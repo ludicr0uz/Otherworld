@@ -213,18 +213,14 @@ def build_npc_blueprint(ai_bp):
         unreal.log_error(f"[NPC] missing skeletal mesh {SKELETAL_MESH_PATH}")
     # ── Animation ────────────────────────────────────────────────────────────
     # ABP_Unarmed's locomotion gates on
-    #   ShouldMove = (GroundSpeed > 0) AND (GetCurrentAcceleration() != 0)
-    # For a long time this NPC slid along in its idle pose because acceleration
-    # was always zero.  That turned out to be a SYMPTOM of the stale-navmesh bug
-    # (see generate_forest_level.py section 7): with no navmesh, path following
-    # fell back to setting velocity directly, which both zeroes acceleration and
-    # bypasses MaxWalkSpeed -- the NPC was measured at 192 cm/s against a
-    # configured 110.  With the navmesh building properly the move is
-    # acceleration-driven again and the measured speed is 100 cm/s, so
-    # ShouldMove should now evaluate true.
+    #   ShouldMove = (GroundSpeed > threshold) AND (GetCurrentAcceleration() != 0)
+    # The acceleration half of that is supplied by use_acceleration_for_paths
+    # below -- see the note there; it is the load-bearing setting for whether a
+    # walk cycle plays at all, not anything in this block.
     #
-    # animation_mode must be set explicitly: with only anim_class set the mesh
-    # holds its reference pose, which looks identical to "never animates".
+    # animation_mode is already ANIMATION_BLUEPRINT once anim_class is set; it
+    # is pinned here only because this builder updates blueprints in place and
+    # should not inherit a stale AnimationSingleNode/AnimationCustomMode value.
     anim_class = unreal.load_class(None, ANIM_BP_PATH)
     if anim_class:
         _try_set(mesh_comp, "animation_mode",
@@ -252,14 +248,26 @@ def build_npc_blueprint(ai_bp):
         "rotation_rate", unreal.Rotator(pitch=0.0, yaw=180.0, roll=0.0))
     movement.set_editor_property("orient_rotation_to_movement", True)
 
-    # Pin this to False explicitly rather than trusting the engine default.
-    # This builder updates blueprints IN PLACE, so any property it does not set
-    # keeps whatever value the asset already had -- deleting a line does not
-    # revert it.  True was tried here (it would give the AnimBP a non-zero
-    # GetCurrentAcceleration) and measured to stop the NPC moving altogether:
-    # 0.0 m over 91 s, versus 51.7 m with it False.
+    # MUST be True, and pinned explicitly rather than left to the engine default:
+    # this builder updates blueprints IN PLACE, so any property it does not set
+    # keeps whatever the asset already had -- deleting a line does not revert it.
+    #
+    # With it False, UCharacterMovementComponent::ApplyRequestedMove takes its
+    # "just set velocity directly" branch and leaves Acceleration at exactly
+    # zero every frame.  ABP_Unarmed gates locomotion on
+    #   ShouldMove = GroundSpeed > threshold AND GetCurrentAcceleration() != 0
+    # so the state machine stays in Idle and the NPC slides along in its idle
+    # pose -- which is precisely the bug this was once (wrongly) blamed for.
+    # With it True the branch guard is
+    #   CurrentSpeedSq < Square(RequestedSpeed * 1.01f)
+    # which still holds at cruising speed, so acceleration stays non-zero.
+    #
+    # A note here used to claim True was measured at 0.0 m over 91 s versus
+    # 51.7 m with False.  That measurement predates the navmesh fix (section 7
+    # of generate_forest_level.py): the level had zero nav tiles, so every
+    # MoveTo failed and the NPC covered 0 m regardless of this flag.
     nav_props = movement.get_editor_property("nav_movement_properties")
-    nav_props.set_editor_property("use_acceleration_for_paths", False)
+    nav_props.set_editor_property("use_acceleration_for_paths", True)
     movement.set_editor_property("nav_movement_properties", nav_props)
     # A stock Character has use_controller_rotation_yaw = True, which forces the
     # pawn's yaw to the controller's every frame and fights the line above.

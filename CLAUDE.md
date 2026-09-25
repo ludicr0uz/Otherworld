@@ -55,8 +55,10 @@ Python** — no hand editing — and is idempotent, so re-generating a level reu
   `MoveToActor` does the pathfinding, which is what makes it walk *around* trees.
 - `BP_ForestWanderer` (Character). Mirrors the **player's** rig exactly — `SKM_Quinn_Simple`
   + `ABP_Unarmed`, mesh at z −89 and yaw 270 — because that combination is known to animate.
-  `animation_mode` must be `ANIMATION_BLUEPRINT`: setting `anim_class` alone leaves the mesh
-  in its reference pose, which looks exactly like an NPC that never animates.
+  `use_acceleration_for_paths` **must be True**: with it False, `ApplyRequestedMove` sets
+  velocity directly and leaves `Acceleration` at zero, and `ABP_Unarmed` gates on
+  `GroundSpeed > threshold AND GetCurrentAcceleration() != 0` — so the NPC glides along in its
+  idle pose. That is the cause of "moves but never animates"; the mesh/anim_mode dials are not.
   Auto-possessed by the controller above.
 
 Run it standalone with `-ExecutePythonScript` to rebuild the assets after editing it.

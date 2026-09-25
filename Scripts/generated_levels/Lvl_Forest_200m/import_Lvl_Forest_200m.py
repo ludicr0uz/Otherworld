@@ -571,7 +571,11 @@ if NPC_SPAWN:
     if SCRIPTS_DIR not in sys.path:
         sys.path.insert(0, SCRIPTS_DIR)
     import build_npc_blueprints
-    npc_bp = build_npc_blueprints.ensure_npc_blueprints()
+    # force=True: the builder updates assets IN PLACE and is idempotent,
+    # so re-running it is cheap -- and without it an existing
+    # BP_ForestWanderer is reused wholesale and no property change in
+    # build_npc_blueprints.py ever reaches the asset via this path.
+    npc_bp = build_npc_blueprints.ensure_npc_blueprints(force=True)
     npc_class = unreal.BlueprintEditorLibrary.generated_class(npc_bp)
 
     npc_actor = editor_actor_sub.spawn_actor_from_class(

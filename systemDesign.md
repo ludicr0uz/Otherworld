@@ -79,19 +79,19 @@ embedded script templates).
 
 ```
 CLI ──► terrain.generate_terrain_obj ──► tree_placement.scatter_trees
-     ──► grass_placement.scatter_grass
-     ──► verification.run_all_checks (19 offline checks; exits 1 on failure)
+     ──► grass_placement.scatter_grass ──► npc_placement.place_npc
+     ──► verification.run_all_checks (25 offline checks; exits 1 on failure)
      ──► verification_report.json
      ──► emit grass_<Level>.json  (instance transforms, read at import time)
      ──► emit import_<Level>.py   (build the level in-editor)
-     ──► emit verify_<Level>.py   (84 in-editor assertions)
+     ──► emit verify_<Level>.py   (101 in-editor assertions)
      ──► print the two UnrealEditor-Cmd commands
 ```
 
 CLI flags: `--size <meters>` (required), `--name` (default `Lvl_Forest_<size>m`),
 `--seed` (42), `--grid` (default auto), `--time-of-day {day,night}` (default `day`),
 `--grass-density` (1.2 clumps/m²), `--grass-height` (50 cm), `--grass-patchiness` (0.25),
-`--no-grass`, `--json-report`.
+`--no-grass`, `--no-npc`, `--npc-min-distance <metres>`, `--json-report`.
 
 Output dir: `Scripts/generated_levels/<LevelName>/` holding
 `SM_<Level>_Terrain.obj`, `grass_<Level>.json`, `import_<Level>.py`, `verify_<Level>.py`,
@@ -171,6 +171,80 @@ jitter is height ×0.85–1.20 (tightened per species where the upscale budget i
 200 m at the defaults ⇒ **44,368 clumps**, 1.11/m² realised against 1.20 requested (the
 difference is the spawn ring, the trunk rings and the coverage inset).
 
+### 3.2c NPC placement — `forest_generator/npc_placement.py`
+
+One wandering NPC per level, spawned somewhere random and walking to the player.
+
+**Spawn point.** Rejection sampling (up to 400 attempts) against four constraints: at least
+55 % of the usable radius away from the PlayerStart so the walk is a real journey; at least
+220 cm clear of any trunk; inside 88 % of the half-extent; and — preferred rather than
+required — with at least one tree straddling the straight line to the player, so the detour
+behaviour is actually exercised. Candidates are drawn uniformly *by area* over the annulus
+(`sqrt` on the radius) so they do not bunch toward the centre. The first obstructed candidate
+wins; if none is found in 400 tries the best legal candidate is used and the check reports the
+clear line instead of failing. Seeded `seed ^ 0x4E7C`, so it is decorrelated from trees and
+grass. Z is `terrain_z + 88 cm` (the stock Character capsule half-height) and yaw faces the
+player.
+
+Trunk radius is approximated as `15 cm × tree scale` — a proxy used only for spawn clearance
+and the line-of-sight test, never for collision, which comes from the real mesh.
+
+### 3.2d NPC Blueprints — `Scripts/build_npc_blueprints.py`
+
+These two assets depend on nothing per-level, so they live in their own idempotent script
+rather than the generated one; the import script imports it and calls
+`ensure_npc_blueprints()`. UE 5.8 exposes genuine Blueprint graph authoring to Python
+(`unreal.BlueprintGraphEditor`), so both are built and compiled from code.
+
+`BP_ForestWandererAI` — parent `AIController`. Event graph:
+
+```
+[Event BeginPlay] --exec--> [MoveToActor] --exec--> [Delay 0.5s] --,
+                                 ^                                 |
+                                 '---------------------------------'
+[Get Player Pawn 0] --ReturnValue--> [MoveToActor.Goal]
+```
+
+`MoveToActor` (`bUsePathfinding=true`, `AcceptanceRadius=150`) is what routes the NPC around
+trees. Re-issuing it on a loop rather than once means it follows a moving player and
+self-heals if the first request fires before the navmesh or the player pawn exists — which it
+will, because the navmesh is built at game start. A `Delay` loop is used rather than a timer
+because it needs no `self` reference and no delegate node.
+
+Two API notes worth keeping: a freshly created Blueprint already carries a *disabled*
+`ReceiveBeginPlay` node, so the graph is enabled by finding that node and connecting to it
+(`find_event_node("ReceiveBeginPlay")`) rather than adding one; and display names do not
+resolve — the member name is what the lookup takes.
+
+`BP_ForestWanderer` — parent `Character`. Mannequin `SKM_Manny_Simple` + `ABP_Unarmed` so the
+walk animates, mesh dropped 89 cm to the capsule's feet and yawed −90°, `max_walk_speed`
+**110 cm/s** (the engine default of 600 is a run; "slowly" is the requirement),
+`orient_rotation_to_movement`, `ai_controller_class` = the controller above and
+`auto_possess_ai = PLACED_IN_WORLD_OR_SPAWNED`. Behaviour constants live in
+`npc_placement.py` — which imports no `unreal` — so the host-side generator can bake them
+into the verification checks without an editor.
+
+### 3.2e Navigation
+
+The import script spawns a `NavMeshBoundsVolume` and scales the actor by `world_size / 200`
+(its default brush is a 200 cm cube), which makes it cover the map exactly, plus a
+`RecastNavMesh`. Two findings shaped this:
+
+- **The nav system overwrites the agent config.** `agent_radius`/`agent_height` set on the
+  RecastNavMesh are replaced by the navigation system's default agent (35 cm / 144 cm) when
+  the nav data registers, so a per-actor override does not survive a load. The constants
+  therefore *match* those defaults rather than pretending otherwise; widening the inset around
+  trunks means changing Project Settings → Navigation System → Supported Agents. A 35 cm inset
+  still clears the NPC's 34 cm capsule, and tree spacing is ≥ 125 cm.
+- **A headless bake never completes.** `-ExecutePythonScript` does not tick the editor, so
+  async tile generation makes no progress and a path query right after setup returns `None`.
+  Generated levels therefore set `runtime_generation = DYNAMIC` (this property *does* stick)
+  and the navigation system builds the mesh at game start — which is the right model for
+  procedural content anyway.
+
+The consequence for verification: the rig can be asserted, but whether a path is actually
+found can only be confirmed in PIE. See §6.
+
 ### 3.3 Offline verification — `forest_generator/verification.py`
 
 `run_all_checks` → `VerificationReport` (`CheckResult` list, `summary`, `all_passed`,
@@ -186,6 +260,12 @@ difference is the spawn ring, the trunk rings and the coverage inset).
   ±30 % of the target and no clump may exceed 1.6×); upscale factor ≤ 2.4×; coverage —
   every cell of a 12×12 grid over the map contains grass, which is what "throughout the
   level" actually means; species spread.
+- **NPC (6, skipped under `--no-npc`):** placed at all; within the usable bounds; far enough
+  from the player to have a journey; clear of trunks; grounded (capsule centre exactly one
+  half-height above the re-derived terrain Z); and route-obstructed — reports whether a tree
+  blocks the direct line. That last one passes either way by design, since a clear line can
+  be legitimate on a sparse map, but it tells you whether the detour behaviour is being
+  exercised.
 
 ### 3.4 Generated import script
 
@@ -211,22 +291,32 @@ difference is the spawn ring, the trunk rings and the coverage inset).
    `scale = (unit·width_mul, unit·width_mul, target_h / mesh_height)`. If bounds come back
    unusable it logs an error and falls back to scale 1.0 rather than emitting giant grass.
 6. **PlayerStart** at `(0, 0, 100)`.
-7. `save_current_level()`.
+7. **Navigation + NPC** — `NavMeshBoundsVolume` scaled to the map, `RecastNavMesh` with
+   `runtime_generation = DYNAMIC`, then `build_npc_blueprints.ensure_npc_blueprints()` and the
+   NPC actor spawned at the computed transform (§3.2c–e).
+8. `save_current_level()`.
 
 All spawned actors are labelled `<LevelName>_<Role>` (`_Terrain`, `_Sun`/`_Moon`,
 `_SkyAtmosphere`, `_SkySphere`, `_SkyLight`, `_Fog`, `_PostProcess`, `_PlayerStart`) —
-that convention is what makes step 2's cleanup and the verify script's lookups work.
+that convention is what makes step 2's cleanup and the verify script's lookups work. The
+NPC rig follows it too: `_NavBounds`, `_NavMesh`, `_NPC_Wanderer`.
 
 ### 3.5 Generated verify script
 
-`_write_unreal_verify_script` emits a `check(name, condition, detail)` harness and 84
+`_write_unreal_verify_script` emits a `check(name, condition, detail)` harness and 101
 assertions over the *saved* level: terrain actor/component/collision/Nanite/material, the
 full lighting rig against the preset (§4.3), tree HISM counts per species, PlayerStart, and
 per grass species — actor exists, instance count, `NoCollision`, and a **knee-height proof**:
 50 instance transforms are sampled and `scale.z × mesh bounds height` must land inside the
 min/max target height the offline pass recorded for that species. That last check is the one
 that would catch a mis-scaled asset, since nothing offline can see the mesh.
-Prints `[VERIFY] ✅ ALL 84 CHECKS PASSED!` or a list of failures.
+
+The NPC block asserts both Blueprint assets exist; that the character's `ai_controller_class`
+points at the controller, `auto_possess_ai` is `PLACED_IN_WORLD_OR_SPAWNED`, `max_walk_speed`
+is the slow 110 cm/s, and the mesh and anim class are set; that the placed actor is a
+`Character` at the expected transform and the expected distance from the PlayerStart; and that
+the nav bounds cover the map and the navmesh's `runtime_generation` is `DYNAMIC`.
+Prints `[VERIFY] ✅ ALL 101 CHECKS PASSED!` or a list of failures.
 
 ---
 
@@ -311,6 +401,9 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
   `seed ^ 0x6A55` so grass settings can be retuned without disturbing tree placement.
 - **Never hard-code a grass scale.** The scans carry no real-world size; derive it from
   `get_bounds()` at plant time (§3.2b).
+- **Blueprint authoring is available from Python.** `BlueprintGraphEditor` +
+  `BlueprintEditorLibrary` cover node creation, pin lookup, connection, variables, compile.
+  Prefer it over hand-editing assets — and never over editing `.uasset` as text.
 - **Foliage instance budgets.** ~44 k HISM instances at the default density is fine, but the
   count scales with map *area* — a 400 m map is 4× the clumps. Reach for `--grass-density`
   before reaching for a new scatter algorithm.
@@ -324,8 +417,17 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
 - Git: branch `night-mode`, working tree clean, head `e5745e9 night mode initial`
   (adds `lighting.py`, the generator rewrite, the regenerated night scripts and a `.gitignore`).
 - `/Game/Maps/Lvl_Forest_200m` — 200 m, seed 42, 136 trees over 5 species, 44,368 knee-high
-  grass clumps over 9 species, **night** preset.
-  Offline 19/19, in-editor 84/84, import log clean.
+  grass clumps over 9 species, one NPC at (−1564, 5626) 58.4 m from the player with 2 trees
+  blocking the direct line, **night** preset.
+  Offline 25/25, in-editor 101/101, import log clean.
+- New assets from the NPC run: `/Game/Forest/NPC/BP_ForestWanderer`,
+  `/Game/Forest/NPC/BP_ForestWandererAI`.
+- **Pre-existing bug, unfixed and unrelated to the NPC work:** `scatter_trees` performs no
+  minimum-spacing rejection — it draws independent polar coordinates — so some size/seed
+  combinations fail the `Tree Spacing (>100cm)` check. `--size 300` with the default seed 42
+  produces a 70 cm pair; 300 m with seed 99 passes, as does 200 m with seed 42. Reproduces
+  with `--no-grass --no-npc`. The fix is rejection sampling (or a Poisson-disc scatter) in
+  `tree_placement.scatter_trees`.
 - New engine assets from that run: `M_NightSky_Starfield`, `MI_NightSky_Starfield`.
 - The `day` path was regression-checked with a throwaway 100 m level (12/12, both emitted
   scripts parse, day-only asset references present) and the throwaway removed.
@@ -334,3 +436,10 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
   The same applies to grass: the checks prove every clump is knee high, seated on the
   terrain, evenly covering the map and not over-stretched, but density and patchiness are
   taste calls — `--grass-density` and `--grass-patchiness` exist for that.
+- **Not verified programmatically: that the NPC actually walks and paths.** The navmesh is
+  generated at game start, and a headless `-ExecutePythonScript` run does not tick the editor,
+  so no path can be queried offline — a query immediately after setup returns `None`. Every
+  precondition is asserted (rig, bounds, runtime generation, controller, possession, speed,
+  spawn transform, obstructed route), but confirming the NPC leaves its spawn, routes around
+  trunks and stops 150 cm from the player needs a PIE session. Press Play in
+  `Lvl_Forest_200m`; `show Navigation` draws the generated mesh.

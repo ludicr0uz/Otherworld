@@ -1,9 +1,9 @@
 """
-Auto-generated Unreal verification script for Lvl_Forest_200m.
+Auto-generated Unreal verification script for Lvl_NPCProbe.
 Verifies collision, materials, actor presence, tree and grass HISM
 instances (including that grass really is knee high), the NPC and its
 navigation rig, and the time-of-day lighting rig.
-Time of day: Night — starry sky as the only light source, low luminosity
+Time of day: Daytime — bright sun, blue sky, volumetric clouds
 """
 import json
 import unreal
@@ -12,17 +12,17 @@ editor_asset_sub = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
 editor_actor_sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 level_editor_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 
-LEVEL_NAME = "Lvl_Forest_200m"
-WORLD_SIZE_CM = 20000.0
-EXPECTED_TREE_COUNT = 136
-EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island_02": 28, "HISM_Tree_Fir_A": 44, "HISM_Tree_Pine_A": 20, "HISM_Tree_Deciduous": 16}
-EXPECTED_GRASS_COUNT = 44368
-EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_Mid_B": 2850, "HISM_Grass_Knee_Tall_B": 7813, "HISM_Grass_Knee_Mid_A": 5862, "HISM_Grass_Knee_Tall_A": 8451, "HISM_Grass_Knee_Clump_C": 5844, "HISM_Grass_Under_Clump_A": 2325, "HISM_Grass_Under_Large_B": 2611, "HISM_Grass_Under_Large_A": 2197}
-EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.242809249629246, 55.199687244614566], "HISM_Grass_Under_Mid_B": [25.503926948960117, 35.99430151464459], "HISM_Grass_Knee_Tall_B": [42.50254371397834, 59.99927478522139], "HISM_Grass_Knee_Mid_A": [40.481314514524335, 50.599412580219756], "HISM_Grass_Knee_Tall_A": [42.50006710260952, 59.99895840027987], "HISM_Grass_Knee_Clump_C": [43.12312612443456, 53.89936647630565], "HISM_Grass_Under_Clump_A": [23.800345353400235, 33.59905037018744], "HISM_Grass_Under_Large_B": [24.65506062683597, 34.79728745482545], "HISM_Grass_Under_Large_A": [22.100624064757703, 31.198261357139028]}
-EXPECTED_NPC = json.loads(r"""{"x": -1563.97, "y": 5625.67, "z": 365.64, "yaw": 285.54, "distance_cm": 5839.03}""")
+LEVEL_NAME = "Lvl_NPCProbe"
+WORLD_SIZE_CM = 6000.0
+EXPECTED_TREE_COUNT = 13
+EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 3, "HISM_Tree_Leafy_Island_02": 3, "HISM_Tree_Fir_A": 4, "HISM_Tree_Pine_A": 2, "HISM_Tree_Deciduous": 1}
+EXPECTED_GRASS_COUNT = 0
+EXPECTED_GRASS_SPEC_COUNTS = {}
+EXPECTED_GRASS_HEIGHTS = {}
+EXPECTED_NPC = json.loads(r"""{"x": 344.18, "y": 1772.75, "z": 110.88, "yaw": 259.01, "distance_cm": 1805.85}""")
 EXPECTED_NPC_WALK_SPEED = 110.0
 EXPECTED_NAV_AGENT_RADIUS = 35.0
-LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
+LIGHTING = json.loads(r"""{"key": "day", "label": "Daytime \u2014 bright sun, blue sky, volumetric clouds", "sun": {"enabled": true, "label_suffix": "Sun", "intensity": 6.0, "color": [255, 248, 235], "pitch": -50.0, "yaw": -30.0, "cast_shadows": true}, "sky_light": {"intensity": 1.2, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Engine/EngineSky/M_SimpleSkyDome.M_SimpleSkyDome", "build_starfield": false}, "volumetric_cloud": {"enabled": true}, "fog": {"density": 0.02, "inscattering_color": [0.45, 0.55, 0.65], "enable_volumetric": true, "volumetric_extinction_scale": 1.0}, "post_process": {"auto_exposure_min_brightness": 0.03, "auto_exposure_max_brightness": 2.0, "auto_exposure_bias": 0.5}}""")
 
 passed = 0
 failed = 0
@@ -85,7 +85,7 @@ for a in actors:
                           "M_Forest_Ground_PBR" in mat.get_path_name(),
                           f"(got: {mat.get_path_name()})")
 
-# ── 3. Lighting & Sky Actors (time of day: Night — starry sky as the only light source, low luminosity) ──────────────
+# ── 3. Lighting & Sky Actors (time of day: Daytime — bright sun, blue sky, volumetric clouds) ──────────────
 sun_cfg = LIGHTING["sun"]
 sky_cfg = LIGHTING["sky_light"]
 dome_cfg = LIGHTING["sky_dome"]

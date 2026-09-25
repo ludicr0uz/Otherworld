@@ -11,7 +11,8 @@ Usage:
 This script:
   1. Generates a terrain OBJ mesh (pure Python)
   2. Scatters trees and knee-high grass with exact terrain snapping (pure Python)
-  3. Runs 18+ offline verification checks
+  3. Picks a spawn point for a wandering NPC that walks to the player
+  4. Runs 25 offline verification checks
   4. Writes an Unreal Python script to import everything into the editor
   5. Prints a command to run the import inside UnrealEditor-Cmd
 """
@@ -42,6 +43,13 @@ from forest_generator.grass_placement import (
     DEFAULT_DENSITY_PER_SQM,
     DEFAULT_PATCHINESS,
     KNEE_HEIGHT_CM,
+)
+from forest_generator.npc_placement import (
+    place_npc,
+    NPC_WALK_SPEED_CMS,
+    NPC_CAPSULE_HALF_HEIGHT_CM,
+    NAV_AGENT_RADIUS_CM,
+    NAV_AGENT_HEIGHT_CM,
 )
 from forest_generator.verification import run_all_checks
 from forest_generator.lighting import (
@@ -86,6 +94,11 @@ def main():
                              f"(default: {DEFAULT_PATCHINESS})")
     parser.add_argument("--no-grass", action="store_true",
                         help="Skip grass generation entirely")
+    parser.add_argument("--no-npc", action="store_true",
+                        help="Skip the wandering NPC")
+    parser.add_argument("--npc-min-distance", type=float, default=None,
+                        help="Minimum metres between the NPC spawn and the "
+                             "player start (default: 55%% of the usable radius)")
     parser.add_argument("--json-report", type=str, default=None,
                         help="Path to write JSON verification report")
     args = parser.parse_args()
@@ -107,11 +120,12 @@ def main():
         print(f"  Grass: disabled")
     else:
         print(f"  Grass: {args.grass_density:.2f}/m2, knee height {args.grass_height:.0f} cm")
+    print(f"  NPC: {'disabled' if args.no_npc else 'one wanderer, walks to the player'}")
     print(f"{'═' * 60}\n")
 
     # ── Step 1: Generate terrain mesh ────────────────────────────────────
     obj_path = os.path.join(output_dir, f"SM_{level_name}_Terrain.obj")
-    print(f"[1/5] Generating terrain mesh → {obj_path}")
+    print(f"[1/6] Generating terrain mesh → {obj_path}")
     terrain = generate_terrain_obj(obj_path, world_size_cm, grid_size=args.grid)
     grid_size = terrain["grid_size"]
     grid_z = terrain["grid_z"]
@@ -119,7 +133,7 @@ def main():
     print(f"       File: {terrain['bytes']:,} bytes")
 
     # ── Step 2: Scatter trees ────────────────────────────────────────────
-    print(f"\n[2/5] Scattering trees (seed={args.seed})...")
+    print(f"\n[2/6] Scattering trees (seed={args.seed})...")
     placed_trees = scatter_trees(
         world_size_cm=world_size_cm,
         grid_z=grid_z,
@@ -135,10 +149,10 @@ def main():
 
     # ── Step 3: Scatter knee-high grass ──────────────────────────────────
     if args.no_grass:
-        print(f"\n[3/5] Grass generation disabled (--no-grass)")
+        print(f"\n[3/6] Grass generation disabled (--no-grass)")
         placed_grass = []
     else:
-        print(f"\n[3/5] Scattering knee-high grass "
+        print(f"\n[3/6] Scattering knee-high grass "
               f"({args.grass_density:.2f}/m2, {args.grass_height:.0f} cm)...")
         placed_grass = scatter_grass(
             world_size_cm=world_size_cm,
@@ -155,8 +169,36 @@ def main():
             print(f"       {name}: {cnt:,} instances")
         print(f"       TOTAL: {len(placed_grass):,} grass clumps")
 
-    # ── Step 4: Run verification ─────────────────────────────────────────
-    print(f"\n[4/5] Running verification suite...")
+    # ── Step 4: Place the wandering NPC ──────────────────────────────────
+    if args.no_npc:
+        print(f"\n[4/6] NPC disabled (--no-npc)")
+        placed_npc = None
+    else:
+        print(f"\n[4/6] Placing the wandering NPC...")
+        min_fraction = None
+        if args.npc_min_distance is not None:
+            usable = world_size_cm / 2.0 * 0.88
+            min_fraction = min(0.95, max(0.0, args.npc_min_distance * 100.0 / usable))
+        placed_npc = place_npc(
+            world_size_cm=world_size_cm,
+            grid_z=grid_z,
+            grid_size=grid_size,
+            seed=args.seed,
+            placed_trees=placed_trees,
+            **({"min_distance_fraction": min_fraction} if min_fraction else {}),
+        )
+        if placed_npc is None:
+            print("       ⚠️  No legal NPC spawn point found.")
+        else:
+            print(f"       Spawn: ({placed_npc.x:.0f}, {placed_npc.y:.0f}, "
+                  f"{placed_npc.spawn_z:.0f}) cm, facing yaw {placed_npc.yaw_deg:.0f}°")
+            print(f"       {placed_npc.distance_to_player_cm / 100.0:.1f} m from the "
+                  f"player, nearest trunk {placed_npc.nearest_trunk_cm:.0f} cm")
+            print(f"       {placed_npc.blocking_trees} tree(s) block the direct line "
+                  f"(found in {placed_npc.attempts} attempt(s))")
+
+    # ── Step 5: Run verification ─────────────────────────────────────────
+    print(f"\n[5/6] Running verification suite...")
     report = run_all_checks(
         level_name=level_name,
         world_size_cm=world_size_cm,
@@ -167,6 +209,8 @@ def main():
         placed_grass=placed_grass,
         grass_density_per_sqm=args.grass_density,
         knee_height_cm=args.grass_height,
+        placed_npc=placed_npc,
+        expect_npc=not args.no_npc,
     )
     print()
     print(report.summary)
@@ -180,7 +224,7 @@ def main():
         print("\n⚠️  Verification failed — fix issues before importing into Unreal!")
         sys.exit(1)
 
-    # ── Step 5: Write the grass sidecar + Unreal scripts ─────────────────
+    # ── Step 6: Write the grass sidecar + Unreal scripts ─────────────────
     # Tens of thousands of transforms would bloat the generated script, so the
     # grass instances live in their own JSON file the import script reads.
     grass_data_path = os.path.join(output_dir, f"grass_{level_name}.json")
@@ -190,7 +234,7 @@ def main():
               f"({os.path.getsize(grass_data_path):,} bytes)")
 
 
-    print(f"\n[5/5] Writing Unreal import script...")
+    print(f"\n[6/6] Writing Unreal import script...")
     ue_script_path = os.path.join(output_dir, f"import_{level_name}.py")
     _write_unreal_import_script(
         ue_script_path,
@@ -201,6 +245,7 @@ def main():
         placed_trees=placed_trees,
         grass_data_path=grass_data_path,
         grass_count=len(placed_grass),
+        placed_npc=placed_npc,
         lighting=lighting,
     )
     print(f"       Script → {ue_script_path}")
@@ -214,6 +259,7 @@ def main():
         grid_size=grid_size,
         placed_trees=placed_trees,
         placed_grass=placed_grass,
+        placed_npc=placed_npc,
         lighting=lighting,
     )
     print(f"       Verify → {ue_verify_path}")
@@ -273,9 +319,19 @@ def _write_unreal_import_script(
     placed_trees,
     grass_data_path: str,
     grass_count: int,
+    placed_npc,
     lighting: dict,
 ):
     """Generate a self-contained Unreal Python script that imports everything."""
+
+    npc_json = json.dumps(
+        {
+            "x": round(placed_npc.x, 2),
+            "y": round(placed_npc.y, 2),
+            "z": round(placed_npc.spawn_z, 2),
+            "yaw": round(placed_npc.yaw_deg, 2),
+        } if placed_npc else None
+    )
 
     # Grass mesh/material table, keyed by HISM actor label
     grass_configs = {
@@ -283,6 +339,9 @@ def _write_unreal_import_script(
         for s in DEFAULT_GRASS_SPECS
     }
     grass_configs_json = json.dumps(grass_configs)
+    scripts_dir = SCRIPTS_DIR
+    nav_agent_radius = NAV_AGENT_RADIUS_CM
+    nav_agent_height = NAV_AGENT_HEIGHT_CM
 
     # Serialize tree placements to embed in the script
     tree_data = []
@@ -318,6 +377,7 @@ def _write_unreal_import_script(
         """
         import json
         import os
+        import sys
         import unreal
 
         asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -830,7 +890,70 @@ def _write_unreal_import_script(
         )
         ps.set_actor_label(f"{{LEVEL_NAME}}_PlayerStart")
 
-        # ── 7. Save ─────────────────────────────────────────────────────────
+        # ── 7. Navigation + wandering NPC ────────────────────────────────────
+        NPC_SPAWN = json.loads(r"""{npc_json}""")
+        SCRIPTS_DIR = r"{scripts_dir}"
+        NAV_AGENT_RADIUS = {nav_agent_radius}
+        NAV_AGENT_HEIGHT = {nav_agent_height}
+
+        if NPC_SPAWN:
+            unreal.log_warning("[GEN] 7. Building navigation and spawning the NPC...")
+
+            # NavMeshBoundsVolume's default brush is a 200 cm cube, so scaling
+            # the actor by world_size/200 makes it cover the map exactly.
+            nav_volume = editor_actor_sub.spawn_actor_from_class(
+                unreal.NavMeshBoundsVolume, unreal.Vector(0, 0, 0))
+            nav_volume.set_actor_label(f"{{LEVEL_NAME}}_NavBounds")
+            nav_scale = WORLD_SIZE_CM / 200.0
+            # Z is generous: the terrain's edge ramp climbs well above the centre.
+            nav_volume.set_actor_scale3d(
+                unreal.Vector(nav_scale, nav_scale, max(20.0, nav_scale * 0.4)))
+
+            nav_data = None
+            for a in editor_actor_sub.get_all_level_actors():
+                if isinstance(a, unreal.RecastNavMesh):
+                    nav_data = a
+                    break
+            if nav_data is None:
+                nav_data = editor_actor_sub.spawn_actor_from_class(
+                    unreal.RecastNavMesh, unreal.Vector(0, 0, 0))
+            nav_data.set_actor_label(f"{{LEVEL_NAME}}_NavMesh")
+            # These match the navigation system's default agent. Setting them
+            # is belt-and-braces: the nav system re-applies its default agent
+            # config when the nav data registers, so these values are what the
+            # navmesh ends up with either way.
+            try_set(nav_data, "agent_radius", NAV_AGENT_RADIUS)
+            try_set(nav_data, "agent_height", NAV_AGENT_HEIGHT)
+            # A headless editor never finishes an async navmesh bake, and this
+            # level is generated rather than hand-built, so have the navigation
+            # system generate the mesh when the game starts instead of relying
+            # on baked tiles.
+            try_set(nav_data, "runtime_generation",
+                    unreal.RuntimeGenerationType.DYNAMIC)
+
+            # The NPC Blueprints are level-independent, so they live in their
+            # own idempotent builder script rather than being re-emitted here.
+            if SCRIPTS_DIR not in sys.path:
+                sys.path.insert(0, SCRIPTS_DIR)
+            import build_npc_blueprints
+            npc_bp = build_npc_blueprints.ensure_npc_blueprints()
+            npc_class = unreal.BlueprintEditorLibrary.generated_class(npc_bp)
+
+            npc_actor = editor_actor_sub.spawn_actor_from_class(
+                npc_class,
+                unreal.Vector(NPC_SPAWN["x"], NPC_SPAWN["y"], NPC_SPAWN["z"]),
+                # Keywords, not positional: unreal.Rotator is (roll, pitch, yaw).
+                unreal.Rotator(pitch=0.0, yaw=NPC_SPAWN["yaw"], roll=0.0),
+            )
+            npc_actor.set_actor_label(f"{{LEVEL_NAME}}_NPC_Wanderer")
+            unreal.log_warning(
+                f"[GEN]    NPC at ({{NPC_SPAWN['x']:.0f}}, {{NPC_SPAWN['y']:.0f}}, "
+                f"{{NPC_SPAWN['z']:.0f}}), nav agent r={{NAV_AGENT_RADIUS}} "
+                f"h={{NAV_AGENT_HEIGHT}}, runtime navmesh generation DYNAMIC")
+        else:
+            unreal.log_warning("[GEN] 7. NPC skipped (none placed).")
+
+        # ── 8. Save ─────────────────────────────────────────────────────────
         level_editor_sub.save_current_level()
         unreal.log_warning("=" * 60)
         unreal.log_warning(f"[GEN] ✅ {{LEVEL_NAME}} GENERATED AND SAVED!")
@@ -851,9 +974,22 @@ def _write_unreal_verify_script(
     grid_size: int,
     placed_trees,
     placed_grass,
+    placed_npc,
     lighting: dict,
 ):
     """Generate an Unreal Python script that verifies the level after import."""
+
+    npc_json = json.dumps(
+        {
+            "x": round(placed_npc.x, 2),
+            "y": round(placed_npc.y, 2),
+            "z": round(placed_npc.spawn_z, 2),
+            "yaw": round(placed_npc.yaw_deg, 2),
+            "distance_cm": round(placed_npc.distance_to_player_cm, 2),
+        } if placed_npc else None
+    )
+    npc_walk_speed = NPC_WALK_SPEED_CMS
+    nav_agent_radius = NAV_AGENT_RADIUS_CM
 
     tree_count = len(placed_trees)
     spec_counts = dict(Counter(t.spec_name for t in placed_trees))
@@ -874,8 +1010,8 @@ def _write_unreal_verify_script(
         """
         Auto-generated Unreal verification script for {level_name}.
         Verifies collision, materials, actor presence, tree and grass HISM
-        instances (including that grass really is knee high), and the
-        time-of-day lighting rig.
+        instances (including that grass really is knee high), the NPC and its
+        navigation rig, and the time-of-day lighting rig.
         Time of day: {tod_label}
         """
         import json
@@ -892,6 +1028,9 @@ def _write_unreal_verify_script(
         EXPECTED_GRASS_COUNT = {grass_count}
         EXPECTED_GRASS_SPEC_COUNTS = {json.dumps(grass_spec_counts)}
         EXPECTED_GRASS_HEIGHTS = {json.dumps(grass_expected_heights)}
+        EXPECTED_NPC = json.loads(r"""{npc_json}""")
+        EXPECTED_NPC_WALK_SPEED = {npc_walk_speed}
+        EXPECTED_NAV_AGENT_RADIUS = {nav_agent_radius}
         LIGHTING = json.loads(r"""{lighting_json}""")
 
         passed = 0
@@ -1122,6 +1261,88 @@ def _write_unreal_verify_script(
             check("Total Grass Instances",
                   total_grass_instances == EXPECTED_GRASS_COUNT,
                   f"(expected {{EXPECTED_GRASS_COUNT}}, got {{total_grass_instances}})")
+
+        # ── 6. Navigation + NPC ──────────────────────────────────────────────
+        if EXPECTED_NPC:
+            npc_actor = None
+            nav_bounds = None
+            nav_mesh = None
+            for a in actors:
+                lbl = a.get_actor_label()
+                if lbl == f"{{LEVEL_NAME}}_NPC_Wanderer":
+                    npc_actor = a
+                elif lbl == f"{{LEVEL_NAME}}_NavBounds":
+                    nav_bounds = a
+                elif lbl == f"{{LEVEL_NAME}}_NavMesh":
+                    nav_mesh = a
+
+            # -- The Blueprint assets --
+            for path in ("/Game/Forest/NPC/BP_ForestWanderer",
+                         "/Game/Forest/NPC/BP_ForestWandererAI"):
+                check(f"Asset Exists {{path.rsplit('/', 1)[-1]}}",
+                      editor_asset_sub.does_asset_exist(path))
+
+            npc_bp = editor_asset_sub.load_asset("/Game/Forest/NPC/BP_ForestWanderer")
+            if npc_bp:
+                cdo = unreal.get_default_object(
+                    unreal.BlueprintEditorLibrary.generated_class(npc_bp))
+                ai_cls = cdo.get_editor_property("ai_controller_class")
+                check("NPC AI Controller Class",
+                      ai_cls is not None and "ForestWandererAI" in str(ai_cls),
+                      f"(got {{ai_cls}})")
+                check("NPC Auto Possess AI",
+                      cdo.get_editor_property("auto_possess_ai") ==
+                      unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
+                mv = cdo.get_editor_property("character_movement")
+                speed = mv.get_editor_property("max_walk_speed")
+                check("NPC Walks Slowly",
+                      close(speed, EXPECTED_NPC_WALK_SPEED, 0.5),
+                      f"(expected {{EXPECTED_NPC_WALK_SPEED}} cm/s, got {{speed}})")
+                check("NPC Orients To Movement",
+                      mv.get_editor_property("orient_rotation_to_movement") is True)
+                mesh_comp = cdo.get_editor_property("mesh")
+                check("NPC Has Skeletal Mesh",
+                      mesh_comp.get_editor_property("skeletal_mesh_asset") is not None)
+                check("NPC Has Anim Class",
+                      mesh_comp.get_editor_property("anim_class") is not None)
+
+            # -- The placed actor --
+            check("NPC Actor Exists", npc_actor is not None)
+            if npc_actor:
+                loc = npc_actor.get_actor_location()
+                check("NPC Spawn Location",
+                      close(loc.x, EXPECTED_NPC["x"], 1.0)
+                      and close(loc.y, EXPECTED_NPC["y"], 1.0)
+                      and close(loc.z, EXPECTED_NPC["z"], 1.0),
+                      f"(expected {{EXPECTED_NPC['x']:.0f}},{{EXPECTED_NPC['y']:.0f}},"
+                      f"{{EXPECTED_NPC['z']:.0f}} got {{loc.x:.0f}},{{loc.y:.0f}},{{loc.z:.0f}})")
+                dist = (loc.x ** 2 + loc.y ** 2) ** 0.5
+                check("NPC Far From Player Start",
+                      close(dist, EXPECTED_NPC["distance_cm"], 2.0),
+                      f"({{dist / 100.0:.1f}} m from spawn)")
+                check("NPC Is A Character",
+                      isinstance(npc_actor, unreal.Character))
+
+            # -- Navigation rig --
+            check("Nav Bounds Volume Exists", nav_bounds is not None)
+            if nav_bounds:
+                origin, extent = nav_bounds.get_actor_bounds(False)
+                need = WORLD_SIZE_CM / 2.0
+                check("Nav Bounds Cover The Map",
+                      extent.x >= need - 1.0 and extent.y >= need - 1.0,
+                      f"(extent {{extent.x:.0f}}x{{extent.y:.0f}} cm, "
+                      f"need >= {{need:.0f}})")
+            check("Nav Mesh Actor Exists", nav_mesh is not None)
+            if nav_mesh:
+                r = nav_mesh.get_editor_property("agent_radius")
+                check("Nav Agent Radius",
+                      close(r, EXPECTED_NAV_AGENT_RADIUS, 0.5),
+                      f"(expected {{EXPECTED_NAV_AGENT_RADIUS}}, got {{r}})")
+                gen = nav_mesh.get_editor_property("runtime_generation")
+                check("Nav Runtime Generation Dynamic",
+                      gen == unreal.RuntimeGenerationType.DYNAMIC,
+                      f"(got {{gen}} — must be DYNAMIC so the mesh builds at "
+                      f"game start)")
 
         # ── Summary ──────────────────────────────────────────────────────────
         unreal.log_warning("")

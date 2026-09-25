@@ -132,6 +132,42 @@
         "HISM_Grass_Under_Large_B: 2,611",
         "HISM_Grass_Under_Mid_B: 2,850"
       ]
+    },
+    {
+      "name": "NPC Placed",
+      "passed": true,
+      "message": "spawned at (-1564, 5626) after 1 attempt(s)",
+      "details": []
+    },
+    {
+      "name": "NPC Within Bounds",
+      "passed": true,
+      "message": "(-1564, 5626) inside +/-8800 cm",
+      "details": []
+    },
+    {
+      "name": "NPC Walk Distance",
+      "passed": true,
+      "message": "58.4 m from the player (minimum 48.4 m)",
+      "details": []
+    },
+    {
+      "name": "NPC Clear Of Trees",
+      "passed": true,
+      "message": "nearest trunk 236 cm away (minimum 220 cm)",
+      "details": []
+    },
+    {
+      "name": "NPC Grounded",
+      "passed": true,
+      "message": "capsule centre 88.0 cm above terrain Z 277.6",
+      "details": []
+    },
+    {
+      "name": "NPC Route Is Obstructed",
+      "passed": true,
+      "message": "2 tree(s) straddle the direct line \u2014 pathfinding must detour",
+      "details": []
     }
   ]
 }

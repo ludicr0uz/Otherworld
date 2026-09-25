@@ -12,6 +12,12 @@ import os
 from dataclasses import dataclass, field
 
 from .terrain import get_exact_mesh_z, compute_grid, make_elevation_fn
+from .npc_placement import (
+    NPC_CAPSULE_HALF_HEIGHT_CM,
+    TRUNK_CLEARANCE_CM,
+    MIN_PLAYER_DISTANCE_FRACTION,
+    EDGE_MARGIN_FRACTION,
+)
 from .grass_placement import (
     KNEE_LAYER_MIN_RATIO,
     MAX_UPSCALE_FACTOR,
@@ -454,6 +460,98 @@ def check_grass_spec_distribution(placed_grass) -> CheckResult:
     return CheckResult("Grass Species Spread", ok, msg, details)
 
 
+# ─── NPC checks ─────────────────────────────────────────────────────────────
+
+def check_npc_placed(placed_npc) -> CheckResult:
+    """The NPC must have found a legal spawn point at all."""
+    ok = placed_npc is not None
+    msg = (f"spawned at ({placed_npc.x:.0f}, {placed_npc.y:.0f}) after "
+           f"{placed_npc.attempts} attempt(s)" if ok
+           else "no legal spawn point found — map too small or too dense")
+    return CheckResult("NPC Placed", ok, msg)
+
+
+def check_npc_within_bounds(placed_npc, world_size_cm: float) -> CheckResult:
+    """The NPC must start inside the navigable area, clear of the map edge."""
+    if placed_npc is None:
+        return CheckResult("NPC Within Bounds", False, "no NPC")
+    usable = world_size_cm / 2.0 * EDGE_MARGIN_FRACTION
+    ok = abs(placed_npc.x) <= usable and abs(placed_npc.y) <= usable
+    msg = (f"({placed_npc.x:.0f}, {placed_npc.y:.0f}) inside "
+           f"+/-{usable:.0f} cm" if ok else
+           f"({placed_npc.x:.0f}, {placed_npc.y:.0f}) outside +/-{usable:.0f} cm")
+    return CheckResult("NPC Within Bounds", ok, msg)
+
+
+def check_npc_walk_distance(placed_npc, world_size_cm: float) -> CheckResult:
+    """
+    The point of the NPC is that it walks *to* the player, so it must not start
+    next to them.
+    """
+    if placed_npc is None:
+        return CheckResult("NPC Walk Distance", False, "no NPC")
+    usable = world_size_cm / 2.0 * EDGE_MARGIN_FRACTION
+    required = usable * MIN_PLAYER_DISTANCE_FRACTION
+    ok = placed_npc.distance_to_player_cm >= required - 1.0
+    msg = (f"{placed_npc.distance_to_player_cm / 100.0:.1f} m from the player "
+           f"(minimum {required / 100.0:.1f} m)")
+    return CheckResult("NPC Walk Distance", ok, msg)
+
+
+def check_npc_clear_of_trees(placed_npc) -> CheckResult:
+    """The capsule must not start inside a trunk."""
+    if placed_npc is None:
+        return CheckResult("NPC Clear Of Trees", False, "no NPC")
+    ok = placed_npc.nearest_trunk_cm >= TRUNK_CLEARANCE_CM - 1.0
+    msg = (f"nearest trunk {placed_npc.nearest_trunk_cm:.0f} cm away "
+           f"(minimum {TRUNK_CLEARANCE_CM:.0f} cm)")
+    return CheckResult("NPC Clear Of Trees", ok, msg)
+
+
+def check_npc_grounded(placed_npc, world_size_cm: float,
+                       grid_z, grid_size: int) -> CheckResult:
+    """
+    The capsule centre must sit exactly one half-height above the terrain: any
+    lower and the NPC spawns embedded in the ground, any higher and it drops.
+    """
+    if placed_npc is None:
+        return CheckResult("NPC Grounded", False, "no NPC")
+    exact = get_exact_mesh_z(placed_npc.x, placed_npc.y, grid_z, grid_size,
+                             world_size_cm)
+    details = []
+    if abs(exact - placed_npc.terrain_z) > 0.01:
+        details.append(f"terrain_z {placed_npc.terrain_z:.2f} != exact {exact:.2f}")
+    lift = placed_npc.spawn_z - placed_npc.terrain_z
+    if abs(lift - NPC_CAPSULE_HALF_HEIGHT_CM) > 0.01:
+        details.append(f"capsule lift {lift:.2f} cm != "
+                       f"{NPC_CAPSULE_HALF_HEIGHT_CM:.2f} cm")
+    ok = not details
+    msg = (f"capsule centre {lift:.1f} cm above terrain Z {placed_npc.terrain_z:.1f}"
+           if ok else "spawn height is wrong")
+    return CheckResult("NPC Grounded", ok, msg, details)
+
+
+def check_npc_route_is_obstructed(placed_npc) -> CheckResult:
+    """
+    The interesting requirement is that the NPC walks *around* the trees, which
+    is only observable if the straight line to the player is blocked in the
+    first place.  Placement prefers such spots; this reports whether it found
+    one.  A clear line is a warning-shaped pass, not a failure — on a sparse
+    map it can be legitimately unavoidable.
+    """
+    if placed_npc is None:
+        return CheckResult("NPC Route Is Obstructed", False, "no NPC")
+    ok = placed_npc.blocking_trees > 0
+    if ok:
+        msg = (f"{placed_npc.blocking_trees} tree(s) straddle the direct line — "
+               f"pathfinding must detour")
+        return CheckResult("NPC Route Is Obstructed", True, msg)
+    msg = ("direct line to the player is clear; the NPC will walk straight. "
+           "Raise tree density or re-run with a different --seed to exercise "
+           "the detour behaviour")
+    return CheckResult("NPC Route Is Obstructed", True, msg)
+
+
 def check_barycentric_consistency(world_size_cm: float, grid_z,
                                   grid_size: int) -> CheckResult:
     """
@@ -499,6 +597,8 @@ def run_all_checks(
     placed_grass=None,
     grass_density_per_sqm: float = 0.0,
     knee_height_cm: float = 50.0,
+    placed_npc=None,
+    expect_npc: bool = False,
 ) -> VerificationReport:
     """Run the complete verification suite and return a report."""
     world_size_m = world_size_cm / 100.0
@@ -531,5 +631,15 @@ def run_all_checks(
         report.checks.append(check_grass_upscale(placed_grass, knee_height_cm))
         report.checks.append(check_grass_coverage(placed_grass, world_size_cm))
         report.checks.append(check_grass_spec_distribution(placed_grass))
+
+    # NPC checks (skipped entirely when NPC spawning is disabled)
+    if expect_npc:
+        report.checks.append(check_npc_placed(placed_npc))
+        report.checks.append(check_npc_within_bounds(placed_npc, world_size_cm))
+        report.checks.append(check_npc_walk_distance(placed_npc, world_size_cm))
+        report.checks.append(check_npc_clear_of_trees(placed_npc))
+        report.checks.append(check_npc_grounded(placed_npc, world_size_cm,
+                                                grid_z, grid_size))
+        report.checks.append(check_npc_route_is_obstructed(placed_npc))
 
     return report

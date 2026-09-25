@@ -38,6 +38,10 @@ Scripts/downloaded_scanned_assets/
 Scripts/generated_assets/
 Scripts/generated_realistic_assets/
 
-# Ignore generated heavy assets for Code-Only Repo
+# Python caches
+__pycache__/
+*.pyc
+
+# Ignore heavy generated assets for Code-Only Repo
 Content/Forest/
 Content/Maps/

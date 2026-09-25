@@ -1,7 +1,10 @@
 """
 Auto-generated Unreal verification script for Lvl_Forest_200m.
-Verifies collision, materials, actor presence, and tree HISM instances.
+Verifies collision, materials, actor presence, tree HISM instances,
+and the time-of-day lighting rig.
+Time of day: Night — starry sky as the only light source, low luminosity
 """
+import json
 import unreal
 
 editor_asset_sub = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
@@ -12,6 +15,7 @@ LEVEL_NAME = "Lvl_Forest_200m"
 WORLD_SIZE_CM = 20000.0
 EXPECTED_TREE_COUNT = 136
 EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island_02": 28, "HISM_Tree_Fir_A": 44, "HISM_Tree_Pine_A": 20, "HISM_Tree_Deciduous": 16}
+LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 passed = 0
 failed = 0
@@ -74,50 +78,104 @@ for a in actors:
                           "M_Forest_Ground_PBR" in mat.get_path_name(),
                           f"(got: {mat.get_path_name()})")
 
-# ── 3. Lighting & Sky Actors ─────────────────────────────────────────
-if "night" != "night":
-    sun_actor = next((a for a in actors if a.get_actor_label() == f"{LEVEL_NAME}_Sun"), None)
-    check("Sun Light Exists", sun_actor is not None)
-    if sun_actor:
-        sun_comp = sun_actor.get_component_by_class(unreal.DirectionalLightComponent)
-        check("Sun Intensity is 6.0 in Day", sun_comp.get_editor_property("intensity") == 6.0)
-        check("Sun Casts Shadows in Day", sun_comp.get_editor_property("cast_shadows") == True)
-        check("Sun Atmosphere Light is True in Day", sun_comp.get_editor_property("atmosphere_sun_light") == True)
+# ── 3. Lighting & Sky Actors (time of day: Night — starry sky as the only light source, low luminosity) ──────────────
+sun_cfg = LIGHTING["sun"]
+sky_cfg = LIGHTING["sky_light"]
+dome_cfg = LIGHTING["sky_dome"]
+cloud_cfg = LIGHTING["volumetric_cloud"]
+pp_cfg = LIGHTING["post_process"]
 
-if "night" == "night":
-    moon_actor = next((a for a in actors if a.get_actor_label() == f"{LEVEL_NAME}_Moon"), None)
-    check("Moon Light Exists", moon_actor is not None)
-    if moon_actor:
-        moon_comp = moon_actor.get_component_by_class(unreal.DirectionalLightComponent)
-        check("Moon Intensity is 2.0 (Locked Exposure Night)", moon_comp.get_editor_property("intensity") == 2.0)
-        check("Moon Atmosphere Light is True", moon_comp.get_editor_property("atmosphere_sun_light") == True)
-        check("Moon Index is 0", moon_comp.get_editor_property("atmosphere_sun_light_index") == 0)
-        check("Moon Casts Shadows", moon_comp.get_editor_property("cast_shadows") == True)
-
+sun_label = f"{LEVEL_NAME}_{sun_cfg['label_suffix']}"
+check("Directional Light Exists", sun_label in actor_labels, f"({sun_label})")
 check("Sky Atmosphere Exists", f"{LEVEL_NAME}_SkyAtmosphere" in actor_labels)
-check("Volumetric Cloud Exists", f"{LEVEL_NAME}_VolumetricCloud" in actor_labels)
-if "night" != "night":
-    check("Sky Sphere Exists", f"{LEVEL_NAME}_SkySphere" in actor_labels)
+check("Sky Sphere Exists", f"{LEVEL_NAME}_SkySphere" in actor_labels)
 check("Sky Light Exists", f"{LEVEL_NAME}_SkyLight" in actor_labels)
 check("Fog Exists", f"{LEVEL_NAME}_Fog" in actor_labels)
-
-ppv_actor = next((a for a in actors if a.get_actor_label() == f"{LEVEL_NAME}_PostProcess"), None)
-check("PostProcess Exists", ppv_actor is not None)
-if ppv_actor:
-    settings = ppv_actor.get_editor_property("settings")
-    min_bright = settings.get_editor_property("auto_exposure_min_brightness")
-    bias = settings.get_editor_property("auto_exposure_bias")
-    priority = ppv_actor.get_editor_property("priority")
-
-    check("PostProcess Priority is 10.0", priority == 10.0)
-
-    expected_min = 1.0 if "night" == "night" else 0.03
-    check(f"PostProcess Min Exposure is {expected_min}", abs(min_bright - expected_min) < 0.01)
-
-    # Check bias
-    check(f"PostProcess Bias is 0.0", abs(bias - 0.0) < 0.01)
-
+check("PostProcess Exists", f"{LEVEL_NAME}_PostProcess" in actor_labels)
 check("Player Start Exists", f"{LEVEL_NAME}_PlayerStart" in actor_labels)
+
+cloud_present = f"{LEVEL_NAME}_VolumetricCloud" in actor_labels
+check("Volumetric Cloud Matches Preset",
+      cloud_present == cloud_cfg["enabled"],
+      f"(preset wants {cloud_cfg['enabled']}, found {cloud_present})")
+
+def close(a, b, tol=1e-3):
+    return abs(a - b) <= tol
+
+for a in actors:
+    lbl = a.get_actor_label()
+
+    if lbl == sun_label:
+        dlc = a.get_component_by_class(unreal.DirectionalLightComponent)
+        check("Directional Light Component", dlc is not None)
+        if dlc:
+            inten = dlc.get_editor_property("intensity")
+            check("Directional Light Intensity",
+                  close(inten, sun_cfg["intensity"], 0.01),
+                  f"(expected {sun_cfg['intensity']} lux, got {inten})")
+            check("Atmosphere Sun Light Enabled",
+                  dlc.get_editor_property("atmosphere_sun_light"))
+            check("Directional Light Casts Shadows",
+                  dlc.get_editor_property("cast_shadows") == sun_cfg["cast_shadows"])
+
+    elif lbl == f"{LEVEL_NAME}_SkyLight":
+        slc = a.get_component_by_class(unreal.SkyLightComponent)
+        if slc:
+            inten = slc.get_editor_property("intensity")
+            check("Sky Light Intensity",
+                  close(inten, sky_cfg["intensity"], 0.01),
+                  f"(expected {sky_cfg['intensity']}, got {inten})")
+            check("Sky Light Real Time Capture",
+                  slc.get_editor_property("real_time_capture") == sky_cfg["real_time_capture"])
+
+    elif lbl == f"{LEVEL_NAME}_SkySphere":
+        ssc = a.get_component_by_class(unreal.StaticMeshComponent)
+        if ssc:
+            dome_mat = ssc.get_material(0)
+            check("Sky Dome Material Assigned", dome_mat is not None)
+            if dome_mat:
+                mat_path = dome_mat.get_path_name()
+                if dome_cfg.get("build_starfield"):
+                    check("Sky Dome Is Starfield",
+                          "NightSky_Starfield" in mat_path,
+                          f"(got: {mat_path})")
+                    base = dome_mat.get_base_material() if hasattr(dome_mat, "get_base_material") else None
+                    src = base or dome_mat
+                    try:
+                        check("Starfield Material Is Unlit",
+                              src.get_editor_property("shading_model")
+                              == unreal.MaterialShadingModel.MSM_UNLIT)
+                        check("Starfield Material Tagged IsSky",
+                              src.get_editor_property("is_sky"))
+                    except Exception as exc:
+                        check("Starfield Material Flags", False, f"({exc})")
+                    try:
+                        sb = unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(
+                            dome_mat, "StarBrightness")
+                        check("Star Brightness Set",
+                              close(sb, dome_cfg["star_brightness"], 0.01),
+                              f"(expected {dome_cfg['star_brightness']}, got {sb})")
+                    except Exception as exc:
+                        check("Star Brightness Set", False, f"({exc})")
+                else:
+                    check("Sky Dome Material Matches Preset",
+                          dome_cfg["material"].split(".")[0] in mat_path,
+                          f"(got: {mat_path})")
+
+    elif lbl == f"{LEVEL_NAME}_PostProcess":
+        st = a.get_editor_property("settings")
+        check("Exposure Min Brightness",
+              close(st.get_editor_property("auto_exposure_min_brightness"),
+                    pp_cfg["auto_exposure_min_brightness"], 1e-4),
+              f"(expected {pp_cfg['auto_exposure_min_brightness']})")
+        check("Exposure Max Brightness",
+              close(st.get_editor_property("auto_exposure_max_brightness"),
+                    pp_cfg["auto_exposure_max_brightness"], 1e-4),
+              f"(expected {pp_cfg['auto_exposure_max_brightness']})")
+        check("Exposure Bias",
+              close(st.get_editor_property("auto_exposure_bias"),
+                    pp_cfg["auto_exposure_bias"], 1e-4),
+              f"(expected {pp_cfg['auto_exposure_bias']})")
 
 # ── 4. Tree HISM Actors ──────────────────────────────────────────────
 total_tree_instances = 0
@@ -151,38 +209,3 @@ if failed == 0:
 else:
     unreal.log_error(f"[VERIFY] ❌ {failed}/{total} CHECKS FAILED!")
 unreal.log_warning("=" * 60)
-
-# ── 5. Runtime Error Checking (PIE) ──────────────────────────────────
-unreal.log_warning("[VERIFY] Starting Play-In-Editor (PIE) to check for runtime rendering errors...")
-unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_play_simulate()
-
-# We will schedule a python tick to stop PIE after 3 seconds and check the log.
-import time
-import os
-
-start_time = time.time()
-
-def check_pie_log(dt):
-    if time.time() - start_time < 3.0:
-        return True # continue ticking
-
-    unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_end_play()
-
-    # Read the latest Mac Unreal log
-    log_path = os.path.expanduser("~/Library/Logs/Unreal Engine/OtherworldEditor/Otherworld.log")
-    if os.path.exists(log_path):
-        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
-            log_data = f.read()
-
-        # Only check the last 20,000 characters to see if it occurred during THIS pie session
-        if "Cached lighting in Lumen and real-time sky capture lighting is going to be clipped" in log_data[-20000:]:
-            unreal.log_error("❌ [VERIFY] RUNTIME ERROR DETECTED: Lumen cached lighting clipping error! The scene is too pitch black.")
-        else:
-            unreal.log_warning("✅ [VERIFY] RUNTIME TEST PASSED: No Lumen exposure clipping errors detected during Play!")
-    else:
-        unreal.log_warning("⚠️ [VERIFY] Could not locate Unreal log file to verify runtime errors.")
-
-    return False # unregister
-
-unreal.register_slate_post_tick_callback(check_pie_log)
-

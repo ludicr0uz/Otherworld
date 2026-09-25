@@ -70,7 +70,9 @@ points `BP_ThirdPersonGameMode.HUDClass` at it. That game mode is `GlobalDefault
 no generated level overrides it, so the menu is in every level without placing an actor or
 touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / High.
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 21 checks. Run it after any
+It also draws the player's HP bar (see "The shotgun and health").
+
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 27 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
@@ -99,8 +101,52 @@ Note the consequence in PIE: these are global cvars, so whichever preset is acti
 PIE is what your editor viewport keeps. `r.ScreenPercentage 100` and `r.ShadowQuality 3` restore
 it.
 
+## The shotgun and health
+
+`Scripts/build_shotgun_and_health.py` builds everything under `/Game/Weapons` and installs
+it; `Scripts/verify_shotgun_and_health.py` reads the saved assets back (37 checks).
+
+- `BP_HealthComponent` — ActorComponent, **no event graph**: `Health` and `MaxHealth`, both
+  100. Installed on `BP_ThirdPersonCharacter` and on `BP_ForestWanderer`.
+- `BP_ShotgunComponent` — ActorComponent on the player. BeginPlay snaps the weapon to the
+  hand; Tick polls **LeftMouseButton or F** and fires 8 pellets in a 5° cone, each an
+  independent `LineTraceSingle` out to 40 m doing 9 damage. Ammo is unlimited by omission —
+  nothing counts shells. Its tick group is forced to **TG_PostPhysics** so the player
+  controller has already run `ProcessInputStack` that frame (see gotchas).
+  `TRACE_DEBUG_SECONDS` draws the pellet traces in the world; it is on, because the weapon
+  has no muzzle flash, sound or hit marker, so a working shot and a dead trigger look
+  identical without it.
+- The weapon itself is 7 engine primitives (`Receiver`, `Barrel`, `MagTube`, `Pump`, `Stock`,
+  `Grip`, `TriggerGuard`) under a `Shotgun` scene component on the character's mesh, with
+  `M_Gunmetal` / `M_GunWood`.
+- The HUD (`build_graphics_menu.py`) draws the HP bar and number every frame, top-left, by
+  looking `BP_HealthComponent` up on the player pawn. The quality panel moved down to y=130
+  to open underneath it.
+
+Health is a *component*, not a variable on each character, so the shooter and the HUD share
+one lookup (`GetComponentByClass` → cast → `Health`) that works on anything carrying it.
+Damage is written directly rather than via `ApplyDamage`/`Event AnyDamage`, because AnyDamage
+is an **Actor** event and routing through it would mean authoring a graph on both characters.
+Neither character's event graph is touched at all — only components are added. That is
+deliberate: `BP_ThirdPersonCharacter`'s graph is the Enhanced Input template, and the
+graph API cannot remove "just the nodes a script added", so anything written there could
+never be rebuilt without wiping input handling too.
+
+The weapon's orientation is **measured, not guessed**: `SKM_Quinn_Simple` carries a
+`HandGrip_R` socket (and `weapon_r_muzzle`) — there is no `weapon_r` bone, and `hand_r` is a
+bone rather than a socket, so `find_socket('hand_r')` returns None. Querying the reference
+pose puts `weapon_r_muzzle` at `(99.1, 45.7, -19.4)` in `HandGrip_R` space, and the weapon is
+built along its local +X and rotated to aim at that point (pitch −10.1°, yaw 24.8°).
+`AttachToComponent` uses **KeepRelative** — SnapToTarget would throw that offset away.
+
+Not verifiable headlessly: how the gun *looks* in the hand while `ABP_Unarmed` plays, and how
+firing feels. Both need a play session.
+
 ## Current state
 
+- The player carries a shotgun and both the player and the NPC have 100 HP; the HUD shows
+  the player's. Built by `build_shotgun_and_health.py`, 37/37 in-engine checks pass, and the
+  builder is idempotent (verified by running it twice back to back).
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
@@ -119,6 +165,61 @@ it.
 
 ## Gotchas learned the hard way
 
+- **Diagnosing a frozen editor:** `sample <pid> 5 -file /tmp/hang.txt`, then read the
+  `GameThread` stack — it names the spinning call directly. `ps -o %cpu` separates a spin
+  (100%) from a deadlock (0%). Logs are **not** in `Saved/Logs` here; they are at
+  `~/Library/Logs/Unreal Engine/OtherworldEditor/Otherworld.log`, with the previous session
+  rolled to `Otherworld-backup-<timestamp>.log` at startup.
+- **Never call `GameUserSettings.ApplySettings` from gameplay.** It applies *resolution* as
+  well, which fires the cvar sinks → `SystemResolutionSinkCallback` →
+  `FSceneViewport::ResizeFrame` → `SWindow::SetWindowMode` → `FMacWindow::UpdateFullScreenState`,
+  which pumps the Cocoa run loop waiting on a window-mode transition that never completes in
+  PIE. The editor hangs at 100% CPU with no log line after `Bringing up level for play`.
+  Use `ApplyNonResolutionSettings()`. `verify_graphics_menu.py` asserts ApplySettings appears
+  nowhere.
+- **`-nullrhi` cannot prove PIE works.** With no real window, `ResizeFrame` has nothing to
+  resize, so the hang above passed a clean 70-second headless run. Headless runs verify
+  gameplay logic, never anything that touches the window or the viewport.
+- **A const `BlueprintCallable` is silently promoted to `BlueprintPure` by UHT.**
+  `WasInputKeyJustPressed` and `IsInputKeyDown` are declared `BlueprintCallable` and `const`,
+  and their nodes have **no exec pin** — so they are evaluated when something reads their
+  output, and there is nothing to wire. Check `has_exec` before concluding a node "never
+  runs".
+- **Input polled from a component needs a late tick group.** `WasInputKeyJustPressed` reads
+  `EventCounts`, which `UPlayerInput::ProcessInputStack` swaps out once per frame during the
+  controller's `TG_PrePhysics` tick. A component defaults to `TG_PrePhysics` too, with no
+  defined order against the controller. `AHUD` gets away with polling because it ticks later.
+- **When instrumenting a graph with PrintString, splice — do not just connect.** An exec
+  *output* holds one link, so `then.try_create_connection(probe)` silently drops whatever
+  came next and severs the rest of the chain. Capture the existing destinations first and
+  reconnect them after the probe, or every measurement downstream reads zero and looks like
+  a product bug.
+- **`add_member_variable`'s default value silently does not apply.** It returns True, the
+  compiler logs `Can't parse default value '100.0' … Property: Health`, and the property
+  stays at **zero** — a health component that starts dead while every declaration reads
+  100. UE 5.8 exposes no API for a *member* variable's default (only
+  `set_local_variable_default_value`, for locals). Write the value onto the compiled class's
+  CDO, recompile to bake it in, and read it back (`_apply_defaults` in
+  `build_shotgun_and_health.py`). This was invisible in the graphics menu only because
+  `MenuOpen` defaults to false and `Quality` to 0 — both already zero.
+- **`delete_subobject` does not cascade, and `rename_subobject` fails silently.** Deleting a
+  component root orphans its children; on the next run they still hold the names the new
+  parts want, so the renames quietly fail, the parts come back as `StaticMesh1..13`, and the
+  character grows a second nameless copy of the weapon every run. Delete the whole subtree
+  (descendants are targets too), and assert the name landed after renaming.
+- **Subobject handles go stale the moment any sibling is deleted.** Deleting a second handle
+  from the same `k2_gather_subobject_data_for_blueprint` batch trips
+  `Ensure condition failed: ParentNode` inside `RemoveNodeAndPromoteChildren`. Re-gather
+  after every single delete.
+- **`bCanEverTick` is not a UPROPERTY** and cannot be set from Python — but it does not need
+  to be. `FKismetCompilerContext::SetCanEverTick` turns it on at compile time for any
+  Blueprint whose first native parent is `AActor` or `UActorComponent` and whose Tick event
+  has its exec pin **connected**. Leave Tick wired or the component silently stops firing.
+- Cast nodes come from the palette as `Utilities|Casting|CastTo<ClassName>`, but **only for
+  classes already loaded** — load the asset before listing or creating. The output pin is
+  named with spaces inserted (`AsBP Health Component`), so match pin names loosely.
+  `add_get_member_variable_node(name, class_path)` gives a node with a `self` pin, which is
+  how a graph reads another object's variable once it has been cast.
 - **UMG layout cannot be authored from Python** in 5.8: `UWidgetBlueprint::WidgetTree` is a
   protected `UPROPERTY`, so `get_editor_property("WidgetTree")` is refused and there is no
   editor subsystem exposing it. A Widget Blueprint's widgets can only be placed by hand. That

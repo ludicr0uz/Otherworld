@@ -120,21 +120,32 @@ def main():
           commands == expected_cmds,
           str(sorted(commands ^ expected_cmds)) if commands != expected_cmds else "")
 
-    applies = by_pins("bCheckForCommandLineOverrides")
-    check("ApplySettings once per preset, plus BeginPlay's",
+    # ApplyNonResolutionSettings takes no arguments, so it is the only node in
+    # the graph whose inputs are exactly exec + self.
+    applies = [n for n in nodes if pin_names(n) == {"execute", "self"}]
+    check("ApplyNonResolutionSettings once per preset, plus BeginPlay's",
           len(applies) == len(G.PRESETS) + 1, str(len(applies)))
-    check("ApplySettings ignores command-line overrides",
-          all(BEL.find_input_pin(n, "bCheckForCommandLineOverrides").get_pin_value()
-              == "false" for n in applies))
+    # Regression guard, and the single most important check in this file:
+    # ApplySettings also applies *resolution*, which on macOS drives
+    # SWindow::SetWindowMode -> FMacWindow::UpdateFullScreenState and hangs the
+    # editor at 100% CPU the moment PIE starts.
+    check("no ApplySettings anywhere (it hangs macOS PIE on a window-mode change)",
+          not by_pins("bCheckForCommandLineOverrides"))
 
     # --- drawing
     texts = by_pins("Text", "ScreenX")
     drawn = {BEL.find_input_pin(n, "Text").get_pin_value() for n in texts}
-    expected_text = {"GRAPHICS QUALITY", f"[{G.MENU_KEY}]   close", ">"}
+    expected_text = {"GRAPHICS QUALITY", f"[{G.MENU_KEY}]   close", ">", "HP"}
     expected_text |= {f"[{i + 1}]   {p[0]}" for i, p in enumerate(G.PRESETS)}
-    check("panel draws title, three rows, hint and caret",
+    # The health number has no literal text -- its Text pin is driven -- so it
+    # contributes an empty string here.
+    expected_text |= {""}
+    check("panel draws title, three rows, hint, caret and the HP label",
           drawn == expected_text, str(sorted(drawn ^ expected_text)))
-    check("one DrawRect backing the panel", len(by_pins("RectColor")) == 1)
+    # One backs the quality panel; two more are the health bar's empty track and
+    # its fill.
+    check("three DrawRects: panel, HP track, HP fill",
+          len(by_pins("RectColor")) == 3, str(len(by_pins("RectColor"))))
 
     # The caret is the only text whose position is computed rather than literal.
     caret = [n for n in texts
@@ -143,6 +154,31 @@ def main():
         y = BEL.find_input_pin(caret[0], "ScreenY")
         check("caret's ScreenY is driven by Quality, not a constant",
               bool(y.list_connected_pins()))
+
+    # --- the health readout
+    health_reads = [n for n in nodes
+                    if "Health" in pin_names(n, False) or
+                    "MaxHealth" in pin_names(n, False)]
+    check("HUD reads Health and MaxHealth off the health component",
+          len(health_reads) == 2, str(len(health_reads)))
+
+    lookups = by_pins("ComponentClass")
+    check("HUD looks the health component up on the player pawn",
+          len(lookups) == 1 and
+          G.HEALTH_CLASS_PATH in
+          str(BEL.find_input_pin(lookups[0], "ComponentClass").get_pin_value()))
+
+    # The fill rect is the one whose width is computed; the track's is literal.
+    rects = by_pins("RectColor")
+    driven = [n for n in rects
+              if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]
+    check("the HP fill's width is driven by Health, not a constant",
+          len(driven) == 1, str(len(driven)))
+
+    # A pawn with no health component must not take the menu down with it.
+    check("HP number is drawn from a driven Text pin",
+          any(not BEL.find_input_pin(n, "Text").get_pin_value() and
+              BEL.find_input_pin(n, "Text").list_connected_pins() for n in texts))
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

@@ -37,13 +37,25 @@ Event graph:
                                [Branch: key "3"] True --> apply High   --'
 
     "apply <preset>" = Set Quality -> GetGameUserSettings ->
-                       SetOverallScalabilityLevel -> ApplySettings ->
+                       SetOverallScalabilityLevel -> ApplyNonResolutionSettings ->
                        ConsoleCommand r.ShadowQuality -> ConsoleCommand r.ScreenPercentage
 
-  [Event ReceiveDrawHUD] --> [Branch: MenuOpen]
-                                True --> DrawRect(panel) --> DrawText x5
-                                         (the caret's ScreenY is computed from
-                                          Quality, so it tracks the selection)
+  [Event ReceiveDrawHUD] --> GetPlayerPawn -> GetComponentByClass(Health)
+                             --> [Cast to BP_HealthComponent]
+                                   ok --> DrawRect(bar back) -> DrawRect(bar
+                                          fill, width = Health/MaxHealth * W)
+                                          -> DrawText("HP") -> DrawText(Health)
+                                   failed ------------------------------------,
+                             --> [Branch: MenuOpen]                           |
+                                   True --> DrawRect(panel) --> DrawText x5 <-'
+                                            (the caret's ScreenY is computed
+                                             from Quality, so it tracks the
+                                             selection)
+
+The health readout draws every frame; the quality panel only while MenuOpen.
+Health is read off BP_HealthComponent (built by build_shotgun_and_health.py)
+rather than off the character class, so the HUD does not care which pawn is
+possessed -- anything carrying the component displays.
 """
 
 import unreal
@@ -96,20 +108,32 @@ MENU_KEY = "M"
 # if it is the thing that established it.
 DEFAULT_PRESET = 0  # Low
 
+# Where the player's health lives.  Built by build_shotgun_and_health.py; the
+# HUD degrades to drawing nothing if the pawn has no such component.
+HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
+
 # ─── Panel geometry (HUD canvas pixels, top-left origin) ─────────────────────
 # Fixed coordinates rather than viewport-relative ones: centring would need the
 # DrawHUD event's SizeX/SizeY through int->float conversion nodes for every
 # coordinate, which triples the node count of the draw graph to move a box that
 # is legible where it is.
-PANEL = (60.0, 60.0, 600.0, 300.0)   # x, y, w, h
-TITLE_POS = (92.0, 88.0)
+# The health readout owns the top-left corner because it is always on screen;
+# the quality panel was moved down to open underneath it rather than across it.
+HP_LABEL_POS = (62.0, 30.0)
+HP_LABEL_SCALE = 1.5
+HP_BAR = (60.0, 62.0, 420.0, 30.0)   # x, y, w, h -- w is the *full* bar
+HP_NUM_POS = (500.0, 58.0)
+HP_NUM_SCALE = 2.4
+
+PANEL = (60.0, 130.0, 600.0, 300.0)   # x, y, w, h
+TITLE_POS = (92.0, 158.0)
 TITLE_SCALE = 2.2
 ROW_X = 150.0
-ROW_Y0 = 168.0
+ROW_Y0 = 238.0
 ROW_STEP = 46.0
 ROW_SCALE = 2.0
 CARET_X = 112.0
-HINT_POS = (92.0, 312.0)
+HINT_POS = (92.0, 382.0)
 HINT_SCALE = 1.5
 
 COL_PANEL = "(R=0.020000,G=0.025000,B=0.035000,A=0.780000)"
@@ -117,6 +141,10 @@ COL_TITLE = "(R=0.850000,G=0.900000,B=1.000000,A=1.000000)"
 COL_ROW = "(R=0.720000,G=0.750000,B=0.800000,A=1.000000)"
 COL_CARET = "(R=1.000000,G=0.820000,B=0.320000,A=1.000000)"
 COL_HINT = "(R=0.480000,G=0.510000,B=0.560000,A=1.000000)"
+COL_HP_BACK = "(R=0.030000,G=0.030000,B=0.035000,A=0.800000)"
+COL_HP_FILL = "(R=0.750000,G=0.130000,B=0.120000,A=0.950000)"
+COL_HP_LABEL = "(R=0.620000,G=0.650000,B=0.700000,A=1.000000)"
+COL_HP_NUM = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
 
 # ─── Function paths for the graph nodes ──────────────────────────────────────
 
@@ -125,19 +153,25 @@ FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 FN_CONSOLE = "/Script/Engine.KismetSystemLibrary.ExecuteConsoleCommand"
 FN_GET_GUS = "/Script/Engine.GameUserSettings.GetGameUserSettings"
 FN_SET_OVERALL = "/Script/Engine.GameUserSettings.SetOverallScalabilityLevel"
-FN_APPLY = "/Script/Engine.GameUserSettings.ApplySettings"
+FN_APPLY = "/Script/Engine.GameUserSettings.ApplyNonResolutionSettings"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_CONV_INT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
 FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
 FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
 FN_DRAW_RECT = "/Script/Engine.HUD.DrawRect"
 FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
+FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
+FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
+FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
+FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
+FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
 
 # The DrawHUD event is not one of the placeholder nodes a fresh Blueprint ships
 # with (BeginPlay and Tick are), so it has to be created from the palette.
 NODE_DRAW_HUD = "AddEvent|EventReceiveDrawHUD"
 NODE_TICK = "AddEvent|EventTick"
 NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
+NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 
 BGE = unreal.BlueprintGraphEditor
 BEL = unreal.BlueprintEditorLibrary
@@ -187,6 +221,26 @@ def _node(ed, function_path):
     return n
 
 
+def _palette(ed, name, x=0.0, y=0.0):
+    n = ed.create_node_from_name(name, unreal.Vector2D(float(x), float(y)), [])
+    if not n:
+        raise RuntimeError(f"palette node {name!r} could not be created")
+    return n
+
+
+def _loose_pin(node, wanted, is_input=True):
+    """Find a pin ignoring spaces and case.
+
+    Cast nodes name their output after the class with spaces inserted
+    ("AsBP Health Component"), which is not worth depending on exactly.
+    """
+    key = wanted.replace(" ", "").lower()
+    for p in (BEL.list_input_pins(node) if is_input else BEL.list_output_pins(node)):
+        if str(PIN.get_pin_name(p)).replace(" ", "").lower() == key:
+            return p
+    raise RuntimeError(f"no pin like {wanted!r} on node")
+
+
 def _pin(node, name, is_input=True):
     p = (BEL.find_input_pin(node, name) if is_input
          else BEL.find_output_pin(node, name))
@@ -230,6 +284,28 @@ def _ensure_variables(ed, bp):
             raise RuntimeError(f"could not declare member variable {name}")
 
 
+def _apply_defaults(bp, defaults):
+    """Bake variable defaults onto the CDO, because add_member_variable cannot.
+
+    Passing a default to add_member_variable returns True and then the compiler
+    logs `Can't parse default value` and leaves the property at zero. That is
+    invisible here today only because MenuOpen defaults to false and Quality to
+    DEFAULT_PRESET 0 -- both of which *are* zero. Point DEFAULT_PRESET at
+    Medium and the caret would silently start on Low. UE 5.8 exposes no API for
+    a member variable's default, so it is written to the compiled class's
+    default object and baked in by recompiling.
+    """
+    cdo = unreal.get_default_object(BEL.generated_class(bp))
+    for name, value in defaults.items():
+        cdo.set_editor_property(name, value)
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_GraphicsMenuHUD failed to recompile after defaults")
+    fresh = unreal.get_default_object(BEL.generated_class(bp))
+    for name, value in defaults.items():
+        if fresh.get_editor_property(name) != value:
+            raise RuntimeError(f"default for {name} did not stick")
+
+
 # ─── One preset, applied ─────────────────────────────────────────────────────
 
 def _emit_apply(ed, index, x, y, in_exec):
@@ -254,10 +330,17 @@ def _emit_apply(ed, index, x, y, in_exec):
     _set(sos, "Value", level)
     _connect(BEL.find_then_pin(gus), _pin(sos, "execute"))
 
+    # ApplyNonResolutionSettings, *never* ApplySettings.  ApplySettings also
+    # applies resolution, which fires the console-variable sinks ->
+    # SystemResolutionSinkCallback -> FSceneViewport::ResizeFrame ->
+    # SWindow::SetWindowMode.  On macOS that lands in
+    # FMacWindow::UpdateFullScreenState, which pumps the Cocoa run loop waiting
+    # on a window-mode transition that never completes inside PIE: the editor
+    # hangs at 100% CPU, on this very BeginPlay, with no log line after
+    # "Bringing up level for play".  The menu never changes resolution, so
+    # there is nothing to lose by skipping that half.
     app = _at(_node(ed, FN_APPLY), x + 620, y)
     _connect(gus_out, _pin(app, "self"))
-    # False: command-line overrides would re-clamp the level we just picked.
-    _set(app, "bCheckForCommandLineOverrides", "false")
     _connect(BEL.find_then_pin(sos), _pin(app, "execute"))
 
     made = [set_q, gus, sos, app]
@@ -355,6 +438,88 @@ def _author_tick(ed, tick):
         flow = _pin(br, "else", is_input=False)
 
 
+# ─── The health readout ──────────────────────────────────────────────────────
+
+def _author_hp(ed, x0, y0, in_exec):
+    """Draw the player's HP bar and number.  Returns the exec pins to go on from.
+
+    Two of them: a pawn carrying no BP_HealthComponent fails the cast, and the
+    graphics menu still has to draw in that case, so the failure pin is a
+    continuation rather than a dead end.
+    """
+    pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 240)
+    _set(pawn, "PlayerIndex", 0)
+
+    comp = _at(_node(ed, FN_GET_COMP), x0 + 240, y0 + 240)
+    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
+
+    cast = _at(_palette(ed, NODE_CAST_HEALTH), x0 + 500, y0)
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(in_exec, _pin(cast, "execute"))
+    as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
+
+    health = _at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
+                 x0 + 760, y0 + 260)
+    _connect(as_health, _pin(health, "self"))
+    max_health = _at(ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH),
+                     x0 + 760, y0 + 400)
+    _connect(as_health, _pin(max_health, "self"))
+    health_out = _pin(health, "Health", is_input=False)
+
+    frac = _at(_node(ed, FN_DIV), x0 + 1000, y0 + 320)
+    _connect(health_out, _pin(frac, "A"))
+    _connect(_pin(max_health, "MaxHealth", is_input=False), _pin(frac, "B"))
+    fill_w = _at(_node(ed, FN_MUL), x0 + 1200, y0 + 320)
+    _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
+    _set(fill_w, "B", HP_BAR[2])
+
+    back = _at(_node(ed, FN_DRAW_RECT), x0 + 760, y0)
+    _set(back, "RectColor", COL_HP_BACK)
+    for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), HP_BAR):
+        _set(back, name, value)
+    _connect(BEL.find_then_pin(cast), _pin(back, "execute"))
+
+    # Same rect, but its width is driven rather than set: the empty part of the
+    # bar is the background showing through.
+    fill = _at(_node(ed, FN_DRAW_RECT), x0 + 1000, y0)
+    _set(fill, "RectColor", COL_HP_FILL)
+    for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), HP_BAR):
+        _set(fill, name, value)
+    _connect(_pin(fill_w, "ReturnValue", is_input=False), _pin(fill, "ScreenW"))
+    _connect(BEL.find_then_pin(back), _pin(fill, "execute"))
+
+    label = _at(_node(ed, FN_DRAW_TEXT), x0 + 1240, y0)
+    _set(label, "Text", "HP")
+    _set(label, "TextColor", COL_HP_LABEL)
+    _set(label, "ScreenX", HP_LABEL_POS[0])
+    _set(label, "ScreenY", HP_LABEL_POS[1])
+    _set(label, "Scale", HP_LABEL_SCALE)
+    _set(label, "bScalePosition", "false")
+    _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
+
+    rounded = _at(_node(ed, FN_ROUND), x0 + 1240, y0 + 320)
+    _connect(health_out, _pin(rounded, "A"))
+    as_text = _at(_node(ed, FN_INT_TO_STR), x0 + 1420, y0 + 320)
+    _connect(_pin(rounded, "ReturnValue", is_input=False), _pin(as_text, "InInt"))
+
+    number = _at(_node(ed, FN_DRAW_TEXT), x0 + 1480, y0)
+    _set(number, "TextColor", COL_HP_NUM)
+    _set(number, "ScreenX", HP_NUM_POS[0])
+    _set(number, "ScreenY", HP_NUM_POS[1])
+    _set(number, "Scale", HP_NUM_SCALE)
+    _set(number, "bScalePosition", "false")
+    _connect(_pin(as_text, "ReturnValue", is_input=False), _pin(number, "Text"))
+    _connect(BEL.find_then_pin(label), _pin(number, "execute"))
+
+    ed.add_comment_to_nodes(
+        "Always drawn.  Health is rounded for display only -- the bar reads the "
+        "unrounded value, so chip damage still moves it.",
+        [pawn, comp, cast, health, max_health, frac, fill_w,
+         back, fill, label, rounded, as_text, number])
+    return (BEL.find_then_pin(number), _pin(cast, "CastFailed", is_input=False))
+
+
 # ─── Event ReceiveDrawHUD: the panel ─────────────────────────────────────────
 
 def _author_draw(ed, x0, y0):
@@ -362,10 +527,16 @@ def _author_draw(ed, x0, y0):
     if not draw:
         raise RuntimeError(f"could not create {NODE_DRAW_HUD}")
 
+    # HP first, so it is on screen whether or not the menu is open.
+    after_hp = _author_hp(ed, x0, y0 - 900, BEL.find_then_pin(draw))
+
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 240, y0 + 200)
     br = _at(ed.add_branch_node(), x0 + 420, y0)
     _connect(_pin(get_open, "MenuOpen", is_input=False), _pin(br, "Condition"))
-    _connect(BEL.find_then_pin(draw), _pin(br, "execute"))
+    # Both the drawn and the cast-failed paths fall through to the menu; an exec
+    # input takes more than one link, so no Sequence node is needed.
+    for exec_out in after_hp:
+        _connect(exec_out, _pin(br, "execute"))
 
     rect = _at(_node(ed, FN_DRAW_RECT), x0 + 640, y0)
     _set(rect, "RectColor", COL_PANEL)
@@ -473,6 +644,7 @@ def build_hud_blueprint(rebuild=False):
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
+    _apply_defaults(bp, {"MenuOpen": False, "Quality": DEFAULT_PRESET})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

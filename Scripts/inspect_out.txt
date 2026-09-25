@@ -1,0 +1,223 @@
+[INSPECT] Total actors in level: 30
+
+Actor: 'DirectionalLight_0' | Label: 'DirectionalLight' | Class: DirectionalLight | Loc: <Struct 'Vector' (0x39ce95cd0) {x: 0.000000, y: 0.000000, z: 400.000000}> | Scale: <Struct 'Vector' (0x3a285a270) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: ArrowComponent0 (ArrowComponent)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'SkyAtmosphere_0' | Label: 'SkyAtmosphere' | Class: SkyAtmosphere | Loc: <Struct 'Vector' (0x39ce76680) {x: 0.000000, y: 0.000000, z: -6000.000000}> | Scale: <Struct 'Vector' (0x39ce95cd0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: Sprite (BillboardComponent)
+  Component: ArrowComponent (ArrowComponent)
+
+Actor: 'SkyLight_0' | Label: 'SkyLight' | Class: SkyLight | Loc: <Struct 'Vector' (0x39ce75780) {x: 0.000000, y: 0.000000, z: 600.000000}> | Scale: <Struct 'Vector' (0x39ce76680) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: Sprite (BillboardComponent)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'ExponentialHeightFog_0' | Label: 'ExponentialHeightFog' | Class: ExponentialHeightFog | Loc: <Struct 'Vector' (0x3a285a450) {x: -5600.000000, y: -50.000000, z: -6850.000000}> | Scale: <Struct 'Vector' (0x39ce75780) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: Sprite (BillboardComponent)
+
+Actor: 'VolumetricCloud_0' | Label: 'VolumetricCloud' | Class: VolumetricCloud | Loc: <Struct 'Vector' (0x39ce95cd0) {x: 0.000000, y: 0.000000, z: 700.000000}> | Scale: <Struct 'Vector' (0x3a285a450) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: Sprite (BillboardComponent)
+
+Actor: 'PlayerStart_0' | Label: 'PlayerStart' | Class: PlayerStart | Loc: <Struct 'Vector' (0x39ce76680) {x: 0.000000, y: 0.000000, z: 120.000000}> | Scale: <Struct 'Vector' (0x39ce95cd0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: CollisionCapsule (CapsuleComponent)
+  Component: Sprite (BillboardComponent)
+  Component: Sprite2 (BillboardComponent)
+  Component: Arrow (ArrowComponent)
+
+Actor: 'StaticMeshActor_0' | Label: 'SM_SkySphere' | Class: StaticMeshActor | Loc: <Struct 'Vector' (0x39f6f5be0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce76680) {x: 400.000000, y: 400.000000, z: 400.000000}>
+  Component: StaticMeshComponent0 (StaticMeshComponent)
+    StaticMesh: SM_SkySphere (/Engine/EngineSky/SM_SkySphere.SM_SkySphere)
+    Comp Material[0]: M_SimpleSkyDome (/Engine/EngineSky/M_SimpleSkyDome.M_SimpleSkyDome)
+    Mesh MaterialSlot[0] (M_Sky_Panning_Clouds2): M_Sky_Panning_Clouds2 (/Engine/EngineSky/M_Sky_Panning_Clouds2.M_Sky_Panning_Clouds2)
+
+Actor: 'StaticMeshActor_1' | Label: 'Forest_Terrain_Landscape' | Class: StaticMeshActor | Loc: <Struct 'Vector' (0x3a285a4a0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39f6f5be0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: StaticMeshComponent0 (StaticMeshComponent)
+    StaticMesh: SM_ForestLandscape (/Game/Forest/Meshes/SM_ForestLandscape.SM_ForestLandscape)
+    Comp Material[0]: M_Forest_Ground_PBR (/Game/Forest/Materials/M_Forest_Ground_PBR.M_Forest_Ground_PBR)
+    Mesh MaterialSlot[0] (M_Forest_Ground_PBR): M_Forest_Ground_PBR (/Game/Forest/Materials/M_Forest_Ground_PBR.M_Forest_Ground_PBR)
+
+Actor: 'Actor_2' | Label: 'HISM_Stump_01' | Class: Actor | Loc: <Struct 'Vector' (0x39ce75780) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a4a0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_tree_stump_01 (/Game/Forest/Scanned/tree_stump_01/tree_stump_01_1k/StaticMeshes/SM_tree_stump_01.SM_tree_stump_01)
+    Comp Material[0]: MI_TreeStump01 (/Game/Forest/Materials/Instances/MI_TreeStump01.MI_TreeStump01)
+    Mesh MaterialSlot[0] (tree_stump_01): tree_stump_01 (/Game/Forest/Scanned/tree_stump_01/tree_stump_01_1k/Materials/tree_stump_01.tree_stump_01)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_3' | Label: 'HISM_Stump_02' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a540) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce75780) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_tree_stump_02 (/Game/Forest/Scanned/tree_stump_02/tree_stump_02_1k/StaticMeshes/SM_tree_stump_02.SM_tree_stump_02)
+    Comp Material[0]: MI_TreeStump02 (/Game/Forest/Materials/Instances/MI_TreeStump02.MI_TreeStump02)
+    Mesh MaterialSlot[0] (tree_stump_02): tree_stump_02 (/Game/Forest/Scanned/tree_stump_02/tree_stump_02_1k/Materials/tree_stump_02.tree_stump_02)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_4' | Label: 'HISM_Root_Cluster' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a400) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a540) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_root_cluster_01 (/Game/Forest/Scanned/root_cluster_01/root_cluster_01_1k/StaticMeshes/SM_root_cluster_01.SM_root_cluster_01)
+    Comp Material[0]: MI_RootCluster01 (/Game/Forest/Materials/Instances/MI_RootCluster01.MI_RootCluster01)
+    Mesh MaterialSlot[0] (root_cluster_01): root_cluster_01 (/Game/Forest/Scanned/root_cluster_01/root_cluster_01_1k/Materials/root_cluster_01.root_cluster_01)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_5' | Label: 'HISM_Rock_Granite' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a4a0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a400) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_rock_07 (/Game/Forest/Scanned/rock_07/rock_07_1k/StaticMeshes/SM_rock_07.SM_rock_07)
+    Comp Material[0]: MI_Rock07 (/Game/Forest/Materials/Instances/MI_Rock07.MI_Rock07)
+    Mesh MaterialSlot[0] (rock_07): rock_07 (/Game/Forest/Scanned/rock_07/rock_07_1k/Materials/rock_07.rock_07)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_6' | Label: 'HISM_Rock_Moss' | Class: Actor | Loc: <Struct 'Vector' (0x39ce75780) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce76680) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: rock_moss_set_01_rock01 (/Game/Forest/Scanned/rock_moss_set_01/rock_moss_set_01_1k/StaticMeshes/rock_moss_set_01_rock01.rock_moss_set_01_rock01)
+    Comp Material[0]: MI_RockMossSet (/Game/Forest/Materials/Instances/MI_RockMossSet.MI_RockMossSet)
+    Mesh MaterialSlot[0] (rock_moss_set_01): rock_moss_set_01 (/Game/Forest/Scanned/rock_moss_set_01/rock_moss_set_01_1k/Materials/rock_moss_set_01.rock_moss_set_01)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_7' | Label: 'HISM_Shrub_01' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a4a0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce75780) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_shrub_01 (/Game/Forest/Scanned/shrub_01/shrub_01_1k/StaticMeshes/SM_shrub_01.SM_shrub_01)
+    Comp Material[0]: MI_Shrub01 (/Game/Forest/Materials/Instances/MI_Shrub01.MI_Shrub01)
+    Mesh MaterialSlot[0] (shrub_01): shrub_01 (/Game/Forest/Scanned/shrub_01/shrub_01_1k/Materials/shrub_01.shrub_01)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_8' | Label: 'HISM_Shrub_03' | Class: Actor | Loc: <Struct 'Vector' (0x39ce76680) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a4a0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: shrub_03_a (/Game/Forest/Scanned/shrub_03/shrub_03_1k/StaticMeshes/shrub_03_a.shrub_03_a)
+    Comp Material[0]: MI_Shrub03 (/Game/Forest/Materials/Instances/MI_Shrub03.MI_Shrub03)
+    Mesh MaterialSlot[0] (shrub_03): shrub_03 (/Game/Forest/Scanned/shrub_03/shrub_03_1k/Materials/shrub_03.shrub_03)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_9' | Label: 'HISM_Flowers' | Class: Actor | Loc: <Struct 'Vector' (0x39ce75780) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce76680) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: periwinkle_plant_01_LOD0 (/Game/Forest/Scanned/periwinkle_plant/periwinkle_plant_1k/StaticMeshes/periwinkle_plant_01_LOD0.periwinkle_plant_01_LOD0)
+    Comp Material[0]: MI_Periwinkle (/Game/Forest/Materials/Instances/MI_Periwinkle.MI_Periwinkle)
+    Mesh MaterialSlot[0] (periwinkle_plant): periwinkle_plant (/Game/Forest/Scanned/periwinkle_plant/periwinkle_plant_1k/Materials/periwinkle_plant.periwinkle_plant)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_24' | Label: 'HISM_Grass_Medium' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a540) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce75780) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: grass_medium_01_large_a_LOD0 (/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_large_a_LOD0.grass_medium_01_large_a_LOD0)
+    Comp Material[0]: MI_GrassMedium01 (/Game/Forest/Materials/Instances/MI_GrassMedium01.MI_GrassMedium01)
+    Mesh MaterialSlot[0] (grass_medium_01): grass_medium_01 (/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/Materials/grass_medium_01.grass_medium_01)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_25' | Label: 'HISM_Grass_Tall' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a400) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a540) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: grass_medium_02_a (/Game/Forest/Scanned/grass_medium_02/grass_medium_02_1k/StaticMeshes/grass_medium_02_a.grass_medium_02_a)
+    Comp Material[0]: MI_GrassMedium02 (/Game/Forest/Materials/Instances/MI_GrassMedium02.MI_GrassMedium02)
+    Mesh MaterialSlot[0] (grass_medium_02): grass_medium_02 (/Game/Forest/Scanned/grass_medium_02/grass_medium_02_1k/Materials/grass_medium_02.grass_medium_02)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_26' | Label: 'HISM_Ferns' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a4a0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a400) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: fern_02_a (/Game/Forest/Scanned/fern_02/fern_02_1k/StaticMeshes/fern_02_a.fern_02_a)
+    Comp Material[0]: MI_Fern02 (/Game/Forest/Materials/Instances/MI_Fern02.MI_Fern02)
+    Mesh MaterialSlot[0] (fern_02): MI_fern_02_a_S0_fern_02 (/Game/Forest/Materials/Instances/MI_fern_02_a_S0_fern_02.MI_fern_02_a_S0_fern_02)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_27' | Label: 'HISM_Moss_Patch' | Class: Actor | Loc: <Struct 'Vector' (0x39ce95cd0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a4a0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: moss_01_a_LOD0 (/Game/Forest/Scanned/moss_01/moss_01_1k/StaticMeshes/moss_01_a_LOD0.moss_01_a_LOD0)
+    Comp Material[0]: MI_Moss01 (/Game/Forest/Materials/Instances/MI_Moss01.MI_Moss01)
+    Mesh MaterialSlot[0] (moss_01): moss_01 (/Game/Forest/Scanned/moss_01/moss_01_1k/Materials/moss_01.moss_01)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'PostProcessVolume_0' | Label: 'PostProcessVolume_Forest' | Class: PostProcessVolume | Loc: <Struct 'Vector' (0x3a285a450) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce95cd0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: BrushComponent0 (BrushComponent)
+
+Actor: 'Actor_10' | Label: 'HISM_Tree_Leafy_Island_01' | Class: Actor | Loc: <Struct 'Vector' (0x39ce76680) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce75780) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_island_tree_01 (/Game/Forest/Scanned/island_tree_01/island_tree_01_1k/StaticMeshes/SM_island_tree_01.SM_island_tree_01)
+    Comp Material[0]: MI_IslandTree01_Trunk (/Game/Forest/Materials/Instances/MI_IslandTree01_Trunk.MI_IslandTree01_Trunk)
+    Comp Material[1]: MI_IslandTree01_Leaves (/Game/Forest/Materials/Instances/MI_IslandTree01_Leaves.MI_IslandTree01_Leaves)
+    Comp Material[2]: MI_IslandTree01_Branches (/Game/Forest/Materials/Instances/MI_IslandTree01_Branches.MI_IslandTree01_Branches)
+    Mesh MaterialSlot[0] (island_tree_01): MI_SM_island_tree_01_S0_trunk (/Game/Forest/Materials/Instances/MI_SM_island_tree_01_S0_trunk.MI_SM_island_tree_01_S0_trunk)
+    Mesh MaterialSlot[1] (island_tree_01_leaves): MI_SM_island_tree_01_S1_leaves (/Game/Forest/Materials/Instances/MI_SM_island_tree_01_S1_leaves.MI_SM_island_tree_01_S1_leaves)
+    Mesh MaterialSlot[2] (island_tree_01_branches): MI_SM_island_tree_01_S2_branches (/Game/Forest/Materials/Instances/MI_SM_island_tree_01_S2_branches.MI_SM_island_tree_01_S2_branches)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_11' | Label: 'HISM_Tree_Leafy_Island_02' | Class: Actor | Loc: <Struct 'Vector' (0x39f6f5be0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39ce76680) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_island_tree_02 (/Game/Forest/Scanned/island_tree_02/island_tree_02_1k/StaticMeshes/SM_island_tree_02.SM_island_tree_02)
+    Comp Material[0]: MI_IslandTree02_Trunk (/Game/Forest/Materials/Instances/MI_IslandTree02_Trunk.MI_IslandTree02_Trunk)
+    Comp Material[1]: MI_IslandTree02_Leaves (/Game/Forest/Materials/Instances/MI_IslandTree02_Leaves.MI_IslandTree02_Leaves)
+    Comp Material[2]: MI_IslandTree02_Branches (/Game/Forest/Materials/Instances/MI_IslandTree02_Branches.MI_IslandTree02_Branches)
+    Mesh MaterialSlot[0] (island_tree_02): MI_SM_island_tree_02_S0_trunk (/Game/Forest/Materials/Instances/MI_SM_island_tree_02_S0_trunk.MI_SM_island_tree_02_S0_trunk)
+    Mesh MaterialSlot[1] (island_tree_02_leaves): MI_SM_island_tree_02_S1_leaves (/Game/Forest/Materials/Instances/MI_SM_island_tree_02_S1_leaves.MI_SM_island_tree_02_S1_leaves)
+    Mesh MaterialSlot[2] (island_tree_02_branches): MI_SM_island_tree_02_S2_branches (/Game/Forest/Materials/Instances/MI_SM_island_tree_02_S2_branches.MI_SM_island_tree_02_S2_branches)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_12' | Label: 'HISM_Tree_Fir_A' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a4a0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x39f6f5be0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: fir_tree_01_a_LOD0 (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/StaticMeshes/fir_tree_01_a_LOD0.fir_tree_01_a_LOD0)
+    Comp Material[0]: MI_FirTree01_Bark (/Game/Forest/Materials/Instances/MI_FirTree01_Bark.MI_FirTree01_Bark)
+    Comp Material[1]: MI_FirTree01_TrunkA (/Game/Forest/Materials/Instances/MI_FirTree01_TrunkA.MI_FirTree01_TrunkA)
+    Comp Material[2]: MI_FirTree01_Twig (/Game/Forest/Materials/Instances/MI_FirTree01_Twig.MI_FirTree01_Twig)
+    Comp Material[3]: MI_FirTree01_Bark (/Game/Forest/Materials/Instances/MI_FirTree01_Bark.MI_FirTree01_Bark)
+    Mesh MaterialSlot[0] (fir_tree_01_bark): MI_fir_tree_01_a_LOD0_S0_bark (/Game/Forest/Materials/Instances/MI_fir_tree_01_a_LOD0_S0_bark.MI_fir_tree_01_a_LOD0_S0_bark)
+    Mesh MaterialSlot[1] (fir_tree_01_trunk_a): MI_fir_tree_01_a_LOD0_S1_trunk_a (/Game/Forest/Materials/Instances/MI_fir_tree_01_a_LOD0_S1_trunk_a.MI_fir_tree_01_a_LOD0_S1_trunk_a)
+    Mesh MaterialSlot[2] (fir_tree_01_twig): MI_fir_tree_01_a_LOD0_S2_twig (/Game/Forest/Materials/Instances/MI_fir_tree_01_a_LOD0_S2_twig.MI_fir_tree_01_a_LOD0_S2_twig)
+    Mesh MaterialSlot[3] (fir_tree_01_dead_branches): MI_fir_tree_01_a_LOD0_S3_dead_branches (/Game/Forest/Materials/Instances/MI_fir_tree_01_a_LOD0_S3_dead_branches.MI_fir_tree_01_a_LOD0_S3_dead_branches)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_13' | Label: 'HISM_Tree_Fir_B' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a540) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a4a0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: fir_tree_01_b_LOD0 (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/StaticMeshes/fir_tree_01_b_LOD0.fir_tree_01_b_LOD0)
+    Comp Material[0]: MI_FirTree01_Bark (/Game/Forest/Materials/Instances/MI_FirTree01_Bark.MI_FirTree01_Bark)
+    Comp Material[1]: MI_FirTree01_TrunkB (/Game/Forest/Materials/Instances/MI_FirTree01_TrunkB.MI_FirTree01_TrunkB)
+    Comp Material[2]: MI_FirTree01_Twig (/Game/Forest/Materials/Instances/MI_FirTree01_Twig.MI_FirTree01_Twig)
+    Comp Material[3]: MI_FirTree01_Bark (/Game/Forest/Materials/Instances/MI_FirTree01_Bark.MI_FirTree01_Bark)
+    Mesh MaterialSlot[0] (fir_tree_01_bark): fir_tree_01_bark (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_bark.fir_tree_01_bark)
+    Mesh MaterialSlot[1] (fir_tree_01_trunk_b): fir_tree_01_trunk_b (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_trunk_b.fir_tree_01_trunk_b)
+    Mesh MaterialSlot[2] (fir_tree_01_twig): fir_tree_01_twig (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_twig.fir_tree_01_twig)
+    Mesh MaterialSlot[3] (fir_tree_01_dead_branches): fir_tree_01_dead_branches (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_dead_branches.fir_tree_01_dead_branches)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_14' | Label: 'HISM_Tree_Fir_C' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a400) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a540) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: fir_tree_01_c_LOD0 (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/StaticMeshes/fir_tree_01_c_LOD0.fir_tree_01_c_LOD0)
+    Comp Material[0]: MI_FirTree01_Bark (/Game/Forest/Materials/Instances/MI_FirTree01_Bark.MI_FirTree01_Bark)
+    Comp Material[1]: MI_FirTree01_Twig (/Game/Forest/Materials/Instances/MI_FirTree01_Twig.MI_FirTree01_Twig)
+    Comp Material[2]: MI_FirTree01_Bark (/Game/Forest/Materials/Instances/MI_FirTree01_Bark.MI_FirTree01_Bark)
+    Comp Material[3]: MI_FirTree01_TrunkB (/Game/Forest/Materials/Instances/MI_FirTree01_TrunkB.MI_FirTree01_TrunkB)
+    Mesh MaterialSlot[0] (fir_tree_01_bark): fir_tree_01_bark (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_bark.fir_tree_01_bark)
+    Mesh MaterialSlot[1] (fir_tree_01_twig): fir_tree_01_twig (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_twig.fir_tree_01_twig)
+    Mesh MaterialSlot[2] (fir_tree_01_dead_branches): fir_tree_01_dead_branches (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_dead_branches.fir_tree_01_dead_branches)
+    Mesh MaterialSlot[3] (fir_tree_01_trunk_c): fir_tree_01_trunk_c (/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/Materials/fir_tree_01_trunk_c.fir_tree_01_trunk_c)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_15' | Label: 'HISM_Tree_Pine_A' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a270) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a400) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: pine_sapling_small_a (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/StaticMeshes/pine_sapling_small_a.pine_sapling_small_a)
+    Comp Material[0]: MI_PineSapling_Bark (/Game/Forest/Materials/Instances/MI_PineSapling_Bark.MI_PineSapling_Bark)
+    Comp Material[1]: MI_PineSapling_Twig (/Game/Forest/Materials/Instances/MI_PineSapling_Twig.MI_PineSapling_Twig)
+    Mesh MaterialSlot[0] (pine_sapling_small_bark): pine_sapling_small_bark (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/Materials/pine_sapling_small_bark.pine_sapling_small_bark)
+    Mesh MaterialSlot[1] (pine_sapling_small_twig): pine_sapling_small_twig (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/Materials/pine_sapling_small_twig.pine_sapling_small_twig)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_16' | Label: 'HISM_Tree_Pine_B' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a4a0) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a270) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: pine_sapling_small_b (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/StaticMeshes/pine_sapling_small_b.pine_sapling_small_b)
+    Comp Material[0]: MI_PineSapling_Bark (/Game/Forest/Materials/Instances/MI_PineSapling_Bark.MI_PineSapling_Bark)
+    Comp Material[1]: MI_PineSapling_Twig (/Game/Forest/Materials/Instances/MI_PineSapling_Twig.MI_PineSapling_Twig)
+    Mesh MaterialSlot[0] (pine_sapling_small_bark): pine_sapling_small_bark (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/Materials/pine_sapling_small_bark.pine_sapling_small_bark)
+    Mesh MaterialSlot[1] (pine_sapling_small_twig): pine_sapling_small_twig (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/Materials/pine_sapling_small_twig.pine_sapling_small_twig)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_17' | Label: 'HISM_Tree_Pine_C' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a450) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a4a0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: pine_sapling_small_c (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/StaticMeshes/pine_sapling_small_c.pine_sapling_small_c)
+    Comp Material[0]: MI_PineSapling_Bark (/Game/Forest/Materials/Instances/MI_PineSapling_Bark.MI_PineSapling_Bark)
+    Comp Material[1]: MI_PineSapling_Twig (/Game/Forest/Materials/Instances/MI_PineSapling_Twig.MI_PineSapling_Twig)
+    Mesh MaterialSlot[0] (pine_sapling_small_bark): pine_sapling_small_bark (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/Materials/pine_sapling_small_bark.pine_sapling_small_bark)
+    Mesh MaterialSlot[1] (pine_sapling_small_twig): pine_sapling_small_twig (/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/Materials/pine_sapling_small_twig.pine_sapling_small_twig)
+  Component: BillboardComponent_0 (BillboardComponent)
+
+Actor: 'Actor_18' | Label: 'HISM_Tree_Deciduous' | Class: Actor | Loc: <Struct 'Vector' (0x3a285a540) {x: 0.000000, y: 0.000000, z: 0.000000}> | Scale: <Struct 'Vector' (0x3a285a450) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Component: HierarchicalInstancedStaticMeshComponent_0 (HierarchicalInstancedStaticMeshComponent)
+    StaticMesh: SM_tree_small_02 (/Game/Forest/Scanned/tree_small_02/tree_small_02_1k/StaticMeshes/SM_tree_small_02.SM_tree_small_02)
+    Comp Material[0]: MI_TreeSmall02_Branches (/Game/Forest/Materials/Instances/MI_TreeSmall02_Branches.MI_TreeSmall02_Branches)
+    Comp Material[1]: MI_TreeSmall02_Leaves (/Game/Forest/Materials/Instances/MI_TreeSmall02_Leaves.MI_TreeSmall02_Leaves)
+    Comp Material[2]: MI_TreeSmall02_Trunk (/Game/Forest/Materials/Instances/MI_TreeSmall02_Trunk.MI_TreeSmall02_Trunk)
+    Mesh MaterialSlot[0] (tree_small_02_branches): MI_SM_tree_small_02_S0_branches (/Game/Forest/Materials/Instances/MI_SM_tree_small_02_S0_branches.MI_SM_tree_small_02_S0_branches)
+    Mesh MaterialSlot[1] (tree_small_02_leaves): MI_SM_tree_small_02_S1_leaves (/Game/Forest/Materials/Instances/MI_SM_tree_small_02_S1_leaves.MI_SM_tree_small_02_S1_leaves)
+    Mesh MaterialSlot[2] (tree_small_02_trunk): MI_SM_tree_small_02_S2_trunk (/Game/Forest/Materials/Instances/MI_SM_tree_small_02_S2_trunk.MI_SM_tree_small_02_S2_trunk)
+  Component: BillboardComponent_0 (BillboardComponent)

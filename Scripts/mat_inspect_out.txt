@@ -1,0 +1,44 @@
+Material: M_Forest_Ground_PBR
+Total expressions: 25
+Expression: MaterialExpressionTextureSample_1 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_LeafyGrass_D.T_LeafyGrass_D, SamplerType: <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+Expression: MaterialExpressionTextureSample_3 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_ForestFloor_R.T_ForestFloor_R, SamplerType: <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+Expression: MaterialExpressionTextureCoordinate_3 (MaterialExpressionTextureCoordinate) desc=''
+  TexCoord: UTiling=3.0, VTiling=3.0
+Expression: MaterialExpressionConstant3Vector_0 (MaterialExpressionConstant3Vector) desc=''
+  Constant3Vector: <Struct 'LinearColor' (0x868391b30e0) {r: 0.450000, g: 0.320000, b: 0.200000, a: 1.000000}>
+Expression: MaterialExpressionTextureSample_6 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_ForestLeaves02_D.T_ForestLeaves02_D, SamplerType: <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+Expression: MaterialExpressionMultiply_1 (MaterialExpressionMultiply) desc=''
+Expression: MaterialExpressionAdd_0 (MaterialExpressionAdd) desc=''
+Expression: MaterialExpressionClamp_0 (MaterialExpressionClamp) desc=''
+Expression: MaterialExpressionTextureSample_8 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_MudForest_N.T_MudForest_N, SamplerType: <MaterialSamplerType.SAMPLERTYPE_NORMAL: 3>
+Expression: MaterialExpressionMultiply_2 (MaterialExpressionMultiply) desc=''
+Expression: MaterialExpressionTextureCoordinate_0 (MaterialExpressionTextureCoordinate) desc=''
+  TexCoord: UTiling=40.0, VTiling=40.0
+Expression: MaterialExpressionTextureCoordinate_4 (MaterialExpressionTextureCoordinate) desc=''
+  TexCoord: UTiling=2.5, VTiling=2.5
+Expression: MaterialExpressionTextureSample_0 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_MudForest_D.T_MudForest_D, SamplerType: <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+Expression: MaterialExpressionConstant3Vector_2 (MaterialExpressionConstant3Vector) desc=''
+  Constant3Vector: <Struct 'LinearColor' (0x868391b3460) {r: 0.300000, g: 0.180000, b: 0.100000, a: 1.000000}>
+Expression: MaterialExpressionMultiply_3 (MaterialExpressionMultiply) desc=''
+Expression: MaterialExpressionTextureSample_2 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_ForestLeaves02_D.T_ForestLeaves02_D, SamplerType: <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+Expression: MaterialExpressionConstant3Vector_3 (MaterialExpressionConstant3Vector) desc=''
+  Constant3Vector: <Struct 'LinearColor' (0x868391b4f80) {r: 0.220000, g: 0.500000, b: 0.150000, a: 1.000000}>
+Expression: MaterialExpressionMultiply_4 (MaterialExpressionMultiply) desc=''
+Expression: MaterialExpressionTextureSample_4 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_ForestLeaves02_D.T_ForestLeaves02_D, SamplerType: <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+Expression: MaterialExpressionLinearInterpolate_0 (MaterialExpressionLinearInterpolate) desc=''
+Expression: MaterialExpressionTextureSample_11 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_MudForest_N.T_MudForest_N, SamplerType: <MaterialSamplerType.SAMPLERTYPE_NORMAL: 3>
+Expression: MaterialExpressionTextureSample_12 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_MudForest_R.T_MudForest_R, SamplerType: <MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>
+Expression: MaterialExpressionMultiply_5 (MaterialExpressionMultiply) desc=''
+Expression: MaterialExpressionConstant_3 (MaterialExpressionConstant) desc=''
+  Constant: 1.2000000476837158
+Expression: MaterialExpressionTextureSample_13 (MaterialExpressionTextureSample) desc=''
+  Texture: /Game/Forest/Textures/T_MudForest_AO.T_MudForest_AO, SamplerType: <MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>

@@ -1,0 +1,61 @@
+==================================================
+DEEP DIAGNOSTIC OF FOREST TERRAIN RENDERING
+==================================================
+Mesh: /Game/Forest/Meshes/SM_ForestLandscape.SM_ForestLandscape
+  Num LODs: 1
+  Num Sections LOD0: 1
+  Num Materials: 1
+    Slot[0] (M_Forest_Ground_PBR): /Game/Forest/Materials/M_Forest_Ground_PBR.M_Forest_Ground_PBR
+  Nanite Enabled: True
+
+Material: /Game/Forest/Materials/M_Forest_Ground_PBR.M_Forest_Ground_PBR
+  BlendMode: <BlendMode.BLEND_OPAQUE: 0>
+  ShadingModel: <MaterialShadingModel.MSM_DEFAULT_LIT: 1>
+  TwoSided: False
+  UsedWithNanite: True
+  UsedWithISM: True
+  Total Expressions: 16
+    TexCoord: Index=0, Tiling=(60.0, 60.0)
+    TexCoord: Index=0, Tiling=(50.0, 50.0)
+    TexCoord: Index=0, Tiling=(3.0, 3.0)
+    TextureSample: T_GrassGround_D (<MaterialSamplerType.SAMPLERTYPE_COLOR: 0>)
+    TextureSample: T_GrassGround_N (<MaterialSamplerType.SAMPLERTYPE_NORMAL: 3>)
+    TextureSample: T_GrassGround_R (<MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>)
+    TextureSample: T_GrassGround_AO (<MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>)
+    TextureSample: T_ForrestGround01_D (<MaterialSamplerType.SAMPLERTYPE_COLOR: 0>)
+    TextureSample: T_ForrestGround01_N (<MaterialSamplerType.SAMPLERTYPE_NORMAL: 3>)
+    TextureSample: T_ForrestGround01_R (<MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>)
+    TextureSample: T_ForrestGround01_AO (<MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>)
+    TextureSample: T_ForestGround05_D (<MaterialSamplerType.SAMPLERTYPE_COLOR: 0>)
+    Lerp: MaterialExpressionLinearInterpolate_0
+    Lerp: MaterialExpressionLinearInterpolate_1
+    Lerp: MaterialExpressionLinearInterpolate_2
+    Lerp: MaterialExpressionLinearInterpolate_3
+
+Textures:
+  T_GrassGround_D: Size=2048x2048, sRGB=True, Compression=<TextureCompressionSettings.TC_DEFAULT: 0>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD: 0>
+  T_GrassGround_N: Size=2048x2048, sRGB=False, Compression=<TextureCompressionSettings.TC_NORMALMAP: 1>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD_NORMAL_MAP: 1>
+  T_GrassGround_R: Size=2048x2048, sRGB=False, Compression=<TextureCompressionSettings.TC_DEFAULT: 0>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD: 0>
+  T_GrassGround_AO: Size=2048x2048, sRGB=False, Compression=<TextureCompressionSettings.TC_DEFAULT: 0>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD: 0>
+  T_ForrestGround01_D: Size=2048x2048, sRGB=True, Compression=<TextureCompressionSettings.TC_DEFAULT: 0>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD: 0>
+  T_ForrestGround01_N: Size=2048x2048, sRGB=False, Compression=<TextureCompressionSettings.TC_NORMALMAP: 1>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD_NORMAL_MAP: 1>
+  T_ForrestGround01_R: Size=2048x2048, sRGB=False, Compression=<TextureCompressionSettings.TC_DEFAULT: 0>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD: 0>
+  T_ForrestGround01_AO: Size=2048x2048, sRGB=False, Compression=<TextureCompressionSettings.TC_DEFAULT: 0>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD: 0>
+  T_ForestGround05_D: Size=2048x2048, sRGB=True, Compression=<TextureCompressionSettings.TC_DEFAULT: 0>, NeverStream=False, LODGroup=<TextureGroup.TEXTUREGROUP_WORLD: 0>
+
+Level Actors (30 total):
+  Actor 'DirectionalLight' (DirectionalLight) Loc=<Struct 'Vector' (0x39b5761d0) {x: 0.000000, y: 0.000000, z: 400.000000}>, Scale=<Struct 'Vector' (0x3a126ea90) {x: 1.000000, y: 1.000000, z: 1.000000}>
+    DirLight Intensity: 10.0
+    DirLight Color: <Struct 'Color' (0x56cbf5fbcb8) {b: 255, g: 255, r: 255, a: 255}>
+  Actor 'SkyLight' (SkyLight) Loc=<Struct 'Vector' (0x39b556680) {x: 0.000000, y: 0.000000, z: 600.000000}>, Scale=<Struct 'Vector' (0x39b5761d0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+    SkyLight Intensity: 1.0
+  Actor 'ExponentialHeightFog' (ExponentialHeightFog) Loc=<Struct 'Vector' (0x3a126ee50) {x: -5600.000000, y: -50.000000, z: -6850.000000}>, Scale=<Struct 'Vector' (0x39b556680) {x: 1.000000, y: 1.000000, z: 1.000000}>
+  Actor 'Forest_Terrain_Landscape' (StaticMeshActor) Loc=<Struct 'Vector' (0x3a126edb0) {x: 0.000000, y: 0.000000, z: 0.000000}>, Scale=<Struct 'Vector' (0x3a126ee50) {x: 1.000000, y: 1.000000, z: 1.000000}>
+    Mesh: /Game/Forest/Meshes/SM_ForestLandscape.SM_ForestLandscape
+    Material Override[0]: /Game/Forest/Materials/M_Forest_Ground_PBR.M_Forest_Ground_PBR
+  Actor 'PostProcessVolume_Forest' (PostProcessVolume) Loc=<Struct 'Vector' (0x3a126ea90) {x: 0.000000, y: 0.000000, z: 0.000000}>, Scale=<Struct 'Vector' (0x3a126edb0) {x: 1.000000, y: 1.000000, z: 1.000000}>
+    PP Unbound: True
+    PP AutoExposure Method: <AutoExposureMethod.AEM_HISTOGRAM: 0>
+    PP AutoExposure MinEV100: 0.5
+    PP AutoExposure MaxEV100: 2.0
+    PP AutoExposure Bias: 0.0

@@ -1,0 +1,77 @@
+Material: M_Forest_Ground_PBR
+BlendMode: <BlendMode.BLEND_OPAQUE: 0>
+ShadingModel: <MaterialShadingModel.MSM_DEFAULT_LIT: 1>
+TwoSided: False
+
+Expression: MaterialExpressionTextureSample_1 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+  texture = <Object '/Game/Forest/Textures/T_LeafyGrass_D.T_LeafyGrass_D' (0x958799d3c00) Class 'Texture2D'>
+
+Expression: MaterialExpressionTextureSample_3 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+  texture = <Object '/Game/Forest/Textures/T_ForestFloor_R.T_ForestFloor_R' (0x958cf66f000) Class 'Texture2D'>
+
+Expression: MaterialExpressionTextureCoordinate_3 (MaterialExpressionTextureCoordinate)
+
+Expression: MaterialExpressionConstant3Vector_0 (MaterialExpressionConstant3Vector)
+  constant = <Struct 'LinearColor' (0x958cf6a4c00) {r: 0.450000, g: 0.320000, b: 0.200000, a: 1.000000}>
+
+Expression: MaterialExpressionTextureSample_6 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+  texture = <Object '/Game/Forest/Textures/T_ForestLeaves02_D.T_ForestLeaves02_D' (0x958cf66f600) Class 'Texture2D'>
+
+Expression: MaterialExpressionMultiply_1 (MaterialExpressionMultiply)
+
+Expression: MaterialExpressionAdd_0 (MaterialExpressionAdd)
+
+Expression: MaterialExpressionClamp_0 (MaterialExpressionClamp)
+
+Expression: MaterialExpressionTextureSample_8 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_NORMAL: 3>
+  texture = <Object '/Game/Forest/Textures/T_MudForest_N.T_MudForest_N' (0x958cf7d0600) Class 'Texture2D'>
+
+Expression: MaterialExpressionMultiply_2 (MaterialExpressionMultiply)
+
+Expression: MaterialExpressionTextureCoordinate_0 (MaterialExpressionTextureCoordinate)
+
+Expression: MaterialExpressionTextureCoordinate_4 (MaterialExpressionTextureCoordinate)
+
+Expression: MaterialExpressionTextureSample_0 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+  texture = <Object '/Game/Forest/Textures/T_MudForest_D.T_MudForest_D' (0x958cf7d0000) Class 'Texture2D'>
+
+Expression: MaterialExpressionConstant3Vector_2 (MaterialExpressionConstant3Vector)
+  constant = <Struct 'LinearColor' (0x958cf6a47a0) {r: 0.300000, g: 0.180000, b: 0.100000, a: 1.000000}>
+
+Expression: MaterialExpressionMultiply_3 (MaterialExpressionMultiply)
+
+Expression: MaterialExpressionTextureSample_2 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+  texture = <Object '/Game/Forest/Textures/T_ForestLeaves02_D.T_ForestLeaves02_D' (0x958cf66f600) Class 'Texture2D'>
+
+Expression: MaterialExpressionConstant3Vector_3 (MaterialExpressionConstant3Vector)
+  constant = <Struct 'LinearColor' (0x958cf6a4340) {r: 0.220000, g: 0.500000, b: 0.150000, a: 1.000000}>
+
+Expression: MaterialExpressionMultiply_4 (MaterialExpressionMultiply)
+
+Expression: MaterialExpressionTextureSample_4 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_COLOR: 0>
+  texture = <Object '/Game/Forest/Textures/T_ForestLeaves02_D.T_ForestLeaves02_D' (0x958cf66f600) Class 'Texture2D'>
+
+Expression: MaterialExpressionLinearInterpolate_0 (MaterialExpressionLinearInterpolate)
+
+Expression: MaterialExpressionTextureSample_11 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_NORMAL: 3>
+  texture = <Object '/Game/Forest/Textures/T_MudForest_N.T_MudForest_N' (0x958cf7d0600) Class 'Texture2D'>
+
+Expression: MaterialExpressionTextureSample_12 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>
+  texture = <Object '/Game/Forest/Textures/T_MudForest_R.T_MudForest_R' (0x958cf7d0c00) Class 'Texture2D'>
+
+Expression: MaterialExpressionMultiply_5 (MaterialExpressionMultiply)
+
+Expression: MaterialExpressionConstant_3 (MaterialExpressionConstant)
+
+Expression: MaterialExpressionTextureSample_13 (MaterialExpressionTextureSample)
+  sampler_type = <MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>
+  texture = <Object '/Game/Forest/Textures/T_MudForest_AO.T_MudForest_AO' (0x958c2e2cc00) Class 'Texture2D'>

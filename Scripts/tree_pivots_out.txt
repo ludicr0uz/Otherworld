@@ -1,0 +1,11 @@
+=== Tree Bounding Boxes & Pivot Offsets ===
+IslandTree01: Origin=<Struct 'Vector' (0x9968b4fce80) {x: 3.312912, y: -17.469833, z: 249.339547}>, Extent=<Struct 'Vector' (0x9968b4fce98) {x: 237.757477, y: 240.883987, z: 251.372337}>, MinZ=-2.03, MaxZ=500.71
+IslandTree02: Origin=<Struct 'Vector' (0x9968b4fbb40) {x: 5.153473, y: 92.119453, z: 168.629120}>, Extent=<Struct 'Vector' (0x9968b4fbb58) {x: 210.387268, y: 203.534874, z: 170.330292}>, MinZ=-1.70, MaxZ=338.96
+FirTree01A: Origin=<Struct 'Vector' (0x9968b6aab40) {x: 4.775330, y: -32.735077, z: 938.234911}>, Extent=<Struct 'Vector' (0x9968b6aab58) {x: 326.688965, y: 321.341156, z: 946.255445}>, MinZ=-8.02, MaxZ=1884.49
+FirTree01B: Origin=<Struct 'Vector' (0x9968ce83700) {x: 624.192169, y: -11.120438, z: 694.083831}>, Extent=<Struct 'Vector' (0x9968ce83718) {x: 280.629364, y: 302.833542, z: 702.760285}>, MinZ=-8.68, MaxZ=1396.84
+FirTree01C: Origin=<Struct 'Vector' (0x9968ce83080) {x: 1240.593903, y: -1.315414, z: 716.646810}>, Extent=<Struct 'Vector' (0x9968ce83098) {x: 315.296967, y: 298.311874, z: 726.029093}>, MinZ=-9.38, MaxZ=1442.68
+PineA: Origin=<Struct 'Vector' (0x9968ce85dc0) {x: 3.353037, y: -0.766523, z: 63.399453}>, Extent=<Struct 'Vector' (0x9968ce85dd8) {x: 39.383680, y: 36.371065, z: 64.947868}>, MinZ=-1.55, MaxZ=128.35
+Deciduous: Origin=<Struct 'Vector' (0x9968ce85700) {x: 14.935654, y: 76.361183, z: 225.426659}>, Extent=<Struct 'Vector' (0x9968ce85718) {x: 145.835007, y: 214.623863, z: 227.837044}>, MinZ=-2.41, MaxZ=453.26
+
+Terrain BodySetup: TraceFlag=<CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+Terrain Nanite: Enabled=True

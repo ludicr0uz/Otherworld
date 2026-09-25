@@ -1,0 +1,21 @@
+=== M_Forest_Ground_PBR ===
+BlendMode: <BlendMode.BLEND_OPAQUE: 0>
+ShadingModel: <MaterialShadingModel.MSM_DEFAULT_LIT: 1>
+MaterialExpressionTextureCoordinate_0 (MaterialExpressionTextureCoordinate): Tiling=(30.0, 30.0)
+MaterialExpressionTextureCoordinate_1 (MaterialExpressionTextureCoordinate): Tiling=(2.0, 2.0)
+MaterialExpressionTextureSample_0 (MaterialExpressionTextureSample): tex=T_MudForest_D (<MaterialSamplerType.SAMPLERTYPE_COLOR: 0>)
+MaterialExpressionConstant3Vector_0 (MaterialExpressionConstant3Vector): RGB=(0.25, 0.15, 0.08)
+MaterialExpressionMultiply_0 (MaterialExpressionMultiply): 
+MaterialExpressionTextureSample_1 (MaterialExpressionTextureSample): tex=T_ForestLeaves02_D (<MaterialSamplerType.SAMPLERTYPE_COLOR: 0>)
+MaterialExpressionConstant3Vector_1 (MaterialExpressionConstant3Vector): RGB=(0.12, 0.45, 0.08)
+MaterialExpressionMultiply_1 (MaterialExpressionMultiply): 
+MaterialExpressionTextureSample_2 (MaterialExpressionTextureSample): tex=T_ForestLeaves02_D (<MaterialSamplerType.SAMPLERTYPE_COLOR: 0>)
+MaterialExpressionConstant_0 (MaterialExpressionConstant): val=0.20000000298023224
+MaterialExpressionAdd_0 (MaterialExpressionAdd): 
+MaterialExpressionClamp_0 (MaterialExpressionClamp): 
+MaterialExpressionLinearInterpolate_0 (MaterialExpressionLinearInterpolate): 
+MaterialExpressionTextureSample_3 (MaterialExpressionTextureSample): tex=T_MudForest_N (<MaterialSamplerType.SAMPLERTYPE_NORMAL: 3>)
+MaterialExpressionTextureSample_4 (MaterialExpressionTextureSample): tex=T_MudForest_R (<MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>)
+MaterialExpressionConstant_1 (MaterialExpressionConstant): val=1.100000023841858
+MaterialExpressionMultiply_2 (MaterialExpressionMultiply): 
+MaterialExpressionTextureSample_5 (MaterialExpressionTextureSample): tex=T_MudForest_AO (<MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR: 6>)

@@ -1,0 +1,85 @@
+{
+  "level_name": "Lvl_Forest_200m",
+  "world_size_m": 200.0,
+  "all_passed": true,
+  "checks": [
+    {
+      "name": "OBJ File Valid",
+      "passed": true,
+      "message": "2312 vertices, 4620 faces, 2312 normals",
+      "details": []
+    },
+    {
+      "name": "Terrain Bounds",
+      "passed": true,
+      "message": "X span: 20000 cm, Y span: 20000 cm (expected 20000 cm)",
+      "details": []
+    },
+    {
+      "name": "Center Spawn Flat",
+      "passed": true,
+      "message": "Max |Z| in spawn zone: 0.00 cm (threshold: 1.0 cm)",
+      "details": [
+        "(0, 0) \u2192 Z=0.00",
+        "(1000, 0) \u2192 Z=0.00",
+        "(-1000, 0) \u2192 Z=0.00",
+        "(0, 1000) \u2192 Z=0.00",
+        "(0, -1000) \u2192 Z=0.00"
+      ]
+    },
+    {
+      "name": "Top Normals Upward",
+      "passed": true,
+      "message": "Checked 2312 normals, 0 bad top-surface normals",
+      "details": []
+    },
+    {
+      "name": "Barycentric Consistency",
+      "passed": true,
+      "message": "Max barycentric error at grid vertices: 0.0000 cm",
+      "details": []
+    },
+    {
+      "name": "Tree Count / Density",
+      "passed": true,
+      "message": "136 trees on 4.0 ha = 34.0 trees/ha",
+      "details": []
+    },
+    {
+      "name": "Trees Within Bounds",
+      "passed": true,
+      "message": "All trees within map bounds",
+      "details": []
+    },
+    {
+      "name": "Trees Not Floating",
+      "passed": true,
+      "message": "All trees at or below terrain",
+      "details": []
+    },
+    {
+      "name": "Trees Not Over-Buried",
+      "passed": true,
+      "message": "All sinks within 200 cm",
+      "details": []
+    },
+    {
+      "name": "Trees Vertical",
+      "passed": true,
+      "message": "All trees placed with pitch=0, roll=0 (vertical)",
+      "details": []
+    },
+    {
+      "name": "Tree Spacing (>100cm)",
+      "passed": true,
+      "message": "Min spacing: 125 cm, 0 overlaps",
+      "details": []
+    },
+    {
+      "name": "Spawn Zone Clear",
+      "passed": true,
+      "message": "Spawn zone (5m radius) clear",
+      "details": []
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+=== Level HISM Actors & Instances ===
+HISM 'HISM_Stump_01': 21 instances | Mesh: SM_tree_stump_01 | Mats: ['MI_TreeStump01']
+HISM 'HISM_Stump_02': 18 instances | Mesh: SM_tree_stump_02 | Mats: ['MI_TreeStump02']
+HISM 'HISM_Root_Cluster': 21 instances | Mesh: SM_root_cluster_01 | Mats: ['MI_RootCluster01']
+HISM 'HISM_Rock_Granite': 33 instances | Mesh: SM_rock_07 | Mats: ['MI_Rock07']
+HISM 'HISM_Rock_Moss': 47 instances | Mesh: rock_moss_set_01_rock01 | Mats: ['MI_RockMossSet']
+HISM 'HISM_Shrub_01': 48 instances | Mesh: SM_shrub_01 | Mats: ['MI_Shrub01']
+HISM 'HISM_Shrub_03': 50 instances | Mesh: shrub_03_a | Mats: ['MI_Shrub03']
+HISM 'HISM_Flowers': 22 instances | Mesh: periwinkle_plant_01_LOD0 | Mats: ['MI_Periwinkle']
+HISM 'HISM_Grass_Medium': 250 instances | Mesh: grass_medium_01_large_a_LOD0 | Mats: ['MI_GrassMedium01']
+HISM 'HISM_Grass_Tall': 160 instances | Mesh: grass_medium_02_a | Mats: ['MI_GrassMedium02']
+HISM 'HISM_Ferns': 90 instances | Mesh: fern_02_a | Mats: ['MI_Fern02']
+HISM 'HISM_Moss_Patch': 70 instances | Mesh: moss_01_a_LOD0 | Mats: ['MI_Moss01']
+HISM 'HISM_Tree_Leafy_Island_01': 75 instances | Mesh: SM_island_tree_01 | Mats: ['MI_IslandTree01_Trunk', 'MI_IslandTree01_Leaves', 'MI_IslandTree01_Branches']
+HISM 'HISM_Tree_Leafy_Island_02': 65 instances | Mesh: SM_island_tree_02 | Mats: ['MI_IslandTree02_Trunk', 'MI_IslandTree02_Leaves', 'MI_IslandTree02_Branches']
+HISM 'HISM_Tree_Fir_A': 180 instances | Mesh: fir_tree_01_a_LOD0 | Mats: ['MI_FirTree01_Bark', 'MI_FirTree01_TrunkA', 'MI_FirTree01_Twig', 'MI_FirTree01_Bark']
+HISM 'HISM_Tree_Pine_A': 87 instances | Mesh: pine_sapling_small_a | Mats: ['MI_PineSapling_Bark', 'MI_PineSapling_Twig']
+HISM 'HISM_Tree_Deciduous': 53 instances | Mesh: SM_tree_small_02 | Mats: ['MI_TreeSmall02_Branches', 'MI_TreeSmall02_Leaves', 'MI_TreeSmall02_Trunk']
+
+Total Instanced Objects: 1290
+
+Terrain Actor: Mesh=SM_ForestLandscape, Nanite=False, CollisionTrace=<CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>

@@ -1,0 +1,1 @@
+=== ThirdPersonMap Lighting Settings ===

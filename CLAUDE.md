@@ -63,8 +63,46 @@ Python** — no hand editing — and is idempotent, so re-generating a level reu
 
 Run it standalone with `-ExecutePythonScript` to rebuild the assets after editing it.
 
+## The graphics menu
+
+`Scripts/build_graphics_menu.py` builds `/Game/UI/BP_GraphicsMenuHUD` (parent `AHUD`) and
+points `BP_ThirdPersonGameMode.HUDClass` at it. That game mode is `GlobalDefaultGameMode` and
+no generated level overrides it, so the menu is in every level without placing an actor or
+touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / High.
+
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 21 checks. Run it after any
+edit to the builder; it is the only thing that catches pin values that compile but don't mean
+what they look like (see the `FKey` gotcha below).
+
+Each preset sets an overall scalability level *and* two console commands:
+
+| preset | scalability | `r.ShadowQuality` | `r.ScreenPercentage` |
+|--------|-------------|-------------------|----------------------|
+| Low    | 0 (Low)     | 1                 | 70                   |
+| Medium | 1 (Medium)  | 2                 | 85                   |
+| High   | 3 (Epic)    | 3                 | 100                  |
+
+High maps to Epic, not to 2, because Epic is what the project already runs at — the top preset
+has to be the current look, not a downgrade. The console commands are **not** redundant:
+`DefaultEngine.ini` pins `r.ShadowQuality=3` under `[/Script/Engine.RendererSettings]`, which is
+`SetByProjectSetting` priority and outranks `SetByScalability`, so `SetOverallScalabilityLevel`
+cannot move shadows at all (the editor logs `was ignored as it is lower priority`). A console
+command is `SetByConsole`, which outranks both. `r.ScreenPercentage` is in no scalability group
+and is the biggest GPU lever on a forest this dense.
+
+`BeginPlay` **applies** `DEFAULT_PRESET` (Low) rather than merely pointing the caret at it — the
+panel can only tell the truth about current quality if it is the thing that established it. The
+menu does not call `SaveSettings`, so a choice lasts the session and every launch starts at Low
+again.
+
+Note the consequence in PIE: these are global cvars, so whichever preset is active when you stop
+PIE is what your editor viewport keeps. `r.ScreenPercentage 100` and `r.ShadowQuality 3` restore
+it.
+
 ## Current state
 
+- `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
+  `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
 - `/Game/Maps/Lvl_Forest_200m` is generated in **night** mode: 136 trees / 5 species,
   44,368 knee-high grass clumps / 9 species, one NPC 58 m from the player, moon light
@@ -81,6 +119,30 @@ Run it standalone with `-ExecutePythonScript` to rebuild the assets after editin
 
 ## Gotchas learned the hard way
 
+- **UMG layout cannot be authored from Python** in 5.8: `UWidgetBlueprint::WidgetTree` is a
+  protected `UPROPERTY`, so `get_editor_property("WidgetTree")` is refused and there is no
+  editor subsystem exposing it. A Widget Blueprint's widgets can only be placed by hand. That
+  is why the graphics menu is an `AHUD` drawing to the canvas — `DrawText`/`DrawRect` are
+  ordinary BlueprintCallable functions, so the whole thing stays scriptable.
+- **`FKey` pin defaults are the bare key name**, not struct text. `FKey` overrides
+  `ExportTextItem` to write just `KeyName`, so a pin set to `(KeyName="M")` imports back as a
+  key literally called `(`. It compiles, it saves, and the key silently never matches at
+  runtime. Set the pin to `M` / `One` / `Two` / `Three`.
+- `BlueprintEditorLibrary.get_node_title` returns an **empty string** for every node in 5.8's
+  Python layer, and `list_all_nodes` hands back objects typed as the `K2Node` base, so
+  `isinstance` against a subclass never matches either. Identify nodes by their input-pin
+  signature instead (`verify_graphics_menu.py` does this).
+- `add_call_function_node` returns a **pinless node, not `None`**, for a function path that does
+  not resolve — including paths that exist in C++ but are not `BlueprintCallable`
+  (`APlayerController::ConsoleCommand` is one; use
+  `KismetSystemLibrary.ExecuteConsoleCommand`). The failure surfaces much later as
+  `pin 'self' not found on `. Guard node creation by asserting the node has pins.
+- Events other than the placeholders a fresh Blueprint ships with (BeginPlay, Tick) must come
+  from the palette via `create_node_from_name` — e.g. `AddEvent|EventReceiveDrawHUD`,
+  `AddEvent|EventTick`. `find_event_node` only finds what already exists.
+- A builder whose "already authored, reusing" guard has no escape hatch means **no edit to the
+  builder ever reaches the asset**. `build_graphics_menu.py` takes `rebuild=True`, wipes the
+  graph with `remove_nodes`, and re-creates the event nodes from the palette.
 - UE 5.8 renamed the height-fog property to `fog_inscattering_luminance`
   (was `fog_inscattering_color`). Use the `try_set_first([...])` helper pattern.
 - Terrain mesh needs Nanite **off** + `CTF_USE_COMPLEX_AS_SIMPLE`, or collision is wrong.

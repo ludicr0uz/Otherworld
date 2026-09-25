@@ -46,6 +46,8 @@ from forest_generator.grass_placement import (
 )
 from forest_generator.npc_placement import (
     place_npc,
+    compute_nav_bounds,
+    NAV_MAX_VERTICAL_SPAN_CM,
     NPC_WALK_SPEED_CMS,
     NPC_CAPSULE_HALF_HEIGHT_CM,
     NAV_AGENT_RADIUS_CM,
@@ -197,6 +199,15 @@ def main():
             print(f"       {placed_npc.blocking_trees} tree(s) block the direct line "
                   f"(found in {placed_npc.attempts} attempt(s))")
 
+    nav_bounds = None
+    if placed_npc is not None:
+        nav_bounds = compute_nav_bounds(world_size_cm, grid_z, grid_size)
+        print(f"       Nav volume: +/-{nav_bounds['half_xy_cm']:.0f} cm XY, "
+              f"Z {nav_bounds['center_z_cm'] - nav_bounds['half_z_cm']:.0f}..."
+              f"{nav_bounds['center_z_cm'] + nav_bounds['half_z_cm']:.0f} cm "
+              f"(terrain {nav_bounds['terrain_min_z_cm']:.0f}..."
+              f"{nav_bounds['terrain_max_z_cm']:.0f})")
+
     # ── Step 5: Run verification ─────────────────────────────────────────
     print(f"\n[5/6] Running verification suite...")
     report = run_all_checks(
@@ -211,6 +222,7 @@ def main():
         knee_height_cm=args.grass_height,
         placed_npc=placed_npc,
         expect_npc=not args.no_npc,
+        nav_bounds=nav_bounds,
     )
     print()
     print(report.summary)
@@ -246,6 +258,7 @@ def main():
         grass_data_path=grass_data_path,
         grass_count=len(placed_grass),
         placed_npc=placed_npc,
+        nav_bounds=nav_bounds,
         lighting=lighting,
     )
     print(f"       Script → {ue_script_path}")
@@ -260,6 +273,7 @@ def main():
         placed_trees=placed_trees,
         placed_grass=placed_grass,
         placed_npc=placed_npc,
+        nav_bounds=nav_bounds,
         lighting=lighting,
     )
     print(f"       Verify → {ue_verify_path}")
@@ -320,6 +334,7 @@ def _write_unreal_import_script(
     grass_data_path: str,
     grass_count: int,
     placed_npc,
+    nav_bounds,
     lighting: dict,
 ):
     """Generate a self-contained Unreal Python script that imports everything."""
@@ -332,6 +347,8 @@ def _write_unreal_import_script(
             "yaw": round(placed_npc.yaw_deg, 2),
         } if placed_npc else None
     )
+    nav_bounds_json = json.dumps(
+        {k: round(v, 2) for k, v in nav_bounds.items()} if nav_bounds else None)
 
     # Grass mesh/material table, keyed by HISM actor label
     grass_configs = {
@@ -892,6 +909,7 @@ def _write_unreal_import_script(
 
         # ── 7. Navigation + wandering NPC ────────────────────────────────────
         NPC_SPAWN = json.loads(r"""{npc_json}""")
+        NAV_BOUNDS = json.loads(r"""{nav_bounds_json}""")
         SCRIPTS_DIR = r"{scripts_dir}"
         NAV_AGENT_RADIUS = {nav_agent_radius}
         NAV_AGENT_HEIGHT = {nav_agent_height}
@@ -901,35 +919,40 @@ def _write_unreal_import_script(
 
             # NavMeshBoundsVolume's default brush is a 200 cm cube, so scaling
             # the actor by world_size/200 makes it cover the map exactly.
+            # Sized from the terrain band the NPC can actually walk on, NOT
+            # from the map width.  Recast voxelises the full height of every
+            # tile, so an over-tall volume silently yields no tiles at all and
+            # nothing is ever navigable.
             nav_volume = editor_actor_sub.spawn_actor_from_class(
-                unreal.NavMeshBoundsVolume, unreal.Vector(0, 0, 0))
+                unreal.NavMeshBoundsVolume,
+                unreal.Vector(0.0, 0.0, NAV_BOUNDS["center_z_cm"]))
             nav_volume.set_actor_label(f"{{LEVEL_NAME}}_NavBounds")
-            nav_scale = WORLD_SIZE_CM / 200.0
-            # Z is generous: the terrain's edge ramp climbs well above the centre.
-            nav_volume.set_actor_scale3d(
-                unreal.Vector(nav_scale, nav_scale, max(20.0, nav_scale * 0.4)))
+            # The default brush is a 200 cm cube, i.e. 100 cm half-extent.
+            nav_volume.set_actor_scale3d(unreal.Vector(
+                NAV_BOUNDS["half_xy_cm"] / 100.0,
+                NAV_BOUNDS["half_xy_cm"] / 100.0,
+                NAV_BOUNDS["half_z_cm"] / 100.0,
+            ))
 
-            nav_data = None
-            for a in editor_actor_sub.get_all_level_actors():
-                if isinstance(a, unreal.RecastNavMesh):
-                    nav_data = a
-                    break
-            if nav_data is None:
-                nav_data = editor_actor_sub.spawn_actor_from_class(
-                    unreal.RecastNavMesh, unreal.Vector(0, 0, 0))
-            nav_data.set_actor_label(f"{{LEVEL_NAME}}_NavMesh")
-            # These match the navigation system's default agent. Setting them
-            # is belt-and-braces: the nav system re-applies its default agent
-            # config when the nav data registers, so these values are what the
-            # navmesh ends up with either way.
-            try_set(nav_data, "agent_radius", NAV_AGENT_RADIUS)
-            try_set(nav_data, "agent_height", NAV_AGENT_HEIGHT)
-            # A headless editor never finishes an async navmesh bake, and this
-            # level is generated rather than hand-built, so have the navigation
-            # system generate the mesh when the game starts instead of relying
-            # on baked tiles.
-            try_set(nav_data, "runtime_generation",
-                    unreal.RuntimeGenerationType.DYNAMIC)
+            # Deliberately do NOT place a RecastNavMesh actor.
+            #
+            # A headless editor never finishes an async navmesh bake, so any
+            # RecastNavMesh saved from here carries EMPTY serialised tile data.
+            # At game start the engine finds that data structurally valid and
+            # reuses it instead of building -- 0 tiles, every MoveTo fails, and
+            # the NPC never moves.  It only ever appeared to work right after a
+            # nav-bounds change, because the changed parameters no longer matched
+            # the serialised ones and the engine logged
+            #   "Recreating dtNavMesh instance ... due mismatch in ... maxTiles"
+            # and rebuilt.  Once the bounds settled, it silently stopped again.
+            #
+            # Leaving no nav data in the level makes the navigation system create
+            # it at load, which always builds (324 tiles here).  Runtime
+            # generation is Dynamic via Config/DefaultEngine.ini, since the nav
+            # system overwrites per-actor values with class defaults anyway.
+            # (the actual removal happens immediately before the save below --
+            #  the navigation system re-creates nav data while the level is open,
+            #  so removing it any earlier accomplishes nothing)
 
             # The NPC Blueprints are level-independent, so they live in their
             # own idempotent builder script rather than being re-emitted here.
@@ -948,12 +971,26 @@ def _write_unreal_import_script(
             npc_actor.set_actor_label(f"{{LEVEL_NAME}}_NPC_Wanderer")
             unreal.log_warning(
                 f"[GEN]    NPC at ({{NPC_SPAWN['x']:.0f}}, {{NPC_SPAWN['y']:.0f}}, "
-                f"{{NPC_SPAWN['z']:.0f}}), nav agent r={{NAV_AGENT_RADIUS}} "
-                f"h={{NAV_AGENT_HEIGHT}}, runtime navmesh generation DYNAMIC")
+                f"{{NPC_SPAWN['z']:.0f}}); navmesh is built by the navigation "
+                f"system at game start (no nav data saved in the level)")
+            unreal.log_warning(
+                f"[GEN]    Nav volume: +/-{{NAV_BOUNDS['half_xy_cm']:.0f}} cm XY, "
+                f"Z span {{NAV_BOUNDS['half_z_cm'] * 2.0:.0f}} cm "
+                f"centred {{NAV_BOUNDS['center_z_cm']:.0f}}")
         else:
             unreal.log_warning("[GEN] 7. NPC skipped (none placed).")
 
         # ── 8. Save ─────────────────────────────────────────────────────────
+        # Strip nav data as the very last action: the navigation system
+        # re-creates a RecastNavMesh whenever the level is open, and anything
+        # saved here carries EMPTY serialised tiles that the game then reuses
+        # instead of building (see section 7).
+        stripped = 0
+        for a in list(editor_actor_sub.get_all_level_actors()):
+            if isinstance(a, unreal.RecastNavMesh):
+                editor_actor_sub.destroy_actor(a)
+                stripped += 1
+        unreal.log_warning(f"[GEN] Stripped {{stripped}} RecastNavMesh actor(s) before save")
         level_editor_sub.save_current_level()
         unreal.log_warning("=" * 60)
         unreal.log_warning(f"[GEN] ✅ {{LEVEL_NAME}} GENERATED AND SAVED!")
@@ -975,6 +1012,7 @@ def _write_unreal_verify_script(
     placed_trees,
     placed_grass,
     placed_npc,
+    nav_bounds,
     lighting: dict,
 ):
     """Generate an Unreal Python script that verifies the level after import."""
@@ -990,6 +1028,10 @@ def _write_unreal_verify_script(
     )
     npc_walk_speed = NPC_WALK_SPEED_CMS
     nav_agent_radius = NAV_AGENT_RADIUS_CM
+    nav_bounds_json = json.dumps(
+        {k: round(v, 2) for k, v in nav_bounds.items()} if nav_bounds else None)
+    nav_max_span = NAV_MAX_VERTICAL_SPAN_CM
+    capsule_half = NPC_CAPSULE_HALF_HEIGHT_CM
 
     tree_count = len(placed_trees)
     spec_counts = dict(Counter(t.spec_name for t in placed_trees))
@@ -1031,6 +1073,7 @@ def _write_unreal_verify_script(
         EXPECTED_NPC = json.loads(r"""{npc_json}""")
         EXPECTED_NPC_WALK_SPEED = {npc_walk_speed}
         EXPECTED_NAV_AGENT_RADIUS = {nav_agent_radius}
+        EXPECTED_NAV_BOUNDS = json.loads(r"""{nav_bounds_json}""")
         LIGHTING = json.loads(r"""{lighting_json}""")
 
         passed = 0
@@ -1303,6 +1346,10 @@ def _write_unreal_verify_script(
                 mesh_comp = cdo.get_editor_property("mesh")
                 check("NPC Has Skeletal Mesh",
                       mesh_comp.get_editor_property("skeletal_mesh_asset") is not None)
+                check("NPC Animation Mode Blueprint",
+                      mesh_comp.get_editor_property("animation_mode") ==
+                      unreal.AnimationMode.ANIMATION_BLUEPRINT,
+                      f"(got {{mesh_comp.get_editor_property('animation_mode')}})")
                 check("NPC Has Anim Class",
                       mesh_comp.get_editor_property("anim_class") is not None)
 
@@ -1325,24 +1372,41 @@ def _write_unreal_verify_script(
 
             # -- Navigation rig --
             check("Nav Bounds Volume Exists", nav_bounds is not None)
-            if nav_bounds:
+            if nav_bounds and EXPECTED_NAV_BOUNDS:
                 origin, extent = nav_bounds.get_actor_bounds(False)
-                need = WORLD_SIZE_CM / 2.0
-                check("Nav Bounds Cover The Map",
-                      extent.x >= need - 1.0 and extent.y >= need - 1.0,
-                      f"(extent {{extent.x:.0f}}x{{extent.y:.0f}} cm, "
-                      f"need >= {{need:.0f}})")
-            check("Nav Mesh Actor Exists", nav_mesh is not None)
-            if nav_mesh:
-                r = nav_mesh.get_editor_property("agent_radius")
-                check("Nav Agent Radius",
-                      close(r, EXPECTED_NAV_AGENT_RADIUS, 0.5),
-                      f"(expected {{EXPECTED_NAV_AGENT_RADIUS}}, got {{r}})")
-                gen = nav_mesh.get_editor_property("runtime_generation")
-                check("Nav Runtime Generation Dynamic",
-                      gen == unreal.RuntimeGenerationType.DYNAMIC,
-                      f"(got {{gen}} — must be DYNAMIC so the mesh builds at "
-                      f"game start)")
+                want_xy = EXPECTED_NAV_BOUNDS["half_xy_cm"]
+                want_z = EXPECTED_NAV_BOUNDS["half_z_cm"]
+                check("Nav Bounds XY Extent",
+                      close(extent.x, want_xy, 2.0) and close(extent.y, want_xy, 2.0),
+                      f"(expected +/-{{want_xy:.0f}}, got {{extent.x:.0f}}x{{extent.y:.0f}})")
+                check("Nav Bounds Z Extent",
+                      close(extent.z, want_z, 2.0),
+                      f"(expected +/-{{want_z:.0f}}, got {{extent.z:.0f}})")
+                check("Nav Bounds Centred On Terrain",
+                      close(origin.z, EXPECTED_NAV_BOUNDS["center_z_cm"], 2.0),
+                      f"(expected z {{EXPECTED_NAV_BOUNDS['center_z_cm']:.0f}}, "
+                      f"got {{origin.z:.0f}})")
+                # The bug that made the NPC immobile: an over-tall volume makes
+                # Recast generate no tiles at all.
+                check("Nav Bounds Vertical Span Sane",
+                      extent.z * 2.0 <= {nav_max_span},
+                      f"(span {{extent.z * 2.0:.0f}} cm, limit {nav_max_span:.0f})")
+                # The NPC must stand inside the volume or it has no navmesh.
+                if npc_actor:
+                    loc = npc_actor.get_actor_location()
+                    feet_z = loc.z - {capsule_half}
+                    inside = (abs(loc.x) <= want_xy and abs(loc.y) <= want_xy
+                              and abs(feet_z - origin.z) <= want_z)
+                    check("NPC Inside Nav Bounds", inside,
+                          f"(feet z {{feet_z:.0f}} vs volume "
+                          f"{{origin.z - want_z:.0f}}..{{origin.z + want_z:.0f}})")
+            # NOTE: whether stale nav data was SAVED cannot be asserted from
+            # here -- opening the level makes the navigation system create a
+            # RecastNavMesh in memory, so one is always present in an editor
+            # session regardless of what is on disk.  The import script strips
+            # nav data immediately before saving; the real gate is the runtime
+            # check documented in systemDesign.md (grep the game log for
+            # "Building tile", which must be non-zero).
 
         # ── Summary ──────────────────────────────────────────────────────────
         unreal.log_warning("")

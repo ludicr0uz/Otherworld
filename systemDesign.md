@@ -80,11 +80,11 @@ embedded script templates).
 ```
 CLI ──► terrain.generate_terrain_obj ──► tree_placement.scatter_trees
      ──► grass_placement.scatter_grass ──► npc_placement.place_npc
-     ──► verification.run_all_checks (25 offline checks; exits 1 on failure)
+     ──► verification.run_all_checks (27 offline checks; exits 1 on failure)
      ──► verification_report.json
      ──► emit grass_<Level>.json  (instance transforms, read at import time)
      ──► emit import_<Level>.py   (build the level in-editor)
-     ──► emit verify_<Level>.py   (101 in-editor assertions)
+     ──► emit verify_<Level>.py   (103 in-editor assertions)
      ──► print the two UnrealEditor-Cmd commands
 ```
 
@@ -226,9 +226,73 @@ into the verification checks without an editor.
 
 ### 3.2e Navigation
 
-The import script spawns a `NavMeshBoundsVolume` and scales the actor by `world_size / 200`
-(its default brush is a 200 cm cube), which makes it cover the map exactly, plus a
-`RecastNavMesh`. Two findings shaped this:
+The import script spawns a `NavMeshBoundsVolume` sized by `npc_placement.compute_nav_bounds`
+plus a `RecastNavMesh`. **How that volume is sized is the single most load-bearing detail in
+the NPC feature**, and getting it wrong is silent.
+
+**The level must not contain saved nav data.** This was the root cause of the NPC never
+moving, and it masqueraded as several other bugs. A headless editor never finishes an async
+navmesh bake, so a `RecastNavMesh` saved from the import script carries *empty* serialised
+tiles. At game start the engine finds those structurally valid and reuses them instead of
+building — 0 tiles, every `MoveToActor` returns `Failed`, and the NPC stands still forever.
+
+What made it so slippery: it appeared to work immediately after any change to the nav bounds,
+because the changed parameters no longer matched the serialised ones and the engine logged
+
+```
+Warning: Recreating dtNavMesh instance (RecastNavMesh_0) due mismatch in number of bytes
+required to store serialized maxTiles (serialized: 1083, 11 bits) vs calculated required (972, 10 bits)
+```
+
+and rebuilt from scratch. Every "successful" run during development was an accident of having
+just retuned the bounds; once they settled, it silently stopped building and stayed broken.
+
+The fix is for the import script to destroy every `RecastNavMesh` **as its last action before
+`save_current_level()`** — the navigation system re-creates nav data whenever the level is
+open, so stripping it any earlier accomplishes nothing — and to let the navigation system
+create the mesh at load instead. `Config/DefaultEngine.ini` sets
+`[/Script/NavigationSystem.RecastNavMesh] RuntimeGeneration=Dynamic` as a **class default**,
+because the nav system overwrites per-actor values with class defaults on registration (the
+same reset that clobbers `AgentRadius`).
+
+This is not assertable from the editor: opening a level always materialises a nav actor in
+memory, so a check cannot tell "saved on disk" from "created on load". The runtime grep for
+`Building tile` is the only real gate.
+
+**Recast also generates nothing at all if the volume is too large.** No warning, no error, no
+`LogRecast` output — the navmesh registers, `CalculateMaxTilesCount` runs, and then no tile is
+ever built, so every query fails with `InitPathfinding start point not on navmesh` and the NPC
+stands still forever. The first implementation sized Z as a fraction of map width, giving
+±4000 cm on a 200 m map, and produced **zero** tiles. Measured envelope:
+
+| Volume | Tiles built | Result |
+|---|---|---|
+| ±10000 cm XY, 8000 cm Z span | **0** | NPC immobile, 862 consecutive `Failed` |
+| ±9200 cm XY, 2007 cm Z span | **0** | NPC immobile |
+| ±8500 cm XY, 1500 cm Z span | 176 | NPC walks to the player |
+| ±8500 cm XY, 1479 cm Z span | 324 | NPC walks 51 m and stops at the player |
+
+`NAV_MAX_HALF_XY_CM` (8500) and `NAV_MAX_VERTICAL_SPAN_CM` (1600) encode that envelope. They
+are **empirical**, not derived: UE 5.8 exposes neither `tile_size_uu` nor a readable tile
+limit to Python, so the cliff between the third and second rows cannot currently be explained
+from the engine side. If a navmesh ever comes up empty, suspect these first.
+
+Two consequences for how the volume is computed:
+
+- **Size Z from the terrain, not the map.** `compute_nav_bounds` walks `grid_z` and takes the
+  actual min/max elevation, then adds headroom that must exceed the agent height (144 cm) or
+  the ground beneath the ceiling reads as too low to stand in.
+- **Sample a disk, not the square.** The volume is a box that has to contain the disk the NPC
+  spawns in, but the box's corners sit 1.41x further out — where this terrain's edge ramp is
+  ~40 m tall. Letting the corners set the Z band inflated the span from 2007 cm to 3635 cm for
+  ground nobody can walk on. Terrain poking above the box simply stays non-navigable, which is
+  correct: it is a cliff.
+
+Because coverage is capped, on a map larger than the cap the navmesh is a central island —
+so `npc_usable_radius()` clamps the NPC's spawn radius to the same cap, and both
+`place_npc()` and the offline checks call it so they cannot drift apart.
+
+Two further findings shaped this:
 
 - **The nav system overwrites the agent config.** `agent_radius`/`agent_height` set on the
   RecastNavMesh are replaced by the navigation system's default agent (35 cm / 144 cm) when
@@ -260,12 +324,14 @@ found can only be confirmed in PIE. See §6.
   ±30 % of the target and no clump may exceed 1.6×); upscale factor ≤ 2.4×; coverage —
   every cell of a 12×12 grid over the map contains grass, which is what "throughout the
   level" actually means; species spread.
-- **NPC (6, skipped under `--no-npc`):** placed at all; within the usable bounds; far enough
+- **NPC (8, skipped under `--no-npc`):** placed at all; within the usable bounds; far enough
   from the player to have a journey; clear of trunks; grounded (capsule centre exactly one
   half-height above the re-derived terrain Z); and route-obstructed — reports whether a tree
   blocks the direct line. That last one passes either way by design, since a clear line can
   be legitimate on a sparse map, but it tells you whether the detour behaviour is being
-  exercised.
+  exercised. Plus `Nav Bounds Sane` (vertical span within the measured envelope) and
+  `NPC Inside Nav Bounds` (the capsule's *feet* — pathfinding queries feet, not centre — lie
+  inside the volume, and nav coverage is not narrower than the NPC's spawn radius).
 
 ### 3.4 Generated import script
 
@@ -316,7 +382,10 @@ points at the controller, `auto_possess_ai` is `PLACED_IN_WORLD_OR_SPAWNED`, `ma
 is the slow 110 cm/s, and the mesh and anim class are set; that the placed actor is a
 `Character` at the expected transform and the expected distance from the PlayerStart; and that
 the nav bounds cover the map and the navmesh's `runtime_generation` is `DYNAMIC`.
-Prints `[VERIFY] ✅ ALL 101 CHECKS PASSED!` or a list of failures.
+The nav block asserts the volume's XY and Z extents and centre match what the generator
+computed, that the vertical span is inside the measured envelope, and that the NPC's feet sit
+inside the volume.
+Prints `[VERIFY] ✅ ALL 105 CHECKS PASSED!` or a list of failures.
 
 ---
 
@@ -436,10 +505,43 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
   The same applies to grass: the checks prove every clump is knee high, seated on the
   terrain, evenly covering the map and not over-stretched, but density and patchiness are
   taste calls — `--grass-density` and `--grass-patchiness` exist for that.
-- **Not verified programmatically: that the NPC actually walks and paths.** The navmesh is
-  generated at game start, and a headless `-ExecutePythonScript` run does not tick the editor,
-  so no path can be queried offline — a query immediately after setup returns `None`. Every
-  precondition is asserted (rig, bounds, runtime generation, controller, possession, speed,
-  spawn transform, obstructed route), but confirming the NPC leaves its spawn, routes around
-  trunks and stops 150 cm from the player needs a PIE session. Press Play in
-  `Lvl_Forest_200m`; `show Navigation` draws the generated mesh.
+- **The NPC's walk is verified, but only out of process.** A headless `-ExecutePythonScript`
+  run does not tick the editor, so no path can be queried from the generator's own checks.
+  Running the map as a game does work, and is how the fix above was validated:
+
+  ```
+  UnrealEditor-Cmd <uproject> /Game/Maps/<Level> -game -nullrhi -unattended \
+      -forcelogflush -LogCmds="LogNavigation Verbose" -abslog=<path>
+  ```
+
+  Grep for `Building tile` (hundreds when healthy, **zero** when the volume is oversized) and
+  `not on navmesh` (a couple at startup, then silence). Note `-stdout` block-buffers and UE
+  writes no `Saved/Logs` under it, so `-abslog` plus `-forcelogflush` are required — without
+  them the log looks frozen at engine init while the process burns CPU.
+
+  Last measured run on `Lvl_Forest_200m`: the NPC walked 51.7 m of path from
+  (−1422, 5114) to (0, 187) in 27 s and held at the acceptance radius.
+
+- **Walk speed: resolved.** It measured 192 cm/s against a configured 110 for as long as the
+  navmesh was broken — with no navmesh, path following falls back to setting velocity
+  directly, which bypasses `MaxWalkSpeed` *and* leaves `GetCurrentAcceleration()` at zero.
+  With the navmesh building, the move is acceleration-driven and measures **100 cm/s**.
+  The same zero-acceleration side effect is why `ABP_Unarmed` (whose `ShouldMove` is
+  `GroundSpeed > 0 AND Acceleration != 0`) held the idle pose.
+
+- Two fixes were tried for the idle-pose symptom *before* the navmesh cause was found, and
+  both were measured to stop movement dead (0.0 m); neither is used, and both are recorded in
+  `build_npc_blueprints.py` so they are not retried: setting
+  `NavMovementProperties.use_acceleration_for_paths = True`, and driving the mesh with
+  `ANIMATION_SINGLE_NODE` playing a walk clip (the single-node instance consumes root motion,
+  and the template clips are root-locked, pinning the character in place).
+- **Note on in-place blueprint updates.** `build_npc_blueprints.py` now updates assets in
+  place rather than delete-and-recreate (deletion fails whenever the level or the other
+  blueprint still references them). Consequence: every property must be set *explicitly* —
+  deleting a line no longer reverts it, because the asset keeps its previous value.
+- **Not reproduced — stopping at obstacles.** The route above had `path/straight = 1.008`,
+  i.e. essentially straight, so no headless run has yet exercised a real detour. Navmesh
+  carve inset is the agent radius (35 cm) against a 34 cm capsule, leaving ~1 cm of
+  clearance, so a path hugging a trunk is a plausible jam point. Widening it means changing
+  Project Settings → Navigation System → Supported Agents, since per-actor agent values are
+  overwritten on registration.

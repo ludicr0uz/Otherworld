@@ -19,9 +19,10 @@ EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island
 EXPECTED_GRASS_COUNT = 44368
 EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_Mid_B": 2850, "HISM_Grass_Knee_Tall_B": 7813, "HISM_Grass_Knee_Mid_A": 5862, "HISM_Grass_Knee_Tall_A": 8451, "HISM_Grass_Knee_Clump_C": 5844, "HISM_Grass_Under_Clump_A": 2325, "HISM_Grass_Under_Large_B": 2611, "HISM_Grass_Under_Large_A": 2197}
 EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.242809249629246, 55.199687244614566], "HISM_Grass_Under_Mid_B": [25.503926948960117, 35.99430151464459], "HISM_Grass_Knee_Tall_B": [42.50254371397834, 59.99927478522139], "HISM_Grass_Knee_Mid_A": [40.481314514524335, 50.599412580219756], "HISM_Grass_Knee_Tall_A": [42.50006710260952, 59.99895840027987], "HISM_Grass_Knee_Clump_C": [43.12312612443456, 53.89936647630565], "HISM_Grass_Under_Clump_A": [23.800345353400235, 33.59905037018744], "HISM_Grass_Under_Large_B": [24.65506062683597, 34.79728745482545], "HISM_Grass_Under_Large_A": [22.100624064757703, 31.198261357139028]}
-EXPECTED_NPC = json.loads(r"""{"x": -1563.97, "y": 5625.67, "z": 365.64, "yaw": 285.54, "distance_cm": 5839.03}""")
+EXPECTED_NPC = json.loads(r"""{"x": -1421.79, "y": 5114.25, "z": 300.99, "yaw": 285.54, "distance_cm": 5308.2}""")
 EXPECTED_NPC_WALK_SPEED = 110.0
 EXPECTED_NAV_AGENT_RADIUS = 35.0
+EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 8500.0, "center_z_cm": 354.6, "half_z_cm": 739.54, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 894.14}""")
 LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 passed = 0
@@ -294,6 +295,10 @@ if EXPECTED_NPC:
         mesh_comp = cdo.get_editor_property("mesh")
         check("NPC Has Skeletal Mesh",
               mesh_comp.get_editor_property("skeletal_mesh_asset") is not None)
+        check("NPC Animation Mode Blueprint",
+              mesh_comp.get_editor_property("animation_mode") ==
+              unreal.AnimationMode.ANIMATION_BLUEPRINT,
+              f"(got {mesh_comp.get_editor_property('animation_mode')})")
         check("NPC Has Anim Class",
               mesh_comp.get_editor_property("anim_class") is not None)
 
@@ -316,24 +321,41 @@ if EXPECTED_NPC:
 
     # -- Navigation rig --
     check("Nav Bounds Volume Exists", nav_bounds is not None)
-    if nav_bounds:
+    if nav_bounds and EXPECTED_NAV_BOUNDS:
         origin, extent = nav_bounds.get_actor_bounds(False)
-        need = WORLD_SIZE_CM / 2.0
-        check("Nav Bounds Cover The Map",
-              extent.x >= need - 1.0 and extent.y >= need - 1.0,
-              f"(extent {extent.x:.0f}x{extent.y:.0f} cm, "
-              f"need >= {need:.0f})")
-    check("Nav Mesh Actor Exists", nav_mesh is not None)
-    if nav_mesh:
-        r = nav_mesh.get_editor_property("agent_radius")
-        check("Nav Agent Radius",
-              close(r, EXPECTED_NAV_AGENT_RADIUS, 0.5),
-              f"(expected {EXPECTED_NAV_AGENT_RADIUS}, got {r})")
-        gen = nav_mesh.get_editor_property("runtime_generation")
-        check("Nav Runtime Generation Dynamic",
-              gen == unreal.RuntimeGenerationType.DYNAMIC,
-              f"(got {gen} — must be DYNAMIC so the mesh builds at "
-              f"game start)")
+        want_xy = EXPECTED_NAV_BOUNDS["half_xy_cm"]
+        want_z = EXPECTED_NAV_BOUNDS["half_z_cm"]
+        check("Nav Bounds XY Extent",
+              close(extent.x, want_xy, 2.0) and close(extent.y, want_xy, 2.0),
+              f"(expected +/-{want_xy:.0f}, got {extent.x:.0f}x{extent.y:.0f})")
+        check("Nav Bounds Z Extent",
+              close(extent.z, want_z, 2.0),
+              f"(expected +/-{want_z:.0f}, got {extent.z:.0f})")
+        check("Nav Bounds Centred On Terrain",
+              close(origin.z, EXPECTED_NAV_BOUNDS["center_z_cm"], 2.0),
+              f"(expected z {EXPECTED_NAV_BOUNDS['center_z_cm']:.0f}, "
+              f"got {origin.z:.0f})")
+        # The bug that made the NPC immobile: an over-tall volume makes
+        # Recast generate no tiles at all.
+        check("Nav Bounds Vertical Span Sane",
+              extent.z * 2.0 <= 1600.0,
+              f"(span {extent.z * 2.0:.0f} cm, limit 1600)")
+        # The NPC must stand inside the volume or it has no navmesh.
+        if npc_actor:
+            loc = npc_actor.get_actor_location()
+            feet_z = loc.z - 88.0
+            inside = (abs(loc.x) <= want_xy and abs(loc.y) <= want_xy
+                      and abs(feet_z - origin.z) <= want_z)
+            check("NPC Inside Nav Bounds", inside,
+                  f"(feet z {feet_z:.0f} vs volume "
+                  f"{origin.z - want_z:.0f}..{origin.z + want_z:.0f})")
+    # NOTE: whether stale nav data was SAVED cannot be asserted from
+    # here -- opening the level makes the navigation system create a
+    # RecastNavMesh in memory, so one is always present in an editor
+    # session regardless of what is on disk.  The import script strips
+    # nav data immediately before saving; the real gate is the runtime
+    # check documented in systemDesign.md (grep the game log for
+    # "Building tile", which must be non-zero).
 
 # ── Summary ──────────────────────────────────────────────────────────
 unreal.log_warning("")

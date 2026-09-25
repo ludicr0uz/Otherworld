@@ -13,7 +13,10 @@ from dataclasses import dataclass, field
 
 from .terrain import get_exact_mesh_z, compute_grid, make_elevation_fn
 from .npc_placement import (
+    NAV_MAX_VERTICAL_SPAN_CM,
+    NAV_COVERAGE_FRACTION,
     NPC_CAPSULE_HALF_HEIGHT_CM,
+    npc_usable_radius,
     TRUNK_CLEARANCE_CM,
     MIN_PLAYER_DISTANCE_FRACTION,
     EDGE_MARGIN_FRACTION,
@@ -475,7 +478,7 @@ def check_npc_within_bounds(placed_npc, world_size_cm: float) -> CheckResult:
     """The NPC must start inside the navigable area, clear of the map edge."""
     if placed_npc is None:
         return CheckResult("NPC Within Bounds", False, "no NPC")
-    usable = world_size_cm / 2.0 * EDGE_MARGIN_FRACTION
+    usable = npc_usable_radius(world_size_cm)
     ok = abs(placed_npc.x) <= usable and abs(placed_npc.y) <= usable
     msg = (f"({placed_npc.x:.0f}, {placed_npc.y:.0f}) inside "
            f"+/-{usable:.0f} cm" if ok else
@@ -490,7 +493,7 @@ def check_npc_walk_distance(placed_npc, world_size_cm: float) -> CheckResult:
     """
     if placed_npc is None:
         return CheckResult("NPC Walk Distance", False, "no NPC")
-    usable = world_size_cm / 2.0 * EDGE_MARGIN_FRACTION
+    usable = npc_usable_radius(world_size_cm)
     required = usable * MIN_PLAYER_DISTANCE_FRACTION
     ok = placed_npc.distance_to_player_cm >= required - 1.0
     msg = (f"{placed_npc.distance_to_player_cm / 100.0:.1f} m from the player "
@@ -552,6 +555,64 @@ def check_npc_route_is_obstructed(placed_npc) -> CheckResult:
     return CheckResult("NPC Route Is Obstructed", True, msg)
 
 
+def check_nav_bounds_sane(nav_bounds, world_size_cm: float) -> CheckResult:
+    """
+    Guard the bug that left the NPC immobile: Recast voxelises the full height
+    of every tile, so an over-tall NavMeshBoundsVolume silently generates *no
+    tiles at all* and nothing in the level is navigable.  Sizing Z from map
+    width gave an 8000 cm span on a 200 m map and produced zero tiles.
+    """
+    if nav_bounds is None:
+        return CheckResult("Nav Bounds Sane", False, "no nav bounds computed")
+
+    span = nav_bounds["half_z_cm"] * 2.0
+    details = []
+    if span > NAV_MAX_VERTICAL_SPAN_CM:
+        details.append(f"vertical span {span:.0f} cm exceeds "
+                       f"{NAV_MAX_VERTICAL_SPAN_CM:.0f} cm — Recast will "
+                       f"generate no tiles")
+    if nav_bounds["half_xy_cm"] <= 0:
+        details.append("XY extent is not positive")
+
+    ok = not details
+    msg = (f"+/-{nav_bounds['half_xy_cm']:.0f} cm XY, {span:.0f} cm vertical span "
+           f"(terrain {nav_bounds['terrain_min_z_cm']:.0f}.."
+           f"{nav_bounds['terrain_max_z_cm']:.0f})")
+    return CheckResult("Nav Bounds Sane", ok, msg, details)
+
+
+def check_npc_inside_nav_bounds(placed_npc, nav_bounds) -> CheckResult:
+    """
+    The NPC has to start on the navmesh.  Nav coverage is a *larger* fraction of
+    the map than the NPC's placement margin precisely so this cannot fail, but
+    the two constants live apart, so assert the relationship rather than trust it.
+    """
+    if placed_npc is None or nav_bounds is None:
+        return CheckResult("NPC Inside Nav Bounds", False, "no NPC or nav bounds")
+
+    half_xy = nav_bounds["half_xy_cm"]
+    lo = nav_bounds["center_z_cm"] - nav_bounds["half_z_cm"]
+    hi = nav_bounds["center_z_cm"] + nav_bounds["half_z_cm"]
+    details = []
+    if abs(placed_npc.x) > half_xy or abs(placed_npc.y) > half_xy:
+        details.append(f"spawn ({placed_npc.x:.0f}, {placed_npc.y:.0f}) outside "
+                       f"+/-{half_xy:.0f} cm")
+    # Pathfinding queries the capsule's feet, not its centre.
+    feet_z = placed_npc.spawn_z - NPC_CAPSULE_HALF_HEIGHT_CM
+    if not (lo <= feet_z <= hi):
+        details.append(f"feet z {feet_z:.0f} outside {lo:.0f}..{hi:.0f}")
+    if NAV_COVERAGE_FRACTION < EDGE_MARGIN_FRACTION:
+        details.append(f"NAV_COVERAGE_FRACTION ({NAV_COVERAGE_FRACTION}) is below "
+                       f"EDGE_MARGIN_FRACTION ({EDGE_MARGIN_FRACTION}); an NPC can "
+                       f"spawn off the navmesh")
+
+    ok = not details
+    msg = (f"feet at z {feet_z:.0f} inside {lo:.0f}..{hi:.0f}, "
+           f"{max(abs(placed_npc.x), abs(placed_npc.y)):.0f} cm from centre "
+           f"(limit {half_xy:.0f})")
+    return CheckResult("NPC Inside Nav Bounds", ok, msg, details)
+
+
 def check_barycentric_consistency(world_size_cm: float, grid_z,
                                   grid_size: int) -> CheckResult:
     """
@@ -599,6 +660,7 @@ def run_all_checks(
     knee_height_cm: float = 50.0,
     placed_npc=None,
     expect_npc: bool = False,
+    nav_bounds=None,
 ) -> VerificationReport:
     """Run the complete verification suite and return a report."""
     world_size_m = world_size_cm / 100.0
@@ -641,5 +703,7 @@ def run_all_checks(
         report.checks.append(check_npc_grounded(placed_npc, world_size_cm,
                                                 grid_z, grid_size))
         report.checks.append(check_npc_route_is_obstructed(placed_npc))
+        report.checks.append(check_nav_bounds_sane(nav_bounds, world_size_cm))
+        report.checks.append(check_npc_inside_nav_bounds(placed_npc, nav_bounds))
 
     return report

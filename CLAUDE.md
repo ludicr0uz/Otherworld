@@ -24,7 +24,7 @@ Logs from generated scripts are prefixed `[GEN]` (import) / `[VERIFY]` (checks).
 ## The level generator (the main thing here)
 
 `Scripts/generate_forest_level.py` — pure Python, no `unreal` import. It computes terrain,
-tree, grass and NPC placement, runs 25 offline checks, then **code-generates** two Unreal
+tree, grass and NPC placement, runs 27 offline checks, then **code-generates** two Unreal
 Python scripts into `Scripts/generated_levels/<LevelName>/`.
 
 ```bash
@@ -34,7 +34,7 @@ python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
 #        --no-grass --no-npc --npc-min-distance <m> --json-report
 ```
 Then run the printed `import_<Level>.py` (builds the level) and `verify_<Level>.py`
-(101 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
+(103 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
 
 Grass transforms do **not** live in the generated script — there are tens of thousands of
 them, so they go to a gitignored `grass_<Level>.json` sidecar the import script reads.
@@ -53,8 +53,11 @@ Python** — no hand editing — and is idempotent, so re-generating a level reu
 - `BP_ForestWandererAI` (AIController). Event graph, authored via `unreal.BlueprintGraphEditor`:
   `BeginPlay → MoveToActor(Get Player Pawn) → Delay 0.5s → back to MoveToActor`.
   `MoveToActor` does the pathfinding, which is what makes it walk *around* trees.
-- `BP_ForestWanderer` (Character). Mannequin mesh + `ABP_Unarmed`, `max_walk_speed` 110 cm/s
-  (engine default is 600 — a run), auto-possessed by the controller above.
+- `BP_ForestWanderer` (Character). Mirrors the **player's** rig exactly — `SKM_Quinn_Simple`
+  + `ABP_Unarmed`, mesh at z −89 and yaw 270 — because that combination is known to animate.
+  `animation_mode` must be `ANIMATION_BLUEPRINT`: setting `anim_class` alone leaves the mesh
+  in its reference pose, which looks exactly like an NPC that never animates.
+  Auto-possessed by the controller above.
 
 Run it standalone with `-ExecutePythonScript` to rebuild the assets after editing it.
 
@@ -68,6 +71,7 @@ Run it standalone with `-ExecutePythonScript` to rebuild the assets after editin
 - **Known pre-existing bug:** `scatter_trees` does no minimum-spacing rejection, so some
   size/seed combinations fail the `Tree Spacing (>100cm)` check (e.g. `--size 300` with the
   default seed 42 gives a 70 cm pair). 200 m/seed 42 and 300 m/seed 99 pass. Unfixed.
+- The NPC walks 51.7 m to the player at a measured **100 cm/s** (`max_walk_speed` 110).
 - Night-sky dials live in `Scripts/forest_generator/lighting.py`: `star_brightness` (2.5),
   sun `intensity` (0.12), `auto_exposure_bias` (1.6).
 - `Scripts/` also holds ~110 older one-off inspect/fix scripts from earlier iterations.
@@ -97,4 +101,27 @@ Run it standalone with `-ExecutePythonScript` to rebuild the assets after editin
   load. Widen via Project Settings → Navigation System → Supported Agents, not on the actor.
 - A headless editor never finishes an async navmesh bake, so generated levels set
   `runtime_generation = DYNAMIC` and the mesh builds at game start. That property *does*
-  stick. Pathfinding itself can only be confirmed in PIE.
+  stick.
+- **Never save a RecastNavMesh into a generated level.** A headless editor can't finish an
+  async bake, so any nav data saved from it has EMPTY serialised tiles — and at game start the
+  engine finds that structurally valid and *reuses* it rather than building. Result: 0 tiles,
+  every `MoveTo` fails, NPC frozen. It appears to work right after any nav-bounds change,
+  because the parameters then mismatch and the engine logs `Recreating dtNavMesh instance …
+  due mismatch in … maxTiles` and rebuilds — then silently breaks again once bounds settle.
+  The import script therefore strips every `RecastNavMesh` **immediately before saving** (the
+  nav system re-creates one whenever the level is open, so removing it earlier is useless),
+  and `Config/DefaultEngine.ini` sets `RuntimeGeneration=Dynamic` as a class default.
+  This cannot be asserted from the editor — opening a level always materialises a nav actor.
+  The only real gate is the runtime check below.
+- **Recast fails silently when the nav volume is too big** — no warning, no error, just zero
+  tiles and an NPC that cannot move (`InitPathfinding start point not on navmesh`). Measured
+  envelope: ±8500 cm XY with a 1500 cm vertical span builds 176–324 tiles and works;
+  ±9200 cm / 2007 cm builds **nothing**. `NAV_MAX_HALF_XY_CM` and
+  `NAV_MAX_VERTICAL_SPAN_CM` in `npc_placement.py` encode that. Size the volume from the
+  **terrain elevation band**, sampled over a *disk*, never from map width — the square's
+  corners sit 1.41x further out where this terrain's edge ramp is ~40 m tall.
+- To watch the NPC actually move, run the map headless and read the log:
+  `UnrealEditor-Cmd <uproject> /Game/Maps/<Level> -game -nullrhi -unattended -forcelogflush
+  -LogCmds="LogNavigation Verbose" -abslog=<path>` then grep for `Building tile` (should be
+  hundreds) and `not on navmesh` (should stop after the first second or two). `-stdout`
+  block-buffers and UE writes no `Saved/Logs` under it, so `-abslog` is required.

@@ -48,8 +48,14 @@ NPC_DIR = "/Game/Forest/NPC"
 AI_BP_PATH = f"{NPC_DIR}/BP_ForestWandererAI"
 NPC_BP_PATH = f"{NPC_DIR}/BP_ForestWanderer"
 
-SKELETAL_MESH_PATH = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"
+# Mirror the player character's rig rather than hand-rolling one: the
+# third-person template's combination is known to animate, so copying it is the
+# surest route to a walk cycle.  Read from BP_ThirdPersonCharacter's CDO.
+SKELETAL_MESH_PATH = "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple"
 ANIM_BP_PATH = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed.ABP_Unarmed_C"
+
+MESH_RELATIVE_Z_CM = -89.0
+MESH_RELATIVE_YAW_DEG = 270.0
 
 # Function paths for the graph nodes
 FN_MOVE_TO_ACTOR = "/Script/AIModule.AIController.MoveToActor"
@@ -64,15 +70,32 @@ def _log(msg):
     unreal.log_warning(f"[NPC] {msg}")
 
 
+def _try_set(obj, prop, value):
+    """Set a property, logging instead of raising if the name moved."""
+    try:
+        obj.set_editor_property(prop, value)
+    except Exception as exc:
+        unreal.log_warning(f"[NPC] could not set {prop}: {exc}")
+
+
 def _asset_sub():
     return unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
 
 
 def _create_blueprint(path, parent_class):
-    """Create (replacing any existing) a Blueprint asset with the given parent."""
+    """
+    Load the Blueprint at ``path``, creating it if absent.
+
+    Deliberately does NOT delete-and-recreate: an existing asset is usually
+    still referenced (by the level's NPC actor, or by the other blueprint's
+    ai_controller_class), the delete then silently fails, and asset creation
+    errors out. Updating in place is both more robust and idempotent.
+    """
     eas = _asset_sub()
     if eas.does_asset_exist(path):
-        eas.delete_asset(path)
+        existing = eas.load_asset(path)
+        if existing:
+            return existing
     package_path, asset_name = path.rsplit("/", 1)
     factory = unreal.BlueprintFactory()
     factory.set_editor_property("parent_class", parent_class)
@@ -108,6 +131,18 @@ def build_ai_controller_blueprint():
     if not ed:
         raise RuntimeError("BP_ForestWandererAI has no EventGraph")
 
+    # Already authored? Leave the graph alone — re-adding the nodes would
+    # duplicate the chase loop.
+    existing_bp = ed.find_event_node("ReceiveBeginPlay")
+    if existing_bp:
+        outgoing = BEL.find_then_pin(existing_bp)
+        if outgoing and outgoing.is_valid() and outgoing.list_connected_pins():
+            _log(f"{AI_BP_PATH} graph already authored — reusing")
+            if not BEL.compile_blueprint(bp):
+                raise RuntimeError("BP_ForestWandererAI failed to compile")
+            _asset_sub().save_loaded_asset(bp)
+            return bp
+
     # A freshly created Blueprint already carries a (disabled) BeginPlay event
     # node; connecting to it is what turns it on.
     begin_play = ed.find_event_node("ReceiveBeginPlay")
@@ -131,6 +166,9 @@ def build_ai_controller_blueprint():
     _pin(move_to, "AcceptanceRadius").set_pin_value(str(NPC_ACCEPTANCE_RADIUS_CM))
     _pin(move_to, "bUsePathfinding").set_pin_value("true")
     _pin(move_to, "bStopOnOverlap").set_pin_value("true")
+    # Partial paths keep the NPC advancing as far as the navmesh allows instead
+    # of refusing to move at all; the retry loop then re-paths, so a temporary
+    # dead end does not end the chase.
     _pin(move_to, "bAllowPartialPath").set_pin_value("true")
 
     _pin(delay, "Duration").set_pin_value(str(NPC_REPATH_SECONDS))
@@ -173,16 +211,39 @@ def build_npc_blueprint(ai_bp):
         mesh_comp.set_editor_property("skeletal_mesh_asset", skel)
     else:
         unreal.log_error(f"[NPC] missing skeletal mesh {SKELETAL_MESH_PATH}")
+    # ── Animation ────────────────────────────────────────────────────────────
+    # ABP_Unarmed's locomotion gates on
+    #   ShouldMove = (GroundSpeed > 0) AND (GetCurrentAcceleration() != 0)
+    # For a long time this NPC slid along in its idle pose because acceleration
+    # was always zero.  That turned out to be a SYMPTOM of the stale-navmesh bug
+    # (see generate_forest_level.py section 7): with no navmesh, path following
+    # fell back to setting velocity directly, which both zeroes acceleration and
+    # bypasses MaxWalkSpeed -- the NPC was measured at 192 cm/s against a
+    # configured 110.  With the navmesh building properly the move is
+    # acceleration-driven again and the measured speed is 100 cm/s, so
+    # ShouldMove should now evaluate true.
+    #
+    # animation_mode must be set explicitly: with only anim_class set the mesh
+    # holds its reference pose, which looks identical to "never animates".
     anim_class = unreal.load_class(None, ANIM_BP_PATH)
     if anim_class:
+        _try_set(mesh_comp, "animation_mode",
+                 unreal.AnimationMode.ANIMATION_BLUEPRINT)
         mesh_comp.set_editor_property("anim_class", anim_class)
     else:
         unreal.log_error(f"[NPC] missing anim blueprint {ANIM_BP_PATH}")
-    # Stock Character capsule is 88 cm half-height; drop the mesh to its feet
-    # and face it down +X, matching the third-person template.
-    mesh_comp.set_editor_property("relative_location", unreal.Vector(0, 0, -89.0))
+
+    # Keep the pose updating even when the NPC is off-screen, so it is mid-stride
+    # when the player turns to look rather than snapping into a pose.
+    _try_set(mesh_comp, "visibility_based_anim_tick_option",
+             unreal.VisibilityBasedAnimTickOption.ALWAYS_TICK_POSE_AND_REFRESH_BONES)
+
+    # Stock Character capsule is 88 cm half-height; drop the mesh to its feet.
     mesh_comp.set_editor_property(
-        "relative_rotation", unreal.Rotator(pitch=0.0, yaw=-90.0, roll=0.0))
+        "relative_location", unreal.Vector(0, 0, MESH_RELATIVE_Z_CM))
+    mesh_comp.set_editor_property(
+        "relative_rotation",
+        unreal.Rotator(pitch=0.0, yaw=MESH_RELATIVE_YAW_DEG, roll=0.0))
 
     movement = cdo.get_editor_property("character_movement")
     movement.set_editor_property("max_walk_speed", NPC_WALK_SPEED_CMS)
@@ -190,6 +251,16 @@ def build_npc_blueprint(ai_bp):
     movement.set_editor_property(
         "rotation_rate", unreal.Rotator(pitch=0.0, yaw=180.0, roll=0.0))
     movement.set_editor_property("orient_rotation_to_movement", True)
+
+    # Pin this to False explicitly rather than trusting the engine default.
+    # This builder updates blueprints IN PLACE, so any property it does not set
+    # keeps whatever value the asset already had -- deleting a line does not
+    # revert it.  True was tried here (it would give the AnimBP a non-zero
+    # GetCurrentAcceleration) and measured to stop the NPC moving altogether:
+    # 0.0 m over 91 s, versus 51.7 m with it False.
+    nav_props = movement.get_editor_property("nav_movement_properties")
+    nav_props.set_editor_property("use_acceleration_for_paths", False)
+    movement.set_editor_property("nav_movement_properties", nav_props)
     # A stock Character has use_controller_rotation_yaw = True, which forces the
     # pawn's yaw to the controller's every frame and fights the line above.
     # The third-person template turns it off for the same reason.

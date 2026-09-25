@@ -136,37 +136,49 @@
     {
       "name": "NPC Placed",
       "passed": true,
-      "message": "spawned at (-1564, 5626) after 1 attempt(s)",
+      "message": "spawned at (-1422, 5114) after 1 attempt(s)",
       "details": []
     },
     {
       "name": "NPC Within Bounds",
       "passed": true,
-      "message": "(-1564, 5626) inside +/-8800 cm",
+      "message": "(-1422, 5114) inside +/-8000 cm",
       "details": []
     },
     {
       "name": "NPC Walk Distance",
       "passed": true,
-      "message": "58.4 m from the player (minimum 48.4 m)",
+      "message": "53.1 m from the player (minimum 44.0 m)",
       "details": []
     },
     {
       "name": "NPC Clear Of Trees",
       "passed": true,
-      "message": "nearest trunk 236 cm away (minimum 220 cm)",
+      "message": "nearest trunk 639 cm away (minimum 220 cm)",
       "details": []
     },
     {
       "name": "NPC Grounded",
       "passed": true,
-      "message": "capsule centre 88.0 cm above terrain Z 277.6",
+      "message": "capsule centre 88.0 cm above terrain Z 213.0",
       "details": []
     },
     {
       "name": "NPC Route Is Obstructed",
       "passed": true,
       "message": "2 tree(s) straddle the direct line \u2014 pathfinding must detour",
+      "details": []
+    },
+    {
+      "name": "Nav Bounds Sane",
+      "passed": true,
+      "message": "+/-8500 cm XY, 1479 cm vertical span (terrain -185..894)",
+      "details": []
+    },
+    {
+      "name": "NPC Inside Nav Bounds",
+      "passed": true,
+      "message": "feet at z 213 inside -385..1094, 5114 cm from centre (limit 8500)",
       "details": []
     }
   ]

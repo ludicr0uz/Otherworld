@@ -520,7 +520,8 @@ ps = editor_actor_sub.spawn_actor_from_class(
 ps.set_actor_label(f"{LEVEL_NAME}_PlayerStart")
 
 # ── 7. Navigation + wandering NPC ────────────────────────────────────
-NPC_SPAWN = json.loads(r"""{"x": -1563.97, "y": 5625.67, "z": 365.64, "yaw": 285.54}""")
+NPC_SPAWN = json.loads(r"""{"x": -1421.79, "y": 5114.25, "z": 300.99, "yaw": 285.54}""")
+NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 8500.0, "center_z_cm": 354.6, "half_z_cm": 739.54, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 894.14}""")
 SCRIPTS_DIR = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts"
 NAV_AGENT_RADIUS = 35.0
 NAV_AGENT_HEIGHT = 144.0
@@ -530,35 +531,40 @@ if NPC_SPAWN:
 
     # NavMeshBoundsVolume's default brush is a 200 cm cube, so scaling
     # the actor by world_size/200 makes it cover the map exactly.
+    # Sized from the terrain band the NPC can actually walk on, NOT
+    # from the map width.  Recast voxelises the full height of every
+    # tile, so an over-tall volume silently yields no tiles at all and
+    # nothing is ever navigable.
     nav_volume = editor_actor_sub.spawn_actor_from_class(
-        unreal.NavMeshBoundsVolume, unreal.Vector(0, 0, 0))
+        unreal.NavMeshBoundsVolume,
+        unreal.Vector(0.0, 0.0, NAV_BOUNDS["center_z_cm"]))
     nav_volume.set_actor_label(f"{LEVEL_NAME}_NavBounds")
-    nav_scale = WORLD_SIZE_CM / 200.0
-    # Z is generous: the terrain's edge ramp climbs well above the centre.
-    nav_volume.set_actor_scale3d(
-        unreal.Vector(nav_scale, nav_scale, max(20.0, nav_scale * 0.4)))
+    # The default brush is a 200 cm cube, i.e. 100 cm half-extent.
+    nav_volume.set_actor_scale3d(unreal.Vector(
+        NAV_BOUNDS["half_xy_cm"] / 100.0,
+        NAV_BOUNDS["half_xy_cm"] / 100.0,
+        NAV_BOUNDS["half_z_cm"] / 100.0,
+    ))
 
-    nav_data = None
-    for a in editor_actor_sub.get_all_level_actors():
-        if isinstance(a, unreal.RecastNavMesh):
-            nav_data = a
-            break
-    if nav_data is None:
-        nav_data = editor_actor_sub.spawn_actor_from_class(
-            unreal.RecastNavMesh, unreal.Vector(0, 0, 0))
-    nav_data.set_actor_label(f"{LEVEL_NAME}_NavMesh")
-    # These match the navigation system's default agent. Setting them
-    # is belt-and-braces: the nav system re-applies its default agent
-    # config when the nav data registers, so these values are what the
-    # navmesh ends up with either way.
-    try_set(nav_data, "agent_radius", NAV_AGENT_RADIUS)
-    try_set(nav_data, "agent_height", NAV_AGENT_HEIGHT)
-    # A headless editor never finishes an async navmesh bake, and this
-    # level is generated rather than hand-built, so have the navigation
-    # system generate the mesh when the game starts instead of relying
-    # on baked tiles.
-    try_set(nav_data, "runtime_generation",
-            unreal.RuntimeGenerationType.DYNAMIC)
+    # Deliberately do NOT place a RecastNavMesh actor.
+    #
+    # A headless editor never finishes an async navmesh bake, so any
+    # RecastNavMesh saved from here carries EMPTY serialised tile data.
+    # At game start the engine finds that data structurally valid and
+    # reuses it instead of building -- 0 tiles, every MoveTo fails, and
+    # the NPC never moves.  It only ever appeared to work right after a
+    # nav-bounds change, because the changed parameters no longer matched
+    # the serialised ones and the engine logged
+    #   "Recreating dtNavMesh instance ... due mismatch in ... maxTiles"
+    # and rebuilt.  Once the bounds settled, it silently stopped again.
+    #
+    # Leaving no nav data in the level makes the navigation system create
+    # it at load, which always builds (324 tiles here).  Runtime
+    # generation is Dynamic via Config/DefaultEngine.ini, since the nav
+    # system overwrites per-actor values with class defaults anyway.
+    # (the actual removal happens immediately before the save below --
+    #  the navigation system re-creates nav data while the level is open,
+    #  so removing it any earlier accomplishes nothing)
 
     # The NPC Blueprints are level-independent, so they live in their
     # own idempotent builder script rather than being re-emitted here.
@@ -571,17 +577,32 @@ if NPC_SPAWN:
     npc_actor = editor_actor_sub.spawn_actor_from_class(
         npc_class,
         unreal.Vector(NPC_SPAWN["x"], NPC_SPAWN["y"], NPC_SPAWN["z"]),
-        unreal.Rotator(0.0, NPC_SPAWN["yaw"], 0.0),
+        # Keywords, not positional: unreal.Rotator is (roll, pitch, yaw).
+        unreal.Rotator(pitch=0.0, yaw=NPC_SPAWN["yaw"], roll=0.0),
     )
     npc_actor.set_actor_label(f"{LEVEL_NAME}_NPC_Wanderer")
     unreal.log_warning(
         f"[GEN]    NPC at ({NPC_SPAWN['x']:.0f}, {NPC_SPAWN['y']:.0f}, "
-        f"{NPC_SPAWN['z']:.0f}), nav agent r={NAV_AGENT_RADIUS} "
-        f"h={NAV_AGENT_HEIGHT}, runtime navmesh generation DYNAMIC")
+        f"{NPC_SPAWN['z']:.0f}); navmesh is built by the navigation "
+        f"system at game start (no nav data saved in the level)")
+    unreal.log_warning(
+        f"[GEN]    Nav volume: +/-{NAV_BOUNDS['half_xy_cm']:.0f} cm XY, "
+        f"Z span {NAV_BOUNDS['half_z_cm'] * 2.0:.0f} cm "
+        f"centred {NAV_BOUNDS['center_z_cm']:.0f}")
 else:
     unreal.log_warning("[GEN] 7. NPC skipped (none placed).")
 
 # ── 8. Save ─────────────────────────────────────────────────────────
+# Strip nav data as the very last action: the navigation system
+# re-creates a RecastNavMesh whenever the level is open, and anything
+# saved here carries EMPTY serialised tiles that the game then reuses
+# instead of building (see section 7).
+stripped = 0
+for a in list(editor_actor_sub.get_all_level_actors()):
+    if isinstance(a, unreal.RecastNavMesh):
+        editor_actor_sub.destroy_actor(a)
+        stripped += 1
+unreal.log_warning(f"[GEN] Stripped {stripped} RecastNavMesh actor(s) before save")
 level_editor_sub.save_current_level()
 unreal.log_warning("=" * 60)
 unreal.log_warning(f"[GEN] ✅ {LEVEL_NAME} GENERATED AND SAVED!")

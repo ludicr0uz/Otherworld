@@ -47,6 +47,26 @@ NPC_REPATH_SECONDS = 0.5           # how often the move order is re-issued
 NAV_AGENT_RADIUS_CM = 35.0
 NAV_AGENT_HEIGHT_CM = 144.0
 
+# ── Navigation volume sizing ─────────────────────────────────────────────────
+#
+# Recast silently generates *no tiles at all* once the volume gets too big for
+# its tile pool -- no warning, no error, just an empty navmesh and an NPC that
+# cannot move.  The limits below are an EMPIRICALLY MEASURED envelope, not
+# something read out of the engine:
+#
+#     +/-8500 cm XY, 1500 cm vertical span  -> 176 tiles built, NPC walked (OK)
+#     +/-9200 cm XY, 2007 cm vertical span  -> 0 tiles built, NPC immobile
+#
+# so the caps sit just above the known-good point.  UE 5.8 exposes neither
+# `tile_size_uu` nor a readable tile limit to Python, so this cannot currently be
+# derived; if the navmesh ever comes up empty again, suspect these first.
+NAV_COVERAGE_FRACTION = 0.85
+NAV_MAX_HALF_XY_CM = 8500.0
+NAV_MAX_VERTICAL_SPAN_CM = 1600.0
+# Headroom must exceed the agent height (144 cm) or the surface right under the
+# volume's ceiling is treated as too low to stand in.
+NAV_VERTICAL_HEADROOM_CM = 200.0
+
 # Rough trunk radius per unit of tree scale.  This is a proxy, used only for
 # spawn clearance and the line-of-sight test below — never for collision, which
 # comes from the real mesh geometry.
@@ -55,8 +75,85 @@ NOMINAL_TRUNK_RADIUS_PER_SCALE_CM = 15.0
 # Spawn constraints
 MIN_PLAYER_DISTANCE_FRACTION = 0.55  # of the usable radius
 TRUNK_CLEARANCE_CM = 220.0           # keep the capsule clear of any trunk
-EDGE_MARGIN_FRACTION = 0.88          # stay inside this much of the half-extent
+EDGE_MARGIN_FRACTION = 0.80          # stay inside this much of the half-extent
 MAX_PLACEMENT_ATTEMPTS = 400
+
+
+def compute_nav_bounds(
+    world_size_cm: float,
+    grid_z,
+    grid_size: int,
+    coverage_fraction: float = NAV_COVERAGE_FRACTION,
+    headroom_cm: float = NAV_VERTICAL_HEADROOM_CM,
+    min_half_xy_cm: float = 0.0,
+) -> dict:
+    """
+    Size the NavMeshBoundsVolume from the terrain it actually has to cover.
+
+    Returns ``half_xy_cm``, ``center_z_cm`` and ``half_z_cm`` for the volume,
+    plus the terrain band they were derived from.
+
+    Sizing Z from the *terrain* rather than from the map width is the whole
+    point: this terrain's edge ramp climbs to ~40 m at the corners, so a
+    width-derived Z span covers mostly empty air and unwalkable cliff, and
+    Recast then generates nothing.
+    """
+    half = world_size_cm / 2.0
+    # Capped: see NAV_MAX_HALF_XY_CM.  On a map larger than the cap the navmesh
+    # covers a central island rather than the whole world -- which is why
+    # place_npc() clamps the spawn radius to the same cap.
+    half_xy = min(half * coverage_fraction, NAV_MAX_HALF_XY_CM)
+
+    # Sample a DISK of this radius, not the square box.  The box has to contain
+    # the disk the NPC spawns in, but its corners sit ~1.41x further out, where
+    # this terrain's edge ramp is tens of metres tall.  Letting those corners set
+    # the Z band inflates the volume enormously for ground no one can walk on --
+    # and an inflated Z band is what stops Recast generating tiles at all.
+    # Terrain above the box top simply stays non-navigable, which is correct: it
+    # is a cliff.
+    step = world_size_cm / grid_size
+    radius_sq = half_xy * half_xy
+    lo, hi = float("inf"), float("-inf")
+    for gi in range(grid_size + 1):
+        gx = -half + gi * step
+        row = grid_z[gi]
+        for gj in range(grid_size + 1):
+            gy = -half + gj * step
+            if gx * gx + gy * gy > radius_sq:
+                continue
+            z = row[gj]
+            lo = min(lo, z)
+            hi = max(hi, z)
+    if lo > hi:            # degenerate (tiny map); fall back to a flat band
+        lo = hi = 0.0
+
+    span = (hi - lo) + 2.0 * headroom_cm
+    # If the terrain band is still too tall, pull the radius in until it fits --
+    # the tall ground is the outer edge ramp, so a smaller radius lowers the band.
+    while span > NAV_MAX_VERTICAL_SPAN_CM and half_xy > max(min_half_xy_cm, 1000.0):
+        half_xy *= 0.9
+        radius_sq = half_xy * half_xy
+        lo, hi = float("inf"), float("-inf")
+        for gi in range(grid_size + 1):
+            gx = -half + gi * step
+            row = grid_z[gi]
+            for gj in range(grid_size + 1):
+                gy = -half + gj * step
+                if gx * gx + gy * gy > radius_sq:
+                    continue
+                lo = min(lo, row[gj])
+                hi = max(hi, row[gj])
+        if lo > hi:
+            lo = hi = 0.0
+        span = (hi - lo) + 2.0 * headroom_cm
+
+    return {
+        "half_xy_cm": half_xy,
+        "center_z_cm": (hi + lo) / 2.0,
+        "half_z_cm": span / 2.0,
+        "terrain_min_z_cm": lo,
+        "terrain_max_z_cm": hi,
+    }
 
 
 @dataclass
@@ -71,6 +168,20 @@ class PlacedNPC:
     nearest_trunk_cm: float
     blocking_trees: int         # trees straddling the straight line to player
     attempts: int
+
+
+def npc_usable_radius(
+    world_size_cm: float,
+    edge_margin_fraction: float = EDGE_MARGIN_FRACTION,
+) -> float:
+    """
+    The radius the NPC may spawn within — the single source of truth, shared by
+    place_npc() and the offline checks so the two cannot drift apart.
+
+    Clamped to the navigable island (see NAV_MAX_HALF_XY_CM).
+    """
+    half = world_size_cm / 2.0
+    return min(half * edge_margin_fraction, NAV_MAX_HALF_XY_CM - 300.0)
 
 
 def _trunk_radius(tree) -> float:
@@ -124,7 +235,10 @@ def place_npc(
     rng = random.Random(seed ^ 0x4E7C)  # decorrelated from trees and grass
 
     half = world_size_cm / 2.0
-    usable = half * edge_margin_fraction
+    # Never spawn outside the navmesh: nav coverage is capped, so on a large map
+    # the navigable region is a central island, and a spawn beyond it would leave
+    # the NPC permanently off-mesh and immobile.
+    usable = npc_usable_radius(world_size_cm, edge_margin_fraction)
     min_dist = usable * min_distance_fraction
     px, py = player_start
 

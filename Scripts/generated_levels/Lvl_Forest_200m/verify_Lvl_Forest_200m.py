@@ -1,7 +1,8 @@
 """
 Auto-generated Unreal verification script for Lvl_Forest_200m.
-Verifies collision, materials, actor presence, tree HISM instances,
-and the time-of-day lighting rig.
+Verifies collision, materials, actor presence, tree and grass HISM
+instances (including that grass really is knee high), and the
+time-of-day lighting rig.
 Time of day: Night — starry sky as the only light source, low luminosity
 """
 import json
@@ -15,6 +16,9 @@ LEVEL_NAME = "Lvl_Forest_200m"
 WORLD_SIZE_CM = 20000.0
 EXPECTED_TREE_COUNT = 136
 EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island_02": 28, "HISM_Tree_Fir_A": 44, "HISM_Tree_Pine_A": 20, "HISM_Tree_Deciduous": 16}
+EXPECTED_GRASS_COUNT = 44368
+EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_Mid_B": 2850, "HISM_Grass_Knee_Tall_B": 7813, "HISM_Grass_Knee_Mid_A": 5862, "HISM_Grass_Knee_Tall_A": 8451, "HISM_Grass_Knee_Clump_C": 5844, "HISM_Grass_Under_Clump_A": 2325, "HISM_Grass_Under_Large_B": 2611, "HISM_Grass_Under_Large_A": 2197}
+EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.242809249629246, 55.199687244614566], "HISM_Grass_Under_Mid_B": [25.503926948960117, 35.99430151464459], "HISM_Grass_Knee_Tall_B": [42.50254371397834, 59.99927478522139], "HISM_Grass_Knee_Mid_A": [40.481314514524335, 50.599412580219756], "HISM_Grass_Knee_Tall_A": [42.50006710260952, 59.99895840027987], "HISM_Grass_Knee_Clump_C": [43.12312612443456, 53.89936647630565], "HISM_Grass_Under_Clump_A": [23.800345353400235, 33.59905037018744], "HISM_Grass_Under_Large_B": [24.65506062683597, 34.79728745482545], "HISM_Grass_Under_Large_A": [22.100624064757703, 31.198261357139028]}
 LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 passed = 0
@@ -200,6 +204,51 @@ for spec_name, expected_count in EXPECTED_SPEC_COUNTS.items():
 check("Total Tree Instances",
       total_tree_instances == EXPECTED_TREE_COUNT,
       f"(expected {EXPECTED_TREE_COUNT}, got {total_tree_instances})")
+
+# ── 5. Grass HISM Actors ─────────────────────────────────────────────
+if EXPECTED_GRASS_COUNT > 0:
+    total_grass_instances = 0
+    for spec_name, expected_count in EXPECTED_GRASS_SPEC_COUNTS.items():
+        found = False
+        for a in actors:
+            if a.get_actor_label() == spec_name:
+                found = True
+                root = a.get_editor_property("root_component")
+                if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
+                    inst_count = root.get_instance_count()
+                    total_grass_instances += inst_count
+                    check(f"{spec_name} Instance Count",
+                          inst_count == expected_count,
+                          f"(expected {expected_count}, got {inst_count})")
+                    # Grass must never block the player.
+                    check(f"{spec_name} No Collision",
+                          str(root.get_collision_profile_name()) == "NoCollision",
+                          f"(got {root.get_collision_profile_name()})")
+
+                    # Prove the clumps really land at knee height:
+                    # mesh bounds height × instance Z scale.
+                    mesh = root.get_editor_property("static_mesh")
+                    lo_hi = EXPECTED_GRASS_HEIGHTS.get(spec_name)
+                    if mesh and lo_hi and inst_count > 0:
+                        mesh_h = float(mesh.get_bounds().box_extent.z) * 2.0
+                        sampled = []
+                        step = max(1, inst_count // 50)
+                        for i in range(0, inst_count, step):
+                            tf = root.get_instance_transform(i, world_space=False)
+                            sampled.append(float(tf.scale3d.z) * mesh_h)
+                        lo, hi = lo_hi
+                        worst = [h for h in sampled
+                                 if not (lo - 1.0 <= h <= hi + 1.0)]
+                        check(f"{spec_name} Knee Height",
+                              len(worst) == 0,
+                              f"(expected {lo:.1f}-{hi:.1f} cm, "
+                              f"sampled {min(sampled):.1f}-{max(sampled):.1f} cm)")
+                break
+        check(f"{spec_name} Actor Exists", found)
+
+    check("Total Grass Instances",
+          total_grass_instances == EXPECTED_GRASS_COUNT,
+          f"(expected {EXPECTED_GRASS_COUNT}, got {total_grass_instances})")
 
 # ── Summary ──────────────────────────────────────────────────────────
 unreal.log_warning("")

@@ -45,3 +45,6 @@ __pycache__/
 # Ignore heavy generated assets for Code-Only Repo
 Content/Forest/
 Content/Maps/
+
+# Grass transform sidecars — 3 MB+ per level, fully regenerable from the seed
+Scripts/generated_levels/*/grass_*.json

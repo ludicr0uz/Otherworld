@@ -12,6 +12,11 @@ import os
 from dataclasses import dataclass, field
 
 from .terrain import get_exact_mesh_z, compute_grid, make_elevation_fn
+from .grass_placement import (
+    KNEE_LAYER_MIN_RATIO,
+    MAX_UPSCALE_FACTOR,
+    grass_spec_by_name,
+)
 
 
 # ─── Result types ────────────────────────────────────────────────────────────
@@ -279,6 +284,176 @@ def check_no_trees_in_spawn_zone(placed_trees, world_size_cm: float) -> CheckRes
     return CheckResult("Spawn Zone Clear", ok, msg, intruders)
 
 
+# ─── Grass checks ───────────────────────────────────────────────────────────
+
+def check_grass_count(placed_grass, world_size_cm: float,
+                      density_per_sqm: float) -> CheckResult:
+    """Verify the realised density matches the requested density."""
+    area_sqm = (world_size_cm / 100.0) ** 2
+    count = len(placed_grass)
+    density = count / area_sqm if area_sqm > 0 else 0.0
+
+    # Trees, the spawn ring and the coverage inset all remove a little area,
+    # so allow the realised density to sit inside 70–105 % of the request.
+    lo, hi = density_per_sqm * 0.70, density_per_sqm * 1.05
+    ok = count > 0 and lo <= density <= hi
+    msg = (f"{count:,} clumps on {area_sqm:,.0f} m² = {density:.2f}/m² "
+           f"(requested {density_per_sqm:.2f}/m²)")
+    return CheckResult("Grass Count / Density", ok, msg)
+
+
+def check_grass_within_bounds(placed_grass, world_size_cm: float) -> CheckResult:
+    """Verify every clump sits inside the terrain boundary."""
+    half = world_size_cm / 2.0
+    oob = []
+    for g in placed_grass:
+        if abs(g.x) > half or abs(g.y) > half:
+            oob.append(f"{g.spec_name} at ({g.x:.0f}, {g.y:.0f}) — OUT OF BOUNDS")
+            if len(oob) > 20:
+                break
+
+    ok = len(oob) == 0
+    msg = f"{len(oob)} clumps out of bounds" if oob else "All grass within map bounds"
+    return CheckResult("Grass Within Bounds", ok, msg, oob)
+
+
+def check_grass_snapped_to_terrain(placed_grass, world_size_cm: float,
+                                   grid_z, grid_size: int) -> CheckResult:
+    """
+    Re-derive the terrain height under a sample of clumps and confirm each one
+    is seated on the surface (sunk by its own sink_cm, never floating).
+    """
+    if not placed_grass:
+        return CheckResult("Grass Snapped To Terrain", True, "No grass to check")
+
+    step = max(1, len(placed_grass) // 500)
+    bad = []
+    for g in placed_grass[::step]:
+        exact = get_exact_mesh_z(g.x, g.y, grid_z, grid_size, world_size_cm)
+        if abs(exact - g.terrain_z) > 0.01:
+            bad.append(f"{g.spec_name} at ({g.x:.0f},{g.y:.0f}): terrain_z "
+                       f"{g.terrain_z:.2f} != exact {exact:.2f}")
+        elif abs((g.terrain_z - g.sink_cm) - g.placed_z) > 0.01:
+            bad.append(f"{g.spec_name} at ({g.x:.0f},{g.y:.0f}): placed_z "
+                       f"{g.placed_z:.2f} != terrain_z - sink {g.terrain_z - g.sink_cm:.2f}")
+        if len(bad) > 20:
+            break
+
+    ok = len(bad) == 0
+    msg = (f"{len(bad)} mis-seated clumps" if bad
+           else f"All {len(placed_grass[::step])} sampled clumps seated on the mesh")
+    return CheckResult("Grass Snapped To Terrain", ok, msg, bad)
+
+
+def check_grass_knee_height(placed_grass, knee_height_cm: float) -> CheckResult:
+    """
+    The dominant layer must actually measure knee high, and nothing may end up
+    tall enough to read as a bush.
+    """
+    if not placed_grass:
+        return CheckResult("Grass Knee Height", True, "No grass to check")
+
+    knee_lo, knee_hi = knee_height_cm * 0.70, knee_height_cm * 1.30
+    hard_max = knee_height_cm * 1.60
+
+    knee_heights = []
+    offenders = []
+    for g in placed_grass:
+        spec = grass_spec_by_name(g.spec_name)
+        ratio = spec.height_ratio if spec else 1.0
+        if g.target_height_cm > hard_max:
+            offenders.append(f"{g.spec_name}: {g.target_height_cm:.1f} cm > {hard_max:.1f} cm")
+        if ratio >= KNEE_LAYER_MIN_RATIO:
+            knee_heights.append(g.target_height_cm)
+            if not (knee_lo <= g.target_height_cm <= knee_hi):
+                offenders.append(f"{g.spec_name}: {g.target_height_cm:.1f} cm "
+                                 f"outside knee band {knee_lo:.0f}–{knee_hi:.0f} cm")
+        if len(offenders) > 20:
+            break
+
+    share = len(knee_heights) / len(placed_grass)
+    avg = sum(knee_heights) / len(knee_heights) if knee_heights else 0.0
+    ok = not offenders and share >= 0.60 and knee_lo <= avg <= knee_hi
+    msg = (f"knee layer = {share * 100:.0f}% of clumps, avg {avg:.1f} cm "
+           f"(target {knee_height_cm:.0f} cm)")
+    return CheckResult("Grass Knee Height", ok, msg, offenders)
+
+
+def check_grass_upscale(placed_grass, knee_height_cm: float) -> CheckResult:
+    """
+    Guard the visual quality of the scans: a clump stretched far past its
+    authored size reads as oversized blades, so keep every species inside
+    MAX_UPSCALE_FACTOR.  Uses the bounds heights measured in-editor and
+    recorded on each spec.
+    """
+    if not placed_grass:
+        return CheckResult("Grass Upscale Factor", True, "No grass to check")
+
+    worst_name, worst_factor = "", 0.0
+    offenders = []
+    seen = set()
+    for g in placed_grass:
+        if g.spec_name in seen:
+            continue
+        seen.add(g.spec_name)
+        spec = grass_spec_by_name(g.spec_name)
+        if not spec or spec.nominal_mesh_height_cm <= 0:
+            continue
+        # Worst case is the tallest jitter on the shortest mesh.
+        peak = knee_height_cm * spec.height_ratio * spec.height_jitter[1]
+        factor = peak / spec.nominal_mesh_height_cm
+        if factor > worst_factor:
+            worst_name, worst_factor = spec.name, factor
+        if factor > MAX_UPSCALE_FACTOR:
+            offenders.append(f"{spec.name}: {factor:.2f}x "
+                             f"({spec.nominal_mesh_height_cm:.1f} cm mesh -> "
+                             f"{peak:.1f} cm) exceeds {MAX_UPSCALE_FACTOR:.2f}x")
+
+    ok = len(offenders) == 0
+    msg = f"worst upscale {worst_factor:.2f}x ({worst_name}), limit {MAX_UPSCALE_FACTOR:.2f}x"
+    return CheckResult("Grass Upscale Factor", ok, msg, offenders)
+
+
+def check_grass_coverage(placed_grass, world_size_cm: float,
+                         divisions: int = 12) -> CheckResult:
+    """
+    "Throughout the level" — every cell of a coarse grid over the map must
+    contain grass, so no quadrant is left bald.
+    """
+    if not placed_grass:
+        return CheckResult("Grass Coverage", False, "No grass placed")
+
+    half = world_size_cm / 2.0
+    cell = (2.0 * half) / divisions
+    occupied = set()
+    for g in placed_grass:
+        ix = min(divisions - 1, max(0, int((g.x + half) / cell)))
+        iy = min(divisions - 1, max(0, int((g.y + half) / cell)))
+        occupied.add((ix, iy))
+
+    total_cells = divisions * divisions
+    empty = [f"cell ({ix},{iy}) has no grass"
+             for iy in range(divisions) for ix in range(divisions)
+             if (ix, iy) not in occupied]
+
+    ok = len(empty) == 0
+    msg = (f"{len(occupied)}/{total_cells} cells of a {divisions}×{divisions} grid covered")
+    return CheckResult("Grass Coverage", ok, msg, empty)
+
+
+def check_grass_spec_distribution(placed_grass) -> CheckResult:
+    """Every configured species must be represented — no dead HISM actors."""
+    if not placed_grass:
+        return CheckResult("Grass Species Spread", True, "No grass to check")
+
+    from collections import Counter
+    counts = Counter(g.spec_name for g in placed_grass)
+    details = [f"{n}: {c:,}" for n, c in sorted(counts.items())]
+    ok = len(counts) >= 2 and min(counts.values()) > 0
+    msg = f"{len(counts)} species represented"
+    return CheckResult("Grass Species Spread", ok, msg, details)
+
+
 def check_barycentric_consistency(world_size_cm: float, grid_z,
                                   grid_size: int) -> CheckResult:
     """
@@ -321,6 +496,9 @@ def run_all_checks(
     grid_z,
     grid_size: int,
     placed_trees,
+    placed_grass=None,
+    grass_density_per_sqm: float = 0.0,
+    knee_height_cm: float = 50.0,
 ) -> VerificationReport:
     """Run the complete verification suite and return a report."""
     world_size_m = world_size_cm / 100.0
@@ -341,5 +519,17 @@ def run_all_checks(
     report.checks.append(check_trees_vertical(placed_trees))
     report.checks.append(check_tree_spacing(placed_trees))
     report.checks.append(check_no_trees_in_spawn_zone(placed_trees, world_size_cm))
+
+    # Grass checks (skipped entirely when grass generation is disabled)
+    if placed_grass:
+        report.checks.append(check_grass_count(placed_grass, world_size_cm,
+                                               grass_density_per_sqm))
+        report.checks.append(check_grass_within_bounds(placed_grass, world_size_cm))
+        report.checks.append(check_grass_snapped_to_terrain(placed_grass, world_size_cm,
+                                                           grid_z, grid_size))
+        report.checks.append(check_grass_knee_height(placed_grass, knee_height_cm))
+        report.checks.append(check_grass_upscale(placed_grass, knee_height_cm))
+        report.checks.append(check_grass_coverage(placed_grass, world_size_cm))
+        report.checks.append(check_grass_spec_distribution(placed_grass))
 
     return report

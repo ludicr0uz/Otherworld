@@ -6,11 +6,12 @@ Usage:
     python3 Scripts/generate_forest_level.py --size 200
     python3 Scripts/generate_forest_level.py --size 400 --name Lvl_BigForest --seed 99
     python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
+    python3 Scripts/generate_forest_level.py --size 200 --grass-density 2.0 --grass-height 55
 
 This script:
   1. Generates a terrain OBJ mesh (pure Python)
-  2. Scatters trees with exact terrain snapping (pure Python)
-  3. Runs 12+ offline verification checks
+  2. Scatters trees and knee-high grass with exact terrain snapping (pure Python)
+  3. Runs 18+ offline verification checks
   4. Writes an Unreal Python script to import everything into the editor
   5. Prints a command to run the import inside UnrealEditor-Cmd
 """
@@ -20,6 +21,7 @@ import json
 import os
 import sys
 import textwrap
+from collections import Counter
 
 # Add parent directory so forest_generator package is importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,6 +35,13 @@ from forest_generator.terrain import (
 from forest_generator.tree_placement import (
     scatter_trees,
     DEFAULT_TREE_SPECS,
+)
+from forest_generator.grass_placement import (
+    scatter_grass,
+    DEFAULT_GRASS_SPECS,
+    DEFAULT_DENSITY_PER_SQM,
+    DEFAULT_PATCHINESS,
+    KNEE_HEIGHT_CM,
 )
 from forest_generator.verification import run_all_checks
 from forest_generator.lighting import (
@@ -66,6 +75,17 @@ def main():
                         choices=sorted(TIME_OF_DAY_PRESETS.keys()),
                         help="Lighting preset: 'day' (bright sun) or 'night' "
                              "(starry sky providing low luminosity)")
+    parser.add_argument("--grass-density", type=float, default=DEFAULT_DENSITY_PER_SQM,
+                        help=f"Grass clumps per square metre "
+                             f"(default: {DEFAULT_DENSITY_PER_SQM})")
+    parser.add_argument("--grass-height", type=float, default=KNEE_HEIGHT_CM,
+                        help=f"Knee height in cm the dominant grass layer is "
+                             f"scaled to (default: {KNEE_HEIGHT_CM:.0f})")
+    parser.add_argument("--grass-patchiness", type=float, default=DEFAULT_PATCHINESS,
+                        help=f"0 = perfectly even grass, ->1 = heavily clustered "
+                             f"(default: {DEFAULT_PATCHINESS})")
+    parser.add_argument("--no-grass", action="store_true",
+                        help="Skip grass generation entirely")
     parser.add_argument("--json-report", type=str, default=None,
                         help="Path to write JSON verification report")
     args = parser.parse_args()
@@ -83,11 +103,15 @@ def main():
     print(f"  Map size: {world_size_m}m × {world_size_m}m")
     print(f"  Seed: {args.seed}")
     print(f"  Time of day: {lighting['label']}")
+    if args.no_grass:
+        print(f"  Grass: disabled")
+    else:
+        print(f"  Grass: {args.grass_density:.2f}/m2, knee height {args.grass_height:.0f} cm")
     print(f"{'═' * 60}\n")
 
     # ── Step 1: Generate terrain mesh ────────────────────────────────────
     obj_path = os.path.join(output_dir, f"SM_{level_name}_Terrain.obj")
-    print(f"[1/4] Generating terrain mesh → {obj_path}")
+    print(f"[1/5] Generating terrain mesh → {obj_path}")
     terrain = generate_terrain_obj(obj_path, world_size_cm, grid_size=args.grid)
     grid_size = terrain["grid_size"]
     grid_z = terrain["grid_z"]
@@ -95,7 +119,7 @@ def main():
     print(f"       File: {terrain['bytes']:,} bytes")
 
     # ── Step 2: Scatter trees ────────────────────────────────────────────
-    print(f"\n[2/4] Scattering trees (seed={args.seed})...")
+    print(f"\n[2/5] Scattering trees (seed={args.seed})...")
     placed_trees = scatter_trees(
         world_size_cm=world_size_cm,
         grid_z=grid_z,
@@ -104,14 +128,35 @@ def main():
     )
 
     # Count per spec
-    from collections import Counter
     counts = Counter(t.spec_name for t in placed_trees)
     for name, cnt in sorted(counts.items()):
         print(f"       {name}: {cnt} instances")
     print(f"       TOTAL: {len(placed_trees)} trees")
 
-    # ── Step 3: Run verification ─────────────────────────────────────────
-    print(f"\n[3/4] Running verification suite...")
+    # ── Step 3: Scatter knee-high grass ──────────────────────────────────
+    if args.no_grass:
+        print(f"\n[3/5] Grass generation disabled (--no-grass)")
+        placed_grass = []
+    else:
+        print(f"\n[3/5] Scattering knee-high grass "
+              f"({args.grass_density:.2f}/m2, {args.grass_height:.0f} cm)...")
+        placed_grass = scatter_grass(
+            world_size_cm=world_size_cm,
+            grid_z=grid_z,
+            grid_size=grid_size,
+            seed=args.seed,
+            density_per_sqm=args.grass_density,
+            knee_height_cm=args.grass_height,
+            patchiness=args.grass_patchiness,
+            placed_trees=placed_trees,
+        )
+        grass_counts = Counter(g.spec_name for g in placed_grass)
+        for name, cnt in sorted(grass_counts.items()):
+            print(f"       {name}: {cnt:,} instances")
+        print(f"       TOTAL: {len(placed_grass):,} grass clumps")
+
+    # ── Step 4: Run verification ─────────────────────────────────────────
+    print(f"\n[4/5] Running verification suite...")
     report = run_all_checks(
         level_name=level_name,
         world_size_cm=world_size_cm,
@@ -119,6 +164,9 @@ def main():
         grid_z=grid_z,
         grid_size=grid_size,
         placed_trees=placed_trees,
+        placed_grass=placed_grass,
+        grass_density_per_sqm=args.grass_density,
+        knee_height_cm=args.grass_height,
     )
     print()
     print(report.summary)
@@ -132,8 +180,17 @@ def main():
         print("\n⚠️  Verification failed — fix issues before importing into Unreal!")
         sys.exit(1)
 
-    # ── Step 4: Write Unreal import script ───────────────────────────────
-    print(f"\n[4/4] Writing Unreal import script...")
+    # ── Step 5: Write the grass sidecar + Unreal scripts ─────────────────
+    # Tens of thousands of transforms would bloat the generated script, so the
+    # grass instances live in their own JSON file the import script reads.
+    grass_data_path = os.path.join(output_dir, f"grass_{level_name}.json")
+    _write_grass_data(grass_data_path, placed_grass)
+    if placed_grass:
+        print(f"\n       Grass data → {grass_data_path} "
+              f"({os.path.getsize(grass_data_path):,} bytes)")
+
+
+    print(f"\n[5/5] Writing Unreal import script...")
     ue_script_path = os.path.join(output_dir, f"import_{level_name}.py")
     _write_unreal_import_script(
         ue_script_path,
@@ -142,11 +199,13 @@ def main():
         world_size_cm=world_size_cm,
         grid_size=grid_size,
         placed_trees=placed_trees,
+        grass_data_path=grass_data_path,
+        grass_count=len(placed_grass),
         lighting=lighting,
     )
     print(f"       Script → {ue_script_path}")
 
-    # ── Step 5: Write Unreal verification script ─────────────────────────
+    # ── Write Unreal verification script ─────────────────────────────────
     ue_verify_path = os.path.join(output_dir, f"verify_{level_name}.py")
     _write_unreal_verify_script(
         ue_verify_path,
@@ -154,6 +213,7 @@ def main():
         world_size_cm=world_size_cm,
         grid_size=grid_size,
         placed_trees=placed_trees,
+        placed_grass=placed_grass,
         lighting=lighting,
     )
     print(f"       Verify → {ue_verify_path}")
@@ -171,6 +231,37 @@ def main():
     print(f"{'═' * 60}\n")
 
 
+# ─── Grass sidecar writer ───────────────────────────────────────────────────
+
+def _write_grass_data(path: str, placed_grass) -> None:
+    """
+    Write grass instance transforms to a compact JSON sidecar.
+
+    One record per clump, and there are tens of thousands of them on a normal
+    map — so spec names are interned into an index table and each instance is
+    a flat rounded array:
+        [spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul, target_h_cm]
+    """
+    spec_names = sorted({g.spec_name for g in placed_grass})
+    spec_idx = {n: i for i, n in enumerate(spec_names)}
+    payload = {
+        "specs": spec_names,
+        "instances": [
+            [
+                spec_idx[g.spec_name],
+                round(g.x, 1), round(g.y, 1), round(g.placed_z, 1),
+                round(g.yaw_deg, 1), round(g.pitch_deg, 2), round(g.roll_deg, 2),
+                round(g.height_scale, 3), round(g.width_scale, 3),
+                round(g.target_height_cm, 2),
+            ]
+            for g in placed_grass
+        ],
+    }
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(payload, f, separators=(",", ":"))
+
+
 # ─── Unreal import script generator ─────────────────────────────────────────
 
 def _write_unreal_import_script(
@@ -180,9 +271,18 @@ def _write_unreal_import_script(
     world_size_cm: float,
     grid_size: int,
     placed_trees,
+    grass_data_path: str,
+    grass_count: int,
     lighting: dict,
 ):
     """Generate a self-contained Unreal Python script that imports everything."""
+
+    # Grass mesh/material table, keyed by HISM actor label
+    grass_configs = {
+        s.name: {"mesh": s.mesh_path, "mats": list(s.material_paths)}
+        for s in DEFAULT_GRASS_SPECS
+    }
+    grass_configs_json = json.dumps(grass_configs)
 
     # Serialize tree placements to embed in the script
     tree_data = []
@@ -287,7 +387,9 @@ def _write_unreal_import_script(
             # Remove existing generated actors to allow clean re-generation
             for a in editor_actor_sub.get_all_level_actors():
                 lbl = a.get_actor_label()
-                if lbl.startswith(LEVEL_NAME) or lbl.startswith("HISM_Tree"):
+                if (lbl.startswith(LEVEL_NAME)
+                        or lbl.startswith("HISM_Tree")
+                        or lbl.startswith("HISM_Grass")):
                     editor_actor_sub.destroy_actor(a)
         else:
             level_editor_sub.new_level(map_path)
@@ -629,6 +731,96 @@ def _write_unreal_import_script(
 
         unreal.log_warning(f"[GEN] Planted {{total_planted}} trees across {{len(TREE_CONFIGS)}} species!")
 
+        # ── 5b. Plant knee-high grass ────────────────────────────────────────
+        GRASS_DATA_PATH = r"{grass_data_path}"
+        EXPECTED_GRASS_COUNT = {grass_count}
+        GRASS_CONFIGS = json.loads(r"""{grass_configs_json}""")
+        # Distance (cm) at which grass instances begin / finish fading out.
+        GRASS_CULL_START = 6000
+        GRASS_CULL_END = 9000
+
+        if EXPECTED_GRASS_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
+            unreal.log_warning("[GEN] 5b. Planting knee-high grass...")
+            with open(GRASS_DATA_PATH, "r") as _f:
+                grass_payload = json.load(_f)
+
+            grass_spec_names = grass_payload["specs"]
+            grass_groups = defaultdict(list)
+            for inst in grass_payload["instances"]:
+                grass_groups[grass_spec_names[inst[0]]].append(inst)
+
+            def create_grass_hism(name, mesh_path, mat_paths):
+                """Like create_hism, but grass never blocks the player."""
+                mesh = editor_asset_sub.load_asset(mesh_path)
+                if not mesh:
+                    unreal.log_error(f"[GEN] Missing grass mesh: {{mesh_path}}")
+                    return None, 0.0
+                actor = editor_actor_sub.spawn_actor_from_class(
+                    unreal.Actor, unreal.Vector(0, 0, 0))
+                actor.set_actor_label(name)
+                comp = unreal.HierarchicalInstancedStaticMeshComponent(actor)
+                comp.set_static_mesh(mesh)
+                actor.set_editor_property("root_component", comp)
+                comp.set_collision_profile_name("NoCollision")
+                comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+                comp.set_mobility(unreal.ComponentMobility.STATIC)
+                comp.set_editor_property("cast_shadow", True)
+                try_set(comp, "instance_start_cull_distance", GRASS_CULL_START)
+                try_set(comp, "instance_end_cull_distance", GRASS_CULL_END)
+                for idx, mp in enumerate(mat_paths):
+                    mat_obj = editor_asset_sub.load_asset(mp)
+                    if mat_obj:
+                        comp.set_material(idx, mat_obj)
+
+                # The scanned meshes have no authored real-world size, so derive
+                # the scale that makes a clump exactly its target height.
+                mesh_height = 0.0
+                try:
+                    bounds = mesh.get_bounds()
+                    mesh_height = float(bounds.box_extent.z) * 2.0
+                except Exception as exc:
+                    unreal.log_warning(f"[GEN] Could not read bounds for {{name}}: {{exc}}")
+                return comp, mesh_height
+
+            total_grass = 0
+            for spec_name, instances in grass_groups.items():
+                config = GRASS_CONFIGS.get(spec_name)
+                if not config or not instances:
+                    continue
+                comp, mesh_height = create_grass_hism(
+                    spec_name, config["mesh"], config["mats"])
+                if not comp:
+                    continue
+                if mesh_height <= 1.0:
+                    unreal.log_error(
+                        f"[GEN] {{spec_name}} has unusable bounds height "
+                        f"{{mesh_height}}; falling back to scale 1.0")
+
+                for inst in instances:
+                    _, gx, gy, gz, yaw, pitch, roll, h_mul, w_mul, target_h = inst
+                    if mesh_height > 1.0:
+                        s_z = target_h / mesh_height
+                        s_xy = (target_h / max(h_mul, 1e-3)) / mesh_height * w_mul
+                    else:
+                        s_z, s_xy = 1.0, 1.0
+                    tf = unreal.Transform(
+                        location=unreal.Vector(gx, gy, gz),
+                        rotation=unreal.Rotator(pitch=pitch, yaw=yaw, roll=roll),
+                        scale=unreal.Vector(s_xy, s_xy, s_z),
+                    )
+                    comp.add_instance(tf)
+                    total_grass += 1
+
+                unreal.log_warning(
+                    f"[GEN]    {{spec_name}}: {{len(instances)}} clumps "
+                    f"(mesh height {{mesh_height:.1f}} cm)")
+
+            unreal.log_warning(
+                f"[GEN] Planted {{total_grass}} grass clumps across "
+                f"{{len(grass_groups)}} species!")
+        else:
+            unreal.log_warning("[GEN] 5b. Grass skipped (none generated).")
+
         # ── 6. Spawn Player Start ────────────────────────────────────────────
         unreal.log_warning("[GEN] 6. Spawning player start...")
         ps = editor_actor_sub.spawn_actor_from_class(
@@ -658,13 +850,22 @@ def _write_unreal_verify_script(
     world_size_cm: float,
     grid_size: int,
     placed_trees,
+    placed_grass,
     lighting: dict,
 ):
     """Generate an Unreal Python script that verifies the level after import."""
 
     tree_count = len(placed_trees)
-    from collections import Counter
     spec_counts = dict(Counter(t.spec_name for t in placed_trees))
+
+    grass_count = len(placed_grass)
+    grass_spec_counts = dict(Counter(g.spec_name for g in placed_grass))
+    # Expected world height per grass species, used to prove "knee high" in-engine.
+    grass_expected_heights = {}
+    for g in placed_grass:
+        lo, hi = grass_expected_heights.get(g.spec_name, (1e9, -1e9))
+        grass_expected_heights[g.spec_name] = (
+            min(lo, g.target_height_cm), max(hi, g.target_height_cm))
 
     lighting_json = json.dumps(lighting)
     tod_label = lighting["label"]
@@ -672,8 +873,9 @@ def _write_unreal_verify_script(
     script = textwrap.dedent(f'''\
         """
         Auto-generated Unreal verification script for {level_name}.
-        Verifies collision, materials, actor presence, tree HISM instances,
-        and the time-of-day lighting rig.
+        Verifies collision, materials, actor presence, tree and grass HISM
+        instances (including that grass really is knee high), and the
+        time-of-day lighting rig.
         Time of day: {tod_label}
         """
         import json
@@ -687,6 +889,9 @@ def _write_unreal_verify_script(
         WORLD_SIZE_CM = {world_size_cm}
         EXPECTED_TREE_COUNT = {tree_count}
         EXPECTED_SPEC_COUNTS = {json.dumps(spec_counts)}
+        EXPECTED_GRASS_COUNT = {grass_count}
+        EXPECTED_GRASS_SPEC_COUNTS = {json.dumps(grass_spec_counts)}
+        EXPECTED_GRASS_HEIGHTS = {json.dumps(grass_expected_heights)}
         LIGHTING = json.loads(r"""{lighting_json}""")
 
         passed = 0
@@ -872,6 +1077,51 @@ def _write_unreal_verify_script(
         check("Total Tree Instances",
               total_tree_instances == EXPECTED_TREE_COUNT,
               f"(expected {{EXPECTED_TREE_COUNT}}, got {{total_tree_instances}})")
+
+        # ── 5. Grass HISM Actors ─────────────────────────────────────────────
+        if EXPECTED_GRASS_COUNT > 0:
+            total_grass_instances = 0
+            for spec_name, expected_count in EXPECTED_GRASS_SPEC_COUNTS.items():
+                found = False
+                for a in actors:
+                    if a.get_actor_label() == spec_name:
+                        found = True
+                        root = a.get_editor_property("root_component")
+                        if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
+                            inst_count = root.get_instance_count()
+                            total_grass_instances += inst_count
+                            check(f"{{spec_name}} Instance Count",
+                                  inst_count == expected_count,
+                                  f"(expected {{expected_count}}, got {{inst_count}})")
+                            # Grass must never block the player.
+                            check(f"{{spec_name}} No Collision",
+                                  str(root.get_collision_profile_name()) == "NoCollision",
+                                  f"(got {{root.get_collision_profile_name()}})")
+
+                            # Prove the clumps really land at knee height:
+                            # mesh bounds height × instance Z scale.
+                            mesh = root.get_editor_property("static_mesh")
+                            lo_hi = EXPECTED_GRASS_HEIGHTS.get(spec_name)
+                            if mesh and lo_hi and inst_count > 0:
+                                mesh_h = float(mesh.get_bounds().box_extent.z) * 2.0
+                                sampled = []
+                                step = max(1, inst_count // 50)
+                                for i in range(0, inst_count, step):
+                                    tf = root.get_instance_transform(i, world_space=False)
+                                    sampled.append(float(tf.scale3d.z) * mesh_h)
+                                lo, hi = lo_hi
+                                worst = [h for h in sampled
+                                         if not (lo - 1.0 <= h <= hi + 1.0)]
+                                check(f"{{spec_name}} Knee Height",
+                                      len(worst) == 0,
+                                      f"(expected {{lo:.1f}}-{{hi:.1f}} cm, "
+                                      f"sampled {{min(sampled):.1f}}-{{max(sampled):.1f}} cm)")
+                        break
+                check(f"{{spec_name}} Actor Exists", found)
+
+            check("Total Grass Instances",
+                  total_grass_instances == EXPECTED_GRASS_COUNT,
+                  f"(expected {{EXPECTED_GRASS_COUNT}}, got {{total_grass_instances}})")
 
         # ── Summary ──────────────────────────────────────────────────────────
         unreal.log_warning("")

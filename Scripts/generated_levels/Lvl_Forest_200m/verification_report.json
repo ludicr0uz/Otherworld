@@ -80,6 +80,58 @@
       "passed": true,
       "message": "Spawn zone (5m radius) clear",
       "details": []
+    },
+    {
+      "name": "Grass Count / Density",
+      "passed": true,
+      "message": "44,368 clumps on 40,000 m\u00b2 = 1.11/m\u00b2 (requested 1.20/m\u00b2)",
+      "details": []
+    },
+    {
+      "name": "Grass Within Bounds",
+      "passed": true,
+      "message": "All grass within map bounds",
+      "details": []
+    },
+    {
+      "name": "Grass Snapped To Terrain",
+      "passed": true,
+      "message": "All 505 sampled clumps seated on the mesh",
+      "details": []
+    },
+    {
+      "name": "Grass Knee Height",
+      "passed": true,
+      "message": "knee layer = 77% of clumps, avg 49.4 cm (target 50 cm)",
+      "details": []
+    },
+    {
+      "name": "Grass Upscale Factor",
+      "passed": true,
+      "message": "worst upscale 2.34x (HISM_Grass_Knee_Tall_C), limit 2.40x",
+      "details": []
+    },
+    {
+      "name": "Grass Coverage",
+      "passed": true,
+      "message": "144/144 cells of a 12\u00d712 grid covered",
+      "details": []
+    },
+    {
+      "name": "Grass Species Spread",
+      "passed": true,
+      "message": "9 species represented",
+      "details": [
+        "HISM_Grass_Knee_Clump_C: 5,844",
+        "HISM_Grass_Knee_Mid_A: 5,862",
+        "HISM_Grass_Knee_Tall_A: 8,451",
+        "HISM_Grass_Knee_Tall_B: 7,813",
+        "HISM_Grass_Knee_Tall_C: 6,415",
+        "HISM_Grass_Under_Clump_A: 2,325",
+        "HISM_Grass_Under_Large_A: 2,197",
+        "HISM_Grass_Under_Large_B: 2,611",
+        "HISM_Grass_Under_Mid_B: 2,850"
+      ]
     }
   ]
 }

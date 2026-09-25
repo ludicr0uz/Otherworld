@@ -75,7 +75,9 @@ if editor_asset_sub.does_asset_exist(map_path):
     # Remove existing generated actors to allow clean re-generation
     for a in editor_actor_sub.get_all_level_actors():
         lbl = a.get_actor_label()
-        if lbl.startswith(LEVEL_NAME) or lbl.startswith("HISM_Tree"):
+        if (lbl.startswith(LEVEL_NAME)
+                or lbl.startswith("HISM_Tree")
+                or lbl.startswith("HISM_Grass")):
             editor_actor_sub.destroy_actor(a)
 else:
     level_editor_sub.new_level(map_path)
@@ -416,6 +418,96 @@ for spec_name, config in TREE_CONFIGS.items():
         total_planted += 1
 
 unreal.log_warning(f"[GEN] Planted {total_planted} trees across {len(TREE_CONFIGS)} species!")
+
+# ── 5b. Plant knee-high grass ────────────────────────────────────────
+GRASS_DATA_PATH = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/generated_levels/Lvl_Forest_200m/grass_Lvl_Forest_200m.json"
+EXPECTED_GRASS_COUNT = 44368
+GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_Knee_Tall_A": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_tall_a_LOD0.grass_medium_01_tall_a_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Knee_Tall_B": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_tall_b_LOD0.grass_medium_01_tall_b_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Knee_Tall_C": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_tall_c_LOD0.grass_medium_01_tall_c_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Knee_Clump_C": {"mesh": "/Game/Forest/Scanned/grass_medium_02/grass_medium_02_1k/StaticMeshes/grass_medium_02_c.grass_medium_02_c", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium02"]}, "HISM_Grass_Knee_Mid_A": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_mid_a_LOD0.grass_medium_01_mid_a_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Under_Mid_B": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_mid_b_LOD0.grass_medium_01_mid_b_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Under_Large_B": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_large_b_LOD0.grass_medium_01_large_b_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Under_Clump_A": {"mesh": "/Game/Forest/Scanned/grass_medium_02/grass_medium_02_1k/StaticMeshes/grass_medium_02_a.grass_medium_02_a", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium02"]}, "HISM_Grass_Under_Large_A": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_large_a_LOD0.grass_medium_01_large_a_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}}""")
+# Distance (cm) at which grass instances begin / finish fading out.
+GRASS_CULL_START = 6000
+GRASS_CULL_END = 9000
+
+if EXPECTED_GRASS_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
+    unreal.log_warning("[GEN] 5b. Planting knee-high grass...")
+    with open(GRASS_DATA_PATH, "r") as _f:
+        grass_payload = json.load(_f)
+
+    grass_spec_names = grass_payload["specs"]
+    grass_groups = defaultdict(list)
+    for inst in grass_payload["instances"]:
+        grass_groups[grass_spec_names[inst[0]]].append(inst)
+
+    def create_grass_hism(name, mesh_path, mat_paths):
+        """Like create_hism, but grass never blocks the player."""
+        mesh = editor_asset_sub.load_asset(mesh_path)
+        if not mesh:
+            unreal.log_error(f"[GEN] Missing grass mesh: {mesh_path}")
+            return None, 0.0
+        actor = editor_actor_sub.spawn_actor_from_class(
+            unreal.Actor, unreal.Vector(0, 0, 0))
+        actor.set_actor_label(name)
+        comp = unreal.HierarchicalInstancedStaticMeshComponent(actor)
+        comp.set_static_mesh(mesh)
+        actor.set_editor_property("root_component", comp)
+        comp.set_collision_profile_name("NoCollision")
+        comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        comp.set_mobility(unreal.ComponentMobility.STATIC)
+        comp.set_editor_property("cast_shadow", True)
+        try_set(comp, "instance_start_cull_distance", GRASS_CULL_START)
+        try_set(comp, "instance_end_cull_distance", GRASS_CULL_END)
+        for idx, mp in enumerate(mat_paths):
+            mat_obj = editor_asset_sub.load_asset(mp)
+            if mat_obj:
+                comp.set_material(idx, mat_obj)
+
+        # The scanned meshes have no authored real-world size, so derive
+        # the scale that makes a clump exactly its target height.
+        mesh_height = 0.0
+        try:
+            bounds = mesh.get_bounds()
+            mesh_height = float(bounds.box_extent.z) * 2.0
+        except Exception as exc:
+            unreal.log_warning(f"[GEN] Could not read bounds for {name}: {exc}")
+        return comp, mesh_height
+
+    total_grass = 0
+    for spec_name, instances in grass_groups.items():
+        config = GRASS_CONFIGS.get(spec_name)
+        if not config or not instances:
+            continue
+        comp, mesh_height = create_grass_hism(
+            spec_name, config["mesh"], config["mats"])
+        if not comp:
+            continue
+        if mesh_height <= 1.0:
+            unreal.log_error(
+                f"[GEN] {spec_name} has unusable bounds height "
+                f"{mesh_height}; falling back to scale 1.0")
+
+        for inst in instances:
+            _, gx, gy, gz, yaw, pitch, roll, h_mul, w_mul, target_h = inst
+            if mesh_height > 1.0:
+                s_z = target_h / mesh_height
+                s_xy = (target_h / max(h_mul, 1e-3)) / mesh_height * w_mul
+            else:
+                s_z, s_xy = 1.0, 1.0
+            tf = unreal.Transform(
+                location=unreal.Vector(gx, gy, gz),
+                rotation=unreal.Rotator(pitch=pitch, yaw=yaw, roll=roll),
+                scale=unreal.Vector(s_xy, s_xy, s_z),
+            )
+            comp.add_instance(tf)
+            total_grass += 1
+
+        unreal.log_warning(
+            f"[GEN]    {spec_name}: {len(instances)} clumps "
+            f"(mesh height {mesh_height:.1f} cm)")
+
+    unreal.log_warning(
+        f"[GEN] Planted {total_grass} grass clumps across "
+        f"{len(grass_groups)} species!")
+else:
+    unreal.log_warning("[GEN] 5b. Grass skipped (none generated).")
 
 # ── 6. Spawn Player Start ────────────────────────────────────────────
 unreal.log_warning("[GEN] 6. Spawning player start...")

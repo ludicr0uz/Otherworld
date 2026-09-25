@@ -79,19 +79,24 @@ embedded script templates).
 
 ```
 CLI ──► terrain.generate_terrain_obj ──► tree_placement.scatter_trees
-     ──► verification.run_all_checks (12 offline checks; exits 1 on failure)
+     ──► grass_placement.scatter_grass
+     ──► verification.run_all_checks (19 offline checks; exits 1 on failure)
      ──► verification_report.json
+     ──► emit grass_<Level>.json  (instance transforms, read at import time)
      ──► emit import_<Level>.py   (build the level in-editor)
-     ──► emit verify_<Level>.py   (47 in-editor assertions)
+     ──► emit verify_<Level>.py   (84 in-editor assertions)
      ──► print the two UnrealEditor-Cmd commands
 ```
 
 CLI flags: `--size <meters>` (required), `--name` (default `Lvl_Forest_<size>m`),
 `--seed` (42), `--grid` (default auto), `--time-of-day {day,night}` (default `day`),
-`--json-report`.
+`--grass-density` (1.2 clumps/m²), `--grass-height` (50 cm), `--grass-patchiness` (0.25),
+`--no-grass`, `--json-report`.
 
 Output dir: `Scripts/generated_levels/<LevelName>/` holding
-`SM_<Level>_Terrain.obj`, `import_<Level>.py`, `verify_<Level>.py`, `verification_report.json`.
+`SM_<Level>_Terrain.obj`, `grass_<Level>.json`, `import_<Level>.py`, `verify_<Level>.py`,
+`verification_report.json`. The grass sidecar is gitignored — it is ~3 MB for a 200 m map
+and fully regenerable from the seed.
 Re-running with the same seed reproduces byte-identical output.
 
 ### 3.1 Terrain — `forest_generator/terrain.py`
@@ -129,12 +134,58 @@ each tree gets a polar position between `min_dist_from_center` and 85 % of the h
 bury instead of hovering. Returns `PlacedTree` records (both `terrain_z` and `placed_z` are
 kept so verification can check hover *and* burial independently). 200 m ⇒ 136 trees.
 
+### 3.2b Grass placement — `forest_generator/grass_placement.py`
+
+Knee-high grass across the whole map, deterministic from the same `--seed`
+(XOR-decorrelated from the tree RNG so changing grass settings never moves a tree).
+
+**Distribution.** A jittered stratified grid, cell edge = `sqrt(1/density)` metres, one
+candidate per cell placed uniformly inside it. That guarantees coverage everywhere, which a
+plain uniform-random scatter does not. A `patchiness` term then drops a cell and doubles a
+cell at *equal* probability (0.25 each by default), so thin and thick patches appear while the
+expected density stays exactly as requested. Candidates are rejected inside a 150 cm ring
+around the PlayerStart and within 90 cm of a trunk (trees are bucketed into a hash grid, so
+the rejection test is O(1) per clump). Coverage runs to 97 % of the half-extent.
+
+**Height — the part that matters.** The source scans are photogrammetry with no authored
+real-world size: measured from their bounds they are only **14.7–32.3 cm** tall. So the module
+never bakes a scale. Each `PlacedGrass` carries a `target_height_cm` (what the clump should
+measure in world space) plus independent height and width multipliers; the generated import
+script divides that target by the mesh's *actual* `get_bounds().box_extent.z * 2` at plant
+time. "Knee high" therefore stays true if an asset is ever re-exported at a different size.
+
+**Layering.** `DEFAULT_GRASS_SPECS` is two layers, nine HISM actors:
+
+| Layer | Species | `height_ratio` | Result at the 50 cm default |
+|---|---|---|---|
+| Knee | `Tall_A/B/C`, `Clump_C`, `Mid_A` | 0.92–1.00 | ~46–50 cm, ~77 % of clumps |
+| Understory | `Under_Mid_B`, `Under_Large_A/B`, `Under_Clump_A` | 0.52–0.60 | shin height, breaks the silhouette |
+
+The split is driven by the *measured* mesh heights recorded on each spec as
+`nominal_mesh_height_cm`: the tallest scans carry the knee layer because reaching 50 cm from a
+15 cm clump needs a 3.4× upscale and the blades read as coarse. As built, the worst upscale is
+2.34× and the offline `Grass Upscale Factor` check fails the build past **2.4×**. Per-instance
+jitter is height ×0.85–1.20 (tightened per species where the upscale budget is thin), width
+×0.90–1.18, and a ±4° lean so the field does not look stamped.
+
+200 m at the defaults ⇒ **44,368 clumps**, 1.11/m² realised against 1.20 requested (the
+difference is the spawn ring, the trunk rings and the coverage inset).
+
 ### 3.3 Offline verification — `forest_generator/verification.py`
 
 `run_all_checks` → `VerificationReport` (`CheckResult` list, `summary`, `all_passed`,
-`to_json`). The 12 checks: OBJ validity, terrain bounds ±5 %, flat spawn zone, upward normals,
-tree count sanity, in-bounds, not floating, not buried, vertical, spacing, spawn-zone clear,
-barycentric consistency. A failure aborts before any editor work happens.
+`to_json`). 19 checks, all of which must pass before any editor work happens:
+
+- **Terrain (5):** OBJ validity, bounds ±5 %, flat spawn zone, upward normals,
+  barycentric consistency.
+- **Trees (7):** count sanity, in-bounds, not floating, not buried, vertical, spacing,
+  spawn-zone clear.
+- **Grass (7, skipped under `--no-grass`):** density within 70–105 % of the request;
+  in-bounds; seated on the mesh (terrain Z re-derived for a 500-clump sample and compared
+  against the recorded value and the sink); knee height (the knee layer must average inside
+  ±30 % of the target and no clump may exceed 1.6×); upscale factor ≤ 2.4×; coverage —
+  every cell of a 12×12 grid over the map contains grass, which is what "throughout the
+  level" actually means; species spread.
 
 ### 3.4 Generated import script
 
@@ -144,12 +195,21 @@ barycentric consistency. A failure aborts before any editor work happens.
    Nanite disabled, `collision_trace_flag = CTF_USE_COMPLEX_AS_SIMPLE`, `allow_cpu_access`,
    material `M_Forest_Ground_PBR`.
 2. **Level** `/Game/Maps/<Level>` — load if it exists and destroy every actor whose label
-   starts with the level name or `HISM_Tree` (idempotent re-generation), else `new_level`.
+   starts with the level name, `HISM_Tree` or `HISM_Grass` (idempotent re-generation),
+   else `new_level`.
 3. **Terrain actor** — `StaticMeshActor`, `BlockAll`, `QUERY_AND_PHYSICS`, static.
 4. **Lighting & sky** — fully driven by the embedded preset (§4).
 5. **Trees** — placements inlined as a `TREE_DATA` literal, grouped by spec; one actor per
    species carrying a `HierarchicalInstancedStaticMeshComponent` as its root, `BlockAll`,
    static, shadow-casting, materials set by slot index, then one `add_instance` per tree.
+5b. **Grass** — transforms are *not* inlined (tens of thousands of them); the script reads
+   `grass_<Level>.json`, whose instances are flat rounded arrays
+   `[spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul, target_h_cm]` against an
+   interned spec-name table. One HISM actor per species, `NoCollision` (grass must never
+   block the player), cull distances 6000–9000 cm, shadow-casting. Per species the script
+   reads the mesh bounds once, then per instance sets
+   `scale = (unit·width_mul, unit·width_mul, target_h / mesh_height)`. If bounds come back
+   unusable it logs an error and falls back to scale 1.0 rather than emitting giant grass.
 6. **PlayerStart** at `(0, 0, 100)`.
 7. `save_current_level()`.
 
@@ -159,10 +219,14 @@ that convention is what makes step 2's cleanup and the verify script's lookups w
 
 ### 3.5 Generated verify script
 
-`_write_unreal_verify_script` emits a `check(name, condition, detail)` harness and 47
+`_write_unreal_verify_script` emits a `check(name, condition, detail)` harness and 84
 assertions over the *saved* level: terrain actor/component/collision/Nanite/material, the
-full lighting rig against the preset (§4.3), tree HISM counts per species, and PlayerStart.
-Prints `[VERIFY] ✅ ALL 47 CHECKS PASSED!` or a list of failures.
+full lighting rig against the preset (§4.3), tree HISM counts per species, PlayerStart, and
+per grass species — actor exists, instance count, `NoCollision`, and a **knee-height proof**:
+50 instance transforms are sampled and `scale.z × mesh bounds height` must land inside the
+min/max target height the offline pass recorded for that species. That last check is the one
+that would catch a mis-scaled asset, since nothing offline can see the mesh.
+Prints `[VERIFY] ✅ ALL 84 CHECKS PASSED!` or a list of failures.
 
 ---
 
@@ -242,8 +306,14 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
   re-parented and re-parameterised; level actors are wiped by label prefix before respawn.
 - **Terrain collision.** Nanite must be off and the trace flag set to
   `CTF_USE_COMPLEX_AS_SIMPLE`, otherwise the player falls through or lands on a coarse hull.
-- **Determinism.** Same `--seed` ⇒ same terrain and same tree transforms. Change the seed, not
-  the placement code, when you want a different forest.
+- **Determinism.** Same `--seed` ⇒ same terrain, tree and grass transforms. Change the seed,
+  not the placement code, when you want a different forest. The grass RNG is seeded
+  `seed ^ 0x6A55` so grass settings can be retuned without disturbing tree placement.
+- **Never hard-code a grass scale.** The scans carry no real-world size; derive it from
+  `get_bounds()` at plant time (§3.2b).
+- **Foliage instance budgets.** ~44 k HISM instances at the default density is fine, but the
+  count scales with map *area* — a 400 m map is 4× the clumps. Reach for `--grass-density`
+  before reaching for a new scatter algorithm.
 - **Verify after importing.** The offline suite cannot see collision, materials or actors;
   the in-editor script is the real gate.
 
@@ -253,10 +323,14 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
 
 - Git: branch `night-mode`, working tree clean, head `e5745e9 night mode initial`
   (adds `lighting.py`, the generator rewrite, the regenerated night scripts and a `.gitignore`).
-- `/Game/Maps/Lvl_Forest_200m` — 200 m, seed 42, 136 trees over 5 species, **night** preset.
-  Offline 12/12, in-editor 47/47, import log clean.
+- `/Game/Maps/Lvl_Forest_200m` — 200 m, seed 42, 136 trees over 5 species, 44,368 knee-high
+  grass clumps over 9 species, **night** preset.
+  Offline 19/19, in-editor 84/84, import log clean.
 - New engine assets from that run: `M_NightSky_Starfield`, `MI_NightSky_Starfield`.
 - The `day` path was regression-checked with a throwaway 100 m level (12/12, both emitted
   scripts parse, day-only asset references present) and the throwaway removed.
 - Not verified programmatically: how the night scene actually *looks*. Tune
   `star_brightness`, moon `intensity`, and `auto_exposure_bias` in `lighting.py` by eye.
+  The same applies to grass: the checks prove every clump is knee high, seated on the
+  terrain, evenly covering the map and not over-stretched, but density and patchiness are
+  taste calls — `--grass-density` and `--grass-patchiness` exist for that.

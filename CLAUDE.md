@@ -104,7 +104,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**82 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**87 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
@@ -173,36 +173,40 @@ and would paint the screen solid.
 
 ### How a weapon is oriented in the hand
 
-**Tick turns the held weapon to face the aim point, every frame.** It is not a baked grip
-offset. A baked offset has to be correct in whatever pose the arms are actually in, which means
-predicting how the aim montage, the layered blend and the Control Rig compose on `HandGrip_R` —
-and that question was answered confidently and wrongly twice. Driving the rotation makes it
-moot, and it buys something a fixed grip never could: the barrel tracks pitch, so aiming up
-raises the gun.
+**`HandGrip_R` carries the weapon's forward on its +Y axis, not its +X.** Everything else here
+follows from that, and getting it wrong cost three rounds. Measured in the actor's space:
 
-The rotation is solved from the weapon's *location* (`MakeRotFromX(AimPoint - weapon location)`),
-not from its muzzle, so nothing depends on the value about to be written — the attach point is
-snapped to the socket and does not move when the rotation changes.
+| pose | socket +Y | socket +X |
+|---|---|---|
+| `MM_Idle` (arms down) | (0.07, 0.07, **−0.99**) — at the floor | (0.06, −1.00, −0.06) |
+| `MF_Rifle_Idle_ADS` | (**0.97**, 0.14, 0.21) — down the sights | (0.19, **−0.94**, −0.27) |
+| `MF_Pistol_Idle_ADS` | (**0.99**, 0.06, 0.14) — down the sights | (0.06, **−1.00**, −0.01) |
 
-`GripRotation` survives only as the resting orientation for the single frame between equipping
-and the next aim resolve. Both weapons share it: it is the orientation of the *hand*, which does
-not depend on what is in it.
+A hand at the side points its weapon axis at the floor; a hand in a ready pose points it where
+the player is looking. +X does neither — it reads ~0.94 to the player's **left**, which is
+exactly where the barrel kept ending up. Weapons are modelled along their own +X, so
+`GripRotation` is the rotation taking +X onto the socket's +Y with the weapon upright: a plain
+**90° yaw** in the socket's frame. One value for every weapon, because it describes the *hand*.
 
-**Do not compute hand orientation offline.** `AnimPoseExtensions` looks authoritative and
-disagrees with the engine: composing `HandGrip_R` onto `hand_r` from a sampled pose predicted a
-socket +X of `(0.65, -0.26, -0.72)` where the live skeleton reports `(0.996, 0.057, -0.065)`.
-The offline number produced a barrel pointing 90° to the player's left while every assertion
-built on the same maths said "straight ahead" — a self-consistent wrong answer, which is the
-worst kind. `_measure_grip_rotation()` spawns a character into the **editor world** and reads
-`get_socket_transform(..., RTS_COMPONENT)` instead.
+**The weapon is rigidly attached and never rotated on its own.** Driving its rotation from the
+aim point each frame was tried and reverted: the gun swivels out of the hand holding it and
+spins a full turn as the camera comes round. What aims it is the character —
+`face_the_camera()` sets `use_controller_rotation_yaw` and clears
+`orient_rotation_to_movement`, so the body follows the camera's yaw and the ready pose keeps the
+arms down the sights. That is the standard third-person-shooter arrangement, and it is what
+keeps the barrel on the crosshair while the player runs in any direction.
 
-`verify_weapons_and_combat.py` checks the same thing **end to end** rather than by re-deriving
-it: spawn the character, attach the weapon exactly as the game does (snap to `HandGrip_R`, apply
-the saved `GripRotation`), and read the barrel's world direction back off the engine. It must be
-`(1, 0, 0)`. Note also that posing a live mesh headlessly does **not** work — `play_animation` +
-`set_position` leaves the socket identical for two different animations, and
-`refresh_bone_transforms` is not exposed, so the editor world can only ever be asked about the
-reference pose.
+Two honest limits: there is **no aim offset**, so the gun does not pitch up or down with the
+camera (the hybrid aim still puts the shot where the reticle is); and the legs still play the
+**unarmed forward gait**, so strafing reads as running forward while sliding sideways — a strafe
+set needs blend spaces, which cannot be authored from Python.
+
+`verify_weapons_and_combat.py` checks this **end to end and pose-independently**: it spawns the
+character, attaches the weapon exactly as the game does, and asserts the barrel lies along the
+socket's +Y (`dot = 1.0000`). Asking "does the barrel point forward?" would be wrong — a
+headless editor world only ever shows the reference pose, where a correctly seated barrel points
+at the floor. It separately asserts, from the sampled ready poses, that +Y *is* the aim
+direction and that +X is not.
 
 ### The HUD
 
@@ -226,7 +230,7 @@ centred and bottom-anchored at any window size.
 - Not verified headlessly, and worth a look in a play session: how the reticle reads while
   moving, how much the gun visibly detaches from the hand now that its rotation is driven, and
   how the blood splash looks. The last runtime `-game` pass predates the hybrid aim, the
-  reticle, the shoulder camera and the driven weapon rotation.
+  reticle, the shoulder camera and the camera-facing body.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
@@ -291,6 +295,12 @@ centred and bottom-anchored at any window size.
   `Failed to set default value … on A`, but `set_pin_value`'s return is the real signal — and
   note it also returns False when the value you set equals the pin's existing default, so a
   False is not always a failure.
+- **The mesh's reference pose is not the skeleton's.** `AnimPoseExtensions.get_reference_pose`
+  takes a `Skeleton`, and for `SKM_Quinn_Simple` that returns `SK_Mannequin`'s pose, which is
+  not what a spawned mesh shows. Comparing the two produced an apparent 40° disagreement that I
+  briefly recorded here as "offline sampling disagrees with the engine" — it does not. Sampling
+  `MM_Idle` offline gives HandGrip_R at `(-3.72, 3.28, 85.90)` and the live mesh reports
+  `(-3.719, 3.275, 85.904)`. Compare like with like.
 - **An animation pose can be sampled from Python**, which is what makes a derived grip
   possible: `AnimPoseExtensions.get_anim_pose_at_time(seq, t, AnimPoseEvaluationOptions())`
   then `get_bone_pose(pose, bone, AnimPoseSpaces.WORLD)`. Note `WORLD` there means **component**

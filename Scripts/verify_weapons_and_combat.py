@@ -172,24 +172,20 @@ if shot and pist:
           a.get_editor_property("AimPose") != b.get_editor_property("AimPose"))
     check("the two weapons use different fire sounds",
           a.get_editor_property("FireSound") != b.get_editor_property("FireSound"))
-    def barrel_direction(bp):
-        """Where this weapon's barrel actually ends up, measured end to end.
+    def barrel_vs_hand(bp):
+        """Attach the weapon for real, and see whether it lies along the hand's axis.
 
-        Spawn the character, attach the weapon the way the game does (snap to
-        HandGrip_R, then apply the saved GripRotation) and read the barrel's
-        world direction back off the engine. No offline pose maths: that is
-        exactly what got this wrong -- AnimPoseExtensions predicted a socket
-        orientation the live skeleton disagrees with, and the gun ended up
-        pointing 90 degrees to the player's left while every offline number
-        said it was straight ahead.
-
-        The character is spawned facing +X, so the barrel should come back as
-        (1, 0, 0).
+        Pose-independent on purpose. A headless editor world only ever shows the
+        reference pose, in which the arms hang down and the barrel should point
+        at the floor -- so "does the barrel point forward?" is the wrong
+        question to ask here and would fail for a perfectly seated weapon. What
+        must hold in *every* pose is that the barrel lies along HandGrip_R's +Y,
+        which is the axis the Mannequin puts a weapon's forward on.
         """
         actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+        eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
         here = unreal.Vector(0.0, 0.0, 0.0)
         straight = unreal.Rotator(0.0, 0.0, 0.0)
-        eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
         char = actors.spawn_actor_from_class(
             eas.load_blueprint_class(G.CHARACTER_BP_PATH), here, straight)
         gun = actors.spawn_actor_from_class(
@@ -200,15 +196,31 @@ if shot and pist:
             gun.attach_to_component(mesh, G.GRIP_SOCKET, snap, snap, snap, False)
             gun.set_actor_relative_rotation(
                 cdo(bp).get_editor_property("GripRotation"), False, False)
-            return gun.get_actor_forward_vector()
+            hand = mesh.get_socket_transform(
+                G.GRIP_SOCKET, unreal.RelativeTransformSpace.RTS_WORLD).rotation.rotator()
+            weapon_axis = unreal.MathLibrary.greater_greater_vector_rotator(
+                G.WEAPON_AXIS_IN_SOCKET, hand)
+            barrel = gun.get_actor_forward_vector()
+            return (barrel.x * weapon_axis.x + barrel.y * weapon_axis.y
+                    + barrel.z * weapon_axis.z)
         finally:
             actors.destroy_actor(gun)
             actors.destroy_actor(char)
 
     for bp, name in ((shot, "Shotgun"), (pist, "Pistol")):
-        aimed = barrel_direction(bp)
-        check(f"{name}: at rest the barrel points forward, not across the body",
-              aimed.x > 0.999, f"barrel direction = {aimed.to_tuple()}")
+        along = barrel_vs_hand(bp)
+        check(f"{name}: the barrel lies along the hand's weapon axis",
+              along > 0.999, f"dot(barrel, HandGrip_R +Y) = {along:.4f}")
+
+    # And that axis has to be the aiming direction, or the weapon is seated
+    # perfectly in a hand that points somewhere useless.
+    for name, aim in (("rifle", G.AIM_RIFLE), ("pistol", G.AIM_PISTOL)):
+        axes = G.socket_pose_axes(aim)
+        check(f"in the {name} ready pose the hand aims where the player faces",
+              axes["Y"].x > 0.9, f"hand's weapon axis = {axes['Y'].to_tuple()}")
+        check(f"in the {name} ready pose the hand's +X is NOT the aim direction",
+              abs(axes["X"].x) < 0.5,
+              f"+X = {axes['X'].to_tuple()} — this is the axis that pointed left")
 
     check("the two weapons show different colours in the inventory",
           a.get_editor_property("SlotColor").to_tuple()
@@ -312,22 +324,19 @@ check("a dropped weapon lands in front of the player, not on their feet",
               for axis in "XYZ")
           for n in titled(wg, "MakeVector")),
       f"{G.DROP_FORWARD:.0f} cm ahead")
-# Two subtractions off AimPoint: one aims the pellets, one aims the weapon.
+# One subtraction off AimPoint: the pellet direction.
 deltas = [n for n in titled(wg, "vector - vector")
           if any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get AimPoint"
                  for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A")))]
 check("the pellet direction is muzzle -> AimPoint, not camera forward",
-      len(deltas) == 2, f"{len(deltas)} vector subtractions driven by AimPoint")
+      len(deltas) == 1, f"{len(deltas)} vector subtractions driven by AimPoint")
 
-# The fix for "the gun points left": the weapon's rotation is driven every
-# frame from the aim, instead of being baked into a grip offset that has to be
-# correct in whatever pose the arms are in.
-turns = titled(wg, "Set Actor Rotation")
-check("the held weapon is turned to face the aim point every frame",
-      len(turns) == 1 and any(
-          str(BEL.get_node_title(PIN.get_owning_node(q))) == "MakeRotFromX"
-          for q in PIN.list_connected_pins(BEL.find_input_pin(turns[0], "NewRotation"))),
-      f"{len(turns)} SetActorRotation node(s)")
+# A held weapon is rigidly attached and never rotated on its own. Driving its
+# rotation from the aim was tried and reverted: the gun swivelled out of the
+# hand and spun a full turn as the camera came round.
+check("nothing rotates the held weapon out of the hand",
+      not titled(wg, "Set Actor Rotation"),
+      f"{len(titled(wg, 'Set Actor Rotation'))} SetActorRotation node(s)")
 drawn = [t for t in traces if "ForDuration" in pin_value(t, "DrawDebugType")]
 check("only the pellets are drawn -- the aim traces run every frame and would "
       "paint the screen", len(drawn) == 1, f"{len(drawn)} drawn")
@@ -381,6 +390,14 @@ check("the camera sits over the shoulder, so the reticle is not on the player",
       and abs(arm.get_editor_property("target_arm_length") - G.CAMERA_ARM) < 1e-3,
       f"offset {arm.get_editor_property('socket_offset').to_tuple()}, "
       f"arm {arm.get_editor_property('target_arm_length')}" if arm else "no boom")
+
+move = next((c for c in (component_template(char, n) for n in components(char))
+             if isinstance(c, unreal.CharacterMovementComponent)), None)
+check("the body follows the camera, so the gun stays on the crosshair",
+      cdo(char).get_editor_property("use_controller_rotation_yaw")
+      and move is not None
+      and not move.get_editor_property("orient_rotation_to_movement"),
+      "orient-to-movement would turn the gun with the movement input instead")
 
 check("player carries HealthComponent + WeaponComponent",
       {"HealthComponent", "WeaponComponent"} <= cnames,

@@ -38,22 +38,19 @@ firing code can read Damage/Spread/Range/FireSound off whatever is held. The
 alternative -- two sibling classes -- would need a cast and a duplicate branch
 per weapon in every graph that touches a weapon.
 
-HOW THE WEAPON IS ORIENTED (and why it is not a grip offset)
-------------------------------------------------------------
-Tick turns the held weapon to face the aim point, every frame. The obvious
-alternative -- bake a per-weapon GripRotation and let the hand carry it -- has
-to be correct in whatever pose the arms are actually in, which means predicting
-how the aim montage, the layered blend and the Control Rig compose on
-HandGrip_R. Offline pose maths answered that question confidently and wrongly:
-AnimPoseExtensions predicted a socket +X of (0.65, -0.26, -0.72) where the live
-engine reports (0.996, 0.057, -0.065), and the gun ended up pointing 90 degrees
-to the player's left while every number said straight ahead.
+HOW THE WEAPON IS ORIENTED
+--------------------------
+The weapon is rigidly attached to HandGrip_R and never rotated on its own. What
+points it at the crosshair is the character: the body follows the camera's yaw
+(face_the_camera) and the ready pose puts the arms down the sights, so the
+barrel tracks the crosshair while staying in the fist.
 
-Driving the rotation makes the question moot, and it does something a fixed
-grip never could: the barrel tracks pitch, so aiming up raises the gun.
-GripRotation survives only as the resting orientation for the single frame
-between equipping and the next aim resolve, and it is *measured* -- a character
-is spawned into the editor world and asked where HandGrip_R points.
+The grip itself is one fixed rotation, and the thing worth knowing is which axis
+it targets: the Mannequin's HandGrip_R carries the weapon's forward on its **+Y**
+axis, not its +X. See _grip_rotation() for the measurements. Aiming the barrel
+down +X instead -- which is the obvious reading of a socket named "grip" -- puts
+it 90 degrees across the player's body, and no amount of solving for a better
+rotation fixes a wrong axis.
 
 THE AIM POSE (the part with a real constraint behind it)
 --------------------------------------------------------
@@ -98,7 +95,6 @@ BP_WeaponComponent event graph:
   because the reticle depends on it:
 
     camera -> LineTrace -> AimPoint      what the crosshair is resting on
-    turn the held weapon to face AimPoint
     muzzle -> LineTrace -> AimPoint      can the gun actually reach it?
                                          if not, AimPoint moves to the wall and
                                          AimBlocked goes true (red reticle)
@@ -540,52 +536,87 @@ def _pure_rotation(rotator):
                             scale=unreal.Vector(1.0, 1.0, 1.0))
 
 
-def _forward_in_mesh_space(mesh):
-    """Which way "the player is facing" points inside the mesh's own space.
+WEAPON_AXIS_IN_SOCKET = unreal.Vector(0.0, 1.0, 0.0)
 
-    The Mannequin's mesh is yawed 270 degrees inside the actor, so the actor's
-    forward (+X) is the mesh's +Y. Getting this backwards is a 90 degree error
-    in every weapon at once, which is why it is read off the component rather
-    than written down.
+
+def _grip_socket():
+    """(mesh yaw inside the actor, the HandGrip_R socket) off the player's mesh."""
+    bp = _assets().load_asset(CHARACTER_BP_PATH)
+    if not bp:
+        raise RuntimeError(f"could not load {CHARACTER_BP_PATH}")
+    for handle, _name in _handles(bp):
+        obj = _component_object(handle)
+        if isinstance(obj, unreal.SkeletalMeshComponent):
+            skeletal = obj.get_editor_property("skeletal_mesh_asset")
+            socket = skeletal.find_socket(GRIP_SOCKET)
+            if not socket:
+                raise RuntimeError(f"{skeletal.get_name()} has no {GRIP_SOCKET}")
+            return obj.get_editor_property("relative_rotation").yaw, socket
+    raise RuntimeError(f"{CHARACTER_BP_PATH} has no SkeletalMeshComponent")
+
+
+def socket_pose_axes(aim_pose_path):
+    """HandGrip_R's three axes, in the actor's space, during a given pose.
+
+    Sampled from the animation, not from a live mesh: a headless editor world
+    only ever shows the *reference* pose, and the reference pose is not the one
+    a weapon is held in.
     """
-    yaw = mesh.get_editor_property("relative_rotation").yaw
-    return _rotate_vector(_rot(yaw=-yaw), unreal.Vector(1.0, 0.0, 0.0))
+    mesh_yaw, socket = _grip_socket()
+    anim = _assets().load_asset(aim_pose_path)
+    if not anim:
+        raise RuntimeError(f"could not load the pose {aim_pose_path}")
+    pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(
+        anim, 0.0, unreal.AnimPoseEvaluationOptions())
+    # AnimPoseSpaces.WORLD means *component* space here -- a pose has no world
+    # to be in -- and the mesh's own yaw is what carries that into the actor.
+    bone = unreal.AnimPoseExtensions.get_bone_pose(
+        pose, socket.get_editor_property("bone_name"), unreal.AnimPoseSpaces.WORLD)
+    in_mesh = unreal.MathLibrary.compose_transforms(
+        _pure_rotation(socket.get_editor_property("relative_rotation")),
+        bone).rotation.rotator()
+    return {name: _rotate_vector(_rot(yaw=mesh_yaw), _rotate_vector(in_mesh, vector))
+            for name, vector in (("X", unreal.Vector(1.0, 0.0, 0.0)),
+                                 ("Y", unreal.Vector(0.0, 1.0, 0.0)),
+                                 ("Z", unreal.Vector(0.0, 0.0, 1.0)))}
 
 
-def _measure_grip_rotation():
-    """Solve the resting grip against a socket transform the *engine* measured.
+def _grip_rotation():
+    """The fixed rotation that seats a weapon in the hand pointing down the barrel.
 
-    This number only has to be right for the frame between equipping a weapon
-    and the first aim resolve -- Tick drives the held weapon's rotation from
-    then on -- but it still has to be right, because a wrong resting value is
-    what made the gun point 90 degrees left.
+    The Mannequin's HandGrip_R socket carries the weapon's forward on its **+Y**
+    axis, not its +X. That is not a guess -- it is what the poses say, measured
+    in the actor's space:
 
-    Measured, not computed. Sampling the pose offline with AnimPoseExtensions
-    looked authoritative and was not: composing HandGrip_R onto hand_r that way
-    predicted a socket +X of (0.65, -0.26, -0.72) where the live engine reports
-    (0.996, 0.057, -0.065). So a character is spawned into the editor world and
-    asked directly, which is the only version of this that has ever agreed with
-    what the game does.
+        MM_Idle (arms down)   socket +Y = ( 0.07,  0.07, -0.99)  straight down
+        MF_Rifle_Idle_ADS     socket +Y = ( 0.97,  0.14,  0.21)  down the sights
+        MF_Pistol_Idle_ADS    socket +Y = ( 0.99,  0.06,  0.14)  down the sights
+
+    A hand at the side points its weapon axis at the floor and a hand in a ready
+    pose points it where the player is looking. +X does neither: in the rifle
+    pose it reads 0.94 to the player's *left*, which is exactly where the barrel
+    kept ending up. Weapons here are modelled along their own +X, so the grip is
+    the rotation taking +X onto the socket's +Y with the weapon left upright --
+    a plain 90 degree yaw in the socket's own frame.
+
+    One rotation for every weapon, because it describes the *hand*, which does
+    not care what it is holding.
     """
-    actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-    char_class = _assets().load_blueprint_class(CHARACTER_BP_PATH)
-    if not char_class:
-        raise RuntimeError(f"could not load {CHARACTER_BP_PATH} as a class")
-    actor = actors.spawn_actor_from_class(char_class, unreal.Vector(0.0, 0.0, 0.0),
-                                          unreal.Rotator(0.0, 0.0, 0.0))
-    try:
-        mesh = actor.get_component_by_class(unreal.SkeletalMeshComponent)
-        socket = _pure_rotation(mesh.get_socket_transform(
-            GRIP_SOCKET, unreal.RelativeTransformSpace.RTS_COMPONENT
-        ).rotation.rotator())
-        desired = _pure_rotation(unreal.MathLibrary.make_rot_from_xz(
-            _forward_in_mesh_space(mesh), unreal.Vector(0.0, 0.0, 1.0)))
-        grip = unreal.MathLibrary.compose_transforms(
-            desired, unreal.MathLibrary.invert_transform(socket)).rotation.rotator()
-    finally:
-        actors.destroy_actor(actor)
-    _log(f"grip rotation measured from the skeleton: pitch {grip.pitch:.1f}, "
-         f"yaw {grip.yaw:.1f}, roll {grip.roll:.1f}")
+    grip = unreal.MathLibrary.make_rot_from_xz(
+        WEAPON_AXIS_IN_SOCKET, unreal.Vector(0.0, 0.0, 1.0))
+
+    # The convention, checked against the assets that rely on it: in a ready
+    # pose the hand's weapon axis has to point roughly where the player faces.
+    for aim in (AIM_RIFLE, AIM_PISTOL):
+        forward = socket_pose_axes(aim)["Y"]
+        if forward.x < 0.9:
+            raise RuntimeError(
+                f"{aim.rsplit('/', 1)[-1]}: the hand's weapon axis points "
+                f"{forward.to_tuple()}, not down the sights — the +Y convention "
+                "does not hold for this pose, and the grip would aim the barrel "
+                "somewhere else entirely")
+    _log(f"grip rotation: pitch {grip.pitch:.1f}, yaw {grip.yaw:.1f}, "
+         f"roll {grip.roll:.1f} — weapon +X onto the socket's +Y")
     return grip
 
 
@@ -645,7 +676,7 @@ def _weapon_specs():
     HandGrip_R is placed in the fist already, and an invented offset is one more
     number nobody can later explain.
     """
-    grip = _measure_grip_rotation()
+    grip = _grip_rotation()
     return (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
              display="Shotgun", damage=9.0, pellets=8, spread=5.0, range=4000.0,
@@ -942,8 +973,6 @@ FN_SET_HIDDEN = "/Script/Engine.Actor.SetActorHiddenInGame"
 FN_SET_ACTOR_LOC = "/Script/Engine.Actor.K2_SetActorLocation"
 FN_SET_REL_LOC = "/Script/Engine.Actor.K2_SetActorRelativeLocation"
 FN_SET_REL_ROT = "/Script/Engine.Actor.K2_SetActorRelativeRotation"
-FN_SET_WORLD_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
-FN_ROT_FROM_X = "/Script/Engine.KismetMathLibrary.MakeRotFromX"
 FN_SET_SCALE = "/Script/Engine.Actor.SetActorScale3D"
 FN_DESTROY = "/Script/Engine.Actor.K2_DestroyActor"
 FN_LIFESPAN = "/Script/Engine.Actor.SetLifeSpan"
@@ -1333,10 +1362,6 @@ def _author_resolve_aim(ed, held, exec_in, x0, y0):
     will not make. The pellet loop then only has to spread a cone around
     (AimPoint - muzzle).
 
-    In the middle of those two steps the held weapon is turned to face the aim
-    point, which is what actually makes the gun point where it shoots -- see
-    the module docstring for why that is driven rather than baked into a grip.
-
     Runs before the fire gate and unconditionally, because the reticle has to be
     right on frames where the trigger is not pulled -- which is most of them.
     """
@@ -1409,39 +1434,20 @@ def _author_resolve_aim(ed, held, exec_in, x0, y0):
     aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0 + 2500, y0 + 460))
     aim_out = _pin(aim_get, "AimPoint", is_input=False)
 
-    # --- turn the gun to face the shot --------------------------------------
-    # The weapon's rotation is driven every frame rather than baked into a grip
-    # offset. A baked offset has to be right in whatever pose the arms happen to
-    # be in, which means guessing at the skeleton's conventions and at how the
-    # aim montage, the layered blend and the Control Rig compose -- and guessing
-    # wrong there is what left the barrel pointing 90 degrees to the left.
-    #
-    # Aiming from the weapon's *location* keeps this free of circularity: the
-    # attach point is snapped to the socket and does not move when the rotation
-    # changes, so nothing here depends on the value it is about to write. It
-    # also means the gun tracks pitch, which a fixed grip never could -- aim up
-    # and the barrel goes up with it.
-    gun_at = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 2500, y0 + 700))
-    _connect(held, _pin(gun_at, "self"))
-    toward = keep(_at(_node(ed, FN_SUB_VV), x0 + 2760, y0 + 620))
-    _connect(aim_out, _pin(toward, "A"))
-    _connect(_pin(gun_at, "ReturnValue", is_input=False), _pin(toward, "B"))
-    facing = keep(_at(_node(ed, FN_ROT_FROM_X), x0 + 3000, y0 + 620))
-    _connect(_pin(toward, "ReturnValue", is_input=False), _pin(facing, "X"))
-    turn = keep(_at(_node(ed, FN_SET_WORLD_ROT), x0 + 2760, y0))
-    _connect(held, _pin(turn, "self"))
-    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(turn, "NewRotation"))
-    _connect(BEL.find_then_pin(holding), _pin(turn, "execute"))
-
-    # Read *after* the turn, so the barrel tip is this frame's, not last
-    # frame's: MuzzleOffset runs through the transform that was just set.
+    # The weapon is *not* rotated here. It was, briefly, and it was wrong: a
+    # gun turned to face the aim point every frame swivels out of the hand that
+    # is holding it and spins a full turn as the camera comes round. A held
+    # weapon is rigidly attached, full stop -- what aims it is the character.
+    # install_on_character() makes the body face the camera's yaw, and the ready
+    # pose points the arms down the sights, so the barrel follows the crosshair
+    # without ever leaving the fist.
     muzzle = _muzzle_location(ed, held, x0 + 2500, y0 + 1000)
 
     clear = keep(_at(_node(ed, FN_TRACE), x0 + 3260, y0))
     _connect(muzzle, _pin(clear, "Start"))
     _connect(aim_out, _pin(clear, "End"))
     _trace_defaults(clear, draw=False)
-    _connect(BEL.find_then_pin(turn), _pin(clear, "execute"))
+    _connect(BEL.find_then_pin(holding), _pin(clear, "execute"))
 
     clear_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 2760, y0 + 560))
     _connect(_pin(clear, "OutHit", is_input=False), _loose_pin(clear_brk, "Hit"))
@@ -2212,6 +2218,40 @@ def make_shootable(bp):
     _log(f"{bp.get_name()}: capsule now blocks Visibility (shootable)")
 
 
+def face_the_camera(bp):
+    """Turn the body with the camera instead of with the movement input.
+
+    This is what aims the gun, and it is the standard arrangement for a
+    third-person shooter: the character always faces where the camera looks and
+    strafes around that, so the ready pose -- and therefore the barrel -- stays
+    lined up with the crosshair no matter which way the player is running.
+
+    The template ships the opposite (`orient_rotation_to_movement`), which turns
+    the whole body to face the movement input. With a weapon in hand that means
+    running left points the gun left while the crosshair stays dead ahead.
+
+    The honest cost: the legs still play the *unarmed* forward gait, because a
+    strafe set needs blend spaces and those cannot be authored from Python, so
+    sideways movement reads as running forward while sliding. That is the same
+    limitation the ready pose already documents, not a new one.
+    """
+    cdo = unreal.get_default_object(BEL.generated_class(bp))
+    cdo.set_editor_property("use_controller_rotation_yaw", True)
+    movement = None
+    for handle, _name in _handles(bp):
+        obj = _component_object(handle)
+        if isinstance(obj, unreal.CharacterMovementComponent):
+            movement = obj
+            break
+    if movement is None:
+        raise RuntimeError(f"{bp.get_name()} has no CharacterMovementComponent")
+    movement.set_editor_property("orient_rotation_to_movement", False)
+    if movement.get_editor_property("orient_rotation_to_movement"):
+        raise RuntimeError("the character still turns to face its movement — "
+                           "the body would fight the camera for where to aim")
+    _log("player: body follows the camera's yaw (gun stays on the crosshair)")
+
+
 def aim_camera(bp):
     """Move the camera boom over the player's right shoulder.
 
@@ -2251,6 +2291,7 @@ def install_on_character(health_bp, weapon_bp):
     # that shoots back later needs to be able to hit them.
     make_shootable(bp)
     aim_camera(bp)
+    face_the_camera(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)

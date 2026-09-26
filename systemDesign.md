@@ -218,7 +218,9 @@ resolve — the member name is what the lookup takes.
 
 `BP_ForestWanderer` — parent `Character`. Mannequin `SKM_Manny_Simple` + `ABP_Unarmed` so the
 walk animates, mesh dropped 89 cm to the capsule's feet and yawed −90°, `max_walk_speed`
-**110 cm/s** (the engine default of 600 is a run; "slowly" is the requirement),
+**600 cm/s** — the engine default, which is a run, and the top of `ABP_Unarmed`'s blend space,
+so the legs jog rather than play a walk sped up (it was 110 cm/s while the NPC was scenery
+rather than a threat),
 `orient_rotation_to_movement`, `ai_controller_class` = the controller above and
 `auto_possess_ai = PLACED_IN_WORLD_OR_SPAWNED`. Behaviour constants live in
 `npc_placement.py` — which imports no `unreal` — so the host-side generator can bake them
@@ -379,13 +381,15 @@ that would catch a mis-scaled asset, since nothing offline can see the mesh.
 
 The NPC block asserts both Blueprint assets exist; that the character's `ai_controller_class`
 points at the controller, `auto_possess_ai` is `PLACED_IN_WORLD_OR_SPAWNED`, `max_walk_speed`
-is the slow 110 cm/s, and the mesh and anim class are set; that the placed actor is a
-`Character` at the expected transform and the expected distance from the PlayerStart; and that
+is the 600 cm/s run, and the mesh and anim class are set; that the controller's melee literals
+(range, damage, interval) and its `NextAttackTime` cooldown variable survived the save, since an
+unset pin compiles as a swing for 0 damage at a range of 0; that **each** of the five placed
+actors is a `Character` at its expected transform and inside the spawn band; and that
 the nav bounds cover the map and the navmesh's `runtime_generation` is `DYNAMIC`.
 The nav block asserts the volume's XY and Z extents and centre match what the generator
 computed, that the vertical span is inside the measured envelope, and that the NPC's feet sit
 inside the volume.
-Prints `[VERIFY] ✅ ALL 105 CHECKS PASSED!` or a list of failures.
+Prints `[VERIFY] ✅ ALL 122 CHECKS PASSED!` or a list of failures.
 
 ---
 
@@ -486,9 +490,9 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
 - Git: branch `night-mode`, working tree clean, head `e5745e9 night mode initial`
   (adds `lighting.py`, the generator rewrite, the regenerated night scripts and a `.gitignore`).
 - `/Game/Maps/Lvl_Forest_200m` — 200 m, seed 42, 136 trees over 5 species, 44,368 knee-high
-  grass clumps over 9 species, one NPC at (−1564, 5626) 58.4 m from the player with 2 trees
-  blocking the direct line, **night** preset.
-  Offline 25/25, in-editor 101/101, import log clean.
+  grass clumps over 9 species, **five NPCs 75.0–77.5 m** from the player (every one of them
+  with at least one tree blocking the direct line), **night** preset.
+  Offline 28/28, in-editor 122/122, import log clean.
 - New assets from the NPC run: `/Game/Forest/NPC/BP_ForestWanderer`,
   `/Game/Forest/NPC/BP_ForestWandererAI`.
 - **Pre-existing bug, unfixed and unrelated to the NPC work:** `scatter_trees` performs no

@@ -31,28 +31,35 @@ Python scripts into `Scripts/generated_levels/<LevelName>/`.
 python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
 # flags: --size <meters, required> --name --seed (42) --grid --time-of-day {day,night}
 #        --grass-density (1.2/m²) --grass-height (50 cm) --grass-patchiness (0.25)
-#        --no-grass --no-npc --npc-min-distance <m> --json-report
+#        --no-grass --no-npc --npc-count (5) --npc-min-distance (75 m)
+#        --npc-max-distance (100 m) --json-report
 ```
 Then run the printed `import_<Level>.py` (builds the level) and `verify_<Level>.py`
-(103 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
+(122 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
 
 Grass transforms do **not** live in the generated script — there are tens of thousands of
 them, so they go to a gitignored `grass_<Level>.json` sidecar the import script reads.
 
 Support package `Scripts/forest_generator/`: `terrain.py` (heightfield + OBJ),
 `tree_placement.py` (`DEFAULT_TREE_SPECS`, scatter), `grass_placement.py`
-(`DEFAULT_GRASS_SPECS`, stratified scatter), `npc_placement.py` (NPC spawn point +
-**walk speed / nav agent constants**), `verification.py` (offline suite),
+(`DEFAULT_GRASS_SPECS`, stratified scatter), `npc_placement.py` (NPC spawn band +
+**run speed / melee / nav agent constants**), `verification.py` (offline suite),
 `lighting.py` (**time-of-day presets — edit here to tune day/night**).
 
-## The NPC
+## The NPCs
 
 `Scripts/build_npc_blueprints.py` builds two Blueprints under `/Game/Forest/NPC` **from
-Python** — no hand editing — and is idempotent, so re-generating a level reuses them:
+Python** — no hand editing — and is idempotent, so re-generating a level reuses them. Every
+number they use (run speed, melee, spawn band) lives in
+`Scripts/forest_generator/npc_placement.py`, which imports no `unreal`, so the offline
+generator and its checks read exactly what the editor builds.
 
 - `BP_ForestWandererAI` (AIController). Event graph, authored via `unreal.BlueprintGraphEditor`:
-  `BeginPlay → MoveToActor(Get Player Pawn) → Delay 0.5s → back to MoveToActor`.
-  `MoveToActor` does the pathfinding, which is what makes it walk *around* trees.
+  `BeginPlay → MoveToActor(Get Player Pawn) → [in reach and off cooldown? → swing] → Delay 0.5s
+  → back to MoveToActor`.
+  `MoveToActor` does the pathfinding, which is what makes it run *around* trees. The melee check
+  is spliced into that same loop rather than given a Tick of its own — the loop is already the
+  NPC's heartbeat, and two of them can disagree about whether the chase is still running.
 - `BP_ForestWanderer` (Character). Mirrors the **player's** rig exactly — `SKM_Quinn_Simple`
   + `ABP_Unarmed`, mesh at z −89 and yaw 270 — because that combination is known to animate.
   `use_acceleration_for_paths` **must be True**: with it False, `ApplyRequestedMove` sets
@@ -61,7 +68,65 @@ Python** — no hand editing — and is idempotent, so re-generating a level reu
   idle pose. That is the cause of "moves but never animates"; the mesh/anim_mode dials are not.
   Auto-possessed by the controller above.
 
-Run it standalone with `-ExecutePythonScript` to rebuild the assets after editing it.
+Run it standalone with `-ExecutePythonScript` to rebuild the assets after editing it. It
+rebuilds the AI graph by default now (`rebuild=True`): the old "already authored — reusing"
+guard meant no edit to the builder ever reached the asset once it existed.
+
+### The pack: five, running, at 75–100 m
+
+| dial (`npc_placement.py`) | value | why |
+|---|---|---|
+| `NPC_COUNT` | 5 | one actor per spawn point, labelled `<Level>_NPC_Wanderer_<n>` |
+| `NPC_RUN_SPEED_CMS` | 600 | UE's own default `MaxWalkSpeed` and the top of `ABP_Unarmed`'s blend space, so the legs jog rather than play a walk too fast. Measured: 75 m closed in ~15 s |
+| `NPC_SPAWN_MIN/MAX_DISTANCE_CM` | 7500 / 10000 | far enough that the player never opens their eyes next to one |
+| `NPC_MIN_SEPARATION_CM` | 600 | they all path to the same target, so a clump never unclumps |
+| `NPC_ACCEPTANCE_RADIUS_CM` | 120 | **must stay below** `NPC_MELEE_RANGE_CM`, or the NPC parks outside its own reach and never lands a hit |
+| `NPC_MELEE_RANGE_CM` | 200 | centre-to-centre between two 34 cm capsules ≈ an arm's length of air |
+| `NPC_MELEE_DAMAGE` / `_INTERVAL_S` | 10 / 1.5 | balanced against the **pack**, not one attacker — see below |
+
+The **spawn band is clamped to the navigable island**, and the clamp is loud rather than silent:
+`npc_usable_radius` caps at 80 m on a 200 m map (nav coverage is capped — see
+`NAV_MAX_HALF_XY_CM`), so `Lvl_Forest_200m` spawns its five at **75–79.6 m**, and both the
+generator's console output and the `NPC Spawn Band` check report the band they actually used.
+`spawn_band()` is the only thing that decides it, so the check cannot drift from the placement.
+
+**Balance is a property of the pack.** The five spawn in one band and arrive within a few
+seconds of each other, so one wanderer's numbers are very nearly multiplied by five. Measured in
+a `-game` run: 12 damage every 1.2 s was 50 dps and killed a 100 HP player in **two seconds**,
+before a shot could be fired. 10 every 1.5 s is ~33 dps for the pack. This is the kind of thing
+that cannot be read off the graph — it needed the running game.
+
+**Respawns obey the band too.** `BP_HealthComponent`'s death path used to put a replacement
+within 40 m of where the dead one *started*; it now picks a random bearing and a random distance
+in the same 75–100 m band **measured from the player's current location**, snapped onto the
+navmesh (`NPC_RESPAWN_NAV_SNAP_CM`, 30 m — generous, because the far edge of the band can fall
+outside the navigable island). Without that, "always 75–100 m away" held only until the first
+kill. The population therefore stays at five with nothing tracking it.
+
+### The melee attack
+
+```
+MoveToActor --> [distance <= 200 cm  AND  now >= NextAttackTime]
+                  true  --> NextAttackTime = now + 1.5
+                        --> PlaySlotAnimationAsDynamicMontage(MM_Attack_01, DefaultSlot)
+                        --> player's BP_HealthComponent.Health -= 10  (clamped at 0)
+                  false ----------------------------------------------> Delay 0.5s
+```
+
+- The cooldown is wall-clock (`GetTimeSeconds`) and lives on the **controller**, so five
+  wanderers keep five independent timers instead of hitting in lockstep.
+- The swing plays into `DefaultSlot`, which `build_weapons_and_combat.py`'s layered blend makes
+  upper-body only — so the NPC swings while still running. Without that patch the montage is
+  full body; it still reads as an attack, so it is not a hard dependency.
+- Damage is applied by **writing `Health` on the player's component**, exactly as the pellets do.
+  `ApplyDamage`/`AnyDamage` is an *Actor* event and would need a graph on
+  `BP_ThirdPersonCharacter`, whose Enhanced Input template graph the Python API cannot partially
+  rebuild.
+- **Every exit of the melee chain reconnects to the Delay** — the hit, and both cast-failure
+  pins. A dangling cast-failure pin ends the chase loop on the first swing and freezes the NPC
+  forever, and it would only show up in a level where the player has no health component.
+- If `BP_HealthComponent` does not exist, the melee half is skipped with a log line and the NPC
+  just chases. The cast node needs the class loaded, or its palette name reads like a typo.
 
 ## The graphics menu
 
@@ -72,7 +137,7 @@ touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / H
 
 It also draws the player's HP bar (see "The shotgun and health").
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 33 checks. Run it after any
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 34 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
@@ -104,7 +169,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**88 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**89 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
@@ -223,7 +288,12 @@ what the screen shows, measure the running game.
 
 `build_graphics_menu.py` draws, every frame: the player's HP bar (top-left), a projected health
 bar over every wanderer, a 5-slot inventory strip centred along the bottom, and the centre
-reticle. The strip and the reticle are both laid out from the viewport size, so they stay
+reticle. The **FPS readout in the top-right is not drawn here**: BeginPlay runs
+`stat fps` (`FPS_COMMAND`), and the engine's own stat display puts itself in that corner. There
+is no position to tune and no canvas call to collide with the HP bar — and the number is the
+engine's smoothed frame time, not a `1/DeltaSeconds` recomputed on the HUD. Like the preset
+cvars, it is global: a PIE session leaves `stat fps` on in the editor viewport, and `stat fps`
+again turns it off. The strip and the reticle are both laid out from the viewport size, so they stay
 centred at any window size. Slot colour and
 name are read from each weapon's own `SlotColor`/`DisplayName`, so the HUD keeps no list of
 weapons to fall out of step with. The strip is laid out from the viewport size so it stays
@@ -233,9 +303,9 @@ centred and bottom-anchored at any window size.
 
 - The player carries a **shotgun and a pistol**, switchable with Q, droppable with G and
   recoverable with E; both weapons fire with sound, blood and muzzle-origin spread, and the
-  character holds the matching ready pose while moving. The NPC has a floating health bar,
-  dies at 0 HP and respawns elsewhere on the navmesh. Built by
-  `build_weapons_and_combat.py` — **81/81** in-engine checks, **33/33** HUD checks.
+  character holds the matching ready pose while moving. Every wanderer has a floating health
+  bar, dies at 0 HP and respawns 75-100 m from the player. Built by
+  `build_weapons_and_combat.py` — **89/89** in-engine checks, **34/34** HUD checks.
   Aiming is the camera/muzzle hybrid described above, with a reticle on the real impact point,
   and the held weapon is turned to face that point every frame.
 - Not verified headlessly, and worth a look in a play session: how the reticle reads while
@@ -247,13 +317,16 @@ centred and bottom-anchored at any window size.
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
 - `/Game/Maps/Lvl_Forest_200m` is generated in **night** mode: 136 trees / 5 species,
-  44,368 knee-high grass clumps / 9 species, one NPC 58 m from the player, moon light
-  0.12 lux, emissive starfield sky dome as the ambient light source.
-  Offline 25/25 and in-engine 101/101 checks pass.
+  44,368 knee-high grass clumps / 9 species, **five NPCs at 75.0-77.5 m** from the player,
+  moon light 0.12 lux, emissive starfield sky dome as the ambient light source.
+  Offline 28/28 and in-engine 122/122 checks pass.
 - **Known pre-existing bug:** `scatter_trees` does no minimum-spacing rejection, so some
   size/seed combinations fail the `Tree Spacing (>100cm)` check (e.g. `--size 300` with the
   default seed 42 gives a 70 cm pair). 200 m/seed 42 and 300 m/seed 99 pass. Unfixed.
-- The NPC walks 51.7 m to the player at a measured **100 cm/s** (`max_walk_speed` 110).
+- The pack **runs**: measured in a `-game` run, all five closed 75 m in ~15 s
+  (`max_walk_speed` 600) and then landed melee hits. Not seen headlessly, and worth a look in a
+  play session: whether `MM_Attack_01` actually reads as a swing on the upper body while the
+  legs keep running, and whether five bars plus five attackers crowd the HUD.
 - Night-sky dials live in `Scripts/forest_generator/lighting.py`: `star_brightness` (2.5),
   sun `intensity` (0.12), `auto_exposure_bias` (1.6).
 - `Scripts/` also holds ~110 older one-off inspect/fix scripts from earlier iterations.

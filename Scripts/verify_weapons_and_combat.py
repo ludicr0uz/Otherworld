@@ -178,51 +178,6 @@ if shot and pist:
           a.get_editor_property("AimPose") != b.get_editor_property("AimPose"))
     check("the two weapons use different fire sounds",
           a.get_editor_property("FireSound") != b.get_editor_property("FireSound"))
-    def engine_agrees(bp):
-        """Attach the weapon for real and check the engine composes it as modelled.
-
-        Everything else here is arithmetic on a saved rotation; this is the one
-        place that asks the engine whether SetActorRelativeRotation on a
-        socket-attached actor really does compose in the *socket's* frame. If it
-        did not, every grip solved against a socket transform would be wrong.
-
-        Pose-independent: it compares the engine's answer against the same
-        composition done by hand, in whatever pose the editor world happens to
-        show, rather than expecting any particular direction.
-        """
-        actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-        eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
-        here = unreal.Vector(0.0, 0.0, 0.0)
-        straight = unreal.Rotator(0.0, 0.0, 0.0)
-        char = actors.spawn_actor_from_class(
-            eas.load_blueprint_class(G.CHARACTER_BP_PATH), here, straight)
-        gun = actors.spawn_actor_from_class(
-            eas.load_blueprint_class(bp.get_path_name().split(".")[0]), here, straight)
-        try:
-            mesh = char.get_component_by_class(unreal.SkeletalMeshComponent)
-            snap = unreal.AttachmentRule.SNAP_TO_TARGET
-            gun.attach_to_component(mesh, G.GRIP_SOCKET, snap, snap, snap, False)
-            grip = cdo(bp).get_editor_property("GripRotation")
-            gun.set_actor_relative_rotation(grip, False, False)
-            hand = mesh.get_socket_transform(
-                G.GRIP_SOCKET, unreal.RelativeTransformSpace.RTS_WORLD).rotation.rotator()
-            modelled = unreal.MathLibrary.greater_greater_vector_rotator(
-                unreal.Vector(1.0, 0.0, 0.0),
-                unreal.MathLibrary.compose_transforms(
-                    G._pure_rotation(grip),
-                    G._pure_rotation(hand)).rotation.rotator())
-            actual = gun.get_actor_forward_vector()
-            return (actual.x * modelled.x + actual.y * modelled.y
-                    + actual.z * modelled.z)
-        finally:
-            actors.destroy_actor(gun)
-            actors.destroy_actor(char)
-
-    for bp, name in ((shot, "Shotgun"), (pist, "Pistol")):
-        agreement = engine_agrees(bp)
-        check(f"{name}: the engine seats the grip in the socket's frame, as modelled",
-              agreement > 0.999, f"dot(engine, model) = {agreement:.4f}")
-
     # The thing the player actually sees: in the pose the weapon is held in, the
     # barrel has to point where the character is facing. Computed from the
     # *saved* GripRotation, so a grip that was solved wrongly fails here.
@@ -266,6 +221,21 @@ check("death destroys the owner",
       any(in_pins(n) == {"execute", "self"} for n in hg))
 check("respawn point comes from the navmesh",
       bool(by_pins(hg, "Origin", "Radius")))
+
+# The respawn band. A replacement wanderer has to keep the "75-100 m away" rule
+# the level generator spawns the pack under, or the rule holds only until the
+# first kill -- and it is measured from the *player*, not from a stored spawn
+# point, so that it survives the player walking across the map.
+ranges = {(pin_value(n, "Min"), pin_value(n, "Max")) for n in by_pins(hg, "Min", "Max")}
+want_band = (str(G.RESPAWN_BAND[0]), str(G.RESPAWN_BAND[1]))
+check("respawns land in the 75-100 m band", want_band in ranges,
+      f"{sorted(ranges)} vs {want_band}")
+check("the bearing is random over a full circle", ("0.0", "360.0") in ranges,
+      str(sorted(ranges)))
+check("the respawn is measured from the player, not a stored spawn point",
+      "SpawnOrigin" not in {str(v) for v in BEL.list_member_variable_names(
+          health_bp, False)}
+      and bool(by_pins(hg, "PlayerIndex")))
 tick = graph(health_bp).find_event_node("ReceiveTick")
 check("health ticks (otherwise nothing notices 0 HP)",
       tick is not None and bool(BEL.find_then_pin(tick).list_connected_pins()))

@@ -19,8 +19,11 @@ EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island
 EXPECTED_GRASS_COUNT = 44368
 EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_Mid_B": 2850, "HISM_Grass_Knee_Tall_B": 7813, "HISM_Grass_Knee_Mid_A": 5862, "HISM_Grass_Knee_Tall_A": 8451, "HISM_Grass_Knee_Clump_C": 5844, "HISM_Grass_Under_Clump_A": 2325, "HISM_Grass_Under_Large_B": 2611, "HISM_Grass_Under_Large_A": 2197}
 EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.242809249629246, 55.199687244614566], "HISM_Grass_Under_Mid_B": [25.503926948960117, 35.99430151464459], "HISM_Grass_Knee_Tall_B": [42.50254371397834, 59.99927478522139], "HISM_Grass_Knee_Mid_A": [40.481314514524335, 50.599412580219756], "HISM_Grass_Knee_Tall_A": [42.50006710260952, 59.99895840027987], "HISM_Grass_Knee_Clump_C": [43.12312612443456, 53.89936647630565], "HISM_Grass_Under_Clump_A": [23.800345353400235, 33.59905037018744], "HISM_Grass_Under_Large_B": [24.65506062683597, 34.79728745482545], "HISM_Grass_Under_Large_A": [22.100624064757703, 31.198261357139028]}
-EXPECTED_NPC = json.loads(r"""{"x": -1421.79, "y": 5114.25, "z": 300.99, "yaw": 285.54, "distance_cm": 5308.2}""")
-EXPECTED_NPC_WALK_SPEED = 110.0
+EXPECTED_NPCS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54, "distance_cm": 7593.07}, {"x": 4241.23, "y": 6260.28, "z": 520.91, "yaw": 235.88, "distance_cm": 7561.69}, {"x": 6982.28, "y": -3337.22, "z": 718.2, "yaw": 154.45, "distance_cm": 7738.82}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1, "distance_cm": 7501.07}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52, "distance_cm": 7746.09}]""")
+EXPECTED_NPC_RUN_SPEED = 600.0
+EXPECTED_MELEE_RANGE = 200.0
+EXPECTED_MELEE_DAMAGE = 10.0
+EXPECTED_MELEE_INTERVAL = 1.5
 EXPECTED_NAV_AGENT_RADIUS = 35.0
 EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 8500.0, "center_z_cm": 354.6, "half_z_cm": 739.54, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 894.14}""")
 LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
@@ -254,19 +257,20 @@ if EXPECTED_GRASS_COUNT > 0:
           total_grass_instances == EXPECTED_GRASS_COUNT,
           f"(expected {EXPECTED_GRASS_COUNT}, got {total_grass_instances})")
 
-# ── 6. Navigation + NPC ──────────────────────────────────────────────
-if EXPECTED_NPC:
-    npc_actor = None
+# ── 6. Navigation + NPCs ─────────────────────────────────────────────
+if EXPECTED_NPCS:
+    npc_actors = []
     nav_bounds = None
     nav_mesh = None
     for a in actors:
         lbl = a.get_actor_label()
-        if lbl == f"{LEVEL_NAME}_NPC_Wanderer":
-            npc_actor = a
+        if lbl.startswith(f"{LEVEL_NAME}_NPC_Wanderer"):
+            npc_actors.append(a)
         elif lbl == f"{LEVEL_NAME}_NavBounds":
             nav_bounds = a
         elif lbl == f"{LEVEL_NAME}_NavMesh":
             nav_mesh = a
+    npc_actors.sort(key=lambda a: a.get_actor_label())
 
     # -- The Blueprint assets --
     for path in ("/Game/Forest/NPC/BP_ForestWanderer",
@@ -287,9 +291,9 @@ if EXPECTED_NPC:
               unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
         mv = cdo.get_editor_property("character_movement")
         speed = mv.get_editor_property("max_walk_speed")
-        check("NPC Walks Slowly",
-              close(speed, EXPECTED_NPC_WALK_SPEED, 0.5),
-              f"(expected {EXPECTED_NPC_WALK_SPEED} cm/s, got {speed})")
+        check("NPC Runs At The Player",
+              close(speed, EXPECTED_NPC_RUN_SPEED, 0.5),
+              f"(expected {EXPECTED_NPC_RUN_SPEED} cm/s, got {speed})")
         check("NPC Orients To Movement",
               mv.get_editor_property("orient_rotation_to_movement") is True)
         mesh_comp = cdo.get_editor_property("mesh")
@@ -302,22 +306,60 @@ if EXPECTED_NPC:
         check("NPC Has Anim Class",
               mesh_comp.get_editor_property("anim_class") is not None)
 
-    # -- The placed actor --
-    check("NPC Actor Exists", npc_actor is not None)
-    if npc_actor:
-        loc = npc_actor.get_actor_location()
-        check("NPC Spawn Location",
-              close(loc.x, EXPECTED_NPC["x"], 1.0)
-              and close(loc.y, EXPECTED_NPC["y"], 1.0)
-              and close(loc.z, EXPECTED_NPC["z"], 1.0),
-              f"(expected {EXPECTED_NPC['x']:.0f},{EXPECTED_NPC['y']:.0f},"
-              f"{EXPECTED_NPC['z']:.0f} got {loc.x:.0f},{loc.y:.0f},{loc.z:.0f})")
+    # -- The melee attack, read off the controller's own graph --
+    # Pin literals rather than behaviour: a headless editor cannot run
+    # the chase, but a swing that costs 0 damage or fires at a range of
+    # 0 is exactly what an unset pin compiles to (see the set_pin_value
+    # gotcha in CLAUDE.md), so the numbers are worth asserting.
+    ai_bp = editor_asset_sub.load_asset("/Game/Forest/NPC/BP_ForestWandererAI")
+    if ai_bp:
+        BEL = unreal.BlueprintEditorLibrary
+        ed = unreal.BlueprintGraphEditor.get_graph_editor_by_name(
+            ai_bp, "EventGraph")
+        nodes = ed.list_all_nodes() if ed else []
+        literals = set()
+        for n in nodes:
+            for pin in BEL.list_input_pins(n):
+                val = str(unreal.BlueprintGraphPinLibrary.get_pin_value(pin))
+                if val:
+                    literals.add(val)
+        names = {str(v) for v in BEL.list_member_variable_names(ai_bp, False)}
+        check("NPC Melee Cooldown Variable", "NextAttackTime" in names,
+              f"(variables: {sorted(names)})")
+        for label, value in (("Range", EXPECTED_MELEE_RANGE),
+                             ("Damage", EXPECTED_MELEE_DAMAGE),
+                             ("Interval", EXPECTED_MELEE_INTERVAL)):
+            check(f"NPC Melee {label} Literal",
+                  any(close(float(v), value, 0.01)
+                      for v in literals
+                      if v.replace(".", "", 1).replace("-", "", 1).isdigit()),
+                  f"(expected {value})")
+        check("NPC Melee Plays An Attack Montage",
+              any("MM_Attack" in v for v in literals))
+        check("NPC Melee Uses The Upper-Body Slot",
+              any(v == "DefaultSlot" for v in literals))
+        check("NPC Graph Compiles Clean",
+              ed is not None and not ed.list_nodes_with_errors())
+
+    # -- The placed actors --
+    check("NPC Count",
+          len(npc_actors) == len(EXPECTED_NPCS),
+          f"(expected {len(EXPECTED_NPCS)}, got {len(npc_actors)})")
+    for i, (actor, want) in enumerate(zip(npc_actors, EXPECTED_NPCS),
+                                      start=1):
+        loc = actor.get_actor_location()
+        check(f"NPC {i} Spawn Location",
+              close(loc.x, want["x"], 1.0)
+              and close(loc.y, want["y"], 1.0)
+              and close(loc.z, want["z"], 1.0),
+              f"(expected {want['x']:.0f},{want['y']:.0f},{want['z']:.0f} "
+              f"got {loc.x:.0f},{loc.y:.0f},{loc.z:.0f})")
         dist = (loc.x ** 2 + loc.y ** 2) ** 0.5
-        check("NPC Far From Player Start",
-              close(dist, EXPECTED_NPC["distance_cm"], 2.0),
-              f"({dist / 100.0:.1f} m from spawn)")
-        check("NPC Is A Character",
-              isinstance(npc_actor, unreal.Character))
+        check(f"NPC {i} In The Spawn Band",
+              close(dist, want["distance_cm"], 2.0),
+              f"({dist / 100.0:.1f} m from the player start)")
+        check(f"NPC {i} Is A Character",
+              isinstance(actor, unreal.Character))
 
     # -- Navigation rig --
     check("Nav Bounds Volume Exists", nav_bounds is not None)
@@ -340,15 +382,18 @@ if EXPECTED_NPC:
         check("Nav Bounds Vertical Span Sane",
               extent.z * 2.0 <= 1600.0,
               f"(span {extent.z * 2.0:.0f} cm, limit 1600)")
-        # The NPC must stand inside the volume or it has no navmesh.
-        if npc_actor:
-            loc = npc_actor.get_actor_location()
+        # Every NPC must stand inside the volume or it has no navmesh.
+        outside = []
+        for i, actor in enumerate(npc_actors, start=1):
+            loc = actor.get_actor_location()
             feet_z = loc.z - 88.0
-            inside = (abs(loc.x) <= want_xy and abs(loc.y) <= want_xy
-                      and abs(feet_z - origin.z) <= want_z)
-            check("NPC Inside Nav Bounds", inside,
-                  f"(feet z {feet_z:.0f} vs volume "
-                  f"{origin.z - want_z:.0f}..{origin.z + want_z:.0f})")
+            if not (abs(loc.x) <= want_xy and abs(loc.y) <= want_xy
+                    and abs(feet_z - origin.z) <= want_z):
+                outside.append(f"NPC {i} at ({loc.x:.0f},{loc.y:.0f},"
+                               f"feet {feet_z:.0f})")
+        check("NPCs Inside Nav Bounds", not outside,
+              f"(volume {origin.z - want_z:.0f}..{origin.z + want_z:.0f}"
+              f"{'; outside: ' + ', '.join(outside) if outside else ''})")
     # NOTE: whether stale nav data was SAVED cannot be asserted from
     # here -- opening the level makes the navigation system create a
     # RecastNavMesh in memory, so one is always present in an editor

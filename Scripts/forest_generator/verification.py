@@ -18,8 +18,11 @@ from .npc_placement import (
     NPC_CAPSULE_HALF_HEIGHT_CM,
     npc_usable_radius,
     TRUNK_CLEARANCE_CM,
-    MIN_PLAYER_DISTANCE_FRACTION,
     EDGE_MARGIN_FRACTION,
+    NPC_MIN_SEPARATION_CM,
+    NPC_SPAWN_MIN_DISTANCE_CM,
+    NPC_SPAWN_MAX_DISTANCE_CM,
+    spawn_band,
 )
 from .grass_placement import (
     KNEE_LAYER_MIN_RATIO,
@@ -464,94 +467,143 @@ def check_grass_spec_distribution(placed_grass) -> CheckResult:
 
 
 # ─── NPC checks ─────────────────────────────────────────────────────────────
-
-def check_npc_placed(placed_npc) -> CheckResult:
-    """The NPC must have found a legal spawn point at all."""
-    ok = placed_npc is not None
-    msg = (f"spawned at ({placed_npc.x:.0f}, {placed_npc.y:.0f}) after "
-           f"{placed_npc.attempts} attempt(s)" if ok
-           else "no legal spawn point found — map too small or too dense")
-    return CheckResult("NPC Placed", ok, msg)
+#
+# Every check here takes the whole pack and reports the worst member, rather
+# than one check per NPC: five near-identical failures read as noise, and the
+# thing worth knowing is "does any wanderer break this rule".
 
 
-def check_npc_within_bounds(placed_npc, world_size_cm: float) -> CheckResult:
-    """The NPC must start inside the navigable area, clear of the map edge."""
-    if placed_npc is None:
-        return CheckResult("NPC Within Bounds", False, "no NPC")
-    usable = npc_usable_radius(world_size_cm)
-    ok = abs(placed_npc.x) <= usable and abs(placed_npc.y) <= usable
-    msg = (f"({placed_npc.x:.0f}, {placed_npc.y:.0f}) inside "
-           f"+/-{usable:.0f} cm" if ok else
-           f"({placed_npc.x:.0f}, {placed_npc.y:.0f}) outside +/-{usable:.0f} cm")
-    return CheckResult("NPC Within Bounds", ok, msg)
+def _worst(placed_npcs, key):
+    """The NPC with the smallest ``key``, or None for an empty pack."""
+    return min(placed_npcs, key=key) if placed_npcs else None
 
 
-def check_npc_walk_distance(placed_npc, world_size_cm: float) -> CheckResult:
+def check_npc_count(placed_npcs, expected: int) -> CheckResult:
+    """The pack must be the size that was asked for.
+
+    Fewer than expected means rejection sampling ran out of legal spots inside
+    the spawn band -- too small a map, too dense a forest, or a separation
+    requirement the band cannot hold -- and it is a hard failure rather than a
+    quiet under-spawn, because "up to 5 at a time" is the feature.
     """
-    The point of the NPC is that it walks *to* the player, so it must not start
-    next to them.
+    got = len(placed_npcs)
+    ok = got == expected
+    msg = (f"{got} wanderer(s) placed"
+           if ok else f"only {got} of {expected} wanderers could be placed")
+    details = [] if ok else [
+        "the spawn band may be too narrow for NPC_MIN_SEPARATION_CM, or the "
+        "forest too dense for TRUNK_CLEARANCE_CM"]
+    return CheckResult("NPC Count", ok, msg, details)
+
+
+def check_npc_spawn_band(placed_npcs, world_size_cm: float) -> CheckResult:
+    """Every NPC starts inside the 75-100 m band (as clamped for this map).
+
+    This is the check that makes the clamp honest: spawn_band() is the only
+    thing that decides what the band is, and on a map too small for 75-100 m it
+    reports a narrower one, which shows up in this message rather than passing
+    silently against a rule nobody met.
     """
-    if placed_npc is None:
-        return CheckResult("NPC Walk Distance", False, "no NPC")
+    if not placed_npcs:
+        return CheckResult("NPC Spawn Band", False, "no NPCs")
+    lo, hi, clamped = spawn_band(world_size_cm)
+    details = [f"NPC {i + 1} at {n.distance_to_player_cm / 100.0:.1f} m"
+               for i, n in enumerate(placed_npcs)
+               if not (lo - 1.0 <= n.distance_to_player_cm <= hi + 1.0)]
+    near = min(n.distance_to_player_cm for n in placed_npcs) / 100.0
+    far = max(n.distance_to_player_cm for n in placed_npcs) / 100.0
+    note = (f" (clamped from {NPC_SPAWN_MIN_DISTANCE_CM / 100.0:.0f}-"
+            f"{NPC_SPAWN_MAX_DISTANCE_CM / 100.0:.0f} m by the navigable "
+            f"radius)" if clamped else "")
+    msg = (f"{near:.1f}-{far:.1f} m from the player start, band "
+           f"{lo / 100.0:.1f}-{hi / 100.0:.1f} m{note}")
+    return CheckResult("NPC Spawn Band", not details, msg, details)
+
+
+def check_npc_separation(placed_npcs) -> CheckResult:
+    """No two wanderers may start on top of each other.
+
+    They all path to the same target, so a clump never unclumps -- it arrives
+    as one body occupying one capsule's worth of space.
+    """
+    if len(placed_npcs) < 2:
+        return CheckResult("NPC Separation", True, "fewer than two NPCs")
+    worst = min(
+        (math.hypot(a.x - b.x, a.y - b.y), i + 1, j + 1)
+        for i, a in enumerate(placed_npcs)
+        for j, b in enumerate(placed_npcs) if j > i)
+    gap, a_i, b_i = worst
+    ok = gap >= NPC_MIN_SEPARATION_CM - 1.0
+    msg = (f"closest pair (NPC {a_i}, NPC {b_i}) {gap / 100.0:.1f} m apart "
+           f"(minimum {NPC_MIN_SEPARATION_CM / 100.0:.1f} m)")
+    return CheckResult("NPC Separation", ok, msg)
+
+
+def check_npcs_within_bounds(placed_npcs, world_size_cm: float) -> CheckResult:
+    """Every NPC starts inside the navigable area, clear of the map edge."""
+    if not placed_npcs:
+        return CheckResult("NPC Within Bounds", False, "no NPCs")
     usable = npc_usable_radius(world_size_cm)
-    required = usable * MIN_PLAYER_DISTANCE_FRACTION
-    ok = placed_npc.distance_to_player_cm >= required - 1.0
-    msg = (f"{placed_npc.distance_to_player_cm / 100.0:.1f} m from the player "
-           f"(minimum {required / 100.0:.1f} m)")
-    return CheckResult("NPC Walk Distance", ok, msg)
+    details = [f"NPC {i + 1} at ({n.x:.0f}, {n.y:.0f})"
+               for i, n in enumerate(placed_npcs)
+               if abs(n.x) > usable or abs(n.y) > usable]
+    msg = f"all {len(placed_npcs)} inside +/-{usable:.0f} cm"
+    return CheckResult("NPC Within Bounds", not details, msg, details)
 
 
-def check_npc_clear_of_trees(placed_npc) -> CheckResult:
-    """The capsule must not start inside a trunk."""
-    if placed_npc is None:
-        return CheckResult("NPC Clear Of Trees", False, "no NPC")
-    ok = placed_npc.nearest_trunk_cm >= TRUNK_CLEARANCE_CM - 1.0
-    msg = (f"nearest trunk {placed_npc.nearest_trunk_cm:.0f} cm away "
-           f"(minimum {TRUNK_CLEARANCE_CM:.0f} cm)")
+def check_npcs_clear_of_trees(placed_npcs) -> CheckResult:
+    """No capsule may start inside a trunk."""
+    if not placed_npcs:
+        return CheckResult("NPC Clear Of Trees", False, "no NPCs")
+    worst = _worst(placed_npcs, lambda n: n.nearest_trunk_cm)
+    ok = worst.nearest_trunk_cm >= TRUNK_CLEARANCE_CM - 1.0
+    msg = (f"tightest spawn has {worst.nearest_trunk_cm:.0f} cm to the nearest "
+           f"trunk (minimum {TRUNK_CLEARANCE_CM:.0f} cm)")
     return CheckResult("NPC Clear Of Trees", ok, msg)
 
 
-def check_npc_grounded(placed_npc, world_size_cm: float,
-                       grid_z, grid_size: int) -> CheckResult:
+def check_npcs_grounded(placed_npcs, world_size_cm: float,
+                        grid_z, grid_size: int) -> CheckResult:
     """
-    The capsule centre must sit exactly one half-height above the terrain: any
+    Every capsule centre must sit exactly one half-height above the terrain: any
     lower and the NPC spawns embedded in the ground, any higher and it drops.
     """
-    if placed_npc is None:
-        return CheckResult("NPC Grounded", False, "no NPC")
-    exact = get_exact_mesh_z(placed_npc.x, placed_npc.y, grid_z, grid_size,
-                             world_size_cm)
+    if not placed_npcs:
+        return CheckResult("NPC Grounded", False, "no NPCs")
     details = []
-    if abs(exact - placed_npc.terrain_z) > 0.01:
-        details.append(f"terrain_z {placed_npc.terrain_z:.2f} != exact {exact:.2f}")
-    lift = placed_npc.spawn_z - placed_npc.terrain_z
-    if abs(lift - NPC_CAPSULE_HALF_HEIGHT_CM) > 0.01:
-        details.append(f"capsule lift {lift:.2f} cm != "
-                       f"{NPC_CAPSULE_HALF_HEIGHT_CM:.2f} cm")
-    ok = not details
-    msg = (f"capsule centre {lift:.1f} cm above terrain Z {placed_npc.terrain_z:.1f}"
-           if ok else "spawn height is wrong")
-    return CheckResult("NPC Grounded", ok, msg, details)
+    for i, n in enumerate(placed_npcs):
+        exact = get_exact_mesh_z(n.x, n.y, grid_z, grid_size, world_size_cm)
+        if abs(exact - n.terrain_z) > 0.01:
+            details.append(f"NPC {i + 1}: terrain_z {n.terrain_z:.2f} != "
+                           f"exact {exact:.2f}")
+        lift = n.spawn_z - n.terrain_z
+        if abs(lift - NPC_CAPSULE_HALF_HEIGHT_CM) > 0.01:
+            details.append(f"NPC {i + 1}: capsule lift {lift:.2f} cm != "
+                           f"{NPC_CAPSULE_HALF_HEIGHT_CM:.2f} cm")
+    msg = (f"all {len(placed_npcs)} capsule centres "
+           f"{NPC_CAPSULE_HALF_HEIGHT_CM:.0f} cm above the exact mesh Z"
+           if not details else "at least one spawn height is wrong")
+    return CheckResult("NPC Grounded", not details, msg, details)
 
 
-def check_npc_route_is_obstructed(placed_npc) -> CheckResult:
+def check_npc_routes_are_obstructed(placed_npcs) -> CheckResult:
     """
-    The interesting requirement is that the NPC walks *around* the trees, which
+    The interesting requirement is that the NPCs walk *around* the trees, which
     is only observable if the straight line to the player is blocked in the
-    first place.  Placement prefers such spots; this reports whether it found
-    one.  A clear line is a warning-shaped pass, not a failure — on a sparse
-    map it can be legitimately unavoidable.
+    first place.  Placement prefers such spots; this reports how many of the
+    pack found one.  A clear line is a warning-shaped pass, not a failure — on a
+    sparse map it can be legitimately unavoidable.
     """
-    if placed_npc is None:
-        return CheckResult("NPC Route Is Obstructed", False, "no NPC")
-    ok = placed_npc.blocking_trees > 0
-    if ok:
-        msg = (f"{placed_npc.blocking_trees} tree(s) straddle the direct line — "
+    if not placed_npcs:
+        return CheckResult("NPC Route Is Obstructed", False, "no NPCs")
+    blocked = [n for n in placed_npcs if n.blocking_trees > 0]
+    if len(blocked) == len(placed_npcs):
+        msg = (f"all {len(placed_npcs)} routes cross at least one trunk — "
                f"pathfinding must detour")
-        return CheckResult("NPC Route Is Obstructed", True, msg)
-    msg = ("direct line to the player is clear; the NPC will walk straight. "
-           "Raise tree density or re-run with a different --seed to exercise "
-           "the detour behaviour")
+    else:
+        msg = (f"{len(blocked)}/{len(placed_npcs)} routes cross a trunk; the "
+               f"rest walk straight. Raise tree density or re-run with a "
+               f"different --seed to exercise the detour behaviour")
     return CheckResult("NPC Route Is Obstructed", True, msg)
 
 
@@ -581,36 +633,36 @@ def check_nav_bounds_sane(nav_bounds, world_size_cm: float) -> CheckResult:
     return CheckResult("Nav Bounds Sane", ok, msg, details)
 
 
-def check_npc_inside_nav_bounds(placed_npc, nav_bounds) -> CheckResult:
+def check_npcs_inside_nav_bounds(placed_npcs, nav_bounds) -> CheckResult:
     """
-    The NPC has to start on the navmesh.  Nav coverage is a *larger* fraction of
-    the map than the NPC's placement margin precisely so this cannot fail, but
-    the two constants live apart, so assert the relationship rather than trust it.
+    Every NPC has to start on the navmesh.  Nav coverage is a *larger* fraction
+    of the map than the NPCs' placement margin precisely so this cannot fail,
+    but the two constants live apart, so assert the relationship rather than
+    trust it.
     """
-    if placed_npc is None or nav_bounds is None:
-        return CheckResult("NPC Inside Nav Bounds", False, "no NPC or nav bounds")
+    if not placed_npcs or nav_bounds is None:
+        return CheckResult("NPC Inside Nav Bounds", False, "no NPCs or nav bounds")
 
     half_xy = nav_bounds["half_xy_cm"]
     lo = nav_bounds["center_z_cm"] - nav_bounds["half_z_cm"]
     hi = nav_bounds["center_z_cm"] + nav_bounds["half_z_cm"]
     details = []
-    if abs(placed_npc.x) > half_xy or abs(placed_npc.y) > half_xy:
-        details.append(f"spawn ({placed_npc.x:.0f}, {placed_npc.y:.0f}) outside "
-                       f"+/-{half_xy:.0f} cm")
-    # Pathfinding queries the capsule's feet, not its centre.
-    feet_z = placed_npc.spawn_z - NPC_CAPSULE_HALF_HEIGHT_CM
-    if not (lo <= feet_z <= hi):
-        details.append(f"feet z {feet_z:.0f} outside {lo:.0f}..{hi:.0f}")
+    for i, n in enumerate(placed_npcs):
+        if abs(n.x) > half_xy or abs(n.y) > half_xy:
+            details.append(f"NPC {i + 1} at ({n.x:.0f}, {n.y:.0f}) outside "
+                           f"+/-{half_xy:.0f} cm")
+        # Pathfinding queries the capsule's feet, not its centre.
+        feet_z = n.spawn_z - NPC_CAPSULE_HALF_HEIGHT_CM
+        if not (lo <= feet_z <= hi):
+            details.append(f"NPC {i + 1}: feet z {feet_z:.0f} outside "
+                           f"{lo:.0f}..{hi:.0f}")
     if NAV_COVERAGE_FRACTION < EDGE_MARGIN_FRACTION:
         details.append(f"NAV_COVERAGE_FRACTION ({NAV_COVERAGE_FRACTION}) is below "
                        f"EDGE_MARGIN_FRACTION ({EDGE_MARGIN_FRACTION}); an NPC can "
                        f"spawn off the navmesh")
-
-    ok = not details
-    msg = (f"feet at z {feet_z:.0f} inside {lo:.0f}..{hi:.0f}, "
-           f"{max(abs(placed_npc.x), abs(placed_npc.y)):.0f} cm from centre "
-           f"(limit {half_xy:.0f})")
-    return CheckResult("NPC Inside Nav Bounds", ok, msg, details)
+    msg = (f"all {len(placed_npcs)} stand inside +/-{half_xy:.0f} cm XY, "
+           f"feet within {lo:.0f}..{hi:.0f}")
+    return CheckResult("NPC Inside Nav Bounds", not details, msg, details)
 
 
 def check_barycentric_consistency(world_size_cm: float, grid_z,
@@ -658,8 +710,9 @@ def run_all_checks(
     placed_grass=None,
     grass_density_per_sqm: float = 0.0,
     knee_height_cm: float = 50.0,
-    placed_npc=None,
+    placed_npcs=None,
     expect_npc: bool = False,
+    expected_npc_count: int = 0,
     nav_bounds=None,
 ) -> VerificationReport:
     """Run the complete verification suite and return a report."""
@@ -696,14 +749,16 @@ def run_all_checks(
 
     # NPC checks (skipped entirely when NPC spawning is disabled)
     if expect_npc:
-        report.checks.append(check_npc_placed(placed_npc))
-        report.checks.append(check_npc_within_bounds(placed_npc, world_size_cm))
-        report.checks.append(check_npc_walk_distance(placed_npc, world_size_cm))
-        report.checks.append(check_npc_clear_of_trees(placed_npc))
-        report.checks.append(check_npc_grounded(placed_npc, world_size_cm,
-                                                grid_z, grid_size))
-        report.checks.append(check_npc_route_is_obstructed(placed_npc))
+        placed_npcs = placed_npcs or []
+        report.checks.append(check_npc_count(placed_npcs, expected_npc_count))
+        report.checks.append(check_npc_spawn_band(placed_npcs, world_size_cm))
+        report.checks.append(check_npc_separation(placed_npcs))
+        report.checks.append(check_npcs_within_bounds(placed_npcs, world_size_cm))
+        report.checks.append(check_npcs_clear_of_trees(placed_npcs))
+        report.checks.append(check_npcs_grounded(placed_npcs, world_size_cm,
+                                                 grid_z, grid_size))
+        report.checks.append(check_npc_routes_are_obstructed(placed_npcs))
         report.checks.append(check_nav_bounds_sane(nav_bounds, world_size_cm))
-        report.checks.append(check_npc_inside_nav_bounds(placed_npc, nav_bounds))
+        report.checks.append(check_npcs_inside_nav_bounds(placed_npcs, nav_bounds))
 
     return report

@@ -520,14 +520,16 @@ ps = editor_actor_sub.spawn_actor_from_class(
 ps.set_actor_label(f"{LEVEL_NAME}_PlayerStart")
 
 # ── 7. Navigation + wandering NPC ────────────────────────────────────
-NPC_SPAWN = json.loads(r"""{"x": -1421.79, "y": 5114.25, "z": 300.99, "yaw": 285.54}""")
+NPC_SPAWNS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54}, {"x": 4241.23, "y": 6260.28, "z": 520.91, "yaw": 235.88}, {"x": 6982.28, "y": -3337.22, "z": 718.2, "yaw": 154.45}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52}]""")
 NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 8500.0, "center_z_cm": 354.6, "half_z_cm": 739.54, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 894.14}""")
 SCRIPTS_DIR = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts"
 NAV_AGENT_RADIUS = 35.0
 NAV_AGENT_HEIGHT = 144.0
 
-if NPC_SPAWN:
-    unreal.log_warning("[GEN] 7. Building navigation and spawning the NPC...")
+if NPC_SPAWNS:
+    unreal.log_warning(
+        f"[GEN] 7. Building navigation and spawning "
+        f"{len(NPC_SPAWNS)} NPC(s)...")
 
     # NavMeshBoundsVolume's default brush is a 200 cm cube, so scaling
     # the actor by world_size/200 makes it cover the map exactly.
@@ -578,23 +580,29 @@ if NPC_SPAWN:
     npc_bp = build_npc_blueprints.ensure_npc_blueprints(force=True)
     npc_class = unreal.BlueprintEditorLibrary.generated_class(npc_bp)
 
-    npc_actor = editor_actor_sub.spawn_actor_from_class(
-        npc_class,
-        unreal.Vector(NPC_SPAWN["x"], NPC_SPAWN["y"], NPC_SPAWN["z"]),
-        # Keywords, not positional: unreal.Rotator is (roll, pitch, yaw).
-        unreal.Rotator(pitch=0.0, yaw=NPC_SPAWN["yaw"], roll=0.0),
-    )
-    npc_actor.set_actor_label(f"{LEVEL_NAME}_NPC_Wanderer")
+    # One actor per spawn point, labelled _NPC_Wanderer_<n>.  The
+    # labels are what verify_<Level>.py matches on, and they are
+    # 1-based to line up with the generator's own console output.
+    for i, spawn in enumerate(NPC_SPAWNS, start=1):
+        npc_actor = editor_actor_sub.spawn_actor_from_class(
+            npc_class,
+            unreal.Vector(spawn["x"], spawn["y"], spawn["z"]),
+            # Keywords, not positional: unreal.Rotator is (roll, pitch, yaw).
+            unreal.Rotator(pitch=0.0, yaw=spawn["yaw"], roll=0.0),
+        )
+        npc_actor.set_actor_label(f"{LEVEL_NAME}_NPC_Wanderer_{i}")
+        unreal.log_warning(
+            f"[GEN]    NPC {i} at ({spawn['x']:.0f}, {spawn['y']:.0f}, "
+            f"{spawn['z']:.0f})")
     unreal.log_warning(
-        f"[GEN]    NPC at ({NPC_SPAWN['x']:.0f}, {NPC_SPAWN['y']:.0f}, "
-        f"{NPC_SPAWN['z']:.0f}); navmesh is built by the navigation "
-        f"system at game start (no nav data saved in the level)")
+        "[GEN]    navmesh is built by the navigation system at game "
+        "start (no nav data saved in the level)")
     unreal.log_warning(
         f"[GEN]    Nav volume: +/-{NAV_BOUNDS['half_xy_cm']:.0f} cm XY, "
         f"Z span {NAV_BOUNDS['half_z_cm'] * 2.0:.0f} cm "
         f"centred {NAV_BOUNDS['center_z_cm']:.0f}")
 else:
-    unreal.log_warning("[GEN] 7. NPC skipped (none placed).")
+    unreal.log_warning("[GEN] 7. NPCs skipped (none placed).")
 
 # ── 8. Save ─────────────────────────────────────────────────────────
 # Strip nav data as the very last action: the navigation system

@@ -31,11 +31,65 @@ NPC_CAPSULE_HALF_HEIGHT_CM = 88.0
 # Kept here rather than in the builder because this module imports no `unreal`,
 # so the host-side generator can read them too and bake them into the checks.
 #
-# "Slowly": UE's default walk speed is 600 cm/s (a run).  110 cm/s reads as an
-# unhurried walk and gives the player time to see the NPC coming.
-NPC_WALK_SPEED_CMS = 110.0
-NPC_ACCEPTANCE_RADIUS_CM = 150.0   # stop this far from the player
+# The wanderers RUN at the player: 600 cm/s is UE's own default MaxWalkSpeed and
+# the speed ABP_Unarmed's locomotion blend space tops out at, so the legs play
+# the jog cycle rather than a walk played back too fast.  (It used to be
+# 110 cm/s -- an unhurried walk, from when the NPC was scenery rather than a
+# threat.)
+NPC_RUN_SPEED_CMS = 600.0
+
+# Stop just inside melee reach, not on top of the player: the acceptance radius
+# has to be SMALLER than NPC_MELEE_RANGE_CM or the NPC parks itself outside its
+# own reach and never lands a hit.
+NPC_ACCEPTANCE_RADIUS_CM = 120.0
 NPC_REPATH_SECONDS = 0.5           # how often the move order is re-issued
+
+# ── Melee, shared with build_npc_blueprints.py ───────────────────────────────
+# Range is measured between actor *origins* (capsule centres), which is what
+# Vector_Distance on the two GetActorLocation calls gives.  Two stock Character
+# capsules are 34 cm in radius each, so 200 cm centre-to-centre is roughly an
+# arm's length of clear air between them -- close enough to read as a hit, loose
+# enough that a frame of separation does not cancel the swing.
+NPC_MELEE_RANGE_CM = 200.0
+# Balance these two against the PACK, not against one attacker: the five spawn
+# in one band and arrive within a few seconds of each other, so whatever one
+# wanderer does is very nearly multiplied by NPC_COUNT.  Measured in a -game
+# run, 12 damage every 1.2 s put five of them at 50 dps and killed a 100 HP
+# player in two seconds flat, before a single shot could be fired.  10 every
+# 1.5 s is 6.7 dps each, ~33 for the pack -- still lethal in about three
+# seconds if the player stands still and lets all five reach them, which is the
+# point of a 75 m approach the player can watch coming.
+NPC_MELEE_DAMAGE = 10.0            # 100 HP / 10 = 10 hits from one wanderer
+NPC_MELEE_INTERVAL_S = 1.5         # seconds between swings, per NPC
+# Played on DefaultSlot, which build_weapons_and_combat.py's layered blend makes
+# upper-body only -- so the NPC swings while still running.
+NPC_MELEE_MONTAGE = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
+NPC_MELEE_BLEND_S = 0.15
+
+# ── How many, and how far away ───────────────────────────────────────────────
+# Five wanderers, every one of them spawned in a 75-100 m band around the
+# PlayerStart: far enough that the player never opens their eyes next to one,
+# close enough that the pack arrives within ~15 s at a 600 cm/s run.
+#
+# The band is CLAMPED to the navigable island on small maps (see
+# npc_usable_radius): a 200 m map has a usable radius of 80 m, so the band
+# there is 75-80 m.  place_npcs() reports the band it actually used and
+# verification.check_npc_spawn_band asserts against that, so a clamp is visible
+# rather than silent.
+NPC_COUNT = 5
+NPC_SPAWN_MIN_DISTANCE_CM = 7500.0
+NPC_SPAWN_MAX_DISTANCE_CM = 10000.0
+# Keep the pack from spawning as a single clump -- they path to the same target
+# and would otherwise arrive as one body occupying one capsule's worth of space.
+NPC_MIN_SEPARATION_CM = 600.0
+
+# Where a *replacement* appears after one dies.  The same band, but measured
+# from wherever the player is standing at that moment rather than from the
+# PlayerStart, so the 75-100 m rule keeps holding once the player moves.  The
+# nav snap radius is generous because the far edge of the band can fall outside
+# the navigable island: 30 m is enough to reach back onto it from a point 100 m
+# out on a 200 m map.
+NPC_RESPAWN_NAV_SNAP_CM = 3000.0
 
 # Navmesh agent.  These are the navigation system's *default agent* values, and
 # they are deliberately not something else: the nav system overwrites whatever
@@ -210,6 +264,129 @@ def _segment_blockers(x0, y0, x1, y1, placed_trees, pad_cm: float) -> int:
     return blockers
 
 
+def spawn_band(
+    world_size_cm: float,
+    edge_margin_fraction: float = EDGE_MARGIN_FRACTION,
+    min_distance_cm: float = NPC_SPAWN_MIN_DISTANCE_CM,
+    max_distance_cm: float = NPC_SPAWN_MAX_DISTANCE_CM,
+) -> tuple[float, float, bool]:
+    """
+    The annulus the NPCs spawn in, clamped to what the map can actually hold.
+
+    Returns ``(min_cm, max_cm, clamped)``.  This is the single source of truth
+    for the band: place_npcs() draws from it and
+    ``verification.check_npc_spawn_band`` asserts against it, so the two cannot
+    disagree about what "75-100 m" meant on a map too small to hold it.
+
+    The clamp is not cosmetic.  A 200 m map's usable radius is 80 m (see
+    npc_usable_radius -- nav coverage is capped, and a spawn beyond the navmesh
+    leaves the NPC immobile), so the honest band there is 75-80 m.  A request
+    that cannot be met at all collapses to a ring just inside the usable radius
+    rather than silently spawning NPCs off the navmesh.
+    """
+    usable = npc_usable_radius(world_size_cm, edge_margin_fraction)
+    # 0.5% back from the edge: the rejection test below is on |x| and |y|, and a
+    # candidate exactly on the radius fails it at theta = 0 for float reasons.
+    hi = min(max_distance_cm, usable * 0.995)
+    lo = min(min_distance_cm, hi)
+    if lo >= hi:
+        lo = hi * 0.9
+    clamped = (hi < max_distance_cm - 1e-6) or (lo < min_distance_cm - 1e-6)
+    return lo, hi, clamped
+
+
+def place_npcs(
+    world_size_cm: float,
+    grid_z,
+    grid_size: int,
+    seed: int = 42,
+    placed_trees=None,
+    player_start=(0.0, 0.0),
+    count: int = NPC_COUNT,
+    min_distance_cm: float = NPC_SPAWN_MIN_DISTANCE_CM,
+    max_distance_cm: float = NPC_SPAWN_MAX_DISTANCE_CM,
+    trunk_clearance_cm: float = TRUNK_CLEARANCE_CM,
+    edge_margin_fraction: float = EDGE_MARGIN_FRACTION,
+    min_separation_cm: float = NPC_MIN_SEPARATION_CM,
+) -> list[PlacedNPC]:
+    """
+    Choose spawn points for ``count`` wanderers, all inside the spawn band.
+
+    Rejection sampling per NPC, with the same hard constraints as before --
+    clear of trunks, inside the navigable area -- plus one new one: no two
+    wanderers within ``min_separation_cm``, so the pack starts spread around the
+    player rather than stacked in one spot (they all path to the same target, so
+    a clump never unclumps).
+
+    Distance is drawn uniformly *by area* within the band, which is why it is a
+    sqrt rather than a plain uniform: a plain uniform bunches spawns toward the
+    inner edge.  A candidate whose straight line to the player is blocked by a
+    tree is preferred -- that is what makes "walks around the trees" observable
+    -- but an unobstructed one is accepted rather than failing the build, and
+    the offline check reports which happened.
+
+    Returns as many NPCs as it could place; fewer than ``count`` means the map
+    is too small or too dense for the band, and check_npc_count fails.
+    """
+    placed_trees = placed_trees or []
+    usable = npc_usable_radius(world_size_cm, edge_margin_fraction)
+    lo, hi, _clamped = spawn_band(world_size_cm, edge_margin_fraction,
+                                  min_distance_cm, max_distance_cm)
+    px, py = player_start
+
+    placed: list[PlacedNPC] = []
+    for index in range(count):
+        # Each NPC gets its own decorrelated stream, so adding a sixth wanderer
+        # does not move the first five.
+        rng = random.Random((seed ^ 0x4E7C) + index * 7919)
+        fallback = None
+
+        for attempt in range(1, MAX_PLACEMENT_ATTEMPTS + 1):
+            frac = rng.random()
+            dist = math.sqrt(lo ** 2 + frac * (hi ** 2 - lo ** 2))
+            theta = rng.uniform(0.0, 2.0 * math.pi)
+            nx = px + dist * math.cos(theta)
+            ny = py + dist * math.sin(theta)
+
+            if abs(nx) > usable or abs(ny) > usable:
+                continue
+
+            if any(math.hypot(o.x - nx, o.y - ny) < min_separation_cm
+                   for o in placed):
+                continue
+
+            nearest = min((math.hypot(t.x - nx, t.y - ny) - _trunk_radius(t)
+                           for t in placed_trees), default=float("inf"))
+            if nearest < trunk_clearance_cm:
+                continue
+
+            nz = get_exact_mesh_z(nx, ny, grid_z, grid_size, world_size_cm)
+            blockers = _segment_blockers(nx, ny, px, py, placed_trees,
+                                         NAV_AGENT_RADIUS_CM)
+
+            candidate = PlacedNPC(
+                x=nx, y=ny,
+                terrain_z=nz,
+                spawn_z=nz + NPC_CAPSULE_HALF_HEIGHT_CM,
+                yaw_deg=math.degrees(math.atan2(py - ny, px - nx)) % 360.0,
+                distance_to_player_cm=math.hypot(nx - px, ny - py),
+                nearest_trunk_cm=nearest,
+                blocking_trees=blockers,
+                attempts=attempt,
+            )
+
+            if blockers > 0:
+                fallback = candidate
+                break
+            if fallback is None:
+                fallback = candidate
+
+        if fallback is not None:
+            placed.append(fallback)
+
+    return placed
+
+
 def place_npc(
     world_size_cm: float,
     grid_z,
@@ -217,67 +394,14 @@ def place_npc(
     seed: int = 42,
     placed_trees=None,
     player_start=(0.0, 0.0),
-    min_distance_fraction: float = MIN_PLAYER_DISTANCE_FRACTION,
-    trunk_clearance_cm: float = TRUNK_CLEARANCE_CM,
-    edge_margin_fraction: float = EDGE_MARGIN_FRACTION,
+    **kwargs,
 ) -> PlacedNPC | None:
     """
-    Choose the NPC's spawn point.  Returns None only if no candidate satisfies
-    the hard constraints, which would mean the map is too small or too dense.
-
-    Candidates are drawn uniformly by area (``sqrt`` on the radius, so the
-    distribution does not bunch up at the centre) and the first one that both
-    satisfies the hard constraints *and* has a tree blocking the direct route
-    wins.  If none is obstructed, the best legal candidate is used and the
-    offline check reports it rather than failing the build.
+    One wanderer, for callers that only want one.  Kept as a thin wrapper over
+    place_npcs() so there is exactly one implementation of "where may an NPC
+    stand", not two that drift apart.
     """
-    placed_trees = placed_trees or []
-    rng = random.Random(seed ^ 0x4E7C)  # decorrelated from trees and grass
-
-    half = world_size_cm / 2.0
-    # Never spawn outside the navmesh: nav coverage is capped, so on a large map
-    # the navigable region is a central island, and a spawn beyond it would leave
-    # the NPC permanently off-mesh and immobile.
-    usable = npc_usable_radius(world_size_cm, edge_margin_fraction)
-    min_dist = usable * min_distance_fraction
-    px, py = player_start
-
-    fallback = None
-
-    for attempt in range(1, MAX_PLACEMENT_ATTEMPTS + 1):
-        # Uniform over the annulus between min_dist and usable.
-        frac = rng.random()
-        dist = math.sqrt(min_dist ** 2 + frac * (usable ** 2 - min_dist ** 2))
-        theta = rng.uniform(0.0, 2.0 * math.pi)
-        nx = px + dist * math.cos(theta)
-        ny = py + dist * math.sin(theta)
-
-        if abs(nx) > usable or abs(ny) > usable:
-            continue
-
-        nearest = min((math.hypot(t.x - nx, t.y - ny) - _trunk_radius(t)
-                       for t in placed_trees), default=float("inf"))
-        if nearest < trunk_clearance_cm:
-            continue
-
-        nz = get_exact_mesh_z(nx, ny, grid_z, grid_size, world_size_cm)
-        blockers = _segment_blockers(nx, ny, px, py, placed_trees,
-                                     NAV_AGENT_RADIUS_CM)
-
-        candidate = PlacedNPC(
-            x=nx, y=ny,
-            terrain_z=nz,
-            spawn_z=nz + NPC_CAPSULE_HALF_HEIGHT_CM,
-            yaw_deg=math.degrees(math.atan2(py - ny, px - nx)) % 360.0,
-            distance_to_player_cm=math.hypot(nx - px, ny - py),
-            nearest_trunk_cm=nearest,
-            blocking_trees=blockers,
-            attempts=attempt,
-        )
-
-        if blockers > 0:
-            return candidate
-        if fallback is None:
-            fallback = candidate
-
-    return fallback
+    placed = place_npcs(world_size_cm, grid_z, grid_size, seed=seed,
+                        placed_trees=placed_trees, player_start=player_start,
+                        count=1, **kwargs)
+    return placed[0] if placed else None

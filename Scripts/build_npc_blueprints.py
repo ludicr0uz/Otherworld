@@ -10,18 +10,31 @@ Two assets are produced under /Game/Forest/NPC:
 
   BP_ForestWandererAI  (parent AIController)  — the brain.  Event graph:
 
-      [Event BeginPlay] --exec--> [MoveToActor] --exec--> [Delay 0.5s] --,
-                                       ^                                 |
-                                       '---------------------------------'
+      [Event BeginPlay] --> [MoveToActor] --> [in reach and off cooldown?]
+                                 ^                 |            |
+                                 |             yes |            | no
+                                 |                 v            |
+                                 |        [arm next swing]      |
+                                 |        [play MM_Attack_01]   |
+                                 |        [player Health -= 12] |
+                                 |                 |            |
+                                 '------ [Delay 0.5s] <---------'
+
       [Get Player Pawn 0] --ReturnValue--> [MoveToActor.Goal]
 
-      MoveToActor does the pathfinding, so the NPC walks *around* trees
-      rather than into them.  Re-issuing it on a timer (instead of once) means
-      the NPC keeps following a player who moves, and recovers on its own if
-      the first request fires before the navmesh or the player pawn exist.
+      MoveToActor does the pathfinding, so the NPC runs *around* trees rather
+      than into them.  Re-issuing it on a timer (instead of once) means the NPC
+      keeps following a player who moves, and recovers on its own if the first
+      request fires before the navmesh or the player pawn exist -- and that same
+      loop is where the melee check lives, so there is one heartbeat rather than
+      two that can disagree.
 
   BP_ForestWanderer    (parent Character)     — the body: mannequin mesh,
-      slow walk speed, and the controller above auto-possessing it.
+      running movement speed, and the controller above auto-possessing it.
+
+The numbers (run speed, melee range/damage/interval, spawn band) all live in
+forest_generator/npc_placement.py, which imports no `unreal`, so the host-side
+generator and its offline checks read exactly what the editor builds.
 
 These assets are level-independent — nothing here depends on map size, seed or
 time of day — which is why they live in their own script instead of the
@@ -37,9 +50,14 @@ import unreal
 # generator can read them without importing `unreal`.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from forest_generator.npc_placement import (
-    NPC_WALK_SPEED_CMS,
+    NPC_RUN_SPEED_CMS,
     NPC_ACCEPTANCE_RADIUS_CM,
     NPC_REPATH_SECONDS,
+    NPC_MELEE_RANGE_CM,
+    NPC_MELEE_DAMAGE,
+    NPC_MELEE_INTERVAL_S,
+    NPC_MELEE_MONTAGE,
+    NPC_MELEE_BLEND_S,
 )
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -57,13 +75,50 @@ ANIM_BP_PATH = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed.ABP_Unarme
 MESH_RELATIVE_Z_CM = -89.0
 MESH_RELATIVE_YAW_DEG = 270.0
 
+# Where the player's health lives.  Built by build_weapons_and_combat.py; if it
+# is absent (a project where the weapons have never been built) the melee half
+# of the chase loop is skipped and the NPC just runs at the player.
+HEALTH_BP_PATH = "/Game/Weapons/BP_HealthComponent"
+HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
+
+# The slot the attack animation is played into.  build_weapons_and_combat.py
+# splices a layered blend per bone (spine_01) into ABP_Unarmed, which makes
+# DefaultSlot upper-body only -- so the NPC swings its arms while the legs keep
+# running.  Without that patch the montage is full body and the swing also stops
+# the legs; it still reads as an attack, so this is not a hard dependency.
+MELEE_SLOT = "DefaultSlot"
+
+# An object pin holds the full object path (package + object name), and it
+# normalises whatever is written into that form -- so write it that way, or the
+# read-back guard in _set() reports a mismatch that is not one.
+MELEE_MONTAGE_OBJECT = f"{NPC_MELEE_MONTAGE}.{NPC_MELEE_MONTAGE.rsplit('/', 1)[-1]}"
+
+INF = 1.0e9
+
 # Function paths for the graph nodes
 FN_MOVE_TO_ACTOR = "/Script/AIModule.AIController.MoveToActor"
 FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
+FN_GET_PAWN = "/Script/Engine.Controller.K2_GetPawn"
+FN_ACTOR_LOC = "/Script/Engine.Actor.K2_GetActorLocation"
+FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
+FN_LE_FF = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
+FN_GE_FF = "/Script/Engine.KismetMathLibrary.GreaterEqual_DoubleDouble"
+FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
+FN_ADD_FF = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
+FN_SUB_FF = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
+FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
+FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
+FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
+FN_ANIM_INSTANCE = "/Script/Engine.SkeletalMeshComponent.GetAnimInstance"
+FN_PLAY_SLOT = "/Script/Engine.AnimInstance.PlaySlotAnimationAsDynamicMontage"
+
+NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
+NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 
 BGE = unreal.BlueprintGraphEditor
 BEL = unreal.BlueprintEditorLibrary
+PIN = unreal.BlueprintGraphPinLibrary
 
 
 def _log(msg):
@@ -122,70 +177,313 @@ def _connect(a, b):
         raise RuntimeError("could not connect pins")
 
 
+def _at(node, x, y):
+    BEL.set_node_pos(node, unreal.IntPoint(int(x), int(y)))
+    return node
+
+
+def _node(ed, function_path):
+    """add_call_function_node, but loud when the path does not resolve.
+
+    An unresolvable path yields a *pinless* node rather than None, which
+    surfaces much later as a baffling "pin 'self' not found on ''".
+    """
+    n = ed.add_call_function_node(function_path)
+    if not n or not BEL.list_all_pins(n):
+        raise RuntimeError(f"{function_path} is not a Blueprint-callable function")
+    return n
+
+
+def _palette(ed, name, x=0.0, y=0.0):
+    n = ed.create_node_from_name(name, unreal.Vector2D(float(x), float(y)), [])
+    if not n:
+        raise RuntimeError(f"palette node {name!r} could not be created")
+    return n
+
+
+def _loose_pin(node, wanted, is_input=True):
+    """Find a pin ignoring spaces and case -- cast nodes name their output after
+    the class with spaces inserted ("AsBP Health Component")."""
+    key = wanted.replace(" ", "").lower()
+    for p in (BEL.list_input_pins(node) if is_input else BEL.list_output_pins(node)):
+        if str(PIN.get_pin_name(p)).replace(" ", "").lower() == key:
+            return p
+    raise RuntimeError(f"no pin like {wanted!r} on {BEL.get_node_title(node)}")
+
+
+def _set(node, name, value):
+    """Set a pin's literal and prove it landed.
+
+    set_pin_value's return is not a usable signal (False means both "rejected"
+    and "already equal to the default"), and a pin that quietly stays empty
+    compiles as **zero** -- a melee attack for 0 damage at a range of 0, which
+    looks perfect in the graph.
+    """
+    pin = _pin(node, name)
+    pin.set_pin_value(str(value))
+    got = str(PIN.get_pin_value(pin))
+    if got == str(value):
+        return
+    try:
+        if abs(float(got or 0.0) - float(value)) < 1e-6:
+            return
+    except ValueError:
+        pass
+    if got.lower() == str(value).lower() or got.endswith(f"::{value}"):
+        return
+    raise RuntimeError(f"pin {name!r} would not take {value!r} — reads back {got!r}")
+
+
 # ─── The AI controller ──────────────────────────────────────────────────────
 
-def build_ai_controller_blueprint():
-    """Create BP_ForestWandererAI and author its chase loop."""
+def _author_melee(ed, move_to, delay, x0, y0):
+    """Swing at the player when the chase has closed the distance.
+
+    Spliced between the move order and the re-path delay, so the check runs
+    every NPC_REPATH_SECONDS with no Tick event of its own: the loop is already
+    the NPC's heartbeat, and a second one would only add a way for the two to
+    disagree about whether the chase is still running.
+
+        MoveToActor --> [in range AND off cooldown?]
+                          true  --> NextAttackTime = now + interval
+                                --> play MM_Attack_01 on the upper body
+                                --> player Health -= NPC_MELEE_DAMAGE
+                          false -------------------------------------> Delay
+
+    Range is centre-to-centre between the two capsules, which is why
+    NPC_MELEE_RANGE_CM (200) has to exceed NPC_ACCEPTANCE_RADIUS_CM (120): the
+    move order stops the NPC at the acceptance radius, and an NPC that parks
+    itself outside its own reach never lands a hit.
+
+    The cooldown is wall-clock rather than a counter of loop iterations so the
+    swing rate is independent of NPC_REPATH_SECONDS -- and it lives on the
+    *controller*, so five wanderers each keep their own, rather than sharing one
+    and machine-gunning the player in lockstep.
+
+    Damage is applied by writing Health on the player's BP_HealthComponent,
+    which is exactly what the pellets do (see _author_impact in
+    build_weapons_and_combat.py). Routing through ApplyDamage/AnyDamage instead
+    would need a graph on BP_ThirdPersonCharacter, whose Enhanced Input template
+    graph the Python API cannot partially rebuild.
+
+    Returns the nodes it made (for the comment box), or None when
+    BP_HealthComponent is absent -- a project where the weapons have never been
+    built still gets a chasing NPC, just not a damaging one.
+    """
+    eas = _asset_sub()
+    if not eas.does_asset_exist(HEALTH_BP_PATH):
+        _log(f"note: {HEALTH_BP_PATH} not found — melee skipped, the NPC will "
+             f"chase but not attack (run build_weapons_and_combat.py first)")
+        return None
+    # A cast node only appears in the palette for a class that is already
+    # loaded; without this the node name reads like a typo rather than a
+    # missing asset.
+    if not eas.load_asset(HEALTH_BP_PATH):
+        raise RuntimeError(f"could not load {HEALTH_BP_PATH} for its cast node")
+
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    # --- is the player within reach? ----------------------------------------
+    self_pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 260))
+    self_loc = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 240, y0 + 260))
+    _connect(_pin(self_pawn, "ReturnValue", is_input=False), _pin(self_loc, "self"))
+
+    player = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 420))
+    _set(player, "PlayerIndex", 0)
+    player_out = _pin(player, "ReturnValue", is_input=False)
+    player_loc = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 240, y0 + 420))
+    _connect(player_out, _pin(player_loc, "self"))
+
+    gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 480, y0 + 340))
+    _connect(_pin(self_loc, "ReturnValue", is_input=False), _pin(gap, "V1"))
+    _connect(_pin(player_loc, "ReturnValue", is_input=False), _pin(gap, "V2"))
+
+    in_range = keep(_at(_node(ed, FN_LE_FF), x0 + 720, y0 + 340))
+    _connect(_pin(gap, "ReturnValue", is_input=False), _pin(in_range, "A"))
+    _set(in_range, "B", NPC_MELEE_RANGE_CM)
+
+    # --- has this NPC's cooldown expired? ------------------------------------
+    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 480, y0 + 560))
+    now_out = _pin(now, "ReturnValue", is_input=False)
+    next_at = keep(_at(ed.add_get_member_variable_node("NextAttackTime"),
+                       x0 + 480, y0 + 680))
+    ready = keep(_at(_node(ed, FN_GE_FF), x0 + 720, y0 + 560))
+    _connect(now_out, _pin(ready, "A"))
+    _connect(_pin(next_at, "NextAttackTime", is_input=False), _pin(ready, "B"))
+
+    both = keep(_at(_node(ed, FN_AND), x0 + 960, y0 + 400))
+    _connect(_pin(in_range, "ReturnValue", is_input=False), _pin(both, "A"))
+    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(both, "B"))
+
+    swing = keep(_at(ed.add_branch_node(), x0 + 1200, y0))
+    _connect(_pin(both, "ReturnValue", is_input=False), _pin(swing, "Condition"))
+    _connect(BEL.find_then_pin(move_to), _pin(swing, "execute"))
+    # Not in range, or still on cooldown: straight on to the re-path delay.
+    _connect(BEL.find_else_pin(swing), BEL.find_execute_pin(delay))
+
+    # --- arm the next swing --------------------------------------------------
+    when = keep(_at(_node(ed, FN_ADD_FF), x0 + 1440, y0 + 300))
+    _connect(now_out, _pin(when, "A"))
+    _set(when, "B", NPC_MELEE_INTERVAL_S)
+    arm = keep(_at(ed.add_set_member_variable_node("NextAttackTime"),
+                   x0 + 1680, y0))
+    _connect(_pin(when, "ReturnValue", is_input=False), _pin(arm, "NextAttackTime"))
+    _connect(BEL.find_then_pin(swing), _pin(arm, "execute"))
+
+    # --- play the swing ------------------------------------------------------
+    # The montage goes through the pawn's own AnimInstance, so it animates
+    # whichever body this controller happens to possess rather than assuming
+    # BP_ForestWanderer.
+    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0 + 1920, y0))
+    _connect(_pin(self_pawn, "ReturnValue", is_input=False), _pin(as_char, "Object"))
+    _connect(BEL.find_then_pin(arm), _pin(as_char, "execute"))
+    char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
+
+    mesh = keep(_at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
+                    x0 + 1920, y0 + 300))
+    _connect(char_out, _pin(mesh, "self"))
+
+    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 2160, y0 + 300))
+    _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
+
+    montage = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 2400, y0))
+    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(montage, "self"))
+    _set(montage, "Asset", MELEE_MONTAGE_OBJECT)
+    _set(montage, "SlotNodeName", MELEE_SLOT)
+    _set(montage, "BlendInTime", NPC_MELEE_BLEND_S)
+    _set(montage, "BlendOutTime", NPC_MELEE_BLEND_S)
+    _connect(BEL.find_then_pin(as_char), _pin(montage, "execute"))
+
+    # --- land the hit --------------------------------------------------------
+    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 2400, y0 + 300))
+    _connect(player_out, _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
+
+    hit = keep(_at(_palette(ed, NODE_CAST_HEALTH), x0 + 2640, y0))
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(hit, "Object"))
+    _connect(BEL.find_then_pin(montage), _pin(hit, "execute"))
+    as_health = _loose_pin(hit, "AsBPHealthComponent", is_input=False)
+
+    read = keep(_at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
+                    x0 + 2880, y0 + 300))
+    _connect(as_health, _pin(read, "self"))
+    hurt = keep(_at(_node(ed, FN_SUB_FF), x0 + 3120, y0 + 300))
+    _connect(_pin(read, "Health", is_input=False), _pin(hurt, "A"))
+    _set(hurt, "B", NPC_MELEE_DAMAGE)
+    floor = keep(_at(_node(ed, FN_CLAMP), x0 + 3360, y0 + 300))
+    _connect(_pin(hurt, "ReturnValue", is_input=False), _pin(floor, "Value"))
+    _set(floor, "Min", 0.0)
+    _set(floor, "Max", INF)
+    write = keep(_at(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH),
+                     x0 + 3600, y0))
+    _connect(as_health, _pin(write, "self"))
+    _connect(_pin(floor, "ReturnValue", is_input=False), _pin(write, "Health"))
+    _connect(BEL.find_then_pin(hit), _pin(write, "execute"))
+
+    # Every exit -- hit, missing health component, not a Character -- has to
+    # reach the Delay, or the chase loop ends on the first swing and the NPC
+    # stands still forever.  A cast's failure pin left dangling is exactly that
+    # bug, and it only shows up in a level where the player has no health
+    # component.
+    for tail in (BEL.find_then_pin(write),
+                 _pin(hit, "CastFailed", is_input=False),
+                 _pin(as_char, "CastFailed", is_input=False)):
+        _connect(tail, BEL.find_execute_pin(delay))
+
+    return made
+
+
+def build_ai_controller_blueprint(rebuild=True):
+    """Create BP_ForestWandererAI and author its chase-and-attack loop.
+
+    ``rebuild`` wipes the graph first.  It defaults to True because this builder
+    is the only description of the behaviour: the old "already authored,
+    reusing" guard meant no edit here ever reached the asset once it existed.
+    """
     bp = _create_blueprint(AI_BP_PATH, unreal.AIController)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     if not ed:
         raise RuntimeError("BP_ForestWandererAI has no EventGraph")
 
-    # Already authored? Leave the graph alone — re-adding the nodes would
-    # duplicate the chase loop.
-    existing_bp = ed.find_event_node("ReceiveBeginPlay")
-    if existing_bp:
-        outgoing = BEL.find_then_pin(existing_bp)
-        if outgoing and outgoing.is_valid() and outgoing.list_connected_pins():
-            _log(f"{AI_BP_PATH} graph already authored — reusing")
-            if not BEL.compile_blueprint(bp):
-                raise RuntimeError("BP_ForestWandererAI failed to compile")
-            _asset_sub().save_loaded_asset(bp)
-            return bp
-
-    # A freshly created Blueprint already carries a (disabled) BeginPlay event
-    # node; connecting to it is what turns it on.
     begin_play = ed.find_event_node("ReceiveBeginPlay")
+    authored = bool(begin_play and BEL.find_then_pin(begin_play)
+                    and BEL.find_then_pin(begin_play).list_connected_pins())
+    if authored and not rebuild:
+        _log(f"{AI_BP_PATH} graph already authored — reusing")
+        if not BEL.compile_blueprint(bp):
+            raise RuntimeError("BP_ForestWandererAI failed to compile")
+        _asset_sub().save_loaded_asset(bp)
+        return bp
+    if authored:
+        _log("wiping the existing AI graph")
+        ed.remove_nodes(ed.list_all_nodes())
+        begin_play = None
+
     if not begin_play:
-        raise RuntimeError("could not find the ReceiveBeginPlay event node")
+        begin_play = ed.find_event_node("ReceiveBeginPlay")
+    if not begin_play:
+        # A fresh Blueprint ships a disabled BeginPlay placeholder, but a wiped
+        # graph has none, so put one back from the palette.
+        begin_play = _palette(ed, "AddEvent|EventBeginPlay", 0.0, 0.0)
     origin = BEL.get_node_pos(begin_play)
 
-    move_to = ed.add_call_function_node(FN_MOVE_TO_ACTOR)
-    get_pawn = ed.add_call_function_node(FN_GET_PLAYER_PAWN)
-    delay = ed.add_call_function_node(FN_DELAY)
+    # Each NPC's swing timer. Zero is the right default -- it means "may attack
+    # immediately" -- which is just as well, since add_member_variable's own
+    # default-value argument silently does not apply (see CLAUDE.md).
+    ed.remove_member_variable("NextAttackTime")
+    if not ed.add_member_variable("NextAttackTime",
+                                  BEL.get_basic_type_by_name("real")):
+        raise RuntimeError("could not declare NextAttackTime")
 
-    BEL.set_node_pos(move_to, unreal.IntPoint(origin.x + 340, origin.y))
-    BEL.set_node_pos(get_pawn, unreal.IntPoint(origin.x + 40, origin.y + 220))
-    BEL.set_node_pos(delay, unreal.IntPoint(origin.x + 780, origin.y))
+    move_to = _at(_node(ed, FN_MOVE_TO_ACTOR), origin.x + 340, origin.y)
+    get_pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), origin.x + 40, origin.y + 220)
+    delay = _at(_node(ed, FN_DELAY), origin.x + 4000, origin.y)
 
     # Goal = the player pawn
-    _pin(get_pawn, "PlayerIndex").set_pin_value("0")
+    _set(get_pawn, "PlayerIndex", 0)
     _connect(_pin(get_pawn, "ReturnValue", is_input=False), _pin(move_to, "Goal"))
 
-    # Pathfinding is what makes it walk around the trees rather than into them.
-    _pin(move_to, "AcceptanceRadius").set_pin_value(str(NPC_ACCEPTANCE_RADIUS_CM))
-    _pin(move_to, "bUsePathfinding").set_pin_value("true")
-    _pin(move_to, "bStopOnOverlap").set_pin_value("true")
+    # Pathfinding is what makes it run around the trees rather than into them.
+    _set(move_to, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
+    _set(move_to, "bUsePathfinding", "true")
+    _set(move_to, "bStopOnOverlap", "true")
     # Partial paths keep the NPC advancing as far as the navmesh allows instead
     # of refusing to move at all; the retry loop then re-paths, so a temporary
     # dead end does not end the chase.
-    _pin(move_to, "bAllowPartialPath").set_pin_value("true")
+    _set(move_to, "bAllowPartialPath", "true")
 
-    _pin(delay, "Duration").set_pin_value(str(NPC_REPATH_SECONDS))
+    _set(delay, "Duration", NPC_REPATH_SECONDS)
 
-    # BeginPlay -> MoveToActor -> Delay -> back to MoveToActor (a chase loop)
+    # BeginPlay -> MoveToActor -> (melee) -> Delay -> back to MoveToActor
     _connect(BEL.find_then_pin(begin_play), BEL.find_execute_pin(move_to))
-    _connect(BEL.find_then_pin(move_to), BEL.find_execute_pin(delay))
     _connect(BEL.find_then_pin(delay), BEL.find_execute_pin(move_to))
 
+    melee = _author_melee(ed, move_to, delay, origin.x + 700, origin.y)
+    if melee is None:
+        _connect(BEL.find_then_pin(move_to), BEL.find_execute_pin(delay))
+
     ed.add_comment_to_nodes(
-        "Re-issue a pathfinding move order at the player twice a second.",
+        f"Re-issue a pathfinding move order at the player every "
+        f"{NPC_REPATH_SECONDS} s.",
         [move_to, get_pawn, delay])
+    if melee:
+        ed.add_comment_to_nodes(
+            f"Melee: within {NPC_MELEE_RANGE_CM:.0f} cm and off cooldown, swing "
+            f"for {NPC_MELEE_DAMAGE:.0f} damage, then arm the next swing "
+            f"{NPC_MELEE_INTERVAL_S} s out. The cooldown is per controller, so "
+            f"a pack does not hit in lockstep.",
+            melee)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWandererAI failed to compile")
     _asset_sub().save_loaded_asset(bp)
-    _log(f"built {AI_BP_PATH}")
+    _log(f"built {AI_BP_PATH}"
+         + (f" (melee {NPC_MELEE_DAMAGE:.0f} dmg / {NPC_MELEE_INTERVAL_S} s "
+            f"inside {NPC_MELEE_RANGE_CM:.0f} cm)" if melee else " (no melee)"))
     return bp
 
 
@@ -242,7 +540,7 @@ def build_npc_blueprint(ai_bp):
         unreal.Rotator(pitch=0.0, yaw=MESH_RELATIVE_YAW_DEG, roll=0.0))
 
     movement = cdo.get_editor_property("character_movement")
-    movement.set_editor_property("max_walk_speed", NPC_WALK_SPEED_CMS)
+    movement.set_editor_property("max_walk_speed", NPC_RUN_SPEED_CMS)
     # Turn in place smoothly instead of snapping to each new path segment.
     movement.set_editor_property(
         "rotation_rate", unreal.Rotator(pitch=0.0, yaw=180.0, roll=0.0))
@@ -277,7 +575,7 @@ def build_npc_blueprint(ai_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")
     eas.save_loaded_asset(bp)
-    _log(f"built {NPC_BP_PATH} (walk speed {NPC_WALK_SPEED_CMS} cm/s)")
+    _log(f"built {NPC_BP_PATH} (run speed {NPC_RUN_SPEED_CMS} cm/s)")
     return bp
 
 
@@ -295,7 +593,7 @@ def ensure_npc_blueprints(force=False):
         _log("NPC blueprints already exist — reusing")
         return eas.load_asset(NPC_BP_PATH)
 
-    ai_bp = build_ai_controller_blueprint()
+    ai_bp = build_ai_controller_blueprint(rebuild=force)
     return build_npc_blueprint(ai_bp)
 
 

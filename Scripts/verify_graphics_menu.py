@@ -116,9 +116,14 @@ def main():
     for _label, _level, shadow, pct in G.PRESETS:
         expected_cmds.add(f"r.ShadowQuality {shadow}")
         expected_cmds.add(f"r.ScreenPercentage {pct}")
-    check("every preset's console overrides are present",
+    expected_cmds.add(G.FPS_COMMAND)
+    check("every preset's console overrides are present, plus the FPS readout",
           commands == expected_cmds,
           str(sorted(commands ^ expected_cmds)) if commands != expected_cmds else "")
+    # The FPS indicator is the engine's own stat display, so the only evidence
+    # of it in the graph is this one command -- nothing is drawn on the canvas.
+    check("BeginPlay turns on the built-in FPS readout (top-right)",
+          G.FPS_COMMAND in commands)
 
     # ApplyNonResolutionSettings takes no arguments, so it is the only node in
     # the graph whose inputs are exactly exec + self.

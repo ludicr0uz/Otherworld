@@ -24,6 +24,8 @@ file stays the single source of truth, per the project's no-hand-editing rule.
 Event graph:
 
   [Event BeginPlay] --> apply the startup preset (Low)
+                    --> ConsoleCommand "stat fps"  (engine's own readout,
+                        which draws itself in the top-right corner)
 
   [Event Tick] --> [Branch: WasInputKeyJustPressed(M)]
                       True  --> [Set MenuOpen = Not MenuOpen] --,
@@ -102,6 +104,17 @@ PRESETS = (
 PRESET_KEYS = ("One", "Two", "Three")
 
 MENU_KEY = "M"
+
+# The FPS readout.  "stat fps" is the engine's own frame-rate display and it
+# renders in the **top-right** corner of the viewport on its own -- there is no
+# position to set, and nothing is drawn by this HUD's canvas for it.  Doing it
+# this way rather than with a DrawText of 1/DeltaSeconds is deliberate: the stat
+# system's number is the engine's own smoothed frame time (the same one the
+# profiler reports), it costs nothing to maintain, and it keeps working if the
+# HUD's draw graph is ever rewritten.  Chained onto BeginPlay for the same
+# reason the startup preset is: a readout has to be on for the session, not
+# waiting on a keypress the player has to know about.
+FPS_COMMAND = "stat fps"
 
 # The preset every session starts at.  BeginPlay *applies* it rather than just
 # setting the caret: the menu can only tell the truth about the current quality
@@ -447,6 +460,17 @@ def _author_begin_play(ed, begin_play):
         f"just point the caret at it: otherwise the panel would claim {label} "
         "while the engine ran at whatever scalability it happened to boot with.",
         made)
+
+    # ...and then turn the engine's own FPS display on.  It is last in the chain
+    # so that a failure to apply the preset cannot be hidden behind it.
+    fps = _at(_node(ed, FN_CONSOLE), origin.x + 320, origin.y + 240)
+    _set(fps, "Command", FPS_COMMAND)
+    _connect(BEL.find_then_pin(made[-1]), _pin(fps, "execute"))
+    ed.add_comment_to_nodes(
+        f"{FPS_COMMAND!r} -- UE's built-in frame-rate readout, which draws "
+        "itself in the top-right corner. Nothing on this HUD's canvas is "
+        "involved, so it cannot collide with the HP bar or the quality panel.",
+        [fps])
 
 
 # ─── Event Tick: input ───────────────────────────────────────────────────────

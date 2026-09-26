@@ -45,13 +45,20 @@ from forest_generator.grass_placement import (
     KNEE_HEIGHT_CM,
 )
 from forest_generator.npc_placement import (
-    place_npc,
+    place_npcs,
+    spawn_band,
     compute_nav_bounds,
     NAV_MAX_VERTICAL_SPAN_CM,
-    NPC_WALK_SPEED_CMS,
+    NPC_RUN_SPEED_CMS,
     NPC_CAPSULE_HALF_HEIGHT_CM,
     NAV_AGENT_RADIUS_CM,
     NAV_AGENT_HEIGHT_CM,
+    NPC_COUNT,
+    NPC_SPAWN_MIN_DISTANCE_CM,
+    NPC_SPAWN_MAX_DISTANCE_CM,
+    NPC_MELEE_RANGE_CM,
+    NPC_MELEE_DAMAGE,
+    NPC_MELEE_INTERVAL_S,
 )
 from forest_generator.verification import run_all_checks
 from forest_generator.lighting import (
@@ -97,10 +104,16 @@ def main():
     parser.add_argument("--no-grass", action="store_true",
                         help="Skip grass generation entirely")
     parser.add_argument("--no-npc", action="store_true",
-                        help="Skip the wandering NPC")
+                        help="Skip the wandering NPCs")
+    parser.add_argument("--npc-count", type=int, default=NPC_COUNT,
+                        help=f"How many wanderers to spawn (default: {NPC_COUNT})")
     parser.add_argument("--npc-min-distance", type=float, default=None,
-                        help="Minimum metres between the NPC spawn and the "
-                             "player start (default: 55%% of the usable radius)")
+                        help=f"Inner edge of the spawn band, in metres "
+                             f"(default: {NPC_SPAWN_MIN_DISTANCE_CM / 100.0:.0f})")
+    parser.add_argument("--npc-max-distance", type=float, default=None,
+                        help=f"Outer edge of the spawn band, in metres "
+                             f"(default: {NPC_SPAWN_MAX_DISTANCE_CM / 100.0:.0f}; "
+                             f"both edges are clamped to the navigable radius)")
     parser.add_argument("--json-report", type=str, default=None,
                         help="Path to write JSON verification report")
     args = parser.parse_args()
@@ -122,7 +135,21 @@ def main():
         print(f"  Grass: disabled")
     else:
         print(f"  Grass: {args.grass_density:.2f}/m2, knee height {args.grass_height:.0f} cm")
-    print(f"  NPC: {'disabled' if args.no_npc else 'one wanderer, walks to the player'}")
+    if args.no_npc:
+        print(f"  NPCs: disabled")
+    else:
+        band_lo, band_hi, _clamped = spawn_band(
+            world_size_cm,
+            min_distance_cm=(args.npc_min_distance * 100.0
+                             if args.npc_min_distance is not None
+                             else NPC_SPAWN_MIN_DISTANCE_CM),
+            max_distance_cm=(args.npc_max_distance * 100.0
+                             if args.npc_max_distance is not None
+                             else NPC_SPAWN_MAX_DISTANCE_CM))
+        print(f"  NPCs: {args.npc_count} wanderers, spawning "
+              f"{band_lo / 100.0:.0f}-{band_hi / 100.0:.0f} m out, running at "
+              f"{NPC_RUN_SPEED_CMS:.0f} cm/s, {NPC_MELEE_DAMAGE:.0f} dmg melee "
+              f"every {NPC_MELEE_INTERVAL_S:.1f} s inside {NPC_MELEE_RANGE_CM / 100.0:.0f} m")
     print(f"{'═' * 60}\n")
 
     # ── Step 1: Generate terrain mesh ────────────────────────────────────
@@ -171,36 +198,48 @@ def main():
             print(f"       {name}: {cnt:,} instances")
         print(f"       TOTAL: {len(placed_grass):,} grass clumps")
 
-    # ── Step 4: Place the wandering NPC ──────────────────────────────────
+    # ── Step 4: Place the wandering NPCs ─────────────────────────────────
     if args.no_npc:
-        print(f"\n[4/6] NPC disabled (--no-npc)")
-        placed_npc = None
+        print(f"\n[4/6] NPCs disabled (--no-npc)")
+        placed_npcs = []
     else:
-        print(f"\n[4/6] Placing the wandering NPC...")
-        min_fraction = None
-        if args.npc_min_distance is not None:
-            usable = world_size_cm / 2.0 * 0.88
-            min_fraction = min(0.95, max(0.0, args.npc_min_distance * 100.0 / usable))
-        placed_npc = place_npc(
+        print(f"\n[4/6] Placing {args.npc_count} wandering NPC(s)...")
+        band_lo, band_hi, clamped = spawn_band(
+            world_size_cm,
+            min_distance_cm=(args.npc_min_distance * 100.0
+                             if args.npc_min_distance is not None
+                             else NPC_SPAWN_MIN_DISTANCE_CM),
+            max_distance_cm=(args.npc_max_distance * 100.0
+                             if args.npc_max_distance is not None
+                             else NPC_SPAWN_MAX_DISTANCE_CM))
+        if clamped:
+            # Loud, because the requested band is a gameplay decision and the
+            # navigable radius silently overriding it would be a surprise.
+            print(f"       ⚠️  Band clamped to {band_lo / 100.0:.1f}-"
+                  f"{band_hi / 100.0:.1f} m — the navigable radius on a "
+                  f"{world_size_m:.0f} m map cannot hold the full request")
+        placed_npcs = place_npcs(
             world_size_cm=world_size_cm,
             grid_z=grid_z,
             grid_size=grid_size,
             seed=args.seed,
             placed_trees=placed_trees,
-            **({"min_distance_fraction": min_fraction} if min_fraction else {}),
+            count=args.npc_count,
+            min_distance_cm=band_lo,
+            max_distance_cm=band_hi,
         )
-        if placed_npc is None:
+        if not placed_npcs:
             print("       ⚠️  No legal NPC spawn point found.")
-        else:
-            print(f"       Spawn: ({placed_npc.x:.0f}, {placed_npc.y:.0f}, "
-                  f"{placed_npc.spawn_z:.0f}) cm, facing yaw {placed_npc.yaw_deg:.0f}°")
-            print(f"       {placed_npc.distance_to_player_cm / 100.0:.1f} m from the "
-                  f"player, nearest trunk {placed_npc.nearest_trunk_cm:.0f} cm")
-            print(f"       {placed_npc.blocking_trees} tree(s) block the direct line "
-                  f"(found in {placed_npc.attempts} attempt(s))")
+        for i, npc in enumerate(placed_npcs, start=1):
+            print(f"       NPC {i}: ({npc.x:.0f}, {npc.y:.0f}, {npc.spawn_z:.0f}) cm, "
+                  f"yaw {npc.yaw_deg:.0f}°, "
+                  f"{npc.distance_to_player_cm / 100.0:.1f} m out, "
+                  f"nearest trunk {npc.nearest_trunk_cm:.0f} cm, "
+                  f"{npc.blocking_trees} blocking tree(s), "
+                  f"{npc.attempts} attempt(s)")
 
     nav_bounds = None
-    if placed_npc is not None:
+    if placed_npcs:
         nav_bounds = compute_nav_bounds(world_size_cm, grid_z, grid_size)
         print(f"       Nav volume: +/-{nav_bounds['half_xy_cm']:.0f} cm XY, "
               f"Z {nav_bounds['center_z_cm'] - nav_bounds['half_z_cm']:.0f}..."
@@ -220,8 +259,9 @@ def main():
         placed_grass=placed_grass,
         grass_density_per_sqm=args.grass_density,
         knee_height_cm=args.grass_height,
-        placed_npc=placed_npc,
+        placed_npcs=placed_npcs,
         expect_npc=not args.no_npc,
+        expected_npc_count=args.npc_count,
         nav_bounds=nav_bounds,
     )
     print()
@@ -257,7 +297,7 @@ def main():
         placed_trees=placed_trees,
         grass_data_path=grass_data_path,
         grass_count=len(placed_grass),
-        placed_npc=placed_npc,
+        placed_npcs=placed_npcs,
         nav_bounds=nav_bounds,
         lighting=lighting,
     )
@@ -272,7 +312,7 @@ def main():
         grid_size=grid_size,
         placed_trees=placed_trees,
         placed_grass=placed_grass,
-        placed_npc=placed_npc,
+        placed_npcs=placed_npcs,
         nav_bounds=nav_bounds,
         lighting=lighting,
     )
@@ -333,20 +373,20 @@ def _write_unreal_import_script(
     placed_trees,
     grass_data_path: str,
     grass_count: int,
-    placed_npc,
+    placed_npcs,
     nav_bounds,
     lighting: dict,
 ):
     """Generate a self-contained Unreal Python script that imports everything."""
 
-    npc_json = json.dumps(
+    npc_json = json.dumps([
         {
-            "x": round(placed_npc.x, 2),
-            "y": round(placed_npc.y, 2),
-            "z": round(placed_npc.spawn_z, 2),
-            "yaw": round(placed_npc.yaw_deg, 2),
-        } if placed_npc else None
-    )
+            "x": round(npc.x, 2),
+            "y": round(npc.y, 2),
+            "z": round(npc.spawn_z, 2),
+            "yaw": round(npc.yaw_deg, 2),
+        } for npc in (placed_npcs or [])
+    ])
     nav_bounds_json = json.dumps(
         {k: round(v, 2) for k, v in nav_bounds.items()} if nav_bounds else None)
 
@@ -908,14 +948,16 @@ def _write_unreal_import_script(
         ps.set_actor_label(f"{{LEVEL_NAME}}_PlayerStart")
 
         # ── 7. Navigation + wandering NPC ────────────────────────────────────
-        NPC_SPAWN = json.loads(r"""{npc_json}""")
+        NPC_SPAWNS = json.loads(r"""{npc_json}""")
         NAV_BOUNDS = json.loads(r"""{nav_bounds_json}""")
         SCRIPTS_DIR = r"{scripts_dir}"
         NAV_AGENT_RADIUS = {nav_agent_radius}
         NAV_AGENT_HEIGHT = {nav_agent_height}
 
-        if NPC_SPAWN:
-            unreal.log_warning("[GEN] 7. Building navigation and spawning the NPC...")
+        if NPC_SPAWNS:
+            unreal.log_warning(
+                f"[GEN] 7. Building navigation and spawning "
+                f"{{len(NPC_SPAWNS)}} NPC(s)...")
 
             # NavMeshBoundsVolume's default brush is a 200 cm cube, so scaling
             # the actor by world_size/200 makes it cover the map exactly.
@@ -966,23 +1008,29 @@ def _write_unreal_import_script(
             npc_bp = build_npc_blueprints.ensure_npc_blueprints(force=True)
             npc_class = unreal.BlueprintEditorLibrary.generated_class(npc_bp)
 
-            npc_actor = editor_actor_sub.spawn_actor_from_class(
-                npc_class,
-                unreal.Vector(NPC_SPAWN["x"], NPC_SPAWN["y"], NPC_SPAWN["z"]),
-                # Keywords, not positional: unreal.Rotator is (roll, pitch, yaw).
-                unreal.Rotator(pitch=0.0, yaw=NPC_SPAWN["yaw"], roll=0.0),
-            )
-            npc_actor.set_actor_label(f"{{LEVEL_NAME}}_NPC_Wanderer")
+            # One actor per spawn point, labelled _NPC_Wanderer_<n>.  The
+            # labels are what verify_<Level>.py matches on, and they are
+            # 1-based to line up with the generator's own console output.
+            for i, spawn in enumerate(NPC_SPAWNS, start=1):
+                npc_actor = editor_actor_sub.spawn_actor_from_class(
+                    npc_class,
+                    unreal.Vector(spawn["x"], spawn["y"], spawn["z"]),
+                    # Keywords, not positional: unreal.Rotator is (roll, pitch, yaw).
+                    unreal.Rotator(pitch=0.0, yaw=spawn["yaw"], roll=0.0),
+                )
+                npc_actor.set_actor_label(f"{{LEVEL_NAME}}_NPC_Wanderer_{{i}}")
+                unreal.log_warning(
+                    f"[GEN]    NPC {{i}} at ({{spawn['x']:.0f}}, {{spawn['y']:.0f}}, "
+                    f"{{spawn['z']:.0f}})")
             unreal.log_warning(
-                f"[GEN]    NPC at ({{NPC_SPAWN['x']:.0f}}, {{NPC_SPAWN['y']:.0f}}, "
-                f"{{NPC_SPAWN['z']:.0f}}); navmesh is built by the navigation "
-                f"system at game start (no nav data saved in the level)")
+                "[GEN]    navmesh is built by the navigation system at game "
+                "start (no nav data saved in the level)")
             unreal.log_warning(
                 f"[GEN]    Nav volume: +/-{{NAV_BOUNDS['half_xy_cm']:.0f}} cm XY, "
                 f"Z span {{NAV_BOUNDS['half_z_cm'] * 2.0:.0f}} cm "
                 f"centred {{NAV_BOUNDS['center_z_cm']:.0f}}")
         else:
-            unreal.log_warning("[GEN] 7. NPC skipped (none placed).")
+            unreal.log_warning("[GEN] 7. NPCs skipped (none placed).")
 
         # ── 8. Save ─────────────────────────────────────────────────────────
         # Strip nav data as the very last action: the navigation system
@@ -1015,22 +1063,25 @@ def _write_unreal_verify_script(
     grid_size: int,
     placed_trees,
     placed_grass,
-    placed_npc,
+    placed_npcs,
     nav_bounds,
     lighting: dict,
 ):
     """Generate an Unreal Python script that verifies the level after import."""
 
-    npc_json = json.dumps(
+    npc_json = json.dumps([
         {
-            "x": round(placed_npc.x, 2),
-            "y": round(placed_npc.y, 2),
-            "z": round(placed_npc.spawn_z, 2),
-            "yaw": round(placed_npc.yaw_deg, 2),
-            "distance_cm": round(placed_npc.distance_to_player_cm, 2),
-        } if placed_npc else None
-    )
-    npc_walk_speed = NPC_WALK_SPEED_CMS
+            "x": round(npc.x, 2),
+            "y": round(npc.y, 2),
+            "z": round(npc.spawn_z, 2),
+            "yaw": round(npc.yaw_deg, 2),
+            "distance_cm": round(npc.distance_to_player_cm, 2),
+        } for npc in (placed_npcs or [])
+    ])
+    npc_run_speed = NPC_RUN_SPEED_CMS
+    npc_melee_range = NPC_MELEE_RANGE_CM
+    npc_melee_damage = NPC_MELEE_DAMAGE
+    npc_melee_interval = NPC_MELEE_INTERVAL_S
     nav_agent_radius = NAV_AGENT_RADIUS_CM
     nav_bounds_json = json.dumps(
         {k: round(v, 2) for k, v in nav_bounds.items()} if nav_bounds else None)
@@ -1074,8 +1125,11 @@ def _write_unreal_verify_script(
         EXPECTED_GRASS_COUNT = {grass_count}
         EXPECTED_GRASS_SPEC_COUNTS = {json.dumps(grass_spec_counts)}
         EXPECTED_GRASS_HEIGHTS = {json.dumps(grass_expected_heights)}
-        EXPECTED_NPC = json.loads(r"""{npc_json}""")
-        EXPECTED_NPC_WALK_SPEED = {npc_walk_speed}
+        EXPECTED_NPCS = json.loads(r"""{npc_json}""")
+        EXPECTED_NPC_RUN_SPEED = {npc_run_speed}
+        EXPECTED_MELEE_RANGE = {npc_melee_range}
+        EXPECTED_MELEE_DAMAGE = {npc_melee_damage}
+        EXPECTED_MELEE_INTERVAL = {npc_melee_interval}
         EXPECTED_NAV_AGENT_RADIUS = {nav_agent_radius}
         EXPECTED_NAV_BOUNDS = json.loads(r"""{nav_bounds_json}""")
         LIGHTING = json.loads(r"""{lighting_json}""")
@@ -1309,19 +1363,20 @@ def _write_unreal_verify_script(
                   total_grass_instances == EXPECTED_GRASS_COUNT,
                   f"(expected {{EXPECTED_GRASS_COUNT}}, got {{total_grass_instances}})")
 
-        # ── 6. Navigation + NPC ──────────────────────────────────────────────
-        if EXPECTED_NPC:
-            npc_actor = None
+        # ── 6. Navigation + NPCs ─────────────────────────────────────────────
+        if EXPECTED_NPCS:
+            npc_actors = []
             nav_bounds = None
             nav_mesh = None
             for a in actors:
                 lbl = a.get_actor_label()
-                if lbl == f"{{LEVEL_NAME}}_NPC_Wanderer":
-                    npc_actor = a
+                if lbl.startswith(f"{{LEVEL_NAME}}_NPC_Wanderer"):
+                    npc_actors.append(a)
                 elif lbl == f"{{LEVEL_NAME}}_NavBounds":
                     nav_bounds = a
                 elif lbl == f"{{LEVEL_NAME}}_NavMesh":
                     nav_mesh = a
+            npc_actors.sort(key=lambda a: a.get_actor_label())
 
             # -- The Blueprint assets --
             for path in ("/Game/Forest/NPC/BP_ForestWanderer",
@@ -1342,9 +1397,9 @@ def _write_unreal_verify_script(
                       unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
                 mv = cdo.get_editor_property("character_movement")
                 speed = mv.get_editor_property("max_walk_speed")
-                check("NPC Walks Slowly",
-                      close(speed, EXPECTED_NPC_WALK_SPEED, 0.5),
-                      f"(expected {{EXPECTED_NPC_WALK_SPEED}} cm/s, got {{speed}})")
+                check("NPC Runs At The Player",
+                      close(speed, EXPECTED_NPC_RUN_SPEED, 0.5),
+                      f"(expected {{EXPECTED_NPC_RUN_SPEED}} cm/s, got {{speed}})")
                 check("NPC Orients To Movement",
                       mv.get_editor_property("orient_rotation_to_movement") is True)
                 mesh_comp = cdo.get_editor_property("mesh")
@@ -1357,22 +1412,60 @@ def _write_unreal_verify_script(
                 check("NPC Has Anim Class",
                       mesh_comp.get_editor_property("anim_class") is not None)
 
-            # -- The placed actor --
-            check("NPC Actor Exists", npc_actor is not None)
-            if npc_actor:
-                loc = npc_actor.get_actor_location()
-                check("NPC Spawn Location",
-                      close(loc.x, EXPECTED_NPC["x"], 1.0)
-                      and close(loc.y, EXPECTED_NPC["y"], 1.0)
-                      and close(loc.z, EXPECTED_NPC["z"], 1.0),
-                      f"(expected {{EXPECTED_NPC['x']:.0f}},{{EXPECTED_NPC['y']:.0f}},"
-                      f"{{EXPECTED_NPC['z']:.0f}} got {{loc.x:.0f}},{{loc.y:.0f}},{{loc.z:.0f}})")
+            # -- The melee attack, read off the controller's own graph --
+            # Pin literals rather than behaviour: a headless editor cannot run
+            # the chase, but a swing that costs 0 damage or fires at a range of
+            # 0 is exactly what an unset pin compiles to (see the set_pin_value
+            # gotcha in CLAUDE.md), so the numbers are worth asserting.
+            ai_bp = editor_asset_sub.load_asset("/Game/Forest/NPC/BP_ForestWandererAI")
+            if ai_bp:
+                BEL = unreal.BlueprintEditorLibrary
+                ed = unreal.BlueprintGraphEditor.get_graph_editor_by_name(
+                    ai_bp, "EventGraph")
+                nodes = ed.list_all_nodes() if ed else []
+                literals = set()
+                for n in nodes:
+                    for pin in BEL.list_input_pins(n):
+                        val = str(unreal.BlueprintGraphPinLibrary.get_pin_value(pin))
+                        if val:
+                            literals.add(val)
+                names = {{str(v) for v in BEL.list_member_variable_names(ai_bp, False)}}
+                check("NPC Melee Cooldown Variable", "NextAttackTime" in names,
+                      f"(variables: {{sorted(names)}})")
+                for label, value in (("Range", EXPECTED_MELEE_RANGE),
+                                     ("Damage", EXPECTED_MELEE_DAMAGE),
+                                     ("Interval", EXPECTED_MELEE_INTERVAL)):
+                    check(f"NPC Melee {{label}} Literal",
+                          any(close(float(v), value, 0.01)
+                              for v in literals
+                              if v.replace(".", "", 1).replace("-", "", 1).isdigit()),
+                          f"(expected {{value}})")
+                check("NPC Melee Plays An Attack Montage",
+                      any("MM_Attack" in v for v in literals))
+                check("NPC Melee Uses The Upper-Body Slot",
+                      any(v == "DefaultSlot" for v in literals))
+                check("NPC Graph Compiles Clean",
+                      ed is not None and not ed.list_nodes_with_errors())
+
+            # -- The placed actors --
+            check("NPC Count",
+                  len(npc_actors) == len(EXPECTED_NPCS),
+                  f"(expected {{len(EXPECTED_NPCS)}}, got {{len(npc_actors)}})")
+            for i, (actor, want) in enumerate(zip(npc_actors, EXPECTED_NPCS),
+                                              start=1):
+                loc = actor.get_actor_location()
+                check(f"NPC {{i}} Spawn Location",
+                      close(loc.x, want["x"], 1.0)
+                      and close(loc.y, want["y"], 1.0)
+                      and close(loc.z, want["z"], 1.0),
+                      f"(expected {{want['x']:.0f}},{{want['y']:.0f}},{{want['z']:.0f}} "
+                      f"got {{loc.x:.0f}},{{loc.y:.0f}},{{loc.z:.0f}})")
                 dist = (loc.x ** 2 + loc.y ** 2) ** 0.5
-                check("NPC Far From Player Start",
-                      close(dist, EXPECTED_NPC["distance_cm"], 2.0),
-                      f"({{dist / 100.0:.1f}} m from spawn)")
-                check("NPC Is A Character",
-                      isinstance(npc_actor, unreal.Character))
+                check(f"NPC {{i}} In The Spawn Band",
+                      close(dist, want["distance_cm"], 2.0),
+                      f"({{dist / 100.0:.1f}} m from the player start)")
+                check(f"NPC {{i}} Is A Character",
+                      isinstance(actor, unreal.Character))
 
             # -- Navigation rig --
             check("Nav Bounds Volume Exists", nav_bounds is not None)
@@ -1395,15 +1488,18 @@ def _write_unreal_verify_script(
                 check("Nav Bounds Vertical Span Sane",
                       extent.z * 2.0 <= {nav_max_span},
                       f"(span {{extent.z * 2.0:.0f}} cm, limit {nav_max_span:.0f})")
-                # The NPC must stand inside the volume or it has no navmesh.
-                if npc_actor:
-                    loc = npc_actor.get_actor_location()
+                # Every NPC must stand inside the volume or it has no navmesh.
+                outside = []
+                for i, actor in enumerate(npc_actors, start=1):
+                    loc = actor.get_actor_location()
                     feet_z = loc.z - {capsule_half}
-                    inside = (abs(loc.x) <= want_xy and abs(loc.y) <= want_xy
-                              and abs(feet_z - origin.z) <= want_z)
-                    check("NPC Inside Nav Bounds", inside,
-                          f"(feet z {{feet_z:.0f}} vs volume "
-                          f"{{origin.z - want_z:.0f}}..{{origin.z + want_z:.0f}})")
+                    if not (abs(loc.x) <= want_xy and abs(loc.y) <= want_xy
+                            and abs(feet_z - origin.z) <= want_z):
+                        outside.append(f"NPC {{i}} at ({{loc.x:.0f}},{{loc.y:.0f}},"
+                                       f"feet {{feet_z:.0f}})")
+                check("NPCs Inside Nav Bounds", not outside,
+                      f"(volume {{origin.z - want_z:.0f}}..{{origin.z + want_z:.0f}}"
+                      f"{{'; outside: ' + ', '.join(outside) if outside else ''}})")
             # NOTE: whether stale nav data was SAVED cannot be asserted from
             # here -- opening the level makes the navigation system create a
             # RecastNavMesh in memory, so one is always present in an editor

@@ -134,39 +134,45 @@
       ]
     },
     {
-      "name": "NPC Placed",
+      "name": "NPC Count",
       "passed": true,
-      "message": "spawned at (-1422, 5114) after 1 attempt(s)",
+      "message": "5 wanderer(s) placed",
+      "details": []
+    },
+    {
+      "name": "NPC Spawn Band",
+      "passed": true,
+      "message": "75.0-77.5 m from the player start, band 75.0-79.6 m (clamped from 75-100 m by the navigable radius)",
+      "details": []
+    },
+    {
+      "name": "NPC Separation",
+      "passed": true,
+      "message": "closest pair (NPC 3, NPC 5) 12.2 m apart (minimum 6.0 m)",
       "details": []
     },
     {
       "name": "NPC Within Bounds",
       "passed": true,
-      "message": "(-1422, 5114) inside +/-8000 cm",
-      "details": []
-    },
-    {
-      "name": "NPC Walk Distance",
-      "passed": true,
-      "message": "53.1 m from the player (minimum 44.0 m)",
+      "message": "all 5 inside +/-8000 cm",
       "details": []
     },
     {
       "name": "NPC Clear Of Trees",
       "passed": true,
-      "message": "nearest trunk 639 cm away (minimum 220 cm)",
+      "message": "tightest spawn has 343 cm to the nearest trunk (minimum 220 cm)",
       "details": []
     },
     {
       "name": "NPC Grounded",
       "passed": true,
-      "message": "capsule centre 88.0 cm above terrain Z 213.0",
+      "message": "all 5 capsule centres 88 cm above the exact mesh Z",
       "details": []
     },
     {
       "name": "NPC Route Is Obstructed",
       "passed": true,
-      "message": "2 tree(s) straddle the direct line \u2014 pathfinding must detour",
+      "message": "all 5 routes cross at least one trunk \u2014 pathfinding must detour",
       "details": []
     },
     {
@@ -178,7 +184,7 @@
     {
       "name": "NPC Inside Nav Bounds",
       "passed": true,
-      "message": "feet at z 213 inside -385..1094, 5114 cm from centre (limit 8500)",
+      "message": "all 5 stand inside +/-8500 cm XY, feet within -385..1094",
       "details": []
     }
   ]

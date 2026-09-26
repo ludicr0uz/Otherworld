@@ -45,12 +45,19 @@ points it at the crosshair is the character: the body follows the camera's yaw
 (face_the_camera) and the ready pose puts the arms down the sights, so the
 barrel tracks the crosshair while staying in the fist.
 
-The grip itself is one fixed rotation, and the thing worth knowing is which axis
-it targets: the Mannequin's HandGrip_R carries the weapon's forward on its **+Y**
-axis, not its +X. See _grip_rotation() for the measurements. Aiming the barrel
-down +X instead -- which is the obvious reading of a socket named "grip" -- puts
-it 90 degrees across the player's body, and no amount of solving for a better
-rotation fixes a wrong axis.
+Two things have to be right for that to hold, and each one looked like the
+other's bug:
+
+  * HandGrip_R carries the weapon's forward on its **+Y** axis, not its +X.
+    _grip_rotation() has the measurements; aiming down +X puts the barrel 90
+    degrees across the player's body.
+  * The layered blend has to run in **mesh-space rotation** mode, or the ready
+    pose's arms inherit the locomotion hips and lose their own pelvis yaw --
+    worth a constant 21 degrees to the left. See patch_anim_blueprint().
+
+Neither is visible in a static check of the grip: both rounds of solving it
+produced self-consistent numbers and a gun pointing sideways. What settled it
+was PrintString on Tick and reading yaws out of a -game run.
 
 THE AIM POSE (the part with a real constraint behind it)
 --------------------------------------------------------
@@ -123,8 +130,21 @@ version would use the identical aim resolve and fire a velocity along
 """
 
 import os
+import sys
 
 import unreal
+
+# The NPC tuning lives in the pure-Python placement module (no `unreal` import),
+# so the level generator and its offline checks read exactly the numbers the
+# editor builds with. The respawn band below is the same one initial placement
+# uses -- a replacement wanderer has to obey "75-100 m away" too, or the rule
+# holds only until the first kill.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from forest_generator.npc_placement import (                      # noqa: E402
+    NPC_SPAWN_MIN_DISTANCE_CM,
+    NPC_SPAWN_MAX_DISTANCE_CM,
+    NPC_RESPAWN_NAV_SNAP_CM,
+)
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 
@@ -181,10 +201,19 @@ DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
 # tell you a shot happened and that it connected, but not that it missed high.
 TRACE_DEBUG_SECONDS = 1.5
 
-# NPC respawn: a new wanderer appears within this radius of where the dead one
-# *started*, not where it died, so the forest does not slowly drain toward
-# wherever the player does their shooting. The replacement is immediate.
-RESPAWN_RADIUS = 4000.0
+# NPC respawn: a replacement wanderer appears in the same 75-100 m band the
+# level generator spawns the pack in -- but measured from wherever the PLAYER is
+# standing at that moment, not from a fixed point. Anchoring it to the dead
+# NPC's own spawn point (what this used to do) made the rule decay: the player
+# walks 300 m, kills something, and its replacement appears 300 m behind them,
+# or worse, right on top of them when they have walked toward the spawn.
+#
+# The band's far edge can fall outside the navigable island, so the random point
+# is snapped back onto the navmesh with a generous radius; a respawn that lands
+# 70 m out because the navmesh ended is fine, one that lands off-mesh and cannot
+# move is not.
+RESPAWN_BAND = (NPC_SPAWN_MIN_DISTANCE_CM, NPC_SPAWN_MAX_DISTANCE_CM)
+RESPAWN_NAV_SNAP = NPC_RESPAWN_NAV_SNAP_CM
 
 GRIP_SOCKET = "HandGrip_R"
 
@@ -534,10 +563,6 @@ def _pure_rotation(rotator):
     return unreal.Transform(location=unreal.Vector(0.0, 0.0, 0.0),
                             rotation=rotator,
                             scale=unreal.Vector(1.0, 1.0, 1.0))
-
-
-# The socket axis a weapon's forward lives on. See _grip_rotation().
-WEAPON_AXIS_IN_SOCKET = unreal.Vector(0.0, 1.0, 0.0)
 
 
 def _grip_socket():
@@ -989,6 +1014,7 @@ def build_weapon(spec, item_bp):
 
 FN_GET_OWNER = "/Script/Engine.ActorComponent.GetOwner"
 FN_GET_PC = "/Script/Engine.GameplayStatics.GetPlayerController"
+FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 FN_GET_CAM = "/Script/Engine.GameplayStatics.GetPlayerCameraManager"
 FN_CAM_LOC = "/Script/Engine.PlayerCameraManager.GetCameraLocation"
@@ -1045,6 +1071,8 @@ FN_LESS_FF = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
 FN_GREATER_FF = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
 FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
+FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
+FN_MAKE_ROT = "/Script/Engine.KismetMathLibrary.MakeRotator"
 
 NODE_TICK = "AddEvent|EventTick"
 NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
@@ -1211,10 +1239,12 @@ def build_health_component(rebuild=True):
                          player simply sits at 0 rather than vanishing.
         RespawnClass     what to spawn in the dead actor's place. Set to
                          BP_ForestWanderer on the NPC, left empty on the player.
-        SpawnOrigin      captured on BeginPlay; the replacement appears within
-                         RESPAWN_RADIUS of where this one *started*, not where
-                         it died, so the forest does not slowly drain toward
-                         wherever the player does their shooting.
+
+    Where the replacement appears is the RESPAWN_BAND: a random bearing and a
+    random distance in the same 75-100 m annulus the level generator uses,
+    measured from the player's current location and then snapped onto the
+    navmesh. So killing one wanderer keeps the population at five and keeps
+    every one of them at a distance the player can see coming.
 
     Because the replacement carries the same component with the same defaults,
     one death begets one respawn indefinitely with nothing tracking it.
@@ -1233,17 +1263,17 @@ def build_health_component(rebuild=True):
         _declare(ed, name, _float_type())
     for name in ("Dead", "DespawnOnDeath"):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    _declare(ed, "SpawnOrigin", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "RespawnClass",
              BEL.get_class_reference_type(unreal.Actor.static_class()))
 
-    # --- BeginPlay: remember where this actor started ------------------------
-    owner_b = _at(_node(ed, FN_GET_OWNER), 260, -740)
-    loc_b = _at(_node(ed, FN_ACTOR_LOC), 500, -740)
-    _connect(_pin(owner_b, "ReturnValue", is_input=False), _pin(loc_b, "self"))
-    set_origin = _at(ed.add_set_member_variable_node("SpawnOrigin"), 760, -900)
-    _connect(_pin(loc_b, "ReturnValue", is_input=False), _pin(set_origin, "SpawnOrigin"))
-    _connect(BEL.find_then_pin(begin), _pin(set_origin, "execute"))
+    # SpawnOrigin used to hold where this actor started, back when a replacement
+    # appeared near the dead one's own spawn point. It has to be removed
+    # explicitly: this builder updates blueprints in place, so a variable it
+    # simply stops declaring stays on the asset forever.
+    ed.remove_member_variable("SpawnOrigin")
+
+    # BeginPlay is left empty on purpose: the respawn point is computed from the
+    # player at the moment of death, so there is nothing to capture at start.
 
     # --- Tick: has it died this frame? ---------------------------------------
     health = _at(ed.add_get_member_variable_node("Health"), 240, 240)
@@ -1279,16 +1309,45 @@ def build_health_component(rebuild=True):
     _connect(_pin(can_respawn, "ReturnValue", is_input=False), _pin(respawns, "Condition"))
     _connect(BEL.find_then_pin(should), _pin(respawns, "execute"))
 
-    origin_get = _at(ed.add_get_member_variable_node("SpawnOrigin"), 2120, 300)
-    where = _at(_node(ed, FN_RANDOM_NAV), 2360, 300)
-    _connect(_pin(origin_get, "SpawnOrigin", is_input=False), _pin(where, "Origin"))
-    _set(where, "Radius", RESPAWN_RADIUS)
+    # Somewhere in the band around the player: random bearing, random distance.
+    hero = _at(_node(ed, FN_GET_PLAYER_PAWN), 1660, 560)
+    _set(hero, "PlayerIndex", 0)
+    hero_loc = _at(_node(ed, FN_ACTOR_LOC), 1900, 560)
+    _connect(_pin(hero, "ReturnValue", is_input=False), _pin(hero_loc, "self"))
 
-    xform = _at(_node(ed, FN_MAKE_TRANSFORM), 2620, 300)
+    bearing = _at(_node(ed, FN_RANDOM_FLOAT), 1660, 720)
+    _set(bearing, "Min", 0.0)
+    _set(bearing, "Max", 360.0)
+    facing = _at(_node(ed, FN_MAKE_ROT), 1900, 720)
+    _connect(_pin(bearing, "ReturnValue", is_input=False), _pin(facing, "Yaw"))
+    _set(facing, "Pitch", 0.0)
+    _set(facing, "Roll", 0.0)
+    heading = _at(_node(ed, FN_FORWARD), 2120, 720)
+    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(heading, "InRot"))
+
+    reach = _at(_node(ed, FN_RANDOM_FLOAT), 1900, 880)
+    _set(reach, "Min", RESPAWN_BAND[0])
+    _set(reach, "Max", RESPAWN_BAND[1])
+    # Multiply_VectorFloat is a wildcard operator whose B pin defaults to a
+    # *vector*, so a float literal on it silently does nothing -- but a
+    # connected float is fine, and that is what this is.
+    offset = _at(_node(ed, FN_MUL_VF), 2360, 720)
+    _connect(_pin(heading, "ReturnValue", is_input=False), _pin(offset, "A"))
+    _connect(_pin(reach, "ReturnValue", is_input=False), _pin(offset, "B"))
+
+    target = _at(_node(ed, FN_ADD_VV), 2360, 560)
+    _connect(_pin(hero_loc, "ReturnValue", is_input=False), _pin(target, "A"))
+    _connect(_pin(offset, "ReturnValue", is_input=False), _pin(target, "B"))
+
+    where = _at(_node(ed, FN_RANDOM_NAV), 2620, 560)
+    _connect(_pin(target, "ReturnValue", is_input=False), _pin(where, "Origin"))
+    _set(where, "Radius", RESPAWN_NAV_SNAP)
+
+    xform = _at(_node(ed, FN_MAKE_TRANSFORM), 2880, 300)
     _connect(_pin(where, "RandomLocation", is_input=False), _pin(xform, "Location"))
-    _connect(_vec(ed, 1.0, 1.0, 1.0, 2360, 500), _pin(xform, "Scale"))
+    _connect(_vec(ed, 1.0, 1.0, 1.0, 2620, 400), _pin(xform, "Scale"))
 
-    spawn = _at(_palette(ed, NODE_SPAWN), 2880, 0)
+    spawn = _at(_palette(ed, NODE_SPAWN), 3140, 0)
     _connect(_pin(cls_get, "RespawnClass", is_input=False), _pin(spawn, "Class"))
     _connect(_pin(xform, "ReturnValue", is_input=False), _pin(spawn, "SpawnTransform"))
     # AlwaysSpawn: the random nav point is on the navmesh but may still overlap
@@ -1297,8 +1356,8 @@ def build_health_component(rebuild=True):
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(BEL.find_then_pin(respawns), _pin(spawn, "execute"))
 
-    owner_t = _at(_node(ed, FN_GET_OWNER), 2880, 380)
-    destroy = _at(_node(ed, FN_DESTROY), 3140, 0)
+    owner_t = _at(_node(ed, FN_GET_OWNER), 3140, 380)
+    destroy = _at(_node(ed, FN_DESTROY), 3400, 0)
     _connect(_pin(owner_t, "ReturnValue", is_input=False), _pin(destroy, "self"))
     # Both the respawned and the no-respawn-class paths end in the same destroy;
     # an exec *input* takes more than one link, so no Sequence node is needed.
@@ -1307,13 +1366,15 @@ def build_health_component(rebuild=True):
 
     ed.add_comment_to_nodes(
         f"At 0 HP: mark Dead once, then (if DespawnOnDeath) spawn a replacement "
-        f"on a random navmesh point within {RESPAWN_RADIUS / 100:.0f} m of where "
-        "this actor spawned and destroy this one. The replacement carries the "
-        "same component, so the cycle sustains itself with nothing tracking it. "
-        "The player's copy has DespawnOnDeath false and no RespawnClass.",
+        f"{RESPAWN_BAND[0] / 100:.0f}-{RESPAWN_BAND[1] / 100:.0f} m from the "
+        f"player on a random bearing, snapped to the navmesh, and destroy this "
+        "one. The replacement carries the same component, so the cycle sustains "
+        "itself with nothing tracking it -- the pack stays five strong and every "
+        "member still has to cross the forest. The player's copy has "
+        "DespawnOnDeath false and no RespawnClass, so none of this runs on them.",
         [health, dying, at_zero, dead_get, already, mark, despawn_get, should,
-         cls_get, can_respawn, respawns, origin_get, where, xform, spawn,
-         owner_t, destroy])
+         cls_get, can_respawn, respawns, hero, hero_loc, bearing, facing,
+         heading, reach, offset, target, where, xform, spawn, owner_t, destroy])
 
     _post_physics_tick(bp)
     if not BEL.compile_blueprint(bp):
@@ -1476,13 +1537,6 @@ def _author_resolve_aim(ed, held, exec_in, x0, y0):
     aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0 + 2500, y0 + 460))
     aim_out = _pin(aim_get, "AimPoint", is_input=False)
 
-    # The weapon is *not* rotated here. It was, briefly, and it was wrong: a
-    # gun turned to face the aim point every frame swivels out of the hand that
-    # is holding it and spins a full turn as the camera comes round. A held
-    # weapon is rigidly attached, full stop -- what aims it is the character.
-    # install_on_character() makes the body face the camera's yaw, and the ready
-    # pose points the arms down the sights, so the barrel follows the crosshair
-    # without ever leaving the fist.
     muzzle = _muzzle_location(ed, held, x0 + 2500, y0 + 1000)
 
     clear = keep(_at(_node(ed, FN_TRACE), x0 + 3260, y0))

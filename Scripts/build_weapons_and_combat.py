@@ -536,6 +536,7 @@ def _pure_rotation(rotator):
                             scale=unreal.Vector(1.0, 1.0, 1.0))
 
 
+# The socket axis a weapon's forward lives on. See _grip_rotation().
 WEAPON_AXIS_IN_SOCKET = unreal.Vector(0.0, 1.0, 0.0)
 
 
@@ -555,12 +556,14 @@ def _grip_socket():
     raise RuntimeError(f"{CHARACTER_BP_PATH} has no SkeletalMeshComponent")
 
 
-def socket_pose_axes(aim_pose_path):
-    """HandGrip_R's three axes, in the actor's space, during a given pose.
+def socket_in_mesh(aim_pose_path):
+    """(mesh yaw, HandGrip_R's rotation in mesh space) during a given pose.
 
     Sampled from the animation, not from a live mesh: a headless editor world
-    only ever shows the *reference* pose, and the reference pose is not the one
-    a weapon is held in.
+    only ever shows the *reference* pose, and that is not the pose a weapon is
+    held in. With the layered blend in mesh-space rotation mode this sample is
+    what the game actually uses -- the blended bones keep the ready pose's own
+    component-space orientation rather than inheriting the locomotion hips.
     """
     mesh_yaw, socket = _grip_socket()
     anim = _assets().load_asset(aim_pose_path)
@@ -572,51 +575,66 @@ def socket_pose_axes(aim_pose_path):
     # to be in -- and the mesh's own yaw is what carries that into the actor.
     bone = unreal.AnimPoseExtensions.get_bone_pose(
         pose, socket.get_editor_property("bone_name"), unreal.AnimPoseSpaces.WORLD)
-    in_mesh = unreal.MathLibrary.compose_transforms(
+    return mesh_yaw, unreal.MathLibrary.compose_transforms(
         _pure_rotation(socket.get_editor_property("relative_rotation")),
         bone).rotation.rotator()
+
+
+def socket_pose_axes(aim_pose_path):
+    """HandGrip_R's three axes, in the actor's space, during a given pose."""
+    mesh_yaw, in_mesh = socket_in_mesh(aim_pose_path)
     return {name: _rotate_vector(_rot(yaw=mesh_yaw), _rotate_vector(in_mesh, vector))
             for name, vector in (("X", unreal.Vector(1.0, 0.0, 0.0)),
                                  ("Y", unreal.Vector(0.0, 1.0, 0.0)),
                                  ("Z", unreal.Vector(0.0, 0.0, 1.0)))}
 
 
-def _grip_rotation():
-    """The fixed rotation that seats a weapon in the hand pointing down the barrel.
+def _grip_rotation(aim_pose_path):
+    """The fixed rotation that seats a weapon in the hand aiming straight ahead.
 
-    The Mannequin's HandGrip_R socket carries the weapon's forward on its **+Y**
-    axis, not its +X. That is not a guess -- it is what the poses say, measured
-    in the actor's space:
+    Two things had to be understood before this could be one line of maths.
 
-        MM_Idle (arms down)   socket +Y = ( 0.07,  0.07, -0.99)  straight down
+    First, the axis. The Mannequin's HandGrip_R carries the weapon's forward on
+    its **+Y**, not its +X. Measured in the actor's space:
+
+        MM_Idle (arms down)   socket +Y = ( 0.07,  0.07, -0.99)  at the floor
         MF_Rifle_Idle_ADS     socket +Y = ( 0.97,  0.14,  0.21)  down the sights
         MF_Pistol_Idle_ADS    socket +Y = ( 0.99,  0.06,  0.14)  down the sights
 
     A hand at the side points its weapon axis at the floor and a hand in a ready
-    pose points it where the player is looking. +X does neither: in the rifle
-    pose it reads 0.94 to the player's *left*, which is exactly where the barrel
-    kept ending up. Weapons here are modelled along their own +X, so the grip is
-    the rotation taking +X onto the socket's +Y with the weapon left upright --
-    a plain 90 degree yaw in the socket's own frame.
+    pose points it where the player is looking; +X does neither -- in the rifle
+    pose it reads 0.94 to the player's *left*.
 
-    One rotation for every weapon, because it describes the *hand*, which does
-    not care what it is holding.
+    Second, the pose to solve against. It is this sampled one only because the
+    layered blend runs in mesh-space rotation mode; in local space the arms
+    inherit the locomotion hips and land somewhere else entirely.
+
+    So: rotate the weapon's own +X onto whatever socket-space direction *is* the
+    player's forward in this pose, keeping the weapon upright. Solving it this
+    way rather than as a fixed 90 degree yaw also takes out the few degrees the
+    ready poses are authored off-centre -- the rifle pose aims about 8 degrees
+    right of the body -- and gives each weapon its own value for free, because
+    the rifle hand and the pistol hand are not held at the same angle.
     """
+    mesh_yaw, socket = socket_in_mesh(aim_pose_path)
+    into_socket = unreal.MathLibrary.invert_transform(
+        _pure_rotation(socket)).rotation.rotator()
+    # The player's forward and up, as the socket sees them.
+    forward_in_mesh = _rotate_vector(_rot(yaw=-mesh_yaw), unreal.Vector(1.0, 0.0, 0.0))
     grip = unreal.MathLibrary.make_rot_from_xz(
-        WEAPON_AXIS_IN_SOCKET, unreal.Vector(0.0, 0.0, 1.0))
+        _rotate_vector(into_socket, forward_in_mesh),
+        _rotate_vector(into_socket, unreal.Vector(0.0, 0.0, 1.0)))
 
-    # The convention, checked against the assets that rely on it: in a ready
-    # pose the hand's weapon axis has to point roughly where the player faces.
-    for aim in (AIM_RIFLE, AIM_PISTOL):
-        forward = socket_pose_axes(aim)["Y"]
-        if forward.x < 0.9:
-            raise RuntimeError(
-                f"{aim.rsplit('/', 1)[-1]}: the hand's weapon axis points "
-                f"{forward.to_tuple()}, not down the sights — the +Y convention "
-                "does not hold for this pose, and the grip would aim the barrel "
-                "somewhere else entirely")
-    _log(f"grip rotation: pitch {grip.pitch:.1f}, yaw {grip.yaw:.1f}, "
-         f"roll {grip.roll:.1f} — weapon +X onto the socket's +Y")
+    barrel = _rotate_vector(
+        _rot(yaw=mesh_yaw),
+        _rotate_vector(unreal.MathLibrary.compose_transforms(
+            _pure_rotation(grip), _pure_rotation(socket)).rotation.rotator(),
+            unreal.Vector(1.0, 0.0, 0.0)))
+    if barrel.x < 0.999:
+        raise RuntimeError(f"{aim_pose_path}: the barrel would point "
+                           f"{barrel.to_tuple()}, not straight ahead")
+    _log(f"{aim_pose_path.rsplit('/', 1)[-1]}: grip pitch {grip.pitch:.1f}, "
+         f"yaw {grip.yaw:.1f}, roll {grip.roll:.1f}")
     return grip
 
 
@@ -669,24 +687,21 @@ PISTOL_MUZZLE = (30.0, 0.0, 1.5)
 def _weapon_specs():
     """Everything that differs between the two weapons, in one table.
 
-    Both weapons share a grip rotation, and that is not an oversight: it is the
-    resting orientation of the *hand*, which does not depend on what is in it.
-    What actually aims each weapon is Tick, which turns whatever is held to face
-    the aim point every frame. GripLocation stays at the socket for both --
-    HandGrip_R is placed in the fist already, and an invented offset is one more
-    number nobody can later explain.
+    Each grip is solved against that weapon's own ready pose, so the two differ
+    because the poses differ -- not because a fudge factor was added to one of
+    them. GripLocation stays at the socket for both: HandGrip_R sits in the fist
+    already, and an invented offset is one more number nobody can later explain.
     """
-    grip = _grip_rotation()
     return (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
              display="Shotgun", damage=9.0, pellets=8, spread=5.0, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", aim=AIM_RIFLE,
-             grip_loc=(0.0, 0.0, 0.0), grip_rot=grip,
+             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.85, 0.45, 0.10)),
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
              display="Pistol", damage=26.0, pellets=1, spread=1.0, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", aim=AIM_PISTOL,
-             grip_loc=(0.0, 0.0, 0.0), grip_rot=grip,
+             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_PISTOL),
              colour=(0.35, 0.65, 0.95)),
     )
 
@@ -767,6 +782,29 @@ def import_sounds():
 
 # ─── The AnimGraph patch ─────────────────────────────────────────────────────
 
+def _configure_blend(blend):
+    """Branch filter, weight and blend space on a LayeredBoneBlend node.
+
+    Everything here lives on the inner FAnimNode struct rather than on the graph
+    node, and the struct that comes back from a read is a *copy* -- so it has to
+    be read, changed, and written back wholesale.
+    """
+    bone = unreal.BranchFilter()
+    bone.set_editor_property("bone_name", UPPER_BODY_ROOT)
+    bone.set_editor_property("blend_depth", UPPER_BODY_BLEND_DEPTH)
+    layer = unreal.InputBlendPose()
+    layer.set_editor_property("branch_filters", [bone])
+    inner = blend.get_editor_property("node")
+    inner.set_editor_property("layer_setup", [layer])
+    inner.set_editor_property("blend_weights", [1.0])
+    inner.set_editor_property("mesh_space_rotation_blend", True)
+    blend.set_editor_property("node", inner)
+    back = blend.get_editor_property("node")
+    if not back.get_editor_property("mesh_space_rotation_blend"):
+        raise RuntimeError("the blend stayed in local space — the aim pose would "
+                           "inherit the locomotion hips and aim off to one side")
+
+
 def patch_anim_blueprint():
     """Make DefaultSlot upper-body-only in ABP_Unarmed.
 
@@ -785,9 +823,18 @@ def patch_anim_blueprint():
     with a spine_01 branch filter. Legs keep walking; arms and chest take the
     ready pose.
 
-    Re-running is safe: an existing LayeredBoneBlend means the patch is already
-    in, and the function returns without touching anything. The check is by node
-    class rather than by a flag, so a hand-reverted graph is re-patched.
+    The blend is set to **mesh space rotation blending**, and that is the
+    difference between a gun that aims where you look and one that does not.
+    In the default (local space) mode the aim pose's arms are hung off whatever
+    the locomotion pose's hips are doing, so the ready pose loses its own pelvis
+    yaw -- measured at runtime, that put the barrel a constant 21 degrees to the
+    player's left (body yaw 44.6, gun yaw 23.3, every frame). In mesh space the
+    blended bones keep the ready pose's own component-space orientation, so the
+    arms aim where they were authored to aim no matter which way the hips are
+    turned.
+
+    Re-running is safe, and re-running after an edit to *this* function is too:
+    an existing blend is left wired as it is but its settings are re-applied.
     """
     bp = _assets().load_asset(ABP_PATH)
     if not bp:
@@ -799,8 +846,13 @@ def patch_anim_blueprint():
     def by_class(name):
         return [n for n in ed.list_all_nodes() if n.get_class().get_name() == name]
 
-    if by_class("AnimGraphNode_LayeredBoneBlend"):
-        _log("ABP_Unarmed already has the upper-body blend — leaving it alone")
+    existing = by_class("AnimGraphNode_LayeredBoneBlend")
+    if existing:
+        _configure_blend(existing[0])
+        if not BEL.compile_blueprint(bp):
+            raise RuntimeError("ABP_Unarmed failed to compile")
+        _assets().save_loaded_asset(bp)
+        _log("ABP_Unarmed already has the upper-body blend — settings refreshed")
         return bp
 
     slots = by_class("AnimGraphNode_Slot")
@@ -826,17 +878,7 @@ def patch_anim_blueprint():
     _connect(_pin(slot, "Pose", is_input=False), _pin(blend, "BlendPoses_0"))
     _connect(_pin(blend, "Pose", is_input=False), _pin(rig, "Source"))
 
-    bone = unreal.BranchFilter()
-    bone.set_editor_property("bone_name", UPPER_BODY_ROOT)
-    bone.set_editor_property("blend_depth", UPPER_BODY_BLEND_DEPTH)
-    layer = unreal.InputBlendPose()
-    layer.set_editor_property("branch_filters", [bone])
-    # layer_setup lives on the inner FAnimNode struct, not on the graph node, and
-    # the struct read back is a copy -- so it has to be written back wholesale.
-    inner = blend.get_editor_property("node")
-    inner.set_editor_property("layer_setup", [layer])
-    inner.set_editor_property("blend_weights", [1.0])
-    blend.set_editor_property("node", inner)
+    _configure_blend(blend)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("ABP_Unarmed failed to compile after the blend patch")

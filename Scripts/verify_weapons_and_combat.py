@@ -98,6 +98,12 @@ if blends:
     blend_src = [PIN.get_owning_node(q).get_class().get_name()
                  for q in PIN.list_connected_pins(
                      BEL.find_input_pin(blends[0], "BlendPoses_0"))]
+    # The regression that put the barrel 21 degrees left: in local space the
+    # aim pose's arms hang off the locomotion hips and lose their own pelvis
+    # yaw. Runtime, before the fix: body yaw 44.6, gun yaw 23.3, every frame.
+    check("the blend runs in mesh space, so the aim pose keeps its own direction",
+          blends[0].get_editor_property("node").get_editor_property(
+              "mesh_space_rotation_blend"))
     check("DefaultSlot feeds the blend pose, so it cannot override the legs",
           blend_src == ["AnimGraphNode_Slot"], str(blend_src))
     base_src = [PIN.get_owning_node(q).get_class().get_name()
@@ -172,15 +178,17 @@ if shot and pist:
           a.get_editor_property("AimPose") != b.get_editor_property("AimPose"))
     check("the two weapons use different fire sounds",
           a.get_editor_property("FireSound") != b.get_editor_property("FireSound"))
-    def barrel_vs_hand(bp):
-        """Attach the weapon for real, and see whether it lies along the hand's axis.
+    def engine_agrees(bp):
+        """Attach the weapon for real and check the engine composes it as modelled.
 
-        Pose-independent on purpose. A headless editor world only ever shows the
-        reference pose, in which the arms hang down and the barrel should point
-        at the floor -- so "does the barrel point forward?" is the wrong
-        question to ask here and would fail for a perfectly seated weapon. What
-        must hold in *every* pose is that the barrel lies along HandGrip_R's +Y,
-        which is the axis the Mannequin puts a weapon's forward on.
+        Everything else here is arithmetic on a saved rotation; this is the one
+        place that asks the engine whether SetActorRelativeRotation on a
+        socket-attached actor really does compose in the *socket's* frame. If it
+        did not, every grip solved against a socket transform would be wrong.
+
+        Pose-independent: it compares the engine's answer against the same
+        composition done by hand, in whatever pose the editor world happens to
+        show, rather than expecting any particular direction.
         """
         actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
         eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
@@ -194,33 +202,48 @@ if shot and pist:
             mesh = char.get_component_by_class(unreal.SkeletalMeshComponent)
             snap = unreal.AttachmentRule.SNAP_TO_TARGET
             gun.attach_to_component(mesh, G.GRIP_SOCKET, snap, snap, snap, False)
-            gun.set_actor_relative_rotation(
-                cdo(bp).get_editor_property("GripRotation"), False, False)
+            grip = cdo(bp).get_editor_property("GripRotation")
+            gun.set_actor_relative_rotation(grip, False, False)
             hand = mesh.get_socket_transform(
                 G.GRIP_SOCKET, unreal.RelativeTransformSpace.RTS_WORLD).rotation.rotator()
-            weapon_axis = unreal.MathLibrary.greater_greater_vector_rotator(
-                G.WEAPON_AXIS_IN_SOCKET, hand)
-            barrel = gun.get_actor_forward_vector()
-            return (barrel.x * weapon_axis.x + barrel.y * weapon_axis.y
-                    + barrel.z * weapon_axis.z)
+            modelled = unreal.MathLibrary.greater_greater_vector_rotator(
+                unreal.Vector(1.0, 0.0, 0.0),
+                unreal.MathLibrary.compose_transforms(
+                    G._pure_rotation(grip),
+                    G._pure_rotation(hand)).rotation.rotator())
+            actual = gun.get_actor_forward_vector()
+            return (actual.x * modelled.x + actual.y * modelled.y
+                    + actual.z * modelled.z)
         finally:
             actors.destroy_actor(gun)
             actors.destroy_actor(char)
 
     for bp, name in ((shot, "Shotgun"), (pist, "Pistol")):
-        along = barrel_vs_hand(bp)
-        check(f"{name}: the barrel lies along the hand's weapon axis",
-              along > 0.999, f"dot(barrel, HandGrip_R +Y) = {along:.4f}")
+        agreement = engine_agrees(bp)
+        check(f"{name}: the engine seats the grip in the socket's frame, as modelled",
+              agreement > 0.999, f"dot(engine, model) = {agreement:.4f}")
 
-    # And that axis has to be the aiming direction, or the weapon is seated
-    # perfectly in a hand that points somewhere useless.
+    # The thing the player actually sees: in the pose the weapon is held in, the
+    # barrel has to point where the character is facing. Computed from the
+    # *saved* GripRotation, so a grip that was solved wrongly fails here.
+    for bp, name, aim in ((shot, "Shotgun", G.AIM_RIFLE),
+                          (pist, "Pistol", G.AIM_PISTOL)):
+        mesh_yaw, socket = G.socket_in_mesh(aim)
+        barrel = G._rotate_vector(
+            G._rot(yaw=mesh_yaw),
+            G._rotate_vector(unreal.MathLibrary.compose_transforms(
+                G._pure_rotation(cdo(bp).get_editor_property("GripRotation")),
+                G._pure_rotation(socket)).rotation.rotator(),
+                unreal.Vector(1.0, 0.0, 0.0)))
+        check(f"{name}: in its ready pose the barrel points where the player faces",
+              barrel.x > 0.999, f"barrel = {barrel.to_tuple()}")
+
+    # And the axis that caused three rounds of this: not +X.
     for name, aim in (("rifle", G.AIM_RIFLE), ("pistol", G.AIM_PISTOL)):
         axes = G.socket_pose_axes(aim)
-        check(f"in the {name} ready pose the hand aims where the player faces",
-              axes["Y"].x > 0.9, f"hand's weapon axis = {axes['Y'].to_tuple()}")
-        check(f"in the {name} ready pose the hand's +X is NOT the aim direction",
-              abs(axes["X"].x) < 0.5,
-              f"+X = {axes['X'].to_tuple()} — this is the axis that pointed left")
+        check(f"in the {name} ready pose the hand's weapon axis is +Y, not +X",
+              axes["Y"].x > 0.9 and abs(axes["X"].x) < 0.5,
+              f"+Y = {axes['Y'].to_tuple()}, +X = {axes['X'].to_tuple()}")
 
     check("the two weapons show different colours in the inventory",
           a.get_editor_property("SlotColor").to_tuple()

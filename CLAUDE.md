@@ -104,7 +104,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**87 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**88 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
@@ -173,8 +173,10 @@ and would paint the screen solid.
 
 ### How a weapon is oriented in the hand
 
-**`HandGrip_R` carries the weapon's forward on its +Y axis, not its +X.** Everything else here
-follows from that, and getting it wrong cost three rounds. Measured in the actor's space:
+Two independent things had to be right, and each one looked like the other's bug.
+
+**1. `HandGrip_R` carries the weapon's forward on its +Y axis, not its +X.** Measured in the
+actor's space:
 
 | pose | socket +Y | socket +X |
 |---|---|---|
@@ -183,30 +185,39 @@ follows from that, and getting it wrong cost three rounds. Measured in the actor
 | `MF_Pistol_Idle_ADS` | (**0.99**, 0.06, 0.14) — down the sights | (0.06, **−1.00**, −0.01) |
 
 A hand at the side points its weapon axis at the floor; a hand in a ready pose points it where
-the player is looking. +X does neither — it reads ~0.94 to the player's **left**, which is
-exactly where the barrel kept ending up. Weapons are modelled along their own +X, so
-`GripRotation` is the rotation taking +X onto the socket's +Y with the weapon upright: a plain
-**90° yaw** in the socket's frame. One value for every weapon, because it describes the *hand*.
+the player is looking. +X does neither — it reads ~0.94 to the player's **left**.
+
+**2. The layered blend must run in mesh-space rotation mode**
+(`mesh_space_rotation_blend = True`). In the default local-space mode the aim pose's arms are
+hung off whatever the *locomotion* hips are doing, so the ready pose loses its own pelvis yaw
+(component yaw −35.0 in the ADS pose vs −92.0 in idle). Measured in a running game, that put the
+barrel a constant **21° to the player's left**: body yaw 44.6, gun yaw 23.3, every frame. In
+mesh space the blended bones keep the ready pose's own component-space orientation. After the
+fix, body −29.400 / gun −29.47, body −32.200 / gun −32.17 — under half a degree.
+
+`GripRotation` is then solved per weapon against that weapon's own sampled ready pose: rotate
+the weapon's +X onto whatever socket-space direction *is* the player's forward, keeping it
+upright. Solving it (rather than using a flat 90° yaw) also removes the few degrees each ready
+pose is authored off-centre.
 
 **The weapon is rigidly attached and never rotated on its own.** Driving its rotation from the
-aim point each frame was tried and reverted: the gun swivels out of the hand holding it and
-spins a full turn as the camera comes round. What aims it is the character —
-`face_the_camera()` sets `use_controller_rotation_yaw` and clears
-`orient_rotation_to_movement`, so the body follows the camera's yaw and the ready pose keeps the
-arms down the sights. That is the standard third-person-shooter arrangement, and it is what
-keeps the barrel on the crosshair while the player runs in any direction.
+aim point each frame was tried and reverted: the gun swivels out of the hand and spins a full
+turn as the camera comes round. What aims it is the character — `face_the_camera()` sets
+`use_controller_rotation_yaw` and clears `orient_rotation_to_movement`, so the body follows the
+camera's yaw and the ready pose keeps the arms down the sights. Verified at runtime: body yaw,
+control yaw and camera yaw are equal to the last decimal, every frame.
 
-Two honest limits: there is **no aim offset**, so the gun does not pitch up or down with the
-camera (the hybrid aim still puts the shot where the reticle is); and the legs still play the
-**unarmed forward gait**, so strafing reads as running forward while sliding sideways — a strafe
-set needs blend spaces, which cannot be authored from Python.
+Two honest limits: there is **no aim offset**, so the gun does not pitch with the camera (the
+hybrid aim still puts the shot on the reticle); and the legs play the **unarmed forward gait**,
+so strafing reads as running forward while sliding sideways — a strafe set needs blend spaces,
+which cannot be authored from Python.
 
-`verify_weapons_and_combat.py` checks this **end to end and pose-independently**: it spawns the
-character, attaches the weapon exactly as the game does, and asserts the barrel lies along the
-socket's +Y (`dot = 1.0000`). Asking "does the barrel point forward?" would be wrong — a
-headless editor world only ever shows the reference pose, where a correctly seated barrel points
-at the floor. It separately asserts, from the sampled ready poses, that +Y *is* the aim
-direction and that +X is not.
+**This took three wrong fixes, and the reason is worth remembering: static derivation kept
+agreeing with itself.** Each round produced a self-consistent grip, asserted it in both builder
+and verifier, and shipped a gun pointing sideways — because the error was downstream of
+everything being checked. What settled it was instrumenting `Tick` with `PrintString` and
+reading actual yaws out of a `-game` run. When two rounds of static reasoning disagree with
+what the screen shows, measure the running game.
 
 ### The HUD
 
@@ -230,7 +241,8 @@ centred and bottom-anchored at any window size.
 - Not verified headlessly, and worth a look in a play session: how the reticle reads while
   moving, how much the gun visibly detaches from the hand now that its rotation is driven, and
   how the blood splash looks. The last runtime `-game` pass predates the hybrid aim, the
-  reticle, the shoulder camera and the camera-facing body.
+  reticle and the shoulder camera. The weapon orientation *was* checked in a `-game` run
+  (gun yaw tracks body yaw to within 0.3°).
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.

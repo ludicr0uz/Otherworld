@@ -466,7 +466,67 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
 
 ---
 
-## 5. Conventions & pitfalls
+## 5. The run loop — damage, sprint, death
+
+The level generator above knows nothing about any of this; it is built by
+`Scripts/build_weapons_and_combat.py` and `Scripts/build_graphics_menu.py` onto assets that
+every generated level picks up through `BP_ThirdPersonGameMode`. CLAUDE.md carries the
+reasoning; this is the shape.
+
+**Three values on the GameMode, because Blueprints have no statics** and each has to outlive
+every actor that touches it — including the player's own components, which die with them:
+
+| variable | written by | read by |
+|---|---|---|
+| `NpcSpawnCount` | each wanderer's `BeginPlay` | the next wanderer, for its number |
+| `NpcKillCount` | the death path, *only* when `DamagedByPlayer` | the HUD corner and the death menu |
+| `PlayerDead` | the player's death path | the HUD, to draw the menu instead of the HUD |
+
+**Two stamps on the health component,** both written by the pellet that landed
+(`_author_impact`) and by nothing else:
+
+```
+LastDamageTime    GetTimeSeconds() at the hit;  the HUD shows a wanderer's bar for 5 s after it
+DamagedByPlayer   true;  the guard that separates a kill from the safety net's own deaths
+```
+
+`DamagedByPlayer` is the load-bearing one. The under-the-world net writes `Health = 0` and lets
+the ordinary death path run, so without the guard every wanderer the terrain lost would score.
+Measured both ways: five wanderers killed with the flag report `killed with 5`, the same five
+without it report `killed with 0`.
+
+**The death branch now has two arms.** `DespawnOnDeath` decides which:
+
+```
+Health <= 0, not already Dead
+   |
+   +-- DespawnOnDeath  --> [DamagedByPlayer? -> NpcKillCount += 1] --> respawn --> destroy
+   |
+   '-- otherwise (the player)
+          DisableMovement
+          -> MM_Death_Front_01 into FullBodySlot
+          -> Delay 2.2 s                       (the animation is ~1.9 s)
+          -> GameMode.PlayerDead = true
+          -> "[PLAYER-DEAD] killed with N"
+          -> SetGamePaused(true)
+```
+
+`FullBodySlot` is a **second** Slot node in `ABP_Unarmed`, inserted between the layered blend
+and the ControlRig. `DefaultSlot` sits *inside* the blend and is filtered to the upper body, so
+the aim pose can leave the legs walking — a death played into it folds the chest over legs that
+are still standing.
+
+**Sprint lives on `BP_WeaponComponent`,** with `Stamina` / `MaxStamina` / `Sprinting` /
+`BaseSpeed`, because that is the component that has to refuse to fire while the key is held and
+the one the HUD already casts to. `BaseSpeed` is read off the character at `BeginPlay` (600 in
+this project, measured at runtime) and never hardcoded.
+
+**The HUD's `DrawHUD` branches on `PlayerDead` first**, so the menu replaces the HUD rather
+than covering it, and it polls the restart key itself — Event Tick does not run in a paused
+world, which is the only state the menu exists in, while `DrawHUD` is called by the renderer
+every frame and `APlayerController` ticks through a pause.
+
+## 6. Conventions & pitfalls
 
 - **Template braces.** The generated scripts come from `textwrap.dedent(f'''…''')`, so every
   literal `{` `}` in emitted Python must be doubled. This is the single easiest way to break
@@ -495,7 +555,7 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
 
 ---
 
-## 6. Status (as of 2026-09-24)
+## 7. Status (as of 2026-09-26)
 
 - Git: branch `night-mode`, working tree clean, head `e5745e9 night mode initial`
   (adds `lighting.py`, the generator rewrite, the regenerated night scripts and a `.gitignore`).
@@ -503,6 +563,10 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
   grass clumps over 9 species, **five NPCs 75.0–77.5 m** from the player (every one of them
   with at least one tree blocking the direct line), **night** preset.
   Offline 28/28, in-editor 126/126, import log clean.
+- Combat and HUD: **145/145** (`verify_weapons_and_combat.py`) and **50/50**
+  (`verify_graphics_menu.py`). A 90 s `-game` run is clean — 0 runtime errors, 0 Accessed
+  None, 5 spawns, 0 falls — and ends with the pack killing the player, which is the death
+  path running end to end.
 - New assets from the NPC run: `/Game/Forest/NPC/BP_ForestWanderer`,
   `/Game/Forest/NPC/BP_ForestWandererAI`.
 - **Pre-existing bug, unfixed and unrelated to the NPC work:** `scatter_trees` performs no

@@ -97,8 +97,10 @@ def main():
         keys.add(BEL.find_input_pin(n, "Key").get_pin_value())
     # Bare key names: FKey exports as its name, so struct text would silently
     # import back as a key called "(".
-    expected_keys = set((G.MENU_KEY,) + G.PRESET_KEYS)
-    check("polls exactly the menu + preset keys", keys == expected_keys,
+    # The restart key is polled from ReceiveDrawHUD, not from Tick: Tick does
+    # not run while the game is paused, and the death menu only exists paused.
+    expected_keys = set((G.MENU_KEY, G.RESTART_KEY) + G.PRESET_KEYS)
+    check("polls exactly the menu, preset and restart keys", keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
 
     # --- each preset applies its own scalability level and cvars
@@ -140,18 +142,21 @@ def main():
     # --- drawing
     texts = by_pins("Text", "ScreenX")
     drawn = {BEL.find_input_pin(n, "Text").get_pin_value() for n in texts}
-    expected_text = {"GRAPHICS QUALITY", f"[{G.MENU_KEY}]   close", ">", "HP"}
+    expected_text = {"GRAPHICS QUALITY", f"[{G.MENU_KEY}]   close", ">", "HP",
+                     "STA", "YOU DIED", f"[{G.RESTART_KEY}]   try again"}
     expected_text |= {f"[{i + 1}]   {p[0]}" for i, p in enumerate(G.PRESETS)}
     # The health number has no literal text -- its Text pin is driven -- so it
     # contributes an empty string here.
     expected_text |= {""}
-    check("panel draws title, three rows, hint, caret and the HP label",
+    check("panel, HP, stamina and the death menu all draw their labels",
           drawn == expected_text, str(sorted(drawn ^ expected_text)))
     # One backs the quality panel, two are the player's HP track and fill, two
     # more are an NPC bar's track and fill, five are the empty inventory slots,
     # and the last two are a filled slot and the equipped slot's underline.
-    expected_rects = 1 + 2 + 2 + G.INVENTORY_SIZE + 2 + 5
-    check(f"{expected_rects} DrawRects: panel, HP, NPC bar, inventory, reticle",
+    # ...plus two for the stamina track and fill, and one for the death panel.
+    expected_rects = 1 + 2 + 2 + 2 + G.INVENTORY_SIZE + 2 + 5 + 1
+    check(f"{expected_rects} DrawRects: panel, HP, stamina, NPC bar, inventory, "
+          f"reticle, death panel",
           len(by_pins("RectColor")) == expected_rects,
           str(len(by_pins("RectColor"))))
 
@@ -186,8 +191,10 @@ def main():
           aim_reads == {"Get AimValid", "Get AimBlocked"}, str(sorted(aim_reads)))
     viewports = [n for n in nodes
                  if str(BEL.get_node_title(n)).replace("\n", " ") == "GetViewportSize"]
-    check("the reticle and the inventory strip both centre off the viewport size",
-          len(viewports) == 2, str(len(viewports)))
+    # Four now: the reticle and the inventory strip centre off it, the kill
+    # counter right-anchors off it, and the death panel centres off it.
+    check("everything positioned off the window edge reads the viewport size",
+          len(viewports) == 4, str(len(viewports)))
     check("a blocked shot colours the reticle differently",
           any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
           and "Get AimBlocked" in aim_reads)
@@ -198,8 +205,10 @@ def main():
              for n in lookups}
     # Four: the player's health, an NPC's health, the weapon component for the
     # inventory strip, and the weapon component again for the reticle.
+    # Five: the player's health, an NPC's health, and the weapon component
+    # three times -- inventory strip, reticle, and the stamina bar.
     check("HUD looks up health (player + NPC) and the weapon component",
-          len(lookups) == 4 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 5 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # A fill rect's width is computed from a health fraction; the track behind it
@@ -207,8 +216,8 @@ def main():
     rects = by_pins("RectColor")
     driven = [n for n in rects
               if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]
-    check("both HP fills are driven by Health, not by a constant",
-          len(driven) == 2, str(len(driven)))
+    check("the HP, NPC and stamina fills are all driven, not constants",
+          len(driven) == 3, str(len(driven)))
 
     # --- the new HUD layers
     npc_scans = [n for n in by_pins("ActorClass")
@@ -225,8 +234,10 @@ def main():
                    and BEL.find_input_pin(n, "Text").list_connected_pins()]
     # Three now: the player's HP number, each inventory slot's weapon name, and
     # each wanderer's spawn number.
-    check("HP number, slot names and NPC numbers are read from data",
-          len(driven_text) == 3, str(len(driven_text)))
+    # Five now: the HP number, each slot's weapon name, each wanderer's spawn
+    # number, the kill counter and the death menu's final score.
+    check("HP, slot names, NPC numbers, kills and the final score read from data",
+          len(driven_text) == 5, str(len(driven_text)))
     ids = [n for n in nodes
            if "NpcId" in {str(p_) for p_ in pin_names(n, False)}]
     check("each NPC bar carries the wanderer's spawn number",
@@ -236,6 +247,89 @@ def main():
     check("HP number is drawn from a driven Text pin",
           any(not BEL.find_input_pin(n, "Text").get_pin_value() and
               BEL.find_input_pin(n, "Text").list_connected_pins() for n in texts))
+
+    # --- the kill counter, the stamina bar and the death menu
+    titles = [str(BEL.get_node_title(n)).replace("\n", " ") for n in nodes]
+
+    check("the HUD reads the kill count off the GameMode",
+          any(t == f"Get {G.KILL_COUNT_VAR}" for t in titles),
+          str(sorted({t for t in titles if "Kill" in t})))
+    # Twice: once for the corner and once for the death menu's final score. The
+    # menu re-reads rather than being handed a copy, so the two can never
+    # disagree about the score.
+    check("the corner and the death menu read the same counter",
+          sum(1 for t in titles if t == f"Get {G.KILL_COUNT_VAR}") == 2,
+          str(sum(1 for t in titles if t == f"Get {G.KILL_COUNT_VAR}")))
+    kill_labels = [n for n in by_pins("A", "B")
+                   if BEL.find_input_pin(n, "A").get_pin_value() == "KILLS  "]
+    check("the counter is labelled KILLS", len(kill_labels) == 1,
+          str(len(kill_labels)))
+
+    # Right-anchored, not placed at a fixed x: the counter has to stay in the
+    # corner at any window size, like the inventory strip stays centred.
+    kill_texts = [n for n in texts
+                  if BEL.find_input_pin(n, "ScreenX").list_connected_pins()
+                  and float(BEL.find_input_pin(n, "ScreenY").get_pin_value() or 0)
+                  == G.KILL_TOP]
+    check("the kill counter is anchored to the right edge, not a fixed x",
+          len(kill_texts) == 1, str(len(kill_texts)))
+
+    # --- stamina
+    stamina_reads = {t for t in titles if t in ("Get Stamina", "Get MaxStamina",
+                                                "Get Sprinting")}
+    check("the stamina bar reads Stamina, MaxStamina and Sprinting",
+          stamina_reads == {"Get Stamina", "Get MaxStamina", "Get Sprinting"},
+          str(sorted(stamina_reads)))
+    st_rects = [n for n in by_pins("RectColor")
+                if float(BEL.find_input_pin(n, "ScreenY").get_pin_value() or -1)
+                == G.ST_BAR[1]]
+    check("the stamina bar has a track and a fill, under the HP bar",
+          len(st_rects) == 2 and G.ST_BAR[1] > G.HP_BAR[1],
+          f"{len(st_rects)} rects at y={G.ST_BAR[1]}")
+    # Two SelectColors now: the reticle's blocked state and the stamina fill.
+    check("the stamina fill changes colour while the key is held",
+          sum(1 for t in titles if t == "SelectColor") == 2,
+          str(sum(1 for t in titles if t == "SelectColor")))
+
+    # --- the NPC bars are hidden unless something just got hurt
+    check("a wanderer's bar reads when it was last damaged",
+          any(t == f"Get {G.LAST_DAMAGE_VAR}" for t in titles),
+          str(sorted({t for t in titles if "Damage" in t})))
+    windows = [n for n in nodes
+               if pin_names(n) == {"A", "B"}
+               and BEL.find_input_pin(n, "B").get_pin_value()
+               == str(G.NPC_BAR_SECONDS)]
+    check(f"the bar is shown for {G.NPC_BAR_SECONDS:.0f}s after a hit and "
+          f"hidden otherwise", len(windows) == 1, str(len(windows)))
+    check("...measured against the clock, not against a frame counter",
+          any(t == "GetTimeSeconds" for t in titles), str(len(titles)))
+
+    # --- the death menu
+    check("the HUD knows whether the player is dead",
+          any(t == f"Get {G.PLAYER_DEAD_VAR}" for t in titles))
+    # Twice: once to decide whether to draw the HUD at all, once inside the
+    # menu block. The first is what makes the menu *replace* the HUD -- a
+    # reticle and an inventory strip over a death screen read as a game still
+    # being played.
+    check("the death menu replaces the HUD rather than covering it",
+          sum(1 for t in titles if t == f"Get {G.PLAYER_DEAD_VAR}") == 2,
+          str(sum(1 for t in titles if t == f"Get {G.PLAYER_DEAD_VAR}")))
+    check("the menu offers a restart",
+          any(t.startswith("Open Level") for t in titles),
+          str(sorted({t for t in titles if "Level" in t})))
+    # ...of whatever level is loaded, so a generated map restarts as itself.
+    check("it restarts the current level, not a path written down here",
+          any("Current Level Name" in t or "GetCurrentLevelName" in t
+              for t in titles),
+          str(sorted({t for t in titles if "Level" in t})))
+    # And it unpauses first: a level opened while the world is paused comes up
+    # paused, with nothing left able to unpause it.
+    unpauses = by_pins("bPaused")
+    check("restarting unpauses before it reopens", len(unpauses) == 1
+          and BEL.find_input_pin(unpauses[0], "bPaused").get_pin_value()
+          in ("false", "False"),
+          str([BEL.find_input_pin(n, "bPaused").get_pin_value()
+               for n in unpauses]))
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

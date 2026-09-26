@@ -322,7 +322,7 @@ touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / H
 
 It also draws the player's HP bar (see "The shotgun and health").
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 35 checks. Run it after any
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 50 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
@@ -354,10 +354,11 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**103 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**145 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
-**Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
+**Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up ·
+**Shift** sprints · **R** restarts from the death menu.
 (1/2/3 and M belong to the graphics menu, so the weapon keys stay clear of them.)
 
 | asset | what it is |
@@ -365,9 +366,9 @@ It supersedes `build_shotgun_and_health.py`, which is kept only as history — d
 | `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, AimPose, SlotColor, DisplayName, Dropped). No geometry, no graph. |
 | `BP_Shotgun` | child: 7 primitives, 8 pellets × 9 dmg, 5° cone, 40 m, rifle ready pose |
 | `BP_Pistol` | child: 5 primitives, 1 shot × 26 dmg, 1° cone, 60 m, pistol ready pose, different grip angle |
-| `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/drop/pick up |
-| `BP_HealthComponent` | Health/MaxHealth + death, despawn and respawn |
-| `BP_BloodSplash` | 5 emissive spheres that swell over 0.45 s and self-destruct |
+| `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/drop/pick up, **sprint + stamina** |
+| `BP_HealthComponent` | Health/MaxHealth, the damage stamp, death — despawn and respawn for a wanderer, **the death sequence and the pause** for the player |
+| `BP_BloodSplash` | 10 emissive spheres thrown out along the hit normal, arcing down as they swell, over 0.7 s |
 | `Audio/A_ShotgunFire`, `A_PistolFire` | synthesised by `Scripts/make_weapon_sounds.py` (pure Python — the project ships no audio and `/Engine` has no usable gunshot) |
 
 **Weapons are Actors, not components.** The old shotgun was a component tree welded to the
@@ -469,11 +470,114 @@ everything being checked. What settled it was instrumenting `Tick` with `PrintSt
 reading actual yaws out of a `-game` run. When two rounds of static reasoning disagree with
 what the screen shows, measure the running game.
 
+### Sprint, and what it costs
+
+**Shift** runs at 900 cm/s while stamina lasts — 4 s from full, refilling at 12/s once it is
+let go. The pack runs at 600, so sprinting is the one way to open a gap, and the asymmetry
+between the drain and the refill is what stops it being the only way you ever move.
+
+It lives on `BP_WeaponComponent` rather than on the character for the reason every other key
+here does: `BP_ThirdPersonCharacter`'s graph is the Enhanced Input template, which the Python
+API cannot partially rebuild. It also belongs there — **the weapon is what has to refuse**:
+the fire gate is `pressed AND armed AND NOT Sprinting`.
+
+The whole block is authored **without a Branch**:
+
+```
+Sprinting     = ShiftDown AND Stamina > 0
+MaxWalkSpeed  = SelectFloat(SPRINT_SPEED_CMS, BaseSpeed,        Sprinting)
+Stamina      += SelectFloat(-drain,           +regen, Sprinting) * DeltaSeconds,  clamped
+```
+
+Two arms of an if would be the same two writes with different numbers in them, and the pair
+could drift; `SelectFloat` picks the number and one write applies it.
+
+`BaseSpeed` is **cached from the character at BeginPlay, never written down here**. Measured
+in a `-game` run it comes back as **600**, not the 500 a hardcoded "walk speed" would have
+guessed — so the literal would have silently retuned the player the first time they sprinted,
+and the symptom ("wrong speed, but only after sprinting once") would have pointed at the
+sprint code rather than at the copy.
+
+### Dying, and the menu
+
+At 0 HP the player's health component used to do nothing at all — `DespawnOnDeath` is false
+for them, and that arm of the death branch simply ended, so they sat at 0 while the pack kept
+swinging. It now runs:
+
+```
+DisableMovement -> MM_Death_Front_01 into FullBodySlot -> Delay 2.2s
+    -> GameMode.PlayerDead = true -> "[PLAYER-DEAD] killed with N" -> SetGamePaused(true)
+```
+
+Four things in that order, each for a reason:
+
+- **DisableMovement, not DisableInput.** The body has to stop where it fell, but the HUD polls
+  the restart key off the same PlayerController, and turning input off risks it.
+- **`FullBodySlot`, a second slot.** `DefaultSlot` is filtered to the upper body so the aim
+  pose leaves the legs walking (see the ABP patch), and a death played into it folds the chest
+  over legs that are still standing. The new slot sits **after** the layered blend, where it
+  overrides everything. Getting one made from Python has a trick to it — see the gotcha below.
+- **The delay comes before the pause.** `MM_Death_Front_01` runs about 1.9 s; pausing on top of
+  it freezes the player mid-stumble, which reads as a hang rather than as a death.
+- **The log line exists because the menu cannot be seen headlessly.** A paused game and a game
+  where the death path silently did nothing produce identical logs otherwise.
+
+The menu itself is drawn by the HUD off `GameMode.PlayerDead`: **YOU DIED**, the final kill
+count, and `[R] try again`, which unpauses and reopens the current level by name. Unpausing
+**before** the open is load-bearing — a level opened into a paused world comes up paused with
+nothing left able to unpause it. Reopening the level is also what resets the score, since the
+counter lives on the GameMode and `OpenLevel` builds a new one.
+
+**Polling the restart key from `DrawHUD`, not from Tick, is the whole reason the menu works.**
+Event Tick does not run in a paused world — which is exactly the state the menu exists in — but
+`DrawHUD` is called from the renderer every frame regardless, and `APlayerController` sets
+`bTickEvenWhenPaused`, so its `PlayerInput` is still updated and `WasInputKeyJustPressed` still
+answers.
+
+### Blood
+
+Ten emissive spheres in a cone, and the **actor** is animated rather than the spheres:
+
+```
+position = Origin + Forward * 130 cm/s * Age - Z * 260 * Age^2
+scale    = 0.55 + Jitter + 2.6 * sin(pi * Age / 0.7)
+```
+
+`_author_impact` spawns the splash rotated so its forward **is the surface normal it hit**
+(`MakeRotFromX`), so blood comes out of the wound rather than along a world axis, and a shot to
+the chest and one to the back throw it opposite ways. The parabola is what makes it read as
+blood instead of an expanding ball; the sine does grow-then-vanish in one pure expression, with
+no branch and no Timeline (whose curve asset cannot be authored from Python). `Jitter` is one
+`RandomFloatInRange` **stored in a variable** — pure, so a second read would be a second dice
+roll, and without it a shotgun's eight pellets into one torso read as a single big sphere.
+
+The cone layout is generated from a fixed seed at build time, which is how the verifier can
+recompute it and compare component by component.
+
 ### The HUD
 
-`build_graphics_menu.py` draws, every frame: the player's HP bar (top-left), a projected health
-bar over every wanderer with its spawn number beside it, a 5-slot inventory strip centred along the bottom, and the centre
-reticle. The **FPS readout in the top-right is not drawn here**: BeginPlay runs
+`build_graphics_menu.py` draws, every frame: the player's HP bar and the stamina bar under it
+(top-left), the **kill counter** (top-right), a projected health bar over every wanderer with
+its spawn number beside it, a 5-slot inventory strip centred along the bottom, and the centre
+reticle. Or, if the player is dead, **only the death menu** — the first thing `DrawHUD` does is
+read `GameMode.PlayerDead` and branch, because a reticle and an inventory strip over a death
+screen read as a game still being played.
+
+**A wanderer's bar is hidden by default** and shown only for **5 s after something hurt it**.
+Five bars over five chasing NPCs is most of the screen, and the bar is only ever *read* just
+after a shot lands; the rest of the time it is clutter over the forest the player is aiming
+into. The pellet stamps `LastDamageTime` on the health component it hit (`_author_impact`), the
+HUD compares it against `GetTimeSeconds`, and the default of −1000 is what keeps every bar off
+the screen at level start.
+
+**The kill counter is on the GameMode** (`NpcKillCount`), not on anything that dies — it has to
+outlive both the wanderers that earn it and the player's own components. It is incremented in
+the death path only when `DamagedByPlayer` is set, which is the guard that matters: the
+under-the-world safety net writes `Health = 0` down that same path, and nobody shot that.
+Measured both ways in a `-game` run — five wanderers killed with the flag set report
+`killed with 5`, the same five killed without it report `killed with 0`.
+
+The **FPS readout in the top-right is not drawn here**: BeginPlay runs
 `stat fps` (`FPS_COMMAND`), and the engine's own stat display puts itself in that corner. There
 is no position to tune and no canvas call to collide with the HP bar — and the number is the
 engine's smoothed frame time, not a `1/DeltaSeconds` recomputed on the HUD. Like the preset
@@ -488,16 +592,24 @@ centred and bottom-anchored at any window size.
 
 - The player carries a **shotgun and a pistol**, switchable with Q, droppable with G and
   recoverable with E; both weapons fire with sound, blood and muzzle-origin spread, and the
-  character holds the matching ready pose while moving. Every wanderer has a floating health
-  bar, dies at 0 HP and respawns 75-100 m from the player. Built by
-  `build_weapons_and_combat.py` — **103/103** in-engine checks, **35/35** HUD checks.
+  character holds the matching ready pose while moving. **Shift sprints** at 900 cm/s against a
+  4-second stamina bar and blocks firing while held. Every wanderer dies at 0 HP, respawns
+  75-100 m from the player, and shows its health bar only for 5 s after being hit; kills are
+  counted in the top-right. At 0 HP the **player** drops, the game pauses and a menu offers the
+  final score and **R to try again**. Built by
+  `build_weapons_and_combat.py` — **145/145** in-engine checks, **50/50** HUD checks.
   Aiming is the camera/muzzle hybrid described above, with a reticle on the real impact point,
   and the held weapon is turned to face that point every frame.
-- Not verified headlessly, and worth a look in a play session: how the reticle reads while
-  moving, how much the gun visibly detaches from the hand now that its rotation is driven, and
-  how the blood splash looks. The last runtime `-game` pass predates the hybrid aim, the
-  reticle and the shoulder camera. The weapon orientation *was* checked in a `-game` run
-  (gun yaw tracks body yaw to within 0.3°).
+- Proven in `-game` runs, not just in the graph: the player's death pauses the world (the
+  health components' last Tick is at world t = 2.200635, exactly the delay, and there is **not
+  one log line of any kind** afterwards); the kill counter counts shot wanderers and refuses
+  fallen ones (5 vs 0 over identical deaths); `BaseSpeed` caches as **600**. A clean 90 s run
+  is 0 runtime errors, 0 Accessed None, 5 spawns, 0 falls, and the pack killing the player.
+- **Still unverified headlessly, and worth a play session:** everything that needs a key held
+  or an eye on the screen — how sprint feels against a pack that runs at 600, whether the
+  stamina bar reads clearly under the HP bar, whether the new blood spray looks like blood, and
+  how the death menu sits on the screen. Also still open from before: how the reticle reads
+  while moving, and how much the gun visibly detaches from the hand.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
@@ -592,6 +704,17 @@ centred and bottom-anchored at any window size.
   wraps, use `get_node_title` — `"GetCameraLocation"`, `"vector * vector"`, `"MakeVector"`,
   `"Get AimPoint"`. Pin sets alone cannot separate two nodes that both take `self` and return a
   value, which is how `verify_weapons_and_combat.py` distinguishes the four traces.
+- **A Slot node's palette entry is named after an already-registered slot**
+  (`Animation|Montage|Slot'DefaultSlot'`), so a slot that does not exist yet cannot be asked
+  for by name — every spelling of `Animation|Montage|Slot` returns None. Spawn the entry for an
+  existing slot, rename the node's inner `node.slot_name`, and compile:
+  `UAnimGraphNode_Slot::BakeDataDuringCompilation` calls `Skeleton->RegisterSlotNode` on
+  whatever name it finds, so one compile does the registering. That is how `FullBodySlot` gets
+  made. Runtime matching is by name only — `PlaySlotAnimationAsDynamicMontage` builds a
+  transient montage whose track carries the slot name, and the node picks it up.
+- **`BlueprintEditorLibrary.set_node_pos` takes an `IntPoint`**, while
+  `create_node_from_name` takes a `Vector2D`. Passing the wrong one is a nativize TypeError,
+  not a silent failure — but the two APIs sitting next to each other invites it.
 - **AnimGraphs *are* authorable from Python; blend spaces are not.**
   `BlueprintGraphEditor.get_graph_editor_by_name(anim_bp, "AnimGraph")` returns a working
   editor: anim nodes can be created from the palette (`Animation|Blends|Layeredblendperbone`),
@@ -665,6 +788,21 @@ centred and bottom-anchored at any window size.
   `EventCounts`, which `UPlayerInput::ProcessInputStack` swaps out once per frame during the
   controller's `TG_PrePhysics` tick. A component defaults to `TG_PrePhysics` too, with no
   defined order against the controller. `AHUD` gets away with polling because it ticks later.
+- **World time in a `-nullrhi -game` run advances by a fixed small step per frame, not by
+  wall clock.** Measured: ~0.6 ms of world time per frame whatever the frame rate. So slowing
+  the frame rate puts the *game* into slow motion — a PrintString on a component Tick, firing
+  from all six health components, dropped a run to ~14 fps and therefore to about **a
+  twentieth of real time**. The pack then never crossed the 75 m to kill anyone and a 2.2 s
+  delay never elapsed, in runs that looked simply "quiet". This is the probe changing the thing
+  it is measuring, and it cost three inconclusive runs before it was spotted. Gate a per-frame
+  probe down to one actor, and cross-check world time (`GetTimeSeconds`) against the log's wall
+  clock before reading anything into "it did not happen".
+- **A test that waits on the game is a test of the game.** The death pause was finally measured
+  by killing the player at BeginPlay instead of waiting for the pack, and the kill counter by
+  killing the original five at BeginPlay — the counter's own log line is then the whole
+  assertion, and the same probe run twice (with and without `DamagedByPlayer`) reads 5 and 0.
+  Isolating the thing under test from everything upstream of it turned a 3-minute inconclusive
+  run into a 40-second decisive one.
 - **When instrumenting a graph with PrintString, splice — do not just connect.** An exec
   *output* holds one link, so `then.try_create_connection(probe)` silently drops whatever
   came next and severs the rest of the chain. Capture the existing destinations first and

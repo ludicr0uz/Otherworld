@@ -82,6 +82,7 @@ def components(bp):
 abp = load(G.ABP_PATH)
 anim = graph(abp, "AnimGraph")
 anim_nodes = anim.list_all_nodes() if anim else []
+rigs = [n for n in anim_nodes if n.get_class().get_name() == "AnimGraphNode_ControlRig"]
 blends = [n for n in anim_nodes
           if n.get_class().get_name() == "AnimGraphNode_LayeredBoneBlend"]
 check("ABP_Unarmed has exactly one layered bone blend", len(blends) == 1,
@@ -113,9 +114,26 @@ if blends:
           str(base_src))
 
 slots = [n for n in anim_nodes if n.get_class().get_name() == "AnimGraphNode_Slot"]
-if slots:
-    name = str(slots[0].get_editor_property("node").get_editor_property("slot_name"))
-    check(f"the slot is still named {G.AIM_SLOT}", name == G.AIM_SLOT, name)
+slot_names = {str(n.get_editor_property("node").get_editor_property("slot_name")): n
+              for n in slots}
+check(f"both slots exist: {G.AIM_SLOT} (aim) and {G.FULL_BODY_SLOT} (death)",
+      {G.AIM_SLOT, G.FULL_BODY_SLOT} <= set(slot_names), str(sorted(slot_names)))
+check("exactly two slots -- a rerun must not stack a third on the chain",
+      len(slots) == 2, str(len(slots)))
+# The death slot has to sit AFTER the layered blend, or it is filtered to the
+# upper body like the aim slot and the player dies from the chest up.
+if G.FULL_BODY_SLOT in slot_names and rigs:
+    feeding = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(rigs[0], "Source"))]
+    check(f"{G.FULL_BODY_SLOT} feeds the ControlRig, downstream of the blend",
+          feeding == [slot_names[G.FULL_BODY_SLOT]],
+          str([n.get_class().get_name() for n in feeding]))
+    behind = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(slot_names[G.FULL_BODY_SLOT], "Source"))]
+    check(f"the layered blend feeds {G.FULL_BODY_SLOT}",
+          [n.get_class().get_name() for n in behind]
+          == ["AnimGraphNode_LayeredBoneBlend"],
+          str([n.get_class().get_name() for n in behind]))
 
 # ─── The two weapons ─────────────────────────────────────────────────────────
 
@@ -286,7 +304,8 @@ for var, want in (("ShotgunClass", "BP_Shotgun_C"),
           got.get_name() if got else "None")
 
 keys = sorted(pin_value(n, "Key") for n in by_pins(wg, "self", "Key"))
-want_keys = sorted([G.FIRE_KEY, G.SWITCH_KEY, G.DROP_KEY, G.PICKUP_KEY])
+want_keys = sorted([G.FIRE_KEY, G.SWITCH_KEY, G.DROP_KEY, G.PICKUP_KEY,
+                    G.SPRINT_KEY])
 check(f"polls exactly {want_keys}", keys == want_keys, str(keys))
 
 plays = by_pins(wg, "Asset", "SlotNodeName")
@@ -391,15 +410,15 @@ check("the health component carries the wanderer's number",
       G.NPC_ID_VAR in {str(v) for v in BEL.list_member_variable_names(
           health_bp, False)})
 logs = [n for n in hg if "InString" in in_pins(n)]
-# Exactly two, both deliberate: the spawn log and the safety net's. Any more is
-# a probe left behind -- and this graph is the one that gets instrumented
-# whenever respawns misbehave.
-check("exactly two log lines in the health graph (spawn + fell)",
-      len(logs) == 2, f"{len(logs)} PrintString(s)")
+# Exactly three, all deliberate: the spawn log, the safety net's, and the
+# player's death. Any more is a probe left behind -- and this graph is the one
+# that gets instrumented whenever respawns misbehave.
+check("exactly three log lines in the health graph (spawn + fell + death)",
+      len(logs) == 3, f"{len(logs)} PrintString(s)")
 # PrintWarning has no screen toggle (it is log-only by construction); the spawn
 # log is a PrintString and must be told not to paint over the HUD.
 screened = [n for n in logs if "bPrintToScreen" in in_pins(n)]
-check("the spawn log is written to the log, not painted over the HUD",
+check("the spawn and death logs are written to the log, not over the HUD",
       all(pin_value(n, "bPrintToScreen") in ("false", "False") for n in screened)
       and bool(screened))
 # Blueprint cannot log at Error severity at all, so the fall is reported at the
@@ -490,6 +509,185 @@ if npc:
     check("a spawned wanderer still gets an AI controller",
           n.get_editor_property("auto_possess_ai")
           == unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
+
+# ─── Blood: the spray, not just the spheres ──────────────────────────────────
+# The layout is generated from a fixed seed, so it can be recomputed here and
+# compared component by component -- a blob nudged by hand in the editor, or a
+# seed changed without meaning to, shows up as a mismatch rather than as "the
+# blood looks a bit different from how I remember it".
+
+blood_bp = load(G.BLOOD_BP_PATH)
+want_blobs = G._blood_blobs()
+check(f"the splash has {len(want_blobs)} blobs",
+      len({c for c in components(blood_bp) if c.startswith("Blob")})
+      == len(want_blobs),
+      str(sorted({c for c in components(blood_bp) if c.startswith("Blob")})))
+placed = True
+for i, (bx, by, bz, bscale) in enumerate(want_blobs):
+    t = component_template(blood_bp, f"Blob{i}")
+    if t is None:
+        placed = False
+        break
+    loc = t.get_editor_property("relative_location")
+    size = t.get_editor_property("relative_scale3d")
+    placed &= (abs(loc.x - bx) < 1e-3 and abs(loc.y - by) < 1e-3
+               and abs(loc.z - bz) < 1e-3 and abs(size.x - bscale) < 1e-4)
+check("every blob sits where the seeded layout puts it", placed)
+# The cone has to lean along +X, which is what the impact rotates onto the hit
+# normal. A symmetric ball of spheres would spray nowhere in particular.
+check("the cone reaches out along +X, the hit normal",
+      max(b[0] for b in want_blobs) > 5.0
+      and max(abs(b[1]) for b in want_blobs) < max(b[0] for b in want_blobs),
+      f"reach {max(b[0] for b in want_blobs):.1f} cm")
+
+bg = graph(blood_bp).list_all_nodes()
+check("the burst swells and fades on a sine, not a straight ramp",
+      any("Sin" in str(BEL.get_node_title(n)) for n in bg))
+check("the spray arcs: the age is squared for the gravity term",
+      any({PIN.get_owning_node(q)
+           for side in ("A", "B")
+           for q in PIN.list_connected_pins(BEL.find_input_pin(n, side))
+           } and len({PIN.get_owning_node(q)
+                      for side in ("A", "B")
+                      for q in PIN.list_connected_pins(
+                          BEL.find_input_pin(n, side))}) == 1
+          for n in by_pins(bg, "A", "B")),
+      "expected Age * Age feeding the fall")
+check("the splash moves rather than only scaling",
+      bool(by_pins(bg, "NewLocation")))
+check("the wound position is stored, so the arc cannot drift frame to frame",
+      "Origin" in {str(v) for v in BEL.list_member_variable_names(blood_bp, False)})
+check("the splash still cleans itself up", bool(by_pins(bg, "InLifespan")))
+
+# And the half that makes the direction mean anything: the impact has to turn
+# the splash onto the surface normal it hit.
+check("impacts point the splash down the surface normal",
+      bool(titled(wg, "MakeRotFromX")),
+      "without it the spray leaves along the world's +X, not out of the wound")
+
+# ─── The damage stamp ────────────────────────────────────────────────────────
+
+health_vars = {str(v) for v in BEL.list_member_variable_names(health_bp, False)}
+check("the health component records when it was last hurt",
+      G.LAST_DAMAGE_VAR in health_vars, str(sorted(health_vars)))
+check("nothing starts the game looking recently hurt",
+      abs(float(h.get_editor_property(G.LAST_DAMAGE_VAR)) - G.NEVER_DAMAGED) < 1e-6,
+      str(h.get_editor_property(G.LAST_DAMAGE_VAR)))
+check("LastDamageTime is a float, not an int",
+      isinstance(h.get_editor_property(G.LAST_DAMAGE_VAR), float),
+      type(h.get_editor_property(G.LAST_DAMAGE_VAR)).__name__)
+check("a pellet stamps the time it landed",
+      bool(titled(wg, f"SET {G.LAST_DAMAGE_VAR}"))
+      or bool(titled(wg, f"Set {G.LAST_DAMAGE_VAR}")),
+      "the HUD floats a wanderer's bar off this")
+check("a pellet also records who did it",
+      bool(titled(wg, f"SET {G.DAMAGED_BY_PLAYER_VAR}"))
+      or bool(titled(wg, f"Set {G.DAMAGED_BY_PLAYER_VAR}")))
+check("nothing is born blamed on the player",
+      h.get_editor_property(G.DAMAGED_BY_PLAYER_VAR) is False)
+
+# ─── The kill counter ────────────────────────────────────────────────────────
+
+gm_vars = {str(v) for v in BEL.list_member_variable_names(gm, False)}
+check("the GameMode carries the kill counter", G.KILL_COUNT_VAR in gm_vars,
+      str(sorted(gm_vars)))
+check("the GameMode carries the player-death flag", G.PLAYER_DEAD_VAR in gm_vars)
+check("a death adds one to the kill counter",
+      bool(titled(hg, f"SET {G.KILL_COUNT_VAR}"))
+      or bool(titled(hg, f"Set {G.KILL_COUNT_VAR}")))
+# The guard that stops the safety net inflating the score: a wanderer that fell
+# through the world dies down this very same path, and nobody shot it.
+blamed = [n for n in hg if G.DAMAGED_BY_PLAYER_VAR in out_pins(n)]
+check("only a death the player caused is counted", len(blamed) == 1,
+      f"{len(blamed)} reads of {G.DAMAGED_BY_PLAYER_VAR} in the death path")
+if blamed:
+    driven = [PIN.get_owning_node(q) for q in
+              BEL.find_output_pin(blamed[0],
+                                  G.DAMAGED_BY_PLAYER_VAR).list_connected_pins()]
+    check("and a Branch is what guards on it, not an AND",
+          [n.get_class().get_name() for n in driven] == ["K2Node_IfThenElse"],
+          str([n.get_class().get_name() for n in driven]))
+
+# ─── The player's death ──────────────────────────────────────────────────────
+# Until now the DespawnOnDeath-false arm of the death path simply ended: the
+# player sat at 0 HP while the pack kept swinging.
+
+deaths = by_pins(hg, "Asset", "SlotNodeName")
+check("the player plays a death animation", len(deaths) == 1, str(len(deaths)))
+if deaths:
+    check(f"it plays into {G.FULL_BODY_SLOT}, so the legs go down too",
+          pin_value(deaths[0], "SlotNodeName") == G.FULL_BODY_SLOT,
+          pin_value(deaths[0], "SlotNodeName"))
+    check("it plays a death animation, not the attack montage",
+          "Death" in pin_value(deaths[0], "Asset"), pin_value(deaths[0], "Asset"))
+check("the body stops where it fell",
+      bool(titled(hg, "DisableMovement")),
+      "without it the corpse slides on under the last movement input")
+pauses = by_pins(hg, "bPaused")
+check("death pauses the game", len(pauses) == 1, str(len(pauses)))
+if pauses:
+    check("...paused, not unpaused",
+          pin_value(pauses[0], "bPaused") in ("true", "True"),
+          pin_value(pauses[0], "bPaused"))
+check("the pause waits for the animation to land",
+      any(abs(float(pin_value(n, "Duration") or 0) - G.DEATH_PAUSE_SECONDS) < 1e-3
+          for n in by_pins(hg, "Duration")),
+      f"expected a {G.DEATH_PAUSE_SECONDS}s Delay before the pause")
+check("the death flag is raised for the HUD to draw the menu from",
+      bool(titled(hg, f"SET {G.PLAYER_DEAD_VAR}"))
+      or bool(titled(hg, f"Set {G.PLAYER_DEAD_VAR}")))
+
+# ─── Sprint and stamina ──────────────────────────────────────────────────────
+
+for var, kind, want in (("Stamina", float, G.MAX_STAMINA),
+                        ("MaxStamina", float, G.MAX_STAMINA),
+                        ("Sprinting", bool, False)):
+    value = w.get_editor_property(var)
+    check(f"{var} starts at {want!r}",
+          isinstance(value, kind)
+          and (value == want if kind is bool else abs(value - want) < 1e-6),
+          f"{type(value).__name__} = {value}")
+check("BaseSpeed is a float, not an int",
+      isinstance(w.get_editor_property("BaseSpeed"), float),
+      type(w.get_editor_property("BaseSpeed")).__name__)
+sprint_polls = [n for n in wg
+                if in_pins(n) == {"self", "Key"}
+                and pin_value(n, "Key") == G.SPRINT_KEY]
+check(f"{G.SPRINT_KEY} is polled as held, not as a tap",
+      bool(sprint_polls)
+      and all("IsInputKeyDown" in str(BEL.get_node_title(n))
+              for n in sprint_polls),
+      str([str(BEL.get_node_title(n)) for n in sprint_polls]))
+walk_titles = {t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                           for n in wg) if "MaxWalkSpeed" in t}
+check("sprinting drives the character's own walk speed",
+      any(t.startswith("SET") or t.startswith("Set") for t in walk_titles),
+      str(sorted(walk_titles)))
+# Cached, never written down: a literal walk speed here would fight any later
+# change to the character's movement defaults, and only after the first sprint.
+check("the walking speed is cached off the character, not hardcoded",
+      any(t.startswith("Get") for t in walk_titles)
+      and any("BaseSpeed" in str(BEL.get_node_title(n)).replace("\n", " ")
+              for n in wg),
+      str(sorted(walk_titles)))
+selects = titled(wg, "SelectFloat")
+check("one SelectFloat picks the speed and one picks the drain",
+      len(selects) == 2, f"{len(selects)} SelectFloat node(s)")
+check("stamina is clamped, so it cannot run past its own bar",
+      any(pin_value(n, "Max") == str(G.MAX_STAMINA)
+          for n in by_pins(wg, "Value", "Min", "Max")),
+      f"expected a clamp at {G.MAX_STAMINA}")
+# The requirement the flag exists for: you cannot shoot while running.
+sprint_reads = [n for n in wg if "Sprinting" in out_pins(n)]
+check("the trigger reads Sprinting", bool(sprint_reads),
+      f"{len(sprint_reads)} reads")
+negated = [n for n in sprint_reads
+           if any("NOT" in str(BEL.get_node_title(PIN.get_owning_node(q))).upper()
+                  for q in BEL.find_output_pin(n, "Sprinting").list_connected_pins())]
+check("...through a NOT, so firing is refused while it is set", bool(negated),
+      str([str(BEL.get_node_title(PIN.get_owning_node(q)))
+           for n in sprint_reads
+           for q in BEL.find_output_pin(n, "Sprinting").list_connected_pins()]))
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 

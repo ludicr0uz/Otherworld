@@ -129,7 +129,9 @@ version would use the identical aim resolve and fire a velocity along
 (AimPoint - muzzle) instead of tracing it.
 """
 
+import math
 import os
+import random
 import sys
 
 import unreal
@@ -196,9 +198,42 @@ FIRE_KEY = "LeftMouseButton"
 SWITCH_KEY = "Q"
 DROP_KEY = "G"
 PICKUP_KEY = "E"
+SPRINT_KEY = "LeftShift"
 
 PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
 DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
+
+# --- sprint and stamina ------------------------------------------------------
+# Sprint is polled on the weapon component rather than bound as an input action
+# for the same reason every other key here is: BP_ThirdPersonCharacter's graph
+# is the Enhanced Input template, and adding an IA asset plus an IMC entry is
+# not authorable from Python. It lives on the *weapon* component specifically
+# because that is the thing that has to refuse to fire while it is held down.
+#
+# The walking speed is NOT a constant here: BeginPlay caches whatever the
+# character's MaxWalkSpeed already is into BaseSpeed and restores that. A
+# literal would silently fight any later change to the character's own default.
+SPRINT_SPEED_CMS = 900.0
+MAX_STAMINA = 100.0
+# 4 s of sprint from full, a little over 8 s to refill. Deliberately
+# asymmetric: sprint is the escape from a pack that runs at 600 cm/s, so it has
+# to be worth spending and it has to cost something to have spent.
+STAMINA_DRAIN_PER_S = 25.0
+STAMINA_REGEN_PER_S = 12.0
+
+# --- the player's death ------------------------------------------------------
+# A full-body death needs its own slot. DefaultSlot is filtered to the upper
+# body (see patch_anim_blueprint) so that the aim pose leaves the legs walking,
+# and a death played into it would fold the chest while the legs stood there.
+# The second slot sits *after* the layered blend, where it overrides everything.
+DEATH_ANIM = "/Game/Characters/Mannequins/Anims/Death/MM_Death_Front_01"
+DEATH_ANIM_OBJECT = f"{DEATH_ANIM}.{DEATH_ANIM.rsplit('/', 1)[-1]}"
+FULL_BODY_SLOT = "FullBodySlot"
+DEATH_BLEND_S = 0.1
+# How long the body is left falling before the game pauses and the menu opens.
+# MM_Death_Front_01 runs about 1.9 s; pausing on top of it freezes the player
+# mid-stumble, which reads as a hang rather than as a death.
+DEATH_PAUSE_SECONDS = 2.2
 # Pellet traces drawn in the world for this many seconds; 0 turns them off.
 # On, because they are the only way to see *where* a shot went -- sound and blood
 # tell you a shot happened and that it connected, but not that it missed high.
@@ -254,6 +289,20 @@ WORLD_FLOOR_Z = -1000.0
 # every wanderer.
 SPAWN_COUNT_VAR = "NpcSpawnCount"
 NPC_ID_VAR = "NpcId"
+# Two more numbers on the same GameMode, for the same reason: they have to
+# outlive every wanderer and every one of the player's own components.
+# NpcKillCount is what the HUD counts in the corner and what the death menu
+# quotes; PlayerDead is the one flag the menu is drawn from.
+KILL_COUNT_VAR = "NpcKillCount"
+PLAYER_DEAD_VAR = "PlayerDead"
+# Set on a health component by whatever hurt it. The HUD shows a wanderer's bar
+# only for a few seconds after LastDamageTime, and only a death with
+# DamagedByPlayer true counts as a kill -- the safety net writes Health to 0 for
+# a wanderer that fell through the world, and that is not something anyone shot.
+LAST_DAMAGE_VAR = "LastDamageTime"
+DAMAGED_BY_PLAYER_VAR = "DamagedByPlayer"
+# Far enough in the past that nothing is "recently damaged" at level start.
+NEVER_DAMAGED = -1000.0
 SPAWN_LOG_PREFIX = "[NPC-SPAWN] #"
 # Flagged ERROR in the text because Blueprint cannot emit an Error-severity log
 # line at all: PrintWarning is the highest the Kismet library offers (there is
@@ -262,6 +311,12 @@ SPAWN_LOG_PREFIX = "[NPC-SPAWN] #"
 # least colours it in the Output Log and trips the editor's warning filter; the
 # token makes it greppable as an error regardless.
 FELL_LOG_PREFIX = "[NPC-FELL] ERROR #"
+# The player's own death, written once. Without it a headless -game run has no
+# way to say whether the death path ran at all: the menu it opens is on a canvas
+# nobody is looking at, and a paused game and a quiet game look identical in a
+# log. The score goes in the line because it is the one number worth having
+# afterwards.
+DEAD_LOG_PREFIX = "[PLAYER-DEAD] killed with "
 SPAWNED_AT_VAR = "SpawnedAt"
 # How many independent bearings to try before giving up on the band. One is
 # enough whenever the navmesh has settled -- measured at runtime, 215 of 220
@@ -887,6 +942,59 @@ def _configure_blend(blend):
                            "inherit the locomotion hips and aim off to one side")
 
 
+def _ensure_full_body_slot(ed):
+    """Insert Slot(FullBodySlot) between the blend and the ControlRig.
+
+        ... -> LayeredBoneBlend -> Slot(FullBodySlot) -> ControlRig -> Root
+
+    A slot with nothing playing passes its input pose straight through, so this
+    is free until something plays into it -- and when the death montage does, it
+    lands *after* the upper-body blend and therefore replaces the whole body,
+    legs included. Playing a death into DefaultSlot instead folds the chest over
+    legs that are still standing in the locomotion pose.
+
+    The palette entry for a slot node is spelled with the slot's own name
+    (``Slot'DefaultSlot'``) and only registered names appear, so a new slot
+    cannot be asked for directly. The way round it is the way the editor does it
+    anyway: spawn the DefaultSlot entry, rename the node's inner slot, and let
+    the compiler register the new name -- UAnimGraphNode_Slot::
+    BakeDataDuringCompilation calls Skeleton->RegisterSlotNode on whatever name
+    it finds, so one compile is all the registration takes.
+    """
+    rigs = [n for n in ed.list_all_nodes()
+            if n.get_class().get_name() == "AnimGraphNode_ControlRig"]
+    if len(rigs) != 1:
+        raise RuntimeError(f"expected one ControlRig node, found {len(rigs)}")
+    rig = rigs[0]
+
+    feeding = PIN.list_connected_pins(_pin(rig, "Source"))
+    if not feeding:
+        raise RuntimeError("ControlRig.Source is unconnected; graph is not what "
+                           "we expect")
+    upstream = PIN.get_owning_node(feeding[0])
+
+    def name_it(node):
+        inner = node.get_editor_property("node")
+        inner.set_editor_property("slot_name", FULL_BODY_SLOT)
+        node.set_editor_property("node", inner)
+        back = str(node.get_editor_property("node").get_editor_property("slot_name"))
+        if back != FULL_BODY_SLOT:
+            raise RuntimeError(f"the slot kept the name {back!r}")
+
+    if upstream.get_class().get_name() == "AnimGraphNode_Slot":
+        # Already inserted by an earlier run: re-apply the name and leave the
+        # wiring alone, so re-running never stacks a second slot on the chain.
+        name_it(upstream)
+        return upstream
+
+    slot = _at(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"), -140, 620)
+    name_it(slot)
+    PIN.break_pin_links(_pin(rig, "Source"))
+    _connect(_pin(upstream, "Pose", is_input=False), _pin(slot, "Source"))
+    _connect(_pin(slot, "Pose", is_input=False), _pin(rig, "Source"))
+    return slot
+
+
 def patch_anim_blueprint():
     """Make DefaultSlot upper-body-only in ABP_Unarmed.
 
@@ -931,6 +1039,7 @@ def patch_anim_blueprint():
     existing = by_class("AnimGraphNode_LayeredBoneBlend")
     if existing:
         _configure_blend(existing[0])
+        _ensure_full_body_slot(ed)
         if not BEL.compile_blueprint(bp):
             raise RuntimeError("ABP_Unarmed failed to compile")
         _assets().save_loaded_asset(bp)
@@ -961,6 +1070,7 @@ def patch_anim_blueprint():
     _connect(_pin(blend, "Pose", is_input=False), _pin(rig, "Source"))
 
     _configure_blend(blend)
+    _ensure_full_body_slot(ed)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("ABP_Unarmed failed to compile after the blend patch")
@@ -1073,6 +1183,9 @@ FN_GET_OWNER = "/Script/Engine.ActorComponent.GetOwner"
 FN_GET_PC = "/Script/Engine.GameplayStatics.GetPlayerController"
 FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
+# Held, not tapped: sprint is a state for as long as the key is down, so it is
+# the one polled key in this file that cannot use WasInputKeyJustPressed.
+FN_IS_KEY_DOWN = "/Script/Engine.PlayerController.IsInputKeyDown"
 FN_GET_CAM = "/Script/Engine.GameplayStatics.GetPlayerCameraManager"
 FN_CAM_LOC = "/Script/Engine.PlayerCameraManager.GetCameraLocation"
 FN_CAM_ROT = "/Script/Engine.PlayerCameraManager.GetCameraRotation"
@@ -1139,12 +1252,24 @@ FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
 FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
 FN_MAKE_ROT = "/Script/Engine.KismetMathLibrary.MakeRotator"
+FN_MUL_FF = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
+FN_SELECT_FF = "/Script/Engine.KismetMathLibrary.SelectFloat"
+FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
+FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
+FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
+FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
+FN_DISABLE_MOVEMENT = "/Script/Engine.CharacterMovementComponent.DisableMovement"
+FN_SIN = "/Script/Engine.KismetMathLibrary.Sin"
+FN_ROT_FROM_X = "/Script/Engine.KismetMathLibrary.MakeRotFromX"
+FN_SET_ACTOR_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
+FN_ACTOR_FORWARD = "/Script/Engine.Actor.GetActorForwardVector"
 
 NODE_TICK = "AddEvent|EventTick"
 NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
 NODE_BREAK_HIT = "Collision|BreakHitResult"
 NODE_SPAWN = "Game|SpawnActorfromClass"
 NODE_CAST_CHAR = "Utilities|Casting|CastToBP_ThirdPersonCharacter"
+NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
 MACRO_FOR_LOOP = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForLoop"
@@ -1209,28 +1334,66 @@ def _post_physics_tick(bp):
 
 # ─── BP_BloodSplash ──────────────────────────────────────────────────────────
 
-BLOOD_BLOBS = (
-    (0.0, 0.0, 0.0, 0.10),
-    (4.0, 3.0, 2.0, 0.07),
-    (-3.0, 4.0, -2.0, 0.06),
-    (2.0, -4.0, 3.0, 0.055),
-    (-4.0, -2.0, -3.0, 0.05),
-)
-BLOOD_LIFETIME = 0.45
-BLOOD_GROWTH = 5.0      # scale units per second
+BLOOD_SEED = 7             # laid out once, at build time, so it is reproducible
+BLOOD_DROPLETS = 8         # plus the two-sphere wound core
+BLOOD_CONE = 0.45          # spray half-width, as a fraction of its own reach
+BLOOD_LIFETIME = 0.7
+BLOOD_START_SCALE = 0.55   # how big the burst is on the frame it appears
+BLOOD_SWELL = 2.6          # extra scale at the middle of its life
+BLOOD_SPRAY_CMS = 130.0    # how fast the spray travels back along the normal
+BLOOD_GRAVITY = 260.0      # what bends the spray back down into an arc
+BLOOD_JITTER = 0.25        # +/- size randomness, so two hits never match
+
+
+def _blood_blobs():
+    """A wound core, then a cone of droplets thrown back along +X.
+
+    +X is the actor's forward, and _author_impact spawns the splash rotated so
+    that forward *is* the surface normal of whatever the pellet hit. So the
+    spray comes out of the wound rather than out of an arbitrary world axis,
+    and a shot to the chest and a shot to the back throw blood opposite ways.
+
+    Seeded rather than authored by hand: the shape wanted here is "irregular",
+    which a person writing tuples produces badly and a seed produces for free --
+    and a fixed seed keeps it reproducible, so the verifier can recompute the
+    same layout and compare it against the saved components.
+    """
+    rng = random.Random(BLOOD_SEED)
+    blobs = [(0.0, 0.0, 0.0, 0.11), (1.4, 0.0, 0.0, 0.085)]
+    for i in range(BLOOD_DROPLETS):
+        reach = 2.0 + 7.0 * (i + 1) / BLOOD_DROPLETS
+        angle = rng.uniform(0.0, math.tau)
+        radius = rng.uniform(0.35, 1.0) * reach * BLOOD_CONE
+        blobs.append((round(reach, 3),
+                      round(math.cos(angle) * radius, 3),
+                      round(math.sin(angle) * radius, 3),
+                      round(rng.uniform(0.028, 0.055), 4)))
+    return tuple(blobs)
+
+
+BLOOD_BLOBS = _blood_blobs()
 
 
 def build_blood_splash(rebuild=True):
-    """A handful of emissive red spheres that swell and vanish.
+    """Emissive red spheres thrown out of the wound, arcing down as they swell.
 
-    Not a particle system: Niagara systems cannot be authored from Python at
-    all, and a Cascade emitter is no better. Five spheres that scale up over
-    0.45 s and destroy themselves read as a splash at the distance you actually
-    see them from, and they cost one Blueprint.
+    Not a particle system: Niagara cannot be authored from Python at all, and a
+    Cascade emitter is no better. What stands in for one is a fixed cone of
+    spheres whose *actor* is animated on Tick -- ten components moved by three
+    nodes, instead of ten components each needing their own chain:
+
+        position = Origin + Forward * spray * Age - Z * gravity * Age^2
+        scale    = start + swell * sin(pi * Age / lifetime)
+
+    The parabola is what makes it read as blood rather than as an expanding
+    ball: the spray leaves the wound fast, slows, and falls. The sine does the
+    whole life in one pure expression -- zero extra at both ends, widest in the
+    middle -- so the burst grows in and shrinks away without a branch anywhere,
+    and without a Timeline, whose curve asset cannot be authored from Python.
     """
     eas = _assets()
     bp = _create_blueprint(BLOOD_BP_PATH, unreal.Actor)
-    names = {f"Blob{i}" for i in range(len(BLOOD_BLOBS))}
+    names = {f"Blob{i}" for i in range(max(len(BLOOD_BLOBS), 16))}
     _drop_components(bp, {"Burst"} | names)
     root = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Burst")
     for i, (x, y, z, scale) in enumerate(BLOOD_BLOBS):
@@ -1248,13 +1411,34 @@ def build_blood_splash(rebuild=True):
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
     _declare(ed, "Age", _float_type())
+    # Where the pellet landed. The spray is computed from this rather than from
+    # "wherever I am now", so an error in one frame cannot accumulate.
+    _declare(ed, "Origin", _struct_type(unreal.Vector.static_struct()))
+    _declare(ed, "Jitter", _float_type())
 
-    # BeginPlay: let the engine clean the actor up rather than tracking it.
-    life = _at(_node(ed, FN_LIFESPAN), 320, -900)
+    # --- BeginPlay: remember the wound, pick a size, arrange to be cleaned up.
+    here = _at(_node(ed, FN_ACTOR_LOC), 320, -700)
+    pin_origin = _at(ed.add_set_member_variable_node("Origin"), 560, -900)
+    _connect(_pin(here, "ReturnValue", is_input=False), _pin(pin_origin, "Origin"))
+    _connect(BEL.find_then_pin(begin), _pin(pin_origin, "execute"))
+
+    # One random draw, stored. Every burst is the same ten spheres in the same
+    # cone, so without this a shotgun's eight pellets into one torso read as one
+    # big sphere. RandomFloatInRange is **pure**, so it must be read exactly
+    # once and then read back from the variable -- the same rule the respawn
+    # point follows, for the same reason: a second read is a second dice roll.
+    roll = _at(_node(ed, FN_RANDOM_FLOAT), 800, -700)
+    _set(roll, "Min", -BLOOD_JITTER)
+    _set(roll, "Max", BLOOD_JITTER)
+    keep_roll = _at(ed.add_set_member_variable_node("Jitter"), 1040, -900)
+    _connect(_pin(roll, "ReturnValue", is_input=False), _pin(keep_roll, "Jitter"))
+    _connect(BEL.find_then_pin(pin_origin), _pin(keep_roll, "execute"))
+
+    life = _at(_node(ed, FN_LIFESPAN), 1280, -900)
     _set(life, "InLifespan", BLOOD_LIFETIME)
-    _connect(BEL.find_then_pin(begin), _pin(life, "execute"))
+    _connect(BEL.find_then_pin(keep_roll), _pin(life, "execute"))
 
-    # Tick: Age += DeltaSeconds, scale = 1 + Age * growth.
+    # --- Tick: age, then scale, then position -------------------------------
     age_get = _at(ed.add_get_member_variable_node("Age"), 260, 200)
     add = _at(_node(ed, FN_ADD_FF), 470, 200)
     _connect(_pin(age_get, "Age", is_input=False), _pin(add, "A"))
@@ -1262,46 +1446,110 @@ def build_blood_splash(rebuild=True):
     age_set = _at(ed.add_set_member_variable_node("Age"), 700, 0)
     _connect(_pin(add, "ReturnValue", is_input=False), _pin(age_set, "Age"))
     _connect(BEL.find_then_pin(tick), _pin(age_set, "execute"))
+    # Read the *stored* age from here on. The add is pure, so every re-read of
+    # its output would recompute it -- harmless while the inputs hold still, but
+    # the stored value is the one the next frame accumulates from, and the two
+    # should not be allowed to drift apart.
+    age = _at(ed.add_get_member_variable_node("Age"), 700, 240)
+    age_out = _pin(age, "Age", is_input=False)
 
-    scale_v = _at(_node(ed, FN_MUL_VF), 940, 260)
-    _connect(_vec(ed, BLOOD_GROWTH, BLOOD_GROWTH, BLOOD_GROWTH, 700, 400),
-             _pin(scale_v, "A"))
-    _connect(_pin(add, "ReturnValue", is_input=False), _pin(scale_v, "B"))
-    bump = _at(_node(ed, FN_ADD_VV), 1160, 260)
-    _connect(_vec(ed, 1.0, 1.0, 1.0, 940, 420), _pin(bump, "A"))
-    _connect(_pin(scale_v, "ReturnValue", is_input=False), _pin(bump, "B"))
+    # scale = start + Jitter + swell * sin(pi * Age / lifetime)
+    phase = _at(_node(ed, FN_MUL_FF), 940, 400)
+    _connect(age_out, _pin(phase, "A"))
+    _set(phase, "B", math.pi / BLOOD_LIFETIME)
+    wave = _at(_node(ed, FN_SIN), 1160, 400)
+    _connect(_pin(phase, "ReturnValue", is_input=False), _pin(wave, "A"))
+    swell = _at(_node(ed, FN_MUL_FF), 1380, 400)
+    _connect(_pin(wave, "ReturnValue", is_input=False), _pin(swell, "A"))
+    _set(swell, "B", BLOOD_SWELL)
+    jitter = _at(ed.add_get_member_variable_node("Jitter"), 1380, 560)
+    base = _at(_node(ed, FN_ADD_FF), 1600, 560)
+    _connect(_pin(jitter, "Jitter", is_input=False), _pin(base, "A"))
+    _set(base, "B", BLOOD_START_SCALE)
+    size = _at(_node(ed, FN_ADD_FF), 1820, 400)
+    _connect(_pin(swell, "ReturnValue", is_input=False), _pin(size, "A"))
+    _connect(_pin(base, "ReturnValue", is_input=False), _pin(size, "B"))
+    scale_v = _at(_node(ed, FN_MUL_VF), 2060, 400)
+    _connect(_vec(ed, 1.0, 1.0, 1.0, 1820, 560), _pin(scale_v, "A"))
+    _connect(_pin(size, "ReturnValue", is_input=False), _pin(scale_v, "B"))
 
-    set_scale = _at(_node(ed, FN_SET_SCALE), 1400, 0)
-    _connect(_pin(bump, "ReturnValue", is_input=False), _pin(set_scale, "NewScale3D"))
+    set_scale = _at(_node(ed, FN_SET_SCALE), 2300, 0)
+    _connect(_pin(scale_v, "ReturnValue", is_input=False), _pin(set_scale, "NewScale3D"))
     _connect(BEL.find_then_pin(age_set), _pin(set_scale, "execute"))
 
+    # position = Origin + Forward * spray * Age + (0,0,-gravity) * Age^2
+    forward = _at(_node(ed, FN_ACTOR_FORWARD), 940, 800)
+    travelled = _at(_node(ed, FN_MUL_FF), 940, 940)
+    _connect(age_out, _pin(travelled, "A"))
+    _set(travelled, "B", BLOOD_SPRAY_CMS)
+    thrown = _at(_node(ed, FN_MUL_VF), 1380, 800)
+    _connect(_pin(forward, "ReturnValue", is_input=False), _pin(thrown, "A"))
+    _connect(_pin(travelled, "ReturnValue", is_input=False), _pin(thrown, "B"))
+
+    squared = _at(_node(ed, FN_MUL_FF), 940, 1120)
+    _connect(age_out, _pin(squared, "A"))
+    _connect(age_out, _pin(squared, "B"))
+    fall = _at(_node(ed, FN_MUL_VF), 1380, 1120)
+    _connect(_vec(ed, 0.0, 0.0, -BLOOD_GRAVITY, 1160, 1260), _pin(fall, "A"))
+    _connect(_pin(squared, "ReturnValue", is_input=False), _pin(fall, "B"))
+
+    origin_get = _at(ed.add_get_member_variable_node("Origin"), 1600, 980)
+    arc = _at(_node(ed, FN_ADD_VV), 1820, 800)
+    _connect(_pin(thrown, "ReturnValue", is_input=False), _pin(arc, "A"))
+    _connect(_pin(fall, "ReturnValue", is_input=False), _pin(arc, "B"))
+    where = _at(_node(ed, FN_ADD_VV), 2060, 800)
+    _connect(_pin(origin_get, "Origin", is_input=False), _pin(where, "A"))
+    _connect(_pin(arc, "ReturnValue", is_input=False), _pin(where, "B"))
+
+    move = _at(_node(ed, FN_SET_ACTOR_LOC), 2540, 0)
+    _connect(_pin(where, "ReturnValue", is_input=False), _pin(move, "NewLocation"))
+    # No sweep: the spheres have no collision and the spray is meant to pass
+    # through the surface it came off, not to be stopped by it.
+    _set(move, "bSweep", "false")
+    _set(move, "bTeleport", "true")
+    _connect(BEL.find_then_pin(set_scale), _pin(move, "execute"))
+
     ed.add_comment_to_nodes(
-        f"Swells from 1x to about {1 + BLOOD_GROWTH * BLOOD_LIFETIME:.1f}x over "
-        f"{BLOOD_LIFETIME}s, then SetLifeSpan removes the actor. Scaling on Tick "
-        "rather than with a Timeline because a Timeline's curve asset cannot be "
-        "authored from Python.",
-        [age_get, add, age_set, scale_v, bump, set_scale, life])
+        f"{len(BLOOD_BLOBS)} spheres in a cone along the actor's +X, which "
+        f"_author_impact points down the surface normal of the hit. On Tick the "
+        f"whole burst is thrown out along that normal at {BLOOD_SPRAY_CMS:.0f} "
+        f"cm/s and pulled back down, while its scale follows "
+        f"{BLOOD_START_SCALE} + {BLOOD_SWELL} * sin(pi * Age / {BLOOD_LIFETIME}) "
+        f"-- in and out over one lifetime with no branch. SetLifeSpan then "
+        f"removes the actor.",
+        [age_get, add, age_set, age, phase, wave, swell, jitter, base, size,
+         scale_v, set_scale, forward, travelled, thrown, squared, fall,
+         origin_get, arc, where, move, here, pin_origin, roll, keep_roll, life])
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_BloodSplash failed to compile")
     eas.save_loaded_asset(bp)
-    _log(f"built {BLOOD_BP_PATH} ({len(BLOOD_BLOBS)} blobs, {BLOOD_LIFETIME}s)")
+    _log(f"built {BLOOD_BP_PATH} ({len(BLOOD_BLOBS)} blobs, {BLOOD_LIFETIME}s, "
+         f"sprayed along the hit normal)")
     return bp
 
 
 # ─── BP_HealthComponent ──────────────────────────────────────────────────────
 
-def ensure_spawn_counter():
-    """Put the world-scoped spawn counter on the GameMode.
+def ensure_game_mode_vars():
+    """Put the world-scoped counters and the death flag on the GameMode.
 
-    A variable only -- no graph. The GameMode is chosen because Blueprints have
-    no statics and this has to be one number per session, shared by every
-    wanderer's health component: the HUD reads each NPC's own copy of the number
-    it was handed, and the log line is written once, when it is handed out.
+    Variables only -- no graph. The GameMode is chosen because Blueprints have
+    no statics and each of these has to be one value per session, shared by
+    every wanderer's health component and read by the HUD:
+
+        NpcSpawnCount  the next number to hand a wanderer, so the log and the
+                       floating bars agree on who is who;
+        NpcKillCount   what the corner of the HUD shows and what the death menu
+                       quotes as the final score;
+        PlayerDead     the one flag the death menu is drawn from.
+
+    All three outlive every actor that touches them -- the player's own health
+    component is destroyed with the player, so the score cannot live there.
 
     Declared here rather than in build_graphics_menu.py (which owns the other
-    edit to this asset, HUDClass) because the counter is part of the NPC life
-    cycle, and this file is what reads and writes it.
+    edit to this asset, HUDClass) because they are part of the NPC and player
+    life cycle, and this file is what writes them.
     """
     eas = _assets()
     bp = eas.load_asset(GAME_MODE_BP_PATH)
@@ -1310,12 +1558,172 @@ def ensure_spawn_counter():
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     if not ed:
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
-    _declare(ed, SPAWN_COUNT_VAR, BEL.get_basic_type_by_name("int"))
+    for name in (SPAWN_COUNT_VAR, KILL_COUNT_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("int"))
+    _declare(ed, PLAYER_DEAD_VAR, BEL.get_basic_type_by_name("bool"))
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
-    _log(f"{GAME_MODE_BP_PATH}.{SPAWN_COUNT_VAR} ready (spawn counter)")
+    _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {KILL_COUNT_VAR}, "
+         f"{PLAYER_DEAD_VAR} ready")
     return bp
+
+
+def _author_kill_count(ed, exec_in, x0, y0):
+    """Count this death on the GameMode, if a pellet is what caused it.
+
+    Spliced between "this one despawns" and the respawn, so it sees exactly the
+    deaths that are a wanderer's. The guard is the point: the safety net writes
+    Health to 0 for anything that falls under the world, and the same death path
+    runs for it -- counting that as a kill would inflate the score every time
+    the terrain lost someone. Only a pellet sets DamagedByPlayer.
+
+    Returns the exec pins to carry on from -- both of them, because a wanderer
+    that died unshot still has to be replaced.
+    """
+    earned = _at(ed.add_get_member_variable_node(DAMAGED_BY_PLAYER_VAR), x0, y0 + 240)
+    shot = _at(ed.add_branch_node(), x0 + 240, y0)
+    _connect(_pin(earned, DAMAGED_BY_PLAYER_VAR, is_input=False), _pin(shot, "Condition"))
+    _connect(exec_in, _pin(shot, "execute"))
+
+    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 + 480, y0 + 240)
+    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 720, y0)
+    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(BEL.find_then_pin(shot), _pin(as_mode, "execute"))
+    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
+
+    tally = _at(ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH),
+                x0 + 960, y0 + 240)
+    _connect(mode_out, _pin(tally, "self"))
+    one_more = _at(_node(ed, FN_ADD_II), x0 + 1200, y0 + 240)
+    _connect(_pin(tally, KILL_COUNT_VAR, is_input=False), _pin(one_more, "A"))
+    _set(one_more, "B", 1)
+    write = _at(ed.add_set_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH),
+                x0 + 1440, y0)
+    _connect(mode_out, _pin(write, "self"))
+    _connect(_pin(one_more, "ReturnValue", is_input=False), _pin(write, KILL_COUNT_VAR))
+    _connect(BEL.find_then_pin(as_mode), _pin(write, "execute"))
+
+    ed.add_comment_to_nodes(
+        "One kill, counted on the GameMode where it outlives the wanderer that "
+        "earned it. DamagedByPlayer is the guard: the safety net kills anything "
+        "that falls under the world through this same path, and nobody shot it.",
+        [earned, shot, mode, as_mode, tally, one_more, write])
+    return (BEL.find_then_pin(write),
+            _pin(as_mode, "CastFailed", is_input=False),
+            BEL.find_else_pin(shot))
+
+
+def _author_player_death(ed, exec_in, x0, y0):
+    """The player hit 0 HP: drop, wait for the fall, then pause and open the menu.
+
+    This is the DespawnOnDeath-false arm of the death path, which until now
+    simply ended -- the player sat at 0 HP and the pack kept hitting them.
+
+    Three things in order, and the order is the whole design:
+
+      1. DisableMovement, so the body stops where it fell rather than sliding on
+         under whatever input was last held. Movement, not input: turning input
+         off would be tidier to look at and would risk the restart key, which
+         the HUD polls off the same PlayerController.
+      2. the death animation, played into FullBodySlot -- the slot that sits
+         after the upper-body blend, so this one takes the legs too.
+      3. a Delay as long as the animation, and only then SetGamePaused. Pausing
+         first would freeze the player standing up, which reads as a hang; the
+         menu is what the pause is for, and the menu can wait 2 seconds.
+
+    PlayerDead is set on the GameMode rather than here because the HUD is what
+    draws the menu and the HUD has no route to this component -- it would have
+    to find the player's pawn, find this component and cast to it, every frame,
+    to read one bool that the GameMode already exists to hold.
+    """
+    owner = _at(_node(ed, FN_GET_OWNER), x0, y0 + 240)
+    as_char = _at(_palette(ed, NODE_CAST_CHARACTER), x0 + 240, y0)
+    _connect(_pin(owner, "ReturnValue", is_input=False), _pin(as_char, "Object"))
+    _connect(exec_in, _pin(as_char, "execute"))
+    char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
+
+    movement = _at(ed.add_get_member_variable_node("CharacterMovement",
+                                                   "/Script/Engine.Character"),
+                   x0 + 480, y0 + 240)
+    _connect(char_out, _pin(movement, "self"))
+    stop = _at(_node(ed, FN_DISABLE_MOVEMENT), x0 + 720, y0)
+    _connect(_pin(movement, "CharacterMovement", is_input=False), _pin(stop, "self"))
+    _connect(BEL.find_then_pin(as_char), _pin(stop, "execute"))
+
+    mesh = _at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
+               x0 + 720, y0 + 240)
+    _connect(char_out, _pin(mesh, "self"))
+    anim = _at(_node(ed, FN_ANIM_INSTANCE), x0 + 960, y0 + 240)
+    _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
+
+    fall = _at(_node(ed, FN_PLAY_SLOT), x0 + 1200, y0)
+    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(fall, "self"))
+    _set(fall, "Asset", DEATH_ANIM_OBJECT)
+    _set(fall, "SlotNodeName", FULL_BODY_SLOT)
+    _set(fall, "BlendInTime", DEATH_BLEND_S)
+    _set(fall, "BlendOutTime", DEATH_BLEND_S)
+    _connect(BEL.find_then_pin(stop), _pin(fall, "execute"))
+
+    wait = _at(_node(ed, FN_DELAY), x0 + 1440, y0)
+    _set(wait, "Duration", DEATH_PAUSE_SECONDS)
+    # The cast failure reaches the Delay too. A player with no Character under
+    # them cannot be animated, but the menu still has to open -- a death with no
+    # menu is a game that has simply stopped responding.
+    for tail in (BEL.find_then_pin(fall),
+                 _pin(as_char, "CastFailed", is_input=False)):
+        _connect(tail, _pin(wait, "execute"))
+
+    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 + 1680, y0 + 240)
+    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 1920, y0)
+    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(BEL.find_then_pin(wait), _pin(as_mode, "execute"))
+    tell = _at(ed.add_set_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH),
+               x0 + 2160, y0)
+    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
+             _pin(tell, "self"))
+    _set(tell, PLAYER_DEAD_VAR, "true")
+    _connect(BEL.find_then_pin(as_mode), _pin(tell, "execute"))
+
+    # Say so in the log, with the score. A paused game and a game where the
+    # death path silently did nothing look exactly the same from outside, and
+    # the menu that would tell them apart is drawn on a canvas that a headless
+    # run has nobody looking at.
+    score = _at(ed.add_get_member_variable_node(KILL_COUNT_VAR,
+                                                GAME_MODE_CLASS_PATH),
+                x0 + 2160, y0 + 400)
+    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
+             _pin(score, "self"))
+    score_str = _at(_node(ed, FN_INT_TO_STR), x0 + 2400, y0 + 400)
+    _connect(_pin(score, KILL_COUNT_VAR, is_input=False), _pin(score_str, "InInt"))
+    dead_line = _at(_node(ed, FN_CONCAT), x0 + 2640, y0 + 400)
+    _set(dead_line, "A", DEAD_LOG_PREFIX)
+    _connect(_pin(score_str, "ReturnValue", is_input=False), _pin(dead_line, "B"))
+    say_dead = _at(_node(ed, FN_PRINT), x0 + 2640, y0)
+    _connect(_pin(dead_line, "ReturnValue", is_input=False), _pin(say_dead, "InString"))
+    # Log only: the menu is what says it on screen, and it says it better.
+    _set(say_dead, "bPrintToScreen", "false")
+    _set(say_dead, "bPrintToLog", "true")
+    _set(say_dead, "Duration", 0.0)
+    _connect(BEL.find_then_pin(tell), _pin(say_dead, "execute"))
+
+    # Pause last, and on every arm: with the flag set the HUD draws the menu,
+    # and with the game paused nothing moves behind it. The HUD polls its
+    # restart key from the PlayerController, which ticks through a pause.
+    freeze = _at(_node(ed, FN_SET_PAUSED), x0 + 2900, y0)
+    _set(freeze, "bPaused", "true")
+    for tail in (BEL.find_then_pin(say_dead),
+                 _pin(as_mode, "CastFailed", is_input=False)):
+        _connect(tail, _pin(freeze, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"The player's death. Stop the body, play {DEATH_ANIM.rsplit('/', 1)[-1]} "
+        f"into {FULL_BODY_SLOT} (the slot after the upper-body blend, so it "
+        f"takes the legs), wait {DEATH_PAUSE_SECONDS}s for it to land, then tell "
+        f"the GameMode and pause. BP_GraphicsMenuHUD draws the menu off "
+        f"{PLAYER_DEAD_VAR} and restarts the level from it.",
+        [owner, as_char, movement, stop, mesh, anim, fall, wait, mode, as_mode,
+         tell, score, score_str, dead_line, say_dead, freeze])
 
 
 def build_health_component(rebuild=True):
@@ -1353,9 +1761,9 @@ def build_health_component(rebuild=True):
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
 
-    for name in ("Health", "MaxHealth"):
+    for name in ("Health", "MaxHealth", LAST_DAMAGE_VAR):
         _declare(ed, name, _float_type())
-    for name in ("Dead", "DespawnOnDeath"):
+    for name in ("Dead", "DespawnOnDeath", DAMAGED_BY_PLAYER_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     _declare(ed, "RespawnClass",
              BEL.get_class_reference_type(unreal.Actor.static_class()))
@@ -1574,13 +1982,20 @@ def build_health_component(rebuild=True):
     _connect(_pin(despawn_get, "DespawnOnDeath", is_input=False), _pin(should, "Condition"))
     _connect(BEL.find_then_pin(mark), _pin(should, "execute"))
 
-    # --- respawn, then destroy ----------------------------------------------
+    # The player's arm of the same branch, which used to be a dead end: sit at
+    # 0 HP forever while the pack carried on hitting the body.
+    _author_player_death(ed, BEL.find_else_pin(should), 1420, 1600)
+
+    # --- count it, then respawn, then destroy -------------------------------
+    counted = _author_kill_count(ed, BEL.find_then_pin(should), 1420, -1600)
+
     cls_get = _at(ed.add_get_member_variable_node("RespawnClass"), 1660, 300)
     can_respawn = _at(_node(ed, FN_IS_VALID_CLASS), 1900, 300)
     _connect(_pin(cls_get, "RespawnClass", is_input=False), _pin(can_respawn, "Class"))
     respawns = _at(ed.add_branch_node(), 2120, 0)
     _connect(_pin(can_respawn, "ReturnValue", is_input=False), _pin(respawns, "Condition"))
-    _connect(BEL.find_then_pin(should), _pin(respawns, "execute"))
+    for tail in counted:
+        _connect(tail, _pin(respawns, "execute"))
 
     # --- where the replacement goes -----------------------------------------
     # Three steps, and the order matters:
@@ -1802,6 +2217,11 @@ def build_health_component(rebuild=True):
         "MaxHealth": START_HEALTH,
         "Dead": False,
         "DespawnOnDeath": False,
+        # Far enough in the past that nothing counts as recently hurt at level
+        # start -- a zero here would float every wanderer's bar for the first
+        # five seconds of the game.
+        LAST_DAMAGE_VAR: NEVER_DAMAGED,
+        DAMAGED_BY_PLAYER_VAR: False,
     })
     _log(f"built {HEALTH_BP_PATH} (Health = MaxHealth = {START_HEALTH})")
     return bp
@@ -2109,6 +2529,12 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     where = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 520, y0 + 380)
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(where, "Location"))
     _connect(_vec(ed, 1.0, 1.0, 1.0, x0 + 260, y0 + 520), _pin(where, "Scale"))
+    # Point the splash's +X down the surface normal: BP_BloodSplash throws its
+    # cone along its own forward, so this is what makes the spray come *out of*
+    # the wound instead of along an arbitrary world axis.
+    facing = _at(_node(ed, FN_ROT_FROM_X), x0 + 520, y0 + 660)
+    _connect(_loose_pin(brk, "ImpactNormal", is_input=False), _pin(facing, "X"))
+    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(where, "Rotation"))
     splash = _at(_palette(ed, NODE_SPAWN), x0 + 800, y0)
     _connect(_pin(blood_cls, "BloodClass", is_input=False), _pin(splash, "Class"))
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(splash, "SpawnTransform"))
@@ -2132,11 +2558,36 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(set_h, "Health"))
     _connect(BEL.find_then_pin(splash), _pin(set_h, "execute"))
 
+    # Stamp the hit. Two things read this and nothing else writes it:
+    #
+    #   LastDamageTime  the HUD floats a wanderer's health bar for a few seconds
+    #                   after it, and hides it the rest of the time;
+    #   DamagedByPlayer what separates a kill from a wanderer that fell through
+    #                   the world -- the safety net writes Health to 0 too, and
+    #                   the kill counter must not count that.
+    #
+    # Written on every pellet rather than only on the killing one: a wanderer
+    # that takes a hit and lives has to show its bar as well.
+    now = _at(_node(ed, FN_TIME_SECONDS), x0 + 1820, y0 + 300)
+    stamp = _at(ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH),
+                x0 + 2080, y0)
+    _connect(as_health, _pin(stamp, "self"))
+    _connect(_pin(now, "ReturnValue", is_input=False), _pin(stamp, LAST_DAMAGE_VAR))
+    _connect(BEL.find_then_pin(set_h), _pin(stamp, "execute"))
+
+    blame = _at(ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR,
+                                                HEALTH_CLASS_PATH),
+                x0 + 2340, y0)
+    _connect(as_health, _pin(blame, "self"))
+    _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
+    _connect(BEL.find_then_pin(stamp), _pin(blame, "execute"))
+
     ed.add_comment_to_nodes(
         "Clamped at zero so an overkill shot cannot drive Health negative -- "
         "the HUD bar divides by MaxHealth and the death check is Health <= 0, "
         "and both want a floor.",
-        [comp, cast, blood_cls, where, splash, get_h, dmg_n, sub, clamp, set_h])
+        [comp, cast, blood_cls, where, facing, splash, get_h, dmg_n, sub, clamp,
+         set_h, now, stamp, blame])
 
 
 def _detach_rules(node):
@@ -2469,11 +2920,26 @@ def _author_wc_begin_play(ed, begin):
     _connect(_pin(mesh, "Mesh", is_input=False), _pin(remember, "OwnerMesh"))
     _connect(BEL.find_then_pin(cast), _pin(remember, "execute"))
 
+    # Whatever the character's own walking speed is, before sprint ever touches
+    # it. Cached rather than written down here: a literal would silently fight
+    # any later change to BP_ThirdPersonCharacter's movement defaults, and the
+    # symptom -- "the player walks at the wrong speed, but only after
+    # sprinting once" -- would point at the sprint code instead of at the copy.
+    movement = keep(_at(ed.add_get_member_variable_node(
+        "CharacterMovement", "/Script/Engine.Character"), 1040, -1560))
+    _connect(as_char, _pin(movement, "self"))
+    walk = keep(_at(ed.add_get_member_variable_node(
+        "MaxWalkSpeed", "/Script/Engine.CharacterMovementComponent"), 1300, -1560))
+    _connect(_pin(movement, "CharacterMovement", is_input=False), _pin(walk, "self"))
+    cache = keep(_at(ed.add_set_member_variable_node("BaseSpeed"), 1300, -1420))
+    _connect(_pin(walk, "MaxWalkSpeed", is_input=False), _pin(cache, "BaseSpeed"))
+    _connect(BEL.find_then_pin(remember), _pin(cache, "execute"))
+
     where = keep(_at(_node(ed, FN_GET_TRANSFORM), 1040, -1000))
     _connect(as_char, _pin(where, "self"))
     spawn_at = _pin(where, "ReturnValue", is_input=False)
 
-    prev = BEL.find_then_pin(remember)
+    prev = BEL.find_then_pin(cache)
     for i, var in enumerate(("ShotgunClass", "PistolClass")):
         cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
         spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))
@@ -2504,6 +2970,113 @@ def _author_wc_begin_play(ed, begin):
         "exist. NeedsRefresh makes Tick do the actual equipping, so the attach "
         "logic is authored exactly once.",
         made)
+
+
+def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
+    """Hold Shift to run, while there is stamina left to spend.
+
+    Written without a single Branch, which is not cleverness for its own sake:
+    the two arms would otherwise be the same two writes with different numbers,
+    and the pair could drift. SelectFloat picks the number, one write applies it:
+
+        Sprinting = ShiftDown AND Stamina > 0
+        MaxWalkSpeed = Sprinting ? SPRINT_SPEED : BaseSpeed
+        Stamina += (Sprinting ? -drain : +regen) * DeltaSeconds,  clamped
+
+    BaseSpeed is whatever the character's own MaxWalkSpeed was at BeginPlay, so
+    sprinting can never leave the player permanently faster or slower than the
+    character asset says they are -- which is exactly what a hardcoded "walk
+    speed" here would do the first time someone retuned the character.
+
+    Stamina lives on the *weapon* component rather than on the health one
+    because the HUD already casts to this component every frame for the
+    inventory strip and the reticle, and because the thing sprinting interacts
+    with is firing: the fire gate below reads Sprinting.
+
+    Returns the exec pins to carry on from.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    # A cast, because MaxWalkSpeed lives on the CharacterMovementComponent and
+    # GetOwner only promises an Actor. Its failure pin is a continuation: a
+    # weapon component on something that is not a Character still has to fire.
+    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0, y0))
+    _connect(owner_out, _pin(as_char, "Object"))
+    for e in exec_ins:
+        _connect(e, _pin(as_char, "execute"))
+    char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
+
+    movement = keep(_at(ed.add_get_member_variable_node(
+        "CharacterMovement", "/Script/Engine.Character"), x0 + 240, y0 + 240))
+    _connect(char_out, _pin(movement, "self"))
+    movement_out = _pin(movement, "CharacterMovement", is_input=False)
+
+    down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0 + 240, y0 + 420))
+    _connect(pc_out, _pin(down, "self"))
+    _set(down, "Key", SPRINT_KEY)
+
+    stamina = keep(_at(ed.add_get_member_variable_node("Stamina"), x0 + 240, y0 + 560))
+    stamina_out = _pin(stamina, "Stamina", is_input=False)
+    left = keep(_at(_node(ed, FN_GREATER_FF), x0 + 480, y0 + 560))
+    _connect(stamina_out, _pin(left, "A"))
+    _set(left, "B", 0.0)
+
+    running = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 460))
+    _connect(_pin(down, "ReturnValue", is_input=False), _pin(running, "A"))
+    _connect(_pin(left, "ReturnValue", is_input=False), _pin(running, "B"))
+    mark = keep(_at(ed.add_set_member_variable_node("Sprinting"), x0 + 960, y0))
+    _connect(_pin(running, "ReturnValue", is_input=False), _pin(mark, "Sprinting"))
+    _connect(BEL.find_then_pin(as_char), _pin(mark, "execute"))
+    # Read the stored flag from here on, for the same reason the NPC id is read
+    # back from its variable: the AND is pure and would be re-evaluated per read.
+    is_running = keep(_at(ed.add_get_member_variable_node("Sprinting"),
+                          x0 + 960, y0 + 460))
+    running_out = _pin(is_running, "Sprinting", is_input=False)
+
+    base = keep(_at(ed.add_get_member_variable_node("BaseSpeed"), x0 + 1200, y0 + 300))
+    pick_speed = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 300))
+    _set(pick_speed, "A", SPRINT_SPEED_CMS)
+    _connect(_pin(base, "BaseSpeed", is_input=False), _pin(pick_speed, "B"))
+    _connect(running_out, _pin(pick_speed, "bPickA"))
+    apply_speed = keep(_at(ed.add_set_member_variable_node(
+        "MaxWalkSpeed", "/Script/Engine.CharacterMovementComponent"), x0 + 1700, y0))
+    _connect(movement_out, _pin(apply_speed, "self"))
+    _connect(_pin(pick_speed, "ReturnValue", is_input=False),
+             _pin(apply_speed, "MaxWalkSpeed"))
+    _connect(BEL.find_then_pin(mark), _pin(apply_speed, "execute"))
+
+    rate = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 620))
+    _set(rate, "A", -STAMINA_DRAIN_PER_S)
+    _set(rate, "B", STAMINA_REGEN_PER_S)
+    _connect(running_out, _pin(rate, "bPickA"))
+    step = keep(_at(_node(ed, FN_MUL_FF), x0 + 1700, y0 + 620))
+    _connect(_pin(rate, "ReturnValue", is_input=False), _pin(step, "A"))
+    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "B"))
+    moved = keep(_at(_node(ed, FN_ADD_FF), x0 + 1940, y0 + 620))
+    _connect(stamina_out, _pin(moved, "A"))
+    _connect(_pin(step, "ReturnValue", is_input=False), _pin(moved, "B"))
+    held_in = keep(_at(_node(ed, FN_CLAMP), x0 + 2180, y0 + 620))
+    _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held_in, "Value"))
+    _set(held_in, "Min", 0.0)
+    _set(held_in, "Max", MAX_STAMINA)
+    spend = keep(_at(ed.add_set_member_variable_node("Stamina"), x0 + 2420, y0))
+    _connect(_pin(held_in, "ReturnValue", is_input=False), _pin(spend, "Stamina"))
+    _connect(BEL.find_then_pin(apply_speed), _pin(spend, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"{SPRINT_KEY}: {SPRINT_SPEED_CMS:.0f} cm/s while Stamina lasts "
+        f"({MAX_STAMINA / STAMINA_DRAIN_PER_S:.0f} s from full), refilling at "
+        f"{STAMINA_REGEN_PER_S:.0f}/s the moment it is let go. No Branch: "
+        f"SelectFloat picks the speed and the sign of the drain, so there is one "
+        f"write of each and the two arms cannot drift apart. The fire gate below "
+        f"reads Sprinting -- you cannot shoot while running.",
+        made)
+    return (BEL.find_then_pin(spend),
+            _pin(as_char, "CastFailed", is_input=False))
 
 
 def _author_wc_tick(ed, tick):
@@ -2551,10 +3124,25 @@ def _author_wc_tick(ed, tick):
     aim_exits, muzzle = _author_resolve_aim(ed, held, BEL.find_then_pin(tick),
                                             1040, -2400)
 
+    # --- sprint --------------------------------------------------------------
+    # Before the trigger, because the trigger reads Sprinting: polled in the
+    # other order, a shot would be allowed on the frame the sprint started.
+    sprint_exits = _author_sprint(ed, tick, pc_out, owner_out, aim_exits,
+                                  1040, -1400)
+
     # --- fire ----------------------------------------------------------------
+    # Three conditions, and "not sprinting" is the new one: the weapon is being
+    # used to run with, not to aim with. Note this AND is safe to fold together
+    # -- every input is a plain bool read, with no chain behind it that could be
+    # pulled by the half that should not have run (unlike the NPC melee gate).
+    steady = _at(_node(ed, FN_NOT), 760, 760)
+    _connect(_pin(_at(ed.add_get_member_variable_node("Sprinting"), 480, 760),
+                  "Sprinting", is_input=False), _pin(steady, "A"))
     fire_gate = _at(ed.add_branch_node(), 1040, 0)
-    _connect(both(pressed(FIRE_KEY, 640), armed_out, 640), _pin(fire_gate, "Condition"))
-    for exit_pin in aim_exits:
+    _connect(both(both(pressed(FIRE_KEY, 640), armed_out, 640),
+                  _pin(steady, "ReturnValue", is_input=False), 700),
+             _pin(fire_gate, "Condition"))
+    for exit_pin in sprint_exits:
         _connect(exit_pin, _pin(fire_gate, "execute"))
     after_fire = _author_fire(ed, held, muzzle, BEL.find_then_pin(fire_gate),
                               1400, 0)
@@ -2654,6 +3242,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     _declare(ed, "AimPoint", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "AimValid", BEL.get_basic_type_by_name("bool"))
     _declare(ed, "AimBlocked", BEL.get_basic_type_by_name("bool"))
+    # Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's
+    # HP bar; BaseSpeed is cached off the character at BeginPlay, never a
+    # literal. Sprinting is what the fire gate refuses on.
+    for name in ("Stamina", "MaxStamina", "BaseSpeed"):
+        _declare(ed, name, _float_type())
+    _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
     # Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
     # return pin takes its type from its Class pin, and an Actor-typed return
     # cannot be added to an array of BP_WeaponItem.
@@ -2671,6 +3265,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     _apply_defaults(bp, {
         "EquippedIndex": 0,
         "NeedsRefresh": True,
+        "Stamina": MAX_STAMINA,
+        "MaxStamina": MAX_STAMINA,
+        # Overwritten on the first frame of BeginPlay; this is only what the
+        # bar would divide by if that somehow never ran.
+        "BaseSpeed": 500.0,
+        "Sprinting": False,
         "ShotgunClass": BEL.generated_class(shotgun_bp),
         "PistolClass": BEL.generated_class(pistol_bp),
         "ItemClass": item_class,
@@ -2877,7 +3477,7 @@ def main():
     blood_bp = build_blood_splash()
     # Before the health component: its BeginPlay casts to the GameMode, and a
     # cast node only appears in the palette for a class that is already loaded.
-    ensure_spawn_counter()
+    ensure_game_mode_vars()
     health_bp = build_health_component()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], blood_bp)

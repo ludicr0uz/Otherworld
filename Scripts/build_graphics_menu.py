@@ -163,6 +163,41 @@ COL_HP_FILL = "(R=0.750000,G=0.130000,B=0.120000,A=0.950000)"
 COL_HP_LABEL = "(R=0.620000,G=0.650000,B=0.700000,A=1.000000)"
 COL_HP_NUM = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
 
+# --- the stamina bar, directly under the HP bar ------------------------------
+# Same left edge and same width as HP, half the height: it reads as the second
+# line of one readout rather than as a second widget. Sprint is on the weapon
+# component (see build_weapons_and_combat.py), which this HUD already casts to
+# every frame for the inventory strip, so the bar costs one extra variable read.
+ST_BAR = (60.0, 100.0, 420.0, 14.0)
+ST_LABEL_POS = (16.0, 96.0)
+ST_LABEL_SCALE = 1.1
+COL_ST_BACK = "(R=0.030000,G=0.030000,B=0.035000,A=0.800000)"
+COL_ST_FILL = "(R=0.320000,G=0.720000,B=0.880000,A=0.950000)"
+COL_ST_SPENT = "(R=0.820000,G=0.560000,B=0.180000,A=0.950000)"
+COL_ST_LABEL = "(R=0.620000,G=0.650000,B=0.700000,A=1.000000)"
+
+# --- the kill counter, top right ---------------------------------------------
+# Under the engine's own `stat fps` line, which owns the very top of that
+# corner. Right-anchored off the viewport width rather than placed at a fixed
+# x, for the same reason the inventory strip is centred that way.
+KILL_RIGHT_MARGIN = 150.0
+KILL_TOP = 92.0
+KILL_SCALE = 2.2
+COL_KILL = "(R=0.960000,G=0.860000,B=0.450000,A=0.950000)"
+
+# --- the death menu ----------------------------------------------------------
+# R, not Enter or Space: Enter opens the editor console in PIE and Space is the
+# jump key, which is still bound while the pawn stands dead.
+RESTART_KEY = "R"
+DEATH_PANEL = (560.0, 300.0)      # width, height; centred on the viewport
+COL_DEATH_PANEL = "(R=0.040000,G=0.010000,B=0.012000,A=0.880000)"
+COL_DEATH_TITLE = "(R=0.880000,G=0.220000,B=0.180000,A=1.000000)"
+COL_DEATH_TEXT = "(R=0.900000,G=0.900000,B=0.920000,A=1.000000)"
+COL_DEATH_HINT = "(R=0.700000,G=0.720000,B=0.760000,A=1.000000)"
+DEATH_TITLE_SCALE = 3.4
+DEATH_SCORE_SCALE = 2.2
+DEATH_HINT_SCALE = 1.6
+
 # --- NPC health bars, drawn in the world above each wanderer ------------------
 NPC_CLASS_PATH = "/Game/Forest/NPC/BP_ForestWanderer.BP_ForestWanderer_C"
 NPC_BAR_Z = 110.0          # cm above the actor's origin, just over its head
@@ -174,6 +209,12 @@ COL_NPC_FILL = "(R=0.900000,G=0.250000,B=0.180000,A=0.950000)"
 # where it appeared, so a wanderer misbehaving on screen can be looked up in the
 # log by the number floating over its head.
 NPC_ID_VAR = "NpcId"
+# A wanderer's bar is hidden by default and shown only for a few seconds after
+# something hurt it. Five bars over five chasing NPCs is most of the screen, and
+# the bar is only ever *read* just after a shot lands -- the rest of the time it
+# is clutter covering the forest the player is trying to aim into.
+LAST_DAMAGE_VAR = "LastDamageTime"
+NPC_BAR_SECONDS = 5.0
 NPC_ID_GAP = 8.0           # pixels between the number and the left of the bar
 NPC_ID_WIDTH = 34.0        # room reserved for up to three digits
 NPC_ID_RISE = 4.0          # nudge up, so digits sit level with the bar
@@ -181,6 +222,10 @@ NPC_ID_SCALE = 1.0
 COL_NPC_ID = "(R=0.960000,G=0.860000,B=0.450000,A=0.950000)"
 
 # --- inventory strip, bottom centre ------------------------------------------
+GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
+                        ".BP_ThirdPersonGameMode_C")
+KILL_COUNT_VAR = "NpcKillCount"
+PLAYER_DEAD_VAR = "PlayerDead"
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
 INVENTORY_SIZE = 5
@@ -239,6 +284,14 @@ FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
 FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"
+FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
+FN_GET_GAME_MODE = "/Script/Engine.GameplayStatics.GetGameMode"
+FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
+FN_LE = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
+FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
+FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
+FN_OPEN_LEVEL = "/Script/Engine.GameplayStatics.OpenLevel"
+FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
 
 # The DrawHUD event is not one of the placeholder nodes a fresh Blueprint ships
 # with (BeginPlay and Tick are), so it has to be created from the palette.
@@ -247,6 +300,7 @@ NODE_TICK = "AddEvent|EventTick"
 NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
+NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
 MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
                   ".StandardMacros:ForEachLoop")
 
@@ -555,7 +609,7 @@ def _author_tick(ed, tick):
 
 # ─── The health readout ──────────────────────────────────────────────────────
 
-def _author_hp(ed, x0, y0, in_exec):
+def _author_hp(ed, x0, y0, in_execs):
     """Draw the player's HP bar and number.  Returns the exec pins to go on from.
 
     Two of them: a pawn carrying no BP_HealthComponent fails the cast, and the
@@ -571,7 +625,8 @@ def _author_hp(ed, x0, y0, in_exec):
 
     cast = _at(_palette(ed, NODE_CAST_HEALTH), x0 + 500, y0)
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
-    _connect(in_exec, _pin(cast, "execute"))
+    for e in in_execs:
+        _connect(e, _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
     health = _at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
@@ -633,6 +688,143 @@ def _author_hp(ed, x0, y0, in_exec):
         [pawn, comp, cast, health, max_health, frac, fill_w,
          back, fill, label, rounded, as_text, number])
     return (BEL.find_then_pin(number), _pin(cast, "CastFailed", is_input=False))
+
+
+def _author_stamina(ed, x0, y0, in_execs):
+    """The sprint bar, directly under the HP bar.
+
+    Read off BP_WeaponComponent rather than off the health component: that is
+    where sprint lives (it is the thing that has to refuse to fire while the key
+    is held), and this HUD already casts to it for the inventory strip anyway.
+
+    The fill changes colour while the key is down, which is the cheapest way to
+    answer the only question a stamina bar is ever asked mid-fight -- "is it
+    going down because I am sprinting, or did I stop and it is coming back?"
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    pawn = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 260))
+    _set(pawn, "PlayerIndex", 0)
+    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 240, y0 + 260))
+    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
+
+    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 500, y0))
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    for e in in_execs:
+        _connect(e, _pin(cast, "execute"))
+    as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
+
+    def var(name, py):
+        n = keep(_at(ed.add_get_member_variable_node(name, WEAPON_COMP_CLASS_PATH),
+                     x0 + 760, py))
+        _connect(as_weapon, _pin(n, "self"))
+        return _pin(n, name, is_input=False)
+
+    stamina = var("Stamina", y0 + 260)
+    max_stamina = var("MaxStamina", y0 + 400)
+    sprinting = var("Sprinting", y0 + 540)
+
+    frac = keep(_at(_node(ed, FN_DIV), x0 + 1000, y0 + 320))
+    _connect(stamina, _pin(frac, "A"))
+    _connect(max_stamina, _pin(frac, "B"))
+    fill_w = keep(_at(_node(ed, FN_MUL), x0 + 1200, y0 + 320))
+    _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
+    _set(fill_w, "B", ST_BAR[2])
+
+    back = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 760, y0))
+    _set(back, "RectColor", COL_ST_BACK)
+    for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), ST_BAR):
+        _set(back, name, value)
+    _connect(BEL.find_then_pin(cast), _pin(back, "execute"))
+
+    tint = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1000, y0 + 560))
+    _set(tint, "A", COL_ST_SPENT)
+    _set(tint, "B", COL_ST_FILL)
+    _connect(sprinting, _pin(tint, "bPickA"))
+
+    fill = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 1000, y0))
+    for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), ST_BAR):
+        _set(fill, name, value)
+    _connect(_pin(fill_w, "ReturnValue", is_input=False), _pin(fill, "ScreenW"))
+    _connect(_pin(tint, "ReturnValue", is_input=False), _pin(fill, "RectColor"))
+    _connect(BEL.find_then_pin(back), _pin(fill, "execute"))
+
+    label = keep(_at(_node(ed, FN_DRAW_TEXT), x0 + 1240, y0))
+    _set(label, "Text", "STA")
+    _set(label, "TextColor", COL_ST_LABEL)
+    _set(label, "ScreenX", ST_LABEL_POS[0])
+    _set(label, "ScreenY", ST_LABEL_POS[1])
+    _set(label, "Scale", ST_LABEL_SCALE)
+    _set(label, "bScalePosition", "false")
+    _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
+
+    ed.add_comment_to_nodes(
+        "Stamina, under the HP bar. The fill goes amber while the sprint key is "
+        "held and back to blue while it refills, so a bar that is moving always "
+        "says which way it is going.",
+        made)
+    return (BEL.find_then_pin(label), _pin(cast, "CastFailed", is_input=False))
+
+
+def _author_kills(ed, x0, y0, in_execs):
+    """The kill counter, top right, under the engine's fps readout.
+
+    The number lives on the GameMode -- it has to outlast the wanderers that
+    earn it and the player's own components, and Blueprints have no statics.
+    The HUD only reads it; build_weapons_and_combat.py's death path is the one
+    thing that writes it, and only for a wanderer a pellet actually killed.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    mode = keep(_at(_node(ed, FN_GET_GAME_MODE), x0, y0 + 260))
+    cast = keep(_at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 260, y0))
+    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    for e in in_execs:
+        _connect(e, _pin(cast, "execute"))
+
+    kills = keep(_at(ed.add_get_member_variable_node(KILL_COUNT_VAR,
+                                                     GAME_MODE_CLASS_PATH),
+                     x0 + 520, y0 + 260))
+    _connect(_loose_pin(cast, "AsBPThirdPersonGameMode", is_input=False),
+             _pin(kills, "self"))
+    as_text = keep(_at(_node(ed, FN_INT_TO_STR), x0 + 760, y0 + 260))
+    _connect(_pin(kills, KILL_COUNT_VAR, is_input=False), _pin(as_text, "InInt"))
+    line = keep(_at(_node(ed, FN_CONCAT), x0 + 1000, y0 + 260))
+    _set(line, "A", "KILLS  ")
+    _connect(_pin(as_text, "ReturnValue", is_input=False), _pin(line, "B"))
+
+    # Right-anchored: x is the viewport width less a margin, not a constant.
+    size = keep(_at(_node(ed, FN_VIEWPORT), x0 + 520, y0 + 460))
+    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 760, y0 + 460))
+    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
+    right = keep(_at(_node(ed, FN_SUB), x0 + 1000, y0 + 460))
+    _connect(_loose_pin(wh, "X", is_input=False), _pin(right, "A"))
+    _set(right, "B", KILL_RIGHT_MARGIN)
+
+    text = keep(_at(_node(ed, FN_DRAW_TEXT), x0 + 1260, y0))
+    _connect(_pin(line, "ReturnValue", is_input=False), _pin(text, "Text"))
+    _set(text, "TextColor", COL_KILL)
+    _connect(_pin(right, "ReturnValue", is_input=False), _pin(text, "ScreenX"))
+    _set(text, "ScreenY", KILL_TOP)
+    _set(text, "Scale", KILL_SCALE)
+    _set(text, "bScalePosition", "false")
+    _connect(BEL.find_then_pin(cast), _pin(text, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"Kills, {KILL_RIGHT_MARGIN:.0f} px in from the right edge and "
+        f"{KILL_TOP:.0f} px down -- clear of the engine's own `stat fps` line, "
+        "which owns the very top of that corner and is not drawn on this canvas.",
+        made)
+    return (BEL.find_then_pin(text), _pin(cast, "CastFailed", is_input=False))
 
 
 def _vec(ed, x, y, z, px, py):
@@ -701,8 +893,35 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     in_front = _at(_node(ed, FN_GREATER), x0 + 2120, y0 + 640)
     _connect(_pin(parts, "Z", is_input=False), _pin(in_front, "A"))
     _set(in_front, "B", 0.0)
+
+    # ...and hurt recently. A bar over every wanderer at all times is most of
+    # the screen once the pack arrives, and it is only ever *read* just after a
+    # shot lands; the rest of the time it is clutter over the forest the player
+    # is aiming into. LastDamageTime is stamped by the pellet that did the
+    # damage (see _author_impact), and defaults far enough in the past that
+    # nothing is showing a bar at level start.
+    hurt_at = _at(ed.add_get_member_variable_node(LAST_DAMAGE_VAR,
+                                                  HEALTH_CLASS_PATH),
+                  x0 + 1100, y0 + 940)
+    _connect(as_health, _pin(hurt_at, "self"))
+    now = _at(_node(ed, FN_TIME_SECONDS), x0 + 1100, y0 + 1080)
+    since = _at(_node(ed, FN_SUB), x0 + 1620, y0 + 940)
+    _connect(_pin(now, "ReturnValue", is_input=False), _pin(since, "A"))
+    _connect(_pin(hurt_at, LAST_DAMAGE_VAR, is_input=False), _pin(since, "B"))
+    recent = _at(_node(ed, FN_LE), x0 + 1860, y0 + 940)
+    _connect(_pin(since, "ReturnValue", is_input=False), _pin(recent, "A"))
+    _set(recent, "B", NPC_BAR_SECONDS)
+
+    # Safe to fold into one AND: both halves are arithmetic on values already
+    # read, so pulling both costs two comparisons and has no side effect. (The
+    # NPC melee gate could not do this -- there, one half of the AND dragged a
+    # whole location chain behind it. See the pure-node note in CLAUDE.md.)
+    showing = _at(_node(ed, FN_AND), x0 + 2120, y0 + 800)
+    _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(showing, "A"))
+    _connect(_pin(recent, "ReturnValue", is_input=False), _pin(showing, "B"))
+
     visible = _at(ed.add_branch_node(), x0 + 2380, y0)
-    _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(visible, "Condition"))
+    _connect(_pin(showing, "ReturnValue", is_input=False), _pin(visible, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(visible, "execute"))
 
     left = _at(_node(ed, FN_SUB), x0 + 2380, y0 + 300)
@@ -760,13 +979,14 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     _connect(BEL.find_then_pin(fill), _pin(number, "execute"))
 
     ed.add_comment_to_nodes(
-        "One bar per living wanderer. GetAllActorsOfClass every frame is not "
-        "free, but there is one NPC in this level and the alternative -- a "
-        "registry the NPCs write themselves into -- would need a graph on "
-        "BP_ForestWanderer, which build_npc_blueprints.py owns.",
+        f"One bar per wanderer, and only for {NPC_BAR_SECONDS:.0f}s after "
+        "something hurt it -- hidden by default. GetAllActorsOfClass every "
+        "frame is not free, but the alternative -- a registry the NPCs write "
+        "themselves into -- would need a graph on BP_ForestWanderer, which "
+        "build_npc_blueprints.py owns.",
         [every, loop, comp, cast, health, max_health, where, above, proj, parts,
-         in_front, visible, left, frac, fill_w, back, fill, nid, nid_str,
-         id_x, id_y, number])
+         in_front, hurt_at, now, since, recent, showing, visible, left, frac,
+         fill_w, back, fill, nid, nid_str, id_x, id_y, number])
     return (_loose_pin(loop, "Completed", is_input=False),)
 
 
@@ -1051,21 +1271,180 @@ def _author_reticle(ed, x0, y0, in_execs):
 
 # ─── Event ReceiveDrawHUD: the panel ─────────────────────────────────────────
 
+def _author_death_menu(ed, x0, y0, in_execs, mode_out):
+    """What is on screen once the player is dead and the game is paused.
+
+    Drawn instead of the HUD, not on top of it: a reticle and an inventory
+    strip over a death screen read as a game that is still being played.
+
+    The restart key is polled *here*, in DrawHUD, and that is the load-bearing
+    detail. Event Tick does not run while the game is paused, so a key polled
+    there would never be seen -- but DrawHUD is called from the renderer every
+    frame regardless, and APlayerController sets bTickEvenWhenPaused, so its
+    PlayerInput is still updated and WasInputKeyJustPressed still answers.
+
+    Restarting is SetGamePaused(false) *then* OpenLevel: a level opened while
+    the world is paused comes up paused, with nothing left able to unpause it.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    dead = keep(_at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
+                                                    GAME_MODE_CLASS_PATH),
+                    x0, y0 + 240))
+    _connect(mode_out, _pin(dead, "self"))
+    over = keep(_at(ed.add_branch_node(), x0 + 260, y0))
+    _connect(_pin(dead, PLAYER_DEAD_VAR, is_input=False), _pin(over, "Condition"))
+    for e in in_execs:
+        _connect(e, _pin(over, "execute"))
+
+    # Centred on the viewport, so the panel lands in the middle of any window.
+    size = keep(_at(_node(ed, FN_VIEWPORT), x0 + 260, y0 + 420))
+    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 500, y0 + 420))
+    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
+
+    def centred(axis, span, py):
+        half = keep(_at(_node(ed, FN_MUL), x0 + 740, py))
+        _connect(_loose_pin(wh, axis, is_input=False), _pin(half, "A"))
+        _set(half, "B", 0.5)
+        off = keep(_at(_node(ed, FN_SUB), x0 + 980, py))
+        _connect(_pin(half, "ReturnValue", is_input=False), _pin(off, "A"))
+        _set(off, "B", span)
+        return _pin(off, "ReturnValue", is_input=False)
+
+    panel_x = centred("X", DEATH_PANEL[0] / 2.0, y0 + 420)
+    panel_y = centred("Y", DEATH_PANEL[1] / 2.0, y0 + 560)
+
+    panel = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 1240, y0))
+    _set(panel, "RectColor", COL_DEATH_PANEL)
+    _set(panel, "ScreenW", DEATH_PANEL[0])
+    _set(panel, "ScreenH", DEATH_PANEL[1])
+    _connect(panel_x, _pin(panel, "ScreenX"))
+    _connect(panel_y, _pin(panel, "ScreenY"))
+    _connect(BEL.find_then_pin(over), _pin(panel, "execute"))
+
+    flow = BEL.find_then_pin(panel)
+    column = 0
+
+    def line(x_off, y_off, scale, color, px):
+        """One line of the menu, positioned relative to the panel's corner."""
+        nonlocal flow, column
+        column += 1
+        at_x = keep(_at(_node(ed, FN_ADD), px, y0 + 700 + column * 140))
+        _connect(panel_x, _pin(at_x, "A"))
+        _set(at_x, "B", x_off)
+        at_y = keep(_at(_node(ed, FN_ADD), px, y0 + 770 + column * 140))
+        _connect(panel_y, _pin(at_y, "A"))
+        _set(at_y, "B", y_off)
+        n = keep(_at(_node(ed, FN_DRAW_TEXT), px + 240, y0))
+        _set(n, "TextColor", color)
+        _set(n, "Scale", scale)
+        _set(n, "bScalePosition", "false")
+        _connect(_pin(at_x, "ReturnValue", is_input=False), _pin(n, "ScreenX"))
+        _connect(_pin(at_y, "ReturnValue", is_input=False), _pin(n, "ScreenY"))
+        _connect(flow, _pin(n, "execute"))
+        flow = BEL.find_then_pin(n)
+        return n
+
+    title = line(150.0, 50.0, DEATH_TITLE_SCALE, COL_DEATH_TITLE, x0 + 1480)
+    _set(title, "Text", "YOU DIED")
+
+    # The same counter the corner shows, read once more so the final score is
+    # the live number rather than a copy taken when the player fell.
+    kills = keep(_at(ed.add_get_member_variable_node(KILL_COUNT_VAR,
+                                                     GAME_MODE_CLASS_PATH),
+                     x0 + 1240, y0 + 1120))
+    _connect(mode_out, _pin(kills, "self"))
+    kills_str = keep(_at(_node(ed, FN_INT_TO_STR), x0 + 1480, y0 + 1120))
+    _connect(_pin(kills, KILL_COUNT_VAR, is_input=False), _pin(kills_str, "InInt"))
+    score_text = keep(_at(_node(ed, FN_CONCAT), x0 + 1720, y0 + 1120))
+    _set(score_text, "A", "NPCs killed:  ")
+    _connect(_pin(kills_str, "ReturnValue", is_input=False), _pin(score_text, "B"))
+
+    score = line(150.0, 140.0, DEATH_SCORE_SCALE, COL_DEATH_TEXT, x0 + 2000)
+    _connect(_pin(score_text, "ReturnValue", is_input=False), _pin(score, "Text"))
+
+    hint = line(150.0, 220.0, DEATH_HINT_SCALE, COL_DEATH_HINT, x0 + 2520)
+    _set(hint, "Text", f"[{RESTART_KEY}]   try again")
+
+    # --- the restart itself --------------------------------------------------
+    pc = keep(_at(_node(ed, FN_GET_OWNING_PC), x0 + 3040, y0 + 300))
+    pressed = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 3280, y0 + 300))
+    _connect(_pin(pc, "ReturnValue", is_input=False), _pin(pressed, "self"))
+    _set(pressed, "Key", RESTART_KEY)
+    again = keep(_at(ed.add_branch_node(), x0 + 3540, y0))
+    _connect(_pin(pressed, "ReturnValue", is_input=False), _pin(again, "Condition"))
+    _connect(flow, _pin(again, "execute"))
+
+    unpause = keep(_at(_node(ed, FN_SET_PAUSED), x0 + 3800, y0))
+    _set(unpause, "bPaused", "false")
+    _connect(BEL.find_then_pin(again), _pin(unpause, "execute"))
+
+    # The current map by name, so the menu restarts whatever level is loaded
+    # rather than a path written down here that a generated level would not
+    # match. bRemovePrefixString strips PIE's UEDPIE_0_ -- without it the open
+    # would look for a map that only exists inside a running PIE session.
+    where = keep(_at(_node(ed, FN_LEVEL_NAME), x0 + 4060, y0))
+    _set(where, "bRemovePrefixString", "true")
+    _connect(BEL.find_then_pin(unpause), _pin(where, "execute"))
+    reopen = keep(_at(_node(ed, FN_OPEN_LEVEL), x0 + 4320, y0))
+    _connect(_pin(where, "ReturnValue", is_input=False), _pin(reopen, "LevelName"))
+    _connect(BEL.find_then_pin(where), _pin(reopen, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"The death menu, drawn instead of the HUD while the GameMode's "
+        f"{PLAYER_DEAD_VAR} is set and the game is paused. [{RESTART_KEY}] "
+        f"unpauses and reopens the current level, which resets the kill count "
+        f"with it -- the counter lives on the GameMode, and OpenLevel builds a "
+        f"new one.",
+        made)
+
+
 def _author_draw(ed, x0, y0):
     draw = ed.create_node_from_name(NODE_DRAW_HUD, unreal.Vector2D(x0, y0), [])
     if not draw:
         raise RuntimeError(f"could not create {NODE_DRAW_HUD}")
 
+    # Dead or alive, before anything is drawn. The death menu replaces the HUD
+    # rather than covering it, so this branch is the first thing in the frame.
+    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 - 700, y0 + 240)
+    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 - 440, y0)
+    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(BEL.find_then_pin(draw), _pin(as_mode, "execute"))
+    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
+
+    alive = _at(ed.add_branch_node(), x0 - 180, y0)
+    dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
+                                                   GAME_MODE_CLASS_PATH),
+                   x0 - 440, y0 + 240)
+    _connect(mode_out, _pin(dead_get, "self"))
+    _connect(_pin(dead_get, PLAYER_DEAD_VAR, is_input=False), _pin(alive, "Condition"))
+    _connect(BEL.find_then_pin(as_mode), _pin(alive, "execute"))
+
+    _author_death_menu(ed, x0 + 3000, y0 + 3000,
+                       (BEL.find_then_pin(alive),), mode_out)
+
+    # A GameMode that is not BP_ThirdPersonGameMode cannot say whether the
+    # player is dead, so it is treated as alive and the HUD draws as normal --
+    # a missing death menu is recoverable, a missing HUD is not.
+    living = (BEL.find_else_pin(alive),
+              _pin(as_mode, "CastFailed", is_input=False))
+
     # HP first, so it is on screen whether or not the menu is open.
-    after_hp = _author_hp(ed, x0, y0 - 900, BEL.find_then_pin(draw))
+    after_hp = _author_hp(ed, x0, y0 - 900, living)
+    after_st = _author_stamina(ed, x0, y0 - 1600, after_hp)
+    after_kills = _author_kills(ed, x0, y0 - 2300, after_st)
 
     # Then the world-space NPC bars and the inventory strip, both of which are
     # always on screen for the same reason the HP bar is.
-    after_npc = _author_npc_bars(ed, x0, y0 - 2300, after_hp)
-    after_inv = _author_inventory(ed, x0, y0 - 3900, after_npc)
+    after_npc = _author_npc_bars(ed, x0, y0 - 3200, after_kills)
+    after_inv = _author_inventory(ed, x0, y0 - 5000, after_npc)
 
     # Last of the always-on layers, so the crosshair sits on top of the rest.
-    after_aim = _author_reticle(ed, x0, y0 - 5600, after_inv)
+    after_aim = _author_reticle(ed, x0, y0 - 6800, after_inv)
 
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 240, y0 + 200)
     br = _at(ed.add_branch_node(), x0 + 420, y0)
@@ -1143,7 +1522,8 @@ def build_hud_blueprint(rebuild=False):
     # in the node name rather than a missing asset.
     for path in ("/Game/Weapons/BP_HealthComponent",
                  "/Game/Weapons/BP_WeaponComponent",
-                 "/Game/Weapons/BP_WeaponItem"):
+                 "/Game/Weapons/BP_WeaponItem",
+                 GAME_MODE_PATH):
         if not _asset_sub().load_asset(path):
             raise RuntimeError(f"could not load {path} for its cast node")
 

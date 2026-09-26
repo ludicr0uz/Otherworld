@@ -72,7 +72,7 @@ touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / H
 
 It also draws the player's HP bar (see "The shotgun and health").
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 27 checks. Run it after any
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 33 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
@@ -104,7 +104,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**68 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**81 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
@@ -132,54 +132,74 @@ Tick's last block consumes it and runs the single equip sequence. Weapons are sp
 BeginPlay and then hidden/shown, never destroyed, so a weapon keeps its identity across
 switches and dropping can hand the very same actor to the world.
 
-**The pellet cone starts at the muzzle**, not the camera. Tracing from the camera is the usual
-third-person shortcut, but the camera sits on a boom *behind* the player, which is exactly why
-the spread appeared to come from behind their shoulder. The origin is now
-`TransformLocation(weapon transform, MuzzleOffset)` and only the *direction* comes from the
-camera. `verify_weapons_and_combat.py` asserts a trace is fed by a `TransformLocation` node.
+### Aiming: the hybrid, and the reticle
 
-**Death and respawn live on the health component**, driven by three defaults rather than by
-subclassing: `DespawnOnDeath` (false on the player, so the player just sits at 0),
-`RespawnClass`, and `SpawnOrigin` captured at BeginPlay. At 0 HP the NPC spawns a replacement
-on a random navmesh point within 40 m *of where it started* and destroys itself. The
-replacement carries the same component with the same defaults, so the cycle sustains itself
-with nothing tracking it. `auto_possess_ai` is set to `PlacedInWorldOrSpawned` on
-`BP_ForestWanderer` or a spawned wanderer would have no AI controller.
+Neither obvious origin works on its own. **Muzzle-only** is geometrically honest and
+unplayable — the barrel sits below and to the side of the camera, so shots land off the
+crosshair, and a player standing beside a wall shoots the wall while their crosshair is on an
+enemy in the open. **Camera-only** is playable and looks broken — the camera is on a boom
+*behind* the shoulder, so the cone visibly fans out from behind the player.
 
-### The ready pose — and why it is a slot, not a state machine
-
-The project ships a full Mannequin set (`MF_Rifle_Idle_ADS`, `MF_Pistol_Idle_ADS`, directional
-rifle/pistol walk and jog, aim offsets) but **only one Anim Blueprint**, `ABP_Unarmed`, which
-uses none of it. A rifle locomotion state machine cannot be authored from Python: `UBlendSpace`
-exposes **no sample-authoring API at all**, so the directional sets cannot be assembled into the
-blend spaces such a graph needs.
-
-What *is* possible is playing into a slot. `ABP_Unarmed`'s AnimGraph is
-`StateMachine → Slot(DefaultSlot) → ControlRig → Root`, and that slot is **full-body** — played
-as-is, an ADS idle freezes the legs and the character slides. So `patch_anim_blueprint()`
-inserts a **Layered blend per bone** with a `spine_01` branch filter:
+So Tick resolves the aim **every frame, before the trigger is even checked** (the reticle has to
+be right on the frames where nothing is fired, which is most of them):
 
 ```
-StateMachine --+---------------------------> LayeredBoneBlend.BasePose ---+
-               |                                                          |--> ControlRig
-               +--> Slot(DefaultSlot) ------> LayeredBoneBlend.BlendPose --+
+camera location + forward * AIM_TRACE_RANGE  --LineTrace-->  AimPoint   what is being aimed at
+muzzle --LineTrace--> AimPoint                               AimPoint   can the gun reach it?
+                                                             AimBlocked  if it stopped short
 ```
 
-`DefaultSlot` becomes upper-body-only, and `PlaySlotAnimationAsDynamicMontage(AimPose,
-"DefaultSlot", LoopCount=9999)` puts the arms and chest in the ready pose while the legs keep
-walking, running and jumping. One new node, one rewire. It is idempotent (it checks for an
-existing `LayeredBoneBlend`) and verified at runtime, not just statically.
+Step 2 is not a safety check bolted on — it is the same line the pellets fly down, so the
+reticle cannot promise a hit the shot will not make. Firing then only has to spread a cone
+around `Normal(AimPoint - muzzle)`; `PelletCount`/`SpreadDegrees` make a 1-shot pistol and an
+8-pellet shotgun the same code path. This is **hitscan**; a projectile version would keep the
+identical aim resolve and fire a velocity along `AimPoint - muzzle` instead of tracing it.
 
-**Consequence:** every montage played on `DefaultSlot` is now upper-body-only for this
-skeleton. Nothing here plays a full-body montage (the NPC despawns rather than playing a death
-animation), but a future death or knockdown animation needs its own slot.
-Note also that the shipped `MM_Pistol_Fire_Montage` targets a slot called **"Arms"** which does
-not exist in this AnimGraph — it would play at zero weight.
+`BP_WeaponComponent` publishes `AimPoint` / `AimValid` / `AimBlocked`; the HUD projects
+`AimPoint` back onto the canvas and draws the reticle **there**, not at screen centre. Walk up
+to a tree with the crosshair on an NPC beyond it and the reticle jumps to the bark in front of
+the barrel and turns red, because that is genuinely where the shot goes.
+
+Only the pellet traces are drawn (`TRACE_DEBUG_SECONDS`). The two aim traces run every frame
+and would paint the screen solid.
+
+### How a weapon is oriented in the hand
+
+**Tick turns the held weapon to face the aim point, every frame.** It is not a baked grip
+offset. A baked offset has to be correct in whatever pose the arms are actually in, which means
+predicting how the aim montage, the layered blend and the Control Rig compose on `HandGrip_R` —
+and that question was answered confidently and wrongly twice. Driving the rotation makes it
+moot, and it buys something a fixed grip never could: the barrel tracks pitch, so aiming up
+raises the gun.
+
+The rotation is solved from the weapon's *location* (`MakeRotFromX(AimPoint - weapon location)`),
+not from its muzzle, so nothing depends on the value about to be written — the attach point is
+snapped to the socket and does not move when the rotation changes.
+
+`GripRotation` survives only as the resting orientation for the single frame between equipping
+and the next aim resolve. Both weapons share it: it is the orientation of the *hand*, which does
+not depend on what is in it.
+
+**Do not compute hand orientation offline.** `AnimPoseExtensions` looks authoritative and
+disagrees with the engine: composing `HandGrip_R` onto `hand_r` from a sampled pose predicted a
+socket +X of `(0.65, -0.26, -0.72)` where the live skeleton reports `(0.996, 0.057, -0.065)`.
+The offline number produced a barrel pointing 90° to the player's left while every assertion
+built on the same maths said "straight ahead" — a self-consistent wrong answer, which is the
+worst kind. `_measure_grip_rotation()` spawns a character into the **editor world** and reads
+`get_socket_transform(..., RTS_COMPONENT)` instead.
+
+`verify_weapons_and_combat.py` checks the same thing **end to end** rather than by re-deriving
+it: spawn the character, attach the weapon exactly as the game does (snap to `HandGrip_R`, apply
+the saved `GripRotation`), and read the barrel's world direction back off the engine. It must be
+`(1, 0, 0)`. Note also that posing a live mesh headlessly does **not** work — `play_animation` +
+`set_position` leaves the socket identical for two different animations, and
+`refresh_bone_transforms` is not exposed, so the editor world can only ever be asked about the
+reference pose.
 
 ### The HUD
 
 `build_graphics_menu.py` draws, every frame: the player's HP bar (top-left), a projected health
-bar over every wanderer, and a 5-slot inventory strip centred along the bottom. Slot colour and
+bar over every wanderer, a 5-slot inventory strip centred along the bottom, and the reticle. Slot colour and
 name are read from each weapon's own `SlotColor`/`DisplayName`, so the HUD keeps no list of
 weapons to fall out of step with. The strip is laid out from the viewport size so it stays
 centred and bottom-anchored at any window size.
@@ -190,11 +210,13 @@ centred and bottom-anchored at any window size.
   recoverable with E; both weapons fire with sound, blood and muzzle-origin spread, and the
   character holds the matching ready pose while moving. The NPC has a floating health bar,
   dies at 0 HP and respawns elsewhere on the navmesh. Built by
-  `build_weapons_and_combat.py` — 68/68 in-engine checks, 29/29 HUD checks, and a runtime
-  `-game` pass with 0 accessed-none in which spawn, attach and the aim montage were all
-  confirmed to execute.
-- Not verified headlessly, and worth a look in a play session: how the two weapons *sit* in
-  the hand, whether the pistol grip angle reads right, and how the blood splash looks.
+  `build_weapons_and_combat.py` — **81/81** in-engine checks, **33/33** HUD checks.
+  Aiming is the camera/muzzle hybrid described above, with a reticle on the real impact point,
+  and the held weapon is turned to face that point every frame.
+- Not verified headlessly, and worth a look in a play session: how the reticle reads while
+  moving, how much the gun visibly detaches from the hand now that its rotation is driven, and
+  how the blood splash looks. The last runtime `-game` pass predates the hybrid aim, the
+  reticle and the driven weapon rotation.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
@@ -239,6 +261,17 @@ centred and bottom-anchored at any window size.
   needs a fraction. `verify_weapons_and_combat.py` guards this by asserting
   `isinstance(cdo.get_editor_property(var), float)` — an int property hands Python an `int`.
   `build_shotgun_and_health.py` has this bug throughout; it is superseded, not fixed.
+- **`set_pin_value`'s return value is not a usable signal**, and a pin that quietly stays
+  empty compiles as **zero**. Both builders' `_set()` now writes the pin and then *reads it
+  back*, raising if the literal did not land — an empty numeric pin is accepted only when the
+  value written was itself zero, since a blank literal genuinely is 0. Adding that guard
+  immediately surfaced two live instances: the camera aim ray's 1 km length, and `DROP_FORWARD`,
+  which meant dropped weapons had been landing on the player's own feet rather than 120 cm
+  ahead. Both looked perfect in the graph.
+- **UE 5 promotes `Multiply_VectorFloat` to a wildcard operator**, and with nothing connected
+  its `B` pin is a **vector** — a struct pin, which takes no literal at all. Connecting a float
+  works; setting a float *literal* silently does nothing. Multiply component-wise by a
+  `MakeVector(R, R, R)` instead. This is the specific shape both bugs above took.
 - **Struct pins reject `set_pin_value` outright.** Every format for an `FVector` pin
   (`"5,5,5"`, `"(X=5,Y=5,Z=5)"`, `"X=5 Y=5 Z=5"`, …) returns False and leaves the pin empty,
   which the compiler then reads as the **zero vector** — a zero scale on a spawn transform
@@ -248,6 +281,17 @@ centred and bottom-anchored at any window size.
   `Failed to set default value … on A`, but `set_pin_value`'s return is the real signal — and
   note it also returns False when the value you set equals the pin's existing default, so a
   False is not always a failure.
+- **An animation pose can be sampled from Python**, which is what makes a derived grip
+  possible: `AnimPoseExtensions.get_anim_pose_at_time(seq, t, AnimPoseEvaluationOptions())`
+  then `get_bone_pose(pose, bone, AnimPoseSpaces.WORLD)`. Note `WORLD` there means **component**
+  space — a pose has no world to be in. `SkeletalMesh.find_socket(name)` gives the socket's
+  parent bone and relative transform (`SkeletalMesh.Sockets` itself is protected and
+  unreadable), and `MathLibrary.compose_transforms(A, B)` is A-then-B, so
+  `socket_component = compose(socket_relative, bone_component)`.
+- **`BlueprintEditorLibrary` has no `get_function_name`.** To tell *which* function a call node
+  wraps, use `get_node_title` — `"GetCameraLocation"`, `"vector * vector"`, `"MakeVector"`,
+  `"Get AimPoint"`. Pin sets alone cannot separate two nodes that both take `self` and return a
+  value, which is how `verify_weapons_and_combat.py` distinguishes the four traces.
 - **AnimGraphs *are* authorable from Python; blend spaces are not.**
   `BlueprintGraphEditor.get_graph_editor_by_name(anim_bp, "AnimGraph")` returns a working
   editor: anim nodes can be created from the palette (`Animation|Blends|Layeredblendperbone`),

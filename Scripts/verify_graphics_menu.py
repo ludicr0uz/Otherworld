@@ -145,8 +145,8 @@ def main():
     # One backs the quality panel, two are the player's HP track and fill, two
     # more are an NPC bar's track and fill, five are the empty inventory slots,
     # and the last two are a filled slot and the equipped slot's underline.
-    expected_rects = 1 + 2 + 2 + G.INVENTORY_SIZE + 2
-    check(f"{expected_rects} DrawRects: panel, HP, NPC bar, inventory",
+    expected_rects = 1 + 2 + 2 + G.INVENTORY_SIZE + 2 + 5
+    check(f"{expected_rects} DrawRects: panel, HP, NPC bar, inventory, reticle",
           len(by_pins("RectColor")) == expected_rects,
           str(len(by_pins("RectColor"))))
 
@@ -166,12 +166,40 @@ def main():
     check("HUD reads Health and MaxHealth for both the player and the NPCs",
           len(health_reads) == 4, str(len(health_reads)))
 
+    # --- the reticle
+    # It must not be pinned to the centre of the screen: its position comes from
+    # the weapon component's resolved impact point, through Project().
+    projects = [n for n in nodes
+                if str(BEL.get_node_title(n)).replace("\n", " ") == "Project"]
+    check("two Project() calls: the NPC bars and the reticle",
+          len(projects) == 2, str(len(projects)))
+    aim_reads = [n for n in nodes
+                 if str(BEL.get_node_title(n)) in
+                 ("Get AimPoint", "Get AimValid", "Get AimBlocked")]
+    check("the reticle reads AimPoint, AimValid and AimBlocked off the weapon",
+          len(aim_reads) == 3, str(sorted(str(BEL.get_node_title(n))
+                                          for n in aim_reads)))
+    reticle_reads = {str(BEL.get_node_title(n)) for n in aim_reads}
+    point = [n for n in aim_reads if str(BEL.get_node_title(n)) == "Get AimPoint"]
+    if point and projects:
+        fed = {PIN.get_owning_node(q)
+               for pr in projects
+               for q in BEL.find_input_pin(pr, "Location").list_connected_pins()}
+        check("the reticle is drawn where the shot lands, not at screen centre",
+              any(n in fed for n in point),
+              "AimPoint feeds a Project() call")
+    check("a blocked shot colours the reticle differently",
+          any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
+          and "Get AimBlocked" in reticle_reads)
+
     lookups = by_pins("ComponentClass")
     wanted = {G.HEALTH_CLASS_PATH, G.WEAPON_COMP_CLASS_PATH}
     found = {str(BEL.find_input_pin(n, "ComponentClass").get_pin_value())
              for n in lookups}
+    # Four: the player's health, an NPC's health, the weapon component for the
+    # inventory strip, and the weapon component again for the reticle.
     check("HUD looks up health (player + NPC) and the weapon component",
-          len(lookups) == 3 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 4 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # A fill rect's width is computed from a health fraction; the track behind it

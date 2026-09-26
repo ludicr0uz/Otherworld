@@ -167,6 +167,20 @@ COL_SLOT_BACK = "(R=0.020000,G=0.025000,B=0.035000,A=0.700000)"
 COL_SLOT_NAME = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
 COL_SLOT_MARK = "(R=1.000000,G=0.820000,B=0.320000,A=1.000000)"
 
+# --- reticle, drawn at the point the shot will actually land ------------------
+# Not at the centre of the screen. The centre is where the *camera* is looking,
+# and the shot leaves the muzzle, so the two only agree at infinity. The weapon
+# component resolves the real impact point every frame (BP_WeaponComponent's
+# AimPoint); this projects that world point back onto the canvas, so the reticle
+# sits on the thing that is about to be hit -- including on the near side of a
+# tree the camera can see straight past.
+RETICLE_GAP = 7.0          # pixels of clear space around the centre dot
+RETICLE_ARM = 11.0         # length of each of the four ticks
+RETICLE_THICK = 2.0
+RETICLE_DOT = 3.0
+COL_RETICLE = "(R=0.960000,G=0.960000,B=0.970000,A=0.900000)"
+COL_RETICLE_BLOCKED = "(R=0.950000,G=0.250000,B=0.200000,A=0.950000)"
+
 # ─── Function paths for the graph nodes ──────────────────────────────────────
 
 FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
@@ -197,6 +211,7 @@ FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
 FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
+FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"
 
 # The DrawHUD event is not one of the placeholder nodes a fresh Blueprint ships
 # with (BeginPlay and Tick are), so it has to be created from the palette.
@@ -292,7 +307,34 @@ def _connect(a, b):
 
 
 def _set(node, name, value):
-    _pin(node, name).set_pin_value(str(value))
+    """Set a pin's literal, and prove it landed.
+
+    set_pin_value's return is useless as a signal -- False means both "rejected"
+    and "already equal to the default" -- so the pin is read back instead. A pin
+    that quietly stayed empty compiles as zero and looks perfect in the graph,
+    which is exactly how a scale factor can go missing without a single warning.
+    """
+    pin = _pin(node, name)
+    pin.set_pin_value(str(value))
+    got = str(PIN.get_pin_value(pin))
+    if not _literal_matches(got, value):
+        raise RuntimeError(f"pin {name!r} would not take {value!r} — it reads "
+                           f"back as {got!r} (struct pins reject every format; "
+                           "build the constant as a node instead)")
+
+
+def _literal_matches(got, want):
+    want = str(want)
+    if got == want:
+        return True
+    try:
+        # An empty numeric pin *is* zero: the compiler reads a blank literal as
+        # 0, so setting zero and reading back "" is a genuine match.
+        return abs(float(got or 0.0) - float(want)) < 1e-6
+    except ValueError:
+        pass
+    # Enum literals read back namespaced, bools lower-cased.
+    return got.lower() == want.lower() or got.endswith(f"::{want}")
 
 
 def _at(node, x, y):
@@ -826,6 +868,130 @@ def _author_inventory(ed, x0, y0, in_execs):
             _pin(cast, "CastFailed", is_input=False))
 
 
+def _author_reticle(ed, x0, y0, in_execs):
+    """A crosshair on the point the shot will land, not on the centre of the screen.
+
+    The centre of the screen is where the camera is looking; the pellets leave
+    the muzzle, a metre below and to the side of it, so the two only agree at
+    infinity. BP_WeaponComponent already resolves the real impact point every
+    frame -- camera trace to find the target, muzzle trace to check the gun can
+    reach it -- so all this has to do is Project() that world point back onto
+    the canvas.
+
+    The payoff is that the reticle can be wrong-in-the-right-way: walk up to a
+    tree with the crosshair on an NPC beyond it and the reticle jumps to the
+    bark in front of the barrel and turns red, because that is genuinely where
+    the shot goes.
+
+    Four ticks and a dot, from DrawRect: DrawLine would be the obvious tool but
+    five rects need no new node type, and at these sizes the shapes are
+    identical.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    pawn = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 300))
+    _set(pawn, "PlayerIndex", 0)
+    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 240, y0 + 300))
+    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
+
+    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 500, y0))
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    for e in in_execs:
+        _connect(e, _pin(cast, "execute"))
+    as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
+
+    valid = keep(_at(ed.add_get_member_variable_node("AimValid",
+                                                     WEAPON_COMP_CLASS_PATH),
+                     x0 + 760, y0 + 300))
+    _connect(as_weapon, _pin(valid, "self"))
+    point = keep(_at(ed.add_get_member_variable_node("AimPoint",
+                                                     WEAPON_COMP_CLASS_PATH),
+                     x0 + 760, y0 + 420))
+    _connect(as_weapon, _pin(point, "self"))
+    blocked = keep(_at(ed.add_get_member_variable_node("AimBlocked",
+                                                       WEAPON_COMP_CLASS_PATH),
+                       x0 + 760, y0 + 540))
+    _connect(as_weapon, _pin(blocked, "self"))
+
+    # Empty hands draw nothing: a reticle with no weapon behind it would be
+    # pointing at a shot that cannot be taken.
+    armed = keep(_at(ed.add_branch_node(), x0 + 1020, y0))
+    _connect(_pin(valid, "AimValid", is_input=False), _pin(armed, "Condition"))
+    _connect(BEL.find_then_pin(cast), _pin(armed, "execute"))
+
+    proj = keep(_at(_node(ed, FN_PROJECT), x0 + 1020, y0 + 420))
+    _connect(_pin(point, "AimPoint", is_input=False), _pin(proj, "Location"))
+    parts = keep(_at(_node(ed, FN_BREAK_VECTOR), x0 + 1280, y0 + 420))
+    _connect(_pin(proj, "ReturnValue", is_input=False), _loose_pin(parts, "InVec"))
+
+    # Same trap as the NPC bars: Project's Z is the depth, and it goes negative
+    # behind the camera, where the X/Y it returns are a mirrored fiction.
+    in_front = keep(_at(_node(ed, FN_GREATER), x0 + 1540, y0 + 560))
+    _connect(_pin(parts, "Z", is_input=False), _pin(in_front, "A"))
+    _set(in_front, "B", 0.0)
+    visible = keep(_at(ed.add_branch_node(), x0 + 1800, y0))
+    _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(visible, "Condition"))
+    _connect(BEL.find_then_pin(armed), _pin(visible, "execute"))
+
+    colour = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1800, y0 + 700))
+    _set(colour, "A", COL_RETICLE_BLOCKED)
+    _set(colour, "B", COL_RETICLE)
+    _connect(_pin(blocked, "AimBlocked", is_input=False), _pin(colour, "bPickA"))
+    colour_out = _pin(colour, "ReturnValue", is_input=False)
+
+    cx = _pin(parts, "X", is_input=False)
+    cy = _pin(parts, "Y", is_input=False)
+
+    def offset(src, by, px, py):
+        """cx + by, as a node -- DrawRect wants the corner and we have the centre."""
+        n = keep(_at(_node(ed, FN_ADD), px, py))
+        _connect(src, _pin(n, "A"))
+        _set(n, "B", by)
+        return _pin(n, "ReturnValue", is_input=False)
+
+    half_t = RETICLE_THICK / 2.0
+    half_d = RETICLE_DOT / 2.0
+    inner = RETICLE_GAP
+    outer = RETICLE_GAP + RETICLE_ARM
+    # (dx, dy, w, h) of each piece relative to the impact point on screen.
+    pieces = (
+        ("left",   -outer,   -half_t,  RETICLE_ARM,   RETICLE_THICK),
+        ("right",   inner,   -half_t,  RETICLE_ARM,   RETICLE_THICK),
+        ("top",    -half_t,  -outer,   RETICLE_THICK, RETICLE_ARM),
+        ("bottom", -half_t,   inner,   RETICLE_THICK, RETICLE_ARM),
+        ("dot",    -half_d,  -half_d,  RETICLE_DOT,   RETICLE_DOT),
+    )
+
+    flow = BEL.find_then_pin(visible)
+    for i, (name, dx, dy, w, h) in enumerate(pieces):
+        px = x0 + 2100 + i * 260
+        r = keep(_at(_node(ed, FN_DRAW_RECT), px, y0))
+        _set(r, "ScreenW", w)
+        _set(r, "ScreenH", h)
+        _connect(colour_out, _pin(r, "RectColor"))
+        _connect(offset(cx, dx, px, y0 + 300), _pin(r, "ScreenX"))
+        _connect(offset(cy, dy, px, y0 + 440), _pin(r, "ScreenY"))
+        _connect(flow, _pin(r, "execute"))
+        flow = BEL.find_then_pin(r)
+
+    ed.add_comment_to_nodes(
+        "Reticle. Its position comes from BP_WeaponComponent.AimPoint -- the "
+        "world point the pellets will actually reach -- so it is not pinned to "
+        "the centre of the screen and it turns red when the muzzle's line is "
+        "blocked short of what the camera is looking at.",
+        made)
+
+    return (flow,
+            BEL.find_else_pin(armed),
+            BEL.find_else_pin(visible),
+            _pin(cast, "CastFailed", is_input=False))
+
+
 # ─── Event ReceiveDrawHUD: the panel ─────────────────────────────────────────
 
 def _author_draw(ed, x0, y0):
@@ -841,12 +1007,15 @@ def _author_draw(ed, x0, y0):
     after_npc = _author_npc_bars(ed, x0, y0 - 2300, after_hp)
     after_inv = _author_inventory(ed, x0, y0 - 3900, after_npc)
 
+    # Last of the always-on layers, so the crosshair sits on top of the rest.
+    after_aim = _author_reticle(ed, x0, y0 - 5600, after_inv)
+
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 240, y0 + 200)
     br = _at(ed.add_branch_node(), x0 + 420, y0)
     _connect(_pin(get_open, "MenuOpen", is_input=False), _pin(br, "Condition"))
     # Every path above -- drawn or cast-failed -- falls through to the menu; an
     # exec input takes more than one link, so no Sequence node is needed.
-    for exec_out in after_inv:
+    for exec_out in after_aim:
         _connect(exec_out, _pin(br, "execute"))
 
     rect = _at(_node(ed, FN_DRAW_RECT), x0 + 640, y0)

@@ -38,6 +38,23 @@ firing code can read Damage/Spread/Range/FireSound off whatever is held. The
 alternative -- two sibling classes -- would need a cast and a duplicate branch
 per weapon in every graph that touches a weapon.
 
+HOW THE WEAPON IS ORIENTED (and why it is not a grip offset)
+------------------------------------------------------------
+Tick turns the held weapon to face the aim point, every frame. The obvious
+alternative -- bake a per-weapon GripRotation and let the hand carry it -- has
+to be correct in whatever pose the arms are actually in, which means predicting
+how the aim montage, the layered blend and the Control Rig compose on
+HandGrip_R. Offline pose maths answered that question confidently and wrongly:
+AnimPoseExtensions predicted a socket +X of (0.65, -0.26, -0.72) where the live
+engine reports (0.996, 0.057, -0.065), and the gun ended up pointing 90 degrees
+to the player's left while every number said straight ahead.
+
+Driving the rotation makes the question moot, and it does something a fixed
+grip never could: the barrel tracks pitch, so aiming up raises the gun.
+GripRotation survives only as the resting orientation for the single frame
+between equipping and the next aim resolve, and it is *measured* -- a character
+is spawned into the editor world and asked where HandGrip_R points.
+
 THE AIM POSE (the part with a real constraint behind it)
 --------------------------------------------------------
 The project ships a full Mannequin animation set: MF_Rifle_Idle_ADS,
@@ -77,13 +94,38 @@ BP_WeaponComponent event graph:
          --> Branch WasInputKeyJustPressed(G)               --> drop held
          --> Branch WasInputKeyJustPressed(E)               --> pick up nearest
 
+  Tick also resolves the aim every frame, before the trigger is even looked at,
+  because the reticle depends on it:
+
+    camera -> LineTrace -> AimPoint      what the crosshair is resting on
+    turn the held weapon to face AimPoint
+    muzzle -> LineTrace -> AimPoint      can the gun actually reach it?
+                                         if not, AimPoint moves to the wall and
+                                         AimBlocked goes true (red reticle)
+
   Fire: muzzle world location  -> Start
-        camera aim point       -> direction
+        AimPoint - muzzle      -> direction
         N pellets in a cone    -> LineTraceSingle each
         hit -> BP_BloodSplash at the impact + Health -= Damage
+
+THE HYBRID AIM (why there are two traces and not one)
+------------------------------------------------------
+Aiming from the muzzle alone is geometrically honest and unplayable: the barrel
+is below and to the side of the camera, so shots land off the crosshair, and a
+player beside a wall shoots the wall while the crosshair is on an enemy in the
+open. Aiming from the camera alone is playable and looks broken: the camera is
+on a boom behind the shoulder, so the cone fans out from behind the player.
+
+The camera picks *what* is aimed at; the muzzle decides whether the gun can
+reach it, and the pellets then fly down that same muzzle line. The wall check is
+not an extra safety net -- it is the same trace the pellets use, which is what
+lets the reticle promise only hits the shot can actually make.
+
+This is hitscan: the pellets resolve in the frame they are fired. A projectile
+version would use the identical aim resolve and fire a velocity along
+(AimPoint - muzzle) instead of tracing it.
 """
 
-import math
 import os
 
 import unreal
@@ -150,11 +192,17 @@ RESPAWN_RADIUS = 4000.0
 
 GRIP_SOCKET = "HandGrip_R"
 
-# Where the skeleton says a held weapon's muzzle belongs, measured in
-# HandGrip_R's own space by querying the reference pose. Weapons are modelled
-# along local +X, so aiming +X at this point puts the barrel where Epic's rig
-# expects it instead of at a guessed angle.
-MUZZLE_IN_GRIP_SPACE = (99.108845, 45.728250, -19.447308)
+# How far the camera's aiming ray reaches when it finds nothing: the "point
+# arbitrarily far away" the shot is then aimed at. 1 km is past anything in a
+# 200 m level, so the ray effectively never runs out before the world does.
+AIM_TRACE_RANGE = 100000.0
+
+# The reticle turns red when the muzzle's own line to the aim point stops this
+# much short of it -- i.e. something is in front of the barrel that the camera
+# cannot see past the player's shoulder. Slack, not zero: the muzzle and the
+# camera converge on the same surface from different angles, so their hits are
+# never at exactly the same millimetre.
+BLOCKED_SLACK = 75.0
 
 # The bone the upper body blend starts at. spine_01 is the lowest spine joint,
 # so arms + chest follow the aim pose and the hips and legs keep locomotion.
@@ -236,7 +284,37 @@ def _connect(a, b):
 
 
 def _set(node, name, value):
-    _pin(node, name).set_pin_value(str(value))
+    """Set a pin's literal, and prove it landed.
+
+    set_pin_value's return is not a usable signal: it is False when the set
+    genuinely failed *and* when the value already equalled the pin's default.
+    Reading the pin back is. A pin that silently stayed empty compiles as zero,
+    which is how a 1 km aiming ray quietly became a 0 cm one -- and the shape of
+    the graph looked perfect the whole time.
+    """
+    pin = _pin(node, name)
+    pin.set_pin_value(str(value))
+    got = str(PIN.get_pin_value(pin))
+    if not _literal_matches(got, value):
+        raise RuntimeError(f"pin {name!r} would not take {value!r} — it reads "
+                           f"back as {got!r} (struct pins reject every format; "
+                           "build the constant as a node instead)")
+
+
+def _literal_matches(got, want):
+    want = str(want)
+    if got == want:
+        return True
+    try:
+        # An empty numeric pin *is* zero -- the compiler reads a blank literal
+        # as 0 -- so setting a pin to zero and reading back "" is a real match,
+        # not the silent failure this guard is looking for.
+        return abs(float(got or 0.0) - float(want)) < 1e-6
+    except ValueError:
+        pass
+    # Enum literals read back namespaced (EDrawDebugTrace::ForDuration), and
+    # bools read back lower-cased.
+    return got.lower() == want.lower() or got.endswith(f"::{want}")
 
 
 def _at(node, x, y):
@@ -430,17 +508,6 @@ def _rotate_vector(rotator, vector):
         return unreal.MathLibrary.greater_greater_vector_rotator(vector, rotator)
 
 
-def _grip_rotation():
-    """Rotator that points a weapon's local +X at the hand's muzzle socket."""
-    x, y, z = MUZZLE_IN_GRIP_SPACE
-    length = math.sqrt(x * x + y * y + z * z)
-    r = unreal.Rotator()
-    r.yaw = math.degrees(math.atan2(y, x))
-    r.pitch = math.degrees(math.asin(z / length))
-    r.roll = 0.0
-    return r
-
-
 def _barrel_rotation():
     """Rotation that turns a Cylinder's +Z axis into the weapon's +X.
 
@@ -453,6 +520,62 @@ def _barrel_rotation():
         if _rotate_vector(r, unreal.Vector(0.0, 0.0, 1.0)).x > 0.9:
             return r
     raise RuntimeError("no pitch maps a cylinder's +Z onto +X")
+
+
+def _pure_rotation(rotator):
+    """A rotation-only Transform, so ComposeTransforms can be used as rotator algebra."""
+    return unreal.Transform(location=unreal.Vector(0.0, 0.0, 0.0),
+                            rotation=rotator,
+                            scale=unreal.Vector(1.0, 1.0, 1.0))
+
+
+def _forward_in_mesh_space(mesh):
+    """Which way "the player is facing" points inside the mesh's own space.
+
+    The Mannequin's mesh is yawed 270 degrees inside the actor, so the actor's
+    forward (+X) is the mesh's +Y. Getting this backwards is a 90 degree error
+    in every weapon at once, which is why it is read off the component rather
+    than written down.
+    """
+    yaw = mesh.get_editor_property("relative_rotation").yaw
+    return _rotate_vector(_rot(yaw=-yaw), unreal.Vector(1.0, 0.0, 0.0))
+
+
+def _measure_grip_rotation():
+    """Solve the resting grip against a socket transform the *engine* measured.
+
+    This number only has to be right for the frame between equipping a weapon
+    and the first aim resolve -- Tick drives the held weapon's rotation from
+    then on -- but it still has to be right, because a wrong resting value is
+    what made the gun point 90 degrees left.
+
+    Measured, not computed. Sampling the pose offline with AnimPoseExtensions
+    looked authoritative and was not: composing HandGrip_R onto hand_r that way
+    predicted a socket +X of (0.65, -0.26, -0.72) where the live engine reports
+    (0.996, 0.057, -0.065). So a character is spawned into the editor world and
+    asked directly, which is the only version of this that has ever agreed with
+    what the game does.
+    """
+    actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    char_class = _assets().load_blueprint_class(CHARACTER_BP_PATH)
+    if not char_class:
+        raise RuntimeError(f"could not load {CHARACTER_BP_PATH} as a class")
+    actor = actors.spawn_actor_from_class(char_class, unreal.Vector(0.0, 0.0, 0.0),
+                                          unreal.Rotator(0.0, 0.0, 0.0))
+    try:
+        mesh = actor.get_component_by_class(unreal.SkeletalMeshComponent)
+        socket = _pure_rotation(mesh.get_socket_transform(
+            GRIP_SOCKET, unreal.RelativeTransformSpace.RTS_COMPONENT
+        ).rotation.rotator())
+        desired = _pure_rotation(unreal.MathLibrary.make_rot_from_xz(
+            _forward_in_mesh_space(mesh), unreal.Vector(0.0, 0.0, 1.0)))
+        grip = unreal.MathLibrary.compose_transforms(
+            desired, unreal.MathLibrary.invert_transform(socket)).rotation.rotator()
+    finally:
+        actors.destroy_actor(actor)
+    _log(f"grip rotation measured from the skeleton: pitch {grip.pitch:.1f}, "
+         f"yaw {grip.yaw:.1f}, roll {grip.roll:.1f}")
+    return grip
 
 
 def _rot(pitch=0.0, yaw=0.0, roll=0.0):
@@ -502,22 +625,26 @@ PISTOL_MUZZLE = (30.0, 0.0, 1.5)
 
 
 def _weapon_specs():
-    """Everything that differs between the two weapons, in one table."""
-    grip = _grip_rotation()
+    """Everything that differs between the two weapons, in one table.
+
+    Both weapons share a grip rotation, and that is not an oversight: it is the
+    resting orientation of the *hand*, which does not depend on what is in it.
+    What actually aims each weapon is Tick, which turns whatever is held to face
+    the aim point every frame. GripLocation stays at the socket for both --
+    HandGrip_R is placed in the fist already, and an invented offset is one more
+    number nobody can later explain.
+    """
+    grip = _measure_grip_rotation()
     return (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
              display="Shotgun", damage=9.0, pellets=8, spread=5.0, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=grip,
              colour=(0.85, 0.45, 0.10)),
-        # Held higher in the hand and rolled slightly, so the two weapons do not
-        # sit in the fist at the same angle; the bigger visual difference comes
-        # from the pistol ready pose, which is a different animation entirely.
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
              display="Pistol", damage=26.0, pellets=1, spread=1.0, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", aim=AIM_PISTOL,
-             grip_loc=(2.0, 0.0, 1.0),
-             grip_rot=_rot(pitch=grip.pitch + 4.0, yaw=grip.yaw, roll=-8.0),
+             grip_loc=(0.0, 0.0, 0.0), grip_rot=grip,
              colour=(0.35, 0.65, 0.95)),
     )
 
@@ -804,6 +931,8 @@ FN_SET_HIDDEN = "/Script/Engine.Actor.SetActorHiddenInGame"
 FN_SET_ACTOR_LOC = "/Script/Engine.Actor.K2_SetActorLocation"
 FN_SET_REL_LOC = "/Script/Engine.Actor.K2_SetActorRelativeLocation"
 FN_SET_REL_ROT = "/Script/Engine.Actor.K2_SetActorRelativeRotation"
+FN_SET_WORLD_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
+FN_ROT_FROM_X = "/Script/Engine.KismetMathLibrary.MakeRotFromX"
 FN_SET_SCALE = "/Script/Engine.Actor.SetActorScale3D"
 FN_DESTROY = "/Script/Engine.Actor.K2_DestroyActor"
 FN_LIFESPAN = "/Script/Engine.Actor.SetLifeSpan"
@@ -831,6 +960,7 @@ FN_ADD_FF = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
 FN_SUB_FF = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
 FN_LE_FF = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
 FN_LESS_FF = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
+FN_GREATER_FF = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
 FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
 
@@ -1134,16 +1264,70 @@ def _prop(ed, name, self_pin, x, y, class_path=ITEM_CLASS_PATH):
     return _pin(n, name, is_input=False), n
 
 
-def _author_fire(ed, held, owner_loc_src, exec_in, x0, y0):
-    """One trigger pull: sound, then one trace per pellet from the muzzle.
+def _trace_defaults(node, draw):
+    """The settings every trace in this file shares."""
+    _set(node, "TraceChannel", "TraceTypeQuery1")   # Visibility
+    _set(node, "bTraceComplex", "false")
+    # Ignores the pawn this component hangs off. The weapon actor is separate
+    # and *not* ignored, but every one of its parts is NoCollision, so a pellet
+    # cannot hit the gun it came out of.
+    _set(node, "bIgnoreSelf", "true")
+    if draw and TRACE_DEBUG_SECONDS > 0:
+        _set(node, "DrawDebugType", "ForDuration")
+        _set(node, "DrawTime", TRACE_DEBUG_SECONDS)
+    else:
+        _set(node, "DrawDebugType", "None")
 
-    The cone starts at the *muzzle*, not at the camera. Tracing from the camera
-    is the usual third-person trick -- it guarantees the shot goes where the
-    crosshair is -- but the camera sits on a boom behind the player, so the cone
-    visibly fans out from behind their shoulder. Here the origin is the barrel
-    tip (the weapon's MuzzleOffset through its own transform) and only the
-    *direction* comes from the camera: aim at the point the camera is looking
-    at, from where the gun actually is.
+
+def _muzzle_location(ed, held, x, y):
+    """World position of the held weapon's barrel tip, as a pure sub-graph.
+
+    Pure, so it can be shared: the aim resolve and the pellet loop must agree on
+    where the gun is, and the cheapest way to guarantee that is for them to read
+    the same nodes rather than each build their own copy.
+    """
+    xform = _at(_node(ed, FN_GET_TRANSFORM), x, y)
+    _connect(held, _pin(xform, "self"))
+    off_pin, _off = _prop(ed, "MuzzleOffset", held, x, y + 140)
+    at = _at(_node(ed, FN_TRANSFORM_LOC), x + 260, y)
+    _connect(_pin(xform, "ReturnValue", is_input=False), _pin(at, "T"))
+    _connect(off_pin, _pin(at, "Location"))
+    return _pin(at, "ReturnValue", is_input=False)
+
+
+def _author_resolve_aim(ed, held, exec_in, x0, y0):
+    """Work out where this frame's shot lands. The hybrid of the two obvious wrongs.
+
+    Aiming purely from the muzzle is honest and unplayable: the barrel sits below
+    and to the side of the camera, so the shot lands a little off wherever the
+    crosshair is, and a player standing beside a wall shoots the wall while their
+    crosshair is on an enemy in the open. Aiming purely from the camera is
+    playable and looks broken: the camera is on a boom behind the shoulder, so
+    the pellets visibly fan out from behind the player -- which is exactly what
+    was reported here.
+
+    So: the camera decides *what* is being aimed at, and the muzzle decides
+    whether the gun can actually reach it.
+
+      1. Trace from the camera along its forward vector. Whatever it hits is the
+         aim point; if it hits nothing, the aim point is a point a kilometre out,
+         which is the standard stand-in for "the sky".
+      2. Trace from the muzzle to that aim point. If something stops that second
+         line well short, *that* is where the shot lands -- the wall in front of
+         the barrel -- and AimBlocked says so, which is what turns the reticle
+         red.
+
+    Step 2 is not a separate safety check bolted on: it is the same line the
+    pellets themselves fly down, so the reticle cannot promise a hit the shot
+    will not make. The pellet loop then only has to spread a cone around
+    (AimPoint - muzzle).
+
+    In the middle of those two steps the held weapon is turned to face the aim
+    point, which is what actually makes the gun point where it shoots -- see
+    the module docstring for why that is driven rather than baked into a grip.
+
+    Runs before the fire gate and unconditionally, because the reticle has to be
+    right on frames where the trigger is not pulled -- which is most of them.
     """
     made = []
 
@@ -1151,37 +1335,164 @@ def _author_fire(ed, held, owner_loc_src, exec_in, x0, y0):
         made.append(n)
         return n
 
-    xform = keep(_at(_node(ed, FN_GET_TRANSFORM), x0, y0 + 300))
-    _connect(held, _pin(xform, "self"))
-    off_pin, off_n = _prop(ed, "MuzzleOffset", held, x0, y0 + 440)
-    keep(off_n)
-    muzzle_n = keep(_at(_node(ed, FN_TRANSFORM_LOC), x0 + 260, y0 + 300))
-    _connect(_pin(xform, "ReturnValue", is_input=False), _pin(muzzle_n, "T"))
-    _connect(off_pin, _pin(muzzle_n, "Location"))
-    muzzle = _pin(muzzle_n, "ReturnValue", is_input=False)
-
-    cam = keep(_at(_node(ed, FN_GET_CAM), x0, y0 + 600))
+    cam = keep(_at(_node(ed, FN_GET_CAM), x0, y0 + 260))
     _set(cam, "PlayerIndex", 0)
     cam_out = _pin(cam, "ReturnValue", is_input=False)
-    cam_loc = keep(_at(_node(ed, FN_CAM_LOC), x0 + 240, y0 + 580))
+    cam_loc = keep(_at(_node(ed, FN_CAM_LOC), x0 + 240, y0 + 260))
     _connect(cam_out, _pin(cam_loc, "self"))
-    cam_rot = keep(_at(_node(ed, FN_CAM_ROT), x0 + 240, y0 + 700))
+    cam_loc_out = _pin(cam_loc, "ReturnValue", is_input=False)
+    cam_rot = keep(_at(_node(ed, FN_CAM_ROT), x0 + 240, y0 + 400))
     _connect(cam_out, _pin(cam_rot, "self"))
-    fwd = keep(_at(_node(ed, FN_FORWARD), x0 + 460, y0 + 700))
+    fwd = keep(_at(_node(ed, FN_FORWARD), x0 + 480, y0 + 400))
     _connect(_pin(cam_rot, "ReturnValue", is_input=False), _pin(fwd, "InRot"))
+    reach = keep(_at(_node(ed, FN_MUL_VF), x0 + 720, y0 + 400))
+    _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(reach, "A"))
+    # The length goes in as a *vector* literal, not a float one. UE 5 promotes
+    # Multiply_VectorFloat to a wildcard operator, and with nothing connected
+    # its B pin is a vector -- which is a struct pin, which rejects every
+    # literal format there is. Multiplying component-wise by (R, R, R) is the
+    # same arithmetic and actually survives the save.
+    _connect(_vec(ed, AIM_TRACE_RANGE, AIM_TRACE_RANGE, AIM_TRACE_RANGE,
+                  x0 + 480, y0 + 560),
+             _pin(reach, "B"))
+    sky = keep(_at(_node(ed, FN_ADD_VV), x0 + 960, y0 + 320))
+    _connect(cam_loc_out, _pin(sky, "A"))
+    _connect(_pin(reach, "ReturnValue", is_input=False), _pin(sky, "B"))
+    sky_out = _pin(sky, "ReturnValue", is_input=False)
 
-    rng_pin, rng_n = _prop(ed, "WeaponRange", held, x0 + 460, y0 + 840)
-    keep(rng_n)
-    far = keep(_at(_node(ed, FN_MUL_VF), x0 + 700, y0 + 700))
-    _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(far, "A"))
-    _connect(rng_pin, _pin(far, "B"))
-    aim = keep(_at(_node(ed, FN_ADD_VV), x0 + 940, y0 + 620))
-    _connect(_pin(cam_loc, "ReturnValue", is_input=False), _pin(aim, "A"))
-    _connect(_pin(far, "ReturnValue", is_input=False), _pin(aim, "B"))
-    delta = keep(_at(_node(ed, FN_SUB_VV), x0 + 1180, y0 + 560))
-    _connect(_pin(aim, "ReturnValue", is_input=False), _pin(delta, "A"))
+    look = keep(_at(_node(ed, FN_TRACE), x0 + 1200, y0))
+    _connect(cam_loc_out, _pin(look, "Start"))
+    _connect(sky_out, _pin(look, "End"))
+    # Never drawn: this line runs from the camera through the player's own head
+    # every frame, so drawing it would fill the screen. Only the pellets are
+    # drawn, and only when they are actually fired.
+    _trace_defaults(look, draw=False)
+    _connect(exec_in, _pin(look, "execute"))
+
+    look_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 1200, y0 + 560))
+    _connect(_pin(look, "OutHit", is_input=False), _loose_pin(look_brk, "Hit"))
+    saw = keep(_at(ed.add_branch_node(), x0 + 1480, y0))
+    _connect(_pin(look, "ReturnValue", is_input=False), _pin(saw, "Condition"))
+    _connect(BEL.find_then_pin(look), _pin(saw, "execute"))
+
+    on_surface = keep(_at(ed.add_set_member_variable_node("AimPoint"), x0 + 1740, y0 - 160))
+    _connect(_loose_pin(look_brk, "Location", is_input=False), _pin(on_surface, "AimPoint"))
+    _connect(BEL.find_then_pin(saw), _pin(on_surface, "execute"))
+    at_sky = keep(_at(ed.add_set_member_variable_node("AimPoint"), x0 + 1740, y0 + 220))
+    _connect(sky_out, _pin(at_sky, "AimPoint"))
+    _connect(BEL.find_else_pin(saw), _pin(at_sky, "execute"))
+
+    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 2000, y0 + 320))
+    _connect(held, _pin(armed, "Object"))
+    holding = keep(_at(ed.add_branch_node(), x0 + 2240, y0))
+    _connect(_pin(armed, "ReturnValue", is_input=False), _pin(holding, "Condition"))
+    _connect(BEL.find_then_pin(on_surface), _pin(holding, "execute"))
+    _connect(BEL.find_then_pin(at_sky), _pin(holding, "execute"))
+
+    # Empty-handed: there is nothing to draw a reticle for, and no muzzle to
+    # trace from -- reading one off a null weapon is how Accessed None happens.
+    unarmed = keep(_at(ed.add_set_member_variable_node("AimValid"), x0 + 2500, y0 + 700))
+    _set(unarmed, "AimValid", "false")
+    _connect(BEL.find_else_pin(holding), _pin(unarmed, "execute"))
+
+    aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0 + 2500, y0 + 460))
+    aim_out = _pin(aim_get, "AimPoint", is_input=False)
+
+    # --- turn the gun to face the shot --------------------------------------
+    # The weapon's rotation is driven every frame rather than baked into a grip
+    # offset. A baked offset has to be right in whatever pose the arms happen to
+    # be in, which means guessing at the skeleton's conventions and at how the
+    # aim montage, the layered blend and the Control Rig compose -- and guessing
+    # wrong there is what left the barrel pointing 90 degrees to the left.
+    #
+    # Aiming from the weapon's *location* keeps this free of circularity: the
+    # attach point is snapped to the socket and does not move when the rotation
+    # changes, so nothing here depends on the value it is about to write. It
+    # also means the gun tracks pitch, which a fixed grip never could -- aim up
+    # and the barrel goes up with it.
+    gun_at = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 2500, y0 + 700))
+    _connect(held, _pin(gun_at, "self"))
+    toward = keep(_at(_node(ed, FN_SUB_VV), x0 + 2760, y0 + 620))
+    _connect(aim_out, _pin(toward, "A"))
+    _connect(_pin(gun_at, "ReturnValue", is_input=False), _pin(toward, "B"))
+    facing = keep(_at(_node(ed, FN_ROT_FROM_X), x0 + 3000, y0 + 620))
+    _connect(_pin(toward, "ReturnValue", is_input=False), _pin(facing, "X"))
+    turn = keep(_at(_node(ed, FN_SET_WORLD_ROT), x0 + 2760, y0))
+    _connect(held, _pin(turn, "self"))
+    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(turn, "NewRotation"))
+    _connect(BEL.find_then_pin(holding), _pin(turn, "execute"))
+
+    # Read *after* the turn, so the barrel tip is this frame's, not last
+    # frame's: MuzzleOffset runs through the transform that was just set.
+    muzzle = _muzzle_location(ed, held, x0 + 2500, y0 + 1000)
+
+    clear = keep(_at(_node(ed, FN_TRACE), x0 + 3260, y0))
+    _connect(muzzle, _pin(clear, "Start"))
+    _connect(aim_out, _pin(clear, "End"))
+    _trace_defaults(clear, draw=False)
+    _connect(BEL.find_then_pin(turn), _pin(clear, "execute"))
+
+    clear_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 2760, y0 + 560))
+    _connect(_pin(clear, "OutHit", is_input=False), _loose_pin(clear_brk, "Hit"))
+    stopped = keep(_at(ed.add_branch_node(), x0 + 3040, y0))
+    _connect(_pin(clear, "ReturnValue", is_input=False), _pin(stopped, "Condition"))
+    _connect(BEL.find_then_pin(clear), _pin(stopped, "execute"))
+
+    short_by = keep(_at(_node(ed, FN_DISTANCE), x0 + 3040, y0 + 700))
+    _connect(_loose_pin(clear_brk, "Location", is_input=False), _pin(short_by, "V1"))
+    _connect(aim_out, _pin(short_by, "V2"))
+    far_short = keep(_at(_node(ed, FN_GREATER_FF), x0 + 3280, y0 + 700))
+    _connect(_pin(short_by, "ReturnValue", is_input=False), _pin(far_short, "A"))
+    _set(far_short, "B", BLOCKED_SLACK)
+
+    mark = keep(_at(ed.add_set_member_variable_node("AimBlocked"), x0 + 3300, y0 - 160))
+    _connect(_pin(far_short, "ReturnValue", is_input=False), _pin(mark, "AimBlocked"))
+    _connect(BEL.find_then_pin(stopped), _pin(mark, "execute"))
+    # The aim point moves to where the barrel's own line actually ends, so the
+    # reticle sits on the near wall rather than on the enemy behind it.
+    reality = keep(_at(ed.add_set_member_variable_node("AimPoint"), x0 + 3560, y0 - 160))
+    _connect(_loose_pin(clear_brk, "Location", is_input=False), _pin(reality, "AimPoint"))
+    _connect(BEL.find_then_pin(mark), _pin(reality, "execute"))
+
+    open_shot = keep(_at(ed.add_set_member_variable_node("AimBlocked"), x0 + 3300, y0 + 260))
+    _set(open_shot, "AimBlocked", "false")
+    _connect(BEL.find_else_pin(stopped), _pin(open_shot, "execute"))
+
+    ready = keep(_at(ed.add_set_member_variable_node("AimValid"), x0 + 3840, y0))
+    _set(ready, "AimValid", "true")
+    _connect(BEL.find_then_pin(reality), _pin(ready, "execute"))
+    _connect(BEL.find_then_pin(open_shot), _pin(ready, "execute"))
+
+    ed.add_comment_to_nodes(
+        "Resolve aim: the camera picks the target, the muzzle decides whether "
+        "the gun can reach it. AimPoint ends up at the first surface on the "
+        "line the pellets will actually fly down, which is what makes the "
+        "reticle honest -- including when the barrel is against a tree and the "
+        "camera can see straight past it.",
+        made)
+    return [BEL.find_then_pin(ready), BEL.find_then_pin(unarmed)], muzzle
+
+
+def _author_fire(ed, held, muzzle, exec_in, x0, y0):
+    """One trigger pull: the fire sound, then one trace per pellet from the muzzle.
+
+    All the aiming was done in _author_resolve_aim; what is left here is the
+    spread. Each pellet takes the muzzle-to-AimPoint direction, jitters it inside
+    the weapon's own cone, and traces the weapon's own range. A single-pellet
+    weapon with a 1 degree cone is the same code path as an eight-pellet
+    shotgun, which is why the pistol needed no second implementation.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0, y0 + 560))
+    delta = keep(_at(_node(ed, FN_SUB_VV), x0 + 260, y0 + 560))
+    _connect(_pin(aim_get, "AimPoint", is_input=False), _pin(delta, "A"))
     _connect(muzzle, _pin(delta, "B"))
-    direction_n = keep(_at(_node(ed, FN_NORMAL), x0 + 1420, y0 + 560))
+    direction_n = keep(_at(_node(ed, FN_NORMAL), x0 + 500, y0 + 560))
     _connect(_pin(delta, "ReturnValue", is_input=False), _pin(direction_n, "A"))
     direction = _pin(direction_n, "ReturnValue", is_input=False)
 
@@ -1215,6 +1526,8 @@ def _author_fire(ed, held, owner_loc_src, exec_in, x0, y0):
     _connect(direction, _pin(cone, "ConeDir"))
     _connect(_pin(rad, "ReturnValue", is_input=False),
              _pin(cone, "ConeHalfAngleInRadians"))
+    rng_pin, rng_n = _prop(ed, "WeaponRange", held, x0 + 1900, y0 + 840)
+    keep(rng_n)
     reach = keep(_at(_node(ed, FN_MUL_VF), x0 + 2140, y0 + 620))
     _connect(_pin(cone, "ReturnValue", is_input=False), _pin(reach, "A"))
     _connect(rng_pin, _pin(reach, "B"))
@@ -1225,17 +1538,9 @@ def _author_fire(ed, held, owner_loc_src, exec_in, x0, y0):
     trace = keep(_at(_node(ed, FN_TRACE), x0 + 2620, y0))
     _connect(muzzle, _pin(trace, "Start"))
     _connect(_pin(end, "ReturnValue", is_input=False), _pin(trace, "End"))
-    _set(trace, "TraceChannel", "TraceTypeQuery1")   # Visibility
-    _set(trace, "bTraceComplex", "false")
-    # Ignores the pawn this component hangs off. The weapon actor is separate
-    # and *not* ignored, but every one of its parts is NoCollision, so a pellet
-    # cannot hit the gun it came out of.
-    _set(trace, "bIgnoreSelf", "true")
-    if TRACE_DEBUG_SECONDS > 0:
-        _set(trace, "DrawDebugType", "ForDuration")
-        _set(trace, "DrawTime", TRACE_DEBUG_SECONDS)
-    else:
-        _set(trace, "DrawDebugType", "None")
+    # The one trace that *is* drawn: the tracer starts at the barrel, so what
+    # you see is the line the pellet took, not a line from the camera.
+    _trace_defaults(trace, draw=True)
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(trace, "execute"))
 
     hit = keep(_at(ed.add_branch_node(), x0 + 2900, y0))
@@ -1245,10 +1550,9 @@ def _author_fire(ed, held, owner_loc_src, exec_in, x0, y0):
     _connect(_pin(trace, "OutHit", is_input=False), _loose_pin(brk, "Hit"))
 
     ed.add_comment_to_nodes(
-        "Fire: the cone's origin is the muzzle (MuzzleOffset through the "
-        "weapon's transform) and only its direction comes from the camera. "
-        "Tracing from the camera instead -- the usual third-person shortcut -- "
-        "is what made the spread appear to come from behind the player.",
+        "Fire: origin is the muzzle, direction is muzzle -> AimPoint, spread is "
+        "the weapon's own cone. The visible tracer therefore leaves the barrel "
+        "and ends where the reticle said it would.",
         made)
 
     _author_impact(ed, brk, held, BEL.find_then_pin(hit), x0 + 3180, y0)
@@ -1337,7 +1641,12 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
     _connect(_pin(rot, "ReturnValue", is_input=False), _pin(fwd, "InRot"))
     ahead = keep(_at(_node(ed, FN_MUL_VF), x0 + 480, y0 + 420))
     _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(ahead, "A"))
-    _set(ahead, "B", DROP_FORWARD)
+    # A vector literal, for the same reason as the aim ray: with nothing
+    # connected, this operator's B pin is a struct pin and will not take a
+    # number. Until _set started reading pins back, this silently stayed empty
+    # and dropped weapons landed on the player's own feet.
+    _connect(_vec(ed, DROP_FORWARD, DROP_FORWARD, DROP_FORWARD, x0 + 240, y0 + 560),
+             _pin(ahead, "B"))
     start = keep(_at(_node(ed, FN_ADD_VV), x0 + 720, y0 + 340))
     _connect(_pin(loc, "ReturnValue", is_input=False), _pin(start, "A"))
     _connect(_pin(ahead, "ReturnValue", is_input=False), _pin(start, "B"))
@@ -1552,6 +1861,9 @@ def _author_equip(ed, exec_in, x0, y0):
     _connect(gl_pin, _pin(put, "NewRelativeLocation"))
     _connect(BEL.find_then_pin(attach), _pin(put, "execute"))
 
+    # The resting orientation only. From the next frame on, Tick points the
+    # held weapon at the aim point; this just stops it being visibly wrong for
+    # the one frame in between.
     gr_pin, gr_n = _prop(ed, "GripRotation", item, x0 + 1860, y0 + 120)
     keep(gr_n)
     turn = keep(_at(_node(ed, FN_SET_REL_ROT), x0 + 2140, y0 - 160))
@@ -1701,11 +2013,19 @@ def _author_wc_tick(ed, tick):
         _connect(b, _pin(n, "B"))
         return _pin(n, "ReturnValue", is_input=False)
 
+    # --- aim -----------------------------------------------------------------
+    # First, and unconditionally: the reticle has to be right on the frames
+    # where nothing is fired, which is nearly all of them. It also leaves
+    # AimPoint and the muzzle position sitting there for the fire block to use.
+    aim_exits, muzzle = _author_resolve_aim(ed, held, BEL.find_then_pin(tick),
+                                            1040, -2400)
+
     # --- fire ----------------------------------------------------------------
     fire_gate = _at(ed.add_branch_node(), 1040, 0)
     _connect(both(pressed(FIRE_KEY, 640), armed_out, 640), _pin(fire_gate, "Condition"))
-    _connect(BEL.find_then_pin(tick), _pin(fire_gate, "execute"))
-    after_fire = _author_fire(ed, held, owner_out, BEL.find_then_pin(fire_gate),
+    for exit_pin in aim_exits:
+        _connect(exit_pin, _pin(fire_gate, "execute"))
+    after_fire = _author_fire(ed, held, muzzle, BEL.find_then_pin(fire_gate),
                               1400, 0)
 
     # --- switch --------------------------------------------------------------
@@ -1798,6 +2118,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     _declare(ed, "NeedsRefresh", BEL.get_basic_type_by_name("bool"))
     _declare(ed, "OwnerMesh", BEL.get_object_reference_type(
         unreal.SkeletalMeshComponent.static_class()))
+    # Where this frame's shot lands, and whether there is anything to draw a
+    # reticle on. The HUD reads all three; nothing else writes them.
+    _declare(ed, "AimPoint", _struct_type(unreal.Vector.static_struct()))
+    _declare(ed, "AimValid", BEL.get_basic_type_by_name("bool"))
+    _declare(ed, "AimBlocked", BEL.get_basic_type_by_name("bool"))
     # Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
     # return pin takes its type from its Class pin, and an Actor-typed return
     # cannot be added to an array of BP_WeaponItem.

@@ -172,9 +172,44 @@ if shot and pist:
           a.get_editor_property("AimPose") != b.get_editor_property("AimPose"))
     check("the two weapons use different fire sounds",
           a.get_editor_property("FireSound") != b.get_editor_property("FireSound"))
-    check("the two weapons are held at different angles",
-          a.get_editor_property("GripRotation").to_tuple()
-          != b.get_editor_property("GripRotation").to_tuple())
+    def barrel_direction(bp):
+        """Where this weapon's barrel actually ends up, measured end to end.
+
+        Spawn the character, attach the weapon the way the game does (snap to
+        HandGrip_R, then apply the saved GripRotation) and read the barrel's
+        world direction back off the engine. No offline pose maths: that is
+        exactly what got this wrong -- AnimPoseExtensions predicted a socket
+        orientation the live skeleton disagrees with, and the gun ended up
+        pointing 90 degrees to the player's left while every offline number
+        said it was straight ahead.
+
+        The character is spawned facing +X, so the barrel should come back as
+        (1, 0, 0).
+        """
+        actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+        here = unreal.Vector(0.0, 0.0, 0.0)
+        straight = unreal.Rotator(0.0, 0.0, 0.0)
+        eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
+        char = actors.spawn_actor_from_class(
+            eas.load_blueprint_class(G.CHARACTER_BP_PATH), here, straight)
+        gun = actors.spawn_actor_from_class(
+            eas.load_blueprint_class(bp.get_path_name().split(".")[0]), here, straight)
+        try:
+            mesh = char.get_component_by_class(unreal.SkeletalMeshComponent)
+            snap = unreal.AttachmentRule.SNAP_TO_TARGET
+            gun.attach_to_component(mesh, G.GRIP_SOCKET, snap, snap, snap, False)
+            gun.set_actor_relative_rotation(
+                cdo(bp).get_editor_property("GripRotation"), False, False)
+            return gun.get_actor_forward_vector()
+        finally:
+            actors.destroy_actor(gun)
+            actors.destroy_actor(char)
+
+    for bp, name in ((shot, "Shotgun"), (pist, "Pistol")):
+        aimed = barrel_direction(bp)
+        check(f"{name}: at rest the barrel points forward, not across the body",
+              aimed.x > 0.999, f"barrel direction = {aimed.to_tuple()}")
+
     check("the two weapons show different colours in the inventory",
           a.get_editor_property("SlotColor").to_tuple()
           != b.get_editor_property("SlotColor").to_tuple())
@@ -232,18 +267,76 @@ if plays:
           pin_value(plays[0], "LoopCount"))
 check("empty hands stop the slot", bool(by_pins(wg, "InBlendOutTime", "SlotNodeName")))
 
-# The regression this whole rework exists to fix: the pellet cone must start at
-# the muzzle, not at the camera behind the player's shoulder.
+# The hybrid aim, which is the whole point of the trace layout: the camera line
+# decides what is being aimed at, the muzzle line decides whether the gun can
+# reach it, and the pellets fly down the muzzle line. Getting this wrong is not
+# a compile error -- it is a gun that shoots from behind the player's shoulder.
 traces = by_pins(wg, "Start", "End", "TraceChannel")
-check("there are two traces (pellets, and the drop's ground probe)",
-      len(traces) == 2, str(len(traces)))
-from_muzzle = []
+check("there are four traces (camera aim, muzzle clearance, pellets, drop probe)",
+      len(traces) == 4, str(len(traces)))
+
+
+def titled(nodes, title):
+    """Nodes by their displayed title.
+
+    The only handle Python gets on *which* function a call node wraps:
+    BlueprintEditorLibrary exposes no get_function_name, and pin sets alone
+    cannot tell GetCameraLocation from any other self-and-return node.
+    """
+    return [n for n in nodes
+            if str(BEL.get_node_title(n)).replace("\n", " ") == title]
+
+
+from_muzzle, from_camera = [], []
 for t in traces:
-    src = [PIN.get_owning_node(q) for q in
-           PIN.list_connected_pins(BEL.find_input_pin(t, "Start"))]
-    from_muzzle += [n for n in src if {"T", "Location"} <= in_pins(n)]
-check("a pellet trace starts at the weapon's muzzle transform, not the camera",
-      len(from_muzzle) == 1, f"{len(from_muzzle)} trace(s) fed by TransformLocation")
+    feeders = [PIN.get_owning_node(q) for q in
+               PIN.list_connected_pins(BEL.find_input_pin(t, "Start"))]
+    for n in feeders:
+        if {"T", "Location"} <= in_pins(n):                      # TransformLocation
+            from_muzzle.append(t)
+        if str(BEL.get_node_title(n)) == "GetCameraLocation":
+            from_camera.append(t)
+check("two traces start at the weapon's muzzle: the clearance check and the pellets",
+      len(from_muzzle) == 2, f"{len(from_muzzle)} fed by TransformLocation")
+check("exactly one trace starts at the camera -- the one that picks the target",
+      len(from_camera) == 1, f"{len(from_camera)} fed by GetCameraLocation")
+# Built as a MakeVector, not as a pin literal: that operator's B pin is a
+# struct pin when nothing is connected, and struct pins take no literal at all.
+check("the camera's ray reaches AIM_TRACE_RANGE when it hits nothing",
+      any(all(abs(float(pin_value(n, axis) or 0) - G.AIM_TRACE_RANGE) < 1e-3
+              for axis in "XYZ")
+          for n in titled(wg, "MakeVector")),
+      f"{G.AIM_TRACE_RANGE:.0f} cm")
+check("a dropped weapon lands in front of the player, not on their feet",
+      any(all(abs(float(pin_value(n, axis) or 0) - G.DROP_FORWARD) < 1e-3
+              for axis in "XYZ")
+          for n in titled(wg, "MakeVector")),
+      f"{G.DROP_FORWARD:.0f} cm ahead")
+# Two subtractions off AimPoint: one aims the pellets, one aims the weapon.
+deltas = [n for n in titled(wg, "vector - vector")
+          if any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get AimPoint"
+                 for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A")))]
+check("the pellet direction is muzzle -> AimPoint, not camera forward",
+      len(deltas) == 2, f"{len(deltas)} vector subtractions driven by AimPoint")
+
+# The fix for "the gun points left": the weapon's rotation is driven every
+# frame from the aim, instead of being baked into a grip offset that has to be
+# correct in whatever pose the arms are in.
+turns = titled(wg, "Set Actor Rotation")
+check("the held weapon is turned to face the aim point every frame",
+      len(turns) == 1 and any(
+          str(BEL.get_node_title(PIN.get_owning_node(q))) == "MakeRotFromX"
+          for q in PIN.list_connected_pins(BEL.find_input_pin(turns[0], "NewRotation"))),
+      f"{len(turns)} SetActorRotation node(s)")
+drawn = [t for t in traces if "ForDuration" in pin_value(t, "DrawDebugType")]
+check("only the pellets are drawn -- the aim traces run every frame and would "
+      "paint the screen", len(drawn) == 1, f"{len(drawn)} drawn")
+
+for var, kind in (("AimPoint", unreal.Vector), ("AimValid", bool),
+                  ("AimBlocked", bool)):
+    value = w.get_editor_property(var)
+    check(f"{var} exists on the weapon component for the HUD to read",
+          isinstance(value, kind), type(value).__name__)
 
 check("firing plays a sound", bool(by_pins(wg, "Sound", "Location")))
 check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,

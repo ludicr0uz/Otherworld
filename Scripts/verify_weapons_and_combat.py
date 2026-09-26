@@ -260,6 +260,21 @@ check("no leftover debug PrintStrings", not probes, f"{len(probes)} found")
 
 # ─── Installation ────────────────────────────────────────────────────────────
 
+def blocks_visibility(bp):
+    """Would a Visibility line trace hit this character?
+
+    The single most important check in this file. UE's stock Pawn profile
+    ignores Visibility, which is the channel the pellets trace on, so a
+    character left on the default is simply unhittable -- and the trace reports
+    "no hit" exactly as it would for a real miss, so nothing anywhere says so.
+    """
+    capsule = component_template(bp, "CapsuleComponent")
+    if capsule is None:
+        return None
+    return (capsule.get_collision_response_to_channel(
+        unreal.CollisionChannel.ECC_VISIBILITY) == unreal.CollisionResponseType.ECR_BLOCK)
+
+
 char = load(G.CHARACTER_BP_PATH)
 cnames = set(components(char))
 check("player carries HealthComponent + WeaponComponent",
@@ -267,6 +282,11 @@ check("player carries HealthComponent + WeaponComponent",
       str(sorted(cnames)))
 stale = cnames & G.OLD_SHOTGUN_PARTS
 check("the old welded shotgun is gone from the player", not stale, str(sorted(stale)))
+check("player's capsule blocks Visibility, so it can be shot too",
+      blocks_visibility(char) is True, str(blocks_visibility(char)))
+
+check("pellet traces are drawn, so a miss is visible",
+      G.TRACE_DEBUG_SECONDS > 0, f"{G.TRACE_DEBUG_SECONDS}s")
 
 npc = load(G.NPC_BP_PATH)
 if npc:
@@ -282,6 +302,8 @@ if npc:
     check("NPC respawns as another wanderer",
           rc is not None and "ForestWanderer" in rc.get_name(),
           rc.get_name() if rc else "None")
+    check("NPC's capsule blocks Visibility, so pellets can actually hit it",
+          blocks_visibility(npc) is True, str(blocks_visibility(npc)))
     check("a spawned wanderer still gets an AI controller",
           n.get_editor_property("auto_possess_ai")
           == unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)

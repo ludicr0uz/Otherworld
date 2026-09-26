@@ -138,8 +138,10 @@ PICKUP_KEY = "E"
 
 PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
 DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
-TRACE_DEBUG_SECONDS = 0.0  # pellet traces; 0 = off now that there is a muzzle
-                           # flash's worth of feedback (sound + blood + recoil)
+# Pellet traces drawn in the world for this many seconds; 0 turns them off.
+# On, because they are the only way to see *where* a shot went -- sound and blood
+# tell you a shot happened and that it connected, but not that it missed high.
+TRACE_DEBUG_SECONDS = 1.5
 
 # NPC respawn: a new wanderer appears within this radius of where the dead one
 # *started*, not where it died, so the forest does not slowly drain toward
@@ -1842,6 +1844,38 @@ def _uninstall_old_shotgun(bp):
         _log(f"removed the old welded shotgun: {sorted(present)}")
 
 
+def make_shootable(bp):
+    """Let a Visibility trace hit this character's capsule.
+
+    This is the bug that made the NPC unkillable. UE's stock `Pawn` profile sets
+    Visibility to **Ignore** (and `CharacterMesh` does too), while the pellets
+    trace on TraceTypeQuery1, which *is* Visibility -- so every shot passed
+    straight through the NPC and no hit was ever registered. Nothing logs this:
+    the trace simply reports no hit, exactly as it would for a genuine miss.
+
+    The capsule alone is made to block, not the skeletal mesh: the capsule is
+    guaranteed present and correctly sized, whereas hitting the mesh depends on
+    the physics asset's shapes being well fitted. Capsule-only hit detection is
+    coarse but predictable.
+
+    Setting a single channel response switches the profile off its preset and
+    onto "Custom", which is expected.
+    """
+    capsule = _find_handle(bp, "CapsuleComponent")
+    if not capsule:
+        _log(f"note: {bp.get_name()} has no CapsuleComponent — not made shootable")
+        return
+    obj = _component_object(capsule)
+    obj.set_collision_response_to_channel(
+        unreal.CollisionChannel.ECC_VISIBILITY, unreal.CollisionResponseType.ECR_BLOCK)
+    got = obj.get_collision_response_to_channel(unreal.CollisionChannel.ECC_VISIBILITY)
+    if got != unreal.CollisionResponseType.ECR_BLOCK:
+        raise RuntimeError(
+            f"{bp.get_name()}'s capsule still ignores Visibility ({got}) — "
+            "shots would pass through it")
+    _log(f"{bp.get_name()}: capsule now blocks Visibility (shootable)")
+
+
 def install_on_character(health_bp, weapon_bp):
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
@@ -1852,6 +1886,9 @@ def install_on_character(health_bp, weapon_bp):
     for name, source in (("HealthComponent", health_bp),
                          ("WeaponComponent", weapon_bp)):
         _add_component(bp, _root_handle(bp), BEL.generated_class(source), name)
+    # Symmetry, and forward planning: the player carries health too, so anything
+    # that shoots back later needs to be able to hit them.
+    make_shootable(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)
@@ -1886,6 +1923,8 @@ def install_on_npc(health_bp):
             "auto_possess_ai", unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
     except Exception as exc:                                      # noqa: BLE001
         _log(f"note: could not set auto_possess_ai: {exc}")
+
+    make_shootable(bp)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")

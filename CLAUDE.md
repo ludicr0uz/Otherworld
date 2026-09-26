@@ -213,6 +213,24 @@ centred and bottom-anchored at any window size.
 
 ## Gotchas learned the hard way
 
+- **UE's stock `Pawn` profile IGNORES the Visibility channel** — and so does `CharacterMesh`.
+  A `LineTraceSingle` on `TraceTypeQuery1` (which *is* Visibility) therefore passes straight
+  through a Character and reports **no hit**, indistinguishable from a genuine miss. Nothing
+  logs it. This made the NPC unkillable through two rounds of debugging, and it also explains
+  an earlier instrumented run where pellets hit terrain hundreds of times and applied damage
+  zero times — that was wrongly blamed on range. `make_shootable()` in
+  `build_weapons_and_combat.py` sets the capsule's Visibility response to Block and asserts
+  the read-back; `verify_weapons_and_combat.py` guards it for both characters. Setting one
+  channel response flips the profile from its preset to "Custom", which is expected.
+  To test a collision change without a play session: spawn the actor into the **editor**
+  world and run `unreal.SystemLibrary.line_trace_single` through it — and A/B it by reverting
+  the response and re-tracing, which is what proved this fix rather than assuming it.
+- The collision-response enum is **`unreal.CollisionResponseType.ECR_BLOCK`**;
+  `unreal.CollisionResponse` is an unrelated *struct*, and
+  `BodyInstance.collision_response_template` is not exposed. Read and write per-channel
+  responses with the PrimitiveComponent methods
+  `get_/set_collision_response_to_channel`, not through properties.
+
 - **`get_basic_type_by_name("float")` silently declares an `int`.** So does `"double"`. The
   only spelling that yields a Blueprint float is **`"real"`**. The one clue is a
   `LogBlueprintEditorLib: Warning: Primitive type: float not recognized, defaulting to int`

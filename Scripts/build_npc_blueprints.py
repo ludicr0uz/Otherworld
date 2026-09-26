@@ -100,6 +100,7 @@ FN_MOVE_TO_ACTOR = "/Script/AIModule.AIController.MoveToActor"
 FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
 FN_GET_PAWN = "/Script/Engine.Controller.K2_GetPawn"
+FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
 FN_ACTOR_LOC = "/Script/Engine.Actor.K2_GetActorLocation"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
 FN_LE_FF = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
@@ -458,9 +459,32 @@ def build_ai_controller_blueprint(rebuild=True):
 
     _set(delay, "Duration", NPC_REPATH_SECONDS)
 
-    # BeginPlay -> MoveToActor -> (melee) -> Delay -> back to MoveToActor
-    _connect(BEL.find_then_pin(begin_play), BEL.find_execute_pin(move_to))
-    _connect(BEL.find_then_pin(delay), BEL.find_execute_pin(move_to))
+    # BeginPlay -> [possessed?] -> MoveToActor -> (melee) -> Delay -> back
+    #
+    # The gate is not defensive padding: a controller's BeginPlay runs before it
+    # has possessed anything, so the first pass through the loop has no pawn.
+    # MoveToActor then quietly does nothing, and the melee chain's
+    # GetActorLocation reads a None pawn -- which the VM reports as an "Accessed
+    # None ... CallFunc_K2_GetPawn_ReturnValue" runtime error against the swing
+    # Branch, once per spawned NPC.  Note the gate has to sit *before*
+    # MoveToActor rather than joining the melee AND: pure nodes are pulled by
+    # whichever node reads them and BooleanAND does not short-circuit, so an
+    # IsValid in the condition would still evaluate the location chain.
+    #
+    # Skipping the body costs one Delay -- the loop re-enters
+    # NPC_REPATH_SECONDS later, by which time possession has happened.
+    own_pawn = _at(_node(ed, FN_GET_PAWN), origin.x - 220, origin.y - 320)
+    possessed = _at(_node(ed, FN_IS_VALID), origin.x + 40, origin.y - 320)
+    _connect(_pin(own_pawn, "ReturnValue", is_input=False),
+             _pin(possessed, "Object"))
+    gate = _at(ed.add_branch_node(), origin.x + 300, origin.y - 200)
+    _connect(_pin(possessed, "ReturnValue", is_input=False),
+             _pin(gate, "Condition"))
+    _connect(BEL.find_then_pin(begin_play), _pin(gate, "execute"))
+    _connect(BEL.find_then_pin(delay), _pin(gate, "execute"))
+    _connect(BEL.find_then_pin(gate), BEL.find_execute_pin(move_to))
+    # Unpossessed: straight back to the delay and try again next tick of the loop.
+    _connect(BEL.find_else_pin(gate), BEL.find_execute_pin(delay))
 
     melee = _author_melee(ed, move_to, delay, origin.x + 700, origin.y)
     if melee is None:
@@ -468,8 +492,8 @@ def build_ai_controller_blueprint(rebuild=True):
 
     ed.add_comment_to_nodes(
         f"Re-issue a pathfinding move order at the player every "
-        f"{NPC_REPATH_SECONDS} s.",
-        [move_to, get_pawn, delay])
+        f"{NPC_REPATH_SECONDS} s, once the controller has a pawn to move.",
+        [move_to, get_pawn, delay, gate, own_pawn, possessed])
     if melee:
         ed.add_comment_to_nodes(
             f"Melee: within {NPC_MELEE_RANGE_CM:.0f} cm and off cooldown, swing "

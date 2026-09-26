@@ -199,11 +199,21 @@ rather than the generated one; the import script imports it and calls
 `BP_ForestWandererAI` — parent `AIController`. Event graph:
 
 ```
-[Event BeginPlay] --exec--> [MoveToActor] --exec--> [Delay 0.5s] --,
-                                 ^                                 |
-                                 '---------------------------------'
+[Event BeginPlay] --exec--> [Branch: IsValid(Get Controlled Pawn)?]
+                                   |true                      |false
+                                   v                          |
+                             [MoveToActor] --exec--> [Delay 0.5s] <-'
+                                   ^                          |
+                                   '--------------------------'
 [Get Player Pawn 0] --ReturnValue--> [MoveToActor.Goal]
 ```
+
+The `IsValid` gate exists because a controller's `BeginPlay` fires before possession: on the
+first pass `Get Controlled Pawn` is None, `MoveToActor` silently does nothing, and the melee
+chain spliced in below reads `GetActorLocation` off None — which the VM logs as an
+`Accessed None ... CallFunc_K2_GetPawn_ReturnValue` error, once per spawned NPC. It must gate
+the *exec* flow rather than join the melee `AND`, because `BooleanAND` evaluates both pins and
+so would pull the pure location chain regardless.
 
 `MoveToActor` (`bUsePathfinding=true`, `AcceptanceRadius=150`) is what routes the NPC around
 trees. Re-issuing it on a loop rather than once means it follows a moving player and
@@ -389,7 +399,7 @@ the nav bounds cover the map and the navmesh's `runtime_generation` is `DYNAMIC`
 The nav block asserts the volume's XY and Z extents and centre match what the generator
 computed, that the vertical span is inside the measured envelope, and that the NPC's feet sit
 inside the volume.
-Prints `[VERIFY] ✅ ALL 123 CHECKS PASSED!` or a list of failures.
+Prints `[VERIFY] ✅ ALL 126 CHECKS PASSED!` or a list of failures.
 
 ---
 
@@ -492,7 +502,7 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
 - `/Game/Maps/Lvl_Forest_200m` — 200 m, seed 42, 136 trees over 5 species, 44,368 knee-high
   grass clumps over 9 species, **five NPCs 75.0–77.5 m** from the player (every one of them
   with at least one tree blocking the direct line), **night** preset.
-  Offline 28/28, in-editor 123/123, import log clean.
+  Offline 28/28, in-editor 126/126, import log clean.
 - New assets from the NPC run: `/Game/Forest/NPC/BP_ForestWanderer`,
   `/Game/Forest/NPC/BP_ForestWandererAI`.
 - **Pre-existing bug, unfixed and unrelated to the NPC work:** `scatter_trees` performs no

@@ -7,12 +7,42 @@ there is no C++ module. See `systemDesign.md` for the detailed architecture.
 
 1. **Never** open or edit `.uasset` / `.umap` as text. All asset work goes through the
    `unreal` Python API (or the editor UI).
-2. Automation scripts live in `Scripts/` (run headless) or `Content/Python/`
-   (auto-discovered by the editor; `init_unreal.py` runs at startup).
+2. Automation scripts live in `Scripts/` (run headless), `Scripts/dev/` (tooling for driving
+   the editor, not content) or `Content/Python/` (auto-discovered by the editor;
+   `init_unreal.py` runs at startup).
 3. Asset prefixes: `SM_ SK_ M_ MI_ T_ BP_ WBP_ ST_ A_ Cue_`; levels `Lvl_`.
-4. Absolute paths only when invoking the editor — the Bash tool resets cwd between calls.
+4. Absolute paths only when invoking the editor directly — the Bash tool resets cwd between
+   calls. (`Scripts/dev/uepy.py` resolves its own arguments, so relative paths are fine there.)
 
-## Run a script headless
+## Run a script — fast
+
+**Default to `Scripts/dev/uepy.py`.** A cold `UnrealEditor-Cmd` costs **35-45 s of boot and
+shutdown no matter what the script does** — a script that dies on line 13 still burns ~33 s.
+That overhead, not the work, is what makes iteration slow: a session with 18 launches spends
+ten minutes booting. `uepy.py` sends the script to an **editor that is already open** over the
+Python plugin's remote-execution channel (~1 s), and cold-boots only when nothing is listening,
+so the same command works either way.
+
+```bash
+python3 Scripts/dev/uepy.py Scripts/build_npc_blueprints.py
+python3 Scripts/dev/uepy.py Scripts/verify_weapons_and_combat.py Scripts/verify_graphics_menu.py
+python3 Scripts/dev/uepy.py -c "import unreal; unreal.log_warning('hi')"
+python3 Scripts/dev/uepy.py --list          # which editors are listening?
+python3 Scripts/dev/uepy.py --game --seconds 25   # headless -game run + error summary
+python3 Scripts/dev/uepy.py --cold <script> # force a fresh editor
+```
+Several targets in one invocation share **one** connection or **one** boot — three verifiers
+cost one boot, not three. Exit code is non-zero if any target raised. `--game` kills the run on
+a timer and counts `Blueprint Runtime Error` / `Accessed None` / `NPC-SPAWN` / `NPC-FELL` for you.
+
+Remote execution needs a **UI** editor (a `-NoUI` commandlet never registers) and
+`bRemoteExecution=True` under `[/Script/PythonScriptPlugin.PythonScriptPluginSettings]` in
+`Config/DefaultEngine.ini`. It is **read at startup, so a config change needs an editor
+restart**; `--list` showing nothing when an editor is open means exactly that. Do not push asset
+builders while PIE is running — recompiling a Blueprint under the running game leaves you
+observing neither build; `uepy.py` detects PIE and refuses unless given `--allow-pie`.
+
+The raw form, still correct and what `uepy.py` falls back to:
 
 ```bash
 "/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd" \
@@ -20,6 +50,26 @@ there is no C++ module. See `systemDesign.md` for the detailed architecture.
   -ExecutePythonScript="<abs path to .py>" -NoUI -stdout
 ```
 Logs from generated scripts are prefixed `[GEN]` (import) / `[VERIFY]` (checks).
+
+### Iteration guidelines (what actually costs time)
+
+1. **Never guess an engine API name across a boot.** A wrong guess (`break_pin_link` →
+   `break_single_pin_link`, node title `"Is Valid"` → `"IsValid"`) costs a full launch per
+   attempt. Dump the candidates **in the same script that uses them** — `dir(...)`, node titles,
+   pin names — with a fallback, or read the engine source: `remote_execution.py` and the plugin
+   headers under `Engine/Plugins/.../PythonScriptPlugin/Source` are on disk and free to grep.
+2. **`print()` does not reach the headless log** — use `unreal.log_warning`. A discovery run
+   whose output you cannot see is a wasted 40 s.
+3. **Right-size `-game` runs.** Spawn-path bugs show in the first two seconds; 25 s is plenty.
+   Only respawn *statistics* justify 90 s+.
+4. **Scope verification to the blast radius.** AI-graph change → the level verifier. Run the
+   full sweep (level + weapons + HUD) once before calling a session done, not per edit.
+5. **Zero errors is not proof of a fix** when the fix is a guard: a gate that never opens looks
+   identical in the log to a gate that works. Measure the positive case too (see the possession
+   gate in *The NPCs*, proven with a 410-opens probe), then remove the probe by re-running the
+   builder.
+6. **Batch.** When a cold boot is unavoidable, put every script for that boot on one `uepy.py`
+   command line.
 
 ## The level generator (the main thing here)
 
@@ -35,7 +85,7 @@ python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
 #        --npc-max-distance (100 m) --json-report
 ```
 Then run the printed `import_<Level>.py` (builds the level) and `verify_<Level>.py`
-(123 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
+(126 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
 
 Grass transforms do **not** live in the generated script — there are tens of thousands of
 them, so they go to a gitignored `grass_<Level>.json` sidecar the import script reads.
@@ -55,11 +105,18 @@ number they use (run speed, melee, spawn band) lives in
 generator and its checks read exactly what the editor builds.
 
 - `BP_ForestWandererAI` (AIController). Event graph, authored via `unreal.BlueprintGraphEditor`:
-  `BeginPlay → MoveToActor(Get Player Pawn) → [in reach and off cooldown? → swing] → Delay 0.5s
-  → back to MoveToActor`.
+  `BeginPlay → [possessed? no → Delay] → MoveToActor(Get Player Pawn) → [in reach and off
+  cooldown? → swing] → Delay 0.5s → back to the gate`.
   `MoveToActor` does the pathfinding, which is what makes it run *around* trees. The melee check
   is spliced into that same loop rather than given a Tick of its own — the loop is already the
   NPC's heartbeat, and two of them can disagree about whether the chase is still running.
+  The possession gate is load-bearing: a controller's `BeginPlay` runs **before** it possesses
+  its pawn, so the first pass has none, and the melee chain's `GetActorLocation` then reads a
+  location off None — one `Accessed None … CallFunc_K2_GetPawn_ReturnValue` runtime error per
+  spawned NPC, reported against the swing `Branch`. It has to be an exec branch *ahead of*
+  `MoveToActor`, not an extra `IsValid` in the melee `AND`: `BooleanAND` reads both its pins, so
+  it would pull the location chain anyway (see the pure-node gotcha below). Closing the gate
+  costs one `Delay` — possession has happened by the time the loop re-enters.
 - `BP_ForestWanderer` (Character). Mirrors the **player's** rig exactly — `SKM_Quinn_Simple`
   + `ABP_Unarmed`, mesh at z −89 and yaw 270 — because that combination is known to animate.
   `use_acceleration_for_paths` **must be True**: with it False, `ApplyRequestedMove` sets
@@ -396,7 +453,7 @@ centred and bottom-anchored at any window size.
 - `/Game/Maps/Lvl_Forest_200m` is generated in **night** mode: 136 trees / 5 species,
   44,368 knee-high grass clumps / 9 species, **five NPCs at 75.0-77.5 m** from the player,
   moon light 0.12 lux, emissive starfield sky dome as the ambient light source.
-  Offline 28/28 and in-engine 123/123 checks pass.
+  Offline 28/28 and in-engine 126/126 checks pass.
 - **Known pre-existing bug:** `scatter_trees` does no minimum-spacing rejection, so some
   size/seed combinations fail the `Tree Spacing (>100cm)` check (e.g. `--size 300` with the
   default seed 42 gives a 70 cm pair). 200 m/seed 42 and 300 m/seed 99 pass. Unfixed.
@@ -410,6 +467,16 @@ centred and bottom-anchored at any window size.
   They are history, not API — prefer the generator + `forest_generator/` package.
 
 ## Gotchas learned the hard way
+
+- **An unknown key in an `.ini` section is silently ignored — including the section name.**
+  `bRemoteExecution` belongs to `UPythonScriptPluginSettings` (`UCLASS(config=Engine)`, so
+  `DefaultEngine.ini`); this project long declared it under
+  `[/Script/PythonScriptPlugin.PythonScriptPluginUserSettings]`, a real class that has no such
+  property, in *both* `DefaultEngine.ini` and `DefaultEditorPerProjectUserSettings.ini`. No
+  warning, no log line, remote execution simply never on. When a config flag appears to do
+  nothing, confirm the owning class and its `config=` target in the engine source
+  (`Engine/Plugins/.../Private/*Settings.h`) before believing the setting.
+  `bDeveloperMode` genuinely is a UserSettings key — the two live in different files.
 
 - **UE's stock `Pawn` profile IGNORES the Visibility channel** — and so does `CharacterMesh`.
   A `LineTraceSingle` on `TraceTypeQuery1` (which *is* Visibility) therefore passes straight

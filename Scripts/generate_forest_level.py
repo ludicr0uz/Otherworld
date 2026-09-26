@@ -1453,6 +1453,34 @@ def _write_unreal_verify_script(
                       not [n for n in nodes
                            if "PrintString" in
                            " ".join(str(BEL.get_node_title(n)).split())])
+                # A controller's BeginPlay runs before it possesses anything,
+                # so the first pass through the chase loop has no pawn: the
+                # melee chain then reads a location off None and the VM logs an
+                # "Accessed None ... K2_GetPawn_ReturnValue" error once per
+                # spawned NPC. The gate has to be an exec branch ahead of
+                # MoveToActor -- folding IsValid into the melee AND would not
+                # help, since BooleanAND reads both pins and so still pulls the
+                # location chain.
+                PIN = unreal.BlueprintGraphPinLibrary
+                def ins(n):
+                    return {{str(PIN.get_pin_name(q))
+                            for q in BEL.list_input_pins(n)}}
+                moves = [n for n in nodes
+                         if {{"Goal", "AcceptanceRadius"}} <= ins(n)]
+                check("NPC Chase Has One Move Order", len(moves) == 1,
+                      f"(got {{len(moves)}})")
+                if moves:
+                    drivers = [PIN.get_owning_node(q) for q in
+                               BEL.find_execute_pin(moves[0]).list_connected_pins()]
+                    check("NPC Chase Is Gated On Possession",
+                          bool(drivers) and all(
+                              d.get_class().get_name() == "K2Node_IfThenElse"
+                              for d in drivers),
+                          f"(driven by {{[d.get_class().get_name() for d in drivers]}})")
+                    check("NPC Possession Gate Asks IsValid",
+                          any("IsValid" ==
+                              " ".join(str(BEL.get_node_title(n)).split())
+                              for n in nodes))
 
             # -- The placed actors --
             check("NPC Count",

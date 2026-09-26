@@ -1376,7 +1376,17 @@ def _write_unreal_verify_script(
                     nav_bounds = a
                 elif lbl == f"{{LEVEL_NAME}}_NavMesh":
                     nav_mesh = a
-            npc_actors.sort(key=lambda a: a.get_actor_label())
+            # Sort by the label's trailing NUMBER, not by the label. The
+            # wanderers are checked against EXPECTED_NPCS pairwise by position,
+            # and a plain string sort puts "_10" between "_1" and "_2" -- so
+            # every NPC from the second one on is compared against its
+            # neighbour's expected spawn point and all of them fail, while the
+            # placement itself is perfectly correct. Invisible below ten.
+            def _npc_index(actor):
+                tail = actor.get_actor_label().rsplit("_", 1)[-1]
+                return int(tail) if tail.isdigit() else 0
+
+            npc_actors.sort(key=_npc_index)
 
             # -- The Blueprint assets --
             for path in ("/Game/Forest/NPC/BP_ForestWanderer",

@@ -84,7 +84,7 @@ CLI ──► terrain.generate_terrain_obj ──► tree_placement.scatter_tree
      ──► verification_report.json
      ──► emit grass_<Level>.json  (instance transforms, read at import time)
      ──► emit import_<Level>.py   (build the level in-editor)
-     ──► emit verify_<Level>.py   (103 in-editor assertions)
+     ──► emit verify_<Level>.py   (141 in-editor assertions)
      ──► print the two UnrealEditor-Cmd commands
 ```
 
@@ -399,7 +399,7 @@ the nav bounds cover the map and the navmesh's `runtime_generation` is `DYNAMIC`
 The nav block asserts the volume's XY and Z extents and centre match what the generator
 computed, that the vertical span is inside the measured envelope, and that the NPC's feet sit
 inside the volume.
-Prints `[VERIFY] ✅ ALL 126 CHECKS PASSED!` or a list of failures.
+Prints `[VERIFY] ✅ ALL 141 CHECKS PASSED!` or a list of failures.
 
 ---
 
@@ -560,9 +560,9 @@ every frame and `APlayerController` ticks through a pause.
 - Git: branch `night-mode`, working tree clean, head `e5745e9 night mode initial`
   (adds `lighting.py`, the generator rewrite, the regenerated night scripts and a `.gitignore`).
 - `/Game/Maps/Lvl_Forest_200m` — 200 m, seed 42, 136 trees over 5 species, 44,368 knee-high
-  grass clumps over 9 species, **five NPCs 75.0–77.5 m** from the player (every one of them
+  grass clumps over 9 species, **ten NPCs 75.0–78.0 m** from the player (every one of them
   with at least one tree blocking the direct line), **night** preset.
-  Offline 28/28, in-editor 126/126, import log clean.
+  Offline 28/28, in-editor 141/141, import log clean.
 - Combat and HUD: **145/145** (`verify_weapons_and_combat.py`) and **50/50**
   (`verify_graphics_menu.py`). A 90 s `-game` run is clean — 0 runtime errors, 0 Accessed
   None, 5 spawns, 0 falls — and ends with the pack killing the player, which is the death

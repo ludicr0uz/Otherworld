@@ -132,11 +132,11 @@ Python scripts into `Scripts/generated_levels/<LevelName>/`.
 python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
 # flags: --size <meters, required> --name --seed (42) --grid --time-of-day {day,night}
 #        --grass-density (1.2/m²) --grass-height (50 cm) --grass-patchiness (0.25)
-#        --no-grass --no-npc --npc-count (5) --npc-min-distance (75 m)
+#        --no-grass --no-npc --npc-count (10) --npc-min-distance (75 m)
 #        --npc-max-distance (100 m) --json-report
 ```
 Then run the printed `import_<Level>.py` (builds the level) and `verify_<Level>.py`
-(126 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
+(141 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
 
 Grass transforms do **not** live in the generated script — there are tens of thousands of
 them, so they go to a gitignored `grass_<Level>.json` sidecar the import script reads.
@@ -180,11 +180,11 @@ Run it standalone with `-ExecutePythonScript` to rebuild the assets after editin
 rebuilds the AI graph by default now (`rebuild=True`): the old "already authored — reusing"
 guard meant no edit to the builder ever reached the asset once it existed.
 
-### The pack: five, running, at 75–100 m
+### The pack: ten, running, at 75–100 m
 
 | dial (`npc_placement.py`) | value | why |
 |---|---|---|
-| `NPC_COUNT` | 5 | one actor per spawn point, labelled `<Level>_NPC_Wanderer_<n>` |
+| `NPC_COUNT` | 10 | one actor per spawn point, labelled `<Level>_NPC_Wanderer_<n>` |
 | `NPC_RUN_SPEED_CMS` | 600 | UE's own default `MaxWalkSpeed` and the top of `ABP_Unarmed`'s blend space, so the legs jog rather than play a walk too fast. Measured: 75 m closed in ~15 s |
 | `NPC_SPAWN_MIN/MAX_DISTANCE_CM` | 7500 / 10000 | far enough that the player never opens their eyes next to one |
 | `NPC_MIN_SEPARATION_CM` | 600 | they all path to the same target, so a clump never unclumps |
@@ -194,21 +194,27 @@ guard meant no edit to the builder ever reached the asset once it existed.
 
 The **spawn band is clamped to the navigable island**, and the clamp is loud rather than silent:
 `npc_usable_radius` caps at 80 m on a 200 m map (nav coverage is capped — see
-`NAV_MAX_HALF_XY_CM`), so `Lvl_Forest_200m` spawns its five at **75–79.6 m**, and both the
+`NAV_MAX_HALF_XY_CM`), so `Lvl_Forest_200m` spawns its ten at **75.0–78.0 m**, and both the
 generator's console output and the `NPC Spawn Band` check report the band they actually used.
 `spawn_band()` is the only thing that decides it, so the check cannot drift from the placement.
 
-**Balance is a property of the pack.** The five spawn in one band and arrive within a few
-seconds of each other, so one wanderer's numbers are very nearly multiplied by five. Measured in
-a `-game` run: 12 damage every 1.2 s was 50 dps and killed a 100 HP player in **two seconds**,
-before a shot could be fired. 10 every 1.5 s is ~33 dps for the pack. This is the kind of thing
-that cannot be read off the graph — it needed the running game.
+**Balance is a property of the pack.** They spawn in one band and arrive within a few seconds
+of each other, so one wanderer's numbers are very nearly multiplied by `NPC_COUNT`. Measured in
+a `-game` run: 12 damage every 1.2 s was 50 dps for a pack of five and killed a 100 HP player in
+**two seconds**, before a shot could be fired. 10 every 1.5 s is 6.7 dps each. This is the kind
+of thing that cannot be read off the graph — it needed the running game.
+
+**Raising `NPC_COUNT` to 10 doubled that**: ~67 dps, about a second and a half of standing
+still. The melee numbers were **not** retuned to compensate — the pack is meant to be something
+you run from, and sprint (900 cm/s against their 600) is the answer the player now has. If it
+wants softening, `NPC_MELEE_DAMAGE` and `NPC_MELEE_INTERVAL_S` are the dials, and both are in
+`npc_placement.py` where the checks read them.
 
 **Respawns obey the band too, and land on walkable ground.** `BP_HealthComponent`'s death path
 used to put a replacement within 40 m of where the dead one *started*; it now picks a random
 bearing and distance in the same 75–100 m band **measured from the player's current location**.
 Without that, "always 75–100 m away" held only until the first kill. The population stays at
-five with nothing tracking it.
+ten with nothing tracking it.
 
 That band point is a **request, never a spawn location**, and the difference is the bug that
 dropped wanderers through the world:
@@ -224,7 +230,7 @@ dropped wanderers through the world:
 
 `RESPAWN_ATTEMPTS` (2) independent bearings are tried; only if both fail does it fall back to
 any navigable point near the player, and if even that fails the dead wanderer is removed and
-**not** replaced. Losing one of five is visible and recoverable; a replacement under the terrain
+**not** replaced. Losing one of ten is visible and recoverable; a replacement under the terrain
 is neither.
 
 **And the navmesh Z is not the ground.** Recast voxelises the terrain and simplifies the result,
@@ -298,8 +304,8 @@ MoveToActor --> [distance <= 200 cm  AND  now >= NextAttackTime]
                   false ----------------------------------------------> Delay 0.5s
 ```
 
-- The cooldown is wall-clock (`GetTimeSeconds`) and lives on the **controller**, so five
-  wanderers keep five independent timers instead of hitting in lockstep.
+- The cooldown is wall-clock (`GetTimeSeconds`) and lives on the **controller**, so ten
+  wanderers keep ten independent timers instead of hitting in lockstep.
 - The swing plays into `DefaultSlot`, which `build_weapons_and_combat.py`'s layered blend makes
   upper-body only — so the NPC swings while still running. Without that patch the montage is
   full body; it still reads as an attack, so it is not a hard dependency.
@@ -564,7 +570,7 @@ read `GameMode.PlayerDead` and branch, because a reticle and an inventory strip 
 screen read as a game still being played.
 
 **A wanderer's bar is hidden by default** and shown only for **5 s after something hurt it**.
-Five bars over five chasing NPCs is most of the screen, and the bar is only ever *read* just
+Ten bars over ten chasing NPCs is most of the screen, and the bar is only ever *read* just
 after a shot lands; the rest of the time it is clutter over the forest the player is aiming
 into. The pellet stamps `LastDamageTime` on the health component it hit (`_author_impact`), the
 HUD compares it against `GetTimeSeconds`, and the default of −1000 is what keeps every bar off
@@ -594,7 +600,8 @@ centred and bottom-anchored at any window size.
   recoverable with E; both weapons fire with sound, blood and muzzle-origin spread, and the
   character holds the matching ready pose while moving. **Shift sprints** at 900 cm/s against a
   4-second stamina bar and blocks firing while held. Every wanderer dies at 0 HP, respawns
-  75-100 m from the player, and shows its health bar only for 5 s after being hit; kills are
+  75-100 m from the player, and shows its health bar only for 5 s after being hit; **ten of
+  them** chase at once. Kills are
   counted in the top-right. At 0 HP the **player** drops, the game pauses and a menu offers the
   final score and **R to try again**. Built by
   `build_weapons_and_combat.py` — **145/145** in-engine checks, **50/50** HUD checks.
@@ -604,7 +611,7 @@ centred and bottom-anchored at any window size.
   health components' last Tick is at world t = 2.200635, exactly the delay, and there is **not
   one log line of any kind** afterwards); the kill counter counts shot wanderers and refuses
   fallen ones (5 vs 0 over identical deaths); `BaseSpeed` caches as **600**. A clean 90 s run
-  is 0 runtime errors, 0 Accessed None, 5 spawns, 0 falls, and the pack killing the player.
+  is 0 runtime errors, 0 Accessed None, 10 spawns, 0 falls, and the pack killing the player.
 - **Still unverified headlessly, and worth a play session:** everything that needs a key held
   or an eye on the screen — how sprint feels against a pack that runs at 600, whether the
   stamina bar reads clearly under the HP bar, whether the new blood spray looks like blood, and
@@ -614,16 +621,19 @@ centred and bottom-anchored at any window size.
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
 - `/Game/Maps/Lvl_Forest_200m` is generated in **night** mode: 136 trees / 5 species,
-  44,368 knee-high grass clumps / 9 species, **five NPCs at 75.0-77.5 m** from the player,
+  44,368 knee-high grass clumps / 9 species, **ten NPCs at 75.0-78.0 m** from the player,
   moon light 0.12 lux, emissive starfield sky dome as the ambient light source.
-  Offline 28/28 and in-engine 126/126 checks pass.
+  Offline 28/28 and in-engine 141/141 checks pass.
 - **Known pre-existing bug:** `scatter_trees` does no minimum-spacing rejection, so some
   size/seed combinations fail the `Tree Spacing (>100cm)` check (e.g. `--size 300` with the
   default seed 42 gives a 70 cm pair). 200 m/seed 42 and 300 m/seed 99 pass. Unfixed.
-- The pack **runs**: measured in a `-game` run, all five closed 75 m in ~15 s
-  (`max_walk_speed` 600) and then landed melee hits. Not seen headlessly, and worth a look in a
-  play session: whether `MM_Attack_01` actually reads as a swing on the upper body while the
-  legs keep running, and whether five bars plus five attackers crowd the HUD.
+- The pack **runs**: measured in a `-game` run, all of them closed 75 m in ~15 s
+  (`max_walk_speed` 600) and then landed melee hits. Time from level start to the player's
+  death line is 18.0 s with five and 16.8 s with ten — the approach dominates, because a
+  player standing still dies within a second of contact either way. Not seen headlessly, and
+  worth a look in a play session: whether `MM_Attack_01` actually reads as a swing on the upper
+  body while the legs keep running, and whether ten attackers crowd the screen (their health
+  bars no longer do — those are hidden unless one was just hit).
 - Night-sky dials live in `Scripts/forest_generator/lighting.py`: `star_brightness` (2.5),
   sun `intensity` (0.12), `auto_exposure_bias` (1.6).
 - `Scripts/` also holds ~110 older one-off inspect/fix scripts from earlier iterations.
@@ -788,6 +798,13 @@ centred and bottom-anchored at any window size.
   `EventCounts`, which `UPlayerInput::ProcessInputStack` swaps out once per frame during the
   controller's `TG_PrePhysics` tick. A component defaults to `TG_PrePhysics` too, with no
   defined order against the controller. `AHUD` gets away with polling because it ticks later.
+- **A label sort is not an index sort, and it only breaks at ten.** The generated level
+  verifier gathered the wanderers by label prefix and `sort`ed them as strings, then compared
+  them pairwise against the expected spawn points. With five that is fine; with ten, `_10`
+  sorts between `_1` and `_2`, so every NPC from the second on was compared against its
+  neighbour's expected position and **18 checks failed while the placement was perfectly
+  correct**. The tell was that all the "got" values were present, just shifted by one slot.
+  Sort on the trailing integer.
 - **World time in a `-nullrhi -game` run advances by a fixed small step per frame, not by
   wall clock.** Measured: ~0.6 ms of world time per frame whatever the frame rate. So slowing
   the frame rate puts the *game* into slow motion — a PrintString on a component Tick, firing

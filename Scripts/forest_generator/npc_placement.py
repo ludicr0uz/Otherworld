@@ -51,14 +51,16 @@ NPC_REPATH_SECONDS = 0.5           # how often the move order is re-issued
 # arm's length of clear air between them -- close enough to read as a hit, loose
 # enough that a frame of separation does not cancel the swing.
 NPC_MELEE_RANGE_CM = 200.0
-# Balance these two against the PACK, not against one attacker: the five spawn
-# in one band and arrive within a few seconds of each other, so whatever one
-# wanderer does is very nearly multiplied by NPC_COUNT.  Measured in a -game
+# Balance these two against the PACK, not against one attacker: they spawn in
+# one band and arrive within a few seconds of each other, so whatever one
+# wanderer does is very nearly multiplied by NPC_COUNT -- and NPC_COUNT is now
+# ten, so the numbers below are twice as lethal as the run they were tuned in.  Measured in a -game
 # run, 12 damage every 1.2 s put five of them at 50 dps and killed a 100 HP
 # player in two seconds flat, before a single shot could be fired.  10 every
-# 1.5 s is 6.7 dps each, ~33 for the pack -- still lethal in about three
-# seconds if the player stands still and lets all five reach them, which is the
-# point of a 75 m approach the player can watch coming.
+# 1.5 s is 6.7 dps each: ~33 for a pack of five, ~67 for the ten that spawn
+# now. Lethal in about a second and a half if the player stands still and lets
+# all ten reach them, which is what the 75 m approach and the sprint key exist
+# to give them an answer to.
 NPC_MELEE_DAMAGE = 10.0            # 100 HP / 10 = 10 hits from one wanderer
 NPC_MELEE_INTERVAL_S = 1.5         # seconds between swings, per NPC
 # Played on DefaultSlot, which build_weapons_and_combat.py's layered blend makes
@@ -67,16 +69,22 @@ NPC_MELEE_MONTAGE = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_
 NPC_MELEE_BLEND_S = 0.15
 
 # ── How many, and how far away ───────────────────────────────────────────────
-# Five wanderers, every one of them spawned in a 75-100 m band around the
+# Ten wanderers, every one of them spawned in a 75-100 m band around the
 # PlayerStart: far enough that the player never opens their eyes next to one,
 # close enough that the pack arrives within ~15 s at a 600 cm/s run.
+#
+# Ten rather than five is a real change to the fight, not a bigger number: the
+# pack's damage scales with this constant (see NPC_MELEE_DAMAGE above), so ten
+# arriving together is ~67 dps against 100 HP -- about a second and a half of
+# standing still. Sprint (900 cm/s against their 600) is what that leaves as the
+# answer, rather than trading hits.
 #
 # The band is CLAMPED to the navigable island on small maps (see
 # npc_usable_radius): a 200 m map has a usable radius of 80 m, so the band
 # there is 75-80 m.  place_npcs() reports the band it actually used and
 # verification.check_npc_spawn_band asserts against that, so a clamp is visible
 # rather than silent.
-NPC_COUNT = 5
+NPC_COUNT = 10
 NPC_SPAWN_MIN_DISTANCE_CM = 7500.0
 NPC_SPAWN_MAX_DISTANCE_CM = 10000.0
 # Keep the pack from spawning as a single clump -- they path to the same target

@@ -136,25 +136,25 @@
     {
       "name": "NPC Count",
       "passed": true,
-      "message": "5 wanderer(s) placed",
+      "message": "10 wanderer(s) placed",
       "details": []
     },
     {
       "name": "NPC Spawn Band",
       "passed": true,
-      "message": "75.0-77.5 m from the player start, band 75.0-79.6 m (clamped from 75-100 m by the navigable radius)",
+      "message": "75.0-78.0 m from the player start, band 75.0-79.6 m (clamped from 75-100 m by the navigable radius)",
       "details": []
     },
     {
       "name": "NPC Separation",
       "passed": true,
-      "message": "closest pair (NPC 3, NPC 5) 12.2 m apart (minimum 6.0 m)",
+      "message": "closest pair (NPC 7, NPC 8) 6.9 m apart (minimum 6.0 m)",
       "details": []
     },
     {
       "name": "NPC Within Bounds",
       "passed": true,
-      "message": "all 5 inside +/-8000 cm",
+      "message": "all 10 inside +/-8000 cm",
       "details": []
     },
     {
@@ -166,13 +166,13 @@
     {
       "name": "NPC Grounded",
       "passed": true,
-      "message": "all 5 capsule centres 88 cm above the exact mesh Z",
+      "message": "all 10 capsule centres 88 cm above the exact mesh Z",
       "details": []
     },
     {
       "name": "NPC Route Is Obstructed",
       "passed": true,
-      "message": "all 5 routes cross at least one trunk \u2014 pathfinding must detour",
+      "message": "all 10 routes cross at least one trunk \u2014 pathfinding must detour",
       "details": []
     },
     {
@@ -184,7 +184,7 @@
     {
       "name": "NPC Inside Nav Bounds",
       "passed": true,
-      "message": "all 5 stand inside +/-8500 cm XY, feet within -385..1094",
+      "message": "all 10 stand inside +/-8500 cm XY, feet within -385..1094",
       "details": []
     }
   ]

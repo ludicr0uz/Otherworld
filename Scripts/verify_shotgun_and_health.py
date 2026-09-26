@@ -1,3 +1,10 @@
+"""verify_shotgun_and_health.py — SUPERSEDED. Kept as history; do not run.
+
+Checks the assets build_shotgun_and_health.py produced, including
+BP_ShotgunComponent, which build_weapons_and_combat.py deletes. Use
+verify_weapons_and_combat.py instead.
+"""
+
 """
 verify_shotgun_and_health.py — in-engine checks for the shotgun and health.
 

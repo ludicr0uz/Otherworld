@@ -142,10 +142,13 @@ def main():
     expected_text |= {""}
     check("panel draws title, three rows, hint, caret and the HP label",
           drawn == expected_text, str(sorted(drawn ^ expected_text)))
-    # One backs the quality panel; two more are the health bar's empty track and
-    # its fill.
-    check("three DrawRects: panel, HP track, HP fill",
-          len(by_pins("RectColor")) == 3, str(len(by_pins("RectColor"))))
+    # One backs the quality panel, two are the player's HP track and fill, two
+    # more are an NPC bar's track and fill, five are the empty inventory slots,
+    # and the last two are a filled slot and the equipped slot's underline.
+    expected_rects = 1 + 2 + 2 + G.INVENTORY_SIZE + 2
+    check(f"{expected_rects} DrawRects: panel, HP, NPC bar, inventory",
+          len(by_pins("RectColor")) == expected_rects,
+          str(len(by_pins("RectColor"))))
 
     # The caret is the only text whose position is computed rather than literal.
     caret = [n for n in texts
@@ -159,21 +162,41 @@ def main():
     health_reads = [n for n in nodes
                     if "Health" in pin_names(n, False) or
                     "MaxHealth" in pin_names(n, False)]
-    check("HUD reads Health and MaxHealth off the health component",
-          len(health_reads) == 2, str(len(health_reads)))
+    # Two pairs now: the player's bar and the NPC bars read the same component.
+    check("HUD reads Health and MaxHealth for both the player and the NPCs",
+          len(health_reads) == 4, str(len(health_reads)))
 
     lookups = by_pins("ComponentClass")
-    check("HUD looks the health component up on the player pawn",
-          len(lookups) == 1 and
-          G.HEALTH_CLASS_PATH in
-          str(BEL.find_input_pin(lookups[0], "ComponentClass").get_pin_value()))
+    wanted = {G.HEALTH_CLASS_PATH, G.WEAPON_COMP_CLASS_PATH}
+    found = {str(BEL.find_input_pin(n, "ComponentClass").get_pin_value())
+             for n in lookups}
+    check("HUD looks up health (player + NPC) and the weapon component",
+          len(lookups) == 3 and all(any(w in f for f in found) for w in wanted),
+          f"{len(lookups)} lookups: {sorted(found)}")
 
-    # The fill rect is the one whose width is computed; the track's is literal.
+    # A fill rect's width is computed from a health fraction; the track behind it
+    # is literal. Two of them now -- the player's bar and the NPC bars.
     rects = by_pins("RectColor")
     driven = [n for n in rects
               if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]
-    check("the HP fill's width is driven by Health, not a constant",
-          len(driven) == 1, str(len(driven)))
+    check("both HP fills are driven by Health, not by a constant",
+          len(driven) == 2, str(len(driven)))
+
+    # --- the new HUD layers
+    npc_scans = [n for n in by_pins("ActorClass")
+                 if "ForestWanderer" in
+                 str(BEL.find_input_pin(n, "ActorClass").get_pin_value())]
+    check("a bar is drawn for every wanderer in the level",
+          len(npc_scans) == 1, f"{len(npc_scans)} GetAllActorsOfClass(NPC)")
+
+    # Two texts are driven rather than literal: the player's HP number and each
+    # inventory slot's weapon name. A literal slot name would mean the HUD kept
+    # its own copy of the weapon list.
+    driven_text = [n for n in texts
+                   if not BEL.find_input_pin(n, "Text").get_pin_value()
+                   and BEL.find_input_pin(n, "Text").list_connected_pins()]
+    check("HP number and slot names are both read from data, not hard-coded",
+          len(driven_text) == 2, str(len(driven_text)))
 
     # A pawn with no health component must not take the menu down with it.
     check("HP number is drawn from a driven Text pin",

@@ -146,6 +146,27 @@ COL_HP_FILL = "(R=0.750000,G=0.130000,B=0.120000,A=0.950000)"
 COL_HP_LABEL = "(R=0.620000,G=0.650000,B=0.700000,A=1.000000)"
 COL_HP_NUM = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
 
+# --- NPC health bars, drawn in the world above each wanderer ------------------
+NPC_CLASS_PATH = "/Game/Forest/NPC/BP_ForestWanderer.BP_ForestWanderer_C"
+NPC_BAR_Z = 110.0          # cm above the actor's origin, just over its head
+NPC_BAR = (90.0, 10.0)     # width, height in pixels
+COL_NPC_BACK = "(R=0.020000,G=0.020000,B=0.025000,A=0.750000)"
+COL_NPC_FILL = "(R=0.900000,G=0.250000,B=0.180000,A=0.950000)"
+
+# --- inventory strip, bottom centre ------------------------------------------
+WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
+ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
+INVENTORY_SIZE = 5
+SLOT_W = 104.0
+SLOT_H = 68.0
+SLOT_GAP = 10.0
+SLOT_BOTTOM = 46.0         # pixels between the strip and the bottom edge
+SLOT_NAME_SCALE = 1.3
+SLOT_MARK_H = 5.0          # the equipped slot's underline
+COL_SLOT_BACK = "(R=0.020000,G=0.025000,B=0.035000,A=0.700000)"
+COL_SLOT_NAME = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
+COL_SLOT_MARK = "(R=1.000000,G=0.820000,B=0.320000,A=1.000000)"
+
 # ─── Function paths for the graph nodes ──────────────────────────────────────
 
 FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
@@ -165,6 +186,17 @@ FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
 FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
 FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
 FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
+FN_ALL_ACTORS = "/Script/Engine.GameplayStatics.GetAllActorsOfClass"
+FN_ACTOR_LOC = "/Script/Engine.Actor.K2_GetActorLocation"
+FN_ADD_VV = "/Script/Engine.KismetMathLibrary.Add_VectorVector"
+FN_MAKE_VECTOR = "/Script/Engine.KismetMathLibrary.MakeVector"
+FN_BREAK_VECTOR = "/Script/Engine.KismetMathLibrary.BreakVector"
+FN_BREAK_V2D = "/Script/Engine.KismetMathLibrary.BreakVector2D"
+FN_PROJECT = "/Script/Engine.HUD.Project"
+FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
+FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
+FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
+FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
 
 # The DrawHUD event is not one of the placeholder nodes a fresh Blueprint ships
 # with (BeginPlay and Tick are), so it has to be created from the palette.
@@ -172,6 +204,9 @@ NODE_DRAW_HUD = "AddEvent|EventReceiveDrawHUD"
 NODE_TICK = "AddEvent|EventTick"
 NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
+NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
+MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
+                  ".StandardMacros:ForEachLoop")
 
 BGE = unreal.BlueprintGraphEditor
 BEL = unreal.BlueprintEditorLibrary
@@ -520,6 +555,277 @@ def _author_hp(ed, x0, y0, in_exec):
     return (BEL.find_then_pin(number), _pin(cast, "CastFailed", is_input=False))
 
 
+def _vec(ed, x, y, z, px, py):
+    """A constant vector as a node, because struct pins reject text defaults.
+
+    set_pin_value on an FVector pin returns False for every format and leaves
+    the pin empty, which the compiler reads as the zero vector.
+    """
+    n = _at(_node(ed, FN_MAKE_VECTOR), px, py)
+    for axis, value in (("X", x), ("Y", y), ("Z", z)):
+        _set(n, axis, float(value))
+    return _pin(n, "ReturnValue", is_input=False)
+
+
+def _author_npc_bars(ed, x0, y0, in_execs):
+    """A health bar floating over every NPC, in screen space.
+
+    Drawn on the HUD canvas rather than as a widget component on the NPC: UMG
+    layout cannot be authored from Python at all (WidgetTree is protected), and
+    a 3D bar would need a material and a facing update. Project() turns the
+    world point above each head into canvas pixels, which is all DrawRect needs.
+    """
+    every = _at(_node(ed, FN_ALL_ACTORS), x0, y0)
+    _pin(every, "ActorClass").set_pin_value(NPC_CLASS_PATH)
+    for e in in_execs:
+        _connect(e, _pin(every, "execute"))
+
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
+    if not loop:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    _at(loop, x0 + 280, y0)
+    _connect(_pin(every, "OutActors", is_input=False), _loose_pin(loop, "Array"))
+    _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
+    npc = _loose_pin(loop, "ArrayElement", is_input=False)
+
+    comp = _at(_node(ed, FN_GET_COMP), x0 + 580, y0 + 260)
+    _connect(npc, _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
+
+    cast = _at(_palette(ed, NODE_CAST_HEALTH), x0 + 840, y0)
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
+    as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
+
+    health = _at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
+                 x0 + 1100, y0 + 260)
+    _connect(as_health, _pin(health, "self"))
+    max_health = _at(ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH),
+                     x0 + 1100, y0 + 380)
+    _connect(as_health, _pin(max_health, "self"))
+
+    where = _at(_node(ed, FN_ACTOR_LOC), x0 + 1100, y0 + 520)
+    _connect(npc, _pin(where, "self"))
+    above = _at(_node(ed, FN_ADD_VV), x0 + 1360, y0 + 520)
+    _connect(_pin(where, "ReturnValue", is_input=False), _pin(above, "A"))
+    _connect(_vec(ed, 0.0, 0.0, NPC_BAR_Z, x0 + 1100, y0 + 660), _pin(above, "B"))
+
+    proj = _at(_node(ed, FN_PROJECT), x0 + 1620, y0 + 520)
+    _connect(_pin(above, "ReturnValue", is_input=False), _pin(proj, "Location"))
+    parts = _at(_node(ed, FN_BREAK_VECTOR), x0 + 1860, y0 + 520)
+    _connect(_pin(proj, "ReturnValue", is_input=False), _loose_pin(parts, "InVec"))
+
+    # Project returns the depth in Z, and it is negative for anything behind the
+    # camera -- without this test those NPCs get their bars mirrored onto the
+    # screen as if they were in front.
+    in_front = _at(_node(ed, FN_GREATER), x0 + 2120, y0 + 640)
+    _connect(_pin(parts, "Z", is_input=False), _pin(in_front, "A"))
+    _set(in_front, "B", 0.0)
+    visible = _at(ed.add_branch_node(), x0 + 2380, y0)
+    _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(visible, "Condition"))
+    _connect(BEL.find_then_pin(cast), _pin(visible, "execute"))
+
+    left = _at(_node(ed, FN_SUB), x0 + 2380, y0 + 300)
+    _connect(_pin(parts, "X", is_input=False), _pin(left, "A"))
+    _set(left, "B", NPC_BAR[0] / 2.0)          # centre the bar on the head
+    left_out = _pin(left, "ReturnValue", is_input=False)
+    top_out = _pin(parts, "Y", is_input=False)
+
+    frac = _at(_node(ed, FN_DIV), x0 + 2380, y0 + 440)
+    _connect(_pin(health, "Health", is_input=False), _pin(frac, "A"))
+    _connect(_pin(max_health, "MaxHealth", is_input=False), _pin(frac, "B"))
+    fill_w = _at(_node(ed, FN_MUL), x0 + 2620, y0 + 440)
+    _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
+    _set(fill_w, "B", NPC_BAR[0])
+
+    back = _at(_node(ed, FN_DRAW_RECT), x0 + 2640, y0)
+    _set(back, "RectColor", COL_NPC_BACK)
+    _set(back, "ScreenW", NPC_BAR[0])
+    _set(back, "ScreenH", NPC_BAR[1])
+    _connect(left_out, _pin(back, "ScreenX"))
+    _connect(top_out, _pin(back, "ScreenY"))
+    _connect(BEL.find_then_pin(visible), _pin(back, "execute"))
+
+    fill = _at(_node(ed, FN_DRAW_RECT), x0 + 2900, y0)
+    _set(fill, "RectColor", COL_NPC_FILL)
+    _set(fill, "ScreenW", NPC_BAR[0])
+    _set(fill, "ScreenH", NPC_BAR[1])
+    _connect(left_out, _pin(fill, "ScreenX"))
+    _connect(top_out, _pin(fill, "ScreenY"))
+    _connect(_pin(fill_w, "ReturnValue", is_input=False), _pin(fill, "ScreenW"))
+    _connect(BEL.find_then_pin(back), _pin(fill, "execute"))
+
+    ed.add_comment_to_nodes(
+        "One bar per living wanderer. GetAllActorsOfClass every frame is not "
+        "free, but there is one NPC in this level and the alternative -- a "
+        "registry the NPCs write themselves into -- would need a graph on "
+        "BP_ForestWanderer, which build_npc_blueprints.py owns.",
+        [every, loop, comp, cast, health, max_health, where, above, proj, parts,
+         in_front, visible, left, frac, fill_w, back, fill])
+    return (_loose_pin(loop, "Completed", is_input=False),)
+
+
+def _author_inventory(ed, x0, y0, in_execs):
+    """Five slots along the bottom, filled from the weapon component's Inventory.
+
+    The strip is drawn from the viewport size rather than from fixed pixels so
+    it stays centred and bottom-anchored at any window size -- DrawRect works in
+    canvas pixels, which change with the window.
+    """
+    size = _at(_node(ed, FN_VIEWPORT), x0, y0 + 700)
+    wh = _at(_node(ed, FN_BREAK_V2D), x0 + 240, y0 + 700)
+    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
+
+    strip_w = INVENTORY_SIZE * SLOT_W + (INVENTORY_SIZE - 1) * SLOT_GAP
+    half = _at(_node(ed, FN_MUL), x0 + 480, y0 + 700)
+    _connect(_pin(wh, "X", is_input=False), _pin(half, "A"))
+    _set(half, "B", 0.5)
+    origin_x = _at(_node(ed, FN_SUB), x0 + 720, y0 + 700)
+    _connect(_pin(half, "ReturnValue", is_input=False), _pin(origin_x, "A"))
+    _set(origin_x, "B", strip_w / 2.0)
+    x_out = _pin(origin_x, "ReturnValue", is_input=False)
+
+    row_y = _at(_node(ed, FN_SUB), x0 + 720, y0 + 840)
+    _connect(_pin(wh, "Y", is_input=False), _pin(row_y, "A"))
+    _set(row_y, "B", SLOT_H + SLOT_BOTTOM)
+    y_out = _pin(row_y, "ReturnValue", is_input=False)
+
+    made = [size, wh, half, origin_x, row_y]
+
+    def slot_x(index, px, py):
+        """origin_x + index * (SLOT_W + SLOT_GAP), as a node chain."""
+        n = _at(_node(ed, FN_ADD), px, py)
+        _connect(x_out, _pin(n, "A"))
+        _set(n, "B", index * (SLOT_W + SLOT_GAP))
+        made.append(n)
+        return _pin(n, "ReturnValue", is_input=False)
+
+    # Five empty slots first, so the strip is visible even with nothing carried
+    # and even if the weapon component is missing entirely.
+    flow = None
+    for i in range(INVENTORY_SIZE):
+        r = _at(_node(ed, FN_DRAW_RECT), x0 + 1000 + i * 240, y0)
+        _set(r, "RectColor", COL_SLOT_BACK)
+        _set(r, "ScreenW", SLOT_W)
+        _set(r, "ScreenH", SLOT_H)
+        _connect(slot_x(i, x0 + 1000 + i * 240, y0 + 300), _pin(r, "ScreenX"))
+        _connect(y_out, _pin(r, "ScreenY"))
+        if flow is None:
+            for e in in_execs:
+                _connect(e, _pin(r, "execute"))
+        else:
+            _connect(flow, _pin(r, "execute"))
+        flow = BEL.find_then_pin(r)
+        made.append(r)
+
+    ed.add_comment_to_nodes(
+        f"{INVENTORY_SIZE} empty slots, centred on the viewport and anchored "
+        f"{SLOT_BOTTOM:.0f} px off the bottom.", made)
+
+    # --- what is actually carried -------------------------------------------
+    pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), x0 + 2400, y0 + 300)
+    _set(pawn, "PlayerIndex", 0)
+    comp = _at(_node(ed, FN_GET_COMP), x0 + 2640, y0 + 300)
+    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
+
+    cast = _at(_palette(ed, NODE_CAST_WEAPON), x0 + 2900, y0)
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(flow, _pin(cast, "execute"))
+    as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
+
+    inv = _at(ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH),
+              x0 + 3160, y0 + 300)
+    _connect(as_weapon, _pin(inv, "self"))
+    equipped = _at(ed.add_get_member_variable_node("EquippedIndex",
+                                                   WEAPON_COMP_CLASS_PATH),
+                   x0 + 3160, y0 + 420)
+    _connect(as_weapon, _pin(equipped, "self"))
+
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
+    if not loop:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    _at(loop, x0 + 3420, y0)
+    _connect(_pin(inv, "Inventory", is_input=False), _loose_pin(loop, "Array"))
+    _connect(BEL.find_then_pin(cast), _loose_pin(loop, "Exec"))
+    item = _loose_pin(loop, "ArrayElement", is_input=False)
+    index = _loose_pin(loop, "ArrayIndex", is_input=False)
+
+    # The slot's X is index-driven, so one draw covers all five positions
+    # instead of five unrolled copies with baked-in coordinates.
+    as_float = _at(_node(ed, FN_CONV_INT), x0 + 3700, y0 + 520)
+    _connect(index, _pin(as_float, "InInt"))
+    step = _at(_node(ed, FN_MUL), x0 + 3940, y0 + 520)
+    _connect(_pin(as_float, "ReturnValue", is_input=False), _pin(step, "A"))
+    _set(step, "B", SLOT_W + SLOT_GAP)
+    at_x = _at(_node(ed, FN_ADD), x0 + 4180, y0 + 520)
+    _connect(x_out, _pin(at_x, "A"))
+    _connect(_pin(step, "ReturnValue", is_input=False), _pin(at_x, "B"))
+    at_x_out = _pin(at_x, "ReturnValue", is_input=False)
+
+    colour = _at(ed.add_get_member_variable_node("SlotColor", ITEM_CLASS_PATH),
+                 x0 + 3700, y0 + 660)
+    _connect(item, _pin(colour, "self"))
+    name = _at(ed.add_get_member_variable_node("DisplayName", ITEM_CLASS_PATH),
+               x0 + 3700, y0 + 780)
+    _connect(item, _pin(name, "self"))
+
+    fill = _at(_node(ed, FN_DRAW_RECT), x0 + 4420, y0)
+    _connect(_pin(colour, "SlotColor", is_input=False), _pin(fill, "RectColor"))
+    _set(fill, "ScreenW", SLOT_W)
+    _set(fill, "ScreenH", SLOT_H)
+    _connect(at_x_out, _pin(fill, "ScreenX"))
+    _connect(y_out, _pin(fill, "ScreenY"))
+    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(fill, "execute"))
+
+    label_x = _at(_node(ed, FN_ADD), x0 + 4420, y0 + 520)
+    _connect(at_x_out, _pin(label_x, "A"))
+    _set(label_x, "B", 8.0)
+    label_y = _at(_node(ed, FN_ADD), x0 + 4420, y0 + 640)
+    _connect(y_out, _pin(label_y, "A"))
+    _set(label_y, "B", SLOT_H - 24.0)
+
+    label = _at(_node(ed, FN_DRAW_TEXT), x0 + 4680, y0)
+    _connect(_pin(name, "DisplayName", is_input=False), _pin(label, "Text"))
+    _set(label, "TextColor", COL_SLOT_NAME)
+    _set(label, "Scale", SLOT_NAME_SCALE)
+    _set(label, "bScalePosition", "false")
+    _connect(_pin(label_x, "ReturnValue", is_input=False), _pin(label, "ScreenX"))
+    _connect(_pin(label_y, "ReturnValue", is_input=False), _pin(label, "ScreenY"))
+    _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
+
+    # --- the equipped slot gets an underline --------------------------------
+    is_equipped = _at(_node(ed, FN_EQ_II), x0 + 4680, y0 + 520)
+    _connect(index, _pin(is_equipped, "A"))
+    _connect(_pin(equipped, "EquippedIndex", is_input=False), _pin(is_equipped, "B"))
+    marked = _at(ed.add_branch_node(), x0 + 4940, y0)
+    _connect(_pin(is_equipped, "ReturnValue", is_input=False), _pin(marked, "Condition"))
+    _connect(BEL.find_then_pin(label), _pin(marked, "execute"))
+
+    mark_y = _at(_node(ed, FN_ADD), x0 + 4940, y0 + 520)
+    _connect(y_out, _pin(mark_y, "A"))
+    _set(mark_y, "B", SLOT_H - SLOT_MARK_H)
+    mark = _at(_node(ed, FN_DRAW_RECT), x0 + 5200, y0)
+    _set(mark, "RectColor", COL_SLOT_MARK)
+    _set(mark, "ScreenW", SLOT_W)
+    _set(mark, "ScreenH", SLOT_MARK_H)
+    _connect(at_x_out, _pin(mark, "ScreenX"))
+    _connect(_pin(mark_y, "ReturnValue", is_input=False), _pin(mark, "ScreenY"))
+    _connect(BEL.find_then_pin(marked), _pin(mark, "execute"))
+
+    ed.add_comment_to_nodes(
+        "Each carried weapon paints its own SlotColor and DisplayName into its "
+        "slot, and the equipped one gets the underline. Reading the weapon's "
+        "own properties means the HUD needs no table of weapon names to keep "
+        "in step with BP_Shotgun and BP_Pistol.",
+        [pawn, comp, cast, inv, equipped, loop, as_float, step, at_x, colour,
+         name, fill, label_x, label_y, label, is_equipped, marked, mark_y, mark])
+
+    # A pawn with no weapon component still has to reach the menu below.
+    return (_loose_pin(loop, "Completed", is_input=False),
+            _pin(cast, "CastFailed", is_input=False))
+
+
 # ─── Event ReceiveDrawHUD: the panel ─────────────────────────────────────────
 
 def _author_draw(ed, x0, y0):
@@ -530,12 +836,17 @@ def _author_draw(ed, x0, y0):
     # HP first, so it is on screen whether or not the menu is open.
     after_hp = _author_hp(ed, x0, y0 - 900, BEL.find_then_pin(draw))
 
+    # Then the world-space NPC bars and the inventory strip, both of which are
+    # always on screen for the same reason the HP bar is.
+    after_npc = _author_npc_bars(ed, x0, y0 - 2300, after_hp)
+    after_inv = _author_inventory(ed, x0, y0 - 3900, after_npc)
+
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 240, y0 + 200)
     br = _at(ed.add_branch_node(), x0 + 420, y0)
     _connect(_pin(get_open, "MenuOpen", is_input=False), _pin(br, "Condition"))
-    # Both the drawn and the cast-failed paths fall through to the menu; an exec
-    # input takes more than one link, so no Sequence node is needed.
-    for exec_out in after_hp:
+    # Every path above -- drawn or cast-failed -- falls through to the menu; an
+    # exec input takes more than one link, so no Sequence node is needed.
+    for exec_out in after_inv:
         _connect(exec_out, _pin(br, "execute"))
 
     rect = _at(_node(ed, FN_DRAW_RECT), x0 + 640, y0)
@@ -600,6 +911,16 @@ def build_hud_blueprint(rebuild=False):
     both graphs -- but that also means no edit to this file would ever reach the
     asset, which is the trap the NPC builder fell into.
     """
+    # Cast nodes only appear in the palette for classes that are already
+    # loaded; this graph casts to the health and weapon components. Without the
+    # loads create_node_from_name returns None and the error reads like a typo
+    # in the node name rather than a missing asset.
+    for path in ("/Game/Weapons/BP_HealthComponent",
+                 "/Game/Weapons/BP_WeaponComponent",
+                 "/Game/Weapons/BP_WeaponItem"):
+        if not _asset_sub().load_asset(path):
+            raise RuntimeError(f"could not load {path} for its cast node")
+
     bp = _create_blueprint(HUD_BP_PATH, unreal.HUD)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     if not ed:

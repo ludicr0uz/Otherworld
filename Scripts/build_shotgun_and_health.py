@@ -1,5 +1,18 @@
 """
-build_shotgun_and_health.py — Shotgun weapon + health for the player and the NPC.
+build_shotgun_and_health.py — SUPERSEDED. Kept as history; do not run.
+
+Replaced by build_weapons_and_combat.py, which builds the shotgun as a droppable
+Actor alongside a pistol, an inventory and the aim pose. Running this file again
+would weld the old component tree back onto the character.
+
+It also carries a bug worth knowing about: every "float" variable here is really
+an **int**, because get_basic_type_by_name("float") is not recognised and falls
+back to int (the correct name is "real"). Every default in this file happens to
+be integral, so nothing ever looked wrong.
+
+Original header follows.
+
+Shotgun weapon + health for the player and the NPC.
 
 Run inside the editor:
     UnrealEditor-Cmd <uproject> -ExecutePythonScript="<abs>/Scripts/build_shotgun_and_health.py" -NoUI -stdout

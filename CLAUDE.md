@@ -101,52 +101,100 @@ Note the consequence in PIE: these are global cvars, so whichever preset is acti
 PIE is what your editor viewport keeps. `r.ScreenPercentage 100` and `r.ShadowQuality 3` restore
 it.
 
-## The shotgun and health
+## Weapons, inventory and combat
 
-`Scripts/build_shotgun_and_health.py` builds everything under `/Game/Weapons` and installs
-it; `Scripts/verify_shotgun_and_health.py` reads the saved assets back (37 checks).
+`Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**68 checks**).
+It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
-- `BP_HealthComponent` — ActorComponent, **no event graph**: `Health` and `MaxHealth`, both
-  100. Installed on `BP_ThirdPersonCharacter` and on `BP_ForestWanderer`.
-- `BP_ShotgunComponent` — ActorComponent on the player. BeginPlay snaps the weapon to the
-  hand; Tick polls **LeftMouseButton or F** and fires 8 pellets in a 5° cone, each an
-  independent `LineTraceSingle` out to 40 m doing 9 damage. Ammo is unlimited by omission —
-  nothing counts shells. Its tick group is forced to **TG_PostPhysics** so the player
-  controller has already run `ProcessInputStack` that frame (see gotchas).
-  `TRACE_DEBUG_SECONDS` draws the pellet traces in the world; it is on, because the weapon
-  has no muzzle flash, sound or hit marker, so a working shot and a dead trigger look
-  identical without it.
-- The weapon itself is 7 engine primitives (`Receiver`, `Barrel`, `MagTube`, `Pump`, `Stock`,
-  `Grip`, `TriggerGuard`) under a `Shotgun` scene component on the character's mesh, with
-  `M_Gunmetal` / `M_GunWood`.
-- The HUD (`build_graphics_menu.py`) draws the HP bar and number every frame, top-left, by
-  looking `BP_HealthComponent` up on the player pawn. The quality panel moved down to y=130
-  to open underneath it.
+**Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
+(1/2/3 and M belong to the graphics menu, so the weapon keys stay clear of them.)
 
-Health is a *component*, not a variable on each character, so the shooter and the HUD share
-one lookup (`GetComponentByClass` → cast → `Health`) that works on anything carrying it.
-Damage is written directly rather than via `ApplyDamage`/`Event AnyDamage`, because AnyDamage
-is an **Actor** event and routing through it would mean authoring a graph on both characters.
-Neither character's event graph is touched at all — only components are added. That is
-deliberate: `BP_ThirdPersonCharacter`'s graph is the Enhanced Input template, and the
-graph API cannot remove "just the nodes a script added", so anything written there could
-never be rebuilt without wiping input handling too.
+| asset | what it is |
+|-------|------------|
+| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, AimPose, SlotColor, DisplayName, Dropped). No geometry, no graph. |
+| `BP_Shotgun` | child: 7 primitives, 8 pellets × 9 dmg, 5° cone, 40 m, rifle ready pose |
+| `BP_Pistol` | child: 5 primitives, 1 shot × 26 dmg, 1° cone, 60 m, pistol ready pose, different grip angle |
+| `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/drop/pick up |
+| `BP_HealthComponent` | Health/MaxHealth + death, despawn and respawn |
+| `BP_BloodSplash` | 5 emissive spheres that swell over 0.45 s and self-destruct |
+| `Audio/A_ShotgunFire`, `A_PistolFire` | synthesised by `Scripts/make_weapon_sounds.py` (pure Python — the project ships no audio and `/Engine` has no usable gunshot) |
 
-The weapon's orientation is **measured, not guessed**: `SKM_Quinn_Simple` carries a
-`HandGrip_R` socket (and `weapon_r_muzzle`) — there is no `weapon_r` bone, and `hand_r` is a
-bone rather than a socket, so `find_socket('hand_r')` returns None. Querying the reference
-pose puts `weapon_r_muzzle` at `(99.1, 45.7, -19.4)` in `HandGrip_R` space, and the weapon is
-built along its local +X and rotated to aim at that point (pitch −10.1°, yaw 24.8°).
-`AttachToComponent` uses **KeepRelative** — SnapToTarget would throw that offset away.
+**Weapons are Actors, not components.** The old shotgun was a component tree welded to the
+character's mesh, which cannot be dropped — there is no way to leave a component behind in the
+world. Making a weapon an Actor is what makes drop, pick-up and switching fall out naturally:
+equipping is an attach, dropping is a detach. `BP_Shotgun`/`BP_Pistol` derive from
+`BP_WeaponItem` so `Inventory` is one typed array and firing reads its stats off whatever is
+held, with one cast and no per-weapon branching.
 
-Not verifiable headlessly: how the gun *looks* in the hand while `ABP_Unarmed` plays, and how
-firing feels. Both need a play session.
+**Equipping is authored once.** `NeedsRefresh` is set by BeginPlay, switch, drop and pick-up;
+Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
+BeginPlay and then hidden/shown, never destroyed, so a weapon keeps its identity across
+switches and dropping can hand the very same actor to the world.
+
+**The pellet cone starts at the muzzle**, not the camera. Tracing from the camera is the usual
+third-person shortcut, but the camera sits on a boom *behind* the player, which is exactly why
+the spread appeared to come from behind their shoulder. The origin is now
+`TransformLocation(weapon transform, MuzzleOffset)` and only the *direction* comes from the
+camera. `verify_weapons_and_combat.py` asserts a trace is fed by a `TransformLocation` node.
+
+**Death and respawn live on the health component**, driven by three defaults rather than by
+subclassing: `DespawnOnDeath` (false on the player, so the player just sits at 0),
+`RespawnClass`, and `SpawnOrigin` captured at BeginPlay. At 0 HP the NPC spawns a replacement
+on a random navmesh point within 40 m *of where it started* and destroys itself. The
+replacement carries the same component with the same defaults, so the cycle sustains itself
+with nothing tracking it. `auto_possess_ai` is set to `PlacedInWorldOrSpawned` on
+`BP_ForestWanderer` or a spawned wanderer would have no AI controller.
+
+### The ready pose — and why it is a slot, not a state machine
+
+The project ships a full Mannequin set (`MF_Rifle_Idle_ADS`, `MF_Pistol_Idle_ADS`, directional
+rifle/pistol walk and jog, aim offsets) but **only one Anim Blueprint**, `ABP_Unarmed`, which
+uses none of it. A rifle locomotion state machine cannot be authored from Python: `UBlendSpace`
+exposes **no sample-authoring API at all**, so the directional sets cannot be assembled into the
+blend spaces such a graph needs.
+
+What *is* possible is playing into a slot. `ABP_Unarmed`'s AnimGraph is
+`StateMachine → Slot(DefaultSlot) → ControlRig → Root`, and that slot is **full-body** — played
+as-is, an ADS idle freezes the legs and the character slides. So `patch_anim_blueprint()`
+inserts a **Layered blend per bone** with a `spine_01` branch filter:
+
+```
+StateMachine --+---------------------------> LayeredBoneBlend.BasePose ---+
+               |                                                          |--> ControlRig
+               +--> Slot(DefaultSlot) ------> LayeredBoneBlend.BlendPose --+
+```
+
+`DefaultSlot` becomes upper-body-only, and `PlaySlotAnimationAsDynamicMontage(AimPose,
+"DefaultSlot", LoopCount=9999)` puts the arms and chest in the ready pose while the legs keep
+walking, running and jumping. One new node, one rewire. It is idempotent (it checks for an
+existing `LayeredBoneBlend`) and verified at runtime, not just statically.
+
+**Consequence:** every montage played on `DefaultSlot` is now upper-body-only for this
+skeleton. Nothing here plays a full-body montage (the NPC despawns rather than playing a death
+animation), but a future death or knockdown animation needs its own slot.
+Note also that the shipped `MM_Pistol_Fire_Montage` targets a slot called **"Arms"** which does
+not exist in this AnimGraph — it would play at zero weight.
+
+### The HUD
+
+`build_graphics_menu.py` draws, every frame: the player's HP bar (top-left), a projected health
+bar over every wanderer, and a 5-slot inventory strip centred along the bottom. Slot colour and
+name are read from each weapon's own `SlotColor`/`DisplayName`, so the HUD keeps no list of
+weapons to fall out of step with. The strip is laid out from the viewport size so it stays
+centred and bottom-anchored at any window size.
 
 ## Current state
 
-- The player carries a shotgun and both the player and the NPC have 100 HP; the HUD shows
-  the player's. Built by `build_shotgun_and_health.py`, 37/37 in-engine checks pass, and the
-  builder is idempotent (verified by running it twice back to back).
+- The player carries a **shotgun and a pistol**, switchable with Q, droppable with G and
+  recoverable with E; both weapons fire with sound, blood and muzzle-origin spread, and the
+  character holds the matching ready pose while moving. The NPC has a floating health bar,
+  dies at 0 HP and respawns elsewhere on the navmesh. Built by
+  `build_weapons_and_combat.py` — 68/68 in-engine checks, 29/29 HUD checks, and a runtime
+  `-game` pass with 0 accessed-none in which spawn, attach and the aim montage were all
+  confirmed to execute.
+- Not verified headlessly, and worth a look in a play session: how the two weapons *sit* in
+  the hand, whether the pistol grip angle reads right, and how the blood splash looks.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
@@ -164,6 +212,59 @@ firing feels. Both need a play session.
   They are history, not API — prefer the generator + `forest_generator/` package.
 
 ## Gotchas learned the hard way
+
+- **`get_basic_type_by_name("float")` silently declares an `int`.** So does `"double"`. The
+  only spelling that yields a Blueprint float is **`"real"`**. The one clue is a
+  `LogBlueprintEditorLib: Warning: Primitive type: float not recognized, defaulting to int`
+  buried in the log; the variable compiles, saves, and reads back correctly for any integral
+  default (100.0, 9.0, 4000.0 all survive the round trip), so it surfaces only once something
+  needs a fraction. `verify_weapons_and_combat.py` guards this by asserting
+  `isinstance(cdo.get_editor_property(var), float)` — an int property hands Python an `int`.
+  `build_shotgun_and_health.py` has this bug throughout; it is superseded, not fixed.
+- **Struct pins reject `set_pin_value` outright.** Every format for an `FVector` pin
+  (`"5,5,5"`, `"(X=5,Y=5,Z=5)"`, `"X=5 Y=5 Z=5"`, …) returns False and leaves the pin empty,
+  which the compiler then reads as the **zero vector** — a zero scale on a spawn transform
+  makes the actor invisible. Build constants with a `MakeVector` node instead (`_vec()`).
+  `LinearColor` pins *do* accept `"(R=…,G=…,B=…,A=…)"`, which is why the HUD's colours work
+  and makes the vector case easy to assume works too. The engine logs
+  `Failed to set default value … on A`, but `set_pin_value`'s return is the real signal — and
+  note it also returns False when the value you set equals the pin's existing default, so a
+  False is not always a failure.
+- **AnimGraphs *are* authorable from Python; blend spaces are not.**
+  `BlueprintGraphEditor.get_graph_editor_by_name(anim_bp, "AnimGraph")` returns a working
+  editor: anim nodes can be created from the palette (`Animation|Blends|Layeredblendperbone`),
+  wired, and compiled. But `UBlendSpace` exposes no sample-authoring API, so a locomotion
+  graph that needs directional blend spaces cannot be built. `UBlueprint.FunctionGraphs` is
+  not a UPROPERTY, so go through `get_graph_editor_by_name`, and note a bare
+  `BlueprintGraphEditor(bp)` targets the **EventGraph** — on an Anim Blueprint that is the
+  wrong graph and `list_all_nodes()` quietly returns the event graph's nodes.
+- **A pose output pin legally feeds two pose inputs** through the API, and it compiles — so
+  splitting locomotion into both a layered blend's base and a slot's source needs no cached
+  pose pair.
+- **An anim node's settings live on its inner `node` struct, and the read is a copy.**
+  `blend.get_editor_property("layer_setup")` fails (it is not on the graph node); go through
+  `node`, mutate, and **write the whole struct back**. Also: these structs `repr()` as `{}`
+  even when populated, so verify by reading fields, not by printing.
+- **`IsValid` refuses a class pin.** A class reference is a different pin category from an
+  object reference; use `IsValidClass`. The failure is a bare "could not connect pins".
+- **`SpawnActorFromClass`'s return pin takes its type from its `Class` pin.** A variable typed
+  `class of Actor` yields an `Actor` return that cannot be added to an array of a subclass.
+  Type the class variable to the class you actually want back.
+- **A component added through the SCS is not a property on the CDO.** It is constructed per
+  instance, so `get_default_object(bp).get_editor_property("HealthComponent")` is `None`.
+  Authored per-Blueprint defaults live on the **subobject template** — reach it with
+  `SubobjectDataBlueprintFunctionLibrary.get_object(data)`, which is also where they must be
+  written.
+- **`NavigationSystemV1` lives in `/Script/NavigationSystem`, not `/Script/Engine`.** The
+  Engine path resolves to a *pinless* node rather than an error.
+- **`timeout` on a `-game` run fakes a crash.** Killing the process produces
+  `Assertion failed: Index>=0 && Index<NumBits [BitArray.h]` / `SIGSEGV` with
+  `GracefulTerminationHandler` in the callstack — that *is* the signal handler running while
+  the output device flushes, not a gameplay fault. Check the stack for
+  `GracefulTerminationHandler` before chasing it.
+- **`unreal.log` output does not reach `-stdout` reliably.** Use
+  `-forcelogflush -abslog=<path>` and read the file; this is the same buffering caveat the
+  navmesh section already notes.
 
 - **Diagnosing a frozen editor:** `sample <pid> 5 -file /tmp/hang.txt`, then read the
   `GameThread` stack — it names the spinning call directly. `ps -o %cpu` separates a spin

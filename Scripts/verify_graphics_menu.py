@@ -167,30 +167,25 @@ def main():
           len(health_reads) == 4, str(len(health_reads)))
 
     # --- the reticle
-    # It must not be pinned to the centre of the screen: its position comes from
-    # the weapon component's resolved impact point, through Project().
+    # It must be nailed to the centre of the viewport. Drawing it at the
+    # projected impact point was tried and reverted -- the crosshair slid around
+    # under its own parallax -- so a second Project() call here is a regression,
+    # not a feature.
     projects = [n for n in nodes
                 if str(BEL.get_node_title(n)).replace("\n", " ") == "Project"]
-    check("two Project() calls: the NPC bars and the reticle",
-          len(projects) == 2, str(len(projects)))
-    aim_reads = [n for n in nodes
-                 if str(BEL.get_node_title(n)) in
-                 ("Get AimPoint", "Get AimValid", "Get AimBlocked")]
-    check("the reticle reads AimPoint, AimValid and AimBlocked off the weapon",
-          len(aim_reads) == 3, str(sorted(str(BEL.get_node_title(n))
-                                          for n in aim_reads)))
-    reticle_reads = {str(BEL.get_node_title(n)) for n in aim_reads}
-    point = [n for n in aim_reads if str(BEL.get_node_title(n)) == "Get AimPoint"]
-    if point and projects:
-        fed = {PIN.get_owning_node(q)
-               for pr in projects
-               for q in BEL.find_input_pin(pr, "Location").list_connected_pins()}
-        check("the reticle is drawn where the shot lands, not at screen centre",
-              any(n in fed for n in point),
-              "AimPoint feeds a Project() call")
+    check("only the NPC bars project a world point; the reticle does not",
+          len(projects) == 1, str(len(projects)))
+    aim_reads = {str(BEL.get_node_title(n)) for n in nodes
+                 if str(BEL.get_node_title(n)).startswith("Get Aim")}
+    check("the reticle reads AimValid and AimBlocked, and not AimPoint",
+          aim_reads == {"Get AimValid", "Get AimBlocked"}, str(sorted(aim_reads)))
+    viewports = [n for n in nodes
+                 if str(BEL.get_node_title(n)).replace("\n", " ") == "GetViewportSize"]
+    check("the reticle and the inventory strip both centre off the viewport size",
+          len(viewports) == 2, str(len(viewports)))
     check("a blocked shot colours the reticle differently",
           any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
-          and "Get AimBlocked" in reticle_reads)
+          and "Get AimBlocked" in aim_reads)
 
     lookups = by_pins("ComponentClass")
     wanted = {G.HEALTH_CLASS_PATH, G.WEAPON_COMP_CLASS_PATH}

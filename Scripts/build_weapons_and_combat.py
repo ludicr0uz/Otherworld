@@ -192,6 +192,17 @@ RESPAWN_RADIUS = 4000.0
 
 GRIP_SOCKET = "HandGrip_R"
 
+# --- the shooting camera -----------------------------------------------------
+# A centred third-person camera puts the character's own back where the reticle
+# is, so the crosshair sits on the thing you are least interested in shooting.
+# The standard fix is to move the boom over the shoulder: shorter, right, and
+# up, which frames the player in the lower-left and leaves the centre of the
+# screen clear. The boom shortens as well as offsets -- pushing a 400 cm arm
+# sideways swings the camera wide enough that the player's own shoulder crosses
+# the centre again when they turn.
+CAMERA_ARM = 260.0                  # cm, was 400
+CAMERA_SHOULDER = (0.0, 55.0, 60.0) # right and up, in the boom's own space
+
 # How far the camera's aiming ray reaches when it finds nothing: the "point
 # arbitrarily far away" the shot is then aimed at. 1 km is past anything in a
 # 200 m level, so the ray effectively never runs out before the world does.
@@ -2201,6 +2212,31 @@ def make_shootable(bp):
     _log(f"{bp.get_name()}: capsule now blocks Visibility (shootable)")
 
 
+def aim_camera(bp):
+    """Move the camera boom over the player's right shoulder.
+
+    Belongs with the weapons rather than with the level or the HUD: it exists
+    because there is now a reticle in the middle of the screen, and a centred
+    boom points that reticle straight at the player's own back.
+    """
+    arm = None
+    for handle, _name in _handles(bp):
+        obj = _component_object(handle)
+        if isinstance(obj, unreal.SpringArmComponent):
+            arm = obj
+            break
+    if arm is None:
+        _log(f"note: {bp.get_name()} has no SpringArmComponent — camera left alone")
+        return
+    arm.set_editor_property("target_arm_length", CAMERA_ARM)
+    arm.set_editor_property("socket_offset", unreal.Vector(*CAMERA_SHOULDER))
+    got = arm.get_editor_property("socket_offset")
+    if abs(got.y - CAMERA_SHOULDER[1]) > 1e-3:
+        raise RuntimeError(f"the camera boom kept its old offset ({got})")
+    _log(f"camera: boom {CAMERA_ARM:.0f} cm, over the shoulder by "
+         f"{CAMERA_SHOULDER[1]:.0f} cm right / {CAMERA_SHOULDER[2]:.0f} cm up")
+
+
 def install_on_character(health_bp, weapon_bp):
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
@@ -2214,6 +2250,7 @@ def install_on_character(health_bp, weapon_bp):
     # Symmetry, and forward planning: the player carries health too, so anything
     # that shoots back later needs to be able to hit them.
     make_shootable(bp)
+    aim_camera(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)

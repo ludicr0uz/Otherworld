@@ -104,7 +104,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**81 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**82 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
@@ -155,10 +155,18 @@ around `Normal(AimPoint - muzzle)`; `PelletCount`/`SpreadDegrees` make a 1-shot 
 8-pellet shotgun the same code path. This is **hitscan**; a projectile version would keep the
 identical aim resolve and fire a velocity along `AimPoint - muzzle` instead of tracing it.
 
-`BP_WeaponComponent` publishes `AimPoint` / `AimValid` / `AimBlocked`; the HUD projects
-`AimPoint` back onto the canvas and draws the reticle **there**, not at screen centre. Walk up
-to a tree with the crosshair on an NPC beyond it and the reticle jumps to the bark in front of
-the barrel and turns red, because that is genuinely where the shot goes.
+`BP_WeaponComponent` publishes `AimPoint` / `AimValid` / `AimBlocked`. The **reticle is nailed
+to the centre of the viewport**, which is not a compromise: the aim ray is cast along the
+camera's forward vector, and that *is* the centre of the screen. Drawing it at the projected
+`AimPoint` instead was tried and reverted — that point is a world position on whatever surface
+the ray lands on, so the crosshair slid under its own parallax and jumped between a near trunk
+and the ground behind it. A crosshair you aim with has to hold still. Only its **colour** still
+reflects the world: red when the muzzle's line is blocked short of what the camera can see.
+
+The camera boom is **over the right shoulder** (`aim_camera()`: arm 260 cm, socket offset
+`(0, 55, 60)`), because a centred third-person boom points the reticle straight at the player's
+own back. The boom is shortened as well as offset — pushing a 400 cm arm sideways swings the
+camera wide enough that the player's shoulder crosses the centre again when they turn.
 
 Only the pellet traces are drawn (`TRACE_DEBUG_SECONDS`). The two aim traces run every frame
 and would paint the screen solid.
@@ -199,7 +207,9 @@ reference pose.
 ### The HUD
 
 `build_graphics_menu.py` draws, every frame: the player's HP bar (top-left), a projected health
-bar over every wanderer, a 5-slot inventory strip centred along the bottom, and the reticle. Slot colour and
+bar over every wanderer, a 5-slot inventory strip centred along the bottom, and the centre
+reticle. The strip and the reticle are both laid out from the viewport size, so they stay
+centred at any window size. Slot colour and
 name are read from each weapon's own `SlotColor`/`DisplayName`, so the HUD keeps no list of
 weapons to fall out of step with. The strip is laid out from the viewport size so it stays
 centred and bottom-anchored at any window size.
@@ -216,7 +226,7 @@ centred and bottom-anchored at any window size.
 - Not verified headlessly, and worth a look in a play session: how the reticle reads while
   moving, how much the gun visibly detaches from the hand now that its rotation is driven, and
   how the blood splash looks. The last runtime `-game` pass predates the hybrid aim, the
-  reticle and the driven weapon rotation.
+  reticle, the shoulder camera and the driven weapon rotation.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.

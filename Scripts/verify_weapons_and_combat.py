@@ -370,6 +370,18 @@ def blocks_visibility(bp):
 
 char = load(G.CHARACTER_BP_PATH)
 cnames = set(components(char))
+# Found by type, not by name: the template's boom is "CameraBoom" in the
+# third-person template but that is a name somebody could reasonably change,
+# whereas there is only ever one spring arm on a third-person character.
+arm = next((c for c in (component_template(char, n) for n in components(char))
+            if isinstance(c, unreal.SpringArmComponent)), None)
+check("the camera sits over the shoulder, so the reticle is not on the player",
+      arm is not None
+      and abs(arm.get_editor_property("socket_offset").y - G.CAMERA_SHOULDER[1]) < 1e-3
+      and abs(arm.get_editor_property("target_arm_length") - G.CAMERA_ARM) < 1e-3,
+      f"offset {arm.get_editor_property('socket_offset').to_tuple()}, "
+      f"arm {arm.get_editor_property('target_arm_length')}" if arm else "no boom")
+
 check("player carries HealthComponent + WeaponComponent",
       {"HealthComponent", "WeaponComponent"} <= cnames,
       str(sorted(cnames)))

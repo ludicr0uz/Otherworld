@@ -167,13 +167,13 @@ COL_SLOT_BACK = "(R=0.020000,G=0.025000,B=0.035000,A=0.700000)"
 COL_SLOT_NAME = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
 COL_SLOT_MARK = "(R=1.000000,G=0.820000,B=0.320000,A=1.000000)"
 
-# --- reticle, drawn at the point the shot will actually land ------------------
-# Not at the centre of the screen. The centre is where the *camera* is looking,
-# and the shot leaves the muzzle, so the two only agree at infinity. The weapon
-# component resolves the real impact point every frame (BP_WeaponComponent's
-# AimPoint); this projects that world point back onto the canvas, so the reticle
-# sits on the thing that is about to be hit -- including on the near side of a
-# tree the camera can see straight past.
+# --- reticle, nailed to the centre of the viewport ----------------------------
+# The aim ray is cast from the camera along its forward vector, which is the
+# centre of the screen, so the centre is where the shot goes. Drawing it at the
+# projected impact point instead was tried and reverted: that point is a world
+# position on whatever surface the ray lands on, so the crosshair slid around
+# under its own parallax and could not be aimed with. Only the colour still
+# reflects the world -- red when the muzzle's line is blocked.
 RETICLE_GAP = 7.0          # pixels of clear space around the centre dot
 RETICLE_ARM = 11.0         # length of each of the four ticks
 RETICLE_THICK = 2.0
@@ -869,23 +869,24 @@ def _author_inventory(ed, x0, y0, in_execs):
 
 
 def _author_reticle(ed, x0, y0, in_execs):
-    """A crosshair on the point the shot will land, not on the centre of the screen.
+    """A crosshair pinned to the centre of the screen.
 
-    The centre of the screen is where the camera is looking; the pellets leave
-    the muzzle, a metre below and to the side of it, so the two only agree at
-    infinity. BP_WeaponComponent already resolves the real impact point every
-    frame -- camera trace to find the target, muzzle trace to check the gun can
-    reach it -- so all this has to do is Project() that world point back onto
-    the canvas.
+    It was briefly drawn at the projected impact point instead, on the theory
+    that a reticle should sit on the thing about to be hit. In practice that
+    reticle will not hold still: the impact point is a world position on
+    whatever surface the ray lands on, so it slides as the player walks, jumps
+    between a near trunk and the ground behind it, and shifts under its own
+    parallax. A crosshair that moves is unusable -- you aim with it by holding
+    it still and turning the camera, which only works if it is nailed down.
 
-    The payoff is that the reticle can be wrong-in-the-right-way: walk up to a
-    tree with the crosshair on an NPC beyond it and the reticle jumps to the
-    bark in front of the barrel and turns red, because that is genuinely where
-    the shot goes.
+    Fixed at the centre is also *correct* here, not a compromise: the aim ray is
+    cast from the camera along its forward vector, and the camera's forward
+    vector is the centre of the screen. AimPoint is still where the shot lands;
+    the reticle just no longer tries to follow it around.
 
-    Four ticks and a dot, from DrawRect: DrawLine would be the obvious tool but
-    five rects need no new node type, and at these sizes the shapes are
-    identical.
+    What is kept from the impact point is the one thing worth showing: the
+    crosshair turns red when the muzzle's line is blocked short of what the
+    camera can see, so a barrel against a tree reads as such without moving.
     """
     made = []
 
@@ -909,46 +910,40 @@ def _author_reticle(ed, x0, y0, in_execs):
                                                      WEAPON_COMP_CLASS_PATH),
                      x0 + 760, y0 + 300))
     _connect(as_weapon, _pin(valid, "self"))
-    point = keep(_at(ed.add_get_member_variable_node("AimPoint",
-                                                     WEAPON_COMP_CLASS_PATH),
-                     x0 + 760, y0 + 420))
-    _connect(as_weapon, _pin(point, "self"))
     blocked = keep(_at(ed.add_get_member_variable_node("AimBlocked",
                                                        WEAPON_COMP_CLASS_PATH),
-                       x0 + 760, y0 + 540))
+                       x0 + 760, y0 + 420))
     _connect(as_weapon, _pin(blocked, "self"))
 
-    # Empty hands draw nothing: a reticle with no weapon behind it would be
-    # pointing at a shot that cannot be taken.
+    # Empty hands draw nothing: a reticle with no weapon behind it points at a
+    # shot that cannot be taken.
     armed = keep(_at(ed.add_branch_node(), x0 + 1020, y0))
     _connect(_pin(valid, "AimValid", is_input=False), _pin(armed, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(armed, "execute"))
 
-    proj = keep(_at(_node(ed, FN_PROJECT), x0 + 1020, y0 + 420))
-    _connect(_pin(point, "AimPoint", is_input=False), _pin(proj, "Location"))
-    parts = keep(_at(_node(ed, FN_BREAK_VECTOR), x0 + 1280, y0 + 420))
-    _connect(_pin(proj, "ReturnValue", is_input=False), _loose_pin(parts, "InVec"))
+    # Centre from the viewport, not from a constant: DrawRect works in canvas
+    # pixels, which change with the window.
+    size = keep(_at(_node(ed, FN_VIEWPORT), x0 + 1020, y0 + 560))
+    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 1260, y0 + 560))
+    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
 
-    # Same trap as the NPC bars: Project's Z is the depth, and it goes negative
-    # behind the camera, where the X/Y it returns are a mirrored fiction.
-    in_front = keep(_at(_node(ed, FN_GREATER), x0 + 1540, y0 + 560))
-    _connect(_pin(parts, "Z", is_input=False), _pin(in_front, "A"))
-    _set(in_front, "B", 0.0)
-    visible = keep(_at(ed.add_branch_node(), x0 + 1800, y0))
-    _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(visible, "Condition"))
-    _connect(BEL.find_then_pin(armed), _pin(visible, "execute"))
+    def half(axis, py):
+        n = keep(_at(_node(ed, FN_MUL), x0 + 1500, py))
+        _connect(_loose_pin(wh, axis, is_input=False), _pin(n, "A"))
+        _set(n, "B", 0.5)
+        return _pin(n, "ReturnValue", is_input=False)
 
-    colour = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1800, y0 + 700))
+    cx = half("X", y0 + 560)
+    cy = half("Y", y0 + 700)
+
+    colour = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1500, y0 + 840))
     _set(colour, "A", COL_RETICLE_BLOCKED)
     _set(colour, "B", COL_RETICLE)
     _connect(_pin(blocked, "AimBlocked", is_input=False), _pin(colour, "bPickA"))
     colour_out = _pin(colour, "ReturnValue", is_input=False)
 
-    cx = _pin(parts, "X", is_input=False)
-    cy = _pin(parts, "Y", is_input=False)
-
     def offset(src, by, px, py):
-        """cx + by, as a node -- DrawRect wants the corner and we have the centre."""
+        """centre + by, as a node -- DrawRect wants the corner, we have the middle."""
         n = keep(_at(_node(ed, FN_ADD), px, py))
         _connect(src, _pin(n, "A"))
         _set(n, "B", by)
@@ -958,7 +953,7 @@ def _author_reticle(ed, x0, y0, in_execs):
     half_d = RETICLE_DOT / 2.0
     inner = RETICLE_GAP
     outer = RETICLE_GAP + RETICLE_ARM
-    # (dx, dy, w, h) of each piece relative to the impact point on screen.
+    # (name, dx, dy, w, h) of each piece relative to the centre of the screen.
     pieces = (
         ("left",   -outer,   -half_t,  RETICLE_ARM,   RETICLE_THICK),
         ("right",   inner,   -half_t,  RETICLE_ARM,   RETICLE_THICK),
@@ -967,9 +962,9 @@ def _author_reticle(ed, x0, y0, in_execs):
         ("dot",    -half_d,  -half_d,  RETICLE_DOT,   RETICLE_DOT),
     )
 
-    flow = BEL.find_then_pin(visible)
+    flow = BEL.find_then_pin(armed)
     for i, (name, dx, dy, w, h) in enumerate(pieces):
-        px = x0 + 2100 + i * 260
+        px = x0 + 1800 + i * 260
         r = keep(_at(_node(ed, FN_DRAW_RECT), px, y0))
         _set(r, "ScreenW", w)
         _set(r, "ScreenH", h)
@@ -980,15 +975,14 @@ def _author_reticle(ed, x0, y0, in_execs):
         flow = BEL.find_then_pin(r)
 
     ed.add_comment_to_nodes(
-        "Reticle. Its position comes from BP_WeaponComponent.AimPoint -- the "
-        "world point the pellets will actually reach -- so it is not pinned to "
-        "the centre of the screen and it turns red when the muzzle's line is "
-        "blocked short of what the camera is looking at.",
+        "Reticle, nailed to the centre of the viewport. The aim ray is cast "
+        "along the camera's forward vector, and that *is* the centre of the "
+        "screen, so this is where the shot goes -- it turns red when the muzzle "
+        "cannot reach what the camera is looking at.",
         made)
 
     return (flow,
             BEL.find_else_pin(armed),
-            BEL.find_else_pin(visible),
             _pin(cast, "CastFailed", is_input=False))
 
 

@@ -9,7 +9,7 @@ there is no C++ module. See `systemDesign.md` for the detailed architecture.
    `unreal` Python API (or the editor UI).
 2. Automation scripts live in `Scripts/` (run headless), `Scripts/dev/` (tooling for driving
    the editor, not content) or `Content/Python/` (auto-discovered by the editor;
-   `init_unreal.py` runs at startup).
+   `init_unreal.py` runs at startup and starts `uepy_inbox`).
 3. Asset prefixes: `SM_ SK_ M_ MI_ T_ BP_ WBP_ ST_ A_ Cue_`; levels `Lvl_`.
 4. Absolute paths only when invoking the editor directly — the Bash tool resets cwd between
    calls. (`Scripts/dev/uepy.py` resolves its own arguments, so relative paths are fine there.)
@@ -35,12 +35,36 @@ Several targets in one invocation share **one** connection or **one** boot — t
 cost one boot, not three. Exit code is non-zero if any target raised. `--game` kills the run on
 a timer and counts `Blueprint Runtime Error` / `Accessed None` / `NPC-SPAWN` / `NPC-FELL` for you.
 
-Remote execution needs a **UI** editor (a `-NoUI` commandlet never registers) and
-`bRemoteExecution=True` under `[/Script/PythonScriptPlugin.PythonScriptPluginSettings]` in
-`Config/DefaultEngine.ini`. It is **read at startup, so a config change needs an editor
-restart**; `--list` showing nothing when an editor is open means exactly that. Do not push asset
-builders while PIE is running — recompiling a Blueprint under the running game leaves you
-observing neither build; `uepy.py` detects PIE and refuses unless given `--allow-pie`.
+`--project <path>` points it at another project. Do not push asset builders while PIE is
+running — recompiling a Blueprint under the running game leaves you observing neither build;
+`uepy.py` detects PIE and refuses unless given `--allow-pie`.
+
+#### Two transports, and why there are two
+
+`uepy.py` tries, in order: **the inbox**, then **multicast remote execution**, then a cold boot.
+
+1. **The inbox** (`Content/Python/uepy_inbox.py`, started from `init_unreal.py`) is a
+   request/result directory under `Saved/uepy/` that the editor polls on its Slate tick. No
+   network, no permissions. **This is the transport that works on this machine**: measured
+   round trip **0.24 s**, against 22-45 s for a cold boot. It captures `print()` *and*
+   `unreal.log_warning` (by wrapping `unreal.log*` for the duration of the job — the Python API
+   exposes the log *directory* but not the log *filename*, so tailing the log file silently
+   captures nothing when the editor was started with `-abslog`).
+2. **The engine's own remote execution** is tried next. It needs a UI editor (a `-NoUI`
+   commandlet never registers) and `bRemoteExecution=True` under
+   `[/Script/PythonScriptPlugin.PythonScriptPluginSettings]`, read at startup. **It cannot work
+   on this machine**: discovery is UDP multicast on 239.0.0.1:6766, and multicast is not
+   delivered here even to a listener in the same process tree — proven with a plain Python
+   sender/receiver pair, no Unreal involved, on both `lo0` and `en0`. macOS Local Network
+   privacy drops it silently; the editor's socket is bound (`lsof -iUDP:6766` confirms) and
+   ticking, and never hears a ping. Granting Terminal and Unreal Editor "Local Network" access
+   in System Settings → Privacy & Security may revive it; the inbox does not care either way.
+
+**Activating the inbox in an editor that is already open** (it loads at startup, so an editor
+started before this existed has no inbox): in the editor's Output Log, switch the command box to
+*Python* and run `import uepy_inbox; uepy_inbox.start()`. A restart does it automatically.
+The module can be hot-reloaded without restarting:
+`import importlib, uepy_inbox; uepy_inbox.stop(); importlib.reload(uepy_inbox); uepy_inbox.start()`.
 
 The raw form, still correct and what `uepy.py` falls back to:
 
@@ -50,6 +74,33 @@ The raw form, still correct and what `uepy.py` falls back to:
   -ExecutePythonScript="<abs path to .py>" -NoUI -stdout
 ```
 Logs from generated scripts are prefixed `[GEN]` (import) / `[VERIFY]` (checks).
+
+### Cold runs while the editor is open — the staleness trap
+
+A running editor **does not see** asset changes a cold `UnrealEditor-Cmd` writes to disk. There
+is no filesystem watcher for packages: the `PackageReload` machinery in the engine is driven
+only by source control (sync/revert), and the auto-reimport watcher covers *source* files
+(fbx/png), never `.uasset`. So a cold run and an open editor silently diverge, three ways:
+
+1. **You test the old build.** PIE spawns from the objects already in memory, so a playtest
+   after a cold rebuild exercises the *previous* Blueprint. Conclusions drawn from it are
+   worthless, and nothing in the log says so.
+2. **The editor can overwrite the script's work.** It still holds the old package in memory. Any
+   save that touches it — an autosave of a dirty package, Save All, a property nudge — writes
+   that stale state back over the new bytes. The build is silently reverted.
+3. **New assets are invisible** until the asset registry rescans
+   (`AssetRegistry.scan_paths_synchronous`/`scan_modified_asset_files`).
+
+**The fix is to not have two copies.** `uepy.py` with a live editor (via the inbox) executes
+*inside that editor's own process*, so there is one authority for what the asset is and
+divergence cannot happen. That is a correctness reason to prefer it, not just a speed one — and
+the reason the inbox is worth having even though the engine ships its own remote execution.
+
+If a cold run while the editor is open is unavoidable: afterwards, reload the packages in the
+editor (`unreal.EditorLoadingAndSavingUtils.reload_packages([...])` — verified to exist;
+`EditorAssetSubsystem.reload_asset` does **not**), or restart it. Make sure nothing is dirty
+first: reloading discards in-memory changes, which is the point. Never cold-run a builder while
+PIE is active.
 
 ### Iteration guidelines (what actually costs time)
 

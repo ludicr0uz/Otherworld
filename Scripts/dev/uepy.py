@@ -32,12 +32,14 @@ already sets it. Remote execution only reaches an editor with a **UI**; a
 
 import argparse
 import glob
+import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(HERE))       # Scripts/dev -> root
@@ -90,7 +92,22 @@ def engine_dir(override=None):
     return roots[-1]
 
 
+PROJECT_OVERRIDE = None   # set from --project / $UE_PROJECT
+
+
 def uproject():
+    """The .uproject to act on: --project, then $UE_PROJECT, then this repo."""
+    override = PROJECT_OVERRIDE or os.environ.get("UE_PROJECT")
+    if override:
+        path = os.path.abspath(override)
+        if os.path.isdir(path):
+            hits = glob.glob(os.path.join(path, "*.uproject"))
+            if not hits:
+                sys.exit(f"[uepy] no .uproject in {path}")
+            return hits[0]
+        if not os.path.isfile(path):
+            sys.exit(f"[uepy] no such project: {path}")
+        return path
     hits = glob.glob(os.path.join(PROJECT_ROOT, "*.uproject"))
     if not hits:
         sys.exit(f"[uepy] no .uproject in {PROJECT_ROOT}")
@@ -245,6 +262,90 @@ def run_remote(engine, targets, quiet=False, allow_pie=False):
             pass
 
 
+# ─── The file-based inbox (Content/Python/uepy_inbox.py) ────────────────────
+#
+# The engine's own remote execution discovers editors over UDP multicast, which
+# does not work on this machine: a plain Python sender/receiver pair on
+# 239.0.0.1 delivers nothing on lo0 *or* en0, with no Unreal in the picture
+# (macOS Local Network privacy drops it silently). The editor binds its socket
+# and ticks happily and never hears a ping. So there is a second transport that
+# needs no network at all -- a request/result directory under Saved/uepy that
+# the editor polls on its Slate tick.
+
+INBOX_FRESH_SECONDS = 6.0     # a heartbeat older than this means "not running"
+INBOX_POLL = 0.05
+INBOX_TIMEOUT = 1800.0
+
+
+def inbox_dir():
+    return os.path.join(os.path.dirname(uproject()), "Saved", "uepy")
+
+
+def inbox_heartbeat():
+    """The editor's liveness record, or None."""
+    path = os.path.join(inbox_dir(), "heartbeat")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            beat = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if time.time() - float(beat.get("time", 0)) > INBOX_FRESH_SECONDS:
+        return None
+    return beat
+
+
+def run_inbox(targets, quiet=False, allow_pie=False, timeout=INBOX_TIMEOUT):
+    """Execute targets in the editor listening on the inbox, or return None."""
+    beat = inbox_heartbeat()
+    if not beat:
+        return None
+    log(f"live editor via inbox: pid={beat.get('pid')} "
+        f"{os.path.basename(str(beat.get('project')))}"
+        + (" [PIE]" if beat.get("pie") else ""))
+    path = inbox_dir()
+    ok = True
+    for kind, value in targets:
+        label = os.path.basename(value) if kind == "file" else "<statement>"
+        job_id = uuid.uuid4().hex[:12]
+        payload = {"kind": kind, "value": value, "allow_pie": allow_pie}
+        tmp = os.path.join(path, job_id + ".request.tmp")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh)
+        # Atomic rename so the editor never reads a half-written request.
+        os.replace(tmp, os.path.join(path, job_id + ".request"))
+        log(f"=== {label}")
+        result_path = os.path.join(path, job_id + ".result")
+        deadline = time.time() + timeout
+        result = None
+        while time.time() < deadline:
+            if os.path.exists(result_path):
+                try:
+                    with open(result_path, encoding="utf-8") as fh:
+                        result = json.load(fh)
+                    os.remove(result_path)
+                except (OSError, ValueError):
+                    result = None
+                if result is not None:
+                    break
+            if inbox_heartbeat() is None and not os.path.exists(result_path):
+                log("the editor stopped responding -- is it still running?")
+                return False
+            time.sleep(INBOX_POLL)
+        if result is None:
+            log(f"timed out after {timeout:.0f}s waiting for {label}")
+            return False
+        text = str(result.get("output", "")).rstrip()
+        if text:
+            for line in text.splitlines():
+                if quiet and not re.search(
+                        r"LogPython|Error|Warning|❌|✅|Traceback", line):
+                    continue
+                print(line, flush=True)
+        ok = bool(result.get("success")) and ok
+        log(f"--- {label} ({float(result.get('seconds', 0.0)):.1f}s)")
+    return ok
+
+
 # ─── Falling back to a cold editor ──────────────────────────────────────────
 
 # One boot, N scripts. runpy with run_name="__main__" so a script whose work
@@ -274,7 +375,7 @@ if failed:
 '''
 
 
-def run_cold(engine, targets, quiet=False):
+def run_cold(engine, targets, quiet=False, boot_timeout=900):
     cmd_bin = os.path.join(engine, "Binaries/Mac/UnrealEditor-Cmd")
     if not os.path.isfile(cmd_bin):
         sys.exit(f"[uepy] no UnrealEditor-Cmd at {cmd_bin}")
@@ -284,11 +385,24 @@ def run_cold(engine, targets, quiet=False):
         fh.write(COLD_DRIVER.format(targets=targets))
     log(f"no live editor -- cold boot ({len(targets)} script(s), one launch)")
     started = time.time()
-    proc = subprocess.run(
-        [cmd_bin, uproject(), f"-ExecutePythonScript={driver}", "-NoUI",
-         "-stdout"],
-        capture_output=True, text=True)
-    out = proc.stdout + proc.stderr
+    # Log to a FILE, never to a pipe. subprocess pipes deadlock here: the editor
+    # hands its inherited stdout to long-lived helpers (UnrealEditorServices and
+    # friends) that outlive the run, so capture_output=True waits for an EOF
+    # that never comes -- the editor process is long gone and the wait is
+    # forever. Observed exactly that; a file has no such failure mode.
+    outfile = os.path.join(tmp, "cold.log")
+    with open(outfile, "w") as sink:
+        proc = subprocess.Popen(
+            [cmd_bin, uproject(), f"-ExecutePythonScript={driver}", "-NoUI",
+             "-stdout"], stdout=sink, stderr=subprocess.STDOUT)
+        try:
+            proc.wait(timeout=boot_timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            log(f"cold run exceeded {boot_timeout}s and was killed")
+    with open(outfile, errors="replace") as fh:
+        out = fh.read()
     for line in out.splitlines():
         if quiet and not re.search(
                 r"\[uepy\]|LogPython|Error|Warning|❌|✅|Traceback", line):
@@ -364,16 +478,31 @@ def main():
                     help="extra regex to count in a --game log")
     ap.add_argument("-q", "--quiet", action="store_true",
                     help="drop routine Info lines")
+    ap.add_argument("--project",
+                    help="run against another .uproject (file or directory)")
+    ap.add_argument("--boot-timeout", type=int, default=900,
+                    help="kill a cold run that overruns (seconds, default 900)")
     ap.add_argument("--engine", help="engine directory override")
     args = ap.parse_args()
 
+    global PROJECT_OVERRIDE
+    PROJECT_OVERRIDE = args.project
     engine = engine_dir(args.engine)
 
     if args.list:
         _, remote, nodes = discover(engine, project_filter=False)
         if not nodes:
-            log("no editor is listening (remote execution needs a UI editor "
-                "with bRemoteExecution=True)")
+            log("no editor answered multicast discovery (needs a UI editor "
+                "with bRemoteExecution=True, and a host where multicast is "
+                "actually delivered -- see Content/Python/uepy_inbox.py)")
+        beat = inbox_heartbeat()
+        if beat:
+            log(f"inbox: pid={beat.get('pid')} "
+                f"{os.path.basename(str(beat.get('project')))}"
+                + (" [PIE]" if beat.get("pie") else "")
+                + f" -- {inbox_dir()}")
+        else:
+            log(f"inbox: nothing listening in {inbox_dir()}")
         for n in nodes:
             log(f"{n.get('project_name', '?'):<20} "
                 f"{n.get('engine_version', '?'):<12} "
@@ -394,13 +523,20 @@ def main():
             sys.exit(f"[uepy] no such script: {value}")
 
     if not args.cold:
-        outcome = run_remote(engine, targets, args.quiet, args.allow_pie)
+        # Inbox first: detecting it is a single file stat, while multicast
+        # discovery costs a fixed 2.5 s wait and, on a host where multicast is
+        # not delivered, always costs it for nothing. Both transports execute in
+        # the same editor, so preferring the cheap probe loses nothing.
+        outcome = run_inbox(targets, args.quiet, args.allow_pie)
+        if outcome is None:
+            outcome = run_remote(engine, targets, args.quiet, args.allow_pie)
         if outcome is not None:
             return 0 if outcome else 1
         if args.remote_only:
             sys.exit("[uepy] no live editor and --remote-only was given")
 
-    return 0 if run_cold(engine, targets, args.quiet) else 1
+    return 0 if run_cold(engine, targets, args.quiet,
+                         args.boot_timeout) else 1
 
 
 if __name__ == "__main__":

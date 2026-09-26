@@ -144,6 +144,7 @@ from forest_generator.npc_placement import (                      # noqa: E402
     NPC_SPAWN_MIN_DISTANCE_CM,
     NPC_SPAWN_MAX_DISTANCE_CM,
     NPC_RESPAWN_NAV_SNAP_CM,
+    NPC_CAPSULE_HALF_HEIGHT_CM,
 )
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -162,10 +163,12 @@ WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"
 
 CHARACTER_BP_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter"
+GAME_MODE_BP_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
 NPC_BP_PATH = "/Game/Forest/NPC/BP_ForestWanderer"
 ABP_PATH = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"
 
 CHARACTER_CLASS_PATH = f"{CHARACTER_BP_PATH}.BP_ThirdPersonCharacter_C"
+GAME_MODE_CLASS_PATH = f"{GAME_MODE_BP_PATH}.BP_ThirdPersonGameMode_C"
 NPC_CLASS_PATH = f"{NPC_BP_PATH}.BP_ForestWanderer_C"
 ITEM_CLASS_PATH = f"{ITEM_BP_PATH}.BP_WeaponItem_C"
 HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
@@ -208,12 +211,66 @@ TRACE_DEBUG_SECONDS = 1.5
 # walks 300 m, kills something, and its replacement appears 300 m behind them,
 # or worse, right on top of them when they have walked toward the spawn.
 #
-# The band's far edge can fall outside the navigable island, so the random point
-# is snapped back onto the navmesh with a generous radius; a respawn that lands
-# 70 m out because the navmesh ended is fine, one that lands off-mesh and cannot
-# move is not.
+# The band's far edge can fall outside the navigable island, and the point is
+# built from the PLAYER's Z, which is not the ground height at a spot 90 m away.
+# So the point is a *request*, never a spawn location: it is projected onto the
+# navmesh first, and only the projected result is ever spawned at. See
+# _author_respawn_point for what happens when the projection fails.
 RESPAWN_BAND = (NPC_SPAWN_MIN_DISTANCE_CM, NPC_SPAWN_MAX_DISTANCE_CM)
 RESPAWN_NAV_SNAP = NPC_RESPAWN_NAV_SNAP_CM
+# Search box for that projection, half-extents in cm. Deliberately wide in XY:
+# a band point that overshoots the navigable island by 20 m snaps back onto its
+# edge rather than failing, which is the common case on a map whose usable
+# radius (80 m on a 200 m map) is narrower than the band. Deliberately tall in
+# Z: the request carries the player's height, and the terrain it has to land on
+# ranges from a -2 m hollow to a 40 m edge ramp.
+RESPAWN_PROJECT_EXTENT = (3000.0, 3000.0, 10000.0)
+# A navmesh point is the ground; a Character's origin is its capsule centre.
+RESPAWN_LIFT = NPC_CAPSULE_HALF_HEIGHT_CM
+# ...except a navmesh point is NOT reliably the ground. Recast voxelises the
+# terrain (cell height, then polygon simplification), so on a slope its polygon
+# can sit well below the mesh surface -- measured at up to 86 cm low over 1847
+# respawns, with 3% of them landing a capsule less than half-seated and 0.2%
+# more than half buried. A capsule that starts inside the terrain depenetrates,
+# and a thin one-sided surface is exactly what it pops *through*: that is the
+# "some still fall through" case. So the chosen point's XY is kept and its Z is
+# re-derived by tracing onto the real collision geometry.
+#
+# The trace starts only 2 m up on purpose. A trace from far overhead would hit a
+# tree canopy and seat the wanderer in the branches; 2 m clears the worst
+# measured burial and stays under anything growing above.
+RESPAWN_TRACE_UP = 200.0
+RESPAWN_TRACE_DOWN = 500.0
+# The floor of the world, for the safety net below. The terrain bottoms out at
+# about -185 cm and the nav volume at -385, so anything under -1000 cm is not
+# standing on anything and never will be.
+WORLD_FLOOR_Z = -1000.0
+
+# Every wanderer gets a number, handed out in spawn order and shown beside its
+# health bar, so a fall-through seen on screen can be matched to the exact
+# spawn location in the log. The counter has to live somewhere world-scoped and
+# Blueprints have no statics -- the GameMode is the project's existing wiring
+# point (it already carries HUDClass), one instance per session, and it outlives
+# every wanderer.
+SPAWN_COUNT_VAR = "NpcSpawnCount"
+NPC_ID_VAR = "NpcId"
+SPAWN_LOG_PREFIX = "[NPC-SPAWN] #"
+# Flagged ERROR in the text because Blueprint cannot emit an Error-severity log
+# line at all: PrintWarning is the highest the Kismet library offers (there is
+# no PrintStringWithSeverity / LogError node), and a real UE_LOG(Error) would
+# need a C++ module, which this project does not have. Warning severity at
+# least colours it in the Output Log and trips the editor's warning filter; the
+# token makes it greppable as an error regardless.
+FELL_LOG_PREFIX = "[NPC-FELL] ERROR #"
+SPAWNED_AT_VAR = "SpawnedAt"
+# How many independent bearings to try before giving up on the band. One is
+# enough whenever the navmesh has settled -- measured at runtime, 215 of 220
+# band points projected, and the five failures were all in the first frame,
+# before any tile existed. A second draw exists for exactly that window, and for
+# the tile churn that follows a burst of deaths: it costs nothing when the first
+# attempt succeeds, and it keeps a respawn in the band instead of dropping it
+# next to the player.
+RESPAWN_ATTEMPTS = 2
 
 GRIP_SOCKET = "HandGrip_R"
 
@@ -1032,6 +1089,13 @@ FN_GET_TRANSFORM = "/Script/Engine.Actor.GetTransform"
 FN_ACTOR_LOC = "/Script/Engine.Actor.K2_GetActorLocation"
 FN_MAKE_TRANSFORM = "/Script/Engine.KismetMathLibrary.MakeTransform"
 FN_MAKE_VECTOR = "/Script/Engine.KismetMathLibrary.MakeVector"
+FN_BREAK_VECTOR = "/Script/Engine.KismetMathLibrary.BreakVector"
+FN_GET_GAME_MODE = "/Script/Engine.GameplayStatics.GetGameMode"
+FN_PRINT = "/Script/Engine.KismetSystemLibrary.PrintString"
+FN_WARN = "/Script/Engine.KismetSystemLibrary.PrintWarning"
+FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
+FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
+FN_VEC_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_VectorToString"
 FN_NORMAL = "/Script/Engine.KismetMathLibrary.Normal"
 FN_DEG2RAD = "/Script/Engine.KismetMathLibrary.DegreesToRadians"
 FN_PLAY_SOUND = "/Script/Engine.GameplayStatics.PlaySoundAtLocation"
@@ -1049,7 +1113,9 @@ FN_ANIM_INSTANCE = "/Script/Engine.SkeletalMeshComponent.GetAnimInstance"
 FN_PLAY_SLOT = "/Script/Engine.AnimInstance.PlaySlotAnimationAsDynamicMontage"
 FN_STOP_SLOT = "/Script/Engine.AnimInstance.StopSlotAnimation"
 FN_RANDOM_NAV = ("/Script/NavigationSystem.NavigationSystemV1"
-                 ".K2_GetRandomReachablePointInRadius")
+                 ".K2_GetRandomLocationInNavigableRadius")
+FN_PROJECT_NAV = ("/Script/NavigationSystem.NavigationSystemV1"
+                  ".K2_ProjectPointToNavigation")
 
 FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
 FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
@@ -1080,6 +1146,7 @@ NODE_BREAK_HIT = "Collision|BreakHitResult"
 NODE_SPAWN = "Game|SpawnActorfromClass"
 NODE_CAST_CHAR = "Utilities|Casting|CastToBP_ThirdPersonCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
+NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
 MACRO_FOR_LOOP = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForLoop"
 MACRO_FOR_EACH = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForEachLoop"
 
@@ -1224,6 +1291,33 @@ def build_blood_splash(rebuild=True):
 
 # ─── BP_HealthComponent ──────────────────────────────────────────────────────
 
+def ensure_spawn_counter():
+    """Put the world-scoped spawn counter on the GameMode.
+
+    A variable only -- no graph. The GameMode is chosen because Blueprints have
+    no statics and this has to be one number per session, shared by every
+    wanderer's health component: the HUD reads each NPC's own copy of the number
+    it was handed, and the log line is written once, when it is handed out.
+
+    Declared here rather than in build_graphics_menu.py (which owns the other
+    edit to this asset, HUDClass) because the counter is part of the NPC life
+    cycle, and this file is what reads and writes it.
+    """
+    eas = _assets()
+    bp = eas.load_asset(GAME_MODE_BP_PATH)
+    if not bp:
+        raise RuntimeError(f"could not load {GAME_MODE_BP_PATH}")
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    if not ed:
+        raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
+    _declare(ed, SPAWN_COUNT_VAR, BEL.get_basic_type_by_name("int"))
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
+    eas.save_loaded_asset(bp)
+    _log(f"{GAME_MODE_BP_PATH}.{SPAWN_COUNT_VAR} ready (spawn counter)")
+    return bp
+
+
 def build_health_component(rebuild=True):
     """Health, plus what happens when it runs out.
 
@@ -1265,6 +1359,18 @@ def build_health_component(rebuild=True):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     _declare(ed, "RespawnClass",
              BEL.get_class_reference_type(unreal.Actor.static_class()))
+    # Where the replacement will appear. Written three times on the way to the
+    # spawn -- the request, then whichever navmesh point it resolved to -- so
+    # that the random draw and the nav query are each evaluated exactly once.
+    _declare(ed, "RespawnPoint", _struct_type(unreal.Vector.static_struct()))
+    # The number this wanderer was given at spawn. The HUD draws it beside the
+    # health bar; the log line below records where that number appeared.
+    _declare(ed, NPC_ID_VAR, BEL.get_basic_type_by_name("int"))
+    # Where this wanderer was put. Recorded for diagnosis, not for gameplay --
+    # the respawn point is computed from the player, not from here (the old
+    # SpawnOrigin, which anchored respawns to it, is gone on purpose). It is
+    # what lets the safety net report the spawn that produced a faller.
+    _declare(ed, SPAWNED_AT_VAR, _struct_type(unreal.Vector.static_struct()))
 
     # SpawnOrigin used to hold where this actor started, back when a replacement
     # appeared near the dead one's own spawn point. It has to be removed
@@ -1272,8 +1378,171 @@ def build_health_component(rebuild=True):
     # simply stops declaring stays on the asset forever.
     ed.remove_member_variable("SpawnOrigin")
 
-    # BeginPlay is left empty on purpose: the respawn point is computed from the
-    # player at the moment of death, so there is nothing to capture at start.
+    # --- BeginPlay: take the next number and say where this one appeared -----
+    # Numbered in spawn order, wanderers only (the player carries the same
+    # component and must not consume a number). Both the initially placed five
+    # and every replacement come through here, so the log is a complete record
+    # of every wanderer that has ever existed this session -- which is what
+    # makes a fall-through reportable: read the number off the health bar, find
+    # that number in the log, and its spawn location is right there.
+    mine = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -1200, -640)
+    is_wanderer = _at(ed.add_branch_node(), -960, -900)
+    _connect(_pin(mine, "DespawnOnDeath", is_input=False), _pin(is_wanderer, "Condition"))
+    _connect(BEL.find_then_pin(begin), _pin(is_wanderer, "execute"))
+
+    mode = _at(_node(ed, FN_GET_GAME_MODE), -720, -900)
+    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), -480, -900)
+    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(BEL.find_then_pin(is_wanderer), _pin(as_mode, "execute"))
+    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
+
+    seen = _at(ed.add_get_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH),
+               -480, -700)
+    _connect(mode_out, _pin(seen, "self"))
+    next_id = _at(_node(ed, FN_ADD_II), -240, -700)
+    _connect(_pin(seen, SPAWN_COUNT_VAR, is_input=False), _pin(next_id, "A"))
+    _set(next_id, "B", 1)
+    # Take the number FIRST, then write the counter back from the stored value,
+    # and read the stored value everywhere after that. The obvious order -- bump
+    # the counter, then set NpcId from the same "+1" node -- numbers the first
+    # wanderer 2: the add is pure, so reading it again after the counter has
+    # moved re-evaluates it against the new count. Same trap as the navmesh
+    # queries in the respawn path; a stored value is what makes it go away.
+    take = _at(ed.add_set_member_variable_node(NPC_ID_VAR), 0, -900)
+    _connect(_pin(next_id, "ReturnValue", is_input=False), _pin(take, NPC_ID_VAR))
+    _connect(BEL.find_then_pin(as_mode), _pin(take, "execute"))
+
+    my_id = _at(ed.add_get_member_variable_node(NPC_ID_VAR), 240, -700)
+    my_id_out = _pin(my_id, NPC_ID_VAR, is_input=False)
+
+    bump = _at(ed.add_set_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH),
+               240, -900)
+    _connect(mode_out, _pin(bump, "self"))
+    _connect(my_id_out, _pin(bump, SPAWN_COUNT_VAR))
+    _connect(BEL.find_then_pin(take), _pin(bump, "execute"))
+
+    # "[NPC-SPAWN] #7 at X=... Y=... Z=..."
+    id_str = _at(_node(ed, FN_INT_TO_STR), 480, -700)
+    _connect(my_id_out, _pin(id_str, "InInt"))
+    head = _at(_node(ed, FN_CONCAT), 720, -700)
+    _set(head, "A", SPAWN_LOG_PREFIX)
+    _connect(_pin(id_str, "ReturnValue", is_input=False), _pin(head, "B"))
+    here_owner = _at(_node(ed, FN_GET_OWNER), 240, -520)
+    here = _at(_node(ed, FN_ACTOR_LOC), 480, -520)
+    _connect(_pin(here_owner, "ReturnValue", is_input=False), _pin(here, "self"))
+    record = _at(ed.add_set_member_variable_node(SPAWNED_AT_VAR), 480, -900)
+    _connect(_pin(here, "ReturnValue", is_input=False), _pin(record, SPAWNED_AT_VAR))
+    _connect(BEL.find_then_pin(bump), _pin(record, "execute"))
+    # The log line reads the stored value rather than the actor again, so the
+    # line and the variable the safety net quotes can never disagree.
+    spawned_at = _at(ed.add_get_member_variable_node(SPAWNED_AT_VAR), 720, -520)
+    where_str = _at(_node(ed, FN_VEC_TO_STR), 960, -520)
+    _connect(_pin(spawned_at, SPAWNED_AT_VAR, is_input=False), _pin(where_str, "InVec"))
+    at_str = _at(_node(ed, FN_CONCAT), 1200, -520)
+    _set(at_str, "A", " at ")
+    _connect(_pin(where_str, "ReturnValue", is_input=False), _pin(at_str, "B"))
+    line = _at(_node(ed, FN_CONCAT), 1440, -700)
+    _connect(_pin(head, "ReturnValue", is_input=False), _pin(line, "A"))
+    _connect(_pin(at_str, "ReturnValue", is_input=False), _pin(line, "B"))
+
+    say = _at(_node(ed, FN_PRINT), 1440, -900)
+    _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
+    # Log only. On screen it would be five lines at level start and another
+    # every time something dies, over the top of the HUD it is meant to explain.
+    _set(say, "bPrintToScreen", "false")
+    _set(say, "bPrintToLog", "true")
+    _set(say, "Duration", 0.0)
+    _connect(BEL.find_then_pin(record), _pin(say, "execute"))
+
+    ed.add_comment_to_nodes(
+        "Every wanderer takes the next number from the GameMode as it spawns "
+        "and writes one log line saying where it appeared. The HUD draws the "
+        "same number beside its health bar, so anything seen on screen can be "
+        "looked up in the log. The player's copy of this component skips it -- "
+        "DespawnOnDeath is what tells the two apart.",
+        [mine, is_wanderer, mode, as_mode, seen, next_id, take, my_id, bump,
+         record, spawned_at, id_str, head, here_owner, here, where_str, at_str,
+         line, say])
+
+
+    # --- Tick: the safety net -----------------------------------------------
+    # Anything below the world is counted as dead, which routes it through the
+    # despawn-and-replace path that already exists -- so a wanderer that somehow
+    # ends up under the terrain is gone within a frame and a correctly seated
+    # replacement takes its place, instead of falling for the rest of the
+    # session. Gated on DespawnOnDeath so it applies to the NPCs and never to
+    # the player, who has no replacement to be given.
+    #
+    # This is a net, not the fix: the fix is tracing the respawn onto real
+    # ground (see below). A net is worth having anyway, because "the capsule
+    # ended up inside geometry" has more causes than the one that was measured.
+    net_owner = _at(_node(ed, FN_GET_OWNER), -1200, 240)
+    net_loc = _at(_node(ed, FN_ACTOR_LOC), -960, 240)
+    _connect(_pin(net_owner, "ReturnValue", is_input=False), _pin(net_loc, "self"))
+    net_brk = _at(_node(ed, FN_BREAK_VECTOR), -720, 240)
+    _connect(_pin(net_loc, "ReturnValue", is_input=False), _pin(net_brk, "InVec"))
+    under = _at(_node(ed, FN_LESS_FF), -480, 240)
+    _connect(_pin(net_brk, "Z", is_input=False), _pin(under, "A"))
+    _set(under, "B", WORLD_FLOOR_Z)
+    net_is_npc = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -480, 400)
+    net_both = _at(_node(ed, FN_AND), -240, 240)
+    _connect(_pin(under, "ReturnValue", is_input=False), _pin(net_both, "A"))
+    _connect(_pin(net_is_npc, "DespawnOnDeath", is_input=False), _pin(net_both, "B"))
+    lost = _at(ed.add_branch_node(), -240, 0)
+    _connect(_pin(net_both, "ReturnValue", is_input=False), _pin(lost, "Condition"))
+    _connect(BEL.find_then_pin(tick), _pin(lost, "execute"))
+    # Say which one, by its number, before removing it: the net recovers the
+    # game within a frame, which would otherwise erase the evidence of the very
+    # thing worth diagnosing. Grep [NPC-FELL] for the number, then [NPC-SPAWN]
+    # for the same number to see exactly where it was put.
+    net_id = _at(ed.add_get_member_variable_node(NPC_ID_VAR), -240, 400)
+    net_id_str = _at(_node(ed, FN_INT_TO_STR), 0, 400)
+    _connect(_pin(net_id, NPC_ID_VAR, is_input=False), _pin(net_id_str, "InInt"))
+    net_head = _at(_node(ed, FN_CONCAT), 240, 400)
+    _set(net_head, "A", FELL_LOG_PREFIX)
+    _connect(_pin(net_id_str, "ReturnValue", is_input=False), _pin(net_head, "B"))
+    net_where = _at(_node(ed, FN_VEC_TO_STR), 240, 560)
+    _connect(_pin(net_loc, "ReturnValue", is_input=False), _pin(net_where, "InVec"))
+    net_at = _at(_node(ed, FN_CONCAT), 480, 560)
+    _set(net_at, "A", " fell to ")
+    _connect(_pin(net_where, "ReturnValue", is_input=False), _pin(net_at, "B"))
+    net_line = _at(_node(ed, FN_CONCAT), 720, 400)
+    _connect(_pin(net_head, "ReturnValue", is_input=False), _pin(net_line, "A"))
+    _connect(_pin(net_at, "ReturnValue", is_input=False), _pin(net_line, "B"))
+
+    # ...and where it was spawned, which is the half worth having: the fall
+    # position is always "somewhere under the map", while the spawn position is
+    # the thing that has to be explained. Quoting the stored SpawnedAt means the
+    # two lines for one wanderer agree by construction.
+    net_origin = _at(ed.add_get_member_variable_node(SPAWNED_AT_VAR), 480, 720)
+    net_origin_str = _at(_node(ed, FN_VEC_TO_STR), 720, 720)
+    _connect(_pin(net_origin, SPAWNED_AT_VAR, is_input=False),
+             _pin(net_origin_str, "InVec"))
+    net_from = _at(_node(ed, FN_CONCAT), 960, 720)
+    _set(net_from, "A", " — spawned at ")
+    _connect(_pin(net_origin_str, "ReturnValue", is_input=False), _pin(net_from, "B"))
+    net_full = _at(_node(ed, FN_CONCAT), 1200, 400)
+    _connect(_pin(net_line, "ReturnValue", is_input=False), _pin(net_full, "A"))
+    _connect(_pin(net_from, "ReturnValue", is_input=False), _pin(net_full, "B"))
+
+    # PrintWarning, not PrintString: Warning is the highest severity Blueprint
+    # can emit, so this is as close to an error as the graph can get, and it is
+    # what makes the line stand out in the Output Log.
+    net_say = _at(_node(ed, FN_WARN), 1200, 0)
+    _connect(_pin(net_full, "ReturnValue", is_input=False), _pin(net_say, "InString"))
+    _connect(BEL.find_then_pin(lost), _pin(net_say, "execute"))
+
+    write_off = _at(ed.add_set_member_variable_node("Health"), 960, 0)
+    _set(write_off, "Health", 0.0)
+    _connect(BEL.find_then_pin(net_say), _pin(write_off, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"Safety net: an owner that has fallen below {WORLD_FLOOR_Z / 100:.0f} m "
+        "is named in the log and then written off as dead, so the existing death "
+        "path replaces it. NPCs only -- the player has no RespawnClass.",
+        [net_owner, net_loc, net_brk, under, net_is_npc, net_both, lost, net_id,
+         net_id_str, net_head, net_where, net_at, net_line, net_origin,
+         net_origin_str, net_from, net_full, net_say, write_off])
 
     # --- Tick: has it died this frame? ---------------------------------------
     health = _at(ed.add_get_member_variable_node("Health"), 240, 240)
@@ -1283,7 +1552,11 @@ def build_health_component(rebuild=True):
 
     at_zero = _at(ed.add_branch_node(), 700, 0)
     _connect(_pin(dying, "ReturnValue", is_input=False), _pin(at_zero, "Condition"))
-    _connect(BEL.find_then_pin(tick), _pin(at_zero, "execute"))
+    # Both arms of the net fall through to here. The Health getter above is
+    # pure, so it is read at *this* branch -- after the net's write -- and a
+    # wanderer written off this frame dies this frame.
+    _connect(BEL.find_then_pin(write_off), _pin(at_zero, "execute"))
+    _connect(BEL.find_else_pin(lost), _pin(at_zero, "execute"))
 
     # Branch on Dead and use its *False* pin -- one node cheaper than a NOT, and
     # it is what stops the death path running again every frame after the first.
@@ -1309,72 +1582,217 @@ def build_health_component(rebuild=True):
     _connect(_pin(can_respawn, "ReturnValue", is_input=False), _pin(respawns, "Condition"))
     _connect(BEL.find_then_pin(should), _pin(respawns, "execute"))
 
-    # Somewhere in the band around the player: random bearing, random distance.
+    # --- where the replacement goes -----------------------------------------
+    # Three steps, and the order matters:
+    #
+    #   1. build the REQUEST -- a random bearing and distance in the band,
+    #      around the player -- and store it, so the random draw happens once;
+    #   2. project it onto the navmesh, which is what supplies a real ground
+    #      height (the request carries the *player's* Z, which is meaningless
+    #      90 m away) and pulls a point that overshot the navigable island back
+    #      onto it;
+    #   3. only then spawn, lifted by the capsule's half height.
+    #
+    # Step 1 has to be a variable rather than wires straight into step 2.
+    # K2_ProjectPointToNavigation is **pure** (a const BlueprintCallable, which
+    # UHT promotes), so it is re-evaluated once per output pin read -- and if
+    # its Point pin were driven by the RandomFloatInRange chain, the branch on
+    # ReturnValue and the read of ProjectedLocation would each roll fresh
+    # numbers and project two different points. Storing the request first makes
+    # every re-evaluation deterministic.
+    #
+    # THIS IS THE BUG THIS SHAPE EXISTS TO FIX: the previous version read the
+    # nav query's location output and never looked at its bool, so a failed
+    # query -- routine here, because the band's far edge lies outside the
+    # navigable island on a 200 m map -- spawned the replacement at the raw
+    # request point, at the player's own Z. On any ground higher than the player
+    # that is *inside* the terrain, and the capsule falls through the world.
     hero = _at(_node(ed, FN_GET_PLAYER_PAWN), 1660, 560)
     _set(hero, "PlayerIndex", 0)
     hero_loc = _at(_node(ed, FN_ACTOR_LOC), 1900, 560)
     _connect(_pin(hero, "ReturnValue", is_input=False), _pin(hero_loc, "self"))
+    hero_out = _pin(hero_loc, "ReturnValue", is_input=False)
 
-    bearing = _at(_node(ed, FN_RANDOM_FLOAT), 1660, 720)
-    _set(bearing, "Min", 0.0)
-    _set(bearing, "Max", 360.0)
-    facing = _at(_node(ed, FN_MAKE_ROT), 1900, 720)
-    _connect(_pin(bearing, "ReturnValue", is_input=False), _pin(facing, "Yaw"))
-    _set(facing, "Pitch", 0.0)
-    _set(facing, "Roll", 0.0)
-    heading = _at(_node(ed, FN_FORWARD), 2120, 720)
-    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(heading, "InRot"))
+    made = [hero, hero_loc]
+    flow = BEL.find_then_pin(respawns)
+    ready = []          # exec pins that have a good point and may spawn
 
-    reach = _at(_node(ed, FN_RANDOM_FLOAT), 1900, 880)
-    _set(reach, "Min", RESPAWN_BAND[0])
-    _set(reach, "Max", RESPAWN_BAND[1])
-    # Multiply_VectorFloat is a wildcard operator whose B pin defaults to a
-    # *vector*, so a float literal on it silently does nothing -- but a
-    # connected float is fine, and that is what this is.
-    offset = _at(_node(ed, FN_MUL_VF), 2360, 720)
-    _connect(_pin(heading, "ReturnValue", is_input=False), _pin(offset, "A"))
-    _connect(_pin(reach, "ReturnValue", is_input=False), _pin(offset, "B"))
+    for attempt in range(RESPAWN_ATTEMPTS):
+        x0 = 2360 + attempt * 1400
+        y0 = attempt * 900
 
-    target = _at(_node(ed, FN_ADD_VV), 2360, 560)
-    _connect(_pin(hero_loc, "ReturnValue", is_input=False), _pin(target, "A"))
-    _connect(_pin(offset, "ReturnValue", is_input=False), _pin(target, "B"))
+        bearing = _at(_node(ed, FN_RANDOM_FLOAT), x0 - 700, y0 + 300)
+        _set(bearing, "Min", 0.0)
+        _set(bearing, "Max", 360.0)
+        facing = _at(_node(ed, FN_MAKE_ROT), x0 - 460, y0 + 300)
+        _connect(_pin(bearing, "ReturnValue", is_input=False), _pin(facing, "Yaw"))
+        _set(facing, "Pitch", 0.0)
+        _set(facing, "Roll", 0.0)
+        heading = _at(_node(ed, FN_FORWARD), x0 - 220, y0 + 300)
+        _connect(_pin(facing, "ReturnValue", is_input=False), _pin(heading, "InRot"))
 
-    where = _at(_node(ed, FN_RANDOM_NAV), 2620, 560)
-    _connect(_pin(target, "ReturnValue", is_input=False), _pin(where, "Origin"))
-    _set(where, "Radius", RESPAWN_NAV_SNAP)
+        reach = _at(_node(ed, FN_RANDOM_FLOAT), x0 - 460, y0 + 460)
+        _set(reach, "Min", RESPAWN_BAND[0])
+        _set(reach, "Max", RESPAWN_BAND[1])
+        # Multiply_VectorFloat is a wildcard operator whose B pin defaults to a
+        # *vector*, so a float literal on it silently does nothing -- but a
+        # connected float is fine, and that is what this is.
+        offset = _at(_node(ed, FN_MUL_VF), x0, y0 + 300)
+        _connect(_pin(heading, "ReturnValue", is_input=False), _pin(offset, "A"))
+        _connect(_pin(reach, "ReturnValue", is_input=False), _pin(offset, "B"))
 
-    xform = _at(_node(ed, FN_MAKE_TRANSFORM), 2880, 300)
-    _connect(_pin(where, "RandomLocation", is_input=False), _pin(xform, "Location"))
-    _connect(_vec(ed, 1.0, 1.0, 1.0, 2620, 400), _pin(xform, "Scale"))
+        request = _at(_node(ed, FN_ADD_VV), x0 + 240, y0 + 160)
+        _connect(hero_out, _pin(request, "A"))
+        _connect(_pin(offset, "ReturnValue", is_input=False), _pin(request, "B"))
 
-    spawn = _at(_palette(ed, NODE_SPAWN), 3140, 0)
+        ask = _at(ed.add_set_member_variable_node("RespawnPoint"), x0 + 480, y0)
+        _connect(_pin(request, "ReturnValue", is_input=False), _pin(ask, "RespawnPoint"))
+        _connect(flow, _pin(ask, "execute"))
+        asked = _at(ed.add_get_member_variable_node("RespawnPoint"), x0 + 480, y0 + 200)
+
+        proj = _at(_node(ed, FN_PROJECT_NAV), x0 + 720, y0 + 200)
+        _connect(_pin(asked, "RespawnPoint", is_input=False), _pin(proj, "Point"))
+        # QueryExtent is a struct pin, and struct pins reject set_pin_value
+        # outright -- an empty one compiles as the ZERO vector, i.e. a search box
+        # with no volume, which finds nothing and fails every projection.
+        _connect(_vec(ed, *RESPAWN_PROJECT_EXTENT, x0 + 480, y0 + 420),
+                 _pin(proj, "QueryExtent"))
+
+        landed = _at(ed.add_branch_node(), x0 + 960, y0)
+        _connect(_pin(proj, "ReturnValue", is_input=False), _pin(landed, "Condition"))
+        _connect(BEL.find_then_pin(ask), _pin(landed, "execute"))
+
+        use_proj = _at(ed.add_set_member_variable_node("RespawnPoint"), x0 + 1200, y0)
+        _connect(_pin(proj, "ProjectedLocation", is_input=False),
+                 _pin(use_proj, "RespawnPoint"))
+        _connect(BEL.find_then_pin(landed), _pin(use_proj, "execute"))
+
+        ready.append(BEL.find_then_pin(use_proj))
+        # A failed projection falls through to the next bearing; the draws are
+        # independent, so a second one is a real second chance and not a repeat.
+        flow = BEL.find_else_pin(landed)
+        made += [bearing, facing, heading, reach, offset, request, ask, asked,
+                 proj, landed, use_proj]
+
+    # Last resort: no band point anywhere in the search box projected, which in
+    # practice means the navmesh has not been generated yet (the first frame of
+    # a level, or the tile churn after a burst of deaths). Take any navigable
+    # point near the player rather than none -- a replacement standing too close
+    # is a gameplay annoyance, one under the terrain is a bug. This call is the
+    # *impure* nav function on purpose: it is random, so it must be evaluated
+    # exactly once, and only a node with an exec pin can promise that.
+    anywhere = _at(_node(ed, FN_RANDOM_NAV), 5400, 1500)
+    _connect(hero_out, _pin(anywhere, "Origin"))
+    _set(anywhere, "Radius", RESPAWN_BAND[1])
+    _connect(flow, _pin(anywhere, "execute"))
+
+    salvaged = _at(ed.add_branch_node(), 5660, 1500)
+    _connect(_pin(anywhere, "ReturnValue", is_input=False), _pin(salvaged, "Condition"))
+    _connect(BEL.find_then_pin(anywhere), _pin(salvaged, "execute"))
+
+    use_any = _at(ed.add_set_member_variable_node("RespawnPoint"), 5920, 1500)
+    _connect(_pin(anywhere, "RandomLocation", is_input=False),
+             _pin(use_any, "RespawnPoint"))
+    _connect(BEL.find_then_pin(salvaged), _pin(use_any, "execute"))
+    ready.append(BEL.find_then_pin(use_any))
+
+    # 3. seat it on the real ground. The point is on the navmesh by now, but the
+    # navmesh is a voxelised approximation of the terrain and its Z can be most
+    # of a capsule too low -- so keep the XY, throw the Z away, and trace onto
+    # the collision geometry the character will actually stand on.
+    seat = _at(ed.add_get_member_variable_node("RespawnPoint"), 6180, 600)
+    seat_out = _pin(seat, "RespawnPoint", is_input=False)
+    above = _at(_node(ed, FN_ADD_VV), 6420, 600)
+    _connect(seat_out, _pin(above, "A"))
+    _connect(_vec(ed, 0.0, 0.0, RESPAWN_TRACE_UP, 6180, 800), _pin(above, "B"))
+    below = _at(_node(ed, FN_ADD_VV), 6420, 780)
+    _connect(seat_out, _pin(below, "A"))
+    _connect(_vec(ed, 0.0, 0.0, -RESPAWN_TRACE_DOWN, 6180, 960), _pin(below, "B"))
+
+    drop = _at(_node(ed, FN_TRACE), 6680, 300)
+    _connect(_pin(above, "ReturnValue", is_input=False), _pin(drop, "Start"))
+    _connect(_pin(below, "ReturnValue", is_input=False), _pin(drop, "End"))
+    _trace_defaults(drop, draw=False)
+    # The terrain is imported with complex collision, and its simple collision
+    # is a box around the whole 200 m mesh -- tracing against that would seat
+    # every respawn on an invisible lid.
+    _set(drop, "bTraceComplex", "true")
+    for tail in ready:
+        _connect(tail, _pin(drop, "execute"))
+
+    found = _at(ed.add_branch_node(), 6940, 300)
+    _connect(_pin(drop, "ReturnValue", is_input=False), _pin(found, "Condition"))
+    _connect(BEL.find_then_pin(drop), _pin(found, "execute"))
+
+    lift = _vec(ed, 0.0, 0.0, RESPAWN_LIFT, 6940, 900)
+    brk = _at(_palette(ed, NODE_BREAK_HIT), 7200, 700)
+    _connect(_pin(drop, "OutHit", is_input=False), _pin(brk, "Hit"))
+    ground = _at(_node(ed, FN_ADD_VV), 7460, 700)
+    _connect(_loose_pin(brk, "Location", is_input=False), _pin(ground, "A"))
+    _connect(lift, _pin(ground, "B"))
+    stand = _at(ed.add_set_member_variable_node("RespawnPoint"), 7460, 500)
+    _connect(_pin(ground, "ReturnValue", is_input=False), _pin(stand, "RespawnPoint"))
+    _connect(BEL.find_then_pin(found), _pin(stand, "execute"))
+
+    # Nothing under the point at all (it hangs over a hole in the world). Keep
+    # the navmesh height and lift off that instead -- worse, but still above
+    # whatever the navmesh thinks the floor is.
+    airborne = _at(_node(ed, FN_ADD_VV), 7460, 1100)
+    _connect(seat_out, _pin(airborne, "A"))
+    _connect(lift, _pin(airborne, "B"))
+    hover = _at(ed.add_set_member_variable_node("RespawnPoint"), 7460, 950)
+    _connect(_pin(airborne, "ReturnValue", is_input=False), _pin(hover, "RespawnPoint"))
+    _connect(BEL.find_else_pin(found), _pin(hover, "execute"))
+
+    made += [seat, above, below, drop, found, brk, ground, stand, airborne, hover]
+
+    # 4. spawn, on ground the character can actually stand on.
+    chosen = _at(ed.add_get_member_variable_node("RespawnPoint"), 7720, 300)
+    xform = _at(_node(ed, FN_MAKE_TRANSFORM), 7960, 300)
+    _connect(_pin(chosen, "RespawnPoint", is_input=False), _pin(xform, "Location"))
+    _connect(_vec(ed, 1.0, 1.0, 1.0, 7720, 500), _pin(xform, "Scale"))
+
+    spawn = _at(_palette(ed, NODE_SPAWN), 8220, 0)
     _connect(_pin(cls_get, "RespawnClass", is_input=False), _pin(spawn, "Class"))
     _connect(_pin(xform, "ReturnValue", is_input=False), _pin(spawn, "SpawnTransform"))
-    # AlwaysSpawn: the random nav point is on the navmesh but may still overlap
-    # a tree's collision, and a respawn that silently returns null would empty
-    # the forest one death at a time.
-    _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(BEL.find_then_pin(respawns), _pin(spawn, "execute"))
+    # AlwaysSpawn: the nav point is inset from obstacles by the agent radius but
+    # may still clip a trunk's collision, and a respawn that silently returns
+    # null would empty the forest one death at a time.
+    # AdjustIfPossibleButAlwaysSpawn, not AlwaysSpawn: the nav point is inset
+    # from obstacles by the agent radius but can still clip a trunk, and a
+    # capsule left interpenetrating gets depenetrated -- sometimes downwards,
+    # through the terrain. Adjusting nudges it clear first; it still always
+    # spawns, so a respawn cannot silently return null and empty the forest.
+    _set(spawn, "CollisionHandlingOverride", "AdjustIfPossibleButAlwaysSpawn")
+    for tail in (BEL.find_then_pin(stand), BEL.find_then_pin(hover)):
+        _connect(tail, _pin(spawn, "execute"))
 
-    owner_t = _at(_node(ed, FN_GET_OWNER), 3140, 380)
-    destroy = _at(_node(ed, FN_DESTROY), 3400, 0)
+    owner_t = _at(_node(ed, FN_GET_OWNER), 8220, 380)
+    destroy = _at(_node(ed, FN_DESTROY), 8480, 0)
     _connect(_pin(owner_t, "ReturnValue", is_input=False), _pin(destroy, "self"))
-    # Both the respawned and the no-respawn-class paths end in the same destroy;
-    # an exec *input* takes more than one link, so no Sequence node is needed.
+    # Every path ends at the same destroy; an exec *input* takes more than one
+    # link, so no Sequence node is needed. Note the last one: with no navmesh to
+    # be found at all, the dead wanderer is removed and NOT replaced. Losing one
+    # of five is recoverable and visible; dropping a replacement through the
+    # floor is neither.
     _connect(BEL.find_then_pin(spawn), _pin(destroy, "execute"))
     _connect(BEL.find_else_pin(respawns), _pin(destroy, "execute"))
+    _connect(BEL.find_else_pin(salvaged), _pin(destroy, "execute"))
 
     ed.add_comment_to_nodes(
-        f"At 0 HP: mark Dead once, then (if DespawnOnDeath) spawn a replacement "
+        f"At 0 HP: mark Dead once, then (if DespawnOnDeath) ask for a point "
         f"{RESPAWN_BAND[0] / 100:.0f}-{RESPAWN_BAND[1] / 100:.0f} m from the "
-        f"player on a random bearing, snapped to the navmesh, and destroy this "
-        "one. The replacement carries the same component, so the cycle sustains "
+        f"player on a random bearing, PROJECT it onto the navmesh (the request "
+        f"carries the player's Z, which is not the ground height out there), "
+        f"spawn the replacement on that ground and destroy this one "
+        f"({RESPAWN_ATTEMPTS} bearings are tried before falling back to any "
+        f"navigable point near the player). The replacement carries the same component, so the cycle sustains "
         "itself with nothing tracking it -- the pack stays five strong and every "
         "member still has to cross the forest. The player's copy has "
         "DespawnOnDeath false and no RespawnClass, so none of this runs on them.",
         [health, dying, at_zero, dead_get, already, mark, despawn_get, should,
-         cls_get, can_respawn, respawns, hero, hero_loc, bearing, facing,
-         heading, reach, offset, target, where, xform, spawn, owner_t, destroy])
+         cls_get, can_respawn, respawns] + made +
+        [anywhere, salvaged, use_any, chosen, xform, spawn, owner_t, destroy])
 
     _post_physics_tick(bp)
     if not BEL.compile_blueprint(bp):
@@ -2457,6 +2875,9 @@ def main():
         weapons[spec["display"]] = build_weapon(spec, item_bp)
 
     blood_bp = build_blood_splash()
+    # Before the health component: its BeginPlay casts to the GameMode, and a
+    # cast node only appears in the palette for a class that is already loaded.
+    ensure_spawn_counter()
     health_bp = build_health_component()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], blood_bp)

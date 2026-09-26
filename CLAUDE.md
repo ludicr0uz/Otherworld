@@ -35,7 +35,7 @@ python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
 #        --npc-max-distance (100 m) --json-report
 ```
 Then run the printed `import_<Level>.py` (builds the level) and `verify_<Level>.py`
-(122 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
+(123 in-engine checks) through UnrealEditor-Cmd. Generation is deterministic for a given seed.
 
 Grass transforms do **not** live in the generated script — there are tens of thousands of
 them, so they go to a gitignored `grass_<Level>.json` sidecar the import script reads.
@@ -96,12 +96,89 @@ a `-game` run: 12 damage every 1.2 s was 50 dps and killed a 100 HP player in **
 before a shot could be fired. 10 every 1.5 s is ~33 dps for the pack. This is the kind of thing
 that cannot be read off the graph — it needed the running game.
 
-**Respawns obey the band too.** `BP_HealthComponent`'s death path used to put a replacement
-within 40 m of where the dead one *started*; it now picks a random bearing and a random distance
-in the same 75–100 m band **measured from the player's current location**, snapped onto the
-navmesh (`NPC_RESPAWN_NAV_SNAP_CM`, 30 m — generous, because the far edge of the band can fall
-outside the navigable island). Without that, "always 75–100 m away" held only until the first
-kill. The population therefore stays at five with nothing tracking it.
+**Respawns obey the band too, and land on walkable ground.** `BP_HealthComponent`'s death path
+used to put a replacement within 40 m of where the dead one *started*; it now picks a random
+bearing and distance in the same 75–100 m band **measured from the player's current location**.
+Without that, "always 75–100 m away" held only until the first kill. The population stays at
+five with nothing tracking it.
+
+That band point is a **request, never a spawn location**, and the difference is the bug that
+dropped wanderers through the world:
+
+1. the request is stored in `RespawnPoint` — it *must* be a variable, because
+   `K2_ProjectPointToNavigation` is pure and re-evaluates per output pin read, so a request
+   wired straight in would roll fresh random numbers for the `ReturnValue` branch and for the
+   `ProjectedLocation` read, and project two different points;
+2. it is projected onto the navmesh (`RESPAWN_PROJECT_EXTENT`, a 30 × 30 × 100 m search box —
+   wide in XY so a point overshooting the navigable island snaps back to its edge, tall in Z
+   because the request carries the *player's* height);
+3. only the projected point is spawned at, lifted by the capsule half height (88 cm).
+
+`RESPAWN_ATTEMPTS` (2) independent bearings are tried; only if both fail does it fall back to
+any navigable point near the player, and if even that fails the dead wanderer is removed and
+**not** replaced. Losing one of five is visible and recoverable; a replacement under the terrain
+is neither.
+
+**And the navmesh Z is not the ground.** Recast voxelises the terrain and simplifies the result,
+so its polygon can sit most of a capsule below the real surface — measured at up to 86 cm low,
+which left 3% of respawns under-seated and 0.2% more than half buried. A capsule that starts
+inside a thin one-sided terrain surface depenetrates *through* it, which is the "still falling
+through" case. So the projected point's XY is kept and its **Z is re-derived by tracing onto the
+actual collision geometry** (`RESPAWN_TRACE_UP`/`_DOWN`), then lifted by the capsule half height.
+The trace starts only 2 m up on purpose: from far overhead it would hit a tree canopy and seat
+the wanderer in the branches. The spawn also uses `AdjustIfPossibleButAlwaysSpawn`, so a capsule
+clipping a trunk is nudged clear rather than left interpenetrating.
+
+Measured over matched 80 s `-game` runs with a roaming player and heavy death rates (~1840
+respawns each), against the generator's own heightfield:
+
+| | worst clearance | half-buried | fell through |
+|---|---|---|---|
+| navmesh Z | 35.4 cm | 1 | 0 |
+| traced Z | **51.3 cm** | **0** | 0 |
+
+(88 cm = capsule seated exactly on the ground.) Nothing spawns outside the map: over 1847
+samples the furthest was 8512 cm, the navmesh island edge, well inside the ±10000 cm terrain.
+
+**And a net under all of it.** Any NPC below `WORLD_FLOOR_Z` (−1000 cm, well under the terrain's
+−185 cm floor) is named in the log, written off as dead and replaced within a frame — verified
+by teleporting wanderers to z = −5000 and watching 13 of them get caught and replaced. It is a
+net, not the fix: "the capsule ended up inside geometry" has more causes than the one measured.
+
+### Numbered wanderers, and the spawn log
+
+Every wanderer takes the next number from a counter on `BP_ThirdPersonGameMode`
+(`NpcSpawnCount`) as it spawns, stores it in its own `BP_HealthComponent.NpcId`, and writes one
+line to the log. The HUD draws that same number beside the floating health bar, so anything seen
+on screen can be looked up afterwards:
+
+```
+[NPC-SPAWN] #7 at X=8511.005 Y=-585.336 Z=753.045
+[NPC-FELL] ERROR #2 fell to X=-0.178 Y=-0.322 Z=-5000.092 — spawned at X=4241.230 Y=6260.280 Z=526.093
+```
+
+The fall report carries **both** positions, and the spawn one is the half worth having: where it
+fell to is always "somewhere under the map", while where it was put is the thing that has to be
+explained. Both lines quote the same stored `SpawnedAt`, so they cannot disagree.
+
+`SpawnedAt` is recorded for diagnosis only — respawn points are computed from the player, never
+from it. (The old `SpawnOrigin`, which *did* anchor respawns to it, is gone on purpose.)
+
+**Severity:** the fall report uses `PrintWarning`, because Blueprint cannot log at Error severity
+at all — there is no `PrintStringWithSeverity` or `LogError` node, and a real `UE_LOG(…, Error)`
+needs a C++ module this project does not have. Warning is the highest the Kismet library offers;
+it colours the line in the Output Log and trips the editor's warning filter, and the literal
+`ERROR` token in the text makes it greppable as one regardless. Both lines stay off the screen —
+there they would cover the HUD they exist to explain. The log is at
+`~/Library/Logs/Unreal Engine/OtherworldEditor/Otherworld.log`; `grep NPC-` it, or watch the
+Output Log in the editor. The counter lives on the GameMode because Blueprints have no statics
+and it must be one number per session, shared across every wanderer that ever exists; the HUD
+reads each NPC's own copy, so it never needs telling that one died and another replaced it.
+
+Note the ordering trap in how the number is taken: set `NpcId` **first**, then write the counter
+back from the stored `NpcId`. The obvious order — bump the counter, then set `NpcId` from the
+same `+1` node — numbers the first wanderer 2, because the add is pure and re-evaluates against
+the already-bumped count. It is the same trap as the navmesh queries below.
 
 ### The melee attack
 
@@ -137,7 +214,7 @@ touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / H
 
 It also draws the player's HP bar (see "The shotgun and health").
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 34 checks. Run it after any
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 35 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
@@ -169,7 +246,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**89 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**103 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up.
@@ -287,7 +364,7 @@ what the screen shows, measure the running game.
 ### The HUD
 
 `build_graphics_menu.py` draws, every frame: the player's HP bar (top-left), a projected health
-bar over every wanderer, a 5-slot inventory strip centred along the bottom, and the centre
+bar over every wanderer with its spawn number beside it, a 5-slot inventory strip centred along the bottom, and the centre
 reticle. The **FPS readout in the top-right is not drawn here**: BeginPlay runs
 `stat fps` (`FPS_COMMAND`), and the engine's own stat display puts itself in that corner. There
 is no position to tune and no canvas call to collide with the HP bar — and the number is the
@@ -305,7 +382,7 @@ centred and bottom-anchored at any window size.
   recoverable with E; both weapons fire with sound, blood and muzzle-origin spread, and the
   character holds the matching ready pose while moving. Every wanderer has a floating health
   bar, dies at 0 HP and respawns 75-100 m from the player. Built by
-  `build_weapons_and_combat.py` — **89/89** in-engine checks, **34/34** HUD checks.
+  `build_weapons_and_combat.py` — **103/103** in-engine checks, **35/35** HUD checks.
   Aiming is the camera/muzzle hybrid described above, with a reticle on the real impact point,
   and the held weapon is turned to face that point every frame.
 - Not verified headlessly, and worth a look in a play session: how the reticle reads while
@@ -319,7 +396,7 @@ centred and bottom-anchored at any window size.
 - `/Game/Maps/Lvl_Forest_200m` is generated in **night** mode: 136 trees / 5 species,
   44,368 knee-high grass clumps / 9 species, **five NPCs at 75.0-77.5 m** from the player,
   moon light 0.12 lux, emissive starfield sky dome as the ambient light source.
-  Offline 28/28 and in-engine 122/122 checks pass.
+  Offline 28/28 and in-engine 123/123 checks pass.
 - **Known pre-existing bug:** `scatter_trees` does no minimum-spacing rejection, so some
   size/seed combinations fail the `Tree Spacing (>100cm)` check (e.g. `--size 300` with the
   default seed 42 gives a 70 cm pair). 200 m/seed 42 and 300 m/seed 99 pass. Unfixed.
@@ -412,6 +489,19 @@ centred and bottom-anchored at any window size.
   `blend.get_editor_property("layer_setup")` fails (it is not on the graph node); go through
   `node`, mutate, and **write the whole struct back**. Also: these structs `repr()` as `{}`
   even when populated, so verify by reading fields, not by printing.
+- **The navmesh query nodes are PURE, and a failed one still hands you a location.**
+  `K2_ProjectPointToNavigation` and `K2_GetRandomReachablePointInRadius` are const
+  `BlueprintCallable`s, so UHT promotes them to pure: no exec pin, and **one evaluation per
+  output pin read**. Two consequences, both of which compile and look right:
+  a graph that reads the location output and ignores the bool spawns *something* at a garbage
+  point when the query fails (this is what put respawned NPCs under the terrain — the location
+  fell back to the raw input, carrying the player's Z); and driving such a node's input from a
+  `RandomFloatInRange` chain re-rolls that chain for every output read, so the bool you branched
+  on and the location you used describe different points. Store the input in a variable first,
+  branch on the bool, and use the impure `K2_GetRandomLocationInNavigableRadius` when a *single*
+  random evaluation matters.
+- **A navmesh point is the ground; a Character's origin is its capsule centre.** Spawning a
+  wanderer at a projected nav point without adding the 88 cm half height buries it to the waist.
 - **`IsValid` refuses a class pin.** A class reference is a different pin category from an
   object reference; use `IsValidClass`. The failure is a bare "could not connect pins".
 - **`SpawnActorFromClass`'s return pin takes its type from its `Class` pin.** A variable typed

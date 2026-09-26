@@ -42,6 +42,10 @@ Event graph:
                        SetOverallScalabilityLevel -> ApplyNonResolutionSettings ->
                        ConsoleCommand r.ShadowQuality -> ConsoleCommand r.ScreenPercentage
 
+  Every wanderer's bar carries its spawn number (read off its own
+  BP_HealthComponent.NpcId), so what is on screen can be matched to the
+  [NPC-SPAWN] lines in the log.
+
   [Event ReceiveDrawHUD] --> GetPlayerPawn -> GetComponentByClass(Health)
                              --> [Cast to BP_HealthComponent]
                                    ok --> DrawRect(bar back) -> DrawRect(bar
@@ -165,6 +169,16 @@ NPC_BAR_Z = 110.0          # cm above the actor's origin, just over its head
 NPC_BAR = (90.0, 10.0)     # width, height in pixels
 COL_NPC_BACK = "(R=0.020000,G=0.020000,B=0.025000,A=0.750000)"
 COL_NPC_FILL = "(R=0.900000,G=0.250000,B=0.180000,A=0.950000)"
+# The wanderer's spawn number, drawn just left of its bar. Every NPC takes the
+# next number as it spawns (build_weapons_and_combat.py hands them out) and logs
+# where it appeared, so a wanderer misbehaving on screen can be looked up in the
+# log by the number floating over its head.
+NPC_ID_VAR = "NpcId"
+NPC_ID_GAP = 8.0           # pixels between the number and the left of the bar
+NPC_ID_WIDTH = 34.0        # room reserved for up to three digits
+NPC_ID_RISE = 4.0          # nudge up, so digits sit level with the bar
+NPC_ID_SCALE = 1.0
+COL_NPC_ID = "(R=0.960000,G=0.860000,B=0.450000,A=0.950000)"
 
 # --- inventory strip, bottom centre ------------------------------------------
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
@@ -721,13 +735,38 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     _connect(_pin(fill_w, "ReturnValue", is_input=False), _pin(fill, "ScreenW"))
     _connect(BEL.find_then_pin(back), _pin(fill, "execute"))
 
+    # The wanderer's number, just left of its bar. Read off the NPC's own health
+    # component rather than kept in a list here: the HUD never has to be told
+    # that a wanderer died and another took its place.
+    nid = _at(ed.add_get_member_variable_node(NPC_ID_VAR, HEALTH_CLASS_PATH),
+              x0 + 1100, y0 + 800)
+    _connect(as_health, _pin(nid, "self"))
+    nid_str = _at(_node(ed, FN_INT_TO_STR), x0 + 1360, y0 + 800)
+    _connect(_pin(nid, NPC_ID_VAR, is_input=False), _pin(nid_str, "InInt"))
+
+    id_x = _at(_node(ed, FN_SUB), x0 + 2620, y0 + 700)
+    _connect(left_out, _pin(id_x, "A"))
+    _set(id_x, "B", NPC_ID_WIDTH + NPC_ID_GAP)
+    id_y = _at(_node(ed, FN_SUB), x0 + 2620, y0 + 840)
+    _connect(top_out, _pin(id_y, "A"))
+    _set(id_y, "B", NPC_ID_RISE)
+
+    number = _at(_node(ed, FN_DRAW_TEXT), x0 + 3160, y0)
+    _connect(_pin(nid_str, "ReturnValue", is_input=False), _pin(number, "Text"))
+    _set(number, "TextColor", COL_NPC_ID)
+    _set(number, "Scale", NPC_ID_SCALE)
+    _connect(_pin(id_x, "ReturnValue", is_input=False), _pin(number, "ScreenX"))
+    _connect(_pin(id_y, "ReturnValue", is_input=False), _pin(number, "ScreenY"))
+    _connect(BEL.find_then_pin(fill), _pin(number, "execute"))
+
     ed.add_comment_to_nodes(
         "One bar per living wanderer. GetAllActorsOfClass every frame is not "
         "free, but there is one NPC in this level and the alternative -- a "
         "registry the NPCs write themselves into -- would need a graph on "
         "BP_ForestWanderer, which build_npc_blueprints.py owns.",
         [every, loop, comp, cast, health, max_health, where, above, proj, parts,
-         in_front, visible, left, frac, fill_w, back, fill])
+         in_front, visible, left, frac, fill_w, back, fill, nid, nid_str,
+         id_x, id_y, number])
     return (_loose_pin(loop, "Completed", is_input=False),)
 
 

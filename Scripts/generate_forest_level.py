@@ -1446,6 +1446,13 @@ def _write_unreal_verify_script(
                       any(v == "DefaultSlot" for v in literals))
                 check("NPC Graph Compiles Clean",
                       ed is not None and not ed.list_nodes_with_errors())
+                # Debugging the chase means splicing PrintStrings into this
+                # graph (it is the only way to see what the AI is measuring),
+                # so guard against one being left behind.
+                check("No Leftover Debug PrintStrings In The AI Graph",
+                      not [n for n in nodes
+                           if "PrintString" in
+                           " ".join(str(BEL.get_node_title(n)).split())])
 
             # -- The placed actors --
             check("NPC Count",

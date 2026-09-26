@@ -223,8 +223,14 @@ def main():
     driven_text = [n for n in texts
                    if not BEL.find_input_pin(n, "Text").get_pin_value()
                    and BEL.find_input_pin(n, "Text").list_connected_pins()]
-    check("HP number and slot names are both read from data, not hard-coded",
-          len(driven_text) == 2, str(len(driven_text)))
+    # Three now: the player's HP number, each inventory slot's weapon name, and
+    # each wanderer's spawn number.
+    check("HP number, slot names and NPC numbers are read from data",
+          len(driven_text) == 3, str(len(driven_text)))
+    ids = [n for n in nodes
+           if "NpcId" in {str(p_) for p_ in pin_names(n, False)}]
+    check("each NPC bar carries the wanderer's spawn number",
+          len(ids) == 1, f"{len(ids)} NpcId read(s)")
 
     # A pawn with no health component must not take the menu down with it.
     check("HP number is drawn from a driven Text pin",

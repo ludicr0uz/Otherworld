@@ -222,6 +222,33 @@ check("death destroys the owner",
 check("respawn point comes from the navmesh",
       bool(by_pins(hg, "Origin", "Radius")))
 
+# The respawn has to land on walkable ground. The band point is built from the
+# PLAYER's Z, so on any terrain higher than the player it is underground -- and
+# a Character spawned underground falls through the world. These four checks
+# guard the shape that fixes it, each of which compiles fine when broken:
+projections = by_pins(hg, "Point", "QueryExtent")
+check("the respawn point is projected onto the navmesh",
+      len(projections) == G.RESPAWN_ATTEMPTS,
+      f"{len(projections)} ProjectPointToNavigation node(s), "
+      f"expected {G.RESPAWN_ATTEMPTS}")
+# An unconnected struct pin reads as the ZERO vector: a search box with no
+# volume, which finds nothing and fails every projection.
+check("every projection has a real search box, not an empty struct pin",
+      all(BEL.find_input_pin(n, "QueryExtent").list_connected_pins()
+          for n in projections) and bool(projections))
+# The original bug: the location output was used and the bool ignored, so a
+# failed query spawned at the raw request point, at the player's own Z.
+check("every projection's success is branched on, not ignored",
+      all(BEL.find_output_pin(n, "ReturnValue").list_connected_pins()
+          for n in projections) and bool(projections))
+lifts = [n for n in by_pins(hg, "X", "Y", "Z")
+         if pin_value(n, "Z") == str(G.RESPAWN_LIFT)]
+check("the spawn is lifted from the ground to the capsule's centre",
+      bool(lifts), f"expected a MakeVector with Z = {G.RESPAWN_LIFT}")
+check("the chosen point is stored, so the random draw is evaluated once",
+      "RespawnPoint" in {str(v) for v in BEL.list_member_variable_names(
+          health_bp, False)})
+
 # The respawn band. A replacement wanderer has to keep the "75-100 m away" rule
 # the level generator spawns the pack under, or the rule holds only until the
 # first kill -- and it is measured from the *player*, not from a stored spawn
@@ -352,6 +379,47 @@ check("dropping detaches the weapon",
 
 probes = [n for n in wg if "InString" in in_pins(n)]
 check("no leftover debug PrintStrings", not probes, f"{len(probes)} found")
+
+# ─── Spawn numbering ─────────────────────────────────────────────────────────
+# Every wanderer takes a number as it spawns and logs where it appeared; the HUD
+# draws that number beside its health bar. The pair is what makes a fall-through
+# reportable, so both halves are guarded here.
+gm = load(G.GAME_MODE_BP_PATH)
+check("the GameMode carries the spawn counter",
+      G.SPAWN_COUNT_VAR in {str(v) for v in BEL.list_member_variable_names(gm, False)})
+check("the health component carries the wanderer's number",
+      G.NPC_ID_VAR in {str(v) for v in BEL.list_member_variable_names(
+          health_bp, False)})
+logs = [n for n in hg if "InString" in in_pins(n)]
+# Exactly two, both deliberate: the spawn log and the safety net's. Any more is
+# a probe left behind -- and this graph is the one that gets instrumented
+# whenever respawns misbehave.
+check("exactly two log lines in the health graph (spawn + fell)",
+      len(logs) == 2, f"{len(logs)} PrintString(s)")
+# PrintWarning has no screen toggle (it is log-only by construction); the spawn
+# log is a PrintString and must be told not to paint over the HUD.
+screened = [n for n in logs if "bPrintToScreen" in in_pins(n)]
+check("the spawn log is written to the log, not painted over the HUD",
+      all(pin_value(n, "bPrintToScreen") in ("false", "False") for n in screened)
+      and bool(screened))
+# Blueprint cannot log at Error severity at all, so the fall is reported at the
+# highest it has: PrintWarning takes InString and nothing else.
+check("the fall is reported at warning severity, not a plain print",
+      any("bPrintToScreen" not in in_pins(n) for n in logs))
+check("the wanderer remembers where it was spawned",
+      G.SPAWNED_AT_VAR in {str(v) for v in BEL.list_member_variable_names(
+          health_bp, False)})
+# Both lines quote the stored SpawnedAt, so they cannot disagree.
+def out_pins(node):
+    return {str(PIN.get_pin_name(p)) for p in BEL.list_output_pins(node)}
+
+reads = [n for n in hg if G.SPAWNED_AT_VAR in out_pins(n)]
+check("the fall report names the spawn location too", len(reads) == 2,
+      f"{len(reads)} SpawnedAt read(s), expected 2 (spawn log + fall report)")
+prefixes = {pin_value(n, "A") for n in by_pins(hg, "A", "B")}
+for label, want in (("spawn", G.SPAWN_LOG_PREFIX), ("fall", G.FELL_LOG_PREFIX)):
+    check(f"{label} log lines are greppable", want in prefixes,
+          f"expected {want!r}")
 
 # ─── Installation ────────────────────────────────────────────────────────────
 

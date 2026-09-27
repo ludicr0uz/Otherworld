@@ -573,7 +573,8 @@ if NPC_SPAWNS:
     if SCRIPTS_DIR not in sys.path:
         sys.path.insert(0, SCRIPTS_DIR)
     import build_npc_blueprints
-    from forest_generator.npc_placement import variant_for_index
+    from forest_generator.npc_placement import (
+gait_scale_for_index, variant_for_index)
     # force=True: the builder updates assets IN PLACE and is idempotent,
     # so re-running it is cheap -- and without it an existing
     # BP_ForestWanderer is reused wholesale and no property change in
@@ -601,6 +602,16 @@ if NPC_SPAWNS:
         )
         npc_actor.set_actor_label(
             f"{LEVEL_NAME}_NPC_Wanderer_{variant.key}_{i}")
+
+        # Break the lockstep. See gait_scale_for_index -- rate and walk
+        # speed move together so the stride stays planted.
+        gait = gait_scale_for_index(i)
+        npc_actor.get_editor_property("mesh").set_editor_property(
+            "global_anim_rate_scale", gait)
+        move = npc_actor.get_editor_property("character_movement")
+        move.set_editor_property(
+            "max_walk_speed",
+            move.get_editor_property("max_walk_speed") * gait)
         unreal.log_warning(
             f"[GEN]    NPC {i} ({variant.key}) at ({spawn['x']:.0f}, "
             f"{spawn['y']:.0f}, {spawn['z']:.0f})")

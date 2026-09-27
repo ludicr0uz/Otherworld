@@ -127,6 +127,39 @@ NPC_ANIM_BP = "/Game/Sourced/Characters/Anims/A_Meshy_ABP_Unarmed"
 NPC_ANIM_BP_FALLBACK = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"
 
 
+# ── Per-instance gait variance ───────────────────────────────────────────────
+#
+# Every wanderer spawns at level load and every one of them starts its blend
+# space at normalised time 0.  Epic's locomotion advances through a sync group,
+# so identical inputs stay in phase forever: ten monsters walking with the same
+# leg on the same frame, which reads as a chorus line rather than a crowd.
+#
+# The fix is to give each one a slightly different gait.  It scales the
+# animation rate AND the walk speed by the *same* factor -- rate alone would
+# desynchronise them but slide their feet, since the clips are authored for a
+# particular ground speed.  Scaling both keeps the stride planted.
+#
+# This is per INSTANCE, not per species: BP_Wanderer_Zombie and
+# BP_Wanderer_Wendigo still carry byte-identical stats.  The variance is
+# applied to the placed actor by the level generator.
+NPC_GAIT_VARIANCE = 0.08
+
+# Golden-ratio low-discrepancy sequence: deterministic (so a regenerated level
+# is identical), and it never lets neighbouring indices land on close values
+# the way index % n would.
+_GOLDEN = 0.6180339887498949
+
+
+def gait_scale_for_index(index):
+    """Animation-rate and walk-speed multiplier for the ``index``-th wanderer.
+
+    ``index`` is 1-based.  Returns a value in
+    [1 - NPC_GAIT_VARIANCE, 1 + NPC_GAIT_VARIANCE].
+    """
+    phase = (index * _GOLDEN) % 1.0
+    return 1.0 - NPC_GAIT_VARIANCE + 2.0 * NPC_GAIT_VARIANCE * phase
+
+
 def variant_for_index(index):
     """Which creature the ``index``-th wanderer wears. ``index`` is 1-based.
 

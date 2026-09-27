@@ -186,8 +186,16 @@ def _expr(mat, cls, x, y):
     return unreal.MaterialEditingLibrary.create_material_expression(mat, cls, x, y)
 
 
-def build_master():
+def build_master(defaults):
     """One material for every creature; per-monster differences are instances.
+
+    ``defaults`` maps each texture parameter name to the Texture2D that stands
+    in when nothing overrides it.  It is not cosmetic: a TextureSampleParameter
+    with a null texture is a **compile error**, and a master material that
+    fails to compile is silently replaced by the engine's grey default on every
+    instance beneath it -- which is exactly how every monster ended up grey.
+    The defaults come from a real monster rather than /Engine, so each one also
+    matches its sampler's expected colour space and compression.
 
     Built from scratch each run rather than patched: a material graph edited in
     place accumulates orphaned nodes, and this asset has no hand edits worth
@@ -196,13 +204,19 @@ def build_master():
     mel = unreal.MaterialEditingLibrary
     unreal.EditorAssetLibrary.make_directory(MATERIAL_DIR)
 
-    mat = unreal.EditorAssetLibrary.load_asset(MASTER_PATH)
-    if mat:
-        mel.delete_all_material_expressions(mat)
-    else:
-        mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-            "M_MeshyCreature", MATERIAL_DIR, unreal.Material,
-            unreal.MaterialFactoryNew())
+    # Deleted and recreated rather than cleared in place.
+    # delete_all_material_expressions does not leave an empty graph behind: the
+    # node count crept up across rebuilds (10, then 11, then 12) before settling,
+    # so something survives the clear. Nothing here is hand-authored, and the
+    # instances are re-parented immediately below, so starting from an empty
+    # asset is both safe and the only way the output is a function of the input
+    # alone.
+    if unreal.EditorAssetLibrary.does_asset_exist(MASTER_PATH):
+        if not unreal.EditorAssetLibrary.delete_asset(MASTER_PATH):
+            raise RuntimeError(f"could not delete {MASTER_PATH} to rebuild it")
+    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        "M_MeshyCreature", MATERIAL_DIR, unreal.Material,
+        unreal.MaterialFactoryNew())
     if not mat:
         raise RuntimeError(f"could not create {MASTER_PATH}")
 
@@ -211,6 +225,7 @@ def build_master():
     # regenerating a 4k texture, and costs one instruction.
     base = _expr(mat, unreal.MaterialExpressionTextureSampleParameter2D, -800, -300)
     base.set_editor_property("parameter_name", "BaseColor")
+    base.set_editor_property("texture", defaults["BaseColor"])
     base.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR)
 
     tint = _expr(mat, unreal.MaterialExpressionVectorParameter, -800, 0)
@@ -225,6 +240,7 @@ def build_master():
     # ── Normal ───────────────────────────────────────────────────────────────
     norm = _expr(mat, unreal.MaterialExpressionTextureSampleParameter2D, -800, 300)
     norm.set_editor_property("parameter_name", "Normal")
+    norm.set_editor_property("texture", defaults["Normal"])
     norm.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
     mel.connect_material_property(norm, "RGB", unreal.MaterialProperty.MP_NORMAL)
 
@@ -232,6 +248,7 @@ def build_master():
     # Channel assignment is measured, not assumed -- see the module docstring.
     orm = _expr(mat, unreal.MaterialExpressionTextureSampleParameter2D, -800, 700)
     orm.set_editor_property("parameter_name", "ORM")
+    orm.set_editor_property("texture", defaults["ORM"])
     orm.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
 
     # Roughness gets a scalar trim. Meshy's roughness reads a little flat on
@@ -251,6 +268,13 @@ def build_master():
 
     # Skeletal meshes are a separate shader permutation from static ones; a
     # master material that has never been used on one will not compile for it.
+    empty = [n for n, e in (("BaseColor", base), ("Normal", norm), ("ORM", orm))
+             if not e.get_editor_property("texture")]
+    if empty:
+        raise RuntimeError(
+            f"{MASTER_PATH}: samplers with no default texture: {empty}. "
+            "The material would fail to compile and every monster would be grey.")
+
     mel.set_material_usage(mat, unreal.MaterialUsage.MATUSAGE_SKELETAL_MESH)
     mel.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset(MASTER_PATH)
@@ -437,12 +461,22 @@ def main():
         _log(f"nothing cached under {CACHE_ROOT} -- run fetch_monsters.py first")
         return
 
-    master = build_master()
+    # Textures first: the master needs a real one per sampler as its default.
+    imported = []
     for spec in specs:
         _log(f"--- {spec['id']} ---")
         maps = import_maps(spec)
-        if not maps:
-            continue
+        if maps:
+            imported.append((spec, maps))
+
+    defaults = next((m for _, m in imported
+                     if all(k in m for k in ("BaseColor", "Normal", "ORM"))), None)
+    if not defaults:
+        _log("no monster has a full map set -- cannot build the master material")
+        return
+
+    master = build_master(defaults)
+    for spec, maps in imported:
         mi = build_instance(spec, master, maps)
         if mi:
             assign_to_mesh(spec, mi)

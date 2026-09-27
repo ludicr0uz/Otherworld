@@ -45,6 +45,7 @@ from forest_generator.grass_placement import (
     KNEE_HEIGHT_CM,
 )
 from forest_generator.npc_placement import (
+    gait_scale_for_index,
     place_npcs,
     spawn_band,
     compute_nav_bounds,
@@ -1002,7 +1003,8 @@ def _write_unreal_import_script(
             if SCRIPTS_DIR not in sys.path:
                 sys.path.insert(0, SCRIPTS_DIR)
             import build_npc_blueprints
-            from forest_generator.npc_placement import variant_for_index
+            from forest_generator.npc_placement import (
+        gait_scale_for_index, variant_for_index)
             # force=True: the builder updates assets IN PLACE and is idempotent,
             # so re-running it is cheap -- and without it an existing
             # BP_ForestWanderer is reused wholesale and no property change in
@@ -1030,6 +1032,16 @@ def _write_unreal_import_script(
                 )
                 npc_actor.set_actor_label(
                     f"{{LEVEL_NAME}}_NPC_Wanderer_{{variant.key}}_{{i}}")
+
+                # Break the lockstep. See gait_scale_for_index -- rate and walk
+                # speed move together so the stride stays planted.
+                gait = gait_scale_for_index(i)
+                npc_actor.get_editor_property("mesh").set_editor_property(
+                    "global_anim_rate_scale", gait)
+                move = npc_actor.get_editor_property("character_movement")
+                move.set_editor_property(
+                    "max_walk_speed",
+                    move.get_editor_property("max_walk_speed") * gait)
                 unreal.log_warning(
                     f"[GEN]    NPC {{i}} ({{variant.key}}) at ({{spawn['x']:.0f}}, "
                     f"{{spawn['y']:.0f}}, {{spawn['z']:.0f}})")
@@ -1089,6 +1101,8 @@ def _write_unreal_verify_script(
             "distance_cm": round(npc.distance_to_player_cm, 2),
         } for npc in (placed_npcs or [])
     ])
+    npc_gaits = json.dumps([gait_scale_for_index(i)
+                            for i in range(1, len(placed_npcs or []) + 1)])
     npc_run_speed = NPC_RUN_SPEED_CMS
     npc_melee_range = NPC_MELEE_RANGE_CM
     nav_reachable_extent = NAV_REACHABLE_EXTENT_CM
@@ -1139,6 +1153,8 @@ def _write_unreal_verify_script(
         EXPECTED_GRASS_HEIGHTS = {json.dumps(grass_expected_heights)}
         EXPECTED_NPCS = json.loads(r"""{npc_json}""")
         EXPECTED_NPC_RUN_SPEED = {npc_run_speed}
+        # Per-instance gait multipliers -- see npc_placement.gait_scale_for_index.
+        EXPECTED_NPC_GAITS = json.loads(r"""{npc_gaits}""")
         EXPECTED_MELEE_RANGE = {npc_melee_range}
         EXPECTED_MELEE_DAMAGE = {npc_melee_damage}
         EXPECTED_MELEE_INTERVAL = {npc_melee_interval}
@@ -1608,6 +1624,29 @@ def _write_unreal_verify_script(
                 check("Nav Bounds Vertical Span Sane",
                       extent.z * 2.0 <= {nav_max_span},
                       f"(span {{extent.z * 2.0:.0f}} cm, limit {nav_max_span:.0f})")
+                # Lockstep guard: every wanderer must have its own gait, and
+                # its animation rate must match its ground speed or its feet
+                # skate.  A regression here is invisible in a screenshot and
+                # obvious in motion, which is exactly why it is checked.
+                gaits, mismatched = [], []
+                for i, actor in enumerate(npc_actors, start=1):
+                    want = EXPECTED_NPC_GAITS[i - 1]
+                    rate = actor.get_editor_property("mesh").get_editor_property(
+                        "global_anim_rate_scale")
+                    speed = actor.get_editor_property(
+                        "character_movement").get_editor_property("max_walk_speed")
+                    gaits.append(round(rate, 4))
+                    if not (close(rate, want, 0.001)
+                            and close(speed, EXPECTED_NPC_RUN_SPEED * want, 0.5)):
+                        mismatched.append(
+                            f"NPC {{i}} rate {{rate:.3f}} speed {{speed:.1f}} "
+                            f"(wanted {{want:.3f}} / "
+                            f"{{EXPECTED_NPC_RUN_SPEED * want:.1f}})")
+                check("NPC Gaits Are Staggered", len(set(gaits)) == len(gaits),
+                      f"(rates {{sorted(gaits)}} -- duplicates march in lockstep)")
+                check("NPC Anim Rate Matches Ground Speed", not mismatched,
+                      "; ".join(mismatched))
+
                 # Every NPC must stand inside the volume or it has no navmesh.
                 outside = []
                 for i, actor in enumerate(npc_actors, start=1):

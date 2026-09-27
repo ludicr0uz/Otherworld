@@ -38,7 +38,9 @@ Chain names are deliberately identical on both sides so the mapping is an exact
 string match rather than a fuzzy guess.
 """
 
+import math
 import os
+
 import unreal
 
 MANNEQUIN_MESH = "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple"
@@ -142,7 +144,8 @@ ROOT_MOTION_BONE_MANNEQUIN = "root"
 # MM_Attack_01 is named separately because nothing references it: the AI
 # controller plays it into a slot by path at runtime, so the dependency walk
 # cannot see it.
-ABP_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"
+MANNEQUIN_ANIM_DIR = "/Game/Characters/Mannequins/Anims/Unarmed"
+ABP_SOURCE = f"{MANNEQUIN_ANIM_DIR}/ABP_Unarmed"
 MELEE_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
 RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE)
 
@@ -252,7 +255,7 @@ def build_ik_rig(pkg, mesh_pkg, chains, retarget_root, root_motion_bone=None):
     return rig
 
 
-def build_retargeter(source_rig, target_rig, pkg):
+def build_retargeter(source_rig, target_rig, pkg, palm_angles=None):
     name = pkg.rsplit("/", 1)[1]
     rtg = _reuse_or_create(pkg, unreal.IKRetargeter,
                            unreal.IKRetargetFactory())
@@ -307,6 +310,14 @@ def build_retargeter(source_rig, target_rig, pkg):
                              unreal.RetargetAutoAlignMethod.CHAIN_TO_CHAIN)
     _log(f"{name}: target retarget pose auto-aligned to the source (chain to chain)")
 
+    # Chain alignment fixes DIRECTION and leaves ROLL, which is why the monsters
+    # ran with their palms up -- measured at 80-95 degrees off the mannequin in
+    # the retargeted clips. The hands get a second pass with MESH_TO_MESH, which
+    # derives orientation from the skinned geometry rather than from bone axes.
+    # It has to be geometry: Epic runs X down the bone and Mixamo runs Y, so the
+    # rotation-axis methods would be measuring the convention, not the pose.
+    _apply_palm_twist(ctl, name, palm_angles or {})
+
     # Ask per target chain rather than reading the op stack: an unmapped chain
     # comes back "None" here, so a silent hole in the mapping is visible.
     unmapped = []
@@ -321,6 +332,50 @@ def build_retargeter(source_rig, target_rig, pkg):
 
     unreal.EditorAssetLibrary.save_asset(pkg)
     return rtg
+
+
+# The local axis the roll is applied about.
+PALM_TWIST_AXIS_LOCAL = (0.0, 1.0, 0.0)   # Mixamo runs Y down the bone
+
+
+def _quat_axis_angle(axis, degrees):
+    half = math.radians(degrees) * 0.5
+    sn = math.sin(half)
+    a = _unit(*axis)
+    return unreal.Quat(a.x * sn, a.y * sn, a.z * sn, math.cos(half))
+
+
+def _apply_palm_twist(ctl, name, angles):
+    """Roll each hand in the target retarget pose so the palms face right.
+
+    Chain alignment fixes the direction a chain points and says nothing about
+    the spin around it, so the hands arrive rolled -- the monsters ran with
+    their palms up, measured at 75-95 degrees off the mannequin.
+
+    The offsets are LOCAL-space deltas and which way round they compose is not
+    something to guess at, so the angle is not derived analytically, it is
+    CALIBRATED: retarget once, measure the roll in the resulting clip, apply
+    the negative of it, retarget again.  A trial of +45 degrees moved the
+    measured roll by +43 to +48 on every hand of both creatures, so the
+    response is essentially one-for-one -- but nothing here depends on that
+    being exactly true, only on it being monotonic, and the second measurement
+    checks the result rather than assuming it.
+
+    Being a measurement rather than a constant is what makes it work for the
+    next creature without anyone opening the retargeter.
+    """
+    pose = ctl.get_current_retarget_pose(unreal.RetargetSourceOrTarget.TARGET)
+    existing = dict(pose.get_editor_property("bone_rotation_offsets"))
+    for _src, bone in HAND_PAIRS:
+        deg = angles.get(bone, 0.0)
+        if not deg:
+            continue
+        q = _quat_axis_angle(PALM_TWIST_AXIS_LOCAL, deg)
+        prior = existing.get(unreal.Name(bone))
+        combined = prior.multiply(q) if prior else q
+        ctl.set_rotation_offset_for_retarget_pose_bone(
+            unreal.Name(bone), combined, unreal.RetargetSourceOrTarget.TARGET)
+        _log(f"  {bone} palm roll {deg:+.1f} deg")
 
 
 def _source_assets():
@@ -387,6 +442,253 @@ def _bone_world(anim, bone, time):
         xf = xf.multiply(unreal.AnimationLibrary.get_bone_pose_for_time(
             anim, b, time, False))
     return xf.translation
+
+
+# ─── Palms ──────────────────────────────────────────────────────────────────
+#
+# CHAIN_TO_CHAIN alignment matches each chain's DIRECTION and says nothing
+# about roll around it, so the arms came out pointing correctly with the hands
+# rolled -- the monsters ran with their palms up.
+#
+# The roll cannot be read off the skeletons.  Epic runs X down the bone and
+# Mixamo runs Y, so the bone axes sit ~90 degrees apart everywhere and comparing
+# them measures the convention, not the pose; and Meshy's LeftHand is a LEAF
+# with no finger children, so there is no second bone to define a hand plane
+# from.  Palm orientation exists only in the skinned geometry.
+#
+# So it is measured there: take the vertices whose dominant weight is the hand
+# (plus its descendants, because the mannequin has 15 finger bones under hand_l
+# while Meshy's hand is one bone), and fit a frame to the cloud.
+#
+#   finger direction  wrist -> cloud centroid.  Unambiguous.
+#   palm normal       the least-variance PCA axis.  A hand is a flat slab, so
+#                     this is well conditioned (mannequin eigenvalues
+#                     26.6/10.7/3.2, zombie 25.0/17.9/2.9).
+#
+# PCA gives no sign, and the sign is the whole answer, so it comes from the
+# cloud's SKEW along that axis: a hand is not symmetric about its own plane --
+# the fingers curl toward the palm -- so the third moment has a consistent sign.
+# It measures +0.084/-0.084 on the mannequin's two hands (exactly antisymmetric,
+# which is the check that it is real and not noise) and +0.418/-0.564 on the
+# zombie's.  Signing both rigs by the same geometric rule is what makes their
+# palm normals comparable at all.
+#
+# Measured residual twist after chain alignment, about the finger axis:
+#
+#     Zombie01   L -70.9   R +62.0
+#     Wendigo01  L -87.8   R +90.7
+#
+# Mirror-consistent on both creatures, and ~90 degrees, which is the known
+# difference between a Mixamo A-pose and Epic's.
+
+HAND_PAIRS = (("hand_l", "LeftHand"), ("hand_r", "RightHand"))
+
+# The clip the palm roll is calibrated against, and how close is close enough.
+# An idle is the right choice: the hands are at rest, so what is measured is the
+# retarget pose's own error and not a pose the animator put there.
+PALM_CALIBRATION_CLIP = "MM_Idle"
+PALM_TOLERANCE_DEG = 15.0
+
+
+def _descendants(mesh, root):
+    """``root`` plus every bone beneath it, and the mesh's own bone order.
+
+    The order matters and is not the order AnimPoseExtensions reports: skin
+    weight bone indices are into the MESH's reference skeleton, and indexing one
+    with the other silently attributes vertices to the wrong bone -- it put 974
+    units of variance in the mannequin's "hand", which is an arm.
+    """
+    actor = unreal.EditorLevelLibrary.spawn_actor_from_class(
+        unreal.SkeletalMeshActor, unreal.Vector(0, 0, -1000000))
+    try:
+        comp = actor.skeletal_mesh_component
+        comp.set_skeletal_mesh_asset(mesh)
+        order = [str(comp.get_bone_name(i)) for i in range(comp.get_num_bones())]
+        family = set()
+        for n in order:
+            cur, depth = n, 0
+            while cur and cur != "None" and depth < 64:
+                if cur == root:
+                    family.add(n)
+                    break
+                cur = str(comp.get_parent_bone(cur))
+                depth += 1
+        return family, order
+    finally:
+        unreal.EditorLevelLibrary.destroy_actor(actor)
+
+
+def _unit(x, y, z):
+    m = math.sqrt(x * x + y * y + z * z) or 1.0
+    return unreal.Vector(x / m, y / m, z / m)
+
+
+def _eig3(m):
+    """Eigenvectors of a symmetric 3x3 by Jacobi rotation, descending."""
+    a = [row[:] for row in m]
+    v = [[1.0 if i == j else 0.0 for j in range(3)] for i in range(3)]
+    for _ in range(64):
+        p, q, best = 0, 1, 0.0
+        for i in range(3):
+            for j in range(i + 1, 3):
+                if abs(a[i][j]) > best:
+                    best, p, q = abs(a[i][j]), i, j
+        if best < 1e-12:
+            break
+        theta = 0.5 * math.atan2(2 * a[p][q], a[q][q] - a[p][p])
+        c, sn = math.cos(theta), math.sin(theta)
+        for k in range(3):
+            a[k][p], a[k][q] = c * a[k][p] - sn * a[k][q], sn * a[k][p] + c * a[k][q]
+        for k in range(3):
+            a[p][k], a[q][k] = c * a[p][k] - sn * a[q][k], sn * a[p][k] + c * a[q][k]
+        for k in range(3):
+            v[k][p], v[k][q] = c * v[k][p] - sn * v[k][q], sn * v[k][p] + c * v[k][q]
+    out = [(a[i][i], (v[0][i], v[1][i], v[2][i])) for i in range(3)]
+    out.sort(key=lambda t: -t[0])
+    return out
+
+
+def hand_frame(mesh, bone):
+    """(finger direction, palm normal) for one hand, in component space."""
+    family, order = _descendants(mesh, bone)
+    skel = mesh.get_editor_property("skeleton")
+    pose = unreal.AnimPoseExtensions.get_reference_pose(skel)
+    wrist = unreal.AnimPoseExtensions.get_bone_pose(
+        pose, bone, unreal.AnimPoseSpaces.WORLD).translation
+
+    dm = unreal.DynamicMesh()
+    dm, _ = unreal.GeometryScript_AssetUtils.copy_mesh_from_skeletal_mesh(
+        mesh, dm, unreal.GeometryScriptCopyMeshFromAssetOptions(),
+        unreal.GeometryScriptMeshReadLOD())
+    pts = []
+    for i in range(dm.get_vertex_count()):
+        _d, w, ok = dm.get_vertex_bone_weights(i)
+        if not ok or not w:
+            continue
+        top = max(w, key=lambda x: x.get_editor_property("weight"))
+        if order[top.get_editor_property("bone_index")] not in family:
+            continue
+        pt, _ = dm.get_vertex_position(i)
+        pts.append((pt.x, pt.y, pt.z))
+    if len(pts) < 32:
+        raise RuntimeError(f"{mesh.get_name()}/{bone}: only {len(pts)} skinned "
+                           "vertices -- cannot fit a palm frame")
+
+    n = len(pts)
+    c = [sum(p[i] for p in pts) / n for i in range(3)]
+    cov = [[0.0] * 3 for _ in range(3)]
+    for p in pts:
+        d = [p[i] - c[i] for i in range(3)]
+        for i in range(3):
+            for j in range(3):
+                cov[i][j] += d[i] * d[j]
+    for i in range(3):
+        for j in range(3):
+            cov[i][j] /= n
+    ev = _eig3(cov)
+    normal = _unit(*ev[2][1])
+
+    s1 = s3 = 0.0
+    for p in pts:
+        d = (p[0] - c[0], p[1] - c[1], p[2] - c[2])
+        proj = d[0] * normal.x + d[1] * normal.y + d[2] * normal.z
+        s1 += proj * proj
+        s3 += proj ** 3
+    sigma = math.sqrt(s1 / n) or 1.0
+    if (s3 / n) / (sigma ** 3) < 0:
+        normal = unreal.Vector(-normal.x, -normal.y, -normal.z)
+
+    finger = _unit(c[0] - wrist.x, c[1] - wrist.y, c[2] - wrist.z)
+    return finger, normal
+
+
+def _signed_twist(src_finger, src_normal, tgt_finger, tgt_normal):
+    """Roll left over once the target's finger axis is turned onto the source's.
+
+    This is the part chain alignment does not fix: turning the finger axis onto
+    the source's still leaves the hand free to spin about that axis, and the
+    spin is what points the palms at the sky.
+    """
+    axis = tgt_finger.cross(src_finger)
+    d = max(-1.0, min(1.0, tgt_finger.dot(src_finger)))
+    if axis.length() > 1e-6:
+        turned = _rodrigues(_unit(axis.x, axis.y, axis.z), math.acos(d), tgt_normal)
+    else:
+        turned = tgt_normal
+    a = _reject(turned, src_finger)
+    b = _reject(src_normal, src_finger)
+    return math.degrees(math.atan2(a.cross(b).dot(src_finger), a.dot(b)))
+
+
+def _rodrigues(axis, angle, v):
+    c, s = math.cos(angle), math.sin(angle)
+    cr = axis.cross(v)
+    return unreal.Vector(
+        v.x * c + cr.x * s + axis.x * axis.dot(v) * (1 - c),
+        v.y * c + cr.y * s + axis.y * axis.dot(v) * (1 - c),
+        v.z * c + cr.z * s + axis.z * axis.dot(v) * (1 - c))
+
+
+def _reject(v, axis):
+    d = v.dot(axis)
+    return _unit(v.x - d * axis.x, v.y - d * axis.y, v.z - d * axis.z)
+
+
+def _bone_xf(anim, bone, time):
+    """Component-space TRANSFORM of a bone at a time (not just its position)."""
+    xf = unreal.Transform()
+    for b in unreal.AnimationLibrary.find_bone_path_to_root(anim, bone):
+        xf = xf.multiply(unreal.AnimationLibrary.get_bone_pose_for_time(
+            anim, b, time, False))
+    return xf
+
+
+def measure_clip_palm_twist(src_anim, tgt_anim, tgt_mesh, time=0.0):
+    """Residual palm roll in an actual retargeted clip, per side, in degrees.
+
+    The reference-pose measurement cannot see the fix: auto-align writes into
+    the retargeter's retarget pose, not into the meshes.  This samples what the
+    player is shown -- the animated hand -- and is therefore the only honest
+    check that the palms came out facing the same way as the mannequin's.
+
+    The hand cloud is rigid to its bone, so the palm frame at time t is the
+    reference-pose frame carried by the bone's animated rotation.
+    """
+    man = _load(MANNEQUIN_MESH)
+    out = {}
+    for src_bone, tgt_bone in HAND_PAIRS:
+        sf0, sn0 = hand_frame(man, src_bone)
+        tf0, tn0 = hand_frame(tgt_mesh, tgt_bone)
+
+        sr = _bone_xf(src_anim, src_bone, time).rotation
+        s_ref = unreal.AnimPoseExtensions.get_bone_pose(
+            unreal.AnimPoseExtensions.get_reference_pose(
+                man.get_editor_property("skeleton")),
+            src_bone, unreal.AnimPoseSpaces.WORLD).rotation
+        tr = _bone_xf(tgt_anim, tgt_bone, time).rotation
+        t_ref = unreal.AnimPoseExtensions.get_bone_pose(
+            unreal.AnimPoseExtensions.get_reference_pose(
+                tgt_mesh.get_editor_property("skeleton")),
+            tgt_bone, unreal.AnimPoseSpaces.WORLD).rotation
+
+        def carry(cur, ref, v):
+            return cur.rotate_vector(ref.inversed().rotate_vector(v))
+
+        out[tgt_bone] = _signed_twist(
+            carry(sr, s_ref, sf0), carry(sr, s_ref, sn0),
+            carry(tr, t_ref, tf0), carry(tr, t_ref, tn0))
+    return out
+
+
+def measure_palm_twist(target_mesh):
+    """Residual palm roll per side, target vs the mannequin, in degrees."""
+    man = _load(MANNEQUIN_MESH)
+    out = {}
+    for src_bone, tgt_bone in HAND_PAIRS:
+        sf, sn = hand_frame(man, src_bone)
+        tf, tn = hand_frame(target_mesh, tgt_bone)
+        out[tgt_bone] = _signed_twist(sf, sn, tf, tn)
+    return out
 
 
 # ─── Fixing up the retargeted Anim Blueprint ────────────────────────────────
@@ -680,25 +982,52 @@ def main():
 
     monsters = _monsters()
     _log(f"{len(monsters)} monster(s): {', '.join(n for n, _, _ in monsters)}")
+    src_clip = _load(f"{MANNEQUIN_ANIM_DIR}/{PALM_CALIBRATION_CLIP}")
     totals = []
     for name, mesh, skeleton in monsters:
         _log(f"--- {name} ({skeleton.get_name()}) ---")
         tgt = build_ik_rig(ik_rig_path(name),
                            mesh.get_path_name().split(".")[0],
                            CHAINS_MESHY, RETARGET_ROOT_MESHY)
+
+        # Pass 1 establishes the palm error; pass 2 corrects it. The clips from
+        # pass 1 are thrown away -- retarget_animations wipes the directory --
+        # so nothing half-corrected can survive into the game.
         rtg = build_retargeter(src, tgt, retargeter_path(name))
+        retarget_animations(rtg, mesh, anim_dir(name), anim_prefix(name))
+        before = measure_clip_palm_twist(
+            src_clip, _load(f"{anim_dir(name)}/{anim_prefix(name)}"
+                            f"{PALM_CALIBRATION_CLIP}"), mesh)
+        _log("  palm roll before: "
+             + ", ".join(f"{k} {v:+.1f}" for k, v in before.items()))
+
+        rtg = build_retargeter(src, tgt, retargeter_path(name),
+                               palm_angles={k: -v for k, v in before.items()})
         created = retarget_animations(rtg, mesh, anim_dir(name),
                                       anim_prefix(name))
+        after = measure_clip_palm_twist(
+            src_clip, _load(f"{anim_dir(name)}/{anim_prefix(name)}"
+                            f"{PALM_CALIBRATION_CLIP}"), mesh)
+        _log("  palm roll after:  "
+             + ", ".join(f"{k} {v:+.1f}" for k, v in after.items()))
+        worst = max(abs(v) for v in after.values())
+        if worst > PALM_TOLERANCE_DEG:
+            raise RuntimeError(
+                f"{name}: palms still {worst:.1f} deg off the mannequin after "
+                f"correction (tolerance {PALM_TOLERANCE_DEG}); the creature "
+                "would run with its palms turned")
+
         # After the copy, before the checks: verify() asserts the graph is clean.
         fix_retargeted_abp(abp_path(name), skeleton)
-        totals.append((name, *verify(created, name, skeleton)))
+        totals.append((name, *verify(created, name, skeleton), worst))
 
     unreal.EditorAssetLibrary.save_directory(RIG_DIR, only_if_is_dirty=False)
     unreal.EditorAssetLibrary.save_directory(ANIM_ROOT, only_if_is_dirty=False)
 
     _log("=" * 52)
-    for name, ok, clips in totals:
-        _log(f"  {name:12s} {ok}/{clips} clips, anim BP {abp_path(name).rsplit('/', 1)[1]}")
+    for name, ok, clips, palm in totals:
+        _log(f"  {name:12s} {ok}/{clips} clips, palms within {palm:.1f} deg, "
+             f"anim BP {abp_path(name).rsplit('/', 1)[1]}")
     _log(f"{len(totals)} monster(s) animate against their own bind pose")
 
 

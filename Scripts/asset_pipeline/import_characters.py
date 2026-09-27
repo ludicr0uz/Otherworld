@@ -100,6 +100,10 @@ def import_fbx(fbx_path, dest_path, asset_name, skeleton=None):
     opts.set_editor_property("import_textures", True)
     opts.set_editor_property("import_animations", False)
     opts.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_SKELETAL_MESH)
+    # Asked for, but not relied on: the importer ignores this whenever an
+    # existing skeleton is supplied, and one always is here. _ensure_physics()
+    # below is what actually guarantees it.
+    opts.set_editor_property("create_physics_asset", True)
     if skeleton:
         # Binding to an existing skeleton is the whole point: it is what makes
         # monster #2 onwards free of animation setup.
@@ -202,7 +206,15 @@ def check_mesh(mesh, spec):
     except Exception:
         pass
 
-    # (6) materials and PBR maps
+    # (6) a physics asset, or nothing can be shot
+    phys = mesh.get_editor_property("physics_asset")
+    _log(f"[IMPORT]   physics asset = {phys.get_name() if phys else None}")
+    if not phys:
+        _log("[IMPORT]   FAIL no physics asset -- hit zones cannot be built, "
+             "so the creature would be unshootable")
+        ok = False
+
+    # (7) materials and PBR maps
     mats = mesh.get_editor_property("materials")
     _log(f"[IMPORT]   material slots = {len(mats)}")
     if not mats:
@@ -250,6 +262,30 @@ def _mint_skeleton(spec):
     unreal.EditorAssetLibrary.delete_directory(seed_dir)
     _log(f"[IMPORT] minted {path} from {spec['id']}")
     return unreal.EditorAssetLibrary.load_asset(path)
+
+
+def _ensure_physics(mesh):
+    """Give the mesh a physics asset if the import did not.
+
+    build_weapons_and_combat.py builds every hit zone out of a physics asset's
+    bodies, so a creature without one cannot be shot at all -- and it fails
+    three scripts later with "has no physics asset", a long way from the import
+    that skipped it.
+
+    The importer's create_physics_asset flag is ignored when an existing
+    skeleton is supplied, which is always the case here: each monster is bound
+    to the skeleton minted for it a moment earlier. So it is created directly
+    instead.
+    """
+    if mesh.get_editor_property("physics_asset"):
+        return mesh.get_editor_property("physics_asset")
+    sub = unreal.get_editor_subsystem(unreal.SkeletalMeshEditorSubsystem)
+    phys = sub.create_physics_asset(mesh)
+    if phys:
+        mesh.set_editor_property("physics_asset", phys)
+        unreal.EditorAssetLibrary.save_loaded_asset(phys)
+        unreal.EditorAssetLibrary.save_loaded_asset(mesh)
+    return phys
 
 
 def _bind_fingerprint(skel):
@@ -301,6 +337,7 @@ def main():
             _log(f"[IMPORT] {sid}: FAILED -- no SkeletalMesh produced")
             continue
 
+        _ensure_physics(mesh)
         ok = check_mesh(mesh, spec)
         skel = mesh.get_editor_property("skeleton")
         _log(f"[IMPORT]   skeleton = {skel.get_name() if skel else None}")

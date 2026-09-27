@@ -137,10 +137,25 @@ GENERATED = (
              "sound cache -- see CACHE below.",
     ),
     AssetSource(
+        dest="Content/UI/Art",
+        kind="generated",
+        builders=("Scripts/build_ui_art.py",
+                  "Scripts/asset_pipeline/import_ui_art.py"),
+        note="The HUD's artwork: panels, inventory slots, bars and one "
+             "silhouette per weapon. Drawn by Pillow rather than authored, so "
+             "the look of the UI is a readable script and not a folder of "
+             "PNGs nobody can regenerate. Two steps because the editor's "
+             "embedded Python has no Pillow: build_ui_art.py writes assets/ui/ "
+             "from outside, import_ui_art.py brings it in with the settings "
+             "that keep it crisp (UI texture group, uncompressed, no mips).",
+    ),
+    AssetSource(
         dest="Content/UI",
         kind="generated",
         builders=("Scripts/build_graphics_menu.py",),
-        note="BP_GraphicsMenuHUD: the settings menu, HP and stamina bars.",
+        note="BP_GraphicsMenuHUD: the settings menu, HP and stamina bars, the "
+             "inventory strip and the death screen, drawn with the artwork "
+             "above.",
     ),
     AssetSource(
         dest="Content/Forest/NPC",
@@ -237,6 +252,12 @@ STOCK_CHECKSUM_FILE = "Scripts/forest_generator/stock_checksums.json"
 RESTORE_ORDER = (
     "Scripts/sync_assets.py --restore-stock",
     "Scripts/fetch_weapon_sounds.py",
+    # The HUD's artwork comes before the weapons, because each weapon stores a
+    # reference to its own inventory icon, and before the menu, which draws the
+    # panels, slots and bars. Two steps, not one: the generator needs Pillow and
+    # the editor's embedded Python does not have it, so it runs outside.
+    "python3 Scripts/build_ui_art.py",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_ui_art.py",
     "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     # The monsters come before the NPC blueprints, because the wanderers ARE

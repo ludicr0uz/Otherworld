@@ -156,15 +156,30 @@ def main():
     expected_text |= {""}
     check("panel, HP, stamina, debug row and the death menu draw their labels",
           drawn == expected_text, str(sorted(drawn ^ expected_text)))
-    # One backs the quality panel, two are the player's HP track and fill, two
-    # more are an NPC bar's track and fill, five are the empty inventory slots,
-    # and the last two are a filled slot and the equipped slot's underline.
-    # ...plus two for the stamina track and fill, and one for the death panel.
-    expected_rects = 1 + 2 + 2 + 2 + G.INVENTORY_SIZE + 2 + 5 + 1
-    check(f"{expected_rects} DrawRects: panel, HP, stamina, NPC bar, inventory, "
-          f"reticle, death panel",
+    # Almost everything that used to be a DrawRect is a DrawTexture now -- see
+    # the generated-artwork note in build_graphics_menu.py. What is left as
+    # rects is the reticle, and only the reticle: five hairline ticks, where a
+    # texture would buy nothing and cost a sample.
+    expected_rects = 5
+    check(f"{expected_rects} DrawRects, all of them the reticle",
           len(by_pins("RectColor")) == expected_rects,
           str(len(by_pins("RectColor"))))
+
+    # One quality panel, one death panel, five empty slots, the equipped
+    # frame, the carried weapon's icon, and a track+fill for each of HP,
+    # stamina and the NPC bar.
+    expected_textures = 1 + 1 + G.INVENTORY_SIZE + 1 + 1 + 2 + 2 + 2
+    textures = by_pins("Texture")
+    check(f"{expected_textures} DrawTextures: panels, slots, weapon icon, bars",
+          len(textures) == expected_textures, str(len(textures)))
+
+    # The weapon icon is the one whose Texture is DRIVEN -- it comes off the
+    # item, so the strip holds no table of weapon names. Everything else names
+    # a constant.
+    driven = [n for n in textures
+              if BEL.find_input_pin(n, "Texture").list_connected_pins()]
+    check("exactly one DrawTexture takes its texture from the weapon itself",
+          len(driven) == 1, str(len(driven)))
 
     # The caret is the only text whose position is computed rather than literal.
     caret = [n for n in texts
@@ -217,10 +232,11 @@ def main():
           len(lookups) == 5 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
-    # A fill rect's width is computed from a health fraction; the track behind it
-    # is literal. Two of them now -- the player's bar and the NPC bars.
-    rects = by_pins("RectColor")
-    driven = [n for n in rects
+    # A fill's width is computed from a health fraction; the track behind it is
+    # literal. Three of them -- the player's HP, the NPC bars, and stamina.
+    # These are DrawTextures now, so the bars can have a lit gradient; the test
+    # is unchanged in substance, only in which node type it counts.
+    driven = [n for n in by_pins("Texture")
               if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]
     check("the HP, NPC and stamina fills are all driven, not constants",
           len(driven) == 3, str(len(driven)))
@@ -286,7 +302,7 @@ def main():
     check("the stamina bar reads Stamina, MaxStamina and Sprinting",
           stamina_reads == {"Get Stamina", "Get MaxStamina", "Get Sprinting"},
           str(sorted(stamina_reads)))
-    st_rects = [n for n in by_pins("RectColor")
+    st_rects = [n for n in by_pins("Texture")
                 if float(BEL.find_input_pin(n, "ScreenY").get_pin_value() or -1)
                 == G.ST_BAR[1]]
     check("the stamina bar has a track and a fill, under the HP bar",

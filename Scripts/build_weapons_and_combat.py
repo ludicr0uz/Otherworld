@@ -142,6 +142,7 @@ import unreal
 # uses -- a replacement wanderer has to obey "75-100 m away" too, or the rule
 # holds only until the first kill.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from build_ui_art import ICON_NAME_FOR                            # noqa: E402
 from forest_generator.npc_placement import (                      # noqa: E402
     NPC_SPAWN_MIN_DISTANCE_CM,
     NPC_SPAWN_MAX_DISTANCE_CM,
@@ -153,6 +154,8 @@ from forest_generator.npc_placement import (                      # noqa: E402
 
 WEAPON_DIR = "/Game/Weapons"
 AUDIO_DIR = f"{WEAPON_DIR}/Audio"
+# Where Scripts/asset_pipeline/import_ui_art.py puts the generated HUD art.
+UI_ART_DIR = "/Game/UI/Art"
 MAT_METAL = f"{WEAPON_DIR}/M_Gunmetal"
 MAT_WOOD = f"{WEAPON_DIR}/M_GunWood"
 MAT_BLOOD = f"{WEAPON_DIR}/M_Blood"
@@ -470,8 +473,25 @@ RESPAWN_ATTEMPTS = 2
 # neither: they are body, as is anything the zones do not name.
 HEAD_MULTIPLIER = 1.5
 LIMB_MULTIPLIER = 0.75
-HEAD_ROOTS = ("head",)
-LIMB_ROOTS = ("upperarm_l", "upperarm_r", "thigh_l", "thigh_r")
+# Zone roots by ROLE, with the candidate bone names each rig might use.
+#
+# Two skeletons reach this code and they share almost no bone names: Epic's
+# mannequin (head, upperarm_l, thigh_l) and Meshy's Mixamo-style creature rig
+# (Head, LeftArm, LeftUpLeg). A single hardcoded list meant the creatures could
+# not be shot at all -- and because the weapons script is not re-run by a level
+# rebuild, that only surfaced the next time somebody ran it, a long way from the
+# change that caused it.
+#
+# Resolved against the bodies the physics asset actually has, so a rig only
+# needs to match ONE candidate per role, and a third creature family is a few
+# more names here rather than a second copy of this function.
+HEAD_CANDIDATES = ("head", "Head")
+LIMB_CANDIDATES = (
+    ("upperarm_l", "LeftArm"),
+    ("upperarm_r", "RightArm"),
+    ("thigh_l", "LeftUpLeg"),
+    ("thigh_r", "RightUpLeg"),
+)
 HEAD_BONES_VAR = "HeadBones"
 LIMB_BONES_VAR = "LimbBones"
 HEAD_MULT_VAR = "HeadMultiplier"
@@ -1064,6 +1084,21 @@ RIFLE_MUZZLE = (122.0, 0.0, 1.8)
 SNIPER_MUZZLE = (148.0, 0.0, 2.0)
 
 
+def _weapon_icon(display):
+    """The weapon's HUD silhouette, or None if the UI art is not built yet.
+
+    Soft rather than fatal: a clone that has not run build_ui_art.py should
+    still get a working game, with an empty slot where the icon goes.
+    """
+    path = f"{UI_ART_DIR}/{ICON_NAME_FOR(display)}"
+    tex = unreal.EditorAssetLibrary.load_asset(path)
+    if not tex:
+        _log(f"note: {path} missing -- {display} will have no inventory icon. "
+             "Run `python3 Scripts/build_ui_art.py` then "
+             "Scripts/asset_pipeline/import_ui_art.py")
+    return tex
+
+
 def _weapon_specs():
     """Everything that differs between the two weapons, in one table.
 
@@ -1447,6 +1482,12 @@ def build_weapon_item():
     _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripRotation", _struct_type(unreal.Rotator.static_struct()))
     _declare(ed, "SlotColor", _struct_type(unreal.LinearColor.static_struct()))
+    # The weapon's own silhouette for the inventory strip, drawn by
+    # build_graphics_menu.py. On the item rather than in a table in the HUD for
+    # the same reason SlotColor and DisplayName are: adding a weapon stays a
+    # row in _weapon_specs() and the HUD never learns any weapon's name.
+    _declare(ed, "Icon",
+             BEL.get_object_reference_type(unreal.Texture2D.static_class()))
     # Three sounds, not one, and all three live on the weapon for the same
     # reason FireSound does: the graphs read them off Held, so a new weapon is
     # a row in _weapon_specs() and nothing else. The dry-fire and reload
@@ -1516,6 +1557,7 @@ def build_weapon(spec, item_bp):
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
+        "Icon": _weapon_icon(spec["display"]),
         "FireSound": _must_load(spec["sound"]),
         "DryFireSound": _must_load(SND_DRY_FIRE),
         "ReloadSound": _must_load(spec["reload_sound"]),
@@ -4761,12 +4803,24 @@ def hit_zones(mesh_asset):
     def under(bone, roots):
         return any(bone == root or probe.bone_is_child_of(bone, root) for root in roots)
 
-    missing = [r for r in HEAD_ROOTS + LIMB_ROOTS if r not in bodies]
-    if missing:
-        raise RuntimeError(f"{pa.get_name()} has no body for {missing} — "
-                           "that zone could never be hit")
-    head = sorted(b for b in bodies if under(b, HEAD_ROOTS))
-    limbs = sorted(b for b in bodies if under(b, LIMB_ROOTS))
+    # FName comparison is case-insensitive, so "head" already finds "Head";
+    # the pairs that actually differ are the limbs.
+    lower = {b.lower(): b for b in bodies}
+
+    def resolve(candidates, role):
+        for c in candidates:
+            if c.lower() in lower:
+                return lower[c.lower()]
+        raise RuntimeError(
+            f"{pa.get_name()} has no body for {role} (tried {list(candidates)}) "
+            "— that zone could never be hit. Add this rig's bone name to "
+            "HEAD_CANDIDATES / LIMB_CANDIDATES.")
+
+    head_roots = (resolve(HEAD_CANDIDATES, "the head"),)
+    limb_roots = tuple(resolve(c, f"limb {i + 1}")
+                       for i, c in enumerate(LIMB_CANDIDATES))
+    head = sorted(b for b in bodies if under(b, head_roots))
+    limbs = sorted(b for b in bodies if under(b, limb_roots))
     return head, limbs, sorted(bodies - set(head) - set(limbs))
 
 

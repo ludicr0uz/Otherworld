@@ -284,6 +284,7 @@ FN_CONV_INT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
 FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
 FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
 FN_DRAW_RECT = "/Script/Engine.HUD.DrawRect"
+FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"
 FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
 FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
@@ -436,12 +437,73 @@ def _literal_matches(got, want):
     return got.lower() == want.lower() or got.endswith(f"::{want}")
 
 
+# ─── Generated artwork ───────────────────────────────────────────────────────
+#
+# DrawRect gives a flat, hard-edged, single-colour rectangle: no corner radius,
+# no gradient, no border, no shadow. Every panel, bar and inventory slot was
+# one of those, and that is what made the HUD look unfinished -- rearranging
+# rectangles does not fix it.
+#
+# DrawTexture takes a tint and a blend mode, so the same layout drawn with
+# generated art gets rounded corners, a hairline border and a lit gradient, and
+# the weapons get silhouettes instead of colour swatches.
+# Scripts/build_ui_art.py draws them; import_ui_art.py imports them.
+UI_ART_DIR = "/Game/UI/Art"
+
+# Roboto rather than the engine's default face. The default is a bitmap font
+# that does not scale cleanly, and at the sizes this HUD uses -- the HP number
+# is drawn at 2.4x, the death title at 3.4x -- it is the single most obviously
+# unpolished thing on screen.
+UI_FONT = "/Engine/EngineFonts/Roboto.Roboto"
+
+# Source sizes, so DrawTexture can be handed a UV rectangle in texels.
+UI_TEX_SIZE = {
+    "T_UI_Panel": (600, 346),
+    "T_UI_PanelDeath": (560, 300),
+    "T_UI_Slot": (104, 68),
+    "T_UI_SlotActive": (104, 68),
+    "T_UI_SlotFrame": (104, 68),
+    "T_UI_Bar": (240, 32),
+    "T_UI_BarTrack": (240, 32),
+}
+ICON_TEX_SIZE = (128, 64)
+
+# The weapon icon inside its slot: full width less a margin, on the upper line
+# so the name has the lower one.
+SLOT_ICON_W = 88.0
+SLOT_ICON_H = 44.0
+SLOT_ICON_TOP = 2.0
+
+
 def _at(node, x, y):
     BEL.set_node_pos(node, unreal.IntPoint(int(x), int(y)))
     return node
 
 
 # ─── Member variables ────────────────────────────────────────────────────────
+
+def _draw_texture(ed, x, y, tex, w=None, h=None, tint=None):
+    """A DrawTexture node with its UV rectangle set to the whole texture.
+
+    The UV pins are in TEXELS, not normalised, so they are the source size.
+    Left unset they default to zero and the node draws nothing at all -- which
+    looks exactly like a missing texture and is the easy way to lose an hour.
+    """
+    tw, th = UI_TEX_SIZE[tex] if tex in UI_TEX_SIZE else ICON_TEX_SIZE
+    n = _at(_node(ed, FN_DRAW_TEXTURE), x, y)
+    _set(n, "Texture", f"{UI_ART_DIR}/{tex}.{tex}")
+    if w is not None:
+        _set(n, "ScreenW", w)
+    if h is not None:
+        _set(n, "ScreenH", h)
+    _set(n, "TextureU", 0.0)
+    _set(n, "TextureV", 0.0)
+    _set(n, "TextureUWidth", float(tw))
+    _set(n, "TextureVHeight", float(th))
+    if tint:
+        _set(n, "TintColor", tint)
+    return n
+
 
 def _ensure_variables(ed, bp):
     """MenuOpen drives both input gating and drawing; Quality drives the caret.
@@ -705,16 +767,14 @@ def _author_hp(ed, x0, y0, in_execs):
     _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
     _set(fill_w, "B", HP_BAR[2])
 
-    back = _at(_node(ed, FN_DRAW_RECT), x0 + 760, y0)
-    _set(back, "RectColor", COL_HP_BACK)
+    back = _draw_texture(ed, x0 + 760, y0, "T_UI_BarTrack")
     for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), HP_BAR):
         _set(back, name, value)
     _connect(BEL.find_then_pin(cast), _pin(back, "execute"))
 
-    # Same rect, but its width is driven rather than set: the empty part of the
-    # bar is the background showing through.
-    fill = _at(_node(ed, FN_DRAW_RECT), x0 + 1000, y0)
-    _set(fill, "RectColor", COL_HP_FILL)
+    # Same texture, but its width is driven rather than set: the empty part of
+    # the bar is the track showing through.
+    fill = _draw_texture(ed, x0 + 1000, y0, "T_UI_Bar", tint=COL_HP_FILL)
     for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), HP_BAR):
         _set(fill, name, value)
     _connect(_pin(fill_w, "ReturnValue", is_input=False), _pin(fill, "ScreenW"))
@@ -727,6 +787,7 @@ def _author_hp(ed, x0, y0, in_execs):
     _set(label, "ScreenY", HP_LABEL_POS[1])
     _set(label, "Scale", HP_LABEL_SCALE)
     _set(label, "bScalePosition", "false")
+    _set(label, "Font", UI_FONT)
     _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
 
     rounded = _at(_node(ed, FN_ROUND), x0 + 1240, y0 + 320)
@@ -740,6 +801,7 @@ def _author_hp(ed, x0, y0, in_execs):
     _set(number, "ScreenY", HP_NUM_POS[1])
     _set(number, "Scale", HP_NUM_SCALE)
     _set(number, "bScalePosition", "false")
+    _set(number, "Font", UI_FONT)
     _connect(_pin(as_text, "ReturnValue", is_input=False), _pin(number, "Text"))
     _connect(BEL.find_then_pin(label), _pin(number, "execute"))
 
@@ -797,8 +859,7 @@ def _author_stamina(ed, x0, y0, in_execs):
     _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
     _set(fill_w, "B", ST_BAR[2])
 
-    back = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 760, y0))
-    _set(back, "RectColor", COL_ST_BACK)
+    back = keep(_draw_texture(ed, x0 + 760, y0, "T_UI_BarTrack"))
     for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), ST_BAR):
         _set(back, name, value)
     _connect(BEL.find_then_pin(cast), _pin(back, "execute"))
@@ -808,11 +869,11 @@ def _author_stamina(ed, x0, y0, in_execs):
     _set(tint, "B", COL_ST_FILL)
     _connect(sprinting, _pin(tint, "bPickA"))
 
-    fill = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 1000, y0))
+    fill = keep(_draw_texture(ed, x0 + 1000, y0, "T_UI_Bar"))
     for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), ST_BAR):
         _set(fill, name, value)
     _connect(_pin(fill_w, "ReturnValue", is_input=False), _pin(fill, "ScreenW"))
-    _connect(_pin(tint, "ReturnValue", is_input=False), _pin(fill, "RectColor"))
+    _connect(_pin(tint, "ReturnValue", is_input=False), _pin(fill, "TintColor"))
     _connect(BEL.find_then_pin(back), _pin(fill, "execute"))
 
     label = keep(_at(_node(ed, FN_DRAW_TEXT), x0 + 1240, y0))
@@ -822,6 +883,7 @@ def _author_stamina(ed, x0, y0, in_execs):
     _set(label, "ScreenY", ST_LABEL_POS[1])
     _set(label, "Scale", ST_LABEL_SCALE)
     _set(label, "bScalePosition", "false")
+    _set(label, "Font", UI_FONT)
     _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
 
     ed.add_comment_to_nodes(
@@ -878,6 +940,7 @@ def _author_kills(ed, x0, y0, in_execs):
     _set(text, "ScreenY", KILL_TOP)
     _set(text, "Scale", KILL_SCALE)
     _set(text, "bScalePosition", "false")
+    _set(text, "Font", UI_FONT)
     _connect(BEL.find_then_pin(cast), _pin(text, "execute"))
 
     ed.add_comment_to_nodes(
@@ -998,16 +1061,14 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
     _set(fill_w, "B", NPC_BAR[0])
 
-    back = _at(_node(ed, FN_DRAW_RECT), x0 + 2640, y0)
-    _set(back, "RectColor", COL_NPC_BACK)
+    back = _draw_texture(ed, x0 + 2640, y0, "T_UI_BarTrack")
     _set(back, "ScreenW", NPC_BAR[0])
     _set(back, "ScreenH", NPC_BAR[1])
     _connect(left_out, _pin(back, "ScreenX"))
     _connect(top_out, _pin(back, "ScreenY"))
     _connect(BEL.find_then_pin(visible), _pin(back, "execute"))
 
-    fill = _at(_node(ed, FN_DRAW_RECT), x0 + 2900, y0)
-    _set(fill, "RectColor", COL_NPC_FILL)
+    fill = _draw_texture(ed, x0 + 2900, y0, "T_UI_Bar", tint=COL_NPC_FILL)
     _set(fill, "ScreenW", NPC_BAR[0])
     _set(fill, "ScreenH", NPC_BAR[1])
     _connect(left_out, _pin(fill, "ScreenX"))
@@ -1100,10 +1161,8 @@ def _author_inventory(ed, x0, y0, in_execs):
     # and even if the weapon component is missing entirely.
     flow = None
     for i in range(INVENTORY_SIZE):
-        r = _at(_node(ed, FN_DRAW_RECT), x0 + 1000 + i * 240, y0)
-        _set(r, "RectColor", COL_SLOT_BACK)
-        _set(r, "ScreenW", SLOT_W)
-        _set(r, "ScreenH", SLOT_H)
+        r = _draw_texture(ed, x0 + 1000 + i * 240, y0, "T_UI_Slot",
+                          w=SLOT_W, h=SLOT_H)
         _connect(slot_x(i, x0 + 1000 + i * 240, y0 + 300), _pin(r, "ScreenX"))
         _connect(y_out, _pin(r, "ScreenY"))
         if flow is None:
@@ -1166,12 +1225,31 @@ def _author_inventory(ed, x0, y0, in_execs):
                x0 + 3700, y0 + 780)
     _connect(item, _pin(name, "self"))
 
-    fill = _at(_node(ed, FN_DRAW_RECT), x0 + 4420, y0)
-    _connect(_pin(colour, "SlotColor", is_input=False), _pin(fill, "RectColor"))
-    _set(fill, "ScreenW", SLOT_W)
-    _set(fill, "ScreenH", SLOT_H)
-    _connect(at_x_out, _pin(fill, "ScreenX"))
-    _connect(y_out, _pin(fill, "ScreenY"))
+    # The weapon's own silhouette, tinted with its own SlotColor: the colour
+    # still identifies it at a glance from across the strip, and the shape says
+    # which gun it is without reading the label.
+    icon = _at(ed.add_get_member_variable_node("Icon", ITEM_CLASS_PATH),
+               x0 + 3700, y0 + 900)
+    _connect(item, _pin(icon, "self"))
+
+    icon_x = _at(_node(ed, FN_ADD), x0 + 4180, y0 + 660)
+    _connect(at_x_out, _pin(icon_x, "A"))
+    _set(icon_x, "B", (SLOT_W - SLOT_ICON_W) / 2.0)
+    icon_y = _at(_node(ed, FN_ADD), x0 + 4180, y0 + 780)
+    _connect(y_out, _pin(icon_y, "A"))
+    _set(icon_y, "B", SLOT_ICON_TOP)
+
+    fill = _at(_node(ed, FN_DRAW_TEXTURE), x0 + 4420, y0)
+    _connect(_pin(icon, "Icon", is_input=False), _pin(fill, "Texture"))
+    _connect(_pin(colour, "SlotColor", is_input=False), _pin(fill, "TintColor"))
+    _set(fill, "ScreenW", SLOT_ICON_W)
+    _set(fill, "ScreenH", SLOT_ICON_H)
+    _set(fill, "TextureU", 0.0)
+    _set(fill, "TextureV", 0.0)
+    _set(fill, "TextureUWidth", float(ICON_TEX_SIZE[0]))
+    _set(fill, "TextureVHeight", float(ICON_TEX_SIZE[1]))
+    _connect(_pin(icon_x, "ReturnValue", is_input=False), _pin(fill, "ScreenX"))
+    _connect(_pin(icon_y, "ReturnValue", is_input=False), _pin(fill, "ScreenY"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(fill, "execute"))
 
     label_x = _at(_node(ed, FN_ADD), x0 + 4420, y0 + 520)
@@ -1186,6 +1264,7 @@ def _author_inventory(ed, x0, y0, in_execs):
     _set(label, "TextColor", COL_SLOT_NAME)
     _set(label, "Scale", SLOT_NAME_SCALE)
     _set(label, "bScalePosition", "false")
+    _set(label, "Font", UI_FONT)
     _connect(_pin(label_x, "ReturnValue", is_input=False), _pin(label, "ScreenX"))
     _connect(_pin(label_y, "ReturnValue", is_input=False), _pin(label, "ScreenY"))
     _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
@@ -1229,6 +1308,7 @@ def _author_inventory(ed, x0, y0, in_execs):
     _set(ammo, "TextColor", COL_SLOT_AMMO)
     _set(ammo, "Scale", SLOT_AMMO_SCALE)
     _set(ammo, "bScalePosition", "false")
+    _set(ammo, "Font", UI_FONT)
     _connect(_pin(ammo_x, "ReturnValue", is_input=False), _pin(ammo, "ScreenX"))
     _connect(_pin(ammo_y, "ReturnValue", is_input=False), _pin(ammo, "ScreenY"))
     _connect(BEL.find_then_pin(counted), _pin(ammo, "execute"))
@@ -1244,15 +1324,13 @@ def _author_inventory(ed, x0, y0, in_execs):
     _connect(BEL.find_then_pin(ammo), _pin(marked, "execute"))
     _connect(BEL.find_else_pin(counted), _pin(marked, "execute"))
 
-    mark_y = _at(_node(ed, FN_ADD), x0 + 5940, y0 + 520)
-    _connect(y_out, _pin(mark_y, "A"))
-    _set(mark_y, "B", SLOT_H - SLOT_MARK_H)
-    mark = _at(_node(ed, FN_DRAW_RECT), x0 + 6200, y0)
-    _set(mark, "RectColor", COL_SLOT_MARK)
-    _set(mark, "ScreenW", SLOT_W)
-    _set(mark, "ScreenH", SLOT_MARK_H)
+    # A lit frame around the whole slot rather than a 5px underline. It is a
+    # separate texture from T_UI_SlotActive because it is drawn OVER the icon:
+    # the filled variant would hide the thing the player is looking at.
+    mark = _draw_texture(ed, x0 + 6200, y0, "T_UI_SlotFrame",
+                         w=SLOT_W, h=SLOT_H)
     _connect(at_x_out, _pin(mark, "ScreenX"))
-    _connect(_pin(mark_y, "ReturnValue", is_input=False), _pin(mark, "ScreenY"))
+    _connect(y_out, _pin(mark, "ScreenY"))
     _connect(BEL.find_then_pin(marked), _pin(mark, "execute"))
 
     ed.add_comment_to_nodes(
@@ -1265,7 +1343,7 @@ def _author_inventory(ed, x0, y0, in_execs):
         [pawn, comp, cast, inv, equipped, loop, as_float, step, at_x, colour,
          name, fill, label_x, label_y, label, uses, counted, in_gun, in_bag,
          in_gun_s, in_bag_s, sep, ammo_str, ammo_x, ammo_y, ammo,
-         is_equipped, marked, mark_y, mark])
+         is_equipped, marked, icon, icon_x, icon_y, mark])
 
     # A pawn with no weapon component still has to reach the menu below.
     return (_loose_pin(loop, "Completed", is_input=False),
@@ -1439,10 +1517,8 @@ def _author_death_menu(ed, x0, y0, in_execs, mode_out):
     panel_x = centred("X", DEATH_PANEL[0] / 2.0, y0 + 420)
     panel_y = centred("Y", DEATH_PANEL[1] / 2.0, y0 + 560)
 
-    panel = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 1240, y0))
-    _set(panel, "RectColor", COL_DEATH_PANEL)
-    _set(panel, "ScreenW", DEATH_PANEL[0])
-    _set(panel, "ScreenH", DEATH_PANEL[1])
+    panel = keep(_draw_texture(ed, x0 + 1240, y0, "T_UI_PanelDeath",
+                               w=DEATH_PANEL[0], h=DEATH_PANEL[1]))
     _connect(panel_x, _pin(panel, "ScreenX"))
     _connect(panel_y, _pin(panel, "ScreenY"))
     _connect(BEL.find_then_pin(over), _pin(panel, "execute"))
@@ -1464,6 +1540,7 @@ def _author_death_menu(ed, x0, y0, in_execs, mode_out):
         _set(n, "TextColor", color)
         _set(n, "Scale", scale)
         _set(n, "bScalePosition", "false")
+        _set(n, "Font", UI_FONT)
         _connect(_pin(at_x, "ReturnValue", is_input=False), _pin(n, "ScreenX"))
         _connect(_pin(at_y, "ReturnValue", is_input=False), _pin(n, "ScreenY"))
         _connect(flow, _pin(n, "execute"))
@@ -1591,10 +1668,10 @@ def _author_draw(ed, x0, y0):
     for exec_out in after_aim:
         _connect(exec_out, _pin(br, "execute"))
 
-    rect = _at(_node(ed, FN_DRAW_RECT), x0 + 640, y0)
-    _set(rect, "RectColor", COL_PANEL)
-    for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), PANEL):
-        _set(rect, name, value)
+    rect = _draw_texture(ed, x0 + 640, y0, "T_UI_Panel",
+                         w=PANEL[2], h=PANEL[3])
+    _set(rect, "ScreenX", PANEL[0])
+    _set(rect, "ScreenY", PANEL[1])
     _connect(BEL.find_then_pin(br), _pin(rect, "execute"))
 
     flow = BEL.find_then_pin(rect)
@@ -1609,6 +1686,7 @@ def _author_draw(ed, x0, y0):
         _set(n, "ScreenY", y)
         _set(n, "Scale", scale)
         _set(n, "bScalePosition", "false")
+        _set(n, "Font", UI_FONT)
         _connect(flow, _pin(n, "execute"))
         flow = BEL.find_then_pin(n)
         made.append(n)
@@ -1636,6 +1714,7 @@ def _author_draw(ed, x0, y0):
         _set(n, "ScreenY", DEBUG_ROW_Y)
         _set(n, "Scale", ROW_SCALE)
         _set(n, "bScalePosition", "false")
+        _set(n, "Font", UI_FONT)
         _connect(exec_in, _pin(n, "execute"))
         made.append(n)
         return BEL.find_then_pin(n)
@@ -1652,6 +1731,7 @@ def _author_draw(ed, x0, y0):
     _set(hint, "ScreenY", HINT_POS[1])
     _set(hint, "Scale", HINT_SCALE)
     _set(hint, "bScalePosition", "false")
+    _set(hint, "Font", UI_FONT)
     for tail in (on_tail, off_tail):
         _connect(tail, _pin(hint, "execute"))
     made.append(hint)

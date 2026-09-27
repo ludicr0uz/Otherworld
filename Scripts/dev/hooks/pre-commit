@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# pre-commit -- keep the repository code only.
+#
+# Installed by pointing git at this directory, which is tracked, so the guard
+# travels with the clone instead of living in one machine's .git:
+#
+#     git config core.hooksPath Scripts/dev/hooks
+#
+# Two rules, both about the same failure: an asset landing in a commit. The
+# project rebuilds every .uasset from the engine install or a script in
+# Scripts/ (see Scripts/forest_generator/asset_sources.py), so a committed one
+# is a derived artefact whose bytes change on the next Blueprint recompile --
+# and a big one is worse than useless, because GitHub hard-rejects any file
+# over 100 MB and the push fails for everyone.
+#
+# Genuinely need to commit something this blocks? git commit --no-verify
+
+MAX_BYTES=5242880          # 5 MB
+
+# Extensions that are content, not code.
+BLOCKED='uasset|umap|7z|zip|tar|gz|tgz|rar|wav|mp3|ogg|flac|aiff|fbx|obj|gltf|glb|abc|png|jpg|jpeg|tga|exr|dds|psd|hdr|mp4|mov|avi|pyc'
+
+GIT_DIR=${GIT_DIR:-$(git rev-parse --git-dir)}
+rm -f "$GIT_DIR/.precommit_fail"
+
+# Added or modified files in this commit, NUL-separated so spaces survive.
+files=$(git diff --cached --name-only --diff-filter=AM -z | tr '\0' '\n')
+
+[ -z "$files" ] && exit 0
+
+printf '%s\n' "$files" | while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    [ -f "$f" ] || continue
+
+    ext=$(printf '%s' "$f" | tr 'A-Z' 'a-z' | sed -n 's/.*\.\([a-z0-9]*\)$/\1/p')
+    if printf '%s' "$ext" | grep -qE "^($BLOCKED)$"; then
+        echo "pre-commit: $f"
+        echo "            .$ext is content, not code. The repository is code only:"
+        echo "            python3 Scripts/sync_assets.py --status"
+        echo "            Put it in assets/ (git-ignored) and record it in"
+        echo "            Scripts/forest_generator/asset_sources.py."
+        echo "BLOCKED" >> "$GIT_DIR/.precommit_fail"
+        continue
+    fi
+
+    size=$(wc -c < "$f" | tr -d ' ')
+    if [ "$size" -gt "$MAX_BYTES" ]; then
+        mb=$((size / 1048576))
+        echo "pre-commit: $f"
+        echo "            ${mb} MB exceeds the 5 MB limit for a code-only repository."
+        echo "            GitHub hard-rejects anything over 100 MB, and this tree"
+        echo "            already lost 1.5 GB to committed assets once."
+        echo "BLOCKED" >> "$GIT_DIR/.precommit_fail"
+    fi
+done
+
+if [ -f "$GIT_DIR/.precommit_fail" ]; then
+    rm -f "$GIT_DIR/.precommit_fail"
+    echo
+    echo "pre-commit: commit refused. Override with --no-verify if you mean it."
+    exit 1
+fi
+exit 0

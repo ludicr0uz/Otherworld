@@ -51,6 +51,16 @@ textures), `assets/generated` and `assets/generated_realistic` (generator scratc
 commit an archive — GitHub hard-rejects any file over 100 MB, and the 185 MB `firearm_library.7z`
 in `assets/cache/sounds` is exactly the file that would trip it.
 
+**A fresh clone must arm the guard**, because `core.hooksPath` is local config and does not
+travel with the repository:
+
+```bash
+git config core.hooksPath Scripts/dev/hooks
+```
+
+`Scripts/dev/hooks/pre-commit` refuses any staged file over 5 MB or carrying a content
+extension (`.uasset .umap .7z .zip .wav .fbx .png …`). `git commit --no-verify` overrides it.
+
 Proved end to end on 2026-09-27: the four stock directories were deleted, re-copied from
 UE 5.8.3 and rebuilt, and the suite came back **356/356 weapons, 60/60 HUD, 148/148 level**.
 

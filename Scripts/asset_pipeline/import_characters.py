@@ -102,6 +102,54 @@ def import_fbx(fbx_path, dest_path, asset_name, skeleton=None):
     return None
 
 
+def _sweep_root():
+    """Delete unreferenced strays sitting directly under DEST_ROOT.
+
+    The FBX importer scatters a copy of the material and texture into the
+    PARENT of the folder it was told to import into, so duplicates accumulate
+    at the root next to the skeleton.  They are named on Meshy's generic
+    pattern, so they are probed by name rather than discovered by listing the
+    directory: freshly written assets do not reliably appear in a registry
+    listing during the same cold run that created them, and a sweep that
+    silently finds nothing is worse than no sweep at all.
+
+    Only assets with no referencers are removed.  The skeleton has plenty, and
+    each monster's real material and textures live one level down.
+    """
+    candidates = [path.split(".")[0] for path in
+                  unreal.EditorAssetLibrary.list_assets(DEST_ROOT, recursive=False)]
+    for n in range(8):
+        candidates += [f"{DEST_ROOT}/Material_{n}", f"{DEST_ROOT}/texture_{n}"]
+
+    for base in dict.fromkeys(candidates):
+        if base == SHARED_SKELETON:
+            continue
+        if not unreal.EditorAssetLibrary.does_asset_exist(base):
+            continue
+        if unreal.EditorAssetLibrary.find_package_referencers_for_asset(base, False):
+            continue
+        if unreal.EditorAssetLibrary.delete_asset(base):
+            _log(f"[IMPORT] swept unreferenced stray {base.rsplit('/', 1)[1]}")
+
+
+def _monster_dir(spec):
+    """Where one monster's mesh, material and textures live, together.
+
+    Meshy names every export's material ``Material_1`` and its textures
+    ``texture_0``.  Imported into one shared folder the SECOND monster finds
+    those names taken and binds to the FIRST monster's assets instead of
+    creating its own -- the zombie and the wendigo came out wearing the same
+    skin, and a material slot count of 1 on each made it look deliberate.
+
+    Renaming them after each import looks like the obvious fix and is a trap:
+    a rename leaves a redirector behind, the mesh keeps pointing at that, and
+    the reference reads correctly right up until the redirector is collected.
+    A folder per monster removes the collision instead of repairing it, so
+    nothing is ever renamed and no redirector is ever created.
+    """
+    return f"{DEST_ROOT}/{os.path.basename(spec.get('dest', spec['id']))}"
+
+
 def check_mesh(mesh, spec):
     """The import-step checks from the spike spec, in order."""
     name = mesh.get_name()
@@ -137,6 +185,47 @@ def check_mesh(mesh, spec):
     return ok
 
 
+def _mint_shared_skeleton(specs):
+    """Create SK_MeshyHumanoid, before any monster is imported for keeps.
+
+    The skeleton only comes into existence as a side effect of importing a
+    mesh, and it is named after that mesh -- import the wendigo first and every
+    future creature hangs off ``SKM_Wendigo01_Skeleton``.  Renaming it
+    afterwards seemed like the fix, but a rename leaves the mesh pointing at a
+    redirector: it resolves inside the same session and looks correct, then
+    resolves to nothing once the redirector is gone.  That is how the wendigo
+    ended up with a skeleton of None.
+
+    So the first import is treated as throwaway.  It exists to mint the
+    skeleton under its canonical name; the mesh it produced is discarded and
+    re-imported in the real pass, bound explicitly to that skeleton.  Every
+    monster then takes the identical path through the importer, including the
+    first one.
+    """
+    existing = unreal.EditorAssetLibrary.load_asset(SHARED_SKELETON)
+    if existing:
+        _log(f"[IMPORT] reusing {SHARED_SKELETON}")
+        return existing
+
+    for spec in specs:
+        fbx = _rigged_fbx(os.path.join(CACHE_ROOT, spec["id"]))
+        if not fbx:
+            continue
+        seed_dir = f"{DEST_ROOT}/_seed"
+        mesh = import_fbx(fbx, seed_dir, "SKM_MeshySeed")
+        skel = mesh.get_editor_property("skeleton") if mesh else None
+        if not skel:
+            continue
+        src = skel.get_path_name().split(".")[0]
+        unreal.EditorAssetLibrary.rename_asset(src, SHARED_SKELETON)
+        # The seed mesh and its material must not survive: a reference to them
+        # is exactly the rotting reference this whole dance exists to avoid.
+        unreal.EditorAssetLibrary.delete_directory(seed_dir)
+        _log(f"[IMPORT] minted {SHARED_SKELETON} from {spec['id']}")
+        return unreal.EditorAssetLibrary.load_asset(SHARED_SKELETON)
+    return None
+
+
 def main():
     specs = _specs()
     if not specs:
@@ -144,22 +233,23 @@ def main():
         return
 
     unreal.EditorAssetLibrary.make_directory(DEST_ROOT)
-    prints = {}
-    shared_skeleton = unreal.EditorAssetLibrary.load_asset(SHARED_SKELETON)
-    if shared_skeleton:
-        _log(f"[IMPORT] reusing {SHARED_SKELETON}")
+    shared_skeleton = _mint_shared_skeleton(specs)
+    if not shared_skeleton:
+        _log("[IMPORT] could not create a skeleton from any cached rig")
+        return
 
+    prints = {}
     for spec in specs:
         sid = spec["id"]
-        cache_dir = os.path.join(CACHE_ROOT, sid)
-        fbx = _rigged_fbx(cache_dir)
+        fbx = _rigged_fbx(os.path.join(CACHE_ROOT, sid))
         if not fbx:
             _log(f"[IMPORT] {sid}: no rigged FBX in cache, skipping")
             continue
         asset_name = os.path.basename(spec.get("dest", f"SKM_{sid}"))
-        _log(f"[IMPORT] {sid}: importing {os.path.basename(fbx)} -> {asset_name}")
+        dest_dir = _monster_dir(spec)
+        _log(f"[IMPORT] {sid}: importing {os.path.basename(fbx)} -> {dest_dir}/{asset_name}")
 
-        mesh = import_fbx(fbx, DEST_ROOT, asset_name, skeleton=shared_skeleton)
+        mesh = import_fbx(fbx, dest_dir, asset_name, skeleton=shared_skeleton)
         if not mesh:
             _log(f"[IMPORT] {sid}: FAILED -- no SkeletalMesh produced")
             continue
@@ -167,24 +257,13 @@ def main():
         ok = check_mesh(mesh, spec)
         skel = mesh.get_editor_property("skeleton")
         _log(f"[IMPORT]   skeleton = {skel.get_name() if skel else None}")
-        if shared_skeleton is None and skel:
-            # First import of the run created the skeleton. Rename it to the
-            # canonical path so monster #2 onward binds to something named for
-            # the rig, not for this particular creature.
-            src = skel.get_path_name().split(".")[0]
-            if src != SHARED_SKELETON:
-                if unreal.EditorAssetLibrary.rename_asset(src, SHARED_SKELETON):
-                    _log(f"[IMPORT]   renamed skeleton {src} -> {SHARED_SKELETON}")
-                else:
-                    _log(f"[IMPORT]   WARNING could not rename {src}")
-            shared_skeleton = unreal.EditorAssetLibrary.load_asset(SHARED_SKELETON) or skel
-            _log(f"[IMPORT]   -> later monsters bind to {shared_skeleton.get_name()}")
+        if skel != shared_skeleton:
+            _log("[IMPORT]   FAIL bound to the wrong skeleton")
+            ok = False
+        prints[sid] = (skel.get_name() if skel else "NONE", ok)
 
-        # Recorded AFTER the rename above: reading it before made the first
-        # monster of a run report its pre-rename skeleton and the summary then
-        # claimed two distinct skeletons where there was only ever one.
-        final = mesh.get_editor_property("skeleton")
-        prints[sid] = (final.get_name() if final else None, ok)
+    _sweep_root()
+    unreal.EditorAssetLibrary.save_directory(DEST_ROOT, only_if_is_dirty=False)
 
     # (4) the result the spike exists to produce
     _log("[IMPORT] ================ summary ================")
@@ -197,6 +276,5 @@ def main():
                  "one IK Rig and one anim BP will serve them")
         else:
             _log(f"[IMPORT]   WARNING: {len(skels)} distinct skeletons: {sorted(skels)}")
-
 
 main()

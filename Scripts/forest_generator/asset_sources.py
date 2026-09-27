@@ -158,13 +158,18 @@ GENERATED = (
     AssetSource(
         dest="Content/Sourced/Characters",
         kind="generated",
-        builders=("Scripts/asset_pipeline/import_characters.py",),
+        builders=("Scripts/asset_pipeline/import_characters.py",
+                  "Scripts/asset_pipeline/build_retarget.py"),
         note="AI-generated monsters (zombie, wendigo) imported from the Meshy "
-             "cache below. Every one of them shares SK_MeshyHumanoid: two "
-             "independently generated creatures 1.8 m and 2.4 m tall came back "
-             "on byte-identical 24-bone hierarchies, so one skeleton, one IK "
-             "Rig and one anim BP serve the lot. Rebuilt with "
-             "uepy.py --cold Scripts/asset_pipeline/import_characters.py.",
+             "cache below, plus the rigs that animate them. Every monster "
+             "shares SK_MeshyHumanoid: two independently generated creatures "
+             "1.8 m and 2.4 m tall came back on byte-identical 24-bone "
+             "hierarchies, so IK_MeshyHumanoid, RTG_Meshy_to_Mannequin and one "
+             "set of retargeted clips under Anims/ serve the lot -- each new "
+             "creature is a mesh and nothing else. Each monster imports into a "
+             "folder of its own: Meshy names every export's material "
+             "Material_1, so a shared folder makes the second monster bind to "
+             "the first one's skin. Run the two builders in that order.",
     ),
     AssetSource(
         dest="Content/Maps",
@@ -227,6 +232,7 @@ RESTORE_ORDER = (
     # Meshy key can stop here with a working game and no creatures.
     "Scripts/asset_pipeline/fetch_monsters.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_characters.py",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_retarget.py",
 )
 
 

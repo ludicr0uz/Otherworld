@@ -26,7 +26,7 @@ EXPECTED_MELEE_DAMAGE = 10.0
 EXPECTED_MELEE_INTERVAL = 1.5
 EXPECTED_NAV_AGENT_RADIUS = 35.0
 EXPECTED_REACHABLE_EXTENT = (200.0, 200.0, 400.0)
-EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 8500.0, "center_z_cm": 354.6, "half_z_cm": 739.54, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 894.14}""")
+EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 10000.0, "center_z_cm": 1905.25, "half_z_cm": 2290.19, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 3995.44}""")
 LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 passed = 0
@@ -388,13 +388,13 @@ if EXPECTED_NPCS:
                       for n in nodes))
 
         # -- Chasing off the navmesh --
-        # The navmesh is a disc of radius NAV_MAX_HALF_XY_CM inside a
-        # square of terrain, so there is a ring of walkable ground with
-        # no navigation data on it.  A player standing there used to be
-        # unreachable, and -- because MoveToActor is issued with
-        # bAllowPartialPath -- the request did not fail: it succeeded
-        # at the island edge and the pack stood there.  These check the
-        # straight-line fallback that fixes it.
+        # The navmesh now covers the whole terrain, so the 15 m ring of
+        # un-navigable ground that used to surround the map -- where a
+        # player was simply unreachable, and where MoveToActor's
+        # bAllowPartialPath meant the request SUCCEEDED at the island
+        # edge rather than failing -- is gone.  The straight-line
+        # fallback stays as a net for the corner ramps Recast refuses
+        # to build on, and these check it is still wired correctly.
         direct = [n for n in nodes
                   if {"Dest", "bUsePathfinding"} <= ins(n)]
         check("NPC Has A Straight-Line Move Order", len(direct) == 1,
@@ -486,8 +486,8 @@ if EXPECTED_NPCS:
         # The bug that made the NPC immobile: an over-tall volume makes
         # Recast generate no tiles at all.
         check("Nav Bounds Vertical Span Sane",
-              extent.z * 2.0 <= 1600.0,
-              f"(span {extent.z * 2.0:.0f} cm, limit 1600)")
+              extent.z * 2.0 <= 5000.0,
+              f"(span {extent.z * 2.0:.0f} cm, limit 5000)")
         # Every NPC must stand inside the volume or it has no navmesh.
         outside = []
         for i, actor in enumerate(npc_actors, start=1):

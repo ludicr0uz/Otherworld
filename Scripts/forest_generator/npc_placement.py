@@ -111,51 +111,67 @@ NAV_AGENT_HEIGHT_CM = 144.0
 
 # ── Navigation volume sizing ─────────────────────────────────────────────────
 #
-# Recast silently generates *no tiles at all* once the volume gets too big for
-# its tile pool -- no warning, no error, just an empty navmesh and an NPC that
-# cannot move.  The limits below are an EMPIRICALLY MEASURED envelope, not
-# something read out of the engine:
+# The navmesh covers the WHOLE terrain.  It did not always: the volume used to
+# be sized at 0.85 of the map with a 1600 cm ceiling on its vertical span, on
+# the belief that a larger volume overruns Recast's tile pool and silently
+# generates *no tiles at all*.  That belief came from one measurement --
 #
-#     +/-8500 cm XY, 1500 cm vertical span  -> 176 tiles built, NPC walked (OK)
-#     +/-9200 cm XY, 2007 cm vertical span  -> 0 tiles built, NPC immobile
+#     +/-8500 cm XY, 1500 cm vertical span  -> 176 tiles, NPC walked
+#     +/-9200 cm XY, 2007 cm vertical span  -> 0 tiles,   NPC immobile
 #
-# so the caps sit just above the known-good point.  UE 5.8 exposes neither
-# `tile_size_uu` nor a readable tile limit to Python, so this cannot currently be
-# derived; if the navmesh ever comes up empty again, suspect these first.
-NAV_COVERAGE_FRACTION = 0.85
-NAV_MAX_HALF_XY_CM = 8500.0
-NAV_MAX_VERTICAL_SPAN_CM = 1600.0
+# -- which moved two variables at once and blamed the wrong one.  Re-measured
+# directly on Lvl_Forest_200m by resizing the volume in a live editor, running
+# RebuildNavigation, and then projecting points onto the result:
+#
+#     +/-10000 cm XY, 4586 cm vertical span -> navmesh reaches the terrain edge
+#                                              on all 48 sampled headings, with
+#                                              no heading short by even 4 m
+#
+# So the cap was not a Recast limit, it was a self-inflicted dead zone: a ring
+# of walkable ground 15 m wide with no navigation data on it, which is exactly
+# where NPCs stopped following.  Cover the terrain and the ring does not exist.
+#
+# The caps below are kept as guard rails rather than targets -- they now sit at
+# the measured-good point instead of below it, and they only bite on a map
+# LARGER than 200 m, which has never been built.  If a bigger map ever does
+# come up with an empty navmesh, measure before believing anything here: UE 5.8
+# exposes neither `tile_size_uu` nor a readable tile limit to Python, so the
+# only honest way to know is to resize, rebuild, and project.
+NAV_COVERAGE_FRACTION = 1.0
+NAV_MAX_HALF_XY_CM = 10000.0
+NAV_MAX_VERTICAL_SPAN_CM = 5000.0
 # Headroom must exceed the agent height (144 cm) or the surface right under the
 # volume's ceiling is treated as too low to stand in.
 NAV_VERTICAL_HEADROOM_CM = 200.0
 
 # ── Chasing off the navmesh ──────────────────────────────────────────────────
 #
-# The navmesh covers a disc of radius NAV_MAX_HALF_XY_CM (85 m) inside a 200 m
-# square of terrain, so there is a ring 15 m wide -- wider at the corners --
-# that is walkable ground with no navigation data on it.  A player standing
-# there was UNREACHABLE: MoveToActor is issued with bAllowPartialPath, so
-# rather than failing it quietly paths to the nearest point that IS on the
-# navmesh, the NPC jogs to the island edge, arrives, and stands there.  From
-# inside the game that reads as the pack losing interest at an invisible line.
+# With the volume covering the whole terrain (above) there is no dead zone left
+# to speak of, but the navmesh edge and the terrain edge are still not the same
+# line to the centimetre: Recast will not build on ground steeper than the
+# agent's slope limit, so the corner ramps keep a few metres that a player can
+# scramble onto and a path cannot be found to.  The chase therefore still asks,
+# twice a second, whether pathfinding applies at all, and issues the same move
+# order with pathfinding switched off when it does not -- which path-follows a
+# straight line and works anywhere there is ground.
 #
-# The fix is not a bigger navmesh.  The cap is an empirically measured Recast
-# limit (see NAV_MAX_HALF_XY_CM above: +/-9200 cm builds *zero* tiles), so
-# widening it does not make the dead zone smaller, it makes the whole navmesh
-# disappear.  Instead the chase asks, twice a second, whether pathfinding
-# applies at all -- and when it does not, issues the same move order with
-# pathfinding switched off, which path-follows a straight line and works
-# anywhere there is ground.
+# This is a net, not the mechanism.  When it WAS the mechanism -- a 15 m ring
+# of un-navigable ground around the whole map -- it showed: the fallback and
+# the pathfinding order flip-flopped as the projection test flickered along the
+# island edge, each flip cancelling the move request the other had just issued,
+# and the pack visibly stuttered at an invisible line before crossing it.  A
+# navmesh that reaches the terrain edge is what fixes that; the fallback then
+# only ever fires for the last metre or two of a corner.
 #
 # Straight-line chasing is the right fallback specifically HERE and it is worth
 # saying why, because in general it is not: trees are scattered only within
-# EDGE_MARGIN_FRACTION (0.80) of the half-extent, so the un-navigable ring is
-# almost entirely open ground.  There is very little out there to walk into.
+# EDGE_MARGIN_FRACTION (0.80) of the half-extent, so the ground it covers is
+# open.  There is very little out there to walk into.
 #
 # The test is "does this point project onto the navmesh within this box", and
-# the box has to be TIGHT or it answers yes for a player 15 m outside the
-# island by snapping to its edge -- which is the bug, restated.  200 cm in XY
-# is far tighter than anything that reads as "off the mesh".
+# the box has to be TIGHT or it answers yes for a player well outside the
+# navmesh by snapping to its edge -- which was the original bug, restated.
+# 200 cm in XY is far tighter than anything that reads as "off the mesh".
 #
 # Z is generous for a reason that has already bitten this project once: a
 # navmesh polygon can sit up to 86 cm below the real ground (Recast voxelises
@@ -192,32 +208,35 @@ def compute_nav_bounds(
     plus the terrain band they were derived from.
 
     Sizing Z from the *terrain* rather than from the map width is the whole
-    point: this terrain's edge ramp climbs to ~40 m at the corners, so a
-    width-derived Z span covers mostly empty air and unwalkable cliff, and
-    Recast then generates nothing.
+    point: a width-derived span covers mostly empty air, and an empty band is
+    voxelised at full height for every tile for no benefit.  The band this
+    terrain actually asks for on a 200 m map is -190..3995 cm -- the corner
+    ramps -- plus headroom at each end.
     """
     half = world_size_cm / 2.0
-    # Capped: see NAV_MAX_HALF_XY_CM.  On a map larger than the cap the navmesh
-    # covers a central island rather than the whole world -- which is why
-    # place_npc() clamps the spawn radius to the same cap.
+    # Capped: see NAV_MAX_HALF_XY_CM.  At the default coverage of 1.0 the cap
+    # only bites on a map wider than 200 m, and then the navmesh covers a
+    # central island rather than the whole world -- which is why place_npc()
+    # clamps the spawn radius to the same cap.
     half_xy = min(half * coverage_fraction, NAV_MAX_HALF_XY_CM)
 
-    # Sample a DISK of this radius, not the square box.  The box has to contain
-    # the disk the NPC spawns in, but its corners sit ~1.41x further out, where
-    # this terrain's edge ramp is tens of metres tall.  Letting those corners set
-    # the Z band inflates the volume enormously for ground no one can walk on --
-    # and an inflated Z band is what stops Recast generating tiles at all.
-    # Terrain above the box top simply stays non-navigable, which is correct: it
-    # is a cliff.
+    # Sample the BOX, corners included, because the box is what gets built.
+    # This used to sample an inscribed disk so that the tall corner ramps could
+    # not inflate the Z band -- on the theory that a tall band is what stops
+    # Recast generating tiles.  Measurement says otherwise (see
+    # NAV_MAX_VERTICAL_SPAN_CM): the 4586 cm band this terrain's corners ask for
+    # builds fine, and sampling the disk instead left the corners sticking out
+    # through the volume's ceiling, where they were not navigable.
     step = world_size_cm / grid_size
-    radius_sq = half_xy * half_xy
     lo, hi = float("inf"), float("-inf")
     for gi in range(grid_size + 1):
         gx = -half + gi * step
+        if abs(gx) > half_xy:
+            continue
         row = grid_z[gi]
         for gj in range(grid_size + 1):
             gy = -half + gj * step
-            if gx * gx + gy * gy > radius_sq:
+            if abs(gy) > half_xy:
                 continue
             z = row[gj]
             lo = min(lo, z)
@@ -230,14 +249,15 @@ def compute_nav_bounds(
     # the tall ground is the outer edge ramp, so a smaller radius lowers the band.
     while span > NAV_MAX_VERTICAL_SPAN_CM and half_xy > max(min_half_xy_cm, 1000.0):
         half_xy *= 0.9
-        radius_sq = half_xy * half_xy
         lo, hi = float("inf"), float("-inf")
         for gi in range(grid_size + 1):
             gx = -half + gi * step
+            if abs(gx) > half_xy:
+                continue
             row = grid_z[gi]
             for gj in range(grid_size + 1):
                 gy = -half + gj * step
-                if gx * gx + gy * gy > radius_sq:
+                if abs(gy) > half_xy:
                     continue
                 lo = min(lo, row[gj])
                 hi = max(hi, row[gj])
@@ -276,7 +296,9 @@ def npc_usable_radius(
     The radius the NPC may spawn within — the single source of truth, shared by
     place_npc() and the offline checks so the two cannot drift apart.
 
-    Clamped to the navigable island (see NAV_MAX_HALF_XY_CM).
+    Clamped to NAV_MAX_HALF_XY_CM as well, which on a 200 m map is slack --
+    the 0.80 margin binds first -- and only matters on a map too wide for the
+    navmesh to cover.
     """
     half = world_size_cm / 2.0
     return min(half * edge_margin_fraction, NAV_MAX_HALF_XY_CM - 300.0)

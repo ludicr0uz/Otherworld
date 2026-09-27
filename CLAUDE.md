@@ -156,9 +156,11 @@ number they use (run speed, melee, spawn band) lives in
 generator and its checks read exactly what the editor builds.
 
 - `BP_ForestWandererAI` (AIController). Event graph, authored via `unreal.BlueprintGraphEditor`:
-  `BeginPlay → [possessed? no → Delay] → MoveToActor(Get Player Pawn) → [in reach and off
-  cooldown? → swing] → Delay 0.5s → back to the gate`.
-  `MoveToActor` does the pathfinding, which is what makes it run *around* trees. The melee check
+  `BeginPlay → [possessed? no → Delay] → [both ends on the navmesh? yes → MoveToActor(Get
+  Player Pawn) / no → MoveToLocation, no pathfinding] → [in reach and off cooldown? → swing]
+  → Delay 0.5s → back to the gate`.
+  `MoveToActor` does the pathfinding, which is what makes it run *around* trees; the
+  straight-line branch beside it is the net described under **Following to the edge**. The melee check
   is spliced into that same loop rather than given a Tick of its own — the loop is already the
   NPC's heartbeat, and two of them can disagree about whether the chase is still running.
   The possession gate is load-bearing: a controller's `BeginPlay` runs **before** it possesses
@@ -192,9 +194,10 @@ guard meant no edit to the builder ever reached the asset once it existed.
 | `NPC_MELEE_RANGE_CM` | 200 | centre-to-centre between two 34 cm capsules ≈ an arm's length of air |
 | `NPC_MELEE_DAMAGE` / `_INTERVAL_S` | 10 / 1.5 | balanced against the **pack**, not one attacker — see below |
 
-The **spawn band is clamped to the navigable island**, and the clamp is loud rather than silent:
-`npc_usable_radius` caps at 80 m on a 200 m map (nav coverage is capped — see
-`NAV_MAX_HALF_XY_CM`), so `Lvl_Forest_200m` spawns its ten at **75.0–78.0 m**, and both the
+The **spawn band is clamped**, and the clamp is loud rather than silent:
+`npc_usable_radius` caps at 80 m on a 200 m map — `EDGE_MARGIN_FRACTION` (0.80), the same
+margin the trees respect, so a wanderer never starts on the bare outer ramp — and so
+`Lvl_Forest_200m` spawns its ten at **75.0–78.0 m**, and both the
 generator's console output and the `NPC Spawn Band` check report the band they actually used.
 `spawn_band()` is the only thing that decides it, so the check cannot drift from the placement.
 
@@ -252,7 +255,8 @@ respawns each), against the generator's own heightfield:
 | traced Z | **51.3 cm** | **0** | 0 |
 
 (88 cm = capsule seated exactly on the ground.) Nothing spawns outside the map: over 1847
-samples the furthest was 8512 cm, the navmesh island edge, well inside the ±10000 cm terrain.
+samples the furthest was 8512 cm, well inside the ±10000 cm terrain. (That run predates the
+full-map navmesh below, when 8500 cm was where the navmesh stopped.)
 
 **And a net under all of it.** Any NPC below `WORLD_FLOOR_Z` (−1000 cm, well under the terrain's
 −185 cm floor) is named in the log, written off as dead and replaced within a frame — verified
@@ -293,6 +297,50 @@ Note the ordering trap in how the number is taken: set `NpcId` **first**, then w
 back from the stored `NpcId`. The obvious order — bump the counter, then set `NpcId` from the
 same `+1` node — numbers the first wanderer 2, because the add is pure and re-evaluates against
 the already-bumped count. It is the same trap as the navmesh queries below.
+
+### Following to the edge of the map
+
+The pack used to lose interest at an invisible line. Walk out past ~85 m and the wanderers
+stuttered, stopped, and milled about at a boundary nothing on screen marks; cross it and they
+stayed out there rather than coming back in.
+
+The cause was the navmesh, not the AI. The `NavMeshBoundsVolume` was sized at 0.85 of the map
+with a hard cap of ±8500 cm, so a 15 m ring of perfectly walkable terrain — wider at the
+corners — had no navigation data on it at all. A player standing in the ring could not be
+pathed to, and because `MoveToActor` is issued with `bAllowPartialPath` the request did not
+*fail*: it succeeded, at the nearest point that was on the navmesh. The NPC ran to the island
+edge, arrived, and stood there. The stutter was the same fact seen twice a second: the
+reachability test flickered as the pack straddled the boundary, and each flip cancelled the
+move order the other branch had just issued.
+
+**The fix is a navmesh that covers the whole terrain.** The cap was believed to be a Recast
+tile-pool limit, on the strength of one measurement that moved two variables at once
+(±9200 cm XY *and* a 2007 cm vertical span → zero tiles). Re-measured properly — resize the
+volume in a live editor, `RebuildNavigation`, then project points onto the result — ±10000 cm
+XY with the 4586 cm band this terrain's corner ramps actually ask for builds fine, and the
+navmesh reaches the terrain edge on **all 48 sampled headings**, none short by even 4 m. The
+limit that is real is in Z alone: an 8000 cm span still builds nothing. `NAV_COVERAGE_FRACTION`
+is now 1.0, `NAV_MAX_VERTICAL_SPAN_CM` 5000, and `compute_nav_bounds` samples the **box**,
+corners included, because the box is what gets built — sampling an inscribed disk was what
+left the corners poking out through the volume's ceiling.
+
+The straight-line fallback stays, demoted to what it should always have been: a net for the
+last metre or two of corner ramp that Recast refuses to build on because it is too steep.
+Twice a second the loop projects **both** ends of the chase onto the navmesh — the player may
+have walked off it, and so may the wanderer — and if either misses, it re-issues the same move
+order with `bUsePathfinding` off. That still path-follows, so it persists between loop
+iterations; `AddMovementInput` would move the NPC for one frame in thirty. Two pins carry the
+whole point: the query box is a tight 200 cm in XY (a loose one answers "yes, on the navmesh"
+for a player 15 m outside it by snapping to the edge — the bug, restated) and 400 cm in Z (a
+Recast polygon can sit 86 cm under the real ground and the projected point is a capsule centre
+another 88 cm above it); and `bProjectDestinationToNavigation` **must stay false**, because
+true is the dead zone written a different way.
+
+**Proof it follows now.** Headless `-game`, player teleported to x=9500 and again to x=9800 —
+2 m from the edge of the world, deep inside what used to be the dead ring. Both runs: the
+player's own position projects onto the navmesh, all ten wanderers close at the full 600 cm/s,
+and by t=17 s five of them are standing 76–150 cm away, inside melee range. Zero Accessed
+None, zero Blueprint runtime errors, zero falls.
 
 ### The melee attack
 
@@ -361,11 +409,12 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**289 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**356 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
-**Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up ·
-**Shift** sprints · **R** reloads, and restarts from the death menu.
+**Controls:** left click fires — **held**, on the SMG and the assault rifle · **Q** cycles
+weapons · **G** drops · **E** picks up · **Shift** sprints · **R** reloads, and restarts from the
+death menu.
 (1/2/3, M and D belong to the graphics menu, so the weapon keys stay clear of them.)
 
 **R** is shared between reload and restart, and that is safe rather than lucky: Event Tick does
@@ -375,17 +424,17 @@ and does run paused.
 
 | asset | what it is |
 |-------|------------|
-| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, **DryFireSound, ReloadSound**, AimPose, SlotColor, DisplayName, Dropped, UsesAmmo, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime). No geometry, no graph. |
+| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, DryFireSound, ReloadSound, AimPose, SlotColor, DisplayName, Dropped, UsesAmmo, **Automatic**, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime). No geometry, no graph. |
 | `BP_Shotgun` | child: 7 primitives, 8 pellets × 18 dmg, 5° cone, 40 m, rifle ready pose, 5+15 rounds, 0.85 s, 1.6 s reload. **Issued.** |
 | `BP_Pistol` | child: 5 primitives, 1 × 26 dmg, 1° cone, 60 m, pistol ready pose, unlimited ammo, 0.18 s. **Issued.** |
-| `BP_SMG` | child: 7 primitives, 1 × **12** dmg, 2.6° cone, 45 m, 30+90 rounds, **0.09 s**, 1.9 s reload. **Found only.** |
-| `BP_AssaultRifle` | child: 8 primitives, 1 × **24** dmg, 1.4° cone, 90 m, 30+90 rounds, 0.14 s, 2.1 s reload. **Found only.** |
+| `BP_SMG` | child: 7 primitives, 1 × **12** dmg, 2.6° cone, 45 m, 30+90 rounds, **0.09 s**, 1.9 s reload. **Automatic. Found only.** |
+| `BP_AssaultRifle` | child: 8 primitives, 1 × **24** dmg, 1.4° cone, 90 m, 30+90 rounds, 0.14 s, 2.1 s reload. **Automatic. Found only.** |
 | `BP_SniperRifle` | child: 10 primitives, 1 × **120** dmg, 0.2° cone, 200 m, 5+15 rounds, **1.6 s**, 2.6 s reload. **Found only.** |
 | `BP_AmmoPickup` | 2 brass shells a killed wanderer leaves behind; walked into, not pressed for |
 | `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/reload/drop/pick up, **sprint + stamina** |
 | `BP_HealthComponent` | Health/MaxHealth, the damage stamp, death — despawn and respawn for a wanderer, **the death sequence and the pause** for the player |
 | `BP_BloodSplash` | 10 emissive spheres thrown out along the hit normal, arcing down as they swell, over 0.7 s |
-| `Audio/A_*Fire` × 5, `A_DryFire`, `A_Reload` | synthesised by `Scripts/make_weapon_sounds.py` (pure Python — the project ships no audio and `/Engine` has no usable gunshot) |
+| `Audio/A_*Fire` × 5, `A_DryFire`, `A_ReloadShotgun`, `A_ReloadRifle`, `A_ReloadPistol` | **cut from CC0 recordings of real firearms** by `Scripts/fetch_weapon_sounds.py`. `Scripts/make_weapon_sounds.py`, which synthesised the earlier set, is kept as history and is no longer wired in |
 
 **Weapons are Actors, not components.** The old shotgun was a component tree welded to the
 character's mesh, which cannot be dropped — there is no way to leave a component behind in the
@@ -577,6 +626,32 @@ Event Tick does not run in a paused world — which is exactly the state the men
 `bTickEvenWhenPaused`, so its `PlayerInput` is still updated and `WasInputKeyJustPressed` still
 answers.
 
+**Walking off the edge of the world kills you.** Before, it did not: the terrain ends at
+±10000 cm and a player who stepped past it fell forever, with no floor, no death and nothing to
+do but quit. The fix reuses two things that already existed rather than adding a KillZ volume or
+a teleport. `BP_HealthComponent` already ticked a **world floor** net at `WORLD_FLOOR_Z`
+(−1000 cm, well under the terrain's −185 cm floor) to catch wanderers the terrain lost; that net
+was AND-ed with `DespawnOnDeath`, so it only ever looked at NPCs. Removing that one AND is the
+entire feature:
+
+```
+below WORLD_FLOOR_Z?
+   |
+   +-- yes --> [DespawnOnDeath? -> "[NPC-FELL] …"]   (the log line only)
+   |            -> Health = 0                         (both arms land here)
+   '-- no ---> carry on
+```
+
+The `DespawnOnDeath` test moved **inward**, from gating the net to gating the log line, because
+the fall report quotes an `NpcId` and a spawn point the player does not have. Setting
+`Health = 0` then drops the player into the ordinary death path above — animation, delay, menu —
+so there is exactly one way to die in this game and falling is not a special case. Proved at
+runtime: dropped off the edge, the player fell unaided to `hp=0.0 dead=True` under −1000 and
+logged `[PLAYER-DEAD] killed with 0`.
+
+The one thing that cannot be checked headlessly is how it *reads*: the camera watches the death
+animation from ~8 m under the terrain, looking at its underside.
+
 ### Blood
 
 Ten emissive spheres in a cone, and the **actor** is animated rather than the spheres:
@@ -693,36 +768,93 @@ ten `BP_AmmoPickup`s, with 0 blueprint errors and 0 `Accessed None`. Counting ac
 have proved a spawn happened — the second number is the one that proves the cast behind it
 succeeded and the pick-up interface was actually written.
 
-### Weapon sounds, including the two that are not shots
+### Weapon sounds: nine assets, cut from recordings of real firearms
 
-`Scripts/make_weapon_sounds.py` is pure Python and synthesises all seven WAVs. The five gunshots
-come from `_shot()` — crack (bright noise, fast decay) + body (low-passed noise) + thump (a sine
-swept downward) — differing only in tail length and thump depth. Broadly: the longer and deeper
-the tail, the bigger the gun. The SMG is almost all crack (0.26 s, because at 0.09 s between
-rounds a longer tail turns a burst into mush); the sniper is almost all boom (1.30 s).
+`Scripts/fetch_weapon_sounds.py` **downloads and cuts** the nine WAVs; it does not synthesise
+them. (`make_weapon_sounds.py`, which did, is gone — a synthesised gunshot reads as a
+synthesised gunshot.) It is pure Python plus tools that ship with macOS: `curl` to fetch,
+`bsdtar` to unpack the 7-Zip archive (libarchive reads 7z; there is no `7z` binary on a stock
+Mac), `afconvert` to resample, and the stdlib `wave` module to cut. Downloads cache in
+`Scripts/downloaded_sounds/` (~200 MB, git-ignored), output lands in
+`Scripts/generated_assets/sounds/` alongside a generated `SOURCES.md`.
 
-The other two are **mechanical**, and come from a different generator. A hammer falling on an
-empty chamber and a shell going into a tube are metal hitting metal with no powder behind them,
-so `_clack()` lays one or more damped metallic *rings* into a buffer at given offsets. The ring
-is what makes it read as metal — noise alone is a pop. `A_DryFire` is one event at 2.8 kHz over
-0.14 s; `A_Reload` is three (two shells in, then the pump closing) over 0.9 s, so the sound
-finishing is roughly the cue that the weapon is live again.
+**Every source is CC0**, which was a hard filter rather than a preference: this project has no
+credits screen, so a CC-BY pack cannot be used correctly no matter how good it sounds. The five
+gunshots all come from *The Free Firearm Sound Library* — one Mossberg, one 1911, one Carl
+Gustav M45, one AK-47, one Mosin Nagant — deliberately from the **same** library, because five
+samples from five places differ in room and in distance before they differ in calibre. The four
+handling sounds come from two CC0 OpenGameArt packs.
 
-Both are **shared by every weapon** — one hammer sounds much like another — but they still live
-on `BP_WeaponItem` as `DryFireSound` / `ReloadSound` rather than on the component, because that
-is a fact about the *defaults* and not about the shape of the data. The graphs read all three
-sounds off `Held`, so a new weapon stays a row in `_weapon_specs()`.
+| asset | is | length |
+|---|---|---|
+| `A_ShotgunFire` / `A_PistolFire` / `A_SMGFire` / `A_RifleFire` / `A_SniperFire` | one report each, from the five firearms above | 0.60–1.60 s |
+| `A_ReloadShotgun` | a pump being cocked | 0.47 s |
+| `A_ReloadRifle` | magazine out, magazine in, bolt released | 1.56 s |
+| `A_ReloadPistol` | a slower, hand-fed reload | 1.58 s |
+| `A_DryFire` | one metallic lock click | 0.14 s |
 
-**Where each one is gated is the whole design:**
+**The reload is no longer one sound for five weapons.** `ReloadSound` is a per-weapon field:
+the pump shotgun gets the pump, the SMG and the assault rifle share the magazine reload, and
+the pistol and sniper share the slower one. `DryFireSound` *is* still shared — one hammer
+falling on an empty chamber sounds much like another — which is a fact about the defaults, not
+about the shape of the data. All three sounds live on `BP_WeaponItem` and are read off `Held`,
+so a new weapon is still a row in `_weapon_specs()`.
+
+Four decisions are baked into the samples rather than into the graph:
+
+- **Mono, 44.1 kHz, 16-bit.** `PlaySoundAtLocation` spatialises by panning and attenuating, and
+  it can only do that to a one-channel source. A stereo shot plays flat wherever it happens.
+- **The level is baked in, per weapon.** The two automatics are cut quieter (peak < 0.80) than
+  the single-shot weapons, because at 0.09 s between rounds up to twelve copies of the SMG
+  sample overlap and equal-loudness samples would clip the mix. Zero graph nodes were spent on
+  this; the verifier asserts `sample_length ÷ FireInterval ≤ 12` and the peak for each.
+- **Shots are truncated mid-tail and faded (30% of the cut); handling sounds are not** — they
+  already end in silence, and a 30% fade was ducking the reload's bolt release by 70%.
+- **A burst guard, because one take fooled me.** `AK-47/C_29P.wav` is a four-round burst that
+  reads as a single shot at a glance; shipped, it would have fired one bullet and played four.
+  `_count_shots()` now counts onsets in every gunshot cut and raises unless there is exactly
+  one, calibrated against known bursts (4, 9 and 10 rounds) and the loudest slapback echo in
+  the library (0.61 of peak).
+
+**Where each sound is gated is the whole design:**
 
 - **The click** hangs off the False arm of the ready gate — the one place that knows the trigger
-  was pulled and the shot did not happen. Two reasons lead there and only one deserves a sound,
-  so the condition is `empty AND cooled`, not just `empty`. Clicking while merely between shots
-  would click on most frames of a held SMG trigger. No cooldown is stamped: `FIRE_KEY` is polled
-  with `WasInputKeyJustPressed`, so one click of the mouse is one click of the hammer.
-- **The clack** plays on the True arm of the reload only. On the False arm — an unlimited weapon,
-  or a full magazine — nothing moves, and a sound there would be the game claiming it had done
-  something it had not, while the pause that normally follows a reload also would not happen.
+  was pulled and no shot happened. Its condition is `empty AND cooled AND tapped`, all three.
+  Without `cooled` it would click on most frames of a held trigger; without `tapped` it clicks
+  60 times a second on a held *empty* weapon, which is the automatic-fire change reaching into
+  a graph that did not seem to care about it.
+- **The clack** plays on the True arm of the reload only. On the False arm — an unlimited
+  weapon, or a full magazine — nothing moves, and a sound there would be the game claiming it
+  had done something it had not.
+
+### Holding the trigger: automatic weapons
+
+`BP_SMG` and `BP_AssaultRifle` are automatic; the other three are not. **This cost no new
+state.** `FireInterval` and `NextFireTime` were already consulted on every frame the trigger
+was down, so the only question the change had to answer is whether a held button counts as a
+new trigger pull. `Automatic` is one more bool on `BP_WeaponItem` and one more column in
+`_weapon_specs()`; no graph branches on a weapon's name.
+
+The care went into **where** the question is asked:
+
+```
+outer gate:   (tapped OR holding) AND Held valid AND NOT Sprinting
+   '-- inner: (has ammo AND cooled) AND (tapped OR (holding AND Held.Automatic))
+```
+
+The outer gate asks only what can be answered with no weapon in hand — *is the trigger being
+touched at all* — and the weapon-specific half sits inside, where `Held` is known valid. Read
+`Automatic` in the outer condition and it is an `Accessed None` **every frame** the player
+walks around empty-handed, because a Branch's condition is pulled every frame and a pure Get
+re-evaluates per read. That is the same nested-Branch rule the ammunition gate already
+follows, and the verifier now pins it: exactly one Branch's condition closure reads
+`Automatic`, and that same closure also reads `Loaded` and `NextFireTime` — which is what
+proves it sits behind the valid-`Held` gate rather than beside it.
+
+`tapped` is `WasInputKeyJustPressed`, `holding` is `IsInputKeyDown`, both on `LeftMouseButton`;
+OR-ing them is what makes a single-shot weapon still fire on a tap while an automatic keeps
+firing. Rate of fire is entirely `FireInterval` — 0.09 s on the SMG, 0.14 s on the rifle — so
+tuning an automatic is tuning a number, not a loop.
 
 ### Debug mode
 
@@ -794,7 +926,12 @@ centred and bottom-anchored at any window size.
   **2 shells** that are picked up by walking over them; the pistol stays unlimited. **D** in the
   graphics menu toggles debug mode, which is the only thing that shows pellet tracers or the
   wanderers' numbers. Built by
-  `build_weapons_and_combat.py` — **187/187** in-engine checks, **60/60** HUD checks.
+  `build_weapons_and_combat.py` — **356/356** in-engine checks, **60/60** HUD checks.
+  The **SMG and the assault rifle fire while the button is held**; the other three are
+  tap-only. All nine weapon sounds are cuts from **CC0 recordings of real firearms**, with a
+  reload per weapon class. A player who walks off the edge of the terrain now **dies** instead
+  of falling forever, and the NPCs **follow to the edge of the map** — the navmesh covers the
+  whole terrain, so the 15 m ring it used to leave uncovered is gone.
   Aiming is the camera/muzzle hybrid described above, with a reticle on the real impact point,
   and the held weapon is turned to face that point every frame.
 - Proven in `-game` runs, not just in the graph: the player's death pauses the world (the
@@ -805,6 +942,13 @@ centred and bottom-anchored at any window size.
   The ammunition pickup was proved the same way: a `BP_AmmoPickup` dropped on the player took
   the shotgun's reserve from **15 to 17** and removed itself, with no errors and no
   `Accessed None`.
+- **The four newest features were proved at runtime, not only in the graph.** Automatic fire,
+  the new audio and the off-the-edge death: a clean 30 s `-game` run with 0 errors, 0 Accessed
+  None, 0 script warnings, 10 spawns, 0 falls, and a player dropped off the edge falling
+  unaided to `hp=0.0 dead=True` with `[PLAYER-DEAD] killed with 0` logged. The navmesh fix: the
+  player teleported to x=9500 and again to x=9800 — 2 m from the edge of the world — projects
+  onto the navmesh, and all ten wanderers close at the full 600 cm/s, five of them standing
+  76–150 cm away (inside melee range) by t=17 s.
 - **Still unverified headlessly, and worth a play session:** everything that needs a key held
   or an eye on the screen — how sprint feels against a pack that runs at 600, whether the
   stamina bar reads clearly under the HP bar, whether the new blood spray looks like blood, and
@@ -819,14 +963,19 @@ centred and bottom-anchored at any window size.
   whether one drop in ten feels like a reward or like nothing, whether a dropped gun floating
   ~1.3 m above where the corpse stood reads as a pickup or as a bug, whether the dry-fire click
   is audible over the pack, and whether dropping the ready pose mid-sprint looks like a
-  transition or like a pop.
+  transition or like a pop. New with the sounds and automatic fire: whether a held SMG trigger
+  reads as a burst or as mush (0.09 s between rounds against a 0.60 s sample), whether the AK
+  and the Mosin read as different guns out in the forest, whether the 0.47 s pump under a 1.6 s
+  shotgun reload feels short, and whether dying ~8 m under the terrain — the camera watching
+  the death animation from beneath the map — reads acceptably.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
 - `/Game/Maps/Lvl_Forest_200m` is generated in **night** mode: 136 trees / 5 species,
   44,368 knee-high grass clumps / 9 species, **ten NPCs at 75.0-78.0 m** from the player,
   moon light 0.12 lux, emissive starfield sky dome as the ambient light source.
-  Offline 28/28 and in-engine 141/141 checks pass.
+  Offline 28/28 and in-engine **148/148** checks pass. The `NavMeshBoundsVolume` now covers
+  the whole map: ±10000 cm XY, a 4580 cm vertical band centred at z 1905.
 - **Known pre-existing bug:** `scatter_trees` does no minimum-spacing rejection, so some
   size/seed combinations fail the `Tree Spacing (>100cm)` check (e.g. `--size 300` with the
   default seed 42 gives a 70 cm pair). 200 m/seed 42 and 300 m/seed 99 pass. Unfixed.
@@ -1134,18 +1283,29 @@ centred and bottom-anchored at any window size.
   and `Config/DefaultEngine.ini` sets `RuntimeGeneration=Dynamic` as a class default.
   This cannot be asserted from the editor — opening a level always materialises a nav actor.
   The only real gate is the runtime check below.
-- **Recast fails silently when the nav volume is too big** — no warning, no error, just zero
-  tiles and an NPC that cannot move (`InitPathfinding start point not on navmesh`). Measured
-  envelope: ±8500 cm XY with a 1500 cm vertical span builds 176–324 tiles and works;
-  ±9200 cm / 2007 cm builds **nothing**. `NAV_MAX_HALF_XY_CM` and
-  `NAV_MAX_VERTICAL_SPAN_CM` in `npc_placement.py` encode that. Size the volume from the
-  **terrain elevation band**, sampled over a *disk*, never from map width — the square's
-  corners sit 1.41x further out where this terrain's edge ramp is ~40 m tall.
+- **Recast fails silently when the nav volume is too TALL** — no warning, no error, just zero
+  tiles and an NPC that cannot move (`InitPathfinding start point not on navmesh`). ±10000 cm
+  XY with an 8000 cm vertical span builds **nothing**; the same ±10000 cm with the 4586 cm
+  band this terrain actually needs builds and reaches the terrain edge everywhere. Size the
+  volume from the **terrain elevation band**, never from map width. The width cap that used to
+  sit at ±8500 cm was a misreading of one measurement that changed XY and Z together — and it
+  cost the project a 15 m navigation dead zone around the whole map (see **Following to the
+  edge of the map**). When a navmesh comes up empty, change *one* dial, rebuild, and project
+  points at it; UE 5.8 exposes neither `tile_size_uu` nor a readable tile limit to Python, so
+  guessing from the outside is all there is.
+- **Measure a navmesh by projecting at it, not by reading its settings.** In a live editor,
+  `vol.set_actor_scale3d(...)` → `execute_console_command(world, "RebuildNavigation")` → wait
+  → `unreal.NavigationSystemV1.project_point_to_navigation(world, p, None, None, extent)` for
+  a fan of headings answers "where does the navmesh actually end" in about a minute, which is
+  the only question that matters and is not otherwise readable.
 - To watch the NPC actually move, run the map headless and read the log:
   `UnrealEditor-Cmd <uproject> /Game/Maps/<Level> -game -nullrhi -unattended -forcelogflush
   -LogCmds="LogNavigation Verbose" -abslog=<path>` then grep for `Building tile` (should be
   hundreds) and `not on navmesh` (should stop after the first second or two). `-stdout`
   block-buffers and UE writes no `Saved/Logs` under it, so `-abslog` is required.
+- **There is no world context in a `-game` Python probe** — `GameplayStatics.get_player_controller(None, 0)` returns None with a RuntimeWarning, and the pawn you would use as a context object is the thing you are asking for. `unreal.find_object(None, "/Game/Maps/Lvl_Forest_200m.Lvl_Forest_200m")` returns the live `UWorld`, and everything else follows from it. Also: `-ExecutePythonScript` is editor-only, so a `-game` boot needs `-ExecCmds="py /path/to/probe.py"`, and the path must contain **no spaces** — nested quoting through the shell mangles it.
+- **World time in `-nullrhi -game` advances in tiny fixed steps**, so anything behind a 2 s `Delay` is impractical to observe in a probe. Measure something upstream of the delay instead — the health component's `Health`/`Dead`, not the GameMode's `PlayerDead`.
+- **`BEL.list_input_pins` includes the `execute` pin**, so an upstream walk that is meant to find *data* dependencies will follow the exec chain backwards and reach every pure node in the graph. Filter `get_pin_name(pin) != "execute"`, or a check like "exactly one Branch reads `Automatic`" answers "five".
 - **`Array_Get`'s displayed node title is the bare word `Get`** — identical to every variable
   getter in the graph. A verifier that matched the feeder of a spawn's Class pin by title found
   nothing and reported "0 weapon spawns" on a graph that had one. Pin sets are the only

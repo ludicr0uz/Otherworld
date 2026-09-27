@@ -1049,7 +1049,15 @@ check("two keys are polled held rather than tapped: sprint and the trigger",
 # read in the same Branch condition as the other Held properties, all of which
 # are already known to sit behind the valid-Held gate.
 def upstream(pin, limit=200):
-    """Every node feeding this pin, following data links only."""
+    """Every node feeding this pin, following DATA links only.
+
+    Skipping the exec pin is the whole of it. list_input_pins hands back the
+    node's "execute" pin alongside its data pins, and following that walks
+    backwards up the exec chain -- from which every pure node in the graph is
+    reachable, so the traversal answers "yes" for every Branch and proves
+    nothing. The first version of this check did exactly that and reported
+    five branches consulting Automatic when there is one.
+    """
     seen, stack = set(), [pin]
     while stack and len(seen) < limit:
         for q in PIN.list_connected_pins(stack.pop()):
@@ -1057,7 +1065,8 @@ def upstream(pin, limit=200):
             if node in seen:
                 continue
             seen.add(node)
-            stack.extend(BEL.list_input_pins(node))
+            stack.extend(x for x in BEL.list_input_pins(node)
+                         if str(PIN.get_pin_name(x)) != "execute")
     return seen
 
 def reads(nodes, var):

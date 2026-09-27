@@ -202,10 +202,18 @@ rather than the generated one; the import script imports it and calls
 [Event BeginPlay] --exec--> [Branch: IsValid(Get Controlled Pawn)?]
                                    |true                      |false
                                    v                          |
-                             [MoveToActor] --exec--> [Delay 0.5s] <-'
-                                   ^                          |
-                                   '--------------------------'
+                     [Branch: both ends on the navmesh?]      |
+                          |true              |false           |
+                          v                  v                |
+                    [MoveToActor]      [MoveToLocation,       |
+                          |             no pathfinding]       |
+                          '--------.---------'                |
+                                   v                          |
+                             [Delay 0.5s] <-------------------'
+                                   |
+                                   '--> back to the IsValid gate
 [Get Player Pawn 0] --ReturnValue--> [MoveToActor.Goal]
+                    --GetActorLocation--> [MoveToLocation.Dest]
 ```
 
 The `IsValid` gate exists because a controller's `BeginPlay` fires before possession: on the
@@ -214,6 +222,16 @@ chain spliced in below reads `GetActorLocation` off None — which the VM logs a
 `Accessed None ... CallFunc_K2_GetPawn_ReturnValue` error, once per spawned NPC. It must gate
 the *exec* flow rather than join the melee `AND`, because `BooleanAND` evaluates both pins and
 so would pull the pure location chain regardless.
+
+The second branch projects **both** ends of the chase onto the navmesh through
+`K2_ProjectPointToNavigation` with a tight 200 × 200 × 400 cm query box
+(`NAV_REACHABLE_EXTENT_CM`) and falls back to `MoveToLocation` with `bUsePathfinding=false` and
+`bProjectDestinationToNavigation=false` when either misses. It exists because the navmesh and
+the terrain are not the same shape to the centimetre — Recast will not build on the steepest
+corner ramp — and it used to matter far more, when the volume covered only 0.85 of the map and
+left a 15 m dead ring. §3.2e has that story. The fallback is a *move request*, not
+`AddMovementInput`: it path-follows, so it survives between loop iterations, where an input
+nudge would move the NPC one frame in thirty.
 
 `MoveToActor` (`bUsePathfinding=true`, `AcceptanceRadius=150`) is what routes the NPC around
 trees. Re-issuing it on a loop rather than once means it follows a moving player and
@@ -277,32 +295,44 @@ ever built, so every query fails with `InitPathfinding start point not on navmes
 stands still forever. The first implementation sized Z as a fraction of map width, giving
 ±4000 cm on a 200 m map, and produced **zero** tiles. Measured envelope:
 
-| Volume | Tiles built | Result |
-|---|---|---|
-| ±10000 cm XY, 8000 cm Z span | **0** | NPC immobile, 862 consecutive `Failed` |
-| ±9200 cm XY, 2007 cm Z span | **0** | NPC immobile |
-| ±8500 cm XY, 1500 cm Z span | 176 | NPC walks to the player |
-| ±8500 cm XY, 1479 cm Z span | 324 | NPC walks 51 m and stops at the player |
+| Volume | Result |
+|---|---|
+| ±10000 cm XY, 8000 cm Z span | **0 tiles** — NPC immobile, 862 consecutive `Failed` |
+| ±9200 cm XY, 2007 cm Z span | **0 tiles** — NPC immobile (not reproducible today; see below) |
+| ±8500 cm XY, 1500 cm Z span | 176 tiles — NPC walks to the player |
+| ±8500 cm XY, 1479 cm Z span | 324 tiles — NPC walks 51 m and stops at the player |
+| ±10000 cm XY, 4586 cm Z span | navmesh reaches the terrain edge on all 48 sampled headings |
 
-`NAV_MAX_HALF_XY_CM` (8500) and `NAV_MAX_VERTICAL_SPAN_CM` (1600) encode that envelope. They
-are **empirical**, not derived: UE 5.8 exposes neither `tile_size_uu` nor a readable tile
-limit to Python, so the cliff between the third and second rows cannot currently be explained
-from the engine side. If a navmesh ever comes up empty, suspect these first.
+The last row is the current configuration, and it invalidates the conclusion the first four
+were used to draw. Reading the second row as an *XY* limit produced `NAV_MAX_HALF_XY_CM` =
+8500 — and with it a 15 m ring of walkable terrain with no navigation data on it, which is
+where the NPCs stopped following (§4). Re-measured one dial at a time, by resizing the volume
+in a live editor, running `RebuildNavigation` and then projecting points onto the result, the
+limit is in **Z alone**: 4586 cm builds, 8000 cm does not. The ±9200 / 2007 row is most likely
+the stale-`RecastNavMesh` bug below wearing a different hat — it predates the strip-before-save
+fix — but it has not been reproduced, so it stays in the table as measured rather than being
+quietly deleted.
+
+`NAV_MAX_VERTICAL_SPAN_CM` (5000) and `NAV_MAX_HALF_XY_CM` (10000) now sit *at* the
+measured-good point rather than below it, and `NAV_COVERAGE_FRACTION` is 1.0. They are still
+**empirical**, not derived: UE 5.8 exposes neither `tile_size_uu` nor a readable tile limit to
+Python. If a navmesh ever comes up empty, change one dial, rebuild, and project at it.
 
 Two consequences for how the volume is computed:
 
 - **Size Z from the terrain, not the map.** `compute_nav_bounds` walks `grid_z` and takes the
   actual min/max elevation, then adds headroom that must exceed the agent height (144 cm) or
   the ground beneath the ceiling reads as too low to stand in.
-- **Sample a disk, not the square.** The volume is a box that has to contain the disk the NPC
-  spawns in, but the box's corners sit 1.41x further out — where this terrain's edge ramp is
-  ~40 m tall. Letting the corners set the Z band inflated the span from 2007 cm to 3635 cm for
-  ground nobody can walk on. Terrain poking above the box simply stays non-navigable, which is
-  correct: it is a cliff.
+- **Sample the box, corners included.** This used to sample an inscribed disk, so that the
+  corner ramps — ~40 m tall on this terrain — could not inflate the Z band. That is a saving
+  only if a tall band is fatal, and it is not until 8000 cm. What the disk actually bought was
+  corners sticking up through the volume's ceiling, non-navigable. The box is what gets built,
+  so the box is what gets sampled.
 
-Because coverage is capped, on a map larger than the cap the navmesh is a central island —
-so `npc_usable_radius()` clamps the NPC's spawn radius to the same cap, and both
-`place_npc()` and the offline checks call it so they cannot drift apart.
+The cap only bites on a map wider than 200 m, where the navmesh would again be a central
+island — so `npc_usable_radius()` clamps the NPC's spawn radius to the same cap, and both
+`place_npc()` and the offline checks call it so they cannot drift apart. On the maps that
+exist, `EDGE_MARGIN_FRACTION` (0.80) binds first and the cap is slack.
 
 Two further findings shaped this:
 
@@ -515,13 +545,19 @@ Health <= 0, not already Dead
    |                       --> respawn --> destroy
    |
    '-- otherwise (the player)
-          DisableMovement
+          DisableMovement   <-- also reached by the world-floor net below
           -> MM_Death_Front_01 into FullBodySlot
           -> Delay 2.2 s                       (the animation is ~1.9 s)
           -> GameMode.PlayerDead = true
           -> "[PLAYER-DEAD] killed with N"
           -> SetGamePaused(true)
 ```
+
+**The world floor feeds that same branch.** Any owner below `WORLD_FLOOR_Z` (−1000 cm) has
+`Health` written to 0, which runs the ordinary death path; `DespawnOnDeath` gates only the
+`[NPC-FELL]` log line, which quotes an `NpcId` and a spawn point the player has not got. That
+one relocated AND is the whole of "the player dies if they walk off the edge" — no KillZ, no
+teleport, and exactly one way to die in the game.
 
 `FullBodySlot` is a **second** Slot node in `ABP_Unarmed`, inserted between the layered blend
 and the ControlRig. `DefaultSlot` sits *inside* the blend and is filtered to the upper body, so
@@ -549,18 +585,28 @@ ammunition and cooldown test reads a property off `Held` and a Branch's conditio
 every frame, including the frames where nothing is equipped.
 
 ```
-pressed(LMB) AND Held valid AND NOT Sprinting
-   '-- (NOT UsesAmmo OR Loaded > 0) AND now >= NextFireTime
+(tapped(LMB) OR holding(LMB)) AND Held valid AND NOT Sprinting
+   '-- ((NOT UsesAmmo OR Loaded > 0) AND now >= NextFireTime)
+       AND (tapped OR (holding AND Held.Automatic))
           -> Loaded -= 1;  NextFireTime = now + FireInterval
           -> cache GameMode.DebugMode;  sound;  one trace per pellet
 ```
 
+**Automatic fire is the `Automatic` term in that inner condition and nothing else.** The outer
+gate asks only what is answerable with no weapon in hand; the weapon-specific half is nested
+inside, where `Held` is valid, because a Branch's condition is pulled every frame and reading
+`Automatic` off `None` would be an `Accessed None` per frame of walking around empty-handed.
+`BP_SMG` and `BP_AssaultRifle` set it; rate of fire stays entirely `FireInterval`.
+
 **Three sounds per weapon, and two of them are about silence.** `FireSound`, `DryFireSound` and
-`ReloadSound` all live on `BP_WeaponItem` and are read off `Held`; the latter two happen to share
-one asset across all five weapons, which is a fact about the defaults and not about the shape of
-the data. The click hangs off the **False arm of the ready gate** and is gated on
-`empty AND cooled`, not on `empty` alone — the other reason the gate refuses is the cooldown, and
-clicking there would click on most frames of a held SMG trigger. The clack plays on the **True
+`ReloadSound` all live on `BP_WeaponItem` and are read off `Held`. `ReloadSound` is genuinely
+per-weapon — a pump, a magazine change, a slower hand-fed reload — while `DryFireSound` is
+shared, which is a fact about the defaults and not about the shape of the data. All nine assets
+are cuts from CC0 recordings of real firearms, produced by `Scripts/fetch_weapon_sounds.py`
+(mono, because `PlaySoundAtLocation` can only spatialise one channel; level baked in per weapon,
+so twelve overlapping SMG rounds do not clip). The click hangs off the **False arm of the ready
+gate** and is gated on `empty AND cooled AND tapped` — the cooldown is the other reason the gate
+refuses, and `tapped` is what stops a *held* empty trigger clicking sixty times a second. The clack plays on the **True
 arm of the reload only**, because the False arm moves no rounds and costs no pause, so a sound
 there would announce something that did not happen.
 
@@ -636,8 +682,10 @@ every frame and `APlayerController` ticks through a pause.
 - `/Game/Maps/Lvl_Forest_200m` — 200 m, seed 42, 136 trees over 5 species, 44,368 knee-high
   grass clumps over 9 species, **ten NPCs 75.0–78.0 m** from the player (every one of them
   with at least one tree blocking the direct line), **night** preset.
-  Offline 28/28, in-editor 141/141, import log clean.
-- Combat and HUD: **289/289** (`verify_weapons_and_combat.py`) and **60/60**
+  Offline 28/28, in-editor **148/148**, import log clean. The `NavMeshBoundsVolume` covers the
+  whole map (±10000 cm XY, 4580 cm band centred z 1905), so there is no navigation dead zone
+  around the edge any more.
+- Combat and HUD: **356/356** (`verify_weapons_and_combat.py`) and **60/60**
   (`verify_graphics_menu.py`). A 90 s `-game` run is clean — 0 runtime errors, 0 Accessed
   None, 10 spawns, 0 falls — and ends with the pack killing the player, which is the death
   path running end to end. The ammunition pickup was proved the same way: a `BP_AmmoPickup`
@@ -649,9 +697,21 @@ every frame and `APlayerController` ticks through a pause.
   carried `Dropped = true`**, plus ten shell drops, with 0 errors and 0 `Accessed None`. The
   second number is the one that matters — counting actors proves a spawn happened, while the
   flag proves the cast behind it succeeded and the pick-up interface was written.
-- Seven synthesised audio assets under `/Game/Weapons/Audio`: five gunshots from `_shot()` and
-  two mechanical sounds (`A_DryFire`, `A_Reload`) from `_clack()`, all from
-  `Scripts/make_weapon_sounds.py`, which imports no `unreal`.
+- **Nine** audio assets under `/Game/Weapons/Audio`, all cut from **CC0 recordings of real
+  firearms** by `Scripts/fetch_weapon_sounds.py` (pure Python plus `curl`, `bsdtar` and
+  `afconvert`; imports no `unreal`): five gunshots from five firearms in one library, three
+  reloads (pump / magazine / hand-fed) and one lock click. The synthesiser it replaced,
+  `make_weapon_sounds.py`, is gone. `Scripts/downloaded_sounds/` caches ~200 MB of source
+  archives and is git-ignored.
+- **Automatic fire:** `BP_SMG` and `BP_AssaultRifle` keep firing while the button is held,
+  via one `Automatic` bool read behind the valid-`Held` gate. The other three are tap-only.
+- **Falling off the level kills the player**, through the world-floor net that already caught
+  wanderers (§5). Proved at runtime: `hp=0.0 dead=True` under −1000 cm and
+  `[PLAYER-DEAD] killed with 0` in the log.
+- **The pack follows to the edge of the map.** With the navmesh covering the whole terrain, a
+  player teleported to x=9500 and again to x=9800 (2 m from the edge of the world) projects
+  onto the navmesh, and all ten wanderers close at 600 cm/s — five inside melee range by
+  t = 17 s, with 0 errors and 0 Accessed None.
 - New assets from the NPC run: `/Game/Forest/NPC/BP_ForestWanderer`,
   `/Game/Forest/NPC/BP_ForestWandererAI`.
 - **Pre-existing bug, unfixed and unrelated to the NPC work:** `scatter_trees` performs no

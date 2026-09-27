@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from .terrain import get_exact_mesh_z, compute_grid, make_elevation_fn
 from .npc_placement import (
     NAV_MAX_VERTICAL_SPAN_CM,
+    NAV_MAX_HALF_XY_CM,
     NAV_COVERAGE_FRACTION,
     NPC_CAPSULE_HALF_HEIGHT_CM,
     npc_usable_radius,
@@ -609,25 +610,42 @@ def check_npc_routes_are_obstructed(placed_npcs) -> CheckResult:
 
 def check_nav_bounds_sane(nav_bounds, world_size_cm: float) -> CheckResult:
     """
-    Guard the bug that left the NPC immobile: Recast voxelises the full height
-    of every tile, so an over-tall NavMeshBoundsVolume silently generates *no
-    tiles at all* and nothing in the level is navigable.  Sizing Z from map
-    width gave an 8000 cm span on a 200 m map and produced zero tiles.
+    Two failures, one check.
+
+    The first left the NPC immobile: Recast voxelises the full height of every
+    tile, so a wildly over-tall NavMeshBoundsVolume generates *no tiles at all*
+    and nothing in the level is navigable.  Sizing Z from map width gave an
+    8000 cm span on a 200 m map and produced zero tiles.
+
+    The second left the NPCs following only in the middle of the map: a volume
+    NARROWER than the terrain leaves a ring of walkable ground with no
+    navigation data on it, and a player standing in the ring cannot be pathed
+    to.  So a volume that could cover the whole map and does not is a failure
+    here, not a tuning choice.
     """
     if nav_bounds is None:
         return CheckResult("Nav Bounds Sane", False, "no nav bounds computed")
 
     span = nav_bounds["half_z_cm"] * 2.0
+    half_xy = nav_bounds["half_xy_cm"]
+    terrain_half = world_size_cm / 2.0
     details = []
     if span > NAV_MAX_VERTICAL_SPAN_CM:
         details.append(f"vertical span {span:.0f} cm exceeds "
                        f"{NAV_MAX_VERTICAL_SPAN_CM:.0f} cm — Recast will "
                        f"generate no tiles")
-    if nav_bounds["half_xy_cm"] <= 0:
+    if half_xy <= 0:
         details.append("XY extent is not positive")
+    coverable = min(terrain_half, NAV_MAX_HALF_XY_CM)
+    if half_xy < coverable - 1.0:
+        details.append(f"navmesh covers +/-{half_xy:.0f} cm of +/-"
+                       f"{coverable:.0f} cm of coverable terrain — the "
+                       f"{coverable - half_xy:.0f} cm ring outside it is "
+                       f"walkable ground an NPC cannot be pathed across")
 
     ok = not details
-    msg = (f"+/-{nav_bounds['half_xy_cm']:.0f} cm XY, {span:.0f} cm vertical span "
+    msg = (f"+/-{half_xy:.0f} cm XY covering +/-{terrain_half:.0f} cm of terrain, "
+           f"{span:.0f} cm vertical span "
            f"(terrain {nav_bounds['terrain_min_z_cm']:.0f}.."
            f"{nav_bounds['terrain_max_z_cm']:.0f})")
     return CheckResult("Nav Bounds Sane", ok, msg, details)

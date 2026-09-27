@@ -1496,13 +1496,13 @@ def _write_unreal_verify_script(
                               for n in nodes))
 
                 # -- Chasing off the navmesh --
-                # The navmesh is a disc of radius NAV_MAX_HALF_XY_CM inside a
-                # square of terrain, so there is a ring of walkable ground with
-                # no navigation data on it.  A player standing there used to be
-                # unreachable, and -- because MoveToActor is issued with
-                # bAllowPartialPath -- the request did not fail: it succeeded
-                # at the island edge and the pack stood there.  These check the
-                # straight-line fallback that fixes it.
+                # The navmesh now covers the whole terrain, so the 15 m ring of
+                # un-navigable ground that used to surround the map -- where a
+                # player was simply unreachable, and where MoveToActor's
+                # bAllowPartialPath meant the request SUCCEEDED at the island
+                # edge rather than failing -- is gone.  The straight-line
+                # fallback stays as a net for the corner ramps Recast refuses
+                # to build on, and these check it is still wired correctly.
                 direct = [n for n in nodes
                           if {{"Dest", "bUsePathfinding"}} <= ins(n)]
                 check("NPC Has A Straight-Line Move Order", len(direct) == 1,

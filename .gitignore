@@ -35,6 +35,8 @@ Thumbs.db
 
 # Temporary Download Caches
 Scripts/downloaded_scanned_assets/
+# ~200 MB of CC0 firearm recordings, re-fetched by Scripts/fetch_weapon_sounds.py
+Scripts/downloaded_sounds/
 Scripts/generated_assets/
 Scripts/generated_realistic_assets/
 

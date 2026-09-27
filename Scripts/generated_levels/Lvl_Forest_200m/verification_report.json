@@ -178,13 +178,13 @@
     {
       "name": "Nav Bounds Sane",
       "passed": true,
-      "message": "+/-8500 cm XY, 1479 cm vertical span (terrain -185..894)",
+      "message": "+/-10000 cm XY covering +/-10000 cm of terrain, 4580 cm vertical span (terrain -185..3995)",
       "details": []
     },
     {
       "name": "NPC Inside Nav Bounds",
       "passed": true,
-      "message": "all 10 stand inside +/-8500 cm XY, feet within -385..1094",
+      "message": "all 10 stand inside +/-10000 cm XY, feet within -385..4195",
       "details": []
     }
   ]

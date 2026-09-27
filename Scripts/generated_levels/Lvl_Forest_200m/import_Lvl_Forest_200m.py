@@ -521,7 +521,7 @@ ps.set_actor_label(f"{LEVEL_NAME}_PlayerStart")
 
 # ── 7. Navigation + wandering NPC ────────────────────────────────────
 NPC_SPAWNS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54}, {"x": 4241.23, "y": 6260.28, "z": 520.91, "yaw": 235.88}, {"x": 6982.28, "y": -3337.22, "z": 718.2, "yaw": 154.45}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52}, {"x": -7393.56, "y": 1418.04, "z": 691.28, "yaw": 349.14}, {"x": -4965.03, "y": -6019.83, "z": 662.55, "yaw": 50.48}, {"x": -4315.67, "y": -6265.34, "z": 655.45, "yaw": 55.44}, {"x": 4881.11, "y": -5744.38, "z": 560.93, "yaw": 130.36}, {"x": 591.33, "y": -7709.05, "z": 636.5, "yaw": 94.39}]""")
-NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 8500.0, "center_z_cm": 354.6, "half_z_cm": 739.54, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 894.14}""")
+NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 10000.0, "center_z_cm": 1905.25, "half_z_cm": 2290.19, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 3995.44}""")
 SCRIPTS_DIR = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts"
 NAV_AGENT_RADIUS = 35.0
 NAV_AGENT_HEIGHT = 144.0

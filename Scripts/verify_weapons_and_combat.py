@@ -665,6 +665,178 @@ if npc:
           n.get_editor_property("auto_possess_ai")
           == unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
 
+# ─── Hit boxes ───────────────────────────────────────────────────────────────
+# The capsule says whether a pellet hit; the physics bodies say where. Every
+# half of that can be wrong while the gun still works -- a table that never
+# filled, a multiplier that declared as an int (1.5 -> 1), a second trace fed
+# from the wrong line -- and each looks exactly like "every hit is a body hit".
+
+for var, want in ((G.HEAD_MULT_VAR, G.HEAD_MULTIPLIER),
+                  (G.LIMB_MULT_VAR, G.LIMB_MULTIPLIER)):
+    got = h.get_editor_property(var)
+    check(f"{var} is {want}, and a float -- an int would truncate it",
+          isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
+
+
+def _mesh_asset(bp):
+    for name in components(bp):
+        t = component_template(bp, name)
+        if isinstance(t, unreal.SkeletalMeshComponent):
+            return t.get_editor_property("skeletal_mesh_asset")
+    return None
+
+
+zoned = {}
+for tag, bp in (("player", char), ("NPC", npc)):
+    if not bp:
+        continue
+    comp = component_template(bp, "HealthComponent")
+    heads = [str(b) for b in comp.get_editor_property(G.HEAD_BONES_VAR)] if comp else []
+    limbs = [str(b) for b in comp.get_editor_property(G.LIMB_BONES_VAR)] if comp else []
+    zoned[tag] = (heads, limbs)
+    want_head, want_limbs, body = G.hit_zones(_mesh_asset(bp))
+    check(f"{tag}: the head table is its own skeleton's head bodies",
+          heads == want_head and "head" in heads, str(heads))
+    check(f"{tag}: the limb table is its own skeleton's arm and leg bodies",
+          limbs == want_limbs
+          and {"upperarm_l", "lowerarm_r", "hand_l", "thigh_r", "calf_l", "foot_r"}
+          <= set(limbs), str(limbs))
+    check(f"{tag}: no bone is both head and limb", not set(heads) & set(limbs))
+    check(f"{tag}: the torso is neither -- a chest shot is a 1x shot",
+          not {"pelvis", "spine_03", "spine_05"} & (set(heads) | set(limbs)),
+          str(body))
+
+wt = wg
+zone_traces = [n for n in wt if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)]
+check("one trace against the struck character's body, per pellet",
+      len(zone_traces) == 1, f"{len(zone_traces)} K2_LineTraceComponent node(s)")
+if zone_traces:
+    zt = zone_traces[0]
+    fed = {pin: {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+                 for q in PIN.list_connected_pins(BEL.find_input_pin(zt, pin))}
+           for pin in ("TraceStart", "TraceEnd", "self")}
+    # The pellet's own line, from the pellet's own hit result -- not the aim
+    # point, not the muzzle recomputed: a second line would land somewhere the
+    # first one did not.
+    check("it retraces the pellet's own line (TraceStart/TraceEnd of its hit)",
+          all(any("BreakHitResult" in t for t in fed[p])
+              for p in ("TraceStart", "TraceEnd")), str(fed))
+    check("it traces the character's mesh, whose bodies carry bone names",
+          any("Mesh" in t for t in fed["self"]), str(fed["self"]))
+    check("it traces the simple (physics body) shapes, not the render mesh",
+          pin_value(zt, "bTraceComplex").lower() == "false")
+contains = [n for n in wt if {"TargetArray", "ItemToFind"} <= in_pins(n)]
+tables = {str(BEL.get_node_title(PIN.get_owning_node(q)))
+          for n in contains
+          for q in PIN.list_connected_pins(BEL.find_input_pin(n, "TargetArray"))}
+check("the struck bone is looked up in both of the TARGET's tables",
+      {f"Get {G.HEAD_BONES_VAR}", f"Get {G.LIMB_BONES_VAR}"} <= tables, str(tables))
+# The damage subtraction's B must be Damage x multiplier, not raw Damage.
+scaled = False
+for n in titled(wt, "float - float"):
+    for q in PIN.list_connected_pins(BEL.find_input_pin(n, "B")):
+        mul = PIN.get_owning_node(q)
+        if "*" not in str(BEL.get_node_title(mul)):
+            continue
+        srcs = {str(BEL.get_node_title(PIN.get_owning_node(r)))
+                for pin in ("A", "B")
+                for r in PIN.list_connected_pins(BEL.find_input_pin(mul, pin))}
+        scaled |= "Get Damage" in srcs and any("Select" in s for s in srcs)
+check("health loses Damage x the zone's multiplier, not raw Damage", scaled)
+
+
+def upstream(node, depth=8):
+    """Titles of every node feeding `node`'s inputs, transitively."""
+    # Data pins only: following "execute" would walk back up the whole shot.
+    # Nodes are tracked by name, not title -- two SelectFloats share a title.
+    out, seen, frontier = set(), set(), [node]
+    for _ in range(depth):
+        nxt = []
+        for n in frontier:
+            for p in BEL.list_input_pins(n):
+                if str(PIN.get_pin_name(p)) == "execute":
+                    continue
+                for q in PIN.list_connected_pins(p):
+                    src = PIN.get_owning_node(q)
+                    if src.get_name() in seen:
+                        continue
+                    seen.add(src.get_name())
+                    out.add(str(BEL.get_node_title(src)).replace("\n", " "))
+                    nxt.append(src)
+        frontier = nxt
+    return out
+
+
+# Debug mode's damage readout: the number the target actually lost, at the
+# point it was hit, only when the tracers are on.
+readouts = [n for n in wt if {"TextLocation", "Text", "Duration"} <= in_pins(n)]
+check("one damage readout per impact (DrawDebugString)", len(readouts) == 1,
+      f"{len(readouts)} DrawDebugString node(s)")
+if readouts:
+    ro = readouts[0]
+    gates = [PIN.get_owning_node(q) for q in
+             PIN.list_connected_pins(BEL.find_input_pin(ro, "execute"))]
+    check("...drawn only in debug mode",
+          any("Branch" in str(BEL.get_node_title(g))
+              and any(G.DEBUG_MODE_VAR in str(BEL.get_node_title(PIN.get_owning_node(q)))
+                      for q in PIN.list_connected_pins(BEL.find_input_pin(g, "Condition")))
+              for g in gates))
+    check("...at the impact point",
+          any("BreakHitResult" in str(BEL.get_node_title(PIN.get_owning_node(q)))
+              for q in PIN.list_connected_pins(BEL.find_input_pin(ro, "TextLocation"))))
+    check("...for as long as the tracer",
+          abs((num_pin(ro, "Duration") or 0.0) - G.TRACE_DEBUG_SECONDS) < 1e-6,
+          pin_value(ro, "Duration"))
+    fed = upstream(ro)
+    check("...showing the damage dealt (Damage x zone), not the weapon's raw Damage",
+          "Get Damage" in fed and any("*" in t for t in fed)
+          and f"Get {G.HEAD_MULT_VAR}" in fed, str(sorted(fed)))
+
+# And the geometry: put a wanderer in the editor world and fire the same
+# component trace through each part of it. This is what proves the physics
+# asset actually covers the body where the tables say it does, and that the
+# bone a trace reports is one the tables know.
+if npc and "NPC" in zoned:
+    heads, limbs = zoned["NPC"]
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    dummy = eas.spawn_actor_from_class(BEL.generated_class(npc),
+                                       unreal.Vector(0.0, 0.0, 60000.0))
+    try:
+        body_mesh = dummy.get_component_by_class(unreal.SkeletalMeshComponent)
+
+        def between(a, b):
+            pa, pb = body_mesh.get_socket_location(a), body_mesh.get_socket_location(b)
+            return (pa + pb) * 0.5
+
+        # (point, direction the shot comes from, what it should be worth). The
+        # arms are shot from the side they hang on: in the reference pose they
+        # lie along the flanks, and a line through the upper arm from the
+        # front meets the chest first -- which is the correct answer for that
+        # line, and not the part under test.
+        front = unreal.Vector(300.0, 0.0, 0.0)
+        aims = {
+            "head": (body_mesh.get_socket_location("head")
+                     + unreal.Vector(0.0, 0.0, 10.0), front, G.HEAD_MULTIPLIER),
+            "upper arm": (between("upperarm_r", "lowerarm_r"),
+                          unreal.Vector(0.0, 300.0, 0.0), G.LIMB_MULTIPLIER),
+            "forearm": (between("lowerarm_l", "hand_l"),
+                        unreal.Vector(0.0, -300.0, 0.0), G.LIMB_MULTIPLIER),
+            "thigh": (between("thigh_l", "calf_l"), front, G.LIMB_MULTIPLIER),
+            "shin": (between("calf_r", "foot_r"), front, G.LIMB_MULTIPLIER),
+            "chest": (between("spine_03", "spine_04"), front, 1.0),
+        }
+        for part, (at, side, want) in aims.items():
+            hit = body_mesh.line_trace_component(at + side, at - side,
+                                                 False, False, False)
+            bone = str(hit[2]) if hit and hit[2] else "None"
+            worth = (G.HEAD_MULTIPLIER if bone in heads
+                     else G.LIMB_MULTIPLIER if bone in limbs else 1.0)
+            check(f"a shot through the {part} strikes a body worth {want}x",
+                  bone != "None" and abs(worth - want) < 1e-6,
+                  f"bone {bone} -> {worth}x")
+    finally:
+        dummy.destroy_actor()
+
 # ─── Blood: the spray, not just the spheres ──────────────────────────────────
 # The layout is generated from a fixed seed, so it can be recomputed here and
 # compared component by component -- a blob nudged by hand in the editor, or a
@@ -874,7 +1046,11 @@ check("the walking speed is cached off the character, not hardcoded",
       and any("BaseSpeed" in str(BEL.get_node_title(n)).replace("\n", " ")
               for n in wg),
       str(sorted(walk_titles)))
-selects = titled(wg, "SelectFloat")
+# The hit-box multiplier has two SelectFloats of its own, each picked by a
+# table lookup; those are counted in the hit-box section, not here.
+selects = [n for n in titled(wg, "SelectFloat")
+           if not any("Contains" in str(BEL.get_node_title(PIN.get_owning_node(q)))
+                      for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
 check("one SelectFloat picks the speed and one picks the drain",
       len(selects) == 2, f"{len(selects)} SelectFloat node(s)")
 check("stamina is clamped, so it cannot run past its own bar",
@@ -1165,8 +1341,10 @@ check("...and it lasts as long as the tracer always did",
 check("the flag is read off the GameMode once per shot and cached",
       len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                        for n in wg) if t == f"Set {G.DEBUG_MODE_VAR}"]) == 1)
+# Three reads: the GameMode's own (once per shot), then the cached copy twice
+# per pellet -- the tracer's branch and the damage readout's.
 check("...and the pellet loop branches on the cached copy",
-      len([n for n in wg if G.DEBUG_MODE_VAR in out_pins(n)]) == 2,
+      len([n for n in wg if G.DEBUG_MODE_VAR in out_pins(n)]) == 3,
       f"{len([n for n in wg if G.DEBUG_MODE_VAR in out_pins(n)])} reads")
 
 # ─── BP_AmmoPickup ───────────────────────────────────────────────────────────

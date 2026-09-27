@@ -459,7 +459,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**356 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**383 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires — **held**, on the SMG and the assault rifle · **Q** cycles
@@ -722,6 +722,47 @@ roll, and without it a shotgun's eight pellets into one torso read as a single b
 The cone layout is generated from a fixed seed at build time, which is how the verifier can
 recompute it and compare component by component.
 
+### Hit boxes
+
+A pellet that hits a character does **1.5x** to the head, **0.75x** to an arm or a leg, and
+1x anywhere else (pelvis, spine, neck, clavicles). The dials are `HEAD_MULTIPLIER` /
+`LIMB_MULTIPLIER` and the zone roots `HEAD_ROOTS` / `LIMB_ROOTS`, all in
+`build_weapons_and_combat.py`.
+
+**The capsule still decides whether a character was hit; the physics asset decides where.**
+The pellet trace stops at the capsule, as it always has, so the aim trace and the reticle are
+untouched. `_author_hit_zone` then retraces **the same line** (the hit's own
+`TraceStart`/`TraceEnd`) with `K2_LineTraceComponent` against the struck character's `Mesh`.
+That tests the physics bodies of that one component only, and each body reports its bone.
+It ignores collision channels, so `CharacterMesh` ignoring Visibility does not matter.
+What does matter is that the mesh has query collision at all, or it has no bodies at
+runtime. `install_hit_zones` raises if it does not. A pellet that clips the capsule but
+threads between the limbs strikes no body, and counts as a 1x body hit, which is what
+every hit was before.
+
+**The tables live on the target, not the weapon.** `HeadBones` / `LimbBones` are Name arrays
+on each character's `HealthComponent` template, derived at build time from **that
+character's own mesh**. `hit_zones()` takes the body bones from the physics asset's
+constraints (`SkeletalBodySetups` is protected from Python, but every body is one end of a
+constraint). It then zones each bone by walking the real skeleton with `BoneIsChildOf` on a
+transient component, so no bone list is typed out anywhere. For `PA_Mannequin` that is head
+= `head`, limbs = 12 bodies (upper arm, forearm, hand, thigh, calf, foot on each side).
+The multipliers are class defaults on `BP_HealthComponent`, and an un-zoned target (empty
+tables) takes everything at 1x.
+
+**The player is zoned too, but nothing traces at the player yet.** The wanderers' punch is
+a range check with no hit location, and it deliberately stays a 1x body hit. The pack's
+damage was balanced as it is (see *Balance is a property of the pack*). Anything that later
+shoots at the player gets head and limb scaling with no graph change.
+
+Proved beyond the graph: the verifier spawns a wanderer in the editor world and traces
+through head, upper arm, forearm, thigh, shin and chest, and each lands on a body worth the
+right multiplier. In PIE, against ten live wanderers (running and standing), the same traces
+resolved head 1.5x, thigh and shin 0.75x and chest 1x on all 40 samples. So the bodies do
+follow the animation. **Not yet proved:** a real trigger pull through the full graph. Headless
+runs cannot press the mouse, so that needs a play session (a head shot with the pistol should
+take a wanderer from 100 to 61).
+
 ### Ammunition
 
 The shotgun starts with twenty shells — **five in the gun and fifteen spare**, not five plus
@@ -909,9 +950,15 @@ tuning an automatic is tuning a number, not a loop.
 ### Debug mode
 
 One bool on the GameMode (`DebugMode`), toggled with **D** in the graphics menu, **off by
-default**. It turns on the two developer overlays: the **pellet tracers** drawn from the muzzle,
-and the **wanderer's number** beside its health bar. Both are instrumentation, and
-instrumentation is not what the game looks like.
+default**. It turns on three developer overlays: the **pellet tracers** drawn from the muzzle,
+the **damage readout** at each impact, and the **wanderer's number** beside its health bar.
+All three are instrumentation, and instrumentation is not what the game looks like.
+
+The damage readout is a `DrawDebugString` at the pellet's impact point, drawn for the
+tracer's `TRACE_DEBUG_SECONDS`. It reads `39.0 (x1.5)`: the health the target actually lost,
+and the hit-box multiplier behind it. It only appears on things that carry a
+`BP_HealthComponent`, because a tree takes no damage. A shotgun blast draws one number per
+pellet that connected, so eight can stack on one torso.
 
 It lives on the GameMode rather than on the HUD that toggles it because `BP_WeaponComponent`
 draws the tracers, and a component cannot reach a HUD variable.
@@ -976,7 +1023,7 @@ centred and bottom-anchored at any window size.
   **2 shells** that are picked up by walking over them; the pistol stays unlimited. **D** in the
   graphics menu toggles debug mode, which is the only thing that shows pellet tracers or the
   wanderers' numbers. Built by
-  `build_weapons_and_combat.py` — **356/356** in-engine checks, **60/60** HUD checks.
+  `build_weapons_and_combat.py` — **383/383** in-engine checks, **60/60** HUD checks.
   The **SMG and the assault rifle fire while the button is held**; the other three are
   tap-only. All nine weapon sounds are cuts from **CC0 recordings of real firearms**, with a
   reload per weapon class. A player who walks off the edge of the terrain now **dies** instead

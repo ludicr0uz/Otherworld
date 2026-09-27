@@ -462,6 +462,27 @@ SPAWNED_AT_VAR = "SpawnedAt"
 # next to the player.
 RESPAWN_ATTEMPTS = 2
 
+# --- hit boxes ---------------------------------------------------------------
+# The capsule decides *whether* a pellet hit a character; the physics asset's
+# bodies decide *where*. A zone is a root bone plus everything under it in the
+# skeleton, so the tables are derived from each character's own mesh at build
+# time (hit_zones) and never typed out here. The neck and the clavicles are
+# neither: they are body, as is anything the zones do not name.
+HEAD_MULTIPLIER = 1.5
+LIMB_MULTIPLIER = 0.75
+HEAD_ROOTS = ("head",)
+LIMB_ROOTS = ("upperarm_l", "upperarm_r", "thigh_l", "thigh_r")
+HEAD_BONES_VAR = "HeadBones"
+LIMB_BONES_VAR = "LimbBones"
+HEAD_MULT_VAR = "HeadMultiplier"
+LIMB_MULT_VAR = "LimbMultiplier"
+# The bone the current pellet struck, on the weapon component. A variable
+# because it is written on three different exec arms (struck a body, threaded
+# between the limbs, hit something that is not a Character) and read by one.
+HIT_BONE_VAR = "HitBone"
+# Debug mode's damage readout, drawn at each impact for as long as the tracer.
+DAMAGE_TEXT_COLOR = "(R=1.000000,G=0.850000,B=0.100000,A=1.000000)"
+
 GRIP_SOCKET = "HandGrip_R"
 
 # --- the shooting camera -----------------------------------------------------
@@ -1604,6 +1625,10 @@ FN_SET_ACTOR_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
 FN_ACTOR_FORWARD = "/Script/Engine.Actor.GetActorForwardVector"
 FN_DRAW_LINE = "/Script/Engine.KismetSystemLibrary.DrawDebugLine"
 FN_ADD_LOCAL_ROT = "/Script/Engine.Actor.K2_AddActorLocalRotation"
+FN_DRAW_STRING = "/Script/Engine.KismetSystemLibrary.DrawDebugString"
+FN_FLOAT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_DoubleToString"
+FN_TRACE_COMPONENT = "/Script/Engine.PrimitiveComponent.K2_LineTraceComponent"
+FN_ARR_CONTAINS = "/Script/Engine.KismetArrayLibrary.Array_Contains"
 
 NODE_TICK = "AddEvent|EventTick"
 NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
@@ -2498,6 +2523,15 @@ def build_health_component(rebuild=True):
     # SpawnOrigin, which anchored respawns to it, is gone on purpose). It is
     # what lets the safety net report the spawn that produced a faller.
     _declare(ed, SPAWNED_AT_VAR, _struct_type(unreal.Vector.static_struct()))
+    # Hit boxes: which physics-asset bodies are head and which are limbs, and
+    # what each is worth. On the target rather than on the weapon, because the
+    # tables are a fact about the target's skeleton -- install_on_character
+    # and install_on_npc fill them from each one's own mesh. Empty here, which
+    # makes a target nobody has zoned take every hit at 1.0x.
+    for name in (HEAD_BONES_VAR, LIMB_BONES_VAR):
+        _declare(ed, name, BEL.get_array_type(BEL.get_basic_type_by_name("name")))
+    for name in (HEAD_MULT_VAR, LIMB_MULT_VAR):
+        _declare(ed, name, _float_type())
 
     # SpawnOrigin used to hold where this actor started, back when a replacement
     # appeared near the dead one's own spawn point. It has to be removed
@@ -2964,6 +2998,8 @@ def build_health_component(rebuild=True):
         # five seconds of the game.
         LAST_DAMAGE_VAR: NEVER_DAMAGED,
         DAMAGED_BY_PLAYER_VAR: False,
+        HEAD_MULT_VAR: HEAD_MULTIPLIER,
+        LIMB_MULT_VAR: LIMB_MULTIPLIER,
     })
     _log(f"built {HEALTH_BP_PATH} (Health = MaxHealth = {START_HEALTH})")
     return bp
@@ -3332,7 +3368,9 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     """A pellet that hit something: blood, then subtract the damage.
 
     Both are behind the health cast, so trees and terrain cost nothing and
-    produce no blood -- only things carrying BP_HealthComponent bleed.
+    produce no blood -- only things carrying BP_HealthComponent bleed. The
+    damage is the weapon's, scaled by where on the body it landed (see
+    _author_hit_zone), using the target's own hit-box tables.
     """
     comp = _at(_node(ed, FN_GET_COMP), x0, y0 + 260)
     _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(comp, "self"))
@@ -3359,22 +3397,33 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     _set(splash, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(BEL.find_then_pin(cast), _pin(splash, "execute"))
 
+    zoned, zone_nodes, x_zone = _author_hit_zone(
+        ed, brk, BEL.find_then_pin(splash), x0 + 1080, y0)
+
     get_h = _at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
-                x0 + 1080, y0 + 300)
+                x_zone, y0 + 300)
     _connect(as_health, _pin(get_h, "self"))
-    dmg_pin, dmg_n = _prop(ed, "Damage", held, x0 + 1080, y0 + 440)
-    sub = _at(_node(ed, FN_SUB_FF), x0 + 1320, y0 + 300)
+    dmg_pin, dmg_n = _prop(ed, "Damage", held, x_zone - 480, y0 + 1300)
+    worth, worth_nodes = _zone_multiplier(ed, as_health, x_zone - 480, y0 + 1440)
+    scaled = _at(_node(ed, FN_MUL_FF), x_zone, y0 + 1300)
+    _connect(dmg_pin, _pin(scaled, "A"))
+    _connect(worth, _pin(scaled, "B"))
+    sub = _at(_node(ed, FN_SUB_FF), x_zone + 240, y0 + 300)
     _connect(_pin(get_h, "Health", is_input=False), _pin(sub, "A"))
-    _connect(dmg_pin, _pin(sub, "B"))
-    clamp = _at(_node(ed, FN_CLAMP), x0 + 1560, y0 + 300)
+    _connect(_pin(scaled, "ReturnValue", is_input=False), _pin(sub, "B"))
+    clamp = _at(_node(ed, FN_CLAMP), x_zone + 480, y0 + 300)
     _connect(_pin(sub, "ReturnValue", is_input=False), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", INF)
     set_h = _at(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH),
-                x0 + 1820, y0)
+                x_zone + 740, y0)
     _connect(as_health, _pin(set_h, "self"))
     _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(set_h, "Health"))
-    _connect(BEL.find_then_pin(splash), _pin(set_h, "execute"))
+    for tail in zoned:
+        _connect(tail, _pin(set_h, "execute"))
+    # Everything after this sits right of the zone block, as it sat right of
+    # the splash before there was one.
+    x0 += x_zone - (x0 + 1080)
 
     # Stamp the hit. Two things read this and nothing else writes it:
     #
@@ -3400,12 +3449,178 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
     _connect(BEL.find_then_pin(stamp), _pin(blame, "execute"))
 
+    shown = _author_damage_readout(ed, brk, _pin(scaled, "ReturnValue", is_input=False),
+                                   worth, BEL.find_then_pin(blame), x0 + 2600, y0)
+
     ed.add_comment_to_nodes(
         "Clamped at zero so an overkill shot cannot drive Health negative -- "
         "the HUD bar divides by MaxHealth and the death check is Health <= 0, "
         "and both want a floor.",
-        [comp, cast, blood_cls, where, facing, splash, get_h, dmg_n, sub, clamp,
+        [comp, cast, blood_cls, where, facing, splash, get_h, sub, clamp,
          set_h, now, stamp, blame])
+    ed.add_comment_to_nodes(
+        f"Hit boxes: the pellet's own line is traced again against the target's "
+        f"physics-asset bodies alone, and the bone it strikes picks the "
+        f"multiplier off the TARGET's health component -- head "
+        f"{HEAD_MULTIPLIER}x, arms and legs {LIMB_MULTIPLIER}x, anything else "
+        f"1x. A pellet that clipped the capsule but threaded between the limbs "
+        f"strikes no body and counts as a body hit, which is what every hit "
+        f"was before.",
+        zone_nodes + worth_nodes + [dmg_n, scaled])
+    ed.add_comment_to_nodes(
+        "Debug mode only: the damage this pellet actually did, and the zone "
+        "multiplier behind it, drawn where it landed for as long as the tracer.",
+        shown)
+
+
+def _author_damage_readout(ed, brk, damage, worth, exec_in, x0, y0):
+    """In debug mode, write "<damage> (x<multiplier>)" at the impact point.
+
+    Behind the same cached DebugMode the tracer branches on, and for the same
+    TRACE_DEBUG_SECONDS, so the number appears at the end of the line that
+    explains it. DrawDebugString rather than anything on the HUD: it is world
+    space, needs no projection, and is compiled out of shipping builds like
+    DrawDebugLine is.
+
+    Re-reading `damage` and `worth` here is safe, though both are pure: their
+    inputs (Damage, HitBone, the target's tables) are not written between the
+    health update and this node.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    seen = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR), x0, y0 + 300))
+    showing = keep(_at(ed.add_branch_node(), x0 + 240, y0))
+    _connect(_pin(seen, DEBUG_MODE_VAR, is_input=False), _pin(showing, "Condition"))
+    _connect(exec_in, _pin(showing, "execute"))
+
+    dmg_str = keep(_at(_node(ed, FN_FLOAT_TO_STR), x0, y0 + 440))
+    _connect(damage, _pin(dmg_str, "InDouble"))
+    mult_str = keep(_at(_node(ed, FN_FLOAT_TO_STR), x0, y0 + 580))
+    _connect(worth, _pin(mult_str, "InDouble"))
+    lead = keep(_at(_node(ed, FN_CONCAT), x0 + 240, y0 + 440))
+    _connect(_pin(dmg_str, "ReturnValue", is_input=False), _pin(lead, "A"))
+    _set(lead, "B", " (x")
+    body = keep(_at(_node(ed, FN_CONCAT), x0 + 480, y0 + 440))
+    _connect(_pin(lead, "ReturnValue", is_input=False), _pin(body, "A"))
+    _connect(_pin(mult_str, "ReturnValue", is_input=False), _pin(body, "B"))
+    text = keep(_at(_node(ed, FN_CONCAT), x0 + 720, y0 + 440))
+    _connect(_pin(body, "ReturnValue", is_input=False), _pin(text, "A"))
+    _set(text, "B", ")")
+
+    draw = keep(_at(_node(ed, FN_DRAW_STRING), x0 + 960, y0))
+    _connect(_loose_pin(brk, "Location", is_input=False), _pin(draw, "TextLocation"))
+    _connect(_pin(text, "ReturnValue", is_input=False), _pin(draw, "Text"))
+    _set(draw, "TextColor", DAMAGE_TEXT_COLOR)
+    _set(draw, "Duration", TRACE_DEBUG_SECONDS)
+    _connect(BEL.find_then_pin(showing), _pin(draw, "execute"))
+    return made
+
+
+def _author_hit_zone(ed, brk, exec_in, x0, y0):
+    """Which bone did this pellet strike? Written into HitBone, None for none.
+
+    The pellet trace stops at the capsule -- make_shootable makes the capsule,
+    not the mesh, block Visibility, and that is what keeps the aim trace and
+    the reticle predictable. So the capsule answers *whether* a character was
+    hit, and a second trace along the very same line (the hit result carries
+    its TraceStart/TraceEnd) answers *where*: K2_LineTraceComponent tests one
+    component only, and on a skeletal mesh that means its physics bodies, each
+    of which reports its bone. It ignores collision channels altogether, so the
+    mesh's own profile (CharacterMesh, which ignores Visibility) is irrelevant;
+    what matters is that the mesh has query collision at all, or it has no
+    bodies at runtime -- install_hit_zones asserts that.
+
+    HitBone is cleared first, then written only by a trace that struck, which
+    covers both misses with one node: an actor that is not a Character (no
+    mesh to trace), and a pellet that clipped the capsule's edge and threaded
+    between the arms and the body.
+
+    Returns (exec outs that continue to the damage, nodes made, next free x).
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    clear = keep(_at(ed.add_set_member_variable_node(HIT_BONE_VAR), x0, y0))
+    _set(clear, HIT_BONE_VAR, "None")
+    _connect(exec_in, _pin(clear, "execute"))
+
+    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0 + 260, y0))
+    _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(as_char, "Object"))
+    _connect(BEL.find_then_pin(clear), _pin(as_char, "execute"))
+    mesh = keep(_at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
+                    x0 + 260, y0 + 300))
+    _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
+
+    probe = keep(_at(_node(ed, FN_TRACE_COMPONENT), x0 + 560, y0))
+    _connect(_pin(mesh, "Mesh", is_input=False), _pin(probe, "self"))
+    _connect(_loose_pin(brk, "TraceStart", is_input=False), _pin(probe, "TraceStart"))
+    _connect(_loose_pin(brk, "TraceEnd", is_input=False), _pin(probe, "TraceEnd"))
+    # Simple collision is the physics asset's capsules and spheres, which is
+    # the point: complex would be the render mesh, which has no bone to report.
+    _set(probe, "bTraceComplex", "false")
+    _set(probe, "bShowTrace", "false")
+    _set(probe, "bPersistentShowTrace", "false")
+    _connect(BEL.find_then_pin(as_char), _pin(probe, "execute"))
+
+    struck = keep(_at(ed.add_branch_node(), x0 + 880, y0))
+    _connect(_pin(probe, "ReturnValue", is_input=False), _pin(struck, "Condition"))
+    _connect(BEL.find_then_pin(probe), _pin(struck, "execute"))
+    note = keep(_at(ed.add_set_member_variable_node(HIT_BONE_VAR), x0 + 1120, y0))
+    _connect(_pin(probe, "BoneName", is_input=False), _pin(note, HIT_BONE_VAR))
+    _connect(BEL.find_then_pin(struck), _pin(note, "execute"))
+
+    outs = [BEL.find_then_pin(note), BEL.find_else_pin(struck),
+            _pin(as_char, "CastFailed", is_input=False)]
+    return outs, made, x0 + 1400
+
+
+def _zone_multiplier(ed, as_health, x0, y0):
+    """What HitBone is worth on this target: a pure float, 1.0 unless zoned.
+
+    Head is tested last so it wins, though the two tables never overlap -- a
+    bone cannot be under both the head and a thigh.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    bone = keep(_at(ed.add_get_member_variable_node(HIT_BONE_VAR), x0, y0 + 280))
+    bone_out = _pin(bone, HIT_BONE_VAR, is_input=False)
+
+    def member(table, x, y):
+        pin, n = _prop(ed, table, as_health, x, y, HEALTH_CLASS_PATH)
+        keep(n)
+        test = keep(_at(_node(ed, FN_ARR_CONTAINS), x + 240, y))
+        _connect(pin, _loose_pin(test, "TargetArray"))
+        _connect(bone_out, _loose_pin(test, "ItemToFind"))
+        return _pin(test, "ReturnValue", is_input=False)
+
+    def worth(var, x, y):
+        pin, n = _prop(ed, var, as_health, x, y, HEALTH_CLASS_PATH)
+        keep(n)
+        return pin
+
+    is_limb = member(LIMB_BONES_VAR, x0, y0)
+    limb_or_body = keep(_at(_node(ed, FN_SELECT_FF), x0 + 480, y0))
+    _connect(worth(LIMB_MULT_VAR, x0 + 240, y0 + 140), _pin(limb_or_body, "A"))
+    _set(limb_or_body, "B", 1.0)
+    _connect(is_limb, _pin(limb_or_body, "bPickA"))
+
+    is_head = member(HEAD_BONES_VAR, x0, y0 + 420)
+    pick = keep(_at(_node(ed, FN_SELECT_FF), x0 + 720, y0 + 420))
+    _connect(worth(HEAD_MULT_VAR, x0 + 480, y0 + 560), _pin(pick, "A"))
+    _connect(_pin(limb_or_body, "ReturnValue", is_input=False), _pin(pick, "B"))
+    _connect(is_head, _pin(pick, "bPickA"))
+    return _pin(pick, "ReturnValue", is_input=False), made
 
 
 def _detach_rules(node):
@@ -4430,6 +4645,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # The GameMode's DebugMode, cached at the moment of firing so the pellet
     # loop can branch on a plain bool instead of casting eight times.
     _declare(ed, DEBUG_MODE_VAR, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, HIT_BONE_VAR, BEL.get_basic_type_by_name("name"))
     # Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
     # return pin takes its type from its Class pin, and an Actor-typed return
     # cannot be added to an array of BP_WeaponItem.
@@ -4519,6 +4735,74 @@ def make_shootable(bp):
     _log(f"{bp.get_name()}: capsule now blocks Visibility (shootable)")
 
 
+def hit_zones(mesh_asset):
+    """(head, limbs, body): the physics-asset bodies of a mesh, by zone.
+
+    Only bones with a body can ever come back from a trace, so the tables list
+    exactly those. The physics asset's SkeletalBodySetups are protected from
+    Python, but every body is one end of a constraint, and the constraints are
+    readable. The zone test walks the real skeleton (BoneIsChildOf on a
+    transient component), so a renamed or re-parented bone moves with it rather
+    than falling out of a hand-written list.
+    """
+    pa = mesh_asset.get_editor_property("physics_asset")
+    if not pa:
+        raise RuntimeError(f"{mesh_asset.get_name()} has no physics asset — "
+                           "there are no bodies for a hit to land on")
+    bodies = set()
+    for constraint in pa.get_constraints(False):
+        ends = unreal.ConstraintInstanceBlueprintLibrary.get_attached_body_names(constraint)
+        bodies.update(str(n) for n in ends if isinstance(n, unreal.Name))
+    bodies.discard("None")
+
+    probe = unreal.SkeletalMeshComponent()
+    probe.set_skeletal_mesh_asset(mesh_asset)
+
+    def under(bone, roots):
+        return any(bone == root or probe.bone_is_child_of(bone, root) for root in roots)
+
+    missing = [r for r in HEAD_ROOTS + LIMB_ROOTS if r not in bodies]
+    if missing:
+        raise RuntimeError(f"{pa.get_name()} has no body for {missing} — "
+                           "that zone could never be hit")
+    head = sorted(b for b in bodies if under(b, HEAD_ROOTS))
+    limbs = sorted(b for b in bodies if under(b, LIMB_ROOTS))
+    return head, limbs, sorted(bodies - set(head) - set(limbs))
+
+
+def install_hit_zones(bp, health_handle):
+    """Write this character's own hit-box tables onto its HealthComponent.
+
+    Per character, on the component template -- the same place DespawnOnDeath
+    goes -- because the tables describe *this* skeleton; a character with a
+    different rig gets different bones with no change to the graph.
+    """
+    mesh = None
+    for handle, _name in _handles(bp):
+        obj = _component_object(handle)
+        if isinstance(obj, unreal.SkeletalMeshComponent):
+            mesh = obj
+            break
+    if mesh is None:
+        raise RuntimeError(f"{bp.get_name()} has no SkeletalMeshComponent to zone")
+    # K2_LineTraceComponent walks the mesh's physics bodies, and a mesh with
+    # collision off never creates them: every hit would be a body hit and
+    # nothing would say so.
+    if mesh.get_collision_enabled() == unreal.CollisionEnabled.NO_COLLISION:
+        raise RuntimeError(f"{bp.get_name()}'s mesh has no collision — "
+                           "it has no physics bodies to tell head from leg")
+    head, limbs, body = hit_zones(mesh.get_editor_property("skeletal_mesh_asset"))
+    comp = _component_object(health_handle)
+    comp.set_editor_property(HEAD_BONES_VAR, [unreal.Name(b) for b in head])
+    comp.set_editor_property(LIMB_BONES_VAR, [unreal.Name(b) for b in limbs])
+    got = ([str(b) for b in comp.get_editor_property(HEAD_BONES_VAR)],
+           [str(b) for b in comp.get_editor_property(LIMB_BONES_VAR)])
+    if got != (head, limbs):
+        raise RuntimeError(f"{bp.get_name()}'s hit-box tables did not stick: {got}")
+    _log(f"{bp.get_name()}: hit boxes — head {head} x{HEAD_MULTIPLIER}, "
+         f"limbs {len(limbs)} bodies x{LIMB_MULTIPLIER}, body {body} x1.0")
+
+
 def face_the_camera(bp):
     """Turn the body with the camera instead of with the movement input.
 
@@ -4585,12 +4869,16 @@ def install_on_character(health_bp, weapon_bp):
         raise RuntimeError(f"could not load {CHARACTER_BP_PATH}")
     _uninstall_old_shotgun(bp)
     _drop_components(bp, {"HealthComponent", "WeaponComponent"})
+    handles = {}
     for name, source in (("HealthComponent", health_bp),
                          ("WeaponComponent", weapon_bp)):
-        _add_component(bp, _root_handle(bp), BEL.generated_class(source), name)
+        handles[name] = _add_component(bp, _root_handle(bp),
+                                       BEL.generated_class(source), name)
     # Symmetry, and forward planning: the player carries health too, so anything
-    # that shoots back later needs to be able to hit them.
+    # that shoots back later needs to be able to hit them -- and hit them in
+    # the head. (The wanderers' punch is not a trace and stays a body hit.)
     make_shootable(bp)
+    install_hit_zones(bp, handles["HealthComponent"])
     aim_camera(bp)
     face_the_camera(bp)
     if not BEL.compile_blueprint(bp):
@@ -4629,6 +4917,7 @@ def install_on_npc(health_bp):
         _log(f"note: could not set auto_possess_ai: {exc}")
 
     make_shootable(bp)
+    install_hit_zones(bp, handle)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")

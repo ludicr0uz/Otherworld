@@ -695,7 +695,7 @@ every frame and `APlayerController` ticks through a pause.
   Offline 28/28, in-editor **148/148**, import log clean. The `NavMeshBoundsVolume` covers the
   whole map (±10000 cm XY, 4580 cm band centred z 1905), so there is no navigation dead zone
   around the edge any more.
-- Combat and HUD: **356/356** (`verify_weapons_and_combat.py`) and **60/60**
+- Combat and HUD: **383/383** (`verify_weapons_and_combat.py`) and **60/60**
   (`verify_graphics_menu.py`). A 90 s `-game` run is clean — 0 runtime errors, 0 Accessed
   None, 10 spawns, 0 falls — and ends with the pack killing the player, which is the death
   path running end to end. The ammunition pickup was proved the same way: a `BP_AmmoPickup`

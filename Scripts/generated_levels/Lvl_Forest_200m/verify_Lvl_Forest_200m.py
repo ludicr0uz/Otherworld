@@ -21,6 +21,7 @@ EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_
 EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.242809249629246, 55.199687244614566], "HISM_Grass_Under_Mid_B": [25.503926948960117, 35.99430151464459], "HISM_Grass_Knee_Tall_B": [42.50254371397834, 59.99927478522139], "HISM_Grass_Knee_Mid_A": [40.481314514524335, 50.599412580219756], "HISM_Grass_Knee_Tall_A": [42.50006710260952, 59.99895840027987], "HISM_Grass_Knee_Clump_C": [43.12312612443456, 53.89936647630565], "HISM_Grass_Under_Clump_A": [23.800345353400235, 33.59905037018744], "HISM_Grass_Under_Large_B": [24.65506062683597, 34.79728745482545], "HISM_Grass_Under_Large_A": [22.100624064757703, 31.198261357139028]}
 EXPECTED_NPCS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54, "distance_cm": 7593.07}, {"x": 4241.23, "y": 6260.28, "z": 520.91, "yaw": 235.88, "distance_cm": 7561.69}, {"x": 6982.28, "y": -3337.22, "z": 718.2, "yaw": 154.45, "distance_cm": 7738.82}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1, "distance_cm": 7501.07}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52, "distance_cm": 7746.09}, {"x": -7393.56, "y": 1418.04, "z": 691.28, "yaw": 349.14, "distance_cm": 7528.32}, {"x": -4965.03, "y": -6019.83, "z": 662.55, "yaw": 50.48, "distance_cm": 7803.2}, {"x": -4315.67, "y": -6265.34, "z": 655.45, "yaw": 55.44, "distance_cm": 7607.86}, {"x": 4881.11, "y": -5744.38, "z": 560.93, "yaw": 130.36, "distance_cm": 7538.11}, {"x": 591.33, "y": -7709.05, "z": 636.5, "yaw": 94.39, "distance_cm": 7731.69}]""")
 EXPECTED_NPC_RUN_SPEED = 600.0
+EXPECTED_VARIANTS = json.loads(r"""[{"key": "Zombie", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Zombie", "mesh": "/Game/Sourced/Characters/SKM_Zombie01/SKM_Zombie01", "anim_bp": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Zombie"}, {"key": "Wendigo", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Wendigo", "mesh": "/Game/Sourced/Characters/SKM_Wendigo01/SKM_Wendigo01", "anim_bp": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Wendigo"}]""")
 # Per-instance gait multipliers -- see npc_placement.gait_scale_for_index.
 EXPECTED_NPC_GAITS = json.loads(r"""[1.0188854381999832, 0.9577708763999664, 1.0566563145999497, 0.9955417527999327, 0.934427190999916, 1.033312629199899, 0.9721980673998823, 1.0710835055998655, 1.0099689437998487, 0.9488543819998319]""")
 EXPECTED_MELEE_RANGE = 200.0
@@ -286,12 +287,59 @@ if EXPECTED_NPCS:
     npc_actors.sort(key=_npc_index)
 
     # -- The Blueprint assets --
-    for path in ("/Game/Forest/NPC/BP_ForestWanderer",
-                 "/Game/Forest/NPC/BP_ForestWandererAI",
-                 "/Game/Forest/NPC/BP_Wanderer_Zombie",
-                 "/Game/Forest/NPC/BP_Wanderer_Wendigo"):
+    for path in (["/Game/Forest/NPC/BP_ForestWanderer",
+                  "/Game/Forest/NPC/BP_ForestWandererAI"]
+                 + [v["blueprint"] for v in EXPECTED_VARIANTS]
+                 + [v["ai_blueprint"] for v in EXPECTED_VARIANTS]):
         check(f"Asset Exists {path.rsplit('/', 1)[-1]}",
               editor_asset_sub.does_asset_exist(path))
+
+    # Each creature must animate against ITS OWN skeleton. Sharing one
+    # skeleton across monsters is what put the wendigo's forward neck
+    # pitch on the zombie and left its head hanging off the front of
+    # its chest -- and nothing errored, at build time or at runtime.
+    # This is the check that would have caught it.
+    seen_skeletons = {}
+    for variant in EXPECTED_VARIANTS:
+        bp = editor_asset_sub.load_asset(variant["blueprint"])
+        if not bp:
+            check(f"{variant['key']} Blueprint Loads", False)
+            continue
+        cdo = unreal.get_default_object(
+            unreal.BlueprintEditorLibrary.generated_class(bp))
+        comp = cdo.get_editor_property("mesh")
+        mesh = comp.get_editor_property("skeletal_mesh_asset")
+        anim_cls = comp.get_editor_property("anim_class")
+        mesh_skel = mesh.get_editor_property("skeleton") if mesh else None
+
+        check(f"{variant['key']} Wears Its Own Mesh",
+              mesh is not None and variant["mesh"].endswith(mesh.get_name()),
+              f"(got {mesh.get_name() if mesh else None})")
+
+        anim_skel = None
+        if anim_cls:
+            anim_bp = editor_asset_sub.load_asset(variant["anim_bp"])
+            if anim_bp:
+                anim_skel = anim_bp.get_editor_property("target_skeleton")
+        check(f"{variant['key']} Anim BP Matches Its Skeleton",
+              anim_skel is not None and anim_skel == mesh_skel,
+              f"(mesh on {mesh_skel.get_name() if mesh_skel else None}, "
+              f"anim BP on {anim_skel.get_name() if anim_skel else None})")
+
+        melee = editor_asset_sub.load_asset(variant["melee"])
+        check(f"{variant['key']} Attack Clip Matches Its Skeleton",
+              melee is not None
+              and melee.get_editor_property("skeleton") == mesh_skel,
+              f"(clip on "
+              f"{melee.get_editor_property('skeleton').get_name() if melee else None})")
+
+        if mesh_skel:
+            seen_skeletons.setdefault(mesh_skel.get_name(), []).append(
+                variant["key"])
+
+    shared = {k: v for k, v in seen_skeletons.items() if len(v) > 1}
+    check("Each Creature Has Its Own Skeleton", not shared,
+          f"(shared: {shared} -- one of these wears another's bind pose)")
 
     npc_bp = editor_asset_sub.load_asset("/Game/Forest/NPC/BP_ForestWanderer")
     if npc_bp:

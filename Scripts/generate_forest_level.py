@@ -45,6 +45,7 @@ from forest_generator.grass_placement import (
     KNEE_HEIGHT_CM,
 )
 from forest_generator.npc_placement import (
+    NPC_VARIANTS,
     gait_scale_for_index,
     place_npcs,
     spawn_band,
@@ -1101,6 +1102,10 @@ def _write_unreal_verify_script(
             "distance_cm": round(npc.distance_to_player_cm, 2),
         } for npc in (placed_npcs or [])
     ])
+    variants_json = json.dumps([
+        {"key": v.key, "blueprint": v.blueprint, "mesh": v.mesh,
+         "anim_bp": v.anim_bp, "melee": v.melee,
+         "ai_blueprint": v.ai_blueprint} for v in NPC_VARIANTS])
     npc_gaits = json.dumps([gait_scale_for_index(i)
                             for i in range(1, len(placed_npcs or []) + 1)])
     npc_run_speed = NPC_RUN_SPEED_CMS
@@ -1153,6 +1158,7 @@ def _write_unreal_verify_script(
         EXPECTED_GRASS_HEIGHTS = {json.dumps(grass_expected_heights)}
         EXPECTED_NPCS = json.loads(r"""{npc_json}""")
         EXPECTED_NPC_RUN_SPEED = {npc_run_speed}
+        EXPECTED_VARIANTS = json.loads(r"""{variants_json}""")
         # Per-instance gait multipliers -- see npc_placement.gait_scale_for_index.
         EXPECTED_NPC_GAITS = json.loads(r"""{npc_gaits}""")
         EXPECTED_MELEE_RANGE = {npc_melee_range}
@@ -1418,12 +1424,59 @@ def _write_unreal_verify_script(
             npc_actors.sort(key=_npc_index)
 
             # -- The Blueprint assets --
-            for path in ("/Game/Forest/NPC/BP_ForestWanderer",
-                         "/Game/Forest/NPC/BP_ForestWandererAI",
-                         "/Game/Forest/NPC/BP_Wanderer_Zombie",
-                         "/Game/Forest/NPC/BP_Wanderer_Wendigo"):
+            for path in (["/Game/Forest/NPC/BP_ForestWanderer",
+                          "/Game/Forest/NPC/BP_ForestWandererAI"]
+                         + [v["blueprint"] for v in EXPECTED_VARIANTS]
+                         + [v["ai_blueprint"] for v in EXPECTED_VARIANTS]):
                 check(f"Asset Exists {{path.rsplit('/', 1)[-1]}}",
                       editor_asset_sub.does_asset_exist(path))
+
+            # Each creature must animate against ITS OWN skeleton. Sharing one
+            # skeleton across monsters is what put the wendigo's forward neck
+            # pitch on the zombie and left its head hanging off the front of
+            # its chest -- and nothing errored, at build time or at runtime.
+            # This is the check that would have caught it.
+            seen_skeletons = {{}}
+            for variant in EXPECTED_VARIANTS:
+                bp = editor_asset_sub.load_asset(variant["blueprint"])
+                if not bp:
+                    check(f"{{variant['key']}} Blueprint Loads", False)
+                    continue
+                cdo = unreal.get_default_object(
+                    unreal.BlueprintEditorLibrary.generated_class(bp))
+                comp = cdo.get_editor_property("mesh")
+                mesh = comp.get_editor_property("skeletal_mesh_asset")
+                anim_cls = comp.get_editor_property("anim_class")
+                mesh_skel = mesh.get_editor_property("skeleton") if mesh else None
+
+                check(f"{{variant['key']}} Wears Its Own Mesh",
+                      mesh is not None and variant["mesh"].endswith(mesh.get_name()),
+                      f"(got {{mesh.get_name() if mesh else None}})")
+
+                anim_skel = None
+                if anim_cls:
+                    anim_bp = editor_asset_sub.load_asset(variant["anim_bp"])
+                    if anim_bp:
+                        anim_skel = anim_bp.get_editor_property("target_skeleton")
+                check(f"{{variant['key']}} Anim BP Matches Its Skeleton",
+                      anim_skel is not None and anim_skel == mesh_skel,
+                      f"(mesh on {{mesh_skel.get_name() if mesh_skel else None}}, "
+                      f"anim BP on {{anim_skel.get_name() if anim_skel else None}})")
+
+                melee = editor_asset_sub.load_asset(variant["melee"])
+                check(f"{{variant['key']}} Attack Clip Matches Its Skeleton",
+                      melee is not None
+                      and melee.get_editor_property("skeleton") == mesh_skel,
+                      f"(clip on "
+                      f"{{melee.get_editor_property('skeleton').get_name() if melee else None}})")
+
+                if mesh_skel:
+                    seen_skeletons.setdefault(mesh_skel.get_name(), []).append(
+                        variant["key"])
+
+            shared = {{k: v for k, v in seen_skeletons.items() if len(v) > 1}}
+            check("Each Creature Has Its Own Skeleton", not shared,
+                  f"(shared: {{shared}} -- one of these wears another's bind pose)")
 
             npc_bp = editor_asset_sub.load_asset("/Game/Forest/NPC/BP_ForestWanderer")
             if npc_bp:

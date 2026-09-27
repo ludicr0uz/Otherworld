@@ -6,22 +6,48 @@ Editor-side.  Run through the usual harness, after import_characters.py:
 
 ── Why this exists ─────────────────────────────────────────────────────────
 
-Meshy's refine stage was run with ``enable_pbr`` on, so every monster ships
-four maps: base colour, normal, roughness and metallic, plus a packed
-metallic-roughness.  Exactly ONE of them reaches the game on its own.  The
-rigged FBX embeds only ``texture_0`` -- the base colour -- and the importer
-builds a material with that single map plugged into Base Color.  The normal
-and roughness sat unused in assets/cache/meshy/<id>/textures/, which is the
-"shades like plastic" failure the enable_pbr work existed to prevent: a
-monster with no normal map has no skin detail at grazing angles, and one with
-no roughness map is uniformly shiny.
+Meshy's refine stage was run with ``enable_pbr`` on, so every monster ships a
+full PBR set.  Exactly ONE map reaches the game on its own: the rigged FBX
+embeds ``texture_0`` -- the base colour -- and the importer builds a material
+with that single map plugged into Base Color.  A monster with no normal map
+has no skin detail at grazing angles, and one with no roughness map is
+uniformly shiny, which is the "shades like plastic" failure enable_pbr existed
+to prevent.  So the maps are imported here explicitly and wired into a real
+master material.
 
-So the maps are imported here explicitly and wired into a real master
-material, rather than being left to whatever the FBX happened to carry.
+── WHICH maps, and why it is not the obvious ones ──────────────────────────
+
+The pipeline is preview -> refine -> remesh -> rig, and **remesh re-lays the
+UVs**.  The rigger caps at 320k faces, the refine mesh is 724k, so the model
+that actually ships is the remeshed one -- with a completely different UV
+atlas from the mesh the refine stage textured.
+
+That matters because the files sitting in ``<id>/textures/`` are a mixture:
+
+    <id>_base_color.png          refine stage   -- WRONG UVs
+    <id>_normal.png              refine stage   -- WRONG UVs
+    <id>_roughness.png           refine stage   -- WRONG UVs, and superseded
+    <id>_metallic.png            refine stage   -- WRONG UVs, and superseded
+    <id>_metallic_roughness.png  remesh stage   -- correct
+
+They all have the same filename shape and the same average colour, so wiring
+up the wrong ones produces a monster that is textured, plausibly lit, and
+subtly scrambled -- the failure mode reads as "one flat texture over the whole
+model" rather than as an error.  Measured on zombie_01, refine base colour vs
+remesh base colour differs by a mean of 30-40 per channel while the mean
+colour differs by under 3: same paint, different atlas.
+
+The complete, correct set is embedded in ``<id>_remesh.glb`` as three images
+-- ``texture_0``, ``normal`` and ``texture_0_metallic_roughness`` -- so that is
+what this script extracts and imports.  Two facts make it safe to treat the
+remesh maps as the rigged mesh's maps: the remesh GLB's ``texture_0`` is
+BYTE-IDENTICAL to the rigged GLB's, so rigging preserves the remesh UVs; and
+the remesh GLB's packed map is byte-identical to the ``metallic_roughness.png``
+already on disk.  Only the base colour and normal were ever wrong.
 
 ── Channel packing, measured rather than assumed ───────────────────────────
 
-``<id>_metallic_roughness.png`` follows the glTF convention, confirmed by
+The packed map follows the glTF convention, confirmed by
 differencing it against the separate maps for zombie_01 (mean |delta| per
 channel, 0-255):
 
@@ -54,6 +80,7 @@ still scales below it.
 
 import json
 import os
+import struct
 
 import unreal
 
@@ -70,18 +97,24 @@ MAX_TEXTURE_SIZE = 2048
 # and normal, so the packed map is clamped harder.
 MAX_ORM_SIZE = 1024
 
-# suffix in the cache  ->  (asset suffix, srgb, compression, lod group)
+# image name inside <id>_remesh.glb -> (asset suffix, srgb, compression,
+#                                        lod group, size clamp)
 MAPS = (
-    ("base_color", "BaseColor", True,
+    ("texture_0", "BaseColor", True,
      unreal.TextureCompressionSettings.TC_DEFAULT,
      unreal.TextureGroup.TEXTUREGROUP_CHARACTER, MAX_TEXTURE_SIZE),
     ("normal", "Normal", False,
      unreal.TextureCompressionSettings.TC_NORMALMAP,
      unreal.TextureGroup.TEXTUREGROUP_CHARACTER_NORMAL_MAP, MAX_TEXTURE_SIZE),
-    ("metallic_roughness", "ORM", False,
+    ("texture_0_metallic_roughness", "ORM", False,
      unreal.TextureCompressionSettings.TC_MASKS,
      unreal.TextureGroup.TEXTUREGROUP_CHARACTER_SPECULAR, MAX_ORM_SIZE),
 )
+
+# Where the extracted PNGs are parked.  A sibling of textures/ rather than a
+# file in it: the names would otherwise collide with the refine-stage maps that
+# caused this bug, and the whole point is that the two sets stay separable.
+REMESH_TEX_SUBDIR = "textures_remesh"
 
 # Meshy names every export's material Material_1 and its texture texture_0.
 # Once the mesh wears a real instance these are unreferenced dead weight --
@@ -156,21 +189,96 @@ def import_texture(png, dest_dir, asset_name, srgb, compression, group, max_size
     return tex
 
 
-def import_maps(spec):
-    """Every PBR map for one monster, keyed by its role."""
+def _glb_images(path):
+    """Every embedded image in a .glb, as {name: png bytes}.
+
+    Hand-parsed rather than pulled in as a dependency: a GLB is a 12-byte
+    header, a JSON chunk and a binary chunk, and the images are byte ranges
+    into the second one.  The editor's Python has no glTF library and this is
+    twenty lines.
+    """
+    with open(path, "rb") as fh:
+        blob = fh.read()
+    if blob[:4] != b"glTF":
+        raise RuntimeError(f"{path} is not a GLB")
+    json_len = struct.unpack("<I", blob[12:16])[0]
+    doc = json.loads(blob[20:20 + json_len])
+    bin_start = 20 + json_len
+    bin_len = struct.unpack("<I", blob[bin_start:bin_start + 4])[0]
+    bin_chunk = blob[bin_start + 8: bin_start + 8 + bin_len]
+
+    views = doc.get("bufferViews", [])
+    out = {}
+    for i, img in enumerate(doc.get("images", [])):
+        if "bufferView" not in img:
+            continue
+        view = views[img["bufferView"]]
+        off = view.get("byteOffset", 0)
+        out[img.get("name") or f"image_{i}"] = bin_chunk[off: off + view["byteLength"]]
+    return out
+
+
+def extract_remesh_maps(spec):
+    """Unpack the remesh GLB's textures to disk so the importer can read them.
+
+    Written once and reused: the GLB is ~50 MB and re-extracting it on every
+    run would dominate the script's runtime for no gain.  Keyed on existence
+    rather than a hash because the cache is immutable once fetched.
+    """
     sid = spec["id"]
-    tex_dir = os.path.join(CACHE_ROOT, sid, "textures")
-    if not os.path.isdir(tex_dir):
-        _log(f"{sid}: no textures/ in cache -- nothing to wire")
+    glb = os.path.join(CACHE_ROOT, sid, f"{sid}_remesh.glb")
+    out_dir = os.path.join(CACHE_ROOT, sid, REMESH_TEX_SUBDIR)
+    wanted = {img for img, _, _, _, _, _ in MAPS}
+
+    have = {img: os.path.join(out_dir, f"{sid}_{img}.png")
+            for img in wanted
+            if os.path.exists(os.path.join(out_dir, f"{sid}_{img}.png"))}
+    if set(have) == wanted:
+        return have
+
+    if not os.path.exists(glb):
+        _log(f"{sid}: no {os.path.basename(glb)} in cache -- "
+             "cannot recover the remeshed UVs' textures")
+        return have
+
+    os.makedirs(out_dir, exist_ok=True)
+    images = _glb_images(glb)
+    for img in sorted(wanted):
+        if img in have:
+            continue
+        if img not in images:
+            _log(f"{sid}: {os.path.basename(glb)} has no image {img!r} "
+                 f"(it has {sorted(images)})")
+            continue
+        dest = os.path.join(out_dir, f"{sid}_{img}.png")
+        with open(dest, "wb") as fh:
+            fh.write(images[img])
+        have[img] = dest
+        _log(f"{sid}: extracted {img} ({len(images[img]) / 1e6:.1f} MB) "
+             f"from the remesh GLB")
+    return have
+
+
+def import_maps(spec):
+    """Every PBR map for one monster, keyed by its role.
+
+    Sourced from the remesh GLB, not from textures/ -- see the module
+    docstring.  The refine-stage PNGs in textures/ are atlased for a mesh that
+    was thrown away before rigging.
+    """
+    sid = spec["id"]
+    sources = extract_remesh_maps(spec)
+    if not sources:
+        _log(f"{sid}: no remesh textures -- nothing to wire")
         return {}
 
     dest_dir = _monster_dir(spec)
     name = _monster_name(spec).replace("SKM_", "")
     out = {}
-    for cache_suffix, role, srgb, compression, group, max_size in MAPS:
-        png = os.path.join(tex_dir, f"{sid}_{cache_suffix}.png")
-        if not os.path.exists(png):
-            _log(f"{sid}: MISSING {os.path.basename(png)} -- "
+    for img, role, srgb, compression, group, max_size in MAPS:
+        png = sources.get(img)
+        if not png:
+            _log(f"{sid}: MISSING {img} -- "
                  f"{role} will fall back to the master default")
             continue
         tex = import_texture(png, dest_dir, f"T_{name}_{role}",

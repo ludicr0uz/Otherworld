@@ -5,19 +5,26 @@ Run inside the editor:
 
     Scripts/dev/uepy.py Scripts/asset_pipeline/build_retarget.py
 
-Meshy rigs every creature on the same 24-bone Mixamo-named skeleton -- proved by
-skeleton_probe.py, which found byte-identical hierarchies for a 1.8 m zombie and
-a 2.4 m wendigo.  So the work here is done **once**, not once per monster: two IK
-Rigs and one retargeter, after which every new creature is a mesh binding to
-SK_MeshyHumanoid and inheriting this animation set for free.
+Meshy rigs every creature on the same 24-bone Mixamo-named skeleton -- same bone
+names, same parents, for a 1.8 m zombie and a 2.4 m wendigo alike.  That made it
+look as though the work here could be done once for all monsters, and for a
+while it was.  It cannot: what an animation stores is a per-bone local rotation,
+and what that rotation MEANS depends on the bind pose, which Meshy does not
+share between creatures.  Retargeted once against the wendigo, the clips put the
+wendigo's 59-degree forward neck pitch on the zombie and its head hung in front
+of its chest.  import_characters.py carries the measurements.
 
-Three assets get built:
+So the source side is built once and the target side once per creature:
 
-    IK_Mannequin        chains over SK_Mannequin      (source of the animation)
-    IK_MeshyHumanoid    chains over SK_MeshyHumanoid  (where it is going)
-    RTG_Meshy_to_Mannequin                            (the mapping between them)
+    IK_Mannequin              chains over SK_Mannequin   (source of the motion)
+    IK_<Monster>              chains over SK_<Monster>   (where it is going)
+    RTG_<Monster>_from_Mannequin                         (the mapping)
 
-Then the Unarmed locomotion set is batch-retargeted onto SK_MeshyHumanoid.
+and the Unarmed locomotion set is batch-retargeted per monster into
+Anims/<Monster>/ with an A_<Monster>_ prefix.  Nothing hand-authored is
+duplicated -- the chain tables below are keyed by bone name, and those really
+are shared, so a new creature still needs no new authoring.  What multiplies is
+generated assets: about 22 clips, an IK Rig and a retargeter each.
 
 Why the chains are written out by hand instead of calling
 ``apply_auto_generated_retarget_definition``: Meshy numbers its spine
@@ -35,15 +42,50 @@ import os
 import unreal
 
 MANNEQUIN_MESH = "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple"
-MESHY_SKELETON = "/Game/Sourced/Characters/SK_MeshyHumanoid"
 
 CHARACTER_ROOT = "/Game/Sourced/Characters"
 RIG_DIR = "/Game/Sourced/Characters/Rigs"
-ANIM_DIR = "/Game/Sourced/Characters/Anims"
+ANIM_ROOT = "/Game/Sourced/Characters/Anims"
 
 IK_MANNEQUIN = f"{RIG_DIR}/IK_Mannequin"
-IK_MESHY = f"{RIG_DIR}/IK_MeshyHumanoid"
-RETARGETER = f"{RIG_DIR}/RTG_Meshy_to_Mannequin"
+
+
+# ─── One animation set per monster ──────────────────────────────────────────
+#
+# These used to be single constants, because every monster was bound to one
+# SK_MeshyHumanoid.  They are functions now for the reason spelled out at
+# length in import_characters.py: Meshy shares bone NAMES between creatures but
+# not bind poses, so a clip retargeted against the wendigo puts the wendigo's
+# 59-degree forward neck pitch on a zombie and its head hangs off the front of
+# its body.  Each monster animates against its own bind pose or it animates
+# wrong.
+#
+# Nothing hand-authored is duplicated by this -- the chain tables below are
+# keyed by bone name and those genuinely are shared.  What multiplies is
+# generated assets: roughly 22 clips, an IK Rig and a retargeter per creature.
+
+def ik_rig_path(name):
+    return f"{RIG_DIR}/IK_{name}"
+
+
+def retargeter_path(name):
+    return f"{RIG_DIR}/RTG_{name}_from_Mannequin"
+
+
+def anim_dir(name):
+    return f"{ANIM_ROOT}/{name}"
+
+
+def anim_prefix(name):
+    return f"A_{name}_"
+
+
+def abp_path(name):
+    return f"{anim_dir(name)}/{anim_prefix(name)}ABP_Unarmed"
+
+
+def melee_path(name):
+    return f"{anim_dir(name)}/{anim_prefix(name)}MM_Attack_01"
 
 # name -> (start bone, end bone).  Identical keys on both sides: auto_map_chains
 # then pairs them by exact string match and never has to guess.
@@ -107,8 +149,6 @@ RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE)
 # What the NPC builder points a monster's SkeletalMeshComponent at.  Derived
 # from the source name and the prefix below, and asserted in verify() rather
 # than left as a comment, because a rename here silently breaks the NPCs.
-ABP_MESHY = f"{ANIM_DIR}/A_Meshy_ABP_Unarmed"
-MELEE_MESHY = f"{ANIM_DIR}/A_Meshy_MM_Attack_01"
 
 
 # print() goes nowhere in a cold -ExecutePythonScript run; the log does.
@@ -116,19 +156,27 @@ def _log(msg):
     unreal.log_warning(f"[RETARGET] {msg}")
 
 
-def _meshy_mesh():
-    """Any monster bound to SK_MeshyHumanoid will do -- they share the rig.
+def _monsters():
+    """Every imported creature, as (short name, mesh, skeleton).
 
-    Found rather than hardcoded: each monster imports into a folder of its own,
-    and which one happens to be there is not this script's business.
+    Discovered rather than listed: each monster imports into a folder of its
+    own and which ones are present depends on what the catalog fetched.  The
+    short name drops the SKM_ prefix, so SKM_Zombie01 animates out of
+    Anims/Zombie01 with an A_Zombie01_ prefix.
     """
-    skel = _load(MESHY_SKELETON)
-    for path in sorted(unreal.EditorAssetLibrary.list_assets(CHARACTER_ROOT, recursive=True)):
+    out = []
+    for path in sorted(unreal.EditorAssetLibrary.list_assets(
+            CHARACTER_ROOT, recursive=True)):
         asset = unreal.EditorAssetLibrary.load_asset(path.split(".")[0])
-        if isinstance(asset, unreal.SkeletalMesh) and \
-                asset.get_editor_property("skeleton") == skel:
-            return asset
-    raise RuntimeError(f"no skeletal mesh under {CHARACTER_ROOT} uses {MESHY_SKELETON}")
+        if not isinstance(asset, unreal.SkeletalMesh):
+            continue
+        skel = asset.get_editor_property("skeleton")
+        if not skel:
+            continue
+        out.append((asset.get_name().replace("SKM_", ""), asset, skel))
+    if not out:
+        raise RuntimeError(f"no skeletal mesh under {CHARACTER_ROOT}")
+    return out
 
 
 def _reuse_or_create(pkg, cls, factory):
@@ -204,9 +252,9 @@ def build_ik_rig(pkg, mesh_pkg, chains, retarget_root, root_motion_bone=None):
     return rig
 
 
-def build_retargeter(source_rig, target_rig):
-    name = RETARGETER.rsplit("/", 1)[1]
-    rtg = _reuse_or_create(RETARGETER, unreal.IKRetargeter,
+def build_retargeter(source_rig, target_rig, pkg):
+    name = pkg.rsplit("/", 1)[1]
+    rtg = _reuse_or_create(pkg, unreal.IKRetargeter,
                            unreal.IKRetargetFactory())
     ctl = unreal.IKRetargeterController.get_controller(rtg)
     ctl.remove_all_ops()
@@ -271,7 +319,7 @@ def build_retargeter(source_rig, target_rig):
     if unmapped:
         raise RuntimeError(f"{name}: target chains with no source: {unmapped}")
 
-    unreal.EditorAssetLibrary.save_asset(RETARGETER)
+    unreal.EditorAssetLibrary.save_asset(pkg)
     return rtg
 
 
@@ -291,9 +339,9 @@ def _source_assets():
     return out
 
 
-def retarget_animations(rtg):
+def retarget_animations(rtg, mesh, out_dir, prefix):
     assets = _source_assets()
-    _log(f"retargeting {len(assets)} roots (+ their dependencies) -> {ANIM_DIR}")
+    _log(f"retargeting {len(assets)} roots (+ their dependencies) -> {out_dir}")
 
     # Wipe first.  The batch operation does not reliably overwrite in place: a
     # run whose output collided with an existing A_Meshy_MM_Idle produced
@@ -301,15 +349,15 @@ def retarget_animations(rtg):
     # numbered duplicate is the kind of thing that gets referenced by accident
     # and then never updates.  The directory is generated in full every run and
     # is git-ignored, so there is nothing here worth preserving.
-    if unreal.EditorAssetLibrary.does_directory_exist(ANIM_DIR):
-        unreal.EditorAssetLibrary.delete_directory(ANIM_DIR)
-    unreal.EditorAssetLibrary.make_directory(ANIM_DIR)
+    if unreal.EditorAssetLibrary.does_directory_exist(out_dir):
+        unreal.EditorAssetLibrary.delete_directory(out_dir)
+    unreal.EditorAssetLibrary.make_directory(out_dir)
     unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
 
     inputs = unreal.IKRetargetBatchOperationInputs()
     inputs.set_editor_property("assets_to_retarget", assets)
     inputs.set_editor_property("source_mesh", _load(MANNEQUIN_MESH))
-    inputs.set_editor_property("target_mesh", _meshy_mesh())
+    inputs.set_editor_property("target_mesh", mesh)
     inputs.set_editor_property("ik_retarget_asset", rtg)
     # Follow the graph: this is what turns two roots into the whole locomotion
     # set, blend space and state machine included.
@@ -318,8 +366,8 @@ def retarget_animations(rtg):
     # so /Game/Sourced/Characters/Anims never collides with the source set.
     inputs.set_editor_property("search", "MF_Unarmed_")
     inputs.set_editor_property("replace", "")
-    inputs.set_editor_property("prefix", "A_Meshy_")
-    inputs.set_editor_property("target_path", ANIM_DIR)
+    inputs.set_editor_property("prefix", prefix)
+    inputs.set_editor_property("target_path", out_dir)
     inputs.set_editor_property("use_source_path", False)
     inputs.set_editor_property("overwrite_existing_files", True)
 
@@ -358,7 +406,7 @@ def _bone_world(anim, bone, time):
 UPPER_BODY_ROOT_MESHY = "Spine02"
 
 
-def fix_retargeted_abp():
+def fix_retargeted_abp(abp_pkg, skeleton):
     """Make the copied anim graph address the skeleton it now runs on.
 
     Two edits:
@@ -375,17 +423,17 @@ def fix_retargeted_abp():
        removed rather than repaired: foot IK is a per-skeleton rig, this one
        cannot be retargeted, and the monsters do not need it.
     """
-    bp = _load(ABP_MESHY)
+    bp = _load(abp_pkg)
     if not bp:
-        raise RuntimeError(f"{ABP_MESHY} missing -- the retarget did not run")
+        raise RuntimeError(f"{abp_pkg} missing -- the retarget did not run")
     ed = unreal.BlueprintGraphEditor.get_graph_editor_by_name(bp, "AnimGraph")
     if not ed:
-        raise RuntimeError(f"{ABP_MESHY} has no AnimGraph")
+        raise RuntimeError(f"{abp_pkg} has no AnimGraph")
 
     def by_class(n):
         return [x for x in ed.list_all_nodes() if x.get_class().get_name() == n]
 
-    bones = set(_skeleton_bone_names())
+    bones = set(_skeleton_bone_names(skeleton))
 
     # ── 1. branch filters ────────────────────────────────────────────────────
     for blend in by_class("AnimGraphNode_LayeredBoneBlend"):
@@ -438,7 +486,7 @@ def fix_retargeted_abp():
              "SK_Mannequin; it mismapped 'Head' on this skeleton)")
 
     if not unreal.BlueprintEditorLibrary.compile_blueprint(bp):
-        raise RuntimeError(f"{ABP_MESHY} failed to compile after the fix-up")
+        raise RuntimeError(f"{abp_pkg} failed to compile after the fix-up")
     unreal.EditorAssetLibrary.save_loaded_asset(bp)
 
     left = [x.get_class().get_name() for x in ed.list_all_nodes()
@@ -451,18 +499,30 @@ def fix_retargeted_abp():
                     bad.append(str(f.get_editor_property("bone_name")))
     if left or bad:
         raise RuntimeError(f"fix-up did not stick: control rigs={left} bad filters={bad}")
-    _log(f"{ABP_MESHY.rsplit('/', 1)[1]}: graph now addresses SK_MeshyHumanoid only")
+    _log(f"  {abp_pkg.rsplit('/', 1)[1]}: graph now addresses "
+         f"{skeleton.get_name()} only")
 
 
-def _skeleton_bone_names():
-    sk = _load(MESHY_SKELETON)
-    if not sk:
-        raise RuntimeError(f"{MESHY_SKELETON} missing")
-    pose = unreal.AnimPoseExtensions.get_reference_pose(sk)
+def _skeleton_bone_names(skeleton):
+    pose = unreal.AnimPoseExtensions.get_reference_pose(skeleton)
     return [str(b) for b in unreal.AnimPoseExtensions.get_bone_names(pose)]
 
 
-def _check_pose(anim):
+def _ref_hips_z(skeleton):
+    """Hip height in the skeleton's own reference pose, component space.
+
+    The grounded band below used to be the literal 60..140, which happened to
+    bracket both the 1.8 m zombie (hips 101) and the 2.4 m wendigo (hips 128).
+    Now that each creature carries its own skeleton, a taller one would fail a
+    check that is really asking "are the hips roughly where this creature's
+    hips belong" -- so ask that.
+    """
+    pose = unreal.AnimPoseExtensions.get_reference_pose(skeleton)
+    return unreal.AnimPoseExtensions.get_bone_pose(
+        pose, "Hips", unreal.AnimPoseSpaces.WORLD).translation.z
+
+
+def _check_pose(anim, ref_hips):
     """Is this a creature standing up and taking steps, or a folded heap?
 
     Existing-and-non-empty is not a useful test: an animation that folds the
@@ -496,10 +556,13 @@ def _check_pose(anim):
         if not (head > hips > feet):
             problems.append(f"t={t:.2f} not upright "
                             f"(head {head:.0f} hips {hips:.0f} feet {feet:.0f})")
-        # Ref-pose hips sit at 101 uu. A pelvis on the floor means the Root
-        # Motion op stole the track; one at head height means a broken chain.
-        if grounded and not 60.0 < hips < 140.0:
-            problems.append(f"t={t:.2f} hips at z={hips:.0f}, expected ~101")
+        # A pelvis on the floor means the Root Motion op stole the track; one
+        # at head height means a broken chain. Banded against this creature's
+        # own reference pose rather than a literal, so a taller monster is not
+        # failed for being tall.
+        if grounded and not 0.6 * ref_hips < hips < 1.4 * ref_hips:
+            problems.append(f"t={t:.2f} hips at z={hips:.0f}, "
+                            f"expected ~{ref_hips:.0f}")
         foot_gaps.append(p["LeftFoot"].z - p["RightFoot"].z)
         hips_xy.append((p["Hips"].x, p["Hips"].y))
 
@@ -521,7 +584,7 @@ def _check_pose(anim):
     return problems
 
 
-def verify(created):
+def verify(created, monster, meshy_skel):
     """The point of the whole exercise: does a monster actually animate?
 
     The batch now returns three kinds of asset, and each needs a different
@@ -533,8 +596,8 @@ def verify(created):
     sample, so they are checked for the thing that breaks instead: the blend
     space for its skeleton, the blueprint for whether it compiles.
     """
-    meshy_skel = _load(MESHY_SKELETON)
     clips, ok, bad = 0, 0, []
+    ref_hips = _ref_hips_z(meshy_skel)
 
     for data in created:
         pkg = str(data.package_name)
@@ -555,7 +618,7 @@ def verify(created):
             elif frames < 2:
                 bad.append((name, f"{frames} frames"))
             else:
-                problems = _check_pose(asset)
+                problems = _check_pose(asset, ref_hips)
                 bad.extend((name, p) for p in problems)
                 ok += not problems
 
@@ -586,19 +649,18 @@ def verify(created):
 
     # The NPC builder addresses these two by path. A rename upstream would
     # otherwise surface as a missing anim class at spawn time, in the game.
-    for expected in (ABP_MESHY, MELEE_MESHY):
+    for expected in (abp_path(monster), melee_path(monster)):
         if not unreal.EditorAssetLibrary.does_asset_exist(expected):
             bad.append((expected.rsplit("/", 1)[1], "expected by the NPC builder, not produced"))
 
-    _log("=" * 52)
-    _log(f"{ok}/{clips} clips upright, in place, with a real gait "
+    _log(f"  {ok}/{clips} clips upright, in place, with a real gait "
          f"({len(created)} assets total)")
-    for name, why in bad:
-        _log(f"  FAIL {name}: {why}")
+    for bad_name, why in bad:
+        _log(f"  FAIL {bad_name}: {why}")
     if bad:
-        raise RuntimeError(f"{len(bad)} problems across the retargeted set")
-    _log(f"monsters walk -- every mesh on {MESHY_SKELETON.rsplit('/', 1)[1]} "
-         f"shares {ABP_MESHY.rsplit('/', 1)[1]}")
+        raise RuntimeError(
+            f"{monster}: {len(bad)} problems across the retargeted set")
+    return ok, clips
 
 
 def main():
@@ -607,22 +669,37 @@ def main():
     # create_asset quietly returns None. Wait for it rather than race it.
     unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
 
-    for d in (RIG_DIR, ANIM_DIR):
+    for d in (RIG_DIR, ANIM_ROOT):
         if not unreal.EditorAssetLibrary.does_directory_exist(d):
             unreal.EditorAssetLibrary.make_directory(d)
 
+    # The source side is built once: there is only one mannequin.
     src = build_ik_rig(IK_MANNEQUIN, MANNEQUIN_MESH,
                        CHAINS_MANNEQUIN, RETARGET_ROOT_MANNEQUIN,
                        root_motion_bone=ROOT_MOTION_BONE_MANNEQUIN)
-    tgt = build_ik_rig(IK_MESHY, _meshy_mesh().get_path_name().split(".")[0],
-                       CHAINS_MESHY, RETARGET_ROOT_MESHY)
-    rtg = build_retargeter(src, tgt)
-    created = retarget_animations(rtg)
-    # After the copy, before the checks: verify() asserts the graph is clean.
-    fix_retargeted_abp()
-    verify(created)
+
+    monsters = _monsters()
+    _log(f"{len(monsters)} monster(s): {', '.join(n for n, _, _ in monsters)}")
+    totals = []
+    for name, mesh, skeleton in monsters:
+        _log(f"--- {name} ({skeleton.get_name()}) ---")
+        tgt = build_ik_rig(ik_rig_path(name),
+                           mesh.get_path_name().split(".")[0],
+                           CHAINS_MESHY, RETARGET_ROOT_MESHY)
+        rtg = build_retargeter(src, tgt, retargeter_path(name))
+        created = retarget_animations(rtg, mesh, anim_dir(name),
+                                      anim_prefix(name))
+        # After the copy, before the checks: verify() asserts the graph is clean.
+        fix_retargeted_abp(abp_path(name), skeleton)
+        totals.append((name, *verify(created, name, skeleton)))
+
     unreal.EditorAssetLibrary.save_directory(RIG_DIR, only_if_is_dirty=False)
-    unreal.EditorAssetLibrary.save_directory(ANIM_DIR, only_if_is_dirty=False)
+    unreal.EditorAssetLibrary.save_directory(ANIM_ROOT, only_if_is_dirty=False)
+
+    _log("=" * 52)
+    for name, ok, clips in totals:
+        _log(f"  {name:12s} {ok}/{clips} clips, anim BP {abp_path(name).rsplit('/', 1)[1]}")
+    _log(f"{len(totals)} monster(s) animate against their own bind pose")
 
 
 main()

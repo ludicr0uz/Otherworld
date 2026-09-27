@@ -10,15 +10,34 @@ code-only contract the rest of Content/ lives under.
 
 ── What this is really for ─────────────────────────────────────────────────
 
-The import is the easy half.  The half that decides the architecture is check
-(4) below: whether two separately generated monsters come back on the *same*
-bone hierarchy.  If they do, one skeleton, one IK Rig, one retargeter and one
-anim BP serve every monster you ever generate, and each new creature is just a
-mesh.  If they do not, every monster carries its own animation setup and the
-cost per creature is many times higher.
+The import is the easy half.  The half that decides the architecture is
+whether two separately generated monsters can share one animation setup.
 
-So this script does not merely import.  It fingerprints the skeleton of each
-mesh and compares them, and says plainly which of those two worlds we are in.
+The first answer to that was wrong, and it is worth recording why.
+skeleton_probe.py compared bone HIERARCHIES -- names and parents -- found them
+identical for a 1.8 m zombie and a 2.4 m wendigo, and concluded one skeleton
+would serve both.  Every monster was then bound to a single SK_MeshyHumanoid.
+
+Identical hierarchies are not sufficient.  What an animation actually carries
+is a per-bone LOCAL ROTATION, and what that rotation means depends on the bone
+orientation in the mesh's BIND POSE.  Meshy reuses the bone names; it does not
+reuse the bind pose, and it cannot -- a wendigo's neck is not a zombie's neck.
+Measured on the two rigs:
+
+    bone    zombie bind pose          wendigo bind pose
+    neck    T y=9.55   rot x=0.023    T z=17.34  rot x=0.493   <- 59 deg pitch
+    Head    T y=7.26                  T y=34.20
+
+SK_MeshyHumanoid was minted from whichever monster imported first -- the
+wendigo -- so every retargeted clip was authored against the wendigo's forward
+neck pitch.  The wendigo looked right.  The zombie wore the wendigo's neck and
+its head hung out in front of its body, and nothing errored.
+
+So each monster now gets its OWN skeleton, and with it its own IK Rig,
+retargeter and anim BP.  That is the more expensive world, and it is the one
+we are actually in.  The cost is per creature; the chain table in
+build_retarget.py is by bone NAME and those really are shared, so adding a
+creature is still no new hand-authoring -- just more generated assets.
 """
 
 import json
@@ -30,11 +49,14 @@ PROJECT_DIR = unreal.Paths.project_dir()
 CACHE_ROOT = os.path.join(PROJECT_DIR, "assets", "cache", "meshy")
 DEST_ROOT = "/Game/Sourced/Characters"
 
-# Every Meshy monster shares one skeleton -- proved by skeleton_probe.py, which
-# found identical 24-bone hierarchies for a 1.8 m zombie and a 2.4 m wendigo.
-# It gets a canonical name rather than being named after whichever creature
-# happened to import first.
-SHARED_SKELETON = f"{DEST_ROOT}/SK_MeshyHumanoid"
+# One skeleton per monster.  See the module docstring for why this is not
+# SK_MeshyHumanoid any more.
+def _skeleton_path(spec):
+    return f"{DEST_ROOT}/SK_{_monster_name(spec).replace('SKM_', '')}"
+
+
+def _monster_name(spec):
+    return os.path.basename(spec.get("dest", f"SKM_{spec['id']}"))
 
 # SKM_Quinn_Simple, measured 2026-09-27: 180.17 uu tall. Anything arriving at
 # ~1.8 instead of ~180 has come in as metres and needs an import scale of 100.
@@ -122,9 +144,14 @@ def _sweep_root():
         candidates += [f"{DEST_ROOT}/Material_{n}", f"{DEST_ROOT}/texture_{n}"]
 
     for base in dict.fromkeys(candidates):
-        if base == SHARED_SKELETON:
-            continue
         if not unreal.EditorAssetLibrary.does_asset_exist(base):
+            continue
+        # Never sweep a skeleton. They sit directly under DEST_ROOT alongside
+        # the strays, and the referencer check answers from DISK -- so a mesh
+        # imported but not yet saved does not count as a referencer and its
+        # brand-new skeleton looks like garbage. This deleted both skeletons
+        # the first time the per-monster layout ran.
+        if isinstance(unreal.EditorAssetLibrary.load_asset(base), unreal.Skeleton):
             continue
         if unreal.EditorAssetLibrary.find_package_referencers_for_asset(base, False):
             continue
@@ -185,45 +212,64 @@ def check_mesh(mesh, spec):
     return ok
 
 
-def _mint_shared_skeleton(specs):
-    """Create SK_MeshyHumanoid, before any monster is imported for keeps.
+def _mint_skeleton(spec):
+    """Create SK_<Monster>, before that monster is imported for keeps.
 
-    The skeleton only comes into existence as a side effect of importing a
-    mesh, and it is named after that mesh -- import the wendigo first and every
-    future creature hangs off ``SKM_Wendigo01_Skeleton``.  Renaming it
-    afterwards seemed like the fix, but a rename leaves the mesh pointing at a
-    redirector: it resolves inside the same session and looks correct, then
-    resolves to nothing once the redirector is gone.  That is how the wendigo
-    ended up with a skeleton of None.
+    A skeleton only comes into existence as a side effect of importing a mesh,
+    and it is named after that mesh -- so an unmanaged import leaves
+    ``SKM_Zombie01_Skeleton`` next to ``SKM_Zombie01``.  Renaming it afterwards
+    seemed like the fix, but a rename leaves the mesh pointing at a redirector:
+    it resolves inside the same session and looks correct, then resolves to
+    nothing once the redirector is collected.  That is how the wendigo ended up
+    with a skeleton of None.
 
-    So the first import is treated as throwaway.  It exists to mint the
-    skeleton under its canonical name; the mesh it produced is discarded and
-    re-imported in the real pass, bound explicitly to that skeleton.  Every
-    monster then takes the identical path through the importer, including the
-    first one.
+    So the first import of each monster is treated as throwaway.  It exists to
+    mint the skeleton under its canonical name; the mesh it produced is
+    discarded and re-imported in the real pass, bound explicitly to that
+    skeleton.
     """
-    existing = unreal.EditorAssetLibrary.load_asset(SHARED_SKELETON)
+    path = _skeleton_path(spec)
+    existing = unreal.EditorAssetLibrary.load_asset(path)
     if existing:
-        _log(f"[IMPORT] reusing {SHARED_SKELETON}")
+        _log(f"[IMPORT] reusing {path}")
         return existing
 
-    for spec in specs:
-        fbx = _rigged_fbx(os.path.join(CACHE_ROOT, spec["id"]))
-        if not fbx:
-            continue
-        seed_dir = f"{DEST_ROOT}/_seed"
-        mesh = import_fbx(fbx, seed_dir, "SKM_MeshySeed")
-        skel = mesh.get_editor_property("skeleton") if mesh else None
-        if not skel:
-            continue
-        src = skel.get_path_name().split(".")[0]
-        unreal.EditorAssetLibrary.rename_asset(src, SHARED_SKELETON)
-        # The seed mesh and its material must not survive: a reference to them
-        # is exactly the rotting reference this whole dance exists to avoid.
+    fbx = _rigged_fbx(os.path.join(CACHE_ROOT, spec["id"]))
+    if not fbx:
+        return None
+    seed_dir = f"{DEST_ROOT}/_seed"
+    mesh = import_fbx(fbx, seed_dir, "SKM_MeshySeed")
+    skel = mesh.get_editor_property("skeleton") if mesh else None
+    if not skel:
         unreal.EditorAssetLibrary.delete_directory(seed_dir)
-        _log(f"[IMPORT] minted {SHARED_SKELETON} from {spec['id']}")
-        return unreal.EditorAssetLibrary.load_asset(SHARED_SKELETON)
-    return None
+        return None
+    src = skel.get_path_name().split(".")[0]
+    unreal.EditorAssetLibrary.rename_asset(src, path)
+    # The seed mesh and its material must not survive: a reference to them is
+    # exactly the rotting reference this whole dance exists to avoid.
+    unreal.EditorAssetLibrary.delete_directory(seed_dir)
+    _log(f"[IMPORT] minted {path} from {spec['id']}")
+    return unreal.EditorAssetLibrary.load_asset(path)
+
+
+def _bind_fingerprint(skel):
+    """A few bind-pose numbers that decide whether two rigs can share clips.
+
+    Bone names and parents are NOT enough -- see the module docstring.  These
+    are the bones where the two monsters actually diverged.
+    """
+    pose = unreal.AnimPoseExtensions.get_reference_pose(skel)
+    names = {str(b) for b in unreal.AnimPoseExtensions.get_bone_names(pose)}
+    out = []
+    for bone in ("Hips", "Spine", "neck", "Head"):
+        if bone not in names:
+            continue
+        t = unreal.AnimPoseExtensions.get_bone_pose(
+            pose, bone, unreal.AnimPoseSpaces.LOCAL)
+        r = t.rotation.rotator()
+        out.append(f"{bone}(y{t.translation.y:.1f} z{t.translation.z:.1f} "
+                   f"r{r.roll:.0f})")
+    return " ".join(out)
 
 
 def main():
@@ -233,10 +279,6 @@ def main():
         return
 
     unreal.EditorAssetLibrary.make_directory(DEST_ROOT)
-    shared_skeleton = _mint_shared_skeleton(specs)
-    if not shared_skeleton:
-        _log("[IMPORT] could not create a skeleton from any cached rig")
-        return
 
     prints = {}
     for spec in specs:
@@ -245,11 +287,16 @@ def main():
         if not fbx:
             _log(f"[IMPORT] {sid}: no rigged FBX in cache, skipping")
             continue
-        asset_name = os.path.basename(spec.get("dest", f"SKM_{sid}"))
+        asset_name = _monster_name(spec)
         dest_dir = _monster_dir(spec)
         _log(f"[IMPORT] {sid}: importing {os.path.basename(fbx)} -> {dest_dir}/{asset_name}")
 
-        mesh = import_fbx(fbx, dest_dir, asset_name, skeleton=shared_skeleton)
+        own_skeleton = _mint_skeleton(spec)
+        if not own_skeleton:
+            _log(f"[IMPORT] {sid}: FAILED -- could not mint a skeleton")
+            continue
+
+        mesh = import_fbx(fbx, dest_dir, asset_name, skeleton=own_skeleton)
         if not mesh:
             _log(f"[IMPORT] {sid}: FAILED -- no SkeletalMesh produced")
             continue
@@ -257,24 +304,39 @@ def main():
         ok = check_mesh(mesh, spec)
         skel = mesh.get_editor_property("skeleton")
         _log(f"[IMPORT]   skeleton = {skel.get_name() if skel else None}")
-        if skel != shared_skeleton:
+        if skel != own_skeleton:
             _log("[IMPORT]   FAIL bound to the wrong skeleton")
             ok = False
-        prints[sid] = (skel.get_name() if skel else "NONE", ok)
+        prints[sid] = (skel.get_name() if skel else "NONE", ok,
+                       _bind_fingerprint(skel) if skel else "")
 
+    # Save first: find_package_referencers_for_asset reads what is on disk, so
+    # an unsaved mesh does not yet count as referencing anything it imported.
+    unreal.EditorAssetLibrary.save_directory(DEST_ROOT, only_if_is_dirty=False)
     _sweep_root()
     unreal.EditorAssetLibrary.save_directory(DEST_ROOT, only_if_is_dirty=False)
 
     # (4) the result the spike exists to produce
     _log("[IMPORT] ================ summary ================")
-    for sid, (skname, ok) in prints.items():
-        _log(f"[IMPORT]   {sid:14s} {skname:28s} {'ok' if ok else 'CHECKS FAILED'}")
-    skels = {s for s, _ in prints.values() if s}
+    for sid, (skname, ok, finger) in prints.items():
+        _log(f"[IMPORT]   {sid:14s} {skname:22s} {'ok' if ok else 'CHECKS FAILED'}")
+        _log(f"[IMPORT]     bind pose: {finger}")
+    skels = {v[0] for v in prints.values() if v[0]}
     if len(prints) > 1:
-        if len(skels) == 1:
-            _log(f"[IMPORT]   all {len(prints)} monsters share {skels.pop()} -- "
-                 "one IK Rig and one anim BP will serve them")
+        # One skeleton per monster is the expected and correct outcome. The
+        # check is inverted from what it used to be: a SHARED skeleton is now
+        # the bug, because it means one creature is wearing another's bind pose.
+        if len(skels) == len(prints):
+            _log(f"[IMPORT]   {len(prints)} monsters, {len(skels)} skeletons -- "
+                 "each creature animates against its own bind pose")
         else:
-            _log(f"[IMPORT]   WARNING: {len(skels)} distinct skeletons: {sorted(skels)}")
+            _log(f"[IMPORT]   WARNING: {len(prints)} monsters share only "
+                 f"{len(skels)} skeleton(s): {sorted(skels)}. Whichever monster "
+                 "did not mint the skeleton will animate against another "
+                 "creature's bind pose.")
+        fingers = {v[2] for v in prints.values()}
+        if len(fingers) > 1:
+            _log("[IMPORT]   (bind poses differ, as expected -- this is exactly "
+                 "why the clips cannot be shared)")
 
 main()

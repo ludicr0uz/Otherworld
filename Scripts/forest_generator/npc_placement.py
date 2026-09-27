@@ -72,7 +72,6 @@ NPC_MELEE_INTERVAL_S = 1.5         # seconds between swings, per NPC
 # git-ignored and rebuilt from assets/cache/meshy, so a fresh clone that has
 # not run the asset pipeline has no Meshy anything, and an NPC with no melee
 # animation is better than a builder that dies.
-NPC_MELEE_MONTAGE = "/Game/Sourced/Characters/Anims/A_Meshy_MM_Attack_01"
 NPC_MELEE_MONTAGE_FALLBACK = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
 NPC_MELEE_BLEND_S = 0.15
 
@@ -95,35 +94,51 @@ NPC_WENDIGO_EVERY = 5
 
 @dataclass(frozen=True)
 class NpcVariant:
-    """One creature a wanderer can wear.
+    """One creature the wanderers can wear.
 
-    ``mesh`` is a package path, not an object path; the builder appends the
-    object name.  ``blueprint`` is where its child Blueprint is written.
+    Every field but ``key`` names a per-creature asset, because a creature IS
+    its own skeleton: Meshy shares bone names between monsters but not bind
+    poses, so each one carries its own retargeted animation set and, since an
+    AnimSequence belongs to exactly one skeleton, its own AI controller holding
+    its own attack clip.  See import_characters.py for the measurements.
+
+    What is NOT per creature is any stat: the variants are child Blueprints of
+    BP_ForestWanderer and override only these asset references, so capsule,
+    run speed, melee damage, range and interval cannot drift between them.
     """
-
     key: str
     blueprint: str
     mesh: str
+    anim_bp: str
+    melee: str
+    ai_blueprint: str
+
+
+def _creature(key, folder):
+    """The asset layout every creature follows, from one name."""
+    return NpcVariant(
+        key=key,
+        blueprint=f"/Game/Forest/NPC/BP_Wanderer_{key}",
+        mesh=f"/Game/Sourced/Characters/SKM_{folder}/SKM_{folder}",
+        anim_bp=f"/Game/Sourced/Characters/Anims/{folder}/A_{folder}_ABP_Unarmed",
+        melee=f"/Game/Sourced/Characters/Anims/{folder}/A_{folder}_MM_Attack_01",
+        ai_blueprint=f"/Game/Forest/NPC/BP_ForestWandererAI_{key}",
+    )
 
 
 NPC_VARIANTS = (
-    NpcVariant(
-        key="Zombie",
-        blueprint="/Game/Forest/NPC/BP_Wanderer_Zombie",
-        mesh="/Game/Sourced/Characters/SKM_Zombie01/SKM_Zombie01",
-    ),
-    NpcVariant(
-        key="Wendigo",
-        blueprint="/Game/Forest/NPC/BP_Wanderer_Wendigo",
-        mesh="/Game/Sourced/Characters/SKM_Wendigo01/SKM_Wendigo01",
-    ),
+    _creature("Zombie", "Zombie01"),
+    _creature("Wendigo", "Wendigo01"),
 )
 
-# The base Blueprint every variant derives from, and what it wears if the Meshy
-# assets are missing entirely.
+
+# The parent BP_ForestWanderer wears the first creature. It is never spawned
+# directly -- every placed wanderer is one of the variants -- but it has to be
+# a complete, working character so the children inherit one.
+NPC_MELEE_MONTAGE = NPC_VARIANTS[0].melee
 NPC_BASE_MESH = NPC_VARIANTS[0].mesh
 NPC_BASE_MESH_FALLBACK = "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple"
-NPC_ANIM_BP = "/Game/Sourced/Characters/Anims/A_Meshy_ABP_Unarmed"
+NPC_ANIM_BP = NPC_VARIANTS[0].anim_bp
 NPC_ANIM_BP_FALLBACK = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"
 
 

@@ -156,6 +156,17 @@ GENERATED = (
              "the reason the repository is code only.",
     ),
     AssetSource(
+        dest="Content/Sourced/Characters",
+        kind="generated",
+        builders=("Scripts/asset_pipeline/import_characters.py",),
+        note="AI-generated monsters (zombie, wendigo) imported from the Meshy "
+             "cache below. Every one of them shares SK_MeshyHumanoid: two "
+             "independently generated creatures 1.8 m and 2.4 m tall came back "
+             "on byte-identical 24-bone hierarchies, so one skeleton, one IK "
+             "Rig and one anim BP serve the lot. Rebuilt with "
+             "uepy.py --cold Scripts/asset_pipeline/import_characters.py.",
+    ),
+    AssetSource(
         dest="Content/Maps",
         kind="generated",
         builders=("Scripts/generate_forest_level.py",),
@@ -181,6 +192,21 @@ CACHE = (
     ),
 )
 
+CACHE = CACHE + (
+    AssetSource(
+        dest="assets/cache/meshy",
+        kind="cache",
+        builders=("Scripts/asset_pipeline/fetch_monsters.py",),
+        note="Meshy.ai output: ~250 MB per monster across preview, refine, "
+             "remesh and rig stages. Costs 40 credits per creature and real "
+             "money beyond the free tier, so the fetcher is resumable -- each "
+             "completed stage is recorded in <id>/task.json and skipped on a "
+             "re-run. Requires MESHY_API_KEY in assets/.env, which is "
+             "git-ignored and must never be referenced from a tracked file. "
+             "Scripts/asset_pipeline/catalog.py holds the prompts.",
+    ),
+)
+
 ALL_SOURCES = STOCK + GENERATED + CACHE
 
 # Where the stock checksums live, relative to the project root. Written by
@@ -197,6 +223,10 @@ RESTORE_ORDER = (
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",
     "Scripts/generate_forest_level.py",
+    # Monsters last: they need nothing from the rest, and a clone without a
+    # Meshy key can stop here with a working game and no creatures.
+    "Scripts/asset_pipeline/fetch_monsters.py",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_characters.py",
 )
 
 

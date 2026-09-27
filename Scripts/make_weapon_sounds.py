@@ -26,7 +26,7 @@ powder behind them. _clack() lays one or more damped metallic rings into a
 buffer at given offsets, which is what makes a reload a rhythm (clunk ... clunk
 ... clack) rather than a single event.
 
-Output lands in Scripts/generated_assets/sounds/ and is imported into
+Output lands in assets/generated/sounds/ and is imported into
 /Game/Weapons/Audio by build_weapons_and_combat.py.
 """
 
@@ -37,8 +37,8 @@ import struct
 import wave
 
 RATE = 44100
-OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "generated_assets", "sounds")
+OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "assets", "generated", "sounds")
 
 
 def _lowpass(samples, cutoff_hz):

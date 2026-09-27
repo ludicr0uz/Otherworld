@@ -17,7 +17,7 @@ editor_actor_sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 level_editor_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 mel = unreal.MaterialEditingLibrary
 
-SCANNED_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/downloaded_scanned_assets"
+SCANNED_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/assets/cache/scanned"
 
 # -------------------------------------------------------------------------
 # Step 1: Import 2K Ground Textures

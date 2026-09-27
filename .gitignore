@@ -33,20 +33,31 @@ Build/*
 *~
 Thumbs.db
 
-# Temporary Download Caches
-Scripts/downloaded_scanned_assets/
-# ~200 MB of CC0 firearm recordings, re-fetched by Scripts/fetch_weapon_sounds.py
-Scripts/downloaded_sounds/
-Scripts/generated_assets/
-Scripts/generated_realistic_assets/
+# Everything that is not code. Downloads, generator scratch and any asset the
+# project did not write itself live here, and none of it is committed --
+# Scripts/forest_generator/asset_sources.py records where each one comes from
+# and Scripts/sync_assets.py puts it back.
+assets/
 
 # Python caches
 __pycache__/
 *.pyc
 
-# Ignore heavy generated assets for Code-Only Repo
-Content/Forest/
-Content/Maps/
+# ── Code-only repository ─────────────────────────────────────────────────────
+#
+# Nothing under Content/ is committed. Every .uasset in this project is either
+# stock engine content or written by a script in Scripts/, and
+# Scripts/forest_generator/asset_sources.py records which is which:
+#
+#     python3 Scripts/sync_assets.py --status    what is present
+#     python3 Scripts/sync_assets.py --plan      how to rebuild it from nothing
+#
+# The exception is Content/Python, which the engine auto-discovers at start-up
+# and which is Python, not assets.
+Content/*
+!Content/Python/
+Content/Python/__pycache__/
 
-# Grass transform sidecars — 3 MB+ per level, fully regenerable from the seed
+# Generator sidecars: megabytes apiece, and fully determined by the seed.
 Scripts/generated_levels/*/grass_*.json
+Scripts/generated_levels/*/*.obj

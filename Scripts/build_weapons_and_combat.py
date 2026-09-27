@@ -13,7 +13,7 @@ WHAT THIS BUILDS
 ----------------
 /Game/Weapons
   M_Gunmetal, M_GunWood, M_Blood   flat materials
-  Audio/A_ShotgunFire, A_PistolFire  imported from Scripts/generated_assets/sounds
+  Audio/A_ShotgunFire, A_PistolFire  imported from assets/generated/sounds
   BP_WeaponItem     Actor. The base class: every variable the weapon component
                     reads lives here, so the component casts once and never
                     branches per weapon type.
@@ -220,8 +220,8 @@ CUBE = "/Engine/BasicShapes/Cube"          # 100 cm box
 CYLINDER = "/Engine/BasicShapes/Cylinder"  # 100 cm tall, 50 cm radius, axis +Z
 SPHERE = "/Engine/BasicShapes/Sphere"      # 100 cm diameter
 
-SOUND_SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "generated_assets", "sounds")
+SOUND_SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "assets", "generated", "sounds")
 
 # ─── Tuning ──────────────────────────────────────────────────────────────────
 

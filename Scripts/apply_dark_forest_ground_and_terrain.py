@@ -14,7 +14,7 @@ level_editor_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 mel = unreal.MaterialEditingLibrary
 
 PROJECT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld"
-OBJ_FILE = os.path.join(PROJECT_DIR, "Scripts/generated_assets/SM_ForestLandscape.obj")
+OBJ_FILE = os.path.join(PROJECT_DIR, "assets", "generated", "SM_ForestLandscape.obj")
 
 unreal.log_warning("==================================================")
 unreal.log_warning("[AGY] 1. Re-importing SM_ForestLandscape with Clean Normalized UVs...")

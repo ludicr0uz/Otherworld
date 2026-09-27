@@ -4,7 +4,7 @@ import urllib.request
 import ssl
 
 PROJECT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld"
-DOWNLOAD_DIR = os.path.join(PROJECT_DIR, "Scripts", "downloaded_scanned_assets")
+DOWNLOAD_DIR = os.path.join(PROJECT_DIR, "assets", "cache", "scanned")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # Ignore SSL verification issues if any

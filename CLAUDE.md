@@ -14,6 +14,46 @@ there is no C++ module. See `systemDesign.md` for the detailed architecture.
 4. Absolute paths only when invoking the editor directly — the Bash tool resets cwd between
    calls. (`Scripts/dev/uepy.py` resolves its own arguments, so relative paths are fine there.)
 
+## The repository is code only — a fresh clone has no Content/
+
+Nothing under `Content/` is committed except `Content/Python`. A clone gives you the
+`.uproject`, the scripts, the config and the docs; the ~1 GB of assets is rebuilt locally.
+This is deliberate: every `.uasset` in the project is either stock engine content or
+written by a script, so committing them stores a derived artefact that a Blueprint
+recompile changes the bytes of on every build.
+
+```bash
+python3 Scripts/sync_assets.py --status         # what is present, what is missing
+python3 Scripts/sync_assets.py --plan           # the full from-nothing order
+python3 Scripts/sync_assets.py --restore-stock  # copy the engine's template assets in
+python3 Scripts/sync_assets.py --verify         # checksum them against what was recorded
+```
+
+`Scripts/forest_generator/asset_sources.py` is the table that makes this work: for every
+directory under `Content/` it names the one thing that produces it. Three kinds —
+
+| kind | restored by | verified by |
+|---|---|---|
+| **stock** — 171 files, 126 MB, ships with UE 5.8 | `sync_assets.py --restore-stock` | sha256, in `stock_checksums.json` |
+| **generated** — everything else under `Content/` | the builder named in the table | the verifier suite, 564 checks |
+| **cache** — downloads, in git-ignored `assets/` | `fetch_weapon_sounds.py` | the fetcher's own cached-file report |
+
+**Three stock files are patched in place by builders** and so belong to both kinds:
+`ABP_Unarmed` (the LayeredBoneBlend that keeps `DefaultSlot` on the upper body),
+`BP_ThirdPersonCharacter` and `BP_ThirdPersonGameMode`. They are *restored* by copying the
+engine's copy and *verified* by the suite, never by checksum — a Blueprint recompile is not
+byte-deterministic, so two correct builds of the same graph differ by hundreds of bytes.
+`--verify` excludes them by name and says so.
+
+**Everything that is not code lives in `assets/`, which is git-ignored:** `assets/cache/sounds`
+(300 MB of CC0 firearm recordings), `assets/cache/scanned` (2.3 GB of scanned meshes and
+textures), `assets/generated` and `assets/generated_realistic` (generator scratch). Never
+commit an archive — GitHub hard-rejects any file over 100 MB, and the 185 MB `firearm_library.7z`
+in `assets/cache/sounds` is exactly the file that would trip it.
+
+Proved end to end on 2026-09-27: the four stock directories were deleted, re-copied from
+UE 5.8.3 and rebuilt, and the suite came back **356/356 weapons, 60/60 HUD, 148/148 level**.
+
 ## Run a script — fast
 
 **Default to `Scripts/dev/uepy.py`.** A cold `UnrealEditor-Cmd` costs **35-45 s of boot and

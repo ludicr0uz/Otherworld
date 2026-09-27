@@ -24,7 +24,17 @@ Enabled plugins: `ModelingToolsEditorMode` (editor-only), `GameplayStateTree`,
 
 No C++ source module exists — the project is Blueprint + Python only. It started from the
 Third Person template (`Content/ThirdPerson`, `Content/Characters/Mannequins`,
-`Content/Input`, `Content/LevelPrototyping` are template leftovers and largely untouched).
+`Content/Input`, `Content/LevelPrototyping`), and "largely untouched" turns out to be
+measurable: of those 171 files, **168 are byte-identical to the UE 5.8.3 install** and three
+are patched in place by builders — `ABP_Unarmed`, `BP_ThirdPersonCharacter` and
+`BP_ThirdPersonGameMode`.
+
+That is why the repository is code only. Nothing under `Content/` is committed except
+`Content/Python`: the stock files are restored by copying them out of the engine, and
+everything else is written by a script in `Scripts/`. `Scripts/forest_generator/asset_sources.py`
+is the table of which is which, `Scripts/sync_assets.py` is the tool that acts on it, and
+`assets/` (git-ignored) holds downloads and generator scratch. Verified 2026-09-27 by
+deleting the four stock directories and rebuilding: 356/356 weapons, 60/60 HUD, 148/148 level.
 
 ### Content layout that matters
 

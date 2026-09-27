@@ -2,7 +2,7 @@ import os
 import unreal
 
 PROJECT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld"
-gltf_file = os.path.join(PROJECT_DIR, "Scripts", "downloaded_scanned_assets", "rock_07", "rock_07_1k.gltf")
+gltf_file = os.path.join(PROJECT_DIR, "assets", "cache", "scanned", "rock_07", "rock_07_1k.gltf")
 
 asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
 editor_asset_sub = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)

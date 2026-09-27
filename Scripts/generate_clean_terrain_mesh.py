@@ -3,7 +3,7 @@ import math
 
 PROJECT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld"
 SCRIPTS_DIR = os.path.join(PROJECT_DIR, "Scripts")
-GENERATED_DIR = os.path.join(SCRIPTS_DIR, "generated_assets")
+GENERATED_DIR = os.path.join(os.path.dirname(SCRIPTS_DIR), "assets", "generated")
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 def generate_clean_terrain_obj(filepath):

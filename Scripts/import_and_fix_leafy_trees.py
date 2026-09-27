@@ -8,7 +8,7 @@ asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
 editor_asset_sub = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
 mel = unreal.MaterialEditingLibrary
 
-SCANNED_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/downloaded_scanned_assets"
+SCANNED_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/assets/cache/scanned"
 tree_models = ["island_tree_01", "island_tree_02", "fir_tree_01"]
 
 for mid in tree_models:

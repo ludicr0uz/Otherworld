@@ -12,7 +12,7 @@ import struct
 # Paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(PROJECT_DIR, "Scripts")
-GENERATED_DIR = os.path.join(SCRIPTS_DIR, "generated_realistic_assets")
+GENERATED_DIR = os.path.join(os.path.dirname(SCRIPTS_DIR), "assets", "generated_realistic")
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 # -------------------------------------------------------------

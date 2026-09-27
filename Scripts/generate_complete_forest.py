@@ -11,7 +11,7 @@ import struct
 # Directory paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(PROJECT_DIR, "Scripts")
-GENERATED_DIR = os.path.join(SCRIPTS_DIR, "generated_assets")
+GENERATED_DIR = os.path.join(os.path.dirname(SCRIPTS_DIR), "assets", "generated")
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 # -------------------------------------------------------------

@@ -11,7 +11,7 @@ editor_actor_sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 level_editor_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 mel = unreal.MaterialEditingLibrary
 
-SCANNED_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/downloaded_scanned_assets/textures"
+SCANNED_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/assets/cache/scanned/textures"
 
 # 1. Import New 2K Textures
 textures_to_import = [

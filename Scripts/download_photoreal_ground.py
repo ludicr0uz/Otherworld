@@ -2,7 +2,7 @@ import urllib.request
 import json
 import os
 
-OUT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/downloaded_scanned_assets/textures"
+OUT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/assets/cache/scanned/textures"
 
 def download_polyhaven_texture(tex_name):
     target_dir = os.path.join(OUT_DIR, tex_name)

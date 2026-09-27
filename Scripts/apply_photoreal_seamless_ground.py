@@ -8,7 +8,7 @@ level_editor_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 mel = unreal.MaterialEditingLibrary
 
 PROJECT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld"
-TEXTURES_DIR = os.path.join(PROJECT_DIR, "Scripts/downloaded_scanned_assets/textures")
+TEXTURES_DIR = os.path.join(PROJECT_DIR, "assets", "cache", "scanned", "textures")
 
 unreal.log_warning("==================================================")
 unreal.log_warning("[AGY] 1. Importing High-Fidelity Scanned Textures...")

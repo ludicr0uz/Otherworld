@@ -30,9 +30,9 @@ already manage without.
 
     python3 Scripts/fetch_weapon_sounds.py
 
-Downloads are cached in Scripts/downloaded_sounds/ (gitignored, ~200 MB) so a
+Downloads are cached in assets/cache/sounds/ (gitignored, ~200 MB) so a
 re-run only re-cuts. Output is nine 44.1 kHz 16-bit mono WAVs in
-Scripts/generated_assets/sounds/, which is exactly where
+assets/generated/sounds/, which is exactly where
 build_weapons_and_combat.import_sounds() looks for them.
 
 MONO IS NOT A SIZE OPTIMISATION. PlaySoundAtLocation spatialises a sound by
@@ -51,8 +51,8 @@ import urllib.request
 import wave
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE_DIR = os.path.join(HERE, "downloaded_sounds")
-OUT_DIR = os.path.join(HERE, "generated_assets", "sounds")
+CACHE_DIR = os.path.join(os.path.dirname(HERE), "assets", "cache", "sounds")
+OUT_DIR = os.path.join(os.path.dirname(HERE), "assets", "generated", "sounds")
 
 RATE = 44100
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"

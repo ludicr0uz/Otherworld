@@ -2,7 +2,7 @@ import os
 import json
 import urllib.request
 
-OUTPUT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/downloaded_scanned_assets"
+OUTPUT_DIR = "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/assets/cache/scanned"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 HEADERS = {

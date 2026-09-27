@@ -159,6 +159,7 @@ GENERATED = (
         dest="Content/Sourced/Characters",
         kind="generated",
         builders=("Scripts/asset_pipeline/import_characters.py",
+                  "Scripts/asset_pipeline/build_creature_materials.py",
                   "Scripts/asset_pipeline/build_retarget.py"),
         note="AI-generated monsters (zombie, wendigo) imported from the Meshy "
              "cache below, plus the rigs that animate them. Every monster "
@@ -169,7 +170,14 @@ GENERATED = (
              "creature is a mesh and nothing else. Each monster imports into a "
              "folder of its own: Meshy names every export's material "
              "Material_1, so a shared folder makes the second monster bind to "
-             "the first one's skin. Run the two builders in that order.",
+             "the first one's skin. The rigged FBX carries only a base colour, "
+             "so build_creature_materials.py imports the normal and packed "
+             "occlusion/roughness/metallic maps from the cache and wires them "
+             "into M_MeshyCreature -- without it the creatures shade like "
+             "plastic. build_retarget.py retargets the anim BLUEPRINT, not a "
+             "list of clips, which is what gives the creatures a state machine "
+             "a Character can actually be pointed at. Run the three builders "
+             "in that order.",
     ),
     AssetSource(
         dest="Content/Maps",
@@ -226,13 +234,22 @@ RESTORE_ORDER = (
     "Scripts/fetch_weapon_sounds.py",
     "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
-    "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",
-    "Scripts/generate_forest_level.py",
-    # Monsters last: they need nothing from the rest, and a clone without a
-    # Meshy key can stop here with a working game and no creatures.
+    # The monsters come before the NPC blueprints, because the wanderers ARE
+    # the monsters: BP_Wanderer_Zombie and BP_Wanderer_Wendigo need
+    # SKM_Zombie01/SKM_Wendigo01 and the retargeted A_Meshy_ABP_Unarmed to
+    # exist before they can point at them.
+    #
+    # A clone without a Meshy key can still stop before this block and run the
+    # rest: build_npc_blueprints falls back to the mannequin and says so in the
+    # log. That is a playable game with wrong-looking enemies, which is the
+    # right failure for a missing optional credential -- but it is a FALLBACK,
+    # not the intended build, so the order here is the full one.
     "Scripts/asset_pipeline/fetch_monsters.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_characters.py",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_creature_materials.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_retarget.py",
+    "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",
+    "Scripts/generate_forest_level.py",
 )
 
 

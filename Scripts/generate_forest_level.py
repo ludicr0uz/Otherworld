@@ -1002,27 +1002,37 @@ def _write_unreal_import_script(
             if SCRIPTS_DIR not in sys.path:
                 sys.path.insert(0, SCRIPTS_DIR)
             import build_npc_blueprints
+            from forest_generator.npc_placement import variant_for_index
             # force=True: the builder updates assets IN PLACE and is idempotent,
             # so re-running it is cheap -- and without it an existing
             # BP_ForestWanderer is reused wholesale and no property change in
             # build_npc_blueprints.py ever reaches the asset via this path.
-            npc_bp = build_npc_blueprints.ensure_npc_blueprints(force=True)
-            npc_class = unreal.BlueprintEditorLibrary.generated_class(npc_bp)
+            npc_variants = build_npc_blueprints.ensure_npc_variants(force=True)
+            npc_classes = {{
+                key: unreal.BlueprintEditorLibrary.generated_class(bp)
+                for key, bp in npc_variants.items()
+            }}
 
-            # One actor per spawn point, labelled _NPC_Wanderer_<n>.  The
-            # labels are what verify_<Level>.py matches on, and they are
+            # One actor per spawn point, labelled _NPC_Wanderer_<creature>_<n>.
+            # The labels are what verify_<Level>.py matches on: it filters on
+            # the _NPC_Wanderer prefix and sorts on the TRAILING number, so the
+            # creature name goes in the middle -- appended, it would be read as
+            # the index, every wanderer would sort as 0, and the pairwise
+            # position checks would compare each NPC against the wrong spawn.
             # 1-based to line up with the generator's own console output.
             for i, spawn in enumerate(NPC_SPAWNS, start=1):
+                variant = variant_for_index(i)
                 npc_actor = editor_actor_sub.spawn_actor_from_class(
-                    npc_class,
+                    npc_classes[variant.key],
                     unreal.Vector(spawn["x"], spawn["y"], spawn["z"]),
                     # Keywords, not positional: unreal.Rotator is (roll, pitch, yaw).
                     unreal.Rotator(pitch=0.0, yaw=spawn["yaw"], roll=0.0),
                 )
-                npc_actor.set_actor_label(f"{{LEVEL_NAME}}_NPC_Wanderer_{{i}}")
+                npc_actor.set_actor_label(
+                    f"{{LEVEL_NAME}}_NPC_Wanderer_{{variant.key}}_{{i}}")
                 unreal.log_warning(
-                    f"[GEN]    NPC {{i}} at ({{spawn['x']:.0f}}, {{spawn['y']:.0f}}, "
-                    f"{{spawn['z']:.0f}})")
+                    f"[GEN]    NPC {{i}} ({{variant.key}}) at ({{spawn['x']:.0f}}, "
+                    f"{{spawn['y']:.0f}}, {{spawn['z']:.0f}})")
             unreal.log_warning(
                 "[GEN]    navmesh is built by the navigation system at game "
                 "start (no nav data saved in the level)")
@@ -1393,7 +1403,9 @@ def _write_unreal_verify_script(
 
             # -- The Blueprint assets --
             for path in ("/Game/Forest/NPC/BP_ForestWanderer",
-                         "/Game/Forest/NPC/BP_ForestWandererAI"):
+                         "/Game/Forest/NPC/BP_ForestWandererAI",
+                         "/Game/Forest/NPC/BP_Wanderer_Zombie",
+                         "/Game/Forest/NPC/BP_Wanderer_Wendigo"):
                 check(f"Asset Exists {{path.rsplit('/', 1)[-1]}}",
                       editor_asset_sub.does_asset_exist(path))
 

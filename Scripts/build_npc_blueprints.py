@@ -73,8 +73,14 @@ from forest_generator.npc_placement import (
     NPC_MELEE_DAMAGE,
     NPC_MELEE_INTERVAL_S,
     NPC_MELEE_MONTAGE,
+    NPC_MELEE_MONTAGE_FALLBACK,
     NPC_MELEE_BLEND_S,
     NAV_REACHABLE_EXTENT_CM,
+    NPC_VARIANTS,
+    NPC_BASE_MESH,
+    NPC_BASE_MESH_FALLBACK,
+    NPC_ANIM_BP,
+    NPC_ANIM_BP_FALLBACK,
 )
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -83,11 +89,36 @@ NPC_DIR = "/Game/Forest/NPC"
 AI_BP_PATH = f"{NPC_DIR}/BP_ForestWandererAI"
 NPC_BP_PATH = f"{NPC_DIR}/BP_ForestWanderer"
 
-# Mirror the player character's rig rather than hand-rolling one: the
-# third-person template's combination is known to animate, so copying it is the
-# surest route to a walk cycle.  Read from BP_ThirdPersonCharacter's CDO.
-SKELETAL_MESH_PATH = "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple"
-ANIM_BP_PATH = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed.ABP_Unarmed_C"
+# ── Body and animation ───────────────────────────────────────────────────────
+#
+# The wanderers wear Meshy creatures on SK_MeshyHumanoid, animated by
+# A_Meshy_ABP_Unarmed -- ABP_Unarmed retargeted onto that skeleton, state
+# machine and blend space included, by Scripts/asset_pipeline/build_retarget.py.
+# An anim BP is bound to one skeleton, so the mannequin's cannot drive a
+# creature; retargeting the BLUEPRINT rather than a folder of clips is what
+# makes the monsters usable by a Character at all.
+#
+# Every one of these lives under /Game/Sourced, which is git-ignored and
+# rebuilt from assets/cache/meshy.  A checkout that has not run the asset
+# pipeline therefore has none of them, and the mannequin pair it falls back to
+# is the combination that shipped before the creatures existed -- a wanderer
+# that looks wrong is a far better failure than a build that stops, and the log
+# says loudly which one happened.
+def _resolve(preferred, fallback, what):
+    """First of the two that exists on disk, as an OBJECT path."""
+    eas = _asset_sub()
+    for pkg in (preferred, fallback):
+        if eas.does_asset_exist(pkg):
+            if pkg is fallback:
+                unreal.log_warning(
+                    f"[NPC] {what}: {preferred} is missing -- falling back to "
+                    f"{pkg}. Run Scripts/asset_pipeline to build the creatures.")
+            return f"{pkg}.{pkg.rsplit('/', 1)[-1]}"
+    raise RuntimeError(f"[NPC] neither {preferred} nor {fallback} exists ({what})")
+
+
+def _mesh_object(pkg):
+    return f"{pkg}.{pkg.rsplit('/', 1)[-1]}"
 
 MESH_RELATIVE_Z_CM = -89.0
 MESH_RELATIVE_YAW_DEG = 270.0
@@ -108,7 +139,12 @@ MELEE_SLOT = "DefaultSlot"
 # An object pin holds the full object path (package + object name), and it
 # normalises whatever is written into that form -- so write it that way, or the
 # read-back guard in _set() reports a mismatch that is not one.
-MELEE_MONTAGE_OBJECT = f"{NPC_MELEE_MONTAGE}.{NPC_MELEE_MONTAGE.rsplit('/', 1)[-1]}"
+#
+# Resolved when the graph is authored rather than at import, because which of
+# the two montages exists depends on whether the asset pipeline has run, and
+# _resolve needs the editor's asset subsystem.
+def _melee_montage_object():
+    return _resolve(NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK, "melee montage")
 
 INF = 1.0e9
 
@@ -385,7 +421,7 @@ def _author_melee(ed, after_move, delay, x0, y0):
 
     montage = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 2400, y0))
     _connect(_pin(anim, "ReturnValue", is_input=False), _pin(montage, "self"))
-    _set(montage, "Asset", MELEE_MONTAGE_OBJECT)
+    _set(montage, "Asset", _melee_montage_object())
     _set(montage, "SlotNodeName", MELEE_SLOT)
     _set(montage, "BlendInTime", NPC_MELEE_BLEND_S)
     _set(montage, "BlendOutTime", NPC_MELEE_BLEND_S)
@@ -625,13 +661,14 @@ def build_npc_blueprint(ai_bp):
     cdo.set_editor_property(
         "auto_possess_ai", unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
 
-    # Body — reuse the template mannequin so the walk animates.
+    # Body — the default creature. Each variant child overrides just this.
     mesh_comp = cdo.get_editor_property("mesh")
-    skel = eas.load_asset(SKELETAL_MESH_PATH)
+    mesh_path = _resolve(NPC_BASE_MESH, NPC_BASE_MESH_FALLBACK, "base mesh")
+    skel = eas.load_asset(mesh_path)
     if skel:
         mesh_comp.set_editor_property("skeletal_mesh_asset", skel)
     else:
-        unreal.log_error(f"[NPC] missing skeletal mesh {SKELETAL_MESH_PATH}")
+        unreal.log_error(f"[NPC] missing skeletal mesh {mesh_path}")
 
     # The wanderer wears the mesh's own materials. This array is written every
     # build, empty included, because this builder edits the Blueprint in place:
@@ -654,13 +691,16 @@ def build_npc_blueprint(ai_bp):
     # animation_mode is already ANIMATION_BLUEPRINT once anim_class is set; it
     # is pinned here only because this builder updates blueprints in place and
     # should not inherit a stale AnimationSingleNode/AnimationCustomMode value.
-    anim_class = unreal.load_class(None, ANIM_BP_PATH)
+    # _resolve hands back an object path; a Blueprint's runtime class is that
+    # plus _C, which is what a component's anim_class actually wants.
+    anim_bp = _resolve(NPC_ANIM_BP, NPC_ANIM_BP_FALLBACK, "anim blueprint")
+    anim_class = unreal.load_class(None, f"{anim_bp}_C")
     if anim_class:
         _try_set(mesh_comp, "animation_mode",
                  unreal.AnimationMode.ANIMATION_BLUEPRINT)
         mesh_comp.set_editor_property("anim_class", anim_class)
     else:
-        unreal.log_error(f"[NPC] missing anim blueprint {ANIM_BP_PATH}")
+        unreal.log_error(f"[NPC] missing anim blueprint {anim_bp}_C")
 
     # Keep the pose updating even when the NPC is off-screen, so it is mid-stride
     # when the player turns to look rather than snapping into a pose.
@@ -714,6 +754,53 @@ def build_npc_blueprint(ai_bp):
     return bp
 
 
+# ─── Creature variants ──────────────────────────────────────────────────────
+
+def build_variant_blueprint(base_bp, variant):
+    """A child of BP_ForestWanderer wearing one creature.
+
+    Child Blueprints rather than a mesh swap at spawn time, and rather than one
+    builder per creature.  The user's requirement is that the variants have
+    identical stats and movement logic, and inheritance is the only way to
+    express that such that it CANNOT drift: the capsule, run speed, melee
+    numbers, rotation rate and the whole AI controller are defined once on the
+    parent and are not repeated here.  This function sets exactly one thing.
+
+    Adding a creature is therefore an entry in NPC_VARIANTS and nothing else.
+    """
+    eas = _asset_sub()
+    parent_class = BEL.generated_class(base_bp)
+    if not parent_class:
+        raise RuntimeError("base NPC blueprint has no generated class")
+
+    bp = _create_blueprint(variant.blueprint, parent_class)
+    cdo = unreal.get_default_object(BEL.generated_class(bp))
+    mesh_comp = cdo.get_editor_property("mesh")
+
+    mesh = eas.load_asset(_mesh_object(variant.mesh))
+    if mesh:
+        mesh_comp.set_editor_property("skeletal_mesh_asset", mesh)
+    else:
+        # Not fatal: the child still inherits the parent's mesh, so the NPC
+        # spawns and behaves correctly, it just wears the wrong creature.
+        unreal.log_warning(
+            f"[NPC] {variant.key}: {variant.mesh} is missing -- this variant "
+            "will wear the base mesh")
+
+    # The creature carries its own material instance (MI_Zombie01 and friends,
+    # built by build_creature_materials.py), so an override here could only
+    # ever be wrong.  Written explicitly rather than left alone because this
+    # builder edits in place: an override set by a previous build survives
+    # until something states otherwise.
+    mesh_comp.set_editor_property("override_materials", [])
+
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError(f"{variant.blueprint} failed to compile")
+    eas.save_loaded_asset(bp)
+    _log(f"built {variant.blueprint} ({mesh.get_name() if mesh else 'inherited mesh'})")
+    return bp
+
+
 # ─── Entry point ────────────────────────────────────────────────────────────
 
 def ensure_npc_blueprints(force=False):
@@ -732,6 +819,23 @@ def ensure_npc_blueprints(force=False):
     return build_npc_blueprint(ai_bp)
 
 
+def ensure_npc_variants(force=False):
+    """Every creature Blueprint the level can spawn, keyed by variant key.
+
+    This is what a level generator wants; ``ensure_npc_blueprints`` builds the
+    shared parent and is kept because the verify scripts address it by name.
+    """
+    base = ensure_npc_blueprints(force=force)
+    eas = _asset_sub()
+    out = {}
+    for variant in NPC_VARIANTS:
+        if not force and eas.does_asset_exist(variant.blueprint):
+            out[variant.key] = eas.load_asset(variant.blueprint)
+        else:
+            out[variant.key] = build_variant_blueprint(base, variant)
+    return out
+
+
 if __name__ == "__main__":
-    ensure_npc_blueprints(force=True)
+    ensure_npc_variants(force=True)
     _log("done")

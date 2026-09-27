@@ -87,11 +87,28 @@ ROOT_MOTION_BONE_MANNEQUIN = "root"
 
 # The locomotion an enemy actually needs.  Not the pistol/rifle sets: the Meshy
 # rig has no fingers, so anything that grips a weapon is meaningless on it.
-ANIM_SOURCES = (
-    "/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle",
-    "/Game/Characters/Mannequins/Anims/Unarmed/Walk",
-    "/Game/Characters/Mannequins/Anims/Unarmed/Jog",
-)
+# Two roots, not a list of clips.  Retargeting the ANIM BLUEPRINT with
+# include_referenced_assets pulls in everything it plays -- BS_Idle_Walk_Run and
+# the sixteen directional clips behind it, MM_Idle, and the jump set -- and,
+# more importantly, produces a target-skeleton copy of the state machine that
+# drives them.  A folder of loose AnimSequences is not something a Character can
+# be pointed at; an anim BP is.  Listing the clips by hand, as this did at
+# first, retargeted the animation and left the animation LOGIC behind on
+# SK_Mannequin, which is why the monsters existed as assets but nothing in the
+# game could use them.
+#
+# MM_Attack_01 is named separately because nothing references it: the AI
+# controller plays it into a slot by path at runtime, so the dependency walk
+# cannot see it.
+ABP_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"
+MELEE_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
+RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE)
+
+# What the NPC builder points a monster's SkeletalMeshComponent at.  Derived
+# from the source name and the prefix below, and asserted in verify() rather
+# than left as a comment, because a rename here silently breaks the NPCs.
+ABP_MESHY = f"{ANIM_DIR}/A_Meshy_ABP_Unarmed"
+MELEE_MESHY = f"{ANIM_DIR}/A_Meshy_MM_Attack_01"
 
 
 # print() goes nowhere in a cold -ExecutePythonScript run; the log does.
@@ -238,29 +255,45 @@ def build_retargeter(source_rig, target_rig):
     return rtg
 
 
-def _anim_assets():
-    """Expand ANIM_SOURCES -- each entry is either an asset or a folder."""
+def _source_assets():
+    """AssetData for the retarget roots.
+
+    The batch operation takes FAssetData, not loaded objects -- passing the
+    UObject fails with "Cannot nativize 'AnimBlueprint' as 'AssetData'".
+    """
     reg = unreal.AssetRegistryHelpers.get_asset_registry()
-    out = {}
-    for entry in ANIM_SOURCES:
-        found = (reg.get_assets_by_path(entry, recursive=True)
-                 if unreal.EditorAssetLibrary.does_directory_exist(entry)
-                 else [reg.get_asset_by_object_path(f"{entry}.{entry.rsplit('/', 1)[1]}")])
-        for data in found:
-            if data and str(data.asset_class_path.asset_name) == "AnimSequence":
-                out[str(data.package_name)] = data
-    return [out[k] for k in sorted(out)]
+    out = []
+    for pkg in RETARGET_SOURCES:
+        data = reg.get_asset_by_object_path(f"{pkg}.{pkg.rsplit('/', 1)[1]}")
+        if not data or not data.is_valid():
+            raise RuntimeError(f"retarget source not found: {pkg}")
+        out.append(data)
+    return out
 
 
 def retarget_animations(rtg):
-    assets = _anim_assets()
-    _log(f"retargeting {len(assets)} animations -> {ANIM_DIR}")
+    assets = _source_assets()
+    _log(f"retargeting {len(assets)} roots (+ their dependencies) -> {ANIM_DIR}")
+
+    # Wipe first.  The batch operation does not reliably overwrite in place: a
+    # run whose output collided with an existing A_Meshy_MM_Idle produced
+    # A_Meshy_MM_Idle1 beside it despite overwrite_existing_files, and a stray
+    # numbered duplicate is the kind of thing that gets referenced by accident
+    # and then never updates.  The directory is generated in full every run and
+    # is git-ignored, so there is nothing here worth preserving.
+    if unreal.EditorAssetLibrary.does_directory_exist(ANIM_DIR):
+        unreal.EditorAssetLibrary.delete_directory(ANIM_DIR)
+    unreal.EditorAssetLibrary.make_directory(ANIM_DIR)
+    unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
 
     inputs = unreal.IKRetargetBatchOperationInputs()
     inputs.set_editor_property("assets_to_retarget", assets)
     inputs.set_editor_property("source_mesh", _load(MANNEQUIN_MESH))
     inputs.set_editor_property("target_mesh", _meshy_mesh())
     inputs.set_editor_property("ik_retarget_asset", rtg)
+    # Follow the graph: this is what turns two roots into the whole locomotion
+    # set, blend space and state machine included.
+    inputs.set_editor_property("include_referenced_assets", True)
     # Strip the mannequin's naming convention and stamp the creature family on,
     # so /Game/Sourced/Characters/Anims never collides with the source set.
     inputs.set_editor_property("search", "MF_Unarmed_")
@@ -271,7 +304,7 @@ def retarget_animations(rtg):
     inputs.set_editor_property("overwrite_existing_files", True)
 
     created = unreal.IKRetargetBatchOperation.run_batch_retarget(inputs)
-    _log(f"created {len(created)} animation assets")
+    _log(f"created {len(created)} assets")
     return created
 
 
@@ -301,6 +334,19 @@ def _check_pose(anim):
     problems = []
     foot_gaps, hips_xy = [], []
 
+    # Two exemptions, both because the check below encodes what GROUNDED
+    # locomotion looks like and these clips are not that.
+    #
+    # An idle has no gait: an idle whose feet alternate is the bug.
+    #
+    # An airborne clip has no fixed hip height and no step cycle -- rising is
+    # the entire content of a jump.  MM_Jump legitimately reaches z=153 and
+    # was the one clip to fail the grounded band.  Upright and in-place still
+    # apply to it: a jump that folds double or drifts sideways is still wrong.
+    name = anim.get_name()
+    grounded = not any(k in name for k in ("Jump", "Fall", "Land"))
+    has_gait = grounded and "Idle" not in name
+
     for t in samples:
         p = {b: _bone_world(anim, b, t)
              for b in ("Hips", "Head", "LeftFoot", "RightFoot")}
@@ -311,15 +357,14 @@ def _check_pose(anim):
                             f"(head {head:.0f} hips {hips:.0f} feet {feet:.0f})")
         # Ref-pose hips sit at 101 uu. A pelvis on the floor means the Root
         # Motion op stole the track; one at head height means a broken chain.
-        if not 60.0 < hips < 140.0:
+        if grounded and not 60.0 < hips < 140.0:
             problems.append(f"t={t:.2f} hips at z={hips:.0f}, expected ~101")
         foot_gaps.append(p["LeftFoot"].z - p["RightFoot"].z)
         hips_xy.append((p["Hips"].x, p["Hips"].y))
 
     # A frozen pose satisfies every bound above, so locomotion has to show a
     # gait: one foot high while the other is planted, and the pair swapping.
-    # Idles are exempt by design -- an idle whose feet alternate is the bug.
-    if "Idle" not in anim.get_name():
+    if has_gait:
         if max(foot_gaps) - min(foot_gaps) < 5.0:
             problems.append("feet never alternate "
                             f"(spread {max(foot_gaps) - min(foot_gaps):.1f} uu)")
@@ -336,40 +381,83 @@ def _check_pose(anim):
 
 
 def verify(created):
-    """The point of the whole exercise: does a monster actually animate?"""
+    """The point of the whole exercise: does a monster actually animate?
+
+    The batch now returns three kinds of asset, and each needs a different
+    question asked of it.  A clip is checked geometrically -- upright, in
+    place, with a real step cycle -- because the cheap check (right skeleton,
+    non-zero length) passes for a creature folded double at the waist or
+    pinned to the floor, which is exactly what two live bugs produced while
+    this reported "ok".  A blend space and an anim blueprint have no pose to
+    sample, so they are checked for the thing that breaks instead: the blend
+    space for its skeleton, the blueprint for whether it compiles.
+    """
     meshy_skel = _load(MESHY_SKELETON)
-    ok, bad = 0, []
+    clips, ok, bad = 0, 0, []
+
     for data in created:
         pkg = str(data.package_name)
-        anim = unreal.EditorAssetLibrary.load_asset(pkg)
-        if not isinstance(anim, unreal.AnimSequence):
-            bad.append((pkg, "not an AnimSequence"))
-            continue
+        asset = unreal.EditorAssetLibrary.load_asset(pkg)
+        name = asset.get_name() if asset else pkg
 
-        # Nothing downstream can extract root motion from a skeleton with no
-        # root bone; leaving the flag on invites a silent foot-slide instead.
-        anim.set_editor_property("enable_root_motion", False)
-        anim.set_editor_property("force_root_lock", False)
+        if isinstance(asset, unreal.AnimSequence):
+            clips += 1
+            # Nothing downstream can extract root motion from a skeleton with
+            # no root bone; leaving the flag on invites a silent foot-slide.
+            asset.set_editor_property("enable_root_motion", False)
+            asset.set_editor_property("force_root_lock", False)
 
-        skel = anim.get_editor_property("skeleton")
-        frames = anim.get_editor_property("number_of_sampled_frames")
-        if skel != meshy_skel:
-            bad.append((anim.get_name(), f"skeleton {skel.get_name()}"))
-        elif frames < 2:
-            bad.append((anim.get_name(), f"{frames} frames"))
+            skel = asset.get_editor_property("skeleton")
+            frames = asset.get_editor_property("number_of_sampled_frames")
+            if skel != meshy_skel:
+                bad.append((name, f"skeleton {skel.get_name() if skel else None}"))
+            elif frames < 2:
+                bad.append((name, f"{frames} frames"))
+            else:
+                problems = _check_pose(asset)
+                bad.extend((name, p) for p in problems)
+                ok += not problems
+
+        elif isinstance(asset, unreal.AnimBlueprint):
+            # A retargeted anim BP keeps every node it had, including ones
+            # bound to the source rig.  ABP_Unarmed drives CR_Mannequin_FootIK,
+            # a Control Rig authored against SK_Mannequin's bone names; on the
+            # Meshy hierarchy those elements do not resolve.  That is a no-op
+            # rather than an error -- the foot IK simply stops contributing --
+            # but it has to compile, because a blueprint that does not compile
+            # has no generated class and cannot be assigned to a component.
+            if not unreal.BlueprintEditorLibrary.compile_blueprint(asset):
+                bad.append((name, "does not compile"))
+            elif not unreal.BlueprintEditorLibrary.generated_class(asset):
+                bad.append((name, "compiled but produced no class"))
+            else:
+                skel = asset.get_editor_property("target_skeleton")
+                if skel != meshy_skel:
+                    bad.append((name, f"targets {skel.get_name() if skel else None}"))
+
+        elif isinstance(asset, unreal.BlendSpace) or isinstance(asset, unreal.AnimationAsset):
+            skel = asset.get_editor_property("skeleton")
+            if skel != meshy_skel:
+                bad.append((name, f"skeleton {skel.get_name() if skel else None}"))
+
         else:
-            problems = _check_pose(anim)
-            bad.extend((anim.get_name(), p) for p in problems)
-            ok += not problems
+            bad.append((name, f"unexpected asset type {type(asset).__name__}"))
+
+    # The NPC builder addresses these two by path. A rename upstream would
+    # otherwise surface as a missing anim class at spawn time, in the game.
+    for expected in (ABP_MESHY, MELEE_MESHY):
+        if not unreal.EditorAssetLibrary.does_asset_exist(expected):
+            bad.append((expected.rsplit("/", 1)[1], "expected by the NPC builder, not produced"))
 
     _log("=" * 52)
-    _log(f"{ok}/{len(created)} clips upright, in place, with a real gait")
+    _log(f"{ok}/{clips} clips upright, in place, with a real gait "
+         f"({len(created)} assets total)")
     for name, why in bad:
         _log(f"  FAIL {name}: {why}")
     if bad:
         raise RuntimeError(f"{len(bad)} problems across the retargeted set")
     _log(f"monsters walk -- every mesh on {MESHY_SKELETON.rsplit('/', 1)[1]} "
-         "shares these clips")
+         f"shares {ABP_MESHY.rsplit('/', 1)[1]}")
 
 
 def main():

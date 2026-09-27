@@ -285,7 +285,9 @@ if EXPECTED_NPCS:
 
     # -- The Blueprint assets --
     for path in ("/Game/Forest/NPC/BP_ForestWanderer",
-                 "/Game/Forest/NPC/BP_ForestWandererAI"):
+                 "/Game/Forest/NPC/BP_ForestWandererAI",
+                 "/Game/Forest/NPC/BP_Wanderer_Zombie",
+                 "/Game/Forest/NPC/BP_Wanderer_Wendigo"):
         check(f"Asset Exists {path.rsplit('/', 1)[-1]}",
               editor_asset_sub.does_asset_exist(path))
 

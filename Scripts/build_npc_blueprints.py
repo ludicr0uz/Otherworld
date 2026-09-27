@@ -10,15 +10,24 @@ Two assets are produced under /Game/Forest/NPC:
 
   BP_ForestWandererAI  (parent AIController)  — the brain.  Event graph:
 
-      [Event BeginPlay] --> [MoveToActor] --> [in reach and off cooldown?]
-                                 ^                 |            |
-                                 |             yes |            | no
-                                 |                 v            |
-                                 |        [arm next swing]      |
-                                 |        [play MM_Attack_01]   |
-                                 |        [player Health -= 12] |
-                                 |                 |            |
-                                 '------ [Delay 0.5s] <---------'
+      [Event BeginPlay] --> [both ends on the navmesh?]
+                                 ^     |            |
+                                 |  yes|            |no
+                                 |     v            v
+                                 | [MoveToActor] [MoveToLocation,
+                                 |  (pathfound)   no pathfinding]
+                                 |     |            |
+                                 |     '-----.------'
+                                 |           v
+                                 |   [in reach and off cooldown?]
+                                 |           |            |
+                                 |       yes |            | no
+                                 |           v            |
+                                 |  [arm next swing]      |
+                                 |  [play MM_Attack_01]   |
+                                 |  [player Health -= 12] |
+                                 |           |            |
+                                 '--- [Delay 0.5s] <------'
 
       [Get Player Pawn 0] --ReturnValue--> [MoveToActor.Goal]
 
@@ -28,6 +37,13 @@ Two assets are produced under /Game/Forest/NPC:
       request fires before the navmesh or the player pawn exist -- and that same
       loop is where the melee check lives, so there is one heartbeat rather than
       two that can disagree.
+
+      The branch in front of it is the answer to a navigation DEAD ZONE: the
+      navmesh covers a disc of radius 85 m inside a 200 m square of terrain, so
+      a player who walks into the ring outside it cannot be pathed to at all.
+      With bAllowPartialPath the request did not even fail -- it succeeded, at
+      the island edge, and the pack stood there.  See NAV_REACHABLE_EXTENT_CM
+      in npc_placement.py.
 
   BP_ForestWanderer    (parent Character)     — the body: mannequin mesh,
       running movement speed, and the controller above auto-possessing it.
@@ -58,6 +74,7 @@ from forest_generator.npc_placement import (
     NPC_MELEE_INTERVAL_S,
     NPC_MELEE_MONTAGE,
     NPC_MELEE_BLEND_S,
+    NAV_REACHABLE_EXTENT_CM,
 )
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -97,6 +114,15 @@ INF = 1.0e9
 
 # Function paths for the graph nodes
 FN_MOVE_TO_ACTOR = "/Script/AIModule.AIController.MoveToActor"
+# The same move order with pathfinding switched off: path following still runs,
+# it just follows a straight line to the point instead of a Recast path. This
+# is what lets a wanderer chase a player who is standing on ground the navmesh
+# does not cover.
+FN_MOVE_TO_LOCATION = "/Script/AIModule.AIController.MoveToLocation"
+FN_PROJECT_NAV = ("/Script/NavigationSystem.NavigationSystemV1"
+                  ".K2_ProjectPointToNavigation")
+FN_MAKE_VECTOR = "/Script/Engine.KismetMathLibrary.MakeVector"
+FN_AND_B = "/Script/Engine.KismetMathLibrary.BooleanAND"
 FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
 FN_GET_PAWN = "/Script/Engine.Controller.K2_GetPawn"
@@ -237,8 +263,13 @@ def _set(node, name, value):
 
 # ─── The AI controller ──────────────────────────────────────────────────────
 
-def _author_melee(ed, move_to, delay, x0, y0):
+def _author_melee(ed, after_move, delay, x0, y0):
     """Swing at the player when the chase has closed the distance.
+
+    ``after_move`` is every exec pin that has just issued a move order -- there
+    are two of them now, the pathfinding one and the straight-line one -- and
+    all of them run into the same range check. The melee half does not care
+    which kind of move got the NPC here.
 
     Spliced between the move order and the re-path delay, so the check runs
     every NPC_REPATH_SECONDS with no Tick event of its own: the loop is already
@@ -322,7 +353,8 @@ def _author_melee(ed, move_to, delay, x0, y0):
 
     swing = keep(_at(ed.add_branch_node(), x0 + 1200, y0))
     _connect(_pin(both, "ReturnValue", is_input=False), _pin(swing, "Condition"))
-    _connect(BEL.find_then_pin(move_to), _pin(swing, "execute"))
+    for tail in after_move:
+        _connect(tail, _pin(swing, "execute"))
     # Not in range, or still on cooldown: straight on to the re-path delay.
     _connect(BEL.find_else_pin(swing), BEL.find_execute_pin(delay))
 
@@ -440,9 +472,9 @@ def build_ai_controller_blueprint(rebuild=True):
                                   BEL.get_basic_type_by_name("real")):
         raise RuntimeError("could not declare NextAttackTime")
 
-    move_to = _at(_node(ed, FN_MOVE_TO_ACTOR), origin.x + 340, origin.y)
+    move_to = _at(_node(ed, FN_MOVE_TO_ACTOR), origin.x + 1000, origin.y - 120)
     get_pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), origin.x + 40, origin.y + 220)
-    delay = _at(_node(ed, FN_DELAY), origin.x + 4000, origin.y)
+    delay = _at(_node(ed, FN_DELAY), origin.x + 4600, origin.y)
 
     # Goal = the player pawn
     _set(get_pawn, "PlayerIndex", 0)
@@ -482,18 +514,85 @@ def build_ai_controller_blueprint(rebuild=True):
              _pin(gate, "Condition"))
     _connect(BEL.find_then_pin(begin_play), _pin(gate, "execute"))
     _connect(BEL.find_then_pin(delay), _pin(gate, "execute"))
-    _connect(BEL.find_then_pin(gate), BEL.find_execute_pin(move_to))
-    # Unpossessed: straight back to the delay and try again next tick of the loop.
+    # --- can this chase be pathfound at all? ---------------------------------
+    # See NAV_REACHABLE_EXTENT_CM. Both ends are tested, and both have to be
+    # on the navmesh for pathfinding to be the right tool: a player who has
+    # walked into the un-navigable ring cannot be pathed TO, and a wanderer
+    # already standing in it cannot be pathed FROM. Either way the answer is
+    # the same -- walk at them in a straight line.
+    #
+    # K2_ProjectPointToNavigation is pure and re-evaluates once per output pin
+    # that is read. Only ReturnValue is read from each of these, so each
+    # projects exactly once per frame the loop runs, and the ProjectedLocation
+    # output is deliberately left dangling: the destination is the player's
+    # real position, not a snapped one. Snapping it back onto the navmesh is
+    # precisely the behaviour that made the dead zone.
+    reach = _at(_node(ed, FN_MAKE_VECTOR), origin.x + 40, origin.y + 900)
+    for axis, value in zip(("X", "Y", "Z"), NAV_REACHABLE_EXTENT_CM):
+        _set(reach, axis, value)
+    reach_out = _pin(reach, "ReturnValue", is_input=False)
+
+    goal_loc = _at(_node(ed, FN_ACTOR_LOC), origin.x + 300, origin.y + 380)
+    _connect(_pin(get_pawn, "ReturnValue", is_input=False), _pin(goal_loc, "self"))
+    goal_out = _pin(goal_loc, "ReturnValue", is_input=False)
+    goal_on = _at(_node(ed, FN_PROJECT_NAV), origin.x + 560, origin.y + 380)
+    _connect(goal_out, _pin(goal_on, "Point"))
+    _connect(reach_out, _pin(goal_on, "QueryExtent"))
+
+    here_pawn = _at(_node(ed, FN_GET_PAWN), origin.x + 40, origin.y + 620)
+    here_loc = _at(_node(ed, FN_ACTOR_LOC), origin.x + 300, origin.y + 620)
+    _connect(_pin(here_pawn, "ReturnValue", is_input=False), _pin(here_loc, "self"))
+    here_on = _at(_node(ed, FN_PROJECT_NAV), origin.x + 560, origin.y + 620)
+    _connect(_pin(here_loc, "ReturnValue", is_input=False), _pin(here_on, "Point"))
+    _connect(reach_out, _pin(here_on, "QueryExtent"))
+
+    both_on = _at(_node(ed, FN_AND_B), origin.x + 800, origin.y + 500)
+    _connect(_pin(goal_on, "ReturnValue", is_input=False), _pin(both_on, "A"))
+    _connect(_pin(here_on, "ReturnValue", is_input=False), _pin(both_on, "B"))
+
+    pathable = _at(ed.add_branch_node(), origin.x + 800, origin.y + 200)
+    _connect(_pin(both_on, "ReturnValue", is_input=False), _pin(pathable, "Condition"))
+    _connect(BEL.find_then_pin(gate), _pin(pathable, "execute"))
+    _connect(BEL.find_then_pin(pathable), BEL.find_execute_pin(move_to))
+
+    # --- the straight line ---------------------------------------------------
+    # Not a teleport, not AddMovementInput, and not a second Tick: this is the
+    # SAME move request the pathfinding branch issues, with pathfinding off, so
+    # the path-following component drives the character with the same
+    # acceleration and the same stop condition and keeps doing it between loop
+    # iterations. AddMovementInput would move the NPC for exactly one frame out
+    # of every thirty, because this loop runs twice a second.
+    #
+    # bProjectDestinationToNavigation must stay FALSE. True is the dead zone,
+    # written a different way: it snaps the goal back onto the navmesh island
+    # and the NPC walks to the edge and stops.
+    direct = _at(_node(ed, FN_MOVE_TO_LOCATION), origin.x + 1000, origin.y + 200)
+    _connect(goal_out, _pin(direct, "Dest"))
+    _set(direct, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
+    _set(direct, "bUsePathfinding", "false")
+    _set(direct, "bProjectDestinationToNavigation", "false")
+    _set(direct, "bStopOnOverlap", "true")
+    _set(direct, "bCanStrafe", "false")
+    _connect(BEL.find_else_pin(pathable), BEL.find_execute_pin(direct))
+
+    after_move = (BEL.find_then_pin(move_to), BEL.find_then_pin(direct))
+
     _connect(BEL.find_else_pin(gate), BEL.find_execute_pin(delay))
 
-    melee = _author_melee(ed, move_to, delay, origin.x + 700, origin.y)
+    melee = _author_melee(ed, after_move, delay, origin.x + 1400, origin.y)
     if melee is None:
-        _connect(BEL.find_then_pin(move_to), BEL.find_execute_pin(delay))
+        for tail in after_move:
+            _connect(tail, BEL.find_execute_pin(delay))
 
     ed.add_comment_to_nodes(
-        f"Re-issue a pathfinding move order at the player every "
-        f"{NPC_REPATH_SECONDS} s, once the controller has a pawn to move.",
-        [move_to, get_pawn, delay, gate, own_pawn, possessed])
+        f"Re-issue a move order at the player every {NPC_REPATH_SECONDS} s, "
+        f"once the controller has a pawn to move. Pathfinding when both ends "
+        f"are on the navmesh -- which is what runs the NPC around trees -- and "
+        f"a straight-line move order when either end is not, because the "
+        f"navmesh only covers a disc inside the terrain and a player in the "
+        f"ring outside it used to be simply unreachable.",
+        [move_to, get_pawn, delay, gate, own_pawn, possessed, reach, goal_loc,
+         goal_on, here_pawn, here_loc, here_on, both_on, pathable, direct])
     if melee:
         ed.add_comment_to_nodes(
             f"Melee: within {NPC_MELEE_RANGE_CM:.0f} cm and off cooldown, swing "

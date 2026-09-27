@@ -129,6 +129,42 @@ NAV_MAX_VERTICAL_SPAN_CM = 1600.0
 # volume's ceiling is treated as too low to stand in.
 NAV_VERTICAL_HEADROOM_CM = 200.0
 
+# ── Chasing off the navmesh ──────────────────────────────────────────────────
+#
+# The navmesh covers a disc of radius NAV_MAX_HALF_XY_CM (85 m) inside a 200 m
+# square of terrain, so there is a ring 15 m wide -- wider at the corners --
+# that is walkable ground with no navigation data on it.  A player standing
+# there was UNREACHABLE: MoveToActor is issued with bAllowPartialPath, so
+# rather than failing it quietly paths to the nearest point that IS on the
+# navmesh, the NPC jogs to the island edge, arrives, and stands there.  From
+# inside the game that reads as the pack losing interest at an invisible line.
+#
+# The fix is not a bigger navmesh.  The cap is an empirically measured Recast
+# limit (see NAV_MAX_HALF_XY_CM above: +/-9200 cm builds *zero* tiles), so
+# widening it does not make the dead zone smaller, it makes the whole navmesh
+# disappear.  Instead the chase asks, twice a second, whether pathfinding
+# applies at all -- and when it does not, issues the same move order with
+# pathfinding switched off, which path-follows a straight line and works
+# anywhere there is ground.
+#
+# Straight-line chasing is the right fallback specifically HERE and it is worth
+# saying why, because in general it is not: trees are scattered only within
+# EDGE_MARGIN_FRACTION (0.80) of the half-extent, so the un-navigable ring is
+# almost entirely open ground.  There is very little out there to walk into.
+#
+# The test is "does this point project onto the navmesh within this box", and
+# the box has to be TIGHT or it answers yes for a player 15 m outside the
+# island by snapping to its edge -- which is the bug, restated.  200 cm in XY
+# is far tighter than anything that reads as "off the mesh".
+#
+# Z is generous for a reason that has already bitten this project once: a
+# navmesh polygon can sit up to 86 cm below the real ground (Recast voxelises
+# and then simplifies), and the point being projected is an actor location,
+# i.e. a capsule CENTRE, another 88 cm above the surface.  A tight Z box would
+# report a player standing squarely on the navmesh as being off it, and the
+# whole pack would abandon pathfinding in the middle of the forest.
+NAV_REACHABLE_EXTENT_CM = (200.0, 200.0, 400.0)
+
 # Rough trunk radius per unit of tree scale.  This is a proxy, used only for
 # spawn clearance and the line-of-sight test below — never for collision, which
 # comes from the real mesh geometry.

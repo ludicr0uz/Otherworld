@@ -249,13 +249,97 @@ if shot and pist:
              for sp in G._weapon_specs()]
     check("every weapon has its own fire sound",
           len(set(shots)) == len(shots), str(sorted(shots)))
-    # The two mechanical noises go the other way on purpose: a hammer on an
-    # empty chamber is the same noise in any receiver.
-    for slot in ("DryFireSound", "ReloadSound"):
-        shared = {cdo(load(sp["path"])).get_editor_property(slot).get_name()
-                  for sp in G._weapon_specs()}
-        check(f"...while {slot} is deliberately shared by all of them",
-              len(shared) == 1, str(sorted(shared)))
+    # The click goes the other way on purpose: a hammer falling on an empty
+    # chamber is the same noise in any receiver, so one asset serves all five.
+    clicks = {cdo(load(sp["path"])).get_editor_property("DryFireSound").get_name()
+              for sp in G._weapon_specs()}
+    check("...while DryFireSound is deliberately shared by all of them",
+          len(clicks) == 1, str(sorted(clicks)))
+    # The reload does NOT, and that changed when the sounds became recordings
+    # of real firearms: a pump shotgun, a magazine swap and a hand-fed reload
+    # are three different actions. Assert against the spec table rather than
+    # against a list written out here, so a weapon whose row is edited is
+    # checked against its row.
+    for sp in G._weapon_specs():
+        want = sp["reload_sound"].rsplit("/", 1)[-1]
+        got = cdo(load(sp["path"])).get_editor_property("ReloadSound")
+        check(f"{sp['display']}: reloads with {want}",
+              got is not None and got.get_name() == want,
+              got.get_name() if got else "None")
+    reloads = {cdo(load(sp["path"])).get_editor_property("ReloadSound").get_name()
+               for sp in G._weapon_specs()}
+    check("...and the reload is NOT one sound for five weapons any more",
+          len(reloads) > 1, str(sorted(reloads)))
+    # The one pairing that would be audibly wrong: a 0.47 s pump under an
+    # assault rifle, or a magazine swap on a pump shotgun.
+    by_name = {sp["display"]: cdo(load(sp["path"]))
+               .get_editor_property("ReloadSound").get_name()
+               for sp in G._weapon_specs()}
+    check("the pump shotgun does not share a reload with the magazine weapons",
+          by_name["Shotgun"] not in {by_name["SMG"], by_name["Rifle"]},
+          str(by_name))
+
+# ─── The sounds themselves ───────────────────────────────────────────────────
+# Nine assets cut from CC0 recordings of real firearms by
+# Scripts/fetch_weapon_sounds.py, which replaced a synthesiser. The checks are
+# on the WAVs on disk rather than on the SoundWave assets, because the two
+# properties worth asserting are properties of the audio and not of the import.
+
+import os
+import wave as _wave
+
+_eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
+
+for name in G.SOUND_NAMES:
+    check(f"{name} imported", _eas.does_asset_exist(f"{G.AUDIO_DIR}/{name}"))
+# A_Reload was the one synthesised clack every weapon shared. A builder that
+# simply stops referencing an asset leaves it on disk forever, so its removal
+# is deliberate and worth asserting -- an orphan in the audio folder reads as
+# something still in use.
+for path in G.RETIRED_SOUNDS:
+    check(f"the superseded {path.rsplit('/', 1)[-1]} is gone",
+          not _eas.does_asset_exist(path), path)
+
+for name in G.SOUND_NAMES:
+    src = os.path.join(G.SOUND_SRC_DIR, f"{name}.wav")
+    if not os.path.isfile(src):
+        check(f"{name}.wav is on disk", False, src)
+        continue
+    with _wave.open(src, "rb") as fh:
+        channels, rate, frames = (fh.getnchannels(), fh.getframerate(),
+                                  fh.getnframes())
+    # MONO IS LOAD-BEARING, not a size choice. PlaySoundAtLocation spatialises
+    # by panning and attenuating around the listener and can only do that to a
+    # one-channel source; hand it the stereo original and every shot plays flat
+    # and full volume with no sense of where the muzzle was.
+    check(f"{name} is mono, so PlaySoundAtLocation can place it",
+          channels == 1, f"{channels} channels")
+    check(f"{name} is 44.1 kHz", rate == 44100, str(rate))
+    seconds = frames / float(rate)
+    check(f"{name} is between 0.2 s and 2.5 s long", 0.2 <= seconds <= 2.5,
+          f"{seconds:.2f}s")
+
+# A shot has to finish inside its own fire interval or an automatic stacks an
+# unbounded number of copies of itself. Only the automatics are checked: the
+# sniper's 1.6 s report deliberately runs into its 1.6 s cadence.
+for name in G.AUTO_DISPLAYS:
+    sp = next(x for x in G._weapon_specs() if x["display"] == name)
+    src = os.path.join(G.SOUND_SRC_DIR, f"{sp['sound'].rsplit('/', 1)[-1]}.wav")
+    if not os.path.isfile(src):
+        continue
+    with _wave.open(src, "rb") as fh:
+        seconds = fh.getnframes() / float(fh.getframerate())
+    overlap = seconds / sp["interval"]
+    check(f"{name}: a held trigger stacks at most 12 copies of the shot",
+          overlap <= 12.0, f"{seconds:.2f}s sample / {sp['interval']:.2f}s "
+                           f"interval = {overlap:.1f} overlapping")
+    # ...and the ones that do stack are mixed down for it, or the burst clips.
+    with _wave.open(src, "rb") as fh:
+        raw = fh.readframes(fh.getnframes())
+    peak = max(abs(int.from_bytes(raw[i:i + 2], "little", signed=True))
+               for i in range(0, len(raw), 2)) / 32767.0
+    check(f"{name}: its sample is mixed below full scale, so a burst does not "
+          f"clip", peak < 0.80, f"peak {peak:.2f}")
 
 # ─── The three found weapons ─────────────────────────────────────────────────
 # The starting loadout is spawned into the player's hands; these three exist
@@ -366,9 +450,12 @@ for var, want in (("ShotgunClass", "BP_Shotgun_C"),
     check(f"{var} points at {want}", got is not None and got.get_name() == want,
           got.get_name() if got else "None")
 
+# The fire key appears TWICE and that is the whole of automatic fire: once as
+# WasInputKeyJustPressed (a tap) and once as IsInputKeyDown (a hold). Sprint is
+# the only other held key.
 keys = sorted(pin_value(n, "Key") for n in by_pins(wg, "self", "Key"))
-want_keys = sorted([G.FIRE_KEY, G.SWITCH_KEY, G.DROP_KEY, G.PICKUP_KEY,
-                    G.SPRINT_KEY, G.RELOAD_KEY])
+want_keys = sorted([G.FIRE_KEY, G.FIRE_KEY, G.SWITCH_KEY, G.DROP_KEY,
+                    G.PICKUP_KEY, G.SPRINT_KEY, G.RELOAD_KEY])
 check(f"polls exactly {want_keys}", keys == want_keys, str(keys))
 
 plays = by_pins(wg, "Asset", "SlotNodeName")
@@ -705,6 +792,55 @@ check("the death flag is raised for the HUD to draw the menu from",
       bool(titled(hg, f"SET {G.PLAYER_DEAD_VAR}"))
       or bool(titled(hg, f"Set {G.PLAYER_DEAD_VAR}")))
 
+# ─── Walking off the edge of the world ───────────────────────────────────────
+# The navmesh is a disc of radius 85 m and the terrain a 200 m square, but the
+# terrain does eventually END -- and a Character in freefall never stops. The
+# player used to fall for the rest of the session with nothing noticing, because
+# "still falling" and "standing still" look identical to everything watching.
+#
+# The fix reuses the NPC safety net rather than adding a KillZ or a teleport:
+# below WORLD_FLOOR_Z, write Health to 0 and let the death path that already
+# exists open the restart menu. What had to change is that the net used to be
+# AND-ed with DespawnOnDeath -- NPCs only -- and that gate moved inward so it
+# guards only the log line, which quotes an NpcId the player does not have.
+
+floors = [n for n in hg if num_pin(n, "B") == G.WORLD_FLOOR_Z]
+check(f"something compares a height against {G.WORLD_FLOOR_Z:.0f} cm",
+      len(floors) == 1, f"{len(floors)} comparisons")
+if floors:
+    gates = [PIN.get_owning_node(q) for q in
+             BEL.find_output_pin(floors[0], "ReturnValue").list_connected_pins()]
+    # THE REGRESSION THIS EXISTS TO CATCH: an AND here means the test is once
+    # again "under the world AND is an NPC", and the player falls forever.
+    check("the world floor is branched on directly, not AND-ed with a "
+          "\"...and is an NPC\" term",
+          [g.get_class().get_name() for g in gates] == ["K2Node_IfThenElse"],
+          str([str(BEL.get_node_title(g)) for g in gates]))
+
+# Two writes of Health = 0 would mean two floors; one, reached from both arms
+# of the "is this worth a log line" branch, is the shape that catches both the
+# wanderer and the player.
+zeroes = [n for n in hg
+          if str(BEL.get_node_title(n)).replace("\n", " ") == "Set Health"
+          and num_pin(n, "Health") == 0.0]
+check("exactly one node writes the fall off as death", len(zeroes) == 1,
+      f"{len(zeroes)} writes of Health = 0")
+if zeroes:
+    feeders = [PIN.get_owning_node(q) for q in
+               PIN.list_connected_pins(BEL.find_input_pin(zeroes[0], "execute"))]
+    check("...and BOTH arms of the report branch reach it -- the reported "
+          "wanderer and the unreported player",
+          len(feeders) == 2, f"reached from {len(feeders)} exec pin(s)")
+    kinds = sorted(f.get_class().get_name() for f in feeders)
+    check("...one of them straight from a Branch (the player: no log line)",
+          "K2Node_IfThenElse" in kinds, str(kinds))
+# The log line stays wanderer-only: it quotes a number and a spawn point.
+check("the fall report is still gated on DespawnOnDeath",
+      any("DespawnOnDeath" in out_pins(n) for n in hg))
+check("...and still names the wanderer and where it was put",
+      bool(titled(hg, "PrintWarning")) or bool(titled(hg, "Print Warning")),
+      "the fall report is the one line Blueprint can raise above Display")
+
 # ─── Sprint and stamina ──────────────────────────────────────────────────────
 
 for var, kind, want in (("Stamina", float, G.MAX_STAMINA),
@@ -873,6 +1009,89 @@ if dry:
     nots = [t for t in titles if "NOT" in t.upper() and "Boolean" in t]
     check("...one half of which is \"has no ammunition\"", len(nots) >= 3,
           f"{len(nots)} NOT nodes (unlimited-weapon, not-sprinting, empty, pose)")
+
+# ─── Automatic fire ──────────────────────────────────────────────────────────
+# Hold the button and the SMG and the assault rifle keep firing; the shotgun,
+# the pistol and the sniper are one shot per click. What makes this cheap is
+# that the rate limit already existed: FireInterval and NextFireTime were being
+# consulted on every frame the trigger was down long before anything could hold
+# it down. All that is added is whether a held button still counts as a pull.
+
+autos = {sp["display"] for sp in G._weapon_specs() if sp["automatic"]}
+check("exactly the SMG and the assault rifle are automatic",
+      autos == set(G.AUTO_DISPLAYS), str(sorted(autos)))
+for sp in G._weapon_specs():
+    check(f"{sp['display']}: Automatic is {sp['automatic']}",
+          bool(cdo(load(sp["path"])).get_editor_property("Automatic"))
+          is bool(sp["automatic"]))
+# A held trigger with no rate limit is one shot per frame, i.e. 60 rounds a
+# second out of a 30-round magazine. Both automatics must have an interval.
+for name in G.AUTO_DISPLAYS:
+    sp = next(x for x in G._weapon_specs() if x["display"] == name)
+    check(f"{name}: has a fire interval, so a held trigger is not one shot "
+          f"per frame",
+          float(cdo(load(sp["path"])).get_editor_property("FireInterval")) > 0.0,
+          str(sp["interval"]))
+
+downs = [n for n in wg if "IsInputKeyDown" in str(BEL.get_node_title(n))]
+check("two keys are polled held rather than tapped: sprint and the trigger",
+      sorted(pin_value(x, "Key") for x in downs)
+      == sorted([G.FIRE_KEY, G.SPRINT_KEY]),
+      str(sorted(pin_value(x, "Key") for x in downs)))
+
+# THE TRAP THIS SECTION EXISTS FOR. Automatic lives on the weapon, so reading
+# it means a pure Get with its self pin driven by Held -- and Held is null
+# whenever the player's hands are empty. Read in the OUTER fire gate's
+# condition, which is pulled on every frame, that is an "Accessed None" per
+# frame forever; read behind it, where Held has been checked valid, it is free.
+#
+# Rather than try to name the outer gate, assert the invariant: Automatic is
+# read in the same Branch condition as the other Held properties, all of which
+# are already known to sit behind the valid-Held gate.
+def upstream(pin, limit=200):
+    """Every node feeding this pin, following data links only."""
+    seen, stack = set(), [pin]
+    while stack and len(seen) < limit:
+        for q in PIN.list_connected_pins(stack.pop()):
+            node = PIN.get_owning_node(q)
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.extend(BEL.list_input_pins(node))
+    return seen
+
+def reads(nodes, var):
+    return any(var in out_pins(x) for x in nodes)
+
+conds = [(x, upstream(BEL.find_input_pin(x, "Condition")))
+         for x in wg
+         if x.get_class().get_name() == "K2Node_IfThenElse"
+         and BEL.find_input_pin(x, "Condition")]
+with_auto = [(x, up) for x, up in conds if reads(up, "Automatic")]
+check("exactly one Branch consults Automatic", len(with_auto) == 1,
+      f"{len(with_auto)} branches")
+if with_auto:
+    _, up = with_auto[0]
+    check("...and it is the gate that also reads Loaded and NextFireTime, so "
+          "Automatic is read behind the valid-Held check and not in front of it",
+          reads(up, "Loaded") and reads(up, "NextFireTime"),
+          f"Loaded={reads(up, 'Loaded')} NextFireTime={reads(up, 'NextFireTime')}")
+    # The held button only counts when the weapon says so: Automatic must be
+    # AND-ed with the key, never read on its own.
+    consumers = [PIN.get_owning_node(q)
+                 for x in wg if "Automatic" in out_pins(x)
+                 for q in PIN.list_connected_pins(
+                     BEL.find_output_pin(x, "Automatic"))]
+    check("Automatic is AND-ed with the held key, not used on its own",
+          bool(consumers) and all("AND" in str(BEL.get_node_title(c)).upper()
+                                  for c in consumers),
+          str([str(BEL.get_node_title(c)) for c in consumers]))
+# ...and a semi-automatic still fires: the tap has to bypass the Automatic
+# test, which means an OR sits between them.
+check("a tapped trigger fires regardless of Automatic (an OR, not an AND)",
+      len([x for x in wg if "OR Boolean"
+           in str(BEL.get_node_title(x)).replace("\n", " ")]) >= 2,
+      "one OR for the unlimited-ammo short circuit, one for tap-or-hold")
 
 # ─── Sprinting drops the ready pose ──────────────────────────────────────────
 # The complaint this answers: running with the barrel levelled at the horizon.

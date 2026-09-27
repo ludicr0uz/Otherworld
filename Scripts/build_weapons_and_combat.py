@@ -183,12 +183,35 @@ WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
 AMMO_CLASS_PATH = f"{AMMO_BP_PATH}.BP_AmmoPickup_C"
 
-# Two mechanical sounds, shared by every weapon rather than synthesised per
-# gun: a hammer on an empty chamber and a shell going into a tube are the same
-# noise whichever receiver they happen in, and five copies of each would be
-# five things to keep in step for no audible gain.
+# The mechanical sounds. All of these, and the five gunshots, are now cut from
+# CC0 recordings of real firearms by Scripts/fetch_weapon_sounds.py -- see that
+# file for the sources and for why every one of them is public domain rather
+# than merely free.
+#
+# The click stays SHARED by all five weapons: a hammer falling on an empty
+# chamber genuinely is the same noise in every receiver, and five copies would
+# be five things to keep in step for no audible gain.
+#
+# The reload does NOT, and that is the one thing the real recordings changed
+# about the shape of this data. When it was a synthesised clack, one sound for
+# five weapons was defensible because none of them sounded like anything in
+# particular. A pump shotgun, a magazine swap and a hand-fed reload are three
+# different actions that take three different lengths of time, and the weapon
+# already carried a per-weapon ReloadSound slot -- so which one to play is now
+# a column in _weapon_specs() like every other difference between guns.
 SND_DRY_FIRE = f"{AUDIO_DIR}/A_DryFire"
-SND_RELOAD = f"{AUDIO_DIR}/A_Reload"
+SND_RELOAD_SHOTGUN = f"{AUDIO_DIR}/A_ReloadShotgun"   # 0.47 s -- a pump cocked
+SND_RELOAD_RIFLE = f"{AUDIO_DIR}/A_ReloadRifle"       # 1.56 s -- mag out, mag in, bolt
+SND_RELOAD_PISTOL = f"{AUDIO_DIR}/A_ReloadPistol"     # 1.58 s -- slower, hand-fed
+
+# The sound assets this builder imports, and the only list of them. Retiring
+# A_Reload (the single shared synthesised clack) is deliberate and is handled
+# by retire_old_assets(): a builder that simply stops referencing an asset
+# leaves it on disk forever.
+SOUND_NAMES = ("A_ShotgunFire", "A_PistolFire", "A_SMGFire", "A_RifleFire",
+               "A_SniperFire", "A_DryFire", "A_ReloadShotgun",
+               "A_ReloadRifle", "A_ReloadPistol")
+RETIRED_SOUNDS = (f"{AUDIO_DIR}/A_Reload",)
 
 AIM_RIFLE = "/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS"
 AIM_PISTOL = "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS"
@@ -284,6 +307,20 @@ RIFLE_FIRE_INTERVAL, RIFLE_RELOAD_SECONDS = 0.14, 2.1
 SNIPER_MAGAZINE, SNIPER_RESERVE = 5, 15
 SNIPER_FIRE_INTERVAL, SNIPER_RELOAD_SECONDS = 1.60, 2.6
 
+# Which of the five hold the trigger down. The SMG and the assault rifle do;
+# the shotgun, the pistol and the sniper are one shot per click.
+#
+# This is a property of the weapon and not of the input code, which is the
+# whole reason it is expressible at all: the trigger is polled two ways every
+# frame -- tapped and held -- and the weapon decides which of the two it
+# answers to. Nothing branches on a weapon's name to find out.
+#
+# Note what automatic fire does NOT need: a timer, a "firing" state, or a
+# repeating event. FireInterval and NextFireTime already gate the rate, and
+# they were already being consulted on every frame the trigger was down. All
+# the automatics change is whether a held button still counts as a pull.
+AUTO_DISPLAYS = ("SMG", "Rifle")
+
 # One kill in ten leaves a gun. Rolled once per counted kill, then a second
 # uniform draw picks which of the three -- so each individual weapon is a
 # 1-in-30 drop and a player who wants a specific one has to keep going.
@@ -361,9 +398,22 @@ RESPAWN_LIFT = NPC_CAPSULE_HALF_HEIGHT_CM
 # measured burial and stays under anything growing above.
 RESPAWN_TRACE_UP = 200.0
 RESPAWN_TRACE_DOWN = 500.0
-# The floor of the world, for the safety net below. The terrain bottoms out at
-# about -185 cm and the nav volume at -385, so anything under -1000 cm is not
-# standing on anything and never will be.
+# The floor of the world. The terrain bottoms out at about -185 cm and the nav
+# volume at -385, so anything under -1000 cm is not standing on anything and
+# never will be.
+#
+# This is now BOTH the NPC safety net and the player's death from walking off
+# the map, which are the same measurement and deliberately the same number.
+# The navigable island is a disc of radius 85 m inside a 200 m square of
+# terrain, and the terrain itself simply ends: walk far enough and there is
+# nothing under the capsule. Before this, the player fell for the rest of the
+# session -- no floor, no KillZ, no bottom. A Character in freefall never
+# stops, and the game has no way to notice, because "still falling" and
+# "standing still" look identical to everything that is watching.
+#
+# Routing it into Health = 0 rather than into a teleport or a Destroy is what
+# makes it cost nothing: the death path, the animation, the pause and the
+# restart menu all already exist and all already run at 0 HP.
 WORLD_FLOOR_Z = -1000.0
 
 # Every wanderer gets a number, handed out in spawn order and shown beside its
@@ -1003,7 +1053,10 @@ def _weapon_specs():
 
     The ammunition columns are here too rather than branched on DisplayName
     anywhere in the graphs: the firing code asks the weapon whether it uses
-    ammo, so a third weapon needs a row in this table and no new nodes.
+    ammo, so a third weapon needs a row in this table and no new nodes. The
+    same is true of `automatic`: the tick polls the fire key both ways every
+    frame and asks the weapon which answer counts, so making a sixth weapon
+    full-auto is a True in this table and nothing else.
 
     That claim has now been tested. The SMG, the assault rifle and the sniper
     were added as three rows here plus three part tables, and not one node in
@@ -1017,15 +1070,15 @@ def _weapon_specs():
     """
     return (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
-             display="Shotgun", damage=18.0, pellets=8, spread=5.0, range=4000.0,
-             sound=f"{AUDIO_DIR}/A_ShotgunFire", aim=AIM_RIFLE,
+             display="Shotgun", automatic=False, damage=18.0, pellets=8, spread=5.0, range=4000.0,
+             sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS),
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
-             display="Pistol", damage=26.0, pellets=1, spread=1.0, range=6000.0,
-             sound=f"{AUDIO_DIR}/A_PistolFire", aim=AIM_PISTOL,
+             display="Pistol", automatic=False, damage=26.0, pellets=1, spread=1.0, range=6000.0,
+             sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_PISTOL),
              colour=(0.35, 0.65, 0.95),
              uses_ammo=False, magazine=0, reserve=0,
@@ -1034,8 +1087,8 @@ def _weapon_specs():
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast.
         dict(path=SMG_BP_PATH, parts=_smg_parts(), muzzle=SMG_MUZZLE,
-             display="SMG", damage=12.0, pellets=1, spread=2.6, range=4500.0,
-             sound=f"{AUDIO_DIR}/A_SMGFire", aim=AIM_RIFLE,
+             display="SMG", automatic=True, damage=12.0, pellets=1, spread=2.6, range=4500.0,
+             sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.45, 0.85, 0.35),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
@@ -1043,8 +1096,8 @@ def _weapon_specs():
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
         dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE,
-             display="Rifle", damage=24.0, pellets=1, spread=1.4, range=9000.0,
-             sound=f"{AUDIO_DIR}/A_RifleFire", aim=AIM_RIFLE,
+             display="Rifle", automatic=True, damage=24.0, pellets=1, spread=1.4, range=9000.0,
+             sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.70, 0.45, 0.95),
              uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
@@ -1055,8 +1108,8 @@ def _weapon_specs():
         # runs at 600 cm/s is the difference between opening at distance and
         # being caught reloading.
         dict(path=SNIPER_BP_PATH, parts=_sniper_parts(), muzzle=SNIPER_MUZZLE,
-             display="Sniper", damage=120.0, pellets=1, spread=0.2, range=20000.0,
-             sound=f"{AUDIO_DIR}/A_SniperFire", aim=AIM_RIFLE,
+             display="Sniper", automatic=False, damage=120.0, pellets=1, spread=0.2, range=20000.0,
+             sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.95, 0.30, 0.35),
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
@@ -1116,24 +1169,28 @@ def build_materials():
 
 
 def import_sounds():
-    """Import the synthesised WAVs as SoundWave assets.
+    """Import the WAVs as SoundWave assets.
 
-    The .wav files come from Scripts/make_weapon_sounds.py, which is pure Python
-    and has already run by the time this does -- see main(). Nothing in
-    /Engine/Content is a usable gunshot, so they are generated rather than
-    referenced.
+    The .wav files come from Scripts/fetch_weapon_sounds.py, which is pure
+    Python plus the macOS tools and is run by hand rather than from main() --
+    it reaches the network and unpacks 194 MB, which is not something an asset
+    build should do on every invocation. The cut files are committed; the
+    downloads are not.
+
+    Nothing in /Engine/Content is a usable gunshot, which is why this project
+    supplies its own at all.
     """
     eas = _assets()
     made = []
-    for name in ("A_ShotgunFire", "A_PistolFire", "A_SMGFire", "A_RifleFire",
-                 "A_SniperFire", "A_DryFire", "A_Reload"):
+    for name in SOUND_NAMES:
         dest = f"{AUDIO_DIR}/{name}"
         if eas.does_asset_exist(dest):
             made.append(dest)
             continue
         src = os.path.join(SOUND_SRC_DIR, f"{name}.wav")
         if not os.path.isfile(src):
-            raise RuntimeError(f"missing {src} -- run Scripts/make_weapon_sounds.py")
+            raise RuntimeError(
+                f"missing {src} -- run Scripts/fetch_weapon_sounds.py")
         task = unreal.AssetImportTask()
         task.set_editor_property("filename", src)
         task.set_editor_property("destination_path", AUDIO_DIR)
@@ -1357,7 +1414,13 @@ def build_weapon_item():
                        ("UsesAmmo", "bool"),
                        ("MagazineSize", "int"),
                        ("Loaded", "int"),
-                       ("Reserve", "int")):
+                       ("Reserve", "int"),
+                       # Held trigger or tapped trigger. Read only behind the
+                       # fire gate, where Held is known valid -- a pure Get off
+                       # a null self is an Accessed None every frame, and the
+                       # outer gate's condition is pulled on frames where
+                       # nothing is equipped at all.
+                       ("Automatic", "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
@@ -1418,6 +1481,7 @@ def build_weapon(spec, item_bp):
         "WeaponRange": float(spec["range"]),
         "Dropped": False,
         "UsesAmmo": bool(spec["uses_ammo"]),
+        "Automatic": bool(spec["automatic"]),
         "MagazineSize": int(spec["magazine"]),
         # Starts loaded. A weapon that had to be reloaded before its first shot
         # would be a puzzle, not a mechanic.
@@ -1433,14 +1497,15 @@ def build_weapon(spec, item_bp):
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
         "FireSound": _must_load(spec["sound"]),
         "DryFireSound": _must_load(SND_DRY_FIRE),
-        "ReloadSound": _must_load(SND_RELOAD),
+        "ReloadSound": _must_load(spec["reload_sound"]),
         "AimPose": _must_load(spec["aim"]),
     })
     _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
          f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
          + (f"{spec['magazine']}+{spec['reserve']} rounds, "
-            f"{spec['interval']:.2f}s between shots)" if spec["uses_ammo"]
-            else "unlimited ammo)"))
+            f"{spec['interval']:.2f}s between shots"
+            if spec["uses_ammo"] else "unlimited ammo")
+         + (", automatic)" if spec["automatic"] else ")"))
     return bp
 
 
@@ -2528,16 +2593,26 @@ def build_health_component(rebuild=True):
 
 
     # --- Tick: the safety net -----------------------------------------------
-    # Anything below the world is counted as dead, which routes it through the
-    # despawn-and-replace path that already exists -- so a wanderer that somehow
-    # ends up under the terrain is gone within a frame and a correctly seated
-    # replacement takes its place, instead of falling for the rest of the
-    # session. Gated on DespawnOnDeath so it applies to the NPCs and never to
-    # the player, who has no replacement to be given.
+    # Anything below the world is counted as dead. For a wanderer that routes
+    # into the despawn-and-replace path, so one that ends up under the terrain
+    # is gone within a frame and a correctly seated replacement takes its
+    # place. For the player it routes into _author_player_death, and that is
+    # the answer to walking off the edge of the map.
     #
-    # This is a net, not the fix: the fix is tracing the respawn onto real
-    # ground (see below). A net is worth having anyway, because "the capsule
-    # ended up inside geometry" has more causes than the one that was measured.
+    # IT USED TO BE GATED ON DespawnOnDeath, i.e. NPCs only, on the reasoning
+    # that the player "has no replacement to be given". That was true when it
+    # was written and stopped being true the day the player got a death path:
+    # the player does not need a replacement, they need the restart menu, and
+    # the menu is what 0 HP already opens. So the gate moved inward. It now
+    # guards only the log line, which is the part that really is
+    # wanderer-specific -- it quotes an NpcId and a spawn location, and the
+    # player has neither.
+    #
+    # For the NPCs this is a net, not the fix: the fix is tracing the respawn
+    # onto real ground (see below). A net is worth having anyway, because "the
+    # capsule ended up inside geometry" has more causes than the one that was
+    # measured. For the player it is not a net at all -- it is the only thing
+    # standing between "walked too far" and a fall with no bottom.
     net_owner = _at(_node(ed, FN_GET_OWNER), -1200, 240)
     net_loc = _at(_node(ed, FN_ACTOR_LOC), -960, 240)
     _connect(_pin(net_owner, "ReturnValue", is_input=False), _pin(net_loc, "self"))
@@ -2546,13 +2621,17 @@ def build_health_component(rebuild=True):
     under = _at(_node(ed, FN_LESS_FF), -480, 240)
     _connect(_pin(net_brk, "Z", is_input=False), _pin(under, "A"))
     _set(under, "B", WORLD_FLOOR_Z)
-    net_is_npc = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -480, 400)
-    net_both = _at(_node(ed, FN_AND), -240, 240)
-    _connect(_pin(under, "ReturnValue", is_input=False), _pin(net_both, "A"))
-    _connect(_pin(net_is_npc, "DespawnOnDeath", is_input=False), _pin(net_both, "B"))
     lost = _at(ed.add_branch_node(), -240, 0)
-    _connect(_pin(net_both, "ReturnValue", is_input=False), _pin(lost, "Condition"))
+    _connect(_pin(under, "ReturnValue", is_input=False), _pin(lost, "Condition"))
     _connect(BEL.find_then_pin(tick), _pin(lost, "execute"))
+    # ...and only then, is this one worth a log line? A wanderer under the map
+    # is a bug worth reporting with its number and its spawn point. A player
+    # under the map walked there.
+    net_is_npc = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -240, 240)
+    reportable = _at(ed.add_branch_node(), 0, 0)
+    _connect(_pin(net_is_npc, "DespawnOnDeath", is_input=False),
+             _pin(reportable, "Condition"))
+    _connect(BEL.find_then_pin(lost), _pin(reportable, "execute"))
     # Say which one, by its number, before removing it: the net recovers the
     # game within a frame, which would otherwise erase the evidence of the very
     # thing worth diagnosing. Grep [NPC-FELL] for the number, then [NPC-SPAWN]
@@ -2592,18 +2671,27 @@ def build_health_component(rebuild=True):
     # what makes the line stand out in the Output Log.
     net_say = _at(_node(ed, FN_WARN), 1200, 0)
     _connect(_pin(net_full, "ReturnValue", is_input=False), _pin(net_say, "InString"))
-    _connect(BEL.find_then_pin(lost), _pin(net_say, "execute"))
+    _connect(BEL.find_then_pin(reportable), _pin(net_say, "execute"))
 
-    write_off = _at(ed.add_set_member_variable_node("Health"), 960, 0)
+    # Both arms write the zero -- the reported wanderer after its line, the
+    # player straight away. Missing the second connection would be the exact
+    # bug this block exists to fix, silently: the player would fall past the
+    # threshold, take the unreported branch, and carry on falling.
+    write_off = _at(ed.add_set_member_variable_node("Health"), 1440, 0)
     _set(write_off, "Health", 0.0)
-    _connect(BEL.find_then_pin(net_say), _pin(write_off, "execute"))
+    for tail in (BEL.find_then_pin(net_say), BEL.find_else_pin(reportable)):
+        _connect(tail, _pin(write_off, "execute"))
 
     ed.add_comment_to_nodes(
-        f"Safety net: an owner that has fallen below {WORLD_FLOOR_Z / 100:.0f} m "
-        "is named in the log and then written off as dead, so the existing death "
-        "path replaces it. NPCs only -- the player has no RespawnClass.",
-        [net_owner, net_loc, net_brk, under, net_is_npc, net_both, lost, net_id,
-         net_id_str, net_head, net_where, net_at, net_line, net_origin,
+        f"Below {WORLD_FLOOR_Z / 100:.0f} m there is nothing under the capsule "
+        "and never will be, so whatever is down there is written off as dead "
+        "and takes the death path it already has: a wanderer is replaced, and "
+        "the player -- who walked off the edge of a 200 m square of terrain -- "
+        "gets the restart menu instead of falling for the rest of the session. "
+        "Only the log line is wanderer-specific; it quotes a number and a spawn "
+        "point, and the player has neither.",
+        [net_owner, net_loc, net_brk, under, net_is_npc, lost, reportable,
+         net_id, net_id_str, net_head, net_where, net_at, net_line, net_origin,
          net_origin_str, net_from, net_full, net_say, write_off])
 
     # --- Tick: has it died this frame? ---------------------------------------
@@ -3954,12 +4042,12 @@ def _author_reload(ed, held, exec_in, x0, y0):
     return (BEL.find_then_pin(pause), BEL.find_else_pin(does))
 
 
-def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, exec_in, x0, y0):
+def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, tapped, exec_in, x0, y0):
     """The trigger was pulled on an empty chamber: click, and nothing else.
 
     Hangs off the False arm of the ready gate, which is the one place in the
-    graph that knows the trigger was pulled and the shot did not happen. Two
-    reasons lead here and only one of them is worth a sound:
+    graph that knows the trigger was pulled and the shot did not happen. Three
+    reasons now lead here and only one of them is worth a sound:
 
         no ammunition   the player has to *do* something (reload, or switch)
                         and nothing on screen says so -- the ammo readout is
@@ -3967,14 +4055,23 @@ def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, exec_in, x0, y0):
         still cooling   the weapon is working exactly as designed. Clicking
                         here would mean clicking on every frame a held trigger
                         outruns the interval, which on the SMG is most of them.
+        held, not tapped  a semi-automatic with the button still down. Nothing
+                        has gone wrong; the player has simply not let go.
 
-    So the condition is "empty AND cooled", not just "empty". Both inputs are
-    the same pure pins the ready gate itself used: re-reading them costs two
-    re-evaluations of plain property reads, and nothing has written to Held
-    between the gate and here -- precisely because nothing fired.
+    So the condition is "empty AND cooled AND tapped". The third term arrived
+    with automatic fire and is not optional: the outer gate now opens on a HELD
+    button, so without it, holding the mouse on an empty shotgun would click
+    sixty times a second. Tapped also gives the automatics the right behaviour
+    for free -- an empty SMG clicks once per pull rather than at its own fire
+    rate, because it is out of ammunition, not out of cooldown.
 
-    No cooldown is stamped. FIRE_KEY is polled with WasInputKeyJustPressed, so
-    one click of the mouse is one click of the hammer however long it is held.
+    All three inputs are the same pure pins the ready gate itself used:
+    re-reading them costs three re-evaluations of plain reads, and nothing has
+    written to Held between the gate and here -- precisely because nothing
+    fired.
+
+    No cooldown is stamped, and with the tap requirement none is needed: one
+    click of the mouse is one click of the hammer however long it is held.
     """
     made = []
 
@@ -3984,9 +4081,12 @@ def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, exec_in, x0, y0):
 
     empty = keep(_at(_node(ed, FN_NOT), x0, y0 + 300))
     _connect(has_ammo, _pin(empty, "A"))
-    worth = keep(_at(_node(ed, FN_AND), x0 + 260, y0 + 300))
-    _connect(_pin(empty, "ReturnValue", is_input=False), _pin(worth, "A"))
-    _connect(cooled, _pin(worth, "B"))
+    settled = keep(_at(_node(ed, FN_AND), x0 + 260, y0 + 300))
+    _connect(_pin(empty, "ReturnValue", is_input=False), _pin(settled, "A"))
+    _connect(cooled, _pin(settled, "B"))
+    worth = keep(_at(_node(ed, FN_AND), x0 + 260, y0 + 460))
+    _connect(_pin(settled, "ReturnValue", is_input=False), _pin(worth, "A"))
+    _connect(tapped, _pin(worth, "B"))
 
     click = keep(_at(ed.add_branch_node(), x0 + 520, y0))
     _connect(_pin(worth, "ReturnValue", is_input=False), _pin(click, "Condition"))
@@ -4003,9 +4103,11 @@ def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, exec_in, x0, y0):
 
     ed.add_comment_to_nodes(
         "Empty chamber: the click. Gated on \"out of ammunition\" AND \"off "
-        "cooldown\", so the weapon clicks when the player needs to be told to "
-        "reload and stays silent while it is merely between shots -- which on "
-        f"the SMG is every {SMG_FIRE_INTERVAL:.2f}s.",
+        "cooldown\" AND \"pressed this frame\", so the weapon clicks when the "
+        "player needs to be told to reload, stays silent while it is merely "
+        f"between shots (every {SMG_FIRE_INTERVAL:.2f}s on the SMG), and clicks "
+        "once per pull rather than once per frame now that a HELD button opens "
+        "the gate above.",
         made)
     return (BEL.find_then_pin(play), BEL.find_else_pin(click))
 
@@ -4098,11 +4200,37 @@ def _author_wc_tick(ed, tick):
     # used to run with, not to aim with. Note this AND is safe to fold together
     # -- every input is a plain bool read, with no chain behind it that could be
     # pulled by the half that should not have run (unlike the NPC melee gate).
+    #
+    # The trigger is polled BOTH ways, and the two are OR'd here rather than
+    # chosen between. Which one a given weapon honours is settled further in,
+    # behind this gate, because the answer is a property of Held -- and this
+    # condition is evaluated on every frame, including the frames where nothing
+    # is equipped. Reading Automatic here would be an Accessed None per frame
+    # for as long as the player's hands are empty.
+    #
+    # So the outer gate asks the question that is answerable without a weapon:
+    # is the player touching the trigger at all? A tap is also a hold on the
+    # frame it happens, so the OR is not strictly necessary for the automatics
+    # -- it is there so that a semi-automatic still opens the gate on the tap
+    # frame even if IsInputKeyDown were ever to disagree, and so that the two
+    # reads that actually decide are the same two pins the weapon is asked
+    # about below.
     steady = _at(_node(ed, FN_NOT), 760, 760)
     _connect(_pin(_at(ed.add_get_member_variable_node("Sprinting"), 480, 760),
                   "Sprinting", is_input=False), _pin(steady, "A"))
+
+    tap = pressed(FIRE_KEY, 600)
+    holding = _at(_node(ed, FN_IS_KEY_DOWN), 480, 860)
+    _connect(pc_out, _pin(holding, "self"))
+    _set(holding, "Key", FIRE_KEY)
+    holding_out = _pin(holding, "ReturnValue", is_input=False)
+    touching = _at(_node(ed, FN_OR), 760, 580)
+    _connect(tap, _pin(touching, "A"))
+    _connect(holding_out, _pin(touching, "B"))
+
     fire_gate = _at(ed.add_branch_node(), 1040, 0)
-    _connect(both(both(pressed(FIRE_KEY, 640), armed_out, 640),
+    _connect(both(both(_pin(touching, "ReturnValue", is_input=False),
+                       armed_out, 640),
                   _pin(steady, "ReturnValue", is_input=False), 700),
              _pin(fire_gate, "Condition"))
     for exit_pin in pose_exits:
@@ -4133,21 +4261,40 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(right_now, "ReturnValue", is_input=False), _pin(cooled, "A"))
     _connect(when, _pin(cooled, "B"))
 
+    # Held trigger, or tapped trigger? Now that Held is known valid, the
+    # weapon can be asked. An automatic accepts either; everything else
+    # accepts only the tap, which is what makes one click one shot on the
+    # shotgun even though the button is still down on the following frame.
+    auto_pin, auto_n = _prop(ed, "Automatic", held, 1240, 820)
+    spraying = _at(_node(ed, FN_AND), 1480, 820)
+    _connect(holding_out, _pin(spraying, "A"))
+    _connect(auto_pin, _pin(spraying, "B"))
+    trigger = _at(_node(ed, FN_OR), 1720, 760)
+    _connect(tap, _pin(trigger, "A"))
+    _connect(_pin(spraying, "ReturnValue", is_input=False), _pin(trigger, "B"))
+    trigger_out = _pin(trigger, "ReturnValue", is_input=False)
+
     ready = _at(_node(ed, FN_AND), 1960, 420)
     _connect(_pin(has_ammo, "ReturnValue", is_input=False), _pin(ready, "A"))
     _connect(_pin(cooled, "ReturnValue", is_input=False), _pin(ready, "B"))
+    allowed = _at(_node(ed, FN_AND), 1960, 600)
+    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(allowed, "A"))
+    _connect(trigger_out, _pin(allowed, "B"))
     ready_gate = _at(ed.add_branch_node(), 2200, 0)
-    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(ready_gate, "Condition"))
+    _connect(_pin(allowed, "ReturnValue", is_input=False),
+             _pin(ready_gate, "Condition"))
     _connect(BEL.find_then_pin(fire_gate), _pin(ready_gate, "execute"))
 
     ed.add_comment_to_nodes(
-        "The trigger is pulled, the weapon is out and the player is not "
+        "The trigger is being touched, the weapon is out and the player is not "
         "sprinting -- now, can it actually fire? A weapon with no ammunition "
         "rule passes on the first half; every weapon waits out its own "
-        "FireInterval on the second. Nested inside the first gate rather than "
-        "folded into it, because every one of these reads a property off Held.",
+        "FireInterval on the second; and an automatic is the only kind that "
+        "counts a held button as a pull. Nested inside the first gate rather "
+        "than folded into it, because every one of these reads a property off "
+        "Held.",
         [loaded_n, rounds, limited_n, unlimited, has_ammo, when_n, right_now,
-         cooled, ready, ready_gate])
+         cooled, auto_n, spraying, trigger, ready, allowed, ready_gate])
 
     after_fire = _author_fire(ed, held, muzzle, BEL.find_then_pin(ready_gate),
                               2700, 0)
@@ -4156,8 +4303,8 @@ def _author_wc_tick(ed, tick):
     dry_exits = _author_dry_fire(
         ed, held, muzzle,
         _pin(has_ammo, "ReturnValue", is_input=False),
-        _pin(cooled, "ReturnValue", is_input=False),
-        BEL.find_else_pin(ready_gate), 2200, 900)
+        _pin(cooled, "ReturnValue", is_input=False), tap,
+        BEL.find_else_pin(ready_gate), 2200, 1100)
 
     # --- reload --------------------------------------------------------------
     # Shares its key with the death menu's "try again", and that is safe rather
@@ -4491,15 +4638,23 @@ def install_on_npc(health_bp):
 
 
 def retire_old_assets():
-    """Delete BP_ShotgunComponent once nothing references it."""
+    """Delete assets this build has superseded, once nothing references them.
+
+    Both cases are the same shape: an asset that an earlier version of this
+    builder created and that nothing now points at. Neither disappears on its
+    own -- this builder updates in place, so a reference it simply stops
+    emitting leaves the old asset sitting in the content tree, where the next
+    person to read the audio folder will reasonably assume it is still in use.
+    """
     eas = _assets()
-    if not eas.does_asset_exist(OLD_SHOTGUN_BP):
-        return
-    try:
-        if eas.delete_asset(OLD_SHOTGUN_BP):
-            _log(f"deleted the superseded {OLD_SHOTGUN_BP}")
-    except Exception as exc:                                      # noqa: BLE001
-        _log(f"note: {OLD_SHOTGUN_BP} still referenced, left in place: {exc}")
+    for path in (OLD_SHOTGUN_BP,) + RETIRED_SOUNDS:
+        if not eas.does_asset_exist(path):
+            continue
+        try:
+            if eas.delete_asset(path):
+                _log(f"deleted the superseded {path}")
+        except Exception as exc:                                  # noqa: BLE001
+            _log(f"note: {path} still referenced, left in place: {exc}")
 
 
 # ─── Entry point ─────────────────────────────────────────────────────────────

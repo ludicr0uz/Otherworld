@@ -59,6 +59,7 @@ from forest_generator.npc_placement import (
     NPC_MELEE_RANGE_CM,
     NPC_MELEE_DAMAGE,
     NPC_MELEE_INTERVAL_S,
+    NAV_REACHABLE_EXTENT_CM,
 )
 from forest_generator.verification import run_all_checks
 from forest_generator.lighting import (
@@ -1080,6 +1081,7 @@ def _write_unreal_verify_script(
     ])
     npc_run_speed = NPC_RUN_SPEED_CMS
     npc_melee_range = NPC_MELEE_RANGE_CM
+    nav_reachable_extent = NAV_REACHABLE_EXTENT_CM
     npc_melee_damage = NPC_MELEE_DAMAGE
     npc_melee_interval = NPC_MELEE_INTERVAL_S
     nav_agent_radius = NAV_AGENT_RADIUS_CM
@@ -1131,6 +1133,7 @@ def _write_unreal_verify_script(
         EXPECTED_MELEE_DAMAGE = {npc_melee_damage}
         EXPECTED_MELEE_INTERVAL = {npc_melee_interval}
         EXPECTED_NAV_AGENT_RADIUS = {nav_agent_radius}
+        EXPECTED_REACHABLE_EXTENT = {nav_reachable_extent}
         EXPECTED_NAV_BOUNDS = json.loads(r"""{nav_bounds_json}""")
         LIGHTING = json.loads(r"""{lighting_json}""")
 
@@ -1491,6 +1494,66 @@ def _write_unreal_verify_script(
                           any("IsValid" ==
                               " ".join(str(BEL.get_node_title(n)).split())
                               for n in nodes))
+
+                # -- Chasing off the navmesh --
+                # The navmesh is a disc of radius NAV_MAX_HALF_XY_CM inside a
+                # square of terrain, so there is a ring of walkable ground with
+                # no navigation data on it.  A player standing there used to be
+                # unreachable, and -- because MoveToActor is issued with
+                # bAllowPartialPath -- the request did not fail: it succeeded
+                # at the island edge and the pack stood there.  These check the
+                # straight-line fallback that fixes it.
+                direct = [n for n in nodes
+                          if {{"Dest", "bUsePathfinding"}} <= ins(n)]
+                check("NPC Has A Straight-Line Move Order", len(direct) == 1,
+                      f"(got {{len(direct)}})")
+                if direct:
+                    def lit(node, pin):
+                        return str(PIN.get_pin_value(
+                            BEL.find_input_pin(node, pin)))
+                    check("Straight-Line Order Does Not Pathfind",
+                          lit(direct[0], "bUsePathfinding") == "false",
+                          f"(got {{lit(direct[0], 'bUsePathfinding')}})")
+                    # The whole bug, restated: projecting the destination back
+                    # onto the navmesh walks the NPC to the island edge and
+                    # stops it there, which is exactly what it used to do.
+                    check("Straight-Line Order Keeps The Real Destination",
+                          lit(direct[0], "bProjectDestinationToNavigation")
+                          == "false",
+                          f"(got {{lit(direct[0], 'bProjectDestinationToNavigation')}})")
+                    check("Pathfinding Order Still Pathfinds",
+                          lit(moves[0], "bUsePathfinding") == "true"
+                          if moves else False)
+                # Both ends are tested -- the player may have walked off the
+                # navmesh, and so may the wanderer.
+                projections = [n for n in nodes
+                               if {{"Point", "QueryExtent"}} <= ins(n)]
+                check("Reachability Tests Both Ends Of The Chase",
+                      len(projections) == 2, f"(got {{len(projections)}})")
+                # A loose query box answers "yes, reachable" for a player ten
+                # metres outside the island by snapping to its edge, which is
+                # the dead zone with extra steps.  A tight one in Z reports a
+                # player standing squarely ON the navmesh as being off it,
+                # because the point is a capsule centre and a Recast polygon
+                # can sit most of a metre under the real ground.
+                extents = [n for n in nodes if {{"X", "Y", "Z"}} <= ins(n)]
+                want_extent = [f"{{v:.1f}}" for v in EXPECTED_REACHABLE_EXTENT]
+                check("Reachability Query Box Matches The Constant",
+                      any([str(PIN.get_pin_value(BEL.find_input_pin(n, a)))
+                           for a in ("X", "Y", "Z")] == want_extent
+                          for n in extents),
+                      f"(expected {{want_extent}})")
+                # One branch, feeding both move orders: the pathfinding one on
+                # True and the straight line on False.
+                if direct and moves:
+                    def driver_of(node):
+                        pins = BEL.find_execute_pin(node).list_connected_pins()
+                        return {{PIN.get_owning_node(q) for q in pins}}
+                    shared = driver_of(moves[0]) & driver_of(direct[0])
+                    check("One Branch Chooses Between The Two Move Orders",
+                          len(shared) == 1 and next(iter(shared)).get_class()
+                          .get_name() == "K2Node_IfThenElse",
+                          f"(shared drivers: {{len(shared)}})")
 
             # -- The placed actors --
             check("NPC Count",

@@ -632,6 +632,18 @@ def build_npc_blueprint(ai_bp):
         mesh_comp.set_editor_property("skeletal_mesh_asset", skel)
     else:
         unreal.log_error(f"[NPC] missing skeletal mesh {SKELETAL_MESH_PATH}")
+
+    # The wanderer wears the mesh's own materials. This array is written every
+    # build, empty included, because this builder edits the Blueprint in place:
+    # anything it does not write survives from the previous build. An abandoned
+    # re-skin experiment left two material instances here that no code
+    # referenced any more, and no amount of rebuilding cleared them -- the
+    # builder simply never mentioned the array. Silence is not a default.
+    previous = list(mesh_comp.get_editor_property("override_materials") or [])
+    mesh_comp.set_editor_property("override_materials", [])
+    if previous:
+        names = ", ".join(m.get_name() if m else "None" for m in previous)
+        unreal.log_warning(f"[NPC] cleared {len(previous)} material override(s): {names}")
     # ── Animation ────────────────────────────────────────────────────────────
     # ABP_Unarmed's locomotion gates on
     #   ShouldMove = (GroundSpeed > threshold) AND (GetCurrentAcceleration() != 0)

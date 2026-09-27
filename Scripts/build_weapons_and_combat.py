@@ -161,6 +161,9 @@ MAT_BRASS = f"{WEAPON_DIR}/M_Brass"
 ITEM_BP_PATH = f"{WEAPON_DIR}/BP_WeaponItem"
 SHOTGUN_BP_PATH = f"{WEAPON_DIR}/BP_Shotgun"
 PISTOL_BP_PATH = f"{WEAPON_DIR}/BP_Pistol"
+SMG_BP_PATH = f"{WEAPON_DIR}/BP_SMG"
+RIFLE_BP_PATH = f"{WEAPON_DIR}/BP_AssaultRifle"
+SNIPER_BP_PATH = f"{WEAPON_DIR}/BP_SniperRifle"
 HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"
@@ -179,6 +182,13 @@ HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
 AMMO_CLASS_PATH = f"{AMMO_BP_PATH}.BP_AmmoPickup_C"
+
+# Two mechanical sounds, shared by every weapon rather than synthesised per
+# gun: a hammer on an empty chamber and a shell going into a tube are the same
+# noise whichever receiver they happen in, and five copies of each would be
+# five things to keep in step for no audible gain.
+SND_DRY_FIRE = f"{AUDIO_DIR}/A_DryFire"
+SND_RELOAD = f"{AUDIO_DIR}/A_Reload"
 
 AIM_RIFLE = "/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS"
 AIM_PISTOL = "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS"
@@ -254,6 +264,35 @@ AMMO_PICKUP_RADIUS = 200.0   # cm; walked into, not pressed for
 AMMO_PICKUP_LIFT = 40.0      # cm above the corpse, so it is not inside the mesh
 AMMO_PICKUP_LIFETIME = 120.0 # s before an uncollected drop tidies itself away
 AMMO_SPIN_DEG_PER_S = 90.0
+
+# --- the three found weapons -------------------------------------------------
+# The shotgun and pistol are the starting loadout and are spawned into the
+# player's hands at BeginPlay. These three are not: the only way to get one is
+# to kill something that happens to be carrying it, which is what makes the
+# 10% a reason to keep fighting rather than a number in a table.
+#
+# The balance across all five is deliberately one axis: damage per second is
+# roughly flat, and what differs is how it is delivered. The SMG spends nine
+# rounds to kill a 100 HP wanderer in under a second; the sniper spends one and
+# then makes you wait 1.6 s for the next. The shotgun sits between them and
+# only at close range, because eight pellets in a 5 degree cone stop all
+# landing on one target past about 15 m.
+SMG_MAGAZINE, SMG_RESERVE = 30, 90
+SMG_FIRE_INTERVAL, SMG_RELOAD_SECONDS = 0.09, 1.9
+RIFLE_MAGAZINE, RIFLE_RESERVE = 30, 90
+RIFLE_FIRE_INTERVAL, RIFLE_RELOAD_SECONDS = 0.14, 2.1
+SNIPER_MAGAZINE, SNIPER_RESERVE = 5, 15
+SNIPER_FIRE_INTERVAL, SNIPER_RELOAD_SECONDS = 1.60, 2.6
+
+# One kill in ten leaves a gun. Rolled once per counted kill, then a second
+# uniform draw picks which of the three -- so each individual weapon is a
+# 1-in-30 drop and a player who wants a specific one has to keep going.
+#
+# Rolled on exactly the same arm as the shells, which means DamagedByPlayer
+# guards it too: a wanderer the terrain swallowed has not been killed, and the
+# safety net must not be a weapon dispenser.
+GUN_DROP_CHANCE = 0.10
+GUN_DROP_FORWARD = 70.0   # cm; clear of the shells, which land on the corpse
 
 # --- debug mode --------------------------------------------------------------
 # One flag on the GameMode, toggled from the graphics menu, that turns the
@@ -552,13 +591,32 @@ def _declare(ed, name, pin_type):
         raise RuntimeError(f"could not declare {name}")
 
 
+def _must_load(path):
+    """load_asset, but a miss is an error rather than a None.
+
+    _same() compares a read-back default against what was written, and None
+    against None is equal -- so a weapon whose FireSound path was misspelt
+    would build, apply, verify and ship in silence, and the only symptom would
+    be a gun that makes no noise. Every asset reference written as a default
+    goes through here.
+    """
+    asset = _assets().load_asset(path)
+    if not asset:
+        raise RuntimeError(f"could not load {path}")
+    return asset
+
+
 def _same(a, b):
     """Compare a read-back default with what was written.
 
     str() on a UE struct embeds its address, so two identical Vectors never
     compare equal that way -- to_tuple() is the field-wise view. Objects compare
     by path, since the read-back is a different wrapper around the same asset.
+    An array comes back as unreal.Array, which is not a list and whose repr is
+    an address too, so it is compared element-wise by this same function.
     """
+    if isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
     if isinstance(b, bool):
         return bool(a) == b
     if isinstance(b, float):
@@ -861,10 +919,78 @@ def _pistol_parts():
     )
 
 
+def _smg_parts():
+    """Compact and all-metal, with the magazine hanging straight down.
+
+    The five weapons have to be told apart in a fist at 3 m with no UI, so each
+    silhouette commits to one thing. The SMG's is *short* -- barely longer than
+    the pistol -- and the vertical box magazine under the receiver is the one
+    feature no other weapon here has.
+    """
+    barrel = _barrel_rotation()
+    return (
+        ("Receiver",     CUBE,     (20.0, 0.0, 0.0),   _rot(),           (0.24, 0.050, 0.070), MAT_METAL),
+        ("Handguard",    CUBE,     (34.0, 0.0, 1.0),   _rot(),           (0.12, 0.045, 0.045), MAT_METAL),
+        ("Barrel",       CYLINDER, (44.0, 0.0, 1.5),   barrel,           (0.014, 0.014, 0.22), MAT_METAL),
+        ("Magazine",     CUBE,     (14.0, 0.0, -9.0),  _rot(pitch=8.0),  (0.035, 0.030, 0.110), MAT_METAL),
+        ("Grip",         CUBE,     (4.0, 0.0, -7.0),   _rot(pitch=18.0), (0.048, 0.038, 0.088), MAT_METAL),
+        ("Stock",        CUBE,     (-6.0, 0.0, 0.0),   _rot(),           (0.18, 0.030, 0.030), MAT_METAL),
+        ("TriggerGuard", CUBE,     (10.0, 0.0, -4.5),  _rot(),           (0.060, 0.028, 0.018), MAT_METAL),
+    )
+
+
+def _rifle_parts():
+    """Long, straight and flat-topped, with a carry handle above the receiver.
+
+    The handle is doing real work: it is the only part above the bore line on
+    any weapon but the sniper, and it is what stops the rifle reading as a
+    slightly bigger SMG when both are seen from behind the shoulder.
+    """
+    barrel = _barrel_rotation()
+    return (
+        ("Receiver",     CUBE,     (26.0, 0.0, 0.0),    _rot(),            (0.30, 0.052, 0.072), MAT_METAL),
+        ("Handguard",    CUBE,     (58.0, 0.0, 1.0),    _rot(),            (0.22, 0.048, 0.050), MAT_METAL),
+        ("Barrel",       CYLINDER, (86.0, 0.0, 1.8),    barrel,            (0.016, 0.016, 0.34), MAT_METAL),
+        ("CarryHandle",  CUBE,     (30.0, 0.0, 6.5),    _rot(),            (0.14, 0.030, 0.020), MAT_METAL),
+        ("Magazine",     CUBE,     (18.0, 0.0, -10.0),  _rot(pitch=-12.0), (0.040, 0.032, 0.130), MAT_METAL),
+        ("Grip",         CUBE,     (6.0, 0.0, -7.5),    _rot(pitch=20.0),  (0.050, 0.040, 0.090), MAT_METAL),
+        ("Stock",        CUBE,     (-12.0, 0.0, -1.0),  _rot(),            (0.30, 0.045, 0.060), MAT_METAL),
+        ("TriggerGuard", CUBE,     (13.0, 0.0, -4.5),   _rot(),            (0.065, 0.028, 0.018), MAT_METAL),
+    )
+
+
+def _sniper_parts():
+    """The longest of the five, with wood furniture and a scope on rings.
+
+    Wood is shared with the shotgun on purpose -- these are the two slow, heavy
+    weapons -- and the scope plus the bolt handle are what separate them at a
+    glance. It is also the only weapon whose barrel reaches past 1.4 m, which
+    is visible in third person every time the player turns.
+    """
+    barrel = _barrel_rotation()
+    return (
+        ("Receiver",     CUBE,     (28.0, 0.0, 0.0),    _rot(),            (0.32, 0.055, 0.075), MAT_METAL),
+        ("Barrel",       CYLINDER, (96.0, 0.0, 2.0),    barrel,            (0.018, 0.018, 0.52), MAT_METAL),
+        ("Forestock",    CUBE,     (58.0, 0.0, -1.5),   _rot(),            (0.26, 0.050, 0.050), MAT_WOOD),
+        ("Stock",        CUBE,     (-14.0, 0.0, -2.0),  _rot(pitch=4.0),   (0.42, 0.050, 0.078), MAT_WOOD),
+        ("Scope",        CYLINDER, (34.0, 0.0, 9.0),    barrel,            (0.030, 0.030, 0.30), MAT_METAL),
+        ("ScopeMountF",  CUBE,     (22.0, 0.0, 5.5),    _rot(),            (0.020, 0.020, 0.045), MAT_METAL),
+        ("ScopeMountR",  CUBE,     (46.0, 0.0, 5.5),    _rot(),            (0.020, 0.020, 0.045), MAT_METAL),
+        # Sticking out to the shooter's left in the weapon's own frame, which
+        # reads as the bolt handle from the third-person camera behind them.
+        ("Bolt",         CYLINDER, (18.0, -4.5, 2.0),   _rot(roll=90.0),   (0.012, 0.012, 0.090), MAT_METAL),
+        ("Grip",         CUBE,     (10.0, 0.0, -6.5),   _rot(pitch=18.0),  (0.052, 0.040, 0.085), MAT_WOOD),
+        ("TriggerGuard", CUBE,     (16.0, 0.0, -4.5),   _rot(),            (0.070, 0.030, 0.020), MAT_METAL),
+    )
+
+
 # Muzzle tip in the weapon's own space: where the barrel actually ends, so the
 # pellet cone starts at the gun rather than inside the player's chest.
 SHOTGUN_MUZZLE = (101.0, 0.0, 2.2)
 PISTOL_MUZZLE = (30.0, 0.0, 1.5)
+SMG_MUZZLE = (56.0, 0.0, 1.5)
+RIFLE_MUZZLE = (122.0, 0.0, 1.8)
+SNIPER_MUZZLE = (148.0, 0.0, 2.0)
 
 
 def _weapon_specs():
@@ -878,6 +1004,16 @@ def _weapon_specs():
     The ammunition columns are here too rather than branched on DisplayName
     anywhere in the graphs: the firing code asks the weapon whether it uses
     ammo, so a third weapon needs a row in this table and no new nodes.
+
+    That claim has now been tested. The SMG, the assault rifle and the sniper
+    were added as three rows here plus three part tables, and not one node in
+    _author_fire, _author_reload or the fire gate changed to accommodate them:
+    pellet count, spread, range, interval, magazine and reload time were
+    already the parameters those graphs read off Held. The only code the three
+    needed is the code for *finding* one, which is a property of the drop and
+    not of the weapon.
+
+    DropClasses below is what marks a weapon as findable rather than issued.
     """
     return (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
@@ -894,7 +1030,44 @@ def _weapon_specs():
              colour=(0.35, 0.65, 0.95),
              uses_ammo=False, magazine=0, reserve=0,
              interval=PISTOL_FIRE_INTERVAL, reload_s=0.0),
+        # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
+        # per round of the five and the highest per second, which is the whole
+        # identity: it wins a fight it is already in and empties fast.
+        dict(path=SMG_BP_PATH, parts=_smg_parts(), muzzle=SMG_MUZZLE,
+             display="SMG", damage=12.0, pellets=1, spread=2.6, range=4500.0,
+             sound=f"{AUDIO_DIR}/A_SMGFire", aim=AIM_RIFLE,
+             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
+             colour=(0.45, 0.85, 0.35),
+             uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
+             interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS),
+        # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
+        # and the one a player who finds it will simply keep.
+        dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE,
+             display="Rifle", damage=24.0, pellets=1, spread=1.4, range=9000.0,
+             sound=f"{AUDIO_DIR}/A_RifleFire", aim=AIM_RIFLE,
+             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
+             colour=(0.70, 0.45, 0.95),
+             uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
+             interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS),
+        # One shot, one kill: 120 against 100 HP, at 0.2 degrees of spread and
+        # 200 m of range -- further than anything in a 200 m forest is visible.
+        # The cost is 1.6 s between shots, which against a pack of five that
+        # runs at 600 cm/s is the difference between opening at distance and
+        # being caught reloading.
+        dict(path=SNIPER_BP_PATH, parts=_sniper_parts(), muzzle=SNIPER_MUZZLE,
+             display="Sniper", damage=120.0, pellets=1, spread=0.2, range=20000.0,
+             sound=f"{AUDIO_DIR}/A_SniperFire", aim=AIM_RIFLE,
+             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
+             colour=(0.95, 0.30, 0.35),
+             uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
+             interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS),
     )
+
+
+# Which of the five a killed wanderer can be carrying. The starting loadout is
+# excluded by construction: a drop the player already has in slot 0 is not a
+# reward, and this list is the only thing that decides.
+DROP_DISPLAYS = ("SMG", "Rifle", "Sniper")
 
 
 # ─── Materials and sounds ────────────────────────────────────────────────────
@@ -952,7 +1125,8 @@ def import_sounds():
     """
     eas = _assets()
     made = []
-    for name in ("A_ShotgunFire", "A_PistolFire"):
+    for name in ("A_ShotgunFire", "A_PistolFire", "A_SMGFire", "A_RifleFire",
+                 "A_SniperFire", "A_DryFire", "A_Reload"):
         dest = f"{AUDIO_DIR}/{name}"
         if eas.does_asset_exist(dest):
             made.append(dest)
@@ -1189,8 +1363,14 @@ def build_weapon_item():
     _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripRotation", _struct_type(unreal.Rotator.static_struct()))
     _declare(ed, "SlotColor", _struct_type(unreal.LinearColor.static_struct()))
-    _declare(ed, "FireSound",
-             BEL.get_object_reference_type(unreal.SoundBase.static_class()))
+    # Three sounds, not one, and all three live on the weapon for the same
+    # reason FireSound does: the graphs read them off Held, so a new weapon is
+    # a row in _weapon_specs() and nothing else. The dry-fire and reload
+    # assets happen to be shared by every weapon today -- that is a fact about
+    # the defaults, not about the shape of the data.
+    for name in ("FireSound", "DryFireSound", "ReloadSound"):
+        _declare(ed, name,
+                 BEL.get_object_reference_type(unreal.SoundBase.static_class()))
     _declare(ed, "AimPose",
              BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
 
@@ -1251,8 +1431,10 @@ def build_weapon(spec, item_bp):
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
-        "FireSound": eas.load_asset(spec["sound"]),
-        "AimPose": eas.load_asset(spec["aim"]),
+        "FireSound": _must_load(spec["sound"]),
+        "DryFireSound": _must_load(SND_DRY_FIRE),
+        "ReloadSound": _must_load(SND_RELOAD),
+        "AimPose": _must_load(spec["aim"]),
     })
     _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
          f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
@@ -1318,6 +1500,7 @@ FN_PROJECT_NAV = ("/Script/NavigationSystem.NavigationSystemV1"
 FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
 FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
 FN_ARR_REMOVE = "/Script/Engine.KismetArrayLibrary.Array_Remove"
+FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
 
 FN_ADD_VV = "/Script/Engine.KismetMathLibrary.Add_VectorVector"
 FN_SUB_VV = "/Script/Engine.KismetMathLibrary.Subtract_VectorVector"
@@ -1340,6 +1523,8 @@ FN_GE_FF = "/Script/Engine.KismetMathLibrary.GreaterEqual_DoubleDouble"
 FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
 FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
+FN_RAND_INT = "/Script/Engine.KismetMathLibrary.RandomIntegerInRange"
+FN_NEQ_BB = "/Script/Engine.KismetMathLibrary.NotEqual_BoolBool"
 FN_MAKE_ROT = "/Script/Engine.KismetMathLibrary.MakeRotator"
 FN_MUL_FF = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
 FN_SELECT_FF = "/Script/Engine.KismetMathLibrary.SelectFloat"
@@ -1363,6 +1548,7 @@ NODE_CAST_CHAR = "Utilities|Casting|CastToBP_ThirdPersonCharacter"
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
+NODE_CAST_ITEM = "Utilities|Casting|CastToBP_WeaponItem"
 MACRO_FOR_LOOP = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForLoop"
 MACRO_FOR_EACH = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForEachLoop"
 
@@ -1637,9 +1823,16 @@ def build_ammo_pickup(rebuild=True):
     measuring its own distance costs one Tick each. The alternative re-walks
     every pickup in the level every frame whether any exist or not.
 
-    Credit goes to the first carried weapon that uses ammunition, and Credited
-    is what stops the loop handing the same two shells to a second shotgun --
-    ForEachLoop has no break pin, so the guard has to be a flag the body sets.
+    Credit goes to the weapon in the player's hands, if that weapon takes
+    ammunition, and otherwise to the first carried weapon that does. The
+    preference is not decoration: with four of the five weapons using
+    ammunition, "first in the inventory" means the shells always land in the
+    shotgun in slot 0, so a player clearing the forest with the sniper would
+    watch their reserve stay at 15 while a gun they are not holding fills up.
+
+    Credited is what stops the fallback loop handing the same two shells to a
+    second shotgun -- ForEachLoop has no break pin, so the guard has to be a
+    flag the body sets -- and it is also what the destroy is gated on.
     """
     eas = _assets()
     bp = _create_blueprint(AMMO_BP_PATH, unreal.Actor)
@@ -1711,8 +1904,47 @@ def build_ammo_pickup(rebuild=True):
     _connect(BEL.find_then_pin(reached), _pin(as_weapon_n, "execute"))
     as_weapon = _loose_pin(as_weapon_n, "AsBPWeaponComponent", is_input=False)
 
+    # --- first choice: whatever is in the player's hands ---------------------
+    # Two nested branches rather than one AND, and for the reason this file has
+    # now hit four times: UsesAmmo is a pure read off Held, and pulling it while
+    # Held is None is an Accessed None. The validity test has to be a gate the
+    # second read sits behind, not a term beside it.
+    held_get = _at(ed.add_get_member_variable_node("Held", WEAPON_COMP_CLASS_PATH),
+                   2560, 300)
+    _connect(as_weapon, _pin(held_get, "self"))
+    held = _pin(held_get, "Held", is_input=False)
+    armed = _at(_node(ed, FN_IS_VALID), 2800, 300)
+    _connect(held, _pin(armed, "Object"))
+    has_gun = _at(ed.add_branch_node(), 3040, -700)
+    _connect(_pin(armed, "ReturnValue", is_input=False), _pin(has_gun, "Condition"))
+    _connect(BEL.find_then_pin(as_weapon_n), _pin(has_gun, "execute"))
+
+    held_uses, held_uses_n = _prop(ed, "UsesAmmo", held, 3300, -400)
+    takes_ammo = _at(ed.add_branch_node(), 3560, -700)
+    _connect(held_uses, _pin(takes_ammo, "Condition"))
+    _connect(BEL.find_then_pin(has_gun), _pin(takes_ammo, "execute"))
+
+    held_res, held_res_n = _prop(ed, "Reserve", held, 3820, -400)
+    held_shells = _at(ed.add_get_member_variable_node("Shells"), 3820, -280)
+    held_richer = _at(_node(ed, FN_ADD_II), 4080, -400)
+    _connect(held_res, _pin(held_richer, "A"))
+    _connect(_pin(held_shells, "Shells", is_input=False), _pin(held_richer, "B"))
+    held_store = _at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH),
+                     4340, -700)
+    _connect(held, _pin(held_store, "self"))
+    _connect(_pin(held_richer, "ReturnValue", is_input=False),
+             _pin(held_store, "Reserve"))
+    _connect(BEL.find_then_pin(takes_ammo), _pin(held_store, "execute"))
+    held_mark = _at(ed.add_set_member_variable_node("Credited"), 4600, -700)
+    _set(held_mark, "Credited", "true")
+    _connect(BEL.find_then_pin(held_store), _pin(held_mark, "execute"))
+
+    # --- fallback: the first carried weapon that takes ammunition ------------
+    # Reached when nothing is held, or when what is held is the pistol. Walking
+    # over shells with the pistol out still has to pay into something, or the
+    # drop is lost for the sake of a rule about which gun is out.
     inv = _at(ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH),
-              2560, 300)
+              2560, 420)
     _connect(as_weapon, _pin(inv, "self"))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
@@ -1720,7 +1952,8 @@ def build_ammo_pickup(rebuild=True):
         raise RuntimeError("could not create the ForEachLoop macro node")
     _at(loop, 2840, 0)
     _connect(_pin(inv, "Inventory", is_input=False), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(as_weapon_n), _loose_pin(loop, "Exec"))
+    _connect(BEL.find_else_pin(has_gun), _loose_pin(loop, "Exec"))
+    _connect(BEL.find_else_pin(takes_ammo), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
     uses, uses_n = _prop(ed, "UsesAmmo", item, 3140, 300)
@@ -1735,10 +1968,10 @@ def build_ammo_pickup(rebuild=True):
     _connect(_pin(wants, "ReturnValue", is_input=False), _pin(give, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(give, "execute"))
 
-    held_res, held_res_n = _prop(ed, "Reserve", item, 4140, 300)
+    item_res, item_res_n = _prop(ed, "Reserve", item, 4140, 300)
     shells = _at(ed.add_get_member_variable_node("Shells"), 4140, 440)
     richer = _at(_node(ed, FN_ADD_II), 4400, 300)
-    _connect(held_res, _pin(richer, "A"))
+    _connect(item_res, _pin(richer, "A"))
     _connect(_pin(shells, "Shells", is_input=False), _pin(richer, "B"))
     store = _at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH), 4660, 0)
     _connect(item, _pin(store, "self"))
@@ -1757,6 +1990,7 @@ def build_ammo_pickup(rebuild=True):
     took = _at(ed.add_branch_node(), 5440, 0)
     _connect(_pin(took_get, "Credited", is_input=False), _pin(took, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(took, "execute"))
+    _connect(BEL.find_then_pin(held_mark), _pin(took, "execute"))
     gone = _at(_node(ed, FN_DESTROY), 5700, 0)
     _connect(BEL.find_then_pin(took), _pin(gone, "execute"))
 
@@ -1765,12 +1999,16 @@ def build_ammo_pickup(rebuild=True):
         f"{AMMO_PICKUP_RADIUS:.0f} cm of them. The distance is measured HERE "
         "rather than in the weapon component's Tick, so the cost is one Tick "
         "per dropped pickup instead of a GetAllActorsOfClass sweep every frame "
-        "whether anything has been dropped or not. Credited is the break "
-        "ForEachLoop does not have: without it a player carrying two shotguns "
-        "would be paid twice.",
+        "whether anything has been dropped or not. The shells go to the weapon "
+        "in hand when that weapon takes ammunition, and otherwise to the first "
+        "carried one that does -- with four of five weapons using ammunition, "
+        "\"first in the inventory\" would mean the shotgun in slot 0, always. "
+        "Credited is the break ForEachLoop does not have.",
         [life, turn, delta, spin, pawn, there, here, gap, near, reached, comp,
-         as_weapon_n, inv, loop, uses_n, done_get, fresh, wants, give,
-         held_res_n, shells, richer, store, mark, took_get, took, gone])
+         as_weapon_n, held_get, armed, has_gun, held_uses_n, takes_ammo,
+         held_res_n, held_shells, held_richer, held_store, held_mark,
+         inv, loop, uses_n, done_get, fresh, wants, give,
+         item_res_n, shells, richer, store, mark, took_get, took, gone])
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_AmmoPickup failed to compile")
@@ -1895,9 +2133,121 @@ def _author_kill_count(ed, exec_in, x0, y0):
         "that falls under the world through this same path, and nobody shot it.",
         [earned, shot, mode, as_mode, tally, one_more, write, corpse, fell_at,
          lifted, where, ammo_cls, drop])
-    return (BEL.find_then_pin(drop),
-            _pin(as_mode, "CastFailed", is_input=False),
-            BEL.find_else_pin(shot))
+
+    gun_exits = _author_gun_drop(ed, _pin(lifted, "ReturnValue", is_input=False),
+                                 BEL.find_then_pin(drop), x0, y0 + 1000)
+    return gun_exits + (_pin(as_mode, "CastFailed", is_input=False),
+                        BEL.find_else_pin(shot))
+
+
+def _author_gun_drop(ed, at, exec_in, x0, y0):
+    """One kill in ten also leaves a weapon: which one is a second uniform draw.
+
+    Two decisions, deliberately separate. Whether anything drops is one roll
+    against GUN_DROP_CHANCE; *what* drops is an index into DropClasses. Keeping
+    them apart means the rate and the table are tuned independently -- adding a
+    fourth findable weapon changes what a drop is worth and not how often one
+    happens, which is not true of the obvious alternative (one roll into a
+    weighted table).
+
+    DropClasses is an array rather than three variables and a Switch for the
+    same reason: a Switch on an integer would have to grow a pin per weapon,
+    and the length of the array is already the only number the draw needs.
+
+    Two guards on the roll, folded into one condition because both are plain
+    reads with nothing behind them:
+
+        lucky    the 10%.
+        stocked  the array is not empty. Without it RandomIntegerInRange(0, -1)
+                 feeds Array_Get an index into nothing, which is an access-none
+                 per kill on any build where main() has not filled the table.
+
+    The spawned actor is cast to BP_WeaponItem so Dropped can be set on it, and
+    Dropped is the entire interface: from that moment it is an ordinary weapon
+    lying in the forest, and the E key that picks up a gun the player threw
+    away is the same code that picks this one up. Nothing in _author_pickup
+    knows these exist.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    roll = keep(_at(_node(ed, FN_RANDOM_FLOAT), x0 + 2400, y0 + 300))
+    _set(roll, "Min", 0.0)
+    _set(roll, "Max", 1.0)
+    lucky = keep(_at(_node(ed, FN_LESS_FF), x0 + 2640, y0 + 300))
+    _connect(_pin(roll, "ReturnValue", is_input=False), _pin(lucky, "A"))
+    _set(lucky, "B", GUN_DROP_CHANCE)
+
+    table = keep(_at(ed.add_get_member_variable_node("DropClasses"),
+                     x0 + 2400, y0 + 440))
+    table_out = _pin(table, "DropClasses", is_input=False)
+    how_many = keep(_at(_node(ed, FN_ARR_LEN), x0 + 2640, y0 + 440))
+    _connect(table_out, _pin(how_many, "TargetArray"))
+    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 2880, y0 + 440))
+    _connect(_pin(how_many, "ReturnValue", is_input=False), _pin(stocked, "A"))
+    _set(stocked, "B", 0)
+
+    worth = keep(_at(_node(ed, FN_AND), x0 + 3120, y0 + 360))
+    _connect(_pin(lucky, "ReturnValue", is_input=False), _pin(worth, "A"))
+    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(worth, "B"))
+    rare = keep(_at(ed.add_branch_node(), x0 + 3360, y0))
+    _connect(_pin(worth, "ReturnValue", is_input=False), _pin(rare, "Condition"))
+    _connect(exec_in, _pin(rare, "execute"))
+
+    # RandomIntegerInRange is inclusive at both ends, so the top is length - 1.
+    top = keep(_at(_node(ed, FN_SUB_II), x0 + 2880, y0 + 580))
+    _connect(_pin(how_many, "ReturnValue", is_input=False), _pin(top, "A"))
+    _set(top, "B", 1)
+    which = keep(_at(_node(ed, FN_RAND_INT), x0 + 3120, y0 + 580))
+    _set(which, "Min", 0)
+    _connect(_pin(top, "ReturnValue", is_input=False), _pin(which, "Max"))
+    pick = keep(_at(_node(ed, FN_ARR_GET), x0 + 3360, y0 + 580))
+    _connect(table_out, _pin(pick, "TargetArray"))
+    _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
+
+    # Clear of the shells, which are already sitting on the corpse: two pickups
+    # at the same point read as one object and the player collects the ammo
+    # without ever seeing the gun.
+    beside = keep(_at(_node(ed, FN_ADD_VV), x0 + 3620, y0 + 300))
+    _connect(at, _pin(beside, "A"))
+    _connect(_vec(ed, GUN_DROP_FORWARD, 0.0, 0.0, x0 + 3360, y0 + 440),
+             _pin(beside, "B"))
+    where = keep(_at(_node(ed, FN_MAKE_TRANSFORM), x0 + 3880, y0 + 300))
+    _connect(_pin(beside, "ReturnValue", is_input=False), _pin(where, "Location"))
+    _connect(_vec(ed, 1.0, 1.0, 1.0, x0 + 3620, y0 + 480), _pin(where, "Scale"))
+
+    spawn = keep(_at(_palette(ed, NODE_SPAWN), x0 + 4140, y0))
+    _connect(_pin(pick, "Item", is_input=False), _pin(spawn, "Class"))
+    _connect(_pin(where, "ReturnValue", is_input=False), _pin(spawn, "SpawnTransform"))
+    _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
+    _connect(BEL.find_then_pin(rare), _pin(spawn, "execute"))
+
+    # DropClasses is typed as class-of-Actor, for the same reason AmmoClass is:
+    # this component has to compile in a pass where BP_WeaponItem's generated
+    # class is not available to type a pin against. The cost is this cast.
+    as_item = keep(_at(_palette(ed, NODE_CAST_ITEM), x0 + 4400, y0))
+    _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(as_item, "Object"))
+    _connect(BEL.find_then_pin(spawn), _pin(as_item, "execute"))
+    loose = keep(_at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH),
+                     x0 + 4680, y0))
+    _connect(_loose_pin(as_item, "AsBPWeaponItem", is_input=False),
+             _pin(loose, "self"))
+    _set(loose, "Dropped", "true")
+    _connect(BEL.find_then_pin(as_item), _pin(loose, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"{GUN_DROP_CHANCE * 100:.0f}% of counted kills leave a weapon, drawn "
+        f"uniformly from DropClasses -- so each of the three is about a "
+        f"1-in-{int(round(1.0 / GUN_DROP_CHANCE)) * len(DROP_DISPLAYS)} drop. "
+        "Dropped=true is the whole handover: from here it is an ordinary "
+        "weapon on the ground and E picks it up with no new code.",
+        made)
+    return (BEL.find_then_pin(loose),
+            _pin(as_item, "CastFailed", is_input=False),
+            BEL.find_else_pin(rare))
 
 
 def _author_player_death(ed, exec_in, x0, y0):
@@ -2043,6 +2393,11 @@ def build_health_component(rebuild=True):
     BP_ThirdPersonCharacter's graph is the Enhanced Input template, which the
     graph API cannot partially rebuild.
     """
+    # The weapon-drop path casts the spawned actor to BP_WeaponItem, and a cast
+    # node only appears in the palette for a class that is already loaded.
+    if not _assets().load_asset(ITEM_BP_PATH):
+        raise RuntimeError(f"could not load {ITEM_BP_PATH} for its cast node")
+
     bp = _create_blueprint(HEALTH_BP_PATH, unreal.ActorComponent)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
@@ -2060,6 +2415,12 @@ def build_health_component(rebuild=True):
     # and so has to be built after it. main() fills the default in afterwards.
     _declare(ed, "AmmoClass",
              BEL.get_class_reference_type(unreal.Actor.static_class()))
+    # The weapons a kill can leave behind, class-of-Actor for the same reason
+    # AmmoClass is, and filled by main() once every weapon blueprint exists.
+    # Empty is a legal state and means "no weapon ever drops" -- the graph
+    # checks the length before it draws an index.
+    _declare(ed, "DropClasses", BEL.get_array_type(
+        BEL.get_class_reference_type(unreal.Actor.static_class())))
     # Where the replacement will appear. Written three times on the way to the
     # spawn -- the request, then whichever navmesh point it resolved to -- so
     # that the random draw and the nav query are each evaluated exactly once.
@@ -3158,6 +3519,16 @@ def _author_equip(ed, exec_in, x0, y0):
     than destroying and respawning them, so a weapon keeps its identity (and
     could keep its ammo, condition, anything) across switches, and so dropping
     can hand the very same actor to the world.
+
+    It is also where sprinting stops looking absurd. The ready pose is a
+    montage in an upper-body slot; a sprinting player with it still playing
+    runs with the barrel levelled at the horizon and the arms locked, which is
+    the one animation complaint this project has had. The fix is not a new
+    animation -- it is *not playing* this one: stop the slot, and the layered
+    blend has nothing left to override the locomotion state machine with, so
+    the character runs with its own run cycle and the weapon goes along in the
+    hand socket where it is attached. Sprint's own block in Tick raises
+    NeedsRefresh on the frame the state flips, which is what routes back here.
     """
     made = []
 
@@ -3231,8 +3602,18 @@ def _author_equip(ed, exec_in, x0, y0):
     held = _pin(held_get, "Held", is_input=False)
     armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 2940, y0 + 300))
     _connect(held, _pin(armed, "Object"))
-    posing = keep(_at(ed.add_branch_node(), x0 + 3180, y0))
-    _connect(_pin(armed, "ReturnValue", is_input=False), _pin(posing, "Condition"))
+    # Safe to fold into one condition, unlike the fire gate's ammunition tests:
+    # IsValid takes a null object as an answer rather than as an error, and
+    # Sprinting is this component's own bool. Neither read can touch Held.
+    running = keep(_at(ed.add_get_member_variable_node("Sprinting"),
+                       x0 + 2700, y0 + 480))
+    still = keep(_at(_node(ed, FN_NOT), x0 + 2940, y0 + 480))
+    _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
+    shown = keep(_at(_node(ed, FN_AND), x0 + 3180, y0 + 400))
+    _connect(_pin(armed, "ReturnValue", is_input=False), _pin(shown, "A"))
+    _connect(_pin(still, "ReturnValue", is_input=False), _pin(shown, "B"))
+    posing = keep(_at(ed.add_branch_node(), x0 + 3420, y0))
+    _connect(_pin(shown, "ReturnValue", is_input=False), _pin(posing, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(posing, "execute"))
 
     mesh2 = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 3180, y0 + 440))
@@ -3264,7 +3645,9 @@ def _author_equip(ed, exec_in, x0, y0):
         "has no infinite option. It reads as a pose rather than a full-body "
         "animation only because patch_anim_blueprint() put a spine_01 layered "
         "blend around that slot in ABP_Unarmed -- without it the legs would "
-        "freeze mid-stride. Empty hands stop the slot and locomotion returns.",
+        "freeze mid-stride. Empty hands stop the slot and locomotion returns, "
+        "and so does sprinting: you cannot fire while running, so there is "
+        "nothing for a ready pose to be ready for.",
         made)
 
 
@@ -3504,6 +3887,23 @@ def _author_reload(ed, held, exec_in, x0, y0):
     _connect(_pin(worth, "ReturnValue", is_input=False), _pin(does, "Condition"))
     _connect(BEL.find_then_pin(pin_take), _pin(does, "execute"))
 
+    # The clack, on the True arm only. On the False arm nothing moves, so a
+    # sound there would be the game telling the player it had done something it
+    # had not -- which is worse than silence, because the pause that normally
+    # follows a reload would not happen either.
+    #
+    # Placed at the weapon rather than at the player: the gun is in the
+    # player's hands, so the two are the same position to within a few
+    # centimetres, and reading the weapon's transform needs no owner cast.
+    at = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 1520, y0 + 300))
+    _connect(held, _pin(at, "self"))
+    clack_pin, clack_n = _prop(ed, "ReloadSound", held, x0 + 1520, y0 + 180)
+    keep(clack_n)
+    clack = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 1780, y0))
+    _connect(clack_pin, _pin(clack, "Sound"))
+    _connect(_pin(at, "ReturnValue", is_input=False), _pin(clack, "Location"))
+    _connect(BEL.find_then_pin(does), _pin(clack, "execute"))
+
     take_a = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
                       x0 + 1780, y0 + 420))
     was, was_n = _prop(ed, "Loaded", held, x0 + 1780, y0 + 300)
@@ -3515,7 +3915,7 @@ def _author_reload(ed, held, exec_in, x0, y0):
                     x0 + 2280, y0))
     _connect(held, _pin(load, "self"))
     _connect(_pin(filled, "ReturnValue", is_input=False), _pin(load, "Loaded"))
-    _connect(BEL.find_then_pin(does), _pin(load, "execute"))
+    _connect(BEL.find_then_pin(clack), _pin(load, "execute"))
 
     take_b = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
                       x0 + 2280, y0 + 420))
@@ -3546,11 +3946,68 @@ def _author_reload(ed, held, exec_in, x0, y0):
         f"{RELOAD_KEY} reloads. ReloadTake is computed once and stored because "
         "the arithmetic behind it is pure: read it again after Loaded has gone "
         "up and the reserve is charged less than the magazine gained. The cost "
-        f"is {SHOTGUN_RELOAD_SECONDS}s pushed onto NextFireTime -- the same "
+        "is the weapon's own ReloadSeconds pushed onto NextFireTime -- the same "
         "field the interval between shots uses, so there is only ever one rule "
-        "saying when the weapon may fire.",
+        "saying when the weapon may fire. The clack plays on the True arm only, "
+        "because a reload that moved nothing has nothing to announce.",
         made)
     return (BEL.find_then_pin(pause), BEL.find_else_pin(does))
+
+
+def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, exec_in, x0, y0):
+    """The trigger was pulled on an empty chamber: click, and nothing else.
+
+    Hangs off the False arm of the ready gate, which is the one place in the
+    graph that knows the trigger was pulled and the shot did not happen. Two
+    reasons lead here and only one of them is worth a sound:
+
+        no ammunition   the player has to *do* something (reload, or switch)
+                        and nothing on screen says so -- the ammo readout is
+                        four digits in the corner of a slot. This is the cue.
+        still cooling   the weapon is working exactly as designed. Clicking
+                        here would mean clicking on every frame a held trigger
+                        outruns the interval, which on the SMG is most of them.
+
+    So the condition is "empty AND cooled", not just "empty". Both inputs are
+    the same pure pins the ready gate itself used: re-reading them costs two
+    re-evaluations of plain property reads, and nothing has written to Held
+    between the gate and here -- precisely because nothing fired.
+
+    No cooldown is stamped. FIRE_KEY is polled with WasInputKeyJustPressed, so
+    one click of the mouse is one click of the hammer however long it is held.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    empty = keep(_at(_node(ed, FN_NOT), x0, y0 + 300))
+    _connect(has_ammo, _pin(empty, "A"))
+    worth = keep(_at(_node(ed, FN_AND), x0 + 260, y0 + 300))
+    _connect(_pin(empty, "ReturnValue", is_input=False), _pin(worth, "A"))
+    _connect(cooled, _pin(worth, "B"))
+
+    click = keep(_at(ed.add_branch_node(), x0 + 520, y0))
+    _connect(_pin(worth, "ReturnValue", is_input=False), _pin(click, "Condition"))
+    _connect(exec_in, _pin(click, "execute"))
+
+    dry_pin, dry_n = _prop(ed, "DryFireSound", held, x0 + 520, y0 + 180)
+    keep(dry_n)
+    play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 780, y0))
+    _connect(dry_pin, _pin(play, "Sound"))
+    # At the muzzle, like the shot it is standing in for, so the click comes
+    # from the same place in the mix as the bang the player expected.
+    _connect(muzzle, _pin(play, "Location"))
+    _connect(BEL.find_then_pin(click), _pin(play, "execute"))
+
+    ed.add_comment_to_nodes(
+        "Empty chamber: the click. Gated on \"out of ammunition\" AND \"off "
+        "cooldown\", so the weapon clicks when the player needs to be told to "
+        "reload and stays silent while it is merely between shots -- which on "
+        f"the SMG is every {SMG_FIRE_INTERVAL:.2f}s.",
+        made)
+    return (BEL.find_then_pin(play), BEL.find_else_pin(click))
 
 
 def _author_wc_tick(ed, tick):
@@ -3604,6 +4061,38 @@ def _author_wc_tick(ed, tick):
     sprint_exits = _author_sprint(ed, tick, pc_out, owner_out, aim_exits,
                                   1040, -1400)
 
+    # --- the pose follows the sprint -----------------------------------------
+    # Edge-triggered, not level-triggered, and that distinction is the whole
+    # block. Re-equipping costs a detach, an attach and a montage restart; done
+    # every frame the player holds Shift it would restart the run's ready pose
+    # sixty times a second, which is a weapon that flickers. PoseSprinting is
+    # what the pose currently reflects, Sprinting is what it should reflect,
+    # and only the frames where those disagree do any work.
+    now_sprint = _at(ed.add_get_member_variable_node("Sprinting"), 240, 1020)
+    now_sprint_out = _pin(now_sprint, "Sprinting", is_input=False)
+    posed = _at(ed.add_get_member_variable_node("PoseSprinting"), 240, 1140)
+    changed = _at(_node(ed, FN_NEQ_BB), 520, 1060)
+    _connect(now_sprint_out, _pin(changed, "A"))
+    _connect(_pin(posed, "PoseSprinting", is_input=False), _pin(changed, "B"))
+    pose_gate = _at(ed.add_branch_node(), 780, 940)
+    _connect(_pin(changed, "ReturnValue", is_input=False), _pin(pose_gate, "Condition"))
+    for exit_pin in sprint_exits:
+        _connect(exit_pin, _pin(pose_gate, "execute"))
+    remember = _at(ed.add_set_member_variable_node("PoseSprinting"), 1040, 940)
+    _connect(now_sprint_out, _pin(remember, "PoseSprinting"))
+    _connect(BEL.find_then_pin(pose_gate), _pin(remember, "execute"))
+    pose_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 1300, 940)
+    _set(pose_dirty, "NeedsRefresh", "true")
+    _connect(BEL.find_then_pin(remember), _pin(pose_dirty, "execute"))
+    pose_exits = (BEL.find_then_pin(pose_dirty), BEL.find_else_pin(pose_gate))
+
+    ed.add_comment_to_nodes(
+        "Started or stopped sprinting this frame -- re-equip, which is what "
+        "starts or stops the ready pose. Edge-triggered on PoseSprinting: the "
+        "level-triggered version restarts the montage every frame Shift is "
+        "held, and the weapon strobes.",
+        [now_sprint, posed, changed, pose_gate, remember, pose_dirty])
+
     # --- fire ----------------------------------------------------------------
     # Three conditions, and "not sprinting" is the new one: the weapon is being
     # used to run with, not to aim with. Note this AND is safe to fold together
@@ -3616,7 +4105,7 @@ def _author_wc_tick(ed, tick):
     _connect(both(both(pressed(FIRE_KEY, 640), armed_out, 640),
                   _pin(steady, "ReturnValue", is_input=False), 700),
              _pin(fire_gate, "Condition"))
-    for exit_pin in sprint_exits:
+    for exit_pin in pose_exits:
         _connect(exit_pin, _pin(fire_gate, "execute"))
 
     # Ammunition and the cooldown are a SECOND branch inside the first, not two
@@ -3663,6 +4152,13 @@ def _author_wc_tick(ed, tick):
     after_fire = _author_fire(ed, held, muzzle, BEL.find_then_pin(ready_gate),
                               2700, 0)
 
+    # --- the click, when the gate said no ------------------------------------
+    dry_exits = _author_dry_fire(
+        ed, held, muzzle,
+        _pin(has_ammo, "ReturnValue", is_input=False),
+        _pin(cooled, "ReturnValue", is_input=False),
+        BEL.find_else_pin(ready_gate), 2200, 900)
+
     # --- reload --------------------------------------------------------------
     # Shares its key with the death menu's "try again", and that is safe rather
     # than lucky: Event Tick does not run while the game is paused, so this
@@ -3672,8 +4168,7 @@ def _author_wc_tick(ed, tick):
     reload_gate = _at(ed.add_branch_node(), 1040, 7200)
     _connect(both(pressed(RELOAD_KEY, 7360), armed_out, 7300),
              _pin(reload_gate, "Condition"))
-    for exit_pin in (after_fire, BEL.find_else_pin(fire_gate),
-                     BEL.find_else_pin(ready_gate)):
+    for exit_pin in (after_fire, BEL.find_else_pin(fire_gate)) + dry_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
     reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate),
                                   1400, 7200)
@@ -3779,6 +4274,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     for name in ("Stamina", "MaxStamina", "BaseSpeed"):
         _declare(ed, name, _float_type())
     _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
+    # What the ready pose currently reflects, as opposed to what it should.
+    # The pair is what makes the sprint pose edge-triggered; see _author_wc_tick.
+    _declare(ed, "PoseSprinting", BEL.get_basic_type_by_name("bool"))
     # How many rounds this reload moves, computed once and read back three
     # times. See _author_reload for why it cannot just be recomputed.
     _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
@@ -3808,6 +4306,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # bar would divide by if that somehow never ran.
         "BaseSpeed": 500.0,
         "Sprinting": False,
+        # Matches Sprinting, so the first frame sees no edge and does not
+        # re-equip for nothing.
+        "PoseSprinting": False,
         "ReloadTake": 0,
         DEBUG_MODE_VAR: False,
         "ShotgunClass": BEL.generated_class(shotgun_bp),
@@ -4025,15 +4526,24 @@ def main():
     # therefore after the health component that spawns it, which is why the
     # link between the two is a default written here rather than a parameter.
     ammo_bp = build_ammo_pickup()
-    _apply_defaults(health_bp, {"AmmoClass": BEL.generated_class(ammo_bp)})
+    _apply_defaults(health_bp, {
+        "AmmoClass": BEL.generated_class(ammo_bp),
+        # The three findable weapons, in the order _weapon_specs() lists them
+        # rather than in an order written out here -- so a weapon added to
+        # DROP_DISPLAYS is in the table with no second edit.
+        "DropClasses": [BEL.generated_class(weapons[name])
+                        for name in DROP_DISPLAYS],
+    })
     _log(f"{HEALTH_BP_PATH}.AmmoClass -> {AMMO_BP_PATH}")
+    _log(f"{HEALTH_BP_PATH}.DropClasses -> {', '.join(DROP_DISPLAYS)} "
+         f"({GUN_DROP_CHANCE * 100:.0f}% per kill)")
 
     install_on_character(health_bp, weapon_bp)
     install_on_npc(health_bp)
     retire_old_assets()
 
-    _log("done — shotgun + pistol, ammunition, inventory, aiming, blood, "
-         "death and respawn")
+    _log("done — five weapons, ammunition, inventory, aiming, blood, "
+         "death, drops and respawn")
 
 
 if __name__ == "__main__":

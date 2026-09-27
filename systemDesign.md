@@ -509,7 +509,9 @@ without it report `killed with 0`.
 Health <= 0, not already Dead
    |
    +-- DespawnOnDeath  --> [DamagedByPlayer? -> NpcKillCount += 1
-   |                                          -> spawn BP_AmmoPickup (2 shells)]
+   |                                          -> spawn BP_AmmoPickup (2 shells)
+   |                                          -> roll 10%: spawn one of DropClasses,
+   |                                             cast to BP_WeaponItem, Dropped = true]
    |                       --> respawn --> destroy
    |
    '-- otherwise (the player)
@@ -533,6 +535,13 @@ picked up again. Seven fields — `UsesAmmo`, `MagazineSize`, `Loaded`, `Reserve
 1.6 s reload, 8 × 18 damage) and the pistol (`UsesAmmo` false) is entirely a row in
 `_weapon_specs()`. Nothing in any graph branches on a weapon's name.
 
+That was a design claim until three more weapons were added to test it. **The SMG, assault rifle
+and sniper cost three rows in `_weapon_specs()` and three part tables, and changed no node in
+`_author_fire`, `_author_reload` or the fire gate** — pellet count, spread, range, interval,
+magazine size and reload time were already the parameters those graphs read off `Held`. The
+sniper's 120 × 1 at 0.2° over 200 m and the SMG's 12 × 1 every 0.09 s run the same code path as
+the shotgun's 8 × 18 cone.
+
 `NextFireTime` is a **world-time deadline**, and both the interval between shots and the cost of
 a reload push it out; there is no reloading state, no timer and no flag that can disagree with
 itself. The fire gate is **two nested Branches** rather than one folded condition, because every
@@ -546,11 +555,40 @@ pressed(LMB) AND Held valid AND NOT Sprinting
           -> cache GameMode.DebugMode;  sound;  one trace per pellet
 ```
 
+**Three sounds per weapon, and two of them are about silence.** `FireSound`, `DryFireSound` and
+`ReloadSound` all live on `BP_WeaponItem` and are read off `Held`; the latter two happen to share
+one asset across all five weapons, which is a fact about the defaults and not about the shape of
+the data. The click hangs off the **False arm of the ready gate** and is gated on
+`empty AND cooled`, not on `empty` alone — the other reason the gate refuses is the cooldown, and
+clicking there would click on most frames of a held SMG trigger. The clack plays on the **True
+arm of the reload only**, because the False arm moves no rounds and costs no pause, so a sound
+there would announce something that did not happen.
+
+**Sprinting stops the ready pose rather than adding an animation.** The pose is `AimPose` played
+as a dynamic montage into the upper-body-filtered `DefaultSlot`; stop the slot and the layered
+blend has nothing left to override the locomotion state machine with, so `ABP_Unarmed`'s own run
+cycle comes through and the weapon rides along in the hand socket. The equip branch gains
+`AND NOT Sprinting`, and Tick raises `NeedsRefresh` **only on the frames `Sprinting` disagrees
+with `PoseSprinting`** — level-triggering it restarts the montage every frame Shift is held.
+
+**One kill in ten leaves a weapon.** Two independent draws: `RandomFloat < GUN_DROP_CHANCE`
+decides *whether*, and `Array_Get(DropClasses, RandomInt(0, Length-1))` decides *which*, so the
+rate and the table tune apart — a fourth findable weapon changes what a drop is worth, not how
+often one happens. `DropClasses` is an array on `BP_HealthComponent` (typed class-of-Actor, for
+the same reason `AmmoClass` is, and filled by `main()`), guarded by `Length > 0` so an unfilled
+table drops nothing instead of indexing off the end. The roll sits on the same `DamagedByPlayer`
+arm as the shells. `Dropped = true` on the spawned actor is the entire handover: from there it is
+an ordinary weapon in the forest and `_author_pickup` needs no knowledge that drops exist.
+
 **`BP_AmmoPickup`** measures its own distance to the player on its own Tick — a handful of
-actors ticking beats a `GetAllActorsOfClass` sweep from the weapon component every frame — walks
-the player's `Inventory`, credits the first weapon whose `UsesAmmo` is true, and destroys itself
-only once `Credited` is set (`ForEachLoop` has no break pin, and a shotgun-less player must
-leave the shells where they are).
+actors ticking beats a `GetAllActorsOfClass` sweep from the weapon component every frame — and
+credits the weapon in the player's **hands** when that weapon takes ammunition, falling back to
+the first such weapon in `Inventory` otherwise. The preference matters now that four of the five
+weapons use ammunition: "first in the inventory" is the shotgun in slot 0, always. The `Held`
+read sits behind a nested `IsValid` gate, not beside one in an `AND`, because `UsesAmmo` is a
+pure pull and pulling it off `None` is an `Accessed None`. It destroys itself only once
+`Credited` is set (`ForEachLoop` has no break pin, and a shotgun-less player must leave the
+shells where they are).
 
 **Sprint lives on `BP_WeaponComponent`,** with `Stamina` / `MaxStamina` / `Sprinting` /
 `BaseSpeed`, because that is the component that has to refuse to fire while the key is held and
@@ -599,11 +637,21 @@ every frame and `APlayerController` ticks through a pause.
   grass clumps over 9 species, **ten NPCs 75.0–78.0 m** from the player (every one of them
   with at least one tree blocking the direct line), **night** preset.
   Offline 28/28, in-editor 141/141, import log clean.
-- Combat and HUD: **187/187** (`verify_weapons_and_combat.py`) and **60/60**
+- Combat and HUD: **289/289** (`verify_weapons_and_combat.py`) and **60/60**
   (`verify_graphics_menu.py`). A 90 s `-game` run is clean — 0 runtime errors, 0 Accessed
   None, 10 spawns, 0 falls — and ends with the pack killing the player, which is the death
   path running end to end. The ammunition pickup was proved the same way: a `BP_AmmoPickup`
   dropped on the player took the shotgun's reserve from 15 to 17 and removed itself.
+- Five weapons: `BP_Shotgun` and `BP_Pistol` issued at `BeginPlay`, `BP_SMG`,
+  `BP_AssaultRifle` and `BP_SniperRifle` obtainable only as a 10% drop from a counted kill.
+  The drop path was proved at runtime with a temporary probe and the chance forced to 1.0:
+  ten forced kills left **12 `BP_WeaponItem` actors** (2 = the player's own) of which **10
+  carried `Dropped = true`**, plus ten shell drops, with 0 errors and 0 `Accessed None`. The
+  second number is the one that matters — counting actors proves a spawn happened, while the
+  flag proves the cast behind it succeeded and the pick-up interface was written.
+- Seven synthesised audio assets under `/Game/Weapons/Audio`: five gunshots from `_shot()` and
+  two mechanical sounds (`A_DryFire`, `A_Reload`) from `_clack()`, all from
+  `Scripts/make_weapon_sounds.py`, which imports no `unreal`.
 - New assets from the NPC run: `/Game/Forest/NPC/BP_ForestWanderer`,
   `/Game/Forest/NPC/BP_ForestWandererAI`.
 - **Pre-existing bug, unfixed and unrelated to the NPC work:** `scatter_trees` performs no

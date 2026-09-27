@@ -54,6 +54,19 @@ def pin_value(node, name):
     return str(PIN.get_pin_value(BEL.find_input_pin(node, name)))
 
 
+def num_pin(node, name):
+    """pin_value as a float, or None when the pin does not hold one.
+
+    Sweeps like "is there any node whose B pin is 0.1" run over every node with
+    a B pin, and in a graph with booleans in it that includes pins reading
+    'false'. float() on those is a ValueError that stops the whole verifier.
+    """
+    try:
+        return float(pin_value(node, name))
+    except (TypeError, ValueError):
+        return None
+
+
 def cdo(bp):
     return unreal.get_default_object(BEL.generated_class(bp))
 
@@ -135,7 +148,10 @@ if G.FULL_BODY_SLOT in slot_names and rigs:
           == ["AnimGraphNode_LayeredBoneBlend"],
           str([n.get_class().get_name() for n in behind]))
 
-# ─── The two weapons ─────────────────────────────────────────────────────────
+# ─── The five weapons ────────────────────────────────────────────────────────
+# Driven off _weapon_specs() rather than off a list written here, so a weapon
+# added to the builder is a weapon checked by the verifier with no second edit.
+# That is the claim the SMG, rifle and sniper were added to test.
 
 item_bp = load(G.ITEM_BP_PATH)
 check("BP_WeaponItem exists", item_bp is not None)
@@ -178,8 +194,11 @@ for spec in G._weapon_specs():
     check(f"{tag}: muzzle is at the barrel tip, not the origin",
           d.get_editor_property("MuzzleOffset").x > 10.0,
           str(d.get_editor_property("MuzzleOffset").x))
-    check(f"{tag}: has a fire sound",
-          d.get_editor_property("FireSound") is not None)
+    for slot, label in (("FireSound", "a fire sound"),
+                        ("DryFireSound", "a click for an empty chamber"),
+                        ("ReloadSound", "a reload clack")):
+        check(f"{tag}: has {label}",
+              d.get_editor_property(slot) is not None)
     pose = d.get_editor_property("AimPose")
     check(f"{tag}: ready pose is {spec['aim'].rsplit('/', 1)[-1]}",
           pose is not None and pose.get_name() == spec["aim"].rsplit("/", 1)[-1],
@@ -199,8 +218,8 @@ if shot and pist:
     # The thing the player actually sees: in the pose the weapon is held in, the
     # barrel has to point where the character is facing. Computed from the
     # *saved* GripRotation, so a grip that was solved wrongly fails here.
-    for bp, name, aim in ((shot, "Shotgun", G.AIM_RIFLE),
-                          (pist, "Pistol", G.AIM_PISTOL)):
+    for spec in G._weapon_specs():
+        bp, name, aim = load(spec["path"]), spec["display"], spec["aim"]
         mesh_yaw, socket = G.socket_in_mesh(aim)
         barrel = G._rotate_vector(
             G._rot(yaw=mesh_yaw),
@@ -218,9 +237,53 @@ if shot and pist:
               axes["Y"].x > 0.9 and abs(axes["X"].x) < 0.5,
               f"+Y = {axes['Y'].to_tuple()}, +X = {axes['X'].to_tuple()}")
 
-    check("the two weapons show different colours in the inventory",
-          a.get_editor_property("SlotColor").to_tuple()
-          != b.get_editor_property("SlotColor").to_tuple())
+    # Five weapons in five slots with no icons: the colour swatch is the only
+    # thing distinguishing them at a glance, so two the same is a real bug.
+    swatches = [cdo(load(sp["path"])).get_editor_property("SlotColor").to_tuple()
+                for sp in G._weapon_specs()]
+    check("every weapon shows a different colour in the inventory",
+          len(set(swatches)) == len(swatches), str(len(set(swatches))))
+    # Same argument in the other sense: the gun you cannot see is the gun you
+    # can hear, and a shared shot would make the sniper sound like the SMG.
+    shots = [cdo(load(sp["path"])).get_editor_property("FireSound").get_name()
+             for sp in G._weapon_specs()]
+    check("every weapon has its own fire sound",
+          len(set(shots)) == len(shots), str(sorted(shots)))
+    # The two mechanical noises go the other way on purpose: a hammer on an
+    # empty chamber is the same noise in any receiver.
+    for slot in ("DryFireSound", "ReloadSound"):
+        shared = {cdo(load(sp["path"])).get_editor_property(slot).get_name()
+                  for sp in G._weapon_specs()}
+        check(f"...while {slot} is deliberately shared by all of them",
+              len(shared) == 1, str(sorted(shared)))
+
+# ─── The three found weapons ─────────────────────────────────────────────────
+# The starting loadout is spawned into the player's hands; these three exist
+# only as drops, and that distinction is DROP_DISPLAYS.
+
+issued = {"Shotgun", "Pistol"}
+check("the drop table is the three weapons that are not issued",
+      set(G.DROP_DISPLAYS) | issued == {sp["display"] for sp in G._weapon_specs()}
+      and not (set(G.DROP_DISPLAYS) & issued),
+      str(G.DROP_DISPLAYS))
+# Sustained damage per second across the five. This is the one balance claim
+# worth asserting mechanically: what differs between the weapons should be how
+# the damage is *delivered* -- one big hit or nine small ones -- and not how
+# much of it there is. A weapon three times the DPS of another is not a choice.
+dps = {sp["display"]: sp["damage"] * sp["pellets"] / sp["interval"]
+       for sp in G._weapon_specs()}
+check("no weapon out-damages another by more than 3x over time",
+      max(dps.values()) / min(dps.values()) < 3.0,
+      ", ".join(f"{k} {v:.0f}" for k, v in sorted(dps.items(), key=lambda kv: -kv[1])))
+sniper = next(sp for sp in G._weapon_specs() if sp["display"] == "Sniper")
+check("the sniper kills a 100 HP wanderer in one shot",
+      sniper["damage"] * sniper["pellets"] >= 100.0, str(sniper["damage"]))
+smg = next(sp for sp in G._weapon_specs() if sp["display"] == "SMG")
+check("...and the SMG needs most of a second and most of a magazine to do it",
+      -(-100 // smg["damage"]) <= smg["magazine"]
+      and -(-100 // smg["damage"]) * smg["interval"] > 0.5,
+      f"{-(-100 // smg['damage']):.0f} rounds, "
+      f"{-(-100 // smg['damage']) * smg['interval']:.2f}s")
 
 # ─── Health, death, respawn ──────────────────────────────────────────────────
 
@@ -389,7 +452,9 @@ for var, kind in (("AimPoint", unreal.Vector), ("AimValid", bool),
     check(f"{var} exists on the weapon component for the HUD to read",
           isinstance(value, kind), type(value).__name__)
 
-check("firing plays a sound", bool(by_pins(wg, "Sound", "Location")))
+check("the component plays three sounds: the shot, the click and the reload",
+      len(by_pins(wg, "Sound", "Location")) == 3,
+      f"{len(by_pins(wg, 'Sound', 'Location'))} PlaySoundAtLocation node(s)")
 check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,
       f"{len(by_pins(wg, 'Class', 'SpawnTransform'))} spawn nodes "
       "(shotgun, pistol, blood)")
@@ -697,9 +762,9 @@ check("...through a NOT, so firing is refused while it is set", bool(negated),
 # check here is about the difference between those two being *data* -- a row in
 # _weapon_specs -- rather than a branch on the weapon's name somewhere.
 
-for path, spec in ((G.SHOTGUN_BP_PATH, "Shotgun"), (G.PISTOL_BP_PATH, "Pistol")):
-    want = next(w for w in G._weapon_specs() if w["display"] == spec)
-    gun = cdo(load(path))
+for want in G._weapon_specs():
+    spec = want["display"]
+    gun = cdo(load(want["path"]))
     check(f"{spec}: UsesAmmo is {want['uses_ammo']}",
           gun.get_editor_property("UsesAmmo") == want["uses_ammo"],
           str(gun.get_editor_property("UsesAmmo")))
@@ -717,6 +782,9 @@ for path, spec in ((G.SHOTGUN_BP_PATH, "Shotgun"), (G.PISTOL_BP_PATH, "Pistol"))
     check(f"{spec}: the first shot of a session is free",
           gun.get_editor_property("NextFireTime") == 0.0,
           str(gun.get_editor_property("NextFireTime")))
+    check(f"{spec}: reloading takes {want['reload_s']}s",
+          abs(gun.get_editor_property("ReloadSeconds") - want["reload_s"]) < 1e-6,
+          f"{gun.get_editor_property('ReloadSeconds'):.2f}s")
 
 shotgun_cdo = cdo(load(G.SHOTGUN_BP_PATH))
 check(f"the shotgun starts with {G.SHOTGUN_MAGAZINE + G.SHOTGUN_RESERVE} shells "
@@ -773,6 +841,84 @@ check("an unlimited weapon short-circuits the magazine test (an OR, not an AND)"
       str(sorted({t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                               for n in wg) if " OR" in t.upper()})))
 
+# ─── The click and the clack ─────────────────────────────────────────────────
+# Two sounds whose whole value is *when* they do not play. A click on every
+# refused trigger pull would fire on the SMG's every-0.09s cooldown; a clack on
+# every R would reward pressing reload at a full magazine.
+
+titles = [str(BEL.get_node_title(n)).replace("\n", " ") for n in wg]
+check("the empty chamber clicks",
+      titles.count("Get DryFireSound") == 1,
+      f"{titles.count('Get DryFireSound')} reads of DryFireSound")
+check("the reload clacks",
+      titles.count("Get ReloadSound") == 1,
+      f"{titles.count('Get ReloadSound')} reads of ReloadSound")
+dry = [n for n in by_pins(wg, "Sound", "Location")
+       if any("DryFireSound" in str(BEL.get_node_title(PIN.get_owning_node(q)))
+              for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Sound")))]
+check("exactly one node plays the click", len(dry) == 1, f"{len(dry)}")
+if dry:
+    # The gate above it must be an AND, not a bare NOT: "empty" alone would
+    # click through every cooldown frame of a held trigger.
+    ins = BEL.find_input_pin(dry[0], "execute")
+    gate = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(ins)]
+    cond = ([PIN.get_owning_node(q)
+             for q in PIN.list_connected_pins(
+                 BEL.find_input_pin(gate[0], "Condition"))] if gate else [])
+    check("...behind a Branch whose condition is an AND of two things, so it "
+          "stays silent between shots as well as when loaded",
+          bool(cond) and "AND" in str(BEL.get_node_title(cond[0])).upper(),
+          str([str(BEL.get_node_title(n)) for n in cond]))
+    # And one of the two has to be the negation of the ammunition test.
+    nots = [t for t in titles if "NOT" in t.upper() and "Boolean" in t]
+    check("...one half of which is \"has no ammunition\"", len(nots) >= 3,
+          f"{len(nots)} NOT nodes (unlimited-weapon, not-sprinting, empty, pose)")
+
+# ─── Sprinting drops the ready pose ──────────────────────────────────────────
+# The complaint this answers: running with the barrel levelled at the horizon.
+# There is no new animation -- the fix is to stop playing the ready pose, and
+# let ABP_Unarmed's own locomotion state machine through the layered blend.
+
+check("PoseSprinting exists to make the change edge-triggered",
+      w.get_editor_property("PoseSprinting") is False,
+      str(w.get_editor_property("PoseSprinting")))
+check("...and it matches Sprinting at start, so frame one re-equips nothing",
+      w.get_editor_property("PoseSprinting")
+      == w.get_editor_property("Sprinting"))
+check("the sprint state is remembered exactly once",
+      titles.count("Set PoseSprinting") == 1,
+      f"{titles.count('Set PoseSprinting')} writes")
+check("...and re-equipping happens only on the frames the two disagree",
+      any("!=" in t or "NotEqual" in t.replace(" ", "") for t in titles),
+      str(sorted({t for t in titles if "=" in t})))
+# The pose itself: the branch that decides whether to play or stop the slot
+# now has a NOT Sprinting in its condition, which is what actually stops it.
+plays = by_pins(wg, "Asset", "SlotNodeName")
+if plays:
+    node, reached = plays[0], False
+    ins = BEL.find_input_pin(node, "execute")
+    gate = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(ins)]
+    if gate:
+        cond = [PIN.get_owning_node(q)
+                for q in PIN.list_connected_pins(
+                    BEL.find_input_pin(gate[0], "Condition"))]
+        # Walk the two inputs of the AND looking for a Sprinting read.
+        frontier = list(cond)
+        for _ in range(6):
+            nxt = []
+            for n in frontier:
+                if "Sprinting" in out_pins(n):
+                    reached = True
+                for q in BEL.list_input_pins(n):
+                    nxt += [PIN.get_owning_node(r)
+                            for r in PIN.list_connected_pins(q)]
+            frontier = nxt
+    check("the ready pose is not played while sprinting", reached,
+          "Sprinting read found behind the pose branch's condition")
+sprint_gets = [n for n in wg if "Sprinting" in out_pins(n)]
+check("Sprinting is read by the fire gate, the pose edge and the pose branch",
+      len(sprint_gets) >= 4, f"{len(sprint_gets)} reads")
+
 # ─── Debug mode ──────────────────────────────────────────────────────────────
 
 mode_cdo = cdo(load(G.GAME_MODE_BP_PATH))
@@ -823,13 +969,101 @@ check("no key is involved -- it is not another thing to press E on",
 check("it credits the weapon's own Reserve, not a counter on the player",
       any(str(BEL.get_node_title(n)).replace("\n", " ") == "Set Reserve"
           for n in ag))
-check("Credited is the break ForEachLoop does not have, so a second shotgun "
-      "is not paid too",
+check("Credited is written on both paths -- the held weapon and the fallback loop",
       len([n for n in ag
-           if str(BEL.get_node_title(n)).replace("\n", " ") == "Set Credited"]) == 1)
+           if str(BEL.get_node_title(n)).replace("\n", " ") == "Set Credited"]) == 2,
+      f"{len([n for n in ag if str(BEL.get_node_title(n)).replace(chr(10), ' ') == 'Set Credited'])} writes")
 check("...and it only vanishes once something has actually taken it",
       len([n for n in ag if "Credited" in out_pins(n)]) == 2,
       f"{len([n for n in ag if 'Credited' in out_pins(n)])} reads of Credited")
+# With four of the five weapons using ammunition, "the first one in the
+# inventory" means the shotgun in slot 0 forever -- so a player clearing the
+# forest with the sniper would watch a gun they are not holding fill up.
+check("the shells go to the weapon in the player's hands first",
+      any("Held" in out_pins(n) for n in ag),
+      "no read of the weapon component's Held on the pickup")
+held_reads = [n for n in ag if "Held" in out_pins(n)]
+if held_reads:
+    # And that read has to be behind an IsValid gate rather than beside one:
+    # UsesAmmo is a pure pull off Held, and pulling it while unarmed is an
+    # Accessed None -- the trap this project has now hit four times.
+    valids = [n for n in ag if "Object" in in_pins(n)
+              and "IsValid" in str(BEL.get_node_title(n))]
+    check("...behind an IsValid gate, because reading UsesAmmo off None is an "
+          "Accessed None", bool(valids), f"{len(valids)} IsValid node(s)")
+check("...with the inventory loop kept as the fallback for an unarmed player "
+      "or one holding the pistol",
+      bool(by_pins(ag, "Array")) or any("Inventory" in out_pins(n) for n in ag),
+      "the ForEachLoop over Inventory is gone")
+
+# ─── The 10% weapon drop ─────────────────────────────────────────────────────
+
+drop_classes = list(cdo(health_bp).get_editor_property("DropClasses"))
+check(f"a kill can leave one of {len(G.DROP_DISPLAYS)} weapons",
+      len(drop_classes) == len(G.DROP_DISPLAYS), str(len(drop_classes)))
+check("...and they are the three that are not in the starting loadout",
+      [c.get_name() for c in drop_classes]
+      == [f"{sp['path'].rsplit('/', 1)[-1]}_C" for sp in G._weapon_specs()
+          if sp["display"] in G.DROP_DISPLAYS],
+      str([c.get_name() for c in drop_classes]))
+check(f"the drop rate is {G.GUN_DROP_CHANCE * 100:.0f}%",
+      any(abs((num_pin(n, "B") or -1.0) - G.GUN_DROP_CHANCE) < 1e-6
+          for n in hg if "B" in in_pins(n)),
+      f"expected a comparison against {G.GUN_DROP_CHANCE}")
+# Two draws, not one weighted table: the rate and the table are tuned apart.
+check("...rolled once, and which weapon drawn separately",
+      bool([n for n in hg if {"Min", "Max"} <= in_pins(n)
+            and "Random" in str(BEL.get_node_title(n))]),
+      "no random draw in the death path")
+check("the weapon is picked by index into the array, not by a Switch that "
+      "would need a pin per weapon",
+      bool(by_pins(hg, "TargetArray", "Index")),
+      f"{len(by_pins(hg, 'TargetArray', 'Index'))} Array_Get node(s)")
+# The empty-table guard. Without it RandomIntegerInRange(0, -1) indexes nothing.
+check("an empty drop table drops nothing rather than indexing off the end",
+      any(str(BEL.get_node_title(n)).replace("\n", " ").startswith("Get DropClasses")
+          for n in hg)
+      and bool([n for n in hg if "TargetArray" in in_pins(n)
+                and "Length" in str(BEL.get_node_title(n))]),
+      "no Array_Length on DropClasses")
+# The handover: from here it is an ordinary weapon on the ground, and the E key
+# that picks up a gun the player threw away picks this one up with no new code.
+check("a dropped weapon is flagged Dropped, which is the whole pick-up interface",
+      any(str(BEL.get_node_title(n)).replace("\n", " ") == "Set Dropped"
+          for n in hg),
+      "nothing sets Dropped in the death path")
+# Matched by the feeder's PIN SET, not by its title: Array_Get's displayed
+# title is the bare word "Get", which is also how every variable getter in the
+# graph reads. Pins are the only unambiguous handle.
+guns = [n for n in by_pins(hg, "Class", "SpawnTransform")
+        if any({"TargetArray", "Index"} <= in_pins(PIN.get_owning_node(q))
+               for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Class")))]
+check("exactly one spawn in the death path drops a weapon",
+      len(guns) == 1, f"{len(guns)} weapon spawns")
+# Same guard as the shells and the kill count, walked the same way: the safety
+# net kills anything that falls under the world down this very path.
+if guns:
+    seen, node, guarded = set(), guns[0], False
+    for _ in range(60):
+        ins = BEL.find_input_pin(node, "execute")
+        feeders = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(ins)] \
+            if ins and ins.is_valid() else []
+        if not feeders:
+            break
+        node = feeders[0]
+        if id(node) in seen:
+            break
+        seen.add(id(node))
+        if "Branch" in str(BEL.get_node_title(node)).replace("\n", " "):
+            cond = BEL.find_input_pin(node, "Condition")
+            if cond and cond.is_valid() and any(
+                    G.DAMAGED_BY_PLAYER_VAR in str(BEL.get_node_title(
+                        PIN.get_owning_node(q)))
+                    for q in PIN.list_connected_pins(cond)):
+                guarded = True
+                break
+    check("only a death the player caused drops a weapon", guarded,
+          "the safety net must not be a weapon dispenser")
 check("an uncollected drop tidies itself away",
       any(abs(float(pin_value(n, "InLifespan") or 0) - G.AMMO_PICKUP_LIFETIME) < 1e-3
           for n in ag if "InLifespan" in in_pins(n)),

@@ -361,7 +361,7 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**187 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**289 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up ·
@@ -375,14 +375,17 @@ and does run paused.
 
 | asset | what it is |
 |-------|------------|
-| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, AimPose, SlotColor, DisplayName, Dropped, **UsesAmmo, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime**). No geometry, no graph. |
-| `BP_Shotgun` | child: 7 primitives, 8 pellets × **18** dmg, 5° cone, 40 m, rifle ready pose, **5-round magazine + 15 spare, 0.85 s between shots, 1.6 s reload** |
-| `BP_Pistol` | child: 5 primitives, 1 shot × 26 dmg, 1° cone, 60 m, pistol ready pose, different grip angle, **unlimited ammo, 0.18 s between shots** |
+| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, **DryFireSound, ReloadSound**, AimPose, SlotColor, DisplayName, Dropped, UsesAmmo, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime). No geometry, no graph. |
+| `BP_Shotgun` | child: 7 primitives, 8 pellets × 18 dmg, 5° cone, 40 m, rifle ready pose, 5+15 rounds, 0.85 s, 1.6 s reload. **Issued.** |
+| `BP_Pistol` | child: 5 primitives, 1 × 26 dmg, 1° cone, 60 m, pistol ready pose, unlimited ammo, 0.18 s. **Issued.** |
+| `BP_SMG` | child: 7 primitives, 1 × **12** dmg, 2.6° cone, 45 m, 30+90 rounds, **0.09 s**, 1.9 s reload. **Found only.** |
+| `BP_AssaultRifle` | child: 8 primitives, 1 × **24** dmg, 1.4° cone, 90 m, 30+90 rounds, 0.14 s, 2.1 s reload. **Found only.** |
+| `BP_SniperRifle` | child: 10 primitives, 1 × **120** dmg, 0.2° cone, 200 m, 5+15 rounds, **1.6 s**, 2.6 s reload. **Found only.** |
 | `BP_AmmoPickup` | 2 brass shells a killed wanderer leaves behind; walked into, not pressed for |
 | `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/reload/drop/pick up, **sprint + stamina** |
 | `BP_HealthComponent` | Health/MaxHealth, the damage stamp, death — despawn and respawn for a wanderer, **the death sequence and the pause** for the player |
 | `BP_BloodSplash` | 10 emissive spheres thrown out along the hit normal, arcing down as they swell, over 0.7 s |
-| `Audio/A_ShotgunFire`, `A_PistolFire` | synthesised by `Scripts/make_weapon_sounds.py` (pure Python — the project ships no audio and `/Engine` has no usable gunshot) |
+| `Audio/A_*Fire` × 5, `A_DryFire`, `A_Reload` | synthesised by `Scripts/make_weapon_sounds.py` (pure Python — the project ships no audio and `/Engine` has no usable gunshot) |
 
 **Weapons are Actors, not components.** The old shotgun was a component tree welded to the
 character's mesh, which cannot be dropped — there is no way to leave a component behind in the
@@ -390,6 +393,12 @@ world. Making a weapon an Actor is what makes drop, pick-up and switching fall o
 equipping is an attach, dropping is a detach. `BP_Shotgun`/`BP_Pistol` derive from
 `BP_WeaponItem` so `Inventory` is one typed array and firing reads its stats off whatever is
 held, with one cast and no per-weapon branching.
+
+**That claim has now been tested.** The SMG, assault rifle and sniper were added as three rows
+in `_weapon_specs()` plus three part tables, and **not one node changed** in `_author_fire`,
+`_author_reload` or the fire gate: pellet count, spread, range, interval, magazine size and
+reload time were already parameters those graphs read off `Held`. The only new code the three
+needed is the code for *finding* one, which is a property of the drop and not of the weapon.
 
 **Equipping is authored once.** `NeedsRefresh` is set by BeginPlay, switch, drop and pick-up;
 Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
@@ -505,6 +514,27 @@ Stamina      += SelectFloat(-drain,           +regen, Sprinting) * DeltaSeconds,
 Two arms of an if would be the same two writes with different numbers in them, and the pair
 could drift; `SelectFloat` picks the number and one write applies it.
 
+**Sprinting drops the ready pose**, and there is no new animation behind that. The ready pose
+is the weapon's `AimPose` played as a dynamic montage into `DefaultSlot`, which
+`patch_anim_blueprint()` made upper-body-only; running with it still playing is a character
+sprinting with the barrel levelled at the horizon and the arms locked. The fix is to **stop the
+slot** — with nothing playing into it the layered blend has nothing to override the locomotion
+state machine with, so `ABP_Unarmed`'s own run cycle comes through and the weapon goes along in
+the hand socket where it is attached.
+
+Mechanically it is one term added to the equip branch's condition
+(`IsValid(Held) AND NOT Sprinting`) plus an **edge trigger** in Tick:
+
+```
+if Sprinting != PoseSprinting:        # only the frames where they disagree
+    PoseSprinting = Sprinting
+    NeedsRefresh  = true              # ...which routes back into the one equip block
+```
+
+`PoseSprinting` is what the pose currently reflects; `Sprinting` is what it should reflect.
+Level-triggering this instead — re-equipping on every frame Shift is held — restarts the
+montage sixty times a second, and the weapon strobes.
+
 `BaseSpeed` is **cached from the character at BeginPlay, never written down here**. Measured
 in a `-game` run it comes back as **600**, not the 500 a hardcoded "walk speed" would have
 guessed — so the literal would have silently retuned the player the first time they sprinted,
@@ -567,24 +597,32 @@ roll, and without it a shotgun's eight pellets into one torso read as a single b
 The cone layout is generated from a fixed seed at build time, which is how the verifier can
 recompute it and compare component by component.
 
-### Shotgun ammunition
+### Ammunition
 
-Twenty shells to start with — **five in the gun and fifteen spare**, not five plus twenty. Every
-one of those numbers lives on `BP_WeaponItem`, and that placement is the design: a weapon here
-is a *droppable actor*, so drop a half-empty shotgun, walk away, come back and pick it up, and
-it is still half empty. A reserve on the weapon component would belong to the player and would
-survive a gun that did not.
+The shotgun starts with twenty shells — **five in the gun and fifteen spare**, not five plus
+twenty. Every one of those numbers lives on `BP_WeaponItem`, and that placement is the design: a
+weapon here is a *droppable actor*, so drop a half-empty shotgun, walk away, come back and pick
+it up, and it is still half empty. A reserve on the weapon component would belong to the player
+and would survive a gun that did not.
 
-| field | shotgun | pistol |
-|-------|---------|--------|
-| `UsesAmmo` | true | **false** — the pistol is the fallback and is deliberately unlimited |
-| `MagazineSize` / `Loaded` | 5 | 0 (never read) |
-| `Reserve` | 15 | 0 |
-| `FireInterval` | 0.85 s | 0.18 s |
-| `ReloadSeconds` | 1.6 s | — |
+| field | shotgun | pistol | SMG | rifle | sniper |
+|-------|---------|--------|-----|-------|--------|
+| damage × pellets | 18 × 8 | 26 × 1 | 12 × 1 | 24 × 1 | **120 × 1** |
+| `UsesAmmo` | true | **false** | true | true | true |
+| `MagazineSize` / `Loaded` | 5 | 0 (never read) | 30 | 30 | 5 |
+| `Reserve` | 15 | 0 | 90 | 90 | 15 |
+| `FireInterval` | 0.85 s | 0.18 s | **0.09 s** | 0.14 s | **1.60 s** |
+| `ReloadSeconds` | 1.6 s | — | 1.9 s | 2.1 s | 2.6 s |
+| spread / range | 5° / 40 m | 1° / 60 m | 2.6° / 45 m | 1.4° / 90 m | **0.2° / 200 m** |
 
-The shotgun now does **8 × 18 = 144** damage (it was 8 × 9), so one connected shot kills a
-100 HP wanderer and the 0.85 s interval is the whole balance of the weapon.
+The pistol is the fallback and is deliberately unlimited. The shotgun does **8 × 18 = 144**, so
+one connected shot kills a 100 HP wanderer and the 0.85 s interval is the whole balance of the
+weapon; the sniper kills in one round and then makes you wait 1.6 s for the next; the SMG spends
+nine rounds and most of a second to do the same thing.
+
+Sustained DPS across the five spans **75 to 171** — a 2.3× band, asserted by the verifier. What
+differs between the weapons is meant to be how the damage is *delivered*, not how much of it
+there is: a weapon three times another's output is not a choice.
 
 **There is no reloading state.** `NextFireTime` is a world-time deadline, and both the interval
 between shots and the cost of a reload push it out. That means "cannot fire yet" has exactly one
@@ -616,6 +654,75 @@ actually taken it, so the shells are still there when a shotgun-less player late
 
 Proved at runtime with a temporary probe: a pickup dropped on the player took the reserve from
 **15 to 17** and removed itself, with zero blueprint errors and zero `Accessed None`.
+
+### The three found weapons, and the 10% drop
+
+The shotgun and the pistol are **issued** — spawned into the player's hands at BeginPlay. The
+SMG, the assault rifle and the sniper are **found**: the only way to get one is to kill something
+carrying it, which is what makes the rate a reason to keep fighting rather than a number in a
+table.
+
+```
+one kill in ten leaves a weapon   GUN_DROP_CHANCE = 0.10
+...drawn uniformly from three     so each individual gun is ~1 in 30
+```
+
+Two decisions, deliberately separate. **Whether** anything drops is one roll; **what** drops is
+an index into `DropClasses` (an array on `BP_HealthComponent`, filled by `main()`). Keeping them
+apart means the rate and the table tune independently — adding a fourth findable weapon changes
+what a drop is *worth* and not how often one happens, which is not true of the obvious
+alternative, one roll into a weighted table. It is also why the table is an array rather than
+three variables and a `Switch`: a Switch grows a pin per weapon, and the array's length is
+already the only number the draw needs.
+
+Rolled on **the same `DamagedByPlayer` arm as the shells and the kill count** — the safety net
+writes `Health = 0` for anything that falls through the world, and it must not be a weapon
+dispenser.
+
+`Dropped = true` on the spawned actor is the **entire** handover. From that moment it is an
+ordinary weapon lying in the forest, and the `E` that picks up a gun the player threw away picks
+this one up with no new code: nothing in `_author_pickup` knows these exist.
+
+Guard worth keeping: the roll's condition is `lucky AND stocked`, where `stocked` is
+`Length(DropClasses) > 0`. Without it `RandomIntegerInRange(0, -1)` feeds `Array_Get` an index
+into nothing on any build where `main()` has not filled the table.
+
+Proved at runtime with a temporary probe and the chance forced to 1.0: ten forced kills produced
+**12 `BP_WeaponItem` actors** (2 = the player's own) and **10 of them flagged `Dropped`**, plus
+ten `BP_AmmoPickup`s, with 0 blueprint errors and 0 `Accessed None`. Counting actors would only
+have proved a spawn happened — the second number is the one that proves the cast behind it
+succeeded and the pick-up interface was actually written.
+
+### Weapon sounds, including the two that are not shots
+
+`Scripts/make_weapon_sounds.py` is pure Python and synthesises all seven WAVs. The five gunshots
+come from `_shot()` — crack (bright noise, fast decay) + body (low-passed noise) + thump (a sine
+swept downward) — differing only in tail length and thump depth. Broadly: the longer and deeper
+the tail, the bigger the gun. The SMG is almost all crack (0.26 s, because at 0.09 s between
+rounds a longer tail turns a burst into mush); the sniper is almost all boom (1.30 s).
+
+The other two are **mechanical**, and come from a different generator. A hammer falling on an
+empty chamber and a shell going into a tube are metal hitting metal with no powder behind them,
+so `_clack()` lays one or more damped metallic *rings* into a buffer at given offsets. The ring
+is what makes it read as metal — noise alone is a pop. `A_DryFire` is one event at 2.8 kHz over
+0.14 s; `A_Reload` is three (two shells in, then the pump closing) over 0.9 s, so the sound
+finishing is roughly the cue that the weapon is live again.
+
+Both are **shared by every weapon** — one hammer sounds much like another — but they still live
+on `BP_WeaponItem` as `DryFireSound` / `ReloadSound` rather than on the component, because that
+is a fact about the *defaults* and not about the shape of the data. The graphs read all three
+sounds off `Held`, so a new weapon stays a row in `_weapon_specs()`.
+
+**Where each one is gated is the whole design:**
+
+- **The click** hangs off the False arm of the ready gate — the one place that knows the trigger
+  was pulled and the shot did not happen. Two reasons lead there and only one deserves a sound,
+  so the condition is `empty AND cooled`, not just `empty`. Clicking while merely between shots
+  would click on most frames of a held SMG trigger. No cooldown is stamped: `FIRE_KEY` is polled
+  with `WasInputKeyJustPressed`, so one click of the mouse is one click of the hammer.
+- **The clack** plays on the True arm of the reload only. On the False arm — an unlimited weapon,
+  or a full magazine — nothing moves, and a sound there would be the game claiming it had done
+  something it had not, while the pause that normally follows a reload also would not happen.
 
 ### Debug mode
 
@@ -705,7 +812,14 @@ centred and bottom-anchored at any window size.
   like weight or like lag, whether 20 shells against ten chasing NPCs is tight or merciless,
   whether the two brass shells are actually findable on a forest floor at night, and whether
   the slot's "3 / 15" is legible at that size. Also still open from before: how the reticle
-  reads while moving, and how much the gun visibly detaches from the hand.
+  reads while moving, and how much the gun visibly detaches from the hand. New again with the
+  three found weapons: whether the five silhouettes are actually distinguishable in a fist at
+  3 m (the SMG is short, the rifle has a carry handle, the sniper has a scope and wood), whether
+  the sniper's 1.6 s between shots is tense or just slow against a pack that closes 75 m in 15 s,
+  whether one drop in ten feels like a reward or like nothing, whether a dropped gun floating
+  ~1.3 m above where the corpse stood reads as a pickup or as a bug, whether the dry-fire click
+  is audible over the pack, and whether dropping the ready pose mid-sprint looks like a
+  transition or like a pop.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
@@ -1032,3 +1146,23 @@ centred and bottom-anchored at any window size.
   -LogCmds="LogNavigation Verbose" -abslog=<path>` then grep for `Building tile` (should be
   hundreds) and `not on navmesh` (should stop after the first second or two). `-stdout`
   block-buffers and UE writes no `Saved/Logs` under it, so `-abslog` is required.
+- **`Array_Get`'s displayed node title is the bare word `Get`** — identical to every variable
+  getter in the graph. A verifier that matched the feeder of a spawn's Class pin by title found
+  nothing and reported "0 weapon spawns" on a graph that had one. Pin sets are the only
+  unambiguous handle for a call node: match on `{"TargetArray", "Index"}`, not on the title.
+  (`BEL.get_node_title` is still the right tool for *variable* nodes — `Set Loaded`, `Get
+  DebugMode` — where the name is in the title.)
+- **`_same(None, None)` is `True`, so a mistyped asset path verifies clean.** `_apply_defaults`
+  writes `eas.load_asset(path)` and reads it back; a path that resolves to nothing writes `None`,
+  reads `None`, and passes — a gun that silently makes no noise, all the way through build,
+  verify and ship. Every asset reference written as a default now goes through `_must_load()`,
+  which raises on a miss. The general rule: a read-back check is only as good as its ability to
+  distinguish "absent" from "absent".
+- **An array default comes back as `unreal.Array`, not a `list`**, and its `repr` embeds an
+  address, so `str(a) == str(b)` never holds. `_same` compares arrays element-wise through
+  itself. Symptom before the fix: `default for DropClasses did not stick: <Array object at
+  0x…> != [<Object '/Game/Weapons/BP_SMG…'>, …]` on a write that had in fact stuck perfectly.
+- **A `Delay` in a headless `-nullrhi -game` run is measured in world time, which advances by a
+  fixed tiny step per frame.** A 3 s delay may never elapse in a 30 s wall-clock session; 0.4 s
+  does. Keep probe delays well under a second, and never read a headless run's silence as a
+  failure of the thing behind the delay.

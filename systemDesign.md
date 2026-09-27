@@ -466,14 +466,14 @@ simply matches the preset path. Exposure min/max/bias are compared with a float 
 
 ---
 
-## 5. The run loop — damage, sprint, death
+## 5. The run loop — damage, ammunition, sprint, death
 
 The level generator above knows nothing about any of this; it is built by
 `Scripts/build_weapons_and_combat.py` and `Scripts/build_graphics_menu.py` onto assets that
 every generated level picks up through `BP_ThirdPersonGameMode`. CLAUDE.md carries the
 reasoning; this is the shape.
 
-**Three values on the GameMode, because Blueprints have no statics** and each has to outlive
+**Four values on the GameMode, because Blueprints have no statics** and each has to outlive
 every actor that touches it — including the player's own components, which die with them:
 
 | variable | written by | read by |
@@ -481,6 +481,14 @@ every actor that touches it — including the player's own components, which die
 | `NpcSpawnCount` | each wanderer's `BeginPlay` | the next wanderer, for its number |
 | `NpcKillCount` | the death path, *only* when `DamagedByPlayer` | the HUD corner and the death menu |
 | `PlayerDead` | the player's death path | the HUD, to draw the menu instead of the HUD |
+| `DebugMode` | **D** in the graphics menu | the weapon component (tracers) and the HUD (NPC numbers) |
+
+`DebugMode` is on the GameMode rather than on the HUD that toggles it for the same reason as
+the rest: `BP_WeaponComponent` is the other reader, and a component cannot reach a HUD
+variable. Both readers take one cheap copy — the weapon component once per shot, the HUD once
+per `DrawHUD` — rather than casting per pellet or per wanderer. The HUD's copy (`DebugOn`) also
+gives the cast-failed path a real answer, since that path reaches the same drawing code and a
+`Get` off an invalid object is an `Accessed None` per wanderer per frame.
 
 **Two stamps on the health component,** both written by the pellet that landed
 (`_author_impact`) and by nothing else:
@@ -500,7 +508,9 @@ without it report `killed with 0`.
 ```
 Health <= 0, not already Dead
    |
-   +-- DespawnOnDeath  --> [DamagedByPlayer? -> NpcKillCount += 1] --> respawn --> destroy
+   +-- DespawnOnDeath  --> [DamagedByPlayer? -> NpcKillCount += 1
+   |                                          -> spawn BP_AmmoPickup (2 shells)]
+   |                       --> respawn --> destroy
    |
    '-- otherwise (the player)
           DisableMovement
@@ -515,6 +525,32 @@ Health <= 0, not already Dead
 and the ControlRig. `DefaultSlot` sits *inside* the blend and is filtered to the upper body, so
 the aim pose can leave the legs walking — a death played into it folds the chest over legs that
 are still standing.
+
+**Ammunition lives on `BP_WeaponItem`,** not on the weapon component, because a weapon here is
+a droppable actor: a half-empty shotgun left on the ground has to still be half empty when it is
+picked up again. Seven fields — `UsesAmmo`, `MagazineSize`, `Loaded`, `Reserve`, `FireInterval`,
+`ReloadSeconds`, `NextFireTime` — and the difference between the shotgun (5 + 15 shells, 0.85 s,
+1.6 s reload, 8 × 18 damage) and the pistol (`UsesAmmo` false) is entirely a row in
+`_weapon_specs()`. Nothing in any graph branches on a weapon's name.
+
+`NextFireTime` is a **world-time deadline**, and both the interval between shots and the cost of
+a reload push it out; there is no reloading state, no timer and no flag that can disagree with
+itself. The fire gate is **two nested Branches** rather than one folded condition, because every
+ammunition and cooldown test reads a property off `Held` and a Branch's condition is pulled on
+every frame, including the frames where nothing is equipped.
+
+```
+pressed(LMB) AND Held valid AND NOT Sprinting
+   '-- (NOT UsesAmmo OR Loaded > 0) AND now >= NextFireTime
+          -> Loaded -= 1;  NextFireTime = now + FireInterval
+          -> cache GameMode.DebugMode;  sound;  one trace per pellet
+```
+
+**`BP_AmmoPickup`** measures its own distance to the player on its own Tick — a handful of
+actors ticking beats a `GetAllActorsOfClass` sweep from the weapon component every frame — walks
+the player's `Inventory`, credits the first weapon whose `UsesAmmo` is true, and destroys itself
+only once `Credited` is set (`ForEachLoop` has no break pin, and a shotgun-less player must
+leave the shells where they are).
 
 **Sprint lives on `BP_WeaponComponent`,** with `Stamina` / `MaxStamina` / `Sprinting` /
 `BaseSpeed`, because that is the component that has to refuse to fire while the key is held and
@@ -555,7 +591,7 @@ every frame and `APlayerController` ticks through a pause.
 
 ---
 
-## 7. Status (as of 2026-09-26)
+## 7. Status (as of 2026-09-27)
 
 - Git: branch `night-mode`, working tree clean, head `e5745e9 night mode initial`
   (adds `lighting.py`, the generator rewrite, the regenerated night scripts and a `.gitignore`).
@@ -563,10 +599,11 @@ every frame and `APlayerController` ticks through a pause.
   grass clumps over 9 species, **ten NPCs 75.0–78.0 m** from the player (every one of them
   with at least one tree blocking the direct line), **night** preset.
   Offline 28/28, in-editor 141/141, import log clean.
-- Combat and HUD: **145/145** (`verify_weapons_and_combat.py`) and **50/50**
+- Combat and HUD: **187/187** (`verify_weapons_and_combat.py`) and **60/60**
   (`verify_graphics_menu.py`). A 90 s `-game` run is clean — 0 runtime errors, 0 Accessed
-  None, 5 spawns, 0 falls — and ends with the pack killing the player, which is the death
-  path running end to end.
+  None, 10 spawns, 0 falls — and ends with the pack killing the player, which is the death
+  path running end to end. The ammunition pickup was proved the same way: a `BP_AmmoPickup`
+  dropped on the player took the shotgun's reserve from 15 to 17 and removed itself.
 - New assets from the NPC run: `/Game/Forest/NPC/BP_ForestWanderer`,
   `/Game/Forest/NPC/BP_ForestWandererAI`.
 - **Pre-existing bug, unfixed and unrelated to the NPC work:** `scatter_trees` performs no

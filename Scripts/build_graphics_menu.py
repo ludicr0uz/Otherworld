@@ -109,6 +109,15 @@ PRESET_KEYS = ("One", "Two", "Three")
 
 MENU_KEY = "M"
 
+# Debug mode: the developer overlays, on one key in the same menu.  The flag
+# itself lives on the GameMode (declared by build_weapons_and_combat.py), not
+# here, because the *weapon component* is the other thing that reads it and a
+# HUD variable is not reachable from a component.  What lives here is DebugOn,
+# a copy taken once per frame at the top of DrawHUD so the draw code can branch
+# on a plain bool instead of casting to the GameMode for every wanderer.
+DEBUG_KEY = "D"
+DEBUG_MODE_VAR = "DebugMode"
+
 # The FPS readout.  "stat fps" is the engine's own frame-rate display and it
 # renders in the **top-right** corner of the viewport on its own -- there is no
 # position to set, and nothing is drawn by this HUD's canvas for it.  Doing it
@@ -142,15 +151,16 @@ HP_BAR = (60.0, 62.0, 420.0, 30.0)   # x, y, w, h -- w is the *full* bar
 HP_NUM_POS = (500.0, 58.0)
 HP_NUM_SCALE = 2.4
 
-PANEL = (60.0, 130.0, 600.0, 300.0)   # x, y, w, h
+PANEL = (60.0, 130.0, 600.0, 346.0)   # x, y, w, h
 TITLE_POS = (92.0, 158.0)
 TITLE_SCALE = 2.2
 ROW_X = 150.0
 ROW_Y0 = 238.0
 ROW_STEP = 46.0
 ROW_SCALE = 2.0
+DEBUG_ROW_Y = 376.0        # one row below the three presets
 CARET_X = 112.0
-HINT_POS = (92.0, 382.0)
+HINT_POS = (92.0, 428.0)
 HINT_SCALE = 1.5
 
 COL_PANEL = "(R=0.020000,G=0.025000,B=0.035000,A=0.780000)"
@@ -235,6 +245,14 @@ SLOT_GAP = 10.0
 SLOT_BOTTOM = 46.0         # pixels between the strip and the bottom edge
 SLOT_NAME_SCALE = 1.3
 SLOT_MARK_H = 5.0          # the equipped slot's underline
+# The ammunition readout, in the slot's own top-right corner: "3 / 15" is
+# rounds in the magazine and rounds in reserve.  Drawn only for weapons whose
+# UsesAmmo is true, so the pistol's slot stays empty rather than claiming an
+# infinity nobody has to manage.
+SLOT_AMMO_SCALE = 1.2
+SLOT_AMMO_RIGHT = 8.0      # px from the slot's right edge to the text's left
+SLOT_AMMO_TOP = 6.0
+COL_SLOT_AMMO = "(R=0.960000,G=0.860000,B=0.450000,A=0.950000)"
 COL_SLOT_BACK = "(R=0.020000,G=0.025000,B=0.035000,A=0.700000)"
 COL_SLOT_NAME = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
 COL_SLOT_MARK = "(R=1.000000,G=0.820000,B=0.320000,A=1.000000)"
@@ -435,6 +453,9 @@ def _ensure_variables(ed, bp):
     asset, so nothing is referencing them at this point.
     """
     for name, kind, default in (("MenuOpen", "bool", "false"),
+                                # This frame's copy of the GameMode's
+                                # DebugMode.  Taken once at the top of DrawHUD.
+                                ("DebugOn", "bool", "false"),
                                 ("Quality", "int", str(DEFAULT_PRESET))):
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind),
@@ -605,6 +626,46 @@ def _author_tick(ed, tick):
 
         # An unmatched key falls through to the next test.
         flow = _pin(br, "else", is_input=False)
+
+    # --- D toggles debug mode -----------------------------------------------
+    # Written to the GameMode rather than to this HUD: the pellet tracers are
+    # drawn by BP_WeaponComponent, which can reach a GameMode and cannot reach
+    # a HUD variable.  Behind the same MenuOpen gate as the preset keys, so D
+    # is a walking key everywhere except with the menu open.
+    bx = x0 + 1500
+    by = y0 + len(PRESETS) * 420
+    was_d = _at(_node(ed, FN_WAS_PRESSED), bx, by + 140)
+    _connect(pc_out, _pin(was_d, "self"))
+    _set(was_d, "Key", DEBUG_KEY)
+    br_d = _at(ed.add_branch_node(), bx + 300, by)
+    _connect(_pin(was_d, "ReturnValue", is_input=False), _pin(br_d, "Condition"))
+    _connect(flow, _pin(br_d, "execute"))
+
+    gm = _at(_node(ed, FN_GET_GAME_MODE), bx + 500, by + 240)
+    as_gm = _at(_palette(ed, NODE_CAST_GAME_MODE), bx + 740, by)
+    _connect(_pin(gm, "ReturnValue", is_input=False), _pin(as_gm, "Object"))
+    _connect(BEL.find_then_pin(br_d), _pin(as_gm, "execute"))
+    gm_out = _loose_pin(as_gm, "AsBPThirdPersonGameMode", is_input=False)
+
+    was_on = _at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
+                                                 GAME_MODE_CLASS_PATH),
+                 bx + 980, by + 240)
+    _connect(gm_out, _pin(was_on, "self"))
+    flip = _at(_node(ed, FN_NOT), bx + 1220, by + 240)
+    _connect(_pin(was_on, DEBUG_MODE_VAR, is_input=False), _pin(flip, "A"))
+    set_dbg = _at(ed.add_set_member_variable_node(DEBUG_MODE_VAR,
+                                                  GAME_MODE_CLASS_PATH),
+                  bx + 1460, by)
+    _connect(gm_out, _pin(set_dbg, "self"))
+    _connect(_pin(flip, "ReturnValue", is_input=False), _pin(set_dbg, DEBUG_MODE_VAR))
+    _connect(BEL.find_then_pin(as_gm), _pin(set_dbg, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"{DEBUG_KEY} -> debug mode, held on the GameMode so the weapon "
+        "component can read it too.  It turns on the pellet tracers and the "
+        "wanderers' numbers -- instrumentation, which is why it is off by "
+        "default rather than something the player has to switch away.",
+        [was_d, br_d, gm, as_gm, was_on, flip, set_dbg])
 
 
 # ─── The health readout ──────────────────────────────────────────────────────
@@ -970,13 +1031,22 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     _connect(top_out, _pin(id_y, "A"))
     _set(id_y, "B", NPC_ID_RISE)
 
-    number = _at(_node(ed, FN_DRAW_TEXT), x0 + 3160, y0)
+    # ...and only in debug mode. The number is how the log's "[NPC-SPAWN] #7"
+    # is matched to a body on screen, which is a thing a developer does and not
+    # a thing the game is. DebugOn is this frame's copy of the GameMode's flag,
+    # taken once in _author_draw.
+    numbered = _at(ed.add_get_member_variable_node("DebugOn"), x0 + 2900, y0 + 300)
+    labelled = _at(ed.add_branch_node(), x0 + 3160, y0)
+    _connect(_pin(numbered, "DebugOn", is_input=False), _pin(labelled, "Condition"))
+    _connect(BEL.find_then_pin(fill), _pin(labelled, "execute"))
+
+    number = _at(_node(ed, FN_DRAW_TEXT), x0 + 3420, y0)
     _connect(_pin(nid_str, "ReturnValue", is_input=False), _pin(number, "Text"))
     _set(number, "TextColor", COL_NPC_ID)
     _set(number, "Scale", NPC_ID_SCALE)
     _connect(_pin(id_x, "ReturnValue", is_input=False), _pin(number, "ScreenX"))
     _connect(_pin(id_y, "ReturnValue", is_input=False), _pin(number, "ScreenY"))
-    _connect(BEL.find_then_pin(fill), _pin(number, "execute"))
+    _connect(BEL.find_then_pin(labelled), _pin(number, "execute"))
 
     ed.add_comment_to_nodes(
         f"One bar per wanderer, and only for {NPC_BAR_SECONDS:.0f}s after "
@@ -986,7 +1056,8 @@ def _author_npc_bars(ed, x0, y0, in_execs):
         "build_npc_blueprints.py owns.",
         [every, loop, comp, cast, health, max_health, where, above, proj, parts,
          in_front, hurt_at, now, since, recent, showing, visible, left, frac,
-         fill_w, back, fill, nid, nid_str, id_x, id_y, number])
+         fill_w, back, fill, nid, nid_str, id_x, id_y, numbered, labelled,
+         number])
     return (_loose_pin(loop, "Completed", is_input=False),)
 
 
@@ -1119,18 +1190,64 @@ def _author_inventory(ed, x0, y0, in_execs):
     _connect(_pin(label_y, "ReturnValue", is_input=False), _pin(label, "ScreenY"))
     _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
 
+    # --- how much ammunition this weapon has --------------------------------
+    # Read off the item, like SlotColor and DisplayName, so the strip stays a
+    # view of whatever is carried and knows nothing about shotguns.
+    uses = _at(ed.add_get_member_variable_node("UsesAmmo", ITEM_CLASS_PATH),
+               x0 + 4680, y0 + 660)
+    _connect(item, _pin(uses, "self"))
+    counted = _at(ed.add_branch_node(), x0 + 4940, y0 + 900)
+    _connect(_pin(uses, "UsesAmmo", is_input=False), _pin(counted, "Condition"))
+    _connect(BEL.find_then_pin(label), _pin(counted, "execute"))
+
+    in_gun = _at(ed.add_get_member_variable_node("Loaded", ITEM_CLASS_PATH),
+                 x0 + 4680, y0 + 780)
+    _connect(item, _pin(in_gun, "self"))
+    in_bag = _at(ed.add_get_member_variable_node("Reserve", ITEM_CLASS_PATH),
+                 x0 + 4680, y0 + 900)
+    _connect(item, _pin(in_bag, "self"))
+    in_gun_s = _at(_node(ed, FN_INT_TO_STR), x0 + 4940, y0 + 780)
+    _connect(_pin(in_gun, "Loaded", is_input=False), _pin(in_gun_s, "InInt"))
+    in_bag_s = _at(_node(ed, FN_INT_TO_STR), x0 + 4940, y0 + 1020)
+    _connect(_pin(in_bag, "Reserve", is_input=False), _pin(in_bag_s, "InInt"))
+    sep = _at(_node(ed, FN_CONCAT), x0 + 5180, y0 + 900)
+    _set(sep, "A", " / ")
+    _connect(_pin(in_bag_s, "ReturnValue", is_input=False), _pin(sep, "B"))
+    ammo_str = _at(_node(ed, FN_CONCAT), x0 + 5420, y0 + 840)
+    _connect(_pin(in_gun_s, "ReturnValue", is_input=False), _pin(ammo_str, "A"))
+    _connect(_pin(sep, "ReturnValue", is_input=False), _pin(ammo_str, "B"))
+
+    ammo_x = _at(_node(ed, FN_ADD), x0 + 5180, y0 + 660)
+    _connect(at_x_out, _pin(ammo_x, "A"))
+    _set(ammo_x, "B", SLOT_W - SLOT_AMMO_RIGHT - 46.0)
+    ammo_y = _at(_node(ed, FN_ADD), x0 + 5180, y0 + 780)
+    _connect(y_out, _pin(ammo_y, "A"))
+    _set(ammo_y, "B", SLOT_AMMO_TOP)
+
+    ammo = _at(_node(ed, FN_DRAW_TEXT), x0 + 5680, y0 + 640)
+    _connect(_pin(ammo_str, "ReturnValue", is_input=False), _pin(ammo, "Text"))
+    _set(ammo, "TextColor", COL_SLOT_AMMO)
+    _set(ammo, "Scale", SLOT_AMMO_SCALE)
+    _set(ammo, "bScalePosition", "false")
+    _connect(_pin(ammo_x, "ReturnValue", is_input=False), _pin(ammo, "ScreenX"))
+    _connect(_pin(ammo_y, "ReturnValue", is_input=False), _pin(ammo, "ScreenY"))
+    _connect(BEL.find_then_pin(counted), _pin(ammo, "execute"))
+
     # --- the equipped slot gets an underline --------------------------------
     is_equipped = _at(_node(ed, FN_EQ_II), x0 + 4680, y0 + 520)
     _connect(index, _pin(is_equipped, "A"))
     _connect(_pin(equipped, "EquippedIndex", is_input=False), _pin(is_equipped, "B"))
-    marked = _at(ed.add_branch_node(), x0 + 4940, y0)
+    marked = _at(ed.add_branch_node(), x0 + 5940, y0)
     _connect(_pin(is_equipped, "ReturnValue", is_input=False), _pin(marked, "Condition"))
-    _connect(BEL.find_then_pin(label), _pin(marked, "execute"))
+    # Both arms of the ammunition branch carry on: a pistol still gets its
+    # underline.
+    _connect(BEL.find_then_pin(ammo), _pin(marked, "execute"))
+    _connect(BEL.find_else_pin(counted), _pin(marked, "execute"))
 
-    mark_y = _at(_node(ed, FN_ADD), x0 + 4940, y0 + 520)
+    mark_y = _at(_node(ed, FN_ADD), x0 + 5940, y0 + 520)
     _connect(y_out, _pin(mark_y, "A"))
     _set(mark_y, "B", SLOT_H - SLOT_MARK_H)
-    mark = _at(_node(ed, FN_DRAW_RECT), x0 + 5200, y0)
+    mark = _at(_node(ed, FN_DRAW_RECT), x0 + 6200, y0)
     _set(mark, "RectColor", COL_SLOT_MARK)
     _set(mark, "ScreenW", SLOT_W)
     _set(mark, "ScreenH", SLOT_MARK_H)
@@ -1140,11 +1257,15 @@ def _author_inventory(ed, x0, y0, in_execs):
 
     ed.add_comment_to_nodes(
         "Each carried weapon paints its own SlotColor and DisplayName into its "
-        "slot, and the equipped one gets the underline. Reading the weapon's "
+        "slot, its rounds-in-gun / rounds-in-reserve if it uses ammunition at "
+        "all, and the equipped one gets the underline. Reading the weapon's "
         "own properties means the HUD needs no table of weapon names to keep "
-        "in step with BP_Shotgun and BP_Pistol.",
+        "in step with BP_Shotgun and BP_Pistol -- and no idea which of them is "
+        "the one with a magazine.",
         [pawn, comp, cast, inv, equipped, loop, as_float, step, at_x, colour,
-         name, fill, label_x, label_y, label, is_equipped, marked, mark_y, mark])
+         name, fill, label_x, label_y, label, uses, counted, in_gun, in_bag,
+         in_gun_s, in_bag_s, sep, ammo_str, ammo_x, ammo_y, ammo,
+         is_equipped, marked, mark_y, mark])
 
     # A pawn with no weapon component still has to reach the menu below.
     return (_loose_pin(loop, "Completed", is_input=False),
@@ -1416,13 +1537,30 @@ def _author_draw(ed, x0, y0):
     _connect(BEL.find_then_pin(draw), _pin(as_mode, "execute"))
     mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
 
-    alive = _at(ed.add_branch_node(), x0 - 180, y0)
+    # This frame's copy of DebugMode, taken here and nowhere else.  Every
+    # consumer below reads the HUD's own DebugOn instead of the GameMode's
+    # variable, for one reason: the cast-failed path reaches the same drawing
+    # code, and a Get with an invalid self is an "Accessed None" per wanderer
+    # per frame.  Copying it once gives that path a real answer -- false -- and
+    # costs one node.
+    on_get = _at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
+                                                 GAME_MODE_CLASS_PATH),
+                 x0 - 440, y0 + 380)
+    _connect(mode_out, _pin(on_get, "self"))
+    copy_dbg = _at(ed.add_set_member_variable_node("DebugOn"), x0 - 180, y0 + 380)
+    _connect(_pin(on_get, DEBUG_MODE_VAR, is_input=False), _pin(copy_dbg, "DebugOn"))
+    _connect(BEL.find_then_pin(as_mode), _pin(copy_dbg, "execute"))
+    no_dbg = _at(ed.add_set_member_variable_node("DebugOn"), x0 - 180, y0 + 620)
+    _set(no_dbg, "DebugOn", "false")
+    _connect(_pin(as_mode, "CastFailed", is_input=False), _pin(no_dbg, "execute"))
+
+    alive = _at(ed.add_branch_node(), x0 + 60, y0)
     dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
                                                    GAME_MODE_CLASS_PATH),
                    x0 - 440, y0 + 240)
     _connect(mode_out, _pin(dead_get, "self"))
     _connect(_pin(dead_get, PLAYER_DEAD_VAR, is_input=False), _pin(alive, "Condition"))
-    _connect(BEL.find_then_pin(as_mode), _pin(alive, "execute"))
+    _connect(BEL.find_then_pin(copy_dbg), _pin(alive, "execute"))
 
     _author_death_menu(ed, x0 + 3000, y0 + 3000,
                        (BEL.find_then_pin(alive),), mode_out)
@@ -1430,8 +1568,7 @@ def _author_draw(ed, x0, y0):
     # A GameMode that is not BP_ThirdPersonGameMode cannot say whether the
     # player is dead, so it is treated as alive and the HUD draws as normal --
     # a missing death menu is recoverable, a missing HUD is not.
-    living = (BEL.find_else_pin(alive),
-              _pin(as_mode, "CastFailed", is_input=False))
+    living = (BEL.find_else_pin(alive), BEL.find_then_pin(no_dbg))
 
     # HP first, so it is on screen whether or not the menu is open.
     after_hp = _author_hp(ed, x0, y0 - 900, living)
@@ -1482,8 +1619,43 @@ def _author_draw(ed, x0, y0):
     for i, (label, _lvl, _sq, _sp) in enumerate(PRESETS):
         text(f"[{i + 1}]   {label}", ROW_X, ROW_Y0 + i * ROW_STEP, ROW_SCALE,
              COL_ROW, x0 + 1080 + i * 220, y0)
-    text(f"[{MENU_KEY}]   close", HINT_POS[0], HINT_POS[1], HINT_SCALE, COL_HINT,
-         x0 + 1740, y0)
+    # Two draws behind one branch rather than one draw with a driven string:
+    # KismetStringLibrary has no Select, and a bool converted to a string reads
+    # "[D]   debug   true", which is a variable's value and not a setting.
+    dbg_get = _at(ed.add_get_member_variable_node("DebugOn"), x0 + 1740, y0 + 320)
+    dbg_br = _at(ed.add_branch_node(), x0 + 1740, y0)
+    _connect(_pin(dbg_get, "DebugOn", is_input=False), _pin(dbg_br, "Condition"))
+    _connect(flow, _pin(dbg_br, "execute"))
+    made += [dbg_get, dbg_br]
+
+    def debug_row(label, at_x, exec_in):
+        n = _at(_node(ed, FN_DRAW_TEXT), at_x, y0)
+        _set(n, "Text", label)
+        _set(n, "TextColor", COL_ROW)
+        _set(n, "ScreenX", ROW_X)
+        _set(n, "ScreenY", DEBUG_ROW_Y)
+        _set(n, "Scale", ROW_SCALE)
+        _set(n, "bScalePosition", "false")
+        _connect(exec_in, _pin(n, "execute"))
+        made.append(n)
+        return BEL.find_then_pin(n)
+
+    on_tail = debug_row(f"[{DEBUG_KEY}]   debug   ON", x0 + 1960,
+                        BEL.find_then_pin(dbg_br))
+    off_tail = debug_row(f"[{DEBUG_KEY}]   debug   OFF", x0 + 2180,
+                         BEL.find_else_pin(dbg_br))
+
+    hint = _at(_node(ed, FN_DRAW_TEXT), x0 + 2400, y0)
+    _set(hint, "Text", f"[{MENU_KEY}]   close")
+    _set(hint, "TextColor", COL_HINT)
+    _set(hint, "ScreenX", HINT_POS[0])
+    _set(hint, "ScreenY", HINT_POS[1])
+    _set(hint, "Scale", HINT_SCALE)
+    _set(hint, "bScalePosition", "false")
+    for tail in (on_tail, off_tail):
+        _connect(tail, _pin(hint, "execute"))
+    made.append(hint)
+    flow = BEL.find_then_pin(hint)
 
     # The caret's Y is Quality-driven, so the selection is read off the variable
     # instead of needing three separate draws with baked-in coordinates.
@@ -1497,7 +1669,7 @@ def _author_draw(ed, x0, y0):
     _connect(_pin(mul, "ReturnValue", is_input=False), _pin(add, "A"))
     _set(add, "B", ROW_Y0)
 
-    caret = text(">", CARET_X, ROW_Y0, ROW_SCALE, COL_CARET, x0 + 1960, y0)
+    caret = text(">", CARET_X, ROW_Y0, ROW_SCALE, COL_CARET, x0 + 2620, y0)
     _connect(_pin(add, "ReturnValue", is_input=False), _pin(caret, "ScreenY"))
 
     ed.add_comment_to_nodes(
@@ -1571,7 +1743,8 @@ def build_hud_blueprint(rebuild=False):
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
-    _apply_defaults(bp, {"MenuOpen": False, "Quality": DEFAULT_PRESET})
+    _apply_defaults(bp, {"MenuOpen": False, "DebugOn": False,
+                         "Quality": DEFAULT_PRESET})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

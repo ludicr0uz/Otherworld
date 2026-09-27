@@ -324,11 +324,12 @@ MoveToActor --> [distance <= 200 cm  AND  now >= NextAttackTime]
 `Scripts/build_graphics_menu.py` builds `/Game/UI/BP_GraphicsMenuHUD` (parent `AHUD`) and
 points `BP_ThirdPersonGameMode.HUDClass` at it. That game mode is `GlobalDefaultGameMode` and
 no generated level overrides it, so the menu is in every level without placing an actor or
-touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / High.
+touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / High, **D**
+toggles debug mode.
 
 It also draws the player's HP bar (see "The shotgun and health").
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 50 checks. Run it after any
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 60 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
@@ -360,19 +361,25 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**145 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**187 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls:** left click fires · **Q** cycles weapons · **G** drops · **E** picks up ·
-**Shift** sprints · **R** restarts from the death menu.
-(1/2/3 and M belong to the graphics menu, so the weapon keys stay clear of them.)
+**Shift** sprints · **R** reloads, and restarts from the death menu.
+(1/2/3, M and D belong to the graphics menu, so the weapon keys stay clear of them.)
+
+**R** is shared between reload and restart, and that is safe rather than lucky: Event Tick does
+not run while the game is paused, so the weapon component is not listening on any frame the
+death menu is on screen. The menu polls its own copy from `DrawHUD`, which *is* renderer-driven
+and does run paused.
 
 | asset | what it is |
 |-------|------------|
-| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, AimPose, SlotColor, DisplayName, Dropped). No geometry, no graph. |
-| `BP_Shotgun` | child: 7 primitives, 8 pellets × 9 dmg, 5° cone, 40 m, rifle ready pose |
-| `BP_Pistol` | child: 5 primitives, 1 shot × 26 dmg, 1° cone, 60 m, pistol ready pose, different grip angle |
-| `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/drop/pick up, **sprint + stamina** |
+| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, AimPose, SlotColor, DisplayName, Dropped, **UsesAmmo, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime**). No geometry, no graph. |
+| `BP_Shotgun` | child: 7 primitives, 8 pellets × **18** dmg, 5° cone, 40 m, rifle ready pose, **5-round magazine + 15 spare, 0.85 s between shots, 1.6 s reload** |
+| `BP_Pistol` | child: 5 primitives, 1 shot × 26 dmg, 1° cone, 60 m, pistol ready pose, different grip angle, **unlimited ammo, 0.18 s between shots** |
+| `BP_AmmoPickup` | 2 brass shells a killed wanderer leaves behind; walked into, not pressed for |
+| `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/reload/drop/pick up, **sprint + stamina** |
 | `BP_HealthComponent` | Health/MaxHealth, the damage stamp, death — despawn and respawn for a wanderer, **the death sequence and the pause** for the player |
 | `BP_BloodSplash` | 10 emissive spheres thrown out along the hit normal, arcing down as they swell, over 0.7 s |
 | `Audio/A_ShotgunFire`, `A_PistolFire` | synthesised by `Scripts/make_weapon_sounds.py` (pure Python — the project ships no audio and `/Engine` has no usable gunshot) |
@@ -560,12 +567,83 @@ roll, and without it a shotgun's eight pellets into one torso read as a single b
 The cone layout is generated from a fixed seed at build time, which is how the verifier can
 recompute it and compare component by component.
 
+### Shotgun ammunition
+
+Twenty shells to start with — **five in the gun and fifteen spare**, not five plus twenty. Every
+one of those numbers lives on `BP_WeaponItem`, and that placement is the design: a weapon here
+is a *droppable actor*, so drop a half-empty shotgun, walk away, come back and pick it up, and
+it is still half empty. A reserve on the weapon component would belong to the player and would
+survive a gun that did not.
+
+| field | shotgun | pistol |
+|-------|---------|--------|
+| `UsesAmmo` | true | **false** — the pistol is the fallback and is deliberately unlimited |
+| `MagazineSize` / `Loaded` | 5 | 0 (never read) |
+| `Reserve` | 15 | 0 |
+| `FireInterval` | 0.85 s | 0.18 s |
+| `ReloadSeconds` | 1.6 s | — |
+
+The shotgun now does **8 × 18 = 144** damage (it was 8 × 9), so one connected shot kills a
+100 HP wanderer and the 0.85 s interval is the whole balance of the weapon.
+
+**There is no reloading state.** `NextFireTime` is a world-time deadline, and both the interval
+between shots and the cost of a reload push it out. That means "cannot fire yet" has exactly one
+meaning in the system and nothing has to decide which of two rules is in force — no timer, no
+interrupt rule, no `bIsReloading` that can disagree with itself.
+
+**The fire gate is two nested Branches, not one folded condition**, and that is not cosmetic.
+`pressed AND armed AND NOT sprinting` is the outer one; the ammunition and cooldown tests are
+inside it. Every one of those inner tests reads a property off `Held`, and a Branch's condition
+is pulled **every frame** — including the frames where nothing is equipped. Folded together,
+that is an `Accessed None` per frame forever.
+
+**The reload's arithmetic is computed once and stored** in `ReloadTake`
+(`Min(MagazineSize - Loaded, Reserve)`). Read it back after `Loaded` has gone up and it quietly
+returns a smaller number, so the reserve is charged less than the magazine gained — the
+pure-node trap in its most expensive form: free ammunition.
+
+**A killed wanderer drops two shells**, on the same `DamagedByPlayer` arm the kill counter uses,
+and for the same reason: the safety net writes `Health = 0` for anything that falls through the
+world, and paying for that would turn a bug into an ammunition supply.
+
+`BP_AmmoPickup` is **walked into, not pressed for** — `E` already picks weapons up, and a weapon
+on the ground is a real choice (five slots are finite) where ammunition you obviously want is
+not. The distance is measured **on the pickup**, not in the weapon component's Tick: there are at
+most a handful of these on the ground, so one Tick each beats a `GetAllActorsOfClass` sweep every
+frame whether any exist or not. `Credited` is the break `ForEachLoop` does not have — without it
+a player carrying two shotguns would be paid twice. It only destroys itself once something has
+actually taken it, so the shells are still there when a shotgun-less player later finds one.
+
+Proved at runtime with a temporary probe: a pickup dropped on the player took the reserve from
+**15 to 17** and removed itself, with zero blueprint errors and zero `Accessed None`.
+
+### Debug mode
+
+One bool on the GameMode (`DebugMode`), toggled with **D** in the graphics menu, **off by
+default**. It turns on the two developer overlays: the **pellet tracers** drawn from the muzzle,
+and the **wanderer's number** beside its health bar. Both are instrumentation, and
+instrumentation is not what the game looks like.
+
+It lives on the GameMode rather than on the HUD that toggles it because `BP_WeaponComponent`
+draws the tracers, and a component cannot reach a HUD variable.
+
+The tracer is a **separate `DrawDebugLine` behind a Branch**, not the trace node's own
+`DrawDebugType`. That pin is an enum *literal* and an enum pin cannot be driven by a variable, so
+"sometimes" is not expressible there at all; every trace in the file is now `None`.
+
+Each reader takes one cheap copy rather than casting repeatedly: the weapon component reads the
+flag off the GameMode **once per shot** and branches on its own cached bool per pellet; the HUD
+copies it into `DebugOn` **once per `DrawHUD`**. The HUD's copy also exists so the cast-failed
+path has a real answer (`false`) — that path reaches the same drawing code, and a `Get` off an
+invalid object is an `Accessed None` per wanderer per frame.
+
 ### The HUD
 
 `build_graphics_menu.py` draws, every frame: the player's HP bar and the stamina bar under it
-(top-left), the **kill counter** (top-right), a projected health bar over every wanderer with
-its spawn number beside it, a 5-slot inventory strip centred along the bottom, and the centre
-reticle. Or, if the player is dead, **only the death menu** — the first thing `DrawHUD` does is
+(top-left), the **kill counter** (top-right), a projected health bar over every wanderer (with
+its spawn number beside it **in debug mode only**), a 5-slot inventory strip centred along the
+bottom — each slot showing its weapon's **rounds-loaded / rounds-in-reserve** if it uses
+ammunition at all — and the centre reticle. Or, if the player is dead, **only the death menu** — the first thing `DrawHUD` does is
 read `GameMode.PlayerDead` and branch, because a reticle and an inventory strip over a death
 screen read as a game still being played.
 
@@ -590,8 +668,9 @@ engine's smoothed frame time, not a `1/DeltaSeconds` recomputed on the HUD. Like
 cvars, it is global: a PIE session leaves `stat fps` on in the editor viewport, and `stat fps`
 again turns it off. The strip and the reticle are both laid out from the viewport size, so they stay
 centred at any window size. Slot colour and
-name are read from each weapon's own `SlotColor`/`DisplayName`, so the HUD keeps no list of
-weapons to fall out of step with. The strip is laid out from the viewport size so it stays
+name are read from each weapon's own `SlotColor`/`DisplayName`, and the ammunition readout off
+its own `UsesAmmo`/`Loaded`/`Reserve` — so the HUD keeps no list of weapons to fall out of step
+with, and no idea which of them is the one with a magazine. The strip is laid out from the viewport size so it stays
 centred and bottom-anchored at any window size.
 
 ## Current state
@@ -603,8 +682,12 @@ centred and bottom-anchored at any window size.
   75-100 m from the player, and shows its health bar only for 5 s after being hit; **ten of
   them** chase at once. Kills are
   counted in the top-right. At 0 HP the **player** drops, the game pauses and a menu offers the
-  final score and **R to try again**. Built by
-  `build_weapons_and_combat.py` — **145/145** in-engine checks, **50/50** HUD checks.
+  final score and **R to try again**. The shotgun is **limited to 20 shells** (5 loaded, 15
+  spare), does 8 × 18, waits 0.85 s between shots and reloads with **R**; killed wanderers drop
+  **2 shells** that are picked up by walking over them; the pistol stays unlimited. **D** in the
+  graphics menu toggles debug mode, which is the only thing that shows pellet tracers or the
+  wanderers' numbers. Built by
+  `build_weapons_and_combat.py` — **187/187** in-engine checks, **60/60** HUD checks.
   Aiming is the camera/muzzle hybrid described above, with a reticle on the real impact point,
   and the held weapon is turned to face that point every frame.
 - Proven in `-game` runs, not just in the graph: the player's death pauses the world (the
@@ -612,11 +695,17 @@ centred and bottom-anchored at any window size.
   one log line of any kind** afterwards); the kill counter counts shot wanderers and refuses
   fallen ones (5 vs 0 over identical deaths); `BaseSpeed` caches as **600**. A clean 90 s run
   is 0 runtime errors, 0 Accessed None, 10 spawns, 0 falls, and the pack killing the player.
+  The ammunition pickup was proved the same way: a `BP_AmmoPickup` dropped on the player took
+  the shotgun's reserve from **15 to 17** and removed itself, with no errors and no
+  `Accessed None`.
 - **Still unverified headlessly, and worth a play session:** everything that needs a key held
   or an eye on the screen — how sprint feels against a pack that runs at 600, whether the
   stamina bar reads clearly under the HP bar, whether the new blood spray looks like blood, and
-  how the death menu sits on the screen. Also still open from before: how the reticle reads
-  while moving, and how much the gun visibly detaches from the hand.
+  how the death menu sits on the screen. New to that list: whether 0.85 s between shots feels
+  like weight or like lag, whether 20 shells against ten chasing NPCs is tight or merciless,
+  whether the two brass shells are actually findable on a forest floor at night, and whether
+  the slot's "3 / 15" is legible at that size. Also still open from before: how the reticle
+  reads while moving, and how much the gun visibly detaches from the hand.
 - `EditorStartupMap` is `/Game/Maps/Lvl_Forest_200m`. `GameDefaultMap` is still
   `/Game/Maps/Lvl_Forest` — a packaged or standalone run boots the old level.
 - Branch `night-mode`, clean. Latest commit `e5745e9 night mode initial`.
@@ -798,6 +887,28 @@ centred and bottom-anchored at any window size.
   `EventCounts`, which `UPlayerInput::ProcessInputStack` swaps out once per frame during the
   controller's `TG_PrePhysics` tick. A component defaults to `TG_PrePhysics` too, with no
   defined order against the controller. `AHUD` gets away with polling because it ticks later.
+- **An enum pin is a literal and cannot be driven by a variable.** `LineTraceSingle`'s
+  `DrawDebugType` is the case that bit: "draw the tracer only in debug mode" is not
+  expressible on that pin at all, because there is nothing to connect a bool to. A `Select`
+  node does not help either — the enum type has no Select. The fix is a separate
+  `DrawDebugLine` behind a `Branch`, and every trace's own `DrawDebugType` set to `None`. The
+  general rule: if a behaviour has to vary at runtime, it cannot live in a pin literal.
+
+- **Folding a property read into a Branch condition evaluates it on every frame, including the
+  frames where the object is null.** A Branch's condition is a pure pull, so
+  `pressed AND armed AND Held.Loaded > 0` reads `Loaded` off `Held` whether or not `armed` is
+  true — an `Accessed None` every frame the player is unarmed, forever, with the game otherwise
+  working perfectly. The fix is to **nest a second Branch** rather than extend the condition:
+  inside the first gate, the object has already been checked. This is the same pure-node
+  hazard as the NPC melee gate, in its quietest form — nothing breaks, the log just fills up.
+
+- **Storing a computed value matters most when the thing it is computed from is about to
+  change.** The reload moves `Min(MagazineSize - Loaded, Reserve)` rounds. Recomputing that
+  expression after `Loaded` has been raised returns a smaller number, so the reserve is charged
+  less than the magazine gained — a pure-node re-evaluation bug whose symptom is *free
+  ammunition*, which no test that only checks "did the reload work" would ever catch. It is
+  written once into `ReloadTake` and read back three times.
+
 - **A label sort is not an index sort, and it only breaks at ten.** The generated level
   verifier gathered the wanderers by label prefix and `sort`ed them as strings, then compared
   them pairwise against the expected spawn points. With five that is fine; with ten, `_10`

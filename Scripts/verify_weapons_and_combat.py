@@ -305,7 +305,7 @@ for var, want in (("ShotgunClass", "BP_Shotgun_C"),
 
 keys = sorted(pin_value(n, "Key") for n in by_pins(wg, "self", "Key"))
 want_keys = sorted([G.FIRE_KEY, G.SWITCH_KEY, G.DROP_KEY, G.PICKUP_KEY,
-                    G.SPRINT_KEY])
+                    G.SPRINT_KEY, G.RELOAD_KEY])
 check(f"polls exactly {want_keys}", keys == want_keys, str(keys))
 
 plays = by_pins(wg, "Asset", "SlotNodeName")
@@ -376,9 +376,12 @@ check("the pellet direction is muzzle -> AimPoint, not camera forward",
 check("nothing rotates the held weapon out of the hand",
       not titled(wg, "Set Actor Rotation"),
       f"{len(titled(wg, 'Set Actor Rotation'))} SetActorRotation node(s)")
+# No trace draws itself any more: DrawDebugType is an enum literal on the pin
+# and an enum pin cannot be driven, so "only in debug mode" is inexpressible
+# there. The tracer is a DrawDebugLine behind a Branch instead.
 drawn = [t for t in traces if "ForDuration" in pin_value(t, "DrawDebugType")]
-check("only the pellets are drawn -- the aim traces run every frame and would "
-      "paint the screen", len(drawn) == 1, f"{len(drawn)} drawn")
+check("no trace draws itself -- the tracer is conditional and a pin literal is not",
+      not drawn, f"{len(drawn)} drawn")
 
 for var, kind in (("AimPoint", unreal.Vector), ("AimValid", bool),
                   ("AimBlocked", bool)):
@@ -688,6 +691,189 @@ check("...through a NOT, so firing is refused while it is set", bool(negated),
       str([str(BEL.get_node_title(PIN.get_owning_node(q)))
            for n in sprint_reads
            for q in BEL.find_output_pin(n, "Sprinting").list_connected_pins()]))
+
+# ─── Ammunition, the cooldown and the reload ─────────────────────────────────
+# The requirement in one line: the shotgun is limited, the pistol is not. Every
+# check here is about the difference between those two being *data* -- a row in
+# _weapon_specs -- rather than a branch on the weapon's name somewhere.
+
+for path, spec in ((G.SHOTGUN_BP_PATH, "Shotgun"), (G.PISTOL_BP_PATH, "Pistol")):
+    want = next(w for w in G._weapon_specs() if w["display"] == spec)
+    gun = cdo(load(path))
+    check(f"{spec}: UsesAmmo is {want['uses_ammo']}",
+          gun.get_editor_property("UsesAmmo") == want["uses_ammo"],
+          str(gun.get_editor_property("UsesAmmo")))
+    check(f"{spec}: it starts loaded, not empty",
+          gun.get_editor_property("Loaded")
+          == gun.get_editor_property("MagazineSize") == want["magazine"],
+          f"{gun.get_editor_property('Loaded')} / "
+          f"{gun.get_editor_property('MagazineSize')}")
+    check(f"{spec}: reserve is {want['reserve']}",
+          gun.get_editor_property("Reserve") == want["reserve"],
+          str(gun.get_editor_property("Reserve")))
+    check(f"{spec}: there is a pause between shots",
+          abs(gun.get_editor_property("FireInterval") - want["interval"]) < 1e-6,
+          f"{gun.get_editor_property('FireInterval'):.2f}s")
+    check(f"{spec}: the first shot of a session is free",
+          gun.get_editor_property("NextFireTime") == 0.0,
+          str(gun.get_editor_property("NextFireTime")))
+
+shotgun_cdo = cdo(load(G.SHOTGUN_BP_PATH))
+check(f"the shotgun starts with {G.SHOTGUN_MAGAZINE + G.SHOTGUN_RESERVE} shells "
+      f"in total -- {G.SHOTGUN_MAGAZINE} loaded and {G.SHOTGUN_RESERVE} spare",
+      shotgun_cdo.get_editor_property("Loaded")
+      + shotgun_cdo.get_editor_property("Reserve") == 20,
+      str(shotgun_cdo.get_editor_property("Loaded")
+          + shotgun_cdo.get_editor_property("Reserve")))
+# 2x what it was. The pellet count is unchanged, so this is the whole change:
+# 8 x 18 = 144 against a 100 HP wanderer, i.e. one connected shot is a kill.
+check("the shotgun does twice the damage it used to (9 -> 18 per pellet)",
+      abs(shotgun_cdo.get_editor_property("Damage") - 18.0) < 1e-6,
+      str(shotgun_cdo.get_editor_property("Damage")))
+check("...and still fires the same 8 pellets, so the change is damage and not spread",
+      shotgun_cdo.get_editor_property("PelletCount") == 8,
+      str(shotgun_cdo.get_editor_property("PelletCount")))
+check("the pistol is unlimited and therefore never reloads",
+      cdo(load(G.PISTOL_BP_PATH)).get_editor_property("UsesAmmo") is False)
+
+# --- what the graph does with all that ---------------------------------------
+loaded_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                             for n in wg) if t == "Set Loaded"]
+check("firing spends a round and reloading puts rounds back",
+      len(loaded_writes) == 2, f"{len(loaded_writes)} writes to Loaded")
+next_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                           for n in wg) if t == "Set NextFireTime"]
+check("both the interval and the reload push the same NextFireTime deadline",
+      len(next_writes) == 2, f"{len(next_writes)} writes to NextFireTime")
+check("the deadline is compared against the clock, not a frame count",
+      bool(titled(wg, "GetTimeSeconds")),
+      f"{len(titled(wg, 'GetTimeSeconds'))} GetTimeSeconds")
+# The reserve is only ever *spent* here; it is topped up by BP_AmmoPickup.
+check("the weapon component spends the reserve and never grants it",
+      len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                       for n in wg) if t == "Set Reserve"]) == 1)
+# The pure-node trap, in the one place where getting it wrong is free ammo.
+check("the reload works out how many rounds move ONCE and stores it",
+      len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                       for n in wg) if t == "Set ReloadTake"]) == 1)
+check("...and reads it back three times rather than recomputing it",
+      len([n for n in wg if "ReloadTake" in out_pins(n)]) == 3,
+      f"{len([n for n in wg if 'ReloadTake' in out_pins(n)])} reads")
+check("the reload can never take more than the reserve holds",
+      bool(titled(wg, "Min (Integer)")),
+      str(sorted({t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                              for n in wg) if t.lower().startswith("min")})))
+# The gate is nested, not folded: every one of these reads a property off Held,
+# and the outer condition is pulled on frames where nothing is equipped.
+ammo_reads = [n for n in wg if "UsesAmmo" in out_pins(n)]
+check("the fire gate and the reload both ask the weapon whether it uses ammo",
+      len(ammo_reads) == 2, f"{len(ammo_reads)} UsesAmmo reads")
+check("an unlimited weapon short-circuits the magazine test (an OR, not an AND)",
+      bool(titled(wg, "OR Boolean")),
+      str(sorted({t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                              for n in wg) if " OR" in t.upper()})))
+
+# ─── Debug mode ──────────────────────────────────────────────────────────────
+
+mode_cdo = cdo(load(G.GAME_MODE_BP_PATH))
+check("the GameMode carries the debug flag, where a component can reach it",
+      isinstance(mode_cdo.get_editor_property(G.DEBUG_MODE_VAR), bool))
+check("...and it is OFF by default -- the overlays are instrumentation",
+      mode_cdo.get_editor_property(G.DEBUG_MODE_VAR) is False)
+check("the pellet tracer is a DrawDebugLine, not a trace that draws itself",
+      bool(by_pins(wg, "LineStart", "LineEnd")),
+      f"{len(by_pins(wg, 'LineStart', 'LineEnd'))} DrawDebugLine node(s)")
+check("...and it lasts as long as the tracer always did",
+      all(abs(float(pin_value(n, "Duration") or 0) - G.TRACE_DEBUG_SECONDS) < 1e-3
+          for n in by_pins(wg, "LineStart", "LineEnd")),
+      f"{G.TRACE_DEBUG_SECONDS}s")
+# Read once per shot off the GameMode, cached, then branched on per pellet.
+check("the flag is read off the GameMode once per shot and cached",
+      len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
+                       for n in wg) if t == f"Set {G.DEBUG_MODE_VAR}"]) == 1)
+check("...and the pellet loop branches on the cached copy",
+      len([n for n in wg if G.DEBUG_MODE_VAR in out_pins(n)]) == 2,
+      f"{len([n for n in wg if G.DEBUG_MODE_VAR in out_pins(n)])} reads")
+
+# ─── BP_AmmoPickup ───────────────────────────────────────────────────────────
+
+ammo_bp = load(G.AMMO_BP_PATH)
+ammo = cdo(ammo_bp)
+ag = graph(ammo_bp).list_all_nodes()
+
+check(f"a drop carries {G.AMMO_DROP_SHELLS} shells",
+      ammo.get_editor_property("Shells") == G.AMMO_DROP_SHELLS,
+      str(ammo.get_editor_property("Shells")))
+check("it starts uncollected", ammo.get_editor_property("Credited") is False)
+check("it looks like what it gives you -- one mesh per shell",
+      len({n for n in components(ammo_bp) if n.startswith("Shell")})
+      == G.AMMO_DROP_SHELLS,
+      str(sorted({n for n in components(ammo_bp) if n.startswith("Shell")})))
+# Measured HERE, on at most a handful of actors, rather than by sweeping the
+# level from the weapon component's Tick every frame whether any exist or not.
+check("the pickup measures its own distance to the player",
+      bool(by_pins(ag, "V1", "V2")) and bool(by_pins(ag, "PlayerIndex")),
+      f"{len(by_pins(ag, 'V1', 'V2'))} distance node(s)")
+check(f"...and is taken by walking within {G.AMMO_PICKUP_RADIUS:.0f} cm of it",
+      any(pin_value(n, "B") == str(G.AMMO_PICKUP_RADIUS)
+          for n in ag if "B" in in_pins(n)),
+      f"{G.AMMO_PICKUP_RADIUS:.0f} cm")
+check("no key is involved -- it is not another thing to press E on",
+      not by_pins(ag, "Key"), f"{len(by_pins(ag, 'Key'))} key polls")
+check("it credits the weapon's own Reserve, not a counter on the player",
+      any(str(BEL.get_node_title(n)).replace("\n", " ") == "Set Reserve"
+          for n in ag))
+check("Credited is the break ForEachLoop does not have, so a second shotgun "
+      "is not paid too",
+      len([n for n in ag
+           if str(BEL.get_node_title(n)).replace("\n", " ") == "Set Credited"]) == 1)
+check("...and it only vanishes once something has actually taken it",
+      len([n for n in ag if "Credited" in out_pins(n)]) == 2,
+      f"{len([n for n in ag if 'Credited' in out_pins(n)])} reads of Credited")
+check("an uncollected drop tidies itself away",
+      any(abs(float(pin_value(n, "InLifespan") or 0) - G.AMMO_PICKUP_LIFETIME) < 1e-3
+          for n in ag if "InLifespan" in in_pins(n)),
+      f"{G.AMMO_PICKUP_LIFETIME:.0f}s")
+
+# --- and who drops it --------------------------------------------------------
+hp = load(G.HEALTH_BP_PATH)
+hg = graph(hp).list_all_nodes()
+check("a killed wanderer's health component knows what to drop",
+      cdo(hp).get_editor_property("AmmoClass") is not None
+      and cdo(hp).get_editor_property("AmmoClass").get_name() == "BP_AmmoPickup_C",
+      str(cdo(hp).get_editor_property("AmmoClass")))
+drops = [n for n in by_pins(hg, "Class", "SpawnTransform")
+         if any("AmmoClass" in str(BEL.get_node_title(PIN.get_owning_node(q)))
+                for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Class")))]
+check("exactly one spawn in the death path drops ammunition",
+      len(drops) == 1, f"{len(drops)} ammo spawns")
+# The same guard the kill counter uses, and for the same reason: the safety net
+# writes Health to 0 for a wanderer that fell through the world, and paying the
+# player for that would turn a bug into an ammunition supply.
+if drops:
+    seen, node, guarded = set(), drops[0], False
+    for _ in range(40):
+        ins = BEL.find_input_pin(node, "execute")
+        feeders = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(ins)] \
+            if ins and ins.is_valid() else []
+        if not feeders:
+            break
+        node = feeders[0]
+        if id(node) in seen:
+            break
+        seen.add(id(node))
+        title = str(BEL.get_node_title(node)).replace("\n", " ")
+        if "Branch" in title:
+            cond = BEL.find_input_pin(node, "Condition")
+            if cond and cond.is_valid() and any(
+                    G.DAMAGED_BY_PLAYER_VAR in str(BEL.get_node_title(
+                        PIN.get_owning_node(q)))
+                    for q in PIN.list_connected_pins(cond)):
+                guarded = True
+                break
+    check("only a death the player caused drops shells", guarded,
+          f"{G.DAMAGED_BY_PLAYER_VAR} branch found upstream: {guarded}")
+
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 

@@ -99,8 +99,9 @@ def main():
     # import back as a key called "(".
     # The restart key is polled from ReceiveDrawHUD, not from Tick: Tick does
     # not run while the game is paused, and the death menu only exists paused.
-    expected_keys = set((G.MENU_KEY, G.RESTART_KEY) + G.PRESET_KEYS)
-    check("polls exactly the menu, preset and restart keys", keys == expected_keys,
+    expected_keys = set((G.MENU_KEY, G.RESTART_KEY, G.DEBUG_KEY) + G.PRESET_KEYS)
+    check("polls exactly the menu, preset, debug and restart keys",
+          keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
 
     # --- each preset applies its own scalability level and cvars
@@ -143,12 +144,17 @@ def main():
     texts = by_pins("Text", "ScreenX")
     drawn = {BEL.find_input_pin(n, "Text").get_pin_value() for n in texts}
     expected_text = {"GRAPHICS QUALITY", f"[{G.MENU_KEY}]   close", ">", "HP",
-                     "STA", "YOU DIED", f"[{G.RESTART_KEY}]   try again"}
+                     "STA", "YOU DIED", f"[{G.RESTART_KEY}]   try again",
+                     # Two draws behind one branch, because there is no
+                     # SelectString and a bool rendered as "true" is a
+                     # variable's value rather than a setting's state.
+                     f"[{G.DEBUG_KEY}]   debug   ON",
+                     f"[{G.DEBUG_KEY}]   debug   OFF"}
     expected_text |= {f"[{i + 1}]   {p[0]}" for i, p in enumerate(G.PRESETS)}
     # The health number has no literal text -- its Text pin is driven -- so it
     # contributes an empty string here.
     expected_text |= {""}
-    check("panel, HP, stamina and the death menu all draw their labels",
+    check("panel, HP, stamina, debug row and the death menu draw their labels",
           drawn == expected_text, str(sorted(drawn ^ expected_text)))
     # One backs the quality panel, two are the player's HP track and fill, two
     # more are an NPC bar's track and fill, five are the empty inventory slots,
@@ -234,10 +240,10 @@ def main():
                    and BEL.find_input_pin(n, "Text").list_connected_pins()]
     # Three now: the player's HP number, each inventory slot's weapon name, and
     # each wanderer's spawn number.
-    # Five now: the HP number, each slot's weapon name, each wanderer's spawn
-    # number, the kill counter and the death menu's final score.
-    check("HP, slot names, NPC numbers, kills and the final score read from data",
-          len(driven_text) == 5, str(len(driven_text)))
+    # Six now: the HP number, each slot's weapon name, each slot's ammunition,
+    # each wanderer's spawn number, the kill counter and the final score.
+    check("HP, slot names, ammo, NPC numbers, kills and the score read from data",
+          len(driven_text) == 6, str(len(driven_text)))
     ids = [n for n in nodes
            if "NpcId" in {str(p_) for p_ in pin_names(n, False)}]
     check("each NPC bar carries the wanderer's spawn number",
@@ -330,6 +336,48 @@ def main():
           in ("false", "False"),
           str([BEL.find_input_pin(n, "bPaused").get_pin_value()
                for n in unpauses]))
+
+    # --- the shotgun's ammunition, beside its icon
+    # Read off the item like SlotColor and DisplayName are, so the strip stays
+    # a view of whatever is carried and knows nothing about shotguns.
+    for var in ("UsesAmmo", "Loaded", "Reserve"):
+        check(f"the slot reads the weapon's own {var}",
+              sum(1 for t in titles if t == f"Get {var}") == 1,
+              str(sum(1 for t in titles if t == f"Get {var}")))
+    check("the count is rounds-in-gun / rounds-in-reserve, not one number",
+          any(BEL.find_input_pin(n, "A").get_pin_value() == " / "
+              for n in by_pins("A", "B")
+              if BEL.find_input_pin(n, "A")),
+          "a ' / ' separator")
+    # The pistol is deliberately unlimited, so its slot must stay empty rather
+    # than claim an infinity nobody has to manage.
+    check("...and only weapons that use ammunition show it at all",
+          sum(1 for t in titles if t == "Get UsesAmmo") == 1)
+
+    # --- debug mode
+    # The flag lives on the GameMode, because BP_WeaponComponent draws the
+    # tracers and a component cannot reach a HUD variable.
+    check(f"{G.DEBUG_KEY} toggles debug mode on the GameMode, not on the HUD",
+          any(t == f"Set {G.DEBUG_MODE_VAR}" for t in titles),
+          str(sorted({t for t in titles if G.DEBUG_MODE_VAR in t})))
+    # Twice: the toggle reads it to flip it, and DrawHUD reads it to copy it.
+    check("...by flipping what is already there, so it is a toggle",
+          sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}") == 2,
+          str(sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}")))
+    # Copied once per frame into DebugOn. The point is the cast-failed path:
+    # it reaches the same drawing code, and a Get off an invalid object is an
+    # "Accessed None" per wanderer per frame. Two writes -- the real value and
+    # the false the failed cast gets.
+    check("this frame's copy is taken once, with an answer for a failed cast",
+          sum(1 for t in titles if t == "Set DebugOn") == 2,
+          str(sum(1 for t in titles if t == "Set DebugOn")))
+    # Two readers: the menu row that reports the state, and the NPC number.
+    check("the tracer's twin -- the wanderer's number -- is gated on the copy",
+          sum(1 for t in titles if t == "Get DebugOn") == 2,
+          str(sum(1 for t in titles if t == "Get DebugOn")))
+    hud_cdo = unreal.get_default_object(BEL.generated_class(bp))
+    check("the HUD starts with the overlays off",
+          hud_cdo.get_editor_property("DebugOn") is False)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

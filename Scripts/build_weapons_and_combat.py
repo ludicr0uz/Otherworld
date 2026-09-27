@@ -156,6 +156,7 @@ AUDIO_DIR = f"{WEAPON_DIR}/Audio"
 MAT_METAL = f"{WEAPON_DIR}/M_Gunmetal"
 MAT_WOOD = f"{WEAPON_DIR}/M_GunWood"
 MAT_BLOOD = f"{WEAPON_DIR}/M_Blood"
+MAT_BRASS = f"{WEAPON_DIR}/M_Brass"
 
 ITEM_BP_PATH = f"{WEAPON_DIR}/BP_WeaponItem"
 SHOTGUN_BP_PATH = f"{WEAPON_DIR}/BP_Shotgun"
@@ -163,6 +164,7 @@ PISTOL_BP_PATH = f"{WEAPON_DIR}/BP_Pistol"
 HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"
+AMMO_BP_PATH = f"{WEAPON_DIR}/BP_AmmoPickup"
 
 CHARACTER_BP_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter"
 GAME_MODE_BP_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
@@ -176,6 +178,7 @@ ITEM_CLASS_PATH = f"{ITEM_BP_PATH}.BP_WeaponItem_C"
 HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
+AMMO_CLASS_PATH = f"{AMMO_BP_PATH}.BP_AmmoPickup_C"
 
 AIM_RIFLE = "/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS"
 AIM_PISTOL = "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS"
@@ -221,6 +224,44 @@ MAX_STAMINA = 100.0
 STAMINA_DRAIN_PER_S = 25.0
 STAMINA_REGEN_PER_S = 12.0
 
+# --- shotgun ammunition ------------------------------------------------------
+# Ammunition lives on BP_WeaponItem, not on the weapon component, because a
+# weapon is a droppable actor here: drop a half-empty shotgun, walk away, come
+# back and pick it up, and it still has to be half empty. Reserve on the
+# component would belong to the player and would survive a gun that did not.
+#
+# "Starting 20" is read as twenty shells in total, not twenty plus a free
+# magazine: five are in the gun and fifteen are spare.
+SHOTGUN_MAGAZINE = 5
+SHOTGUN_RESERVE = 15
+# Enough of a pause that the shotgun is a decision and not a hose -- it now does
+# 8 x 18 = 144 damage to a wanderer with 100 HP, so one connected shot is a
+# kill and the interval is the whole balance of the weapon.
+SHOTGUN_FIRE_INTERVAL = 0.85
+# Reload is not a state machine and not a montage: it pushes NextFireTime out by
+# this much, which is exactly what "cannot shoot for 1.6 s" means, and it costs
+# three nodes instead of a timer, an interrupt rule and an is-reloading flag.
+SHOTGUN_RELOAD_SECONDS = 1.6
+# The pistol is the fallback weapon and keeps infinite ammo; it still gets an
+# interval, because without one it fires once per frame.
+PISTOL_FIRE_INTERVAL = 0.18
+RELOAD_KEY = "R"
+# Shells a killed wanderer leaves behind. Two per kill against five spent per
+# magazine means the shotgun runs down unless most shots land, which is the
+# point of giving it a reserve at all.
+AMMO_DROP_SHELLS = 2
+AMMO_PICKUP_RADIUS = 200.0   # cm; walked into, not pressed for
+AMMO_PICKUP_LIFT = 40.0      # cm above the corpse, so it is not inside the mesh
+AMMO_PICKUP_LIFETIME = 120.0 # s before an uncollected drop tidies itself away
+AMMO_SPIN_DEG_PER_S = 90.0
+
+# --- debug mode --------------------------------------------------------------
+# One flag on the GameMode, toggled from the graphics menu, that turns the
+# developer overlays on and off: the pellet tracers drawn from the muzzle and
+# the wanderer's number beside its health bar. Off by default -- they are both
+# instrumentation, and instrumentation is not what the game looks like.
+DEBUG_MODE_VAR = "DebugMode"
+
 # --- the player's death ------------------------------------------------------
 # A full-body death needs its own slot. DefaultSlot is filtered to the upper
 # body (see patch_anim_blueprint) so that the aim pose leaves the legs walking,
@@ -234,9 +275,14 @@ DEATH_BLEND_S = 0.1
 # MM_Death_Front_01 runs about 1.9 s; pausing on top of it freezes the player
 # mid-stumble, which reads as a hang rather than as a death.
 DEATH_PAUSE_SECONDS = 2.2
-# Pellet traces drawn in the world for this many seconds; 0 turns them off.
-# On, because they are the only way to see *where* a shot went -- sound and blood
-# tell you a shot happened and that it connected, but not that it missed high.
+# Pellet tracers drawn in the world for this many seconds, in debug mode only.
+# They are the only way to see *where* a shot went -- sound and blood tell you a
+# shot happened and that it connected, but not that it missed high -- which is
+# exactly why they are instrumentation and not part of the game.
+#
+# Drawn with an explicit DrawDebugLine rather than with the trace node's own
+# DrawDebugType: that pin is an enum literal, and an enum pin cannot be driven
+# by a variable, so "sometimes" is not expressible there at all.
 TRACE_DEBUG_SECONDS = 1.5
 
 # NPC respawn: a replacement wanderer appears in the same 75-100 m band the
@@ -828,18 +874,26 @@ def _weapon_specs():
     because the poses differ -- not because a fudge factor was added to one of
     them. GripLocation stays at the socket for both: HandGrip_R sits in the fist
     already, and an invented offset is one more number nobody can later explain.
+
+    The ammunition columns are here too rather than branched on DisplayName
+    anywhere in the graphs: the firing code asks the weapon whether it uses
+    ammo, so a third weapon needs a row in this table and no new nodes.
     """
     return (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
-             display="Shotgun", damage=9.0, pellets=8, spread=5.0, range=4000.0,
+             display="Shotgun", damage=18.0, pellets=8, spread=5.0, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
-             colour=(0.85, 0.45, 0.10)),
+             colour=(0.85, 0.45, 0.10),
+             uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
+             interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS),
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
              display="Pistol", damage=26.0, pellets=1, spread=1.0, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", aim=AIM_PISTOL,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_PISTOL),
-             colour=(0.35, 0.65, 0.95)),
+             colour=(0.35, 0.65, 0.95),
+             uses_ammo=False, magazine=0, reserve=0,
+             interval=PISTOL_FIRE_INTERVAL, reload_s=0.0),
     )
 
 
@@ -858,7 +912,11 @@ def build_materials():
             (MAT_WOOD, ((0.115, 0.062, 0.030), 0.0, 0.62, None)),
             # Blood is emissive so a splash reads at night, which is the only
             # lighting this project currently ships.
-            (MAT_BLOOD, ((0.30, 0.005, 0.005), 0.0, 0.35, (0.55, 0.01, 0.01)))):
+            (MAT_BLOOD, ((0.30, 0.005, 0.005), 0.0, 0.35, (0.55, 0.01, 0.01))),
+            # Shells on the forest floor, at night, under trees. Emissive
+            # for the same reason blood is: without it a dropped pickup is
+            # a black cylinder on black ground and nobody ever finds it.
+            (MAT_BRASS, ((0.52, 0.36, 0.08), 1.0, 0.28, (0.34, 0.22, 0.03)))):
         if eas.does_asset_exist(path):
             continue
         package_path, name = path.rsplit("/", 1)
@@ -1107,11 +1165,25 @@ def build_weapon_item():
     _drop_components(bp, {"Body"})
     _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Body")
 
-    for name in ("Damage", "SpreadDegrees", "WeaponRange"):
+    for name in ("Damage", "SpreadDegrees", "WeaponRange",
+                 # When this weapon may next be fired, as a world time in
+                 # seconds. One number does both jobs the shotgun needs: the
+                 # interval between shots, and the pause a reload costs. A
+                 # "reloading" bool plus a timer would need an interrupt rule
+                 # and could disagree with itself; a deadline cannot.
+                 "FireInterval", "NextFireTime", "ReloadSeconds"):
         _declare(ed, name, _float_type())
     for name, kind in (("DisplayName", "string"),
                        ("PelletCount", "int"),
-                       ("Dropped", "bool")):
+                       ("Dropped", "bool"),
+                       # Ammunition. UsesAmmo false means the other three are
+                       # never read -- the pistol is deliberately unlimited, and
+                       # the fire gate short-circuits on this rather than on a
+                       # magazine that would have to be topped up forever.
+                       ("UsesAmmo", "bool"),
+                       ("MagazineSize", "int"),
+                       ("Loaded", "int"),
+                       ("Reserve", "int")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
@@ -1165,6 +1237,16 @@ def build_weapon(spec, item_bp):
         "SpreadDegrees": float(spec["spread"]),
         "WeaponRange": float(spec["range"]),
         "Dropped": False,
+        "UsesAmmo": bool(spec["uses_ammo"]),
+        "MagazineSize": int(spec["magazine"]),
+        # Starts loaded. A weapon that had to be reloaded before its first shot
+        # would be a puzzle, not a mechanic.
+        "Loaded": int(spec["magazine"]),
+        "Reserve": int(spec["reserve"]),
+        "FireInterval": float(spec["interval"]),
+        "ReloadSeconds": float(spec["reload_s"]),
+        # World time 0 is "now" at level start, so the first shot is free.
+        "NextFireTime": 0.0,
         "MuzzleOffset": unreal.Vector(*spec["muzzle"]),
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
@@ -1173,7 +1255,10 @@ def build_weapon(spec, item_bp):
         "AimPose": eas.load_asset(spec["aim"]),
     })
     _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
-         f"{spec['pellets']}x{spec['damage']:.0f} dmg)")
+         f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
+         + (f"{spec['magazine']}+{spec['reserve']} rounds, "
+            f"{spec['interval']:.2f}s between shots)" if spec["uses_ammo"]
+            else "unlimited ammo)"))
     return bp
 
 
@@ -1242,12 +1327,16 @@ FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
 FN_MOD_II = "/Script/Engine.KismetMathLibrary.Percent_IntInt"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 FN_LESS_II = "/Script/Engine.KismetMathLibrary.Less_IntInt"
+FN_GREATER_II = "/Script/Engine.KismetMathLibrary.Greater_IntInt"
+FN_MIN_II = "/Script/Engine.KismetMathLibrary.Min"
 FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
+FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
 FN_ADD_FF = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
 FN_SUB_FF = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
 FN_LE_FF = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
 FN_LESS_FF = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
 FN_GREATER_FF = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
+FN_GE_FF = "/Script/Engine.KismetMathLibrary.GreaterEqual_DoubleDouble"
 FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
 FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
@@ -1263,6 +1352,8 @@ FN_SIN = "/Script/Engine.KismetMathLibrary.Sin"
 FN_ROT_FROM_X = "/Script/Engine.KismetMathLibrary.MakeRotFromX"
 FN_SET_ACTOR_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
 FN_ACTOR_FORWARD = "/Script/Engine.Actor.GetActorForwardVector"
+FN_DRAW_LINE = "/Script/Engine.KismetSystemLibrary.DrawDebugLine"
+FN_ADD_LOCAL_ROT = "/Script/Engine.Actor.K2_AddActorLocalRotation"
 
 NODE_TICK = "AddEvent|EventTick"
 NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
@@ -1529,6 +1620,166 @@ def build_blood_splash(rebuild=True):
     return bp
 
 
+# ─── BP_AmmoPickup ───────────────────────────────────────────────────────────
+
+def build_ammo_pickup(rebuild=True):
+    """The two shells a killed wanderer leaves behind, and how they are taken.
+
+    Walked into rather than pressed for. E already picks weapons up, and making
+    the player press it again for ammunition they obviously want is friction
+    with no decision in it -- whereas a *weapon* on the ground is a real choice,
+    because the five slots are finite.
+
+    The proximity test runs on the pickup, not on the player, and that is the
+    whole reason this is an actor with a graph instead of another
+    GetAllActorsOfClass sweep in the weapon component's Tick. There are at most
+    a handful of these on the ground; there is exactly one player. One actor
+    measuring its own distance costs one Tick each. The alternative re-walks
+    every pickup in the level every frame whether any exist or not.
+
+    Credit goes to the first carried weapon that uses ammunition, and Credited
+    is what stops the loop handing the same two shells to a second shotgun --
+    ForEachLoop has no break pin, so the guard has to be a flag the body sets.
+    """
+    eas = _assets()
+    bp = _create_blueprint(AMMO_BP_PATH, unreal.Actor)
+
+    _drop_components(bp, {"Pack", "ShellA", "ShellB"})
+    root = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Pack")
+    # Two of them, because two is what a kill drops and the pickup should look
+    # like what it gives you.
+    for name, y in (("ShellA", -5.0), ("ShellB", 5.0)):
+        handle = _add_component(bp, root, unreal.StaticMeshComponent, name)
+        obj = _component_object(handle)
+        obj.set_editor_property("static_mesh", eas.load_asset(CYLINDER))
+        obj.set_editor_property("relative_location", unreal.Vector(0.0, y, 0.0))
+        obj.set_editor_property("relative_scale3d", unreal.Vector(0.08, 0.08, 0.14))
+        obj.set_editor_property("override_materials", [eas.load_asset(MAT_BRASS)])
+        try:
+            obj.set_collision_profile_name("NoCollision")
+        except Exception as exc:                                  # noqa: BLE001
+            _log(f"  note: could not set NoCollision on {name}: {exc}")
+
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    tick, begin = _events(ed, rebuild)
+    _declare(ed, "Shells", BEL.get_basic_type_by_name("int"))
+    _declare(ed, "Credited", BEL.get_basic_type_by_name("bool"))
+
+    # --- BeginPlay: tidy yourself away eventually ---------------------------
+    life = _at(_node(ed, FN_LIFESPAN), 320, -500)
+    _set(life, "InLifespan", AMMO_PICKUP_LIFETIME)
+    _connect(BEL.find_then_pin(begin), _pin(life, "execute"))
+
+    # --- Tick: spin, then check the distance --------------------------------
+    # The spin is what makes a 10 cm object findable on a forest floor at night;
+    # the emissive brass does the rest.
+    turn = _at(_node(ed, FN_MUL_FF), 320, 300)
+    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(turn, "A"))
+    _set(turn, "B", AMMO_SPIN_DEG_PER_S)
+    delta = _at(_node(ed, FN_MAKE_ROT), 560, 300)
+    _connect(_pin(turn, "ReturnValue", is_input=False), _pin(delta, "Yaw"))
+    spin = _at(_node(ed, FN_ADD_LOCAL_ROT), 800, 0)
+    _connect(_pin(delta, "ReturnValue", is_input=False), _pin(spin, "DeltaRotation"))
+    _set(spin, "bSweep", "false")
+    _set(spin, "bTeleport", "true")
+    _connect(BEL.find_then_pin(tick), _pin(spin, "execute"))
+
+    pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), 800, 300)
+    _set(pawn, "PlayerIndex", 0)
+    pawn_out = _pin(pawn, "ReturnValue", is_input=False)
+    there = _at(_node(ed, FN_ACTOR_LOC), 1040, 300)
+    _connect(pawn_out, _pin(there, "self"))
+    here = _at(_node(ed, FN_ACTOR_LOC), 1040, 420)
+    gap = _at(_node(ed, FN_DISTANCE), 1280, 300)
+    _connect(_pin(there, "ReturnValue", is_input=False), _pin(gap, "V1"))
+    _connect(_pin(here, "ReturnValue", is_input=False), _pin(gap, "V2"))
+    near = _at(_node(ed, FN_LESS_FF), 1520, 300)
+    _connect(_pin(gap, "ReturnValue", is_input=False), _pin(near, "A"))
+    _set(near, "B", AMMO_PICKUP_RADIUS)
+
+    reached = _at(ed.add_branch_node(), 1760, 0)
+    _connect(_pin(near, "ReturnValue", is_input=False), _pin(reached, "Condition"))
+    _connect(BEL.find_then_pin(spin), _pin(reached, "execute"))
+
+    # --- who gets the shells ------------------------------------------------
+    comp = _at(_node(ed, FN_GET_COMP), 2000, 300)
+    _connect(pawn_out, _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
+    as_weapon_n = _at(_palette(ed, "Utilities|Casting|CastToBP_WeaponComponent"),
+                      2280, 0)
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_weapon_n, "Object"))
+    _connect(BEL.find_then_pin(reached), _pin(as_weapon_n, "execute"))
+    as_weapon = _loose_pin(as_weapon_n, "AsBPWeaponComponent", is_input=False)
+
+    inv = _at(ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH),
+              2560, 300)
+    _connect(as_weapon, _pin(inv, "self"))
+
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
+    if not loop:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    _at(loop, 2840, 0)
+    _connect(_pin(inv, "Inventory", is_input=False), _loose_pin(loop, "Array"))
+    _connect(BEL.find_then_pin(as_weapon_n), _loose_pin(loop, "Exec"))
+    item = _loose_pin(loop, "ArrayElement", is_input=False)
+
+    uses, uses_n = _prop(ed, "UsesAmmo", item, 3140, 300)
+    done_get = _at(ed.add_get_member_variable_node("Credited"), 3140, 440)
+    fresh = _at(_node(ed, FN_NOT), 3380, 440)
+    _connect(_pin(done_get, "Credited", is_input=False), _pin(fresh, "A"))
+    wants = _at(_node(ed, FN_AND), 3620, 360)
+    _connect(uses, _pin(wants, "A"))
+    _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(wants, "B"))
+
+    give = _at(ed.add_branch_node(), 3880, 0)
+    _connect(_pin(wants, "ReturnValue", is_input=False), _pin(give, "Condition"))
+    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(give, "execute"))
+
+    held_res, held_res_n = _prop(ed, "Reserve", item, 4140, 300)
+    shells = _at(ed.add_get_member_variable_node("Shells"), 4140, 440)
+    richer = _at(_node(ed, FN_ADD_II), 4400, 300)
+    _connect(held_res, _pin(richer, "A"))
+    _connect(_pin(shells, "Shells", is_input=False), _pin(richer, "B"))
+    store = _at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH), 4660, 0)
+    _connect(item, _pin(store, "self"))
+    _connect(_pin(richer, "ReturnValue", is_input=False), _pin(store, "Reserve"))
+    _connect(BEL.find_then_pin(give), _pin(store, "execute"))
+
+    mark = _at(ed.add_set_member_variable_node("Credited"), 4920, 0)
+    _set(mark, "Credited", "true")
+    _connect(BEL.find_then_pin(store), _pin(mark, "execute"))
+
+    # --- and only then vanish -----------------------------------------------
+    # Gated on Credited rather than destroyed unconditionally at the Completed
+    # pin: a player with no shotgun who walks over the shells has not picked
+    # anything up, and the drop has to still be there when they find one.
+    took_get = _at(ed.add_get_member_variable_node("Credited"), 5180, 300)
+    took = _at(ed.add_branch_node(), 5440, 0)
+    _connect(_pin(took_get, "Credited", is_input=False), _pin(took, "Condition"))
+    _connect(_loose_pin(loop, "Completed", is_input=False), _pin(took, "execute"))
+    gone = _at(_node(ed, FN_DESTROY), 5700, 0)
+    _connect(BEL.find_then_pin(took), _pin(gone, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"{AMMO_DROP_SHELLS} shells, taken by walking within "
+        f"{AMMO_PICKUP_RADIUS:.0f} cm of them. The distance is measured HERE "
+        "rather than in the weapon component's Tick, so the cost is one Tick "
+        "per dropped pickup instead of a GetAllActorsOfClass sweep every frame "
+        "whether anything has been dropped or not. Credited is the break "
+        "ForEachLoop does not have: without it a player carrying two shotguns "
+        "would be paid twice.",
+        [life, turn, delta, spin, pawn, there, here, gap, near, reached, comp,
+         as_weapon_n, inv, loop, uses_n, done_get, fresh, wants, give,
+         held_res_n, shells, richer, store, mark, took_get, took, gone])
+
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_AmmoPickup failed to compile")
+    _apply_defaults(bp, {"Shells": AMMO_DROP_SHELLS, "Credited": False})
+    _log(f"built {AMMO_BP_PATH} ({AMMO_DROP_SHELLS} shells, "
+         f"{AMMO_PICKUP_RADIUS:.0f} cm, {AMMO_PICKUP_LIFETIME:.0f}s)")
+    return bp
+
+
 # ─── BP_HealthComponent ──────────────────────────────────────────────────────
 
 def ensure_game_mode_vars():
@@ -1542,7 +1793,11 @@ def ensure_game_mode_vars():
                        floating bars agree on who is who;
         NpcKillCount   what the corner of the HUD shows and what the death menu
                        quotes as the final score;
-        PlayerDead     the one flag the death menu is drawn from.
+        PlayerDead     the one flag the death menu is drawn from;
+        DebugMode      whether the developer overlays are on. Here rather than
+                       on the HUD that toggles it because the *weapon
+                       component* is the other thing that reads it, and a HUD
+                       variable is not reachable from a component.
 
     All three outlive every actor that touches them -- the player's own health
     component is destroyed with the player, so the score cannot live there.
@@ -1560,12 +1815,13 @@ def ensure_game_mode_vars():
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
     for name in (SPAWN_COUNT_VAR, KILL_COUNT_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    _declare(ed, PLAYER_DEAD_VAR, BEL.get_basic_type_by_name("bool"))
+    for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
     _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {KILL_COUNT_VAR}, "
-         f"{PLAYER_DEAD_VAR} ready")
+         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR} ready")
     return bp
 
 
@@ -1604,12 +1860,42 @@ def _author_kill_count(ed, exec_in, x0, y0):
     _connect(_pin(one_more, "ReturnValue", is_input=False), _pin(write, KILL_COUNT_VAR))
     _connect(BEL.find_then_pin(as_mode), _pin(write, "execute"))
 
+    # --- and the shells it drops --------------------------------------------
+    # On the same arm as the count, and for the same reason: a wanderer the
+    # terrain swallowed was not killed, and paying the player for it would turn
+    # the safety net into an ammunition supply.
+    #
+    # Spawned before the owner is destroyed, at the owner's feet plus a lift --
+    # the corpse's origin is at the capsule centre, so a drop placed exactly
+    # there is inside the body on the frame it appears.
+    corpse = _at(_node(ed, FN_GET_OWNER), x0 + 1680, y0 + 380)
+    fell_at = _at(_node(ed, FN_ACTOR_LOC), x0 + 1920, y0 + 380)
+    _connect(_pin(corpse, "ReturnValue", is_input=False), _pin(fell_at, "self"))
+    lifted = _at(_node(ed, FN_ADD_VV), x0 + 2160, y0 + 380)
+    _connect(_pin(fell_at, "ReturnValue", is_input=False), _pin(lifted, "A"))
+    _connect(_vec(ed, 0.0, 0.0, AMMO_PICKUP_LIFT, x0 + 1920, y0 + 520),
+             _pin(lifted, "B"))
+    where = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 2400, y0 + 380)
+    _connect(_pin(lifted, "ReturnValue", is_input=False), _pin(where, "Location"))
+    # A struct pin cannot be given a literal, and an unset Scale pin compiles to
+    # the zero vector -- which spawns the pickup at zero size, invisible.
+    _connect(_vec(ed, 1.0, 1.0, 1.0, x0 + 2160, y0 + 560), _pin(where, "Scale"))
+
+    ammo_cls = _at(ed.add_get_member_variable_node("AmmoClass"), x0 + 2400, y0 + 240)
+    drop = _at(_palette(ed, NODE_SPAWN), x0 + 2660, y0)
+    _connect(_pin(ammo_cls, "AmmoClass", is_input=False), _pin(drop, "Class"))
+    _connect(_pin(where, "ReturnValue", is_input=False), _pin(drop, "SpawnTransform"))
+    _set(drop, "CollisionHandlingOverride", "AlwaysSpawn")
+    _connect(BEL.find_then_pin(write), _pin(drop, "execute"))
+
     ed.add_comment_to_nodes(
-        "One kill, counted on the GameMode where it outlives the wanderer that "
-        "earned it. DamagedByPlayer is the guard: the safety net kills anything "
+        f"One kill, counted on the GameMode where it outlives the wanderer that "
+        f"earned it, and {AMMO_DROP_SHELLS} shells left where it fell. "
+        "DamagedByPlayer is the guard on both: the safety net kills anything "
         "that falls under the world through this same path, and nobody shot it.",
-        [earned, shot, mode, as_mode, tally, one_more, write])
-    return (BEL.find_then_pin(write),
+        [earned, shot, mode, as_mode, tally, one_more, write, corpse, fell_at,
+         lifted, where, ammo_cls, drop])
+    return (BEL.find_then_pin(drop),
             _pin(as_mode, "CastFailed", is_input=False),
             BEL.find_else_pin(shot))
 
@@ -1766,6 +2052,13 @@ def build_health_component(rebuild=True):
     for name in ("Dead", "DespawnOnDeath", DAMAGED_BY_PLAYER_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     _declare(ed, "RespawnClass",
+             BEL.get_class_reference_type(unreal.Actor.static_class()))
+    # What a killed wanderer leaves on the ground. Typed as a class rather than
+    # hard-coded in the graph so this component still compiles when
+    # BP_AmmoPickup does not exist yet -- which is the case every time this
+    # builder runs from scratch, because the pickup casts to BP_WeaponComponent
+    # and so has to be built after it. main() fills the default in afterwards.
+    _declare(ed, "AmmoClass",
              BEL.get_class_reference_type(unreal.Actor.static_class()))
     # Where the replacement will appear. Written three times on the way to the
     # spawn -- the request, then whichever navmesh point it resolved to -- so
@@ -2127,7 +2420,7 @@ def build_health_component(rebuild=True):
     drop = _at(_node(ed, FN_TRACE), 6680, 300)
     _connect(_pin(above, "ReturnValue", is_input=False), _pin(drop, "Start"))
     _connect(_pin(below, "ReturnValue", is_input=False), _pin(drop, "End"))
-    _trace_defaults(drop, draw=False)
+    _trace_defaults(drop)
     # The terrain is imported with complex collision, and its simple collision
     # is a box around the whole 200 m mesh -- tracing against that would seat
     # every respawn on an invisible lid.
@@ -2245,19 +2538,21 @@ def _prop(ed, name, self_pin, x, y, class_path=ITEM_CLASS_PATH):
     return _pin(n, name, is_input=False), n
 
 
-def _trace_defaults(node, draw):
-    """The settings every trace in this file shares."""
+def _trace_defaults(node):
+    """The settings every trace in this file shares.
+
+    No trace draws itself any more. DrawDebugType is an enum *literal* on the
+    pin, and an enum pin cannot be driven by a variable, so a trace that draws
+    only in debug mode is not expressible here at all -- the pellet tracer is a
+    separate DrawDebugLine behind a Branch instead (see _author_fire).
+    """
     _set(node, "TraceChannel", "TraceTypeQuery1")   # Visibility
     _set(node, "bTraceComplex", "false")
     # Ignores the pawn this component hangs off. The weapon actor is separate
     # and *not* ignored, but every one of its parts is NoCollision, so a pellet
     # cannot hit the gun it came out of.
     _set(node, "bIgnoreSelf", "true")
-    if draw and TRACE_DEBUG_SECONDS > 0:
-        _set(node, "DrawDebugType", "ForDuration")
-        _set(node, "DrawTime", TRACE_DEBUG_SECONDS)
-    else:
-        _set(node, "DrawDebugType", "None")
+    _set(node, "DrawDebugType", "None")
 
 
 def _muzzle_location(ed, held, x, y):
@@ -2343,7 +2638,7 @@ def _author_resolve_aim(ed, held, exec_in, x0, y0):
     # Never drawn: this line runs from the camera through the player's own head
     # every frame, so drawing it would fill the screen. Only the pellets are
     # drawn, and only when they are actually fired.
-    _trace_defaults(look, draw=False)
+    _trace_defaults(look)
     _connect(exec_in, _pin(look, "execute"))
 
     look_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 1200, y0 + 560))
@@ -2380,7 +2675,7 @@ def _author_resolve_aim(ed, held, exec_in, x0, y0):
     clear = keep(_at(_node(ed, FN_TRACE), x0 + 3260, y0))
     _connect(muzzle, _pin(clear, "Start"))
     _connect(aim_out, _pin(clear, "End"))
-    _trace_defaults(clear, draw=False)
+    _trace_defaults(clear)
     _connect(BEL.find_then_pin(holding), _pin(clear, "execute"))
 
     clear_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 2760, y0 + 560))
@@ -2432,12 +2727,67 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     the weapon's own cone, and traces the weapon's own range. A single-pellet
     weapon with a 1 degree cone is the same code path as an eight-pellet
     shotgun, which is why the pistol needed no second implementation.
+
+    Ammunition is spent here rather than in the gate that allowed the shot: the
+    gate decides, this does. Both the round and the cooldown are written before
+    a single pellet is traced, so nothing downstream can leave the weapon
+    having fired for free.
     """
     made = []
 
     def keep(n):
         made.append(n)
         return n
+
+    # --- what the shot costs -------------------------------------------------
+    # Unconditional, including on the pistol. Loaded is only ever *read* behind
+    # UsesAmmo, so letting an unlimited weapon count into the negatives costs
+    # nothing and saves a branch on the one path that runs eight traces.
+    was = keep(_at(ed.add_get_member_variable_node("Loaded", ITEM_CLASS_PATH),
+                   x0 - 760, y0 + 300))
+    _connect(held, _pin(was, "self"))
+    spent = keep(_at(_node(ed, FN_SUB_II), x0 - 520, y0 + 300))
+    _connect(_pin(was, "Loaded", is_input=False), _pin(spent, "A"))
+    _set(spent, "B", 1)
+    burn = keep(_at(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH),
+                    x0 - 280, y0))
+    _connect(held, _pin(burn, "self"))
+    _connect(_pin(spent, "ReturnValue", is_input=False), _pin(burn, "Loaded"))
+    _connect(exec_in, _pin(burn, "execute"))
+
+    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 - 760, y0 + 440))
+    every, every_n = _prop(ed, "FireInterval", held, x0 - 760, y0 + 560)
+    keep(every_n)
+    again = keep(_at(_node(ed, FN_ADD_FF), x0 - 520, y0 + 440))
+    _connect(_pin(now, "ReturnValue", is_input=False), _pin(again, "A"))
+    _connect(every, _pin(again, "B"))
+    cool = keep(_at(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH),
+                    x0 - 40, y0))
+    _connect(held, _pin(cool, "self"))
+    _connect(_pin(again, "ReturnValue", is_input=False), _pin(cool, "NextFireTime"))
+    _connect(BEL.find_then_pin(burn), _pin(cool, "execute"))
+
+    # --- is anyone watching the tracers? -------------------------------------
+    # Read once per shot and cached on this component, rather than read per
+    # pellet: the pellet loop needs a plain bool it can branch on, and a
+    # GetGameMode plus a cast eight times over for one flag is eight times the
+    # work for the same answer.
+    mode = keep(_at(_node(ed, FN_GET_GAME_MODE), x0 + 200, y0 + 300))
+    as_mode = keep(_at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 200, y0))
+    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(BEL.find_then_pin(cool), _pin(as_mode, "execute"))
+    flag = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
+                                                    GAME_MODE_CLASS_PATH),
+                    x0 + 200, y0 + 440))
+    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
+             _pin(flag, "self"))
+    note = keep(_at(ed.add_set_member_variable_node(DEBUG_MODE_VAR), x0 + 460, y0))
+    _connect(_pin(flag, DEBUG_MODE_VAR, is_input=False), _pin(note, DEBUG_MODE_VAR))
+    _connect(BEL.find_then_pin(as_mode), _pin(note, "execute"))
+    # A GameMode of the wrong class cannot say; not drawing is the safe answer,
+    # and the component's own default is already false.
+    after_cost = [BEL.find_then_pin(note),
+                  _pin(as_mode, "CastFailed", is_input=False)]
 
     aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0, y0 + 560))
     delta = keep(_at(_node(ed, FN_SUB_VV), x0 + 260, y0 + 560))
@@ -2452,7 +2802,8 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 520, y0))
     _connect(snd_pin, _pin(play, "Sound"))
     _connect(muzzle, _pin(play, "Location"))
-    _connect(exec_in, _pin(play, "execute"))
+    for tail in after_cost:
+        _connect(tail, _pin(play, "execute"))
 
     pel_pin, pel_n = _prop(ed, "PelletCount", held, x0 + 760, y0 + 180)
     keep(pel_n)
@@ -2489,24 +2840,42 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     trace = keep(_at(_node(ed, FN_TRACE), x0 + 2620, y0))
     _connect(muzzle, _pin(trace, "Start"))
     _connect(_pin(end, "ReturnValue", is_input=False), _pin(trace, "End"))
-    # The one trace that *is* drawn: the tracer starts at the barrel, so what
-    # you see is the line the pellet took, not a line from the camera.
-    _trace_defaults(trace, draw=True)
+    _trace_defaults(trace)
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(trace, "execute"))
 
-    hit = keep(_at(ed.add_branch_node(), x0 + 2900, y0))
+    # The tracer, in debug mode only. It starts at the barrel, so what you see
+    # is the line the pellet took and not a line from the camera -- which is
+    # what makes it worth having while tuning the aim solve, and what makes it
+    # wrong to leave switched on in the game.
+    seen = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR),
+                    x0 + 2620, y0 + 300))
+    showing = keep(_at(ed.add_branch_node(), x0 + 2860, y0))
+    _connect(_pin(seen, DEBUG_MODE_VAR, is_input=False), _pin(showing, "Condition"))
+    _connect(BEL.find_then_pin(trace), _pin(showing, "execute"))
+    tracer = keep(_at(_node(ed, FN_DRAW_LINE), x0 + 3100, y0 - 320))
+    _connect(muzzle, _pin(tracer, "LineStart"))
+    _connect(_pin(end, "ReturnValue", is_input=False), _pin(tracer, "LineEnd"))
+    _set(tracer, "Duration", TRACE_DEBUG_SECONDS)
+    _set(tracer, "Thickness", 1.0)
+    _connect(BEL.find_then_pin(showing), _pin(tracer, "execute"))
+
+    hit = keep(_at(ed.add_branch_node(), x0 + 3360, y0))
     _connect(_pin(trace, "ReturnValue", is_input=False), _pin(hit, "Condition"))
-    _connect(BEL.find_then_pin(trace), _pin(hit, "execute"))
-    brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 2900, y0 + 300))
+    # Both arms of the tracer branch carry on: whether a line was drawn has
+    # nothing to do with whether the pellet connected.
+    _connect(BEL.find_then_pin(tracer), _pin(hit, "execute"))
+    _connect(BEL.find_else_pin(showing), _pin(hit, "execute"))
+    brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 3360, y0 + 300))
     _connect(_pin(trace, "OutHit", is_input=False), _loose_pin(brk, "Hit"))
 
     ed.add_comment_to_nodes(
-        "Fire: origin is the muzzle, direction is muzzle -> AimPoint, spread is "
-        "the weapon's own cone. The visible tracer therefore leaves the barrel "
-        "and ends where the reticle said it would.",
+        "Fire: one round and one cooldown stamp first, then origin at the "
+        "muzzle, direction muzzle -> AimPoint, spread the weapon's own cone. "
+        "The tracer leaves the barrel and ends where the reticle said it would "
+        "-- when DebugMode is on, which is the only time it is drawn at all.",
         made)
 
-    _author_impact(ed, brk, held, BEL.find_then_pin(hit), x0 + 3180, y0)
+    _author_impact(ed, brk, held, BEL.find_then_pin(hit), x0 + 3640, y0)
     return _loose_pin(loop, "Completed", is_input=False)
 
 
@@ -3079,8 +3448,113 @@ def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
             _pin(as_char, "CastFailed", is_input=False))
 
 
+def _author_reload(ed, held, exec_in, x0, y0):
+    """R: top the magazine up from the reserve, and stand still for a moment.
+
+    How many rounds move is worked out ONCE and stored in ReloadTake before
+    anything is written. The arithmetic is pure, so a second read of
+    ``Min(MagazineSize - Loaded, Reserve)`` after Loaded has been raised would
+    quietly return a different (smaller) number, and the reserve would be
+    charged less than the magazine gained -- the pure-node trap this file keeps
+    running into, in its most expensive form yet: free ammunition.
+
+    There is no reloading *state*. The cost is a deadline pushed out on the
+    weapon's own NextFireTime, which is the same field the interval between
+    shots uses, so "cannot fire yet" has exactly one meaning in the whole
+    system and nothing has to decide which of two rules is in force.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    mag, mag_n = _prop(ed, "MagazineSize", held, x0, y0 + 300)
+    have, have_n = _prop(ed, "Loaded", held, x0, y0 + 420)
+    keep(mag_n), keep(have_n)
+    gap = keep(_at(_node(ed, FN_SUB_II), x0 + 260, y0 + 300))
+    _connect(mag, _pin(gap, "A"))
+    _connect(have, _pin(gap, "B"))
+    spare, spare_n = _prop(ed, "Reserve", held, x0, y0 + 560)
+    keep(spare_n)
+    # Min, so a reserve of one tops a magazine that is four short up by one and
+    # not by four -- and so the reserve can never be driven negative.
+    moving = keep(_at(_node(ed, FN_MIN_II), x0 + 520, y0 + 300))
+    _connect(_pin(gap, "ReturnValue", is_input=False), _pin(moving, "A"))
+    _connect(spare, _pin(moving, "B"))
+    pin_take = keep(_at(ed.add_set_member_variable_node("ReloadTake"), x0 + 780, y0))
+    _connect(_pin(moving, "ReturnValue", is_input=False), _pin(pin_take, "ReloadTake"))
+    _connect(exec_in, _pin(pin_take, "execute"))
+
+    uses, uses_n = _prop(ed, "UsesAmmo", held, x0 + 780, y0 + 420)
+    keep(uses_n)
+    take_get = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
+                        x0 + 780, y0 + 540))
+    any_left = keep(_at(_node(ed, FN_GREATER_II), x0 + 1020, y0 + 540))
+    _connect(_pin(take_get, "ReloadTake", is_input=False), _pin(any_left, "A"))
+    _set(any_left, "B", 0)
+    worth = keep(_at(_node(ed, FN_AND), x0 + 1260, y0 + 460))
+    _connect(uses, _pin(worth, "A"))
+    _connect(_pin(any_left, "ReturnValue", is_input=False), _pin(worth, "B"))
+
+    # An unlimited weapon and a full magazine both take the False arm, and both
+    # skip the pause -- a reload that cost 1.6 s and moved nothing would be a
+    # way to punish the player for pressing a key that did not apply.
+    does = keep(_at(ed.add_branch_node(), x0 + 1520, y0))
+    _connect(_pin(worth, "ReturnValue", is_input=False), _pin(does, "Condition"))
+    _connect(BEL.find_then_pin(pin_take), _pin(does, "execute"))
+
+    take_a = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
+                      x0 + 1780, y0 + 420))
+    was, was_n = _prop(ed, "Loaded", held, x0 + 1780, y0 + 300)
+    keep(was_n)
+    filled = keep(_at(_node(ed, FN_ADD_II), x0 + 2020, y0 + 300))
+    _connect(was, _pin(filled, "A"))
+    _connect(_pin(take_a, "ReloadTake", is_input=False), _pin(filled, "B"))
+    load = keep(_at(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH),
+                    x0 + 2280, y0))
+    _connect(held, _pin(load, "self"))
+    _connect(_pin(filled, "ReturnValue", is_input=False), _pin(load, "Loaded"))
+    _connect(BEL.find_then_pin(does), _pin(load, "execute"))
+
+    take_b = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
+                      x0 + 2280, y0 + 420))
+    kept, kept_n = _prop(ed, "Reserve", held, x0 + 2280, y0 + 300)
+    keep(kept_n)
+    fewer = keep(_at(_node(ed, FN_SUB_II), x0 + 2540, y0 + 300))
+    _connect(kept, _pin(fewer, "A"))
+    _connect(_pin(take_b, "ReloadTake", is_input=False), _pin(fewer, "B"))
+    charge = keep(_at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH),
+                      x0 + 2800, y0))
+    _connect(held, _pin(charge, "self"))
+    _connect(_pin(fewer, "ReturnValue", is_input=False), _pin(charge, "Reserve"))
+    _connect(BEL.find_then_pin(load), _pin(charge, "execute"))
+
+    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 2800, y0 + 300))
+    takes, takes_n = _prop(ed, "ReloadSeconds", held, x0 + 2800, y0 + 420)
+    keep(takes_n)
+    ready = keep(_at(_node(ed, FN_ADD_FF), x0 + 3060, y0 + 300))
+    _connect(_pin(now, "ReturnValue", is_input=False), _pin(ready, "A"))
+    _connect(takes, _pin(ready, "B"))
+    pause = keep(_at(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH),
+                     x0 + 3320, y0))
+    _connect(held, _pin(pause, "self"))
+    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(pause, "NextFireTime"))
+    _connect(BEL.find_then_pin(charge), _pin(pause, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"{RELOAD_KEY} reloads. ReloadTake is computed once and stored because "
+        "the arithmetic behind it is pure: read it again after Loaded has gone "
+        "up and the reserve is charged less than the magazine gained. The cost "
+        f"is {SHOTGUN_RELOAD_SECONDS}s pushed onto NextFireTime -- the same "
+        "field the interval between shots uses, so there is only ever one rule "
+        "saying when the weapon may fire.",
+        made)
+    return (BEL.find_then_pin(pause), BEL.find_else_pin(does))
+
+
 def _author_wc_tick(ed, tick):
-    """Four polled keys and a refresh, chained so each block rejoins the next.
+    """Five polled keys and a refresh, chained so each block rejoins the next.
 
     There is no Sequence node here: an exec *input* accepts any number of links,
     so every block's exit and its guard branch's False pin both run into the
@@ -3144,8 +3618,65 @@ def _author_wc_tick(ed, tick):
              _pin(fire_gate, "Condition"))
     for exit_pin in sprint_exits:
         _connect(exit_pin, _pin(fire_gate, "execute"))
-    after_fire = _author_fire(ed, held, muzzle, BEL.find_then_pin(fire_gate),
-                              1400, 0)
+
+    # Ammunition and the cooldown are a SECOND branch inside the first, not two
+    # more terms folded into its condition, and that nesting is the whole
+    # reason this reads the way it does. Both tests have to read properties off
+    # Held, and the condition of the outer gate is pulled on every frame --
+    # including the frames where nothing is equipped at all. A pure Get with a
+    # null self is an "Accessed None" per frame forever. Behind the gate, Held
+    # has already been checked valid.
+    loaded, loaded_n = _prop(ed, "Loaded", held, 1240, 300)
+    rounds = _at(_node(ed, FN_GREATER_II), 1480, 300)
+    _connect(loaded, _pin(rounds, "A"))
+    _set(rounds, "B", 0)
+    limited, limited_n = _prop(ed, "UsesAmmo", held, 1240, 420)
+    unlimited = _at(_node(ed, FN_NOT), 1480, 420)
+    _connect(limited, _pin(unlimited, "A"))
+    # OR, so the pistol never consults a magazine it does not have.
+    has_ammo = _at(_node(ed, FN_OR), 1720, 360)
+    _connect(_pin(unlimited, "ReturnValue", is_input=False), _pin(has_ammo, "A"))
+    _connect(_pin(rounds, "ReturnValue", is_input=False), _pin(has_ammo, "B"))
+
+    when, when_n = _prop(ed, "NextFireTime", held, 1240, 560)
+    right_now = _at(_node(ed, FN_TIME_SECONDS), 1240, 680)
+    cooled = _at(_node(ed, FN_GE_FF), 1480, 560)
+    _connect(_pin(right_now, "ReturnValue", is_input=False), _pin(cooled, "A"))
+    _connect(when, _pin(cooled, "B"))
+
+    ready = _at(_node(ed, FN_AND), 1960, 420)
+    _connect(_pin(has_ammo, "ReturnValue", is_input=False), _pin(ready, "A"))
+    _connect(_pin(cooled, "ReturnValue", is_input=False), _pin(ready, "B"))
+    ready_gate = _at(ed.add_branch_node(), 2200, 0)
+    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(ready_gate, "Condition"))
+    _connect(BEL.find_then_pin(fire_gate), _pin(ready_gate, "execute"))
+
+    ed.add_comment_to_nodes(
+        "The trigger is pulled, the weapon is out and the player is not "
+        "sprinting -- now, can it actually fire? A weapon with no ammunition "
+        "rule passes on the first half; every weapon waits out its own "
+        "FireInterval on the second. Nested inside the first gate rather than "
+        "folded into it, because every one of these reads a property off Held.",
+        [loaded_n, rounds, limited_n, unlimited, has_ammo, when_n, right_now,
+         cooled, ready, ready_gate])
+
+    after_fire = _author_fire(ed, held, muzzle, BEL.find_then_pin(ready_gate),
+                              2700, 0)
+
+    # --- reload --------------------------------------------------------------
+    # Shares its key with the death menu's "try again", and that is safe rather
+    # than lucky: Event Tick does not run while the game is paused, so this
+    # graph is not listening on any frame the menu is on screen. (The HUD's
+    # DrawHUD is; it is renderer-driven, which is why the menu can poll a key at
+    # all.)
+    reload_gate = _at(ed.add_branch_node(), 1040, 7200)
+    _connect(both(pressed(RELOAD_KEY, 7360), armed_out, 7300),
+             _pin(reload_gate, "Condition"))
+    for exit_pin in (after_fire, BEL.find_else_pin(fire_gate),
+                     BEL.find_else_pin(ready_gate)):
+        _connect(exit_pin, _pin(reload_gate, "execute"))
+    reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate),
+                                  1400, 7200)
 
     # --- switch --------------------------------------------------------------
     switch_gate = _at(ed.add_branch_node(), 1040, 1400)
@@ -3158,8 +3689,8 @@ def _author_wc_tick(ed, tick):
     _connect(count_out, _pin(any_held, "B"))
     _connect(both(pressed(SWITCH_KEY, 1560), _pin(any_held, "ReturnValue", is_input=False),
                   1620), _pin(switch_gate, "Condition"))
-    _connect(after_fire, _pin(switch_gate, "execute"))
-    _connect(BEL.find_else_pin(fire_gate), _pin(switch_gate, "execute"))
+    for exit_pin in reload_exits + (BEL.find_else_pin(reload_gate),):
+        _connect(exit_pin, _pin(switch_gate, "execute"))
 
     idx = _at(ed.add_get_member_variable_node("EquippedIndex"), 1300, 1600)
     step = _at(_node(ed, FN_ADD_II), 1540, 1600)
@@ -3248,6 +3779,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     for name in ("Stamina", "MaxStamina", "BaseSpeed"):
         _declare(ed, name, _float_type())
     _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
+    # How many rounds this reload moves, computed once and read back three
+    # times. See _author_reload for why it cannot just be recomputed.
+    _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
+    # The GameMode's DebugMode, cached at the moment of firing so the pellet
+    # loop can branch on a plain bool instead of casting eight times.
+    _declare(ed, DEBUG_MODE_VAR, BEL.get_basic_type_by_name("bool"))
     # Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
     # return pin takes its type from its Class pin, and an Actor-typed return
     # cannot be added to an array of BP_WeaponItem.
@@ -3271,6 +3808,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # bar would divide by if that somehow never ran.
         "BaseSpeed": 500.0,
         "Sprinting": False,
+        "ReloadTake": 0,
+        DEBUG_MODE_VAR: False,
         "ShotgunClass": BEL.generated_class(shotgun_bp),
         "PistolClass": BEL.generated_class(pistol_bp),
         "ItemClass": item_class,
@@ -3482,11 +4021,19 @@ def main():
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], blood_bp)
 
+    # After the weapon component, because the pickup's graph casts to it -- and
+    # therefore after the health component that spawns it, which is why the
+    # link between the two is a default written here rather than a parameter.
+    ammo_bp = build_ammo_pickup()
+    _apply_defaults(health_bp, {"AmmoClass": BEL.generated_class(ammo_bp)})
+    _log(f"{HEALTH_BP_PATH}.AmmoClass -> {AMMO_BP_PATH}")
+
     install_on_character(health_bp, weapon_bp)
     install_on_npc(health_bp)
     retire_old_assets()
 
-    _log("done — shotgun + pistol, inventory, aiming, blood, death and respawn")
+    _log("done — shotgun + pistol, ammunition, inventory, aiming, blood, "
+         "death and respawn")
 
 
 if __name__ == "__main__":

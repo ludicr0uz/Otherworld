@@ -249,6 +249,14 @@ COL_MAIN_SUB = "(R=0.520000,G=0.560000,B=0.630000,A=1.000000)"
 COL_MAIN_START = "(R=1.000000,G=0.870000,B=0.450000,A=1.000000)"
 COL_MAIN_HINT = "(R=0.560000,G=0.590000,B=0.650000,A=1.000000)"
 GAME_STARTED_VAR = "GameStarted"
+# How long the world runs before BeginPlay pauses it under the menu. Pausing on
+# frame zero froze the view INSIDE the player: LevelTick skips
+# UpdateCameraManager while paused (unless the controller full-ticks), so the
+# camera never left the spawn point for the boom, and the mesh never evaluated
+# its anim graph, so its reference-pose arms filled the screen from within.
+# A quarter second lets both settle; the wanderers are 75 m away and cannot
+# close that in the time.
+MENU_SETTLE_S = 0.25
 
 # ── The settings screen, and what survives a restart ─────────────────────────
 #
@@ -480,6 +488,7 @@ FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
 FN_LE = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
 FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
+FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
 FN_OPEN_LEVEL = "/Script/Engine.GameplayStatics.OpenLevel"
 FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
 FN_SAVE_EXISTS = "/Script/Engine.GameplayStatics.DoesSaveGameExist"
@@ -703,11 +712,13 @@ def _key(name):
 def _draw_texture(ed, x, y, tex, w=None, h=None, tint=None):
     """A DrawTexture node with its UV rectangle set to the whole texture.
 
-    The UV pins are in TEXELS, not normalised, so they are the source size.
-    Left unset they default to zero and the node draws nothing at all -- which
-    looks exactly like a missing texture and is the easy way to lose an hour.
+    The UV pins are NORMALISED (HUD.h: "in normalized UV distance"), so the
+    whole texture is 0,0 + 1x1. Left unset they default to zero and the node
+    draws nothing at all, which looks exactly like a missing texture. Set to
+    the texel size, as they once were, the texture wraps that many times: a
+    120x84 slot became a grid of amber borders and the 600x346 panel shrank
+    to one transparent corner texel per pixel, i.e. vanished.
     """
-    tw, th = UI_TEX_SIZE[tex] if tex in UI_TEX_SIZE else ICON_TEX_SIZE
     n = _at(_node(ed, FN_DRAW_TEXTURE), x, y)
     _set(n, "Texture", f"{UI_ART_DIR}/{tex}.{tex}")
     if w is not None:
@@ -716,8 +727,8 @@ def _draw_texture(ed, x, y, tex, w=None, h=None, tint=None):
         _set(n, "ScreenH", h)
     _set(n, "TextureU", 0.0)
     _set(n, "TextureV", 0.0)
-    _set(n, "TextureUWidth", float(tw))
-    _set(n, "TextureVHeight", float(th))
+    _set(n, "TextureUWidth", 1.0)
+    _set(n, "TextureVHeight", 1.0)
     if tint:
         _set(n, "TintColor", tint)
     return n
@@ -1016,10 +1027,28 @@ def _author_begin_play(ed, begin_play):
         "while the engine ran at whatever scalability it happened to boot with.",
         made)
 
-    # --- open paused, on the menu -------------------------------------------
-    # Before the FPS readout and after the preset, so a preset that fails to
-    # apply still fails loudly rather than behind a paused world.
+    # The FPS readout and the settings load come BEFORE the menu decision now:
+    # the pause waits MENU_SETTLE_S behind a Delay, and anything chained after
+    # it would wait too -- or never run at all if NEW GAME got in first.
     #
+    # The engine's own FPS display.  Straight after the preset so that a
+    # failure to apply the preset cannot be hidden behind it.
+    fps = _at(_node(ed, FN_CONSOLE), origin.x + 320, origin.y + 240)
+    _set(fps, "Command", FPS_COMMAND)
+    _connect(BEL.find_then_pin(made[-1]), _pin(fps, "execute"))
+    ed.add_comment_to_nodes(
+        f"{FPS_COMMAND!r} -- UE's built-in frame-rate readout, which draws "
+        "itself in the top-right corner. Nothing on this HUD's canvas is "
+        "involved, so it cannot collide with the HP bar or the quality panel.",
+        [fps])
+
+    # The settings only have to exist by the first DrawHUD, and putting disk
+    # access in front of the preset would let a failed load hide a failed
+    # preset.
+    loaded_tails = _author_load_settings(ed, origin.x + 320, origin.y + 1100,
+                                         BEL.find_then_pin(fps))
+
+    # --- open paused, on the menu -------------------------------------------
     # Pausing is what makes the menu a menu. Without it the level is live
     # behind the panel: ten wanderers spawn, start running at a player who
     # cannot move, and are on top of them by the time the title is read.
@@ -1028,54 +1057,53 @@ def _author_begin_play(ed, begin_play):
     # below silently reads an empty string, which means the switch would never
     # be seen and every headless run would sit on the menu. It warns, loudly,
     # and verify_graphics_menu fails on node warnings for exactly this reason.
-    cmdline = _at(_node(ed, FN_COMMAND_LINE), origin.x + 320, origin.y + 720)
-    skipping = _at(_node(ed, FN_CONTAINS), origin.x + 560, origin.y + 720)
+    mx, my = origin.x + 320, origin.y - 900
+    cmdline = _at(_node(ed, FN_COMMAND_LINE), mx, my + 320)
+    skipping = _at(_node(ed, FN_CONTAINS), mx + 240, my + 320)
     _connect(_pin(cmdline, "ReturnValue", is_input=False), _pin(skipping, "SearchIn"))
     _set(skipping, "Substring", SKIP_MENU_SWITCH)
-    wants_menu = _at(_node(ed, FN_NOT), origin.x + 800, origin.y + 720)
+    wants_menu = _at(_node(ed, FN_NOT), mx + 480, my + 320)
     _connect(_pin(skipping, "ReturnValue", is_input=False), _pin(wants_menu, "A"))
-    shown = _at(ed.add_branch_node(), origin.x + 800, origin.y + 480)
+    shown = _at(ed.add_branch_node(), mx + 480, my)
     _connect(_pin(wants_menu, "ReturnValue", is_input=False), _pin(shown, "Condition"))
-    _connect(BEL.find_then_pin(made[-1]), _pin(cmdline, "execute"))
+    for tail in loaded_tails:
+        _connect(tail, _pin(cmdline, "execute"))
     _connect(BEL.find_then_pin(cmdline), _pin(shown, "execute"))
 
-    hold = _at(_node(ed, FN_SET_PAUSED), origin.x + 1060, origin.y + 400)
+    # Not paused on frame zero -- see MENU_SETTLE_S. And only if the player has
+    # not already pressed Enter inside that window: pausing after NEW GAME
+    # would freeze the game with no menu left to unpause it.
+    settle = _at(_node(ed, FN_DELAY), mx + 740, my)
+    _set(settle, "Duration", MENU_SETTLE_S)
+    _connect(BEL.find_then_pin(shown), _pin(settle, "execute"))
+    started = _at(ed.add_get_member_variable_node(GAME_STARTED_VAR),
+                  mx + 740, my + 320)
+    still_on_menu = _at(ed.add_branch_node(), mx + 1000, my)
+    _connect(_pin(started, GAME_STARTED_VAR, is_input=False),
+             _pin(still_on_menu, "Condition"))
+    _connect(BEL.find_then_pin(settle), _pin(still_on_menu, "execute"))
+    hold = _at(_node(ed, FN_SET_PAUSED), mx + 1260, my)
     _set(hold, "bPaused", "true")
-    _connect(BEL.find_then_pin(shown), _pin(hold, "execute"))
+    _connect(BEL.find_else_pin(still_on_menu), _pin(hold, "execute"))
 
     # Straight into the game, for a run with nobody to press Enter.
     skip = _at(ed.add_set_member_variable_node(GAME_STARTED_VAR),
-               origin.x + 1060, origin.y + 640)
+               mx + 740, my + 480)
     _set(skip, GAME_STARTED_VAR, "true")
     _connect(BEL.find_else_pin(shown), _pin(skip, "execute"))
 
     ed.add_comment_to_nodes(
-        f"Open paused and on the main menu. {GAME_STARTED_VAR} defaults to "
-        f"false, so ReceiveDrawHUD draws the title panel instead of the HUD "
-        f"until the player starts -- see _author_main_menu. Pausing is what "
-        f"makes it a menu rather than a picture: unpaused, ten wanderers are "
-        f"already running at a player who cannot move. "
-        f"{SKIP_MENU_SWITCH} on the command line skips both, which is how the "
-        f"headless runs still test a game rather than a title screen.",
-        [cmdline, skipping, wants_menu, shown, hold, skip])
-
-    # ...and then turn the engine's own FPS display on.  It is last in the chain
-    # so that a failure to apply the preset cannot be hidden behind it.
-    fps = _at(_node(ed, FN_CONSOLE), origin.x + 320, origin.y + 240)
-    _set(fps, "Command", FPS_COMMAND)
-    for tail in (BEL.find_then_pin(hold), BEL.find_then_pin(skip)):
-        _connect(tail, _pin(fps, "execute"))
-    ed.add_comment_to_nodes(
-        f"{FPS_COMMAND!r} -- UE's built-in frame-rate readout, which draws "
-        "itself in the top-right corner. Nothing on this HUD's canvas is "
-        "involved, so it cannot collide with the HP bar or the quality panel.",
-        [fps])
-
-    # Last, and after the pause: the settings only have to exist by the first
-    # DrawHUD, and putting disk access in front of the preset would let a
-    # failed load hide a failed preset.
-    _author_load_settings(ed, origin.x + 320, origin.y + 1100,
-                          BEL.find_then_pin(fps))
+        f"Open on the main menu, paused {MENU_SETTLE_S}s in. {GAME_STARTED_VAR} "
+        f"defaults to false, so ReceiveDrawHUD draws the title panel instead "
+        f"of the HUD until the player starts -- see _author_main_menu. Pausing "
+        f"is what makes it a menu rather than a picture: unpaused, ten "
+        f"wanderers are already running at a player who cannot move. The "
+        f"delay is because a world paused on frame zero never updates its "
+        f"camera or animates the player, so the view sits inside the "
+        f"reference-posed mesh. {SKIP_MENU_SWITCH} on the command line skips "
+        f"the menu, which is how the headless runs still test a game.",
+        [cmdline, skipping, wants_menu, shown, settle, started, still_on_menu,
+         hold, skip])
 
 
 # ─── Event Tick: input ───────────────────────────────────────────────────────
@@ -1733,8 +1761,8 @@ def _author_inventory(ed, x0, y0, in_execs):
     _set(fill, "ScreenH", SLOT_ICON_H)
     _set(fill, "TextureU", 0.0)
     _set(fill, "TextureV", 0.0)
-    _set(fill, "TextureUWidth", float(ICON_TEX_SIZE[0]))
-    _set(fill, "TextureVHeight", float(ICON_TEX_SIZE[1]))
+    _set(fill, "TextureUWidth", 1.0)    # normalised -- see _draw_texture
+    _set(fill, "TextureVHeight", 1.0)
     _connect(_pin(icon_x, "ReturnValue", is_input=False), _pin(fill, "ScreenX"))
     _connect(_pin(icon_y, "ReturnValue", is_input=False), _pin(fill, "ScreenY"))
     _connect(BEL.find_then_pin(back), _pin(fill, "execute"))

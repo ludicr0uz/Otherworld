@@ -218,9 +218,24 @@ def main():
     check("exactly one DrawTexture takes its texture from the weapon itself",
           len(driven) == 1, str(len(driven)))
 
+    # DrawTexture's UV rectangle is NORMALISED: the whole picture is 1x1. It
+    # was once given the texel size, which tiles the texture that many times
+    # -- the menu's button became a grid of amber borders and every panel
+    # vanished into transparent corner texels. Nothing errors when that
+    # happens, so it is checked here.
+    bad_uv = []
+    for n in textures:
+        uv = tuple(float(BEL.find_input_pin(n, p).get_pin_value() or 0)
+                   for p in ("TextureU", "TextureV", "TextureUWidth",
+                             "TextureVHeight"))
+        if uv != (0.0, 0.0, 1.0, 1.0):
+            bad_uv.append(str(uv))
+    check("every DrawTexture samples the whole texture once (UV 0,0 + 1x1)",
+          not bad_uv, "; ".join(bad_uv))
+
     # --- the artwork is the size the HUD thinks it is -----------------------
-    # DrawTexture's UV rectangle is in TEXELS, and build_graphics_menu.py
-    # supplies it from UI_TEX_SIZE -- a table of numbers, not a measurement. If
+    # The HUD draws each texture at the size in UI_TEX_SIZE -- a table of
+    # numbers, not a measurement. If
     # a texture is regenerated at a different size (the slots went from 104x68
     # to 120x84 for exactly this reason) and that table is not updated, or the
     # PNGs are rebuilt and never re-imported, the HUD samples a rectangle that
@@ -257,6 +272,13 @@ def main():
     literals = [BEL.find_input_pin(n, "bPaused").get_pin_value() for n in paused]
     check("exactly one SetGamePaused(true) -- the main menu's, at BeginPlay",
           literals.count("true") == 1, str(literals))
+    # ...and not on frame zero: a world paused before its first tick never
+    # updates the camera, so the menu would be seen from inside the player.
+    delays = [n for n in by_pins("Duration", "execute")
+              if abs(float(BEL.find_input_pin(n, "Duration").get_pin_value() or 0)
+                     - G.MENU_SETTLE_S) < 1e-6]
+    check(f"the menu pause waits {G.MENU_SETTLE_S}s for the camera to settle",
+          len(delays) == 1, str(len(delays)))
     # Two unpause: the menu's NEW GAME and the death menu's restart.
     check("two SetGamePaused(false) -- starting a game and restarting one",
           literals.count("false") == 2, str(literals))

@@ -11,7 +11,7 @@ from combat.graph import (
 )
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_II, FN_ADD_VV, FN_AND, FN_ARR_GET, FN_ARR_LEN,
-    FN_CONCAT, FN_DELAY, FN_DESTROY, FN_DISABLE_MOVEMENT, FN_GET_CONTROLLER,
+    FN_CONCAT, FN_DELAY, FN_DISABLE_MOVEMENT, FN_GET_CONTROLLER,
     FN_GET_GAME_MODE, FN_GET_OWNER, FN_GREATER_II, FN_INT_TO_STR, FN_IS_VALID,
     FN_LESS_FF, FN_LIFESPAN, FN_MAKE_TRANSFORM, FN_PRINT, FN_RANDOM_FLOAT,
     FN_RAND_INT, FN_SET_COLLISION, FN_SET_PAUSED, FN_SET_PROFILE,
@@ -30,6 +30,10 @@ from combat.weapon_specs import DROP_DISPLAYS
 # visible history of itself, short enough that a long session does not end up
 # rendering a hundred skeletal meshes nobody is looking at.
 CORPSE_SECONDS = 60.0
+# How long a dead wanderer's AI controller outlives it. Not zero: SetLifeSpan(0)
+# means "live forever". The controller's own heartbeat already stopped when it
+# saw the pawn Dead (npc/corpse.py), so this is only how soon it is cleaned up.
+CONTROLLER_RETIRE_SECONDS = 0.1
 # How long the player's body is left falling before the game pauses and the
 # menu opens. The pause stops physics too, so this is also how long the ragdoll
 # gets to settle: pausing early freezes the player mid-topple, which reads as a
@@ -314,20 +318,26 @@ def _author_corpse(ed, exec_ins, x0, y0):
     The collapse is shared (see _author_death_collapse); this is the half that
     is only true of an NPC.
 
-    The AI controller is DESTROYED rather than told to stop. A wanderer's whole
-    behaviour -- the chase, the melee, the growls -- is one self-re-entering
-    loop on its controller, and none of it consults the pawn's health: a corpse
-    whose controller survived would keep hitting the player from the floor.
-    Destroying an AController unpossesses it on the way out, which is what
-    stops the movement request as well, and it leaves nothing behind to leak
-    one controller per kill over a session. UnPossess alone would close the
-    loop's possession gate too, but it would leave that controller running its
-    Delay for the rest of the game.
+    The AI controller is retired with SetLifeSpan, NOT K2_DestroyActor. This
+    used to call DestroyActor on it, and that never did anything: the engine
+    overrides AController::K2_DestroyActor with an empty body ("disallow
+    destroying controller from Blueprints", Controller.cpp). Every corpse kept
+    its controller, and the controller kept its chase-and-swing loop. Its
+    movement was disabled, but the melee is a distance check from the capsule,
+    and the ragdoll rolls away from the capsule. A player who stood where a
+    wanderer died was hit by nothing they could see.
 
-    This used to be a K2_DestroyActor on the owner, on the same frame. The
-    corpse now lies there for CORPSE_SECONDS, and SetLifeSpan is the engine's
-    own timer for exactly that -- a Delay here would be a latent action on a
-    component belonging to the actor it is waiting to destroy.
+    Two things now close that, and neither relies on the other:
+      * npc/corpse.py: the heartbeat's first check is the pawn's Dead flag, and
+        a corpse's loop ends there. That is what stops the swinging.
+      * here: the controller gets CONTROLLER_RETIRE_SECONDS of lifespan. When a
+        lifespan runs out the engine calls the C++ Destroy(), which the
+        Blueprint override does not block, and a destroyed controller
+        unpossesses on the way out. So one controller does not leak per kill.
+
+    The body lies there for CORPSE_SECONDS, also by SetLifeSpan -- a Delay here
+    would be a latent action on a component belonging to the actor it is
+    waiting to destroy.
     """
     owner = _at(_node(ed, FN_GET_OWNER), x0, y0 + 240)
     owner_out = _pin(owner, "ReturnValue", is_input=False)
@@ -348,8 +358,9 @@ def _author_corpse(ed, exec_ins, x0, y0):
     _connect(_pin(possessed, "ReturnValue", is_input=False), _pin(has_brain, "Condition"))
     _connect(BEL.find_then_pin(as_pawn), _pin(has_brain, "execute"))
 
-    lobotomy = _at(_node(ed, FN_DESTROY), x0 + 1200, y0)
+    lobotomy = _at(_node(ed, FN_LIFESPAN), x0 + 1200, y0)
     _connect(brain_out, _pin(lobotomy, "self"))
+    _set(lobotomy, "InLifespan", CONTROLLER_RETIRE_SECONDS)
     _connect(BEL.find_then_pin(has_brain), _pin(lobotomy, "execute"))
 
     rot = _at(_node(ed, FN_LIFESPAN), x0 + 1440, y0)
@@ -361,9 +372,10 @@ def _author_corpse(ed, exec_ins, x0, y0):
         _connect(tail, _pin(rot, "execute"))
 
     ed.add_comment_to_nodes(
-        f"A dead wanderer: destroy the AI controller -- the chase, the melee "
-        f"and the growls are one loop on it, and none of them ask whether the "
-        f"pawn is alive -- and give the body {CORPSE_SECONDS:.0f} s of lifespan. "
+        f"A dead wanderer: give its AI controller {CONTROLLER_RETIRE_SECONDS} s "
+        f"of lifespan (K2_DestroyActor on a controller is a no-op in the "
+        f"engine; an expiring lifespan really destroys it) and the body "
+        f"{CORPSE_SECONDS:.0f} s. "
         f"The kill has already been counted and the replacement already spawned "
         f"by the time this runs, so the pack is back to strength while the "
         f"corpse is still falling.",

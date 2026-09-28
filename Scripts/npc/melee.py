@@ -20,6 +20,7 @@ from npc.graph import (
     _asset_sub, _at, BEL, _connect, _log, _loose_pin, _node, _palette, _pin,
     _resolve, _set,
 )
+from npc.combat_trace import _author_melee_trace
 from npc.sound import _author_random_sound
 
 
@@ -206,7 +207,20 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     _connect(as_health, _pin(came_from, "self"))
     _connect(_pin(bearing, "ReturnValue", is_input=False),
              _pin(came_from, LAST_HIT_FROM_VAR))
-    _connect(BEL.find_then_pin(write), _pin(came_from, "execute"))
+
+    # --- and, when the combat trace is on, say who did it -------------------
+    # Between the hit and its bearing, so the line quotes the health just
+    # written. Every exit of the trace, logged or not, carries on to the bearing.
+    # The trace's nodes stay out of `made`: they have their own comment box.
+    _, trace_tails = _author_melee_trace(
+        ed, BEL.find_then_pin(write),
+        _pin(self_pawn, "ReturnValue", is_input=False),
+        _pin(self_loc, "ReturnValue", is_input=False), player_out,
+        _pin(player_loc, "ReturnValue", is_input=False),
+        _pin(gap, "ReturnValue", is_input=False), as_health,
+        x0 + 3600, y0 + 1400)
+    for tail in trace_tails:
+        _connect(tail, _pin(came_from, "execute"))
 
     # --- and make a noise landing it ----------------------------------------
     # At the PLAYER's location rather than the wanderer's: the sound is the

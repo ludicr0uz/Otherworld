@@ -18,14 +18,14 @@ from npc.graph import (
 from npc.sound import _author_random_sound
 
 
-def _author_stats_and_voice(ed, gate, x0, y0, health, voice_min, voice_max):
+def _author_stats_and_voice(ed, exec_ins, x0, y0, health, voice_min, voice_max):
     """Apply this creature's health once, then growl on a timer.
 
     Both hang off the chase loop's existing heartbeat rather than getting a
     Tick of their own, for the reason _author_melee gives: the loop is already
     the NPC's clock and a second one is only a way for the two to disagree.
 
-        gate(possessed) --> [stats applied yet?]
+        gate(possessed, alive) --> [stats applied yet?]
                               no  --> MaxHealth = Health = <this creature's>
                               yes ----------------------------.
                                                               v
@@ -81,7 +81,8 @@ def _author_stats_and_voice(ed, gate, x0, y0, health, voice_min, voice_max):
     _connect(_pin(done, STATS_APPLIED_VAR, is_input=False), _pin(fresh, "A"))
     first = keep(_at(ed.add_branch_node(), x0 + 480, y0))
     _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(first, "Condition"))
-    _connect(BEL.find_then_pin(gate), _pin(first, "execute"))
+    for pin in exec_ins:
+        _connect(pin, _pin(first, "execute"))
 
     comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 480, y0 + 380))
     _connect(pawn_out, _pin(comp, "self"))

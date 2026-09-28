@@ -59,6 +59,14 @@ FN_WARN = "/Script/Engine.KismetSystemLibrary.PrintWarning"
 FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 FN_DISPLAY_NAME = "/Script/Engine.KismetSystemLibrary.GetDisplayName"
 
+# The combat trace (npc/combat_trace.py) and the corpse state (npc/corpse.py).
+FN_PRINT = "/Script/Engine.KismetSystemLibrary.PrintString"
+FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
+FN_VEC_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_VectorToString"
+FN_FLOAT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_DoubleToString"
+FN_BOOL_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_BoolToString"
+FN_STOP_MOVEMENT = "/Script/Engine.Controller.StopMovement"
+
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"

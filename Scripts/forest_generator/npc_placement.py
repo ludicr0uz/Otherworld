@@ -345,14 +345,19 @@ NAV_AGENT_HEIGHT_CM = 144.0
 # of walkable ground 15 m wide with no navigation data on it, which is exactly
 # where NPCs stopped following.  Cover the terrain and the ring does not exist.
 #
-# The caps below are kept as guard rails rather than targets -- they now sit at
-# the measured-good point instead of below it, and they only bite on a map
-# LARGER than 200 m, which has never been built.  If a bigger map ever does
-# come up with an empty navmesh, measure before believing anything here: UE 5.8
+# The caps below are guard rails rather than targets, and each sits at a
+# measured-good point: +/-50000 XY was measured on Lvl_Forest_1000m the same way
+# (401/401 probe points on the navmesh).  If a map comes up with an empty
+# navmesh, measure before believing anything here: UE 5.8
 # exposes neither `tile_size_uu` nor a readable tile limit to Python, so the
 # only honest way to know is to resize, rebuild, and project.
 NAV_COVERAGE_FRACTION = 1.0
-NAV_MAX_HALF_XY_CM = 10000.0
+# Raised from 10000 for Lvl_Forest_1000m: a +/-10000 cap left 96% of that map
+# without navigation, i.e. nowhere the pack could follow.  Recast's own tile
+# limit (TileNumberHardLimit, 1 << 20) is far above the ~10k tiles +/-50000
+# needs, and pending tiles build nearest-the-player first (SortPendingBuildTiles
+# with seed locations), so the ground around the spawn is ready first.
+NAV_MAX_HALF_XY_CM = 50000.0
 NAV_MAX_VERTICAL_SPAN_CM = 5000.0
 # Headroom must exceed the agent height (144 cm) or the surface right under the
 # volume's ceiling is treated as too low to stand in.

@@ -69,3 +69,14 @@ PATROL_TARGET_VAR = "PatrolTarget"
 NEXT_PATROL_VAR = "NextPatrolTime"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 CHARACTER_CLASS_PATH = "/Script/Engine.Character"
+
+# ── The corpse state (npc/corpse.py) ─────────────────────────────────────────
+#
+# The wanderer's third and last state, after patrol (Aggro false) and hunt
+# (Aggro true). Set on the first heartbeat that finds the pawn's health
+# component Dead, and nothing sets it back. A corpse's heartbeat stops there:
+# no stats, no voice, no patrol, no chase, no swing, and no next Delay. The
+# health component also destroys the controller when it dies (combat/death.py
+# _author_corpse). This gate does not depend on that destroy having happened.
+CORPSE_VAR = "Corpse"
+CORPSE_LOG_PREFIX = "[NPC-CORPSE] #"

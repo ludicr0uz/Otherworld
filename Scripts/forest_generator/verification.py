@@ -256,15 +256,21 @@ def check_trees_vertical(placed_trees) -> CheckResult:
 def check_tree_spacing(placed_trees) -> CheckResult:
     """
     Verify no two trees overlap at trunk level (minimum 100 cm apart).
-    Uses a simple O(n²) check for moderate tree counts.
+    Every pair within one 1000 cm hash cell of each other is compared, so the
+    true nearest pair is found at any tree count.
     """
     min_dist = float("inf")
     violations = []
-    n = len(placed_trees)
+    cell = 1000.0
+    buckets = {}
+    for i, t in enumerate(placed_trees):
+        buckets.setdefault((int(math.floor(t.x / cell)), int(math.floor(t.y / cell))), []).append(i)
 
-    # For large maps, only check nearest neighbors within grid cells
-    for i in range(n):
-        for j in range(i + 1, min(i + 50, n)):  # check nearby in list
+    for (ci, cj), members in buckets.items():
+        near = [k for di in (-1, 0, 1) for dj in (-1, 0, 1)
+                for k in buckets.get((ci + di, cj + dj), ())]
+        pairs = ((i, j) for i in members for j in near if j > i)
+        for i, j in pairs:
             dx = placed_trees[i].x - placed_trees[j].x
             dy = placed_trees[i].y - placed_trees[j].y
             d = math.hypot(dx, dy)

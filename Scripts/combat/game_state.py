@@ -18,6 +18,18 @@ from combat.paths import GAME_MODE_BP_PATH
 # instrumentation, and instrumentation is not what the game looks like.
 DEBUG_MODE_VAR = "DebugMode"
 
+# --- combat trace ------------------------------------------------------------
+# A second developer switch on the GameMode, and a log rather than an overlay:
+# with it on, every wanderer's swing that lands writes one COMBAT_TRACE_PREFIX
+# line naming the attacker by number, where it stood, and where its target
+# stood. Off by default (COMBAT_TRACE_DEFAULT in tuning.py); flipped at runtime
+# from the console with `ke * CombatTraceOn` / `ke * CombatTraceOff`, which
+# call the two custom events combat/combat_trace.py authors on the GameMode.
+COMBAT_TRACE_VAR = "CombatTrace"
+COMBAT_TRACE_ON_EVENT = "CombatTraceOn"
+COMBAT_TRACE_OFF_EVENT = "CombatTraceOff"
+COMBAT_TRACE_PREFIX = "[COMBAT-TRACE] "
+
 # Pellet tracers drawn in the world for this many seconds, in debug mode only.
 # They are the only way to see *where* a shot went -- sound and blood tell you a
 # shot happened and that it connected, but not that it missed high -- which is
@@ -104,6 +116,9 @@ def ensure_game_mode_vars():
                        on the HUD that toggles it because the *weapon
                        component* is the other thing that reads it, and a HUD
                        variable is not reachable from a component.
+        CombatTrace    whether wanderers log each landed swing (see
+                       COMBAT_TRACE_VAR). Its default is written by
+                       combat_trace.build_combat_trace_switch().
         Noise*         the last noise the player made (see NOISE_TIME_VAR),
                        written by whatever made it, heard by every wanderer.
 
@@ -123,7 +138,7 @@ def ensure_game_mode_vars():
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
     for name in (SPAWN_COUNT_VAR, KILL_COUNT_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR):
+    for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR, COMBAT_TRACE_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in NOISE_FLOAT_VARS:
         _declare(ed, name, _float_type())
@@ -133,5 +148,6 @@ def ensure_game_mode_vars():
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
     _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {KILL_COUNT_VAR}, "
-         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR}, the noise record ready")
+         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR}, {COMBAT_TRACE_VAR}, the noise "
+         f"record ready")
     return bp

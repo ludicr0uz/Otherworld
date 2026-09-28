@@ -115,6 +115,21 @@ class PlacedTree:
 
 # ─── Scatter ─────────────────────────────────────────────────────────────────
 
+# Trunks closer than this are re-drawn.  The offline check fails below 100 cm;
+# the margin covers two scale-3.6 trunks (~54 cm radius each) side by side.
+MIN_TREE_SPACING_CM = 150.0
+MAX_SPACING_REDRAWS = 30
+
+
+def _too_close(cells: dict, x: float, y: float) -> bool:
+    ci, cj = int(math.floor(x / MIN_TREE_SPACING_CM)), int(math.floor(y / MIN_TREE_SPACING_CM))
+    for di in (-1, 0, 1):
+        for dj in (-1, 0, 1):
+            for ox, oy in cells.get((ci + di, cj + dj), ()):
+                if math.hypot(x - ox, y - oy) < MIN_TREE_SPACING_CM:
+                    return True
+    return False
+
 def scatter_trees(
     world_size_cm: float,
     grid_z,
@@ -141,18 +156,26 @@ def scatter_trees(
     max_dist = half * 0.85  # keep trees inside 85% of the map edge
 
     placed: list[PlacedTree] = []
+    cells: dict = {}       # spatial hash of trunk positions, MIN_TREE_SPACING_CM cells
 
     for spec in tree_specs:
         count = max(1, int(round(spec.count_per_hectare * area_hectares)))
         for _ in range(count):
-            dist = rng.uniform(spec.min_dist_from_center, max_dist)
-            theta = rng.uniform(0, 2 * math.pi)
-            tx = dist * math.cos(theta)
-            ty = dist * math.sin(theta)
+            for _attempt in range(MAX_SPACING_REDRAWS):
+                dist = rng.uniform(spec.min_dist_from_center, max_dist)
+                theta = rng.uniform(0, 2 * math.pi)
+                tx = dist * math.cos(theta)
+                ty = dist * math.sin(theta)
 
-            # Clamp to map bounds
-            tx = max(-half * 0.95, min(half * 0.95, tx))
-            ty = max(-half * 0.95, min(half * 0.95, ty))
+                # Clamp to map bounds
+                tx = max(-half * 0.95, min(half * 0.95, tx))
+                ty = max(-half * 0.95, min(half * 0.95, ty))
+                if not _too_close(cells, tx, ty):
+                    break
+            else:
+                continue       # no room left for this one; skip it
+            cells.setdefault((int(math.floor(tx / MIN_TREE_SPACING_CM)),
+                              int(math.floor(ty / MIN_TREE_SPACING_CM))), []).append((tx, ty))
 
             tz = get_exact_mesh_z(tx, ty, grid_z, grid_size, world_size_cm)
 

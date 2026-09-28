@@ -214,7 +214,8 @@ GENERATED = (
         dest="Content/Maps",
         kind="generated",
         builders=("Scripts/generate_forest_level.py",),
-        note="Lvl_Forest_200m.umap and its World Partition sidecars.",
+        note="Lvl_Forest_200m.umap (--size 200) and Lvl_Forest_1000m.umap "
+             "(--size 1000), each with its World Partition sidecars.",
     ),
 )
 

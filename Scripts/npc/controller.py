@@ -24,6 +24,7 @@ from npc.graph import (
 )
 from npc.stats import _author_stats_and_voice
 from npc.agro import _author_agro
+from npc.corpse import _author_corpse_gate
 from npc.melee import _author_melee
 
 
@@ -185,11 +186,16 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     _connect(_pin(both_on, "ReturnValue", is_input=False), _pin(pathable, "Condition"))
     _connect(BEL.find_then_pin(pathable), BEL.find_execute_pin(move_to))
 
-    # Between "we have a pawn" and "can we path to the player": this creature's
+    # First thing with a pawn: is it a corpse? A dead wanderer's heartbeat ends
+    # there, so nothing below -- stats, voice, patrol, chase, melee -- can run
+    # for it. See npc/corpse.py.
+    _, alive = _author_corpse_gate(ed, BEL.find_then_pin(gate),
+                                   origin.x - 200, origin.y - 1400)
+    # Between "a living pawn" and "can we path to the player": this creature's
     # health, applied once, and its voice on a timer. Both need the pawn, which
     # is why they sit after the gate and not on BeginPlay.
     extras, after_extras = _author_stats_and_voice(
-        ed, gate, origin.x - 200, origin.y + 1400,
+        ed, alive, origin.x - 200, origin.y + 1400,
         health, NPC_VOICE_MIN_S, NPC_VOICE_MAX_S)
     # ...then patrol or hunt. Everything above runs for a patrolling wanderer
     # too (it still has its health and still growls); the chase below runs

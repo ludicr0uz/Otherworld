@@ -2,7 +2,9 @@
 dying, the corpse and the world-floor net.
 """
 
-from combat.death import CORPSE_SECONDS, DEATH_PAUSE_SECONDS
+from combat.death import (
+    CONTROLLER_RETIRE_SECONDS, CORPSE_SECONDS, DEATH_PAUSE_SECONDS,
+)
 from combat.game_state import (
     DAMAGED_BY_PLAYER_VAR, FELL_LOG_PREFIX, KILL_COUNT_VAR, LAST_DAMAGE_VAR,
     NEVER_DAMAGED, NPC_ID_VAR, PLAYER_DEAD_VAR, SPAWNED_AT_VAR,
@@ -245,28 +247,38 @@ def check_dying():
 # ─── The corpse, and when it goes away ───────────────────────────────────────
 
 def check_corpse():
+    def _fed_by(node):
+        return [str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+                for q in PIN.list_connected_pins(BEL.find_input_pin(node, "self"))]
+
     lifespans = titled(hg, "SetLifeSpan")
+    bodies = [n for n in lifespans if _fed_by(n) == ["GetOwner"]]
+    brains = [n for n in lifespans if _fed_by(n) == ["GetController"]]
     check("a killed wanderer leaves a corpse instead of vanishing",
-          len(lifespans) == 1, str(len(lifespans)))
-    if lifespans:
+          len(bodies) == 1, str([_fed_by(n) for n in lifespans]))
+    if bodies:
         check(f"the corpse despawns after {CORPSE_SECONDS:.0f} s",
-              abs((num_pin(lifespans[0], "InLifespan") or -1.0)
+              abs((num_pin(bodies[0], "InLifespan") or -1.0)
                   - CORPSE_SECONDS) < 1e-3,
-              pin_value(lifespans[0], "InLifespan"))
+              pin_value(bodies[0], "InLifespan"))
     check("60 s, as asked for", abs(CORPSE_SECONDS - 60.0) < 1e-6,
           f"{CORPSE_SECONDS}")
     # The chase, the melee and the growls are one self-re-entering loop on the AI
-    # controller and none of them ask whether the pawn is alive, so a corpse whose
-    # controller survived would keep hitting the player from the floor.
-    destroys = titled(hg, "Destroy Actor")
-    check("a corpse's AI controller is destroyed", len(destroys) == 1,
-          str(len(destroys)))
-    if destroys:
-        fed_by = [str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
-                  for q in PIN.list_connected_pins(
-                      BEL.find_input_pin(destroys[0], "self"))]
-        check("...the CONTROLLER, not the body -- the body has a lifespan now",
-              fed_by == ["GetController"], str(fed_by))
+    # controller. The loop now stops itself for a Dead pawn (npc/corpse.py); this
+    # is the cleanup. It has to be a lifespan: K2_DestroyActor on a controller is
+    # an empty override in the engine, and this check used to pass on a Destroy
+    # node that never destroyed anything.
+    check("a corpse's AI controller is retired by lifespan (a Blueprint "
+          "DestroyActor on a controller is a no-op)",
+          len(brains) == 1 and not titled(hg, "Destroy Actor"),
+          f"{len(brains)} controller lifespan(s), "
+          f"{len(titled(hg, 'Destroy Actor'))} Destroy Actor node(s)")
+    if brains:
+        got = num_pin(brains[0], "InLifespan")
+        check(f"...after {CONTROLLER_RETIRE_SECONDS} s, and not 0 (which means forever)",
+              got is not None and got > 0.0
+              and abs(got - CONTROLLER_RETIRE_SECONDS) < 1e-3,
+              pin_value(brains[0], "InLifespan"))
 
     pauses = by_pins(hg, "bPaused")
     check("death pauses the game", len(pauses) == 1, str(len(pauses)))

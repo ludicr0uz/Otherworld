@@ -17,8 +17,10 @@ SHARED AUTHORING HELPERS
 
 THE CONTROLLER'S HEARTBEAT (one fragment per concern)
   sound        play one of several sounds (voice, melee impact)
+  corpse       the corpse state: a Dead pawn ends the heartbeat for good
   stats        this creature's health and flinch clips, once; voice on a timer
   melee        range + cooldown check, swing, damage, hit direction
+  combat_trace the [COMBAT-TRACE] line a landed swing logs, when enabled
   patrol       once-per-life setup (centre, run speed); stroll to a point
   senses       hurt, sight (cone + line of sight), touch, sound
   agro         the patrol/agro switch: setup -> [Aggro?] -> senses -> chase

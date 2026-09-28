@@ -1,0 +1,191 @@
+{
+  "level_name": "Lvl_Forest_1000m",
+  "world_size_m": 1000.0,
+  "all_passed": true,
+  "checks": [
+    {
+      "name": "OBJ File Valid",
+      "passed": true,
+      "message": "33282 vertices, 66560 faces, 33282 normals",
+      "details": []
+    },
+    {
+      "name": "Terrain Bounds",
+      "passed": true,
+      "message": "X span: 100000 cm, Y span: 100000 cm (expected 100000 cm)",
+      "details": []
+    },
+    {
+      "name": "Center Spawn Flat",
+      "passed": true,
+      "message": "Max |Z| in spawn zone: 0.00 cm (threshold: 1.0 cm)",
+      "details": [
+        "(0, 0) \u2192 Z=0.00",
+        "(5000, 0) \u2192 Z=0.00",
+        "(-5000, 0) \u2192 Z=0.00",
+        "(0, 5000) \u2192 Z=0.00",
+        "(0, -5000) \u2192 Z=0.00"
+      ]
+    },
+    {
+      "name": "Top Normals Upward",
+      "passed": true,
+      "message": "Checked 33282 normals, 0 bad top-surface normals",
+      "details": []
+    },
+    {
+      "name": "Barycentric Consistency",
+      "passed": true,
+      "message": "Max barycentric error at grid vertices: 0.0000 cm",
+      "details": []
+    },
+    {
+      "name": "Tree Count / Density",
+      "passed": true,
+      "message": "3400 trees on 100.0 ha = 34.0 trees/ha",
+      "details": []
+    },
+    {
+      "name": "Trees Within Bounds",
+      "passed": true,
+      "message": "All trees within map bounds",
+      "details": []
+    },
+    {
+      "name": "Trees Not Floating",
+      "passed": true,
+      "message": "All trees at or below terrain",
+      "details": []
+    },
+    {
+      "name": "Trees Not Over-Buried",
+      "passed": true,
+      "message": "All sinks within 200 cm",
+      "details": []
+    },
+    {
+      "name": "Trees Vertical",
+      "passed": true,
+      "message": "All trees placed with pitch=0, roll=0 (vertical)",
+      "details": []
+    },
+    {
+      "name": "Tree Spacing (>100cm)",
+      "passed": true,
+      "message": "Min spacing: 150 cm, 0 overlaps",
+      "details": []
+    },
+    {
+      "name": "Spawn Zone Clear",
+      "passed": true,
+      "message": "Spawn zone (5m radius) clear",
+      "details": []
+    },
+    {
+      "name": "Grass Count / Density",
+      "passed": true,
+      "message": "1,115,761 clumps on 1,000,000 m\u00b2 = 1.12/m\u00b2 (requested 1.20/m\u00b2)",
+      "details": []
+    },
+    {
+      "name": "Grass Within Bounds",
+      "passed": true,
+      "message": "All grass within map bounds",
+      "details": []
+    },
+    {
+      "name": "Grass Snapped To Terrain",
+      "passed": true,
+      "message": "All 501 sampled clumps seated on the mesh",
+      "details": []
+    },
+    {
+      "name": "Grass Knee Height",
+      "passed": true,
+      "message": "knee layer = 77% of clumps, avg 49.3 cm (target 50 cm)",
+      "details": []
+    },
+    {
+      "name": "Grass Upscale Factor",
+      "passed": true,
+      "message": "worst upscale 2.34x (HISM_Grass_Knee_Tall_C), limit 2.40x",
+      "details": []
+    },
+    {
+      "name": "Grass Coverage",
+      "passed": true,
+      "message": "144/144 cells of a 12\u00d712 grid covered",
+      "details": []
+    },
+    {
+      "name": "Grass Species Spread",
+      "passed": true,
+      "message": "9 species represented",
+      "details": [
+        "HISM_Grass_Knee_Clump_C: 146,558",
+        "HISM_Grass_Knee_Mid_A: 146,969",
+        "HISM_Grass_Knee_Tall_A: 211,338",
+        "HISM_Grass_Knee_Tall_B: 195,411",
+        "HISM_Grass_Knee_Tall_C: 162,526",
+        "HISM_Grass_Under_Clump_A: 57,107",
+        "HISM_Grass_Under_Large_A: 57,102",
+        "HISM_Grass_Under_Large_B: 65,351",
+        "HISM_Grass_Under_Mid_B: 73,399"
+      ]
+    },
+    {
+      "name": "NPC Count",
+      "passed": true,
+      "message": "10 wanderer(s) placed",
+      "details": []
+    },
+    {
+      "name": "NPC Spawn Band",
+      "passed": true,
+      "message": "76.7-95.0 m from the player start, band 75.0-100.0 m",
+      "details": []
+    },
+    {
+      "name": "NPC Separation",
+      "passed": true,
+      "message": "closest pair (NPC 6, NPC 9) 6.1 m apart (minimum 6.0 m)",
+      "details": []
+    },
+    {
+      "name": "NPC Within Bounds",
+      "passed": true,
+      "message": "all 10 inside +/-40000 cm",
+      "details": []
+    },
+    {
+      "name": "NPC Clear Of Trees",
+      "passed": true,
+      "message": "tightest spawn has 229 cm to the nearest trunk (minimum 220 cm)",
+      "details": []
+    },
+    {
+      "name": "NPC Grounded",
+      "passed": true,
+      "message": "all 10 capsule centres 88 cm above the exact mesh Z",
+      "details": []
+    },
+    {
+      "name": "NPC Route Is Obstructed",
+      "passed": true,
+      "message": "all 10 routes cross at least one trunk \u2014 pathfinding must detour",
+      "details": []
+    },
+    {
+      "name": "Nav Bounds Sane",
+      "passed": true,
+      "message": "+/-50000 cm XY covering +/-50000 cm of terrain, 3600 cm vertical span (terrain -600..2600)",
+      "details": []
+    },
+    {
+      "name": "NPC Inside Nav Bounds",
+      "passed": true,
+      "message": "all 10 stand inside +/-50000 cm XY, feet within -800..2800",
+      "details": []
+    }
+  ]
+}

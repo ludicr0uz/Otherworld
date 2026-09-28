@@ -33,6 +33,8 @@ ASSETS AND PATCHES
   blood             BP_BloodSplash
   ammo_pickup       BP_AmmoPickup
   footsteps         BP_FootstepComponent
+  combat_trace      the combat trace switch: GameMode's CombatTraceOn/Off
+                    console events and CombatTrace's default
 
 BP_HealthComponent (health_component wires the fragments together)
   health_component  variables, defaults, the Tick's death branch

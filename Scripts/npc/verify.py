@@ -20,9 +20,11 @@ from forest_generator.npc_agro import (
     agro_for,
 )
 from forest_generator.npc_placement import NPC_VARIANTS
+from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR
 from npc.paths import (
-    AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, NEXT_PATROL_VAR, PATROL_HOME_VAR,
-    PATROL_READY_VAR, PATROL_TARGET_VAR, RUN_SPEED_VAR,
+    AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
+    NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
+    RUN_SPEED_VAR,
 )
 
 BEL = unreal.BlueprintEditorLibrary
@@ -133,6 +135,7 @@ def check_controller(path, agro):
     nodes = ed.list_all_nodes()
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     check(f"{tag}: the graph compiles clean", not ed.list_nodes_with_errors())
+    check_corpse_and_trace(tag, nodes, cdo)
 
     # --- state, and that it starts patrolling --------------------------------
     kinds = {AGGRO_VAR: bool, PATROL_READY_VAR: bool, AGGRO_REASON_VAR: str,
@@ -238,6 +241,69 @@ def check_controller(path, agro):
                             agro.hearing_scale)) == 2)
     check(f"{tag}: only a noise from the last {COMBAT.noise_hold_s} s is heard",
           len(_with_literal(_titled(nodes, "float <= float"), "B", COMBAT.noise_hold_s)) == 1)
+
+
+def _exec_reach(start):
+    """Every node reachable from ``start`` along exec wires, ``start`` included."""
+    seen, todo = {}, [start]
+    while todo:
+        n = todo.pop()
+        key = n.get_path_name()
+        if key in seen:
+            continue
+        seen[key] = n
+        for pin in BEL.list_output_pins(n):
+            if "exec" not in str(PIN.get_pin_type_display_string(pin)).lower():
+                continue
+            todo += [PIN.get_owning_node(q) for q in PIN.list_connected_pins(pin)]
+    return list(seen.values())
+
+
+def check_corpse_and_trace(tag, nodes, cdo):
+    """npc/corpse.py's state gate and npc/combat_trace.py's melee line."""
+    check(f"{tag}: {CORPSE_VAR} is a bool that starts false",
+          cdo.get_editor_property(CORPSE_VAR) is False)
+    marks = _titled(nodes, f"Set {CORPSE_VAR}")
+    check(f"{tag}: one thing makes it a corpse, and nothing makes it alive",
+          len(marks) == 1 and _lit(marks[0], CORPSE_VAR) == "true",
+          f"{[_lit(n, CORPSE_VAR) for n in marks]}")
+    if len(marks) != 1:
+        return
+    gate = [d for d in _drivers(marks[0]) if _title(d) == "Branch"]
+    check(f"{tag}: ...when its pawn's health component reads Dead",
+          len(gate) == 1 and {_title(f) for f in _feeders(gate[0], "Condition")}
+          == {"Get Dead"})
+    after = _exec_reach(marks[0])
+    check(f"{tag}: a corpse's heartbeat ends -- no Delay, no move, no swing after it",
+          not any(_title(n) == "Delay" or {"Goal"} <= _ins(n) or {"Dest"} <= _ins(n)
+                  or {"SlotNodeName"} <= _ins(n) for n in after),
+          f"{sorted({_title(n) for n in after})}")
+    check(f"{tag}: ...and it stops moving",
+          any(_title(n) == "StopMovement" for n in after),
+          f"{sorted({_title(n) for n in after})}")
+    heads = [n for n in _titled(nodes, "Append") if _lit(n, "A") == CORPSE_LOG_PREFIX]
+    check(f"{tag}: becoming a corpse is logged as '{CORPSE_LOG_PREFIX}<n>'",
+          len(heads) == 1)
+    # The corpse check has to come before everything else the heartbeat does:
+    # the stats/voice fragment must be reached only through it.
+    if gate:
+        cast = [d for d in _drivers(gate[0])]
+        before = [d for c in cast for d in _drivers(c)]
+        check(f"{tag}: it is the first thing checked once there is a pawn",
+              len(before) == 1 and _title(before[0]) == "Branch"
+              and {_title(f) for f in _feeders(before[0], "Condition")} == {"IsValid"},
+              f"{[_title(b) for b in before]}")
+
+    # --- the combat trace ----------------------------------------------------
+    trace_heads = [n for n in _titled(nodes, "Append")
+                   if _lit(n, "A") == f"{COMBAT_TRACE_PREFIX}melee #"]
+    check(f"{tag}: a landed swing can log '{COMBAT_TRACE_PREFIX}melee #<n> ...'",
+          len(trace_heads) == 1)
+    flags = [n for n in nodes if _title(n) == f"Get {COMBAT_TRACE_VAR}"]
+    gated = [b for f in flags for b in _titled(nodes, "Branch")
+             if f in _feeders(b, "Condition")]
+    check(f"{tag}: ...only while the GameMode's {COMBAT_TRACE_VAR} is on",
+          len(flags) == 1 and len(gated) == 1)
 
 
 def run():

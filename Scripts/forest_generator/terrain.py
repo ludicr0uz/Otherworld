@@ -35,6 +35,8 @@ def make_elevation_fn(world_size_cm: float):
     # Scale factors derived from the reference 400 m (40 000 cm) map
     ref = 40_000.0
     s = world_size_cm / ref  # linear scale
+    if world_size_cm > LARGE_MAP_THRESHOLD_CM:
+        return _make_large_elevation_fn(world_size_cm, s)
 
     flat_radius    = 4_500.0 * s
     wave_period    = 3_200.0 * s
@@ -52,6 +54,44 @@ def make_elevation_fn(world_size_cm: float):
                      * wave_amplitude)
         edge_factor = max(0.0, (dist - edge_onset) / edge_ramp)
         return elevation + (edge_factor ** 2) * edge_height
+
+    return elev
+
+
+# Maps wider than 200 m.  Scaling the reference shape linearly breaks twice
+# past that size.  First, the radial edge bowl's corners outgrow what Recast
+# will build a navmesh over (NAV_MAX_VERTICAL_SPAN_CM): 300 m already asks for
+# a 4976 cm band, and 1000 m climbs to ~197 m at the corners.  Second, the
+# hills start at full amplitude right at the flat disk's edge, which leaves a
+# cliff (9.5 m on a 1000 m map).  So past 200 m the hills keep scaling, but
+# they fade in over a blend ring, and the edge is a rim of FIXED size measured
+# by box distance.  Box distance keeps the rim equally tall along the sides and
+# at the corners.  200 m, the largest map built with the bowl, is unchanged.
+LARGE_MAP_THRESHOLD_CM = 20_000.0
+LARGE_WAVE_BLEND_CM = 4_000.0    # hills fade in over this ring past the flat disk
+LARGE_RIM_WIDTH_CM = 6_000.0     # rim rises over the outermost 60 m of each side
+LARGE_RIM_HEIGHT_CM = 2_000.0    # ...to 20 m at the very edge
+LARGE_WAVE_AMPLITUDE_CAP_CM = 600.0   # valleys stay 4 m above WORLD_FLOOR_Z (-1000 cm)
+
+
+def _make_large_elevation_fn(world_size_cm: float, s: float):
+    half = world_size_cm / 2.0
+    flat_radius = 4_500.0 * s
+    wave_period = 3_200.0 * s
+    wave_amplitude = min(380.0 * s, LARGE_WAVE_AMPLITUDE_CAP_CM)
+    rim_onset = half - LARGE_RIM_WIDTH_CM
+
+    def elev(x: float, y: float) -> float:
+        dist = math.hypot(x, y)
+        if dist < flat_radius:
+            return 0.0
+        t = min(1.0, (dist - flat_radius) / LARGE_WAVE_BLEND_CM)
+        blend = t * t * (3.0 - 2.0 * t)          # smoothstep: no cliff, no kink
+        elevation = (math.sin(x / wave_period)
+                     * math.cos(y / wave_period)
+                     * wave_amplitude * blend)
+        rim = max(0.0, (max(abs(x), abs(y)) - rim_onset) / LARGE_RIM_WIDTH_CM)
+        return elevation + (rim ** 2) * LARGE_RIM_HEIGHT_CM
 
     return elev
 

@@ -367,3 +367,12 @@ AUTO_DISPLAYS = ("SMG", "Rifle")
 # safety net must not be a weapon dispenser.
 GUN_DROP_CHANCE = 0.10
 GUN_DROP_FORWARD = 70.0   # cm; clear of the shells, which land on the corpse
+
+
+# --- combat trace --------------------------------------------------------------
+# Whether BP_ThirdPersonGameMode starts with the combat trace on (see
+# COMBAT_TRACE_VAR in game_state.py). Leave it False: the trace is for
+# troubleshooting, and a normal session should not write a line per punch.
+# Turn it on for one session with `ke * CombatTraceOn` in the console, or make it
+# the default by setting this True and re-running build_weapons_and_combat.py.
+COMBAT_TRACE_DEFAULT = False

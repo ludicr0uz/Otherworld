@@ -13,11 +13,11 @@ and it never relies on a variable another section left behind.
   fixtures    shared loaded assets (health, weapon component, characters, ...)
   anim_blueprint  weapons  audio  health  weapon_inputs  install
   player_body  blood  hit_reactions  ragdoll  aiming  settings_and_tuning
-  firing  drops  noise
+  firing  drops  noise  combat_trace
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "audio", "health", "weapon_inputs", "install",
     "player_body", "blood", "hit_reactions", "ragdoll", "aiming",
-    "settings_and_tuning", "firing", "drops", "noise",
+    "settings_and_tuning", "firing", "drops", "noise", "combat_trace",
 )

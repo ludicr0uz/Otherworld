@@ -47,6 +47,7 @@ from combat.audio import (                                        # noqa: E402
     apply_attenuation, build_sound_attenuations, import_sounds,
 )
 from combat.blood import build_blood_splash                       # noqa: E402
+from combat.combat_trace import build_combat_trace_switch         # noqa: E402
 from combat.footsteps import build_footstep_component             # noqa: E402
 from combat.game_state import ensure_game_mode_vars               # noqa: E402
 from combat.graph import BEL, _apply_defaults, _log               # noqa: E402
@@ -97,6 +98,7 @@ def main():
     # Before the health component: its BeginPlay casts to the GameMode, and a
     # cast node only appears in the palette for a class that is already loaded.
     ensure_game_mode_vars()
+    build_combat_trace_switch()
     health_bp = build_health_component()
     footstep_bp = build_footstep_component()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],

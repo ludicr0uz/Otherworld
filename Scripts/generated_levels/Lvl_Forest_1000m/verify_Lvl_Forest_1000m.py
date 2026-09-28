@@ -1,5 +1,5 @@
 """
-Auto-generated Unreal verification script for Lvl_Forest_200m.
+Auto-generated Unreal verification script for Lvl_Forest_1000m.
 Verifies collision, materials, actor presence, tree and grass HISM
 instances (including that grass really is knee high), the NPC and its
 navigation rig, and the time-of-day lighting rig.
@@ -12,14 +12,14 @@ editor_asset_sub = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
 editor_actor_sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 level_editor_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 
-LEVEL_NAME = "Lvl_Forest_200m"
-WORLD_SIZE_CM = 20000.0
-EXPECTED_TREE_COUNT = 136
-EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island_02": 28, "HISM_Tree_Fir_A": 44, "HISM_Tree_Pine_A": 20, "HISM_Tree_Deciduous": 16}
-EXPECTED_GRASS_COUNT = 44368
-EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_Mid_B": 2850, "HISM_Grass_Knee_Tall_B": 7813, "HISM_Grass_Knee_Mid_A": 5862, "HISM_Grass_Knee_Tall_A": 8451, "HISM_Grass_Knee_Clump_C": 5844, "HISM_Grass_Under_Clump_A": 2325, "HISM_Grass_Under_Large_B": 2611, "HISM_Grass_Under_Large_A": 2197}
-EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.24203236572195, 55.19965777829051], "HISM_Grass_Under_Mid_B": [25.50236822702523, 35.99548227179528], "HISM_Grass_Knee_Tall_B": [42.50385457167636, 59.99974280771928], "HISM_Grass_Knee_Mid_A": [40.48063773707256, 50.59822823779188], "HISM_Grass_Knee_Tall_A": [42.50318653697187, 59.99869496378578], "HISM_Grass_Knee_Clump_C": [43.122974101764925, 53.898815809648305], "HISM_Grass_Under_Clump_A": [23.80250827203032, 33.59948519848749], "HISM_Grass_Under_Large_B": [24.651614798889643, 34.79934409277889], "HISM_Grass_Under_Large_A": [22.10593062586047, 31.198874274235948]}
-EXPECTED_NPCS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54, "distance_cm": 7593.07}, {"x": 4241.23, "y": 6260.28, "z": 520.91, "yaw": 235.88, "distance_cm": 7561.69}, {"x": 6982.28, "y": -3337.22, "z": 718.2, "yaw": 154.45, "distance_cm": 7738.82}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1, "distance_cm": 7501.07}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52, "distance_cm": 7746.09}, {"x": -7393.56, "y": 1418.04, "z": 691.28, "yaw": 349.14, "distance_cm": 7528.32}, {"x": -4965.03, "y": -6019.83, "z": 662.55, "yaw": 50.48, "distance_cm": 7803.2}, {"x": -4315.67, "y": -6265.34, "z": 655.45, "yaw": 55.44, "distance_cm": 7607.86}, {"x": 4881.11, "y": -5744.38, "z": 560.93, "yaw": 130.36, "distance_cm": 7538.11}, {"x": 591.33, "y": -7709.05, "z": 636.5, "yaw": 94.39, "distance_cm": 7731.69}]""")
+LEVEL_NAME = "Lvl_Forest_1000m"
+WORLD_SIZE_CM = 100000.0
+EXPECTED_TREE_COUNT = 3400
+EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 700, "HISM_Tree_Leafy_Island_02": 700, "HISM_Tree_Fir_A": 1100, "HISM_Tree_Pine_A": 500, "HISM_Tree_Deciduous": 400}
+EXPECTED_GRASS_COUNT = 1115761
+EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 162526, "HISM_Grass_Under_Mid_B": 73399, "HISM_Grass_Knee_Tall_B": 195411, "HISM_Grass_Knee_Mid_A": 146969, "HISM_Grass_Knee_Tall_A": 211338, "HISM_Grass_Knee_Clump_C": 146558, "HISM_Grass_Under_Clump_A": 57107, "HISM_Grass_Under_Large_B": 65351, "HISM_Grass_Under_Large_A": 57102}
+EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.24006685497192, 55.199893491401276], "HISM_Grass_Under_Mid_B": [25.500140594845533, 35.99955340636545], "HISM_Grass_Knee_Tall_B": [42.50004418637726, 59.9998529540912], "HISM_Grass_Knee_Mid_A": [40.48006467178663, 50.59994909808587], "HISM_Grass_Knee_Tall_A": [42.50012028500365, 59.99984698887548], "HISM_Grass_Knee_Clump_C": [43.12001264538074, 53.89977546867576], "HISM_Grass_Under_Clump_A": [23.80017238514594, 33.59961510198457], "HISM_Grass_Under_Large_B": [24.65018734209176, 34.79986821158218], "HISM_Grass_Under_Large_A": [22.10008810158521, 31.199997158391774]}
+EXPECTED_NPCS = json.loads(r"""[{"x": -2157.65, "y": 7761.17, "z": 88.0, "yaw": 285.54, "distance_cm": 8055.51}, {"x": 4415.19, "y": 6517.06, "z": 88.0, "yaw": 235.88, "distance_cm": 7871.84}, {"x": 8000.93, "y": -3824.09, "z": 88.0, "yaw": 154.45, "distance_cm": 8867.84}, {"x": -8035.34, "y": -244.76, "z": 88.0, "yaw": 1.74, "distance_cm": 8039.07}, {"x": -4049.92, "y": 7352.05, "z": 88.0, "yaw": 298.85, "distance_cm": 8393.72}, {"x": -7535.23, "y": 1445.21, "z": 88.0, "yaw": 349.14, "distance_cm": 7672.57}, {"x": -4895.2, "y": 8142.14, "z": 88.0, "yaw": 301.02, "distance_cm": 9500.39}, {"x": 6676.28, "y": 6003.28, "z": 88.0, "yaw": 221.96, "distance_cm": 8978.43}, {"x": -7872.46, "y": 941.5, "z": 88.0, "yaw": 353.18, "distance_cm": 7928.56}, {"x": 675.29, "y": -8803.66, "z": 88.0, "yaw": 94.39, "distance_cm": 8829.52}]""")
 EXPECTED_NPC_RUN_SPEED = 600.0
 EXPECTED_VARIANTS = json.loads(r"""[{"key": "Zombie", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Zombie", "mesh": "/Game/Sourced/Characters/SKM_Zombie01/SKM_Zombie01", "anim_bp": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Zombie", "health": 100.0, "speed_scale": 1.0, "voices": ["/Game/Audio/A_ZombieGrowl_01", "/Game/Audio/A_ZombieGrowl_02", "/Game/Audio/A_ZombieGrowl_03"]}, {"key": "Wendigo", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Wendigo", "mesh": "/Game/Sourced/Characters/SKM_Wendigo01/SKM_Wendigo01", "anim_bp": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Wendigo", "health": 300.0, "speed_scale": 1.15, "voices": ["/Game/Audio/A_WendigoRoar_01", "/Game/Audio/A_WendigoRoar_02", "/Game/Audio/A_WendigoRoar_03"]}]""")
 # Per-instance {key, rate, speed} -- see
@@ -30,7 +30,7 @@ EXPECTED_MELEE_DAMAGE = 10.0
 EXPECTED_MELEE_INTERVAL = 1.5
 EXPECTED_NAV_AGENT_RADIUS = 35.0
 EXPECTED_REACHABLE_EXTENT = (200.0, 200.0, 400.0)
-EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 10000.0, "center_z_cm": 1905.25, "half_z_cm": 2290.19, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 3995.44}""")
+EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 50000.0, "center_z_cm": 999.88, "half_z_cm": 1799.77, "terrain_min_z_cm": -599.9, "terrain_max_z_cm": 2599.65}""")
 LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 passed = 0

@@ -251,6 +251,9 @@ Then run the printed `import_<Level>.py` (builds the level) and `verify_<Level>.
 Grass transforms do **not** live in the generated script — there are tens of thousands of
 them, so they go to a gitignored `grass_<Level>.json` sidecar the import script reads.
 
+Built so far: `--size 200` (`Lvl_Forest_200m`) and `--size 1000` (`Lvl_Forest_1000m`, see
+*Current state* for what changes above 200 m).
+
 Support package `Scripts/forest_generator/`: `terrain.py` (heightfield + OBJ),
 `tree_placement.py` (`DEFAULT_TREE_SPECS`, scatter), `grass_placement.py`
 (`DEFAULT_GRASS_SPECS`, stratified scatter), `npc_placement.py` (NPC spawn band +
@@ -1002,22 +1005,61 @@ Order and reasons:
 replacement is already out, so the pack is back to strength while the body is still falling:
 
 ```
-GetController -> IsValid? -> DestroyActor(the controller) -> Owner.SetLifeSpan(60)
+GetController -> IsValid? -> SetLifeSpan(the controller, 0.1) -> Owner.SetLifeSpan(60)
 ```
 
-- **The AI controller is destroyed, not stopped.** The chase, the melee and the growls are one
-  self-re-entering loop on the controller and *none of them consult the pawn's health* — a corpse
-  whose controller survived would keep hitting the player from the floor. Destroying an
-  `AController` unpossesses it on the way out, and it leaves nothing to leak one controller per
-  kill over a session. `UnPossess` alone would close the loop's possession gate too, but that
-  controller would sit there running its `Delay` for the rest of the game.
-- **`SetLifeSpan`, not a `Delay`.** A latent action here belongs to the component of the actor it
-  is waiting to destroy; `SetLifeSpan` is the engine's own timer for exactly this.
+- **Dead is a monster state, checked by the monster.** A wanderer has three states: patrol
+  (`Aggro` false), hunt (`Aggro` true) and **corpse** (`Corpse` true, `npc/corpse.py`). The
+  controller's heartbeat checks the pawn's `BP_HealthComponent.Dead` before anything else, on
+  every pass. A dead pawn gets `Corpse = true`, `StopMovement`, one `[NPC-CORPSE] #<n> ...` log
+  line, and **no Delay**, so the loop ends: no stats, voice, patrol, chase or swing after that.
+- **Never `DestroyActor` a controller from Blueprint: it is a no-op.** `AController::K2_DestroyActor`
+  is overridden with an empty body in the engine ("disallow destroying controller from
+  Blueprints", `Controller.cpp`). This graph used to do exactly that, and the verifier passed on
+  the node existing. Every corpse kept its controller and its chase-and-swing loop. Movement was
+  disabled, but the melee is a distance check from the capsule, and the ragdoll rolls away from
+  the capsule, so a player standing where a wanderer died was killed by nothing visible.
+  **Measured in PIE:** before the fix, a dead zombie's controller was still possessing it 20 s
+  later. After it, the controller was gone at the next check, and a corpse held 1.2 m from the
+  player for 10 s never swung. The controller now gets `CONTROLLER_RETIRE_SECONDS` (0.1) of
+  lifespan instead: an expiring lifespan calls the C++ `Destroy()`, which the override doesn't
+  block. The corpse state above does not depend on this.
+- **`SetLifeSpan`, not a `Delay`,** for the body. A latent action here belongs to the component
+  of the actor it is waiting to destroy.
 - **`GetController`, not the `Controller` member.** `APawn::Controller` is not
   `BlueprintReadOnly`: a get-variable node for it compiles as a warning today and an error in a
   future release.
 - The HUD's floating health bar is gated on `NOT Dead` as well as on recency — a corpse was shot
   a moment ago by definition, so without that every body wears an empty bar for five seconds.
+
+### The combat trace: who hit you, from where
+
+Off by default. In the game's console (`` ` ``): **`ke * CombatTraceOn`** / **`ke * CombatTraceOff`**.
+It prints `[COMBAT-TRACE] on/off` on screen to confirm. To have it on from the start, set
+`COMBAT_TRACE_DEFAULT = True` in `Scripts/combat/tuning.py` and re-run `build_weapons_and_combat.py`.
+While on, every wanderer swing that lands writes one log line (never on screen):
+
+```
+[COMBAT-TRACE] melee #3 Lvl_Forest_200m_NPC_Wanderer_Zombie_2 (hp 100.0, dead false) at X=3134.335 Y=6888.532 Z=521.395 -> target BP_ThirdPersonCharacter0 at X=... Y=... Z=... dist 69.4 cm, dmg 10.0, target hp 60.0
+```
+
+`#3` is the wanderer's `NpcId`, the same number as its `[NPC-SPAWN]` line and its debug-mode
+health bar. The attacker's own hp and `Dead` flag are in the line because the bug it was written
+for was a corpse still swinging. `grep COMBAT-TRACE` the editor log
+(`~/Library/Logs/Unreal Engine/OtherworldEditor/Otherworld.log`).
+
+- The flag is `CombatTrace` on `BP_ThirdPersonGameMode` (`combat/game_state.py`).
+  `combat/combat_trace.py` authors the two console events and **owns the GameMode's EventGraph**
+  (it wipes it each build; nothing else puts nodes there). `npc/combat_trace.py` writes the
+  line from the melee.
+- `ke *` calls the named function on every object in the world that has it, and only the
+  GameMode does. It works in PIE and in development builds. A shipping build strips console
+  commands.
+- The level verifier's "No Leftover Debug PrintStrings In The AI Graph" check allows exactly the
+  `[COMBAT-TRACE]` and `[NPC-CORPSE]` lines, found by the literal each line's text starts with.
+  Anything else is still a failure.
+- **Known, unfixed:** a wanderer can land one more swing on a player who is already at 0 HP
+  (seen as a second `target hp 0.0` line), because the melee does not check the target's `Dead`.
 
 ### The player's death
 
@@ -1722,9 +1764,26 @@ centred and bottom-anchored at any window size.
   moon light 0.12 lux, emissive starfield sky dome as the ambient light source.
   Offline 28/28 and in-engine **148/148** checks pass. The `NavMeshBoundsVolume` now covers
   the whole map: ±10000 cm XY, a 4580 cm vertical band centred at z 1905.
-- **Known pre-existing bug:** `scatter_trees` does no minimum-spacing rejection, so some
-  size/seed combinations fail the `Tree Spacing (>100cm)` check (e.g. `--size 300` with the
-  default seed 42 gives a 70 cm pair). 200 m/seed 42 and 300 m/seed 99 pass. Unfixed.
+- `scatter_trees` re-draws any trunk within `MIN_TREE_SPACING_CM` (150) of another, and
+  the offline `Tree Spacing` check now compares every nearby pair through a spatial hash
+  (it used to compare list neighbours only). 200/300/400/600/1000 m at seed 42 all pass 28/28.
+- **`/Game/Maps/Lvl_Forest_1000m`** (`--size 1000`, night, seed 42): 3,400 trees, 1,115,761
+  grass clumps, ten NPCs at 76.7–95.0 m. Offline 28/28, in-engine **172/172**. The `.umap` is
+  161 MB, mostly grass. The import takes ~1 min in a live editor, 9 s of it grass, because
+  grass now goes in through batched `add_instances`. `uepy.py` reports "the editor stopped
+  responding" on a job that long: its heartbeat check sees the editor blocked. The job
+  keeps running, so read the editor log (`~/Library/Logs/Unreal Engine/OtherworldEditor/`).
+  - **Terrain past 200 m is a different shape** (`terrain._make_large_elevation_fn`). The
+    radial bowl's corners outgrow the navmesh's Z limit from 300 m up (197 m tall at
+    1000 m). Past 200 m the hills fade in over a 40 m ring (no cliff at the spawn disk),
+    stay under 6 m, and the edge is a fixed 60 m-wide, 20 m-tall rim on box distance.
+    The 1000 m band is −600..2600 cm. The 200 m map's formula is unchanged.
+  - **The navmesh covers all ±50000 cm** (`NAV_MAX_HALF_XY_CM` 10000 → 50000). Measured in
+    a live editor: `RebuildNavigation` built it in 10 s, and 401/401 probe points (out to
+    490 m on every side, 480 m on the diagonals) project onto it. At runtime (`-game`) the
+    10,404 tiles build nearest-first, so everything within ~100 m (the whole spawn band) is
+    ready at 7.8 s, 150 m at 17 s, and the whole map at ~2 min. Zero `not on navmesh`.
+    Probe with the terrain's exact Z, not a downward line trace, which lands on tree canopies.
 - The pack **runs**: measured in a `-game` run, all of them closed 75 m in ~15 s
   (`max_walk_speed` 600) and then landed melee hits. Time from level start to the player's
   death line is 18.0 s with five and 16.8 s with ten — the approach dominates, because a

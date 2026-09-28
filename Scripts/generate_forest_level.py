@@ -920,6 +920,10 @@ def _write_unreal_import_script(
                         f"[GEN] {{spec_name}} has unusable bounds height "
                         f"{{mesh_height}}; falling back to scale 1.0")
 
+                # One add_instances call per chunk, not one add_instance per
+                # clump: a 1000 m map has over a million, and each single add
+                # is a separate round trip into the HISM.
+                batch = []
                 for inst in instances:
                     _, gx, gy, gz, yaw, pitch, roll, h_mul, w_mul, target_h = inst
                     if mesh_height > 1.0:
@@ -927,13 +931,18 @@ def _write_unreal_import_script(
                         s_xy = (target_h / max(h_mul, 1e-3)) / mesh_height * w_mul
                     else:
                         s_z, s_xy = 1.0, 1.0
-                    tf = unreal.Transform(
+                    batch.append(unreal.Transform(
                         location=unreal.Vector(gx, gy, gz),
                         rotation=unreal.Rotator(pitch=pitch, yaw=yaw, roll=roll),
                         scale=unreal.Vector(s_xy, s_xy, s_z),
-                    )
-                    comp.add_instance(tf)
-                    total_grass += 1
+                    ))
+                    if len(batch) >= 50000:
+                        comp.add_instances(batch, False, True, False)
+                        total_grass += len(batch)
+                        batch = []
+                if batch:
+                    comp.add_instances(batch, False, True, False)
+                    total_grass += len(batch)
 
                 unreal.log_warning(
                     f"[GEN]    {{spec_name}}: {{len(instances)}} clumps "
@@ -1623,11 +1632,25 @@ def _write_unreal_verify_script(
                       ed is not None and not ed.list_nodes_with_errors())
                 # Debugging the chase means splicing PrintStrings into this
                 # graph (it is the only way to see what the AI is measuring),
-                # so guard against one being left behind.
-                check("No Leftover Debug PrintStrings In The AI Graph",
-                      not [n for n in nodes
-                           if "PrintString" in
-                           " ".join(str(BEL.get_node_title(n)).split())])
+                # so guard against one being left behind. Two are meant to be
+                # there -- the combat trace and the corpse state's one line --
+                # and each is told apart by the literal its text starts with.
+                def _line_head(n):
+                    pin = BEL.find_input_pin(n, "InString")
+                    for _ in range(40):
+                        fed = unreal.BlueprintGraphPinLibrary.list_connected_pins(pin)
+                        if not fed:
+                            return str(unreal.BlueprintGraphPinLibrary.get_pin_value(pin))
+                        pin = BEL.find_input_pin(
+                            unreal.BlueprintGraphPinLibrary.get_owning_node(fed[0]), "A")
+                        if pin is None:
+                            return ""
+                    return ""
+                stray = [n for n in nodes
+                         if "PrintString" in " ".join(str(BEL.get_node_title(n)).split())
+                         and not _line_head(n).startswith(("[COMBAT-TRACE]", "[NPC-CORPSE]"))]
+                check("No Leftover Debug PrintStrings In The AI Graph", not stray,
+                      f"({{len(stray)}} unexplained)")
                 # A controller's BeginPlay runs before it possesses anything,
                 # so the first pass through the chase loop has no pawn: the
                 # melee chain then reads a location off None and the VM logs an

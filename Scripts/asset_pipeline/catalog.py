@@ -104,7 +104,7 @@ MONSTERS = (
 #
 # Two things the prompt does NOT ask for, both for reasons of where the camera
 # is.  No backpack: the boom sits 260 cm behind and 55 cm right of the player
-# (CAMERA_SHOULDER in build_weapons_and_combat.py), so anything on the upper
+# (CAMERA_SHOULDER in combat/camera.py), so anything on the upper
 # back is drawn across the middle of the screen at all times.  And no long
 # coat or cloak: Meshy skins loose geometry to the nearest bone, so a hem hangs
 # off the thighs and scissors open on every stride.

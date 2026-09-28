@@ -1,0 +1,150 @@
+"""verify.settings_and_tuning -- BP_Settings (what survives a restart) and the CombatConfig being the
+only home of the global numbers.
+"""
+
+import dataclasses
+
+import unreal
+
+from combat.paths import SETTINGS_BP_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX
+from combat.tuning import BIND_VARS, COMBAT, CombatConfig
+from combat.verify.fixtures import w, wc_cdo, wg
+from combat.verify.common import BEL, builder_modules, cdo, check, load, titled
+
+
+# ─── BP_Settings: what survives a restart ────────────────────────────────────
+
+def check_settings_savegame():
+    # Built here rather than in build_graphics_menu.py so that both consumers -- the
+    # weapon component's defaults and the HUD's settings screen -- can name the
+    # class without a build-order cycle. Nothing in this file reads it at runtime;
+    # the HUD pushes its values onto the component every DrawHUD frame.
+    sg = load(SETTINGS_BP_PATH)
+    check("BP_Settings exists", sg is not None, SETTINGS_BP_PATH)
+    if sg:
+        check("...and is a USaveGame, so it can be written to a slot",
+              BEL.get_blueprint_parent_class(sg) == unreal.SaveGame.static_class(),
+              str(BEL.get_blueprint_parent_class(sg)))
+        sg_cdo = cdo(sg)
+        check("...carrying a mouse sensitivity that is a float, not an int",
+              isinstance(sg_cdo.get_editor_property("MouseSensitivity"), float),
+              type(sg_cdo.get_editor_property("MouseSensitivity")).__name__)
+        check(f"...defaulting to {COMBAT.mouse_sensitivity_default}",
+              abs(sg_cdo.get_editor_property("MouseSensitivity")
+                  - COMBAT.mouse_sensitivity_default) < 1e-6,
+              repr(sg_cdo.get_editor_property("MouseSensitivity")))
+        stored = list(sg_cdo.get_editor_property("Binds"))
+        check(f"...and {len(BIND_VARS)} binds, one per rebindable action",
+              len(stored) == len(BIND_VARS), str(len(stored)))
+        # Index-for-index against BIND_VARS, because Binds is indexed and not
+        # keyed: the settings screen writes Binds[row - 1] and the HUD pushes
+        # Binds[i] into BIND_VARS[i], so a reordering here silently rebinds every
+        # save already on disk.
+        check("...in the same order BIND_VARS names them",
+              [k.export_text() for k in stored] == [d for _v, d in BIND_VARS],
+              str([k.export_text() for k in stored]))
+        check("the slot it is written to is named and single",
+              bool(SETTINGS_SLOT) and SETTINGS_USER_INDEX == 0,
+              f"{SETTINGS_SLOT!r} / user {SETTINGS_USER_INDEX}")
+        # The requirement, exercised rather than inspected: a BP_Settings written
+        # to a slot has to come back off the disk with its FKey array intact. An
+        # FKey is a struct with no Python-visible fields, so "it compiles" says
+        # nothing about whether it serialises -- this is the only check here that
+        # writes a file and reads it back.
+        probe_slot = f"{SETTINGS_SLOT}Probe"
+        made = unreal.GameplayStatics.create_save_game_object(
+            BEL.generated_class(sg))
+        wrote = unreal.GameplayStatics.save_game_to_slot(made, probe_slot, 0)
+        read = unreal.GameplayStatics.load_game_from_slot(probe_slot, 0)
+        check("a BP_Settings survives a write to a slot and a read back",
+              wrote and read is not None
+              and [k.export_text() for k in read.get_editor_property("Binds")]
+              == [d for _v, d in BIND_VARS]
+              and abs(read.get_editor_property("MouseSensitivity")
+                      - COMBAT.mouse_sensitivity_default) < 1e-6,
+              f"wrote={wrote}")
+        unreal.GameplayStatics.delete_game_in_slot(probe_slot, 0)
+
+    for var, _default in BIND_VARS:
+        check(f"{var} is an FKey on the component, not a string",
+              isinstance(w.get_editor_property(var), unreal.Key),
+              type(w.get_editor_property(var)).__name__)
+
+    check("the engine's pitch scale is negative, so it MUST be cached not written",
+          wc_cdo.get_editor_property("BasePitchScale") < 0.0,
+          repr(wc_cdo.get_editor_property("BasePitchScale")))
+    check("...and the yaw scale positive",
+          wc_cdo.get_editor_property("BaseYawScale") > 0.0,
+          repr(wc_cdo.get_editor_property("BaseYawScale")))
+    scale_reads = {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg}
+    for label, want in (("yaw", "Set Deprecated Input Yaw Scale"),
+                        ("pitch", "Set Deprecated Input Pitch Scale")):
+        hits = [t for t in scale_reads if t.replace(" ", "")
+                == want.replace(" ", "")]
+        check(f"the {label} look scale is written every frame", bool(hits), want)
+    for label, want in (("yaw", "Get Deprecated Input Yaw Scale"),
+                        ("pitch", "Get Deprecated Input Pitch Scale")):
+        hits = [t for t in scale_reads if t.replace(" ", "")
+                == want.replace(" ", "")]
+        check(f"...from a {label} base READ off the controller, not a literal",
+              bool(hits), want)
+    check("the slowdown is driven off the zoom, not off the Aiming flag -- so it "
+          "eases in and is stronger on the scope",
+          bool(titled(wg, "Lerp")) and 0.0 < COMBAT.ads_sens_compensation <= 1.0,
+          f"Lerp(1, CurrentFOV/BaseFOV, {COMBAT.ads_sens_compensation})")
+    # The numbers the player actually feels, spelled out so a change to either
+    # constant has to be argued for rather than noticed later.
+    for name, zoom, want in (("irons", COMBAT.ads_zoom_irons, 0.75),
+                             ("scope", COMBAT.ads_zoom_scope, 0.4375)):
+        got = 1.0 + COMBAT.ads_sens_compensation * (1.0 / zoom - 1.0)
+        check(f"...which works out at {want:.2f}x sensitivity down the {name}",
+              abs(got - want) < 5e-3, f"{got:.4f}")
+
+
+# ─── The combat config ───────────────────────────────────────────────────────
+
+def check_combat_config():
+    # The ask was for a named, tunable home for the global combat parameters, with
+    # more to follow. What can go wrong quietly is that it becomes a SECOND home --
+    # the structure exists, a builder still reads a leftover module constant, and
+    # the two disagree until somebody tunes the one that is not wired up.
+
+    check("the global combat tuning lives in one named structure",
+          dataclasses.is_dataclass(CombatConfig)
+          and isinstance(COMBAT, CombatConfig),
+          type(COMBAT).__name__)
+    check("...frozen, so no builder can rewrite a value the verifier then asserts",
+          CombatConfig.__dataclass_params__.frozen)
+    knobs = {f.name for f in dataclasses.fields(COMBAT)}
+    check("...holding every global knob: lethality, sprint, ADS, look, recoil",
+          knobs >= {"start_health", "head_multiplier", "limb_multiplier",
+                    "sprint_speed_cms", "max_stamina", "stamina_drain_per_s",
+                    "stamina_regen_per_s", "ads_zoom_irons", "ads_zoom_scope",
+                    "ads_interp_speed", "ads_spread_scale",
+                    "mouse_sensitivity_default", "mouse_sensitivity_min",
+                    "mouse_sensitivity_max", "mouse_sensitivity_step",
+                    "ads_sens_compensation", "ads_move_speed_scale",
+                    "recoil_recovery_speed",
+                    "recoil_recovery_fraction", "recoil_ads_scale",
+                    "recoil_horizontal_ratio"},
+          str(sorted(knobs)))
+    stale = [n for n in ("START_HEALTH", "HEAD_MULTIPLIER", "LIMB_MULTIPLIER",
+                         "SPRINT_SPEED_CMS", "MAX_STAMINA", "STAMINA_DRAIN_PER_S",
+                         "STAMINA_REGEN_PER_S", "ADS_ZOOM_IRONS", "ADS_ZOOM_SCOPE",
+                         "ADS_INTERP_SPEED", "ADS_SPREAD_SCALE",
+                         "ADS_SENS_COMPENSATION", "MOUSE_SENSITIVITY_DEFAULT",
+                         "MOUSE_SENSITIVITY_MIN", "MOUSE_SENSITIVITY_MAX",
+                         "MOUSE_SENSITIVITY_STEP")
+             if any(hasattr(m, n) for m in builder_modules())]
+    check("...and it is the ONLY home -- every loose constant it replaced is gone, "
+          "so nothing can read a stale second copy", not stale, str(stale))
+    # Per-weapon numbers must NOT have been swept into it: that would undo the
+    # "a sixth weapon is a row in a table" property the whole file is built on.
+    check("per-weapon numbers stayed on the weapon table",
+          not (knobs & {"damage", "spread", "recoil", "interval", "magazine"}),
+          str(sorted(knobs)))
+
+
+def run():
+    check_settings_savegame()
+    check_combat_config()

@@ -72,10 +72,11 @@ import unreal
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # The one import between two builders in Scripts/, and it buys a contract this
 # file cannot keep on its own: BIND_VARS fixes which index of BP_Settings.Binds
-# means which action, and the three sensitivity limits on W.COMBAT have to be
-# the same ones BP_WeaponComponent's CDO default sits inside. Copied instead, the
+# means which action, and the three sensitivity limits on COMBAT have to be the
+# same ones BP_WeaponComponent's CDO default sits inside. Copied instead, the
 # two would drift and the symptom would be a save file that rebinds itself.
-import build_weapons_and_combat as W                               # noqa: E402
+from combat import paths as combat_paths                           # noqa: E402
+from combat import tuning as combat_tuning                         # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -266,13 +267,13 @@ GAME_STARTED_VAR = "GameStarted"
 # build_weapons_and_combat.py, which runs first. This file is the only thing
 # that reads or writes the save; BP_WeaponComponent is PUSHED the values every
 # DrawHUD frame and never learns that a disk exists.
-SETTINGS_CLASS_PATH = W.SETTINGS_CLASS_PATH
-SETTINGS_SLOT = W.SETTINGS_SLOT
-SETTINGS_USER_INDEX = W.SETTINGS_USER_INDEX
-BIND_VARS = W.BIND_VARS
-MOUSE_SENSITIVITY_MIN = W.COMBAT.mouse_sensitivity_min
-MOUSE_SENSITIVITY_MAX = W.COMBAT.mouse_sensitivity_max
-MOUSE_SENSITIVITY_STEP = W.COMBAT.mouse_sensitivity_step
+SETTINGS_CLASS_PATH = combat_paths.SETTINGS_CLASS_PATH
+SETTINGS_SLOT = combat_paths.SETTINGS_SLOT
+SETTINGS_USER_INDEX = combat_paths.SETTINGS_USER_INDEX
+BIND_VARS = combat_tuning.BIND_VARS
+MOUSE_SENSITIVITY_MIN = combat_tuning.COMBAT.mouse_sensitivity_min
+MOUSE_SENSITIVITY_MAX = combat_tuning.COMBAT.mouse_sensitivity_max
+MOUSE_SENSITIVITY_STEP = combat_tuning.COMBAT.mouse_sensitivity_step
 
 PAGE_TITLE = 0
 PAGE_SETTINGS = 1
@@ -754,9 +755,9 @@ def _ensure_variables(ed, bp):
     # The loaded save. Typed as BP_Settings rather than as SaveGame so the page
     # can read MouseSensitivity and Binds off it without a cast per read; the
     # one cast is at BeginPlay, where LoadGameFromSlot hands back a USaveGame.
-    settings_class = _asset_sub().load_asset(W.SETTINGS_BP_PATH)
+    settings_class = _asset_sub().load_asset(combat_paths.SETTINGS_BP_PATH)
     if not settings_class:
-        raise RuntimeError(f"{W.SETTINGS_BP_PATH} must be built first "
+        raise RuntimeError(f"{combat_paths.SETTINGS_BP_PATH} must be built first "
                            "(build_weapons_and_combat.py)")
     for name, pin_type in (
             ("Settings", BEL.get_object_reference_type(

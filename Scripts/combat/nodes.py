@@ -1,0 +1,181 @@
+"""Function paths (FN_*), palette node names (NODE_*) and macros used when
+authoring graphs. Constants only.
+"""
+
+
+
+# ─── Graph node paths ────────────────────────────────────────────────────────
+
+FN_GET_OWNER = "/Script/Engine.ActorComponent.GetOwner"
+FN_GET_PC = "/Script/Engine.GameplayStatics.GetPlayerController"
+FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
+FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
+# Held, not tapped: sprint is a state for as long as the key is down, so it is
+# the one polled key in this file that cannot use WasInputKeyJustPressed.
+FN_IS_KEY_DOWN = "/Script/Engine.PlayerController.IsInputKeyDown"
+FN_GET_CAM = "/Script/Engine.GameplayStatics.GetPlayerCameraManager"
+FN_CAM_LOC = "/Script/Engine.PlayerCameraManager.GetCameraLocation"
+FN_CAM_ROT = "/Script/Engine.PlayerCameraManager.GetCameraRotation"
+FN_FORWARD = "/Script/Engine.KismetMathLibrary.GetForwardVector"
+FN_RAND_CONE = "/Script/Engine.KismetMathLibrary.RandomUnitVectorInConeInRadians"
+FN_TRACE = "/Script/Engine.KismetSystemLibrary.LineTraceSingle"
+FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
+FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
+# A class reference is a different pin category from an object reference, so
+# IsValid refuses to connect to one; IsValidClass is the class-pin twin.
+FN_IS_VALID_CLASS = "/Script/Engine.KismetSystemLibrary.IsValidClass"
+FN_TRANSFORM_LOC = "/Script/Engine.KismetMathLibrary.TransformLocation"
+FN_GET_TRANSFORM = "/Script/Engine.Actor.GetTransform"
+FN_ACTOR_LOC = "/Script/Engine.Actor.K2_GetActorLocation"
+FN_MAKE_TRANSFORM = "/Script/Engine.KismetMathLibrary.MakeTransform"
+FN_MAKE_VECTOR = "/Script/Engine.KismetMathLibrary.MakeVector"
+FN_BREAK_VECTOR = "/Script/Engine.KismetMathLibrary.BreakVector"
+FN_GET_GAME_MODE = "/Script/Engine.GameplayStatics.GetGameMode"
+FN_PRINT = "/Script/Engine.KismetSystemLibrary.PrintString"
+FN_WARN = "/Script/Engine.KismetSystemLibrary.PrintWarning"
+FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
+FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
+FN_VEC_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_VectorToString"
+FN_NORMAL = "/Script/Engine.KismetMathLibrary.Normal"
+FN_DEG2RAD = "/Script/Engine.KismetMathLibrary.DegreesToRadians"
+FN_PLAY_SOUND = "/Script/Engine.GameplayStatics.PlaySoundAtLocation"
+FN_OBJECT_CLASS = "/Script/Engine.GameplayStatics.GetObjectClass"
+FN_ATTACH = "/Script/Engine.Actor.K2_AttachToComponent"
+FN_DETACH = "/Script/Engine.Actor.K2_DetachFromActor"
+FN_SET_HIDDEN = "/Script/Engine.Actor.SetActorHiddenInGame"
+FN_SET_ACTOR_LOC = "/Script/Engine.Actor.K2_SetActorLocation"
+FN_SET_REL_LOC = "/Script/Engine.Actor.K2_SetActorRelativeLocation"
+FN_SET_REL_ROT = "/Script/Engine.Actor.K2_SetActorRelativeRotation"
+FN_SET_SCALE = "/Script/Engine.Actor.SetActorScale3D"
+FN_DESTROY = "/Script/Engine.Actor.K2_DestroyActor"
+FN_LIFESPAN = "/Script/Engine.Actor.SetLifeSpan"
+FN_ALL_ACTORS = "/Script/Engine.GameplayStatics.GetAllActorsOfClass"
+FN_ANIM_INSTANCE = "/Script/Engine.SkeletalMeshComponent.GetAnimInstance"
+FN_PLAY_SLOT = "/Script/Engine.AnimInstance.PlaySlotAnimationAsDynamicMontage"
+FN_STOP_SLOT = "/Script/Engine.AnimInstance.StopSlotAnimation"
+FN_RANDOM_NAV = ("/Script/NavigationSystem.NavigationSystemV1"
+                 ".K2_GetRandomLocationInNavigableRadius")
+FN_PROJECT_NAV = ("/Script/NavigationSystem.NavigationSystemV1"
+                  ".K2_ProjectPointToNavigation")
+
+FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
+FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
+FN_ARR_REMOVE = "/Script/Engine.KismetArrayLibrary.Array_Remove"
+FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
+
+FN_ADD_VV = "/Script/Engine.KismetMathLibrary.Add_VectorVector"
+FN_SUB_VV = "/Script/Engine.KismetMathLibrary.Subtract_VectorVector"
+FN_MUL_VF = "/Script/Engine.KismetMathLibrary.Multiply_VectorFloat"
+FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
+FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
+FN_MOD_II = "/Script/Engine.KismetMathLibrary.Percent_IntInt"
+FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
+FN_LESS_II = "/Script/Engine.KismetMathLibrary.Less_IntInt"
+FN_GREATER_II = "/Script/Engine.KismetMathLibrary.Greater_IntInt"
+FN_MIN_II = "/Script/Engine.KismetMathLibrary.Min"
+FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
+FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
+FN_ADD_FF = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
+FN_SUB_FF = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
+FN_LE_FF = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
+FN_LESS_FF = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
+FN_GREATER_FF = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
+FN_GE_FF = "/Script/Engine.KismetMathLibrary.GreaterEqual_DoubleDouble"
+# The ground test. UCharacterMovementComponent::IsMovingOnGround and ::IsFalling
+# are both virtual C++ and neither is BlueprintCallable -- measured, all three
+# spellings return a pinless node. Character::CanJump is, and it is a real
+# feet-on-the-ground query rather than a coincidence: CanJumpInternal requires
+# the movement mode to be walking. It is a PROXY, and the way it could be wrong
+# is if something ever disables jumping on an owner, which would silence that
+# owner's footsteps. Nothing does.
+FN_ON_GROUND = "/Script/Engine.Character.CanJump"
+FN_GET_VELOCITY = "/Script/Engine.Actor.GetVelocity"
+FN_VSIZE_XY = "/Script/Engine.KismetMathLibrary.VSizeXY"
+FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
+FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
+FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
+FN_RAND_INT = "/Script/Engine.KismetMathLibrary.RandomIntegerInRange"
+FN_NEQ_BB = "/Script/Engine.KismetMathLibrary.NotEqual_BoolBool"
+FN_MAKE_ROT = "/Script/Engine.KismetMathLibrary.MakeRotator"
+FN_MUL_FF = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
+FN_SELECT_FF = "/Script/Engine.KismetMathLibrary.SelectFloat"
+FN_DIV_FF = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
+FN_INTERP_FF = "/Script/Engine.KismetMathLibrary.FInterpTo"
+FN_NOT_B = "/Script/Engine.KismetMathLibrary.Not_PreBool"
+FN_SET_FOV = "/Script/Engine.CameraComponent.SetFieldOfView"
+FN_GET_YAW_SCALE = "/Script/Engine.PlayerController.GetDeprecatedInputYawScale"
+FN_GET_PITCH_SCALE = "/Script/Engine.PlayerController.GetDeprecatedInputPitchScale"
+FN_SET_YAW_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputYawScale"
+FN_SET_PITCH_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputPitchScale"
+FN_LERP = "/Script/Engine.KismetMathLibrary.Lerp"
+# Recoil moves the view through the CONTROLLER's rotation, not through
+# AddPitchInput: see COMBAT's recoil block for why routing it through
+# RotationInput would make the kick scale with the sensitivity slider.
+FN_GET_CONTROL_ROT = "/Script/Engine.Controller.GetControlRotation"
+FN_SET_CONTROL_ROT = "/Script/Engine.Controller.SetControlRotation"
+FN_BREAK_ROT = "/Script/Engine.KismetMathLibrary.BreakRotator"
+FN_ABS = "/Script/Engine.KismetMathLibrary.Abs"
+# "Is anything playing in this slot right now?" -- pure, one Name in, one bool
+# out. It is what lets the ready pose notice that a hit reaction took the
+# montage group off it, and put itself back the frame the flinch ends.
+FN_IS_SLOT_ACTIVE = "/Script/Engine.AnimInstance.IsSlotActive"
+# The hit-direction pick. Dot_VectorVector against the owner's own forward and
+# right is what turns "where the round came from" into one of four clips
+# without a single angle or a single trigonometric function.
+FN_DOT_VV = "/Script/Engine.KismetMathLibrary.Dot_VectorVector"
+FN_ACTOR_RIGHT = "/Script/Engine.Actor.GetActorRightVector"
+# Integer clamp, not FClamp: the reaction index is an array index, and an array
+# shorter than HIT_REACTION_CLIPS (a checkout whose retarget has not run) must
+# clip to the last entry rather than read off the end.
+FN_CLAMP_II = "/Script/Engine.KismetMathLibrary.Clamp"
+CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
+MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
+FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
+FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
+FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
+FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
+FN_DISABLE_MOVEMENT = "/Script/Engine.CharacterMovementComponent.DisableMovement"
+FN_SET_COLLISION = "/Script/Engine.PrimitiveComponent.SetCollisionEnabled"
+FN_GET_CONTROLLER = "/Script/Engine.Pawn.GetController"
+FN_SET_PROFILE = "/Script/Engine.PrimitiveComponent.SetCollisionProfileName"
+# Every body in the physics asset, not the component's one root body --
+# see RAGDOLL_PROFILE. SkeletalMeshComponent has no SetSimulatePhysics
+# UFunction at all, so there is no node to reach for by mistake.
+FN_SIMULATE_ALL = ("/Script/Engine.SkeletalMeshComponent"
+                   ".SetAllBodiesSimulatePhysics")
+FN_SIN = "/Script/Engine.KismetMathLibrary.Sin"
+FN_ROT_FROM_X = "/Script/Engine.KismetMathLibrary.MakeRotFromX"
+FN_EXP = "/Script/Engine.KismetMathLibrary.Exp"
+FN_INV_XFORM_DIR = "/Script/Engine.KismetMathLibrary.InverseTransformDirection"
+FN_BREAK_TRANSFORM = "/Script/Engine.KismetMathLibrary.BreakTransform"
+FN_GET_COMPONENTS = "/Script/Engine.Actor.K2_GetComponentsByClass"
+# Component-space, not the Actor.* pair above it: the droplets move relative to
+# the burst, and the actor itself never moves after the frame it spawns.
+FN_COMP_REL_XFORM = "/Script/Engine.SceneComponent.GetRelativeTransform"
+FN_COMP_SET_REL_LOC = "/Script/Engine.SceneComponent.K2_SetRelativeLocation"
+FN_COMP_SET_SCALE = "/Script/Engine.SceneComponent.SetRelativeScale3D"
+FN_SET_ACTOR_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
+FN_ACTOR_FORWARD = "/Script/Engine.Actor.GetActorForwardVector"
+FN_DRAW_LINE = "/Script/Engine.KismetSystemLibrary.DrawDebugLine"
+FN_ADD_LOCAL_ROT = "/Script/Engine.Actor.K2_AddActorLocalRotation"
+FN_DRAW_STRING = "/Script/Engine.KismetSystemLibrary.DrawDebugString"
+FN_FLOAT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_DoubleToString"
+# Only the temporary hit-reaction probe uses this; see HIT_REACT_PROBE.
+FN_DISPLAY_NAME = "/Script/Engine.KismetSystemLibrary.GetDisplayName"
+FN_TRACE_COMPONENT = "/Script/Engine.PrimitiveComponent.K2_LineTraceComponent"
+FN_ARR_CONTAINS = "/Script/Engine.KismetArrayLibrary.Array_Contains"
+
+NODE_TICK = "AddEvent|EventTick"
+NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
+NODE_BREAK_HIT = "Collision|BreakHitResult"
+NODE_SPAWN = "Game|SpawnActorfromClass"
+NODE_CAST_CHAR = "Utilities|Casting|CastToBP_ThirdPersonCharacter"
+NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
+NODE_CAST_PAWN = "Utilities|Casting|CastToPawn"
+NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
+NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
+NODE_CAST_ITEM = "Utilities|Casting|CastToBP_WeaponItem"
+MACRO_FOR_LOOP = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForLoop"
+MACRO_FOR_EACH = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForEachLoop"
+
+INF = 1.0e9

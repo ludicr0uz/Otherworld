@@ -192,7 +192,7 @@ FN_SUB_VV = "/Script/Engine.KismetMathLibrary.Subtract_VectorVector"
 FN_NORMAL = "/Script/Engine.KismetMathLibrary.Normal"
 
 # Where the creature voices and the impact sounds are imported to, by
-# build_weapons_and_combat.import_sounds().
+# combat.audio.import_sounds().
 VOICES_VAR = "Voices"
 HIT_SOUNDS_VAR = "HitSounds"
 STATS_APPLIED_VAR = "StatsApplied"

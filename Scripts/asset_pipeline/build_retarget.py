@@ -201,7 +201,7 @@ AIM_SOURCES = ("/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS",
 #
 # The six chosen, and their order, are NPC_HIT_REACTION_CLIPS's -- see there for
 # which Front stands in for Left and Right, since Epic authored neither.
-# build_weapons_and_combat.hit_reactions() sorts the retargeted copies into that
+# combat.hit_reaction.hit_reactions() sorts the retargeted copies into that
 # order and the health component picks by which side the round came from.
 #
 # Retargeted for every creature, for the same reason the aim poses are: which

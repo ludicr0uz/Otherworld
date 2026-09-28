@@ -13,6 +13,66 @@ there is no C++ module. See `systemDesign.md` for the detailed architecture.
 3. Asset prefixes: `SM_ SK_ M_ MI_ T_ BP_ WBP_ ST_ A_ Cue_`; levels `Lvl_`.
 4. Absolute paths only when invoking the editor directly — the Bash tool resets cwd between
    calls. (`Scripts/dev/uepy.py` resolves its own arguments, so relative paths are fine there.)
+5. **Keep modules small and single-purpose** (below). No new code goes into a module that is
+   already over budget; split it first.
+
+## Code layout: small modules, one owner each
+
+An agent pays for a file every time it reads it. The weapons builder used to be one 8,180-line
+file plus a 3,127-line verifier, and one session spent ~58M input tokens mostly re-reading it
+across 272 calls. It is now the `Scripts/combat/` package: 34 builder modules and 16 verifier
+modules, none over 500 lines, behind two short entry points. Keep new work in that shape.
+
+**Budgets.** A module stays under **~500 lines**, and a function under **~150** (a graph-authoring
+`build_*` / `_author_*` function may reach ~250, because its nodes and wiring read top to
+bottom). Past the budget, split before adding: extract a phase into an `_author_<thing>(ed,
+exec_in, …)` fragment that returns the pins its caller wires on (see `respawn.py`'s
+`_author_world_floor_net`), or move a group of functions into a sibling module.
+
+**Shape of a feature.**
+- `Scripts/<verb>_<feature>.py` is a **thin entry point**: path setup, dropping cached project
+  modules, and a `main()` that calls steps in dependency order. No logic of its own.
+- The code lives in a **package** (`combat/`, `forest_generator/`, `asset_pipeline/`), one
+  module per responsibility, named after what it owns: one Blueprint (`blood.py` →
+  `BP_BloodSplash`), one graph concern (`weapon_component/recoil.py`), or one table of
+  constants (`tuning.py`, `paths.py`, `nodes.py`). Constants-only modules stay separate from
+  the modules that author graphs.
+- The package's `__init__.py` docstring is **the map**: every module, one line each. Update it
+  whenever a module is added, renamed or changes job. Each module's own docstring says what it
+  owns and why it is shaped that way; the design rationale lives next to the code it explains.
+- **Explicit imports only**: `from combat.tuning import COMBAT, SPRINT_KEY`. No `import *`, no
+  facade module re-exporting a package. The import block is how a reader finds where a name
+  lives without opening anything else.
+- **No import cycles.** Direction: constants → shared helpers (`graph.py`) → builders → entry
+  point. Needing a name from a module that already imports you means the name is in the
+  wrong module; move it down.
+- **Verifiers mirror builders.** `combat/verify/<area>.py` holds self-contained `check_*`
+  functions, one per section. A value two sections need goes in `verify/fixtures.py`. A
+  section never reads a variable another section left behind: the old flat verifier had one
+  of those, a loop variable leaking between sections, which nothing but the file's order kept
+  correct.
+
+**Working in it.** Find the owner from the `__init__` map, then open that one module; `grep -rn
+'^def \|^[A-Z_]* =' Scripts/combat` is a cheap symbol index. When a change spans modules, the
+imports show the blast radius.
+
+**Moving code between modules** (a split, or a function that outgrew its home): move it
+verbatim and let the imports follow, then run the verifier. It must report the **same count
+and the same check lines** as before, and that comparison is the proof the move changed
+nothing. `Scripts/combat/` was split this way: identical bytecode for every moved function
+(`build_health_component` alone was restructured, with two phases extracted), 720/720 checks
+line-for-line identical to the monolith's, and a clean `--game` run.
+
+**Over budget today; split before extending:** `build_graphics_menu.py` (3.2k lines),
+`generate_forest_level.py` (1.8k), `build_npc_blueprints.py` (1.2k),
+`asset_pipeline/build_retarget.py` (1.1k), `verify_graphics_menu.py`,
+`forest_generator/verification.py`. `build_shotgun_and_health.py` is history; leave it alone.
+
+**Stale imports in a live editor.** The editor's Python outlives every `uepy.py` job, so a
+module imported by one run is reused by the next unless something drops it. `uepy_inbox` now
+forgets every module loaded from `Scripts/` before each job, and the combat entry points also
+purge `combat.*` themselves. An editor started before that change has the old inbox, so
+hot-reload it (see *Two transports*) or edits to package modules will silently not run.
 
 ## The repository is code only — a fresh clone has no Content/
 
@@ -481,7 +541,7 @@ Two things about it are load-bearing and easy to undo by accident:
   and never casts back to the HUD. Its seven `Key` variables (`BIND_VARS`) keep CDO defaults
   equal to the keys documented below, so a pawn with no HUD in front of it still plays. Pushed
   from `DrawHUD` and not from Tick for the usual reason: the menu is a paused world.
-- **`BP_Settings.Binds` is indexed, not keyed.** `BIND_VARS` in `build_weapons_and_combat.py` is
+- **`BP_Settings.Binds` is indexed, not keyed.** `BIND_VARS` in `Scripts/combat/tuning.py` is
   the contract — reorder it and every save already on disk silently rebinds itself. The HUD's
   BeginPlay refills the array whenever its length is not exactly seven, which is what a save
   written by an older build looks like.
@@ -493,7 +553,10 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**480 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**720 checks**). Both are
+thin entry points: the code is the `Scripts/combat/` package, one module per responsibility,
+and the verifier's sections are `Scripts/combat/verify/`. `Scripts/combat/__init__.py` maps
+which module owns what — start there rather than grepping.
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls (the defaults — all seven are rebindable on the settings screen):** left click
@@ -542,8 +605,8 @@ switches and dropping can hand the very same actor to the world.
 
 ### Where to tune combat, and recoil
 
-**`COMBAT`, a frozen `CombatConfig` dataclass at the top of
-`Scripts/build_weapons_and_combat.py`, is the one place the global combat numbers live** —
+**`COMBAT`, a frozen `CombatConfig` dataclass in
+`Scripts/combat/tuning.py`, is the one place the global combat numbers live** —
 lethality (`start_health`, `head_multiplier`, `limb_multiplier`), sprint and stamina, the ADS
 zoom/interp/cone figures, the mouse-sensitivity limits and compensation, and recoil. Change a
 field, re-run the builder. There is no in-editor equivalent on purpose: every one of these
@@ -1129,7 +1192,7 @@ take a wanderer from 100 to 61).
 ### Hit reactions: a survivor flinches
 
 A hit that does not kill plays a short flinch on the upper body, for the player and for every
-wanderer. It is authored by `_author_hit_reaction` in `build_weapons_and_combat.py`, on the
+wanderer. It is authored by `_author_hit_reaction` in `Scripts/combat/hit_reaction.py`, on the
 **False** arm of `BP_HealthComponent`'s death branch, so nothing can ragdoll and flinch in the
 same frame.
 
@@ -1152,7 +1215,7 @@ the direction of every bucket from the source clip's head motion (the mannequin 
 right is −X).
 
 **The order is a contract.** `NPC_HIT_REACTION_CLIPS` in `forest_generator/npc_placement.py` is
-the one definition. `build_weapons_and_combat.HIT_REACTION_CLIPS` imports it, and the graph bakes
+the one definition. `combat.hit_reaction.HIT_REACTION_CLIPS` imports it, and the graph bakes
 positions in it into pin literals:
 
 ```
@@ -1611,7 +1674,7 @@ centred and bottom-anchored at any window size.
   logs it. This made the NPC unkillable through two rounds of debugging, and it also explains
   an earlier instrumented run where pellets hit terrain hundreds of times and applied damage
   zero times — that was wrongly blamed on range. `make_shootable()` in
-  `build_weapons_and_combat.py` sets the capsule's Visibility response to Block and asserts
+  `Scripts/combat/hit_zones.py` sets the capsule's Visibility response to Block and asserts
   the read-back; `verify_weapons_and_combat.py` guards it for both characters. Setting one
   channel response flips the profile from its preset to "Custom", which is expected.
   To test a collision change without a play session: spawn the actor into the **editor**

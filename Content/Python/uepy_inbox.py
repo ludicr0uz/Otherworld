@@ -113,8 +113,31 @@ def _write_atomic(path, payload):
     os.replace(tmp, path)
 
 
+def _forget_project_modules():
+    """Drop every module imported from the project's Scripts/ directory.
+
+    The editor's interpreter outlives every job, so a module a job imported is
+    still in sys.modules for the next one: edit Scripts/combat/tuning.py, rerun
+    the builder, and the builder silently uses the old numbers. A cold boot
+    never has this problem, so the inbox would be the one transport whose
+    results depend on what ran before. Forgetting them makes each job import
+    what is on disk, exactly as a cold boot would.
+    """
+    project = os.path.abspath(unreal.Paths.convert_relative_path_to_full(
+        unreal.Paths.project_dir()))
+    scripts = os.path.join(project, "Scripts") + os.sep
+    for name, module in list(sys.modules.items()):
+        path = getattr(module, "__file__", None) or ""
+        if os.path.abspath(path).startswith(scripts):
+            del sys.modules[name]
+
+
 def _execute(job):
     """Run one job on the game thread, returning (success, output)."""
+    try:
+        _forget_project_modules()
+    except Exception:
+        traceback.print_exc()
     captured = []
     restore_logs = _patch_logs(captured)
 

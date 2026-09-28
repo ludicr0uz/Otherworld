@@ -79,7 +79,7 @@ NPC_MELEE_BLEND_S = 0.15
 #
 # The six clips a wanderer plays when it is shot and lives, in the order the
 # reaction graph indexes them: three Fronts, then Back, Left, Right.  THE ORDER
-# IS THE CONTRACT -- build_weapons_and_combat.HIT_REACTION_CLIPS imports this
+# IS THE CONTRACT -- combat.hit_reaction.HIT_REACTION_CLIPS imports this
 # tuple and bakes positions in it into pin literals, so reordering here silently
 # plays a Left clip for a hit in the back.
 #
@@ -106,7 +106,7 @@ NPC_BASE_HEALTH = 100.0
 # ── Voices ───────────────────────────────────────────────────────────────────
 #
 # Synthesised by Scripts/make_creature_sounds.py and imported to /Game/Audio by
-# build_weapons_and_combat.import_sounds().  Several takes per creature and the
+# combat.audio.import_sounds().  Several takes per creature and the
 # controller draws one at random, because a pack of ten on a 4-9 s timer
 # retriggering ONE buffer reads as a machine rather than as a forest.
 #

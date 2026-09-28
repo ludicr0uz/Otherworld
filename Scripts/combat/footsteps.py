@@ -1,0 +1,222 @@
+"""BP_FootstepComponent: distance-driven footfalls for the player and every
+wanderer, and the random-sound picker it plays through.
+"""
+
+import unreal
+
+from combat.audio import CREATURE_AUDIO_DIR, FOOTSTEP_NAMES
+from combat.graph import (
+    BEL, BGE, _apply_defaults, _assets, _at, _connect, _create_blueprint,
+    _declare, _events, _float_type, _log, _loose_pin, _node, _palette, _pin,
+    _set,
+)
+from combat.nodes import (
+    FN_ACTOR_LOC, FN_ADD_FF, FN_AND, FN_ARR_GET, FN_ARR_LEN, FN_GET_OWNER,
+    FN_GET_VELOCITY, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_MUL_FF,
+    FN_ON_GROUND, FN_PLAY_SOUND, FN_RAND_INT, FN_SUB_FF, FN_SUB_II,
+    FN_VSIZE_XY, NODE_CAST_CHARACTER,
+)
+from combat.paths import WEAPON_DIR
+
+
+# --- footsteps ---------------------------------------------------------------
+# One component, on the player and on every wanderer, because a footfall is a
+# fact about having legs and not about which side you are on.
+#
+# Driven by DISTANCE TRAVELLED, not by a timer. That is the whole design: a
+# timer has to be told how fast its owner is moving and gets it wrong the
+# moment anything else changes the speed, and three things already do -- sprint
+# (900 vs 600), the per-instance gait variance, and the wendigo's 1.15x. An
+# accumulator over ground covered needs to know none of them and cannot
+# disagree with any of them; the faster something moves, the sooner it has
+# covered a stride.
+#
+# 160 cm is one footfall of a run at 600 cm/s, which works out at about 3.7
+# steps a second. It is a compromise across the speed range -- the same stride
+# at a walk is slightly long -- and a compromise is the right answer here,
+# because the alternative is a speed-to-stride curve that nobody can hear.
+#
+# The remainder is CARRIED rather than reset to zero when a step fires, or the
+# effective stride would be "160 cm plus however far this frame happened to
+# take us", which makes the step rate depend on framerate.
+FOOTSTEP_STRIDE_CM = 160.0
+# Below this the owner is shuffling against a wall, not walking.
+FOOTSTEP_MIN_SPEED_CMS = 40.0
+FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
+
+
+def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
+    """Play a random element of the ``var_name`` sound array at ``at_pin``.
+
+    Returns ``(nodes, then_pin)``. Guarded on the array's own length, because
+    RandomIntegerInRange(0, -1) into Array_Get is an access-none rather than
+    silence -- and an empty array is the normal state of a checkout that has
+    not run Scripts/make_creature_sounds.py yet.
+
+    The same shape exists in build_npc_blueprints.py. Two copies rather than a
+    shared module because the two files each carry their own _pin/_connect/_set
+    authoring helpers, and hoisting one function would mean hoisting those.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    table = keep(_at(ed.add_get_member_variable_node(var_name), x0, y0 + 240))
+    table_out = _pin(table, var_name, is_input=False)
+    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 240, y0 + 240))
+    _connect(table_out, _pin(count, "TargetArray"))
+    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 480, y0 + 240))
+    _connect(_pin(count, "ReturnValue", is_input=False), _pin(stocked, "A"))
+    _set(stocked, "B", 0)
+
+    have = keep(_at(ed.add_branch_node(), x0 + 720, y0))
+    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(exec_in, _pin(have, "execute"))
+
+    top = keep(_at(_node(ed, FN_SUB_II), x0 + 720, y0 + 240))
+    _connect(_pin(count, "ReturnValue", is_input=False), _pin(top, "A"))
+    _set(top, "B", 1)
+    which = keep(_at(_node(ed, FN_RAND_INT), x0 + 960, y0 + 240))
+    _set(which, "Min", 0)
+    _connect(_pin(top, "ReturnValue", is_input=False), _pin(which, "Max"))
+    pick = keep(_at(_node(ed, FN_ARR_GET), x0 + 1200, y0 + 240))
+    _connect(table_out, _pin(pick, "TargetArray"))
+    _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
+
+    play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 1440, y0))
+    _connect(_pin(pick, "Item", is_input=False), _pin(play, "Sound"))
+    _connect(at_pin, _pin(play, "Location"))
+    _connect(BEL.find_then_pin(have), _pin(play, "execute"))
+
+    join = keep(_at(ed.add_branch_node(), x0 + 1700, y0))
+    _set(join, "Condition", "true")
+    _connect(BEL.find_then_pin(play), _pin(join, "execute"))
+    _connect(BEL.find_else_pin(have), _pin(join, "execute"))
+    return made, BEL.find_then_pin(join)
+
+
+def build_footstep_component(rebuild=True):
+    """A footfall every FOOTSTEP_STRIDE_CM of ground covered.
+
+        [Tick] -> cast owner to Character -> [on the ground?]
+                    no  -> Travelled = 0          (a jump restarts the stride)
+                    yes -> Travelled += speed * dt
+                        -> [Travelled >= stride AND moving?]
+                             yes -> Travelled -= stride
+                                 -> play one of Sounds at the owner
+                             no  -> done
+
+    Distance rather than time: see FOOTSTEP_STRIDE_CM. Nothing here knows about
+    sprint, about the gait variance the level generator applies per wanderer,
+    or about the wendigo being 15% faster -- all three change how far the owner
+    moves per second, and all three therefore change the step rate for free.
+
+    Subtracting the stride rather than zeroing Travelled is what keeps the rate
+    independent of framerate: zeroing throws away the overshoot, so the real
+    stride becomes 160 cm plus whatever one frame added.
+    """
+    bp = _create_blueprint(FOOTSTEP_BP_PATH, unreal.ActorComponent)
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    tick, _begin = _events(ed, rebuild)
+
+    _declare(ed, "Travelled", _float_type())
+    _declare(ed, "StrideCm", _float_type())
+    _declare(ed, "Sounds", BEL.get_array_type(
+        BEL.get_object_reference_type(unreal.SoundBase.static_class())))
+
+    owner = _at(_node(ed, FN_GET_OWNER), 0, 300)
+    owner_out = _pin(owner, "ReturnValue", is_input=False)
+    as_char = _at(_palette(ed, NODE_CAST_CHARACTER), 260, 0)
+    _connect(owner_out, _pin(as_char, "Object"))
+    _connect(BEL.find_then_pin(tick), _pin(as_char, "execute"))
+    char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
+
+    grounded = _at(_node(ed, FN_ON_GROUND), 780, 300)
+    _connect(char_out, _pin(grounded, "self"))
+
+    walking = _at(ed.add_branch_node(), 1040, 0)
+    _connect(_pin(grounded, "ReturnValue", is_input=False), _pin(walking, "Condition"))
+    _connect(BEL.find_then_pin(as_char), _pin(walking, "execute"))
+
+    # Airborne: forget the part-stride, so landing does not immediately fire a
+    # step that was 90% accumulated before the jump.
+    reset = _at(ed.add_set_member_variable_node("Travelled"), 1300, 400)
+    _set(reset, "Travelled", 0.0)
+    _connect(BEL.find_else_pin(walking), _pin(reset, "execute"))
+
+    speed_v = _at(_node(ed, FN_GET_VELOCITY), 1040, 560)
+    _connect(owner_out, _pin(speed_v, "self"))
+    # Horizontal speed only: falling at terminal velocity is not walking, and
+    # VSize would count it.
+    speed = _at(_node(ed, FN_VSIZE_XY), 1300, 560)
+    _connect(_pin(speed_v, "ReturnValue", is_input=False), _pin(speed, "A"))
+    speed_out = _pin(speed, "ReturnValue", is_input=False)
+
+    step = _at(_node(ed, FN_MUL_FF), 1560, 560)
+    _connect(speed_out, _pin(step, "A"))
+    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "B"))
+    sofar = _at(ed.add_get_member_variable_node("Travelled"), 1560, 700)
+    total = _at(_node(ed, FN_ADD_FF), 1820, 560)
+    _connect(_pin(sofar, "Travelled", is_input=False), _pin(total, "A"))
+    _connect(_pin(step, "ReturnValue", is_input=False), _pin(total, "B"))
+    advance = _at(ed.add_set_member_variable_node("Travelled"), 2080, 0)
+    _connect(_pin(total, "ReturnValue", is_input=False), _pin(advance, "Travelled"))
+    _connect(BEL.find_then_pin(walking), _pin(advance, "execute"))
+    # Read the STORED total from here on. The add is pure and would be
+    # re-evaluated against the new Travelled on a second read -- the same trap
+    # the NPC id and the reload arithmetic ran into.
+    have = _at(ed.add_get_member_variable_node("Travelled"), 2080, 300)
+    have_out = _pin(have, "Travelled", is_input=False)
+
+    stride = _at(ed.add_get_member_variable_node("StrideCm"), 2080, 420)
+    stride_out = _pin(stride, "StrideCm", is_input=False)
+    far_enough = _at(_node(ed, FN_GE_FF), 2340, 300)
+    _connect(have_out, _pin(far_enough, "A"))
+    _connect(stride_out, _pin(far_enough, "B"))
+    quick_enough = _at(_node(ed, FN_GREATER_FF), 2340, 560)
+    _connect(speed_out, _pin(quick_enough, "A"))
+    _set(quick_enough, "B", FOOTSTEP_MIN_SPEED_CMS)
+    both = _at(_node(ed, FN_AND), 2600, 420)
+    _connect(_pin(far_enough, "ReturnValue", is_input=False), _pin(both, "A"))
+    _connect(_pin(quick_enough, "ReturnValue", is_input=False), _pin(both, "B"))
+
+    lands = _at(ed.add_branch_node(), 2860, 0)
+    _connect(_pin(both, "ReturnValue", is_input=False), _pin(lands, "Condition"))
+    _connect(BEL.find_then_pin(advance), _pin(lands, "execute"))
+
+    left = _at(_node(ed, FN_SUB_FF), 3120, 300)
+    _connect(have_out, _pin(left, "A"))
+    _connect(stride_out, _pin(left, "B"))
+    charge = _at(ed.add_set_member_variable_node("Travelled"), 3380, 0)
+    _connect(_pin(left, "ReturnValue", is_input=False), _pin(charge, "Travelled"))
+    _connect(BEL.find_then_pin(lands), _pin(charge, "execute"))
+
+    at = _at(_node(ed, FN_ACTOR_LOC), 3380, 300)
+    _connect(owner_out, _pin(at, "self"))
+    _author_random_sound(ed, "Sounds", _pin(at, "ReturnValue", is_input=False),
+                         BEL.find_then_pin(charge), 3640, 0)
+
+    ed.add_comment_to_nodes(
+        f"A footfall every {FOOTSTEP_STRIDE_CM:.0f} cm of ground covered, "
+        f"which is about {600.0 / FOOTSTEP_STRIDE_CM:.1f} a second at a "
+        f"600 cm/s run. Distance, not a timer: sprint, the per-wanderer gait "
+        f"variance and the wendigo's 1.15x all change how fast their owner "
+        f"moves, and an accumulator over distance tracks every one of them "
+        f"without being told. The remainder is carried, not zeroed, so the "
+        f"rate does not depend on framerate.",
+        ed.list_all_nodes())
+
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_FootstepComponent failed to compile")
+
+    eas = _assets()
+    found = [eas.load_asset(f"{CREATURE_AUDIO_DIR}/{n}") for n in FOOTSTEP_NAMES
+             if eas.does_asset_exist(f"{CREATURE_AUDIO_DIR}/{n}")]
+    _apply_defaults(bp, {"StrideCm": FOOTSTEP_STRIDE_CM,
+                         "Travelled": 0.0,
+                         "Sounds": found})
+    _log(f"built {FOOTSTEP_BP_PATH} "
+         f"({len(found)} steps, one every {FOOTSTEP_STRIDE_CM:.0f} cm)")
+    return bp

@@ -33,7 +33,7 @@ already manage without.
 Downloads are cached in assets/cache/sounds/ (gitignored, ~200 MB) so a
 re-run only re-cuts. Output is nine 44.1 kHz 16-bit mono WAVs in
 assets/generated/sounds/, which is exactly where
-build_weapons_and_combat.import_sounds() looks for them.
+combat.audio.import_sounds() looks for them.
 
 MONO IS NOT A SIZE OPTIMISATION. PlaySoundAtLocation spatialises a sound by
 panning and attenuating it around the listener, and it can only do that to a

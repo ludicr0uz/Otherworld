@@ -1,0 +1,52 @@
+"""combat -- weapons, inventory, aiming, damage and death, as Unreal Python.
+
+Entry point: Scripts/build_weapons_and_combat.py (main() calls the build_*
+functions below in dependency order). Checks: Scripts/verify_weapons_and_combat.py,
+which runs the combat.verify package.
+
+One module per responsibility. Find the owner here before opening anything;
+each module's docstring says what it owns and why it is shaped that way.
+
+DATA (constants and pure tables -- no Blueprint authoring)
+  paths             /Game asset paths and generated-class paths
+  nodes             FN_* function paths, NODE_* palette names, macros
+  tuning            keys, CombatConfig / COMBAT, ammo, drops, auto fire
+  game_state        GameMode + health-component variable names, debug mode,
+                    ensure_game_mode_vars()
+  weapon_specs      the five weapons: parts, muzzles, icons, _weapon_specs()
+  camera            boom and aim-trace numbers, face/aim-the-camera patches
+
+SHARED AUTHORING HELPERS
+  graph             node/pin/connect/set, variables, components, events
+
+ASSETS AND PATCHES
+  materials         flat materials (gunmetal, wood, blood, brass)
+  audio             sound names, attenuation profiles, import + link
+  anim_blueprint    ABP_Unarmed: layered blends and the three slots
+  skin              the player's body (PlayerSkin, wear_skin)
+  grip              hand-grip socket maths for holding a weapon
+  settings_savegame BP_Settings
+  weapon_items      BP_WeaponItem and one child per weapon
+  blood             BP_BloodSplash
+  ammo_pickup       BP_AmmoPickup
+  footsteps         BP_FootstepComponent
+
+BP_HealthComponent (health_component wires the fragments together)
+  health_component  variables, defaults, the Tick's death branch
+  respawn           spawn numbering, world-floor net, respawn band
+  death             kill count, gun drop, ragdoll collapse, corpse, player death
+  hit_reaction      flinch clips and direction pick
+  hit_zones         head/limb bone tables and multipliers
+  ragdoll           joint limits and tune_ragdolls()
+
+BP_WeaponComponent -> the weapon_component subpackage (see its __init__)
+
+INSTALLING
+  install           components onto the player and the wanderer; retire old
+
+Dependency direction: data modules import nothing from this package except
+each other; graph imports only nodes; everything else may import data and
+graph. No module imports the entry point. Keep it acyclic -- a module that
+needs a name from a sibling that already imports it means the name is in the
+wrong module.
+"""

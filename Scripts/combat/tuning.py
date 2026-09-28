@@ -1,0 +1,314 @@
+"""Global combat tuning: polled keys, inventory size, the CombatConfig
+dataclass (COMBAT), ammunition, drops and automatic fire. Numbers only --
+the graphs that read them live elsewhere.
+"""
+
+import dataclasses
+
+
+# ─── Tuning ──────────────────────────────────────────────────────────────────
+
+INVENTORY_SIZE = 5
+
+# Polled keys.  1/2/3 and M belong to the graphics menu, so the weapon keys stay
+# clear of them.
+#
+# Every one of them is polled on the weapon component's Tick rather than bound
+# as an input action, for the same reason: BP_ThirdPersonCharacter's graph is
+# the Enhanced Input template, and adding an IA asset plus an IMC entry is not
+# authorable from Python. Sprint lives on the *weapon* component specifically
+# because that is the thing that has to refuse to fire while it is held down.
+FIRE_KEY = "LeftMouseButton"
+AIM_KEY = "RightMouseButton"
+SWITCH_KEY = "Q"
+DROP_KEY = "G"
+PICKUP_KEY = "E"
+SPRINT_KEY = "LeftShift"
+
+PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
+DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
+
+# ─── The combat config ───────────────────────────────────────────────────────
+#
+# One named structure for the global combat tuning, and it is a Python
+# dataclass rather than a UserDefinedStruct or a DataAsset on purpose.
+#
+# Every number in here is BAKED INTO A GRAPH at build time: the cone scale is a
+# SelectFloat pin literal, the recoil recovery speed an FInterpTo pin literal,
+# the sensitivity limits FClamp literals in the settings screen. A struct asset
+# a designer edited in the editor would have to be *read* at runtime instead --
+# an asset load, a null guard and a member read in front of every one of those
+# pins, in a project where each of those nodes is placed and wired by hand from
+# Python.
+#
+# And it would not survive being edited. Nothing under Content/ is committed
+# (see CLAUDE.md): every asset in this project is derived and is rebuilt from
+# these scripts on a fresh clone. An in-editor edit to a generated DataAsset is
+# erased the next time the builder runs and was never in the repository to
+# begin with -- so "tunable in the editor without re-running Python" is a
+# promise this architecture cannot keep, and pretending otherwise would lose
+# somebody's tuning pass rather than save them a build.
+#
+# So tuning combat means editing this object and re-running
+# build_weapons_and_combat.py. That is the same workflow as the project's two
+# other tuning homes, forest_generator/lighting.py (the time-of-day presets)
+# and forest_generator/npc_placement.py (run speed, melee reach) -- and it is
+# the one that gets checked, because the verifier reads these fields back out
+# of the compiled graphs.
+#
+# Frozen, so no builder can quietly write a number back into it and leave the
+# verifier asserting a value the graph never saw.
+#
+# PER-WEAPON numbers deliberately do NOT live here. Damage, spread, range, fire
+# interval, magazine size and recoil are columns in _weapon_specs(), which is
+# what keeps a sixth weapon a row in a table rather than a code change. This is
+# the other half: what is true of a fight whatever is being held.
+@dataclasses.dataclass(frozen=True)
+class CombatConfig:
+    """The global, tunable combat parameters -- the one place to change them."""
+
+    # --- what it takes to kill and to die ------------------------------------
+    start_health: float = 100.0
+    # Where on the body a shot landed. The capsule decides *whether* a pellet
+    # hit a character; the physics asset's bodies decide where (see hit_zones).
+    # Anything the zones do not name -- neck, clavicles, torso -- is worth 1.0.
+    head_multiplier: float = 1.5
+    limb_multiplier: float = 0.75
+
+    # --- sprint and stamina --------------------------------------------------
+    # The walking speed is NOT here: BeginPlay caches whatever the character's
+    # MaxWalkSpeed already is into BaseSpeed and restores that. A literal would
+    # silently fight any later change to the character's own default.
+    sprint_speed_cms: float = 900.0
+    max_stamina: float = 100.0
+    # 4 s of sprint from full, a little over 8 s to refill. Deliberately
+    # asymmetric: sprint is the escape from a pack that runs at 600 cm/s, so it
+    # has to be worth spending and it has to cost something to have spent.
+    stamina_drain_per_s: float = 25.0
+    stamina_regen_per_s: float = 12.0
+
+    # --- aiming down the sights ----------------------------------------------
+    # What ADS does is narrow the camera's field of view and tighten the
+    # weapon's cone. The zoom factor is per weapon (AdsZoom on BP_WeaponItem)
+    # because the sniper's is a scope and everything else's is a set of irons:
+    # 4x against 1.5x is the difference the player is buying when they pick the
+    # rifle up. These two are the values that table chooses between.
+    #
+    # BaseFOV is cached at BeginPlay from whatever the camera already has,
+    # exactly as BaseSpeed caches MaxWalkSpeed.
+    ads_zoom_irons: float = 1.5
+    ads_zoom_scope: float = 4.0
+    # The FOV is NOT snapped. FInterpTo at this speed takes about a fifth of a
+    # second to arrive, which is short enough to feel instant and long enough
+    # that a 4x snap does not read as a teleport. CurrentFOV is stored rather
+    # than recomputed because FInterpTo needs its own previous output.
+    ads_interp_speed: float = 12.0
+    # Aiming is worth something mechanically, not only visually: the cone
+    # shrinks to a third. The shotgun's 5 degrees becomes 1.7, which still
+    # patterns, and the sniper's 0.2 becomes 0.07, which is academic -- the
+    # weapons this matters to are the automatics in the middle.
+    ads_spread_scale: float = 0.34
+    # And what it costs in mobility: at full ADS the player walks at half
+    # speed. Aiming is meant to be a commitment -- the cone is a third as wide
+    # and the camera is inside a scope, so the price is that you cannot also
+    # be going anywhere.
+    #
+    # Applied as a fraction of BaseSpeed, never of the CURRENT walk speed: the
+    # write runs every frame, so scaling what is already there would compound
+    # to a standstill in about a second. And it eases in along the zoom's own
+    # curve rather than snapping with the button, for the reason
+    # ads_sens_compensation below eases -- except that the interpolant here is
+    # normalised by the weapon's own AdsZoom, so full ADS is exactly this
+    # number on irons and on the scope alike. The sensitivity one deliberately
+    # is NOT normalised, because "a 4x scope slows the mouse more" is wanted
+    # and "a 4x scope slows the legs more" is not.
+    ads_move_speed_scale: float = 0.50
+
+    # --- mouse sensitivity, and what aiming does to it -----------------------
+    # The player's look input is the Enhanced Input template's IA_Look, which
+    # lands on AddControllerYawInput / AddControllerPitchInput -- and those
+    # still multiply by APlayerController's InputYawScale / InputPitchScale on
+    # their way into RotationInput. That pair is marked deprecated in UE5, but
+    # the setters are BlueprintCallable and they are the ONLY per-frame handle
+    # on look speed that does not require editing BP_ThirdPersonCharacter's
+    # input graph, which the Blueprint graph API cannot partially rebuild.
+    #
+    # Their values are CACHED at BeginPlay rather than written down here, for
+    # the same reason as BaseSpeed and BaseFOV. It matters more here than
+    # anywhere else: the engine's default pitch scale is NEGATIVE (-2.5), so a
+    # literal positive number would silently invert the player's vertical look.
+    mouse_sensitivity_default: float = 1.0
+    mouse_sensitivity_min: float = 0.20
+    mouse_sensitivity_max: float = 3.00
+    mouse_sensitivity_step: float = 0.05
+    # How much of the zoom aiming gives back in slower mouse movement.
+    #
+    # Driven off CurrentFOV / BaseFOV, not off a flag, which buys three things
+    # for one node: the slowdown is per weapon without anything per weapon
+    # being written (a 4x scope slows the mouse more than 1.5x irons because
+    # its FOV is narrower), it EASES IN along the same FInterpTo curve the zoom
+    # does rather than snapping the instant the button goes down, and letting
+    # go restores it by the same curve with no second code path.
+    #
+    # 1.0 would be full compensation: the crosshair would then cross the same
+    # number of PIXELS per centimetre of mouse at any zoom, which at 4x reads
+    # as the mouse having gone dead. 0.0 would be none at all, which at 4x
+    # throws the crosshair off the far side of the scope. 0.75 is the usual
+    # compromise, and works out at 0.75x sensitivity down the irons and 0.44x
+    # down the scope.
+    ads_sens_compensation: float = 0.75
+
+    # --- recoil --------------------------------------------------------------
+    # A shot kicks the view up by the weapon's own RecoilPitch (a column in
+    # _weapon_specs(), because how hard a gun kicks is the gun's business) and
+    # sideways by a random fraction of it, and the kick is then paid back over
+    # the following fraction of a second.
+    #
+    # Applied by READING AND WRITING THE CONTROL ROTATION, never with
+    # AddPitchInput / AddControllerPitchInput. That route multiplies by
+    # APlayerController's deprecated InputPitchScale -- which is exactly the
+    # handle the mouse-sensitivity setting above drives -- so a player on 0.2
+    # sensitivity would get a fifth of the recoil and a player on 3.0 would be
+    # thrown at the sky. Recoil is a property of the weapon and must not move
+    # when a settings slider does. SetControlRotation bypasses RotationInput
+    # entirely, and the engine's own LimitViewPitch re-clamps the result inside
+    # ViewPitchMin/Max on the controller's next UpdateRotation, so a kick taken
+    # while already looking near-vertical cannot push the camera over the top.
+    #
+    # The accumulator is RecoilDebt: what has been kicked and not yet given
+    # back. Recovery is an FInterpTo of the debt toward zero, so it is fast at
+    # first and settles rather than stopping dead.
+    recoil_recovery_speed: float = 7.0
+    # ...and only this much of each frame's recovery is handed back to the
+    # view. The rest of the debt still decays -- the accumulator always returns
+    # to zero, so nothing can build up across a magazine -- but 30% of every
+    # kick is left in the player's aim for good. That is the difference between
+    # a gun and a screen shake: a burst walks up the target and has to be
+    # pulled back down, instead of springing exactly home between rounds.
+    recoil_recovery_fraction: float = 0.70
+    # Aiming down the sights steadies the weapon, conventionally and here. One
+    # multiplier over the whole kick, vertical and horizontal together, applied
+    # with the same SelectFloat shape the cone uses -- deliberately not a
+    # second per-weapon column, because "shouldering a gun steadies it" is a
+    # fact about shoulders and not about which gun.
+    recoil_ads_scale: float = 0.65
+    # The horizontal kick, as a fraction of the vertical, drawn uniformly in
+    # [-r, +r] per shot. Pure vertical recoil reads as a mechanism; a little
+    # unpredictable sideways is what makes a burst feel like it is fighting
+    # back. Kept well under 1 so the climb is still recognisably upward.
+    recoil_horizontal_ratio: float = 0.35
+
+    # --- flinching (taking a hit and living) ---------------------------------
+    # Anything that takes damage and survives plays a one-second stagger on its
+    # upper body, picked by which side the hit came from. See the hit-reaction
+    # block below HIT_SLOT for what it is made of and why it is upper body.
+    #
+    # The cooldown is the load-bearing number of the three. The reaction is
+    # triggered by a per-frame "is Health lower than it was last frame" poll, so
+    # without one the SMG (one round every 0.09 s) would restart the montage
+    # eleven times a second and the target would stand in the first two frames
+    # of a flinch forever -- a vibration, not a reaction. 0.45 s is a little
+    # over half the clip at the rate below: consecutive hits still re-trigger,
+    # visibly, but only after the previous stagger has read.
+    hit_react_cooldown_s: float = 0.45
+    # Faster than authored. The clips are ~1.0 s of stagger-and-recover, which
+    # is a long time to have your chest yanked around in a firefight; 1.4x
+    # brings it to ~0.7 s, which still reads and gets the arms back under the
+    # player's control sooner.
+    hit_react_rate: float = 1.4
+    # In and out. Short enough to look like an impact -- a hit that eases in
+    # over a quarter of a second reads as a stumble, not a bullet -- and long
+    # enough not to pop the chest between two poses in one frame.
+    hit_react_blend_s: float = 0.08
+
+
+COMBAT = CombatConfig()
+
+
+# --- shotgun ammunition ------------------------------------------------------
+# Ammunition lives on BP_WeaponItem, not on the weapon component, because a
+# weapon is a droppable actor here: drop a half-empty shotgun, walk away, come
+# back and pick it up, and it still has to be half empty. Reserve on the
+# component would belong to the player and would survive a gun that did not.
+#
+# "Starting 20" is read as twenty shells in total, not twenty plus a free
+# magazine: five are in the gun and fifteen are spare.
+SHOTGUN_MAGAZINE = 5
+SHOTGUN_RESERVE = 15
+# Enough of a pause that the shotgun is a decision and not a hose -- it now does
+# 8 x 18 = 144 damage to a wanderer with 100 HP, so one connected shot is a
+# kill and the interval is the whole balance of the weapon.
+SHOTGUN_FIRE_INTERVAL = 0.85
+# Reload is not a state machine and not a montage: it pushes NextFireTime out by
+# this much, which is exactly what "cannot shoot for 1.6 s" means, and it costs
+# three nodes instead of a timer, an interrupt rule and an is-reloading flag.
+SHOTGUN_RELOAD_SECONDS = 1.6
+# The pistol is the fallback weapon and keeps infinite ammo; it still gets an
+# interval, because without one it fires once per frame.
+PISTOL_FIRE_INTERVAL = 0.18
+RELOAD_KEY = "R"
+
+# The seven rebindable actions, in the order the settings screen lists them and
+# -- more importantly -- in the order BP_Settings.Binds stores them. That array
+# is indexed, not keyed, so this tuple IS the contract between the two builders:
+# build_graphics_menu.py imports it and writes Binds[i] for the same i the HUD
+# pushes back into the variable named here. Reorder it and every existing save
+# on disk silently rebinds itself to the wrong actions.
+BIND_VARS = (("KeyFire", FIRE_KEY),
+             ("KeyAim", AIM_KEY),
+             ("KeySprint", SPRINT_KEY),
+             ("KeySwitch", SWITCH_KEY),
+             ("KeyDrop", DROP_KEY),
+             ("KeyPickup", PICKUP_KEY),
+             ("KeyReload", RELOAD_KEY))
+# Shells a killed wanderer leaves behind. Two per kill against five spent per
+# magazine means the shotgun runs down unless most shots land, which is the
+# point of giving it a reserve at all.
+AMMO_DROP_SHELLS = 2
+AMMO_PICKUP_RADIUS = 200.0   # cm; walked into, not pressed for
+AMMO_PICKUP_LIFT = 40.0      # cm above the corpse, so it is not inside the mesh
+AMMO_PICKUP_LIFETIME = 120.0 # s before an uncollected drop tidies itself away
+AMMO_SPIN_DEG_PER_S = 90.0
+
+# --- the three found weapons -------------------------------------------------
+# The shotgun and pistol are the starting loadout and are spawned into the
+# player's hands at BeginPlay. These three are not: the only way to get one is
+# to kill something that happens to be carrying it, which is what makes the
+# 10% a reason to keep fighting rather than a number in a table.
+#
+# The balance across all five is deliberately one axis: damage per second is
+# roughly flat, and what differs is how it is delivered. The SMG spends nine
+# rounds to kill a 100 HP wanderer in under a second; the sniper spends one and
+# then makes you wait 1.6 s for the next. The shotgun sits between them and
+# only at close range, because eight pellets in a 5 degree cone stop all
+# landing on one target past about 15 m.
+SMG_MAGAZINE, SMG_RESERVE = 30, 90
+SMG_FIRE_INTERVAL, SMG_RELOAD_SECONDS = 0.09, 1.9
+RIFLE_MAGAZINE, RIFLE_RESERVE = 30, 90
+RIFLE_FIRE_INTERVAL, RIFLE_RELOAD_SECONDS = 0.14, 2.1
+SNIPER_MAGAZINE, SNIPER_RESERVE = 5, 15
+SNIPER_FIRE_INTERVAL, SNIPER_RELOAD_SECONDS = 1.60, 2.6
+
+# Which of the five hold the trigger down. The SMG and the assault rifle do;
+# the shotgun, the pistol and the sniper are one shot per click.
+#
+# This is a property of the weapon and not of the input code, which is the
+# whole reason it is expressible at all: the trigger is polled two ways every
+# frame -- tapped and held -- and the weapon decides which of the two it
+# answers to. Nothing branches on a weapon's name to find out.
+#
+# Note what automatic fire does NOT need: a timer, a "firing" state, or a
+# repeating event. FireInterval and NextFireTime already gate the rate, and
+# they were already being consulted on every frame the trigger was down. All
+# the automatics change is whether a held button still counts as a pull.
+AUTO_DISPLAYS = ("SMG", "Rifle")
+
+# One kill in ten leaves a gun. Rolled once per counted kill, then a second
+# uniform draw picks which of the three -- so each individual weapon is a
+# 1-in-30 drop and a player who wants a specific one has to keep going.
+#
+# Rolled on exactly the same arm as the shells, which means DamagedByPlayer
+# guards it too: a wanderer the terrain swallowed has not been killed, and the
+# safety net must not be a weapon dispenser.
+GUN_DROP_CHANCE = 0.10
+GUN_DROP_FORWARD = 70.0   # cm; clear of the shells, which land on the corpse

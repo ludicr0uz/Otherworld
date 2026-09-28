@@ -787,7 +787,7 @@ DisableMovement -> Capsule.SetCollisionEnabled(NoCollision)
 **There is no death animation in this project and no honest way to make one.** Meshy's rigging
 step generates a walk and a run and nothing else — nothing in `assets/cache/meshy`, and nothing
 among the 21 clips retargeted per creature, ends on the ground. Epic's own `MM_Death_*` set, the
-six clips the player used to play one of, is **hit reactions, not collapses**: measured off the
+six clips the player used to play one of, is **staggers, not collapses**: measured off the
 assets, every one of them is about a second long and ends with the pelvis at 83–88 cm and both
 feet on the floor, having staggered 1.5–2 m backwards. That measurement is the whole diagnosis of
 "the player gets up right away" — the dynamic montage blended out after 1.1 s, the locomotion
@@ -800,6 +800,19 @@ A ragdoll needs no asset. Every character here already carries a physics asset (
 `install_hit_zones` reads the head and limb tables off those bodies, so a rig that could not
 ragdoll could not be shot in the head either. The verifier asserts the physics asset and a body
 count for both characters.
+
+**The creatures' joints are tuned; the importer's are not usable.** `import_characters` gets its
+physics assets from `SkeletalMeshEditorSubsystem.create_physics_asset`, which gives every joint
+one 45/45/45 cone. Knees fold 45° sideways, elbows twist 45° about themselves, and three 45° spine
+joints fold 135°: a corpse on those limits falls "as if it had no bones". `tune_ragdolls()`
+rewrites every joint of every mesh under `/Game/Sourced/Characters` (the player's `Adventurer01`
+included) from `RAGDOLL_JOINT_LIMITS`. These are `PA_Mannequin`'s own numbers, written per
+*anatomical* axis (flex, side-bend, twist): spine 15/10/10, knee 60/5/5, elbow 70/5/20, hip
+55/30/20. `ragdoll_plan()` maps them onto the constraint's axes from the reference pose. Meshy
+bones do not point down X the way the mannequin's do (their X is the hinge axis), so this cannot
+be copied number for number. The limits are symmetric, because UE 5.8 gives Python no access to a
+constraint's frame to offset them. `PA_Mannequin`'s knees are ±60 for the same reason.
+`PA_Mannequin` itself is stock and untouched. The verifier reads the saved limits back.
 
 Order and reasons:
 
@@ -1092,23 +1105,35 @@ take a wanderer from 100 to 61).
 
 ### Hit reactions: a survivor flinches
 
-A hit that does not kill plays a one-second stagger on the upper body, for the player and for
-every wanderer. It is authored by `_author_hit_reaction` in `build_weapons_and_combat.py`, on
-the **False** arm of `BP_HealthComponent`'s death branch, so nothing can ragdoll and flinch in
-the same frame.
+A hit that does not kill plays a short flinch on the upper body, for the player and for every
+wanderer. It is authored by `_author_hit_reaction` in `build_weapons_and_combat.py`, on the
+**False** arm of `BP_HealthComponent`'s death branch, so nothing can ragdoll and flinch in the
+same frame.
 
-**The clips are Epic's `MM_Death_*` set, and they are not deaths.** All six are ~1 s long,
-stagger 1.5–2 m backwards and end with the pelvis at 83–88 cm and both feet on the floor: they
-are flinches, authored to blend into a ragdoll. That is why death here is a ragdoll and nothing
-plays them at 0 HP, and why they fit a character that has been shot and survived.
-`build_retarget.py` retargets all six onto every creature (`HIT_SOURCES`, `hit_paths()`).
+**The clips are Epic's `MM_HitReact_*` set** (`/Game/Characters/Mannequins/Anims/Rifle/HitReact`),
+the flinches Epic ships for exactly this: 0.7–1.2 s, in place, the head moving 3–18 cm and the
+chest turning at most 55° before both come back to rest. `build_retarget.py` retargets the six
+chosen onto every creature (`HIT_SOURCES`, built from the shared tuple).
+
+**Not `MM_Death_*`.** The first version played those, on the reasoning that they end standing and
+so must be staggers. Measured, they carry the head 0.9–2.2 m, and `Front_02`/`Front_03` turn the
+whole body 105–180°. `HitSlot`'s layered blend takes spine rotation in *mesh* space while the legs
+stay on locomotion, so that turn played as the chest spinning half round on walking hips. The
+verifier now measures every clip, rather than trusting names: head displacement under 30 cm,
+chest turn under 60°, on the source clips and on every creature's retargeted copy.
+
+**Epic authored no Left or Right hit react.** Those two slots hold the Front whose head moves
+*away* from that side: `Front_Hvy_01` (head 4 cm right, chest 55° left) answers a hit from the
+left, `Front_Lgt_04` (head 6 cm left, chest 27° right) a hit from the right. The verifier asserts
+the direction of every bucket from the source clip's head motion (the mannequin faces +Y, its
+right is −X).
 
 **The order is a contract.** `NPC_HIT_REACTION_CLIPS` in `forest_generator/npc_placement.py` is
 the one definition. `build_weapons_and_combat.HIT_REACTION_CLIPS` imports it, and the graph bakes
 positions in it into pin literals:
 
 ```
-(Front_01, Front_02, Front_03, Back_01, Left_01, Right_01)
+(Front_Lgt_01, Front_Med_01, Front_Lgt_02, Back_Med_01, Front_Hvy_01, Front_Lgt_04)
 HIT_DIR_FRONT = (0, 3)  HIT_DIR_BACK = (3, 1)  HIT_DIR_LEFT = (4, 1)  HIT_DIR_RIGHT = (5, 1)
 ```
 
@@ -1151,18 +1176,20 @@ PrevHealth = Health                     on every arm
   controller, and they are copied onto the pawn's `HealthComponent` at possession, the same
   route per-variant health takes. Without this, every wanderer would carry `BP_ForestWanderer`'s
   clips, and the wendigos, whose skeleton is different, would never flinch.
-- **The pose verifier exempts reaction clips** from "feet alternate" and "pelvis stays put",
-  because a stagger breaks both on purpose. It also allows the head below the hips, which
-  happens on the wendigo for about half a second as it doubles over. Upright, the pelvis band
-  and head-above-feet are still enforced.
+- **The pose verifier exempts reaction clips from "feet alternate" only**: a flinch keeps its
+  feet planted. In place, upright and the pelvis band are enforced, and all 29 clips per creature
+  pass. Head-below-hips is still tolerated for reactions, a relaxation the `MM_Death_*` set
+  needed on the hunched wendigo.
 
 **Proved at runtime** with a temporary probe (`HIT_REACT_PROBE`, since removed; the verifier
 asserts the switch is off and no probe token survives in any graph). In one 2026-09-28 session
 it logged 200 reactions: 16 on the player and 184 on zombie and wendigo wanderers. All six
 indices fired (Front 0/1/2: 52/49/51, Back 3, Left 32, Right 13), the ready pose was restarted
-94 times, and there were 0 runtime errors. **Needs eyes in a play session:** how the upper-body
-stagger reads with the gun raised, and whether 0.45 s under SMG fire looks like repeated
-impacts rather than jitter.
+94 times, and there were 0 runtime errors. That run used the `MM_Death_*` clips; the graph is
+unchanged by the switch, which only swaps the six assets it indexes. **Needs eyes in a play
+session:** the arms. The set is Epic's *rifle* hit reacts, so a flinching zombie or wendigo
+briefly takes a rifle-holding arm pose. Also whether `Front_Hvy_01` and `Front_Lgt_04` read as
+side hits, and whether 0.45 s under SMG fire looks like repeated impacts rather than jitter.
 
 ### Ammunition
 

@@ -1471,20 +1471,88 @@ check(f"{G.NEXT_REACT_VAR} starts at zero, so the FIRST hit is never on cooldown
 # first, then one each of Back, Left and Right.
 check("the six reaction clips are the shared tuple, not a second copy",
       G.HIT_REACTION_CLIPS is NPC_HIT_REACTION_CLIPS)
-check("three Fronts, then Back, Left, Right -- the order the graph indexes",
-      list(G.HIT_REACTION_CLIPS) == ["MM_Death_Front_01", "MM_Death_Front_02",
-                                     "MM_Death_Front_03", "MM_Death_Back_01",
-                                     "MM_Death_Left_01", "MM_Death_Right_01"],
+check("six clips, all from Epic's MM_HitReact_* set -- not MM_Death_*, whose "
+      "'staggers' carry the head 1-2 m and spin the body up to 180 deg",
+      len(G.HIT_REACTION_CLIPS) == 6
+      and all(c.startswith("MM_HitReact_") for c in G.HIT_REACTION_CLIPS),
       str(G.HIT_REACTION_CLIPS))
+check("the four direction buckets tile the six clips, Fronts first",
+      [G.HIT_DIR_FRONT, G.HIT_DIR_BACK, G.HIT_DIR_LEFT, G.HIT_DIR_RIGHT]
+      == [(0, 3), (3, 1), (4, 1), (5, 1)])
+check("build_retarget.py retargets exactly those six, from Epic's MM_HitReact_* set",
+      [p.rsplit("/", 1)[1] for p in RETARGET_HIT_SOURCES] == list(G.HIT_REACTION_CLIPS)
+      and all(p.startswith(G.HIT_ANIM_FALLBACK_DIR + "/") for p in RETARGET_HIT_SOURCES),
+      str(RETARGET_HIT_SOURCES))
+
+
+def _clip_motion(seq, pelvis, chest, head, forward_axis, right_axis):
+    """(head's peak push as (forward, right) cm, chest's largest turn in deg).
+
+    The turn is the chest's heading change against frame 0, measured on
+    whichever of its axes lies flattest -- the mannequin's spine bones point
+    their X up, where a rotator's yaw means nothing. forward/right are the
+    mesh's own axes (the mannequin faces +Y, its right is -X).
+    """
+    opts = unreal.AnimPoseEvaluationOptions()
+    ext, world = unreal.AnimPoseExtensions, unreal.AnimPoseSpaces.WORLD
+    length = seq.get_play_length()
+    at = lambda t: ext.get_anim_pose_at_time(seq, t, opts)
+    first = at(0.0)
+    q0 = ext.get_bone_pose(first, chest, world).rotation
+    axis = min((unreal.Vector(1, 0, 0), unreal.Vector(0, 1, 0), unreal.Vector(0, 0, 1)),
+               key=lambda a: abs(q0.rotate_vector(a).z))
+    heading = lambda q: math.degrees(math.atan2(q.rotate_vector(axis).y,
+                                                q.rotate_vector(axis).x))
+    h0, head0 = heading(q0), ext.get_bone_pose(first, head, world).translation
+    turn, push = 0.0, (0.0, 0.0, 0.0)
+    for i in range(41):
+        pose = at(length * i / 40)
+        d = (heading(ext.get_bone_pose(pose, chest, world).rotation) - h0 + 180) % 360 - 180
+        turn = max(turn, abs(d))
+        off = ext.get_bone_pose(pose, head, world).translation - head0
+        fwd = off.x * forward_axis.x + off.y * forward_axis.y + off.z * forward_axis.z
+        right = off.x * right_axis.x + off.y * right_axis.y + off.z * right_axis.z
+        if (fwd * fwd + right * right) ** 0.5 > push[0]:
+            push = ((fwd * fwd + right * right) ** 0.5, fwd, right)
+    return push[1], push[2], turn
+
+
+# MEASURED, because the names cannot be trusted twice over: the MM_Death_* set
+# was chosen on its names and spun the chest half round, and Epic authored no
+# Left or Right hit react, so those two slots hold Fronts picked for which way
+# the head goes. A round from a side pushes the head AWAY from it.
+_want = {"Front": lambda f, r: f < 0, "Back": lambda f, r: f > 0,
+         "Left": lambda f, r: r > 0, "Right": lambda f, r: r < 0}
+_mesh_fwd, _mesh_right = unreal.Vector(0, 1, 0), unreal.Vector(-1, 0, 0)
 for (base, count), name in ((G.HIT_DIR_FRONT, "Front"), (G.HIT_DIR_BACK, "Back"),
                             (G.HIT_DIR_LEFT, "Left"), (G.HIT_DIR_RIGHT, "Right")):
-    got = list(G.HIT_REACTION_CLIPS[base:base + count])
-    check(f"the {name} bucket indexes the {name} clips",
-          all(name in c for c in got) and len(got) == count, str(got))
-check("build_retarget.py retargets exactly those six, from Epic's MM_Death_* set",
-      sorted(p.rsplit("/", 1)[1] for p in RETARGET_HIT_SOURCES)
-      == sorted(G.HIT_REACTION_CLIPS),
-      str(sorted(p.rsplit("/", 1)[1] for p in RETARGET_HIT_SOURCES)))
+    for clip in G.HIT_REACTION_CLIPS[base:base + count]:
+        seq = load(f"{G.HIT_ANIM_FALLBACK_DIR}/{clip}")
+        if not seq:
+            check(f"{clip} exists", False)
+            continue
+        fwd, right, turn = _clip_motion(seq, "pelvis", "spine_05", "head",
+                                        _mesh_fwd, _mesh_right)
+        check(f"{clip}, in the {name} bucket, pushes the head away from a hit "
+              f"from the {name.lower()}", _want[name](fwd, right),
+              f"head forward {fwd:+.1f} cm, right {right:+.1f} cm")
+        check(f"{clip} is a flinch: head moves under 30 cm, chest turns under 60 deg",
+              (fwd * fwd + right * right) ** 0.5 < 30.0 and turn < 60.0,
+              f"head {(fwd * fwd + right * right) ** 0.5:.1f} cm, chest {turn:.0f} deg")
+
+# And on every creature's retargeted copy: a retarget with a bad spine chain can
+# put the spin back in on its own, and the retargeted copies are what play.
+for _family in sorted({p.split("/")[-2] for p in unreal.EditorAssetLibrary.list_assets(
+        G.HIT_ANIM_ROOT, recursive=True) if "/A_" in p}):
+    _turns = {}
+    for clip in G.HIT_REACTION_CLIPS:
+        seq = load(f"{G.HIT_ANIM_ROOT}/{_family}/A_{_family}_{clip}")
+        if seq:
+            _turns[clip] = _clip_motion(seq, "Hips", "Spine", "Head",
+                                        _mesh_fwd, _mesh_right)[2]
+    check(f"{_family}: all six flinches retargeted, none turning the chest past 60 deg",
+          len(_turns) == 6 and max(_turns.values()) < 60.0,
+          ", ".join(f"{c[12:]} {t:.0f}" for c, t in _turns.items()))
 
 # The tuning, and that it is on COMBAT rather than loose in the graph.
 for field, low, high in (("hit_react_cooldown_s", 0.05, 3.0),
@@ -1791,6 +1859,40 @@ for bp_path in (G.CHARACTER_BP_PATH, G.NPC_BP_PATH):
         check(f"...with enough bodies to fall apart ({bp_path.rsplit('/', 1)[1]})",
               len(head) + len(limbs) + len(body) >= 8,
               f"{len(head) + len(limbs) + len(body)} bodies")
+
+# The ragdoll's JOINTS, not just its bodies. The importer's physics asset gives
+# every joint one 45/45/45 cone -- knees folding sideways, a three-joint spine
+# folding 135 deg -- and a corpse on those limits falls "as if it had no bones".
+# tune_ragdolls() rewrites them; this reads them back off the saved assets.
+_lib = unreal.ConstraintInstanceBlueprintLibrary
+for _path in sorted(unreal.EditorAssetLibrary.list_assets(G.RAGDOLL_MESH_ROOT,
+                                                          recursive=True)):
+    _mesh = load(_path.split(".")[0])
+    if not isinstance(_mesh, unreal.SkeletalMesh):
+        continue
+    _pa = _mesh.get_editor_property("physics_asset")
+    if not _pa:
+        continue
+    _plan = G.ragdoll_plan(_mesh)
+    _got = {c: [round(v, 1) for v in _lib.get_angular_limits(k)[1:][1::2]]
+            for k, c, _ in _plan}
+    check(f"{_pa.get_name()}: every joint has a role in RAGDOLL_JOINT_LIMITS",
+          len(_plan) == len(_pa.get_constraints(False)),
+          f"{len(_plan)} of {len(_pa.get_constraints(False))}")
+    check(f"...and no joint is left on the importer's uniform 45/45/45 cone",
+          all(v != [45.0, 45.0, 45.0] for v in _got.values()),
+          str({c: v for c, v in _got.items() if v == [45.0, 45.0, 45.0]}))
+    check(f"...and the saved limits are the planned ones",
+          all(_got[c] == [round(x, 1) for x in lim] for _, c, lim in _plan),
+          str(_got))
+    _knees = {c: v for c, v in _got.items() if G._ragdoll_role(c) == "leg"}
+    check(f"...and the knees are hinges: one free axis, two held to 5 deg",
+          len(_knees) == 2 and all(sorted(v)[:2] == [5.0, 5.0] and max(v) == 60.0
+                                   for v in _knees.values()),
+          str(_knees))
+    _spine = {c: v for c, v in _got.items() if G._ragdoll_role(c) == "spine"}
+    check(f"...and no spine joint bends past 15 deg",
+          _spine and all(max(v) <= 15.0 for v in _spine.values()), str(_spine))
 
 # ─── Walking off the edge of the world ───────────────────────────────────────
 # The navmesh is a disc of radius 85 m and the terrain a 200 m square, but the

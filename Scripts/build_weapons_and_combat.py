@@ -130,6 +130,7 @@ version would use the identical aim resolve and fire a velocity along
 """
 
 import dataclasses
+import itertools
 import math
 import os
 import random
@@ -833,6 +834,41 @@ DEBUG_MODE_VAR = "DebugMode"
 # on a PrimitiveComponent it would simulate the one root body, which is a
 # creature-shaped rigid brick falling over rather than a ragdoll.
 RAGDOLL_PROFILE = "Ragdoll"
+# How far each joint of a ragdoll may bend, in degrees: (flex, side-bend,
+# twist), keyed by the joint's CHILD bone with Left/Right stripped -- Meshy's
+# names, the only rigs this is applied to (see tune_ragdolls).
+#
+# The importer's physics asset gives every joint the same 45/45/45 cone: a knee
+# folds 45 deg sideways, an elbow twists 45 deg about itself, and three spine
+# joints stack into a 135 deg fold. That is what "they fall as if they had no
+# bones" was. The numbers are Epic's own PA_Mannequin's, read off the asset and
+# re-expressed per anatomical axis -- spine 10-ish per joint, hinges (knee,
+# elbow) free on one axis and near-locked on the other two, hip 55/30/20, wrist
+# and ankle loose -- with the spine a little looser because Meshy has three
+# spine joints where the mannequin has five.
+#
+# Symmetric, as every Chaos cone limit is: a knee that may bend 60 deg forward
+# may bend 60 back. Epic centres the range with an offset on the constraint
+# frame, and UE 5.8 exposes no constraint frame to Python (the physics asset's
+# setups are protected; ConstraintInstanceBlueprintLibrary has limits, not
+# frames). PA_Mannequin ships its knees at +/-60 too.
+RAGDOLL_JOINT_LIMITS = {
+    "spine":    (15.0, 10.0, 10.0),
+    "neck":     (20.0, 15.0, 20.0),
+    "head":     (25.0, 15.0, 30.0),
+    "shoulder": (15.0, 15.0, 10.0),
+    "arm":      (60.0, 45.0, 30.0),
+    "forearm":  (70.0, 5.0, 20.0),
+    "hand":     (45.0, 25.0, 20.0),
+    "upleg":    (55.0, 30.0, 20.0),
+    "leg":      (60.0, 5.0, 5.0),
+    "foot":     (20.0, 10.0, 10.0),
+    "toebase":  (15.0, 5.0, 5.0),
+}
+# Every mesh under here got its physics asset from the importer
+# (import_characters._ensure_physics). Epic's PA_Mannequin is hand-tuned and a
+# stock asset, and is left alone.
+RAGDOLL_MESH_ROOT = "/Game/Sourced/Characters"
 # How long a corpse lies where it fell. Long enough that a firefight leaves a
 # visible history of itself, short enough that a long session does not end up
 # rendering a hundred skeletal meshes nobody is looking at.
@@ -901,11 +937,14 @@ HIT_SLOT = "HitSlot"
 # the run of Fronts. Front first because it is the common case and the one Epic
 # authored three of.
 #
-# They are Epic's MM_Death_* set and they are not deaths -- see the dying block
-# above, and HIT_SOURCES in Scripts/asset_pipeline/build_retarget.py, which
-# retargets all six onto every creature. Every one is ~1 s long and ends with
-# the pelvis at 83-88 cm and both feet on the floor. Rejected for death for
-# exactly the reason they are right here.
+# They are Epic's MM_HitReact_* set, the flinches Epic ships for this: 0.7-1.2 s
+# each, in place, the head moving 3-18 cm and the chest turning at most 55 deg
+# before both come back to rest. Not MM_Death_* (see the dying block above and
+# HIT_SOURCES in build_retarget.py): those carry the head 1-2 m and two of them
+# turn the whole body 105-180 deg, and through HitSlot's mesh-space blend that
+# was the chest spinning half round on walking legs. Epic authored no Left or
+# Right, so those slots hold the Front whose head moves away from that side --
+# see NPC_HIT_REACTION_CLIPS, and the measurement in the verifier.
 # Imported, not written out again: the wanderers' AI controllers build their
 # own per-creature paths from the same tuple (npc_placement._creature), and two
 # copies of an ORDER that three files index by position is the drift this
@@ -924,7 +963,7 @@ HIT_DIR_RIGHT = (5, 1)
 # build_retarget.anim_dir; it is derived from the mesh's own name at build time
 # (see hit_reactions), never written out per creature.
 HIT_ANIM_ROOT = "/Game/Sourced/Characters/Anims"
-HIT_ANIM_FALLBACK_DIR = "/Game/Characters/Mannequins/Anims/Death"
+HIT_ANIM_FALLBACK_DIR = "/Game/Characters/Mannequins/Anims/Rifle/HitReact"
 # The clips this character can play, on the component, filled per character by
 # install_hit_reactions from that character's OWN skeleton -- exactly as the
 # hit-zone tables are. An AnimSequence belongs to one skeleton, so a shared
@@ -7499,6 +7538,136 @@ def hit_zones(mesh_asset):
     return head, limbs, sorted(bodies - set(head) - set(limbs))
 
 
+def _ragdoll_role(bone):
+    """RAGDOLL_JOINT_LIMITS key for a joint's child bone, or None."""
+    b = bone.lower()
+    for side in ("left", "right"):
+        if b.startswith(side):
+            b = b[len(side):]
+            break
+    if b.startswith("spine"):
+        return "spine"
+    return b if b in RAGDOLL_JOINT_LIMITS else None
+
+
+def ragdoll_plan(mesh_asset):
+    """[(constraint, child bone, (swing1, swing2, twist))] for a mesh's ragdoll.
+
+    The limits are written per ANATOMICAL axis and the constraint wants them
+    per CONSTRAINT axis -- twist about X, swing1 about Z, swing2 about Y of the
+    child body's frame, which for an importer-made joint is the child bone's
+    own frame. Meshy's bones do not point down X the way the mannequin's do,
+    so which constraint axis is "the knee's hinge" is worked out from the
+    reference pose rather than assumed: the twist axis runs along the bone,
+    flex is the body's left-right axis made perpendicular to it (for a leg, the
+    hinge; for an arm hanging in an A-pose, the elbow's), side-bend is the
+    third. Each constraint axis takes the anatomical axis it lines up with.
+    """
+    def vec(v):
+        return (v.x, v.y, v.z)
+
+    def sub(a, b):
+        return tuple(x - y for x, y in zip(a, b))
+
+    def dot(a, b):
+        return sum(x * y for x, y in zip(a, b))
+
+    def norm(a):
+        n = dot(a, a) ** 0.5
+        return tuple(x / n for x in a) if n > 1e-6 else None
+
+    def cross(a, b):
+        return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0])
+
+    def perp(a, b):
+        return norm(sub(a, tuple(dot(a, b) * x for x in b)))
+
+    pa = mesh_asset.get_editor_property("physics_asset")
+    skeleton = mesh_asset.get_editor_property("skeleton")
+    if not pa or not skeleton:
+        return []
+    pose = unreal.AnimPoseExtensions.get_reference_pose(skeleton)
+    names = [str(n) for n in unreal.AnimPoseExtensions.get_bone_names(pose)]
+    xf = {n: unreal.AnimPoseExtensions.get_bone_pose(
+        pose, n, unreal.AnimPoseSpaces.WORLD) for n in names}
+    pos = {n: vec(t.translation) for n, t in xf.items()}
+    probe = unreal.SkeletalMeshComponent()
+    probe.set_skeletal_mesh_asset(mesh_asset)
+    parent = {n: str(probe.get_parent_bone(n)) for n in names}
+
+    # The body's left-right axis, from every Left*/Right* pair it has.
+    pairs = [sub(pos[n], pos["Right" + n[4:]]) for n in names
+             if n.startswith("Left") and "Right" + n[4:] in pos]
+    lateral = norm(tuple(sum(c) for c in zip(*pairs))) if pairs else None
+    if lateral is None:
+        raise RuntimeError(f"{mesh_asset.get_name()} has no Left/Right bone "
+                           "pairs to find its sides from")
+
+    plan = []
+    for constraint in pa.get_constraints(False):
+        ends = [str(n) for n in unreal.ConstraintInstanceBlueprintLibrary
+                .get_attached_body_names(constraint) if isinstance(n, unreal.Name)]
+        child = ends[-1] if ends else None
+        role = _ragdoll_role(child) if child in pos else None
+        if role is None:
+            _log(f"note: {pa.get_name()}: no ragdoll limits for joint {ends} "
+                 "-- left as imported")
+            continue
+        kids = [pos[n] for n in names if parent[n] == child]
+        if kids:
+            along = norm(sub(tuple(sum(c) / len(kids) for c in zip(*kids)), pos[child]))
+        else:
+            along = norm(sub(pos[child], pos[parent[child]]))
+        flex = perp(lateral, along) or perp((0.0, 0.0, 1.0), along)
+        anatomy = {"flex": flex, "side": cross(along, flex), "twist": along}
+        rot = xf[child].rotation
+        frame = {"twist": vec(rot.rotate_vector(unreal.Vector(1, 0, 0))),
+                 "swing1": vec(rot.rotate_vector(unreal.Vector(0, 0, 1))),
+                 "swing2": vec(rot.rotate_vector(unreal.Vector(0, 1, 0)))}
+        slots = list(frame)
+        best = max(itertools.permutations(anatomy),
+                   key=lambda perm: sum(abs(dot(frame[s], anatomy[a]))
+                                        for s, a in zip(slots, perm)))
+        limit = dict(zip(("flex", "side", "twist"), RAGDOLL_JOINT_LIMITS[role]))
+        by_slot = {s: limit[a] for s, a in zip(slots, best)}
+        plan.append((constraint, child,
+                     (by_slot["swing1"], by_slot["swing2"], by_slot["twist"])))
+    return plan
+
+
+def tune_ragdolls():
+    """Give every imported creature's ragdoll real joints. See RAGDOLL_JOINT_LIMITS.
+
+    Every skeletal mesh under RAGDOLL_MESH_ROOT, whether or not anything wears
+    it yet: which creature is the player and which ten are wanderers is decided
+    in other files, and all of them die.
+    """
+    lib = unreal.ConstraintInstanceBlueprintLibrary
+    limited = unreal.AngularConstraintMotion.ACM_LIMITED
+    eas = _assets()
+    for path in sorted(eas.list_assets(RAGDOLL_MESH_ROOT, recursive=True)):
+        mesh = eas.load_asset(path.split(".")[0])
+        if not isinstance(mesh, unreal.SkeletalMesh):
+            continue
+        pa = mesh.get_editor_property("physics_asset")
+        plan = ragdoll_plan(mesh)
+        if not plan:
+            continue
+        pa.modify()
+        for constraint, child, (swing1, swing2, twist) in plan:
+            lib.set_angular_limits(constraint, limited, swing1, limited, swing2,
+                                   limited, twist)
+            got = lib.get_angular_limits(constraint)[1:]
+            if [round(got[i], 3) for i in (1, 3, 5)] != [swing1, swing2, twist]:
+                raise RuntimeError(f"{pa.get_name()}: limits on {child} did not "
+                                   f"stick: {got}")
+        eas.save_loaded_asset(pa)
+        _log(f"{pa.get_name()}: {len(plan)} joints limited like a body -- "
+             + ", ".join(f"{c} {s1:.0f}/{s2:.0f}/{t:.0f}"
+                         for _, c, (s1, s2, t) in plan))
+
+
 def install_hit_zones(bp, health_handle):
     """Write this character's own hit-box tables onto its HealthComponent.
 
@@ -7871,6 +8040,7 @@ def main():
     _log(f"{HEALTH_BP_PATH}.DropClasses -> {', '.join(DROP_DISPLAYS)} "
          f"({GUN_DROP_CHANCE * 100:.0f}% per kill)")
 
+    tune_ragdolls()
     install_on_character(health_bp, weapon_bp, footstep_bp)
     install_on_npc(health_bp, footstep_bp)
     retire_old_assets()

@@ -86,11 +86,17 @@ NPC_MELEE_BLEND_S = 0.15
 # Bare clip names, because the same six exist once per creature under that
 # creature's own Anims folder (an AnimSequence belongs to one skeleton, exactly
 # as the melee swing above does).  Scripts/asset_pipeline/build_retarget.py
-# produces them from Epic's MM_Death_* set, which -- measured -- is not deaths
-# at all but one-second hit reactions; see HIT_SOURCES there.
-NPC_HIT_REACTION_CLIPS = ("MM_Death_Front_01", "MM_Death_Front_02",
-                          "MM_Death_Front_03", "MM_Death_Back_01",
-                          "MM_Death_Left_01", "MM_Death_Right_01")
+# produces them from Epic's MM_HitReact_* set -- the flinches Epic ships for
+# exactly this; see HIT_SOURCES there for why it is not MM_Death_*.
+#
+# Epic authored no Left or Right, so the side slots are the two Fronts whose
+# head moves AWAY from that side (measured off the source assets, and asserted
+# by verify_weapons_and_combat.py rather than trusted to the names):
+#   Front_Hvy_01  head 4 cm to the right, chest turned 55 deg left -> hit on the LEFT
+#   Front_Lgt_04  head 6 cm to the left,  chest turned 27 deg right -> hit on the RIGHT
+NPC_HIT_REACTION_CLIPS = ("MM_HitReact_Front_Lgt_01", "MM_HitReact_Front_Med_01",
+                          "MM_HitReact_Front_Lgt_02", "MM_HitReact_Back_Med_01",
+                          "MM_HitReact_Front_Hvy_01", "MM_HitReact_Front_Lgt_04")
 
 # How much health a wanderer has. The zombie is the yardstick -- 100 HP against
 # a pistol that does 26 means four rounds, which is what the weapon damage

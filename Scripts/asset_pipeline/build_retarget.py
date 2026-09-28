@@ -40,8 +40,14 @@ string match rather than a fuzzy guess.
 
 import math
 import os
+import sys
 
 import unreal
+
+# The hit-reaction tuple is shared with the NPC and weapons builders, whose
+# graphs index it by position; one copy of an order is the only safe number.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from forest_generator.npc_placement import NPC_HIT_REACTION_CLIPS  # noqa: E402
 
 MANNEQUIN_MESH = "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple"
 
@@ -182,32 +188,26 @@ MELEE_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
 AIM_SOURCES = ("/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS",
                "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS")
 
-# The hit reactions -- and the reason they are spelled MM_Death_*.
+# The hit reactions: Epic's MM_HitReact_* set, the flinches it ships for this.
 #
-# Epic's "death" set is not deaths.  Measured off the source assets: every one
-# of the six is about a second long and ends with the pelvis at 83-88 cm and
-# both feet on the floor, having staggered 1.5-2 m backwards.  They are
-# FLINCHES authored to be blended into a ragdoll, which is why the project's
-# own death is a ragdoll and nothing plays these at 0 HP (see the dying block
-# in build_weapons_and_combat.py).  What they are is exactly what a survivor
-# reacting to a bullet needs, so this is where they earn their place.
+# NOT MM_Death_*, which this project played for a while on the strength of
+# "they end standing, so they are staggers". They are staggers the way a man
+# thrown across a room is: measured off the source assets, they carry the head
+# 0.9-2.2 m, and Front_02 and Front_03 turn the whole body 105-180 deg. Played
+# into the upper-body HitSlot, whose blend takes spine rotation in MESH space
+# while the legs stay on locomotion, that turn became the chest spinning half
+# round on walking hips. The MM_HitReact_* set moves the head 3-18 cm, turns the
+# chest at most 55 deg and comes back to where it started, in place.
 #
-# The names carry a DIRECTION and that direction is load-bearing:
-# build_weapons_and_combat.hit_reactions() sorts the retargeted copies into
-# HIT_REACTION_CLIPS order and the health component picks by which side the
-# round came from.  Three Fronts and one each of the others is what Epic
-# shipped, and the three Fronts are why being shot from in front -- the common
-# case -- does not look like a loop.
+# The six chosen, and their order, are NPC_HIT_REACTION_CLIPS's -- see there for
+# which Front stands in for Left and Right, since Epic authored neither.
+# build_weapons_and_combat.hit_reactions() sorts the retargeted copies into that
+# order and the health component picks by which side the round came from.
 #
 # Retargeted for every creature, for the same reason the aim poses are: which
 # body the player wears is a decision taken in another file.
-HIT_DIR = "/Game/Characters/Mannequins/Anims/Death"
-HIT_SOURCES = (f"{HIT_DIR}/MM_Death_Front_01",
-               f"{HIT_DIR}/MM_Death_Front_02",
-               f"{HIT_DIR}/MM_Death_Front_03",
-               f"{HIT_DIR}/MM_Death_Back_01",
-               f"{HIT_DIR}/MM_Death_Left_01",
-               f"{HIT_DIR}/MM_Death_Right_01")
+HIT_DIR = "/Game/Characters/Mannequins/Anims/Rifle/HitReact"
+HIT_SOURCES = tuple(f"{HIT_DIR}/{clip}" for clip in NPC_HIT_REACTION_CLIPS)
 
 RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE) + AIM_SOURCES + HIT_SOURCES
 
@@ -909,18 +909,16 @@ def _check_pose(anim, ref_hips):
     # was the one clip to fail the grounded band.  Upright and in-place still
     # apply to it: a jump that folds double or drifts sideways is still wrong.
     #
-    # A HIT REACTION (MM_Death_*, see HIT_SOURCES -- they are flinches, not
-    # deaths) is a stagger: the whole point of it is that the creature is
-    # knocked off its feet' rhythm and shoved 1.5-2 m backwards, so both "the
-    # feet alternate" and "the pelvis stays put" are assertions that it is NOT
-    # a reaction.  Upright and the hip band still apply, and between them they
-    # are the whole reason these clips were usable here at all: a reaction that
-    # ended on the floor would be a death and this project does not have one.
+    # A HIT REACTION (MM_HitReact_*, see HIT_SOURCES) has no gait -- the
+    # feet stay planted while the chest takes the hit -- so "the feet
+    # alternate" is an assertion that it is NOT a reaction. In place, upright
+    # and the hip band all still apply: a flinch that travels, or folds a
+    # creature onto the floor, is the MM_Death_* mistake over again.
     name = anim.get_name()
     grounded = not any(k in name for k in ("Jump", "Fall", "Land"))
-    reaction = "Death" in name
+    reaction = "HitReact" in name
     has_gait = grounded and not reaction and "Idle" not in name
-    in_place = not reaction
+    in_place = True
 
     for t in samples:
         p = {b: _bone_world(anim, b, t)

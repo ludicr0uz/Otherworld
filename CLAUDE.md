@@ -1090,6 +1090,80 @@ follow the animation. **Not yet proved:** a real trigger pull through the full g
 runs cannot press the mouse, so that needs a play session (a head shot with the pistol should
 take a wanderer from 100 to 61).
 
+### Hit reactions: a survivor flinches
+
+A hit that does not kill plays a one-second stagger on the upper body, for the player and for
+every wanderer. It is authored by `_author_hit_reaction` in `build_weapons_and_combat.py`, on
+the **False** arm of `BP_HealthComponent`'s death branch, so nothing can ragdoll and flinch in
+the same frame.
+
+**The clips are Epic's `MM_Death_*` set, and they are not deaths.** All six are ~1 s long,
+stagger 1.5–2 m backwards and end with the pelvis at 83–88 cm and both feet on the floor: they
+are flinches, authored to blend into a ragdoll. That is why death here is a ragdoll and nothing
+plays them at 0 HP, and why they fit a character that has been shot and survived.
+`build_retarget.py` retargets all six onto every creature (`HIT_SOURCES`, `hit_paths()`).
+
+**The order is a contract.** `NPC_HIT_REACTION_CLIPS` in `forest_generator/npc_placement.py` is
+the one definition. `build_weapons_and_combat.HIT_REACTION_CLIPS` imports it, and the graph bakes
+positions in it into pin literals:
+
+```
+(Front_01, Front_02, Front_03, Back_01, Left_01, Right_01)
+HIT_DIR_FRONT = (0, 3)  HIT_DIR_BACK = (3, 1)  HIT_DIR_LEFT = (4, 1)  HIT_DIR_RIGHT = (5, 1)
+```
+
+If you reorder the tuple, a shot in the back plays a Left clip and nothing reports it. It is all
+six or none. `hit_reactions()` returns an empty list unless every clip exists on the mesh's own
+skeleton, because five of six would give the wrong clip rather than a missing one. An empty
+array is guarded in the graph, so that character simply does not flinch.
+
+```
+Health < PrevHealth?                    polled on Tick, so every damage source reacts
+  -> now >= NextReactTime?              cooldown: COMBAT.hit_react_cooldown_s (0.45 s)
+    -> HitReactions not empty?
+      -> f = LastHitFrom . forward, r = LastHitFrom . right
+         f >= |r| Front (random 1 of 3) | -f > |r| Back | r > |f| Right | -r > |f| Left
+      -> Montage into HitSlot at COMBAT.hit_react_rate (1.4x), blend COMBAT.hit_react_blend_s
+      -> NextReactTime = now + cooldown
+PrevHealth = Health                     on every arm
+```
+
+- **`LastHitFrom`** is a unit vector from the victim toward the source. The damage dealer writes
+  it: `_author_impact` derives it from the pellet's impact normal, and the wanderers' punch
+  derives it from the two actor locations already on its range check. Nobody has to write it,
+  though. The zero vector makes both dots 0, and `>=` on the front test sends that case to
+  Front. When the pack surrounds you, each hit comes from its own side.
+- **The index is clamped** against the array's real length, so a short array cannot cause an
+  `Array_Get` off the end.
+- **`HitSlot` is a slot of its own** (`_ensure_hit_slot`), spliced after the aim blend through a
+  second `LayeredBoneBlend` on the same spine root. The chest, arms and head take the hit, and
+  the legs keep running. It cannot be `DefaultSlot`, because the weapon's ready pose is a
+  9999-loop montage held there.
+- **`_author_ready_pose_keepalive` is required, not belt and braces.** All slots share the
+  default montage *group* (`USkeleton::SetSlotGroupName` is not reachable from Python in 5.8),
+  so starting the flinch in `HitSlot` stops the ready pose in `DefaultSlot`. Before this
+  existed, the first hit left the player holding the gun in the locomotion pose for the rest of
+  the session. The keepalive restarts the ready pose from Tick when both slots are quiet. The
+  `HitSlot`-quiet condition stops it from cancelling the flinch on its first frame.
+- **Each wanderer variant's clips travel on its AI controller.** Every creature has its own
+  skeleton, and Python cannot reach a child Blueprint's override of an inherited component
+  (`InheritableComponentHandler`). So `NpcVariant.reactions` puts each variant's six on its
+  controller, and they are copied onto the pawn's `HealthComponent` at possession, the same
+  route per-variant health takes. Without this, every wanderer would carry `BP_ForestWanderer`'s
+  clips, and the wendigos, whose skeleton is different, would never flinch.
+- **The pose verifier exempts reaction clips** from "feet alternate" and "pelvis stays put",
+  because a stagger breaks both on purpose. It also allows the head below the hips, which
+  happens on the wendigo for about half a second as it doubles over. Upright, the pelvis band
+  and head-above-feet are still enforced.
+
+**Proved at runtime** with a temporary probe (`HIT_REACT_PROBE`, since removed; the verifier
+asserts the switch is off and no probe token survives in any graph). In one 2026-09-28 session
+it logged 200 reactions: 16 on the player and 184 on zombie and wendigo wanderers. All six
+indices fired (Front 0/1/2: 52/49/51, Back 3, Left 32, Right 13), the ready pose was restarted
+94 times, and there were 0 runtime errors. **Needs eyes in a play session:** how the upper-body
+stagger reads with the gun raised, and whether 0.45 s under SMG fire looks like repeated
+impacts rather than jitter.
+
 ### Ammunition
 
 The shotgun starts with twenty shells — **five in the gun and fifteen spare**, not five plus

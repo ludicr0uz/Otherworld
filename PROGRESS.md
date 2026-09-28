@@ -508,3 +508,25 @@ a missing `BP_ShotgunComponent`, a dead verifier for an asset
   that already existed, so changed material recipes silently never landed.
 
 Nothing has been committed. The working tree holds all eight tasks' changes.
+
+---
+
+# Otherworld — orchestrated task run 2 (2026-09-28)
+
+Ten tasks, executed strictly in order, one subagent each.
+Baseline commit: `d0c5cb8 AI progress` (run 1's eight tasks, all landed).
+
+| #  | Task | Status |
+|----|------|--------|
+| 11 | Hit impact animation for player and NPCs | pending |
+| 12 | NPC patrol state + agro: vision cone, audio radius, gunshot-sound cone; configurable agro settings | pending |
+| 13 | NPCs spawn patrolling; per-type configurable circular patrol area | pending |
+| 14 | Per-gun shot volume in the combat config (sniper loudest → pistol quietest) | pending |
+| 15 | Player melee attack when no gun is equipped | pending |
+| 16 | Inventory size raised to 10 | pending |
+| 17 | Food and water items, randomly spawned around the level | pending |
+| 18 | Trigger button eats/drinks the selected food/water | pending |
+| 19 | Hunger, thirst and temperature bars; hunger/thirst decay, eating/drinking replenish | pending |
+| 20 | Starving/dehydrated debuff at zero, draining HP slowly | pending |
+
+## Results — run 2

@@ -149,6 +149,7 @@ from forest_generator.npc_placement import (                      # noqa: E402
     NPC_SPAWN_MAX_DISTANCE_CM,
     NPC_RESPAWN_NAV_SNAP_CM,
     NPC_CAPSULE_HALF_HEIGHT_CM,
+    NPC_HIT_REACTION_CLIPS,
 )
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -679,6 +680,29 @@ class CombatConfig:
     # back. Kept well under 1 so the climb is still recognisably upward.
     recoil_horizontal_ratio: float = 0.35
 
+    # --- flinching (taking a hit and living) ---------------------------------
+    # Anything that takes damage and survives plays a one-second stagger on its
+    # upper body, picked by which side the hit came from. See the hit-reaction
+    # block below HIT_SLOT for what it is made of and why it is upper body.
+    #
+    # The cooldown is the load-bearing number of the three. The reaction is
+    # triggered by a per-frame "is Health lower than it was last frame" poll, so
+    # without one the SMG (one round every 0.09 s) would restart the montage
+    # eleven times a second and the target would stand in the first two frames
+    # of a flinch forever -- a vibration, not a reaction. 0.45 s is a little
+    # over half the clip at the rate below: consecutive hits still re-trigger,
+    # visibly, but only after the previous stagger has read.
+    hit_react_cooldown_s: float = 0.45
+    # Faster than authored. The clips are ~1.0 s of stagger-and-recover, which
+    # is a long time to have your chest yanked around in a firefight; 1.4x
+    # brings it to ~0.7 s, which still reads and gets the arms back under the
+    # player's control sooner.
+    hit_react_rate: float = 1.4
+    # In and out. Short enough to look like an impact -- a hit that eases in
+    # over a quarter of a second reads as a stumble, not a bullet -- and long
+    # enough not to pop the chest between two poses in one frame.
+    hit_react_blend_s: float = 0.08
+
 
 COMBAT = CombatConfig()
 
@@ -824,6 +848,119 @@ DEATH_PAUSE_SECONDS = 2.2
 # want it -- DefaultSlot is filtered to the upper body so the aim pose leaves
 # the legs walking.
 FULL_BODY_SLOT = "FullBodySlot"
+
+# --- flinching: the hit reaction ---------------------------------------------
+# A survivor reacts; a corpse ragdolls. The two are deliberately different
+# mechanisms and they cannot both be wanted at once, which is why the reaction
+# hangs off the **False** arm of the death branch in BP_HealthComponent's Tick:
+# "Health went down since last frame AND it is still above zero".
+#
+# WHY A POLL AND NOT A CALL. Damage is written straight onto Health by whoever
+# did it -- the weapon component's pellet loop, the wanderers' melee, the world
+# floor. Triggering the reaction at each of those sites means each of them can
+# forget, and the next damage source that appears starts out silent. Comparing
+# Health against PrevHealth once per Tick is one place that cannot be forgotten
+# and does not care where the damage came from. It also gets "and survived" for
+# free: the frame a target dies, the death branch is taken and the reaction arm
+# is never reached, so nothing can flinch and ragdoll in the same frame.
+#
+# WHY ITS OWN SLOT, UPPER BODY. Three montages want the chest at various times
+# and playing two into one slot stops the first:
+#
+#   DefaultSlot    the aim pose, a 9999-loop dynamic montage the player holds
+#                  for as long as a weapon is equipped, and the wanderers'
+#                  attack swing. Reacting into it would kill the ready pose and
+#                  leave the player holding a rifle in the locomotion pose until
+#                  the next equip -- "does not break aiming" ruled it out.
+#   FullBodySlot   free, and full body. A one-second full-body stagger stops the
+#                  legs: the player loses control of a running character mid
+#                  firefight and a charging wanderer freezes in the open.
+#   HitSlot        added here, downstream of the aim blend and filtered to the
+#                  same spine root, so a reaction overrides the ready pose (and
+#                  the swing) for its duration and blends back out of it, while
+#                  the legs never stop.
+#
+# A slot with nothing playing passes its input straight through, and the second
+# layered blend's two inputs are then the same pose, so this costs nothing until
+# something is actually hit.
+#
+# WHAT A SEPARATE SLOT DOES NOT BUY, and this is the one surprise in the whole
+# feature: montages are stopped per GROUP, not per slot. Every slot belongs to
+# the skeleton's default group unless USkeleton::SetSlotGroupName says
+# otherwise, and UE 5.8 exposes none of that to Python -- `slot_group_names`,
+# `slot_to_group_name_map` and `slot_anim_tracks` all fail as editor properties
+# on a USkeleton, and the class has no slot or group methods at all (measured).
+# So a flinch in HitSlot DOES stop the ready pose in DefaultSlot. What the
+# separate slot buys is the POSE -- the reaction lands on top of the aim pose
+# for its second instead of replacing the whole upper body for good -- and
+# _author_ready_pose_keepalive buys back the rest by restarting the ready pose
+# on the first frame after the stagger.
+HIT_SLOT = "HitSlot"
+# The six clips, and the ORDER IS THE CONTRACT: the graph picks a direction,
+# turns it into a base index into this array, and adds a random offset within
+# the run of Fronts. Front first because it is the common case and the one Epic
+# authored three of.
+#
+# They are Epic's MM_Death_* set and they are not deaths -- see the dying block
+# above, and HIT_SOURCES in Scripts/asset_pipeline/build_retarget.py, which
+# retargets all six onto every creature. Every one is ~1 s long and ends with
+# the pelvis at 83-88 cm and both feet on the floor. Rejected for death for
+# exactly the reason they are right here.
+# Imported, not written out again: the wanderers' AI controllers build their
+# own per-creature paths from the same tuple (npc_placement._creature), and two
+# copies of an ORDER that three files index by position is the drift this
+# project's one-table rule exists to prevent.
+HIT_REACTION_CLIPS = NPC_HIT_REACTION_CLIPS
+# (base index, count) per direction, derived from the tuple above rather than
+# written twice -- the graph bakes these numbers into pin literals, so a
+# reordering that only changed the tuple would otherwise play a Left clip for a
+# hit in the back and nothing would say so.
+HIT_DIR_FRONT = (0, 3)
+HIT_DIR_BACK = (3, 1)
+HIT_DIR_LEFT = (4, 1)
+HIT_DIR_RIGHT = (5, 1)
+# Where the six live once retargeted, and the fallback for a checkout with no
+# /Game/Sourced. The creature layout mirrors npc_placement._creature and
+# build_retarget.anim_dir; it is derived from the mesh's own name at build time
+# (see hit_reactions), never written out per creature.
+HIT_ANIM_ROOT = "/Game/Sourced/Characters/Anims"
+HIT_ANIM_FALLBACK_DIR = "/Game/Characters/Mannequins/Anims/Death"
+# The clips this character can play, on the component, filled per character by
+# install_hit_reactions from that character's OWN skeleton -- exactly as the
+# hit-zone tables are. An AnimSequence belongs to one skeleton, so a shared
+# default here could only ever be right for one body.
+HIT_REACTIONS_VAR = "HitReactions"
+# Unit vector, world space, pointing from the victim TOWARD whatever hit it.
+# Written by the pellet loop (off the impact normal, which already points back
+# up the shot) and by a wanderer's punch; read once, by the direction pick.
+# Zero is a legal value and means "nobody said" -- the pick is written so that
+# it falls to Front, which is the reaction that has three clips.
+LAST_HIT_FROM_VAR = "LastHitFrom"
+# What Health was on the previous Tick. The whole trigger.
+PREV_HEALTH_VAR = "PrevHealth"
+# When the next reaction may start, in world seconds. Same shape as the
+# wanderers' NextVoiceTime and the weapons' NextFireTime: a deadline, not a
+# timer, so nothing has to tick it down.
+NEXT_REACT_VAR = "NextReactTime"
+# The index the direction pick chose, stored rather than wired because it is
+# written on four different exec arms and read by one.
+REACT_INDEX_VAR = "ReactIndex"
+# TEMPORARY INSTRUMENTATION, and it must stay False.
+#
+# "A gate that never opens looks identical to one that works": a -game run in
+# which nothing flinched and a -game run in which the reaction silently never
+# fired produce the same log. Flipping this to True adds one PrintWarning to
+# the end of the reaction chain, naming the actor and the clip index, so the
+# path can be proved to run -- and it was, see the hit-reaction section of
+# CLAUDE.md for the numbers. It is then flipped back and the builder re-run,
+# which is what removes the node; verify_weapons_and_combat.py asserts BOTH
+# that this is False and that no node in the built graph prints the token, so
+# a probe left switched on cannot pass.
+HIT_REACT_PROBE = False
+HIT_REACT_PROBE_PREFIX = "[HIT-REACT] "
+# The other half of the same probe: the ready pose putting itself back.
+POSE_BACK_PROBE_PREFIX = "[POSE-BACK] "
+
 # Pellet tracers drawn in the world for this many seconds, in debug mode only.
 # They are the only way to see *where* a shot went -- sound and blood tell you a
 # shot happened and that it connected, but not that it missed high -- which is
@@ -1964,6 +2101,98 @@ def _configure_blend(blend):
                            "inherit the locomotion hips and aim off to one side")
 
 
+def _slot_name(node):
+    """The slot a Slot node plays, as a plain string."""
+    return str(node.get_editor_property("node").get_editor_property("slot_name"))
+
+
+def _name_slot(node, wanted):
+    """Rename a Slot node's inner slot, and prove it took.
+
+    The palette entry for a slot node is spelled with the slot's own name
+    (``Slot'DefaultSlot'``) and only *registered* names appear there, so a new
+    slot cannot be asked for directly. The way round it is the way the editor
+    does it anyway: spawn the DefaultSlot entry, rename the node's inner slot,
+    and let the compiler register the new name -- UAnimGraphNode_Slot::
+    BakeDataDuringCompilation calls Skeleton->RegisterSlotNode on whatever name
+    it finds, so one compile is all the registration takes.
+    """
+    inner = node.get_editor_property("node")
+    inner.set_editor_property("slot_name", wanted)
+    node.set_editor_property("node", inner)
+    if _slot_name(node) != wanted:
+        raise RuntimeError(f"the slot kept the name {_slot_name(node)!r}")
+    return node
+
+
+def _anim_nodes(ed, class_name):
+    return [n for n in ed.list_all_nodes()
+            if n.get_class().get_name() == class_name]
+
+
+def _slot_node(ed, name):
+    """The Slot node playing ``name``, or None."""
+    for n in _anim_nodes(ed, "AnimGraphNode_Slot"):
+        if _slot_name(n) == name:
+            return n
+    return None
+
+
+def _ensure_hit_slot(ed, aim_blend):
+    """Splice Slot(HitSlot) and a second layered blend in after the aim blend.
+
+        aim_blend --+--------------------------> LayeredBoneBlend.BasePose --+
+                    |                                                        |--> on
+                    +--> Slot(HitSlot) --------> LayeredBoneBlend.Blend -----+
+
+    filtered on the same spine root, so a hit reaction reaches the chest, the
+    arms and the head and never the legs.
+
+    It has to be a slot of its own rather than DefaultSlot -- see the block at
+    HIT_SLOT. The short version: DefaultSlot is occupied for the whole time a
+    weapon is held (the ready pose is a 9999-loop dynamic montage) and playing a
+    second montage into one slot stops the first, so reacting there would cost
+    the player their aim pose permanently.
+
+    Both of the second blend's inputs are the SAME pose whenever nothing is
+    playing -- a slot with no montage passes its source straight through -- so
+    the whole insertion is a no-op at rest whatever weight it carries.
+
+    Re-running is safe: an existing HitSlot is left wired where it is and only
+    its settings are re-applied, so this never stacks a third blend on the
+    chain.
+    """
+    already = _slot_node(ed, HIT_SLOT)
+    if already:
+        feeds = PIN.list_connected_pins(_pin(already, "Pose", is_input=False))
+        if not feeds:
+            raise RuntimeError(f"Slot({HIT_SLOT}) is in the graph but wired to "
+                               "nothing — refusing to guess how it was meant to go")
+        _configure_blend(PIN.get_owning_node(feeds[0]))
+        return already
+
+    out = _pin(aim_blend, "Pose", is_input=False)
+    downstream = list(PIN.list_connected_pins(out))
+    if not downstream:
+        raise RuntimeError("the aim blend feeds nothing; graph is not what we expect")
+
+    slot = _name_slot(_at(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"),
+                          -280, 900), HIT_SLOT)
+    blend = _at(_palette(ed, "Animation|Blends|Layeredblendperbone"), -20, 900)
+
+    PIN.break_pin_links(out)
+    # One pose output legally drives more than one input, so the aim blend
+    # reaches both the new blend's base and the slot's source with no cached
+    # pose pair in between.
+    _connect(out, _pin(blend, "BasePose"))
+    _connect(out, _pin(slot, "Source"))
+    _connect(_pin(slot, "Pose", is_input=False), _pin(blend, "BlendPoses_0"))
+    for pin in downstream:
+        _connect(_pin(blend, "Pose", is_input=False), pin)
+    _configure_blend(blend)
+    return slot
+
+
 def _ensure_full_body_slot(ed):
     """Insert Slot(FullBodySlot) between the blend and the ControlRig.
 
@@ -1975,16 +2204,13 @@ def _ensure_full_body_slot(ed):
     legs included. Playing a death into DefaultSlot instead folds the chest over
     legs that are still standing in the locomotion pose.
 
-    The palette entry for a slot node is spelled with the slot's own name
-    (``Slot'DefaultSlot'``) and only registered names appear, so a new slot
-    cannot be asked for directly. The way round it is the way the editor does it
-    anyway: spawn the DefaultSlot entry, rename the node's inner slot, and let
-    the compiler register the new name -- UAnimGraphNode_Slot::
-    BakeDataDuringCompilation calls Skeleton->RegisterSlotNode on whatever name
-    it finds, so one compile is all the registration takes.
+    Nothing plays into it today -- the death is a ragdoll and the hit reaction
+    is upper body, in HitSlot -- and a slot with nothing playing costs nothing,
+    so it stays as the one full-body override either character has.
+
+    See _name_slot for how a slot that is not in the palette gets made at all.
     """
-    rigs = [n for n in ed.list_all_nodes()
-            if n.get_class().get_name() == "AnimGraphNode_ControlRig"]
+    rigs = _anim_nodes(ed, "AnimGraphNode_ControlRig")
     if len(rigs) != 1:
         raise RuntimeError(f"expected one ControlRig node, found {len(rigs)}")
     rig = rigs[0]
@@ -1995,22 +2221,13 @@ def _ensure_full_body_slot(ed):
                            "we expect")
     upstream = PIN.get_owning_node(feeding[0])
 
-    def name_it(node):
-        inner = node.get_editor_property("node")
-        inner.set_editor_property("slot_name", FULL_BODY_SLOT)
-        node.set_editor_property("node", inner)
-        back = str(node.get_editor_property("node").get_editor_property("slot_name"))
-        if back != FULL_BODY_SLOT:
-            raise RuntimeError(f"the slot kept the name {back!r}")
-
     if upstream.get_class().get_name() == "AnimGraphNode_Slot":
         # Already inserted by an earlier run: re-apply the name and leave the
         # wiring alone, so re-running never stacks a second slot on the chain.
-        name_it(upstream)
-        return upstream
+        return _name_slot(upstream, FULL_BODY_SLOT)
 
-    slot = _at(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"), -140, 620)
-    name_it(slot)
+    slot = _name_slot(_at(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"),
+                          -140, 620), FULL_BODY_SLOT)
     PIN.break_pin_links(_pin(rig, "Source"))
     _connect(_pin(upstream, "Pose", is_input=False), _pin(slot, "Source"))
     _connect(_pin(slot, "Pose", is_input=False), _pin(rig, "Source"))
@@ -2045,6 +2262,19 @@ def patch_anim_blueprint():
     arms aim where they were authored to aim no matter which way the hips are
     turned.
 
+    There are now THREE slots on the chain, in this order, and the order is the
+    design:
+
+        StateMachine -> [aim blend: DefaultSlot]     the ready pose, upper body
+                     -> [hit blend: HitSlot]         the flinch, upper body
+                     -> Slot(FullBodySlot)           nothing, kept for the legs
+                     -> ControlRig -> Root
+
+    HitSlot sits downstream of DefaultSlot so a reaction overrides the ready
+    pose for its second and blends back into it, rather than replacing it -- see
+    _ensure_hit_slot, and the HIT_SLOT block, for why it could not just share
+    DefaultSlot.
+
     Re-running is safe, and re-running after an edit to *this* function is too:
     an existing blend is left wired as it is but its settings are re-applied.
     """
@@ -2055,55 +2285,68 @@ def patch_anim_blueprint():
     if not ed:
         raise RuntimeError("ABP_Unarmed has no AnimGraph")
 
-    def by_class(name):
-        return [n for n in ed.list_all_nodes() if n.get_class().get_name() == name]
+    aim_slot = _slot_node(ed, AIM_SLOT)
+    if aim_slot is None:
+        raise RuntimeError(f"ABP_Unarmed has no Slot({AIM_SLOT}); graph is not "
+                           "what we expect")
 
-    existing = by_class("AnimGraphNode_LayeredBoneBlend")
-    if existing:
-        _configure_blend(existing[0])
-        _ensure_full_body_slot(ed)
-        if not BEL.compile_blueprint(bp):
-            raise RuntimeError("ABP_Unarmed failed to compile")
-        _assets().save_loaded_asset(bp)
-        _log("ABP_Unarmed already has the upper-body blend — settings refreshed")
-        return bp
+    # The aim blend is the one DefaultSlot feeds, found by following the wire
+    # rather than by taking the first LayeredBoneBlend in the list: there are
+    # two of them now and list order is not graph order.
+    fed = PIN.list_connected_pins(_pin(aim_slot, "Pose", is_input=False))
+    aim_blend = PIN.get_owning_node(fed[0]) if fed else None
+    fresh = aim_blend is None or \
+        aim_blend.get_class().get_name() != "AnimGraphNode_LayeredBoneBlend"
 
-    slots = by_class("AnimGraphNode_Slot")
-    rigs = by_class("AnimGraphNode_ControlRig")
-    if len(slots) != 1 or len(rigs) != 1:
-        raise RuntimeError(
-            f"expected exactly one Slot and one ControlRig in ABP_Unarmed's "
-            f"AnimGraph, found {len(slots)} and {len(rigs)}")
-    slot, rig = slots[0], rigs[0]
+    if fresh:
+        # First run on a stock ABP_Unarmed: StateMachine -> Slot -> ControlRig.
+        rigs = _anim_nodes(ed, "AnimGraphNode_ControlRig")
+        if len(rigs) != 1:
+            raise RuntimeError(f"expected one ControlRig in ABP_Unarmed's "
+                               f"AnimGraph, found {len(rigs)}")
+        rig = rigs[0]
+        feeding = PIN.list_connected_pins(_pin(aim_slot, "Source"))
+        if not feeding:
+            raise RuntimeError("Slot.Source is unconnected; graph is not what "
+                               "we expect")
+        loco = PIN.get_owning_node(feeding[0])
 
-    feeding = PIN.list_connected_pins(_pin(slot, "Source"))
-    if not feeding:
-        raise RuntimeError("Slot.Source is unconnected; graph is not what we expect")
-    loco = PIN.get_owning_node(feeding[0])
+        aim_blend = _at(_palette(ed, "Animation|Blends|Layeredblendperbone"),
+                        -420, 620)
+        # A pose output legally drives more than one input here, so the
+        # locomotion pose reaches both the blend's base and the slot's source
+        # without needing a cached-pose pair.
+        _connect(_pin(loco, "Pose", is_input=False), _pin(aim_blend, "BasePose"))
+        PIN.break_pin_links(_pin(rig, "Source"))
+        _connect(_pin(aim_slot, "Pose", is_input=False),
+                 _pin(aim_blend, "BlendPoses_0"))
+        _connect(_pin(aim_blend, "Pose", is_input=False), _pin(rig, "Source"))
 
-    blend = _at(_palette(ed, "Animation|Blends|Layeredblendperbone"), -420, 620)
-
-    # A pose output legally drives more than one input here, so the locomotion
-    # pose reaches both the blend's base and the slot's source without needing
-    # a cached-pose pair.
-    _connect(_pin(loco, "Pose", is_input=False), _pin(blend, "BasePose"))
-    PIN.break_pin_links(_pin(rig, "Source"))
-    _connect(_pin(slot, "Pose", is_input=False), _pin(blend, "BlendPoses_0"))
-    _connect(_pin(blend, "Pose", is_input=False), _pin(rig, "Source"))
-
-    _configure_blend(blend)
+    _configure_blend(aim_blend)
+    _ensure_hit_slot(ed, aim_blend)
     _ensure_full_body_slot(ed)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("ABP_Unarmed failed to compile after the blend patch")
     _assets().save_loaded_asset(bp)
 
-    got = blend.get_editor_property("node").get_editor_property("layer_setup")
+    # Both blends, not just the aim one: an unresolvable branch filter
+    # contributes no bones, so a hit blend that lost its filter would play every
+    # reaction at zero weight -- invisible, and indistinguishable in the log
+    # from a reaction that never fired.
+    blends = _anim_nodes(ed, "AnimGraphNode_LayeredBoneBlend")
     filters = [str(f.get_editor_property("bone_name"))
-               for l in got for f in l.get_editor_property("branch_filters")]
-    if filters != [UPPER_BODY_ROOT]:
-        raise RuntimeError(f"branch filter did not stick: {filters}")
-    _log(f"ABP_Unarmed: DefaultSlot is now upper-body only (from {UPPER_BODY_ROOT})")
+               for b in blends
+               for l in b.get_editor_property("node").get_editor_property("layer_setup")
+               for f in l.get_editor_property("branch_filters")]
+    if len(blends) != 2 or filters != [UPPER_BODY_ROOT] * 2:
+        raise RuntimeError(f"expected two {UPPER_BODY_ROOT} blends, got "
+                           f"{len(blends)} with filters {filters}")
+    slots = sorted(_slot_name(n) for n in _anim_nodes(ed, "AnimGraphNode_Slot"))
+    if slots != sorted((AIM_SLOT, HIT_SLOT, FULL_BODY_SLOT)):
+        raise RuntimeError(f"ABP_Unarmed's slots are {slots}")
+    _log(f"ABP_Unarmed: {AIM_SLOT} and {HIT_SLOT} are upper-body only (from "
+         f"{UPPER_BODY_ROOT}), {FULL_BODY_SLOT} is full body")
     return bp
 
 
@@ -2430,6 +2673,19 @@ FN_GET_CONTROL_ROT = "/Script/Engine.Controller.GetControlRotation"
 FN_SET_CONTROL_ROT = "/Script/Engine.Controller.SetControlRotation"
 FN_BREAK_ROT = "/Script/Engine.KismetMathLibrary.BreakRotator"
 FN_ABS = "/Script/Engine.KismetMathLibrary.Abs"
+# "Is anything playing in this slot right now?" -- pure, one Name in, one bool
+# out. It is what lets the ready pose notice that a hit reaction took the
+# montage group off it, and put itself back the frame the flinch ends.
+FN_IS_SLOT_ACTIVE = "/Script/Engine.AnimInstance.IsSlotActive"
+# The hit-direction pick. Dot_VectorVector against the owner's own forward and
+# right is what turns "where the round came from" into one of four clips
+# without a single angle or a single trigonometric function.
+FN_DOT_VV = "/Script/Engine.KismetMathLibrary.Dot_VectorVector"
+FN_ACTOR_RIGHT = "/Script/Engine.Actor.GetActorRightVector"
+# Integer clamp, not FClamp: the reaction index is an array index, and an array
+# shorter than HIT_REACTION_CLIPS (a checkout whose retarget has not run) must
+# clip to the last entry rather than read off the end.
+FN_CLAMP_II = "/Script/Engine.KismetMathLibrary.Clamp"
 CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
@@ -2462,6 +2718,8 @@ FN_DRAW_LINE = "/Script/Engine.KismetSystemLibrary.DrawDebugLine"
 FN_ADD_LOCAL_ROT = "/Script/Engine.Actor.K2_AddActorLocalRotation"
 FN_DRAW_STRING = "/Script/Engine.KismetSystemLibrary.DrawDebugString"
 FN_FLOAT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_DoubleToString"
+# Only the temporary hit-reaction probe uses this; see HIT_REACT_PROBE.
+FN_DISPLAY_NAME = "/Script/Engine.KismetSystemLibrary.GetDisplayName"
 FN_TRACE_COMPONENT = "/Script/Engine.PrimitiveComponent.K2_LineTraceComponent"
 FN_ARR_CONTAINS = "/Script/Engine.KismetArrayLibrary.Array_Contains"
 
@@ -3613,6 +3871,260 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
     return made, BEL.find_then_pin(join)
 
 
+def _author_hit_reaction(ed, exec_in, x0, y0):
+    """Took a hit and lived: flinch. Returns ``(nodes, then_pin)``.
+
+    Wired onto the **False** arm of the death branch, which is what makes
+    "survived" free: the frame a target's Health reaches zero the other arm is
+    taken, so nothing can ragdoll and stagger at the same time.
+
+        Health < PrevHealth?                      something hurt us this frame
+          -> world time past NextReactTime?       not still mid-flinch
+            -> HitReactions is not empty?         this body has clips
+              -> which way did it come from?      -> ReactIndex
+              -> play it into HitSlot, upper body
+              -> NextReactTime = now + cooldown
+        (every no, and a non-Character owner) ---> PrevHealth = Health
+
+    WHICH CLIP. The six are Epic's directional set (three Fronts, one each of
+    Back/Left/Right -- see HIT_REACTION_CLIPS) and the pick is two dot products,
+    no angles:
+
+        f = LastHitFrom . owner forward     f >= |r|        -> Front, one of 3
+        r = LastHitFrom . owner right       -f > |r|        -> Back
+                                            |f| < r         -> Right
+                                            |f| < -r        -> Left
+
+    LastHitFrom is written by whoever did the damage and points from the victim
+    toward the source. Nobody is obliged to write it: an unattributed hit leaves
+    it at the zero vector, both dots come out 0, and `>=` on the forward test is
+    what makes that land on Front -- the direction with three clips and the one
+    a player is most likely to be facing anyway.
+
+    THE INDEX IS CLAMPED against the array's real length rather than trusted.
+    The base indices are positions in HIT_REACTION_CLIPS, and a body whose
+    retarget has not run carries fewer than six clips (or none -- hence the
+    length guard above it); an unclamped Back on a three-clip array is an
+    Array_Get off the end.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    # --- did Health go down this frame? --------------------------------------
+    now_h = keep(_at(ed.add_get_member_variable_node("Health"), x0, y0 + 240))
+    was_h = keep(_at(ed.add_get_member_variable_node(PREV_HEALTH_VAR), x0, y0 + 360))
+    dropped = keep(_at(_node(ed, FN_LESS_FF), x0 + 240, y0 + 240))
+    _connect(_pin(now_h, "Health", is_input=False), _pin(dropped, "A"))
+    _connect(_pin(was_h, PREV_HEALTH_VAR, is_input=False), _pin(dropped, "B"))
+    took = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+    _connect(_pin(dropped, "ReturnValue", is_input=False), _pin(took, "Condition"))
+    _connect(exec_in, _pin(took, "execute"))
+
+    # --- is the last one finished? -------------------------------------------
+    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 480, y0 + 380))
+    now_out = _pin(now, "ReturnValue", is_input=False)
+    due = keep(_at(ed.add_get_member_variable_node(NEXT_REACT_VAR), x0 + 480, y0 + 500))
+    ready = keep(_at(_node(ed, FN_GE_FF), x0 + 720, y0 + 380))
+    _connect(now_out, _pin(ready, "A"))
+    _connect(_pin(due, NEXT_REACT_VAR, is_input=False), _pin(ready, "B"))
+    cooled = keep(_at(ed.add_branch_node(), x0 + 960, y0))
+    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(cooled, "Condition"))
+    _connect(BEL.find_then_pin(took), _pin(cooled, "execute"))
+
+    # --- does this body have any reactions at all? ---------------------------
+    clips = keep(_at(ed.add_get_member_variable_node(HIT_REACTIONS_VAR),
+                     x0 + 960, y0 + 620))
+    clips_out = _pin(clips, HIT_REACTIONS_VAR, is_input=False)
+    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 1200, y0 + 620))
+    _connect(clips_out, _pin(count, "TargetArray"))
+    count_out = _pin(count, "ReturnValue", is_input=False)
+    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 1440, y0 + 620))
+    _connect(count_out, _pin(stocked, "A"))
+    _set(stocked, "B", 0)
+    have = keep(_at(ed.add_branch_node(), x0 + 1680, y0))
+    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(BEL.find_then_pin(cooled), _pin(have, "execute"))
+
+    # --- which way did it come from? -----------------------------------------
+    owner = keep(_at(_node(ed, FN_GET_OWNER), x0 + 1680, y0 + 760))
+    owner_out = _pin(owner, "ReturnValue", is_input=False)
+    fwd = keep(_at(_node(ed, FN_ACTOR_FORWARD), x0 + 1920, y0 + 760))
+    _connect(owner_out, _pin(fwd, "self"))
+    rgt = keep(_at(_node(ed, FN_ACTOR_RIGHT), x0 + 1920, y0 + 880))
+    _connect(owner_out, _pin(rgt, "self"))
+    came = keep(_at(ed.add_get_member_variable_node(LAST_HIT_FROM_VAR),
+                    x0 + 1920, y0 + 1000))
+    came_out = _pin(came, LAST_HIT_FROM_VAR, is_input=False)
+
+    ahead = keep(_at(_node(ed, FN_DOT_VV), x0 + 2160, y0 + 760))
+    _connect(came_out, _pin(ahead, "A"))
+    _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(ahead, "B"))
+    ahead_out = _pin(ahead, "ReturnValue", is_input=False)
+    beside = keep(_at(_node(ed, FN_DOT_VV), x0 + 2160, y0 + 900))
+    _connect(came_out, _pin(beside, "A"))
+    _connect(_pin(rgt, "ReturnValue", is_input=False), _pin(beside, "B"))
+    beside_out = _pin(beside, "ReturnValue", is_input=False)
+
+    fore_aft = keep(_at(_node(ed, FN_ABS), x0 + 2400, y0 + 760))
+    _connect(ahead_out, _pin(fore_aft, "A"))
+    lateral = keep(_at(_node(ed, FN_ABS), x0 + 2400, y0 + 900))
+    _connect(beside_out, _pin(lateral, "A"))
+    axis = keep(_at(_node(ed, FN_GE_FF), x0 + 2640, y0 + 760))
+    _connect(_pin(fore_aft, "ReturnValue", is_input=False), _pin(axis, "A"))
+    _connect(_pin(lateral, "ReturnValue", is_input=False), _pin(axis, "B"))
+    front_back = keep(_at(ed.add_branch_node(), x0 + 2880, y0))
+    _connect(_pin(axis, "ReturnValue", is_input=False), _pin(front_back, "Condition"))
+    _connect(BEL.find_then_pin(have), _pin(front_back, "execute"))
+
+    # Front, and one of the three Epic authored. The random draw is the only
+    # thing that keeps a firefight from looking like one animation on a loop,
+    # and Front is where it is worth spending because it is the common case.
+    facing = keep(_at(_node(ed, FN_GE_FF), x0 + 2880, y0 + 380))
+    _connect(ahead_out, _pin(facing, "A"))
+    _set(facing, "B", 0.0)
+    from_front = keep(_at(ed.add_branch_node(), x0 + 3120, y0 - 260))
+    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(from_front, "Condition"))
+    _connect(BEL.find_then_pin(front_back), _pin(from_front, "execute"))
+
+    spread = keep(_at(_node(ed, FN_RAND_INT), x0 + 3120, y0 + 380))
+    _set(spread, "Min", 0)
+    _set(spread, "Max", HIT_DIR_FRONT[1] - 1)
+    front_idx = keep(_at(_node(ed, FN_ADD_II), x0 + 3360, y0 + 380))
+    _connect(_pin(spread, "ReturnValue", is_input=False), _pin(front_idx, "A"))
+    _set(front_idx, "B", HIT_DIR_FRONT[0])
+
+    arms = []
+    pick_front = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
+                          x0 + 3600, y0 - 400))
+    _connect(_pin(front_idx, "ReturnValue", is_input=False),
+             _pin(pick_front, REACT_INDEX_VAR))
+    _connect(BEL.find_then_pin(from_front), _pin(pick_front, "execute"))
+    arms.append(BEL.find_then_pin(pick_front))
+
+    pick_back = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
+                         x0 + 3600, y0 - 180))
+    _set(pick_back, REACT_INDEX_VAR, HIT_DIR_BACK[0])
+    _connect(BEL.find_else_pin(from_front), _pin(pick_back, "execute"))
+    arms.append(BEL.find_then_pin(pick_back))
+
+    to_right = keep(_at(_node(ed, FN_GE_FF), x0 + 2880, y0 + 500))
+    _connect(beside_out, _pin(to_right, "A"))
+    _set(to_right, "B", 0.0)
+    from_side = keep(_at(ed.add_branch_node(), x0 + 3120, y0 + 40))
+    _connect(_pin(to_right, "ReturnValue", is_input=False), _pin(from_side, "Condition"))
+    _connect(BEL.find_else_pin(front_back), _pin(from_side, "execute"))
+
+    pick_right = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
+                          x0 + 3600, y0 + 40))
+    _set(pick_right, REACT_INDEX_VAR, HIT_DIR_RIGHT[0])
+    _connect(BEL.find_then_pin(from_side), _pin(pick_right, "execute"))
+    arms.append(BEL.find_then_pin(pick_right))
+
+    pick_left = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
+                         x0 + 3600, y0 + 260))
+    _set(pick_left, REACT_INDEX_VAR, HIT_DIR_LEFT[0])
+    _connect(BEL.find_else_pin(from_side), _pin(pick_left, "execute"))
+    arms.append(BEL.find_then_pin(pick_left))
+
+    # --- play it, into HitSlot, on whatever body this is ---------------------
+    chosen = keep(_at(ed.add_get_member_variable_node(REACT_INDEX_VAR),
+                      x0 + 3840, y0 + 620))
+    last = keep(_at(_node(ed, FN_SUB_II), x0 + 3840, y0 + 760))
+    _connect(count_out, _pin(last, "A"))
+    _set(last, "B", 1)
+    safe = keep(_at(_node(ed, FN_CLAMP_II), x0 + 4080, y0 + 620))
+    _connect(_pin(chosen, REACT_INDEX_VAR, is_input=False), _pin(safe, "Value"))
+    _set(safe, "Min", 0)
+    _connect(_pin(last, "ReturnValue", is_input=False), _pin(safe, "Max"))
+    clip = keep(_at(_node(ed, FN_ARR_GET), x0 + 4320, y0 + 620))
+    _connect(clips_out, _pin(clip, "TargetArray"))
+    _connect(_pin(safe, "ReturnValue", is_input=False), _pin(clip, "Index"))
+
+    # Through the owner's own AnimInstance, so this works on the player, on a
+    # zombie and on a wendigo without knowing which it is holding.
+    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0 + 3840, y0))
+    _connect(owner_out, _pin(as_char, "Object"))
+    for tail in arms:
+        _connect(tail, _pin(as_char, "execute"))
+    char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
+    mesh = keep(_at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
+                    x0 + 4080, y0 + 340))
+    _connect(char_out, _pin(mesh, "self"))
+    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 4320, y0 + 340))
+    _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
+
+    play = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 4560, y0))
+    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(play, "self"))
+    _connect(_pin(clip, "Item", is_input=False), _pin(play, "Asset"))
+    _set(play, "SlotNodeName", HIT_SLOT)
+    _set(play, "BlendInTime", COMBAT.hit_react_blend_s)
+    _set(play, "BlendOutTime", COMBAT.hit_react_blend_s)
+    _set(play, "InPlayRate", COMBAT.hit_react_rate)
+    _set(play, "LoopCount", 1)
+    _connect(BEL.find_then_pin(as_char), _pin(play, "execute"))
+
+    # A deadline, not a countdown: nothing has to tick it.
+    when = keep(_at(_node(ed, FN_ADD_FF), x0 + 4560, y0 + 480))
+    _connect(now_out, _pin(when, "A"))
+    _set(when, "B", COMBAT.hit_react_cooldown_s)
+    rearm = keep(_at(ed.add_set_member_variable_node(NEXT_REACT_VAR),
+                     x0 + 4820, y0))
+    _connect(_pin(when, "ReturnValue", is_input=False), _pin(rearm, NEXT_REACT_VAR))
+    _connect(BEL.find_then_pin(play), _pin(rearm, "execute"))
+
+    after_play = BEL.find_then_pin(rearm)
+    if HIT_REACT_PROBE:
+        who = keep(_at(_node(ed, FN_GET_OWNER), x0 + 4820, y0 + 700))
+        who_name = keep(_at(_node(ed, FN_DISPLAY_NAME), x0 + 5060, y0 + 700))
+        _connect(_pin(who, "ReturnValue", is_input=False), _pin(who_name, "Object"))
+        head = keep(_at(_node(ed, FN_CONCAT), x0 + 5300, y0 + 700))
+        _set(head, "A", HIT_REACT_PROBE_PREFIX)
+        _connect(_pin(who_name, "ReturnValue", is_input=False), _pin(head, "B"))
+        idx_str = keep(_at(_node(ed, FN_INT_TO_STR), x0 + 5060, y0 + 840))
+        _connect(_pin(safe, "ReturnValue", is_input=False), _pin(idx_str, "InInt"))
+        tail_str = keep(_at(_node(ed, FN_CONCAT), x0 + 5300, y0 + 840))
+        _set(tail_str, "A", " clip ")
+        _connect(_pin(idx_str, "ReturnValue", is_input=False), _pin(tail_str, "B"))
+        line = keep(_at(_node(ed, FN_CONCAT), x0 + 5540, y0 + 700))
+        _connect(_pin(head, "ReturnValue", is_input=False), _pin(line, "A"))
+        _connect(_pin(tail_str, "ReturnValue", is_input=False), _pin(line, "B"))
+        say = keep(_at(_node(ed, FN_WARN), x0 + 5540, y0 + 480))
+        _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
+        _connect(after_play, _pin(say, "execute"))
+        after_play = BEL.find_then_pin(say)
+
+    # --- and remember this frame's health, on every path ---------------------
+    # Including the ones that did not react. Skipping it on the cooldown arm
+    # would make the NEXT hit compare against a health from before this one and
+    # fire the moment the cooldown lapses, with nothing new having happened.
+    remember = keep(_at(ed.add_set_member_variable_node(PREV_HEALTH_VAR),
+                        x0 + 5080, y0))
+    _connect(_pin(now_h, "Health", is_input=False), _pin(remember, PREV_HEALTH_VAR))
+    for tail in (after_play,
+                 _pin(as_char, "CastFailed", is_input=False),
+                 BEL.find_else_pin(have),
+                 BEL.find_else_pin(cooled),
+                 BEL.find_else_pin(took)):
+        _connect(tail, _pin(remember, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"FLINCH. Health dropped since last frame and is still above zero, so "
+        f"whatever it was, this one lived: play one of {len(HIT_REACTION_CLIPS)} "
+        f"one-second staggers into {HIT_SLOT} at {COMBAT.hit_react_rate}x, "
+        f"chosen by which side LastHitFrom points at, and refuse another for "
+        f"{COMBAT.hit_react_cooldown_s} s. {HIT_SLOT} is blended from "
+        f"{UPPER_BODY_ROOT} down, so the chest and arms take the hit and the "
+        f"legs never stop -- the player keeps running and a wanderer keeps "
+        f"closing. Triggered by POLLING Health rather than called by the "
+        f"shooter, so every source of damage reacts, including ones that do not "
+        f"know this exists.",
+        made)
+    return made, BEL.find_then_pin(remember)
+
+
 def build_footstep_component(rebuild=True):
     """A footfall every FOOTSTEP_STRIDE_CM of ground covered.
 
@@ -3824,6 +4336,16 @@ def build_health_component(rebuild=True):
     for name in (HEAD_MULT_VAR, LIMB_MULT_VAR):
         _declare(ed, name, _float_type())
 
+    # Flinching. Four variables and a clip table, all on the component rather
+    # than on either character, because both of them react the same way and
+    # neither of their Blueprints has a graph this could be written into.
+    _declare(ed, HIT_REACTIONS_VAR, BEL.get_array_type(
+        BEL.get_object_reference_type(unreal.AnimSequenceBase.static_class())))
+    _declare(ed, LAST_HIT_FROM_VAR, _struct_type(unreal.Vector.static_struct()))
+    for name in (PREV_HEALTH_VAR, NEXT_REACT_VAR):
+        _declare(ed, name, _float_type())
+    _declare(ed, REACT_INDEX_VAR, BEL.get_basic_type_by_name("int"))
+
     # SpawnOrigin used to hold where this actor started, back when a replacement
     # appeared near the dead one's own spawn point. It has to be removed
     # explicitly: this builder updates blueprints in place, so a variable it
@@ -3969,7 +4491,60 @@ def build_health_component(rebuild=True):
     _set(under, "B", WORLD_FLOOR_Z)
     lost = _at(ed.add_branch_node(), -240, 0)
     _connect(_pin(under, "ReturnValue", is_input=False), _pin(lost, "Condition"))
-    _connect(BEL.find_then_pin(tick), _pin(lost, "execute"))
+    tick_out = BEL.find_then_pin(tick)
+
+    if HIT_REACT_PROBE:
+        # TEMPORARY, and removed by re-running with HIT_REACT_PROBE False.
+        #
+        # Nothing shoots a wanderer in a headless run, so the NPC half of the
+        # reaction is a gate the -game session never opens -- and an unopened
+        # gate and a broken one leave the same (empty) log. This shoots one for
+        # it: at t > 6 s, any wanderer still at full health takes 20 damage from
+        # a direction along its OWN FORWARD, which is the Front bucket and
+        # therefore the random-of-three arm the player's own punches never
+        # reach. It needs no extra variable to fire once -- after the hit,
+        # Health < MaxHealth is false forever.
+        probe_npc = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -1900, 1000)
+        probe_now = _at(_node(ed, FN_TIME_SECONDS), -1900, 1120)
+        probe_late = _at(_node(ed, FN_GREATER_FF), -1660, 1120)
+        _connect(_pin(probe_now, "ReturnValue", is_input=False), _pin(probe_late, "A"))
+        _set(probe_late, "B", 6.0)
+        probe_hp = _at(ed.add_get_member_variable_node("Health"), -1900, 1240)
+        probe_max = _at(ed.add_get_member_variable_node("MaxHealth"), -1900, 1360)
+        probe_full = _at(_node(ed, FN_GE_FF), -1660, 1240)
+        _connect(_pin(probe_hp, "Health", is_input=False), _pin(probe_full, "A"))
+        _connect(_pin(probe_max, "MaxHealth", is_input=False), _pin(probe_full, "B"))
+        probe_and = _at(_node(ed, FN_AND), -1420, 1120)
+        _connect(_pin(probe_npc, "DespawnOnDeath", is_input=False), _pin(probe_and, "A"))
+        _connect(_pin(probe_late, "ReturnValue", is_input=False), _pin(probe_and, "B"))
+        probe_and2 = _at(_node(ed, FN_AND), -1180, 1120)
+        _connect(_pin(probe_and, "ReturnValue", is_input=False), _pin(probe_and2, "A"))
+        _connect(_pin(probe_full, "ReturnValue", is_input=False), _pin(probe_and2, "B"))
+        probe_br = _at(ed.add_branch_node(), -940, 1000)
+        _connect(_pin(probe_and2, "ReturnValue", is_input=False), _pin(probe_br, "Condition"))
+        _connect(tick_out, _pin(probe_br, "execute"))
+
+        probe_owner = _at(_node(ed, FN_GET_OWNER), -940, 1240)
+        probe_fwd = _at(_node(ed, FN_ACTOR_FORWARD), -700, 1240)
+        _connect(_pin(probe_owner, "ReturnValue", is_input=False), _pin(probe_fwd, "self"))
+        probe_dir = _at(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR), -700, 1000)
+        _connect(_pin(probe_fwd, "ReturnValue", is_input=False),
+                 _pin(probe_dir, LAST_HIT_FROM_VAR))
+        _connect(BEL.find_then_pin(probe_br), _pin(probe_dir, "execute"))
+        probe_hurt = _at(_node(ed, FN_SUB_FF), -460, 1240)
+        _connect(_pin(probe_hp, "Health", is_input=False), _pin(probe_hurt, "A"))
+        _set(probe_hurt, "B", 20.0)
+        probe_set = _at(ed.add_set_member_variable_node("Health"), -460, 1000)
+        _connect(_pin(probe_hurt, "ReturnValue", is_input=False), _pin(probe_set, "Health"))
+        _connect(BEL.find_then_pin(probe_dir), _pin(probe_set, "execute"))
+
+        probe_join = _at(ed.add_branch_node(), -220, 1000)
+        _set(probe_join, "Condition", "true")
+        _connect(BEL.find_then_pin(probe_set), _pin(probe_join, "execute"))
+        _connect(BEL.find_else_pin(probe_br), _pin(probe_join, "execute"))
+        tick_out = BEL.find_then_pin(probe_join)
+
+    _connect(tick_out, _pin(lost, "execute"))
     # ...and only then, is this one worth a log line? A wanderer under the map
     # is a bug worth reporting with its number and its spawn point. A player
     # under the map walked there.
@@ -4053,6 +4628,11 @@ def build_health_component(rebuild=True):
     # wanderer written off this frame dies this frame.
     _connect(BEL.find_then_pin(write_off), _pin(at_zero, "execute"))
     _connect(BEL.find_else_pin(lost), _pin(at_zero, "execute"))
+
+    # --- Tick: took a hit and lived --------------------------------------
+    # The other arm of the same branch, and that is the whole "and survived":
+    # this exec pin is reached only on frames the owner is still above zero.
+    _author_hit_reaction(ed, BEL.find_else_pin(at_zero), 700, 1600)
 
     # Branch on Dead and use its *False* pin -- one node cheaper than a NOT, and
     # it is what stops the death path running again every frame after the first.
@@ -4323,6 +4903,15 @@ def build_health_component(rebuild=True):
         DAMAGED_BY_PLAYER_VAR: False,
         HEAD_MULT_VAR: COMBAT.head_multiplier,
         LIMB_MULT_VAR: COMBAT.limb_multiplier,
+        # Seeded at full health, so the very first Tick compares like with like
+        # and nobody flinches on the frame they spawn. (A wanderer's real
+        # maximum is written over this at possession -- see
+        # _author_stats_and_voice in build_npc_blueprints.py -- and the poll
+        # only ever looks for a DECREASE, so the correction cannot fire one.)
+        PREV_HEALTH_VAR: COMBAT.start_health,
+        # Zero, not NEVER_DAMAGED: world time starts at zero and this is a
+        # deadline, so anything at or before it means "ready now".
+        NEXT_REACT_VAR: 0.0,
     })
     _log(f"built {HEALTH_BP_PATH} (Health = MaxHealth = {COMBAT.start_health})")
     return bp
@@ -4804,15 +5393,30 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
     _connect(BEL.find_then_pin(stamp), _pin(blame, "execute"))
 
+    # ...and which way it came from, for the flinch. The IMPACT NORMAL, not the
+    # shot's own direction reversed: it is already in the hit result, it already
+    # points back out of the surface toward the muzzle, and it is the one that
+    # is right for a pellet that grazed a shoulder at an angle. A target shot in
+    # the back therefore plays the Back reaction with nothing having measured an
+    # angle. See _author_hit_reaction for what reads it.
+    from_where = _at(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR,
+                                                     HEALTH_CLASS_PATH),
+                     x0 + 2600, y0)
+    _connect(as_health, _pin(from_where, "self"))
+    _connect(_loose_pin(brk, "ImpactNormal", is_input=False),
+             _pin(from_where, LAST_HIT_FROM_VAR))
+    _connect(BEL.find_then_pin(blame), _pin(from_where, "execute"))
+
     shown = _author_damage_readout(ed, brk, _pin(scaled, "ReturnValue", is_input=False),
-                                   worth, BEL.find_then_pin(blame), x0 + 2600, y0)
+                                   worth, BEL.find_then_pin(from_where), x0 + 2860, y0)
 
     ed.add_comment_to_nodes(
         "Clamped at zero so an overkill shot cannot drive Health negative -- "
         "the HUD bar divides by MaxHealth and the death check is Health <= 0, "
         "and both want a floor.",
         [comp, cast, blood_cls, where, facing, splash, spray_dmg, ratio, spray,
-         spray_v, get_h, sub, clamp, set_h, now, stamp, blame])
+         spray_v, get_h, sub, clamp, set_h, now, stamp, blame,
+         from_where])
     ed.add_comment_to_nodes(
         f"Hit boxes: the pellet's own line is traced again against the target's "
         f"physics-asset bodies alone, and the bone it strikes picks the "
@@ -6244,6 +6848,127 @@ def _author_recoil_recovery(ed, tick, pc_out, exec_in, x0, y0):
     return (flow, BEL.find_else_pin(gate))
 
 
+def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
+    """Put the ready pose back after a hit reaction has taken it away.
+
+    THIS IS NOT BELT AND BRACES, it is the price of the second slot.
+    UAnimInstance plays montages per GROUP, and every slot on a skeleton
+    belongs to the default group unless the SKELETON maps it elsewhere --
+    USkeleton::SetSlotGroupName, which UE 5.8 does not expose to Python at all
+    (measured: `slot_group_names`, `slot_to_group_name_map` and
+    `slot_anim_tracks` all fail as editor properties on a USkeleton, and the
+    class has no slot or group methods). So starting the flinch in HitSlot
+    stops the ready pose in DefaultSlot even though the two slots are different
+    nodes in different blends.
+
+    Measured before this existed, in a -game run: DefaultSlot sat at weight
+    1.000 until the first punch landed, and read active=False, weight 0.000 for
+    the rest of the session -- the player fought on with the gun in the
+    locomotion pose. The flinch itself was fine; what it cost was the aim.
+
+    Re-asserting it from Tick is the fix, and it is a better fix than never
+    interrupting would have been: the arms ARE meant to be yanked off the
+    sights for the length of the stagger, and this puts them back on the first
+    frame after it, with the montage's own blend.
+
+        Held is valid AND not sprinting
+          AND DefaultSlot is quiet      (nothing is holding the pose)
+          AND HitSlot is quiet          (we are not mid-flinch)
+            -> play AimPose into DefaultSlot again
+
+    The HitSlot term is the one that stops it oscillating: without it, the
+    frame the flinch starts DefaultSlot goes quiet, this restarts the ready
+    pose, and the restart stops the flinch -- in the same group, for the same
+    reason -- and the reaction is a single frame of twitch.
+
+    Nothing inside the condition reads a property off Held: only IsValid does,
+    and the AimPose getter sits behind the gate on the play node's own pin, so
+    a player with empty hands does not cost an Accessed None per frame.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    mesh = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0, y0 + 500))
+    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 240, y0 + 500))
+    _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(anim, "self"))
+    anim_out = _pin(anim, "ReturnValue", is_input=False)
+
+    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 160))
+    _connect(held, _pin(armed, "Object"))
+    running = keep(_at(ed.add_get_member_variable_node("Sprinting"), x0, y0 + 280))
+    still = keep(_at(_node(ed, FN_NOT), x0 + 240, y0 + 280))
+    _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
+
+    aiming = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 480, y0 + 620))
+    _connect(anim_out, _pin(aiming, "self"))
+    _set(aiming, "SlotNodeName", AIM_SLOT)
+    no_pose = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 620))
+    _connect(_pin(aiming, "ReturnValue", is_input=False), _pin(no_pose, "A"))
+
+    flinching = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 480, y0 + 760))
+    _connect(anim_out, _pin(flinching, "self"))
+    _set(flinching, "SlotNodeName", HIT_SLOT)
+    settled = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 760))
+    _connect(_pin(flinching, "ReturnValue", is_input=False), _pin(settled, "A"))
+
+    ready = keep(_at(_node(ed, FN_AND), x0 + 480, y0 + 220))
+    _connect(_pin(armed, "ReturnValue", is_input=False), _pin(ready, "A"))
+    _connect(_pin(still, "ReturnValue", is_input=False), _pin(ready, "B"))
+    quiet = keep(_at(_node(ed, FN_AND), x0 + 960, y0 + 680))
+    _connect(_pin(no_pose, "ReturnValue", is_input=False), _pin(quiet, "A"))
+    _connect(_pin(settled, "ReturnValue", is_input=False), _pin(quiet, "B"))
+    needed = keep(_at(_node(ed, FN_AND), x0 + 1200, y0 + 400))
+    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(needed, "A"))
+    _connect(_pin(quiet, "ReturnValue", is_input=False), _pin(needed, "B"))
+
+    gate = keep(_at(ed.add_branch_node(), x0 + 1440, y0))
+    _connect(_pin(needed, "ReturnValue", is_input=False), _pin(gate, "Condition"))
+    for tail in exec_ins:
+        _connect(tail, _pin(gate, "execute"))
+
+    pose_pin, pose_n = _prop(ed, "AimPose", held, x0 + 1440, y0 + 300)
+    keep(pose_n)
+    replay = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 1720, y0))
+    _connect(anim_out, _pin(replay, "self"))
+    _connect(pose_pin, _pin(replay, "Asset"))
+    _set(replay, "SlotNodeName", AIM_SLOT)
+    _set(replay, "BlendInTime", AIM_BLEND)
+    _set(replay, "BlendOutTime", AIM_BLEND)
+    _set(replay, "InPlayRate", 1.0)
+    _set(replay, "LoopCount", AIM_LOOPS)
+    _connect(BEL.find_then_pin(gate), _pin(replay, "execute"))
+
+    after_replay = BEL.find_then_pin(replay)
+    if HIT_REACT_PROBE:
+        # Same temporary instrumentation as the reaction's own, and removed the
+        # same way. Without it "the pose came back" is unobservable in a log:
+        # the restart is silent and the only other evidence is a slot weight
+        # sampled from outside, which cannot be caught in the 0.05 s gap
+        # between two flinches when ten wanderers are hitting the player.
+        say = keep(_at(_node(ed, FN_WARN), x0 + 1980, y0 + 300))
+        _set(say, "InString", POSE_BACK_PROBE_PREFIX + "ready pose restarted")
+        _connect(after_replay, _pin(say, "execute"))
+        after_replay = BEL.find_then_pin(say)
+
+    join = keep(_at(ed.add_branch_node(), x0 + 2240, y0))
+    _set(join, "Condition", "true")
+    _connect(after_replay, _pin(join, "execute"))
+    _connect(BEL.find_else_pin(gate), _pin(join, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"The ready pose puts itself back. A montage started in {HIT_SLOT} "
+        f"stops the one in {AIM_SLOT}, because both slots are in the skeleton's "
+        f"default montage GROUP and UE 5.8 gives Python no way to move one out "
+        f"of it -- so the flinch costs the aim pose, and this is what buys it "
+        f"back, on the first frame after the stagger has finished. The "
+        f"{HIT_SLOT} term is what stops the two restarting each other forever.",
+        made)
+    return (BEL.find_then_pin(join),)
+
+
 def _author_wc_tick(ed, tick):
     """Five polled keys and a refresh, chained so each block rejoins the next.
 
@@ -6340,6 +7065,14 @@ def _author_wc_tick(ed, tick):
     _set(pose_dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(remember), _pin(pose_dirty, "execute"))
     pose_exits = (BEL.find_then_pin(pose_dirty), BEL.find_else_pin(pose_gate))
+
+    # --- and the pose survives being shot ------------------------------------
+    # After the sprint edge, because that block is what starts and stops the
+    # pose deliberately, and this one only restores what something else took
+    # away. See _author_ready_pose_keepalive: a hit reaction stops the ready
+    # pose as a side effect of the montage group, and without this the player
+    # fights the rest of the session with the gun in the locomotion pose.
+    pose_exits = _author_ready_pose_keepalive(ed, held, pose_exits, 240, 1400)
 
     ed.add_comment_to_nodes(
         "Started or stopped sprinting this frame -- re-equip, which is what "
@@ -6799,6 +7532,83 @@ def install_hit_zones(bp, health_handle):
          f"limbs {len(limbs)} bodies x{COMBAT.limb_multiplier}, body {body} x1.0")
 
 
+def hit_reactions(mesh_asset):
+    """The six flinches on THIS mesh's own skeleton, in HIT_REACTION_CLIPS order.
+
+    An AnimSequence belongs to exactly one skeleton, so there is no shared
+    default that could be right for the adventurer, the zombie and the wendigo
+    at once -- which is why this is resolved per character at build time,
+    exactly as the hit-zone tables are.
+
+    Where they live is derived from the mesh's own name (SKM_Zombie01 ->
+    Anims/Zombie01/A_Zombie01_*), the layout build_retarget.py writes and
+    npc_placement._creature reads. A mannequin-skinned checkout, which has no
+    /Game/Sourced at all, falls back to Epic's originals -- they are on
+    SK_Mannequin, so the skeleton test below passes for exactly the bodies they
+    can drive and fails for the rest.
+
+    ALL SIX OR NONE. The directional pick indexes this array by position, so a
+    partial set is not a smaller set, it is the wrong clip for three of the four
+    directions -- and unlike a missing asset, that failure is silent. Every
+    candidate's skeleton is checked for the same reason: a clip on the wrong
+    skeleton does not error, it simply never plays.
+    """
+    skeleton = mesh_asset.get_editor_property("skeleton") if mesh_asset else None
+    if not skeleton:
+        return []
+    name = mesh_asset.get_name()
+    family = name[4:] if name.startswith("SKM_") else name
+    eas = _assets()
+    for folder, prefix in ((f"{HIT_ANIM_ROOT}/{family}", f"A_{family}_"),
+                           (HIT_ANIM_FALLBACK_DIR, "")):
+        found = []
+        for clip in HIT_REACTION_CLIPS:
+            path = f"{folder}/{prefix}{clip}"
+            asset = eas.load_asset(path) if eas.does_asset_exist(path) else None
+            if (isinstance(asset, unreal.AnimSequence)
+                    and asset.get_editor_property("skeleton") == skeleton):
+                found.append(asset)
+        if len(found) == len(HIT_REACTION_CLIPS):
+            return found
+    return []
+
+
+def install_hit_reactions(bp, health_handle):
+    """Write this character's own six reaction clips onto its HealthComponent.
+
+    Per character and on the component template, for the reason
+    install_hit_zones is: the clips describe *this* skeleton.
+
+    Empty is a legal, logged outcome rather than an error. On a from-nothing
+    build this runs before build_retarget.py has ever produced a creature's
+    clips -- the weapons builder runs twice, see the build-order note in the
+    player's-body section of CLAUDE.md -- and the graph guards an empty array:
+    the character simply does not flinch, which is what it did before.
+    """
+    mesh = None
+    for handle, _name in _handles(bp):
+        obj = _component_object(handle)
+        if isinstance(obj, unreal.SkeletalMeshComponent):
+            mesh = obj
+            break
+    if mesh is None:
+        raise RuntimeError(f"{bp.get_name()} has no SkeletalMeshComponent")
+    clips = hit_reactions(mesh.get_editor_property("skeletal_mesh_asset"))
+    comp = _component_object(health_handle)
+    comp.set_editor_property(HIT_REACTIONS_VAR, clips)
+    got = [a.get_name() for a in comp.get_editor_property(HIT_REACTIONS_VAR)]
+    if got != [a.get_name() for a in clips]:
+        raise RuntimeError(f"{bp.get_name()}'s hit reactions did not stick: {got}")
+    if clips:
+        _log(f"{bp.get_name()}: {len(clips)} hit reactions into {HIT_SLOT} "
+             f"({got[0]} ... {got[-1]})")
+    else:
+        _log(f"note: {bp.get_name()} has no hit reactions on its skeleton -- it "
+             f"will not flinch. Run Scripts/asset_pipeline/build_retarget.py, "
+             f"then this builder again.")
+    return clips
+
+
 def face_the_camera(bp):
     """Turn the body with the camera instead of with the movement input.
 
@@ -6928,6 +7738,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     # the head. (The wanderers' punch is not a trace and stays a body hit.)
     make_shootable(bp)
     install_hit_zones(bp, handles["HealthComponent"])
+    install_hit_reactions(bp, handles["HealthComponent"])
     aim_camera(bp)
     face_the_camera(bp)
     if not BEL.compile_blueprint(bp):
@@ -6972,6 +7783,12 @@ def install_on_npc(health_bp, footstep_bp):
 
     make_shootable(bp)
     install_hit_zones(bp, handle)
+    # The PARENT's clips, i.e. whichever creature BP_ForestWanderer wears. Each
+    # variant child is a different skeleton and cannot override an inherited
+    # component's defaults from Python (see _author_stats_and_voice in
+    # build_npc_blueprints.py), so its own six are copied onto the component at
+    # possession by its own AI controller -- the same route its health takes.
+    install_hit_reactions(bp, handle)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")

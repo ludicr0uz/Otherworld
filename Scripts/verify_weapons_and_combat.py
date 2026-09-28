@@ -19,6 +19,14 @@ import unreal
 
 sys.path.insert(0, "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
 import build_weapons_and_combat as G                              # noqa: E402
+# The two other files that have to agree with this one about the hit reactions:
+# the shared clip ORDER the graph indexes by position, and the retarget sources
+# that produce them. Imported rather than restated, so the check below is that
+# the three files agree and not that this one was edited too.
+from forest_generator.npc_placement import NPC_HIT_REACTION_CLIPS  # noqa: E402
+sys.path.insert(0, "/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/"
+                   "Scripts/asset_pipeline")
+from build_retarget import HIT_SOURCES as RETARGET_HIT_SOURCES     # noqa: E402
 
 BGE = unreal.BlueprintGraphEditor
 BEL = unreal.BlueprintEditorLibrary
@@ -45,6 +53,17 @@ def graph(bp, name="EventGraph"):
 def in_pins(node):
     return {str(PIN.get_pin_name(p)).replace(" ", "")
             for p in BEL.list_input_pins(node)}
+
+
+def has_in_pin(node, name):
+    """Does this node really have an input pin called ``name``?
+
+    BEL.find_input_pin answers with an INVALID pin rather than None for a name
+    the node does not have, so the obvious truthiness test matches every node in
+    the graph -- it matched all 414 of them once, which is how this exists.
+    """
+    pin = BEL.find_input_pin(node, name)
+    return bool(pin) and pin.is_valid()
 
 
 def by_pins(nodes, *required):
@@ -100,54 +119,96 @@ anim_nodes = anim.list_all_nodes() if anim else []
 rigs = [n for n in anim_nodes if n.get_class().get_name() == "AnimGraphNode_ControlRig"]
 blends = [n for n in anim_nodes
           if n.get_class().get_name() == "AnimGraphNode_LayeredBoneBlend"]
-check("ABP_Unarmed has exactly one layered bone blend", len(blends) == 1,
-      str(len(blends)))
-if blends:
-    layers = blends[0].get_editor_property("node").get_editor_property("layer_setup")
-    bones = [str(f.get_editor_property("bone_name"))
-             for l in layers for f in l.get_editor_property("branch_filters")]
-    check(f"the blend is filtered at {G.UPPER_BODY_ROOT} (upper body only)",
-          bones == [G.UPPER_BODY_ROOT], str(bones))
-
-    # The slot must feed the *blend* pose, not the graph root -- that is the
-    # whole difference between an aim pose and a frozen full-body override.
-    blend_src = [PIN.get_owning_node(q).get_class().get_name()
-                 for q in PIN.list_connected_pins(
-                     BEL.find_input_pin(blends[0], "BlendPoses_0"))]
-    # The regression that put the barrel 21 degrees left: in local space the
-    # aim pose's arms hang off the locomotion hips and lose their own pelvis
-    # yaw. Runtime, before the fix: body yaw 44.6, gun yaw 23.3, every frame.
-    check("the blend runs in mesh space, so the aim pose keeps its own direction",
-          blends[0].get_editor_property("node").get_editor_property(
-              "mesh_space_rotation_blend"))
-    check("DefaultSlot feeds the blend pose, so it cannot override the legs",
-          blend_src == ["AnimGraphNode_Slot"], str(blend_src))
-    base_src = [PIN.get_owning_node(q).get_class().get_name()
-                for q in PIN.list_connected_pins(
-                    BEL.find_input_pin(blends[0], "BasePose"))]
-    check("locomotion feeds the base pose", base_src == ["AnimGraphNode_StateMachine"],
-          str(base_src))
+# Two now, not one: the aim pose's, and the hit reaction's behind it. Both are
+# filtered at the same spine root, and BOTH filters are checked -- an
+# unresolvable branch filter contributes no bones, so a blend that lost its
+# filter plays its slot at zero weight, which is invisible on screen and
+# indistinguishable in a log from a montage that never started.
+check("ABP_Unarmed has exactly two layered bone blends (aim, then hit)",
+      len(blends) == 2, str(len(blends)))
 
 slots = [n for n in anim_nodes if n.get_class().get_name() == "AnimGraphNode_Slot"]
 slot_names = {str(n.get_editor_property("node").get_editor_property("slot_name")): n
               for n in slots}
-check(f"both slots exist: {G.AIM_SLOT} (aim) and {G.FULL_BODY_SLOT} (death)",
-      {G.AIM_SLOT, G.FULL_BODY_SLOT} <= set(slot_names), str(sorted(slot_names)))
-check("exactly two slots -- a rerun must not stack a third on the chain",
-      len(slots) == 2, str(len(slots)))
-# The death slot has to sit AFTER the layered blend, or it is filtered to the
-# upper body like the aim slot and the player dies from the chest up.
+check(f"all three slots exist: {G.AIM_SLOT} (aim), {G.HIT_SLOT} (flinch) and "
+      f"{G.FULL_BODY_SLOT}",
+      {G.AIM_SLOT, G.HIT_SLOT, G.FULL_BODY_SLOT} <= set(slot_names),
+      str(sorted(slot_names)))
+check("exactly three slots -- a rerun must not stack a fourth on the chain",
+      len(slots) == 3, str(len(slots)))
+
+
+def _fed_blend(slot_node):
+    """The LayeredBoneBlend a Slot node's pose runs into, or None."""
+    fed = PIN.list_connected_pins(BEL.find_output_pin(slot_node, "Pose"))
+    if not fed:
+        return None
+    owner = PIN.get_owning_node(fed[0])
+    return owner if owner.get_class().get_name() == "AnimGraphNode_LayeredBoneBlend" \
+        else None
+
+
+aim_blend = _fed_blend(slot_names[G.AIM_SLOT]) if G.AIM_SLOT in slot_names else None
+hit_blend = _fed_blend(slot_names[G.HIT_SLOT]) if G.HIT_SLOT in slot_names else None
+check("the aim slot and the hit slot feed two DIFFERENT blends",
+      aim_blend is not None and hit_blend is not None and aim_blend != hit_blend)
+
+for label, blend, want_base in (("aim", aim_blend, "AnimGraphNode_StateMachine"),
+                                ("hit", hit_blend, "AnimGraphNode_LayeredBoneBlend")):
+    if blend is None:
+        continue
+    layers = blend.get_editor_property("node").get_editor_property("layer_setup")
+    bones = [str(f.get_editor_property("bone_name"))
+             for l in layers for f in l.get_editor_property("branch_filters")]
+    check(f"the {label} blend is filtered at {G.UPPER_BODY_ROOT} (upper body only)",
+          bones == [G.UPPER_BODY_ROOT], str(bones))
+    # The regression that put the barrel 21 degrees left: in local space the
+    # aim pose's arms hang off the locomotion hips and lose their own pelvis
+    # yaw. Runtime, before the fix: body yaw 44.6, gun yaw 23.3, every frame.
+    check(f"the {label} blend runs in mesh space, so its pose keeps its own "
+          f"direction",
+          blend.get_editor_property("node").get_editor_property(
+              "mesh_space_rotation_blend"))
+    base_src = [PIN.get_owning_node(q).get_class().get_name()
+                for q in PIN.list_connected_pins(
+                    BEL.find_input_pin(blend, "BasePose"))]
+    check(f"the {label} blend's base pose comes from {want_base}",
+          base_src == [want_base], str(base_src))
+
+# The hit slot's SOURCE is the aim blend's output, i.e. the same pose as its own
+# blend's base. That is what makes the second blend free at rest -- both inputs
+# are the same pose, so its weight cannot matter until a montage is playing.
+if hit_blend is not None:
+    src = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(slot_names[G.HIT_SLOT], "Source"))]
+    base = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(hit_blend, "BasePose"))]
+    check(f"{G.HIT_SLOT} passes through the same pose its blend uses as a base, "
+          f"so the insertion is a no-op until something is hit",
+          src == base and src == [aim_blend],
+          f"{[n.get_name() for n in src]} vs {[n.get_name() for n in base]}")
+
+# ...and the flinch is DOWNSTREAM of the aim pose, not upstream: a reaction has
+# to win over the ready pose for its second, not be overwritten by it.
+if aim_blend is not None and hit_blend is not None:
+    onward = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_output_pin(aim_blend, "Pose"))]
+    check(f"the aim blend feeds the hit blend, so {G.HIT_SLOT} overrides the "
+          f"ready pose rather than the other way round",
+          hit_blend in onward, str([n.get_name() for n in onward]))
+# The full-body slot has to sit AFTER both layered blends, or it is filtered to
+# the upper body like the other two and whatever plays into it reaches the chest
+# only.
 if G.FULL_BODY_SLOT in slot_names and rigs:
     feeding = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
         BEL.find_input_pin(rigs[0], "Source"))]
-    check(f"{G.FULL_BODY_SLOT} feeds the ControlRig, downstream of the blend",
+    check(f"{G.FULL_BODY_SLOT} feeds the ControlRig, downstream of both blends",
           feeding == [slot_names[G.FULL_BODY_SLOT]],
           str([n.get_class().get_name() for n in feeding]))
     behind = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
         BEL.find_input_pin(slot_names[G.FULL_BODY_SLOT], "Source"))]
-    check(f"the layered blend feeds {G.FULL_BODY_SLOT}",
-          [n.get_class().get_name() for n in behind]
-          == ["AnimGraphNode_LayeredBoneBlend"],
+    check(f"the hit blend -- the last one -- feeds {G.FULL_BODY_SLOT}",
+          behind == [hit_blend],
           str([n.get_class().get_name() for n in behind]))
 
 # ─── The five weapons ────────────────────────────────────────────────────────
@@ -614,14 +675,34 @@ for var, default in G.BIND_VARS:
           got.export_text() if got is not None else "None")
 
 plays = by_pins(wg, "Asset", "SlotNodeName")
-check("the ready pose is played into a slot", len(plays) == 1, str(len(plays)))
-if plays:
-    check(f"it plays into {G.AIM_SLOT}",
-          pin_value(plays[0], "SlotNodeName") == G.AIM_SLOT)
-    check("it loops rather than playing once",
-          int(float(pin_value(plays[0], "LoopCount"))) >= 100,
-          pin_value(plays[0], "LoopCount"))
+# TWO, and the second one is not a duplicate. A montage started in HitSlot stops
+# the ready pose in DefaultSlot -- montages are stopped per GROUP and UE 5.8
+# exposes no way to put a slot in a different group from Python -- so the flinch
+# costs the aim pose, and the keepalive in Tick is what puts it back on the
+# first frame after the stagger. Measured before it existed: DefaultSlot sat at
+# weight 1.000 until the first punch landed and read 0.000 for the rest of the
+# session.
+check("the ready pose is played into a slot twice: on equip, and again after a "
+      "hit reaction has taken it away", len(plays) == 2, str(len(plays)))
+for i, play in enumerate(plays):
+    check(f"ready-pose play {i} goes into {G.AIM_SLOT}",
+          pin_value(play, "SlotNodeName") == G.AIM_SLOT,
+          pin_value(play, "SlotNodeName"))
+    check(f"ready-pose play {i} loops rather than playing once",
+          int(float(pin_value(play, "LoopCount"))) >= 100,
+          pin_value(play, "LoopCount"))
 check("empty hands stop the slot", bool(by_pins(wg, "InBlendOutTime", "SlotNodeName")))
+
+# The keepalive's two guards. Without the HitSlot one it restarts the ready pose
+# on the frame the flinch begins, the restart stops the flinch (same group), and
+# the reaction is one frame of twitch.
+_slot_tests = {pin_value(n, "SlotNodeName")
+               for n in wg
+               if str(BEL.get_node_title(n)).replace("\n", " ").startswith("Is Slot Active")
+               or "IsSlotActive" in str(BEL.get_node_title(n)).replace(" ", "")}
+check(f"the keepalive asks whether {G.AIM_SLOT} and {G.HIT_SLOT} are quiet "
+      f"before it replays the pose",
+      {G.AIM_SLOT, G.HIT_SLOT} <= _slot_tests, str(sorted(_slot_tests)))
 
 # The hybrid aim, which is the whole point of the trace layout: the camera line
 # decides what is being aimed at, the muzzle line decides whether the gun can
@@ -1365,6 +1446,205 @@ if blamed:
           [n.get_class().get_name() for n in driven] == ["K2Node_IfThenElse"],
           str([n.get_class().get_name() for n in driven]))
 
+# ─── Flinching: took a hit and lived ─────────────────────────────────────────
+# Everything here is about the difference between a survivor and a corpse. The
+# reaction hangs off the FALSE arm of the death branch, so the two can never run
+# on the same frame; it plays into its own slot, so it cannot cost the player
+# the aim pose permanently; and it is triggered by polling Health rather than
+# called by the shooter, so a damage source that has never heard of it still
+# makes its target flinch.
+
+check(f"{G.HIT_REACTIONS_VAR} is an array of animations on the component",
+      isinstance(h.get_editor_property(G.HIT_REACTIONS_VAR), (list, unreal.Array)))
+check(f"{G.LAST_HIT_FROM_VAR} is a vector, so a direction can be stated",
+      isinstance(h.get_editor_property(G.LAST_HIT_FROM_VAR), unreal.Vector))
+check(f"{G.PREV_HEALTH_VAR} starts at full health, so nothing flinches on the "
+      f"frame it spawns",
+      abs(h.get_editor_property(G.PREV_HEALTH_VAR) - G.COMBAT.start_health) < 1e-6,
+      str(h.get_editor_property(G.PREV_HEALTH_VAR)))
+check(f"{G.NEXT_REACT_VAR} starts at zero, so the FIRST hit is never on cooldown",
+      abs(h.get_editor_property(G.NEXT_REACT_VAR)) < 1e-6,
+      str(h.get_editor_property(G.NEXT_REACT_VAR)))
+
+# The order is the contract: the graph turns a direction into a base index into
+# this tuple and adds a random offset inside the run of Fronts. Three Fronts
+# first, then one each of Back, Left and Right.
+check("the six reaction clips are the shared tuple, not a second copy",
+      G.HIT_REACTION_CLIPS is NPC_HIT_REACTION_CLIPS)
+check("three Fronts, then Back, Left, Right -- the order the graph indexes",
+      list(G.HIT_REACTION_CLIPS) == ["MM_Death_Front_01", "MM_Death_Front_02",
+                                     "MM_Death_Front_03", "MM_Death_Back_01",
+                                     "MM_Death_Left_01", "MM_Death_Right_01"],
+      str(G.HIT_REACTION_CLIPS))
+for (base, count), name in ((G.HIT_DIR_FRONT, "Front"), (G.HIT_DIR_BACK, "Back"),
+                            (G.HIT_DIR_LEFT, "Left"), (G.HIT_DIR_RIGHT, "Right")):
+    got = list(G.HIT_REACTION_CLIPS[base:base + count])
+    check(f"the {name} bucket indexes the {name} clips",
+          all(name in c for c in got) and len(got) == count, str(got))
+check("build_retarget.py retargets exactly those six, from Epic's MM_Death_* set",
+      sorted(p.rsplit("/", 1)[1] for p in RETARGET_HIT_SOURCES)
+      == sorted(G.HIT_REACTION_CLIPS),
+      str(sorted(p.rsplit("/", 1)[1] for p in RETARGET_HIT_SOURCES)))
+
+# The tuning, and that it is on COMBAT rather than loose in the graph.
+for field, low, high in (("hit_react_cooldown_s", 0.05, 3.0),
+                         ("hit_react_rate", 0.25, 4.0),
+                         ("hit_react_blend_s", 0.0, 0.5)):
+    check(f"COMBAT.{field} is a sane, tunable number",
+          field in {f.name for f in dataclasses.fields(G.CombatConfig)}
+          and low <= getattr(G.COMBAT, field) <= high,
+          str(getattr(G.COMBAT, field, None)))
+# A shotgun puts eight pellets into a target in one frame and the SMG fires
+# eleven rounds a second. Without a cooldown longer than a frame the target
+# stands in the first two frames of a stagger forever -- a vibration, not a
+# reaction.
+check("the cooldown is longer than a frame, or the reaction is a vibration",
+      G.COMBAT.hit_react_cooldown_s > 0.1, str(G.COMBAT.hit_react_cooldown_s))
+
+# Every montage in the health graph, and there is exactly one: the flinch.
+_montages = by_pins(hg, "Asset", "SlotNodeName")
+check("exactly one montage in the health graph -- the flinch, and nothing else",
+      len(_montages) == 1, str(len(_montages)))
+check(f"...and it plays into {G.HIT_SLOT}, never {G.FULL_BODY_SLOT}: a full-body "
+      f"montage on the death path would blend out and stand the body back up",
+      all(pin_value(m, "SlotNodeName") == G.HIT_SLOT for m in _montages),
+      str([pin_value(m, "SlotNodeName") for m in _montages]))
+if _montages:
+    m = _montages[0]
+    check("the flinch blends in and out rather than popping",
+          num_pin(m, "BlendInTime") == G.COMBAT.hit_react_blend_s
+          and num_pin(m, "BlendOutTime") == G.COMBAT.hit_react_blend_s,
+          f"{pin_value(m, 'BlendInTime')}/{pin_value(m, 'BlendOutTime')}")
+    check(f"...at COMBAT.hit_react_rate ({G.COMBAT.hit_react_rate}x), not the "
+          f"authored second",
+          num_pin(m, "InPlayRate") == G.COMBAT.hit_react_rate,
+          pin_value(m, "InPlayRate"))
+    check("...once, not looping: a flinch that loops is a seizure",
+          num_pin(m, "LoopCount") == 1, pin_value(m, "LoopCount"))
+    # The clip comes out of the array, not off a pin: a literal here would be
+    # one skeleton's clip on every body in the game.
+    check("the clip is read from the array, never written on the pin",
+          bool(PIN.list_connected_pins(BEL.find_input_pin(m, "Asset"))))
+
+# The trigger. Health compared against PrevHealth, and the whole chain hanging
+# off the death branch's False arm.
+_prev_reads = [n for n in hg if str(BEL.get_node_title(n)).replace("\n", " ")
+               == f"Get {G.PREV_HEALTH_VAR}"]
+_prev_writes = [n for n in hg if has_in_pin(n, G.PREV_HEALTH_VAR)]
+check(f"{G.PREV_HEALTH_VAR} is read once and written once -- the whole trigger",
+      len(_prev_reads) == 1 and len(_prev_writes) == 1,
+      f"{len(_prev_reads)} reads, {len(_prev_writes)} writes")
+if _prev_writes:
+    # Written on EVERY path through the reaction block, not only the one that
+    # played something: skipping it on the cooldown arm makes the next hit
+    # compare against a health from before this one and fire for nothing.
+    _arms = PIN.list_connected_pins(BEL.find_execute_pin(_prev_writes[0]))
+    check(f"...and written on every arm, including the ones that did not react",
+          len(_arms) >= 4, f"{len(_arms)} exec links")
+
+# Direction: two dot products against the owner's own axes, and nothing else.
+_dots = titled(hg, "Dot Product")
+check("the hit direction is two dot products (forward and right), no angles",
+      len(_dots) == 2, str(len(_dots)))
+check("...one against the owner's forward",
+      len(titled(hg, "GetActorForwardVector")) >= 1)
+check("...and one against the owner's right",
+      len(titled(hg, "GetActorRightVector")) >= 1)
+# Four buckets, four writes of the index.
+_index_writes = [n for n in hg if has_in_pin(n, G.REACT_INDEX_VAR)]
+check("four directions, four writes of the clip index",
+      len(_index_writes) == 4, str(len(_index_writes)))
+# Three of the four are pin literals. The fourth -- Front -- has its value
+# WIRED, from a RandomIntegerInRange, which is the only reason a firefight does
+# not look like one animation on a loop; a literal there would read back as 0
+# and pass a naive test, so connected pins are excluded rather than read.
+_wired = [n for n in _index_writes
+          if PIN.list_connected_pins(BEL.find_input_pin(n, G.REACT_INDEX_VAR))]
+_literals = sorted(int(v) for n in _index_writes if n not in _wired
+                   for v in [num_pin(n, G.REACT_INDEX_VAR)] if v is not None)
+check("Back, Left and Right are written as literals",
+      _literals == sorted([G.HIT_DIR_BACK[0], G.HIT_DIR_LEFT[0],
+                           G.HIT_DIR_RIGHT[0]]), str(_literals))
+check("...and exactly one of the four -- Front -- is wired instead",
+      len(_wired) == 1, str(len(_wired)))
+# The draw itself: 0..2 over the three Front clips, offset by the Front base.
+_draws = [n for n in hg if has_in_pin(n, "Min") and has_in_pin(n, "Max")
+          and num_pin(n, "Max") == float(G.HIT_DIR_FRONT[1] - 1)
+          and num_pin(n, "Min") == 0.0]
+check(f"the Front pick draws over all {G.HIT_DIR_FRONT[1]} Front clips, so a "
+      f"firefight is not one animation on a loop",
+      len(_draws) == 1, str(len(_draws)))
+# An array shorter than six -- a checkout whose retarget has not run -- must
+# clip to the last entry rather than read off the end.
+check("the index is clamped against the array's real length",
+      bool(titled(hg, "Clamp")) or bool(by_pins(hg, "Value", "Min", "Max")))
+check("...and the array's length is checked before anything is played",
+      bool(titled(hg, "Length")))
+
+# Who writes the direction. Both damage sources do, and neither of them had to
+# know the reaction exists to make it fire -- only to make it point the right
+# way.
+_from_writes = [n for n in wg if has_in_pin(n, G.LAST_HIT_FROM_VAR)]
+check(f"the pellet loop records {G.LAST_HIT_FROM_VAR} where it lands",
+      len(_from_writes) == 1, str(len(_from_writes)))
+if _from_writes:
+    _src = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(_from_writes[0], G.LAST_HIT_FROM_VAR))]
+    _src_pin = PIN.list_connected_pins(
+        BEL.find_input_pin(_from_writes[0], G.LAST_HIT_FROM_VAR))
+    check("...off the hit's own impact normal, which already points back up the "
+          "shot",
+          [str(PIN.get_pin_name(q)).replace(" ", "") for q in _src_pin]
+          == ["ImpactNormal"],
+          str([str(PIN.get_pin_name(q)) for q in _src_pin]))
+
+# THE PROBE IS GONE. "A gate that never opens looks identical to one that
+# works", so the reaction was proved at runtime with a PrintWarning on the end
+# of the chain and a scripted hit on every wanderer -- and both are removed by
+# rebuilding with HIT_REACT_PROBE False. These two checks are what stop one
+# coming back: the switch, and the built graph.
+check("the hit-reaction probe switch is off", G.HIT_REACT_PROBE is False,
+      str(G.HIT_REACT_PROBE))
+_probe_tokens = (G.HIT_REACT_PROBE_PREFIX, G.POSE_BACK_PROBE_PREFIX)
+_probe_nodes = [f"{_g}:{BEL.get_node_title(n)}"
+                for _g, _nodes in (("health", hg), ("weapon", wg))
+                for n in _nodes
+                for _p in BEL.list_input_pins(n)
+                if any(t in str(PIN.get_pin_value(_p)) for t in _probe_tokens)]
+check("...and no probe node survives in either built graph",
+      not _probe_nodes, str(_probe_nodes))
+# The scripted hit the probe used to deal itself, too: nothing in the shipped
+# health graph may subtract from Health except the world floor's write of zero.
+check("...and the probe's scripted self-hit is gone with it",
+      not [n for n in hg
+           if str(BEL.get_node_title(n)).replace("\n", " ").startswith("Get MaxHealth")],
+      "MaxHealth is read by nothing in the health graph but the probe")
+
+# Every character carries its OWN six, because an AnimSequence belongs to one
+# skeleton and a shared default could only be right for one body.
+for _bp_path, _who in ((G.CHARACTER_BP_PATH, "the player"),
+                       (G.NPC_BP_PATH, "a wanderer")):
+    _bp = load(_bp_path)
+    if not _bp:
+        continue
+    _comp = component_template(_bp, "HealthComponent")
+    if not _comp:
+        continue
+    _clips = list(_comp.get_editor_property(G.HIT_REACTIONS_VAR))
+    check(f"{_who} carries all six reactions, or none at all",
+          len(_clips) in (0, len(G.HIT_REACTION_CLIPS)), str(len(_clips)))
+    if _clips:
+        check(f"...in HIT_REACTION_CLIPS order",
+              [c.get_name().rsplit("_MM_", 1)[-1] for c in _clips]
+              == [c.split("MM_", 1)[1] for c in G.HIT_REACTION_CLIPS],
+              str([c.get_name() for c in _clips]))
+        _mesh = _mesh_asset(_bp)
+        _skel = _mesh.get_editor_property("skeleton") if _mesh else None
+        check(f"...all on {_who}'s OWN skeleton, or they would never play",
+              all(c.get_editor_property("skeleton") == _skel for c in _clips),
+              str({c.get_editor_property("skeleton").get_name() for c in _clips}))
+
+
 # ─── Dying: the ragdoll, the corpse, and the menu ────────────────────────────
 # The player used to play MM_Death_Front_01 into FullBodySlot and the wanderers
 # were destroyed on the frame they died. Both are gone: Epic's six MM_Death_*
@@ -1385,10 +1665,8 @@ if ragdolls:
 # one on the mesh pin.
 check("and every body in the physics asset, not just the root",
       not titled(hg, "SetSimulatePhysics"))
-check("no death montage survives anywhere in the health graph",
-      not by_pins(hg, "Asset", "SlotNodeName"),
-      "a montage would blend out and stand the body back up")
-
+# The montage count and its slot are checked in the flinch section above; what
+# matters here is that the death path itself plays nothing.
 profiles = titled(hg, "SetCollisionProfileName")
 check("the ragdoll gets a collision profile that lets it hit the ground",
       len(profiles) == 1, str(len(profiles)))
@@ -1414,10 +1692,28 @@ check("the body stops where it fell",
 # places for "what dying looks like" to drift apart.
 casts = [n for n in hg if n.get_class().get_name() == "K2Node_DynamicCast"
          and "AsCharacter" in {q.replace(" ", "") for q in out_pins(n)}]
+# There are TWO of these now and they are not interchangeable: the flinch also
+# has to reach the owner's mesh to find an AnimInstance. Told apart by following
+# the montage's own self pin back up -- montage <- GetAnimInstance <- Get Mesh
+# <- cast -- rather than by position or by exec-link count, either of which
+# would quietly pick the wrong one the next time the graph moves.
+_flinch_cast = None
+if _montages:
+    _walk = _montages[0]
+    for _ in range(3):
+        _up = PIN.list_connected_pins(BEL.find_input_pin(_walk, "self"))
+        if not _up:
+            break
+        _walk = PIN.get_owning_node(_up[0])
+    _flinch_cast = _walk if _walk in casts else None
+check("the flinch finds its body through its own CastToCharacter",
+      _flinch_cast is not None)
+collapse_casts = [n for n in casts if n is not _flinch_cast]
 check("the player and the wanderers collapse through the same nodes",
-      len(casts) == 1, f"{len(casts)} CastToCharacter(s)")
-if casts:
-    feeders = PIN.list_connected_pins(BEL.find_input_pin(casts[0], "execute"))
+      len(collapse_casts) == 1, f"{len(collapse_casts)} collapse CastToCharacter(s) "
+      f"of {len(casts)} in the graph")
+if collapse_casts:
+    feeders = PIN.list_connected_pins(BEL.find_input_pin(collapse_casts[0], "execute"))
     check("...and both arms really do reach it", len(feeders) == 2,
           f"{len(feeders)} exec link(s) into the collapse")
 

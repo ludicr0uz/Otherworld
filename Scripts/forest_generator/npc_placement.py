@@ -75,6 +75,23 @@ NPC_MELEE_INTERVAL_S = 1.5         # seconds between swings, per NPC
 NPC_MELEE_MONTAGE_FALLBACK = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
 NPC_MELEE_BLEND_S = 0.15
 
+# ── Flinching ────────────────────────────────────────────────────────────────
+#
+# The six clips a wanderer plays when it is shot and lives, in the order the
+# reaction graph indexes them: three Fronts, then Back, Left, Right.  THE ORDER
+# IS THE CONTRACT -- build_weapons_and_combat.HIT_REACTION_CLIPS imports this
+# tuple and bakes positions in it into pin literals, so reordering here silently
+# plays a Left clip for a hit in the back.
+#
+# Bare clip names, because the same six exist once per creature under that
+# creature's own Anims folder (an AnimSequence belongs to one skeleton, exactly
+# as the melee swing above does).  Scripts/asset_pipeline/build_retarget.py
+# produces them from Epic's MM_Death_* set, which -- measured -- is not deaths
+# at all but one-second hit reactions; see HIT_SOURCES there.
+NPC_HIT_REACTION_CLIPS = ("MM_Death_Front_01", "MM_Death_Front_02",
+                          "MM_Death_Front_03", "MM_Death_Back_01",
+                          "MM_Death_Left_01", "MM_Death_Right_01")
+
 # How much health a wanderer has. The zombie is the yardstick -- 100 HP against
 # a pistol that does 26 means four rounds, which is what the weapon damage
 # numbers in build_weapons_and_combat.py were tuned against.
@@ -171,20 +188,28 @@ class NpcVariant:
     health: float
     speed_scale: float
     voices: tuple
+    # This creature's six hit reactions, in NPC_HIT_REACTION_CLIPS order. Its
+    # AI controller copies them onto the pawn's health component at possession,
+    # for the same reason it writes the health: an inherited component's
+    # defaults cannot be overridden per child Blueprint from Python.
+    reactions: tuple = ()
 
 
 def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0, voices=()):
     """The asset layout every creature follows, from one name."""
+    anims = f"/Game/Sourced/Characters/Anims/{folder}"
     return NpcVariant(
         key=key,
         blueprint=f"/Game/Forest/NPC/BP_Wanderer_{key}",
         mesh=f"/Game/Sourced/Characters/SKM_{folder}/SKM_{folder}",
-        anim_bp=f"/Game/Sourced/Characters/Anims/{folder}/A_{folder}_ABP_Unarmed",
-        melee=f"/Game/Sourced/Characters/Anims/{folder}/A_{folder}_MM_Attack_01",
+        anim_bp=f"{anims}/A_{folder}_ABP_Unarmed",
+        melee=f"{anims}/A_{folder}_MM_Attack_01",
         ai_blueprint=f"/Game/Forest/NPC/BP_ForestWandererAI_{key}",
         health=health,
         speed_scale=speed_scale,
         voices=voices,
+        reactions=tuple(f"{anims}/A_{folder}_{clip}"
+                        for clip in NPC_HIT_REACTION_CLIPS),
     )
 
 

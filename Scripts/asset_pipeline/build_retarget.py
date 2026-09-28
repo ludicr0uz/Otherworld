@@ -99,6 +99,18 @@ def aim_paths(name):
     return tuple(f"{anim_dir(name)}/{anim_prefix(name)}{src.rsplit('/', 1)[1]}"
                  for src in AIM_SOURCES)
 
+
+def hit_paths(name):
+    """Where this creature's six retargeted hit reactions land.
+
+    Same shape as aim_paths, and named here for the same reason: nothing
+    references them either -- the health component plays them into HitSlot by
+    object reference written onto a class default, so the dependency walk that
+    drives the batch cannot find them from the anim Blueprint.
+    """
+    return tuple(f"{anim_dir(name)}/{anim_prefix(name)}{src.rsplit('/', 1)[1]}"
+                 for src in HIT_SOURCES)
+
 # name -> (start bone, end bone).  Identical keys on both sides: auto_map_chains
 # then pairs them by exact string match and never has to guess.
 CHAINS_MANNEQUIN = {
@@ -169,7 +181,35 @@ MELEE_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
 # creature is built with depend on a decision taken in a different file.
 AIM_SOURCES = ("/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS",
                "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS")
-RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE) + AIM_SOURCES
+
+# The hit reactions -- and the reason they are spelled MM_Death_*.
+#
+# Epic's "death" set is not deaths.  Measured off the source assets: every one
+# of the six is about a second long and ends with the pelvis at 83-88 cm and
+# both feet on the floor, having staggered 1.5-2 m backwards.  They are
+# FLINCHES authored to be blended into a ragdoll, which is why the project's
+# own death is a ragdoll and nothing plays these at 0 HP (see the dying block
+# in build_weapons_and_combat.py).  What they are is exactly what a survivor
+# reacting to a bullet needs, so this is where they earn their place.
+#
+# The names carry a DIRECTION and that direction is load-bearing:
+# build_weapons_and_combat.hit_reactions() sorts the retargeted copies into
+# HIT_REACTION_CLIPS order and the health component picks by which side the
+# round came from.  Three Fronts and one each of the others is what Epic
+# shipped, and the three Fronts are why being shot from in front -- the common
+# case -- does not look like a loop.
+#
+# Retargeted for every creature, for the same reason the aim poses are: which
+# body the player wears is a decision taken in another file.
+HIT_DIR = "/Game/Characters/Mannequins/Anims/Death"
+HIT_SOURCES = (f"{HIT_DIR}/MM_Death_Front_01",
+               f"{HIT_DIR}/MM_Death_Front_02",
+               f"{HIT_DIR}/MM_Death_Front_03",
+               f"{HIT_DIR}/MM_Death_Back_01",
+               f"{HIT_DIR}/MM_Death_Left_01",
+               f"{HIT_DIR}/MM_Death_Right_01")
+
+RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE) + AIM_SOURCES + HIT_SOURCES
 
 # What the NPC builder points a monster's SkeletalMeshComponent at.  Derived
 # from the source name and the prefix below, and asserted in verify() rather
@@ -859,7 +899,7 @@ def _check_pose(anim, ref_hips):
     problems = []
     foot_gaps, hips_xy = [], []
 
-    # Two exemptions, both because the check below encodes what GROUNDED
+    # Three exemptions, all because the checks below encode what GROUNDED
     # locomotion looks like and these clips are not that.
     #
     # An idle has no gait: an idle whose feet alternate is the bug.
@@ -868,16 +908,37 @@ def _check_pose(anim, ref_hips):
     # the entire content of a jump.  MM_Jump legitimately reaches z=153 and
     # was the one clip to fail the grounded band.  Upright and in-place still
     # apply to it: a jump that folds double or drifts sideways is still wrong.
+    #
+    # A HIT REACTION (MM_Death_*, see HIT_SOURCES -- they are flinches, not
+    # deaths) is a stagger: the whole point of it is that the creature is
+    # knocked off its feet' rhythm and shoved 1.5-2 m backwards, so both "the
+    # feet alternate" and "the pelvis stays put" are assertions that it is NOT
+    # a reaction.  Upright and the hip band still apply, and between them they
+    # are the whole reason these clips were usable here at all: a reaction that
+    # ended on the floor would be a death and this project does not have one.
     name = anim.get_name()
     grounded = not any(k in name for k in ("Jump", "Fall", "Land"))
-    has_gait = grounded and "Idle" not in name
+    reaction = "Death" in name
+    has_gait = grounded and not reaction and "Idle" not in name
+    in_place = not reaction
 
     for t in samples:
         p = {b: _bone_world(anim, b, t)
              for b in ("Hips", "Head", "LeftFoot", "RightFoot")}
         hips, head = p["Hips"].z, p["Head"].z
         feet = max(p["LeftFoot"].z, p["RightFoot"].z)
-        if not (head > hips > feet):
+        # A reaction is allowed to put its head UNDER its hips, and the hunched
+        # creatures do: the wendigo's bind pose already pitches the neck 59 deg
+        # forward, so a flinch that bows the head adds to an existing bow and
+        # the head ends up around knee height for half a second. Measured, not
+        # guessed -- head 73-105 against hips 108-124 on the wendigo, and the
+        # zombie and the adventurer stay upright throughout. That is a monster
+        # doubling over when it is shot, which is the point. What must still
+        # hold is the pelvis (the band below, unrelaxed) and head-above-feet:
+        # a reaction that folds a creature onto the floor is a death, and this
+        # project's death is a ragdoll.
+        upright = head > feet if reaction else head > hips > feet
+        if not upright:
             problems.append(f"t={t:.2f} not upright "
                             f"(head {head:.0f} hips {hips:.0f} feet {feet:.0f})")
         # A pelvis on the floor means the Root Motion op stole the track; one
@@ -903,7 +964,7 @@ def _check_pose(anim, ref_hips):
     # metres in its pelvis track slides away from its own capsule.
     travel = max((abs(a - c) + abs(b - d))
                  for a, b in hips_xy for c, d in hips_xy)
-    if travel > 50.0:
+    if in_place and travel > 50.0:
         problems.append(f"pelvis travels {travel:.0f} uu -- not in place")
     return problems
 
@@ -985,6 +1046,15 @@ def verify(created, monster, meshy_skel):
             bad.append((expected.rsplit("/", 1)[1],
                         "expected by the weapon builder, not produced"))
 
+    # ...and the six hit reactions, which install_hit_reactions() writes onto
+    # every character's health component.  All six, in full: the directional
+    # pick indexes a six-entry array, so five of six is a silently wrong clip
+    # rather than a missing one.
+    for expected in hit_paths(monster):
+        if not unreal.EditorAssetLibrary.does_asset_exist(expected):
+            bad.append((expected.rsplit("/", 1)[1],
+                        "hit reaction expected by the weapon builder, not produced"))
+
     _log(f"  {ok}/{clips} clips upright, in place, with a real gait "
          f"({len(created)} assets total)")
     for bad_name, why in bad:
@@ -1061,4 +1131,10 @@ def main():
     _log(f"{len(totals)} monster(s) animate against their own bind pose")
 
 
-main()
+# Guarded, so that a verifier can import this module for its tables -- the six
+# HIT_SOURCES in particular, which verify_weapons_and_combat.py checks against
+# its own clip order -- without retargeting three creatures as a side effect.
+# Both ways this file is actually run (UnrealEditor-Cmd -ExecutePythonScript and
+# uepy's runpy) give it __main__, so nothing about running it changes.
+if __name__ == "__main__":
+    main()

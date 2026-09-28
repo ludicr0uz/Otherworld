@@ -188,6 +188,8 @@ FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
 FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
 FN_GREATER_II = "/Script/Engine.KismetMathLibrary.Greater_IntInt"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
+FN_SUB_VV = "/Script/Engine.KismetMathLibrary.Subtract_VectorVector"
+FN_NORMAL = "/Script/Engine.KismetMathLibrary.Normal"
 
 # Where the creature voices and the impact sounds are imported to, by
 # build_weapons_and_combat.import_sounds().
@@ -196,6 +198,21 @@ HIT_SOUNDS_VAR = "HitSounds"
 STATS_APPLIED_VAR = "StatsApplied"
 NEXT_VOICE_VAR = "NextVoiceTime"
 HIT_SOUNDS = tuple(f"/Game/Audio/A_MeleeHit_{i:02d}" for i in (1, 2, 3))
+
+# This creature's six flinches, carried on the CONTROLLER and copied onto the
+# pawn's health component at possession -- the same route, and for the same
+# reason, as its health: an AnimSequence belongs to one skeleton, the variants
+# are three different skeletons, and a child Blueprint's override of an
+# inherited component's defaults lives in an InheritableComponentHandler the
+# Python API cannot reach.  Without this every wanderer would flinch with
+# BP_ForestWanderer's mesh's clips, i.e. the wendigos would not flinch at all.
+REACTIONS_VAR = "HitReactions"
+# On BP_HealthComponent, written by whoever did the damage: a unit vector from
+# the victim toward the source.  The wanderers' punch is the only melee in the
+# game and this is the only place it is written; build_weapons_and_combat.py
+# writes it off the impact normal for a bullet.  See _author_hit_reaction there
+# for what reads it.
+LAST_HIT_FROM_VAR = "LastHitFrom"
 
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
@@ -428,6 +445,10 @@ def _author_stats_and_voice(ed, gate, x0, y0, health, voice_min, voice_max):
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, sound_array):
             raise RuntimeError(f"could not declare {name}")
+    ed.remove_member_variable(REACTIONS_VAR)
+    if not ed.add_member_variable(REACTIONS_VAR, BEL.get_array_type(
+            BEL.get_object_reference_type(unreal.AnimSequenceBase.static_class()))):
+        raise RuntimeError(f"could not declare {REACTIONS_VAR}")
 
     pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 620))
     pawn_out = _pin(pawn, "ReturnValue", is_input=False)
@@ -463,9 +484,23 @@ def _author_stats_and_voice(ed, gate, x0, y0, health, voice_min, voice_max):
     _set(set_now, "Health", health)
     _connect(BEL.find_then_pin(set_max), _pin(set_now, "execute"))
 
-    mark = keep(_at(ed.add_set_member_variable_node(STATS_APPLIED_VAR), x0 + 1500, y0))
+    # ...and this creature's own hit reactions, onto the same component, in the
+    # same breath and for the same reason.  A plain array-to-array copy: the
+    # health component's graph does the picking, all this has to do is put the
+    # right skeleton's clips where it can see them.
+    set_reacts = keep(_at(ed.add_set_member_variable_node(REACTIONS_VAR,
+                                                          HEALTH_CLASS_PATH),
+                          x0 + 1500, y0))
+    _connect(health_out, _pin(set_reacts, "self"))
+    mine = keep(_at(ed.add_get_member_variable_node(REACTIONS_VAR),
+                    x0 + 1500, y0 + 380))
+    _connect(_pin(mine, REACTIONS_VAR, is_input=False),
+             _pin(set_reacts, REACTIONS_VAR))
+    _connect(BEL.find_then_pin(set_now), _pin(set_reacts, "execute"))
+
+    mark = keep(_at(ed.add_set_member_variable_node(STATS_APPLIED_VAR), x0 + 1760, y0))
     _set(mark, STATS_APPLIED_VAR, "true")
-    _connect(BEL.find_then_pin(set_now), _pin(mark, "execute"))
+    _connect(BEL.find_then_pin(set_reacts), _pin(mark, "execute"))
 
     # --- every few seconds: a noise -----------------------------------------
     now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 1760, y0 + 380))
@@ -660,6 +695,26 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     _connect(_pin(floor, "ReturnValue", is_input=False), _pin(write, "Health"))
     _connect(BEL.find_then_pin(hit), _pin(write, "execute"))
 
+    # --- and which way it came from ------------------------------------------
+    # The player's flinch is picked by direction, and a punch has no impact
+    # normal to read it off -- so it is stated: the unit vector from the player
+    # to the wanderer that swung.  Both locations are already on the graph for
+    # the range check, so this is three pure nodes and a Set.  Whichever of the
+    # ten lands the blow writes its own bearing, so being surrounded reads as
+    # being hit from all sides rather than as one repeated stagger.
+    toward = keep(_at(_node(ed, FN_SUB_VV), x0 + 3600, y0 + 300))
+    _connect(_pin(self_loc, "ReturnValue", is_input=False), _pin(toward, "A"))
+    _connect(_pin(player_loc, "ReturnValue", is_input=False), _pin(toward, "B"))
+    bearing = keep(_at(_node(ed, FN_NORMAL), x0 + 3840, y0 + 300))
+    _connect(_pin(toward, "ReturnValue", is_input=False), _pin(bearing, "A"))
+    came_from = keep(_at(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR,
+                                                          HEALTH_CLASS_PATH),
+                         x0 + 3840, y0))
+    _connect(as_health, _pin(came_from, "self"))
+    _connect(_pin(bearing, "ReturnValue", is_input=False),
+             _pin(came_from, LAST_HIT_FROM_VAR))
+    _connect(BEL.find_then_pin(write), _pin(came_from, "execute"))
+
     # --- and make a noise landing it ----------------------------------------
     # At the PLAYER's location rather than the wanderer's: the sound is the
     # impact, and the impact happens where the hit lands. With ten wanderers
@@ -668,7 +723,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     # front of them.
     thud, after_thud = _author_random_sound(
         ed, HIT_SOUNDS_VAR, _pin(player_loc, "ReturnValue", is_input=False),
-        BEL.find_then_pin(write), x0 + 3860, y0)
+        BEL.find_then_pin(came_from), x0 + 4120, y0)
     made.extend(thud)
 
     # Every exit -- hit, missing health component, not a Character -- has to
@@ -686,7 +741,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
 
 def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
                                  health=NPC_BASE_HEALTH, voices=(),
-                                 hit_sounds=HIT_SOUNDS):
+                                 hit_sounds=HIT_SOUNDS, reactions=()):
     """Create an AI controller and author its chase-and-attack loop.
 
     ``rebuild`` wipes the graph first.  It defaults to True because this builder
@@ -919,8 +974,22 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
                  f"exist -- run Scripts/make_creature_sounds.py, then "
                  f"build_weapons_and_combat.py, to import the rest")
 
+    # The flinches, same mechanism, but ALL SIX OR NONE: the reaction graph
+    # indexes this array by position (three Fronts, then Back, Left, Right), so
+    # a partial set is not a shorter list, it is the wrong clip for three of the
+    # four directions -- and that failure is silent, where an empty array simply
+    # means this creature does not flinch.
+    clips = [eas.load_asset(a) for a in reactions if eas.does_asset_exist(a)]
+    if len(clips) != len(reactions):
+        _log(f"note: {path}: {len(clips)} of {len(reactions)} hit reactions "
+             f"exist -- run Scripts/asset_pipeline/build_retarget.py. This "
+             f"creature will not flinch.")
+        clips = []
+    cdo.set_editor_property(REACTIONS_VAR, clips)
+
     eas.save_loaded_asset(bp)
-    _log(f"built {path} (health {health:.0f}"
+    _log(f"built {path} ({len(cdo.get_editor_property(REACTIONS_VAR))} hit "
+         f"reactions, health {health:.0f}"
          + (f", melee {NPC_MELEE_DAMAGE:.0f} dmg / {NPC_MELEE_INTERVAL_S} s "
             f"inside {NPC_MELEE_RANGE_CM:.0f} cm" if melee else ", no melee")
          + f", {len(cdo.get_editor_property(VOICES_VAR))} voices)")
@@ -1120,7 +1189,8 @@ def build_variant_blueprint(base_bp, variant):
         rebuild=True, path=variant.ai_blueprint,
         melee_anim=_resolve(variant.melee, NPC_MELEE_MONTAGE_FALLBACK,
                             f"{variant.key} melee clip"),
-        health=variant.health, voices=variant.voices)
+        health=variant.health, voices=variant.voices,
+        reactions=variant.reactions)
     cdo.set_editor_property("ai_controller_class", BEL.generated_class(ai_bp))
 
     if not BEL.compile_blueprint(bp):

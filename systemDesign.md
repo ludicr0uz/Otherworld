@@ -201,6 +201,10 @@ and the line-of-sight test, never for collision, which comes from the real mesh.
 
 ### 3.2d NPC Blueprints — `Scripts/build_npc_blueprints.py`
 
+> Since 2026-09-28 the builder is a thin entry point over the `Scripts/npc/` package, and the
+> controller patrols until a sense (hurt, sight, touch, sound) flips it to the chase below —
+> see §3.2f for how patrol, the senses, noise and the agro ranges are implemented.
+
 These two assets depend on nothing per-level, so they live in their own idempotent script
 rather than the generated one; the import script imports it and calls
 `ensure_npc_blueprints()`. UE 5.8 exposes genuine Blueprint graph authoring to Python
@@ -360,6 +364,204 @@ Two further findings shaped this:
 
 The consequence for verification: the rig can be asserted, but whether a path is actually
 found can only be confirmed in PIE. See §6.
+
+### 3.2f Patrol, senses and noise (agro)
+
+A wanderer has two states, held in one `Aggro` bool on its AI controller. It spawns
+**patrolling** (every respawn too, since each spawn gets a fresh controller) and switches to
+**aggro**, the chase-and-swing loop of 3.2d, when a sense detects the player. Nothing switches
+it back.
+
+**Where things live**
+
+| concern | code | numbers |
+|---|---|---|
+| the patrol/aggro switch | `npc/agro.py` | — |
+| hurt, sight, touch, hearing | `npc/senses.py` | `forest_generator/npc_agro.py` (`AgroSettings`, per creature) |
+| patrol setup and stroll | `npc/patrol.py` | same `AgroSettings` row |
+| the noise record (vars) | `combat/game_state.py` | — |
+| writing a noise | `combat/noise.py` (`_author_make_noise`) | `COMBAT` noise fields, `combat/tuning.py` |
+| gunshot noise | `combat/weapon_component/shot_noise.py` | `SHOT_VOLUME_CM` → `ShotVolume` on each weapon |
+| footstep noise | `combat/footsteps.py` | `COMBAT.footstep_noise_*` |
+| checks | `npc/verify.py`, `combat/verify/noise.py` | — |
+
+All numbers are **baked into pin literals** at build time, like every other NPC and combat
+number (see 3.2d and §5). Each creature already has its own controller for its attack clip, so
+each creature's controller also carries its own senses. Changing a number means editing the
+table and re-running `build_weapons_and_combat.py` (emitters) and/or `build_npc_blueprints.py`
+(listeners).
+
+#### The heartbeat
+
+The switch is spliced into the controller's existing 0.5 s loop, between the stats/voice block
+and the chase. There is no second Tick:
+
+```
+possessed? -> stats + voice -> patrol setup (once per life)
+           -> [Aggro?] yes ------------------------------------> chase + swing -> Delay 0.5 s
+                 no  -> [player pawn valid?] no ----------------> patrol step --> Delay 0.5 s
+                         yes -> hurt? -> sight? -> touch? -> sound?
+                                 any yes -> AggroReason = <sense>, Aggro = true,
+                                            MaxWalkSpeed = RunSpeed,
+                                            PrintWarning "[NPC-AGRO] <sense> -- <actor>"
+                                            -> chase + swing (this same heartbeat)
+                                 all no  -> patrol step -> Delay 0.5 s
+```
+
+The senses are a chain of **exec branches**, not one boolean OR. `BooleanAND`/`OR` do not
+short-circuit and pure nodes are evaluated by whatever reads them, so a single expression would
+run the line-of-sight trace and the GameMode cast every heartbeat whatever the cheaper senses
+said, and it could not report which sense fired.
+
+#### Patrol
+
+*Setup, once per life, on the first heartbeat with a pawn:* `PatrolHome` = the pawn's location
+(the centre of its circle, so a respawn patrols around its new spot); `RunSpeed` = the pawn's
+current `MaxWalkSpeed` (this already includes the creature's speed multiplier and the level's
+per-instance gait variance); `MaxWalkSpeed = RunSpeed × patrol_speed_scale`.
+
+*Step, on every patrolling heartbeat:* once `now ≥ NextPatrolTime`, it sets
+`PatrolTarget = GetRandomReachablePointInRadius(PatrolHome, patrol_radius_cm).RandomLocation`
+and `NextPatrolTime = now + random(repick_min, repick_max)`. If `|PatrolTarget − PatrolHome| ≤
+radius × 1.1 + 200 cm`, it calls `SimpleMoveToLocation(PatrolTarget)`.
+
+- The query is **pure**, so each output read would re-run it. Only `RandomLocation` is read,
+  once, into a variable, and `ReturnValue` is never read.
+- The distance guard replaces `ReturnValue`. On failure the query returns the origin it was
+  given; with no navigation system it returns the zero vector, which is the player's spawn
+  point, and the guard refuses that.
+- `SimpleMoveToLocation` is used rather than a second `MoveToActor`/`MoveToLocation`, because
+  the level verifier asserts the chase has exactly one of each.
+- Speed is always written from the stored `RunSpeed`. Scaling the live `MaxWalkSpeed` would
+  compound on every write.
+
+#### The four senses
+
+Let `P` be the pawn location, `Q` the player location, `F` the pawn's forward vector and `A` the
+creature's `AgroSettings`.
+
+| sense | condition | cost |
+|---|---|---|
+| hurt | `BP_HealthComponent.DamagedByPlayer` (the flag the kill count trusts) | cast + read |
+| sight | `\|Q−P\| ≤ A.vision_range_cm` **and** `F · unit(Q−P) ≥ cos(A.vision_half_angle_deg)` **and** `LineOfSightTo(player)` | 1 visibility trace |
+| touch | `\|Q−P\| ≤ A.touch_range_cm`, from any direction | distance |
+| sound | see below | GameMode cast |
+
+`F` is the facing, and while patrolling that is the walking direction
+(`orient_rotation_to_movement`). The player can therefore approach from behind unseen, but not
+touch it. `LineOfSightTo` is the controller's own function and traces from the pawn's eyes, so
+tree trunks block sight.
+
+#### Sound: one noise record, owned by whatever made the noise
+
+The emitters (weapon component, footstep component) and the listeners (every controller) share
+no reference to each other, so the noise is published on the GameMode. The GameMode is already
+the world-scoped wiring point for the spawn and kill counters.
+
+| GameMode variable | meaning |
+|---|---|
+| `NoiseTime` | world time of the write |
+| `NoiseLocation` | where the noise was made (muzzle, player's feet) |
+| `NoiseRange` | all-round reach in cm, at hearing scale 1.0 |
+| `NoiseDirection` | unit vector of the cone (gunshot only) |
+| `NoiseConeRange` | reach inside the cone; 0 = no cone |
+| `NoiseConeCos` | cos of the cone's half-angle |
+
+**Write rule** (`_author_make_noise`). With `loud(x) = max(x.Range, x.ConeRange)`:
+
+```
+write  iff  now − NoiseTime ≥ COMBAT.noise_hold_s            (record is stale)
+       or   loud(new) ≥ loud(record)                          (new noise is at least as loud)
+```
+
+There is one record, so a new noise replaces the old one. The hold stops a footstep from
+erasing a gunshot before every wanderer has had a heartbeat to check it. That only works while
+`noise_hold_s` (0.6 s) is longer than the heartbeat (`NPC_REPATH_SECONDS`, 0.5 s), and the
+combat verifier asserts that inequality.
+
+**Hearing test** (listener, `_author_hearing`), with `h = A.hearing_scale`, `L =
+NoiseLocation` and `d = |P − L|`:
+
+```
+recent  = now − NoiseTime ≤ noise_hold_s
+round   = d ≤ NoiseRange · h
+cone    = d ≤ NoiseConeRange · h   and   NoiseDirection · unit(P − L) ≥ NoiseConeCos
+heard   = recent and (round or cone)
+```
+
+- `recent` stops a wanderer that strolls into range later from hearing an old noise.
+- The noise decides how far it carries; the listener contributes only `h`.
+- Distances are 3D, from the noise source to the capsule centre. NPC ground heights on the
+  200 m map vary by about 7 m, so this is within about 1% of horizontal distance.
+
+**Emitters**
+
+| noise | `NoiseRange` | cone | written |
+|---|---|---|---|
+| gunshot | held weapon's `ShotVolume` | `ShotVolume × shot_noise_cone_range_scale` (1.6), `cos(shot_noise_cone_half_angle_deg = 30°)`, direction = the pellets' own muzzle→AimPoint vector | after the pellet loop, every shot |
+| footstep | `speed × footstep_noise_range_cm / footstep_noise_reference_speed_cms` (1200/600 = 2.0 s) | none (`NoiseConeRange` = 0) | on each footfall, **player only** (`IsPlayerControlled`; the wanderers use the same component) |
+
+The shot's cone uses `_author_fire`'s returned direction pin, not a recomputed copy, so the
+cone always points along the line the pellets were traced.
+
+#### Effective ranges
+
+Per creature (`NPC_AGRO`):
+
+| | vision | half-angle | touch | hearing | patrol radius | patrol speed | re-pick |
+|---|---|---|---|---|---|---|---|
+| Zombie | 20 m | 50° | 2.5 m | 1.0× | 15 m | 0.30 × run | 6–12 s |
+| Wendigo | 35 m | 65° | 3.0 m | 1.4× | 30 m | 0.30 × run | 8–16 s |
+
+Gunshots (`SHOT_VOLUME_CM`), showing reach at hearing scale 1.0 (zombie) / 1.4 (wendigo):
+
+| gun | all round | inside the 30° cone | heard from the player start (avg of 10)* |
+|---|---|---|---|
+| Sniper | 150 / 210 m | 240 / 336 m | 10 |
+| Rifle | 90 / 126 m | 144 / 202 m | 9.9 |
+| Shotgun | 85 / 119 m | 136 / 190 m | 8.7 |
+| SMG | 50 / 70 m | 80 / 112 m | 0.6 |
+| Pistol | 35 / 49 m | 56 / 78 m | 0 |
+
+\* All-round only, over `Lvl_Forest_200m`'s ten spawn points with each wanderer anywhere in its
+patrol circle. The pack starts 75–78 m out, just inside rifle and shotgun range, so from the
+centre those two wake nearly as many as the sniper. From a corner the sniper reaches 7–10 and
+the rifle/shotgun 3–6. The cone only reaches what lies within 30° of the aim, not the whole
+ring.
+
+Footsteps: 12 m at a 600 cm/s run, 18 m at the 900 cm/s sprint, 6 m at the half-speed ADS walk
+(× 1.4 for a wendigo).
+
+These are agro ranges only. The audio attenuation profiles that set how loud shots *sound*
+(§5) are separate and unchanged.
+
+#### Verification
+
+- `verify_npc_blueprints.py` (100 checks) tests each controller against its own creature's
+  row: variable types, spawning with `Aggro` false, a single flip to true, the four reasons,
+  the chase reachable only through the switch, both speed writes derived from `RunSpeed`, the
+  pure query read once, the guard, and every sense literal. It tells equal literals apart by
+  which distance they measure (the wendigo's 35 m sight equals its 35 m patrol guard).
+- `combat/verify/noise.py` checks the record's types, each gun's `ShotVolume` and their order,
+  both writers' stale-or-louder guard and fields, the cone sharing the pellets' direction, the
+  player-only footstep gate, and `noise_hold_s > NPC_REPATH_SECONDS`.
+- Runtime (headless `-game`, probes through the inbox): patrol stayed inside its circles and
+  never approached an idle player. Each sense flipped the right wanderer: sight, touch, hurt,
+  an all-round noise, a cone aimed at an NPC, and the player's real footsteps 8 m behind one.
+  A 5 m noise 25 m away and an NPC behind a shot fired away from it did not flip. The gunshot's
+  own write has **not** run live, because a headless run cannot press the trigger (raw-key
+  polling, no Python input injection); it shares its writer with the footsteps, which are
+  proven.
+
+#### Limits and next dials
+
+- **No way back to patrol.** Losing interest would be a new `AgroSettings` field and a branch
+  on the yes arm of `[Aggro?]`.
+- **One record means one noise per ~0.6 s window.** Two simultaneous noises in different
+  places keep only the louder. A list would need an array on the GameMode and a loop in every
+  listener.
+- **Sound ignores occlusion.** A shot carries through trees and terrain, while sight does not.
+- **No pack alerting.** One wanderer going aggro does not alert its neighbours.
 
 ### 3.3 Offline verification — `forest_generator/verification.py`
 

@@ -20,6 +20,7 @@ from combat.weapon_component.ready_pose import _author_ready_pose_keepalive
 from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
 )
+from combat.weapon_component.shot_noise import _author_shot_noise
 from combat.weapon_component.sprint import _author_sprint
 
 
@@ -241,7 +242,10 @@ def _author_wc_tick(ed, tick):
     # fly down the AimPoint resolved at the top of this frame.
     kicked = _author_recoil_kick(ed, held, pc_out,
                                  BEL.find_then_pin(ready_gate), 6800, -1400)
-    after_fire = _author_fire(ed, held, muzzle, kicked, 2700, 0)
+    fired, flew = _author_fire(ed, held, muzzle, kicked, 2700, 0)
+    # ...and the wanderers hear it. After the pellets, so a shot is heard
+    # whether or not it hit anything.
+    after_fire = _author_shot_noise(ed, held, muzzle, flew, fired, 6800, -2600)
 
     # --- the click, when the gate said no ------------------------------------
     dry_exits = _author_dry_fire(

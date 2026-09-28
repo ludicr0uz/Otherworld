@@ -208,8 +208,9 @@ def cmd_plan() -> int:
     print("From an empty Content/ (bar Content/Python), with the editor closed:\n")
     for i, step in enumerate(RESTORE_ORDER, 1):
         print(f"  {i}. python3 {step}")
-    print("\nThen the verifiers -- 564 checks, all of which must pass:\n")
+    print("\nThen the verifiers, every check of which must pass:\n")
     for v in ("Scripts/verify_weapons_and_combat.py",
+              "Scripts/verify_npc_blueprints.py",
               "Scripts/verify_graphics_menu.py",
               "Scripts/generated_levels/Lvl_Forest_200m/verify_Lvl_Forest_200m.py"):
         print(f"     python3 Scripts/dev/uepy.py --cold {v}")

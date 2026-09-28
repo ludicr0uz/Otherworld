@@ -20,8 +20,8 @@ from combat.tuning import (
     COMBAT, PISTOL_FIRE_INTERVAL, RIFLE_FIRE_INTERVAL, RIFLE_MAGAZINE,
     RIFLE_RELOAD_SECONDS, RIFLE_RESERVE, SHOTGUN_FIRE_INTERVAL,
     SHOTGUN_MAGAZINE, SHOTGUN_RELOAD_SECONDS, SHOTGUN_RESERVE,
-    SMG_FIRE_INTERVAL, SMG_MAGAZINE, SMG_RELOAD_SECONDS, SMG_RESERVE,
-    SNIPER_FIRE_INTERVAL, SNIPER_MAGAZINE, SNIPER_RELOAD_SECONDS,
+    SHOT_VOLUME_CM, SMG_FIRE_INTERVAL, SMG_MAGAZINE, SMG_RELOAD_SECONDS,
+    SMG_RESERVE, SNIPER_FIRE_INTERVAL, SNIPER_MAGAZINE, SNIPER_RELOAD_SECONDS,
     SNIPER_RESERVE,
 )
 
@@ -185,6 +185,11 @@ def _weapon_specs():
     which is the same "wins the fight it is already in" identity its damage
     gives it. The two singles pay their whole kick in one visible jolt and
     then have a second to recover.
+
+    `shot_volume` is how far the shot is heard, and it is read from
+    SHOT_VOLUME_CM in tuning.py rather than written inline, because the five
+    only mean something against each other: that table is where "the sniper
+    is the loudest, the pistol the quietest" is visible in one place.
     """
     skin = player_skin()
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
@@ -196,7 +201,7 @@ def _weapon_specs():
              colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
-             recoil=2.2),
+             recoil=2.2, shot_volume=SHOT_VOLUME_CM["Shotgun"]),
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
              display="Pistol", automatic=False, damage=26.0, pellets=1, spread=1.0, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
@@ -204,7 +209,7 @@ def _weapon_specs():
              colour=(0.35, 0.65, 0.95),
              uses_ammo=False, magazine=0, reserve=0,
              interval=PISTOL_FIRE_INTERVAL, reload_s=0.0,
-             recoil=0.30),
+             recoil=0.30, shot_volume=SHOT_VOLUME_CM["Pistol"]),
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast.
@@ -215,7 +220,7 @@ def _weapon_specs():
              colour=(0.45, 0.85, 0.35),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
              interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
-             recoil=0.45),
+             recoil=0.45, shot_volume=SHOT_VOLUME_CM["SMG"]),
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
         dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE,
@@ -225,7 +230,7 @@ def _weapon_specs():
              colour=(0.70, 0.45, 0.95),
              uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
              interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS,
-             recoil=0.85),
+             recoil=0.85, shot_volume=SHOT_VOLUME_CM["Rifle"]),
         # One shot, one kill: 120 against 100 HP, at 0.2 degrees of spread and
         # 200 m of range -- further than anything in a 200 m forest is visible.
         # The cost is 1.6 s between shots, which against a pack of five that
@@ -238,7 +243,7 @@ def _weapon_specs():
              colour=(0.95, 0.30, 0.35), ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
              interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
-             recoil=2.4),
+             recoil=2.4, shot_volume=SHOT_VOLUME_CM["Sniper"]),
     )
 
 

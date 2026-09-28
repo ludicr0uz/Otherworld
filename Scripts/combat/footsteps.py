@@ -1,5 +1,6 @@
 """BP_FootstepComponent: distance-driven footfalls for the player and every
-wanderer, and the random-sound picker it plays through.
+wanderer, the random-sound picker it plays through, and the noise the
+player's steps make for the wanderers to hear.
 """
 
 import unreal
@@ -13,10 +14,12 @@ from combat.graph import (
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_AND, FN_ARR_GET, FN_ARR_LEN, FN_GET_OWNER,
     FN_GET_VELOCITY, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_MUL_FF,
-    FN_ON_GROUND, FN_PLAY_SOUND, FN_RAND_INT, FN_SUB_FF, FN_SUB_II,
-    FN_VSIZE_XY, NODE_CAST_CHARACTER,
+    FN_IS_PLAYER_CONTROLLED, FN_ON_GROUND, FN_PLAY_SOUND, FN_RAND_INT,
+    FN_SUB_FF, FN_SUB_II, FN_VSIZE_XY, NODE_CAST_CHARACTER,
 )
+from combat.noise import _author_make_noise
 from combat.paths import WEAPON_DIR
+from combat.tuning import COMBAT
 
 
 # --- footsteps ---------------------------------------------------------------
@@ -195,8 +198,29 @@ def build_footstep_component(rebuild=True):
 
     at = _at(_node(ed, FN_ACTOR_LOC), 3380, 300)
     _connect(owner_out, _pin(at, "self"))
-    _author_random_sound(ed, "Sounds", _pin(at, "ReturnValue", is_input=False),
-                         BEL.find_then_pin(charge), 3640, 0)
+    _sounded, stepped = _author_random_sound(
+        ed, "Sounds", _pin(at, "ReturnValue", is_input=False),
+        BEL.find_then_pin(charge), 3640, 0)
+
+    # --- and the wanderers may hear it ---------------------------------------
+    # Only the player's steps: the wanderers wear this same component, and a
+    # pack that woke itself up with its own feet would never patrol at all.
+    # The reach is proportional to speed (COMBAT.footstep_noise_range_cm at
+    # the reference speed), so a sprint carries further than a walk and
+    # aiming's half-speed creep carries half as far, without this graph
+    # knowing about either.
+    mine = _at(_node(ed, FN_IS_PLAYER_CONTROLLED), 5400, 300)
+    _connect(char_out, _pin(mine, "self"))
+    players = _at(ed.add_branch_node(), 5400, 0)
+    _connect(_pin(mine, "ReturnValue", is_input=False), _pin(players, "Condition"))
+    _connect(stepped, _pin(players, "execute"))
+    reach = _at(_node(ed, FN_MUL_FF), 5660, 300)
+    _connect(speed_out, _pin(reach, "A"))
+    _set(reach, "B", COMBAT.footstep_noise_range_cm
+         / COMBAT.footstep_noise_reference_speed_cms)
+    _author_make_noise(ed, BEL.find_then_pin(players),
+                       _pin(at, "ReturnValue", is_input=False),
+                       _pin(reach, "ReturnValue", is_input=False), 5920, 0)
 
     ed.add_comment_to_nodes(
         f"A footfall every {FOOTSTEP_STRIDE_CM:.0f} cm of ground covered, "

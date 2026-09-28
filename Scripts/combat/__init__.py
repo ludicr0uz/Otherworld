@@ -10,14 +10,17 @@ each module's docstring says what it owns and why it is shaped that way.
 DATA (constants and pure tables -- no Blueprint authoring)
   paths             /Game asset paths and generated-class paths
   nodes             FN_* function paths, NODE_* palette names, macros
-  tuning            keys, CombatConfig / COMBAT, ammo, drops, auto fire
+  tuning            keys, CombatConfig / COMBAT, ammo, drops, auto fire,
+                    noise, SHOT_VOLUME_CM (how loud each gun is)
   game_state        GameMode + health-component variable names, debug mode,
-                    ensure_game_mode_vars()
+                    the noise record, ensure_game_mode_vars()
   weapon_specs      the five weapons: parts, muzzles, icons, _weapon_specs()
   camera            boom and aim-trace numbers, face/aim-the-camera patches
 
 SHARED AUTHORING HELPERS
   graph             node/pin/connect/set, variables, components, events
+  noise             _author_make_noise: write the GameMode's noise record
+                    (the shot and the player's footsteps call it)
 
 ASSETS AND PATCHES
   materials         flat materials (gunmetal, wood, blood, brass)

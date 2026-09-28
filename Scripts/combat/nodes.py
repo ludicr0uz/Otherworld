@@ -132,6 +132,11 @@ CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
+# The noise record (combat/noise.py): the louder of two reaches, and whether a
+# footstep belongs to the player rather than to one of the wanderers who share
+# the footstep component.
+FN_MAX_FF = "/Script/Engine.KismetMathLibrary.FMax"
+FN_IS_PLAYER_CONTROLLED = "/Script/Engine.Pawn.IsPlayerControlled"
 FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
 FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
 FN_DISABLE_MOVEMENT = "/Script/Engine.CharacterMovementComponent.DisableMovement"

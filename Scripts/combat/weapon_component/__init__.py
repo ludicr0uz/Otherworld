@@ -10,6 +10,7 @@ _author_* fragment per concern, each in its own module:
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire
   recoil      view turn, kick, recovery
+  shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
   sprint      sprint and stamina
   ready_pose  restart the ready pose after it is interrupted
   tick        the Tick that calls all of the above

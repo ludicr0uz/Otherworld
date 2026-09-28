@@ -107,6 +107,10 @@ def build_weapon_item():
     # drawn per shot, and the fraction is the same for every gun (see
     # COMBAT.recoil_horizontal_ratio).
     _declare(ed, "RecoilPitch", _float_type())
+    # How far this weapon's shot is heard by the wanderers, in cm (see
+    # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
+    # Held like every other per-weapon number.
+    _declare(ed, "ShotVolume", _float_type())
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
@@ -176,6 +180,7 @@ def build_weapon(spec, item_bp):
         "AdsZoom": float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),
         "Scoped": bool(spec.get("scoped", False)),
         "RecoilPitch": float(spec["recoil"]),
+        "ShotVolume": float(spec["shot_volume"]),
         "Icon": _weapon_icon(spec["display"]),
         "FireSound": _must_load(spec["sound"]),
         "DryFireSound": _must_load(SND_DRY_FIRE),
@@ -185,6 +190,7 @@ def build_weapon(spec, item_bp):
     _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
          f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
          f"{spec['recoil']:.2f} deg kick, "
+         f"heard at {spec['shot_volume'] / 100.0:.0f} m, "
          + (f"{spec['magazine']}+{spec['reserve']} rounds, "
             f"{spec['interval']:.2f}s between shots"
             if spec["uses_ammo"] else "unlimited ammo")

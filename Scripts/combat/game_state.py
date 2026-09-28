@@ -3,7 +3,11 @@ mode) and the per-health-component variable names every graph agrees on,
 plus ensure_game_mode_vars() which declares them.
 """
 
-from combat.graph import BEL, BGE, _assets, _declare, _log
+import unreal
+
+from combat.graph import (
+    BEL, BGE, _assets, _declare, _float_type, _log, _struct_type,
+)
 from combat.paths import GAME_MODE_BP_PATH
 
 
@@ -61,6 +65,23 @@ FELL_LOG_PREFIX = "[NPC-FELL] ERROR #"
 # afterwards.
 DEAD_LOG_PREFIX = "[PLAYER-DEAD] killed with "
 SPAWNED_AT_VAR = "SpawnedAt"
+# The last noise the player made, for the wanderers to hear. One record,
+# world-scoped for the same reason as the counters above: the emitters (the
+# weapon component, the footstep component) and the listeners (every
+# wanderer's AI controller) share nothing else. Written by combat/noise.py,
+# read by Scripts/npc/senses.py. Where, when, how far it carries all round,
+# and -- for a gunshot -- the direction and reach of the louder cone down the
+# barrel, with the cosine of its half-angle. An all-round noise leaves the
+# cone reach at 0, which no listener can be inside.
+NOISE_TIME_VAR = "NoiseTime"
+NOISE_LOCATION_VAR = "NoiseLocation"
+NOISE_RANGE_VAR = "NoiseRange"
+NOISE_DIRECTION_VAR = "NoiseDirection"
+NOISE_CONE_RANGE_VAR = "NoiseConeRange"
+NOISE_CONE_COS_VAR = "NoiseConeCos"
+NOISE_FLOAT_VARS = (NOISE_TIME_VAR, NOISE_RANGE_VAR, NOISE_CONE_RANGE_VAR,
+                    NOISE_CONE_COS_VAR)
+NOISE_VECTOR_VARS = (NOISE_LOCATION_VAR, NOISE_DIRECTION_VAR)
 # Debug mode's damage readout, drawn at each impact for as long as the tracer.
 DAMAGE_TEXT_COLOR = "(R=1.000000,G=0.850000,B=0.100000,A=1.000000)"
 
@@ -83,6 +104,8 @@ def ensure_game_mode_vars():
                        on the HUD that toggles it because the *weapon
                        component* is the other thing that reads it, and a HUD
                        variable is not reachable from a component.
+        Noise*         the last noise the player made (see NOISE_TIME_VAR),
+                       written by whatever made it, heard by every wanderer.
 
     All three outlive every actor that touches them -- the player's own health
     component is destroyed with the player, so the score cannot live there.
@@ -102,9 +125,13 @@ def ensure_game_mode_vars():
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
     for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    for name in NOISE_FLOAT_VARS:
+        _declare(ed, name, _float_type())
+    for name in NOISE_VECTOR_VARS:
+        _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
     _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {KILL_COUNT_VAR}, "
-         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR} ready")
+         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR}, the noise record ready")
     return bp

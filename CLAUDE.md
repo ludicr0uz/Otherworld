@@ -64,7 +64,7 @@ nothing. `Scripts/combat/` was split this way: identical bytecode for every move
 line-for-line identical to the monolith's, and a clean `--game` run.
 
 **Over budget today; split before extending:** `build_graphics_menu.py` (3.2k lines),
-`generate_forest_level.py` (1.8k), `build_npc_blueprints.py` (1.2k),
+`generate_forest_level.py` (1.8k),
 `asset_pipeline/build_retarget.py` (1.1k), `verify_graphics_menu.py`,
 `forest_generator/verification.py`. `build_shotgun_and_health.py` is history; leave it alone.
 
@@ -224,7 +224,7 @@ PIE is active.
 3. **Right-size `-game` runs.** Spawn-path bugs show in the first two seconds; 25 s is plenty.
    Only respawn *statistics* justify 90 s+.
 4. **Scope verification to the blast radius.** AI-graph change → the level verifier. Run the
-   full sweep (level + weapons + HUD) once before calling a session done, not per edit.
+   full sweep (level + weapons + NPC + HUD) once before calling a session done, not per edit.
 5. **Zero errors is not proof of a fix** when the fix is a guard: a gate that never opens looks
    identical in the log to a gate that works. Measure the positive case too (see the possession
    gate in *The NPCs*, proven with a 410-opens probe), then remove the probe by re-running the
@@ -260,10 +260,14 @@ Support package `Scripts/forest_generator/`: `terrain.py` (heightfield + OBJ),
 ## The NPCs
 
 `Scripts/build_npc_blueprints.py` builds two Blueprints under `/Game/Forest/NPC` **from
-Python** — no hand editing — and is idempotent, so re-generating a level reuses them. Every
-number they use (run speed, melee, spawn band) lives in
-`Scripts/forest_generator/npc_placement.py`, which imports no `unreal`, so the offline
-generator and its checks read exactly what the editor builds.
+Python** — no hand editing — and is idempotent, so re-generating a level reuses them. It is a
+thin entry point; the code is the `Scripts/npc/` package (its `__init__` is the map: one
+module per heartbeat fragment — stats, melee, patrol, senses, agro — plus the controller and
+the character). Every number they use (run speed, melee, spawn band) lives in
+`Scripts/forest_generator/npc_placement.py`, and every sense and patrol number in
+`Scripts/forest_generator/npc_agro.py`; neither imports `unreal`, so the offline generator
+and its checks read exactly what the editor builds. `Scripts/verify_npc_blueprints.py` checks
+patrol and agro per controller (100 checks); the level verifier still owns the chase and melee.
 
 - `BP_ForestWandererAI` (AIController). Event graph, authored via `unreal.BlueprintGraphEditor`:
   `BeginPlay → [possessed? no → Delay] → [both ends on the navmesh? yes → MoveToActor(Get
@@ -322,6 +326,10 @@ still. The melee numbers were **not** retuned to compensate — the pack is mean
 you run from, and sprint (900 cm/s against their 600) is the answer the player now has. If it
 wants softening, `NPC_MELEE_DAMAGE` and `NPC_MELEE_INTERVAL_S` are the dials, and both are in
 `npc_placement.py` where the checks read them.
+
+**Since patrol and agro (below), the pack no longer converges on its own.** Each wanderer
+strolls about its spawn point until it notices the player, so "ten arriving together" is now
+something the player *causes* — a sniper shot is heard 150 m off and wakes nearly all of them.
 
 **Respawns obey the band too, and land on walkable ground.** `BP_HealthComponent`'s death path
 used to put a replacement within 40 m of where the dead one *started*; it now picks a random
@@ -477,6 +485,79 @@ MoveToActor --> [distance <= 200 cm  AND  now >= NextAttackTime]
 - If `BP_HealthComponent` does not exist, the melee half is skipped with a log line and the NPC
   just chases. The cast node needs the class loaded, or its palette name reads like a typo.
 
+### Patrol and agro: they do not know where you are
+
+A wanderer spawns **patrolling** — respawns included — and only becomes the chasing,
+swinging thing described above once it has noticed the player. The switch is one `Aggro` bool
+on its controller, spliced into the heartbeat between the stats block and the chase
+(`npc/agro.py`); nothing sets it back, so once found, it hunts for the rest of its life.
+
+```
+heartbeat -> patrol setup (once: PatrolHome = spawn point, RunSpeed = its MaxWalkSpeed,
+                           MaxWalkSpeed = RunSpeed * patrol_speed_scale)
+          -> [Aggro?] yes -> chase + swing
+               no -> hurt? sight? touch? sound?   any -> Aggro = true, run speed, log, chase
+                                                  none -> maybe stroll to a new point -> Delay
+```
+
+| sense | fires when | per creature (`npc_agro.py`) |
+|---|---|---|
+| hurt | `BP_HealthComponent.DamagedByPlayer` | — |
+| sight | within `vision_range_cm`, within `vision_half_angle_deg` of its facing, **and** `LineOfSightTo` the player (trunks hide you) | zombie 20 m / 50°, wendigo 35 m / 65° |
+| touch | within `touch_range_cm`, any direction | 2.5 m / 3 m |
+| sound | inside the latest noise's reach × `hearing_scale` | 1.0 / 1.4 |
+
+**Patrol** is a stroll about a circle centred where it spawned (`patrol_radius_cm`: zombie
+15 m, wendigo 30 m) at 30% of *its own* run speed (~180–200 cm/s, which the blend space plays
+as a walk), picking a new point every `patrol_repick_min_s..max_s`. Three traps, all handled
+and checked: `GetRandomReachablePointInRadius` is **pure**, so only `RandomLocation` is read,
+once, into `PatrolTarget` (reading `ReturnValue` too would run a second random query); on
+failure it returns the centre, or with no nav system the **zero vector — the player's spawn** —
+so a point outside `radius × 1.1 + 2 m` is refused; and the stroll uses
+`SimpleMoveToLocation`, not a second `MoveToActor`/`MoveToLocation`, which the level verifier
+counts to prove the chase has exactly one of each. Speeds are always written from the stored
+`RunSpeed`, never by scaling the live `MaxWalkSpeed` (that compounds).
+
+**Noise belongs to whatever made it.** One record on the GameMode (`Noise*` vars,
+`combat/game_state.py`), written by `combat/noise.py`'s `_author_make_noise` and read by every
+patrolling wanderer on its heartbeat. A write lands only if the record is older than
+`COMBAT.noise_hold_s` (0.6 s — must outlast one 0.5 s heartbeat, asserted) or the new noise is
+at least as loud, so a footstep cannot erase a gunshot before the pack has checked for it.
+
+- **Gunshots**: all-round reach = the held weapon's `ShotVolume`, plus a cone of
+  `shot_noise_cone_range_scale` (1.6×) that reach within `shot_noise_cone_half_angle_deg` (30°)
+  of the line the pellets flew (`_author_fire` returns its own direction pin for this). Fire
+  *at* a pack and it hears you from further off than fire *away* from it.
+- **Footsteps**: the player's only (`IsPlayerControlled` — the wanderers share the component),
+  reach proportional to speed: 12 m at 600 cm/s, 18 m sprinting, 6 m creeping down the sights.
+
+**How loud each gun is** — `SHOT_VOLUME_CM` in `combat/tuning.py`, a column of `_weapon_specs()`,
+`ShotVolume` on `BP_WeaponItem`: Sniper 150 m · Rifle 90 m · Shotgun 85 m · SMG 50 m · Pistol
+35 m (wendigos hear 1.4× further). Measured against the level's real spawn points, one
+shot from the player start is heard by ~10, 9.9, 8.7, 0.6 and 0 of the ten respectively: the
+pack starts 75–78 m out, just inside rifle and shotgun range, so those two only separate from
+the sniper away from the centre (from a corner: sniper 7–10, rifle/shotgun 3–6). The cone is
+30° either side of the aim, so "aimed at the pack" reaches what is in that slice, not the whole
+ring. This is the *agro* volume; the audio attenuation profiles are unchanged.
+
+`[NPC-AGRO] <sense> -- <actor>` is logged (PrintWarning, log only) on every transition.
+
+**Proved at runtime** (headless `-game`, probes through the inbox, 0 runtime errors, 10 spawns):
+all ten spawned non-aggro at 0.3× their own run speed and stayed 61–89 m from an idle player
+over the whole run, never more than 17.5 m from home. Sight (8 m ahead, clear trace), touch
+(1.8 m behind), hurt, an all-round noise, a shot cone aimed at an NPC 30 m away, and the
+player's **real** footsteps 8 m behind an NPC each flipped the right wanderer with the right
+reason; a 5 m noise 25 m away and an NPC 30 m behind a shot fired away from it did not. Walking
+the player wrote a 1200 cm record at 600 cm/s with no hand-written values. **Not** exercised
+at runtime: the shot's own write — a headless run cannot press the trigger; it shares the
+writer with the footsteps and its inputs are checked statically.
+
+Writing a Blueprint variable of a *live* object from Python: `set_editor_property` refuses
+("cannot be edited on instances"). The console's `setnopec <unique object name> <prop>
+<value>` works (vectors as `(X=..,Y=..,Z=..)`); plain `set` notifies, and on a component
+class it re-runs every owner's construction script — thousands of `[NPC-SPAWN]` lines from
+one command. `KismetSystemLibrary.Set*PropertyByName` is not exposed to Python.
+
 ## The graphics menu
 
 `Scripts/build_graphics_menu.py` builds `/Game/UI/BP_GraphicsMenuHUD` (parent `AHUD`) and
@@ -573,7 +654,7 @@ and does run paused.
 
 | asset | what it is |
 |-------|------------|
-| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, DryFireSound, ReloadSound, AimPose, SlotColor, DisplayName, Dropped, UsesAmmo, **Automatic**, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime, AdsZoom, Scoped, **RecoilPitch**). No geometry, no graph. |
+| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, DryFireSound, ReloadSound, AimPose, SlotColor, DisplayName, Dropped, UsesAmmo, **Automatic**, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime, AdsZoom, Scoped, **RecoilPitch**, **ShotVolume**). No geometry, no graph. |
 | `BP_Shotgun` | child: 7 primitives, 8 pellets × 18 dmg, 5° cone, 40 m, rifle ready pose, 5+15 rounds, 0.85 s, 1.6 s reload. **Issued.** |
 | `BP_Pistol` | child: 5 primitives, 1 × 26 dmg, 1° cone, 60 m, pistol ready pose, unlimited ammo, 0.18 s. **Issued.** |
 | `BP_SMG` | child: 7 primitives, 1 × **12** dmg, 2.6° cone, 45 m, 30+90 rounds, **0.09 s**, 1.9 s reload. **Automatic. Found only.** |

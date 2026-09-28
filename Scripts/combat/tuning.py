@@ -221,6 +221,34 @@ class CombatConfig:
     # enough not to pop the chest between two poses in one frame.
     hit_react_blend_s: float = 0.08
 
+    # --- noise: what the wanderers can hear ----------------------------------
+    # A noise is one record on the GameMode (combat/noise.py) -- where, how far
+    # it carries all round, and for a gunshot how far it carries down the
+    # barrel -- and every patrolling wanderer checks it on its heartbeat. How
+    # far a noise carries belongs to whatever made it; the listener only
+    # scales it (forest_generator/npc_agro.py, hearing_scale).
+    #
+    # A noise is held this long before anything quieter may replace it. It
+    # has to outlast one NPC heartbeat (NPC_REPATH_SECONDS, 0.5 s), or a
+    # footstep 0.3 s after a gunshot would overwrite the shot before half the
+    # pack had checked for it. The verifier asserts the inequality.
+    noise_hold_s: float = 0.6
+    # A gunshot is louder in front of the muzzle: inside this half-angle of
+    # the aim direction it carries shot_noise_cone_range_scale times the
+    # weapon's ShotVolume, all round it carries ShotVolume. So firing TOWARD a
+    # pack wakes it from further off than firing away from it.
+    shot_noise_cone_half_angle_deg: float = 30.0
+    shot_noise_cone_range_scale: float = 1.6
+    # The player's footsteps carry this far at this speed, and in proportion
+    # to speed either side of it: 12 m at a 600 cm/s run, 18 m at a 900 cm/s
+    # sprint, 6 m at the half-speed walk aiming costs. Proportional rather
+    # than a walk/sprint pair so that anything else that changes the player's
+    # speed changes their noise for free. Only the PLAYER's footsteps are a
+    # noise -- the wanderers share the footstep component and must not wake
+    # each other up.
+    footstep_noise_range_cm: float = 1200.0
+    footstep_noise_reference_speed_cms: float = 600.0
+
 
 COMBAT = CombatConfig()
 
@@ -288,6 +316,33 @@ RIFLE_MAGAZINE, RIFLE_RESERVE = 30, 90
 RIFLE_FIRE_INTERVAL, RIFLE_RELOAD_SECONDS = 0.14, 2.1
 SNIPER_MAGAZINE, SNIPER_RESERVE = 5, 15
 SNIPER_FIRE_INTERVAL, SNIPER_RELOAD_SECONDS = 1.60, 2.6
+
+# --- how loud each gun is ----------------------------------------------------
+# ShotVolume: how far, in cm, a wanderer with ordinary ears (hearing_scale 1.0)
+# hears this weapon fired, all round. Down the barrel it carries
+# COMBAT.shot_noise_cone_range_scale (1.6x) further, inside 30 degrees of the
+# aim line only. A wendigo (hearing_scale 1.4) hears every figure 1.4x further.
+# Measured against Lvl_Forest_200m's ten real spawn points and patrol circles
+# (the pack starts 75-78 m from the player start), wanderers that hear one shot
+# fired all-round from the player start, on average:
+#
+#   Sniper   150 m  (240 m ahead)  10 of 10; from a corner, 7 for sure + 3 maybe
+#   Rifle     90 m  (144 m ahead)  ~9.9 of 10 -- the pack sits just inside it
+#   Shotgun   85 m  (136 m ahead)  ~8.7 of 10
+#   SMG       50 m   (80 m ahead)  ~0.6 of 10: local unless aimed at someone
+#   Pistol    35 m   (56 m ahead)  0 of 10: only what is already close
+#
+# So from the start, rifle and shotgun wake nearly as much as the sniper; the
+# gap between them opens up away from the centre, where the sniper still
+# reaches 7-10 and the rifle and shotgun 3-6. Shrink RIFLE/SHOTGUN below ~75 m
+# if the middle tier should leave part of the starting pack asleep.
+SHOT_VOLUME_CM = {
+    "Sniper": 15000.0,
+    "Rifle": 9000.0,
+    "Shotgun": 8500.0,
+    "SMG": 5000.0,
+    "Pistol": 3500.0,
+}
 
 # Which of the five hold the trigger down. The SMG and the assault rifle do;
 # the shotgun, the pistol and the sniper are one shot per click.

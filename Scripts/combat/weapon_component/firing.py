@@ -204,7 +204,8 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
         made)
 
     _author_impact(ed, brk, held, BEL.find_then_pin(hit), x0 + 3640, y0)
-    return _loose_pin(loop, "Completed", is_input=False)
+    # The direction goes back too, so the shot's noise cone is the pellets' line.
+    return _loose_pin(loop, "Completed", is_input=False), direction
 
 
 def _author_impact(ed, brk, held, exec_in, x0, y0):

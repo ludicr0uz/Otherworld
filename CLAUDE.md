@@ -180,7 +180,7 @@ Python scripts into `Scripts/generated_levels/<LevelName>/`.
 
 ```bash
 python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
-# flags: --size <meters, required> --name --seed (42) --grid --time-of-day {day,night}
+# flags: --size <meters, required> --name --seed (42) --grid --time-of-day {night,day} (night)
 #        --grass-density (1.2/m²) --grass-height (50 cm) --grass-patchiness (0.25)
 #        --no-grass --no-npc --npc-count (10) --npc-min-distance (75 m)
 #        --npc-max-distance (100 m) --json-report

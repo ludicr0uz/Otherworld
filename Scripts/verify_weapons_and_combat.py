@@ -1320,6 +1320,56 @@ check("aiming is refused while sprinting, which cannot fire anyway",
       {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg},
       f"cone x{G.ADS_SPREAD_SCALE}")
 
+# ─── Mouse sensitivity, and what the zoom does to it ─────────────────────────
+# Three ways this goes wrong without looking wrong. The pitch scale is cached
+# rather than written down because the engine ships it NEGATIVE, so a literal
+# would invert the look half the time; the slowdown is driven off CurrentFOV
+# rather than off the Aiming flag, so it eases in with the zoom and is
+# automatically stronger on the scope; and the default sensitivity has to be
+# exactly 1.0 or a player who never opens the settings screen gets a mouse
+# that does not feel like the controller's own.
+wc_cdo = cdo(wc)
+check("the weapon component carries a mouse sensitivity",
+      isinstance(wc_cdo.get_editor_property("MouseSensitivity"), float))
+check("...defaulting to 1.0, i.e. exactly the controller's own feel",
+      abs(wc_cdo.get_editor_property("MouseSensitivity")
+          - G.MOUSE_SENSITIVITY_DEFAULT) < 1e-6
+      and abs(G.MOUSE_SENSITIVITY_DEFAULT - 1.0) < 1e-6,
+      repr(wc_cdo.get_editor_property("MouseSensitivity")))
+check("...within a range that cannot reach zero, which would kill the mouse",
+      0.0 < G.MOUSE_SENSITIVITY_MIN < G.MOUSE_SENSITIVITY_DEFAULT
+      < G.MOUSE_SENSITIVITY_MAX,
+      f"{G.MOUSE_SENSITIVITY_MIN}..{G.MOUSE_SENSITIVITY_MAX}")
+check("the engine's pitch scale is negative, so it MUST be cached not written",
+      wc_cdo.get_editor_property("BasePitchScale") < 0.0,
+      repr(wc_cdo.get_editor_property("BasePitchScale")))
+check("...and the yaw scale positive",
+      wc_cdo.get_editor_property("BaseYawScale") > 0.0,
+      repr(wc_cdo.get_editor_property("BaseYawScale")))
+scale_reads = {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg}
+for label, want in (("yaw", "Set Deprecated Input Yaw Scale"),
+                    ("pitch", "Set Deprecated Input Pitch Scale")):
+    hits = [t for t in scale_reads if t.replace(" ", "")
+            == want.replace(" ", "")]
+    check(f"the {label} look scale is written every frame", bool(hits), want)
+for label, want in (("yaw", "Get Deprecated Input Yaw Scale"),
+                    ("pitch", "Get Deprecated Input Pitch Scale")):
+    hits = [t for t in scale_reads if t.replace(" ", "")
+            == want.replace(" ", "")]
+    check(f"...from a {label} base READ off the controller, not a literal",
+          bool(hits), want)
+check("the slowdown is driven off the zoom, not off the Aiming flag -- so it "
+      "eases in and is stronger on the scope",
+      bool(titled(wg, "Lerp")) and 0.0 < G.ADS_SENS_COMPENSATION <= 1.0,
+      f"Lerp(1, CurrentFOV/BaseFOV, {G.ADS_SENS_COMPENSATION})")
+# The numbers the player actually feels, spelled out so a change to either
+# constant has to be argued for rather than noticed later.
+for name, zoom, want in (("irons", G.ADS_ZOOM_IRONS, 0.75),
+                         ("scope", G.ADS_ZOOM_SCOPE, 0.4375)):
+    got = 1.0 + G.ADS_SENS_COMPENSATION * (1.0 / zoom - 1.0)
+    check(f"...which works out at {want:.2f}x sensitivity down the {name}",
+          abs(got - want) < 5e-3, f"{got:.4f}")
+
 # ─── Footsteps ───────────────────────────────────────────────────────────────
 
 foot = load(G.FOOTSTEP_BP_PATH)

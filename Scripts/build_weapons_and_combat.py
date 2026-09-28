@@ -332,6 +332,41 @@ ADS_INTERP_SPEED = 12.0
 # to are the automatics in the middle.
 ADS_SPREAD_SCALE = 0.34
 
+# --- mouse sensitivity, and what aiming does to it ---------------------------
+# The player's look input is the Enhanced Input template's IA_Look, which lands
+# on AddControllerYawInput / AddControllerPitchInput -- and those still
+# multiply by APlayerController's InputYawScale / InputPitchScale on their way
+# into RotationInput. That pair is marked deprecated in UE5, but the setters
+# are BlueprintCallable and they are the ONLY per-frame handle on look speed
+# that does not require editing BP_ThirdPersonCharacter's input graph, which
+# the Blueprint graph API cannot partially rebuild.
+#
+# Their values are CACHED at BeginPlay rather than written down here, for the
+# third time in this file and for the third identical reason (see BaseSpeed and
+# BaseFOV). It matters more here than anywhere else: the engine's default pitch
+# scale is NEGATIVE (-2.5), so a literal positive number would silently invert
+# the player's vertical look.
+MOUSE_SENSITIVITY_DEFAULT = 1.0
+MOUSE_SENSITIVITY_MIN = 0.20
+MOUSE_SENSITIVITY_MAX = 3.00
+MOUSE_SENSITIVITY_STEP = 0.05
+
+# How much of the zoom aiming gives back in slower mouse movement.
+#
+# Driven off CurrentFOV / BaseFOV, not off a flag, which buys three things for
+# one node: the slowdown is per weapon without anything per weapon being
+# written (a 4x scope slows the mouse more than 1.5x irons because its FOV is
+# narrower), it EASES IN along the same FInterpTo curve the zoom does rather
+# than snapping the instant the button goes down, and letting go restores it by
+# the same curve with no second code path -- exactly as the zoom itself does.
+#
+# 1.0 would be full compensation: the crosshair would then cross the same
+# number of PIXELS per centimetre of mouse at any zoom, which at 4x reads as
+# the mouse having gone dead. 0.0 would be none at all, which at 4x throws the
+# crosshair off the far side of the scope. 0.75 is the usual compromise, and
+# works out at 0.75x sensitivity down the irons and 0.44x down the scope.
+ADS_SENS_COMPENSATION = 0.75
+
 # --- shotgun ammunition ------------------------------------------------------
 # Ammunition lives on BP_WeaponItem, not on the weapon component, because a
 # weapon is a droppable actor here: drop a half-empty shotgun, walk away, come
@@ -1753,6 +1788,11 @@ FN_DIV_FF = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
 FN_INTERP_FF = "/Script/Engine.KismetMathLibrary.FInterpTo"
 FN_NOT_B = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_SET_FOV = "/Script/Engine.CameraComponent.SetFieldOfView"
+FN_GET_YAW_SCALE = "/Script/Engine.PlayerController.GetDeprecatedInputYawScale"
+FN_GET_PITCH_SCALE = "/Script/Engine.PlayerController.GetDeprecatedInputPitchScale"
+FN_SET_YAW_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputYawScale"
+FN_SET_PITCH_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputPitchScale"
+FN_LERP = "/Script/Engine.KismetMathLibrary.Lerp"
 CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
@@ -4365,11 +4405,34 @@ def _author_wc_begin_play(ed, begin):
     _connect(fov_out, _pin(now_fov, "CurrentFOV"))
     _connect(BEL.find_then_pin(base_fov), _pin(now_fov, "execute"))
 
+    # And whatever the controller's own look scales already are, for the third
+    # time in this function and for the third identical reason. The pitch one
+    # is the reason this is a cache and not a constant: the engine ships it
+    # NEGATIVE (-2.5), so any literal written here would have a one-in-two
+    # chance of inverting the player's vertical look, and the symptom -- "the
+    # mouse is upside down, but only after aiming once" -- would send whoever
+    # chased it into the ADS code rather than into this line.
+    pc = keep(_at(_node(ed, FN_GET_PC), 1040, -1840))
+    _set(pc, "PlayerIndex", 0)
+    pc_out = _pin(pc, "ReturnValue", is_input=False)
+    yaw_now = keep(_at(_node(ed, FN_GET_YAW_SCALE), 1300, -1840))
+    _connect(pc_out, _pin(yaw_now, "self"))
+    keep_yaw = keep(_at(ed.add_set_member_variable_node("BaseYawScale"), 2080, -1700))
+    _connect(_pin(yaw_now, "ReturnValue", is_input=False), _pin(keep_yaw, "BaseYawScale"))
+    _connect(BEL.find_then_pin(now_fov), _pin(keep_yaw, "execute"))
+    pitch_now = keep(_at(_node(ed, FN_GET_PITCH_SCALE), 1300, -1960))
+    _connect(pc_out, _pin(pitch_now, "self"))
+    keep_pitch = keep(_at(ed.add_set_member_variable_node("BasePitchScale"),
+                          2340, -1700))
+    _connect(_pin(pitch_now, "ReturnValue", is_input=False),
+             _pin(keep_pitch, "BasePitchScale"))
+    _connect(BEL.find_then_pin(keep_yaw), _pin(keep_pitch, "execute"))
+
     where = keep(_at(_node(ed, FN_GET_TRANSFORM), 1040, -1000))
     _connect(as_char, _pin(where, "self"))
     spawn_at = _pin(where, "ReturnValue", is_input=False)
 
-    prev = BEL.find_then_pin(now_fov)
+    prev = BEL.find_then_pin(keep_pitch)
     for i, var in enumerate(("ShotgunClass", "PistolClass")):
         cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
         spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))
@@ -4618,6 +4681,51 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
              _pin(apply_fov, "InFieldOfView"))
     _connect(BEL.find_then_pin(moved), _pin(apply_fov, "execute"))
 
+    # --- and slow the mouse by the same curve --------------------------------
+    # Not "if aiming, use the slow number": the factor is read straight off how
+    # far the zoom has actually travelled this frame, so it eases in and out
+    # along the FInterpTo above, is automatically stronger on the 4x scope than
+    # on 1.5x irons, and has no second code path for letting the button go.
+    #
+    #     eased = Lerp(1, CurrentFOV / BaseFOV, ADS_SENS_COMPENSATION)
+    #     yaw   scale = BaseYawScale   * MouseSensitivity * eased
+    #     pitch scale = BasePitchScale * MouseSensitivity * eased
+    #
+    # Both base scales are signed as the engine shipped them, so multiplying
+    # by a positive sensitivity cannot flip the pitch axis.
+    base_again = keep(_at(ed.add_get_member_variable_node("BaseFOV"),
+                          x0 + 2800, y0 + 560))
+    ratio = keep(_at(_node(ed, FN_DIV_FF), x0 + 3060, y0 + 480))
+    _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(ratio, "A"))
+    _connect(_pin(base_again, "BaseFOV", is_input=False), _pin(ratio, "B"))
+    eased = keep(_at(_node(ed, FN_LERP), x0 + 3320, y0 + 480))
+    _set(eased, "A", 1.0)
+    _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(eased, "B"))
+    _set(eased, "Alpha", ADS_SENS_COMPENSATION)
+
+    sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity"),
+                    x0 + 3320, y0 + 620))
+    factor = keep(_at(_node(ed, FN_MUL_FF), x0 + 3580, y0 + 480))
+    _connect(_pin(eased, "ReturnValue", is_input=False), _pin(factor, "A"))
+    _connect(_pin(sens, "MouseSensitivity", is_input=False), _pin(factor, "B"))
+    factor_out = _pin(factor, "ReturnValue", is_input=False)
+
+    flow = BEL.find_then_pin(apply_fov)
+    for i, (var, setter, arg) in enumerate(
+            (("BaseYawScale", FN_SET_YAW_SCALE, "NewValue"),
+             ("BasePitchScale", FN_SET_PITCH_SCALE, "NewValue"))):
+        base_scale = keep(_at(ed.add_get_member_variable_node(var),
+                              x0 + 3840, y0 + 480 + i * 140))
+        scaled = keep(_at(_node(ed, FN_MUL_FF), x0 + 4100, y0 + 480 + i * 140))
+        _connect(_pin(base_scale, var, is_input=False), _pin(scaled, "A"))
+        _connect(factor_out, _pin(scaled, "B"))
+        put = keep(_at(_node(ed, setter), x0 + 4360, y0 + i * 220))
+        _connect(pc_out, _pin(put, "self"))
+        _connect(_pin(scaled, "ReturnValue", is_input=False),
+                 _loose_pin(put, arg))
+        _connect(flow, _pin(put, "execute"))
+        flow = BEL.find_then_pin(put)
+
     ed.add_comment_to_nodes(
         f"{AIM_KEY}: zoom to BaseFOV / the weapon's own AdsZoom "
         f"({ADS_ZOOM_IRONS:g}x irons, {ADS_ZOOM_SCOPE:g}x on the sniper's "
@@ -4625,9 +4733,13 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
         f"a fifth of a second. Refused while sprinting -- the fire gate already "
         f"is -- and with empty hands, which is also what keeps the AdsZoom "
         f"getter off a null Held. The cone shrinks to "
-        f"{ADS_SPREAD_SCALE:g}x while Aiming; see _author_fire.",
+        f"{ADS_SPREAD_SCALE:g}x while Aiming; see _author_fire. The mouse "
+        f"slows with the zoom rather than with the button: "
+        f"Lerp(1, CurrentFOV/BaseFOV, {ADS_SENS_COMPENSATION:g}) scaling both "
+        f"of the controller's cached look scales, so a 4x scope is slower than "
+        f"1.5x irons for free and the slowdown eases in on the same curve.",
         made)
-    return (BEL.find_then_pin(apply_fov),)
+    return (flow,)
 
 
 def _author_reload(ed, held, exec_in, x0, y0):
@@ -5147,6 +5259,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     for name in ("BaseFOV", "CurrentFOV", "TargetFOV"):
         _declare(ed, name, _float_type())
     _declare(ed, "Aiming", BEL.get_basic_type_by_name("bool"))
+    # Mouse sensitivity, and the two controller scales it multiplies. Both
+    # bases are cached off the PlayerController at BeginPlay -- BasePitchScale
+    # especially, because the engine ships it negative and a literal would
+    # invert the look. See the ADS block for what the zoom does to them.
+    for name in ("MouseSensitivity", "BaseYawScale", "BasePitchScale"):
+        _declare(ed, name, _float_type())
     # What the ready pose currently reflects, as opposed to what it should.
     # The pair is what makes the sprint pose edge-triggered; see _author_wc_tick.
     _declare(ed, "PoseSprinting", BEL.get_basic_type_by_name("bool"))
@@ -5180,6 +5298,15 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # bar would divide by if that somehow never ran.
         "BaseSpeed": 500.0,
         "Sprinting": False,
+        # 1.0 is "exactly what the controller already does", because the two
+        # base scales this multiplies are the controller's own. A player who
+        # never opens the settings screen therefore gets the stock feel.
+        "MouseSensitivity": MOUSE_SENSITIVITY_DEFAULT,
+        # Both overwritten on the first frame of BeginPlay. Seeded with the
+        # engine's own defaults, signs included, so that a BeginPlay that
+        # somehow never ran leaves the look working rather than dead.
+        "BaseYawScale": 2.5,
+        "BasePitchScale": -2.5,
         # Matches Sprinting, so the first frame sees no edge and does not
         # re-equip for nothing.
         "PoseSprinting": False,

@@ -92,10 +92,13 @@ def main():
                         help="Random seed for tree placement")
     parser.add_argument("--grid", type=int, default=None,
                         help="Grid resolution (auto if omitted)")
-    parser.add_argument("--time-of-day", type=str, default="day",
+    # Night is the default because the game is set at night: a day default
+    # means every regeneration that forgets the flag silently ships a daylit
+    # forest, which is exactly how this level ended up bright once already.
+    parser.add_argument("--time-of-day", type=str, default="night",
                         choices=sorted(TIME_OF_DAY_PRESETS.keys()),
-                        help="Lighting preset: 'day' (bright sun) or 'night' "
-                             "(starry sky providing low luminosity)")
+                        help="Lighting preset: 'night' (starry sky providing "
+                             "low luminosity, the default) or 'day' (bright sun)")
     parser.add_argument("--grass-density", type=float, default=DEFAULT_DENSITY_PER_SQM,
                         help=f"Grass clumps per square metre "
                              f"(default: {DEFAULT_DENSITY_PER_SQM})")

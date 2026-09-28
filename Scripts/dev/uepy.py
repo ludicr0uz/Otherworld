@@ -428,8 +428,12 @@ def run_game(engine, level, seconds, extra_patterns=()):
     # is not in the macOS base system (it arrives with coreutils, sometimes as
     # gtimeout) -- one less thing that has to be installed for this to work.
     proc = subprocess.Popen(
+        # -nomenu: the HUD opens on a paused main menu (build_graphics_menu.py,
+        # SKIP_MENU_SWITCH). A headless run has nobody to press Enter, so
+        # without this the log would be a title screen sitting still -- which
+        # reads as a clean run rather than as a run that never started.
         [cmd_bin, uproject(), level, "-game", "-nullrhi", "-unattended",
-         "-forcelogflush", f"-abslog={logfile}"],
+         "-nomenu", "-forcelogflush", f"-abslog={logfile}"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         proc.wait(timeout=seconds)

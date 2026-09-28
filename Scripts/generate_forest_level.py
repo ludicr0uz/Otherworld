@@ -47,6 +47,7 @@ from forest_generator.grass_placement import (
 from forest_generator.npc_placement import (
     NPC_VARIANTS,
     gait_scale_for_index,
+    variant_for_index,
     place_npcs,
     spawn_band,
     compute_nav_bounds,
@@ -1034,18 +1035,32 @@ def _write_unreal_import_script(
                 npc_actor.set_actor_label(
                     f"{{LEVEL_NAME}}_NPC_Wanderer_{{variant.key}}_{{i}}")
 
-                # Break the lockstep. See gait_scale_for_index -- rate and walk
-                # speed move together so the stride stays planted.
+                # Break the lockstep, and keep the stride planted.
+                #
+                # TWO factors multiply into the animation rate and only one of
+                # them into the speed here, because the other is already in it:
+                # the variant Blueprint carries its own MaxWalkSpeed (the
+                # wendigo runs at 690), so reading and scaling that applies the
+                # gait on top of a speed that is already right. The anim rate
+                # has no such starting point -- it is 1.0 on every variant --
+                # so it has to be told about both.
+                #
+                # Getting that wrong is foot-sliding: the locomotion blend
+                # space is authored for a ground speed, so a wendigo covering
+                # 15% more ground per second at a zombie's stride rate skates.
                 gait = gait_scale_for_index(i)
+                rate = gait * variant.speed_scale
                 npc_actor.get_editor_property("mesh").set_editor_property(
-                    "global_anim_rate_scale", gait)
+                    "global_anim_rate_scale", rate)
                 move = npc_actor.get_editor_property("character_movement")
                 move.set_editor_property(
                     "max_walk_speed",
                     move.get_editor_property("max_walk_speed") * gait)
                 unreal.log_warning(
                     f"[GEN]    NPC {{i}} ({{variant.key}}) at ({{spawn['x']:.0f}}, "
-                    f"{{spawn['y']:.0f}}, {{spawn['z']:.0f}})")
+                    f"{{spawn['y']:.0f}}, {{spawn['z']:.0f}}) -- "
+                    f"{{move.get_editor_property('max_walk_speed'):.0f}} cm/s, "
+                    f"anim x{{rate:.3f}}")
             unreal.log_warning(
                 "[GEN]    navmesh is built by the navigation system at game "
                 "start (no nav data saved in the level)")
@@ -1105,9 +1120,19 @@ def _write_unreal_verify_script(
     variants_json = json.dumps([
         {"key": v.key, "blueprint": v.blueprint, "mesh": v.mesh,
          "anim_bp": v.anim_bp, "melee": v.melee,
-         "ai_blueprint": v.ai_blueprint} for v in NPC_VARIANTS])
-    npc_gaits = json.dumps([gait_scale_for_index(i)
-                            for i in range(1, len(placed_npcs or []) + 1)])
+         "ai_blueprint": v.ai_blueprint, "health": v.health,
+         "speed_scale": v.speed_scale, "voices": list(v.voices)}
+        for v in NPC_VARIANTS])
+    # What each placed wanderer should end up with, computed here rather than
+    # re-derived in the verify script: the composition of the per-instance gait
+    # with the creature's own speed scale is the thing most likely to be got
+    # wrong, so the check has to hold the answer rather than the formula.
+    npc_gaits = json.dumps([
+        {"key": variant_for_index(i).key,
+         "rate": gait_scale_for_index(i) * variant_for_index(i).speed_scale,
+         "speed": (NPC_RUN_SPEED_CMS * variant_for_index(i).speed_scale
+                   * gait_scale_for_index(i))}
+        for i in range(1, len(placed_npcs or []) + 1)])
     npc_run_speed = NPC_RUN_SPEED_CMS
     npc_melee_range = NPC_MELEE_RANGE_CM
     nav_reachable_extent = NAV_REACHABLE_EXTENT_CM
@@ -1159,7 +1184,8 @@ def _write_unreal_verify_script(
         EXPECTED_NPCS = json.loads(r"""{npc_json}""")
         EXPECTED_NPC_RUN_SPEED = {npc_run_speed}
         EXPECTED_VARIANTS = json.loads(r"""{variants_json}""")
-        # Per-instance gait multipliers -- see npc_placement.gait_scale_for_index.
+        # Per-instance {{key, rate, speed}} -- see
+        # npc_placement.gait_scale_for_index and NpcVariant.speed_scale.
         EXPECTED_NPC_GAITS = json.loads(r"""{npc_gaits}""")
         EXPECTED_MELEE_RANGE = {npc_melee_range}
         EXPECTED_MELEE_DAMAGE = {npc_melee_damage}
@@ -1470,6 +1496,46 @@ def _write_unreal_verify_script(
                       f"(clip on "
                       f"{{melee.get_editor_property('skeleton').get_name() if melee else None}})")
 
+                # Its own run speed, on the pawn. The wendigo is meant to be
+                # 15% faster than the zombie and the only place that can be
+                # said is CharacterMovement's own default, so it is the only
+                # place worth checking.
+                want_speed = EXPECTED_NPC_RUN_SPEED * variant["speed_scale"]
+                got_speed = cdo.get_editor_property(
+                    "character_movement").get_editor_property("max_walk_speed")
+                check(f"{{variant['key']}} Runs At Its Own Speed",
+                      close(got_speed, want_speed, 0.5),
+                      f"(wanted {{want_speed:.0f}} cm/s, got {{got_speed:.0f}})")
+
+                # Its own health and its own voice, both of which live on its
+                # AI controller -- MaxHealth is on an INHERITED component and
+                # Unreal keeps a child Blueprint's override of one somewhere
+                # Python cannot reach, so the controller applies it on
+                # possession instead. That indirection is exactly the sort of
+                # thing that silently stops working, hence the check.
+                ai = editor_asset_sub.load_asset(variant["ai_blueprint"])
+                ai_cdo = unreal.get_default_object(
+                    unreal.BlueprintEditorLibrary.generated_class(ai)) if ai else None
+                voices = (list(ai_cdo.get_editor_property("Voices"))
+                          if ai_cdo else [])
+                hits = (list(ai_cdo.get_editor_property("HitSounds"))
+                        if ai_cdo else [])
+                check(f"{{variant['key']}} Has Its Own Voice",
+                      len(voices) == len(variant["voices"]) and len(voices) > 0,
+                      f"(wanted {{len(variant['voices'])}} clips, got {{len(voices)}})")
+                check(f"{{variant['key']}} Has Melee Impact Sounds",
+                      len(hits) > 0, f"(got {{len(hits)}})")
+
+                # Footsteps, on the wanderer as well as on the player.
+                foot = None
+                for handle in unreal.get_engine_subsystem(
+                        unreal.SubobjectDataSubsystem).k2_gather_subobject_data_for_blueprint(bp):
+                    obj = unreal.SubobjectDataBlueprintFunctionLibrary.get_object(
+                        unreal.SubobjectDataBlueprintFunctionLibrary.get_data(handle))
+                    if obj and "Footstep" in obj.get_name():
+                        foot = obj
+                check(f"{{variant['key']}} Has Footsteps", foot is not None)
+
                 if mesh_skel:
                     seen_skeletons.setdefault(mesh_skel.get_name(), []).append(
                         variant["key"])
@@ -1681,7 +1747,7 @@ def _write_unreal_verify_script(
                 # its animation rate must match its ground speed or its feet
                 # skate.  A regression here is invisible in a screenshot and
                 # obvious in motion, which is exactly why it is checked.
-                gaits, mismatched = [], []
+                gaits, mismatched, skating = [], [], []
                 for i, actor in enumerate(npc_actors, start=1):
                     want = EXPECTED_NPC_GAITS[i - 1]
                     rate = actor.get_editor_property("mesh").get_editor_property(
@@ -1689,16 +1755,30 @@ def _write_unreal_verify_script(
                     speed = actor.get_editor_property(
                         "character_movement").get_editor_property("max_walk_speed")
                     gaits.append(round(rate, 4))
-                    if not (close(rate, want, 0.001)
-                            and close(speed, EXPECTED_NPC_RUN_SPEED * want, 0.5)):
+                    if not (close(rate, want["rate"], 0.001)
+                            and close(speed, want["speed"], 0.5)):
                         mismatched.append(
-                            f"NPC {{i}} rate {{rate:.3f}} speed {{speed:.1f}} "
-                            f"(wanted {{want:.3f}} / "
-                            f"{{EXPECTED_NPC_RUN_SPEED * want:.1f}})")
+                            f"NPC {{i}} ({{want['key']}}) rate {{rate:.3f}} "
+                            f"speed {{speed:.1f}} (wanted {{want['rate']:.3f}} / "
+                            f"{{want['speed']:.1f}})")
+                    # The invariant behind both numbers, checked directly:
+                    # ground covered per second divided by animation rate must
+                    # be the speed the locomotion was authored at. If it is
+                    # not, the feet skate -- and that is exactly the failure a
+                    # per-creature speed multiplier introduces if the rate is
+                    # left alone.
+                    if rate > 1e-6 and not close(speed / rate,
+                                                 EXPECTED_NPC_RUN_SPEED, 1.0):
+                        skating.append(
+                            f"NPC {{i}} ({{want['key']}}) {{speed:.0f}} cm/s at "
+                            f"x{{rate:.3f}} = {{speed / rate:.0f}} cm/s of stride")
                 check("NPC Gaits Are Staggered", len(set(gaits)) == len(gaits),
                       f"(rates {{sorted(gaits)}} -- duplicates march in lockstep)")
                 check("NPC Anim Rate Matches Ground Speed", not mismatched,
                       "; ".join(mismatched))
+                check("NPC Strides Stay Planted", not skating,
+                      "; ".join(skating) +
+                      f" (stride speed must be {{EXPECTED_NPC_RUN_SPEED:.0f}})")
 
                 # Every NPC must stand inside the volume or it has no navmesh.
                 outside = []

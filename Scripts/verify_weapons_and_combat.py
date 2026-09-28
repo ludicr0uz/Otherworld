@@ -451,11 +451,11 @@ for var, want in (("ShotgunClass", "BP_Shotgun_C"),
           got.get_name() if got else "None")
 
 # The fire key appears TWICE and that is the whole of automatic fire: once as
-# WasInputKeyJustPressed (a tap) and once as IsInputKeyDown (a hold). Sprint is
-# the only other held key.
+# WasInputKeyJustPressed (a tap) and once as IsInputKeyDown (a hold). Sprint
+# and aim are the other two held keys.
 keys = sorted(pin_value(n, "Key") for n in by_pins(wg, "self", "Key"))
 want_keys = sorted([G.FIRE_KEY, G.FIRE_KEY, G.SWITCH_KEY, G.DROP_KEY,
-                    G.PICKUP_KEY, G.SPRINT_KEY, G.RELOAD_KEY])
+                    G.PICKUP_KEY, G.SPRINT_KEY, G.RELOAD_KEY, G.AIM_KEY])
 check(f"polls exactly {want_keys}", keys == want_keys, str(keys))
 
 plays = by_pins(wg, "Asset", "SlotNodeName")
@@ -659,6 +659,31 @@ if npc:
     check("NPC respawns as another wanderer",
           rc is not None and "ForestWanderer" in rc.get_name(),
           rc.get_name() if rc else "None")
+    # ...and as ITS OWN kind of wanderer. That template default names the
+    # parent, and every variant inherits it, so on its own it means a dead
+    # wendigo is replaced by a BP_ForestWanderer -- which wears the parent's
+    # mesh, i.e. a zombie. Kill the two wendigos the level places and there are
+    # never any more. The fix is that BeginPlay overwrites RespawnClass with
+    # the owner's own class, and this is the check for it, because nothing a
+    # headless run does will ever kill a wanderer.
+    # GetObjectClass renders as "Get Class" in the graph.
+    owner_class = [n for n in hg
+                   if str(BEL.get_node_title(n)).replace("\n", " ") == "Get Class"]
+    check("...and BeginPlay asks the owner what class it is",
+          len(owner_class) == 1, str(len(owner_class)))
+    # Loop variable deliberately not `n`: `n` is the NPC's CDO, read again two
+    # checks below, and shadowing it here turned that read into a call on a
+    # graph node.
+    rewritten = []
+    for getter in owner_class:
+        for pin in BEL.list_output_pins(getter):
+            for other in pin.list_connected_pins():
+                node = unreal.BlueprintGraphPinLibrary.get_owning_node(other)
+                if node and "RespawnClass" in str(BEL.get_node_title(node)):
+                    rewritten.append(node)
+    check("...and writes it into RespawnClass, so each creature respawns as "
+          "itself", len(rewritten) == 1,
+          str([str(BEL.get_node_title(x)) for x in rewritten]))
     check("NPC's capsule blocks Visibility, so pellets can actually hit it",
           blocks_visibility(npc) is True, str(blocks_visibility(npc)))
     check("a spawned wanderer still gets an AI controller",
@@ -695,15 +720,28 @@ for tag, bp in (("player", char), ("NPC", npc)):
     limbs = [str(b) for b in comp.get_editor_property(G.LIMB_BONES_VAR)] if comp else []
     zoned[tag] = (heads, limbs)
     want_head, want_limbs, body = G.hit_zones(_mesh_asset(bp))
+    # Rig-AGNOSTIC, deliberately. The first version of these asserted literal
+    # mannequin bone names ("head" in heads, upperarm_l in limbs), which is the
+    # very bug they were written to catch, one level up: the monsters are on a
+    # Mixamo rig whose bodies are Head / LeftArm / LeftUpLeg, the tables were
+    # perfectly correct, and the CHECK failed. What is actually worth asserting
+    # is structural -- that the tables are what this mesh's own physics asset
+    # resolves to, that both zones exist, that they do not overlap, and that
+    # the torso is in neither.
     check(f"{tag}: the head table is its own skeleton's head bodies",
-          heads == want_head and "head" in heads, str(heads))
+          heads == want_head and len(heads) > 0, str(heads))
     check(f"{tag}: the limb table is its own skeleton's arm and leg bodies",
-          limbs == want_limbs
-          and {"upperarm_l", "lowerarm_r", "hand_l", "thigh_r", "calf_l", "foot_r"}
-          <= set(limbs), str(limbs))
+          limbs == want_limbs and len(limbs) >= 4, str(limbs))
+    # Four limbs means all four were found, not one root matched twice: a rig
+    # whose arms resolved and whose legs did not would still list "several".
+    roots = {b for b in limbs if not any(
+        o != b and b.lower().startswith(o.lower()) for o in limbs)}
+    check(f"{tag}: all four limbs are covered, not just the arms",
+          len(limbs) >= 8 or len(roots) >= 4,
+          f"{len(limbs)} limb bodies: {limbs}")
     check(f"{tag}: no bone is both head and limb", not set(heads) & set(limbs))
     check(f"{tag}: the torso is neither -- a chest shot is a 1x shot",
-          not {"pelvis", "spine_03", "spine_05"} & (set(heads) | set(limbs)),
+          len(body) > 0 and not set(body) & (set(heads) | set(limbs)),
           str(body))
 
 wt = wg
@@ -814,17 +852,72 @@ if npc and "NPC" in zoned:
         # front meets the chest first -- which is the correct answer for that
         # line, and not the part under test.
         front = unreal.Vector(300.0, 0.0, 0.0)
-        aims = {
-            "head": (body_mesh.get_socket_location("head")
-                     + unreal.Vector(0.0, 0.0, 10.0), front, G.HEAD_MULTIPLIER),
-            "upper arm": (between("upperarm_r", "lowerarm_r"),
-                          unreal.Vector(0.0, 300.0, 0.0), G.LIMB_MULTIPLIER),
-            "forearm": (between("lowerarm_l", "hand_l"),
-                        unreal.Vector(0.0, -300.0, 0.0), G.LIMB_MULTIPLIER),
-            "thigh": (between("thigh_l", "calf_l"), front, G.LIMB_MULTIPLIER),
-            "shin": (between("calf_r", "foot_r"), front, G.LIMB_MULTIPLIER),
-            "chest": (between("spine_03", "spine_04"), front, 1.0),
-        }
+
+        # Probe bones resolved from the rig, not written down. Same reason as
+        # the tables above -- and here the stakes are higher, because
+        # get_socket_location on a bone that does not exist returns the
+        # component origin rather than failing, so a stale name does not make
+        # the check fail, it makes it trace through the middle of the actor and
+        # PASS for the wrong reason. Three of these were doing exactly that.
+        def bone(*candidates):
+            have = {b.lower(): b for b in (heads + limbs + body)}
+            for c in candidates:
+                if c.lower() in have:
+                    return have[c.lower()]
+            return None
+
+        head_b = bone("head", "Head")
+        arm_u = bone("upperarm_r", "RightArm")
+        arm_l = bone("lowerarm_r", "RightForeArm")
+        leg_u = bone("thigh_l", "LeftUpLeg")
+        leg_l = bone("calf_l", "LeftLeg")
+        chest = bone("spine_03", "Spine2", "Spine1", "Spine")
+
+        aims = {}
+        if head_b:
+            aims["head"] = (body_mesh.get_socket_location(head_b)
+                            + unreal.Vector(0.0, 0.0, 10.0), front,
+                            G.HEAD_MULTIPLIER)
+        # Across the bone, not along a world axis. A fixed sideways shot works
+        # on the mannequin, whose arms hang at the flanks, and fails on the
+        # Meshy A-pose, whose arms are held out -- there the line reaches the
+        # spine first and reports a 1x chest hit, which is the correct answer
+        # for that line and not the part under test. 30 cm is short enough that
+        # it cannot reach the torso from any limb.
+        def across(a, b, reach=30.0):
+            pa, pb = (body_mesh.get_socket_location(a),
+                      body_mesh.get_socket_location(b))
+            axis = pb - pa
+            length = axis.length()
+            if length < 1e-3:
+                return unreal.Vector(0.0, reach, 0.0)
+            axis = axis / length
+            # Any vector not parallel to the bone, made perpendicular to it.
+            seed = (unreal.Vector(0.0, 0.0, 1.0) if abs(axis.z) < 0.9
+                    else unreal.Vector(1.0, 0.0, 0.0))
+            perp = seed - axis * (seed.x * axis.x + seed.y * axis.y
+                                  + seed.z * axis.z)
+            n2 = perp.length()
+            return (perp / n2) * reach if n2 > 1e-3 else unreal.Vector(0.0, reach, 0.0)
+
+        # Centred on the JOINT at the far end of the limb -- the elbow, the
+        # knee -- rather than on the midpoint of the two. The midpoint is fine
+        # on the mannequin and lands near the shoulder on the Meshy rig, where
+        # a 30 cm line across it still reaches Spine01 and reports a chest hit.
+        # An elbow is unambiguously in an arm on any rig.
+        if arm_u and arm_l:
+            aims["upper arm"] = (body_mesh.get_socket_location(arm_l),
+                                 across(arm_u, arm_l, 18.0),
+                                 G.LIMB_MULTIPLIER)
+        if leg_u and leg_l:
+            aims["thigh"] = (body_mesh.get_socket_location(leg_l),
+                             across(leg_u, leg_l, 18.0), G.LIMB_MULTIPLIER)
+        if chest:
+            aims["chest"] = (body_mesh.get_socket_location(chest), front, 1.0)
+        check("the zone probe found bones to shoot at on this rig",
+              len(aims) == 4,
+              f"{sorted(aims)} (head={head_b} arm={arm_u}/{arm_l} "
+              f"leg={leg_u}/{leg_l} chest={chest})")
         for part, (at, side, want) in aims.items():
             hit = body_mesh.line_trace_component(at + side, at - side,
                                                  False, False, False)
@@ -1051,8 +1144,10 @@ check("the walking speed is cached off the character, not hardcoded",
 selects = [n for n in titled(wg, "SelectFloat")
            if not any("Contains" in str(BEL.get_node_title(PIN.get_owning_node(q)))
                       for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
-check("one SelectFloat picks the speed and one picks the drain",
-      len(selects) == 2, f"{len(selects)} SelectFloat node(s)")
+# Three now: sprint picks the speed and the sign of the drain, and aiming
+# picks how much of its own cone the weapon keeps.
+check("SelectFloat picks the speed, the drain, and the aimed cone",
+      len(selects) == 3, f"{len(selects)} SelectFloat node(s)")
 check("stamina is clamped, so it cannot run past its own bar",
       any(pin_value(n, "Max") == str(G.MAX_STAMINA)
           for n in by_pins(wg, "Value", "Min", "Max")),
@@ -1186,6 +1281,74 @@ if dry:
     check("...one half of which is \"has no ammunition\"", len(nots) >= 3,
           f"{len(nots)} NOT nodes (unlimited-weapon, not-sprinting, empty, pose)")
 
+# ─── Aiming down the sights ──────────────────────────────────────────────────
+# Right mouse narrows the camera to the weapon's own AdsZoom. What can go wrong
+# quietly: a zoom that is never applied (the FOV write missing), a zoom that is
+# applied and never undone (no path back to BaseFOV), and a BaseFOV that is a
+# literal rather than the camera's own -- all three look fine in the graph.
+
+for sp in G._weapon_specs():
+    want = sp.get("ads_zoom", G.ADS_ZOOM_IRONS)
+    got = cdo(load(sp["path"])).get_editor_property("AdsZoom")
+    check(f"{sp['display']}: AdsZoom is {want}x",
+          isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
+check("only the sniper carries a scope's worth of zoom",
+      {sp["display"] for sp in G._weapon_specs()
+       if sp.get("ads_zoom", G.ADS_ZOOM_IRONS) == G.ADS_ZOOM_SCOPE} == {"Sniper"},
+      str(sorted(sp.get("ads_zoom", G.ADS_ZOOM_IRONS)
+                 for sp in G._weapon_specs())))
+
+fov_writes = [x for x in wg if "SetFieldOfView" in
+              str(BEL.get_node_title(x)).replace(" ", "")]
+check("one write of the camera's field of view, so the two directions cannot "
+      "drift", len(fov_writes) == 1, str(len(fov_writes)))
+# Two TargetFOV writes -- the zoomed arm and the unzoomed one -- is what makes
+# letting go of the button a path back rather than a second mechanism.
+target_writes = [x for x in wg
+                 if str(BEL.get_node_title(x)).replace("\n", " ")
+                 == "Set TargetFOV"]
+check("...fed from two writes of TargetFOV: aiming, and not aiming",
+      len(target_writes) == 2, str(len(target_writes)))
+check("the zoom is interpolated, not snapped",
+      bool(titled(wg, "FInterp To")) or bool(titled(wg, "FInterpTo")),
+      "FInterpTo")
+base_reads = [x for x in wg if "FieldOfView" in out_pins(x)]
+check("BaseFOV is cached off the camera, not written down as a literal",
+      bool(base_reads), str(len(base_reads)))
+check("aiming is refused while sprinting, which cannot fire anyway",
+      G.ADS_SPREAD_SCALE < 1.0 and "Get Sprinting" in
+      {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg},
+      f"cone x{G.ADS_SPREAD_SCALE}")
+
+# ─── Footsteps ───────────────────────────────────────────────────────────────
+
+foot = load(G.FOOTSTEP_BP_PATH)
+check("there is a footstep component", foot is not None)
+if foot:
+    f = cdo(foot)
+    sounds = list(f.get_editor_property("Sounds"))
+    check("...with more than one step, so it is not one buffer retriggered",
+          len(sounds) >= 3, f"{len(sounds)} clips")
+    check("...on a stride measured in centimetres, not seconds",
+          abs(f.get_editor_property("StrideCm") - G.FOOTSTEP_STRIDE_CM) < 1e-6,
+          repr(f.get_editor_property("StrideCm")))
+    fg = graph(foot).list_all_nodes()
+    # NOT `titles`: this file is a flat script and `titles` is the weapon
+    # component's, read again hundreds of lines below.
+    foot_titles = {str(BEL.get_node_title(x)).replace("\n", " ") for x in fg}
+    # Distance, not time: the accumulator has to be driven by SPEED x dt. A
+    # Delay or a plain timer here would be the bug this design exists to avoid.
+    check("...accumulated from the owner's own speed",
+          any("eloc" in t for t in foot_titles),
+          str(sorted(t for t in foot_titles if "eloc" in t)))
+    check("...and the remainder is carried, not zeroed, so the rate does not "
+          "follow the framerate",
+          any("-" in t or "Subtract" in t for t in foot_titles),
+          str(len(foot_titles)))
+check("both the player and the wanderers wear it",
+      "FootstepComponent" in components(char)
+      and (npc is None or "FootstepComponent" in components(npc)))
+
 # ─── Automatic fire ──────────────────────────────────────────────────────────
 # Hold the button and the SMG and the assault rifle keep firing; the shotgun,
 # the pistol and the sniper are one shot per click. What makes this cheap is
@@ -1210,9 +1373,10 @@ for name in G.AUTO_DISPLAYS:
           str(sp["interval"]))
 
 downs = [n for n in wg if "IsInputKeyDown" in str(BEL.get_node_title(n))]
-check("two keys are polled held rather than tapped: sprint and the trigger",
+check("three keys are polled held rather than tapped: sprint, aim and the "
+      "trigger",
       sorted(pin_value(x, "Key") for x in downs)
-      == sorted([G.FIRE_KEY, G.SPRINT_KEY]),
+      == sorted([G.FIRE_KEY, G.SPRINT_KEY, G.AIM_KEY]),
       str(sorted(pin_value(x, "Key") for x in downs)))
 
 # THE TRAP THIS SECTION EXISTS FOR. Automatic lives on the weapon, so reading
@@ -1449,16 +1613,21 @@ check("exactly one spawn in the death path drops a weapon",
 # Same guard as the shells and the kill count, walked the same way: the safety
 # net kills anything that falls under the world down this very path.
 if guns:
-    seen, node, guarded = set(), guns[0], False
-    for _ in range(60):
-        ins = BEL.find_input_pin(node, "execute")
-        feeders = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(ins)] \
-            if ins and ins.is_valid() else []
-        if not feeders:
-            break
-        node = feeders[0]
+    # BREADTH-first over every exec feeder, not a single chain.
+    #
+    # This used to follow feeders[0] and stop, which made it a coin flip: an
+    # exec input takes any number of links and their order is not something
+    # this API promises, so on a graph where the drop is reached from more than
+    # one place the walk would sometimes take the arm without the guard on it
+    # and report the guard missing. It failed intermittently, on a graph that
+    # had not changed, which is worse than no check at all -- a flaky assertion
+    # teaches you to ignore it.
+    seen, frontier, guarded, hops = set(), [guns[0]], False, 0
+    while frontier and hops < 400 and not guarded:
+        node = frontier.pop(0)
+        hops += 1
         if id(node) in seen:
-            break
+            continue
         seen.add(id(node))
         if "Branch" in str(BEL.get_node_title(node)).replace("\n", " "):
             cond = BEL.find_input_pin(node, "Condition")
@@ -1468,6 +1637,10 @@ if guns:
                     for q in PIN.list_connected_pins(cond)):
                 guarded = True
                 break
+        ins = BEL.find_input_pin(node, "execute")
+        if ins and ins.is_valid():
+            frontier.extend(PIN.get_owning_node(q)
+                            for q in PIN.list_connected_pins(ins))
     check("only a death the player caused drops a weapon", guarded,
           "the safety net must not be a weapon dispenser")
 check("an uncollected drop tidies itself away",

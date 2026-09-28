@@ -99,8 +99,11 @@ def main():
     # import back as a key called "(".
     # The restart key is polled from ReceiveDrawHUD, not from Tick: Tick does
     # not run while the game is paused, and the death menu only exists paused.
-    expected_keys = set((G.MENU_KEY, G.RESTART_KEY, G.DEBUG_KEY) + G.PRESET_KEYS)
-    check("polls exactly the menu, preset, debug and restart keys",
+    # The main menu's start keys are polled from ReceiveDrawHUD for the same
+    # reason the restart key is, and there are three of them.
+    expected_keys = set((G.MENU_KEY, G.RESTART_KEY, G.DEBUG_KEY)
+                        + G.PRESET_KEYS + G.START_KEYS)
+    check("polls exactly the menu, preset, debug, restart and start keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
 
@@ -149,7 +152,11 @@ def main():
                      # SelectString and a bool rendered as "true" is a
                      # variable's value rather than a setting's state.
                      f"[{G.DEBUG_KEY}]   debug   ON",
-                     f"[{G.DEBUG_KEY}]   debug   OFF"}
+                     f"[{G.DEBUG_KEY}]   debug   OFF",
+                     # The main menu, drawn before anything else while
+                     # GameStarted is false.
+                     G.GAME_TITLE, G.GAME_SUBTITLE, G.START_LABEL,
+                     "press  ENTER  ·  SPACE  ·  or click"}
     expected_text |= {f"[{i + 1}]   {p[0]}" for i, p in enumerate(G.PRESETS)}
     # The health number has no literal text -- its Text pin is driven -- so it
     # contributes an empty string here.
@@ -165,10 +172,11 @@ def main():
           len(by_pins("RectColor")) == expected_rects,
           str(len(by_pins("RectColor"))))
 
-    # One quality panel, one death panel, five empty slots, the equipped
-    # frame, the carried weapon's icon, and a track+fill for each of HP,
-    # stamina and the NPC bar.
-    expected_textures = 1 + 1 + G.INVENTORY_SIZE + 1 + 1 + 2 + 2 + 2
+    # One quality panel, one death panel, the main-menu panel and its NEW GAME
+    # button plate, five empty slots, the equipped slot's lit background, the
+    # equipped frame, the carried weapon's icon, and a track+fill for each of
+    # HP, stamina and the NPC bar.
+    expected_textures = 1 + 1 + 2 + G.INVENTORY_SIZE + 1 + 1 + 1 + 2 + 2 + 2
     textures = by_pins("Texture")
     check(f"{expected_textures} DrawTextures: panels, slots, weapon icon, bars",
           len(textures) == expected_textures, str(len(textures)))
@@ -180,6 +188,62 @@ def main():
               if BEL.find_input_pin(n, "Texture").list_connected_pins()]
     check("exactly one DrawTexture takes its texture from the weapon itself",
           len(driven) == 1, str(len(driven)))
+
+    # --- the artwork is the size the HUD thinks it is -----------------------
+    # DrawTexture's UV rectangle is in TEXELS, and build_graphics_menu.py
+    # supplies it from UI_TEX_SIZE -- a table of numbers, not a measurement. If
+    # a texture is regenerated at a different size (the slots went from 104x68
+    # to 120x84 for exactly this reason) and that table is not updated, or the
+    # PNGs are rebuilt and never re-imported, the HUD samples a rectangle that
+    # is not the picture. Nothing errors; the art is just subtly wrong.
+    wrong = []
+    for name, (want_w, want_h) in G.UI_TEX_SIZE.items():
+        tex = eas.load_asset(f"{G.UI_ART_DIR}/{name}")
+        if not tex:
+            wrong.append(f"{name} not imported")
+            continue
+        got = (tex.blueprint_get_size_x(), tex.blueprint_get_size_y())
+        if got != (want_w, want_h):
+            wrong.append(f"{name} is {got[0]}x{got[1]}, HUD draws "
+                         f"{want_w}x{want_h}")
+    check("every imported texture is the size the HUD samples it at",
+          not wrong, "; ".join(wrong))
+    icons = []
+    for display in ("Pistol", "Shotgun", "SMG", "Rifle", "Sniper"):
+        tex = eas.load_asset(f"{G.UI_ART_DIR}/T_UI_Icon_{display}")
+        if not tex:
+            icons.append(f"{display} not imported")
+        elif (tex.blueprint_get_size_x(),
+              tex.blueprint_get_size_y()) != G.ICON_TEX_SIZE:
+            icons.append(f"{display} is "
+                         f"{tex.blueprint_get_size_x()}x"
+                         f"{tex.blueprint_get_size_y()}")
+    check("...and so is every weapon icon", not icons, "; ".join(icons))
+
+    # --- the main menu ------------------------------------------------------
+    # The game must not be running behind the title screen: BeginPlay pauses,
+    # and only the menu unpauses. Two SetGamePaused calls with a literal true
+    # would mean something else pausing as well, which is worth knowing about.
+    paused = by_pins("bPaused")
+    literals = [BEL.find_input_pin(n, "bPaused").get_pin_value() for n in paused]
+    check("exactly one SetGamePaused(true) -- the main menu's, at BeginPlay",
+          literals.count("true") == 1, str(literals))
+    # Two unpause: the menu's NEW GAME and the death menu's restart.
+    check("two SetGamePaused(false) -- starting a game and restarting one",
+          literals.count("false") == 2, str(literals))
+
+    keys = {str(BEL.find_input_pin(n, "Key").get_pin_value())
+            for n in by_pins("Key")}
+    for key in G.START_KEYS:
+        check(f"the main menu accepts {key}", key in keys, str(sorted(keys)))
+
+    started = [n for n in nodes
+               if G.GAME_STARTED_VAR in str(BEL.get_node_title(n))]
+    check(f"{G.GAME_STARTED_VAR} is read and written",
+          len(started) >= 2, str(len(started)))
+    cdo = unreal.get_default_object(BEL.generated_class(bp))
+    check(f"{G.GAME_STARTED_VAR} starts false, so the menu is what loads",
+          cdo.get_editor_property(G.GAME_STARTED_VAR) is False)
 
     # The caret is the only text whose position is computed rather than literal.
     caret = [n for n in texts
@@ -212,10 +276,11 @@ def main():
           aim_reads == {"Get AimValid", "Get AimBlocked"}, str(sorted(aim_reads)))
     viewports = [n for n in nodes
                  if str(BEL.get_node_title(n)).replace("\n", " ") == "GetViewportSize"]
-    # Four now: the reticle and the inventory strip centre off it, the kill
-    # counter right-anchors off it, and the death panel centres off it.
+    # Five now: the reticle and the inventory strip centre off it, the kill
+    # counter right-anchors off it, and the death panel and the main menu each
+    # centre off it.
     check("everything positioned off the window edge reads the viewport size",
-          len(viewports) == 4, str(len(viewports)))
+          len(viewports) == 5, str(len(viewports)))
     check("a blocked shot colours the reticle differently",
           any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
           and "Get AimBlocked" in aim_reads)
@@ -346,12 +411,23 @@ def main():
           str(sorted({t for t in titles if "Level" in t})))
     # And it unpauses first: a level opened while the world is paused comes up
     # paused, with nothing left able to unpause it.
-    unpauses = by_pins("bPaused")
-    check("restarting unpauses before it reopens", len(unpauses) == 1
-          and BEL.find_input_pin(unpauses[0], "bPaused").get_pin_value()
-          in ("false", "False"),
-          str([BEL.find_input_pin(n, "bPaused").get_pin_value()
-               for n in unpauses]))
+    # Three SetGamePaused in the graph now: the main menu pauses at BeginPlay,
+    # NEW GAME unpauses, and the restart unpauses. What this check is about is
+    # the restart one, and the thing that identifies it is that it is the
+    # unpause sitting in front of an OpenLevel.
+    unpauses = [n for n in by_pins("bPaused")
+                if BEL.find_input_pin(n, "bPaused").get_pin_value()
+                in ("false", "False")]
+    reopening = []
+    for n in unpauses:
+        then = BEL.find_then_pin(n)
+        for other in (then.list_connected_pins() if then else []):
+            owner = unreal.BlueprintGraphPinLibrary.get_owning_node(other)
+            if owner and "Level" in str(BEL.get_node_title(owner)):
+                reopening.append(n)
+    check("restarting unpauses before it reopens", len(reopening) == 1,
+          f"{len(unpauses)} unpauses, {len(reopening)} of them feeding an "
+          f"Open Level")
 
     # --- the shotgun's ammunition, beside its icon
     # Read off the item like SlotColor and DisplayName are, so the strip stays

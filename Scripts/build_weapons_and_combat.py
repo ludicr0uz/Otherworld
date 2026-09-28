@@ -216,6 +216,24 @@ SOUND_NAMES = ("A_ShotgunFire", "A_PistolFire", "A_SMGFire", "A_RifleFire",
                "A_ReloadRifle", "A_ReloadPistol")
 RETIRED_SOUNDS = (f"{AUDIO_DIR}/A_Reload",)
 
+# ── Foley and creature voices ────────────────────────────────────────────────
+#
+# A second folder, not /Game/Weapons/Audio, because these are not weapon
+# sounds: footsteps belong to anything with legs and the growls belong to the
+# monsters. They are imported by the same function for the same reason the
+# gunshots are -- it is the only importer that exists -- but nothing about them
+# is a weapon.
+#
+# The .wav files come from Scripts/make_creature_sounds.py, which synthesises
+# rather than cutting from recordings; that file's docstring says why that is
+# the right call for these and the wrong one for gunfire.
+CREATURE_AUDIO_DIR = "/Game/Audio"
+FOOTSTEP_NAMES = tuple(f"A_Footstep_{i:02d}" for i in (1, 2, 3, 4))
+MELEE_HIT_NAMES = tuple(f"A_MeleeHit_{i:02d}" for i in (1, 2, 3))
+CREATURE_VOICE_NAMES = (tuple(f"A_ZombieGrowl_{i:02d}" for i in (1, 2, 3))
+                        + tuple(f"A_WendigoRoar_{i:02d}" for i in (1, 2, 3)))
+CREATURE_SOUND_NAMES = FOOTSTEP_NAMES + MELEE_HIT_NAMES + CREATURE_VOICE_NAMES
+
 AIM_RIFLE = "/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS"
 AIM_PISTOL = "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS"
 
@@ -259,6 +277,60 @@ MAX_STAMINA = 100.0
 # to be worth spending and it has to cost something to have spent.
 STAMINA_DRAIN_PER_S = 25.0
 STAMINA_REGEN_PER_S = 12.0
+
+# --- footsteps ---------------------------------------------------------------
+# One component, on the player and on every wanderer, because a footfall is a
+# fact about having legs and not about which side you are on.
+#
+# Driven by DISTANCE TRAVELLED, not by a timer. That is the whole design: a
+# timer has to be told how fast its owner is moving and gets it wrong the
+# moment anything else changes the speed, and three things already do -- sprint
+# (900 vs 600), the per-instance gait variance, and the wendigo's 1.15x. An
+# accumulator over ground covered needs to know none of them and cannot
+# disagree with any of them; the faster something moves, the sooner it has
+# covered a stride.
+#
+# 160 cm is one footfall of a run at 600 cm/s, which works out at about 3.7
+# steps a second. It is a compromise across the speed range -- the same stride
+# at a walk is slightly long -- and a compromise is the right answer here,
+# because the alternative is a speed-to-stride curve that nobody can hear.
+#
+# The remainder is CARRIED rather than reset to zero when a step fires, or the
+# effective stride would be "160 cm plus however far this frame happened to
+# take us", which makes the step rate depend on framerate.
+FOOTSTEP_STRIDE_CM = 160.0
+# Below this the owner is shuffling against a wall, not walking.
+FOOTSTEP_MIN_SPEED_CMS = 40.0
+FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
+
+# --- aiming down the sights --------------------------------------------------
+# Right mouse, held. Polled on the weapon component's Tick like every other key
+# in this project, and for the same reason: BP_ThirdPersonCharacter's graph is
+# the Enhanced Input template and a new IA asset plus an IMC entry is not
+# authorable from Python.
+#
+# What ADS does is narrow the camera's field of view and tighten the weapon's
+# cone. The zoom factor is per weapon (AdsZoom on BP_WeaponItem) because the
+# sniper's is a scope and everything else's is a set of irons: 4x against 1.5x
+# is the difference the player is buying when they pick the rifle up.
+#
+# The FOV is NOT snapped. FInterpTo at ADS_INTERP_SPEED takes about a fifth of
+# a second to arrive, which is short enough to feel instant and long enough
+# that a 4x snap does not read as a teleport. CurrentFOV is stored rather than
+# recomputed because FInterpTo needs its own previous output.
+#
+# BaseFOV is cached at BeginPlay from whatever the camera already has, exactly
+# as BaseSpeed caches MaxWalkSpeed: a literal here would silently fight any
+# later change to the camera asset.
+AIM_KEY = "RightMouseButton"
+ADS_ZOOM_IRONS = 1.5
+ADS_ZOOM_SCOPE = 4.0
+ADS_INTERP_SPEED = 12.0
+# Aiming is worth something mechanically, not only visually: the cone shrinks
+# to a third. The shotgun's 5 degrees becomes 1.7, which still patterns, and
+# the sniper's 0.2 becomes 0.07, which is academic -- the weapons this matters
+# to are the automatics in the middle.
+ADS_SPREAD_SCALE = 0.34
 
 # --- shotgun ammunition ------------------------------------------------------
 # Ammunition lives on BP_WeaponItem, not on the weapon component, because a
@@ -1167,7 +1239,7 @@ def _weapon_specs():
              display="Sniper", automatic=False, damage=120.0, pellets=1, spread=0.2, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
-             colour=(0.95, 0.30, 0.35),
+             colour=(0.95, 0.30, 0.35), ads_zoom=ADS_ZOOM_SCOPE,
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
              interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS),
     )
@@ -1227,29 +1299,34 @@ def build_materials():
 def import_sounds():
     """Import the WAVs as SoundWave assets.
 
-    The .wav files come from Scripts/fetch_weapon_sounds.py, which is pure
-    Python plus the macOS tools and is run by hand rather than from main() --
-    it reaches the network and unpacks 194 MB, which is not something an asset
-    build should do on every invocation. The cut files are committed; the
-    downloads are not.
+    Two folders and two sources. The gunshots are cut from CC0 recordings by
+    Scripts/fetch_weapon_sounds.py, which is run by hand rather than from
+    main() -- it reaches the network and unpacks 194 MB, which is not something
+    an asset build should do on every invocation. The foley and the monster
+    voices are synthesised by Scripts/make_creature_sounds.py, which is cheap
+    and offline. Both write into assets/generated/sounds; the cut and
+    synthesised files are committed, the downloads are not.
 
-    Nothing in /Engine/Content is a usable gunshot, which is why this project
-    supplies its own at all.
+    Nothing in /Engine/Content is a usable gunshot -- or footstep, or growl --
+    which is why this project supplies its own at all.
     """
     eas = _assets()
     made = []
-    for name in SOUND_NAMES:
-        dest = f"{AUDIO_DIR}/{name}"
+    groups = ((AUDIO_DIR, SOUND_NAMES, "Scripts/fetch_weapon_sounds.py"),
+              (CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES,
+               "Scripts/make_creature_sounds.py"))
+    for folder, names, how in groups:
+      for name in names:
+        dest = f"{folder}/{name}"
         if eas.does_asset_exist(dest):
             made.append(dest)
             continue
         src = os.path.join(SOUND_SRC_DIR, f"{name}.wav")
         if not os.path.isfile(src):
-            raise RuntimeError(
-                f"missing {src} -- run Scripts/fetch_weapon_sounds.py")
+            raise RuntimeError(f"missing {src} -- run {how}")
         task = unreal.AssetImportTask()
         task.set_editor_property("filename", src)
-        task.set_editor_property("destination_path", AUDIO_DIR)
+        task.set_editor_property("destination_path", folder)
         task.set_editor_property("destination_name", name)
         task.set_editor_property("automated", True)
         task.set_editor_property("replace_existing", True)
@@ -1498,6 +1575,10 @@ def build_weapon_item():
                  BEL.get_object_reference_type(unreal.SoundBase.static_class()))
     _declare(ed, "AimPose",
              BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
+    # How far this weapon zooms when the right button is held. On the item for
+    # the same reason SpreadDegrees is -- the component reads it off Held and
+    # knows nothing about which weapon it is holding.
+    _declare(ed, "AdsZoom", _float_type())
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
@@ -1557,6 +1638,7 @@ def build_weapon(spec, item_bp):
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
+        "AdsZoom": float(spec.get("ads_zoom", ADS_ZOOM_IRONS)),
         "Icon": _weapon_icon(spec["display"]),
         "FireSound": _must_load(spec["sound"]),
         "DryFireSound": _must_load(SND_DRY_FIRE),
@@ -1607,6 +1689,7 @@ FN_VEC_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_VectorToString"
 FN_NORMAL = "/Script/Engine.KismetMathLibrary.Normal"
 FN_DEG2RAD = "/Script/Engine.KismetMathLibrary.DegreesToRadians"
 FN_PLAY_SOUND = "/Script/Engine.GameplayStatics.PlaySoundAtLocation"
+FN_OBJECT_CLASS = "/Script/Engine.GameplayStatics.GetObjectClass"
 FN_ATTACH = "/Script/Engine.Actor.K2_AttachToComponent"
 FN_DETACH = "/Script/Engine.Actor.K2_DetachFromActor"
 FN_SET_HIDDEN = "/Script/Engine.Actor.SetActorHiddenInGame"
@@ -1648,6 +1731,16 @@ FN_LE_FF = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
 FN_LESS_FF = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
 FN_GREATER_FF = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
 FN_GE_FF = "/Script/Engine.KismetMathLibrary.GreaterEqual_DoubleDouble"
+# The ground test. UCharacterMovementComponent::IsMovingOnGround and ::IsFalling
+# are both virtual C++ and neither is BlueprintCallable -- measured, all three
+# spellings return a pinless node. Character::CanJump is, and it is a real
+# feet-on-the-ground query rather than a coincidence: CanJumpInternal requires
+# the movement mode to be walking. It is a PROXY, and the way it could be wrong
+# is if something ever disables jumping on an owner, which would silence that
+# owner's footsteps. Nothing does.
+FN_ON_GROUND = "/Script/Engine.Character.CanJump"
+FN_GET_VELOCITY = "/Script/Engine.Actor.GetVelocity"
+FN_VSIZE_XY = "/Script/Engine.KismetMathLibrary.VSizeXY"
 FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
 FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
@@ -1656,6 +1749,11 @@ FN_NEQ_BB = "/Script/Engine.KismetMathLibrary.NotEqual_BoolBool"
 FN_MAKE_ROT = "/Script/Engine.KismetMathLibrary.MakeRotator"
 FN_MUL_FF = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
 FN_SELECT_FF = "/Script/Engine.KismetMathLibrary.SelectFloat"
+FN_DIV_FF = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
+FN_INTERP_FF = "/Script/Engine.KismetMathLibrary.FInterpTo"
+FN_NOT_B = "/Script/Engine.KismetMathLibrary.Not_PreBool"
+FN_SET_FOV = "/Script/Engine.CameraComponent.SetFieldOfView"
+CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
 FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
@@ -2494,6 +2592,183 @@ def _author_player_death(ed, exec_in, x0, y0):
          tell, score, score_str, dead_line, say_dead, freeze])
 
 
+def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
+    """Play a random element of the ``var_name`` sound array at ``at_pin``.
+
+    Returns ``(nodes, then_pin)``. Guarded on the array's own length, because
+    RandomIntegerInRange(0, -1) into Array_Get is an access-none rather than
+    silence -- and an empty array is the normal state of a checkout that has
+    not run Scripts/make_creature_sounds.py yet.
+
+    The same shape exists in build_npc_blueprints.py. Two copies rather than a
+    shared module because the two files each carry their own _pin/_connect/_set
+    authoring helpers, and hoisting one function would mean hoisting those.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    table = keep(_at(ed.add_get_member_variable_node(var_name), x0, y0 + 240))
+    table_out = _pin(table, var_name, is_input=False)
+    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 240, y0 + 240))
+    _connect(table_out, _pin(count, "TargetArray"))
+    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 480, y0 + 240))
+    _connect(_pin(count, "ReturnValue", is_input=False), _pin(stocked, "A"))
+    _set(stocked, "B", 0)
+
+    have = keep(_at(ed.add_branch_node(), x0 + 720, y0))
+    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(exec_in, _pin(have, "execute"))
+
+    top = keep(_at(_node(ed, FN_SUB_II), x0 + 720, y0 + 240))
+    _connect(_pin(count, "ReturnValue", is_input=False), _pin(top, "A"))
+    _set(top, "B", 1)
+    which = keep(_at(_node(ed, FN_RAND_INT), x0 + 960, y0 + 240))
+    _set(which, "Min", 0)
+    _connect(_pin(top, "ReturnValue", is_input=False), _pin(which, "Max"))
+    pick = keep(_at(_node(ed, FN_ARR_GET), x0 + 1200, y0 + 240))
+    _connect(table_out, _pin(pick, "TargetArray"))
+    _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
+
+    play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 1440, y0))
+    _connect(_pin(pick, "Item", is_input=False), _pin(play, "Sound"))
+    _connect(at_pin, _pin(play, "Location"))
+    _connect(BEL.find_then_pin(have), _pin(play, "execute"))
+
+    join = keep(_at(ed.add_branch_node(), x0 + 1700, y0))
+    _set(join, "Condition", "true")
+    _connect(BEL.find_then_pin(play), _pin(join, "execute"))
+    _connect(BEL.find_else_pin(have), _pin(join, "execute"))
+    return made, BEL.find_then_pin(join)
+
+
+def build_footstep_component(rebuild=True):
+    """A footfall every FOOTSTEP_STRIDE_CM of ground covered.
+
+        [Tick] -> cast owner to Character -> [on the ground?]
+                    no  -> Travelled = 0          (a jump restarts the stride)
+                    yes -> Travelled += speed * dt
+                        -> [Travelled >= stride AND moving?]
+                             yes -> Travelled -= stride
+                                 -> play one of Sounds at the owner
+                             no  -> done
+
+    Distance rather than time: see FOOTSTEP_STRIDE_CM. Nothing here knows about
+    sprint, about the gait variance the level generator applies per wanderer,
+    or about the wendigo being 15% faster -- all three change how far the owner
+    moves per second, and all three therefore change the step rate for free.
+
+    Subtracting the stride rather than zeroing Travelled is what keeps the rate
+    independent of framerate: zeroing throws away the overshoot, so the real
+    stride becomes 160 cm plus whatever one frame added.
+    """
+    bp = _create_blueprint(FOOTSTEP_BP_PATH, unreal.ActorComponent)
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    tick, _begin = _events(ed, rebuild)
+
+    _declare(ed, "Travelled", _float_type())
+    _declare(ed, "StrideCm", _float_type())
+    _declare(ed, "Sounds", BEL.get_array_type(
+        BEL.get_object_reference_type(unreal.SoundBase.static_class())))
+
+    owner = _at(_node(ed, FN_GET_OWNER), 0, 300)
+    owner_out = _pin(owner, "ReturnValue", is_input=False)
+    as_char = _at(_palette(ed, NODE_CAST_CHARACTER), 260, 0)
+    _connect(owner_out, _pin(as_char, "Object"))
+    _connect(BEL.find_then_pin(tick), _pin(as_char, "execute"))
+    char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
+
+    grounded = _at(_node(ed, FN_ON_GROUND), 780, 300)
+    _connect(char_out, _pin(grounded, "self"))
+
+    walking = _at(ed.add_branch_node(), 1040, 0)
+    _connect(_pin(grounded, "ReturnValue", is_input=False), _pin(walking, "Condition"))
+    _connect(BEL.find_then_pin(as_char), _pin(walking, "execute"))
+
+    # Airborne: forget the part-stride, so landing does not immediately fire a
+    # step that was 90% accumulated before the jump.
+    reset = _at(ed.add_set_member_variable_node("Travelled"), 1300, 400)
+    _set(reset, "Travelled", 0.0)
+    _connect(BEL.find_else_pin(walking), _pin(reset, "execute"))
+
+    speed_v = _at(_node(ed, FN_GET_VELOCITY), 1040, 560)
+    _connect(owner_out, _pin(speed_v, "self"))
+    # Horizontal speed only: falling at terminal velocity is not walking, and
+    # VSize would count it.
+    speed = _at(_node(ed, FN_VSIZE_XY), 1300, 560)
+    _connect(_pin(speed_v, "ReturnValue", is_input=False), _pin(speed, "A"))
+    speed_out = _pin(speed, "ReturnValue", is_input=False)
+
+    step = _at(_node(ed, FN_MUL_FF), 1560, 560)
+    _connect(speed_out, _pin(step, "A"))
+    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "B"))
+    sofar = _at(ed.add_get_member_variable_node("Travelled"), 1560, 700)
+    total = _at(_node(ed, FN_ADD_FF), 1820, 560)
+    _connect(_pin(sofar, "Travelled", is_input=False), _pin(total, "A"))
+    _connect(_pin(step, "ReturnValue", is_input=False), _pin(total, "B"))
+    advance = _at(ed.add_set_member_variable_node("Travelled"), 2080, 0)
+    _connect(_pin(total, "ReturnValue", is_input=False), _pin(advance, "Travelled"))
+    _connect(BEL.find_then_pin(walking), _pin(advance, "execute"))
+    # Read the STORED total from here on. The add is pure and would be
+    # re-evaluated against the new Travelled on a second read -- the same trap
+    # the NPC id and the reload arithmetic ran into.
+    have = _at(ed.add_get_member_variable_node("Travelled"), 2080, 300)
+    have_out = _pin(have, "Travelled", is_input=False)
+
+    stride = _at(ed.add_get_member_variable_node("StrideCm"), 2080, 420)
+    stride_out = _pin(stride, "StrideCm", is_input=False)
+    far_enough = _at(_node(ed, FN_GE_FF), 2340, 300)
+    _connect(have_out, _pin(far_enough, "A"))
+    _connect(stride_out, _pin(far_enough, "B"))
+    quick_enough = _at(_node(ed, FN_GREATER_FF), 2340, 560)
+    _connect(speed_out, _pin(quick_enough, "A"))
+    _set(quick_enough, "B", FOOTSTEP_MIN_SPEED_CMS)
+    both = _at(_node(ed, FN_AND), 2600, 420)
+    _connect(_pin(far_enough, "ReturnValue", is_input=False), _pin(both, "A"))
+    _connect(_pin(quick_enough, "ReturnValue", is_input=False), _pin(both, "B"))
+
+    lands = _at(ed.add_branch_node(), 2860, 0)
+    _connect(_pin(both, "ReturnValue", is_input=False), _pin(lands, "Condition"))
+    _connect(BEL.find_then_pin(advance), _pin(lands, "execute"))
+
+    left = _at(_node(ed, FN_SUB_FF), 3120, 300)
+    _connect(have_out, _pin(left, "A"))
+    _connect(stride_out, _pin(left, "B"))
+    charge = _at(ed.add_set_member_variable_node("Travelled"), 3380, 0)
+    _connect(_pin(left, "ReturnValue", is_input=False), _pin(charge, "Travelled"))
+    _connect(BEL.find_then_pin(lands), _pin(charge, "execute"))
+
+    at = _at(_node(ed, FN_ACTOR_LOC), 3380, 300)
+    _connect(owner_out, _pin(at, "self"))
+    _author_random_sound(ed, "Sounds", _pin(at, "ReturnValue", is_input=False),
+                         BEL.find_then_pin(charge), 3640, 0)
+
+    ed.add_comment_to_nodes(
+        f"A footfall every {FOOTSTEP_STRIDE_CM:.0f} cm of ground covered, "
+        f"which is about {600.0 / FOOTSTEP_STRIDE_CM:.1f} a second at a "
+        f"600 cm/s run. Distance, not a timer: sprint, the per-wanderer gait "
+        f"variance and the wendigo's 1.15x all change how fast their owner "
+        f"moves, and an accumulator over distance tracks every one of them "
+        f"without being told. The remainder is carried, not zeroed, so the "
+        f"rate does not depend on framerate.",
+        ed.list_all_nodes())
+
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_FootstepComponent failed to compile")
+
+    eas = _assets()
+    found = [eas.load_asset(f"{CREATURE_AUDIO_DIR}/{n}") for n in FOOTSTEP_NAMES
+             if eas.does_asset_exist(f"{CREATURE_AUDIO_DIR}/{n}")]
+    _apply_defaults(bp, {"StrideCm": FOOTSTEP_STRIDE_CM,
+                         "Travelled": 0.0,
+                         "Sounds": found})
+    _log(f"built {FOOTSTEP_BP_PATH} "
+         f"({len(found)} steps, one every {FOOTSTEP_STRIDE_CM:.0f} cm)")
+    return bp
+
+
 def build_health_component(rebuild=True):
     """Health, plus what happens when it runs out.
 
@@ -2507,8 +2782,11 @@ def build_health_component(rebuild=True):
 
         DespawnOnDeath   destroy the owner at 0 HP. False on the player, so the
                          player simply sits at 0 rather than vanishing.
-        RespawnClass     what to spawn in the dead actor's place. Set to
-                         BP_ForestWanderer on the NPC, left empty on the player.
+        RespawnClass     what to spawn in the dead actor's place. Left empty on
+                         the player; on a wanderer it is overwritten at
+                         BeginPlay with the owner's OWN class, so each creature
+                         respawns as itself rather than as whatever the shared
+                         component template happened to name.
 
     Where the replacement appears is the RESPAWN_BAND: a random bearing and a
     random distance in the same 75-100 m annulus the level generator uses,
@@ -2593,10 +2871,31 @@ def build_health_component(rebuild=True):
     _connect(_pin(mine, "DespawnOnDeath", is_input=False), _pin(is_wanderer, "Condition"))
     _connect(BEL.find_then_pin(begin), _pin(is_wanderer, "execute"))
 
+    # --- what this one respawns as: itself -----------------------------------
+    # RespawnClass used to be a default written onto BP_ForestWanderer's own
+    # component template, and every variant inherited it. So a wendigo's
+    # replacement was a BP_ForestWanderer -- which wears the PARENT's mesh,
+    # i.e. a zombie. Kill the two wendigos the level places and there are never
+    # any more, which is exactly what it looked like. (The zombies had the same
+    # bug and it was invisible: the thing they respawned as looked identical.)
+    #
+    # Asking the owner what class it is fixes it for every variant at once,
+    # including ones that do not exist yet, and needs nothing per creature.
+    # The template default stays as the fallback for a wanderer that somehow
+    # has no owner class, and DespawnOnDeath -- already the "am I a wanderer"
+    # test above -- stays the thing that decides whether any of this runs.
+    me = _at(_node(ed, FN_GET_OWNER), -1200, -500)
+    my_class = _at(_node(ed, FN_OBJECT_CLASS), -960, -500)
+    _connect(_pin(me, "ReturnValue", is_input=False), _pin(my_class, "Object"))
+    same_again = _at(ed.add_set_member_variable_node("RespawnClass"), -720, -1100)
+    _connect(_pin(my_class, "ReturnValue", is_input=False),
+             _pin(same_again, "RespawnClass"))
+    _connect(BEL.find_then_pin(is_wanderer), _pin(same_again, "execute"))
+
     mode = _at(_node(ed, FN_GET_GAME_MODE), -720, -900)
     as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), -480, -900)
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
-    _connect(BEL.find_then_pin(is_wanderer), _pin(as_mode, "execute"))
+    _connect(BEL.find_then_pin(same_again), _pin(as_mode, "execute"))
     mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
 
     seen = _at(ed.add_get_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH),
@@ -3348,8 +3647,22 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
 
     spread_pin, spread_n = _prop(ed, "SpreadDegrees", held, x0 + 1420, y0 + 840)
     keep(spread_n)
-    rad = keep(_at(_node(ed, FN_DEG2RAD), x0 + 1660, y0 + 840))
-    _connect(spread_pin, _pin(rad, "A"))
+    # Aiming down the sights is worth something, not just a zoom: the cone
+    # shrinks to ADS_SPREAD_SCALE of the weapon's own figure. SelectFloat
+    # rather than a branch, so there is exactly one cone and the two cases
+    # cannot drift -- the same shape _author_sprint uses to pick a speed.
+    aiming_now = keep(_at(ed.add_get_member_variable_node("Aiming"),
+                          x0 + 1420, y0 + 1080))
+    steadied = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1660, y0 + 1080))
+    _set(steadied, "A", ADS_SPREAD_SCALE)
+    _set(steadied, "B", 1.0)
+    _connect(_pin(aiming_now, "Aiming", is_input=False), _pin(steadied, "bPickA"))
+    tightened = keep(_at(_node(ed, FN_MUL_FF), x0 + 1660, y0 + 940))
+    _connect(spread_pin, _pin(tightened, "A"))
+    _connect(_pin(steadied, "ReturnValue", is_input=False), _pin(tightened, "B"))
+
+    rad = keep(_at(_node(ed, FN_DEG2RAD), x0 + 1900, y0 + 940))
+    _connect(_pin(tightened, "ReturnValue", is_input=False), _pin(rad, "A"))
 
     cone = keep(_at(_node(ed, FN_RAND_CONE), x0 + 1900, y0 + 620))
     _connect(direction, _pin(cone, "ConeDir"))
@@ -4032,11 +4345,31 @@ def _author_wc_begin_play(ed, begin):
     _connect(_pin(walk, "MaxWalkSpeed", is_input=False), _pin(cache, "BaseSpeed"))
     _connect(BEL.find_then_pin(remember), _pin(cache, "execute"))
 
+    # And whatever the camera's own field of view is, for the same reason and
+    # with the same failure mode: a literal 90 here would silently fight the
+    # camera asset, and the symptom -- "the view is subtly wrong, but only
+    # after aiming once" -- would point at the ADS code rather than at the copy.
+    cam = keep(_at(_node(ed, FN_GET_COMP), 1040, -1700))
+    _connect(as_char, _pin(cam, "self"))
+    _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
+    fov = keep(_at(ed.add_get_member_variable_node("FieldOfView", CAMERA_CLASS_PATH),
+                   1300, -1700))
+    _connect(_pin(cam, "ReturnValue", is_input=False), _pin(fov, "self"))
+    fov_out = _pin(fov, "FieldOfView", is_input=False)
+    base_fov = keep(_at(ed.add_set_member_variable_node("BaseFOV"), 1560, -1700))
+    _connect(fov_out, _pin(base_fov, "BaseFOV"))
+    _connect(BEL.find_then_pin(cache), _pin(base_fov, "execute"))
+    # Start the interpolation where the camera already is, or the first frame
+    # lerps from zero and the view snaps open.
+    now_fov = keep(_at(ed.add_set_member_variable_node("CurrentFOV"), 1820, -1700))
+    _connect(fov_out, _pin(now_fov, "CurrentFOV"))
+    _connect(BEL.find_then_pin(base_fov), _pin(now_fov, "execute"))
+
     where = keep(_at(_node(ed, FN_GET_TRANSFORM), 1040, -1000))
     _connect(as_char, _pin(where, "self"))
     spawn_at = _pin(where, "ReturnValue", is_input=False)
 
-    prev = BEL.find_then_pin(cache)
+    prev = BEL.find_then_pin(now_fov)
     for i, var in enumerate(("ShotgunClass", "PistolClass")):
         cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
         spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))
@@ -4174,6 +4507,127 @@ def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
         made)
     return (BEL.find_then_pin(spend),
             _pin(as_char, "CastFailed", is_input=False))
+
+
+def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
+    """Right mouse held: narrow the camera to this weapon's AdsZoom.
+
+        Aiming   = RightMouseButton down AND something is equipped
+                                          AND not sprinting
+        TargetFOV = Aiming ? BaseFOV / Held.AdsZoom : BaseFOV
+        CurrentFOV = FInterpTo(CurrentFOV, TargetFOV, dt, ADS_INTERP_SPEED)
+        Camera.SetFieldOfView(CurrentFOV)
+
+    Three things are load-bearing here.
+
+    Not while sprinting, because the fire gate already refuses to shoot while
+    sprinting: a zoom that stayed on through a sprint would be aiming a weapon
+    that cannot fire, and the view would be narrow exactly when the player is
+    running away and needs it wide.
+
+    Not with empty hands, because AdsZoom is read off Held and a pure Get off a
+    null self is an Accessed None every frame. The read therefore sits inside
+    the true arm of the branch, where Held is known valid -- pure nodes are
+    pulled by whoever reads them, so the getter simply never runs on the frames
+    nothing is equipped. That is the same trap ``Automatic`` is commented for
+    above, and it has bitten this file before.
+
+    Interpolated rather than snapped, and CurrentFOV is a stored variable
+    because FInterpTo's input is its own previous output. Recomputing the
+    target every frame and lerping toward it also means letting go of the
+    button unzooms by the same curve with no second code path.
+
+    Returns the exec pins to carry on from.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0, y0 + 300))
+    _connect(pc_out, _pin(down, "self"))
+    _set(down, "Key", AIM_KEY)
+
+    # Sprinting has already been written this frame -- _author_sprint runs
+    # before this block -- so this reads the flag rather than the key.
+    running = keep(_at(ed.add_get_member_variable_node("Sprinting"), x0, y0 + 420))
+    still = keep(_at(_node(ed, FN_NOT_B), x0 + 240, y0 + 420))
+    _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
+
+    can = keep(_at(_node(ed, FN_AND), x0 + 480, y0 + 360))
+    _connect(_pin(down, "ReturnValue", is_input=False), _pin(can, "A"))
+    _connect(_pin(still, "ReturnValue", is_input=False), _pin(can, "B"))
+    wants = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 300))
+    _connect(_pin(can, "ReturnValue", is_input=False), _pin(wants, "A"))
+    _connect(armed_out, _pin(wants, "B"))
+
+    mark = keep(_at(ed.add_set_member_variable_node("Aiming"), x0 + 980, y0))
+    _connect(_pin(wants, "ReturnValue", is_input=False), _pin(mark, "Aiming"))
+    for e in exec_ins:
+        _connect(e, _pin(mark, "execute"))
+
+    base = keep(_at(ed.add_get_member_variable_node("BaseFOV"), x0 + 980, y0 + 420))
+    base_out = _pin(base, "BaseFOV", is_input=False)
+
+    aiming = keep(_at(ed.add_get_member_variable_node("Aiming"), x0 + 980, y0 + 300))
+    zoomed = keep(_at(ed.add_branch_node(), x0 + 1240, y0))
+    _connect(_pin(aiming, "Aiming", is_input=False), _pin(zoomed, "Condition"))
+    _connect(BEL.find_then_pin(mark), _pin(zoomed, "execute"))
+
+    # True arm: BaseFOV / this weapon's zoom. The AdsZoom getter lives here so
+    # it is never pulled on a frame with nothing equipped.
+    zoom_pin, zoom_n = _prop(ed, "AdsZoom", held, x0 + 1240, y0 + 420)
+    keep(zoom_n)
+    narrow = keep(_at(_node(ed, FN_DIV_FF), x0 + 1500, y0 + 420))
+    _connect(base_out, _pin(narrow, "A"))
+    _connect(zoom_pin, _pin(narrow, "B"))
+    want_in = keep(_at(ed.add_set_member_variable_node("TargetFOV"), x0 + 1760, y0))
+    _connect(_pin(narrow, "ReturnValue", is_input=False), _pin(want_in, "TargetFOV"))
+    _connect(BEL.find_then_pin(zoomed), _pin(want_in, "execute"))
+
+    want_out = keep(_at(ed.add_set_member_variable_node("TargetFOV"), x0 + 1760, y0 + 220))
+    _connect(base_out, _pin(want_out, "TargetFOV"))
+    _connect(BEL.find_else_pin(zoomed), _pin(want_out, "execute"))
+
+    # --- move the camera toward it ------------------------------------------
+    have = keep(_at(ed.add_get_member_variable_node("CurrentFOV"), x0 + 2020, y0 + 420))
+    want = keep(_at(ed.add_get_member_variable_node("TargetFOV"), x0 + 2020, y0 + 540))
+    step = keep(_at(_node(ed, FN_INTERP_FF), x0 + 2280, y0 + 420))
+    _connect(_pin(have, "CurrentFOV", is_input=False), _pin(step, "Current"))
+    _connect(_pin(want, "TargetFOV", is_input=False), _pin(step, "Target"))
+    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
+    _set(step, "InterpSpeed", ADS_INTERP_SPEED)
+    moved = keep(_at(ed.add_set_member_variable_node("CurrentFOV"), x0 + 2540, y0))
+    _connect(_pin(step, "ReturnValue", is_input=False), _pin(moved, "CurrentFOV"))
+    for tail in (BEL.find_then_pin(want_in), BEL.find_then_pin(want_out)):
+        _connect(tail, _pin(moved, "execute"))
+
+    cam = keep(_at(_node(ed, FN_GET_COMP), x0 + 2540, y0 + 420))
+    _connect(owner_out, _pin(cam, "self"))
+    _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
+    apply_fov = keep(_at(_node(ed, FN_SET_FOV), x0 + 2800, y0))
+    _connect(_pin(cam, "ReturnValue", is_input=False), _pin(apply_fov, "self"))
+    # Driven from the SET node's own pass-through output, not from a fresh
+    # getter: the setter passes the value it wrote straight out, so this cannot
+    # read a stale CurrentFOV the way a second Get would if anything were ever
+    # spliced in between. That pin is called "Output_Get", NOT the variable's
+    # own name -- a Set node's data output is named for what it does, not for
+    # what it writes.
+    _connect(_loose_pin(moved, "Output_Get", is_input=False),
+             _pin(apply_fov, "InFieldOfView"))
+    _connect(BEL.find_then_pin(moved), _pin(apply_fov, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"{AIM_KEY}: zoom to BaseFOV / the weapon's own AdsZoom "
+        f"({ADS_ZOOM_IRONS:g}x irons, {ADS_ZOOM_SCOPE:g}x on the sniper's "
+        f"scope), interpolated at {ADS_INTERP_SPEED:g} so it arrives in about "
+        f"a fifth of a second. Refused while sprinting -- the fire gate already "
+        f"is -- and with empty hands, which is also what keeps the AdsZoom "
+        f"getter off a null Held. The cone shrinks to "
+        f"{ADS_SPREAD_SCALE:g}x while Aiming; see _author_fire.",
+        made)
+    return (BEL.find_then_pin(apply_fov),)
 
 
 def _author_reload(ed, held, exec_in, x0, y0):
@@ -4420,6 +4874,13 @@ def _author_wc_tick(ed, tick):
     sprint_exits = _author_sprint(ed, tick, pc_out, owner_out, aim_exits,
                                   1040, -1400)
 
+    # --- aim down the sights -------------------------------------------------
+    # After the sprint block, which writes Sprinting, and before the trigger,
+    # which the cone width now depends on: polled in any other order the zoom
+    # and the spread would disagree by a frame.
+    ads_exits = _author_ads(ed, tick, pc_out, owner_out, held, armed_out,
+                            sprint_exits, 1040, -700)
+
     # --- the pose follows the sprint -----------------------------------------
     # Edge-triggered, not level-triggered, and that distinction is the whole
     # block. Re-equipping costs a detach, an attach and a montage restart; done
@@ -4435,7 +4896,7 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(posed, "PoseSprinting", is_input=False), _pin(changed, "B"))
     pose_gate = _at(ed.add_branch_node(), 780, 940)
     _connect(_pin(changed, "ReturnValue", is_input=False), _pin(pose_gate, "Condition"))
-    for exit_pin in sprint_exits:
+    for exit_pin in ads_exits:
         _connect(exit_pin, _pin(pose_gate, "execute"))
     remember = _at(ed.add_set_member_variable_node("PoseSprinting"), 1040, 940)
     _connect(now_sprint_out, _pin(remember, "PoseSprinting"))
@@ -4678,6 +5139,14 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     for name in ("Stamina", "MaxStamina", "BaseSpeed"):
         _declare(ed, name, _float_type())
     _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
+    # Aiming down the sights. BaseFOV is cached off the camera at BeginPlay for
+    # the same reason BaseSpeed is cached off the movement component; CurrentFOV
+    # is stored because FInterpTo's input is its own previous output, and
+    # TargetFOV because the two arms of the zoom branch must write one value
+    # that one interpolation then reads.
+    for name in ("BaseFOV", "CurrentFOV", "TargetFOV"):
+        _declare(ed, name, _float_type())
+    _declare(ed, "Aiming", BEL.get_basic_type_by_name("bool"))
     # What the ready pose currently reflects, as opposed to what it should.
     # The pair is what makes the sprint pose edge-triggered; see _author_wc_tick.
     _declare(ed, "PoseSprinting", BEL.get_basic_type_by_name("bool"))
@@ -4916,16 +5385,17 @@ def aim_camera(bp):
          f"{CAMERA_SHOULDER[1]:.0f} cm right / {CAMERA_SHOULDER[2]:.0f} cm up")
 
 
-def install_on_character(health_bp, weapon_bp):
+def install_on_character(health_bp, weapon_bp, footstep_bp):
     eas = _assets()
     bp = eas.load_asset(CHARACTER_BP_PATH)
     if not bp:
         raise RuntimeError(f"could not load {CHARACTER_BP_PATH}")
     _uninstall_old_shotgun(bp)
-    _drop_components(bp, {"HealthComponent", "WeaponComponent"})
+    _drop_components(bp, {"HealthComponent", "WeaponComponent", "FootstepComponent"})
     handles = {}
     for name, source in (("HealthComponent", health_bp),
-                         ("WeaponComponent", weapon_bp)):
+                         ("WeaponComponent", weapon_bp),
+                         ("FootstepComponent", footstep_bp)):
         handles[name] = _add_component(bp, _root_handle(bp),
                                        BEL.generated_class(source), name)
     # Symmetry, and forward planning: the player carries health too, so anything
@@ -4938,10 +5408,10 @@ def install_on_character(health_bp, weapon_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)
-    _log("player: HealthComponent + WeaponComponent installed")
+    _log("player: HealthComponent + WeaponComponent + FootstepComponent installed")
 
 
-def install_on_npc(health_bp):
+def install_on_npc(health_bp, footstep_bp):
     """The NPC gets health that despawns and respawns it.
 
     DespawnOnDeath and RespawnClass are set on *this* Blueprint's component
@@ -4954,9 +5424,14 @@ def install_on_npc(health_bp):
     if not bp:
         _log(f"note: {NPC_BP_PATH} not found — skipping the NPC")
         return None
-    _drop_components(bp, {"HealthComponent"})
+    _drop_components(bp, {"HealthComponent", "FootstepComponent"})
     handle = _add_component(bp, _root_handle(bp),
                             BEL.generated_class(health_bp), "HealthComponent")
+    # The same component the player carries. A wanderer at 600 cm/s covers a
+    # stride more than three times a second, and ten of them arriving through
+    # the trees is most of what the approach sounds like.
+    _add_component(bp, _root_handle(bp),
+                   BEL.generated_class(footstep_bp), "FootstepComponent")
     comp = _component_object(handle)
     comp.set_editor_property("DespawnOnDeath", True)
     comp.set_editor_property("RespawnClass", unreal.load_class(None, NPC_CLASS_PATH))
@@ -4976,7 +5451,8 @@ def install_on_npc(health_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")
     eas.save_loaded_asset(bp)
-    _log("NPC: HealthComponent installed (despawns and respawns at 0 HP)")
+    _log("NPC: HealthComponent + FootstepComponent installed "
+         "(despawns and respawns at 0 HP)")
     return bp
 
 
@@ -5017,6 +5493,7 @@ def main():
     # cast node only appears in the palette for a class that is already loaded.
     ensure_game_mode_vars()
     health_bp = build_health_component()
+    footstep_bp = build_footstep_component()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], blood_bp)
 
@@ -5036,12 +5513,12 @@ def main():
     _log(f"{HEALTH_BP_PATH}.DropClasses -> {', '.join(DROP_DISPLAYS)} "
          f"({GUN_DROP_CHANCE * 100:.0f}% per kill)")
 
-    install_on_character(health_bp, weapon_bp)
-    install_on_npc(health_bp)
+    install_on_character(health_bp, weapon_bp, footstep_bp)
+    install_on_npc(health_bp, footstep_bp)
     retire_old_assets()
 
-    _log("done — five weapons, ammunition, inventory, aiming, blood, "
-         "death, drops and respawn")
+    _log("done — five weapons, ammunition, inventory, aiming down the sights, "
+         "footsteps, blood, death, drops and respawn")
 
 
 if __name__ == "__main__":

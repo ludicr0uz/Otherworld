@@ -3,7 +3,7 @@ Auto-generated Unreal verification script for Lvl_Forest_200m.
 Verifies collision, materials, actor presence, tree and grass HISM
 instances (including that grass really is knee high), the NPC and its
 navigation rig, and the time-of-day lighting rig.
-Time of day: Night — starry sky as the only light source, low luminosity
+Time of day: Daytime — bright sun, blue sky, volumetric clouds
 """
 import json
 import unreal
@@ -18,19 +18,20 @@ EXPECTED_TREE_COUNT = 136
 EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island_02": 28, "HISM_Tree_Fir_A": 44, "HISM_Tree_Pine_A": 20, "HISM_Tree_Deciduous": 16}
 EXPECTED_GRASS_COUNT = 44368
 EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_Mid_B": 2850, "HISM_Grass_Knee_Tall_B": 7813, "HISM_Grass_Knee_Mid_A": 5862, "HISM_Grass_Knee_Tall_A": 8451, "HISM_Grass_Knee_Clump_C": 5844, "HISM_Grass_Under_Clump_A": 2325, "HISM_Grass_Under_Large_B": 2611, "HISM_Grass_Under_Large_A": 2197}
-EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.242809249629246, 55.199687244614566], "HISM_Grass_Under_Mid_B": [25.503926948960117, 35.99430151464459], "HISM_Grass_Knee_Tall_B": [42.50254371397834, 59.99927478522139], "HISM_Grass_Knee_Mid_A": [40.481314514524335, 50.599412580219756], "HISM_Grass_Knee_Tall_A": [42.50006710260952, 59.99895840027987], "HISM_Grass_Knee_Clump_C": [43.12312612443456, 53.89936647630565], "HISM_Grass_Under_Clump_A": [23.800345353400235, 33.59905037018744], "HISM_Grass_Under_Large_B": [24.65506062683597, 34.79728745482545], "HISM_Grass_Under_Large_A": [22.100624064757703, 31.198261357139028]}
+EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.24203236572195, 55.19965777829051], "HISM_Grass_Under_Mid_B": [25.50236822702523, 35.99548227179528], "HISM_Grass_Knee_Tall_B": [42.50385457167636, 59.99974280771928], "HISM_Grass_Knee_Mid_A": [40.48063773707256, 50.59822823779188], "HISM_Grass_Knee_Tall_A": [42.50318653697187, 59.99869496378578], "HISM_Grass_Knee_Clump_C": [43.122974101764925, 53.898815809648305], "HISM_Grass_Under_Clump_A": [23.80250827203032, 33.59948519848749], "HISM_Grass_Under_Large_B": [24.651614798889643, 34.79934409277889], "HISM_Grass_Under_Large_A": [22.10593062586047, 31.198874274235948]}
 EXPECTED_NPCS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54, "distance_cm": 7593.07}, {"x": 4241.23, "y": 6260.28, "z": 520.91, "yaw": 235.88, "distance_cm": 7561.69}, {"x": 6982.28, "y": -3337.22, "z": 718.2, "yaw": 154.45, "distance_cm": 7738.82}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1, "distance_cm": 7501.07}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52, "distance_cm": 7746.09}, {"x": -7393.56, "y": 1418.04, "z": 691.28, "yaw": 349.14, "distance_cm": 7528.32}, {"x": -4965.03, "y": -6019.83, "z": 662.55, "yaw": 50.48, "distance_cm": 7803.2}, {"x": -4315.67, "y": -6265.34, "z": 655.45, "yaw": 55.44, "distance_cm": 7607.86}, {"x": 4881.11, "y": -5744.38, "z": 560.93, "yaw": 130.36, "distance_cm": 7538.11}, {"x": 591.33, "y": -7709.05, "z": 636.5, "yaw": 94.39, "distance_cm": 7731.69}]""")
 EXPECTED_NPC_RUN_SPEED = 600.0
-EXPECTED_VARIANTS = json.loads(r"""[{"key": "Zombie", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Zombie", "mesh": "/Game/Sourced/Characters/SKM_Zombie01/SKM_Zombie01", "anim_bp": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Zombie"}, {"key": "Wendigo", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Wendigo", "mesh": "/Game/Sourced/Characters/SKM_Wendigo01/SKM_Wendigo01", "anim_bp": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Wendigo"}]""")
-# Per-instance gait multipliers -- see npc_placement.gait_scale_for_index.
-EXPECTED_NPC_GAITS = json.loads(r"""[1.0188854381999832, 0.9577708763999664, 1.0566563145999497, 0.9955417527999327, 0.934427190999916, 1.033312629199899, 0.9721980673998823, 1.0710835055998655, 1.0099689437998487, 0.9488543819998319]""")
+EXPECTED_VARIANTS = json.loads(r"""[{"key": "Zombie", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Zombie", "mesh": "/Game/Sourced/Characters/SKM_Zombie01/SKM_Zombie01", "anim_bp": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Zombie", "health": 100.0, "speed_scale": 1.0, "voices": ["/Game/Audio/A_ZombieGrowl_01", "/Game/Audio/A_ZombieGrowl_02", "/Game/Audio/A_ZombieGrowl_03"]}, {"key": "Wendigo", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Wendigo", "mesh": "/Game/Sourced/Characters/SKM_Wendigo01/SKM_Wendigo01", "anim_bp": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Wendigo", "health": 300.0, "speed_scale": 1.15, "voices": ["/Game/Audio/A_WendigoRoar_01", "/Game/Audio/A_WendigoRoar_02", "/Game/Audio/A_WendigoRoar_03"]}]""")
+# Per-instance {key, rate, speed} -- see
+# npc_placement.gait_scale_for_index and NpcVariant.speed_scale.
+EXPECTED_NPC_GAITS = json.loads(r"""[{"key": "Zombie", "rate": 1.0188854381999832, "speed": 611.33126291999}, {"key": "Zombie", "rate": 0.9577708763999664, "speed": 574.6625258399798}, {"key": "Zombie", "rate": 1.0566563145999497, "speed": 633.9937887599698}, {"key": "Zombie", "rate": 0.9955417527999327, "speed": 597.3250516799596}, {"key": "Wendigo", "rate": 1.0745912696499034, "speed": 644.754761789942}, {"key": "Zombie", "rate": 1.033312629199899, "speed": 619.9875775199395}, {"key": "Zombie", "rate": 0.9721980673998823, "speed": 583.3188404399294}, {"key": "Zombie", "rate": 1.0710835055998655, "speed": 642.6501033599193}, {"key": "Zombie", "rate": 1.0099689437998487, "speed": 605.9813662799093}, {"key": "Wendigo", "rate": 1.0911825392998065, "speed": 654.709523579884}]""")
 EXPECTED_MELEE_RANGE = 200.0
 EXPECTED_MELEE_DAMAGE = 10.0
 EXPECTED_MELEE_INTERVAL = 1.5
 EXPECTED_NAV_AGENT_RADIUS = 35.0
 EXPECTED_REACHABLE_EXTENT = (200.0, 200.0, 400.0)
 EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 10000.0, "center_z_cm": 1905.25, "half_z_cm": 2290.19, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 3995.44}""")
-LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
+LIGHTING = json.loads(r"""{"key": "day", "label": "Daytime \u2014 bright sun, blue sky, volumetric clouds", "sun": {"enabled": true, "label_suffix": "Sun", "intensity": 6.0, "color": [255, 248, 235], "pitch": -50.0, "yaw": -30.0, "cast_shadows": true}, "sky_light": {"intensity": 1.2, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Engine/EngineSky/M_SimpleSkyDome.M_SimpleSkyDome", "build_starfield": false}, "volumetric_cloud": {"enabled": true}, "fog": {"density": 0.02, "inscattering_color": [0.45, 0.55, 0.65], "enable_volumetric": true, "volumetric_extinction_scale": 1.0}, "post_process": {"auto_exposure_min_brightness": 0.03, "auto_exposure_max_brightness": 2.0, "auto_exposure_bias": 0.5}}""")
 
 passed = 0
 failed = 0
@@ -93,7 +94,7 @@ for a in actors:
                           "M_Forest_Ground_PBR" in mat.get_path_name(),
                           f"(got: {mat.get_path_name()})")
 
-# ── 3. Lighting & Sky Actors (time of day: Night — starry sky as the only light source, low luminosity) ──────────────
+# ── 3. Lighting & Sky Actors (time of day: Daytime — bright sun, blue sky, volumetric clouds) ──────────────
 sun_cfg = LIGHTING["sun"]
 sky_cfg = LIGHTING["sky_light"]
 dome_cfg = LIGHTING["sky_dome"]
@@ -333,6 +334,46 @@ if EXPECTED_NPCS:
               f"(clip on "
               f"{melee.get_editor_property('skeleton').get_name() if melee else None})")
 
+        # Its own run speed, on the pawn. The wendigo is meant to be
+        # 15% faster than the zombie and the only place that can be
+        # said is CharacterMovement's own default, so it is the only
+        # place worth checking.
+        want_speed = EXPECTED_NPC_RUN_SPEED * variant["speed_scale"]
+        got_speed = cdo.get_editor_property(
+            "character_movement").get_editor_property("max_walk_speed")
+        check(f"{variant['key']} Runs At Its Own Speed",
+              close(got_speed, want_speed, 0.5),
+              f"(wanted {want_speed:.0f} cm/s, got {got_speed:.0f})")
+
+        # Its own health and its own voice, both of which live on its
+        # AI controller -- MaxHealth is on an INHERITED component and
+        # Unreal keeps a child Blueprint's override of one somewhere
+        # Python cannot reach, so the controller applies it on
+        # possession instead. That indirection is exactly the sort of
+        # thing that silently stops working, hence the check.
+        ai = editor_asset_sub.load_asset(variant["ai_blueprint"])
+        ai_cdo = unreal.get_default_object(
+            unreal.BlueprintEditorLibrary.generated_class(ai)) if ai else None
+        voices = (list(ai_cdo.get_editor_property("Voices"))
+                  if ai_cdo else [])
+        hits = (list(ai_cdo.get_editor_property("HitSounds"))
+                if ai_cdo else [])
+        check(f"{variant['key']} Has Its Own Voice",
+              len(voices) == len(variant["voices"]) and len(voices) > 0,
+              f"(wanted {len(variant['voices'])} clips, got {len(voices)})")
+        check(f"{variant['key']} Has Melee Impact Sounds",
+              len(hits) > 0, f"(got {len(hits)})")
+
+        # Footsteps, on the wanderer as well as on the player.
+        foot = None
+        for handle in unreal.get_engine_subsystem(
+                unreal.SubobjectDataSubsystem).k2_gather_subobject_data_for_blueprint(bp):
+            obj = unreal.SubobjectDataBlueprintFunctionLibrary.get_object(
+                unreal.SubobjectDataBlueprintFunctionLibrary.get_data(handle))
+            if obj and "Footstep" in obj.get_name():
+                foot = obj
+        check(f"{variant['key']} Has Footsteps", foot is not None)
+
         if mesh_skel:
             seen_skeletons.setdefault(mesh_skel.get_name(), []).append(
                 variant["key"])
@@ -544,7 +585,7 @@ if EXPECTED_NPCS:
         # its animation rate must match its ground speed or its feet
         # skate.  A regression here is invisible in a screenshot and
         # obvious in motion, which is exactly why it is checked.
-        gaits, mismatched = [], []
+        gaits, mismatched, skating = [], [], []
         for i, actor in enumerate(npc_actors, start=1):
             want = EXPECTED_NPC_GAITS[i - 1]
             rate = actor.get_editor_property("mesh").get_editor_property(
@@ -552,16 +593,30 @@ if EXPECTED_NPCS:
             speed = actor.get_editor_property(
                 "character_movement").get_editor_property("max_walk_speed")
             gaits.append(round(rate, 4))
-            if not (close(rate, want, 0.001)
-                    and close(speed, EXPECTED_NPC_RUN_SPEED * want, 0.5)):
+            if not (close(rate, want["rate"], 0.001)
+                    and close(speed, want["speed"], 0.5)):
                 mismatched.append(
-                    f"NPC {i} rate {rate:.3f} speed {speed:.1f} "
-                    f"(wanted {want:.3f} / "
-                    f"{EXPECTED_NPC_RUN_SPEED * want:.1f})")
+                    f"NPC {i} ({want['key']}) rate {rate:.3f} "
+                    f"speed {speed:.1f} (wanted {want['rate']:.3f} / "
+                    f"{want['speed']:.1f})")
+            # The invariant behind both numbers, checked directly:
+            # ground covered per second divided by animation rate must
+            # be the speed the locomotion was authored at. If it is
+            # not, the feet skate -- and that is exactly the failure a
+            # per-creature speed multiplier introduces if the rate is
+            # left alone.
+            if rate > 1e-6 and not close(speed / rate,
+                                         EXPECTED_NPC_RUN_SPEED, 1.0):
+                skating.append(
+                    f"NPC {i} ({want['key']}) {speed:.0f} cm/s at "
+                    f"x{rate:.3f} = {speed / rate:.0f} cm/s of stride")
         check("NPC Gaits Are Staggered", len(set(gaits)) == len(gaits),
               f"(rates {sorted(gaits)} -- duplicates march in lockstep)")
         check("NPC Anim Rate Matches Ground Speed", not mismatched,
               "; ".join(mismatched))
+        check("NPC Strides Stay Planted", not skating,
+              "; ".join(skating) +
+              f" (stride speed must be {EXPECTED_NPC_RUN_SPEED:.0f})")
 
         # Every NPC must stand inside the volume or it has no navmesh.
         outside = []

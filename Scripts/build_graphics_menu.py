@@ -199,6 +199,50 @@ COL_KILL = "(R=0.960000,G=0.860000,B=0.450000,A=0.950000)"
 # R, not Enter or Space: Enter opens the editor console in PIE and Space is the
 # jump key, which is still bound while the pawn stands dead.
 RESTART_KEY = "R"
+# ── The main menu ────────────────────────────────────────────────────────────
+#
+# Shown the moment the level loads, with the game PAUSED, and replaced by the
+# HUD when the player starts. Nothing about it is a new mechanism: it is the
+# death menu's shape, and it works for the same reason -- it is drawn AND
+# polled inside ReceiveDrawHUD rather than on Tick, because Event Tick does not
+# run while the game is paused but PostRender is called by the renderer every
+# frame regardless, and APlayerController sets bTickEvenWhenPaused so its
+# PlayerInput is still updated. A key polled on Tick here would simply never be
+# seen. (That is not a guess -- it is why the death menu's [R] is where it is.)
+#
+# Three keys accept, rather than one. Enter is the conventional one, Space is
+# what a player's hand is already near, and the left mouse button is there
+# because "press New Game" is what was asked for and a button you cannot click
+# is a strange button. There is no cursor and no hit test: with exactly one
+# option on the panel, "click" and "click the button" are the same gesture, and
+# a hit test would only add a way for the menu to refuse to start the game.
+START_KEYS = ("Enter", "SpaceBar", "LeftMouseButton")
+MENU_PANEL = (600.0, 346.0)
+GAME_TITLE = "OTHERWORLD"
+GAME_SUBTITLE = "a night in the forest"
+START_LABEL = "NEW GAME"
+START_BUTTON = (300.0, 64.0)
+MAIN_TITLE_SCALE = 3.4
+MAIN_SUB_SCALE = 1.4
+MAIN_START_SCALE = 2.2
+MAIN_HINT_SCALE = 1.2
+COL_MAIN_TITLE = "(R=0.920000,G=0.945000,B=1.000000,A=1.000000)"
+COL_MAIN_SUB = "(R=0.520000,G=0.560000,B=0.630000,A=1.000000)"
+COL_MAIN_START = "(R=1.000000,G=0.870000,B=0.450000,A=1.000000)"
+COL_MAIN_HINT = "(R=0.560000,G=0.590000,B=0.650000,A=1.000000)"
+GAME_STARTED_VAR = "GameStarted"
+
+# The one way past the menu that is not a keypress. A headless -game run has
+# nobody to press Enter, so without this every automated run would sit on the
+# title screen forever and the whole harness would go quiet -- which is a worse
+# outcome than the menu, because a silent test looks like a passing one.
+#
+# A command-line switch rather than a console variable: it has to be read at
+# BeginPlay, before anything could have executed a console command, and
+# GetCommandLine is the only thing available that early. Scripts/dev/uepy.py
+# passes it on every --game run.
+SKIP_MENU_SWITCH = "-nomenu"
+
 DEATH_PANEL = (560.0, 300.0)      # width, height; centred on the viewport
 COL_DEATH_PANEL = "(R=0.040000,G=0.010000,B=0.012000,A=0.880000)"
 COL_DEATH_TITLE = "(R=0.880000,G=0.220000,B=0.180000,A=1.000000)"
@@ -239,19 +283,36 @@ PLAYER_DEAD_VAR = "PlayerDead"
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
 INVENTORY_SIZE = 5
-SLOT_W = 104.0
-SLOT_H = 68.0
+SLOT_W = 120.0
+SLOT_H = 84.0
 SLOT_GAP = 10.0
 SLOT_BOTTOM = 46.0         # pixels between the strip and the bottom edge
-SLOT_NAME_SCALE = 1.3
-SLOT_MARK_H = 5.0          # the equipped slot's underline
+
+# The equipped weapon's name, drawn ONCE above the strip rather than five times
+# inside it.
+#
+# It used to be a label in every slot, at 1.3x, sharing a 104 px row with the
+# ammunition count. That was the wrong trade twice over: four of the five names
+# on screen name a weapon the player is not holding, and the one that matters
+# was the same size as the four that do not. Above the strip it can be big
+# enough to read at a glance, and taking it out of the slot is what leaves room
+# for an ammunition count that can also be read at a glance.
+EQUIPPED_NAME_SCALE = 1.7
+EQUIPPED_NAME_ABOVE = 12.0   # px between the strip's top edge and the baseline
+COL_EQUIPPED_NAME = "(R=1.000000,G=0.870000,B=0.450000,A=1.000000)"
 # The ammunition readout, in the slot's own top-right corner: "3 / 15" is
 # rounds in the magazine and rounds in reserve.  Drawn only for weapons whose
 # UsesAmmo is true, so the pistol's slot stays empty rather than claiming an
 # infinity nobody has to manage.
-SLOT_AMMO_SCALE = 1.2
-SLOT_AMMO_RIGHT = 8.0      # px from the slot's right edge to the text's left
-SLOT_AMMO_TOP = 6.0
+# Bigger, and moved off the icon. At 1.2x in the top-right corner the count was
+# drawn ON TOP of the silhouette, which is both hard to read and the reason the
+# silhouette looked cluttered. It now has the slot's lower row to itself, and
+# is right-aligned from a real measurement (HUD::GetTextSize) rather than from
+# a guessed character width -- "5/15" and "30/90" are different widths and a
+# fixed offset cannot be right for both.
+SLOT_AMMO_SCALE = 1.7
+SLOT_AMMO_RIGHT = 9.0      # px from the slot's right edge to the text's RIGHT
+SLOT_AMMO_BASELINE = 54.0  # px down from the slot's top edge
 COL_SLOT_AMMO = "(R=0.960000,G=0.860000,B=0.450000,A=0.950000)"
 COL_SLOT_BACK = "(R=0.020000,G=0.025000,B=0.035000,A=0.700000)"
 COL_SLOT_NAME = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
@@ -301,6 +362,13 @@ FN_PROJECT = "/Script/Engine.HUD.Project"
 FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
 FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
+# How wide a string will be drawn. A HUD method, so its self pin is this HUD;
+# it must be given the same Font and Scale as the DrawText it is measuring for,
+# or it measures a different string from the one that appears.
+FN_TEXT_SIZE = "/Script/Engine.HUD.GetTextSize"
+FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
+FN_COMMAND_LINE = "/Script/Engine.KismetSystemLibrary.GetCommandLine"
+FN_CONTAINS = "/Script/Engine.KismetStringLibrary.Contains"
 FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
 FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
@@ -460,19 +528,25 @@ UI_FONT = "/Engine/EngineFonts/Roboto.Roboto"
 UI_TEX_SIZE = {
     "T_UI_Panel": (600, 346),
     "T_UI_PanelDeath": (560, 300),
-    "T_UI_Slot": (104, 68),
-    "T_UI_SlotActive": (104, 68),
-    "T_UI_SlotFrame": (104, 68),
+    "T_UI_Slot": (120, 84),
+    "T_UI_SlotActive": (120, 84),
+    "T_UI_SlotFrame": (120, 84),
     "T_UI_Bar": (240, 32),
     "T_UI_BarTrack": (240, 32),
 }
 ICON_TEX_SIZE = (128, 64)
 
-# The weapon icon inside its slot: full width less a margin, on the upper line
-# so the name has the lower one.
-SLOT_ICON_W = 88.0
-SLOT_ICON_H = 44.0
-SLOT_ICON_TOP = 2.0
+# The weapon icon inside its slot: nearly the full width, on the upper line so
+# the ammunition count has the lower one.
+#
+# 112 x 50, up from 88 x 44. That is not a tweak -- the icons were reported as
+# unreadable ("lots of small dots"), and while the drawings themselves were
+# redrawn for it (see build_ui_art.py) the other half of the fix is simply
+# giving them more pixels. A weapon silhouette at 88 px wide has about 40 px of
+# usable length once the margins are off it, and no silhouette survives that.
+SLOT_ICON_W = 112.0
+SLOT_ICON_H = 50.0
+SLOT_ICON_TOP = 3.0
 
 
 def _at(node, x, y):
@@ -518,6 +592,9 @@ def _ensure_variables(ed, bp):
                                 # This frame's copy of the GameMode's
                                 # DebugMode.  Taken once at the top of DrawHUD.
                                 ("DebugOn", "bool", "false"),
+                                # False until the player picks NEW GAME.
+                                # BeginPlay pauses the world alongside it.
+                                (GAME_STARTED_VAR, "bool", "false"),
                                 ("Quality", "int", str(DEFAULT_PRESET))):
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind),
@@ -612,11 +689,55 @@ def _author_begin_play(ed, begin_play):
         "while the engine ran at whatever scalability it happened to boot with.",
         made)
 
+    # --- open paused, on the menu -------------------------------------------
+    # Before the FPS readout and after the preset, so a preset that fails to
+    # apply still fails loudly rather than behind a paused world.
+    #
+    # Pausing is what makes the menu a menu. Without it the level is live
+    # behind the panel: ten wanderers spawn, start running at a player who
+    # cannot move, and are on top of them by the time the title is read.
+    # GetCommandLine is IMPURE -- it has an Exec pin -- so it has to sit in the
+    # chain. Left hanging off it the compiler prunes the node and the Contains
+    # below silently reads an empty string, which means the switch would never
+    # be seen and every headless run would sit on the menu. It warns, loudly,
+    # and verify_graphics_menu fails on node warnings for exactly this reason.
+    cmdline = _at(_node(ed, FN_COMMAND_LINE), origin.x + 320, origin.y + 720)
+    skipping = _at(_node(ed, FN_CONTAINS), origin.x + 560, origin.y + 720)
+    _connect(_pin(cmdline, "ReturnValue", is_input=False), _pin(skipping, "SearchIn"))
+    _set(skipping, "Substring", SKIP_MENU_SWITCH)
+    wants_menu = _at(_node(ed, FN_NOT), origin.x + 800, origin.y + 720)
+    _connect(_pin(skipping, "ReturnValue", is_input=False), _pin(wants_menu, "A"))
+    shown = _at(ed.add_branch_node(), origin.x + 800, origin.y + 480)
+    _connect(_pin(wants_menu, "ReturnValue", is_input=False), _pin(shown, "Condition"))
+    _connect(BEL.find_then_pin(made[-1]), _pin(cmdline, "execute"))
+    _connect(BEL.find_then_pin(cmdline), _pin(shown, "execute"))
+
+    hold = _at(_node(ed, FN_SET_PAUSED), origin.x + 1060, origin.y + 400)
+    _set(hold, "bPaused", "true")
+    _connect(BEL.find_then_pin(shown), _pin(hold, "execute"))
+
+    # Straight into the game, for a run with nobody to press Enter.
+    skip = _at(ed.add_set_member_variable_node(GAME_STARTED_VAR),
+               origin.x + 1060, origin.y + 640)
+    _set(skip, GAME_STARTED_VAR, "true")
+    _connect(BEL.find_else_pin(shown), _pin(skip, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"Open paused and on the main menu. {GAME_STARTED_VAR} defaults to "
+        f"false, so ReceiveDrawHUD draws the title panel instead of the HUD "
+        f"until the player starts -- see _author_main_menu. Pausing is what "
+        f"makes it a menu rather than a picture: unpaused, ten wanderers are "
+        f"already running at a player who cannot move. "
+        f"{SKIP_MENU_SWITCH} on the command line skips both, which is how the "
+        f"headless runs still test a game rather than a title screen.",
+        [cmdline, skipping, wants_menu, shown, hold, skip])
+
     # ...and then turn the engine's own FPS display on.  It is last in the chain
     # so that a failure to apply the preset cannot be hidden behind it.
     fps = _at(_node(ed, FN_CONSOLE), origin.x + 320, origin.y + 240)
     _set(fps, "Command", FPS_COMMAND)
-    _connect(BEL.find_then_pin(made[-1]), _pin(fps, "execute"))
+    for tail in (BEL.find_then_pin(hold), BEL.find_then_pin(skip)):
+        _connect(tail, _pin(fps, "execute"))
     ed.add_comment_to_nodes(
         f"{FPS_COMMAND!r} -- UE's built-in frame-rate readout, which draws "
         "itself in the top-right corner. Nothing on this HUD's canvas is "
@@ -1232,6 +1353,25 @@ def _author_inventory(ed, x0, y0, in_execs):
                x0 + 3700, y0 + 900)
     _connect(item, _pin(icon, "self"))
 
+    # --- is this the equipped slot? -----------------------------------------
+    # Computed before anything in the slot is drawn, because the answer now
+    # changes the BACKGROUND as well as the border. A lit edge over a dark slot
+    # was reported as not reading at all; a lit slot with a lit edge is a
+    # different shape from its neighbours, not a brighter outline on the same
+    # one.
+    is_equipped = _at(_node(ed, FN_EQ_II), x0 + 3940, y0 + 1040)
+    _connect(index, _pin(is_equipped, "A"))
+    _connect(_pin(equipped, "EquippedIndex", is_input=False), _pin(is_equipped, "B"))
+    lit = _at(ed.add_branch_node(), x0 + 4180, y0 - 300)
+    _connect(_pin(is_equipped, "ReturnValue", is_input=False), _pin(lit, "Condition"))
+    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(lit, "execute"))
+
+    back = _draw_texture(ed, x0 + 4420, y0 - 300, "T_UI_SlotActive",
+                         w=SLOT_W, h=SLOT_H)
+    _connect(at_x_out, _pin(back, "ScreenX"))
+    _connect(y_out, _pin(back, "ScreenY"))
+    _connect(BEL.find_then_pin(lit), _pin(back, "execute"))
+
     icon_x = _at(_node(ed, FN_ADD), x0 + 4180, y0 + 660)
     _connect(at_x_out, _pin(icon_x, "A"))
     _set(icon_x, "B", (SLOT_W - SLOT_ICON_W) / 2.0)
@@ -1250,24 +1390,8 @@ def _author_inventory(ed, x0, y0, in_execs):
     _set(fill, "TextureVHeight", float(ICON_TEX_SIZE[1]))
     _connect(_pin(icon_x, "ReturnValue", is_input=False), _pin(fill, "ScreenX"))
     _connect(_pin(icon_y, "ReturnValue", is_input=False), _pin(fill, "ScreenY"))
-    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(fill, "execute"))
-
-    label_x = _at(_node(ed, FN_ADD), x0 + 4420, y0 + 520)
-    _connect(at_x_out, _pin(label_x, "A"))
-    _set(label_x, "B", 8.0)
-    label_y = _at(_node(ed, FN_ADD), x0 + 4420, y0 + 640)
-    _connect(y_out, _pin(label_y, "A"))
-    _set(label_y, "B", SLOT_H - 24.0)
-
-    label = _at(_node(ed, FN_DRAW_TEXT), x0 + 4680, y0)
-    _connect(_pin(name, "DisplayName", is_input=False), _pin(label, "Text"))
-    _set(label, "TextColor", COL_SLOT_NAME)
-    _set(label, "Scale", SLOT_NAME_SCALE)
-    _set(label, "bScalePosition", "false")
-    _set(label, "Font", UI_FONT)
-    _connect(_pin(label_x, "ReturnValue", is_input=False), _pin(label, "ScreenX"))
-    _connect(_pin(label_y, "ReturnValue", is_input=False), _pin(label, "ScreenY"))
-    _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
+    _connect(BEL.find_then_pin(back), _pin(fill, "execute"))
+    _connect(BEL.find_else_pin(lit), _pin(fill, "execute"))
 
     # --- how much ammunition this weapon has --------------------------------
     # Read off the item, like SlotColor and DisplayName, so the strip stays a
@@ -1277,7 +1401,7 @@ def _author_inventory(ed, x0, y0, in_execs):
     _connect(item, _pin(uses, "self"))
     counted = _at(ed.add_branch_node(), x0 + 4940, y0 + 900)
     _connect(_pin(uses, "UsesAmmo", is_input=False), _pin(counted, "Condition"))
-    _connect(BEL.find_then_pin(label), _pin(counted, "execute"))
+    _connect(BEL.find_then_pin(fill), _pin(counted, "execute"))
 
     in_gun = _at(ed.add_get_member_variable_node("Loaded", ITEM_CLASS_PATH),
                  x0 + 4680, y0 + 780)
@@ -1296,12 +1420,23 @@ def _author_inventory(ed, x0, y0, in_execs):
     _connect(_pin(in_gun_s, "ReturnValue", is_input=False), _pin(ammo_str, "A"))
     _connect(_pin(sep, "ReturnValue", is_input=False), _pin(ammo_str, "B"))
 
-    ammo_x = _at(_node(ed, FN_ADD), x0 + 5180, y0 + 660)
-    _connect(at_x_out, _pin(ammo_x, "A"))
-    _set(ammo_x, "B", SLOT_W - SLOT_AMMO_RIGHT - 46.0)
+    # Right-aligned, from the width the font actually reports. GetTextSize is
+    # a HUD method, so "self" is this HUD -- and it has to be given the same
+    # Font and Scale the DrawText below uses or it measures a different string.
+    measure = _at(_node(ed, FN_TEXT_SIZE), x0 + 5420, y0 + 1080)
+    _connect(_pin(ammo_str, "ReturnValue", is_input=False), _pin(measure, "Text"))
+    _set(measure, "Font", UI_FONT)
+    _set(measure, "Scale", SLOT_AMMO_SCALE)
+
+    ammo_right = _at(_node(ed, FN_ADD), x0 + 5180, y0 + 660)
+    _connect(at_x_out, _pin(ammo_right, "A"))
+    _set(ammo_right, "B", SLOT_W - SLOT_AMMO_RIGHT)
+    ammo_x = _at(_node(ed, FN_SUB), x0 + 5660, y0 + 660)
+    _connect(_pin(ammo_right, "ReturnValue", is_input=False), _pin(ammo_x, "A"))
+    _connect(_pin(measure, "OutWidth", is_input=False), _pin(ammo_x, "B"))
     ammo_y = _at(_node(ed, FN_ADD), x0 + 5180, y0 + 780)
     _connect(y_out, _pin(ammo_y, "A"))
-    _set(ammo_y, "B", SLOT_AMMO_TOP)
+    _set(ammo_y, "B", SLOT_AMMO_BASELINE)
 
     ammo = _at(_node(ed, FN_DRAW_TEXT), x0 + 5680, y0 + 640)
     _connect(_pin(ammo_str, "ReturnValue", is_input=False), _pin(ammo, "Text"))
@@ -1313,10 +1448,7 @@ def _author_inventory(ed, x0, y0, in_execs):
     _connect(_pin(ammo_y, "ReturnValue", is_input=False), _pin(ammo, "ScreenY"))
     _connect(BEL.find_then_pin(counted), _pin(ammo, "execute"))
 
-    # --- the equipped slot gets an underline --------------------------------
-    is_equipped = _at(_node(ed, FN_EQ_II), x0 + 4680, y0 + 520)
-    _connect(index, _pin(is_equipped, "A"))
-    _connect(_pin(equipped, "EquippedIndex", is_input=False), _pin(is_equipped, "B"))
+    # --- the equipped slot gets its frame and its name ----------------------
     marked = _at(ed.add_branch_node(), x0 + 5940, y0)
     _connect(_pin(is_equipped, "ReturnValue", is_input=False), _pin(marked, "Condition"))
     # Both arms of the ammunition branch carry on: a pistol still gets its
@@ -1333,17 +1465,50 @@ def _author_inventory(ed, x0, y0, in_execs):
     _connect(y_out, _pin(mark, "ScreenY"))
     _connect(BEL.find_then_pin(marked), _pin(mark, "execute"))
 
+    # And its name, once, centred over the whole strip. Centred from a real
+    # measurement for the same reason the ammunition count is right-aligned
+    # from one: "SMG" and "Shotgun" are not the same width.
+    name_size = _at(_node(ed, FN_TEXT_SIZE), x0 + 6200, y0 + 900)
+    _connect(_pin(name, "DisplayName", is_input=False), _pin(name_size, "Text"))
+    _set(name_size, "Font", UI_FONT)
+    _set(name_size, "Scale", EQUIPPED_NAME_SCALE)
+    half_name = _at(_node(ed, FN_MUL), x0 + 6440, y0 + 900)
+    _connect(_pin(name_size, "OutWidth", is_input=False), _pin(half_name, "A"))
+    _set(half_name, "B", 0.5)
+    mid = _at(_node(ed, FN_MUL), x0 + 6440, y0 + 1040)
+    _connect(_pin(wh, "X", is_input=False), _pin(mid, "A"))
+    _set(mid, "B", 0.5)
+    name_x = _at(_node(ed, FN_SUB), x0 + 6680, y0 + 900)
+    _connect(_pin(mid, "ReturnValue", is_input=False), _pin(name_x, "A"))
+    _connect(_pin(half_name, "ReturnValue", is_input=False), _pin(name_x, "B"))
+    name_y = _at(_node(ed, FN_SUB), x0 + 6680, y0 + 1040)
+    _connect(y_out, _pin(name_y, "A"))
+    _set(name_y, "B", EQUIPPED_NAME_ABOVE + 20.0)
+
+    who = _at(_node(ed, FN_DRAW_TEXT), x0 + 6940, y0)
+    _connect(_pin(name, "DisplayName", is_input=False), _pin(who, "Text"))
+    _set(who, "TextColor", COL_EQUIPPED_NAME)
+    _set(who, "Scale", EQUIPPED_NAME_SCALE)
+    _set(who, "bScalePosition", "false")
+    _set(who, "Font", UI_FONT)
+    _connect(_pin(name_x, "ReturnValue", is_input=False), _pin(who, "ScreenX"))
+    _connect(_pin(name_y, "ReturnValue", is_input=False), _pin(who, "ScreenY"))
+    _connect(BEL.find_then_pin(mark), _pin(who, "execute"))
+
     ed.add_comment_to_nodes(
-        "Each carried weapon paints its own SlotColor and DisplayName into its "
-        "slot, its rounds-in-gun / rounds-in-reserve if it uses ammunition at "
-        "all, and the equipped one gets the underline. Reading the weapon's "
-        "own properties means the HUD needs no table of weapon names to keep "
-        "in step with BP_Shotgun and BP_Pistol -- and no idea which of them is "
-        "the one with a magazine.",
+        "Each carried weapon paints its own silhouette into its slot, tinted "
+        "with its own SlotColor, and its rounds-in-gun / rounds-in-reserve "
+        "right-aligned underneath if it uses ammunition at all. The equipped "
+        "one gets three things rather than one -- a lit background, a lit "
+        "frame over the icon, and its name centred above the strip -- because "
+        "a lit edge alone was reported as not reading. Everything is off the "
+        "weapon's own properties, so the HUD needs no table of weapon names "
+        "and no idea which of them is the one with a magazine.",
         [pawn, comp, cast, inv, equipped, loop, as_float, step, at_x, colour,
-         name, fill, label_x, label_y, label, uses, counted, in_gun, in_bag,
+         name, fill, uses, counted, in_gun, in_bag,
          in_gun_s, in_bag_s, sep, ammo_str, ammo_x, ammo_y, ammo,
-         is_equipped, marked, icon, icon_x, icon_y, mark])
+         is_equipped, marked, icon, icon_x, icon_y, mark, lit, back,
+         measure, ammo_right, name_size, half_name, mid, name_x, name_y, who])
 
     # A pawn with no weapon component still has to reach the menu below.
     return (_loose_pin(loop, "Completed", is_input=False),
@@ -1469,6 +1634,160 @@ def _author_reticle(ed, x0, y0, in_execs):
 
 
 # ─── Event ReceiveDrawHUD: the panel ─────────────────────────────────────────
+
+def _author_main_menu(ed, x0, y0, in_execs):
+    """The menu the game opens on, and the one thing that leaves it.
+
+    Returns ``(exec_pins_when_already_started,)`` -- the path the rest of the
+    HUD hangs off. Nothing below this point draws until the player has started,
+    which is the point: a reticle and a health bar over a title screen read as
+    a game that is already being played.
+
+    See START_KEYS for why this is polled here and not on Event Tick.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    started = keep(_at(ed.add_get_member_variable_node(GAME_STARTED_VAR),
+                       x0, y0 + 240))
+    playing = keep(_at(ed.add_branch_node(), x0 + 260, y0))
+    _connect(_pin(started, GAME_STARTED_VAR, is_input=False), _pin(playing, "Condition"))
+    for e in in_execs:
+        _connect(e, _pin(playing, "execute"))
+
+    size = keep(_at(_node(ed, FN_VIEWPORT), x0 + 260, y0 + 420))
+    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 500, y0 + 420))
+    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
+
+    def centred(axis, span, py):
+        half = keep(_at(_node(ed, FN_MUL), x0 + 740, py))
+        _connect(_loose_pin(wh, axis, is_input=False), _pin(half, "A"))
+        _set(half, "B", 0.5)
+        off = keep(_at(_node(ed, FN_SUB), x0 + 980, py))
+        _connect(_pin(half, "ReturnValue", is_input=False), _pin(off, "A"))
+        _set(off, "B", span)
+        return _pin(off, "ReturnValue", is_input=False)
+
+    panel_x = centred("X", MENU_PANEL[0] / 2.0, y0 + 420)
+    panel_y = centred("Y", MENU_PANEL[1] / 2.0, y0 + 560)
+
+    panel = keep(_draw_texture(ed, x0 + 1240, y0, "T_UI_Panel",
+                               w=MENU_PANEL[0], h=MENU_PANEL[1]))
+    _connect(panel_x, _pin(panel, "ScreenX"))
+    _connect(panel_y, _pin(panel, "ScreenY"))
+    _connect(BEL.find_else_pin(playing), _pin(panel, "execute"))
+
+    # The button plate, so NEW GAME reads as something you press rather than as
+    # a third line of text. T_UI_SlotActive stretched: it is already the lit,
+    # amber-edged surface the inventory strip uses for "this is the one", which
+    # is the same thing being said here.
+    button_x = keep(_at(_node(ed, FN_ADD), x0 + 1240, y0 + 700))
+    _connect(panel_x, _pin(button_x, "A"))
+    _set(button_x, "B", (MENU_PANEL[0] - START_BUTTON[0]) / 2.0)
+    button_y = keep(_at(_node(ed, FN_ADD), x0 + 1240, y0 + 820))
+    _connect(panel_y, _pin(button_y, "A"))
+    _set(button_y, "B", 176.0)
+    button = keep(_draw_texture(ed, x0 + 1500, y0, "T_UI_SlotActive",
+                                w=START_BUTTON[0], h=START_BUTTON[1]))
+    _connect(_pin(button_x, "ReturnValue", is_input=False), _pin(button, "ScreenX"))
+    _connect(_pin(button_y, "ReturnValue", is_input=False), _pin(button, "ScreenY"))
+    _connect(BEL.find_then_pin(panel), _pin(button, "execute"))
+
+    flow = BEL.find_then_pin(button)
+    column = 0
+
+    def line(text, y_off, scale, color, px):
+        """One centred line, measured rather than guessed.
+
+        GetTextSize with the SAME font and scale the draw uses -- a fixed x
+        offset per string is a guess at Roboto's advance widths that is wrong
+        by a different amount for every line, and the miscentring shows most on
+        exactly the biggest one.
+        """
+        nonlocal flow, column
+        column += 1
+        py = y0 + 900 + column * 200
+        m = keep(_at(_node(ed, FN_TEXT_SIZE), px, py))
+        _set(m, "Text", text)
+        _set(m, "Font", UI_FONT)
+        _set(m, "Scale", scale)
+        half = keep(_at(_node(ed, FN_MUL), px + 240, py))
+        _connect(_pin(m, "OutWidth", is_input=False), _pin(half, "A"))
+        _set(half, "B", 0.5)
+        mid = keep(_at(_node(ed, FN_MUL), px + 240, py + 120))
+        _connect(_loose_pin(wh, "X", is_input=False), _pin(mid, "A"))
+        _set(mid, "B", 0.5)
+        at_x = keep(_at(_node(ed, FN_SUB), px + 480, py))
+        _connect(_pin(mid, "ReturnValue", is_input=False), _pin(at_x, "A"))
+        _connect(_pin(half, "ReturnValue", is_input=False), _pin(at_x, "B"))
+        at_y = keep(_at(_node(ed, FN_ADD), px + 480, py + 120))
+        _connect(panel_y, _pin(at_y, "A"))
+        _set(at_y, "B", y_off)
+
+        n = keep(_at(_node(ed, FN_DRAW_TEXT), px + 720, y0))
+        _set(n, "Text", text)
+        _set(n, "TextColor", color)
+        _set(n, "Scale", scale)
+        _set(n, "bScalePosition", "false")
+        _set(n, "Font", UI_FONT)
+        _connect(_pin(at_x, "ReturnValue", is_input=False), _pin(n, "ScreenX"))
+        _connect(_pin(at_y, "ReturnValue", is_input=False), _pin(n, "ScreenY"))
+        _connect(flow, _pin(n, "execute"))
+        flow = BEL.find_then_pin(n)
+        return n
+
+    line(GAME_TITLE, 56.0, MAIN_TITLE_SCALE, COL_MAIN_TITLE, x0 + 1760)
+    line(GAME_SUBTITLE, 124.0, MAIN_SUB_SCALE, COL_MAIN_SUB, x0 + 2600)
+    line(START_LABEL, 192.0, MAIN_START_SCALE, COL_MAIN_START, x0 + 3440)
+    line("press  ENTER  ·  SPACE  ·  or click", 270.0, MAIN_HINT_SCALE,
+         COL_MAIN_HINT, x0 + 4280)
+
+    # --- starting ------------------------------------------------------------
+    pc = keep(_at(_node(ed, FN_GET_OWNING_PC), x0 + 5120, y0 + 400))
+    pc_out = _pin(pc, "ReturnValue", is_input=False)
+    any_key = None
+    for i, key in enumerate(START_KEYS):
+        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 5360, y0 + 400 + i * 140))
+        _connect(pc_out, _pin(was, "self"))
+        _set(was, "Key", key)
+        got = _pin(was, "ReturnValue", is_input=False)
+        if any_key is None:
+            any_key = got
+        else:
+            either = keep(_at(_node(ed, FN_OR), x0 + 5600, y0 + 400 + i * 140))
+            _connect(any_key, _pin(either, "A"))
+            _connect(got, _pin(either, "B"))
+            any_key = _pin(either, "ReturnValue", is_input=False)
+
+    go = keep(_at(ed.add_branch_node(), x0 + 5860, y0))
+    _connect(any_key, _pin(go, "Condition"))
+    _connect(flow, _pin(go, "execute"))
+
+    mark = keep(_at(ed.add_set_member_variable_node(GAME_STARTED_VAR),
+                    x0 + 6120, y0))
+    _set(mark, GAME_STARTED_VAR, "true")
+    _connect(BEL.find_then_pin(go), _pin(mark, "execute"))
+
+    # Unpause LAST. Setting GameStarted first means the very next frame draws
+    # the HUD rather than the menu, so there is no frame where the world is
+    # running behind a title screen.
+    resume = keep(_at(_node(ed, FN_SET_PAUSED), x0 + 6380, y0))
+    _set(resume, "bPaused", "false")
+    _connect(BEL.find_then_pin(mark), _pin(resume, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"The main menu. Drawn instead of the HUD while {GAME_STARTED_VAR} is "
+        f"false, which BeginPlay sets it to along with pausing the world, so "
+        f"the wanderers are not already running at the player behind the title. "
+        f"{' / '.join(START_KEYS)} starts, and it is polled HERE rather than on "
+        f"Event Tick because Tick does not run while the game is paused -- the "
+        f"same reason the death menu's restart key lives in DrawHUD.",
+        made)
+    return (BEL.find_then_pin(playing),)
+
 
 def _author_death_menu(ed, x0, y0, in_execs, mode_out):
     """What is on screen once the player is dead and the game is paused.
@@ -1631,13 +1950,20 @@ def _author_draw(ed, x0, y0):
     _set(no_dbg, "DebugOn", "false")
     _connect(_pin(as_mode, "CastFailed", is_input=False), _pin(no_dbg, "execute"))
 
+    # The main menu, before anything else is drawn and before the dead/alive
+    # test: a title screen is neither.
+    playing = _author_main_menu(ed, x0 + 3000, y0 + 6000,
+                                (BEL.find_then_pin(copy_dbg),
+                                 BEL.find_then_pin(no_dbg)))
+
     alive = _at(ed.add_branch_node(), x0 + 60, y0)
     dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
                                                    GAME_MODE_CLASS_PATH),
                    x0 - 440, y0 + 240)
     _connect(mode_out, _pin(dead_get, "self"))
     _connect(_pin(dead_get, PLAYER_DEAD_VAR, is_input=False), _pin(alive, "Condition"))
-    _connect(BEL.find_then_pin(copy_dbg), _pin(alive, "execute"))
+    for e in playing:
+        _connect(e, _pin(alive, "execute"))
 
     _author_death_menu(ed, x0 + 3000, y0 + 3000,
                        (BEL.find_then_pin(alive),), mode_out)
@@ -1645,7 +1971,7 @@ def _author_draw(ed, x0, y0):
     # A GameMode that is not BP_ThirdPersonGameMode cannot say whether the
     # player is dead, so it is treated as alive and the HUD draws as normal --
     # a missing death menu is recoverable, a missing HUD is not.
-    living = (BEL.find_else_pin(alive), BEL.find_then_pin(no_dbg))
+    living = (BEL.find_else_pin(alive),)
 
     # HP first, so it is on screen whether or not the menu is open.
     after_hp = _author_hp(ed, x0, y0 - 900, living)

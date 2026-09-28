@@ -193,11 +193,28 @@ def bar_fill(w, h, colour):
 # ── Weapon silhouettes ──────────────────────────────────────────────────────
 #
 # Side profiles facing right, drawn white on transparent so the HUD can tint
-# them per weapon.  They are silhouettes, not illustrations: at 84x42 on screen
+# them per weapon.  They are silhouettes, not illustrations: at 112x50 on screen
 # the only thing that survives is the outline, and the five have to be
 # distinguishable from each other at a glance while the player is being chased.
-# So each leans on its one unmistakable feature -- the shotgun's pump, the
-# SMG's vertical magazine, the sniper's scope.
+#
+# The first pass got that wrong and it is worth recording how: each weapon was
+# given its identifying feature, but as DETAIL -- a pump 8 units deep, a 6-unit
+# scope, a front sight post 6 x 9.  Reduced to slot size those land on two or
+# three pixels each, and two or three pixels of a 50-pixel icon is noise.  The
+# player reported "lots of small dots", which is exactly what a 3px feature
+# antialiased down to a HUD looks like.
+#
+# So the rule now is that the distinguishing feature is not a detail but the
+# BULK, and the five differ in where their bulk sits:
+#
+#     Pistol    small, and nothing else in the set is
+#     Shotgun   two full-length horizontal tubes with daylight between them
+#     SMG       a magazine dropping below the body -- a T
+#     Rifle     a raked magazine, the only slanted mass here
+#     Sniper    a scope, the only mass ABOVE the barrel
+#
+# Every one of those survives being shrunk, because shrinking a big shape
+# leaves a smaller big shape.
 
 ICON_W, ICON_H = 128, 64
 
@@ -219,7 +236,7 @@ def _guard(d, x0, y0, x1, y1):
     """A trigger guard, as a half-loop hanging off the receiver."""
     s = SUPERSAMPLE
     d.arc((x0 * s, y0 * s, x1 * s, y1 * s), 0, 180,
-          fill=(255, 255, 255, 255), width=3 * s)
+          fill=(255, 255, 255, 255), width=4 * s)
 
 
 # How long each weapon reads relative to the longest. Applied as a scale after
@@ -227,7 +244,7 @@ def _guard(d, x0, y0, x1, y1):
 # the canvas: a pistol that fills the slot as completely as a sniper rifle
 # tells the player the wrong thing about it.
 ICON_RELATIVE_LENGTH = {
-    "Pistol": 0.60, "SMG": 0.76, "Shotgun": 0.94, "Rifle": 1.00, "Sniper": 1.00,
+    "Pistol": 0.55, "SMG": 0.72, "Shotgun": 0.96, "Rifle": 1.00, "Sniper": 1.00,
 }
 
 
@@ -244,10 +261,10 @@ def _icon(builder, relative=1.0):
     box = img.getbbox()
     if box:
         img = img.crop(box)
-    target_w = max(1, round(ICON_W * SUPERSAMPLE * 0.94 * relative))
+    target_w = max(1, round(ICON_W * SUPERSAMPLE * 0.98 * relative))
     scale = target_w / img.width
     target_h = max(1, round(img.height * scale))
-    limit = round(ICON_H * SUPERSAMPLE * 0.94)
+    limit = round(ICON_H * SUPERSAMPLE * 0.98)
     if target_h > limit:
         target_w = max(1, round(target_w * limit / target_h))
         target_h = limit
@@ -259,63 +276,94 @@ def _icon(builder, relative=1.0):
     return _down(out, ICON_W, ICON_H)
 
 
+# The five drawings.  Each one is built around a single feature that no other
+# weapon in the set has, and that feature is drawn FAT -- see the note above
+# _shape for why.  What each one is for:
+#
+#   Pistol    small.  It is the only short one, so size alone identifies it.
+#   Shotgun   two full-length tubes, barrel over magazine, and a fat pump.
+#   SMG       a long straight magazine dropping to the bottom of the frame.
+#   Rifle     a raked banana magazine -- the only slanted shape in the set.
+#   Sniper    a scope, which is the only mass ABOVE the barrel in the set.
+#
+# So the five differ by where their bulk sits (small / two bars / below /
+# slanted / above) rather than by detail, which is what survives the reduction
+# to 112 x 54 on screen.
+
+
 def icon_pistol(d):
-    """Compact: a short slide over a deep grip. The grip is the whole tell --
-    lengthen the slide and it reads as an SMG, which is what the first pass
-    did."""
-    _shape(d, polys=[[(40, 38), (56, 38), (50, 60), (32, 60)]],   # grip, raked
-           rounds=[(36, 22, 86, 34, 3),      # slide
-                   (82, 26, 92, 32, 2),      # muzzle
-                   (40, 34, 58, 39, 1)])     # frame under the slide
-    _guard(d, 52, 38, 68, 52)
+    """Compact: a short slide over a deep grip.
+
+    The whole tell is that it is SMALL -- ICON_RELATIVE_LENGTH draws it at
+    just over half the length of the rifles, so it reads before any detail
+    does.  The grip is drawn deep and heavily raked to use the height the
+    short body leaves free.
+    """
+    _shape(d, polys=[[(40, 40), (66, 40), (58, 64), (30, 64)]],   # grip, raked
+           rounds=[(30, 18, 96, 32, 3),      # slide
+                   (34, 31, 74, 41, 2)])     # frame under the slide
+    _guard(d, 56, 40, 78, 58)
 
 
 def icon_shotgun(d):
-    """The pump under the barrel is the tell."""
-    _shape(d, polys=[[(14, 28), (32, 26), (32, 42), (16, 47)]],   # stock
-           rounds=[(14, 26, 116, 33, 2),     # barrel, full length
-                   (32, 25, 58, 38, 3),      # receiver
-                   (64, 35, 96, 43, 4),      # pump / forend
-                   (108, 26, 120, 33, 2)])   # muzzle
-    _guard(d, 50, 37, 66, 51)
+    """Two full-length tubes and a fat pump.
+
+    Barrel over magazine tube is the one shape in the set that is a DOUBLE
+    horizontal bar, and the pump is a solid block bridging both.  The previous
+    pass drew a single thin barrel with a small forend, which at slot size was
+    the same blob as the rifle.
+    """
+    _shape(d, polys=[[(2, 18), (28, 15), (28, 40), (6, 48)]],     # stock
+           rounds=[(26, 16, 122, 26, 3),     # barrel
+                   (44, 32, 112, 40, 3),     # magazine tube, under it
+                   (26, 14, 58, 42, 3),      # receiver, joining the two
+                   (64, 31, 94, 47, 4)])     # pump, riding the tube
+    _guard(d, 44, 42, 62, 58)
 
 
 def icon_smg(d):
-    """The vertical box magazine is the tell, so it is long and square-cut --
-    the first pass tucked it under the body and the icon read as a pistol."""
+    """A long straight magazine, dropping clear of the body.
+
+    Short receiver plus a magazine that reaches the bottom of the frame: the
+    silhouette is a T, which nothing else here is.
+    """
     _shape(d, polys=[],
-           rounds=[(30, 22, 88, 36, 3),      # boxy receiver
-                   (84, 26, 100, 32, 2),     # stubby barrel
-                   (18, 26, 32, 32, 2),      # folded stock
-                   (50, 36, 64, 62, 2),      # MAGAZINE, straight and long
-                   (72, 36, 80, 50, 2)])     # foregrip
-    _guard(d, 62, 34, 76, 48)
+           rounds=[(22, 16, 86, 34, 3),      # boxy receiver
+                   (84, 21, 104, 29, 2),     # stubby barrel
+                   (8, 20, 24, 30, 2),       # folded stock
+                   (46, 34, 62, 64, 2)])     # MAGAZINE -- the tell
+    _guard(d, 62, 34, 80, 50)
 
 
 def icon_rifle(d):
-    """Long, with a curved magazine and a full stock."""
-    _shape(d, polys=[[(12, 27), (32, 25), (32, 40), (14, 45)],    # stock
-                     [(58, 36), (72, 36), (77, 56), (63, 56)]],   # curved mag
-           rounds=[(12, 25, 120, 32, 2),     # full length
-                   (32, 23, 64, 37, 3),      # receiver
-                   (80, 33, 100, 39, 2),     # handguard
-                   (112, 25, 124, 31, 2)])   # muzzle
-    _guard(d, 46, 35, 62, 49)
+    """Long, with a raked banana magazine.
+
+    The magazine is the only slanted mass in the set, so the rifle is told
+    apart from the shotgun by the angle rather than by any detail.
+    """
+    _shape(d, polys=[[(2, 20), (30, 17), (30, 40), (6, 48)],      # stock
+                     [(52, 38), (70, 38), (84, 61), (66, 61)]],   # banana mag
+           rounds=[(12, 24, 124, 30, 2),     # thin barrel, full length
+                   (28, 18, 72, 38, 3),      # receiver
+                   (88, 27, 114, 35, 2)])    # handguard
+    _guard(d, 40, 38, 56, 52)
 
 
 def icon_sniper(d):
-    """The scope is the tell, so it sits proud of the barrel with visible
-    mounts and the bipod anchors the far end."""
-    _shape(d, polys=[[(8, 30), (30, 27), (30, 43), (10, 48)],     # long stock
-                     [(92, 35), (96, 35), (89, 54), (85, 54)],    # bipod leg
-                     [(96, 35), (100, 35), (107, 54), (103, 54)]],
-           rounds=[(8, 28, 124, 34, 2),      # very long barrel
-                   (30, 26, 60, 39, 3),      # receiver
-                   (42, 12, 84, 21, 4),      # scope tube
-                   (47, 21, 52, 27, 1),      # front mount
-                   (74, 21, 79, 27, 1),      # rear mount
-                   (116, 27, 126, 33, 2)])   # muzzle brake
-    _guard(d, 44, 35, 60, 49)
+    """A scope, which is the only mass above the barrel in the set.
+
+    Drawn long and thick and sitting proud on two mounts, so "something big on
+    top" survives even when the mounts and the bipod do not.
+    """
+    _shape(d, polys=[[(0, 24), (28, 21), (28, 44), (4, 52)],      # long stock
+                     [(90, 34), (96, 34), (88, 60), (82, 60)],    # bipod legs
+                     [(96, 34), (102, 34), (110, 60), (104, 60)]],
+           rounds=[(6, 26, 126, 34, 2),      # very long barrel
+                   (26, 22, 64, 40, 3),      # receiver
+                   (34, 2, 92, 16, 5),       # SCOPE -- the tell
+                   (42, 15, 50, 27, 1),      # front mount
+                   (76, 15, 84, 27, 1)])     # rear mount
+    _guard(d, 42, 40, 58, 54)
 
 
 # One texture per weapon, named T_UI_Icon_<DisplayName>. The item carries a
@@ -345,11 +393,16 @@ PANELS = {
                             bottom=DANGER_BOTTOM, border=DANGER_BORDER,
                             border_alpha=110, accent=(200, 60, 50)),
 }
+# 120 x 84, up from 104 x 68. The slot exists to make its icon readable and it
+# was not big enough to: at the old size the five silhouettes reduced to the
+# same white blob and the ammunition count sat on top of the icon because there
+# was nowhere else for it. The extra 16 px of height is a text row under the
+# icon; the extra 16 px of width is icon.
 SLOTS = {
-    "T_UI_Slot":       dict(w=104, h=68, active=False),
-    "T_UI_SlotActive": dict(w=104, h=68, active=True),
+    "T_UI_Slot":       dict(w=120, h=84, active=False),
+    "T_UI_SlotActive": dict(w=120, h=84, active=True),
 }
-FRAMES = {"T_UI_SlotFrame": dict(w=104, h=68)}
+FRAMES = {"T_UI_SlotFrame": dict(w=120, h=84)}
 # One white bar, tinted at draw time, rather than one texture per colour.
 # HUD::DrawTexture takes a tint, and the stamina bar changes colour while it is
 # being spent -- with baked colours that would need two textures and a switch,

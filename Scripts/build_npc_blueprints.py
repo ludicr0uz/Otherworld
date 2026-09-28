@@ -81,6 +81,10 @@ from forest_generator.npc_placement import (
     NPC_BASE_MESH_FALLBACK,
     NPC_ANIM_BP,
     NPC_ANIM_BP_FALLBACK,
+    NPC_BASE_HEALTH,
+    NPC_RUN_SPEED_CMS as _NPC_RUN_SPEED_CMS,
+    NPC_VOICE_MIN_S,
+    NPC_VOICE_MAX_S,
 )
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -176,6 +180,22 @@ FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
 FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
 FN_ANIM_INSTANCE = "/Script/Engine.SkeletalMeshComponent.GetAnimInstance"
 FN_PLAY_SLOT = "/Script/Engine.AnimInstance.PlaySlotAnimationAsDynamicMontage"
+FN_PLAY_SOUND = "/Script/Engine.GameplayStatics.PlaySoundAtLocation"
+FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
+FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
+FN_RAND_INT = "/Script/Engine.KismetMathLibrary.RandomIntegerInRange"
+FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
+FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
+FN_GREATER_II = "/Script/Engine.KismetMathLibrary.Greater_IntInt"
+FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
+
+# Where the creature voices and the impact sounds are imported to, by
+# build_weapons_and_combat.import_sounds().
+VOICES_VAR = "Voices"
+HIT_SOUNDS_VAR = "HitSounds"
+STATS_APPLIED_VAR = "StatsApplied"
+NEXT_VOICE_VAR = "NextVoiceTime"
+HIT_SOUNDS = tuple(f"/Game/Audio/A_MeleeHit_{i:02d}" for i in (1, 2, 3))
 
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
@@ -299,6 +319,192 @@ def _set(node, name, value):
 
 
 # ─── The AI controller ──────────────────────────────────────────────────────
+
+# ─── Playing one of several sounds ──────────────────────────────────────────
+
+def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
+    """Play a random element of the ``var_name`` sound array at ``at_pin``.
+
+    Returns ``(nodes, then_pin)``.  The array is guarded on its own length:
+    RandomIntegerInRange(0, -1) against an empty array feeds Array_Get an index
+    into nothing, which is an access-none at runtime rather than silence.  That
+    matters here because the arrays are filled from /Game/Audio, which a
+    checkout that has never run Scripts/make_creature_sounds.py does not have
+    -- an unvoiced monster is a fine outcome, a spammed error log is not.
+
+    One sound is drawn per call rather than cycling, and there are three of
+    each: a pack of ten retriggering a single buffer on a shared timer reads
+    as one machine, which is the same lockstep problem gait_scale_for_index
+    solves for the legs.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    table = keep(_at(ed.add_get_member_variable_node(var_name), x0, y0 + 240))
+    table_out = _pin(table, var_name, is_input=False)
+
+    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 240, y0 + 240))
+    _connect(table_out, _pin(count, "TargetArray"))
+    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 480, y0 + 240))
+    _connect(_pin(count, "ReturnValue", is_input=False), _pin(stocked, "A"))
+    _set(stocked, "B", 0)
+
+    have = keep(_at(ed.add_branch_node(), x0 + 720, y0))
+    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(exec_in, _pin(have, "execute"))
+
+    # RandomIntegerInRange is inclusive at both ends, so the top is length - 1.
+    top = keep(_at(_node(ed, FN_SUB_II), x0 + 720, y0 + 240))
+    _connect(_pin(count, "ReturnValue", is_input=False), _pin(top, "A"))
+    _set(top, "B", 1)
+    which = keep(_at(_node(ed, FN_RAND_INT), x0 + 960, y0 + 240))
+    _set(which, "Min", 0)
+    _connect(_pin(top, "ReturnValue", is_input=False), _pin(which, "Max"))
+    pick = keep(_at(_node(ed, FN_ARR_GET), x0 + 1200, y0 + 240))
+    _connect(table_out, _pin(pick, "TargetArray"))
+    _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
+
+    play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 1440, y0))
+    _connect(_pin(pick, "Item", is_input=False), _pin(play, "Sound"))
+    _connect(at_pin, _pin(play, "Location"))
+    _connect(BEL.find_then_pin(have), _pin(play, "execute"))
+
+    # A join node so the caller has ONE exec to carry on from whether or not
+    # there was a sound to play. Without it the empty-array path dangles and
+    # the chase loop ends the first time a wanderer tries to speak.
+    join = keep(_at(ed.add_branch_node(), x0 + 1700, y0))
+    _set(join, "Condition", "true")
+    _connect(BEL.find_then_pin(play), _pin(join, "execute"))
+    _connect(BEL.find_else_pin(have), _pin(join, "execute"))
+    return made, BEL.find_then_pin(join)
+
+
+def _author_stats_and_voice(ed, gate, x0, y0, health, voice_min, voice_max):
+    """Apply this creature's health once, then growl on a timer.
+
+    Both hang off the chase loop's existing heartbeat rather than getting a
+    Tick of their own, for the reason _author_melee gives: the loop is already
+    the NPC's clock and a second one is only a way for the two to disagree.
+
+        gate(possessed) --> [stats applied yet?]
+                              no  --> MaxHealth = Health = <this creature's>
+                              yes ----------------------------.
+                                                              v
+                                            [time to make a noise?]
+                                              yes --> play one of Voices
+                                              no  ----------------------> on
+
+    Health is applied HERE, from a literal baked into this controller, rather
+    than set on the pawn Blueprint. It has to be: MaxHealth lives on an
+    inherited BP_HealthComponent, and Unreal stores a child Blueprint's
+    override of an inherited component's defaults in an InheritableComponentHandler
+    that the Python API does not expose -- ``get_component_by_class`` on a CDO
+    returns None (measured). The controller is already per creature for the
+    attack clip, so it is the one place that both knows which creature this is
+    and can reach the component at runtime.
+
+    Applying it on the first heartbeat AFTER possession, rather than at
+    BeginPlay, is what makes it reliable: a controller's BeginPlay runs before
+    it possesses anything, so there is no pawn to find the component on.
+
+    Returns the nodes it made and the exec to carry on with.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    for name, kind in ((STATS_APPLIED_VAR, "bool"), (NEXT_VOICE_VAR, "real")):
+        ed.remove_member_variable(name)
+        if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind)):
+            raise RuntimeError(f"could not declare {name}")
+    sound_array = BEL.get_array_type(
+        BEL.get_object_reference_type(unreal.SoundBase.static_class()))
+    for name in (VOICES_VAR, HIT_SOUNDS_VAR):
+        ed.remove_member_variable(name)
+        if not ed.add_member_variable(name, sound_array):
+            raise RuntimeError(f"could not declare {name}")
+
+    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 620))
+    pawn_out = _pin(pawn, "ReturnValue", is_input=False)
+    where = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 240, y0 + 620))
+    _connect(pawn_out, _pin(where, "self"))
+    where_out = _pin(where, "ReturnValue", is_input=False)
+
+    # --- once: this creature's health ---------------------------------------
+    done = keep(_at(ed.add_get_member_variable_node(STATS_APPLIED_VAR), x0, y0 + 240))
+    fresh = keep(_at(_node(ed, FN_NOT), x0 + 240, y0 + 240))
+    _connect(_pin(done, STATS_APPLIED_VAR, is_input=False), _pin(fresh, "A"))
+    first = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+    _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(first, "Condition"))
+    _connect(BEL.find_then_pin(gate), _pin(first, "execute"))
+
+    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 480, y0 + 380))
+    _connect(pawn_out, _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
+    as_health = keep(_at(_palette(ed, NODE_CAST_HEALTH), x0 + 720, y0))
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_health, "Object"))
+    _connect(BEL.find_then_pin(first), _pin(as_health, "execute"))
+    health_out = _loose_pin(as_health, "AsBPHealthComponent", is_input=False)
+
+    set_max = keep(_at(ed.add_set_member_variable_node("MaxHealth", HEALTH_CLASS_PATH),
+                       x0 + 980, y0))
+    _connect(health_out, _pin(set_max, "self"))
+    _set(set_max, "MaxHealth", health)
+    _connect(BEL.find_then_pin(as_health), _pin(set_max, "execute"))
+
+    set_now = keep(_at(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH),
+                       x0 + 1240, y0))
+    _connect(health_out, _pin(set_now, "self"))
+    _set(set_now, "Health", health)
+    _connect(BEL.find_then_pin(set_max), _pin(set_now, "execute"))
+
+    mark = keep(_at(ed.add_set_member_variable_node(STATS_APPLIED_VAR), x0 + 1500, y0))
+    _set(mark, STATS_APPLIED_VAR, "true")
+    _connect(BEL.find_then_pin(set_now), _pin(mark, "execute"))
+
+    # --- every few seconds: a noise -----------------------------------------
+    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 1760, y0 + 380))
+    now_out = _pin(now, "ReturnValue", is_input=False)
+    due_at = keep(_at(ed.add_get_member_variable_node(NEXT_VOICE_VAR), x0 + 1760, y0 + 500))
+    due = keep(_at(_node(ed, FN_GE_FF), x0 + 2000, y0 + 380))
+    _connect(now_out, _pin(due, "A"))
+    _connect(_pin(due_at, NEXT_VOICE_VAR, is_input=False), _pin(due, "B"))
+    speak = keep(_at(ed.add_branch_node(), x0 + 2240, y0))
+    _connect(_pin(due, "ReturnValue", is_input=False), _pin(speak, "Condition"))
+    # Every way into the voice check: stats just applied, stats already
+    # applied, or the component was not there to apply them to.
+    for tail in (BEL.find_then_pin(mark),
+                 BEL.find_else_pin(first),
+                 _pin(as_health, "CastFailed", is_input=False)):
+        _connect(tail, _pin(speak, "execute"))
+
+    voiced, after_voice = _author_random_sound(
+        ed, VOICES_VAR, where_out, BEL.find_then_pin(speak), x0 + 2500, y0)
+    made.extend(voiced)
+
+    gap = keep(_at(_node(ed, FN_RANDOM_FLOAT), x0 + 4300, y0 + 380))
+    _set(gap, "Min", voice_min)
+    _set(gap, "Max", voice_max)
+    again = keep(_at(_node(ed, FN_ADD_FF), x0 + 4540, y0 + 380))
+    _connect(now_out, _pin(again, "A"))
+    _connect(_pin(gap, "ReturnValue", is_input=False), _pin(again, "B"))
+    rearm = keep(_at(ed.add_set_member_variable_node(NEXT_VOICE_VAR), x0 + 4800, y0))
+    _connect(_pin(again, "ReturnValue", is_input=False), _pin(rearm, NEXT_VOICE_VAR))
+    _connect(after_voice, _pin(rearm, "execute"))
+
+    # One exec out, whether or not it spoke this pass.
+    out = keep(_at(ed.add_branch_node(), x0 + 5060, y0))
+    _set(out, "Condition", "true")
+    _connect(BEL.find_then_pin(rearm), _pin(out, "execute"))
+    _connect(BEL.find_else_pin(speak), _pin(out, "execute"))
+    return made, BEL.find_then_pin(out)
+
+
 
 def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     """Swing at the player when the chase has closed the distance.
@@ -454,12 +660,23 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     _connect(_pin(floor, "ReturnValue", is_input=False), _pin(write, "Health"))
     _connect(BEL.find_then_pin(hit), _pin(write, "execute"))
 
+    # --- and make a noise landing it ----------------------------------------
+    # At the PLAYER's location rather than the wanderer's: the sound is the
+    # impact, and the impact happens where the hit lands. With ten wanderers
+    # around one player the difference is audible -- from the attacker it
+    # smears around the listener, from the target it is one solid thump in
+    # front of them.
+    thud, after_thud = _author_random_sound(
+        ed, HIT_SOUNDS_VAR, _pin(player_loc, "ReturnValue", is_input=False),
+        BEL.find_then_pin(write), x0 + 3860, y0)
+    made.extend(thud)
+
     # Every exit -- hit, missing health component, not a Character -- has to
     # reach the Delay, or the chase loop ends on the first swing and the NPC
     # stands still forever.  A cast's failure pin left dangling is exactly that
     # bug, and it only shows up in a level where the player has no health
     # component.
-    for tail in (BEL.find_then_pin(write),
+    for tail in (after_thud,
                  _pin(hit, "CastFailed", is_input=False),
                  _pin(as_char, "CastFailed", is_input=False)):
         _connect(tail, BEL.find_execute_pin(delay))
@@ -467,17 +684,24 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     return made
 
 
-def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None):
+def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
+                                 health=NPC_BASE_HEALTH, voices=(),
+                                 hit_sounds=HIT_SOUNDS):
     """Create an AI controller and author its chase-and-attack loop.
 
     ``rebuild`` wipes the graph first.  It defaults to True because this builder
     is the only description of the behaviour: the old "already authored,
     reusing" guard meant no edit here ever reached the asset once it existed.
 
-    ``path`` and ``melee_anim`` exist because the attack clip is per creature.
-    Each monster now has its own skeleton (see import_characters.py), and an
+    ``path``, ``melee_anim``, ``health`` and ``voices`` exist because all four
+    are per creature.  The attack clip is per creature because
+    each monster now has its own skeleton (see import_characters.py), and an
     AnimSequence belongs to exactly one skeleton, so a single controller cannot
-    hold a literal that plays on both a zombie and a wendigo.
+    hold a literal that plays on both a zombie and a wendigo.  ``health`` is
+    per creature because a wendigo has three times a zombie's, and the
+    controller is the only place that can reach an inherited component's
+    defaults per child (see _author_stats_and_voice).  ``voices`` because a
+    zombie growls and a wendigo roars.
 
     A controller per variant is one way to solve that, and it is what this
     does.  Both are generated by THIS function from the same constants, so the
@@ -611,8 +835,15 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None):
 
     pathable = _at(ed.add_branch_node(), origin.x + 800, origin.y + 200)
     _connect(_pin(both_on, "ReturnValue", is_input=False), _pin(pathable, "Condition"))
-    _connect(BEL.find_then_pin(gate), _pin(pathable, "execute"))
     _connect(BEL.find_then_pin(pathable), BEL.find_execute_pin(move_to))
+
+    # Between "we have a pawn" and "can we path to the player": this creature's
+    # health, applied once, and its voice on a timer. Both need the pawn, which
+    # is why they sit after the gate and not on BeginPlay.
+    extras, after_extras = _author_stats_and_voice(
+        ed, gate, origin.x - 200, origin.y + 1400,
+        health, NPC_VOICE_MIN_S, NPC_VOICE_MAX_S)
+    _connect(after_extras, _pin(pathable, "execute"))
 
     # --- the straight line ---------------------------------------------------
     # Not a teleport, not AddMovementInput, and not a second Tick: this is the
@@ -661,12 +892,38 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None):
             f"a pack does not hit in lockstep.",
             melee)
 
+    ed.add_comment_to_nodes(
+        f"This creature's own health ({health:.0f}), applied once on the first "
+        f"heartbeat after possession, and its voice every "
+        f"{NPC_VOICE_MIN_S:.0f}-{NPC_VOICE_MAX_S:.0f} s. Health is set from "
+        f"here rather than on the pawn because MaxHealth lives on an INHERITED "
+        f"component, and Unreal keeps a child Blueprint's override of one in an "
+        f"InheritableComponentHandler that Python cannot reach.",
+        extras)
+
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
-    _asset_sub().save_loaded_asset(bp)
-    _log(f"built {path}"
-         + (f" (melee {NPC_MELEE_DAMAGE:.0f} dmg / {NPC_MELEE_INTERVAL_S} s "
-            f"inside {NPC_MELEE_RANGE_CM:.0f} cm)" if melee else " (no melee)"))
+
+    # The sound arrays are defaults on the class, not pin literals -- an array
+    # cannot be written into a pin. Missing files are dropped rather than
+    # raising: /Game/Audio is built from assets/generated/sounds, which a
+    # checkout that has not run Scripts/make_creature_sounds.py does not have,
+    # and the graph already guards an empty array.
+    eas = _asset_sub()
+    cdo = unreal.get_default_object(BEL.generated_class(bp))
+    for var, wanted in ((VOICES_VAR, voices), (HIT_SOUNDS_VAR, hit_sounds)):
+        found = [eas.load_asset(a) for a in wanted if eas.does_asset_exist(a)]
+        cdo.set_editor_property(var, found)
+        if len(found) != len(wanted):
+            _log(f"note: {path} {var}: {len(found)} of {len(wanted)} sounds "
+                 f"exist -- run Scripts/make_creature_sounds.py, then "
+                 f"build_weapons_and_combat.py, to import the rest")
+
+    eas.save_loaded_asset(bp)
+    _log(f"built {path} (health {health:.0f}"
+         + (f", melee {NPC_MELEE_DAMAGE:.0f} dmg / {NPC_MELEE_INTERVAL_S} s "
+            f"inside {NPC_MELEE_RANGE_CM:.0f} cm" if melee else ", no melee")
+         + f", {len(cdo.get_editor_property(VOICES_VAR))} voices)")
     return bp
 
 
@@ -784,12 +1041,15 @@ def build_variant_blueprint(base_bp, variant):
     """A child of BP_ForestWanderer wearing one creature.
 
     Child Blueprints rather than a mesh swap at spawn time, and rather than one
-    builder per creature.  The user's requirement is that the variants have
-    identical stats and movement logic, and inheritance is the only way to
-    express that such that it CANNOT drift: the capsule, run speed, melee
-    numbers, rotation rate and the chase loop are defined once on the parent and
-    are not repeated here.  What this function sets is only ever asset
-    references, never a stat.
+    builder per creature.  Inheritance is what keeps the SHARED behaviour from
+    drifting: the capsule, the melee numbers, the rotation rate and the whole
+    chase loop are defined once on the parent and are not repeated here.
+
+    Two stats are now per creature -- health and run speed, see
+    WENDIGO_HEALTH_MULTIPLIER in npc_placement.py -- and they are both read
+    from the variant record rather than written out here, so "a wendigo has
+    three times the health" is stated in one place and applied in another.
+    Everything else this function sets is an asset reference.
 
     It sets three of them rather than one, because a creature is its own
     skeleton: the mesh, the anim Blueprint retargeted against THAT skeleton,
@@ -837,12 +1097,30 @@ def build_variant_blueprint(base_bp, variant):
                                   unreal.AnimationMode.ANIMATION_BLUEPRINT)
     mesh_comp.set_editor_property("anim_class", anim_class)
 
+    # How fast this creature runs. The one stat that IS set on the pawn,
+    # because MaxWalkSpeed lives on CharacterMovement -- a native subobject,
+    # which a CDO does expose -- rather than on an added component. Health
+    # cannot be set here for exactly that reason; see _author_stats_and_voice.
+    #
+    # The animation rate is scaled by the same factor at spawn time (see
+    # generate_forest_level.py), not here, because it multiplies with the
+    # per-instance gait variance and there is one place that composes the two.
+    speed = _NPC_RUN_SPEED_CMS * variant.speed_scale
+    move = cdo.get_editor_property("character_movement")
+    move.set_editor_property("max_walk_speed", speed)
+    got = move.get_editor_property("max_walk_speed")
+    if abs(got - speed) > 1e-3:
+        raise RuntimeError(
+            f"{variant.key}: MaxWalkSpeed stayed at {got}, wanted {speed}")
+
     # Its own controller, because the attack clip inside it belongs to this
-    # creature's skeleton and will not play on any other.
+    # creature's skeleton and will not play on any other -- and because its
+    # health and its voice are per creature too.
     ai_bp = build_ai_controller_blueprint(
         rebuild=True, path=variant.ai_blueprint,
         melee_anim=_resolve(variant.melee, NPC_MELEE_MONTAGE_FALLBACK,
-                            f"{variant.key} melee clip"))
+                            f"{variant.key} melee clip"),
+        health=variant.health, voices=variant.voices)
     cdo.set_editor_property("ai_controller_class", BEL.generated_class(ai_bp))
 
     if not BEL.compile_blueprint(bp):
@@ -850,7 +1128,8 @@ def build_variant_blueprint(base_bp, variant):
     eas.save_loaded_asset(bp)
     _log(f"built {variant.blueprint} "
          f"({mesh.get_name() if mesh else 'inherited mesh'}, "
-         f"{anim_class.get_name()}, {ai_bp.get_name()})")
+         f"{anim_class.get_name()}, {ai_bp.get_name()}, "
+         f"{variant.health:.0f} HP, {speed:.0f} cm/s)")
     return bp
 
 

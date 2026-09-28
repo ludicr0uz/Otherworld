@@ -75,6 +75,33 @@ NPC_MELEE_INTERVAL_S = 1.5         # seconds between swings, per NPC
 NPC_MELEE_MONTAGE_FALLBACK = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
 NPC_MELEE_BLEND_S = 0.15
 
+# How much health a wanderer has. The zombie is the yardstick -- 100 HP against
+# a pistol that does 26 means four rounds, which is what the weapon damage
+# numbers in build_weapons_and_combat.py were tuned against.
+NPC_BASE_HEALTH = 100.0
+
+# ── Voices ───────────────────────────────────────────────────────────────────
+#
+# Synthesised by Scripts/make_creature_sounds.py and imported to /Game/Audio by
+# build_weapons_and_combat.import_sounds().  Several takes per creature and the
+# controller draws one at random, because a pack of ten on a 4-9 s timer
+# retriggering ONE buffer reads as a machine rather than as a forest.
+#
+# These are asset *package* paths; the builder resolves them and silently drops
+# any that are missing, so a checkout that has not run the sound script still
+# gets silent monsters rather than a failed build.
+CREATURE_AUDIO_DIR = "/Game/Audio"
+ZOMBIE_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/A_ZombieGrowl_{i:02d}" for i in (1, 2, 3))
+WENDIGO_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/A_WendigoRoar_{i:02d}" for i in (1, 2, 3))
+
+# How often a wanderer makes a noise, drawn uniformly per utterance. Tuned
+# against the PACK and not against one monster: ten of them on a 4-9 s timer is
+# a sound roughly every 0.65 s somewhere in the forest, which is a constant
+# presence without being a wall. One creature alone is quiet enough to be
+# startling.
+NPC_VOICE_MIN_S = 4.0
+NPC_VOICE_MAX_S = 9.0
+
 
 # ── Which creature each wanderer wears ───────────────────────────────────────
 #
@@ -91,6 +118,28 @@ NPC_MELEE_BLEND_S = 0.15
 # such only if most of what the player meets is a zombie.
 NPC_WENDIGO_EVERY = 5
 
+# ── What makes a wendigo different ───────────────────────────────────────────
+#
+# It used to be nothing but the mesh: the variants were child Blueprints that
+# overrode asset references and were forbidden from touching a stat, so that
+# behaviour could not drift between them.  That was the right rule while the
+# two were meant to be the same monster in different skin, and it is the wrong
+# one now that the wendigo is meant to be the dangerous one.
+#
+# So the variants carry stats, but only these two, and only as MULTIPLES of the
+# base -- the melee damage, the range, the interval, the acceptance radius and
+# the whole chase loop are still defined exactly once on the parent.  A wendigo
+# is a zombie with more health and more speed, and the code says so in one line
+# rather than in a second copy of the behaviour.
+#
+# 3x health and 1.15x speed, both asked for directly.  What they cost: 300 HP
+# is twelve pistol rounds or three sniper shots, and at 690 cm/s the wendigo is
+# faster than the player's 600 cm/s walk but still slower than the 900 cm/s
+# sprint -- so it cannot be walked away from and can be outrun, which is the
+# only arrangement that keeps sprint meaningful.
+WENDIGO_HEALTH_MULTIPLIER = 3.0
+WENDIGO_SPEED_MULTIPLIER = 1.15
+
 
 @dataclass(frozen=True)
 class NpcVariant:
@@ -102,9 +151,16 @@ class NpcVariant:
     AnimSequence belongs to exactly one skeleton, its own AI controller holding
     its own attack clip.  See import_characters.py for the measurements.
 
-    What is NOT per creature is any stat: the variants are child Blueprints of
-    BP_ForestWanderer and override only these asset references, so capsule,
-    run speed, melee damage, range and interval cannot drift between them.
+    Two stats are per creature -- see WENDIGO_HEALTH_MULTIPLIER -- and they are
+    the only two.  Everything else about how a wanderer behaves (capsule, melee
+    damage, range, interval, acceptance radius, the chase loop itself) is
+    defined once on BP_ForestWanderer and inherited, so it cannot drift.
+
+    ``speed_scale`` multiplies the run speed AND the animation rate together.
+    Scaling one without the other is foot-sliding: the locomotion blend space
+    is authored for a particular ground speed, so a wendigo running 15% faster
+    with the stride of a zombie skates.  See gait_scale_for_index, which has
+    the same constraint for a different reason.
     """
     key: str
     blueprint: str
@@ -112,9 +168,12 @@ class NpcVariant:
     anim_bp: str
     melee: str
     ai_blueprint: str
+    health: float
+    speed_scale: float
+    voices: tuple
 
 
-def _creature(key, folder):
+def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0, voices=()):
     """The asset layout every creature follows, from one name."""
     return NpcVariant(
         key=key,
@@ -123,12 +182,18 @@ def _creature(key, folder):
         anim_bp=f"/Game/Sourced/Characters/Anims/{folder}/A_{folder}_ABP_Unarmed",
         melee=f"/Game/Sourced/Characters/Anims/{folder}/A_{folder}_MM_Attack_01",
         ai_blueprint=f"/Game/Forest/NPC/BP_ForestWandererAI_{key}",
+        health=health,
+        speed_scale=speed_scale,
+        voices=voices,
     )
 
 
 NPC_VARIANTS = (
-    _creature("Zombie", "Zombie01"),
-    _creature("Wendigo", "Wendigo01"),
+    _creature("Zombie", "Zombie01", voices=ZOMBIE_VOICES),
+    _creature("Wendigo", "Wendigo01",
+              health=NPC_BASE_HEALTH * WENDIGO_HEALTH_MULTIPLIER,
+              speed_scale=WENDIGO_SPEED_MULTIPLIER,
+              voices=WENDIGO_VOICES),
 )
 
 

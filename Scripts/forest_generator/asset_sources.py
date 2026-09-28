@@ -221,7 +221,11 @@ CACHE = (
              "rejects files over 100 MB, and the fetcher reproduces them "
              "exactly. make_weapon_sounds.py synthesised the earlier set and "
              "is history -- running it AFTER the fetcher overwrites real "
-             "recordings with synthesised ones.",
+             "recordings with synthesised ones. Scripts/make_creature_sounds.py "
+             "is NOT that: it synthesises footsteps, melee impacts and the "
+             "monster voices, which have no recording to be overwritten by, "
+             "and writes only A_Footstep_*, A_MeleeHit_*, A_ZombieGrowl_* and "
+             "A_WendigoRoar_*. The two never touch the same file.",
     ),
 )
 
@@ -252,6 +256,12 @@ STOCK_CHECKSUM_FILE = "Scripts/forest_generator/stock_checksums.json"
 RESTORE_ORDER = (
     "Scripts/sync_assets.py --restore-stock",
     "Scripts/fetch_weapon_sounds.py",
+    # The foley and the monster voices. A separate script from the fetcher
+    # because it is synthesised rather than cut from recordings -- see its
+    # docstring for why that split is the right one and not laziness. Both
+    # write into assets/generated/sounds and build_weapons_and_combat.py
+    # imports the lot.
+    "python3 Scripts/make_creature_sounds.py",
     # The HUD's artwork comes before the weapons, because each weapon stores a
     # reference to its own inventory icon, and before the menu, which draws the
     # panels, slots and bars. Two steps, not one: the generator needs Pillow and

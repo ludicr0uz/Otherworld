@@ -802,17 +802,40 @@ ragdoll could not be shot in the head either. The verifier asserts the physics a
 count for both characters.
 
 **The creatures' joints are tuned; the importer's are not usable.** `import_characters` gets its
-physics assets from `SkeletalMeshEditorSubsystem.create_physics_asset`, which gives every joint
-one 45/45/45 cone. Knees fold 45° sideways, elbows twist 45° about themselves, and three 45° spine
-joints fold 135°: a corpse on those limits falls "as if it had no bones". `tune_ragdolls()`
-rewrites every joint of every mesh under `/Game/Sourced/Characters` (the player's `Adventurer01`
-included) from `RAGDOLL_JOINT_LIMITS`. These are `PA_Mannequin`'s own numbers, written per
-*anatomical* axis (flex, side-bend, twist): spine 15/10/10, knee 60/5/5, elbow 70/5/20, hip
-55/30/20. `ragdoll_plan()` maps them onto the constraint's axes from the reference pose. Meshy
-bones do not point down X the way the mannequin's do (their X is the hinge axis), so this cannot
-be copied number for number. The limits are symmetric, because UE 5.8 gives Python no access to a
-constraint's frame to offset them. `PA_Mannequin`'s knees are ±60 for the same reason.
-`PA_Mannequin` itself is stock and untouched. The verifier reads the saved limits back.
+physics assets from `SkeletalMeshEditorSubsystem.create_physics_asset`. It gives every joint one
+*soft* 45/45/45 cone (stiffness 50, damping 5) centred on the bind pose. That caused two problems:
+- **"No bones":** knees folded sideways and a three-joint spine folded 135°. Tightening the limits
+  fixed that.
+- **"Limbs bend at unnatural angles":** a range centred on the bind pose runs both ways. A knee
+  that folds 60° forward also folds 60° backwards. Meshy's bind pose already bends the elbow
+  60–90°, so a centred elbow range lets it straighten and keep going. A falling body also pushes
+  straight through a stiffness-50 soft limit.
+
+`tune_ragdolls()` rewrites every joint of every mesh under `/Game/Sourced/Characters` (the
+player's `Adventurer01` included) from `RAGDOLL_JOINTS`. Each role has a one-sided flex range in
+anatomical degrees (knee 0..135 folding back, elbow 0..135 folding forward, hip -20..100,
+spine -10..20 per joint), plus a side-bend and a twist. `ragdoll_plan()` builds both constraint
+frames itself from the reference pose, because Meshy bones point every which way:
+- **Ball joint:** X runs along the bone and Y is the flex axis.
+- **Hinge:** X is the flex axis, which is Chaos's twist and can swing furthest.
+- **Off-centre range:** the parent frame is turned about the flex axis to the middle of the range.
+  This is PA_Mannequin's own trick for knees that cannot bend backwards.
+- **Measuring hinges:** a hinge's flex is measured from where the bind pose really has it; its
+  axis comes from the plane of the bend when that bend is over 20°.
+- **Spring:** soft-limit strength is PA_Mannequin's, 500/50 for ball joints and 1000/100 for
+  hinges.
+
+It all goes through `set_editor_property` on each `PhysicsConstraintTemplate`'s `DefaultInstance`,
+which is reachable with `unreal.find_object(pa, "PhysicsConstraintTemplate_N")`. The Python name
+is `DefaultInstance`, not `default_instance`. Two approaches do not work:
+- `ConstraintInstanceBlueprintLibrary` has limits but no frames.
+- `AngularRotationOffset` is read only by `PhysicsConstraintComponent`, never by a physics asset.
+
+The property-change notification matters: `Serialize` writes the template's transient
+`DefaultProfile`, not `DefaultInstance.ProfileInstance`, so an edit that skips the notification
+reverts on save. The verifier runs against the saved assets in a fresh editor. It reads back the
+limits, frames and springs, then bends every joint to just inside and just past both ends of its
+range. `PA_Mannequin` itself is stock and untouched.
 
 Order and reasons:
 

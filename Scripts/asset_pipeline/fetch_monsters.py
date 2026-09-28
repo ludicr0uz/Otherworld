@@ -144,7 +144,7 @@ def _download_tree(node, dest, prefix, trail=""):
 
 
 def cmd_status():
-    for spec in catalog.MONSTERS:
+    for spec in catalog.CHARACTERS:
         state = meshy.load_state(spec)
         stages = state.get("stages", {})
         marks = " ".join(
@@ -165,7 +165,7 @@ def main():
         cmd_status()
         return 0
 
-    specs = [catalog.by_id(i) for i in args.ids] if args.ids else list(catalog.MONSTERS)
+    specs = [catalog.by_id(i) for i in args.ids] if args.ids else list(catalog.CHARACTERS)
     failures = []
     for spec in specs:
         try:

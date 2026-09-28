@@ -129,6 +129,7 @@ version would use the identical aim resolve and fire a velocity along
 (AimPoint - muzzle) instead of tracing it.
 """
 
+import dataclasses
 import math
 import os
 import random
@@ -171,6 +172,16 @@ HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"
 AMMO_BP_PATH = f"{WEAPON_DIR}/BP_AmmoPickup"
+# The settings SaveGame. It lives beside the weapons rather than under /Game/UI
+# because this file builds it, and Scripts/forest_generator/asset_sources.py
+# names exactly one builder per content directory -- a second directory owned by
+# a second script is the thing that table exists to prevent.
+SETTINGS_BP_PATH = f"{WEAPON_DIR}/BP_Settings"
+# One slot, index 0. There are no profiles and no per-level settings: a keybind
+# the player set once has to be there the next time the game is opened, which is
+# the whole requirement.
+SETTINGS_SLOT = "OtherworldSettings"
+SETTINGS_USER_INDEX = 0
 
 CHARACTER_BP_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter"
 GAME_MODE_BP_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
@@ -185,6 +196,7 @@ HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
 AMMO_CLASS_PATH = f"{AMMO_BP_PATH}.BP_AmmoPickup_C"
+SETTINGS_CLASS_PATH = f"{SETTINGS_BP_PATH}.BP_Settings_C"
 
 # The mechanical sounds. All of these, and the five gunshots, are now cut from
 # CC0 recordings of real firearms by Scripts/fetch_weapon_sounds.py -- see that
@@ -211,9 +223,15 @@ SND_RELOAD_PISTOL = f"{AUDIO_DIR}/A_ReloadPistol"     # 1.58 s -- slower, hand-f
 # A_Reload (the single shared synthesised clack) is deliberate and is handled
 # by retire_old_assets(): a builder that simply stops referencing an asset
 # leaves it on disk forever.
-SOUND_NAMES = ("A_ShotgunFire", "A_PistolFire", "A_SMGFire", "A_RifleFire",
-               "A_SniperFire", "A_DryFire", "A_ReloadShotgun",
-               "A_ReloadRifle", "A_ReloadPistol")
+#
+# Split in two because the two halves carry different distances -- a gunshot is
+# heard across the map and a magazine change is not -- and SOUND_ATTENUATION
+# below is keyed off the split rather than off a second hand-written list.
+GUNSHOT_NAMES = ("A_ShotgunFire", "A_PistolFire", "A_SMGFire", "A_RifleFire",
+                 "A_SniperFire")
+HANDLING_NAMES = ("A_DryFire", "A_ReloadShotgun", "A_ReloadRifle",
+                  "A_ReloadPistol")
+SOUND_NAMES = GUNSHOT_NAMES + HANDLING_NAMES
 RETIRED_SOUNDS = (f"{AUDIO_DIR}/A_Reload",)
 
 # ── Foley and creature voices ────────────────────────────────────────────────
@@ -234,8 +252,208 @@ CREATURE_VOICE_NAMES = (tuple(f"A_ZombieGrowl_{i:02d}" for i in (1, 2, 3))
                         + tuple(f"A_WendigoRoar_{i:02d}" for i in (1, 2, 3)))
 CREATURE_SOUND_NAMES = FOOTSTEP_NAMES + MELEE_HIT_NAMES + CREATURE_VOICE_NAMES
 
-AIM_RIFLE = "/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS"
-AIM_PISTOL = "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS"
+# ── How far each of them carries ─────────────────────────────────────────────
+#
+# Nothing in this project had a USoundAttenuation asset until now, and a
+# USoundBase whose AttenuationSettings is None is NOT "attenuated by default".
+# Distance falloff and spatialisation are both parsed out of the attenuation
+# settings and out of nothing else, so a sound without them plays at full
+# volume, dead centre, from anywhere on a 200 m map. That -- not the call
+# sites, which were already PlaySoundAtLocation -- is why the audio was flat.
+#
+# Three profiles rather than one, because how far a noise carries is a fact
+# about the noise. A rifle report across a forest and a boot in leaf litter
+# differ by orders of magnitude, and one shared falloff has to be wrong for at
+# least one of them: sized for the gun, every footstep in the level is audible;
+# sized for the boot, a sniper shot from 60 m away is silent.
+#
+# NATURAL_SOUND is the engine's dB-based curve and is the realistic one: volume
+# falls with the logarithm of distance the way sound pressure actually does,
+# reaching ATT_DB_AT_MAX at the edge. Linear and Inverse are mixing tools, not
+# physics.
+#
+# Spatialisation stays on SPATIALIZATION_DEFAULT -- the mixer's own panner.
+# SPATIALIZATION_HRTF is the other option the enum offers, but it is a request
+# for a binaural *plugin*, and with none installed the mixer falls back to the
+# panner anyway; asking for it would be a line that claims something the build
+# does not do. Panning is what makes the audio directional, and it needs the
+# sources to be mono, which fetch_weapon_sounds.py and make_creature_sounds.py
+# already guarantee and the verifier already asserts.
+ATT_DB_AT_MAX = -60.0
+# The distance low-pass, for the profiles that ask for it. 20 kHz is "no
+# filtering at all", so the near end is deliberately the full band and only the
+# far end is dulled.
+ATT_LPF_NEAR_HZ = 20000.0
+ATT_LPF_FAR_HZ = 2500.0
+# The brief's ceiling: nothing in the game may be audible from further than
+# 100 m. UE units are centimetres, and the falloff is measured from the EDGE of
+# the full-volume sphere, so the audible radius is radius + falloff.
+AUDIBLE_LIMIT_CM = 10000.0
+
+
+@dataclasses.dataclass(frozen=True)
+class AttenuationProfile:
+    """One USoundAttenuation asset.
+
+    ``radius_cm`` is the sphere inside which the sound is at full volume --
+    roughly "at arm's length from the thing making it" -- and ``falloff_cm``
+    the distance beyond that over which it fades to ATT_DB_AT_MAX.
+
+    ``air_absorption`` turns on the engine's distance low-pass. Only the
+    gunshots use it: high frequencies are the first thing air eats, which is
+    why distant gunfire is a thump rather than a crack, and it is only over
+    tens of metres that the effect exists at all.
+    """
+
+    name: str
+    radius_cm: float
+    falloff_cm: float
+    air_absorption: bool = False
+
+    @property
+    def path(self):
+        return f"{CREATURE_AUDIO_DIR}/{self.name}"
+
+    @property
+    def audible_cm(self):
+        return self.radius_cm + self.falloff_cm
+
+
+# 100 m exactly -- the loudest thing in the game spends the whole allowance.
+ATT_GUNFIRE = AttenuationProfile("A_Att_Gunfire", 200.0, 9800.0,
+                                 air_absorption=True)
+# 40 m: far enough that a wanderer is heard before it is seen through the
+# trees, short enough that ten of them spread over the map are not all audible
+# at once.
+ATT_CREATURE = AttenuationProfile("A_Att_Creature", 150.0, 3850.0)
+# 15 m. Footsteps, the dry click and the reload clack: small mechanical noises
+# that in the real world do not reach the next clearing.
+ATT_FOLEY = AttenuationProfile("A_Att_Foley", 100.0, 1400.0)
+ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_FOLEY)
+
+# Which sound gets which, and the only table that says so. Every sound in the
+# game is a WORLD sound -- something in the level made it, at a place -- so
+# every one is spatialised. There is no 2D exception to make: the HUD is drawn
+# with DrawText and DrawTexture and is silent, there are no menu clicks, and
+# the one sound that might conventionally stay flat, the player's own weapon,
+# is a third-person weapon in a third-person game -- it is visibly out there in
+# the world at the end of the player's arms, and the muzzle is ~1.5 m from the
+# listener, where the gunfire curve is still 1.0 anyway.
+#
+# The player's own FOOTSTEPS are the judgement call. They share the component
+# and therefore the profile with the wanderers', which means they attenuate
+# too; at the third-person camera's ~3 m that costs a little volume the player
+# did not ask to lose. Kept spatialised regardless, because the alternative is
+# a second non-attenuated footstep path whose only purpose is to be wrong about
+# where the player's feet are, and because a step that pans as you turn is the
+# cheapest cue in the game that the audio is placed at all.
+SOUND_ATTENUATION = dict(
+    [(n, ATT_GUNFIRE) for n in GUNSHOT_NAMES]
+    + [(n, ATT_FOLEY) for n in HANDLING_NAMES + FOOTSTEP_NAMES]
+    + [(n, ATT_CREATURE) for n in MELEE_HIT_NAMES + CREATURE_VOICE_NAMES])
+
+# ─── What the player is wearing ──────────────────────────────────────────────
+#
+# The player used to be SKM_Quinn_Simple and nothing else could be said about
+# it: the mesh, the ready poses, the grip socket and the bone the aim pose is
+# blended from were four literals scattered through this file that all happened
+# to describe the Epic mannequin. They are one record now, because changing the
+# player's body means changing all four together or not at all.
+#
+# ── Why the adventurer is on its own skeleton, and not on SK_Mannequin ──
+#
+# The obvious integration -- generate a new mesh and bind it to the skeleton
+# everything here already depends on -- is not reachable from this toolchain,
+# and it was probed before a credit was spent rather than after:
+#
+#   * Meshy's rigging endpoint takes an input mesh and a height and nothing
+#     else. There is no skeleton-convention parameter, so what comes back is
+#     always its own 24-bone Mixamo-named rig (measured: Hips, Spine02..Spine,
+#     LeftArm..LeftHand, neck, Head -- no fingers, no twist bones).
+#   * Re-binding that mesh at import time is not a matter of asking: the FBX
+#     importer merges the incoming bone tree into the supplied skeleton, and
+#     24 differently-named bones do not merge into SK_Mannequin's 161.
+#   * And UE 5.8 exposes no skin transfer to Python. IKRetargetBatchOperation
+#     retargets *animation* assets only; IKRetargeterController has no mesh
+#     export, so the editor's "retarget skeletal mesh" button has no scripted
+#     equivalent. A project with no C++ module cannot reach the C++ that does it.
+#
+# So the animation moves to the mesh instead of the mesh to the skeleton --
+# exactly what the monsters already do, through build_retarget.py -- and the
+# three things that made that sound dangerous turn out to be rig-agnostic
+# already: hit_zones() derives its tables from whatever mesh the character is
+# wearing, the ragdoll is SetAllBodiesSimulatePhysics on whatever physics asset
+# that mesh carries, and the locomotion is a retargeted copy of ABP_Unarmed
+# that fix_retargeted_abp() has already re-pointed at the new spine.
+#
+# What is genuinely lost is finger articulation: a 24-bone rig cannot close a
+# fist, so the adventurer's hand holds its weapon open rather than gripped.
+# That is a known cost of the only route that exists, recorded here rather than
+# discovered later.
+@dataclasses.dataclass(frozen=True)
+class PlayerSkin:
+    """The player's body: mesh, animation, and where a weapon sits in it."""
+
+    mesh: str
+    anim_bp: str
+    # Attachment point for the held weapon. A socket where the rig has one; a
+    # BONE name otherwise -- AttachToComponent resolves either out of the same
+    # namespace, and Python cannot mint a socket (SkeletalMeshSocket's
+    # SocketName and BoneName are both read-only, checked).
+    grip: str
+    aim_rifle: str
+    aim_pistol: str
+    # Mesh component transform inside the actor. The template's own numbers;
+    # they are a property of a 1.8 m humanoid standing in an 88 cm capsule
+    # facing +X, not of the mannequin, which is why the Meshy skin reuses them.
+    mesh_z: float = -89.0
+    mesh_yaw: float = 270.0
+
+
+SKIN_QUINN = PlayerSkin(
+    mesh="/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple",
+    anim_bp="/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed",
+    grip="HandGrip_R",
+    aim_rifle="/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS",
+    aim_pistol="/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS",
+)
+
+# Built by Scripts/asset_pipeline: fetch_monsters.py -> import_characters.py ->
+# build_retarget.py. Every path here is under /Game/Sourced, which is
+# git-ignored, so a checkout that has never run the pipeline has none of it and
+# falls back to the mannequin above -- the same bargain build_npc_blueprints.py
+# strikes, and for the same reason: a player who looks wrong is a far better
+# failure than a build that stops.
+ADVENTURER = "Adventurer01"
+SKIN_ADVENTURER = PlayerSkin(
+    mesh=f"/Game/Sourced/Characters/SKM_{ADVENTURER}/SKM_{ADVENTURER}",
+    anim_bp=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/A_{ADVENTURER}_ABP_Unarmed",
+    grip="RightHand",
+    aim_rifle=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/"
+              f"A_{ADVENTURER}_MF_Rifle_Idle_ADS",
+    aim_pistol=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/"
+               f"A_{ADVENTURER}_MF_Pistol_Idle_ADS",
+)
+
+
+def player_skin():
+    """The adventurer if the pipeline has produced all of it, else the mannequin.
+
+    All four assets or none: a skin resolved piecemeal is the failure that
+    cannot be read off a log -- the adventurer's mesh wearing the mannequin's
+    anim BP compiles, runs, and stands in the reference pose forever.
+    """
+    eas = _assets()
+    want = (SKIN_ADVENTURER.mesh, SKIN_ADVENTURER.anim_bp,
+            SKIN_ADVENTURER.aim_rifle, SKIN_ADVENTURER.aim_pistol)
+    missing = [p for p in want if not eas.does_asset_exist(p)]
+    if not missing:
+        return SKIN_ADVENTURER
+    if len(missing) < len(want):
+        _log(f"note: the adventurer skin is incomplete ({len(missing)} of "
+             f"{len(want)} assets missing, first {missing[0]}) — wearing the "
+             "mannequin. Run Scripts/asset_pipeline to build it.")
+    return SKIN_QUINN
 
 CUBE = "/Engine/BasicShapes/Cube"          # 100 cm box
 CYLINDER = "/Engine/BasicShapes/Cylinder"  # 100 cm tall, 50 cm radius, axis +Z
@@ -246,12 +464,18 @@ SOUND_SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 
 # ─── Tuning ──────────────────────────────────────────────────────────────────
 
-START_HEALTH = 100.0
 INVENTORY_SIZE = 5
 
 # Polled keys.  1/2/3 and M belong to the graphics menu, so the weapon keys stay
 # clear of them.
+#
+# Every one of them is polled on the weapon component's Tick rather than bound
+# as an input action, for the same reason: BP_ThirdPersonCharacter's graph is
+# the Enhanced Input template, and adding an IA asset plus an IMC entry is not
+# authorable from Python. Sprint lives on the *weapon* component specifically
+# because that is the thing that has to refuse to fire while it is held down.
 FIRE_KEY = "LeftMouseButton"
+AIM_KEY = "RightMouseButton"
 SWITCH_KEY = "Q"
 DROP_KEY = "G"
 PICKUP_KEY = "E"
@@ -259,24 +483,6 @@ SPRINT_KEY = "LeftShift"
 
 PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
 DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
-
-# --- sprint and stamina ------------------------------------------------------
-# Sprint is polled on the weapon component rather than bound as an input action
-# for the same reason every other key here is: BP_ThirdPersonCharacter's graph
-# is the Enhanced Input template, and adding an IA asset plus an IMC entry is
-# not authorable from Python. It lives on the *weapon* component specifically
-# because that is the thing that has to refuse to fire while it is held down.
-#
-# The walking speed is NOT a constant here: BeginPlay caches whatever the
-# character's MaxWalkSpeed already is into BaseSpeed and restores that. A
-# literal would silently fight any later change to the character's own default.
-SPRINT_SPEED_CMS = 900.0
-MAX_STAMINA = 100.0
-# 4 s of sprint from full, a little over 8 s to refill. Deliberately
-# asymmetric: sprint is the escape from a pack that runs at 600 cm/s, so it has
-# to be worth spending and it has to cost something to have spent.
-STAMINA_DRAIN_PER_S = 25.0
-STAMINA_REGEN_PER_S = 12.0
 
 # --- footsteps ---------------------------------------------------------------
 # One component, on the player and on every wanderer, because a footfall is a
@@ -303,69 +509,179 @@ FOOTSTEP_STRIDE_CM = 160.0
 FOOTSTEP_MIN_SPEED_CMS = 40.0
 FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
 
-# --- aiming down the sights --------------------------------------------------
-# Right mouse, held. Polled on the weapon component's Tick like every other key
-# in this project, and for the same reason: BP_ThirdPersonCharacter's graph is
-# the Enhanced Input template and a new IA asset plus an IMC entry is not
-# authorable from Python.
+# ─── The combat config ───────────────────────────────────────────────────────
 #
-# What ADS does is narrow the camera's field of view and tighten the weapon's
-# cone. The zoom factor is per weapon (AdsZoom on BP_WeaponItem) because the
-# sniper's is a scope and everything else's is a set of irons: 4x against 1.5x
-# is the difference the player is buying when they pick the rifle up.
+# One named structure for the global combat tuning, and it is a Python
+# dataclass rather than a UserDefinedStruct or a DataAsset on purpose.
 #
-# The FOV is NOT snapped. FInterpTo at ADS_INTERP_SPEED takes about a fifth of
-# a second to arrive, which is short enough to feel instant and long enough
-# that a 4x snap does not read as a teleport. CurrentFOV is stored rather than
-# recomputed because FInterpTo needs its own previous output.
+# Every number in here is BAKED INTO A GRAPH at build time: the cone scale is a
+# SelectFloat pin literal, the recoil recovery speed an FInterpTo pin literal,
+# the sensitivity limits FClamp literals in the settings screen. A struct asset
+# a designer edited in the editor would have to be *read* at runtime instead --
+# an asset load, a null guard and a member read in front of every one of those
+# pins, in a project where each of those nodes is placed and wired by hand from
+# Python.
 #
-# BaseFOV is cached at BeginPlay from whatever the camera already has, exactly
-# as BaseSpeed caches MaxWalkSpeed: a literal here would silently fight any
-# later change to the camera asset.
-AIM_KEY = "RightMouseButton"
-ADS_ZOOM_IRONS = 1.5
-ADS_ZOOM_SCOPE = 4.0
-ADS_INTERP_SPEED = 12.0
-# Aiming is worth something mechanically, not only visually: the cone shrinks
-# to a third. The shotgun's 5 degrees becomes 1.7, which still patterns, and
-# the sniper's 0.2 becomes 0.07, which is academic -- the weapons this matters
-# to are the automatics in the middle.
-ADS_SPREAD_SCALE = 0.34
+# And it would not survive being edited. Nothing under Content/ is committed
+# (see CLAUDE.md): every asset in this project is derived and is rebuilt from
+# these scripts on a fresh clone. An in-editor edit to a generated DataAsset is
+# erased the next time the builder runs and was never in the repository to
+# begin with -- so "tunable in the editor without re-running Python" is a
+# promise this architecture cannot keep, and pretending otherwise would lose
+# somebody's tuning pass rather than save them a build.
+#
+# So tuning combat means editing this object and re-running
+# build_weapons_and_combat.py. That is the same workflow as the project's two
+# other tuning homes, forest_generator/lighting.py (the time-of-day presets)
+# and forest_generator/npc_placement.py (run speed, melee reach) -- and it is
+# the one that gets checked, because the verifier reads these fields back out
+# of the compiled graphs.
+#
+# Frozen, so no builder can quietly write a number back into it and leave the
+# verifier asserting a value the graph never saw.
+#
+# PER-WEAPON numbers deliberately do NOT live here. Damage, spread, range, fire
+# interval, magazine size and recoil are columns in _weapon_specs(), which is
+# what keeps a sixth weapon a row in a table rather than a code change. This is
+# the other half: what is true of a fight whatever is being held.
+@dataclasses.dataclass(frozen=True)
+class CombatConfig:
+    """The global, tunable combat parameters -- the one place to change them."""
 
-# --- mouse sensitivity, and what aiming does to it ---------------------------
-# The player's look input is the Enhanced Input template's IA_Look, which lands
-# on AddControllerYawInput / AddControllerPitchInput -- and those still
-# multiply by APlayerController's InputYawScale / InputPitchScale on their way
-# into RotationInput. That pair is marked deprecated in UE5, but the setters
-# are BlueprintCallable and they are the ONLY per-frame handle on look speed
-# that does not require editing BP_ThirdPersonCharacter's input graph, which
-# the Blueprint graph API cannot partially rebuild.
-#
-# Their values are CACHED at BeginPlay rather than written down here, for the
-# third time in this file and for the third identical reason (see BaseSpeed and
-# BaseFOV). It matters more here than anywhere else: the engine's default pitch
-# scale is NEGATIVE (-2.5), so a literal positive number would silently invert
-# the player's vertical look.
-MOUSE_SENSITIVITY_DEFAULT = 1.0
-MOUSE_SENSITIVITY_MIN = 0.20
-MOUSE_SENSITIVITY_MAX = 3.00
-MOUSE_SENSITIVITY_STEP = 0.05
+    # --- what it takes to kill and to die ------------------------------------
+    start_health: float = 100.0
+    # Where on the body a shot landed. The capsule decides *whether* a pellet
+    # hit a character; the physics asset's bodies decide where (see hit_zones).
+    # Anything the zones do not name -- neck, clavicles, torso -- is worth 1.0.
+    head_multiplier: float = 1.5
+    limb_multiplier: float = 0.75
 
-# How much of the zoom aiming gives back in slower mouse movement.
-#
-# Driven off CurrentFOV / BaseFOV, not off a flag, which buys three things for
-# one node: the slowdown is per weapon without anything per weapon being
-# written (a 4x scope slows the mouse more than 1.5x irons because its FOV is
-# narrower), it EASES IN along the same FInterpTo curve the zoom does rather
-# than snapping the instant the button goes down, and letting go restores it by
-# the same curve with no second code path -- exactly as the zoom itself does.
-#
-# 1.0 would be full compensation: the crosshair would then cross the same
-# number of PIXELS per centimetre of mouse at any zoom, which at 4x reads as
-# the mouse having gone dead. 0.0 would be none at all, which at 4x throws the
-# crosshair off the far side of the scope. 0.75 is the usual compromise, and
-# works out at 0.75x sensitivity down the irons and 0.44x down the scope.
-ADS_SENS_COMPENSATION = 0.75
+    # --- sprint and stamina --------------------------------------------------
+    # The walking speed is NOT here: BeginPlay caches whatever the character's
+    # MaxWalkSpeed already is into BaseSpeed and restores that. A literal would
+    # silently fight any later change to the character's own default.
+    sprint_speed_cms: float = 900.0
+    max_stamina: float = 100.0
+    # 4 s of sprint from full, a little over 8 s to refill. Deliberately
+    # asymmetric: sprint is the escape from a pack that runs at 600 cm/s, so it
+    # has to be worth spending and it has to cost something to have spent.
+    stamina_drain_per_s: float = 25.0
+    stamina_regen_per_s: float = 12.0
+
+    # --- aiming down the sights ----------------------------------------------
+    # What ADS does is narrow the camera's field of view and tighten the
+    # weapon's cone. The zoom factor is per weapon (AdsZoom on BP_WeaponItem)
+    # because the sniper's is a scope and everything else's is a set of irons:
+    # 4x against 1.5x is the difference the player is buying when they pick the
+    # rifle up. These two are the values that table chooses between.
+    #
+    # BaseFOV is cached at BeginPlay from whatever the camera already has,
+    # exactly as BaseSpeed caches MaxWalkSpeed.
+    ads_zoom_irons: float = 1.5
+    ads_zoom_scope: float = 4.0
+    # The FOV is NOT snapped. FInterpTo at this speed takes about a fifth of a
+    # second to arrive, which is short enough to feel instant and long enough
+    # that a 4x snap does not read as a teleport. CurrentFOV is stored rather
+    # than recomputed because FInterpTo needs its own previous output.
+    ads_interp_speed: float = 12.0
+    # Aiming is worth something mechanically, not only visually: the cone
+    # shrinks to a third. The shotgun's 5 degrees becomes 1.7, which still
+    # patterns, and the sniper's 0.2 becomes 0.07, which is academic -- the
+    # weapons this matters to are the automatics in the middle.
+    ads_spread_scale: float = 0.34
+    # And what it costs in mobility: at full ADS the player walks at half
+    # speed. Aiming is meant to be a commitment -- the cone is a third as wide
+    # and the camera is inside a scope, so the price is that you cannot also
+    # be going anywhere.
+    #
+    # Applied as a fraction of BaseSpeed, never of the CURRENT walk speed: the
+    # write runs every frame, so scaling what is already there would compound
+    # to a standstill in about a second. And it eases in along the zoom's own
+    # curve rather than snapping with the button, for the reason
+    # ads_sens_compensation below eases -- except that the interpolant here is
+    # normalised by the weapon's own AdsZoom, so full ADS is exactly this
+    # number on irons and on the scope alike. The sensitivity one deliberately
+    # is NOT normalised, because "a 4x scope slows the mouse more" is wanted
+    # and "a 4x scope slows the legs more" is not.
+    ads_move_speed_scale: float = 0.50
+
+    # --- mouse sensitivity, and what aiming does to it -----------------------
+    # The player's look input is the Enhanced Input template's IA_Look, which
+    # lands on AddControllerYawInput / AddControllerPitchInput -- and those
+    # still multiply by APlayerController's InputYawScale / InputPitchScale on
+    # their way into RotationInput. That pair is marked deprecated in UE5, but
+    # the setters are BlueprintCallable and they are the ONLY per-frame handle
+    # on look speed that does not require editing BP_ThirdPersonCharacter's
+    # input graph, which the Blueprint graph API cannot partially rebuild.
+    #
+    # Their values are CACHED at BeginPlay rather than written down here, for
+    # the same reason as BaseSpeed and BaseFOV. It matters more here than
+    # anywhere else: the engine's default pitch scale is NEGATIVE (-2.5), so a
+    # literal positive number would silently invert the player's vertical look.
+    mouse_sensitivity_default: float = 1.0
+    mouse_sensitivity_min: float = 0.20
+    mouse_sensitivity_max: float = 3.00
+    mouse_sensitivity_step: float = 0.05
+    # How much of the zoom aiming gives back in slower mouse movement.
+    #
+    # Driven off CurrentFOV / BaseFOV, not off a flag, which buys three things
+    # for one node: the slowdown is per weapon without anything per weapon
+    # being written (a 4x scope slows the mouse more than 1.5x irons because
+    # its FOV is narrower), it EASES IN along the same FInterpTo curve the zoom
+    # does rather than snapping the instant the button goes down, and letting
+    # go restores it by the same curve with no second code path.
+    #
+    # 1.0 would be full compensation: the crosshair would then cross the same
+    # number of PIXELS per centimetre of mouse at any zoom, which at 4x reads
+    # as the mouse having gone dead. 0.0 would be none at all, which at 4x
+    # throws the crosshair off the far side of the scope. 0.75 is the usual
+    # compromise, and works out at 0.75x sensitivity down the irons and 0.44x
+    # down the scope.
+    ads_sens_compensation: float = 0.75
+
+    # --- recoil --------------------------------------------------------------
+    # A shot kicks the view up by the weapon's own RecoilPitch (a column in
+    # _weapon_specs(), because how hard a gun kicks is the gun's business) and
+    # sideways by a random fraction of it, and the kick is then paid back over
+    # the following fraction of a second.
+    #
+    # Applied by READING AND WRITING THE CONTROL ROTATION, never with
+    # AddPitchInput / AddControllerPitchInput. That route multiplies by
+    # APlayerController's deprecated InputPitchScale -- which is exactly the
+    # handle the mouse-sensitivity setting above drives -- so a player on 0.2
+    # sensitivity would get a fifth of the recoil and a player on 3.0 would be
+    # thrown at the sky. Recoil is a property of the weapon and must not move
+    # when a settings slider does. SetControlRotation bypasses RotationInput
+    # entirely, and the engine's own LimitViewPitch re-clamps the result inside
+    # ViewPitchMin/Max on the controller's next UpdateRotation, so a kick taken
+    # while already looking near-vertical cannot push the camera over the top.
+    #
+    # The accumulator is RecoilDebt: what has been kicked and not yet given
+    # back. Recovery is an FInterpTo of the debt toward zero, so it is fast at
+    # first and settles rather than stopping dead.
+    recoil_recovery_speed: float = 7.0
+    # ...and only this much of each frame's recovery is handed back to the
+    # view. The rest of the debt still decays -- the accumulator always returns
+    # to zero, so nothing can build up across a magazine -- but 30% of every
+    # kick is left in the player's aim for good. That is the difference between
+    # a gun and a screen shake: a burst walks up the target and has to be
+    # pulled back down, instead of springing exactly home between rounds.
+    recoil_recovery_fraction: float = 0.70
+    # Aiming down the sights steadies the weapon, conventionally and here. One
+    # multiplier over the whole kick, vertical and horizontal together, applied
+    # with the same SelectFloat shape the cone uses -- deliberately not a
+    # second per-weapon column, because "shouldering a gun steadies it" is a
+    # fact about shoulders and not about which gun.
+    recoil_ads_scale: float = 0.65
+    # The horizontal kick, as a fraction of the vertical, drawn uniformly in
+    # [-r, +r] per shot. Pure vertical recoil reads as a mechanism; a little
+    # unpredictable sideways is what makes a burst feel like it is fighting
+    # back. Kept well under 1 so the climb is still recognisably upward.
+    recoil_horizontal_ratio: float = 0.35
+
+
+COMBAT = CombatConfig()
+
 
 # --- shotgun ammunition ------------------------------------------------------
 # Ammunition lives on BP_WeaponItem, not on the weapon component, because a
@@ -389,6 +705,20 @@ SHOTGUN_RELOAD_SECONDS = 1.6
 # interval, because without one it fires once per frame.
 PISTOL_FIRE_INTERVAL = 0.18
 RELOAD_KEY = "R"
+
+# The seven rebindable actions, in the order the settings screen lists them and
+# -- more importantly -- in the order BP_Settings.Binds stores them. That array
+# is indexed, not keyed, so this tuple IS the contract between the two builders:
+# build_graphics_menu.py imports it and writes Binds[i] for the same i the HUD
+# pushes back into the variable named here. Reorder it and every existing save
+# on disk silently rebinds itself to the wrong actions.
+BIND_VARS = (("KeyFire", FIRE_KEY),
+             ("KeyAim", AIM_KEY),
+             ("KeySprint", SPRINT_KEY),
+             ("KeySwitch", SWITCH_KEY),
+             ("KeyDrop", DROP_KEY),
+             ("KeyPickup", PICKUP_KEY),
+             ("KeyReload", RELOAD_KEY))
 # Shells a killed wanderer leaves behind. Two per kill against five spent per
 # magazine means the shotgun runs down unless most shots land, which is the
 # point of giving it a reserve at all.
@@ -448,19 +778,52 @@ GUN_DROP_FORWARD = 70.0   # cm; clear of the shells, which land on the corpse
 # instrumentation, and instrumentation is not what the game looks like.
 DEBUG_MODE_VAR = "DebugMode"
 
-# --- the player's death ------------------------------------------------------
-# A full-body death needs its own slot. DefaultSlot is filtered to the upper
-# body (see patch_anim_blueprint) so that the aim pose leaves the legs walking,
-# and a death played into it would fold the chest while the legs stood there.
-# The second slot sits *after* the layered blend, where it overrides everything.
-DEATH_ANIM = "/Game/Characters/Mannequins/Anims/Death/MM_Death_Front_01"
-DEATH_ANIM_OBJECT = f"{DEATH_ANIM}.{DEATH_ANIM.rsplit('/', 1)[-1]}"
-FULL_BODY_SLOT = "FullBodySlot"
-DEATH_BLEND_S = 0.1
-# How long the body is left falling before the game pauses and the menu opens.
-# MM_Death_Front_01 runs about 1.9 s; pausing on top of it freezes the player
-# mid-stumble, which reads as a hang rather than as a death.
+# --- dying: the collapse, and how long a corpse lies there -------------------
+# EVERYTHING that dies in this game collapses the same way, and it collapses
+# physically rather than by playing a clip. There is no death animation in this
+# project and no honest way to make one here:
+#
+#   * the creatures come from Meshy, whose rigging step generates a walk and a
+#     run and nothing else -- there is no clip in assets/cache/meshy that ends
+#     on the ground, and none among the 21 retargeted per creature;
+#   * Epic's own MM_Death_* set, which the player used to play, is six
+#     one-second STAGGERS. Measured off the assets: every one of them ends with
+#     the pelvis at 83-88 cm and both feet on the floor, i.e. still standing,
+#     having travelled 1.5-2 m backwards. They are hit reactions authored to be
+#     blended into a ragdoll, not collapses.
+#
+# That measurement is the whole diagnosis of "he gets up right away": the
+# player staggered for 1.1 s, the dynamic montage blended out, and the
+# locomotion state machine underneath it had him standing again well before the
+# 2.2 s pause.
+#
+# A ragdoll needs no asset at all. Every character here already carries a
+# physics asset -- PA_Mannequin, SKM_Zombie01_PhysicsAsset,
+# SKM_Wendigo01_PhysicsAsset -- and it is not optional: install_hit_zones reads
+# the head and limb tables off those bodies, so a rig that could not ragdoll
+# could not be shot in the head either. The fall is different every time, it is
+# plausible on a slope, and there is nothing to retarget.
+#
+# SetAllBodiesSimulatePhysics, not SetSimulatePhysics: the latter is not even a
+# UFunction on SkeletalMeshComponent (checked -- the node does not exist), and
+# on a PrimitiveComponent it would simulate the one root body, which is a
+# creature-shaped rigid brick falling over rather than a ragdoll.
+RAGDOLL_PROFILE = "Ragdoll"
+# How long a corpse lies where it fell. Long enough that a firefight leaves a
+# visible history of itself, short enough that a long session does not end up
+# rendering a hundred skeletal meshes nobody is looking at.
+CORPSE_SECONDS = 60.0
+# How long the player's body is left falling before the game pauses and the
+# menu opens. The pause stops physics too, so this is also how long the ragdoll
+# gets to settle: pausing early freezes the player mid-topple, which reads as a
+# hang rather than as a death.
 DEATH_PAUSE_SECONDS = 2.2
+# The slot the death montage used to play into. Kept, and still spliced into
+# ABP_Unarmed by patch_anim_blueprint, because it is the only full-body slot
+# either character has and the next thing that needs to override the legs will
+# want it -- DefaultSlot is filtered to the upper body so the aim pose leaves
+# the legs walking.
+FULL_BODY_SLOT = "FullBodySlot"
 # Pellet tracers drawn in the world for this many seconds, in debug mode only.
 # They are the only way to see *where* a shot went -- sound and blood tell you a
 # shot happened and that it connected, but not that it missed high -- which is
@@ -573,13 +936,11 @@ SPAWNED_AT_VAR = "SpawnedAt"
 RESPAWN_ATTEMPTS = 2
 
 # --- hit boxes ---------------------------------------------------------------
-# The capsule decides *whether* a pellet hit a character; the physics asset's
-# bodies decide *where*. A zone is a root bone plus everything under it in the
-# skeleton, so the tables are derived from each character's own mesh at build
-# time (hit_zones) and never typed out here. The neck and the clavicles are
-# neither: they are body, as is anything the zones do not name.
-HEAD_MULTIPLIER = 1.5
-LIMB_MULTIPLIER = 0.75
+# A zone is a root bone plus everything under it in the skeleton, so the tables
+# are derived from each character's own mesh at build time (hit_zones) and
+# never typed out here. What a zone is WORTH is combat tuning and lives on
+# COMBAT; which bones are in one is a fact about a rig and lives below.
+#
 # Zone roots by ROLE, with the candidate bone names each rig might use.
 #
 # Two skeletons reach this code and they share almost no bone names: Epic's
@@ -610,7 +971,6 @@ HIT_BONE_VAR = "HitBone"
 # Debug mode's damage readout, drawn at each impact for as long as the tracer.
 DAMAGE_TEXT_COLOR = "(R=1.000000,G=0.850000,B=0.100000,A=1.000000)"
 
-GRIP_SOCKET = "HandGrip_R"
 
 # --- the shooting camera -----------------------------------------------------
 # A centred third-person camera puts the character's own back where the reticle
@@ -823,6 +1183,14 @@ def _same(a, b):
         return int(a) == b
     if hasattr(b, "get_path_name"):
         return a is not None and a.get_path_name() == b.get_path_name()
+    if isinstance(b, unreal.Key):
+        # BEFORE the to_tuple arm, and that order is the whole point: FKey
+        # exposes no struct fields to Python, so to_tuple() is () for every key
+        # and comparing two of them that way passes unconditionally. Python's ==
+        # on the wrapper is identity, which fails unconditionally. export_text()
+        # is the only view that answers the question -- and it is the same bare
+        # key name a pin literal uses.
+        return a is not None and a.export_text() == b.export_text()
     if hasattr(b, "to_tuple"):
         return (a is not None and hasattr(a, "to_tuple")
                 and all(abs(x - y) < 1e-4 for x, y in zip(a.to_tuple(), b.to_tuple())))
@@ -979,20 +1347,70 @@ def _pure_rotation(rotator):
                             scale=unreal.Vector(1.0, 1.0, 1.0))
 
 
+class _BoneGrip:
+    """A socket-shaped stand-in for a rig that has no grip socket.
+
+    Python cannot create a SkeletalMeshSocket -- both SocketName and BoneName
+    are read-only on it, so there is no way to say which bone a new socket
+    hangs off -- and a Meshy rig arrives with none. Attaching to the BONE works
+    instead: AttachToComponent resolves a socket name and a bone name out of
+    the same namespace, and everything downstream of here only ever asks a
+    socket for its bone and its rotation.
+
+    The rotation is identity, and that is not an approximation. _grip_rotation
+    *solves* for the transform that puts the barrel on the player's forward in
+    a given pose, so whatever frame the hand bone happens to be authored in is
+    taken out by the solve. What identity costs is position, not aim: the
+    weapon hangs off the wrist joint rather than the middle of the palm.
+    """
+
+    def __init__(self, bone):
+        self._bone = bone
+
+    def get_editor_property(self, name):
+        if name == "bone_name":
+            return unreal.Name(self._bone)
+        if name == "relative_rotation":
+            return unreal.Rotator()
+        if name == "relative_location":
+            return unreal.Vector()
+        raise AttributeError(name)
+
+
 def _grip_socket():
-    """(mesh yaw inside the actor, the HandGrip_R socket) off the player's mesh."""
+    """(mesh yaw inside the actor, the grip socket) off the player's mesh."""
     bp = _assets().load_asset(CHARACTER_BP_PATH)
     if not bp:
         raise RuntimeError(f"could not load {CHARACTER_BP_PATH}")
+    grip = player_skin().grip
     for handle, _name in _handles(bp):
         obj = _component_object(handle)
         if isinstance(obj, unreal.SkeletalMeshComponent):
             skeletal = obj.get_editor_property("skeletal_mesh_asset")
-            socket = skeletal.find_socket(GRIP_SOCKET)
+            socket = skeletal.find_socket(grip)
             if not socket:
-                raise RuntimeError(f"{skeletal.get_name()} has no {GRIP_SOCKET}")
+                # Not an error unless the name is neither a socket nor a bone:
+                # then the weapon would attach to the component root and hang
+                # in the middle of the player's chest.
+                if unreal.Name(grip) not in _mesh_bone_names(skeletal):
+                    raise RuntimeError(
+                        f"{skeletal.get_name()} has neither a {grip} socket nor "
+                        f"a {grip} bone — a weapon could not be put in its hand")
+                socket = _BoneGrip(grip)
             return obj.get_editor_property("relative_rotation").yaw, socket
     raise RuntimeError(f"{CHARACTER_BP_PATH} has no SkeletalMeshComponent")
+
+
+def _mesh_bone_names(skeletal):
+    """Every bone of a skeletal mesh, as Names.
+
+    Off the skeleton's reference pose rather than off a spawned component: this
+    runs during a headless build, where spawning an actor to ask it a question
+    costs a level that then has to be left undirtied.
+    """
+    skel = skeletal.get_editor_property("skeleton")
+    pose = unreal.AnimPoseExtensions.get_reference_pose(skel)
+    return list(unreal.AnimPoseExtensions.get_bone_names(pose))
 
 
 def socket_in_mesh(aim_pose_path):
@@ -1230,7 +1648,21 @@ def _weapon_specs():
     not of the weapon.
 
     DropClasses below is what marks a weapon as findable rather than issued.
+
+    `recoil` is degrees of muzzle climb per shot, and it is a column here for
+    the same reason `spread` is -- how hard a gun kicks is a fact about the
+    gun. The ordering is the point of the numbers: the two heavy, slow weapons
+    kick hardest (sniper 2.4, shotgun 2.2), the assault rifle next (0.85), the
+    SMG noticeably less (0.45) and the pistol least (0.30). Read against
+    `interval` it is also a rate: the SMG's 0.45 every 0.09 s is five degrees a
+    second of raw climb against the rifle's six, so the rifle is the one that
+    walks off target under sustained fire while the SMG stays controllable --
+    which is the same "wins the fight it is already in" identity its damage
+    gives it. The two singles pay their whole kick in one visible jolt and
+    then have a second to recover.
     """
+    skin = player_skin()
+    AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
     return (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
              display="Shotgun", automatic=False, damage=18.0, pellets=8, spread=5.0, range=4000.0,
@@ -1238,14 +1670,16 @@ def _weapon_specs():
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
-             interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS),
+             interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
+             recoil=2.2),
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
              display="Pistol", automatic=False, damage=26.0, pellets=1, spread=1.0, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_PISTOL),
              colour=(0.35, 0.65, 0.95),
              uses_ammo=False, magazine=0, reserve=0,
-             interval=PISTOL_FIRE_INTERVAL, reload_s=0.0),
+             interval=PISTOL_FIRE_INTERVAL, reload_s=0.0,
+             recoil=0.30),
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast.
@@ -1255,7 +1689,8 @@ def _weapon_specs():
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.45, 0.85, 0.35),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
-             interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS),
+             interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
+             recoil=0.45),
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
         dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE,
@@ -1264,7 +1699,8 @@ def _weapon_specs():
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.70, 0.45, 0.95),
              uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
-             interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS),
+             interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS,
+             recoil=0.85),
         # One shot, one kill: 120 against 100 HP, at 0.2 degrees of spread and
         # 200 m of range -- further than anything in a 200 m forest is visible.
         # The cost is 1.6 s between shots, which against a pack of five that
@@ -1274,9 +1710,10 @@ def _weapon_specs():
              display="Sniper", automatic=False, damage=120.0, pellets=1, spread=0.2, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
-             colour=(0.95, 0.30, 0.35), ads_zoom=ADS_ZOOM_SCOPE,
+             colour=(0.95, 0.30, 0.35), ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
-             interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS),
+             interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
+             recoil=2.4),
     )
 
 
@@ -1288,29 +1725,51 @@ DROP_DISPLAYS = ("SMG", "Rifle", "Sniper")
 
 # ─── Materials and sounds ────────────────────────────────────────────────────
 
+# Linear base colours. M_Blood is the one worth stating a number for:
+# (0.150, 0.014, 0.012) is sRGB #6C2825, a dark desaturated crimson roughly two
+# stops under arterial red. Pure (1, 0, 0) -- or the (0.30, 0.005, 0.005) this
+# used to be, which is that hue at lower value -- is the single loudest
+# "cartoon" cue there is, because nothing in a forest at night is that
+# saturated.
+BLOOD_BASE_COLOUR = (0.150, 0.014, 0.012)
+# Wet, not painted. The specular highlight off a 0.22-rough droplet is what
+# actually makes blood readable at night; emissive was the old answer and it is
+# the wrong one -- a glowing droplet cannot sit in the scene's lighting, it only
+# sits on top of it.
+BLOOD_ROUGHNESS = 0.22
+
+
 def build_materials():
     """Flat constant materials, so the parts read as a gun and not as white boxes.
 
     Material *instances* of BasicShapeMaterial would be cheaper, but that engine
     material exposes no parameters, so there is nothing to instance.
+
+    Re-authored in place on every run rather than skipped when the asset is
+    already there. The old skip meant a changed recipe never landed: the blood
+    colour could be edited here, the builder re-run, and the material on disk
+    would still be last month's. delete_all_material_expressions clears the
+    graph without deleting the asset, so every reference to it survives.
     """
     eas = _assets()
     mel = unreal.MaterialEditingLibrary
     for path, (colour, metallic, roughness, emissive) in (
             (MAT_METAL, ((0.055, 0.058, 0.065), 1.0, 0.32, None)),
             (MAT_WOOD, ((0.115, 0.062, 0.030), 0.0, 0.62, None)),
-            # Blood is emissive so a splash reads at night, which is the only
-            # lighting this project currently ships.
-            (MAT_BLOOD, ((0.30, 0.005, 0.005), 0.0, 0.35, (0.55, 0.01, 0.01))),
+            # Deliberately NOT emissive -- see BLOOD_BASE_COLOUR.
+            (MAT_BLOOD, (BLOOD_BASE_COLOUR, 0.0, BLOOD_ROUGHNESS, None)),
             # Shells on the forest floor, at night, under trees. Emissive
-            # for the same reason blood is: without it a dropped pickup is
-            # a black cylinder on black ground and nobody ever finds it.
+            # because without it a dropped pickup is a black cylinder on black
+            # ground and nobody ever finds it -- a gameplay affordance, which
+            # is a reason blood does not get to borrow.
             (MAT_BRASS, ((0.52, 0.36, 0.08), 1.0, 0.28, (0.34, 0.22, 0.03)))):
-        if eas.does_asset_exist(path):
-            continue
         package_path, name = path.rsplit("/", 1)
-        mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-            name, package_path, unreal.Material, unreal.MaterialFactoryNew())
+        if eas.does_asset_exist(path):
+            mat = _must_load(path)
+            mel.delete_all_material_expressions(mat)
+        else:
+            mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+                name, package_path, unreal.Material, unreal.MaterialFactoryNew())
         base = mel.create_material_expression(
             mat, unreal.MaterialExpressionConstant3Vector, -400, 0)
         base.set_editor_property("constant", unreal.LinearColor(*colour, 1.0))
@@ -1326,9 +1785,115 @@ def build_materials():
                 mat, unreal.MaterialExpressionConstant3Vector, -400, 440)
             e.set_editor_property("constant", unreal.LinearColor(*emissive, 1.0))
             mel.connect_material_property(e, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        # delete_all_material_expressions above leaves the previous run's
+        # now-unreferenced nodes behind in the asset; this is what actually
+        # removes them, and without it every rebuild grows the graph.
+        mel.delete_unused_expressions(mat)
         mel.recompile_material(mat)
         eas.save_loaded_asset(mat)
         _log(f"built {path}")
+
+
+def build_sound_attenuations():
+    """Build the USoundAttenuation assets, one per AttenuationProfile.
+
+    Re-authored in place every run rather than skipped when present: that is
+    the lesson build_materials() had to learn the hard way -- a builder that
+    leaves an existing asset alone can never change a recipe, and since nothing
+    under Content/ is committed, the asset on disk is only ever as good as the
+    last run that actually wrote it.
+
+    Returns {name: asset} for apply_attenuation().
+    """
+    tools = unreal.AssetToolsHelpers.get_asset_tools()
+    eas = _assets()
+    built = {}
+    for profile in ATTENUATIONS:
+        if profile.audible_cm > AUDIBLE_LIMIT_CM:
+            raise RuntimeError(
+                f"{profile.name} would be audible from "
+                f"{profile.audible_cm / 100.0:.0f} m, over the "
+                f"{AUDIBLE_LIMIT_CM / 100.0:.0f} m ceiling")
+        asset = (eas.load_asset(profile.path)
+                 if eas.does_asset_exist(profile.path)
+                 else tools.create_asset(profile.name, CREATURE_AUDIO_DIR,
+                                         unreal.SoundAttenuation,
+                                         unreal.SoundAttenuationFactory()))
+        if asset is None:
+            raise RuntimeError(f"could not create {profile.path}")
+        # The struct read back off the asset is a COPY -- the same trap the
+        # LayeredBoneBlend node's inner FAnimNode has -- so it is read,
+        # changed, and written back wholesale.
+        at = asset.get_editor_property("attenuation")
+        at.set_editor_property("attenuate", True)
+        at.set_editor_property("spatialize", True)
+        at.set_editor_property("distance_algorithm",
+                               unreal.AttenuationDistanceModel.NATURAL_SOUND)
+        at.set_editor_property("attenuation_shape",
+                               unreal.AttenuationShape.SPHERE)
+        # Only X is read for a sphere; Y and Z are the box and capsule extents.
+        at.set_editor_property("attenuation_shape_extents",
+                               unreal.Vector(profile.radius_cm, 0.0, 0.0))
+        at.set_editor_property("falloff_distance", profile.falloff_cm)
+        # Spelled d_b_ and not db_: the UPROPERTY is dBAttenuationAtMax and
+        # the Python name is generated one word boundary at a time.
+        at.set_editor_property("d_b_attenuation_at_max", ATT_DB_AT_MAX)
+        at.set_editor_property(
+            "spatialization_algorithm",
+            unreal.SoundSpatializationAlgorithm.SPATIALIZATION_DEFAULT)
+        at.set_editor_property("attenuate_with_lpf", profile.air_absorption)
+        if profile.air_absorption:
+            at.set_editor_property("lpf_radius_min", profile.radius_cm)
+            at.set_editor_property("lpf_radius_max", profile.audible_cm)
+            at.set_editor_property("lpf_frequency_at_min", ATT_LPF_NEAR_HZ)
+            at.set_editor_property("lpf_frequency_at_max", ATT_LPF_FAR_HZ)
+        asset.set_editor_property("attenuation", at)
+        eas.save_loaded_asset(asset)
+        built[profile.name] = asset
+        _log(f"built {profile.path} "
+             f"(full volume to {profile.radius_cm:.0f} cm, silent past "
+             f"{profile.audible_cm / 100.0:.0f} m"
+             + (", air absorption on)" if profile.air_absorption else ")"))
+    return built
+
+
+def apply_attenuation(attenuations):
+    """Point every SoundWave in the two audio folders at its profile.
+
+    On the ASSET, not on the PlaySoundAtLocation nodes. Both would work -- the
+    node carries an AttenuationSettings pin that overrides the asset -- but the
+    pin has to be wired at every call site, and there are five of those across
+    three Blueprints authored by two different builders, so the pin is five
+    chances to miss one and the asset is one write per sound.
+
+    It sweeps the FOLDERS rather than SOUND_NAMES + CREATURE_SOUND_NAMES, and
+    raises on a wave it has no profile for. That is the check that makes "no
+    world sound was left behind" true rather than merely intended: a sound
+    added to either tuple, or dropped into the folder by hand, stops the build
+    instead of shipping unattenuated.
+    """
+    eas = _assets()
+    orphans, applied = [], {}
+    for folder in (AUDIO_DIR, CREATURE_AUDIO_DIR):
+        for ref in eas.list_assets(folder, recursive=False):
+            asset = eas.load_asset(ref)
+            if not isinstance(asset, unreal.SoundWave):
+                continue
+            profile = SOUND_ATTENUATION.get(asset.get_name())
+            if profile is None:
+                orphans.append(asset.get_name())
+                continue
+            asset.set_editor_property("attenuation_settings",
+                                      attenuations[profile.name])
+            eas.save_loaded_asset(asset)
+            applied.setdefault(profile.name, []).append(asset.get_name())
+    if orphans:
+        raise RuntimeError(
+            f"no attenuation profile for {sorted(orphans)} -- add them to "
+            f"SOUND_ATTENUATION, or they ship audible from anywhere")
+    for name, names in sorted(applied.items()):
+        _log(f"{name} -> {len(names)} sound(s): {', '.join(sorted(names))}")
+    return applied
 
 
 def import_sounds():
@@ -1548,6 +2113,49 @@ def _struct_type(struct):
     return BEL.get_struct_type(struct)
 
 
+def _key(name):
+    """An FKey value for a CDO default.
+
+    unreal.Key takes no constructor argument and exposes no fields, so the only
+    two ways in are set_editor_property("key_name", ...) and import_text(). The
+    property form is used here because it fails loudly on a misspelling, where
+    import_text returns True for anything.
+    """
+    k = unreal.Key()
+    k.set_editor_property("key_name", name)
+    return k
+
+
+def build_settings_savegame(rebuild=True):
+    """The settings the player keeps between runs: BP_Settings, a USaveGame.
+
+    A SaveGame and not a GameInstance, and built HERE and not in
+    build_graphics_menu.py, for the same reason: both of its consumers have to
+    be able to name the class. The HUD loads it, edits it and saves it; the
+    weapon component is handed the values every frame and never touches the
+    disk. Putting it in the HUD's builder would mean the HUD's builder had to
+    run first, and putting it on a GameInstance would mean the menu could not
+    write to it without the game already being in progress.
+
+    No graph: this is a record, not behaviour.
+    """
+    bp = _create_blueprint(SETTINGS_BP_PATH, unreal.SaveGame)
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    _declare(ed, "MouseSensitivity", _float_type())
+    # Indexed, not a struct per bind and not seven separate variables: the
+    # settings screen walks the rows with one ForEachLoop and one Array_Set, and
+    # BIND_VARS is what says which index means which action.
+    _declare(ed, "Binds", BEL.get_array_type(_struct_type(unreal.Key.static_struct())))
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_Settings failed to compile")
+    _apply_defaults(bp, {
+        "MouseSensitivity": COMBAT.mouse_sensitivity_default,
+        "Binds": [_key(k) for _name, k in BIND_VARS],
+    })
+    _log(f"built {SETTINGS_BP_PATH} (slot {SETTINGS_SLOT!r})")
+    return bp
+
+
 def build_weapon_item():
     """The base weapon Actor: no geometry, no graph, just the data a gun has.
 
@@ -1614,6 +2222,18 @@ def build_weapon_item():
     # the same reason SpreadDegrees is -- the component reads it off Held and
     # knows nothing about which weapon it is holding.
     _declare(ed, "AdsZoom", _float_type())
+    # Whether aiming this weapon puts a scope over the screen. A flag rather
+    # than "AdsZoom >= COMBAT.ads_zoom_scope": the zoom is how far the camera moves
+    # and the scope is what the sight looks like, and a future weapon is free
+    # to be a 4x with irons or a 2x with glass without either answer moving.
+    _declare(ed, "Scoped", BEL.get_basic_type_by_name("bool"))
+    # Degrees of upward kick this weapon puts on the view per shot. On the item
+    # for the same reason AdsZoom and SpreadDegrees are: the component reads it
+    # off Held and knows nothing about which weapon it is holding. The
+    # horizontal half is not a second column -- it is a fraction of this one,
+    # drawn per shot, and the fraction is the same for every gun (see
+    # COMBAT.recoil_horizontal_ratio).
+    _declare(ed, "RecoilPitch", _float_type())
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
@@ -1651,6 +2271,13 @@ def build_weapon(spec, item_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{spec['path']} failed to compile")
 
+    # The HUD fades the scope on (BaseFOV/CurrentFOV - 1) / (AdsZoom - 1), so a
+    # scoped weapon that does not zoom is a divide by zero once per frame while
+    # it is aimed. Caught here rather than guarded there: it is a nonsense row
+    # in the table, not a state the game can reach.
+    if spec.get("scoped") and float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)) <= 1.0:
+        raise RuntimeError(f"{spec['display']} is scoped but does not zoom")
+
     _apply_defaults(bp, {
         "DisplayName": spec["display"],
         "Damage": float(spec["damage"]),
@@ -1673,7 +2300,9 @@ def build_weapon(spec, item_bp):
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
-        "AdsZoom": float(spec.get("ads_zoom", ADS_ZOOM_IRONS)),
+        "AdsZoom": float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),
+        "Scoped": bool(spec.get("scoped", False)),
+        "RecoilPitch": float(spec["recoil"]),
         "Icon": _weapon_icon(spec["display"]),
         "FireSound": _must_load(spec["sound"]),
         "DryFireSound": _must_load(SND_DRY_FIRE),
@@ -1682,6 +2311,7 @@ def build_weapon(spec, item_bp):
     })
     _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
          f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
+         f"{spec['recoil']:.2f} deg kick, "
          + (f"{spec['magazine']}+{spec['reserve']} rounds, "
             f"{spec['interval']:.2f}s between shots"
             if spec["uses_ammo"] else "unlimited ammo")
@@ -1793,14 +2423,39 @@ FN_GET_PITCH_SCALE = "/Script/Engine.PlayerController.GetDeprecatedInputPitchSca
 FN_SET_YAW_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputYawScale"
 FN_SET_PITCH_SCALE = "/Script/Engine.PlayerController.SetDeprecatedInputPitchScale"
 FN_LERP = "/Script/Engine.KismetMathLibrary.Lerp"
+# Recoil moves the view through the CONTROLLER's rotation, not through
+# AddPitchInput: see COMBAT's recoil block for why routing it through
+# RotationInput would make the kick scale with the sensitivity slider.
+FN_GET_CONTROL_ROT = "/Script/Engine.Controller.GetControlRotation"
+FN_SET_CONTROL_ROT = "/Script/Engine.Controller.SetControlRotation"
+FN_BREAK_ROT = "/Script/Engine.KismetMathLibrary.BreakRotator"
+FN_ABS = "/Script/Engine.KismetMathLibrary.Abs"
 CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
+MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
 FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
 FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
 FN_DISABLE_MOVEMENT = "/Script/Engine.CharacterMovementComponent.DisableMovement"
+FN_SET_COLLISION = "/Script/Engine.PrimitiveComponent.SetCollisionEnabled"
+FN_GET_CONTROLLER = "/Script/Engine.Pawn.GetController"
+FN_SET_PROFILE = "/Script/Engine.PrimitiveComponent.SetCollisionProfileName"
+# Every body in the physics asset, not the component's one root body --
+# see RAGDOLL_PROFILE. SkeletalMeshComponent has no SetSimulatePhysics
+# UFunction at all, so there is no node to reach for by mistake.
+FN_SIMULATE_ALL = ("/Script/Engine.SkeletalMeshComponent"
+                   ".SetAllBodiesSimulatePhysics")
 FN_SIN = "/Script/Engine.KismetMathLibrary.Sin"
 FN_ROT_FROM_X = "/Script/Engine.KismetMathLibrary.MakeRotFromX"
+FN_EXP = "/Script/Engine.KismetMathLibrary.Exp"
+FN_INV_XFORM_DIR = "/Script/Engine.KismetMathLibrary.InverseTransformDirection"
+FN_BREAK_TRANSFORM = "/Script/Engine.KismetMathLibrary.BreakTransform"
+FN_GET_COMPONENTS = "/Script/Engine.Actor.K2_GetComponentsByClass"
+# Component-space, not the Actor.* pair above it: the droplets move relative to
+# the burst, and the actor itself never moves after the frame it spawns.
+FN_COMP_REL_XFORM = "/Script/Engine.SceneComponent.GetRelativeTransform"
+FN_COMP_SET_REL_LOC = "/Script/Engine.SceneComponent.K2_SetRelativeLocation"
+FN_COMP_SET_SCALE = "/Script/Engine.SceneComponent.SetRelativeScale3D"
 FN_SET_ACTOR_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
 FN_ACTOR_FORWARD = "/Script/Engine.Actor.GetActorForwardVector"
 FN_DRAW_LINE = "/Script/Engine.KismetSystemLibrary.DrawDebugLine"
@@ -1816,6 +2471,7 @@ NODE_BREAK_HIT = "Collision|BreakHitResult"
 NODE_SPAWN = "Game|SpawnActorfromClass"
 NODE_CAST_CHAR = "Utilities|Casting|CastToBP_ThirdPersonCharacter"
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
+NODE_CAST_PAWN = "Utilities|Casting|CastToPawn"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
 NODE_CAST_ITEM = "Utilities|Casting|CastToBP_WeaponItem"
@@ -1882,23 +2538,55 @@ def _post_physics_tick(bp):
 # ─── BP_BloodSplash ──────────────────────────────────────────────────────────
 
 BLOOD_SEED = 7             # laid out once, at build time, so it is reproducible
-BLOOD_DROPLETS = 8         # plus the two-sphere wound core
-BLOOD_CONE = 0.45          # spray half-width, as a fraction of its own reach
-BLOOD_LIFETIME = 0.7
-BLOOD_START_SCALE = 0.55   # how big the burst is on the frame it appears
-BLOOD_SWELL = 2.6          # extra scale at the middle of its life
-BLOOD_SPRAY_CMS = 130.0    # how fast the spray travels back along the normal
-BLOOD_GRAVITY = 260.0      # what bends the spray back down into an arc
-BLOOD_JITTER = 0.25        # +/- size randomness, so two hits never match
+BLOOD_DROPLETS = 14        # the fast spray
+BLOOD_MIST = 5             # fine, slow, near the wound: what is left hanging
+BLOOD_CONE_DEG = 34.0      # spray half-angle around the surface normal
+BLOOD_MIST_CONE_DEG = 72.0 # the haze is not directional in the way the spray is
+BLOOD_LIFETIME = 0.45      # punctuation, not a fountain
+BLOOD_FADE_TAIL = 0.14     # the last of the lifetime, spent shrinking to nothing
+BLOOD_SPEED_MIN = 140.0    # cm/s -- the laggards
+BLOOD_SPEED_MAX = 900.0    # cm/s -- the leading edge of the spray
+BLOOD_MIST_SPEED_MIN = 25.0
+BLOOD_MIST_SPEED_MAX = 90.0
+BLOOD_DRAG = 3.6           # 1/s. Air drag on a 2 mm droplet, near enough
+BLOOD_GRAVITY = 980.0      # cm/s^2, real gravity and not a stylised fraction
+BLOOD_DROP_SCALE = (0.010, 0.030)   # 1-3 cm droplets off a 100 cm sphere
+BLOOD_MIST_SCALE = (0.005, 0.011)   # 0.5-1.1 cm
+# The velocity of each droplet is baked into its relative *location*, divided by
+# this. Two things fall out of that and both matter:
+#
+#   * there is no parallel table to keep in step with the components -- the
+#     droplet carries its own velocity, so no ordering assumption about what
+#     GetComponentsByClass hands back can ever be wrong;
+#   * the frame the actor spawns, before BeginPlay has run, the components are
+#     still sitting where the builder left them. At 100 that is a 1-9 cm clump
+#     around the wound, which is a wound. Store the velocity directly and the
+#     first frame of every hit is a nine-metre sphere of blood.
+#
+# 100 rather than any other number because cm/s over 100 is m/s, so the baked
+# location reads as the droplet's launch speed in metres per second and there
+# is nothing to decode by hand. The graph converts it back where it scales the
+# drag term, not per droplet.
+BLOOD_VELOCITY_ENCODE = 100.0
+# Damage the spray is sized against. Shotgun pellets are 18 each and there are
+# eight of them; the sniper is one large number. Clamped either side so no
+# weapon can produce either a mist or a fire hose.
+BLOOD_REFERENCE_DAMAGE = 24.0
+BLOOD_SCALE_MIN = 0.65
+BLOOD_SCALE_MAX = 1.60
 
 
 def _blood_blobs():
-    """A wound core, then a cone of droplets thrown back along +X.
+    """A seeded spray of droplet velocities, thrown back along +X.
 
     +X is the actor's forward, and _author_impact spawns the splash rotated so
     that forward *is* the surface normal of whatever the pellet hit. So the
     spray comes out of the wound rather than out of an arbitrary world axis,
     and a shot to the chest and a shot to the back throw blood opposite ways.
+
+    Each tuple is (x, y, z, scale) where x/y/z is the droplet's launch velocity
+    over BLOOD_VELOCITY_ENCODE -- see that constant for why the velocity lives
+    in the location.
 
     Seeded rather than authored by hand: the shape wanted here is "irregular",
     which a person writing tuples produces badly and a seed produces for free --
@@ -1906,15 +2594,31 @@ def _blood_blobs():
     same layout and compare it against the saved components.
     """
     rng = random.Random(BLOOD_SEED)
-    blobs = [(0.0, 0.0, 0.0, 0.11), (1.4, 0.0, 0.0, 0.085)]
-    for i in range(BLOOD_DROPLETS):
-        reach = 2.0 + 7.0 * (i + 1) / BLOOD_DROPLETS
-        angle = rng.uniform(0.0, math.tau)
-        radius = rng.uniform(0.35, 1.0) * reach * BLOOD_CONE
-        blobs.append((round(reach, 3),
-                      round(math.cos(angle) * radius, 3),
-                      round(math.sin(angle) * radius, 3),
-                      round(rng.uniform(0.028, 0.055), 4)))
+    blobs = []
+
+    def shoot(cone_deg, speed_lo, speed_hi, scale_lo, scale_hi, bias):
+        # sqrt() on the polar draw is what spreads samples evenly over the cap
+        # instead of piling them on the axis -- a uniform draw in theta gives a
+        # needle with a halo, which is not what a spray looks like.
+        theta = math.radians(cone_deg) * math.sqrt(rng.random())
+        phi = rng.uniform(0.0, math.tau)
+        # Biased toward the top of the range: most of the spray is fast and a
+        # few droplets lag badly behind it. Drawn uniformly, every droplet ends
+        # the frame at much the same radius and the burst reads as one
+        # expanding shell -- the "everything moves at one speed" tell.
+        speed = speed_lo + (speed_hi - speed_lo) * (rng.random() ** bias)
+        direction = (math.cos(theta),
+                     math.sin(theta) * math.cos(phi),
+                     math.sin(theta) * math.sin(phi))
+        return tuple(round(d * speed / BLOOD_VELOCITY_ENCODE, 5)
+                     for d in direction) + (round(rng.uniform(scale_lo, scale_hi), 5),)
+
+    for _ in range(BLOOD_DROPLETS):
+        blobs.append(shoot(BLOOD_CONE_DEG, BLOOD_SPEED_MIN, BLOOD_SPEED_MAX,
+                           *BLOOD_DROP_SCALE, bias=0.5))
+    for _ in range(BLOOD_MIST):
+        blobs.append(shoot(BLOOD_MIST_CONE_DEG, BLOOD_MIST_SPEED_MIN,
+                           BLOOD_MIST_SPEED_MAX, *BLOOD_MIST_SCALE, bias=1.0))
     return tuple(blobs)
 
 
@@ -1922,25 +2626,43 @@ BLOOD_BLOBS = _blood_blobs()
 
 
 def build_blood_splash(rebuild=True):
-    """Emissive red spheres thrown out of the wound, arcing down as they swell.
+    """Small dark droplets thrown out of the wound under drag and real gravity.
 
-    Not a particle system: Niagara cannot be authored from Python at all, and a
-    Cascade emitter is no better. What stands in for one is a fixed cone of
-    spheres whose *actor* is animated on Tick -- ten components moved by three
-    nodes, instead of ten components each needing their own chain:
+    **Not Niagara, and the reason is not preference.** UE 5.8 exposes
+    NiagaraSystem to Python with no emitter handles, no exposed parameters and
+    no renderer access -- `get_editor_property("emitter_handles")` does not
+    resolve -- and the one API that *can* build an emitter stack,
+    UNiagaraExternalSystemEditorUtilities (AddEmitter / AddModule /
+    SetStackInputData, the thing the editor's own external-edit tooling drives),
+    is plain C++ statics with no UFUNCTION on them, so none of it reaches
+    Python. Duplicating an engine template such as
+    /Niagara/DefaultAssets/Templates/Systems/DirectionalBurst gets an asset that
+    cannot then be retuned. Cascade is worse: the runtime classes survive in 5.8
+    but the editor module and every ParticleModule* reflection type are gone.
+    A system nobody can rebuild from a script is not allowed here, so the
+    droplets are components and the solver is in the graph.
 
-        position = Origin + Forward * spray * Age - Z * gravity * Age^2
-        scale    = start + swell * sin(pi * Age / lifetime)
+    What each droplet does is the closed-form solution of dv/dt = g - k*v,
+    which is a falling drop with linear air drag:
 
-    The parabola is what makes it read as blood rather than as an expanding
-    ball: the spray leaves the wound fast, slows, and falls. The sine does the
-    whole life in one pure expression -- zero extra at both ends, widest in the
-    middle -- so the burst grows in and shrinks away without a branch anywhere,
-    and without a Timeline, whose curve asset cannot be authored from Python.
+        A(t)  = (1 - e^(-k t)) / k
+        B(t)  = (t - A) / k
+        local = Velocity * A + Fall * B
+
+    -- one pair of scalars computed once per frame for the whole burst, and one
+    multiply-add per droplet. Every droplet has its own launch velocity, so they
+    separate as they fly: that separation is most of what the old version was
+    missing. It threw ten spheres as one rigid cone at a single speed and swelled
+    them on a sine to 35 cm across, which is a cartoon for three separate
+    reasons -- one speed, one shape, and blood does not inflate.
+
+    Scale is held flat and then cut to nothing over the last BLOOD_FADE_TAIL of
+    the life, so the burst is a punctuation mark rather than something that
+    grows.
     """
     eas = _assets()
     bp = _create_blueprint(BLOOD_BP_PATH, unreal.Actor)
-    names = {f"Blob{i}" for i in range(max(len(BLOOD_BLOBS), 16))}
+    names = {f"Blob{i}" for i in range(max(len(BLOOD_BLOBS), 24))}
     _drop_components(bp, {"Burst"} | names)
     root = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Burst")
     for i, (x, y, z, scale) in enumerate(BLOOD_BLOBS):
@@ -1950,6 +2672,10 @@ def build_blood_splash(rebuild=True):
         obj.set_editor_property("relative_location", unreal.Vector(x, y, z))
         obj.set_editor_property("relative_scale3d", unreal.Vector(scale, scale, scale))
         obj.set_editor_property("override_materials", [eas.load_asset(MAT_BLOOD)])
+        # A droplet is 1-3 cm and gone in under half a second; it has no
+        # business in the shadow pass, and 19 of them per pellet times eight
+        # pellets is 152 shadow casters for a single shotgun blast.
+        obj.set_editor_property("cast_shadow", False)
         try:
             obj.set_collision_profile_name("NoCollision")
         except Exception as exc:                                  # noqa: BLE001
@@ -1958,34 +2684,76 @@ def build_blood_splash(rebuild=True):
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
     _declare(ed, "Age", _float_type())
-    # Where the pellet landed. The spray is computed from this rather than from
-    # "wherever I am now", so an error in one frame cannot accumulate.
-    _declare(ed, "Origin", _struct_type(unreal.Vector.static_struct()))
-    _declare(ed, "Jitter", _float_type())
+    _declare(ed, "Blobs", BEL.get_array_type(
+        BEL.get_object_reference_type(unreal.StaticMeshComponent.static_class())))
+    # Launch velocity and untouched size, one entry per component, filled in the
+    # same loop that fills Blobs -- so the three arrays are in step by
+    # construction and not by an assumption about component ordering.
+    _declare(ed, "Velocity", BEL.get_array_type(
+        _struct_type(unreal.Vector.static_struct())))
+    _declare(ed, "Size", BEL.get_array_type(_float_type()))
+    # Gravity, rotated into the actor's own frame once. The actor is spawned
+    # facing the hit normal and never turns, so this cannot go stale, and doing
+    # it here keeps a transform inverse out of the per-frame path.
+    _declare(ed, "Fall", _struct_type(unreal.Vector.static_struct()))
 
-    # --- BeginPlay: remember the wound, pick a size, arrange to be cleaned up.
-    here = _at(_node(ed, FN_ACTOR_LOC), 320, -700)
-    pin_origin = _at(ed.add_set_member_variable_node("Origin"), 560, -900)
-    _connect(_pin(here, "ReturnValue", is_input=False), _pin(pin_origin, "Origin"))
-    _connect(BEL.find_then_pin(begin), _pin(pin_origin, "execute"))
+    # --- BeginPlay: read each droplet's velocity back off the component ------
+    # Pure, not impure: UHT promotes a const BlueprintCallable to BlueprintPure,
+    # so this node has no exec pin to thread and the loop hangs off BeginPlay
+    # directly. The same is true of GetRelativeTransform below.
+    found = _at(_node(ed, FN_GET_COMPONENTS), 320, -900)
+    _pin(found, "ComponentClass").set_pin_value("/Script/Engine.StaticMeshComponent")
 
-    # One random draw, stored. Every burst is the same ten spheres in the same
-    # cone, so without this a shotgun's eight pellets into one torso read as one
-    # big sphere. RandomFloatInRange is **pure**, so it must be read exactly
-    # once and then read back from the variable -- the same rule the respawn
-    # point follows, for the same reason: a second read is a second dice roll.
-    roll = _at(_node(ed, FN_RANDOM_FLOAT), 800, -700)
-    _set(roll, "Min", -BLOOD_JITTER)
-    _set(roll, "Max", BLOOD_JITTER)
-    keep_roll = _at(ed.add_set_member_variable_node("Jitter"), 1040, -900)
-    _connect(_pin(roll, "ReturnValue", is_input=False), _pin(keep_roll, "Jitter"))
-    _connect(BEL.find_then_pin(pin_origin), _pin(keep_roll, "execute"))
+    gather = ed.add_macro_node(MACRO_FOR_EACH)
+    if not gather:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    _at(gather, 620, -900)
+    _connect(_pin(found, "ReturnValue", is_input=False), _loose_pin(gather, "Array"))
+    _connect(BEL.find_then_pin(begin), _loose_pin(gather, "Exec"))
+    blob = _loose_pin(gather, "ArrayElement", is_input=False)
 
-    life = _at(_node(ed, FN_LIFESPAN), 1280, -900)
+    rel = _at(_node(ed, FN_COMP_REL_XFORM), 920, -900)
+    _connect(blob, _pin(rel, "self"))
+    parts = _at(_node(ed, FN_BREAK_TRANSFORM), 1180, -640)
+    _connect(_pin(rel, "ReturnValue", is_input=False), _pin(parts, "InTransform"))
+
+    keep_blob = _at(_node(ed, FN_ARR_ADD), 1180, -900)
+    _connect(_pin(_at(ed.add_get_member_variable_node("Blobs"), 1180, -760),
+                  "Blobs", is_input=False),
+             _pin(keep_blob, "TargetArray"))
+    _connect(blob, _pin(keep_blob, "NewItem"))
+    _connect(_loose_pin(gather, "LoopBody", is_input=False), _pin(keep_blob, "execute"))
+
+    keep_vel = _at(_node(ed, FN_ARR_ADD), 1700, -900)
+    _connect(_pin(_at(ed.add_get_member_variable_node("Velocity"), 1440, -760),
+                  "Velocity", is_input=False),
+             _pin(keep_vel, "TargetArray"))
+    _connect(_loose_pin(parts, "Location", is_input=False), _pin(keep_vel, "NewItem"))
+    _connect(BEL.find_then_pin(keep_blob), _pin(keep_vel, "execute"))
+
+    # Uniform by construction, so X is the whole story.
+    axes = _at(_node(ed, FN_BREAK_VECTOR), 1700, -560)
+    _connect(_loose_pin(parts, "Scale", is_input=False), _pin(axes, "InVec"))
+    keep_size = _at(_node(ed, FN_ARR_ADD), 1960, -900)
+    _connect(_pin(_at(ed.add_get_member_variable_node("Size"), 1960, -760),
+                  "Size", is_input=False),
+             _pin(keep_size, "TargetArray"))
+    _connect(_pin(axes, "X", is_input=False), _pin(keep_size, "NewItem"))
+    _connect(BEL.find_then_pin(keep_vel), _pin(keep_size, "execute"))
+
+    here = _at(_node(ed, FN_GET_TRANSFORM), 620, -1220)
+    local_g = _at(_node(ed, FN_INV_XFORM_DIR), 920, -1220)
+    _connect(_pin(here, "ReturnValue", is_input=False), _pin(local_g, "T"))
+    _connect(_vec(ed, 0.0, 0.0, -BLOOD_GRAVITY, 620, -1080), _pin(local_g, "Direction"))
+    pin_fall = _at(ed.add_set_member_variable_node("Fall"), 1180, -1220)
+    _connect(_pin(local_g, "ReturnValue", is_input=False), _pin(pin_fall, "Fall"))
+    _connect(_loose_pin(gather, "Completed", is_input=False), _pin(pin_fall, "execute"))
+
+    life = _at(_node(ed, FN_LIFESPAN), 1440, -1220)
     _set(life, "InLifespan", BLOOD_LIFETIME)
-    _connect(BEL.find_then_pin(keep_roll), _pin(life, "execute"))
+    _connect(BEL.find_then_pin(pin_fall), _pin(life, "execute"))
 
-    # --- Tick: age, then scale, then position -------------------------------
+    # --- Tick: two scalars for the whole burst, then one pass over it --------
     age_get = _at(ed.add_get_member_variable_node("Age"), 260, 200)
     add = _at(_node(ed, FN_ADD_FF), 470, 200)
     _connect(_pin(age_get, "Age", is_input=False), _pin(add, "A"))
@@ -2000,79 +2768,129 @@ def build_blood_splash(rebuild=True):
     age = _at(ed.add_get_member_variable_node("Age"), 700, 240)
     age_out = _pin(age, "Age", is_input=False)
 
-    # scale = start + Jitter + swell * sin(pi * Age / lifetime)
-    phase = _at(_node(ed, FN_MUL_FF), 940, 400)
-    _connect(age_out, _pin(phase, "A"))
-    _set(phase, "B", math.pi / BLOOD_LIFETIME)
-    wave = _at(_node(ed, FN_SIN), 1160, 400)
-    _connect(_pin(phase, "ReturnValue", is_input=False), _pin(wave, "A"))
-    swell = _at(_node(ed, FN_MUL_FF), 1380, 400)
-    _connect(_pin(wave, "ReturnValue", is_input=False), _pin(swell, "A"))
-    _set(swell, "B", BLOOD_SWELL)
-    jitter = _at(ed.add_get_member_variable_node("Jitter"), 1380, 560)
-    base = _at(_node(ed, FN_ADD_FF), 1600, 560)
-    _connect(_pin(jitter, "Jitter", is_input=False), _pin(base, "A"))
-    _set(base, "B", BLOOD_START_SCALE)
-    size = _at(_node(ed, FN_ADD_FF), 1820, 400)
-    _connect(_pin(swell, "ReturnValue", is_input=False), _pin(size, "A"))
-    _connect(_pin(base, "ReturnValue", is_input=False), _pin(size, "B"))
-    scale_v = _at(_node(ed, FN_MUL_VF), 2060, 400)
-    _connect(_vec(ed, 1.0, 1.0, 1.0, 1820, 560), _pin(scale_v, "A"))
-    _connect(_pin(size, "ReturnValue", is_input=False), _pin(scale_v, "B"))
+    # A = (1 - e^(-k t)) / k, written as (e^(-k t) - 1) / -k. Algebraically the
+    # same; the difference is that every constant then lands on a B pin, and
+    # the A pin of these math nodes will not hold a literal -- set_pin_value
+    # reports success and the pin reads back empty, which compiles as a zero.
+    decay = _at(_node(ed, FN_MUL_FF), 940, 400)
+    _connect(age_out, _pin(decay, "A"))
+    _set(decay, "B", -BLOOD_DRAG)
+    gone_frac = _at(_node(ed, FN_EXP), 1160, 400)
+    _connect(_pin(decay, "ReturnValue", is_input=False), _pin(gone_frac, "A"))
+    spent = _at(_node(ed, FN_SUB_FF), 1380, 400)
+    _connect(_pin(gone_frac, "ReturnValue", is_input=False), _pin(spent, "A"))
+    _set(spent, "B", 1.0)
+    a_term = _at(_node(ed, FN_DIV_FF), 1600, 400)
+    _connect(_pin(spent, "ReturnValue", is_input=False), _pin(a_term, "A"))
+    _set(a_term, "B", -BLOOD_DRAG)
+    a_out = _pin(a_term, "ReturnValue", is_input=False)
+    # A in centimetres, for the velocities stored in metres per second. Done
+    # once here rather than per droplet, and not on the Multiply_VectorFloat
+    # itself -- that node's float pin rejects a literal default, reading back
+    # empty whatever is written to it.
+    a_cm = _at(_node(ed, FN_MUL_FF), 1820, 400)
+    _connect(a_out, _pin(a_cm, "A"))
+    _set(a_cm, "B", BLOOD_VELOCITY_ENCODE)
+    a_cm_out = _pin(a_cm, "ReturnValue", is_input=False)
 
-    set_scale = _at(_node(ed, FN_SET_SCALE), 2300, 0)
-    _connect(_pin(scale_v, "ReturnValue", is_input=False), _pin(set_scale, "NewScale3D"))
-    _connect(BEL.find_then_pin(age_set), _pin(set_scale, "execute"))
+    # B = (t - A) / k
+    lag = _at(_node(ed, FN_SUB_FF), 1820, 560)
+    _connect(age_out, _pin(lag, "A"))
+    _connect(a_out, _pin(lag, "B"))
+    b_term = _at(_node(ed, FN_DIV_FF), 2040, 560)
+    _connect(_pin(lag, "ReturnValue", is_input=False), _pin(b_term, "A"))
+    _set(b_term, "B", BLOOD_DRAG)
+    b_out = _pin(b_term, "ReturnValue", is_input=False)
 
-    # position = Origin + Forward * spray * Age + (0,0,-gravity) * Age^2
-    forward = _at(_node(ed, FN_ACTOR_FORWARD), 940, 800)
-    travelled = _at(_node(ed, FN_MUL_FF), 940, 940)
-    _connect(age_out, _pin(travelled, "A"))
-    _set(travelled, "B", BLOOD_SPRAY_CMS)
-    thrown = _at(_node(ed, FN_MUL_VF), 1380, 800)
-    _connect(_pin(forward, "ReturnValue", is_input=False), _pin(thrown, "A"))
-    _connect(_pin(travelled, "ReturnValue", is_input=False), _pin(thrown, "B"))
+    # fade = clamp((lifetime - age) / tail, 0, 1): flat, then a hard cut. Both
+    # signs flipped for the same B-pin reason as the A term above.
+    left = _at(_node(ed, FN_SUB_FF), 940, 760)
+    _connect(age_out, _pin(left, "A"))
+    _set(left, "B", BLOOD_LIFETIME)
+    tail = _at(_node(ed, FN_DIV_FF), 1160, 760)
+    _connect(_pin(left, "ReturnValue", is_input=False), _pin(tail, "A"))
+    _set(tail, "B", -BLOOD_FADE_TAIL)
+    fade = _at(_node(ed, FN_CLAMP), 1380, 760)
+    _connect(_pin(tail, "ReturnValue", is_input=False), _pin(fade, "Value"))
+    _set(fade, "Min", 0.0)
+    _set(fade, "Max", 1.0)
+    fade_out = _pin(fade, "ReturnValue", is_input=False)
 
-    squared = _at(_node(ed, FN_MUL_FF), 940, 1120)
-    _connect(age_out, _pin(squared, "A"))
-    _connect(age_out, _pin(squared, "B"))
-    fall = _at(_node(ed, FN_MUL_VF), 1380, 1120)
-    _connect(_vec(ed, 0.0, 0.0, -BLOOD_GRAVITY, 1160, 1260), _pin(fall, "A"))
-    _connect(_pin(squared, "ReturnValue", is_input=False), _pin(fall, "B"))
+    blobs_get = _at(ed.add_get_member_variable_node("Blobs"), 2300, 240)
+    fly = ed.add_macro_node(MACRO_FOR_EACH)
+    if not fly:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    _at(fly, 2560, 0)
+    _connect(_pin(blobs_get, "Blobs", is_input=False), _loose_pin(fly, "Array"))
+    _connect(BEL.find_then_pin(age_set), _loose_pin(fly, "Exec"))
+    each = _loose_pin(fly, "ArrayElement", is_input=False)
+    index = _loose_pin(fly, "ArrayIndex", is_input=False)
 
-    origin_get = _at(ed.add_get_member_variable_node("Origin"), 1600, 980)
-    arc = _at(_node(ed, FN_ADD_VV), 1820, 800)
-    _connect(_pin(thrown, "ReturnValue", is_input=False), _pin(arc, "A"))
-    _connect(_pin(fall, "ReturnValue", is_input=False), _pin(arc, "B"))
-    where = _at(_node(ed, FN_ADD_VV), 2060, 800)
-    _connect(_pin(origin_get, "Origin", is_input=False), _pin(where, "A"))
-    _connect(_pin(arc, "ReturnValue", is_input=False), _pin(where, "B"))
+    vel_arr = _at(ed.add_get_member_variable_node("Velocity"), 2860, 420)
+    vel = _at(_node(ed, FN_ARR_GET), 3080, 420)
+    _connect(_pin(vel_arr, "Velocity", is_input=False), _pin(vel, "TargetArray"))
+    _connect(index, _pin(vel, "Index"))
+    thrown = _at(_node(ed, FN_MUL_VF), 3320, 420)
+    _connect(_pin(vel, "Item", is_input=False), _pin(thrown, "A"))
+    _connect(a_cm_out, _pin(thrown, "B"))
 
-    move = _at(_node(ed, FN_SET_ACTOR_LOC), 2540, 0)
-    _connect(_pin(where, "ReturnValue", is_input=False), _pin(move, "NewLocation"))
-    # No sweep: the spheres have no collision and the spray is meant to pass
+    fall_get = _at(ed.add_get_member_variable_node("Fall"), 2860, 640)
+    dropped = _at(_node(ed, FN_MUL_VF), 3320, 640)
+    _connect(_pin(fall_get, "Fall", is_input=False), _pin(dropped, "A"))
+    _connect(b_out, _pin(dropped, "B"))
+
+    offset = _at(_node(ed, FN_ADD_VV), 3560, 420)
+    _connect(_pin(thrown, "ReturnValue", is_input=False), _pin(offset, "A"))
+    _connect(_pin(dropped, "ReturnValue", is_input=False), _pin(offset, "B"))
+
+    put = _at(_node(ed, FN_COMP_SET_REL_LOC), 3820, 0)
+    _connect(each, _pin(put, "self"))
+    _connect(_pin(offset, "ReturnValue", is_input=False), _pin(put, "NewLocation"))
+    # No sweep: the droplets have no collision and the spray is meant to pass
     # through the surface it came off, not to be stopped by it.
-    _set(move, "bSweep", "false")
-    _set(move, "bTeleport", "true")
-    _connect(BEL.find_then_pin(set_scale), _pin(move, "execute"))
+    _set(put, "bSweep", "false")
+    _set(put, "bTeleport", "true")
+    _connect(_loose_pin(fly, "LoopBody", is_input=False), _pin(put, "execute"))
+
+    size_arr = _at(ed.add_get_member_variable_node("Size"), 2860, 900)
+    born = _at(_node(ed, FN_ARR_GET), 3080, 900)
+    _connect(_pin(size_arr, "Size", is_input=False), _pin(born, "TargetArray"))
+    _connect(index, _pin(born, "Index"))
+    now_size = _at(_node(ed, FN_MUL_FF), 3320, 900)
+    _connect(_pin(born, "Item", is_input=False), _pin(now_size, "A"))
+    _connect(fade_out, _pin(now_size, "B"))
+    size_v = _at(_node(ed, FN_MUL_VF), 3560, 900)
+    _connect(_vec(ed, 1.0, 1.0, 1.0, 3320, 1040), _pin(size_v, "A"))
+    _connect(_pin(now_size, "ReturnValue", is_input=False), _pin(size_v, "B"))
+    shrink = _at(_node(ed, FN_COMP_SET_SCALE), 4080, 0)
+    _connect(each, _pin(shrink, "self"))
+    _connect(_pin(size_v, "ReturnValue", is_input=False), _pin(shrink, "NewScale3D"))
+    _connect(BEL.find_then_pin(put), _pin(shrink, "execute"))
 
     ed.add_comment_to_nodes(
-        f"{len(BLOOD_BLOBS)} spheres in a cone along the actor's +X, which "
-        f"_author_impact points down the surface normal of the hit. On Tick the "
-        f"whole burst is thrown out along that normal at {BLOOD_SPRAY_CMS:.0f} "
-        f"cm/s and pulled back down, while its scale follows "
-        f"{BLOOD_START_SCALE} + {BLOOD_SWELL} * sin(pi * Age / {BLOOD_LIFETIME}) "
-        f"-- in and out over one lifetime with no branch. SetLifeSpan then "
-        f"removes the actor.",
-        [age_get, add, age_set, age, phase, wave, swell, jitter, base, size,
-         scale_v, set_scale, forward, travelled, thrown, squared, fall,
-         origin_get, arc, where, move, here, pin_origin, roll, keep_roll, life])
+        f"{len(BLOOD_BLOBS)} droplets -- {BLOOD_DROPLETS} of spray in a "
+        f"{BLOOD_CONE_DEG:.0f} deg cone around the actor's +X, which "
+        f"_author_impact points down the surface normal of the hit, plus "
+        f"{BLOOD_MIST} slow fine ones that hang at the wound. Each carries its "
+        f"own launch velocity ({BLOOD_SPEED_MIN:.0f}-{BLOOD_SPEED_MAX:.0f} cm/s) "
+        f"in its build-time relative location over {BLOOD_VELOCITY_ENCODE:.0f}, "
+        f"and flies the exact solution of dv/dt = g - {BLOOD_DRAG} v under "
+        f"{BLOOD_GRAVITY:.0f} cm/s^2 -- two scalars for the burst, one "
+        f"multiply-add each. Flat scale until the last {BLOOD_FADE_TAIL}s of "
+        f"{BLOOD_LIFETIME}s, then cut. SetLifeSpan removes the actor.",
+        [found, gather, rel, parts, keep_blob, keep_vel, axes, keep_size,
+         here, local_g, pin_fall, life, age_get, add, age_set, age, decay,
+         gone_frac, spent, a_term, a_cm, lag, b_term, left, tail, fade,
+         blobs_get, fly,
+         vel_arr, vel, thrown, fall_get, dropped, offset, put, size_arr, born,
+         now_size, size_v, shrink])
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_BloodSplash failed to compile")
     eas.save_loaded_asset(bp)
-    _log(f"built {BLOOD_BP_PATH} ({len(BLOOD_BLOBS)} blobs, {BLOOD_LIFETIME}s, "
-         f"sprayed along the hit normal)")
+    _log(f"built {BLOOD_BP_PATH} ({len(BLOOD_BLOBS)} droplets, {BLOOD_LIFETIME}s, "
+         f"drag {BLOOD_DRAG}, gravity {BLOOD_GRAVITY:.0f}, sprayed along the hit "
+         f"normal)")
     return bp
 
 
@@ -2520,33 +3338,39 @@ def _author_gun_drop(ed, at, exec_in, x0, y0):
             BEL.find_else_pin(rare))
 
 
-def _author_player_death(ed, exec_in, x0, y0):
-    """The player hit 0 HP: drop, wait for the fall, then pause and open the menu.
+def _author_death_collapse(ed, exec_ins, x0, y0):
+    """The body goes down, physically, and stops being in the way.
 
-    This is the DespawnOnDeath-false arm of the death path, which until now
-    simply ended -- the player sat at 0 HP and the pack kept hitting them.
+    Shared by the player and by every wanderer, which is the point: there is
+    one answer in this project to "what does dying look like", and both arms of
+    the death branch walk into it. See the RAGDOLL_PROFILE comment for why it
+    is a ragdoll and not a clip -- in short, there is no clip, here or in Epic's
+    content, that ends with a body on the ground.
 
-    Three things in order, and the order is the whole design:
+    Four calls, in this order and for these reasons:
 
-      1. DisableMovement, so the body stops where it fell rather than sliding on
-         under whatever input was last held. Movement, not input: turning input
-         off would be tidier to look at and would risk the restart key, which
-         the HUD polls off the same PlayerController.
-      2. the death animation, played into FullBodySlot -- the slot that sits
-         after the upper-body blend, so this one takes the legs too.
-      3. a Delay as long as the animation, and only then SetGamePaused. Pausing
-         first would freeze the player standing up, which reads as a hang; the
-         menu is what the pause is for, and the menu can wait 2 seconds.
+      1. DisableMovement. CharacterMovement is still driving the capsule, and a
+         corpse whose capsule is walking gets dragged along by the mesh's
+         attachment. Movement, not input: the HUD polls the restart key off the
+         same PlayerController and turning input off risks it.
+      2. the capsule stops colliding. It is the capsule -- not the mesh -- that
+         blocks the player and that blocks the pellets (see make_shootable), so
+         switching it off is both halves of "a corpse is not in the way": you
+         can walk through it and you cannot waste ammunition on it.
+      3. the mesh takes the Ragdoll profile, which is what makes the bodies
+         collide with the terrain and ignore Pawn. Without it the mesh keeps
+         CharacterMesh, which collides with nothing, and the ragdoll falls
+         through the world.
+      4. only then simulate. Set the profile after simulation starts and the
+         first frame is resolved against the old responses.
 
-    PlayerDead is set on the GameMode rather than here because the HUD is what
-    draws the menu and the HUD has no route to this component -- it would have
-    to find the player's pawn, find this component and cast to it, every frame,
-    to read one bool that the GameMode already exists to hold.
+    Returns the exec to carry on with.
     """
     owner = _at(_node(ed, FN_GET_OWNER), x0, y0 + 240)
     as_char = _at(_palette(ed, NODE_CAST_CHARACTER), x0 + 240, y0)
     _connect(_pin(owner, "ReturnValue", is_input=False), _pin(as_char, "Object"))
-    _connect(exec_in, _pin(as_char, "execute"))
+    for tail in exec_ins:
+        _connect(tail, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
     movement = _at(ed.add_get_member_variable_node("CharacterMovement",
@@ -2557,35 +3381,140 @@ def _author_player_death(ed, exec_in, x0, y0):
     _connect(_pin(movement, "CharacterMovement", is_input=False), _pin(stop, "self"))
     _connect(BEL.find_then_pin(as_char), _pin(stop, "execute"))
 
+    capsule = _at(ed.add_get_member_variable_node("CapsuleComponent",
+                                                  "/Script/Engine.Character"),
+                  x0 + 960, y0 + 240)
+    _connect(char_out, _pin(capsule, "self"))
+    intangible = _at(_node(ed, FN_SET_COLLISION), x0 + 1200, y0)
+    _connect(_pin(capsule, "CapsuleComponent", is_input=False),
+             _pin(intangible, "self"))
+    _set(intangible, "NewType", "NoCollision")
+    _connect(BEL.find_then_pin(stop), _pin(intangible, "execute"))
+
     mesh = _at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
-               x0 + 720, y0 + 240)
+               x0 + 1440, y0 + 240)
     _connect(char_out, _pin(mesh, "self"))
-    anim = _at(_node(ed, FN_ANIM_INSTANCE), x0 + 960, y0 + 240)
-    _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
+    mesh_out = _pin(mesh, "Mesh", is_input=False)
 
-    fall = _at(_node(ed, FN_PLAY_SLOT), x0 + 1200, y0)
-    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(fall, "self"))
-    _set(fall, "Asset", DEATH_ANIM_OBJECT)
-    _set(fall, "SlotNodeName", FULL_BODY_SLOT)
-    _set(fall, "BlendInTime", DEATH_BLEND_S)
-    _set(fall, "BlendOutTime", DEATH_BLEND_S)
-    _connect(BEL.find_then_pin(stop), _pin(fall, "execute"))
+    loosen = _at(_node(ed, FN_SET_PROFILE), x0 + 1680, y0)
+    _connect(mesh_out, _pin(loosen, "self"))
+    _set(loosen, "InCollisionProfileName", RAGDOLL_PROFILE)
+    _connect(BEL.find_then_pin(intangible), _pin(loosen, "execute"))
 
-    wait = _at(_node(ed, FN_DELAY), x0 + 1440, y0)
+    limp = _at(_node(ed, FN_SIMULATE_ALL), x0 + 1920, y0)
+    _connect(mesh_out, _pin(limp, "self"))
+    _set(limp, "bNewSimulate", "true")
+    _connect(BEL.find_then_pin(loosen), _pin(limp, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"Dying, for the player and for every wanderer alike: stop the "
+        f"movement, switch the capsule off so the body is neither an obstacle "
+        f"nor a target, put the mesh on the {RAGDOLL_PROFILE} profile and "
+        f"simulate every body in the physics asset. There is no death clip in "
+        f"this project to play instead -- Meshy generates a walk and a run, and "
+        f"Epic's six MM_Death_* clips are staggers that end on their feet.",
+        [owner, as_char, movement, stop, capsule, intangible, mesh, loosen, limp])
+
+    # The cast failure is carried, not dropped: a thing with no Character under
+    # it cannot be ragdolled, but the player still has to get a menu and a
+    # wanderer still has to be cleaned up.
+    return (BEL.find_then_pin(limp),
+            _pin(as_char, "CastFailed", is_input=False))
+
+
+def _author_corpse(ed, exec_ins, x0, y0):
+    """Everything a dead wanderer has to stop doing, and when it goes away.
+
+    The collapse is shared (see _author_death_collapse); this is the half that
+    is only true of an NPC.
+
+    The AI controller is DESTROYED rather than told to stop. A wanderer's whole
+    behaviour -- the chase, the melee, the growls -- is one self-re-entering
+    loop on its controller, and none of it consults the pawn's health: a corpse
+    whose controller survived would keep hitting the player from the floor.
+    Destroying an AController unpossesses it on the way out, which is what
+    stops the movement request as well, and it leaves nothing behind to leak
+    one controller per kill over a session. UnPossess alone would close the
+    loop's possession gate too, but it would leave that controller running its
+    Delay for the rest of the game.
+
+    This used to be a K2_DestroyActor on the owner, on the same frame. The
+    corpse now lies there for CORPSE_SECONDS, and SetLifeSpan is the engine's
+    own timer for exactly that -- a Delay here would be a latent action on a
+    component belonging to the actor it is waiting to destroy.
+    """
+    owner = _at(_node(ed, FN_GET_OWNER), x0, y0 + 240)
+    owner_out = _pin(owner, "ReturnValue", is_input=False)
+    as_pawn = _at(_palette(ed, NODE_CAST_PAWN), x0 + 240, y0)
+    _connect(owner_out, _pin(as_pawn, "Object"))
+    for tail in exec_ins:
+        _connect(tail, _pin(as_pawn, "execute"))
+
+    # GetController, not the Controller member: APawn::Controller is not marked
+    # BlueprintReadOnly, and a get-variable node for it compiles as a warning
+    # today and an error in a future release.
+    brain = _at(_node(ed, FN_GET_CONTROLLER), x0 + 480, y0 + 240)
+    _connect(_loose_pin(as_pawn, "AsPawn", is_input=False), _pin(brain, "self"))
+    brain_out = _pin(brain, "ReturnValue", is_input=False)
+    possessed = _at(_node(ed, FN_IS_VALID), x0 + 720, y0 + 240)
+    _connect(brain_out, _pin(possessed, "Object"))
+    has_brain = _at(ed.add_branch_node(), x0 + 960, y0)
+    _connect(_pin(possessed, "ReturnValue", is_input=False), _pin(has_brain, "Condition"))
+    _connect(BEL.find_then_pin(as_pawn), _pin(has_brain, "execute"))
+
+    lobotomy = _at(_node(ed, FN_DESTROY), x0 + 1200, y0)
+    _connect(brain_out, _pin(lobotomy, "self"))
+    _connect(BEL.find_then_pin(has_brain), _pin(lobotomy, "execute"))
+
+    rot = _at(_node(ed, FN_LIFESPAN), x0 + 1440, y0)
+    _connect(owner_out, _pin(rot, "self"))
+    _set(rot, "InLifespan", CORPSE_SECONDS)
+    for tail in (BEL.find_then_pin(lobotomy),
+                 BEL.find_else_pin(has_brain),
+                 _pin(as_pawn, "CastFailed", is_input=False)):
+        _connect(tail, _pin(rot, "execute"))
+
+    ed.add_comment_to_nodes(
+        f"A dead wanderer: destroy the AI controller -- the chase, the melee "
+        f"and the growls are one loop on it, and none of them ask whether the "
+        f"pawn is alive -- and give the body {CORPSE_SECONDS:.0f} s of lifespan. "
+        f"The kill has already been counted and the replacement already spawned "
+        f"by the time this runs, so the pack is back to strength while the "
+        f"corpse is still falling.",
+        [owner, as_pawn, brain, possessed, has_brain, lobotomy, rot])
+    return BEL.find_then_pin(rot)
+
+
+def _author_player_death(ed, exec_ins, x0, y0):
+    """The player is down: wait for the fall, then pause and open the menu.
+
+    This is the DespawnOnDeath-false arm, and it now starts from a body that is
+    already a ragdoll -- so there is nothing here that has to keep it down. The
+    bug this used to have was the opposite one: a dynamic montage of
+    MM_Death_Front_01 blended OUT after 1.1 s, the locomotion state machine
+    underneath took the pose back, and the player was on his feet a whole
+    second before the pause arrived to freeze him there.
+
+    The Delay is still here and still comes before the pause, for the reason it
+    always did -- pausing stops physics as well as everything else, so pausing
+    early freezes the body mid-topple.
+
+    PlayerDead is set on the GameMode rather than here because the HUD is what
+    draws the menu and the HUD has no route to this component -- it would have
+    to find the player's pawn, find this component and cast to it, every frame,
+    to read one bool that the GameMode already exists to hold.
+    """
+    wait = _at(_node(ed, FN_DELAY), x0, y0)
     _set(wait, "Duration", DEATH_PAUSE_SECONDS)
-    # The cast failure reaches the Delay too. A player with no Character under
-    # them cannot be animated, but the menu still has to open -- a death with no
-    # menu is a game that has simply stopped responding.
-    for tail in (BEL.find_then_pin(fall),
-                 _pin(as_char, "CastFailed", is_input=False)):
+    for tail in exec_ins:
         _connect(tail, _pin(wait, "execute"))
 
-    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 + 1680, y0 + 240)
-    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 1920, y0)
+    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 + 240, y0 + 240)
+    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 480, y0)
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     _connect(BEL.find_then_pin(wait), _pin(as_mode, "execute"))
     tell = _at(ed.add_set_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH),
-               x0 + 2160, y0)
+               x0 + 720, y0)
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(tell, "self"))
     _set(tell, PLAYER_DEAD_VAR, "true")
@@ -2597,15 +3526,15 @@ def _author_player_death(ed, exec_in, x0, y0):
     # run has nobody looking at.
     score = _at(ed.add_get_member_variable_node(KILL_COUNT_VAR,
                                                 GAME_MODE_CLASS_PATH),
-                x0 + 2160, y0 + 400)
+                x0 + 720, y0 + 400)
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(score, "self"))
-    score_str = _at(_node(ed, FN_INT_TO_STR), x0 + 2400, y0 + 400)
+    score_str = _at(_node(ed, FN_INT_TO_STR), x0 + 960, y0 + 400)
     _connect(_pin(score, KILL_COUNT_VAR, is_input=False), _pin(score_str, "InInt"))
-    dead_line = _at(_node(ed, FN_CONCAT), x0 + 2640, y0 + 400)
+    dead_line = _at(_node(ed, FN_CONCAT), x0 + 1200, y0 + 400)
     _set(dead_line, "A", DEAD_LOG_PREFIX)
     _connect(_pin(score_str, "ReturnValue", is_input=False), _pin(dead_line, "B"))
-    say_dead = _at(_node(ed, FN_PRINT), x0 + 2640, y0)
+    say_dead = _at(_node(ed, FN_PRINT), x0 + 1200, y0)
     _connect(_pin(dead_line, "ReturnValue", is_input=False), _pin(say_dead, "InString"))
     # Log only: the menu is what says it on screen, and it says it better.
     _set(say_dead, "bPrintToScreen", "false")
@@ -2616,20 +3545,20 @@ def _author_player_death(ed, exec_in, x0, y0):
     # Pause last, and on every arm: with the flag set the HUD draws the menu,
     # and with the game paused nothing moves behind it. The HUD polls its
     # restart key from the PlayerController, which ticks through a pause.
-    freeze = _at(_node(ed, FN_SET_PAUSED), x0 + 2900, y0)
+    freeze = _at(_node(ed, FN_SET_PAUSED), x0 + 1460, y0)
     _set(freeze, "bPaused", "true")
     for tail in (BEL.find_then_pin(say_dead),
                  _pin(as_mode, "CastFailed", is_input=False)):
         _connect(tail, _pin(freeze, "execute"))
 
     ed.add_comment_to_nodes(
-        f"The player's death. Stop the body, play {DEATH_ANIM.rsplit('/', 1)[-1]} "
-        f"into {FULL_BODY_SLOT} (the slot after the upper-body blend, so it "
-        f"takes the legs), wait {DEATH_PAUSE_SECONDS}s for it to land, then tell "
-        f"the GameMode and pause. BP_GraphicsMenuHUD draws the menu off "
+        f"The player's death, from a body that is already on the floor: wait "
+        f"{DEATH_PAUSE_SECONDS}s for the ragdoll to settle, tell the GameMode "
+        f"and pause. The pause stops physics too, so the body stays exactly as "
+        f"it fell until the level reopens -- which is the fix for the player "
+        f"standing back up. BP_GraphicsMenuHUD draws the menu off "
         f"{PLAYER_DEAD_VAR} and restarts the level from it.",
-        [owner, as_char, movement, stop, mesh, anim, fall, wait, mode, as_mode,
-         tell, score, score_str, dead_line, say_dead, freeze])
+        [wait, mode, as_mode, tell, score, score_str, dead_line, say_dead, freeze])
 
 
 def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
@@ -2820,8 +3749,10 @@ def build_health_component(rebuild=True):
     Death lives here too, and is driven by three defaults rather than by
     subclassing:
 
-        DespawnOnDeath   destroy the owner at 0 HP. False on the player, so the
-                         player simply sits at 0 rather than vanishing.
+        DespawnOnDeath   this is a wanderer: at 0 HP count the kill, spawn a
+                         replacement, kill the AI and let the body rot for
+                         CORPSE_SECONDS. False on the player, whose body stays
+                         where it fell until the level reopens.
         RespawnClass     what to spawn in the dead actor's place. Left empty on
                          the player; on a wanderer it is overwritten at
                          BeginPlay with the owner's OWN class, so each creature
@@ -3139,11 +4070,7 @@ def build_health_component(rebuild=True):
     _connect(_pin(despawn_get, "DespawnOnDeath", is_input=False), _pin(should, "Condition"))
     _connect(BEL.find_then_pin(mark), _pin(should, "execute"))
 
-    # The player's arm of the same branch, which used to be a dead end: sit at
-    # 0 HP forever while the pack carried on hitting the body.
-    _author_player_death(ed, BEL.find_else_pin(should), 1420, 1600)
-
-    # --- count it, then respawn, then destroy -------------------------------
+    # --- count it, then respawn, then leave a corpse -------------------------
     counted = _author_kill_count(ed, BEL.find_then_pin(should), 1420, -1600)
 
     cls_get = _at(ed.add_get_member_variable_node("RespawnClass"), 1660, 300)
@@ -3339,24 +4266,38 @@ def build_health_component(rebuild=True):
     for tail in (BEL.find_then_pin(stand), BEL.find_then_pin(hover)):
         _connect(tail, _pin(spawn, "execute"))
 
-    owner_t = _at(_node(ed, FN_GET_OWNER), 8220, 380)
-    destroy = _at(_node(ed, FN_DESTROY), 8480, 0)
-    _connect(_pin(owner_t, "ReturnValue", is_input=False), _pin(destroy, "self"))
-    # Every path ends at the same destroy; an exec *input* takes more than one
+    # Every path ends at the same corpse; an exec *input* takes more than one
     # link, so no Sequence node is needed. Note the last one: with no navmesh to
-    # be found at all, the dead wanderer is removed and NOT replaced. Losing one
-    # of five is recoverable and visible; dropping a replacement through the
-    # floor is neither.
-    _connect(BEL.find_then_pin(spawn), _pin(destroy, "execute"))
-    _connect(BEL.find_else_pin(respawns), _pin(destroy, "execute"))
-    _connect(BEL.find_else_pin(salvaged), _pin(destroy, "execute"))
+    # be found at all, the dead wanderer is NOT replaced -- it still leaves a
+    # body. Losing one of ten is recoverable and visible; dropping a replacement
+    # through the floor is neither.
+    corpsed = _author_corpse(ed, (BEL.find_then_pin(spawn),
+                                  BEL.find_else_pin(respawns),
+                                  BEL.find_else_pin(salvaged)), 8220, 0)
+
+    # Both arms of the death branch collapse the same way and through the same
+    # nodes: the player straight off the branch, the wanderer once its
+    # replacement is out and its brain is gone.
+    fell, no_body = _author_death_collapse(
+        ed, (corpsed, BEL.find_else_pin(should)), 9900, 0)
+    # ...and only the player gets a menu out of it. A second read of
+    # DespawnOnDeath rather than routing the two arms separately, so there is
+    # exactly one place that says what dying looks like.
+    mine_again = _at(ed.add_get_member_variable_node("DespawnOnDeath"), 12060, 240)
+    is_player = _at(ed.add_branch_node(), 12300, 0)
+    _connect(_pin(mine_again, "DespawnOnDeath", is_input=False),
+             _pin(is_player, "Condition"))
+    for tail in (fell, no_body):
+        _connect(tail, _pin(is_player, "execute"))
+    _author_player_death(ed, (BEL.find_else_pin(is_player),), 12540, 0)
 
     ed.add_comment_to_nodes(
         f"At 0 HP: mark Dead once, then (if DespawnOnDeath) ask for a point "
         f"{RESPAWN_BAND[0] / 100:.0f}-{RESPAWN_BAND[1] / 100:.0f} m from the "
         f"player on a random bearing, PROJECT it onto the navmesh (the request "
         f"carries the player's Z, which is not the ground height out there), "
-        f"spawn the replacement on that ground and destroy this one "
+        f"spawn the replacement on that ground and leave this one on the "
+        f"ground for {CORPSE_SECONDS:.0f} s "
         f"({RESPAWN_ATTEMPTS} bearings are tried before falling back to any "
         f"navigable point near the player). The replacement carries the same component, so the cycle sustains "
         "itself with nothing tracking it -- the pack stays five strong and every "
@@ -3364,14 +4305,15 @@ def build_health_component(rebuild=True):
         "DespawnOnDeath false and no RespawnClass, so none of this runs on them.",
         [health, dying, at_zero, dead_get, already, mark, despawn_get, should,
          cls_get, can_respawn, respawns] + made +
-        [anywhere, salvaged, use_any, chosen, xform, spawn, owner_t, destroy])
+        [anywhere, salvaged, use_any, chosen, xform, spawn, mine_again,
+         is_player])
 
     _post_physics_tick(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_HealthComponent failed to compile")
     _apply_defaults(bp, {
-        "Health": START_HEALTH,
-        "MaxHealth": START_HEALTH,
+        "Health": COMBAT.start_health,
+        "MaxHealth": COMBAT.start_health,
         "Dead": False,
         "DespawnOnDeath": False,
         # Far enough in the past that nothing counts as recently hurt at level
@@ -3379,10 +4321,10 @@ def build_health_component(rebuild=True):
         # five seconds of the game.
         LAST_DAMAGE_VAR: NEVER_DAMAGED,
         DAMAGED_BY_PLAYER_VAR: False,
-        HEAD_MULT_VAR: HEAD_MULTIPLIER,
-        LIMB_MULT_VAR: LIMB_MULTIPLIER,
+        HEAD_MULT_VAR: COMBAT.head_multiplier,
+        LIMB_MULT_VAR: COMBAT.limb_multiplier,
     })
-    _log(f"built {HEALTH_BP_PATH} (Health = MaxHealth = {START_HEALTH})")
+    _log(f"built {HEALTH_BP_PATH} (Health = MaxHealth = {COMBAT.start_health})")
     return bp
 
 
@@ -3437,7 +4379,7 @@ def _muzzle_location(ed, held, x, y):
     return _pin(at, "ReturnValue", is_input=False)
 
 
-def _author_resolve_aim(ed, held, exec_in, x0, y0):
+def _author_resolve_aim(ed, held, exec_ins, x0, y0):
     """Work out where this frame's shot lands. The hybrid of the two obvious wrongs.
 
     Aiming purely from the muzzle is honest and unplayable: the barrel sits below
@@ -3505,7 +4447,8 @@ def _author_resolve_aim(ed, held, exec_in, x0, y0):
     # every frame, so drawing it would fill the screen. Only the pellets are
     # drawn, and only when they are actually fired.
     _trace_defaults(look)
-    _connect(exec_in, _pin(look, "execute"))
+    for e in exec_ins:
+        _connect(e, _pin(look, "execute"))
 
     look_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 1200, y0 + 560))
     _connect(_pin(look, "OutHit", is_input=False), _loose_pin(look_brk, "Hit"))
@@ -3688,13 +4631,13 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     spread_pin, spread_n = _prop(ed, "SpreadDegrees", held, x0 + 1420, y0 + 840)
     keep(spread_n)
     # Aiming down the sights is worth something, not just a zoom: the cone
-    # shrinks to ADS_SPREAD_SCALE of the weapon's own figure. SelectFloat
+    # shrinks to COMBAT.ads_spread_scale of the weapon's own figure. SelectFloat
     # rather than a branch, so there is exactly one cone and the two cases
     # cannot drift -- the same shape _author_sprint uses to pick a speed.
     aiming_now = keep(_at(ed.add_get_member_variable_node("Aiming"),
                           x0 + 1420, y0 + 1080))
     steadied = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1660, y0 + 1080))
-    _set(steadied, "A", ADS_SPREAD_SCALE)
+    _set(steadied, "A", COMBAT.ads_spread_scale)
     _set(steadied, "B", 1.0)
     _connect(_pin(aiming_now, "Aiming", is_input=False), _pin(steadied, "bPickA"))
     tightened = keep(_at(_node(ed, FN_MUL_FF), x0 + 1660, y0 + 940))
@@ -3779,7 +4722,24 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     blood_cls = _at(ed.add_get_member_variable_node("BloodClass"), x0 + 520, y0 + 520)
     where = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 520, y0 + 380)
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(where, "Location"))
-    _connect(_vec(ed, 1.0, 1.0, 1.0, x0 + 260, y0 + 520), _pin(where, "Scale"))
+    # How big the spray is, as a clamped ratio of the round's damage to a
+    # reference one. Spawn *scale* rather than a parameter on the splash,
+    # because the droplet solver works in the actor's own space: scaling the
+    # actor scales launch distance and droplet size together, which is the
+    # single number that separates a 9 mm from a slug at contact range. A
+    # shotgun pays eight of these at once, which is why one pellet is under 1x.
+    spray_dmg_pin, spray_dmg = _prop(ed, "Damage", held, x0 - 40, y0 + 760)
+    ratio = _at(_node(ed, FN_DIV_FF), x0 + 200, y0 + 760)
+    _connect(spray_dmg_pin, _pin(ratio, "A"))
+    _set(ratio, "B", BLOOD_REFERENCE_DAMAGE)
+    spray = _at(_node(ed, FN_CLAMP), x0 + 440, y0 + 760)
+    _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(spray, "Value"))
+    _set(spray, "Min", BLOOD_SCALE_MIN)
+    _set(spray, "Max", BLOOD_SCALE_MAX)
+    spray_v = _at(_node(ed, FN_MUL_VF), x0 + 680, y0 + 900)
+    _connect(_vec(ed, 1.0, 1.0, 1.0, x0 + 440, y0 + 1040), _pin(spray_v, "A"))
+    _connect(_pin(spray, "ReturnValue", is_input=False), _pin(spray_v, "B"))
+    _connect(_pin(spray_v, "ReturnValue", is_input=False), _pin(where, "Scale"))
     # Point the splash's +X down the surface normal: BP_BloodSplash throws its
     # cone along its own forward, so this is what makes the spray come *out of*
     # the wound instead of along an arbitrary world axis.
@@ -3851,13 +4811,13 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
         "Clamped at zero so an overkill shot cannot drive Health negative -- "
         "the HUD bar divides by MaxHealth and the death check is Health <= 0, "
         "and both want a floor.",
-        [comp, cast, blood_cls, where, facing, splash, get_h, sub, clamp,
-         set_h, now, stamp, blame])
+        [comp, cast, blood_cls, where, facing, splash, spray_dmg, ratio, spray,
+         spray_v, get_h, sub, clamp, set_h, now, stamp, blame])
     ed.add_comment_to_nodes(
         f"Hit boxes: the pellet's own line is traced again against the target's "
         f"physics-asset bodies alone, and the bone it strikes picks the "
         f"multiplier off the TARGET's health component -- head "
-        f"{HEAD_MULTIPLIER}x, arms and legs {LIMB_MULTIPLIER}x, anything else "
+        f"{COMBAT.head_multiplier}x, arms and legs {COMBAT.limb_multiplier}x, anything else "
         f"1x. A pellet that clipped the capsule but threaded between the limbs "
         f"strikes no body and counts as a body hit, which is what every hit "
         f"was before.",
@@ -4266,7 +5226,7 @@ def _author_equip(ed, exec_in, x0, y0):
     attach = keep(_at(_node(ed, FN_ATTACH), x0 + 1580, y0 - 160))
     _connect(item, _pin(attach, "self"))
     _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(attach, "Parent"))
-    _set(attach, "SocketName", GRIP_SOCKET)
+    _set(attach, "SocketName", player_skin().grip)
     # Snap first, then apply the weapon's own grip offset explicitly. Snapping
     # gives a known starting transform; KeepRelative would carry over whatever
     # the actor happened to be at, which after a drop is a world position.
@@ -4379,7 +5339,7 @@ def _author_wc_begin_play(ed, begin):
         "CharacterMovement", "/Script/Engine.Character"), 1040, -1560))
     _connect(as_char, _pin(movement, "self"))
     walk = keep(_at(ed.add_get_member_variable_node(
-        "MaxWalkSpeed", "/Script/Engine.CharacterMovementComponent"), 1300, -1560))
+        "MaxWalkSpeed", MOVEMENT_CLASS_PATH), 1300, -1560))
     _connect(_pin(movement, "CharacterMovement", is_input=False), _pin(walk, "self"))
     cache = keep(_at(ed.add_set_member_variable_node("BaseSpeed"), 1300, -1420))
     _connect(_pin(walk, "MaxWalkSpeed", is_input=False), _pin(cache, "BaseSpeed"))
@@ -4465,7 +5425,7 @@ def _author_wc_begin_play(ed, begin):
         made)
 
 
-def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
+def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     """Hold Shift to run, while there is stamina left to spend.
 
     Written without a single Branch, which is not cleverness for its own sake:
@@ -4510,7 +5470,7 @@ def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
 
     down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0 + 240, y0 + 420))
     _connect(pc_out, _pin(down, "self"))
-    _set(down, "Key", SPRINT_KEY)
+    _connect(key_pin, _pin(down, "Key"))
 
     stamina = keep(_at(ed.add_get_member_variable_node("Stamina"), x0 + 240, y0 + 560))
     stamina_out = _pin(stamina, "Stamina", is_input=False)
@@ -4532,19 +5492,19 @@ def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
 
     base = keep(_at(ed.add_get_member_variable_node("BaseSpeed"), x0 + 1200, y0 + 300))
     pick_speed = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 300))
-    _set(pick_speed, "A", SPRINT_SPEED_CMS)
+    _set(pick_speed, "A", COMBAT.sprint_speed_cms)
     _connect(_pin(base, "BaseSpeed", is_input=False), _pin(pick_speed, "B"))
     _connect(running_out, _pin(pick_speed, "bPickA"))
     apply_speed = keep(_at(ed.add_set_member_variable_node(
-        "MaxWalkSpeed", "/Script/Engine.CharacterMovementComponent"), x0 + 1700, y0))
+        "MaxWalkSpeed", MOVEMENT_CLASS_PATH), x0 + 1700, y0))
     _connect(movement_out, _pin(apply_speed, "self"))
     _connect(_pin(pick_speed, "ReturnValue", is_input=False),
              _pin(apply_speed, "MaxWalkSpeed"))
     _connect(BEL.find_then_pin(mark), _pin(apply_speed, "execute"))
 
     rate = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 620))
-    _set(rate, "A", -STAMINA_DRAIN_PER_S)
-    _set(rate, "B", STAMINA_REGEN_PER_S)
+    _set(rate, "A", -COMBAT.stamina_drain_per_s)
+    _set(rate, "B", COMBAT.stamina_regen_per_s)
     _connect(running_out, _pin(rate, "bPickA"))
     step = keep(_at(_node(ed, FN_MUL_FF), x0 + 1700, y0 + 620))
     _connect(_pin(rate, "ReturnValue", is_input=False), _pin(step, "A"))
@@ -4555,15 +5515,15 @@ def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
     held_in = keep(_at(_node(ed, FN_CLAMP), x0 + 2180, y0 + 620))
     _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held_in, "Value"))
     _set(held_in, "Min", 0.0)
-    _set(held_in, "Max", MAX_STAMINA)
+    _set(held_in, "Max", COMBAT.max_stamina)
     spend = keep(_at(ed.add_set_member_variable_node("Stamina"), x0 + 2420, y0))
     _connect(_pin(held_in, "ReturnValue", is_input=False), _pin(spend, "Stamina"))
     _connect(BEL.find_then_pin(apply_speed), _pin(spend, "execute"))
 
     ed.add_comment_to_nodes(
-        f"{SPRINT_KEY}: {SPRINT_SPEED_CMS:.0f} cm/s while Stamina lasts "
-        f"({MAX_STAMINA / STAMINA_DRAIN_PER_S:.0f} s from full), refilling at "
-        f"{STAMINA_REGEN_PER_S:.0f}/s the moment it is let go. No Branch: "
+        f"{SPRINT_KEY}: {COMBAT.sprint_speed_cms:.0f} cm/s while Stamina lasts "
+        f"({COMBAT.max_stamina / COMBAT.stamina_drain_per_s:.0f} s from full), refilling at "
+        f"{COMBAT.stamina_regen_per_s:.0f}/s the moment it is let go. No Branch: "
         f"SelectFloat picks the speed and the sign of the drain, so there is one "
         f"write of each and the two arms cannot drift apart. The fire gate below "
         f"reads Sprinting -- you cannot shoot while running.",
@@ -4572,14 +5532,20 @@ def _author_sprint(ed, tick, pc_out, owner_out, exec_ins, x0, y0):
             _pin(as_char, "CastFailed", is_input=False))
 
 
-def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
+def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pin,
+                exec_ins, x0, y0):
     """Right mouse held: narrow the camera to this weapon's AdsZoom.
 
         Aiming   = RightMouseButton down AND something is equipped
                                           AND not sprinting
         TargetFOV = Aiming ? BaseFOV / Held.AdsZoom : BaseFOV
-        CurrentFOV = FInterpTo(CurrentFOV, TargetFOV, dt, ADS_INTERP_SPEED)
+        CurrentFOV = FInterpTo(CurrentFOV, TargetFOV, dt, COMBAT.ads_interp_speed)
         Camera.SetFieldOfView(CurrentFOV)
+
+    ...and then slow the mouse and the legs by how far that zoom has actually
+    travelled, rather than by the key state. The legs are the second write of
+    MaxWalkSpeed in this Tick; see the block itself for why that is the cheap
+    way round.
 
     Three things are load-bearing here.
 
@@ -4610,7 +5576,7 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
 
     down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0, y0 + 300))
     _connect(pc_out, _pin(down, "self"))
-    _set(down, "Key", AIM_KEY)
+    _connect(key_pin, _pin(down, "Key"))
 
     # Sprinting has already been written this frame -- _author_sprint runs
     # before this block -- so this reads the flag rather than the key.
@@ -4660,7 +5626,7 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
     _connect(_pin(have, "CurrentFOV", is_input=False), _pin(step, "Current"))
     _connect(_pin(want, "TargetFOV", is_input=False), _pin(step, "Target"))
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
-    _set(step, "InterpSpeed", ADS_INTERP_SPEED)
+    _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
     moved = keep(_at(ed.add_set_member_variable_node("CurrentFOV"), x0 + 2540, y0))
     _connect(_pin(step, "ReturnValue", is_input=False), _pin(moved, "CurrentFOV"))
     for tail in (BEL.find_then_pin(want_in), BEL.find_then_pin(want_out)):
@@ -4687,7 +5653,7 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
     # along the FInterpTo above, is automatically stronger on the 4x scope than
     # on 1.5x irons, and has no second code path for letting the button go.
     #
-    #     eased = Lerp(1, CurrentFOV / BaseFOV, ADS_SENS_COMPENSATION)
+    #     eased = Lerp(1, CurrentFOV / BaseFOV, COMBAT.ads_sens_compensation)
     #     yaw   scale = BaseYawScale   * MouseSensitivity * eased
     #     pitch scale = BasePitchScale * MouseSensitivity * eased
     #
@@ -4701,7 +5667,7 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
     eased = keep(_at(_node(ed, FN_LERP), x0 + 3320, y0 + 480))
     _set(eased, "A", 1.0)
     _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(eased, "B"))
-    _set(eased, "Alpha", ADS_SENS_COMPENSATION)
+    _set(eased, "Alpha", COMBAT.ads_sens_compensation)
 
     sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity"),
                     x0 + 3320, y0 + 620))
@@ -4726,20 +5692,116 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, exec_ins, x0, y0):
         _connect(flow, _pin(put, "execute"))
         flow = BEL.find_then_pin(put)
 
+    # --- and slow the legs by the same curve ---------------------------------
+    # A SECOND write of MaxWalkSpeed, after the one _author_sprint made earlier
+    # in this same Tick, and that ordering is the whole design. Sprint writes
+    # the speed unconditionally every frame -- Sprinting ? sprint_speed :
+    # BaseSpeed -- so this write does not need an "undo" path at all: the frame
+    # this branch stops running, sprint's write has already put the player back
+    # at BaseSpeed. Moving the decision into _author_sprint instead was the
+    # alternative, and it is worse: the aim state is resolved after the sprint
+    # block (it reads Sprinting), and sprint's CastFailed pin is a live
+    # continuation that would then need the same arithmetic on it.
+    #
+    # Gated on "not sprinting", the same pin the zoom is gated on, so the two
+    # MaxWalkSpeed writes can never disagree about a frame: while Sprinting is
+    # set this block does nothing and sprint's 900 stands, and letting go of
+    # Shift hands the frame straight back here. Gated on armed as well,
+    # because the AdsZoom read below needs a valid Held.
+    #
+    #     progress = FClamp((BaseFOV / CurrentFOV - 1) / (AdsZoom - 1), 0, 1)
+    #     MaxWalkSpeed = BaseSpeed * Lerp(1, COMBAT.ads_move_speed_scale, progress)
+    #
+    # progress is the scope overlay's fade alpha, node for node -- how far the
+    # camera has actually travelled toward this weapon's zoom, 0 at rest and 1
+    # at full ADS. So the slowdown eases in and out on the FInterpTo above
+    # instead of snapping on a key, it has no second code path for release, and
+    # because it is NORMALISED by the weapon's own AdsZoom it lands on exactly
+    # ads_move_speed_scale at full ADS for every weapon. The un-normalised
+    # CurrentFOV/BaseFOV the sensitivity uses would have made the sniper slower
+    # on its legs than the pistol, which is a zoom factor leaking into a
+    # mechanic that has nothing to do with zoom.
+    steady = keep(_at(_node(ed, FN_AND), x0 + 4620, y0 + 900))
+    _connect(_pin(still, "ReturnValue", is_input=False), _pin(steady, "A"))
+    _connect(armed_out, _pin(steady, "B"))
+    slow_gate = keep(_at(ed.add_branch_node(), x0 + 4880, y0 + 760))
+    _connect(_pin(steady, "ReturnValue", is_input=False), _pin(slow_gate, "Condition"))
+    _connect(flow, _pin(slow_gate, "execute"))
+
+    base_third = keep(_at(ed.add_get_member_variable_node("BaseFOV"),
+                          x0 + 4880, y0 + 1040))
+    zoom_ratio = keep(_at(_node(ed, FN_DIV_FF), x0 + 5140, y0 + 1040))
+    _connect(_pin(base_third, "BaseFOV", is_input=False), _pin(zoom_ratio, "A"))
+    _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_ratio, "B"))
+    so_far = keep(_at(_node(ed, FN_SUB_FF), x0 + 5400, y0 + 1040))
+    _connect(_pin(zoom_ratio, "ReturnValue", is_input=False), _pin(so_far, "A"))
+    _set(so_far, "B", 1.0)
+
+    # The denominator is this weapon's own zoom, not the config's, for the same
+    # reason the scope's fade uses it: 4x has four times as far to travel.
+    zoom_again, zoom_again_n = _prop(ed, "AdsZoom", held, x0 + 5140, y0 + 1180)
+    keep(zoom_again_n)
+    span = keep(_at(_node(ed, FN_SUB_FF), x0 + 5400, y0 + 1180))
+    _connect(zoom_again, _pin(span, "A"))
+    _set(span, "B", 1.0)
+
+    frac = keep(_at(_node(ed, FN_DIV_FF), x0 + 5660, y0 + 1040))
+    _connect(_pin(so_far, "ReturnValue", is_input=False), _pin(frac, "A"))
+    _connect(_pin(span, "ReturnValue", is_input=False), _pin(frac, "B"))
+    # Clamped because the FInterpTo can overshoot its target by a fraction on a
+    # long frame, and an unclamped progress of 1.02 is a walk speed below the
+    # configured floor -- small, but it would be a number nobody chose.
+    progress = keep(_at(_node(ed, FN_CLAMP), x0 + 5920, y0 + 1040))
+    _connect(_pin(frac, "ReturnValue", is_input=False), _pin(progress, "Value"))
+    _set(progress, "Min", 0.0)
+    _set(progress, "Max", 1.0)
+
+    slowed = keep(_at(_node(ed, FN_LERP), x0 + 6180, y0 + 1040))
+    _set(slowed, "A", 1.0)
+    _set(slowed, "B", COMBAT.ads_move_speed_scale)
+    _connect(_pin(progress, "ReturnValue", is_input=False), _pin(slowed, "Alpha"))
+    # Off BaseSpeed, not off the speed that is currently set: this runs every
+    # frame, so a factor applied to the live value would compound.
+    walked = keep(_at(ed.add_get_member_variable_node("BaseSpeed"),
+                      x0 + 6180, y0 + 1180))
+    speed = keep(_at(_node(ed, FN_MUL_FF), x0 + 6440, y0 + 1040))
+    _connect(_pin(walked, "BaseSpeed", is_input=False), _pin(speed, "A"))
+    _connect(_pin(slowed, "ReturnValue", is_input=False), _pin(speed, "B"))
+
+    # No cast: GetComponentByClass reshapes its return pin to the class chosen
+    # on ComponentClass, so this wires straight into the movement component's
+    # own setter. _author_sprint casts to Character instead only because it
+    # needs the CastFailed pin as a continuation; here the branch above is
+    # already the guard.
+    legs = keep(_at(_node(ed, FN_GET_COMP), x0 + 5140, y0 + 900))
+    _connect(owner_out, _pin(legs, "self"))
+    _pin(legs, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
+    apply_speed = keep(_at(ed.add_set_member_variable_node(
+        "MaxWalkSpeed", MOVEMENT_CLASS_PATH), x0 + 6700, y0 + 760))
+    _connect(_pin(legs, "ReturnValue", is_input=False), _pin(apply_speed, "self"))
+    _connect(_pin(speed, "ReturnValue", is_input=False),
+             _pin(apply_speed, "MaxWalkSpeed"))
+    _connect(BEL.find_then_pin(slow_gate), _pin(apply_speed, "execute"))
+
     ed.add_comment_to_nodes(
         f"{AIM_KEY}: zoom to BaseFOV / the weapon's own AdsZoom "
-        f"({ADS_ZOOM_IRONS:g}x irons, {ADS_ZOOM_SCOPE:g}x on the sniper's "
-        f"scope), interpolated at {ADS_INTERP_SPEED:g} so it arrives in about "
+        f"({COMBAT.ads_zoom_irons:g}x irons, {COMBAT.ads_zoom_scope:g}x on the sniper's "
+        f"scope), interpolated at {COMBAT.ads_interp_speed:g} so it arrives in about "
         f"a fifth of a second. Refused while sprinting -- the fire gate already "
         f"is -- and with empty hands, which is also what keeps the AdsZoom "
         f"getter off a null Held. The cone shrinks to "
-        f"{ADS_SPREAD_SCALE:g}x while Aiming; see _author_fire. The mouse "
+        f"{COMBAT.ads_spread_scale:g}x while Aiming; see _author_fire. The mouse "
         f"slows with the zoom rather than with the button: "
-        f"Lerp(1, CurrentFOV/BaseFOV, {ADS_SENS_COMPENSATION:g}) scaling both "
+        f"Lerp(1, CurrentFOV/BaseFOV, {COMBAT.ads_sens_compensation:g}) scaling both "
         f"of the controller's cached look scales, so a 4x scope is slower than "
-        f"1.5x irons for free and the slowdown eases in on the same curve.",
+        f"1.5x irons for free and the slowdown eases in on the same curve. "
+        f"The legs slow too, to {COMBAT.ads_move_speed_scale:g}x BaseSpeed at full "
+        f"ADS, on the scope overlay's own fade curve -- a second MaxWalkSpeed "
+        f"write after the sprint block's, which is what makes releasing the "
+        f"button need no code: sprint restores BaseSpeed unconditionally on "
+        f"the next frame.",
         made)
-    return (flow,)
+    return (BEL.find_then_pin(apply_speed), BEL.find_else_pin(slow_gate))
 
 
 def _author_reload(ed, held, exec_in, x0, y0):
@@ -4935,6 +5997,253 @@ def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, tapped, exec_in, x0, y0
     return (BEL.find_then_pin(play), BEL.find_else_pin(click))
 
 
+def _author_turn_view(ed, pc_out, pitch_delta, yaw_delta, exec_in, x0, y0):
+    """Add a pitch and a yaw to the player's own control rotation.
+
+    SetControlRotation, never AddPitchInput / AddControllerPitchInput. Those
+    accumulate into RotationInput, which APlayerController then multiplies by
+    its deprecated InputPitchScale -- and that is precisely the handle the
+    mouse-sensitivity setting drives every frame (see _author_ads). Recoil fed
+    through it would be a fifth of its size for a player on 0.2 and three times
+    its size for a player on 3.0, which is a weapon whose kick depends on a
+    menu slider.
+
+    Nothing clamps the result here and nothing needs to: the controller's own
+    UpdateRotation runs LimitViewPitch against ViewPitchMin/Max on the very
+    next frame, so a kick taken while already looking near-vertical is pulled
+    back under the limit rather than tipping the camera over the top.
+
+    Roll is carried through from the rotation that was read rather than written
+    as zero. Nothing rolls the view in this project today, and a literal 0 here
+    would be this function deciding that for whatever does later.
+
+    Returns (the exec pin to carry on from, the nodes it made).
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    now = keep(_at(_node(ed, FN_GET_CONTROL_ROT), x0, y0 + 240))
+    _connect(pc_out, _pin(now, "self"))
+    brk = keep(_at(_node(ed, FN_BREAK_ROT), x0 + 240, y0 + 240))
+    _connect(_pin(now, "ReturnValue", is_input=False), _pin(brk, "InRot"))
+
+    lifted = keep(_at(_node(ed, FN_ADD_FF), x0 + 500, y0 + 240))
+    _connect(_pin(brk, "Pitch", is_input=False), _pin(lifted, "A"))
+    _connect(pitch_delta, _pin(lifted, "B"))
+    swung = keep(_at(_node(ed, FN_ADD_FF), x0 + 500, y0 + 400))
+    _connect(_pin(brk, "Yaw", is_input=False), _pin(swung, "A"))
+    _connect(yaw_delta, _pin(swung, "B"))
+
+    aimed = keep(_at(_node(ed, FN_MAKE_ROT), x0 + 760, y0 + 240))
+    _connect(_pin(brk, "Roll", is_input=False), _pin(aimed, "Roll"))
+    _connect(_pin(lifted, "ReturnValue", is_input=False), _pin(aimed, "Pitch"))
+    _connect(_pin(swung, "ReturnValue", is_input=False), _pin(aimed, "Yaw"))
+
+    turn = keep(_at(_node(ed, FN_SET_CONTROL_ROT), x0 + 1020, y0))
+    _connect(pc_out, _pin(turn, "self"))
+    _connect(_pin(aimed, "ReturnValue", is_input=False), _pin(turn, "NewRotation"))
+    _connect(exec_in, _pin(turn, "execute"))
+    return BEL.find_then_pin(turn), made
+
+
+def _author_recoil_kick(ed, held, pc_out, exec_in, x0, y0):
+    """One shot's jolt: up by the weapon's own RecoilPitch, and a little sideways.
+
+        kick     = Held.RecoilPitch * (Aiming ? recoil_ads_scale : 1)
+        sideways = random in +/- kick * recoil_horizontal_ratio
+        RecoilDebt    += kick
+        RecoilYawDebt += sideways
+        control rotation += (kick, sideways)
+
+    Both halves are charged to the accumulators *and* applied to the view. The
+    debts are what _author_recoil_recovery then pays back down; without them a
+    kick would be permanent, and with them and no view write it would be
+    invisible.
+
+    RandomFloatInRange is a PURE node, so every pin that reads it draws its own
+    number. The draw is therefore made once, into RecoilYawKick, and read from
+    there twice -- inline it in both places and the view would swing one way
+    while the accumulator was charged another, so the recovery would never
+    cancel the kick it was paying for. That is the same "a pure node is pulled
+    by whoever reads it" trap ReloadTake exists for.
+
+    Reading RecoilPitch off Held is safe here and only here: this runs behind
+    both fire gates, where Held has already been checked valid.
+
+    Returns the exec pin to carry on from.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    per_shot, per_shot_n = _prop(ed, "RecoilPitch", held, x0, y0 + 320)
+    keep(per_shot_n)
+    # Down the sights the weapon is shouldered and kicks less. SelectFloat and
+    # not a Branch, the same shape _author_fire picks the cone width with, so
+    # the aimed and unaimed cases are one expression that cannot drift.
+    aiming = keep(_at(ed.add_get_member_variable_node("Aiming"), x0, y0 + 460))
+    steadied = keep(_at(_node(ed, FN_SELECT_FF), x0 + 260, y0 + 460))
+    _set(steadied, "A", COMBAT.recoil_ads_scale)
+    _set(steadied, "B", 1.0)
+    _connect(_pin(aiming, "Aiming", is_input=False), _pin(steadied, "bPickA"))
+    up = keep(_at(_node(ed, FN_MUL_FF), x0 + 520, y0 + 320))
+    _connect(per_shot, _pin(up, "A"))
+    _connect(_pin(steadied, "ReturnValue", is_input=False), _pin(up, "B"))
+    up_out = _pin(up, "ReturnValue", is_input=False)
+
+    span = keep(_at(_node(ed, FN_MUL_FF), x0 + 780, y0 + 620))
+    _connect(up_out, _pin(span, "A"))
+    _set(span, "B", COMBAT.recoil_horizontal_ratio)
+    span_out = _pin(span, "ReturnValue", is_input=False)
+    mirrored = keep(_at(_node(ed, FN_MUL_FF), x0 + 1040, y0 + 760))
+    _connect(span_out, _pin(mirrored, "A"))
+    _set(mirrored, "B", -1.0)
+    draw = keep(_at(_node(ed, FN_RANDOM_FLOAT), x0 + 1300, y0 + 620))
+    _connect(_pin(mirrored, "ReturnValue", is_input=False), _pin(draw, "Min"))
+    _connect(span_out, _pin(draw, "Max"))
+    hold = keep(_at(ed.add_set_member_variable_node("RecoilYawKick"), x0 + 1560, y0))
+    _connect(_pin(draw, "ReturnValue", is_input=False), _pin(hold, "RecoilYawKick"))
+    _connect(exec_in, _pin(hold, "execute"))
+
+    owed = keep(_at(ed.add_get_member_variable_node("RecoilDebt"), x0 + 1820, y0 + 320))
+    charge = keep(_at(_node(ed, FN_ADD_FF), x0 + 2080, y0 + 320))
+    _connect(_pin(owed, "RecoilDebt", is_input=False), _pin(charge, "A"))
+    _connect(up_out, _pin(charge, "B"))
+    bill = keep(_at(ed.add_set_member_variable_node("RecoilDebt"), x0 + 2340, y0))
+    _connect(_pin(charge, "ReturnValue", is_input=False), _pin(bill, "RecoilDebt"))
+    _connect(BEL.find_then_pin(hold), _pin(bill, "execute"))
+
+    drawn = keep(_at(ed.add_get_member_variable_node("RecoilYawKick"),
+                     x0 + 1820, y0 + 620))
+    drawn_out = _pin(drawn, "RecoilYawKick", is_input=False)
+    owed_yaw = keep(_at(ed.add_get_member_variable_node("RecoilYawDebt"),
+                        x0 + 1820, y0 + 480))
+    charge_yaw = keep(_at(_node(ed, FN_ADD_FF), x0 + 2080, y0 + 480))
+    _connect(_pin(owed_yaw, "RecoilYawDebt", is_input=False), _pin(charge_yaw, "A"))
+    _connect(drawn_out, _pin(charge_yaw, "B"))
+    bill_yaw = keep(_at(ed.add_set_member_variable_node("RecoilYawDebt"),
+                        x0 + 2600, y0))
+    _connect(_pin(charge_yaw, "ReturnValue", is_input=False),
+             _pin(bill_yaw, "RecoilYawDebt"))
+    _connect(BEL.find_then_pin(bill), _pin(bill_yaw, "execute"))
+
+    turned, turn_nodes = _author_turn_view(
+        ed, pc_out, up_out, drawn_out, BEL.find_then_pin(bill_yaw),
+        x0 + 2860, y0)
+    made.extend(turn_nodes)
+
+    ed.add_comment_to_nodes(
+        f"Recoil, on the shot the gate just allowed: this weapon's own "
+        f"RecoilPitch up ({COMBAT.recoil_ads_scale:g}x of it while aiming) and "
+        f"a random +/-{COMBAT.recoil_horizontal_ratio:g} of that sideways, "
+        f"charged to RecoilDebt and applied to the control rotation. The "
+        f"pellets below fly down the AimPoint resolved at the top of this "
+        f"frame, so a shot never bends itself -- it is the next one that pays.",
+        made)
+    return turned
+
+
+def _author_recoil_recovery(ed, tick, pc_out, exec_in, x0, y0):
+    """Give most of the kick back, every frame, until the debt is settled.
+
+        RecoilDebt    -> FInterpTo(debt, 0, dt, recoil_recovery_speed)
+        the view moves by (that step - the debt) * recoil_recovery_fraction
+
+    Two things about that shape are the whole feel of it.
+
+    The debt always reaches zero, so nothing accumulates across a magazine --
+    but only recoil_recovery_fraction of each step is handed back to the view,
+    so a fraction of every kick stays in the player's aim. A burst therefore
+    walks up its target and has to be pulled back down by hand, which is what
+    separates a gun from a screen shake.
+
+    And the view is turned BEFORE the debts are written, not after. Every
+    number here is pure and is pulled by whoever reads it, so a give-back
+    computed from Get RecoilDebt after the Set would read the value it had just
+    been reduced to and come out as zero -- the graph would look right and the
+    view would never move.
+
+    Skipped entirely while both debts are settled, so this does not write the
+    player's control rotation sixty times a second to no effect.
+
+    Returns the exec pins to carry on from.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    owed = keep(_at(ed.add_get_member_variable_node("RecoilDebt"), x0, y0 + 300))
+    owed_out = _pin(owed, "RecoilDebt", is_input=False)
+    owed_yaw = keep(_at(ed.add_get_member_variable_node("RecoilYawDebt"),
+                        x0, y0 + 440))
+    owed_yaw_out = _pin(owed_yaw, "RecoilYawDebt", is_input=False)
+
+    size = keep(_at(_node(ed, FN_ABS), x0 + 260, y0 + 300))
+    _connect(owed_out, _pin(size, "A"))
+    size_yaw = keep(_at(_node(ed, FN_ABS), x0 + 260, y0 + 440))
+    _connect(owed_yaw_out, _pin(size_yaw, "A"))
+    total = keep(_at(_node(ed, FN_ADD_FF), x0 + 520, y0 + 360))
+    _connect(_pin(size, "ReturnValue", is_input=False), _pin(total, "A"))
+    _connect(_pin(size_yaw, "ReturnValue", is_input=False), _pin(total, "B"))
+    # FInterpTo snaps to its target once the remaining distance is negligible,
+    # so the debt reaches exactly zero and this gate really does close.
+    owing = keep(_at(_node(ed, FN_GREATER_FF), x0 + 780, y0 + 360))
+    _connect(_pin(total, "ReturnValue", is_input=False), _pin(owing, "A"))
+    _set(owing, "B", 0.001)
+    gate = keep(_at(ed.add_branch_node(), x0 + 1040, y0))
+    _connect(_pin(owing, "ReturnValue", is_input=False), _pin(gate, "Condition"))
+    _connect(exec_in, _pin(gate, "execute"))
+
+    deltas = []
+    for i, (var, current) in enumerate((("RecoilDebt", owed_out),
+                                        ("RecoilYawDebt", owed_yaw_out))):
+        step = keep(_at(_node(ed, FN_INTERP_FF), x0 + 1300, y0 + 300 + i * 300))
+        _connect(current, _pin(step, "Current"))
+        _set(step, "Target", 0.0)
+        _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
+        _set(step, "InterpSpeed", COMBAT.recoil_recovery_speed)
+        paid = keep(_at(_node(ed, FN_SUB_FF), x0 + 1560, y0 + 300 + i * 300))
+        _connect(_pin(step, "ReturnValue", is_input=False), _pin(paid, "A"))
+        _connect(current, _pin(paid, "B"))
+        given = keep(_at(_node(ed, FN_MUL_FF), x0 + 1820, y0 + 300 + i * 300))
+        _connect(_pin(paid, "ReturnValue", is_input=False), _pin(given, "A"))
+        _set(given, "B", COMBAT.recoil_recovery_fraction)
+        deltas.append((step, _pin(given, "ReturnValue", is_input=False)))
+
+    turned, turn_nodes = _author_turn_view(
+        ed, pc_out, deltas[0][1], deltas[1][1], BEL.find_then_pin(gate),
+        x0 + 2080, y0)
+    made.extend(turn_nodes)
+
+    flow = turned
+    for i, ((step, _delta), var) in enumerate(zip(deltas,
+                                                  ("RecoilDebt", "RecoilYawDebt"))):
+        settle = keep(_at(ed.add_set_member_variable_node(var),
+                          x0 + 3400 + i * 260, y0))
+        _connect(_pin(step, "ReturnValue", is_input=False), _pin(settle, var))
+        _connect(flow, _pin(settle, "execute"))
+        flow = BEL.find_then_pin(settle)
+
+    ed.add_comment_to_nodes(
+        f"Recoil recovery: both debts FInterpTo zero at "
+        f"{COMBAT.recoil_recovery_speed:g}, and "
+        f"{COMBAT.recoil_recovery_fraction * 100:.0f}% of each frame's step is "
+        f"handed back to the view -- so the accumulator always settles but "
+        f"{(1.0 - COMBAT.recoil_recovery_fraction) * 100:.0f}% of every kick "
+        f"stays in the player's aim, which is what makes a burst climb. The "
+        f"view is turned before the debts are written, because both give-backs "
+        f"are pure and would read the already-reduced value otherwise.",
+        made)
+    return (flow, BEL.find_else_pin(gate))
+
+
 def _author_wc_tick(ed, tick):
     """Five polled keys and a refresh, chained so each block rejoins the next.
 
@@ -4959,12 +6268,19 @@ def _author_wc_tick(ed, tick):
     _connect(held, _pin(armed, "Object"))
     armed_out = _pin(armed, "ReturnValue", is_input=False)
 
-    def pressed(key, y):
+    # One Get per bind, reused by every poll below -- an output pin takes any
+    # number of links. The Key pins are DRIVEN rather than set to a literal,
+    # which is the whole of rebinding: the HUD writes these variables each
+    # frame from the player's save, and a literal cannot be written to.
+    key_pins = {}
+    for i, (name, _default) in enumerate(BIND_VARS):
+        getter = _at(ed.add_get_member_variable_node(name), -40, 260 + i * 120)
+        key_pins[name] = _pin(getter, name, is_input=False)
+
+    def pressed(var, y):
         n = _at(_node(ed, FN_WAS_PRESSED), 480, y)
         _connect(pc_out, _pin(n, "self"))
-        # Bare key name, never struct text: FKey exports as just its name, so
-        # '(KeyName="Q")' would import back as a key literally called "(".
-        _set(n, "Key", key)
+        _connect(key_pins[var], _pin(n, "Key"))
         return _pin(n, "ReturnValue", is_input=False)
 
     def both(a, b, y):
@@ -4977,13 +6293,20 @@ def _author_wc_tick(ed, tick):
     # First, and unconditionally: the reticle has to be right on the frames
     # where nothing is fired, which is nearly all of them. It also leaves
     # AimPoint and the muzzle position sitting there for the fire block to use.
-    aim_exits, muzzle = _author_resolve_aim(ed, held, BEL.find_then_pin(tick),
+    # --- recoil recovery -----------------------------------------------------
+    # First of all, because it moves the view: the aim trace below has to be
+    # taken after this frame's give-back rather than one frame behind it.
+    recoil_exits = _author_recoil_recovery(ed, tick, pc_out,
+                                           BEL.find_then_pin(tick), 1040, -3600)
+
+    aim_exits, muzzle = _author_resolve_aim(ed, held, recoil_exits,
                                             1040, -2400)
 
     # --- sprint --------------------------------------------------------------
     # Before the trigger, because the trigger reads Sprinting: polled in the
     # other order, a shot would be allowed on the frame the sprint started.
-    sprint_exits = _author_sprint(ed, tick, pc_out, owner_out, aim_exits,
+    sprint_exits = _author_sprint(ed, tick, pc_out, owner_out,
+                                  key_pins["KeySprint"], aim_exits,
                                   1040, -1400)
 
     # --- aim down the sights -------------------------------------------------
@@ -4991,7 +6314,7 @@ def _author_wc_tick(ed, tick):
     # which the cone width now depends on: polled in any other order the zoom
     # and the spread would disagree by a frame.
     ads_exits = _author_ads(ed, tick, pc_out, owner_out, held, armed_out,
-                            sprint_exits, 1040, -700)
+                            key_pins["KeyAim"], sprint_exits, 1040, -700)
 
     # --- the pose follows the sprint -----------------------------------------
     # Edge-triggered, not level-triggered, and that distinction is the whole
@@ -5049,10 +6372,10 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(_at(ed.add_get_member_variable_node("Sprinting"), 480, 760),
                   "Sprinting", is_input=False), _pin(steady, "A"))
 
-    tap = pressed(FIRE_KEY, 600)
+    tap = pressed("KeyFire", 600)
     holding = _at(_node(ed, FN_IS_KEY_DOWN), 480, 860)
     _connect(pc_out, _pin(holding, "self"))
-    _set(holding, "Key", FIRE_KEY)
+    _connect(key_pins["KeyFire"], _pin(holding, "Key"))
     holding_out = _pin(holding, "ReturnValue", is_input=False)
     touching = _at(_node(ed, FN_OR), 760, 580)
     _connect(tap, _pin(touching, "A"))
@@ -5126,8 +6449,12 @@ def _author_wc_tick(ed, tick):
         [loaded_n, rounds, limited_n, unlimited, has_ammo, when_n, right_now,
          cooled, auto_n, spraying, trigger, ready, allowed, ready_gate])
 
-    after_fire = _author_fire(ed, held, muzzle, BEL.find_then_pin(ready_gate),
-                              2700, 0)
+    # The kick lands before the round is spent, which costs nothing and reads
+    # in the right order. It cannot bend the shot that caused it: the pellets
+    # fly down the AimPoint resolved at the top of this frame.
+    kicked = _author_recoil_kick(ed, held, pc_out,
+                                 BEL.find_then_pin(ready_gate), 6800, -1400)
+    after_fire = _author_fire(ed, held, muzzle, kicked, 2700, 0)
 
     # --- the click, when the gate said no ------------------------------------
     dry_exits = _author_dry_fire(
@@ -5143,7 +6470,7 @@ def _author_wc_tick(ed, tick):
     # DrawHUD is; it is renderer-driven, which is why the menu can poll a key at
     # all.)
     reload_gate = _at(ed.add_branch_node(), 1040, 7200)
-    _connect(both(pressed(RELOAD_KEY, 7360), armed_out, 7300),
+    _connect(both(pressed("KeyReload", 7360), armed_out, 7300),
              _pin(reload_gate, "Condition"))
     for exit_pin in (after_fire, BEL.find_else_pin(fire_gate)) + dry_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
@@ -5159,7 +6486,7 @@ def _author_wc_tick(ed, tick):
     any_held = _at(_node(ed, FN_LESS_II), 760, 1680)
     _set(any_held, "A", 0)
     _connect(count_out, _pin(any_held, "B"))
-    _connect(both(pressed(SWITCH_KEY, 1560), _pin(any_held, "ReturnValue", is_input=False),
+    _connect(both(pressed("KeySwitch", 1560), _pin(any_held, "ReturnValue", is_input=False),
                   1620), _pin(switch_gate, "Condition"))
     for exit_pin in reload_exits + (BEL.find_else_pin(reload_gate),):
         _connect(exit_pin, _pin(switch_gate, "execute"))
@@ -5186,7 +6513,7 @@ def _author_wc_tick(ed, tick):
 
     # --- drop ----------------------------------------------------------------
     drop_gate = _at(ed.add_branch_node(), 1040, 2200)
-    _connect(both(pressed(DROP_KEY, 2360), armed_out, 2300), _pin(drop_gate, "Condition"))
+    _connect(both(pressed("KeyDrop", 2360), armed_out, 2300), _pin(drop_gate, "Condition"))
     _connect(BEL.find_then_pin(switch_dirty), _pin(drop_gate, "execute"))
     _connect(BEL.find_else_pin(switch_gate), _pin(drop_gate, "execute"))
     after_drop = _author_drop(ed, held, owner_out, BEL.find_then_pin(drop_gate),
@@ -5197,7 +6524,7 @@ def _author_wc_tick(ed, tick):
 
     # --- pick up -------------------------------------------------------------
     pick_gate = _at(ed.add_branch_node(), 1040, 3400)
-    _connect(pressed(PICKUP_KEY, 3560), _pin(pick_gate, "Condition"))
+    _connect(pressed("KeyPickup", 3560), _pin(pick_gate, "Condition"))
     _connect(BEL.find_then_pin(drop_dirty), _pin(pick_gate, "execute"))
     _connect(BEL.find_else_pin(drop_gate), _pin(pick_gate, "execute"))
     after_pick = _author_pickup(ed, owner_out, BEL.find_then_pin(pick_gate),
@@ -5259,6 +6586,15 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     for name in ("BaseFOV", "CurrentFOV", "TargetFOV"):
         _declare(ed, name, _float_type())
     _declare(ed, "Aiming", BEL.get_basic_type_by_name("bool"))
+    # The seven polled keys, as variables rather than as pin literals. Nothing
+    # in this component loads them: the HUD pushes the player's binds in every
+    # DrawHUD frame (see build_graphics_menu._author_push_settings), which is
+    # what keeps the component free of any cast to the HUD and of any knowledge
+    # that a save file exists. The CDO defaults below are therefore also the
+    # standalone fallback -- a weapon component on an actor with no HUD in front
+    # of it still plays with the keys this file documents.
+    for name, _default in BIND_VARS:
+        _declare(ed, name, _struct_type(unreal.Key.static_struct()))
     # Mouse sensitivity, and the two controller scales it multiplies. Both
     # bases are cached off the PlayerController at BeginPlay -- BasePitchScale
     # especially, because the engine ships it negative and a literal would
@@ -5268,6 +6604,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # What the ready pose currently reflects, as opposed to what it should.
     # The pair is what makes the sprint pose edge-triggered; see _author_wc_tick.
     _declare(ed, "PoseSprinting", BEL.get_basic_type_by_name("bool"))
+    # Recoil. RecoilDebt/RecoilYawDebt are what has been kicked and not yet
+    # given back, recovered toward zero every frame; RecoilYawKick holds the
+    # one draw of the sideways component for the frame it is fired on, because
+    # RandomFloatInRange is pure and a second read would be a second number.
+    for name in ("RecoilDebt", "RecoilYawDebt", "RecoilYawKick"):
+        _declare(ed, name, _float_type())
     # How many rounds this reload moves, computed once and read back three
     # times. See _author_reload for why it cannot just be recomputed.
     _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
@@ -5292,8 +6634,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     _apply_defaults(bp, {
         "EquippedIndex": 0,
         "NeedsRefresh": True,
-        "Stamina": MAX_STAMINA,
-        "MaxStamina": MAX_STAMINA,
+        "Stamina": COMBAT.max_stamina,
+        "MaxStamina": COMBAT.max_stamina,
         # Overwritten on the first frame of BeginPlay; this is only what the
         # bar would divide by if that somehow never ran.
         "BaseSpeed": 500.0,
@@ -5301,7 +6643,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # 1.0 is "exactly what the controller already does", because the two
         # base scales this multiplies are the controller's own. A player who
         # never opens the settings screen therefore gets the stock feel.
-        "MouseSensitivity": MOUSE_SENSITIVITY_DEFAULT,
+        "MouseSensitivity": COMBAT.mouse_sensitivity_default,
+        **{name: _key(k) for name, k in BIND_VARS},
         # Both overwritten on the first frame of BeginPlay. Seeded with the
         # engine's own defaults, signs included, so that a BeginPlay that
         # somehow never ran leaves the look working rather than dead.
@@ -5311,6 +6654,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # re-equip for nothing.
         "PoseSprinting": False,
         "ReloadTake": 0,
+        "RecoilDebt": 0.0,
+        "RecoilYawDebt": 0.0,
+        "RecoilYawKick": 0.0,
         DEBUG_MODE_VAR: False,
         "ShotgunClass": BEL.generated_class(shotgun_bp),
         "PistolClass": BEL.generated_class(pistol_bp),
@@ -5449,8 +6795,8 @@ def install_hit_zones(bp, health_handle):
            [str(b) for b in comp.get_editor_property(LIMB_BONES_VAR)])
     if got != (head, limbs):
         raise RuntimeError(f"{bp.get_name()}'s hit-box tables did not stick: {got}")
-    _log(f"{bp.get_name()}: hit boxes — head {head} x{HEAD_MULTIPLIER}, "
-         f"limbs {len(limbs)} bodies x{LIMB_MULTIPLIER}, body {body} x1.0")
+    _log(f"{bp.get_name()}: hit boxes — head {head} x{COMBAT.head_multiplier}, "
+         f"limbs {len(limbs)} bodies x{COMBAT.limb_multiplier}, body {body} x1.0")
 
 
 def face_the_camera(bp):
@@ -5510,6 +6856,58 @@ def aim_camera(bp):
         raise RuntimeError(f"the camera boom kept its old offset ({got})")
     _log(f"camera: boom {CAMERA_ARM:.0f} cm, over the shoulder by "
          f"{CAMERA_SHOULDER[1]:.0f} cm right / {CAMERA_SHOULDER[2]:.0f} cm up")
+
+
+def wear_skin(skin=None):
+    """Put the player in a body, and run that body's animation.
+
+    Separate from install_on_character, and called before it, because the
+    weapon specs are built in between: _grip_rotation() samples the ready pose
+    through whatever mesh the player is wearing at the time, so a skin applied
+    afterwards would leave five weapons oriented for the previous rig.
+
+    Idempotent, and quiet when there is nothing to do -- the template already
+    ships wearing SKM_Quinn_Simple, so a checkout without the asset pipeline
+    passes through here writing the values that are already there.
+    """
+    skin = skin or player_skin()
+    eas = _assets()
+    bp = eas.load_asset(CHARACTER_BP_PATH)
+    if not bp:
+        raise RuntimeError(f"could not load {CHARACTER_BP_PATH}")
+    mesh_asset = eas.load_asset(skin.mesh)
+    if not mesh_asset:
+        raise RuntimeError(f"{skin.mesh} is missing — the player would have no body")
+    # An anim BP is bound to one skeleton, so a mismatch here is not a cosmetic
+    # error: the component silently falls back to the reference pose and the
+    # player slides around the map in a T-pose with nothing in the log.
+    anim_class = unreal.load_class(None, f"{skin.anim_bp}.{skin.anim_bp.rsplit('/', 1)[1]}_C")
+    if not anim_class:
+        raise RuntimeError(f"{skin.anim_bp} has no generated class — it did not compile")
+
+    comp = None
+    for handle, _name in _handles(bp):
+        obj = _component_object(handle)
+        if isinstance(obj, unreal.SkeletalMeshComponent):
+            comp = obj
+            break
+    if comp is None:
+        raise RuntimeError(f"{CHARACTER_BP_PATH} has no SkeletalMeshComponent")
+
+    comp.set_editor_property("skeletal_mesh_asset", mesh_asset)
+    comp.set_editor_property("anim_class", anim_class)
+    comp.set_editor_property("relative_location", unreal.Vector(0.0, 0.0, skin.mesh_z))
+    comp.set_editor_property("relative_rotation", _rot(yaw=skin.mesh_yaw))
+    got = comp.get_editor_property("skeletal_mesh_asset")
+    if got != mesh_asset or comp.get_editor_property("anim_class") != anim_class:
+        raise RuntimeError(f"the skin did not stick: mesh={got}, "
+                           f"anim={comp.get_editor_property('anim_class')}")
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_ThirdPersonCharacter failed to compile after the skin")
+    eas.save_loaded_asset(bp)
+    _log(f"player: wearing {mesh_asset.get_name()} animated by "
+         f"{anim_class.get_name()}, weapon on {skin.grip}")
+    return skin
 
 
 def install_on_character(health_bp, weapon_bp, footstep_bp):
@@ -5608,7 +7006,23 @@ def retire_old_assets():
 def main():
     build_materials()
     import_sounds()
+    # Both halves have to exist before either can name the other, so the link
+    # is a third step rather than something import_sounds() does on the way
+    # past -- and it is a step that refuses to finish with a sound it has no
+    # profile for.
+    apply_attenuation(build_sound_attenuations())
     patch_anim_blueprint()
+
+    # First of the Blueprints, and before anything that names its class: both
+    # consumers -- this file's weapon component defaults and the HUD's settings
+    # screen -- have to be able to load /Game/Weapons/BP_Settings, and the HUD
+    # builder runs after this whole script.
+    build_settings_savegame()
+
+    # Before the weapons: every weapon's GripRotation is solved against the
+    # ready pose as seen through the player's own rig, so the body has to be
+    # the final one before the first spec is built.
+    skin = wear_skin()
 
     item_bp = build_weapon_item()
     weapons = {}
@@ -5644,8 +7058,9 @@ def main():
     install_on_npc(health_bp, footstep_bp)
     retire_old_assets()
 
-    _log("done — five weapons, ammunition, inventory, aiming down the sights, "
-         "footsteps, blood, death, drops and respawn")
+    _log(f"done — five weapons, ammunition, inventory, aiming down the sights, "
+         f"footsteps, blood, death, drops and respawn, worn by "
+         f"{skin.mesh.rsplit('/', 1)[1]}")
 
 
 if __name__ == "__main__":

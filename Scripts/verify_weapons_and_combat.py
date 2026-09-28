@@ -11,6 +11,8 @@ be a float, a rename that quietly did not happen. Each of those compiles, saves,
 and looks entirely correct until something depends on it.
 """
 
+import dataclasses
+import math
 import sys
 
 import unreal
@@ -230,12 +232,33 @@ if shot and pist:
         check(f"{name}: in its ready pose the barrel points where the player faces",
               barrel.x > 0.999, f"barrel = {barrel.to_tuple()}")
 
-    # And the axis that caused three rounds of this: not +X.
-    for name, aim in (("rifle", G.AIM_RIFLE), ("pistol", G.AIM_PISTOL)):
+    # And the axis that caused three rounds of this. On the mannequin's
+    # HandGrip_R the weapon rides the socket's +Y and +X reads 0.94 to the
+    # player's left -- the assertion that stopped that from being re-learned.
+    # A rig with no socket is gripped by its hand BONE, whose frame is Meshy's
+    # to choose, so what is asserted there is the weaker true thing: ONE of the
+    # three axes is the aim, which is what makes the grip solvable at all.
+    _skin = G.player_skin()
+    _socketed = _skin is G.SKIN_QUINN
+    for name, aim in (("rifle", _skin.aim_rifle), ("pistol", _skin.aim_pistol)):
         axes = G.socket_pose_axes(aim)
-        check(f"in the {name} ready pose the hand's weapon axis is +Y, not +X",
-              axes["Y"].x > 0.9 and abs(axes["X"].x) < 0.5,
-              f"+Y = {axes['Y'].to_tuple()}, +X = {axes['X'].to_tuple()}")
+        if _socketed:
+            check(f"in the {name} ready pose the hand's weapon axis is +Y, not +X",
+                  axes["Y"].x > 0.9 and abs(axes["X"].x) < 0.5,
+                  f"+Y = {axes['Y'].to_tuple()}, +X = {axes['X'].to_tuple()}")
+        else:
+            # The inverse assertion, and the more useful one. On a hand BONE
+            # nothing carries the weapon: measured on the adventurer, the
+            # rifle pose's three axes read 0.55, -0.78 and -0.31 along the
+            # player's forward, so no axis is the aim and no fixed offset
+            # could be written down. That is what makes _grip_rotation's
+            # solve load-bearing rather than a convenience -- the check that
+            # the solve worked is the per-weapon barrel test above.
+            check(f"in the {name} ready pose the grip bone is an orthonormal "
+                  "frame with no axis on the aim, so the grip must be solved",
+                  all(abs(a.length() - 1.0) < 1e-3 for a in axes.values())
+                  and max(abs(a.x) for a in axes.values()) < 0.9,
+                  ", ".join(f"{k} = {v.to_tuple()}" for k, v in axes.items()))
 
     # Five weapons in five slots with no icons: the colour swatch is the only
     # thing distinguishing them at a glance, so two the same is a real bug.
@@ -341,6 +364,116 @@ for name in G.AUTO_DISPLAYS:
     check(f"{name}: its sample is mixed below full scale, so a burst does not "
           f"clip", peak < 0.80, f"peak {peak:.2f}")
 
+# ─── Distance and direction ──────────────────────────────────────────────────
+# Every sound in this game is made by something standing somewhere, so every
+# one of them is spatialised and every one of them fades with distance. The
+# machinery is the engine's: a USoundAttenuation asset per profile, named on
+# the SoundWave rather than wired into each PlaySoundAtLocation node.
+#
+# The failure this section exists to catch is the quiet one. A SoundBase whose
+# AttenuationSettings is None does not fall back to some default falloff -- it
+# is parsed with no spatialisation and no attenuation at all, and plays at full
+# volume, centred, from anywhere on the map. That is indistinguishable from
+# working until you walk away from the thing making the noise.
+
+_ATT_OK = {p.name: p for p in G.ATTENUATIONS}
+check("there is a small named set of attenuation profiles, not one per sound",
+      1 <= len(G.ATTENUATIONS) <= 4, str(sorted(_ATT_OK)))
+
+for profile in G.ATTENUATIONS:
+    att = load(profile.path)
+    check(f"{profile.name} exists", att is not None, profile.path)
+    if att is None:
+        continue
+    check(f"{profile.name} is a SoundAttenuation asset",
+          isinstance(att, unreal.SoundAttenuation), str(type(att)))
+    st = att.get_editor_property("attenuation")
+    check(f"{profile.name}: volume falls off with distance",
+          bool(st.get_editor_property("attenuate")))
+    # Without this the sound has a position and no direction: it attenuates as
+    # you walk away but never moves in the stereo field as you turn.
+    check(f"{profile.name}: spatialised, so it comes from where it happened",
+          bool(st.get_editor_property("spatialize")))
+    check(f"{profile.name}: on the engine's own panner",
+          st.get_editor_property("spatialization_algorithm")
+          == unreal.SoundSpatializationAlgorithm.SPATIALIZATION_DEFAULT,
+          str(st.get_editor_property("spatialization_algorithm")))
+    check(f"{profile.name}: a natural (dB) falloff curve, not a mixing one",
+          st.get_editor_property("distance_algorithm")
+          == unreal.AttenuationDistanceModel.NATURAL_SOUND,
+          str(st.get_editor_property("distance_algorithm")))
+    check(f"{profile.name}: a sphere, so it fades the same in every direction",
+          st.get_editor_property("attenuation_shape")
+          == unreal.AttenuationShape.SPHERE,
+          str(st.get_editor_property("attenuation_shape")))
+    radius = float(st.get_editor_property("attenuation_shape_extents").x)
+    falloff = float(st.get_editor_property("falloff_distance"))
+    check(f"{profile.name}: full volume out to {profile.radius_cm:.0f} cm",
+          abs(radius - profile.radius_cm) < 1e-3, f"{radius:.1f} cm")
+    check(f"{profile.name}: fades over {profile.falloff_cm:.0f} cm beyond that",
+          abs(falloff - profile.falloff_cm) < 1e-3, f"{falloff:.1f} cm")
+    # THE NUMBER THE BRIEF ASKED FOR. The falloff is measured from the edge of
+    # the full-volume sphere, so the audible radius is the sum of the two --
+    # reading falloff_distance alone would under-report it by the radius.
+    check(f"{profile.name}: inaudible past 100 m",
+          radius + falloff <= G.AUDIBLE_LIMIT_CM + 1e-3,
+          f"{(radius + falloff) / 100.0:.1f} m")
+    check(f"{profile.name}: reaches {G.ATT_DB_AT_MAX:.0f} dB at the edge",
+          abs(float(st.get_editor_property("d_b_attenuation_at_max"))
+              - G.ATT_DB_AT_MAX) < 1e-3,
+          str(st.get_editor_property("d_b_attenuation_at_max")))
+    check(f"{profile.name}: air absorption "
+          f"{'on' if profile.air_absorption else 'off'}",
+          bool(st.get_editor_property("attenuate_with_lpf"))
+          is bool(profile.air_absorption))
+
+# One profile has to spend the whole 100 m allowance, or "at most 100 m" has
+# been satisfied by making everything quiet instead of by placing it.
+check("a gunshot is the thing that carries the full 100 m",
+      abs(G.ATT_GUNFIRE.audible_cm - G.AUDIBLE_LIMIT_CM) < 1e-3,
+      f"{G.ATT_GUNFIRE.audible_cm / 100.0:.0f} m")
+check("a footstep carries far less than a gunshot",
+      G.ATT_FOLEY.audible_cm * 4 < G.ATT_GUNFIRE.audible_cm,
+      f"{G.ATT_FOLEY.audible_cm / 100.0:.0f} m vs "
+      f"{G.ATT_GUNFIRE.audible_cm / 100.0:.0f} m")
+
+# THE SWEEP THAT MAKES "NOTHING WAS MISSED" TRUE. It walks the two audio
+# folders on disk rather than G.SOUND_NAMES + G.CREATURE_SOUND_NAMES, so a
+# sound the builder imports under a name nobody remembered to profile is a
+# failure here rather than one unattenuated noise nobody notices.
+_waves, _flat = [], []
+for _folder in (G.AUDIO_DIR, G.CREATURE_AUDIO_DIR):
+    for _ref in _eas.list_assets(_folder, recursive=False):
+        _asset = load(_ref)
+        if not isinstance(_asset, unreal.SoundWave):
+            continue
+        _waves.append(_asset.get_name())
+        _att = _asset.get_editor_property("attenuation_settings")
+        if _att is None or _att.get_name() not in _ATT_OK:
+            _flat.append(f"{_asset.get_name()} -> {_att}")
+check("every sound in the game carries one of the attenuation profiles",
+      not _flat and len(_waves) == len(G.SOUND_NAMES) + len(G.CREATURE_SOUND_NAMES),
+      f"{len(_waves)} sounds, unattenuated: {sorted(_flat)}")
+for _name, _profile in sorted(G.SOUND_ATTENUATION.items()):
+    # Named folder, not "try one then the other": a failed load is an Error
+    # line in the log, and 13 of them on every clean run is how a real one
+    # stops being read.
+    _asset = load(f"{G.AUDIO_DIR if _name in G.SOUND_NAMES else G.CREATURE_AUDIO_DIR}"
+                  f"/{_name}")
+    _att = _asset.get_editor_property("attenuation_settings") if _asset else None
+    check(f"{_name} -> {_profile.name}",
+          _att is not None and _att.get_name() == _profile.name, str(_att))
+    # AND THE ENGINE AGREES. MaxDistance is not a field this builder writes --
+    # USoundBase caches it off whatever attenuation it ends up resolving, and
+    # it is the number the audio device culls against at play time. Reading it
+    # back is the end-to-end proof that the asset link actually reached the
+    # sound, rather than a re-read of the struct the builder just wrote; an
+    # unattenuated wave reports the whole world here, not 100 m.
+    _reach = float(_asset.get_editor_property("max_distance")) if _asset else -1.0
+    check(f"...and the engine will cull {_name} past "
+          f"{_profile.audible_cm / 100.0:.0f} m",
+          abs(_reach - _profile.audible_cm) < 1e-3, f"{_reach:.0f} cm")
+
 # ─── The three found weapons ─────────────────────────────────────────────────
 # The starting loadout is spawned into the player's hands; these three exist
 # only as drops, and that distinction is DROP_DISPLAYS.
@@ -382,8 +515,6 @@ check("the player's copy does not despawn at 0 HP (default is off)",
 
 hg = graph(health_bp).list_all_nodes()
 check("death spawns a replacement", bool(by_pins(hg, "Class", "SpawnTransform")))
-check("death destroys the owner",
-      any(in_pins(n) == {"execute", "self"} for n in hg))
 check("respawn point comes from the navmesh",
       bool(by_pins(hg, "Origin", "Radius")))
 
@@ -450,13 +581,37 @@ for var, want in (("ShotgunClass", "BP_Shotgun_C"),
     check(f"{var} points at {want}", got is not None and got.get_name() == want,
           got.get_name() if got else "None")
 
+# ─── The keys, and the fact that not one of them is a literal ────────────────
+# Every Key pin in this graph is DRIVEN by a member variable, which is the
+# whole of rebinding: the HUD writes those variables every DrawHUD frame from
+# the player's save, and a pin literal cannot be written to. A pin that went
+# back to a literal would compile, save, and simply ignore the settings screen
+# for ever -- so the assertion is on the wiring, not on the value.
+polls = by_pins(wg, "self", "Key")
+literal = [pin_value(n, "Key") for n in polls if pin_value(n, "Key")]
+check("no key is polled as a pin literal any more", not literal, str(literal))
+driven = []
+for n in polls:
+    src = PIN.list_connected_pins(BEL.find_input_pin(n, "Key"))
+    driven += [str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+               for q in src]
 # The fire key appears TWICE and that is the whole of automatic fire: once as
 # WasInputKeyJustPressed (a tap) and once as IsInputKeyDown (a hold). Sprint
 # and aim are the other two held keys.
-keys = sorted(pin_value(n, "Key") for n in by_pins(wg, "self", "Key"))
-want_keys = sorted([G.FIRE_KEY, G.FIRE_KEY, G.SWITCH_KEY, G.DROP_KEY,
-                    G.PICKUP_KEY, G.SPRINT_KEY, G.RELOAD_KEY, G.AIM_KEY])
-check(f"polls exactly {want_keys}", keys == want_keys, str(keys))
+want_keys = sorted([f"Get {v}" for v, _k in G.BIND_VARS] + ["Get KeyFire"])
+check(f"polls exactly {want_keys}", sorted(driven) == want_keys, str(sorted(driven)))
+# One Get per bind, reused by every poll -- an output pin takes any number of
+# links, so eight polls come off seven reads.
+reads = [n for n in wg
+         if str(BEL.get_node_title(n)).replace("\n", " ")
+         in {f"Get {v}" for v, _k in G.BIND_VARS}]
+check("one read per bind, shared by the polls that use it",
+      len(reads) == len(G.BIND_VARS), str(len(reads)))
+for var, default in G.BIND_VARS:
+    got = w.get_editor_property(var)
+    check(f"{var} defaults to {default}, the key this file documents",
+          got is not None and got.export_text() == default,
+          got.export_text() if got is not None else "None")
 
 plays = by_pins(wg, "Asset", "SlotNodeName")
 check("the ready pose is played into a slot", len(plays) == 1, str(len(plays)))
@@ -696,8 +851,8 @@ if npc:
 # filled, a multiplier that declared as an int (1.5 -> 1), a second trace fed
 # from the wrong line -- and each looks exactly like "every hit is a body hit".
 
-for var, want in ((G.HEAD_MULT_VAR, G.HEAD_MULTIPLIER),
-                  (G.LIMB_MULT_VAR, G.LIMB_MULTIPLIER)):
+for var, want in ((G.HEAD_MULT_VAR, G.COMBAT.head_multiplier),
+                  (G.LIMB_MULT_VAR, G.COMBAT.limb_multiplier)):
     got = h.get_editor_property(var)
     check(f"{var} is {want}, and a float -- an int would truncate it",
           isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
@@ -743,6 +898,90 @@ for tag, bp in (("player", char), ("NPC", npc)):
     check(f"{tag}: the torso is neither -- a chest shot is a 1x shot",
           len(body) > 0 and not set(body) & (set(heads) | set(limbs)),
           str(body))
+
+# ─── The player's body ───────────────────────────────────────────────────────
+# The player is no longer necessarily SKM_Quinn_Simple. Which body is worn is
+# decided by whether the asset pipeline has produced the adventurer, so what is
+# asserted here is that WHICHEVER skin resolved is internally consistent --
+# and, above all, that the mesh and the anim BP agree about the skeleton. That
+# mismatch is the silent one: the component falls back to the reference pose
+# and the player slides around the map in a bind pose with nothing in the log.
+
+skin = G.player_skin()
+unreal.log_warning(f"[VERIFY] player skin: {skin.mesh.rsplit('/', 1)[1]}")
+worn = _mesh_asset(char) if char else None
+check("the player wears the skin the builder resolved",
+      worn is not None and worn.get_path_name().split(".")[0] == skin.mesh,
+      worn.get_path_name() if worn else "None")
+
+_anim_class = unreal.load_class(
+    None, f"{skin.anim_bp}.{skin.anim_bp.rsplit('/', 1)[1]}_C")
+_mesh_comp = None
+for _h, _n in (G._handles(char) if char else []):
+    _o = G._component_object(_h)
+    if isinstance(_o, unreal.SkeletalMeshComponent):
+        _mesh_comp = _o
+        break
+check("...animated by that skin's anim blueprint",
+      _mesh_comp is not None and _anim_class is not None
+      and _mesh_comp.get_editor_property("anim_class") == _anim_class,
+      str(_mesh_comp.get_editor_property("anim_class")) if _mesh_comp else "no mesh")
+_abp = load(skin.anim_bp)
+check("...and the two agree about the skeleton, so the pose is not the bind pose",
+      worn is not None and _abp is not None
+      and _abp.get_editor_property("target_skeleton")
+      == worn.get_editor_property("skeleton"),
+      f"mesh {worn.get_editor_property('skeleton').get_name() if worn else None} vs "
+      f"anim {_abp.get_editor_property('target_skeleton').get_name() if _abp else None}")
+
+if _mesh_comp:
+    check("the body stands in its capsule, not on top of it",
+          abs(_mesh_comp.get_editor_property("relative_location").z - skin.mesh_z) < 0.01,
+          str(_mesh_comp.get_editor_property("relative_location").z))
+    check("...facing the actor's forward",
+          abs(_mesh_comp.get_editor_property("relative_rotation").yaw
+              - skin.mesh_yaw) < 0.01,
+          str(_mesh_comp.get_editor_property("relative_rotation").yaw))
+
+# The grip has to resolve to something on the worn mesh. A name that is neither
+# a socket nor a bone does not error at attach time: the weapon silently binds
+# to the component root and rides in the middle of the player's chest.
+if worn:
+    _sock = worn.find_socket(skin.grip)
+    _bones = [str(b) for b in G._mesh_bone_names(worn)]
+    check(f"the weapon's attach point {skin.grip!r} exists on the worn body",
+          _sock is not None or skin.grip in _bones,
+          "neither a socket nor a bone")
+    check("...and the rig it belongs to has a hand at the end of each arm",
+          len([b for b in _bones if "hand" in b.lower()]) >= 2
+          or len([b for b in _bones if b.lower().endswith("_r")
+                  or b.lower().endswith("_l")]) >= 2,
+          str([b for b in _bones if "hand" in b.lower()]))
+    # Ragdoll and hit zones are the same precondition asked twice: both are
+    # reading the bodies of the worn mesh's physics asset, and a skin swapped
+    # in without one would pass every graph check in this file and then stand
+    # bolt upright at 0 HP.
+    check("the worn body has a physics asset, so it can ragdoll and be zoned",
+          worn.get_editor_property("physics_asset") is not None,
+          str(worn.get_editor_property("physics_asset")))
+
+# The fallback is load-bearing and is never the thing being exercised, so it is
+# checked directly: a clone that has not run the asset pipeline gets SKIN_QUINN
+# and must get four assets that exist.
+_fallback = [a for a in (G.SKIN_QUINN.mesh, G.SKIN_QUINN.anim_bp,
+                         G.SKIN_QUINN.aim_rifle, G.SKIN_QUINN.aim_pistol)
+             if not load(a)]
+check("the mannequin fallback skin is complete, for a clone with no /Game/Sourced",
+      not _fallback, str(_fallback))
+# Every ready pose the weapons name has to live on the skeleton being worn, or
+# PlaySlotAnimationAsDynamicMontage plays nothing and the gun hangs at the hip.
+for _label, _pose in (("rifle", skin.aim_rifle), ("pistol", skin.aim_pistol)):
+    _p = load(_pose)
+    check(f"the {_label} ready pose is authored for the worn skeleton",
+          _p is not None and worn is not None
+          and _p.get_editor_property("skeleton") == worn.get_editor_property("skeleton"),
+          str(_p.get_editor_property("skeleton").get_name()) if _p else "missing")
+
 
 wt = wg
 zone_traces = [n for n in wt if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)]
@@ -877,7 +1116,7 @@ if npc and "NPC" in zoned:
         if head_b:
             aims["head"] = (body_mesh.get_socket_location(head_b)
                             + unreal.Vector(0.0, 0.0, 10.0), front,
-                            G.HEAD_MULTIPLIER)
+                            G.COMBAT.head_multiplier)
         # Across the bone, not along a world axis. A fixed sideways shot works
         # on the mannequin, whose arms hang at the flanks, and fails on the
         # Meshy A-pose, whose arms are held out -- there the line reaches the
@@ -908,10 +1147,10 @@ if npc and "NPC" in zoned:
         if arm_u and arm_l:
             aims["upper arm"] = (body_mesh.get_socket_location(arm_l),
                                  across(arm_u, arm_l, 18.0),
-                                 G.LIMB_MULTIPLIER)
+                                 G.COMBAT.limb_multiplier)
         if leg_u and leg_l:
             aims["thigh"] = (body_mesh.get_socket_location(leg_l),
-                             across(leg_u, leg_l, 18.0), G.LIMB_MULTIPLIER)
+                             across(leg_u, leg_l, 18.0), G.COMBAT.limb_multiplier)
         if chest:
             aims["chest"] = (body_mesh.get_socket_location(chest), front, 1.0)
         check("the zone probe found bones to shoot at on this rig",
@@ -922,8 +1161,8 @@ if npc and "NPC" in zoned:
             hit = body_mesh.line_trace_component(at + side, at - side,
                                                  False, False, False)
             bone = str(hit[2]) if hit and hit[2] else "None"
-            worth = (G.HEAD_MULTIPLIER if bone in heads
-                     else G.LIMB_MULTIPLIER if bone in limbs else 1.0)
+            worth = (G.COMBAT.head_multiplier if bone in heads
+                     else G.COMBAT.limb_multiplier if bone in limbs else 1.0)
             check(f"a shot through the {part} strikes a body worth {want}x",
                   bone != "None" and abs(worth - want) < 1e-6,
                   f"bone {bone} -> {worth}x")
@@ -932,17 +1171,53 @@ if npc and "NPC" in zoned:
 
 # ─── Blood: the spray, not just the spheres ──────────────────────────────────
 # The layout is generated from a fixed seed, so it can be recomputed here and
-# compared component by component -- a blob nudged by hand in the editor, or a
-# seed changed without meaning to, shows up as a mismatch rather than as "the
+# compared component by component -- a droplet nudged by hand in the editor, or
+# a seed changed without meaning to, shows up as a mismatch rather than as "the
 # blood looks a bit different from how I remember it".
+#
+# Most of what follows is about the thing that made the old burst read as a
+# cartoon rather than as blood, and every clause of it is asserted: the colour
+# is dark, desaturated and LIT; the droplets are droplets; they leave at wildly
+# different speeds; they fall under real gravity with drag; and nothing swells.
+
+mel = unreal.MaterialEditingLibrary
+blood_mat = load(G.MAT_BLOOD)
+lit = mel.get_material_property_input_node(
+    blood_mat, unreal.MaterialProperty.MP_EMISSIVE_COLOR) is None
+check("blood is lit rather than emissive", lit,
+      "an emissive droplet glows in its own little world instead of sitting in "
+      "the scene's lighting, which is the loudest cartoon cue of the lot")
+base_node = mel.get_material_property_input_node(
+    blood_mat, unreal.MaterialProperty.MP_BASE_COLOR)
+base = base_node.get_editor_property("constant") if base_node else None
+check("blood has a base colour at all", base is not None)
+if base is not None:
+    check("blood is dark", max(base.r, base.g, base.b) <= 0.25,
+          f"brightest channel {max(base.r, base.g, base.b):.3f} (linear)")
+    check("blood is not pure saturated red",
+          base.g > 0.004 and base.b > 0.004 and base.r / max(base.g, 1e-6) < 20.0,
+          f"({base.r:.3f}, {base.g:.3f}, {base.b:.3f}) -- "
+          f"R/G {base.r / max(base.g, 1e-6):.1f}")
+    check("the builder's colour is the one on disk",
+          all(abs(a - b) < 1e-6 for a, b in
+              zip(G.BLOOD_BASE_COLOUR, (base.r, base.g, base.b))))
+rough_node = mel.get_material_property_input_node(
+    blood_mat, unreal.MaterialProperty.MP_ROUGHNESS)
+rough = rough_node.get_editor_property("r") if rough_node else None
+check("blood is wet, not chalk", rough is not None and rough <= 0.35,
+      f"roughness {rough}")
+check("M_Blood carries no expressions left over from an earlier build",
+      mel.get_num_material_expressions(blood_mat) == 3,
+      f"{mel.get_num_material_expressions(blood_mat)} expressions")
 
 blood_bp = load(G.BLOOD_BP_PATH)
 want_blobs = G._blood_blobs()
-check(f"the splash has {len(want_blobs)} blobs",
+check(f"the splash has {len(want_blobs)} droplets",
       len({c for c in components(blood_bp) if c.startswith("Blob")})
       == len(want_blobs),
       str(sorted({c for c in components(blood_bp) if c.startswith("Blob")})))
 placed = True
+unshadowed = True
 for i, (bx, by, bz, bscale) in enumerate(want_blobs):
     t = component_template(blood_bp, f"Blob{i}")
     if t is None:
@@ -952,38 +1227,100 @@ for i, (bx, by, bz, bscale) in enumerate(want_blobs):
     size = t.get_editor_property("relative_scale3d")
     placed &= (abs(loc.x - bx) < 1e-3 and abs(loc.y - by) < 1e-3
                and abs(loc.z - bz) < 1e-3 and abs(size.x - bscale) < 1e-4)
-check("every blob sits where the seeded layout puts it", placed)
+    unshadowed &= not t.get_editor_property("cast_shadow")
+check("every droplet carries the seeded launch velocity in its location", placed)
+check("no droplet casts a shadow", unshadowed,
+      "19 shadow casters per pellet, eight pellets to a shotgun shell")
+
 # The cone has to lean along +X, which is what the impact rotates onto the hit
-# normal. A symmetric ball of spheres would spray nowhere in particular.
+# normal. A symmetric ball of droplets would spray nowhere in particular.
 check("the cone reaches out along +X, the hit normal",
-      max(b[0] for b in want_blobs) > 5.0
-      and max(abs(b[1]) for b in want_blobs) < max(b[0] for b in want_blobs),
-      f"reach {max(b[0] for b in want_blobs):.1f} cm")
+      max(b[0] for b in want_blobs) > 0.0
+      and max(b[0] for b in want_blobs) > max(abs(b[1]) for b in want_blobs),
+      f"reach {max(b[0] for b in want_blobs) * G.BLOOD_VELOCITY_ENCODE:.0f} cm/s")
+speeds = [math.sqrt(b[0] ** 2 + b[1] ** 2 + b[2] ** 2) * G.BLOOD_VELOCITY_ENCODE
+          for b in want_blobs]
+check("the spray leaves at wildly different speeds",
+      max(speeds) / max(min(speeds), 1e-6) >= 3.0,
+      f"{min(speeds):.0f}-{max(speeds):.0f} cm/s, a {max(speeds) / min(speeds):.1f}x "
+      "spread -- one speed for everything is what makes a burst read as one "
+      "expanding shell")
+spray_speeds = speeds[:G.BLOOD_DROPLETS]
+mist_speeds = speeds[G.BLOOD_DROPLETS:]
+check("the mist hangs at the wound while the spray leaves",
+      len(mist_speeds) == G.BLOOD_MIST
+      and max(mist_speeds) < min(spray_speeds),
+      f"mist <= {max(mist_speeds):.0f} cm/s, spray >= {min(spray_speeds):.0f} cm/s")
+# 100 cm is the engine sphere's diameter at scale 1, so scale IS size in metres.
+biggest = max(b[3] for b in want_blobs) * 100.0
+check("droplets are droplets", biggest <= 4.0, f"largest {biggest:.1f} cm across")
+check("the whole thing is over fast", 0.2 <= G.BLOOD_LIFETIME <= 0.6,
+      f"{G.BLOOD_LIFETIME}s")
 
 bg = graph(blood_bp).list_all_nodes()
-check("the burst swells and fades on a sine, not a straight ramp",
-      any("Sin" in str(BEL.get_node_title(n)) for n in bg))
-check("the spray arcs: the age is squared for the gravity term",
-      any({PIN.get_owning_node(q)
-           for side in ("A", "B")
-           for q in PIN.list_connected_pins(BEL.find_input_pin(n, side))
-           } and len({PIN.get_owning_node(q)
-                      for side in ("A", "B")
-                      for q in PIN.list_connected_pins(
-                          BEL.find_input_pin(n, side))}) == 1
-          for n in by_pins(bg, "A", "B")),
-      "expected Age * Age feeding the fall")
-check("the splash moves rather than only scaling",
-      bool(by_pins(bg, "NewLocation")))
-check("the wound position is stored, so the arc cannot drift frame to frame",
-      "Origin" in {str(v) for v in BEL.list_member_variable_names(blood_bp, False)})
-check("the splash still cleans itself up", bool(by_pins(bg, "InLifespan")))
+check("nothing swells: the burst no longer rides a sine",
+      not any("Sin" in str(BEL.get_node_title(n)) for n in bg),
+      "blood does not inflate")
+check("droplets fly under drag rather than in a straight line",
+      bool(titled(bg, "Exp")),
+      "the closed form of dv/dt = g - kv needs an exponential in it")
+check("the drag coefficient is the one the builder states",
+      any(abs((num_pin(n, "B") if num_pin(n, "B") is not None else 0.0)
+              + G.BLOOD_DRAG) < 1e-6 for n in by_pins(bg, "A", "B")),
+      f"-{G.BLOOD_DRAG} on a B pin")
+check("gravity is rotated into the actor's own frame once",
+      bool(titled(bg, "InverseTransformDirection")),
+      "the actor faces the hit normal, so world -Z is not local -Z")
+falls = [n for n in bg if "MakeVector" in str(BEL.get_node_title(n))
+         and num_pin(n, "Z") is not None
+         and abs(num_pin(n, "Z") + G.BLOOD_GRAVITY) < 1e-6]
+check("and it is real gravity, not a stylised fraction of it", bool(falls),
+      f"expected a (0, 0, -{G.BLOOD_GRAVITY:.0f}) constant")
+check("each droplet is moved on its own",
+      bool(titled(bg, "Set Relative Location")),
+      "the old burst moved the whole actor, so every sphere flew at one speed")
+check("the actor itself never moves after it spawns",
+      not titled(bg, "SetActorLocation"),
+      "the wound does not travel")
+check("the droplets are walked once a frame, not wired one by one",
+      len(titled(bg, "For Each Loop")) >= 2,
+      "one loop to read the launch velocities at BeginPlay, one to fly them")
+check("velocity is read back off each component, so no parallel table can "
+      "fall out of step",
+      bool(titled(bg, "GetRelativeTransform")))
+check("size only ever falls away",
+      any(num_pin(n, "Min") == 0.0 and num_pin(n, "Max") == 1.0
+          for n in by_pins(bg, "Value", "Min", "Max")),
+      "the fade is a 0..1 clamp, so nothing can grow past the size it was built")
+check("the splash still cleans itself up",
+      any(num_pin(n, "InLifespan") == G.BLOOD_LIFETIME
+          for n in by_pins(bg, "InLifespan")),
+      f"{G.BLOOD_LIFETIME}s")
+
+# The droplet solver was proved at runtime with a temporary PrintString in the
+# fly loop and a forced spawn at BeginPlay; this is what keeps either from
+# being left behind, the same way the ADS probe is kept out.
+check("no probe survives in the splash's Tick",
+      not by_pins(bg, "InString"),
+      "a PrintString per droplet per frame is 19 lines a frame")
+
+blood_vars = {str(v) for v in BEL.list_member_variable_names(blood_bp, False)}
+check("the splash keeps the three per-droplet tables it fills at BeginPlay",
+      {"Blobs", "Velocity", "Size", "Fall", "Age"} <= blood_vars,
+      str(sorted(blood_vars)))
 
 # And the half that makes the direction mean anything: the impact has to turn
-# the splash onto the surface normal it hit.
+# the splash onto the surface normal it hit, and size it by the round.
 check("impacts point the splash down the surface normal",
       bool(titled(wg, "MakeRotFromX")),
       "without it the spray leaves along the world's +X, not out of the wound")
+check("the spray is sized by what the round did",
+      any(num_pin(n, "Min") == G.BLOOD_SCALE_MIN
+          and num_pin(n, "Max") == G.BLOOD_SCALE_MAX
+          for n in by_pins(wg, "Value", "Min", "Max")),
+      f"a clamp to {G.BLOOD_SCALE_MIN}..{G.BLOOD_SCALE_MAX} off Damage / "
+      f"{G.BLOOD_REFERENCE_DAMAGE}")
+
 
 # ─── The damage stamp ────────────────────────────────────────────────────────
 
@@ -1028,34 +1365,136 @@ if blamed:
           [n.get_class().get_name() for n in driven] == ["K2Node_IfThenElse"],
           str([n.get_class().get_name() for n in driven]))
 
-# ─── The player's death ──────────────────────────────────────────────────────
-# Until now the DespawnOnDeath-false arm of the death path simply ended: the
-# player sat at 0 HP while the pack kept swinging.
+# ─── Dying: the ragdoll, the corpse, and the menu ────────────────────────────
+# The player used to play MM_Death_Front_01 into FullBodySlot and the wanderers
+# were destroyed on the frame they died. Both are gone: Epic's six MM_Death_*
+# clips are one-second staggers that END STANDING (measured off the assets:
+# pelvis 83-88 cm, both feet on the floor, 1.5-2 m of backwards travel), so the
+# montage blended out and put the player back on his feet a second before the
+# pause -- which is exactly what "he gets up right away" was.
 
-deaths = by_pins(hg, "Asset", "SlotNodeName")
-check("the player plays a death animation", len(deaths) == 1, str(len(deaths)))
-if deaths:
-    check(f"it plays into {G.FULL_BODY_SLOT}, so the legs go down too",
-          pin_value(deaths[0], "SlotNodeName") == G.FULL_BODY_SLOT,
-          pin_value(deaths[0], "SlotNodeName"))
-    check("it plays a death animation, not the attack montage",
-          "Death" in pin_value(deaths[0], "Asset"), pin_value(deaths[0], "Asset"))
+ragdolls = titled(hg, "SetAllBodiesSimulatePhysics")
+check("dying is a ragdoll, not a clip", len(ragdolls) == 1, str(len(ragdolls)))
+if ragdolls:
+    check("...simulating, not un-simulating",
+          pin_value(ragdolls[0], "bNewSimulate") in ("true", "True"),
+          pin_value(ragdolls[0], "bNewSimulate"))
+# SetSimulatePhysics would put the ONE root body into simulation -- a
+# creature-shaped brick toppling over. It is not even a UFunction on
+# SkeletalMeshComponent, so this is a ban on reaching for the PrimitiveComponent
+# one on the mesh pin.
+check("and every body in the physics asset, not just the root",
+      not titled(hg, "SetSimulatePhysics"))
+check("no death montage survives anywhere in the health graph",
+      not by_pins(hg, "Asset", "SlotNodeName"),
+      "a montage would blend out and stand the body back up")
+
+profiles = titled(hg, "SetCollisionProfileName")
+check("the ragdoll gets a collision profile that lets it hit the ground",
+      len(profiles) == 1, str(len(profiles)))
+if profiles:
+    check(f"...the {G.RAGDOLL_PROFILE} profile, which also ignores Pawn",
+          pin_value(profiles[0], "InCollisionProfileName") == G.RAGDOLL_PROFILE,
+          pin_value(profiles[0], "InCollisionProfileName"))
+# The capsule -- not the mesh -- is what blocks the player and what the pellets
+# trace against (see make_shootable), so switching it off is both halves of "a
+# corpse is not in the way".
+capsules = titled(hg, "SetCollisionEnabled")
+check("the capsule stops colliding, so a corpse is neither an obstacle nor a "
+      "target", len(capsules) == 1, str(len(capsules)))
+if capsules:
+    check("...switched off entirely",
+          pin_value(capsules[0], "NewType").endswith("NoCollision"),
+          pin_value(capsules[0], "NewType"))
 check("the body stops where it fell",
-      bool(titled(hg, "DisableMovement")),
-      "without it the corpse slides on under the last movement input")
+      len(titled(hg, "DisableMovement")) == 1,
+      "without it CharacterMovement drags the capsule and the mesh with it")
+
+# One collapse, reached from both arms of the death branch. Two would be two
+# places for "what dying looks like" to drift apart.
+casts = [n for n in hg if n.get_class().get_name() == "K2Node_DynamicCast"
+         and "AsCharacter" in {q.replace(" ", "") for q in out_pins(n)}]
+check("the player and the wanderers collapse through the same nodes",
+      len(casts) == 1, f"{len(casts)} CastToCharacter(s)")
+if casts:
+    feeders = PIN.list_connected_pins(BEL.find_input_pin(casts[0], "execute"))
+    check("...and both arms really do reach it", len(feeders) == 2,
+          f"{len(feeders)} exec link(s) into the collapse")
+
+# ─── The corpse, and when it goes away ───────────────────────────────────────
+lifespans = titled(hg, "SetLifeSpan")
+check("a killed wanderer leaves a corpse instead of vanishing",
+      len(lifespans) == 1, str(len(lifespans)))
+if lifespans:
+    check(f"the corpse despawns after {G.CORPSE_SECONDS:.0f} s",
+          abs((num_pin(lifespans[0], "InLifespan") or -1.0)
+              - G.CORPSE_SECONDS) < 1e-3,
+          pin_value(lifespans[0], "InLifespan"))
+check("60 s, as asked for", abs(G.CORPSE_SECONDS - 60.0) < 1e-6,
+      f"{G.CORPSE_SECONDS}")
+# The chase, the melee and the growls are one self-re-entering loop on the AI
+# controller and none of them ask whether the pawn is alive, so a corpse whose
+# controller survived would keep hitting the player from the floor.
+destroys = titled(hg, "Destroy Actor")
+check("a corpse's AI controller is destroyed", len(destroys) == 1,
+      str(len(destroys)))
+if destroys:
+    fed_by = [str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+              for q in PIN.list_connected_pins(
+                  BEL.find_input_pin(destroys[0], "self"))]
+    check("...the CONTROLLER, not the body -- the body has a lifespan now",
+          fed_by == ["GetController"], str(fed_by))
+
 pauses = by_pins(hg, "bPaused")
 check("death pauses the game", len(pauses) == 1, str(len(pauses)))
 if pauses:
     check("...paused, not unpaused",
           pin_value(pauses[0], "bPaused") in ("true", "True"),
           pin_value(pauses[0], "bPaused"))
-check("the pause waits for the animation to land",
-      any(abs(float(pin_value(n, "Duration") or 0) - G.DEATH_PAUSE_SECONDS) < 1e-3
+# The pause stops physics too, so this is also how long the ragdoll gets to
+# settle; pausing early freezes the player mid-topple.
+check("the pause waits for the body to land",
+      any(abs((num_pin(n, "Duration") or -1.0) - G.DEATH_PAUSE_SECONDS) < 1e-3
           for n in by_pins(hg, "Duration")),
       f"expected a {G.DEATH_PAUSE_SECONDS}s Delay before the pause")
 check("the death flag is raised for the HUD to draw the menu from",
       bool(titled(hg, f"SET {G.PLAYER_DEAD_VAR}"))
       or bool(titled(hg, f"Set {G.PLAYER_DEAD_VAR}")))
+
+# One writer, and it is the safety net's. Anything else writing Health inside
+# the component's own graph is a probe that was left behind -- which is exactly
+# how the 60 s corpse timer was measured, on a compressed value, with a clock
+# forcing the death.
+writes = [n for n in hg if str(BEL.get_node_title(n)) in ("SET Health", "Set Health")]
+check("only the world-floor net writes Health from inside the component",
+      len(writes) == 1, f"{len(writes)} Set Health node(s)")
+
+# ─── A ragdoll needs bodies to be a ragdoll ──────────────────────────────────
+# Not a formality: it is the one precondition the collapse cannot check for
+# itself, and a mesh that arrives without a physics asset would simply stand
+# there dead. install_hit_zones already depends on the same bodies, so a rig
+# that cannot ragdoll cannot be shot in the head either.
+for bp_path in (G.CHARACTER_BP_PATH, G.NPC_BP_PATH):
+    bp = load(bp_path)
+    if not bp:
+        continue
+    mesh = None
+    for name in components(bp):
+        obj = component_template(bp, name)
+        if isinstance(obj, unreal.SkeletalMeshComponent):
+            mesh = obj
+            break
+    if mesh is None:
+        mesh = cdo(bp).get_editor_property("mesh")
+    asset = mesh.get_editor_property("skeletal_mesh_asset") if mesh else None
+    pa = asset.get_editor_property("physics_asset") if asset else None
+    check(f"{bp_path.rsplit('/', 1)[1]} has a physics asset to ragdoll with",
+          pa is not None, pa.get_name() if pa else "None")
+    if pa:
+        head, limbs, body = G.hit_zones(asset)
+        check(f"...with enough bodies to fall apart ({bp_path.rsplit('/', 1)[1]})",
+              len(head) + len(limbs) + len(body) >= 8,
+              f"{len(head) + len(limbs) + len(body)} bodies")
 
 # ─── Walking off the edge of the world ───────────────────────────────────────
 # The navmesh is a disc of radius 85 m and the terrain a 200 m square, but the
@@ -1108,8 +1547,8 @@ check("...and still names the wanderer and where it was put",
 
 # ─── Sprint and stamina ──────────────────────────────────────────────────────
 
-for var, kind, want in (("Stamina", float, G.MAX_STAMINA),
-                        ("MaxStamina", float, G.MAX_STAMINA),
+for var, kind, want in (("Stamina", float, G.COMBAT.max_stamina),
+                        ("MaxStamina", float, G.COMBAT.max_stamina),
                         ("Sprinting", bool, False)):
     value = w.get_editor_property(var)
     check(f"{var} starts at {want!r}",
@@ -1121,8 +1560,11 @@ check("BaseSpeed is a float, not an int",
       type(w.get_editor_property("BaseSpeed")).__name__)
 sprint_polls = [n for n in wg
                 if in_pins(n) == {"self", "Key"}
-                and pin_value(n, "Key") == G.SPRINT_KEY]
-check(f"{G.SPRINT_KEY} is polled as held, not as a tap",
+                and any("Get KeySprint" in
+                        str(BEL.get_node_title(PIN.get_owning_node(q)))
+                        for q in PIN.list_connected_pins(
+                            BEL.find_input_pin(n, "Key")))]
+check("the sprint bind is polled as held, not as a tap",
       bool(sprint_polls)
       and all("IsInputKeyDown" in str(BEL.get_node_title(n))
               for n in sprint_polls),
@@ -1144,14 +1586,14 @@ check("the walking speed is cached off the character, not hardcoded",
 selects = [n for n in titled(wg, "SelectFloat")
            if not any("Contains" in str(BEL.get_node_title(PIN.get_owning_node(q)))
                       for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
-# Three now: sprint picks the speed and the sign of the drain, and aiming
-# picks how much of its own cone the weapon keeps.
-check("SelectFloat picks the speed, the drain, and the aimed cone",
-      len(selects) == 3, f"{len(selects)} SelectFloat node(s)")
+# Four now: sprint picks the speed and the sign of the drain, and aiming picks
+# both how much of its own cone the weapon keeps and how much of its recoil.
+check("SelectFloat picks the speed, the drain, the aimed cone and the aimed "
+      "kick", len(selects) == 4, f"{len(selects)} SelectFloat node(s)")
 check("stamina is clamped, so it cannot run past its own bar",
-      any(pin_value(n, "Max") == str(G.MAX_STAMINA)
+      any(pin_value(n, "Max") == str(G.COMBAT.max_stamina)
           for n in by_pins(wg, "Value", "Min", "Max")),
-      f"expected a clamp at {G.MAX_STAMINA}")
+      f"expected a clamp at {G.COMBAT.max_stamina}")
 # The requirement the flag exists for: you cannot shoot while running.
 sprint_reads = [n for n in wg if "Sprinting" in out_pins(n)]
 check("the trigger reads Sprinting", bool(sprint_reads),
@@ -1288,15 +1730,36 @@ if dry:
 # literal rather than the camera's own -- all three look fine in the graph.
 
 for sp in G._weapon_specs():
-    want = sp.get("ads_zoom", G.ADS_ZOOM_IRONS)
+    want = sp.get("ads_zoom", G.COMBAT.ads_zoom_irons)
     got = cdo(load(sp["path"])).get_editor_property("AdsZoom")
     check(f"{sp['display']}: AdsZoom is {want}x",
           isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
 check("only the sniper carries a scope's worth of zoom",
       {sp["display"] for sp in G._weapon_specs()
-       if sp.get("ads_zoom", G.ADS_ZOOM_IRONS) == G.ADS_ZOOM_SCOPE} == {"Sniper"},
-      str(sorted(sp.get("ads_zoom", G.ADS_ZOOM_IRONS)
+       if sp.get("ads_zoom", G.COMBAT.ads_zoom_irons) == G.COMBAT.ads_zoom_scope} == {"Sniper"},
+      str(sorted(sp.get("ads_zoom", G.COMBAT.ads_zoom_irons)
                  for sp in G._weapon_specs())))
+
+# Scoped is what the HUD branches on to black the screen out and draw the
+# sniper reticle, and it is deliberately a separate fact from AdsZoom -- so
+# both the flag and the agreement between the two are worth checking.
+scoped = set()
+for sp in G._weapon_specs():
+    want = bool(sp.get("scoped", False))
+    got = cdo(load(sp["path"])).get_editor_property("Scoped")
+    check(f"{sp['display']}: Scoped is {want}", got is want, repr(got))
+    if got:
+        scoped.add(sp["display"])
+check("the sniper is the only weapon with glass on it", scoped == {"Sniper"},
+      str(sorted(scoped)))
+# The HUD fades the scope over (BaseFOV/CurrentFOV - 1) / (AdsZoom - 1), so a
+# scoped weapon that does not zoom would divide by zero every frame it is
+# aimed. build_weapon refuses to build one; this is the same rule read off the
+# assets that shipped.
+flat = {sp["display"] for sp in G._weapon_specs()
+        if sp.get("scoped") and sp.get("ads_zoom", G.COMBAT.ads_zoom_irons) <= 1.0}
+check("...and it zooms, so the scope's fade has something to divide by",
+      not flat, str(sorted(flat)))
 
 fov_writes = [x for x in wg if "SetFieldOfView" in
               str(BEL.get_node_title(x)).replace(" ", "")]
@@ -1316,9 +1779,9 @@ base_reads = [x for x in wg if "FieldOfView" in out_pins(x)]
 check("BaseFOV is cached off the camera, not written down as a literal",
       bool(base_reads), str(len(base_reads)))
 check("aiming is refused while sprinting, which cannot fire anyway",
-      G.ADS_SPREAD_SCALE < 1.0 and "Get Sprinting" in
+      G.COMBAT.ads_spread_scale < 1.0 and "Get Sprinting" in
       {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg},
-      f"cone x{G.ADS_SPREAD_SCALE}")
+      f"cone x{G.COMBAT.ads_spread_scale}")
 
 # ─── Mouse sensitivity, and what the zoom does to it ─────────────────────────
 # Three ways this goes wrong without looking wrong. The pitch scale is cached
@@ -1333,13 +1796,69 @@ check("the weapon component carries a mouse sensitivity",
       isinstance(wc_cdo.get_editor_property("MouseSensitivity"), float))
 check("...defaulting to 1.0, i.e. exactly the controller's own feel",
       abs(wc_cdo.get_editor_property("MouseSensitivity")
-          - G.MOUSE_SENSITIVITY_DEFAULT) < 1e-6
-      and abs(G.MOUSE_SENSITIVITY_DEFAULT - 1.0) < 1e-6,
+          - G.COMBAT.mouse_sensitivity_default) < 1e-6
+      and abs(G.COMBAT.mouse_sensitivity_default - 1.0) < 1e-6,
       repr(wc_cdo.get_editor_property("MouseSensitivity")))
 check("...within a range that cannot reach zero, which would kill the mouse",
-      0.0 < G.MOUSE_SENSITIVITY_MIN < G.MOUSE_SENSITIVITY_DEFAULT
-      < G.MOUSE_SENSITIVITY_MAX,
-      f"{G.MOUSE_SENSITIVITY_MIN}..{G.MOUSE_SENSITIVITY_MAX}")
+      0.0 < G.COMBAT.mouse_sensitivity_min < G.COMBAT.mouse_sensitivity_default
+      < G.COMBAT.mouse_sensitivity_max,
+      f"{G.COMBAT.mouse_sensitivity_min}..{G.COMBAT.mouse_sensitivity_max}")
+# ─── BP_Settings: what survives a restart ────────────────────────────────────
+# Built here rather than in build_graphics_menu.py so that both consumers -- the
+# weapon component's defaults and the HUD's settings screen -- can name the
+# class without a build-order cycle. Nothing in this file reads it at runtime;
+# the HUD pushes its values onto the component every DrawHUD frame.
+sg = load(G.SETTINGS_BP_PATH)
+check("BP_Settings exists", sg is not None, G.SETTINGS_BP_PATH)
+if sg:
+    check("...and is a USaveGame, so it can be written to a slot",
+          BEL.get_blueprint_parent_class(sg) == unreal.SaveGame.static_class(),
+          str(BEL.get_blueprint_parent_class(sg)))
+    sg_cdo = cdo(sg)
+    check("...carrying a mouse sensitivity that is a float, not an int",
+          isinstance(sg_cdo.get_editor_property("MouseSensitivity"), float),
+          type(sg_cdo.get_editor_property("MouseSensitivity")).__name__)
+    check(f"...defaulting to {G.COMBAT.mouse_sensitivity_default}",
+          abs(sg_cdo.get_editor_property("MouseSensitivity")
+              - G.COMBAT.mouse_sensitivity_default) < 1e-6,
+          repr(sg_cdo.get_editor_property("MouseSensitivity")))
+    stored = list(sg_cdo.get_editor_property("Binds"))
+    check(f"...and {len(G.BIND_VARS)} binds, one per rebindable action",
+          len(stored) == len(G.BIND_VARS), str(len(stored)))
+    # Index-for-index against BIND_VARS, because Binds is indexed and not
+    # keyed: the settings screen writes Binds[row - 1] and the HUD pushes
+    # Binds[i] into BIND_VARS[i], so a reordering here silently rebinds every
+    # save already on disk.
+    check("...in the same order BIND_VARS names them",
+          [k.export_text() for k in stored] == [d for _v, d in G.BIND_VARS],
+          str([k.export_text() for k in stored]))
+    check("the slot it is written to is named and single",
+          bool(G.SETTINGS_SLOT) and G.SETTINGS_USER_INDEX == 0,
+          f"{G.SETTINGS_SLOT!r} / user {G.SETTINGS_USER_INDEX}")
+    # The requirement, exercised rather than inspected: a BP_Settings written
+    # to a slot has to come back off the disk with its FKey array intact. An
+    # FKey is a struct with no Python-visible fields, so "it compiles" says
+    # nothing about whether it serialises -- this is the only check here that
+    # writes a file and reads it back.
+    probe_slot = f"{G.SETTINGS_SLOT}Probe"
+    made = unreal.GameplayStatics.create_save_game_object(
+        BEL.generated_class(sg))
+    wrote = unreal.GameplayStatics.save_game_to_slot(made, probe_slot, 0)
+    read = unreal.GameplayStatics.load_game_from_slot(probe_slot, 0)
+    check("a BP_Settings survives a write to a slot and a read back",
+          wrote and read is not None
+          and [k.export_text() for k in read.get_editor_property("Binds")]
+          == [d for _v, d in G.BIND_VARS]
+          and abs(read.get_editor_property("MouseSensitivity")
+                  - G.COMBAT.mouse_sensitivity_default) < 1e-6,
+          f"wrote={wrote}")
+    unreal.GameplayStatics.delete_game_in_slot(probe_slot, 0)
+
+for var, _default in G.BIND_VARS:
+    check(f"{var} is an FKey on the component, not a string",
+          isinstance(w.get_editor_property(var), unreal.Key),
+          type(w.get_editor_property(var)).__name__)
+
 check("the engine's pitch scale is negative, so it MUST be cached not written",
       wc_cdo.get_editor_property("BasePitchScale") < 0.0,
       repr(wc_cdo.get_editor_property("BasePitchScale")))
@@ -1360,15 +1879,349 @@ for label, want in (("yaw", "Get Deprecated Input Yaw Scale"),
           bool(hits), want)
 check("the slowdown is driven off the zoom, not off the Aiming flag -- so it "
       "eases in and is stronger on the scope",
-      bool(titled(wg, "Lerp")) and 0.0 < G.ADS_SENS_COMPENSATION <= 1.0,
-      f"Lerp(1, CurrentFOV/BaseFOV, {G.ADS_SENS_COMPENSATION})")
+      bool(titled(wg, "Lerp")) and 0.0 < G.COMBAT.ads_sens_compensation <= 1.0,
+      f"Lerp(1, CurrentFOV/BaseFOV, {G.COMBAT.ads_sens_compensation})")
 # The numbers the player actually feels, spelled out so a change to either
 # constant has to be argued for rather than noticed later.
-for name, zoom, want in (("irons", G.ADS_ZOOM_IRONS, 0.75),
-                         ("scope", G.ADS_ZOOM_SCOPE, 0.4375)):
-    got = 1.0 + G.ADS_SENS_COMPENSATION * (1.0 / zoom - 1.0)
+for name, zoom, want in (("irons", G.COMBAT.ads_zoom_irons, 0.75),
+                         ("scope", G.COMBAT.ads_zoom_scope, 0.4375)):
+    got = 1.0 + G.COMBAT.ads_sens_compensation * (1.0 / zoom - 1.0)
     check(f"...which works out at {want:.2f}x sensitivity down the {name}",
           abs(got - want) < 5e-3, f"{got:.4f}")
+
+# ─── What aiming costs in mobility ───────────────────────────────────────────
+# Full ADS is half speed, and it is a second MaxWalkSpeed write layered on top
+# of the sprint block's unconditional one. Four ways that goes wrong while the
+# graph still looks right: the factor is applied to the LIVE walk speed rather
+# than to BaseSpeed, which compounds to a standstill in about a second; nothing
+# ever restores the speed, because the author added an "undo" path that turns
+# out to be dead; the slowdown is driven off the Aiming flag, so it snaps on a
+# frame before the camera moves; and it is driven off the raw CurrentFOV/BaseFOV
+# ratio the sensitivity uses, which would make the sniper slower on its legs
+# than the pistol and never reach exactly half on anything.
+
+check(f"aiming costs {(1 - G.COMBAT.ads_move_speed_scale) * 100:.0f}% of the "
+      f"walking speed, which is the ask",
+      abs(G.COMBAT.ads_move_speed_scale - 0.5) < 1e-9,
+      f"x{G.COMBAT.ads_move_speed_scale}")
+
+def feeds(pin, limit=250):
+    """Every node feeding this pin through DATA links only.
+
+    Same shape, and for the same reason, as the traversal the Automatic check
+    uses further down: following the exec pin as well would reach every pure
+    node in the graph and make each of these checks pass vacuously.
+    """
+    seen, stack = set(), [pin]
+    while stack and len(seen) < limit:
+        for q in PIN.list_connected_pins(stack.pop()):
+            node = PIN.get_owning_node(q)
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.extend(x for x in BEL.list_input_pins(node)
+                         if str(PIN.get_pin_name(x)) != "execute")
+    return seen
+
+speed_writes = [n for n in wg if "MaxWalkSpeed" in in_pins(n)]
+check("MaxWalkSpeed is written exactly twice: the sprint block's "
+      "unconditional write, and the ADS slowdown layered on top of it",
+      len(speed_writes) == 2, str(len(speed_writes)))
+# The sprint write reaches the movement component through a cast to Character
+# (it wants the CastFailed pin as a continuation); the ADS one takes the
+# GetComponentByClass shortcut, which is what tells the two apart from here.
+by_class = [n for n in speed_writes
+            if any("getcomponentbyclass" in
+                   str(BEL.get_node_title(PIN.get_owning_node(q)))
+                   .replace(" ", "").lower()
+                   for q in PIN.list_connected_pins(
+                       BEL.find_input_pin(n, "self")))]
+check("...the second of them off GetComponentByClass, which reshapes its "
+      "return pin to the chosen class and so needs no cast",
+      len(by_class) == 1, str(len(by_class)))
+
+if by_class:
+    ads_speed = by_class[0]
+    up = feeds(BEL.find_input_pin(ads_speed, "MaxWalkSpeed"))
+    up_titles = {str(BEL.get_node_title(n)).replace("\n", " ") for n in up}
+    check("THE COMPOUNDING TRAP: the slowed speed is computed from BaseSpeed, "
+          "never from the MaxWalkSpeed that is already set -- this write runs "
+          "every frame, so a factor on the live value would walk the player to "
+          "a standstill in about a second",
+          any("BaseSpeed" in out_pins(n) for n in up)
+          and not any("MaxWalkSpeed" in out_pins(n) for n in up),
+          str(sorted(up_titles)))
+    check("...and BaseSpeed is still written exactly once, at BeginPlay, off "
+          "the character's own default",
+          len([n for n in wg if "BaseSpeed" in in_pins(n)]) == 1,
+          str(len([n for n in wg if "BaseSpeed" in in_pins(n)])))
+    check("the slowdown is driven off how far the zoom has actually travelled, "
+          "not off the Aiming flag -- the flag would snap it on a frame before "
+          "the camera moved",
+          "Set CurrentFOV" in up_titles
+          and not any("Aiming" in out_pins(n) for n in up),
+          str(sorted(t for t in up_titles if "FOV" in t or "Aiming" in t)))
+    check("...normalised by the weapon's OWN AdsZoom, so full ADS is the same "
+          "half speed on a 4x scope as on 1.5x irons",
+          any("AdsZoom" in out_pins(n) for n in up),
+          str(sorted(up_titles)))
+    # An FInterpTo can overshoot its target on a long frame, and an unclamped
+    # progress past 1 is a walk speed below the number anybody chose.
+    # `num_pin(n, "Min") or X` would be the wrong test and quietly the wrong
+    # answer: a Min that really is 0.0 is falsy, so the fallback wins and the
+    # clamp that exists reads as missing.
+    def holds(node, name, want):
+        got = num_pin(node, name)
+        return got is not None and abs(got - want) < 1e-9
+
+    clamps = [n for n in up if {"Value", "Min", "Max"} <= in_pins(n)]
+    check("...clamped to 0..1, because the interpolation can overshoot",
+          any(holds(n, "Min", 0.0) and holds(n, "Max", 1.0) for n in clamps),
+          str(len(clamps)))
+    lerps = [n for n in up
+             if holds(n, "B", G.COMBAT.ads_move_speed_scale)
+             and holds(n, "A", 1.0)]
+    check(f"...and eased Lerp(1, {G.COMBAT.ads_move_speed_scale:g}, progress), "
+          f"so it arrives with the zoom rather than with the key",
+          len(lerps) == 1, str(len(lerps)))
+
+    # THE REASON THE GATE IS THERE. Sprint writes MaxWalkSpeed unconditionally
+    # every frame, earlier in the same Tick, which is what makes releasing the
+    # aim key need no code at all -- and also what would make the two writes
+    # fight over the frames the player is sprinting, if this one were not shut
+    # off on exactly the condition the zoom is.
+    driving = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(ads_speed, "execute"))]
+    gates = [n for n in driving if n.get_class().get_name() == "K2Node_IfThenElse"]
+    check("the ADS write sits behind a Branch, so the frames it does not run "
+          "are the frames sprint's unconditional write stands -- that is the "
+          "whole of \"letting go restores the speed\"",
+          len(gates) == 1, str([n.get_class().get_name() for n in driving]))
+    if gates:
+        cond = feeds(BEL.find_input_pin(gates[0], "Condition"))
+        cond_titles = {str(BEL.get_node_title(n)).replace("\n", " ")
+                       for n in cond}
+        check("...gated on NOT Sprinting, the same pin the zoom is, so the two "
+              "MaxWalkSpeed writes can never disagree about a frame",
+              any("Sprinting" in out_pins(n) for n in cond)
+              and any("NOT" in t.upper() for t in cond_titles),
+              str(sorted(cond_titles)))
+        check("...and on a valid Held, because the AdsZoom read behind it "
+              "would otherwise be an Accessed None every frame the hands are "
+              "empty",
+              any("isvalid" in t.replace(" ", "").lower() for t in cond_titles),
+              str(sorted(cond_titles)))
+
+# The headless -game run takes no input, so the gate above never opens by
+# itself and the positive case has to be forced with a temporary probe. This is
+# what makes sure the probe left again: Aiming is driven by the aim bind and by
+# nothing else -- a forcing function wired in front of the key poll (a clock, a
+# literal true) would still zoom, still slow the player down, and still pass
+# every structural check above.
+aiming_writes = [n for n in wg if "Aiming" in in_pins(n)]
+check("Aiming is written exactly once", len(aiming_writes) == 1,
+      str(len(aiming_writes)))
+if aiming_writes:
+    src = feeds(BEL.find_input_pin(aiming_writes[0], "Aiming"))
+    src_titles = {str(BEL.get_node_title(n)).replace("\n", " ") for n in src}
+    check("...off the aim bind, and off nothing that stands in for it -- no "
+          "clock and no literal left over from forcing the state at runtime",
+          any("Get KeyAim" in t for t in src_titles)
+          and not any("Time Seconds" in t or t.strip() in ("Sin", "Sin (Radians)")
+                      for t in src_titles),
+          str(sorted(src_titles)))
+check("and no probe is left printing out of the weapon component's Tick",
+      not [n for n in wg
+           if "printstring" in
+           str(BEL.get_node_title(n)).replace(" ", "").lower()],
+      str([str(BEL.get_node_title(n)) for n in wg
+           if "printstring" in
+           str(BEL.get_node_title(n)).replace(" ", "").lower()]))
+
+# The numbers the player actually feels, spelled out so that a change to either
+# the scale or a weapon's zoom has to be argued for rather than noticed later.
+# At full ADS CurrentFOV is BaseFOV/AdsZoom, so progress is exactly 1 whatever
+# the zoom -- which is the point of dividing by (AdsZoom - 1).
+def _eased(zoom, travelled):
+    """The walk-speed factor once the camera is `travelled` of the way in."""
+    now = 1.0 / (1.0 + travelled * (zoom - 1.0))        # CurrentFOV / BaseFOV
+    progress = min(max((1.0 / now - 1.0) / (zoom - 1.0), 0.0), 1.0)
+    return 1.0 + (G.COMBAT.ads_move_speed_scale - 1.0) * progress
+
+full_ads = {sp["display"]:
+            _eased(sp.get("ads_zoom", G.COMBAT.ads_zoom_irons), 1.0)
+            for sp in G._weapon_specs()}
+check(f"every weapon lands on exactly {G.COMBAT.ads_move_speed_scale:g}x speed "
+      f"at full ADS",
+      all(abs(v - G.COMBAT.ads_move_speed_scale) < 1e-9
+          for v in full_ads.values()),
+      str(sorted(full_ads.items())))
+check("...and on full speed with the button up, so nothing is left behind",
+      all(abs(_eased(sp.get("ads_zoom", G.COMBAT.ads_zoom_irons), 0.0) - 1.0)
+          < 1e-9 for sp in G._weapon_specs()))
+halfway = {sp["display"]:
+           _eased(sp.get("ads_zoom", G.COMBAT.ads_zoom_irons), 0.5)
+           for sp in G._weapon_specs()}
+check("...half way in it is 0.75x on every weapon too: the easing follows the "
+      "zoom's curve, not the zoom's magnitude",
+      all(abs(v - 0.75) < 1e-9 for v in halfway.values()),
+      str(sorted(halfway.items())))
+# And the contrast that justifies normalising at all: the raw ratio the mouse
+# uses would be a different speed per weapon and never exactly the number asked
+# for -- right for sensitivity, wrong for legs.
+raw = {sp["display"]:
+       1.0 + (1.0 - G.COMBAT.ads_move_speed_scale)
+       * (1.0 / sp.get("ads_zoom", G.COMBAT.ads_zoom_irons) - 1.0)
+       for sp in G._weapon_specs()}
+check("...which the raw CurrentFOV/BaseFOV ratio the sensitivity uses would "
+      "NOT have been: that is why this one is normalised and that one is not",
+      len({round(v, 6) for v in raw.values()}) > 1
+      and all(abs(v - G.COMBAT.ads_move_speed_scale) > 1e-6
+              for v in raw.values()),
+      str(sorted(raw.items())))
+
+# ─── The combat config ───────────────────────────────────────────────────────
+# The ask was for a named, tunable home for the global combat parameters, with
+# more to follow. What can go wrong quietly is that it becomes a SECOND home --
+# the structure exists, a builder still reads a leftover module constant, and
+# the two disagree until somebody tunes the one that is not wired up.
+
+check("the global combat tuning lives in one named structure",
+      dataclasses.is_dataclass(G.CombatConfig)
+      and isinstance(G.COMBAT, G.CombatConfig),
+      type(G.COMBAT).__name__)
+check("...frozen, so no builder can rewrite a value the verifier then asserts",
+      G.CombatConfig.__dataclass_params__.frozen)
+knobs = {f.name for f in dataclasses.fields(G.COMBAT)}
+check("...holding every global knob: lethality, sprint, ADS, look, recoil",
+      knobs >= {"start_health", "head_multiplier", "limb_multiplier",
+                "sprint_speed_cms", "max_stamina", "stamina_drain_per_s",
+                "stamina_regen_per_s", "ads_zoom_irons", "ads_zoom_scope",
+                "ads_interp_speed", "ads_spread_scale",
+                "mouse_sensitivity_default", "mouse_sensitivity_min",
+                "mouse_sensitivity_max", "mouse_sensitivity_step",
+                "ads_sens_compensation", "ads_move_speed_scale",
+                "recoil_recovery_speed",
+                "recoil_recovery_fraction", "recoil_ads_scale",
+                "recoil_horizontal_ratio"},
+      str(sorted(knobs)))
+stale = [n for n in ("START_HEALTH", "HEAD_MULTIPLIER", "LIMB_MULTIPLIER",
+                     "SPRINT_SPEED_CMS", "MAX_STAMINA", "STAMINA_DRAIN_PER_S",
+                     "STAMINA_REGEN_PER_S", "ADS_ZOOM_IRONS", "ADS_ZOOM_SCOPE",
+                     "ADS_INTERP_SPEED", "ADS_SPREAD_SCALE",
+                     "ADS_SENS_COMPENSATION", "MOUSE_SENSITIVITY_DEFAULT",
+                     "MOUSE_SENSITIVITY_MIN", "MOUSE_SENSITIVITY_MAX",
+                     "MOUSE_SENSITIVITY_STEP")
+         if hasattr(G, n)]
+check("...and it is the ONLY home -- every loose constant it replaced is gone, "
+      "so nothing can read a stale second copy", not stale, str(stale))
+# Per-weapon numbers must NOT have been swept into it: that would undo the
+# "a sixth weapon is a row in a table" property the whole file is built on.
+check("per-weapon numbers stayed on the weapon table",
+      not (knobs & {"damage", "spread", "recoil", "interval", "magazine"}),
+      str(sorted(knobs)))
+
+# ─── Recoil ──────────────────────────────────────────────────────────────────
+# The requested ordering, read off the built assets rather than off the table
+# that produced them, plus the one trap this feature had: routing the kick
+# through AddControllerPitchInput would multiply it by the deprecated
+# InputPitchScale, which is exactly the handle the mouse-sensitivity setting
+# drives -- so the recoil would scale with the player's slider.
+
+kick = {}
+for sp in G._weapon_specs():
+    got = cdo(load(sp["path"])).get_editor_property("RecoilPitch")
+    check(f"{sp['display']}: RecoilPitch is {sp['recoil']} deg",
+          isinstance(got, float) and abs(got - sp["recoil"]) < 1e-6, repr(got))
+    kick[sp["display"]] = got
+
+check("every weapon kicks at all", all(v > 0.0 for v in kick.values()),
+      str(sorted(kick.items(), key=lambda kv: -kv[1])))
+heavy = min(kick["Shotgun"], kick["Sniper"])
+check("the shotgun and the sniper kick hardest of the five",
+      heavy > max(kick["Rifle"], kick["SMG"], kick["Pistol"]),
+      f"shotgun {kick['Shotgun']}, sniper {kick['Sniper']} vs "
+      f"rifle {kick['Rifle']}")
+check("...the assault rifle next", kick["Rifle"] > kick["SMG"],
+      f"rifle {kick['Rifle']} > smg {kick['SMG']}")
+check("...the SMG less than that", kick["SMG"] > kick["Pistol"],
+      f"smg {kick['SMG']} > pistol {kick['Pistol']}")
+check("...and the pistol least of all",
+      kick["Pistol"] == min(kick.values()),
+      f"pistol {kick['Pistol']}, lowest of {sorted(kick.values())}")
+
+for name in ("RecoilDebt", "RecoilYawDebt", "RecoilYawKick"):
+    got = wc_cdo.get_editor_property(name)
+    check(f"{name} is a float on the component, starting settled at zero",
+          isinstance(got, float) and abs(got) < 1e-9, repr(got))
+
+flat = [t.replace(" ", "") for t in titles]
+banned = sorted({t for t in flat
+                 if "PitchInput" in t or "ControllerYawInput" in t})
+check("the kick never goes through AddControllerPitchInput -- that route "
+      "multiplies by the deprecated InputPitchScale the sensitivity setting "
+      "drives, so recoil would scale with the player's slider",
+      not banned, str(banned))
+for label, want, n in (("written", "SetControlRotation", 2),
+                       ("read back first", "GetControlRotation", 2)):
+    hits = [t for t in flat if t.startswith(want)]
+    check(f"the control rotation is {label} exactly {n}x: the kick and the "
+          f"recovery", len(hits) == n, f"{len(hits)} x {want}")
+makers = [n for n in wg if {"Roll", "Pitch", "Yaw"} <= in_pins(n)]
+check("both writes are rebuilt through a Make Rotator", len(makers) == 2,
+      str(len(makers)))
+check("...whose Roll comes from the rotation that was read, not a literal zero "
+      "that would quietly decide the view never rolls",
+      bool(makers) and all(PIN.list_connected_pins(BEL.find_input_pin(m, "Roll"))
+                           for m in makers),
+      str(len(makers)))
+
+interps = by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
+check("the two debts recover by interpolation, alongside the zoom's",
+      len(interps) == 3, f"{len(interps)} FInterpTo (2 recoil + 1 FOV)")
+settling = [n for n in interps
+            if (num_pin(n, "Target") or 0.0) == 0.0
+            and abs((num_pin(n, "InterpSpeed") or 0.0)
+                    - G.COMBAT.recoil_recovery_speed) < 1e-6]
+check(f"...toward zero at {G.COMBAT.recoil_recovery_speed:g}, so the "
+      f"accumulator always settles and nothing builds up across a magazine",
+      len(settling) == 2, str(len(settling)))
+check("only part of each step is handed back, which is what makes a burst "
+      "climb instead of springing exactly home",
+      0.0 < G.COMBAT.recoil_recovery_fraction < 1.0,
+      f"{G.COMBAT.recoil_recovery_fraction} of every kick returned, "
+      f"{(1 - G.COMBAT.recoil_recovery_fraction) * 100:.0f}% kept")
+paid = [n for n in by_pins(wg, "A", "B")
+        if abs((num_pin(n, "B") or 0.0)
+               - G.COMBAT.recoil_recovery_fraction) < 1e-9]
+check("...and that fraction is in the graph twice, pitch and yaw",
+      len(paid) == 2, str(len(paid)))
+for var in ("RecoilDebt", "RecoilYawDebt"):
+    writes = [t for t in titles if t == f"Set {var}"]
+    check(f"{var} is written twice: charged by the shot, settled by the tick",
+          len(writes) == 2, str(len(writes)))
+
+check("aiming down the sights steadies the kick",
+      0.0 < G.COMBAT.recoil_ads_scale < 1.0, f"x{G.COMBAT.recoil_ads_scale}")
+steadied = [n for n in by_pins(wg, "A", "B", "bPickA")
+            if abs((num_pin(n, "A") or 0.0) - G.COMBAT.recoil_ads_scale) < 1e-9]
+check("...through the same SelectFloat shape the cone uses, so the aimed and "
+      "unaimed cases cannot drift into two branches", len(steadied) == 1,
+      str(len(steadied)))
+check("the sideways kick is a fraction of the vertical rather than a second "
+      "per-weapon column", 0.0 < G.COMBAT.recoil_horizontal_ratio < 1.0,
+      f"+/-{G.COMBAT.recoil_horizontal_ratio} of the pitch")
+draws = [n for n in wg if str(BEL.get_node_title(n)).replace(" ", "").lower()
+         .startswith("randomfloatinrange")]
+check("...drawn once per shot", len(draws) == 1, str(len(draws)))
+if draws:
+    readers = {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+               for q in PIN.list_connected_pins(
+                   BEL.find_output_pin(draws[0], "ReturnValue"))}
+    check("...and read by exactly one thing, the RecoilYawKick write -- "
+          "RandomFloatInRange is pure, so a second reader would be a second "
+          "number and the recovery would never cancel the kick",
+          readers == {"Set RecoilYawKick"}, str(sorted(readers)))
 
 # ─── Footsteps ───────────────────────────────────────────────────────────────
 
@@ -1395,6 +2248,19 @@ if foot:
           "follow the framerate",
           any("-" in t or "Subtract" in t for t in foot_titles),
           str(len(foot_titles)))
+    # The audibility probe that proved the attenuation boundaries at runtime
+    # lived here, on a once-only Tick gate with a Probed flag. Both it and the
+    # flag are asserted gone: a probe left in ships a PrintString on every
+    # footstep component in the level.
+    try:
+        f.get_editor_property("Probed")
+        _left_over = True
+    except Exception:                                             # noqa: BLE001
+        _left_over = False
+    check("...and the temporary audibility probe is gone",
+          not _left_over
+          and not any("Print" in t or "Probed" in t for t in foot_titles),
+          str(sorted(t for t in foot_titles if "Print" in t or "Probed" in t)))
 check("both the player and the wanderers wear it",
       "FootstepComponent" in components(char)
       and (npc is None or "FootstepComponent" in components(npc)))
@@ -1423,11 +2289,14 @@ for name in G.AUTO_DISPLAYS:
           str(sp["interval"]))
 
 downs = [n for n in wg if "IsInputKeyDown" in str(BEL.get_node_title(n))]
+held_binds = sorted(
+    str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+    for x in downs
+    for q in PIN.list_connected_pins(BEL.find_input_pin(x, "Key")))
 check("three keys are polled held rather than tapped: sprint, aim and the "
       "trigger",
-      sorted(pin_value(x, "Key") for x in downs)
-      == sorted([G.FIRE_KEY, G.SPRINT_KEY, G.AIM_KEY]),
-      str(sorted(pin_value(x, "Key") for x in downs)))
+      held_binds == ["Get KeyAim", "Get KeyFire", "Get KeySprint"],
+      str(held_binds))
 
 # THE TRAP THIS SECTION EXISTS FOR. Automatic lives on the weapon, so reading
 # it means a pure Get with its self pin driven by Held -- and Held is null
@@ -1736,6 +2605,57 @@ if drops:
                 break
     check("only a death the player caused drops shells", guarded,
           f"{G.DAMAGED_BY_PLAYER_VAR} branch found upstream: {guarded}")
+
+
+# ─── Every call site is a placed one ─────────────────────────────────────────
+# Attenuation on the asset only works if the sound is played AT somewhere.
+# PlaySound2D / SpawnSound2D are non-spatial by construction -- they bypass
+# attenuation entirely, whatever the SoundBase says -- so one of them anywhere
+# in the game would be a sound that stayed flat while every check above passed.
+#
+# The sweep is over every Blueprint in the two folders that make noise, found
+# by listing them, so a sixth sound-playing graph added later is covered
+# without anybody remembering to add it here.
+
+_placed, _flat_calls, _unwired, _overridden, _graphs = [], [], [], [], 0
+for _dir in ("/Game/Weapons", "/Game/Forest/NPC"):
+    for _ref in _eas.list_assets(_dir, recursive=True):
+        _bp = load(_ref)
+        if not isinstance(_bp, unreal.Blueprint):
+            continue
+        _g = graph(_bp)
+        if _g is None:
+            continue
+        _graphs += 1
+        # Nodes carrying a Sound INPUT pin: that is every play and spawn
+        # overload and nothing else. Matching on the title instead would sweep
+        # up every `Get FireSound` in the graph.
+        for _n in by_pins(_g.list_all_nodes(), "Sound"):
+            _t = str(BEL.get_node_title(_n)).replace("\n", " ")
+            _where = f"{_bp.get_name()}: {_t}"
+            _placed.append(_where)
+            if "2D" in _t or "Location" not in in_pins(_n):
+                _flat_calls.append(_where)
+            if not PIN.list_connected_pins(BEL.find_input_pin(_n, "Sound")):
+                _unwired.append(_where)
+            _ap = BEL.find_input_pin(_n, "AttenuationSettings")
+            if _ap and _ap.is_valid() and (PIN.list_connected_pins(_ap)
+                                           or str(PIN.get_pin_value(_ap))
+                                           not in ("", "None")):
+                _overridden.append(_where)
+
+check("every sound is played at a world location, never in 2D",
+      not _flat_calls, str(sorted(_flat_calls)))
+check("...and every one of them was handed a sound to play",
+      not _unwired, str(sorted(_unwired)))
+# Not a functional failure -- the pin overrides the asset and would still
+# attenuate -- but it would be a second place the answer lives, and the whole
+# point of setting it on the SoundBase was that there is only one.
+check("...with no per-call attenuation override, so the asset is the one "
+      "place it is said", not _overridden, str(sorted(_overridden)))
+check("all five known call sites are still there: fire, dry fire, reload, "
+      "footstep, and the wanderers' voice and melee thud",
+      len(_placed) >= 5, f"{len(_placed)} across {_graphs} graphs")
 
 
 # ─── Summary ─────────────────────────────────────────────────────────────────

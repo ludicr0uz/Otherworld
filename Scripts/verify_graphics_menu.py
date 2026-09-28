@@ -92,27 +92,48 @@ def main():
         want = set(required)
         return [n for n in nodes if want <= pin_names(n)]
 
+    # "Key" and "self" together: a key POLL is a PlayerController method, which
+    # Key_GetDisplayName (a static library pure with a Key pin of its own) is
+    # not. Without the self pin that node counts as an eighth poll of nothing.
     keys = set()
-    for n in by_pins("Key"):
-        keys.add(BEL.find_input_pin(n, "Key").get_pin_value())
+    driven_keys = []
+    for n in by_pins("Key", "self"):
+        pin = BEL.find_input_pin(n, "Key")
+        if pin.list_connected_pins():
+            driven_keys.append(n)
+        else:
+            keys.add(pin.get_pin_value())
     # Bare key names: FKey exports as its name, so struct text would silently
     # import back as a key called "(".
     # The restart key is polled from ReceiveDrawHUD, not from Tick: Tick does
     # not run while the game is paused, and the death menu only exists paused.
     # The main menu's start keys are polled from ReceiveDrawHUD for the same
-    # reason the restart key is, and there are three of them.
-    expected_keys = set((G.MENU_KEY, G.RESTART_KEY, G.DEBUG_KEY)
+    # reason the restart key is, and so are the four navigation keys.
+    expected_keys = set((G.MENU_KEY, G.RESTART_KEY, G.DEBUG_KEY,
+                         G.NAV_UP, G.NAV_DOWN, G.NAV_LEFT, G.NAV_RIGHT)
                         + G.PRESET_KEYS + G.START_KEYS)
-    check("polls exactly the menu, preset, debug, restart and start keys",
+    check("polls exactly the menu, preset, debug, restart, start and nav keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
+    # Exactly one Key pin in this graph is driven rather than literal: the
+    # capture poll, which asks the PlayerController about each entry of KeyPool
+    # in turn. That is the only place a key is a value rather than a constant.
+    check("one key poll is driven -- the rebind capture, over KeyPool",
+          len(driven_keys) == 1, str(len(driven_keys)))
+    # The navigation keys must not be bindable, or a keypress can lock the
+    # settings screen shut with no way back but deleting the save.
+    nav = {G.NAV_UP, G.NAV_DOWN, G.NAV_LEFT, G.NAV_RIGHT} | set(G.START_KEYS)
+    check("...and the menu's own keys are not in the pool it offers",
+          not (nav & set(G.KEY_POOL)), str(sorted(nav & set(G.KEY_POOL))))
 
     # --- each preset applies its own scalability level and cvars
     # One chain per preset key, plus the BeginPlay one that applies the default.
     expected_levels = sorted([p[1] for p in G.PRESETS]
                              + [G.PRESETS[G.DEFAULT_PRESET][1]])
+    # "Value" alone no longer identifies SetOverallScalabilityLevel -- the
+    # settings page's FClamp has one too, and its literal is a float.
     levels = sorted(int(BEL.find_input_pin(n, "Value").get_pin_value())
-                    for n in by_pins("Value"))
+                    for n in by_pins("Value") if "Min" not in pin_names(n))
     check("one scalability call per preset, plus BeginPlay's default",
           levels == expected_levels, f"{levels} vs {expected_levels}")
 
@@ -154,9 +175,13 @@ def main():
                      f"[{G.DEBUG_KEY}]   debug   ON",
                      f"[{G.DEBUG_KEY}]   debug   OFF",
                      # The main menu, drawn before anything else while
-                     # GameStarted is false.
-                     G.GAME_TITLE, G.GAME_SUBTITLE, G.START_LABEL,
-                     "press  ENTER  ·  SPACE  ·  or click"}
+                     # GameStarted is false, and the settings page behind it.
+                     G.GAME_TITLE, G.GAME_SUBTITLE,
+                     "UP / DOWN  ·  ENTER selects",
+                     G.SETTINGS_TITLE, G.SENS_LABEL, G.BACK_LABEL,
+                     "press any key to bind it",
+                     "arrows adjust  ·  ENTER rebinds"}
+    expected_text |= set(G.MENU_ROWS)
     expected_text |= {f"[{i + 1}]   {p[0]}" for i, p in enumerate(G.PRESETS)}
     # The health number has no literal text -- its Text pin is driven -- so it
     # contributes an empty string here.
@@ -165,10 +190,11 @@ def main():
           drawn == expected_text, str(sorted(drawn ^ expected_text)))
     # Almost everything that used to be a DrawRect is a DrawTexture now -- see
     # the generated-artwork note in build_graphics_menu.py. What is left as
-    # rects is the reticle, and only the reticle: five hairline ticks, where a
-    # texture would buy nothing and cost a sample.
-    expected_rects = 5
-    check(f"{expected_rects} DrawRects, all of them the reticle",
+    # rects is the reticle -- five hairline ticks, where a texture would buy
+    # nothing and cost a sample -- plus the two strips either side of the
+    # sniper's scope, which are flat black by definition.
+    expected_rects = 5 + 2
+    check(f"{expected_rects} DrawRects: the reticle, and the scope's surround",
           len(by_pins("RectColor")) == expected_rects,
           str(len(by_pins("RectColor"))))
 
@@ -176,7 +202,10 @@ def main():
     # button plate, five empty slots, the equipped slot's lit background, the
     # equipped frame, the carried weapon's icon, and a track+fill for each of
     # HP, stamina and the NPC bar.
-    expected_textures = 1 + 1 + 2 + G.INVENTORY_SIZE + 1 + 1 + 1 + 2 + 2 + 2
+    # ...plus the settings page's panel, which is the same artwork stretched
+    # taller rather than a second texture to keep in step.
+    # ...plus the sniper's scope.
+    expected_textures = 1 + 1 + 2 + 1 + G.INVENTORY_SIZE + 1 + 1 + 1 + 2 + 2 + 2 + 1
     textures = by_pins("Texture")
     check(f"{expected_textures} DrawTextures: panels, slots, weapon icon, bars",
           len(textures) == expected_textures, str(len(textures)))
@@ -245,13 +274,17 @@ def main():
     check(f"{G.GAME_STARTED_VAR} starts false, so the menu is what loads",
           cdo.get_editor_property(G.GAME_STARTED_VAR) is False)
 
-    # The caret is the only text whose position is computed rather than literal.
+    # Two carets: the quality panel's, driven by Quality, and the settings
+    # page's, driven by MenuRow. Both are the same idea -- one number decides
+    # which row is marked, so there is no per-row bookkeeping to fall out of
+    # step with what is drawn.
     caret = [n for n in texts
              if BEL.find_input_pin(n, "Text").get_pin_value() == ">"]
-    if caret:
-        y = BEL.find_input_pin(caret[0], "ScreenY")
-        check("caret's ScreenY is driven by Quality, not a constant",
-              bool(y.list_connected_pins()))
+    check("two carets: the quality panel's and the settings page's",
+          len(caret) == 2, str(len(caret)))
+    check("...and both take their ScreenY from a variable, not a constant",
+          all(BEL.find_input_pin(n, "ScreenY").list_connected_pins()
+              for n in caret))
 
     # --- the health readout
     health_reads = [n for n in nodes
@@ -276,14 +309,92 @@ def main():
           aim_reads == {"Get AimValid", "Get AimBlocked"}, str(sorted(aim_reads)))
     viewports = [n for n in nodes
                  if str(BEL.get_node_title(n)).replace("\n", " ") == "GetViewportSize"]
-    # Five now: the reticle and the inventory strip centre off it, the kill
-    # counter right-anchors off it, and the death panel and the main menu each
-    # centre off it.
+    # Six now: the reticle and the inventory strip centre off it, the kill
+    # counter right-anchors off it, and the death panel, the main menu and the
+    # settings page each centre off it.
     check("everything positioned off the window edge reads the viewport size",
-          len(viewports) == 5, str(len(viewports)))
+          len(viewports) == 6, str(len(viewports)))
     check("a blocked shot colours the reticle differently",
           any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
           and "Get AimBlocked" in aim_reads)
+
+    # --- the sniper's scope
+    # It must be the SNIPER's ADS and not everyone's, it must replace the
+    # crosshair rather than sit under it, and it must cover the viewport at any
+    # aspect ratio. All three are structural, and all three are the kind of
+    # thing that looks right in the graph and is wrong on screen.
+    def after(pin):
+        for q in (pin.list_connected_pins() if pin and pin.is_valid() else []):
+            return PIN.get_owning_node(q)
+        return None
+
+    titles = {str(BEL.get_node_title(n)).replace("\n", " ") for n in nodes}
+    for var in ("Get Held", "Get Scoped", "Get AdsZoom",
+                "Get BaseFOV", "Get CurrentFOV"):
+        check(f"the scope reads {var[4:]}", var in titles)
+
+    gate = [n for n in nodes
+            if pin_names(n) == {"execute", "Condition"}
+            and any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get Scoped"
+                    for q in BEL.find_input_pin(n, "Condition").list_connected_pins())]
+    check("one branch decides which sight is drawn, and it is the weapon's own "
+          "Scoped flag", len(gate) == 1, str(len(gate)))
+    if gate:
+        glass = after(BEL.find_then_pin(gate[0]))
+        irons = after(BEL.find_else_pin(gate[0]))
+        # The strips are sized off the viewport; the crosshair's ticks are
+        # literal pixels. That is what tells the two draws apart here.
+        check("a scoped weapon draws the surround...",
+              glass is not None
+              and BEL.find_input_pin(glass, "ScreenW").list_connected_pins())
+        check("...and an unscoped one draws the crosshair, so the two centres "
+              "never double up",
+              irons is not None
+              and not BEL.find_input_pin(irons, "ScreenW").list_connected_pins()
+              and float(BEL.find_input_pin(irons, "ScreenW").get_pin_value())
+              == G.RETICLE_ARM)
+
+    strips = [n for n in by_pins("RectColor")
+              if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]
+    check("two black strips flank the scope, so the corners of the world "
+          "cannot show past it", len(strips) == 2, str(len(strips)))
+    # Negative width is what a portrait viewport would ask for, and DrawRect
+    # draws that backwards rather than not at all.
+    floor = [n for n in nodes
+             if str(BEL.get_node_title(n)).replace("\n", " ") == "Max (Float)"]
+    check("...with their width floored at zero for a taller-than-wide window",
+          len(floor) == 1
+          and BEL.find_input_pin(floor[0], "B").get_pin_value() in ("", "0.0"),
+          str(len(floor)))
+
+    glass = [n for n in by_pins("Texture")
+             if G.SCOPE_TEX in str(BEL.find_input_pin(n, "Texture").get_pin_value())]
+    check("exactly one DrawTexture is the scope itself", len(glass) == 1,
+          str(len(glass)))
+    if glass:
+        w = BEL.find_input_pin(glass[0], "ScreenW").list_connected_pins()
+        h = BEL.find_input_pin(glass[0], "ScreenH").list_connected_pins()
+        # Same source on both: the texture is square and the hole in it is a
+        # circle, so anything but a square on screen is an ellipse.
+        check("the scope is drawn square, off the viewport height",
+              bool(w) and bool(h)
+              and PIN.get_owning_node(w[0]) == PIN.get_owning_node(h[0]))
+
+    # The strips and the scope share one alpha, and that alpha is computed --
+    # not a constant and not the Aiming flag, which would snap the glass on a
+    # frame before the camera had moved.
+    fades = [n for n in nodes
+             if str(BEL.get_node_title(n)).replace("\n", " ") == "MakeColor"]
+    check("the surround and the glass are one colour pair, faded together",
+          len(fades) == 2, str(len(fades)))
+    check("...and their alpha is driven by the zoom, not written down",
+          all(BEL.find_input_pin(n, "A").list_connected_pins() for n in fades))
+    alpha_clamp = [n for n in by_pins("Value", "Min", "Max")
+                   if (float(BEL.find_input_pin(n, "Min").get_pin_value() or 0.0),
+                       float(BEL.find_input_pin(n, "Max").get_pin_value() or 0.0))
+                   == (0.0, 1.0)]
+    check("the fade is clamped to 0..1, so a hipfire frame is fully clear",
+          len(alpha_clamp) == 1, str(len(alpha_clamp)))
 
     lookups = by_pins("ComponentClass")
     wanted = {G.HEALTH_CLASS_PATH, G.WEAPON_COMP_CLASS_PATH}
@@ -293,18 +404,21 @@ def main():
     # inventory strip, and the weapon component again for the reticle.
     # Five: the player's health, an NPC's health, and the weapon component
     # three times -- inventory strip, reticle, and the stamina bar.
+    # Six: the player's health, an NPC's health, and the weapon component four
+    # times -- inventory strip, reticle, stamina bar, and the settings push.
     check("HUD looks up health (player + NPC) and the weapon component",
-          len(lookups) == 5 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 6 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # A fill's width is computed from a health fraction; the track behind it is
     # literal. Three of them -- the player's HP, the NPC bars, and stamina.
     # These are DrawTextures now, so the bars can have a lit gradient; the test
     # is unchanged in substance, only in which node type it counts.
+    # Four: the scope's square is sized off the viewport for the same reason.
     driven = [n for n in by_pins("Texture")
               if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]
-    check("the HP, NPC and stamina fills are all driven, not constants",
-          len(driven) == 3, str(len(driven)))
+    check("the HP, NPC and stamina fills and the scope are driven, not "
+          "constants", len(driven) == 4, str(len(driven)))
 
     # --- the new HUD layers
     npc_scans = [n for n in by_pins("ActorClass")
@@ -323,8 +437,12 @@ def main():
     # each wanderer's spawn number.
     # Six now: the HP number, each slot's weapon name, each slot's ammunition,
     # each wanderer's spawn number, the kill counter and the final score.
-    check("HP, slot names, ammo, NPC numbers, kills and the score read from data",
-          len(driven_text) == 6, str(len(driven_text)))
+    # Nine now: the settings page adds the sensitivity readout and, inside one
+    # ForEachLoop over Binds, a row label and a key name. Those last two are
+    # what keeps the seven bind rows to a single pair of draws.
+    check("HP, slot names, ammo, NPC numbers, kills, score and the settings "
+          "rows read from data",
+          len(driven_text) == 9, str(len(driven_text)))
     ids = [n for n in nodes
            if "NpcId" in {str(p_) for p_ in pin_names(n, False)}]
     check("each NPC bar carries the wanderer's spawn number",
@@ -390,6 +508,12 @@ def main():
           f"hidden otherwise", len(windows) == 1, str(len(windows)))
     check("...measured against the clock, not against a frame counter",
           any(t == "GetTimeSeconds" for t in titles), str(len(titles)))
+    # A corpse lies where it fell for a minute now, and it was shot a moment
+    # ago by definition -- so the recency window alone would float an empty bar
+    # over every body for its first five seconds.
+    check("no bar floats over a corpse",
+          any(t == "Get Dead" for t in titles),
+          str(sorted({t for t in titles if "Dead" in t})))
 
     # --- the death menu
     check("the HUD knows whether the player is dead",
@@ -470,6 +594,176 @@ def main():
     hud_cdo = unreal.get_default_object(BEL.generated_class(bp))
     check("the HUD starts with the overlays off",
           hud_cdo.get_editor_property("DebugOn") is False)
+
+    # ─── Settings: mouse sensitivity, keybinds, and the save behind them ─────
+    # The requirement these serve is "loadable across future game runs", so the
+    # checks are about the disk and about the wiring, not about the drawing:
+    # the page can look perfect and still be a session-only settings screen.
+    for var in ("Settings", "MenuPage", "MenuRow", "Capturing", "KeyPool",
+                "BindLabels"):
+        check(f"{var} variable", var in names)
+    check("the menu opens on the title page with the caret at the top",
+          cdo.get_editor_property("MenuPage") == G.PAGE_TITLE
+          and cdo.get_editor_property("MenuRow") == 0
+          and cdo.get_editor_property("Capturing") is False,
+          f"page {cdo.get_editor_property('MenuPage')}, "
+          f"row {cdo.get_editor_property('MenuRow')}")
+    pool = [k.export_text() for k in cdo.get_editor_property("KeyPool")]
+    check("KeyPool is the set of keys a bind may be captured as",
+          pool == list(G.KEY_POOL), f"{len(pool)} keys")
+    check("...with no duplicates, so one press cannot bind twice",
+          len(set(pool)) == len(pool))
+    labels = [str(x) for x in cdo.get_editor_property("BindLabels")]
+    check("one row label per bind, so the seven rows are one loop not seven "
+          "pairs of draws",
+          len(labels) == len(G.BIND_VARS) and labels == list(G.BIND_LABELS),
+          str(labels))
+
+    # --- the save itself
+    slots = by_pins("SlotName")
+    check("the settings are read and written through a named save slot",
+          bool(slots) and {BEL.find_input_pin(n, "SlotName").get_pin_value()
+                           for n in slots} == {G.SETTINGS_SLOT},
+          str(sorted({BEL.find_input_pin(n, "SlotName").get_pin_value()
+                      for n in slots})))
+    writes = by_pins("SaveGameObject")
+    # Three: BeginPlay's repair of a save from an older build, a rebind, and a
+    # sensitivity nudge. Written at the moment of the change and not on leaving
+    # the page, because a game quit from the settings screen still has to
+    # remember what was set -- which is the whole of "across future game runs".
+    check("every change is written to disk on the spot", len(writes) == 3,
+          str(len(writes)))
+    check("...and there is a load and a create, so a first run is not an error",
+          bool(by_pins("SaveGameClass"))
+          and any("Load Game from Slot" in t.replace("\n", " ")
+                  or "LoadGameFromSlot" in t for t in titles),
+          str(sorted({t for t in titles if "Save" in t or "Load" in t})))
+    check("...both feeding the same BP_Settings variable",
+          sum(1 for t in titles if t == "Set Settings") == 2,
+          str(sum(1 for t in titles if t == "Set Settings")))
+    # A save written by an older build has whatever number of binds that build
+    # had, and every read indexes Binds by row -- so a length that is not
+    # exactly len(BIND_VARS) is refilled rather than trusted.
+    repairs = [n for n in nodes
+               if pin_names(n) == {"A", "B"}
+               and BEL.find_input_pin(n, "B").get_pin_value()
+               == str(len(G.BIND_VARS))
+               and "NotEqual" in str(BEL.get_node_title(n)).replace(" ", "")]
+    check(f"a save whose Binds is not {len(G.BIND_VARS)} long is refilled",
+          len(repairs) == 1, str(len(repairs)))
+    adds = by_pins("NewItem")
+    check("...from the defaults build_weapons_and_combat.py documents",
+          [BEL.find_input_pin(n, "NewItem").get_pin_value() for n in adds]
+          == [d for _v, d in G.BIND_VARS],
+          str([BEL.find_input_pin(n, "NewItem").get_pin_value() for n in adds]))
+
+    # --- the push onto the weapon component
+    # The component never loads the save and never casts back to this HUD: it
+    # is handed the values every DrawHUD frame and keeps its CDO defaults as a
+    # standalone fallback. So the evidence is a Set per bind, on another class.
+    pushes = {t for t in titles
+              if t in {f"Set {v}" for v, _k in G.BIND_VARS}}
+    check("every bind is pushed onto BP_WeaponComponent each frame",
+          pushes == {f"Set {v}" for v, _k in G.BIND_VARS},
+          str(sorted(pushes)))
+    check("...and so is the mouse sensitivity",
+          sum(1 for t in titles if t == "Set MouseSensitivity") == 2,
+          str(sum(1 for t in titles if t == "Set MouseSensitivity")))
+    # Literal indices only: the settings page's own Array_Get and Array_Set
+    # take theirs from the loop and from MenuRow, and those are not the push.
+    reads = [n for n in by_pins("Index")
+             if not BEL.find_input_pin(n, "Index").list_connected_pins()]
+    check("...read out of Binds by index, one per action",
+          sorted(int(BEL.find_input_pin(n, "Index").get_pin_value())
+                 for n in reads) == list(range(len(G.BIND_VARS))),
+          str(sorted(BEL.find_input_pin(n, "Index").get_pin_value()
+                     for n in reads)))
+
+    # --- the sensitivity row
+    # Two FClamps in this graph: the sensitivity row, and the scope's fade.
+    # They are told apart by their bounds rather than by position, so neither
+    # can quietly inherit the other's.
+    clamps = by_pins("Value", "Min", "Max")
+    bounds = {(float(BEL.find_input_pin(n, "Min").get_pin_value() or 0.0),
+               float(BEL.find_input_pin(n, "Max").get_pin_value() or 0.0))
+              for n in clamps}
+    check("the sensitivity is clamped, and its floor is not zero",
+          len(clamps) == 2
+          and (G.MOUSE_SENSITIVITY_MIN, G.MOUSE_SENSITIVITY_MAX) in bounds
+          and G.MOUSE_SENSITIVITY_MIN > 0.0,
+          f"{sorted(bounds)}")
+    # One write with a signed step rather than two arms with the same two
+    # writes in them: the pair would drift and the clamp would end up on one.
+    steps = [n for n in by_pins("A", "B")
+             if BEL.find_input_pin(n, "A").get_pin_value()
+             == str(G.MOUSE_SENSITIVITY_STEP)
+             and BEL.find_input_pin(n, "B").get_pin_value()
+             == str(-G.MOUSE_SENSITIVITY_STEP)]
+    check(f"Left and Right move it by +/-{G.MOUSE_SENSITIVITY_STEP} through "
+          f"one signed step", len(steps) == 1, str(len(steps)))
+
+    # --- rebinding, and the trap it exists to avoid
+    # THE ORDERING CHECK. Enter is what arms a capture, and Enter is still
+    # "just pressed" for the rest of that frame -- so a capture poll that ran
+    # after the activation would see it and bind the accept key to whatever row
+    # the caret was on. The two live in opposite arms of a Branch on Capturing,
+    # which puts them in different FRAMES as well as different paths.
+    def first_after(pin):
+        for q in (pin.list_connected_pins() if pin and pin.is_valid() else []):
+            return PIN.get_owning_node(q)
+        return None
+
+    branches = [n for n in nodes if pin_names(n) == {"execute", "Condition"}]
+    gates = []
+    for n in branches:
+        src = BEL.find_input_pin(n, "Condition").list_connected_pins()
+        if any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get Capturing"
+               for q in src):
+            gates.append(n)
+    # Two of them: the input gate, and the hint line that reports its state.
+    check("the settings page branches on whether a capture is armed",
+          len(gates) == 2, str(len(gates)))
+    armed_gate = [g for g in gates
+                  if (first_after(BEL.find_then_pin(g)) is not None
+                      and first_after(BEL.find_then_pin(g)).get_class()
+                      .get_name() == "K2Node_MacroInstance")]
+    check("the capture poll is the ARMED arm, and nothing else is",
+          len(armed_gate) == 1,
+          str([first_after(BEL.find_then_pin(g)).get_class().get_name()
+               if first_after(BEL.find_then_pin(g)) else "nothing"
+               for g in gates]))
+    if armed_gate:
+        other = first_after(BEL.find_else_pin(armed_gate[0]))
+        check("...and the row activation is the other arm, so the Enter that "
+              "armed the capture is never seen by it",
+              other is not None
+              and pin_names(other) == {"execute", "Condition"},
+              other.get_class().get_name() if other else "nothing")
+    pools = [n for n in nodes
+             if n.get_class().get_name() == "K2Node_MacroInstance"
+             and any("Get KeyPool" in
+                     str(BEL.get_node_title(PIN.get_owning_node(q)))
+                     for p_ in BEL.list_input_pins(n)
+                     for q in p_.list_connected_pins())]
+    check("...and it walks KeyPool rather than every FKey the engine knows",
+          len(pools) == 1, str(len(pools)))
+    check("a captured key is written into Binds at the caret's row",
+          bool(by_pins("TargetArray", "Index", "Item")),
+          f"{len(by_pins('TargetArray', 'Index', 'Item'))} Array_Set")
+    # Armed by Enter on a bind row, cleared the moment a key lands. Without the
+    # clear the next keypress rebinds the same row again, for ever.
+    check("capture mode is armed and then cleared",
+          sum(1 for t in titles if t == "Set Capturing") == 2,
+          str(sum(1 for t in titles if t == "Set Capturing")))
+
+    # --- two pages, and getting between them
+    check("the panel has a title page and a settings page",
+          sum(1 for t in titles if t == "Set MenuPage") == 2
+          and any(t == "Get MenuPage" for t in titles),
+          str(sorted({t for t in titles if "MenuPage" in t})))
+    check("...and the caret is reset on every move between them",
+          sum(1 for t in titles if t == "Set MenuRow") >= 4,
+          str(sum(1 for t in titles if t == "Set MenuRow")))
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

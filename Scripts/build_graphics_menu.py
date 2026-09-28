@@ -64,7 +64,18 @@ rather than off the character class, so the HUD does not care which pawn is
 possessed -- anything carrying the component displays.
 """
 
+import os
+import sys
+
 import unreal
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# The one import between two builders in Scripts/, and it buys a contract this
+# file cannot keep on its own: BIND_VARS fixes which index of BP_Settings.Binds
+# means which action, and the three sensitivity limits on W.COMBAT have to be
+# the same ones BP_WeaponComponent's CDO default sits inside. Copied instead, the
+# two would drift and the symptom would be a save file that rebinds itself.
+import build_weapons_and_combat as W                               # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -210,13 +221,12 @@ RESTART_KEY = "R"
 # PlayerInput is still updated. A key polled on Tick here would simply never be
 # seen. (That is not a guess -- it is why the death menu's [R] is where it is.)
 #
-# Three keys accept, rather than one. Enter is the conventional one, Space is
-# what a player's hand is already near, and the left mouse button is there
-# because "press New Game" is what was asked for and a button you cannot click
-# is a strange button. There is no cursor and no hit test: with exactly one
-# option on the panel, "click" and "click the button" are the same gesture, and
-# a hit test would only add a way for the menu to refuse to start the game.
-START_KEYS = ("Enter", "SpaceBar", "LeftMouseButton")
+# Enter and Space accept. The left mouse button used to be a third, on the
+# argument that a button you cannot click is a strange button -- it is gone now
+# that the panel has two rows, because with no cursor and no hit test a click
+# cannot say WHICH row it means. Keyboard navigation is the whole of the menu
+# instead: Up/Down move the caret, Enter takes the row.
+START_KEYS = ("Enter", "SpaceBar")
 MENU_PANEL = (600.0, 346.0)
 GAME_TITLE = "OTHERWORLD"
 GAME_SUBTITLE = "a night in the forest"
@@ -226,11 +236,90 @@ MAIN_TITLE_SCALE = 3.4
 MAIN_SUB_SCALE = 1.4
 MAIN_START_SCALE = 2.2
 MAIN_HINT_SCALE = 1.2
+# Where the two rows sit under the subtitle, and where the lit plate sits
+# behind whichever one the caret is on. The plate is 16 px taller than the row
+# step so it reads as a button around the text rather than as a highlight of it.
+MAIN_ROW0_OFF = 192.0
+MAIN_ROW_STEP = 52.0
+MAIN_PLATE_OFF = 176.0
+MAIN_HINT_OFF = MAIN_ROW0_OFF + len(("NEW GAME", "SETTINGS")) * MAIN_ROW_STEP + 26.0
 COL_MAIN_TITLE = "(R=0.920000,G=0.945000,B=1.000000,A=1.000000)"
 COL_MAIN_SUB = "(R=0.520000,G=0.560000,B=0.630000,A=1.000000)"
 COL_MAIN_START = "(R=1.000000,G=0.870000,B=0.450000,A=1.000000)"
 COL_MAIN_HINT = "(R=0.560000,G=0.590000,B=0.650000,A=1.000000)"
 GAME_STARTED_VAR = "GameStarted"
+
+# ── The settings screen, and what survives a restart ─────────────────────────
+#
+# Two pages, one panel: MenuPage picks which, MenuRow picks the line, and the
+# caret is drawn from MenuRow the same way the quality caret is drawn from
+# Quality. There is no second HUD and no widget -- see the AHUD note at the top
+# of this file for why there cannot be.
+#
+# Everything on the settings page is stored in BP_Settings, which is a USaveGame
+# written to disk on every change (see SETTINGS_SLOT). That is what "loadable
+# across future game runs" means here, and it is why the save happens at the
+# moment of the edit rather than on leaving the page: a game closed from the
+# settings screen still has to remember what was set.
+#
+# BP_Settings, BIND_VARS and the sensitivity range are all built and defined by
+# build_weapons_and_combat.py, which runs first. This file is the only thing
+# that reads or writes the save; BP_WeaponComponent is PUSHED the values every
+# DrawHUD frame and never learns that a disk exists.
+SETTINGS_CLASS_PATH = W.SETTINGS_CLASS_PATH
+SETTINGS_SLOT = W.SETTINGS_SLOT
+SETTINGS_USER_INDEX = W.SETTINGS_USER_INDEX
+BIND_VARS = W.BIND_VARS
+MOUSE_SENSITIVITY_MIN = W.COMBAT.mouse_sensitivity_min
+MOUSE_SENSITIVITY_MAX = W.COMBAT.mouse_sensitivity_max
+MOUSE_SENSITIVITY_STEP = W.COMBAT.mouse_sensitivity_step
+
+PAGE_TITLE = 0
+PAGE_SETTINGS = 1
+MENU_ROWS = (START_LABEL, "SETTINGS")
+
+# Row 0 is the sensitivity slider, rows 1..7 are BIND_VARS in order, row 8 is
+# BACK. The arithmetic "row - 1 is the bind index" appears in the graph twice
+# and is the reason the binds are contiguous and start at 1.
+SETTINGS_ROWS = 1 + len(BIND_VARS) + 1
+SENS_ROW = 0
+BACK_ROW = SETTINGS_ROWS - 1
+BIND_LABELS = ("FIRE", "AIM", "SPRINT", "SWITCH", "DROP", "PICK UP", "RELOAD")
+SENS_LABEL = "MOUSE SENSITIVITY"
+BACK_LABEL = "BACK"
+SETTINGS_TITLE = "SETTINGS"
+
+# Navigation. Deliberately NOT rebindable and deliberately not in KEY_POOL: a
+# menu whose own keys can be bound away is a menu that can be locked shut, and
+# the only way out would be deleting the save file.
+NAV_UP = "Up"
+NAV_DOWN = "Down"
+NAV_LEFT = "Left"
+NAV_RIGHT = "Right"
+
+SETTINGS_PANEL = (620.0, 560.0)
+SET_TITLE_OFF = 44.0
+SET_ROW0_OFF = 118.0
+SET_ROW_STEP = 46.0
+SET_HINT_OFF = SET_ROW0_OFF + SETTINGS_ROWS * SET_ROW_STEP + 12.0
+SET_LABEL_X = 96.0         # from the panel's left edge
+SET_VALUE_X = 380.0        # the value column, so the nine rows line up
+SET_CARET_X = 56.0
+SET_TITLE_SCALE = 2.2
+SET_ROW_SCALE = 1.5
+SET_HINT_SCALE = 1.2
+
+# What a bind may be set to. Letters, digits, the mouse and the usual
+# modifiers -- and nothing the menu itself uses, so no keypress can make the
+# settings screen unusable. The capture loop walks this every frame it is
+# armed, which is why it is a list of what is ALLOWED rather than a sweep of
+# every FKey the engine knows about.
+KEY_POOL = (tuple(chr(c) for c in range(ord("A"), ord("Z") + 1))
+            + ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
+               "Nine", "Zero",
+               "LeftMouseButton", "RightMouseButton", "MiddleMouseButton",
+               "ThumbMouseButton", "ThumbMouseButton2",
+               "LeftShift", "LeftControl", "LeftAlt", "Tab"))
 
 # The one way past the menu that is not a keypress. A headless -game run has
 # nobody to press Enter, so without this every automated run would sit on the
@@ -332,6 +421,19 @@ RETICLE_DOT = 3.0
 COL_RETICLE = "(R=0.960000,G=0.960000,B=0.970000,A=0.900000)"
 COL_RETICLE_BLOCKED = "(R=0.950000,G=0.250000,B=0.200000,A=0.950000)"
 
+# --- the sniper's scope -------------------------------------------------------
+# T_UI_Scope is a square: an opaque black field with a circular hole and the
+# reticle etched across it. It is drawn as a square of the viewport's HEIGHT,
+# centred, with the two leftover side strips filled black -- stretched to the
+# viewport instead, its hole would be an ellipse, and drawn any smaller the
+# corners of the world would show past the surround.
+#
+# It fades with the zoom rather than with a flag of its own: alpha is how far
+# CurrentFOV has travelled from BaseFOV toward this weapon's AdsZoom, so the
+# glass arrives exactly as the camera settles and leaves with it, and there is
+# no second interpolation to keep in step with the first.
+SCOPE_TEX = "T_UI_Scope"
+
 # ─── Function paths for the graph nodes ──────────────────────────────────────
 
 FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
@@ -379,6 +481,33 @@ FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
 FN_OPEN_LEVEL = "/Script/Engine.GameplayStatics.OpenLevel"
 FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
+FN_SAVE_EXISTS = "/Script/Engine.GameplayStatics.DoesSaveGameExist"
+FN_LOAD_SAVE = "/Script/Engine.GameplayStatics.LoadGameFromSlot"
+FN_CREATE_SAVE = "/Script/Engine.GameplayStatics.CreateSaveGameObject"
+FN_WRITE_SAVE = "/Script/Engine.GameplayStatics.SaveGameToSlot"
+# Key_GetName does not exist in 5.8; the display name is the only readable
+# spelling of an FKey, and it comes back as Text rather than as a String.
+FN_KEY_DISPLAY = "/Script/Engine.KismetInputLibrary.Key_GetDisplayName"
+FN_TEXT_TO_STR = "/Script/Engine.KismetTextLibrary.Conv_TextToString"
+FN_FLOAT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_DoubleToString"
+FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
+FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
+FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
+FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
+FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
+FN_NEQ_II = "/Script/Engine.KismetMathLibrary.NotEqual_IntInt"
+FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
+FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
+FN_MIN_II = "/Script/Engine.KismetMathLibrary.Min"
+FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
+FN_FCLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
+FN_SELECT_FLOAT = "/Script/Engine.KismetMathLibrary.SelectFloat"
+FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
+# MakeColor returns a LinearColor, which is the only way to hand DrawRect and
+# DrawTexture a colour whose alpha is computed: a struct pin rejects every
+# literal format there is.
+FN_MAKE_COLOR = "/Script/Engine.KismetMathLibrary.MakeColor"
+FN_FMAX = "/Script/Engine.KismetMathLibrary.FMax"
 
 # The DrawHUD event is not one of the placeholder nodes a fresh Blueprint ships
 # with (BeginPlay and Tick are), so it has to be created from the palette.
@@ -388,6 +517,7 @@ NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
+NODE_CAST_SETTINGS = "Utilities|Casting|CastToBP_Settings"
 MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
                   ".StandardMacros:ForEachLoop")
 
@@ -533,6 +663,7 @@ UI_TEX_SIZE = {
     "T_UI_SlotFrame": (120, 84),
     "T_UI_Bar": (240, 32),
     "T_UI_BarTrack": (240, 32),
+    "T_UI_Scope": (1024, 1024),
 }
 ICON_TEX_SIZE = (128, 64)
 
@@ -552,6 +683,18 @@ SLOT_ICON_TOP = 3.0
 def _at(node, x, y):
     BEL.set_node_pos(node, unreal.IntPoint(int(x), int(y)))
     return node
+
+
+def _key(name):
+    """An FKey value for a CDO default.
+
+    unreal.Key takes no constructor argument and exposes no fields, so the only
+    way in is the key_name property -- which at least fails loudly on a
+    misspelling, where import_text() returns True for anything.
+    """
+    k = unreal.Key()
+    k.set_editor_property("key_name", name)
+    return k
 
 
 # ─── Member variables ────────────────────────────────────────────────────────
@@ -595,10 +738,41 @@ def _ensure_variables(ed, bp):
                                 # False until the player picks NEW GAME.
                                 # BeginPlay pauses the world alongside it.
                                 (GAME_STARTED_VAR, "bool", "false"),
-                                ("Quality", "int", str(DEFAULT_PRESET))):
+                                ("Quality", "int", str(DEFAULT_PRESET)),
+                                # Which page of the menu panel is on screen,
+                                # and which line of it the caret is on.
+                                ("MenuPage", "int", str(PAGE_TITLE)),
+                                ("MenuRow", "int", "0"),
+                                # Armed by Enter on a bind row; the next key
+                                # the player presses becomes that bind.
+                                ("Capturing", "bool", "false")):
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind),
                                       default):
+            raise RuntimeError(f"could not declare member variable {name}")
+
+    # The loaded save. Typed as BP_Settings rather than as SaveGame so the page
+    # can read MouseSensitivity and Binds off it without a cast per read; the
+    # one cast is at BeginPlay, where LoadGameFromSlot hands back a USaveGame.
+    settings_class = _asset_sub().load_asset(W.SETTINGS_BP_PATH)
+    if not settings_class:
+        raise RuntimeError(f"{W.SETTINGS_BP_PATH} must be built first "
+                           "(build_weapons_and_combat.py)")
+    for name, pin_type in (
+            ("Settings", BEL.get_object_reference_type(
+                BEL.generated_class(settings_class))),
+            # What a bind may be captured as -- walked by a ForEachLoop while
+            # Capturing. A variable rather than a literal chain because the
+            # graph tests every entry with the same three nodes.
+            ("KeyPool", BEL.get_array_type(
+                BEL.get_struct_type(unreal.Key.static_struct()))),
+            # The row labels, so the seven bind rows are ONE draw inside the
+            # loop over Binds rather than seven pairs of DrawTexts with their
+            # y positions written out by hand.
+            ("BindLabels", BEL.get_array_type(
+                BEL.get_basic_type_by_name("string")))):
+        ed.remove_member_variable(name)
+        if not ed.add_member_variable(name, pin_type):
             raise RuntimeError(f"could not declare member variable {name}")
 
 
@@ -620,8 +794,160 @@ def _apply_defaults(bp, defaults):
         raise RuntimeError("BP_GraphicsMenuHUD failed to recompile after defaults")
     fresh = unreal.get_default_object(BEL.generated_class(bp))
     for name, value in defaults.items():
-        if fresh.get_editor_property(name) != value:
+        if not _same_default(fresh.get_editor_property(name), value):
             raise RuntimeError(f"default for {name} did not stick")
+
+
+def _same_default(got, want):
+    """Compare a read-back CDO default with what was written.
+
+    Plain == is enough for the bools and ints, but not for the two arrays: an
+    unreal.Array is never equal to a list, and an FKey is never equal to another
+    FKey (the Python wrapper compares identity, and to_tuple() is empty for
+    every key because FKey exposes no fields). export_text() is the only view of
+    a key that answers the question -- and it is the same bare name a pin
+    literal uses.
+    """
+    if isinstance(want, (list, tuple)):
+        return (len(got) == len(want)
+                and all(_same_default(a, b) for a, b in zip(got, want)))
+    if isinstance(want, unreal.Key):
+        return got is not None and got.export_text() == want.export_text()
+    return got == want
+
+
+def _chain(node, in_exec):
+    """Wire ``in_exec`` into a node if it has an exec pin; return what follows.
+
+    Several of the GameplayStatics calls used here are const BlueprintCallable,
+    which UHT silently promotes to BlueprintPure -- those have no exec pins at
+    all and are pulled by whatever reads their output. Asking the node rather
+    than remembering which is which is one line and cannot go stale.
+    """
+    pin = BEL.find_input_pin(node, "execute")
+    if pin and pin.is_valid():
+        _connect(in_exec, pin)
+        return BEL.find_then_pin(node)
+    return in_exec
+
+
+def _emit_save(ed, settings_out, in_exec, x, y):
+    """Write BP_Settings back to its slot. Called after every single change.
+
+    On the change and not on leaving the page: a game quit from the settings
+    screen still has to remember what was set, and there is no other moment
+    this HUD is guaranteed to see.
+    """
+    n = _at(_node(ed, FN_WRITE_SAVE), x, y)
+    _connect(settings_out, _pin(n, "SaveGameObject"))
+    _set(n, "SlotName", SETTINGS_SLOT)
+    _set(n, "UserIndex", SETTINGS_USER_INDEX)
+    _connect(in_exec, _pin(n, "execute"))
+    return BEL.find_then_pin(n), n
+
+
+def _author_load_settings(ed, x0, y0, in_exec):
+    """BeginPlay: bring the saved settings in, or start a fresh set.
+
+    Two ways to end up with a BP_Settings and one repair. The repair -- refill
+    Binds when it is not exactly len(BIND_VARS) long -- is not paranoia: a save
+    written by an older build has whatever number of binds that build had, and
+    every read on the settings page indexes into this array by row. A short
+    array would be an out-of-range Array_Get per frame, drawing nothing and
+    saying nothing.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    exists = keep(_at(_node(ed, FN_SAVE_EXISTS), x0, y0 + 240))
+    _set(exists, "SlotName", SETTINGS_SLOT)
+    _set(exists, "UserIndex", SETTINGS_USER_INDEX)
+    flow = _chain(exists, in_exec)
+
+    have = keep(_at(ed.add_branch_node(), x0 + 260, y0))
+    _connect(_pin(exists, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(flow, _pin(have, "execute"))
+
+    loaded = keep(_at(_node(ed, FN_LOAD_SAVE), x0 + 520, y0))
+    _set(loaded, "SlotName", SETTINGS_SLOT)
+    _set(loaded, "UserIndex", SETTINGS_USER_INDEX)
+    after_load = _chain(loaded, BEL.find_then_pin(have))
+
+    as_saved = keep(_at(_palette(ed, NODE_CAST_SETTINGS), x0 + 780, y0))
+    _connect(_pin(loaded, "ReturnValue", is_input=False), _pin(as_saved, "Object"))
+    _connect(after_load, _pin(as_saved, "execute"))
+    took = keep(_at(ed.add_set_member_variable_node("Settings"), x0 + 1040, y0))
+    _connect(_loose_pin(as_saved, "AsBPSettings", is_input=False),
+             _pin(took, "Settings"))
+    _connect(BEL.find_then_pin(as_saved), _pin(took, "execute"))
+
+    # A save that will not cast is a save from a different class, which is the
+    # same situation as no save at all -- so the failed arm joins the create
+    # path rather than leaving Settings null and every read below an
+    # Accessed None.
+    fresh = keep(_at(_node(ed, FN_CREATE_SAVE), x0 + 520, y0 + 460))
+    _pin(fresh, "SaveGameClass").set_pin_value(SETTINGS_CLASS_PATH)
+    for e in (BEL.find_else_pin(have),
+              _pin(as_saved, "CastFailed", is_input=False)):
+        _connect(e, _pin(fresh, "execute"))
+    as_new = keep(_at(_palette(ed, NODE_CAST_SETTINGS), x0 + 780, y0 + 460))
+    _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(as_new, "Object"))
+    _connect(BEL.find_then_pin(fresh), _pin(as_new, "execute"))
+    made_it = keep(_at(ed.add_set_member_variable_node("Settings"),
+                       x0 + 1040, y0 + 460))
+    _connect(_loose_pin(as_new, "AsBPSettings", is_input=False),
+             _pin(made_it, "Settings"))
+    _connect(BEL.find_then_pin(as_new), _pin(made_it, "execute"))
+
+    got = keep(_at(ed.add_get_member_variable_node("Settings"),
+                   x0 + 1300, y0 + 700))
+    settings_out = _pin(got, "Settings", is_input=False)
+    binds = keep(_at(ed.add_get_member_variable_node("Binds",
+                                                     SETTINGS_CLASS_PATH),
+                     x0 + 1300, y0 + 840))
+    _connect(settings_out, _pin(binds, "self"))
+    binds_out = _pin(binds, "Binds", is_input=False)
+
+    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 1560, y0 + 840))
+    _connect(binds_out, _loose_pin(count, "TargetArray"))
+    short = keep(_at(_node(ed, FN_NEQ_II), x0 + 1800, y0 + 840))
+    _connect(_pin(count, "ReturnValue", is_input=False), _pin(short, "A"))
+    _set(short, "B", len(BIND_VARS))
+
+    repair = keep(_at(ed.add_branch_node(), x0 + 2060, y0 + 240))
+    _connect(_pin(short, "ReturnValue", is_input=False), _pin(repair, "Condition"))
+    for e in (BEL.find_then_pin(took), BEL.find_then_pin(made_it),
+              _pin(as_new, "CastFailed", is_input=False)):
+        _connect(e, _pin(repair, "execute"))
+
+    wipe = keep(_at(_node(ed, FN_ARR_CLEAR), x0 + 2320, y0 + 240))
+    _connect(binds_out, _loose_pin(wipe, "TargetArray"))
+    _connect(BEL.find_then_pin(repair), _pin(wipe, "execute"))
+    flow = BEL.find_then_pin(wipe)
+    for i, (_var, key) in enumerate(BIND_VARS):
+        add = keep(_at(_node(ed, FN_ARR_ADD), x0 + 2580 + i * 260, y0 + 240))
+        _connect(binds_out, _loose_pin(add, "TargetArray"))
+        # Bare key name, never struct text: FKey exports as just its name, so
+        # '(KeyName="Q")' imports back as a key literally called "(".
+        _set(add, "NewItem", key)
+        _connect(flow, _pin(add, "execute"))
+        flow = BEL.find_then_pin(add)
+    saved, writer = _emit_save(ed, settings_out, flow,
+                               x0 + 2580 + len(BIND_VARS) * 260, y0 + 240)
+    made.append(writer)
+
+    ed.add_comment_to_nodes(
+        f"The settings the player keeps. Slot {SETTINGS_SLOT!r} if it is on "
+        f"disk, a fresh BP_Settings if it is not, and a refill of Binds if it "
+        f"is not exactly {len(BIND_VARS)} long -- which is what a save written "
+        f"by an older build looks like. Every read on the settings page "
+        f"indexes Binds by row, so a short array is an out-of-range Get per "
+        f"frame that draws nothing and says nothing.",
+        made)
+    return (saved, BEL.find_else_pin(repair))
 
 
 # ─── One preset, applied ─────────────────────────────────────────────────────
@@ -743,6 +1069,12 @@ def _author_begin_play(ed, begin_play):
         "itself in the top-right corner. Nothing on this HUD's canvas is "
         "involved, so it cannot collide with the HP bar or the quality panel.",
         [fps])
+
+    # Last, and after the pause: the settings only have to exist by the first
+    # DrawHUD, and putting disk access in front of the preset would let a
+    # failed load hide a failed preset.
+    _author_load_settings(ed, origin.x + 320, origin.y + 1100,
+                          BEL.find_then_pin(fps))
 
 
 # ─── Event Tick: input ───────────────────────────────────────────────────────
@@ -1157,13 +1489,26 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     _connect(_pin(since, "ReturnValue", is_input=False), _pin(recent, "A"))
     _set(recent, "B", NPC_BAR_SECONDS)
 
-    # Safe to fold into one AND: both halves are arithmetic on values already
-    # read, so pulling both costs two comparisons and has no side effect. (The
+    # ...and still alive. A killed wanderer now lies where it fell for a minute
+    # (see CORPSE_SECONDS), and it was shot a moment ago by definition, so
+    # without this every corpse wears an empty bar for its first five seconds.
+    gone = _at(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH),
+               x0 + 1100, y0 + 1200)
+    _connect(as_health, _pin(gone, "self"))
+    alive = _at(_node(ed, FN_NOT), x0 + 1620, y0 + 1200)
+    _connect(_pin(gone, "Dead", is_input=False), _pin(alive, "A"))
+
+    # Safe to fold into one AND: every half is arithmetic on values already
+    # read, so pulling them costs two comparisons and has no side effect. (The
     # NPC melee gate could not do this -- there, one half of the AND dragged a
     # whole location chain behind it. See the pure-node note in CLAUDE.md.)
+    breathing = _at(_node(ed, FN_AND), x0 + 1860, y0 + 1080)
+    _connect(_pin(recent, "ReturnValue", is_input=False), _pin(breathing, "A"))
+    _connect(_pin(alive, "ReturnValue", is_input=False), _pin(breathing, "B"))
+
     showing = _at(_node(ed, FN_AND), x0 + 2120, y0 + 800)
     _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(showing, "A"))
-    _connect(_pin(recent, "ReturnValue", is_input=False), _pin(showing, "B"))
+    _connect(_pin(breathing, "ReturnValue", is_input=False), _pin(showing, "B"))
 
     visible = _at(ed.add_branch_node(), x0 + 2380, y0)
     _connect(_pin(showing, "ReturnValue", is_input=False), _pin(visible, "Condition"))
@@ -1231,13 +1576,14 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     _connect(BEL.find_then_pin(labelled), _pin(number, "execute"))
 
     ed.add_comment_to_nodes(
-        f"One bar per wanderer, and only for {NPC_BAR_SECONDS:.0f}s after "
-        "something hurt it -- hidden by default. GetAllActorsOfClass every "
+        f"One bar per LIVING wanderer, and only for {NPC_BAR_SECONDS:.0f}s "
+        "after something hurt it -- hidden by default. GetAllActorsOfClass every "
         "frame is not free, but the alternative -- a registry the NPCs write "
         "themselves into -- would need a graph on BP_ForestWanderer, which "
         "build_npc_blueprints.py owns.",
         [every, loop, comp, cast, health, max_health, where, above, proj, parts,
-         in_front, hurt_at, now, since, recent, showing, visible, left, frac,
+         in_front, hurt_at, now, since, recent, gone, alive, breathing,
+         showing, visible, left, frac,
          fill_w, back, fill, nid, nid_str, id_x, id_y, numbered, labelled,
          number])
     return (_loose_pin(loop, "Completed", is_input=False),)
@@ -1515,6 +1861,128 @@ def _author_inventory(ed, x0, y0, in_execs):
             _pin(cast, "CastFailed", is_input=False))
 
 
+def _author_scope(ed, x0, y0, in_exec, as_weapon, held_out, cx, cy, height):
+    """The world blacked out except for a circle, with the sniper's reticle in it.
+
+    Three draws: two black rects for the strips either side, and T_UI_Scope as
+    a square of the viewport's height between them. The square is what keeps
+    the hole circular -- the texture is square, so stretching it across a 16:9
+    viewport would flatten the circle into an ellipse -- and the strips are
+    what keep the corners of the world from showing past it at any aspect.
+
+    A portrait viewport makes those strips negative-width, which DrawRect
+    renders as a rectangle running the wrong way rather than as nothing, so
+    they are clamped at zero. The square then overhangs both edges and covers
+    the viewport on its own, which is the right answer for that shape anyway.
+
+    Everything fades on one alpha:
+
+        alpha = clamp((BaseFOV / CurrentFOV - 1) / (AdsZoom - 1), 0, 1)
+
+    i.e. how far the camera has actually travelled toward this weapon's zoom.
+    That is deliberately not "Aiming", which is a key state and would snap the
+    glass on a frame before the camera moved and off a frame before it came
+    back. Reading it off the FOV means the scope and the zoom are the same
+    animation by construction, with nothing to keep in step.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    # cx - cy is both the square's left edge and the width of each side strip,
+    # because the square is the viewport's height wide and centred: the two
+    # leftovers are equal by construction.
+    left = keep(_at(_node(ed, FN_SUB), x0, y0 + 300))
+    _connect(cx, _pin(left, "A"))
+    _connect(cy, _pin(left, "B"))
+    left_out = _pin(left, "ReturnValue", is_input=False)
+    right = keep(_at(_node(ed, FN_ADD), x0, y0 + 440))
+    _connect(cx, _pin(right, "A"))
+    _connect(cy, _pin(right, "B"))
+    bar_w = keep(_at(_node(ed, FN_FMAX), x0 + 240, y0 + 300))
+    _connect(left_out, _pin(bar_w, "A"))
+    _set(bar_w, "B", 0.0)
+    bar_w_out = _pin(bar_w, "ReturnValue", is_input=False)
+
+    base = keep(_at(ed.add_get_member_variable_node("BaseFOV",
+                                                    WEAPON_COMP_CLASS_PATH),
+                    x0, y0 + 600))
+    _connect(as_weapon, _pin(base, "self"))
+    now = keep(_at(ed.add_get_member_variable_node("CurrentFOV",
+                                                   WEAPON_COMP_CLASS_PATH),
+                   x0, y0 + 720))
+    _connect(as_weapon, _pin(now, "self"))
+    zoom = keep(_at(_node(ed, FN_DIV), x0 + 240, y0 + 600))
+    _connect(_pin(base, "BaseFOV", is_input=False), _pin(zoom, "A"))
+    _connect(_pin(now, "CurrentFOV", is_input=False), _pin(zoom, "B"))
+    travelled = keep(_at(_node(ed, FN_SUB), x0 + 480, y0 + 600))
+    _connect(_pin(zoom, "ReturnValue", is_input=False), _pin(travelled, "A"))
+    _set(travelled, "B", 1.0)
+
+    # The denominator is this weapon's own zoom, not the config's scope
+    # figure: the scope and the zoom factor are separate facts about a
+    # weapon, and a 6x scope
+    # would otherwise be fully opaque a third of the way in.
+    ads = keep(_at(ed.add_get_member_variable_node("AdsZoom", ITEM_CLASS_PATH),
+                   x0 + 240, y0 + 840))
+    _connect(held_out, _pin(ads, "self"))
+    span = keep(_at(_node(ed, FN_SUB), x0 + 480, y0 + 840))
+    _connect(_pin(ads, "AdsZoom", is_input=False), _pin(span, "A"))
+    _set(span, "B", 1.0)
+
+    frac = keep(_at(_node(ed, FN_DIV), x0 + 720, y0 + 600))
+    _connect(_pin(travelled, "ReturnValue", is_input=False), _pin(frac, "A"))
+    _connect(_pin(span, "ReturnValue", is_input=False), _pin(frac, "B"))
+    alpha = keep(_at(_node(ed, FN_FCLAMP), x0 + 960, y0 + 600))
+    _connect(_pin(frac, "ReturnValue", is_input=False), _loose_pin(alpha, "Value"))
+    _set(alpha, "Min", 0.0)
+    _set(alpha, "Max", 1.0)
+    alpha_out = _pin(alpha, "ReturnValue", is_input=False)
+
+    ink = keep(_at(_node(ed, FN_MAKE_COLOR), x0 + 1200, y0 + 600))
+    for ch in ("R", "G", "B"):
+        _set(ink, ch, 0.0)
+    _connect(alpha_out, _pin(ink, "A"))
+    ink_out = _pin(ink, "ReturnValue", is_input=False)
+    tint = keep(_at(_node(ed, FN_MAKE_COLOR), x0 + 1200, y0 + 760))
+    for ch in ("R", "G", "B"):
+        _set(tint, ch, 1.0)
+    _connect(alpha_out, _pin(tint, "A"))
+
+    flow = in_exec
+    for i, at_x in enumerate((None, right)):
+        r = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 1460 + i * 260, y0))
+        if at_x is None:
+            _set(r, "ScreenX", 0.0)
+        else:
+            _connect(_pin(at_x, "ReturnValue", is_input=False), _pin(r, "ScreenX"))
+        _set(r, "ScreenY", 0.0)
+        _connect(bar_w_out, _pin(r, "ScreenW"))
+        _connect(height, _pin(r, "ScreenH"))
+        _connect(ink_out, _pin(r, "RectColor"))
+        _connect(flow, _pin(r, "execute"))
+        flow = BEL.find_then_pin(r)
+
+    glass = keep(_draw_texture(ed, x0 + 1980, y0, SCOPE_TEX))
+    _connect(left_out, _pin(glass, "ScreenX"))
+    _set(glass, "ScreenY", 0.0)
+    _connect(height, _pin(glass, "ScreenW"))
+    _connect(height, _pin(glass, "ScreenH"))
+    _connect(_pin(tint, "ReturnValue", is_input=False), _pin(glass, "TintColor"))
+    _connect(flow, _pin(glass, "execute"))
+
+    ed.add_comment_to_nodes(
+        "The sniper's scope. Drawn as a square of the viewport's height with "
+        "the side strips blacked out, so the hole stays a circle at any "
+        "aspect ratio, and faded on how far CurrentFOV has travelled toward "
+        "the weapon's AdsZoom -- the glass and the zoom are one animation.",
+        made)
+
+    return BEL.find_then_pin(glass)
+
+
 def _author_reticle(ed, x0, y0, in_execs):
     """A crosshair pinned to the centre of the screen.
 
@@ -1534,6 +2002,10 @@ def _author_reticle(ed, x0, y0, in_execs):
     What is kept from the impact point is the one thing worth showing: the
     crosshair turns red when the muzzle's line is blocked short of what the
     camera can see, so a barrel against a tree reads as such without moving.
+
+    A scoped weapon draws _author_scope instead of this, never as well as it:
+    the scope has a reticle of its own and two crosshairs on one centre is the
+    sort of thing that reads as a bug.
     """
     made = []
 
@@ -1583,6 +2055,26 @@ def _author_reticle(ed, x0, y0, in_execs):
     cx = half("X", y0 + 560)
     cy = half("Y", y0 + 700)
 
+    # Held is read here rather than in _author_scope because both arms of the
+    # branch below are downstream of it, and because AimValid is exactly the
+    # weapon component's answer to "is Held valid" -- it is set false on the
+    # empty-handed path, so under `armed` this Get cannot be an Accessed None.
+    held = keep(_at(ed.add_get_member_variable_node("Held",
+                                                    WEAPON_COMP_CLASS_PATH),
+                    x0 + 760, y0 + 540))
+    _connect(as_weapon, _pin(held, "self"))
+    held_out = _pin(held, "Held", is_input=False)
+    scoped = keep(_at(ed.add_get_member_variable_node("Scoped", ITEM_CLASS_PATH),
+                      x0 + 1020, y0 + 540))
+    _connect(held_out, _pin(scoped, "self"))
+    glass = keep(_at(ed.add_branch_node(), x0 + 1260, y0))
+    _connect(_pin(scoped, "Scoped", is_input=False), _pin(glass, "Condition"))
+    _connect(BEL.find_then_pin(armed), _pin(glass, "execute"))
+
+    scoped_tail = _author_scope(ed, x0 + 4000, y0, BEL.find_then_pin(glass),
+                                as_weapon, held_out, cx, cy,
+                                _loose_pin(wh, "Y", is_input=False))
+
     colour = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1500, y0 + 840))
     _set(colour, "A", COL_RETICLE_BLOCKED)
     _set(colour, "B", COL_RETICLE)
@@ -1609,7 +2101,7 @@ def _author_reticle(ed, x0, y0, in_execs):
         ("dot",    -half_d,  -half_d,  RETICLE_DOT,   RETICLE_DOT),
     )
 
-    flow = BEL.find_then_pin(armed)
+    flow = BEL.find_else_pin(glass)
     for i, (name, dx, dy, w, h) in enumerate(pieces):
         px = x0 + 1800 + i * 260
         r = keep(_at(_node(ed, FN_DRAW_RECT), px, y0))
@@ -1629,11 +2121,170 @@ def _author_reticle(ed, x0, y0, in_execs):
         made)
 
     return (flow,
+            scoped_tail,
             BEL.find_else_pin(armed),
             _pin(cast, "CastFailed", is_input=False))
 
 
 # ─── Event ReceiveDrawHUD: the panel ─────────────────────────────────────────
+
+def _author_push_settings(ed, x0, y0, in_execs):
+    """Hand BP_WeaponComponent the player's settings, every DrawHUD frame.
+
+    A push and not a pull, and that direction is the whole design. The
+    component would otherwise have to load the save itself (a second reader of
+    one file) or cast to the HUD (a component reaching for an actor that may
+    not exist). Pushed, it keeps plain member variables with CDO defaults that
+    already work on their own, and the settings screen is the only thing that
+    knows a disk is involved.
+
+    Written from DrawHUD rather than Tick for the same reason everything else
+    here is: the menu is a paused world, and Tick does not run in one -- so a
+    sensitivity changed on the settings screen has to land before the game is
+    unpaused, not on the first frame after it.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    got = keep(_at(ed.add_get_member_variable_node("Settings"), x0, y0 + 240))
+    settings_out = _pin(got, "Settings", is_input=False)
+    ok = keep(_at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 240))
+    _connect(settings_out, _pin(ok, "Object"))
+    have = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+    _connect(_pin(ok, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    for e in in_execs:
+        _connect(e, _pin(have, "execute"))
+
+    pawn = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0 + 480, y0 + 400))
+    _set(pawn, "PlayerIndex", 0)
+    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 720, y0 + 400))
+    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
+    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 980, y0))
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(BEL.find_then_pin(have), _pin(cast, "execute"))
+    as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
+
+    sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity",
+                                                    SETTINGS_CLASS_PATH),
+                    x0 + 980, y0 + 400))
+    _connect(settings_out, _pin(sens, "self"))
+    push = keep(_at(ed.add_set_member_variable_node("MouseSensitivity",
+                                                    WEAPON_COMP_CLASS_PATH),
+                    x0 + 1240, y0))
+    _connect(as_weapon, _pin(push, "self"))
+    _connect(_pin(sens, "MouseSensitivity", is_input=False),
+             _pin(push, "MouseSensitivity"))
+    _connect(BEL.find_then_pin(cast), _pin(push, "execute"))
+    flow = BEL.find_then_pin(push)
+
+    binds = keep(_at(ed.add_get_member_variable_node("Binds",
+                                                     SETTINGS_CLASS_PATH),
+                     x0 + 980, y0 + 540))
+    _connect(settings_out, _pin(binds, "self"))
+    binds_out = _pin(binds, "Binds", is_input=False)
+    for i, (var, _default) in enumerate(BIND_VARS):
+        item = keep(_at(_node(ed, FN_ARR_GET), x0 + 1500 + i * 280, y0 + 400))
+        _connect(binds_out, _loose_pin(item, "TargetArray"))
+        _set(item, "Index", i)
+        put = keep(_at(ed.add_set_member_variable_node(
+            var, WEAPON_COMP_CLASS_PATH), x0 + 1500 + i * 280, y0))
+        _connect(as_weapon, _pin(put, "self"))
+        _connect(_loose_pin(item, "Item", is_input=False), _pin(put, var))
+        _connect(flow, _pin(put, "execute"))
+        flow = BEL.find_then_pin(put)
+
+    ed.add_comment_to_nodes(
+        "The player's settings, pushed onto BP_WeaponComponent every frame. "
+        "The component never loads them, never casts back here, and keeps the "
+        "CDO defaults build_weapons_and_combat.py gave it as a standalone "
+        "fallback -- so a pawn with no HUD in front of it still plays with the "
+        "documented keys. Guarded on IsValid(Settings) because the alternative "
+        "is an Accessed None per frame forever if BeginPlay's load ever failed.",
+        made)
+    return (flow, _pin(cast, "CastFailed", is_input=False),
+            BEL.find_else_pin(have))
+
+
+def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0):
+    """Up and Down move MenuRow, clamped at both ends rather than wrapped.
+
+    Two branches in series rather than one Select: MenuRow is read fresh by
+    each, so pressing both in a frame nets to no movement instead of to
+    whichever arm the Select happened to pick.
+
+    Returns ``(exec_pins, nodes)`` -- a pair of pins, because an exec *input*
+    takes any number of links and so neither arm of a Branch needs joining
+    before the next block. That is the same flat-chain shape the weapon
+    component's Tick uses, and it is why there is no Sequence node anywhere
+    in this HUD.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    flow = (in_exec,)
+    for i, (key, step, limit, bound) in enumerate(
+            ((NAV_UP, FN_SUB_II, FN_MAX_II, 0),
+             (NAV_DOWN, FN_ADD_II, FN_MIN_II, last_row))):
+        py = y0 + i * 420
+        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0, py + 260))
+        _connect(pc_out, _pin(was, "self"))
+        _set(was, "Key", key)
+        br = keep(_at(ed.add_branch_node(), x0 + 260, py))
+        _connect(_pin(was, "ReturnValue", is_input=False), _pin(br, "Condition"))
+        for e in flow:
+            _connect(e, _pin(br, "execute"))
+
+        row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 260, py + 400))
+        moved = keep(_at(_node(ed, step), x0 + 520, py + 400))
+        _connect(_pin(row, "MenuRow", is_input=False), _pin(moved, "A"))
+        _set(moved, "B", 1)
+        held = keep(_at(_node(ed, limit), x0 + 780, py + 400))
+        _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held, "A"))
+        _set(held, "B", bound)
+        put = keep(_at(ed.add_set_member_variable_node("MenuRow"), x0 + 1040, py))
+        _connect(_pin(held, "ReturnValue", is_input=False), _pin(put, "MenuRow"))
+        _connect(BEL.find_then_pin(br), _pin(put, "execute"))
+        flow = (BEL.find_then_pin(put), BEL.find_else_pin(br))
+    return flow, made
+
+
+def _emit_accept(ed, pc_out, x0, y0, in_exec, made):
+    """The exec that runs on the frame an accept key is pressed.
+
+    START_KEYS are OR'd rather than chosen between: Enter is the conventional
+    one and Space is what a hand is already near, and with a caret on the panel
+    both mean "this row".
+    """
+    def keep(n):
+        made.append(n)
+        return n
+
+    any_key = None
+    for i, key in enumerate(START_KEYS):
+        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0, y0 + i * 140))
+        _connect(pc_out, _pin(was, "self"))
+        _set(was, "Key", key)
+        got = _pin(was, "ReturnValue", is_input=False)
+        if any_key is None:
+            any_key = got
+        else:
+            either = keep(_at(_node(ed, FN_OR), x0 + 260, y0 + i * 140))
+            _connect(any_key, _pin(either, "A"))
+            _connect(got, _pin(either, "B"))
+            any_key = _pin(either, "ReturnValue", is_input=False)
+    go = keep(_at(ed.add_branch_node(), x0 + 520, y0 - 200))
+    _connect(any_key, _pin(go, "Condition"))
+    for e in in_exec:
+        _connect(e, _pin(go, "execute"))
+    return go
+
 
 def _author_main_menu(ed, x0, y0, in_execs):
     """The menu the game opens on, and the one thing that leaves it.
@@ -1642,6 +2293,10 @@ def _author_main_menu(ed, x0, y0, in_execs):
     HUD hangs off. Nothing below this point draws until the player has started,
     which is the point: a reticle and a health bar over a title screen read as
     a game that is already being played.
+
+    Two rows now, NEW GAME and SETTINGS, which is why the left mouse button is
+    no longer an accept key: with no cursor and no hit test a click cannot say
+    which row it means. See START_KEYS.
 
     See START_KEYS for why this is polled here and not on Event Tick.
     """
@@ -1657,6 +2312,19 @@ def _author_main_menu(ed, x0, y0, in_execs):
     _connect(_pin(started, GAME_STARTED_VAR, is_input=False), _pin(playing, "Condition"))
     for e in in_execs:
         _connect(e, _pin(playing, "execute"))
+
+    # Which page the panel is showing. The settings page is a separate block
+    # rather than more rows on this one because it is a different panel size,
+    # a different column layout and a different set of keys.
+    page = keep(_at(ed.add_get_member_variable_node("MenuPage"), x0 + 260, y0 + 400))
+    on_title = keep(_at(_node(ed, FN_EQ_II), x0 + 500, y0 + 400))
+    _connect(_pin(page, "MenuPage", is_input=False), _pin(on_title, "A"))
+    _set(on_title, "B", PAGE_TITLE)
+    which = keep(_at(ed.add_branch_node(), x0 + 760, y0 + 160))
+    _connect(_pin(on_title, "ReturnValue", is_input=False), _pin(which, "Condition"))
+    _connect(BEL.find_else_pin(playing), _pin(which, "execute"))
+
+    _author_settings_page(ed, x0, y0 + 9000, BEL.find_else_pin(which))
 
     size = keep(_at(_node(ed, FN_VIEWPORT), x0 + 260, y0 + 420))
     wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 500, y0 + 420))
@@ -1678,18 +2346,31 @@ def _author_main_menu(ed, x0, y0, in_execs):
                                w=MENU_PANEL[0], h=MENU_PANEL[1]))
     _connect(panel_x, _pin(panel, "ScreenX"))
     _connect(panel_y, _pin(panel, "ScreenY"))
-    _connect(BEL.find_else_pin(playing), _pin(panel, "execute"))
+    _connect(BEL.find_then_pin(which), _pin(panel, "execute"))
 
-    # The button plate, so NEW GAME reads as something you press rather than as
-    # a third line of text. T_UI_SlotActive stretched: it is already the lit,
+    # The button plate, so a row reads as something you press rather than as a
+    # line of text. T_UI_SlotActive stretched: it is already the lit,
     # amber-edged surface the inventory strip uses for "this is the one", which
     # is the same thing being said here.
+    #
+    # It is also the caret. Its y is MenuRow-driven, exactly as the quality
+    # panel's ">" is Quality-driven, so the selected row is the lit one and
+    # there is no second marker to keep in step with it.
     button_x = keep(_at(_node(ed, FN_ADD), x0 + 1240, y0 + 700))
     _connect(panel_x, _pin(button_x, "A"))
     _set(button_x, "B", (MENU_PANEL[0] - START_BUTTON[0]) / 2.0)
-    button_y = keep(_at(_node(ed, FN_ADD), x0 + 1240, y0 + 820))
-    _connect(panel_y, _pin(button_y, "A"))
-    _set(button_y, "B", 176.0)
+    row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 1240, y0 + 940))
+    row_f = keep(_at(_node(ed, FN_CONV_INT), x0 + 1480, y0 + 940))
+    _connect(_pin(row, "MenuRow", is_input=False), _pin(row_f, "InInt"))
+    row_off = keep(_at(_node(ed, FN_MUL), x0 + 1720, y0 + 940))
+    _connect(_pin(row_f, "ReturnValue", is_input=False), _pin(row_off, "A"))
+    _set(row_off, "B", MAIN_ROW_STEP)
+    plate_y = keep(_at(_node(ed, FN_ADD), x0 + 1240, y0 + 820))
+    _connect(panel_y, _pin(plate_y, "A"))
+    _set(plate_y, "B", MAIN_PLATE_OFF)
+    button_y = keep(_at(_node(ed, FN_ADD), x0 + 1960, y0 + 940))
+    _connect(_pin(plate_y, "ReturnValue", is_input=False), _pin(button_y, "A"))
+    _connect(_pin(row_off, "ReturnValue", is_input=False), _pin(button_y, "B"))
     button = keep(_draw_texture(ed, x0 + 1500, y0, "T_UI_SlotActive",
                                 w=START_BUTTON[0], h=START_BUTTON[1]))
     _connect(_pin(button_x, "ReturnValue", is_input=False), _pin(button, "ScreenX"))
@@ -1741,52 +2422,416 @@ def _author_main_menu(ed, x0, y0, in_execs):
 
     line(GAME_TITLE, 56.0, MAIN_TITLE_SCALE, COL_MAIN_TITLE, x0 + 1760)
     line(GAME_SUBTITLE, 124.0, MAIN_SUB_SCALE, COL_MAIN_SUB, x0 + 2600)
-    line(START_LABEL, 192.0, MAIN_START_SCALE, COL_MAIN_START, x0 + 3440)
-    line("press  ENTER  ·  SPACE  ·  or click", 270.0, MAIN_HINT_SCALE,
-         COL_MAIN_HINT, x0 + 4280)
+    for i, label in enumerate(MENU_ROWS):
+        line(label, MAIN_ROW0_OFF + i * MAIN_ROW_STEP, MAIN_START_SCALE,
+             COL_MAIN_START, x0 + 3440 + i * 840)
+    line("UP / DOWN  ·  ENTER selects", MAIN_HINT_OFF, MAIN_HINT_SCALE,
+         COL_MAIN_HINT, x0 + 5120)
 
-    # --- starting ------------------------------------------------------------
-    pc = keep(_at(_node(ed, FN_GET_OWNING_PC), x0 + 5120, y0 + 400))
+    # --- choosing a row -------------------------------------------------------
+    pc = keep(_at(_node(ed, FN_GET_OWNING_PC), x0 + 5960, y0 + 400))
     pc_out = _pin(pc, "ReturnValue", is_input=False)
-    any_key = None
-    for i, key in enumerate(START_KEYS):
-        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 5360, y0 + 400 + i * 140))
-        _connect(pc_out, _pin(was, "self"))
-        _set(was, "Key", key)
-        got = _pin(was, "ReturnValue", is_input=False)
-        if any_key is None:
-            any_key = got
-        else:
-            either = keep(_at(_node(ed, FN_OR), x0 + 5600, y0 + 400 + i * 140))
-            _connect(any_key, _pin(either, "A"))
-            _connect(got, _pin(either, "B"))
-            any_key = _pin(either, "ReturnValue", is_input=False)
+    moved, nav_nodes = _emit_row_nav(ed, pc_out, len(MENU_ROWS) - 1, flow,
+                                     x0 + 6200, y0 + 1200)
+    made += nav_nodes
+    go = _emit_accept(ed, pc_out, x0 + 7700, y0 + 400, moved, made)
 
-    go = keep(_at(ed.add_branch_node(), x0 + 5860, y0))
-    _connect(any_key, _pin(go, "Condition"))
-    _connect(flow, _pin(go, "execute"))
+    # NEW GAME or SETTINGS, off the same MenuRow the lit plate is drawn from.
+    new_game = keep(_at(_node(ed, FN_EQ_II), x0 + 7960, y0 + 400))
+    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
+                           x0 + 7700, y0 + 400)), "MenuRow", is_input=False),
+             _pin(new_game, "A"))
+    _set(new_game, "B", 0)
+    chosen = keep(_at(ed.add_branch_node(), x0 + 8220, y0))
+    _connect(_pin(new_game, "ReturnValue", is_input=False), _pin(chosen, "Condition"))
+    _connect(BEL.find_then_pin(go), _pin(chosen, "execute"))
 
     mark = keep(_at(ed.add_set_member_variable_node(GAME_STARTED_VAR),
-                    x0 + 6120, y0))
+                    x0 + 8480, y0))
     _set(mark, GAME_STARTED_VAR, "true")
-    _connect(BEL.find_then_pin(go), _pin(mark, "execute"))
+    _connect(BEL.find_then_pin(chosen), _pin(mark, "execute"))
 
     # Unpause LAST. Setting GameStarted first means the very next frame draws
     # the HUD rather than the menu, so there is no frame where the world is
     # running behind a title screen.
-    resume = keep(_at(_node(ed, FN_SET_PAUSED), x0 + 6380, y0))
+    resume = keep(_at(_node(ed, FN_SET_PAUSED), x0 + 8740, y0))
     _set(resume, "bPaused", "false")
     _connect(BEL.find_then_pin(mark), _pin(resume, "execute"))
+
+    # ...or the other row: open the settings page, with the caret at the top of
+    # it rather than wherever it was left on this one.
+    to_settings = keep(_at(ed.add_set_member_variable_node("MenuPage"),
+                           x0 + 8480, y0 + 600))
+    _set(to_settings, "MenuPage", PAGE_SETTINGS)
+    _connect(BEL.find_else_pin(chosen), _pin(to_settings, "execute"))
+    reset_row = keep(_at(ed.add_set_member_variable_node("MenuRow"),
+                         x0 + 8740, y0 + 600))
+    _set(reset_row, "MenuRow", 0)
+    _connect(BEL.find_then_pin(to_settings), _pin(reset_row, "execute"))
 
     ed.add_comment_to_nodes(
         f"The main menu. Drawn instead of the HUD while {GAME_STARTED_VAR} is "
         f"false, which BeginPlay sets it to along with pausing the world, so "
         f"the wanderers are not already running at the player behind the title. "
-        f"{' / '.join(START_KEYS)} starts, and it is polled HERE rather than on "
-        f"Event Tick because Tick does not run while the game is paused -- the "
-        f"same reason the death menu's restart key lives in DrawHUD.",
+        f"{' / '.join(START_KEYS)} takes the row the lit plate is on, and both "
+        f"the plate and the keys are polled HERE rather than on Event Tick "
+        f"because Tick does not run while the game is paused -- the same "
+        f"reason the death menu's restart key lives in DrawHUD.",
         made)
     return (BEL.find_then_pin(playing),)
+
+
+def _author_settings_page(ed, x0, y0, in_exec):
+    """Mouse sensitivity and the seven binds, on the same panel as the title.
+
+    Nine rows: sensitivity, BIND_VARS in order, BACK. Left/Right adjust the
+    first, Enter arms a capture on any of the seven, and every change is
+    written to disk on the spot.
+
+    The seven bind rows are ONE pair of DrawTexts inside a ForEachLoop over
+    Binds, not seven pairs with their y positions written out -- which is why
+    the HUD carries BindLabels as an array rather than as seven literals.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    settings = keep(_at(ed.add_get_member_variable_node("Settings"),
+                        x0, y0 + 240))
+    settings_out = _pin(settings, "Settings", is_input=False)
+
+    size = keep(_at(_node(ed, FN_VIEWPORT), x0, y0 + 420))
+    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 240, y0 + 420))
+    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
+
+    def centred(axis, span, py):
+        half = keep(_at(_node(ed, FN_MUL), x0 + 480, py))
+        _connect(_loose_pin(wh, axis, is_input=False), _pin(half, "A"))
+        _set(half, "B", 0.5)
+        off = keep(_at(_node(ed, FN_SUB), x0 + 720, py))
+        _connect(_pin(half, "ReturnValue", is_input=False), _pin(off, "A"))
+        _set(off, "B", span)
+        return _pin(off, "ReturnValue", is_input=False)
+
+    panel_x = centred("X", SETTINGS_PANEL[0] / 2.0, y0 + 420)
+    panel_y = centred("Y", SETTINGS_PANEL[1] / 2.0, y0 + 560)
+
+    def offset(base, by, px, py):
+        n = keep(_at(_node(ed, FN_ADD), px, py))
+        _connect(base, _pin(n, "A"))
+        _set(n, "B", by)
+        return _pin(n, "ReturnValue", is_input=False)
+
+    label_x = offset(panel_x, SET_LABEL_X, x0 + 960, y0 + 420)
+    value_x = offset(panel_x, SET_VALUE_X, x0 + 960, y0 + 540)
+    caret_x = offset(panel_x, SET_CARET_X, x0 + 960, y0 + 660)
+
+    def row_y(index, py):
+        return offset(panel_y, SET_ROW0_OFF + index * SET_ROW_STEP,
+                      x0 + 960, py)
+
+    panel = keep(_draw_texture(ed, x0 + 1240, y0, "T_UI_Panel",
+                               w=SETTINGS_PANEL[0], h=SETTINGS_PANEL[1]))
+    _connect(panel_x, _pin(panel, "ScreenX"))
+    _connect(panel_y, _pin(panel, "ScreenY"))
+    _connect(in_exec, _pin(panel, "execute"))
+    flow = BEL.find_then_pin(panel)
+
+    def text(px, at_x, at_y, scale, color, literal=None, driven=None):
+        """One left-aligned row. Left-aligned and not centred on purpose: nine
+        rows of different lengths centred individually read as a ragged block,
+        and a value column that moves per row cannot be scanned."""
+        nonlocal flow
+        n = keep(_at(_node(ed, FN_DRAW_TEXT), px, y0))
+        if literal is not None:
+            _set(n, "Text", literal)
+        else:
+            _connect(driven, _pin(n, "Text"))
+        _set(n, "TextColor", color)
+        _set(n, "Scale", scale)
+        _set(n, "bScalePosition", "false")
+        _set(n, "Font", UI_FONT)
+        _connect(at_x, _pin(n, "ScreenX"))
+        _connect(at_y, _pin(n, "ScreenY"))
+        _connect(flow, _pin(n, "execute"))
+        flow = BEL.find_then_pin(n)
+        return n
+
+    text(x0 + 1500, label_x,
+         offset(panel_y, SET_TITLE_OFF, x0 + 960, y0 + 780),
+         SET_TITLE_SCALE, COL_TITLE, literal=SETTINGS_TITLE)
+
+    # The caret, drawn from MenuRow the way the quality panel's is drawn from
+    # Quality -- one number, no per-row bookkeeping.
+    row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 960, y0 + 900))
+    row_f = keep(_at(_node(ed, FN_CONV_INT), x0 + 1200, y0 + 900))
+    _connect(_pin(row, "MenuRow", is_input=False), _pin(row_f, "InInt"))
+    caret_off = keep(_at(_node(ed, FN_MUL), x0 + 1440, y0 + 900))
+    _connect(_pin(row_f, "ReturnValue", is_input=False), _pin(caret_off, "A"))
+    _set(caret_off, "B", SET_ROW_STEP)
+    caret_base = row_y(0, y0 + 1020)
+    caret_y = keep(_at(_node(ed, FN_ADD), x0 + 1680, y0 + 900))
+    _connect(caret_base, _pin(caret_y, "A"))
+    _connect(_pin(caret_off, "ReturnValue", is_input=False), _pin(caret_y, "B"))
+    text(x0 + 1760, caret_x, _pin(caret_y, "ReturnValue", is_input=False),
+         SET_ROW_SCALE, COL_CARET, literal=">")
+
+    # --- row 0: the sensitivity ----------------------------------------------
+    sens_y = row_y(SENS_ROW, y0 + 1140)
+    text(x0 + 2020, label_x, sens_y, SET_ROW_SCALE, COL_ROW, literal=SENS_LABEL)
+    sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity",
+                                                    SETTINGS_CLASS_PATH),
+                    x0 + 2020, y0 + 1260))
+    _connect(settings_out, _pin(sens, "self"))
+    sens_str = keep(_at(_node(ed, FN_FLOAT_TO_STR), x0 + 2280, y0 + 1260))
+    _connect(_pin(sens, "MouseSensitivity", is_input=False),
+             _loose_pin(sens_str, "InDouble"))
+    text(x0 + 2280, value_x, sens_y, SET_ROW_SCALE, COL_CARET,
+         driven=_pin(sens_str, "ReturnValue", is_input=False))
+
+    # --- rows 1..7: the binds, one loop ---------------------------------------
+    binds = keep(_at(ed.add_get_member_variable_node("Binds",
+                                                     SETTINGS_CLASS_PATH),
+                     x0 + 2540, y0 + 1260))
+    _connect(settings_out, _pin(binds, "self"))
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
+    if not loop:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    keep(_at(loop, x0 + 2800, y0))
+    _connect(_pin(binds, "Binds", is_input=False), _loose_pin(loop, "Array"))
+    _connect(flow, _loose_pin(loop, "Exec"))
+    element = _loose_pin(loop, "ArrayElement", is_input=False)
+    index = _loose_pin(loop, "ArrayIndex", is_input=False)
+
+    index_f = keep(_at(_node(ed, FN_CONV_INT), x0 + 3060, y0 + 400))
+    _connect(index, _pin(index_f, "InInt"))
+    step = keep(_at(_node(ed, FN_MUL), x0 + 3300, y0 + 400))
+    _connect(_pin(index_f, "ReturnValue", is_input=False), _pin(step, "A"))
+    _set(step, "B", SET_ROW_STEP)
+    # Binds[0] is row 1, so one step down from the sensitivity row.
+    from_panel = keep(_at(_node(ed, FN_ADD), x0 + 3540, y0 + 400))
+    _connect(_pin(step, "ReturnValue", is_input=False), _pin(from_panel, "A"))
+    _set(from_panel, "B", SET_ROW0_OFF + SET_ROW_STEP)
+    bind_y = keep(_at(_node(ed, FN_ADD), x0 + 3780, y0 + 400))
+    _connect(panel_y, _pin(bind_y, "A"))
+    _connect(_pin(from_panel, "ReturnValue", is_input=False), _pin(bind_y, "B"))
+    bind_y_out = _pin(bind_y, "ReturnValue", is_input=False)
+
+    labels = keep(_at(ed.add_get_member_variable_node("BindLabels"),
+                      x0 + 3060, y0 + 560))
+    label = keep(_at(_node(ed, FN_ARR_GET), x0 + 3300, y0 + 560))
+    _connect(_pin(labels, "BindLabels", is_input=False),
+             _loose_pin(label, "TargetArray"))
+    _connect(index, _pin(label, "Index"))
+
+    # Key_GetDisplayName is the only readable spelling of an FKey in 5.8 --
+    # Key_GetName does not exist -- and it hands back Text, not a String.
+    shown = keep(_at(_node(ed, FN_KEY_DISPLAY), x0 + 3300, y0 + 700))
+    _connect(element, _loose_pin(shown, "Key"))
+    shown_str = keep(_at(_node(ed, FN_TEXT_TO_STR), x0 + 3540, y0 + 700))
+    _connect(_pin(shown, "ReturnValue", is_input=False),
+             _loose_pin(shown_str, "InText"))
+
+    flow = _loose_pin(loop, "LoopBody", is_input=False)
+    text(x0 + 4040, label_x, bind_y_out, SET_ROW_SCALE, COL_ROW,
+         driven=_loose_pin(label, "Item", is_input=False))
+    text(x0 + 4300, value_x, bind_y_out, SET_ROW_SCALE, COL_CARET,
+         driven=_pin(shown_str, "ReturnValue", is_input=False))
+
+    flow = _loose_pin(loop, "Completed", is_input=False)
+    text(x0 + 4560, label_x, row_y(BACK_ROW, y0 + 1380), SET_ROW_SCALE,
+         COL_ROW, literal=BACK_LABEL)
+
+    # Two draws behind one branch, the same shape the debug row uses: there is
+    # no SelectString, and the hint has to say something different while a
+    # capture is armed or the screen looks frozen.
+    hint_y = offset(panel_y, SET_HINT_OFF, x0 + 960, y0 + 1500)
+    arming = keep(_at(ed.add_get_member_variable_node("Capturing"),
+                      x0 + 4820, y0 + 400))
+    hinting = keep(_at(ed.add_branch_node(), x0 + 4820, y0))
+    _connect(_pin(arming, "Capturing", is_input=False), _pin(hinting, "Condition"))
+    _connect(flow, _pin(hinting, "execute"))
+
+    flow = BEL.find_then_pin(hinting)
+    on_tail = BEL.find_then_pin(
+        text(x0 + 5080, label_x, hint_y, SET_HINT_SCALE, COL_CARET,
+             literal="press any key to bind it"))
+    flow = BEL.find_else_pin(hinting)
+    off_tail = BEL.find_then_pin(
+        text(x0 + 5340, label_x, hint_y, SET_HINT_SCALE, COL_MAIN_HINT,
+             literal="arrows adjust  ·  ENTER rebinds"))
+
+    _author_capture(ed, x0, y0 + 3000, settings_out, (on_tail, off_tail), made)
+
+    ed.add_comment_to_nodes(
+        f"The settings page. {SETTINGS_ROWS} rows: sensitivity, the "
+        f"{len(BIND_VARS)} binds, and BACK. Everything it changes is written "
+        f"to slot {SETTINGS_SLOT!r} the moment it changes, which is what makes "
+        f"it survive a restart -- see _emit_save.",
+        made)
+
+
+def _author_capture(ed, x0, y0, settings_out, in_execs, made):
+    """The input half of the settings page: capture first, then everything else.
+
+    THE ORDER OF THESE TWO ARMS IS LOAD-BEARING. The capture poll is authored
+    and branched on BEFORE the row is activated, because Enter is what arms a
+    capture -- and Enter is still "just pressed" for the rest of that frame. A
+    capture poll that ran after the activation would see it and instantly bind
+    the accept key to whatever row the caret was on, which is a settings screen
+    that eats itself the first time it is used. Branching on Capturing puts
+    them in different frames as well as in different arms, and both of those
+    have to be true.
+    """
+    def keep(n):
+        made.append(n)
+        return n
+
+    pc = keep(_at(_node(ed, FN_GET_OWNING_PC), x0, y0 + 240))
+    pc_out = _pin(pc, "ReturnValue", is_input=False)
+
+    armed = keep(_at(ed.add_get_member_variable_node("Capturing"), x0, y0 + 400))
+    listening = keep(_at(ed.add_branch_node(), x0 + 260, y0))
+    _connect(_pin(armed, "Capturing", is_input=False), _pin(listening, "Condition"))
+    for e in in_execs:
+        _connect(e, _pin(listening, "execute"))
+
+    # --- armed: the next key in KEY_POOL that goes down becomes the bind ------
+    pool = keep(_at(ed.add_get_member_variable_node("KeyPool"), x0 + 520, y0 + 400))
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
+    if not loop:
+        raise RuntimeError("could not create the ForEachLoop macro node")
+    keep(_at(loop, x0 + 780, y0))
+    _connect(_pin(pool, "KeyPool", is_input=False), _loose_pin(loop, "Array"))
+    _connect(BEL.find_then_pin(listening), _loose_pin(loop, "Exec"))
+    candidate = _loose_pin(loop, "ArrayElement", is_input=False)
+
+    hit = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 1040, y0 + 400))
+    _connect(pc_out, _pin(hit, "self"))
+    _connect(candidate, _pin(hit, "Key"))
+    took = keep(_at(ed.add_branch_node(), x0 + 1300, y0))
+    _connect(_pin(hit, "ReturnValue", is_input=False), _pin(took, "Condition"))
+    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(took, "execute"))
+
+    # Binds[MenuRow - 1]: row 0 is the sensitivity, so the seven binds start at
+    # row 1 and the subtraction is the whole of that mapping.
+    row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 1300, y0 + 400))
+    slot = keep(_at(_node(ed, FN_SUB_II), x0 + 1560, y0 + 400))
+    _connect(_pin(row, "MenuRow", is_input=False), _pin(slot, "A"))
+    _set(slot, "B", 1)
+    binds = keep(_at(ed.add_get_member_variable_node("Binds",
+                                                     SETTINGS_CLASS_PATH),
+                     x0 + 1300, y0 + 540))
+    _connect(settings_out, _pin(binds, "self"))
+    write = keep(_at(_node(ed, FN_ARR_SET), x0 + 1820, y0))
+    _connect(_pin(binds, "Binds", is_input=False), _loose_pin(write, "TargetArray"))
+    _connect(_pin(slot, "ReturnValue", is_input=False), _pin(write, "Index"))
+    _connect(candidate, _loose_pin(write, "Item"))
+    _connect(BEL.find_then_pin(took), _pin(write, "execute"))
+    done = keep(_at(ed.add_set_member_variable_node("Capturing"), x0 + 2080, y0))
+    _set(done, "Capturing", "false")
+    _connect(BEL.find_then_pin(write), _pin(done, "execute"))
+    _, writer = _emit_save(ed, settings_out, BEL.find_then_pin(done),
+                           x0 + 2340, y0)
+    made.append(writer)
+
+    # --- not armed: move the caret, nudge the sensitivity, take the row -------
+    moved, nav = _emit_row_nav(ed, pc_out, BACK_ROW,
+                               BEL.find_else_pin(listening), x0 + 520, y0 + 1200)
+    made += nav
+
+    left = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 2000, y0 + 1200))
+    _connect(pc_out, _pin(left, "self"))
+    _set(left, "Key", NAV_LEFT)
+    right = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 2000, y0 + 1340))
+    _connect(pc_out, _pin(right, "self"))
+    _set(right, "Key", NAV_RIGHT)
+    right_out = _pin(right, "ReturnValue", is_input=False)
+    either = keep(_at(_node(ed, FN_OR), x0 + 2260, y0 + 1200))
+    _connect(_pin(left, "ReturnValue", is_input=False), _pin(either, "A"))
+    _connect(right_out, _pin(either, "B"))
+    on_sens = keep(_at(_node(ed, FN_EQ_II), x0 + 2260, y0 + 1480))
+    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
+                           x0 + 2000, y0 + 1480)), "MenuRow", is_input=False),
+             _pin(on_sens, "A"))
+    _set(on_sens, "B", SENS_ROW)
+    adjusting = keep(_at(_node(ed, FN_AND), x0 + 2520, y0 + 1200))
+    _connect(_pin(either, "ReturnValue", is_input=False), _pin(adjusting, "A"))
+    _connect(_pin(on_sens, "ReturnValue", is_input=False), _pin(adjusting, "B"))
+    nudging = keep(_at(ed.add_branch_node(), x0 + 2780, y0 + 1000))
+    _connect(_pin(adjusting, "ReturnValue", is_input=False), _pin(nudging, "Condition"))
+    for e in moved:
+        _connect(e, _pin(nudging, "execute"))
+
+    # One write with a signed step rather than two arms with the same two
+    # writes in them: the pair would drift, and the clamp would end up on only
+    # one of them.
+    delta = keep(_at(_node(ed, FN_SELECT_FLOAT), x0 + 2780, y0 + 1340))
+    _set(delta, "A", MOUSE_SENSITIVITY_STEP)
+    _set(delta, "B", -MOUSE_SENSITIVITY_STEP)
+    _connect(right_out, _loose_pin(delta, "bPickA"))
+    now = keep(_at(ed.add_get_member_variable_node("MouseSensitivity",
+                                                   SETTINGS_CLASS_PATH),
+                   x0 + 2780, y0 + 1480))
+    _connect(settings_out, _pin(now, "self"))
+    total = keep(_at(_node(ed, FN_ADD), x0 + 3040, y0 + 1400))
+    _connect(_pin(now, "MouseSensitivity", is_input=False), _pin(total, "A"))
+    _connect(_pin(delta, "ReturnValue", is_input=False), _pin(total, "B"))
+    # Clamped, and the floor is not zero: a sensitivity of 0 is a mouse that
+    # does not turn, on a screen the player would then have to navigate to fix.
+    held = keep(_at(_node(ed, FN_FCLAMP), x0 + 3300, y0 + 1400))
+    _connect(_pin(total, "ReturnValue", is_input=False), _loose_pin(held, "Value"))
+    _set(held, "Min", MOUSE_SENSITIVITY_MIN)
+    _set(held, "Max", MOUSE_SENSITIVITY_MAX)
+    store = keep(_at(ed.add_set_member_variable_node("MouseSensitivity",
+                                                     SETTINGS_CLASS_PATH),
+                     x0 + 3560, y0 + 1000))
+    _connect(settings_out, _pin(store, "self"))
+    _connect(_pin(held, "ReturnValue", is_input=False),
+             _pin(store, "MouseSensitivity"))
+    _connect(BEL.find_then_pin(nudging), _pin(store, "execute"))
+    saved, writer = _emit_save(ed, settings_out, BEL.find_then_pin(store),
+                               x0 + 3820, y0 + 1000)
+    made.append(writer)
+
+    go = _emit_accept(ed, pc_out, x0 + 4100, y0 + 1000,
+                      (saved, BEL.find_else_pin(nudging)), made)
+
+    # BACK, or arm a capture. Row 0 is the sensitivity and Enter means nothing
+    # on it -- the arrows are its control, and arming a capture there would
+    # bind a key to a row that has none.
+    leaving = keep(_at(_node(ed, FN_EQ_II), x0 + 4360, y0 + 1400))
+    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
+                           x0 + 4100, y0 + 1400)), "MenuRow", is_input=False),
+             _pin(leaving, "A"))
+    _set(leaving, "B", BACK_ROW)
+    back = keep(_at(ed.add_branch_node(), x0 + 4620, y0 + 1000))
+    _connect(_pin(leaving, "ReturnValue", is_input=False), _pin(back, "Condition"))
+    _connect(BEL.find_then_pin(go), _pin(back, "execute"))
+
+    to_title = keep(_at(ed.add_set_member_variable_node("MenuPage"),
+                        x0 + 4880, y0 + 1000))
+    _set(to_title, "MenuPage", PAGE_TITLE)
+    _connect(BEL.find_then_pin(back), _pin(to_title, "execute"))
+    home = keep(_at(ed.add_set_member_variable_node("MenuRow"),
+                    x0 + 5140, y0 + 1000))
+    _set(home, "MenuRow", 0)
+    _connect(BEL.find_then_pin(to_title), _pin(home, "execute"))
+
+    bindable = keep(_at(_node(ed, FN_NEQ_II), x0 + 4880, y0 + 1600))
+    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
+                           x0 + 4620, y0 + 1600)), "MenuRow", is_input=False),
+             _pin(bindable, "A"))
+    _set(bindable, "B", SENS_ROW)
+    arming = keep(_at(ed.add_branch_node(), x0 + 5140, y0 + 1600))
+    _connect(_pin(bindable, "ReturnValue", is_input=False), _pin(arming, "Condition"))
+    _connect(BEL.find_else_pin(back), _pin(arming, "execute"))
+    arm = keep(_at(ed.add_set_member_variable_node("Capturing"),
+                   x0 + 5400, y0 + 1600))
+    _set(arm, "Capturing", "true")
+    _connect(BEL.find_then_pin(arming), _pin(arm, "execute"))
 
 
 def _author_death_menu(ed, x0, y0, in_execs, mode_out):
@@ -1950,11 +2995,17 @@ def _author_draw(ed, x0, y0):
     _set(no_dbg, "DebugOn", "false")
     _connect(_pin(as_mode, "CastFailed", is_input=False), _pin(no_dbg, "execute"))
 
+    # The player's settings, onto the weapon component. Before the menu and
+    # before the dead/alive test, because it is the one thing on this event
+    # that has to happen on every frame in every state -- a sensitivity changed
+    # on the settings screen has to be in effect the moment the world unpauses.
+    pushed = _author_push_settings(ed, x0 + 3000, y0 + 14000,
+                                   (BEL.find_then_pin(copy_dbg),
+                                    BEL.find_then_pin(no_dbg)))
+
     # The main menu, before anything else is drawn and before the dead/alive
     # test: a title screen is neither.
-    playing = _author_main_menu(ed, x0 + 3000, y0 + 6000,
-                                (BEL.find_then_pin(copy_dbg),
-                                 BEL.find_then_pin(no_dbg)))
+    playing = _author_main_menu(ed, x0 + 3000, y0 + 6000, pushed)
 
     alive = _at(ed.add_branch_node(), x0 + 60, y0)
     dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
@@ -2150,7 +3201,11 @@ def build_hud_blueprint(rebuild=False):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
     _apply_defaults(bp, {"MenuOpen": False, "DebugOn": False,
-                         "Quality": DEFAULT_PRESET})
+                         "Quality": DEFAULT_PRESET,
+                         "MenuPage": PAGE_TITLE, "MenuRow": 0,
+                         "Capturing": False,
+                         "KeyPool": [_key(k) for k in KEY_POOL],
+                         "BindLabels": list(BIND_LABELS)})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

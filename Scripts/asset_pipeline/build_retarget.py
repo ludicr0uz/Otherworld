@@ -89,6 +89,16 @@ def abp_path(name):
 def melee_path(name):
     return f"{anim_dir(name)}/{anim_prefix(name)}MM_Attack_01"
 
+
+def aim_paths(name):
+    """Where this creature's retargeted ready poses land.
+
+    The batch operation neither searches nor replaces anything in these names,
+    so the output is the source's own name behind the creature prefix.
+    """
+    return tuple(f"{anim_dir(name)}/{anim_prefix(name)}{src.rsplit('/', 1)[1]}"
+                 for src in AIM_SOURCES)
+
 # name -> (start bone, end bone).  Identical keys on both sides: auto_map_chains
 # then pairs them by exact string match and never has to guess.
 CHAINS_MANNEQUIN = {
@@ -147,7 +157,19 @@ ROOT_MOTION_BONE_MANNEQUIN = "root"
 MANNEQUIN_ANIM_DIR = "/Game/Characters/Mannequins/Anims/Unarmed"
 ABP_SOURCE = f"{MANNEQUIN_ANIM_DIR}/ABP_Unarmed"
 MELEE_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01"
-RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE)
+
+# The two ready poses the player holds a weapon in.  Named here for the same
+# reason MM_Attack_01 is: nothing references them, because
+# build_weapons_and_combat.py plays them into DefaultSlot by path at runtime,
+# so the dependency walk cannot find them.
+#
+# They are retargeted for every creature rather than only for the one the
+# player wears.  A creature that never holds a gun pays two clips for it, and
+# the alternative -- a per-creature source list -- would make the set a
+# creature is built with depend on a decision taken in a different file.
+AIM_SOURCES = ("/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS",
+               "/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS")
+RETARGET_SOURCES = (ABP_SOURCE, MELEE_SOURCE) + AIM_SOURCES
 
 # What the NPC builder points a monster's SkeletalMeshComponent at.  Derived
 # from the source name and the prefix below, and asserted in verify() rather
@@ -954,6 +976,14 @@ def verify(created, monster, meshy_skel):
     for expected in (abp_path(monster), melee_path(monster)):
         if not unreal.EditorAssetLibrary.does_asset_exist(expected):
             bad.append((expected.rsplit("/", 1)[1], "expected by the NPC builder, not produced"))
+
+    # And the two the weapon builder addresses by path when this creature is
+    # the one the player wears. Same failure mode: a missing pose surfaces as a
+    # weapon pointing at the floor, a long way from here.
+    for expected in aim_paths(monster):
+        if not unreal.EditorAssetLibrary.does_asset_exist(expected):
+            bad.append((expected.rsplit("/", 1)[1],
+                        "expected by the weapon builder, not produced"))
 
     _log(f"  {ok}/{clips} clips upright, in place, with a real gait "
          f"({len(created)} assets total)")

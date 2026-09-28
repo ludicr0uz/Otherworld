@@ -1529,6 +1529,18 @@ def _write_unreal_verify_script(
                 check(f"{{variant['key']}} Has Melee Impact Sounds",
                       len(hits) > 0, f"(got {{len(hits)}})")
 
+                # ...and that both arrays are heard from where the creature is.
+                # A SoundWave with no AttenuationSettings is not quietly
+                # defaulted: it plays at full volume, centred, from anywhere on
+                # the 200 m map, which sounds exactly like a working sound
+                # until you walk away from it.
+                flat = [s.get_name() for s in voices + hits
+                        if s is None
+                        or s.get_editor_property("attenuation_settings") is None]
+                check(f"{{variant['key']}} Is Heard From Where It Stands",
+                      not flat and len(voices + hits) > 0,
+                      f"(unattenuated: {{flat}})")
+
                 # Footsteps, on the wanderer as well as on the player.
                 foot = None
                 for handle in unreal.get_engine_subsystem(

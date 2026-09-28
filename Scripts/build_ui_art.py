@@ -190,6 +190,126 @@ def bar_fill(w, h, colour):
     return _down(img, w, h)
 
 
+# ── The sniper's scope ──────────────────────────────────────────────────────
+#
+# One square texture: opaque black everywhere except a circular hole in the
+# middle, with the reticle drawn across the hole.  The HUD draws it as a square
+# of the viewport's HEIGHT and fills the two side strips with black rects, so
+# the circle stays a circle at any aspect ratio -- stretching this to the
+# viewport would make it an ellipse, and anything smaller would let the corners
+# of the world show past the surround.
+#
+# Black-and-transparent rather than black-and-a-tinted-lens: the game is a
+# night forest at 0.12 lux and the scope is the only way to see anything at
+# 200 m, so a lens tint would cost the player the very thing they scoped for.
+SCOPE_SIZE = 1024
+# Of the texture's width. Just under a half, so the rim has somewhere to sit
+# and the reticle's outer posts are not clipped by the edge.
+SCOPE_RADIUS = 0.468
+
+# The reticle is a duplex: four fat posts from the rim that taper to a fine
+# cross at the centre. The fat outer half is what the eye finds instantly under
+# recoil; the fine inner half is what the shot is actually taken with, and a
+# reticle that is fine all the way out is invisible against foliage.
+SCOPE_POST_INNER = 0.34    # where the fat post stops, as a fraction of radius
+SCOPE_TICK_STEP = 0.11     # mil-dot spacing, same units
+SCOPE_TICK_LONG = 0.055    # every fifth tick
+SCOPE_TICK_SHORT = 0.030
+
+# Black core with a faint white halo under it. A pure black reticle disappears
+# against a trunk and a pure white one disappears against the sky; the pair
+# reads against both, which is the whole reason scopes are etched this way.
+SCOPE_INK = (10, 11, 14)
+SCOPE_HALO = (235, 240, 250)
+
+
+def _scope_line(d, p0, p1, width, colour, alpha):
+    d.line((p0[0], p0[1], p1[0], p1[1]), fill=colour + (alpha,),
+           width=max(1, int(round(width))))
+
+
+def scope_overlay(size=SCOPE_SIZE):
+    """The sniper's scope: a black field with a hole in it and a reticle across it.
+
+    Drawn at 2x and reduced rather than the strip's 4x: at 1024 square that is
+    already a 4096 x 4096 intermediate, and the only edges that matter here are
+    the rim and four straight lines.
+    """
+    from PIL import Image, ImageDraw
+    s = 2
+    n = size * s
+    c = n / 2.0
+    r = n * SCOPE_RADIUS
+
+    # The surround, and the hole punched straight through its alpha. putalpha
+    # rather than drawing a transparent ellipse: ImageDraw composites nothing,
+    # it *replaces*, but only for the colour channels -- an ellipse filled with
+    # alpha 0 over black leaves black, not a hole.
+    img = Image.new("RGBA", (n, n), (0, 0, 0, 255))
+    hole = Image.new("L", (n, n), 255)
+    ImageDraw.Draw(hole).ellipse((c - r, c - r, c + r, c + r), fill=0)
+    img.putalpha(hole)
+
+    # A soft inner shadow just inside the rim, as concentric rings rather than
+    # a blur: a GaussianBlur wide enough to read here is a 40-pixel kernel over
+    # four megapixels, and the rings are indistinguishable once reduced.
+    shade = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shade)
+    rings = int(round(n * 0.045))
+    for i in range(rings):
+        t = i / float(rings)
+        rr = r - i
+        sd.ellipse((c - rr, c - rr, c + rr, c + rr),
+                   outline=(0, 0, 0, int(round(215 * (1.0 - t) ** 1.6))),
+                   width=s)
+    img.alpha_composite(shade)
+
+    ink = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    d = ImageDraw.Draw(ink)
+    post_w = n * 0.0135
+    fine_w = n * 0.0034
+    halo_w = fine_w + 3 * s
+    inner = r * SCOPE_POST_INNER
+
+    # Four arms, as (dx, dy) unit steps: right, left, down, up.
+    arms = ((1, 0), (-1, 0), (0, 1), (0, -1))
+    for layer, (colour, grow, alpha) in enumerate(
+            ((SCOPE_HALO, 3 * s, 90), (SCOPE_INK, 0, 240))):
+        for dx, dy in arms:
+            _scope_line(d, (c + dx * r, c + dy * r),
+                        (c + dx * inner, c + dy * inner),
+                        post_w + grow, colour, alpha)
+            _scope_line(d, (c + dx * inner, c + dy * inner), (c, c),
+                        fine_w + grow, colour, alpha)
+            # Graduations along the fine section, perpendicular to the arm, so
+            # the scope can be held off for range and for a moving target.
+            k = 1
+            while k * SCOPE_TICK_STEP * r < inner:
+                at = k * SCOPE_TICK_STEP * r
+                half = r * (SCOPE_TICK_LONG if k % 5 == 0 else SCOPE_TICK_SHORT)
+                px, py = c + dx * at, c + dy * at
+                _scope_line(d, (px - dy * half, py - dx * half),
+                            (px + dy * half, py + dx * half),
+                            fine_w + grow, colour, alpha)
+                k += 1
+        if layer == 0:
+            ink = ink.filter(_blur(halo_w * 0.4))
+            d = ImageDraw.Draw(ink)
+
+    # The reticle is clipped to the hole: the arms are drawn out to the rim and
+    # would otherwise paint over the surround, which is the one place they must
+    # not appear -- a line on the black border reads as a scratch on the lens.
+    img.alpha_composite(Image.composite(
+        ink, Image.new("RGBA", (n, n), (0, 0, 0, 0)),
+        Image.eval(hole, lambda v: 255 - v)))
+    return _down(img, size, size)
+
+
+def _blur(radius):
+    from PIL import ImageFilter
+    return ImageFilter.GaussianBlur(max(0.5, radius))
+
+
 # ── Weapon silhouettes ──────────────────────────────────────────────────────
 #
 # Side profiles facing right, drawn white on transparent so the HUD can tint
@@ -436,6 +556,9 @@ def main():
     for name, colour in BARS.items():
         bar_fill(240, 32, colour).save(os.path.join(OUT_DIR, f"{name}.png"))
         made.append(name)
+
+    scope_overlay().save(os.path.join(OUT_DIR, "T_UI_Scope.png"))
+    made.append("T_UI_Scope")
 
     for display, builder in ICONS.items():
         name = ICON_NAME_FOR(display)

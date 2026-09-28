@@ -427,7 +427,7 @@ toggles debug mode.
 
 It also draws the player's HP bar (see "The shotgun and health").
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 60 checks. Run it after any
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 102 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
@@ -452,6 +452,40 @@ panel can only tell the truth about current quality if it is the thing that esta
 menu does not call `SaveSettings`, so a choice lasts the session and every launch starts at Low
 again.
 
+### The settings screen, and what survives a restart
+
+The **main menu** has two rows now — **NEW GAME** and **SETTINGS** — moved with **Up/Down** and
+taken with **Enter/Space**. The left mouse button is no longer an accept key: with no cursor and
+no hit test a click cannot say which row it means.
+
+The settings page is nine rows on the same panel: **mouse sensitivity** (Left/Right, stepped by
+`MOUSE_SENSITIVITY_STEP` and clamped to `MOUSE_SENSITIVITY_MIN..MAX` — a floor above zero,
+because a sensitivity of 0 is a mouse that cannot navigate back off the page that set it), the
+**seven keybinds**, and **BACK**. Enter on a bind row arms a capture; the next key in `KEY_POOL`
+that goes down becomes the bind. The navigation keys are deliberately *not* in that pool — a
+menu whose own keys can be bound away is a menu that can be locked shut.
+
+All of it lives in **`BP_Settings`**, a `USaveGame` written to slot `OtherworldSettings` **on
+every change** rather than on leaving the page: a game quit from the settings screen still has
+to remember what was set. It is built by `build_weapons_and_combat.py`, not by the menu's own
+builder, because **both** of its consumers must be able to name the class and the weapons script
+runs first — that is what avoids a GameInstance and a build-order cycle.
+
+Two things about it are load-bearing and easy to undo by accident:
+
+- **The capture poll is branched on `Capturing` BEFORE the row is activated.** Enter is what
+  arms a capture and Enter is still "just pressed" for the rest of that frame, so a poll that
+  ran after the activation would bind the accept key to the row the caret was on — a settings
+  screen that eats itself the first time it is used.
+- **`BP_WeaponComponent` is PUSHED the values every `DrawHUD` frame**; it never loads the save
+  and never casts back to the HUD. Its seven `Key` variables (`BIND_VARS`) keep CDO defaults
+  equal to the keys documented below, so a pawn with no HUD in front of it still plays. Pushed
+  from `DrawHUD` and not from Tick for the usual reason: the menu is a paused world.
+- **`BP_Settings.Binds` is indexed, not keyed.** `BIND_VARS` in `build_weapons_and_combat.py` is
+  the contract — reorder it and every save already on disk silently rebinds itself. The HUD's
+  BeginPlay refills the array whenever its length is not exactly seven, which is what a save
+  written by an older build looks like.
+
 Note the consequence in PIE: these are global cvars, so whichever preset is active when you stop
 PIE is what your editor viewport keeps. `r.ScreenPercentage 100` and `r.ShadowQuality 3` restore
 it.
@@ -459,13 +493,15 @@ it.
 ## Weapons, inventory and combat
 
 `Scripts/build_weapons_and_combat.py` builds everything under `/Game/Weapons` and installs it;
-`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**383 checks**).
+`Scripts/verify_weapons_and_combat.py` reads the saved assets back (**480 checks**).
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
-**Controls:** left click fires — **held**, on the SMG and the assault rifle · **Q** cycles
-weapons · **G** drops · **E** picks up · **Shift** sprints · **R** reloads, and restarts from the
-death menu.
-(1/2/3, M and D belong to the graphics menu, so the weapon keys stay clear of them.)
+**Controls (the defaults — all seven are rebindable on the settings screen):** left click
+fires — **held**, on the SMG and the assault rifle · right click aims · **Q** cycles weapons ·
+**G** drops · **E** picks up · **Shift** sprints · **R** reloads, and restarts from the death
+menu. (1/2/3, M and D belong to the graphics menu, so the weapon keys stay clear of them.)
+These are CDO defaults on `BP_WeaponComponent`, pushed over every frame by the HUD from
+`BP_Settings` — see "The settings screen" above.
 
 **R** is shared between reload and restart, and that is safe rather than lucky: Event Tick does
 not run while the game is paused, so the weapon component is not listening on any frame the
@@ -474,7 +510,7 @@ and does run paused.
 
 | asset | what it is |
 |-------|------------|
-| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, DryFireSound, ReloadSound, AimPose, SlotColor, DisplayName, Dropped, UsesAmmo, **Automatic**, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime). No geometry, no graph. |
+| `BP_WeaponItem` | Actor. The base class: every property the weapon component reads (Damage, PelletCount, SpreadDegrees, WeaponRange, MuzzleOffset, GripLocation/Rotation, FireSound, DryFireSound, ReloadSound, AimPose, SlotColor, DisplayName, Dropped, UsesAmmo, **Automatic**, MagazineSize, Loaded, Reserve, FireInterval, ReloadSeconds, NextFireTime, AdsZoom, Scoped, **RecoilPitch**). No geometry, no graph. |
 | `BP_Shotgun` | child: 7 primitives, 8 pellets × 18 dmg, 5° cone, 40 m, rifle ready pose, 5+15 rounds, 0.85 s, 1.6 s reload. **Issued.** |
 | `BP_Pistol` | child: 5 primitives, 1 × 26 dmg, 1° cone, 60 m, pistol ready pose, unlimited ammo, 0.18 s. **Issued.** |
 | `BP_SMG` | child: 7 primitives, 1 × **12** dmg, 2.6° cone, 45 m, 30+90 rounds, **0.09 s**, 1.9 s reload. **Automatic. Found only.** |
@@ -483,7 +519,7 @@ and does run paused.
 | `BP_AmmoPickup` | 2 brass shells a killed wanderer leaves behind; walked into, not pressed for |
 | `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/reload/drop/pick up, **sprint + stamina** |
 | `BP_HealthComponent` | Health/MaxHealth, the damage stamp, death — despawn and respawn for a wanderer, **the death sequence and the pause** for the player |
-| `BP_BloodSplash` | 10 emissive spheres thrown out along the hit normal, arcing down as they swell, over 0.7 s |
+| `BP_BloodSplash` | 19 small lit droplets thrown out along the hit normal, each on its own velocity under drag and real gravity, over 0.45 s |
 | `Audio/A_*Fire` × 5, `A_DryFire`, `A_ReloadShotgun`, `A_ReloadRifle`, `A_ReloadPistol` | **cut from CC0 recordings of real firearms** by `Scripts/fetch_weapon_sounds.py`. `Scripts/make_weapon_sounds.py`, which synthesised the earlier set, is kept as history and is no longer wired in |
 
 **Weapons are Actors, not components.** The old shotgun was a component tree welded to the
@@ -503,6 +539,92 @@ needed is the code for *finding* one, which is a property of the drop and not of
 Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
 BeginPlay and then hidden/shown, never destroyed, so a weapon keeps its identity across
 switches and dropping can hand the very same actor to the world.
+
+### Where to tune combat, and recoil
+
+**`COMBAT`, a frozen `CombatConfig` dataclass at the top of
+`Scripts/build_weapons_and_combat.py`, is the one place the global combat numbers live** —
+lethality (`start_health`, `head_multiplier`, `limb_multiplier`), sprint and stamina, the ADS
+zoom/interp/cone figures, the mouse-sensitivity limits and compensation, and recoil. Change a
+field, re-run the builder. There is no in-editor equivalent on purpose: every one of these
+numbers is a *pin literal* baked into a compiled graph, and nothing under `Content/` is
+committed, so a designer's edit to a generated DataAsset would be erased by the next build and
+was never in the repository to begin with. The verifier asserts that the loose module constants
+this replaced are **gone**, so there can be no second, stale copy.
+
+Per-weapon numbers deliberately stay in `_weapon_specs()`. A sixth weapon is still a row.
+
+**Aiming costs half the walking speed** (`ads_move_speed_scale`), and it is applied as a
+*second* `MaxWalkSpeed` write, layered in `_author_ads` on top of the one `_author_sprint`
+already makes earlier in the same Tick. That ordering is why letting go of the aim key needs
+no code at all: sprint writes the speed unconditionally every frame, so the first frame the
+ADS branch does not run, the player is back at `BaseSpeed`. The write is gated on
+`not Sprinting AND IsValid(Held)` — the same "not sprinting" pin the zoom is gated on, so the
+two writes can never disagree about a frame, and a valid `Held` because the factor reads
+`AdsZoom`.
+
+It **eases**, on the scope overlay's fade curve rather than on the key:
+
+```
+progress = FClamp((BaseFOV / CurrentFOV - 1) / (AdsZoom - 1), 0, 1)
+MaxWalkSpeed = BaseSpeed * Lerp(1, ads_move_speed_scale, progress)
+```
+
+Note the division by `AdsZoom - 1`, which the mouse-sensitivity slowdown deliberately does
+*not* do. Normalising means full ADS is exactly half speed on the 4x scope and on 1.5x irons
+alike. Un-normalised — the raw `CurrentFOV/BaseFOV` the mouse uses — the sniper would be
+slower on its legs than the pistol, which is a zoom factor leaking into a mechanic that has
+nothing to do with zoom. Wanted for the mouse, wrong for the legs.
+
+The trap is the *other* way of writing it: scaling the **live** `MaxWalkSpeed` instead of
+`BaseSpeed`. This runs every frame, so that version compounds to a standstill in about a
+second, and it looks completely correct in the graph. The verifier walks the write's data
+inputs and asserts `BaseSpeed` is up there and `MaxWalkSpeed` is not.
+
+Proved at runtime with a temporary probe forcing `Aiming` off a sine of the world clock and
+logging the resulting speed each frame: held, it converged on 300.024 cm/s against a 600 cm/s
+base at FOV 60.0016 (i.e. 0.50004x, the residual being the interpolation's own tail);
+oscillated, the speed tracked the FOV up and down with no second code path. The probe was
+removed by re-running the builder, and the verifier now asserts `Aiming` is driven by the aim
+bind and by nothing standing in for it.
+
+**Recoil** kicks the view up by the weapon's own `RecoilPitch` and sideways by a random
+±`recoil_horizontal_ratio` of it, charges both to `RecoilDebt`/`RecoilYawDebt`, and pays them
+back on Tick with `FInterpTo` toward zero at `recoil_recovery_speed`:
+
+| weapon | kick | |
+|---|---|---|
+| Sniper | **2.4°** | one visible jolt, then 1.6 s to recover |
+| Shotgun | **2.2°** | |
+| Assault rifle | 0.85° | 6°/s sustained — the one that walks off target |
+| SMG | 0.45° | 5°/s sustained, stays controllable |
+| Pistol | 0.30° | |
+
+Only `recoil_recovery_fraction` (0.7) of each recovery step reaches the view. The debt always
+settles, so nothing accumulates across a magazine, but **30% of every kick stays in the
+player's aim** — that is what makes a burst climb and have to be pulled back down, rather than
+springing exactly home between rounds. Aiming down the sights multiplies the whole kick by
+`recoil_ads_scale` (0.65), through the same `SelectFloat` shape the cone uses.
+
+**The trap: never `AddPitchInput` / `AddControllerPitchInput`.** Both accumulate into
+`RotationInput`, which `APlayerController` multiplies by its deprecated `InputPitchScale` — and
+that is precisely the handle the mouse-sensitivity setting writes every frame. Recoil routed
+through it would be a fifth of its size for a player on 0.2 and three times its size for a
+player on 3.0. `_author_turn_view` reads `GetControlRotation`, adds the delta and writes
+`SetControlRotation` instead; the controller's own `LimitViewPitch` re-clamps the result on the
+next `UpdateRotation`, so a kick taken while already looking near-vertical cannot tip the camera
+over the top.
+
+Two evaluation-order traps, both load-bearing and both invisible in a correct-looking graph:
+`RandomFloatInRange` is **pure**, so the sideways draw is made once into `RecoilYawKick` and
+read from there — inline it twice and the view swings one way while the accumulator is charged
+another, and the recovery never cancels the kick. And the recovery **turns the view before it
+writes the debts**, because a give-back computed from `Get RecoilDebt` after the `Set` would
+read the value it had just been reduced to and come out as zero.
+
+Proved at runtime with a temporary probe (a seeded debt, re-seeded on settle, printing the
+control rotation): 1232 frames of smooth two-axis recovery, pitch and yaw holding their seeded
+3:5 ratio to four figures, 0 runtime errors. The probe was removed by re-running the builder.
 
 ### Aiming: the hybrid, and the reticle
 
@@ -534,6 +656,18 @@ camera's forward vector, and that *is* the centre of the screen. Drawing it at t
 the ray lands on, so the crosshair slid under its own parallax and jumped between a near trunk
 and the ground behind it. A crosshair you aim with has to hold still. Only its **colour** still
 reflects the world: red when the muzzle's line is blocked short of what the camera can see.
+
+A weapon whose `Scoped` flag is set — the sniper, and only the sniper — draws a **scope overlay
+instead of that crosshair**, never as well as it: the screen goes black except for a circular
+field of view with an etched duplex reticle in it. The art is one square texture
+(`T_UI_Scope`, an opaque black field with the hole punched through its alpha), drawn as a square
+of the viewport's **height** with the two leftover side strips filled with black rects. Stretched
+to the viewport its hole would be an ellipse, and drawn any smaller the corners of the world
+would show past it. The whole thing fades on
+`clamp((BaseFOV / CurrentFOV − 1) / (AdsZoom − 1), 0, 1)` — how far the camera has actually
+travelled toward this weapon's zoom, *not* the `Aiming` flag, so the glass and the zoom are one
+animation with nothing to keep in step. `Scoped` is a separate fact from `AdsZoom` on purpose:
+a weapon is free to be a 4× with irons or a 2× with glass.
 
 The camera boom is **over the right shoulder** (`aim_camera()`: arm 260 cm, socket offset
 `(0, 55, 60)`), because a centred third-person boom points the reticle straight at the player's
@@ -642,27 +776,89 @@ sprint code rather than at the copy.
 
 ### Dying, and the menu
 
-At 0 HP the player's health component used to do nothing at all — `DespawnOnDeath` is false
-for them, and that arm of the death branch simply ended, so they sat at 0 while the pack kept
-swinging. It now runs:
+**Everything that dies collapses the same way, and it is a ragdoll.** One shared subgraph in
+`BP_HealthComponent` (`_author_death_collapse`), walked into by both arms of the death branch:
 
 ```
-DisableMovement -> MM_Death_Front_01 into FullBodySlot -> Delay 2.2s
-    -> GameMode.PlayerDead = true -> "[PLAYER-DEAD] killed with N" -> SetGamePaused(true)
+DisableMovement -> Capsule.SetCollisionEnabled(NoCollision)
+    -> Mesh.SetCollisionProfileName("Ragdoll") -> Mesh.SetAllBodiesSimulatePhysics(true)
 ```
 
-Four things in that order, each for a reason:
+**There is no death animation in this project and no honest way to make one.** Meshy's rigging
+step generates a walk and a run and nothing else — nothing in `assets/cache/meshy`, and nothing
+among the 21 clips retargeted per creature, ends on the ground. Epic's own `MM_Death_*` set, the
+six clips the player used to play one of, is **hit reactions, not collapses**: measured off the
+assets, every one of them is about a second long and ends with the pelvis at 83–88 cm and both
+feet on the floor, having staggered 1.5–2 m backwards. That measurement is the whole diagnosis of
+"the player gets up right away" — the dynamic montage blended out after 1.1 s, the locomotion
+state machine underneath took the pose back, and he was standing again a second before the 2.2 s
+pause arrived to freeze him there. Retargeting one of those onto the creatures was tried and
+reverted: it produces a monster that staggers and stays up.
 
-- **DisableMovement, not DisableInput.** The body has to stop where it fell, but the HUD polls
-  the restart key off the same PlayerController, and turning input off risks it.
-- **`FullBodySlot`, a second slot.** `DefaultSlot` is filtered to the upper body so the aim
-  pose leaves the legs walking (see the ABP patch), and a death played into it folds the chest
-  over legs that are still standing. The new slot sits **after** the layered blend, where it
-  overrides everything. Getting one made from Python has a trick to it — see the gotcha below.
-- **The delay comes before the pause.** `MM_Death_Front_01` runs about 1.9 s; pausing on top of
-  it freezes the player mid-stumble, which reads as a hang rather than as a death.
+A ragdoll needs no asset. Every character here already carries a physics asset (`PA_Mannequin`,
+`SKM_Zombie01_PhysicsAsset`, `SKM_Wendigo01_PhysicsAsset`) and it is not optional —
+`install_hit_zones` reads the head and limb tables off those bodies, so a rig that could not
+ragdoll could not be shot in the head either. The verifier asserts the physics asset and a body
+count for both characters.
+
+Order and reasons:
+
+- **DisableMovement, not DisableInput.** CharacterMovement is still driving the capsule, and the
+  HUD polls the restart key off the same PlayerController — turning input off risks it.
+- **The capsule stops colliding, not the mesh.** It is the capsule, not the mesh, that blocks the
+  player and that the pellets trace against (see `make_shootable`), so switching it off is both
+  halves of "a corpse is not in the way": you walk through it and you cannot waste ammunition
+  on it.
+- **The profile before the simulation.** `Ragdoll` is what makes the bodies collide with the
+  terrain and ignore Pawn; set it after simulation starts and the first frame resolves against
+  `CharacterMesh`, which collides with nothing.
+- **`SetAllBodiesSimulatePhysics`, never `SetSimulatePhysics`.** The latter is not a UFunction on
+  `SkeletalMeshComponent` at all, and the `PrimitiveComponent` one would simulate the single root
+  body — a creature-shaped brick toppling over.
+
+### A wanderer's corpse: 60 seconds
+
+`_author_corpse` runs on the `DespawnOnDeath` arm, after the kill has been counted and the
+replacement is already out, so the pack is back to strength while the body is still falling:
+
+```
+GetController -> IsValid? -> DestroyActor(the controller) -> Owner.SetLifeSpan(60)
+```
+
+- **The AI controller is destroyed, not stopped.** The chase, the melee and the growls are one
+  self-re-entering loop on the controller and *none of them consult the pawn's health* — a corpse
+  whose controller survived would keep hitting the player from the floor. Destroying an
+  `AController` unpossesses it on the way out, and it leaves nothing to leak one controller per
+  kill over a session. `UnPossess` alone would close the loop's possession gate too, but that
+  controller would sit there running its `Delay` for the rest of the game.
+- **`SetLifeSpan`, not a `Delay`.** A latent action here belongs to the component of the actor it
+  is waiting to destroy; `SetLifeSpan` is the engine's own timer for exactly this.
+- **`GetController`, not the `Controller` member.** `APawn::Controller` is not
+  `BlueprintReadOnly`: a get-variable node for it compiles as a warning today and an error in a
+  future release.
+- The HUD's floating health bar is gated on `NOT Dead` as well as on recency — a corpse was shot
+  a moment ago by definition, so without that every body wears an empty bar for five seconds.
+
+### The player's death
+
+```
+(the collapse above) -> Delay 2.2s -> GameMode.PlayerDead = true
+    -> "[PLAYER-DEAD] killed with N" -> SetGamePaused(true)
+```
+
+- **The delay still comes before the pause, and it now does double duty.** Pausing stops physics
+  as well as everything else, so it is also how long the ragdoll gets to settle; pausing early
+  freezes the player mid-topple, which reads as a hang.
+- **The body stays down because there is nothing left to stand it up.** No montage, so nothing to
+  blend out of; the pause then holds it exactly as it fell until the level reopens. Measured in a
+  `-game` run: the player's head sat at 151.9 cm for twelve seconds, and 2.20 s after death — the
+  last frame before the pause — it was at 1.1 cm.
 - **The log line exists because the menu cannot be seen headlessly.** A paused game and a game
   where the death path silently did nothing produce identical logs otherwise.
+- `FullBodySlot` is still spliced into `ABP_Unarmed` and still asserted. Nothing plays into it
+  now, and a slot with nothing playing passes its pose straight through, so it costs nothing —
+  it is the only full-body slot either character has and the next thing that needs to override
+  the legs will want it.
 
 The menu itself is drawn by the HUD off `GameMode.PlayerDead`: **YOU DIED**, the final kill
 count, and `[R] try again`, which unpauses and reopens the current level by name. Unpausing
@@ -704,23 +900,154 @@ animation from ~8 m under the terrain, looking at its underside.
 
 ### Blood
 
-Ten emissive spheres in a cone, and the **actor** is animated rather than the spheres:
+Nineteen droplets — fourteen of spray in a 34 deg cone plus five slow fine ones that hang at the
+wound — each 1–3 cm across, dark desaturated crimson (`M_Blood`, linear
+`(0.150, 0.014, 0.012)` ≈ sRGB `#6C2825`), **lit and not emissive**, roughness 0.22 so the wet
+highlight is what makes it readable at night. Every droplet flies the closed form of
+`dv/dt = g - k*v` with `k = 3.6 /s` and real `g = 980 cm/s²`:
 
 ```
-position = Origin + Forward * 130 cm/s * Age - Z * 260 * Age^2
-scale    = 0.55 + Jitter + 2.6 * sin(pi * Age / 0.7)
+A(t)  = (1 - e^(-k t)) / k          # two scalars, computed once for the whole burst
+B(t)  = (t - A) / k
+local = Velocity * A + Fall * B     # one multiply-add per droplet, in a ForEachLoop
+scale = built size * clamp((0.45 - Age) / 0.14, 0, 1)
 ```
+
+**Each droplet carries its own launch velocity in its build-time relative location**, divided by
+100 — so the baked number reads as m/s, there is no parallel table that can fall out of step with
+the components, and the frame before `BeginPlay` runs the droplets are a 1–9 cm clump at the
+wound instead of a nine-metre sphere. `BeginPlay` walks `GetComponentsByClass` once and fills
+`Blobs` / `Velocity` / `Size` together, and caches gravity rotated into the actor's frame
+(`Fall`) so no transform inverse runs per frame.
 
 `_author_impact` spawns the splash rotated so its forward **is the surface normal it hit**
 (`MakeRotFromX`), so blood comes out of the wound rather than along a world axis, and a shot to
-the chest and one to the back throw it opposite ways. The parabola is what makes it read as
-blood instead of an expanding ball; the sine does grow-then-vanish in one pure expression, with
-no branch and no Timeline (whose curve asset cannot be authored from Python). `Jitter` is one
-`RandomFloatInRange` **stored in a variable** — pure, so a second read would be a second dice
-roll, and without it a shotgun's eight pellets into one torso read as a single big sphere.
+the chest and one to the back throw it opposite ways. It also sizes the whole actor by
+`clamp(Damage / 24, 0.65, 1.6)`, which scales launch distance and droplet size together.
 
 The cone layout is generated from a fixed seed at build time, which is how the verifier can
 recompute it and compare component by component.
+
+**Why not Niagara.** UE 5.8 hands Python a `NiagaraSystem` with no emitter handles and no exposed
+parameters, and the API that *can* build an emitter stack —
+`UNiagaraExternalSystemEditorUtilities` (`AddEmitter`, `AddModule`, `SetStackInputData`) — is
+plain C++ statics with no `UFUNCTION`, so none of it is callable. Duplicating a template such as
+`/Niagara/DefaultAssets/Templates/Systems/DirectionalBurst` yields an asset nothing can then
+retune. Cascade is worse: the runtime classes survive but the editor module and every
+`ParticleModule*` reflection type are gone. A system no script can rebuild is not allowed here,
+so the droplets are components and the solver is in the graph.
+
+**Trap.** The A pin of the Kismet math nodes will not hold a literal — `set_pin_value` reports
+success and the pin reads back empty, which compiles as zero. `A = (1 - e^(-kt))/k` is therefore
+written `(e^(-kt) - 1) / -k`, and the fade likewise, so every constant sits on a B pin.
+
+### The player's body: a generated adventurer, not the mannequin
+
+The player wears **`SKM_Adventurer01`**, a Meshy-generated photorealistic
+adventurer — hooded field jacket, chest rig, gloves, worn boots — animated by
+**`A_Adventurer01_ABP_Unarmed`**, which is `ABP_Unarmed` retargeted onto its
+skeleton by the same `build_retarget.py` that dresses the monsters. It is
+generated by `catalog.ADVENTURER` through the ordinary four Meshy stages
+(preview → refine → remesh → rig, 40 credits) and is only the *player* because
+`build_weapons_and_combat.py` wears it and `npc_placement.NPC_VARIANTS` does not
+list it.
+
+**Everything about the player's body is one record, `PlayerSkin`** — mesh, anim
+BP, grip point, both ready poses, mesh offset and yaw. They used to be four
+literals scattered through the weapons builder that happened to agree about the
+mannequin. `player_skin()` resolves `SKIN_ADVENTURER` if all four of its assets
+exist and falls back to `SKIN_QUINN` otherwise, all-or-nothing: `/Game/Sourced`
+is git-ignored, so a clone that has not run the asset pipeline is a mannequin
+again, and a *partly* resolved skin — the adventurer's mesh under the
+mannequin's anim BP — compiles, runs, and stands in its bind pose forever.
+
+**Why the animation was moved to the mesh and not the mesh to the skeleton.**
+The obvious integration is to put the new body on `SK_Mannequin`, which
+everything here already depends on. It is not reachable from this toolchain,
+and this was established before a credit was spent:
+
+- Meshy's rigging endpoint takes an input mesh and a height. There is no
+  skeleton-convention parameter, so the result is always its own **24-bone
+  Mixamo-named rig** — `Hips, Spine02, Spine01, Spine, LeftArm…LeftHand, neck,
+  Head`, and **no fingers and no twist bones**.
+- The FBX importer *merges* an incoming bone tree into the skeleton it is
+  given. 24 differently-named bones do not merge into `SK_Mannequin`'s 161.
+- UE 5.8 exposes **no skin transfer to Python**. `IKRetargetBatchOperation`
+  retargets animation assets only, and `IKRetargeterController` has no mesh
+  export — the editor's "retarget skeletal mesh" button has no scripted
+  equivalent, and reaching the C++ behind it needs a module this project does
+  not have.
+
+So the risk was the other way round, and it turned out to be small, because the
+three things that looked skeleton-bound are all rig-agnostic already:
+`hit_zones()` derives head and limb tables from *whatever mesh the character is
+wearing*, the ragdoll is `SetAllBodiesSimulatePhysics` on *that mesh's* physics
+asset, and the locomotion is a retargeted anim BP that `fix_retargeted_abp()`
+has re-pointed from `spine_01` at `Spine02`. Measured on the built asset: head
+`Head` ×1.5, ten limb bodies ×0.75, `Hips/Spine01/Spine02/neck/LeftShoulder/
+RightShoulder` ×1.0.
+
+**The grip is a bone, not a socket, and the rotation is solved rather than
+written down.** The mannequin has a `HandGrip_R` socket sitting in its fist; a
+Meshy rig has no sockets, and **Python cannot make one** — `SkeletalMeshSocket`
+exposes both `SocketName` and `BoneName` read-only, so there is no way to say
+which bone a new socket hangs off. `AttachToComponent` resolves a socket name
+and a bone name out of the same namespace, so the weapon attaches to
+`RightHand` instead, and `_BoneGrip` stands in for the socket everywhere the
+builder asks one for its bone and its rotation. Identity rotation is not an
+approximation: `_grip_rotation` *solves* for the transform that puts the barrel
+on the player's forward in a given ready pose, so the hand bone's own frame is
+taken out by the solve. Measured on the adventurer, the rifle pose's three hand
+axes read 0.55, −0.78 and −0.31 along the player's forward — **no axis is the
+aim**, which is exactly why the socket-era rule ("the weapon rides the socket's
++Y") could not be carried over, and the verifier now asserts that inverted fact.
+What identity costs is position, not aim: the weapon hangs off the wrist joint
+rather than the middle of the palm.
+
+**The honest cost is the hand.** A 24-bone rig cannot close a fist, so the
+adventurer holds its weapon with an open hand. This is a property of what
+Meshy's rigger returns, not of the integration, and there is no asset in the
+project that would fix it.
+
+**The two ready poses are retargeted like everything else.**
+`MF_Rifle_Idle_ADS` and `MF_Pistol_Idle_ADS` are played into `DefaultSlot` by
+path at runtime, so — like `MM_Attack_01` — nothing references them and the
+dependency walk cannot find them. They are named in `build_retarget.AIM_SOURCES`
+and every creature gets a copy, which is why the retargeted set is now **23
+clips** per character rather than 21.
+
+**Build order matters, and it is self-bootstrapping.** The weapons builder
+patches `ABP_Unarmed`; the retargeter copies that patched graph onto each
+skeleton; the weapons builder then wears the result. On a from-nothing build
+that is `build_weapons_and_combat.py` (mannequin fallback) → `fetch_monsters.py`
+→ `import_characters.py` → `build_creature_materials.py` → `build_retarget.py`
+→ `build_npc_blueprints.py` → `build_weapons_and_combat.py` again. The second
+weapons run is what puts the player in the adventurer and re-solves all five
+grips against it. **`build_retarget.py` deletes and rebuilds `Anims/<Creature>/`
+every run**, so `build_npc_blueprints.py` has to follow it or the wanderers are
+left pointing at anim classes that no longer exist — which shows up as four
+failures in the *level* verifier, not the weapons one.
+
+**Proved at runtime**, in a live `-game` session driven through the inbox (the
+`-game` process runs `init_unreal.py` and therefore listens on `Saved/uepy`, so
+`uepy.py` can question a running game the same way it questions the editor —
+just not with `unreal.EditorLevelLibrary`, whose `get_game_world` SIGSEGVs
+there; `unreal.find_object(None, "<map>.<map>")` returns the world instead):
+
+| | evidence |
+|---|---|
+| animates | `SKM_Adventurer01` driven by `A_Adventurer01_ABP_Unarmed_C`; over 14 s of bounded shuttling at up to 600 cm/s the foot gap swept −7.2…+16.9 cm and crossed zero, i.e. the feet alternate |
+| ragdolls | head 67.1 cm above the actor standing, **−78.0 cm** on the frame the death pause froze the world — a 145 cm collapse against an 88 cm capsule half-height |
+| hit zones | live traces on the standing player: `Head`→`Head` ×1.5, both forearms→arm bodies ×0.75, both legs→leg bodies ×0.75, chest→`Spine02` ×1.0 |
+
+**Looking at a generated character.** `Scripts/dev/render_character.py` renders
+every skeletal mesh under `/Game/Sourced/Characters` to
+`Saved/Renders/<Mesh>.png` through a SceneCapture2D — `take_high_res_screenshot`
+needs a viewport and cannot run in this harness. Two traps: the world context is
+**not** optional on `create_render_target2d`/`export_render_target` (pass `None`
+and the capture still fills the target while the export writes nothing and says
+nothing about it), and `show_only_actors` refuses `set_editor_property` on a
+component template — `show_only_actor_components()` is the way in.
 
 ### Hit boxes
 
@@ -918,6 +1245,55 @@ Four decisions are baked into the samples rather than into the graph:
   weapon, or a full magazine — nothing moves, and a sound there would be the game claiming it
   had done something it had not.
 
+### Distance and direction: the three attenuation profiles
+
+Every sound in the game is made by something standing somewhere, and every one of them fades
+with distance and pans with direction. **None of that is hand-rolled.** It is three
+`USoundAttenuation` assets in `/Game/Audio`, built by `build_sound_attenuations()` and named on
+each `SoundWave` by `apply_attenuation()`:
+
+| asset | full volume to | inaudible past | used by |
+|---|---|---|---|
+| `A_Att_Gunfire` | 2 m | **100 m** | the five gunshots |
+| `A_Att_Creature` | 1.5 m | 40 m | growls, roars, melee thuds |
+| `A_Att_Foley` | 1 m | 15 m | footsteps, the dry click, the reload clacks |
+
+All three are `NATURAL_SOUND` (the engine's dB curve, reaching −60 dB at the edge), spherical,
+and spatialised on the mixer's own panner. `A_Att_Gunfire` alone turns on the distance low-pass
+(20 kHz → 2.5 kHz), which is why distant gunfire is a thump and not a crack.
+
+**The trap this fixes, and it is a silent one.** A `USoundBase` whose `AttenuationSettings` is
+`None` is *not* attenuated by some default — distance falloff and spatialisation are parsed out
+of the attenuation settings and out of nothing else, so a sound without them plays at **full
+volume, dead centre, from anywhere on the 200 m map**. Every call site was already
+`PlaySoundAtLocation` and every sample was already mono; the audio was flat because no
+attenuation asset existed at all.
+
+**Set on the asset, not on the node.** `PlaySoundAtLocation` carries an `AttenuationSettings`
+pin that overrides the `SoundBase`, but there are five call sites across three Blueprints
+authored by two builders, so the pin is five chances to miss one. `apply_attenuation()` sweeps
+the two audio *folders* and raises on a wave it has no profile for, so a sound added later
+stops the build rather than shipping audible from everywhere.
+
+**Nothing is 2D.** There are no menu clicks and the HUD is drawn silently, and the player's own
+weapon is a third-person weapon in a third-person game — it is out there in the world at the
+end of the player's arms, and the muzzle is ~1.5 m from the listener where the gunfire curve
+is still 1.0. The player's own **footsteps** are the judgement call: they share the component
+and the profile with the wanderers', so they attenuate over the ~3 m camera boom. Kept that
+way, because the alternative is a second footstep path whose only job is to be wrong about
+where the player's feet are.
+
+**Two things worth knowing next time.** `dBAttenuationAtMax` is spelled `d_b_attenuation_at_max`
+in Python. And `USoundBase.max_distance` is *not* a field the builder writes — the engine
+caches it off whatever attenuation resolves, and it is what the audio device culls against, so
+reading it back (10000 / 4000 / 1500) is end-to-end proof the link took rather than a re-read
+of the struct that was just written. The runtime proof used the same machinery from the other
+side: `AreAnyListenersWithinRange` — the test `PlaySoundAtLocation` itself makes — answered
+true at 5 m and false at 16 m against the foley reach, true at 90 m and false at 105 m against
+the gunfire reach, on all eleven footstep components in a live `-game` world. **It is an
+impure node**: leave its exec pin unwired and the compiler prunes it and the pin reads as the
+default `false`, which looks exactly like "nothing is audible anywhere".
+
 ### Holding the trigger: automatic weapons
 
 `BP_SMG` and `BP_AssaultRifle` are automatic; the other three are not. **This cost no new
@@ -1011,6 +1387,11 @@ centred and bottom-anchored at any window size.
 
 ## Current state
 
+- The player is a **Meshy-generated photorealistic adventurer** (`SKM_Adventurer01`,
+  animated by a retargeted `A_Adventurer01_ABP_Unarmed`) rather than the Epic mannequin —
+  see *The player's body* above for why the body moved to the animation and not the other
+  way round, and for the one thing that cost: a 24-bone rig cannot close a fist, so the
+  weapon is held in an open hand.
 - The player carries a **shotgun and a pistol**, switchable with Q, droppable with G and
   recoverable with E; both weapons fire with sound, blood and muzzle-origin spread, and the
   character holds the matching ready pose while moving. **Shift sprints** at 900 cm/s against a
@@ -1023,7 +1404,7 @@ centred and bottom-anchored at any window size.
   **2 shells** that are picked up by walking over them; the pistol stays unlimited. **D** in the
   graphics menu toggles debug mode, which is the only thing that shows pellet tracers or the
   wanderers' numbers. Built by
-  `build_weapons_and_combat.py` — **383/383** in-engine checks, **60/60** HUD checks.
+  `build_weapons_and_combat.py` — **480/480** in-engine checks, **117/117** HUD checks.
   The **SMG and the assault rifle fire while the button is held**; the other three are
   tap-only. All nine weapon sounds are cuts from **CC0 recordings of real firearms**, with a
   reload per weapon class. A player who walks off the edge of the terrain now **dies** instead

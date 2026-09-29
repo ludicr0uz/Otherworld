@@ -82,6 +82,11 @@ BeginPlay → [possessed? no → Delay] → [dead? → corpse, loop ends] → st
   | sound | the latest noise's reach × `hearing_scale` |
 
 - **Patrol traps:**
+  - **NPCs that stand still while patrolling mean there's no navmesh under them.** Check that
+    first, in the world you're playing: `PatrolTarget == PatrolHome` and
+    `get_random_reachable_point_in_radius` returning `None`. See `bForceRebuildOnLoad` in
+    `forest_generator/CLAUDE.md`. `verify_npc_blueprints.py` passes regardless, because it checks
+    only the graph.
   - `GetRandomReachablePointInRadius` is pure. Read only `RandomLocation`, once, into
     `PatrolTarget`.
   - On failure it returns the centre, or the zero vector (the player's spawn). Refuse points

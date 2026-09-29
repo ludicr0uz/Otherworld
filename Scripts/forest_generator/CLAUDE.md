@@ -65,6 +65,14 @@ script.
     reuses them: 0 tiles, and frozen NPCs.
   - The import script strips nav data immediately before saving, and runtime generation is
     `DYNAMIC`, set in the level and in `DefaultEngine.ini`.
+- **The editor and PIE need `bForceRebuildOnLoad=True`** (`DefaultEngine.ini`).
+  - `-game` spawns a fresh RecastNavMesh and builds it.
+  - The editor treats the one it re-creates on open as loaded, skips the load-time rebuild and
+    stays at 0 tiles.
+  - PIE copies the editor's navmesh and builds nothing of its own. Without the flag, every
+    wanderer's patrol query fails in PIE and the pack stands still.
+  - PIE gets only the tiles that exist when Play is pressed. The 1 km map needs about 2 min after
+    opening. Check with `project_point_to_navigation` at the NPCs' spawn points.
 - **The nav system overwrites `agent_radius`/`agent_height` with its default agent.** To change
   them, widen Supported Agents in the project settings.
 - **Measure a navmesh by projecting points at it,** not by reading its settings:

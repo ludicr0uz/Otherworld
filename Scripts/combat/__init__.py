@@ -29,7 +29,8 @@ ASSETS AND PATCHES
   audio             sound names, attenuation profiles, import + link
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
   skin              the player's body (PlayerSkin, wear_skin)
-  grip              hand-grip socket maths for holding a weapon
+  grip              hand-grip socket maths for holding a weapon: GripRotation
+                    and GripLocation (the handle seated in the fist)
   settings_savegame BP_Settings
   weapon_items      BP_WeaponItem and one child per weapon
   blood             BP_BloodSplash

@@ -3,6 +3,8 @@
 import unreal
 
 from combat.paths import ITEM_BP_PATH
+from combat.skin import player_skin
+from combat.verify.grip_fit import check_handles_in_fist
 from combat.verify.common import BEL, cdo, check, component_template, components, load
 from survival.consumable_specs import consumable_specs
 from survival.paths import CONSUMABLE_BP_PATH
@@ -49,3 +51,7 @@ def run():
                     if (t := component_template(bp, p)) is not None
                     and t.get_collision_enabled() != unreal.CollisionEnabled.NO_COLLISION]
         check(f"{name}'s parts collide with nothing", not blocking, str(blocking))
+    # Held by its grip_part, which the build seats in the pistol pose's fist.
+    check_handles_in_fist([(s["display"], s["path"], player_skin().aim_pistol,
+                            s["parts"], s["grip_part"], None)
+                           for s in consumable_specs()])

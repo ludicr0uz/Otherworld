@@ -22,6 +22,16 @@ Neither is visible in a static check of the grip: both rounds of solving it
 produced self-consistent numbers and a gun pointing sideways. What settled it
 was PrintString on Tick and reading yaws out of a -game run.
 
+WHERE THE WEAPON SITS
+---------------------
+Rotation says where the barrel points; GripLocation says what the fingers
+close round. It is solved too (_grip_location): in the ready pose each
+closing finger's three joints lie on a circle, and the centre of that circle
+is the axis the finger curls round. The mean of the four centres is the
+middle of the fist, and the weapon is moved so its handle is there. Left at
+the socket, a hand BONE held the handle 5-9 cm off the fingers, over the back
+of the hand, because a bone's origin is the wrist and not the palm.
+
 This module holds the socket and grip maths behind that.
 """
 
@@ -76,7 +86,7 @@ class _BoneGrip:
     *solves* for the transform that puts the barrel on the player's forward in
     a given pose, so whatever frame the hand bone happens to be authored in is
     taken out by the solve. What identity costs is position, not aim: the
-    weapon hangs off the wrist joint rather than the middle of the palm.
+    bone's origin is the wrist joint, which _grip_location solves out too.
     """
 
     def __init__(self, bone):
@@ -208,3 +218,80 @@ def _grip_rotation(aim_pose_path):
     _log(f"{aim_pose_path.rsplit('/', 1)[-1]}: grip pitch {grip.pitch:.1f}, "
          f"yaw {grip.yaw:.1f}, roll {grip.roll:.1f}")
     return grip
+
+
+# ─── What the fingers close round ────────────────────────────────────────────
+
+def _curl_centre(a, b, c):
+    """Centre of the circle through three joints: what a curled finger wraps.
+
+    A finger held straight has no such circle, and a weapon cannot be put in
+    a hand that is not closed, so that raises rather than guessing.
+    """
+    ab, ac = b - a, c - a
+    n = ab.cross(ac)
+    nn = n.dot(n)
+    if nn < 1e-4:
+        raise RuntimeError("a gripping finger is straight in the ready pose -- "
+                           "the fingers are not closing (see finger_verify.py)")
+    return a + (n.cross(ab) * ac.dot(ac) + ac.cross(n) * ab.dot(ab)) * (0.5 / nn)
+
+
+def fist_in_socket(aim_pose_path):
+    """(fist centre, [[joint, joint, joint] per finger]) in the grip socket's
+    frame during a given pose -- the frame GripLocation is written in.
+
+    Sampled from the animation for the same reason socket_in_mesh() is: the
+    ready pose, not the reference pose, is the one the weapon is held in.
+    """
+    _mesh_yaw, socket = _grip_socket()
+    anim = _assets().load_asset(aim_pose_path)
+    if not anim:
+        raise RuntimeError(f"could not load the pose {aim_pose_path}")
+    pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(
+        anim, 0.0, unreal.AnimPoseEvaluationOptions())
+
+    def at(bone):
+        return unreal.AnimPoseExtensions.get_bone_pose(
+            pose, bone, unreal.AnimPoseSpaces.WORLD)
+
+    socket_xf = unreal.MathLibrary.compose_transforms(
+        unreal.Transform(location=socket.get_editor_property("relative_location"),
+                         rotation=socket.get_editor_property("relative_rotation"),
+                         scale=unreal.Vector(1.0, 1.0, 1.0)),
+        at(socket.get_editor_property("bone_name")))
+    into_socket = unreal.MathLibrary.invert_transform(socket_xf)
+    fingers = [[unreal.MathLibrary.transform_location(into_socket, at(b).translation)
+                for b in joints] for joints in player_skin().grip_fingers]
+    centres = [_curl_centre(*joints) for joints in fingers]
+    fist = unreal.Vector(0.0, 0.0, 0.0)
+    for c in centres:
+        fist = fist + c
+    return fist * (1.0 / len(centres)), fingers
+
+
+def part_placement(parts, name):
+    """(centre, rotation, half extents in cm) of one primitive part in the
+    weapon's own frame. A Cube is 100 cm and a Cylinder 100 cm tall with a
+    50 cm radius, so for either the half size is 50 x its scale."""
+    for part, _mesh, loc, rot, scale, _mat in parts:
+        if part == name:
+            return (unreal.Vector(*loc), rot,
+                    unreal.Vector(*(50.0 * s for s in scale)))
+    raise RuntimeError(f"no {name!r} part to hold the weapon by")
+
+
+def _grip_location(aim_pose_path, grip_rot, parts, part="Grip"):
+    """The GripLocation that puts `part` in the middle of the fist.
+
+    The weapon is attached at the socket, then moved by GripLocation and turned
+    by GripRotation, both in the socket's frame; so a point p of the weapon
+    lands at GripLocation + GripRotation(p). Solved for the handle's centre
+    landing on the fist's.
+    """
+    fist, _fingers = fist_in_socket(aim_pose_path)
+    centre = part_placement(parts, part)[0]
+    loc = fist - _rotate_vector(grip_rot, centre)
+    _log(f"{aim_pose_path.rsplit('/', 1)[-1]}: {part} seated at the fist, "
+         f"GripLocation ({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})")
+    return loc.to_tuple()

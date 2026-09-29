@@ -118,7 +118,23 @@ The verifier asserts the old loose constants are gone.
 - **`GripRotation` is solved per weapon** against that weapon's sampled ready pose, putting the
   weapon's +X on the player's forward.
   - On the mannequin, `HandGrip_R` carries forward on its **+Y** axis.
-  - On the adventurer, no hand axis is the aim, and the verifier asserts that.
+  - On the adventurer, the hand bone's +Y runs down the aim too, since the retarget's palm
+    calibration turns the whole hand onto the mannequin's. Nothing depends on that.
+- **`GripLocation` is solved too** (`grip._grip_location`): it puts the weapon's `Grip` part in
+  the middle of the fist in the ready pose.
+  - Each closing finger's three joints lie on a circle. The centre of that circle is what the
+    finger curls round, and the fist centre is the mean of the index-to-pinky centres
+    (`PlayerSkin.grip_fingers`).
+  - The ready poses hold the index finger on the trigger, 0.5–1.9 cm from `TriggerGuard`.
+    Centring on the other three fingers alone moved it 2–3 cm off, and sank the pistol grip
+    1.2 cm into the ring finger.
+  - Consumables are seated the same way by their `grip_part` (the mushroom's `Stem`, the
+    canteen's `Neck`).
+  - `verify/grip_fit.py` re-measures the saved values. It checks that the handle is centred,
+    that no joint sinks more than 0.5 cm into the part's box, that every wrapping joint is
+    within 3.5 cm of it, and that the index is at the trigger guard.
+  - **Before the solve,** a hand bone's origin is the wrist, so the grip hung 8–14 cm from the
+    fingers, over the back of the hand.
 - **The weapon is rigidly attached and never rotated on its own.** Aiming it per frame was tried
   and reverted. `face_the_camera()` makes the body follow the camera's yaw instead.
 - **Known limits:**
@@ -284,7 +300,7 @@ The verifier asserts the old loose constants are gone.
   - `fix_retargeted_abp()` re-points `spine_01` to `Spine02`.
 - **The grip is a bone (`RightHand`), not a socket**, because Python can't create a socket.
   `_BoneGrip` stands in for one.
-  - The weapon hangs off the wrist.
+  - The weapon is attached at the wrist, then moved into the fist by `GripLocation`.
   - The fingers close the way the mannequin's do in the retargeted ready pose.
     `finger_verify.py` checks each finger's curl against the mannequin's.
 - **The two ready poses and the six hit reactions are retargeted onto every creature**
@@ -297,6 +313,11 @@ The verifier asserts the old loose constants are gone.
     `build_npc_blueprints` must follow it. Otherwise four checks fail in the *level* verifier.
 - **Looking at a character:** `Scripts/dev/render_character.py` renders every character mesh to
   `Saved/Renders/`.
+  - **To see a pose on it,** call `override_animation_data(anim, True, True, 0, 1)` on a
+    `SkeletalMeshActor` already set to single-node with `play_animation`, set
+    `visibility_based_anim_tick_option` to `ALWAYS_TICK_POSE_AND_REFRESH_BONES`, and capture in
+    a **later** `uepy` job. Nothing poses in the job that spawns the actor. A scene capture is
+    not "rendered", so the default option never evaluates the pose.
   - The world context is **not** optional on `create_render_target2d`/`export_render_target`.
   - Use `show_only_actor_components()`.
 

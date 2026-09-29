@@ -10,7 +10,7 @@ from combat.audio import (
     SND_RELOAD_PISTOL, SND_RELOAD_RIFLE, SND_RELOAD_SHOTGUN,
 )
 from combat.graph import _log, _rot
-from combat.grip import _barrel_rotation, _grip_rotation
+from combat.grip import _barrel_rotation, _grip_location, _grip_rotation
 from combat.paths import (
     AUDIO_DIR, CUBE, CYLINDER, MAT_METAL, MAT_WOOD, PISTOL_BP_PATH,
     RIFLE_BP_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH, UI_ART_DIR,
@@ -154,8 +154,9 @@ def _weapon_specs():
 
     Each grip is solved against that weapon's own ready pose, so the two differ
     because the poses differ -- not because a fudge factor was added to one of
-    them. GripLocation stays at the socket for both: HandGrip_R sits in the fist
-    already, and an invented offset is one more number nobody can later explain.
+    them. GripLocation is solved the same way, never typed in: each weapon's
+    "Grip" part is moved to where the fingers close in its ready pose
+    (grip._grip_location), which is filled in below once the rotation is known.
 
     The ammunition columns are here too rather than branched on DisplayName
     anywhere in the graphs: the firing code asks the weapon whether it uses
@@ -193,11 +194,11 @@ def _weapon_specs():
     """
     skin = player_skin()
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
-    return (
+    specs = (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
              display="Shotgun", automatic=False, damage=18.0, pellets=8, spread=5.0, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_RIFLE,
-             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
+             grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
@@ -205,7 +206,7 @@ def _weapon_specs():
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
              display="Pistol", automatic=False, damage=26.0, pellets=1, spread=1.0, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
-             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_PISTOL),
+             grip_rot=_grip_rotation(AIM_PISTOL),
              colour=(0.35, 0.65, 0.95),
              uses_ammo=False, magazine=0, reserve=0,
              interval=PISTOL_FIRE_INTERVAL, reload_s=0.0,
@@ -216,7 +217,7 @@ def _weapon_specs():
         dict(path=SMG_BP_PATH, parts=_smg_parts(), muzzle=SMG_MUZZLE,
              display="SMG", automatic=True, damage=12.0, pellets=1, spread=2.6, range=4500.0,
              sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
-             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
+             grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.45, 0.85, 0.35),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
              interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
@@ -226,7 +227,7 @@ def _weapon_specs():
         dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE,
              display="Rifle", automatic=True, damage=24.0, pellets=1, spread=1.4, range=9000.0,
              sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
-             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
+             grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.70, 0.45, 0.95),
              uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
              interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS,
@@ -239,12 +240,15 @@ def _weapon_specs():
         dict(path=SNIPER_BP_PATH, parts=_sniper_parts(), muzzle=SNIPER_MUZZLE,
              display="Sniper", automatic=False, damage=120.0, pellets=1, spread=0.2, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
-             grip_loc=(0.0, 0.0, 0.0), grip_rot=_grip_rotation(AIM_RIFLE),
+             grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.95, 0.30, 0.35), ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
              interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
              recoil=2.4, shot_volume=SHOT_VOLUME_CM["Sniper"]),
     )
+    for spec in specs:
+        spec["grip_loc"] = _grip_location(spec["aim"], spec["grip_rot"], spec["parts"])
+    return specs
 
 
 # Which of the five a killed wanderer can be carrying, in loot-table order. The

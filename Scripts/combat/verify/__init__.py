@@ -11,13 +11,13 @@ and it never relies on a variable another section left behind.
 
   common      check(), the PASS/FAIL ledger, pin/graph/component readers
   fixtures    shared loaded assets (health, weapon component, characters, ...)
-  anim_blueprint  weapons  audio  health  weapon_inputs  install
+  anim_blueprint  weapons  grip_fit  audio  health  weapon_inputs  install
   player_body  blood  hit_reactions  ragdoll  aiming  settings_and_tuning
   firing  consume  drops  noise  combat_trace
 """
 
 SECTIONS = (
-    "anim_blueprint", "weapons", "audio", "health", "weapon_inputs", "install",
+    "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
     "player_body", "blood", "hit_reactions", "ragdoll", "aiming",
     "settings_and_tuning", "firing", "consume", "drops", "noise", "combat_trace",
 )

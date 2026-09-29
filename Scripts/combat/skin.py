@@ -62,6 +62,11 @@ class PlayerSkin:
     grip: str
     aim_rifle: str
     aim_pistol: str
+    # The grip hand's four closing fingers, index first, each as its three
+    # joints from the knuckle out. grip.fist_in_socket() finds where they curl
+    # round, and the weapon's handle is put there. The thumb wraps the other
+    # way and is not in; the index's outer joints rest on the trigger.
+    grip_fingers: tuple
     # Mesh component transform inside the actor. The template's own numbers;
     # they are a property of a 1.8 m humanoid standing in an 88 cm capsule
     # facing +X, not of the mannequin, which is why the Meshy skin reuses them.
@@ -75,6 +80,8 @@ SKIN_QUINN = PlayerSkin(
     grip="HandGrip_R",
     aim_rifle="/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS",
     aim_pistol="/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS",
+    grip_fingers=tuple(tuple(f"{f}_{j:02d}_r" for j in (1, 2, 3))
+                       for f in ("index", "middle", "ring", "pinky")),
 )
 
 # Built by Scripts/asset_pipeline: fetch_monsters.py -> import_characters.py ->
@@ -92,6 +99,9 @@ SKIN_ADVENTURER = PlayerSkin(
               f"A_{ADVENTURER}_MF_Rifle_Idle_ADS",
     aim_pistol=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/"
                f"A_{ADVENTURER}_MF_Pistol_Idle_ADS",
+    # asset_pipeline/finger_rig.py adds these, named the Mixamo way.
+    grip_fingers=tuple(tuple(f"RightHand{f}{j}" for j in (1, 2, 3))
+                       for f in ("Index", "Middle", "Ring", "Pinky")),
 )
 
 

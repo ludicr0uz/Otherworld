@@ -23,7 +23,7 @@ from combat.graph import (
 from combat.materials import build_flat_material
 from combat.paths import ITEM_BP_PATH
 from combat.skin import player_skin
-from combat.grip import _grip_rotation
+from combat.grip import _grip_location, _grip_rotation
 from combat.tuning import COMBAT
 from combat.weapon_items import build_parts
 from combat.weapon_specs import _weapon_icon
@@ -55,7 +55,7 @@ def build_consumable(spec, base_bp):
     """One consumable: its parts, and the base classes' defaults for it.
 
     Held like the pistol -- the pistol's ready pose and its solved grip -- so
-    the item is carried out in front in one hand. There is no eating
+    the item is carried out in front in one hand, by its `grip_part`. There is no eating
     animation: nothing in the project can author one (see CLAUDE.md, *The
     player's body*).
     """
@@ -64,6 +64,7 @@ def build_consumable(spec, base_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{spec['path']} failed to compile")
     aim = player_skin().aim_pistol
+    grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
         "DisplayName": spec["display"],
         "Consumable": True,
@@ -84,8 +85,9 @@ def build_consumable(spec, base_bp):
         "Reserve": 0,
         "NextFireTime": 0.0,
         "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(0.0, 0.0, 0.0),
-        "GripRotation": _grip_rotation(aim),
+        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, spec["parts"],
+                                                       spec["grip_part"])),
+        "GripRotation": grip_rot,
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
         # Not 1.0: the ADS speed and scope fade divide by (AdsZoom - 1), and
         # right-click still aims with food in hand. The irons zoom is the

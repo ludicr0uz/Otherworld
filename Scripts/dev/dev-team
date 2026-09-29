@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""dev-team: work through a queue of tasks, one fresh Claude session per task.
+
+Each task runs as its own headless ``claude -p`` in the project root, so every
+one starts with an empty context and reads CLAUDE.md like any new session does.
+Nothing carries over between tasks except what is on disk: the code, git, and
+this run's progress file (each finished task's final report), which the next
+session is pointed at in case an earlier task matters to it.
+
+    Scripts/dev/dev-team tasks.md                  # a task file (see below)
+    Scripts/dev/dev-team "Add X" "Then fix Y"      # tasks as arguments
+    Scripts/dev/dev-team tasks.md --commit         # each task commits its work
+    Scripts/dev/dev-team tasks.md --dry-run        # show what would run
+
+A task file is a Markdown list. Every top-level item is one task; indented or
+following lines up to the next item belong to it, so a task can run to several
+paragraphs. Headings and text before the first item are ignored.
+
+    # Friday queue
+    - [ ] Raise the inventory size to 12.
+    - [ ] Add a campfire that raises Temperature within 5 m.
+          It should burn for 3 minutes, then go out.
+    - [x] Already done -- skipped.
+
+A task that finishes is ticked (``- [x]``) in the file as soon as it does, so
+re-running the same file resumes where the last run stopped. A failed task
+stops the run (later tasks may depend on it) unless --keep-going is given.
+
+Sessions run unattended, so they cannot ask questions. The default permission
+mode is ``auto`` (a classifier approves or blocks each action); pass
+``--permission-mode bypassPermissions`` to allow everything, or a stricter mode
+to allow less. Any action that would prompt is denied, not waited on.
+
+Logs go to Saved/DevTeam/<timestamp>/: the raw stream-json transcript of every
+task, and progress.md with each task's report. Each task's session id is
+printed, so ``claude --resume <id>`` opens any task to inspect or continue it.
+"""
+
+import argparse
+import datetime
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+LOG_ROOT = os.path.join(ROOT, "Saved", "DevTeam")
+
+ITEM = re.compile(r"^(?:[-*+]|\d+[.)])\s+(?:\[( |x|X)\]\s+)?(.*)$")
+FAIL_MARK = "FAILED:"
+
+PROMPT = """\
+You are one member of an automated dev team working through a queue of tasks, \
+one fresh session per task. No human is watching this session: do not ask \
+questions or wait for answers. Where a choice is the user's, make the sensible \
+call and say what you chose in your final report.
+
+Your task ({n} of {total}):
+
+{task}
+
+Work the way CLAUDE.md says: follow its conventions and verify your change the \
+way the project verifies things before you finish.{commit}
+
+Earlier tasks in this run and their reports are in {progress} -- read it if \
+your task may depend on them.
+
+End with a short report: what changed, how you verified it, and anything left \
+undone. If you could not complete the task, make the first line of the report \
+"{fail} <reason>"."""
+
+COMMIT = (" When the task is done and verified, commit your changes with a "
+          "descriptive message (never --no-verify).")
+
+
+class Task:
+    def __init__(self, text, line=None, done=False):
+        self.text, self.line, self.done = text, line, done
+
+    @property
+    def title(self):
+        first = self.text.splitlines()[0]
+        return first if len(first) <= 70 else first[:67] + "..."
+
+
+def parse_tasks(source):
+    """Top-level list items of a Markdown file, with their continuation lines."""
+    tasks, current = [], None
+    for i, raw in enumerate(source.splitlines()):
+        m = ITEM.match(raw)
+        if m:
+            current = Task(m.group(2).strip(), line=i,
+                           done=(m.group(1) or " ").lower() == "x")
+            tasks.append(current)
+        elif current and raw.strip() and not raw.startswith("#"):
+            current.text += "\n" + raw.strip()
+        elif current and not raw.strip():
+            current.text += "\n"
+    for t in tasks:
+        t.text = t.text.strip()
+    return [t for t in tasks if t.text]
+
+
+def tick(path, task):
+    """Mark one task done in its file, touching nothing else."""
+    with open(path) as f:
+        lines = f.read().split("\n")
+    # The file may have been edited during the run: find the item again by its
+    # first line rather than trusting the line number it had at parse time.
+    first = task.text.splitlines()[0]
+    hits = [i for i, l in enumerate(lines)
+            if (m := ITEM.match(l)) and m.group(2).strip() == first
+            and (m.group(1) or " ") == " "]
+    if not hits:
+        print(f"    (could not find this task in {path} to tick it)")
+        return
+    task.line = min(hits, key=lambda i: abs(i - task.line))
+    line = lines[task.line]
+    if re.match(r"^\s*(?:[-*+]|\d+[.)])\s+\[ \]", line):
+        line = line.replace("[ ]", "[x]", 1)
+    else:
+        line = re.sub(r"^((?:[-*+]|\d+[.)])\s+)", r"\1[x] ", line, count=1)
+    lines[task.line] = line
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+
+
+def describe(tool):
+    """One line for a tool call in the live progress output."""
+    name, inp = tool.get("name", "?"), tool.get("input") or {}
+    detail = (inp.get("description") or inp.get("file_path") or inp.get("pattern")
+              or inp.get("command") or inp.get("prompt") or "")
+    detail = " ".join(str(detail).split())
+    if detail.startswith(ROOT):
+        detail = detail[len(ROOT) + 1:]
+    return f"{name}: {detail[:90]}" if detail else name
+
+
+def run_task(task, n, total, args, run_dir, progress):
+    prompt = PROMPT.format(n=n, total=total, task=task.text, progress=progress,
+                           commit=COMMIT if args.commit else "", fail=FAIL_MARK)
+    cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
+           "--permission-mode", args.permission_mode,
+           "--name", f"dev-team {n}/{total}: {task.title}"]
+    if args.model:
+        cmd += ["--model", args.model]
+    if args.effort:
+        cmd += ["--effort", args.effort]
+    if args.budget:
+        cmd += ["--max-budget-usd", str(args.budget)]
+
+    log_path = os.path.join(run_dir, f"task-{n:02d}.jsonl")
+    result = {}
+    with open(log_path, "w") as log:
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True,
+                                stdin=subprocess.DEVNULL, start_new_session=True)
+        try:
+            for line in proc.stdout:
+                log.write(line)
+                log.flush()
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    print(f"    {line.rstrip()}")
+                    continue
+                if event.get("type") == "system" and event.get("subtype") == "init":
+                    print(f"    session {event.get('session_id')}")
+                elif event.get("type") == "assistant" and not event.get("parent_tool_use_id"):
+                    for block in event.get("message", {}).get("content", []):
+                        if block.get("type") == "tool_use":
+                            print(f"    · {describe(block)}")
+                elif event.get("type") == "result":
+                    result = event
+            proc.wait()
+        except KeyboardInterrupt:
+            os.killpg(proc.pid, signal.SIGTERM)
+            proc.wait()
+            raise
+
+    report = (result.get("result") or "").strip()
+    ok = (proc.returncode == 0 and result and not result.get("is_error")
+          and not report.startswith(FAIL_MARK))
+    return ok, report, result, log_path
+
+
+def git_head():
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                              capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return ""
+
+
+def main():
+    p = argparse.ArgumentParser(
+        prog="dev-team", description=__doc__.split("\n\n")[0],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="\n\n".join(__doc__.split("\n\n")[1:]))
+    p.add_argument("tasks", nargs="+",
+                   help="a task file (.md/.txt), '-' for stdin, or task texts")
+    p.add_argument("--commit", action="store_true",
+                   help="have each task commit its work when verified")
+    p.add_argument("--keep-going", action="store_true",
+                   help="continue after a failed task instead of stopping")
+    p.add_argument("--permission-mode", default="auto",
+                   help="auto (default), acceptEdits, bypassPermissions, ...")
+    p.add_argument("--model", help="model for every task (default: claude's own)")
+    p.add_argument("--effort", help="effort level for every task")
+    p.add_argument("--budget", type=float, metavar="USD",
+                   help="per-task spending cap")
+    p.add_argument("--dry-run", action="store_true",
+                   help="list the tasks that would run, then exit")
+    args = p.parse_args()
+
+    task_file = None
+    if len(args.tasks) == 1 and args.tasks[0] == "-":
+        tasks = parse_tasks(sys.stdin.read())
+    elif len(args.tasks) == 1 and os.path.isfile(args.tasks[0]):
+        task_file = os.path.abspath(args.tasks[0])
+        with open(task_file) as f:
+            tasks = parse_tasks(f.read())
+    else:
+        tasks = [Task(t.strip()) for t in args.tasks if t.strip()]
+
+    todo = [t for t in tasks if not t.done]
+    if not todo:
+        sys.exit("dev-team: nothing to do (no unticked tasks)")
+    skipped = len(tasks) - len(todo)
+    print(f"dev-team: {len(todo)} task(s)" + (f", {skipped} already done" if skipped else ""))
+    for i, t in enumerate(todo, 1):
+        print(f"  {i}. {t.title}")
+    if args.dry_run:
+        return
+
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir = os.path.join(LOG_ROOT, stamp)
+    os.makedirs(run_dir)
+    progress = os.path.join(run_dir, "progress.md")
+    with open(progress, "w") as f:
+        f.write(f"# dev-team run {stamp}\n")
+
+    outcomes, total_cost = [], 0.0
+    for n, task in enumerate(todo, 1):
+        print(f"\n[{n}/{len(todo)}] {task.title}")
+        before = git_head()
+        try:
+            ok, report, result, log_path = run_task(task, n, len(todo), args,
+                                                    run_dir, progress)
+        except KeyboardInterrupt:
+            print("\ndev-team: interrupted -- this task stays unticked")
+            outcomes.append((task, "interrupted"))
+            break
+        cost = result.get("total_cost_usd") or 0.0
+        total_cost += cost
+        mins = (result.get("duration_ms") or 0) / 60000
+        status = "done" if ok else "FAILED"
+        after = git_head()
+        commits = f", commits {before}..{after}" if after and after != before else ""
+        print(f"    {status} in {mins:.1f} min, ${cost:.2f}{commits}  (log: {log_path})")
+        if report:
+            print("    " + report.replace("\n", "\n    "))
+
+        with open(progress, "a") as f:
+            f.write(f"\n## Task {n}: {status}\n\n{task.text}\n\n"
+                    f"Session: {result.get('session_id', '?')}{commits}\n\n"
+                    f"### Report\n\n{report or '(no report)'}\n")
+        outcomes.append((task, status))
+        if ok and task_file and task.line is not None:
+            tick(task_file, task)
+        if not ok and not args.keep_going:
+            print("dev-team: stopping (use --keep-going to continue past failures)")
+            break
+
+    print(f"\ndev-team: finished -- ${total_cost:.2f} total, progress in {progress}")
+    for task, status in outcomes:
+        print(f"  {status:>11}  {task.title}")
+    for task in todo[len(outcomes):]:
+        print(f"  {'not run':>11}  {task.title}")
+    sys.exit(0 if all(s == "done" for _t, s in outcomes)
+             and len(outcomes) == len(todo) else 1)
+
+
+if __name__ == "__main__":
+    main()

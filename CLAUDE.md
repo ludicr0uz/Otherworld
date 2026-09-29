@@ -9,7 +9,9 @@ there is no C++ module. See `systemDesign.md` for the detailed architecture.
    `unreal` Python API (or the editor UI).
 2. Automation scripts live in `Scripts/` (run headless), `Scripts/dev/` (tooling for driving
    the editor, not content) or `Content/Python/` (auto-discovered by the editor;
-   `init_unreal.py` runs at startup and starts `uepy_inbox`).
+   `init_unreal.py` runs at startup and starts `uepy_inbox`). `Scripts/dev/dev-team` runs a
+   queue of tasks, one fresh headless Claude session per task (see its docstring); a session
+   started by it has no human to ask, so it decides and reports instead.
 3. Asset prefixes: `SM_ SK_ M_ MI_ T_ BP_ WBP_ ST_ A_ Cue_`; levels `Lvl_`.
 4. Absolute paths only when invoking the editor directly — the Bash tool resets cwd between
    calls. (`Scripts/dev/uepy.py` resolves its own arguments, so relative paths are fine there.)

@@ -12,7 +12,9 @@ from combat.tuning import BIND_VARS, SWITCH_KEY
 from combat.weapon_component.aim import _author_ads, _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire, _author_reload
 from combat.weapon_component.common import _prop
-from combat.weapon_component.consume import _author_consume
+from combat.weapon_component.consume import (
+    _author_trigger_latch, _author_use_gate,
+)
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.inventory import (
     _author_drop, _author_equip, _author_pickup,
@@ -170,13 +172,18 @@ def _author_wc_tick(ed, tick):
     _connect(tap, _pin(touching, "A"))
     _connect(holding_out, _pin(touching, "B"))
 
+    # A press that ate an item is spent until the key comes up: without this
+    # the weapon equipped in the item's place fires on the same press.
+    armed_exit, unspent = _author_trigger_latch(ed, holding_out, pose_exits,
+                                                240, -200)
+
     fire_gate = _at(ed.add_branch_node(), 1040, 0)
-    _connect(both(both(_pin(touching, "ReturnValue", is_input=False),
-                       armed_out, 640),
-                  _pin(steady, "ReturnValue", is_input=False), 700),
+    _connect(both(both(both(_pin(touching, "ReturnValue", is_input=False),
+                            armed_out, 640),
+                       _pin(steady, "ReturnValue", is_input=False), 700),
+                  unspent, 760),
              _pin(fire_gate, "Condition"))
-    for exit_pin in pose_exits:
-        _connect(exit_pin, _pin(fire_gate, "execute"))
+    _connect(armed_exit, _pin(fire_gate, "execute"))
 
     # Ammunition and the cooldown are a SECOND branch inside the first, not two
     # more terms folded into its condition, and that nesting is the whole
@@ -226,25 +233,10 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(allowed, "ReturnValue", is_input=False),
              _pin(ready_gate, "Condition"))
 
-    # --- or is it something to eat? -----------------------------------------
-    # A Consumable is used rather than fired, and only on the tap: a held
-    # button must not eat a stack of mushrooms at frame rate. Inside the fire
-    # gate for the same reason the ammunition test is -- Consumable is read off
-    # Held -- and so it also inherits "not while sprinting".
-    edible, edible_n = _prop(ed, "Consumable", held, 1240, -300)
-    use_gate = _at(ed.add_branch_node(), 1480, -300)
-    _connect(edible, _pin(use_gate, "Condition"))
-    _connect(BEL.find_then_pin(fire_gate), _pin(use_gate, "execute"))
-    _connect(BEL.find_else_pin(use_gate), _pin(ready_gate, "execute"))
-    use_tap = _at(ed.add_branch_node(), 1720, -300)
-    _connect(tap, _pin(use_tap, "Condition"))
-    _connect(BEL.find_then_pin(use_gate), _pin(use_tap, "execute"))
-    consumed = _author_consume(ed, held, owner_out, BEL.find_then_pin(use_tap),
-                               1400, 5800)
-    ed.add_comment_to_nodes(
-        "The held item is Consumable: a tap uses it (consume.py) instead of "
-        "firing it, and a held button does nothing.",
-        [edible_n, use_gate, use_tap])
+    # --- or is it something to eat? (consume.py) --------------------------
+    consumed, untapped = _author_use_gate(
+        ed, held, owner_out, tap, BEL.find_then_pin(fire_gate),
+        _pin(ready_gate, "execute"), 1240, -300)
 
     ed.add_comment_to_nodes(
         "The trigger is being touched, the weapon is out and the player is not "
@@ -284,7 +276,7 @@ def _author_wc_tick(ed, tick):
     _connect(both(pressed("KeyReload", 7360), armed_out, 7300),
              _pin(reload_gate, "Condition"))
     for exit_pin in (after_fire, BEL.find_else_pin(fire_gate), consumed,
-                     BEL.find_else_pin(use_tap)) + dry_exits:
+                     untapped) + dry_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
     reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate),
                                   1400, 7200)

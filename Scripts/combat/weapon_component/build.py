@@ -14,6 +14,7 @@ from combat.paths import (
     CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, WEAPON_COMP_BP_PATH,
 )
 from combat.tuning import BIND_VARS, COMBAT
+from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _author_wc_begin_play
 from combat.weapon_component.tick import _author_wc_tick
 
@@ -88,6 +89,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # How many rounds this reload moves, computed once and read back three
     # times. See _author_reload for why it cannot just be recomputed.
     _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
+    # The fire press that ate an item, until it is released; see consume.py.
+    _declare(ed, TRIGGER_SPENT, BEL.get_basic_type_by_name("bool"))
     # The GameMode's DebugMode, cached at the moment of firing so the pellet
     # loop can branch on a plain bool instead of casting eight times.
     _declare(ed, DEBUG_MODE_VAR, BEL.get_basic_type_by_name("bool"))
@@ -130,6 +133,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # re-equip for nothing.
         "PoseSprinting": False,
         "ReloadTake": 0,
+        TRIGGER_SPENT: False,
         "RecoilDebt": 0.0,
         "RecoilYawDebt": 0.0,
         "RecoilYawKick": 0.0,

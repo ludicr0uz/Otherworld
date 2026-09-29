@@ -341,6 +341,10 @@ The verifier asserts the old loose constants are gone.
     root CLAUDE.md. The verifier pins that exactly one Branch reads `Automatic`, together with
     `Loaded` and `NextFireTime`.
   - Consumables branch off it: `Held.Consumable` plus a tap goes to `weapon_component/consume.py`.
+  - **The press that eats is spent.** Eating equips the next item in the same frame, while the
+    key is still down. `TriggerSpent` is set by the consume chain, the outer gate requires
+    `NOT TriggerSpent`, and `TriggerSpent &= IsInputKeyDown` runs just before the gate. Without
+    it, a weapon in the next slot fired once on the same press.
 - **Reload stores `Min(MagazineSize − Loaded, Reserve)` into `ReloadTake` once.** Recomputing it
   after `Loaded` rises means free ammo.
 - **Debug mode:**

@@ -14,14 +14,77 @@ The event goes out BEFORE the item is destroyed, and that order is load-bearing:
 SendGameplayEventToActor activates the triggered ability synchronously, and the
 ability reads HungerRestore/ThirstRestore off the payload. Destroyed first, it
 would read them off an actor that is already pending kill.
+
+The press that eats an item is spent: TRIGGER_SPENT is set with the item gone,
+and the fire gate stays shut until the key comes up. Without it, the item that
+slides into the emptied slot is equipped the same frame and the press still
+held down fires it -- an automatic on the next frame, anything on a press that
+is still reported.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import (
-    FN_ARR_LEN, FN_ARR_REMOVE, FN_DESTROY, FN_MIN_II, FN_SEND_GAMEPLAY_EVENT,
-    FN_SUB_II, NODE_MAKE_EVENT_DATA,
+    FN_AND, FN_ARR_LEN, FN_ARR_REMOVE, FN_DESTROY, FN_MIN_II, FN_NOT,
+    FN_SEND_GAMEPLAY_EVENT, FN_SUB_II, NODE_MAKE_EVENT_DATA,
 )
 from combat.tuning import CONSUME_EVENT_TAG
+from combat.weapon_component.common import _prop
+
+# The fire press that used an item, still held. Declared in build.py.
+TRIGGER_SPENT = "TriggerSpent"
+
+
+def _author_trigger_latch(ed, holding, exec_ins, x0, y0):
+    """Re-arm the trigger once the fire key is up: TriggerSpent &= holding.
+
+    One unconditional Set per frame, before the fire gate. Returns the exit
+    pin and a NOT TriggerSpent pin for the fire gate's condition; that Get is
+    pulled when the gate runs, after this Set, so the release frame is
+    already armed.
+    """
+    spent = _at(ed.add_get_member_variable_node(TRIGGER_SPENT), x0, y0 + 160)
+    spent_out = _pin(spent, TRIGGER_SPENT, is_input=False)
+    still = _at(_node(ed, FN_AND), x0 + 260, y0 + 160)
+    _connect(spent_out, _pin(still, "A"))
+    _connect(holding, _pin(still, "B"))
+    latch = _at(ed.add_set_member_variable_node(TRIGGER_SPENT), x0 + 520, y0)
+    _connect(_pin(still, "ReturnValue", is_input=False), _pin(latch, TRIGGER_SPENT))
+    for exit_pin in exec_ins:
+        _connect(exit_pin, _pin(latch, "execute"))
+    free = _at(_node(ed, FN_NOT), x0 + 520, y0 + 160)
+    _connect(spent_out, _pin(free, "A"))
+    ed.add_comment_to_nodes(
+        "The press that ate an item stays spent until the fire key is up, so it "
+        "cannot also fire the weapon that is equipped in the item's place.",
+        [spent, still, latch, free])
+    return (BEL.find_then_pin(latch),
+            _pin(free, "ReturnValue", is_input=False))
+
+
+def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, x0, y0):
+    """Branch a Consumable off the fire gate; a tap uses it.
+
+    A Consumable is used rather than fired, and only on the tap: a held button
+    must not eat a stack of mushrooms at frame rate. Inside the fire gate for
+    the same reason the ammunition test is -- Consumable is read off Held --
+    and so it also inherits "not while sprinting". A non-consumable goes on to
+    `not_edible` (the ready gate). Returns the exits: used, and not tapped.
+    """
+    edible, edible_n = _prop(ed, "Consumable", held, x0, y0)
+    use_gate = _at(ed.add_branch_node(), x0 + 240, y0)
+    _connect(edible, _pin(use_gate, "Condition"))
+    _connect(exec_in, _pin(use_gate, "execute"))
+    _connect(BEL.find_else_pin(use_gate), not_edible)
+    use_tap = _at(ed.add_branch_node(), x0 + 480, y0)
+    _connect(tap, _pin(use_tap, "Condition"))
+    _connect(BEL.find_then_pin(use_gate), _pin(use_tap, "execute"))
+    consumed = _author_consume(ed, held, owner, BEL.find_then_pin(use_tap),
+                               x0 + 160, y0 + 6100)
+    ed.add_comment_to_nodes(
+        "The held item is Consumable: a tap uses it (consume.py) instead of "
+        "firing it, and a held button does nothing.",
+        [edible_n, use_gate, use_tap])
+    return consumed, BEL.find_else_pin(use_tap)
 
 
 def _author_consume(ed, held, owner, exec_in, x0, y0):
@@ -85,10 +148,16 @@ def _author_consume(ed, held, owner, exec_in, x0, y0):
     _set(dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(stay), _pin(dirty, "execute"))
 
+    # The press is spent; _author_trigger_latch re-arms it on release.
+    spend = keep(_at(ed.add_set_member_variable_node(TRIGGER_SPENT), x0 + 1960, y0))
+    _set(spend, TRIGGER_SPENT, "true")
+    _connect(BEL.find_then_pin(dirty), _pin(spend, "execute"))
+
     ed.add_comment_to_nodes(
         f"A Consumable is used, not fired: send {CONSUME_EVENT_TAG} to the owner "
         "with the item as OptionalObject (GA_ConsumeItem answers it), THEN take "
         "it out of Inventory and destroy it -- the ability reads the item's "
-        "restore values synchronously inside the send.",
+        "restore values synchronously inside the send. The press is then "
+        "spent, so it cannot fire whatever is equipped next.",
         made)
-    return BEL.find_then_pin(dirty)
+    return BEL.find_then_pin(spend)

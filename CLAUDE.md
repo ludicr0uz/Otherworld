@@ -1779,7 +1779,7 @@ centred and bottom-anchored at any window size.
   the offline `Tree Spacing` check now compares every nearby pair through a spatial hash
   (it used to compare list neighbours only). 200/300/400/600/1000 m at seed 42 all pass 28/28.
 - **`/Game/Maps/Lvl_Forest_1000m`** (`--size 1000`, night, seed 42): 3,400 trees, 1,115,761
-  grass clumps, ten NPCs at 76.7–95.0 m. Offline 28/28, in-engine **211/211**. The `.umap` is
+  grass clumps, ten NPCs at 76.7–95.0 m. Offline 28/28, in-engine **217/217**. The `.umap` is
   161 MB, mostly grass. The import takes ~1 min in a live editor, 9 s of it grass, because
   grass now goes in through batched `add_instances`. `uepy.py` reports "the editor stopped
   responding" on a job that long: its heartbeat check sees the editor blocked. The job
@@ -2092,6 +2092,10 @@ centred and bottom-anchored at any window size.
   the trees render bare — tried and reverted; `forest_import/trees.py` pins it off and the
   verifier checks it. Masked leaf cards on Nanite are what make looking up into the canopy
   slow. `Content/` is not in git, so a bad asset save has no backup.
+- Trees are planted like grass: one HISM per species per 100 m cell, labelled
+  `<spec>__±ix_±iy` (`forest_generator/tree_cells.py`, `forest_import/trees.py`). They fade
+  out at 250–300 m (`TREE_CULL_START_CM`/`TREE_CULL_END_CM`) times `r.ViewDistanceScale`, so
+  120 m on Low. Render culling only — collision and the navmesh still cover every tree.
 - The directional light's real-time shadow range is `SHADOW_DISTANCE_CM` (100 m) in
   `forest_generator/lighting.py`. It is set through `dynamic_shadow_distance_movable_light`
   even though the light is Stationary: with `r.AllowStaticLighting=False` the engine reads

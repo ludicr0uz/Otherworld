@@ -599,10 +599,12 @@ These are agro ranges only. The audio attenuation profiles that set how loud sho
    else `new_level`.
 3. **Terrain actor** — `StaticMeshActor`, `BlockAll`, `QUERY_AND_PHYSICS`, static.
 4. **Lighting & sky** — fully driven by the embedded preset (§4).
-5. **Trees** — placements inlined as a `TREE_DATA` literal, grouped by spec; one actor per
-   species carrying a `HierarchicalInstancedStaticMeshComponent` as its root, `BlockAll`,
-   static, shadow-casting, materials set by slot index, then one `add_instance` per tree.
-   Each tree HISM stays on Nanite (`forest_import/trees.py` pins `disallow_nanite` off):
+5. **Trees** — placements inlined as a `TREE_DATA` literal and handed to
+   `forest_import/trees.py:plant_trees`, which plants **one HISM actor per species per
+   100 m map cell** (`forest_generator/tree_cells.py`, the same cells as grass), labelled
+   `<spec>__±ix_±iy`: `BlockAll`, static, shadow-casting, materials set by slot index. Each
+   cell fades its trees out at 250–300 m (times `r.ViewDistanceScale`) and drops out whole
+   past its max draw distance. Tree HISMs stay on Nanite (`disallow_nanite` pinned off):
    the meshes' auto-built fallbacks have no leaf triangles, so classic rendering draws
    bare trees.
 5b. **Grass** — transforms are *not* inlined (tens of thousands of them); the script reads

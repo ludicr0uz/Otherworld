@@ -1,4 +1,5 @@
 """How grass is cut into map cells, and how far each cell and clump is drawn.
+Trees use the same cells (forest_generator/tree_cells.py).
 
 Pure Python (no ``unreal``): the generator, the in-editor planting code
 (forest_import/grass.py) and the graphics menu all read these, so a label, the
@@ -35,15 +36,25 @@ GRASS_CULL_END_CM = 9000
 # The lowest r.ViewDistanceScale a preset uses (Low).
 MIN_VIEW_DISTANCE_SCALE = 0.4
 
-# A cell's max draw distance is measured to the centre of its bounds, but the
-# clump nearest the camera can sit a half-diagonal away from that centre -- and
-# that slack does NOT shrink with the view-distance scale while the draw
-# distance does. Sized for the worst case (Low), so no cell ever vanishes while
-# a clump in it is still inside its own fade range. The extra 5 m covers the
-# vertical extent of a cell's bounds on hilly terrain.
-_CELL_REACH_CM = GRASS_CELL_CM * math.sqrt(0.5) + 500.0
-GRASS_CELL_MAX_DRAW_CM = round(GRASS_CULL_END_CM
-                               + _CELL_REACH_CM / MIN_VIEW_DISTANCE_SCALE)
+
+
+def cell_max_draw_cm(cull_end_cm, vertical_slack_cm):
+    """Max draw distance for one cell whose instances fade out by ``cull_end_cm``.
+
+    A cell's max draw distance is measured to the centre of its bounds, but the
+    instance nearest the camera can sit a half-diagonal away from that centre --
+    and that slack does NOT shrink with the view-distance scale while the draw
+    distance does. Sized for the worst case (Low), so no cell ever vanishes
+    while an instance in it is still inside its own fade range.
+    ``vertical_slack_cm`` covers how far the bounds centre can sit above or
+    below an instance: hilly terrain, plus the height of what is planted.
+    """
+    reach = GRASS_CELL_CM * math.sqrt(0.5) + vertical_slack_cm
+    return round(cull_end_cm + reach / MIN_VIEW_DISTANCE_SCALE)
+
+
+# 5 m: hilly terrain; a clump itself is knee-high.
+GRASS_CELL_MAX_DRAW_CM = cell_max_draw_cm(GRASS_CULL_END_CM, 500.0)
 
 
 def cell_of(x_cm, y_cm):

@@ -202,29 +202,8 @@ import sys
 if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sys.path:
     sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
 from forest_import import trees as trees_import
-total_tree_instances = 0
-for spec_name, expected_count in EXPECTED_SPEC_COUNTS.items():
-    found = False
-    for a in actors:
-        if a.get_actor_label() == spec_name:
-            found = True
-            # Count HISM instances via root component
-            root = a.get_editor_property("root_component")
-            if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
-                inst_count = root.get_instance_count()
-                total_tree_instances += inst_count
-                check(f"{spec_name} Instance Count",
-                      inst_count == expected_count,
-                      f"(expected {expected_count}, got {inst_count})")
-                check(f"{spec_name} Collision Profile",
-                      root.get_collision_profile_name() == "BlockAll")
-                trees_import.verify_tree_component(check, spec_name, root)
-            break
-    check(f"{spec_name} Actor Exists", found)
-
-check("Total Tree Instances",
-      total_tree_instances == EXPECTED_TREE_COUNT,
-      f"(expected {EXPECTED_TREE_COUNT}, got {total_tree_instances})")
+trees_import.verify_trees(check, actors, EXPECTED_SPEC_COUNTS,
+                          EXPECTED_TREE_COUNT)
 
 # ── 5. Grass cells (forest_import/grass.py) ─────────────────────────
 if EXPECTED_GRASS_COUNT > 0:

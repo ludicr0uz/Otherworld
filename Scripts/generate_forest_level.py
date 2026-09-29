@@ -770,12 +770,6 @@ def _write_unreal_import_script(
 
         TREE_DATA = {json.dumps(tree_data)}
 
-        # Group placements by spec name
-        from collections import defaultdict
-        groups = defaultdict(list)
-        for td in TREE_DATA:
-            groups[td["spec"]].append(td)
-
         # Tree spec → mesh/material config
         TREE_CONFIGS = {{
             "HISM_Tree_Leafy_Island_01": {{
@@ -820,50 +814,13 @@ def _write_unreal_import_script(
             }},
         }}
 
-        # Trees draw their fallback mesh, not Nanite -- see forest_import/trees.py.
+        # Per-cell HISMs with a cull distance, kept on Nanite -- see
+        # forest_import/trees.py and forest_generator/tree_cells.py.
         if r"{scripts_dir}" not in sys.path:
             sys.path.insert(0, r"{scripts_dir}")
         from forest_import import trees as trees_import
-
-        def create_hism(name, mesh_path, mat_paths):
-            mesh = editor_asset_sub.load_asset(mesh_path)
-            if not mesh:
-                unreal.log_error(f"[GEN] Missing mesh: {{mesh_path}}")
-                return None
-            actor = editor_actor_sub.spawn_actor_from_class(unreal.Actor, unreal.Vector(0, 0, 0))
-            actor.set_actor_label(name)
-            comp = unreal.HierarchicalInstancedStaticMeshComponent(actor)
-            comp.set_static_mesh(mesh)
-            actor.set_editor_property("root_component", comp)
-            comp.set_collision_profile_name("BlockAll")
-            comp.set_collision_enabled(unreal.CollisionEnabled.QUERY_AND_PHYSICS)
-            comp.set_mobility(unreal.ComponentMobility.STATIC)
-            comp.set_editor_property("cast_shadow", True)
-            trees_import.configure_tree_component(comp)
-            for idx, mp in enumerate(mat_paths):
-                mat_obj = editor_asset_sub.load_asset(mp)
-                if mat_obj:
-                    comp.set_material(idx, mat_obj)
-            return comp
-
-        total_planted = 0
-        for spec_name, config in TREE_CONFIGS.items():
-            instances = groups.get(spec_name, [])
-            if not instances:
-                continue
-            comp = create_hism(spec_name, config["mesh"], config["mats"])
-            if not comp:
-                continue
-            for td in instances:
-                tf = unreal.Transform(
-                    location=unreal.Vector(td["x"], td["y"], td["z"]),
-                    rotation=unreal.Rotator(pitch=0, yaw=td["yaw"], roll=0),
-                    scale=unreal.Vector(td["scale"], td["scale"], td["scale"]),
-                )
-                comp.add_instance(tf)
-                total_planted += 1
-
-        unreal.log_warning(f"[GEN] Planted {{total_planted}} trees across {{len(TREE_CONFIGS)}} species!")
+        trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
+                                 editor_asset_sub)
 
         # ── 5b. Plant knee-high grass ────────────────────────────────────────
         # Per-cell HISMs, saved unlit -- see forest_import/grass.py and
@@ -1308,29 +1265,8 @@ def _write_unreal_verify_script(
         if r"{scripts_dir}" not in sys.path:
             sys.path.insert(0, r"{scripts_dir}")
         from forest_import import trees as trees_import
-        total_tree_instances = 0
-        for spec_name, expected_count in EXPECTED_SPEC_COUNTS.items():
-            found = False
-            for a in actors:
-                if a.get_actor_label() == spec_name:
-                    found = True
-                    # Count HISM instances via root component
-                    root = a.get_editor_property("root_component")
-                    if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
-                        inst_count = root.get_instance_count()
-                        total_tree_instances += inst_count
-                        check(f"{{spec_name}} Instance Count",
-                              inst_count == expected_count,
-                              f"(expected {{expected_count}}, got {{inst_count}})")
-                        check(f"{{spec_name}} Collision Profile",
-                              root.get_collision_profile_name() == "BlockAll")
-                        trees_import.verify_tree_component(check, spec_name, root)
-                    break
-            check(f"{{spec_name}} Actor Exists", found)
-
-        check("Total Tree Instances",
-              total_tree_instances == EXPECTED_TREE_COUNT,
-              f"(expected {{EXPECTED_TREE_COUNT}}, got {{total_tree_instances}})")
+        trees_import.verify_trees(check, actors, EXPECTED_SPEC_COUNTS,
+                                  EXPECTED_TREE_COUNT)
 
         # ── 5. Grass cells (forest_import/grass.py) ─────────────────────────
         if EXPECTED_GRASS_COUNT > 0:

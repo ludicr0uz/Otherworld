@@ -12,6 +12,7 @@ from combat.tuning import BIND_VARS, SWITCH_KEY
 from combat.weapon_component.ads import _author_ads
 from combat.weapon_component.aim import _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire, _author_reload
+from combat.weapon_component.block import _author_block
 from combat.weapon_component.common import _prop
 from combat.weapon_component.consume import (
     _author_trigger_latch, _author_use_gate,
@@ -94,6 +95,12 @@ def _author_wc_tick(ed, tick):
                                   key_pins["KeySprint"], aim_exits,
                                   1040, -1400)
 
+    # --- block ---------------------------------------------------------------
+    # After sprint (it reads Sprinting), before the trigger (which refuses
+    # while Blocking). block.py says why the hit itself is resolved elsewhere.
+    sprint_exits = (_author_block(ed, pc_out, key_pins["KeyBlock"],
+                                  sprint_exits, 3700, -1400),)
+
     # --- aim down the sights -------------------------------------------------
     # After the sprint block, which writes Sprinting, and before the trigger,
     # which the cone width now depends on: polled in any other order the zoom
@@ -171,6 +178,12 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(_at(ed.add_get_member_variable_node("Sprinting"), 480, 760),
                   "Sprinting", is_input=False), _pin(steady, "A"))
 
+    # Guarding is not shooting: a separate NOT, so the Sprinting read the
+    # verifier walks keeps its own NOT.
+    guarded = _at(_node(ed, FN_NOT), 760, 680)
+    _connect(_pin(_at(ed.add_get_member_variable_node("Blocking"), 480, 680),
+                  "Blocking", is_input=False), _pin(guarded, "A"))
+
     tap = pressed("KeyFire", 600)
     holding = _at(_node(ed, FN_IS_KEY_DOWN), 480, 860)
     _connect(pc_out, _pin(holding, "self"))
@@ -188,7 +201,9 @@ def _author_wc_tick(ed, tick):
     fire_gate = _at(ed.add_branch_node(), 1040, 0)
     _connect(both(both(both(_pin(touching, "ReturnValue", is_input=False),
                             armed_out, 640),
-                       _pin(steady, "ReturnValue", is_input=False), 700),
+                       both(_pin(steady, "ReturnValue", is_input=False),
+                            _pin(guarded, "ReturnValue", is_input=False), 680),
+                       700),
                   unspent, 760),
              _pin(fire_gate, "Condition"))
     _connect(armed_exit, _pin(fire_gate, "execute"))

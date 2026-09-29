@@ -20,6 +20,7 @@ THE CONTROLLER'S HEARTBEAT (one fragment per concern)
   corpse       the corpse state: a Dead pawn ends the heartbeat for good
   stats        this creature's health and flinch clips, once; voice on a timer
   melee        range + cooldown check, swing, damage, hit direction
+  block        the player's guard: blocked damage and its stamina cost
   combat_trace the [COMBAT-TRACE] line a landed swing logs, when enabled
   patrol       once-per-life setup (centre, run speed); stroll to a point
   senses       hurt, sight (cone + line of sight), touch, sound

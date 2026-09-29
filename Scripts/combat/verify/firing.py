@@ -149,9 +149,10 @@ def check_automatic_fire():
         str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
         for x in downs
         for q in PIN.list_connected_pins(BEL.find_input_pin(x, "Key")))
-    check("four keys are polled held rather than tapped: sprint, the two aims "
-          "and the trigger",
-          held_binds == ["Get KeyAim", "Get KeyFire", "Get KeySights", "Get KeySprint"],
+    check("five keys are polled held rather than tapped: sprint, the two aims, "
+          "the guard and the trigger",
+          held_binds == ["Get KeyAim", "Get KeyBlock", "Get KeyFire", "Get KeySights",
+                         "Get KeySprint"],
           str(held_binds))
 
     # THE TRAP THIS SECTION EXISTS FOR. Automatic lives on the weapon, so reading

@@ -11,7 +11,8 @@ from forest_generator.npc_placement import (
     NPC_REPATH_SECONDS, NPC_VARIANTS, NPC_VOICE_MAX_S, NPC_VOICE_MIN_S,
 )
 from npc.paths import (
-    AI_BP_PATH, HIT_SOUNDS, HIT_SOUNDS_VAR, REACTIONS_VAR, VOICES_VAR,
+    AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS, HIT_SOUNDS_VAR, REACTIONS_VAR,
+    VOICES_VAR,
 )
 from npc.nodes import (
     FN_ACTOR_LOC, FN_AND_B, FN_DELAY, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
@@ -103,6 +104,11 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     if not ed.add_member_variable("NextAttackTime",
                                   BEL.get_basic_type_by_name("real")):
         raise RuntimeError("could not declare NextAttackTime")
+    # What the swing being landed deals, after the player's guard (npc/block.py).
+    ed.remove_member_variable(HIT_DAMAGE_VAR)
+    if not ed.add_member_variable(HIT_DAMAGE_VAR,
+                                  BEL.get_basic_type_by_name("real")):
+        raise RuntimeError(f"could not declare {HIT_DAMAGE_VAR}")
 
     move_to = _at(_node(ed, FN_MOVE_TO_ACTOR), origin.x + 1000, origin.y - 120)
     get_pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), origin.x + 40, origin.y + 220)

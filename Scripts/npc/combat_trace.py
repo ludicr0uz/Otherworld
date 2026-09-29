@@ -17,14 +17,13 @@ Log only, never on screen: ten wanderers around the player write a line every
 
 from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, NPC_ID_VAR
 from combat.paths import GAME_MODE_CLASS_PATH
-from forest_generator.npc_placement import NPC_MELEE_DAMAGE
 from npc.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from npc.nodes import (
     FN_BOOL_TO_STR, FN_CONCAT, FN_DISPLAY_NAME, FN_FLOAT_TO_STR,
     FN_GET_COMP, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_PRINT, FN_VEC_TO_STR,
     NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
 )
-from npc.paths import HEALTH_CLASS_PATH
+from npc.paths import HEALTH_CLASS_PATH, HIT_DAMAGE_VAR
 
 
 def _author_concat(ed, keep, parts, x0, y0):
@@ -112,12 +111,18 @@ def _author_melee_trace(ed, exec_in, self_pawn_out, self_loc_out, player_out,
                        field(target_health_out, "Health", x0, yb + 960),
                        x0 + 240, yb + 960)
 
+    # What this swing dealt, after the player's guard (npc/block.py).
+    dealt = to_str(FN_FLOAT_TO_STR, "InDouble",
+                   _pin(keep(_at(ed.add_get_member_variable_node(HIT_DAMAGE_VAR),
+                                 x0, yb + 1080)), HIT_DAMAGE_VAR, is_input=False),
+                   x0 + 240, yb + 1080)
+
     line = _author_concat(ed, keep, [
         f"{COMBAT_TRACE_PREFIX}melee #", npc_id, " ", npc_name,
         " (hp ", npc_hp, ", dead ", npc_dead, ") at ", npc_at,
         " -> target ", target_name, " at ", target_at,
-        " dist ", dist, f" cm, dmg {NPC_MELEE_DAMAGE:.1f}, target hp ", target_hp,
-    ], x0 + 480, yb + 1100)
+        " dist ", dist, " cm, dmg ", dealt, ", target hp ", target_hp,
+    ], x0 + 480, yb + 1220)
 
     say = keep(_at(_node(ed, FN_PRINT), x0 + 1200, y0))
     _connect(line, _pin(say, "InString"))

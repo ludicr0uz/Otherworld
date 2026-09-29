@@ -6,12 +6,12 @@ the code is this package (`__init__.py` is the map) and the verifier's sections 
 
 ## Controls, and where they live
 
-The eight defaults are all rebindable on the settings screen:
+The nine defaults are all rebindable on the settings screen:
 
 - Left click fires. It **auto-fires while held** on the SMG and the assault rifle, and a tap
   **eats or drinks** a held consumable.
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
-  **Q** cycles, **G** drops, **E** picks up, **Shift** sprints.
+  **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held).
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
 
@@ -177,6 +177,27 @@ The verifier asserts the old loose constants are gone.
   It is edge-triggered: `Sprinting != PoseSprinting` sets `NeedsRefresh`. Level-triggering it
   restarts the montage every frame and the weapon strobes.
 - `BaseSpeed` is cached from the character at BeginPlay (600). Never hardcode it.
+
+## Blocking
+
+- **Hold F to guard, armed or not** (`weapon_component/block.py`):
+  `Blocking = KeyBlock down AND Stamina > 0 AND NOT Sprinting`, stored once a frame after the
+  sprint block. It never reads `Held`, so empty hands block too. The fire gate refuses while
+  it is set.
+- **The hit is resolved by the wanderer that swings** (`npc/block.py`), because the melee
+  writes `Health` straight onto the player's component and the swing is the only place its
+  damage and bearing exist together. The controller casts the player's `BP_WeaponComponent`:
+  - `Blocking AND Dot(player forward, bearing) >= cos(block_half_angle_deg)` (60°) →
+    `Stamina -= block_stamina_per_hit` (20, floored at 0), `HitDamage = 10 × block_damage_scale`
+    (2.5);
+  - otherwise, or if the cast fails, `HitDamage = 10`. The Health write reads `HitDamage`.
+  - Five blocked hits from full would break the guard, but regen (12/s) refills 24 between swings
+    of one wanderer, so only a pack wears it down.
+- **Probed in PIE** with `Set Blocking` forced true in memory: a wanderer in front dealt 2.5 per
+  swing and took stamina 100 → 80 each time. From behind, it dealt 10 and cost nothing. The
+  combat trace quotes the dealt `HitDamage`.
+- **Known gaps:** there is no guard pose (no clip exists to play), no HUD cue beyond the stamina
+  bar, and a blocked hit still flinches.
 
 ## Health, respawn and the pack's numbering (`health_component.py`, `respawn.py`)
 
@@ -379,7 +400,7 @@ The verifier asserts the old loose constants are gone.
 
 - **The fire gate:**
   ```
-  outer: (tapped OR holding) AND IsValid(Held) AND NOT Sprinting
+  outer: (tapped OR holding) AND IsValid(Held) AND NOT Sprinting AND NOT Blocking
   inner: (Loaded > 0 AND cooled) AND (tapped OR (holding AND Held.Automatic))
   ```
   - Anything read off `Held` must stay inside the outer gate, per the nested-Branch gotcha in the

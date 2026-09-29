@@ -69,4 +69,5 @@ FN_STOP_MOVEMENT = "/Script/Engine.Controller.StopMovement"
 
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
+NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"

@@ -7,8 +7,8 @@ from forest_generator.npc_placement import (
     NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK, NPC_MELEE_RANGE_CM,
 )
 from npc.paths import (
-    HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_SOUNDS_VAR, INF, LAST_HIT_FROM_VAR,
-    MELEE_SLOT,
+    HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, INF,
+    LAST_HIT_FROM_VAR, MELEE_SLOT,
 )
 from npc.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_AND, FN_ANIM_INSTANCE, FN_CLAMP, FN_DISTANCE,
@@ -20,6 +20,7 @@ from npc.graph import (
     _asset_sub, _at, BEL, _connect, _log, _loose_pin, _node, _palette, _pin,
     _resolve, _set,
 )
+from npc.block import _author_block_check
 from npc.combat_trace import _author_melee_trace
 from npc.sound import _author_random_sound
 
@@ -51,7 +52,9 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
         MoveToActor --> [in range AND off cooldown?]
                           true  --> NextAttackTime = now + interval
                                 --> play MM_Attack_01 on the upper body
-                                --> player Health -= NPC_MELEE_DAMAGE
+                                --> HitDamage = NPC_MELEE_DAMAGE, or less
+                                    on the player's guard (npc/block.py)
+                                --> player Health -= HitDamage
                           false -------------------------------------> Delay
 
     Range is centre-to-centre between the two capsules, which is why
@@ -173,12 +176,30 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     _connect(BEL.find_then_pin(montage), _pin(hit, "execute"))
     as_health = _loose_pin(hit, "AsBPHealthComponent", is_input=False)
 
+    # --- the bearing: which way the swing comes from -----------------------
+    # The unit vector from the player to the wanderer that swung. The guard
+    # reads it to decide whether the swing met the player's front, and it is
+    # stored below as LastHitFrom for the flinch.
+    toward = keep(_at(_node(ed, FN_SUB_VV), x0 + 3600, y0 + 300))
+    _connect(_pin(self_loc, "ReturnValue", is_input=False), _pin(toward, "A"))
+    _connect(_pin(player_loc, "ReturnValue", is_input=False), _pin(toward, "B"))
+    bearing = keep(_at(_node(ed, FN_NORMAL), x0 + 3840, y0 + 300))
+    _connect(_pin(toward, "ReturnValue", is_input=False), _pin(bearing, "A"))
+    bearing_out = _pin(bearing, "ReturnValue", is_input=False)
+
+    # --- how much of it lands: the player's guard --------------------------
+    # Its nodes stay out of `made`: they have their own comment box.
+    _, guarded = _author_block_check(ed, BEL.find_then_pin(hit), player_out,
+                                     bearing_out, x0 + 2880, y0 - 900)
+
     read = keep(_at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
                     x0 + 2880, y0 + 300))
     _connect(as_health, _pin(read, "self"))
     hurt = keep(_at(_node(ed, FN_SUB_FF), x0 + 3120, y0 + 300))
     _connect(_pin(read, "Health", is_input=False), _pin(hurt, "A"))
-    _set(hurt, "B", NPC_MELEE_DAMAGE)
+    dealt = keep(_at(ed.add_get_member_variable_node(HIT_DAMAGE_VAR),
+                     x0 + 2880, y0 + 420))
+    _connect(_pin(dealt, HIT_DAMAGE_VAR, is_input=False), _pin(hurt, "B"))
     floor = keep(_at(_node(ed, FN_CLAMP), x0 + 3360, y0 + 300))
     _connect(_pin(hurt, "ReturnValue", is_input=False), _pin(floor, "Value"))
     _set(floor, "Min", 0.0)
@@ -187,26 +208,19 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
                      x0 + 3600, y0))
     _connect(as_health, _pin(write, "self"))
     _connect(_pin(floor, "ReturnValue", is_input=False), _pin(write, "Health"))
-    _connect(BEL.find_then_pin(hit), _pin(write, "execute"))
+    for tail in guarded:
+        _connect(tail, _pin(write, "execute"))
 
     # --- and which way it came from ------------------------------------------
     # The player's flinch is picked by direction, and a punch has no impact
-    # normal to read it off -- so it is stated: the unit vector from the player
-    # to the wanderer that swung.  Both locations are already on the graph for
-    # the range check, so this is three pure nodes and a Set.  Whichever of the
-    # ten lands the blow writes its own bearing, so being surrounded reads as
-    # being hit from all sides rather than as one repeated stagger.
-    toward = keep(_at(_node(ed, FN_SUB_VV), x0 + 3600, y0 + 300))
-    _connect(_pin(self_loc, "ReturnValue", is_input=False), _pin(toward, "A"))
-    _connect(_pin(player_loc, "ReturnValue", is_input=False), _pin(toward, "B"))
-    bearing = keep(_at(_node(ed, FN_NORMAL), x0 + 3840, y0 + 300))
-    _connect(_pin(toward, "ReturnValue", is_input=False), _pin(bearing, "A"))
+    # normal to read it off -- so it is stated: the bearing above.  Whichever of
+    # the ten lands the blow writes its own bearing, so being surrounded reads
+    # as being hit from all sides rather than as one repeated stagger.
     came_from = keep(_at(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR,
                                                           HEALTH_CLASS_PATH),
                          x0 + 3840, y0))
     _connect(as_health, _pin(came_from, "self"))
-    _connect(_pin(bearing, "ReturnValue", is_input=False),
-             _pin(came_from, LAST_HIT_FROM_VAR))
+    _connect(bearing_out, _pin(came_from, LAST_HIT_FROM_VAR))
 
     # --- and, when the combat trace is on, say who did it -------------------
     # Between the hit and its bearing, so the line quotes the health just

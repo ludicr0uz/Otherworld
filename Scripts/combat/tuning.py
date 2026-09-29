@@ -46,6 +46,9 @@ SWITCH_KEY = "Q"
 DROP_KEY = "G"
 PICKUP_KEY = "E"
 SPRINT_KEY = "LeftShift"
+# Held to guard (weapon_component/block.py). F because it sits under the left
+# hand beside the movement keys and nothing else here uses it; rebindable.
+BLOCK_KEY = "F"
 
 PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
 DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
@@ -108,6 +111,18 @@ class CombatConfig:
     # has to be worth spending and it has to cost something to have spent.
     stamina_drain_per_s: float = 25.0
     stamina_regen_per_s: float = 12.0
+
+    # --- blocking ------------------------------------------------------------
+    # Held BLOCK_KEY, armed or not. A wanderer's swing that lands within
+    # block_half_angle_deg of where the player faces does block_damage_scale of
+    # its damage and costs block_stamina_per_hit; a guard with no stamina left
+    # is no guard (Blocking needs Stamina > 0), so five blocked hits from full
+    # break it. The hit itself is resolved where it is dealt, in the NPC melee
+    # (npc/block.py), because that is the one place the swing's damage and
+    # bearing exist together.
+    block_damage_scale: float = 0.25
+    block_stamina_per_hit: float = 20.0
+    block_half_angle_deg: float = 60.0
 
     # --- aiming down the sights ----------------------------------------------
     # What ADS does is narrow the camera's field of view and tighten the
@@ -330,6 +345,8 @@ RELOAD_KEY = "R"
 # KeySights sits next to KeyAim, and adding it changed the length: a save
 # written before it has seven binds, which the settings loader refills with
 # these defaults rather than trusting (build_graphics_menu.py's settings load).
+# KeyBlock went on the END, for the same reason: a nine-bind list refills an
+# eight-bind save once, and no existing index changes meaning.
 BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyAim", AIM_KEY),
              ("KeySights", SIGHTS_KEY),
@@ -337,7 +354,8 @@ BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeySwitch", SWITCH_KEY),
              ("KeyDrop", DROP_KEY),
              ("KeyPickup", PICKUP_KEY),
-             ("KeyReload", RELOAD_KEY))
+             ("KeyReload", RELOAD_KEY),
+             ("KeyBlock", BLOCK_KEY))
 # Shells a killed wanderer leaves behind. Two per kill against five spent per
 # magazine means the shotgun runs down unless most shots land, which is the
 # point of giving it a reserve at all.

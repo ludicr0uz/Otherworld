@@ -38,6 +38,9 @@ BeginPlay → [possessed? no → Delay] → [dead? → corpse, loop ends] → st
   - Damage is dealt by writing `Health` on the player's component, because
     `ApplyDamage`/`AnyDamage` would need a graph on the Enhanced Input template character.
   - If `BP_HealthComponent` is missing, the NPC only chases.
+  - **The player's guard** (`block.py`) sets the per-controller `HitDamage` before the Health
+    write: 2.5 and 20 of the player's stamina when the player is `Blocking` and faces the swing
+    (within 60°), otherwise 10. See `Scripts/combat/CLAUDE.md`, "Blocking".
 - **The corpse state** (`corpse.py`):
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and no Delay, so the loop ends.

@@ -1,4 +1,5 @@
-"""weapon_component -- BP_WeaponComponent: inventory, aim, fire, reload, recoil, sprint.
+"""weapon_component -- BP_WeaponComponent: inventory, aim, fire, reload, recoil, sprint,
+block.
 
 build.build_weapon_component() is the entry; it declares the variables and
 authors BeginPlay (inventory.py) and Tick (tick.py). Tick calls one
@@ -18,6 +19,8 @@ _author_* fragment per concern, each in its own module:
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
   sprint      sprint and stamina
+  block       the guard: Blocking = block key AND stamina AND not sprinting
+              (what a block does to a swing is npc/block.py)
   ready_pose  restart the ready pose after it is interrupted
   tick        the Tick that calls all of the above
 

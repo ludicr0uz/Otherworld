@@ -6,8 +6,8 @@ the numbers are pin literals baked per controller: a wendigo controller
 carrying the zombie's vision range compiles, runs, and is wrong.
 
 The chase and melee half of these graphs is still checked by the level
-verifier (verify_<Level>.py); this file owns what npc/agro.py, patrol.py and
-senses.py added.
+verifier (verify_<Level>.py); this file owns what npc/agro.py, patrol.py,
+senses.py, corpse.py, combat_trace.py and block.py added.
 """
 
 import math
@@ -19,13 +19,14 @@ from forest_generator.npc_agro import (
     AGRO_LOG_PREFIX, NPC_AGRO, PATROL_ACCEPT_FRACTION, PATROL_ACCEPT_SLACK_CM,
     agro_for,
 )
-from forest_generator.npc_placement import NPC_VARIANTS
+from forest_generator.npc_placement import NPC_MELEE_DAMAGE, NPC_VARIANTS
 from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, DEBUG_MODE_VAR
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
-    RUN_SPEED_VAR,
+    HIT_DAMAGE_VAR, RUN_SPEED_VAR,
 )
+from npc.block import BLOCK_MIN_DOT, BLOCKED_DAMAGE
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -136,6 +137,7 @@ def check_controller(path, agro):
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     check(f"{tag}: the graph compiles clean", not ed.list_nodes_with_errors())
     check_corpse_and_trace(tag, nodes, cdo)
+    check_player_guard(tag, nodes)
 
     # --- state, and that it starts patrolling --------------------------------
     kinds = {AGGRO_VAR: bool, PATROL_READY_VAR: bool, AGGRO_REASON_VAR: str,
@@ -313,6 +315,54 @@ def check_corpse_and_trace(tag, nodes, cdo):
              if f in _feeders(b, "Condition")]
     check(f"{tag}: ...only while the GameMode's {COMBAT_TRACE_VAR} is on",
           len(flags) == 1 and len(gated) == 1)
+
+
+def check_player_guard(tag, nodes):
+    """npc/block.py: what the player's guard does to a landed swing."""
+    sets = _titled(nodes, f"Set {HIT_DAMAGE_VAR}")
+    amounts = sorted(_num(n, HIT_DAMAGE_VAR) or 0.0 for n in sets)
+    check(f"{tag}: a swing deals {NPC_MELEE_DAMAGE:.0f}, or {BLOCKED_DAMAGE:.1f} "
+          f"on the player's guard",
+          len(sets) == 2 and _close(amounts[0], BLOCKED_DAMAGE)
+          and _close(amounts[1], NPC_MELEE_DAMAGE)
+          and BLOCKED_DAMAGE < NPC_MELEE_DAMAGE, f"{amounts}")
+    hurts = [n for n in _titled(nodes, "float - float")
+             if {_title(f) for f in _feeders(n, "A")} == {"Get Health"}]
+    check(f"{tag}: the Health write subtracts {HIT_DAMAGE_VAR}, not a literal",
+          len(hurts) == 1
+          and {_title(f) for f in _feeders(hurts[0], "B")} == {f"Get {HIT_DAMAGE_VAR}"},
+          f"{[_lit(n, 'B') for n in hurts]}")
+    # The player's Health write, told from this creature's own (stats.py) by
+    # what runs it.
+    writes = [n for n in _titled(nodes, "Set Health")
+              if f"Set {HIT_DAMAGE_VAR}" in {_title(d) for d in _drivers(n)}]
+    check(f"{tag}: ...and runs only after {HIT_DAMAGE_VAR} is set, on both arms",
+          len(writes) == 1 and sorted(_title(d) for d in _drivers(writes[0]))
+          == [f"Set {HIT_DAMAGE_VAR}"] * 2,
+          f"{[_title(d) for w in writes for d in _drivers(w)]}")
+    soft = [n for n in sets if _close(_num(n, HIT_DAMAGE_VAR), BLOCKED_DAMAGE)]
+    pay = [d for n in soft for d in _drivers(n)]
+    check(f"{tag}: a blocked swing costs the player "
+          f"{COMBAT.block_stamina_per_hit:.0f} stamina first",
+          len(pay) == 1 and _title(pay[0]) == "Set Stamina"
+          and any(_close(_num(f, "B"), COMBAT.block_stamina_per_hit)
+                  for c in _feeders(pay[0], "Stamina") for f in _feeders(c, "Value")),
+          f"{[_title(d) for d in pay]}")
+    gate = [d for p in pay for d in _drivers(p) if _title(d) == "Branch"]
+    cond = [f for g in gate for f in _feeders(g, "Condition")]
+    fed = {_title(x) for c in cond for pin in ("A", "B") for x in _feeders(c, pin)}
+    fronts = [x for c in cond for x in _feeders(c, "B")]
+    check(f"{tag}: ...only while the player is Blocking and the swing comes from "
+          f"within {COMBAT.block_half_angle_deg:.0f} deg of their facing",
+          len(gate) == 1 and "Get Blocking" in fed
+          and any(_close(_num(x, "B"), BLOCK_MIN_DOT) for x in fronts),
+          f"{sorted(fed)}")
+    full = [n for n in sets if _close(_num(n, HIT_DAMAGE_VAR), NPC_MELEE_DAMAGE)]
+    into_full = sorted(_title(d) for n in full for d in _drivers(n))
+    check(f"{tag}: no guard, or no weapon component, is the full swing "
+          f"(every exit of the check reaches the Health write)",
+          len(full) == 1 and len(into_full) == 2 and "Branch" in into_full,
+          f"{into_full}")
 
 
 def run():

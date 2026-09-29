@@ -51,6 +51,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     for name in ("Stamina", "MaxStamina", "BaseSpeed"):
         _declare(ed, name, _float_type())
     _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
+    # The guard (block.py). Read by the fire gate, and by every wanderer's
+    # swing, which also writes Stamina here when the guard takes the hit.
+    _declare(ed, "Blocking", BEL.get_basic_type_by_name("bool"))
     # Aiming down the sights. BaseFOV is cached off the camera at BeginPlay for
     # the same reason BaseSpeed is cached off the movement component; CurrentFOV
     # is stored because FInterpTo's input is its own previous output, and
@@ -126,6 +129,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # bar would divide by if that somehow never ran.
         "BaseSpeed": 500.0,
         "Sprinting": False,
+        "Blocking": False,
         # 1.0 is "exactly what the controller already does", because the two
         # base scales this multiplies are the controller's own. A player who
         # never opens the settings screen therefore gets the stock feel.

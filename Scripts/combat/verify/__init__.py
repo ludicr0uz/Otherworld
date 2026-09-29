@@ -15,10 +15,11 @@ and it never relies on a variable another section left behind.
   player_body  blood  hit_reactions  ragdoll  aiming  settings_and_tuning
   firing  consume  drops  noise  combat_trace
   sights      the two aim keys, each weapon's eye point, the sight camera
+  block       the guard: its key, the Blocking stance, the fire gate refusing
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "block",
     "settings_and_tuning", "firing", "consume", "drops", "noise", "combat_trace",
 )

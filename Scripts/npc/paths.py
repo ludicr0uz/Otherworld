@@ -49,6 +49,9 @@ REACTIONS_VAR = "HitReactions"
 # writes it off the impact normal for a bullet.  See _author_hit_reaction there
 # for what reads it.
 LAST_HIT_FROM_VAR = "LastHitFrom"
+# Per controller: what the swing being landed deals, set by the player's guard
+# check (npc/block.py) just before the Health write reads it.
+HIT_DAMAGE_VAR = "HitDamage"
 
 # ── Patrol and agro (npc/agro.py, patrol.py, senses.py) ─────────────────────
 #

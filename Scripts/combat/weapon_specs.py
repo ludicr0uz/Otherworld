@@ -149,6 +149,83 @@ RIFLE_SIGHT = (-8.0, 0.0, 9.0)
 SNIPER_SIGHT = (9.0, 0.0, 9.0)
 
 
+# ─── Accuracy: where the shot goes, and what it does to the view ─────────────
+#
+# Two separate mechanics, every number per gun (the task that added them asked
+# for exactly that, so nothing here is a global in COMBAT):
+#
+# THE CLOUD decides where a shot lands. Each trigger pull draws ONE direction
+# inside a cone of AimSpread degrees around the reticle's line, and the round
+# (or the shotgun's whole pellet pattern) flies down it. AimSpread is written
+# every frame by weapon_component/accuracy.py:
+#
+#     spread x (sights ? 0 : shoulder ? spread_shoulder : 1)
+#            x (prone ? spread_prone : crouched ? spread_crouch : 1)
+#
+# so down the sights it is zero and the shot goes exactly where the reticle is.
+# The HUD sizes the reticle from the same number, so its gap is the cloud.
+# `pellet_spread` is not the cloud: it is the shotgun's pattern around wherever
+# the cloud put the shot, and zero on a single-round gun.
+#
+# RECOIL moves the view (and so the reticle) after the shot, never the shot:
+#
+#     up       = recoil     x scale
+#     sideways = +/- recoil_yaw x scale                (drawn once per shot)
+#     scale    = (sights ? recoil_sights : shoulder ? recoil_shoulder : 1)
+#              x (prone ? recoil_prone : crouched ? recoil_crouch : 1)
+#
+# recoil_yaw is a quarter of recoil on every gun (four times more climb than
+# swing); it is a column so a gun may break that, and the verifier asserts the
+# 4x for the five that exist. The orderings the verifier holds every row to:
+# prone < crouched < 1 for both mechanics, and shoulder < 1.
+#
+# `recoil` is degrees of muzzle climb per shot. The ordering is the point of
+# the numbers: the two heavy, slow weapons kick hardest (sniper 2.4, shotgun
+# 2.2), the assault rifle next (0.85), the SMG less (0.45) and the pistol least
+# (0.30). Read against the fire interval it is also a rate: the SMG's 0.45
+# every 0.09 s is five degrees a second against the rifle's six, so the rifle
+# is the one that walks off target under sustained fire.
+GUN_ACCURACY = {
+    #            cloud (deg) and its factors             pattern      recoil (deg) and its factors
+    "Shotgun": dict(spread=3.0, spread_shoulder=0.50, spread_crouch=0.75, spread_prone=0.55,
+                    pellet_spread=5.0,
+                    recoil=2.2, recoil_yaw=0.55, recoil_shoulder=0.80, recoil_sights=0.65,
+                    recoil_crouch=0.75, recoil_prone=0.50),
+    "Pistol":  dict(spread=1.6, spread_shoulder=0.45, spread_crouch=0.75, spread_prone=0.55,
+                    pellet_spread=0.0,
+                    recoil=0.30, recoil_yaw=0.075, recoil_shoulder=0.80, recoil_sights=0.65,
+                    recoil_crouch=0.80, recoil_prone=0.60),
+    "SMG":     dict(spread=2.6, spread_shoulder=0.50, spread_crouch=0.75, spread_prone=0.55,
+                    pellet_spread=0.0,
+                    recoil=0.45, recoil_yaw=0.1125, recoil_shoulder=0.80, recoil_sights=0.65,
+                    recoil_crouch=0.75, recoil_prone=0.50),
+    "Rifle":   dict(spread=2.0, spread_shoulder=0.40, spread_crouch=0.70, spread_prone=0.45,
+                    pellet_spread=0.0,
+                    recoil=0.85, recoil_yaw=0.2125, recoil_shoulder=0.75, recoil_sights=0.60,
+                    recoil_crouch=0.70, recoil_prone=0.45),
+    # A sniper fired from the hip is a guess; from the scope it is exact.
+    "Sniper":  dict(spread=3.0, spread_shoulder=0.35, spread_crouch=0.70, spread_prone=0.35,
+                    pellet_spread=0.0,
+                    recoil=2.4, recoil_yaw=0.6, recoil_shoulder=0.80, recoil_sights=0.60,
+                    recoil_crouch=0.70, recoil_prone=0.40),
+}
+
+# Each accuracy column and the BP_WeaponItem variable it becomes.
+ACCURACY_VARS = (
+    ("spread", "SpreadDegrees"),
+    ("spread_shoulder", "SpreadShoulderScale"),
+    ("spread_crouch", "SpreadCrouchScale"),
+    ("spread_prone", "SpreadProneScale"),
+    ("pellet_spread", "PelletSpreadDegrees"),
+    ("recoil", "RecoilPitch"),
+    ("recoil_yaw", "RecoilYaw"),
+    ("recoil_shoulder", "RecoilShoulderScale"),
+    ("recoil_sights", "RecoilSightsScale"),
+    ("recoil_crouch", "RecoilCrouchScale"),
+    ("recoil_prone", "RecoilProneScale"),
+)
+
+
 def _weapon_icon(display):
     """The weapon's HUD silhouette, or None if the UI art is not built yet.
 
@@ -190,17 +267,9 @@ def _weapon_specs():
 
     DropClasses below is what marks a weapon as findable rather than issued.
 
-    `recoil` is degrees of muzzle climb per shot, and it is a column here for
-    the same reason `spread` is -- how hard a gun kicks is a fact about the
-    gun. The ordering is the point of the numbers: the two heavy, slow weapons
-    kick hardest (sniper 2.4, shotgun 2.2), the assault rifle next (0.85), the
-    SMG noticeably less (0.45) and the pistol least (0.30). Read against
-    `interval` it is also a rate: the SMG's 0.45 every 0.09 s is five degrees a
-    second of raw climb against the rifle's six, so the rifle is the one that
-    walks off target under sustained fire while the SMG stays controllable --
-    which is the same "wins the fight it is already in" identity its damage
-    gives it. The two singles pay their whole kick in one visible jolt and
-    then have a second to recover.
+    Spread and recoil are columns too, but they live in GUN_ACCURACY above and
+    are merged into each row here, so the accuracy of all five reads as one
+    table.
 
     `shot_volume` is how far the shot is heard, and it is read from
     SHOT_VOLUME_CM in tuning.py rather than written inline, because the five
@@ -211,57 +280,58 @@ def _weapon_specs():
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
     specs = (
         dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
-             display="Shotgun", automatic=False, damage=18.0, pellets=8, spread=5.0, range=4000.0,
+             display="Shotgun", automatic=False, damage=18.0, pellets=8, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
-             recoil=2.2, shot_volume=SHOT_VOLUME_CM["Shotgun"]),
+             shot_volume=SHOT_VOLUME_CM["Shotgun"]),
         dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
-             display="Pistol", automatic=False, damage=26.0, pellets=1, spread=1.0, range=6000.0,
+             display="Pistol", automatic=False, damage=26.0, pellets=1, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
              colour=(0.35, 0.65, 0.95),
              uses_ammo=False, magazine=0, reserve=0,
              interval=PISTOL_FIRE_INTERVAL, reload_s=0.0,
-             recoil=0.30, shot_volume=SHOT_VOLUME_CM["Pistol"]),
+             shot_volume=SHOT_VOLUME_CM["Pistol"]),
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast.
         dict(path=SMG_BP_PATH, parts=_smg_parts(), muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
-             display="SMG", automatic=True, damage=12.0, pellets=1, spread=2.6, range=4500.0,
+             display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
              sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.45, 0.85, 0.35),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
              interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
-             recoil=0.45, shot_volume=SHOT_VOLUME_CM["SMG"]),
+             shot_volume=SHOT_VOLUME_CM["SMG"]),
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
         dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
-             display="Rifle", automatic=True, damage=24.0, pellets=1, spread=1.4, range=9000.0,
+             display="Rifle", automatic=True, damage=24.0, pellets=1, range=9000.0,
              sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.70, 0.45, 0.95),
              uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
              interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS,
-             recoil=0.85, shot_volume=SHOT_VOLUME_CM["Rifle"]),
-        # One shot, one kill: 120 against 100 HP, at 0.2 degrees of spread and
+             shot_volume=SHOT_VOLUME_CM["Rifle"]),
+        # One shot, one kill: 120 against 100 HP, exact down the scope, and
         # 200 m of range -- further than anything in a 200 m forest is visible.
         # The cost is 1.6 s between shots, which against a pack of five that
         # runs at 600 cm/s is the difference between opening at distance and
         # being caught reloading.
         dict(path=SNIPER_BP_PATH, parts=_sniper_parts(), muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
-             display="Sniper", automatic=False, damage=120.0, pellets=1, spread=0.2, range=20000.0,
+             display="Sniper", automatic=False, damage=120.0, pellets=1, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
              colour=(0.95, 0.30, 0.35), ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
              interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
-             recoil=2.4, shot_volume=SHOT_VOLUME_CM["Sniper"]),
+             shot_volume=SHOT_VOLUME_CM["Sniper"]),
     )
     for spec in specs:
+        spec.update(GUN_ACCURACY[spec["display"]])
         # Held in both hands is what the rifle ready pose does; the guard pose
         # (body_pose.py) picks fists or the gun across the body on it.
         spec["two_handed"] = spec["aim"] == AIM_RIFLE

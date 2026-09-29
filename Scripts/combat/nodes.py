@@ -157,6 +157,9 @@ FN_BOOL_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_BoolToDouble"
 FN_ADD_TICK_PREREQ = "/Script/Engine.ActorComponent.AddTickPrerequisiteComponent"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
+# The reticle's size (weapon_component/accuracy.py): the cloud's angle as a
+# fraction of the half-width the field of view spans.
+FN_DEG_TAN = "/Script/Engine.KismetMathLibrary.DegTan"
 # The noise record (combat/noise.py): the louder of two reaches, and whether a
 # footstep belongs to the player rather than to one of the wanderers who share
 # the footstep component.

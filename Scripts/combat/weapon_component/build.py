@@ -14,7 +14,9 @@ from combat.paths import (
     CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, WEAPON_COMP_BP_PATH,
 )
 from combat.tuning import BIND_VARS, COMBAT
+from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
 from combat.weapon_component.consume import TRIGGER_SPENT
+from combat.weapon_component.firing import SHOT_DIRECTION_VAR
 from combat.weapon_component.inventory import _author_wc_begin_play
 from combat.weapon_component.pose_weights import HELD_TWO_HANDED
 from combat.weapon_component.stance import STANCE_VAR, STAND
@@ -105,6 +107,13 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # RandomFloatInRange is pure and a second read would be a second number.
     for name in ("RecoilDebt", "RecoilYawDebt", "RecoilYawKick"):
         _declare(ed, name, _float_type())
+    # Accuracy (accuracy.py): the cloud, the kick's scale and the reticle's
+    # size, written once a frame. ShotDirection is the one draw of a shot's
+    # direction inside the cloud, stored because the cone is pure and every
+    # pellet of the shotgun must share it.
+    for name in ACCURACY_OUT_VARS:
+        _declare(ed, name, _float_type())
+    _declare(ed, SHOT_DIRECTION_VAR, _struct_type(unreal.Vector.static_struct()))
     # How many rounds this reload moves, computed once and read back three
     # times. See _author_reload for why it cannot just be recomputed.
     _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
@@ -163,6 +172,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         "RecoilDebt": 0.0,
         "RecoilYawDebt": 0.0,
         "RecoilYawKick": 0.0,
+        **{name: 0.0 for name in ACCURACY_OUT_VARS},
         DEBUG_MODE_VAR: False,
         "ShotgunClass": BEL.generated_class(shotgun_bp),
         "PistolClass": BEL.generated_class(pistol_bp),

@@ -111,9 +111,12 @@ def check_shot_noise():
                    for q in PIN.list_connected_pins(BEL.find_input_pin(n, "ConeDir"))}
     shot_dirs = {PIN.get_owning_node(q) for n in heading
                  for q in PIN.list_connected_pins(BEL.find_input_pin(n, NOISE_DIRECTION_VAR))}
-    check("the cone points down the line the pellets flew",
-          len(heading) == 1 and bool(shot_dirs) and shot_dirs == pellet_dirs,
-          f"{len(shot_dirs)} source(s), shared with the pellets: {shot_dirs == pellet_dirs}")
+    # The pellets now fly around ShotDirection, which the shot's cloud draw
+    # centres on that same Normalize.
+    check("the cone points down the line the shot was drawn around",
+          len(heading) == 1 and bool(shot_dirs) and shot_dirs <= pellet_dirs,
+          f"{len(shot_dirs)} source(s), shared with the shot's cone: "
+          f"{shot_dirs <= pellet_dirs}")
 
 
 def check_footstep_noise():

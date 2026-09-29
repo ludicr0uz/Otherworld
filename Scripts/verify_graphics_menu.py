@@ -20,6 +20,7 @@ from graphics_menu import fps as F
 from graphics_menu import menu_nav as N
 from graphics_menu import grass_tiers as T
 from graphics_menu import presets as P
+from graphics_menu import reticle as R
 from graphics_menu import settings_rows as S
 from graphics_menu import survival_bars as SB
 from graphics_menu import scope as SC
@@ -408,6 +409,20 @@ def main():
     # right-anchored above the kill counter.
     check("everything positioned off the window edge reads the viewport size",
           len(viewports) == 7, str(len(viewports)))
+    # The reticle's gap is the held gun's accuracy cloud (combat accuracy.py
+    # writes ReticleSpread, a fraction of half the width): the four ticks move
+    # out with it, capped, and the dot stays put.
+    spread_reads = [n for n in nodes
+                    if str(BEL.get_node_title(n)).replace("\n", " ") == "Get ReticleSpread"]
+    caps = [n for n in by_pins("A", "B")
+            if float_pin(n, "B") == R.RETICLE_SPREAD_MAX]
+    capped = [n for n in caps
+              if BEL.find_input_pin(n, "A").list_connected_pins()]
+    check("the reticle opens by the gun's cloud (ReticleSpread x half the "
+          "width), capped on screen",
+          len(spread_reads) == 1 and len(capped) == 1,
+          f"{len(spread_reads)} reads, {len(capped)} caps "
+          f"{sorted({str(BEL.get_node_title(n)) for n in caps})}")
     check("a blocked shot colours the reticle differently",
           any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
           and "Get AimBlocked" in aim_reads)
@@ -471,7 +486,7 @@ def main():
               irons is not None
               and not BEL.find_input_pin(irons, "ScreenW").list_connected_pins()
               and float(BEL.find_input_pin(irons, "ScreenW").get_pin_value())
-              == G.RETICLE_ARM)
+              == R.RETICLE_ARM)
 
     strips = [n for n in by_pins("RectColor")
               if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]

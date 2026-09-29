@@ -26,7 +26,7 @@ from combat.graph import (
 )
 from combat.paths import ITEM_BP_PATH
 from combat.tuning import COMBAT
-from combat.weapon_specs import _weapon_icon
+from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
 
 
 def build_weapon_item():
@@ -116,13 +116,14 @@ def build_weapon_item():
     # and the scope is what the sight looks like, and a future weapon is free
     # to be a 4x with irons or a 2x with glass without either answer moving.
     _declare(ed, "Scoped", BEL.get_basic_type_by_name("bool"))
-    # Degrees of upward kick this weapon puts on the view per shot. On the item
-    # for the same reason AdsZoom and SpreadDegrees are: the component reads it
-    # off Held and knows nothing about which weapon it is holding. The
-    # horizontal half is not a second column -- it is a fraction of this one,
-    # drawn per shot, and the fraction is the same for every gun (see
-    # COMBAT.recoil_horizontal_ratio).
-    _declare(ed, "RecoilPitch", _float_type())
+    # Accuracy: the cloud a shot is drawn in and the kick it puts on the view,
+    # with their stance and aim factors. One variable per GUN_ACCURACY column
+    # (weapon_specs.py says what each means), on the item for the same reason
+    # AdsZoom is: the component reads them off Held and knows nothing about
+    # which weapon it is holding. SpreadDegrees is declared above with Damage.
+    for _col, name in ACCURACY_VARS:
+        if name != "SpreadDegrees":
+            _declare(ed, name, _float_type())
     # How far this weapon's shot is heard by the wanderers, in cm (see
     # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
     # Held like every other per-weapon number.
@@ -188,7 +189,6 @@ def build_weapon(spec, item_bp):
         "DisplayName": spec["display"],
         "Damage": float(spec["damage"]),
         "PelletCount": int(spec["pellets"]),
-        "SpreadDegrees": float(spec["spread"]),
         "WeaponRange": float(spec["range"]),
         "Dropped": False,
         "UsesAmmo": bool(spec["uses_ammo"]),
@@ -210,7 +210,7 @@ def build_weapon(spec, item_bp):
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
         "AdsZoom": float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),
         "Scoped": bool(spec.get("scoped", False)),
-        "RecoilPitch": float(spec["recoil"]),
+        **{name: float(spec[col]) for col, name in ACCURACY_VARS},
         "ShotVolume": float(spec["shot_volume"]),
         "Icon": _weapon_icon(spec["display"]),
         "FireSound": _must_load(spec["sound"]),
@@ -221,7 +221,8 @@ def build_weapon(spec, item_bp):
     })
     _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
          f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
-         f"{spec['recoil']:.2f} deg kick, "
+         f"{spec['spread']:.1f} deg cloud, {spec['recoil']:.2f}/"
+         f"{spec['recoil_yaw']:.3f} deg kick, "
          f"heard at {spec['shot_volume'] / 100.0:.0f} m, "
          + (f"{spec['magazine']}+{spec['reserve']} rounds, "
             f"{spec['interval']:.2f}s between shots"

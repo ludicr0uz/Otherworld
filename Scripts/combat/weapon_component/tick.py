@@ -3,6 +3,7 @@ aim/fire/inventory/sprint/recoil/ammo fragments in order.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.weapon_component.accuracy import _author_accuracy
 from combat.nodes import (
     FN_ADD_II, FN_AND, FN_ARR_LEN, FN_GET_OWNER, FN_GET_PC, FN_GE_FF,
     FN_GREATER_II, FN_IS_KEY_DOWN, FN_IS_VALID, FN_LESS_II, FN_MOD_II,
@@ -130,6 +131,11 @@ def _author_wc_tick(ed, tick):
     # After both are written (Stance, Blocking), which set its weights.
     ads_exits = _author_pose_weights(ed, tick, held, armed_out, ads_exits,
                                      12600, -700)
+
+    # --- and how true the gun shoots from here -------------------------------
+    # After the stance and the aim state it reads, before the trigger and the
+    # kick that use it. accuracy.py owns the formula.
+    ads_exits = _author_accuracy(ed, held, armed_out, ads_exits, 16800, -700)
 
     # --- the pose follows the sprint -----------------------------------------
     # Edge-triggered, not level-triggered, and that distinction is the whole

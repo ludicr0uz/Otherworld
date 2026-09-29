@@ -142,7 +142,7 @@ def check_combat_config():
           knobs >= {"start_health", "head_multiplier", "limb_multiplier",
                     "sprint_speed_cms", "max_stamina", "stamina_drain_per_s",
                     "stamina_regen_per_s", "ads_zoom_irons", "ads_zoom_scope",
-                    "ads_interp_speed", "ads_spread_scale",
+                    "ads_interp_speed",
                     "mouse_sensitivity_default", "mouse_sensitivity_min",
                     "mouse_sensitivity_max", "mouse_sensitivity_step",
                     "ads_sens_compensation", "ads_scope_sens_scale",
@@ -150,8 +150,7 @@ def check_combat_config():
                     "scope_sensitivity_step",
                     "ads_move_speed_scale",
                     "recoil_recovery_speed",
-                    "recoil_recovery_fraction", "recoil_ads_scale",
-                    "recoil_horizontal_ratio"},
+                    "recoil_recovery_fraction"},
           str(sorted(knobs)))
     stale = [n for n in ("START_HEALTH", "HEAD_MULTIPLIER", "LIMB_MULTIPLIER",
                          "SPRINT_SPEED_CMS", "MAX_STAMINA", "STAMINA_DRAIN_PER_S",
@@ -166,7 +165,9 @@ def check_combat_config():
     # Per-weapon numbers must NOT have been swept into it: that would undo the
     # "a sixth weapon is a row in a table" property the whole file is built on.
     check("per-weapon numbers stayed on the weapon table",
-          not (knobs & {"damage", "spread", "recoil", "interval", "magazine"}),
+          not (knobs & {"damage", "spread", "recoil", "interval", "magazine",
+                        "ads_spread_scale", "recoil_ads_scale",
+                        "recoil_horizontal_ratio"}),
           str(sorted(knobs)))
 
 

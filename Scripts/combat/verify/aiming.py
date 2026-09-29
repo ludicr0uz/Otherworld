@@ -71,9 +71,8 @@ def check_aiming_down_sights():
     check("BaseFOV is cached off the camera, not written down as a literal",
           bool(base_reads), str(len(base_reads)))
     check("aiming is refused while sprinting, which cannot fire anyway",
-          COMBAT.ads_spread_scale < 1.0 and "Get Sprinting" in
-          {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg},
-          f"cone x{COMBAT.ads_spread_scale}")
+          "Get Sprinting" in
+          {str(BEL.get_node_title(x)).replace("\n", " ") for x in wg})
 
 
 # ─── Mouse sensitivity, and what the zoom does to it ─────────────────────────

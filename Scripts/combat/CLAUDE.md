@@ -85,7 +85,8 @@ The verifier asserts the old loose constants are gone.
   1. A camera trace gives `AimPoint`.
   2. A muzzle trace towards `AimPoint` sets `AimBlocked` if it stops short.
 
-  Pellets fly a cone around `Normal(AimPoint - muzzle)`. It is hitscan.
+  Each shot draws **one** direction inside the accuracy cloud around `Normal(AimPoint - muzzle)`
+  into `ShotDirection`; pellets fly the gun's `PelletSpreadDegrees` pattern around it. Hitscan.
 - **The reticle is nailed to the viewport centre**, and turns red when `AimBlocked`. Drawing it at
   the projected `AimPoint` was tried and reverted: it slid under parallax.
 - **Two ways to aim** (`weapon_component/ads.py`):
@@ -94,7 +95,7 @@ The verifier asserts the old loose constants are gone.
   - `KeySights` (middle) is down the sights: zoom is the weapon's `AdsZoom` (irons 1.5x, scope
     4x), and `sights.py` eases the camera from the boom's `SpringEndpoint` to the held weapon's
     `SightOffset` by `SightBlend`, by **location only**. The rotation stays the boom's.
-  - `Aiming` is either key (cone, recoil, slowdown). `SightAiming` is the sights key alone,
+  - `Aiming` is either key (cloud, recoil, slowdown). `SightAiming` is the sights key alone,
     never with a consumable. `AimZoom` stores the zoom being aimed at. It isn't written on
     release, so the walk slowdown's ease-out divides by the zoom being let go of.
   - The camera is written every frame, both ways. The template camera has no offset on the
@@ -138,11 +139,26 @@ The verifier asserts the old loose constants are gone.
     on any zoom and either aim. The mouse slowdown is deliberately *not* normalised.
   - **Trap:** always scale `BaseSpeed`, never the live `MaxWalkSpeed`, which compounds to a
     standstill. The verifier walks the inputs to check.
+- **Accuracy: two separate mechanics, every number per gun** (`GUN_ACCURACY` in
+  `weapon_specs.py`, copied onto each weapon; `weapon_component/accuracy.py`):
+  - **The cloud** decides where a shot lands. Once a frame, behind an `IsValid(Held)` Branch:
+    `AimSpread = SpreadDegrees × (sights ? 0 : shoulder ? SpreadShoulderScale : 1) ×
+    (prone ? SpreadProneScale : crouched ? SpreadCrouchScale : 1)`. Down the sights it is
+    exactly zero, and `VRandCone` returns the direction itself for a zero cone.
+  - The shot's draw is **stored** in `ShotDirection` before the pellet loop: the cone is pure, and
+    read per pellet it would give the shotgun's pattern a new centre per pellet.
+  - **The reticle is the cloud.** `ReticleSpread = DegTan(AimSpread) / DegTan(CurrentFOV/2)`, a
+    fraction of half the viewport width (UE's FOV is horizontal). The HUD pushes the four ticks
+    out by `ReticleSpread × W/2`, capped at `RETICLE_SPREAD_MAX` (`graphics_menu/reticle.py`).
+  - **Recoil** moves the view, never the shot: `RecoilScale` = the same shape with
+    `RecoilShoulderScale`/`RecoilSightsScale` and `RecoilCrouchScale`/`RecoilProneScale`.
+  - Probed in `-game` with the shotgun: standing hip `AimSpread` 3.0, `RecoilScale` 1,
+    `ReticleSpread` 0.0524 (FOV 90); with the CDO's `Stance` written to 2, 1.65 / 0.5 / 0.0288.
 - **Recoil:**
-  - The view kicks up by `RecoilPitch` and sideways by ±`recoil_horizontal_ratio` of it. Both are
-    charged to `RecoilDebt`/`RecoilYawDebt` and repaid with `FInterpTo`.
+  - The view kicks up by `RecoilPitch × RecoilScale` and sideways by ±`RecoilYaw × RecoilScale`.
+    `RecoilYaw` is a quarter of `RecoilPitch` on every gun (asserted). Both are charged to
+    `RecoilDebt`/`RecoilYawDebt` and repaid with `FInterpTo`.
   - Only `recoil_recovery_fraction` (0.7) of the recovery reaches the view, so bursts climb.
-  - ADS multiplies the kick by `recoil_ads_scale`.
   - **Never use `AddPitchInput`/`AddControllerPitchInput`.** They are scaled by `InputPitchScale`,
     which the mouse-sensitivity setting writes. `_author_turn_view` does Get/Set
     `ControlRotation` instead.
@@ -528,8 +544,10 @@ The verifier asserts the old loose constants are gone.
 - **Hand `remove_nodes` each node once.** Several ModifyBones share one variable getter;
   `aim_pitch._feeding_all` de-duplicates what it hands over.
 - **The editor sometimes dies in `AddCallFunctionNode`** (SIGBUS/SIGSEGV inside the call) on a
-  second or later build in one editor session; it has hit the aim-pitch and the blood-splash
-  graphs. Cause unknown. A freshly started editor has built cleanly every time, and after a crash
+  second or later build in one editor session; it has hit the aim-pitch, the blood-splash, the
+  combat and the HUD builds. Cause unknown. A freshly started editor has built cleanly once
+  every time (the second build in the same session crashed again), so run each builder in its own
+  `uepy.py --cold` launch when it recurs, and after a crash
   `Saved/Autosaves/PackageRestoreData.json` can hold a restore prompt that blocks the next boot
   headlessly.
 - **Probing an ABP variable in PIE:** an anim instance's variables can't be written from Python
@@ -557,6 +575,8 @@ These are feel checks a headless run can't do:
   to 61);
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
+- the `GUN_ACCURACY` numbers: how wide each cloud feels at the hip, and whether the reticle's
+  gap (and its 240 px cap) reads well on a real window;
 - how the death camera looks under the terrain;
 - how the sights' pitch looks at steep angles (the eye swings on an arc round the spine);
 - the body poses in motion: the walk cycle plays on top of the crouch and the prone legs, and a

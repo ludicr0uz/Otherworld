@@ -107,16 +107,14 @@ def check_recoil():
         check(f"{var} is written twice: charged by the shot, settled by the tick",
               len(writes) == 2, str(len(writes)))
 
-    check("aiming down the sights steadies the kick",
-          0.0 < COMBAT.recoil_ads_scale < 1.0, f"x{COMBAT.recoil_ads_scale}")
-    steadied = [n for n in by_pins(wg, "A", "B", "bPickA")
-                if abs((num_pin(n, "A") or 0.0) - COMBAT.recoil_ads_scale) < 1e-9]
-    check("...through the same SelectFloat shape the cone uses, so the aimed and "
-          "unaimed cases cannot drift into two branches", len(steadied) == 1,
-          str(len(steadied)))
-    check("the sideways kick is a fraction of the vertical rather than a second "
-          "per-weapon column", 0.0 < COMBAT.recoil_horizontal_ratio < 1.0,
-          f"+/-{COMBAT.recoil_horizontal_ratio} of the pitch")
+    # How much a stance or an aim steadies the kick, and the sideways swing,
+    # are per gun now (verify/accuracy.py checks the table and the factors).
+    scaled = [n for n in by_pins(wg, "A", "B")
+              if any("Get RecoilScale" == str(BEL.get_node_title(
+                  PIN.get_owning_node(q))).replace("\n", " ")
+                  for q in PIN.list_connected_pins(BEL.find_input_pin(n, "B")))]
+    check("the kick, both halves, is scaled by RecoilScale: the stance and aim "
+          "factors the gun's own table gives", len(scaled) == 2, str(len(scaled)))
     draws = [n for n in wg if str(BEL.get_node_title(n)).replace(" ", "").lower()
              .startswith("randomfloatinrange")]
     check("...drawn once per shot", len(draws) == 1, str(len(draws)))

@@ -15,7 +15,11 @@ _author_* fragment per concern, each in its own module:
               x SightBlend), which tips the upper body and the gun onto the aim
   pose_weights  ease the anim BP's PoseCrouch/PoseProne/GuardArms/GuardGun
               from Stance, Blocking and Held.TwoHanded (body_pose.py's poses)
-  firing      pellets, impacts, damage, hit zones, debug readout
+  accuracy    once a frame: AimSpread (the shot's cloud), RecoilScale and
+              ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
+  firing      the round and cooldown, the shot's one draw inside AimSpread
+              (ShotDirection), the pellet traces around it
+  impact      a pellet that connected: blood, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire
   consume     the fire key on a Consumable: send the GAS use event, spend it,
@@ -52,6 +56,7 @@ BP_WeaponComponent event graph:
 
   Fire: muzzle world location  -> Start
         AimPoint - muzzle      -> direction
+        one draw in AimSpread  -> ShotDirection
         N pellets in a cone    -> LineTraceSingle each
         hit -> BP_BloodSplash at the impact + Health -= Damage
 

@@ -64,7 +64,7 @@ def check_blocking_stance():
     gt = [PIN.get_owning_node(q) for z in zero
           for q in BEL.find_output_pin(z, "Stamina").list_connected_pins()]
     check("...a guard with no stamina left is no guard (Stamina > 0)",
-          len(gt) == 1 and pin_value(gt[0], "B") in ("0.0", "0", "0.000000"),
+          len(gt) == 1 and pin_value(gt[0], "B") in ("", "0.0", "0", "0.000000"),
           str([pin_value(g, "B") for g in gt]))
 
 

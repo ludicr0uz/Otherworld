@@ -172,14 +172,9 @@ class CombatConfig:
     # that a 4x snap does not read as a teleport. CurrentFOV is stored rather
     # than recomputed because FInterpTo needs its own previous output.
     ads_interp_speed: float = 12.0
-    # Aiming is worth something mechanically, not only visually: the cone
-    # shrinks to a third. The shotgun's 5 degrees becomes 1.7, which still
-    # patterns, and the sniper's 0.2 becomes 0.07, which is academic -- the
-    # weapons this matters to are the automatics in the middle.
-    ads_spread_scale: float = 0.34
     # And what it costs in mobility: at full ADS the player walks at half
-    # speed. Aiming is meant to be a commitment -- the cone is a third as wide
-    # and the camera is inside a scope, so the price is that you cannot also
+    # speed. Aiming is meant to be a commitment -- the cloud is narrower (or
+    # gone, down the sights) and the camera is inside a scope, so the price is that you cannot also
     # be going anywhere.
     #
     # Applied as a fraction of BaseSpeed, never of the CURRENT walk speed: the
@@ -244,8 +239,8 @@ class CombatConfig:
 
     # --- recoil --------------------------------------------------------------
     # A shot kicks the view up by the weapon's own RecoilPitch (a column in
-    # _weapon_specs(), because how hard a gun kicks is the gun's business) and
-    # sideways by a random fraction of it, and the kick is then paid back over
+    # GUN_ACCURACY, because how hard a gun kicks is the gun's business) and
+    # sideways by a random draw within its RecoilYaw, and the kick is then paid back over
     # the following fraction of a second.
     #
     # Applied by READING AND WRITING THE CONTROL ROTATION, never with
@@ -270,17 +265,8 @@ class CombatConfig:
     # a gun and a screen shake: a burst walks up the target and has to be
     # pulled back down, instead of springing exactly home between rounds.
     recoil_recovery_fraction: float = 0.70
-    # Aiming down the sights steadies the weapon, conventionally and here. One
-    # multiplier over the whole kick, vertical and horizontal together, applied
-    # with the same SelectFloat shape the cone uses -- deliberately not a
-    # second per-weapon column, because "shouldering a gun steadies it" is a
-    # fact about shoulders and not about which gun.
-    recoil_ads_scale: float = 0.65
-    # The horizontal kick, as a fraction of the vertical, drawn uniformly in
-    # [-r, +r] per shot. Pure vertical recoil reads as a mechanism; a little
-    # unpredictable sideways is what makes a burst feel like it is fighting
-    # back. Kept well under 1 so the climb is still recognisably upward.
-    recoil_horizontal_ratio: float = 0.35
+    # How much each stance and aim steadies the kick, and how far it swings
+    # sideways, are per gun: GUN_ACCURACY in weapon_specs.py.
 
     # --- flinching (taking a hit and living) ---------------------------------
     # Anything that takes damage and survives plays a one-second stagger on its

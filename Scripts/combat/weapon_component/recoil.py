@@ -5,10 +5,11 @@ recovery back toward the aim the player was holding.
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import (
     FN_ABS, FN_ADD_FF, FN_BREAK_ROT, FN_GET_CONTROL_ROT, FN_GREATER_FF,
-    FN_INTERP_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT, FN_SELECT_FF,
+    FN_INTERP_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT,
     FN_SET_CONTROL_ROT, FN_SUB_FF,
 )
 from combat.tuning import COMBAT
+from combat.weapon_component.accuracy import RECOIL_SCALE_VAR
 from combat.weapon_component.common import _prop
 
 
@@ -67,8 +68,8 @@ def _author_turn_view(ed, pc_out, pitch_delta, yaw_delta, exec_in, x0, y0):
 def _author_recoil_kick(ed, held, pc_out, exec_in, x0, y0):
     """One shot's jolt: up by the weapon's own RecoilPitch, and a little sideways.
 
-        kick     = Held.RecoilPitch * (Aiming ? recoil_ads_scale : 1)
-        sideways = random in +/- kick * recoil_horizontal_ratio
+        kick     = Held.RecoilPitch * RecoilScale
+        sideways = random in +/- Held.RecoilYaw * RecoilScale
         RecoilDebt    += kick
         RecoilYawDebt += sideways
         control rotation += (kick, sideways)
@@ -98,22 +99,21 @@ def _author_recoil_kick(ed, held, pc_out, exec_in, x0, y0):
 
     per_shot, per_shot_n = _prop(ed, "RecoilPitch", held, x0, y0 + 320)
     keep(per_shot_n)
-    # Down the sights the weapon is shouldered and kicks less. SelectFloat and
-    # not a Branch, the same shape _author_fire picks the cone width with, so
-    # the aimed and unaimed cases are one expression that cannot drift.
-    aiming = keep(_at(ed.add_get_member_variable_node("Aiming"), x0, y0 + 460))
-    steadied = keep(_at(_node(ed, FN_SELECT_FF), x0 + 260, y0 + 460))
-    _set(steadied, "A", COMBAT.recoil_ads_scale)
-    _set(steadied, "B", 1.0)
-    _connect(_pin(aiming, "Aiming", is_input=False), _pin(steadied, "bPickA"))
+    # How much of it this frame's stance and aim let through: RecoilScale,
+    # written by accuracy.py from the gun's own factors.
+    scale = keep(_at(ed.add_get_member_variable_node(RECOIL_SCALE_VAR),
+                     x0, y0 + 460))
+    scale_out = _pin(scale, RECOIL_SCALE_VAR, is_input=False)
     up = keep(_at(_node(ed, FN_MUL_FF), x0 + 520, y0 + 320))
     _connect(per_shot, _pin(up, "A"))
-    _connect(_pin(steadied, "ReturnValue", is_input=False), _pin(up, "B"))
+    _connect(scale_out, _pin(up, "B"))
     up_out = _pin(up, "ReturnValue", is_input=False)
 
+    swing, swing_n = _prop(ed, "RecoilYaw", held, x0 + 520, y0 + 620)
+    keep(swing_n)
     span = keep(_at(_node(ed, FN_MUL_FF), x0 + 780, y0 + 620))
-    _connect(up_out, _pin(span, "A"))
-    _set(span, "B", COMBAT.recoil_horizontal_ratio)
+    _connect(swing, _pin(span, "A"))
+    _connect(scale_out, _pin(span, "B"))
     span_out = _pin(span, "ReturnValue", is_input=False)
     mirrored = keep(_at(_node(ed, FN_MUL_FF), x0 + 1040, y0 + 760))
     _connect(span_out, _pin(mirrored, "A"))
@@ -153,12 +153,12 @@ def _author_recoil_kick(ed, held, pc_out, exec_in, x0, y0):
     made.extend(turn_nodes)
 
     ed.add_comment_to_nodes(
-        f"Recoil, on the shot the gate just allowed: this weapon's own "
-        f"RecoilPitch up ({COMBAT.recoil_ads_scale:g}x of it while aiming) and "
-        f"a random +/-{COMBAT.recoil_horizontal_ratio:g} of that sideways, "
-        f"charged to RecoilDebt and applied to the control rotation. The "
-        f"pellets below fly down the AimPoint resolved at the top of this "
-        f"frame, so a shot never bends itself -- it is the next one that pays.",
+        "Recoil, on the shot the gate just allowed: this weapon's own "
+        "RecoilPitch up and a random +/- RecoilYaw sideways, both times "
+        "RecoilScale (its stance and aim factors, accuracy.py), "
+        "charged to RecoilDebt and applied to the control rotation. The "
+        "pellets below fly down the AimPoint resolved at the top of this "
+        "frame, so a shot never bends itself -- it is the next one that pays.",
         made)
     return turned
 

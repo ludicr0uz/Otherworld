@@ -67,7 +67,9 @@ split it before extending it.
 - **Wanderers:** a projected health bar over each one, plus its number in debug mode.
 - **Bottom:** the 10-slot inventory strip, in two rows of five (`INVENTORY_COLUMNS`, 120 px
   slots), with loaded/reserve counts for weapons that use ammo.
-- **Centre:** the reticle or scope.
+- **Centre:** the reticle or scope (`reticle.py`). The reticle's four ticks stand off by the held
+  gun's accuracy cloud: `ReticleSpread` (weapon component) × half the viewport width, capped at
+  `RETICLE_SPREAD_MAX` with an `FMin` (an `FClamp` would be read as a settings slider).
 - **When the player is dead:** only the death menu. `DrawHUD` branches on `GameMode.PlayerDead`
   first.
 

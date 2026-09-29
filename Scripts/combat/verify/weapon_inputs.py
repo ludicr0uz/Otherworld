@@ -219,11 +219,12 @@ def check_sprint_and_stamina():
                if not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
                           for k in ("Contains", "Equal")
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
-    # Five now: sprint picks the speed and the sign of the drain, aiming picks
-    # both how much of its own cone the weapon keeps and how much of its recoil,
-    # and the sights key picks the zoom (the weapon's, or the shoulder's).
-    check("SelectFloat picks the speed, the drain, the aimed cone, the aimed "
-          "kick and the aimed zoom", len(selects) == 5,
+    # Seven now: sprint picks the speed and the sign of the drain, the sights
+    # key picks the zoom (the weapon's, or the shoulder's), and accuracy.py
+    # picks the shoulder's and the sights' factor for the cloud and the kick.
+    check("SelectFloat picks the speed, the drain, the aimed zoom, and the "
+          "shoulder and sights factors of the cloud and the kick",
+          len(selects) == 7,
           f"{len(selects)} SelectFloat node(s)")
     check("stamina is clamped, so it cannot run past its own bar",
           any(pin_value(n, "Max") == str(COMBAT.max_stamina)

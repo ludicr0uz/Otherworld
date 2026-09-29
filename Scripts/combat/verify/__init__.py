@@ -23,10 +23,12 @@ and it never relies on a variable another section left behind.
   block       the guard: its key, the Blocking stance, the fire gate refusing
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
               the crouch it drives, the footsteps' volume and reach per stance
+  accuracy    the per-gun cloud and recoil factors: the table, the weapons'
+              variables, AimSpread/RecoilScale/ReticleSpread, the shot's draw
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance", "accuracy",
     "settings_and_tuning", "firing", "consume", "drops", "noise", "combat_trace",
 )

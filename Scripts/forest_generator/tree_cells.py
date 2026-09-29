@@ -25,3 +25,13 @@ TREE_CULL_END_CM = 30000
 # 20 m: hilly terrain plus half a tree's height -- a cell's bounds centre sits
 # up in the trunks, not at the ground a tree stands on.
 TREE_CELL_MAX_DRAW_CM = cell_max_draw_cm(TREE_CULL_END_CM, 2000.0)
+
+# Past this distance Nanite draws the leaves WITHOUT their opacity mask
+# (UPrimitiveComponent::NanitePixelProgrammableDistance): the leaf cards become
+# solid shapes instead of being alpha-tested pixel by pixel. The leaves are
+# masked, two-sided cards, and masked is Nanite's expensive "programmable"
+# raster path -- this is the biggest per-pixel saving the canopy has, and the
+# cost is that distant canopy reads as solid clumps rather than lacy leaves.
+# 60 m is inside the night fog; tune it by eye. Not scaled by
+# r.ViewDistanceScale. 0 would mean "mask at every distance".
+TREE_LEAF_MASK_DISTANCE_CM = 6000.0

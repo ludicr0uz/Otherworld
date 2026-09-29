@@ -15,6 +15,7 @@ import unreal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_graphics_menu as G
+from graphics_menu import fps as F
 from graphics_menu import presets as P
 
 BEL = unreal.BlueprintEditorLibrary
@@ -143,14 +144,13 @@ def main():
     expected_cmds = set()
     for preset in G.PRESETS:
         expected_cmds.update(P.console_commands(preset))
-    expected_cmds.add(G.FPS_COMMAND)
-    check("every preset's console overrides are present, plus the FPS readout",
+    check("every preset's console overrides are present, and nothing else",
           commands == expected_cmds,
           str(sorted(commands ^ expected_cmds)) if commands != expected_cmds else "")
-    # The FPS indicator is the engine's own stat display, so the only evidence
-    # of it in the graph is this one command -- nothing is drawn on the canvas.
-    check("BeginPlay turns on the built-in FPS readout (top-right)",
-          G.FPS_COMMAND in commands)
+    # `stat fps` is a toggle, so sending it could just as well switch the
+    # readout off; the FPS readout is drawn on the canvas instead (fps.py).
+    check("no `stat` console commands (they toggle)",
+          not any(c.startswith("stat ") for c in commands), str(sorted(commands)))
 
     # ApplyNonResolutionSettings takes no arguments, so it is the only node in
     # the graph whose inputs are exactly exec + self.
@@ -364,9 +364,10 @@ def main():
                  if str(BEL.get_node_title(n)).replace("\n", " ") == "GetViewportSize"]
     # Six now: the reticle and the inventory strip centre off it, the kill
     # counter right-anchors off it, and the death panel, the main menu and the
-    # settings page each centre off it.
+    # settings page each centre off it. Seven with the debug FPS readout,
+    # right-anchored above the kill counter.
     check("everything positioned off the window edge reads the viewport size",
-          len(viewports) == 6, str(len(viewports)))
+          len(viewports) == 7, str(len(viewports)))
     check("a blocked shot colours the reticle differently",
           any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
           and "Get AimBlocked" in aim_reads)
@@ -492,10 +493,11 @@ def main():
     # each wanderer's spawn number, the kill counter and the final score.
     # Nine now: the settings page adds the sensitivity readout and, inside one
     # ForEachLoop over Binds, a row label and a key name. Those last two are
-    # what keeps the seven bind rows to a single pair of draws.
-    check("HP, slot names, ammo, NPC numbers, kills, score and the settings "
-          "rows read from data",
-          len(driven_text) == 9, str(len(driven_text)))
+    # what keeps the seven bind rows to a single pair of draws. Ten with the
+    # debug FPS readout.
+    check("HP, slot names, ammo, NPC numbers, kills, score, the settings "
+          "rows and the FPS readout read from data",
+          len(driven_text) == 10, str(len(driven_text)))
     ids = [n for n in nodes
            if "NpcId" in {str(p_) for p_ in pin_names(n, False)}]
     check("each NPC bar carries the wanderer's spawn number",
@@ -629,10 +631,16 @@ def main():
     check(f"{G.DEBUG_KEY} toggles debug mode on the GameMode, not on the HUD",
           any(t == f"Set {G.DEBUG_MODE_VAR}" for t in titles),
           str(sorted({t for t in titles if G.DEBUG_MODE_VAR in t})))
-    # Twice: the toggle reads it to flip it, and DrawHUD reads it to copy it.
+    # Three reads: the toggle reads the GameMode's to flip it, DrawHUD reads
+    # it to copy it, and BeginPlay reads the saved one off BP_Settings.
     check("...by flipping what is already there, so it is a toggle",
-          sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}") == 2,
+          sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}") == 3,
           str(sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}")))
+    # Three writes: BeginPlay restores the saved value onto the GameMode, and
+    # the toggle writes both the GameMode and the save.
+    check("debug mode is restored from the save and written back to it",
+          sum(1 for t in titles if t == f"Set {G.DEBUG_MODE_VAR}") == 3,
+          str(sum(1 for t in titles if t == f"Set {G.DEBUG_MODE_VAR}")))
     # Copied once per frame into DebugOn. The point is the cast-failed path:
     # it reaches the same drawing code, and a Get off an invalid object is an
     # "Accessed None" per wanderer per frame. Two writes -- the real value and
@@ -640,10 +648,16 @@ def main():
     check("this frame's copy is taken once, with an answer for a failed cast",
           sum(1 for t in titles if t == "Set DebugOn") == 2,
           str(sum(1 for t in titles if t == "Set DebugOn")))
-    # Two readers: the menu row that reports the state, and the NPC number.
-    check("the tracer's twin -- the wanderer's number -- is gated on the copy",
-          sum(1 for t in titles if t == "Get DebugOn") == 2,
+    # Three readers: the menu row that reports the state, the NPC number, and
+    # the FPS readout.
+    check("the wanderer's number and the FPS readout are gated on the copy",
+          sum(1 for t in titles if t == "Get DebugOn") == 3,
           str(sum(1 for t in titles if t == "Get DebugOn")))
+    for var in (F.FPS_FRAMES_VAR, F.FPS_SINCE_VAR, F.FPS_SHOWN_VAR):
+        check(f"{var} variable", var in names)
+    check("the FPS readout counts real time, so it runs under the paused menus",
+          any("Real Time" in t or "RealTime" in t for t in titles),
+          str(sorted({t for t in titles if "Time" in t})))
     hud_cdo = unreal.get_default_object(BEL.generated_class(bp))
     check("the HUD starts with the overlays off",
           hud_cdo.get_editor_property("DebugOn") is False)
@@ -680,11 +694,11 @@ def main():
           str(sorted({BEL.find_input_pin(n, "SlotName").get_pin_value()
                       for n in slots})))
     writes = by_pins("SaveGameObject")
-    # Three: BeginPlay's repair of a save from an older build, a rebind, and a
-    # sensitivity nudge. Written at the moment of the change and not on leaving
+    # Four: BeginPlay's repair of a save from an older build, a rebind, a
+    # sensitivity nudge, and the debug toggle. Written at the moment of the change and not on leaving
     # the page, because a game quit from the settings screen still has to
     # remember what was set -- which is the whole of "across future game runs".
-    check("every change is written to disk on the spot", len(writes) == 3,
+    check("every change is written to disk on the spot", len(writes) == 4,
           str(len(writes)))
     check("...and there is a load and a create, so a first run is not an error",
           bool(by_pins("SaveGameClass"))

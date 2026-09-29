@@ -100,6 +100,8 @@ CLI ──► terrain.generate_terrain_obj ──► tree_placement.scatter_tree
 
 CLI flags: `--size <meters>` (required), `--name` (default `Lvl_Forest_<size>m`),
 `--seed` (42), `--grid` (default auto), `--time-of-day {day,night}` (default `day`),
+`--tree-density` (0.5, a multiplier on every species' `count_per_hectare`; the default is
+`DEFAULT_TREE_DENSITY` in `forest_generator/tree_placement.py`),
 `--grass-density` (1.2 clumps/m²), `--grass-height` (50 cm), `--grass-patchiness` (0.25),
 `--no-grass`, `--no-npc`, `--npc-min-distance <metres>`, `--json-report`.
 
@@ -606,7 +608,8 @@ These are agro ranges only. The audio attenuation profiles that set how loud sho
    cell fades its trees out at 250–300 m (times `r.ViewDistanceScale`) and drops out whole
    past its max draw distance. Tree HISMs stay on Nanite (`disallow_nanite` pinned off):
    the meshes' auto-built fallbacks have no leaf triangles, so classic rendering draws
-   bare trees.
+   bare trees. Past 60 m (`TREE_LEAF_MASK_DISTANCE_CM`, via `nanite_pixel_programmable_distance`)
+   the leaves are drawn without their opacity mask, which is far cheaper on Nanite.
 5b. **Grass** — transforms are *not* inlined (tens of thousands of them); the script reads
    `grass_<Level>.json`, whose instances are flat rounded arrays
    `[spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul, target_h_cm]` against an
@@ -734,7 +737,7 @@ every actor that touches it — including the player's own components, which die
 | `NpcSpawnCount` | each wanderer's `BeginPlay` | the next wanderer, for its number |
 | `NpcKillCount` | the death path, *only* when `DamagedByPlayer` | the HUD corner and the death menu |
 | `PlayerDead` | the player's death path | the HUD, to draw the menu instead of the HUD |
-| `DebugMode` | **D** in the graphics menu | the weapon component (tracers) and the HUD (NPC numbers) |
+| `DebugMode` | the HUD's BeginPlay (from `BP_Settings.DebugMode`, default on) and **D** in the graphics menu (which also saves it) | the weapon component (tracers) and the HUD (FPS readout, NPC numbers) |
 
 `DebugMode` is on the GameMode rather than on the HUD that toggles it for the same reason as
 the rest: `BP_WeaponComponent` is the other reader, and a component cannot reach a HUD

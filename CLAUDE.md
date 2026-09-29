@@ -241,6 +241,7 @@ Python scripts into `Scripts/generated_levels/<LevelName>/`.
 ```bash
 python3 Scripts/generate_forest_level.py --size 200 --time-of-day night
 # flags: --size <meters, required> --name --seed (42) --grid --time-of-day {night,day} (night)
+#        --tree-density (0.5 × each species' count_per_hectare)
 #        --grass-density (1.2/m²) --grass-height (50 cm) --grass-patchiness (0.25)
 #        --no-grass --no-npc --npc-count (10) --npc-min-distance (75 m)
 #        --npc-max-distance (100 m) --json-report
@@ -1646,10 +1647,14 @@ tuning an automatic is tuning a number, not a loop.
 
 ### Debug mode
 
-One bool on the GameMode (`DebugMode`), toggled with **D** in the graphics menu, **off by
-default**. It turns on three developer overlays: the **pellet tracers** drawn from the muzzle,
-the **damage readout** at each impact, and the **wanderer's number** beside its health bar.
-All three are instrumentation, and instrumentation is not what the game looks like.
+One bool on the GameMode (`DebugMode`), toggled with **D** in the graphics menu, **on by
+default** and **persisted**: the player's choice is `BP_Settings.DebugMode` in the
+`OtherworldSettings` save (default `True`, so a first run and a save written before the field
+existed both start with it on). The HUD's BeginPlay copies it onto the GameMode once the save is
+loaded, and the D toggle writes both the GameMode and the save, saving on the spot. The
+GameMode's own default stays `False`; the HUD is what turns it on. It turns on four developer
+overlays: the **FPS readout** top-right, the **pellet tracers** drawn from the muzzle, the
+**damage readout** at each impact, and the **wanderer's number** beside its health bar.
 
 The damage readout is a `DrawDebugString` at the pellet's impact point, drawn for the
 tracer's `TRACE_DEBUG_SECONDS`. It reads `39.0 (x1.5)`: the health the target actually lost,
@@ -1694,12 +1699,12 @@ under-the-world safety net writes `Health = 0` down that same path, and nobody s
 Measured both ways in a `-game` run — five wanderers killed with the flag set report
 `killed with 5`, the same five killed without it report `killed with 0`.
 
-The **FPS readout in the top-right is not drawn here**: BeginPlay runs
-`stat fps` (`FPS_COMMAND`), and the engine's own stat display puts itself in that corner. There
-is no position to tune and no canvas call to collide with the HP bar — and the number is the
-engine's smoothed frame time, not a `1/DeltaSeconds` recomputed on the HUD. Like the preset
-cvars, it is global: a PIE session leaves `stat fps` on in the editor viewport, and `stat fps`
-again turns it off. The strip and the reticle are both laid out from the viewport size, so they stay
+The **FPS readout** top-right is drawn on this canvas, **in debug mode only**
+(`Scripts/graphics_menu/fps.py`): frames counted over a 0.5 s window of *real* time, so it
+keeps counting under the paused menus. It used to be `stat fps` sent from BeginPlay, and that
+is the trap: `stat fps` is a **toggle** with no "on" form, and in PIE the stat state outlives
+the session on the editor viewport, so every other Play switched the readout *off*. Never
+drive a HUD element with a `stat` command; the verifier fails on one. The strip and the reticle are both laid out from the viewport size, so they stay
 centred at any window size. Slot colour and
 name are read from each weapon's own `SlotColor`/`DisplayName`, and the ammunition readout off
 its own `UsesAmmo`/`Loaded`/`Reserve` — so the HUD keeps no list of weapons to fall out of step
@@ -1778,8 +1783,8 @@ centred and bottom-anchored at any window size.
 - `scatter_trees` re-draws any trunk within `MIN_TREE_SPACING_CM` (150) of another, and
   the offline `Tree Spacing` check now compares every nearby pair through a spatial hash
   (it used to compare list neighbours only). 200/300/400/600/1000 m at seed 42 all pass 28/28.
-- **`/Game/Maps/Lvl_Forest_1000m`** (`--size 1000`, night, seed 42): 3,400 trees, 1,115,761
-  grass clumps, ten NPCs at 76.7–95.0 m. Offline 28/28, in-engine **217/217**. The `.umap` is
+- **`/Game/Maps/Lvl_Forest_1000m`** (`--size 1000`, night, seed 42, tree density 0.5): 1,700 trees, 1,120,965
+  grass clumps, ten NPCs at 76.7–95.0 m. Offline 28/28, in-engine **222/222**. The `.umap` is
   161 MB, mostly grass. The import takes ~1 min in a live editor, 9 s of it grass, because
   grass now goes in through batched `add_instances`. `uepy.py` reports "the editor stopped
   responding" on a job that long: its heartbeat check sees the editor blocked. The job
@@ -2096,6 +2101,10 @@ centred and bottom-anchored at any window size.
   `<spec>__±ix_±iy` (`forest_generator/tree_cells.py`, `forest_import/trees.py`). They fade
   out at 250–300 m (`TREE_CULL_START_CM`/`TREE_CULL_END_CM`) times `r.ViewDistanceScale`, so
   120 m on Low. Render culling only — collision and the navmesh still cover every tree.
+- Past `TREE_LEAF_MASK_DISTANCE_CM` (60 m) the tree cells' `nanite_pixel_programmable_distance`
+  makes Nanite draw leaves **without their opacity mask**: the cards render solid, which takes
+  the distant canopy off Nanite's expensive masked raster path. The price is distant canopy
+  reading as solid clumps; tune the distance by eye. Not scaled by `r.ViewDistanceScale`.
 - The directional light's real-time shadow range is `SHADOW_DISTANCE_CM` (100 m) in
   `forest_generator/lighting.py`. It is set through `dynamic_shadow_distance_movable_light`
   even though the light is Stationary: with `r.AllowStaticLighting=False` the engine reads

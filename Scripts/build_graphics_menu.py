@@ -24,8 +24,8 @@ file stays the single source of truth, per the project's no-hand-editing rule.
 Event graph:
 
   [Event BeginPlay] --> apply the startup preset (Low)
-                    --> ConsoleCommand "stat fps"  (engine's own readout,
-                        which draws itself in the top-right corner)
+                    --> load BP_Settings --> GameMode.DebugMode =
+                        Settings.DebugMode  (debug mode survives a restart)
 
   [Event Tick] --> [Branch: Quality != GrassQualityApplied]
                       True  --> for each actor tagged OW_Grass: SetCastShadow,
@@ -90,6 +90,8 @@ from combat import tuning as combat_tuning                         # noqa: E402
 from graphics_menu.presets import (                                # noqa: E402
     DEFAULT_PRESET, GRASS_APPLIED_DEFAULT, GRASS_APPLIED_VAR, PRESET_KEYS,
     PRESETS, author_grass_sync, console_commands, emit_apply)
+# The FPS readout, one of the debug-mode overlays; see graphics_menu/fps.py.
+from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -106,19 +108,12 @@ MENU_KEY = "M"
 # HUD variable is not reachable from a component.  What lives here is DebugOn,
 # a copy taken once per frame at the top of DrawHUD so the draw code can branch
 # on a plain bool instead of casting to the GameMode for every wanderer.
+#
+# The player's choice is kept in BP_Settings.DebugMode (default ON), so it
+# survives a restart: BeginPlay copies it onto the GameMode once the save is
+# loaded, and the D toggle writes it back and saves on the spot.
 DEBUG_KEY = "D"
 DEBUG_MODE_VAR = "DebugMode"
-
-# The FPS readout.  "stat fps" is the engine's own frame-rate display and it
-# renders in the **top-right** corner of the viewport on its own -- there is no
-# position to set, and nothing is drawn by this HUD's canvas for it.  Doing it
-# this way rather than with a DrawText of 1/DeltaSeconds is deliberate: the stat
-# system's number is the engine's own smoothed frame time (the same one the
-# profiler reports), it costs nothing to maintain, and it keeps working if the
-# HUD's draw graph is ever rewritten.  Chained onto BeginPlay for the same
-# reason the startup preset is: a readout has to be on for the session, not
-# waiting on a keypress the player has to know about.
-FPS_COMMAND = "stat fps"
 
 # Where the player's health lives.  Built by build_shotgun_and_health.py; the
 # HUD degrades to drawing nothing if the pawn has no such component.
@@ -173,8 +168,8 @@ COL_ST_SPENT = "(R=0.820000,G=0.560000,B=0.180000,A=0.950000)"
 COL_ST_LABEL = "(R=0.620000,G=0.650000,B=0.700000,A=1.000000)"
 
 # --- the kill counter, top right ---------------------------------------------
-# Under the engine's own `stat fps` line, which owns the very top of that
-# corner. Right-anchored off the viewport width rather than placed at a fixed
+# Under the debug-mode FPS readout (graphics_menu/fps.py), which owns the very
+# top of that corner. Right-anchored off the viewport width rather than placed at a fixed
 # x, for the same reason the inventory strip is centred that way.
 KILL_RIGHT_MARGIN = 150.0
 KILL_TOP = 92.0
@@ -761,6 +756,7 @@ def _ensure_variables(ed, bp):
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, pin_type):
             raise RuntimeError(f"could not declare member variable {name}")
+    declare_fps_vars(ed)
 
 
 def _apply_defaults(bp, defaults):
@@ -937,6 +933,35 @@ def _author_load_settings(ed, x0, y0, in_exec):
     return (saved, BEL.find_else_pin(repair))
 
 
+def _author_restore_debug(ed, x0, y0, in_execs):
+    """BeginPlay: GameMode.DebugMode = Settings.DebugMode.
+
+    The save is the record and the GameMode is where the game reads it, so the
+    one copy happens as soon as Settings is known to be valid. A GameMode that
+    is not BP_ThirdPersonGameMode has nowhere to put it, and goes on without.
+    """
+    gm = _at(_node(ed, FN_GET_GAME_MODE), x0, y0 + 240)
+    as_gm = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 260, y0)
+    _connect(_pin(gm, "ReturnValue", is_input=False), _pin(as_gm, "Object"))
+    for e in in_execs:
+        _connect(e, _pin(as_gm, "execute"))
+    settings = _at(ed.add_get_member_variable_node("Settings"), x0 + 260, y0 + 400)
+    saved = _at(ed.add_get_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH),
+                x0 + 520, y0 + 400)
+    _connect(_pin(settings, "Settings", is_input=False), _pin(saved, "self"))
+    put = _at(ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH),
+              x0 + 780, y0)
+    _connect(_loose_pin(as_gm, "AsBPThirdPersonGameMode", is_input=False),
+             _pin(put, "self"))
+    _connect(_pin(saved, DEBUG_MODE_VAR, is_input=False), _pin(put, DEBUG_MODE_VAR))
+    _connect(BEL.find_then_pin(as_gm), _pin(put, "execute"))
+    ed.add_comment_to_nodes(
+        "Debug mode as the player last left it (BP_Settings.DebugMode, on for "
+        "a first run), onto the GameMode where the HUD and the weapon read it.",
+        [gm, as_gm, settings, saved, put])
+    return (BEL.find_then_pin(put), _pin(as_gm, "CastFailed", is_input=False))
+
+
 # ─── Event BeginPlay: the startup default ────────────────────────────────────
 
 def _author_begin_play(ed, begin_play):
@@ -950,26 +975,17 @@ def _author_begin_play(ed, begin_play):
         "while the engine ran at whatever scalability it happened to boot with.",
         made)
 
-    # The FPS readout and the settings load come BEFORE the menu decision now:
-    # the pause waits MENU_SETTLE_S behind a Delay, and anything chained after
-    # it would wait too -- or never run at all if NEW GAME got in first.
+    # The settings load comes BEFORE the menu decision: the pause waits
+    # MENU_SETTLE_S behind a Delay, and anything chained after it would wait
+    # too -- or never run at all if NEW GAME got in first.
     #
-    # The engine's own FPS display.  Straight after the preset so that a
-    # failure to apply the preset cannot be hidden behind it.
-    fps = _at(_node(ed, FN_CONSOLE), origin.x + 320, origin.y + 240)
-    _set(fps, "Command", FPS_COMMAND)
-    _connect(BEL.find_then_pin(made[-1]), _pin(fps, "execute"))
-    ed.add_comment_to_nodes(
-        f"{FPS_COMMAND!r} -- UE's built-in frame-rate readout, which draws "
-        "itself in the top-right corner. Nothing on this HUD's canvas is "
-        "involved, so it cannot collide with the HP bar or the quality panel.",
-        [fps])
-
     # The settings only have to exist by the first DrawHUD, and putting disk
     # access in front of the preset would let a failed load hide a failed
     # preset.
     loaded_tails = _author_load_settings(ed, origin.x + 320, origin.y + 1100,
-                                         BEL.find_then_pin(fps))
+                                         BEL.find_then_pin(made[-1]))
+    loaded_tails = _author_restore_debug(ed, origin.x + 320, origin.y + 2300,
+                                         loaded_tails)
 
     # --- open paused, on the menu -------------------------------------------
     # Pausing is what makes the menu a menu. Without it the level is live
@@ -1131,12 +1147,25 @@ def _author_tick(ed, tick):
     _connect(_pin(flip, "ReturnValue", is_input=False), _pin(set_dbg, DEBUG_MODE_VAR))
     _connect(BEL.find_then_pin(as_gm), _pin(set_dbg, "execute"))
 
+    # ...and into the save, written on the spot like every other setting.
+    settings = _at(ed.add_get_member_variable_node("Settings"), bx + 1460, by + 400)
+    settings_out = _pin(settings, "Settings", is_input=False)
+    keep_dbg = _at(ed.add_set_member_variable_node(DEBUG_MODE_VAR,
+                                                   SETTINGS_CLASS_PATH),
+                   bx + 1720, by)
+    _connect(settings_out, _pin(keep_dbg, "self"))
+    _connect(_pin(flip, "ReturnValue", is_input=False), _pin(keep_dbg, DEBUG_MODE_VAR))
+    _connect(BEL.find_then_pin(set_dbg), _pin(keep_dbg, "execute"))
+    _, writer = _emit_save(ed, settings_out, BEL.find_then_pin(keep_dbg),
+                           bx + 1980, by)
+
     ed.add_comment_to_nodes(
         f"{DEBUG_KEY} -> debug mode, held on the GameMode so the weapon "
-        "component can read it too.  It turns on the pellet tracers and the "
-        "wanderers' numbers -- instrumentation, which is why it is off by "
-        "default rather than something the player has to switch away.",
-        [was_d, br_d, gm, as_gm, was_on, flip, set_dbg])
+        "component can read it too, and saved to BP_Settings so it survives a "
+        "restart.  It turns on the FPS readout, the pellet tracers and the "
+        "wanderers' numbers.",
+        [was_d, br_d, gm, as_gm, was_on, flip, set_dbg, settings, keep_dbg,
+         writer])
 
 
 # ─── The health readout ──────────────────────────────────────────────────────
@@ -1304,7 +1333,7 @@ def _author_stamina(ed, x0, y0, in_execs):
 
 
 def _author_kills(ed, x0, y0, in_execs):
-    """The kill counter, top right, under the engine's fps readout.
+    """The kill counter, top right, under the debug-mode FPS readout.
 
     The number lives on the GameMode -- it has to outlast the wanderers that
     earn it and the player's own components, and Blueprints have no statics.
@@ -1354,8 +1383,8 @@ def _author_kills(ed, x0, y0, in_execs):
 
     ed.add_comment_to_nodes(
         f"Kills, {KILL_RIGHT_MARGIN:.0f} px in from the right edge and "
-        f"{KILL_TOP:.0f} px down -- clear of the engine's own `stat fps` line, "
-        "which owns the very top of that corner and is not drawn on this canvas.",
+        f"{KILL_TOP:.0f} px down -- clear of the debug-mode FPS readout, "
+        "which owns the very top of that corner.",
         made)
     return (BEL.find_then_pin(text), _pin(cast, "CastFailed", is_input=False))
 
@@ -2959,9 +2988,13 @@ def _author_draw(ed, x0, y0):
                                    (BEL.find_then_pin(copy_dbg),
                                     BEL.find_then_pin(no_dbg)))
 
+    # The FPS readout, in every state -- title, game, death -- while debug
+    # mode is on. Drawn first, so every panel after it can sit on top.
+    fps_out = author_fps(ed, x0 + 3000, y0 + 16000, pushed, UI_FONT)
+
     # The main menu, before anything else is drawn and before the dead/alive
     # test: a title screen is neither.
-    playing = _author_main_menu(ed, x0 + 3000, y0 + 6000, pushed)
+    playing = _author_main_menu(ed, x0 + 3000, y0 + 6000, fps_out)
 
     alive = _at(ed.add_branch_node(), x0 + 60, y0)
     dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,

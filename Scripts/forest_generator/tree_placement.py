@@ -98,6 +98,13 @@ DEFAULT_TREE_SPECS = [
 ]
 
 
+# Multiplier on every spec's count_per_hectare. 0.5 halves the forest the specs
+# above describe (3400 -> 1700 trees on the 1 km map): the scanned
+# trees' masked leaf cards are the dominant GPU cost, and per-tree it is
+# roughly linear. Override per map with generate_forest_level.py --tree-density.
+DEFAULT_TREE_DENSITY = 0.5
+
+
 # ─── Placement record ───────────────────────────────────────────────────────
 
 @dataclass
@@ -136,11 +143,12 @@ def scatter_trees(
     grid_size: int,
     tree_specs: list[TreeSpec] | None = None,
     seed: int = 42,
+    density: float = DEFAULT_TREE_DENSITY,
 ) -> list[PlacedTree]:
     """
     Scatter trees across the terrain.
 
-    Tree count per spec is derived from ``count_per_hectare`` × map area.
+    Tree count per spec is ``count_per_hectare`` × ``density`` × map area.
     Every tree is placed at a random polar coordinate and snapped to the
     exact mesh facet via barycentric interpolation.
 
@@ -159,7 +167,7 @@ def scatter_trees(
     cells: dict = {}       # spatial hash of trunk positions, MIN_TREE_SPACING_CM cells
 
     for spec in tree_specs:
-        count = max(1, int(round(spec.count_per_hectare * area_hectares)))
+        count = max(1, int(round(spec.count_per_hectare * density * area_hectares)))
         for _ in range(count):
             for _attempt in range(MAX_SPACING_REDRAWS):
                 dist = rng.uniform(spec.min_dist_from_center, max_dist)

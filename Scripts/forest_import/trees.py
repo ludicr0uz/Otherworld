@@ -13,6 +13,10 @@ instead, and it was tried: the fallbacks (auto-built, relative error 1.0) have
 disconnected cards first -- so every tree rendered bare. Turning Nanite off on
 the asset renders the full scan instead, which is worse. So the component stays
 on Nanite until the leaves have a real classic-render mesh.
+
+What Nanite does allow is dropping the leaves' opacity mask past a distance
+(TREE_LEAF_MASK_DISTANCE_CM, see tree_cells.py), which takes distant canopy off
+Nanite's expensive masked raster path.
 """
 
 from collections import defaultdict
@@ -20,8 +24,8 @@ from collections import defaultdict
 import unreal
 
 from forest_generator.tree_cells import (
-    TREE_CELL_MAX_DRAW_CM, TREE_CULL_END_CM, TREE_CULL_START_CM, cell_label,
-    cell_of, spec_of_label)
+    TREE_CELL_MAX_DRAW_CM, TREE_CULL_END_CM, TREE_CULL_START_CM,
+    TREE_LEAF_MASK_DISTANCE_CM, cell_label, cell_of, spec_of_label)
 
 
 def _log(msg):
@@ -39,6 +43,9 @@ def _spawn_cell(actor_sub, label, mesh, materials):
     comp.set_mobility(unreal.ComponentMobility.STATIC)
     comp.set_editor_property("cast_shadow", True)
     comp.set_editor_property("disallow_nanite", False)
+    # Leaves drawn unmasked (solid) past this distance -- see tree_cells.py.
+    comp.set_editor_property("nanite_pixel_programmable_distance",
+                             TREE_LEAF_MASK_DISTANCE_CM)
     # Render culling only: collision (and so the navmesh) is unaffected.
     comp.set_editor_property("instance_start_cull_distance", TREE_CULL_START_CM)
     comp.set_editor_property("instance_end_cull_distance", TREE_CULL_END_CM)
@@ -115,6 +122,10 @@ def verify_trees(check, actors, expected_counts, expected_total):
         classic = [l for l, c in comps if c.get_editor_property("disallow_nanite")]
         check(f"{spec} Renders Nanite (fallback has no leaves)", not classic,
               str(classic[:3]))
+        unmasked = {c.get_editor_property("nanite_pixel_programmable_distance")
+                    for _, c in comps}
+        check(f"{spec} Leaves Unmasked Past {TREE_LEAF_MASK_DISTANCE_CM / 100:g} m",
+              unmasked == {TREE_LEAF_MASK_DISTANCE_CM}, str(sorted(unmasked)))
         distances = {(c.get_editor_property("ld_max_draw_distance"),
                       c.get_editor_property("instance_start_cull_distance"),
                       c.get_editor_property("instance_end_cull_distance"))

@@ -42,7 +42,7 @@
     {
       "name": "Tree Count / Density",
       "passed": true,
-      "message": "3400 trees on 100.0 ha = 34.0 trees/ha",
+      "message": "1700 trees on 100.0 ha = 17.0 trees/ha",
       "details": []
     },
     {
@@ -84,7 +84,7 @@
     {
       "name": "Grass Count / Density",
       "passed": true,
-      "message": "1,115,761 clumps on 1,000,000 m\u00b2 = 1.12/m\u00b2 (requested 1.20/m\u00b2)",
+      "message": "1,120,965 clumps on 1,000,000 m\u00b2 = 1.12/m\u00b2 (requested 1.20/m\u00b2)",
       "details": []
     },
     {
@@ -122,15 +122,15 @@
       "passed": true,
       "message": "9 species represented",
       "details": [
-        "HISM_Grass_Knee_Clump_C: 146,558",
-        "HISM_Grass_Knee_Mid_A: 146,969",
-        "HISM_Grass_Knee_Tall_A: 211,338",
-        "HISM_Grass_Knee_Tall_B: 195,411",
-        "HISM_Grass_Knee_Tall_C: 162,526",
-        "HISM_Grass_Under_Clump_A: 57,107",
-        "HISM_Grass_Under_Large_A: 57,102",
-        "HISM_Grass_Under_Large_B: 65,351",
-        "HISM_Grass_Under_Mid_B: 73,399"
+        "HISM_Grass_Knee_Clump_C: 146,948",
+        "HISM_Grass_Knee_Mid_A: 147,602",
+        "HISM_Grass_Knee_Tall_A: 212,422",
+        "HISM_Grass_Knee_Tall_B: 196,226",
+        "HISM_Grass_Knee_Tall_C: 163,486",
+        "HISM_Grass_Under_Clump_A: 57,364",
+        "HISM_Grass_Under_Large_A: 57,563",
+        "HISM_Grass_Under_Large_B: 65,615",
+        "HISM_Grass_Under_Mid_B: 73,739"
       ]
     },
     {
@@ -142,7 +142,7 @@
     {
       "name": "NPC Spawn Band",
       "passed": true,
-      "message": "76.7-95.0 m from the player start, band 75.0-100.0 m",
+      "message": "76.7-92.1 m from the player start, band 75.0-100.0 m",
       "details": []
     },
     {
@@ -160,7 +160,7 @@
     {
       "name": "NPC Clear Of Trees",
       "passed": true,
-      "message": "tightest spawn has 229 cm to the nearest trunk (minimum 220 cm)",
+      "message": "tightest spawn has 227 cm to the nearest trunk (minimum 220 cm)",
       "details": []
     },
     {

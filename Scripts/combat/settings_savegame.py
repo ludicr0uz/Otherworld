@@ -1,5 +1,5 @@
 """BP_Settings: the SaveGame the graphics menu and the weapon component
-both read, so rebinds and sensitivity survive a restart.
+both read, so rebinds, sensitivity and debug mode survive a restart.
 """
 
 import unreal
@@ -32,11 +32,17 @@ def build_settings_savegame(rebuild=True):
     # settings screen walks the rows with one ForEachLoop and one Array_Set, and
     # BIND_VARS is what says which index means which action.
     _declare(ed, "Binds", BEL.get_array_type(_struct_type(unreal.Key.static_struct())))
+    # Whether the developer overlays (FPS readout, tracers, wanderer numbers)
+    # are on. ON by default, and a save written before this field existed loads
+    # it as the default too. The HUD copies it onto the GameMode's DebugMode at
+    # BeginPlay and writes it back whenever D flips it.
+    _declare(ed, "DebugMode", BEL.get_basic_type_by_name("bool"))
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_Settings failed to compile")
     _apply_defaults(bp, {
         "MouseSensitivity": COMBAT.mouse_sensitivity_default,
         "Binds": [_key(k) for _name, k in BIND_VARS],
+        "DebugMode": True,
     })
     _log(f"built {SETTINGS_BP_PATH} (slot {SETTINGS_SLOT!r})")
     return bp

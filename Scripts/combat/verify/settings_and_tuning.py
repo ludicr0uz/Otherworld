@@ -43,6 +43,9 @@ def check_settings_savegame():
         check("...in the same order BIND_VARS names them",
               [k.export_text() for k in stored] == [d for _v, d in BIND_VARS],
               str([k.export_text() for k in stored]))
+        check("...and debug mode, on unless the player turned it off",
+              sg_cdo.get_editor_property("DebugMode") is True,
+              repr(sg_cdo.get_editor_property("DebugMode")))
         check("the slot it is written to is named and single",
               bool(SETTINGS_SLOT) and SETTINGS_USER_INDEX == 0,
               f"{SETTINGS_SLOT!r} / user {SETTINGS_USER_INDEX}")

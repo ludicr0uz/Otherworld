@@ -135,8 +135,8 @@ GENERATED = (
         note="Five weapons, ammunition, inventory, health, blood, drops, and "
              "BP_Settings -- the SaveGame the menu's keybinds and mouse "
              "sensitivity live in, built here so both it and the HUD can name "
-             "the class. The Audio/ subfolder is imported by "
-             "make_weapon_sounds.py from the sound cache -- see CACHE below. "
+             "the class. The Audio/ subfolder is imported by this builder "
+             "from the sound cache -- see CACHE below. "
              "The three A_Att_* USoundAttenuation profiles every sound in the "
              "game points at are built by the same script but live in "
              "/Game/Audio, because the foley half of the sounds does.",
@@ -248,13 +248,11 @@ CACHE = (
              "the nine A_* wavs into assets/generated/sounds, which "
              "build_weapons_and_combat.py imports. Never committed: GitHub "
              "rejects files over 100 MB, and the fetcher reproduces them "
-             "exactly. make_weapon_sounds.py synthesised the earlier set and "
-             "is history -- running it AFTER the fetcher overwrites real "
-             "recordings with synthesised ones. Scripts/make_creature_sounds.py "
-             "is NOT that: it synthesises footsteps, melee impacts and the "
+             "exactly. Scripts/make_creature_sounds.py synthesises the other "
+             "sounds -- footsteps, melee impacts and the "
              "monster voices, which have no recording to be overwritten by, "
              "and writes only A_Footstep_*, A_MeleeHit_*, A_ZombieGrowl_* and "
-             "A_WendigoRoar_*. The two never touch the same file.",
+             "A_WendigoRoar_*, never a file the fetcher writes.",
     ),
 )
 

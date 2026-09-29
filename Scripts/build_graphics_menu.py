@@ -70,7 +70,7 @@ Event graph:
                                              selection)
 
 The health readout draws every frame; the quality panel only while MenuOpen.
-Health is read off BP_HealthComponent (built by build_shotgun_and_health.py)
+Health is read off BP_HealthComponent (built by build_weapons_and_combat.py)
 rather than off the character class, so the HUD does not care which pawn is
 possessed -- anything carrying the component displays.
 """
@@ -133,7 +133,7 @@ MENU_KEY = "M"
 DEBUG_KEY = "D"
 DEBUG_MODE_VAR = "DebugMode"
 
-# Where the player's health lives.  Built by build_shotgun_and_health.py; the
+# Where the player's health lives.  Built by build_weapons_and_combat.py; the
 # HUD degrades to drawing nothing if the pawn has no such component.
 HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
 

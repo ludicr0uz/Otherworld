@@ -9,7 +9,7 @@ session is pointed at in case an earlier task matters to it.
 
     Scripts/dev/dev-team tasks.md                  # a task file (see below)
     Scripts/dev/dev-team "Add X" "Then fix Y"      # tasks as arguments
-    Scripts/dev/dev-team tasks.md --commit         # each task commits its work
+    Scripts/dev/dev-team tasks.md --no-commit      # leave changes uncommitted
     Scripts/dev/dev-team tasks.md --dry-run        # show what would run
 
 A task file is a Markdown list. Every top-level item is one task; indented or
@@ -30,6 +30,13 @@ Sessions run unattended, so they cannot ask questions. The default permission
 mode is ``auto`` (a classifier approves or blocks each action); pass
 ``--permission-mode bypassPermissions`` to allow everything, or a stricter mode
 to allow less. Any action that would prompt is denied, not waited on.
+
+Each task's commit message has an "Issues encountered:" section, written by
+the session: the problems it hit and the steps it took to resolve each. After
+the session ends, dev-team adds ``Time:`` (the session's wall-clock time) and
+``Tokens:`` (every model, subagents included) trailers to the task's last
+commit, so ``git log`` shows what each change cost. It amends only the message,
+and never a commit that is already on a remote branch.
 
 Logs go to Saved/DevTeam/<timestamp>/: the raw stream-json transcript of every
 task, and progress.md with each task's report. Each task's session id is
@@ -71,8 +78,13 @@ End with a short report: what changed, how you verified it, and anything left \
 undone. If you could not complete the task, make the first line of the report \
 "{fail} <reason>"."""
 
-COMMIT = (" When the task is done and verified, commit your changes with a "
-          "descriptive message (never --no-verify).")
+COMMIT = """ When the task is done and verified, commit your changes \
+(never --no-verify). Besides saying what changed, the commit message body must \
+have a section headed "Issues encountered:" listing each problem you hit while \
+working (failed checks, wrong assumptions, engine or tooling surprises, dead \
+ends) and, for each, the steps you took to resolve it -- or \
+"Issues encountered: none", above any co-author line. dev-team appends the \
+time and token trailers after you commit, so do not write those yourself."""
 
 
 class Task:
@@ -194,6 +206,60 @@ def git_head():
         return ""
 
 
+def token_usage(result):
+    """Sum the session's tokens over every model it used (subagents included)."""
+    usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+    per_model = result.get("modelUsage") or {}
+    if per_model:
+        for m in per_model.values():
+            usage["input"] += m.get("inputTokens") or 0
+            usage["output"] += m.get("outputTokens") or 0
+            usage["cache_read"] += m.get("cacheReadInputTokens") or 0
+            usage["cache_write"] += m.get("cacheCreationInputTokens") or 0
+    else:
+        u = result.get("usage") or {}
+        usage["input"] = u.get("input_tokens") or 0
+        usage["output"] = u.get("output_tokens") or 0
+        usage["cache_read"] = u.get("cache_read_input_tokens") or 0
+        usage["cache_write"] = u.get("cache_creation_input_tokens") or 0
+    usage["total"] = sum(usage.values())
+    return usage
+
+
+def describe_tokens(usage, cost):
+    return (f"{usage['total']:,} (input {usage['input']:,}, output {usage['output']:,}, "
+            f"cache read {usage['cache_read']:,}, cache write {usage['cache_write']:,}; "
+            f"${cost:.2f})")
+
+
+def git(*argv):
+    return subprocess.run(["git", *argv], cwd=ROOT, capture_output=True, text=True)
+
+
+def describe_time(ms):
+    mins, secs = divmod(round((ms or 0) / 1000), 60)
+    hours, mins = divmod(mins, 60)
+    return f"{hours}h {mins:02d}m {secs:02d}s" if hours else f"{mins}m {secs:02d}s"
+
+
+def tag_commit(before, after, time, tokens):
+    """Add Time:/Tokens: trailers to the task's last commit. Returns the new short HEAD."""
+    if git("branch", "-r", "--contains", "HEAD").stdout.strip():
+        print("    (not recording time/tokens: the commit is already pushed)")
+        return after
+    count = git("rev-list", "--count", f"{before}..HEAD").stdout.strip()
+    scope = f" -- for all {count} commits of this task" if count and count != "1" else ""
+    # --only with no paths rewrites the message alone and leaves the index out;
+    # the content was already verified by the hook when the session committed.
+    done = git("commit", "--amend", "--only", "--no-verify", "--no-edit",
+               "--trailer", f"Time: {time}{scope}",
+               "--trailer", f"Tokens: {tokens}{scope}")
+    if done.returncode:
+        print(f"    (could not record time/tokens in the commit: {done.stderr.strip()})")
+        return after
+    return git_head()
+
+
 def main():
     p = argparse.ArgumentParser(
         prog="dev-team", description=__doc__.split("\n\n")[0],
@@ -201,8 +267,9 @@ def main():
         epilog="\n\n".join(__doc__.split("\n\n")[1:]))
     p.add_argument("tasks", nargs="+",
                    help="a task file (.md/.txt), '-' for stdin, or task texts")
-    p.add_argument("--commit", action="store_true",
-                   help="have each task commit its work when verified")
+    p.add_argument("--no-commit", dest="commit", action="store_false",
+                   help="leave each task's work uncommitted (by default each task "
+                        "commits its work when verified)")
     p.add_argument("--keep-going", action="store_true",
                    help="continue after a failed task instead of stopping")
     p.add_argument("--permission-mode", default="auto",
@@ -257,15 +324,22 @@ def main():
         total_cost += cost
         mins = (result.get("duration_ms") or 0) / 60000
         status = "done" if ok else "FAILED"
+        tokens = describe_tokens(token_usage(result), cost)
         after = git_head()
+        if before and after and after != before:
+            after = tag_commit(before, after, describe_time(result.get("duration_ms")),
+                               tokens)
         commits = f", commits {before}..{after}" if after and after != before else ""
         print(f"    {status} in {mins:.1f} min, ${cost:.2f}{commits}  (log: {log_path})")
+        print(f"    tokens {tokens}")
         if report:
             print("    " + report.replace("\n", "\n    "))
 
         with open(progress, "a") as f:
             f.write(f"\n## Task {n}: {status}\n\n{task.text}\n\n"
-                    f"Session: {result.get('session_id', '?')}{commits}\n\n"
+                    f"Session: {result.get('session_id', '?')}{commits}\n"
+                    f"Time: {describe_time(result.get('duration_ms'))}\n"
+                    f"Tokens: {tokens}\n\n"
                     f"### Report\n\n{report or '(no report)'}\n")
         outcomes.append((task, status))
         if ok and task_file and task.line is not None:

@@ -7,10 +7,11 @@ Nothing carries over between tasks except what is on disk: the code, git, and
 this run's progress file (each finished task's final report), which the next
 session is pointed at in case an earlier task matters to it.
 
-    Scripts/dev/dev-team tasks.md                  # a task file (see below)
+    Scripts/dev/dev-team                           # the queue in Scripts/dev/tasks.md
+    Scripts/dev/dev-team -t other.md               # a different task file
     Scripts/dev/dev-team "Add X" "Then fix Y"      # tasks as arguments
-    Scripts/dev/dev-team tasks.md --no-commit      # leave changes uncommitted
-    Scripts/dev/dev-team tasks.md --dry-run        # show what would run
+    Scripts/dev/dev-team --no-commit               # leave changes uncommitted
+    Scripts/dev/dev-team --dry-run                 # show what would run
 
 A task file is a Markdown list. Every top-level item is one task; indented or
 following lines up to the next item belong to it, so a task can run to several
@@ -54,6 +55,7 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 LOG_ROOT = os.path.join(ROOT, "Saved", "DevTeam")
+DEFAULT_TASKS = os.path.join(ROOT, "Scripts", "dev", "tasks.md")
 
 ITEM = re.compile(r"^(?:[-*+]|\d+[.)])\s+(?:\[( |x|X)\]\s+)?(.*)$")
 FAIL_MARK = "FAILED:"
@@ -139,15 +141,29 @@ def tick(path, task):
         f.write("\n".join(lines))
 
 
+# A leading `cd <root>[/sub];` or `cd <root>[/sub] &&`, quoted or with escaped
+# spaces -- sessions prefix nearly every command with one.
+_ROOTS = "|".join(re.escape(r) for r in (ROOT, ROOT.replace(" ", "\\ ")))
+CD_ROOT = re.compile(rf"""^cd\s+(["']?)(?:{_ROOTS})(/[^"';&]*)?\1\s*(?:;|&&)\s*""")
+
+
 def describe(tool):
     """One line for a tool call in the live progress output."""
     name, inp = tool.get("name", "?"), tool.get("input") or {}
     detail = (inp.get("description") or inp.get("file_path") or inp.get("pattern")
               or inp.get("command") or inp.get("prompt") or "")
     detail = " ".join(str(detail).split())
-    if detail.startswith(ROOT):
-        detail = detail[len(ROOT) + 1:]
+    if m := CD_ROOT.match(detail):
+        sub = (m.group(2) or "").strip("/")
+        detail = (f"[{sub}] " if sub else "") + detail[m.end():]
+    detail = detail.replace(ROOT + "/", "").replace(ROOT, ".")
     return f"{name}: {detail[:90]}" if detail else name
+
+
+def note(text):
+    """The model's own words between tool calls, as one line."""
+    text = " ".join(text.split())
+    return text if len(text) <= 200 else text[:197] + "..."
 
 
 def run_task(task, n, total, args, run_dir, progress):
@@ -165,6 +181,9 @@ def run_task(task, n, total, args, run_dir, progress):
 
     log_path = os.path.join(run_dir, f"task-{n:02d}.jsonl")
     result = {}
+    # A text block is printed only once a tool call follows it: the last one
+    # is the final report, which is printed in full after the session.
+    pending = []
     with open(log_path, "w") as log:
         proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True,
@@ -182,7 +201,12 @@ def run_task(task, n, total, args, run_dir, progress):
                     print(f"    session {event.get('session_id')}")
                 elif event.get("type") == "assistant" and not event.get("parent_tool_use_id"):
                     for block in event.get("message", {}).get("content", []):
-                        if block.get("type") == "tool_use":
+                        if block.get("type") == "text" and block.get("text", "").strip():
+                            pending.append(block["text"])
+                        elif block.get("type") == "tool_use":
+                            for text in pending:
+                                print(f"    » {note(text)}")
+                            pending.clear()
                             print(f"    · {describe(block)}")
                 elif event.get("type") == "result":
                     result = event
@@ -265,8 +289,11 @@ def main():
         prog="dev-team", description=__doc__.split("\n\n")[0],
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="\n\n".join(__doc__.split("\n\n")[1:]))
-    p.add_argument("tasks", nargs="+",
-                   help="a task file (.md/.txt), '-' for stdin, or task texts")
+    p.add_argument("tasks", nargs="*",
+                   help="task texts, or '-' to read a task list from stdin "
+                        "(instead of the task file)")
+    p.add_argument("-t", "--tasks-file", metavar="FILE",
+                   help=f"the task file (default: {os.path.relpath(DEFAULT_TASKS, ROOT)})")
     p.add_argument("--no-commit", dest="commit", action="store_false",
                    help="leave each task's work uncommitted (by default each task "
                         "commits its work when verified)")
@@ -283,14 +310,18 @@ def main():
     args = p.parse_args()
 
     task_file = None
-    if len(args.tasks) == 1 and args.tasks[0] == "-":
+    if args.tasks and args.tasks_file:
+        sys.exit("dev-team: give either task texts or -t FILE, not both")
+    if args.tasks == ["-"]:
         tasks = parse_tasks(sys.stdin.read())
-    elif len(args.tasks) == 1 and os.path.isfile(args.tasks[0]):
-        task_file = os.path.abspath(args.tasks[0])
+    elif args.tasks:
+        tasks = [Task(t.strip()) for t in args.tasks if t.strip()]
+    else:
+        task_file = os.path.abspath(args.tasks_file or DEFAULT_TASKS)
+        if not os.path.isfile(task_file):
+            sys.exit(f"dev-team: no task file at {task_file}")
         with open(task_file) as f:
             tasks = parse_tasks(f.read())
-    else:
-        tasks = [Task(t.strip()) for t in args.tasks if t.strip()]
 
     todo = [t for t in tasks if not t.done]
     if not todo:

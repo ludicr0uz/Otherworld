@@ -60,7 +60,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     _declare(ed, "Aiming", BEL.get_basic_type_by_name("bool"))
     # The seven polled keys, as variables rather than as pin literals. Nothing
     # in this component loads them: the HUD pushes the player's binds in every
-    # DrawHUD frame (see build_graphics_menu._author_push_settings), which is
+    # DrawHUD frame (see graphics_menu/settings_page._author_push_settings), which is
     # what keeps the component free of any cast to the HUD and of any knowledge
     # that a save file exists. The CDO defaults below are therefore also the
     # standalone fallback -- a weapon component on an actor with no HUD in front
@@ -71,7 +71,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # bases are cached off the PlayerController at BeginPlay -- BasePitchScale
     # especially, because the engine ships it negative and a literal would
     # invert the look. See the ADS block for what the zoom does to them.
-    for name in ("MouseSensitivity", "BaseYawScale", "BasePitchScale"):
+    # ScopeSensitivity is the scope's extra multiplier on top of the zoom's
+    # own slowdown -- the settings screen's second row, pushed like the first.
+    for name in ("MouseSensitivity", "ScopeSensitivity", "BaseYawScale",
+                 "BasePitchScale"):
         _declare(ed, name, _float_type())
     # What the ready pose currently reflects, as opposed to what it should.
     # The pair is what makes the sprint pose edge-triggered; see _author_wc_tick.
@@ -116,6 +119,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # base scales this multiplies are the controller's own. A player who
         # never opens the settings screen therefore gets the stock feel.
         "MouseSensitivity": COMBAT.mouse_sensitivity_default,
+        "ScopeSensitivity": COMBAT.ads_scope_sens_scale,
         **{name: _key(k) for name, k in BIND_VARS},
         # Both overwritten on the first frame of BeginPlay. Seeded with the
         # engine's own defaults, signs included, so that a BeginPlay that

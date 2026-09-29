@@ -42,7 +42,7 @@
     {
       "name": "Tree Count / Density",
       "passed": true,
-      "message": "136 trees on 4.0 ha = 34.0 trees/ha",
+      "message": "68 trees on 4.0 ha = 17.0 trees/ha",
       "details": []
     },
     {
@@ -72,7 +72,7 @@
     {
       "name": "Tree Spacing (>100cm)",
       "passed": true,
-      "message": "Min spacing: 125 cm, 0 overlaps",
+      "message": "Min spacing: 249 cm, 0 overlaps",
       "details": []
     },
     {
@@ -84,7 +84,7 @@
     {
       "name": "Grass Count / Density",
       "passed": true,
-      "message": "44,368 clumps on 40,000 m\u00b2 = 1.11/m\u00b2 (requested 1.20/m\u00b2)",
+      "message": "40,521 clumps on 40,000 m\u00b2 = 1.01/m\u00b2 (requested 1.10/m\u00b2)",
       "details": []
     },
     {
@@ -96,19 +96,19 @@
     {
       "name": "Grass Snapped To Terrain",
       "passed": true,
-      "message": "All 505 sampled clumps seated on the mesh",
+      "message": "All 501 sampled clumps seated on the mesh",
       "details": []
     },
     {
       "name": "Grass Knee Height",
       "passed": true,
-      "message": "knee layer = 77% of clumps, avg 49.4 cm (target 50 cm)",
+      "message": "knee layer = 100% of clumps, avg 50.0 cm (target 50 cm)",
       "details": []
     },
     {
       "name": "Grass Upscale Factor",
       "passed": true,
-      "message": "worst upscale 2.34x (HISM_Grass_Knee_Tall_C), limit 2.40x",
+      "message": "worst upscale 1.08x (HISM_Grass_Patch_A), limit 2.40x",
       "details": []
     },
     {
@@ -120,18 +120,34 @@
     {
       "name": "Grass Species Spread",
       "passed": true,
-      "message": "9 species represented",
+      "message": "2 species represented",
       "details": [
-        "HISM_Grass_Knee_Clump_C: 5,844",
-        "HISM_Grass_Knee_Mid_A: 5,862",
-        "HISM_Grass_Knee_Tall_A: 8,451",
-        "HISM_Grass_Knee_Tall_B: 7,813",
-        "HISM_Grass_Knee_Tall_C: 6,415",
-        "HISM_Grass_Under_Clump_A: 2,325",
-        "HISM_Grass_Under_Large_A: 2,197",
-        "HISM_Grass_Under_Large_B: 2,611",
-        "HISM_Grass_Under_Mid_B: 2,850"
+        "HISM_Grass_Patch_A: 25,488",
+        "HISM_Grass_Patch_B: 15,033"
       ]
+    },
+    {
+      "name": "Grass Density Tiers",
+      "passed": true,
+      "message": "T0 16,275, T1 8,043, T2 8,106, T3 8,097",
+      "details": []
+    },
+    {
+      "name": "Foliage Meshes",
+      "passed": true,
+      "message": "2 grass patches, 2 bushes, within budget",
+      "details": [
+        "SM_GrassPatch_A: 1600 tris, 53 cm tall, 147 cm wide",
+        "SM_GrassPatch_B: 1614 tris, 61 cm tall, 137 cm wide",
+        "SM_Bush_Round: 3462 tris, 121 cm tall, 166 cm wide",
+        "SM_Bush_Tall: 3126 tris, 167 cm tall, 131 cm wide"
+      ]
+    },
+    {
+      "name": "Bushes",
+      "passed": true,
+      "message": "328 bushes (82/ha) in 32% of 10 m squares",
+      "details": []
     },
     {
       "name": "NPC Count",
@@ -142,13 +158,13 @@
     {
       "name": "NPC Spawn Band",
       "passed": true,
-      "message": "75.0-78.0 m from the player start, band 75.0-79.6 m (clamped from 75-100 m by the navigable radius)",
+      "message": "75.0-79.4 m from the player start, band 75.0-79.6 m (clamped from 75-100 m by the navigable radius)",
       "details": []
     },
     {
       "name": "NPC Separation",
       "passed": true,
-      "message": "closest pair (NPC 7, NPC 8) 6.9 m apart (minimum 6.0 m)",
+      "message": "closest pair (NPC 2, NPC 4) 10.6 m apart (minimum 6.0 m)",
       "details": []
     },
     {
@@ -160,7 +176,7 @@
     {
       "name": "NPC Clear Of Trees",
       "passed": true,
-      "message": "tightest spawn has 343 cm to the nearest trunk (minimum 220 cm)",
+      "message": "tightest spawn has 371 cm to the nearest trunk (minimum 220 cm)",
       "details": []
     },
     {

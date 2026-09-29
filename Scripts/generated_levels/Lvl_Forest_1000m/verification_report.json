@@ -84,7 +84,7 @@
     {
       "name": "Grass Count / Density",
       "passed": true,
-      "message": "1,120,965 clumps on 1,000,000 m\u00b2 = 1.12/m\u00b2 (requested 1.20/m\u00b2)",
+      "message": "1,025,988 clumps on 1,000,000 m\u00b2 = 1.03/m\u00b2 (requested 1.10/m\u00b2)",
       "details": []
     },
     {
@@ -102,13 +102,13 @@
     {
       "name": "Grass Knee Height",
       "passed": true,
-      "message": "knee layer = 77% of clumps, avg 49.3 cm (target 50 cm)",
+      "message": "knee layer = 100% of clumps, avg 50.0 cm (target 50 cm)",
       "details": []
     },
     {
       "name": "Grass Upscale Factor",
       "passed": true,
-      "message": "worst upscale 2.34x (HISM_Grass_Knee_Tall_C), limit 2.40x",
+      "message": "worst upscale 1.08x (HISM_Grass_Patch_A), limit 2.40x",
       "details": []
     },
     {
@@ -120,18 +120,34 @@
     {
       "name": "Grass Species Spread",
       "passed": true,
-      "message": "9 species represented",
+      "message": "2 species represented",
       "details": [
-        "HISM_Grass_Knee_Clump_C: 146,948",
-        "HISM_Grass_Knee_Mid_A: 147,602",
-        "HISM_Grass_Knee_Tall_A: 212,422",
-        "HISM_Grass_Knee_Tall_B: 196,226",
-        "HISM_Grass_Knee_Tall_C: 163,486",
-        "HISM_Grass_Under_Clump_A: 57,364",
-        "HISM_Grass_Under_Large_A: 57,563",
-        "HISM_Grass_Under_Large_B: 65,615",
-        "HISM_Grass_Under_Mid_B: 73,739"
+        "HISM_Grass_Patch_A: 641,621",
+        "HISM_Grass_Patch_B: 384,367"
       ]
+    },
+    {
+      "name": "Grass Density Tiers",
+      "passed": true,
+      "message": "T0 411,185, T1 204,628, T2 205,231, T3 204,944",
+      "details": []
+    },
+    {
+      "name": "Foliage Meshes",
+      "passed": true,
+      "message": "2 grass patches, 2 bushes, within budget",
+      "details": [
+        "SM_GrassPatch_A: 1600 tris, 53 cm tall, 147 cm wide",
+        "SM_GrassPatch_B: 1614 tris, 61 cm tall, 137 cm wide",
+        "SM_Bush_Round: 3462 tris, 121 cm tall, 166 cm wide",
+        "SM_Bush_Tall: 3126 tris, 167 cm tall, 131 cm wide"
+      ]
+    },
+    {
+      "name": "Bushes",
+      "passed": true,
+      "message": "8,239 bushes (82/ha) in 33% of 10 m squares",
+      "details": []
     },
     {
       "name": "NPC Count",

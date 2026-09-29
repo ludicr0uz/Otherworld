@@ -6,8 +6,10 @@ build_graphics_menu.py:
   emit_apply          -- the chain one preset key (and BeginPlay) runs:
                          Set Quality -> scalability -> two console overrides.
   author_grass_sync   -- a Tick prologue that pushes the preset's grass
-                         lighting onto every grass cell whenever Quality has
-                         changed since it last ran.
+                         lighting onto every grass and bush cell, and shows
+                         the grass density tiers the preset draws
+                         (grass_tiers.py), whenever Quality has changed since
+                         it last ran.
 
 Grass lighting cannot ride on the preset chain itself. There is no cvar for one
 component's shadow, so it has to be set on the components -- and a level
@@ -20,6 +22,7 @@ from collections import namedtuple
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from forest_generator.grass_cells import GRASS_TAG
+from graphics_menu.grass_tiers import SWITCHED_TIERS, author_tier_visibility
 
 # One preset, in menu order.
 #
@@ -66,6 +69,9 @@ PRESET_KEYS = ("One", "Two", "Three", "Four")
 # setting the caret: the menu can only tell the truth about the current quality
 # if it is the thing that established it.
 DEFAULT_PRESET = 0  # Low
+
+# A tier shown from a preset that does not exist would never be shown.
+assert all(t.min_preset < len(PRESETS) for _, t in SWITCHED_TIERS)
 
 # The graph turns Quality into the grass flag with one comparison, which only
 # describes the table above while the grass presets are a contiguous top run.
@@ -219,18 +225,26 @@ def author_grass_sync(ed, x0, y0, in_exec):
         _connect(flow, _pin(s, "execute"))
         flow = BEL.find_then_pin(s)
 
+    # Then the density tiers, then record the Quality all of it was done for.
+    tiers_done, tier_nodes = author_tier_visibility(
+        ed, x0 + 1300, y0 - 900, _loose_pin(loop, "Completed", is_input=False),
+        quality)
+    made.extend(tier_nodes)
     done = keep(_at(ed.add_set_member_variable_node(GRASS_APPLIED_VAR),
-                    x0 + 1300, y0 - 260))
-    _connect(quality(x0 + 1060, y0 - 140), _pin(done, GRASS_APPLIED_VAR))
-    _connect(_loose_pin(loop, "Completed", is_input=False), _pin(done, "execute"))
+                    x0 + 1300 + 1400 * len(SWITCHED_TIERS), y0 - 900))
+    _connect(quality(x0 + 1060 + 1400 * len(SWITCHED_TIERS), y0 - 780),
+             _pin(done, GRASS_APPLIED_VAR))
+    _connect(tiers_done, _pin(done, "execute"))
 
     ultra = PRESETS[GRASS_LIGHTS_FROM].label
     ed.add_comment_to_nodes(
-        f"Grass lighting follows Quality. When Quality differs from "
-        f"{GRASS_APPLIED_VAR}, every actor tagged {GRASS_TAG} gets shadows, "
-        f"distance-field and dynamic indirect lighting switched on for "
-        f"{ultra} and off below it. The import script saves the grass unlit, "
-        f"and {GRASS_APPLIED_VAR} starts at {GRASS_APPLIED_DEFAULT} so the "
-        f"first Tick always applies.",
+        f"Grass follows Quality. When Quality differs from "
+        f"{GRASS_APPLIED_VAR}, every actor tagged {GRASS_TAG} (grass and "
+        f"bushes) gets shadows, distance-field and dynamic indirect lighting "
+        f"switched on for {ultra} and off below it, and each grass density "
+        f"tier above Low is hidden in game below the preset that draws it. "
+        f"The import script saves the grass unlit and those tiers hidden, and "
+        f"{GRASS_APPLIED_VAR} starts at {GRASS_APPLIED_DEFAULT} so the first "
+        f"Tick always applies.",
         made)
     return (BEL.find_then_pin(done), BEL.find_else_pin(changed))

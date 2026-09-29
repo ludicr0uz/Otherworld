@@ -16,9 +16,11 @@ LEVEL_NAME = "Lvl_Forest_1000m"
 WORLD_SIZE_CM = 100000.0
 EXPECTED_TREE_COUNT = 1700
 EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 350, "HISM_Tree_Leafy_Island_02": 350, "HISM_Tree_Fir_A": 550, "HISM_Tree_Pine_A": 250, "HISM_Tree_Deciduous": 200}
-EXPECTED_GRASS_COUNT = 1120965
-EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 163486, "HISM_Grass_Under_Mid_B": 73739, "HISM_Grass_Knee_Tall_B": 196226, "HISM_Grass_Knee_Mid_A": 147602, "HISM_Grass_Knee_Tall_A": 212422, "HISM_Grass_Knee_Clump_C": 146948, "HISM_Grass_Under_Clump_A": 57364, "HISM_Grass_Under_Large_B": 65615, "HISM_Grass_Under_Large_A": 57563}
-EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.24006685497192, 55.199893491401276], "HISM_Grass_Under_Mid_B": [25.500140594845533, 35.999834264086466], "HISM_Grass_Knee_Tall_B": [42.50004418637726, 59.9998529540912], "HISM_Grass_Knee_Mid_A": [40.48010001413594, 50.59994909808587], "HISM_Grass_Knee_Tall_A": [42.50012028500365, 59.9998415337498], "HISM_Grass_Knee_Clump_C": [43.12001264538074, 53.89977546867576], "HISM_Grass_Under_Clump_A": [23.80017238514594, 33.59961510198457], "HISM_Grass_Under_Large_B": [24.65018734209176, 34.79986821158218], "HISM_Grass_Under_Large_A": [22.10008810158521, 31.199997158391774]}
+EXPECTED_GRASS_COUNT = 1025988
+EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Patch_A_T0": 256642, "HISM_Grass_Patch_B_T0": 154543, "HISM_Grass_Patch_B_T1": 76400, "HISM_Grass_Patch_A_T1": 128228, "HISM_Grass_Patch_B_T2": 76338, "HISM_Grass_Patch_A_T2": 128893, "HISM_Grass_Patch_B_T3": 77086, "HISM_Grass_Patch_A_T3": 127858}
+EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Patch_A_T0": [42.50008364559159, 57.49987672615888], "HISM_Grass_Patch_B_T0": [42.50014824229636, 57.499755403554516], "HISM_Grass_Patch_B_T1": [42.50039548418754, 57.49993477499344], "HISM_Grass_Patch_A_T1": [42.50002736287293, 57.49985773064433], "HISM_Grass_Patch_B_T2": [42.500278944638076, 57.499790415979504], "HISM_Grass_Patch_A_T2": [42.50000342181372, 57.499914905389474], "HISM_Grass_Patch_B_T3": [42.50127342940739, 57.49958302070925], "HISM_Grass_Patch_A_T3": [42.500070311926294, 57.499978126494455]}
+EXPECTED_BUSH_COUNT = 8239
+EXPECTED_BUSH_SPEC_COUNTS = {"HISM_Bush_Tall": 2821, "HISM_Bush_Round": 5418}
 EXPECTED_NPCS = json.loads(r"""[{"x": -2157.65, "y": 7761.17, "z": 88.0, "yaw": 285.54, "distance_cm": 8055.51}, {"x": 4415.19, "y": 6517.06, "z": 88.0, "yaw": 235.88, "distance_cm": 7871.84}, {"x": 8000.93, "y": -3824.09, "z": 88.0, "yaw": 154.45, "distance_cm": 8867.84}, {"x": -8035.34, "y": -244.76, "z": 88.0, "yaw": 1.74, "distance_cm": 8039.07}, {"x": 8540.72, "y": -2527.34, "z": 88.0, "yaw": 163.52, "distance_cm": 8906.82}, {"x": -7535.23, "y": 1445.21, "z": 88.0, "yaw": 349.14, "distance_cm": 7672.57}, {"x": -5859.14, "y": -7103.88, "z": 88.0, "yaw": 50.48, "distance_cm": 9208.4}, {"x": 6676.28, "y": 6003.28, "z": 88.0, "yaw": 221.96, "distance_cm": 8978.43}, {"x": -7872.46, "y": 941.5, "z": 88.0, "yaw": 353.18, "distance_cm": 7928.56}, {"x": 675.29, "y": -8803.66, "z": 88.0, "yaw": 94.39, "distance_cm": 8829.52}]""")
 EXPECTED_NPC_RUN_SPEED = 600.0
 EXPECTED_VARIANTS = json.loads(r"""[{"key": "Zombie", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Zombie", "mesh": "/Game/Sourced/Characters/SKM_Zombie01/SKM_Zombie01", "anim_bp": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Zombie", "health": 100.0, "speed_scale": 1.0, "voices": ["/Game/Audio/A_ZombieGrowl_01", "/Game/Audio/A_ZombieGrowl_02", "/Game/Audio/A_ZombieGrowl_03"]}, {"key": "Wendigo", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Wendigo", "mesh": "/Game/Sourced/Characters/SKM_Wendigo01/SKM_Wendigo01", "anim_bp": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Wendigo", "health": 300.0, "speed_scale": 1.15, "voices": ["/Game/Audio/A_WendigoRoar_01", "/Game/Audio/A_WendigoRoar_02", "/Game/Audio/A_WendigoRoar_03"]}]""")
@@ -213,6 +215,16 @@ if EXPECTED_GRASS_COUNT > 0:
     from forest_import import grass as grass_import
     grass_import.verify_grass(check, actors, EXPECTED_GRASS_SPEC_COUNTS,
                               EXPECTED_GRASS_HEIGHTS, EXPECTED_GRASS_COUNT)
+
+# ── 5b. Bushes and the generated meshes (forest_import/bushes.py,
+#        foliage_assets.py) ──────────────────────────────────────────
+if EXPECTED_BUSH_COUNT > 0:
+    from forest_import import bushes as bushes_import
+    bushes_import.verify_bushes(check, actors, EXPECTED_BUSH_SPEC_COUNTS,
+                                EXPECTED_BUSH_COUNT)
+if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
+    from forest_import import foliage_assets
+    foliage_assets.verify_foliage_assets(check)
 
 # ── 6. Navigation + NPCs ─────────────────────────────────────────────
 if EXPECTED_NPCS:

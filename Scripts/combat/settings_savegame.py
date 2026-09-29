@@ -28,6 +28,9 @@ def build_settings_savegame(rebuild=True):
     bp = _create_blueprint(SETTINGS_BP_PATH, unreal.SaveGame)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     _declare(ed, "MouseSensitivity", _float_type())
+    # The sniper scope's own multiplier, on top of the zoom's slowdown. A save
+    # written before this field existed loads it as the default below.
+    _declare(ed, "ScopeSensitivity", _float_type())
     # Indexed, not a struct per bind and not seven separate variables: the
     # settings screen walks the rows with one ForEachLoop and one Array_Set, and
     # BIND_VARS is what says which index means which action.
@@ -41,6 +44,7 @@ def build_settings_savegame(rebuild=True):
         raise RuntimeError("BP_Settings failed to compile")
     _apply_defaults(bp, {
         "MouseSensitivity": COMBAT.mouse_sensitivity_default,
+        "ScopeSensitivity": COMBAT.ads_scope_sens_scale,
         "Binds": [_key(k) for _name, k in BIND_VARS],
         "DebugMode": True,
     })

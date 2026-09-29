@@ -15,8 +15,12 @@ import unreal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_graphics_menu as G
+from graphics_menu import canvas as C
 from graphics_menu import fps as F
+from graphics_menu import menu_nav as N
+from graphics_menu import grass_tiers as T
 from graphics_menu import presets as P
+from graphics_menu import settings_rows as S
 
 BEL = unreal.BlueprintEditorLibrary
 BGE = unreal.BlueprintGraphEditor
@@ -112,7 +116,7 @@ def main():
     # The main menu's start keys are polled from ReceiveDrawHUD for the same
     # reason the restart key is, and so are the four navigation keys.
     expected_keys = set((G.MENU_KEY, G.RESTART_KEY, G.DEBUG_KEY,
-                         G.NAV_UP, G.NAV_DOWN, G.NAV_LEFT, G.NAV_RIGHT)
+                         N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT)
                         + G.PRESET_KEYS + G.START_KEYS)
     check("polls exactly the menu, preset, debug, restart, start and nav keys",
           keys == expected_keys,
@@ -124,7 +128,7 @@ def main():
           len(driven_keys) == 1, str(len(driven_keys)))
     # The navigation keys must not be bindable, or a keypress can lock the
     # settings screen shut with no way back but deleting the save.
-    nav = {G.NAV_UP, G.NAV_DOWN, G.NAV_LEFT, G.NAV_RIGHT} | set(G.START_KEYS)
+    nav = {N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT} | set(G.START_KEYS)
     check("...and the menu's own keys are not in the pool it offers",
           not (nav & set(G.KEY_POOL)), str(sorted(nav & set(G.KEY_POOL))))
 
@@ -172,8 +176,26 @@ def main():
           str(cdo.get_editor_property(P.GRASS_APPLIED_VAR)))
     tagged = [BEL.find_input_pin(n, "Tag").get_pin_value()
               for n in by_pins("Tag") if "ComponentClass" not in pin_names(n)]
-    check(f"grass cells are found by their tag, {P.GRASS_TAG}",
-          tagged == [P.GRASS_TAG], str(tagged))
+    want_tags = [P.GRASS_TAG] + [T.tier_tag(i) for i, _ in T.SWITCHED_TIERS]
+    check(f"grass cells are found by their tags, {', '.join(want_tags)}",
+          sorted(tagged) == sorted(want_tags), str(tagged))
+    # --- grass density follows Quality (grass_tiers.author_tier_visibility)
+    # One SetActorHiddenInGame per switched tier, each fed by Quality < the
+    # tier's first preset, and each looping over that tier's own tag.
+    hides = by_pins("bNewHidden", "self", "execute")
+    thresholds = []
+    for n in hides:
+        for src in BEL.find_input_pin(n, "bNewHidden").list_connected_pins():
+            b = BEL.find_input_pin(PIN.get_owning_node(src), "B")
+            thresholds.append(b.get_pin_value() if b else None)
+    want = [str(t.min_preset) for _, t in T.SWITCHED_TIERS]
+    check("each grass tier is hidden below its preset "
+          f"({', '.join(want)})", sorted(thresholds) == sorted(want),
+          str(thresholds))
+    check("every tier hide runs (exec wired)",
+          len(hides) == len(want) and all(
+              BEL.find_input_pin(n, "execute").list_connected_pins() for n in hides),
+          str(len(hides)))
     for _fn, arg in P.GRASS_SETTERS:
         setters = by_pins(arg, "self", "execute")
         # Driven by the Quality comparison, never a literal: a literal would
@@ -209,7 +231,8 @@ def main():
                      # GameStarted is false, and the settings page behind it.
                      G.GAME_TITLE, G.GAME_SUBTITLE,
                      "UP / DOWN  ·  ENTER selects",
-                     G.SETTINGS_TITLE, G.SENS_LABEL, G.BACK_LABEL,
+                     S.SETTINGS_TITLE, S.BACK_LABEL,
+                     *(sl.label for sl in S.SLIDERS),
                      "press any key to bind it",
                      "arrows adjust  ·  ENTER rebinds"}
     expected_text |= set(G.MENU_ROWS)
@@ -273,7 +296,7 @@ def main():
     # is not the picture. Nothing errors; the art is just subtly wrong.
     wrong = []
     for name, (want_w, want_h) in G.UI_TEX_SIZE.items():
-        tex = eas.load_asset(f"{G.UI_ART_DIR}/{name}")
+        tex = eas.load_asset(f"{C.UI_ART_DIR}/{name}")
         if not tex:
             wrong.append(f"{name} not imported")
             continue
@@ -285,7 +308,7 @@ def main():
           not wrong, "; ".join(wrong))
     icons = []
     for display in ("Pistol", "Shotgun", "SMG", "Rifle", "Sniper"):
-        tex = eas.load_asset(f"{G.UI_ART_DIR}/T_UI_Icon_{display}")
+        tex = eas.load_asset(f"{C.UI_ART_DIR}/T_UI_Icon_{display}")
         if not tex:
             icons.append(f"{display} not imported")
         elif (tex.blueprint_get_size_x(),
@@ -494,10 +517,11 @@ def main():
     # Nine now: the settings page adds the sensitivity readout and, inside one
     # ForEachLoop over Binds, a row label and a key name. Those last two are
     # what keeps the seven bind rows to a single pair of draws. Ten with the
-    # debug FPS readout.
+    # debug FPS readout; one more per extra slider (scope sensitivity).
+    want_driven = 9 + len(S.SLIDERS)
     check("HP, slot names, ammo, NPC numbers, kills, score, the settings "
           "rows and the FPS readout read from data",
-          len(driven_text) == 10, str(len(driven_text)))
+          len(driven_text) == want_driven, f"{len(driven_text)}, want {want_driven}")
     ids = [n for n in nodes
            if "NpcId" in {str(p_) for p_ in pin_names(n, False)}]
     check("each NPC bar carries the wanderer's spawn number",
@@ -694,12 +718,13 @@ def main():
           str(sorted({BEL.find_input_pin(n, "SlotName").get_pin_value()
                       for n in slots})))
     writes = by_pins("SaveGameObject")
-    # Four: BeginPlay's repair of a save from an older build, a rebind, a
-    # sensitivity nudge, and the debug toggle. Written at the moment of the change and not on leaving
-    # the page, because a game quit from the settings screen still has to
-    # remember what was set -- which is the whole of "across future game runs".
-    check("every change is written to disk on the spot", len(writes) == 4,
-          str(len(writes)))
+    # BeginPlay's repair of a save from an older build, a rebind, one nudge per
+    # slider, and the debug toggle. Written at the moment of the change and not
+    # on leaving the page, because a game quit from the settings screen still
+    # has to remember what was set -- which is the whole of "across future game runs".
+    want_writes = 3 + len(S.SLIDERS)
+    check("every change is written to disk on the spot",
+          len(writes) == want_writes, f"{len(writes)}, want {want_writes}")
     check("...and there is a load and a create, so a first run is not an error",
           bool(by_pins("SaveGameClass"))
           and any("Load Game from Slot" in t.replace("\n", " ")
@@ -733,9 +758,11 @@ def main():
     check("every bind is pushed onto BP_WeaponComponent each frame",
           pushes == {f"Set {v}" for v, _k in G.BIND_VARS},
           str(sorted(pushes)))
-    check("...and so is the mouse sensitivity",
-          sum(1 for t in titles if t == "Set MouseSensitivity") == 2,
-          str(sum(1 for t in titles if t == "Set MouseSensitivity")))
+    # Two Sets per slider: the nudge onto BP_Settings, the push onto the component.
+    for slider in S.SLIDERS:
+        check(f"...and so is {slider.var} (stored by its nudge, pushed each frame)",
+              sum(1 for t in titles if t == f"Set {slider.var}") == 2,
+              str(sum(1 for t in titles if t == f"Set {slider.var}")))
     # Literal indices only: the settings page's own Array_Get and Array_Set
     # take theirs from the loop and from MenuRow, and those are not the push.
     reads = [n for n in by_pins("Index")
@@ -746,28 +773,32 @@ def main():
           str(sorted(BEL.find_input_pin(n, "Index").get_pin_value()
                      for n in reads)))
 
-    # --- the sensitivity row
-    # Two FClamps in this graph: the sensitivity row, and the scope's fade.
-    # They are told apart by their bounds rather than by position, so neither
-    # can quietly inherit the other's.
+    # --- the slider rows
+    # One FClamp per slider, plus the scope's fade. They are told apart by
+    # their bounds rather than by position, so none can quietly inherit
+    # another's.
     clamps = by_pins("Value", "Min", "Max")
     bounds = {(float(BEL.find_input_pin(n, "Min").get_pin_value() or 0.0),
                float(BEL.find_input_pin(n, "Max").get_pin_value() or 0.0))
               for n in clamps}
-    check("the sensitivity is clamped, and its floor is not zero",
-          len(clamps) == 2
-          and (G.MOUSE_SENSITIVITY_MIN, G.MOUSE_SENSITIVITY_MAX) in bounds
-          and G.MOUSE_SENSITIVITY_MIN > 0.0,
+    check("every slider is clamped, and no floor is zero",
+          len(clamps) == 1 + len(S.SLIDERS)
+          and all((sl.lo, sl.hi) in bounds and sl.lo > 0.0 for sl in S.SLIDERS),
           f"{sorted(bounds)}")
+    check("the scope sensitivity row is on the page, straight under the mouse's",
+          [sl.var for sl in S.SLIDERS][:2] == ["MouseSensitivity", "ScopeSensitivity"]
+          and S.SLIDERS[S.SCOPE_SENS_ROW].label == S.SCOPE_SENS_LABEL,
+          str([sl.label for sl in S.SLIDERS]))
     # One write with a signed step rather than two arms with the same two
     # writes in them: the pair would drift and the clamp would end up on one.
-    steps = [n for n in by_pins("A", "B")
-             if BEL.find_input_pin(n, "A").get_pin_value()
-             == str(G.MOUSE_SENSITIVITY_STEP)
-             and BEL.find_input_pin(n, "B").get_pin_value()
-             == str(-G.MOUSE_SENSITIVITY_STEP)]
-    check(f"Left and Right move it by +/-{G.MOUSE_SENSITIVITY_STEP} through "
-          f"one signed step", len(steps) == 1, str(len(steps)))
+    # Counted per step size, since two sliders may share one.
+    for size in sorted({sl.step for sl in S.SLIDERS}):
+        steps = [n for n in by_pins("A", "B")
+                 if BEL.find_input_pin(n, "A").get_pin_value() == str(size)
+                 and BEL.find_input_pin(n, "B").get_pin_value() == str(-size)]
+        want = sum(1 for sl in S.SLIDERS if sl.step == size)
+        check(f"Left and Right move each slider by +/-{size} through one "
+              f"signed step", len(steps) == want, f"{len(steps)}, want {want}")
 
     # --- rebinding, and the trap it exists to avoid
     # THE ORDERING CHECK. Enter is what arms a capture, and Enter is still

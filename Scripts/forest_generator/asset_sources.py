@@ -174,7 +174,10 @@ GENERATED = (
         kind="generated",
         builders=("Scripts/generate_forest_level.py",),
         note="Materials, foliage, scanned-asset imports, terrain. ~920 MB, and "
-             "the reason the repository is code only.",
+             "the reason the repository is code only. Procedural/ -- the "
+             "grass patches, bushes and M_ProcFoliage -- is built from "
+             "forest_generator/foliage_meshes.py by "
+             "forest_import/foliage_assets.py, which the level import runs.",
     ),
     AssetSource(
         dest="Content/Sourced/Characters",

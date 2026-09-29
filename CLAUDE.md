@@ -63,7 +63,7 @@ nothing. `Scripts/combat/` was split this way: identical bytecode for every move
 (`build_health_component` alone was restructured, with two phases extracted), 720/720 checks
 line-for-line identical to the monolith's, and a clean `--game` run.
 
-**Over budget today; split before extending:** `build_graphics_menu.py` (3.2k lines),
+**Over budget today; split before extending:** `build_graphics_menu.py` (2.6k lines),
 `generate_forest_level.py` (1.8k),
 `asset_pipeline/build_retarget.py` (1.1k), `verify_graphics_menu.py`,
 `forest_generator/verification.py`. `build_shotgun_and_health.py` is history; leave it alone.

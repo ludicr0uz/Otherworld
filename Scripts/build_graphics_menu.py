@@ -31,6 +31,9 @@ Event graph:
                       True  --> for each actor tagged OW_Grass: SetCastShadow,
                                 SetAffectDistanceFieldLighting,
                                 SetAffectDynamicIndirectLighting (Ultra only)
+                                --> for each tier n above Low, each actor
+                                    tagged OW_GrassTier<n>:
+                                    SetActorHiddenInGame(Quality < n's preset)
                                 --> GrassQualityApplied = Quality
               --> [Branch: WasInputKeyJustPressed(M)]
                       True  --> [Set MenuOpen = Not MenuOpen] --,
@@ -78,20 +81,30 @@ import sys
 import unreal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-# The one import between two builders in Scripts/, and it buys a contract this
-# file cannot keep on its own: BIND_VARS fixes which index of BP_Settings.Binds
-# means which action, and the three sensitivity limits on COMBAT have to be the
-# same ones BP_WeaponComponent's CDO default sits inside. Copied instead, the
-# two would drift and the symptom would be a save file that rebinds itself.
+# BP_Settings' asset path. The settings screen's own contract with the combat
+# package (BIND_VARS, the sensitivity limits) lives in graphics_menu/settings_rows.py.
 from combat import paths as combat_paths                           # noqa: E402
-from combat import tuning as combat_tuning                         # noqa: E402
 # The presets, the chain that applies one and the grass-lighting Tick prologue
 # live in graphics_menu/presets.py; see there for why each preset is what it is.
 from graphics_menu.presets import (                                # noqa: E402
     DEFAULT_PRESET, GRASS_APPLIED_DEFAULT, GRASS_APPLIED_VAR, PRESET_KEYS,
     PRESETS, author_grass_sync, console_commands, emit_apply)
+from forest_generator.grass_cells import GRASS_TIERS                 # noqa: E402
 # The FPS readout, one of the debug-mode overlays; see graphics_menu/fps.py.
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
+# The art, font and panel palette every page draws with.
+from graphics_menu.canvas import (                                 # noqa: E402
+    COL_CARET, COL_MAIN_HINT, COL_ROW, COL_TITLE, UI_FONT, _draw_texture)
+# Up/Down/accept, shared by the title page and the settings page.
+from graphics_menu.menu_nav import (                               # noqa: E402
+    START_KEYS, _emit_accept, _emit_row_nav)
+# The settings screen: constants, the page and its push, the save.
+from graphics_menu.settings_rows import (                          # noqa: E402
+    BIND_LABELS, BIND_VARS, KEY_POOL, PAGE_SETTINGS, PAGE_TITLE,
+    SETTINGS_CLASS_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
+from graphics_menu.settings_input import _emit_save                # noqa: E402
+from graphics_menu.settings_page import (                          # noqa: E402
+    _author_push_settings, _author_settings_page)
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -145,9 +158,6 @@ HINT_POS = (92.0, DEBUG_ROW_Y + 52.0)
 HINT_SCALE = 1.5
 
 COL_PANEL = "(R=0.020000,G=0.025000,B=0.035000,A=0.780000)"
-COL_TITLE = "(R=0.850000,G=0.900000,B=1.000000,A=1.000000)"
-COL_ROW = "(R=0.720000,G=0.750000,B=0.800000,A=1.000000)"
-COL_CARET = "(R=1.000000,G=0.820000,B=0.320000,A=1.000000)"
 COL_HINT = "(R=0.480000,G=0.510000,B=0.560000,A=1.000000)"
 COL_HP_BACK = "(R=0.030000,G=0.030000,B=0.035000,A=0.800000)"
 COL_HP_FILL = "(R=0.750000,G=0.130000,B=0.120000,A=0.950000)"
@@ -196,7 +206,6 @@ RESTART_KEY = "R"
 # that the panel has two rows, because with no cursor and no hit test a click
 # cannot say WHICH row it means. Keyboard navigation is the whole of the menu
 # instead: Up/Down move the caret, Enter takes the row.
-START_KEYS = ("Enter", "SpaceBar")
 MENU_PANEL = (600.0, 346.0)
 GAME_TITLE = "OTHERWORLD"
 GAME_SUBTITLE = "a night in the forest"
@@ -216,7 +225,6 @@ MAIN_HINT_OFF = MAIN_ROW0_OFF + len(("NEW GAME", "SETTINGS")) * MAIN_ROW_STEP + 
 COL_MAIN_TITLE = "(R=0.920000,G=0.945000,B=1.000000,A=1.000000)"
 COL_MAIN_SUB = "(R=0.520000,G=0.560000,B=0.630000,A=1.000000)"
 COL_MAIN_START = "(R=1.000000,G=0.870000,B=0.450000,A=1.000000)"
-COL_MAIN_HINT = "(R=0.560000,G=0.590000,B=0.650000,A=1.000000)"
 GAME_STARTED_VAR = "GameStarted"
 # How long the world runs before BeginPlay pauses it under the menu. Pausing on
 # frame zero froze the view INSIDE the player: LevelTick skips
@@ -227,77 +235,11 @@ GAME_STARTED_VAR = "GameStarted"
 # close that in the time.
 MENU_SETTLE_S = 0.25
 
-# ── The settings screen, and what survives a restart ─────────────────────────
-#
-# Two pages, one panel: MenuPage picks which, MenuRow picks the line, and the
-# caret is drawn from MenuRow the same way the quality caret is drawn from
-# Quality. There is no second HUD and no widget -- see the AHUD note at the top
-# of this file for why there cannot be.
-#
-# Everything on the settings page is stored in BP_Settings, which is a USaveGame
-# written to disk on every change (see SETTINGS_SLOT). That is what "loadable
-# across future game runs" means here, and it is why the save happens at the
-# moment of the edit rather than on leaving the page: a game closed from the
-# settings screen still has to remember what was set.
-#
-# BP_Settings, BIND_VARS and the sensitivity range are all built and defined by
-# build_weapons_and_combat.py, which runs first. This file is the only thing
-# that reads or writes the save; BP_WeaponComponent is PUSHED the values every
-# DrawHUD frame and never learns that a disk exists.
-SETTINGS_CLASS_PATH = combat_paths.SETTINGS_CLASS_PATH
-SETTINGS_SLOT = combat_paths.SETTINGS_SLOT
-SETTINGS_USER_INDEX = combat_paths.SETTINGS_USER_INDEX
-BIND_VARS = combat_tuning.BIND_VARS
-MOUSE_SENSITIVITY_MIN = combat_tuning.COMBAT.mouse_sensitivity_min
-MOUSE_SENSITIVITY_MAX = combat_tuning.COMBAT.mouse_sensitivity_max
-MOUSE_SENSITIVITY_STEP = combat_tuning.COMBAT.mouse_sensitivity_step
 
-PAGE_TITLE = 0
-PAGE_SETTINGS = 1
 MENU_ROWS = (START_LABEL, "SETTINGS")
 
-# Row 0 is the sensitivity slider, rows 1..7 are BIND_VARS in order, row 8 is
-# BACK. The arithmetic "row - 1 is the bind index" appears in the graph twice
-# and is the reason the binds are contiguous and start at 1.
-SETTINGS_ROWS = 1 + len(BIND_VARS) + 1
-SENS_ROW = 0
-BACK_ROW = SETTINGS_ROWS - 1
-BIND_LABELS = ("FIRE", "AIM", "SPRINT", "SWITCH", "DROP", "PICK UP", "RELOAD")
-SENS_LABEL = "MOUSE SENSITIVITY"
-BACK_LABEL = "BACK"
-SETTINGS_TITLE = "SETTINGS"
 
-# Navigation. Deliberately NOT rebindable and deliberately not in KEY_POOL: a
-# menu whose own keys can be bound away is a menu that can be locked shut, and
-# the only way out would be deleting the save file.
-NAV_UP = "Up"
-NAV_DOWN = "Down"
-NAV_LEFT = "Left"
-NAV_RIGHT = "Right"
 
-SETTINGS_PANEL = (620.0, 560.0)
-SET_TITLE_OFF = 44.0
-SET_ROW0_OFF = 118.0
-SET_ROW_STEP = 46.0
-SET_HINT_OFF = SET_ROW0_OFF + SETTINGS_ROWS * SET_ROW_STEP + 12.0
-SET_LABEL_X = 96.0         # from the panel's left edge
-SET_VALUE_X = 380.0        # the value column, so the nine rows line up
-SET_CARET_X = 56.0
-SET_TITLE_SCALE = 2.2
-SET_ROW_SCALE = 1.5
-SET_HINT_SCALE = 1.2
-
-# What a bind may be set to. Letters, digits, the mouse and the usual
-# modifiers -- and nothing the menu itself uses, so no keypress can make the
-# settings screen unusable. The capture loop walks this every frame it is
-# armed, which is why it is a list of what is ALLOWED rather than a sweep of
-# every FKey the engine knows about.
-KEY_POOL = (tuple(chr(c) for c in range(ord("A"), ord("Z") + 1))
-            + ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
-               "Nine", "Zero",
-               "LeftMouseButton", "RightMouseButton", "MiddleMouseButton",
-               "ThumbMouseButton", "ThumbMouseButton2",
-               "LeftShift", "LeftControl", "LeftAlt", "Tab"))
 
 # The one way past the menu that is not a keypress. A headless -game run has
 # nobody to press Enter, so without this every automated run would sit on the
@@ -611,24 +553,6 @@ def _literal_matches(got, want):
     return got.lower() == want.lower() or got.endswith(f"::{want}")
 
 
-# ─── Generated artwork ───────────────────────────────────────────────────────
-#
-# DrawRect gives a flat, hard-edged, single-colour rectangle: no corner radius,
-# no gradient, no border, no shadow. Every panel, bar and inventory slot was
-# one of those, and that is what made the HUD look unfinished -- rearranging
-# rectangles does not fix it.
-#
-# DrawTexture takes a tint and a blend mode, so the same layout drawn with
-# generated art gets rounded corners, a hairline border and a lit gradient, and
-# the weapons get silhouettes instead of colour swatches.
-# Scripts/build_ui_art.py draws them; import_ui_art.py imports them.
-UI_ART_DIR = "/Game/UI/Art"
-
-# Roboto rather than the engine's default face. The default is a bitmap font
-# that does not scale cleanly, and at the sizes this HUD uses -- the HP number
-# is drawn at 2.4x, the death title at 3.4x -- it is the single most obviously
-# unpolished thing on screen.
-UI_FONT = "/Engine/EngineFonts/Roboto.Roboto"
 
 # Source sizes, so DrawTexture can be handed a UV rectangle in texels.
 UI_TEX_SIZE = {
@@ -674,31 +598,6 @@ def _key(name):
 
 
 # ─── Member variables ────────────────────────────────────────────────────────
-
-def _draw_texture(ed, x, y, tex, w=None, h=None, tint=None):
-    """A DrawTexture node with its UV rectangle set to the whole texture.
-
-    The UV pins are NORMALISED (HUD.h: "in normalized UV distance"), so the
-    whole texture is 0,0 + 1x1. Left unset they default to zero and the node
-    draws nothing at all, which looks exactly like a missing texture. Set to
-    the texel size, as they once were, the texture wraps that many times: a
-    120x84 slot became a grid of amber borders and the 600x346 panel shrank
-    to one transparent corner texel per pixel, i.e. vanished.
-    """
-    n = _at(_node(ed, FN_DRAW_TEXTURE), x, y)
-    _set(n, "Texture", f"{UI_ART_DIR}/{tex}.{tex}")
-    if w is not None:
-        _set(n, "ScreenW", w)
-    if h is not None:
-        _set(n, "ScreenH", h)
-    _set(n, "TextureU", 0.0)
-    _set(n, "TextureV", 0.0)
-    _set(n, "TextureUWidth", 1.0)
-    _set(n, "TextureVHeight", 1.0)
-    if tint:
-        _set(n, "TintColor", tint)
-    return n
-
 
 def _ensure_variables(ed, bp):
     """MenuOpen drives both input gating and drawing; Quality drives the caret.
@@ -812,21 +711,6 @@ def _chain(node, in_exec):
         _connect(in_exec, pin)
         return BEL.find_then_pin(node)
     return in_exec
-
-
-def _emit_save(ed, settings_out, in_exec, x, y):
-    """Write BP_Settings back to its slot. Called after every single change.
-
-    On the change and not on leaving the page: a game quit from the settings
-    screen still has to remember what was set, and there is no other moment
-    this HUD is guaranteed to see.
-    """
-    n = _at(_node(ed, FN_WRITE_SAVE), x, y)
-    _connect(settings_out, _pin(n, "SaveGameObject"))
-    _set(n, "SlotName", SETTINGS_SLOT)
-    _set(n, "UserIndex", SETTINGS_USER_INDEX)
-    _connect(in_exec, _pin(n, "execute"))
-    return BEL.find_then_pin(n), n
 
 
 def _author_load_settings(ed, x0, y0, in_exec):
@@ -1108,7 +992,8 @@ def _author_tick(ed, tick):
         ed.add_comment_to_nodes(
             f"{PRESET_KEYS[i]} -> {preset.label}: scalability {preset.level}, "
             f"{', '.join(console_commands(preset))}, grass lighting "
-            f"{'on' if preset.grass_lights else 'off'}.",
+            f"{'on' if preset.grass_lights else 'off'}, grass tiers "
+            f"{', '.join(str(n) for n, t in enumerate(GRASS_TIERS) if t.min_preset <= i)}.",
             [was, br] + applied)
 
         # An unmatched key falls through to the next test.
@@ -2113,164 +1998,6 @@ def _author_reticle(ed, x0, y0, in_execs):
 
 # ─── Event ReceiveDrawHUD: the panel ─────────────────────────────────────────
 
-def _author_push_settings(ed, x0, y0, in_execs):
-    """Hand BP_WeaponComponent the player's settings, every DrawHUD frame.
-
-    A push and not a pull, and that direction is the whole design. The
-    component would otherwise have to load the save itself (a second reader of
-    one file) or cast to the HUD (a component reaching for an actor that may
-    not exist). Pushed, it keeps plain member variables with CDO defaults that
-    already work on their own, and the settings screen is the only thing that
-    knows a disk is involved.
-
-    Written from DrawHUD rather than Tick for the same reason everything else
-    here is: the menu is a paused world, and Tick does not run in one -- so a
-    sensitivity changed on the settings screen has to land before the game is
-    unpaused, not on the first frame after it.
-    """
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    got = keep(_at(ed.add_get_member_variable_node("Settings"), x0, y0 + 240))
-    settings_out = _pin(got, "Settings", is_input=False)
-    ok = keep(_at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 240))
-    _connect(settings_out, _pin(ok, "Object"))
-    have = keep(_at(ed.add_branch_node(), x0 + 480, y0))
-    _connect(_pin(ok, "ReturnValue", is_input=False), _pin(have, "Condition"))
-    for e in in_execs:
-        _connect(e, _pin(have, "execute"))
-
-    pawn = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0 + 480, y0 + 400))
-    _set(pawn, "PlayerIndex", 0)
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 720, y0 + 400))
-    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
-    _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
-    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 980, y0))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(have), _pin(cast, "execute"))
-    as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
-
-    sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity",
-                                                    SETTINGS_CLASS_PATH),
-                    x0 + 980, y0 + 400))
-    _connect(settings_out, _pin(sens, "self"))
-    push = keep(_at(ed.add_set_member_variable_node("MouseSensitivity",
-                                                    WEAPON_COMP_CLASS_PATH),
-                    x0 + 1240, y0))
-    _connect(as_weapon, _pin(push, "self"))
-    _connect(_pin(sens, "MouseSensitivity", is_input=False),
-             _pin(push, "MouseSensitivity"))
-    _connect(BEL.find_then_pin(cast), _pin(push, "execute"))
-    flow = BEL.find_then_pin(push)
-
-    binds = keep(_at(ed.add_get_member_variable_node("Binds",
-                                                     SETTINGS_CLASS_PATH),
-                     x0 + 980, y0 + 540))
-    _connect(settings_out, _pin(binds, "self"))
-    binds_out = _pin(binds, "Binds", is_input=False)
-    for i, (var, _default) in enumerate(BIND_VARS):
-        item = keep(_at(_node(ed, FN_ARR_GET), x0 + 1500 + i * 280, y0 + 400))
-        _connect(binds_out, _loose_pin(item, "TargetArray"))
-        _set(item, "Index", i)
-        put = keep(_at(ed.add_set_member_variable_node(
-            var, WEAPON_COMP_CLASS_PATH), x0 + 1500 + i * 280, y0))
-        _connect(as_weapon, _pin(put, "self"))
-        _connect(_loose_pin(item, "Item", is_input=False), _pin(put, var))
-        _connect(flow, _pin(put, "execute"))
-        flow = BEL.find_then_pin(put)
-
-    ed.add_comment_to_nodes(
-        "The player's settings, pushed onto BP_WeaponComponent every frame. "
-        "The component never loads them, never casts back here, and keeps the "
-        "CDO defaults build_weapons_and_combat.py gave it as a standalone "
-        "fallback -- so a pawn with no HUD in front of it still plays with the "
-        "documented keys. Guarded on IsValid(Settings) because the alternative "
-        "is an Accessed None per frame forever if BeginPlay's load ever failed.",
-        made)
-    return (flow, _pin(cast, "CastFailed", is_input=False),
-            BEL.find_else_pin(have))
-
-
-def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0):
-    """Up and Down move MenuRow, clamped at both ends rather than wrapped.
-
-    Two branches in series rather than one Select: MenuRow is read fresh by
-    each, so pressing both in a frame nets to no movement instead of to
-    whichever arm the Select happened to pick.
-
-    Returns ``(exec_pins, nodes)`` -- a pair of pins, because an exec *input*
-    takes any number of links and so neither arm of a Branch needs joining
-    before the next block. That is the same flat-chain shape the weapon
-    component's Tick uses, and it is why there is no Sequence node anywhere
-    in this HUD.
-    """
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    flow = (in_exec,)
-    for i, (key, step, limit, bound) in enumerate(
-            ((NAV_UP, FN_SUB_II, FN_MAX_II, 0),
-             (NAV_DOWN, FN_ADD_II, FN_MIN_II, last_row))):
-        py = y0 + i * 420
-        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0, py + 260))
-        _connect(pc_out, _pin(was, "self"))
-        _set(was, "Key", key)
-        br = keep(_at(ed.add_branch_node(), x0 + 260, py))
-        _connect(_pin(was, "ReturnValue", is_input=False), _pin(br, "Condition"))
-        for e in flow:
-            _connect(e, _pin(br, "execute"))
-
-        row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 260, py + 400))
-        moved = keep(_at(_node(ed, step), x0 + 520, py + 400))
-        _connect(_pin(row, "MenuRow", is_input=False), _pin(moved, "A"))
-        _set(moved, "B", 1)
-        held = keep(_at(_node(ed, limit), x0 + 780, py + 400))
-        _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held, "A"))
-        _set(held, "B", bound)
-        put = keep(_at(ed.add_set_member_variable_node("MenuRow"), x0 + 1040, py))
-        _connect(_pin(held, "ReturnValue", is_input=False), _pin(put, "MenuRow"))
-        _connect(BEL.find_then_pin(br), _pin(put, "execute"))
-        flow = (BEL.find_then_pin(put), BEL.find_else_pin(br))
-    return flow, made
-
-
-def _emit_accept(ed, pc_out, x0, y0, in_exec, made):
-    """The exec that runs on the frame an accept key is pressed.
-
-    START_KEYS are OR'd rather than chosen between: Enter is the conventional
-    one and Space is what a hand is already near, and with a caret on the panel
-    both mean "this row".
-    """
-    def keep(n):
-        made.append(n)
-        return n
-
-    any_key = None
-    for i, key in enumerate(START_KEYS):
-        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0, y0 + i * 140))
-        _connect(pc_out, _pin(was, "self"))
-        _set(was, "Key", key)
-        got = _pin(was, "ReturnValue", is_input=False)
-        if any_key is None:
-            any_key = got
-        else:
-            either = keep(_at(_node(ed, FN_OR), x0 + 260, y0 + i * 140))
-            _connect(any_key, _pin(either, "A"))
-            _connect(got, _pin(either, "B"))
-            any_key = _pin(either, "ReturnValue", is_input=False)
-    go = keep(_at(ed.add_branch_node(), x0 + 520, y0 - 200))
-    _connect(any_key, _pin(go, "Condition"))
-    for e in in_exec:
-        _connect(e, _pin(go, "execute"))
-    return go
-
-
 def _author_main_menu(ed, x0, y0, in_execs):
     """The menu the game opens on, and the one thing that leaves it.
 
@@ -2464,359 +2191,6 @@ def _author_main_menu(ed, x0, y0, in_execs):
         f"reason the death menu's restart key lives in DrawHUD.",
         made)
     return (BEL.find_then_pin(playing),)
-
-
-def _author_settings_page(ed, x0, y0, in_exec):
-    """Mouse sensitivity and the seven binds, on the same panel as the title.
-
-    Nine rows: sensitivity, BIND_VARS in order, BACK. Left/Right adjust the
-    first, Enter arms a capture on any of the seven, and every change is
-    written to disk on the spot.
-
-    The seven bind rows are ONE pair of DrawTexts inside a ForEachLoop over
-    Binds, not seven pairs with their y positions written out -- which is why
-    the HUD carries BindLabels as an array rather than as seven literals.
-    """
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    settings = keep(_at(ed.add_get_member_variable_node("Settings"),
-                        x0, y0 + 240))
-    settings_out = _pin(settings, "Settings", is_input=False)
-
-    size = keep(_at(_node(ed, FN_VIEWPORT), x0, y0 + 420))
-    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 240, y0 + 420))
-    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
-
-    def centred(axis, span, py):
-        half = keep(_at(_node(ed, FN_MUL), x0 + 480, py))
-        _connect(_loose_pin(wh, axis, is_input=False), _pin(half, "A"))
-        _set(half, "B", 0.5)
-        off = keep(_at(_node(ed, FN_SUB), x0 + 720, py))
-        _connect(_pin(half, "ReturnValue", is_input=False), _pin(off, "A"))
-        _set(off, "B", span)
-        return _pin(off, "ReturnValue", is_input=False)
-
-    panel_x = centred("X", SETTINGS_PANEL[0] / 2.0, y0 + 420)
-    panel_y = centred("Y", SETTINGS_PANEL[1] / 2.0, y0 + 560)
-
-    def offset(base, by, px, py):
-        n = keep(_at(_node(ed, FN_ADD), px, py))
-        _connect(base, _pin(n, "A"))
-        _set(n, "B", by)
-        return _pin(n, "ReturnValue", is_input=False)
-
-    label_x = offset(panel_x, SET_LABEL_X, x0 + 960, y0 + 420)
-    value_x = offset(panel_x, SET_VALUE_X, x0 + 960, y0 + 540)
-    caret_x = offset(panel_x, SET_CARET_X, x0 + 960, y0 + 660)
-
-    def row_y(index, py):
-        return offset(panel_y, SET_ROW0_OFF + index * SET_ROW_STEP,
-                      x0 + 960, py)
-
-    panel = keep(_draw_texture(ed, x0 + 1240, y0, "T_UI_Panel",
-                               w=SETTINGS_PANEL[0], h=SETTINGS_PANEL[1]))
-    _connect(panel_x, _pin(panel, "ScreenX"))
-    _connect(panel_y, _pin(panel, "ScreenY"))
-    _connect(in_exec, _pin(panel, "execute"))
-    flow = BEL.find_then_pin(panel)
-
-    def text(px, at_x, at_y, scale, color, literal=None, driven=None):
-        """One left-aligned row. Left-aligned and not centred on purpose: nine
-        rows of different lengths centred individually read as a ragged block,
-        and a value column that moves per row cannot be scanned."""
-        nonlocal flow
-        n = keep(_at(_node(ed, FN_DRAW_TEXT), px, y0))
-        if literal is not None:
-            _set(n, "Text", literal)
-        else:
-            _connect(driven, _pin(n, "Text"))
-        _set(n, "TextColor", color)
-        _set(n, "Scale", scale)
-        _set(n, "bScalePosition", "false")
-        _set(n, "Font", UI_FONT)
-        _connect(at_x, _pin(n, "ScreenX"))
-        _connect(at_y, _pin(n, "ScreenY"))
-        _connect(flow, _pin(n, "execute"))
-        flow = BEL.find_then_pin(n)
-        return n
-
-    text(x0 + 1500, label_x,
-         offset(panel_y, SET_TITLE_OFF, x0 + 960, y0 + 780),
-         SET_TITLE_SCALE, COL_TITLE, literal=SETTINGS_TITLE)
-
-    # The caret, drawn from MenuRow the way the quality panel's is drawn from
-    # Quality -- one number, no per-row bookkeeping.
-    row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 960, y0 + 900))
-    row_f = keep(_at(_node(ed, FN_CONV_INT), x0 + 1200, y0 + 900))
-    _connect(_pin(row, "MenuRow", is_input=False), _pin(row_f, "InInt"))
-    caret_off = keep(_at(_node(ed, FN_MUL), x0 + 1440, y0 + 900))
-    _connect(_pin(row_f, "ReturnValue", is_input=False), _pin(caret_off, "A"))
-    _set(caret_off, "B", SET_ROW_STEP)
-    caret_base = row_y(0, y0 + 1020)
-    caret_y = keep(_at(_node(ed, FN_ADD), x0 + 1680, y0 + 900))
-    _connect(caret_base, _pin(caret_y, "A"))
-    _connect(_pin(caret_off, "ReturnValue", is_input=False), _pin(caret_y, "B"))
-    text(x0 + 1760, caret_x, _pin(caret_y, "ReturnValue", is_input=False),
-         SET_ROW_SCALE, COL_CARET, literal=">")
-
-    # --- row 0: the sensitivity ----------------------------------------------
-    sens_y = row_y(SENS_ROW, y0 + 1140)
-    text(x0 + 2020, label_x, sens_y, SET_ROW_SCALE, COL_ROW, literal=SENS_LABEL)
-    sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity",
-                                                    SETTINGS_CLASS_PATH),
-                    x0 + 2020, y0 + 1260))
-    _connect(settings_out, _pin(sens, "self"))
-    sens_str = keep(_at(_node(ed, FN_FLOAT_TO_STR), x0 + 2280, y0 + 1260))
-    _connect(_pin(sens, "MouseSensitivity", is_input=False),
-             _loose_pin(sens_str, "InDouble"))
-    text(x0 + 2280, value_x, sens_y, SET_ROW_SCALE, COL_CARET,
-         driven=_pin(sens_str, "ReturnValue", is_input=False))
-
-    # --- rows 1..7: the binds, one loop ---------------------------------------
-    binds = keep(_at(ed.add_get_member_variable_node("Binds",
-                                                     SETTINGS_CLASS_PATH),
-                     x0 + 2540, y0 + 1260))
-    _connect(settings_out, _pin(binds, "self"))
-    loop = ed.add_macro_node(MACRO_FOR_EACH)
-    if not loop:
-        raise RuntimeError("could not create the ForEachLoop macro node")
-    keep(_at(loop, x0 + 2800, y0))
-    _connect(_pin(binds, "Binds", is_input=False), _loose_pin(loop, "Array"))
-    _connect(flow, _loose_pin(loop, "Exec"))
-    element = _loose_pin(loop, "ArrayElement", is_input=False)
-    index = _loose_pin(loop, "ArrayIndex", is_input=False)
-
-    index_f = keep(_at(_node(ed, FN_CONV_INT), x0 + 3060, y0 + 400))
-    _connect(index, _pin(index_f, "InInt"))
-    step = keep(_at(_node(ed, FN_MUL), x0 + 3300, y0 + 400))
-    _connect(_pin(index_f, "ReturnValue", is_input=False), _pin(step, "A"))
-    _set(step, "B", SET_ROW_STEP)
-    # Binds[0] is row 1, so one step down from the sensitivity row.
-    from_panel = keep(_at(_node(ed, FN_ADD), x0 + 3540, y0 + 400))
-    _connect(_pin(step, "ReturnValue", is_input=False), _pin(from_panel, "A"))
-    _set(from_panel, "B", SET_ROW0_OFF + SET_ROW_STEP)
-    bind_y = keep(_at(_node(ed, FN_ADD), x0 + 3780, y0 + 400))
-    _connect(panel_y, _pin(bind_y, "A"))
-    _connect(_pin(from_panel, "ReturnValue", is_input=False), _pin(bind_y, "B"))
-    bind_y_out = _pin(bind_y, "ReturnValue", is_input=False)
-
-    labels = keep(_at(ed.add_get_member_variable_node("BindLabels"),
-                      x0 + 3060, y0 + 560))
-    label = keep(_at(_node(ed, FN_ARR_GET), x0 + 3300, y0 + 560))
-    _connect(_pin(labels, "BindLabels", is_input=False),
-             _loose_pin(label, "TargetArray"))
-    _connect(index, _pin(label, "Index"))
-
-    # Key_GetDisplayName is the only readable spelling of an FKey in 5.8 --
-    # Key_GetName does not exist -- and it hands back Text, not a String.
-    shown = keep(_at(_node(ed, FN_KEY_DISPLAY), x0 + 3300, y0 + 700))
-    _connect(element, _loose_pin(shown, "Key"))
-    shown_str = keep(_at(_node(ed, FN_TEXT_TO_STR), x0 + 3540, y0 + 700))
-    _connect(_pin(shown, "ReturnValue", is_input=False),
-             _loose_pin(shown_str, "InText"))
-
-    flow = _loose_pin(loop, "LoopBody", is_input=False)
-    text(x0 + 4040, label_x, bind_y_out, SET_ROW_SCALE, COL_ROW,
-         driven=_loose_pin(label, "Item", is_input=False))
-    text(x0 + 4300, value_x, bind_y_out, SET_ROW_SCALE, COL_CARET,
-         driven=_pin(shown_str, "ReturnValue", is_input=False))
-
-    flow = _loose_pin(loop, "Completed", is_input=False)
-    text(x0 + 4560, label_x, row_y(BACK_ROW, y0 + 1380), SET_ROW_SCALE,
-         COL_ROW, literal=BACK_LABEL)
-
-    # Two draws behind one branch, the same shape the debug row uses: there is
-    # no SelectString, and the hint has to say something different while a
-    # capture is armed or the screen looks frozen.
-    hint_y = offset(panel_y, SET_HINT_OFF, x0 + 960, y0 + 1500)
-    arming = keep(_at(ed.add_get_member_variable_node("Capturing"),
-                      x0 + 4820, y0 + 400))
-    hinting = keep(_at(ed.add_branch_node(), x0 + 4820, y0))
-    _connect(_pin(arming, "Capturing", is_input=False), _pin(hinting, "Condition"))
-    _connect(flow, _pin(hinting, "execute"))
-
-    flow = BEL.find_then_pin(hinting)
-    on_tail = BEL.find_then_pin(
-        text(x0 + 5080, label_x, hint_y, SET_HINT_SCALE, COL_CARET,
-             literal="press any key to bind it"))
-    flow = BEL.find_else_pin(hinting)
-    off_tail = BEL.find_then_pin(
-        text(x0 + 5340, label_x, hint_y, SET_HINT_SCALE, COL_MAIN_HINT,
-             literal="arrows adjust  ·  ENTER rebinds"))
-
-    _author_capture(ed, x0, y0 + 3000, settings_out, (on_tail, off_tail), made)
-
-    ed.add_comment_to_nodes(
-        f"The settings page. {SETTINGS_ROWS} rows: sensitivity, the "
-        f"{len(BIND_VARS)} binds, and BACK. Everything it changes is written "
-        f"to slot {SETTINGS_SLOT!r} the moment it changes, which is what makes "
-        f"it survive a restart -- see _emit_save.",
-        made)
-
-
-def _author_capture(ed, x0, y0, settings_out, in_execs, made):
-    """The input half of the settings page: capture first, then everything else.
-
-    THE ORDER OF THESE TWO ARMS IS LOAD-BEARING. The capture poll is authored
-    and branched on BEFORE the row is activated, because Enter is what arms a
-    capture -- and Enter is still "just pressed" for the rest of that frame. A
-    capture poll that ran after the activation would see it and instantly bind
-    the accept key to whatever row the caret was on, which is a settings screen
-    that eats itself the first time it is used. Branching on Capturing puts
-    them in different frames as well as in different arms, and both of those
-    have to be true.
-    """
-    def keep(n):
-        made.append(n)
-        return n
-
-    pc = keep(_at(_node(ed, FN_GET_OWNING_PC), x0, y0 + 240))
-    pc_out = _pin(pc, "ReturnValue", is_input=False)
-
-    armed = keep(_at(ed.add_get_member_variable_node("Capturing"), x0, y0 + 400))
-    listening = keep(_at(ed.add_branch_node(), x0 + 260, y0))
-    _connect(_pin(armed, "Capturing", is_input=False), _pin(listening, "Condition"))
-    for e in in_execs:
-        _connect(e, _pin(listening, "execute"))
-
-    # --- armed: the next key in KEY_POOL that goes down becomes the bind ------
-    pool = keep(_at(ed.add_get_member_variable_node("KeyPool"), x0 + 520, y0 + 400))
-    loop = ed.add_macro_node(MACRO_FOR_EACH)
-    if not loop:
-        raise RuntimeError("could not create the ForEachLoop macro node")
-    keep(_at(loop, x0 + 780, y0))
-    _connect(_pin(pool, "KeyPool", is_input=False), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(listening), _loose_pin(loop, "Exec"))
-    candidate = _loose_pin(loop, "ArrayElement", is_input=False)
-
-    hit = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 1040, y0 + 400))
-    _connect(pc_out, _pin(hit, "self"))
-    _connect(candidate, _pin(hit, "Key"))
-    took = keep(_at(ed.add_branch_node(), x0 + 1300, y0))
-    _connect(_pin(hit, "ReturnValue", is_input=False), _pin(took, "Condition"))
-    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(took, "execute"))
-
-    # Binds[MenuRow - 1]: row 0 is the sensitivity, so the seven binds start at
-    # row 1 and the subtraction is the whole of that mapping.
-    row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 1300, y0 + 400))
-    slot = keep(_at(_node(ed, FN_SUB_II), x0 + 1560, y0 + 400))
-    _connect(_pin(row, "MenuRow", is_input=False), _pin(slot, "A"))
-    _set(slot, "B", 1)
-    binds = keep(_at(ed.add_get_member_variable_node("Binds",
-                                                     SETTINGS_CLASS_PATH),
-                     x0 + 1300, y0 + 540))
-    _connect(settings_out, _pin(binds, "self"))
-    write = keep(_at(_node(ed, FN_ARR_SET), x0 + 1820, y0))
-    _connect(_pin(binds, "Binds", is_input=False), _loose_pin(write, "TargetArray"))
-    _connect(_pin(slot, "ReturnValue", is_input=False), _pin(write, "Index"))
-    _connect(candidate, _loose_pin(write, "Item"))
-    _connect(BEL.find_then_pin(took), _pin(write, "execute"))
-    done = keep(_at(ed.add_set_member_variable_node("Capturing"), x0 + 2080, y0))
-    _set(done, "Capturing", "false")
-    _connect(BEL.find_then_pin(write), _pin(done, "execute"))
-    _, writer = _emit_save(ed, settings_out, BEL.find_then_pin(done),
-                           x0 + 2340, y0)
-    made.append(writer)
-
-    # --- not armed: move the caret, nudge the sensitivity, take the row -------
-    moved, nav = _emit_row_nav(ed, pc_out, BACK_ROW,
-                               BEL.find_else_pin(listening), x0 + 520, y0 + 1200)
-    made += nav
-
-    left = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 2000, y0 + 1200))
-    _connect(pc_out, _pin(left, "self"))
-    _set(left, "Key", NAV_LEFT)
-    right = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 2000, y0 + 1340))
-    _connect(pc_out, _pin(right, "self"))
-    _set(right, "Key", NAV_RIGHT)
-    right_out = _pin(right, "ReturnValue", is_input=False)
-    either = keep(_at(_node(ed, FN_OR), x0 + 2260, y0 + 1200))
-    _connect(_pin(left, "ReturnValue", is_input=False), _pin(either, "A"))
-    _connect(right_out, _pin(either, "B"))
-    on_sens = keep(_at(_node(ed, FN_EQ_II), x0 + 2260, y0 + 1480))
-    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
-                           x0 + 2000, y0 + 1480)), "MenuRow", is_input=False),
-             _pin(on_sens, "A"))
-    _set(on_sens, "B", SENS_ROW)
-    adjusting = keep(_at(_node(ed, FN_AND), x0 + 2520, y0 + 1200))
-    _connect(_pin(either, "ReturnValue", is_input=False), _pin(adjusting, "A"))
-    _connect(_pin(on_sens, "ReturnValue", is_input=False), _pin(adjusting, "B"))
-    nudging = keep(_at(ed.add_branch_node(), x0 + 2780, y0 + 1000))
-    _connect(_pin(adjusting, "ReturnValue", is_input=False), _pin(nudging, "Condition"))
-    for e in moved:
-        _connect(e, _pin(nudging, "execute"))
-
-    # One write with a signed step rather than two arms with the same two
-    # writes in them: the pair would drift, and the clamp would end up on only
-    # one of them.
-    delta = keep(_at(_node(ed, FN_SELECT_FLOAT), x0 + 2780, y0 + 1340))
-    _set(delta, "A", MOUSE_SENSITIVITY_STEP)
-    _set(delta, "B", -MOUSE_SENSITIVITY_STEP)
-    _connect(right_out, _loose_pin(delta, "bPickA"))
-    now = keep(_at(ed.add_get_member_variable_node("MouseSensitivity",
-                                                   SETTINGS_CLASS_PATH),
-                   x0 + 2780, y0 + 1480))
-    _connect(settings_out, _pin(now, "self"))
-    total = keep(_at(_node(ed, FN_ADD), x0 + 3040, y0 + 1400))
-    _connect(_pin(now, "MouseSensitivity", is_input=False), _pin(total, "A"))
-    _connect(_pin(delta, "ReturnValue", is_input=False), _pin(total, "B"))
-    # Clamped, and the floor is not zero: a sensitivity of 0 is a mouse that
-    # does not turn, on a screen the player would then have to navigate to fix.
-    held = keep(_at(_node(ed, FN_FCLAMP), x0 + 3300, y0 + 1400))
-    _connect(_pin(total, "ReturnValue", is_input=False), _loose_pin(held, "Value"))
-    _set(held, "Min", MOUSE_SENSITIVITY_MIN)
-    _set(held, "Max", MOUSE_SENSITIVITY_MAX)
-    store = keep(_at(ed.add_set_member_variable_node("MouseSensitivity",
-                                                     SETTINGS_CLASS_PATH),
-                     x0 + 3560, y0 + 1000))
-    _connect(settings_out, _pin(store, "self"))
-    _connect(_pin(held, "ReturnValue", is_input=False),
-             _pin(store, "MouseSensitivity"))
-    _connect(BEL.find_then_pin(nudging), _pin(store, "execute"))
-    saved, writer = _emit_save(ed, settings_out, BEL.find_then_pin(store),
-                               x0 + 3820, y0 + 1000)
-    made.append(writer)
-
-    go = _emit_accept(ed, pc_out, x0 + 4100, y0 + 1000,
-                      (saved, BEL.find_else_pin(nudging)), made)
-
-    # BACK, or arm a capture. Row 0 is the sensitivity and Enter means nothing
-    # on it -- the arrows are its control, and arming a capture there would
-    # bind a key to a row that has none.
-    leaving = keep(_at(_node(ed, FN_EQ_II), x0 + 4360, y0 + 1400))
-    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
-                           x0 + 4100, y0 + 1400)), "MenuRow", is_input=False),
-             _pin(leaving, "A"))
-    _set(leaving, "B", BACK_ROW)
-    back = keep(_at(ed.add_branch_node(), x0 + 4620, y0 + 1000))
-    _connect(_pin(leaving, "ReturnValue", is_input=False), _pin(back, "Condition"))
-    _connect(BEL.find_then_pin(go), _pin(back, "execute"))
-
-    to_title = keep(_at(ed.add_set_member_variable_node("MenuPage"),
-                        x0 + 4880, y0 + 1000))
-    _set(to_title, "MenuPage", PAGE_TITLE)
-    _connect(BEL.find_then_pin(back), _pin(to_title, "execute"))
-    home = keep(_at(ed.add_set_member_variable_node("MenuRow"),
-                    x0 + 5140, y0 + 1000))
-    _set(home, "MenuRow", 0)
-    _connect(BEL.find_then_pin(to_title), _pin(home, "execute"))
-
-    bindable = keep(_at(_node(ed, FN_NEQ_II), x0 + 4880, y0 + 1600))
-    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
-                           x0 + 4620, y0 + 1600)), "MenuRow", is_input=False),
-             _pin(bindable, "A"))
-    _set(bindable, "B", SENS_ROW)
-    arming = keep(_at(ed.add_branch_node(), x0 + 5140, y0 + 1600))
-    _connect(_pin(bindable, "ReturnValue", is_input=False), _pin(arming, "Condition"))
-    _connect(BEL.find_else_pin(back), _pin(arming, "execute"))
-    arm = keep(_at(ed.add_set_member_variable_node("Capturing"),
-                   x0 + 5400, y0 + 1600))
-    _set(arm, "Capturing", "true")
-    _connect(BEL.find_then_pin(arming), _pin(arm, "execute"))
 
 
 def _author_death_menu(ed, x0, y0, in_execs, mode_out):

@@ -306,10 +306,43 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pin,
     _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(eased, "B"))
     _set(eased, "Alpha", COMBAT.ads_sens_compensation)
 
+    # The scope's extra slowdown, on zoom past the irons:
+    #
+    #     past  = FClamp((BaseFOV / CurrentFOV - irons) / (scope - irons), 0, 1)
+    #     scoped = eased * Lerp(1, ScopeSensitivity, past)
+    #
+    # Irons never get past their own zoom, so this is 1 for every weapon but the
+    # sniper, and on the sniper it arrives with the zoom.
+    zoom_now = keep(_at(_node(ed, FN_DIV_FF), x0 + 3060, y0 + 760))
+    _connect(_pin(base_again, "BaseFOV", is_input=False), _pin(zoom_now, "A"))
+    _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_now, "B"))
+    beyond = keep(_at(_node(ed, FN_SUB_FF), x0 + 3320, y0 + 760))
+    _connect(_pin(zoom_now, "ReturnValue", is_input=False), _pin(beyond, "A"))
+    _set(beyond, "B", COMBAT.ads_zoom_irons)
+    beyond_frac = keep(_at(_node(ed, FN_DIV_FF), x0 + 3580, y0 + 760))
+    _connect(_pin(beyond, "ReturnValue", is_input=False), _pin(beyond_frac, "A"))
+    _set(beyond_frac, "B", COMBAT.ads_zoom_scope - COMBAT.ads_zoom_irons)
+    past = keep(_at(_node(ed, FN_CLAMP), x0 + 3840, y0 + 760))
+    _connect(_pin(beyond_frac, "ReturnValue", is_input=False), _pin(past, "Value"))
+    _set(past, "Min", 0.0)
+    _set(past, "Max", 1.0)
+    # B is the player's ScopeSensitivity (settings screen, pushed by the HUD),
+    # whose CDO default is COMBAT.ads_scope_sens_scale.
+    glass = keep(_at(_node(ed, FN_LERP), x0 + 4100, y0 + 760))
+    _set(glass, "A", 1.0)
+    glass_sens = keep(_at(ed.add_get_member_variable_node("ScopeSensitivity"),
+                          x0 + 3840, y0 + 900))
+    _connect(_pin(glass_sens, "ScopeSensitivity", is_input=False),
+             _pin(glass, "B"))
+    _connect(_pin(past, "ReturnValue", is_input=False), _pin(glass, "Alpha"))
+    scoped = keep(_at(_node(ed, FN_MUL_FF), x0 + 3580, y0 + 600))
+    _connect(_pin(eased, "ReturnValue", is_input=False), _pin(scoped, "A"))
+    _connect(_pin(glass, "ReturnValue", is_input=False), _pin(scoped, "B"))
+
     sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity"),
                     x0 + 3320, y0 + 620))
     factor = keep(_at(_node(ed, FN_MUL_FF), x0 + 3580, y0 + 480))
-    _connect(_pin(eased, "ReturnValue", is_input=False), _pin(factor, "A"))
+    _connect(_pin(scoped, "ReturnValue", is_input=False), _pin(factor, "A"))
     _connect(_pin(sens, "MouseSensitivity", is_input=False), _pin(factor, "B"))
     factor_out = _pin(factor, "ReturnValue", is_input=False)
 
@@ -431,7 +464,10 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pin,
         f"slows with the zoom rather than with the button: "
         f"Lerp(1, CurrentFOV/BaseFOV, {COMBAT.ads_sens_compensation:g}) scaling both "
         f"of the controller's cached look scales, so a 4x scope is slower than "
-        f"1.5x irons for free and the slowdown eases in on the same curve. "
+        f"1.5x irons for free and the slowdown eases in on the same curve; "
+        f"zoom past the irons scales it by a further ScopeSensitivity "
+        f"(settings screen, default {COMBAT.ads_scope_sens_scale:g}x), so only "
+        f"the scope gets it. "
         f"The legs slow too, to {COMBAT.ads_move_speed_scale:g}x BaseSpeed at full "
         f"ADS, on the scope overlay's own fade curve -- a second MaxWalkSpeed "
         f"write after the sprint block's, which is what makes releasing the "

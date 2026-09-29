@@ -46,6 +46,12 @@ from forest_generator.grass_placement import (
     DEFAULT_PATCHINESS,
     KNEE_HEIGHT_CM,
 )
+from forest_generator.bush_placement import (
+    scatter_bushes,
+    DEFAULT_BUSH_SPECS,
+    BUSH_CLUSTERS_PER_HA,
+)
+from forest_generator.grass_cells import tier_spec
 from forest_generator.npc_placement import (
     NPC_VARIANTS,
     gait_scale_for_index,
@@ -116,6 +122,11 @@ def main():
                              f"(default: {DEFAULT_PATCHINESS})")
     parser.add_argument("--no-grass", action="store_true",
                         help="Skip grass generation entirely")
+    parser.add_argument("--bush-clusters", type=float, default=BUSH_CLUSTERS_PER_HA,
+                        help=f"Bush thicket grid cells per hectare, before the "
+                             f"empty share (default: {BUSH_CLUSTERS_PER_HA:g})")
+    parser.add_argument("--no-bushes", action="store_true",
+                        help="Skip the walk-through bushes")
     parser.add_argument("--no-npc", action="store_true",
                         help="Skip the wandering NPCs")
     parser.add_argument("--npc-count", type=int, default=NPC_COUNT,
@@ -213,6 +224,19 @@ def main():
             print(f"       {name}: {cnt:,} instances")
         print(f"       TOTAL: {len(placed_grass):,} grass clumps")
 
+    # ── Step 3b: Scatter walk-through bushes ─────────────────────────────
+    if args.no_bushes:
+        print(f"\n[3b/6] Bushes disabled (--no-bushes)")
+        placed_bushes = None
+    else:
+        print(f"\n[3b/6] Scattering bushes ({args.bush_clusters:g} thicket cells/ha)...")
+        placed_bushes = scatter_bushes(world_size_cm, grid_z, grid_size,
+                                       seed=args.seed, placed_trees=placed_trees,
+                                       clusters_per_ha=args.bush_clusters)
+        for name, cnt in sorted(Counter(b.spec_name for b in placed_bushes).items()):
+            print(f"       {name}: {cnt:,} instances")
+        print(f"       TOTAL: {len(placed_bushes):,} bushes")
+
     # ── Step 4: Place the wandering NPCs ─────────────────────────────────
     if args.no_npc:
         print(f"\n[4/6] NPCs disabled (--no-npc)")
@@ -278,6 +302,7 @@ def main():
         expect_npc=not args.no_npc,
         expected_npc_count=args.npc_count,
         nav_bounds=nav_bounds,
+        placed_bushes=placed_bushes,
     )
     print()
     print(report.summary)
@@ -295,8 +320,8 @@ def main():
     # Tens of thousands of transforms would bloat the generated script, so the
     # grass instances live in their own JSON file the import script reads.
     grass_data_path = os.path.join(output_dir, f"grass_{level_name}.json")
-    _write_grass_data(grass_data_path, placed_grass)
-    if placed_grass:
+    _write_grass_data(grass_data_path, placed_grass, placed_bushes or [])
+    if placed_grass or placed_bushes:
         print(f"\n       Grass data → {grass_data_path} "
               f"({os.path.getsize(grass_data_path):,} bytes)")
 
@@ -312,6 +337,7 @@ def main():
         placed_trees=placed_trees,
         grass_data_path=grass_data_path,
         grass_count=len(placed_grass),
+        bush_count=len(placed_bushes or []),
         placed_npcs=placed_npcs,
         nav_bounds=nav_bounds,
         lighting=lighting,
@@ -328,6 +354,7 @@ def main():
         grid_size=grid_size,
         placed_trees=placed_trees,
         placed_grass=placed_grass,
+        placed_bushes=placed_bushes or [],
         placed_npcs=placed_npcs,
         nav_bounds=nav_bounds,
         lighting=lighting,
@@ -349,14 +376,17 @@ def main():
 
 # ─── Grass sidecar writer ───────────────────────────────────────────────────
 
-def _write_grass_data(path: str, placed_grass) -> None:
+def _write_grass_data(path: str, placed_grass, placed_bushes) -> None:
     """
-    Write grass instance transforms to a compact JSON sidecar.
+    Write grass and bush instance transforms to a compact JSON sidecar.
 
-    One record per clump, and there are tens of thousands of them on a normal
-    map — so spec names are interned into an index table and each instance is
-    a flat rounded array:
-        [spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul, target_h_cm]
+    One record per patch, and there are hundreds of thousands of them on a
+    big map — so spec names are interned into an index table and each
+    instance is a flat rounded array:
+        [spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul,
+         target_h_cm, tier]
+    Bushes, under "bushes", carry their final scale instead:
+        [spec_idx, x, y, z, yaw, pitch, roll, scale_xy, scale_z]
     """
     spec_names = sorted({g.spec_name for g in placed_grass})
     spec_idx = {n: i for i, n in enumerate(spec_names)}
@@ -368,9 +398,20 @@ def _write_grass_data(path: str, placed_grass) -> None:
                 round(g.x, 1), round(g.y, 1), round(g.placed_z, 1),
                 round(g.yaw_deg, 1), round(g.pitch_deg, 2), round(g.roll_deg, 2),
                 round(g.height_scale, 3), round(g.width_scale, 3),
-                round(g.target_height_cm, 2),
+                round(g.target_height_cm, 2), g.tier,
             ]
             for g in placed_grass
+        ],
+    }
+    bush_names = sorted({b.spec_name for b in placed_bushes})
+    bush_idx = {n: i for i, n in enumerate(bush_names)}
+    payload["bushes"] = {
+        "specs": bush_names,
+        "instances": [
+            [bush_idx[b.spec_name], round(b.x, 1), round(b.y, 1),
+             round(b.placed_z, 1), round(b.yaw_deg, 1), round(b.pitch_deg, 2),
+             round(b.roll_deg, 2), round(b.scale_xy, 3), round(b.scale_z, 3)]
+            for b in placed_bushes
         ],
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -389,6 +430,7 @@ def _write_unreal_import_script(
     placed_trees,
     grass_data_path: str,
     grass_count: int,
+    bush_count: int,
     placed_npcs,
     nav_bounds,
     lighting: dict,
@@ -413,6 +455,10 @@ def _write_unreal_import_script(
         for s in DEFAULT_GRASS_SPECS
     }
     grass_configs_json = json.dumps(grass_configs)
+    bush_configs_json = json.dumps({
+        s.name: {"mesh": s.mesh_path, "mats": list(s.material_paths)}
+        for s in DEFAULT_BUSH_SPECS
+    })
     scripts_dir = SCRIPTS_DIR
     nav_agent_radius = NAV_AGENT_RADIUS_CM
     nav_agent_height = NAV_AGENT_HEIGHT_CM
@@ -524,7 +570,8 @@ def _write_unreal_import_script(
                 lbl = a.get_actor_label()
                 if (lbl.startswith(LEVEL_NAME)
                         or lbl.startswith("HISM_Tree")
-                        or lbl.startswith("HISM_Grass")):
+                        or lbl.startswith("HISM_Grass")
+                        or lbl.startswith("HISM_Bush")):
                     editor_actor_sub.destroy_actor(a)
         else:
             level_editor_sub.new_level(map_path)
@@ -833,12 +880,22 @@ def _write_unreal_import_script(
         trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
                                  editor_asset_sub)
 
-        # ── 5b. Plant knee-high grass ────────────────────────────────────────
-        # Per-cell HISMs, saved unlit -- see forest_import/grass.py and
-        # forest_generator/grass_cells.py.
+        # ── 5a. Build the generated grass and bush meshes ────────────────────
+        # Opaque Nanite patches and bushes, rebuilt in place every import --
+        # see forest_import/foliage_assets.py.
         GRASS_DATA_PATH = r"{grass_data_path}"
         EXPECTED_GRASS_COUNT = {grass_count}
+        EXPECTED_BUSH_COUNT = {bush_count}
         GRASS_CONFIGS = json.loads(r"""{grass_configs_json}""")
+        BUSH_CONFIGS = json.loads(r"""{bush_configs_json}""")
+        if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
+            unreal.log_warning("[GEN] 5a. Building generated grass and bush meshes...")
+            from forest_import import foliage_assets
+            foliage_assets.ensure_foliage_assets()
+
+        # ── 5b. Plant knee-high grass ────────────────────────────────────────
+        # Per-cell, per-tier HISMs, saved unlit and (above Low) hidden in game
+        # -- see forest_import/grass.py and forest_generator/grass_cells.py.
 
         if EXPECTED_GRASS_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
             unreal.log_warning("[GEN] 5b. Planting knee-high grass...")
@@ -852,6 +909,15 @@ def _write_unreal_import_script(
                 f"{{grass_cells}} cell actors!")
         else:
             unreal.log_warning("[GEN] 5b. Grass skipped (none generated).")
+
+        # ── 5c. Plant walk-through bushes ────────────────────────────────────
+        if EXPECTED_BUSH_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
+            unreal.log_warning("[GEN] 5c. Planting bushes...")
+            from forest_import import bushes as bushes_import
+            bushes_import.plant_bushes(GRASS_DATA_PATH, BUSH_CONFIGS,
+                                       editor_actor_sub, editor_asset_sub)
+        else:
+            unreal.log_warning("[GEN] 5c. Bushes skipped (none generated).")
 
         # ── 6. Spawn Player Start ────────────────────────────────────────────
         unreal.log_warning("[GEN] 6. Spawning player start...")
@@ -1013,6 +1079,7 @@ def _write_unreal_verify_script(
     grid_size: int,
     placed_trees,
     placed_grass,
+    placed_bushes,
     placed_npcs,
     nav_bounds,
     lighting: dict,
@@ -1059,13 +1126,19 @@ def _write_unreal_verify_script(
     spec_counts = dict(Counter(t.spec_name for t in placed_trees))
 
     grass_count = len(placed_grass)
-    grass_spec_counts = dict(Counter(g.spec_name for g in placed_grass))
-    # Expected world height per grass species, used to prove "knee high" in-engine.
+    # Keyed by species and tier, which is how the cells are labelled.
+    grass_spec_counts = dict(Counter(tier_spec(g.spec_name, g.tier)
+                                     for g in placed_grass))
+    # Expected world height per grass cell spec, used to prove "knee high"
+    # in-engine.
     grass_expected_heights = {}
     for g in placed_grass:
-        lo, hi = grass_expected_heights.get(g.spec_name, (1e9, -1e9))
-        grass_expected_heights[g.spec_name] = (
+        key = tier_spec(g.spec_name, g.tier)
+        lo, hi = grass_expected_heights.get(key, (1e9, -1e9))
+        grass_expected_heights[key] = (
             min(lo, g.target_height_cm), max(hi, g.target_height_cm))
+    bush_count = len(placed_bushes)
+    bush_spec_counts = dict(Counter(b.spec_name for b in placed_bushes))
 
     lighting_json = json.dumps(lighting)
     tod_label = lighting["label"]
@@ -1093,6 +1166,8 @@ def _write_unreal_verify_script(
         EXPECTED_GRASS_COUNT = {grass_count}
         EXPECTED_GRASS_SPEC_COUNTS = {json.dumps(grass_spec_counts)}
         EXPECTED_GRASS_HEIGHTS = {json.dumps(grass_expected_heights)}
+        EXPECTED_BUSH_COUNT = {bush_count}
+        EXPECTED_BUSH_SPEC_COUNTS = {json.dumps(bush_spec_counts)}
         EXPECTED_NPCS = json.loads(r"""{npc_json}""")
         EXPECTED_NPC_RUN_SPEED = {npc_run_speed}
         EXPECTED_VARIANTS = json.loads(r"""{variants_json}""")
@@ -1287,6 +1362,16 @@ def _write_unreal_verify_script(
             from forest_import import grass as grass_import
             grass_import.verify_grass(check, actors, EXPECTED_GRASS_SPEC_COUNTS,
                                       EXPECTED_GRASS_HEIGHTS, EXPECTED_GRASS_COUNT)
+
+        # ── 5b. Bushes and the generated meshes (forest_import/bushes.py,
+        #        foliage_assets.py) ──────────────────────────────────────────
+        if EXPECTED_BUSH_COUNT > 0:
+            from forest_import import bushes as bushes_import
+            bushes_import.verify_bushes(check, actors, EXPECTED_BUSH_SPEC_COUNTS,
+                                        EXPECTED_BUSH_COUNT)
+        if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
+            from forest_import import foliage_assets
+            foliage_assets.verify_foliage_assets(check)
 
         # ── 6. Navigation + NPCs ─────────────────────────────────────────────
         if EXPECTED_NPCS:

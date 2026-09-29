@@ -14,12 +14,14 @@ level_editor_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 
 LEVEL_NAME = "Lvl_Forest_200m"
 WORLD_SIZE_CM = 20000.0
-EXPECTED_TREE_COUNT = 136
-EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 28, "HISM_Tree_Leafy_Island_02": 28, "HISM_Tree_Fir_A": 44, "HISM_Tree_Pine_A": 20, "HISM_Tree_Deciduous": 16}
-EXPECTED_GRASS_COUNT = 44368
-EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Knee_Tall_C": 6415, "HISM_Grass_Under_Mid_B": 2850, "HISM_Grass_Knee_Tall_B": 7813, "HISM_Grass_Knee_Mid_A": 5862, "HISM_Grass_Knee_Tall_A": 8451, "HISM_Grass_Knee_Clump_C": 5844, "HISM_Grass_Under_Clump_A": 2325, "HISM_Grass_Under_Large_B": 2611, "HISM_Grass_Under_Large_A": 2197}
-EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Knee_Tall_C": [42.24203236572195, 55.19965777829051], "HISM_Grass_Under_Mid_B": [25.50236822702523, 35.99548227179528], "HISM_Grass_Knee_Tall_B": [42.50385457167636, 59.99974280771928], "HISM_Grass_Knee_Mid_A": [40.48063773707256, 50.59822823779188], "HISM_Grass_Knee_Tall_A": [42.50318653697187, 59.99869496378578], "HISM_Grass_Knee_Clump_C": [43.122974101764925, 53.898815809648305], "HISM_Grass_Under_Clump_A": [23.80250827203032, 33.59948519848749], "HISM_Grass_Under_Large_B": [24.651614798889643, 34.79934409277889], "HISM_Grass_Under_Large_A": [22.10593062586047, 31.198874274235948]}
-EXPECTED_NPCS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54, "distance_cm": 7593.07}, {"x": 4241.23, "y": 6260.28, "z": 520.91, "yaw": 235.88, "distance_cm": 7561.69}, {"x": 6982.28, "y": -3337.22, "z": 718.2, "yaw": 154.45, "distance_cm": 7738.82}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1, "distance_cm": 7501.07}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52, "distance_cm": 7746.09}, {"x": -7393.56, "y": 1418.04, "z": 691.28, "yaw": 349.14, "distance_cm": 7528.32}, {"x": -4965.03, "y": -6019.83, "z": 662.55, "yaw": 50.48, "distance_cm": 7803.2}, {"x": -4315.67, "y": -6265.34, "z": 655.45, "yaw": 55.44, "distance_cm": 7607.86}, {"x": 4881.11, "y": -5744.38, "z": 560.93, "yaw": 130.36, "distance_cm": 7538.11}, {"x": 591.33, "y": -7709.05, "z": 636.5, "yaw": 94.39, "distance_cm": 7731.69}]""")
+EXPECTED_TREE_COUNT = 68
+EXPECTED_SPEC_COUNTS = {"HISM_Tree_Leafy_Island_01": 14, "HISM_Tree_Leafy_Island_02": 14, "HISM_Tree_Fir_A": 22, "HISM_Tree_Pine_A": 10, "HISM_Tree_Deciduous": 8}
+EXPECTED_GRASS_COUNT = 40521
+EXPECTED_GRASS_SPEC_COUNTS = {"HISM_Grass_Patch_A_T0": 10158, "HISM_Grass_Patch_B_T0": 6117, "HISM_Grass_Patch_B_T1": 2998, "HISM_Grass_Patch_A_T1": 5045, "HISM_Grass_Patch_B_T2": 2950, "HISM_Grass_Patch_A_T2": 5156, "HISM_Grass_Patch_B_T3": 2968, "HISM_Grass_Patch_A_T3": 5129}
+EXPECTED_GRASS_HEIGHTS = {"HISM_Grass_Patch_A_T0": [42.503385655783624, 57.49960391005845], "HISM_Grass_Patch_B_T0": [42.50620339292603, 57.49903067898357], "HISM_Grass_Patch_B_T1": [42.50367563534102, 57.499666051560204], "HISM_Grass_Patch_A_T1": [42.504948675407064, 57.499841297984766], "HISM_Grass_Patch_B_T2": [42.510329368360836, 57.47428259367874], "HISM_Grass_Patch_A_T2": [42.50043117125315, 57.49898843600104], "HISM_Grass_Patch_B_T3": [42.50627445096218, 57.491993241472805], "HISM_Grass_Patch_A_T3": [42.50501461857157, 57.49870864078681]}
+EXPECTED_BUSH_COUNT = 328
+EXPECTED_BUSH_SPEC_COUNTS = {"HISM_Bush_Tall": 140, "HISM_Bush_Round": 188}
+EXPECTED_NPCS = json.loads(r"""[{"x": -2033.79, "y": 7315.62, "z": 618.02, "yaw": 285.54, "distance_cm": 7593.07}, {"x": 3975.49, "y": 6860.45, "z": 641.83, "yaw": 239.91, "distance_cm": 7929.08}, {"x": 5533.95, "y": 5687.04, "z": 745.17, "yaw": 225.78, "distance_cm": 7935.17}, {"x": 2918.4, "y": 6910.06, "z": 497.24, "yaw": 247.1, "distance_cm": 7501.07}, {"x": 7427.7, "y": -2197.98, "z": 598.26, "yaw": 163.52, "distance_cm": 7746.09}, {"x": -938.78, "y": 7835.38, "z": 660.55, "yaw": 276.83, "distance_cm": 7891.42}, {"x": -4965.03, "y": -6019.83, "z": 662.55, "yaw": 50.48, "distance_cm": 7803.2}, {"x": -6751.92, "y": -3975.3, "z": 531.92, "yaw": 30.49, "distance_cm": 7835.27}, {"x": 4881.11, "y": -5744.38, "z": 560.93, "yaw": 130.36, "distance_cm": 7538.11}, {"x": 591.33, "y": -7709.05, "z": 636.5, "yaw": 94.39, "distance_cm": 7731.69}]""")
 EXPECTED_NPC_RUN_SPEED = 600.0
 EXPECTED_VARIANTS = json.loads(r"""[{"key": "Zombie", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Zombie", "mesh": "/Game/Sourced/Characters/SKM_Zombie01/SKM_Zombie01", "anim_bp": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Zombie01/A_Zombie01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Zombie", "health": 100.0, "speed_scale": 1.0, "voices": ["/Game/Audio/A_ZombieGrowl_01", "/Game/Audio/A_ZombieGrowl_02", "/Game/Audio/A_ZombieGrowl_03"]}, {"key": "Wendigo", "blueprint": "/Game/Forest/NPC/BP_Wanderer_Wendigo", "mesh": "/Game/Sourced/Characters/SKM_Wendigo01/SKM_Wendigo01", "anim_bp": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_ABP_Unarmed", "melee": "/Game/Sourced/Characters/Anims/Wendigo01/A_Wendigo01_MM_Attack_01", "ai_blueprint": "/Game/Forest/NPC/BP_ForestWandererAI_Wendigo", "health": 300.0, "speed_scale": 1.15, "voices": ["/Game/Audio/A_WendigoRoar_01", "/Game/Audio/A_WendigoRoar_02", "/Game/Audio/A_WendigoRoar_03"]}]""")
 # Per-instance {key, rate, speed} -- see
@@ -31,7 +33,7 @@ EXPECTED_MELEE_INTERVAL = 1.5
 EXPECTED_NAV_AGENT_RADIUS = 35.0
 EXPECTED_REACHABLE_EXTENT = (200.0, 200.0, 400.0)
 EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 10000.0, "center_z_cm": 1905.25, "half_z_cm": 2290.19, "terrain_min_z_cm": -184.94, "terrain_max_z_cm": 3995.44}""")
-LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
+LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true, "shadow_distance_cm": 10000.0}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 passed = 0
 failed = 0
@@ -133,6 +135,10 @@ for a in actors:
                   dlc.get_editor_property("atmosphere_sun_light"))
             check("Directional Light Casts Shadows",
                   dlc.get_editor_property("cast_shadows") == sun_cfg["cast_shadows"])
+            dist = dlc.get_editor_property("dynamic_shadow_distance_movable_light")
+            check("Directional Light Shadow Distance",
+                  close(dist, sun_cfg["shadow_distance_cm"], 1.0),
+                  f"(expected {sun_cfg['shadow_distance_cm']} cm, got {dist})")
 
     elif lbl == f"{LEVEL_NAME}_SkyLight":
         slc = a.get_component_by_class(unreal.SkyLightComponent)
@@ -194,73 +200,31 @@ for a in actors:
               f"(expected {pp_cfg['auto_exposure_bias']})")
 
 # ── 4. Tree HISM Actors ──────────────────────────────────────────────
-total_tree_instances = 0
-for spec_name, expected_count in EXPECTED_SPEC_COUNTS.items():
-    found = False
-    for a in actors:
-        if a.get_actor_label() == spec_name:
-            found = True
-            # Count HISM instances via root component
-            root = a.get_editor_property("root_component")
-            if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
-                inst_count = root.get_instance_count()
-                total_tree_instances += inst_count
-                check(f"{spec_name} Instance Count",
-                      inst_count == expected_count,
-                      f"(expected {expected_count}, got {inst_count})")
-                check(f"{spec_name} Collision Profile",
-                      root.get_collision_profile_name() == "BlockAll")
-            break
-    check(f"{spec_name} Actor Exists", found)
+import sys
+if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sys.path:
+    sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
+from forest_import import trees as trees_import
+trees_import.verify_trees(check, actors, EXPECTED_SPEC_COUNTS,
+                          EXPECTED_TREE_COUNT)
 
-check("Total Tree Instances",
-      total_tree_instances == EXPECTED_TREE_COUNT,
-      f"(expected {EXPECTED_TREE_COUNT}, got {total_tree_instances})")
-
-# ── 5. Grass HISM Actors ─────────────────────────────────────────────
+# ── 5. Grass cells (forest_import/grass.py) ─────────────────────────
 if EXPECTED_GRASS_COUNT > 0:
-    total_grass_instances = 0
-    for spec_name, expected_count in EXPECTED_GRASS_SPEC_COUNTS.items():
-        found = False
-        for a in actors:
-            if a.get_actor_label() == spec_name:
-                found = True
-                root = a.get_editor_property("root_component")
-                if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
-                    inst_count = root.get_instance_count()
-                    total_grass_instances += inst_count
-                    check(f"{spec_name} Instance Count",
-                          inst_count == expected_count,
-                          f"(expected {expected_count}, got {inst_count})")
-                    # Grass must never block the player.
-                    check(f"{spec_name} No Collision",
-                          str(root.get_collision_profile_name()) == "NoCollision",
-                          f"(got {root.get_collision_profile_name()})")
+    import sys
+    if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sys.path:
+        sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
+    from forest_import import grass as grass_import
+    grass_import.verify_grass(check, actors, EXPECTED_GRASS_SPEC_COUNTS,
+                              EXPECTED_GRASS_HEIGHTS, EXPECTED_GRASS_COUNT)
 
-                    # Prove the clumps really land at knee height:
-                    # mesh bounds height × instance Z scale.
-                    mesh = root.get_editor_property("static_mesh")
-                    lo_hi = EXPECTED_GRASS_HEIGHTS.get(spec_name)
-                    if mesh and lo_hi and inst_count > 0:
-                        mesh_h = float(mesh.get_bounds().box_extent.z) * 2.0
-                        sampled = []
-                        step = max(1, inst_count // 50)
-                        for i in range(0, inst_count, step):
-                            tf = root.get_instance_transform(i, world_space=False)
-                            sampled.append(float(tf.scale3d.z) * mesh_h)
-                        lo, hi = lo_hi
-                        worst = [h for h in sampled
-                                 if not (lo - 1.0 <= h <= hi + 1.0)]
-                        check(f"{spec_name} Knee Height",
-                              len(worst) == 0,
-                              f"(expected {lo:.1f}-{hi:.1f} cm, "
-                              f"sampled {min(sampled):.1f}-{max(sampled):.1f} cm)")
-                break
-        check(f"{spec_name} Actor Exists", found)
-
-    check("Total Grass Instances",
-          total_grass_instances == EXPECTED_GRASS_COUNT,
-          f"(expected {EXPECTED_GRASS_COUNT}, got {total_grass_instances})")
+# ── 5b. Bushes and the generated meshes (forest_import/bushes.py,
+#        foliage_assets.py) ──────────────────────────────────────────
+if EXPECTED_BUSH_COUNT > 0:
+    from forest_import import bushes as bushes_import
+    bushes_import.verify_bushes(check, actors, EXPECTED_BUSH_SPEC_COUNTS,
+                                EXPECTED_BUSH_COUNT)
+if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
+    from forest_import import foliage_assets
+    foliage_assets.verify_foliage_assets(check)
 
 # ── 6. Navigation + NPCs ─────────────────────────────────────────────
 if EXPECTED_NPCS:

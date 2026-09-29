@@ -29,8 +29,9 @@ stamped, it just should not float.
 
 Height handling
 ---------------
-The source meshes are photoscans whose real-world size is only known inside
-the editor, so this module does *not* bake an absolute scale.  Each instance
+This module does *not* bake an absolute scale -- the mesh is the import
+side's business, and the scans this was written for had no authored size at
+all.  Each instance
 carries a ``target_height_cm`` (what the clump should measure in world space)
 plus independent height/width multipliers.  The generated Unreal script divides
 ``target_height_cm`` by the mesh's actual bounding-box height to obtain the
@@ -42,6 +43,9 @@ import math
 import random
 from dataclasses import dataclass
 
+from .foliage_meshes import (
+    GRASS_PATCH_A, GRASS_PATCH_B, MI_GRASS, asset_path, mesh_height_cm)
+from .grass_cells import GRASS_TIERS
 from .terrain import get_exact_mesh_z
 
 
@@ -49,11 +53,6 @@ from .terrain import get_exact_mesh_z
 
 # Knee height on an average adult character, in centimetres.
 KNEE_HEIGHT_CM = 50.0
-
-_GRASS_01 = "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes"
-_GRASS_02 = "/Game/Forest/Scanned/grass_medium_02/grass_medium_02_1k/StaticMeshes"
-_MI_01 = "/Game/Forest/Materials/Instances/MI_GrassMedium01"
-_MI_02 = "/Game/Forest/Materials/Instances/MI_GrassMedium02"
 
 
 @dataclass
@@ -68,50 +67,39 @@ class GrassSpec:
     width_jitter: tuple[float, float] = (0.90, 1.18)
     max_tilt_deg: float = 4.0      # random lean, keeps the field from looking stamped
     sink_cm: float = 4.0           # push the base below the surface at knee height
-    # Authored height of the source scan, measured in-editor from its bounding
-    # box.  Only used offline to balance the layers and to flag excessive
-    # upscaling — the import script re-reads the real bounds at plant time.
+    # Authored height of the mesh (foliage_meshes.mesh_height_cm).  Only used
+    # offline to flag excessive upscaling — the import script re-reads the
+    # real bounds at plant time.
     nominal_mesh_height_cm: float = 0.0
 
 
-# Dominant layer = knee height; a lighter understory layer adds depth.
-# The scans are small (15–32 cm authored), so the knee layer is drawn from the
-# tallest ones: reaching 50 cm from a 15 cm clump would need a 3.4x upscale and
-# the blades read as coarse.  Short scans serve as understory instead, where
-# they stay under ~1.8x.  Heights below were measured from the meshes' bounds.
+# Two generated patch meshes (forest_generator/foliage_meshes.py), each a
+# ~1.1 m disc of a few hundred opaque blades authored at knee height -- so
+# planting scales them by 0.8-1.1 instead of stretching 15-30 cm scans by up to
+# 3x. The patch itself is the thickness: one instance carries what took a
+# dozen scanned clumps, so the field is dense at the instance count the scans
+# used to be sparse at.
 DEFAULT_GRASS_SPECS = [
-    # ── Knee layer ───────────────────────────────────────────────────────────
-    GrassSpec("HISM_Grass_Knee_Tall_A", f"{_GRASS_01}/grass_medium_01_tall_a_LOD0.grass_medium_01_tall_a_LOD0",
-              [_MI_01], weight=1.30, height_ratio=1.00, nominal_mesh_height_cm=32.3),
-    GrassSpec("HISM_Grass_Knee_Tall_B", f"{_GRASS_01}/grass_medium_01_tall_b_LOD0.grass_medium_01_tall_b_LOD0",
-              [_MI_01], weight=1.20, height_ratio=1.00, nominal_mesh_height_cm=28.6),
-    GrassSpec("HISM_Grass_Knee_Tall_C", f"{_GRASS_01}/grass_medium_01_tall_c_LOD0.grass_medium_01_tall_c_LOD0",
-              [_MI_01], weight=1.00, height_ratio=0.96, height_jitter=(0.88, 1.15),
-              nominal_mesh_height_cm=23.6),
-    GrassSpec("HISM_Grass_Knee_Clump_C", f"{_GRASS_02}/grass_medium_02_c.grass_medium_02_c",
-              [_MI_02], weight=0.90, height_ratio=0.98, height_jitter=(0.88, 1.10),
-              nominal_mesh_height_cm=23.2),
-    GrassSpec("HISM_Grass_Knee_Mid_A", f"{_GRASS_01}/grass_medium_01_mid_a_LOD0.grass_medium_01_mid_a_LOD0",
-              [_MI_01], weight=0.90, height_ratio=0.92, height_jitter=(0.88, 1.10),
-              nominal_mesh_height_cm=21.8),
-    # ── Understory filler — shin height, breaks up the silhouette ───────────
-    GrassSpec("HISM_Grass_Under_Mid_B", f"{_GRASS_01}/grass_medium_01_mid_b_LOD0.grass_medium_01_mid_b_LOD0",
-              [_MI_01], weight=0.45, height_ratio=0.60, sink_cm=3.0, nominal_mesh_height_cm=17.8),
-    GrassSpec("HISM_Grass_Under_Large_B", f"{_GRASS_01}/grass_medium_01_large_b_LOD0.grass_medium_01_large_b_LOD0",
-              [_MI_01], weight=0.40, height_ratio=0.58, sink_cm=3.0, nominal_mesh_height_cm=16.9),
-    GrassSpec("HISM_Grass_Under_Clump_A", f"{_GRASS_02}/grass_medium_02_a.grass_medium_02_a",
-              [_MI_02], weight=0.35, height_ratio=0.56, sink_cm=3.0, nominal_mesh_height_cm=15.7),
-    GrassSpec("HISM_Grass_Under_Large_A", f"{_GRASS_01}/grass_medium_01_large_a_LOD0.grass_medium_01_large_a_LOD0",
-              [_MI_01], weight=0.35, height_ratio=0.52, sink_cm=3.0, nominal_mesh_height_cm=14.7),
+    GrassSpec("HISM_Grass_Patch_A", asset_path(GRASS_PATCH_A), [MI_GRASS],
+              weight=1.25, height_ratio=1.00, height_jitter=(0.85, 1.15),
+              width_jitter=(0.85, 1.20), sink_cm=3.0,
+              nominal_mesh_height_cm=mesh_height_cm(GRASS_PATCH_A)),
+    GrassSpec("HISM_Grass_Patch_B", asset_path(GRASS_PATCH_B), [MI_GRASS],
+              weight=0.75, height_ratio=1.00, height_jitter=(0.85, 1.15),
+              width_jitter=(0.85, 1.20), sink_cm=3.0,
+              nominal_mesh_height_cm=mesh_height_cm(GRASS_PATCH_B)),
 ]
 
-# Upscaling a photoscan much past this starts to read as oversized blades.
+# Upscaling a patch much past this starts to read as oversized blades.
 MAX_UPSCALE_FACTOR = 2.4
 
 # Specs whose height_ratio is at or above this count as the "knee" layer.
 KNEE_LAYER_MIN_RATIO = 0.85
 
-DEFAULT_DENSITY_PER_SQM = 1.2   # clumps per m² of map
+# Patches per m² of map with every tier drawn (Ultra); Low draws
+# GRASS_TIERS[0].share of it. ~1.1 m² per patch, so ~1.2 layers of blades
+# over the ground at Ultra and about half cover on Low.
+DEFAULT_DENSITY_PER_SQM = 1.1
 DEFAULT_PATCHINESS = 0.25       # 0 = perfectly even, ->1 = heavily clustered
 SPAWN_CLEAR_RADIUS_CM = 150.0   # keep the PlayerStart from being submerged
 TREE_CLEAR_RADIUS_CM = 90.0     # small bare ring at each trunk
@@ -134,6 +122,7 @@ class PlacedGrass:
     width_scale: float      # multiplier on the spec's target width
     target_height_cm: float # final intended world height of this clump
     sink_cm: float
+    tier: int = 0           # grass_cells.GRASS_TIERS index
 
 
 # ─── Scatter ─────────────────────────────────────────────────────────────────
@@ -236,13 +225,18 @@ def scatter_grass(
     spawn_clear_radius_cm: float = SPAWN_CLEAR_RADIUS_CM,
     tree_clear_radius_cm: float = TREE_CLEAR_RADIUS_CM,
     coverage_fraction: float = 0.97,
+    tiers=GRASS_TIERS,
 ) -> list[PlacedGrass]:
     """
-    Scatter grass clumps across the whole terrain.
+    Scatter grass patches across the whole terrain, one layer per density tier
+    (grass_cells.GRASS_TIERS).
 
-    A jittered stratified grid guarantees coverage everywhere; ``patchiness``
-    drops and doubles cells at equal rates so the expected density is preserved
-    while the field gains natural thin and thick patches.
+    Each tier is its own jittered stratified grid at its share of
+    ``density_per_sqm``, with its own random stream, so every tier on its own
+    covers the map evenly -- Low, which draws only the first, is thinner but
+    never bald. ``patchiness`` drops and doubles grid cells at equal rates, so
+    the expected density is preserved while the field gains thin and thick
+    patches.
 
     Returns a list of PlacedGrass records for verification.
     """
@@ -251,8 +245,23 @@ def scatter_grass(
     if density_per_sqm <= 0 or not grass_specs:
         return []
 
-    rng = random.Random(seed ^ 0x6A55)  # decorrelate from tree placement
+    placed: list[PlacedGrass] = []
+    for tier_index, tier in enumerate(tiers):
+        # Decorrelated from tree placement, and each tier from the others.
+        rng = random.Random((seed ^ 0x6A55) + 7919 * tier_index)
+        placed.extend(_scatter_layer(
+            rng, tier_index, density_per_sqm * tier.share, world_size_cm,
+            grid_z, grid_size, knee_height_cm, patchiness, grass_specs,
+            placed_trees, spawn_clear_radius_cm, tree_clear_radius_cm,
+            coverage_fraction))
+    return placed
 
+
+def _scatter_layer(rng, tier, density_per_sqm, world_size_cm, grid_z, grid_size,
+                   knee_height_cm, patchiness, grass_specs, placed_trees,
+                   spawn_clear_radius_cm, tree_clear_radius_cm,
+                   coverage_fraction) -> list[PlacedGrass]:
+    """One tier's even layer of patches; see scatter_grass."""
     half = world_size_cm / 2.0 * coverage_fraction
     cell_cm = math.sqrt(1.0 / density_per_sqm) * 100.0  # density is per m²
     n_cells = max(1, int(math.floor((2.0 * half) / cell_cm)))
@@ -316,6 +325,7 @@ def scatter_grass(
                     width_scale=w_scale,
                     target_height_cm=target_h,
                     sink_cm=sink,
+                    tier=tier,
                 ))
 
     return placed

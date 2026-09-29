@@ -738,8 +738,11 @@ def run_all_checks(
     expect_npc: bool = False,
     expected_npc_count: int = 0,
     nav_bounds=None,
+    placed_bushes=None,
 ) -> VerificationReport:
     """Run the complete verification suite and return a report."""
+    # Imported here: undergrowth_checks imports CheckResult from this module.
+    from . import undergrowth_checks
     world_size_m = world_size_cm / 100.0
     report = VerificationReport(level_name=level_name, world_size_m=world_size_m)
 
@@ -770,6 +773,14 @@ def run_all_checks(
         report.checks.append(check_grass_upscale(placed_grass, knee_height_cm))
         report.checks.append(check_grass_coverage(placed_grass, world_size_cm))
         report.checks.append(check_grass_spec_distribution(placed_grass))
+        report.checks.append(undergrowth_checks.check_grass_tiers(placed_grass,
+                                                                  world_size_cm))
+
+    # Generated meshes, and bushes (None when bush generation is disabled)
+    report.checks.append(undergrowth_checks.check_foliage_meshes())
+    if placed_bushes is not None:
+        report.checks.append(undergrowth_checks.check_bushes(
+            placed_bushes, placed_trees, world_size_cm, grid_z, grid_size))
 
     # NPC checks (skipped entirely when NPC spawning is disabled)
     if expect_npc:

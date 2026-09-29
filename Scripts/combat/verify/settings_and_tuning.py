@@ -33,6 +33,18 @@ def check_settings_savegame():
               abs(sg_cdo.get_editor_property("MouseSensitivity")
                   - COMBAT.mouse_sensitivity_default) < 1e-6,
               repr(sg_cdo.get_editor_property("MouseSensitivity")))
+        # The sniper scope's own multiplier: the settings screen's second row,
+        # and the Lerp target the weapon component eases toward past the irons.
+        for owner, obj in (("BP_Settings", sg_cdo), ("BP_WeaponComponent", wc_cdo)):
+            got = obj.get_editor_property("ScopeSensitivity")
+            check(f"{owner} carries a scope sensitivity defaulting to "
+                  f"{COMBAT.ads_scope_sens_scale}",
+                  isinstance(got, float)
+                  and abs(got - COMBAT.ads_scope_sens_scale) < 1e-6, repr(got))
+        check("...inside its own settings range, whose floor is not zero",
+              0.0 < COMBAT.scope_sensitivity_min <= COMBAT.ads_scope_sens_scale
+              <= COMBAT.scope_sensitivity_max,
+              f"{COMBAT.scope_sensitivity_min}..{COMBAT.scope_sensitivity_max}")
         stored = list(sg_cdo.get_editor_property("Binds"))
         check(f"...and {len(BIND_VARS)} binds, one per rebindable action",
               len(stored) == len(BIND_VARS), str(len(stored)))
@@ -98,10 +110,17 @@ def check_settings_savegame():
     # The numbers the player actually feels, spelled out so a change to either
     # constant has to be argued for rather than noticed later.
     for name, zoom, want in (("irons", COMBAT.ads_zoom_irons, 0.75),
-                             ("scope", COMBAT.ads_zoom_scope, 0.4375)):
+                             ("scope", COMBAT.ads_zoom_scope, 0.21875)):
         got = 1.0 + COMBAT.ads_sens_compensation * (1.0 / zoom - 1.0)
+        past = min(max((zoom - COMBAT.ads_zoom_irons)
+                       / (COMBAT.ads_zoom_scope - COMBAT.ads_zoom_irons), 0.0), 1.0)
+        got *= 1.0 + past * (COMBAT.ads_scope_sens_scale - 1.0)
         check(f"...which works out at {want:.2f}x sensitivity down the {name}",
               abs(got - want) < 5e-3, f"{got:.4f}")
+    check("the scope's extra slowdown is the component's ScopeSensitivity, "
+          "read rather than a literal, so the settings screen can move it",
+          bool(titled(wg, "Get ScopeSensitivity")),
+          str(len(titled(wg, "Get ScopeSensitivity"))))
 
 
 # ─── The combat config ───────────────────────────────────────────────────────
@@ -126,7 +145,10 @@ def check_combat_config():
                     "ads_interp_speed", "ads_spread_scale",
                     "mouse_sensitivity_default", "mouse_sensitivity_min",
                     "mouse_sensitivity_max", "mouse_sensitivity_step",
-                    "ads_sens_compensation", "ads_move_speed_scale",
+                    "ads_sens_compensation", "ads_scope_sens_scale",
+                    "scope_sensitivity_min", "scope_sensitivity_max",
+                    "scope_sensitivity_step",
+                    "ads_move_speed_scale",
                     "recoil_recovery_speed",
                     "recoil_recovery_fraction", "recoil_ads_scale",
                     "recoil_horizontal_ratio"},

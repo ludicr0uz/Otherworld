@@ -157,6 +157,21 @@ class CombatConfig:
     # compromise, and works out at 0.75x sensitivity down the irons and 0.44x
     # down the scope.
     ads_sens_compensation: float = 0.75
+    # ...and on top of that, the sniper's scope halves it again. 0.44x read as
+    # still too twitchy at 4x, where a few pixels of mouse cross a whole head.
+    # Keyed off zoom BEYOND the irons -- progress from ads_zoom_irons to
+    # ads_zoom_scope -- not off Held.Scoped, so it eases in on the same
+    # FInterpTo curve, needs no Held read on the frames nothing is equipped, and
+    # leaves irons exactly at 0.75x. Works out at 0.22x down the scope.
+    #
+    # This is only the DEFAULT: the player sets it on the settings screen
+    # ("SCOPE SENSITIVITY"), it is saved in BP_Settings.ScopeSensitivity and
+    # pushed onto BP_WeaponComponent every frame like MouseSensitivity. 1.0
+    # there means "no extra slowdown", i.e. the 0.44x the zoom alone gives.
+    ads_scope_sens_scale: float = 0.50
+    scope_sensitivity_min: float = 0.10
+    scope_sensitivity_max: float = 1.50
+    scope_sensitivity_step: float = 0.05
 
     # --- recoil --------------------------------------------------------------
     # A shot kicks the view up by the weapon's own RecoilPitch (a column in

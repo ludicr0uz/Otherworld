@@ -79,7 +79,8 @@ if editor_asset_sub.does_asset_exist(map_path):
         lbl = a.get_actor_label()
         if (lbl.startswith(LEVEL_NAME)
                 or lbl.startswith("HISM_Tree")
-                or lbl.startswith("HISM_Grass")):
+                or lbl.startswith("HISM_Grass")
+                or lbl.startswith("HISM_Bush")):
             editor_actor_sub.destroy_actor(a)
 else:
     level_editor_sub.new_level(map_path)
@@ -388,12 +389,22 @@ from forest_import import trees as trees_import
 trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
                          editor_asset_sub)
 
-# ── 5b. Plant knee-high grass ────────────────────────────────────────
-# Per-cell HISMs, saved unlit -- see forest_import/grass.py and
-# forest_generator/grass_cells.py.
+# ── 5a. Build the generated grass and bush meshes ────────────────────
+# Opaque Nanite patches and bushes, rebuilt in place every import --
+# see forest_import/foliage_assets.py.
 GRASS_DATA_PATH = r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts/generated_levels/Lvl_Forest_1000m/grass_Lvl_Forest_1000m.json"
-EXPECTED_GRASS_COUNT = 1120965
-GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_Knee_Tall_A": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_tall_a_LOD0.grass_medium_01_tall_a_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Knee_Tall_B": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_tall_b_LOD0.grass_medium_01_tall_b_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Knee_Tall_C": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_tall_c_LOD0.grass_medium_01_tall_c_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Knee_Clump_C": {"mesh": "/Game/Forest/Scanned/grass_medium_02/grass_medium_02_1k/StaticMeshes/grass_medium_02_c.grass_medium_02_c", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium02"]}, "HISM_Grass_Knee_Mid_A": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_mid_a_LOD0.grass_medium_01_mid_a_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Under_Mid_B": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_mid_b_LOD0.grass_medium_01_mid_b_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Under_Large_B": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_large_b_LOD0.grass_medium_01_large_b_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}, "HISM_Grass_Under_Clump_A": {"mesh": "/Game/Forest/Scanned/grass_medium_02/grass_medium_02_1k/StaticMeshes/grass_medium_02_a.grass_medium_02_a", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium02"]}, "HISM_Grass_Under_Large_A": {"mesh": "/Game/Forest/Scanned/grass_medium_01/grass_medium_01_1k/StaticMeshes/grass_medium_01_large_a_LOD0.grass_medium_01_large_a_LOD0", "mats": ["/Game/Forest/Materials/Instances/MI_GrassMedium01"]}}""")
+EXPECTED_GRASS_COUNT = 1025988
+EXPECTED_BUSH_COUNT = 8239
+GRASS_CONFIGS = json.loads(r"""{"HISM_Grass_Patch_A": {"mesh": "/Game/Forest/Procedural/SM_GrassPatch_A.SM_GrassPatch_A", "mats": ["/Game/Forest/Procedural/MI_ProcGrass"]}, "HISM_Grass_Patch_B": {"mesh": "/Game/Forest/Procedural/SM_GrassPatch_B.SM_GrassPatch_B", "mats": ["/Game/Forest/Procedural/MI_ProcGrass"]}}""")
+BUSH_CONFIGS = json.loads(r"""{"HISM_Bush_Round": {"mesh": "/Game/Forest/Procedural/SM_Bush_Round.SM_Bush_Round", "mats": ["/Game/Forest/Procedural/MI_ProcBush"]}, "HISM_Bush_Tall": {"mesh": "/Game/Forest/Procedural/SM_Bush_Tall.SM_Bush_Tall", "mats": ["/Game/Forest/Procedural/MI_ProcBush"]}}""")
+if EXPECTED_GRASS_COUNT > 0 or EXPECTED_BUSH_COUNT > 0:
+    unreal.log_warning("[GEN] 5a. Building generated grass and bush meshes...")
+    from forest_import import foliage_assets
+    foliage_assets.ensure_foliage_assets()
+
+# ── 5b. Plant knee-high grass ────────────────────────────────────────
+# Per-cell, per-tier HISMs, saved unlit and (above Low) hidden in game
+# -- see forest_import/grass.py and forest_generator/grass_cells.py.
 
 if EXPECTED_GRASS_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
     unreal.log_warning("[GEN] 5b. Planting knee-high grass...")
@@ -407,6 +418,15 @@ if EXPECTED_GRASS_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
         f"{grass_cells} cell actors!")
 else:
     unreal.log_warning("[GEN] 5b. Grass skipped (none generated).")
+
+# ── 5c. Plant walk-through bushes ────────────────────────────────────
+if EXPECTED_BUSH_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
+    unreal.log_warning("[GEN] 5c. Planting bushes...")
+    from forest_import import bushes as bushes_import
+    bushes_import.plant_bushes(GRASS_DATA_PATH, BUSH_CONFIGS,
+                               editor_actor_sub, editor_asset_sub)
+else:
+    unreal.log_warning("[GEN] 5c. Bushes skipped (none generated).")
 
 # ── 6. Spawn Player Start ────────────────────────────────────────────
 unreal.log_warning("[GEN] 6. Spawning player start...")

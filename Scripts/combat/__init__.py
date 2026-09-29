@@ -30,6 +30,8 @@ ASSETS AND PATCHES
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
   aim_pitch         the player's anim BP: AimPitch tips the upper body (two
                     spine ModifyBones) so the gun follows the sights' pitch
+  body_pose         the player's anim BP: crouch, prone and guard poses as
+                    weighted ModifyBones (no clip exists), pose_plan()
   skin              the player's body (PlayerSkin, wear_skin)
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)

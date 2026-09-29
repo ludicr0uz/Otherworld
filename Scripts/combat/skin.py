@@ -71,6 +71,11 @@ class PlayerSkin:
     # sights, lower first; each takes half (aim_pitch.py). Everything above
     # them -- chest, arms, head and the weapon in the hand -- turns rigidly.
     aim_bones: tuple
+    # The bones the procedural stance and guard poses turn (body_pose.py), by
+    # role: hips, spine (the lowest spine joint), neck, and per side
+    # clavicle / upperarm / forearm / hand / thigh / calf / foot as "<role>_l|_r".
+    # The chest is aim_bones[-1].
+    pose_bones: dict
     # Mesh component transform inside the actor. The template's own numbers;
     # they are a property of a 1.8 m humanoid standing in an 88 cm capsule
     # facing +X, not of the mannequin, which is why the Meshy skin reuses them.
@@ -87,6 +92,12 @@ SKIN_QUINN = PlayerSkin(
     grip_fingers=tuple(tuple(f"{f}_{j:02d}_r" for j in (1, 2, 3))
                        for f in ("index", "middle", "ring", "pinky")),
     aim_bones=("spine_03", "spine_05"),
+    pose_bones=dict(
+        hips="pelvis", spine="spine_01", neck="neck_01",
+        **{f"{role}_{s}": f"{bone}_{s}" for s in "lr" for role, bone in (
+            ("clavicle", "clavicle"), ("upperarm", "upperarm"),
+            ("forearm", "lowerarm"), ("hand", "hand"), ("thigh", "thigh"),
+            ("calf", "calf"), ("foot", "foot"))}),
 )
 
 # Built by Scripts/asset_pipeline: fetch_monsters.py -> import_characters.py ->
@@ -109,6 +120,12 @@ SKIN_ADVENTURER = PlayerSkin(
                        for f in ("Index", "Middle", "Ring", "Pinky")),
     # Meshy numbers its spine backwards: Hips -> Spine02 -> Spine01 -> Spine.
     aim_bones=("Spine01", "Spine"),
+    pose_bones=dict(
+        hips="Hips", spine="Spine02", neck="neck",
+        **{f"{role}_{s}": f"{side}{bone}" for s, side in (("l", "Left"), ("r", "Right"))
+           for role, bone in (("clavicle", "Shoulder"), ("upperarm", "Arm"),
+                              ("forearm", "ForeArm"), ("hand", "Hand"),
+                              ("thigh", "UpLeg"), ("calf", "Leg"), ("foot", "Foot"))}),
 )
 
 

@@ -28,6 +28,11 @@ def _feeds(pin, limit=100):
     return seen
 
 
+def _driven(node):
+    """A body-pose ModifyBone (body_pose.py): its Alpha is wired to a weight."""
+    return bool(PIN.list_connected_pins(BEL.find_input_pin(node, "Alpha")))
+
+
 def _pose_source(node, pin_name):
     fed = PIN.list_connected_pins(BEL.find_input_pin(node, pin_name))
     return PIN.get_owning_node(fed[0]) if fed else None
@@ -43,25 +48,36 @@ def check_anim_bp_pitch():
           isinstance(pitch, float) and pitch == 0.0, repr(pitch))
 
     # Output <- ComponentToLocal <- ModifyBone(upper) <- ModifyBone(lower)
-    #        <- LocalToComponent: the whole pose, whatever it is, turns last.
+    #        <- [the body poses, body_pose.py] <- LocalToComponent: the whole
+    # pose, whatever it is, turns last.
     roots = [n for n in nodes if n.get_class().get_name() == "AnimGraphNode_Root"]
     chain, node, pin = [], roots[0] if roots else None, "Result"
-    for want in ("AnimGraphNode_ComponentToLocalSpace", MODIFY_BONE_CLASS,
-                 MODIFY_BONE_CLASS, "AnimGraphNode_LocalToComponentSpace"):
-        node = _pose_source(node, pin) if node else None
-        chain.append(node.get_class().get_name() if node else None)
-        pin = {"AnimGraphNode_LocalToComponentSpace": "LocalPose"}.get(
-            want, "ComponentPose")
+    while node is not None and len(chain) < 64:
+        node = _pose_source(node, pin)
+        if node is None:
+            break
+        name = node.get_class().get_name()
+        if name == MODIFY_BONE_CLASS and _driven(node):
+            chain.append("body pose")
+        else:
+            chain.append(name)
+        if name == "AnimGraphNode_LocalToComponentSpace":
+            break
+        pin = "ComponentPose"
+    while chain.count("body pose") > 1:
+        chain.remove("body pose")
     check("the output pose is the last pose, pitched on two bones in component "
-          "space", chain == ["AnimGraphNode_ComponentToLocalSpace",
-                             MODIFY_BONE_CLASS, MODIFY_BONE_CLASS,
-                             "AnimGraphNode_LocalToComponentSpace"], str(chain))
+          "space", chain[:3] == ["AnimGraphNode_ComponentToLocalSpace",
+                                 MODIFY_BONE_CLASS, MODIFY_BONE_CLASS]
+          and chain[-1] == "AnimGraphNode_LocalToComponentSpace"
+          and len(chain) <= 5, str(chain))
 
     bones = unreal.AnimPoseExtensions.get_bone_names(
         unreal.AnimPoseExtensions.get_reference_pose(
             abp.get_editor_property("target_skeleton")))
-    mods = [n for n in nodes if n.get_class().get_name() == MODIFY_BONE_CLASS]
-    check("exactly two ModifyBones -- a rerun must not stack a third",
+    mods = [n for n in nodes if n.get_class().get_name() == MODIFY_BONE_CLASS
+            and not _driven(n)]
+    check("exactly two pitch ModifyBones -- a rerun must not stack a third",
           len(mods) == 2, str(len(mods)))
     turned = sorted(str(m.get_editor_property("node").get_editor_property(
         "bone_to_modify").get_editor_property("bone_name")) for m in mods)

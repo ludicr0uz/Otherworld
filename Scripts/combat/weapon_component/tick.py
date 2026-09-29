@@ -21,6 +21,7 @@ from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.inventory import (
     _author_drop, _author_equip, _author_pickup,
 )
+from combat.weapon_component.pose_weights import _author_pose_weights
 from combat.weapon_component.ready_pose import _author_ready_pose_keepalive
 from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
@@ -124,6 +125,11 @@ def _author_wc_tick(ed, tick):
     # --- and the body pitches with the view, down the sights -----------------
     # After SightBlend is written, which scales it.
     ads_exits = _author_sight_pitch(ed, pc_out, ads_exits, 11200, -700)
+
+    # --- and the body takes the stance and the guard -------------------------
+    # After both are written (Stance, Blocking), which set its weights.
+    ads_exits = _author_pose_weights(ed, tick, held, armed_out, ads_exits,
+                                     12600, -700)
 
     # --- the pose follows the sprint -----------------------------------------
     # Edge-triggered, not level-triggered, and that distinction is the whole

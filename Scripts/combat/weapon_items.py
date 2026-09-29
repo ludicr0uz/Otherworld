@@ -103,6 +103,10 @@ def build_weapon_item():
                  BEL.get_object_reference_type(unreal.SoundBase.static_class()))
     _declare(ed, "AimPose",
              BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
+    # Held in both hands (the rifle ready pose). The guard reads it to raise
+    # the gun across the body instead of the fists (body_pose.py). False on
+    # the base, so the pistol and every consumable guard with the fists.
+    _declare(ed, "TwoHanded", BEL.get_basic_type_by_name("bool"))
     # How far this weapon zooms when the right button is held. On the item for
     # the same reason SpreadDegrees is -- the component reads it off Held and
     # knows nothing about which weapon it is holding.
@@ -213,6 +217,7 @@ def build_weapon(spec, item_bp):
         "DryFireSound": _must_load(SND_DRY_FIRE),
         "ReloadSound": _must_load(spec["reload_sound"]),
         "AimPose": _must_load(spec["aim"]),
+        "TwoHanded": bool(spec["two_handed"]),
     })
     _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
          f"{spec['pellets']}x{spec['damage']:.0f} dmg, "

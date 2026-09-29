@@ -1,5 +1,5 @@
 """weapon_component -- BP_WeaponComponent: inventory, aim, fire, reload, recoil, sprint,
-block, stance.
+block, stance, body pose weights.
 
 build.build_weapon_component() is the entry; it declares the variables and
 authors BeginPlay (inventory.py) and Tick (tick.py). Tick calls one
@@ -13,6 +13,8 @@ _author_* fragment per concern, each in its own module:
               SightOffset; hide a scoped weapon behind its glass
   sight_pitch down the sights: write the anim BP's AimPitch (the view's pitch
               x SightBlend), which tips the upper body and the gun onto the aim
+  pose_weights  ease the anim BP's PoseCrouch/PoseProne/GuardArms/GuardGun
+              from Stance, Blocking and Held.TwoHanded (body_pose.py's poses)
   firing      pellets, impacts, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire

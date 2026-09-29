@@ -28,9 +28,11 @@ At the very end of the chain, after FullBodySlot and right before the output:
     ... -> Slot(FullBodySlot) -> LocalToComponent -> ModifyBone(lower)
         -> ModifyBone(upper) -> ComponentToLocal -> Output
 
-so it turns whatever the pose is -- the ready pose, a flinch -- and costs
-nothing when AimPitch is 0, which it is everywhere but down the sights. The
-weapon component writes AimPitch (weapon_component/sight_pitch.py).
+(body_pose.py inserts the crouch, prone and guard poses between the
+LocalToComponent and the lower ModifyBone), so it turns whatever the pose is --
+the ready pose, a flinch, a crouch -- and costs nothing when AimPitch is 0,
+which it is everywhere but down the sights. The weapon component writes
+AimPitch (weapon_component/sight_pitch.py).
 
 This is the *player's* anim BP (PlayerSkin.anim_bp), not ABP_Unarmed: the
 adventurer's is a retargeted copy, rebuilt by build_retarget.py, which runs
@@ -64,6 +66,20 @@ def _nodes_of(ed, class_name):
     return [n for n in ed.list_all_nodes() if n.get_class().get_name() == class_name]
 
 
+def _feeding_all(nodes):
+    """Every K2 node upstream of any of ``nodes``, each ONCE.
+
+    Several ModifyBones share one variable getter (all of body_pose.py's
+    nodes of one pose read the same weight), and remove_nodes should be handed
+    each node once rather than asked to delete what it already deleted.
+    """
+    found = {}
+    for n in nodes:
+        for k in _feeding(n):
+            found.setdefault(k.get_name(), k)
+    return list(found.values())
+
+
 def _feeding(node):
     """Every K2 node upstream of ``node``'s non-pose inputs."""
     found, stack = [], [node]
@@ -86,7 +102,7 @@ def _remove_previous(ed, root):
     for n in _nodes_of(ed, "AnimGraphNode_LocalToComponentSpace"):
         fed = PIN.list_connected_pins(_pin(n, "LocalPose"))
         upstream = fed[0] if fed else upstream
-    extras = [k for n in _nodes_of(ed, MODIFY_BONE_CLASS) for k in _feeding(n)]
+    extras = _feeding_all(_nodes_of(ed, MODIFY_BONE_CLASS))
     ed.remove_nodes(mine + extras)
     if upstream is None:
         raise RuntimeError("an earlier aim-pitch chain was fed by nothing; "

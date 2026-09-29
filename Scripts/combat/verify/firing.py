@@ -1,6 +1,7 @@
 """verify.firing -- Recoil, automatic fire and debug mode.
 """
 
+from combat.body_pose import POSE_WEIGHTS
 from combat.game_state import DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
 from combat.paths import GAME_MODE_BP_PATH
 from combat.tuning import AUTO_DISPLAYS, COMBAT
@@ -74,7 +75,12 @@ def check_recoil():
                                for m in makers),
           str(len(makers)))
 
-    interps = by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
+    # The four body-pose weights ease with FInterpTo too (verify/body_pose.py
+    # checks those); each one's Current is its own weight.
+    pose_reads = {f"Get {name}" for name in POSE_WEIGHTS}
+    interps = [n for n in by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
+               if not any(str(BEL.get_node_title(PIN.get_owning_node(q))) in pose_reads
+                          for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Current")))]
     check("the two debts recover by interpolation, alongside the zoom's and "
           "the sight camera's",
           len(interps) == 4,

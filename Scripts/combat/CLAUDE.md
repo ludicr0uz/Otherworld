@@ -211,8 +211,9 @@ The verifier asserts the old loose constants are gone.
 - **Probed in PIE** with `Set Blocking` forced true in memory: a wanderer in front dealt 2.5 per
   swing and took stamina 100 → 80 each time. From behind, it dealt 10 and cost nothing. The
   combat trace quotes the dealt `HitDamage`.
-- **Known gaps:** there is no guard pose (no clip exists to play), no HUD cue beyond the stamina
-  bar, and a blocked hit still flinches.
+- **The guard has a pose** (see Body poses): fists up with empty hands, a pistol or a
+  consumable; the gun raised across the body with a two-handed gun (`BP_WeaponItem.TwoHanded`).
+- **Known gaps:** no HUD cue beyond the stamina bar, and a blocked hit still flinches.
 
 ## Crouch and prone (`weapon_component/stance.py`)
 
@@ -240,13 +241,50 @@ The verifier asserts the old loose constants are gone.
 - **The footstep ground test is `NavMovementComponent.IsMovingOnGround`.** It used to be
   `Character.CanJump`, which is false while crouched, so every low step would have been silent.
   (`CharacterMovementComponent.IsMovingOnGround` isn't callable; the one a class up is.)
+- **The body crouches and lies down** (see Body poses), so the down-the-sights camera follows
+  the gun down too.
 - **Known gaps:**
-  - **No crouch or prone pose.** The mesh stays standing while the capsule and camera drop; the
-    down-the-sights camera still goes to the standing gun. The only crouch clips on this machine
-    are `MM_Unarmed_Crouch_*` in the experimental MoverExamples plugin (not enabled, on its own
-    skeleton, would need retargeting and an ABP state). No prone clip exists anywhere.
   - Space does nothing while low: UE refuses a crouched jump.
   - The camera drops in one frame (no boom lag).
+
+## Body poses (`body_pose.py`, `weapon_component/pose_weights.py`)
+
+- **Procedural, because no clip exists.** The only crouch clips are `MM_Unarmed_Crouch_*` in the
+  experimental MoverExamples plugin (not enabled, another skeleton); there is no prone or guard
+  clip anywhere. Each pose is a set of Transform (Modify) Bone nodes in the player's anim BP,
+  every one with its **Alpha wired to a weight**: `PoseCrouch`, `PoseProne`, `GuardArms`,
+  `GuardGun`. A weight of 0 skips its nodes.
+- **Where:** between the aim pitch's `LocalToComponent` and its two spine bones. Guard first (so
+  the prone hip turn carries the guarded arms), then crouch, then prone, then the aim pitch.
+  `patch_body_pose` runs after `patch_aim_pitch`, whose rerun deletes every ModifyBone; a body-pose
+  node is told apart by its driven Alpha.
+- **Every turn is stated as what it does** (`_between(a, b)`: "swing the thigh's downward line
+  forward 90°") in the component frame (forward +Y, left +X, up +Z), then written as a
+  `MakeRotator`. Nothing depends on bone axes, so the mannequin fallback gets the same poses
+  (`PlayerSkin.pose_bones` names the bones per rig).
+  - Crouch: thighs 90° forward, shins 45° back, feet flattened, lower spine 20° forward and the
+    chest 20° back so the gun stays level. The hip drop (52 cm) and the half-lead back are the
+    two leg turns **replayed on the skeleton's leg**: the textbook `L1(1-cos A)+L2(1-cos S)` left
+    the feet 4 cm up.
+  - Prone: hips turned face down and lowered to 16 cm, chest propped 30°, then both clavicles
+    and the neck turned back up 60° so the gun and the eyes are level again.
+  - `GuardArms` **replaces** the upper arms and forearms (component space): elbows before the
+    ribs, fists before the chin. `GuardGun` turns the chest 60° left and 15° back, and the neck
+    by the inverse.
+- **Two turns keep a gun in both hands:** one bone above both arms (the chest), or both
+  clavicles about the left-right axis (their pivots lie on that axis). Anything else pulls the
+  hands apart. The verifier replays each pose on the reference skeleton and asserts it.
+- **The weights live on the anim instance.** The component eases each one with
+  `FInterpTo(current, target, dt, 12)`: crouch and prone from `Stance`, the guard from
+  `Blocking` and `HeldTwoHanded`. `HeldTwoHanded` is copied from `Held.TwoHanded` behind an
+  `IsValid` Branch, because the weights are computed on empty-handed frames too.
+- **Probed in PIE:** prone put the hips at 14 cm and the head at 38 cm (capsule 40), crouch the
+  head at 101 cm (capsule 60). With `Set Blocking` forced true in memory, the shotgun gave
+  `GuardGun` 1; with its `TwoHanded` cleared in memory, `GuardArms` 1.
+- **Looking at a pose:** spawn a `SkeletalMeshActor` with the anim BP, write the weight on the
+  anim class's CDO, `set_update_animation_in_editor(True)` (the property refuses
+  `set_editor_property`), play the ready pose with `play_slot_animation_as_dynamic_montage`, and
+  capture in a later job (see Looking at a character).
 
 ## Health, respawn and the pack's numbering (`health_component.py`, `respawn.py`)
 
@@ -487,6 +525,13 @@ The verifier asserts the old loose constants are gone.
 - **Turning a bone:** `Animation|SkeletalControls|Transform(Modify)Bone` works on a component-space
   pose. Wrap it in `Animation|ConvertSpaces|LocalToComponent` / `ComponentToLocal`. Its
   `Rotation` pin shows by default and takes a `MakeRotator` fed by an ABP variable.
+- **Hand `remove_nodes` each node once.** Several ModifyBones share one variable getter;
+  `aim_pitch._feeding_all` de-duplicates what it hands over.
+- **The editor sometimes dies in `AddCallFunctionNode`** (SIGBUS/SIGSEGV inside the call) on a
+  second or later build in one editor session; it has hit the aim-pitch and the blood-splash
+  graphs. Cause unknown. A freshly started editor has built cleanly every time, and after a crash
+  `Saved/Autosaves/PackageRestoreData.json` can hold a restore prompt that blocks the next boot
+  headlessly.
 - **Probing an ABP variable in PIE:** an anim instance's variables can't be written from Python
   (not instance editable). Write the CDO, then start PIE again: the instance copies it.
 - **Sampling a pose:** `AnimPoseExtensions.get_anim_pose_at_time` → `get_bone_pose(…, WORLD)`,
@@ -513,4 +558,6 @@ These are feel checks a headless run can't do:
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
 - how the death camera looks under the terrain;
-- how the sights' pitch looks at steep angles (the eye swings on an arc round the spine).
+- how the sights' pitch looks at steep angles (the eye swings on an arc round the spine);
+- the body poses in motion: the walk cycle plays on top of the crouch and the prone legs, and a
+  prone body is longer than its capsule, so it can clip into slopes and walls.

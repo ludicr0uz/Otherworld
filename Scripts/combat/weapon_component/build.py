@@ -16,6 +16,7 @@ from combat.paths import (
 from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _author_wc_begin_play
+from combat.weapon_component.pose_weights import HELD_TWO_HANDED
 from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.tick import _author_wc_tick
 
@@ -58,6 +59,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # Standing, crouched or prone (stance.py). Written only by the stance
     # block; the movement component and the footsteps are told from it.
     _declare(ed, STANCE_VAR, BEL.get_basic_type_by_name("int"))
+    # Held.TwoHanded, or false with nothing held: copied behind an IsValid
+    # Branch once a frame so the guard pose never reads a null Held.
+    _declare(ed, HELD_TWO_HANDED, BEL.get_basic_type_by_name("bool"))
     # Aiming down the sights. BaseFOV is cached off the camera at BeginPlay for
     # the same reason BaseSpeed is cached off the movement component; CurrentFOV
     # is stored because FInterpTo's input is its own previous output, and
@@ -135,6 +139,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         "Sprinting": False,
         "Blocking": False,
         STANCE_VAR: STAND,
+        HELD_TWO_HANDED: False,
         # 1.0 is "exactly what the controller already does", because the two
         # base scales this multiplies are the controller's own. A player who
         # never opens the settings screen therefore gets the stock feel.

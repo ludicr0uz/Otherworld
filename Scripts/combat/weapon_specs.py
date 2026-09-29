@@ -262,6 +262,9 @@ def _weapon_specs():
              recoil=2.4, shot_volume=SHOT_VOLUME_CM["Sniper"]),
     )
     for spec in specs:
+        # Held in both hands is what the rifle ready pose does; the guard pose
+        # (body_pose.py) picks fists or the gun across the body on it.
+        spec["two_handed"] = spec["aim"] == AIM_RIFLE
         spec["grip_loc"] = _grip_location(spec["aim"], spec["grip_rot"], spec["parts"])
     return specs
 

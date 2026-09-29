@@ -78,6 +78,12 @@ def build_weapon_item():
                        ("Consumable", "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
+    # Where the eye goes when this weapon is aimed down its sights, in the
+    # weapon's own space: behind the rear of the sight line and just above it
+    # (on the scope's axis for the sniper). The camera is moved there from the
+    # shoulder boom; see weapon_component/sights.py. A variable for the same
+    # reason MuzzleOffset is -- the component reads it off Held.
+    _declare(ed, "SightOffset", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripRotation", _struct_type(unreal.Rotator.static_struct()))
     _declare(ed, "SlotColor", _struct_type(unreal.LinearColor.static_struct()))
@@ -164,12 +170,15 @@ def build_weapon(spec, item_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{spec['path']} failed to compile")
 
-    # The HUD fades the scope on (BaseFOV/CurrentFOV - 1) / (AdsZoom - 1), so a
-    # scoped weapon that does not zoom is a divide by zero once per frame while
-    # it is aimed. Caught here rather than guarded there: it is a nonsense row
-    # in the table, not a state the game can reach.
-    if spec.get("scoped") and float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)) <= 1.0:
-        raise RuntimeError(f"{spec['display']} is scoped but does not zoom")
+    # The HUD fades the scope on (BaseFOV/CurrentFOV - shoulder) /
+    # (AdsZoom - shoulder), so a scoped weapon that does not zoom past the
+    # shoulder aim is a divide by zero (or a glass that never shows) once per
+    # frame while it is aimed. Caught here rather than guarded there: it is a
+    # nonsense row in the table, not a state the game can reach.
+    if (spec.get("scoped") and float(spec.get("ads_zoom", COMBAT.ads_zoom_irons))
+            <= COMBAT.shoulder_zoom):
+        raise RuntimeError(f"{spec['display']} is scoped but does not zoom past "
+                           f"the shoulder aim")
 
     _apply_defaults(bp, {
         "DisplayName": spec["display"],
@@ -191,6 +200,7 @@ def build_weapon(spec, item_bp):
         # World time 0 is "now" at level start, so the first shot is free.
         "NextFireTime": 0.0,
         "MuzzleOffset": unreal.Vector(*spec["muzzle"]),
+        "SightOffset": unreal.Vector(*spec["sight"]),
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),

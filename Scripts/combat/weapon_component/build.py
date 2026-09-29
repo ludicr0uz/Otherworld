@@ -58,8 +58,16 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # that one interpolation then reads.
     for name in ("BaseFOV", "CurrentFOV", "TargetFOV"):
         _declare(ed, name, _float_type())
+    # Aiming is either aim key (the cone and the recoil read it); SightAiming
+    # is the down-the-sights key alone (the camera and the scope read it).
+    # AimZoom is the zoom being aimed at, stored so the walk slowdown's
+    # ease-out divides by the zoom being let go of; SightBlend is how far the
+    # camera has travelled from the boom to the sight (weapon_component/sights).
     _declare(ed, "Aiming", BEL.get_basic_type_by_name("bool"))
-    # The seven polled keys, as variables rather than as pin literals. Nothing
+    _declare(ed, "SightAiming", BEL.get_basic_type_by_name("bool"))
+    _declare(ed, "AimZoom", _float_type())
+    _declare(ed, "SightBlend", _float_type())
+    # The eight polled keys, as variables rather than as pin literals. Nothing
     # in this component loads them: the HUD pushes the player's binds in every
     # DrawHUD frame (see graphics_menu/settings_page._author_push_settings), which is
     # what keeps the component free of any cast to the HUD and of any knowledge
@@ -123,6 +131,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         # never opens the settings screen therefore gets the stock feel.
         "MouseSensitivity": COMBAT.mouse_sensitivity_default,
         "ScopeSensitivity": COMBAT.ads_scope_sens_scale,
+        "SightAiming": False,
+        # A divisor (AimZoom - 1) from the first frame, so never 1.0.
+        "AimZoom": COMBAT.shoulder_zoom,
+        "SightBlend": 0.0,
         **{name: _key(k) for name, k in BIND_VARS},
         # Both overwritten on the first frame of BeginPlay. Seeded with the
         # engine's own defaults, signs included, so that a BeginPlay that

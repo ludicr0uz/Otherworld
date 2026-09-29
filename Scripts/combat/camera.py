@@ -86,5 +86,15 @@ def aim_camera(bp):
     got = arm.get_editor_property("socket_offset")
     if abs(got.y - CAMERA_SHOULDER[1]) > 1e-3:
         raise RuntimeError(f"the camera boom kept its old offset ({got})")
+    # Aiming down the sights puts the camera back at the boom's socket when it
+    # lets go (weapon_component/sights.py), which is only "where it was" if
+    # the camera sits on that socket with no offset of its own.
+    for handle, _name in _handles(bp):
+        obj = _component_object(handle)
+        if isinstance(obj, unreal.CameraComponent):
+            off = obj.get_editor_property("relative_location")
+            if max(abs(off.x), abs(off.y), abs(off.z)) > 1e-3:
+                raise RuntimeError(f"the camera is offset from the boom's end "
+                                   f"({off}); the sights would not return it there")
     _log(f"camera: boom {CAMERA_ARM:.0f} cm, over the shoulder by "
          f"{CAMERA_SHOULDER[1]:.0f} cm right / {CAMERA_SHOULDER[2]:.0f} cm up")

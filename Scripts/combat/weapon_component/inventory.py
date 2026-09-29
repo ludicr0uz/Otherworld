@@ -21,6 +21,7 @@ from combat.tuning import (
     DROP_FORWARD, DROP_KEY, INVENTORY_SIZE, PICKUP_KEY, PICKUP_RADIUS,
 )
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
+from combat.weapon_component.sights import _author_camera_after_boom
 
 
 def _detach_rules(node):
@@ -47,6 +48,12 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
     _connect(held, _pin(off, "self"))
     _detach_rules(off)
     _connect(BEL.find_then_pin(flag), _pin(off, "execute"))
+    # Shown on the way out: a sniper dropped while down its scope was hidden
+    # by the sight camera (sights.py), and nothing else would ever show it.
+    shown = keep(_at(_node(ed, FN_SET_HIDDEN), x0 + 540, y0 - 160))
+    _connect(held, _pin(shown, "self"))
+    _set(shown, "bNewHidden", "false")
+    _connect(BEL.find_then_pin(off), _pin(shown, "execute"))
 
     loc = keep(_at(_node(ed, FN_ACTOR_LOC), x0, y0 + 300))
     _connect(owner, _pin(loc, "self"))
@@ -80,7 +87,7 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
     _set(ground, "bTraceComplex", "false")
     _set(ground, "bIgnoreSelf", "true")
     _set(ground, "DrawDebugType", "None")
-    _connect(BEL.find_then_pin(off), _pin(ground, "execute"))
+    _connect(BEL.find_then_pin(shown), _pin(ground, "execute"))
 
     landed = keep(_at(ed.add_branch_node(), x0 + 1500, y0))
     _connect(_pin(ground, "ReturnValue", is_input=False), _pin(landed, "Condition"))
@@ -437,7 +444,8 @@ def _author_wc_begin_play(ed, begin):
     _connect(as_char, _pin(where, "self"))
     spawn_at = _pin(where, "ReturnValue", is_input=False)
 
-    prev = BEL.find_then_pin(keep_pitch)
+    prev = _author_camera_after_boom(ed, as_char, BEL.find_then_pin(keep_pitch),
+                                     2600, -1840)
     for i, var in enumerate(("ShotgunClass", "PistolClass")):
         cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
         spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))

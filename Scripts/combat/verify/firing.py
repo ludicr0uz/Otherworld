@@ -70,8 +70,10 @@ def check_recoil():
           str(len(makers)))
 
     interps = by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
-    check("the two debts recover by interpolation, alongside the zoom's",
-          len(interps) == 3, f"{len(interps)} FInterpTo (2 recoil + 1 FOV)")
+    check("the two debts recover by interpolation, alongside the zoom's and "
+          "the sight camera's",
+          len(interps) == 4,
+          f"{len(interps)} FInterpTo (2 recoil + 1 FOV + 1 SightBlend)")
     settling = [n for n in interps
                 if (num_pin(n, "Target") or 0.0) == 0.0
                 and abs((num_pin(n, "InterpSpeed") or 0.0)
@@ -147,9 +149,9 @@ def check_automatic_fire():
         str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
         for x in downs
         for q in PIN.list_connected_pins(BEL.find_input_pin(x, "Key")))
-    check("three keys are polled held rather than tapped: sprint, aim and the "
-          "trigger",
-          held_binds == ["Get KeyAim", "Get KeyFire", "Get KeySprint"],
+    check("four keys are polled held rather than tapped: sprint, the two aims "
+          "and the trigger",
+          held_binds == ["Get KeyAim", "Get KeyFire", "Get KeySights", "Get KeySprint"],
           str(held_binds))
 
     # THE TRAP THIS SECTION EXISTS FOR. Automatic lives on the weapon, so reading

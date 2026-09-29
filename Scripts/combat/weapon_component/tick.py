@@ -9,7 +9,8 @@ from combat.nodes import (
     FN_NEQ_BB, FN_NOT, FN_OR, FN_TIME_SECONDS, FN_WAS_PRESSED,
 )
 from combat.tuning import BIND_VARS, SWITCH_KEY
-from combat.weapon_component.aim import _author_ads, _author_resolve_aim
+from combat.weapon_component.ads import _author_ads
+from combat.weapon_component.aim import _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire, _author_reload
 from combat.weapon_component.common import _prop
 from combat.weapon_component.consume import (
@@ -24,6 +25,7 @@ from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
 )
 from combat.weapon_component.shot_noise import _author_shot_noise
+from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
 
 
@@ -97,7 +99,13 @@ def _author_wc_tick(ed, tick):
     # which the cone width now depends on: polled in any other order the zoom
     # and the spread would disagree by a frame.
     ads_exits = _author_ads(ed, tick, pc_out, owner_out, held, armed_out,
-                            key_pins["KeyAim"], sprint_exits, 1040, -700)
+                            key_pins, sprint_exits, 1040, -700)
+
+    # --- and where the camera is, down the sights ----------------------------
+    # After the aim state it reads (SightAiming). The camera trace at the top
+    # of the next frame then starts from wherever this puts the camera.
+    ads_exits = _author_sight_camera(ed, tick, owner_out, held, armed_out,
+                                     ads_exits, 8400, -700)
 
     # --- the pose follows the sprint -----------------------------------------
     # Edge-triggered, not level-triggered, and that distinction is the whole

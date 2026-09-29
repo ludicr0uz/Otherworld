@@ -22,6 +22,8 @@ from graphics_menu import grass_tiers as T
 from graphics_menu import presets as P
 from graphics_menu import settings_rows as S
 from graphics_menu import survival_bars as SB
+from graphics_menu import scope as SC
+from combat.tuning import COMBAT
 
 BEL = unreal.BlueprintEditorLibrary
 BGE = unreal.BlueprintGraphEditor
@@ -34,6 +36,15 @@ def check(name, condition, detail=""):
     _results.append((name, bool(condition)))
     mark = "ok  " if condition else "FAIL"
     unreal.log_warning(f"[VERIFY] {mark} {name}{(' — ' + detail) if detail else ''}")
+
+
+def float_pin(node, name):
+    """An input pin's literal as a float, or None if it has none."""
+    p = BEL.find_input_pin(node, name)
+    try:
+        return float(p.get_pin_value()) if p and p.is_valid() else None
+    except ValueError:
+        return None
 
 
 def pin_names(node, direction_inputs=True):
@@ -416,12 +427,37 @@ def main():
                 "Get BaseFOV", "Get CurrentFOV"):
         check(f"the scope reads {var[4:]}", var in titles)
 
+    def upstream(pin, depth=4):
+        """Titles of the nodes feeding a pin through data links, a few deep."""
+        found, frontier = set(), [pin]
+        for _ in range(depth):
+            nxt = []
+            for p in frontier:
+                for q in p.list_connected_pins():
+                    n = PIN.get_owning_node(q)
+                    found.add(str(BEL.get_node_title(n)).replace("\n", " "))
+                    nxt += [x for x in BEL.list_input_pins(n)
+                            if str(PIN.get_pin_name(x)) != "execute"]
+            frontier = nxt
+        return found
+
     gate = [n for n in nodes
             if pin_names(n) == {"execute", "Condition"}
-            and any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get Scoped"
-                    for q in BEL.find_input_pin(n, "Condition").list_connected_pins())]
-    check("one branch decides which sight is drawn, and it is the weapon's own "
+            and "Get Scoped" in upstream(BEL.find_input_pin(n, "Condition"))]
+    check("one branch decides which sight is drawn, off the weapon's own "
           "Scoped flag", len(gate) == 1, str(len(gate)))
+    if gate:
+        cond = upstream(BEL.find_input_pin(gate[0], "Condition"))
+        past = [n for n in nodes
+                if float_pin(n, "B") is not None
+                and abs(float_pin(n, "B")
+                        - (COMBAT.shoulder_zoom + SC.SCOPE_GATE_SLACK)) < 1e-9
+                and "Get CurrentFOV" in upstream(BEL.find_input_pin(n, "A"))]
+        check("...AND the zoom being past the shoulder aim's, so the sniper "
+              "keeps its crosshair on the hip and the shoulder and the glass "
+              "is aiming down the sights only",
+              "Get CurrentFOV" in cond and "Get BaseFOV" in cond and len(past) == 1,
+              str(sorted(cond)))
     if gate:
         glass = after(BEL.find_then_pin(gate[0]))
         irons = after(BEL.find_else_pin(gate[0]))
@@ -451,7 +487,7 @@ def main():
           str(len(floor)))
 
     glass = [n for n in by_pins("Texture")
-             if G.SCOPE_TEX in str(BEL.find_input_pin(n, "Texture").get_pin_value())]
+             if SC.SCOPE_TEX in str(BEL.find_input_pin(n, "Texture").get_pin_value())]
     check("exactly one DrawTexture is the scope itself", len(glass) == 1,
           str(len(glass)))
     if glass:
@@ -478,6 +514,16 @@ def main():
                    == (0.0, 1.0)]
     check("the fade is clamped to 0..1, so a hipfire frame is fully clear",
           len(alpha_clamp) == 1, str(len(alpha_clamp)))
+    # Measured from the shoulder aim's zoom, not from 1x: the sniper's shoulder
+    # aim zooms 1.5x too, and from 1x that would be a fifth of the glass over
+    # a view that is not down the sights.
+    from_shoulder = [n for n in by_pins("A", "B")
+                     if float_pin(n, "B") is not None
+                     and abs(float_pin(n, "B") - COMBAT.shoulder_zoom) < 1e-9]
+    check("...and measured from the shoulder aim's zoom, both ends of it, so "
+          "a shouldered sniper shows no glass",
+          len(from_shoulder) == 2,
+          str([str(BEL.get_node_title(n)) for n in from_shoulder]))
 
     lookups = by_pins("ComponentClass")
     wanted = {G.HEALTH_CLASS_PATH, G.WEAPON_COMP_CLASS_PATH}

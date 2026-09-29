@@ -137,6 +137,16 @@ FN_ACTOR_RIGHT = "/Script/Engine.Actor.GetActorRightVector"
 FN_CLAMP_II = "/Script/Engine.KismetMathLibrary.Clamp"
 CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
+# Aiming down the sights (weapon_component/sights.py): the camera leaves the
+# boom's end for the weapon's eye point. USpringArmComponent names its one
+# socket SpringEndpoint; the camera hangs off it with no offset of its own.
+SPRING_ARM_CLASS_PATH = "/Script/Engine.SpringArmComponent"
+SPRING_ARM_SOCKET = "SpringEndpoint"
+FN_SOCKET_LOC = "/Script/Engine.SceneComponent.GetSocketLocation"
+FN_COMP_SET_WORLD_LOC = "/Script/Engine.SceneComponent.K2_SetWorldLocation"
+FN_VLERP = "/Script/Engine.KismetMathLibrary.VLerp"
+FN_BOOL_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_BoolToDouble"
+FN_ADD_TICK_PREREQ = "/Script/Engine.ActorComponent.AddTickPrerequisiteComponent"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
 # The noise record (combat/noise.py): the louder of two reaches, and whether a

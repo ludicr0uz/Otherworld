@@ -34,7 +34,14 @@ DEBUFF_DRAIN_HP_PER_S = 0.5    # 100 HP lasts 200 s with one debuff, 100 with tw
 # authorable from Python. Sprint lives on the *weapon* component specifically
 # because that is the thing that has to refuse to fire while it is held down.
 FIRE_KEY = "LeftMouseButton"
+# Two ways to aim, two keys. AIM_KEY is the over-the-shoulder aim: the camera
+# stays on its boom and zooms. SIGHTS_KEY is aiming down the sights: the camera
+# leaves the boom for the weapon's own eye point (SightOffset on the item), so
+# the player looks along the gun in first person -- and on the sniper, into
+# the scope. Held, not toggled, like the shoulder aim. The middle button
+# because the other two are taken and it is on every mouse; it is rebindable.
 AIM_KEY = "RightMouseButton"
+SIGHTS_KEY = "MiddleMouseButton"
 SWITCH_KEY = "Q"
 DROP_KEY = "G"
 PICKUP_KEY = "E"
@@ -113,6 +120,13 @@ class CombatConfig:
     # exactly as BaseSpeed caches MaxWalkSpeed.
     ads_zoom_irons: float = 1.5
     ads_zoom_scope: float = 4.0
+    # The over-the-shoulder aim zooms by this on every weapon: it is a way of
+    # holding the camera, not a sight, so it is not a column. Equal to the
+    # irons, so shouldering a rifle and looking down its irons frame the world
+    # the same and only the camera moves. The scope's glass and its extra
+    # sensitivity slowdown key off zoom BEYOND this, which is what keeps them
+    # off the sniper's shoulder aim.
+    shoulder_zoom: float = 1.5
     # The FOV is NOT snapped. FInterpTo at this speed takes about a fifth of a
     # second to arrive, which is short enough to feel instant and long enough
     # that a 4x snap does not read as a teleport. CurrentFOV is stored rather
@@ -312,8 +326,13 @@ RELOAD_KEY = "R"
 # build_graphics_menu.py imports it and writes Binds[i] for the same i the HUD
 # pushes back into the variable named here. Reorder it and every existing save
 # on disk silently rebinds itself to the wrong actions.
+#
+# KeySights sits next to KeyAim, and adding it changed the length: a save
+# written before it has seven binds, which the settings loader refills with
+# these defaults rather than trusting (build_graphics_menu.py's settings load).
 BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyAim", AIM_KEY),
+             ("KeySights", SIGHTS_KEY),
              ("KeySprint", SPRINT_KEY),
              ("KeySwitch", SWITCH_KEY),
              ("KeyDrop", DROP_KEY),

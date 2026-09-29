@@ -13,7 +13,8 @@ from combat.verify.common import (
 # ─── Aiming down the sights ──────────────────────────────────────────────────
 
 def check_aiming_down_sights():
-    # Right mouse narrows the camera to the weapon's own AdsZoom. What can go wrong
+    # Either aim key narrows the camera (the shoulder by COMBAT.shoulder_zoom, the
+    # sights by the weapon's own AdsZoom; verify/sights.py). What can go wrong
     # quietly: a zoom that is never applied (the FOV write missing), a zoom that is
     # applied and never undone (no path back to BaseFOV), and a BaseFOV that is a
     # literal rather than the camera's own -- all three look fine in the graph.
@@ -41,13 +42,15 @@ def check_aiming_down_sights():
             scoped.add(sp["display"])
     check("the sniper is the only weapon with glass on it", scoped == {"Sniper"},
           str(sorted(scoped)))
-    # The HUD fades the scope over (BaseFOV/CurrentFOV - 1) / (AdsZoom - 1), so a
-    # scoped weapon that does not zoom would divide by zero every frame it is
-    # aimed. build_weapon refuses to build one; this is the same rule read off the
-    # assets that shipped.
+    # The HUD fades the scope over (BaseFOV/CurrentFOV - shoulder) /
+    # (AdsZoom - shoulder), so a scoped weapon that does not zoom past the
+    # shoulder aim would divide by zero every frame it is aimed. build_weapon
+    # refuses to build one; this is the same rule read off the assets that shipped.
     flat = {sp["display"] for sp in _weapon_specs()
-            if sp.get("scoped") and sp.get("ads_zoom", COMBAT.ads_zoom_irons) <= 1.0}
-    check("...and it zooms, so the scope's fade has something to divide by",
+            if sp.get("scoped")
+            and sp.get("ads_zoom", COMBAT.ads_zoom_irons) <= COMBAT.shoulder_zoom}
+    check("...and it zooms past the shoulder aim, so the scope's fade has "
+          "something to divide by",
           not flat, str(sorted(flat)))
 
     fov_writes = [x for x in wg if "SetFieldOfView" in
@@ -170,9 +173,12 @@ def check_aiming_mobility():
               "Set CurrentFOV" in up_titles
               and not any("Aiming" in out_pins(n) for n in up),
               str(sorted(t for t in up_titles if "FOV" in t or "Aiming" in t)))
-        check("...normalised by the weapon's OWN AdsZoom, so full ADS is the same "
-              "half speed on a 4x scope as on 1.5x irons",
-              any("AdsZoom" in out_pins(n) for n in up),
+        check("...normalised by AimZoom, the zoom being aimed at, so full zoom "
+              "is the same half speed on a 4x scope, 1.5x irons and the "
+              "shoulder -- and not by Held.AdsZoom, which would leave the "
+              "sniper's 1.5x shoulder aim at a sixth of the slowdown",
+              any("AimZoom" in out_pins(n) for n in up)
+              and not any("AdsZoom" in out_pins(n) for n in up),
               str(sorted(up_titles)))
         # An FInterpTo can overshoot its target on a long frame, and an unclamped
         # progress past 1 is a walk speed below the number anybody chose.
@@ -215,9 +221,8 @@ def check_aiming_mobility():
                   any("Sprinting" in out_pins(n) for n in cond)
                   and any("NOT" in t.upper() for t in cond_titles),
                   str(sorted(cond_titles)))
-            check("...and on a valid Held, because the AdsZoom read behind it "
-                  "would otherwise be an Accessed None every frame the hands are "
-                  "empty",
+            check("...and on a valid Held, the same as Aiming is, so empty hands "
+                  "always walk at sprint's speed",
                   any("isvalid" in t.replace(" ", "").lower() for t in cond_titles),
                   str(sorted(cond_titles)))
 
@@ -233,9 +238,11 @@ def check_aiming_mobility():
     if aiming_writes:
         src = feeds(BEL.find_input_pin(aiming_writes[0], "Aiming"))
         src_titles = {str(BEL.get_node_title(n)).replace("\n", " ") for n in src}
-        check("...off the aim bind, and off nothing that stands in for it -- no "
-              "clock and no literal left over from forcing the state at runtime",
+        check("...off the two aim binds, and off nothing that stands in for "
+              "them -- no clock and no literal left over from forcing the state "
+              "at runtime",
               any("Get KeyAim" in t for t in src_titles)
+              and any("Get KeySights" in t for t in src_titles)
               and not any("Time Seconds" in t or t.strip() in ("Sin", "Sin (Radians)")
                           for t in src_titles),
               str(sorted(src_titles)))
@@ -249,28 +256,28 @@ def check_aiming_mobility():
 
     # The numbers the player actually feels, spelled out so that a change to either
     # the scale or a weapon's zoom has to be argued for rather than noticed later.
-    # At full ADS CurrentFOV is BaseFOV/AdsZoom, so progress is exactly 1 whatever
-    # the zoom -- which is the point of dividing by (AdsZoom - 1).
+    # At full zoom CurrentFOV is BaseFOV/AimZoom, so progress is exactly 1 whatever
+    # the zoom -- which is the point of dividing by (AimZoom - 1).
     def _eased(zoom, travelled):
         """The walk-speed factor once the camera is `travelled` of the way in."""
         now = 1.0 / (1.0 + travelled * (zoom - 1.0))        # CurrentFOV / BaseFOV
         progress = min(max((1.0 / now - 1.0) / (zoom - 1.0), 0.0), 1.0)
         return 1.0 + (COMBAT.ads_move_speed_scale - 1.0) * progress
 
-    full_ads = {sp["display"]:
-                _eased(sp.get("ads_zoom", COMBAT.ads_zoom_irons), 1.0)
-                for sp in _weapon_specs()}
-    check(f"every weapon lands on exactly {COMBAT.ads_move_speed_scale:g}x speed "
-          f"at full ADS",
+    # Every zoom the player can be at: each weapon down its sights, and the
+    # shoulder aim, which is the same on all of them.
+    zooms = {**{f"{sp['display']} sights": sp.get("ads_zoom", COMBAT.ads_zoom_irons)
+                for sp in _weapon_specs()},
+             "shoulder": COMBAT.shoulder_zoom}
+    full_ads = {k: _eased(z, 1.0) for k, z in zooms.items()}
+    check(f"every weapon, down its sights or off the shoulder, lands on exactly "
+          f"{COMBAT.ads_move_speed_scale:g}x speed at full zoom",
           all(abs(v - COMBAT.ads_move_speed_scale) < 1e-9
               for v in full_ads.values()),
           str(sorted(full_ads.items())))
     check("...and on full speed with the button up, so nothing is left behind",
-          all(abs(_eased(sp.get("ads_zoom", COMBAT.ads_zoom_irons), 0.0) - 1.0)
-              < 1e-9 for sp in _weapon_specs()))
-    halfway = {sp["display"]:
-               _eased(sp.get("ads_zoom", COMBAT.ads_zoom_irons), 0.5)
-               for sp in _weapon_specs()}
+          all(abs(_eased(z, 0.0) - 1.0) < 1e-9 for z in zooms.values()))
+    halfway = {k: _eased(z, 0.5) for k, z in zooms.items()}
     check("...half way in it is 0.75x on every weapon too: the easing follows the "
           "zoom's curve, not the zoom's magnitude",
           all(abs(v - 0.75) < 1e-9 for v in halfway.values()),
@@ -278,10 +285,8 @@ def check_aiming_mobility():
     # And the contrast that justifies normalising at all: the raw ratio the mouse
     # uses would be a different speed per weapon and never exactly the number asked
     # for -- right for sensitivity, wrong for legs.
-    raw = {sp["display"]:
-           1.0 + (1.0 - COMBAT.ads_move_speed_scale)
-           * (1.0 / sp.get("ads_zoom", COMBAT.ads_zoom_irons) - 1.0)
-           for sp in _weapon_specs()}
+    raw = {k: 1.0 + (1.0 - COMBAT.ads_move_speed_scale) * (1.0 / z - 1.0)
+           for k, z in zooms.items()}
     check("...which the raw CurrentFOV/BaseFOV ratio the sensitivity uses would "
           "NOT have been: that is why this one is normalised and that one is not",
           len({round(v, 6) for v in raw.values()}) > 1

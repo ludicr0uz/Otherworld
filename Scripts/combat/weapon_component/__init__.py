@@ -5,7 +5,11 @@ authors BeginPlay (inventory.py) and Tick (tick.py). Tick calls one
 _author_* fragment per concern, each in its own module:
 
   common      _prop, trace defaults, muzzle location (shared fragments)
-  aim         resolve the aim point every frame; aim down the sights
+  aim         resolve the aim point every frame (camera trace, muzzle trace)
+  ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom;
+              the zoom, and the look and walk slowdowns it drives
+  sights      down the sights: ease the camera from the boom to Held's
+              SightOffset; hide a scoped weapon behind its glass
   firing      pellets, impacts, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire

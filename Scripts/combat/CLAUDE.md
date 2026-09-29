@@ -6,11 +6,12 @@ the code is this package (`__init__.py` is the map) and the verifier's sections 
 
 ## Controls, and where they live
 
-The seven defaults are all rebindable on the settings screen:
+The eight defaults are all rebindable on the settings screen:
 
 - Left click fires. It **auto-fires while held** on the SMG and the assault rifle, and a tap
   **eats or drinks** a held consumable.
-- Right click aims, **Q** cycles, **G** drops, **E** picks up, **Shift** sprints.
+- Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
+  **Q** cycles, **G** drops, **E** picks up, **Shift** sprints.
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
 
@@ -86,18 +87,41 @@ The verifier asserts the old loose constants are gone.
   Pellets fly a cone around `Normal(AimPoint - muzzle)`. It is hitscan.
 - **The reticle is nailed to the viewport centre**, and turns red when `AimBlocked`. Drawing it at
   the projected `AimPoint` was tried and reverted: it slid under parallax.
-- **`Scoped` (sniper only) draws a scope overlay instead of the reticle.** `T_UI_Scope` is drawn
-  as a square of the viewport height, with black side strips. It fades on
-  `clamp((BaseFOV/CurrentFOV - 1) / (AdsZoom - 1), 0, 1)`, so the glass and the zoom are one
-  animation. `Scoped` and `AdsZoom` are independent.
+- **Two ways to aim** (`weapon_component/ads.py`):
+  - `KeyAim` (right) is the shoulder aim: the camera stays on the boom and zooms
+    `COMBAT.shoulder_zoom` (1.5x) on every weapon.
+  - `KeySights` (middle) is down the sights: zoom is the weapon's `AdsZoom` (irons 1.5x, scope
+    4x), and `sights.py` eases the camera from the boom's `SpringEndpoint` to the held weapon's
+    `SightOffset` by `SightBlend`, by **location only**. The rotation stays the boom's.
+  - `Aiming` is either key (cone, recoil, slowdown). `SightAiming` is the sights key alone,
+    never with a consumable. `AimZoom` stores the zoom being aimed at. It isn't written on
+    release, so the walk slowdown's ease-out divides by the zoom being let go of.
+  - The camera is written every frame, both ways. The template camera has no offset on the
+    boom (asserted in `aim_camera`), so SightBlend 0 is exactly home.
+  - The weapon component ticks **after the boom** (`AddTickPrerequisiteComponent`). Otherwise
+    the camera is placed against last frame's boom and shimmers while strafing.
+  - `SightOffset` values (`weapon_specs.py`) were tuned in PIE. At 14 cm behind the receiver,
+    its back face filled a third of the screen. At 34 cm, the camera was inside the head.
+- **`Scoped` (sniper only) draws a scope overlay instead of the reticle, down the sights only.**
+  `T_UI_Scope` is drawn as a square of the viewport height, with black side strips (in
+  `graphics_menu/scope.py`).
+  - It fades on `clamp((BaseFOV/CurrentFOV - shoulder) / (AdsZoom - shoulder), 0, 1)`, so the
+    glass and the zoom are one animation.
+  - It replaces the crosshair only past `shoulder_zoom + 0.02`: the hip and shoulder keep the
+    crosshair. The slack is there because FInterpTo settles within rounding of 1.5x.
+  - The sniper is **hidden past SightBlend 0.9**. The eye is behind the solid scope tube,
+    which would fill the glass's hole. A dropped weapon is always unhidden.
+  - `Scoped` and `AdsZoom` are independent.
+- **Known limit of the sights:** the gun doesn't pitch (no aim offset), so looking steeply up
+  or down leaves it below the view. At level aim the eye is on the sight line.
 - **The camera boom sits over the right shoulder** (`camera.aim_camera()`: arm 260, socket
   offset `(0, 55, 60)`). Only pellet traces are drawn, never the two aim traces.
-- **ADS halves walking speed** (`ads_move_speed_scale`) with a *second* `MaxWalkSpeed` write in
-  `_author_ads`, after sprint's write.
+- **Aiming halves walking speed** (`ads_move_speed_scale`) with a *second* `MaxWalkSpeed`
+  write in `_author_aim_slowdown`, after sprint's write.
   - It is gated on `NOT Sprinting AND IsValid(Held)`. Letting go needs no code, because sprint
     rewrites the speed every frame.
-  - It eases on the same progress formula as the scope, normalised by `AdsZoom - 1` so full ADS
-    is half speed on any zoom. The mouse slowdown is deliberately *not* normalised.
+  - It eases on the zoom's progress, normalised by `AimZoom - 1`, so full zoom is half speed
+    on any zoom and either aim. The mouse slowdown is deliberately *not* normalised.
   - **Trap:** always scale `BaseSpeed`, never the live `MaxWalkSpeed`, which compounds to a
     standstill. The verifier walks the inputs to check.
 - **Recoil:**

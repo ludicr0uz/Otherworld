@@ -133,6 +133,21 @@ SMG_MUZZLE = (56.0, 0.0, 1.5)
 RIFLE_MUZZLE = (122.0, 0.0, 1.8)
 SNIPER_MUZZLE = (148.0, 0.0, 2.0)
 
+# The eye when aiming down the sights, in the same space. None of the guns has
+# a modelled sight, so the sight line is the top of the gun: the eye sits a
+# centimetre or two above the highest part along the bore, and 20-ish cm
+# behind the rear of the receiver (or slide). Tuned by eye in PIE: 14 cm back
+# and the receiver's back face filled a third of the screen; 34 cm back and
+# the camera was inside the adventurer's head, whose hair crossed the view.
+# The rifle looks over its carry handle. The sniper's eye is on the scope's
+# axis, behind the eyepiece -- the HUD's glass is what is actually seen, and
+# the rifle itself is hidden once the camera is nearly there (sights.py).
+SHOTGUN_SIGHT = (-12.0, 0.0, 5.5)
+PISTOL_SIGHT = (-16.0, 0.0, 5.0)
+SMG_SIGHT = (-12.0, 0.0, 5.5)
+RIFLE_SIGHT = (-8.0, 0.0, 9.0)
+SNIPER_SIGHT = (9.0, 0.0, 9.0)
+
 
 def _weapon_icon(display):
     """The weapon's HUD silhouette, or None if the UI art is not built yet.
@@ -195,7 +210,7 @@ def _weapon_specs():
     skin = player_skin()
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
     specs = (
-        dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE,
+        dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
              display="Shotgun", automatic=False, damage=18.0, pellets=8, spread=5.0, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
@@ -203,7 +218,7 @@ def _weapon_specs():
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
              recoil=2.2, shot_volume=SHOT_VOLUME_CM["Shotgun"]),
-        dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE,
+        dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
              display="Pistol", automatic=False, damage=26.0, pellets=1, spread=1.0, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
@@ -214,7 +229,7 @@ def _weapon_specs():
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast.
-        dict(path=SMG_BP_PATH, parts=_smg_parts(), muzzle=SMG_MUZZLE,
+        dict(path=SMG_BP_PATH, parts=_smg_parts(), muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
              display="SMG", automatic=True, damage=12.0, pellets=1, spread=2.6, range=4500.0,
              sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
@@ -224,7 +239,7 @@ def _weapon_specs():
              recoil=0.45, shot_volume=SHOT_VOLUME_CM["SMG"]),
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
-        dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE,
+        dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
              display="Rifle", automatic=True, damage=24.0, pellets=1, spread=1.4, range=9000.0,
              sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
@@ -237,7 +252,7 @@ def _weapon_specs():
         # The cost is 1.6 s between shots, which against a pack of five that
         # runs at 600 cm/s is the difference between opening at distance and
         # being caught reloading.
-        dict(path=SNIPER_BP_PATH, parts=_sniper_parts(), muzzle=SNIPER_MUZZLE,
+        dict(path=SNIPER_BP_PATH, parts=_sniper_parts(), muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
              display="Sniper", automatic=False, damage=120.0, pellets=1, spread=0.2, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),

@@ -60,10 +60,10 @@ from combat.paths import AMMO_BP_PATH, HEALTH_BP_PATH             # noqa: E402
 from combat.ragdoll import tune_ragdolls                          # noqa: E402
 from combat.settings_savegame import build_settings_savegame      # noqa: E402
 from combat.skin import wear_skin                                 # noqa: E402
-from combat.tuning import GUN_DROP_CHANCE                         # noqa: E402
+from combat.tuning import GUN_DROP_CHANCE, GUN_LOOT_TABLE         # noqa: E402
 from combat.weapon_component.build import build_weapon_component  # noqa: E402
 from combat.weapon_items import build_weapon, build_weapon_item   # noqa: E402
-from combat.weapon_specs import DROP_DISPLAYS, _weapon_specs      # noqa: E402
+from combat.weapon_specs import DROP_TICKETS, _weapon_specs       # noqa: E402
 
 
 # ─── Entry point ─────────────────────────────────────────────────────────────
@@ -110,14 +110,14 @@ def main():
     ammo_bp = build_ammo_pickup()
     _apply_defaults(health_bp, {
         "AmmoClass": BEL.generated_class(ammo_bp),
-        # The three findable weapons, in the order _weapon_specs() lists them
-        # rather than in an order written out here -- so a weapon added to
-        # DROP_DISPLAYS is in the table with no second edit.
+        # The loot table, one entry per ticket (GUN_LOOT_TABLE's weights), so
+        # the graph's uniform pick roll over it is the weighted draw.
         "DropClasses": [BEL.generated_class(weapons[name])
-                        for name in DROP_DISPLAYS],
+                        for name in DROP_TICKETS],
     })
     _log(f"{HEALTH_BP_PATH}.AmmoClass -> {AMMO_BP_PATH}")
-    _log(f"{HEALTH_BP_PATH}.DropClasses -> {', '.join(DROP_DISPLAYS)} "
+    _log(f"{HEALTH_BP_PATH}.DropClasses -> "
+         f"{', '.join(f'{n} x{w}' for n, w in GUN_LOOT_TABLE)} "
          f"({GUN_DROP_CHANCE * 100:.0f}% per kill)")
 
     tune_ragdolls()

@@ -17,7 +17,7 @@ from combat.paths import (
 )
 from combat.skin import player_skin
 from combat.tuning import (
-    COMBAT, PISTOL_FIRE_INTERVAL, RIFLE_FIRE_INTERVAL, RIFLE_MAGAZINE,
+    COMBAT, GUN_LOOT_TABLE, PISTOL_FIRE_INTERVAL, RIFLE_FIRE_INTERVAL, RIFLE_MAGAZINE,
     RIFLE_RELOAD_SECONDS, RIFLE_RESERVE, SHOTGUN_FIRE_INTERVAL,
     SHOTGUN_MAGAZINE, SHOTGUN_RELOAD_SECONDS, SHOTGUN_RESERVE,
     SHOT_VOLUME_CM, SMG_FIRE_INTERVAL, SMG_MAGAZINE, SMG_RELOAD_SECONDS,
@@ -247,7 +247,11 @@ def _weapon_specs():
     )
 
 
-# Which of the five a killed wanderer can be carrying. The starting loadout is
-# excluded by construction: a drop the player already has in slot 0 is not a
-# reward, and this list is the only thing that decides.
-DROP_DISPLAYS = ("SMG", "Rifle", "Sniper")
+# Which of the five a killed wanderer can be carrying, in loot-table order. The
+# starting loadout is excluded by construction: a drop the player already has in
+# slot 0 is not a reward, and GUN_LOOT_TABLE is the only thing that decides.
+DROP_DISPLAYS = tuple(name for name, _ in GUN_LOOT_TABLE)
+# The table expanded to one entry per ticket, which is what DropClasses holds:
+# a uniform draw over these is the weighted draw over the table.
+DROP_TICKETS = tuple(name for name, weight in GUN_LOOT_TABLE
+                     for _ in range(weight))

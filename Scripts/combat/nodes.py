@@ -95,6 +95,13 @@ FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
 FN_RANDOM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatInRange"
 FN_RAND_INT = "/Script/Engine.KismetMathLibrary.RandomIntegerInRange"
+# FRandomStream draws. Pure, and they advance the stream they read (its Seed is
+# mutable), so each must be pulled by exactly one exec consumer. The seeders
+# take the stream by reference and write the variable they are wired to.
+FN_STREAM_FLOAT = "/Script/Engine.KismetMathLibrary.RandomFloatFromStream"
+FN_STREAM_INT = "/Script/Engine.KismetMathLibrary.RandomIntegerFromStream"
+FN_SEED_STREAM = "/Script/Engine.KismetMathLibrary.SeedRandomStream"
+FN_SET_STREAM_SEED = "/Script/Engine.KismetMathLibrary.SetRandomStreamSeed"
 FN_NEQ_BB = "/Script/Engine.KismetMathLibrary.NotEqual_BoolBool"
 FN_MAKE_ROT = "/Script/Engine.KismetMathLibrary.MakeRotator"
 FN_MUL_FF = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"

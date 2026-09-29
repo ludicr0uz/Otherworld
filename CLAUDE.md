@@ -263,6 +263,12 @@ editor.
 - **Python can't write a Blueprint variable on an instance** unless it is Instance Editable, and
   the `Set*PropertyByName` functions aren't exported. For a probe, write the **CDO** and reopen the
   level, or use the console's `setnopec`.
+  - `setnopec <object path> …` sent with `execute_console_command` did nothing to a PIE
+    instance, and logged nothing.
+  - What worked: `BEL.set_blueprint_variable_instance_editable(bp, var, True)` and compile,
+    without saving. Then write the PIE instance with `set_editor_property`. Afterwards set it back
+    to False and re-run the builder.
+  - PIE started from Python begins **paused**. Call `GameplayStatics.set_game_paused(w, False)`.
 - **In a cold run, `print()` doesn't reach the log.** Use `unreal.log_warning`. The inbox captures
   both.
 - **Sort numbered actors on their trailing integer, never on the label string,** or `_10` lands

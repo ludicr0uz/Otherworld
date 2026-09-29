@@ -388,14 +388,33 @@ SHOT_VOLUME_CM = {
 # the automatics change is whether a held button still counts as a pull.
 AUTO_DISPLAYS = ("SMG", "Rifle")
 
-# One kill in ten leaves a gun. Rolled once per counted kill, then a second
-# uniform draw picks which of the three -- so each individual weapon is a
-# 1-in-30 drop and a player who wants a specific one has to keep going.
+# --- the gun drop: two seeded rolls and a loot table --------------------------
+# One kill in ten leaves a gun. Two rolls, each on its own FRandomStream kept on
+# the GameMode (combat/gun_drop.py):
+#
+#   the drop roll   RandomFloatFromStream < GUN_DROP_CHANCE -- does anything drop;
+#   the pick roll   RandomIntegerFromStream into the loot table -- which gun.
+#
+# Separate streams, so the pick roll is only consumed by kills that drop: the
+# rate is exactly GUN_DROP_CHANCE whatever the table holds, and re-weighting the
+# table never moves which kills drop.
 #
 # Rolled on exactly the same arm as the shells, which means DamagedByPlayer
 # guards it too: a wanderer the terrain swallowed has not been killed, and the
 # safety net must not be a weapon dispenser.
 GUN_DROP_CHANCE = 0.10
+# The loot table: (weapon display name, weight). A weight is a number of
+# tickets in BP_HealthComponent.DropClasses, so the pick roll is a uniform draw
+# over tickets and a weapon's share of drops is weight / sum(weights). Per kill
+# that is 5% SMG, 3% rifle, 2% sniper -- the sniper is the rarest because it is
+# the one that changes how the forest plays. Only the order and the names here
+# decide what can drop; the starting loadout is not in it on purpose.
+GUN_LOOT_TABLE = (("SMG", 5), ("Rifle", 3), ("Sniper", 2))
+# 0 seeds both streams from the engine's global RNG on the first kill of each
+# session, so every session draws differently. Any other value makes the drop
+# sequence reproducible (drop stream = seed, pick stream = seed + 1): kill N
+# drops the same thing every run, which is what a probe or a bug report needs.
+GUN_DROP_SEED = 0
 GUN_DROP_FORWARD = 70.0   # cm; clear of the shells, which land on the corpse
 
 

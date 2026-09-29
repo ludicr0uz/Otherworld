@@ -1,6 +1,6 @@
 """Graph fragments BP_HealthComponent runs when something dies: the kill
-count, the 10% weapon drop, the ragdoll collapse, the corpse timer and the
-player's own death.
+count, the shells, the ragdoll collapse, the corpse timer and the player's own
+death. The gun drop spliced in after the shells is gun_drop.py.
 """
 
 from combat.game_state import (
@@ -9,21 +9,17 @@ from combat.game_state import (
 from combat.graph import (
     BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec,
 )
+from combat.gun_drop import _author_gun_drop
 from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_II, FN_ADD_VV, FN_AND, FN_ARR_GET, FN_ARR_LEN,
-    FN_CONCAT, FN_DELAY, FN_DISABLE_MOVEMENT, FN_GET_CONTROLLER,
-    FN_GET_GAME_MODE, FN_GET_OWNER, FN_GREATER_II, FN_INT_TO_STR, FN_IS_VALID,
-    FN_LESS_FF, FN_LIFESPAN, FN_MAKE_TRANSFORM, FN_PRINT, FN_RANDOM_FLOAT,
-    FN_RAND_INT, FN_SET_COLLISION, FN_SET_PAUSED, FN_SET_PROFILE,
-    FN_SIMULATE_ALL, FN_SUB_II, NODE_CAST_CHARACTER, NODE_CAST_GAME_MODE,
-    NODE_CAST_ITEM, NODE_CAST_PAWN, NODE_SPAWN,
+    FN_ACTOR_LOC, FN_ADD_II, FN_ADD_VV, FN_CONCAT, FN_DELAY,
+    FN_DISABLE_MOVEMENT, FN_GET_CONTROLLER, FN_GET_GAME_MODE, FN_GET_OWNER,
+    FN_INT_TO_STR, FN_IS_VALID, FN_LIFESPAN, FN_MAKE_TRANSFORM, FN_PRINT,
+    FN_SET_COLLISION, FN_SET_PAUSED, FN_SET_PROFILE, FN_SIMULATE_ALL,
+    NODE_CAST_CHARACTER, NODE_CAST_GAME_MODE, NODE_CAST_PAWN, NODE_SPAWN,
 )
-from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH
+from combat.paths import GAME_MODE_CLASS_PATH
 from combat.ragdoll import RAGDOLL_PROFILE
-from combat.tuning import (
-    AMMO_DROP_SHELLS, AMMO_PICKUP_LIFT, GUN_DROP_CHANCE, GUN_DROP_FORWARD,
-)
-from combat.weapon_specs import DROP_DISPLAYS
+from combat.tuning import AMMO_DROP_SHELLS, AMMO_PICKUP_LIFT
 
 
 # How long a corpse lies where it fell. Long enough that a firefight leaves a
@@ -112,120 +108,11 @@ def _author_kill_count(ed, exec_in, x0, y0):
         [earned, shot, mode, as_mode, tally, one_more, write, corpse, fell_at,
          lifted, where, ammo_cls, drop])
 
-    gun_exits = _author_gun_drop(ed, _pin(lifted, "ReturnValue", is_input=False),
+    gun_exits = _author_gun_drop(ed, mode_out,
+                                 _pin(lifted, "ReturnValue", is_input=False),
                                  BEL.find_then_pin(drop), x0, y0 + 1000)
     return gun_exits + (_pin(as_mode, "CastFailed", is_input=False),
                         BEL.find_else_pin(shot))
-
-
-def _author_gun_drop(ed, at, exec_in, x0, y0):
-    """One kill in ten also leaves a weapon: which one is a second uniform draw.
-
-    Two decisions, deliberately separate. Whether anything drops is one roll
-    against GUN_DROP_CHANCE; *what* drops is an index into DropClasses. Keeping
-    them apart means the rate and the table are tuned independently -- adding a
-    fourth findable weapon changes what a drop is worth and not how often one
-    happens, which is not true of the obvious alternative (one roll into a
-    weighted table).
-
-    DropClasses is an array rather than three variables and a Switch for the
-    same reason: a Switch on an integer would have to grow a pin per weapon,
-    and the length of the array is already the only number the draw needs.
-
-    Two guards on the roll, folded into one condition because both are plain
-    reads with nothing behind them:
-
-        lucky    the 10%.
-        stocked  the array is not empty. Without it RandomIntegerInRange(0, -1)
-                 feeds Array_Get an index into nothing, which is an access-none
-                 per kill on any build where main() has not filled the table.
-
-    The spawned actor is cast to BP_WeaponItem so Dropped can be set on it, and
-    Dropped is the entire interface: from that moment it is an ordinary weapon
-    lying in the forest, and the E key that picks up a gun the player threw
-    away is the same code that picks this one up. Nothing in _author_pickup
-    knows these exist.
-    """
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    roll = keep(_at(_node(ed, FN_RANDOM_FLOAT), x0 + 2400, y0 + 300))
-    _set(roll, "Min", 0.0)
-    _set(roll, "Max", 1.0)
-    lucky = keep(_at(_node(ed, FN_LESS_FF), x0 + 2640, y0 + 300))
-    _connect(_pin(roll, "ReturnValue", is_input=False), _pin(lucky, "A"))
-    _set(lucky, "B", GUN_DROP_CHANCE)
-
-    table = keep(_at(ed.add_get_member_variable_node("DropClasses"),
-                     x0 + 2400, y0 + 440))
-    table_out = _pin(table, "DropClasses", is_input=False)
-    how_many = keep(_at(_node(ed, FN_ARR_LEN), x0 + 2640, y0 + 440))
-    _connect(table_out, _pin(how_many, "TargetArray"))
-    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 2880, y0 + 440))
-    _connect(_pin(how_many, "ReturnValue", is_input=False), _pin(stocked, "A"))
-    _set(stocked, "B", 0)
-
-    worth = keep(_at(_node(ed, FN_AND), x0 + 3120, y0 + 360))
-    _connect(_pin(lucky, "ReturnValue", is_input=False), _pin(worth, "A"))
-    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(worth, "B"))
-    rare = keep(_at(ed.add_branch_node(), x0 + 3360, y0))
-    _connect(_pin(worth, "ReturnValue", is_input=False), _pin(rare, "Condition"))
-    _connect(exec_in, _pin(rare, "execute"))
-
-    # RandomIntegerInRange is inclusive at both ends, so the top is length - 1.
-    top = keep(_at(_node(ed, FN_SUB_II), x0 + 2880, y0 + 580))
-    _connect(_pin(how_many, "ReturnValue", is_input=False), _pin(top, "A"))
-    _set(top, "B", 1)
-    which = keep(_at(_node(ed, FN_RAND_INT), x0 + 3120, y0 + 580))
-    _set(which, "Min", 0)
-    _connect(_pin(top, "ReturnValue", is_input=False), _pin(which, "Max"))
-    pick = keep(_at(_node(ed, FN_ARR_GET), x0 + 3360, y0 + 580))
-    _connect(table_out, _pin(pick, "TargetArray"))
-    _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
-
-    # Clear of the shells, which are already sitting on the corpse: two pickups
-    # at the same point read as one object and the player collects the ammo
-    # without ever seeing the gun.
-    beside = keep(_at(_node(ed, FN_ADD_VV), x0 + 3620, y0 + 300))
-    _connect(at, _pin(beside, "A"))
-    _connect(_vec(ed, GUN_DROP_FORWARD, 0.0, 0.0, x0 + 3360, y0 + 440),
-             _pin(beside, "B"))
-    where = keep(_at(_node(ed, FN_MAKE_TRANSFORM), x0 + 3880, y0 + 300))
-    _connect(_pin(beside, "ReturnValue", is_input=False), _pin(where, "Location"))
-    _connect(_vec(ed, 1.0, 1.0, 1.0, x0 + 3620, y0 + 480), _pin(where, "Scale"))
-
-    spawn = keep(_at(_palette(ed, NODE_SPAWN), x0 + 4140, y0))
-    _connect(_pin(pick, "Item", is_input=False), _pin(spawn, "Class"))
-    _connect(_pin(where, "ReturnValue", is_input=False), _pin(spawn, "SpawnTransform"))
-    _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(BEL.find_then_pin(rare), _pin(spawn, "execute"))
-
-    # DropClasses is typed as class-of-Actor, for the same reason AmmoClass is:
-    # this component has to compile in a pass where BP_WeaponItem's generated
-    # class is not available to type a pin against. The cost is this cast.
-    as_item = keep(_at(_palette(ed, NODE_CAST_ITEM), x0 + 4400, y0))
-    _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(as_item, "Object"))
-    _connect(BEL.find_then_pin(spawn), _pin(as_item, "execute"))
-    loose = keep(_at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH),
-                     x0 + 4680, y0))
-    _connect(_loose_pin(as_item, "AsBPWeaponItem", is_input=False),
-             _pin(loose, "self"))
-    _set(loose, "Dropped", "true")
-    _connect(BEL.find_then_pin(as_item), _pin(loose, "execute"))
-
-    ed.add_comment_to_nodes(
-        f"{GUN_DROP_CHANCE * 100:.0f}% of counted kills leave a weapon, drawn "
-        f"uniformly from DropClasses -- so each of the three is about a "
-        f"1-in-{int(round(1.0 / GUN_DROP_CHANCE)) * len(DROP_DISPLAYS)} drop. "
-        "Dropped=true is the whole handover: from here it is an ordinary "
-        "weapon on the ground and E picks it up with no new code.",
-        made)
-    return (BEL.find_then_pin(loose),
-            _pin(as_item, "CastFailed", is_input=False),
-            BEL.find_else_pin(rare))
 
 
 def _author_death_collapse(ed, exec_ins, x0, y0):

@@ -1,13 +1,18 @@
-"""verify.drops -- BP_AmmoPickup and the 10% weapon drop.
+"""verify.drops -- BP_AmmoPickup and the gun drop (two seeded rolls, loot table).
 """
 
-from combat.game_state import DAMAGED_BY_PLAYER_VAR
-from combat.paths import AMMO_BP_PATH, HEALTH_BP_PATH
+import unreal
+
+from combat.game_state import (
+    DAMAGED_BY_PLAYER_VAR, GUN_PICK_STREAM_VAR, GUN_ROLL_STREAM_VAR,
+    GUN_STREAMS_SEEDED_VAR,
+)
+from combat.paths import AMMO_BP_PATH, GAME_MODE_BP_PATH, HEALTH_BP_PATH
 from combat.tuning import (
     AMMO_DROP_SHELLS, AMMO_PICKUP_LIFETIME, AMMO_PICKUP_RADIUS,
-    GUN_DROP_CHANCE,
+    GUN_DROP_CHANCE, GUN_DROP_SEED, GUN_LOOT_TABLE,
 )
-from combat.weapon_specs import DROP_DISPLAYS, _weapon_specs
+from combat.weapon_specs import DROP_TICKETS, _weapon_specs
 from combat.verify.fixtures import ag, health_bp, hg
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, components, graph, in_pins, load, num_pin,
@@ -71,37 +76,141 @@ def check_ammo_pickup():
           "the ForEachLoop over Inventory is gone")
 
 
-# ─── The 10% weapon drop ─────────────────────────────────────────────────────
+# ─── The gun drop ────────────────────────────────────────────────────────────
+
+class _Stream:
+    """FRandomStream, bit for bit (Core/Public/Math/RandomStream.h), so the
+    table's shares can be measured here with the engine's own generator."""
+
+    def __init__(self, seed):
+        self.seed = seed & 0xFFFFFFFF
+
+    def fraction(self):
+        self.seed = (self.seed * 196314165 + 907633515) & 0xFFFFFFFF
+        # 1.0f with the top 23 bits of the seed as its mantissa, minus 1.
+        return (self.seed >> 9) / float(1 << 23)
+
+    def below(self, top):
+        return int(self.fraction() * top) if top > 0 else 0
+
+
+def simulate_gun_drops(roll_seed, pick_seed, kills, tickets=DROP_TICKETS,
+                       chance=GUN_DROP_CHANCE):
+    """What the death path drops over ``kills`` counted kills: one name or None
+    per kill. The same two draws the graph makes, in the same order."""
+    roll, pick = _Stream(roll_seed), _Stream(pick_seed)
+    return [tickets[pick.below(len(tickets))]
+            if roll.fraction() < chance and tickets else None
+            for _ in range(kills)]
+
+
+def _feeders(node, pin):
+    p = BEL.find_input_pin(node, pin)
+    if not (p and p.is_valid()):
+        return []
+    return [PIN.get_owning_node(q) for q in PIN.list_connected_pins(p)]
+
+
+def _reads(node, var):
+    return var in out_pins(node)
+
 
 def check_weapon_drop():
     drop_classes = list(cdo(health_bp).get_editor_property("DropClasses"))
-    check(f"a kill can leave one of {len(DROP_DISPLAYS)} weapons",
-          len(drop_classes) == len(DROP_DISPLAYS), str(len(drop_classes)))
-    check("...and they are the three that are not in the starting loadout",
-          [c.get_name() for c in drop_classes]
-          == [f"{sp['path'].rsplit('/', 1)[-1]}_C" for sp in _weapon_specs()
-              if sp["display"] in DROP_DISPLAYS],
+    want = [f"{sp['path'].rsplit('/', 1)[-1]}_C"
+            for name in DROP_TICKETS
+            for sp in _weapon_specs() if sp["display"] == name]
+    check(f"the loot table holds one DropClasses entry per ticket "
+          f"({', '.join(f'{n} x{w}' for n, w in GUN_LOOT_TABLE)})",
+          [c.get_name() for c in drop_classes] == want,
           str([c.get_name() for c in drop_classes]))
-    check(f"the drop rate is {GUN_DROP_CHANCE * 100:.0f}%",
-          any(abs((num_pin(n, "B") or -1.0) - GUN_DROP_CHANCE) < 1e-6
-              for n in hg if "B" in in_pins(n)),
-          f"expected a comparison against {GUN_DROP_CHANCE}")
-    # Two draws, not one weighted table: the rate and the table are tuned apart.
-    check("...rolled once, and which weapon drawn separately",
-          bool([n for n in hg if {"Min", "Max"} <= in_pins(n)
-                and "Random" in str(BEL.get_node_title(n))]),
-          "no random draw in the death path")
-    check("the weapon is picked by index into the array, not by a Switch that "
-          "would need a pin per weapon",
-          bool(by_pins(hg, "TargetArray", "Index")),
-          f"{len(by_pins(hg, 'TargetArray', 'Index'))} Array_Get node(s)")
-    # The empty-table guard. Without it RandomIntegerInRange(0, -1) indexes nothing.
-    check("an empty drop table drops nothing rather than indexing off the end",
-          any(str(BEL.get_node_title(n)).replace("\n", " ").startswith("Get DropClasses")
-              for n in hg)
-          and bool([n for n in hg if "TargetArray" in in_pins(n)
-                    and "Length" in str(BEL.get_node_title(n))]),
-          "no Array_Length on DropClasses")
+    issued = {sp["display"] for sp in _weapon_specs()} - {n for n, _ in GUN_LOOT_TABLE}
+    check("...every weight is positive and nothing in the starting loadout is in it",
+          all(w > 0 for _, w in GUN_LOOT_TABLE) and issued == {"Shotgun", "Pistol"},
+          str(GUN_LOOT_TABLE))
+
+    mode = cdo(load(GAME_MODE_BP_PATH))
+    streams = [mode.get_editor_property(v)
+               for v in (GUN_ROLL_STREAM_VAR, GUN_PICK_STREAM_VAR)]
+    check("the GameMode carries the two gun-drop random streams",
+          all(isinstance(x, unreal.RandomStream) for x in streams),
+          str([type(x).__name__ for x in streams]))
+
+    # The two rolls, told apart by which stream feeds them.
+    draws = [n for n in hg if "Stream" in in_pins(n) and "execute" not in in_pins(n)]
+    rolls = [n for n in draws if "Max" not in in_pins(n)
+             and any(_reads(f, GUN_ROLL_STREAM_VAR) for f in _feeders(n, "Stream"))]
+    picks = [n for n in draws if "Max" in in_pins(n)
+             and any(_reads(f, GUN_PICK_STREAM_VAR) for f in _feeders(n, "Stream"))]
+    check("the drop roll is RandomFloatFromStream on GunDropRollStream",
+          len(rolls) == 1, f"{len(rolls)} roll(s), {len(draws)} stream draw(s)")
+    check("the pick roll is RandomIntegerFromStream on GunDropPickStream",
+          len(picks) == 1, f"{len(picks)} pick(s)")
+    check("...and nothing else in the health graph draws from a stream",
+          len(draws) == 2, f"{len(draws)} stream draws")
+    check("no unseeded RandomIntegerInRange is left in the death path -- the "
+          "only one is the flinch clip pick",
+          len([n for n in by_pins(hg, "Min", "Max")
+               if "RandomInteger" in str(BEL.get_node_title(n))]) <= 1)
+    # Pure draws advance their stream: a second reader would be a second roll.
+    for label, nodes in (("drop", rolls), ("pick", picks)):
+        if nodes:
+            outs = [p for p in BEL.list_output_pins(nodes[0])]
+            links = sum(len(PIN.list_connected_pins(p)) for p in outs)
+            check(f"the {label} roll has exactly one reader", links == 1,
+                  f"{links} link(s)")
+    if rolls:
+        lucky = [n for n in hg if rolls[0] in _feeders(n, "A")]
+        check(f"the drop rate is {GUN_DROP_CHANCE * 100:.0f}%, compared against "
+              "the drop roll",
+              len(lucky) == 1
+              and abs((num_pin(lucky[0], "B") or -1.0) - GUN_DROP_CHANCE) < 1e-6,
+              f"expected roll < {GUN_DROP_CHANCE}")
+    if picks:
+        top = _feeders(picks[0], "Max")
+        check("the pick draws over the whole table: Max is Length(DropClasses), "
+              "as RandomIntegerFromStream is already [0, Max)",
+              len(top) == 1 and "TargetArray" in in_pins(top[0])
+              and "Length" in str(BEL.get_node_title(top[0])),
+              str([str(BEL.get_node_title(t)) for t in top]))
+        check("the weapon is picked by index into the array, not by a Switch that "
+              "would need a pin per weapon",
+              any(picks[0] in _feeders(n, "Index")
+                  for n in by_pins(hg, "TargetArray", "Index")),
+              f"{len(by_pins(hg, 'TargetArray', 'Index'))} Array_Get node(s)")
+
+    # Seeded once per session, on the first counted kill.
+    seeders = [n for n in hg if "Stream" in in_pins(n) and "execute" in in_pins(n)]
+    seeded = {v for n in seeders for f in _feeders(n, "Stream")
+              for v in (GUN_ROLL_STREAM_VAR, GUN_PICK_STREAM_VAR) if _reads(f, v)}
+    fixed = [n for n in seeders if "NewSeed" in in_pins(n)]
+    check("both streams are seeded"
+          + (f" (fixed: {GUN_DROP_SEED}, {GUN_DROP_SEED + 1})" if GUN_DROP_SEED
+             else " from the engine RNG, so each session draws differently"),
+          len(seeders) == 2 and seeded == {GUN_ROLL_STREAM_VAR, GUN_PICK_STREAM_VAR}
+          and len(fixed) == (2 if GUN_DROP_SEED else 0),
+          f"{len(seeders)} seeder(s) on {sorted(seeded)}")
+    gate = [n for n in hg if "Branch" in str(BEL.get_node_title(n))
+            and any(_reads(f, GUN_STREAMS_SEEDED_VAR) for f in _feeders(n, "Condition"))]
+    check("...once, behind a Branch on GunDropSeeded that the seeding sets",
+          len(gate) == 1 and any(
+              str(BEL.get_node_title(n)).replace("\n", " ")
+              == f"Set {GUN_STREAMS_SEEDED_VAR}" for n in hg),
+          f"{len(gate)} gate(s)")
+
+    # The engine's own generator over the table: the rate is the chance and the
+    # shares are the weights. 20k kills keeps sampling noise under ~0.5 points.
+    sim = simulate_gun_drops(1, 2, 20000)
+    got = [d for d in sim if d]
+    rate = len(got) / len(sim)
+    total = sum(w for _, w in GUN_LOOT_TABLE)
+    worst = max(abs(got.count(n) / max(len(got), 1) - w / total)
+                for n, w in GUN_LOOT_TABLE)
+    check(f"FRandomStream replayed over 20000 kills drops at {GUN_DROP_CHANCE:.0%}"
+          f" with the table's shares",
+          abs(rate - GUN_DROP_CHANCE) < 0.01 and worst < 0.03,
+          f"rate {rate:.3f}, worst share error {worst:.3f}")
+
     # The handover: from here it is an ordinary weapon on the ground, and the E key
     # that picks up a gun the player threw away picks this one up with no new code.
     check("a dropped weapon is flagged Dropped, which is the whole pick-up interface",

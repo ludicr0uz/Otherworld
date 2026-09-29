@@ -40,8 +40,21 @@ menu polls its own copy from `DrawHUD`, which does.
 - **There is no reloading state.** `NextFireTime` is one world-time deadline. Both the fire
   interval and the reload push it out.
 - **The shotgun and pistol are issued; the SMG, rifle and sniper are found.**
-  - One kill in ten (`GUN_DROP_CHANCE`) rolls a uniform pick from `DropClasses`, an array on
-    `BP_HealthComponent`. Keeping rate and table apart lets each be tuned alone.
+  - The gun drop (`gun_drop.py`) is **two seeded rolls** on two `FRandomStream`s on the
+    GameMode: `GunDropRollStream < GUN_DROP_CHANCE` (10%) decides whether anything drops, then
+    `RandomIntegerFromStream(GunDropPickStream, Length)` decides which.
+  - **The loot table is `GUN_LOOT_TABLE`** (`tuning.py`), as weights: SMG 5, rifle 3, sniper 2.
+    `DropClasses` holds one entry per ticket, so the uniform pick is the weighted draw.
+  - The pick stream advances only on kills that drop, so re-weighting never moves which kills
+    drop.
+  - **The streams are seeded on the first counted kill,** behind `GunDropSeeded`. This happens
+    in the health component because `combat_trace.py` owns the GameMode's graph.
+    `GUN_DROP_SEED = 0` means a fresh seed each session. Any other value replays the same
+    sequence every run: it is for probes.
+  - A stream draw is pure and advances the stream, so each draw has exactly one reader. The
+    verifier asserts it.
+  - `verify/drops.simulate_gun_drops()` replays `FRandomStream` bit for bit. With a fixed seed,
+    a PIE run dropped exactly the predicted guns.
   - Setting `Dropped = true` on the spawned actor is the entire handover.
   - Keep the `Length(DropClasses) > 0` guard, or an unfilled table indexes into nothing.
 - **Kill rewards happen only on the `DamagedByPlayer` arm.** That covers the kill count, the two

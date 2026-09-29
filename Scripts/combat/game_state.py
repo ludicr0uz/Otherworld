@@ -54,6 +54,13 @@ NPC_ID_VAR = "NpcId"
 # quotes; PlayerDead is the one flag the menu is drawn from.
 KILL_COUNT_VAR = "NpcKillCount"
 PLAYER_DEAD_VAR = "PlayerDead"
+# The gun drop's two random streams (combat/gun_drop.py) and whether they have
+# been seeded this session. On the GameMode because a stream only means
+# anything if it outlives the draws: kept on each wanderer's own health
+# component, every kill would be the first draw of a fresh stream.
+GUN_ROLL_STREAM_VAR = "GunDropRollStream"
+GUN_PICK_STREAM_VAR = "GunDropPickStream"
+GUN_STREAMS_SEEDED_VAR = "GunDropSeeded"
 # Set on a health component by whatever hurt it. The HUD shows a wanderer's bar
 # only for a few seconds after LastDamageTime, and only a death with
 # DamagedByPlayer true counts as a kill -- the safety net writes Health to 0 for
@@ -121,6 +128,8 @@ def ensure_game_mode_vars():
                        combat_trace.build_combat_trace_switch().
         Noise*         the last noise the player made (see NOISE_TIME_VAR),
                        written by whatever made it, heard by every wanderer.
+        GunDrop*       the gun drop's roll and pick streams and their
+                       seeded-this-session flag (see GUN_ROLL_STREAM_VAR).
 
     All three outlive every actor that touches them -- the player's own health
     component is destroyed with the player, so the score cannot live there.
@@ -138,16 +147,19 @@ def ensure_game_mode_vars():
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
     for name in (SPAWN_COUNT_VAR, KILL_COUNT_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR, COMBAT_TRACE_VAR):
+    for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR, COMBAT_TRACE_VAR,
+                 GUN_STREAMS_SEEDED_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in NOISE_FLOAT_VARS:
         _declare(ed, name, _float_type())
     for name in NOISE_VECTOR_VARS:
         _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
+    for name in (GUN_ROLL_STREAM_VAR, GUN_PICK_STREAM_VAR):
+        _declare(ed, name, _struct_type(unreal.RandomStream.static_struct()))
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
     _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {KILL_COUNT_VAR}, "
          f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR}, {COMBAT_TRACE_VAR}, the noise "
-         f"record ready")
+         f"record and the gun-drop streams ready")
     return bp

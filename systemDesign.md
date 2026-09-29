@@ -602,9 +602,9 @@ These are agro ranges only. The audio attenuation profiles that set how loud sho
 5. **Trees** — placements inlined as a `TREE_DATA` literal, grouped by spec; one actor per
    species carrying a `HierarchicalInstancedStaticMeshComponent` as its root, `BlockAll`,
    static, shadow-casting, materials set by slot index, then one `add_instance` per tree.
-   Each tree HISM sets `disallow_nanite` (`forest_import/trees.py`): it draws the mesh's
-   light fallback through classic rendering, because masked leaf cards on Nanite are
-   expensive. The meshes themselves keep their Nanite data.
+   Each tree HISM stays on Nanite (`forest_import/trees.py` pins `disallow_nanite` off):
+   the meshes' auto-built fallbacks have no leaf triangles, so classic rendering draws
+   bare trees.
 5b. **Grass** — transforms are *not* inlined (tens of thousands of them); the script reads
    `grass_<Level>.json`, whose instances are flat rounded arrays
    `[spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul, target_h_cm]` against an

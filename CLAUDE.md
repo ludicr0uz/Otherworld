@@ -2087,10 +2087,11 @@ centred and bottom-anchored at any window size.
   reports the *fallback* mesh (1–4k), not the scan, so it undercounts badly. Never switch
   Nanite off on the asset to "go classic": that renders the full scan, and `set_lods` on it
   runs the quadric simplifier on the game thread for 25+ minutes per mesh (the editor looks
-  hung). The tree HISMs set `disallow_nanite` instead (`forest_import/trees.py`), which
-  draws the light fallback mesh through classic rendering. Masked leaf cards on Nanite were
-  what made looking up into the canopy slow. `Content/` is not in git, so a bad asset save
-  has no backup.
+  hung). Don't set `disallow_nanite` on the tree HISMs either: the auto-built fallbacks have
+  **0 triangles in the leaf section** (the simplifier drops the small leaf cards first), so
+  the trees render bare — tried and reverted; `forest_import/trees.py` pins it off and the
+  verifier checks it. Masked leaf cards on Nanite are what make looking up into the canopy
+  slow. `Content/` is not in git, so a bad asset save has no backup.
 - The directional light's real-time shadow range is `SHADOW_DISTANCE_CM` (100 m) in
   `forest_generator/lighting.py`. It is set through `dynamic_shadow_distance_movable_light`
   even though the light is Stationary: with `r.AllowStaticLighting=False` the engine reads

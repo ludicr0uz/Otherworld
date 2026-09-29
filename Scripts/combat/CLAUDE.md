@@ -6,12 +6,13 @@ the code is this package (`__init__.py` is the map) and the verifier's sections 
 
 ## Controls, and where they live
 
-The nine defaults are all rebindable on the settings screen:
+The defaults are all rebindable on the settings screen:
 
 - Left click fires. It **auto-fires while held** on the SMG and the assault rifle, and a tap
   **eats or drinks** a held consumable.
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
-  **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held).
+  **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
+  **C** toggles crouch, **Z** toggles prone.
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
 
@@ -198,6 +199,40 @@ The verifier asserts the old loose constants are gone.
   combat trace quotes the dealt `HitDamage`.
 - **Known gaps:** there is no guard pose (no clip exists to play), no HUD cue beyond the stamina
   bar, and a blocked hit still flinches.
+
+## Crouch and prone (`weapon_component/stance.py`)
+
+- **`Stance` is one int** (0 stand, 1 crouch, 2 prone), toggled by tapping C or Z, and set to
+  standing while `Sprinting`. It is picked with `SelectInt`s, no Branch, and written once a frame
+  after the sprint block.
+- **Both low stances are UE's own crouch.** `allow_crouch()` turns on
+  `NavAgentProps.bCanCrouch` (the template ships it off) and walking off ledges while crouched.
+  The movement component shrinks the capsule (half-height 60 crouched, 40 prone, from 90) and
+  keeps the feet where they were. The camera boom hangs off the capsule, so the view drops with it.
+  - **The engine sizes the capsule only when a crouch starts.** Changing between crouch and prone
+    therefore uncrouches for a frame when the crouched capsule is at the other height, then
+    crouches again. Probed in PIE: 90 → 60 → (90) → 40 → (90) → 60 → 90.
+  - **The prone height can't be below the capsule radius (35).** The engine clamps a crouch to
+    the radius, so the height would never match and the stance would re-crouch every frame. The
+    verifier asserts it.
+  - **Speed:** crouched, the engine reads `MaxWalkSpeedCrouched` instead of `MaxWalkSpeed`. The
+    stance writes it as `BaseSpeed ×` 0.45 or 0.2, so sprint's and aiming's writes don't apply
+    while low.
+- **Footsteps:** `BP_FootstepComponent` has `StepVolume` (the `PlaySoundAtLocation` volume) and
+  `StepNoise` (multiplies the noise reach, which is already proportional to speed). The stance
+  writes them onto the player's component every frame: 1/1 standing, 0.5/0.5 crouched, 0.3/0.35
+  prone. The wanderers keep 1.0. A crouched step carries 12 m × 0.45 × 0.5 = 2.7 m; a crawl
+  under a metre.
+- **The footstep ground test is `NavMovementComponent.IsMovingOnGround`.** It used to be
+  `Character.CanJump`, which is false while crouched, so every low step would have been silent.
+  (`CharacterMovementComponent.IsMovingOnGround` isn't callable; the one a class up is.)
+- **Known gaps:**
+  - **No crouch or prone pose.** The mesh stays standing while the capsule and camera drop; the
+    down-the-sights camera still goes to the standing gun. The only crouch clips on this machine
+    are `MM_Unarmed_Crouch_*` in the experimental MoverExamples plugin (not enabled, on its own
+    skeleton, would need retargeting and an ABP state). No prone clip exists anywhere.
+  - Space does nothing while low: UE refuses a crouched jump.
+  - The camera drops in one frame (no boom lag).
 
 ## Health, respawn and the pack's numbering (`health_component.py`, `respawn.py`)
 

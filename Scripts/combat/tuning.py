@@ -49,6 +49,10 @@ SPRINT_KEY = "LeftShift"
 # Held to guard (weapon_component/block.py). F because it sits under the left
 # hand beside the movement keys and nothing else here uses it; rebindable.
 BLOCK_KEY = "F"
+# Tapped to toggle the stance (weapon_component/stance.py). C and Z are the
+# usual pair, and both sit under the left hand; rebindable.
+CROUCH_KEY = "C"
+PRONE_KEY = "Z"
 
 PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
 DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
@@ -123,6 +127,27 @@ class CombatConfig:
     block_damage_scale: float = 0.25
     block_stamina_per_hit: float = 20.0
     block_half_angle_deg: float = 60.0
+
+    # --- crouch and prone ----------------------------------------------------
+    # Toggled by CROUCH_KEY / PRONE_KEY; sprinting stands the player up. Both
+    # are UE's own crouch (the capsule shrinks, the camera boom rides down with
+    # it), prone being a lower crouch -- see weapon_component/stance.py. Speeds
+    # are fractions of BaseSpeed, so they follow the character's own walk.
+    # The prone capsule cannot be shorter than its radius (the engine clamps
+    # to it, and the stance code would then re-crouch forever); the verifier
+    # asserts it against the character's capsule.
+    crouch_speed_scale: float = 0.45
+    prone_speed_scale: float = 0.2
+    crouch_half_height_cm: float = 60.0
+    prone_half_height_cm: float = 40.0
+    # What a footstep sounds like, and how far it carries for the wanderers,
+    # per stance: StepVolume is the PlaySoundAtLocation volume, StepNoise
+    # multiplies the (already speed-proportional) reach. So a crouched step at
+    # 270 cm/s carries 12 m x 0.45 x 0.5 = 2.7 m, and a crawl under a metre.
+    crouch_step_volume: float = 0.5
+    prone_step_volume: float = 0.3
+    crouch_step_noise: float = 0.5
+    prone_step_noise: float = 0.35
 
     # --- aiming down the sights ----------------------------------------------
     # What ADS does is narrow the camera's field of view and tighten the
@@ -346,7 +371,8 @@ RELOAD_KEY = "R"
 # written before it has seven binds, which the settings loader refills with
 # these defaults rather than trusting (build_graphics_menu.py's settings load).
 # KeyBlock went on the END, for the same reason: a nine-bind list refills an
-# eight-bind save once, and no existing index changes meaning.
+# eight-bind save once, and no existing index changes meaning. KeyCrouch and
+# KeyProne were appended the same way.
 BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyAim", AIM_KEY),
              ("KeySights", SIGHTS_KEY),
@@ -355,7 +381,9 @@ BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyDrop", DROP_KEY),
              ("KeyPickup", PICKUP_KEY),
              ("KeyReload", RELOAD_KEY),
-             ("KeyBlock", BLOCK_KEY))
+             ("KeyBlock", BLOCK_KEY),
+             ("KeyCrouch", CROUCH_KEY),
+             ("KeyProne", PRONE_KEY))
 # Shells a killed wanderer leaves behind. Two per kill against five spent per
 # magazine means the shotgun runs down unless most shots land, which is the
 # point of giving it a reserve at all.

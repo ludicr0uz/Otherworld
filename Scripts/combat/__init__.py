@@ -35,7 +35,7 @@ ASSETS AND PATCHES
   weapon_items      BP_WeaponItem and one child per weapon
   blood             BP_BloodSplash
   ammo_pickup       BP_AmmoPickup
-  footsteps         BP_FootstepComponent
+  footsteps         BP_FootstepComponent (StepVolume/StepNoise, set by the stance)
   combat_trace      the combat trace switch: GameMode's CombatTraceOn/Off
                     console events and CombatTrace's default
 

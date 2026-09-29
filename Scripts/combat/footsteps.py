@@ -48,8 +48,9 @@ FOOTSTEP_MIN_SPEED_CMS = 40.0
 FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
 
 
-def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
-    """Play a random element of the ``var_name`` sound array at ``at_pin``.
+def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0, volume_pin=None):
+    """Play a random element of the ``var_name`` sound array at ``at_pin``,
+    at ``volume_pin`` if one is given (the stance's StepVolume).
 
     Returns ``(nodes, then_pin)``. Guarded on the array's own length, because
     RandomIntegerInRange(0, -1) into Array_Get is an access-none rather than
@@ -91,6 +92,8 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
     play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 1440, y0))
     _connect(_pin(pick, "Item", is_input=False), _pin(play, "Sound"))
     _connect(at_pin, _pin(play, "Location"))
+    if volume_pin is not None:
+        _connect(volume_pin, _pin(play, "VolumeMultiplier"))
     _connect(BEL.find_then_pin(have), _pin(play, "execute"))
 
     join = keep(_at(ed.add_branch_node(), x0 + 1700, y0))
@@ -103,12 +106,13 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0):
 def build_footstep_component(rebuild=True):
     """A footfall every FOOTSTEP_STRIDE_CM of ground covered.
 
-        [Tick] -> cast owner to Character -> [on the ground?]
+        [Tick] -> cast owner to Character -> [movement on the ground?]
                     no  -> Travelled = 0          (a jump restarts the stride)
                     yes -> Travelled += speed * dt
                         -> [Travelled >= stride AND moving?]
                              yes -> Travelled -= stride
-                                 -> play one of Sounds at the owner
+                                 -> play one of Sounds at the owner,
+                                    at StepVolume
                              no  -> done
 
     Distance rather than time: see FOOTSTEP_STRIDE_CM. Nothing here knows about
@@ -126,6 +130,12 @@ def build_footstep_component(rebuild=True):
 
     _declare(ed, "Travelled", _float_type())
     _declare(ed, "StrideCm", _float_type())
+    # How loud a step is and how far it carries, as multipliers. 1.0 on every
+    # wanderer; the player's weapon component writes them from its stance
+    # every frame (weapon_component/stance.py), so this graph never learns
+    # what crouching is.
+    _declare(ed, "StepVolume", _float_type())
+    _declare(ed, "StepNoise", _float_type())
     _declare(ed, "Sounds", BEL.get_array_type(
         BEL.get_object_reference_type(unreal.SoundBase.static_class())))
 
@@ -136,8 +146,12 @@ def build_footstep_component(rebuild=True):
     _connect(BEL.find_then_pin(tick), _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
+    movement = _at(ed.add_get_member_variable_node(
+        "CharacterMovement", "/Script/Engine.Character"), 520, 300)
+    _connect(char_out, _pin(movement, "self"))
     grounded = _at(_node(ed, FN_ON_GROUND), 780, 300)
-    _connect(char_out, _pin(grounded, "self"))
+    _connect(_pin(movement, "CharacterMovement", is_input=False),
+             _pin(grounded, "self"))
 
     walking = _at(ed.add_branch_node(), 1040, 0)
     _connect(_pin(grounded, "ReturnValue", is_input=False), _pin(walking, "Condition"))
@@ -198,9 +212,11 @@ def build_footstep_component(rebuild=True):
 
     at = _at(_node(ed, FN_ACTOR_LOC), 3380, 300)
     _connect(owner_out, _pin(at, "self"))
+    volume = _at(ed.add_get_member_variable_node("StepVolume"), 3380, 440)
     _sounded, stepped = _author_random_sound(
         ed, "Sounds", _pin(at, "ReturnValue", is_input=False),
-        BEL.find_then_pin(charge), 3640, 0)
+        BEL.find_then_pin(charge), 3640, 0,
+        volume_pin=_pin(volume, "StepVolume", is_input=False))
 
     # --- and the wanderers may hear it ---------------------------------------
     # Only the player's steps: the wanderers wear this same component, and a
@@ -208,7 +224,8 @@ def build_footstep_component(rebuild=True):
     # The reach is proportional to speed (COMBAT.footstep_noise_range_cm at
     # the reference speed), so a sprint carries further than a walk and
     # aiming's half-speed creep carries half as far, without this graph
-    # knowing about either.
+    # knowing about either. StepNoise then scales it for the stance: a crouched
+    # or prone step is slower AND quieter.
     mine = _at(_node(ed, FN_IS_PLAYER_CONTROLLED), 5400, 300)
     _connect(char_out, _pin(mine, "self"))
     players = _at(ed.add_branch_node(), 5400, 0)
@@ -218,9 +235,13 @@ def build_footstep_component(rebuild=True):
     _connect(speed_out, _pin(reach, "A"))
     _set(reach, "B", COMBAT.footstep_noise_range_cm
          / COMBAT.footstep_noise_reference_speed_cms)
+    hushed = _at(_node(ed, FN_MUL_FF), 5660, 440)
+    _connect(_pin(reach, "ReturnValue", is_input=False), _pin(hushed, "A"))
+    _connect(_pin(_at(ed.add_get_member_variable_node("StepNoise"), 5400, 560),
+                  "StepNoise", is_input=False), _pin(hushed, "B"))
     _author_make_noise(ed, BEL.find_then_pin(players),
                        _pin(at, "ReturnValue", is_input=False),
-                       _pin(reach, "ReturnValue", is_input=False), 5920, 0)
+                       _pin(hushed, "ReturnValue", is_input=False), 5920, 0)
 
     ed.add_comment_to_nodes(
         f"A footfall every {FOOTSTEP_STRIDE_CM:.0f} cm of ground covered, "
@@ -240,6 +261,8 @@ def build_footstep_component(rebuild=True):
              if eas.does_asset_exist(f"{CREATURE_AUDIO_DIR}/{n}")]
     _apply_defaults(bp, {"StrideCm": FOOTSTEP_STRIDE_CM,
                          "Travelled": 0.0,
+                         "StepVolume": 1.0,
+                         "StepNoise": 1.0,
                          "Sounds": found})
     _log(f"built {FOOTSTEP_BP_PATH} "
          f"({len(found)} steps, one every {FOOTSTEP_STRIDE_CM:.0f} cm)")

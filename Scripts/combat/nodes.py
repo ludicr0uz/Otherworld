@@ -81,14 +81,13 @@ FN_LE_FF = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
 FN_LESS_FF = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
 FN_GREATER_FF = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
 FN_GE_FF = "/Script/Engine.KismetMathLibrary.GreaterEqual_DoubleDouble"
-# The ground test. UCharacterMovementComponent::IsMovingOnGround and ::IsFalling
-# are both virtual C++ and neither is BlueprintCallable -- measured, all three
-# spellings return a pinless node. Character::CanJump is, and it is a real
-# feet-on-the-ground query rather than a coincidence: CanJumpInternal requires
-# the movement mode to be walking. It is a PROXY, and the way it could be wrong
-# is if something ever disables jumping on an owner, which would silence that
-# owner's footsteps. Nothing does.
-FN_ON_GROUND = "/Script/Engine.Character.CanJump"
+# The ground test. UCharacterMovementComponent's own IsMovingOnGround is not
+# BlueprintCallable, but UNavMovementComponent's -- the same virtual, one class
+# up -- is. It replaced Character::CanJump, which was a proxy for "feet on the
+# ground" until crouching arrived: CanJump is false while crouched, and every
+# crouched or prone step would have been silent. The self pin is the movement
+# component, not the character.
+FN_ON_GROUND = "/Script/Engine.NavMovementComponent.IsMovingOnGround"
 FN_GET_VELOCITY = "/Script/Engine.Actor.GetVelocity"
 FN_VSIZE_XY = "/Script/Engine.KismetMathLibrary.VSizeXY"
 FN_CLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
@@ -135,6 +134,13 @@ FN_ACTOR_RIGHT = "/Script/Engine.Actor.GetActorRightVector"
 # shorter than HIT_REACTION_CLIPS (a checkout whose retarget has not run) must
 # clip to the last entry rather than read off the end.
 FN_CLAMP_II = "/Script/Engine.KismetMathLibrary.Clamp"
+# Crouch and prone (weapon_component/stance.py). Crouch/UnCrouch only set the
+# movement component's wish; it resizes the capsule on its own next tick.
+FN_CROUCH = "/Script/Engine.Character.Crouch"
+FN_UNCROUCH = "/Script/Engine.Character.UnCrouch"
+FN_IS_CROUCHING = "/Script/Engine.NavMovementComponent.IsCrouching"
+FN_CAPSULE_HALF_HEIGHT = "/Script/Engine.CapsuleComponent.GetUnscaledCapsuleHalfHeight"
+FN_SELECT_II = "/Script/Engine.KismetMathLibrary.SelectInt"
 CAMERA_CLASS_PATH = "/Script/Engine.CameraComponent"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 # Aiming down the sights (weapon_component/sights.py): the camera leaves the

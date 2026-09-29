@@ -16,10 +16,12 @@ and it never relies on a variable another section left behind.
   firing  consume  drops  noise  combat_trace
   sights      the two aim keys, each weapon's eye point, the sight camera
   block       the guard: its key, the Blocking stance, the fire gate refusing
+  stance      crouch/prone: keys, the character may crouch, the Stance toggle,
+              the crouch it drives, the footsteps' volume and reach per stance
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "block",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "block", "stance",
     "settings_and_tuning", "firing", "consume", "drops", "noise", "combat_trace",
 )

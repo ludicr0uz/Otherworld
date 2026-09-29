@@ -28,6 +28,7 @@ from combat.weapon_component.recoil import (
 from combat.weapon_component.shot_noise import _author_shot_noise
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
+from combat.weapon_component.stance import _author_stance
 
 
 def _author_wc_tick(ed, tick):
@@ -100,6 +101,11 @@ def _author_wc_tick(ed, tick):
     # while Blocking). block.py says why the hit itself is resolved elsewhere.
     sprint_exits = (_author_block(ed, pc_out, key_pins["KeyBlock"],
                                   sprint_exits, 3700, -1400),)
+
+    # --- crouch and prone ----------------------------------------------------
+    # After sprint too, which stands the player up. stance.py owns the rest.
+    sprint_exits = _author_stance(ed, pc_out, owner_out, key_pins,
+                                  sprint_exits, 1040, -9000)
 
     # --- aim down the sights -------------------------------------------------
     # After the sprint block, which writes Sprinting, and before the trigger,

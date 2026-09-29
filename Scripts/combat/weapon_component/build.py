@@ -16,6 +16,7 @@ from combat.paths import (
 from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _author_wc_begin_play
+from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.tick import _author_wc_tick
 
 
@@ -54,6 +55,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # The guard (block.py). Read by the fire gate, and by every wanderer's
     # swing, which also writes Stamina here when the guard takes the hit.
     _declare(ed, "Blocking", BEL.get_basic_type_by_name("bool"))
+    # Standing, crouched or prone (stance.py). Written only by the stance
+    # block; the movement component and the footsteps are told from it.
+    _declare(ed, STANCE_VAR, BEL.get_basic_type_by_name("int"))
     # Aiming down the sights. BaseFOV is cached off the camera at BeginPlay for
     # the same reason BaseSpeed is cached off the movement component; CurrentFOV
     # is stored because FInterpTo's input is its own previous output, and
@@ -70,7 +74,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     _declare(ed, "SightAiming", BEL.get_basic_type_by_name("bool"))
     _declare(ed, "AimZoom", _float_type())
     _declare(ed, "SightBlend", _float_type())
-    # The eight polled keys, as variables rather than as pin literals. Nothing
+    # The polled keys, as variables rather than as pin literals. Nothing
     # in this component loads them: the HUD pushes the player's binds in every
     # DrawHUD frame (see graphics_menu/settings_page._author_push_settings), which is
     # what keeps the component free of any cast to the HUD and of any knowledge
@@ -130,6 +134,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         "BaseSpeed": 500.0,
         "Sprinting": False,
         "Blocking": False,
+        STANCE_VAR: STAND,
         # 1.0 is "exactly what the controller already does", because the two
         # base scales this multiplies are the controller's own. A player who
         # never opens the settings screen therefore gets the stock feel.

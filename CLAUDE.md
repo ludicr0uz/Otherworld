@@ -153,7 +153,8 @@ editor.
 - **The player:** a Meshy-generated adventurer holding an issued shotgun and pistol. The SMG,
   assault rifle and sniper are found as drops. The player can sprint, aim over the shoulder or down
   the sights (the sniper's is its scope), reload and eat, block (F; a swing from the front does a
-  quarter damage and costs stamina), and has a 10-slot inventory.
+  quarter damage and costs stamina), crouch (C) and go prone (Z), both quieter and slower, and has
+  a 10-slot inventory.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee. They respawn 75–100 m away and leave ragdoll corpses.
 - **The HUD:** HP, stamina, hunger, thirst and temperature bars, a kill counter, the death menu,

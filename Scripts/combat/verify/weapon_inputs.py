@@ -213,9 +213,11 @@ def check_sprint_and_stamina():
                   for n in wg),
           str(sorted(walk_titles)))
     # The hit-box multiplier has two SelectFloats of its own, each picked by a
-    # table lookup; those are counted in the hit-box section, not here.
+    # table lookup; those are counted in the hit-box section, not here. So are
+    # the stance's, each picked by comparing Stance (verify/stance.py).
     selects = [n for n in titled(wg, "SelectFloat")
-               if not any("Contains" in str(BEL.get_node_title(PIN.get_owning_node(q)))
+               if not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
+                          for k in ("Contains", "Equal")
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
     # Five now: sprint picks the speed and the sign of the drain, aiming picks
     # both how much of its own cone the weapon keeps and how much of its recoil,

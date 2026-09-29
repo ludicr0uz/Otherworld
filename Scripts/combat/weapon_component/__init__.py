@@ -1,5 +1,5 @@
 """weapon_component -- BP_WeaponComponent: inventory, aim, fire, reload, recoil, sprint,
-block.
+block, stance.
 
 build.build_weapon_component() is the entry; it declares the variables and
 authors BeginPlay (inventory.py) and Tick (tick.py). Tick calls one
@@ -21,6 +21,8 @@ _author_* fragment per concern, each in its own module:
   sprint      sprint and stamina
   block       the guard: Blocking = block key AND stamina AND not sprinting
               (what a block does to a swing is npc/block.py)
+  stance      crouch/prone toggles -> Stance; UE's crouch at two heights, the
+              crouched speed, and the footsteps' StepVolume/StepNoise
   ready_pose  restart the ready pose after it is interrupted
   tick        the Tick that calls all of the above
 

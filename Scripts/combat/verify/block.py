@@ -29,9 +29,9 @@ def _feeds(pin, limit=250):
 
 
 def check_block_key():
-    check(f"blocking is its own bind, {BLOCK_KEY} by default, appended last so "
-          f"no saved bind changes meaning",
-          [v for v, _k in BIND_VARS][-1] == "KeyBlock"
+    check(f"blocking is its own bind, {BLOCK_KEY} by default, appended after "
+          f"the eight older binds so no saved bind changes meaning",
+          [v for v, _k in BIND_VARS][8] == "KeyBlock"
           and w.get_editor_property("KeyBlock").export_text() == BLOCK_KEY,
           str([v for v, _k in BIND_VARS]))
     check("Blocking is a bool that starts false",

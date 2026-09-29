@@ -14,6 +14,14 @@ STARFIELD_MATERIAL_PATH = "/Game/Forest/Materials/M_NightSky_Starfield"
 STARS_TEXTURE_PATH = "/Engine/EngineSky/T_Sky_Stars.T_Sky_Stars"
 SIMPLE_SKY_DOME_PATH = "/Engine/EngineSky/M_SimpleSkyDome.M_SimpleSkyDome"
 
+# How far the directional light draws real-time (cascaded) shadows. The engine
+# default is 400 m, and every tree's masked leaves are drawn again into every
+# cascade over that range -- the canopy overhead most of all. 100 m keeps the
+# shadows that read on screen; the scalability ShadowQuality level then scales
+# it (r.Shadow.DistanceScale: 0.6 Low, 0.7 Medium, 1.0 High/Ultra), and past
+# it High/Ultra fall back to cheap distance-field shadows.
+SHADOW_DISTANCE_CM = 10000.0
+
 
 TIME_OF_DAY_PRESETS = {
     # ── Bright overhead daylight ──────────────────────────────────────────
@@ -28,6 +36,7 @@ TIME_OF_DAY_PRESETS = {
             "pitch": -50.0,            # high sun
             "yaw": -30.0,
             "cast_shadows": True,
+            "shadow_distance_cm": SHADOW_DISTANCE_CM,
         },
         "sky_light": {
             "intensity": 1.2,
@@ -68,6 +77,7 @@ TIME_OF_DAY_PRESETS = {
             "pitch": -32.0,            # low in the sky
             "yaw": 120.0,
             "cast_shadows": True,
+            "shadow_distance_cm": SHADOW_DISTANCE_CM,
         },
         "sky_light": {
             # Real-time capture picks up the emissive starfield dome (it is

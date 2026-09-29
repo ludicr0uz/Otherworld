@@ -31,7 +31,7 @@ EXPECTED_MELEE_INTERVAL = 1.5
 EXPECTED_NAV_AGENT_RADIUS = 35.0
 EXPECTED_REACHABLE_EXTENT = (200.0, 200.0, 400.0)
 EXPECTED_NAV_BOUNDS = json.loads(r"""{"half_xy_cm": 50000.0, "center_z_cm": 999.88, "half_z_cm": 1799.77, "terrain_min_z_cm": -599.9, "terrain_max_z_cm": 2599.65}""")
-LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
+LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true, "shadow_distance_cm": 10000.0}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 passed = 0
 failed = 0
@@ -133,6 +133,10 @@ for a in actors:
                   dlc.get_editor_property("atmosphere_sun_light"))
             check("Directional Light Casts Shadows",
                   dlc.get_editor_property("cast_shadows") == sun_cfg["cast_shadows"])
+            dist = dlc.get_editor_property("dynamic_shadow_distance_movable_light")
+            check("Directional Light Shadow Distance",
+                  close(dist, sun_cfg["shadow_distance_cm"], 1.0),
+                  f"(expected {sun_cfg['shadow_distance_cm']} cm, got {dist})")
 
     elif lbl == f"{LEVEL_NAME}_SkyLight":
         slc = a.get_component_by_class(unreal.SkyLightComponent)
@@ -194,6 +198,10 @@ for a in actors:
               f"(expected {pp_cfg['auto_exposure_bias']})")
 
 # ── 4. Tree HISM Actors ──────────────────────────────────────────────
+import sys
+if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sys.path:
+    sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
+from forest_import import trees as trees_import
 total_tree_instances = 0
 for spec_name, expected_count in EXPECTED_SPEC_COUNTS.items():
     found = False
@@ -210,6 +218,7 @@ for spec_name, expected_count in EXPECTED_SPEC_COUNTS.items():
                       f"(expected {expected_count}, got {inst_count})")
                 check(f"{spec_name} Collision Profile",
                       root.get_collision_profile_name() == "BlockAll")
+                trees_import.verify_tree_component(check, spec_name, root)
             break
     check(f"{spec_name} Actor Exists", found)
 

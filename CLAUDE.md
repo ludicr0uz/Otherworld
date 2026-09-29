@@ -1779,7 +1779,7 @@ centred and bottom-anchored at any window size.
   the offline `Tree Spacing` check now compares every nearby pair through a spatial hash
   (it used to compare list neighbours only). 200/300/400/600/1000 m at seed 42 all pass 28/28.
 - **`/Game/Maps/Lvl_Forest_1000m`** (`--size 1000`, night, seed 42): 3,400 trees, 1,115,761
-  grass clumps, ten NPCs at 76.7–95.0 m. Offline 28/28, in-engine **172/172**. The `.umap` is
+  grass clumps, ten NPCs at 76.7–95.0 m. Offline 28/28, in-engine **211/211**. The `.umap` is
   161 MB, mostly grass. The import takes ~1 min in a live editor, 9 s of it grass, because
   grass now goes in through batched `add_instances`. `uepy.py` reports "the editor stopped
   responding" on a job that long: its heartbeat check sees the editor blocked. The job
@@ -2082,6 +2082,19 @@ centred and bottom-anchored at any window size.
   distance alike. Grass is planted as one HISM per species per 100 m cell
   (`forest_generator/grass_cells.py`, `forest_import/grass.py`), labelled `<spec>__±ix_±iy`,
   tagged `OW_Grass`, saved unlit.
+- **The tree meshes are dense scans, not light meshes.** The asset files are 25–112 MB
+  (hundreds of thousands of triangles and up). `get_number_verts(mesh, 0)` on a Nanite mesh
+  reports the *fallback* mesh (1–4k), not the scan, so it undercounts badly. Never switch
+  Nanite off on the asset to "go classic": that renders the full scan, and `set_lods` on it
+  runs the quadric simplifier on the game thread for 25+ minutes per mesh (the editor looks
+  hung). The tree HISMs set `disallow_nanite` instead (`forest_import/trees.py`), which
+  draws the light fallback mesh through classic rendering. Masked leaf cards on Nanite were
+  what made looking up into the canopy slow. `Content/` is not in git, so a bad asset save
+  has no backup.
+- The directional light's real-time shadow range is `SHADOW_DISTANCE_CM` (100 m) in
+  `forest_generator/lighting.py`. It is set through `dynamic_shadow_distance_movable_light`
+  even though the light is Stationary: with `r.AllowStaticLighting=False` the engine reads
+  the movable value. Scalability scales it (0.6 Low, 0.7 Medium, 1.0 High/Ultra).
 - UE 5.8 exposes real Blueprint graph authoring to Python (`BlueprintGraphEditor`:
   `add_call_function_node`, `find_event_node`, `try_create_connection`, pin helpers on
   `BlueprintEditorLibrary`). A fresh BP already has a disabled `ReceiveBeginPlay` node —

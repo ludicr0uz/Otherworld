@@ -101,7 +101,7 @@ if smc:
 # ── 4. Spawn lighting & sky (Night — starry sky as the only light source, low luminosity) ─────────────────────────────
 unreal.log_warning("[GEN] 4. Setting up lighting and sky — Night — starry sky as the only light source, low luminosity")
 
-LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
+LIGHTING = json.loads(r"""{"key": "night", "label": "Night \u2014 starry sky as the only light source, low luminosity", "sun": {"enabled": true, "label_suffix": "Moon", "intensity": 0.12, "color": [170, 195, 255], "pitch": -32.0, "yaw": 120.0, "cast_shadows": true, "shadow_distance_cm": 10000.0}, "sky_light": {"intensity": 3.0, "real_time_capture": true}, "sky_dome": {"enabled": true, "material": "/Game/Forest/Materials/M_NightSky_Starfield", "build_starfield": true, "star_brightness": 2.5, "night_sky_color": [0.004, 0.008, 0.022, 1.0], "star_tiling": [2.0, 1.0]}, "volumetric_cloud": {"enabled": false}, "fog": {"density": 0.035, "inscattering_color": [0.015, 0.025, 0.055], "enable_volumetric": true, "volumetric_extinction_scale": 0.6}, "post_process": {"auto_exposure_min_brightness": 0.004, "auto_exposure_max_brightness": 0.6, "auto_exposure_bias": 1.6}}""")
 
 def srgb(c):
     return unreal.Color(r=c[0], g=c[1], b=c[2], a=255)
@@ -215,6 +215,10 @@ if sun_cfg["enabled"]:
         sun_comp.set_editor_property("intensity", sun_cfg["intensity"])
         sun_comp.set_editor_property("light_color", srgb(sun_cfg["color"]))
         sun_comp.set_editor_property("cast_shadows", sun_cfg["cast_shadows"])
+        # r.AllowStaticLighting=False, so the engine reads the movable
+        # distance even though the light is Stationary.
+        sun_comp.set_editor_property("dynamic_shadow_distance_movable_light",
+                                     sun_cfg["shadow_distance_cm"])
         sun_comp.set_editor_property("atmosphere_sun_light", True)
         sun_comp.set_editor_property("atmosphere_sun_light_index", 0)
     unreal.log_warning(
@@ -381,6 +385,11 @@ TREE_CONFIGS = {
     },
 }
 
+# Trees draw their fallback mesh, not Nanite -- see forest_import/trees.py.
+if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sys.path:
+    sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
+from forest_import import trees as trees_import
+
 def create_hism(name, mesh_path, mat_paths):
     mesh = editor_asset_sub.load_asset(mesh_path)
     if not mesh:
@@ -395,6 +404,7 @@ def create_hism(name, mesh_path, mat_paths):
     comp.set_collision_enabled(unreal.CollisionEnabled.QUERY_AND_PHYSICS)
     comp.set_mobility(unreal.ComponentMobility.STATIC)
     comp.set_editor_property("cast_shadow", True)
+    trees_import.configure_tree_component(comp)
     for idx, mp in enumerate(mat_paths):
         mat_obj = editor_asset_sub.load_asset(mp)
         if mat_obj:

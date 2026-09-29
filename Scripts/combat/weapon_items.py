@@ -69,7 +69,13 @@ def build_weapon_item():
                        # a null self is an Accessed None every frame, and the
                        # outer gate's condition is pulled on frames where
                        # nothing is equipped at all.
-                       ("Automatic", "bool")):
+                       ("Automatic", "bool"),
+                       # Used rather than fired: the fire key sends
+                       # CONSUME_EVENT_TAG and the item is spent (see
+                       # weapon_component/consume.py). On the base class, not
+                       # on BP_ConsumableItem, so the weapon component can ask
+                       # without naming a class that is built after it.
+                       ("Consumable", "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
@@ -119,17 +125,21 @@ def build_weapon_item():
     return bp
 
 
-def build_weapon(spec, item_bp):
-    """One concrete weapon: the parts, plus the defaults for the base's variables."""
-    eas = _assets()
-    bp = _create_blueprint(spec["path"], BEL.generated_class(item_bp))
+def build_parts(bp, parts):
+    """Hang an item's primitive parts off its inherited Body component.
 
+    Each part is (name, mesh, location, rotation, scale, material). Shared by
+    every child of BP_WeaponItem -- the weapons here, and the food and water in
+    Scripts/survival -- so the collision rule below is stated once.
+    """
+    eas = _assets()
+    path = bp.get_path_name()
     body = _find_handle(bp, "Body")
     if not body:
-        raise RuntimeError(f"{spec['path']} has no inherited Body component")
+        raise RuntimeError(f"{path} has no inherited Body component")
 
-    _drop_components(bp, {p[0] for p in spec["parts"]})
-    for name, mesh_path, location, rotation, scale, material in spec["parts"]:
+    _drop_components(bp, {p[0] for p in parts})
+    for name, mesh_path, location, rotation, scale, material in parts:
         handle = _add_component(bp, body, unreal.StaticMeshComponent, name)
         obj = _component_object(handle)
         obj.set_editor_property("static_mesh", eas.load_asset(mesh_path))
@@ -144,6 +154,12 @@ def build_weapon(spec, item_bp):
             obj.set_collision_profile_name("NoCollision")
         except Exception as exc:                                  # noqa: BLE001
             _log(f"  note: could not set NoCollision on {name}: {exc}")
+
+
+def build_weapon(spec, item_bp):
+    """One concrete weapon: the parts, plus the defaults for the base's variables."""
+    bp = _create_blueprint(spec["path"], BEL.generated_class(item_bp))
+    build_parts(bp, spec["parts"])
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{spec['path']} failed to compile")
@@ -164,6 +180,7 @@ def build_weapon(spec, item_bp):
         "Dropped": False,
         "UsesAmmo": bool(spec["uses_ammo"]),
         "Automatic": bool(spec["automatic"]),
+        "Consumable": False,
         "MagazineSize": int(spec["magazine"]),
         # Starts loaded. A weapon that had to be reloaded before its first shot
         # would be a puzzle, not a mechanic.

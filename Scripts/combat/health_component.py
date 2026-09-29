@@ -6,6 +6,7 @@ hit_reaction.py; this module wires them together.
 
 import unreal
 
+from combat.debuff_drain import _author_debuff_drain
 from combat.death import (
     CORPSE_SECONDS, _author_corpse, _author_death_collapse,
     _author_kill_count, _author_player_death,
@@ -156,11 +157,15 @@ def build_health_component(rebuild=True):
 
     at_zero = _at(ed.add_branch_node(), 700, 0)
     _connect(_pin(dying, "ReturnValue", is_input=False), _pin(at_zero, "Condition"))
-    # Both arms of the net fall through to here. The Health getter above is
-    # pure, so it is read at *this* branch -- after the net's write -- and a
-    # wanderer written off this frame dies this frame.
-    _connect(BEL.find_then_pin(write_off), _pin(at_zero, "execute"))
-    _connect(BEL.find_else_pin(lost), _pin(at_zero, "execute"))
+    # Both arms of the net fall through the debuff drain to here. The Health
+    # getter above is pure, so it is read at *this* branch -- after the net's
+    # write and the drain's -- and a wanderer written off this frame, or a
+    # starving player drained past zero, dies this frame.
+    drained = _author_debuff_drain(
+        ed, tick, (BEL.find_then_pin(write_off), BEL.find_else_pin(lost)),
+        -2600, -1400)
+    for e in drained:
+        _connect(e, _pin(at_zero, "execute"))
 
     # --- Tick: took a hit and lived --------------------------------------
     # The other arm of the same branch, and that is the whole "and survived":

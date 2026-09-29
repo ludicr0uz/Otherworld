@@ -145,10 +145,12 @@ GENERATED = (
         dest="Content/UI/Art",
         kind="generated",
         builders=("Scripts/build_ui_art.py",
+                  "Scripts/build_survival_icons.py",
                   "Scripts/asset_pipeline/import_ui_art.py"),
         note="The HUD's artwork: panels, inventory slots, bars, the sniper's "
              "scope overlay and one "
-             "silhouette per weapon. Drawn by Pillow rather than authored, so "
+             "silhouette per weapon, plus the mushroom's and the canteen's "
+             "(build_survival_icons.py). Drawn by Pillow rather than authored, so "
              "the look of the UI is a readable script and not a folder of "
              "PNGs nobody can regenerate. Two steps because the editor's "
              "embedded Python has no Pillow: build_ui_art.py writes assets/ui/ "
@@ -156,12 +158,24 @@ GENERATED = (
              "that keep it crisp (UI texture group, uncompressed, no mips).",
     ),
     AssetSource(
+        dest="Content/Survival",
+        kind="generated",
+        builders=("Scripts/build_survival.py",),
+        note="Hunger, thirst and temperature (BP_SurvivalComponent), the "
+             "mushroom and the water canteen (children of BP_WeaponItem, so "
+             "they live in the inventory), the two debuff GameplayEffects and "
+             "GA_ConsumeItem. Also installs an AbilitySystemComponent on the "
+             "player and the wanderer. Needs Content/Weapons first; the forage "
+             "in the levels is placed by Scripts/place_forage.py.",
+    ),
+    AssetSource(
         dest="Content/UI",
         kind="generated",
         builders=("Scripts/build_graphics_menu.py",),
         note="BP_GraphicsMenuHUD: the settings menu, HP and stamina bars, the "
-             "inventory strip and the death screen, drawn with the artwork "
-             "above.",
+             "hunger/thirst/temperature bars, the inventory strip and the "
+             "death screen, drawn with the artwork above. Needs Content/"
+             "Survival first: the survival bars cast to its component.",
     ),
     AssetSource(
         dest="Content/Forest/NPC",
@@ -282,8 +296,12 @@ RESTORE_ORDER = (
     # panels, slots and bars. Two steps, not one: the generator needs Pillow and
     # the editor's embedded Python does not have it, so it runs outside.
     "python3 Scripts/build_ui_art.py",
+    "python3 Scripts/build_survival_icons.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_ui_art.py",
     "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
+    # After combat (the consumables are children of BP_WeaponItem) and before
+    # the HUD (whose survival bars cast to BP_SurvivalComponent).
+    "Scripts/dev/uepy.py --cold Scripts/build_survival.py",
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     # The monsters come before the NPC blueprints, because the wanderers ARE
     # the monsters: BP_Wanderer_Zombie and BP_Wanderer_Wendigo need
@@ -301,6 +319,9 @@ RESTORE_ORDER = (
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_retarget.py",
     "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",
     "Scripts/generate_forest_level.py",
+    # Once each printed import_<Level>.py has run: the import rebuilds the
+    # level from nothing, forage included.
+    "Scripts/dev/uepy.py --cold Scripts/place_forage.py",
 )
 
 

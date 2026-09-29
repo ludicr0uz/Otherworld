@@ -8,7 +8,22 @@ import dataclasses
 
 # ─── Tuning ──────────────────────────────────────────────────────────────────
 
-INVENTORY_SIZE = 5
+INVENTORY_SIZE = 10
+
+# The gameplay event the fire key sends when the held item is Consumable
+# rather than a gun (see weapon_component/consume.py). The weapon component
+# only announces the use; what eating or drinking *does* is GA_ConsumeItem's
+# business, triggered by this tag (Scripts/survival/consume_ability.py). The
+# tag itself is declared in Config/DefaultGameplayTags.ini.
+CONSUME_EVENT_TAG = "Event.Item.Consume"
+
+# A debuff that drains health grants this tag, once per debuff, and
+# BP_HealthComponent takes DEBUFF_DRAIN_HP_PER_S per stack of it every second
+# (combat/debuff_drain.py). The debuffs themselves are GameplayEffects built by
+# Scripts/survival; the health component only counts the tag, so any future
+# debuff that should hurt just grants it too.
+HEALTH_DRAIN_TAG = "Debuff.HealthDrain"
+DEBUFF_DRAIN_HP_PER_S = 0.5    # 100 HP lasts 200 s with one debuff, 100 with two
 
 # Polled keys.  1/2/3 and M belong to the graphics menu, so the weapon keys stay
 # clear of them.

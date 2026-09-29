@@ -12,6 +12,7 @@ from combat.tuning import BIND_VARS, SWITCH_KEY
 from combat.weapon_component.aim import _author_ads, _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire, _author_reload
 from combat.weapon_component.common import _prop
+from combat.weapon_component.consume import _author_consume
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.inventory import (
     _author_drop, _author_equip, _author_pickup,
@@ -224,7 +225,26 @@ def _author_wc_tick(ed, tick):
     ready_gate = _at(ed.add_branch_node(), 2200, 0)
     _connect(_pin(allowed, "ReturnValue", is_input=False),
              _pin(ready_gate, "Condition"))
-    _connect(BEL.find_then_pin(fire_gate), _pin(ready_gate, "execute"))
+
+    # --- or is it something to eat? -----------------------------------------
+    # A Consumable is used rather than fired, and only on the tap: a held
+    # button must not eat a stack of mushrooms at frame rate. Inside the fire
+    # gate for the same reason the ammunition test is -- Consumable is read off
+    # Held -- and so it also inherits "not while sprinting".
+    edible, edible_n = _prop(ed, "Consumable", held, 1240, -300)
+    use_gate = _at(ed.add_branch_node(), 1480, -300)
+    _connect(edible, _pin(use_gate, "Condition"))
+    _connect(BEL.find_then_pin(fire_gate), _pin(use_gate, "execute"))
+    _connect(BEL.find_else_pin(use_gate), _pin(ready_gate, "execute"))
+    use_tap = _at(ed.add_branch_node(), 1720, -300)
+    _connect(tap, _pin(use_tap, "Condition"))
+    _connect(BEL.find_then_pin(use_gate), _pin(use_tap, "execute"))
+    consumed = _author_consume(ed, held, owner_out, BEL.find_then_pin(use_tap),
+                               1400, 5800)
+    ed.add_comment_to_nodes(
+        "The held item is Consumable: a tap uses it (consume.py) instead of "
+        "firing it, and a held button does nothing.",
+        [edible_n, use_gate, use_tap])
 
     ed.add_comment_to_nodes(
         "The trigger is being touched, the weapon is out and the player is not "
@@ -263,7 +283,8 @@ def _author_wc_tick(ed, tick):
     reload_gate = _at(ed.add_branch_node(), 1040, 7200)
     _connect(both(pressed("KeyReload", 7360), armed_out, 7300),
              _pin(reload_gate, "Condition"))
-    for exit_pin in (after_fire, BEL.find_else_pin(fire_gate)) + dry_exits:
+    for exit_pin in (after_fire, BEL.find_else_pin(fire_gate), consumed,
+                     BEL.find_else_pin(use_tap)) + dry_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
     reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate),
                                   1400, 7200)

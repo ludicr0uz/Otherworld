@@ -33,7 +33,7 @@ def build_ammo_pickup(rebuild=True):
     Walked into rather than pressed for. E already picks weapons up, and making
     the player press it again for ammunition they obviously want is friction
     with no decision in it -- whereas a *weapon* on the ground is a real choice,
-    because the five slots are finite.
+    because the inventory's slots are finite.
 
     The proximity test runs on the pickup, not on the player, and that is the
     whole reason this is an actor with a graph instead of another

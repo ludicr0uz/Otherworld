@@ -9,4 +9,5 @@ build_graphics_menu.py, which is still the entry point and owns the rest.
   settings_rows   settings screen constants: SLIDERS, row layout, KEY_POOL
   settings_page   drawing the settings page; pushing settings onto the weapon
   settings_input  rebinding capture, slider nudges, BACK, the save
+  survival_bars   hunger/thirst/temperature bars and the debuff names
 """

@@ -177,7 +177,7 @@ def _author_pickup(ed, owner, exec_in, x0, y0):
 
     # The room check is inside the loop, not before it: without it a player
     # standing on a pile would pick up every weapon at once and overflow the
-    # five slots the HUD draws.
+    # INVENTORY_SIZE slots the HUD draws.
     and1 = keep(_at(_node(ed, FN_AND), x0 + 1840, y0 + 340))
     _connect(dropped_pin, _pin(and1, "A"))
     _connect(_pin(near, "ReturnValue", is_input=False), _pin(and1, "B"))

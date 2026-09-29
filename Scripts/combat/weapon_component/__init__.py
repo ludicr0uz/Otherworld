@@ -9,6 +9,7 @@ _author_* fragment per concern, each in its own module:
   firing      pellets, impacts, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire
+  consume     the fire key on a Consumable: send the GAS use event, spend it
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
   sprint      sprint and stamina
@@ -22,6 +23,7 @@ BP_WeaponComponent event graph:
               --> Equip(0)
 
   [Tick] --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
+                                        (or, if Held.Consumable, use it)
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held
          --> Branch WasInputKeyJustPressed(E)               --> pick up nearest

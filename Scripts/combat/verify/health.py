@@ -14,7 +14,9 @@ from combat.ragdoll import RAGDOLL_PROFILE
 from combat.respawn import (
     RESPAWN_ATTEMPTS, RESPAWN_BAND, RESPAWN_LIFT, WORLD_FLOOR_Z,
 )
-from combat.verify.fixtures import _montages, gm, h, health_bp, hg, wg
+from combat.verify.fixtures import (
+    _montages, drain_writes, gm, h, health_bp, hg, wg,
+)
 from combat.verify.common import (
     BEL, PIN, by_pins, check, graph, in_pins, num_pin, out_pins, pin_value,
     titled,
@@ -296,13 +298,16 @@ def check_corpse():
           bool(titled(hg, f"SET {PLAYER_DEAD_VAR}"))
           or bool(titled(hg, f"Set {PLAYER_DEAD_VAR}")))
 
-    # One writer, and it is the safety net's. Anything else writing Health inside
-    # the component's own graph is a probe that was left behind -- which is exactly
-    # how the 60 s corpse timer was measured, on a compressed value, with a clock
-    # forcing the death.
+    # Two writers: the safety net's, and the debuff drain's (combat/debuff_drain.py).
+    # Anything else writing Health inside the component's own graph is a probe
+    # that was left behind -- which is exactly how the 60 s corpse timer was
+    # measured, on a compressed value, with a clock forcing the death.
     writes = [n for n in hg if str(BEL.get_node_title(n)) in ("SET Health", "Set Health")]
-    check("only the world-floor net writes Health from inside the component",
-          len(writes) == 1, f"{len(writes)} Set Health node(s)")
+    drains = [n for n in writes if n in drain_writes]
+    check("only the world-floor net and the debuff drain write Health from "
+          "inside the component",
+          len(writes) == 2 and len(drains) == 1,
+          f"{len(writes)} Set Health node(s), {len(drains)} of them the drain's")
 
 
 # ─── Walking off the edge of the world ───────────────────────────────────────
@@ -335,9 +340,11 @@ def check_world_edge():
     # Two writes of Health = 0 would mean two floors; one, reached from both arms
     # of the "is this worth a log line" branch, is the shape that catches both the
     # wanderer and the player.
+    # A LITERAL zero: a wired pin (the debuff drain's) also reads back as 0.
     zeroes = [n for n in hg
               if str(BEL.get_node_title(n)).replace("\n", " ") == "Set Health"
-              and num_pin(n, "Health") == 0.0]
+              and num_pin(n, "Health") == 0.0
+              and not BEL.find_input_pin(n, "Health").list_connected_pins()]
     check("exactly one node writes the fall off as death", len(zeroes) == 1,
           f"{len(zeroes)} writes of Health = 0")
     if zeroes:

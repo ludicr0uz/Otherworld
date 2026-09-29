@@ -103,6 +103,11 @@ from graphics_menu.settings_rows import (                          # noqa: E402
     BIND_LABELS, BIND_VARS, KEY_POOL, PAGE_SETTINGS, PAGE_TITLE,
     SETTINGS_CLASS_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
 from graphics_menu.settings_input import _emit_save                # noqa: E402
+# Hunger, thirst and temperature under the stamina bar, and the debuff names.
+from graphics_menu.survival_bars import author_survival_bars       # noqa: E402
+# The one inventory size: the weapon component refuses a pick-up past it, and
+# the strip draws exactly that many slots.
+from combat.tuning import INVENTORY_SIZE                            # noqa: E402
 from graphics_menu.settings_page import (                          # noqa: E402
     _author_push_settings, _author_settings_page)
 
@@ -291,7 +296,11 @@ KILL_COUNT_VAR = "NpcKillCount"
 PLAYER_DEAD_VAR = "PlayerDead"
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
-INVENTORY_SIZE = 5
+# Two rows of five rather than one row of ten: ten 120 px slots are a 1290 px
+# strip, wider than a PIE viewport, and the slots were made 120 px wide in the
+# first place because the icons were unreadable any smaller.
+INVENTORY_COLUMNS = 5
+INVENTORY_ROWS = -(-INVENTORY_SIZE // INVENTORY_COLUMNS)
 SLOT_W = 120.0
 SLOT_H = 84.0
 SLOT_GAP = 10.0
@@ -416,6 +425,8 @@ FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
 FN_NEQ_II = "/Script/Engine.KismetMathLibrary.NotEqual_IntInt"
 FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
 FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
+FN_MOD_II = "/Script/Engine.KismetMathLibrary.Percent_IntInt"
+FN_DIV_II = "/Script/Engine.KismetMathLibrary.Divide_IntInt"
 FN_MIN_II = "/Script/Engine.KismetMathLibrary.Min"
 FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
 FN_FCLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
@@ -1460,7 +1471,9 @@ def _author_npc_bars(ed, x0, y0, in_execs):
 
 
 def _author_inventory(ed, x0, y0, in_execs):
-    """Five slots along the bottom, filled from the weapon component's Inventory.
+    """INVENTORY_SIZE slots along the bottom, INVENTORY_COLUMNS to a row,
+    filled from the weapon component's Inventory. Slot i sits in column
+    i % INVENTORY_COLUMNS of row i / INVENTORY_COLUMNS, top row first.
 
     The strip is drawn from the viewport size rather than from fixed pixels so
     it stays centred and bottom-anchored at any window size -- DrawRect works in
@@ -1470,7 +1483,7 @@ def _author_inventory(ed, x0, y0, in_execs):
     wh = _at(_node(ed, FN_BREAK_V2D), x0 + 240, y0 + 700)
     _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
 
-    strip_w = INVENTORY_SIZE * SLOT_W + (INVENTORY_SIZE - 1) * SLOT_GAP
+    strip_w = INVENTORY_COLUMNS * SLOT_W + (INVENTORY_COLUMNS - 1) * SLOT_GAP
     half = _at(_node(ed, FN_MUL), x0 + 480, y0 + 700)
     _connect(_pin(wh, "X", is_input=False), _pin(half, "A"))
     _set(half, "B", 0.5)
@@ -1481,16 +1494,17 @@ def _author_inventory(ed, x0, y0, in_execs):
 
     row_y = _at(_node(ed, FN_SUB), x0 + 720, y0 + 840)
     _connect(_pin(wh, "Y", is_input=False), _pin(row_y, "A"))
-    _set(row_y, "B", SLOT_H + SLOT_BOTTOM)
-    y_out = _pin(row_y, "ReturnValue", is_input=False)
+    _set(row_y, "B", INVENTORY_ROWS * SLOT_H + (INVENTORY_ROWS - 1) * SLOT_GAP
+         + SLOT_BOTTOM)
+    y_out = _pin(row_y, "ReturnValue", is_input=False)   # the TOP row
 
     made = [size, wh, half, origin_x, row_y]
 
-    def slot_x(index, px, py):
-        """origin_x + index * (SLOT_W + SLOT_GAP), as a node chain."""
+    def slot_at(base, offset, px, py):
+        """base + offset, as a node: a slot's column or row, off the strip's."""
         n = _at(_node(ed, FN_ADD), px, py)
-        _connect(x_out, _pin(n, "A"))
-        _set(n, "B", index * (SLOT_W + SLOT_GAP))
+        _connect(base, _pin(n, "A"))
+        _set(n, "B", offset)
         made.append(n)
         return _pin(n, "ReturnValue", is_input=False)
 
@@ -1500,8 +1514,11 @@ def _author_inventory(ed, x0, y0, in_execs):
     for i in range(INVENTORY_SIZE):
         r = _draw_texture(ed, x0 + 1000 + i * 240, y0, "T_UI_Slot",
                           w=SLOT_W, h=SLOT_H)
-        _connect(slot_x(i, x0 + 1000 + i * 240, y0 + 300), _pin(r, "ScreenX"))
-        _connect(y_out, _pin(r, "ScreenY"))
+        col, row = i % INVENTORY_COLUMNS, i // INVENTORY_COLUMNS
+        _connect(slot_at(x_out, col * (SLOT_W + SLOT_GAP), x0 + 1000 + i * 240, y0 + 300),
+                 _pin(r, "ScreenX"))
+        _connect(slot_at(y_out, row * (SLOT_H + SLOT_GAP), x0 + 1000 + i * 240, y0 + 420),
+                 _pin(r, "ScreenY"))
         if flow is None:
             for e in in_execs:
                 _connect(e, _pin(r, "execute"))
@@ -1543,17 +1560,25 @@ def _author_inventory(ed, x0, y0, in_execs):
     item = _loose_pin(loop, "ArrayElement", is_input=False)
     index = _loose_pin(loop, "ArrayIndex", is_input=False)
 
-    # The slot's X is index-driven, so one draw covers all five positions
-    # instead of five unrolled copies with baked-in coordinates.
-    as_float = _at(_node(ed, FN_CONV_INT), x0 + 3700, y0 + 520)
-    _connect(index, _pin(as_float, "InInt"))
-    step = _at(_node(ed, FN_MUL), x0 + 3940, y0 + 520)
-    _connect(_pin(as_float, "ReturnValue", is_input=False), _pin(step, "A"))
-    _set(step, "B", SLOT_W + SLOT_GAP)
-    at_x = _at(_node(ed, FN_ADD), x0 + 4180, y0 + 520)
-    _connect(x_out, _pin(at_x, "A"))
-    _connect(_pin(step, "ReturnValue", is_input=False), _pin(at_x, "B"))
-    at_x_out = _pin(at_x, "ReturnValue", is_input=False)
+    # The slot's position is index-driven, so one draw covers every slot
+    # instead of unrolled copies with baked-in coordinates: column is
+    # index % INVENTORY_COLUMNS, row is index / INVENTORY_COLUMNS.
+    def along(op, base, pitch, py):
+        cell = _at(_node(ed, op), x0 + 3460, py)
+        _connect(index, _pin(cell, "A"))
+        _set(cell, "B", INVENTORY_COLUMNS)
+        as_float = _at(_node(ed, FN_CONV_INT), x0 + 3700, py)
+        _connect(_pin(cell, "ReturnValue", is_input=False), _pin(as_float, "InInt"))
+        step = _at(_node(ed, FN_MUL), x0 + 3940, py)
+        _connect(_pin(as_float, "ReturnValue", is_input=False), _pin(step, "A"))
+        _set(step, "B", pitch)
+        at = _at(_node(ed, FN_ADD), x0 + 4180, py)
+        _connect(base, _pin(at, "A"))
+        _connect(_pin(step, "ReturnValue", is_input=False), _pin(at, "B"))
+        return _pin(at, "ReturnValue", is_input=False), [cell, as_float, step, at]
+
+    at_x_out, x_nodes = along(FN_MOD_II, x_out, SLOT_W + SLOT_GAP, y0 + 520)
+    at_y_out, y_nodes = along(FN_DIV_II, y_out, SLOT_H + SLOT_GAP, y0 + 1180)
 
     colour = _at(ed.add_get_member_variable_node("SlotColor", ITEM_CLASS_PATH),
                  x0 + 3700, y0 + 660)
@@ -1585,14 +1610,14 @@ def _author_inventory(ed, x0, y0, in_execs):
     back = _draw_texture(ed, x0 + 4420, y0 - 300, "T_UI_SlotActive",
                          w=SLOT_W, h=SLOT_H)
     _connect(at_x_out, _pin(back, "ScreenX"))
-    _connect(y_out, _pin(back, "ScreenY"))
+    _connect(at_y_out, _pin(back, "ScreenY"))
     _connect(BEL.find_then_pin(lit), _pin(back, "execute"))
 
     icon_x = _at(_node(ed, FN_ADD), x0 + 4180, y0 + 660)
     _connect(at_x_out, _pin(icon_x, "A"))
     _set(icon_x, "B", (SLOT_W - SLOT_ICON_W) / 2.0)
     icon_y = _at(_node(ed, FN_ADD), x0 + 4180, y0 + 780)
-    _connect(y_out, _pin(icon_y, "A"))
+    _connect(at_y_out, _pin(icon_y, "A"))
     _set(icon_y, "B", SLOT_ICON_TOP)
 
     fill = _at(_node(ed, FN_DRAW_TEXTURE), x0 + 4420, y0)
@@ -1651,7 +1676,7 @@ def _author_inventory(ed, x0, y0, in_execs):
     _connect(_pin(ammo_right, "ReturnValue", is_input=False), _pin(ammo_x, "A"))
     _connect(_pin(measure, "OutWidth", is_input=False), _pin(ammo_x, "B"))
     ammo_y = _at(_node(ed, FN_ADD), x0 + 5180, y0 + 780)
-    _connect(y_out, _pin(ammo_y, "A"))
+    _connect(at_y_out, _pin(ammo_y, "A"))
     _set(ammo_y, "B", SLOT_AMMO_BASELINE)
 
     ammo = _at(_node(ed, FN_DRAW_TEXT), x0 + 5680, y0 + 640)
@@ -1678,7 +1703,7 @@ def _author_inventory(ed, x0, y0, in_execs):
     mark = _draw_texture(ed, x0 + 6200, y0, "T_UI_SlotFrame",
                          w=SLOT_W, h=SLOT_H)
     _connect(at_x_out, _pin(mark, "ScreenX"))
-    _connect(y_out, _pin(mark, "ScreenY"))
+    _connect(at_y_out, _pin(mark, "ScreenY"))
     _connect(BEL.find_then_pin(marked), _pin(mark, "execute"))
 
     # And its name, once, centred over the whole strip. Centred from a real
@@ -1720,7 +1745,7 @@ def _author_inventory(ed, x0, y0, in_execs):
         "a lit edge alone was reported as not reading. Everything is off the "
         "weapon's own properties, so the HUD needs no table of weapon names "
         "and no idea which of them is the one with a magazine.",
-        [pawn, comp, cast, inv, equipped, loop, as_float, step, at_x, colour,
+        [pawn, comp, cast, inv, equipped, loop, *x_nodes, *y_nodes, colour,
          name, fill, uses, counted, in_gun, in_bag,
          in_gun_s, in_bag_s, sep, ammo_str, ammo_x, ammo_y, ammo,
          is_equipped, marked, icon, icon_x, icon_y, mark, lit, back,
@@ -2390,7 +2415,8 @@ def _author_draw(ed, x0, y0):
     # HP first, so it is on screen whether or not the menu is open.
     after_hp = _author_hp(ed, x0, y0 - 900, living)
     after_st = _author_stamina(ed, x0, y0 - 1600, after_hp)
-    after_kills = _author_kills(ed, x0, y0 - 2300, after_st)
+    after_sv = author_survival_bars(ed, x0 + 9000, y0 - 1600, after_st)
+    after_kills = _author_kills(ed, x0, y0 - 2300, after_sv)
 
     # Then the world-space NPC bars and the inventory strip, both of which are
     # always on screen for the same reason the HP bar is.

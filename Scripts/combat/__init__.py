@@ -10,7 +10,8 @@ each module's docstring says what it owns and why it is shaped that way.
 DATA (constants and pure tables -- no Blueprint authoring)
   paths             /Game asset paths and generated-class paths
   nodes             FN_* function paths, NODE_* palette names, macros
-  tuning            keys, CombatConfig / COMBAT, ammo, drops, auto fire,
+  tuning            keys, inventory size, CombatConfig / COMBAT, ammo, drops,
+                    auto fire, the consume event and health-drain tags,
                     noise, SHOT_VOLUME_CM (how loud each gun is)
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
@@ -40,6 +41,7 @@ BP_HealthComponent (health_component wires the fragments together)
   health_component  variables, defaults, the Tick's death branch
   respawn           spawn numbering, world-floor net, respawn band
   death             kill count, gun drop, ragdoll collapse, corpse, player death
+  debuff_drain      HP lost per stack of the GAS Debuff.HealthDrain tag
   hit_reaction      flinch clips and direction pick
   hit_zones         head/limb bone tables and multipliers
   ragdoll           joint limits and tune_ragdolls()

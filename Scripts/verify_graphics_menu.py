@@ -21,6 +21,7 @@ from graphics_menu import menu_nav as N
 from graphics_menu import grass_tiers as T
 from graphics_menu import presets as P
 from graphics_menu import settings_rows as S
+from graphics_menu import survival_bars as SB
 
 BEL = unreal.BlueprintEditorLibrary
 BGE = unreal.BlueprintGraphEditor
@@ -240,6 +241,9 @@ def main():
     # The health number has no literal text -- its Text pin is driven -- so it
     # contributes an empty string here.
     expected_text |= {""}
+    # The survival bars' labels, and the debuff names drawn beside them.
+    expected_text |= {label for _s, label, _c, _y in SB.SURVIVAL_BARS}
+    expected_text |= {label for _t, label, _s in SB.DEBUFF_LABELS}
     check("panel, HP, stamina, debug row and the death menu draw their labels",
           drawn == expected_text, str(sorted(drawn ^ expected_text)))
     # Almost everything that used to be a DrawRect is a DrawTexture now -- see
@@ -259,7 +263,9 @@ def main():
     # ...plus the settings page's panel, which is the same artwork stretched
     # taller rather than a second texture to keep in step.
     # ...plus the sniper's scope.
-    expected_textures = 1 + 1 + 2 + 1 + G.INVENTORY_SIZE + 1 + 1 + 1 + 2 + 2 + 2 + 1
+    # ...plus a track+fill for each survival bar.
+    expected_textures = (1 + 1 + 2 + 1 + G.INVENTORY_SIZE + 1 + 1 + 1 + 2 + 2 + 2 + 1
+                         + 2 * len(SB.SURVIVAL_BARS))
     textures = by_pins("Texture")
     check(f"{expected_textures} DrawTextures: panels, slots, weapon icon, bars",
           len(textures) == expected_textures, str(len(textures)))
@@ -483,8 +489,10 @@ def main():
     # three times -- inventory strip, reticle, and the stamina bar.
     # Six: the player's health, an NPC's health, and the weapon component four
     # times -- inventory strip, reticle, stamina bar, and the settings push.
-    check("HUD looks up health (player + NPC) and the weapon component",
-          len(lookups) == 6 and all(any(w in f for f in found) for w in wanted),
+    # Seven: and the survival component, for its bars.
+    wanted.add(SB.SURVIVAL_CLASS_PATH)
+    check("HUD looks up health (player + NPC), the weapon and survival components",
+          len(lookups) == 7 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # A fill's width is computed from a health fraction; the track behind it is
@@ -494,8 +502,10 @@ def main():
     # Four: the scope's square is sized off the viewport for the same reason.
     driven = [n for n in by_pins("Texture")
               if BEL.find_input_pin(n, "ScreenW").list_connected_pins()]
-    check("the HP, NPC and stamina fills and the scope are driven, not "
-          "constants", len(driven) == 4, str(len(driven)))
+    # ...and one fill per survival bar.
+    want_fills = 4 + len(SB.SURVIVAL_BARS)
+    check("the HP, NPC, stamina and survival fills and the scope are driven, "
+          "not constants", len(driven) == want_fills, f"{len(driven)}, want {want_fills}")
 
     # --- the new HUD layers
     npc_scans = [n for n in by_pins("ActorClass")

@@ -656,7 +656,8 @@ which module owns what — start there rather than grepping.
 It supersedes `build_shotgun_and_health.py`, which is kept only as history — do not run it.
 
 **Controls (the defaults — all seven are rebindable on the settings screen):** left click
-fires — **held**, on the SMG and the assault rifle · right click aims · **Q** cycles weapons ·
+fires — **held**, on the SMG and the assault rifle — and **eats or drinks** a held mushroom or
+canteen (tap) · right click aims · **Q** cycles weapons ·
 **G** drops · **E** picks up · **Shift** sprints · **R** reloads, and restarts from the death
 menu. (1/2/3/4, M and D belong to the graphics menu, so the weapon keys stay clear of them.)
 These are CDO defaults on `BP_WeaponComponent`, pushed over every frame by the HUD from
@@ -676,7 +677,7 @@ and does run paused.
 | `BP_AssaultRifle` | child: 8 primitives, 1 × **24** dmg, 1.4° cone, 90 m, 30+90 rounds, 0.14 s, 2.1 s reload. **Automatic. Found only.** |
 | `BP_SniperRifle` | child: 10 primitives, 1 × **120** dmg, 0.2° cone, 200 m, 5+15 rounds, **1.6 s**, 2.6 s reload. **Found only.** |
 | `BP_AmmoPickup` | 2 brass shells a killed wanderer leaves behind; walked into, not pressed for |
-| `BP_WeaponComponent` | on the player: Inventory (5 slots), equip/switch/fire/reload/drop/pick up, **sprint + stamina** |
+| `BP_WeaponComponent` | on the player: Inventory (**10 slots**, `INVENTORY_SIZE`), equip/switch/fire/reload/drop/pick up, **sprint + stamina**, and the use of a held **Consumable** (see *Survival*) |
 | `BP_HealthComponent` | Health/MaxHealth, the damage stamp, death — despawn and respawn for a wanderer, **the death sequence and the pause** for the player |
 | `BP_BloodSplash` | 19 small lit droplets thrown out along the hit normal, each on its own velocity under drag and real gravity, over 0.45 s |
 | `Audio/A_*Fire` × 5, `A_DryFire`, `A_ReloadShotgun`, `A_ReloadRifle`, `A_ReloadPistol` | **cut from CC0 recordings of real firearms** by `Scripts/fetch_weapon_sounds.py`. `Scripts/make_weapon_sounds.py`, which synthesised the earlier set, is kept as history and is no longer wired in |
@@ -1460,7 +1461,7 @@ and for the same reason: the safety net writes `Health = 0` for anything that fa
 world, and paying for that would turn a bug into an ammunition supply.
 
 `BP_AmmoPickup` is **walked into, not pressed for** — `E` already picks weapons up, and a weapon
-on the ground is a real choice (five slots are finite) where ammunition you obviously want is
+on the ground is a real choice (ten slots are finite) where ammunition you obviously want is
 not. The distance is measured **on the pickup**, not in the weapon component's Tick: there are at
 most a handful of these on the ground, so one Tick each beats a `GetAllActorsOfClass` sweep every
 frame whether any exist or not. `Credited` is the break `ForEachLoop` does not have — without it
@@ -1679,7 +1680,10 @@ invalid object is an `Accessed None` per wanderer per frame.
 
 `build_graphics_menu.py` draws, every frame: the player's HP bar and the stamina bar under it
 (top-left), the **kill counter** (top-right), a projected health bar over every wanderer (with
-its spawn number beside it **in debug mode only**), a 5-slot inventory strip centred along the
+its spawn number beside it **in debug mode only**), the **hunger / thirst / temperature bars**
+under stamina with **STARVING** / **DEHYDRATED** beside them while those debuffs are on (see
+*Survival*), a **10-slot inventory strip — two rows of five** (ten 120 px slots are wider than a
+PIE viewport, and the slots were enlarged to 120 px because smaller icons were unreadable) — centred along the
 bottom — each slot showing its weapon's **rounds-loaded / rounds-in-reserve** if it uses
 ammunition at all — and the centre reticle. Or, if the player is dead, **only the death menu** — the first thing `DrawHUD` does is
 read `GameMode.PlayerDead` and branch, because a reticle and an inventory strip over a death
@@ -1711,6 +1715,62 @@ its own `UsesAmmo`/`Loaded`/`Reserve` — so the HUD keeps no list of weapons to
 with, and no idea which of them is the one with a magazine. The strip is laid out from the viewport size so it stays
 centred and bottom-anchored at any window size.
 
+## Survival: hunger, thirst, food, water and debuffs
+
+`Scripts/build_survival.py` builds `/Game/Survival` and installs it; `Scripts/verify_survival.py`
+reads it back (**88 checks**). Code is the `Scripts/survival/` package (its `__init__` is the
+map). Run **after** `build_weapons_and_combat.py` and **before** `build_graphics_menu.py`:
+
+```bash
+python3 Scripts/build_survival_icons.py                          # Pillow, outside the editor
+python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_ui_art.py Scripts/build_weapons_and_combat.py \
+    Scripts/build_survival.py Scripts/build_graphics_menu.py Scripts/place_forage.py
+python3 Scripts/dev/uepy.py Scripts/verify_survival.py
+```
+
+**It is the Gameplay Ability System** (plugin `GameplayAbilities`, enabled in the `.uproject`;
+tags in `Config/DefaultGameplayTags.ini` — both are read at editor **startup**, so a change to
+either needs an editor restart):
+
+| piece | what it is |
+|---|---|
+| `AbilitySystem` component | a stock `AbilitySystemComponent` on the player **and** the wanderer; it initialises itself in `InitializeComponent`, and `GetAbilitySystemComponent(Actor)` finds it without the C++ interface |
+| `GE_Starving`, `GE_Dehydrated` | **infinite** GameplayEffects — a debuff is an active effect, visible to `showdebug abilitysystem` |
+| `Debuff.Starving` / `Debuff.Dehydrated` / `Debuff.HealthDrain` | the tags a debuff grants; the HUD names a debuff from the first two, `BP_HealthComponent` drains **0.5 HP/s per stack** of the third (`combat/debuff_drain.py`), so both debuffs drain twice as fast |
+| `GA_ConsumeItem` | a GameplayAbility **triggered by the gameplay event `Event.Item.Consume`**; the payload's `OptionalObject` is the item |
+| `BP_SurvivalComponent` | the player's Hunger/Thirst/Temperature (Blueprint floats — an AttributeSet can only be declared in C++), their decay, granting `GA_ConsumeItem` at BeginPlay, and the debuff sync |
+
+The flow: fire key with a **Consumable** held → `weapon_component/consume.py` sends
+`Event.Item.Consume` to the owner, **then** removes and destroys the item (the send activates
+the ability synchronously, and the ability reads the item's restore values) → `GA_ConsumeItem`
+adds `HungerRestore`/`ThirstRestore` to the survival component, clamped → on its next Tick the
+survival component sees "bar at zero" and "effect active" disagree and removes the debuff. There
+is one place that decides a debuff is on, and it asks the ASC (`GetGameplayEffectCount`), not a
+bool of its own. combat never names a survival asset: it knows only the two tag names, in
+`combat/tuning.py`.
+
+**The food and water are weapons, deliberately.** `BP_ConsumableItem` is a child of
+`BP_WeaponItem` with `Consumable = True` (a flag on the *base*, so the weapon component can branch
+on it without naming a class built after it). So E picks them up, G drops them, Q cycles them and
+the strip draws their icons with no new code. They default to **`Dropped = True`** — a consumable
+starts life on the ground — which is also why placing one needs no per-instance write. They are
+held in the pistol's ready pose; there is no eating animation.
+
+**Numbers** (`survival/tuning.py`): hunger empties in 15 min, thirst in 10; a mushroom is +25
+hunger, a canteen +40 thirst; temperature is a 0–100 bar that **nothing moves yet**. Forage:
+`scatter_forage` puts mushrooms 0.7–2.2 m from a random trunk and canteens anywhere, 6 and 1.5 per
+hectare, capped at 300 / 80 — **24 + 6** on the 200 m map, **300 + 80** on the 1 km map. It is
+placed into the saved levels by `place_forage.py` (tag `OW_Forage`, idempotent), **not** by the
+level generator — so re-run it after any `import_<Level>.py`.
+
+**Proved at runtime** (`-game` probe that lowered the component's CDO defaults and reopened the
+level, then used the level's own placed items through the real gameplay event): both debuffs on
+at t = 0.4 s with `HealthDrain` ×2, HP falling 1.00/s; a mushroom took hunger 0 → 25, `Starving`
+came off the next frame and the drain halved (−0.25 HP in 0.5 s); a canteen cleared the rest and
+HP held to five decimals; the hit-reaction timer never moved; 0 runtime errors. **Not** proved
+headlessly: pressing the fire key with food in hand (no input in a headless run — the graph is
+verified, the key press is not), and how the bars and the two-row strip look.
+
 ## Current state
 
 - The player is a **Meshy-generated photorealistic adventurer** (`SKM_Adventurer01`,
@@ -1738,6 +1798,10 @@ centred and bottom-anchored at any window size.
   whole terrain, so the 15 m ring it used to leave uncovered is gone.
   Aiming is the camera/muzzle hybrid described above, with a reticle on the real impact point,
   and the held weapon is turned to face that point every frame.
+- **Survival** (see its section): hunger and thirst fall, mushrooms and water canteens lie in
+  both forests and are eaten/drunk with the fire key, and at zero the GAS debuffs
+  `GE_Starving`/`GE_Dehydrated` drain HP until the player eats or drinks. The inventory holds
+  **10**. Temperature has a bar and nothing moves it yet.
 - Proven in `-game` runs, not just in the graph: the player's death pauses the world (the
   health components' last Tick is at world t = 2.200635, exactly the delay, and there is **not
   one log line of any kind** afterwards); the kill counter counts shot wanderers and refuses
@@ -1813,6 +1877,35 @@ centred and bottom-anchored at any window size.
   They are history, not API — prefer the generator + `forest_generator/` package.
 
 ## Gotchas learned the hard way
+
+- **A GameplayEffect's granted tags cannot be set from Python.** Since 5.3 they live in
+  `TargetTagsGameplayEffectComponent.InheritableGrantedTagsContainer`, which is **private** —
+  `get/set_editor_property` says "Failed to find property", and the class is not even exported by
+  name (`unreal.load_class(None, "/Script/GameplayAbilities.TargetTagsGameplayEffectComponent")`
+  works). The deprecated `InheritableOwnedTagsContainer` is writable and compiles, but the engine
+  only upgrades it into the component for assets saved before `Modular53`; a new asset never is
+  (four probes: fresh, reloaded, unloaded-and-loaded, recompiled). The supported way round it is
+  to grant the tags **on the spec**: `MakeOutgoingSpec` → `AddGrantedTag` ×N →
+  `ApplyGameplayEffectSpecToSelf` (`survival/debuffs.py`). `MakeOutgoingSpec` is a pure node, so
+  chain each `AddGrantedTag` off the previous one's return, or you build two specs.
+  `AbilityTriggerData` exposes no fields to Python (`to_tuple()` is `()`), so read it back with
+  `export_text()`. Structs such as `InheritedTagContainer` refuse `set_editor_property`
+  ("cannot be edited on instances") but take `import_text`.
+- **A level loaded in the same Python call has no terrain collision yet.** Big complex-collision
+  meshes cook asynchronously and finish on a later editor tick, which a Python job never yields:
+  380 of 380 `line_trace_component` calls missed straight after `load_level` on the 1 km map, 15
+  of 15 hit once the editor had ticked (the startup map traced fine only because it was cooked
+  at boot). Read heights from the mesh instead —
+  `ProceduralMeshLibrary.get_section_from_static_mesh` + `survival/terrain_heights.py`.
+- **Python cannot write a Blueprint variable on an *instance*** unless it is Instance Editable
+  ("cannot be edited on instances"), and `SetFloatPropertyByName` & co. are not exported. For a
+  runtime probe, write the **CDO** and reopen the level (`GameplayStatics.open_level`) so the new
+  instances take the value; in the editor, make the class default right instead.
+- `Blueprint.get_blueprint_parent_class()` is the parent class; there is no `parent_class`
+  property and a generated class has no `get_super_class`. In Python `destroy_actor()` is the
+  name, not `k2_destroy_actor`, and there is no `begin_deferred_actor_spawn_from_class`.
+- The ability system warns at startup if `GameplayCueNotifyPaths` is unset and scans all of
+  `/Game`; `Config/DefaultGame.ini` points it at `/Game/Survival`.
 
 - **An unknown key in an `.ini` section is silently ignored — including the section name.**
   `bRemoteExecution` belongs to `UPythonScriptPluginSettings` (`UCLASS(config=Engine)`, so

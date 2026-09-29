@@ -15,7 +15,9 @@ from combat.hit_reaction import (
 )
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH
 from combat.tuning import COMBAT, CombatConfig
-from combat.verify.fixtures import _montages, h, hg, wg
+from combat.verify.fixtures import (
+    _montages, drain_subtracts, drain_writes, h, hg, wg,
+)
 from combat.verify.common import (
     BEL, PIN, _mesh_asset, by_pins, check, component_template, has_in_pin,
     load, num_pin, pin_value, titled,
@@ -175,9 +177,14 @@ def check_flinching():
 
     # The trigger. Health compared against PrevHealth, and the whole chain hanging
     # off the death branch's False arm.
+    # ...leaving out the debuff drain's pair, which lowers PrevHealth with
+    # Health precisely so that it is NOT read as a hit (combat/debuff_drain.py).
+    _drain_reads = [PIN.get_owning_node(q) for n in drain_subtracts
+                    for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A"))]
     _prev_reads = [n for n in hg if str(BEL.get_node_title(n)).replace("\n", " ")
-                   == f"Get {PREV_HEALTH_VAR}"]
-    _prev_writes = [n for n in hg if has_in_pin(n, PREV_HEALTH_VAR)]
+                   == f"Get {PREV_HEALTH_VAR}" and n not in _drain_reads]
+    _prev_writes = [n for n in hg if has_in_pin(n, PREV_HEALTH_VAR)
+                    and n not in drain_writes]
     check(f"{PREV_HEALTH_VAR} is read once and written once -- the whole trigger",
           len(_prev_reads) == 1 and len(_prev_writes) == 1,
           f"{len(_prev_reads)} reads, {len(_prev_writes)} writes")

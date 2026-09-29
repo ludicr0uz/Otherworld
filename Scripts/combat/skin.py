@@ -67,6 +67,10 @@ class PlayerSkin:
     # round, and the weapon's handle is put there. The thumb wraps the other
     # way and is not in; the index's outer joints rest on the trigger.
     grip_fingers: tuple
+    # The two spine joints that pitch the upper body onto the aim down the
+    # sights, lower first; each takes half (aim_pitch.py). Everything above
+    # them -- chest, arms, head and the weapon in the hand -- turns rigidly.
+    aim_bones: tuple
     # Mesh component transform inside the actor. The template's own numbers;
     # they are a property of a 1.8 m humanoid standing in an 88 cm capsule
     # facing +X, not of the mannequin, which is why the Meshy skin reuses them.
@@ -82,6 +86,7 @@ SKIN_QUINN = PlayerSkin(
     aim_pistol="/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS",
     grip_fingers=tuple(tuple(f"{f}_{j:02d}_r" for j in (1, 2, 3))
                        for f in ("index", "middle", "ring", "pinky")),
+    aim_bones=("spine_03", "spine_05"),
 )
 
 # Built by Scripts/asset_pipeline: fetch_monsters.py -> import_characters.py ->
@@ -102,6 +107,8 @@ SKIN_ADVENTURER = PlayerSkin(
     # asset_pipeline/finger_rig.py adds these, named the Mixamo way.
     grip_fingers=tuple(tuple(f"RightHand{f}{j}" for j in (1, 2, 3))
                        for f in ("Index", "Middle", "Ring", "Pinky")),
+    # Meshy numbers its spine backwards: Hips -> Spine02 -> Spine01 -> Spine.
+    aim_bones=("Spine01", "Spine"),
 )
 
 

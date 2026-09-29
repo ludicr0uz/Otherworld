@@ -11,6 +11,8 @@ _author_* fragment per concern, each in its own module:
               the zoom, and the look and walk slowdowns it drives
   sights      down the sights: ease the camera from the boom to Held's
               SightOffset; hide a scoped weapon behind its glass
+  sight_pitch down the sights: write the anim BP's AimPitch (the view's pitch
+              x SightBlend), which tips the upper body and the gun onto the aim
   firing      pellets, impacts, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire

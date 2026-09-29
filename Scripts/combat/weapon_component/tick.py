@@ -26,6 +26,7 @@ from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
 )
 from combat.weapon_component.shot_noise import _author_shot_noise
+from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
 from combat.weapon_component.stance import _author_stance
@@ -119,6 +120,10 @@ def _author_wc_tick(ed, tick):
     # of the next frame then starts from wherever this puts the camera.
     ads_exits = _author_sight_camera(ed, tick, owner_out, held, armed_out,
                                      ads_exits, 8400, -700)
+
+    # --- and the body pitches with the view, down the sights -----------------
+    # After SightBlend is written, which scales it.
+    ads_exits = _author_sight_pitch(ed, pc_out, ads_exits, 11200, -700)
 
     # --- the pose follows the sprint -----------------------------------------
     # Edge-triggered, not level-triggered, and that distinction is the whole

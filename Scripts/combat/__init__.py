@@ -28,6 +28,8 @@ ASSETS AND PATCHES
   materials         flat materials (gunmetal, wood, blood, brass)
   audio             sound names, attenuation profiles, import + link
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
+  aim_pitch         the player's anim BP: AimPitch tips the upper body (two
+                    spine ModifyBones) so the gun follows the sights' pitch
   skin              the player's body (PlayerSkin, wear_skin)
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)

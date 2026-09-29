@@ -9,9 +9,10 @@ camera manager) and the HUD -- so one camera that travels keeps all three
 right, and SightBlend makes the travel an ease rather than a cut.
 
 Why it is written every frame rather than attached to the weapon: the camera's
-rotation has to stay the control rotation (the boom's), and the weapon does
-not pitch. Placing it by location only keeps the view where the mouse points
-and puts the eye at the sight at level aim.
+rotation has to stay the control rotation (the boom's). Placing it by
+location only keeps the view where the mouse points. The weapon pitches with the
+view (sight_pitch.py tips the upper body), so the eye point rides the gun and
+stays on the sight line at any pitch.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
@@ -85,10 +86,9 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
     null Held.
 
     Only the location is written. The rotation stays the boom's, which is the
-    control rotation: the view goes where the mouse points and the weapon,
-    which has no aim offset and does not pitch, drops out of the bottom of the
-    view when the player looks steeply down or up. At level aim the eye is on
-    the sight line.
+    control rotation, so the view goes where the mouse points. sight_pitch.py
+    turns the upper body by the same pitch, and the eye point turns with the
+    gun, so the eye stays on the sight line looking up or down.
 
     Returns the exec pins to carry on from.
     """

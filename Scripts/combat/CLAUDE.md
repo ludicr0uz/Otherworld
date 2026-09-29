@@ -113,8 +113,21 @@ The verifier asserts the old loose constants are gone.
   - The sniper is **hidden past SightBlend 0.9**. The eye is behind the solid scope tube,
     which would fill the glass's hole. A dropped weapon is always unhidden.
   - `Scoped` and `AdsZoom` are independent.
-- **Known limit of the sights:** the gun doesn't pitch (no aim offset), so looking steeply up
-  or down leaves it below the view. At level aim the eye is on the sight line.
+- **Down the sights, the upper body pitches with the view** (`aim_pitch.py`,
+  `weapon_component/sight_pitch.py`):
+  - The player's anim BP (`PlayerSkin.anim_bp`, not `ABP_Unarmed`) has `AimPitch`. Two
+    ModifyBones on `PlayerSkin.aim_bones` (`Spine01`, `Spine`) each **add** half of it as a
+    component-space roll, last in the chain before the output. The chest, arms, head and gun
+    turn rigidly, so the eye at `SightOffset` stays on the sight line at any pitch.
+  - The axis: the mesh is yawed 270, so the body faces component +Y, and `Roll(+a)` tips +Y
+    **down**. Looking up by P is `Roll(-P)`.
+  - The component writes `AimPitch = NormalizeAxis(ControlRotation.Pitch) × SightBlend`, cast
+    to the player's anim BP class. The hip and shoulder aims stay level.
+  - Probed in PIE: at view pitch 0 / +30 / −40 / −80, the view direction in weapon space was
+    (1, 0, 0) within 0.1°. With the pitch not scaled by SightBlend, the gun matched the view to
+    0.1°. At the hip with the view at +30, `AimPitch` read 0.
+  - The anim updates before the component ticks, so the gun trails a fast vertical flick by one
+    frame.
 - **The camera boom sits over the right shoulder** (`camera.aim_camera()`: arm 260, socket
   offset `(0, 55, 60)`). Only pellet traces are drawn, never the two aim traces.
 - **Aiming halves walking speed** (`ads_move_speed_scale`) with a *second* `MaxWalkSpeed`
@@ -163,7 +176,8 @@ The verifier asserts the old loose constants are gone.
 - **The weapon is rigidly attached and never rotated on its own.** Aiming it per frame was tried
   and reverted. `face_the_camera()` makes the body follow the camera's yaw instead.
 - **Known limits:**
-  - There is no aim offset, so the gun doesn't pitch.
+  - There is no aim offset. Only down the sights does the gun pitch (the spine turns, see
+    Aiming), so at the hip and on the shoulder it stays level.
   - The legs play the unarmed gait, because strafe blend spaces can't be authored from Python.
 - **Lesson:** three static "fixes" in a row agreed with themselves and shipped a sideways gun.
   When reasoning disagrees with the screen, instrument a `-game` run.
@@ -470,6 +484,11 @@ The verifier asserts the old loose constants are gone.
   1. Spawn the palette entry for an *existing* slot (`Animation|Montage|Slot'DefaultSlot'`).
   2. Rename `node.slot_name`.
   3. Compile, which registers it.
+- **Turning a bone:** `Animation|SkeletalControls|Transform(Modify)Bone` works on a component-space
+  pose. Wrap it in `Animation|ConvertSpaces|LocalToComponent` / `ComponentToLocal`. Its
+  `Rotation` pin shows by default and takes a `MakeRotator` fed by an ABP variable.
+- **Probing an ABP variable in PIE:** an anim instance's variables can't be written from Python
+  (not instance editable). Write the CDO, then start PIE again: the instance copies it.
 - **Sampling a pose:** `AnimPoseExtensions.get_anim_pose_at_time` → `get_bone_pose(…, WORLD)`,
   where WORLD means component space.
   - `get_reference_pose` takes a Skeleton, and its pose is not the mesh's, so compare like with
@@ -493,4 +512,5 @@ These are feel checks a headless run can't do:
   to 61);
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
-- how the death camera looks under the terrain.
+- how the death camera looks under the terrain;
+- how the sights' pitch looks at steep angles (the eye swings on an arc round the spine).

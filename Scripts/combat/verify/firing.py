@@ -55,9 +55,14 @@ def check_recoil():
           "multiplies by the deprecated InputPitchScale the sensitivity setting "
           "drives, so recoil would scale with the player's slider",
           not banned, str(banned))
+    # The sights' pitch (verify/aim_pitch.py) reads the view too, but writes
+    # only the anim BP, so it is not one of the read-before-write pairs.
+    pitch_reads = sum(1 for t in flat if t.startswith("SetAimPitch"))
     for label, want, n in (("written", "SetControlRotation", 2),
                            ("read back first", "GetControlRotation", 2)):
         hits = [t for t in flat if t.startswith(want)]
+        if want == "GetControlRotation":
+            hits = hits[pitch_reads:]
         check(f"the control rotation is {label} exactly {n}x: the kick and the "
               f"recovery", len(hits) == n, f"{len(hits)} x {want}")
     makers = [n for n in wg if {"Roll", "Pitch", "Yaw"} <= in_pins(n)]

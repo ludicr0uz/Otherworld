@@ -15,6 +15,8 @@ and it never relies on a variable another section left behind.
   player_body  blood  hit_reactions  ragdoll  aiming  settings_and_tuning
   firing  consume  drops  noise  combat_trace
   sights      the two aim keys, each weapon's eye point, the sight camera
+  aim_pitch   down the sights the anim BP pitches two spine bones by AimPitch,
+              which the component writes from the view pitch x SightBlend
   block       the guard: its key, the Blocking stance, the fire gate refusing
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
               the crouch it drives, the footsteps' volume and reach per stance
@@ -22,6 +24,6 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "block", "stance",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "block", "stance",
     "settings_and_tuning", "firing", "consume", "drops", "noise", "combat_trace",
 )

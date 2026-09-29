@@ -120,6 +120,8 @@ FN_LERP = "/Script/Engine.KismetMathLibrary.Lerp"
 FN_GET_CONTROL_ROT = "/Script/Engine.Controller.GetControlRotation"
 FN_SET_CONTROL_ROT = "/Script/Engine.Controller.SetControlRotation"
 FN_BREAK_ROT = "/Script/Engine.KismetMathLibrary.BreakRotator"
+# The control rotation keeps pitch in 0..360; this makes looking down negative.
+FN_NORMALIZE_AXIS = "/Script/Engine.KismetMathLibrary.NormalizeAxis"
 FN_ABS = "/Script/Engine.KismetMathLibrary.Abs"
 # "Is anything playing in this slot right now?" -- pure, one Name in, one bool
 # out. It is what lets the ready pose notice that a hit reaction took the

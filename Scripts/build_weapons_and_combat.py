@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 for _name in [m for m in sys.modules if m == "combat" or m.startswith("combat.")]:
     del sys.modules[_name]
 
+from combat.aim_pitch import patch_aim_pitch                      # noqa: E402
 from combat.ammo_pickup import build_ammo_pickup                  # noqa: E402
 from combat.anim_blueprint import patch_anim_blueprint            # noqa: E402
 from combat.audio import (                                        # noqa: E402
@@ -88,6 +89,8 @@ def main():
     # ready pose as seen through the player's own rig, so the body has to be
     # the final one before the first spec is built.
     skin = wear_skin()
+    # Before the weapon component, whose Tick sets the AimPitch this declares.
+    patch_aim_pitch(skin)
 
     item_bp = build_weapon_item()
     weapons = {}

@@ -274,6 +274,9 @@ The verifier asserts the old loose constants are gone.
   - A partial skin compiles, then stands in its bind pose.
 - **The animation moved to the mesh, not the mesh to `SK_Mannequin`:**
   - Meshy returns its own 24-bone Mixamo-named rig, with no fingers and no twist bones.
+    `asset_pipeline/finger_rig.py` adds 15 finger bones per hand and skins them (mannequin
+    layout and weights carried into the measured hand frame), so the retargeted clips curl the
+    fingers.
   - FBX import merges bone trees.
   - 5.8 exposes no skin transfer to Python.
 - **Everything else is rig-agnostic:**
@@ -282,7 +285,8 @@ The verifier asserts the old loose constants are gone.
 - **The grip is a bone (`RightHand`), not a socket**, because Python can't create a socket.
   `_BoneGrip` stands in for one.
   - The weapon hangs off the wrist.
-  - The hand stays open, because a 24-bone rig can't close a fist.
+  - The fingers close the way the mannequin's do in the retargeted ready pose.
+    `finger_verify.py` checks each finger's curl against the mannequin's.
 - **The two ready poses and the six hit reactions are retargeted onto every creature**
   (`AIM_SOURCES`, `HIT_SOURCES`), because they are played by path and no dependency walk
   finds them.

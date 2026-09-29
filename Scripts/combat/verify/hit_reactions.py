@@ -22,7 +22,7 @@ from combat.verify.common import (
     BEL, PIN, _mesh_asset, by_pins, check, component_template, has_in_pin,
     load, num_pin, pin_value, titled,
 )
-from build_retarget import HIT_SOURCES as RETARGET_HIT_SOURCES
+from asset_pipeline.retarget_paths import HIT_SOURCES as RETARGET_HIT_SOURCES
 from forest_generator.npc_placement import NPC_HIT_REACTION_CLIPS
 
 

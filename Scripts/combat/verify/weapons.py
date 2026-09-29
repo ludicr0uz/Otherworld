@@ -101,8 +101,8 @@ def check_five_weapons():
         # HandGrip_R the weapon rides the socket's +Y and +X reads 0.94 to the
         # player's left -- the assertion that stopped that from being re-learned.
         # A rig with no socket is gripped by its hand BONE, whose frame is Meshy's
-        # to choose, so what is asserted there is the weaker true thing: ONE of the
-        # three axes is the aim, which is what makes the grip solvable at all.
+        # to choose, so what is asserted there is the weaker true thing: the bone
+        # is a clean frame for the grip solve to start from.
         _skin = player_skin()
         _socketed = _skin is SKIN_QUINN
         for name, aim in (("rifle", _skin.aim_rifle), ("pistol", _skin.aim_pistol)):
@@ -112,17 +112,23 @@ def check_five_weapons():
                       axes["Y"].x > 0.9 and abs(axes["X"].x) < 0.5,
                       f"+Y = {axes['Y'].to_tuple()}, +X = {axes['X'].to_tuple()}")
             else:
-                # The inverse assertion, and the more useful one. On a hand BONE
-                # nothing carries the weapon: measured on the adventurer, the
-                # rifle pose's three axes read 0.55, -0.78 and -0.31 along the
-                # player's forward, so no axis is the aim and no fixed offset
-                # could be written down. That is what makes _grip_rotation's
-                # solve load-bearing rather than a convenience -- the check that
-                # the solve worked is the per-weapon barrel test above.
+                # On a hand BONE nothing carries the weapon, so no fixed offset
+                # is written down and _grip_rotation's solve is load-bearing --
+                # the check that the solve worked is the per-weapon barrel test
+                # above. What is asserted here is only that the bone gives the
+                # solve a frame to work from.
+                #
+                # This used to assert further that NO axis lay on the aim
+                # (measured 0.55, -0.78, -0.31 along the player's forward).
+                # That was the wrist bend chain alignment left between the
+                # Meshy hand and the mannequin's, not a property of the rig:
+                # since build_retarget turns the whole hand onto the
+                # mannequin's (measure_clip_hand_turn, which the fingers need),
+                # the bone's Y runs down the aim at 0.98, as the mannequin's
+                # hand does in these poses.
                 check(f"in the {name} ready pose the grip bone is an orthonormal "
-                      "frame with no axis on the aim, so the grip must be solved",
-                      all(abs(a.length() - 1.0) < 1e-3 for a in axes.values())
-                      and max(abs(a.x) for a in axes.values()) < 0.9,
+                      "frame for the grip solve to work from",
+                      all(abs(a.length() - 1.0) < 1e-3 for a in axes.values()),
                       ", ".join(f"{k} = {v.to_tuple()}" for k, v in axes.items()))
 
         # Five weapons in five slots with no icons: the colour swatch is the only

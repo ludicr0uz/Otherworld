@@ -22,8 +22,6 @@ import sys
 
 _SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _SCRIPTS)
-# build_retarget (the hit-reaction retarget sources) lives here.
-sys.path.insert(0, os.path.join(_SCRIPTS, "asset_pipeline"))
 
 # A live editor keeps imported modules between runs, and combat.verify.fixtures
 # holds assets loaded at import: without this a second run would check the

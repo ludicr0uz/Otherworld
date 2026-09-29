@@ -75,8 +75,9 @@ from combat.tuning import COMBAT
 # They are Epic's MM_HitReact_* set, the flinches Epic ships for this: 0.7-1.2 s
 # each, in place, the head moving 3-18 cm and the chest turning at most 55 deg
 # before both come back to rest. Not MM_Death_* (see the dying block above and
-# HIT_SOURCES in build_retarget.py): those carry the head 1-2 m and two of them
-# turn the whole body 105-180 deg, and through HitSlot's mesh-space blend that
+# HIT_SOURCES in asset_pipeline/retarget_paths.py): those carry the head 1-2 m
+# and two of them turn the whole body 105-180 deg, and through HitSlot's
+# mesh-space blend that
 # was the chest spinning half round on walking legs. Epic authored no Left or
 # Right, so those slots hold the Front whose head moves away from that side --
 # see NPC_HIT_REACTION_CLIPS, and the measurement in the verifier.
@@ -95,7 +96,7 @@ HIT_DIR_LEFT = (4, 1)
 HIT_DIR_RIGHT = (5, 1)
 # Where the six live once retargeted, and the fallback for a checkout with no
 # /Game/Sourced. The creature layout mirrors npc_placement._creature and
-# build_retarget.anim_dir; it is derived from the mesh's own name at build time
+# retarget_paths.anim_dir; it is derived from the mesh's own name at build time
 # (see hit_reactions), never written out per creature.
 HIT_ANIM_ROOT = "/Game/Sourced/Characters/Anims"
 HIT_ANIM_FALLBACK_DIR = "/Game/Characters/Mannequins/Anims/Rifle/HitReact"

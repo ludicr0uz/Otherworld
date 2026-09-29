@@ -27,7 +27,8 @@ from combat.paths import CHARACTER_BP_PATH
 #   * Meshy's rigging endpoint takes an input mesh and a height and nothing
 #     else. There is no skeleton-convention parameter, so what comes back is
 #     always its own 24-bone Mixamo-named rig (measured: Hips, Spine02..Spine,
-#     LeftArm..LeftHand, neck, Head -- no fingers, no twist bones).
+#     LeftArm..LeftHand, neck, Head -- no fingers, no twist bones; the
+#     fingers are added afterwards, see below).
 #   * Re-binding that mesh at import time is not a matter of asking: the FBX
 #     importer merges the incoming bone tree into the supplied skeleton, and
 #     24 differently-named bones do not merge into SK_Mannequin's 161.
@@ -44,10 +45,10 @@ from combat.paths import CHARACTER_BP_PATH
 # that mesh carries, and the locomotion is a retargeted copy of ABP_Unarmed
 # that fix_retargeted_abp() has already re-pointed at the new spine.
 #
-# What is genuinely lost is finger articulation: a 24-bone rig cannot close a
-# fist, so the adventurer's hand holds its weapon open rather than gripped.
-# That is a known cost of the only route that exists, recorded here rather than
-# discovered later.
+# Finger articulation was the one thing lost, and it is back: a 24-bone rig
+# cannot close a fist, so asset_pipeline/finger_rig.py adds 15 finger bones per
+# hand after import and skins them, and the retargeted ready poses curl them
+# round the grip the way the mannequin's do.
 @dataclasses.dataclass(frozen=True)
 class PlayerSkin:
     """The player's body: mesh, animation, and where a weapon sits in it."""

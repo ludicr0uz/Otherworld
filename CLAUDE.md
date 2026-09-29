@@ -64,7 +64,6 @@ sessions tens of millions of tokens.
 **Over budget today** (split before extending):
 - `build_graphics_menu.py` (2.6k lines)
 - `generate_forest_level.py` (1.8k)
-- `asset_pipeline/build_retarget.py` (1.1k)
 - `verify_graphics_menu.py`
 - `forest_generator/verification.py`
 
@@ -241,6 +240,21 @@ editor.
   `parent_class`, and no `get_super_class` on a generated class.
 - **Actors:** use `destroy_actor()`, not `k2_destroy_actor`. There is no
   `begin_deferred_actor_spawn_from_class`.
+
+### Skeletons and retargeting (`asset_pipeline/`)
+
+- **`unreal.Quat()` is `(0, 0, 0, 0)`, not the identity.** Written as a retarget-pose offset, it
+  collapsed every finger joint onto its knuckle. Spell out `unreal.Quat(0, 0, 0, 1)`.
+- **A mesh's reference pose is not its skeleton's.** `SKM_Quinn_Simple` uses `SK_Mannequin`,
+  whose reference pose is Manny's: about 10° apart at the hand. Read the mesh's pose through a
+  component (`rig_util.mesh_ref_pose`).
+- **A clip as shown is not a clip as sampled.** Compression drops tracks that only repeat the
+  skeleton's reference pose, and the mesh's own reference pose fills them. The retargeter reads
+  the pose as shown (`rig_util.visible_bone_xf`). Sampled raw, `MM_Idle`'s fingers read 15° off
+  what it retargets.
+- **`SkeletonModifier` adds bones and moves them,** but moving a bone that already exists never
+  updates the skeleton's copy of it. `SkinWeightModifier` addresses the vertices of the mesh
+  description, and a DynamicMesh copy lists the same ids first.
 
 ### Collision
 

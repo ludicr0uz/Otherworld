@@ -56,8 +56,8 @@ def build_consumable(spec, base_bp):
 
     Held like the pistol -- the pistol's ready pose and its solved grip -- so
     the item is carried out in front in one hand. There is no eating
-    animation: the rig has 24 bones and no fingers, and nothing in the project
-    can author one (see CLAUDE.md, *The player's body*).
+    animation: nothing in the project can author one (see CLAUDE.md, *The
+    player's body*).
     """
     bp = _create_blueprint(spec["path"], BEL.generated_class(base_bp))
     build_parts(bp, spec["parts"])

@@ -9,7 +9,7 @@ once, then either chase (aggro) or check the senses and stroll (patrolling).
                             any yes -> AggroReason = <sense>
                                     -> Aggro = true
                                     -> MaxWalkSpeed = RunSpeed
-                                    -> log "[NPC-AGRO] <sense> -- <name>"
+                                    -> [DebugMode?] log "[NPC-AGRO] <sense> -- <name>"
                                     -> chase + swing (this very heartbeat)
                             all no -> patrol step -> Delay
 
@@ -24,13 +24,15 @@ has its own controller (see controller.py), so it gets its own senses too.
 
 import unreal
 
-from combat.game_state import NOISE_TIME_VAR
-from combat.paths import GAME_MODE_BP_PATH
+from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
+from combat.paths import GAME_MODE_BP_PATH, GAME_MODE_CLASS_PATH
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
-from npc.graph import BEL, _asset_sub, _at, _connect, _log, _node, _pin, _set
+from npc.graph import (
+    BEL, _asset_sub, _at, _connect, _log, _loose_pin, _node, _palette, _pin, _set,
+)
 from npc.nodes import (
-    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_IS_VALID,
-    FN_WARN,
+    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
+    FN_IS_VALID, FN_WARN, NODE_CAST_GAME_MODE,
 )
 from npc.patrol import _author_patrol_setup, _author_patrol_step, _author_walk_speed
 from npc.paths import (
@@ -109,13 +111,28 @@ def _author_enter_agro(ed, reasons, chase_in, x0, y0):
     line = keep(_at(_node(ed, FN_CONCAT), x0 + 2520, y0 + 300))
     _connect(_pin(head, "ReturnValue", is_input=False), _pin(line, "A"))
     _connect(_pin(who, "ReturnValue", is_input=False), _pin(line, "B"))
-    # PrintWarning, not PrintString: it goes to the log only, like the spawn
-    # line, and never covers the HUD. One line per wanderer per life.
-    say = keep(_at(_node(ed, FN_WARN), x0 + 2760, y0))
-    _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
+    # A developer line: PrintWarning puts it on screen as well as in the log,
+    # so it is written only while the GameMode's DebugMode is on. One line per
+    # wanderer per life.
+    mode = keep(_at(_node(ed, FN_GET_GAME_MODE), x0 + 2280, y0 + 160))
+    as_mode = keep(_at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 2520, y0 - 160))
+    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     for pin in after:
-        _connect(pin, _pin(say, "execute"))
-    _connect(BEL.find_then_pin(say), chase_in)
+        _connect(pin, _pin(as_mode, "execute"))
+    flag = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
+                                                    GAME_MODE_CLASS_PATH),
+                    x0 + 2760, y0 + 160))
+    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
+             _pin(flag, "self"))
+    debugging = keep(_at(ed.add_branch_node(), x0 + 3000, y0 - 160))
+    _connect(_pin(flag, DEBUG_MODE_VAR, is_input=False), _pin(debugging, "Condition"))
+    _connect(BEL.find_then_pin(as_mode), _pin(debugging, "execute"))
+    say = keep(_at(_node(ed, FN_WARN), x0 + 3240, y0))
+    _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
+    _connect(BEL.find_then_pin(debugging), _pin(say, "execute"))
+    for tail in (BEL.find_then_pin(say), BEL.find_else_pin(debugging),
+                 _pin(as_mode, "CastFailed", is_input=False)):
+        _connect(tail, chase_in)
     return made
 
 

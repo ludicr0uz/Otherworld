@@ -100,7 +100,8 @@ BeginPlay → [possessed? no → Delay] → [dead? → corpse, loop ends] → st
   - **Gunshots:** the reach is the weapon's `ShotVolume` (`SHOT_VOLUME_CM`: sniper 150 m, rifle
     90, shotgun 85, SMG 50, pistol 35), plus a 1.6× cone within 30° of the shot's line.
   - **Footsteps (player only):** 12 m at a run, 18 m sprinting, 6 m while aiming.
-- **Every transition logs `[NPC-AGRO] <sense> -- <actor>`.**
+- **Every transition logs `[NPC-AGRO] <sense> -- <actor>`, in debug mode only.** The line is a
+  `PrintWarning`, which also puts it on screen, so it is gated on the GameMode's `DebugMode`.
 
 ## Following to the edge of the map
 

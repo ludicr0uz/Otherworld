@@ -20,7 +20,7 @@ from forest_generator.npc_agro import (
     agro_for,
 )
 from forest_generator.npc_placement import NPC_VARIANTS
-from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR
+from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, DEBUG_MODE_VAR
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
@@ -163,8 +163,9 @@ def check_controller(path, agro):
     if ok:
         into_chase = {_title(d) for d in _drivers(chase_gate[0])}
         # The chase is reached only through the switch: from the Aggro branch
-        # (already hunting) or from the log line (just started).
-        ok = into_chase == {"Branch", "PrintWarning"}
+        # (already hunting) or from the debug-gated log line (just started:
+        # logged, not debugging, or no GameMode to ask).
+        ok = into_chase == {"Branch", "PrintWarning", "Cast To BP_ThirdPersonGameMode"}
         by_aggro = [d for d in _drivers(chase_gate[0]) if _title(d) == "Branch"
                     and {_title(f) for f in _feeders(d, "Condition")} == {f"Get {AGGRO_VAR}"}]
         ok = ok and len(by_aggro) == 1
@@ -173,6 +174,14 @@ def check_controller(path, agro):
     heads = [n for n in _titled(nodes, "Append") if _lit(n, "A") == AGRO_LOG_PREFIX]
     check(f"{tag}: going aggro is logged as '{AGRO_LOG_PREFIX.strip()} <sense>'",
           len(warns) == 1 and len(heads) == 1)
+    gates = [d for w in warns for d in _drivers(w)]
+    check(f"{tag}: ...only while the GameMode's {DEBUG_MODE_VAR} is on",
+          len(gates) == 1 and _title(gates[0]) == "Branch"
+          and {_title(f) for f in _feeders(gates[0], "Condition")}
+          == {f"Get {DEBUG_MODE_VAR}"}
+          and [str(PIN.get_pin_name(q)) for q in
+               BEL.find_execute_pin(warns[0]).list_connected_pins()] == ["then"],
+          f"{sorted(_title(d) for d in gates)}")
 
     # --- speed ---------------------------------------------------------------
     speeds = _titled(nodes, "Set MaxWalkSpeed")

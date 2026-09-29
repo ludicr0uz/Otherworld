@@ -605,9 +605,14 @@ These are agro ranges only. The audio attenuation profiles that set how loud sho
 5b. **Grass** — transforms are *not* inlined (tens of thousands of them); the script reads
    `grass_<Level>.json`, whose instances are flat rounded arrays
    `[spec_idx, x, y, z, yaw, pitch, roll, height_mul, width_mul, target_h_cm]` against an
-   interned spec-name table. One HISM actor per species, `NoCollision` (grass must never
-   block the player), cull distances 6000–9000 cm, shadow-casting. Per species the script
-   reads the mesh bounds once, then per instance sets
+   interned spec-name table, and hands it to `forest_import/grass.py:plant_grass`. That
+   plants **one HISM actor per species per 100 m map cell** (`forest_generator/grass_cells.py`;
+   900 actors on the 1 km map, labelled `<spec>__±ix_±iy`, tagged `OW_Grass`) so whole cells
+   drop out at the primitive level. Each cell is `NoCollision`, instance cull 6000–9000 cm,
+   primitive max draw distance `GRASS_CELL_MAX_DRAW_CM` (sized so no cell vanishes before its
+   own clumps fade even at Low's 0.4 view-distance scale), and saved **unlit** — no shadow,
+   no distance-field or dynamic indirect lighting; the graphics menu's Ultra preset switches
+   those on at runtime. Per species the mesh bounds are read once, then per instance
    `scale = (unit·width_mul, unit·width_mul, target_h / mesh_height)`. If bounds come back
    unusable it logs an error and falls back to scale 1.0 rather than emitting giant grass.
 6. **PlayerStart** at `(0, 0, 100)`.

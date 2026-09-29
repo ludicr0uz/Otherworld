@@ -15,6 +15,7 @@ import unreal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_graphics_menu as G
+from graphics_menu import presets as P
 
 BEL = unreal.BlueprintEditorLibrary
 BGE = unreal.BlueprintGraphEditor
@@ -140,9 +141,8 @@ def main():
     commands = {BEL.find_input_pin(n, "Command").get_pin_value()
                 for n in by_pins("Command")}
     expected_cmds = set()
-    for _label, _level, shadow, pct in G.PRESETS:
-        expected_cmds.add(f"r.ShadowQuality {shadow}")
-        expected_cmds.add(f"r.ScreenPercentage {pct}")
+    for preset in G.PRESETS:
+        expected_cmds.update(P.console_commands(preset))
     expected_cmds.add(G.FPS_COMMAND)
     check("every preset's console overrides are present, plus the FPS readout",
           commands == expected_cmds,
@@ -163,6 +163,37 @@ def main():
     # editor at 100% CPU the moment PIE starts.
     check("no ApplySettings anywhere (it hangs macOS PIE on a window-mode change)",
           not by_pins("bCheckForCommandLineOverrides"))
+
+    # --- grass lighting follows Quality (presets.author_grass_sync)
+    check(f"{P.GRASS_APPLIED_VAR} variable", P.GRASS_APPLIED_VAR in names)
+    check(f"{P.GRASS_APPLIED_VAR} defaults to {P.GRASS_APPLIED_DEFAULT} "
+          "(so the first Tick always applies)",
+          cdo.get_editor_property(P.GRASS_APPLIED_VAR) == P.GRASS_APPLIED_DEFAULT,
+          str(cdo.get_editor_property(P.GRASS_APPLIED_VAR)))
+    tagged = [BEL.find_input_pin(n, "Tag").get_pin_value()
+              for n in by_pins("Tag") if "ComponentClass" not in pin_names(n)]
+    check(f"grass cells are found by their tag, {P.GRASS_TAG}",
+          tagged == [P.GRASS_TAG], str(tagged))
+    for _fn, arg in P.GRASS_SETTERS:
+        setters = by_pins(arg, "self", "execute")
+        # Driven by the Quality comparison, never a literal: a literal would
+        # light (or unlight) the grass for every preset alike.
+        driven = [n for n in setters
+                  if BEL.find_input_pin(n, arg).list_connected_pins()
+                  and BEL.find_input_pin(n, "execute").list_connected_pins()]
+        check(f"{arg} is set once, from Quality", len(driven) == 1 == len(setters),
+              f"{len(driven)} driven of {len(setters)}")
+    # The comparison feeding the setters, found by following the wire back
+    # from SetCastShadow: its B literal is the first preset that lights grass.
+    thresholds = []
+    arg = P.GRASS_SETTERS[0][1]
+    for n in by_pins(arg, "self", "execute"):
+        for src in BEL.find_input_pin(n, arg).list_connected_pins():
+            b = BEL.find_input_pin(PIN.get_owning_node(src), "B")
+            thresholds.append(b.get_pin_value() if b else None)
+    check(f"grass is lit from preset {P.GRASS_LIGHTS_FROM} "
+          f"({G.PRESETS[P.GRASS_LIGHTS_FROM].label}) up",
+          thresholds == [str(P.GRASS_LIGHTS_FROM)], str(thresholds))
 
     # --- drawing
     texts = by_pins("Text", "ScreenX")

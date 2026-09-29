@@ -856,101 +856,22 @@ def _write_unreal_import_script(
         unreal.log_warning(f"[GEN] Planted {{total_planted}} trees across {{len(TREE_CONFIGS)}} species!")
 
         # ── 5b. Plant knee-high grass ────────────────────────────────────────
+        # Per-cell HISMs, saved unlit -- see forest_import/grass.py and
+        # forest_generator/grass_cells.py.
         GRASS_DATA_PATH = r"{grass_data_path}"
         EXPECTED_GRASS_COUNT = {grass_count}
         GRASS_CONFIGS = json.loads(r"""{grass_configs_json}""")
-        # Distance (cm) at which grass instances begin / finish fading out.
-        GRASS_CULL_START = 6000
-        GRASS_CULL_END = 9000
 
         if EXPECTED_GRASS_COUNT > 0 and os.path.isfile(GRASS_DATA_PATH):
             unreal.log_warning("[GEN] 5b. Planting knee-high grass...")
-            with open(GRASS_DATA_PATH, "r") as _f:
-                grass_payload = json.load(_f)
-
-            grass_spec_names = grass_payload["specs"]
-            grass_groups = defaultdict(list)
-            for inst in grass_payload["instances"]:
-                grass_groups[grass_spec_names[inst[0]]].append(inst)
-
-            def create_grass_hism(name, mesh_path, mat_paths):
-                """Like create_hism, but grass never blocks the player."""
-                mesh = editor_asset_sub.load_asset(mesh_path)
-                if not mesh:
-                    unreal.log_error(f"[GEN] Missing grass mesh: {{mesh_path}}")
-                    return None, 0.0
-                actor = editor_actor_sub.spawn_actor_from_class(
-                    unreal.Actor, unreal.Vector(0, 0, 0))
-                actor.set_actor_label(name)
-                comp = unreal.HierarchicalInstancedStaticMeshComponent(actor)
-                comp.set_static_mesh(mesh)
-                actor.set_editor_property("root_component", comp)
-                comp.set_collision_profile_name("NoCollision")
-                comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-                comp.set_mobility(unreal.ComponentMobility.STATIC)
-                comp.set_editor_property("cast_shadow", True)
-                try_set(comp, "instance_start_cull_distance", GRASS_CULL_START)
-                try_set(comp, "instance_end_cull_distance", GRASS_CULL_END)
-                for idx, mp in enumerate(mat_paths):
-                    mat_obj = editor_asset_sub.load_asset(mp)
-                    if mat_obj:
-                        comp.set_material(idx, mat_obj)
-
-                # The scanned meshes have no authored real-world size, so derive
-                # the scale that makes a clump exactly its target height.
-                mesh_height = 0.0
-                try:
-                    bounds = mesh.get_bounds()
-                    mesh_height = float(bounds.box_extent.z) * 2.0
-                except Exception as exc:
-                    unreal.log_warning(f"[GEN] Could not read bounds for {{name}}: {{exc}}")
-                return comp, mesh_height
-
-            total_grass = 0
-            for spec_name, instances in grass_groups.items():
-                config = GRASS_CONFIGS.get(spec_name)
-                if not config or not instances:
-                    continue
-                comp, mesh_height = create_grass_hism(
-                    spec_name, config["mesh"], config["mats"])
-                if not comp:
-                    continue
-                if mesh_height <= 1.0:
-                    unreal.log_error(
-                        f"[GEN] {{spec_name}} has unusable bounds height "
-                        f"{{mesh_height}}; falling back to scale 1.0")
-
-                # One add_instances call per chunk, not one add_instance per
-                # clump: a 1000 m map has over a million, and each single add
-                # is a separate round trip into the HISM.
-                batch = []
-                for inst in instances:
-                    _, gx, gy, gz, yaw, pitch, roll, h_mul, w_mul, target_h = inst
-                    if mesh_height > 1.0:
-                        s_z = target_h / mesh_height
-                        s_xy = (target_h / max(h_mul, 1e-3)) / mesh_height * w_mul
-                    else:
-                        s_z, s_xy = 1.0, 1.0
-                    batch.append(unreal.Transform(
-                        location=unreal.Vector(gx, gy, gz),
-                        rotation=unreal.Rotator(pitch=pitch, yaw=yaw, roll=roll),
-                        scale=unreal.Vector(s_xy, s_xy, s_z),
-                    ))
-                    if len(batch) >= 50000:
-                        comp.add_instances(batch, False, True, False)
-                        total_grass += len(batch)
-                        batch = []
-                if batch:
-                    comp.add_instances(batch, False, True, False)
-                    total_grass += len(batch)
-
-                unreal.log_warning(
-                    f"[GEN]    {{spec_name}}: {{len(instances)}} clumps "
-                    f"(mesh height {{mesh_height:.1f}} cm)")
-
+            if r"{scripts_dir}" not in sys.path:
+                sys.path.insert(0, r"{scripts_dir}")
+            from forest_import import grass as grass_import
+            total_grass, grass_cells = grass_import.plant_grass(
+                GRASS_DATA_PATH, GRASS_CONFIGS, editor_actor_sub, editor_asset_sub)
             unreal.log_warning(
-                f"[GEN] Planted {{total_grass}} grass clumps across "
-                f"{{len(grass_groups)}} species!")
+                f"[GEN] Planted {{total_grass}} grass clumps in "
+                f"{{grass_cells}} cell actors!")
         else:
             unreal.log_warning("[GEN] 5b. Grass skipped (none generated).")
 
@@ -1170,6 +1091,7 @@ def _write_unreal_verify_script(
 
     lighting_json = json.dumps(lighting)
     tod_label = lighting["label"]
+    scripts_dir = SCRIPTS_DIR
 
     script = textwrap.dedent(f'''\
         """
@@ -1391,50 +1313,14 @@ def _write_unreal_verify_script(
               total_tree_instances == EXPECTED_TREE_COUNT,
               f"(expected {{EXPECTED_TREE_COUNT}}, got {{total_tree_instances}})")
 
-        # ── 5. Grass HISM Actors ─────────────────────────────────────────────
+        # ── 5. Grass cells (forest_import/grass.py) ─────────────────────────
         if EXPECTED_GRASS_COUNT > 0:
-            total_grass_instances = 0
-            for spec_name, expected_count in EXPECTED_GRASS_SPEC_COUNTS.items():
-                found = False
-                for a in actors:
-                    if a.get_actor_label() == spec_name:
-                        found = True
-                        root = a.get_editor_property("root_component")
-                        if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
-                            inst_count = root.get_instance_count()
-                            total_grass_instances += inst_count
-                            check(f"{{spec_name}} Instance Count",
-                                  inst_count == expected_count,
-                                  f"(expected {{expected_count}}, got {{inst_count}})")
-                            # Grass must never block the player.
-                            check(f"{{spec_name}} No Collision",
-                                  str(root.get_collision_profile_name()) == "NoCollision",
-                                  f"(got {{root.get_collision_profile_name()}})")
-
-                            # Prove the clumps really land at knee height:
-                            # mesh bounds height × instance Z scale.
-                            mesh = root.get_editor_property("static_mesh")
-                            lo_hi = EXPECTED_GRASS_HEIGHTS.get(spec_name)
-                            if mesh and lo_hi and inst_count > 0:
-                                mesh_h = float(mesh.get_bounds().box_extent.z) * 2.0
-                                sampled = []
-                                step = max(1, inst_count // 50)
-                                for i in range(0, inst_count, step):
-                                    tf = root.get_instance_transform(i, world_space=False)
-                                    sampled.append(float(tf.scale3d.z) * mesh_h)
-                                lo, hi = lo_hi
-                                worst = [h for h in sampled
-                                         if not (lo - 1.0 <= h <= hi + 1.0)]
-                                check(f"{{spec_name}} Knee Height",
-                                      len(worst) == 0,
-                                      f"(expected {{lo:.1f}}-{{hi:.1f}} cm, "
-                                      f"sampled {{min(sampled):.1f}}-{{max(sampled):.1f}} cm)")
-                        break
-                check(f"{{spec_name}} Actor Exists", found)
-
-            check("Total Grass Instances",
-                  total_grass_instances == EXPECTED_GRASS_COUNT,
-                  f"(expected {{EXPECTED_GRASS_COUNT}}, got {{total_grass_instances}})")
+            import sys
+            if r"{scripts_dir}" not in sys.path:
+                sys.path.insert(0, r"{scripts_dir}")
+            from forest_import import grass as grass_import
+            grass_import.verify_grass(check, actors, EXPECTED_GRASS_SPEC_COUNTS,
+                                      EXPECTED_GRASS_HEIGHTS, EXPECTED_GRASS_COUNT)
 
         # ── 6. Navigation + NPCs ─────────────────────────────────────────────
         if EXPECTED_NPCS:

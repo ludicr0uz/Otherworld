@@ -566,22 +566,33 @@ one command. `KismetSystemLibrary.Set*PropertyByName` is not exposed to Python.
 `Scripts/build_graphics_menu.py` builds `/Game/UI/BP_GraphicsMenuHUD` (parent `AHUD`) and
 points `BP_ThirdPersonGameMode.HUDClass` at it. That game mode is `GlobalDefaultGameMode` and
 no generated level overrides it, so the menu is in every level without placing an actor or
-touching a `.umap`. **M** toggles the panel, **1 / 2 / 3** pick Low / Medium / High, **D**
-toggles debug mode.
+touching a `.umap`. **M** toggles the panel, **1 / 2 / 3 / 4** pick Low / Medium / High / Ultra,
+**D** toggles debug mode. The preset table, the apply chain and the grass-lighting Tick prologue
+live in `Scripts/graphics_menu/presets.py`.
 
 It also draws the player's HP bar (see "The shotgun and health").
 
-`Scripts/verify_graphics_menu.py` reads the saved assets back — 102 checks. Run it after any
+`Scripts/verify_graphics_menu.py` reads the saved assets back — 127 checks. Run it after any
 edit to the builder; it is the only thing that catches pin values that compile but don't mean
 what they look like (see the `FKey` gotcha below).
 
-Each preset sets an overall scalability level *and* two console commands:
+Each preset sets an overall scalability level, two console commands, and the grass lighting:
 
-| preset | scalability | `r.ShadowQuality` | `r.ScreenPercentage` |
-|--------|-------------|-------------------|----------------------|
-| Low    | 0 (Low)     | 1                 | 70                   |
-| Medium | 1 (Medium)  | 2                 | 85                   |
-| High   | 3 (Epic)    | 3                 | 100                  |
+| preset | scalability | `r.ShadowQuality` | `r.ScreenPercentage` | grass shadows + DF/indirect |
+|--------|-------------|-------------------|----------------------|-----------------------------|
+| Low    | 0 (Low)     | 1                 | 70                   | off                         |
+| Medium | 1 (Medium)  | 2                 | 85                   | off                         |
+| High   | 3 (Epic)    | 3                 | 100                  | off                         |
+| Ultra  | 3 (Epic)    | 3                 | 100                  | **on**                      |
+
+**Grass lighting is per component, not a cvar**, so it cannot ride on the apply chain. The
+import script saves every grass cell unlit (no shadow, no distance-field lighting, no dynamic
+indirect lighting). Tick's first block compares `Quality` with `GrassQualityApplied` (default
+−1, so the first Tick always runs) and on a change walks every actor tagged `OW_Grass`, calling
+`SetCastShadow` / `SetAffectDistanceFieldLighting` / `SetAffectDynamicIndirectLighting` on its
+root with `Quality >= 3`. The grass-lit presets must be the top of the table (asserted in
+`presets.py`). Ultra exists because 1.1 M shadow-casting clumps on the 1 km map are drawn again
+into every cascade, for shadows a 0.12-lux moon barely shows.
 
 High maps to Epic, not to 2, because Epic is what the project already runs at — the top preset
 has to be the current look, not a downgrade. The console commands are **not** redundant:
@@ -646,7 +657,7 @@ It supersedes `build_shotgun_and_health.py`, which is kept only as history — d
 **Controls (the defaults — all seven are rebindable on the settings screen):** left click
 fires — **held**, on the SMG and the assault rifle · right click aims · **Q** cycles weapons ·
 **G** drops · **E** picks up · **Shift** sprints · **R** reloads, and restarts from the death
-menu. (1/2/3, M and D belong to the graphics menu, so the weapon keys stay clear of them.)
+menu. (1/2/3/4, M and D belong to the graphics menu, so the weapon keys stay clear of them.)
 These are CDO defaults on `BP_WeaponComponent`, pushed over every frame by the HUD from
 `BP_Settings` — see "The settings screen" above.
 
@@ -2066,7 +2077,11 @@ centred and bottom-anchored at any window size.
   actual bounds height at plant time; never hard-code a grass scale. The offline
   `Grass Upscale Factor` check keeps any species from being stretched past 2.4x, which is
   where blades start to read as coarse.
-- Grass HISMs are `NoCollision` (they must not block the player) and cull at 60–90 m.
+- Grass HISMs are `NoCollision` (they must not block the player) and cull at 60–90 m — times
+  `r.ViewDistanceScale` (0.4 on Low), which scales instance cull and primitive max draw
+  distance alike. Grass is planted as one HISM per species per 100 m cell
+  (`forest_generator/grass_cells.py`, `forest_import/grass.py`), labelled `<spec>__±ix_±iy`,
+  tagged `OW_Grass`, saved unlit.
 - UE 5.8 exposes real Blueprint graph authoring to Python (`BlueprintGraphEditor`:
   `add_call_function_node`, `find_event_node`, `try_create_connection`, pin helpers on
   `BlueprintEditorLibrary`). A fresh BP already has a disabled `ReceiveBeginPlay` node —

@@ -217,50 +217,14 @@ check("Total Tree Instances",
       total_tree_instances == EXPECTED_TREE_COUNT,
       f"(expected {EXPECTED_TREE_COUNT}, got {total_tree_instances})")
 
-# ── 5. Grass HISM Actors ─────────────────────────────────────────────
+# ── 5. Grass cells (forest_import/grass.py) ─────────────────────────
 if EXPECTED_GRASS_COUNT > 0:
-    total_grass_instances = 0
-    for spec_name, expected_count in EXPECTED_GRASS_SPEC_COUNTS.items():
-        found = False
-        for a in actors:
-            if a.get_actor_label() == spec_name:
-                found = True
-                root = a.get_editor_property("root_component")
-                if root and isinstance(root, unreal.HierarchicalInstancedStaticMeshComponent):
-                    inst_count = root.get_instance_count()
-                    total_grass_instances += inst_count
-                    check(f"{spec_name} Instance Count",
-                          inst_count == expected_count,
-                          f"(expected {expected_count}, got {inst_count})")
-                    # Grass must never block the player.
-                    check(f"{spec_name} No Collision",
-                          str(root.get_collision_profile_name()) == "NoCollision",
-                          f"(got {root.get_collision_profile_name()})")
-
-                    # Prove the clumps really land at knee height:
-                    # mesh bounds height × instance Z scale.
-                    mesh = root.get_editor_property("static_mesh")
-                    lo_hi = EXPECTED_GRASS_HEIGHTS.get(spec_name)
-                    if mesh and lo_hi and inst_count > 0:
-                        mesh_h = float(mesh.get_bounds().box_extent.z) * 2.0
-                        sampled = []
-                        step = max(1, inst_count // 50)
-                        for i in range(0, inst_count, step):
-                            tf = root.get_instance_transform(i, world_space=False)
-                            sampled.append(float(tf.scale3d.z) * mesh_h)
-                        lo, hi = lo_hi
-                        worst = [h for h in sampled
-                                 if not (lo - 1.0 <= h <= hi + 1.0)]
-                        check(f"{spec_name} Knee Height",
-                              len(worst) == 0,
-                              f"(expected {lo:.1f}-{hi:.1f} cm, "
-                              f"sampled {min(sampled):.1f}-{max(sampled):.1f} cm)")
-                break
-        check(f"{spec_name} Actor Exists", found)
-
-    check("Total Grass Instances",
-          total_grass_instances == EXPECTED_GRASS_COUNT,
-          f"(expected {EXPECTED_GRASS_COUNT}, got {total_grass_instances})")
+    import sys
+    if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sys.path:
+        sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
+    from forest_import import grass as grass_import
+    grass_import.verify_grass(check, actors, EXPECTED_GRASS_SPEC_COUNTS,
+                              EXPECTED_GRASS_HEIGHTS, EXPECTED_GRASS_COUNT)
 
 # ── 6. Navigation + NPCs ─────────────────────────────────────────────
 if EXPECTED_NPCS:

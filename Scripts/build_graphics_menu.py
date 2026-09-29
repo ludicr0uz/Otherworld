@@ -27,7 +27,12 @@ Event graph:
                     --> ConsoleCommand "stat fps"  (engine's own readout,
                         which draws itself in the top-right corner)
 
-  [Event Tick] --> [Branch: WasInputKeyJustPressed(M)]
+  [Event Tick] --> [Branch: Quality != GrassQualityApplied]
+                      True  --> for each actor tagged OW_Grass: SetCastShadow,
+                                SetAffectDistanceFieldLighting,
+                                SetAffectDynamicIndirectLighting (Ultra only)
+                                --> GrassQualityApplied = Quality
+              --> [Branch: WasInputKeyJustPressed(M)]
                       True  --> [Set MenuOpen = Not MenuOpen] --,
                       False ------------------------------------+
                                                                 v
@@ -36,11 +41,14 @@ Event graph:
                                      | False                             |
                                [Branch: key "2"] True --> apply Medium --+
                                      | False                             |
-                               [Branch: key "3"] True --> apply High   --'
+                               [Branch: key "3"] True --> apply High   --+
+                                     | False                             |
+                               [Branch: key "4"] True --> apply Ultra  --'
 
     "apply <preset>" = Set Quality -> GetGameUserSettings ->
                        SetOverallScalabilityLevel -> ApplyNonResolutionSettings ->
                        ConsoleCommand r.ShadowQuality -> ConsoleCommand r.ScreenPercentage
+    (graphics_menu/presets.py owns both fragments and the preset table.)
 
   Every wanderer's bar carries its spawn number (read off its own
   BP_HealthComponent.NpcId), so what is on screen can be matched to the
@@ -77,6 +85,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # two would drift and the symptom would be a save file that rebinds itself.
 from combat import paths as combat_paths                           # noqa: E402
 from combat import tuning as combat_tuning                         # noqa: E402
+# The presets, the chain that applies one and the grass-lighting Tick prologue
+# live in graphics_menu/presets.py; see there for why each preset is what it is.
+from graphics_menu.presets import (                                # noqa: E402
+    DEFAULT_PRESET, GRASS_APPLIED_DEFAULT, GRASS_APPLIED_VAR, PRESET_KEYS,
+    PRESETS, author_grass_sync, console_commands, emit_apply)
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -84,40 +97,6 @@ UI_DIR = "/Game/UI"
 HUD_BP_PATH = f"{UI_DIR}/BP_GraphicsMenuHUD"
 
 GAME_MODE_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
-
-# The three presets, in menu order.  Each is
-#   (label, scalability level, r.ShadowQuality, r.ScreenPercentage)
-#
-# scalability level indexes UE's own groups: 0 Low, 1 Medium, 2 High, 3 Epic.
-# "High" maps to Epic, not to 2, on purpose: Epic is what the project runs at
-# today (HardwareTargeting DefaultGraphicsPerformance=Maximum), and the brief
-# was that the top preset must be the *current* look, not a downgrade of it.
-# Level 2 is skipped rather than squeezed in -- three well-separated presets
-# beat four adjacent ones.
-#
-# The two console commands are not redundant with the scalability level:
-#
-#   r.ShadowQuality  — Config/DefaultEngine.ini pins this to 3 under
-#     [/Script/Engine.RendererSettings].  That is SetByProjectSetting priority,
-#     which *outranks* SetByScalability, so SetOverallScalabilityLevel silently
-#     cannot move it (the editor logs "was ignored as it is lower priority").
-#     A console command is SetByConsole, which outranks both, so this is the
-#     only way the menu can reach shadows.  High passes 3 — the pinned value —
-#     so picking High reproduces the shipping look exactly.
-#   r.ScreenPercentage — not part of any scalability group, and on a forest this
-#     dense it is the single biggest GPU lever available.
-PRESETS = (
-    ("Low",    0, 1,  70),
-    ("Medium", 1, 2,  85),
-    ("High",   3, 3, 100),
-)
-# Keys 1/2/3.  UE's FKey names for the number row are One/Two/Three.
-#
-# These go into the pin verbatim, NOT as struct text: FKey overrides
-# ExportTextItem to write just the key name, so a pin set to '(KeyName="M")'
-# imports back as a key literally called "(" -- it compiles, it saves, and the
-# key silently never matches at runtime.
-PRESET_KEYS = ("One", "Two", "Three")
 
 MENU_KEY = "M"
 
@@ -141,11 +120,6 @@ DEBUG_MODE_VAR = "DebugMode"
 # waiting on a keypress the player has to know about.
 FPS_COMMAND = "stat fps"
 
-# The preset every session starts at.  BeginPlay *applies* it rather than just
-# setting the caret: the menu can only tell the truth about the current quality
-# if it is the thing that established it.
-DEFAULT_PRESET = 0  # Low
-
 # Where the player's health lives.  Built by build_shotgun_and_health.py; the
 # HUD degrades to drawing nothing if the pawn has no such component.
 HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
@@ -163,16 +137,16 @@ HP_BAR = (60.0, 62.0, 420.0, 30.0)   # x, y, w, h -- w is the *full* bar
 HP_NUM_POS = (500.0, 58.0)
 HP_NUM_SCALE = 2.4
 
-PANEL = (60.0, 130.0, 600.0, 346.0)   # x, y, w, h
+PANEL = (60.0, 130.0, 600.0, 392.0)   # x, y, w, h
 TITLE_POS = (92.0, 158.0)
 TITLE_SCALE = 2.2
 ROW_X = 150.0
 ROW_Y0 = 238.0
 ROW_STEP = 46.0
 ROW_SCALE = 2.0
-DEBUG_ROW_Y = 376.0        # one row below the three presets
+DEBUG_ROW_Y = ROW_Y0 + len(PRESETS) * ROW_STEP   # one row below the presets
 CARET_X = 112.0
-HINT_POS = (92.0, 428.0)
+HINT_POS = (92.0, DEBUG_ROW_Y + 52.0)
 HINT_SCALE = 1.5
 
 COL_PANEL = "(R=0.020000,G=0.025000,B=0.035000,A=0.780000)"
@@ -448,9 +422,6 @@ SCOPE_TEX = "T_UI_Scope"
 FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 FN_CONSOLE = "/Script/Engine.KismetSystemLibrary.ExecuteConsoleCommand"
-FN_GET_GUS = "/Script/Engine.GameUserSettings.GetGameUserSettings"
-FN_SET_OVERALL = "/Script/Engine.GameUserSettings.SetOverallScalabilityLevel"
-FN_APPLY = "/Script/Engine.GameUserSettings.ApplyNonResolutionSettings"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_CONV_INT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
 FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
@@ -751,6 +722,10 @@ def _ensure_variables(ed, bp):
                                 # BeginPlay pauses the world alongside it.
                                 (GAME_STARTED_VAR, "bool", "false"),
                                 ("Quality", "int", str(DEFAULT_PRESET)),
+                                # The Quality the grass cells were last lit
+                                # for -- see presets.author_grass_sync.
+                                (GRASS_APPLIED_VAR, "int",
+                                 str(GRASS_APPLIED_DEFAULT)),
                                 # Which page of the menu panel is on screen,
                                 # and which line of it the caret is on.
                                 ("MenuPage", "int", str(PAGE_TITLE)),
@@ -962,65 +937,13 @@ def _author_load_settings(ed, x0, y0, in_exec):
     return (saved, BEL.find_else_pin(repair))
 
 
-# ─── One preset, applied ─────────────────────────────────────────────────────
-
-def _emit_apply(ed, index, x, y, in_exec):
-    """Emit the chain that applies preset ``index`` and hook it to ``in_exec``.
-
-    Shared by BeginPlay (which applies the startup default) and by each preset
-    key, so there is exactly one description of what picking a preset does.
-    Returns the nodes it made, for the caller to wrap in a comment.
-    """
-    _label, level, shadow, screen_pct = PRESETS[index]
-
-    set_q = _at(ed.add_set_member_variable_node("Quality"), x, y)
-    _set(set_q, "Quality", index)
-    _connect(in_exec, _pin(set_q, "execute"))
-
-    gus = _at(_node(ed, FN_GET_GUS), x + 200, y)
-    _connect(BEL.find_then_pin(set_q), _pin(gus, "execute"))
-    gus_out = _pin(gus, "ReturnValue", is_input=False)
-
-    sos = _at(_node(ed, FN_SET_OVERALL), x + 400, y)
-    _connect(gus_out, _pin(sos, "self"))
-    _set(sos, "Value", level)
-    _connect(BEL.find_then_pin(gus), _pin(sos, "execute"))
-
-    # ApplyNonResolutionSettings, *never* ApplySettings.  ApplySettings also
-    # applies resolution, which fires the console-variable sinks ->
-    # SystemResolutionSinkCallback -> FSceneViewport::ResizeFrame ->
-    # SWindow::SetWindowMode.  On macOS that lands in
-    # FMacWindow::UpdateFullScreenState, which pumps the Cocoa run loop waiting
-    # on a window-mode transition that never completes inside PIE: the editor
-    # hangs at 100% CPU, on this very BeginPlay, with no log line after
-    # "Bringing up level for play".  The menu never changes resolution, so
-    # there is nothing to lose by skipping that half.
-    app = _at(_node(ed, FN_APPLY), x + 620, y)
-    _connect(gus_out, _pin(app, "self"))
-    _connect(BEL.find_then_pin(sos), _pin(app, "execute"))
-
-    made = [set_q, gus, sos, app]
-    flow = BEL.find_then_pin(app)
-    for offset, command in enumerate((f"r.ShadowQuality {shadow}",
-                                      f"r.ScreenPercentage {screen_pct}")):
-        c = _at(_node(ed, FN_CONSOLE), x + 840 + offset * 260, y)
-        # WorldContextObject is a hidden pin the compiler fills from self, and a
-        # null SpecificPlayer means "the first local player" -- which in a HUD
-        # is always the player owning it.
-        _set(c, "Command", command)
-        _connect(flow, _pin(c, "execute"))
-        flow = BEL.find_then_pin(c)
-        made.append(c)
-    return made
-
-
 # ─── Event BeginPlay: the startup default ────────────────────────────────────
 
 def _author_begin_play(ed, begin_play):
     origin = BEL.get_node_pos(begin_play)
-    made = _emit_apply(ed, DEFAULT_PRESET, origin.x + 320, origin.y,
+    made = emit_apply(ed, DEFAULT_PRESET, origin.x + 320, origin.y,
                        BEL.find_then_pin(begin_play))
-    label = PRESETS[DEFAULT_PRESET][0]
+    label = PRESETS[DEFAULT_PRESET].label
     ed.add_comment_to_nodes(
         f"Every session starts at {label}.  This has to *apply* the preset, not "
         f"just point the caret at it: otherwise the panel would claim {label} "
@@ -1123,7 +1046,10 @@ def _author_tick(ed, tick):
 
     br_m = _at(ed.add_branch_node(), x0 + 560, y0)
     _connect(_pin(was_m, "ReturnValue", is_input=False), _pin(br_m, "Condition"))
-    _connect(BEL.find_then_pin(tick), _pin(br_m, "execute"))
+    # Grass lighting catches up with Quality first, so a preset picked on the
+    # previous frame is on the grass before anything else runs this one.
+    for tail in author_grass_sync(ed, x0, y0 - 1100, BEL.find_then_pin(tick)):
+        _connect(tail, _pin(br_m, "execute"))
 
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 560, y0 + 200)
     not_open = _at(_node(ed, FN_NOT), x0 + 740, y0 + 200)
@@ -1149,7 +1075,7 @@ def _author_tick(ed, tick):
     _connect(_pin(br_m, "else", is_input=False), _pin(gate, "execute"))
 
     flow = BEL.find_then_pin(gate)
-    for i, (label, level, shadow, screen_pct) in enumerate(PRESETS):
+    for i, preset in enumerate(PRESETS):
         bx = x0 + 1500
         by = y0 + i * 420
 
@@ -1161,11 +1087,12 @@ def _author_tick(ed, tick):
         _connect(_pin(was, "ReturnValue", is_input=False), _pin(br, "Condition"))
         _connect(flow, _pin(br, "execute"))
 
-        applied = _emit_apply(ed, i, bx + 500, by, BEL.find_then_pin(br))
+        applied = emit_apply(ed, i, bx + 500, by, BEL.find_then_pin(br))
 
         ed.add_comment_to_nodes(
-            f"{PRESET_KEYS[i]} -> {label}: scalability {level}, "
-            f"r.ShadowQuality {shadow}, r.ScreenPercentage {screen_pct}.",
+            f"{PRESET_KEYS[i]} -> {preset.label}: scalability {preset.level}, "
+            f"{', '.join(console_commands(preset))}, grass lighting "
+            f"{'on' if preset.grass_lights else 'off'}.",
             [was, br] + applied)
 
         # An unmatched key falls through to the next test.
@@ -3100,8 +3027,8 @@ def _author_draw(ed, x0, y0):
 
     text("GRAPHICS QUALITY", TITLE_POS[0], TITLE_POS[1], TITLE_SCALE, COL_TITLE,
          x0 + 860, y0)
-    for i, (label, _lvl, _sq, _sp) in enumerate(PRESETS):
-        text(f"[{i + 1}]   {label}", ROW_X, ROW_Y0 + i * ROW_STEP, ROW_SCALE,
+    for i, preset in enumerate(PRESETS):
+        text(f"[{i + 1}]   {preset.label}", ROW_X, ROW_Y0 + i * ROW_STEP, ROW_SCALE,
              COL_ROW, x0 + 1080 + i * 220, y0)
     # Two draws behind one branch rather than one draw with a driven string:
     # KismetStringLibrary has no Select, and a bool converted to a string reads
@@ -3231,6 +3158,7 @@ def build_hud_blueprint(rebuild=False):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
     _apply_defaults(bp, {"MenuOpen": False, "DebugOn": False,
                          "Quality": DEFAULT_PRESET,
+                         GRASS_APPLIED_VAR: GRASS_APPLIED_DEFAULT,
                          "MenuPage": PAGE_TITLE, "MenuRow": 0,
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],

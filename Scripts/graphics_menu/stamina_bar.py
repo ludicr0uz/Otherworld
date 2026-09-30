@@ -1,5 +1,5 @@
-"""DrawHUD: the stamina bar, centred at the bottom of WBP_HUD under the
-inventory grid (the layout is wbp_hud.py's; this writes its fill).
+"""DrawHUD: the stamina bar, beside HP under the inventory grid of WBP_HUD
+(the layout is wbp_hud.py's; this writes its fill, and blinks it when low).
 
 Read off BP_WeaponComponent rather than off the health component: that is
 where sprint lives (it is the thing that has to refuse to fire while the key
@@ -11,8 +11,11 @@ going down because I am sprinting, or did I stop and it is coming back?"
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent
-from graphics_menu.umg_consts import COL_ST_FILL, COL_ST_SPENT, STAMINA_BAR, WBP_HUD
+from graphics_menu.umg_consts import (
+    COL_ST_FILL, COL_ST_SPENT, STAMINA_BAR, ST_GROUP, WBP_HUD,
+)
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
@@ -67,9 +70,13 @@ def _author_stamina(ed, x0, y0, in_execs):
     _connect(_pin(tint, "ReturnValue", is_input=False), _pin(fill, "InColor"))
     _connect(filled, _pin(fill, "execute"))
 
+    flashed = author_flash(ed, part(ed, WBP_HUD, ST_GROUP, x0 + 1800, y0 + 800),
+                           _pin(frac, "ReturnValue", is_input=False),
+                           [BEL.find_then_pin(fill)], x0 + 2100, y0)
+
     ed.add_comment_to_nodes(
-        "Stamina, centred under the inventory grid. The fill goes amber while "
+        "Stamina, beside HP under the inventory grid. The fill goes amber while "
         "the sprint key is held and back to blue while it refills, so a bar "
         "that is moving always says which way it is going.",
         made)
-    return (BEL.find_then_pin(fill), _pin(cast, "CastFailed", is_input=False))
+    return (flashed, _pin(cast, "CastFailed", is_input=False))

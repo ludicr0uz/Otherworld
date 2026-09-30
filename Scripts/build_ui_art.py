@@ -33,6 +33,9 @@ edges come from -- PIL's polygon fill is hard-edged.
 import math
 import os
 
+from ui_art.stat_icons import write_stat_icons
+from ui_art.vertical_bars import write_vertical_bars
+
 # Pillow is imported lazily, inside the functions that draw. The editor's
 # embedded Python has no Pillow but DOES need WEAPON_ICON_ROWS below, and a
 # module-level import would make this file unimportable there.
@@ -565,6 +568,9 @@ def main():
         _icon(builder, ICON_RELATIVE_LENGTH.get(display, 1.0)).save(
             os.path.join(OUT_DIR, f"{name}.png"))
         made.append(name)
+
+    made += write_stat_icons(OUT_DIR)
+    made += write_vertical_bars(OUT_DIR)
 
     print(f"wrote {len(made)} PNGs to {OUT_DIR}")
     for n in made:

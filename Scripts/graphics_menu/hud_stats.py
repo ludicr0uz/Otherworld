@@ -7,8 +7,9 @@ wanderers that earn it and the player's own components.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent, set_text
-from graphics_menu.umg_consts import HP_BAR, HP_NUM, KILLS, WBP_HUD
+from graphics_menu.umg_consts import HP_BAR, HP_GROUP, HP_NUM, KILLS, WBP_HUD
 
 HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
 GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
@@ -28,7 +29,8 @@ FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 
 
 def author_hp(ed, x0, y0, in_execs):
-    """HpBar = Health / MaxHealth, HpNum = round(Health). Returns the exec pins
+    """HpBar = Health / MaxHealth, HpNum = round(Health), and the group
+    blinks under a quarter (hud_flash.py). Returns the exec pins
     to go on from -- the cast-failed one too, so a pawn with no health
     component still reaches the rest of the HUD."""
     pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 240)
@@ -65,7 +67,10 @@ def author_hp(ed, x0, y0, in_execs):
     shown = set_text(ed, part(ed, WBP_HUD, HP_NUM, x0 + 1740, y0 + 500),
                      _pin(as_text, "ReturnValue", is_input=False), [filled],
                      x0 + 2240, y0)
-    return (shown, _pin(cast, "CastFailed", is_input=False))
+    flashed = author_flash(ed, part(ed, WBP_HUD, HP_GROUP, x0 + 2240, y0 + 800),
+                           _pin(frac, "ReturnValue", is_input=False), [shown],
+                           x0 + 2500, y0)
+    return (flashed, _pin(cast, "CastFailed", is_input=False))
 
 
 def author_kills(ed, x0, y0, in_execs):

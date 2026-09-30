@@ -1,12 +1,17 @@
 """WBP_HUD: the in-game overlay's layout.
 
   Body   (hidden on the title and death screens)
-    top left      HP, then the FOOD / H2O / TEMP bars, debuff names beside them
+    bottom left   the FOOD / H2O / TEMP bars, standing vertical, each over its
+                  icon; the debuff names stacked above them
     top right     the kill counter
     top centre    the save-and-exit countdown, or why it was called off
     bottom centre the equipped weapon's name, the 2 x 5 inventory grid of
-                  WBP_InventorySlot, and the stamina bar under it
+                  WBP_InventorySlot, and under it HP and stamina side by side
   Fps    (debug mode, on every screen)
+
+Every bar has a stat icon beside it (ui_art/stat_icons.py), tinted its fill
+colour, and sits with it in one group widget (HpStat, StaStat, <Stat>Stat)
+that the HUD blinks while the bar is low (hud_flash.py).
 
 Everything is anchored to its corner or edge of the viewport, so none of it is
 positioned by arithmetic any more. The values are written by the HUD's DrawHUD
@@ -25,48 +30,70 @@ from graphics_menu.umg_consts import (
     BANNER_COUNT, BANNER_FONT, BANNER_OFF, BANNER_TOP, COL_EXIT_CALLED_OFF, COL_FPS,
     COL_GOLD, COL_HP_FILL, COL_KILL, COL_LABEL, COL_NUMBER, COL_DEBUFF, COL_ST_FILL,
     CORNER_MARGIN, DEBUFF_FONT, DEBUFF_LABELS, EQUIPPED_FONT, EQUIPPED_GAP, EQUIPPED_NAME,
-    FPS_FONT, FPS_TOP, HP_BAR, HP_BAR_SIZE, HP_LABEL_FONT, HP_NUM, HP_NUM_FONT, HUD_BODY,
-    HUD_FPS, INVENTORY_COLUMNS, KILLS, KILLS_FONT, KILLS_TOP, SLOT_GAP, SLOTS,
-    STAMINA_BAR, STAT_LABEL_W, STATS_POS, STRIP_BOTTOM, ST_BAR_SIZE, ST_LABEL_FONT,
-    ST_LABEL_W, ST_OVER, SURVIVAL_BARS, SV_BAR_SIZE, SV_LABEL_FONT, SV_ROW_GAP,
-    WBP_HUD, WBP_INVENTORY_SLOT, debuff_text, stat_bar,
+    FPS_FONT, FPS_TOP, HP_BAR, HP_BAR_SIZE, HP_GROUP, HP_ICON, HP_NUM, HP_NUM_FONT,
+    HUD_BODY, HUD_FPS, ICON_GAP, INVENTORY_COLUMNS, KILLS, KILLS_FONT, KILLS_TOP,
+    SLOT_GAP, SLOTS, STAMINA_BAR, STAT_ICON, STRIP_BOTTOM, ST_BAR_SIZE, ST_GROUP,
+    ST_ICON, SURVIVAL, SURVIVAL_BARS, SURVIVAL_LEFT, SV_BAR_SIZE, SV_COLUMN_GAP,
+    SV_LABEL_FONT, VITALS, VITALS_GAP, VITALS_OVER, WBP_HUD, WBP_INVENTORY_SLOT,
+    debuff_text, stat_bar, stat_group, stat_icon,
 )
+from ui_art.stat_icons import stat_icon_name
 
 DEBUFF_OF = {stat: label for _tag, label, stat in DEBUFF_LABELS}
 
 
-def _stat_row(bp, parent, name, label, font, top):
-    row = U.add(bp, unreal.HorizontalBox, f"{name}Row", parent)
-    U.pad(row, top=top)
-    box = U.sized(bp, row, f"{name}LabelBox", w=STAT_LABEL_W)
-    U.pad(box, v="Center")
-    U.text(bp, box, f"{name}Label", label, font, COL_LABEL)
-    return row
+def _icon(bp, parent, name, stat, tint):
+    return U.image(bp, parent, name, stat_icon_name(stat), (STAT_ICON, STAT_ICON),
+                   tint=tint)
 
 
-def _author_stats(bp, body):
-    stats = U.add(bp, unreal.VerticalBox, "Stats", body)
-    U.at(stats, (0.0, 0.0), (0.0, 0.0), STATS_POS)
+def _author_survival(bp, body):
+    """Bottom left: one column per survival stat -- its bar filling upwards,
+    its icon and its label under it -- with the debuff names above them."""
+    stack = U.add(bp, unreal.VerticalBox, SURVIVAL, body)
+    U.at(stack, (0.0, 1.0), (0.0, 1.0), (SURVIVAL_LEFT, -STRIP_BOTTOM))
+    for _tag, label, stat in DEBUFF_LABELS:
+        name = U.text(bp, stack, debuff_text(stat), label, DEBUFF_FONT, COL_DEBUFF,
+                      variable=True)
+        U.pad(name, bottom=4.0)
+        U.hide(name)
 
-    row = _stat_row(bp, stats, "Hp", "HP", HP_LABEL_FONT, 0.0)
-    hp = U.bar(bp, row, HP_BAR, HP_BAR_SIZE, COL_HP_FILL)
-    U.pad(hp.get_parent(), v="Center")
-    num = U.text(bp, row, HP_NUM, "100", HP_NUM_FONT, COL_NUMBER, variable=True)
-    U.pad(num, left=20.0, v="Center")
+    row = U.add(bp, unreal.HorizontalBox, "SurvivalBars", stack)
+    for i, (stat, label, fill) in enumerate(SURVIVAL_BARS):
+        col = U.add(bp, unreal.VerticalBox, stat_group(stat), row, variable=True)
+        U.pad(col, left=0.0 if i == 0 else SV_COLUMN_GAP, v="Bottom")
+        sv = U.bar(bp, col, stat_bar(stat), SV_BAR_SIZE, fill, vertical=True)
+        U.pad(sv.get_parent(), h="Center")
+        icon = _icon(bp, col, stat_icon(stat), stat, fill)
+        U.pad(icon, top=ICON_GAP, h="Center")
+        caption = U.text(bp, col, f"{stat}Label", label, SV_LABEL_FONT, COL_LABEL)
+        U.pad(caption, top=2.0, h="Center")
 
-    for stat, label, fill in SURVIVAL_BARS:
-        row = _stat_row(bp, stats, stat, label, SV_LABEL_FONT, SV_ROW_GAP)
-        sv = U.bar(bp, row, stat_bar(stat), SV_BAR_SIZE, fill)
-        U.pad(sv.get_parent(), v="Center")
-        if stat in DEBUFF_OF:
-            name = U.text(bp, row, debuff_text(stat), DEBUFF_OF[stat], DEBUFF_FONT,
-                          COL_DEBUFF, variable=True)
-            U.pad(name, left=10.0, v="Center")
-            U.hide(name)
+
+def _author_vitals(bp, strip):
+    """Under the grid: HP (icon, bar, number) and stamina (icon, bar)."""
+    row = U.add(bp, unreal.HorizontalBox, VITALS, strip)
+    U.pad(row, top=VITALS_OVER, h="Center")
+
+    hp = U.add(bp, unreal.HorizontalBox, HP_GROUP, row, variable=True)
+    U.pad(hp, v="Center")
+    icon = _icon(bp, hp, HP_ICON, "Health", COL_HP_FILL)
+    U.pad(icon, right=ICON_GAP, v="Center")
+    bar = U.bar(bp, hp, HP_BAR, HP_BAR_SIZE, COL_HP_FILL)
+    U.pad(bar.get_parent(), v="Center")
+    num = U.text(bp, hp, HP_NUM, "100", HP_NUM_FONT, COL_NUMBER, variable=True)
+    U.pad(num, left=8.0, v="Center")
+
+    st = U.add(bp, unreal.HorizontalBox, ST_GROUP, row, variable=True)
+    U.pad(st, left=VITALS_GAP, v="Center")
+    icon = _icon(bp, st, ST_ICON, "Stamina", COL_ST_FILL)
+    U.pad(icon, right=ICON_GAP, v="Center")
+    bar = U.bar(bp, st, STAMINA_BAR, ST_BAR_SIZE, COL_ST_FILL)
+    U.pad(bar.get_parent(), v="Center")
 
 
 def _author_strip(bp, body):
-    """The equipped name, the grid and the stamina bar, stood on the bottom edge."""
+    """The equipped name, the grid and the vitals, stood on the bottom edge."""
     strip = U.add(bp, unreal.VerticalBox, "Strip", body)
     U.at(strip, (0.5, 1.0), (0.5, 1.0), (0.0, -STRIP_BOTTOM))
 
@@ -81,17 +108,7 @@ def _author_strip(bp, body):
     for i in range(INVENTORY_SIZE):
         cell = U.add(bp, slot_class, f"Slot{i}", grid)
         U.cell(cell, i // INVENTORY_COLUMNS, i % INVENTORY_COLUMNS)
-
-    # The bar centred under the grid: its label on the left is balanced by a
-    # spacer as wide on the right.
-    row = U.add(bp, unreal.HorizontalBox, "StaminaRow", strip)
-    U.pad(row, top=ST_OVER, h="Center")
-    box = U.sized(bp, row, "StaLabelBox", w=ST_LABEL_W)
-    U.pad(box, v="Center")
-    U.text(bp, box, "StaLabel", "STA", ST_LABEL_FONT, COL_LABEL)
-    st = U.bar(bp, row, STAMINA_BAR, ST_BAR_SIZE, COL_ST_FILL)
-    U.pad(st.get_parent(), v="Center")
-    U.sized(bp, row, "StaSpacer", w=ST_LABEL_W)
+    _author_vitals(bp, strip)
 
 
 def build_hud_widget():
@@ -99,7 +116,7 @@ def build_hud_widget():
     root = U.add(bp, unreal.CanvasPanel, "Root")
     body = U.add(bp, unreal.CanvasPanel, HUD_BODY, root, variable=True)
     U.fill_parent(body)
-    _author_stats(bp, body)
+    _author_survival(bp, body)
 
     kills = U.text(bp, body, KILLS, "KILLS  0", KILLS_FONT, COL_KILL, variable=True)
     U.at(kills, (1.0, 0.0), (1.0, 0.0), (-CORNER_MARGIN, KILLS_TOP))

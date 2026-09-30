@@ -6,7 +6,8 @@
 `BP_ThirdPersonGameMode.HUDClass` to it. That game mode is the global default, so the HUD is in
 every level. Run `Scripts/verify_graphics_menu.py` after every edit. It is the only thing that
 catches pin literals that compile but mean something else. After a change to what a screen
-shows, also run `uepy.py --game --probe Scripts/probes/probe_umg_screens.py`.
+shows, also run `uepy.py --game --probe Scripts/probes/probe_umg_screens.py` (and
+`probe_hud_low_flash.py` for the bars).
 
 This package holds the fragments. The entry point itself is still 1.2k lines, over budget, so
 split it before extending it.
@@ -35,9 +36,9 @@ split it before extending it.
   PreConstruct. The HUD writes only the caret (`SetRenderOpacity` 1 on the selected row, 0 on the
   rest: one ForLoop over the rows) and the value column. **Row order is MenuRow's order**:
   `SETTINGS_ROW_LABELS` must match `settings_rows.py`'s row numbers, which the verifier checks.
-- **Anchored, not computed.** Each element is anchored to its corner or edge (stats top-left,
-  kills and FPS top-right, banner top-centre, inventory and stamina bottom-centre, menus
-  centred). UMG scales them with the DPI curve (1.0 at a 1080 px shortest side).
+- **Anchored, not computed.** Each element is anchored to its corner or edge (survival bars
+  bottom-left, kills and FPS top-right, banner top-centre, inventory, HP and stamina
+  bottom-centre, menus centred). UMG scales them with the DPI curve (1.0 at a 1080 px shortest side).
 - **Still on the canvas:** the reticle and the sniper's scope (placed off the viewport centre
   and sized by the gun's cloud every frame) and the wanderers' bars (one per wanderer, placed by
   projecting its head). The task allowed it; a widget per wanderer would need a pool or a
@@ -122,15 +123,26 @@ sync:
 
 **What it shows each frame:**
 
-- **Top-left:** the HP bar and the FOOD / H2O / TEMP bars (`survival_bars.py`).
-  STARVING and DEHYDRATED are read from the ASC's tags.
+- **Bottom-left:** the FOOD / H2O / TEMP bars, vertical and filling from the bottom
+  (`survival_bars.py`), each over its icon and label; STARVING and DEHYDRATED stack above
+  them, read from the ASC's tags. Vertical bars use `T_UI_BarV`/`T_UI_BarTrackV`
+  (`ui_art/vertical_bars.py`): the horizontal art stood upright shades along the bar, so a
+  nearly empty fill showed only its dark foot and read as another colour.
+- **Every bar has a stat icon** (`ui_art/stat_icons.py`: white glyphs, tinted the bar's
+  fill colour in the Image widget) and sits with it in a group widget (`HpStat`, `StaStat`,
+  `<Stat>Stat`). **Low bars blink** (`hud_flash.py`): under `LOW_FRACTION` (25%) the group's
+  render opacity drops to `FLASH_DIM` every other half-beat at `FLASH_HZ`, on
+  `GetRealTimeSeconds` so it still blinks under the paused M panel. Real time moves only
+  between frames, so a probe must draw once a frame to see it
+  (`probe_hud_low_flash.py`).
 - **Top-right:** the kill counter, and the FPS readout in debug mode only.
 - **Wanderers:** a projected health bar over each one, plus its number in debug mode.
 - **Bottom:** the 10-slot inventory grid, in two rows of five (`INVENTORY_COLUMNS`, 84 x 59
   slots, `hud_inventory.py`), with loaded/reserve counts for weapons that use ammo. Slot *i*
   shows `Inventory[i]`, read only behind `IsValidIndex`; a slot past the end is emptied every
-  frame. Under the grid, centred and as wide as its slots and gaps, the stamina bar
-  (`stamina_bar.py`); both sit in one bottom-anchored stack in `WBP_HUD`.
+  frame. Under the grid, side by side in the `Vitals` row: HP (icon, bar, number,
+  `hud_stats.py`) and stamina (icon, bar, `stamina_bar.py`); all in one bottom-anchored
+  stack in `WBP_HUD`.
 - **Centre:** the reticle or scope (`reticle.py`). The reticle's four ticks stand off by the held
   gun's accuracy cloud: `ReticleSpread` (weapon component) × half the viewport width, capped at
   `RETICLE_SPREAD_MAX` with an `FMin` (an `FClamp` would be read as a settings slider).

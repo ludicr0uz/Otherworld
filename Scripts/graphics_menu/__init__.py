@@ -7,13 +7,15 @@ The screens (widget trees, authored through the UMGToolSet plugin)
                   palette -- constants only
   umg_author      building a Widget Blueprint's tree from Python: add, style, slot
   wbp_parts       WBP_MenuRow (caret, label, value) and WBP_InventorySlot
-  wbp_hud         WBP_HUD: stat bars, kills, banner, inventory grid, stamina, FPS
+  wbp_hud         WBP_HUD: survival bars (bottom left), kills, banner, inventory
+                  grid with HP and stamina under it, FPS; an icon by every bar
   wbp_screens     WBP_MainMenu (title + settings pages), WBP_PauseMenu, WBP_DeathMenu
 
 The HUD graph that shows and writes them
   ui_graph        creating the screens at BeginPlay; SetText/SetVisibility/rows helpers
   menu_screens    which screen is up: main menu (+ its keys), death menu, alive, M panel
   hud_stats       HP bar and number, the kill counter
+  hud_flash       a stat bar's group blinking while the bar is low
   stamina_bar     the stamina bar's fill, amber while sprinting
   survival_bars   hunger/thirst/temperature fills and the debuff names
   hud_inventory   the inventory grid and the equipped weapon's name
@@ -46,6 +48,7 @@ Input, settings and state
 
 verify_graphics_menu.py's checks, beside it because it is over budget
   umg_checks         the screens' trees and the graph that creates and writes them
+  hud_bar_checks     the stat bars' places, icons and low-bar blink
   difficulty_checks  the DIFFICULTY row and its push
   profile_checks     the saved profile and save and exit
 """

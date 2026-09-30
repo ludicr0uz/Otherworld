@@ -29,6 +29,7 @@ from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
+from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
 from graphics_menu.umg_checks import check_hud_graph, check_trees, text_literal
 from combat.tuning import COMBAT, SHOT_VOLUME_CM
 
@@ -275,7 +276,8 @@ def main():
 
     # --- the artwork the screens' brushes and the canvas sample is imported
     art = ("T_UI_Panel", "T_UI_PanelDeath", "T_UI_Slot", "T_UI_SlotActive",
-           "T_UI_SlotFrame", "T_UI_Bar", "T_UI_BarTrack", "T_UI_Scope")
+           "T_UI_SlotFrame", "T_UI_Bar", "T_UI_BarTrack", "T_UI_BarV", "T_UI_BarTrackV",
+           "T_UI_Scope")
     wrong = [a for a in art if not eas.load_asset(f"{UC.UI_ART_DIR}/{a}")]
     check("every texture the screens and the canvas draw is imported",
           not wrong, "; ".join(wrong))
@@ -286,6 +288,8 @@ def main():
     # --- the UMG screens: their trees, and the graph that writes them
     check_trees(check)
     check_hud_graph(check, nodes)
+    check_bar_layout(check)
+    check_bar_flash(check, nodes)
 
     # --- the main menu ------------------------------------------------------
     # The game must not be running behind the title screen: BeginPlay pauses,

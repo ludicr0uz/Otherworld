@@ -1,6 +1,7 @@
-"""DrawHUD: the survival bars -- hunger, thirst and temperature under the HP
-bar in WBP_HUD -- and the name of any debuff the player is carrying beside
-them. The layout and the bars' colours are wbp_hud.py's.
+"""DrawHUD: the survival bars -- hunger, thirst and temperature, vertical in
+WBP_HUD's bottom-left corner, each blinking when low -- and the name of any
+debuff the player is carrying above them. The layout and the bars' colours
+are wbp_hud.py's.
 
 The debuff names are shown off the player's AbilitySystemComponent -- the tag
 the debuff GameplayEffect granted -- not off "Hunger <= 0". The HUD therefore
@@ -13,9 +14,10 @@ from combat.graph import (
     BEL, _at, _connect, _loose_pin, _must_load, _node, _palette, _pin, _set,
 )
 from combat.nodes import FN_GET_ASC, FN_TAG_COUNT
+from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent, set_shown, show_if
 from graphics_menu.umg_consts import (
-    DEBUFF_LABELS, SURVIVAL_BARS, WBP_HUD, debuff_text, stat_bar,
+    DEBUFF_LABELS, SURVIVAL_BARS, WBP_HUD, debuff_text, stat_bar, stat_group,
 )
 from survival.paths import (
     NODE_CAST_SURVIVAL, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH,
@@ -29,7 +31,7 @@ FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
 
 
 def _author_bar(ed, survival, stat, exec_in, x0, y0):
-    """<stat>Bar = stat / Max<stat>."""
+    """<stat>Bar = stat / Max<stat>; <stat>Stat blinks while it is low."""
     now = _at(ed.add_get_member_variable_node(stat, SURVIVAL_CLASS_PATH), x0, y0 + 260)
     _connect(survival, _pin(now, "self"))
     top = _at(ed.add_get_member_variable_node(f"Max{stat}", SURVIVAL_CLASS_PATH),
@@ -38,9 +40,12 @@ def _author_bar(ed, survival, stat, exec_in, x0, y0):
     frac = _at(_node(ed, FN_DIV), x0 + 240, y0 + 300)
     _connect(_pin(now, stat, is_input=False), _pin(frac, "A"))
     _connect(_pin(top, f"Max{stat}", is_input=False), _pin(frac, "B"))
-    return set_percent(ed, part(ed, WBP_HUD, stat_bar(stat), x0 + 240, y0 + 500),
-                       _pin(frac, "ReturnValue", is_input=False), [exec_in],
-                       x0 + 700, y0)
+    filled = set_percent(ed, part(ed, WBP_HUD, stat_bar(stat), x0 + 240, y0 + 500),
+                         _pin(frac, "ReturnValue", is_input=False), [exec_in],
+                         x0 + 700, y0)
+    return author_flash(ed, part(ed, WBP_HUD, stat_group(stat), x0 + 240, y0 + 900),
+                        _pin(frac, "ReturnValue", is_input=False), [filled],
+                        x0 + 960, y0)
 
 
 def _author_debuff_labels(ed, pawn, exec_in, x0, y0):
@@ -98,6 +103,6 @@ def author_survival_bars(ed, x0, y0, in_execs):
 
     flow = BEL.find_then_pin(cast)
     for i, (stat, _label, _colour) in enumerate(SURVIVAL_BARS):
-        flow = _author_bar(ed, survival, stat, flow, x0 + 800 + i * 1000, y0)
-    exits = _author_debuff_labels(ed, pawn_out, flow, x0 + 3800, y0)
+        flow = _author_bar(ed, survival, stat, flow, x0 + 800 + i * 2600, y0)
+    exits = _author_debuff_labels(ed, pawn_out, flow, x0 + 8600, y0)
     return exits + (_pin(cast, "CastFailed", is_input=False),)

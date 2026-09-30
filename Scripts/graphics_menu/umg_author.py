@@ -153,9 +153,11 @@ def text(wbp, parent, name, label, size, col, variable=False, bold=False):
     return w
 
 
-def image(wbp, parent, name, texture, size=None, variable=False):
+def image(wbp, parent, name, texture, size=None, variable=False, tint=None):
     w = add(wbp, unreal.Image, name, parent, variable)
     w.set_editor_property("brush", brush(texture, size))
+    if tint:
+        w.set_editor_property("color_and_opacity", colour(tint))
     return w
 
 
@@ -168,8 +170,9 @@ def sized(wbp, parent, name, w=None, h=None, variable=False):
     return box
 
 
-def bar(wbp, parent, name, size, fill):
-    """A ProgressBar on the generated track and fill art, ``size`` exactly.
+def bar(wbp, parent, name, size, fill, vertical=False):
+    """A ProgressBar on the generated track and fill art, ``size`` exactly;
+    ``vertical`` fills it from the bottom up.
 
     SProgressBar clips the fill brush to the percentage rather than squashing
     it, so the lit gradient keeps its shape as the bar empties.
@@ -177,11 +180,15 @@ def bar(wbp, parent, name, size, fill):
     box = sized(wbp, parent, f"{name}Box", *size)
     pb = add(wbp, unreal.ProgressBar, name, box, variable=True)
     style = pb.get_editor_property("widget_style")
-    style.set_editor_property("background_image", brush("T_UI_BarTrack"))
-    style.set_editor_property("fill_image", brush("T_UI_Bar"))
+    upright = "V" if vertical else ""       # ui_art/vertical_bars.py
+    style.set_editor_property("background_image", brush(f"T_UI_BarTrack{upright}"))
+    style.set_editor_property("fill_image", brush(f"T_UI_Bar{upright}"))
     pb.set_editor_property("widget_style", style)
     pb.set_editor_property("fill_color_and_opacity", colour(fill))
     pb.set_editor_property("percent", 1.0)
+    if vertical:
+        pb.set_editor_property("bar_fill_type",
+                               _enum(unreal.ProgressBarFillType, "BOTTOM_TO_TOP"))
     return pb
 
 

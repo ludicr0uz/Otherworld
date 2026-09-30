@@ -116,8 +116,9 @@ def debuff_text(stat):
     return f"{stat}Debuff"
 
 
-# (stat, label, fill colour): hunger, thirst and temperature under the HP bar,
-# thinner than it -- they change over minutes and are read at a glance.
+# (stat, label, fill colour): hunger, thirst and temperature, standing as
+# vertical bars in the bottom-left corner -- they change over minutes and are
+# read at a glance.
 SURVIVAL_BARS = (
     ("Hunger", "FOOD", "(R=0.860000,G=0.580000,B=0.220000,A=0.950000)"),
     ("Thirst", "H2O", "(R=0.200000,G=0.480000,B=1.000000,A=0.950000)"),
@@ -127,22 +128,58 @@ SURVIVAL_BARS = (
 DEBUFF_LABELS = ((STARVING_TAG, "STARVING", "Hunger"),
                  (DEHYDRATED_TAG, "DEHYDRATED", "Thirst"))
 
-STATS_POS = (16.0, 24.0)         # the top-left column: HP, then the survival bars
-STAT_LABEL_W = 44.0
-HP_BAR_SIZE = (420.0, 30.0)
-HP_LABEL_FONT, HP_NUM_FONT = 15.0, 24.0
-SV_BAR_SIZE = (420.0, 12.0)
-SV_ROW_GAP = 6.0
+# Each bar, its icon and (HP) its number sit in one group widget, and the
+# group is what flashes while the bar is low (hud_flash.py).
+HP_GROUP, ST_GROUP = "HpStat", "StaStat"
+HP_ICON, ST_ICON = "HpIcon", "StaIcon"
+STAT_ICON = 24.0                 # px square, beside every bar
+
+
+def stat_group(stat):
+    """The column holding ``stat``'s bar and icon (Hunger -> HungerStat)."""
+    return f"{stat}Stat"
+
+
+def stat_icon(stat):
+    """``stat``'s icon widget (Hunger -> HungerIcon)."""
+    return f"{stat}Icon"
+
+
+def flash_groups():
+    """{group widget: the bar it blinks for}, every bar on the HUD."""
+    groups = {HP_GROUP: HP_BAR, ST_GROUP: STAMINA_BAR}
+    groups.update({stat_group(s): stat_bar(s) for s, _l, _c in SURVIVAL_BARS})
+    return groups
+
+
+# Bottom centre, under the inventory grid: HP then stamina, side by side.
+VITALS = "Vitals"
+HP_BAR_SIZE = (200.0, 18.0)
+HP_NUM_FONT = 17.0
+ST_BAR_SIZE = (200.0, 14.0)
+VITALS_OVER = 10.0               # between the grid and the row
+VITALS_GAP = 24.0                # between the HP group and the stamina group
+ICON_GAP = 6.0                   # between an icon and its bar
+# Bottom-left: the survival columns, the debuff names stacked above them.
+SURVIVAL = "Survival"
+SV_BAR_SIZE = (16.0, 140.0)
+SV_COLUMN_GAP = 14.0
 SV_LABEL_FONT, DEBUFF_FONT = 10.0, 11.0
 CORNER_MARGIN = 40.0             # the kill counter and FPS, in from the right
+SURVIVAL_LEFT = 24.0             # the survival columns, in from the left
 FPS_TOP, FPS_FONT = 40.0, 16.0
 KILLS_TOP, KILLS_FONT = 92.0, 22.0
 BANNER_TOP, BANNER_FONT = 150.0, 20.0
-STRIP_BOTTOM = 22.0              # the stamina bar's bottom edge off the screen's
+STRIP_BOTTOM = 22.0              # the vitals' and the survival bars' bottom edge
 INVENTORY_COLUMNS = 5
 EQUIPPED_FONT, EQUIPPED_GAP = 17.0, 8.0
-ST_BAR_SIZE = (INVENTORY_COLUMNS * SLOT_W + (INVENTORY_COLUMNS - 1) * SLOT_GAP, 14.0)
-ST_LABEL_W, ST_LABEL_FONT, ST_OVER = 40.0, 11.0, 12.0
+
+# A bar under LOW_FRACTION of its maximum blinks its group: FLASH_HZ times a
+# second, down to FLASH_DIM opacity for half of each blink. Real time, so it
+# still blinks with the M panel open over a paused game.
+LOW_FRACTION = 0.25
+FLASH_HZ = 2.0
+FLASH_DIM = 0.25
 
 # ─── WBP_MainMenu: the title page and the settings page ───────────────────────
 TITLE_PANEL, TITLE_ROWS = "TitlePanel", "TitleRows"

@@ -23,8 +23,10 @@ PIN = unreal.BlueprintGraphPinLibrary
 # of its screen, or the HUD's member reads have nothing to read.
 WRITTEN = {
     C.WBP_HUD: (C.HUD_BODY, C.HUD_FPS, C.HP_BAR, C.HP_NUM, C.KILLS, C.BANNER_COUNT,
-                C.BANNER_OFF, C.SLOTS, C.EQUIPPED_NAME, C.STAMINA_BAR)
+                C.BANNER_OFF, C.SLOTS, C.EQUIPPED_NAME, C.STAMINA_BAR, C.HP_GROUP,
+                C.ST_GROUP)
                + tuple(C.stat_bar(s) for s, _l, _c in C.SURVIVAL_BARS)
+               + tuple(C.stat_group(s) for s, _l, _c in C.SURVIVAL_BARS)
                + tuple(C.debuff_text(s) for _t, _l, s in C.DEBUFF_LABELS),
     C.WBP_MAIN_MENU: (C.TITLE_PANEL, C.TITLE_ROWS, C.SETTINGS_PANEL, C.SETTINGS_ROWS_BOX,
                       C.HINT_IDLE, C.HINT_CAPTURE),
@@ -121,7 +123,7 @@ def check_trees(check):
                 texts.add(str(w.get_editor_property("text")))
     want = {C.GAME_TITLE, C.GAME_SUBTITLE, C.MAIN_HINT, C.SETTINGS_TITLE_TEXT,
             C.HINT_IDLE_TEXT, C.HINT_CAPTURE_TEXT, C.PAUSE_TITLE, C.PAUSE_HINT,
-            C.DEATH_TITLE, C.DEATH_HINT, "HP", "STA", EXIT_CALLED_OFF_TEXT}
+            C.DEATH_TITLE, C.DEATH_HINT, EXIT_CALLED_OFF_TEXT}
     want |= {label for _s, label, _c in C.SURVIVAL_BARS}
     want |= {label for _t, label, _s in C.DEBUFF_LABELS}
     check("the screens' static text is in the designer, where it can be edited",
@@ -153,11 +155,9 @@ def check_trees(check):
     strip = hud.get("Strip", (None, False))[0]
     order = [str(w.get_name()) for w in strip.get_all_children()] if strip else []
     pad = grid.get_editor_property("slot_padding").left if grid else None
-    check("the stamina bar is under the grid, as wide as its slots and gaps",
-          order == [C.EQUIPPED_NAME, C.SLOTS, "StaminaRow"]
-          and C.ST_BAR_SIZE[0] == C.INVENTORY_COLUMNS * C.SLOT_W
-          + (C.INVENTORY_COLUMNS - 1) * C.SLOT_GAP and pad == C.SLOT_GAP / 2.0,
-          f"{order}, bar {C.ST_BAR_SIZE[0]}, gap {pad}")
+    check("HP and stamina sit under the grid, whose slots are a gap apart",
+          order == [C.EQUIPPED_NAME, C.SLOTS, C.VITALS] and pad == C.SLOT_GAP / 2.0,
+          f"{order}, gap {pad}")
 
     def anchor(tree, name):
         w = tree.get(name, (None, False))[0]
@@ -167,7 +167,7 @@ def check_trees(check):
         a = s.get_anchors()
         return (a.minimum.x, a.minimum.y, a.maximum.x, a.maximum.y), \
             (s.get_alignment().x, s.get_alignment().y)
-    edges = {"Stats": ((0.0, 0.0, 0.0, 0.0), (0.0, 0.0)),
+    edges = {C.SURVIVAL: ((0.0, 1.0, 0.0, 1.0), (0.0, 1.0)),
              C.KILLS: ((1.0, 0.0, 1.0, 0.0), (1.0, 0.0)),
              C.HUD_FPS: ((1.0, 0.0, 1.0, 0.0), (1.0, 0.0)),
              C.BANNER_COUNT: ((0.5, 0.0, 0.5, 0.0), (0.5, 0.0)),
@@ -239,7 +239,10 @@ def check_hud_graph(check, nodes):
           len(fills) == 1 and _source_titles(fills[0], "InColor") == ["SelectColor"],
           str([_source_titles(n, "InColor") for n in fills]))
 
-    carets = [n for n in nodes if "InOpacity" in _pins(n)]
+    # The stat groups' blinks are hud_bar_checks.py's.
+    groups = {f"Get {g}" for g in C.flash_groups()}
+    carets = [n for n in nodes if "InOpacity" in _pins(n)
+              and not groups & set(_source_titles(n, "self"))]
     selected = []
     for n in carets:
         for pick in _sources(n, "InOpacity"):

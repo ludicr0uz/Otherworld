@@ -172,9 +172,11 @@ GENERATED = (
         dest="Content/UI",
         kind="generated",
         builders=("Scripts/build_graphics_menu.py",),
-        note="BP_GraphicsMenuHUD: the settings menu, HP and stamina bars, the "
-             "hunger/thirst/temperature bars, the inventory strip and the "
-             "death screen, drawn with the artwork above. Needs Content/"
+        note="BP_GraphicsMenuHUD and the UMG screens it drives: WBP_HUD (HP, "
+             "stamina and hunger/thirst/temperature bars, the inventory grid), "
+             "WBP_MainMenu (title and settings pages), WBP_PauseMenu (the M "
+             "panel), WBP_DeathMenu, and their parts WBP_MenuRow and "
+             "WBP_InventorySlot, all built on the artwork above. Needs Content/"
              "Survival first: the survival bars cast to its component.",
     ),
     AssetSource(

@@ -1,11 +1,14 @@
 # The graphics menu, settings and HUD
 
-`Scripts/build_graphics_menu.py` builds `/Game/UI/BP_GraphicsMenuHUD` (an `AHUD`) and sets
+`Scripts/build_graphics_menu.py` builds the four UMG screens (`WBP_HUD`, `WBP_MainMenu`,
+`WBP_PauseMenu`, `WBP_DeathMenu`, from the parts `WBP_MenuRow` and `WBP_InventorySlot`) and
+`/Game/UI/BP_GraphicsMenuHUD`, the `AHUD` that drives them, and sets
 `BP_ThirdPersonGameMode.HUDClass` to it. That game mode is the global default, so the HUD is in
 every level. Run `Scripts/verify_graphics_menu.py` after every edit. It is the only thing that
-catches pin literals that compile but mean something else.
+catches pin literals that compile but mean something else. After a change to what a screen
+shows, also run `uepy.py --game --probe Scripts/probes/probe_umg_screens.py`.
 
-This package holds the fragments. The entry point itself is still 2.6k lines, over budget, so
+This package holds the fragments. The entry point itself is still 1.2k lines, over budget, so
 split it before extending it.
 
 **The keys:**
@@ -14,8 +17,33 @@ split it before extending it.
 - **D** toggles debug mode.
 - **X** (panel open) starts save and exit.
 
-**Why a canvas and not UMG:** UMG layout cannot be authored from Python in 5.8, because
-`WidgetTree` is protected. Everything is drawn with `DrawText`/`DrawRect`/`DrawTexture`.
+## The UMG screens
+
+- **The HUD is the controller, the widgets are views.** `BP_GraphicsMenuHUD` reads the game and
+  polls every key; the widgets hold no logic beyond `WBP_MenuRow`'s PreConstruct. BeginPlay
+  creates all four screens and adds them to the viewport (`ui_graph.py`); every `DrawHUD`
+  shows the one the frame is on and writes the live values (`SetText`, `SetPercent`,
+  `SetVisibility`).
+- **Which screen:** `GameStarted` false → `WBP_MainMenu` (its title or settings panel by
+  `MenuPage`); `PlayerDead` → `WBP_DeathMenu`; otherwise `WBP_HUD`'s `Body`, plus
+  `WBP_PauseMenu` while `MenuOpen`. `WBP_HUD` itself is never hidden, so its `Fps` text (outside
+  `Body`) shows over every screen.
+- **Shown means `HitTestInvisible`, never `Visible`.** No widget may take a click or hover away
+  from the game viewport; every key is polled off the controller. The verifier asserts it.
+- **Labels live in the designer.** Each menu line is a `WBP_MenuRow` whose `LabelText`,
+  `LabelWidth` and `LabelColor` are set per instance (`wbp_screens.py`) and applied by its
+  PreConstruct. The HUD writes only the caret (`SetRenderOpacity` 1 on the selected row, 0 on the
+  rest: one ForLoop over the rows) and the value column. **Row order is MenuRow's order**:
+  `SETTINGS_ROW_LABELS` must match `settings_rows.py`'s row numbers, which the verifier checks.
+- **Anchored, not computed.** Each element is anchored to its corner or edge (stats top-left,
+  kills and FPS top-right, banner top-centre, inventory and stamina bottom-centre, menus
+  centred). UMG scales them with the DPI curve (1.0 at a 1080 px shortest side).
+- **Still on the canvas:** the reticle and the sniper's scope (placed off the viewport centre
+  and sized by the gun's cloud every frame) and the wanderers' bars (one per wanderer, placed by
+  projecting its head). The task allowed it; a widget per wanderer would need a pool or a
+  widget component on the NPC.
+- **Probe:** `probe_umg_screens.py` calls `ReceiveDrawHUD` itself (a `-nullrhi` run never
+  renders, so the engine never does) and reads the widgets back.
 
 ## Presets (`presets.py`)
 
@@ -49,7 +77,7 @@ split it before extending it.
     `BP_Settings.Difficulty` and copied onto the GameMode's `Difficulty` every `DrawHUD`
     (`difficulty.py`). Only EASY does anything yet (the mushroom heal). `-nullrhi` runs no
     `DrawHUD`, so a headless game keeps the GameMode's own default, EASY;
-  - the seven keybinds (Enter arms a capture; the next key from `KEY_POOL` becomes the bind;
+  - the keybinds, one row per `BIND_VARS` entry (Enter arms a capture; the next key from `KEY_POOL` becomes the bind;
     navigation keys are not in the pool);
   - BACK.
 - **`BP_Settings`** is a `USaveGame` saved to slot `OtherworldSettings` on **every change**.
@@ -60,7 +88,7 @@ split it before extending it.
   - **The HUD pushes the settings into `BP_WeaponComponent` every `DrawHUD`.** The component never
     loads the save. Its CDO key defaults stay valid for a pawn with no HUD.
   - **`BP_Settings.Binds` is indexed by `BIND_VARS` (`combat/tuning.py`).** Reordering it rebinds
-    every existing save. BeginPlay refills the array when its length isn't seven.
+    every existing save. BeginPlay refills the array when its length isn't `len(BIND_VARS)`.
 
 ## Save and exit, and the saved profile
 
@@ -92,16 +120,17 @@ sync:
 
 ## HUD
 
-**What it draws each frame:**
+**What it shows each frame:**
 
 - **Top-left:** the HP bar and the FOOD / H2O / TEMP bars (`survival_bars.py`).
   STARVING and DEHYDRATED are read from the ASC's tags.
 - **Top-right:** the kill counter, and the FPS readout in debug mode only.
 - **Wanderers:** a projected health bar over each one, plus its number in debug mode.
-- **Bottom:** the 10-slot inventory strip, in two rows of five (`INVENTORY_COLUMNS`, 84 x 59 px
-  slots), with loaded/reserve counts for weapons that use ammo. Under it, centred and as wide as
-  the strip, the stamina bar (`stamina_bar.py`). `SLOT_BOTTOM` is built from the bar's
-  `ST_BOTTOM + ST_H`, so moving the bar moves the strip.
+- **Bottom:** the 10-slot inventory grid, in two rows of five (`INVENTORY_COLUMNS`, 84 x 59
+  slots, `hud_inventory.py`), with loaded/reserve counts for weapons that use ammo. Slot *i*
+  shows `Inventory[i]`, read only behind `IsValidIndex`; a slot past the end is emptied every
+  frame. Under the grid, centred and as wide as its slots and gaps, the stamina bar
+  (`stamina_bar.py`); both sit in one bottom-anchored stack in `WBP_HUD`.
 - **Centre:** the reticle or scope (`reticle.py`). The reticle's four ticks stand off by the held
   gun's accuracy cloud: `ReticleSpread` (weapon component) × half the viewport width, capped at
   `RETICLE_SPREAD_MAX` with an `FMin` (an `FClamp` would be read as a settings slider).
@@ -110,8 +139,9 @@ sync:
 
 **Rules:**
 
-- **Lay everything out from the viewport size.** Read slot colour, name and ammo from each item's
-  own `SlotColor`/`DisplayName`/`UsesAmmo`/`Loaded`/`Reserve`. The HUD keeps no list of weapons.
+- **Anchor widgets; lay out the canvas layers from the viewport size.** Read slot colour, name
+  and ammo from each item's own `SlotColor`/`DisplayName`/`UsesAmmo`/`Loaded`/`Reserve`. The HUD
+  keeps no list of weapons.
 - **A wanderer's bar shows only for 5 s after it is hurt** (`LastDamageTime`, default −1000). It
   is gated on `NOT Dead`.
 - **`NpcKillCount` lives on the GameMode** and only counts kills with `DamagedByPlayer` set.
@@ -123,6 +153,33 @@ sync:
   false). Never read off an invalid object there.
 
 ## Gotchas specific to this graph
+
+### Authoring the widget trees (`umg_author.py`)
+
+- **The way in is the UMGToolSet plugin** (`Engine/Plugins/Experimental/Toolsets`, enabled for
+  the editor only in `Otherworld.uproject`). Its functions are `AICallable`, not
+  `BlueprintCallable`, so they have no Python methods; reach them with
+  `unreal.get_default_object(unreal.UMGToolSet).call_method("AddWidget", (...))`. It needs an
+  editor restart after enabling.
+- **Rebuilding empties the tree in place** (remove the root: it takes its subtree) and wipes the
+  event graph **first**: a node reading a widget variable stops compiling the moment the tree
+  empties. Recreating the asset would strand the HUD's variables typed to it.
+- **`AddWidget` sanitises a clashing name** into `Name_0`; `add()` asserts the name, because the
+  HUD finds widgets by name. Mark every widget the HUD writes as a variable.
+- **`SlateBrush.image_size` is a `DeprecateSlateVector2D`**, which takes no `Vector2D` and has
+  no `.x`: write it with `import_text("(X=..,Y=..)")`, read it with `export_text()`.
+- **A `SlateColor` default can't go through `_apply_defaults`**: `_same()` walks `to_tuple()`,
+  which nests a `LinearColor`. Compare `export_text()`.
+- **A `Text` pin literal reads back as `NSLOCTEXT("", "<key>", "<words>")`**;
+  `umg_checks.text_literal` extracts the words.
+- **Macro and library pin names:** the `ForLoop` macro's exec input is `execute` (the
+  `ForEachLoop`'s is `Exec`); `Array_IsValidIndex` takes `IndexToTest`;
+  `ProgressBar.SetFillColorAndOpacity` takes `InColor`.
+- **Seeing a screen:** a `-nullrhi` probe proves the values, not the look. A `-game` run without
+  `-nullrhi` (`-windowed -ResX=1280 -ResY=720`) renders on this Mac, and the console command
+  `shot showui` saves the viewport with its widgets to `Saved/Screenshots/MacEditor/`.
+
+### The HUD graph
 
 - **`FKey` pin defaults are the bare key name** (`M`, `One`), not `(KeyName="M")`. Struct text
   compiles and never matches.

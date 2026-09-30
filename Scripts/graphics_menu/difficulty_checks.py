@@ -8,6 +8,8 @@ import unreal
 from combat.difficulty import DIFFICULTY_VAR
 from graphics_menu import settings_rows as S
 from graphics_menu.difficulty import LABELS_VAR
+from graphics_menu.umg_checks import row_labels
+from graphics_menu.umg_consts import SETTINGS_ROWS_BOX, WBP_MAIN_MENU
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -38,9 +40,10 @@ def check_difficulty(check, bp, nodes):
           S.DIFFICULTY_ROW == len(S.SLIDERS) and S.FIRST_BIND_ROW == S.DIFFICULTY_ROW + 1
           and S.BACK_ROW == S.SETTINGS_ROWS - 1,
           f"row {S.DIFFICULTY_ROW}, binds from {S.FIRST_BIND_ROW}")
-    shown = [n for n in nodes if {"Text", "ScreenX", "ScreenY"} <= _pins(n)
-             and _value(n, "Text") == S.DIFFICULTY_LABEL]
-    check("the page draws the DIFFICULTY label", len(shown) == 1, str(len(shown)))
+    rows = row_labels(WBP_MAIN_MENU, SETTINGS_ROWS_BOX)
+    check("the page shows the DIFFICULTY label on its row",
+          rows.count(S.DIFFICULTY_LABEL) == 1
+          and rows.index(S.DIFFICULTY_LABEL) == S.DIFFICULTY_ROW, str(rows))
 
     # Left/Right on the row: + (1 or n-1), mod n. The wrap's B is the count.
     n = len(S.DIFFICULTY_LABELS)

@@ -66,7 +66,7 @@ sessions tens of millions of tokens.
   same check lines as before.
 
 **Over budget today** (split before extending):
-- `build_graphics_menu.py` (2.6k lines)
+- `build_graphics_menu.py` (1.2k lines)
 - `generate_forest_level.py` (1.8k)
 - `verify_graphics_menu.py`
 - `forest_generator/verification.py`
@@ -173,8 +173,9 @@ editor.
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee. They respawn 75–100 m away and leave ragdoll corpses.
-- **The HUD:** HP, stamina, hunger, thirst and temperature bars, a kill counter, the death menu,
-  the graphics menu and a settings screen, which holds the difficulty (EASY / MEDIUM / SURVIVOR,
+- **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
+  bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
+  and a settings screen, which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`, both at night. Food
   and water lie in both.
@@ -209,6 +210,10 @@ editor.
   runtime, it can't live in a pin literal. Use a Branch.
 
 ### Authoring Blueprint graphs from Python (`combat/graph.py` has the helpers)
+
+- **Widget Blueprint layouts can be authored from Python,** through the editor-only UMGToolSet
+  plugin (enabled in `Otherworld.uproject`) and `call_method`, since its functions have no
+  Python glue. `graphics_menu/umg_author.py` wraps it; its CLAUDE.md lists the traps.
 
 - **Declaring a float:** `get_basic_type_by_name("float")` and `"double"` silently declare an
   `int`. Use **`"real"`**. Verify the CDO value `isinstance(…, float)`.

@@ -1,58 +1,30 @@
-"""What save-and-exit puts on screen: its row in the M panel, and the banner.
+"""What save-and-exit puts on screen: WBP_HUD's banner, top centre.
 
-The banner is top centre while the countdown runs ("SAVING AND EXITING IN  12",
-whole seconds rounded up so it never reads 0 while waiting), and for
-EXIT_CALLED_OFF_SHOWN_S after a hit called it off. The logic is save_exit.py's
-on Tick; this only reads its variables.
+While the countdown runs, BannerCount reads "SAVING AND EXITING IN  12"
+(whole seconds rounded up, so it never reads 0 while waiting); for
+EXIT_CALLED_OFF_SHOWN_S after a hit calls it off, BannerOff says why. The
+logic is save_exit.py's on Tick; this only reads its variables. The panel's
+"[X]   save and exit" row is a static label in WBP_PauseMenu.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
-from graphics_menu.canvas import COL_ROW, UI_FONT
+from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from graphics_menu.profile_consts import (
-    COL_EXIT_BANNER, COL_EXIT_CALLED_OFF, EXIT_AT_VAR, EXIT_BANNER_HALF_W,
-    EXIT_BANNER_PREFIX, EXIT_BANNER_SCALE, EXIT_BANNER_Y, EXIT_CALLED_OFF_SHOWN_S,
-    EXIT_CALLED_OFF_TEXT, EXIT_CALLED_OFF_VAR, EXIT_PENDING_VAR, EXIT_ROW_LABEL,
+    EXIT_AT_VAR, EXIT_BANNER_PREFIX, EXIT_CALLED_OFF_SHOWN_S, EXIT_CALLED_OFF_VAR,
+    EXIT_PENDING_VAR,
 )
+from graphics_menu.ui_graph import part, set_shown, set_text, show_if
+from graphics_menu.umg_consts import BANNER_COUNT, BANNER_OFF, WBP_HUD
 
-FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
 FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
-FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
 FN_LESS = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
 FN_CEIL = "/Script/Engine.KismetMathLibrary.FCeil"
 FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
 FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
-FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
-FN_BREAK_V2D = "/Script/Engine.KismetMathLibrary.BreakVector2D"
-
-
-def _text(ed, text, color, x, y, scale, in_execs, at_x, at_y, made):
-    """A DrawText; ``text`` and ``x`` are literals or pins."""
-    n = _at(_node(ed, FN_DRAW_TEXT), at_x, at_y)
-    for name, v in (("Text", text), ("ScreenX", x)):
-        if isinstance(v, (str, float)):
-            _set(n, name, v)
-        else:
-            _connect(v, _pin(n, name))
-    _set(n, "TextColor", color)
-    _set(n, "ScreenY", y)
-    _set(n, "Scale", scale)
-    _set(n, "bScalePosition", "false")
-    _set(n, "Font", UI_FONT)
-    for e in in_execs:
-        _connect(e, _pin(n, "execute"))
-    made.append(n)
-    return BEL.find_then_pin(n)
-
-
-def author_exit_row(ed, x, y, scale, in_execs, at_x, at_y):
-    """The panel's "[X]   save and exit" line. Returns the exec that follows."""
-    made = []
-    return _text(ed, EXIT_ROW_LABEL, COL_ROW, x, y, scale, in_execs, at_x, at_y, made)
 
 
 def author_exit_banner(ed, x0, y0, in_execs):
-    """The countdown, or the called-off notice. Returns the exec tails."""
+    """The countdown, or the called-off notice, or neither. Returns the exec tails."""
     made = []
 
     def keep(n):
@@ -69,17 +41,8 @@ def author_exit_banner(ed, x0, y0, in_execs):
         _connect(e, _pin(br, "execute"))
     now = _pin(keep(_at(_node(ed, FN_TIME_SECONDS), x0, y0 + 600)), "ReturnValue",
                is_input=False)
-
-    size = keep(_at(_node(ed, FN_VIEWPORT), x0 + 240, y0 + 800))
-    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 480, y0 + 800))
-    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
-    half = keep(_at(_node(ed, FN_MUL), x0 + 720, y0 + 800))
-    _connect(_loose_pin(wh, "X", is_input=False), _pin(half, "A"))
-    _set(half, "B", 0.5)
-    left = keep(_at(_node(ed, FN_SUB), x0 + 960, y0 + 800))
-    _connect(_pin(half, "ReturnValue", is_input=False), _pin(left, "A"))
-    _set(left, "B", EXIT_BANNER_HALF_W)
-    left_out = _pin(left, "ReturnValue", is_input=False)
+    count = part(ed, WBP_HUD, BANNER_COUNT, x0 + 960, y0 + 600)
+    called_off = part(ed, WBP_HUD, BANNER_OFF, x0 + 960, y0 + 800)
 
     # --- the countdown -----------------------------------------------------
     remaining = keep(_at(_node(ed, FN_SUB), x0 + 240, y0 + 400))
@@ -92,25 +55,23 @@ def author_exit_banner(ed, x0, y0, in_execs):
     line = keep(_at(_node(ed, FN_CONCAT), x0 + 960, y0 + 400))
     _set(line, "A", EXIT_BANNER_PREFIX)
     _connect(_pin(digits, "ReturnValue", is_input=False), _pin(line, "B"))
-    counting = _text(ed, _pin(line, "ReturnValue", is_input=False), COL_EXIT_BANNER,
-                     left_out, EXIT_BANNER_Y, EXIT_BANNER_SCALE,
-                     [BEL.find_then_pin(br)], x0 + 1200, y0, made)
+    flow = set_text(ed, count, _pin(line, "ReturnValue", is_input=False),
+                    [BEL.find_then_pin(br)], x0 + 1200, y0)
+    flow = set_shown(ed, count, True, [flow], x0 + 1460, y0)
+    counting = set_shown(ed, called_off, False, [flow], x0 + 1720, y0)
 
     # --- or, for a moment after a hit, why it stopped -------------------------
+    idle = set_shown(ed, count, False, [BEL.find_else_pin(br)], x0 + 1200, y0 + 1000)
     ago = keep(_at(_node(ed, FN_SUB), x0 + 240, y0 + 1000))
     _connect(now, _pin(ago, "A"))
     _connect(get(EXIT_CALLED_OFF_VAR, x0, y0 + 1000), _pin(ago, "B"))
     recent = keep(_at(_node(ed, FN_LESS), x0 + 480, y0 + 1000))
     _connect(_pin(ago, "ReturnValue", is_input=False), _pin(recent, "A"))
     _set(recent, "B", EXIT_CALLED_OFF_SHOWN_S)
-    shown = keep(_at(ed.add_branch_node(), x0 + 1200, y0 + 600))
-    _connect(_pin(recent, "ReturnValue", is_input=False), _pin(shown, "Condition"))
-    _connect(BEL.find_else_pin(br), _pin(shown, "execute"))
-    called_off = _text(ed, EXIT_CALLED_OFF_TEXT, COL_EXIT_CALLED_OFF, left_out,
-                       EXIT_BANNER_Y, EXIT_BANNER_SCALE, [BEL.find_then_pin(shown)],
-                       x0 + 1460, y0 + 600, made)
+    tails = show_if(ed, called_off, _pin(recent, "ReturnValue", is_input=False),
+                    [idle], x0 + 1460, y0 + 1000)
     ed.add_comment_to_nodes(
         "Save and exit: the countdown while it runs, and for "
         f"{EXIT_CALLED_OFF_SHOWN_S:.0f} s after a hit calls it off, why it stopped.",
         made)
-    return [counting, called_off, BEL.find_else_pin(shown)]
+    return [counting, *tails]

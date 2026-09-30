@@ -868,7 +868,8 @@ the one the HUD already casts to. `BaseSpeed` is read off the character at `Begi
 this project, measured at runtime) and never hardcoded.
 
 **The HUD's `DrawHUD` branches on `PlayerDead` first**, so the menu replaces the HUD rather
-than covering it, and it polls the restart key itself — Event Tick does not run in a paused
+than covering it (the screens are UMG widgets the `AHUD` shows and writes; see
+`Scripts/graphics_menu/CLAUDE.md`), and it polls the restart key itself — Event Tick does not run in a paused
 world, which is the only state the menu exists in, while `DrawHUD` is called by the renderer
 every frame and `APlayerController` ticks through a pause.
 

@@ -1,6 +1,6 @@
 """The settings screen's constants: what is saved, which row is which, the
-panel's geometry, and what a bind may be set to. Constants only -- the page is
-drawn by settings_page.py and driven by settings_input.py.
+labels, and what a bind may be set to. Constants only -- the page is laid out
+by wbp_screens.py, filled by settings_page.py and driven by settings_input.py.
 """
 
 from collections import namedtuple
@@ -11,10 +11,9 @@ from combat import tuning as combat_tuning
 
 # ── The settings screen, and what survives a restart ─────────────────────────
 #
-# Two pages, one panel: MenuPage picks which, MenuRow picks the line, and the
-# caret is drawn from MenuRow the same way the quality caret is drawn from
-# Quality. There is no second HUD and no widget -- see the AHUD note at the top
-# of this file for why there cannot be.
+# Two pages of WBP_MainMenu: MenuPage picks which, MenuRow picks the line, and
+# the lit caret is MenuRow's row, the way the M panel's is Quality's. The rows'
+# labels are the designer's (graphics_menu/wbp_screens.py).
 #
 # Everything on the settings page is stored in BP_Settings, which is a USaveGame
 # written to disk on every change (see SETTINGS_SLOT). That is what "loadable
@@ -75,20 +74,6 @@ BACK_LABEL = "BACK"
 DIFFICULTY_LABEL = "DIFFICULTY"
 DIFFICULTY_LABELS = combat_difficulty.DIFFICULTY_LABELS
 SETTINGS_TITLE = "SETTINGS"
-
-SET_TITLE_OFF = 44.0
-SET_ROW0_OFF = 118.0
-SET_ROW_STEP = 46.0
-SET_HINT_OFF = SET_ROW0_OFF + SETTINGS_ROWS * SET_ROW_STEP + 12.0
-# Tall enough for every row plus the hint, with the 16 px bottom margin the
-# nine-row page had (560 px); it grows with the rows instead of being retyped.
-SETTINGS_PANEL = (620.0, SET_HINT_OFF + 16.0)
-SET_LABEL_X = 96.0         # from the panel's left edge
-SET_VALUE_X = 380.0        # the value column, so the rows line up
-SET_CARET_X = 56.0
-SET_TITLE_SCALE = 2.2
-SET_ROW_SCALE = 1.5
-SET_HINT_SCALE = 1.2
 
 # What a bind may be set to. Letters, digits, the mouse and the usual
 # modifiers -- and nothing the menu itself uses, so no keypress can make the

@@ -1,35 +1,25 @@
-"""The settings page: drawing it, and pushing what it holds onto
+"""The settings page: filling it in, and pushing what it holds onto
 BP_WeaponComponent every frame. Its input half is settings_input.py; its
 constants are settings_rows.py.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
-from graphics_menu.canvas import (
-    COL_CARET, COL_MAIN_HINT, COL_ROW, COL_TITLE, UI_FONT, _draw_texture)
 from graphics_menu.difficulty import author_difficulty_name
 from graphics_menu.settings_input import _author_capture
 from graphics_menu.settings_rows import (
-    BACK_LABEL, BACK_ROW, BIND_VARS, DIFFICULTY_LABEL, DIFFICULTY_ROW,
-    FIRST_BIND_ROW, SETTINGS_CLASS_PATH,
-    SLIDERS,
-    SETTINGS_PANEL, SETTINGS_ROWS, SETTINGS_SLOT, SETTINGS_TITLE,
-    SET_CARET_X, SET_HINT_OFF, SET_HINT_SCALE, SET_LABEL_X, SET_ROW0_OFF,
-    SET_ROW_SCALE, SET_ROW_STEP, SET_TITLE_OFF, SET_TITLE_SCALE, SET_VALUE_X)
+    BIND_VARS, DIFFICULTY_ROW, FIRST_BIND_ROW, SETTINGS_CLASS_PATH, SETTINGS_ROWS,
+    SETTINGS_SLOT, SLIDERS)
+from graphics_menu.ui_graph import mark_rows, part, row_value, set_shown
+from graphics_menu.umg_consts import (
+    HINT_CAPTURE, HINT_IDLE, SETTINGS_ROWS_BOX, WBP_MAIN_MENU)
 
-FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
+FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
 FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
-FN_BREAK_V2D = "/Script/Engine.KismetMathLibrary.BreakVector2D"
-FN_CONV_INT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
-FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
 FN_FLOAT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_DoubleToString"
 FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
 FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
 FN_KEY_DISPLAY = "/Script/Engine.KismetInputLibrary.Key_GetDisplayName"
-FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
-FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
-FN_TEXT_TO_STR = "/Script/Engine.KismetTextLibrary.Conv_TextToString"
-FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
@@ -119,15 +109,15 @@ def _author_push_settings(ed, x0, y0, in_execs):
 
 
 def _author_settings_page(ed, x0, y0, in_exec):
-    """The sensitivity sliders and the seven binds, on the same panel as the title.
+    """Fill WBP_MainMenu's settings page: the caret, the value column, the hint.
 
-    Rows: SLIDERS (mouse, then scope), DIFFICULTY, BIND_VARS in order, BACK.
-    Left/Right adjust a slider or cycle the difficulty, Enter arms a capture on any of the seven binds, and every
-    change is written to disk on the spot.
+    Rows (labels set in the designer, wbp_screens.py): SLIDERS (mouse, then
+    scope), DIFFICULTY, BIND_VARS in order, BACK. Left/Right adjust a slider
+    or cycle the difficulty, Enter arms a capture on any bind, and every
+    change is written to disk on the spot (settings_input.py).
 
-    The seven bind rows are ONE pair of DrawTexts inside a ForEachLoop over
-    Binds, not seven pairs with their y positions written out -- which is why
-    the HUD carries BindLabels as an array rather than as seven literals.
+    The bind rows' values are ONE write inside a ForEachLoop over Binds, row
+    FIRST_BIND_ROW + index, not one write per bind.
     """
     made = []
 
@@ -135,181 +125,70 @@ def _author_settings_page(ed, x0, y0, in_exec):
         made.append(n)
         return n
 
-    settings = keep(_at(ed.add_get_member_variable_node("Settings"),
-                        x0, y0 + 240))
+    settings = keep(_at(ed.add_get_member_variable_node("Settings"), x0, y0 + 240))
     settings_out = _pin(settings, "Settings", is_input=False)
+    rows = part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX, x0, y0 + 400)
 
-    size = keep(_at(_node(ed, FN_VIEWPORT), x0, y0 + 420))
-    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 240, y0 + 420))
-    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
+    row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 240, y0 + 600))
+    flow = (mark_rows(ed, rows, SETTINGS_ROWS, _pin(row, "MenuRow", is_input=False),
+                      [in_exec], x0 + 500, y0),)
 
-    def centred(axis, span, py):
-        half = keep(_at(_node(ed, FN_MUL), x0 + 480, py))
-        _connect(_loose_pin(wh, axis, is_input=False), _pin(half, "A"))
-        _set(half, "B", 0.5)
-        off = keep(_at(_node(ed, FN_SUB), x0 + 720, py))
-        _connect(_pin(half, "ReturnValue", is_input=False), _pin(off, "A"))
-        _set(off, "B", span)
-        return _pin(off, "ReturnValue", is_input=False)
-
-    panel_x = centred("X", SETTINGS_PANEL[0] / 2.0, y0 + 420)
-    panel_y = centred("Y", SETTINGS_PANEL[1] / 2.0, y0 + 560)
-
-    def offset(base, by, px, py):
-        n = keep(_at(_node(ed, FN_ADD), px, py))
-        _connect(base, _pin(n, "A"))
-        _set(n, "B", by)
-        return _pin(n, "ReturnValue", is_input=False)
-
-    label_x = offset(panel_x, SET_LABEL_X, x0 + 960, y0 + 420)
-    value_x = offset(panel_x, SET_VALUE_X, x0 + 960, y0 + 540)
-    caret_x = offset(panel_x, SET_CARET_X, x0 + 960, y0 + 660)
-
-    def row_y(index, py):
-        return offset(panel_y, SET_ROW0_OFF + index * SET_ROW_STEP,
-                      x0 + 960, py)
-
-    panel = keep(_draw_texture(ed, x0 + 1240, y0, "T_UI_Panel",
-                               w=SETTINGS_PANEL[0], h=SETTINGS_PANEL[1]))
-    _connect(panel_x, _pin(panel, "ScreenX"))
-    _connect(panel_y, _pin(panel, "ScreenY"))
-    _connect(in_exec, _pin(panel, "execute"))
-    flow = BEL.find_then_pin(panel)
-
-    def text(px, at_x, at_y, scale, color, literal=None, driven=None):
-        """One left-aligned row. Left-aligned and not centred on purpose: ten
-        rows of different lengths centred individually read as a ragged block,
-        and a value column that moves per row cannot be scanned."""
-        nonlocal flow
-        n = keep(_at(_node(ed, FN_DRAW_TEXT), px, y0))
-        if literal is not None:
-            _set(n, "Text", literal)
-        else:
-            _connect(driven, _pin(n, "Text"))
-        _set(n, "TextColor", color)
-        _set(n, "Scale", scale)
-        _set(n, "bScalePosition", "false")
-        _set(n, "Font", UI_FONT)
-        _connect(at_x, _pin(n, "ScreenX"))
-        _connect(at_y, _pin(n, "ScreenY"))
-        _connect(flow, _pin(n, "execute"))
-        flow = BEL.find_then_pin(n)
-        return n
-
-    text(x0 + 1500, label_x,
-         offset(panel_y, SET_TITLE_OFF, x0 + 960, y0 + 780),
-         SET_TITLE_SCALE, COL_TITLE, literal=SETTINGS_TITLE)
-
-    # The caret, drawn from MenuRow the way the quality panel's is drawn from
-    # Quality -- one number, no per-row bookkeeping.
-    row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 960, y0 + 900))
-    row_f = keep(_at(_node(ed, FN_CONV_INT), x0 + 1200, y0 + 900))
-    _connect(_pin(row, "MenuRow", is_input=False), _pin(row_f, "InInt"))
-    caret_off = keep(_at(_node(ed, FN_MUL), x0 + 1440, y0 + 900))
-    _connect(_pin(row_f, "ReturnValue", is_input=False), _pin(caret_off, "A"))
-    _set(caret_off, "B", SET_ROW_STEP)
-    caret_base = row_y(0, y0 + 1020)
-    caret_y = keep(_at(_node(ed, FN_ADD), x0 + 1680, y0 + 900))
-    _connect(caret_base, _pin(caret_y, "A"))
-    _connect(_pin(caret_off, "ReturnValue", is_input=False), _pin(caret_y, "B"))
-    text(x0 + 1760, caret_x, _pin(caret_y, "ReturnValue", is_input=False),
-         SET_ROW_SCALE, COL_CARET, literal=">")
-
-    # --- the slider rows: a label and the value it is set to ----------------
+    # --- the slider rows: the value each is set to --------------------------
     for i, slider in enumerate(SLIDERS):
-        py = y0 + 1140 + i * 360
-        slider_y = row_y(i, py)
-        text(x0 + 2020, label_x, slider_y, SET_ROW_SCALE, COL_ROW,
-             literal=slider.label)
+        px = x0 + 2000 + i * 1400
         value = keep(_at(ed.add_get_member_variable_node(slider.var,
                                                          SETTINGS_CLASS_PATH),
-                         x0 + 2020, py + 120))
+                         px, y0 + 600))
         _connect(settings_out, _pin(value, "self"))
-        value_str = keep(_at(_node(ed, FN_FLOAT_TO_STR), x0 + 2280, py + 120))
+        value_str = keep(_at(_node(ed, FN_FLOAT_TO_STR), px + 240, y0 + 600))
         _connect(_pin(value, slider.var, is_input=False),
                  _loose_pin(value_str, "InDouble"))
-        text(x0 + 2280, value_x, slider_y, SET_ROW_SCALE, COL_CARET,
-             driven=_pin(value_str, "ReturnValue", is_input=False))
+        flow = row_value(ed, rows, i, _pin(value_str, "ReturnValue", is_input=False),
+                         flow, px, y0)
 
-    # --- the difficulty: its label and the name it is set to ----------------
-    py = y0 + 1140 + len(SLIDERS) * 360
-    difficulty_y = row_y(DIFFICULTY_ROW, py)
-    text(x0 + 2020, label_x, difficulty_y, SET_ROW_SCALE, COL_ROW,
-         literal=DIFFICULTY_LABEL)
-    text(x0 + 2540, value_x, difficulty_y, SET_ROW_SCALE, COL_CARET,
-         driven=author_difficulty_name(ed, settings_out, x0 + 2020, py + 120, made))
+    # --- the difficulty: the name it is set to ------------------------------
+    px = x0 + 2000 + len(SLIDERS) * 1400
+    flow = row_value(ed, rows, DIFFICULTY_ROW,
+                     author_difficulty_name(ed, settings_out, px, y0 + 600, made),
+                     flow, px, y0)
 
     # --- the binds, one loop ------------------------------------------------
-    binds = keep(_at(ed.add_get_member_variable_node("Binds",
-                                                     SETTINGS_CLASS_PATH),
-                     x0 + 2540, y0 + 1260))
+    px += 1400
+    binds = keep(_at(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH),
+                     px, y0 + 400))
     _connect(settings_out, _pin(binds, "self"))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    keep(_at(loop, x0 + 2800, y0))
+    keep(_at(loop, px + 260, y0))
     _connect(_pin(binds, "Binds", is_input=False), _loose_pin(loop, "Array"))
-    _connect(flow, _loose_pin(loop, "Exec"))
-    element = _loose_pin(loop, "ArrayElement", is_input=False)
+    for e in flow:
+        _connect(e, _loose_pin(loop, "Exec"))
     index = _loose_pin(loop, "ArrayIndex", is_input=False)
-
-    index_f = keep(_at(_node(ed, FN_CONV_INT), x0 + 3060, y0 + 400))
-    _connect(index, _pin(index_f, "InInt"))
-    step = keep(_at(_node(ed, FN_MUL), x0 + 3300, y0 + 400))
-    _connect(_pin(index_f, "ReturnValue", is_input=False), _pin(step, "A"))
-    _set(step, "B", SET_ROW_STEP)
-    # Binds[0] is row FIRST_BIND_ROW, directly under the last slider.
-    from_panel = keep(_at(_node(ed, FN_ADD), x0 + 3540, y0 + 400))
-    _connect(_pin(step, "ReturnValue", is_input=False), _pin(from_panel, "A"))
-    _set(from_panel, "B", SET_ROW0_OFF + FIRST_BIND_ROW * SET_ROW_STEP)
-    bind_y = keep(_at(_node(ed, FN_ADD), x0 + 3780, y0 + 400))
-    _connect(panel_y, _pin(bind_y, "A"))
-    _connect(_pin(from_panel, "ReturnValue", is_input=False), _pin(bind_y, "B"))
-    bind_y_out = _pin(bind_y, "ReturnValue", is_input=False)
-
-    labels = keep(_at(ed.add_get_member_variable_node("BindLabels"),
-                      x0 + 3060, y0 + 560))
-    label = keep(_at(_node(ed, FN_ARR_GET), x0 + 3300, y0 + 560))
-    _connect(_pin(labels, "BindLabels", is_input=False),
-             _loose_pin(label, "TargetArray"))
-    _connect(index, _pin(label, "Index"))
-
+    at_row = keep(_at(_node(ed, FN_ADD_II), px + 520, y0 + 400))
+    _connect(index, _pin(at_row, "A"))
+    _set(at_row, "B", FIRST_BIND_ROW)
     # Key_GetDisplayName is the only readable spelling of an FKey in 5.8 --
-    # Key_GetName does not exist -- and it hands back Text, not a String.
-    shown = keep(_at(_node(ed, FN_KEY_DISPLAY), x0 + 3300, y0 + 700))
-    _connect(element, _loose_pin(shown, "Key"))
-    shown_str = keep(_at(_node(ed, FN_TEXT_TO_STR), x0 + 3540, y0 + 700))
-    _connect(_pin(shown, "ReturnValue", is_input=False),
-             _loose_pin(shown_str, "InText"))
+    # Key_GetName does not exist -- and it hands back Text, which SetText takes.
+    shown = keep(_at(_node(ed, FN_KEY_DISPLAY), px + 520, y0 + 560))
+    _connect(_loose_pin(loop, "ArrayElement", is_input=False), _loose_pin(shown, "Key"))
+    row_value(ed, rows, _pin(at_row, "ReturnValue", is_input=False),
+              ("text", _pin(shown, "ReturnValue", is_input=False)),
+              [_loose_pin(loop, "LoopBody", is_input=False)], px + 800, y0)
 
-    flow = _loose_pin(loop, "LoopBody", is_input=False)
-    text(x0 + 4040, label_x, bind_y_out, SET_ROW_SCALE, COL_ROW,
-         driven=_loose_pin(label, "Item", is_input=False))
-    text(x0 + 4300, value_x, bind_y_out, SET_ROW_SCALE, COL_CARET,
-         driven=_pin(shown_str, "ReturnValue", is_input=False))
-
-    flow = _loose_pin(loop, "Completed", is_input=False)
-    text(x0 + 4560, label_x, row_y(BACK_ROW, y0 + 1380), SET_ROW_SCALE,
-         COL_ROW, literal=BACK_LABEL)
-
-    # Two draws behind one branch, the same shape the debug row uses: there is
-    # no SelectString, and the hint has to say something different while a
-    # capture is armed or the screen looks frozen.
-    hint_y = offset(panel_y, SET_HINT_OFF, x0 + 960, y0 + 1500)
-    arming = keep(_at(ed.add_get_member_variable_node("Capturing"),
-                      x0 + 4820, y0 + 400))
-    hinting = keep(_at(ed.add_branch_node(), x0 + 4820, y0))
+    # The hint says something different while a capture is armed, or the
+    # screen looks frozen: two lines in the designer, one shown.
+    arming = keep(_at(ed.add_get_member_variable_node("Capturing"), px + 2000, y0 + 400))
+    hinting = keep(_at(ed.add_branch_node(), px + 2000, y0))
     _connect(_pin(arming, "Capturing", is_input=False), _pin(hinting, "Condition"))
-    _connect(flow, _pin(hinting, "execute"))
-
-    flow = BEL.find_then_pin(hinting)
-    on_tail = BEL.find_then_pin(
-        text(x0 + 5080, label_x, hint_y, SET_HINT_SCALE, COL_CARET,
-             literal="press any key to bind it"))
-    flow = BEL.find_else_pin(hinting)
-    off_tail = BEL.find_then_pin(
-        text(x0 + 5340, label_x, hint_y, SET_HINT_SCALE, COL_MAIN_HINT,
-             literal="arrows adjust  ·  ENTER rebinds"))
+    _connect(_loose_pin(loop, "Completed", is_input=False), _pin(hinting, "execute"))
+    idle = part(ed, WBP_MAIN_MENU, HINT_IDLE, px + 2000, y0 + 600)
+    armed = part(ed, WBP_MAIN_MENU, HINT_CAPTURE, px + 2000, y0 + 800)
+    on_tail = set_shown(ed, idle, False, [set_shown(
+        ed, armed, True, [BEL.find_then_pin(hinting)], px + 2260, y0)], px + 2520, y0)
+    off_tail = set_shown(ed, armed, False, [set_shown(
+        ed, idle, True, [BEL.find_else_pin(hinting)], px + 2260, y0 + 300)],
+        px + 2520, y0 + 300)
 
     _author_capture(ed, x0, y0 + 3000, settings_out, (on_tail, off_tail), made)
 

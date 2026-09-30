@@ -1,19 +1,14 @@
-"""What every panel of BP_GraphicsMenuHUD draws with: the generated art, the
-font, and the panel text palette.
+"""What the HUD's canvas layers draw with: the generated art.
 
-Split out of build_graphics_menu.py so the settings page (settings_page.py)
-can draw the same way without importing the entry point.
+The canvas is down to what is placed per frame -- the reticle, the sniper's
+scope and the wanderers' bars. Everything else is a UMG screen (umg_consts.py
+has their palette).
 """
 
 from combat.graph import _at, _node, _set
+from graphics_menu.umg_consts import UI_ART_DIR
 
 FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"
-
-# The panel text palette: titles, rows, the caret, and the dim hint line.
-COL_TITLE = "(R=0.850000,G=0.900000,B=1.000000,A=1.000000)"
-COL_ROW = "(R=0.720000,G=0.750000,B=0.800000,A=1.000000)"
-COL_CARET = "(R=1.000000,G=0.820000,B=0.320000,A=1.000000)"
-COL_MAIN_HINT = "(R=0.560000,G=0.590000,B=0.650000,A=1.000000)"
 
 # ─── Generated artwork ───────────────────────────────────────────────────────
 #
@@ -25,14 +20,8 @@ COL_MAIN_HINT = "(R=0.560000,G=0.590000,B=0.650000,A=1.000000)"
 # DrawTexture takes a tint and a blend mode, so the same layout drawn with
 # generated art gets rounded corners, a hairline border and a lit gradient, and
 # the weapons get silhouettes instead of colour swatches.
-# Scripts/build_ui_art.py draws them; import_ui_art.py imports them.
-UI_ART_DIR = "/Game/UI/Art"
-
-# Roboto rather than the engine's default face. The default is a bitmap font
-# that does not scale cleanly, and at the sizes this HUD uses -- the HP number
-# is drawn at 2.4x, the death title at 3.4x -- it is the single most obviously
-# unpolished thing on screen.
-UI_FONT = "/Engine/EngineFonts/Roboto.Roboto"
+# Scripts/build_ui_art.py draws them; import_ui_art.py imports them, into
+# UI_ART_DIR, where the UMG screens' brushes find them too.
 
 
 def _draw_texture(ed, x, y, tex, w=None, h=None, tint=None):

@@ -1,4 +1,4 @@
-"""The FPS readout: one of the debug-mode overlays, drawn on the HUD's canvas.
+"""The FPS readout: one of the debug-mode overlays, WBP_HUD's Fps text.
 
 Authored into BP_GraphicsMenuHUD's ReceiveDrawHUD by build_graphics_menu.py,
 behind the HUD's DebugOn copy, so it shows exactly when debug mode is on.
@@ -7,7 +7,8 @@ It used to be the engine's own ``stat fps``, sent once from BeginPlay. That
 command is a TOGGLE, not a switch: the stat state lives on the viewport, which
 in PIE outlives the session, so every other Play turned the readout *off* --
 and there is no console form that asks for "on". Drawing it here makes its
-state a plain branch on DebugOn, with nothing to fall out of step.
+state a plain branch on DebugOn, with nothing to fall out of step. It sits
+outside WBP_HUD's Body, so it shows on the title and death screens too.
 
 The number is frames counted over a half-second window of *real* time
 (GetRealTimeSeconds keeps running while the game is paused, which the main
@@ -15,18 +16,15 @@ menu and the death menu both are), so it reads steadily instead of flickering
 with every frame's delta.
 """
 
-from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, _node, _pin, _set
+from combat.graph import BEL, _at, _connect, _declare, _float_type, _node, _pin, _set
+from graphics_menu.ui_graph import part, set_shown, set_text
+from graphics_menu.umg_consts import HUD_FPS, WBP_HUD
 
 FPS_FRAMES_VAR = "FpsFrames"   # frames drawn since FpsSince
 FPS_SINCE_VAR = "FpsSince"     # real time the current window opened
 FPS_SHOWN_VAR = "FpsShown"     # what the readout says, rounded
 FPS_WINDOW_S = 0.5
 
-# Top-right, where `stat fps` used to draw, above the kill counter.
-FPS_RIGHT_MARGIN = 150.0
-FPS_TOP = 40.0
-FPS_SCALE = 1.6
-COL_FPS = "(R=0.550000,G=0.950000,B=0.550000,A=0.950000)"
 FPS_PREFIX = "FPS  "
 
 _FN_REAL_TIME = "/Script/Engine.GameplayStatics.GetRealTimeSeconds"
@@ -38,9 +36,6 @@ _FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
 _FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
 _FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
 _FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
-_FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
-_FN_BREAK_V2D = "/Script/Engine.KismetMathLibrary.BreakVector2D"
-_FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
 
 
 def declare_fps_vars(ed):
@@ -50,8 +45,8 @@ def declare_fps_vars(ed):
     _declare(ed, FPS_SHOWN_VAR, BEL.get_basic_type_by_name("int"))
 
 
-def author_fps(ed, x0, y0, in_execs, font):
-    """DebugOn ? count, maybe refresh, draw : skip. Returns the exec pins out."""
+def author_fps(ed, x0, y0, in_execs):
+    """DebugOn ? count, maybe refresh, show : hide. Returns the exec pins out."""
     made = []
 
     def keep(n):
@@ -107,29 +102,19 @@ def author_fps(ed, x0, y0, in_execs, font):
     _connect(now, _pin(since, FPS_SINCE_VAR))
     _connect(BEL.find_then_pin(reset), _pin(since, "execute"))
 
-    # "FPS  60", right-anchored like the kill counter under it.
+    # "FPS  60", in WBP_HUD's top-right corner above the kill counter.
     as_text = keep(_at(_node(ed, _FN_INT_TO_STR), x0 + 2160, y0 + 400))
     _connect(get(FPS_SHOWN_VAR, x0 + 1920, y0 + 560), _pin(as_text, "InInt"))
     line = keep(_at(_node(ed, _FN_CONCAT), x0 + 2400, y0 + 400))
     _set(line, "A", FPS_PREFIX)
     _connect(_pin(as_text, "ReturnValue", is_input=False), _pin(line, "B"))
-    size = keep(_at(_node(ed, _FN_VIEWPORT), x0 + 2160, y0 + 600))
-    wh = keep(_at(_node(ed, _FN_BREAK_V2D), x0 + 2400, y0 + 600))
-    _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
-    right = keep(_at(_node(ed, _FN_SUB), x0 + 2640, y0 + 600))
-    _connect(_loose_pin(wh, "X", is_input=False), _pin(right, "A"))
-    _set(right, "B", FPS_RIGHT_MARGIN)
-
-    text = keep(_at(_node(ed, _FN_DRAW_TEXT), x0 + 2880, y0))
-    _connect(_pin(line, "ReturnValue", is_input=False), _pin(text, "Text"))
-    _set(text, "TextColor", COL_FPS)
-    _connect(_pin(right, "ReturnValue", is_input=False), _pin(text, "ScreenX"))
-    _set(text, "ScreenY", FPS_TOP)
-    _set(text, "Scale", FPS_SCALE)
-    _set(text, "bScalePosition", "false")
-    _set(text, "Font", font)
-    for e in (BEL.find_then_pin(since), BEL.find_else_pin(refresh)):
-        _connect(e, _pin(text, "execute"))
+    readout = part(ed, WBP_HUD, HUD_FPS, x0 + 2400, y0 + 600)
+    wrote = set_text(ed, readout, _pin(line, "ReturnValue", is_input=False),
+                     [BEL.find_then_pin(since), BEL.find_else_pin(refresh)],
+                     x0 + 2880, y0)
+    shown = set_shown(ed, readout, True, [wrote], x0 + 3140, y0)
+    hidden = set_shown(ed, part(ed, WBP_HUD, HUD_FPS, x0 + 240, y0 + 700), False,
+                       [BEL.find_else_pin(on)], x0 + 480, y0 + 700)
 
     ed.add_comment_to_nodes(
         f"FPS readout (debug mode only): frames counted over {FPS_WINDOW_S}s of "
@@ -137,4 +122,4 @@ def author_fps(ed, x0, y0, in_execs, font):
         "rather than with `stat fps`, which is a toggle and so could not be "
         "tied to debug mode.",
         made)
-    return (BEL.find_then_pin(text), BEL.find_else_pin(on))
+    return (shown, hidden)

@@ -8,6 +8,7 @@ import signal
 import subprocess
 
 FAIL_MARK = "FAILED:"
+FAB_MARK = "FAB-REQUIRED:"
 
 PROMPT = """\
 You are one member of an automated dev team working through a queue of tasks, \
@@ -34,9 +35,24 @@ run it with `uepy.py --game --probe FILE` (Scripts/probes/__init__.py).
 
 {gate}
 
+{fab}
+
 End with a short report: what changed, how you verified it, and anything left \
 undone. If you could not complete the task, make the first line of the report \
 "{fail} <reason>"."""
+
+# The contract devteam/fab.py parses. Kept beside the prompt it is part of.
+FAB = """\
+Fab assets (models, animations, Megascans) can only be acquired by the user: \
+never try to sign in, drive the Fab plugin, or download from fab.com, and do \
+not substitute a stand-in for an asset the task needs. First check what the \
+project already has: assets/cache/fab/index.md and index.json (rebuild with \
+`uepy.py Scripts/asset_pipeline/fab_index.py`). You may search fab.com to \
+pick a listing. If the task needs one that is not there, finish whatever does \
+not depend on it, commit that, and end your report with the request instead: \
+first line "{mark} <summary>", then one line per asset:
+- <listing name> | url: <fab.com listing url> | at: /Game/<folder it should import to> | why: <what it is for>
+dev-team asks the user for them and resumes this session once they are in."""
 
 PROGRESS = """
 Earlier tasks in this run and their reports are in {path} -- read it if your \
@@ -84,7 +100,8 @@ def build_prompt(task, n, total, progress_path, baseline_table, commit):
     else:
         gate = GATE.format(table=baseline_table)
     return PROMPT.format(n=n, total=total, task=task.text, progress=progress,
-                         commit=COMMIT if commit else "", gate=gate, fail=FAIL_MARK)
+                         commit=COMMIT if commit else "", gate=gate, fail=FAIL_MARK,
+                         fab=FAB.format(mark=FAB_MARK))
 
 
 def build_fix_prompt(problems, table, commit):
@@ -192,5 +209,5 @@ def run_session(cmd, root, log_path, env):
             raise
     report = (result.get("result") or "").strip()
     ok = (proc.returncode == 0 and result and not result.get("is_error")
-          and not report.startswith(FAIL_MARK))
+          and not report.startswith((FAIL_MARK, FAB_MARK)))
     return bool(ok), report, result

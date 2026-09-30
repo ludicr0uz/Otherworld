@@ -43,7 +43,8 @@ def build_ammo_pickup(rebuild=True):
     every pickup in the level every frame whether any exist or not.
 
     Credit goes to the weapon in the player's hands, if that weapon takes
-    ammunition, and otherwise to the first carried weapon that does. The
+    shells (UsesAmmo and not InfiniteReserve -- the pistol's reserve is
+    endless, so shells paid into it would vanish), and otherwise to the first carried weapon that does. The
     preference is not decoration: with four of the five weapons using
     ammunition, "first in the inventory" means the shells always land in the
     shotgun in slot 0, so a player clearing the forest with the sniper would
@@ -138,9 +139,18 @@ def build_ammo_pickup(rebuild=True):
     _connect(_pin(armed, "ReturnValue", is_input=False), _pin(has_gun, "Condition"))
     _connect(BEL.find_then_pin(as_weapon_n), _pin(has_gun, "execute"))
 
+    # "Takes shells" is UsesAmmo AND NOT InfiniteReserve: the pistol has a
+    # magazine now, but shells paid into a reserve that is never spent would
+    # simply vanish.
     held_uses, held_uses_n = _prop(ed, "UsesAmmo", held, 3300, -400)
+    held_endless, held_endless_n = _prop(ed, "InfiniteReserve", held, 3040, -280)
+    held_finite = _at(_node(ed, FN_NOT), 3300, -280)
+    _connect(held_endless, _pin(held_finite, "A"))
+    held_wants = _at(_node(ed, FN_AND), 3420, -340)
+    _connect(held_uses, _pin(held_wants, "A"))
+    _connect(_pin(held_finite, "ReturnValue", is_input=False), _pin(held_wants, "B"))
     takes_ammo = _at(ed.add_branch_node(), 3560, -700)
-    _connect(held_uses, _pin(takes_ammo, "Condition"))
+    _connect(_pin(held_wants, "ReturnValue", is_input=False), _pin(takes_ammo, "Condition"))
     _connect(BEL.find_then_pin(has_gun), _pin(takes_ammo, "execute"))
 
     held_res, held_res_n = _prop(ed, "Reserve", held, 3820, -400)
@@ -176,11 +186,17 @@ def build_ammo_pickup(rebuild=True):
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
     uses, uses_n = _prop(ed, "UsesAmmo", item, 3140, 300)
+    endless, endless_n = _prop(ed, "InfiniteReserve", item, 3140, 180)
+    finite = _at(_node(ed, FN_NOT), 3380, 180)
+    _connect(endless, _pin(finite, "A"))
+    counts = _at(_node(ed, FN_AND), 3620, 220)
+    _connect(uses, _pin(counts, "A"))
+    _connect(_pin(finite, "ReturnValue", is_input=False), _pin(counts, "B"))
     done_get = _at(ed.add_get_member_variable_node("Credited"), 3140, 440)
     fresh = _at(_node(ed, FN_NOT), 3380, 440)
     _connect(_pin(done_get, "Credited", is_input=False), _pin(fresh, "A"))
     wants = _at(_node(ed, FN_AND), 3620, 360)
-    _connect(uses, _pin(wants, "A"))
+    _connect(_pin(counts, "ReturnValue", is_input=False), _pin(wants, "A"))
     _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(wants, "B"))
 
     give = _at(ed.add_branch_node(), 3880, 0)
@@ -219,14 +235,15 @@ def build_ammo_pickup(rebuild=True):
         "rather than in the weapon component's Tick, so the cost is one Tick "
         "per dropped pickup instead of a GetAllActorsOfClass sweep every frame "
         "whether anything has been dropped or not. The shells go to the weapon "
-        "in hand when that weapon takes ammunition, and otherwise to the first "
-        "carried one that does -- with four of five weapons using ammunition, "
+        "in hand when that weapon takes shells (UsesAmmo and not InfiniteReserve, "
+        "so never the pistol), and otherwise to the first carried one that does -- with four of five weapons using ammunition, "
         "\"first in the inventory\" would mean the shotgun in slot 0, always. "
         "Credited is the break ForEachLoop does not have.",
         [life, turn, delta, spin, pawn, there, here, gap, near, reached, comp,
-         as_weapon_n, held_get, armed, has_gun, held_uses_n, takes_ammo,
+         as_weapon_n, held_get, armed, has_gun, held_uses_n, held_endless_n,
+         held_finite, held_wants, takes_ammo,
          held_res_n, held_shells, held_richer, held_store, held_mark,
-         inv, loop, uses_n, done_get, fresh, wants, give,
+         inv, loop, uses_n, endless_n, finite, counts, done_get, fresh, wants, give,
          item_res_n, shells, richer, store, mark, took_get, took, gone])
 
     if not BEL.compile_blueprint(bp):

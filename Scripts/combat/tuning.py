@@ -341,9 +341,12 @@ SHOTGUN_FIRE_INTERVAL = 0.85
 # this much, which is exactly what "cannot shoot for 1.6 s" means, and it costs
 # three nodes instead of a timer, an interrupt rule and an is-reloading flag.
 SHOTGUN_RELOAD_SECONDS = 1.6
-# The pistol is the fallback weapon and keeps infinite ammo; it still gets an
-# interval, because without one it fires once per frame.
-PISTOL_FIRE_INTERVAL = 0.18
+# The pistol is the fallback weapon: an 8-round magazine over an unlimited
+# reserve (BP_WeaponItem.InfiniteReserve), so it reloads every eight shots but
+# can never run dry for good. It still gets an interval, because without one it
+# fires once per frame.
+PISTOL_MAGAZINE = 8
+PISTOL_FIRE_INTERVAL, PISTOL_RELOAD_SECONDS = 0.18, 1.2
 RELOAD_KEY = "R"
 
 # The seven rebindable actions, in the order the settings screen lists them and

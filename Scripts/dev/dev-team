@@ -49,6 +49,15 @@ to allow less. Any action that would prompt is denied, not waited on. No MCP
 servers are loaded (--strict-mcp-config): no task uses them, and their tools
 would be re-read on every turn.
 
+**Fab assets need you.** Sessions cannot sign in to Fab, so an asset a task
+needs is asked of you at this terminal: a task's ``fab:`` hints before its
+session starts, and a session whose report opens with FAB-REQUIRED after it
+ends. You add the asset (Fab plugin in the editor, or the launcher), give the
+/Game folder it landed in, and dev-team records it in fab_library.json and
+resumes the session. 's' fails the task, 'q' stops the run; with no terminal
+(stdin not a tty) the task is failed with the list rather than waited on.
+See devteam/fab.py.
+
 Each task's commit message has an "Issues encountered:" section, written by
 the session. After the session ends, dev-team adds ``Time:`` and ``Tokens:``
 trailers to the task's last commit (a gate fix included), amending only the
@@ -69,8 +78,9 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
-from devteam import gate                                            # noqa: E402
+from devteam import fab, gate                                       # noqa: E402
 from devteam.accounting import (                                    # noqa: E402
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
     token_usage,
@@ -162,6 +172,10 @@ def run_one(task, n, total, args, run_dir, progress, cache):
     log_path = os.path.join(run_dir, f"task-{n:02d}.jsonl")
     sweep_log = os.path.join(run_dir, f"task-{n:02d}-sweeps.txt")
     env = session_env(os.environ)
+    ask = dict(interactive=args.interactive)
+    blocked = fab.preflight(task.fab, close_editors, **ask)
+    if blocked:
+        return False, [blocked], {}, None, None
     baseline = None
     if args.gate:
         state = tree_state()
@@ -173,7 +187,14 @@ def run_one(task, n, total, args, run_dir, progress, cache):
     ok, report, result = run_session(
         build_cmd(prompt, args.permission_mode, name=f"dev-team {n}/{total}: {task.title}",
                   **common), ROOT, log_path, env)
-    reports, gate_table = [report], None
+
+    def resume(follow_prompt):
+        return run_session(build_cmd(follow_prompt, args.permission_mode,
+                                     resume=result["session_id"], **common),
+                           ROOT, log_path, env)
+
+    ok, reports, result = fab.follow_up(ok, report, result, resume, close_editors, **ask)
+    gate_table = None
     if not (ok and args.gate):
         return ok, reports, result, gate_table, None
     close_editors()
@@ -207,6 +228,8 @@ def run_one(task, n, total, args, run_dir, progress, cache):
 def main():
     args = parse_args()
     task_file, tasks = load_tasks(args)
+    # Fab assets are asked for at the terminal; '-' has used stdin up.
+    args.interactive = sys.stdin.isatty() and args.tasks != ["-"]
     todo = [t for t in tasks if not t.done]
     if not todo:
         sys.exit("dev-team: nothing to do (no unticked tasks)")
@@ -238,6 +261,11 @@ def main():
         except KeyboardInterrupt:
             print("\ndev-team: interrupted -- this task stays unticked")
             outcomes.append((task, "interrupted"))
+            break
+        except fab.FabStop as stop:
+            print(f"\ndev-team: stopped while waiting for Fab asset {stop} "
+                  "-- this task stays unticked")
+            outcomes.append((task, "stopped"))
             break
         cost = result.get("total_cost_usd") or 0.0
         total_cost += cost

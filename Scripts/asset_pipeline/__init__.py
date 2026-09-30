@@ -8,6 +8,7 @@ Host-side (no ``unreal``):
     fetch_monsters.py           entry point: drive Meshy for every spec, cache the results
     providers/meshy.py          Meshy client: preview -> refine -> remesh -> rig
     skeleton_probe.py           fingerprint a cached GLB's bone hierarchy
+    fab_library.py              Fab manifest (fab_library.json) + CLI; acquisition is manual
 
 Editor-side, in pipeline order:
     import_characters.py        entry point: cached FBX -> SKM_/SK_ per character
@@ -22,4 +23,6 @@ Editor-side, in pipeline order:
     rig_chains.py               constants: IK chain tables, finger bone names
     rig_util.py                 log, asset loading, bone lists, bone pose in a clip
     import_ui_art.py            entry point: HUD art PNGs -> textures
+    fab_index.py                entry point: index Fab content -> assets/cache/fab/
+    fab_inventory.py            describe a folder's assets from registry tags
 """

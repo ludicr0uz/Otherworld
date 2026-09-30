@@ -56,14 +56,16 @@ def build_weapon_item():
     for name, kind in (("DisplayName", "string"),
                        ("PelletCount", "int"),
                        ("Dropped", "bool"),
-                       # Ammunition. UsesAmmo false means the other three are
-                       # never read -- the pistol is deliberately unlimited, and
-                       # the fire gate short-circuits on this rather than on a
-                       # magazine that would have to be topped up forever.
+                       # Ammunition. UsesAmmo false means the other four are
+                       # never read (the consumables), and the fire gate
+                       # short-circuits on it. InfiniteReserve is the pistol:
+                       # a real magazine to reload, over a reserve that is
+                       # never charged and never credited by shell pickups.
                        ("UsesAmmo", "bool"),
                        ("MagazineSize", "int"),
                        ("Loaded", "int"),
                        ("Reserve", "int"),
+                       ("InfiniteReserve", "bool"),
                        # Held trigger or tapped trigger. Read only behind the
                        # fire gate, where Held is known valid -- a pure Get off
                        # a null self is an Accessed None every frame, and the
@@ -199,6 +201,7 @@ def build_weapon(spec, item_bp):
         # would be a puzzle, not a mechanic.
         "Loaded": int(spec["magazine"]),
         "Reserve": int(spec["reserve"]),
+        "InfiniteReserve": bool(spec.get("infinite_reserve", False)),
         "FireInterval": float(spec["interval"]),
         "ReloadSeconds": float(spec["reload_s"]),
         # World time 0 is "now" at level start, so the first shot is free.
@@ -224,7 +227,8 @@ def build_weapon(spec, item_bp):
          f"{spec['spread']:.1f} deg cloud, {spec['recoil']:.2f}/"
          f"{spec['recoil_yaw']:.3f} deg kick, "
          f"heard at {spec['shot_volume'] / 100.0:.0f} m, "
-         + (f"{spec['magazine']}+{spec['reserve']} rounds, "
+         + (f"{spec['magazine']}+"
+            f"{'inf' if spec.get('infinite_reserve') else spec['reserve']} rounds, "
             f"{spec['interval']:.2f}s between shots"
             if spec["uses_ammo"] else "unlimited ammo")
          + (", automatic)" if spec["automatic"] else ")"))

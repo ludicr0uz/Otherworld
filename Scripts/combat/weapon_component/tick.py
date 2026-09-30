@@ -245,7 +245,7 @@ def _author_wc_tick(ed, tick):
     limited, limited_n = _prop(ed, "UsesAmmo", held, 1240, 420)
     unlimited = _at(_node(ed, FN_NOT), 1480, 420)
     _connect(limited, _pin(unlimited, "A"))
-    # OR, so the pistol never consults a magazine it does not have.
+    # OR, so an item without ammunition never consults a magazine it does not have.
     has_ammo = _at(_node(ed, FN_OR), 1720, 360)
     _connect(_pin(unlimited, "ReturnValue", is_input=False), _pin(has_ammo, "A"))
     _connect(_pin(rounds, "ReturnValue", is_input=False), _pin(has_ammo, "B"))

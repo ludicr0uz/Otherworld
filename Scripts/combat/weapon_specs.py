@@ -17,7 +17,8 @@ from combat.paths import (
 )
 from combat.skin import player_skin
 from combat.tuning import (
-    COMBAT, GUN_LOOT_TABLE, PISTOL_FIRE_INTERVAL, RIFLE_FIRE_INTERVAL, RIFLE_MAGAZINE,
+    COMBAT, GUN_LOOT_TABLE, PISTOL_FIRE_INTERVAL, PISTOL_MAGAZINE,
+    PISTOL_RELOAD_SECONDS, RIFLE_FIRE_INTERVAL, RIFLE_MAGAZINE,
     RIFLE_RELOAD_SECONDS, RIFLE_RESERVE, SHOTGUN_FIRE_INTERVAL,
     SHOTGUN_MAGAZINE, SHOTGUN_RELOAD_SECONDS, SHOTGUN_RESERVE,
     SHOT_VOLUME_CM, SMG_FIRE_INTERVAL, SMG_MAGAZINE, SMG_RELOAD_SECONDS,
@@ -292,8 +293,8 @@ def _weapon_specs():
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
              colour=(0.35, 0.65, 0.95),
-             uses_ammo=False, magazine=0, reserve=0,
-             interval=PISTOL_FIRE_INTERVAL, reload_s=0.0,
+             uses_ammo=True, magazine=PISTOL_MAGAZINE, reserve=0, infinite_reserve=True,
+             interval=PISTOL_FIRE_INTERVAL, reload_s=PISTOL_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Pistol"]),
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole

@@ -3,26 +3,32 @@
 Indented or following lines up to the next item belong to the item, so a task
 can run to several paragraphs. Headings and text before the first item are
 ignored. A continuation line of the form ``effort: <level>`` or
-``model: <name>`` is a hint for that task's session, not part of its text:
+``model: <name>`` is a hint for that task's session, not part of its text.
+So is ``fab: <request>`` (devteam/fab.py has the format), which may repeat:
+a Fab asset the task needs, asked of the user before its session starts:
 
     - [ ] Raise the inventory size to 12.
           effort: low
     - [ ] Add a campfire that raises Temperature within 5 m.
           It should burn for 3 minutes, then go out.
           model: opus
+    - [ ] Give the wanderers the Game Animation Sample's locomotion.
+          fab: Game Animation Sample | at: /Game/GameAnimationSample
 """
 
 import re
 
 ITEM = re.compile(r"^(?:[-*+]|\d+[.)])\s+(?:\[( |x|X)\]\s+)?(.*)$")
 HINT = re.compile(r"^(effort|model):\s*(\S+)\s*$", re.IGNORECASE)
+FAB_HINT = re.compile(r"^fab:\s*(\S.*?)\s*$", re.IGNORECASE)
 
 
 class Task(object):
 
-    def __init__(self, text, line=None, done=False, effort=None, model=None):
+    def __init__(self, text, line=None, done=False, effort=None, model=None, fab=None):
         self.text, self.line, self.done = text, line, done
         self.effort, self.model = effort, model
+        self.fab = list(fab or [])
 
     @property
     def title(self):
@@ -40,8 +46,10 @@ def parse_tasks(source):
                            done=(m.group(1) or " ").lower() == "x")
             tasks.append(current)
         elif current and raw.strip() and not raw.startswith("#"):
-            hint = HINT.match(raw.strip())
-            if hint:
+            hint, fab = HINT.match(raw.strip()), FAB_HINT.match(raw.strip())
+            if fab:
+                current.fab.append(fab.group(1))
+            elif hint:
                 setattr(current, hint.group(1).lower(), hint.group(2))
             else:
                 current.text += "\n" + raw.strip()

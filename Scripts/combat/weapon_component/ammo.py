@@ -4,7 +4,7 @@
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_MIN_II,
-    FN_NOT, FN_PLAY_SOUND, FN_SUB_II, FN_TIME_SECONDS,
+    FN_NOT, FN_PLAY_SOUND, FN_SELECT_II, FN_SUB_II, FN_TIME_SECONDS,
 )
 from combat.paths import ITEM_CLASS_PATH
 from combat.tuning import RELOAD_KEY, SMG_FIRE_INTERVAL
@@ -25,6 +25,11 @@ def _author_reload(ed, held, exec_in, x0, y0):
     weapon's own NextFireTime, which is the same field the interval between
     shots uses, so "cannot fire yet" has exactly one meaning in the whole
     system and nothing has to decide which of two rules is in force.
+
+    A weapon with InfiniteReserve (the pistol) stands the whole gap in for its
+    reserve, so the magazine always fills -- even from a negative Loaded left
+    by an older save, when the pistol spent rounds it never counted -- and its
+    Reserve is written back unchanged rather than charged.
     """
     made = []
 
@@ -42,9 +47,15 @@ def _author_reload(ed, held, exec_in, x0, y0):
     keep(spare_n)
     # Min, so a reserve of one tops a magazine that is four short up by one and
     # not by four -- and so the reserve can never be driven negative.
+    endless, endless_n = _prop(ed, "InfiniteReserve", held, x0, y0 + 680)
+    keep(endless_n)
+    source = keep(_at(_node(ed, FN_SELECT_II), x0 + 260, y0 + 560))
+    _connect(_pin(gap, "ReturnValue", is_input=False), _pin(source, "A"))
+    _connect(spare, _pin(source, "B"))
+    _connect(endless, _pin(source, "bPickA"))
     moving = keep(_at(_node(ed, FN_MIN_II), x0 + 520, y0 + 300))
     _connect(_pin(gap, "ReturnValue", is_input=False), _pin(moving, "A"))
-    _connect(spare, _pin(moving, "B"))
+    _connect(_pin(source, "ReturnValue", is_input=False), _pin(moving, "B"))
     pin_take = keep(_at(ed.add_set_member_variable_node("ReloadTake"), x0 + 780, y0))
     _connect(_pin(moving, "ReturnValue", is_input=False), _pin(pin_take, "ReloadTake"))
     _connect(exec_in, _pin(pin_take, "execute"))
@@ -60,7 +71,7 @@ def _author_reload(ed, held, exec_in, x0, y0):
     _connect(uses, _pin(worth, "A"))
     _connect(_pin(any_left, "ReturnValue", is_input=False), _pin(worth, "B"))
 
-    # An unlimited weapon and a full magazine both take the False arm, and both
+    # A weapon without ammunition and a full magazine both take the False arm, and both
     # skip the pause -- a reload that cost 1.6 s and moved nothing would be a
     # way to punish the player for pressing a key that did not apply.
     does = keep(_at(ed.add_branch_node(), x0 + 1520, y0))
@@ -104,10 +115,18 @@ def _author_reload(ed, held, exec_in, x0, y0):
     fewer = keep(_at(_node(ed, FN_SUB_II), x0 + 2540, y0 + 300))
     _connect(kept, _pin(fewer, "A"))
     _connect(_pin(take_b, "ReloadTake", is_input=False), _pin(fewer, "B"))
+    # An infinite reserve is written back as it was: one Set Reserve on both
+    # kinds of weapon, rather than a branch around it.
+    free, free_n = _prop(ed, "InfiniteReserve", held, x0 + 2280, y0 + 540)
+    keep(free_n)
+    after = keep(_at(_node(ed, FN_SELECT_II), x0 + 2540, y0 + 460))
+    _connect(kept, _pin(after, "A"))
+    _connect(_pin(fewer, "ReturnValue", is_input=False), _pin(after, "B"))
+    _connect(free, _pin(after, "bPickA"))
     charge = keep(_at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH),
                       x0 + 2800, y0))
     _connect(held, _pin(charge, "self"))
-    _connect(_pin(fewer, "ReturnValue", is_input=False), _pin(charge, "Reserve"))
+    _connect(_pin(after, "ReturnValue", is_input=False), _pin(charge, "Reserve"))
     _connect(BEL.find_then_pin(load), _pin(charge, "execute"))
 
     now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 2800, y0 + 300))
@@ -128,7 +147,9 @@ def _author_reload(ed, held, exec_in, x0, y0):
         "up and the reserve is charged less than the magazine gained. The cost "
         "is the weapon's own ReloadSeconds pushed onto NextFireTime -- the same "
         "field the interval between shots uses, so there is only ever one rule "
-        "saying when the weapon may fire. The clack plays on the True arm only, "
+        "saying when the weapon may fire. An InfiniteReserve weapon (the "
+        "pistol) fills the whole gap and is never charged. "
+        "The clack plays on the True arm only, "
         "because a reload that moved nothing has nothing to announce.",
         made)
     return (BEL.find_then_pin(pause), BEL.find_else_pin(does))

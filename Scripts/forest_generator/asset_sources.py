@@ -28,6 +28,12 @@ Three kinds, and the distinction is the whole point:
   CACHE       bytes fetched off the internet.  Restored by re-running the
               fetcher.  Lives in assets/, which is git-ignored.
 
+  FAB         bytes the user acquired from Fab (Megascans, packs, characters,
+              animations).  Restored BY HAND: Fab needs the user's Epic
+              sign-in, so no script can fetch them.  The tracked
+              asset_pipeline/fab_library.json lists what to re-add and where
+              it lands; ``fab_library.py --check`` names what is missing.
+
 ── The one subtlety: stock assets that a builder then patches ─────────────────
 
 Three stock files are edited in place by builders.  They are STOCK for the
@@ -59,7 +65,7 @@ THIRD_PERSON_TEMPLATE = "Templates/TP_ThirdPersonBP"
 class AssetSource:
     """One directory under Content/, and the single thing that produces it."""
     dest: str                       # project-relative, e.g. "Content/Characters"
-    kind: str                       # "stock" | "generated" | "cache"
+    kind: str                       # "stock" | "generated" | "cache" | "fab"
     engine_subpath: str = ""        # stock: source dir relative to ENGINE_ROOT
     builders: tuple = ()            # generated: scripts, in the order they run
     note: str = ""
@@ -273,7 +279,24 @@ CACHE = CACHE + (
     ),
 )
 
-ALL_SOURCES = STOCK + GENERATED + CACHE
+# ── Fab: acquired by the user, never by a script ─────────────────────────────
+#
+# Only the plugin's default folder is listed here. A pack added through the
+# launcher lands in its own /Game/<Pack>, and fab_library.json records each of
+# those; sync_assets.py --status reports them one by one.
+FAB = (
+    AssetSource(
+        dest="Content/Fab",
+        kind="fab",
+        builders=("(manual) the Fab plugin in the editor -- see "
+                  "Scripts/asset_pipeline/fab_library.py --check",),
+        note="Whatever the Fab plugin imported (Megascans under Megascans/, "
+             "plus /Fab/Materials parents from the plugin itself). Indexed by "
+             "Scripts/asset_pipeline/fab_index.py into assets/cache/fab/.",
+    ),
+)
+
+ALL_SOURCES = STOCK + GENERATED + CACHE + FAB
 
 # Where the stock checksums live, relative to the project root. Written by
 # Scripts/sync_assets.py --record; compared by --verify. Text, a few tens of KB,
@@ -322,6 +345,11 @@ RESTORE_ORDER = (
     # Once each printed import_<Level>.py has run: the import rebuilds the
     # level from nothing, forage included.
     "Scripts/dev/uepy.py --cold Scripts/place_forage.py",
+    # Fab content is re-added by hand (it needs the user's Epic sign-in):
+    # --check lists what fab_library.json holds that the disk does not. Then
+    # the index, which sessions read instead of booting the editor.
+    "Scripts/asset_pipeline/fab_library.py --check",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/fab_index.py",
 )
 
 

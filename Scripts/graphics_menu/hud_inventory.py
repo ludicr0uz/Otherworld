@@ -2,7 +2,7 @@
 equipped weapon's name above them -- filled from the weapon component.
 
 Everything shown comes off the carried item itself (Icon, SlotColor,
-DisplayName, UsesAmmo, Loaded, Reserve), so the HUD keeps no table of weapons
+DisplayName, UsesAmmo, Loaded, Reserve, InfiniteReserve), so the HUD keeps no table of weapons
 and no idea which of them has a magazine. Slot i shows Inventory[i]; a slot
 past the end of the inventory is emptied, every frame, so a dropped weapon
 leaves no ghost behind.
@@ -34,6 +34,9 @@ FN_ARR_VALID = "/Script/Engine.KismetArrayLibrary.Array_IsValidIndex"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
 FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
+FN_SELECT_STR = "/Script/Engine.KismetMathLibrary.SelectString"
+# What an InfiniteReserve weapon (the pistol) shows for its reserve.
+INFINITE_RESERVE_TEXT = "\u221e"
 FN_SET_BRUSH = "/Script/UMG.Image.SetBrushFromTexture"
 FN_SET_TINT = "/Script/UMG.Image.SetColorAndOpacity"
 
@@ -87,15 +90,19 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, x0, y0):
     flow = set_shown(ed, icon, True, [BEL.find_then_pin(tint)], x0 + 780, y0)
 
     # "3 / 15": rounds in the gun, rounds in reserve. Only for a weapon that
-    # uses ammunition -- the pistol's slot stays empty rather than claim an
-    # infinity nobody has to manage.
+    # uses ammunition. The pistol reloads every eight shots over an endless
+    # reserve, so it reads "5 / ∞": the magazine is the part to manage.
     loaded = _at(_node(ed, FN_INT_TO_STR), x0 + 1040, y0 + 440)
     _connect(_get(ed, item, "Loaded", x0 + 780, y0 + 440), _pin(loaded, "InInt"))
     reserve = _at(_node(ed, FN_INT_TO_STR), x0 + 1040, y0 + 580)
     _connect(_get(ed, item, "Reserve", x0 + 780, y0 + 580), _pin(reserve, "InInt"))
+    spare = _at(_node(ed, FN_SELECT_STR), x0 + 1280, y0 + 700)
+    _set(spare, "A", INFINITE_RESERVE_TEXT)
+    _connect(_pin(reserve, "ReturnValue", is_input=False), _pin(spare, "B"))
+    _connect(_get(ed, item, "InfiniteReserve", x0 + 1040, y0 + 720), _pin(spare, "bPickA"))
     sep = _at(_node(ed, FN_CONCAT), x0 + 1280, y0 + 580)
     _set(sep, "A", " / ")
-    _connect(_pin(reserve, "ReturnValue", is_input=False), _pin(sep, "B"))
+    _connect(_pin(spare, "ReturnValue", is_input=False), _pin(sep, "B"))
     count = _at(_node(ed, FN_CONCAT), x0 + 1520, y0 + 440)
     _connect(_pin(loaded, "ReturnValue", is_input=False), _pin(count, "A"))
     _connect(_pin(sep, "ReturnValue", is_input=False), _pin(count, "B"))

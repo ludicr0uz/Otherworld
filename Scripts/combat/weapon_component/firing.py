@@ -45,8 +45,8 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
         return n
 
     # --- what the shot costs -------------------------------------------------
-    # Unconditional, including on the pistol. Loaded is only ever *read* behind
-    # UsesAmmo, so letting an unlimited weapon count into the negatives costs
+    # Unconditional, on every weapon. Loaded is only ever *read* behind
+    # UsesAmmo, so letting a weapon without ammunition count into the negatives costs
     # nothing and saves a branch on the one path that runs eight traces.
     was = keep(_at(ed.add_get_member_variable_node("Loaded", ITEM_CLASS_PATH),
                    x0 - 760, y0 + 300))

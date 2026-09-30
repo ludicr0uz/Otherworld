@@ -39,6 +39,7 @@ from forest_generator.asset_sources import (          # noqa: E402
     ALL_SOURCES,
     CACHE,
     ENGINE_ROOT_GLOB,
+    FAB,
     ENGINE_VERSION,
     GENERATED,
     PATCHED_STOCK,
@@ -89,7 +90,8 @@ def _walk(root: str):
 def cmd_status() -> int:
     print(f"project: {PROJECT_ROOT}\n")
     width = max(len(s.dest) for s in ALL_SOURCES)
-    for group, label in ((STOCK, "stock"), (GENERATED, "generated"), (CACHE, "cache")):
+    for group, label in ((STOCK, "stock"), (GENERATED, "generated"), (CACHE, "cache"),
+                         (FAB, "fab (manual)")):
         print(f"── {label} ──")
         for src in group:
             path = os.path.join(PROJECT_ROOT, src.dest)
@@ -105,6 +107,13 @@ def cmd_status() -> int:
                        else "  &&  ".join(src.builders))
                 print(f"  {'':<{width}}  -> {how}")
         print()
+    from asset_pipeline import fab_library
+    items = fab_library.load()
+    print(f"── fab library ({len(items)} recorded in asset_pipeline/fab_library.json) ──")
+    for item in items:
+        state = "present" if fab_library.is_present(item) else "MISSING  -> re-add in Fab"
+        print(f"  {item.content:<{width}}  {state}  ({item.name})")
+    print()
     return 0
 
 

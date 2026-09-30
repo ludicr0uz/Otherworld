@@ -12,7 +12,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
      - `uepy.py` runs scripts (its pieces are `uepylib/`);
      - `dev-team` runs a queue of tasks, one headless Claude session each (its pieces are
        `devteam/`). A session started that way has no one to ask, so it decides and reports
-       instead.
+       instead. The one exception is a Fab asset (see "Fab assets" below).
      - Their unit tests: `python3 -m unittest discover -s Scripts/dev/tests`. Run them after
        changing anything in `Scripts/dev` or `Scripts/probes`.
    - `Scripts/probes/` holds probes: checks that run inside a headless game (see below).
@@ -86,6 +86,7 @@ directory to whatever produces it:
 | stock (ships with UE 5.8) | `sync_assets.py --restore-stock` | sha256, `stock_checksums.json` |
 | generated | the builder named in the table | the verifier suite |
 | cache (downloads, git-ignored `assets/`) | e.g. `fetch_weapon_sounds.py` | the fetcher's report |
+| fab (`Content/Fab`, packs in `/Game/<Pack>`) | **the user, by hand** (see below) | `fab_library.py --check` |
 
 ```bash
 python3 Scripts/sync_assets.py --status | --plan | --restore-stock | --verify
@@ -94,6 +95,29 @@ python3 Scripts/sync_assets.py --status | --plan | --restore-stock | --verify
 **Three stock files are patched by builders:** `ABP_Unarmed`, `BP_ThirdPersonCharacter` and
 `BP_ThirdPersonGameMode`. They are restored by copying and verified by the suite, never by
 checksum, because a recompile isn't byte-deterministic.
+
+### Fab assets: only the user can acquire them
+
+Official models, animations and Megascans come from Fab through the Fab plugin
+(installed in UE 5.8, imports under `/Game/Fab`) or the launcher's "Add to project"
+(a pack lands in `/Game/<Pack>`). That needs the user's Epic sign-in, so:
+
+- **Never** sign in, drive the Fab plugin or its browser, download from fab.com, or
+  substitute a stand-in for an asset the task needs. Searching fab.com to pick a
+  listing is fine.
+- **Check what's already there first:** `assets/cache/fab/index.md` (library, counts,
+  each skeleton and whether it has the mannequin's bones) and `index.json` (one asset
+  per line: grep it). Rebuild with `uepy.py Scripts/asset_pipeline/fab_index.py`.
+- **Need one that isn't there?** Ask the user for it and wait. In a dev-team session,
+  end the report with `FAB-REQUIRED:` and one line per asset
+  (`<name> | url: <listing> | at: /Game/<folder> | why: <reason>`). dev-team asks the
+  user, records it and resumes the session (`Scripts/dev/devteam/fab.py`). A task can
+  also declare `fab: <same line>` in `tasks.md` to be asked before it starts.
+- **What's been acquired** is `Scripts/asset_pipeline/fab_library.json` (tracked: the
+  restore recipe, since the imported assets are not committed). The user records an
+  addition with `fab_library.py --add <name> --url <listing> --at /Game/<folder>`.
+- **Licences:** each entry records the listing's licence (`--license`). Don't ship an
+  asset whose entry has none; ask the user what it is.
 
 **Everything that isn't code goes in git-ignored `assets/`.** Never commit an archive: GitHub
 rejects files over 100 MB. After a fresh clone, arm the guard:

@@ -112,7 +112,8 @@ def probe(p):
             f"lit {lit}, name '{name}', equipped {equipped}")
     counted = [(i, _text(grid.get_child_at(i).get_editor_property(C.SLOT_AMMO)))
                for i, item in enumerate(items) if p.get(item, "UsesAmmo")]
-    want = [(i, f"{p.get(it, 'Loaded')} / {p.get(it, 'Reserve')}")
+    want = [(i, f"{p.get(it, 'Loaded')} / "
+                f"{chr(0x221e) if p.get(it, 'InfiniteReserve') else p.get(it, 'Reserve')}")
             for i, it in enumerate(items) if p.get(it, "UsesAmmo")]
     p.check("each gun that uses ammunition shows loaded / reserve", counted == want,
             f"{counted} vs {want}")

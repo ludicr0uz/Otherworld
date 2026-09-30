@@ -37,8 +37,10 @@ menu polls its own copy from `DrawHUD`, which does.
   Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
 - **Ammunition lives on the weapon** (`MagazineSize`/`Loaded`/`Reserve` on `BP_WeaponItem`).
-  Drop a half-empty gun and it is still half-empty when picked up. The pistol is the fallback and
-  has unlimited ammo.
+  Drop a half-empty gun and it is still half-empty when picked up. The pistol is the fallback: an
+  8-round magazine over an endless reserve (`InfiniteReserve`), so it reloads every 8 shots but
+  never runs dry. The reload fills its whole gap and never charges its reserve; shell pickups skip
+  it; the HUD shows `5 / ∞`.
 - **There is no reloading state.** `NextFireTime` is one world-time deadline. Both the fire
   interval and the reload push it out.
 - **The shotgun and pistol are issued; the SMG, rifle and sniper are found.**
@@ -108,6 +110,8 @@ These are feel checks a headless run can't do:
 
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100
   to 61);
+- the pistol emptying after 8 shots, clicking, and R refilling it to 8 (no key can be injected
+  into a headless game, so only the verifier covers this);
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
 - the `GUN_ACCURACY` numbers: how wide each cloud feels at the hip, and whether the reticle's

@@ -195,6 +195,7 @@ editor.
   a 10-slot inventory. Crouch, prone and the guard are procedural poses (no clip exists).
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
+  The pistol reloads every 8 shots from an endless reserve.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee. They respawn 75–100 m away and leave ragdoll corpses.
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature

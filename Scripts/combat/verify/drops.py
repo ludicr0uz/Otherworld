@@ -70,6 +70,11 @@ def check_ammo_pickup():
                   and "IsValid" in str(BEL.get_node_title(n))]
         check("...behind an IsValid gate, because reading UsesAmmo off None is an "
               "Accessed None", bool(valids), f"{len(valids)} IsValid node(s)")
+    # The pistol has a magazine now, but its reserve never ends: shells paid
+    # into it would vanish. Both paths (held weapon and loop) ask.
+    endless = [n for n in ag if "InfiniteReserve" in out_pins(n)]
+    check("the shells never go to an InfiniteReserve weapon (the pistol), on "
+          "either path", len(endless) == 2, f"{len(endless)} InfiniteReserve reads")
     check("...with the inventory loop kept as the fallback for an unarmed player "
           "or one holding the pistol",
           bool(by_pins(ag, "Array")) or any("Inventory" in out_pins(n) for n in ag),

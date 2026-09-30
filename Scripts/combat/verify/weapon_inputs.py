@@ -8,7 +8,8 @@ from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.camera import AIM_TRACE_RANGE
 from combat.paths import PISTOL_BP_PATH, SHOTGUN_BP_PATH
 from combat.tuning import (
-    BIND_VARS, COMBAT, DROP_FORWARD, SHOTGUN_MAGAZINE, SHOTGUN_RESERVE,
+    BIND_VARS, COMBAT, DROP_FORWARD, PISTOL_MAGAZINE, SHOTGUN_MAGAZINE,
+    SHOTGUN_RESERVE,
 )
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wg
@@ -261,6 +262,10 @@ def check_ammunition():
               == gun.get_editor_property("MagazineSize") == want["magazine"],
               f"{gun.get_editor_property('Loaded')} / "
               f"{gun.get_editor_property('MagazineSize')}")
+        endless = bool(want.get("infinite_reserve", False))
+        check(f"{spec}: InfiniteReserve is {endless}",
+              gun.get_editor_property("InfiniteReserve") is endless,
+              str(gun.get_editor_property("InfiniteReserve")))
         check(f"{spec}: reserve is {want['reserve']}",
               gun.get_editor_property("Reserve") == want["reserve"],
               str(gun.get_editor_property("Reserve")))
@@ -289,8 +294,18 @@ def check_ammunition():
     check("...and still fires the same 8 pellets, so the change is damage and not spread",
           shotgun_cdo.get_editor_property("PelletCount") == 8,
           str(shotgun_cdo.get_editor_property("PelletCount")))
-    check("the pistol is unlimited and therefore never reloads",
-          cdo(load(PISTOL_BP_PATH)).get_editor_property("UsesAmmo") is False)
+    # The fallback weapon: a magazine to reload, over a reserve that never ends.
+    pistol = cdo(load(PISTOL_BP_PATH))
+    check(f"the pistol reloads every {PISTOL_MAGAZINE} shots",
+          pistol.get_editor_property("UsesAmmo") is True
+          and pistol.get_editor_property("MagazineSize") == PISTOL_MAGAZINE == 8,
+          f"UsesAmmo {pistol.get_editor_property('UsesAmmo')}, "
+          f"magazine {pistol.get_editor_property('MagazineSize')}")
+    check("...over an infinite reserve, so it can never run dry for good",
+          pistol.get_editor_property("InfiniteReserve") is True)
+    check("...and the reload costs it a pause like any other gun",
+          pistol.get_editor_property("ReloadSeconds") > 0.0,
+          f"{pistol.get_editor_property('ReloadSeconds'):.2f}s")
 
 
 # --- what the graph does with all that ---------------------------------------
@@ -322,6 +337,14 @@ def check_ammunition_graph():
           bool(titled(wg, "Min (Integer)")),
           str(sorted({t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                                   for n in wg) if t.lower().startswith("min")})))
+    # The pistol's reload: the gap stands in for its reserve (so the magazine
+    # fills even from a negative count), and the reserve is written back as is.
+    endless_reads = [n for n in wg if "InfiniteReserve" in out_pins(n)]
+    check("the reload asks InfiniteReserve twice: what it may take, what it is charged",
+          len(endless_reads) == 2, f"{len(endless_reads)} InfiniteReserve reads")
+    selects = [n for n in wg if {"A", "B", "bPickA"} <= in_pins(n)]
+    check("...each through a Select, not a branch around the reload",
+          len(selects) >= 2, f"{len(selects)} Select nodes")
     # The gate is nested, not folded: every one of these reads a property off Held,
     # and the outer condition is pulled on frames where nothing is equipped.
     ammo_reads = [n for n in wg if "UsesAmmo" in out_pins(n)]

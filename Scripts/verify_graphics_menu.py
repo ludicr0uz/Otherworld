@@ -629,10 +629,14 @@ def main():
               for n in by_pins("A", "B")
               if BEL.find_input_pin(n, "A")),
           "a ' / ' separator")
-    # The pistol is deliberately unlimited, so its slot must stay empty rather
-    # than claim an infinity nobody has to manage.
     check("...and only weapons that use ammunition show it at all",
           sum(1 for t in titles if t == "Get UsesAmmo") == 1)
+    # The pistol reloads every eight shots over an endless reserve: "5 / inf".
+    check("...an InfiniteReserve weapon shows its reserve as infinity",
+          sum(1 for t in titles if t == "Get InfiniteReserve") == 1
+          and any(BEL.find_input_pin(n, "A").get_pin_value() == "\u221e"
+                  for n in by_pins("A", "B", "bPickA")),
+          str(sum(1 for t in titles if t == "Get InfiniteReserve")))
 
     # --- debug mode
     # The flag lives on the GameMode, because BP_WeaponComponent draws the

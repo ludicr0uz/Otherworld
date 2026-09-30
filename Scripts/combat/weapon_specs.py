@@ -11,6 +11,7 @@ from combat.audio import (
     SND_RELOAD_PISTOL, SND_RELOAD_RIFLE, SND_RELOAD_SHOTGUN,
 )
 from combat.graph import _log, _rot
+from combat.gun_tuning import read_table
 from combat.grip import _barrel_rotation, _grip_location, _grip_rotation
 from combat.paths import (
     AUDIO_DIR, CUBE, CYLINDER, MAT_METAL, MAT_WOOD, PISTOL_BP_PATH,
@@ -210,6 +211,10 @@ def _weapon_specs():
     are merged into each row here, so the accuracy of all five reads as one
     table.
 
+    Every number the GUN TUNING page can change is then overridden by its
+    cell in gun_tuning.csv, so the literals here are the defaults a missing
+    cell falls back to, and the CSV is what gets built.
+
     `shot_volume` is how far the shot is heard, and it is read from
     SHOT_VOLUME_CM in tuning.py rather than written inline, because the five
     only mean something against each other: that table is where "the sniper
@@ -270,8 +275,13 @@ def _weapon_specs():
              interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Sniper"]),
     )
+    # gun_tuning.csv last: what the in-game GUN TUNING page saved wins over
+    # every literal above (gun_tuning.py lists the columns it may hold).
+    tuned = read_table()
     for spec in specs:
         spec.update(GUN_ACCURACY[spec["display"]])
+        spec.setdefault("ads_zoom", COMBAT.ads_zoom_irons)
+        spec.update(tuned.get(spec["display"], {}))
         # Held in both hands is what the rifle ready pose does; the guard pose
         # (body_pose.py) picks fists or the gun across the body on it.
         spec["two_handed"] = spec["aim"] == AIM_RIFLE

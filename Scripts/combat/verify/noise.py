@@ -58,8 +58,9 @@ def check_shot_volumes():
     for spec in specs:
         got = cdo(load(spec["path"])).get_editor_property("ShotVolume")
         check(f"{spec['display']} is heard out to {spec['shot_volume'] / 100:.0f} m",
-              abs(got - SHOT_VOLUME_CM[spec["display"]]) < 1e-3, f"{got}")
-    v = SHOT_VOLUME_CM
+              abs(got - spec["shot_volume"]) < 1e-3, f"{got}")
+    # The ordering holds the built volumes: gun_tuning.csv's over SHOT_VOLUME_CM.
+    v = {s["display"]: s["shot_volume"] for s in specs}
     check("the sniper is the loudest gun",
           v["Sniper"] > max(x for k, x in v.items() if k != "Sniper"))
     check("the rifle and shotgun sit between the sniper and the SMG",

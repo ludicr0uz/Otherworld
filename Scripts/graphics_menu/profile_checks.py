@@ -81,7 +81,10 @@ def check_profile(check, bp, nodes):
             return float(_value(n, "B") or "nan")
         except ValueError:
             return float("nan")
+    # A float's literal reads back with a point; the tuning tab's int index
+    # arithmetic (tune_tick.py) adds whole numbers up to 18, 15 among them.
     deadlines = [n for n in nodes if _pins(n) == {"A", "B"}
+                 and "." in _value(n, "B")
                  and abs(_b(n) - PC.EXIT_SECONDS) < 1e-6]
     check(f"...and it runs for {PC.EXIT_SECONDS:.0f} s", len(deadlines) == 1,
           str(len(deadlines)))

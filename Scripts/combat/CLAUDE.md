@@ -107,6 +107,17 @@ menu polls its own copy from `DrawHUD`, which does.
 live: lethality, sprint and stamina, ADS, mouse sensitivity, recoil and the hit reactions.
 Per-weapon numbers live in `_weapon_specs()`.
 
+**Per-gun numbers can be tuned in game** (the M panel's **T** tab, `graphics_menu/tune_*.py`):
+- `gun_tuning.csv` (tracked) holds each gun's 19 tunable stats (`gun_tuning.TUNE_STATS`: damage,
+  pellets, range, interval, reload, magazine, sights zoom, shot volume and the accuracy columns).
+  `_weapon_specs()` lays it over its literals, so **the CSV wins**; the literals are the
+  fallback for a missing cell. Edit the CSV by hand or through the tab, never only the literal.
+- The tab writes the carried guns live and Enter saves the CSV; the Blueprints change only when
+  `build_weapons_and_combat.py` and then `build_graphics_menu.py` run (the HUD's copy of the
+  table is baked too: `tune_checks` fails if it is stale).
+- A tuned value can break a design check that pins it (e.g. "the shotgun does 18 per pellet",
+  the DPS spread, the recoil 4:1): update the check with the design, or re-tune.
+
 There is no DataAsset on purpose. Every number is a pin literal baked into a compiled graph,
 and `Content/` is not committed, so an edit in the editor would be erased by the next build.
 The verifier asserts the old loose constants are gone.

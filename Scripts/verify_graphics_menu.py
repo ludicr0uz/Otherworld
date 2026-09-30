@@ -30,7 +30,9 @@ from graphics_menu.profile_checks import check_profile
 from graphics_menu import dev_consts as DC
 from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import loot_consts as LC
+from graphics_menu import tune_consts as TC
 from graphics_menu.loot_checks import check_loot
+from graphics_menu.tune_checks import check_tune
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -142,10 +144,12 @@ def main():
     expected_keys = set((G.MENU_KEY, UC.RESTART_KEY, G.DEBUG_KEY,
                          N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
                          PC.EXIT_KEY, DC.DEV_GUNS_KEY,
-                         LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY)
+                         LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
+                         TC.TUNE_KEY, TC.TUNE_UP, TC.TUNE_DOWN, TC.TUNE_LESS,
+                         TC.TUNE_MORE, TC.TUNE_SAVE_KEY)
                         + G.PRESET_KEYS + N.START_KEYS)
     check("polls exactly the menu, preset, debug, restart, start, nav, exit, "
-          "dev-all-guns and loot keys",
+          "dev-all-guns, loot and gun tuning keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -164,9 +168,11 @@ def main():
     expected_levels = sorted([p[1] for p in G.PRESETS]
                              + [G.PRESETS[G.DEFAULT_PRESET][1]])
     # "Value" alone no longer identifies SetOverallScalabilityLevel -- the
-    # settings page's FClamp has one too, and its literal is a float.
+    # settings page's FClamp has one too, and its literal is a float; so has
+    # the tuning panel's Conv_DoubleToText.
     levels = sorted(int(BEL.find_input_pin(n, "Value").get_pin_value())
-                    for n in by_pins("Value") if "Min" not in pin_names(n))
+                    for n in by_pins("Value")
+                    if not {"Min", "MaximumFractionalDigits"} & pin_names(n))
     check("one scalability call per preset, plus BeginPlay's default",
           levels == expected_levels, f"{levels} vs {expected_levels}")
 
@@ -444,8 +450,10 @@ def main():
           "cannot show past it", len(strips) == 2, str(len(strips)))
     # Negative width is what a portrait viewport would ask for, and DrawRect
     # draws that backwards rather than not at all.
+    # B a literal: the tuning tab's FMax takes its floor from TuneMins.
     floor = [n for n in nodes
-             if str(BEL.get_node_title(n)).replace("\n", " ") == "Max (Float)"]
+             if str(BEL.get_node_title(n)).replace("\n", " ") == "Max (Float)"
+             and not BEL.find_input_pin(n, "B").list_connected_pins()]
     check("...with their width floored at zero for a taller-than-wide window",
           len(floor) == 1
           and BEL.find_input_pin(floor[0], "B").get_pin_value() in ("", "0.0"),
@@ -505,9 +513,10 @@ def main():
     # Eleven: and CharacterMovement, frozen while the exit counts down.
     # Fourteen: and the loot window's three -- a body's health and mesh
     # (loot_find.py), and the player's bag (loot_tick.py).
+    # Fifteen: and the carried guns the tuning tab writes (tune_tick.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 14 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 15 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -869,6 +878,7 @@ def main():
     check_profile(check, bp, nodes)
     check_dev_guns(check, bp, nodes)
     check_loot(check, bp, nodes)
+    check_tune(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

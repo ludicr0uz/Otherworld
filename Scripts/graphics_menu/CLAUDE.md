@@ -18,6 +18,7 @@ split it before extending it.
 - **D** toggles debug mode.
 - **X** (panel open) starts save and exit.
 - **K** (panel open) is the dev-all-guns cheat (below).
+- **T** (panel open) opens the GUN TUNING tab (below).
 - **Tab** (near a looted body) opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 
@@ -150,6 +151,26 @@ Run from Tick after save and exit; the design is `Scripts/loot/CLAUDE.md`. Traps
 - **The take reuses the cheat's pattern** (spawn, cast, `Dropped`, `Inventory += it`,
   `NeedsRefresh`). `dev_guns_checks._looting` tells the take's nodes apart from the cheat's.
 - **Probe:** `probe_corpse_loot.py` calls `ReceiveDrawHUD` itself to read the window.
+
+## The GUN TUNING tab (`tune_*.py`, `wbp_tune.py`)
+
+A developer tab beside the M panel: **T with the panel open** toggles `TuneOpen`. Up/Down pick
+the gun row or one of the 19 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Right change the
+gun, or move the stat one step (never under its minimum); **Enter** saves
+`Scripts/combat/gun_tuning.csv`.
+
+- **The table lives on the HUD:** `TuneValues` (guns x stats, flattened), `TuneWeapons`,
+  `TuneSteps`, `TuneMins`, all baked from `_weapon_specs()` (so from the CSV) at build time.
+- **Applied every Tick once touched** (`TuneTouched`): each carried item whose `DisplayName` is
+  in `TuneWeapons` gets all 19 variables (ints rounded). Every Tick rather than per nudge, so a
+  gun picked up afterwards gets the tuning too. Guns lying in the world get it when picked up.
+- **The save is Python**, through `PythonScriptLibrary.ExecutePythonCommand`
+  (`TUNE_SAVE_COMMAND` → `tune_save.save()`), which reads the live HUD's table. Blueprint can't
+  write a file. So it works in the editor, PIE and `-game` of the editor binary, not in a
+  packaged build: a dev tool. `TuneSaved` shows "saved to ..." until the next change.
+- **The keys only raise flags** (`TuneNudge`, `TuneSaveRequested`), which is what lets
+  `probe_gun_tuning.py` tune and save. It backs up the CSV and puts it back.
+- **Still needs a play session:** the keys themselves and how the 20-row panel reads.
 
 ## HUD
 

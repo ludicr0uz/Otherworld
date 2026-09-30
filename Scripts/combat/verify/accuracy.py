@@ -38,11 +38,13 @@ def check_accuracy_table():
           str(sorted(GUN_ACCURACY)))
     columns = {col for col, _var in ACCURACY_VARS}
     for sp in specs:
-        row, name = GUN_ACCURACY.get(sp["display"], {}), sp["display"]
+        literal, name = GUN_ACCURACY.get(sp["display"], {}), sp["display"]
         check(f"{name}: the row sets every accuracy column",
-              set(row) == columns, str(sorted(set(row) ^ columns)))
-        if set(row) != columns:
+              set(literal) == columns, str(sorted(set(literal) ^ columns)))
+        if set(literal) != columns:
             continue
+        # The rules hold the numbers that are built: gun_tuning.csv's over the row.
+        row = {col: sp[col] for col in columns}
         check(f"{name}: recoil climbs 4x more than it swings "
               f"({row['recoil']} up, +/-{row['recoil_yaw']} sideways)",
               abs(row["recoil"] - 4.0 * row["recoil_yaw"]) < 1e-9)

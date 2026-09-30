@@ -11,6 +11,7 @@ import unreal
 
 from combat.graph import BEL, _must_load
 from graphics_menu import umg_author as U
+from graphics_menu.wbp_tune import author_tune_widgets
 from graphics_menu.umg_consts import (
     COL_CARET, COL_DEATH_HINT, COL_DEATH_TEXT, COL_DEATH_TITLE, COL_GOLD, COL_HINT,
     COL_MAIN_HINT, COL_MAIN_SUB, COL_MAIN_TITLE, COL_ROW, COL_TITLE, DEATH_HINT,
@@ -93,6 +94,7 @@ def build_pause_menu():
     U.pad(rows.get_parent(), h="Left")
     _line(bp, stack, "PauseHint", PAUSE_HINT, PAUSE_HINT_FONT, COL_HINT, top=6.0,
           centred=False)
+    author_tune_widgets(bp, root)
     return U.compile_and_save(bp)
 
 

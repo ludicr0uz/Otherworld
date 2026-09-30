@@ -98,6 +98,9 @@ from graphics_menu.save_exit import (                              # noqa: E402
 from graphics_menu.dev_guns import (                               # noqa: E402
     declare_dev_guns_vars, dev_guns_defaults)
 from graphics_menu.loot_draw import author_loot_window              # noqa: E402
+from graphics_menu.tune_draw import author_tune_panel               # noqa: E402
+from graphics_menu.tune_tick import (                               # noqa: E402
+    author_tune_tick, declare_tune_vars, tune_defaults)
 from graphics_menu.loot_tick import (                               # noqa: E402
     author_loot_tick, declare_loot_vars, loot_defaults)
 from survival.paths import SURVIVAL_BP_PATH                        # noqa: E402
@@ -438,6 +441,7 @@ def _ensure_variables(ed, bp):
     declare_profile_vars(ed)
     declare_dev_guns_vars(ed)
     declare_loot_vars(ed)
+    declare_tune_vars(ed)
 
 
 def _apply_defaults(bp, defaults):
@@ -736,7 +740,9 @@ def _author_tick(ed, tick):
     synced = author_grass_sync(ed, x0, y0 - 1100, BEL.find_then_pin(tick))
     # Then the loot window (loot_tick.py): the body in reach, its keys, a take.
     saved = author_save_exit_tick(ed, pc_out, synced, x0, y0 - 4000)
-    for tail in author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000):
+    looted = author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000)
+    # Then the M panel's gun tuning tab (tune_tick.py).
+    for tail in author_tune_tick(ed, pc_out, looted, x0 + 44000, y0 - 4000):
         _connect(tail, _pin(br_m, "execute"))
 
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 560, y0 + 200)
@@ -1110,7 +1116,8 @@ def _author_draw(ed, x0, y0):
 
     # Last: the M panel. Every path above -- written or cast-failed -- falls
     # through to it; an exec input takes more than one link.
-    author_pause_menu(ed, x0 + 420, y0, after_aim)
+    shown = author_pause_menu(ed, x0 + 420, y0, after_aim)
+    author_tune_panel(ed, x0 + 4800, y0, shown)
 
 
 # ─── Entry points ────────────────────────────────────────────────────────────
@@ -1195,7 +1202,8 @@ def build_hud_blueprint(rebuild=False):
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],
                          **difficulty_defaults(), **profile_defaults(),
-                         **dev_guns_defaults(), **loot_defaults()})
+                         **dev_guns_defaults(), **loot_defaults(),
+                         **tune_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

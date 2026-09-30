@@ -17,6 +17,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
+  gun_tuning        gun_tuning.csv: the tunable stats (TUNE_STATS: column,
+                    variable, label, step, minimum), reading and writing it
   weapon_specs      the five weapons: parts, muzzles, icons, _weapon_specs()
   weapon_models     the SMG's, the rifle's and the sniper's Fab models (SMG11,
                     AK 47, AS Val + scope), their muzzles and sights, and the measured outline

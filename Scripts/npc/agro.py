@@ -1,17 +1,17 @@
-"""The patrol/agro switch on the controller's heartbeat: set up the patrol
-once, then either chase (aggro) or check the senses and stroll (patrolling).
+"""The patrol/agro steps the behaviour tree calls (npc/tree.py): is there a
+player, one step per sense, and the stroll. The switch itself (Aggro set:
+hunt) is the tree's Blackboard decorator, and the priority order of the
+senses is the order of its Senses selector.
 
-    heartbeat (possessed, stats applied)
-      -> patrol setup, once per life                        (patrol.py)
-      -> [Aggro?] yes ----------------------------------------> chase + swing
-            no -> [player exists?] no -----------------------> patrol step
-                    yes -> hurt? sight? touch? sound?        (senses.py)
-                            any yes -> AggroReason = <sense>
-                                    -> Aggro = true
-                                    -> MaxWalkSpeed = RunSpeed
-                                    -> [DebugMode?] log "[NPC-AGRO] <sense> -- <name>"
-                                    -> chase + swing (this very heartbeat)
-                            all no -> patrol step -> Delay
+    BT_PlayerPresent: [player exists?] yes: succeed / no: fail
+    BT_Hurt, BT_Sight, BT_Touch, BT_Sound                    (senses.py)
+        yes -> AggroReason = <sense>
+            -> Aggro = true
+            -> MaxWalkSpeed = RunSpeed
+            -> [DebugMode?] log "[NPC-AGRO] <sense> -- <name>"
+            -> Blackboard Aggro, AggroReason -> succeed (the hunt starts next pass)
+        no  -> fail (the selector tries the next sense)
+    BT_Stroll: the patrol step                                (patrol.py)
 
 Nothing sets Aggro back to false: once a wanderer has found the player it
 hunts for the rest of its life, which is the old behaviour. A "lose interest"
@@ -28,16 +28,19 @@ from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
 from combat.paths import GAME_MODE_BP_PATH, GAME_MODE_CLASS_PATH
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
 from npc.graph import (
-    BEL, _asset_sub, _at, _connect, _log, _loose_pin, _node, _palette, _pin, _set,
+    BEL, _asset_sub, _at, _connect, _log, _loose_pin, _name_literal, _node,
+    _palette, _pin, _set,
 )
 from npc.nodes import (
-    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
+    FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_CONCAT, FN_DISPLAY_NAME,
+    FN_GET_BLACKBOARD, FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
     FN_IS_VALID, FN_WARN, NODE_CAST_GAME_MODE,
 )
-from npc.patrol import _author_patrol_setup, _author_patrol_step, _author_walk_speed
+from npc.patrol import _author_patrol_step, _author_walk_speed
 from npc.paths import (
-    AGGRO_REASON_VAR, AGGRO_VAR, NEXT_PATROL_VAR, PATROL_HOME_VAR,
-    PATROL_READY_VAR, PATROL_TARGET_VAR, RUN_SPEED_VAR,
+    AGGRO_REASON_VAR, AGGRO_VAR, BB_AGGRO_KEY, BB_REASON_KEY, NEXT_PATROL_VAR,
+    PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR, RUN_SPEED_VAR,
+    SENSE_STEPS, STEP_PRESENT, STEP_STROLL,
 )
 from npc.senses import _author_hearing, _author_hurt, _author_sight, _author_touch
 
@@ -74,6 +77,7 @@ def _noise_record_exists():
 
 def _author_enter_agro(ed, reasons, chase_in, x0, y0):
     """Every sense's "yes" lands here: name the sense, flip the switch, run.
+    ``chase_in`` is what runs after (the Blackboard write).
 
     ``reasons`` is [(sense name, exec pin)]. Each writes its own name into
     AggroReason and they join on one Set Aggro, so the log line, the speed
@@ -136,57 +140,98 @@ def _author_enter_agro(ed, reasons, chase_in, x0, y0):
     return made
 
 
-def _author_agro(ed, exec_in, chase_in, rest_in, agro, x0, y0):
-    """Splice the patrol/agro switch between the heartbeat and the chase.
-
-    ``exec_in`` is the heartbeat after this creature's stats; ``chase_in`` is
-    the chase's first exec input (the pathfinding branch); ``rest_in`` is the
-    heartbeat's Delay. Returns the nodes made, for the comment boxes.
-    """
-    _declare_agro_vars(ed)
+def _author_tell_blackboard(ed, done_in, x0, y0):
+    """Mirror Aggro and AggroReason into the Blackboard, where the tree's Hunt
+    branch reads them (npc/tree.py). The controller's own variables stay the
+    record every graph reads; the Blackboard is what the tree and its debugger
+    see. Returns ``(nodes, exec_in)``."""
     made = []
 
-    setup, ready = _author_patrol_setup(ed, exec_in, agro, x0, y0)
-    made.extend(setup)
+    def keep(n):
+        made.append(n)
+        return n
 
-    aggro = _at(ed.add_get_member_variable_node(AGGRO_VAR), x0 + 3000, y0 + 300)
-    hunting = _at(ed.add_branch_node(), x0 + 3240, y0)
-    _connect(_pin(aggro, AGGRO_VAR, is_input=False), _pin(hunting, "Condition"))
-    _connect(ready, _pin(hunting, "execute"))
-    _connect(BEL.find_then_pin(hunting), chase_in)
+    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 300))
+    board = keep(_at(_node(ed, FN_GET_BLACKBOARD), x0 + 240, y0 + 300))
+    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(board, "Target"))
+    board_out = _pin(board, "ReturnValue", is_input=False)
+    flag = keep(_at(_node(ed, FN_BB_SET_BOOL), x0 + 480, y0))
+    _connect(board_out, _pin(flag, "self"))
+    _connect(_name_literal(ed, BB_AGGRO_KEY, x0 + 240, y0 + 440), _pin(flag, "KeyName"))
+    _set(flag, "BoolValue", "true")
+    reason = keep(_at(ed.add_get_member_variable_node(AGGRO_REASON_VAR),
+                      x0 + 480, y0 + 300))
+    why = keep(_at(_node(ed, FN_BB_SET_STRING), x0 + 760, y0))
+    _connect(board_out, _pin(why, "self"))
+    _connect(_name_literal(ed, BB_REASON_KEY, x0 + 480, y0 + 440), _pin(why, "KeyName"))
+    _connect(_pin(reason, AGGRO_REASON_VAR, is_input=False), _pin(why, "StringValue"))
+    _connect(BEL.find_then_pin(flag), _pin(why, "execute"))
+    _connect(BEL.find_then_pin(why), done_in)
+    return made, _pin(flag, "execute")
 
-    # No player pawn (before possession, between a death and a restart): no
-    # sense can say anything, so just keep strolling.
-    player = _at(_node(ed, FN_GET_PLAYER_PAWN), x0 + 3240, y0 + 300)
+
+def _author_player_present(ed, exec_in, yes_in, no_in, x0, y0):
+    """No player pawn (before possession, between a death and a restart): no
+    sense can say anything, so the tree goes on to the patrol."""
+    player = _at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 300)
     _set(player, "PlayerIndex", 0)
-    there = _at(_node(ed, FN_IS_VALID), x0 + 3480, y0 + 300)
+    there = _at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 300)
     _connect(_pin(player, "ReturnValue", is_input=False), _pin(there, "Object"))
-    present = _at(ed.add_branch_node(), x0 + 3720, y0)
+    present = _at(ed.add_branch_node(), x0 + 480, y0)
     _connect(_pin(there, "ReturnValue", is_input=False), _pin(present, "Condition"))
-    _connect(BEL.find_else_pin(hunting), _pin(present, "execute"))
-    made += [aggro, hunting, player, there, present]
+    _connect(exec_in, _pin(present, "execute"))
+    _connect(BEL.find_then_pin(present), yes_in)
+    _connect(BEL.find_else_pin(present), no_in)
+    return [player, there, present]
 
-    y = y0 + 1400
-    reasons, nothing = [], [BEL.find_then_pin(present)]
-    hurt, yes, nothing = _author_hurt(ed, nothing, x0 + 4000, y)
-    made.extend(hurt)
-    reasons.append(("hurt", yes))
-    sight, yes, nothing = _author_sight(ed, nothing, agro, x0 + 5200, y)
-    made.extend(sight)
-    reasons.append(("sight", yes))
-    touch, yes, nothing = _author_touch(ed, nothing, agro, x0 + 7400, y)
-    made.extend(touch)
-    reasons.append(("touch", yes))
-    if _noise_record_exists():
-        heard, yes, nothing = _author_hearing(ed, nothing, agro, x0 + 8600, y)
-        made.extend(heard)
-        reasons.append(("sound", yes))
-    else:
+
+def _author_agro_steps(ed, step, result, agro, x0, y0):
+    """Author the tree's notice and patrol steps as controller events.
+
+    ``step(name, x, y)`` makes the custom event BT_<name> and returns its exec
+    output; ``result(value, x, y)`` makes a StepResult write and returns its
+    exec input (npc/steps.py). Every sense is its own step, and the tree's
+    Senses selector (npc/tree.py) holds the priority order: a sense's "yes"
+    names itself, flips the switch, mirrors it into the Blackboard and
+    succeeds; its "no" fails, so the selector tries the next.
+
+    Returns ``(nodes, sense_steps)``: the nodes made, for the comment box, and
+    the step names of the senses authored, in priority order.
+    """
+    made = []
+    made += _author_player_present(
+        ed, step(STEP_PRESENT, x0 + 3000, y0), result(True, x0 + 3800, y0),
+        result(False, x0 + 3800, y0 + 160), x0 + 3240, y0)
+
+    noise = _noise_record_exists()
+    if not noise:
         _log(f"note: {GAME_MODE_BP_PATH} has no noise record -- the wanderers "
              f"will not hear (run build_weapons_and_combat.py first)")
+    fragments = {"hurt": lambda e, x, y: _author_hurt(ed, e, x, y),
+                 "sight": lambda e, x, y: _author_sight(ed, e, agro, x, y),
+                 "touch": lambda e, x, y: _author_touch(ed, e, agro, x, y),
+                 "sound": lambda e, x, y: _author_hearing(ed, e, agro, x, y)}
+    reasons, senses = [], []
+    y = y0 + 1400
+    for sense, name in SENSE_STEPS:
+        if sense == "sound" and not noise:
+            continue
+        nodes, yes, nothing = fragments[sense](
+            [step(name, x0 + 3700, y)], x0 + 4000, y)
+        made.extend(nodes)
+        missed = result(False, x0 + 7000, y + 600)
+        for pin in nothing:
+            _connect(pin, missed)
+        reasons.append((sense, yes))
+        senses.append(name)
+        y += 1200
 
-    made.extend(_author_enter_agro(ed, reasons, chase_in, x0 + 11600, y0))
+    told = result(True, x0 + 16000, y0)
+    tell, tell_in = _author_tell_blackboard(ed, told, x0 + 15000, y0)
+    made.extend(tell)
+    made.extend(_author_enter_agro(ed, reasons, tell_in, x0 + 11600, y0))
+    rested = result(True, x0 + 14000, y0 + 2800)
     made.extend(_author_patrol_step(
-        ed, nothing + [BEL.find_else_pin(present)], rest_in, agro,
+        ed, [step(STEP_STROLL, x0 + 11300, y0 + 2800)], rested, agro,
         x0 + 11600, y0 + 2800))
-    return made
+    return made, senses

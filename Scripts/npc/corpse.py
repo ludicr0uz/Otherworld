@@ -2,7 +2,8 @@
 
     gate(possessed) --> pawn's BP_HealthComponent --> [Dead?]
                           no, or no component --> on (stats, patrol/hunt, melee)
-                          yes --> Corpse = true --> StopMovement --> log, and stop
+                          yes --> Corpse = true --> StopMovement --> log
+                                  --> BrainComponent.StopLogic: the tree ends
 
 A dead wanderer used to keep swinging. Its behaviour is one self-re-entering
 loop on the AI controller, and nothing in that loop asked whether the pawn was
@@ -12,15 +13,16 @@ was missed or ran late, the ragdolled corpse chased and hit the player. The
 ragdoll had rolled away from the capsule, so the attack came from an empty spot.
 
 So death is now a state the loop itself checks, on every pass, before anything
-else can run. The corpse branch deliberately does not reach the Delay: the loop
-ends there, so a corpse costs nothing more for the rest of its lifespan.
+else can run. It runs in the tree's Pulse step (npc/steps.py), and the corpse
+branch stops the Behavior Tree itself (StopLogic): nothing is left to run, so a
+corpse costs nothing more for the rest of its lifespan.
 """
 
 from combat.game_state import NPC_ID_VAR
 from npc.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from npc.nodes import (
     FN_CONCAT, FN_DISPLAY_NAME, FN_GET_COMP, FN_GET_PAWN, FN_INT_TO_STR,
-    FN_PRINT, FN_STOP_MOVEMENT, NODE_CAST_HEALTH,
+    FN_PRINT, FN_STOP_LOGIC, FN_STOP_MOVEMENT, NODE_CAST_HEALTH,
 )
 from npc.paths import CORPSE_LOG_PREFIX, CORPSE_VAR, HEALTH_CLASS_PATH
 
@@ -28,8 +30,9 @@ from npc.paths import CORPSE_LOG_PREFIX, CORPSE_VAR, HEALTH_CLASS_PATH
 def _author_corpse_gate(ed, exec_in, x0, y0):
     """Stop the heartbeat for good once the pawn is dead.
 
-    Returns ``(nodes, alive)``: the nodes made (for a comment box) and the
-    exec pins a living wanderer carries on from.
+    Returns ``(nodes, alive, ended)``: the nodes made (for a comment box), the
+    exec pins a living wanderer carries on from, and the exec pin after the
+    tree has been told to stop.
     """
     ed.remove_member_variable(CORPSE_VAR)
     if not ed.add_member_variable(CORPSE_VAR, BEL.get_basic_type_by_name("bool")):
@@ -91,12 +94,19 @@ def _author_corpse_gate(ed, exec_in, x0, y0):
     _set(say, "bPrintToLog", "true")
     _set(say, "Duration", 0.0)
     _connect(BEL.find_then_pin(halt), _pin(say, "execute"))
-    # say's `then` is left unconnected on purpose: that is the loop ending.
+    # The tree ends here. StopLogic called from inside a running task is
+    # queued by the BehaviorTreeComponent and applied once the task returns.
+    brain = keep(_at(ed.add_get_member_variable_node("BrainComponent"),
+                     x0 + 1680, y0 - 200))
+    stop = keep(_at(_node(ed, FN_STOP_LOGIC), x0 + 1920, y0))
+    _connect(_pin(brain, "BrainComponent", is_input=False), _pin(stop, "self"))
+    _set(stop, "Reason", "corpse")
+    _connect(BEL.find_then_pin(say), _pin(stop, "execute"))
 
     ed.add_comment_to_nodes(
         "Corpse state: if this wanderer's pawn is Dead, mark the controller a "
-        "corpse, stop its movement, log it once, and END the heartbeat (no "
-        "Delay). Nothing after this -- patrol, chase, melee -- runs for a corpse.",
+        "corpse, stop its movement, log it once, and STOP the behaviour tree. "
+        "Nothing after this -- patrol, chase, melee -- runs for a corpse.",
         made)
     alive = [BEL.find_else_pin(is_dead), _pin(health, "CastFailed", is_input=False)]
-    return made, alive
+    return made, alive, BEL.find_then_pin(stop)

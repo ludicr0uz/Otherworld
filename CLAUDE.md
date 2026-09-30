@@ -27,7 +27,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
    | system | entry points | read |
    |---|---|---|
    | weapons, inventory, health, death, blood, audio, hit boxes | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
-   | NPCs: AI loop, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
+   | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
    | graphics menu, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, forage | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
@@ -199,7 +199,7 @@ editor.
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
   The pistol reloads every 8 shots from an endless reserve.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
-  chase and melee. They respawn 75–100 m away and leave ragdoll corpses.
+  chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). They respawn 75–100 m away and leave ragdoll corpses.
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
   and a settings screen (plus K in the M panel: a dev-all-guns cheat), which holds the difficulty (EASY / MEDIUM / SURVIVOR,

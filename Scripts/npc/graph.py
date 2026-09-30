@@ -5,6 +5,8 @@ resolve a creature asset against its mannequin fallback.
 
 import unreal
 
+from npc.nodes import FN_LITERAL_NAME
+
 
 BGE = unreal.BlueprintGraphEditor
 BEL = unreal.BlueprintEditorLibrary
@@ -89,6 +91,14 @@ def _palette(ed, name, x=0.0, y=0.0):
     if not n:
         raise RuntimeError(f"palette node {name!r} could not be created")
     return n
+
+
+def _name_literal(ed, value, x, y):
+    """A MakeLiteralName node holding ``value``; returns its output pin. See
+    FN_LITERAL_NAME for which pins need it."""
+    n = _at(_node(ed, FN_LITERAL_NAME), x, y)
+    _set(n, "Value", value)
+    return _pin(n, "ReturnValue", is_input=False)
 
 
 def _loose_pin(node, wanted, is_input=True):

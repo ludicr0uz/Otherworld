@@ -40,14 +40,13 @@ def _melee_montage_object():
 def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     """Swing at the player when the chase has closed the distance.
 
-    ``after_move`` is every exec pin that has just issued a move order -- there
-    are two of them now, the pathfinding one and the straight-line one -- and
-    all of them run into the same range check. The melee half does not care
-    which kind of move got the NPC here.
+    ``after_move`` is every exec pin that runs the check -- now the tree's
+    Swing step (BT_Swing, npc/steps.py), which follows its Chase step -- and
+    ``delay`` is the node every exit runs into: the step's StepResult write.
 
-    Spliced between the move order and the re-path delay, so the check runs
-    every NPC_REPATH_SECONDS with no Tick event of its own: the loop is already
-    the NPC's heartbeat, and a second one would only add a way for the two to
+    The check runs once per pass of the tree's Hunt branch, every
+    NPC_REPATH_SECONDS, with no Tick event of its own: the tree is already the
+    NPC's heartbeat, and a second one would only add a way for the two to
     disagree about whether the chase is still running.
 
         MoveToActor --> [in range AND off cooldown?]

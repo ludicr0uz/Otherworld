@@ -7,7 +7,8 @@ carrying the zombie's vision range compiles, runs, and is wrong.
 
 The chase and melee half of these graphs is still checked by the level
 verifier (verify_<Level>.py); this file owns what npc/agro.py, patrol.py,
-senses.py, corpse.py, combat_trace.py and block.py added.
+senses.py, corpse.py, combat_trace.py and block.py added. The behaviour tree
+and the step events are npc/verify_tree.py's.
 """
 
 import math
@@ -24,7 +25,7 @@ from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, DEBUG_MODE_
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
-    HIT_DAMAGE_VAR, RUN_SPEED_VAR,
+    HIT_DAMAGE_VAR, RUN_SPEED_VAR, STEP_CHASE,
 )
 from npc.block import BLOCK_MIN_DOT, BLOCKED_DAMAGE
 
@@ -161,17 +162,12 @@ def check_controller(path, agro):
           reasons == ["hurt", "sight", "sound", "touch"], f"{reasons}")
     moves = [n for n in nodes if {"Goal", "AcceptanceRadius"} <= _ins(n)]
     chase_gate = [d for m in moves for d in _drivers(m)]
-    ok = len(chase_gate) == 1
-    if ok:
-        into_chase = {_title(d) for d in _drivers(chase_gate[0])}
-        # The chase is reached only through the switch: from the Aggro branch
-        # (already hunting) or from the debug-gated log line (just started:
-        # logged, not debugging, or no GameMode to ask).
-        ok = into_chase == {"Branch", "PrintWarning", "Cast To BP_ThirdPersonGameMode"}
-        by_aggro = [d for d in _drivers(chase_gate[0]) if _title(d) == "Branch"
-                    and {_title(f) for f in _feeders(d, "Condition")} == {f"Get {AGGRO_VAR}"}]
-        ok = ok and len(by_aggro) == 1
-    check(f"{tag}: the chase runs only once aggro", ok)
+    # The chase is its own step, BT_Chase, and nothing else runs into it: that
+    # it runs only once aggro is the tree's Blackboard gate (verify_tree.py).
+    into_chase = [_title(d) for g in chase_gate for d in _drivers(g)]
+    check(f"{tag}: the chase is reached only from its step event, BT_{STEP_CHASE}",
+          len(chase_gate) == 1 and len(into_chase) == 1
+          and into_chase[0].startswith(f"BT_{STEP_CHASE}"), f"{into_chase}")
     warns = _titled(nodes, "PrintWarning")
     heads = [n for n in _titled(nodes, "Append") if _lit(n, "A") == AGRO_LOG_PREFIX]
     check(f"{tag}: going aggro is logged as '{AGRO_LOG_PREFIX.strip()} <sense>'",
@@ -291,6 +287,9 @@ def check_corpse_and_trace(tag, nodes, cdo):
           f"{sorted({_title(n) for n in after})}")
     check(f"{tag}: ...and it stops moving",
           any(_title(n) == "StopMovement" for n in after),
+          f"{sorted({_title(n) for n in after})}")
+    check(f"{tag}: ...and stops its behaviour tree",
+          any(_title(n).replace(" ", "") == "StopLogic" for n in after),
           f"{sorted({_title(n) for n in after})}")
     heads = [n for n in _titled(nodes, "Append") if _lit(n, "A") == CORPSE_LOG_PREFIX]
     check(f"{tag}: becoming a corpse is logged as '{CORPSE_LOG_PREFIX}<n>'",

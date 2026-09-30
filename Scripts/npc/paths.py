@@ -83,3 +83,44 @@ CHARACTER_CLASS_PATH = "/Script/Engine.Character"
 # _author_corpse). This gate does not depend on that destroy having happened.
 CORPSE_VAR = "Corpse"
 CORPSE_LOG_PREFIX = "[NPC-CORPSE] #"
+
+# ── The behaviour tree (npc/tree.py, step_task.py, steps.py) ─────────────────
+#
+# The controller no longer loops on a Delay: on possession it runs a Behavior
+# Tree, and the tree decides what happens in which order (corpse, hunt,
+# notice, patrol). The work itself is still authored into the controller's
+# event graph, one custom event per step (BT_<Step>), and one task Blueprint
+# per controller calls the event its node's Step names, then finishes with
+# the controller's StepResult. See npc/tree.py for the tree.
+BB_PATH = f"{NPC_DIR}/BB_ForestWanderer"
+# Blackboard keys, mirrored from the controller's own Aggro and AggroReason
+# when a sense fires: the tree's Hunt branch is gated on BB_AGGRO_KEY.
+BB_AGGRO_KEY = "Aggro"
+BB_REASON_KEY = "AggroReason"
+STEP_RESULT_VAR = "StepResult"      # on the controller, written by every step
+STEP_VAR = "Step"                   # on the task, instance editable
+STEP_EVENT_PREFIX = "BT_"
+
+STEP_PULSE = "Pulse"          # possessed? corpse? stats, voice, patrol setup
+STEP_CHASE = "Chase"          # the move order at the player
+STEP_SWING = "Swing"          # the melee check and swing
+STEP_PRESENT = "PlayerPresent"
+STEP_STROLL = "Stroll"        # the patrol step
+# One step per sense, in priority order: the tree's Senses selector tries
+# them left to right, and the first that answers wins.
+SENSE_STEPS = (("hurt", "Hurt"), ("sight", "Sight"), ("touch", "Touch"),
+               ("sound", "Sound"))
+
+
+def _stem(ai_path):
+    return ai_path.rsplit("/", 1)[-1].removeprefix("BP_")
+
+
+def tree_path(ai_path):
+    """BT_ForestWandererAI[_<Creature>]: one tree per controller, because its
+    task class casts to that controller."""
+    return f"{NPC_DIR}/BT_{_stem(ai_path)}"
+
+
+def step_task_path(ai_path):
+    return f"{NPC_DIR}/BTT_{_stem(ai_path)}_Step"

@@ -6,44 +6,29 @@ Run inside the editor:
 
 or import it from a generated level script and call ``ensure_npc_blueprints()``.
 
-Two assets are produced under /Game/Forest/NPC:
+These assets are produced under /Game/Forest/NPC, for the parent and again
+for each creature in npc_placement.NPC_VARIANTS:
 
-  BP_ForestWandererAI  (parent AIController)  — the brain.  Event graph:
+  BP_ForestWandererAI  (parent AIController)  -- the brain.  On possession it
+      runs BT_ForestWandererAI, a Behavior Tree whose steps are this
+      controller's BT_* custom events:
 
-      [Event BeginPlay] --> [both ends on the navmesh?]
-                                 ^     |            |
-                                 |  yes|            |no
-                                 |     v            v
-                                 | [MoveToActor] [MoveToLocation,
-                                 |  (pathfound)   no pathfinding]
-                                 |     |            |
-                                 |     '-----.------'
-                                 |           v
-                                 |   [in reach and off cooldown?]
-                                 |           |            |
-                                 |       yes |            | no
-                                 |           v            |
-                                 |  [arm next swing]      |
-                                 |  [play MM_Attack_01]   |
-                                 |  [player Health -= 12] |
-                                 |           |            |
-                                 '--- [Delay 0.5s] <------'
+      Wanderer (selector)
+        Alive (sequence): Pulse, then Act (selector):
+          Hunt [Blackboard Aggro is set]: Chase, Swing, Wait 0.5
+          Notice: PlayerPresent, then Senses (selector): Hurt, Sight, Touch, Sound
+          Patrol: Stroll, Wait 0.5
+        Idle: Wait 0.5
 
-      [Get Player Pawn 0] --ReturnValue--> [MoveToActor.Goal]
+      Chase is MoveToActor(player) when both ends are on the navmesh, which
+      runs the NPC *around* trees, and a straight-line MoveToLocation when
+      either end is not.  See NAV_REACHABLE_EXTENT_CM in npc_placement.py.
+      The tree, the task class and the step events are npc/tree.py,
+      step_task.py and steps.py.
 
-      MoveToActor does the pathfinding, so the NPC runs *around* trees rather
-      than into them.  Re-issuing it on a timer (instead of once) means the NPC
-      keeps following a player who moves, and recovers on its own if the first
-      request fires before the navmesh or the player pawn exist -- and that same
-      loop is where the melee check lives, so there is one heartbeat rather than
-      two that can disagree.
-
-      The branch in front of it is the answer to a navigation DEAD ZONE: the
-      navmesh covers a disc of radius 85 m inside a 200 m square of terrain, so
-      a player who walks into the ring outside it cannot be pathed to at all.
-      With bAllowPartialPath the request did not even fail -- it succeeded, at
-      the island edge, and the pack stood there.  See NAV_REACHABLE_EXTENT_CM
-      in npc_placement.py.
+  BB_ForestWanderer    (Blackboard, shared)   -- Aggro, AggroReason.
+  BT_ForestWandererAI  (Behavior Tree)        -- the tree above.
+  BTT_ForestWandererAI_Step (BT task)         -- calls the step its node names.
 
   BP_ForestWanderer    (parent Character)     — the body: mannequin mesh,
       running movement speed, and the controller above auto-possessing it.

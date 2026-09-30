@@ -1,32 +1,25 @@
-"""BP_ForestWandererAI and its per-creature copies: the heartbeat loop that
-chases, attacks, speaks and applies the creature's stats.
+"""BP_ForestWandererAI and its per-creature copies: on possession, run this
+controller's Behavior Tree (npc/tree.py), whose steps are the controller's
+BT_* events (npc/steps.py); plus the creature's sounds and hit reactions.
 """
 
 import unreal
 
 from forest_generator.npc_agro import agro_for
-from forest_generator.npc_placement import (
-    NAV_REACHABLE_EXTENT_CM, NPC_ACCEPTANCE_RADIUS_CM, NPC_BASE_HEALTH,
-    NPC_MELEE_DAMAGE, NPC_MELEE_INTERVAL_S, NPC_MELEE_RANGE_CM,
-    NPC_REPATH_SECONDS, NPC_VARIANTS, NPC_VOICE_MAX_S, NPC_VOICE_MIN_S,
-)
+from forest_generator.npc_placement import NPC_BASE_HEALTH, NPC_VARIANTS
 from npc.paths import (
     AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS, HIT_SOUNDS_VAR, REACTIONS_VAR,
-    VOICES_VAR,
+    STEP_CHASE, STEP_PRESENT, STEP_PULSE, STEP_STROLL, STEP_SWING, VOICES_VAR,
+    step_task_path, tree_path,
 )
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_AND_B, FN_DELAY, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
-    FN_IS_VALID, FN_MAKE_VECTOR, FN_MOVE_TO_ACTOR, FN_MOVE_TO_LOCATION,
-    FN_PROJECT_NAV,
-)
+from npc.nodes import FN_RUN_BT, NODE_EVENT_POSSESS
 from npc.graph import (
     _asset_sub, _at, BEL, BGE, _connect, _create_blueprint, _log, _node,
-    _palette, _pin, _set,
+    _palette, _set,
 )
-from npc.stats import _author_stats_and_voice
-from npc.agro import _author_agro
-from npc.corpse import _author_corpse_gate
-from npc.melee import _author_melee
+from npc.step_task import build_step_task, clear_step_task
+from npc.steps import _author_steps
+from npc.tree import build_blackboard, fill_tree, fresh_tree
 
 
 def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
@@ -70,32 +63,26 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     """
     path = path or AI_BP_PATH
     agro = agro or agro_for(NPC_VARIANTS[0].key)
+    bb = build_blackboard()
     bp = _create_blueprint(path, unreal.AIController)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     if not ed:
         raise RuntimeError(f"{path} has no EventGraph")
 
-    begin_play = ed.find_event_node("ReceiveBeginPlay")
-    authored = bool(begin_play and BEL.find_then_pin(begin_play)
-                    and BEL.find_then_pin(begin_play).list_connected_pins())
+    authored = bool(ed.find_event_node("ReceivePossess"))
     if authored and not rebuild:
         _log(f"{path} graph already authored — reusing")
         if not BEL.compile_blueprint(bp):
             raise RuntimeError(f"{path} failed to compile")
         _asset_sub().save_loaded_asset(bp)
         return bp
-    if authored:
-        _log("wiping the existing AI graph")
-        ed.remove_nodes(ed.list_all_nodes())
-        begin_play = None
-
-    if not begin_play:
-        begin_play = ed.find_event_node("ReceiveBeginPlay")
-    if not begin_play:
-        # A fresh Blueprint ships a disabled BeginPlay placeholder, but a wiped
-        # graph has none, so put one back from the palette.
-        begin_play = _palette(ed, "AddEvent|EventBeginPlay", 0.0, 0.0)
-    origin = BEL.get_node_pos(begin_play)
+    _log("wiping the existing AI graph")
+    clear_step_task(step_task_path(path))
+    ed.remove_nodes(ed.list_all_nodes())
+    # Compile the empty graph, so the step events' names are free again and
+    # nothing references the old tree when fresh_tree deletes it.
+    BEL.compile_blueprint(bp)
+    bt = fresh_tree(tree_path(path))
 
     # Each NPC's swing timer. Zero is the right default -- it means "may attack
     # immediately" -- which is just as well, since add_member_variable's own
@@ -110,171 +97,18 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
                                   BEL.get_basic_type_by_name("real")):
         raise RuntimeError(f"could not declare {HIT_DAMAGE_VAR}")
 
-    move_to = _at(_node(ed, FN_MOVE_TO_ACTOR), origin.x + 1000, origin.y - 120)
-    get_pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), origin.x + 40, origin.y + 220)
-    delay = _at(_node(ed, FN_DELAY), origin.x + 4600, origin.y)
-
-    # Goal = the player pawn
-    _set(get_pawn, "PlayerIndex", 0)
-    _connect(_pin(get_pawn, "ReturnValue", is_input=False), _pin(move_to, "Goal"))
-
-    # Pathfinding is what makes it run around the trees rather than into them.
-    _set(move_to, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
-    _set(move_to, "bUsePathfinding", "true")
-    _set(move_to, "bStopOnOverlap", "true")
-    # Partial paths keep the NPC advancing as far as the navmesh allows instead
-    # of refusing to move at all; the retry loop then re-paths, so a temporary
-    # dead end does not end the chase.
-    _set(move_to, "bAllowPartialPath", "true")
-
-    _set(delay, "Duration", NPC_REPATH_SECONDS)
-
-    # BeginPlay -> [possessed?] -> MoveToActor -> (melee) -> Delay -> back
-    #
-    # The gate is not defensive padding: a controller's BeginPlay runs before it
-    # has possessed anything, so the first pass through the loop has no pawn.
-    # MoveToActor then quietly does nothing, and the melee chain's
-    # GetActorLocation reads a None pawn -- which the VM reports as an "Accessed
-    # None ... CallFunc_K2_GetPawn_ReturnValue" runtime error against the swing
-    # Branch, once per spawned NPC.  Note the gate has to sit *before*
-    # MoveToActor rather than joining the melee AND: pure nodes are pulled by
-    # whichever node reads them and BooleanAND does not short-circuit, so an
-    # IsValid in the condition would still evaluate the location chain.
-    #
-    # Skipping the body costs one Delay -- the loop re-enters
-    # NPC_REPATH_SECONDS later, by which time possession has happened.
-    own_pawn = _at(_node(ed, FN_GET_PAWN), origin.x - 220, origin.y - 320)
-    possessed = _at(_node(ed, FN_IS_VALID), origin.x + 40, origin.y - 320)
-    _connect(_pin(own_pawn, "ReturnValue", is_input=False),
-             _pin(possessed, "Object"))
-    gate = _at(ed.add_branch_node(), origin.x + 300, origin.y - 200)
-    _connect(_pin(possessed, "ReturnValue", is_input=False),
-             _pin(gate, "Condition"))
-    _connect(BEL.find_then_pin(begin_play), _pin(gate, "execute"))
-    _connect(BEL.find_then_pin(delay), _pin(gate, "execute"))
-    # --- can this chase be pathfound at all? ---------------------------------
-    # See NAV_REACHABLE_EXTENT_CM. Both ends are tested, and both have to be
-    # on the navmesh for pathfinding to be the right tool: a player who has
-    # walked into the un-navigable ring cannot be pathed TO, and a wanderer
-    # already standing in it cannot be pathed FROM. Either way the answer is
-    # the same -- walk at them in a straight line.
-    #
-    # K2_ProjectPointToNavigation is pure and re-evaluates once per output pin
-    # that is read. Only ReturnValue is read from each of these, so each
-    # projects exactly once per frame the loop runs, and the ProjectedLocation
-    # output is deliberately left dangling: the destination is the player's
-    # real position, not a snapped one. Snapping it back onto the navmesh is
-    # precisely the behaviour that made the dead zone.
-    reach = _at(_node(ed, FN_MAKE_VECTOR), origin.x + 40, origin.y + 900)
-    for axis, value in zip(("X", "Y", "Z"), NAV_REACHABLE_EXTENT_CM):
-        _set(reach, axis, value)
-    reach_out = _pin(reach, "ReturnValue", is_input=False)
-
-    goal_loc = _at(_node(ed, FN_ACTOR_LOC), origin.x + 300, origin.y + 380)
-    _connect(_pin(get_pawn, "ReturnValue", is_input=False), _pin(goal_loc, "self"))
-    goal_out = _pin(goal_loc, "ReturnValue", is_input=False)
-    goal_on = _at(_node(ed, FN_PROJECT_NAV), origin.x + 560, origin.y + 380)
-    _connect(goal_out, _pin(goal_on, "Point"))
-    _connect(reach_out, _pin(goal_on, "QueryExtent"))
-
-    here_pawn = _at(_node(ed, FN_GET_PAWN), origin.x + 40, origin.y + 620)
-    here_loc = _at(_node(ed, FN_ACTOR_LOC), origin.x + 300, origin.y + 620)
-    _connect(_pin(here_pawn, "ReturnValue", is_input=False), _pin(here_loc, "self"))
-    here_on = _at(_node(ed, FN_PROJECT_NAV), origin.x + 560, origin.y + 620)
-    _connect(_pin(here_loc, "ReturnValue", is_input=False), _pin(here_on, "Point"))
-    _connect(reach_out, _pin(here_on, "QueryExtent"))
-
-    both_on = _at(_node(ed, FN_AND_B), origin.x + 800, origin.y + 500)
-    _connect(_pin(goal_on, "ReturnValue", is_input=False), _pin(both_on, "A"))
-    _connect(_pin(here_on, "ReturnValue", is_input=False), _pin(both_on, "B"))
-
-    pathable = _at(ed.add_branch_node(), origin.x + 800, origin.y + 200)
-    _connect(_pin(both_on, "ReturnValue", is_input=False), _pin(pathable, "Condition"))
-    _connect(BEL.find_then_pin(pathable), BEL.find_execute_pin(move_to))
-
-    # First thing with a pawn: is it a corpse? A dead wanderer's heartbeat ends
-    # there, so nothing below -- stats, voice, patrol, chase, melee -- can run
-    # for it. See npc/corpse.py.
-    _, alive = _author_corpse_gate(ed, BEL.find_then_pin(gate),
-                                   origin.x - 200, origin.y - 1400)
-    # Between "a living pawn" and "can we path to the player": this creature's
-    # health, applied once, and its voice on a timer. Both need the pawn, which
-    # is why they sit after the gate and not on BeginPlay.
-    extras, after_extras = _author_stats_and_voice(
-        ed, alive, origin.x - 200, origin.y + 1400,
-        health, NPC_VOICE_MIN_S, NPC_VOICE_MAX_S)
-    # ...then patrol or hunt. Everything above runs for a patrolling wanderer
-    # too (it still has its health and still growls); the chase below runs
-    # only once a sense has flipped it to aggro. See npc/agro.py.
-    agro_nodes = _author_agro(ed, after_extras, _pin(pathable, "execute"),
-                              BEL.find_execute_pin(delay), agro,
-                              origin.x - 200, origin.y + 3000)
-
-    # --- the straight line ---------------------------------------------------
-    # Not a teleport, not AddMovementInput, and not a second Tick: this is the
-    # SAME move request the pathfinding branch issues, with pathfinding off, so
-    # the path-following component drives the character with the same
-    # acceleration and the same stop condition and keeps doing it between loop
-    # iterations. AddMovementInput would move the NPC for exactly one frame out
-    # of every thirty, because this loop runs twice a second.
-    #
-    # bProjectDestinationToNavigation must stay FALSE. True is the dead zone,
-    # written a different way: it snaps the goal back onto the navmesh island
-    # and the NPC walks to the edge and stops.
-    direct = _at(_node(ed, FN_MOVE_TO_LOCATION), origin.x + 1000, origin.y + 200)
-    _connect(goal_out, _pin(direct, "Dest"))
-    _set(direct, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
-    _set(direct, "bUsePathfinding", "false")
-    _set(direct, "bProjectDestinationToNavigation", "false")
-    _set(direct, "bStopOnOverlap", "true")
-    _set(direct, "bCanStrafe", "false")
-    _connect(BEL.find_else_pin(pathable), BEL.find_execute_pin(direct))
-
-    after_move = (BEL.find_then_pin(move_to), BEL.find_then_pin(direct))
-
-    _connect(BEL.find_else_pin(gate), BEL.find_execute_pin(delay))
-
-    melee = _author_melee(ed, after_move, delay, origin.x + 1400, origin.y,
-                          melee_anim=melee_anim)
-    if melee is None:
-        for tail in after_move:
-            _connect(tail, BEL.find_execute_pin(delay))
-
+    # Possession starts the tree. BeginPlay would be too early: a controller's
+    # BeginPlay runs before it has possessed anything.
+    possess = _palette(ed, NODE_EVENT_POSSESS, 0.0, -600.0)
+    run = _at(_node(ed, FN_RUN_BT), 300, -600)
+    _set(run, "BTAsset", bt.get_path_name())
+    _connect(BEL.find_then_pin(possess), BEL.find_execute_pin(run))
     ed.add_comment_to_nodes(
-        f"Re-issue a move order at the player every {NPC_REPATH_SECONDS} s, "
-        f"once the controller has a pawn to move. Pathfinding when both ends "
-        f"are on the navmesh -- which is what runs the NPC around trees -- and "
-        f"a straight-line move order when either end is not, because the "
-        f"navmesh only covers a disc inside the terrain and a player in the "
-        f"ring outside it used to be simply unreachable.",
-        [move_to, get_pawn, delay, gate, own_pawn, possessed, reach, goal_loc,
-         goal_on, here_pawn, here_loc, here_on, both_on, pathable, direct])
-    if melee:
-        ed.add_comment_to_nodes(
-            f"Melee: within {NPC_MELEE_RANGE_CM:.0f} cm and off cooldown, swing "
-            f"for {NPC_MELEE_DAMAGE:.0f} damage, then arm the next swing "
-            f"{NPC_MELEE_INTERVAL_S} s out. The cooldown is per controller, so "
-            f"a pack does not hit in lockstep.",
-            melee)
+        f"On possession, run {bt.get_name()}. The tree (npc/tree.py) decides "
+        f"what this wanderer does; the BT_* events below are its steps.",
+        [possess, run])
 
-    ed.add_comment_to_nodes(
-        f"This creature's own health ({health:.0f}), applied once on the first "
-        f"heartbeat after possession, and its voice every "
-        f"{NPC_VOICE_MIN_S:.0f}-{NPC_VOICE_MAX_S:.0f} s. Health is set from "
-        f"here rather than on the pawn because MaxHealth lives on an INHERITED "
-        f"component, and Unreal keeps a child Blueprint's override of one in an "
-        f"InheritableComponentHandler that Python cannot reach.",
-        extras)
-
-    ed.add_comment_to_nodes(
-        f"Patrol until noticed: stroll a {agro.patrol_radius_cm / 100:.0f} m "
-        f"circle about the spawn point at {agro.patrol_speed_scale:.0%} of run "
-        f"speed; go aggro, for good, when hurt, when the player is seen "
-        f"({agro.vision_range_cm / 100:.0f} m, "
-        f"{agro.vision_half_angle_deg:.0f} deg either side, line of sight), "
-        f"touched ({agro.touch_range_cm:.0f} cm) or heard (the noise's own "
-        f"reach x {agro.hearing_scale}).",
-        agro_nodes)
+    senses = _author_steps(ed, agro, health, melee_anim, 0, 0)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
@@ -307,11 +141,13 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
         clips = []
     cdo.set_editor_property(REACTIONS_VAR, clips)
 
+    task = build_step_task(bp, step_task_path(path),
+                           [STEP_PULSE, STEP_CHASE, STEP_SWING, STEP_PRESENT]
+                           + senses + [STEP_STROLL])
+    fill_tree(bt, bb, task, senses)
     eas.save_loaded_asset(bp)
     _log(f"built {path} ({len(cdo.get_editor_property(REACTIONS_VAR))} hit "
          f"reactions, health {health:.0f}"
-         + (f", melee {NPC_MELEE_DAMAGE:.0f} dmg / {NPC_MELEE_INTERVAL_S} s "
-            f"inside {NPC_MELEE_RANGE_CM:.0f} cm" if melee else ", no melee")
          + f", {len(cdo.get_editor_property(VOICES_VAR))} voices, patrols "
          f"{agro.patrol_radius_cm / 100:.0f} m, sees "
          f"{agro.vision_range_cm / 100:.0f} m)")

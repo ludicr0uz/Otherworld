@@ -1,0 +1,175 @@
+"""Checks for the wanderers' Blackboard, Behavior Trees, step tasks and step
+events (npc/tree.py, step_task.py, steps.py), read back off the saved assets.
+Run through Scripts/verify_npc_blueprints.py, after npc/verify.py's run().
+
+What it proves: possession starts this controller's own tree; the tree holds
+the priorities (Pulse first, Hunt only while the Blackboard says Aggro, the
+senses in the order hurt, sight, touch, sound, the patrol last); every step
+the tree names is an event on the controller; and every exit of every step
+writes StepResult, which is what the task finishes with.
+"""
+
+import unreal
+
+from forest_generator.npc_placement import NPC_REPATH_SECONDS, NPC_VARIANTS
+from npc.paths import (
+    AI_BP_PATH, BB_AGGRO_KEY, BB_PATH, BB_REASON_KEY, SENSE_STEPS, STEP_CHASE,
+    STEP_EVENT_PREFIX, STEP_PRESENT, STEP_PULSE, STEP_RESULT_VAR, STEP_STROLL,
+    STEP_SWING, STEP_VAR, step_task_path, tree_path,
+)
+from npc.verify import BEL, PIN, _close, _drivers, _ins, _lit, _title, check
+
+# The order a pre-order walk of the tree meets the steps in: the priorities.
+WANT_STEPS = ([STEP_PULSE, STEP_CHASE, STEP_SWING, STEP_PRESENT]
+              + [name for _, name in SENSE_STEPS] + [STEP_STROLL])
+
+
+def _load(path):
+    eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
+    return eas.load_asset(path) if eas.does_asset_exist(path) else None
+
+
+def check_blackboard():
+    bb = _load(BB_PATH)
+    check(f"{BB_PATH.rsplit('/', 1)[-1]} exists", bb is not None)
+    if not bb:
+        return
+    kinds = {str(k.get_editor_property("entry_name")):
+             k.get_editor_property("key_type").get_class().get_name()
+             for k in bb.get_editor_property("keys")}
+    check(f"the Blackboard holds {BB_AGGRO_KEY} (bool) and {BB_REASON_KEY} (string)",
+          kinds.get(BB_AGGRO_KEY) == "BlackboardKeyType_Bool"
+          and kinds.get(BB_REASON_KEY) == "BlackboardKeyType_String", f"{kinds}")
+
+
+# ─── The tree ────────────────────────────────────────────────────────────────
+
+def _walk(node, decorators=(), under=()):
+    """Pre-order: (node, its decorators, the composites above it)."""
+    yield node, list(decorators), under
+    if isinstance(node, unreal.BTCompositeNode):
+        for child in node.get_editor_property("children"):
+            sub = (child.get_editor_property("child_composite")
+                   or child.get_editor_property("child_task"))
+            yield from _walk(sub, child.get_editor_property("decorators"),
+                             under + ((node, list(decorators)),))
+
+
+def _gates_on_aggro(decorators):
+    return any(isinstance(d, unreal.BTDecorator_Blackboard)
+               and str(d.get_editor_property("blackboard_key")
+                       .get_editor_property("selected_key_name")) == BB_AGGRO_KEY
+               and d.get_editor_property("basic_operation") == unreal.BasicKeyOperation.SET
+               for d in decorators)
+
+
+def check_tree(ai_path):
+    tag = tree_path(ai_path).rsplit("/", 1)[-1]
+    bt = _load(tree_path(ai_path))
+    check(f"{tag} exists", bt is not None)
+    if not bt:
+        return
+    check(f"{tag}: reads BB_ForestWanderer",
+          bt.get_editor_property("blackboard_asset") == _load(BB_PATH))
+    root = bt.get_editor_property("root_node")
+    check(f"{tag}: the root is a selector", isinstance(root, unreal.BTComposite_Selector))
+    if not root:
+        return
+    walked = list(_walk(root))
+    task = _load(step_task_path(ai_path))
+    task_class = BEL.generated_class(task) if task else None
+    steps = [(n, d, up) for n, d, up in walked
+             if task_class and n.get_class() == task_class]
+    order = [str(n.get_editor_property(STEP_VAR)) for n, _, _ in steps]
+    check(f"{tag}: the steps, in priority order: {', '.join(WANT_STEPS)}",
+          order == WANT_STEPS, f"{order}")
+    check(f"{tag}: every task in the tree is the controller's step task",
+          all(n.get_class() == task_class for n, _, _ in walked
+              if isinstance(n, unreal.BTTaskNode)
+              and not isinstance(n, unreal.BTTask_Wait)))
+
+    def above(step):
+        return [up for n, _, up in steps if str(n.get_editor_property(STEP_VAR)) == step]
+
+    hunt = [up for s in (STEP_CHASE, STEP_SWING) for up in above(s)]
+    check(f"{tag}: Chase and Swing run only under the Blackboard's '{BB_AGGRO_KEY} is set'",
+          len(hunt) == 2 and all(any(_gates_on_aggro(d) for _, d in up) for up in hunt))
+    calm = [up for s in [STEP_PRESENT, STEP_STROLL] + [n for _, n in SENSE_STEPS]
+            for up in above(s)]
+    check(f"{tag}: ...and nothing else does (notice and patrol are not gated on it)",
+          calm and not any(_gates_on_aggro(d) for up in calm for _, d in up))
+    senses = [up[-1][0] for _, n in SENSE_STEPS for up in above(n)]
+    check(f"{tag}: the senses share one selector: the first that fires wins",
+          len({s.get_name() for s in senses}) == 1
+          and isinstance(senses[0], unreal.BTComposite_Selector))
+    pulse = above(STEP_PULSE)
+    check(f"{tag}: Pulse opens every pass (first child of the first sequence)",
+          isinstance(walked[1][0], unreal.BTComposite_Sequence)
+          and walked[2][0] in [n for n, _, _ in steps]
+          and str(walked[2][0].get_editor_property(STEP_VAR)) == STEP_PULSE
+          and len(pulse) == 1)
+    waits = [n.get_editor_property("wait_time").get_editor_property("default_value")
+             for n, _, _ in walked if isinstance(n, unreal.BTTask_Wait)]
+    check(f"{tag}: every Wait is the {NPC_REPATH_SECONDS} s re-path beat",
+          len(waits) == 3 and all(_close(w, NPC_REPATH_SECONDS) for w in waits),
+          f"{waits}")
+
+
+# ─── The controller's side ───────────────────────────────────────────────────
+
+def _exits(start):
+    """Every node reachable from ``start`` along exec wires that runs nothing
+    after it."""
+    seen, todo, leaves = set(), [start], []
+    while todo:
+        n = todo.pop()
+        if n.get_path_name() in seen:
+            continue
+        seen.add(n.get_path_name())
+        nxt = [PIN.get_owning_node(q) for p in BEL.list_output_pins(n)
+               if "exec" in str(PIN.get_pin_type_display_string(p)).lower()
+               for q in PIN.list_connected_pins(p)]
+        if not nxt:
+            leaves.append(n)
+        todo += nxt
+    return leaves
+
+
+def check_controller_steps(ai_path):
+    tag = ai_path.rsplit("/", 1)[-1]
+    bp = _load(ai_path)
+    ed = unreal.BlueprintGraphEditor.get_graph_editor_by_name(bp, "EventGraph")
+    nodes = ed.list_all_nodes()
+    runs = [n for n in nodes if "BTAsset" in _ins(n)]
+    want = tree_path(ai_path).rsplit("/", 1)[-1]
+    check(f"{tag}: possession runs {want}",
+          len(runs) == 1 and _lit(runs[0], "BTAsset").endswith(f"{want}.{want}")
+          and ["On Possess" in _title(d) for d in _drivers(runs[0])] == [True],
+          f"{[_lit(n, 'BTAsset') for n in runs]}")
+    check(f"{tag}: no Delay loop is left", not any(_title(n) == "Delay" for n in nodes))
+    events = {_title(n).split(" ")[0]: n for n in nodes
+              if n.get_class().get_name() == "K2Node_CustomEvent"}
+    missing = [s for s in WANT_STEPS if f"{STEP_EVENT_PREFIX}{s}" not in events]
+    check(f"{tag}: every step the tree names is an event here", not missing, f"{missing}")
+    loose = sorted({f"{name}: {_title(leaf)}" for name, ev in events.items()
+                    for leaf in _exits(ev)
+                    if _title(leaf) != f"Set {STEP_RESULT_VAR}"})
+    check(f"{tag}: every exit of every step writes {STEP_RESULT_VAR}", not loose,
+          f"{loose[:4]}")
+
+    task = _load(step_task_path(ai_path))
+    check(f"{tag}: its step task exists", task is not None)
+    if not task:
+        return
+    ted = unreal.BlueprintGraphEditor.get_graph_editor_by_name(task, "EventGraph")
+    check(f"{tag}: its step task compiles clean", not ted.list_nodes_with_errors())
+    cdo = unreal.get_default_object(BEL.generated_class(task))
+    check(f"{tag}: the task's {STEP_VAR} is a name",
+          isinstance(cdo.get_editor_property(STEP_VAR), unreal.Name))
+
+
+def run():
+    check_blackboard()
+    for path in [AI_BP_PATH] + [v.ai_blueprint for v in NPC_VARIANTS]:
+        check_tree(path)
+        check_controller_steps(path)

@@ -71,3 +71,17 @@ NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
+
+# The behaviour tree (npc/controller.py, steps.py, step_task.py, agro.py).
+FN_RUN_BT = "/Script/AIModule.AIController.RunBehaviorTree"
+FN_STOP_LOGIC = "/Script/AIModule.BrainComponent.StopLogic"
+FN_GET_BLACKBOARD = "/Script/AIModule.AIBlueprintHelperLibrary.GetBlackboard"
+FN_BB_SET_BOOL = "/Script/AIModule.BlackboardComponent.SetValueAsBool"
+FN_BB_SET_STRING = "/Script/AIModule.BlackboardComponent.SetValueAsString"
+FN_FINISH_EXECUTE = "/Script/AIModule.BTTask_BlueprintBase.FinishExecute"
+FN_EQ_NAME = "/Script/Engine.KismetMathLibrary.EqualEqual_NameName"
+NODE_EVENT_POSSESS = "AddEvent|EventOnPossess"
+NODE_EVENT_EXECUTE_AI = "AddEvent|AI|EventReceiveExecuteAI"
+# A Name pin passed by reference (the Blackboard's KeyName) takes no literal,
+# and EqualEqual_NameName is a wildcard until wired: both are fed from this.
+FN_LITERAL_NAME = "/Script/Engine.KismetSystemLibrary.MakeLiteralName"

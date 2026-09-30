@@ -236,11 +236,12 @@ def _weapon_specs():
              shot_volume=SHOT_VOLUME_CM["Pistol"]),
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole
-        # identity: it wins a fight it is already in and empties fast.
+        # identity: it wins a fight it is already in and empties fast. The SMG11
+        # is a machine pistol, so it is held in the pistol's ready pose.
         dict(path=SMG_BP_PATH, parts=smg_outline(), model=SMG_MODEL, muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
              display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
-             sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
-             grip_rot=_grip_rotation(AIM_RIFLE),
+             sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_PISTOL,
+             grip_rot=_grip_rotation(AIM_PISTOL),
              colour=(0.45, 0.85, 0.35),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
              interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,

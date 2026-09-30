@@ -31,7 +31,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - **Probed in PIE** with `Set Blocking` forced true in memory: a wanderer in front dealt 2.5 per
   swing and took stamina 100 → 80 each time. From behind, it dealt 10 and cost nothing. The
   combat trace quotes the dealt `HitDamage`.
-- **The guard has a pose** (see Body poses): fists up with empty hands, a pistol or a
+- **The guard has a pose** (see Body poses): fists up with empty hands, a pistol, the SMG or a
   consumable; the gun raised across the body with a two-handed gun (`BP_WeaponItem.TwoHanded`).
 - **Known gaps:** no HUD cue beyond the stamina bar, and a blocked hit still flinches.
 

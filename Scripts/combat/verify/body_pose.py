@@ -252,8 +252,8 @@ def check_held_two_handed():
           base is False)
     got = {s["display"]: cdo(load(s["path"])).get_editor_property("TwoHanded")
            for s in _weapon_specs()}
-    check("the long guns are two-handed and the pistol is not",
-          got == {"Shotgun": True, "Pistol": False, "SMG": True, "Rifle": True,
+    check("the long guns are two-handed and the pistol and SMG are not",
+          got == {"Shotgun": True, "Pistol": False, "SMG": False, "Rifle": True,
                   "Sniper": True}, str(got))
 
 

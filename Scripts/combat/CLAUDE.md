@@ -38,6 +38,8 @@ menu polls its own copy from `DrawHUD`, which does.
 - **The SMG, the rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon
   Bundle's SMG11 (`SK_SMG11_X`, a MAC-11 with its wire stock folded), AK 47 (`SK_KA47_X`) and
   AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
+  - **The SMG is held like the pistol:** its row's `aim` is the pistol's ready pose, so the grip
+    is solved against it and it is one-handed (`TwoHanded` follows `aim`), guarding with fists.
   - A row with a `model` builds the model instead of its `parts`. Its `parts` are then the
     model's **measured outline**: boxes that are never built, which the grip solve and the sight
     checks read exactly as they read a primitive gun's parts. Re-measure them if the mesh changes.

@@ -13,7 +13,7 @@ AnimationDataController, so the result plays into a slot like any clip.
 
 THE SLASH
 ---------
-It starts from the pistol ready pose, the pose the knife is held in, so the
+It starts from A_HoldKnife (hold_pose.py), the pose the knife is held in, so the
 first and last frames are exactly what the slot shows before and after:
 
     0.00 s  the ready pose
@@ -37,7 +37,7 @@ import unreal
 
 from combat.body_pose import _mul, _conj
 from combat.graph import _assets, _log
-from combat.paths import KNIFE_ANIM_PATH
+from combat.paths import HOLD_KNIFE_ANIM_PATH, KNIFE_ANIM_PATH
 from combat.tuning import COMBAT
 
 FPS = 30
@@ -100,11 +100,11 @@ def _parent(clip, bone):
 
 
 def _slash_clip(skin):
-    """The clip asset, a copy of the skin's pistol ready pose on first build.
+    """The clip asset, a copy of the knife's hold pose on first build.
     Reused afterwards (a just-written asset cannot be deleted in the same
     editor session), unless the worn skeleton changed under it."""
     eal = unreal.EditorAssetLibrary
-    src = _assets().load_asset(skin.aim_pistol)
+    src = _assets().load_asset(HOLD_KNIFE_ANIM_PATH)
     if eal.does_asset_exist(KNIFE_ANIM_PATH):
         clip = _assets().load_asset(KNIFE_ANIM_PATH)
         if clip.get_editor_property("skeleton") == src.get_editor_property("skeleton"):
@@ -112,9 +112,9 @@ def _slash_clip(skin):
         if not eal.delete_asset(KNIFE_ANIM_PATH):
             raise RuntimeError(f"{KNIFE_ANIM_PATH} is on another skeleton and "
                                "could not be deleted; restart the editor")
-    clip = eal.duplicate_asset(skin.aim_pistol, KNIFE_ANIM_PATH)
+    clip = eal.duplicate_asset(HOLD_KNIFE_ANIM_PATH, KNIFE_ANIM_PATH)
     if clip is None:
-        raise RuntimeError(f"could not copy {skin.aim_pistol} to {KNIFE_ANIM_PATH}")
+        raise RuntimeError(f"could not copy {HOLD_KNIFE_ANIM_PATH} to {KNIFE_ANIM_PATH}")
     return clip, src
 
 
@@ -128,7 +128,7 @@ def build_knife_slash(skin):
     lower = {t.lower() for t in tracks}
     missing = [b for b in bones.values() if b.lower() not in lower]
     if missing:
-        raise RuntimeError(f"{skin.aim_pistol} has no track for {missing}")
+        raise RuntimeError(f"{HOLD_KNIFE_ANIM_PATH} has no track for {missing}")
 
     rest = {t: unreal.AnimationLibrary.get_bone_pose_for_time(src, t, 0.0, False)
             for t in tracks}
@@ -162,6 +162,6 @@ def build_knife_slash(skin):
     ctrl.close_bracket(False)
     _assets().save_loaded_asset(clip, False)
     _log(f"built {KNIFE_ANIM_PATH} ({len(tracks)} tracks, {FRAMES} frames at "
-         f"{FPS} fps, from {skin.aim_pistol.rsplit('/', 1)[-1]}; the cut at "
+         f"{FPS} fps, from {HOLD_KNIFE_ANIM_PATH.rsplit('/', 1)[-1]}; the cut at "
          f"{SLASH_KEYS[2][0]:.2f} s, the blow at {COMBAT.knife_impact_s:.2f} s)")
     return clip

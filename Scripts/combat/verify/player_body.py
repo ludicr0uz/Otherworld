@@ -91,7 +91,7 @@ def check_player_body():
     # checked directly: a clone that has not run the asset pipeline gets SKIN_QUINN
     # and must get every asset it names.
     _fallback = [a for a in (SKIN_QUINN.mesh, SKIN_QUINN.anim_bp,
-                             SKIN_QUINN.aim_rifle, SKIN_QUINN.aim_pistol,
+                             SKIN_QUINN.aim_rifle, SKIN_QUINN.aim_pistol, SKIN_QUINN.idle,
                              SKIN_QUINN.punch)
                  if not load(a)]
     check("the mannequin fallback skin is complete, for a clone with no /Game/Sourced",

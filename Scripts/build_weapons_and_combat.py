@@ -30,6 +30,7 @@ WHAT THIS BUILDS
   BP_Knife          child of BP_WeaponItem: the Fab pack's M9 knife, Melee --
                     the fire key slashes (combat/knife.py)
   Anims/A_KnifeSlash  the slash, keyed for the worn body (combat/knife_anim.py)
+  Anims/A_HoldItem, A_HoldKnife  how food and the knife are held (combat/hold_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
   BP_WeaponComponent  inventory of 5, equip/switch/fire/drop/pick up
   BP_BloodSplash    short-lived red burst spawned at each impact
@@ -59,6 +60,7 @@ from combat.graph import BEL, _apply_defaults, _log               # noqa: E402
 from combat.health_component import build_health_component        # noqa: E402
 from combat.knife import build_knife                              # noqa: E402
 from combat.knife_anim import build_knife_slash                   # noqa: E402
+from combat.hold_pose import build_hold_poses                     # noqa: E402
 from combat.install import (                                      # noqa: E402
     install_on_character, install_on_npc, retire_old_assets,
 )
@@ -103,6 +105,8 @@ def main():
     weapons = {}
     for spec in _weapon_specs():
         weapons[spec["display"]] = build_weapon(spec, item_bp)
+    # Before the knife and the consumables, whose grips are solved in them.
+    build_hold_poses(skin)
     # The third starter item: a melee item, not a row of the gun table.
     knife_bp = build_knife(item_bp)
     knife_clip = build_knife_slash(skin)

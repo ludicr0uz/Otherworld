@@ -12,7 +12,9 @@ import unreal
 from combat.anim_blueprint import AIM_SLOT
 from combat.knife import KNIFE_DISPLAY, KNIFE_MESH
 from combat.knife_anim import FPS, FRAMES, SLASH_KEYS
-from combat.paths import ITEM_BP_PATH, KNIFE_ANIM_PATH, KNIFE_BP_PATH
+from combat.paths import (
+    HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, KNIFE_ANIM_PATH, KNIFE_BP_PATH,
+)
 from combat.skin import player_skin
 from combat.tuning import COMBAT
 from combat.verify.common import (
@@ -90,8 +92,8 @@ def check_knife_item():
     check("...blade up and forward out of the fist",
           blade is not None and blade.z > 0.8 and blade.x > 0.1, str(blade))
     pose = d.get_editor_property("AimPose")
-    check("...held in the pistol's ready pose, with an icon and its name",
-          pose is not None and pose == load(player_skin().aim_pistol)
+    check("...held in A_HoldKnife, with an icon and its name",
+          pose is not None and pose == load(HOLD_KNIFE_ANIM_PATH)
           and d.get_editor_property("Icon") is not None
           and str(d.get_editor_property("DisplayName")) == KNIFE_DISPLAY,
           f"{pose} {d.get_editor_property('Icon')}")
@@ -111,7 +113,7 @@ def check_knife_clip():
           abs(clip.get_play_length() - FRAMES / FPS) < 1e-3
           and clip.get_play_length() <= COMBAT.knife_interval_s + 1e-3,
           f"{clip.get_play_length():.3f}")
-    src = load(skin.aim_pistol)
+    src = load(HOLD_KNIFE_ANIM_PATH)
     arm = skin.pose_bones["upperarm_r"]
     lib = unreal.AnimationLibrary
 

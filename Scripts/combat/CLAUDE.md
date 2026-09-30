@@ -61,10 +61,16 @@ menu polls its own copy from `DrawHUD`, which does.
 - **There is no reloading state.** `NextFireTime` is one world-time deadline. Both the fire
   interval and the reload push it out.
 - **The knife is a melee item, not a gun** (`knife.py`): a `BP_WeaponItem` child flagged `Melee`,
-  drawn by the pack's `SK_M9_Knife_X` (blade up, tipped 30° forward, held in the pistol's pose and
-  grip), and not a row of `_weapon_specs()`, whose every column and check is about a gun. Its
-  slash clip `/Game/Weapons/Anims/A_KnifeSlash` is keyed from Python (`knife_anim.py`): the pack
-  has no animation and no stock clip is a knife attack.
+  drawn by the pack's `SK_M9_Knife_X` (blade up, tipped 30° forward, the pistol's grip), and
+  not a row of `_weapon_specs()`, whose every column and check is about a gun. Its slash clip
+  `/Game/Weapons/Anims/A_KnifeSlash` is keyed from Python (`knife_anim.py`): the pack has no
+  animation and no stock clip is a knife attack.
+- **Knife and food have their own hold poses, not the pistol's aim** (`hold_pose.py`):
+  `A_HoldKnife` (knife up at the chest, left fist raised as a guard) and `A_HoldItem` (the
+  item carried at the waist, left arm hanging), keyed off the idle by arm directions like the
+  guard's. The right hand keeps the pistol pose's orientation and fingers, so the grip solve
+  gives the pistol's answer and every item stays upright in the fist. The slash starts and ends
+  in `A_HoldKnife`. `probes/probe_hold_poses.py` measures the hand heights in game.
 - **The shotgun, pistol and knife are issued; the SMG, rifle and sniper are found.**
   - The gun drop (`gun_drop.py`) is **two seeded rolls** on two `FRandomStream`s on the
     GameMode: `GunDropRollStream < GUN_DROP_CHANCE` (10%) decides whether anything drops, then
@@ -132,7 +138,8 @@ These are feel checks a headless run can't do:
 
 - the knife: how the keyed slash reads (`knife_anim.SLASH_KEYS`), whether the blow at
   `COMBAT.knife_impact_s` lines up with the cut, how the knife sits in the fist (the pistol
-  grip's solve; the left hand stays where the pistol pose puts it);
+  grip's solve), and how the two hold poses read (`hold_pose.HOLD_*_DIRS`; the wrist keeps the
+  pistol pose's angle on a lower forearm);
 - the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100

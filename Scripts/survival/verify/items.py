@@ -2,8 +2,7 @@
 
 import unreal
 
-from combat.paths import ITEM_BP_PATH
-from combat.skin import player_skin
+from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH
 from combat.verify.grip_fit import check_handles_in_fist
 from combat.verify.common import BEL, cdo, check, component_template, components, load
 from survival.consumable_specs import consumable_specs
@@ -42,7 +41,9 @@ def run():
         # (AdsZoom - 1) is a divisor in the ADS speed and the scope fade.
         check(f"{name}'s AdsZoom is above 1", d.get_editor_property("AdsZoom") > 1.0)
         check(f"{name} has an inventory icon", d.get_editor_property("Icon") is not None)
-        check(f"{name} has a ready pose", d.get_editor_property("AimPose") is not None)
+        check(f"{name} is carried in A_HoldItem, not aimed like a pistol",
+              d.get_editor_property("AimPose") is not None
+              and d.get_editor_property("AimPose") == load(HOLD_ITEM_ANIM_PATH))
         check(f"{name} uses no ammunition", d.get_editor_property("UsesAmmo") is False)
         parts = [p[0] for p in spec["parts"]]
         present = set(components(bp))
@@ -56,7 +57,7 @@ def run():
     check("a mushroom heals 10 health on EASY",
           mushroom and mushroom[0]["health_easy"] == 10.0,
           str(mushroom and mushroom[0]["health_easy"]))
-    # Held by its grip_part, which the build seats in the pistol pose's fist.
-    check_handles_in_fist([(s["display"], s["path"], player_skin().aim_pistol,
+    # Held by its grip_part, which the build seats in A_HoldItem's fist.
+    check_handles_in_fist([(s["display"], s["path"], HOLD_ITEM_ANIM_PATH,
                             s["parts"], s["grip_part"], None)
                            for s in consumable_specs()])

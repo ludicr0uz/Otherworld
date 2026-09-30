@@ -24,8 +24,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
   camera            boom and aim-trace numbers, face/aim-the-camera patches
   knife             BP_Knife: the Fab M9 knife as a Melee item, its model
                     placement and measured outline, build_knife()
-  knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the worn
-                    skin's pistol ready pose (AnimationDataController)
+  knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the
+                    knife's hold pose (AnimationDataController)
+  hold_pose         A_HoldItem / A_HoldKnife: food carried at the waist, the
+                    knife up in a fighting stance, keyed off the idle
 
 SHARED AUTHORING HELPERS
   graph             node/pin/connect/set, variables, components, events

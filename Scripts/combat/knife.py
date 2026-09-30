@@ -13,8 +13,8 @@ THE MODEL AND HOW IT SITS IN THE HAND
 -------------------------------------
 SK_M9_Knife_X stands on its end in its own frame: the handle z -5.2..7.2
 (2.7 cm round, centred on z 1.0), the guard at z -5.4, the blade down to
-z -24.3 -- measured off the mesh's vertices. It is held the way a pistol is
-(the pistol's ready pose, the pistol's solved GripRotation), and a pistol's
+z -24.3 -- measured off the mesh's vertices. It is held in A_HoldKnife, a
+fighting stance (hold_pose.py) whose fist is the pistol pose's, and a pistol's
 grip runs up and down through the fist, so the knife's handle does too: the
 model is turned over, blade up, and tipped 30 deg forward, a hammer grip with
 the edge leading. `Grip` in the outline is the handle, so grip._grip_location
@@ -27,8 +27,7 @@ from combat.graph import (
     BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
 )
 from combat.grip import _grip_location, _grip_rotation, _rotate_vector
-from combat.paths import CUBE, KNIFE_BP_PATH, MAT_METAL
-from combat.skin import player_skin
+from combat.paths import CUBE, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH, MAT_METAL
 from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_models import FAB_WEAPONS
@@ -88,7 +87,7 @@ def build_knife(item_bp):
     build_model(bp, knife_model())
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{KNIFE_BP_PATH} failed to compile")
-    aim = player_skin().aim_pistol
+    aim = HOLD_KNIFE_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
         "DisplayName": KNIFE_DISPLAY,

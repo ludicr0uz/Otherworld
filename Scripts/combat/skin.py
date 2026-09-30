@@ -62,6 +62,9 @@ class PlayerSkin:
     grip: str
     aim_rifle: str
     aim_pistol: str
+    # Standing idle, arms hanging: the body the hold poses (hold_pose.py) are
+    # keyed on, since a carried item is not aimed.
+    idle: str
     # The grip hand's four closing fingers, index first, each as its three
     # joints from the knuckle out. grip.fist_in_socket() finds where they curl
     # round, and the weapon's handle is put there. The thumb wraps the other
@@ -92,6 +95,7 @@ SKIN_QUINN = PlayerSkin(
     grip="HandGrip_R",
     aim_rifle="/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS",
     aim_pistol="/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS",
+    idle="/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle",
     grip_fingers=tuple(tuple(f"{f}_{j:02d}_r" for j in (1, 2, 3))
                        for f in ("index", "middle", "ring", "pinky")),
     aim_bones=("spine_03", "spine_05"),
@@ -119,6 +123,7 @@ SKIN_ADVENTURER = PlayerSkin(
               f"A_{ADVENTURER}_MF_Rifle_Idle_ADS",
     aim_pistol=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/"
                f"A_{ADVENTURER}_MF_Pistol_Idle_ADS",
+    idle=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/A_{ADVENTURER}_MM_Idle",
     # asset_pipeline/finger_rig.py adds these, named the Mixamo way.
     grip_fingers=tuple(tuple(f"RightHand{f}{j}" for j in (1, 2, 3))
                        for f in ("Index", "Middle", "Ring", "Pinky")),
@@ -145,7 +150,7 @@ def player_skin():
     eas = _assets()
     want = (SKIN_ADVENTURER.mesh, SKIN_ADVENTURER.anim_bp,
             SKIN_ADVENTURER.aim_rifle, SKIN_ADVENTURER.aim_pistol,
-            SKIN_ADVENTURER.punch)
+            SKIN_ADVENTURER.idle, SKIN_ADVENTURER.punch)
     missing = [p for p in want if not eas.does_asset_exist(p)]
     if not missing:
         return SKIN_ADVENTURER

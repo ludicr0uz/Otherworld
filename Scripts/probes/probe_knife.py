@@ -95,7 +95,7 @@ def _run(p):
     anim = player.get_editor_property("mesh").get_anim_instance()
     pose = knife.get_editor_property("AimPose")
     yield 0.2
-    p.check("...in its ready pose (the pistol's)",
+    p.check("...in its ready pose (A_HoldKnife)",
             anim is not None and anim.is_playing_slot_animation(pose, AIM_SLOT))
 
     p.set(health, "Health", 100.0)

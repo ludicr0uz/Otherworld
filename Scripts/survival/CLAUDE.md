@@ -46,8 +46,8 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 
 - **Consumables are weapons:** `BP_ConsumableItem` is a child of `BP_WeaponItem`, with
   `Consumable = True` on the base. E, G, Q and the strip therefore work unchanged.
-- **They default to `Dropped = True`.** They use the pistol's pose, and there is no eating
-  animation.
+- **They default to `Dropped = True`.** They are carried in `A_HoldItem`, one hand at the
+  waist (`combat/hold_pose.py`), and there is no eating animation.
 
 ## Numbers and placement (`tuning.py`)
 

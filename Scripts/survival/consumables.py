@@ -21,8 +21,7 @@ from combat.graph import (
     _float_type, _log, _must_load,
 )
 from combat.materials import build_flat_material
-from combat.paths import ITEM_BP_PATH
-from combat.skin import player_skin
+from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH
 from combat.grip import _grip_location, _grip_rotation
 from combat.tuning import COMBAT
 from combat.weapon_items import build_parts
@@ -54,8 +53,8 @@ def build_consumable_item():
 def build_consumable(spec, base_bp):
     """One consumable: its parts, and the base classes' defaults for it.
 
-    Held like the pistol -- the pistol's ready pose and its solved grip -- so
-    the item is carried out in front in one hand, by its `grip_part`. There is no eating
+    Carried in A_HoldItem (combat/hold_pose.py) with the grip solved against
+    it: in one hand at the waist, by its `grip_part`, not aimed like a gun. There is no eating
     animation: nothing in the project can author one (see CLAUDE.md, *The
     player's body*).
     """
@@ -63,7 +62,7 @@ def build_consumable(spec, base_bp):
     build_parts(bp, spec["parts"])
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{spec['path']} failed to compile")
-    aim = player_skin().aim_pistol
+    aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
         "DisplayName": spec["display"],

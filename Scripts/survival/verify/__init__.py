@@ -11,6 +11,7 @@ so the two suites read the same way.
   hooks         the combat side: the use event, the HP drain, the inventory size
   install       ability systems and the survival component on the characters
   forage        what place_forage.py put in each generated level
+  loot          the corpse loot table written onto BP_HealthComponent
 """
 
-SECTIONS = ("tags", "items", "debuffs", "ability", "hooks", "install", "forage")
+SECTIONS = ("tags", "items", "debuffs", "ability", "hooks", "install", "forage", "loot")

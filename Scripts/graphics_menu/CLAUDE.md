@@ -18,6 +18,8 @@ split it before extending it.
 - **D** toggles debug mode.
 - **X** (panel open) starts save and exit.
 - **K** (panel open) is the dev-all-guns cheat (below).
+- **Tab** (near a looted body) opens the loot window; **Up/Down** and **Enter** in it
+  (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 
 ## The UMG screens
 
@@ -138,6 +140,16 @@ stays held, as with a pick-up; asking twice adds nothing.
   cheat's item comes through a cast; its refresh follows no `Set EquippedIndex`).
 - **Probe:** `uepy.py --game --probe Scripts/probes/probe_dev_all_guns.py` writes the request
   flag (no keyboard in a probe). The K key itself needs a play session.
+
+## The loot window (`loot_*.py`, `wbp_loot.py`)
+
+Run from Tick after save and exit; the design is `Scripts/loot/CLAUDE.md`. Traps met here:
+
+- **Every `Clamp` node in this graph is read as a settings slider** by the verifier, so the
+  window clamps `LootSel` with `Min` then `Max`.
+- **The take reuses the cheat's pattern** (spawn, cast, `Dropped`, `Inventory += it`,
+  `NeedsRefresh`). `dev_guns_checks._looting` tells the take's nodes apart from the cheat's.
+- **Probe:** `probe_corpse_loot.py` calls `ReceiveDrawHUD` itself to read the window.
 
 ## HUD
 

@@ -18,7 +18,8 @@ WHAT THIS BUILDS
   BP_SurvivalComponent         Hunger/Thirst/Temperature, decay, debuffs
   GA_ConsumeItem               GameplayAbility, triggered by Event.Item.Consume
 and installs an AbilitySystemComponent on the player and the wanderer, plus
-BP_SurvivalComponent on the player.
+BP_SurvivalComponent on the player. It also fills the corpse loot tables
+(loot/install.py) onto BP_HealthComponent, since they name these items.
 """
 
 import os
@@ -27,10 +28,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # A live editor keeps imported modules between runs: drop both packages so an
 # edit to any of their modules is what actually runs.
-for _name in [m for m in sys.modules if m.split(".")[0] in ("combat", "survival")]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("combat", "survival", "loot")]:
     del sys.modules[_name]
 
 from combat.graph import BEL, _apply_defaults, _log                 # noqa: E402
+from loot.install import fill_loot_tables                          # noqa: E402
 from survival.consumables import build_consumables                 # noqa: E402
 from survival.consume_ability import build_consume_ability         # noqa: E402
 from survival.effects import build_debuff_effects                  # noqa: E402
@@ -50,6 +52,9 @@ def main():
         **{var: BEL.generated_class(bp) for var, bp in effects.items()},
         "ConsumeAbility": BEL.generated_class(ability_bp),
     })
+    # The corpse loot tables name the items, so they are filled once the last
+    # item exists -- and before the install recompiles the characters.
+    fill_loot_tables()
     install_survival(survival_bp)
     _log(f"done -- {', '.join(items)}, hunger, thirst, temperature, "
          f"{len(effects)} debuffs and GA_ConsumeItem")

@@ -42,7 +42,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # A live editor keeps imported modules between runs: drop the combat package so
 # an edit to any of its modules is what actually runs.
-for _name in [m for m in sys.modules if m == "combat" or m.startswith("combat.")]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("combat", "loot")]:
     del sys.modules[_name]
 
 from combat.aim_pitch import patch_aim_pitch                      # noqa: E402

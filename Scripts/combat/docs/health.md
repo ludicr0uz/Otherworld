@@ -51,6 +51,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     or the edit reverts on save.
   - `ConstraintInstanceBlueprintLibrary` has no frames. `AngularRotationOffset` is ignored by
     physics assets.
+- **Corpse loot** is rolled on the counted-kill arm, after the gun drop (`loot/roll.py`, see
+  `Scripts/loot/CLAUDE.md`). It lives on the corpse's health component and goes with it.
 - **A wanderer's corpse** (`_author_corpse`, on the `DespawnOnDeath` arm):
   `GetController` → `SetLifeSpan(controller, 0.1)` → `Owner.SetLifeSpan(60)`.
   - **`DestroyActor` on a controller is a no-op from Blueprint** (overridden empty in

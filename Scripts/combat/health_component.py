@@ -41,6 +41,7 @@ from combat.respawn import (
 )
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _trace_defaults
+from loot.roll import declare_loot_vars
 
 
 def build_health_component(rebuild=True):
@@ -107,6 +108,8 @@ def build_health_component(rebuild=True):
     # checks the length before it draws an index.
     _declare(ed, "DropClasses", BEL.get_array_type(
         BEL.get_class_reference_type(unreal.Actor.static_class())))
+    # Corpse loot: the table loot/install.py fills, and what this body carries.
+    declare_loot_vars(ed)
     # Where the replacement will appear. Written three times on the way to the
     # spawn -- the request, then whichever navmesh point it resolved to -- so
     # that the random draw and the nav query are each evaluated exactly once.

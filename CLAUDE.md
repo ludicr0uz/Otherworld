@@ -32,6 +32,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
    | survival: GAS, debuffs, forage | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
+| corpse loot: loot tables, the roll, the loot window | `build_survival.py` (tables), `probe_corpse_loot.py` | `Scripts/loot/CLAUDE.md` |
 
 ## Code layout: small modules, one owner each
 
@@ -201,6 +202,9 @@ editor.
   The pistol reloads every 8 shots from an endless reserve.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). They respawn 75–100 m away and leave ragdoll corpses.
+- **Corpse loot:** a wanderer the player kills carries what its loot table rolls (for now, water:
+  a canteen at 50%). Near the body, **Tab** opens a loot window; Up/Down pick and Enter takes
+  the item into the bag (`Scripts/loot/CLAUDE.md`).
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
   and a settings screen (plus K in the M panel: a dev-all-guns cheat), which holds the difficulty (EASY / MEDIUM / SURVIVOR,

@@ -29,6 +29,8 @@ from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
 from graphics_menu import dev_consts as DC
 from graphics_menu.dev_guns_checks import check_dev_guns
+from graphics_menu import loot_consts as LC
+from graphics_menu.loot_checks import check_loot
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -139,10 +141,11 @@ def main():
     # reason the restart key is, and so are the four navigation keys.
     expected_keys = set((G.MENU_KEY, UC.RESTART_KEY, G.DEBUG_KEY,
                          N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
-                         PC.EXIT_KEY, DC.DEV_GUNS_KEY)
+                         PC.EXIT_KEY, DC.DEV_GUNS_KEY,
+                         LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY)
                         + G.PRESET_KEYS + N.START_KEYS)
-    check("polls exactly the menu, preset, debug, restart, start, nav, exit and "
-          "dev-all-guns keys",
+    check("polls exactly the menu, preset, debug, restart, start, nav, exit, "
+          "dev-all-guns and loot keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -500,9 +503,11 @@ def main():
     # Seven: and the survival component, for its bars.
     # Ten: and the three the profile's save and load cast (player_parts.py).
     # Eleven: and CharacterMovement, frozen while the exit counts down.
+    # Fourteen: and the loot window's three -- a body's health and mesh
+    # (loot_find.py), and the player's bag (loot_tick.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 11 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 14 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -863,6 +868,7 @@ def main():
     check_difficulty(check, bp, nodes)
     check_profile(check, bp, nodes)
     check_dev_guns(check, bp, nodes)
+    check_loot(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

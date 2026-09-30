@@ -49,6 +49,9 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 - **They default to `Dropped = True`.** They are carried in `A_HoldItem`, one hand at the
   waist (`combat/hold_pose.py`), and there is no eating animation.
 
+- **Water is also corpse loot:** `build_survival.py` fills the wanderers' loot table
+  (`Scripts/loot/`), a canteen at 50%, because it builds the items the table names.
+
 ## Numbers and placement (`tuning.py`)
 
 - **Rates:**

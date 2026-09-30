@@ -248,8 +248,9 @@ def check_hud_graph(check, nodes):
         for pick in _sources(n, "InOpacity"):
             for eq in _sources(pick, "bPickA"):
                 selected += _source_titles(eq, "B")
-    check("the title page, settings page and M panel light the selected row's caret",
-          sorted(selected) == ["Get MenuRow", "Get MenuRow", "Get Quality"],
+    check("the title page, settings page, M panel and loot window light the selected "
+          "row's caret",
+          sorted(selected) == ["Get LootSel", "Get MenuRow", "Get MenuRow", "Get Quality"],
           str(sorted(selected)))
 
     texts = [n for n in nodes if {"self", "InText"} <= _pins(n)]

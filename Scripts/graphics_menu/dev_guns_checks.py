@@ -8,6 +8,7 @@ from combat.tuning import INVENTORY_SIZE
 from graphics_menu import dev_consts as DC
 from graphics_menu import umg_consts as UC
 from graphics_menu.dev_guns import dev_guns_defaults
+from graphics_menu.loot_consts import LOOT_BAG_FULL_VAR
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -28,6 +29,22 @@ def _value(n, pin):
 def _feeders(n, pin):
     p = BEL.find_input_pin(n, pin)
     return [PIN.get_owning_node(q) for q in (p.list_connected_pins() if p else [])]
+
+
+def _into(n, pin="ReturnValue"):
+    p = BEL.find_output_pin(n, pin)
+    return [PIN.get_owning_node(q) for q in (p.list_connected_pins() if p else [])]
+
+
+def _looting(n):
+    """One of the loot window's nodes (loot_tick/loot_take), which reuse the
+    cheat's pattern: its bag-full test, its Set Dropped on an item spawned from
+    a class read out of the body (not a literal), its refresh before the body's
+    RemoveIndex."""
+    return (any(_title(x) == f"Set {LOOT_BAG_FULL_VAR}" for x in _into(n))
+            or any(_feeders(sp, "Class") for c in _feeders(n, "self")
+                   for sp in _feeders(c, "Object"))
+            or any("IndexToRemove" in _pins(x) for x in _into(n, "then")))
 
 
 def _short(class_path):
@@ -66,19 +83,19 @@ def check_dev_guns(check, bp, nodes):
                  if sum(_short(c) in v for v in tests) != 1]
     check("...skipping a gun already carried (its class tested against the bag)",
           not unchecked, f"untested {unchecked}; tests {tests}")
-    rooms = [n for n in nodes if _pins(n) == {"A", "B"}
+    rooms = [n for n in nodes if _pins(n) == {"A", "B"} and not _looting(n)
              and _value(n, "B") == str(INVENTORY_SIZE)
              and any("Length" in _title(f) for f in _feeders(n, "A"))]
     check(f"...and only while fewer than {INVENTORY_SIZE} items are carried",
           len(rooms) == len(DC.DEV_GUN_CLASS_PATHS), str(len(rooms)))
 
-    carried = [n for n in nodes if _title(n) == "Set Dropped"
+    carried = [n for n in nodes if _title(n) == "Set Dropped" and not _looting(n)
                and any("Cast" in _title(f) for f in _feeders(n, "self"))]
     check("each given gun is carried (Dropped false)",
           len(carried) == len(DC.DEV_GUN_CLASS_PATHS)
           and all(_value(n, "Dropped") == "false" for n in carried),
           str(len(carried)))
-    refresh = [n for n in nodes if _title(n) == "Set NeedsRefresh"
+    refresh = [n for n in nodes if _title(n) == "Set NeedsRefresh" and not _looting(n)
                and not any(_title(f) == "Set EquippedIndex"
                            for f in _feeders(n, "execute"))]
     check("...and the weapon component re-equips after (NeedsRefresh)",

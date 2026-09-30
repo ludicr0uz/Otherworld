@@ -1,6 +1,7 @@
 """Graph fragments BP_HealthComponent runs when something dies: the kill
 count, the shells, the ragdoll collapse, the corpse timer and the player's own
-death. The gun drop spliced in after the shells is gun_drop.py.
+death. The gun drop spliced in after the shells is gun_drop.py; the corpse
+loot rolled after it is loot/roll.py.
 """
 
 from combat.game_state import (
@@ -20,6 +21,7 @@ from combat.nodes import (
 from combat.paths import GAME_MODE_CLASS_PATH
 from combat.ragdoll import RAGDOLL_PROFILE
 from combat.tuning import AMMO_DROP_SHELLS, AMMO_PICKUP_LIFT
+from loot.roll import author_loot_roll
 
 
 # How long a corpse lies where it fell. Long enough that a firefight leaves a
@@ -111,8 +113,11 @@ def _author_kill_count(ed, exec_in, x0, y0):
     gun_exits = _author_gun_drop(ed, mode_out,
                                  _pin(lifted, "ReturnValue", is_input=False),
                                  BEL.find_then_pin(drop), x0, y0 + 1000)
-    return gun_exits + (_pin(as_mode, "CastFailed", is_input=False),
-                        BEL.find_else_pin(shot))
+    # Then what the body carries, for the loot window (loot/roll.py). After the
+    # gun drop, on the same counted-kill arm.
+    looted = author_loot_roll(ed, gun_exits, x0 + 5200, y0 + 1000)
+    return (looted, _pin(as_mode, "CastFailed", is_input=False),
+            BEL.find_else_pin(shot))
 
 
 def _author_death_collapse(ed, exec_ins, x0, y0):

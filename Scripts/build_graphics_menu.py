@@ -30,7 +30,8 @@ Event graph:
                     --> pause on the main menu (unless -nomenu)
 
   [Event Tick] --> grass lighting for the preset, the M / 1-4 / D / X keys,
-                   save and exit (graphics_menu/save_exit.py)
+                   save and exit (graphics_menu/save_exit.py), the loot
+                   window (graphics_menu/loot_tick.py)
 
   [Event ReceiveDrawHUD] --> DebugOn copy, settings pushed onto the weapon
                              component, difficulty onto the GameMode, FPS
@@ -38,7 +39,7 @@ Event graph:
     --> PlayerDead?    yes: the death menu and [R]
                        no:  HP, stamina, survival bars, kills, the wanderers'
                             bars (canvas), inventory, reticle (canvas), the
-                            save-and-exit banner, the M panel
+                            save-and-exit banner, the loot window, the M panel
 """
 
 import os
@@ -96,6 +97,9 @@ from graphics_menu.save_exit import (                              # noqa: E402
     author_save_exit_tick, declare_profile_vars, profile_defaults)
 from graphics_menu.dev_guns import (                               # noqa: E402
     declare_dev_guns_vars, dev_guns_defaults)
+from graphics_menu.loot_draw import author_loot_window              # noqa: E402
+from graphics_menu.loot_tick import (                               # noqa: E402
+    author_loot_tick, declare_loot_vars, loot_defaults)
 from survival.paths import SURVIVAL_BP_PATH                        # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -433,6 +437,7 @@ def _ensure_variables(ed, bp):
     declare_difficulty_vars(ed)
     declare_profile_vars(ed)
     declare_dev_guns_vars(ed)
+    declare_loot_vars(ed)
 
 
 def _apply_defaults(bp, defaults):
@@ -729,7 +734,9 @@ def _author_tick(ed, tick):
     # previous frame is on the grass before anything else runs this one.
     # Then save and exit, the profile load and the death wipe (save_exit.py).
     synced = author_grass_sync(ed, x0, y0 - 1100, BEL.find_then_pin(tick))
-    for tail in author_save_exit_tick(ed, pc_out, synced, x0, y0 - 4000):
+    # Then the loot window (loot_tick.py): the body in reach, its keys, a take.
+    saved = author_save_exit_tick(ed, pc_out, synced, x0, y0 - 4000)
+    for tail in author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000):
         _connect(tail, _pin(br_m, "execute"))
 
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 560, y0 + 200)
@@ -1099,6 +1106,7 @@ def _author_draw(ed, x0, y0):
     # and sized by the gun's cloud every frame.
     after_aim = _author_reticle(ed, x0, y0 - 6800, after_inv)
     after_aim = author_exit_banner(ed, x0, y0 - 8200, after_aim)
+    after_aim = author_loot_window(ed, x0, y0 - 9600, after_aim)
 
     # Last: the M panel. Every path above -- written or cast-failed -- falls
     # through to it; an exec input takes more than one link.
@@ -1187,7 +1195,7 @@ def build_hud_blueprint(rebuild=False):
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],
                          **difficulty_defaults(), **profile_defaults(),
-                         **dev_guns_defaults()})
+                         **dev_guns_defaults(), **loot_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

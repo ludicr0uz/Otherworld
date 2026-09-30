@@ -48,6 +48,13 @@ Input, settings and state
   dev_consts      the dev-all-guns cheat: its key (K), row label, flags, the guns
   dev_guns        the cheat's Tick fragment: K in the M panel gives one of every
                   gun not carried (run from save_exit, after the countdown)
+  loot_consts     the loot window: keys (Tab, Up/Down, Enter), variables, widget names
+  loot_find       Tick: the nearest dead body with Loot in reach -> LootTarget
+  loot_take       Tick: the selected item out of the body and into the bag
+  loot_tick       the loot window's Tick fragment: find, keys, serve a take
+                  (run after save_exit's)
+  loot_draw       DrawHUD: the loot prompt, and the window's rows and caret
+  wbp_loot        WBP_HUD's loot prompt and window (called from wbp_hud)
 
 verify_graphics_menu.py's checks, beside it because it is over budget
   umg_checks         the screens' trees and the graph that creates and writes them
@@ -55,4 +62,5 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   difficulty_checks  the DIFFICULTY row and its push
   profile_checks     the saved profile and save and exit
   dev_guns_checks    the dev-all-guns row, key and the five spawns
+  loot_checks        the loot window: scan, keys, take, widgets
 """

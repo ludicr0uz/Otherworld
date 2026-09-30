@@ -7,6 +7,7 @@
     top centre    the save-and-exit countdown, or why it was called off
     bottom centre the equipped weapon's name, the 2 x 5 inventory grid of
                   WBP_InventorySlot, and under it HP and stamina side by side
+    right edge    the loot window, and under the reticle its prompt (wbp_loot.py)
   Fps    (debug mode, on every screen)
 
 Every bar has a stat icon beside it (ui_art/stat_icons.py), tinted its fill
@@ -26,6 +27,7 @@ from combat.graph import BEL, _must_load
 from combat.tuning import INVENTORY_SIZE
 from graphics_menu import umg_author as U
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
+from graphics_menu.wbp_loot import author_loot_widgets
 from graphics_menu.umg_consts import (
     BANNER_COUNT, BANNER_FONT, BANNER_OFF, BANNER_TOP, COL_EXIT_CALLED_OFF, COL_FPS,
     COL_GOLD, COL_HP_FILL, COL_KILL, COL_LABEL, COL_NUMBER, COL_DEBUFF, COL_ST_FILL,
@@ -126,6 +128,7 @@ def build_hud_widget():
         U.at(banner, (0.5, 0.0), (0.5, 0.0), (0.0, BANNER_TOP))
         U.hide(banner)
     _author_strip(bp, body)
+    author_loot_widgets(bp, body)
 
     fps = U.text(bp, root, HUD_FPS, "FPS  60", FPS_FONT, COL_FPS, variable=True)
     U.at(fps, (1.0, 0.0), (1.0, 0.0), (-CORNER_MARGIN, FPS_TOP))

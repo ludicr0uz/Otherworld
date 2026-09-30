@@ -44,6 +44,10 @@ split it before extending it.
   Enter/Space. Mouse clicks are not accepted, since there is no cursor.
 - **The settings page:**
   - mouse sensitivity (Left/Right, clamped to a minimum above zero);
+  - DIFFICULTY: EASY / MEDIUM / SURVIVOR (Left/Right cycle it; default EASY). Saved as the int
+    `BP_Settings.Difficulty` and copied onto the GameMode's `Difficulty` every `DrawHUD`
+    (`difficulty.py`). Only EASY does anything yet (the mushroom heal). `-nullrhi` runs no
+    `DrawHUD`, so a headless game keeps the GameMode's own default, EASY;
   - the seven keybinds (Enter arms a capture; the next key from `KEY_POOL` becomes the bind;
     navigation keys are not in the pool);
   - BACK.

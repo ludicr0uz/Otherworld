@@ -3,6 +3,7 @@ BACK, and the save written after every change.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from graphics_menu.difficulty import emit_difficulty_nudge
 from graphics_menu.menu_nav import (
     NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav)
 from graphics_menu.settings_rows import (
@@ -127,6 +128,13 @@ def _author_capture(ed, x0, y0, settings_out, in_execs, made):
     for i, slider in enumerate(SLIDERS):
         flow = _emit_nudge(ed, slider, i, settings_out, either_out, right_out,
                            flow, x0 + 2520, y0 + 1600 + i * 700, made)
+    stored, passed = emit_difficulty_nudge(
+        ed, settings_out, either_out, right_out, flow,
+        x0 + 2520, y0 + 1600 + len(SLIDERS) * 700, made)
+    saved, writer = _emit_save(ed, settings_out, stored, x0 + 4340,
+                               y0 + 1600 + len(SLIDERS) * 700)
+    made.append(writer)
+    flow = (saved, passed)
 
     go = _emit_accept(ed, pc_out, x0 + 4100, y0 + 1000, flow, made)
 

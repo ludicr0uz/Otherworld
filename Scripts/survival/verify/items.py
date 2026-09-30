@@ -31,7 +31,8 @@ def run():
         check(f"{name} starts Dropped, so a placed one can be picked up",
               d.get_editor_property("Dropped") is True)
         for var, want in (("HungerRestore", spec["hunger"]),
-                          ("ThirstRestore", spec["thirst"])):
+                          ("ThirstRestore", spec["thirst"]),
+                          ("HealthRestoreEasy", spec["health_easy"])):
             got = d.get_editor_property(var)
             check(f"{name}.{var} is the float {want}",
                   isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
@@ -51,6 +52,10 @@ def run():
                     if (t := component_template(bp, p)) is not None
                     and t.get_collision_enabled() != unreal.CollisionEnabled.NO_COLLISION]
         check(f"{name}'s parts collide with nothing", not blocking, str(blocking))
+    mushroom = [s for s in consumable_specs() if s["display"] == "Mushroom"]
+    check("a mushroom heals 10 health on EASY",
+          mushroom and mushroom[0]["health_easy"] == 10.0,
+          str(mushroom and mushroom[0]["health_easy"]))
     # Held by its grip_part, which the build seats in the pistol pose's fist.
     check_handles_in_fist([(s["display"], s["path"], player_skin().aim_pistol,
                             s["parts"], s["grip_part"], None)

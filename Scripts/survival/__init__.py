@@ -19,7 +19,8 @@ THE STANDARD PIECES (Gameplay Ability System, plugin GameplayAbilities)
 
 DATA (no Blueprint authoring)
   paths             /Game/Survival asset and class paths, component names
-  tuning            SurvivalConfig / SURVIVAL, restores, debuff tags, forage
+  tuning            SurvivalConfig / SURVIVAL, restores (and the EASY heal),
+                    debuff tags, forage
   consumable_specs  the mushroom and the canteen: parts, grip part, colours, restores
   forage_placement  where forage goes in a level (pure Python, seeded)
 
@@ -29,6 +30,7 @@ BUILDERS
   debuffs           _author_debuff_sync: apply/remove a debuff GE at zero
   survival_component  BP_SurvivalComponent: decay, grant the ability, debuffs
   consume_ability   GA_ConsumeItem
+  easy_heal         GA_ConsumeItem's heal: HealthRestoreEasy onto Health, EASY only
   install           the ability system + survival component onto the characters
   forage_level      putting the forage into a level, in the editor
   icon_art          the two inventory icons (Pillow, outside the editor)

@@ -16,6 +16,7 @@ import unreal
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_graphics_menu as G
 from graphics_menu import canvas as C
+from graphics_menu.difficulty_checks import check_difficulty
 from graphics_menu import fps as F
 from graphics_menu import menu_nav as N
 from graphics_menu import grass_tiers as T
@@ -244,7 +245,7 @@ def main():
                      # GameStarted is false, and the settings page behind it.
                      G.GAME_TITLE, G.GAME_SUBTITLE,
                      "UP / DOWN  ·  ENTER selects",
-                     S.SETTINGS_TITLE, S.BACK_LABEL,
+                     S.SETTINGS_TITLE, S.BACK_LABEL, S.DIFFICULTY_LABEL,
                      *(sl.label for sl in S.SLIDERS),
                      "press any key to bind it",
                      "arrows adjust  ·  ENTER rebinds"}
@@ -588,8 +589,9 @@ def main():
     # Nine now: the settings page adds the sensitivity readout and, inside one
     # ForEachLoop over Binds, a row label and a key name. Those last two are
     # what keeps the seven bind rows to a single pair of draws. Ten with the
-    # debug FPS readout; one more per extra slider (scope sensitivity).
-    want_driven = 9 + len(S.SLIDERS)
+    # debug FPS readout; one more per extra slider (scope sensitivity), and
+    # one for the difficulty's name.
+    want_driven = 10 + len(S.SLIDERS)
     check("HP, slot names, ammo, NPC numbers, kills, score, the settings "
           "rows and the FPS readout read from data",
           len(driven_text) == want_driven, f"{len(driven_text)}, want {want_driven}")
@@ -790,10 +792,10 @@ def main():
                       for n in slots})))
     writes = by_pins("SaveGameObject")
     # BeginPlay's repair of a save from an older build, a rebind, one nudge per
-    # slider, and the debug toggle. Written at the moment of the change and not
+    # slider, the difficulty's nudge, and the debug toggle. Written at the moment of the change and not
     # on leaving the page, because a game quit from the settings screen still
     # has to remember what was set -- which is the whole of "across future game runs".
-    want_writes = 3 + len(S.SLIDERS)
+    want_writes = 4 + len(S.SLIDERS)
     check("every change is written to disk on the spot",
           len(writes) == want_writes, f"{len(writes)}, want {want_writes}")
     check("...and there is a load and a create, so a first run is not an error",
@@ -933,6 +935,8 @@ def main():
     check("...and the caret is reset on every move between them",
           sum(1 for t in titles if t == "Set MenuRow") >= 4,
           str(sum(1 for t in titles if t == "Set MenuRow")))
+
+    check_difficulty(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

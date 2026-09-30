@@ -10,8 +10,8 @@ cast in every one of those graphs. What the base class has that food does not
 need (damage, a magazine) is simply zero here, and the fire key never reaches
 it: the weapon component branches on Consumable before the gun code runs.
 
-BP_ConsumableItem adds the two numbers GA_ConsumeItem reads off the payload,
-HungerRestore and ThirstRestore.
+BP_ConsumableItem adds the numbers GA_ConsumeItem reads off the payload:
+HungerRestore, ThirstRestore, and HealthRestoreEasy (applied on EASY only).
 """
 
 import unreal
@@ -37,16 +37,16 @@ def build_consumable_materials():
 
 
 def build_consumable_item():
-    """The consumable base: BP_WeaponItem + HungerRestore/ThirstRestore."""
+    """The consumable base: BP_WeaponItem + the three restores."""
     item_bp = _must_load(ITEM_BP_PATH)
     bp = _create_blueprint(CONSUMABLE_BP_PATH, BEL.generated_class(item_bp))
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    for name in ("HungerRestore", "ThirstRestore"):
+    for name in ("HungerRestore", "ThirstRestore", "HealthRestoreEasy"):
         _declare(ed, name, _float_type())
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ConsumableItem failed to compile")
     _apply_defaults(bp, {"Consumable": True, "HungerRestore": 0.0,
-                         "ThirstRestore": 0.0})
+                         "ThirstRestore": 0.0, "HealthRestoreEasy": 0.0})
     _log(f"built {CONSUMABLE_BP_PATH}")
     return bp
 
@@ -70,6 +70,7 @@ def build_consumable(spec, base_bp):
         "Consumable": True,
         "HungerRestore": float(spec["hunger"]),
         "ThirstRestore": float(spec["thirst"]),
+        "HealthRestoreEasy": float(spec["health_easy"]),
         # True, unlike every weapon: a consumable starts life on the ground,
         # which is exactly what E looks for. place_forage.py therefore needs no
         # per-instance override (Python refuses to write a Blueprint variable
@@ -100,7 +101,7 @@ def build_consumable(spec, base_bp):
         "AimPose": _must_load(aim),
     })
     _log(f"built {spec['path']} ({spec['display']}: +{spec['hunger']:.0f} hunger, "
-         f"+{spec['thirst']:.0f} thirst)")
+         f"+{spec['thirst']:.0f} thirst, +{spec['health_easy']:.0f} health on easy)")
     return bp
 
 

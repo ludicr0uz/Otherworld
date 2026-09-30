@@ -9,6 +9,9 @@ build_graphics_menu.py, which is still the entry point and owns the rest.
   settings_rows   settings screen constants: SLIDERS, row layout, KEY_POOL
   settings_page   drawing the settings page; pushing settings onto the weapon
   settings_input  rebinding capture, slider nudges, BACK, the save
+  difficulty      the DIFFICULTY row (EASY/MEDIUM/SURVIVOR) and its push onto
+                  the GameMode, which gameplay reads
+  difficulty_checks  verify_graphics_menu.py's checks for that row and push
   survival_bars   hunger/thirst/temperature bars and the debuff names
   scope           the sniper's glass, and when it replaces the crosshair
   reticle         the crosshair: centred, red when blocked, gap = the gun's cloud

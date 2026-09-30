@@ -8,6 +8,7 @@ from combat.graph import (
     BEL, BGE, _apply_defaults, _create_blueprint, _declare, _float_type, _key,
     _log, _struct_type,
 )
+from combat.difficulty import DEFAULT_DIFFICULTY, DIFFICULTY_VAR
 from combat.paths import SETTINGS_BP_PATH, SETTINGS_SLOT
 from combat.tuning import BIND_VARS, COMBAT
 
@@ -40,6 +41,9 @@ def build_settings_savegame(rebuild=True):
     # it as the default too. The HUD copies it onto the GameMode's DebugMode at
     # BeginPlay and writes it back whenever D flips it.
     _declare(ed, "DebugMode", BEL.get_basic_type_by_name("bool"))
+    # The difficulty, an index into combat.difficulty.DIFFICULTY_LABELS. A save
+    # written before this field existed loads it as the default (EASY).
+    _declare(ed, DIFFICULTY_VAR, BEL.get_basic_type_by_name("int"))
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_Settings failed to compile")
     _apply_defaults(bp, {
@@ -47,6 +51,7 @@ def build_settings_savegame(rebuild=True):
         "ScopeSensitivity": COMBAT.ads_scope_sens_scale,
         "Binds": [_key(k) for _name, k in BIND_VARS],
         "DebugMode": True,
+        DIFFICULTY_VAR: DEFAULT_DIFFICULTY,
     })
     _log(f"built {SETTINGS_BP_PATH} (slot {SETTINGS_SLOT!r})")
     return bp

@@ -8,6 +8,7 @@ import unreal
 from combat.graph import (
     BEL, BGE, _assets, _declare, _float_type, _log, _struct_type,
 )
+from combat.difficulty import DIFFICULTY_VAR
 from combat.paths import GAME_MODE_BP_PATH
 
 
@@ -130,6 +131,9 @@ def ensure_game_mode_vars():
                        written by whatever made it, heard by every wanderer.
         GunDrop*       the gun drop's roll and pick streams and their
                        seeded-this-session flag (see GUN_ROLL_STREAM_VAR).
+        Difficulty     the settings screen's difficulty, copied here by the
+                       HUD every DrawHUD so gameplay (GA_ConsumeItem) reads it
+                       without loading the save. Its int default, 0, is EASY.
 
     All three outlive every actor that touches them -- the player's own health
     component is destroyed with the player, so the score cannot live there.
@@ -145,7 +149,7 @@ def ensure_game_mode_vars():
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     if not ed:
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
-    for name in (SPAWN_COUNT_VAR, KILL_COUNT_VAR):
+    for name in (SPAWN_COUNT_VAR, KILL_COUNT_VAR, DIFFICULTY_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
     for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR, COMBAT_TRACE_VAR,
                  GUN_STREAMS_SEEDED_VAR):
@@ -160,6 +164,6 @@ def ensure_game_mode_vars():
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
     _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {KILL_COUNT_VAR}, "
-         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR}, {COMBAT_TRACE_VAR}, the noise "
-         f"record and the gun-drop streams ready")
+         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR}, {COMBAT_TRACE_VAR}, "
+         f"{DIFFICULTY_VAR}, the noise record and the gun-drop streams ready")
     return bp

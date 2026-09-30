@@ -112,6 +112,8 @@ from graphics_menu.reticle import _author_reticle                  # noqa: E402
 from combat.tuning import INVENTORY_SIZE                            # noqa: E402
 from graphics_menu.settings_page import (                          # noqa: E402
     _author_push_settings, _author_settings_page)
+from graphics_menu.difficulty import (                             # noqa: E402
+    author_push_difficulty, declare_difficulty_vars, difficulty_defaults)
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -644,6 +646,7 @@ def _ensure_variables(ed, bp):
         if not ed.add_member_variable(name, pin_type):
             raise RuntimeError(f"could not declare member variable {name}")
     declare_fps_vars(ed)
+    declare_difficulty_vars(ed)
 
 
 def _apply_defaults(bp, defaults):
@@ -2095,9 +2098,11 @@ def _author_draw(ed, x0, y0):
     # before the dead/alive test, because it is the one thing on this event
     # that has to happen on every frame in every state -- a sensitivity changed
     # on the settings screen has to be in effect the moment the world unpauses.
+    # The difficulty onto the GameMode first, where there is one to write.
+    to_mode = author_push_difficulty(ed, x0 + 3000, y0 + 13400,
+                                     BEL.find_then_pin(copy_dbg), mode_out)
     pushed = _author_push_settings(ed, x0 + 3000, y0 + 14000,
-                                   (BEL.find_then_pin(copy_dbg),
-                                    BEL.find_then_pin(no_dbg)))
+                                   (*to_mode, BEL.find_then_pin(no_dbg)))
 
     # The FPS readout, in every state -- title, game, death -- while debug
     # mode is on. Drawn first, so every panel after it can sit on top.
@@ -2307,7 +2312,8 @@ def build_hud_blueprint(rebuild=False):
                          "MenuPage": PAGE_TITLE, "MenuRow": 0,
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],
-                         "BindLabels": list(BIND_LABELS)})
+                         "BindLabels": list(BIND_LABELS),
+                         **difficulty_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

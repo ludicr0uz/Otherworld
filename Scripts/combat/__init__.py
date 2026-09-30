@@ -14,6 +14,7 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     (GUN_LOOT_TABLE, GUN_DROP_CHANCE, GUN_DROP_SEED),
                     auto fire, the consume event and health-drain tags,
                     noise, SHOT_VOLUME_CM (how loud each gun is)
+  difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
   weapon_specs      the five weapons: parts, muzzles, icons, _weapon_specs()

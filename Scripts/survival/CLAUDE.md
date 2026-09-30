@@ -32,7 +32,9 @@ Both are read at editor **startup**, so changing either needs a restart.
 1. The player presses fire while holding a `Consumable`.
 2. `combat/weapon_component/consume.py` sends the event, **then** removes and destroys the item.
    The ability runs synchronously and reads the item first.
-3. `GA_ConsumeItem` adds the restore value, clamped.
+3. `GA_ConsumeItem` adds the restore value, clamped. On the **EASY** difficulty it also adds the
+   item's `HealthRestoreEasy` to Health (`easy_heal.py`; a mushroom heals 10). It reads the
+   GameMode's `Difficulty` (`combat/difficulty.py`), which the HUD copies from the settings save.
 4. On the next Tick, the survival component sees that the bar and the effect disagree, and
    removes the effect.
 
@@ -51,7 +53,7 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 
 - **Rates:**
   - Hunger empties in 15 min and thirst in 10.
-  - A mushroom restores +25 hunger and a canteen +40 thirst.
+  - A mushroom restores +25 hunger and a canteen +40 thirst. On EASY a mushroom also heals 10.
   - Temperature is a 0–100 bar that nothing moves yet.
 - **Where forage goes:** `scatter_forage` puts mushrooms 0.7–2.2 m from a trunk and canteens
   anywhere.
@@ -82,5 +84,7 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 
 These can't be proved headlessly:
 
-- pressing fire with food in hand;
+- pressing fire with food in hand (the heal itself was probed in `-game` by sending
+  `Event.Item.Consume` from Python: 50 → 60 HP on EASY, unchanged on MEDIUM; it lands a frame
+  after the send);
 - how the bars and the two-row strip look.

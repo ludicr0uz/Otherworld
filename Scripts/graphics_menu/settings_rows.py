@@ -5,6 +5,7 @@ drawn by settings_page.py and driven by settings_input.py.
 
 from collections import namedtuple
 
+from combat import difficulty as combat_difficulty
 from combat import paths as combat_paths
 from combat import tuning as combat_tuning
 
@@ -55,12 +56,15 @@ SLIDERS = (
            SCOPE_SENSITIVITY_MIN, SCOPE_SENSITIVITY_MAX),
 )
 
-# Rows 0..len(SLIDERS)-1 are the sliders, then BIND_VARS in order, then BACK.
-# The arithmetic "row - FIRST_BIND_ROW is the bind index" appears in the graph
-# twice and is the reason the binds are contiguous.
+# Rows 0..len(SLIDERS)-1 are the sliders, then DIFFICULTY, then BIND_VARS in
+# order, then BACK. The arithmetic "row - FIRST_BIND_ROW is the bind index"
+# appears in the graph twice and is the reason the binds are contiguous.
+# DIFFICULTY sits with the sliders because the arrows are its control too, and
+# above FIRST_BIND_ROW so Enter on it arms no capture.
 SENS_ROW = 0
 SCOPE_SENS_ROW = 1
-FIRST_BIND_ROW = len(SLIDERS)
+DIFFICULTY_ROW = len(SLIDERS)
+FIRST_BIND_ROW = DIFFICULTY_ROW + 1
 SETTINGS_ROWS = FIRST_BIND_ROW + len(BIND_VARS) + 1
 BACK_ROW = SETTINGS_ROWS - 1
 BIND_LABELS = ("FIRE", "SHOULDER AIM", "AIM DOWN SIGHTS", "SPRINT", "SWITCH", "DROP",
@@ -68,6 +72,8 @@ BIND_LABELS = ("FIRE", "SHOULDER AIM", "AIM DOWN SIGHTS", "SPRINT", "SWITCH", "D
 SENS_LABEL = SLIDERS[SENS_ROW].label
 SCOPE_SENS_LABEL = SLIDERS[SCOPE_SENS_ROW].label
 BACK_LABEL = "BACK"
+DIFFICULTY_LABEL = "DIFFICULTY"
+DIFFICULTY_LABELS = combat_difficulty.DIFFICULTY_LABELS
 SETTINGS_TITLE = "SETTINGS"
 
 SET_TITLE_OFF = 44.0

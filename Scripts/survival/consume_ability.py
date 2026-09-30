@@ -12,6 +12,8 @@ actor has been granted for that tag decides what the use does.
         --> Cast GetAvatarActor().GetComponentByClass(Survival) to BP_SurvivalComponent
         --> Hunger = clamp(Hunger + HungerRestore, 0, MaxHunger)
         --> Thirst = clamp(Thirst + ThirstRestore, 0, MaxThirst)
+        --> on EASY: Health = clamp(Health + HealthRestoreEasy, 0, MaxHealth)
+                                    (easy_heal)
         --> EndAbility              (every failed cast ends it too)
 
 Nothing here removes a debuff. Raising Hunger above zero is enough: the
@@ -35,6 +37,7 @@ from combat.nodes import (
     NODE_ABILITY_FROM_EVENT, NODE_BREAK_EVENT_DATA,
 )
 from combat.tuning import CONSUME_EVENT_TAG
+from survival.easy_heal import _author_easy_heal
 from survival.paths import (
     CONSUMABLE_BP_PATH, CONSUMABLE_CLASS_PATH, CONSUME_ABILITY_PATH,
     NODE_CAST_CONSUMABLE, NODE_CAST_SURVIVAL, SURVIVAL_BP_PATH,
@@ -57,8 +60,9 @@ def _author_graph(ed):
     item = _loose_pin(as_item, "AsBPConsumableItem", is_input=False)
 
     avatar = _at(_node(ed, FN_AVATAR), 320, 300)
+    avatar_out = _pin(avatar, "ReturnValue", is_input=False)
     comp = _at(_node(ed, FN_GET_COMP), 560, 300)
-    _connect(_pin(avatar, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _connect(avatar_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(SURVIVAL_CLASS_PATH)
     as_survival = _at(_palette(ed, NODE_CAST_SURVIVAL), 800, 0)
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_survival, "Object"))
@@ -89,17 +93,21 @@ def _author_graph(ed):
         _connect(flow, _pin(write, "execute"))
         flow = BEL.find_then_pin(write)
 
-    # Every path ends the ability, including both failed casts: an ability
-    # left active would block the next activation of this instance.
-    end = _at(_node(ed, FN_END_ABILITY), 2800, 0)
-    for e in (flow, _pin(as_item, "CastFailed", is_input=False),
+    _heal_nodes, healed = _author_easy_heal(ed, flow, item, avatar_out, 2800, 0)
+
+    # Every path ends the ability, including every failed cast and the heal's
+    # not-easy arm: an ability left active would block the next activation of
+    # this instance.
+    end = _at(_node(ed, FN_END_ABILITY), 4900, 0)
+    for e in (*healed, _pin(as_item, "CastFailed", is_input=False),
               _pin(as_survival, "CastFailed", is_input=False)):
         _connect(e, _pin(end, "execute"))
 
     ed.add_comment_to_nodes(
         f"Triggered by {CONSUME_EVENT_TAG}. The payload's OptionalObject is the "
         "item being used; its HungerRestore/ThirstRestore go onto the avatar's "
-        "survival component, clamped to the bars' maxima.",
+        "survival component, clamped to the bars' maxima, and on EASY its "
+        "HealthRestoreEasy onto the avatar's health.",
         [event, data, as_item, avatar, comp, as_survival, end])
 
 

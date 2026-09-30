@@ -39,6 +39,12 @@ MUSHROOM_HUNGER = 25.0
 MUSHROOM_THIRST = 0.0
 CANTEEN_HUNGER = 0.0
 CANTEEN_THIRST = 40.0
+# Health a use gives back, on the EASY difficulty only (combat.difficulty);
+# on MEDIUM and SURVIVOR food is food. GA_ConsumeItem reads the GameMode's
+# Difficulty, so this is the item's number and the ability decides whether it
+# applies.
+MUSHROOM_HEALTH_EASY = 10.0
+CANTEEN_HEALTH_EASY = 0.0
 
 # The debuffs, as gameplay tags (declared in Config/DefaultGameplayTags.ini).
 # Each debuff grants its own tag, so the HUD can name it, plus the shared

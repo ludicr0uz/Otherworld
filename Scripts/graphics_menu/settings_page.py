@@ -6,9 +6,11 @@ constants are settings_rows.py.
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from graphics_menu.canvas import (
     COL_CARET, COL_MAIN_HINT, COL_ROW, COL_TITLE, UI_FONT, _draw_texture)
+from graphics_menu.difficulty import author_difficulty_name
 from graphics_menu.settings_input import _author_capture
 from graphics_menu.settings_rows import (
-    BACK_LABEL, BACK_ROW, BIND_VARS, FIRST_BIND_ROW, SETTINGS_CLASS_PATH,
+    BACK_LABEL, BACK_ROW, BIND_VARS, DIFFICULTY_LABEL, DIFFICULTY_ROW,
+    FIRST_BIND_ROW, SETTINGS_CLASS_PATH,
     SLIDERS,
     SETTINGS_PANEL, SETTINGS_ROWS, SETTINGS_SLOT, SETTINGS_TITLE,
     SET_CARET_X, SET_HINT_OFF, SET_HINT_SCALE, SET_LABEL_X, SET_ROW0_OFF,
@@ -119,8 +121,8 @@ def _author_push_settings(ed, x0, y0, in_execs):
 def _author_settings_page(ed, x0, y0, in_exec):
     """The sensitivity sliders and the seven binds, on the same panel as the title.
 
-    Rows: SLIDERS (mouse, then scope), BIND_VARS in order, BACK. Left/Right
-    adjust a slider, Enter arms a capture on any of the seven binds, and every
+    Rows: SLIDERS (mouse, then scope), DIFFICULTY, BIND_VARS in order, BACK.
+    Left/Right adjust a slider or cycle the difficulty, Enter arms a capture on any of the seven binds, and every
     change is written to disk on the spot.
 
     The seven bind rows are ONE pair of DrawTexts inside a ForEachLoop over
@@ -229,6 +231,14 @@ def _author_settings_page(ed, x0, y0, in_exec):
         text(x0 + 2280, value_x, slider_y, SET_ROW_SCALE, COL_CARET,
              driven=_pin(value_str, "ReturnValue", is_input=False))
 
+    # --- the difficulty: its label and the name it is set to ----------------
+    py = y0 + 1140 + len(SLIDERS) * 360
+    difficulty_y = row_y(DIFFICULTY_ROW, py)
+    text(x0 + 2020, label_x, difficulty_y, SET_ROW_SCALE, COL_ROW,
+         literal=DIFFICULTY_LABEL)
+    text(x0 + 2540, value_x, difficulty_y, SET_ROW_SCALE, COL_CARET,
+         driven=author_difficulty_name(ed, settings_out, x0 + 2020, py + 120, made))
+
     # --- the binds, one loop ------------------------------------------------
     binds = keep(_at(ed.add_get_member_variable_node("Binds",
                                                      SETTINGS_CLASS_PATH),
@@ -305,7 +315,7 @@ def _author_settings_page(ed, x0, y0, in_exec):
 
     ed.add_comment_to_nodes(
         f"The settings page. {SETTINGS_ROWS} rows: {len(SLIDERS)} sliders, the "
-        f"{len(BIND_VARS)} binds, and BACK. Everything it changes is written "
+        f"difficulty, the {len(BIND_VARS)} binds, and BACK. Everything it changes is written "
         f"to slot {SETTINGS_SLOT!r} the moment it changes, which is what makes "
         f"it survive a restart -- see _emit_save.",
         made)

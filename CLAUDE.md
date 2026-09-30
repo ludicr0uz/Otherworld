@@ -160,7 +160,8 @@ editor.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee. They respawn 75–100 m away and leave ragdoll corpses.
 - **The HUD:** HP, stamina, hunger, thirst and temperature bars, a kill counter, the death menu,
-  the graphics menu and a settings screen.
+  the graphics menu and a settings screen, which holds the difficulty (EASY / MEDIUM / SURVIVOR,
+  default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`, both at night. Food
   and water lie in both.
 - **Known gaps:** temperature moves nothing yet. `GameDefaultMap` still points at the old

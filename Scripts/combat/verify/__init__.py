@@ -25,10 +25,11 @@ and it never relies on a variable another section left behind.
               the crouch it drives, the footsteps' volume and reach per stance
   accuracy    the per-gun cloud and recoil factors: the table, the weapons'
               variables, AimSpread/RecoilScale/ReticleSpread, the shot's draw
+  punch       empty hands: the press gate, the clip, the sweep and the blow
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance", "accuracy",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance", "accuracy", "punch",
     "settings_and_tuning", "firing", "consume", "drops", "noise", "combat_trace",
 )

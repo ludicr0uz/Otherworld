@@ -7,18 +7,23 @@ import unreal
 from combat.game_state import DEBUG_MODE_VAR
 from combat.graph import (
     BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _events,
-    _float_type, _key, _log, _post_physics_tick, _struct_type,
+    _float_type, _key, _log, _must_load, _post_physics_tick, _struct_type,
 )
 from combat.hit_zones import HIT_BONE_VAR
 from combat.paths import (
     CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, WEAPON_COMP_BP_PATH,
 )
+from combat.skin import player_skin
 from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.firing import SHOT_DIRECTION_VAR
 from combat.weapon_component.inventory import _author_wc_begin_play
 from combat.weapon_component.pose_weights import HELD_TWO_HANDED
+from combat.weapon_component.punch import (
+    NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
+    PUNCH_QUEUED_VAR,
+)
 from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.tick import _author_wc_tick
 
@@ -130,6 +135,14 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         _declare(ed, name, BEL.get_class_reference_type(item_class))
     _declare(ed, "BloodClass",
              BEL.get_class_reference_type(unreal.Actor.static_class()))
+    # The empty-handed punch (punch.py): its clip on the worn rig, the press
+    # queued for the swing, the cooldown, and the blow still to land.
+    _declare(ed, PUNCH_ANIM_VAR, BEL.get_object_reference_type(
+        unreal.AnimSequenceBase.static_class()))
+    for name in (PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    for name in (NEXT_PUNCH_VAR, PUNCH_DUE_VAR):
+        _declare(ed, name, _float_type())
 
     _author_wc_begin_play(ed, begin)
     _author_wc_tick(ed, tick)
@@ -178,6 +191,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         "PistolClass": BEL.generated_class(pistol_bp),
         "ItemClass": item_class,
         "BloodClass": BEL.generated_class(blood_bp),
+        PUNCH_ANIM_VAR: _must_load(player_skin().punch),
+        PUNCH_QUEUED_VAR: False,
+        PUNCH_PENDING_VAR: False,
+        NEXT_PUNCH_VAR: 0.0,
+        PUNCH_DUE_VAR: 0.0,
     })
     _log(f"built {WEAPON_COMP_BP_PATH}")
     return bp

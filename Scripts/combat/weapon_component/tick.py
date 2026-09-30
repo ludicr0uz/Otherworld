@@ -23,6 +23,7 @@ from combat.weapon_component.inventory import (
     _author_drop, _author_equip, _author_pickup,
 )
 from combat.weapon_component.pose_weights import _author_pose_weights
+from combat.weapon_component.punch import _author_punch
 from combat.weapon_component.ready_pose import _author_ready_pose_keepalive
 from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
@@ -312,6 +313,14 @@ def _author_wc_tick(ed, tick):
         _pin(cooled, "ReturnValue", is_input=False), tap,
         BEL.find_else_pin(ready_gate), 2200, 1100)
 
+    # --- or, with empty hands, a punch (punch.py) ------------------------------
+    # Off the fire gate's False arm, which is where every empty-handed frame
+    # goes: the gate needs IsValid(Held), and the punch needs it false.
+    punch_exits = _author_punch(
+        ed, tap, armed_out, _pin(steady, "ReturnValue", is_input=False),
+        _pin(guarded, "ReturnValue", is_input=False), unspent,
+        (BEL.find_else_pin(fire_gate),), 1040, 9800)
+
     # --- reload --------------------------------------------------------------
     # Shares its key with the death menu's "try again", and that is safe rather
     # than lucky: Event Tick does not run while the game is paused, so this
@@ -321,8 +330,7 @@ def _author_wc_tick(ed, tick):
     reload_gate = _at(ed.add_branch_node(), 1040, 7200)
     _connect(both(pressed("KeyReload", 7360), armed_out, 7300),
              _pin(reload_gate, "Condition"))
-    for exit_pin in (after_fire, BEL.find_else_pin(fire_gate), consumed,
-                     untapped) + dry_exits:
+    for exit_pin in (after_fire, consumed, untapped) + dry_exits + punch_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
     reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate),
                                   1400, 7200)

@@ -22,6 +22,8 @@ _author_* fragment per concern, each in its own module:
   impact      a pellet that connected: blood, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire
+  punch       empty hands: the fire key throws a punch (MM_Attack_01 into the
+              upper-body slot); the blow is a short sphere sweep a moment later
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery
@@ -41,7 +43,8 @@ BP_WeaponComponent event graph:
               --> Equip(0)
 
   [Tick] --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
-                                        (or, if Held.Consumable, use it)
+                                        (or, if Held.Consumable, use it;
+                                         or, with empty hands, punch)
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held
          --> Branch WasInputKeyJustPressed(E)               --> pick up nearest

@@ -76,6 +76,9 @@ class PlayerSkin:
     # clavicle / upperarm / forearm / hand / thigh / calf / foot as "<role>_l|_r".
     # The chest is aim_bones[-1].
     pose_bones: dict
+    # The empty-handed punch (weapon_component/punch.py): MM_Attack_01 on this
+    # rig, played into the upper-body slot.
+    punch: str
     # Mesh component transform inside the actor. The template's own numbers;
     # they are a property of a 1.8 m humanoid standing in an 88 cm capsule
     # facing +X, not of the mannequin, which is why the Meshy skin reuses them.
@@ -98,6 +101,7 @@ SKIN_QUINN = PlayerSkin(
             ("clavicle", "clavicle"), ("upperarm", "upperarm"),
             ("forearm", "lowerarm"), ("hand", "hand"), ("thigh", "thigh"),
             ("calf", "calf"), ("foot", "foot"))}),
+    punch="/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01",
 )
 
 # Built by Scripts/asset_pipeline: fetch_monsters.py -> import_characters.py ->
@@ -126,19 +130,22 @@ SKIN_ADVENTURER = PlayerSkin(
            for role, bone in (("clavicle", "Shoulder"), ("upperarm", "Arm"),
                               ("forearm", "ForeArm"), ("hand", "Hand"),
                               ("thigh", "UpLeg"), ("calf", "Leg"), ("foot", "Foot"))}),
+    # build_retarget.py makes it for every creature (MELEE_SOURCE).
+    punch=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/A_{ADVENTURER}_MM_Attack_01",
 )
 
 
 def player_skin():
     """The adventurer if the pipeline has produced all of it, else the mannequin.
 
-    All four assets or none: a skin resolved piecemeal is the failure that
+    All of its assets or none: a skin resolved piecemeal is the failure that
     cannot be read off a log -- the adventurer's mesh wearing the mannequin's
     anim BP compiles, runs, and stands in the reference pose forever.
     """
     eas = _assets()
     want = (SKIN_ADVENTURER.mesh, SKIN_ADVENTURER.anim_bp,
-            SKIN_ADVENTURER.aim_rifle, SKIN_ADVENTURER.aim_pistol)
+            SKIN_ADVENTURER.aim_rifle, SKIN_ADVENTURER.aim_pistol,
+            SKIN_ADVENTURER.punch)
     missing = [p for p in want if not eas.does_asset_exist(p)]
     if not missing:
         return SKIN_ADVENTURER

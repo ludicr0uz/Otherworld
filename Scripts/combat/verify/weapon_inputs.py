@@ -13,6 +13,7 @@ from combat.tuning import (
 )
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wg
+from combat.verify.punch import is_punch_play, is_punch_sweep
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, pin_value, titled,
 )
@@ -68,7 +69,8 @@ def check_keys_are_variables():
               got is not None and got.export_text() == default,
               got.export_text() if got is not None else "None")
 
-    plays = by_pins(wg, "Asset", "SlotNodeName")
+    # The punch's clip is its own section's (verify/punch.py).
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if not is_punch_play(n)]
     # TWO, and the second one is not a duplicate. A montage started in HitSlot stops
     # the ready pose in DefaultSlot -- montages are stopped per GROUP and UE 5.8
     # exposes no way to put a slot in a different group from Python -- so the flinch
@@ -102,7 +104,8 @@ def check_keys_are_variables():
     # decides what is being aimed at, the muzzle line decides whether the gun can
     # reach it, and the pellets fly down the muzzle line. Getting this wrong is not
     # a compile error -- it is a gun that shoots from behind the player's shoulder.
-    traces = by_pins(wg, "Start", "End", "TraceChannel")
+    traces = [n for n in by_pins(wg, "Start", "End", "TraceChannel")
+              if not is_punch_sweep(n)]
     check("there are four traces (camera aim, muzzle clearance, pellets, drop probe)",
           len(traces) == 4, str(len(traces)))
 

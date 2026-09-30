@@ -17,6 +17,21 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     key is still down. `TriggerSpent` is set by the consume chain, the outer gate requires
     `NOT TriggerSpent`, and `TriggerSpent &= IsInputKeyDown` runs just before the gate. Without
     it, a weapon in the next slot fired once on the same press.
+- **Empty hands punch** (`weapon_component/punch.py`, tuning `COMBAT.punch_*`). The fire
+  gate's False arm runs the punch's press gate: tap AND `NOT IsValid(Held)` AND not sprinting,
+  not blocking, not a spent press, off cooldown (`NextPunchTime`). It reads nothing off `Held`.
+  - The press only sets `PunchQueued`; the swing stage consumes it, so a probe can punch
+    without a key (`Scripts/probes/probe_punch.py`).
+  - The swing plays the worn skin's `MM_Attack_01` (`PlayerSkin.punch`, retargeted by
+    `build_retarget` as `MELEE_SOURCE`) into `DefaultSlot`, upper body only. A flinch or a
+    sprint re-equip stops it (same montage group, or the equip's `StopSlot`).
+  - The blow lands `punch_impact_s` later (`PunchPending`/`PunchDueTime`): a sphere sweep from
+    the chest along the actor's forward, then the same Health/LastDamageTime/DamagedByPlayer/
+    LastHitFrom writes a pellet makes. No blood, no hit zones.
+  - `IsSlotActive` turns true one anim update after the play, not on it; a probe asks
+    `is_playing_slot_animation` first.
+  - The verifier's older counts (ready-pose plays, traces, the fire gate, LastHitFrom writes)
+    set the punch's nodes aside with `verify/punch.is_punch_*`.
 - **Reload stores `Min(MagazineSize − Loaded, Reserve)` into `ReloadTake` once.** Recomputing it
   after `Loaded` rises means free ammo.
 - **Debug mode:**

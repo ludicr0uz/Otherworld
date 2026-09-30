@@ -5,6 +5,7 @@ mobility, and sprint dropping the ready pose.
 from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wc_cdo, wg
+from combat.verify.punch import is_punch_play
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins, titled,
 )
@@ -315,7 +316,7 @@ def check_sprint_drops_ready_pose():
           str(sorted({t for t in titles if "=" in t})))
     # The pose itself: the branch that decides whether to play or stop the slot
     # now has a NOT Sprinting in its condition, which is what actually stops it.
-    plays = by_pins(wg, "Asset", "SlotNodeName")
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if not is_punch_play(n)]
     if plays:
         node, reached = plays[0], False
         ins = BEL.find_input_pin(node, "execute")

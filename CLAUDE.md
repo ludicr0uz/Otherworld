@@ -193,7 +193,7 @@ editor.
   assault rifle and sniper are found as drops. The rifle is the FPS Weapon Bundle's AK 47 and
   the sniper its AS Val with a scope (Fab models); the other three are still primitive shapes. The player can sprint, aim over the shoulder or down
   the sights (the sniper's is its scope), reload and eat, block (F; a swing from the front does a
-  quarter damage and costs stamina), crouch (C) and go prone (Z), both quieter and slower, and has
+  quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), crouch (C) and go prone (Z), both quieter and slower, and has
   a 10-slot inventory. Crouch, prone and the guard are procedural poses (no clip exists).
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.

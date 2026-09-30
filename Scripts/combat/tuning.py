@@ -128,6 +128,18 @@ class CombatConfig:
     block_stamina_per_hit: float = 20.0
     block_half_angle_deg: float = 60.0
 
+    # --- the punch: the fire key with empty hands (weapon_component/punch) ---
+    # One swing every punch_interval_s; the blow lands punch_impact_s into the
+    # clip (MM_Attack_01's fist is out by then), on the first body a sphere of
+    # punch_radius_cm meets within punch_reach_cm in front of the chest. Seven
+    # punches kill a 100 HP wanderer: a last resort, not a weapon.
+    punch_damage: float = 15.0
+    punch_interval_s: float = 0.8
+    punch_impact_s: float = 0.3
+    punch_reach_cm: float = 130.0
+    punch_radius_cm: float = 30.0
+    punch_chest_cm: float = 30.0
+
     # --- crouch and prone ----------------------------------------------------
     # Toggled by CROUCH_KEY / PRONE_KEY; sprinting stands the player up. Both
     # are UE's own crouch (the capsule shrinks, the camera boom rides down with

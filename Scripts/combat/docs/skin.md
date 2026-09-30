@@ -8,7 +8,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   `A_Adventurer01_ABP_Unarmed`, which is `ABP_Unarmed` retargeted by
   `asset_pipeline/build_retarget.py`.
 - **`PlayerSkin` is one record:** mesh, anim BP, grip, poses and offsets.
-  - `player_skin()` picks the adventurer only if **all four** assets exist, and otherwise falls
+  - `player_skin()` picks the adventurer only if **all** its assets exist (mesh, anim BP, both
+    ready poses and the punch clip), and otherwise falls
     back to `SKIN_QUINN`.
   - A partial skin compiles, then stands in its bind pose.
 - **The animation moved to the mesh, not the mesh to `SK_Mannequin`:**

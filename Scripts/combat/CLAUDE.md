@@ -8,8 +8,9 @@ the code is this package (`__init__.py` is the map) and the verifier's sections 
 
 The defaults are all rebindable on the settings screen:
 
-- Left click fires. It **auto-fires while held** on the SMG and the assault rifle, and a tap
-  **eats or drinks** a held consumable.
+- Left click fires. It **auto-fires while held** on the SMG and the assault rifle, a tap
+  **eats or drinks** a held consumable, and with **empty hands it punches**
+  (`weapon_component/punch.py`, see `docs/firing_gate.md`).
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
   **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone.
@@ -122,6 +123,8 @@ touches the fire graph doesn't pay for the notes on blood.
 
 These are feel checks a headless run can't do:
 
+- the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
+  `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100
   to 61);
 - the pistol emptying after 8 shots, clicking, and R refilling it to 8 (no key can be injected

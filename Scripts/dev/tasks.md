@@ -17,13 +17,13 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       death menu using UMG Widgets. This enables responsive scaling, easier dialog/animation support,
       and faster iteration on UI changes. Keep the reticle and scope overlay as custom renders if
       performance requires it, but move all static layouts and stat bars to UMG.
-- [ ] Make the pistol reload every 8 shots, with infinite reloads: an 8-round magazine and an
+- [x] Make the pistol reload every 8 shots, with infinite reloads: an 8-round magazine and an
       unlimited reserve. It is still the fallback weapon, so it can never run dry for good.
-- [ ] Implement daytime and nighttime, with the sun and moon rotating across the sky. The sun is
+- [x] Implement daytime and nighttime, with the sun and moon rotating across the sky. The sun is
       up during the day and the moon at night. At night, stars come out and the light is dim.
       Create new world config settings, and make the day and night durations configurable
       there. For now for testing, set total day to be 4 minutes, and total night to be 4 minutes.
-- [ ] Rework the stat bars on the HUD:
+- [x] Rework the stat bars on the HUD:
       - Move the health bar to the centre bottom of the screen, next to stamina and below the
         item list.
       - Move the temperature and food bars (and the other survival bars) to the bottom left
@@ -31,9 +31,9 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       - Add an icon beside each bar, and make each bar flash when it is low.
       - The item list icons should be about 30% smaller. An earlier task may already have done
         this; if so, leave them as they are and don't shrink them again.
-- [ ] When an item or weapon is picked up, add it to the inventory without switching to it.
+- [x] When an item or weapon is picked up, add it to the inventory without switching to it.
       Whatever item or weapon is active stays active.
-- [ ] Integrate the new gun models that fit into the project to replace current gun models. Use
+- [x] Integrate the new gun models that fit into the project to replace current gun models. Use
       AK 47 for rifle, Use AS Val for sniper rifle. Pistol is missing for now, that's ok - don't
       integrate yet.
       fab: FPS Weapon Bundle | url: https://www.fab.com/listings/8aeb9c48-b404-4dcd-9e56-1d0ecedba7f5 | at: /Game/FPS_Weapon_Bundle | why: real rifle and sniper models
@@ -48,3 +48,12 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       - attachments (static meshes, Accessories/): SM_Scope_25x56_X/_Y, SM_T4_Sight,
         SM_Suppressor5, SM_Vertgrip
       Materials are under Weapons/Materials/, and Maps/Weapons_Showcase shows them all.
+- [x] Add a "dev-all-guns" option to the dev menu (accessed via 'm' key in-game). When selected,
+      the player should receive all available weapons. This is a testing cheat feature for
+      quick weapon testing during development.
+- [x] Migrate NPC AI logic from hand-coded sense chain to Unreal's Behavior Tree system (BTS).
+      Current implementation uses a heartbeat loop with hardcoded sense priorities
+      (hurt → sight → touch → sound). Behavior Trees provide an industry-standard solution
+      with visual debugging, hot-reload support, and reusable subtrees. This makes the AI
+      easier to iterate on and scales better as complexity grows (guards, investigating,
+      calling for help, etc.).

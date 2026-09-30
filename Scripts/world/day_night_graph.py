@@ -1,7 +1,9 @@
 """BP_DayNightCycle's EventGraph: BeginPlay takes over the sky, Tick runs it.
 
 BeginPlay destroys every actor tagged STATIC_SKY_TAG (the level's own light,
-sky light, fog, clouds and dome) and gives the dome a dynamic material.
+sky light, fog, clouds and dome), gives the dome a dynamic material and, with
+RandomStart, sets Clock to a random point in the whole cycle (so a game
+starts at a random time of day).
 
 Tick advances Clock and derives everything else from it, the same sums as
 world_config.sun_state():
@@ -25,10 +27,11 @@ from combat.graph import (
     BEL, _at, _connect, _events, _log, _loose_pin, _node, _pin, _set,
 )
 from combat.nodes import (
-    FN_ADD_FF, FN_DESTROY, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, MACRO_FOR_EACH,
+    FN_ADD_FF, FN_DESTROY, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT,
+    MACRO_FOR_EACH,
 )
 from world import world_config as cfg
-from world.day_night_blueprint import IS_DAY_VAR, SKY_MID_VAR
+from world.day_night_blueprint import IS_DAY_VAR, RANDOM_START_VAR, SKY_MID_VAR
 from world.paths import STATIC_SKY_TAG
 
 KML = "/Script/Engine.KismetMathLibrary"
@@ -106,7 +109,8 @@ def _set_var(ed, chain, name, value_pin, x, y):
 
 
 def _author_begin_play(ed, begin):
-    """Destroy the level's tagged sky rig, then make the dome's dynamic material."""
+    """Destroy the level's tagged sky rig, make the dome's dynamic material,
+    then (RandomStart) pick the starting clock."""
     chain = _Chain(BEL.find_then_pin(begin))
     found = chain.step(_call(ed, FN_ACTORS_WITH_TAG, 300, -900, Tag=STATIC_SKY_TAG))
     loop = _at(ed.add_macro_node(MACRO_FOR_EACH), 600, -900)
@@ -122,6 +126,14 @@ def _author_begin_play(ed, begin):
     mid = chain.step(_call(ed, FN_CREATE_MID, 900, -800,
                            self=_get(ed, "SkyDome", 650, -700), ElementIndex=0))
     _set_var(ed, chain, SKY_MID_VAR, _out(mid), 1250, -800)
+
+    pick = chain.step(_at(ed.add_branch_node(), 1550, -800))
+    _connect(_get(ed, RANDOM_START_VAR, 1350, -650), _pin(pick, "Condition"))
+    total = _out(_call(ed, FN_ADD_FF, 1600, -550,
+                       A=_get(ed, "DayLengthSeconds", 1350, -550),
+                       B=_get(ed, "NightLengthSeconds", 1350, -450)))
+    anywhere = _call(ed, FN_RANDOM_FLOAT, 1850, -550, Min=0.0, Max=total)
+    _set_var(ed, chain, "Clock", _out(anywhere), 2100, -800)
 
 
 def _author_clock(ed, tick, chain):

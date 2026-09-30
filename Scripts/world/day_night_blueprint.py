@@ -23,9 +23,10 @@ from world.paths import SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH
 
 COMPONENTS = ("Sun", "Moon", "SkyLight", "SkyDome", "Fog", "NightGrade", "DayGrade")
 
-# Variables. The two lengths and Clock are Instance Editable, so a level can
-# run a different day, or start at a different hour, without a rebuild.
+# Variables. The two lengths, Clock and RandomStart are Instance Editable, so
+# a level can run a different day, or start at a set hour, without a rebuild.
 CONFIG_VARS = ("DayLengthSeconds", "NightLengthSeconds", "Clock")
+RANDOM_START_VAR = "RandomStart"   # BeginPlay picks Clock anywhere in the cycle
 STATE_FLOAT_VARS = ("DayAmount",)
 IS_DAY_VAR = "IsDay"
 SKY_MID_VAR = "SkyMaterial"
@@ -109,14 +110,16 @@ def build_components(bp):
 def declare_variables(ed):
     for name in CONFIG_VARS + STATE_FLOAT_VARS:
         _declare(ed, name, _float_type())
-    _declare(ed, IS_DAY_VAR, BEL.get_basic_type_by_name("bool"))
+    for name in (IS_DAY_VAR, RANDOM_START_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     _declare(ed, SKY_MID_VAR, BEL.get_object_reference_type(
         unreal.MaterialInstanceDynamic.static_class()))
 
 
 def apply_config(bp):
-    """Instance Editable lengths and clock; defaults from world_config (compiles, saves)."""
-    for name in CONFIG_VARS:
+    """Instance Editable lengths, clock and random start; defaults from
+    world_config (compiles, saves)."""
+    for name in CONFIG_VARS + (RANDOM_START_VAR,):
         BEL.set_blueprint_variable_instance_editable(bp, name, True)
     # The CDO only has the new variables once the class is compiled.
     if not BEL.compile_blueprint(bp):
@@ -125,4 +128,5 @@ def apply_config(bp):
         "DayLengthSeconds": float(cfg.DAY_LENGTH_S),
         "NightLengthSeconds": float(cfg.NIGHT_LENGTH_S),
         "Clock": float(cfg.START_CLOCK_S),
+        RANDOM_START_VAR: bool(cfg.RANDOM_START),
     })

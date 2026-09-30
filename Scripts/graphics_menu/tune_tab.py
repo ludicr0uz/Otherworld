@@ -1,13 +1,15 @@
 """TuneTab: what one developer tuning tab of the M panel is called -- its key,
 the HUD variables, the widget names and words, and the save's Python command.
 
-The GUN TUNING tab (tune_consts.GUN_TAB) and the MONSTER TUNING tab
-(monster_tune_consts.MONSTER_TAB) are the same machine over a different
-table: tune_tick's keys, nudge and save, tune_draw's panel and wbp_tune's
-widgets all take a TuneTab. Only what the table is applied to differs
-(tune_tick._author_apply: carried guns; monster_tune_tick: live controllers).
+The GUN TUNING tab (tune_consts.GUN_TAB), the MONSTER TUNING tab
+(monster_tune_consts.MONSTER_TAB) and the WORLD TUNING tab
+(world_tune_consts.WORLD_TAB) are the same machine over a different table:
+tune_tick's keys, nudge and save, tune_draw's panel and wbp_tune's widgets
+all take a TuneTab. Only what the table is applied to differs
+(tune_tick._author_apply: carried guns; monster_tune_tick: live controllers;
+world_tune_tick: the day/night cycle).
 
-    [key] with the M panel open   open / close the tab (and shut the other)
+    [key] with the M panel open   open / close the tab (and shut the others)
     Up / Down                     pick a row: the subject, then one per stat
     Left / Right                  the subject row: the previous / next one;
                                   a stat: one step down / up, never under
@@ -52,6 +54,7 @@ class TuneTab:
     row_labels: tuple     # the subject row's, then one per stat
     hint_text: str
     saved_words: str
+    fraction_digits: int = 4  # the panel's values, at most this many decimals
 
     @property
     def row_count(self):

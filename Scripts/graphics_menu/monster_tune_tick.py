@@ -2,7 +2,8 @@
 (tune_tick.author_tab_flow, shared with GUN TUNING), then the table onto
 every live wanderer.
 
-    [N] with MenuOpen       MonTuneOpen = NOT MonTuneOpen; TuneOpen = false
+    [N] with MenuOpen       MonTuneOpen = NOT MonTuneOpen; TuneOpen and
+                            WorldTuneOpen = false
     MenuOpen AND MonTuneOpen: Up/Down, Left/Right, Enter as GUN TUNING
     MonTuneTouched -> for each creature c (MON_CONTROLLERS, in table order):
                       every live BP_ForestWandererAI_<c> (GetAllActorsOfClass)
@@ -26,6 +27,7 @@ from graphics_menu.monster_tune_consts import (
 )
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu.tune_tick import author_tab_flow, declare_tab_vars, tab_defaults
+from graphics_menu.world_tune_consts import WORLD_TAB
 from npc.monster_tuning import MONSTER_STATS, monster_specs
 
 FN_GET_ALL_ACTORS = "/Script/Engine.GameplayStatics.GetAllActorsOfClass"
@@ -116,7 +118,8 @@ def author_monster_tune_tick(ed, pc_out, in_execs, x0, y0):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
     flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, MONSTER_TAB,
-                           len(MON_CREATURES), GUN_TAB.open_var)
+                           len(MON_CREATURES),
+                           (GUN_TAB.open_var, WORLD_TAB.open_var))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
         f"Monster tuning ([{MON_TUNE_KEY}] in the M panel): Up/Down pick a row, "

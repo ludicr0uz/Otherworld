@@ -16,7 +16,7 @@ the table written onto every carried gun.
 
 The keys, the nudge and the save are any TuneTab's (tune_tab.py):
 author_tab_flow() is also MONSTER TUNING's (monster_tune_tick.py), and T
-shuts that tab as N shuts this one. Only _author_apply is the guns'.
+and O (WORLD TUNING) shut this tab as T shuts them. Only _author_apply is the guns'.
 
 Tick, not DrawHUD, like the loot window: the M panel does not pause, and a
 -nullrhi probe never draws. The keys only raise flags, so
@@ -47,6 +47,7 @@ from graphics_menu.tune_consts import (
     TUNE_VALUES_VAR, TUNE_WEAPONS_VAR,
 )
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
+from graphics_menu.world_tune_consts import WORLD_TAB
 
 FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
 FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
@@ -119,7 +120,7 @@ def _cell(ed, array_var, index, x, y, made):
 
 def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
     """The tab's key, and with the tab open the arrows and Enter. Opening or
-    shutting it shuts the tab whose open flag is ``closes``, so only one
+    shutting it shuts the tabs whose open flags are ``closes``, so only one
     panel shows and takes the arrows. Returns the exec tails."""
     t = _call(ed, FN_AND, x0, y0 + 300, made, A=_get(ed, "MenuOpen", x0 - 240, y0 + 300, made),
               B=_pressed(ed, pc_out, tab.key, x0 - 240, y0 + 440, made))
@@ -127,7 +128,8 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
     opened = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
                    A=_get(ed, tab.open_var, x0, y0 + 580, made))
     flow = put(ed, tab.open_var, _out(opened), [flip], x0 + 500, y0 - 200, made)
-    flow = _setter(ed, closes, "false", [flow], x0 + 500, y0 - 400, made)
+    for i, other in enumerate(closes):
+        flow = _setter(ed, other, "false", [flow], x0 + 500 + 260 * i, y0 - 400, made)
 
     x = x0 + 800
     active = _call(ed, FN_AND, x - 240, y0 + 300, made,
@@ -267,8 +269,8 @@ def _author_apply(ed, in_execs, x0, y0, made):
 
 
 def author_tab_flow(ed, pc_out, in_execs, x0, y0, made, tab, subjects, closes):
-    """Any tab's keys, nudge and save, in that order. Returns the exec tails,
-    for the tab's own apply."""
+    """Any tab's keys, nudge and save, in that order. ``closes``: the other
+    tabs' open flags. Returns the exec tails, for the tab's own apply."""
     flow = _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes)
     flow = _author_nudge(ed, flow, x0 + 5400, y0, made, tab, subjects)
     return _author_save(ed, flow, x0 + 9000, y0, made, tab)
@@ -278,7 +280,8 @@ def author_tune_tick(ed, pc_out, in_execs, x0, y0):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
     flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GUN_TAB,
-                           len(tune_table()[0]), MONSTER_TAB.open_var)
+                           len(tune_table()[0]),
+                           (MONSTER_TAB.open_var, WORLD_TAB.open_var))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
         f"Gun tuning ([{TUNE_KEY}] in the M panel): Up/Down pick a row, Left/Right "

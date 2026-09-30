@@ -1,5 +1,5 @@
-"""WBP_PauseMenu's tuning panels, one per TuneTab (tune_tab.py): GUN TUNING
-and MONSTER TUNING, in the same spot (only one is open at a time).
+"""WBP_PauseMenu's tuning panels, one per TuneTab (tune_tab.py): GUN, MONSTER
+and WORLD TUNING, in the same spot (only one is open at a time).
 
   right of the M panel   the tab's panel: a title, row_count WBP_MenuRows (the
                          subject, then one per stat, each labelled in
@@ -21,10 +21,11 @@ from graphics_menu.umg_consts import (
     COL_CARET, COL_HINT, COL_ROW, COL_TITLE, ROW_COLOR_VAR, ROW_TEXT_VAR,
     ROW_WIDTH_VAR, WBP_MENU_ROW,
 )
+from graphics_menu.world_tune_consts import WORLD_TAB
 
 
 def author_tune_widgets(bp, root):
-    for tab in (GUN_TAB, MONSTER_TAB):
+    for tab in (GUN_TAB, MONSTER_TAB, WORLD_TAB):
         _author_tab(bp, root, tab)
 
 

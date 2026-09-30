@@ -12,10 +12,16 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_day_night.py
 
 ## Settings: `world_config.py`
 
-- **The world config.** `DAY_LENGTH_S` and `NIGHT_LENGTH_S` are each 240 s for testing.
-  `START_CLOCK_S` (20 s) is where a level starts. Change a number there and re-run the builder.
-- The two lengths and `Clock` are also Instance Editable on the placed actor, so one level can
-  differ.
+- **The world config.** `DAY_LENGTH_S` and `NIGHT_LENGTH_S` are each 240 s for testing, unless
+  `world_tuning.csv` (saved by the M panel's WORLD TUNING tab, [O]) says otherwise. Change a
+  number and re-run the builder.
+- **A level starts at a random time of day:** with `RANDOM_START` (the actor's `RandomStart`),
+  BeginPlay sets `Clock` to `RandomFloatInRange(0, day + night)`. With it off, `Clock`'s default
+  `START_CLOCK_S` (20 s, just after sunrise) is where it starts.
+- The two lengths, `Clock` and `RandomStart` are also Instance Editable on the placed actor, so
+  one level can differ.
+- **The time of day can be set in a game** from the WORLD TUNING tab, on a 24-hour dial
+  (`clock_to_hour`: sunrise 06:00, sunset 18:00). See `Scripts/graphics_menu/CLAUDE.md`.
 - The night values (moon 0.12 lux, sky light 3.0, fog, exposure, star brightness) come from
   `forest_generator/lighting.py`'s night preset, and the day values from its day preset.
 - `sun_state(clock)` does the same sums as the Tick graph. The probe compares the two, so keep

@@ -5,7 +5,9 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
 
   world_config         THE world settings: day and night lengths, start
                        time, sun/moon paths, sky colours; sun_state() does the
-                       Tick's sums in Python
+                       Tick's sums in Python, clock_to_hour() the tuning dial's
+  world_tuning         world_tuning.csv: the lengths the M panel's WORLD
+                       TUNING tab saves, laid over world_config's
   paths                /Game paths, class paths, the two actor tags
   sky_material         M_DayNightSky: the whole sky (gradient, glow, discs,
                        stars) in one Custom node the SkyLight captures

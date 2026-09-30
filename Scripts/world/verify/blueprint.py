@@ -7,7 +7,7 @@ from combat.verify.common import (
     pin_value,
 )
 from world import world_config as cfg
-from world.day_night_blueprint import COMPONENTS
+from world.day_night_blueprint import COMPONENTS, RANDOM_START_VAR
 from world.paths import DAY_NIGHT_BP_PATH, SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH, STATIC_SKY_TAG
 
 
@@ -19,6 +19,9 @@ def _check_defaults(bp):
         got = d.get_editor_property(var)
         check(f"BP_DayNightCycle.{var} defaults to world_config ({want})",
               isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
+    got = d.get_editor_property(RANDOM_START_VAR)
+    check(f"BP_DayNightCycle.{RANDOM_START_VAR} defaults to world_config "
+          f"({cfg.RANDOM_START})", got is cfg.RANDOM_START, repr(got))
 
 
 def _check_components(bp):
@@ -64,6 +67,15 @@ def _check_graph(bp):
           str([pin_value(n, "Tag") for n in tagged]))
     check("BeginPlay makes the dome's dynamic material",
           len(by_pins(nodes, "ElementIndex", "SourceMaterial")) == 1)
+    picks = by_pins(nodes, "Min", "Max")
+    check("BeginPlay, with RandomStart, sets Clock to a random point in the cycle",
+          len(picks) == 1 and num_pin(picks[0], "Min") == 0.0
+          and bool(BEL.find_input_pin(picks[0], "Max").list_connected_pins())
+          and any("Set Clock" in str(BEL.get_node_title(unreal.BlueprintGraphPinLibrary
+                                                        .get_owning_node(q)))
+                  for q in BEL.find_output_pin(picks[0], "ReturnValue")
+                  .list_connected_pins()),
+          str([pin_value(n, "Min") for n in picks]))
     check("Tick turns the sun and the moon", len(by_pins(nodes, "NewRotation")) == 2)
     check("Tick sets three intensities (sun, moon, sky light)",
           len(by_pins(nodes, "NewIntensity")) == 3)

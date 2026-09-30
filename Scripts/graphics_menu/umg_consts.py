@@ -16,6 +16,7 @@ from graphics_menu.presets import PRESETS
 from graphics_menu.profile_consts import EXIT_ROW_LABEL
 from graphics_menu.tune_consts import TUNE_ROW_LABEL
 from graphics_menu.monster_tune_consts import MON_TUNE_ROW_LABEL
+from graphics_menu.world_tune_consts import WORLD_TUNE_ROW_LABEL
 from graphics_menu.settings_rows import (
     BACK_LABEL, BIND_LABELS, DIFFICULTY_LABEL, SETTINGS_TITLE, SLIDERS)
 from survival.tuning import DEHYDRATED_TAG, STARVING_TAG
@@ -210,7 +211,7 @@ MENU_KEY, DEBUG_KEY = "M", "D"
 PAUSE_TITLE = "GRAPHICS QUALITY"
 PAUSE_ROW_LABELS = (tuple(f"[{i + 1}]   {p.label}" for i, p in enumerate(PRESETS))
                     + (f"[{DEBUG_KEY}]   debug", EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL,
-                       TUNE_ROW_LABEL, MON_TUNE_ROW_LABEL))
+                       TUNE_ROW_LABEL, MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL))
 PAUSE_DEBUG_ROW = len(PRESETS)
 PAUSE_HINT = f"[{MENU_KEY}]   close"
 PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0

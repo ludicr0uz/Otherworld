@@ -1,13 +1,13 @@
-"""DrawHUD: a tuning tab's panel on WBP_PauseMenu (GUN TUNING or MONSTER
+"""DrawHUD: a tuning tab's panel on WBP_PauseMenu (GUN, MONSTER or WORLD
 TUNING: any TuneTab, tune_tab.py), from the tab's variables. For the guns:
 
     NOT TuneOpen   TunePanel collapsed
     TuneOpen       shown: row 0's value is TuneWeapons[TuneWeapon], row i's
-                   is TuneValues[TuneWeapon * STAT_COUNT + i - 1] (up to 4
-                   decimals, no grouping), the caret on TuneRow, and "saved
+                   is TuneValues[TuneWeapon * STAT_COUNT + i - 1] (up to
+                   the tab's fraction_digits decimals, no grouping), the caret on TuneRow, and "saved
                    to ..." while TuneSaved
 
-Only reads; tune_tick.py (and monster_tune_tick.py) decide. WBP_PauseMenu itself is shown only while
+Only reads; tune_tick.py (and monster_/world_tune_tick.py) decide. WBP_PauseMenu itself is shown only while
 MenuOpen (menu_screens.author_pause_menu), so this needs no MenuOpen test.
 """
 
@@ -46,7 +46,7 @@ def _author_stats(ed, tab, box, in_execs, x0, y0, made):
     idx = _call(ed, FN_ADD_II, x0 + 540, y0 + 500, made, A=_out(base), B=_out(s))
     words = _call(ed, FN_TO_TEXT, x0 + 1020, y0 + 500, made,
                   Value=_item(ed, tab.values_var, _out(idx), x0 + 780, y0 + 500, made),
-                  bUseGrouping="false", MaximumFractionalDigits=4)
+                  bUseGrouping="false", MaximumFractionalDigits=tab.fraction_digits)
     row_value(ed, box, i, ("text", _out(words)),
               [_pin(loop, "LoopBody", is_input=False)], x0 + 1300, y0)
     return _pin(loop, "Completed", is_input=False)

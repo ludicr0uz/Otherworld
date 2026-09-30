@@ -18,6 +18,7 @@ the Blueprint does: see sun_state().
 import math
 
 from forest_generator.lighting import get_preset
+from world.world_tuning import read_table as _read_tuning
 
 _DAY = get_preset("day")
 _NIGHT = get_preset("night")
@@ -26,11 +27,22 @@ _NIGHT = get_preset("night")
 # One cycle is a day followed by a night. The clock runs from 0 (sunrise) to
 # DAY_LENGTH_S (sunset) to DAY_LENGTH_S + NIGHT_LENGTH_S (the next sunrise).
 # 4 + 4 minutes for testing; a real day wants something like 20 + 10.
-DAY_LENGTH_S = 240.0
-NIGHT_LENGTH_S = 240.0
-# Where a level starts: a little after sunrise, so the first thing the player
+# world_tuning.csv (saved by the M panel's WORLD TUNING tab) overrides both.
+_TUNED = _read_tuning()
+DAY_LENGTH_S = float(_TUNED.get("day_length_s", 240.0))
+NIGHT_LENGTH_S = float(_TUNED.get("night_length_s", 240.0))
+# Where a level starts. RANDOM_START (BP_DayNightCycle.RandomStart, Instance
+# Editable) has BeginPlay pick a clock anywhere in the cycle instead; with it
+# off, START_CLOCK_S is a little after sunrise, so the first thing the player
 # sees is the sun coming up rather than the dark.
+RANDOM_START = True
 START_CLOCK_S = 20.0
+
+# ─── Hours: how the WORLD TUNING tab shows the clock ─────────────────────────
+# However long the day and the night last, each is 12 hours on the tab's
+# 24-hour dial: sunrise is SUNRISE_HOUR, sunset 12 hours later.
+SUNRISE_HOUR = 6.0
+HALF_HOURS = 12.0
 
 # ─── The sun and the moon ────────────────────────────────────────────────────
 # Each crosses the sky in its half of the cycle: it rises at SUNRISE_YAW_DEG,
@@ -84,6 +96,23 @@ def cycle_length():
 def _map_clamped(v, a, b, out_a, out_b):
     t = min(1.0, max(0.0, (v - a) / (b - a)))
     return out_a + (out_b - out_a) * t
+
+
+def clock_to_hour(clock_s, day_s=None, night_s=None):
+    """The hour (0-24) a clock reading shows on the tab's dial. The HUD's
+    graph (graphics_menu/world_tune_tick.py) does the same sums."""
+    day_s, night_s = day_s or DAY_LENGTH_S, night_s or NIGHT_LENGTH_S
+    phase = (_map_clamped(clock_s, 0.0, day_s, 0.0, HALF_HOURS)
+             + _map_clamped(clock_s, day_s, day_s + night_s, 0.0, HALF_HOURS))
+    return (phase + SUNRISE_HOUR) % 24.0
+
+
+def hour_to_clock(hour, day_s=None, night_s=None):
+    """The clock reading for an hour on the dial (any hour: it wraps)."""
+    day_s, night_s = day_s or DAY_LENGTH_S, night_s or NIGHT_LENGTH_S
+    phase = (hour - SUNRISE_HOUR + 24.0) % 24.0
+    return (_map_clamped(phase, 0.0, HALF_HOURS, 0.0, day_s)
+            + _map_clamped(phase, HALF_HOURS, 24.0, 0.0, night_s))
 
 
 def sun_state(clock_s):

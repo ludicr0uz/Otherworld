@@ -70,6 +70,13 @@ Input, settings and state
                   every live controller of its class (run after tune_tick's)
   monster_tune_save    run in the game by the save: the live table into
                   npc/monster_tuning.csv
+  world_tune_consts    the WORLD TUNING tab (O): variables, widget names,
+                  WORLD_TAB
+  world_tune_tick      Tick: the tab's flow, then the lengths and a moved hour
+                  onto the day/night cycle and its clock back as the hour
+                  (run after monster_tune_tick's)
+  world_tune_save      run in the game by the save: the day and night lengths
+                  into world/world_tuning.csv
 
 verify_graphics_menu.py's checks, beside it because it is over budget
   umg_checks         the screens' trees and the graph that creates and writes them
@@ -79,6 +86,7 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   dev_guns_checks    the dev-all-guns row, key and the five spawns
   loot_checks        the loot window: scan, keys, take, widgets
   tune_checks        the gun tuning tab: table, CSV on the guns, panel, save, writes
+  world_tune_checks    the world tuning tab: panel, save, the cycle's Sets
   monster_tune_checks  the monster tuning tab: table, CSV on the controllers,
                      panel, save, writes
 """

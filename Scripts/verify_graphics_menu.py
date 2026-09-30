@@ -36,6 +36,8 @@ from graphics_menu import monster_tune_consts as MC
 from graphics_menu.loot_checks import check_loot
 from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
+from graphics_menu import world_tune_consts as WC
+from graphics_menu.world_tune_checks import check_world_tune
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -149,10 +151,11 @@ def main():
                          PC.EXIT_KEY, DC.DEV_GUNS_KEY,
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
                          TC.TUNE_KEY, TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
-                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.MON_TUNE_KEY)
+                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.MON_TUNE_KEY,
+                         WC.WORLD_TUNE_KEY)
                         + G.PRESET_KEYS + N.START_KEYS)
     check("polls exactly the menu, preset, debug, restart, start, nav, exit, "
-          "dev-all-guns, loot, gun and monster tuning keys",
+          "dev-all-guns, loot, gun, monster and world tuning keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -172,10 +175,10 @@ def main():
                              + [G.PRESETS[G.DEFAULT_PRESET][1]])
     # "Value" alone no longer identifies SetOverallScalabilityLevel -- the
     # settings page's FClamp has one too, and its literal is a float; so has
-    # the tuning panel's Conv_DoubleToText.
+    # the tuning panel's Conv_DoubleToText, and the world tab's MapRangeClamped.
     levels = sorted(int(BEL.find_input_pin(n, "Value").get_pin_value())
                     for n in by_pins("Value")
-                    if not {"Min", "MaximumFractionalDigits"} & pin_names(n))
+                    if not {"Min", "MaximumFractionalDigits", "InRangeA"} & pin_names(n))
     check("one scalability call per preset, plus BeginPlay's default",
           levels == expected_levels, f"{levels} vs {expected_levels}")
 
@@ -782,10 +785,11 @@ def main():
               str(sum(1 for t in titles if t == f"Set {slider.var}")))
     # Literal indices only: the settings page's own Array_Get and Array_Set
     # take theirs from the loop and from MenuRow, and those are not the push.
-    # Nor are the monster tuning tab's cells (literal, off MonTuneValues).
+    # Nor are the monster and world tuning tabs' cells (literal, off
+    # MonTuneValues and WorldTuneValues).
     reads = [n for n in by_pins("TargetArray", "Index")
              if not BEL.find_input_pin(n, "Index").list_connected_pins()
-             and f"Get {MC.MON_TUNE_VALUES_VAR}" not in {
+             and not {f"Get {MC.MON_TUNE_VALUES_VAR}", f"Get {WC.WORLD_TUNE_VALUES_VAR}"} & {
                  str(BEL.get_node_title(PIN.get_owning_node(q)))
                  for q in BEL.find_input_pin(n, "TargetArray").list_connected_pins()}]
     check("...read out of Binds by index, one per action",
@@ -890,6 +894,7 @@ def main():
     check_loot(check, bp, nodes)
     check_tune(check, bp, nodes)
     check_monster_tune(check, bp, nodes)
+    check_world_tune(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

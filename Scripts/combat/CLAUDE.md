@@ -14,7 +14,7 @@ The defaults are all rebindable on the settings screen:
   (`weapon_component/punch.py`; both in `docs/firing_gate.md`).
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
   **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
-  **C** toggles crouch, **Z** toggles prone.
+  **C** toggles crouch, **Z** toggles prone, **V** throws (held: see below).
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
 
@@ -91,6 +91,16 @@ menu polls its own copy from `DrawHUD`, which does.
     a PIE run dropped exactly the predicted guns.
   - Setting `Dropped = true` on the spawned actor is the entire handover.
   - Keep the `Length(DropClasses) > 0` guard, or an unfilled table indexes into nothing.
+- **Anything in hand can be thrown** (`weapon_component/throw.py`). Holding **V** draws the
+  arc: `PredictProjectilePath` from a point in front of the chest, along the view tipped up
+  `THROW_PITCH_UP_DEG`, as world-space instances on `BP_ThrowArc`'s one ISM (spawned on first
+  aim; `throw_arc.py`), with a disc where it lands. Releasing it stores the launch, detaches
+  the item and takes it out of the inventory as a drop does. The flight is **kinematic**, not
+  physics (items are NoCollision): start + v t + g t²/2 under `THROW_GRAVITY_Z`, the arc's own
+  gravity, traced frame to frame on Visibility; on a hit it backs off the surface, traces down
+  to the ground and becomes an ordinary `Dropped` item. One item flies at a time. A thrown
+  item does no damage. `ThrowKeyForced` is the probe's stand-in for the key
+  (`probes/probe_throw.py`); the throw numbers are in `throw_tuning.py`.
 - **Kill rewards happen only on the `DamagedByPlayer` arm.** That covers the kill count, the two
   shells and the gun roll. The world-floor net writes `Health = 0` down the same death path, and
   it must not pay out.
@@ -167,5 +177,8 @@ These are feel checks a headless run can't do:
   gap (and its 240 px cap) reads well on a real window;
 - how the death camera looks under the terrain;
 - how the sights' pitch looks at steep angles (the eye swings on an arc round the spine);
+- the throw: whether V and its arc read well (dot size and spacing, the landing disc on
+  slopes), whether 11 m/s at 12° up feels right, and the item snapping from the hand to the
+  launch point (there is no throw animation);
 - the body poses in motion: the walk cycle plays on top of the crouch and the prone legs, and a
   prone body is longer than its capsule, so it can clip into slopes and walls.

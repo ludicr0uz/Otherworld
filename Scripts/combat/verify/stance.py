@@ -52,7 +52,7 @@ def check_stance_keys():
     names = [v for v, _k in BIND_VARS]
     check(f"crouch ({CROUCH_KEY}) and prone ({PRONE_KEY}) are their own binds, "
           f"appended after every older one so no saved bind changes meaning",
-          names[-2:] == ["KeyCrouch", "KeyProne"]
+          names[9:11] == ["KeyCrouch", "KeyProne"]
           and w.get_editor_property("KeyCrouch").export_text() == CROUCH_KEY
           and w.get_editor_property("KeyProne").export_text() == PRONE_KEY,
           str(names))

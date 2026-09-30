@@ -34,6 +34,7 @@ WHAT THIS BUILDS
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
   BP_WeaponComponent  inventory of 5, equip/switch/fire/drop/pick up
   BP_BloodSplash    short-lived red burst spawned at each impact
+  BP_ThrowArc, M_ThrowArc  the dotted arc drawn while a throw is aimed
 """
 
 import os
@@ -65,6 +66,7 @@ from combat.install import (                                      # noqa: E402
     install_on_character, install_on_npc, retire_old_assets,
 )
 from combat.materials import build_materials                      # noqa: E402
+from combat.throw_arc import build_throw_arc                      # noqa: E402
 from combat.paths import AMMO_BP_PATH, HEALTH_BP_PATH             # noqa: E402
 from combat.ragdoll import tune_ragdolls                          # noqa: E402
 from combat.settings_savegame import build_settings_savegame      # noqa: E402
@@ -118,9 +120,10 @@ def main():
     build_combat_trace_switch()
     health_bp = build_health_component()
     footstep_bp = build_footstep_component()
+    throw_arc_bp = build_throw_arc()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], knife_bp, knife_clip,
-                                       blood_bp)
+                                       blood_bp, throw_arc_bp)
 
     # After the weapon component, because the pickup's graph casts to it -- and
     # therefore after the health component that spawns it, which is why the

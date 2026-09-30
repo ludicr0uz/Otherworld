@@ -53,6 +53,9 @@ BLOCK_KEY = "F"
 # usual pair, and both sit under the left hand; rebindable.
 CROUCH_KEY = "C"
 PRONE_KEY = "Z"
+# Held to aim a throw, released to let go (weapon_component/throw.py). V sits
+# beside C under the left hand, and nothing else here uses it; rebindable.
+THROW_KEY = "V"
 
 PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
 DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
@@ -387,7 +390,7 @@ RELOAD_KEY = "R"
 # these defaults rather than trusting (build_graphics_menu.py's settings load).
 # KeyBlock went on the END, for the same reason: a nine-bind list refills an
 # eight-bind save once, and no existing index changes meaning. KeyCrouch and
-# KeyProne were appended the same way.
+# KeyProne were appended the same way, and then KeyThrow.
 BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyAim", AIM_KEY),
              ("KeySights", SIGHTS_KEY),
@@ -398,7 +401,8 @@ BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyReload", RELOAD_KEY),
              ("KeyBlock", BLOCK_KEY),
              ("KeyCrouch", CROUCH_KEY),
-             ("KeyProne", PRONE_KEY))
+             ("KeyProne", PRONE_KEY),
+             ("KeyThrow", THROW_KEY))
 # Shells a killed wanderer leaves behind. Two per kill against five spent per
 # magazine means the shotgun runs down unless most shots land, which is the
 # point of giving it a reserve at all.

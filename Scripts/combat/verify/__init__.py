@@ -30,11 +30,13 @@ and it never relies on a variable another section left behind.
   knife       the knife: the item, the slash clip, the loadout, the press
               behind the fire gate, the swing and the blow; is_melee_*
   hold_pose   A_HoldItem / A_HoldKnife: arms, hands, fist, who holds them
+  throw       the throw: its key, BP_ThrowArc, the predicted arc, the release,
+              the flight on the same curve; is_throw_trace, launch_nodes
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
     "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance", "accuracy", "punch", "knife",
-    "hold_pose",
+    "hold_pose", "throw",
     "settings_and_tuning", "firing", "consume", "drops", "loot", "noise", "combat_trace",
 )

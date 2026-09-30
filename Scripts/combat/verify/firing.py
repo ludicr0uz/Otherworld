@@ -7,6 +7,7 @@ from combat.paths import GAME_MODE_BP_PATH
 from combat.tuning import AUTO_DISPLAYS, COMBAT
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, wc_cdo, wg
+from combat.verify.throw import launch_nodes
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins,
     pin_value,
@@ -59,14 +60,18 @@ def check_recoil():
     # The sights' pitch (verify/aim_pitch.py) reads the view too, but writes
     # only the anim BP, so it is not one of the read-before-write pairs.
     pitch_reads = sum(1 for t in flat if t.startswith("SetAimPitch"))
+    # The throw's launch reads the view too, and writes nothing back.
+    throw_launch = launch_nodes()
     for label, want, n in (("written", "SetControlRotation", 2),
                            ("read back first", "GetControlRotation", 2)):
-        hits = [t for t in flat if t.startswith(want)]
+        hits = [t for node, t in zip(wg, flat)
+                if t.startswith(want) and node not in throw_launch]
         if want == "GetControlRotation":
             hits = hits[pitch_reads:]
         check(f"the control rotation is {label} exactly {n}x: the kick and the "
               f"recovery", len(hits) == n, f"{len(hits)} x {want}")
-    makers = [n for n in wg if {"Roll", "Pitch", "Yaw"} <= in_pins(n)]
+    makers = [n for n in wg if {"Roll", "Pitch", "Yaw"} <= in_pins(n)
+              and n not in throw_launch]
     check("both writes are rebuilt through a Make Rotator", len(makers) == 2,
           str(len(makers)))
     check("...whose Roll comes from the rotation that was read, not a literal zero "
@@ -158,10 +163,10 @@ def check_automatic_fire():
         str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
         for x in downs
         for q in PIN.list_connected_pins(BEL.find_input_pin(x, "Key")))
-    check("five keys are polled held rather than tapped: sprint, the two aims, "
-          "the guard and the trigger",
+    check("six keys are polled held rather than tapped: sprint, the two aims, "
+          "the guard, the trigger and the throw",
           held_binds == ["Get KeyAim", "Get KeyBlock", "Get KeyFire", "Get KeySights",
-                         "Get KeySprint"],
+                         "Get KeySprint", "Get KeyThrow"],
           str(held_binds))
 
     # THE TRAP THIS SECTION EXISTS FOR. Automatic lives on the weapon, so reading

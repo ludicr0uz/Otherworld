@@ -14,6 +14,7 @@ from combat.tuning import (
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wg
 from combat.verify.knife import is_melee_play, is_melee_sweep
+from combat.verify.throw import is_throw_trace
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, pin_value, titled,
 )
@@ -105,7 +106,7 @@ def check_keys_are_variables():
     # reach it, and the pellets fly down the muzzle line. Getting this wrong is not
     # a compile error -- it is a gun that shoots from behind the player's shoulder.
     traces = [n for n in by_pins(wg, "Start", "End", "TraceChannel")
-              if not is_melee_sweep(n)]
+              if not is_melee_sweep(n) and not is_throw_trace(n)]
     check("there are four traces (camera aim, muzzle clearance, pellets, drop probe)",
           len(traces) == 4, str(len(traces)))
 

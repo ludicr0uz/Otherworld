@@ -15,6 +15,7 @@ MAT_METAL = f"{WEAPON_DIR}/M_Gunmetal"
 MAT_WOOD = f"{WEAPON_DIR}/M_GunWood"
 MAT_BLOOD = f"{WEAPON_DIR}/M_Blood"
 MAT_BRASS = f"{WEAPON_DIR}/M_Brass"
+MAT_THROW_ARC = f"{WEAPON_DIR}/M_ThrowArc"
 
 ITEM_BP_PATH = f"{WEAPON_DIR}/BP_WeaponItem"
 SHOTGUN_BP_PATH = f"{WEAPON_DIR}/BP_Shotgun"
@@ -33,6 +34,8 @@ HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"
 AMMO_BP_PATH = f"{WEAPON_DIR}/BP_AmmoPickup"
+# The dotted arc drawn while a throw is aimed (throw_arc.py).
+THROW_ARC_BP_PATH = f"{WEAPON_DIR}/BP_ThrowArc"
 # The settings SaveGame. It lives beside the weapons rather than under /Game/UI
 # because this file builds it, and Scripts/forest_generator/asset_sources.py
 # names exactly one builder per content directory -- a second directory owned by
@@ -57,6 +60,7 @@ HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
 AMMO_CLASS_PATH = f"{AMMO_BP_PATH}.BP_AmmoPickup_C"
+THROW_ARC_CLASS_PATH = f"{THROW_ARC_BP_PATH}.BP_ThrowArc_C"
 SETTINGS_CLASS_PATH = f"{SETTINGS_BP_PATH}.BP_Settings_C"
 
 CUBE = "/Engine/BasicShapes/Cube"          # 100 cm box

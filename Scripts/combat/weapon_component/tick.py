@@ -38,6 +38,9 @@ from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
 from combat.weapon_component.stance import _author_stance
+from combat.weapon_component.throw import (
+    _author_throw_aim, _author_throw_flight, _author_throw_release,
+)
 
 
 def _author_wc_tick(ed, tick):
@@ -376,13 +379,24 @@ def _author_wc_tick(ed, tick):
     _set(pick_dirty, "NeedsRefresh", "true")
     _connect(after_pick, _pin(pick_dirty, "execute"))
 
+    # --- throw (throw.py) ------------------------------------------------------
+    # After pick-up and before the refresh, which re-equips the emptied hand
+    # on the frame of the throw, as it does after a drop.
+    aim_exits, released, start, velocity = _author_throw_aim(
+        ed, pc_out, owner_out, held, armed_out, key_pins["KeyThrow"],
+        (BEL.find_then_pin(pick_dirty), BEL.find_else_pin(pick_gate)),
+        1040, 12800)
+    thrown = _author_throw_release(ed, held, start, velocity, released,
+                                   4200, 14000)
+    flight_exits = _author_throw_flight(ed, aim_exits + (thrown,), 1040, 15600)
+
     # --- refresh -------------------------------------------------------------
     dirty_get = _at(ed.add_get_member_variable_node("NeedsRefresh"), 1040, 4760)
     refresh_gate = _at(ed.add_branch_node(), 1300, 4600)
     _connect(_pin(dirty_get, "NeedsRefresh", is_input=False),
              _pin(refresh_gate, "Condition"))
-    _connect(BEL.find_then_pin(pick_dirty), _pin(refresh_gate, "execute"))
-    _connect(BEL.find_else_pin(pick_gate), _pin(refresh_gate, "execute"))
+    for exit_pin in flight_exits:
+        _connect(exit_pin, _pin(refresh_gate, "execute"))
     settle = _at(ed.add_set_member_variable_node("NeedsRefresh"), 1560, 4600)
     _set(settle, "NeedsRefresh", "false")
     _connect(BEL.find_then_pin(refresh_gate), _pin(settle, "execute"))

@@ -13,7 +13,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
   tuning            keys, inventory size, CombatConfig / COMBAT, ammo, drops
                     (GUN_LOOT_TABLE, GUN_DROP_CHANCE, GUN_DROP_SEED),
                     auto fire, the consume event and health-drain tags,
+                    the throw (THROW_*),
                     noise, SHOT_VOLUME_CM (how loud each gun is)
+  throw_tuning      the throw's numbers (THROW_*): speed, angle, launch point,
+                    the arc's and the flight's gravity, dots, landing
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
@@ -51,6 +54,8 @@ ASSETS AND PATCHES
   weapon_items      BP_WeaponItem and one child per weapon
   blood             BP_BloodSplash
   ammo_pickup       BP_AmmoPickup
+  throw_arc         BP_ThrowArc + M_ThrowArc: the dotted arc a throw is aimed
+                    with (one instanced mesh of emissive spheres)
   footsteps         BP_FootstepComponent (StepVolume/StepNoise, set by the stance)
   combat_trace      the combat trace switch: GameMode's CombatTraceOn/Off
                     console events and CombatTrace's default

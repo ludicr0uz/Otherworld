@@ -11,7 +11,8 @@ from combat.graph import (
 )
 from combat.hit_zones import HIT_BONE_VAR
 from combat.paths import (
-    CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, WEAPON_COMP_BP_PATH,
+    CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
+    WEAPON_COMP_BP_PATH,
 )
 from combat.skin import player_skin
 from combat.tuning import BIND_VARS, COMBAT
@@ -29,16 +30,21 @@ from combat.weapon_component.punch import (
     PUNCH_QUEUED_VAR,
 )
 from combat.weapon_component.stance import STANCE_VAR, STAND
+from combat.weapon_component.throw import (
+    THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR,
+    THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
+    THROW_VELOCITY_VAR,
+)
 from combat.weapon_component.tick import _author_wc_tick
 
 
 def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
-                           blood_bp, rebuild=True):
+                           blood_bp, throw_arc_bp, rebuild=True):
     # Cast nodes only appear in the palette for classes that are already loaded,
     # and this graph casts to all three. Without these loads
     # create_node_from_name returns None and the failure reads as a typo in the
     # node name rather than as a missing asset.
-    for path in (CHARACTER_BP_PATH, ITEM_BP_PATH, HEALTH_BP_PATH):
+    for path in (CHARACTER_BP_PATH, ITEM_BP_PATH, HEALTH_BP_PATH, THROW_ARC_BP_PATH):
         if not _assets().load_asset(path):
             raise RuntimeError(f"could not load {path} for its cast node")
 
@@ -155,6 +161,17 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in (NEXT_KNIFE_VAR, KNIFE_DUE_VAR):
         _declare(ed, name, _float_type())
+    # The throw (throw.py): the aim and the launch it stores, the item in the
+    # air, and the arc actor it draws on.
+    for name in (THROW_AIMING_VAR, THROW_FORCED_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, THROWN_VAR, BEL.get_object_reference_type(item_class))
+    for name in (THROW_START_VAR, THROW_VELOCITY_VAR, THROW_LAST_VAR):
+        _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
+    _declare(ed, THROW_TIME_VAR, _float_type())
+    arc_class = BEL.generated_class(throw_arc_bp)
+    _declare(ed, THROW_ARC_VAR, BEL.get_object_reference_type(arc_class))
+    _declare(ed, THROW_ARC_CLASS_VAR, BEL.get_class_reference_type(arc_class))
 
     _author_wc_begin_play(ed, begin)
     _author_wc_tick(ed, tick)
@@ -214,6 +231,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         KNIFE_PENDING_VAR: False,
         NEXT_KNIFE_VAR: 0.0,
         KNIFE_DUE_VAR: 0.0,
+        THROW_AIMING_VAR: False,
+        THROW_FORCED_VAR: False,
+        THROW_TIME_VAR: 0.0,
+        THROW_ARC_CLASS_VAR: arc_class,
     })
     _log(f"built {WEAPON_COMP_BP_PATH}")
     return bp

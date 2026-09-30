@@ -30,6 +30,9 @@ _author_* fragment per concern, each in its own module:
   knife       a Melee item held: the fire key slashes (behind the fire gate,
               beside the Consumable branch); punch.py's swing and blow on the
               KNIFE Strike, playing A_KnifeSlash
+  throw       the throw key held: the predicted arc on BP_ThrowArc; released:
+              the item leaves hand and inventory and flies the same curve,
+              landing as a Dropped item
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery
@@ -57,6 +60,9 @@ BP_WeaponComponent event graph:
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held
          --> Branch WasInputKeyJustPressed(E)               --> pick up nearest
+         --> Branch IsInputKeyDown(V)                       --> draw the throw arc;
+                                                                on release, throw held
+         --> Branch IsValid(Thrown)                         --> carry it along the arc
 
   Tick also resolves the aim every frame, before the trigger is even looked at,
   because the reticle depends on it:

@@ -1,4 +1,4 @@
-"""rig_chains -- the IK Rig chain tables, mannequin and Meshy side by side.
+"""rig_chains -- the IK Rig chain tables: mannequin, Meshy and Mixamo side by side.
 
 Constants only.  Chain names are identical on both sides so the retargeter maps
 them by exact string match (see build_retarget.py's docstring for why the chains
@@ -81,3 +81,25 @@ RETARGET_ROOT_MESHY = "Hips"
 # creature forward 4.3 m over a walk cycle.  So the mannequin gets its root
 # bone named explicitly, and root motion is switched off for the target.
 ROOT_MOTION_BONE_MANNEQUIN = "root"
+
+# ─── Mixamo (X Bot), the source side of RTG_<Monster>_from_XBot ─────────────
+#
+# Same chain names again, so the mapping onto CHAINS_MESHY is exact.  Mixamo
+# numbers its spine the usual way round (Spine is the lowest, Spine2 the top),
+# which Meshy -- for all its Mixamo-style names -- does not.  X Bot's fingers
+# have four joints; the fourth is the tip's end effector, which never animates,
+# so the chains stop at 3 like the Meshy ones.
+CHAINS_MIXAMO = {
+    "Spine":         ("Spine", "Spine2"),
+    "Neck":          ("Neck", "Neck"),
+    "Head":          ("Head", "Head"),
+    "LeftClavicle":  ("LeftShoulder", "LeftShoulder"),
+    "LeftArm":       ("LeftArm", "LeftHand"),
+    "RightClavicle": ("RightShoulder", "RightShoulder"),
+    "RightArm":      ("RightArm", "RightHand"),
+    "LeftLeg":       ("LeftUpLeg", "LeftToeBase"),
+    "RightLeg":      ("RightUpLeg", "RightToeBase"),
+    **_finger_chains(meshy_finger_bone, meshy=True),
+}
+
+RETARGET_ROOT_MIXAMO = "Hips"

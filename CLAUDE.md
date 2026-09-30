@@ -203,6 +203,9 @@ editor.
   The pistol reloads every 8 shots from an endless reserve.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). They respawn 75–100 m away and leave ragdoll corpses.
+  The zombie idles, shambles, runs and swings with Mixamo's zombie packs
+  (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
+  mannequin's set.
 - **Corpse loot:** a wanderer the player kills carries what its loot table rolls (for now, water:
   a canteen at 50%). Near the body, **Tab** opens a loot window; Up/Down pick and Enter takes
   the item into the bag (`Scripts/loot/CLAUDE.md`).

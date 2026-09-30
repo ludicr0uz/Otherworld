@@ -238,6 +238,20 @@ GENERATED = (
              "in that order.",
     ),
     AssetSource(
+        dest="Content/Sourced/Mixamo",
+        kind="generated",
+        builders=("Scripts/asset_pipeline/import_mixamo.py",),
+        note="Mixamo animation packs from the cache below: X Bot (SKM_XBot on "
+             "SK_XBot, the skeleton every Mixamo clip is keyed against), each "
+             "pack's clips under <Pack>/, and each clip retargeted onto every "
+             "creature in mixamo_paths.MIXAMO_CREATURES under <Creature>/ "
+             "(the zombie). Also writes IK_XBot and RTG_<Creature>_from_XBot "
+             "into Characters/Rigs, and re-points the zombie's "
+             "A_Zombie01_BS_Idle_Walk_Run at the Mixamo idle/walk/run. Runs "
+             "after build_retarget.py, which re-applies that blend space edit "
+             "itself when it regenerates the set.",
+    ),
+    AssetSource(
         dest="Content/Maps",
         kind="generated",
         builders=("Scripts/generate_forest_level.py",),
@@ -289,6 +303,20 @@ CACHE = CACHE + (
              "re-run. Requires MESHY_API_KEY in assets/.env, which is "
              "git-ignored and must never be referenced from a tracked file. "
              "Scripts/asset_pipeline/catalog.py holds the prompts.",
+    ),
+)
+
+CACHE = CACHE + (
+    AssetSource(
+        dest="assets/cache/mixamo",
+        kind="cache",
+        builders=(),
+        note="Mixamo downloads, one zip per pack (Scary Zombie Pack.zip, Not "
+             "So Scary Zombie Pack.zip), downloaded by hand from mixamo.com "
+             "(it needs an Adobe sign-in); each ships X Bot.fbx and one FBX "
+             "per clip. "
+             "import_mixamo.py unzips them beside themselves; "
+             "asset_pipeline/mixamo_paths.PACKS lists the ones it reads.",
     ),
 )
 
@@ -359,6 +387,10 @@ RESTORE_ORDER = (
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_characters.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_creature_materials.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_retarget.py",
+    # The zombie's Mixamo idle/walk/run/attack (assets/cache/mixamo). Needs
+    # each creature's IK rig and blend space; before the NPCs, whose zombie
+    # controller holds the attack clip.
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_mixamo.py",
     "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",
     "Scripts/generate_forest_level.py",
     # Once each printed import_<Level>.py has run: the import rebuilds the

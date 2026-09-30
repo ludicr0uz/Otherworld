@@ -77,7 +77,11 @@ Wanderer (selector)
 - **Melee:**
   - It is a distance check (`TuneMeleeRange`, 200) plus a wall-clock cooldown per controller
     (`TuneMeleeInterval`).
-  - It plays `MM_Attack_01` into the upper-body-only `DefaultSlot`.
+  - It plays the creature's `NpcVariant.melee` into the upper-body-only `DefaultSlot`:
+    the retargeted `MM_Attack_01`, except the zombie's, which is the Mixamo
+    `A_Zombie01_Mx_Scary_ZombieAttack` (`asset_pipeline/import_mixamo.py`). Its own
+    `MM_Attack_01` is the fallback when that clip is missing, and the never-spawned parent
+    controller always holds it. `probes/probe_zombie_mixamo.py` proves the swing plays it.
   - Damage is dealt by writing `Health` on the player's component, because
     `ApplyDamage`/`AnyDamage` would need a graph on the Enhanced Input template character.
   - If `BP_HealthComponent` is missing, the NPC only chases.

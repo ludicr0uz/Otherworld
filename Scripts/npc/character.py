@@ -127,6 +127,14 @@ def build_npc_blueprint(ai_bp):
 
 # ─── Creature variants ──────────────────────────────────────────────────────
 
+def _first_existing(*pkgs):
+    """The first of ``pkgs`` on disk, else the last: _resolve's fallback slot
+    takes one path, and a creature's own retargeted attack beats the
+    mannequin's."""
+    eas = _asset_sub()
+    return next((p for p in pkgs if p and eas.does_asset_exist(p)), pkgs[-1])
+
+
 def build_variant_blueprint(base_bp, variant):
     """A child of BP_ForestWanderer wearing one creature.
 
@@ -208,7 +216,11 @@ def build_variant_blueprint(base_bp, variant):
     # health and its voice are per creature too.
     ai_bp = build_ai_controller_blueprint(
         rebuild=True, path=variant.ai_blueprint,
-        melee_anim=_resolve(variant.melee, NPC_MELEE_MONTAGE_FALLBACK,
+        melee_anim=_resolve(variant.melee,
+                            _first_existing(*(
+                                p for p in (variant.melee_fallback,
+                                            NPC_MELEE_MONTAGE_FALLBACK)
+                                if p != variant.melee)),
                             f"{variant.key} melee clip"),
         voices=variant.voices, reactions=variant.reactions, key=variant.key)
     cdo.set_editor_property("ai_controller_class", BEL.generated_class(ai_bp))

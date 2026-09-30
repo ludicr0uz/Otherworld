@@ -20,8 +20,14 @@ Editor-side, in pipeline order:
     retarget_verify.py          retargeted clips stand, stay in place and step
     finger_verify.py            fingers skinned, mapped, and posed like the mannequin's
     retarget_paths.py           constants: asset paths and the mannequin source clips
-    rig_chains.py               constants: IK chain tables, finger bone names
+    rig_chains.py               constants: IK chain tables (mannequin, Meshy, Mixamo)
     rig_util.py                 log, asset loading, bone lists, bone pose in a clip
+    retarget_rig.py             build one IK rig from a chain table; one retargeter
+    import_mixamo.py            entry point: Mixamo zips -> X Bot clips -> the zombie
+    mixamo_paths.py             constants: packs, asset paths, which clip plays what
+    mixamo_import.py            unzip the packs; import X Bot and every clip onto SK_XBot
+    mixamo_retarget.py          IK_XBot, RTG_<Creature>_from_XBot, batch retarget
+    mixamo_locomotion.py        the creature's blend space plays the Mixamo gait; checks
     import_ui_art.py            entry point: HUD art PNGs -> textures
     fab_index.py                entry point: index Fab content -> assets/cache/fab/
     fab_inventory.py            describe a folder's assets from registry tags

@@ -199,17 +199,28 @@ class NpcVariant:
     # for the same reason it writes the health: an inherited component's
     # defaults cannot be overridden per child Blueprint from Python.
     reactions: tuple = ()
+    # The creature's own retargeted MM_Attack_01, for when ``melee`` names a
+    # clip the asset pipeline has not produced (e.g. the Mixamo packs were
+    # never imported). Same skeleton either way.
+    melee_fallback: str = ""
 
 
-def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0, voices=()):
-    """The asset layout every creature follows, from one name."""
+def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0, voices=(),
+              melee=None):
+    """The asset layout every creature follows, from one name.
+
+    ``melee`` overrides the retargeted MM_Attack_01, which stays the fallback
+    (``melee_fallback``) for a build that has not imported the override.
+    """
     anims = f"/Game/Sourced/Characters/Anims/{folder}"
+    stock_melee = f"{anims}/A_{folder}_MM_Attack_01"
     return NpcVariant(
         key=key,
         blueprint=f"/Game/Forest/NPC/BP_Wanderer_{key}",
         mesh=f"/Game/Sourced/Characters/SKM_{folder}/SKM_{folder}",
         anim_bp=f"{anims}/A_{folder}_ABP_Unarmed",
-        melee=f"{anims}/A_{folder}_MM_Attack_01",
+        melee=melee or stock_melee,
+        melee_fallback=stock_melee,
         ai_blueprint=f"/Game/Forest/NPC/BP_ForestWandererAI_{key}",
         health=health,
         speed_scale=speed_scale,
@@ -220,7 +231,12 @@ def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0, voices=()):
 
 
 NPC_VARIANTS = (
-    _creature("Zombie", "Zombie01", voices=ZOMBIE_VOICES),
+    # The zombie swings the Mixamo pack's two-handed lunge
+    # (asset_pipeline/import_mixamo.py, which checks this literal against
+    # mixamo_paths.MELEE).
+    _creature("Zombie", "Zombie01", voices=ZOMBIE_VOICES,
+              melee="/Game/Sourced/Mixamo/Zombie01/"
+                    "A_Zombie01_Mx_Scary_ZombieAttack"),
     _creature("Wendigo", "Wendigo01",
               health=NPC_BASE_HEALTH * WENDIGO_HEALTH_MULTIPLIER,
               speed_scale=WENDIGO_SPEED_MULTIPLIER,
@@ -231,7 +247,9 @@ NPC_VARIANTS = (
 # The parent BP_ForestWanderer wears the first creature. It is never spawned
 # directly -- every placed wanderer is one of the variants -- but it has to be
 # a complete, working character so the children inherit one.
-NPC_MELEE_MONTAGE = NPC_VARIANTS[0].melee
+# The creature's own retargeted MM_Attack_01, not an override: the parent is
+# never spawned, so it need not wait on an optional import (the Mixamo packs).
+NPC_MELEE_MONTAGE = NPC_VARIANTS[0].melee_fallback
 NPC_BASE_MESH = NPC_VARIANTS[0].mesh
 NPC_BASE_MESH_FALLBACK = "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple"
 NPC_ANIM_BP = NPC_VARIANTS[0].anim_bp

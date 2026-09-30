@@ -17,7 +17,9 @@ A task file is a Markdown list. Every top-level item is one task; indented or
 following lines up to the next item belong to it, so a task can run to several
 paragraphs. Headings and text before the first item are ignored. A line
 ``effort: <level>`` or ``model: <name>`` under an item sets that task's
-session effort or model, overriding --effort / --model:
+session effort or model, overriding --effort / --model. A task with neither
+an effort: hint nor --effort is sized first (devteam/triage.py: one Haiku call
+for the queue), which runs the small, obvious ones at low effort:
 
     # Friday queue
     - [ ] Raise the inventory size to 12.
@@ -32,9 +34,12 @@ stops the run (later tasks may depend on it) unless --keep-going is given.
 
 **Editors.** Before each task, every editor of this project is closed: asked
 through its inbox to save its dirty packages and quit, and terminated only if
-it does not. Sessions run uepy.py with UEPY_COLD=1, so nothing they do reaches
-an editor the user reopens meanwhile. If an editor cannot be closed, the run
-stops rather than work beside it.
+it does not. If an editor cannot be closed, the run stops rather than work
+beside it. A session gets a warm editor of its own instead (UEPY_SERVE, see
+uepylib/server.py): its first uepy.py call boots a headless editor serving
+Saved/uepy/devteam, later calls reuse it, and nothing it does reaches an
+editor the user reopens meanwhile. dev-team stops it before each sweep, before
+asking for a Fab asset, and at the end of the run.
 
 **The gate.** Before each task dev-team runs every verifier suite once, cold,
 and puts the numbers in the prompt; after the session it runs them again. A
@@ -89,11 +94,13 @@ from devteam.session import (                                       # noqa: E402
     build_cmd, build_fix_prompt, build_prompt, run_session, session_env,
 )
 from devteam.tasks import Task, parse_tasks, tick                   # noqa: E402
-from uepylib import editors                                         # noqa: E402
+from devteam.triage import triage                                   # noqa: E402
+from uepylib import editors, server                                 # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 LOG_ROOT = os.path.join(ROOT, "Saved", "DevTeam")
 DEFAULT_TASKS = os.path.join(ROOT, "Scripts", "dev", "tasks.md")
+SERVE_DIR = os.path.join(ROOT, "Saved", "uepy", "devteam")
 
 
 def parse_args():
@@ -113,7 +120,10 @@ def parse_args():
     p.add_argument("--permission-mode", default="auto",
                    help="auto (default), acceptEdits, bypassPermissions, ...")
     p.add_argument("--model", help="model for every task (default: claude's own)")
-    p.add_argument("--effort", help="effort level for every task")
+    p.add_argument("--effort", help="effort level for every task (skips triage)")
+    p.add_argument("--no-triage", dest="triage", action="store_false",
+                   help="don't size the queue first (devteam/triage.py): every "
+                        "task without an effort: hint runs at the default effort")
     p.add_argument("--budget", type=float, metavar="USD", help="per-task spending cap")
     p.add_argument("--no-gate", dest="gate", action="store_false",
                    help="skip the verifier sweeps before and after each task")
@@ -139,7 +149,10 @@ def load_tasks(args):
 
 
 def close_editors():
-    """True when no editor of the project is left running."""
+    """True when no editor of the project is left running, the session's warm
+    one included (asked to stop first; close_editors would only signal it)."""
+    if server.stop(SERVE_DIR):
+        print("    stopped the session's warm editor")
     _closed, left = editors.close_editors()
     for proc in left:
         print(f"    could not close {proc.binary} {proc.pid}")
@@ -171,7 +184,7 @@ def run_one(task, n, total, args, run_dir, progress, cache):
     Returns (ok, reports, result, gate_table, final sweep or None)."""
     log_path = os.path.join(run_dir, f"task-{n:02d}.jsonl")
     sweep_log = os.path.join(run_dir, f"task-{n:02d}-sweeps.txt")
-    env = session_env(os.environ)
+    env = session_env(os.environ, SERVE_DIR)
     ask = dict(interactive=args.interactive)
     blocked = fab.preflight(task.fab, close_editors, **ask)
     if blocked:
@@ -208,8 +221,10 @@ def run_one(task, n, total, args, run_dir, progress, cache):
         for p in problems:
             print(f"      - {p[:200]}")
         fix = build_fix_prompt(problems, gate.table(baseline, after), args.commit)
+        # Triage guessed low and the gate disagrees: fix at the default effort.
+        fix_opts = dict(common, effort=args.effort) if task.triage else common
         ok, report, fixed = run_session(
-            build_cmd(fix, args.permission_mode, resume=result["session_id"], **common),
+            build_cmd(fix, args.permission_mode, resume=result["session_id"], **fix_opts),
             ROOT, log_path, env)
         result = merge_results(result, fixed)
         reports.append(report)
@@ -235,8 +250,18 @@ def main():
         sys.exit("dev-team: nothing to do (no unticked tasks)")
     skipped = len(tasks) - len(todo)
     print(f"dev-team: {len(todo)} task(s)" + (f", {skipped} already done" if skipped else ""))
+    triage_cost = 0.0
+    if args.triage and not args.effort:
+        unsized = [t for t in todo if not t.effort]
+        triage_cost, error = triage(unsized, ROOT)
+        lowered = sum(1 for t in unsized if t.triage)
+        print(f"  triage: {error}" if error else
+              f"  triage: {lowered} of {len(unsized)} task(s) at low effort, "
+              f"the rest at the default (${triage_cost:.2f})")
     for i, t in enumerate(todo, 1):
         hints = ", ".join(f"{k} {v}" for k, v in (("effort", t.effort), ("model", t.model)) if v)
+        if t.triage:
+            hints += f" -- triage: {t.triage}"
         print(f"  {i}. {t.title}" + (f"  [{hints}]" if hints else ""))
     if args.dry_run:
         return
@@ -248,7 +273,7 @@ def main():
     with open(progress, "w") as f:
         f.write(f"# dev-team run {stamp}\n")
 
-    outcomes, total_cost, cache = [], 0.0, {}
+    outcomes, total_cost, cache = [], triage_cost, {}
     for n, task in enumerate(todo, 1):
         print(f"\n[{n}/{len(todo)}] {task.title}")
         if not close_editors():
@@ -284,7 +309,9 @@ def main():
         with open(progress, "a") as f:
             f.write(f"\n## Task {n}: {status}\n\n{task.text}\n\n"
                     f"Session: {result.get('session_id', '?')}{commits}\n"
-                    f"Time: {took}\nTokens: {tokens}\n\n"
+                    f"Time: {took}\nTokens: {tokens}\n"
+                    f"Effort: {task.effort or args.effort or 'default'}"
+                    + (f" (triage: {task.triage})" if task.triage else "") + "\n\n"
                     + (f"### Verifier gate\n\n{gate_table}\n\n" if gate_table else "")
                     + f"### Report\n\n{report or '(no report)'}\n")
         outcomes.append((task, status))
@@ -298,6 +325,8 @@ def main():
             print("dev-team: stopping (use --keep-going to continue past failures)")
             break
 
+    if server.stop(SERVE_DIR):
+        print("\ndev-team: stopped the last session's warm editor")
     print(f"\ndev-team: finished -- ${total_cost:.2f} total, progress in {progress}")
     for task, status in outcomes:
         print(f"  {status:>11}  {task.title}")

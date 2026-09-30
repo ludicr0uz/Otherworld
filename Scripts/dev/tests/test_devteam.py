@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import tempfile
@@ -10,6 +11,7 @@ from devteam.accounting import describe_time, merge_results, token_usage
 from devteam.session import (
     FAIL_MARK, Narrator, build_cmd, build_fix_prompt, build_prompt, session_env,
 )
+from devteam import triage
 from devteam.tasks import Task, parse_tasks, tick
 
 
@@ -138,10 +140,26 @@ class SessionTest(unittest.TestCase):
         self.assertNotIn("--name", cmd)
 
     def test_session_env(self):
-        env = session_env({"PATH": "/bin"})
-        self.assertEqual((env["UEPY_COLD"], env["UEPY_OUTPUT"]), ("1", "summary"))
+        env = session_env({"PATH": "/bin", "UEPY_COLD": "1"}, "/p/Saved/uepy/devteam")
+        self.assertEqual((env["UEPY_SERVE"], env["UEPY_OUTPUT"]),
+                         ("/p/Saved/uepy/devteam", "summary"))
+        self.assertNotIn("UEPY_COLD", env)          # it would bypass the warm editor
         self.assertEqual(env["ENABLE_CLAUDEAI_MCP_SERVERS"], "false")
         self.assertEqual(env["PATH"], "/bin")
+
+    def test_cmd_allows_the_everyday_commands(self):
+        cmd = build_cmd("go", "auto")
+        allow = json.loads(cmd[cmd.index("--settings") + 1])["permissions"]["allow"]
+        for rule in ("Bash(cd *)", "Bash(sed -n *)", "Bash(grep *)", "Bash(git log *)",
+                     "Bash(python3 Scripts/dev/uepy.py *)"):
+            self.assertIn(rule, allow)
+        self.assertFalse([r for r in allow if r in ("Bash", "Bash(*)", "Bash(python3 *)")])
+        self.assertEqual(cmd[cmd.index("--permission-mode") + 1], "auto")
+
+    def test_prompt_describes_the_warm_editor(self):
+        prompt = build_prompt(Task("Do X"), 1, 1, "/p", "| t |", True)
+        self.assertIn("UEPY_SERVE", prompt)
+        self.assertNotIn("UEPY_COLD=1", prompt)
 
     def test_narrator_strips_the_cd_prefix(self):
         root = "/Users/me/Unreal Projects/Otherworld"
@@ -150,6 +168,57 @@ class SessionTest(unittest.TestCase):
             "command": f'cd "{root}/Scripts"; ls'}}), "Bash: [Scripts] ls")
         self.assertEqual(n.describe({"name": "Read", "input": {
             "file_path": f"{root}/CLAUDE.md"}}), "Read: CLAUDE.md")
+
+
+class TriageTest(unittest.TestCase):
+
+    def test_prompt_numbers_every_task(self):
+        prompt = triage.build_prompt([Task("Raise X"), Task("Add Y\nwith Z")])
+        self.assertIn("1. Raise X", prompt)
+        self.assertIn("2. Add Y\nwith Z", prompt)
+
+    def test_cmd_has_no_tools(self):
+        cmd = triage.build_cmd("p")
+        self.assertEqual(cmd[cmd.index("--tools") + 1], "")
+        self.assertEqual(cmd[cmd.index("--model") + 1], "haiku")
+        self.assertIn("--strict-mcp-config", cmd)
+
+    def test_parse_keeps_only_low(self):
+        text = ('Sure:\n{"tasks": [{"n": 1, "effort": "low", "why": "one  constant"},'
+                ' {"n": 2, "effort": "default", "why": "new UI"},'
+                ' {"n": 3, "effort": "high", "why": "x"}, {"n": 9, "effort": "low"}]}')
+        self.assertEqual(triage.parse(text, 3), {1: ("low", "one constant")})
+
+    def test_parse_survives_junk(self):
+        self.assertEqual(triage.parse("no json here", 2), {})
+        self.assertEqual(triage.parse('{"tasks": [1, {"n": "1", "effort": "low"}]}', 2), {})
+        self.assertEqual(triage.parse(None, 2), {})
+
+    def fake(self, stdout, returncode=0):
+        class P(object):
+            pass
+        p = P()
+        p.stdout, p.returncode = stdout, returncode
+        return lambda *a, **k: p
+
+    def test_triage_sets_effort_and_reason(self):
+        tasks = [Task("Raise X"), Task("Add Y")]
+        answer = json.dumps({"total_cost_usd": 0.01, "is_error": False, "result":
+                             '{"tasks": [{"n": 2, "effort": "low", "why": "tuning"}]}'})
+        cost, error = triage.triage(tasks, "/p", run=self.fake(answer))
+        self.assertEqual((cost, error), (0.01, None))
+        self.assertEqual([(t.effort, t.triage) for t in tasks],
+                         [(None, None), ("low", "tuning")])
+
+    def test_a_failed_call_changes_nothing(self):
+        tasks = [Task("Raise X")]
+        _cost, error = triage.triage(tasks, "/p", run=self.fake("not json", 1))
+        self.assertIn("failed", error)
+        self.assertIsNone(tasks[0].effort)
+        answer = json.dumps({"is_error": True, "result": "rate limited"})
+        _cost, error = triage.triage(tasks, "/p", run=self.fake(answer))
+        self.assertIn("rate limited", error)
+        self.assertIsNone(tasks[0].effort)
 
 
 class AccountingTest(unittest.TestCase):

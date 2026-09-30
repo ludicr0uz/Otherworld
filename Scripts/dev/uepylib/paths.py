@@ -70,9 +70,17 @@ def saved_uepy(*parts):
     return os.path.join(os.path.dirname(uproject()), "Saved", "uepy", *parts)
 
 
+def serve_inbox():
+    """$UEPY_SERVE: the inbox of this caller's own warm editor (uepylib/server.py),
+    or None. dev-team sets it so its sessions never reach the user's editor."""
+    path = os.environ.get("UEPY_SERVE")
+    return os.path.abspath(path) if path else None
+
+
 def editor_inbox():
-    """The inbox a UI editor polls (Content/Python/uepy_inbox.py)."""
-    return saved_uepy()
+    """The inbox a UI editor polls (Content/Python/uepy_inbox.py), or the
+    warm editor's under $UEPY_SERVE."""
+    return serve_inbox() or saved_uepy()
 
 
 def game_inbox():

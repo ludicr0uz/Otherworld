@@ -28,6 +28,7 @@ class Task(object):
     def __init__(self, text, line=None, done=False, effort=None, model=None, fab=None):
         self.text, self.line, self.done = text, line, done
         self.effort, self.model = effort, model
+        self.triage = None          # why devteam/triage.py lowered the effort
         self.fab = list(fab or [])
 
     @property

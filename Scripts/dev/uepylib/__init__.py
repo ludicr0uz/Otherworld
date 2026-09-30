@@ -8,6 +8,7 @@ uepy.py is the thin CLI; everything it does lives here:
   inbox       the file inbox a live editor (or a -game run) polls
   remote      the engine's own multicast remote execution (dead on this machine)
   cold        one UnrealEditor-Cmd boot for N scripts
+  server      a warm headless editor of the caller's own ($UEPY_SERVE), booted once
   game        headless -game runs, with or without probes (Scripts/probes)
   editors     finding and closing the project's running editors
 

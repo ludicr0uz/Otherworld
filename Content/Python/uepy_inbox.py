@@ -20,7 +20,8 @@ listening on it, and cold-boots only when neither is available.
 
 Everything runs on the game thread inside the tick callback, which is exactly
 where editor scripting has to run -- the same place -ExecutePythonScript would
-put it.
+put it. A headless editor has no Slate tick, so there ``serve()`` polls the
+inbox from a blocking loop instead (the warm editor dev-team sessions use).
 """
 
 import json
@@ -36,7 +37,7 @@ POLL_SECONDS = 0.25          # how often the inbox is checked
 HEARTBEAT_SECONDS = 1.0      # how often liveness is published
 RESULT_TTL_SECONDS = 300.0   # results nobody collected are swept after this
 
-_state = {"handle": None, "last_poll": 0.0, "last_beat": 0.0}
+_state = {"handle": None, "last_poll": 0.0, "last_beat": 0.0, "serving": False}
 
 
 def inbox_dir():
@@ -216,60 +217,79 @@ def _sweep(path, now):
             pass
 
 
-def _tick(_delta):
-    """Slate post-tick. Must never raise: an exception here kills the ticker."""
-    now = time.time()
-    try:
-        path = inbox_dir()
-        if now - _state["last_beat"] >= HEARTBEAT_SECONDS:
-            _state["last_beat"] = now
-            _write_atomic(os.path.join(path, "heartbeat"), {
-                "pid": os.getpid(),
-                "time": now,
-                "pie": _in_pie(),
-                "project": unreal.Paths.get_project_file_path(),
-            })
-        if now - _state["last_poll"] < POLL_SECONDS:
-            return
-        _state["last_poll"] = now
-        _sweep(path, now)
+def _beat(path, now, busy=None):
+    _write_atomic(os.path.join(path, "heartbeat"), {
+        "pid": os.getpid(),
+        "time": now,
+        "pie": _in_pie(),
+        "project": unreal.Paths.get_project_file_path(),
+        # A job holds the game thread, so no beat is written until it ends. A
+        # beat that names its job tells the client "busy, not dead": it then
+        # judges liveness by the pid alone, so a 60 s build is not given up on
+        # after 6 s.
+        "busy": busy,
+    })
+    _state["last_beat"] = now
 
-        for name in sorted(n for n in os.listdir(path)
-                           if n.endswith(".request")):
-            full = os.path.join(path, name)
-            job_id = name[: -len(".request")]
-            try:
-                with open(full, encoding="utf-8") as fh:
-                    job = json.load(fh)
-            except (OSError, ValueError):
-                try:
-                    os.remove(full)
-                except OSError:
-                    pass
-                continue
-            # Delete first: a request that hard-crashes the interpreter must not
-            # be retried on the next tick, forever.
+
+def _run_pending(path):
+    """Run every queued request. Returns how many ran."""
+    ran = 0
+    for name in sorted(n for n in os.listdir(path) if n.endswith(".request")):
+        full = os.path.join(path, name)
+        job_id = name[: -len(".request")]
+        try:
+            with open(full, encoding="utf-8") as fh:
+                job = json.load(fh)
+        except (OSError, ValueError):
             try:
                 os.remove(full)
             except OSError:
                 pass
+            continue
+        # Delete first: a request that hard-crashes the interpreter must not
+        # be retried on the next tick, forever.
+        try:
+            os.remove(full)
+        except OSError:
+            pass
 
-            if _in_pie() and not job.get("allow_pie"):
-                _write_atomic(os.path.join(path, job_id + ".result"), {
-                    "success": False,
-                    "output": "[uepy-inbox] refused: the editor is in PIE. "
-                              "Stop PIE, or send allow_pie.",
-                    "seconds": 0.0,
-                })
-                continue
-
-            started = time.time()
-            ok, output = _execute(job)
+        if _in_pie() and not job.get("allow_pie"):
             _write_atomic(os.path.join(path, job_id + ".result"), {
-                "success": ok,
-                "output": output,
-                "seconds": time.time() - started,
+                "success": False,
+                "output": "[uepy-inbox] refused: the editor is in PIE. "
+                          "Stop PIE, or send allow_pie.",
+                "seconds": 0.0,
             })
+            continue
+
+        _beat(path, time.time(), busy=job_id)
+        started = time.time()
+        ok, output = _execute(job)
+        _write_atomic(os.path.join(path, job_id + ".result"), {
+            "success": ok,
+            "output": output,
+            "seconds": time.time() - started,
+        })
+        _beat(path, time.time())
+        ran += 1
+    return ran
+
+
+def _tick(_delta):
+    """Slate post-tick. Must never raise: an exception here kills the ticker."""
+    if _state.get("serving"):
+        return True             # serve() owns the inbox; a nested run would re-enter
+    now = time.time()
+    try:
+        path = inbox_dir()
+        if now - _state["last_beat"] >= HEARTBEAT_SECONDS:
+            _beat(path, now)
+        if now - _state["last_poll"] < POLL_SECONDS:
+            return
+        _state["last_poll"] = now
+        _sweep(path, now)
+        _run_pending(path)
     except Exception:
         # Report, but keep the ticker alive.
         try:
@@ -277,6 +297,45 @@ def _tick(_delta):
         except Exception:
             pass
     return True
+
+
+def serve():
+    """Serve the inbox from a blocking loop until a ``stop`` file appears.
+
+    For a headless ``UnrealEditor-Cmd -ExecutePythonScript`` (uepylib/server.py
+    starts one per dev-team task): there is no Slate tick there, so the loop
+    polls itself. Jobs run exactly where a cold run's driver runs them -- on
+    the game thread, between engine ticks that never come -- so a job sees what
+    it would see cold, minus the 20-40 s boot, plus whatever earlier jobs left
+    loaded (the warm-editor semantics the UI inbox already has).
+    """
+    path = inbox_dir()
+    stop_file = os.path.join(path, "stop")
+    _state["serving"] = True
+    unreal.log_warning(f"[uepy-inbox] serving {path} until {stop_file} appears")
+    try:
+        while not os.path.exists(stop_file):
+            now = time.time()
+            try:
+                if now - _state["last_beat"] >= HEARTBEAT_SECONDS:
+                    _beat(path, now)
+                    _sweep(path, now)
+                if _run_pending(path):
+                    # Nothing ticks here, so nothing collects garbage unless
+                    # asked; a long session of builds would otherwise pile up.
+                    unreal.SystemLibrary.collect_garbage()
+                    continue
+            except Exception:
+                unreal.log_error("[uepy-inbox] " + traceback.format_exc())
+            time.sleep(0.1)
+    finally:
+        _state["serving"] = False
+        for name in ("heartbeat", "stop"):
+            try:
+                os.remove(os.path.join(path, name))
+            except OSError:
+                pass
+    unreal.log_warning("[uepy-inbox] stopped serving")
 
 
 def start():

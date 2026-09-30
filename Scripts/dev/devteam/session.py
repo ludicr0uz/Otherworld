@@ -27,10 +27,16 @@ Every earlier turn is re-read on each new one, so keep what you pull in lean: \
 grep -n and sed -n ranges for a file of more than a few hundred lines, and \
 whole files only when you need all of them.
 
-In this session uepy.py always boots a fresh editor (UEPY_COLD=1; no editor is \
-open) and prints a summary per script (UEPY_OUTPUT=summary: verifier counts, \
-failed checks, traceback tails, plus the path of the full log); pass --full \
-to see everything. To check behaviour in the running game, write a probe and \
+In this session uepy.py runs scripts in a headless editor of this session's \
+own (UEPY_SERVE): the first call boots it (20-40 s), later calls reuse it, so \
+a run costs about what the script itself takes. It is warm: modules under \
+Scripts/ are re-imported for every call, but assets earlier calls loaded stay \
+loaded, as in any open editor. Do not pass --cold (it stops the warm editor \
+first, then pays a full boot). If a call reports the editor stopped \
+responding, a script crashed it; the next call boots a new one. uepy.py \
+prints a summary per script (UEPY_OUTPUT=summary: verifier counts, failed \
+checks, traceback tails, plus the path of the full log); pass --full to see \
+everything. To check behaviour in the running game, write a probe and \
 run it with `uepy.py --game --probe FILE` (Scripts/probes/__init__.py).
 
 {gate}
@@ -93,6 +99,24 @@ End with the same kind of report; if you cannot fix it, make its first line \
 "{fail} <reason>"."""
 
 
+# Commands every session runs dozens of times, allowed outright. In auto mode
+# anything not allowed goes to the classifier first, which measured 0.6-2.2 s
+# a call (about 1.3 s median over ~1,400 calls a day); allowed, 0.03 s, the
+# same as bypassPermissions. Everything else still goes through the mode.
+# A compound command is allowed when each part is, so the sessions' habitual
+# `cd "<root>"; sed -n ...; grep ...` needs `cd` here too.
+ALLOW = [
+    "Bash(cd *)", "Bash(ls *)", "Bash(cat *)", "Bash(head *)", "Bash(tail *)",
+    "Bash(sed -n *)", "Bash(grep *)", "Bash(rg *)", "Bash(wc *)", "Bash(sort *)",
+    "Bash(uniq *)", "Bash(cut *)", "Bash(diff *)",
+    "Bash(git status *)", "Bash(git log *)", "Bash(git show *)", "Bash(git diff *)",
+    "Bash(git grep *)", "Bash(git blame *)", "Bash(git rev-parse *)",
+    "Bash(python3 Scripts/dev/uepy.py *)",
+    "Bash(python3 -m unittest discover -s Scripts/dev/tests*)",
+]
+SETTINGS = {"permissions": {"allow": ALLOW}}
+
+
 def build_prompt(task, n, total, progress_path, baseline_table, commit):
     progress = PROGRESS.format(path=progress_path) if n > 1 else ""
     if baseline_table is None:
@@ -116,7 +140,8 @@ def build_cmd(prompt, permission_mode, name=None, model=None, effort=None,
     # claude.ai connectors (Docs, Drive) add tools to every turn and no task
     # here uses them; ENABLE_CLAUDEAI_MCP_SERVERS=false in session_env() too.
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
-           "--permission-mode", permission_mode, "--strict-mcp-config"]
+           "--permission-mode", permission_mode, "--strict-mcp-config",
+           "--settings", json.dumps(SETTINGS)]
     if resume:
         cmd += ["--resume", resume]
     elif name:
@@ -130,9 +155,10 @@ def build_cmd(prompt, permission_mode, name=None, model=None, effort=None,
     return cmd
 
 
-def session_env(base):
+def session_env(base, serve_dir):
     env = dict(base)
-    env["UEPY_COLD"] = "1"               # never an editor the user may reopen
+    env.pop("UEPY_COLD", None)
+    env["UEPY_SERVE"] = serve_dir        # its own warm editor, never the user's
     env["UEPY_OUTPUT"] = "summary"       # counts and failures, not 2,000 lines
     env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"
     return env

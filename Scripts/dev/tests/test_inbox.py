@@ -26,10 +26,18 @@ class InboxTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    def beat(self, pid=None, age=0.0):
+    def beat(self, pid=None, age=0.0, busy=None):
         with open(os.path.join(self.dir, "heartbeat"), "w") as fh:
             json.dump({"pid": pid or os.getpid(), "time": time.time() - age,
-                       "project": "P.uproject"}, fh)
+                       "project": "P.uproject", "busy": busy}, fh)
+
+    def test_a_busy_listener_is_alive_however_old_its_beat(self):
+        self.beat(age=600, busy="job1")
+        self.assertIsNotNone(inbox.heartbeat(self.dir))
+
+    def test_a_busy_listener_that_died_is_not(self):
+        self.beat(pid=dead_pid(), age=600, busy="job1")
+        self.assertIsNone(inbox.heartbeat(self.dir))
 
     def test_no_heartbeat(self):
         self.assertIsNone(inbox.heartbeat(self.dir))

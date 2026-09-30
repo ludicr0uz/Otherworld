@@ -150,8 +150,12 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
   `$UEPY_OUTPUT=summary` makes summary the default; dev-team sets it.
 - **Exit code:** non-zero if any target raised **or any verifier reported a failed check**.
   The suites return normally when checks fail, so before this a failing sweep exited 0.
-- **`$UEPY_COLD=1`** forces every run cold. dev-team sets it, and closes the project's editors
-  before each task.
+- **`$UEPY_COLD=1`** forces every run cold.
+- **`$UEPY_SERVE=<dir>`** gives the caller a warm editor of its own: the first call boots a
+  headless `UnrealEditor-Cmd` serving the inbox in `<dir>` (`uepylib/server.py`,
+  `uepy_inbox.serve()`), later calls reuse it. dev-team sets it per session
+  (`Saved/uepy/devteam`), closes the project's editors before each task, and stops the warm
+  one before each verifier sweep.
 - **`--game`** counts `Blueprint Runtime Error`, `Accessed None`, `NPC-SPAWN` and `NPC-FELL`.
 - **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`. Never
   rebuild Blueprints under a running game.

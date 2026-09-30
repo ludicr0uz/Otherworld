@@ -36,7 +36,9 @@ def heartbeat(directory, fresh=EDITOR_FRESH_SECONDS):
             beat = json.load(fh)
     except (OSError, ValueError):
         return None
-    if time.time() - float(beat.get("time", 0)) > fresh:
+    # A job holds the listener's thread, so it cannot beat until the job ends.
+    # It names the job in its last beat: busy is alive while its pid is.
+    if time.time() - float(beat.get("time", 0)) > fresh and not beat.get("busy"):
         return None
     # A killed process leaves its last beat behind, still "fresh" for a while.
     if not pid_alive(beat.get("pid")):

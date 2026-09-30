@@ -104,8 +104,12 @@ sync:
 - **Stored:** Health, Stamina, Hunger, Thirst, Temperature, the kill count, the equipped slot,
   and each carried item's class, `Loaded` and `Reserve`. **Never the location**; the verifier
   asserts BP_Profile has no other field.
-- **A hit calls it off.** A wanderer's swing stamps the player's `BP_HealthComponent.LastDamageTime`
-  (`npc/melee.py`), and the countdown stops when that passes `ExitStartedAt`. The starvation
+- **The character can't move during the countdown.** Every Tick it waits, the pawn's
+  `CharacterMovement` gets `DisableMovement` (keyed off `ExitPending`, not the X press, so the
+  probe's variable writes freeze it too). Looking around still works.
+- **A hit calls it off**, and `SetMovementMode(Walking)` frees the pawn. A wanderer's swing stamps
+  the player's `BP_HealthComponent.LastDamageTime` (`npc/melee.py`), and the countdown stops when
+  that passes `ExitStartedAt`. The starvation
   drain lowers Health without stamping it, so it is not a hit.
 - **Loading:** the first Tick of a started game (after NEW GAME, or at once with `-nomenu`) on
   which the weapon component's Inventory is non-empty sets `ProfileChecked` and, if the slot
@@ -114,8 +118,8 @@ sync:
   loadout keeps the issued guns from being added after the saved ones.
 - **Death deletes the slot.** `Health <= 0` on Tick, once (`ProfileForgotten`). Tick, not
   DrawHUD: the death pause comes after a 2.2 s settle, and a `-nullrhi` probe never draws.
-- **Probe:** `uepy.py --game --probe Scripts/probes/probe_save_exit.py`. It covers a hit
-  calling the exit off, the save, the reload and restore, a crafted inventory replacing the
+- **Probe:** `uepy.py --game --probe Scripts/probes/probe_save_exit.py`. It covers the freeze, a
+  hit calling the exit off and freeing the pawn, the save, the reload and restore, a crafted inventory replacing the
   issued one, and the delete on death. It sets aside any real profile on disk and puts it back.
 - **Still needs a play session:** the X key itself and the 15 s at real speed (the probe
   writes the countdown's variables), and how the banner reads.

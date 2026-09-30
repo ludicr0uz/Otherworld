@@ -1,4 +1,5 @@
-"""Save and exit: a hit calls it off, running out saves the profile and
+"""Save and exit: the character stands still while it counts down, a hit
+calls it off and frees it, running out saves the profile and
 reopens the level, the reopened game loads it, a saved inventory unlike the
 issued one replaces it, and dying deletes it.
 
@@ -96,11 +97,18 @@ def _run(p):
     wc = p.component(pawn, WEAPON_COMP_CLASS_PATH)
     survival = p.component(pawn, SURVIVAL_CLASS_PATH)
 
-    # --- a hit calls the exit off -------------------------------------------
+    # --- the character stands still, and a hit calls the exit off -----------
+    moves = pawn.get_editor_property("character_movement")
     _start_exit(p, hud, 100.0)
     yield 0.1
+    p.check("the character can't move while the exit counts down",
+            moves.movement_mode == unreal.MovementMode.MOVE_NONE,
+            str(moves.movement_mode))
     p.set(health, "LastDamageTime", p.time())
     yield 0.2
+    p.check("...and walks again once a hit calls it off",
+            moves.movement_mode == unreal.MovementMode.MOVE_WALKING,
+            str(moves.movement_mode))
     p.check("a hit during the countdown calls the exit off",
             not p.get(hud, EXIT_PENDING_VAR) and p.get(hud, EXIT_CALLED_OFF_VAR) > 0.0,
             f"pending {p.get(hud, EXIT_PENDING_VAR)}, "

@@ -120,3 +120,23 @@ def check_profile(check, bp, nodes):
           len(refresh) == 1 and _value(refresh[0], "NeedsRefresh") == "true"
           and len(dropped) == 1 and _value(dropped[0], "Dropped") == "false",
           f"{len(refresh)} NeedsRefresh, {len(dropped)} Dropped")
+    _check_freeze(check, nodes)
+
+
+def _check_freeze(check, nodes):
+    """The character stands still while the countdown runs; a hit frees it."""
+    stops = [n for n in nodes if "DisableMovement" in _title(n).replace(" ", "")]
+    waits = [b for n in stops for b in _feeders(n, "execute")
+             if f"Get {PC.EXIT_AT_VAR}" in {_title(g) for c in _feeders(b, "Condition")
+                                            for g in _feeders(c, "B")}]
+    check("the character can't move while the exit counts down "
+          "(DisableMovement every Tick it waits)",
+          len(stops) == 1 and len(waits) == 1,
+          f"{len(stops)} DisableMovement, {len(waits)} on the countdown's wait")
+    walks = [n for n in nodes if "NewMovementMode" in _pins(n)]
+    check("...and walks again when a hit calls the exit off",
+          len(walks) == 1 and "Walking" in _value(walks[0], "NewMovementMode")
+          and any(_title(f) == f"Set {PC.EXIT_CALLED_OFF_VAR}"
+                  for f in _feeders(walks[0], "execute")),
+          str([(_value(n, "NewMovementMode"), [_title(f) for f in _feeders(n, "execute")])
+               for n in walks]))

@@ -211,7 +211,7 @@ editor.
   are 4 minutes each for now (`Scripts/world/world_config.py`). The night is moonlit, dim and
   starry. A level starts just after sunrise.
 - **Save and exit:** X in the M panel saves the character's stats and inventory, but not its
-  location, after 15 s, then returns to the main menu. A hit calls it off. The next game loads
+  location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit calls it off. The next game loads
   the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
 - **Known gaps:** temperature moves nothing yet, and nothing else reads the time of day yet. `GameDefaultMap` still points at the old
   `Lvl_Forest`. Feel checks that need a play session are listed per package.

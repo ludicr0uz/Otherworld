@@ -12,8 +12,12 @@ One fragment, run every Tick after the grass sync, in this order:
      = now, ExitAt = now + EXIT_SECONDS, and the panel closes.
   4. An exit running?  If the player was hit since it started
      (BP_HealthComponent.LastDamageTime, stamped by the wanderers' swing) it
-     is called off; once ExitAt has passed, profile_write.py and the current
-     level is reopened -- which opens on the main menu.
+     is called off and the pawn walks again; once ExitAt has passed,
+     profile_write.py and the current level is reopened -- which opens on the
+     main menu. Until then the pawn's CharacterMovement is disabled, every
+     Tick, so the character stands still for the whole countdown. Every Tick
+     rather than once at the X: the countdown can be started by writing its
+     variables (the probe does), and the freeze follows ExitPending either way.
   5. The dev-all-guns cheat ([K] in the panel; dev_guns.py).
 
 Everything reads off the player_parts cast chain; a pawn without the parts
@@ -23,7 +27,7 @@ skips the whole fragment.
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.dev_guns import author_dev_guns
-from graphics_menu.player_parts import author_player_parts
+from graphics_menu.player_parts import PAWN, author_player_parts
 from graphics_menu.profile_consts import (
     EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_KEY, EXIT_PENDING_VAR, EXIT_SECONDS,
     EXIT_STARTED_VAR, NEVER, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR,
@@ -46,6 +50,10 @@ FN_SAVE_EXISTS = "/Script/Engine.GameplayStatics.DoesSaveGameExist"
 FN_DELETE_SAVE = "/Script/Engine.GameplayStatics.DeleteGameInSlot"
 FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
 FN_OPEN_LEVEL = "/Script/Engine.GameplayStatics.OpenLevel"
+FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
+FN_DISABLE_MOVEMENT = "/Script/Engine.CharacterMovementComponent.DisableMovement"
+FN_SET_MOVEMENT_MODE = "/Script/Engine.CharacterMovementComponent.SetMovementMode"
+MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 
 _BOOLS = (EXIT_PENDING_VAR, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR)
 _REALS = (EXIT_AT_VAR, EXIT_STARTED_VAR, EXIT_CALLED_OFF_VAR)
@@ -181,6 +189,12 @@ def _author_start(ed, pc_out, now_out, in_execs, x0, y0, made):
     return flow + [stay]
 
 
+def _movement_call(ed, moves, fn, in_execs, x, y, made):
+    """``fn`` on the pawn's CharacterMovement; returns (node, what follows)."""
+    call = _call(ed, fn, x, y, made, self=moves)
+    return call, _chain(call, in_execs)
+
+
 def _author_countdown(ed, parts, now_out, in_execs, x0, y0, made):
     """A running exit: called off by a hit, or saved and left when it is due."""
     running, idle = _branch(ed, _get(ed, EXIT_PENDING_VAR, x0, y0 + 300, made),
@@ -192,10 +206,20 @@ def _author_countdown(ed, parts, now_out, in_execs, x0, y0, made):
     hit, unhurt = _branch(ed, _out(since), [running], x0 + 720, y0, made)
     off = _setter(ed, EXIT_PENDING_VAR, "false", [hit], x0 + 980, y0 - 300, made)
     off = _setter(ed, EXIT_CALLED_OFF_VAR, now_out, off, x0 + 1240, y0 - 300, made)
+    comp = _call(ed, FN_GET_COMP, x0 + 1240, y0 + 600, made, self=parts[PAWN])
+    _pin(comp, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
+    moves = _out(comp)
+    walk, off = _movement_call(ed, moves, FN_SET_MOVEMENT_MODE, off,
+                               x0 + 1500, y0 - 600, made)
+    _set(walk, "NewMovementMode", "MOVE_Walking")
 
     ripe = _call(ed, FN_GE, x0 + 980, y0 + 300, made, A=now_out,
                  B=_get(ed, EXIT_AT_VAR, x0 + 740, y0 + 440, made))
     leave, wait = _branch(ed, _out(ripe), [unhurt], x0 + 1240, y0, made)
+    # Standing still while the countdown runs; the reopened level brings a
+    # fresh pawn, so only the hit arm has to give the movement back.
+    _, wait = _movement_call(ed, moves, FN_DISABLE_MOVEMENT, [wait],
+                             x0 + 1500, y0 + 600, made)
     flow = _setter(ed, EXIT_PENDING_VAR, "false", [leave], x0 + 1500, y0, made)
     written = author_write_profile(ed, flow[0], parts, x0 + 1760, y0, made)
 
@@ -205,7 +229,7 @@ def _author_countdown(ed, parts, now_out, in_execs, x0, y0, made):
     flow = _chain(where, written)
     reopen = _call(ed, FN_OPEN_LEVEL, x0 + 7060, y0, made, LevelName=_out(where))
     _chain(reopen, flow)
-    return off + [wait, idle]
+    return off + wait + [idle]
 
 
 def author_save_exit_tick(ed, pc_out, in_execs, x0, y0):

@@ -182,9 +182,10 @@ def main():
 
     # ApplyNonResolutionSettings takes no arguments, so it is the only node in
     # the graph whose inputs are exactly exec + self -- apart from the profile
-    # load's DestroyActor, which is told apart by its title.
+    # load's DestroyActor and the exit's DisableMovement, told apart by title.
     applies = [n for n in nodes if pin_names(n) == {"execute", "self"}
-               and "Destroy" not in str(BEL.get_node_title(n))]
+               and not any(w in str(BEL.get_node_title(n)).replace(" ", "")
+                           for w in ("Destroy", "DisableMovement"))]
     check("ApplyNonResolutionSettings once per preset, plus BeginPlay's",
           len(applies) == len(G.PRESETS) + 1, str(len(applies)))
     # Regression guard, and the single most important check in this file:
@@ -498,9 +499,10 @@ def main():
     # times -- inventory strip, reticle, stamina bar, and the settings push.
     # Seven: and the survival component, for its bars.
     # Ten: and the three the profile's save and load cast (player_parts.py).
+    # Eleven: and CharacterMovement, frozen while the exit counts down.
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 10 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 11 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,

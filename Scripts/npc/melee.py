@@ -4,8 +4,7 @@ its direction, and the impact sound.
 
 from combat.game_state import LAST_DAMAGE_VAR
 from forest_generator.npc_placement import (
-    NPC_MELEE_BLEND_S, NPC_MELEE_DAMAGE, NPC_MELEE_INTERVAL_S,
-    NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK, NPC_MELEE_RANGE_CM,
+    NPC_MELEE_BLEND_S, NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK,
 )
 from npc.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, INF,
@@ -24,6 +23,7 @@ from npc.graph import (
 from npc.block import _author_block_check
 from npc.combat_trace import _author_melee_trace
 from npc.sound import _author_random_sound
+from npc.tuned import tuned
 
 
 # An object pin holds the full object path (package + object name), and it
@@ -52,7 +52,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
         MoveToActor --> [in range AND off cooldown?]
                           true  --> NextAttackTime = now + interval
                                 --> play MM_Attack_01 on the upper body
-                                --> HitDamage = NPC_MELEE_DAMAGE, or less
+                                --> HitDamage = TuneMeleeDamage, or less
                                     on the player's guard (npc/block.py)
                                 --> player Health -= HitDamage
                                 --> player LastDamageTime = now (the HUD's
@@ -60,7 +60,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
                           false -------------------------------------> Delay
 
     Range is centre-to-centre between the two capsules, which is why
-    NPC_MELEE_RANGE_CM (200) has to exceed NPC_ACCEPTANCE_RADIUS_CM (120): the
+    TuneMeleeRange (200) has to exceed NPC_ACCEPTANCE_RADIUS_CM (120): the
     move order stops the NPC at the acceptance radius, and an NPC that parks
     itself outside its own reach never lands a hit.
 
@@ -113,7 +113,9 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
 
     in_range = keep(_at(_node(ed, FN_LE_FF), x0 + 720, y0 + 340))
     _connect(_pin(gap, "ReturnValue", is_input=False), _pin(in_range, "A"))
-    _set(in_range, "B", NPC_MELEE_RANGE_CM)
+    reach, reach_out = tuned(ed, "melee_range_cm", x0 + 480, y0 + 460)
+    keep(reach)
+    _connect(reach_out, _pin(in_range, "B"))
 
     # --- has this NPC's cooldown expired? ------------------------------------
     now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 480, y0 + 560))
@@ -138,7 +140,9 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     # --- arm the next swing --------------------------------------------------
     when = keep(_at(_node(ed, FN_ADD_FF), x0 + 1440, y0 + 300))
     _connect(now_out, _pin(when, "A"))
-    _set(when, "B", NPC_MELEE_INTERVAL_S)
+    gap_s, gap_out = tuned(ed, "melee_interval_s", x0 + 1200, y0 + 440)
+    keep(gap_s)
+    _connect(gap_out, _pin(when, "B"))
     arm = keep(_at(ed.add_set_member_variable_node("NextAttackTime"),
                    x0 + 1680, y0))
     _connect(_pin(when, "ReturnValue", is_input=False), _pin(arm, "NextAttackTime"))

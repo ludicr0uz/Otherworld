@@ -406,14 +406,23 @@ if EXPECTED_NPCS:
         names = {str(v) for v in BEL.list_member_variable_names(ai_bp, False)}
         check("NPC Melee Cooldown Variable", "NextAttackTime" in names,
               f"(variables: {sorted(names)})")
+        # The numbers are the controller's TuneMelee* variables (the
+        # M panel's MONSTER TUNING tab writes them live; npc/tuned.py),
+        # so the check is each variable's default and that the graph
+        # reads it. A value tuned into npc/monster_tuning.csv lands
+        # here too: regenerate the level to move these expectations.
+        ai_cdo = unreal.get_default_object(BEL.generated_class(ai_bp))
+        read = {" ".join(str(BEL.get_node_title(n)).split()) for n in nodes}
         for label, value in (("Range", EXPECTED_MELEE_RANGE),
                              ("Damage", EXPECTED_MELEE_DAMAGE),
                              ("Interval", EXPECTED_MELEE_INTERVAL)):
-            check(f"NPC Melee {label} Literal",
-                  any(close(float(v), value, 0.01)
-                      for v in literals
-                      if v.replace(".", "", 1).replace("-", "", 1).isdigit()),
-                  f"(expected {value})")
+            var = f"TuneMelee{label}"
+            got = (ai_cdo.get_editor_property(var)
+                   if var in names else None)
+            check(f"NPC Melee {label} ({var})",
+                  got is not None and close(float(got), value, 0.01)
+                  and f"Get {var}" in read,
+                  f"(expected {value}, got {got})")
         check("NPC Melee Plays An Attack Montage",
               any("MM_Attack" in v for v in literals))
         check("NPC Melee Uses The Upper-Body Slot",

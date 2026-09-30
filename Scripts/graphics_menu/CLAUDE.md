@@ -19,6 +19,7 @@ split it before extending it.
 - **X** (panel open) starts save and exit.
 - **K** (panel open) is the dev-all-guns cheat (below).
 - **T** (panel open) opens the GUN TUNING tab (below).
+- **N** (panel open) opens the MONSTER TUNING tab (below). Opening either shuts the other.
 - **Tab** (near a looted body) opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 
@@ -171,6 +172,41 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
 - **The keys only raise flags** (`TuneNudge`, `TuneSaveRequested`), which is what lets
   `probe_gun_tuning.py` tune and save. It backs up the CSV and puts it back.
 - **Still needs a play session:** the keys themselves and how the 20-row panel reads.
+- **The machine is shared with MONSTER TUNING:** the keys, nudge and save are
+  `tune_tick.author_tab_flow` over a `TuneTab` (`tune_tab.py`); the panel is `tune_draw` and
+  `wbp_tune` over the same. Only the apply differs. The verifier tells the two save calls apart
+  by their command.
+
+## The MONSTER TUNING tab (`monster_tune_*.py`)
+
+**N with the panel open** toggles `MonTuneOpen` (and shuts `TuneOpen`; T shuts this one). The
+creature row, then the 13 stats of `npc/monster_tuning.MONSTER_STATS`: aggro range, aggro cone
+(half-angle), hearing, touch range, patrol radius, patrol speed, the patrol re-pick window, run
+speed, damage per hit, melee range, time between swings, health. Same keys as GUN TUNING;
+**Enter** saves `Scripts/npc/monster_tuning.csv`.
+
+- **Each number is a `Tune*` variable on the creature's AI controller** (`npc/tuned.py`), which
+  every NPC graph reads instead of a pin literal. The HUD's table (`MonTuneValues`, creatures x
+  stats) is baked from `monster_specs()` (so the CSV) at build time.
+- **Applied every Tick once touched** (`MonTuneTouched`): for each creature, `GetAllActorsOfClass`
+  of its controller class, a cast, and 13 Sets from the table (the cell index is a literal on
+  `Array_Get`, known at build time). A wanderer spawned or respawned later gets it within a Tick.
+- **What "immediately" means per stat:** senses, patrol and melee take effect on the
+  wanderer's next tree pass (0.5 s). The Chase and Stroll steps rewrite `MaxWalkSpeed` every
+  pass, so speeds do too. Health is re-applied when `TuneHealth` differs from the controller's
+  `AppliedHealth`: a live wanderer jumps to the new maximum, **full**.
+- **The CSV feeds two builds:** `build_npc_blueprints.py` (the controllers' defaults), then
+  `build_graphics_menu.py` (the HUD's table). `verify_npc_blueprints` and `monster_tune_checks`
+  compare against the CSV, so a saved tuning passes them once rebuilt. The level verifiers pin
+  the melee numbers at generation time: tuning those fails "NPC Melee ... (TuneMelee...)" until
+  the level is regenerated.
+- **The verifier's whole-graph scans exclude this tab:** the wanderer-bar scan skips
+  `ForestWandererAI` classes, and the Binds read-by-index check skips `Get MonTuneValues`.
+- **Probe:** `probe_monster_tuning.py` (12 checks: the live write, the floor, the wendigos
+  untouched, a speed and a health nudge reaching the pawn, the wrap, the CSV, the panel). It
+  backs up the CSV and puts it back.
+- **Still needs a play session:** the N key, how the 14-row panel reads, and how a tuned
+  wanderer feels.
 
 ## HUD
 

@@ -15,8 +15,6 @@ also a "no", and an exec input takes any number of links, so the next sense
 simply takes them all.
 """
 
-import math
-
 from combat.game_state import (
     DAMAGED_BY_PLAYER_VAR, NOISE_CONE_COS_VAR, NOISE_CONE_RANGE_VAR,
     NOISE_DIRECTION_VAR, NOISE_LOCATION_VAR, NOISE_RANGE_VAR, NOISE_TIME_VAR,
@@ -28,9 +26,10 @@ from npc.nodes import (
     FN_ACTOR_LOC, FN_AND, FN_DISTANCE, FN_DOT_VV, FN_FORWARD, FN_GET_COMP,
     FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_GE_FF, FN_LE_FF,
     FN_LINE_OF_SIGHT, FN_MUL_FF, FN_NORMAL, FN_OR, FN_SUB_FF, FN_SUB_VV,
-    FN_TIME_SECONDS, NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
+    FN_TIME_SECONDS, NODE_CAST_GAME_MODE, NODE_CAST_HEALTH, FN_DEG_COS,
 )
 from npc.paths import HEALTH_CLASS_PATH
+from npc.tuned import tuned
 
 
 class _Maker:
@@ -45,6 +44,12 @@ class _Maker:
 
     def fn(self, path, x, y):
         return self(_node(self.ed, path), x, y)
+
+    def tuned(self, column, x, y):
+        """This creature's number for ``column`` (npc/tuned.py): its pin."""
+        node, out = tuned(self.ed, column, x, y)
+        self.made.append(node)
+        return out
 
     def out(self, node, name="ReturnValue"):
         return _pin(node, name, is_input=False)
@@ -96,7 +101,7 @@ def _author_hurt(ed, exec_in, x0, y0):
         BEL.find_else_pin(hurt), _pin(as_health, "CastFailed", is_input=False)]
 
 
-def _author_sight(ed, exec_in, agro, x0, y0):
+def _author_sight(ed, exec_in, x0, y0):
     """Is the player inside the vision cone, and is nothing in the way?
 
         distance <= vision_range  AND  facing . toward_player >= cos(half)
@@ -115,7 +120,7 @@ def _author_sight(ed, exec_in, agro, x0, y0):
     _connect(there, _pin(gap, "V2"))
     near = k.fn(FN_LE_FF, x0 + 720, y0 + 300)
     _connect(k.out(gap), _pin(near, "A"))
-    _set(near, "B", agro.vision_range_cm)
+    _connect(k.tuned("vision_range_cm", x0 + 480, y0 + 200), _pin(near, "B"))
 
     toward = k.fn(FN_SUB_VV, x0 + 480, y0 + 460)
     _connect(there, _pin(toward, "A"))
@@ -129,7 +134,9 @@ def _author_sight(ed, exec_in, agro, x0, y0):
     _connect(k.out(unit), _pin(dot, "B"))
     ahead = k.fn(FN_GE_FF, x0 + 1200, y0 + 460)
     _connect(k.out(dot), _pin(ahead, "A"))
-    _set(ahead, "B", math.cos(math.radians(agro.vision_half_angle_deg)))
+    cos = k.fn(FN_DEG_COS, x0 + 960, y0 + 760)
+    _connect(k.tuned("vision_half_angle_deg", x0 + 720, y0 + 760), _pin(cos, "A"))
+    _connect(k.out(cos), _pin(ahead, "B"))
 
     clear = k.fn(FN_LINE_OF_SIGHT, x0 + 960, y0 + 620)
     _connect(player, _pin(clear, "Other"))
@@ -144,7 +151,7 @@ def _author_sight(ed, exec_in, agro, x0, y0):
     return k.made, BEL.find_then_pin(sees), [BEL.find_else_pin(sees)]
 
 
-def _author_touch(ed, exec_in, agro, x0, y0):
+def _author_touch(ed, exec_in, x0, y0):
     """Is the player within touch_range_cm, whichever way the wanderer faces?"""
     k = _Maker(ed)
     _pawn, here, _player, there = _locations(k, x0, y0 + 300)
@@ -153,12 +160,12 @@ def _author_touch(ed, exec_in, agro, x0, y0):
     _connect(there, _pin(gap, "V2"))
     close = k.fn(FN_LE_FF, x0 + 720, y0 + 300)
     _connect(k.out(gap), _pin(close, "A"))
-    _set(close, "B", agro.touch_range_cm)
+    _connect(k.tuned("touch_range_cm", x0 + 480, y0 + 440), _pin(close, "B"))
     bumped = _branch(k, k.out(close), exec_in, x0 + 960, y0)
     return k.made, BEL.find_then_pin(bumped), [BEL.find_else_pin(bumped)]
 
 
-def _author_hearing(ed, exec_in, agro, x0, y0):
+def _author_hearing(ed, exec_in, x0, y0):
     """Is this wanderer inside the reach of the latest noise?
 
         recent  = now - NoiseTime <= COMBAT.noise_hold_s
@@ -204,7 +211,7 @@ def _author_hearing(ed, exec_in, agro, x0, y0):
     def within(reach_var, x, y):
         reach = k.fn(FN_MUL_FF, x, y)
         _connect(read(reach_var, x - 240, y), _pin(reach, "A"))
-        _set(reach, "B", agro.hearing_scale)
+        _connect(k.tuned("hearing_scale", x - 240, y + 120), _pin(reach, "B"))
         inside = k.fn(FN_LE_FF, x + 240, y)
         _connect(k.out(gap), _pin(inside, "A"))
         _connect(k.out(reach), _pin(inside, "B"))

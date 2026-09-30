@@ -8,6 +8,12 @@ steps, the tree, the step task, the controller and the character).
 - Every movement, melee and spawn-band number lives in `forest_generator/npc_placement.py`.
 - Every sense and patrol number lives in `forest_generator/npc_agro.py`.
 - Neither imports `unreal`, so the offline generator checks exactly what gets built.
+- **The tunable ones are not pin literals.** Senses, patrol, run speed, melee damage/range/
+  interval and health are `Tune*` variables on each controller (`tuned.py`), defaulted to
+  `monster_tuning.monster_specs(key)`: `Scripts/npc/monster_tuning.csv` over the two files
+  above. The M panel's MONSTER TUNING tab (`graphics_menu/CLAUDE.md`) writes them live and
+  saves the CSV. A new tunable is a `MONSTER_STATS` row, a `stock_specs` entry, and the
+  fragment reading it with `tuned()`.
 
 `Scripts/verify_npc_blueprints.py` checks patrol, agro and the trees (`verify.py`,
 `verify_tree.py`). The level verifier owns the chase and the melee.
@@ -69,7 +75,8 @@ Wanderer (selector)
 - **Every exit of the melee chain reaches the Swing step's `StepResult`,** including both
   cast-failure pins.
 - **Melee:**
-  - It is a distance check (`NPC_MELEE_RANGE_CM` 200) plus a wall-clock cooldown per controller.
+  - It is a distance check (`TuneMeleeRange`, 200) plus a wall-clock cooldown per controller
+    (`TuneMeleeInterval`).
   - It plays `MM_Attack_01` into the upper-body-only `DefaultSlot`.
   - Damage is dealt by writing `Health` on the player's component, because
     `ApplyDamage`/`AnyDamage` would need a graph on the Enhanced Input template character.
@@ -77,8 +84,8 @@ Wanderer (selector)
   - A landed swing also stamps the player's `LastDamageTime` with the game time, after
     `LastHitFrom`. The HUD's save-and-exit countdown is called off by it.
   - **The player's guard** (`block.py`) sets the per-controller `HitDamage` before the Health
-    write: 2.5 and 20 of the player's stamina when the player is `Blocking` and faces the swing
-    (within 60°), otherwise 10. See `Scripts/combat/docs/stance.md`, "Blocking".
+    write: a quarter of `TuneMeleeDamage` and 20 of the player's stamina when the player is
+    `Blocking` and faces the swing (within 60°), otherwise `TuneMeleeDamage` (10). See `Scripts/combat/docs/stance.md`, "Blocking".
 - **The corpse state** (`corpse.py`):
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and `StopLogic`: the tree
@@ -135,7 +142,10 @@ Wanderer (selector)
     outside `radius × 1.1 + 2 m`.
   - Stroll with `SimpleMoveToLocation`. The level verifier counts exactly one `MoveToActor` and one
     `MoveToLocation`.
-  - Write speeds from the stored `RunSpeed`, never from the live `MaxWalkSpeed`.
+  - Write speeds from the stored `RunSpeed`, never from the live `MaxWalkSpeed`:
+    `RunSpeed × TuneRunSpeed / stock [× TunePatrolSpeed]`, where stock is the creature's built
+    run speed, so the level's per-instance gait survives the tuning. The Chase and Stroll steps
+    write it every pass (after their move order); aggro and the setup no longer do.
 - **Noise** is one record on the GameMode (`Noise*`, written by `combat/noise.py`).
   - A new noise overwrites the record only if the old one is older than `noise_hold_s` (0.6 s,
     which must outlast the tree's 0.5 s beat) or the new one is at least as loud.

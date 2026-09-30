@@ -2,7 +2,6 @@
 
 import unreal
 
-from forest_generator.npc_agro import agro_for
 from forest_generator.npc_placement import (
     NPC_ANIM_BP, NPC_ANIM_BP_FALLBACK, NPC_BASE_MESH, NPC_BASE_MESH_FALLBACK,
     NPC_MELEE_MONTAGE_FALLBACK, NPC_RUN_SPEED_CMS,
@@ -211,8 +210,7 @@ def build_variant_blueprint(base_bp, variant):
         rebuild=True, path=variant.ai_blueprint,
         melee_anim=_resolve(variant.melee, NPC_MELEE_MONTAGE_FALLBACK,
                             f"{variant.key} melee clip"),
-        health=variant.health, voices=variant.voices,
-        reactions=variant.reactions, agro=agro_for(variant.key))
+        voices=variant.voices, reactions=variant.reactions, key=variant.key)
     cdo.set_editor_property("ai_controller_class", BEL.generated_class(ai_bp))
 
     if not BEL.compile_blueprint(bp):

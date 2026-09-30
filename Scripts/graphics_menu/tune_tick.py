@@ -14,6 +14,10 @@ the table written onto every carried gun.
     TuneTouched -> for each carried item whose DisplayName is in TuneWeapons,
                    every TUNE_STATS variable := its cell (ints rounded)
 
+The keys, the nudge and the save are any TuneTab's (tune_tab.py):
+author_tab_flow() is also MONSTER TUNING's (monster_tune_tick.py), and T
+shuts that tab as N shuts this one. Only _author_apply is the guns'.
+
 Tick, not DrawHUD, like the loot window: the M panel does not pause, and a
 -nullrhi probe never draws. The keys only raise flags, so
 probes/probe_gun_tuning.py tunes and saves without a keyboard. Applying every
@@ -37,12 +41,12 @@ from combat.paths import (
 from combat.weapon_specs import _weapon_specs
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
 from graphics_menu.loot_find import put
+from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import (
-    STAT_COUNT, TUNE_DOWN, TUNE_KEY, TUNE_LESS, TUNE_MINS_VAR, TUNE_MORE,
-    TUNE_NUDGE_VAR, TUNE_OPEN_VAR, TUNE_ROW_VAR, TUNE_SAVE_COMMAND, TUNE_SAVE_KEY,
-    TUNE_SAVE_VAR, TUNE_SAVED_VAR, TUNE_STEPS_VAR, TUNE_TOUCHED_VAR, TUNE_UP,
-    TUNE_VALUES_VAR, TUNE_WEAPON_VAR, TUNE_WEAPONS_VAR,
+    GUN_TAB, STAT_COUNT, TUNE_KEY, TUNE_TOUCHED_VAR,
+    TUNE_VALUES_VAR, TUNE_WEAPONS_VAR,
 )
+from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
 
 FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
 FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
@@ -56,20 +60,35 @@ FN_EXEC_PYTHON = "/Script/PythonScriptPlugin.PythonScriptLibrary.ExecutePythonCo
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 
 
-_BOOLS = (TUNE_OPEN_VAR, TUNE_SAVE_VAR, TUNE_SAVED_VAR, TUNE_TOUCHED_VAR)
-_INTS = (TUNE_ROW_VAR, TUNE_WEAPON_VAR, TUNE_NUDGE_VAR)
-_FLOAT_ARRAYS = (TUNE_VALUES_VAR, TUNE_STEPS_VAR, TUNE_MINS_VAR)
+def _bools(tab):
+    return (tab.open_var, tab.save_var, tab.saved_var, tab.touched_var)
+
+
+def _ints(tab):
+    return (tab.row_var, tab.pick_var, tab.nudge_var)
+
+
+def declare_tab_vars(ed, tab):
+    """A tab's HUD variables. Defaults: tab_defaults()."""
+    for name in _bools(tab):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    for name in _ints(tab):
+        _declare(ed, name, BEL.get_basic_type_by_name("int"))
+    for name in (tab.values_var, tab.steps_var, tab.mins_var):
+        _declare(ed, name, BEL.get_array_type(_float_type()))
+    _declare(ed, tab.names_var, BEL.get_array_type(BEL.get_basic_type_by_name("string")))
+
+
+def tab_defaults(tab, names, values, steps, mins):
+    """Shut, untouched, on the first subject, with the built table."""
+    return {**{b: False for b in _bools(tab)}, **{i: 0 for i in _ints(tab)},
+            tab.values_var: values, tab.names_var: names,
+            tab.steps_var: steps, tab.mins_var: mins}
 
 
 def declare_tune_vars(ed):
-    """The HUD's tuning variables. Defaults: tune_defaults()."""
-    for name in _BOOLS:
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    for name in _INTS:
-        _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in _FLOAT_ARRAYS:
-        _declare(ed, name, BEL.get_array_type(_float_type()))
-    _declare(ed, TUNE_WEAPONS_VAR, BEL.get_array_type(BEL.get_basic_type_by_name("string")))
+    """The HUD's gun tuning variables. Defaults: tune_defaults()."""
+    declare_tab_vars(ed, GUN_TAB)
 
 
 def tune_table():
@@ -83,10 +102,8 @@ def tune_table():
 
 def tune_defaults():
     guns, values = tune_table()
-    return {**{b: False for b in _BOOLS}, **{i: 0 for i in _INTS},
-            TUNE_VALUES_VAR: values, TUNE_WEAPONS_VAR: guns,
-            TUNE_STEPS_VAR: [float(st[3]) for st in TUNE_STATS],
-            TUNE_MINS_VAR: [float(st[4]) for st in TUNE_STATS]}
+    return tab_defaults(GUN_TAB, guns, values, [float(st[3]) for st in TUNE_STATS],
+                        [float(st[4]) for st in TUNE_STATS])
 
 
 def _pressed(ed, pc_out, key, x, y, made):
@@ -100,98 +117,102 @@ def _cell(ed, array_var, index, x, y, made):
     return _pin(n, "Item", is_input=False)
 
 
-def _author_keys(ed, pc_out, in_execs, x0, y0, made):
-    """T, and with the tab open the arrows and Enter. Returns the exec tails."""
+def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
+    """The tab's key, and with the tab open the arrows and Enter. Opening or
+    shutting it shuts the tab whose open flag is ``closes``, so only one
+    panel shows and takes the arrows. Returns the exec tails."""
     t = _call(ed, FN_AND, x0, y0 + 300, made, A=_get(ed, "MenuOpen", x0 - 240, y0 + 300, made),
-              B=_pressed(ed, pc_out, TUNE_KEY, x0 - 240, y0 + 440, made))
+              B=_pressed(ed, pc_out, tab.key, x0 - 240, y0 + 440, made))
     flip, no_t = _branch(ed, _out(t), in_execs, x0 + 240, y0, made)
     opened = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
-                   A=_get(ed, TUNE_OPEN_VAR, x0, y0 + 580, made))
-    flow = put(ed, TUNE_OPEN_VAR, _out(opened), [flip], x0 + 500, y0 - 200, made)
+                   A=_get(ed, tab.open_var, x0, y0 + 580, made))
+    flow = put(ed, tab.open_var, _out(opened), [flip], x0 + 500, y0 - 200, made)
+    flow = _setter(ed, closes, "false", [flow], x0 + 500, y0 - 400, made)
 
     x = x0 + 800
     active = _call(ed, FN_AND, x - 240, y0 + 300, made,
                    A=_get(ed, "MenuOpen", x - 480, y0 + 300, made),
-                   B=_get(ed, TUNE_OPEN_VAR, x - 480, y0 + 440, made))
+                   B=_get(ed, tab.open_var, x - 480, y0 + 440, made))
     on, off = _branch(ed, _out(active), [flow, no_t], x, y0, made)
     flow = [on]
     for key, step, limit, bound in ((TUNE_UP, FN_SUB_II, FN_MAX_II, 0),
-                                    (TUNE_DOWN, FN_ADD_II, FN_MIN_II, STAT_COUNT)):
+                                    (TUNE_DOWN, FN_ADD_II, FN_MIN_II, tab.stat_count)):
         x += 300
         hit, miss = _branch(ed, _pressed(ed, pc_out, key, x, y0 + 440, made), flow,
                             x, y0, made)
         moved = _call(ed, step, x + 300, y0 + 300, made,
-                      A=_get(ed, TUNE_ROW_VAR, x + 60, y0 + 300, made), B=1)
+                      A=_get(ed, tab.row_var, x + 60, y0 + 300, made), B=1)
         held = _call(ed, limit, x + 540, y0 + 300, made, A=_out(moved), B=bound)
-        flow = [put(ed, TUNE_ROW_VAR, _out(held), [hit], x + 780, y0, made), miss]
+        flow = [put(ed, tab.row_var, _out(held), [hit], x + 780, y0, made), miss]
         x += 800
     for key, nudge in ((TUNE_LESS, -1), (TUNE_MORE, 1)):
         hit, miss = _branch(ed, _pressed(ed, pc_out, key, x, y0 + 440, made), flow,
                             x, y0, made)
-        flow = [_setter(ed, TUNE_NUDGE_VAR, nudge, [hit], x + 260, y0, made), miss]
+        flow = [_setter(ed, tab.nudge_var, nudge, [hit], x + 260, y0, made), miss]
         x += 560
     ask, no_ask = _branch(ed, _pressed(ed, pc_out, TUNE_SAVE_KEY, x, y0 + 440, made),
                           flow, x, y0, made)
-    asked = _setter(ed, TUNE_SAVE_VAR, "true", [ask], x + 260, y0, made)
+    asked = _setter(ed, tab.save_var, "true", [ask], x + 260, y0, made)
     return [asked, no_ask, off]
 
 
-def _author_nudge(ed, in_execs, x0, y0, made, guns):
-    """Serve TuneNudge (see the module docstring). Returns the exec tails.
+def _author_nudge(ed, in_execs, x0, y0, made, tab, subjects):
+    """Serve the tab's nudge (see the module docstring); ``subjects`` is how
+    many rows the table has. Returns the exec tails.
 
     Both arms read the nudge before lowering it: a Set's pure inputs are
     pulled when it runs, so lowering first would step by zero."""
     idle = _call(ed, FN_EQ_II, x0, y0 + 300, made,
-                 A=_get(ed, TUNE_NUDGE_VAR, x0 - 240, y0 + 300, made), B=0)
+                 A=_get(ed, tab.nudge_var, x0 - 240, y0 + 300, made), B=0)
     still, asked = _branch(ed, _out(idle), in_execs, x0 + 240, y0, made)
-    on_gun = _call(ed, FN_EQ_II, x0 + 240, y0 + 440, made,
-                   A=_get(ed, TUNE_ROW_VAR, x0, y0 + 440, made), B=0)
-    gun, stat = _branch(ed, _out(on_gun), [asked], x0 + 500, y0, made)
+    on_subject = _call(ed, FN_EQ_II, x0 + 240, y0 + 440, made,
+                       A=_get(ed, tab.row_var, x0, y0 + 440, made), B=0)
+    subject, stat = _branch(ed, _out(on_subject), [asked], x0 + 500, y0, made)
 
-    # The gun row: (TuneWeapon + nudge + guns) % guns, round the ends.
+    # The subject row: (pick + nudge + subjects) % subjects, round the ends.
     x = x0 + 800
     stepped = _call(ed, FN_ADD_II, x, y0 - 300, made,
-                    A=_get(ed, TUNE_WEAPON_VAR, x - 240, y0 - 300, made),
-                    B=_get(ed, TUNE_NUDGE_VAR, x - 240, y0 - 160, made))
-    lifted = _call(ed, FN_ADD_II, x + 240, y0 - 300, made, A=_out(stepped), B=guns)
-    wrapped = _call(ed, FN_MOD_II, x + 480, y0 - 300, made, A=_out(lifted), B=guns)
-    picked = put(ed, TUNE_WEAPON_VAR, _out(wrapped), [gun], x + 720, y0 - 500, made)
+                    A=_get(ed, tab.pick_var, x - 240, y0 - 300, made),
+                    B=_get(ed, tab.nudge_var, x - 240, y0 - 160, made))
+    lifted = _call(ed, FN_ADD_II, x + 240, y0 - 300, made, A=_out(stepped), B=subjects)
+    wrapped = _call(ed, FN_MOD_II, x + 480, y0 - 300, made, A=_out(lifted), B=subjects)
+    picked = put(ed, tab.pick_var, _out(wrapped), [subject], x + 720, y0 - 500, made)
 
     # A stat row: cell := FMax(cell + nudge * step, minimum).
     s = _out(_call(ed, FN_SUB_II, x, y0 + 700, made,
-                   A=_get(ed, TUNE_ROW_VAR, x - 240, y0 + 700, made), B=1))
+                   A=_get(ed, tab.row_var, x - 240, y0 + 700, made), B=1))
     base = _call(ed, FN_MUL_II, x, y0 + 900, made,
-                 A=_get(ed, TUNE_WEAPON_VAR, x - 240, y0 + 900, made), B=STAT_COUNT)
+                 A=_get(ed, tab.pick_var, x - 240, y0 + 900, made), B=tab.stat_count)
     idx = _out(_call(ed, FN_ADD_II, x + 240, y0 + 900, made, A=_out(base), B=s))
     sign = _call(ed, FN_INT_TO_FLOAT, x + 240, y0 + 1100, made,
-                 InInt=_get(ed, TUNE_NUDGE_VAR, x, y0 + 1100, made))
+                 InInt=_get(ed, tab.nudge_var, x, y0 + 1100, made))
     delta = _call(ed, FN_MUL_FF, x + 720, y0 + 1000, made,
-                  A=_cell(ed, TUNE_STEPS_VAR, s, x + 480, y0 + 1200, made), B=_out(sign))
+                  A=_cell(ed, tab.steps_var, s, x + 480, y0 + 1200, made), B=_out(sign))
     moved = _call(ed, FN_ADD_FF, x + 960, y0 + 800, made,
-                  A=_cell(ed, TUNE_VALUES_VAR, idx, x + 720, y0 + 800, made),
+                  A=_cell(ed, tab.values_var, idx, x + 720, y0 + 800, made),
                   B=_out(delta))
     kept = _call(ed, FN_FMAX, x + 1200, y0 + 800, made, A=_out(moved),
-                 B=_cell(ed, TUNE_MINS_VAR, s, x + 960, y0 + 1300, made))
+                 B=_cell(ed, tab.mins_var, s, x + 960, y0 + 1300, made))
     write = _call(ed, FN_ARR_SET, x + 1440, y0, made,
-                  TargetArray=_get(ed, TUNE_VALUES_VAR, x + 1200, y0 + 600, made))
+                  TargetArray=_get(ed, tab.values_var, x + 1200, y0 + 600, made))
     _connect(idx, _pin(write, "Index"))
     _connect(_out(kept), _pin(write, "Item"))
     _connect(stat, _pin(write, "execute"))
-    flow = _setter(ed, TUNE_TOUCHED_VAR, "true", [BEL.find_then_pin(write)],
+    flow = _setter(ed, tab.touched_var, "true", [BEL.find_then_pin(write)],
                    x + 1740, y0, made)
-    flow = _setter(ed, TUNE_SAVED_VAR, "false", [flow], x + 2000, y0, made)
-    lowered = _setter(ed, TUNE_NUDGE_VAR, 0, [flow, picked], x + 2260, y0, made)
+    flow = _setter(ed, tab.saved_var, "false", [flow], x + 2000, y0, made)
+    lowered = _setter(ed, tab.nudge_var, 0, [flow, picked], x + 2260, y0, made)
     return [lowered, still]
 
 
-def _author_save(ed, in_execs, x0, y0, made):
-    """Serve TuneSaveRequested: run tune_save.save() through the Python plugin."""
-    serve, idle = _branch(ed, _get(ed, TUNE_SAVE_VAR, x0 - 240, y0 + 300, made),
+def _author_save(ed, in_execs, x0, y0, made, tab):
+    """Serve the save flag: run the tab's save through the Python plugin."""
+    serve, idle = _branch(ed, _get(ed, tab.save_var, x0 - 240, y0 + 300, made),
                           in_execs, x0, y0, made)
-    flow = _setter(ed, TUNE_SAVE_VAR, "false", [serve], x0 + 260, y0, made)
-    run = _call(ed, FN_EXEC_PYTHON, x0 + 520, y0, made, PythonCommand=TUNE_SAVE_COMMAND)
+    flow = _setter(ed, tab.save_var, "false", [serve], x0 + 260, y0, made)
+    run = _call(ed, FN_EXEC_PYTHON, x0 + 520, y0, made, PythonCommand=tab.save_command)
     _connect(flow, _pin(run, "execute"))
-    done = put(ed, TUNE_SAVED_VAR, _out(run), [BEL.find_then_pin(run)], x0 + 820, y0, made)
+    done = put(ed, tab.saved_var, _out(run), [BEL.find_then_pin(run)], x0 + 820, y0, made)
     return [done, idle]
 
 
@@ -245,13 +266,19 @@ def _author_apply(ed, in_execs, x0, y0, made):
     return [idle, _pin(cast, "CastFailed", is_input=False)]
 
 
+def author_tab_flow(ed, pc_out, in_execs, x0, y0, made, tab, subjects, closes):
+    """Any tab's keys, nudge and save, in that order. Returns the exec tails,
+    for the tab's own apply."""
+    flow = _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes)
+    flow = _author_nudge(ed, flow, x0 + 5400, y0, made, tab, subjects)
+    return _author_save(ed, flow, x0 + 9000, y0, made, tab)
+
+
 def author_tune_tick(ed, pc_out, in_execs, x0, y0):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
-    guns = len(tune_table()[0])
-    flow = _author_keys(ed, pc_out, in_execs, x0, y0, made)
-    flow = _author_nudge(ed, flow, x0 + 5400, y0, made, guns)
-    flow = _author_save(ed, flow, x0 + 9000, y0, made)
+    flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GUN_TAB,
+                           len(tune_table()[0]), MONSTER_TAB.open_var)
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
         f"Gun tuning ([{TUNE_KEY}] in the M panel): Up/Down pick a row, Left/Right "

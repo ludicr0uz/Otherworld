@@ -5,8 +5,7 @@ BT_* events (npc/steps.py); plus the creature's sounds and hit reactions.
 
 import unreal
 
-from forest_generator.npc_agro import agro_for
-from forest_generator.npc_placement import NPC_BASE_HEALTH, NPC_VARIANTS
+from forest_generator.npc_placement import NPC_VARIANTS
 from npc.paths import (
     AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS, HIT_SOUNDS_VAR, REACTIONS_VAR,
     STEP_CHASE, STEP_PRESENT, STEP_PULSE, STEP_STROLL, STEP_SWING, VOICES_VAR,
@@ -20,27 +19,30 @@ from npc.graph import (
 from npc.step_task import build_step_task, clear_step_task
 from npc.steps import _author_steps
 from npc.tree import build_blackboard, fill_tree, fresh_tree
+from npc.monster_tuning import monster_specs
+from npc.tuned import write_tuned_defaults
 
 
 def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
-                                 health=NPC_BASE_HEALTH, voices=(),
-                                 hit_sounds=HIT_SOUNDS, reactions=(),
-                                 agro=None):
+                                 voices=(), hit_sounds=HIT_SOUNDS, reactions=(),
+                                 key=None):
     """Create an AI controller and author its patrol, senses, chase and attack.
 
-    ``agro`` is this creature's AgroSettings (forest_generator/npc_agro.py);
-    None means the base creature's, which is what the parent controller wears.
+    ``key`` is the creature (NPC_VARIANTS); None means the base creature,
+    which is what the parent controller wears. Its numbers -- senses, patrol,
+    speed, melee, health -- are npc/monster_tuning.monster_specs(key), baked
+    as the defaults of the controller's Tune* variables (npc/tuned.py).
 
     ``rebuild`` wipes the graph first.  It defaults to True because this builder
     is the only description of the behaviour: the old "already authored,
     reusing" guard meant no edit here ever reached the asset once it existed.
 
-    ``path``, ``melee_anim``, ``health`` and ``voices`` exist because all four
+    ``path``, ``melee_anim``, ``key`` and ``voices`` exist because all four
     are per creature.  The attack clip is per creature because
     each monster now has its own skeleton (see import_characters.py), and an
     AnimSequence belongs to exactly one skeleton, so a single controller cannot
-    hold a literal that plays on both a zombie and a wendigo.  ``health`` is
-    per creature because a wendigo has three times a zombie's, and the
+    hold a literal that plays on both a zombie and a wendigo.  ``key`` picks
+    the creature's numbers: a wendigo has three times a zombie's health, and the
     controller is the only place that can reach an inherited component's
     defaults per child (see _author_stats_and_voice).  ``voices`` because a
     zombie growls and a wendigo roars.
@@ -62,7 +64,8 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     when a third creature makes the duplication cost something.
     """
     path = path or AI_BP_PATH
-    agro = agro or agro_for(NPC_VARIANTS[0].key)
+    key = key or NPC_VARIANTS[0].key
+    spec = monster_specs(key)
     bb = build_blackboard()
     bp = _create_blueprint(path, unreal.AIController)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
@@ -108,7 +111,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
         f"what this wanderer does; the BT_* events below are its steps.",
         [possess, run])
 
-    senses = _author_steps(ed, agro, health, melee_anim, 0, 0)
+    senses = _author_steps(ed, key, melee_anim, 0, 0)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
@@ -140,6 +143,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
              f"creature will not flinch.")
         clips = []
     cdo.set_editor_property(REACTIONS_VAR, clips)
+    write_tuned_defaults(cdo, spec)
 
     task = build_step_task(bp, step_task_path(path),
                            [STEP_PULSE, STEP_CHASE, STEP_SWING, STEP_PRESENT]
@@ -147,8 +151,8 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     fill_tree(bt, bb, task, senses)
     eas.save_loaded_asset(bp)
     _log(f"built {path} ({len(cdo.get_editor_property(REACTIONS_VAR))} hit "
-         f"reactions, health {health:.0f}"
+         f"reactions, health {spec['health']:.0f}"
          + f", {len(cdo.get_editor_property(VOICES_VAR))} voices, patrols "
-         f"{agro.patrol_radius_cm / 100:.0f} m, sees "
-         f"{agro.vision_range_cm / 100:.0f} m)")
+         f"{spec['patrol_radius_cm'] / 100:.0f} m, sees "
+         f"{spec['vision_range_cm'] / 100:.0f} m)")
     return bp

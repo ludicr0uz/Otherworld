@@ -31,8 +31,11 @@ from graphics_menu import dev_consts as DC
 from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import loot_consts as LC
 from graphics_menu import tune_consts as TC
+from graphics_menu import tune_tab as TT
+from graphics_menu import monster_tune_consts as MC
 from graphics_menu.loot_checks import check_loot
 from graphics_menu.tune_checks import check_tune
+from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -145,11 +148,11 @@ def main():
                          N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
                          PC.EXIT_KEY, DC.DEV_GUNS_KEY,
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
-                         TC.TUNE_KEY, TC.TUNE_UP, TC.TUNE_DOWN, TC.TUNE_LESS,
-                         TC.TUNE_MORE, TC.TUNE_SAVE_KEY)
+                         TC.TUNE_KEY, TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
+                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.MON_TUNE_KEY)
                         + G.PRESET_KEYS + N.START_KEYS)
     check("polls exactly the menu, preset, debug, restart, start, nav, exit, "
-          "dev-all-guns, loot and gun tuning keys",
+          "dev-all-guns, loot, gun and monster tuning keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -528,8 +531,11 @@ def main():
           len(driven) == 2, str(len(driven)))
 
     # --- the new HUD layers
+    # The pawns, not the controllers the monster tuning tab writes.
     npc_scans = [n for n in by_pins("ActorClass")
                  if "ForestWanderer" in
+                 str(BEL.find_input_pin(n, "ActorClass").get_pin_value())
+                 and "ForestWandererAI" not in
                  str(BEL.find_input_pin(n, "ActorClass").get_pin_value())]
     check("a bar is drawn for every wanderer in the level",
           len(npc_scans) == 1, f"{len(npc_scans)} GetAllActorsOfClass(NPC)")
@@ -776,8 +782,12 @@ def main():
               str(sum(1 for t in titles if t == f"Set {slider.var}")))
     # Literal indices only: the settings page's own Array_Get and Array_Set
     # take theirs from the loop and from MenuRow, and those are not the push.
+    # Nor are the monster tuning tab's cells (literal, off MonTuneValues).
     reads = [n for n in by_pins("TargetArray", "Index")
-             if not BEL.find_input_pin(n, "Index").list_connected_pins()]
+             if not BEL.find_input_pin(n, "Index").list_connected_pins()
+             and f"Get {MC.MON_TUNE_VALUES_VAR}" not in {
+                 str(BEL.get_node_title(PIN.get_owning_node(q)))
+                 for q in BEL.find_input_pin(n, "TargetArray").list_connected_pins()}]
     check("...read out of Binds by index, one per action",
           sorted(int(BEL.find_input_pin(n, "Index").get_pin_value())
                  for n in reads) == list(range(len(G.BIND_VARS))),
@@ -879,6 +889,7 @@ def main():
     check_dev_guns(check, bp, nodes)
     check_loot(check, bp, nodes)
     check_tune(check, bp, nodes)
+    check_monster_tune(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

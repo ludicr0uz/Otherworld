@@ -67,11 +67,12 @@ def _check_widgets(check):
 
 
 def _check_graph(check, nodes):
-    runs = [n for n in nodes if "PythonCommand" in _pins(n)]
+    # MONSTER TUNING has its own, with its own command (monster_tune_checks).
+    calls = [n for n in nodes if "PythonCommand" in _pins(n)]
+    runs = [n for n in calls if str(BEL.find_input_pin(n, "PythonCommand")
+                                    .get_pin_value()) == TC.TUNE_SAVE_COMMAND]
     check("Enter's save runs tune_save through ExecutePythonCommand, once",
-          len(runs) == 1 and str(BEL.find_input_pin(runs[0], "PythonCommand")
-                                 .get_pin_value()) == TC.TUNE_SAVE_COMMAND,
-          str(len(runs)))
+          len(runs) == 1, f"{len(runs)} of {len(calls)} Python calls")
     saved = [q for n in runs for q in BEL.find_output_pin(n, "ReturnValue")
              .list_connected_pins()]
     check("...and its success is what TuneSaved shows",

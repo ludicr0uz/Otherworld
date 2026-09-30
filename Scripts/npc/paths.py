@@ -32,6 +32,8 @@ INF = 1.0e9
 VOICES_VAR = "Voices"
 HIT_SOUNDS_VAR = "HitSounds"
 STATS_APPLIED_VAR = "StatsApplied"
+# The TuneHealth last written onto the pawn (npc/stats.py): a change re-applies it.
+APPLIED_HEALTH_VAR = "AppliedHealth"
 NEXT_VOICE_VAR = "NextVoiceTime"
 HIT_SOUNDS = tuple(f"/Game/Audio/A_MeleeHit_{i:02d}" for i in (1, 2, 3))
 

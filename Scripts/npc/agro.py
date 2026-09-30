@@ -7,19 +7,19 @@ senses is the order of its Senses selector.
     BT_Hurt, BT_Sight, BT_Touch, BT_Sound                    (senses.py)
         yes -> AggroReason = <sense>
             -> Aggro = true
-            -> MaxWalkSpeed = RunSpeed
             -> [DebugMode?] log "[NPC-AGRO] <sense> -- <name>"
             -> Blackboard Aggro, AggroReason -> succeed (the hunt starts next pass)
         no  -> fail (the selector tries the next sense)
-    BT_Stroll: the patrol step                                (patrol.py)
+    BT_Stroll: the patrol step, then the walking speed        (patrol.py)
 
 Nothing sets Aggro back to false: once a wanderer has found the player it
 hunts for the rest of its life, which is the old behaviour. A "lose interest"
 rule would be a new AgroSettings field and a branch at the top of the yes arm.
 
-The per-creature numbers are an AgroSettings (forest_generator/npc_agro.py)
-baked into pin literals, like every other NPC number: each creature already
-has its own controller (see controller.py), so it gets its own senses too.
+The per-creature numbers are the controller's Tune* variables (npc/tuned.py),
+whose defaults are this creature's npc/monster_tuning.monster_specs(): the
+AgroSettings in forest_generator/npc_agro.py under monster_tuning.csv. The
+M panel's MONSTER TUNING tab writes them on a live wanderer.
 """
 
 import unreal
@@ -76,12 +76,13 @@ def _noise_record_exists():
 
 
 def _author_enter_agro(ed, reasons, chase_in, x0, y0):
-    """Every sense's "yes" lands here: name the sense, flip the switch, run.
+    """Every sense's "yes" lands here: name the sense, flip the switch.
     ``chase_in`` is what runs after (the Blackboard write).
 
     ``reasons`` is [(sense name, exec pin)]. Each writes its own name into
-    AggroReason and they join on one Set Aggro, so the log line, the speed
-    and the switch are written once rather than once per sense.
+    AggroReason and they join on one Set Aggro, so the log line and the
+    switch are written once rather than once per sense. The run speed is the
+    Chase step's (npc/steps.py).
     """
     made = []
 
@@ -98,8 +99,7 @@ def _author_enter_agro(ed, reasons, chase_in, x0, y0):
         _connect(exec_pin, _pin(why, "execute"))
         _connect(BEL.find_then_pin(why), _pin(flip, "execute"))
 
-    ran, after = _author_walk_speed(ed, [BEL.find_then_pin(flip)], 1.0, x0 + 560, y0)
-    made.extend(ran)
+    after = [BEL.find_then_pin(flip)]
 
     reason = keep(_at(ed.add_get_member_variable_node(AGGRO_REASON_VAR),
                       x0 + 1800, y0 + 300))
@@ -185,7 +185,7 @@ def _author_player_present(ed, exec_in, yes_in, no_in, x0, y0):
     return [player, there, present]
 
 
-def _author_agro_steps(ed, step, result, agro, x0, y0):
+def _author_agro_steps(ed, step, result, stock, x0, y0):
     """Author the tree's notice and patrol steps as controller events.
 
     ``step(name, x, y)`` makes the custom event BT_<name> and returns its exec
@@ -208,9 +208,9 @@ def _author_agro_steps(ed, step, result, agro, x0, y0):
         _log(f"note: {GAME_MODE_BP_PATH} has no noise record -- the wanderers "
              f"will not hear (run build_weapons_and_combat.py first)")
     fragments = {"hurt": lambda e, x, y: _author_hurt(ed, e, x, y),
-                 "sight": lambda e, x, y: _author_sight(ed, e, agro, x, y),
-                 "touch": lambda e, x, y: _author_touch(ed, e, agro, x, y),
-                 "sound": lambda e, x, y: _author_hearing(ed, e, agro, x, y)}
+                 "sight": lambda e, x, y: _author_sight(ed, e, x, y),
+                 "touch": lambda e, x, y: _author_touch(ed, e, x, y),
+                 "sound": lambda e, x, y: _author_hearing(ed, e, x, y)}
     reasons, senses = [], []
     y = y0 + 1400
     for sense, name in SENSE_STEPS:
@@ -230,8 +230,15 @@ def _author_agro_steps(ed, step, result, agro, x0, y0):
     tell, tell_in = _author_tell_blackboard(ed, told, x0 + 15000, y0)
     made.extend(tell)
     made.extend(_author_enter_agro(ed, reasons, tell_in, x0 + 11600, y0))
-    rested = result(True, x0 + 14000, y0 + 2800)
+    # After the stroll order, the walking speed: every pass, so a tuned one
+    # lands at once (patrol._author_walk_speed).
+    walked, walk_tails, walk_in = _author_walk_speed(ed, [], True, stock,
+                                                      x0 + 14200, y0 + 2800)
+    made.extend(walked)
+    rested = result(True, x0 + 15600, y0 + 2800)
+    for tail in walk_tails:
+        _connect(tail, rested)
     made.extend(_author_patrol_step(
-        ed, [step(STEP_STROLL, x0 + 11300, y0 + 2800)], rested, agro,
+        ed, [step(STEP_STROLL, x0 + 11300, y0 + 2800)], walk_in,
         x0 + 11600, y0 + 2800))
     return made, senses

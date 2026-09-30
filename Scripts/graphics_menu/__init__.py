@@ -55,14 +55,21 @@ Input, settings and state
                   (run after save_exit's)
   loot_draw       DrawHUD: the loot prompt, and the window's rows and caret
   wbp_loot        WBP_HUD's loot prompt and window (called from wbp_hud)
-  tune_consts     the GUN TUNING tab: keys (T, arrows, Enter), variables, widget
-                  names, the save's Python command
-  tune_tick       Tick: the tab's keys, a nudge to the table, the save, and the
-                  table onto every carried gun (run after loot_tick's)
-  tune_draw       DrawHUD: the tab's panel, the gun and its values, the caret
+  tune_tab        TuneTab: what a tuning tab is called (keys, variables,
+                  widgets, words, save command); the shared arrows and Enter
+  tune_consts     the GUN TUNING tab (T): variables, widget names, GUN_TAB
+  tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
+                  the gun table onto every carried gun (run after loot_tick's)
+  tune_draw       DrawHUD: a tab's panel, the subject and its values, the caret
   tune_save       run in the game by the save: the live table into
                   combat/gun_tuning.csv
-  wbp_tune        WBP_PauseMenu's tuning panel (called from wbp_screens)
+  wbp_tune        WBP_PauseMenu's two tuning panels (called from wbp_screens)
+  monster_tune_consts  the MONSTER TUNING tab (N): variables, widget names,
+                  the creatures' controller classes, MONSTER_TAB
+  monster_tune_tick    Tick: the tab's flow, then each creature's row onto
+                  every live controller of its class (run after tune_tick's)
+  monster_tune_save    run in the game by the save: the live table into
+                  npc/monster_tuning.csv
 
 verify_graphics_menu.py's checks, beside it because it is over budget
   umg_checks         the screens' trees and the graph that creates and writes them
@@ -71,5 +78,7 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   profile_checks     the saved profile and save and exit
   dev_guns_checks    the dev-all-guns row, key and the five spawns
   loot_checks        the loot window: scan, keys, take, widgets
-  tune_checks        the tuning tab: table, CSV on the guns, panel, save, writes
+  tune_checks        the gun tuning tab: table, CSV on the guns, panel, save, writes
+  monster_tune_checks  the monster tuning tab: table, CSV on the controllers,
+                     panel, save, writes
 """

@@ -12,20 +12,17 @@ import math
 
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.tuning import COMBAT
-from forest_generator.npc_placement import NPC_MELEE_DAMAGE
 from npc.graph import (
     _asset_sub, _at, BEL, _connect, _log, _loose_pin, _node, _palette, _pin,
     _set,
 )
 from npc.nodes import (
-    FN_AND, FN_CLAMP, FN_DOT_VV, FN_FORWARD, FN_GET_COMP, FN_GE_FF, FN_SUB_FF,
-    NODE_CAST_WEAPON,
+    FN_AND, FN_CLAMP, FN_DOT_VV, FN_FORWARD, FN_GET_COMP, FN_GE_FF, FN_MUL_FF,
+    FN_SUB_FF, NODE_CAST_WEAPON,
 )
 from npc.paths import HIT_DAMAGE_VAR, INF
+from npc.tuned import tuned
 
-# The damage literals the two arms write. The unblocked one is the plain
-# NPC_MELEE_DAMAGE, which the level verifier also looks for.
-BLOCKED_DAMAGE = NPC_MELEE_DAMAGE * COMBAT.block_damage_scale
 # Dot(player forward, unit bearing to the swinger) at the edge of the guard.
 BLOCK_MIN_DOT = math.cos(math.radians(COMBAT.block_half_angle_deg))
 
@@ -36,7 +33,7 @@ def _author_block_check(ed, exec_in, player_out, bearing_out, x0, y0):
         exec_in --> cast player's BP_WeaponComponent
                       ok     --> [Blocking AND Dot(forward, bearing) >= cos]
                                    true  --> Stamina -= cost (floored at 0)
-                                         --> HitDamage = damage * scale
+                                         --> HitDamage = TuneMeleeDamage * scale
                                    false --> HitDamage = damage
                       failed ----------------> HitDamage = damage
 
@@ -54,8 +51,10 @@ def _author_block_check(ed, exec_in, player_out, bearing_out, x0, y0):
         made.append(n)
         return n
 
+    damage, damage_out = tuned(ed, "melee_damage", x0 + 1200, y0 + 460)
+    keep(damage)
     full = keep(_at(ed.add_set_member_variable_node(HIT_DAMAGE_VAR), x0 + 1440, y0 + 300))
-    _set(full, HIT_DAMAGE_VAR, NPC_MELEE_DAMAGE)
+    _connect(damage_out, _pin(full, HIT_DAMAGE_VAR))
 
     eas = _asset_sub()
     if not (eas.does_asset_exist(WEAPON_COMP_BP_PATH)
@@ -108,7 +107,10 @@ def _author_block_check(ed, exec_in, player_out, bearing_out, x0, y0):
     _connect(BEL.find_then_pin(blocked), _pin(pay, "execute"))
 
     soft = keep(_at(ed.add_set_member_variable_node(HIT_DAMAGE_VAR), x0 + 1440, y0))
-    _set(soft, HIT_DAMAGE_VAR, BLOCKED_DAMAGE)
+    less = keep(_at(_node(ed, FN_MUL_FF), x0 + 1440, y0 - 120))
+    _connect(damage_out, _pin(less, "A"))
+    _set(less, "B", COMBAT.block_damage_scale)
+    _connect(_pin(less, "ReturnValue", is_input=False), _pin(soft, HIT_DAMAGE_VAR))
     _connect(BEL.find_then_pin(pay), _pin(soft, "execute"))
 
     _connect(BEL.find_else_pin(blocked), _pin(full, "execute"))
@@ -117,7 +119,7 @@ def _author_block_check(ed, exec_in, player_out, bearing_out, x0, y0):
     ed.add_comment_to_nodes(
         f"The player's guard: blocking and facing this wanderer (within "
         f"{COMBAT.block_half_angle_deg:.0f} deg), the swing does "
-        f"{BLOCKED_DAMAGE:.1f} instead of {NPC_MELEE_DAMAGE:.0f} and costs "
+        f"{COMBAT.block_damage_scale:g}x its damage and costs "
         f"{COMBAT.block_stamina_per_hit:.0f} stamina. The player's own Tick "
         f"drops the guard when stamina reaches 0.",
         made)

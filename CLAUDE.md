@@ -207,7 +207,7 @@ editor.
   the item into the bag (`Scripts/loot/CLAUDE.md`).
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
-  and a settings screen (plus K in the M panel: a dev-all-guns cheat, and T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
+  and a settings screen (plus K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`. Food and water lie
   in both.

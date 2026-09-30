@@ -1,17 +1,18 @@
 """Checks for the wanderers' patrol and agro, read back off the saved
 controllers. Run through Scripts/verify_npc_blueprints.py.
 
-Each controller is checked against ITS OWN creature's AgroSettings, because
-the numbers are pin literals baked per controller: a wendigo controller
-carrying the zombie's vision range compiles, runs, and is wrong.
+Each controller is checked against ITS OWN creature's numbers,
+npc/monster_tuning.monster_specs(): every graph reads them off the
+controller's Tune* variables (npc/tuned.py), so the checks are that each is
+wired to its variable and that the variable's default is this creature's --
+a wendigo controller carrying the zombie's vision range compiles, runs, and
+is wrong.
 
 The chase and melee half of these graphs is still checked by the level
 verifier (verify_<Level>.py); this file owns what npc/agro.py, patrol.py,
 senses.py, corpse.py, combat_trace.py and block.py added. The behaviour tree
 and the step events are npc/verify_tree.py's.
 """
-
-import math
 
 import unreal
 
@@ -20,14 +21,16 @@ from forest_generator.npc_agro import (
     AGRO_LOG_PREFIX, NPC_AGRO, PATROL_ACCEPT_FRACTION, PATROL_ACCEPT_SLACK_CM,
     agro_for,
 )
-from forest_generator.npc_placement import NPC_MELEE_DAMAGE, NPC_VARIANTS
+from forest_generator.npc_placement import NPC_VARIANTS
 from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, DEBUG_MODE_VAR
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
     HIT_DAMAGE_VAR, RUN_SPEED_VAR, STEP_CHASE,
 )
-from npc.block import BLOCK_MIN_DOT, BLOCKED_DAMAGE
+from npc.block import BLOCK_MIN_DOT
+from npc.monster_tuning import MONSTER_STATS, TUNED_VAR, monster_specs, stock_run_speed
+from npc.tuned import tuned_values
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -86,18 +89,22 @@ def _with_literal(nodes, pin, value):
 
 
 def _limits(nodes, *measured):
-    """The B literals of every "distance <= B" whose distance is measured
-    between exactly the ``measured`` getters -- so two limits that happen to
-    share a number (the wendigo's 35 m sight and its 35 m patrol guard) are
-    still told apart by what they measure."""
+    """Every "distance <= B" whose distance is measured between exactly the
+    ``measured`` getters -- so two limits are told apart by what they
+    measure, not by what they are compared with."""
     out = []
     for n in _titled(nodes, "float <= float"):
         for d in _feeders(n, "A"):
             if _title(d) == "Distance (Vector)" and sorted(
                     _title(f) for pin in ("V1", "V2") for f in _feeders(d, pin)) \
                     == sorted(measured):
-                out.append(_num(n, "B"))
+                out.append(n)
     return out
+
+
+def _fed(n, pin, column):
+    """Is ``n``'s ``pin`` wired from exactly the Tune variable for ``column``?"""
+    return {_title(f) for f in _feeders(n, pin)} == {f"Get {TUNED_VAR[column]}"}
 
 
 # ─── The settings table ──────────────────────────────────────────────────────
@@ -127,8 +134,9 @@ def check_settings():
 
 # ─── One controller ──────────────────────────────────────────────────────────
 
-def check_controller(path, agro):
+def check_controller(path, key):
     tag = path.rsplit("/", 1)[-1]
+    spec = monster_specs(key)
     bp = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem).load_asset(path)
     check(f"{tag} exists", bp is not None)
     if not bp:
@@ -138,7 +146,7 @@ def check_controller(path, agro):
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     check(f"{tag}: the graph compiles clean", not ed.list_nodes_with_errors())
     check_corpse_and_trace(tag, nodes, cdo)
-    check_player_guard(tag, nodes)
+    check_player_guard(tag, nodes, spec)
 
     # --- state, and that it starts patrolling --------------------------------
     kinds = {AGGRO_VAR: bool, PATROL_READY_VAR: bool, AGGRO_REASON_VAR: str,
@@ -150,6 +158,11 @@ def check_controller(path, agro):
               type(value).__name__)
     check(f"{tag}: spawns PATROLLING (Aggro defaults to false)",
           cdo.get_editor_property(AGGRO_VAR) is False)
+    held = tuned_values(cdo)
+    off = [f"{c}={held[c]:g} want {spec[c]:g}" for c, *_r in MONSTER_STATS
+           if abs(held[c] - spec[c]) > 1e-3]
+    check(f"{tag}: its {len(MONSTER_STATS)} Tune variables hold {key}'s "
+          f"monster_specs (monster_tuning.csv over the literals)", not off, "; ".join(off))
 
     # --- the switch ----------------------------------------------------------
     flips = _titled(nodes, f"Set {AGGRO_VAR}")
@@ -185,11 +198,20 @@ def check_controller(path, agro):
     speeds = _titled(nodes, "Set MaxWalkSpeed")
     check(f"{tag}: two speed writes, the stroll and the run", len(speeds) == 2,
           f"{len(speeds)}")
-    stroll = _with_literal(_titled(nodes, "float * float"), "B", agro.patrol_speed_scale)
-    check(f"{tag}: strolls at {agro.patrol_speed_scale:.0%} of ITS OWN run speed "
-          f"(the stored RunSpeed, never the live MaxWalkSpeed)",
-          len(stroll) == 1
-          and {_title(f) for f in _feeders(stroll[0], "A")} == {f"Get {RUN_SPEED_VAR}"})
+    stock = stock_run_speed(key)
+    muls = _titled(nodes, "float * float")
+    runs = [n for n in muls
+            if {_title(f) for f in _feeders(n, "A")} == {f"Get {RUN_SPEED_VAR}"}]
+    ratios = [f for n in runs for f in _feeders(n, "B")]
+    strolls = [n for n in muls if _fed(n, "B", "patrol_speed_scale")
+               and set(_feeders(n, "A")) <= set(runs)]
+    check(f"{tag}: runs at ITS OWN run speed x TuneRunSpeed / {stock:.0f} (the "
+          f"stored RunSpeed, never the live MaxWalkSpeed), and strolls at "
+          f"TunePatrolSpeed of that",
+          len(runs) == 2 and len(ratios) == 2
+          and all(_fed(r, "A", "run_speed_cms") and _close(_num(r, "B"), stock)
+                  for r in ratios) and len(strolls) == 1,
+          f"{len(runs)} runs, {len(strolls)} strolls")
     cached = _titled(nodes, f"Set {RUN_SPEED_VAR}")
     check(f"{tag}: RunSpeed is read off the pawn once",
           len(cached) == 1 and {_title(f) for f in _feeders(cached[0], RUN_SPEED_VAR)}
@@ -197,8 +219,8 @@ def check_controller(path, agro):
 
     # --- patrol --------------------------------------------------------------
     picks = [n for n in nodes if {"Origin", "Radius"} <= _ins(n)]
-    check(f"{tag}: picks points inside a {agro.patrol_radius_cm / 100:.0f} m circle",
-          len(picks) == 1 and _close(_num(picks[0], "Radius"), agro.patrol_radius_cm)
+    check(f"{tag}: picks points inside a TunePatrolRadius circle",
+          len(picks) == 1 and _fed(picks[0], "Radius", "patrol_radius_cm")
           and {_title(f) for f in _feeders(picks[0], "Origin")} == {f"Get {PATROL_HOME_VAR}"},
           f"{[_lit(n, 'Radius') for n in picks]}")
     if picks:
@@ -213,39 +235,48 @@ def check_controller(path, agro):
     check(f"{tag}: the circle is centred where it spawned",
           len(homes) == 1 and {_title(f) for f in _feeders(homes[0], PATROL_HOME_VAR)}
           == {"Get Actor Location"})
-    guard = agro.patrol_radius_cm * PATROL_ACCEPT_FRACTION + PATROL_ACCEPT_SLACK_CM
     fences = _limits(nodes, f"Get {PATROL_TARGET_VAR}", f"Get {PATROL_HOME_VAR}")
-    check(f"{tag}: a point outside the circle (the no-navmesh origin) is refused",
-          len(fences) == 1 and _close(fences[0], guard), f"{fences} vs {guard:.0f} cm")
+    adds = [f for n in fences for f in _feeders(n, "B")]
+    loose = [f for a in adds for f in _feeders(a, "A")]
+    check(f"{tag}: a point outside the circle (the no-navmesh origin) is refused: "
+          f"TunePatrolRadius x {PATROL_ACCEPT_FRACTION} + {PATROL_ACCEPT_SLACK_CM:.0f} cm",
+          len(fences) == 1 and len(adds) == 1 and len(loose) == 1
+          and _close(_num(adds[0], "B"), PATROL_ACCEPT_SLACK_CM)
+          and _close(_num(loose[0], "B"), PATROL_ACCEPT_FRACTION)
+          and _fed(loose[0], "A", "patrol_radius_cm"),
+          f"{len(fences)} fences")
     strolls = _titled(nodes, "SimpleMoveToLocation")
     check(f"{tag}: one stroll order, to the stored PatrolTarget",
           len(strolls) == 1 and {_title(f) for f in _feeders(strolls[0], "Goal")}
           == {f"Get {PATROL_TARGET_VAR}"}, f"{len(strolls)}")
     windows = [n for n in nodes if {"Min", "Max"} <= _ins(n)
-               and _close(_num(n, "Min"), agro.patrol_repick_min_s)
-               and _close(_num(n, "Max"), agro.patrol_repick_max_s)]
-    check(f"{tag}: a new point every {agro.patrol_repick_min_s:.0f}-"
-          f"{agro.patrol_repick_max_s:.0f} s", len(windows) == 1)
+               and _fed(n, "Min", "patrol_repick_min_s")
+               and _fed(n, "Max", "patrol_repick_max_s")]
+    check(f"{tag}: a new point every TunePatrolRepickMin-Max s "
+          f"({spec['patrol_repick_min_s']:g}-{spec['patrol_repick_max_s']:g})",
+          len(windows) == 1)
 
     # --- the senses ----------------------------------------------------------
     # Sight, touch and the melee swing all measure pawn-to-player, so each is
     # looked for among those limits (the settings check keeps them distinct).
-    reach = sorted(_limits(nodes, "Get Actor Location", "Get Actor Location"))
-    check(f"{tag}: sees {agro.vision_range_cm / 100:.0f} m",
-          any(_close(x, agro.vision_range_cm) for x in reach), f"{reach}")
-    cone = math.cos(math.radians(agro.vision_half_angle_deg))
-    check(f"{tag}: ...{agro.vision_half_angle_deg:.0f} degrees either side of its facing",
-          len(_with_literal(_titled(nodes, "float >= float"), "B", cone)) == 1, f"cos {cone:.4f}")
+    reach = _limits(nodes, "Get Actor Location", "Get Actor Location")
+    fed = sorted(_title(f) for n in reach for f in _feeders(n, "B"))
+    check(f"{tag}: sees TuneSightRange ({spec['vision_range_cm'] / 100:.0f} m)",
+          sum(_fed(n, "B", "vision_range_cm") for n in reach) == 1, f"{fed}")
+    cones = [n for n in _titled(nodes, "float >= float")
+             if any(_fed(c, "A", "vision_half_angle_deg") for c in _feeders(n, "B"))]
+    check(f"{tag}: ...within DegCos(TuneSightHalfAngle) of its facing "
+          f"({spec['vision_half_angle_deg']:.0f} degrees either side)", len(cones) == 1)
     los = _titled(nodes, "LineOfSightTo")
     check(f"{tag}: ...and not through a tree (line of sight to the player)",
           len(los) == 1 and {_title(f) for f in _feeders(los[0], "Other")}
           == {"GetPlayerPawn"})
-    check(f"{tag}: feels the player within {agro.touch_range_cm:.0f} cm",
-          any(_close(x, agro.touch_range_cm) for x in reach), f"{reach}")
-    check(f"{tag}: hears at {agro.hearing_scale}x a noise's own reach, "
-          f"all round and down the cone",
-          len(_with_literal(_titled(nodes, "float * float"), "B",
-                            agro.hearing_scale)) == 2)
+    check(f"{tag}: feels the player within TuneTouchRange "
+          f"({spec['touch_range_cm']:.0f} cm)",
+          sum(_fed(n, "B", "touch_range_cm") for n in reach) == 1, f"{fed}")
+    check(f"{tag}: hears at TuneHearing ({spec['hearing_scale']:g})x a noise's own "
+          f"reach, all round and down the cone",
+          sum(_fed(n, "B", "hearing_scale") for n in muls) == 2)
     check(f"{tag}: only a noise from the last {COMBAT.noise_hold_s} s is heard",
           len(_with_literal(_titled(nodes, "float <= float"), "B", COMBAT.noise_hold_s)) == 1)
 
@@ -316,15 +347,17 @@ def check_corpse_and_trace(tag, nodes, cdo):
           len(flags) == 1 and len(gated) == 1)
 
 
-def check_player_guard(tag, nodes):
+def check_player_guard(tag, nodes, spec):
     """npc/block.py: what the player's guard does to a landed swing."""
     sets = _titled(nodes, f"Set {HIT_DAMAGE_VAR}")
-    amounts = sorted(_num(n, HIT_DAMAGE_VAR) or 0.0 for n in sets)
-    check(f"{tag}: a swing deals {NPC_MELEE_DAMAGE:.0f}, or {BLOCKED_DAMAGE:.1f} "
-          f"on the player's guard",
-          len(sets) == 2 and _close(amounts[0], BLOCKED_DAMAGE)
-          and _close(amounts[1], NPC_MELEE_DAMAGE)
-          and BLOCKED_DAMAGE < NPC_MELEE_DAMAGE, f"{amounts}")
+    full = [n for n in sets if _fed(n, HIT_DAMAGE_VAR, "melee_damage")]
+    soft = [n for n in sets for m in _feeders(n, HIT_DAMAGE_VAR)
+            if _fed(m, "A", "melee_damage")
+            and _close(_num(m, "B"), COMBAT.block_damage_scale)]
+    check(f"{tag}: a swing deals TuneMeleeDamage ({spec['melee_damage']:g}), or "
+          f"{COMBAT.block_damage_scale:g}x it on the player's guard",
+          len(sets) == 2 and len(full) == 1 and len(soft) == 1
+          and 0.0 < COMBAT.block_damage_scale < 1.0, f"{len(sets)} sets")
     hurts = [n for n in _titled(nodes, "float - float")
              if {_title(f) for f in _feeders(n, "A")} == {"Get Health"}]
     check(f"{tag}: the Health write subtracts {HIT_DAMAGE_VAR}, not a literal",
@@ -339,7 +372,6 @@ def check_player_guard(tag, nodes):
           len(writes) == 1 and sorted(_title(d) for d in _drivers(writes[0]))
           == [f"Set {HIT_DAMAGE_VAR}"] * 2,
           f"{[_title(d) for w in writes for d in _drivers(w)]}")
-    soft = [n for n in sets if _close(_num(n, HIT_DAMAGE_VAR), BLOCKED_DAMAGE)]
     pay = [d for n in soft for d in _drivers(n)]
     check(f"{tag}: a blocked swing costs the player "
           f"{COMBAT.block_stamina_per_hit:.0f} stamina first",
@@ -356,7 +388,6 @@ def check_player_guard(tag, nodes):
           len(gate) == 1 and "Get Blocking" in fed
           and any(_close(_num(x, "B"), BLOCK_MIN_DOT) for x in fronts),
           f"{sorted(fed)}")
-    full = [n for n in sets if _close(_num(n, HIT_DAMAGE_VAR), NPC_MELEE_DAMAGE)]
     into_full = sorted(_title(d) for n in full for d in _drivers(n))
     check(f"{tag}: no guard, or no weapon component, is the full swing "
           f"(every exit of the check reaches the Health write)",
@@ -374,6 +405,6 @@ def check_player_guard(tag, nodes):
 
 def run():
     check_settings()
-    check_controller(AI_BP_PATH, agro_for(NPC_VARIANTS[0].key))
+    check_controller(AI_BP_PATH, NPC_VARIANTS[0].key)
     for variant in NPC_VARIANTS:
-        check_controller(variant.ai_blueprint, agro_for(variant.key))
+        check_controller(variant.ai_blueprint, variant.key)

@@ -3,22 +3,23 @@ names and words, and the Python command its save runs. Constants only, so
 wbp_tune (the layout), tune_tick and tune_draw (the graph), tune_save (the
 save, run inside the game) and tune_checks read one table.
 
-    [T] with the M panel open   open / close the tab
+    [T] with the M panel open   open / close the tab (the keys below are
+                                tune_tab's, shared with MONSTER TUNING)
     Up / Down                   pick a row: the gun, then one row per stat
     Left / Right                on the gun row: the previous / next gun;
                                 on a stat: one step down / up (on every
                                 carried copy of that gun, at once)
     Enter                       save every gun's numbers to gun_tuning.csv
 
-The stats, their steps and minimums are combat/gun_tuning.TUNE_STATS.
+The stats, their steps and minimums are combat/gun_tuning.TUNE_STATS. GUN_TAB
+is the same names as a TuneTab (tune_tab.py), which is what the shared
+fragments take.
 """
 
 from combat.gun_tuning import TUNE_STATS
+from graphics_menu.tune_tab import TuneTab, save_command
 
 TUNE_KEY = "T"
-TUNE_UP, TUNE_DOWN = "Up", "Down"
-TUNE_LESS, TUNE_MORE = "Left", "Right"
-TUNE_SAVE_KEY = "Enter"
 TUNE_ROW_LABEL = f"[{TUNE_KEY}]   gun tuning"
 
 # The HUD's variables. The keys only raise TuneNudge / TuneSaveRequested and
@@ -59,11 +60,16 @@ TUNE_TITLE_FONT, TUNE_HINT_FONT = 20.0, 11.0
 # not built from umg_consts.UI_DIR: umg_consts imports this module's label.
 HUD_CLASS_PATH = "/Game/UI/BP_GraphicsMenuHUD.BP_GraphicsMenuHUD_C"
 
-# What Enter runs (PythonScriptLibrary.ExecutePythonCommand): Scripts/ onto
-# the path, then tune_save.save(). Only where the Python plugin runs, which
-# is the editor, PIE and a -game run of the editor binary: a dev tool.
-TUNE_SAVE_COMMAND = (
-    "import sys, unreal; "
-    "d = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()) + 'Scripts'; "
-    "d in sys.path or sys.path.insert(0, d); "
-    "import graphics_menu.tune_save as t; t.save()")
+# What Enter runs: tune_save.save() (see tune_tab.save_command).
+TUNE_SAVE_COMMAND = save_command("graphics_menu.tune_save")
+
+GUN_TAB = TuneTab(
+    key=TUNE_KEY, open_var=TUNE_OPEN_VAR, row_var=TUNE_ROW_VAR,
+    pick_var=TUNE_WEAPON_VAR, nudge_var=TUNE_NUDGE_VAR, save_var=TUNE_SAVE_VAR,
+    saved_var=TUNE_SAVED_VAR, touched_var=TUNE_TOUCHED_VAR,
+    values_var=TUNE_VALUES_VAR, names_var=TUNE_WEAPONS_VAR,
+    steps_var=TUNE_STEPS_VAR, mins_var=TUNE_MINS_VAR, stat_count=STAT_COUNT,
+    save_command=TUNE_SAVE_COMMAND, panel=TUNE_PANEL, rows_box=TUNE_ROWS_BOX,
+    saved_text=TUNE_SAVED_TEXT, title_widget="TuneTitle", hint_widget="TuneHint",
+    title_text=TUNE_TITLE_TEXT, row_labels=TUNE_ROW_LABELS, hint_text=TUNE_HINT_TEXT,
+    saved_words=TUNE_SAVED_WORDS)

@@ -33,6 +33,18 @@ menu polls its own copy from `DrawHUD`, which does.
 - **A new weapon is a row plus a part table.** Add a row in `weapon_specs._weapon_specs()` and a
   part table. Adding the SMG, the rifle and the sniper changed **no** node in the fire, reload or
   gate graphs.
+- **The rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon Bundle's AK 47
+  (`SK_KA47_X`) and AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
+  - A row with a `model` builds the model instead of its `parts`. Its `parts` are then the
+    model's **measured outline**: boxes that are never built, which the grip solve and the sight
+    checks read exactly as they read a primitive gun's parts. Re-measure them if the mesh changes.
+  - The pack's `_X`/`_Y` are **axis** variants, not textures: `_X` points down +X, which is the
+    weapon's frame, so the model sits unrotated at real size. Muzzles are the meshes'
+    `b_gun_muzzleflash` sockets.
+  - The pack isn't committed. Without it the build stops at `_must_load`.
+    `Scripts/asset_pipeline/fab_library.json` is the restore recipe.
+  - The shotgun, pistol and SMG are still primitives. The pack has no shotgun or pistol, and
+    its SMG11 and KA74U were not asked for.
 - **Equipping is authored once.** BeginPlay, switch, drop and pick-up only set `NeedsRefresh`.
   Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.

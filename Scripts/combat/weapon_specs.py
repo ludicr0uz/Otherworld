@@ -1,6 +1,7 @@
 """The five weapons as data: their primitive parts, muzzle offsets, icons
 and the _weapon_specs() table every builder and the verifier iterate.
-Adding a weapon is a row here.
+Adding a weapon is a row here. The rifle and the sniper are Fab models, and
+their parts, muzzles and sights come from weapon_models.py.
 """
 
 import unreal
@@ -16,6 +17,10 @@ from combat.paths import (
     RIFLE_BP_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH, UI_ART_DIR,
 )
 from combat.skin import player_skin
+from combat.weapon_models import (
+    RIFLE_MODEL, RIFLE_MUZZLE, RIFLE_SIGHT, SNIPER_MODEL, SNIPER_MUZZLE,
+    SNIPER_SIGHT, rifle_outline, sniper_outline,
+)
 from combat.tuning import (
     COMBAT, GUN_LOOT_TABLE, PISTOL_FIRE_INTERVAL, PISTOL_MAGAZINE,
     PISTOL_RELOAD_SECONDS, RIFLE_FIRE_INTERVAL, RIFLE_MAGAZINE,
@@ -81,73 +86,23 @@ def _smg_parts():
     )
 
 
-def _rifle_parts():
-    """Long, straight and flat-topped, with a carry handle above the receiver.
-
-    The handle is doing real work: it is the only part above the bore line on
-    any weapon but the sniper, and it is what stops the rifle reading as a
-    slightly bigger SMG when both are seen from behind the shoulder.
-    """
-    barrel = _barrel_rotation()
-    return (
-        ("Receiver",     CUBE,     (26.0, 0.0, 0.0),    _rot(),            (0.30, 0.052, 0.072), MAT_METAL),
-        ("Handguard",    CUBE,     (58.0, 0.0, 1.0),    _rot(),            (0.22, 0.048, 0.050), MAT_METAL),
-        ("Barrel",       CYLINDER, (86.0, 0.0, 1.8),    barrel,            (0.016, 0.016, 0.34), MAT_METAL),
-        ("CarryHandle",  CUBE,     (30.0, 0.0, 6.5),    _rot(),            (0.14, 0.030, 0.020), MAT_METAL),
-        ("Magazine",     CUBE,     (18.0, 0.0, -10.0),  _rot(pitch=-12.0), (0.040, 0.032, 0.130), MAT_METAL),
-        ("Grip",         CUBE,     (6.0, 0.0, -7.5),    _rot(pitch=20.0),  (0.050, 0.040, 0.090), MAT_METAL),
-        ("Stock",        CUBE,     (-12.0, 0.0, -1.0),  _rot(),            (0.30, 0.045, 0.060), MAT_METAL),
-        ("TriggerGuard", CUBE,     (13.0, 0.0, -4.5),   _rot(),            (0.065, 0.028, 0.018), MAT_METAL),
-    )
-
-
-def _sniper_parts():
-    """The longest of the five, with wood furniture and a scope on rings.
-
-    Wood is shared with the shotgun on purpose -- these are the two slow, heavy
-    weapons -- and the scope plus the bolt handle are what separate them at a
-    glance. It is also the only weapon whose barrel reaches past 1.4 m, which
-    is visible in third person every time the player turns.
-    """
-    barrel = _barrel_rotation()
-    return (
-        ("Receiver",     CUBE,     (28.0, 0.0, 0.0),    _rot(),            (0.32, 0.055, 0.075), MAT_METAL),
-        ("Barrel",       CYLINDER, (96.0, 0.0, 2.0),    barrel,            (0.018, 0.018, 0.52), MAT_METAL),
-        ("Forestock",    CUBE,     (58.0, 0.0, -1.5),   _rot(),            (0.26, 0.050, 0.050), MAT_WOOD),
-        ("Stock",        CUBE,     (-14.0, 0.0, -2.0),  _rot(pitch=4.0),   (0.42, 0.050, 0.078), MAT_WOOD),
-        ("Scope",        CYLINDER, (34.0, 0.0, 9.0),    barrel,            (0.030, 0.030, 0.30), MAT_METAL),
-        ("ScopeMountF",  CUBE,     (22.0, 0.0, 5.5),    _rot(),            (0.020, 0.020, 0.045), MAT_METAL),
-        ("ScopeMountR",  CUBE,     (46.0, 0.0, 5.5),    _rot(),            (0.020, 0.020, 0.045), MAT_METAL),
-        # Sticking out to the shooter's left in the weapon's own frame, which
-        # reads as the bolt handle from the third-person camera behind them.
-        ("Bolt",         CYLINDER, (18.0, -4.5, 2.0),   _rot(roll=90.0),   (0.012, 0.012, 0.090), MAT_METAL),
-        ("Grip",         CUBE,     (10.0, 0.0, -6.5),   _rot(pitch=18.0),  (0.052, 0.040, 0.085), MAT_WOOD),
-        ("TriggerGuard", CUBE,     (16.0, 0.0, -4.5),   _rot(),            (0.070, 0.030, 0.020), MAT_METAL),
-    )
-
-
 # Muzzle tip in the weapon's own space: where the barrel actually ends, so the
 # pellet cone starts at the gun rather than inside the player's chest.
 SHOTGUN_MUZZLE = (101.0, 0.0, 2.2)
 PISTOL_MUZZLE = (30.0, 0.0, 1.5)
 SMG_MUZZLE = (56.0, 0.0, 1.5)
-RIFLE_MUZZLE = (122.0, 0.0, 1.8)
-SNIPER_MUZZLE = (148.0, 0.0, 2.0)
 
-# The eye when aiming down the sights, in the same space. None of the guns has
-# a modelled sight, so the sight line is the top of the gun: the eye sits a
+# The eye when aiming down the sights, in the same space. None of the primitive
+# guns has a modelled sight, so the sight line is the top of the gun: the eye sits a
 # centimetre or two above the highest part along the bore, and 20-ish cm
 # behind the rear of the receiver (or slide). Tuned by eye in PIE: 14 cm back
 # and the receiver's back face filled a third of the screen; 34 cm back and
 # the camera was inside the adventurer's head, whose hair crossed the view.
-# The rifle looks over its carry handle. The sniper's eye is on the scope's
-# axis, behind the eyepiece -- the HUD's glass is what is actually seen, and
-# the rifle itself is hidden once the camera is nearly there (sights.py).
+# The rifle (over its irons) and the sniper (on its scope's axis) are in
+# weapon_models.py.
 SHOTGUN_SIGHT = (-12.0, 0.0, 5.5)
 PISTOL_SIGHT = (-16.0, 0.0, 5.0)
 SMG_SIGHT = (-12.0, 0.0, 5.5)
-RIFLE_SIGHT = (-8.0, 0.0, 9.0)
-SNIPER_SIGHT = (9.0, 0.0, 9.0)
 
 
 # ─── Accuracy: where the shot goes, and what it does to the view ─────────────
@@ -268,6 +223,10 @@ def _weapon_specs():
 
     DropClasses below is what marks a weapon as findable rather than issued.
 
+    A row with a `model` is drawn by that model (weapon_models.py), and its
+    `parts` are the model's measured outline: never built, but read by the
+    grip solve and the sight checks exactly as a primitive gun's parts are.
+
     Spread and recoil are columns too, but they live in GUN_ACCURACY above and
     are merged into each row here, so the accuracy of all five reads as one
     table.
@@ -309,7 +268,7 @@ def _weapon_specs():
              shot_volume=SHOT_VOLUME_CM["SMG"]),
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
-        dict(path=RIFLE_BP_PATH, parts=_rifle_parts(), muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
+        dict(path=RIFLE_BP_PATH, parts=rifle_outline(), model=RIFLE_MODEL, muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
              display="Rifle", automatic=True, damage=24.0, pellets=1, range=9000.0,
              sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
@@ -322,7 +281,7 @@ def _weapon_specs():
         # The cost is 1.6 s between shots, which against a pack of five that
         # runs at 600 cm/s is the difference between opening at distance and
         # being caught reloading.
-        dict(path=SNIPER_BP_PATH, parts=_sniper_parts(), muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
+        dict(path=SNIPER_BP_PATH, parts=sniper_outline(), model=SNIPER_MODEL, muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
              display="Sniper", automatic=False, damage=120.0, pellets=1, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),

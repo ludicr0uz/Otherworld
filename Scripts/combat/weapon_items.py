@@ -22,7 +22,7 @@ from combat.audio import SND_DRY_FIRE
 from combat.graph import (
     BEL, BGE, _add_component, _apply_defaults, _assets, _component_object,
     _create_blueprint, _declare, _drop_components, _find_handle, _float_type,
-    _log, _must_load, _root_handle, _struct_type,
+    _handles, _log, _must_load, _root_handle, _struct_type,
 )
 from combat.paths import ITEM_BP_PATH
 from combat.tuning import COMBAT
@@ -169,10 +169,50 @@ def build_parts(bp, parts):
             _log(f"  note: could not set NoCollision on {name}: {exc}")
 
 
+# The components every weapon keeps: its own root and BP_WeaponItem's Body.
+KEEP = {"None", "DefaultSceneRoot", "Body"}
+
+
+def build_model(bp, model):
+    """Hang a weapon's model off its inherited Body component.
+
+    Each entry is (name, mesh, location, rotation, scale); a skeletal mesh gets
+    a SkeletalMeshComponent and a static one a StaticMeshComponent, each with
+    the mesh's own materials. No animation is set, so a skeletal gun holds its
+    reference pose: the magazine in, the trigger forward.
+    """
+    body = _find_handle(bp, "Body")
+    if not body:
+        raise RuntimeError(f"{bp.get_path_name()} has no inherited Body component")
+    _drop_components(bp, {m[0] for m in model})
+    for name, mesh_path, location, rotation, scale in model:
+        mesh = _must_load(mesh_path)
+        skeletal = isinstance(mesh, unreal.SkeletalMesh)
+        handle = _add_component(bp, body, unreal.SkeletalMeshComponent if skeletal
+                                else unreal.StaticMeshComponent, name)
+        obj = _component_object(handle)
+        obj.set_editor_property("skeletal_mesh_asset" if skeletal else "static_mesh", mesh)
+        obj.set_editor_property("relative_location", unreal.Vector(*location))
+        obj.set_editor_property("relative_rotation", rotation)
+        obj.set_editor_property("relative_scale3d", unreal.Vector(*scale))
+        # The same rule as build_parts: a held or dropped gun blocks nothing.
+        obj.set_collision_profile_name("NoCollision")
+
+
 def build_weapon(spec, item_bp):
-    """One concrete weapon: the parts, plus the defaults for the base's variables."""
+    """One concrete weapon: its model or its parts, plus the defaults for the
+    base's variables. A model gun's parts are its measured outline (see
+    weapon_models.py), which nothing builds."""
     bp = _create_blueprint(spec["path"], BEL.generated_class(item_bp))
-    build_parts(bp, spec["parts"])
+    model = spec.get("model")
+    built = [m[0] for m in model] if model else [p[0] for p in spec["parts"]]
+    # Whatever the last build hung on the weapon and this one does not: the
+    # rifle's primitive parts, the first time it is built as a model.
+    _drop_components(bp, {n for _h, n in _handles(bp)} - set(built) - KEEP)
+    if model:
+        build_model(bp, model)
+    else:
+        build_parts(bp, spec["parts"])
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{spec['path']} failed to compile")
@@ -222,8 +262,10 @@ def build_weapon(spec, item_bp):
         "AimPose": _must_load(spec["aim"]),
         "TwoHanded": bool(spec["two_handed"]),
     })
-    _log(f"built {spec['path']} ({len(spec['parts'])} parts, "
-         f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
+    _log(f"built {spec['path']} ("
+         + (f"model {', '.join(m[1].rsplit('/', 1)[-1] for m in model)}, " if model
+            else f"{len(spec['parts'])} parts, ")
+         + f"{spec['pellets']}x{spec['damage']:.0f} dmg, "
          f"{spec['spread']:.1f} deg cloud, {spec['recoil']:.2f}/"
          f"{spec['recoil_yaw']:.3f} deg kick, "
          f"heard at {spec['shot_volume'] / 100.0:.0f} m, "

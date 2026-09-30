@@ -112,6 +112,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     within 3.5 cm of it, and that the index is at the trigger guard.
   - **Before the solve,** a hand bone's origin is the wrist, so the grip hung 8–14 cm from the
     fingers, over the back of the hand.
+  - **A model gun is seated by its measured outline** (`weapon_models.py`): the AK's and the
+    Val's `Grip` and `TriggerGuard` boxes are their real pistol grips, measured off the meshes'
+    vertices. Those grips are 2.6–2.8 cm thick, thinner than the primitive guns' 4 cm, so the
+    fist is looser on them: the furthest wrapping joint is 3.4–3.5 cm off, just inside the
+    3.5 cm limit. A thinner grip than these needs the limit or the ready pose revisited, not
+    a fatter box.
 - **The weapon is rigidly attached and never rotated on its own.** Aiming it per frame was tried
   and reverted. `face_the_camera()` makes the body follow the camera's yaw instead.
 - **Known limits:**

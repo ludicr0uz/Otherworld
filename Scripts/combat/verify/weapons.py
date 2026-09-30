@@ -9,11 +9,43 @@ from combat.grip import (
 )
 from combat.paths import ITEM_BP_PATH, PISTOL_BP_PATH, SHOTGUN_BP_PATH
 from combat.skin import SKIN_QUINN, player_skin
+from combat.weapon_items import KEEP
 from combat.weapon_specs import DROP_DISPLAYS, _weapon_specs
-from combat.verify.common import cdo, check, components, load
+from combat.verify.common import (
+    cdo, check, component_template, components, load,
+)
 
 
 # ─── The five weapons ────────────────────────────────────────────────────────
+
+def check_model(bp, tag, spec, names):
+    """A model gun (weapon_models.py): each model component carries its Fab
+    mesh where the outline was measured, collides with nothing, and no
+    primitive part of the gun it replaced is left under it."""
+    for name, mesh, loc, _rot_, scale in spec["model"]:
+        comp = component_template(bp, name)
+        got = None
+        if comp:
+            got = comp.get_editor_property(
+                "skeletal_mesh_asset" if isinstance(comp, unreal.SkeletalMeshComponent)
+                else "static_mesh")
+        check(f"{tag}: {name} is {mesh.rsplit('/', 1)[-1]}",
+              got is not None and got.get_path_name().split(".")[0] == mesh,
+              got.get_path_name() if got else "missing")
+        if comp:
+            at = comp.get_editor_property("relative_location")
+            check(f"{tag}: {name} sits where its outline was measured",
+                  (at - unreal.Vector(*loc)).length() < 1e-3
+                  and (comp.get_editor_property("relative_scale3d")
+                       - unreal.Vector(*scale)).length() < 1e-6,
+                  str(at.to_tuple()))
+            check(f"{tag}: {name} collides with nothing",
+                  str(comp.get_collision_profile_name()) == "NoCollision",
+                  str(comp.get_collision_profile_name()))
+    stale = sorted(names - {m[0] for m in spec["model"]} - KEEP)
+    check(f"{tag}: nothing but the model is left on it (no old primitive part)",
+          not stale, str(stale))
+
 
 def check_five_weapons():
     # Driven off _weapon_specs() rather than off a list written here, so a weapon
@@ -39,9 +71,12 @@ def check_five_weapons():
             check(f"{tag}: inherits BP_WeaponItem's properties", False, str(exc))
 
         names = set(components(bp))
-        want = {p[0] for p in spec["parts"]}
-        check(f"{tag}: all {len(want)} parts present", want <= names,
-              str(sorted(want - names)))
+        if spec.get("model"):
+            check_model(bp, tag, spec, names)
+        else:
+            want = {p[0] for p in spec["parts"]}
+            check(f"{tag}: all {len(want)} parts present", want <= names,
+                  str(sorted(want - names)))
         debris = [n for n in names if n.startswith("StaticMesh")]
         check(f"{tag}: no leftover generated components", not debris, str(debris))
 

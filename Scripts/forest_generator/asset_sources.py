@@ -142,7 +142,9 @@ GENERATED = (
              "BP_Settings -- the SaveGame the menu's keybinds and mouse "
              "sensitivity live in, built here so both it and the HUD can name "
              "the class. The Audio/ subfolder is imported by this builder "
-             "from the sound cache -- see CACHE below. "
+             "from the sound cache -- see CACHE below. The rifle and the "
+             "sniper wear the FPS Weapon Bundle's models (a Fab pack under "
+             "/Game/FPS_Weapon_Bundle), so that pack must be in first. "
              "The three A_Att_* USoundAttenuation profiles every sound in the "
              "game points at are built by the same script but live in "
              "/Game/Audio, because the foley half of the sounds does.",
@@ -332,6 +334,12 @@ RESTORE_ORDER = (
     "python3 Scripts/build_ui_art.py",
     "python3 Scripts/build_survival_icons.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_ui_art.py",
+    # Fab content is re-added by hand (it needs the user's Epic sign-in):
+    # --check lists what fab_library.json holds that the disk does not. Then
+    # the index, which sessions read instead of booting the editor. Before the
+    # weapons, whose rifle and sniper are the FPS Weapon Bundle's models.
+    "Scripts/asset_pipeline/fab_library.py --check",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/fab_index.py",
     "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
     # After combat (the consumables are children of BP_WeaponItem) and before
     # the HUD (whose survival bars cast to BP_SurvivalComponent).
@@ -359,11 +367,6 @@ RESTORE_ORDER = (
     # Also after the imports: it tags each level's static sky and adds the
     # day/night cycle that replaces it at BeginPlay.
     "Scripts/dev/uepy.py --cold Scripts/build_day_night.py",
-    # Fab content is re-added by hand (it needs the user's Epic sign-in):
-    # --check lists what fab_library.json holds that the disk does not. Then
-    # the index, which sessions read instead of booting the editor.
-    "Scripts/asset_pipeline/fab_library.py --check",
-    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/fab_index.py",
 )
 
 

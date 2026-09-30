@@ -1,9 +1,9 @@
-"""The survival bars: hunger, thirst and temperature under the stamina bar,
+"""The survival bars: hunger, thirst and temperature under the HP bar,
 and the name of any debuff the player is carrying beside them.
 
-Same shape as the HP and stamina bars in build_graphics_menu.py -- a track and a
+Same shape as the HP bar in build_graphics_menu.py -- a track and a
 width-driven fill of the shared white T_UI_Bar, tinted per bar -- and the same
-left edge and width, so the five read as one readout. Thinner than stamina
+left edge and width, so the four read as one readout. Thinner than stamina
 (12 px against 14): they change over minutes, not seconds, and are read at a
 glance rather than watched.
 
@@ -32,7 +32,8 @@ FN_GREATER_II = "/Script/Engine.KismetMathLibrary.Greater_IntInt"
 FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
 FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
 
-# x, w, h of every bar; y per row. The stamina bar ends at y 114.
+# x, w, h of every bar; y per row. The HP bar ends at y 92; the stamina bar
+# is at the bottom of the screen now (stamina_bar.py).
 SV_X, SV_W, SV_H = 60.0, 420.0, 12.0
 SV_LABEL_X = 16.0
 SV_LABEL_RISE = 4.0
@@ -44,9 +45,9 @@ COL_DEBUFF = "(R=0.950000,G=0.300000,B=0.220000,A=1.000000)"
 
 # (stat, label, fill colour, y)
 SURVIVAL_BARS = (
-    ("Hunger", "FOOD", "(R=0.860000,G=0.580000,B=0.220000,A=0.950000)", 122.0),
-    ("Thirst", "H2O", "(R=0.200000,G=0.480000,B=1.000000,A=0.950000)", 140.0),
-    ("Temperature", "TEMP", "(R=0.920000,G=0.360000,B=0.260000,A=0.950000)", 158.0),
+    ("Hunger", "FOOD", "(R=0.860000,G=0.580000,B=0.220000,A=0.950000)", 104.0),
+    ("Thirst", "H2O", "(R=0.200000,G=0.480000,B=1.000000,A=0.950000)", 122.0),
+    ("Temperature", "TEMP", "(R=0.920000,G=0.360000,B=0.260000,A=0.950000)", 140.0),
 )
 # (tag, label, the bar it sits beside)
 DEBUFF_LABELS = ((STARVING_TAG, "STARVING", "Hunger"),

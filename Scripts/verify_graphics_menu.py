@@ -23,6 +23,7 @@ from graphics_menu import grass_tiers as T
 from graphics_menu import presets as P
 from graphics_menu import reticle as R
 from graphics_menu import settings_rows as S
+from graphics_menu import stamina_bar as ST
 from graphics_menu import survival_bars as SB
 from graphics_menu import scope as SC
 from graphics_menu import profile_consts as PC
@@ -418,9 +419,9 @@ def main():
     # counter right-anchors off it, and the death panel, the main menu and the
     # settings page each centre off it. Seven with the debug FPS readout,
     # right-anchored above the kill counter. Eight with the save-and-exit
-    # banner, centred.
+    # banner, centred. Nine with the stamina bar, centred under the strip.
     check("everything positioned off the window edge reads the viewport size",
-          len(viewports) == 8, str(len(viewports)))
+          len(viewports) == 9, str(len(viewports)))
     # The reticle's gap is the held gun's accuracy cloud (combat accuracy.py
     # writes ReticleSpread, a fraction of half the width): the four ticks move
     # out with it, capped, and the dot stays put.
@@ -641,12 +642,24 @@ def main():
     check("the stamina bar reads Stamina, MaxStamina and Sprinting",
           stamina_reads == {"Get Stamina", "Get MaxStamina", "Get Sprinting"},
           str(sorted(stamina_reads)))
+    # Centred at the bottom: both corners come off the viewport, so the only
+    # literal left to find them by is the height.
     st_rects = [n for n in by_pins("Texture")
-                if float(BEL.find_input_pin(n, "ScreenY").get_pin_value() or -1)
-                == G.ST_BAR[1]]
-    check("the stamina bar has a track and a fill, under the HP bar",
-          len(st_rects) == 2 and G.ST_BAR[1] > G.HP_BAR[1],
-          f"{len(st_rects)} rects at y={G.ST_BAR[1]}")
+                if float(BEL.find_input_pin(n, "ScreenH").get_pin_value() or -1)
+                == ST.ST_H
+                and BEL.find_input_pin(n, "ScreenX").list_connected_pins()
+                and BEL.find_input_pin(n, "ScreenY").list_connected_pins()]
+    check("the stamina bar has a track and a fill, positioned off the viewport",
+          len(st_rects) == 2, f"{len(st_rects)} rects {ST.ST_H:.0f} px high")
+    strip_w = (G.INVENTORY_COLUMNS * G.SLOT_W
+               + (G.INVENTORY_COLUMNS - 1) * G.SLOT_GAP)
+    check("the stamina bar is under the inventory strip and as wide as it",
+          G.SLOT_BOTTOM >= ST.ST_BOTTOM + ST.ST_H and ST.ST_W == strip_w,
+          f"strip {strip_w:.0f} px wide, {G.SLOT_BOTTOM:.0f} px up; bar "
+          f"{ST.ST_W:.0f} px wide, top {ST.ST_BOTTOM + ST.ST_H:.0f} px up")
+    check("the inventory slots and icons are 30% smaller (84 x 59, icon 78 x 35)",
+          (G.SLOT_W, G.SLOT_H, G.SLOT_ICON_W, G.SLOT_ICON_H) == (84.0, 59.0, 78.0, 35.0),
+          str((G.SLOT_W, G.SLOT_H, G.SLOT_ICON_W, G.SLOT_ICON_H)))
     # Two SelectColors now: the reticle's blocked state and the stamina fill.
     check("the stamina fill changes colour while the key is held",
           sum(1 for t in titles if t == "SelectColor") == 2,

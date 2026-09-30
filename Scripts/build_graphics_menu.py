@@ -103,7 +103,10 @@ from graphics_menu.settings_rows import (                          # noqa: E402
     BIND_LABELS, BIND_VARS, KEY_POOL, PAGE_SETTINGS, PAGE_TITLE,
     SETTINGS_CLASS_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
 from graphics_menu.settings_input import _emit_save                # noqa: E402
-# Hunger, thirst and temperature under the stamina bar, and the debuff names.
+# The stamina bar, centred under the inventory strip.
+from graphics_menu.stamina_bar import (                             # noqa: E402
+    ST_BOTTOM, ST_H, _author_stamina)
+# Hunger, thirst and temperature under the HP bar, and the debuff names.
 from graphics_menu.survival_bars import author_survival_bars       # noqa: E402
 # The crosshair, sized by the held gun's accuracy cloud, and the scope.
 from graphics_menu.reticle import _author_reticle                  # noqa: E402
@@ -181,19 +184,6 @@ COL_HP_BACK = "(R=0.030000,G=0.030000,B=0.035000,A=0.800000)"
 COL_HP_FILL = "(R=0.750000,G=0.130000,B=0.120000,A=0.950000)"
 COL_HP_LABEL = "(R=0.620000,G=0.650000,B=0.700000,A=1.000000)"
 COL_HP_NUM = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
-
-# --- the stamina bar, directly under the HP bar ------------------------------
-# Same left edge and same width as HP, half the height: it reads as the second
-# line of one readout rather than as a second widget. Sprint is on the weapon
-# component (see build_weapons_and_combat.py), which this HUD already casts to
-# every frame for the inventory strip, so the bar costs one extra variable read.
-ST_BAR = (60.0, 100.0, 420.0, 14.0)
-ST_LABEL_POS = (16.0, 96.0)
-ST_LABEL_SCALE = 1.1
-COL_ST_BACK = "(R=0.030000,G=0.030000,B=0.035000,A=0.800000)"
-COL_ST_FILL = "(R=0.320000,G=0.720000,B=0.880000,A=0.950000)"
-COL_ST_SPENT = "(R=0.820000,G=0.560000,B=0.180000,A=0.950000)"
-COL_ST_LABEL = "(R=0.620000,G=0.650000,B=0.700000,A=1.000000)"
 
 # --- the kill counter, top right ---------------------------------------------
 # Under the debug-mode FPS readout (graphics_menu/fps.py), which owns the very
@@ -309,15 +299,18 @@ KILL_COUNT_VAR = "NpcKillCount"
 PLAYER_DEAD_VAR = "PlayerDead"
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
-# Two rows of five rather than one row of ten: ten 120 px slots are a 1290 px
-# strip, wider than a PIE viewport, and the slots were made 120 px wide in the
-# first place because the icons were unreadable any smaller.
+# Two rows of five rather than one row of ten. The slots were 120 x 84, sized
+# for icons once reported unreadable; they were then asked to be about 30%
+# smaller, so every slot measurement below is the old one x 0.7.
 INVENTORY_COLUMNS = 5
 INVENTORY_ROWS = -(-INVENTORY_SIZE // INVENTORY_COLUMNS)
-SLOT_W = 120.0
-SLOT_H = 84.0
-SLOT_GAP = 10.0
-SLOT_BOTTOM = 46.0         # pixels between the strip and the bottom edge
+SLOT_W = 84.0
+SLOT_H = 59.0
+SLOT_GAP = 7.0
+# The stamina bar sits under the strip (graphics_menu/stamina_bar.py), so the
+# strip stands on it: this many px between the strip and the bottom edge.
+SLOT_OVER_STAMINA = 12.0
+SLOT_BOTTOM = ST_BOTTOM + ST_H + SLOT_OVER_STAMINA
 
 # The equipped weapon's name, drawn ONCE above the strip rather than five times
 # inside it.
@@ -340,10 +333,10 @@ COL_EQUIPPED_NAME = "(R=1.000000,G=0.870000,B=0.450000,A=1.000000)"
 # silhouette looked cluttered. It now has the slot's lower row to itself, and
 # is right-aligned from a real measurement (HUD::GetTextSize) rather than from
 # a guessed character width -- "5/15" and "30/90" are different widths and a
-# fixed offset cannot be right for both.
-SLOT_AMMO_SCALE = 1.7
-SLOT_AMMO_RIGHT = 9.0      # px from the slot's right edge to the text's RIGHT
-SLOT_AMMO_BASELINE = 54.0  # px down from the slot's top edge
+# fixed offset cannot be right for both. Scaled x 0.7 with the slot.
+SLOT_AMMO_SCALE = 1.2
+SLOT_AMMO_RIGHT = 6.0      # px from the slot's right edge to the text's RIGHT
+SLOT_AMMO_BASELINE = 38.0  # px down from the slot's top edge
 COL_SLOT_AMMO = "(R=0.960000,G=0.860000,B=0.450000,A=0.950000)"
 COL_SLOT_BACK = "(R=0.020000,G=0.025000,B=0.035000,A=0.700000)"
 COL_SLOT_NAME = "(R=0.960000,G=0.960000,B=0.970000,A=1.000000)"
@@ -574,9 +567,10 @@ ICON_TEX_SIZE = (128, 64)
 # redrawn for it (see build_ui_art.py) the other half of the fix is simply
 # giving them more pixels. A weapon silhouette at 88 px wide has about 40 px of
 # usable length once the margins are off it, and no silhouette survives that.
-SLOT_ICON_W = 112.0
-SLOT_ICON_H = 50.0
-SLOT_ICON_TOP = 3.0
+# Since shrunk with the slot, by 30%, to 78 x 35 at the player's request.
+SLOT_ICON_W = 78.0
+SLOT_ICON_H = 35.0
+SLOT_ICON_TOP = 2.0
 
 
 def _at(node, x, y):
@@ -1137,87 +1131,6 @@ def _author_hp(ed, x0, y0, in_execs):
         [pawn, comp, cast, health, max_health, frac, fill_w,
          back, fill, label, rounded, as_text, number])
     return (BEL.find_then_pin(number), _pin(cast, "CastFailed", is_input=False))
-
-
-def _author_stamina(ed, x0, y0, in_execs):
-    """The sprint bar, directly under the HP bar.
-
-    Read off BP_WeaponComponent rather than off the health component: that is
-    where sprint lives (it is the thing that has to refuse to fire while the key
-    is held), and this HUD already casts to it for the inventory strip anyway.
-
-    The fill changes colour while the key is down, which is the cheapest way to
-    answer the only question a stamina bar is ever asked mid-fight -- "is it
-    going down because I am sprinting, or did I stop and it is coming back?"
-    """
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    pawn = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 260))
-    _set(pawn, "PlayerIndex", 0)
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 240, y0 + 260))
-    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
-    _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
-
-    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 500, y0))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
-    for e in in_execs:
-        _connect(e, _pin(cast, "execute"))
-    as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
-
-    def var(name, py):
-        n = keep(_at(ed.add_get_member_variable_node(name, WEAPON_COMP_CLASS_PATH),
-                     x0 + 760, py))
-        _connect(as_weapon, _pin(n, "self"))
-        return _pin(n, name, is_input=False)
-
-    stamina = var("Stamina", y0 + 260)
-    max_stamina = var("MaxStamina", y0 + 400)
-    sprinting = var("Sprinting", y0 + 540)
-
-    frac = keep(_at(_node(ed, FN_DIV), x0 + 1000, y0 + 320))
-    _connect(stamina, _pin(frac, "A"))
-    _connect(max_stamina, _pin(frac, "B"))
-    fill_w = keep(_at(_node(ed, FN_MUL), x0 + 1200, y0 + 320))
-    _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
-    _set(fill_w, "B", ST_BAR[2])
-
-    back = keep(_draw_texture(ed, x0 + 760, y0, "T_UI_BarTrack"))
-    for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), ST_BAR):
-        _set(back, name, value)
-    _connect(BEL.find_then_pin(cast), _pin(back, "execute"))
-
-    tint = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1000, y0 + 560))
-    _set(tint, "A", COL_ST_SPENT)
-    _set(tint, "B", COL_ST_FILL)
-    _connect(sprinting, _pin(tint, "bPickA"))
-
-    fill = keep(_draw_texture(ed, x0 + 1000, y0, "T_UI_Bar"))
-    for name, value in zip(("ScreenX", "ScreenY", "ScreenW", "ScreenH"), ST_BAR):
-        _set(fill, name, value)
-    _connect(_pin(fill_w, "ReturnValue", is_input=False), _pin(fill, "ScreenW"))
-    _connect(_pin(tint, "ReturnValue", is_input=False), _pin(fill, "TintColor"))
-    _connect(BEL.find_then_pin(back), _pin(fill, "execute"))
-
-    label = keep(_at(_node(ed, FN_DRAW_TEXT), x0 + 1240, y0))
-    _set(label, "Text", "STA")
-    _set(label, "TextColor", COL_ST_LABEL)
-    _set(label, "ScreenX", ST_LABEL_POS[0])
-    _set(label, "ScreenY", ST_LABEL_POS[1])
-    _set(label, "Scale", ST_LABEL_SCALE)
-    _set(label, "bScalePosition", "false")
-    _set(label, "Font", UI_FONT)
-    _connect(BEL.find_then_pin(fill), _pin(label, "execute"))
-
-    ed.add_comment_to_nodes(
-        "Stamina, under the HP bar. The fill goes amber while the sprint key is "
-        "held and back to blue while it refills, so a bar that is moving always "
-        "says which way it is going.",
-        made)
-    return (BEL.find_then_pin(label), _pin(cast, "CastFailed", is_input=False))
 
 
 def _author_kills(ed, x0, y0, in_execs):

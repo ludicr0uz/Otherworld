@@ -94,12 +94,14 @@ sync:
 
 **What it draws each frame:**
 
-- **Top-left:** the HP bar, the stamina bar, and the FOOD / H2O / TEMP bars (`survival_bars.py`).
+- **Top-left:** the HP bar and the FOOD / H2O / TEMP bars (`survival_bars.py`).
   STARVING and DEHYDRATED are read from the ASC's tags.
 - **Top-right:** the kill counter, and the FPS readout in debug mode only.
 - **Wanderers:** a projected health bar over each one, plus its number in debug mode.
-- **Bottom:** the 10-slot inventory strip, in two rows of five (`INVENTORY_COLUMNS`, 120 px
-  slots), with loaded/reserve counts for weapons that use ammo.
+- **Bottom:** the 10-slot inventory strip, in two rows of five (`INVENTORY_COLUMNS`, 84 x 59 px
+  slots), with loaded/reserve counts for weapons that use ammo. Under it, centred and as wide as
+  the strip, the stamina bar (`stamina_bar.py`). `SLOT_BOTTOM` is built from the bar's
+  `ST_BOTTOM + ST_H`, so moving the bar moves the strip.
 - **Centre:** the reticle or scope (`reticle.py`). The reticle's four ticks stand off by the held
   gun's accuracy cloud: `ReticleSpread` (weapon component) × half the viewport width, capped at
   `RETICLE_SPREAD_MAX` with an `FMin` (an `FClamp` would be read as a settings slider).

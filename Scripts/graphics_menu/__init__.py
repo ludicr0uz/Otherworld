@@ -12,6 +12,7 @@ build_graphics_menu.py, which is still the entry point and owns the rest.
   difficulty      the DIFFICULTY row (EASY/MEDIUM/SURVIVOR) and its push onto
                   the GameMode, which gameplay reads
   difficulty_checks  verify_graphics_menu.py's checks for that row and push
+  stamina_bar     the stamina bar, centred at the bottom under the inventory strip
   survival_bars   hunger/thirst/temperature bars and the debuff names
   scope           the sniper's glass, and when it replaces the crosshair
   reticle         the crosshair: centred, red when blocked, gap = the gun's cloud

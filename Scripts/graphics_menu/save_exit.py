@@ -14,6 +14,7 @@ One fragment, run every Tick after the grass sync, in this order:
      (BP_HealthComponent.LastDamageTime, stamped by the wanderers' swing) it
      is called off; once ExitAt has passed, profile_write.py and the current
      level is reopened -- which opens on the main menu.
+  5. The dev-all-guns cheat ([K] in the panel; dev_guns.py).
 
 Everything reads off the player_parts cast chain; a pawn without the parts
 skips the whole fragment.
@@ -21,6 +22,7 @@ skips the whole fragment.
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
+from graphics_menu.dev_guns import author_dev_guns
 from graphics_menu.player_parts import author_player_parts
 from graphics_menu.profile_consts import (
     EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_KEY, EXIT_PENDING_VAR, EXIT_SECONDS,
@@ -216,6 +218,7 @@ def author_save_exit_tick(ed, pc_out, in_execs, x0, y0):
     flow = _author_load_once(ed, parts, [alive], x0 + 4400, y0, made)
     flow = _author_start(ed, pc_out, now_out, flow, x0 + 12000, y0, made)
     flow = _author_countdown(ed, parts, now_out, flow, x0 + 14000, y0, made)
+    flow = author_dev_guns(ed, pc_out, parts, flow, x0 + 22000, y0, made)
     ed.add_comment_to_nodes(
         f"Save and exit ([{EXIT_KEY}] in the panel, {EXIT_SECONDS:.0f} s, called off "
         f"by a hit), the saved profile loaded once a game starts, and deleted "

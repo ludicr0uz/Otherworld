@@ -11,6 +11,7 @@ DrawText scale x 10: Roboto's LegacyFontSize is 10, so a DrawText at 2.2 was
 22 pt and a 22 pt TextBlock is the same size at 1080p.
 """
 
+from graphics_menu.dev_consts import DEV_GUNS_ROW_LABEL
 from graphics_menu.presets import PRESETS
 from graphics_menu.profile_consts import EXIT_ROW_LABEL
 from graphics_menu.settings_rows import (
@@ -206,7 +207,7 @@ PAUSE_ROWS = "PauseRows"
 MENU_KEY, DEBUG_KEY = "M", "D"
 PAUSE_TITLE = "GRAPHICS QUALITY"
 PAUSE_ROW_LABELS = (tuple(f"[{i + 1}]   {p.label}" for i, p in enumerate(PRESETS))
-                    + (f"[{DEBUG_KEY}]   debug", EXIT_ROW_LABEL))
+                    + (f"[{DEBUG_KEY}]   debug", EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL))
 PAUSE_DEBUG_ROW = len(PRESETS)
 PAUSE_HINT = f"[{MENU_KEY}]   close"
 PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0

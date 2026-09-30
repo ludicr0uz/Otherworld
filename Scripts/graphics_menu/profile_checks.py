@@ -109,8 +109,12 @@ def check_profile(check, bp, nodes):
           str([_title(n) for n in _on_slot(nodes)]))
     wipes = [n for n in _on_slot(nodes) if "Delete" in _title(n)]
     check("dying deletes the profile", len(wipes) == 1, str(len(wipes)))
-    refresh = [n for n in nodes if _title(n) == "Set NeedsRefresh"]
-    dropped = [n for n in nodes if _title(n) == "Set Dropped"]
+    # The profile's own: the dev-all-guns cheat sets both too, but its
+    # NeedsRefresh follows no EquippedIndex and its items come through a cast.
+    refresh = [n for n in nodes if _title(n) == "Set NeedsRefresh"
+               and any(_title(f) == "Set EquippedIndex" for f in _feeders(n, "execute"))]
+    dropped = [n for n in nodes if _title(n) == "Set Dropped"
+               and not any("Cast" in _title(f) for f in _feeders(n, "self"))]
     check("the loaded items are carried (Dropped false) and equipped by the "
           "weapon component (NeedsRefresh)",
           len(refresh) == 1 and _value(refresh[0], "NeedsRefresh") == "true"

@@ -45,10 +45,14 @@ Input, settings and state
                   spawned in place of the issued loadout
   save_exit       the HUD Tick fragment: delete the profile on death, load it once
                   a game starts, X starts the 15 s exit, a hit calls it off
+  dev_consts      the dev-all-guns cheat: its key (K), row label, flags, the guns
+  dev_guns        the cheat's Tick fragment: K in the M panel gives one of every
+                  gun not carried (run from save_exit, after the countdown)
 
 verify_graphics_menu.py's checks, beside it because it is over budget
   umg_checks         the screens' trees and the graph that creates and writes them
   hud_bar_checks     the stat bars' places, icons and low-bar blink
   difficulty_checks  the DIFFICULTY row and its push
   profile_checks     the saved profile and save and exit
+  dev_guns_checks    the dev-all-guns row, key and the five spawns
 """

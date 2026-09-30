@@ -27,6 +27,8 @@ from graphics_menu import survival_bars as SB
 from graphics_menu import scope as SC
 from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
+from graphics_menu import dev_consts as DC
+from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -137,9 +139,10 @@ def main():
     # reason the restart key is, and so are the four navigation keys.
     expected_keys = set((G.MENU_KEY, UC.RESTART_KEY, G.DEBUG_KEY,
                          N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
-                         PC.EXIT_KEY)
+                         PC.EXIT_KEY, DC.DEV_GUNS_KEY)
                         + G.PRESET_KEYS + N.START_KEYS)
-    check("polls exactly the menu, preset, debug, restart, start, nav and exit keys",
+    check("polls exactly the menu, preset, debug, restart, start, nav, exit and "
+          "dev-all-guns keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -857,6 +860,7 @@ def main():
 
     check_difficulty(check, bp, nodes)
     check_profile(check, bp, nodes)
+    check_dev_guns(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

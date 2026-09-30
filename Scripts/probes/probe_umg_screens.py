@@ -127,7 +127,8 @@ def probe(p):
     debug = _text(_row(rows, C.PAUSE_DEBUG_ROW).get_editor_property(C.ROW_VALUE))
     p.check("M opens the panel with the caret on the current preset",
             ui["UiPause"].get_visibility() == SHOWN
-            and carets == [0.0, 0.0, 1.0, 0.0, 0.0, 0.0], str(carets))
+            and carets == [float(i == 2) for i in range(len(C.PAUSE_ROW_LABELS))],
+            str(carets))
     p.check("...and the debug row says whether debug mode is on",
             debug == (C.DEBUG_ON if p.get(hud, "DebugOn") else C.DEBUG_OFF), f"'{debug}'")
     p.set(hud, "MenuOpen", False)

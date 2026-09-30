@@ -94,6 +94,8 @@ from graphics_menu.profile_consts import PROFILE_BP_PATH           # noqa: E402
 from graphics_menu.profile_draw import author_exit_banner           # noqa: E402
 from graphics_menu.save_exit import (                              # noqa: E402
     author_save_exit_tick, declare_profile_vars, profile_defaults)
+from graphics_menu.dev_guns import (                               # noqa: E402
+    declare_dev_guns_vars, dev_guns_defaults)
 from survival.paths import SURVIVAL_BP_PATH                        # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -430,6 +432,7 @@ def _ensure_variables(ed, bp):
     declare_fps_vars(ed)
     declare_difficulty_vars(ed)
     declare_profile_vars(ed)
+    declare_dev_guns_vars(ed)
 
 
 def _apply_defaults(bp, defaults):
@@ -1183,7 +1186,8 @@ def build_hud_blueprint(rebuild=False):
                          "MenuPage": PAGE_TITLE, "MenuRow": 0,
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],
-                         **difficulty_defaults(), **profile_defaults()})
+                         **difficulty_defaults(), **profile_defaults(),
+                         **dev_guns_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

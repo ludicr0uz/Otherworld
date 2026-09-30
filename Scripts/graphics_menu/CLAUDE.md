@@ -17,6 +17,7 @@ split it before extending it.
 - **1 / 2 / 3 / 4** pick the Low / Medium / High / Ultra presets.
 - **D** toggles debug mode.
 - **X** (panel open) starts save and exit.
+- **K** (panel open) is the dev-all-guns cheat (below).
 
 ## The UMG screens
 
@@ -118,6 +119,21 @@ sync:
   issued one, and the delete on death. It sets aside any real profile on disk and puts it back.
 - **Still needs a play session:** the X key itself and the 15 s at real speed (the probe
   writes the countdown's variables), and how the banner reads.
+
+## The dev-all-guns cheat (`dev_guns.py`, `dev_consts.py`)
+
+A testing aid on the M panel's last row. **K with the panel open** raises the HUD's
+`DevAllGunsRequested`; the next Tick (run from `save_exit.py`, after the countdown) lowers it and,
+for each of the five guns in `DEV_GUN_CLASS_PATHS`, spawns one if none is carried and the bag has
+room (`INVENTORY_SIZE`): `Dropped = false`, `Inventory += it`, then `NeedsRefresh`. The held item
+stays held, as with a pick-up; asking twice adds nothing.
+
+- **K, not G:** the weapon component polls its keys whether the panel is open or not, so G would
+  also drop the held gun.
+- **`profile_checks` tells its `Set Dropped`/`Set NeedsRefresh` apart from the cheat's** (the
+  cheat's item comes through a cast; its refresh follows no `Set EquippedIndex`).
+- **Probe:** `uepy.py --game --probe Scripts/probes/probe_dev_all_guns.py` writes the request
+  flag (no keyboard in a probe). The K key itself needs a play session.
 
 ## HUD
 

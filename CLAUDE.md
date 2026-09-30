@@ -202,7 +202,7 @@ editor.
   chase and melee. They respawn 75–100 m away and leave ragdoll corpses.
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
-  and a settings screen, which holds the difficulty (EASY / MEDIUM / SURVIVOR,
+  and a settings screen (plus K in the M panel: a dev-all-guns cheat), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`. Food and water lie
   in both.

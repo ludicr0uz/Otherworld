@@ -36,6 +36,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     crosshair. The slack is there because FInterpTo settles within rounding of 1.5x.
   - The sniper is **hidden past SightBlend 0.9**. The eye is behind the solid scope tube,
     which would fill the glass's hole. A dropped weapon is always unhidden.
+  - The player's own body goes with it: `OwnerMesh` is `OwnerNoSee` on the same condition, so
+    the arms' hold and recoil animation don't swing through the glass. OwnerNoSee rather than
+    hidden, so it still casts its shadow. It is shown again whenever the camera goes home.
+    Probed by `probes/probe_scope_hide.py` (the shotgun's irons hide nothing).
   - `Scoped` and `AdsZoom` are independent.
 - **Down the sights, the upper body pitches with the view** (`aim_pitch.py`,
   `weapon_component/sight_pitch.py`):

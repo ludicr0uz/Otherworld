@@ -196,6 +196,24 @@ def check_sight_camera():
           and any(abs((num_pin(n, "B") or 0.0) - SCOPE_HIDE_BLEND) < 1e-9
                   for n in _feeds(BEL.find_input_pin(tucked[0], "bNewHidden"))),
           str(sorted(up)))
+    no_see = [n for n in wg if "bNewOwnerNoSee" in in_pins(n)]
+    fed = [n for n in no_see
+           if PIN.list_connected_pins(BEL.find_input_pin(n, "bNewOwnerNoSee"))]
+    def _src(n, pin):
+        return [PIN.get_owning_node(q)
+                for q in PIN.list_connected_pins(BEL.find_input_pin(n, pin))]
+    same = fed and tucked and _src(fed[0], "bNewOwnerNoSee") == _src(tucked[0], "bNewHidden")
+    body = fed and {_title(PIN.get_owning_node(q))
+                    for q in PIN.list_connected_pins(BEL.find_input_pin(fed[0], "self"))}
+    check("...and the player's own body with it, hidden from its own camera "
+          "(OwnerNoSee) on the same condition, so the arms' animation stays "
+          "out of the glass",
+          len(fed) == 1 and bool(same) and body == {"Get OwnerMesh"}, str(body))
+    check("...and the body is shown again with empty hands, when the camera "
+          "goes home",
+          len(no_see) == 2 and any(pin_value(n, "bNewOwnerNoSee") == "false"
+                                   for n in no_see if n not in fed),
+          str(len(no_see)))
     detaches = [n for n in wg if "detachfromactor" in _title(n).replace(" ", "").lower()]
     unhide = [PIN.get_owning_node(q) for d in detaches
               for q in PIN.list_connected_pins(BEL.find_then_pin(d))]

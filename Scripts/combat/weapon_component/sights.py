@@ -19,7 +19,7 @@ from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
 from combat.nodes import (
     CAMERA_CLASS_PATH, FN_ADD_TICK_PREREQ, FN_AND, FN_BOOL_TO_FLOAT,
     FN_COMP_SET_WORLD_LOC, FN_GET_COMP, FN_GET_TRANSFORM, FN_GREATER_FF,
-    FN_INTERP_FF, FN_SET_HIDDEN, FN_SOCKET_LOC, FN_TRANSFORM_LOC, FN_VLERP,
+    FN_INTERP_FF, FN_SET_HIDDEN, FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_TRANSFORM_LOC, FN_VLERP,
     SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET,
 )
 from combat.tuning import COMBAT
@@ -30,6 +30,10 @@ from combat.weapon_component.common import _prop
 # tube fills the middle of the view -- exactly the hole the HUD's glass leaves
 # clear. Real scopes are hollow; this one is a cylinder. Hidden late in the
 # travel so the swap happens under a mostly opaque surround, not in the open.
+# The player's own body goes with it (OwnerNoSee on OwnerMesh): the eye point
+# sits among the arms and head that hold the gun, and their hold and recoil
+# animation swung through the glass. OwnerNoSee rather than hidden, so the
+# body is still drawn for its shadow and for any other view.
 SCOPE_HIDE_BLEND = 0.9
 
 
@@ -160,12 +164,25 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
     _connect(_pin(behind_glass, "ReturnValue", is_input=False),
              _pin(tuck, "bNewHidden"))
     _connect(BEL.find_then_pin(to_sight), _pin(tuck, "execute"))
+    body = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 2560, y0 + 700))
+    bare = keep(_at(_node(ed, FN_SET_OWNER_NO_SEE), x0 + 2820, y0))
+    _connect(_pin(body, "OwnerMesh", is_input=False), _pin(bare, "self"))
+    _connect(_pin(behind_glass, "ReturnValue", is_input=False),
+             _pin(bare, "bNewOwnerNoSee"))
+    _connect(BEL.find_then_pin(tuck), _pin(bare, "execute"))
 
     # False arm: nothing to look down, so the camera goes home.
     home = keep(_at(_node(ed, FN_COMP_SET_WORLD_LOC), x0 + 2040, y0 + 240))
     _connect(cam_out, _pin(home, "self"))
     _connect(shoulder_out, _pin(home, "NewLocation"))
     _connect(BEL.find_else_pin(armed), _pin(home, "execute"))
+    # ...and the body shows again: a sniper dropped while scoped leaves no
+    # scope to hide behind.
+    body_home = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 2040, y0 + 400))
+    shown = keep(_at(_node(ed, FN_SET_OWNER_NO_SEE), x0 + 2300, y0 + 240))
+    _connect(_pin(body_home, "OwnerMesh", is_input=False), _pin(shown, "self"))
+    _set(shown, "bNewOwnerNoSee", "false")
+    _connect(BEL.find_then_pin(home), _pin(shown, "execute"))
 
     ed.add_comment_to_nodes(
         "Down the sights: the camera eases (SightBlend, at the zoom's own "
@@ -175,6 +192,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
         "SightBlend 0 it is exactly where the boom holds it and there is no "
         "restore path; with empty hands it goes straight home. A scoped "
         f"weapon hides past SightBlend {SCOPE_HIDE_BLEND:g}, out of its own "
-        "scope's way.",
+        "scope's way, and the player's own body with it (OwnerNoSee), so the "
+        "arms' hold and recoil animation stay out of the glass.",
         made)
-    return (BEL.find_then_pin(tuck), BEL.find_then_pin(home))
+    return (BEL.find_then_pin(bare), BEL.find_then_pin(shown))

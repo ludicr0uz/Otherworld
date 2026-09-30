@@ -27,6 +27,9 @@ WHAT THIS BUILDS
   BP_Shotgun        child of BP_WeaponItem: 7 primitives, 8 pellets, 5 deg cone
   BP_Pistol         child of BP_WeaponItem: 5 primitives, 1 shot, tight, held
                     at a different angle with a different ready pose
+  BP_Knife          child of BP_WeaponItem: the Fab pack's M9 knife, Melee --
+                    the fire key slashes (combat/knife.py)
+  Anims/A_KnifeSlash  the slash, keyed for the worn body (combat/knife_anim.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
   BP_WeaponComponent  inventory of 5, equip/switch/fire/drop/pick up
   BP_BloodSplash    short-lived red burst spawned at each impact
@@ -54,6 +57,8 @@ from combat.footsteps import build_footstep_component             # noqa: E402
 from combat.game_state import ensure_game_mode_vars               # noqa: E402
 from combat.graph import BEL, _apply_defaults, _log               # noqa: E402
 from combat.health_component import build_health_component        # noqa: E402
+from combat.knife import build_knife                              # noqa: E402
+from combat.knife_anim import build_knife_slash                   # noqa: E402
 from combat.install import (                                      # noqa: E402
     install_on_character, install_on_npc, retire_old_assets,
 )
@@ -98,6 +103,9 @@ def main():
     weapons = {}
     for spec in _weapon_specs():
         weapons[spec["display"]] = build_weapon(spec, item_bp)
+    # The third starter item: a melee item, not a row of the gun table.
+    knife_bp = build_knife(item_bp)
+    knife_clip = build_knife_slash(skin)
 
     blood_bp = build_blood_splash()
     # Before the health component: its BeginPlay casts to the GameMode, and a
@@ -107,7 +115,8 @@ def main():
     health_bp = build_health_component()
     footstep_bp = build_footstep_component()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
-                                       weapons["Pistol"], blood_bp)
+                                       weapons["Pistol"], knife_bp, knife_clip,
+                                       blood_bp)
 
     # After the weapon component, because the pickup's graph casts to it -- and
     # therefore after the health component that spawns it, which is why the
@@ -130,7 +139,7 @@ def main():
     install_on_npc(health_bp, footstep_bp)
     retire_old_assets()
 
-    _log(f"done — five weapons, ammunition, inventory, aiming down the sights, "
+    _log(f"done — five weapons and a knife, ammunition, inventory, aiming down the sights, "
          f"footsteps, blood, death, drops and respawn, worn by "
          f"{skin.mesh.rsplit('/', 1)[1]}")
 

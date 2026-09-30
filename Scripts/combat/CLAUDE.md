@@ -9,8 +9,9 @@ the code is this package (`__init__.py` is the map) and the verifier's sections 
 The defaults are all rebindable on the settings screen:
 
 - Left click fires. It **auto-fires while held** on the SMG and the assault rifle, a tap
-  **eats or drinks** a held consumable, and with **empty hands it punches**
-  (`weapon_component/punch.py`, see `docs/firing_gate.md`).
+  **eats or drinks** a held consumable, with the **knife** in hand it **slashes**
+  (`weapon_component/knife.py`), and with **empty hands it punches**
+  (`weapon_component/punch.py`; both in `docs/firing_gate.md`).
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
   **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone.
@@ -58,7 +59,12 @@ menu polls its own copy from `DrawHUD`, which does.
   it; the HUD shows `5 / ∞`.
 - **There is no reloading state.** `NextFireTime` is one world-time deadline. Both the fire
   interval and the reload push it out.
-- **The shotgun and pistol are issued; the SMG, rifle and sniper are found.**
+- **The knife is a melee item, not a gun** (`knife.py`): a `BP_WeaponItem` child flagged `Melee`,
+  drawn by the pack's `SK_M9_Knife_X` (blade up, tipped 30° forward, held in the pistol's pose and
+  grip), and not a row of `_weapon_specs()`, whose every column and check is about a gun. Its
+  slash clip `/Game/Weapons/Anims/A_KnifeSlash` is keyed from Python (`knife_anim.py`): the pack
+  has no animation and no stock clip is a knife attack.
+- **The shotgun, pistol and knife are issued; the SMG, rifle and sniper are found.**
   - The gun drop (`gun_drop.py`) is **two seeded rolls** on two `FRandomStream`s on the
     GameMode: `GunDropRollStream < GUN_DROP_CHANCE` (10%) decides whether anything drops, then
     `RandomIntegerFromStream(GunDropPickStream, Length)` decides which.
@@ -123,6 +129,9 @@ touches the fire graph doesn't pay for the notes on blood.
 
 These are feel checks a headless run can't do:
 
+- the knife: how the keyed slash reads (`knife_anim.SLASH_KEYS`), whether the blow at
+  `COMBAT.knife_impact_s` lines up with the cut, how the knife sits in the fist (the pistol
+  grip's solve; the left hand stays where the pistol pose puts it);
 - the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100

@@ -2,8 +2,9 @@
 press gate, the swing's clip, the sweep and the blow's damage.
 
 The helpers is_punch_play / is_punch_sweep / is_punch_gate / is_punch_write
-let the sections that count the ready-pose plays, the traces, the fire gate
-and the hit's stamps set the punch's nodes aside.
+pick out the punch's nodes; verify/knife.py's is_melee_* (punch or knife) let
+the sections that count the ready-pose plays, the traces, the fire gate and the
+hit's stamps set both melee attacks' nodes aside.
 """
 
 from combat.anim_blueprint import AIM_SLOT
@@ -47,7 +48,8 @@ def is_punch_play(node):
 
 
 def is_punch_sweep(node):
-    return "Radius" in in_pins(node)
+    # The knife's sweep is a sphere too (verify/knife.py); the radius tells them apart.
+    return "Radius" in in_pins(node) and num_pin(node, "Radius") == COMBAT.punch_radius_cm
 
 
 def is_punch_gate(node):

@@ -140,6 +140,20 @@ class CombatConfig:
     punch_radius_cm: float = 30.0
     punch_chest_cm: float = 30.0
 
+    # --- the knife: the fire key with the knife held (weapon_component/knife) -
+    # The same three stages as the punch (press, swing, blow), on their own
+    # variables. A slash every knife_interval_s; the blow lands knife_impact_s
+    # in, at the bottom of the swing of A_KnifeSlash (knife_anim.py), on the
+    # first body a knife_radius_cm sphere meets within knife_reach_cm. Three
+    # slashes kill a 100 HP wanderer, against the punch's seven: a real weapon
+    # at arm's length, where the guns are at range.
+    knife_damage: float = 35.0
+    knife_interval_s: float = 0.6
+    knife_impact_s: float = 0.24
+    knife_reach_cm: float = 150.0
+    knife_radius_cm: float = 25.0
+    knife_chest_cm: float = 30.0
+
     # --- crouch and prone ----------------------------------------------------
     # Toggled by CROUCH_KEY / PRONE_KEY; sprinting stands the player up. Both
     # are UE's own crouch (the capsule shrinks, the camera boom rides down with

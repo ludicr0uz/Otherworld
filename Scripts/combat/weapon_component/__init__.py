@@ -23,7 +23,11 @@ _author_* fragment per concern, each in its own module:
   inventory   equip, drop, pick up, BeginPlay loadout
   ammo        reload and dry fire
   punch       empty hands: the fire key throws a punch (MM_Attack_01 into the
-              upper-body slot); the blow is a short sphere sweep a moment later
+              upper-body slot); the blow is a short sphere sweep a moment later.
+              The swing and the blow are written once, for a Strike
+  knife       a Melee item held: the fire key slashes (behind the fire gate,
+              beside the Consumable branch); punch.py's swing and blow on the
+              KNIFE Strike, playing A_KnifeSlash
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery
@@ -33,17 +37,19 @@ _author_* fragment per concern, each in its own module:
               (what a block does to a swing is npc/block.py)
   stance      crouch/prone toggles -> Stance; UE's crouch at two heights, the
               crouched speed, and the footsteps' StepVolume/StepNoise
-  ready_pose  restart the ready pose after it is interrupted
+  ready_pose  restart the ready pose after it is interrupted; re-equip on the
+              frames the sprint starts or stops (the pose's sprint edge)
   tick        the Tick that calls all of the above
 
 BP_WeaponComponent event graph:
 
   [BeginPlay] --> cache Character + Mesh
-              --> spawn BP_Shotgun and BP_Pistol into Inventory
+              --> spawn BP_Shotgun, BP_Pistol and BP_Knife into Inventory
               --> Equip(0)
 
   [Tick] --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
                                         (or, if Held.Consumable, use it;
+                                         if Held.Melee, slash with it;
                                          or, with empty hands, punch)
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held

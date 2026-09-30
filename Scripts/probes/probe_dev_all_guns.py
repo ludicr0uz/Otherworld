@@ -3,8 +3,8 @@
 The request is raised by writing the HUD's DevAllGunsRequested rather than
 pressing K in the open panel (a probe has no keyboard); the key and its
 MenuOpen gate are the verifier's to check. From the issued shotgun and pistol,
-one request must add the SMG, rifle and sniper, carried and not switched to;
-a second must add nothing.
+with the issued knife taken away first, one request must add the SMG, rifle,
+sniper and knife, carried and not switched to; a second must add nothing.
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
@@ -15,13 +15,13 @@ import shutil
 
 import unreal
 
-from combat.paths import WEAPON_COMP_CLASS_PATH
+from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.tuning import INVENTORY_SIZE
 from graphics_menu.dev_consts import DEV_GUN_CLASS_PATHS, DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)]
+WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR), (WEAPON_COMP_BP_PATH, "Inventory")]
 SETTLE = 0.3     # game seconds for the weapon component's re-equip
 GUNS = [c.rsplit(".", 1)[1] for c in DEV_GUN_CLASS_PATHS]
 
@@ -64,7 +64,15 @@ def _run(p):
     yield lambda: _live_hud(p) is not None
     hud = _live_hud(p)
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
+    # Lose the issued knife, so the request has to hand it back.
+    items = list(p.get(wc, "Inventory"))
+    knives = [i for i in items if i.get_class().get_name() == "BP_Knife_C"]
+    p.set(wc, "Inventory", [i for i in items if i not in knives])
+    for k in knives:
+        k.destroy_actor()
     before = _classes(p, wc)
+    p.check("the knife is gone before the request", "BP_Knife_C" not in before,
+            str(before))
     held = p.get(wc, "Held")
 
     yield from _request(p, hud)

@@ -18,7 +18,13 @@ shove from nowhere.
 The clip plays into DefaultSlot, the ready pose's slot, which is upper body
 only (anim_blueprint.py) -- the legs keep walking. With empty hands nothing
 else plays there. Tuning is COMBAT.punch_* in tuning.py.
+
+The swing and the blow are written once, for a Strike: its variables, clip and
+numbers. The punch is PUNCH; the knife (knife.py) is the same two stages on a
+Strike of its own, behind a press gate of its own.
 """
+
+import dataclasses
 
 from combat.anim_blueprint import AIM_SLOT
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
@@ -43,6 +49,29 @@ PUNCH_DUE_VAR = "PunchDueTime"
 PUNCH_BLEND_S = 0.1
 
 FN_SPHERE_TRACE = "/Script/Engine.KismetSystemLibrary.SphereTraceSingle"
+
+
+@dataclasses.dataclass(frozen=True)
+class Strike:
+    """One melee attack: the component's variables it runs on, and its numbers."""
+    name: str
+    anim_var: str
+    queued_var: str
+    pending_var: str
+    next_var: str
+    due_var: str
+    interval_s: float
+    impact_s: float
+    damage: float
+    reach_cm: float
+    radius_cm: float
+    chest_cm: float
+
+
+PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
+               NEXT_PUNCH_VAR, PUNCH_DUE_VAR, COMBAT.punch_interval_s,
+               COMBAT.punch_impact_s, COMBAT.punch_damage, COMBAT.punch_reach_cm,
+               COMBAT.punch_radius_cm, COMBAT.punch_chest_cm)
 
 
 def _and(ed, a, b, x, y):
@@ -101,23 +130,33 @@ def _author_punch(ed, tap, armed_out, steady, guarded, unspent, exec_ins, x0, y0
     queued = _set_bool(ed, PUNCH_QUEUED_VAR, True, BEL.find_then_pin(press),
                        x0 + 1200, y0)
 
-    # --- swing ---------------------------------------------------------------
-    swing = _at(ed.add_branch_node(), x0 + 1500, y0)
-    _connect(_get(ed, PUNCH_QUEUED_VAR, x0 + 1260, y0 + 200), _pin(swing, "Condition"))
-    _connect(queued, _pin(swing, "execute"))
-    _connect(BEL.find_else_pin(press), _pin(swing, "execute"))
-    step = _set_bool(ed, PUNCH_QUEUED_VAR, False, BEL.find_then_pin(swing),
-                     x0 + 1740, y0)
-    step = _stamp(ed, NEXT_PUNCH_VAR, COMBAT.punch_interval_s, step, x0 + 1980, y0)
-    step = _stamp(ed, PUNCH_DUE_VAR, COMBAT.punch_impact_s, step, x0 + 2700, y0)
-    step = _set_bool(ed, PUNCH_PENDING_VAR, True, step, x0 + 3420, y0)
+    ed.add_comment_to_nodes(
+        "Empty hands: the fire key throws a punch. The press only queues it "
+        "(PunchQueued), so the swing can be started without a key.", [press])
+    return _author_swing(ed, PUNCH, (queued, BEL.find_else_pin(press)),
+                         x0 + 1260, y0)
 
-    mesh = _get(ed, "OwnerMesh", x0 + 3420, y0 + 300)
-    anim = _at(_node(ed, FN_ANIM_INSTANCE), x0 + 3660, y0 + 300)
+
+def _author_swing(ed, strike, exec_ins, x0, y0):
+    """Queued: clear the queue, stamp the cooldown and when the blow lands,
+    and play the strike's clip; then the blow stage. ``exec_ins`` all run into
+    the swing's Branch; returns the exits of the blow stage."""
+    swing = _at(ed.add_branch_node(), x0 + 240, y0)
+    _connect(_get(ed, strike.queued_var, x0, y0 + 200), _pin(swing, "Condition"))
+    for pin in exec_ins:
+        _connect(pin, _pin(swing, "execute"))
+    step = _set_bool(ed, strike.queued_var, False, BEL.find_then_pin(swing),
+                     x0 + 480, y0)
+    step = _stamp(ed, strike.next_var, strike.interval_s, step, x0 + 720, y0)
+    step = _stamp(ed, strike.due_var, strike.impact_s, step, x0 + 1440, y0)
+    step = _set_bool(ed, strike.pending_var, True, step, x0 + 2160, y0)
+
+    mesh = _get(ed, "OwnerMesh", x0 + 2160, y0 + 300)
+    anim = _at(_node(ed, FN_ANIM_INSTANCE), x0 + 2400, y0 + 300)
     _connect(mesh, _pin(anim, "self"))
-    play = _at(_node(ed, FN_PLAY_SLOT), x0 + 3900, y0)
+    play = _at(_node(ed, FN_PLAY_SLOT), x0 + 2640, y0)
     _connect(_pin(anim, "ReturnValue", is_input=False), _pin(play, "self"))
-    _connect(_get(ed, PUNCH_ANIM_VAR, x0 + 3660, y0 + 440), _pin(play, "Asset"))
+    _connect(_get(ed, strike.anim_var, x0 + 2400, y0 + 440), _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
     _set(play, "BlendInTime", PUNCH_BLEND_S)
     _set(play, "BlendOutTime", PUNCH_BLEND_S)
@@ -126,31 +165,29 @@ def _author_punch(ed, tap, armed_out, steady, guarded, unspent, exec_ins, x0, y0
     _connect(step, _pin(play, "execute"))
 
     ed.add_comment_to_nodes(
-        "Empty hands: the fire key throws a punch. The press only queues it "
-        "(PunchQueued), so the swing can be started without a key; the swing "
-        "stamps the cooldown and when the blow lands, then plays the clip into "
-        f"{AIM_SLOT}, upper body only.",
-        [press, swing, play])
+        f"The {strike.name}'s swing: stamp the cooldown and when the blow lands, "
+        f"then play the clip into {AIM_SLOT}, upper body only.",
+        [swing, play])
 
     # --- blow ----------------------------------------------------------------
-    return _author_blow(ed, (BEL.find_then_pin(play), BEL.find_else_pin(swing)),
-                        x0 + 4300, y0)
+    return _author_blow(ed, strike, (BEL.find_then_pin(play), BEL.find_else_pin(swing)),
+                        x0 + 3040, y0)
 
 
-def _author_blow(ed, exec_ins, x0, y0):
-    """PunchPending and due: sweep a sphere forward from the chest, and take
-    COMBAT.punch_damage off the first body with a health component."""
+def _author_blow(ed, strike, exec_ins, x0, y0):
+    """Pending and due: sweep a sphere forward from the chest, and take the
+    strike's damage off the first body with a health component."""
     now = _at(_node(ed, FN_TIME_SECONDS), x0, y0 + 460)
     due = _at(_node(ed, FN_GE_FF), x0 + 240, y0 + 460)
     _connect(_pin(now, "ReturnValue", is_input=False), _pin(due, "A"))
-    _connect(_get(ed, PUNCH_DUE_VAR, x0, y0 + 580), _pin(due, "B"))
+    _connect(_get(ed, strike.due_var, x0, y0 + 580), _pin(due, "B"))
     gate = _at(ed.add_branch_node(), x0 + 720, y0)
-    _connect(_and(ed, _get(ed, PUNCH_PENDING_VAR, x0 + 240, y0 + 300),
+    _connect(_and(ed, _get(ed, strike.pending_var, x0 + 240, y0 + 300),
                   _pin(due, "ReturnValue", is_input=False), x0 + 480, y0 + 300),
              _pin(gate, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(gate, "execute"))
-    step = _set_bool(ed, PUNCH_PENDING_VAR, False, BEL.find_then_pin(gate),
+    step = _set_bool(ed, strike.pending_var, False, BEL.find_then_pin(gate),
                      x0 + 960, y0)
 
     owner = _at(_node(ed, FN_GET_OWNER), x0 + 960, y0 + 300)
@@ -159,7 +196,7 @@ def _author_blow(ed, exec_ins, x0, y0):
     _connect(owner_out, _pin(loc, "self"))
     chest = _at(_node(ed, FN_ADD_VV), x0 + 1440, y0 + 300)
     _connect(_pin(loc, "ReturnValue", is_input=False), _pin(chest, "A"))
-    _connect(_vec(ed, 0.0, 0.0, COMBAT.punch_chest_cm, x0 + 1200, y0 + 440),
+    _connect(_vec(ed, 0.0, 0.0, strike.chest_cm, x0 + 1200, y0 + 440),
              _pin(chest, "B"))
     chest_out = _pin(chest, "ReturnValue", is_input=False)
     fwd = _at(_node(ed, FN_ACTOR_FORWARD), x0 + 1200, y0 + 600)
@@ -167,7 +204,7 @@ def _author_blow(ed, exec_ins, x0, y0):
     # Multiply_VectorFloat's B is promoted to a vector: drive it with one.
     reach = _at(_node(ed, FN_MUL_VF), x0 + 1440, y0 + 600)
     _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(reach, "A"))
-    r = COMBAT.punch_reach_cm
+    r = strike.reach_cm
     _connect(_vec(ed, r, r, r, x0 + 1200, y0 + 740), _pin(reach, "B"))
     end = _at(_node(ed, FN_ADD_VV), x0 + 1680, y0 + 500)
     _connect(chest_out, _pin(end, "A"))
@@ -176,7 +213,7 @@ def _author_blow(ed, exec_ins, x0, y0):
     trace = _at(_node(ed, FN_SPHERE_TRACE), x0 + 1920, y0)
     _connect(chest_out, _pin(trace, "Start"))
     _connect(_pin(end, "ReturnValue", is_input=False), _pin(trace, "End"))
-    _set(trace, "Radius", COMBAT.punch_radius_cm)
+    _set(trace, "Radius", strike.radius_cm)
     _trace_defaults(trace)
     _connect(step, _pin(trace, "execute"))
 
@@ -199,7 +236,7 @@ def _author_blow(ed, exec_ins, x0, y0):
     _connect(as_health, _pin(get_h, "self"))
     sub = _at(_node(ed, FN_SUB_FF), x0 + 3200, y0 + 300)
     _connect(_pin(get_h, "Health", is_input=False), _pin(sub, "A"))
-    _set(sub, "B", COMBAT.punch_damage)
+    _set(sub, "B", strike.damage)
     clamp = _at(_node(ed, FN_CLAMP), x0 + 3440, y0 + 300)
     _connect(_pin(sub, "ReturnValue", is_input=False), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
@@ -232,10 +269,10 @@ def _author_blow(ed, exec_ins, x0, y0):
     _connect(BEL.find_then_pin(blame), _pin(from_where, "execute"))
 
     ed.add_comment_to_nodes(
-        f"The blow, {COMBAT.punch_impact_s} s into the swing: a "
-        f"{COMBAT.punch_radius_cm:.0f} cm sphere swept {COMBAT.punch_reach_cm:.0f} cm "
+        f"The {strike.name}'s blow, {strike.impact_s} s into the swing: a "
+        f"{strike.radius_cm:.0f} cm sphere swept {strike.reach_cm:.0f} cm "
         f"forward from the chest. The first thing with a health component "
-        f"loses {COMBAT.punch_damage:.0f} HP, stamped like a pellet hit.",
+        f"loses {strike.damage:.0f} HP, stamped like a pellet hit.",
         [gate, trace, hit, cast, set_h, stamp, blame, from_where])
 
     return (BEL.find_then_pin(from_where), BEL.find_else_pin(gate),

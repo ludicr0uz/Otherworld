@@ -22,6 +22,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     scope), their muzzles and sights, and the measured outline
                     the grip and sight checks read in place of parts
   camera            boom and aim-trace numbers, face/aim-the-camera patches
+  knife             BP_Knife: the Fab M9 knife as a Melee item, its model
+                    placement and measured outline, build_knife()
+  knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the worn
+                    skin's pistol ready pose (AnimationDataController)
 
 SHARED AUTHORING HELPERS
   graph             node/pin/connect/set, variables, components, events

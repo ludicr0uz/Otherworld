@@ -77,7 +77,10 @@ def build_weapon_item():
                        # weapon_component/consume.py). On the base class, not
                        # on BP_ConsumableItem, so the weapon component can ask
                        # without naming a class that is built after it.
-                       ("Consumable", "bool")):
+                       ("Consumable", "bool"),
+                       # Swung rather than fired: the fire key slashes with it
+                       # (weapon_component/knife.py). The knife (knife.py).
+                       ("Melee", "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     # Where the eye goes when this weapon is aimed down its sights, in the
@@ -236,6 +239,7 @@ def build_weapon(spec, item_bp):
         "UsesAmmo": bool(spec["uses_ammo"]),
         "Automatic": bool(spec["automatic"]),
         "Consumable": False,
+        "Melee": False,
         "MagazineSize": int(spec["magazine"]),
         # Starts loaded. A weapon that had to be reloaded before its first shot
         # would be a puzzle, not a mechanic.

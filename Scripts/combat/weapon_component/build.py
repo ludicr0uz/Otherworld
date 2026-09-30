@@ -19,6 +19,10 @@ from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.firing import SHOT_DIRECTION_VAR
 from combat.weapon_component.inventory import _author_wc_begin_play
+from combat.weapon_component.knife import (
+    KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR,
+    NEXT_KNIFE_VAR,
+)
 from combat.weapon_component.pose_weights import HELD_TWO_HANDED
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
@@ -28,7 +32,8 @@ from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.tick import _author_wc_tick
 
 
-def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=True):
+def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
+                           blood_bp, rebuild=True):
     # Cast nodes only appear in the palette for classes that are already loaded,
     # and this graph casts to all three. Without these loads
     # create_node_from_name returns None and the failure reads as a typo in the
@@ -131,7 +136,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     # Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
     # return pin takes its type from its Class pin, and an Actor-typed return
     # cannot be added to an array of BP_WeaponItem.
-    for name in ("ShotgunClass", "PistolClass", "ItemClass"):
+    for name in ("ShotgunClass", "PistolClass", "KnifeClass", "ItemClass"):
         _declare(ed, name, BEL.get_class_reference_type(item_class))
     _declare(ed, "BloodClass",
              BEL.get_class_reference_type(unreal.Actor.static_class()))
@@ -142,6 +147,13 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
     for name in (PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in (NEXT_PUNCH_VAR, PUNCH_DUE_VAR):
+        _declare(ed, name, _float_type())
+    # The knife's slash (knife.py): the same four, on the knife's own clip.
+    _declare(ed, KNIFE_ANIM_VAR, BEL.get_object_reference_type(
+        unreal.AnimSequenceBase.static_class()))
+    for name in (KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    for name in (NEXT_KNIFE_VAR, KNIFE_DUE_VAR):
         _declare(ed, name, _float_type())
 
     _author_wc_begin_play(ed, begin)
@@ -189,6 +201,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         DEBUG_MODE_VAR: False,
         "ShotgunClass": BEL.generated_class(shotgun_bp),
         "PistolClass": BEL.generated_class(pistol_bp),
+        "KnifeClass": BEL.generated_class(knife_bp),
         "ItemClass": item_class,
         "BloodClass": BEL.generated_class(blood_bp),
         PUNCH_ANIM_VAR: _must_load(player_skin().punch),
@@ -196,6 +209,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, blood_bp, rebuild=Tru
         PUNCH_PENDING_VAR: False,
         NEXT_PUNCH_VAR: 0.0,
         PUNCH_DUE_VAR: 0.0,
+        KNIFE_ANIM_VAR: knife_clip,
+        KNIFE_QUEUED_VAR: False,
+        KNIFE_PENDING_VAR: False,
+        NEXT_KNIFE_VAR: 0.0,
+        KNIFE_DUE_VAR: 0.0,
     })
     _log(f"built {WEAPON_COMP_BP_PATH}")
     return bp

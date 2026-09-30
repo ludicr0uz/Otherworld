@@ -22,6 +22,10 @@ PISTOL_BP_PATH = f"{WEAPON_DIR}/BP_Pistol"
 SMG_BP_PATH = f"{WEAPON_DIR}/BP_SMG"
 RIFLE_BP_PATH = f"{WEAPON_DIR}/BP_AssaultRifle"
 SNIPER_BP_PATH = f"{WEAPON_DIR}/BP_SniperRifle"
+# The knife: a melee item, not a gun (knife.py), and its slash clip, which
+# knife_anim.py keys for whatever body the player wears.
+KNIFE_BP_PATH = f"{WEAPON_DIR}/BP_Knife"
+KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_KnifeSlash"
 HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"

@@ -32,6 +32,19 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     `is_playing_slot_animation` first.
   - The verifier's older counts (ready-pose plays, traces, the fire gate, LastHitFrom writes)
     set the punch's nodes aside with `verify/punch.is_punch_*`.
+- **The knife slashes** (`weapon_component/knife.py`, tuning `COMBAT.knife_*`). Its press is
+  inside the fire gate, since it reads `Held.Melee`: the Consumable branch's False arm asks
+  `Melee`, and a tap off `NextKnifeTime` sets `KnifeQueued`. Anything not Melee goes on to the
+  guns' ready gate, so the knife never reaches the ammunition or cooldown tests of a gun.
+  - The swing and the blow are the punch's (`punch._author_swing`), run on the `KNIFE` Strike
+    with its own variables (`KnifeQueued/Pending`, `NextKnifeTime`, `KnifeDueTime`, `KnifeAnim`).
+    They run every frame whatever is held, so a slash put away mid-swing still lands.
+  - The clip is `A_KnifeSlash` (`knife_anim.py`), 0.6 s, starting and ending in the pistol ready
+    pose the knife is held in; the ready-pose keepalive puts that pose back afterwards.
+  - The blow: a 25 cm sphere 150 cm forward, 35 HP, the pellet's stamps. No blood, no hit zones.
+  - `Scripts/probes/probe_knife.py` equips the knife, writes `KnifeQueued` and sees the clip, the
+    35 HP and the ready pose come back. `verify/knife.py`'s `is_melee_*` set both attacks' nodes
+    aside in the older counts.
 - **Reload stores `Min(MagazineSize − Loaded, Reserve)` into `ReloadTake` once.** Recomputing it
   after `Loaded` rises means free ammo.
 - **Debug mode:**

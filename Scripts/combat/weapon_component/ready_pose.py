@@ -6,7 +6,7 @@ from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
 from combat.nodes import (
-    FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NOT,
+    FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NEQ_BB, FN_NOT,
     FN_PLAY_SLOT, FN_WARN,
 )
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
@@ -131,3 +131,38 @@ def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
         f"{HIT_SLOT} term is what stops the two restarting each other forever.",
         made)
     return (BEL.find_then_pin(join),)
+
+
+def _author_sprint_pose_edge(ed, exec_ins):
+    """Re-equip on the frames Sprinting and PoseSprinting disagree; returns the
+    exits. (Moved verbatim out of tick.py's Tick author.)"""
+    # Edge-triggered, not level-triggered, and that distinction is the whole
+    # block. Re-equipping costs a detach, an attach and a montage restart; done
+    # every frame the player holds Shift it would restart the run's ready pose
+    # sixty times a second, which is a weapon that flickers. PoseSprinting is
+    # what the pose currently reflects, Sprinting is what it should reflect,
+    # and only the frames where those disagree do any work.
+    now_sprint = _at(ed.add_get_member_variable_node("Sprinting"), 240, 1020)
+    now_sprint_out = _pin(now_sprint, "Sprinting", is_input=False)
+    posed = _at(ed.add_get_member_variable_node("PoseSprinting"), 240, 1140)
+    changed = _at(_node(ed, FN_NEQ_BB), 520, 1060)
+    _connect(now_sprint_out, _pin(changed, "A"))
+    _connect(_pin(posed, "PoseSprinting", is_input=False), _pin(changed, "B"))
+    pose_gate = _at(ed.add_branch_node(), 780, 940)
+    _connect(_pin(changed, "ReturnValue", is_input=False), _pin(pose_gate, "Condition"))
+    for exit_pin in exec_ins:
+        _connect(exit_pin, _pin(pose_gate, "execute"))
+    remember = _at(ed.add_set_member_variable_node("PoseSprinting"), 1040, 940)
+    _connect(now_sprint_out, _pin(remember, "PoseSprinting"))
+    _connect(BEL.find_then_pin(pose_gate), _pin(remember, "execute"))
+    pose_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 1300, 940)
+    _set(pose_dirty, "NeedsRefresh", "true")
+    _connect(BEL.find_then_pin(remember), _pin(pose_dirty, "execute"))
+
+    ed.add_comment_to_nodes(
+        "Started or stopped sprinting this frame -- re-equip, which is what "
+        "starts or stops the ready pose. Edge-triggered on PoseSprinting: the "
+        "level-triggered version restarts the montage every frame Shift is "
+        "held, and the weapon strobes.",
+        [now_sprint, posed, changed, pose_gate, remember, pose_dirty])
+    return (BEL.find_then_pin(pose_dirty), BEL.find_else_pin(pose_gate))

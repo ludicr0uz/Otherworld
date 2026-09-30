@@ -124,7 +124,7 @@ sync:
 
 A testing aid on the M panel's last row. **K with the panel open** raises the HUD's
 `DevAllGunsRequested`; the next Tick (run from `save_exit.py`, after the countdown) lowers it and,
-for each of the five guns in `DEV_GUN_CLASS_PATHS`, spawns one if none is carried and the bag has
+for each of the five guns and the knife in `DEV_GUN_CLASS_PATHS`, spawns one if none is carried and the bag has
 room (`INVENTORY_SIZE`): `Dropped = false`, `Inventory += it`, then `NeedsRefresh`. The held item
 stays held, as with a pick-up; asking twice adds nothing.
 

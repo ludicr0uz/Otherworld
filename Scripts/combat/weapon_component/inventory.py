@@ -456,7 +456,7 @@ def _author_wc_begin_play(ed, begin):
 
     prev = _author_camera_after_boom(ed, as_char, BEL.find_then_pin(keep_pitch),
                                      2600, -1840)
-    for i, var in enumerate(("ShotgunClass", "PistolClass")):
+    for i, var in enumerate(("ShotgunClass", "PistolClass", "KnifeClass")):
         cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
         spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))
         _connect(_pin(cls, var, is_input=False), _pin(spawn, "Class"))
@@ -480,7 +480,8 @@ def _author_wc_begin_play(ed, begin):
     _connect(BEL.find_then_pin(first), _pin(dirty, "execute"))
 
     ed.add_comment_to_nodes(
-        "The player starts carrying both weapons. They are spawned here rather "
+        "The player starts carrying the shotgun, the pistol and the knife. "
+        "They are spawned here rather "
         "than placed in the level so that a generated map needs no weapon "
         "actors in it -- nothing in Scripts/generated_levels knows weapons "
         "exist. NeedsRefresh makes Tick do the actual equipping, so the attach "

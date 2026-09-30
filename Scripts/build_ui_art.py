@@ -368,6 +368,7 @@ def _guard(d, x0, y0, x1, y1):
 # tells the player the wrong thing about it.
 ICON_RELATIVE_LENGTH = {
     "Pistol": 0.55, "SMG": 0.72, "Shotgun": 0.96, "Rifle": 1.00, "Sniper": 1.00,
+    "Knife": 0.50,
 }
 
 
@@ -489,6 +490,17 @@ def icon_sniper(d):
     _guard(d, 42, 40, 58, 54)
 
 
+def icon_knife(d):
+    """A blade with a point and a crossguard: no barrel, no grip below it.
+
+    The only drawing with nothing hanging under the body and a tapered end,
+    so it reads as "not a gun" before it reads as anything else.
+    """
+    _shape(d, polys=[[(52, 24), (112, 28), (126, 34), (52, 38)]],  # blade, pointed
+           rounds=[(8, 26, 46, 38, 5),       # handle
+                   (44, 16, 52, 46, 2)])     # crossguard
+
+
 # One texture per weapon, named T_UI_Icon_<DisplayName>. The item carries a
 # Texture2D reference to its own, so the HUD draws whatever the weapon says it
 # looks like and holds no table of weapon names -- the same rule the rest of
@@ -506,6 +518,7 @@ ICONS = {
     "SMG": icon_smg,
     "Rifle": icon_rifle,
     "Sniper": icon_sniper,
+    "Knife": icon_knife,
 }
 
 # Exact HUD sizes. Generated at the size they are drawn so the corner radius

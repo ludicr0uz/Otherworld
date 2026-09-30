@@ -8,7 +8,7 @@ What a block does to a swing is authored into the wanderers' controllers
 from combat.tuning import BIND_VARS, BLOCK_KEY, COMBAT
 from combat.verify.fixtures import w, wg
 from combat.verify.common import BEL, PIN, check, in_pins, pin_value
-from combat.verify.punch import is_punch_gate
+from combat.verify.knife import is_melee_gate
 
 
 def _title(n):
@@ -79,7 +79,7 @@ def check_fire_refused_while_blocking():
     # The fire gate is the one Branch whose condition reads the fire key AND
     # Sprinting; it must read the guard's NOT too.
     # (The punch's press gate reads both too; verify/punch.py checks it.)
-    gates = [n for n in wg if _title(n) == "Branch" and not is_punch_gate(n)
+    gates = [n for n in wg if _title(n) == "Branch" and not is_melee_gate(n)
              and {"Get KeyFire", "Get Sprinting"}
              <= {_title(x) for x in _feeds(BEL.find_input_pin(n, "Condition"))}]
     check("...and the fire gate refuses while the guard is up",

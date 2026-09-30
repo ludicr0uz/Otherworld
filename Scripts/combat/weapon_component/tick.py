@@ -7,7 +7,7 @@ from combat.weapon_component.accuracy import _author_accuracy
 from combat.nodes import (
     FN_ADD_II, FN_AND, FN_ARR_LEN, FN_GET_OWNER, FN_GET_PC, FN_GE_FF,
     FN_GREATER_II, FN_IS_KEY_DOWN, FN_IS_VALID, FN_LESS_II, FN_MOD_II,
-    FN_NEQ_BB, FN_NOT, FN_OR, FN_TIME_SECONDS, FN_WAS_PRESSED,
+    FN_NOT, FN_OR, FN_TIME_SECONDS, FN_WAS_PRESSED,
 )
 from combat.tuning import BIND_VARS, SWITCH_KEY
 from combat.weapon_component.ads import _author_ads
@@ -19,12 +19,17 @@ from combat.weapon_component.consume import (
     _author_trigger_latch, _author_use_gate,
 )
 from combat.weapon_component.firing import _author_fire
+from combat.weapon_component.knife import (
+    _author_knife_press, _author_knife_swing,
+)
 from combat.weapon_component.inventory import (
     _author_drop, _author_equip, _author_pickup,
 )
 from combat.weapon_component.pose_weights import _author_pose_weights
 from combat.weapon_component.punch import _author_punch
-from combat.weapon_component.ready_pose import _author_ready_pose_keepalive
+from combat.weapon_component.ready_pose import (
+    _author_ready_pose_keepalive, _author_sprint_pose_edge,
+)
 from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
 )
@@ -138,30 +143,8 @@ def _author_wc_tick(ed, tick):
     # kick that use it. accuracy.py owns the formula.
     ads_exits = _author_accuracy(ed, held, armed_out, ads_exits, 16800, -700)
 
-    # --- the pose follows the sprint -----------------------------------------
-    # Edge-triggered, not level-triggered, and that distinction is the whole
-    # block. Re-equipping costs a detach, an attach and a montage restart; done
-    # every frame the player holds Shift it would restart the run's ready pose
-    # sixty times a second, which is a weapon that flickers. PoseSprinting is
-    # what the pose currently reflects, Sprinting is what it should reflect,
-    # and only the frames where those disagree do any work.
-    now_sprint = _at(ed.add_get_member_variable_node("Sprinting"), 240, 1020)
-    now_sprint_out = _pin(now_sprint, "Sprinting", is_input=False)
-    posed = _at(ed.add_get_member_variable_node("PoseSprinting"), 240, 1140)
-    changed = _at(_node(ed, FN_NEQ_BB), 520, 1060)
-    _connect(now_sprint_out, _pin(changed, "A"))
-    _connect(_pin(posed, "PoseSprinting", is_input=False), _pin(changed, "B"))
-    pose_gate = _at(ed.add_branch_node(), 780, 940)
-    _connect(_pin(changed, "ReturnValue", is_input=False), _pin(pose_gate, "Condition"))
-    for exit_pin in ads_exits:
-        _connect(exit_pin, _pin(pose_gate, "execute"))
-    remember = _at(ed.add_set_member_variable_node("PoseSprinting"), 1040, 940)
-    _connect(now_sprint_out, _pin(remember, "PoseSprinting"))
-    _connect(BEL.find_then_pin(pose_gate), _pin(remember, "execute"))
-    pose_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 1300, 940)
-    _set(pose_dirty, "NeedsRefresh", "true")
-    _connect(BEL.find_then_pin(remember), _pin(pose_dirty, "execute"))
-    pose_exits = (BEL.find_then_pin(pose_dirty), BEL.find_else_pin(pose_gate))
+    # --- the pose follows the sprint (ready_pose.py) --------------------------
+    pose_exits = _author_sprint_pose_edge(ed, ads_exits)
 
     # --- and the pose survives being shot ------------------------------------
     # After the sprint edge, because that block is what starts and stops the
@@ -170,13 +153,6 @@ def _author_wc_tick(ed, tick):
     # pose as a side effect of the montage group, and without this the player
     # fights the rest of the session with the gun in the locomotion pose.
     pose_exits = _author_ready_pose_keepalive(ed, held, pose_exits, 240, 1400)
-
-    ed.add_comment_to_nodes(
-        "Started or stopped sprinting this frame -- re-equip, which is what "
-        "starts or stops the ready pose. Edge-triggered on PoseSprinting: the "
-        "level-triggered version restarts the montage every frame Shift is "
-        "held, and the weapon strobes.",
-        [now_sprint, posed, changed, pose_gate, remember, pose_dirty])
 
     # --- fire ----------------------------------------------------------------
     # Three conditions, and "not sprinting" is the new one: the weapon is being
@@ -280,10 +256,12 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(allowed, "ReturnValue", is_input=False),
              _pin(ready_gate, "Condition"))
 
-    # --- or is it something to eat? (consume.py) --------------------------
+    # --- or is it something to eat (consume.py), or to swing (knife.py)? ------
+    knife_in, slash_pressed = _author_knife_press(
+        ed, held, tap, _pin(ready_gate, "execute"), 1240, -800)
     consumed, untapped = _author_use_gate(
         ed, held, owner_out, tap, BEL.find_then_pin(fire_gate),
-        _pin(ready_gate, "execute"), 1240, -300)
+        knife_in, 1240, -300)
 
     ed.add_comment_to_nodes(
         "The trigger is being touched, the weapon is out and the player is not "
@@ -327,10 +305,17 @@ def _author_wc_tick(ed, tick):
     # graph is not listening on any frame the menu is on screen. (The HUD's
     # DrawHUD is; it is renderer-driven, which is why the menu can poll a key at
     # all.)
+    # --- the knife's slash, once queued (knife.py) ----------------------------
+    # Every frame, whatever is held: the swing and the blow run on after the
+    # press, and the blow lands even if the knife was put away in between.
+    slash_exits = _author_knife_swing(
+        ed, (after_fire, consumed, untapped) + slash_pressed + dry_exits + punch_exits,
+        1040, 11000)
+
     reload_gate = _at(ed.add_branch_node(), 1040, 7200)
     _connect(both(pressed("KeyReload", 7360), armed_out, 7300),
              _pin(reload_gate, "Condition"))
-    for exit_pin in (after_fire, consumed, untapped) + dry_exits + punch_exits:
+    for exit_pin in slash_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
     reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate),
                                   1400, 7200)

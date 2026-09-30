@@ -26,10 +26,12 @@ and it never relies on a variable another section left behind.
   accuracy    the per-gun cloud and recoil factors: the table, the weapons'
               variables, AimSpread/RecoilScale/ReticleSpread, the shot's draw
   punch       empty hands: the press gate, the clip, the sweep and the blow
+  knife       the knife: the item, the slash clip, the loadout, the press
+              behind the fire gate, the swing and the blow; is_melee_*
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance", "accuracy", "punch",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance", "accuracy", "punch", "knife",
     "settings_and_tuning", "firing", "consume", "drops", "noise", "combat_trace",
 )

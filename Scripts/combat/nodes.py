@@ -156,6 +156,8 @@ FN_COMP_SET_WORLD_LOC = "/Script/Engine.SceneComponent.K2_SetWorldLocation"
 FN_VLERP = "/Script/Engine.KismetMathLibrary.VLerp"
 FN_BOOL_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_BoolToDouble"
 FN_ADD_TICK_PREREQ = "/Script/Engine.ActorComponent.AddTickPrerequisiteComponent"
+FN_SET_LISTENER_ATTENUATION = (
+    "/Script/Engine.PlayerController.SetAudioListenerAttenuationOverride")
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
 # The reticle's size (weapon_component/accuracy.py): the cloud's angle as a

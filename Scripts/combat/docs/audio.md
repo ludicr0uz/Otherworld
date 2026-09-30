@@ -31,3 +31,11 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - Proof it took: the engine-cached `max_distance` reads 10000 / 4000 / 1500.
   - `AreAnyListenersWithinRange` is **impure**. Left without an exec wire, it is pruned and
     reads false.
+- **Distance is heard from the character, not the camera** (`weapon_component/listener.py`).
+  - The engine's listener rides the camera: 2.6 m behind over the shoulder, at the eye down the
+    sights. Footsteps were quiet in one view and loud in the other.
+  - BeginPlay calls `SetAudioListenerAttenuationOverride(CapsuleComponent)` on the player's
+    controller. Attenuation measures from the capsule. Panning still follows the camera, so the
+    call is **not** `SetAudioListenerOverride`, which would move both.
+  - `verify/audio.py` checks the node. A probe can't: the engine places the listener in
+    `GameViewportClient::Draw`, which never runs under `-nullrhi`, so it stays at the origin.

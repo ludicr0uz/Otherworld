@@ -21,6 +21,7 @@ from combat.tuning import (
     DROP_FORWARD, DROP_KEY, INVENTORY_SIZE, PICKUP_KEY, PICKUP_RADIUS,
 )
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
+from combat.weapon_component.listener import _author_listener_at_character
 from combat.weapon_component.sights import _author_camera_after_boom
 
 
@@ -456,6 +457,7 @@ def _author_wc_begin_play(ed, begin):
 
     prev = _author_camera_after_boom(ed, as_char, BEL.find_then_pin(keep_pitch),
                                      2600, -1840)
+    prev = _author_listener_at_character(ed, as_char, pc_out, prev, 3120, -1840)
     for i, var in enumerate(("ShotgunClass", "PistolClass", "KnifeClass")):
         cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
         spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))

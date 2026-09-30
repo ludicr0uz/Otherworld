@@ -21,6 +21,8 @@ _author_* fragment per concern, each in its own module:
               (ShotDirection), the pellet traces around it
   impact      a pellet that connected: blood, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
+  listener    BeginPlay: sounds fade with the distance from the character,
+              not the camera (the controller's attenuation listener override)
   ammo        reload and dry fire
   punch       empty hands: the fire key throws a punch (MM_Attack_01 into the
               upper-body slot); the blow is a short sphere sweep a moment later.
@@ -44,6 +46,7 @@ _author_* fragment per concern, each in its own module:
 BP_WeaponComponent event graph:
 
   [BeginPlay] --> cache Character + Mesh
+              --> attenuation listener on the capsule
               --> spawn BP_Shotgun, BP_Pistol and BP_Knife into Inventory
               --> Equip(0)
 

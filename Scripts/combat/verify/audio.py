@@ -14,7 +14,7 @@ from combat.audio import (
 from combat.paths import AUDIO_DIR
 from combat.tuning import AUTO_DISPLAYS
 from combat.weapon_specs import _weapon_specs
-from combat.verify.fixtures import _eas
+from combat.verify.fixtures import _eas, wg
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, load
 
 
@@ -246,7 +246,42 @@ def check_sound_call_sites():
           len(_placed) >= 5, f"{len(_placed)} across {_graphs} graphs")
 
 
+# ─── Heard from the character, not the camera ────────────────────────────────
+
+def check_listener_at_character():
+    # The engine measures distance from the camera. The camera moves 2.6 m
+    # between the shoulder and the sights, and the footsteps got louder down the
+    # sights. BeginPlay pins the controller's ATTENUATION listener to the
+    # capsule. Panning stays on the camera, so SetAudioListenerOverride (which
+    # moves both) is the wrong call.
+    _set = [n for n in by_pins(wg, "AttachToComponent")
+            if "Attenuation" in str(BEL.get_node_title(n))]
+    _whole = [n for n in by_pins(wg, "AttachToComponent", "Rotation")]
+    check("BeginPlay sets the attenuation listener once, and never moves the "
+          "whole listener off the camera", len(_set) == 1 and not _whole,
+          f"{len(_set)} attenuation, {len(_whole)} whole-listener")
+    if len(_set) != 1:
+        return
+    _n = _set[0]
+    _ex = BEL.find_input_pin(_n, "execute")
+    check("...on the exec chain, so it runs",
+          bool(_ex and PIN.list_connected_pins(_ex)))
+
+    def _src(name):
+        return [str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+                for q in PIN.list_connected_pins(BEL.find_input_pin(_n, name))]
+    check("...attached to the character's capsule, at no offset",
+          any("CapsuleComponent" in t.replace(" ", "")
+              for t in _src("AttachToComponent"))
+          and not _src("AttenuationLocationOVerride"),
+          f"{_src('AttachToComponent')}")
+    check("...of the player's controller",
+          any("PlayerController" in t.replace(" ", "") for t in _src("self")),
+          f"{_src('self')}")
+
+
 def run():
     check_sound_assets()
     check_distance_and_direction()
     check_sound_call_sites()
+    check_listener_at_character()

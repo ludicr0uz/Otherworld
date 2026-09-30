@@ -25,7 +25,9 @@ from graphics_menu import reticle as R
 from graphics_menu import settings_rows as S
 from graphics_menu import survival_bars as SB
 from graphics_menu import scope as SC
-from combat.tuning import COMBAT
+from graphics_menu import profile_consts as PC
+from graphics_menu.profile_checks import check_profile
+from combat.tuning import COMBAT, SHOT_VOLUME_CM
 
 BEL = unreal.BlueprintEditorLibrary
 BGE = unreal.BlueprintGraphEditor
@@ -130,9 +132,10 @@ def main():
     # The main menu's start keys are polled from ReceiveDrawHUD for the same
     # reason the restart key is, and so are the four navigation keys.
     expected_keys = set((G.MENU_KEY, G.RESTART_KEY, G.DEBUG_KEY,
-                         N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT)
+                         N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
+                         PC.EXIT_KEY)
                         + G.PRESET_KEYS + G.START_KEYS)
-    check("polls exactly the menu, preset, debug, restart, start and nav keys",
+    check("polls exactly the menu, preset, debug, restart, start, nav and exit keys",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -171,8 +174,10 @@ def main():
           not any(c.startswith("stat ") for c in commands), str(sorted(commands)))
 
     # ApplyNonResolutionSettings takes no arguments, so it is the only node in
-    # the graph whose inputs are exactly exec + self.
-    applies = [n for n in nodes if pin_names(n) == {"execute", "self"}]
+    # the graph whose inputs are exactly exec + self -- apart from the profile
+    # load's DestroyActor, which is told apart by its title.
+    applies = [n for n in nodes if pin_names(n) == {"execute", "self"}
+               and "Destroy" not in str(BEL.get_node_title(n))]
     check("ApplyNonResolutionSettings once per preset, plus BeginPlay's",
           len(applies) == len(G.PRESETS) + 1, str(len(applies)))
     # Regression guard, and the single most important check in this file:
@@ -248,7 +253,10 @@ def main():
                      S.SETTINGS_TITLE, S.BACK_LABEL, S.DIFFICULTY_LABEL,
                      *(sl.label for sl in S.SLIDERS),
                      "press any key to bind it",
-                     "arrows adjust  ·  ENTER rebinds"}
+                     "arrows adjust  ·  ENTER rebinds",
+                     # Save and exit: the panel's row and the called-off
+                     # notice (the countdown itself is a driven Concat).
+                     PC.EXIT_ROW_LABEL, PC.EXIT_CALLED_OFF_TEXT}
     expected_text |= set(G.MENU_ROWS)
     expected_text |= {f"[{i + 1}]   {p[0]}" for i, p in enumerate(G.PRESETS)}
     # The health number has no literal text -- its Text pin is driven -- so it
@@ -386,8 +394,10 @@ def main():
                     if "Health" in pin_names(n, False) or
                     "MaxHealth" in pin_names(n, False)]
     # Two pairs now: the player's bar and the NPC bars read the same component.
+    # Plus three Health reads for the profile: the death test, the save's
+    # copy off the component, and the load's copy off BP_Profile.
     check("HUD reads Health and MaxHealth for both the player and the NPCs",
-          len(health_reads) == 4, str(len(health_reads)))
+          len(health_reads) == 4 + 3, str(len(health_reads)))
 
     # --- the reticle
     # It must be nailed to the centre of the viewport. Drawing it at the
@@ -407,9 +417,10 @@ def main():
     # Six now: the reticle and the inventory strip centre off it, the kill
     # counter right-anchors off it, and the death panel, the main menu and the
     # settings page each centre off it. Seven with the debug FPS readout,
-    # right-anchored above the kill counter.
+    # right-anchored above the kill counter. Eight with the save-and-exit
+    # banner, centred.
     check("everything positioned off the window edge reads the viewport size",
-          len(viewports) == 7, str(len(viewports)))
+          len(viewports) == 8, str(len(viewports)))
     # The reticle's gap is the held gun's accuracy cloud (combat accuracy.py
     # writes ReticleSpread, a fraction of half the width): the four ticks move
     # out with it, capped, and the dot stays put.
@@ -552,9 +563,10 @@ def main():
     # Six: the player's health, an NPC's health, and the weapon component four
     # times -- inventory strip, reticle, stamina bar, and the settings push.
     # Seven: and the survival component, for its bars.
+    # Ten: and the three the profile's save and load cast (player_parts.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 7 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 10 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # A fill's width is computed from a health fraction; the track behind it is
@@ -576,25 +588,17 @@ def main():
     check("a bar is drawn for every wanderer in the level",
           len(npc_scans) == 1, f"{len(npc_scans)} GetAllActorsOfClass(NPC)")
 
-    # Two texts are driven rather than literal: the player's HP number and each
-    # inventory slot's weapon name. A literal slot name would mean the HUD kept
-    # its own copy of the weapon list.
-    driven_text = [n for n in texts
-                   if not BEL.find_input_pin(n, "Text").get_pin_value()
-                   and BEL.find_input_pin(n, "Text").list_connected_pins()]
-    # Three now: the player's HP number, each inventory slot's weapon name, and
-    # each wanderer's spawn number.
-    # Six now: the HP number, each slot's weapon name, each slot's ammunition,
-    # each wanderer's spawn number, the kill counter and the final score.
-    # Nine now: the settings page adds the sensitivity readout and, inside one
-    # ForEachLoop over Binds, a row label and a key name. Those last two are
-    # what keeps the seven bind rows to a single pair of draws. Ten with the
-    # debug FPS readout; one more per extra slider (scope sensitivity), and
-    # one for the difficulty's name.
-    want_driven = 10 + len(S.SLIDERS)
-    check("HP, slot names, ammo, NPC numbers, kills, score, the settings "
-          "rows and the FPS readout read from data",
-          len(driven_text) == want_driven, f"{len(driven_text)}, want {want_driven}")
+    # A name the data owns -- a weapon's, a difficulty's -- is drawn from the
+    # data, never as a literal: a literal would mean the HUD kept its own copy
+    # of the list. Checked by name: this used to count the driven draws, and
+    # every new readout broke the count without saying what it was.
+    owned = set(SHOT_VOLUME_CM) | set(S.DIFFICULTY_LABELS)
+    check("no weapon or difficulty name is a literal on the HUD -- they come "
+          "from data", not drawn & owned, str(sorted(drawn & owned)))
+    blank = [n for n in texts if not BEL.find_input_pin(n, "Text").get_pin_value()
+             and not BEL.find_input_pin(n, "Text").list_connected_pins()]
+    check("every DrawText has a literal or a wire -- none draws nothing",
+          not blank, f"{len(blank)} empty and unwired")
     ids = [n for n in nodes
            if "NpcId" in {str(p_) for p_ in pin_names(n, False)}]
     check("each NPC bar carries the wanderer's spawn number",
@@ -613,9 +617,9 @@ def main():
           str(sorted({t for t in titles if "Kill" in t})))
     # Twice: once for the corner and once for the death menu's final score. The
     # menu re-reads rather than being handed a copy, so the two can never
-    # disagree about the score.
+    # disagree about the score. A third read is the profile's save of it.
     check("the corner and the death menu read the same counter",
-          sum(1 for t in titles if t == f"Get {G.KILL_COUNT_VAR}") == 2,
+          sum(1 for t in titles if t == f"Get {G.KILL_COUNT_VAR}") == 3,
           str(sum(1 for t in titles if t == f"Get {G.KILL_COUNT_VAR}")))
     kill_labels = [n for n in by_pins("A", "B")
                    if BEL.find_input_pin(n, "A").get_pin_value() == "KILLS  "]
@@ -708,9 +712,12 @@ def main():
     # --- the shotgun's ammunition, beside its icon
     # Read off the item like SlotColor and DisplayName are, so the strip stays
     # a view of whatever is carried and knows nothing about shotguns.
+    # (The profile's save reads Loaded and Reserve off each item too.)
+    saved_ammo = {item_var for _f, item_var in PC.AMMO_FIELDS}
     for var in ("UsesAmmo", "Loaded", "Reserve"):
         check(f"the slot reads the weapon's own {var}",
-              sum(1 for t in titles if t == f"Get {var}") == 1,
+              sum(1 for t in titles if t == f"Get {var}")
+              == 1 + (var in saved_ammo),
               str(sum(1 for t in titles if t == f"Get {var}")))
     check("the count is rounds-in-gun / rounds-in-reserve, not one number",
           any(BEL.find_input_pin(n, "A").get_pin_value() == " / "
@@ -784,13 +791,16 @@ def main():
           str(labels))
 
     # --- the save itself
-    slots = by_pins("SlotName")
+    # The profile's slot is check_profile's business.
+    slots = [n for n in by_pins("SlotName")
+             if BEL.find_input_pin(n, "SlotName").get_pin_value() != PC.PROFILE_SLOT]
     check("the settings are read and written through a named save slot",
           bool(slots) and {BEL.find_input_pin(n, "SlotName").get_pin_value()
                            for n in slots} == {G.SETTINGS_SLOT},
           str(sorted({BEL.find_input_pin(n, "SlotName").get_pin_value()
                       for n in slots})))
-    writes = by_pins("SaveGameObject")
+    writes = [n for n in by_pins("SaveGameObject", "SlotName")
+              if BEL.find_input_pin(n, "SlotName").get_pin_value() != PC.PROFILE_SLOT]
     # BeginPlay's repair of a save from an older build, a rebind, one nudge per
     # slider, the difficulty's nudge, and the debug toggle. Written at the moment of the change and not
     # on leaving the page, because a game quit from the settings screen still
@@ -816,7 +826,9 @@ def main():
                and "NotEqual" in str(BEL.get_node_title(n)).replace(" ", "")]
     check(f"a save whose Binds is not {len(G.BIND_VARS)} long is refilled",
           len(repairs) == 1, str(len(repairs)))
-    adds = by_pins("NewItem")
+    # Literal adds only: the profile's Array_Adds are all wired.
+    adds = [n for n in by_pins("NewItem")
+            if not BEL.find_input_pin(n, "NewItem").list_connected_pins()]
     check("...from the defaults build_weapons_and_combat.py documents",
           [BEL.find_input_pin(n, "NewItem").get_pin_value() for n in adds]
           == [d for _v, d in G.BIND_VARS],
@@ -937,6 +949,7 @@ def main():
           str(sum(1 for t in titles if t == "Set MenuRow")))
 
     check_difficulty(check, bp, nodes)
+    check_profile(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

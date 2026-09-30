@@ -114,6 +114,14 @@ from graphics_menu.settings_page import (                          # noqa: E402
     _author_push_settings, _author_settings_page)
 from graphics_menu.difficulty import (                             # noqa: E402
     author_push_difficulty, declare_difficulty_vars, difficulty_defaults)
+# Save and exit, the saved profile and losing it on death; see save_exit.py.
+from graphics_menu.profile_asset import build_profile_savegame     # noqa: E402
+from graphics_menu.profile_consts import PROFILE_BP_PATH           # noqa: E402
+from graphics_menu.profile_draw import (                           # noqa: E402
+    author_exit_banner, author_exit_row)
+from graphics_menu.save_exit import (                              # noqa: E402
+    author_save_exit_tick, declare_profile_vars, profile_defaults)
+from survival.paths import SURVIVAL_BP_PATH                        # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -154,7 +162,7 @@ HP_BAR = (60.0, 62.0, 420.0, 30.0)   # x, y, w, h -- w is the *full* bar
 HP_NUM_POS = (500.0, 58.0)
 HP_NUM_SCALE = 2.4
 
-PANEL = (60.0, 130.0, 600.0, 392.0)   # x, y, w, h
+PANEL = (60.0, 130.0, 600.0, 438.0)   # x, y, w, h
 TITLE_POS = (92.0, 158.0)
 TITLE_SCALE = 2.2
 ROW_X = 150.0
@@ -163,7 +171,8 @@ ROW_STEP = 46.0
 ROW_SCALE = 2.0
 DEBUG_ROW_Y = ROW_Y0 + len(PRESETS) * ROW_STEP   # one row below the presets
 CARET_X = 112.0
-HINT_POS = (92.0, DEBUG_ROW_Y + 52.0)
+EXIT_ROW_Y = DEBUG_ROW_Y + ROW_STEP                # save and exit, under debug
+HINT_POS = (92.0, EXIT_ROW_Y + 52.0)
 HINT_SCALE = 1.5
 
 COL_PANEL = "(R=0.020000,G=0.025000,B=0.035000,A=0.780000)"
@@ -647,6 +656,7 @@ def _ensure_variables(ed, bp):
             raise RuntimeError(f"could not declare member variable {name}")
     declare_fps_vars(ed)
     declare_difficulty_vars(ed)
+    declare_profile_vars(ed)
 
 
 def _apply_defaults(bp, defaults):
@@ -939,7 +949,9 @@ def _author_tick(ed, tick):
     _connect(_pin(was_m, "ReturnValue", is_input=False), _pin(br_m, "Condition"))
     # Grass lighting catches up with Quality first, so a preset picked on the
     # previous frame is on the grass before anything else runs this one.
-    for tail in author_grass_sync(ed, x0, y0 - 1100, BEL.find_then_pin(tick)):
+    # Then save and exit, the profile load and the death wipe (save_exit.py).
+    synced = author_grass_sync(ed, x0, y0 - 1100, BEL.find_then_pin(tick))
+    for tail in author_save_exit_tick(ed, pc_out, synced, x0, y0 - 4000):
         _connect(tail, _pin(br_m, "execute"))
 
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 560, y0 + 200)
@@ -2142,6 +2154,8 @@ def _author_draw(ed, x0, y0):
 
     # Last of the always-on layers, so the crosshair sits on top of the rest.
     after_aim = _author_reticle(ed, x0, y0 - 6800, after_inv)
+    # The save-and-exit countdown, over everything but the panel.
+    after_aim = author_exit_banner(ed, x0, y0 - 8200, after_aim)
 
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 240, y0 + 200)
     br = _at(ed.add_branch_node(), x0 + 420, y0)
@@ -2215,8 +2229,9 @@ def _author_draw(ed, x0, y0):
     _set(hint, "Scale", HINT_SCALE)
     _set(hint, "bScalePosition", "false")
     _set(hint, "Font", UI_FONT)
-    for tail in (on_tail, off_tail):
-        _connect(tail, _pin(hint, "execute"))
+    exit_tail = author_exit_row(ed, ROW_X, EXIT_ROW_Y, ROW_SCALE,
+                                (on_tail, off_tail), x0 + 2290, y0 + 200)
+    _connect(exit_tail, _pin(hint, "execute"))
     made.append(hint)
     flow = BEL.find_then_pin(hint)
 
@@ -2255,9 +2270,11 @@ def build_hud_blueprint(rebuild=False):
     # loaded; this graph casts to the health and weapon components. Without the
     # loads create_node_from_name returns None and the error reads like a typo
     # in the node name rather than a missing asset.
+    build_profile_savegame()
     for path in ("/Game/Weapons/BP_HealthComponent",
                  "/Game/Weapons/BP_WeaponComponent",
                  "/Game/Weapons/BP_WeaponItem",
+                 SURVIVAL_BP_PATH, PROFILE_BP_PATH,
                  GAME_MODE_PATH):
         if not _asset_sub().load_asset(path):
             raise RuntimeError(f"could not load {path} for its cast node")
@@ -2313,7 +2330,7 @@ def build_hud_blueprint(rebuild=False):
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],
                          "BindLabels": list(BIND_LABELS),
-                         **difficulty_defaults()})
+                         **difficulty_defaults(), **profile_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

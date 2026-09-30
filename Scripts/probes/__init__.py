@@ -1,0 +1,22 @@
+"""probes -- scripted checks that run inside a headless -game, on live objects.
+
+A verifier reads the saved assets; a probe watches the game play them. Run one
+with
+
+    python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
+
+which boots the level, runs every probe in order once the player exists, prints
+each check, and kills the game as soon as the last probe finishes.
+
+A probe file defines ``probe(p)``, a generator. ``p`` is a Probe (context.py);
+``yield 0.3`` waits 0.3 s of game time, ``yield lambda: cond()`` waits until
+cond is true, and ``p.check(label, ok, detail)`` records a result. A file may
+also set ``WRITABLE = [(blueprint_path, variable), ...]``: the variables it
+writes on live instances, which boot.py makes Instance Editable in memory for
+this run only -- nothing on disk changes and no builder has to be re-run.
+
+  runner      the pure driver: advances probe generators on a clock, records checks
+  context     Probe, the object a probe is handed: checks plus the game helpers
+  boot        in-game entry (init_unreal.py calls it when UEPY_PROBES is set)
+  probe_*     the probes themselves, one behaviour each
+"""

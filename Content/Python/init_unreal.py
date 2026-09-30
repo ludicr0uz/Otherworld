@@ -2,6 +2,10 @@
 Otherworld - Unreal Engine Startup Script
 Executed automatically by Unreal Engine Editor on project startup.
 """
+import os
+import sys
+import traceback
+
 import unreal
 
 # The command inbox lets Scripts/dev/uepy.py push work into this already-running
@@ -27,3 +31,14 @@ if __name__ == "__main__":
             uepy_inbox.start()
         except Exception as exc:
             unreal.log_error(f"[uepy-inbox] could not start: {exc}")
+    # A probe run (Scripts/dev/uepy.py --game --probe) names its probes in the
+    # environment; Scripts/probes/boot.py prepares the classes, opens the level
+    # and drives them. Absent in every other editor or game, so a no-op there.
+    if os.environ.get("UEPY_PROBES"):
+        try:
+            sys.path.insert(0, os.path.join(unreal.Paths.convert_relative_path_to_full(
+                unreal.Paths.project_dir()), "Scripts"))
+            from probes import boot
+            boot.start()
+        except Exception:
+            unreal.log_error("[PROBE] could not start: " + traceback.format_exc())

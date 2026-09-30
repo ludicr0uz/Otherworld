@@ -9,9 +9,13 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
 2. **Where scripts live:**
    - `Scripts/` holds builders, verifiers and generators.
    - `Scripts/dev/` holds editor tooling:
-     - `uepy.py` runs scripts;
-     - `dev-team` runs a queue of tasks, one headless Claude session each. A session started
-       that way has no one to ask, so it decides and reports instead.
+     - `uepy.py` runs scripts (its pieces are `uepylib/`);
+     - `dev-team` runs a queue of tasks, one headless Claude session each (its pieces are
+       `devteam/`). A session started that way has no one to ask, so it decides and reports
+       instead.
+     - Their unit tests: `python3 -m unittest discover -s Scripts/dev/tests`. Run them after
+       changing anything in `Scripts/dev` or `Scripts/probes`.
+   - `Scripts/probes/` holds probes: checks that run inside a headless game (see below).
    - `Content/Python/` is auto-loaded by the editor. `init_unreal.py` starts `uepy_inbox`.
 3. **Asset prefixes:** `SM_ SK_ M_ MI_ T_ BP_ WBP_ ST_ A_ Cue_`. Levels use `Lvl_`.
 4. **Use absolute paths when invoking the editor directly,** because the Bash tool resets cwd.
@@ -108,10 +112,20 @@ python3 Scripts/dev/uepy.py Scripts/verify_weapons_and_combat.py Scripts/verify_
 python3 Scripts/dev/uepy.py -c "import unreal; unreal.log_warning('hi')"
 python3 Scripts/dev/uepy.py --list                 # which editors are listening
 python3 Scripts/dev/uepy.py --game --seconds 25    # headless -game run + error summary
+python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py   # see below
 python3 Scripts/dev/uepy.py --cold <script>        # force a fresh editor
+python3 Scripts/dev/uepy.py --summary <scripts>    # one line per script + its failures
+python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's editors
 ```
 
-- **Exit code:** non-zero if any target raised.
+- **Output:** `--summary` prints one line per script (verifier counts, time), then its failed
+  checks, traceback tails and Python errors. The full output is saved under `Saved/uepy/runs/`
+  and its path printed. Prefer it to piping through grep and tail. `--full` prints everything.
+  `$UEPY_OUTPUT=summary` makes summary the default; dev-team sets it.
+- **Exit code:** non-zero if any target raised **or any verifier reported a failed check**.
+  The suites return normally when checks fail, so before this a failing sweep exited 0.
+- **`$UEPY_COLD=1`** forces every run cold. dev-team sets it, and closes the project's editors
+  before each task.
 - **`--game`** counts `Blueprint Runtime Error`, `Accessed None`, `NPC-SPAWN` and `NPC-FELL`.
 - **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`. Never
   rebuild Blueprints under a running game.
@@ -145,7 +159,7 @@ editor.
 3. **Scope verification to what you changed.** Run the full sweep (level, weapons, NPC, HUD,
    survival) once before calling the work done.
 4. **For a guard, zero errors proves nothing.** A gate that never opens logs the same as one that
-   works. Probe the positive case too, then remove the probe by re-running the builder.
+   works. Probe the positive case too, with a probe in `Scripts/probes` (below).
 5. **Batch several scripts into one `uepy.py` call.**
 
 ## Current state
@@ -164,6 +178,9 @@ editor.
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`, both at night. Food
   and water lie in both.
+- **Save and exit:** X in the M panel saves the character's stats and inventory, but not its
+  location, after 15 s, then returns to the main menu. A hit calls it off. The next game loads
+  the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
 - **Known gaps:** temperature moves nothing yet. `GameDefaultMap` still points at the old
   `Lvl_Forest`. Feel checks that need a play session are listed per package.
 
@@ -269,6 +286,27 @@ editor.
 
 ### Headless runs and probes
 
+**Checking behaviour in the running game: write a probe.** Don't hand-roll a `-game` run plus
+inbox polling. One command boots the level, runs the probe once the player exists, prints each
+check and ends the run as soon as the probe does (about 20 s):
+
+```bash
+python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
+```
+
+- **Shape:** a probe defines `probe(p)`, a generator. `yield 0.3` waits 0.3 s of game time,
+  `yield lambda: cond()` waits for a condition, and `p.check(label, ok, detail)` records a
+  result. `p` has the lookups (`pawn`, `component`, `game_mode`, `hud`, `actor_of`,
+  `send_event`, `get`, `set`). `Scripts/probes/probe_consume_heal.py` is the model.
+- **Writing a Blueprint variable on a live instance:** list it in the probe's
+  `WRITABLE = [(bp_path, var)]`. `probes/boot.py` makes it Instance Editable and recompiles, in
+  memory for that run only, before the level loads. Nothing on disk changes and no builder
+  re-run is needed.
+- **Keep probes:** they are checked in, so the next change to the same behaviour re-runs them.
+- **Poking a running game by hand:** start `uepy.py --game --seconds 120` and send scripts with
+  `uepy.py --in-game <script>`. A game has its own inbox, `Saved/uepy/game`, so it never takes a
+  job meant for the editor.
+
 - **World time in `-nullrhi -game` advances by a fixed tiny step per frame.**
   - A 2–3 s `Delay` may never elapse in a 30 s run. Keep probe delays well under a second, and
     measure upstream of long delays.
@@ -276,18 +314,27 @@ editor.
   - Cross-check `GetTimeSeconds` against wall clock before reading "it did not happen".
 - **Isolate the thing under test.** For example, kill the player at BeginPlay rather than waiting
   for the pack: 40 decisive seconds instead of 3 inconclusive minutes.
-- **A `-game` process runs `init_unreal.py`,** so `uepy.py` can query a running game.
+- **A `-game` process runs `init_unreal.py`.** That is how probes start, and how
+  `uepy.py --in-game` reaches a running game.
   - There is no world context there, and `EditorLevelLibrary.get_game_world` SIGSEGVs. Use
     `unreal.find_object(None, "/Game/Maps/<L>.<L>")` to get the world.
 - **Python can't write a Blueprint variable on an instance** unless it is Instance Editable, and
-  the `Set*PropertyByName` functions aren't exported. For a probe, write the **CDO** and reopen the
-  level, or use the console's `setnopec`.
-  - `setnopec <object path> …` sent with `execute_console_command` did nothing to a PIE
-    instance, and logged nothing.
-  - What worked: `BEL.set_blueprint_variable_instance_editable(bp, var, True)` and compile,
-    without saving. Then write the PIE instance with `set_editor_property`. Afterwards set it back
-    to False and re-run the builder.
+  the `Set*PropertyByName` functions aren't exported. Probes handle this with `WRITABLE` (above).
+  What that rests on:
+  - **Instance Editable plus compile, unsaved, works in `-game`**, but only if the Blueprint
+    stays referenced. Opening a level garbage-collects an unreferenced Blueprint, and it
+    reloads from disk without the edit. `boot.py` holds them.
+  - **Write with `set_editor_property(name, value, PropertyAccessChangeNotifyMode.NEVER)`.**
+    The default notifies PostEditChange, which on a live component re-runs the owner's
+    construction script. The actor gets fresh components, so the one you wrote is a dead copy
+    that never ticks again.
+  - **Never use the console's `set <Class> <Prop> <value>` in a game.** It writes every object
+    of the class, including the CDO, and re-runs construction scripts: it set off an endless
+    NPC respawn storm. `setnopec` did nothing to a PIE instance and logged nothing.
   - PIE started from Python begins **paused**. Call `GameplayStatics.set_game_paused(w, False)`.
+- **A `-game` inbox heartbeat can go quiet for seconds.** The game beats once a frame, and a
+  headless frame can be slow. uepy allows a game 30 s (an editor 6 s), and it treats a beat from
+  a dead pid as silence.
 - **In a cold run, `print()` doesn't reach the log.** Use `unreal.log_warning`. The inbox captures
   both.
 - **Sort numbered actors on their trailing integer, never on the label string,** or `_10` lands

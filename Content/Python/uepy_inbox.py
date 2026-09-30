@@ -40,7 +40,11 @@ _state = {"handle": None, "last_poll": 0.0, "last_beat": 0.0}
 
 
 def inbox_dir():
-    path = os.path.join(unreal.Paths.project_saved_dir(), "uepy")
+    # A -game run launched by uepy.py gets its own directory (UEPY_INBOX_DIR),
+    # so a job meant for the open editor can never be picked up by the game --
+    # both would otherwise poll the same Saved/uepy.
+    path = (os.environ.get("UEPY_INBOX_DIR")
+            or os.path.join(unreal.Paths.project_saved_dir(), "uepy"))
     os.makedirs(path, exist_ok=True)
     return os.path.abspath(path)
 

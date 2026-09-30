@@ -2,6 +2,7 @@
 its direction, and the impact sound.
 """
 
+from combat.game_state import LAST_DAMAGE_VAR
 from forest_generator.npc_placement import (
     NPC_MELEE_BLEND_S, NPC_MELEE_DAMAGE, NPC_MELEE_INTERVAL_S,
     NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK, NPC_MELEE_RANGE_CM,
@@ -55,6 +56,8 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
                                 --> HitDamage = NPC_MELEE_DAMAGE, or less
                                     on the player's guard (npc/block.py)
                                 --> player Health -= HitDamage
+                                --> player LastDamageTime = now (the HUD's
+                                    save-and-exit is called off by a hit)
                           false -------------------------------------> Delay
 
     Range is centre-to-centre between the two capsules, which is why
@@ -222,6 +225,17 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     _connect(as_health, _pin(came_from, "self"))
     _connect(bearing_out, _pin(came_from, LAST_HIT_FROM_VAR))
 
+    # --- and when: the moment the player was last hit ------------------------
+    # The HUD's save-and-exit countdown reads it, because being hit calls the
+    # exit off. A time rather than a flag: nothing has to clear it, and a drop
+    # in Health would also count the starvation drain, which is not a hit.
+    struck = keep(_at(ed.add_set_member_variable_node(LAST_DAMAGE_VAR,
+                                                      HEALTH_CLASS_PATH),
+                      x0 + 4080, y0))
+    _connect(as_health, _pin(struck, "self"))
+    _connect(_pin(now, "ReturnValue", is_input=False), _pin(struck, LAST_DAMAGE_VAR))
+    _connect(BEL.find_then_pin(came_from), _pin(struck, "execute"))
+
     # --- and, when the combat trace is on, say who did it -------------------
     # Between the hit and its bearing, so the line quotes the health just
     # written. Every exit of the trace, logged or not, carries on to the bearing.
@@ -244,7 +258,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
     # front of them.
     thud, after_thud = _author_random_sound(
         ed, HIT_SOUNDS_VAR, _pin(player_loc, "ReturnValue", is_input=False),
-        BEL.find_then_pin(came_from), x0 + 4120, y0)
+        BEL.find_then_pin(struck), x0 + 4320, y0)
     made.extend(thud)
 
     # Every exit -- hit, missing health component, not a Character -- has to

@@ -363,6 +363,14 @@ def check_player_guard(tag, nodes):
           f"(every exit of the check reaches the Health write)",
           len(full) == 1 and len(into_full) == 2 and "Branch" in into_full,
           f"{into_full}")
+    # The HUD's save-and-exit is called off by a hit, and reads it off this.
+    stamps = _titled(nodes, "Set LastDamageTime")
+    check(f"{tag}: a landed swing stamps the player's LastDamageTime with the "
+          f"game time, after its bearing",
+          len(stamps) == 1
+          and any("Time" in _title(f) for f in _feeders(stamps[0], "LastDamageTime"))
+          and [_title(d) for d in _drivers(stamps[0])] == ["Set LastHitFrom"],
+          f"{[[_title(d) for d in _drivers(n)] for n in stamps]}")
 
 
 def run():

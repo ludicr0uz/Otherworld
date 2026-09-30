@@ -108,6 +108,18 @@ class ProbeRunTest(unittest.TestCase):
         self.assertTrue(drive(self.run_of(probe, timeout=2.0), self.game, self.wall))
         self.assertIn("waiting for never", self.ledger.error)
 
+    def test_a_timeout_still_runs_the_probes_finally(self):
+        cleaned = []
+
+        def probe():
+            try:
+                yield lambda: False
+            finally:
+                cleaned.append(True)
+
+        self.assertTrue(drive(self.run_of(probe, timeout=2.0), self.game, self.wall))
+        self.assertEqual(cleaned, [True])
+
     def test_an_exception_is_the_probes_error(self):
         def probe():
             yield 0.1

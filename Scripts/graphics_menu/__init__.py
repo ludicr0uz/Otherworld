@@ -15,4 +15,15 @@ build_graphics_menu.py, which is still the entry point and owns the rest.
   survival_bars   hunger/thirst/temperature bars and the debuff names
   scope           the sniper's glass, and when it replaces the crosshair
   reticle         the crosshair: centred, red when blocked, gap = the gun's cloud
+  profile_consts  the saved profile and the save-and-exit countdown: names, numbers
+  profile_asset   BP_Profile, the SaveGame a character is kept in between sessions
+  player_parts    the pawn's health/weapon/survival components and the GameMode,
+                  cast once for the profile's read and write
+  profile_write   the player's stats and inventory into BP_Profile, and the save
+  profile_read    BP_Profile back onto the player: stats, and the saved items
+                  spawned in place of the issued loadout
+  save_exit       the HUD Tick fragment: delete the profile on death, load it once
+                  a game starts, X starts the 15 s exit, a hit calls it off
+  profile_draw    the panel's save-and-exit row and the countdown banner
+  profile_checks  verify_graphics_menu.py's checks for all of the above
 """

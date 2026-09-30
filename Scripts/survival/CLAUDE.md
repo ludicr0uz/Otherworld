@@ -84,7 +84,8 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 
 These can't be proved headlessly:
 
-- pressing fire with food in hand (the heal itself was probed in `-game` by sending
-  `Event.Item.Consume` from Python: 50 → 60 HP on EASY, unchanged on MEDIUM; it lands a frame
-  after the send);
+- pressing fire with food in hand. The heal itself is covered by a probe that sends
+  `Event.Item.Consume` from Python: 50 → 60 HP on EASY, unchanged on MEDIUM, and it lands a
+  frame after the send. Run it with
+  `uepy.py --game --probe Scripts/probes/probe_consume_heal.py`;
 - how the bars and the two-row strip look.

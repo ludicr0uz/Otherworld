@@ -31,6 +31,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
    | graphics menu, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, forage | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
+| day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
 
 ## Code layout: small modules, one owner each
 
@@ -202,12 +203,15 @@ editor.
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
   and a settings screen, which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
-- **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`, both at night. Food
-  and water lie in both.
+- **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`. Food and water lie
+  in both.
+- **Day and night:** a clock turns the sun and the moon across the sky. The day and the night
+  are 4 minutes each for now (`Scripts/world/world_config.py`). The night is moonlit, dim and
+  starry. A level starts just after sunrise.
 - **Save and exit:** X in the M panel saves the character's stats and inventory, but not its
   location, after 15 s, then returns to the main menu. A hit calls it off. The next game loads
   the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
-- **Known gaps:** temperature moves nothing yet. `GameDefaultMap` still points at the old
+- **Known gaps:** temperature moves nothing yet, and nothing else reads the time of day yet. `GameDefaultMap` still points at the old
   `Lvl_Forest`. Feel checks that need a play session are listed per package.
 
 ## Gotchas learned the hard way

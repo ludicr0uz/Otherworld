@@ -26,7 +26,7 @@ The generator's code lives in this package. The level-side import code is in
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
-| `lighting.py` | time-of-day presets (star_brightness 2.5, sun 0.12, exposure bias 1.6) and `SHADOW_DISTANCE_CM` |
+| `lighting.py` | time-of-day presets (star_brightness 2.5, sun 0.12, exposure bias 1.6) and `SHADOW_DISTANCE_CM`. The level's rig is the static sky; at runtime `BP_DayNightCycle` replaces it and reuses these values (`Scripts/world/CLAUDE.md`) |
 | `verification.py` | the offline suite (over budget) |
 | `asset_sources.py` | what produces each `Content/` directory, and `RESTORE_ORDER` |
 
@@ -48,6 +48,9 @@ bowl's corners outgrow the navmesh's Z limit, so larger maps use:
 
 **Grass transforms live in a git-ignored `grass_<Level>.json` sidecar,** not in the generated
 script.
+
+**After an import, re-run `place_forage.py` and `build_day_night.py`.** The import rebuilds the
+level from scratch, which drops the forage and the day/night cycle actor.
 
 ## Navmesh
 

@@ -240,7 +240,18 @@ GENERATED = (
         kind="generated",
         builders=("Scripts/generate_forest_level.py",),
         note="Lvl_Forest_200m.umap (--size 200) and Lvl_Forest_1000m.umap "
-             "(--size 1000), each with its World Partition sidecars.",
+             "(--size 1000), each with its World Partition sidecars. The "
+             "forage (place_forage.py) and the day/night cycle actor "
+             "(build_day_night.py) are added to them afterwards.",
+    ),
+    AssetSource(
+        dest="Content/World",
+        kind="generated",
+        builders=("Scripts/build_day_night.py",),
+        note="The day/night cycle: BP_DayNightCycle (sun, moon, sky light, "
+             "sky dome, fog and exposure, driven by a clock) and "
+             "Materials/M_DayNightSky. The same script places one cycle in "
+             "each generated level. Settings: Scripts/world/world_config.py.",
     ),
 )
 
@@ -345,6 +356,9 @@ RESTORE_ORDER = (
     # Once each printed import_<Level>.py has run: the import rebuilds the
     # level from nothing, forage included.
     "Scripts/dev/uepy.py --cold Scripts/place_forage.py",
+    # Also after the imports: it tags each level's static sky and adds the
+    # day/night cycle that replaces it at BeginPlay.
+    "Scripts/dev/uepy.py --cold Scripts/build_day_night.py",
     # Fab content is re-added by hand (it needs the user's Epic sign-in):
     # --check lists what fab_library.json holds that the disk does not. Then
     # the index, which sessions read instead of booting the editor.

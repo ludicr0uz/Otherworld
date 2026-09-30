@@ -1,0 +1,63 @@
+# The world: day and night
+
+`Scripts/build_day_night.py` builds `M_DayNightSky` and `BP_DayNightCycle` (both under
+`/Game/World`) and puts one cycle actor into every generated level.
+`Scripts/verify_day_night.py` checks it, and `Scripts/probes/probe_day_night.py` runs it in a
+game. The module map is in `__init__.py`.
+
+```bash
+python3 Scripts/dev/uepy.py Scripts/build_day_night.py Scripts/verify_day_night.py
+python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_day_night.py
+```
+
+## Settings: `world_config.py`
+
+- **The world config.** `DAY_LENGTH_S` and `NIGHT_LENGTH_S` are each 240 s for testing.
+  `START_CLOCK_S` (20 s) is where a level starts. Change a number there and re-run the builder.
+- The two lengths and `Clock` are also Instance Editable on the placed actor, so one level can
+  differ.
+- The night values (moon 0.12 lux, sky light 3.0, fog, exposure, star brightness) come from
+  `forest_generator/lighting.py`'s night preset, and the day values from its day preset.
+- `sun_state(clock)` does the same sums as the Tick graph. The probe compares the two, so keep
+  them in step.
+
+## Design
+
+- **The clock:** 0 is sunrise, `DAY_LENGTH_S` is sunset, and the full cycle wraps back to
+  sunrise. The sun rises at `SUNRISE_YAW_DEG` and peaks at 60°. The moon takes the same path
+  through the night and peaks at 45°. `IsDay` is `Clock < DayLengthSeconds`. `DayAmount` (0–1)
+  follows the sun's elevation from -6° to +8°, and everything else blends by it.
+- **The cycle owns the whole sky rig:**
+  - a Movable sun and moon (atmosphere lights 0 and 1);
+  - a real-time SkyLight;
+  - the dome;
+  - the height fog;
+  - two unbound post-process grades that outrank the level's volume: NightGrade is always on,
+    and DayGrade is weighted by DayAmount.
+
+  The level's generated rig stays as generated, because its verifier checks it. The builder
+  only **tags** it `OW_StaticSky` (the directional light, sky light, fog, clouds and the
+  SM_SkySphere dome). The cycle destroys everything with that tag at BeginPlay. A level
+  without a cycle still plays at night.
+- **The sky is one opaque, unlit, IsSky dome** whose material draws everything: the day
+  gradient, the night colour, the sunset glow, the sun and moon discs and the stars. It
+  doesn't hand over to the SkyAtmosphere, because an opaque dome can't cross-fade with it and
+  would pop at dusk. The SkyLight captures the dome, so the ambient light follows the sky.
+- **`import_<Level>.py` rebuilds a level from scratch.** Re-run `build_day_night.py` after it,
+  as with `place_forage.py`.
+
+## Traps
+
+- **Compile before `_apply_defaults`.** A freshly declared variable isn't on the CDO until the
+  class compiles, and `set_editor_property` fails with "Failed to find property".
+- **`MaterialInstanceDynamic`'s scalar getter** is `get_scalar_parameter_value` in Python, not
+  `k2_…`.
+- **Check that a Custom-node material compiled:** `MEL.get_statistics(mat)`'s
+  `num_pixel_shader_instructions` is 0 when it didn't. The verifier checks it.
+
+## Still needs a play session
+
+- **The look:** the sky colours, sunset glow, disc sizes and daytime exposure were set by
+  numbers, not by eye, because `-nullrhi` can't render them. Tune them in `world_config.py`.
+- **Twilight is short** (about 15 s of a 4-minute day), because the sun crosses the horizon
+  fast. A longer day stretches it.

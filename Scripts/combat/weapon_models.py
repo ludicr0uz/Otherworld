@@ -1,5 +1,6 @@
-"""The rifle and the sniper as real models: the FPS Weapon Bundle's AK 47 and
-AS Val (Deadghost Interactive, a Fab pack under /Game/FPS_Weapon_Bundle), how
+"""The SMG, the rifle and the sniper as real models: the FPS Weapon Bundle's
+SMG11, AK 47 and AS Val (Deadghost Interactive, a Fab pack under
+/Game/FPS_Weapon_Bundle), how
 each is placed in the weapon's frame, and the measured outline every grip and
 sight check reads.
 
@@ -18,7 +19,8 @@ THE FRAME
 ---------
 The pack's _X meshes already point down +X with +Z up, which is the weapon's
 own frame (weapon_specs.py), so the model sits at the origin unrotated and
-unscaled: the pack is modelled at real size (the AK is 88 cm, the Val 95 cm)
+unscaled: the pack is modelled at real size (the AK is 88 cm, the Val 95 cm,
+the SMG11 32 cm)
 and the adventurer is a real-size person. Muzzles are the meshes' own
 b_gun_muzzleflash sockets.
 
@@ -37,6 +39,7 @@ from combat.paths import CUBE, CYLINDER, MAT_METAL
 
 FAB_WEAPONS = "/Game/FPS_Weapon_Bundle/Weapons/Meshes"
 
+SMG11_MESH = f"{FAB_WEAPONS}/SMG11/SK_SMG11_X"
 AK47_MESH = f"{FAB_WEAPONS}/Ka47/SK_KA47_X"
 VAL_MESH = f"{FAB_WEAPONS}/KA_Val/SK_KA_Val_X"
 SCOPE_MESH = f"{FAB_WEAPONS}/Accessories/SM_Scope_25x56_X"
@@ -49,10 +52,47 @@ def _box(name, lo, hi):
     return (name, CUBE, centre, _rot(), scale, MAT_METAL)
 
 
-# ─── AK 47: the assault rifle ────────────────────────────────────────────────
-
 # Each model component: (name, mesh, location, rotation, scale). The mesh's
 # class (skeletal or static) decides the component's.
+
+# ─── SMG11: the SMG ─────────────────────────────────────────────────────────
+
+# The pack's SMG11, a MAC-11: a box receiver with the magazine up through the
+# pistol grip (it hangs 13 cm under it), the wire stock folded over the top,
+# and a sling strap hanging under the muzzle.
+SMG_MODEL = (
+    ("Model", SMG11_MESH, (0.0, 0.0, 0.0), _rot(), (1.0, 1.0, 1.0)),
+)
+
+# b_gun_muzzleflash on SK_SMG11_X.
+SMG_MUZZLE = (19.5, 0.0, 8.0)
+
+# Over the folded stock: its wire lies on the receiver's back half and tops
+# out at 12.8, the highest thing on the gun, so the eye is a centimetre over
+# it. The stock's butt is the part nearest the eye, and the eye must be a near
+# plane (10 cm) behind it: that puts it 23 cm behind the grip, a little
+# further back than the shotgun's 20.
+SMG_SIGHT = (-24.0, 0.0, 13.8)
+
+
+def smg_outline():
+    return (
+        _box("Receiver",     (-11.0, -2.8, 4.2),   (16.0, 2.5, 10.6)),
+        # The folded wire stock: the butt behind the receiver, the wire over it.
+        _box("Stock",        (-13.0, -2.4, 1.9),   (-1.0, 2.4, 12.8)),
+        _box("CockingKnob",  (7.0, -1.0, 10.6),    (10.0, 1.0, 12.0)),
+        _box("FrontSight",   (12.8, -1.5, 10.6),   (14.3, 1.5, 12.3)),
+        _box("Barrel",       (16.0, -1.0, 7.1),    (19.5, 1.0, 9.0)),
+        _box("Sling",        (13.5, -1.4, -12.4),  (15.6, 1.4, 4.5)),
+        # The grip is deep front to back because the magazine runs up it.
+        _box("Magazine",     (-1.6, -1.1, -18.8),  (1.9, 1.1, -6.0)),
+        _box("Grip",         (-4.6, -1.6, -6.0),   (2.2, 1.6, 1.0)),
+        _box("TriggerGuard", (2.2, -0.8, 0.6),     (8.0, 0.8, 1.6)),
+    )
+
+
+# ─── AK 47: the assault rifle ────────────────────────────────────────────────
+
 RIFLE_MODEL = (
     ("Model", AK47_MESH, (0.0, 0.0, 0.0), _rot(), (1.0, 1.0, 1.0)),
 )

@@ -35,8 +35,9 @@ menu polls its own copy from `DrawHUD`, which does.
 - **A new weapon is a row plus a part table.** Add a row in `weapon_specs._weapon_specs()` and a
   part table. Adding the SMG, the rifle and the sniper changed **no** node in the fire, reload or
   gate graphs.
-- **The rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon Bundle's AK 47
-  (`SK_KA47_X`) and AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
+- **The SMG, the rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon
+  Bundle's SMG11 (`SK_SMG11_X`, a MAC-11 with its wire stock folded), AK 47 (`SK_KA47_X`) and
+  AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
   - A row with a `model` builds the model instead of its `parts`. Its `parts` are then the
     model's **measured outline**: boxes that are never built, which the grip solve and the sight
     checks read exactly as they read a primitive gun's parts. Re-measure them if the mesh changes.
@@ -45,8 +46,8 @@ menu polls its own copy from `DrawHUD`, which does.
     `b_gun_muzzleflash` sockets.
   - The pack isn't committed. Without it the build stops at `_must_load`.
     `Scripts/asset_pipeline/fab_library.json` is the restore recipe.
-  - The shotgun, pistol and SMG are still primitives. The pack has no shotgun or pistol, and
-    its SMG11 and KA74U were not asked for.
+  - The shotgun and pistol are still primitives. The pack has no shotgun or pistol, and its
+    KA74U was not asked for.
 - **Equipping is authored once.** BeginPlay, switch, drop and pick-up only set `NeedsRefresh`.
   Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
@@ -140,6 +141,8 @@ These are feel checks a headless run can't do:
   into a headless game, so only the verifier covers this);
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
+- the SMG11 down its sights: the eye rides a centimetre over the folded stock's wire, 23 cm
+  behind the grip (the shotgun's is 20), which may put the adventurer's head in view;
 - the `GUN_ACCURACY` numbers: how wide each cloud feels at the hip, and whether the reticle's
   gap (and its 240 px cap) reads well on a real window;
 - how the death camera looks under the terrain;

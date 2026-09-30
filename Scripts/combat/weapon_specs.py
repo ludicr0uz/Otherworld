@@ -1,7 +1,7 @@
 """The five weapons as data: their primitive parts, muzzle offsets, icons
 and the _weapon_specs() table every builder and the verifier iterate.
-Adding a weapon is a row here. The rifle and the sniper are Fab models, and
-their parts, muzzles and sights come from weapon_models.py.
+Adding a weapon is a row here. The SMG, the rifle and the sniper are Fab
+models, and their parts, muzzles and sights come from weapon_models.py.
 """
 
 import unreal
@@ -18,8 +18,9 @@ from combat.paths import (
 )
 from combat.skin import player_skin
 from combat.weapon_models import (
-    RIFLE_MODEL, RIFLE_MUZZLE, RIFLE_SIGHT, SNIPER_MODEL, SNIPER_MUZZLE,
-    SNIPER_SIGHT, rifle_outline, sniper_outline,
+    RIFLE_MODEL, RIFLE_MUZZLE, RIFLE_SIGHT, SMG_MODEL, SMG_MUZZLE, SMG_SIGHT,
+    SNIPER_MODEL, SNIPER_MUZZLE, SNIPER_SIGHT, rifle_outline, smg_outline,
+    sniper_outline,
 )
 from combat.tuning import (
     COMBAT, GUN_LOOT_TABLE, PISTOL_FIRE_INTERVAL, PISTOL_MAGAZINE,
@@ -66,31 +67,10 @@ def _pistol_parts():
     )
 
 
-def _smg_parts():
-    """Compact and all-metal, with the magazine hanging straight down.
-
-    The five weapons have to be told apart in a fist at 3 m with no UI, so each
-    silhouette commits to one thing. The SMG's is *short* -- barely longer than
-    the pistol -- and the vertical box magazine under the receiver is the one
-    feature no other weapon here has.
-    """
-    barrel = _barrel_rotation()
-    return (
-        ("Receiver",     CUBE,     (20.0, 0.0, 0.0),   _rot(),           (0.24, 0.050, 0.070), MAT_METAL),
-        ("Handguard",    CUBE,     (34.0, 0.0, 1.0),   _rot(),           (0.12, 0.045, 0.045), MAT_METAL),
-        ("Barrel",       CYLINDER, (44.0, 0.0, 1.5),   barrel,           (0.014, 0.014, 0.22), MAT_METAL),
-        ("Magazine",     CUBE,     (14.0, 0.0, -9.0),  _rot(pitch=8.0),  (0.035, 0.030, 0.110), MAT_METAL),
-        ("Grip",         CUBE,     (4.0, 0.0, -7.0),   _rot(pitch=18.0), (0.048, 0.038, 0.088), MAT_METAL),
-        ("Stock",        CUBE,     (-6.0, 0.0, 0.0),   _rot(),           (0.18, 0.030, 0.030), MAT_METAL),
-        ("TriggerGuard", CUBE,     (10.0, 0.0, -4.5),  _rot(),           (0.060, 0.028, 0.018), MAT_METAL),
-    )
-
-
 # Muzzle tip in the weapon's own space: where the barrel actually ends, so the
 # pellet cone starts at the gun rather than inside the player's chest.
 SHOTGUN_MUZZLE = (101.0, 0.0, 2.2)
 PISTOL_MUZZLE = (30.0, 0.0, 1.5)
-SMG_MUZZLE = (56.0, 0.0, 1.5)
 
 # The eye when aiming down the sights, in the same space. None of the primitive
 # guns has a modelled sight, so the sight line is the top of the gun: the eye sits a
@@ -98,11 +78,10 @@ SMG_MUZZLE = (56.0, 0.0, 1.5)
 # behind the rear of the receiver (or slide). Tuned by eye in PIE: 14 cm back
 # and the receiver's back face filled a third of the screen; 34 cm back and
 # the camera was inside the adventurer's head, whose hair crossed the view.
-# The rifle (over its irons) and the sniper (on its scope's axis) are in
-# weapon_models.py.
+# The SMG (over its receiver), the rifle (over its irons) and the sniper (on
+# its scope's axis) are in weapon_models.py.
 SHOTGUN_SIGHT = (-12.0, 0.0, 5.5)
 PISTOL_SIGHT = (-16.0, 0.0, 5.0)
-SMG_SIGHT = (-12.0, 0.0, 5.5)
 
 
 # ─── Accuracy: where the shot goes, and what it does to the view ─────────────
@@ -258,7 +237,7 @@ def _weapon_specs():
         # 12 x 9 = 108 damage to kill, delivered in 0.81 s. The lowest damage
         # per round of the five and the highest per second, which is the whole
         # identity: it wins a fight it is already in and empties fast.
-        dict(path=SMG_BP_PATH, parts=_smg_parts(), muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
+        dict(path=SMG_BP_PATH, parts=smg_outline(), model=SMG_MODEL, muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
              display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
              sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),

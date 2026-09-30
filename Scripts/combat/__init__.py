@@ -18,8 +18,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
   weapon_specs      the five weapons: parts, muzzles, icons, _weapon_specs()
-  weapon_models     the rifle's and the sniper's Fab models (AK 47, AS Val +
-                    scope), their muzzles and sights, and the measured outline
+  weapon_models     the SMG's, the rifle's and the sniper's Fab models (SMG11,
+                    AK 47, AS Val + scope), their muzzles and sights, and the measured outline
                     the grip and sight checks read in place of parts
   camera            boom and aim-trace numbers, face/aim-the-camera patches
   knife             BP_Knife: the Fab M9 knife as a Melee item, its model

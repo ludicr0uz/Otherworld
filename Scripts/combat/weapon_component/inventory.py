@@ -208,16 +208,26 @@ def _author_pickup(ed, owner, exec_in, x0, y0):
     _connect(item, _pin(add, "NewItem"))
     _connect(BEL.find_then_pin(clear), _pin(add, "execute"))
 
-    # Equip what was just picked up: its index is the new last one.
-    at = keep(_at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 3100, y0))
+    # A pick-up goes into the bag and whatever is in the hand stays there.
+    # Only empty hands take it up: after dropping or eating the last item,
+    # Held is None and EquippedIndex may be -1, so nothing would be shown.
+    # Array_Add's ReturnValue is the new item's index (an exec node's output,
+    # read once).
+    held = keep(_at(ed.add_get_member_variable_node("Held"), x0 + 2840, y0 + 300))
+    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 3100, y0 + 300))
+    _connect(_pin(held, "Held", is_input=False), _pin(armed, "Object"))
+    empty = keep(_at(ed.add_branch_node(), x0 + 3100, y0))
+    _connect(_pin(armed, "ReturnValue", is_input=False), _pin(empty, "Condition"))
+    _connect(BEL.find_then_pin(add), _pin(empty, "execute"))
+    at = keep(_at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 3360, y0 + 120))
     _connect(_pin(add, "ReturnValue", is_input=False), _pin(at, "EquippedIndex"))
-    _connect(BEL.find_then_pin(add), _pin(at, "execute"))
+    _connect(BEL.find_else_pin(empty), _pin(at, "execute"))
 
     ed.add_comment_to_nodes(
         f"{PICKUP_KEY} picks up any weapon within {PICKUP_RADIUS:.0f} cm that is "
-        f"flagged Dropped, while fewer than {INVENTORY_SIZE} are carried, and "
-        "equips it. Array_Add returns the new item's index, which is exactly "
-        "the slot to switch to.",
+        f"flagged Dropped, while fewer than {INVENTORY_SIZE} are carried, into "
+        "the inventory without switching to it: the held item stays held. "
+        "Only empty hands (Held is None) take up what was picked up.",
         made)
     return _loose_pin(loop, "Completed", is_input=False)
 

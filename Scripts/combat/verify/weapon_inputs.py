@@ -169,11 +169,56 @@ def check_keys_are_variables():
     check("damage is clamped at zero", bool(by_pins(wg, "Value", "Min", "Max")))
     check("switching wraps with a modulo", bool(by_pins(wg, "A", "B")))
     check("pick-up searches the world for weapons", bool(by_pins(wg, "ActorClass")))
+    _check_pickup_keeps_held()
     check("dropping detaches the weapon",
           bool(by_pins(wg, "LocationRule", "RotationRule", "ScaleRule")))
 
     probes = [n for n in wg if "InString" in in_pins(n)]
     check("no leftover debug PrintStrings", not probes, f"{len(probes)} found")
+
+
+def _linked(node, pin_name):
+    """The nodes on the far side of one of ``node``'s output pins."""
+    return [PIN.get_owning_node(q)
+            for q in PIN.list_connected_pins(BEL.find_output_pin(node, pin_name))]
+
+
+def _check_pickup_keeps_held():
+    """A pick-up joins the inventory without switching to it.
+
+    The only EquippedIndex write fed by an Array_Add must run off the else arm
+    of a Branch on IsValid(Held): empty hands take the item up, a held item
+    stays held.
+    """
+    adds = by_pins(wg, "TargetArray", "NewItem")
+    straight = [(a, n) for a in adds for n in _linked(a, "ReturnValue")
+                if "EquippedIndex" in str(BEL.get_node_title(n))]
+    switches = [n for _, n in straight]
+    # BeginPlay's loadout adds too, then equips slot 0: only a write of the
+    # added item's own index counts as switching to it.
+    check("pick-up does not switch straight to what it picked up",
+          not any(n in _linked(a, "then") for a, n in straight),
+          f"{len(adds)} Array_Add node(s)")
+
+    def only_when_empty(n):
+        links = PIN.list_connected_pins(BEL.find_execute_pin(n))
+        if not links:
+            return False
+        for q in links:
+            branch = PIN.get_owning_node(q)
+            if str(PIN.get_pin_name(q)) != "else":
+                return False
+            cond = PIN.list_connected_pins(BEL.find_input_pin(branch, "Condition"))
+            valid = [PIN.get_owning_node(c) for c in cond]
+            if not any("Get Held" in str(BEL.get_node_title(PIN.get_owning_node(h)))
+                       for v in valid if "Object" in in_pins(v)
+                       for h in PIN.list_connected_pins(BEL.find_input_pin(v, "Object"))):
+                return False
+        return True
+
+    check("only empty hands (Held not valid) take up a picked-up item",
+          len(switches) == 1 and only_when_empty(switches[0]),
+          f"{len(switches)} EquippedIndex write(s) fed by Array_Add")
 
 
 # ─── Sprint and stamina ──────────────────────────────────────────────────────

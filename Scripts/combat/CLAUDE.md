@@ -36,6 +36,8 @@ menu polls its own copy from `DrawHUD`, which does.
 - **Equipping is authored once.** BeginPlay, switch, drop and pick-up only set `NeedsRefresh`.
   Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
+- **A pick-up goes into the inventory without switching.** The held item stays held. Only empty
+  hands (`Held` is None, after a drop or eating the last item) take the new item up.
 - **Ammunition lives on the weapon** (`MagazineSize`/`Loaded`/`Reserve` on `BP_WeaponItem`).
   Drop a half-empty gun and it is still half-empty when picked up. The pistol is the fallback: an
   8-round magazine over an endless reserve (`InfiniteReserve`), so it reloads every 8 shots but

@@ -56,6 +56,13 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     both it and the save.
   - It shows the FPS readout, pellet tracers, per-impact damage (`39.0 (x1.5)`, only on actors
     with a health component) and wanderer numbers.
-  - The tracer is a separate `DrawDebugLine` behind a Branch, since the enum pin can't be driven.
-    Every trace's `DrawDebugType` is `None`.
+  - The tracer (`weapon_component/tracer.py`) is a separate `DrawDebugLine` behind a Branch,
+    since the enum pin can't be driven. Every trace's `DrawDebugType` is `None`.
+    - It lasts `TRACE_DEBUG_SECONDS` (3 s) and stops where the pellet did, with a point there:
+      red to an impact, blue out to the weapon's range on a miss.
+    - **Both ends come off the trace's own hit result** (`TraceStart`, then `Location` or
+      `TraceEnd`). The trace's `End` is fed by the pure pellet cone, so a tracer wired to it
+      drew a second, different pellet: the shotgun's lines were not its pellets'.
+      `verify/tracer.py` walks the tracer's pure inputs for a random node.
+  - It also shows each wanderer's sight cone (`Scripts/npc/CLAUDE.md`).
   - Readers copy the flag once: the weapon component per shot, the HUD per `DrawHUD`.

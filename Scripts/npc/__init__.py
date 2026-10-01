@@ -35,6 +35,8 @@ THE CONTROLLER'S STEPS (one fragment per concern)
   senses       hurt, sight (cone + line of sight), touch, sound
   chase        the move order at the player (pathfinding or straight line)
   agro         the notice and patrol steps: player present, one per sense, stroll
+  sight_cone   debug mode: the Tick that draws the sight (aggro) cone, as
+               senses.py tests it, yellow on patrol and red on the hunt
   steps        every BT_<Step> custom event, built from the fragments above
   controller   BP_ForestWandererAI: on possession, run its Behavior Tree
 
@@ -45,6 +47,7 @@ THE BEHAVIOUR TREE
 CHECKS (Scripts/verify_npc_blueprints.py)
   verify       patrol, agro, corpse and guard, per controller
   verify_tree  the Blackboard, each tree's priorities, the step events
+  verify_sight_cone  debug mode's cone: its gates and what it is drawn from
 
 THE BODY
   character    BP_ForestWanderer and one child Blueprint per creature

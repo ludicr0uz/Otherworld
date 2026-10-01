@@ -6,7 +6,8 @@ their patrol and agro against forest_generator/npc_agro.py.
 
 The chase and melee are checked by the level verifier; the checks here live in
 Scripts/npc/verify.py (patrol, agro, corpse, guard) and Scripts/npc/verify_tree.py
-(the Blackboard, the Behavior Trees and their steps).
+(the Blackboard, the Behavior Trees and their steps) and
+Scripts/npc/verify_sight_cone.py (debug mode's sight cone).
 """
 
 import os
@@ -20,9 +21,11 @@ import unreal                                                     # noqa: E402
 
 from npc.verify import FAIL, PASS, run                            # noqa: E402
 from npc.verify_tree import run as run_tree                       # noqa: E402
+from npc.verify_sight_cone import run as run_sight_cone           # noqa: E402
 
 run()
 run_tree()
+run_sight_cone()
 unreal.log_warning(f"[VERIFY] {len(PASS)} passed, {len(FAIL)} failed")
 for f in FAIL:
     unreal.log_warning(f"[VERIFY]   FAILED: {f}")

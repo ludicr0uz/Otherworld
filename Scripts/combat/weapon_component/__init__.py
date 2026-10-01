@@ -19,6 +19,8 @@ _author_* fragment per concern, each in its own module:
               ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
   firing      the round and cooldown, the shot's one draw inside AimSpread
               (ShotDirection), the pellet traces around it
+  tracer      debug mode: the line each pellet flew, off the trace's own hit
+              result (red to an impact, blue out to the range), and a point
   impact      a pellet that connected: blood, damage, hit zones, debug readout
   inventory   equip, drop, pick up, BeginPlay loadout
   listener    BeginPlay: sounds fade with the distance from the character,

@@ -158,6 +158,21 @@ Wanderer (selector)
   - **Footsteps (player only):** 12 m at a run, 18 m sprinting, 6 m while aiming.
 - **Every transition logs `[NPC-AGRO] <sense> -- <actor>`, in debug mode only.** The line is a
   `PrintWarning`, which also puts it on screen, so it is gated on the GameMode's `DebugMode`.
+- **Debug mode also draws each live wanderer's sight (aggro) cone** (`sight_cone.py`): from the
+  pawn, along its forward vector, `TuneSightRange` long and `TuneSightHalfAngle` either side —
+  the sight sense's own inputs, so the MONSTER TUNING tab moves the cone and the sense together.
+  Yellow on patrol, red once aggro.
+  - It is the controller's own **Tick**, not a tree step: the steps run on the tree's 0.5 s
+    beat. One frame per draw (`Duration` 0). Gates are nested Branches: `DebugMode`, a pawn,
+    not `Corpse`.
+  - It is a full cone because the test is a 3D dot product. It doesn't show line of sight
+    (a trunk still hides the player), touch or hearing.
+  - Each draw stamps `SightConeDrawnAt` with the game time, which is how
+    `probes/probe_sight_cone.py` sees the draw in a headless game. `verify_sight_cone.py`
+    checks the graph.
+  - To look at a debug draw, run a `--game --windowed` probe that sends the console command
+    `Shot showui` (lands in `Saved/Screenshots/MacEditor`). `HighResShot` leaves debug lines
+    and the HUD out, and `AutomationLibrary.take_high_res_screenshot` writes nothing there.
 
 ## Following to the edge of the map
 

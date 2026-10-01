@@ -14,9 +14,10 @@ from combat.paths import GAME_MODE_BP_PATH
 
 # --- debug mode --------------------------------------------------------------
 # One flag on the GameMode, toggled from the graphics menu, that turns the
-# developer overlays on and off: the pellet tracers drawn from the muzzle and
-# the wanderer's number beside its health bar. Off by default -- they are both
-# instrumentation, and instrumentation is not what the game looks like.
+# developer overlays on and off: the pellet tracers drawn from the muzzle, the
+# wanderer's number beside its health bar and its sight cone
+# (npc/sight_cone.py). Off by default -- they are all instrumentation, and
+# instrumentation is not what the game looks like.
 DEBUG_MODE_VAR = "DebugMode"
 
 # --- combat trace ------------------------------------------------------------
@@ -39,7 +40,16 @@ COMBAT_TRACE_PREFIX = "[COMBAT-TRACE] "
 # Drawn with an explicit DrawDebugLine rather than with the trace node's own
 # DrawDebugType: that pin is an enum literal, and an enum pin cannot be driven
 # by a variable, so "sometimes" is not expressible there at all.
-TRACE_DEBUG_SECONDS = 1.5
+#
+# Long enough to walk up to a line and look along it. The tracer
+# (weapon_component/tracer.py) stops where the pellet did, with a point there:
+# TRACER_HIT_COLOR when it connected with anything, TRACER_MISS_COLOR when it
+# ran out the weapon's range.
+TRACE_DEBUG_SECONDS = 3.0
+TRACER_THICKNESS = 2.0
+TRACER_POINT_SIZE = 12.0
+TRACER_HIT_COLOR = "(R=1.000000,G=0.150000,B=0.050000,A=1.000000)"
+TRACER_MISS_COLOR = "(R=0.300000,G=0.800000,B=1.000000,A=1.000000)"
 
 # Every wanderer gets a number, handed out in spawn order and shown beside its
 # health bar, so a fall-through seen on screen can be matched to the exact

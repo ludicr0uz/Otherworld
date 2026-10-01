@@ -15,7 +15,8 @@ split it before extending it.
 **The keys:**
 - **M** toggles the panel.
 - **1 / 2 / 3 / 4** pick the Low / Medium / High / Ultra presets.
-- **D** toggles debug mode.
+- **D** toggles debug mode (the FPS readout, wanderer numbers, pellet tracers and impact
+  damage, the wanderers' sight cones).
 - **X** (panel open) starts save and exit.
 - **K** (panel open) is the dev-all-guns cheat (below).
 - **T** (panel open) opens the GUN TUNING tab (below).

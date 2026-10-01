@@ -88,3 +88,9 @@ NODE_EVENT_EXECUTE_AI = "AddEvent|AI|EventReceiveExecuteAI"
 # A Name pin passed by reference (the Blackboard's KeyName) takes no literal,
 # and EqualEqual_NameName is a wildcard until wired: both are fed from this.
 FN_LITERAL_NAME = "/Script/Engine.KismetSystemLibrary.MakeLiteralName"
+
+# Debug mode's sight cone (npc/sight_cone.py): a Tick of the controller's own,
+# because the tree's steps run on its beat and a cone has to follow the head.
+NODE_EVENT_TICK = "AddEvent|EventTick"
+FN_DRAW_CONE = "/Script/Engine.KismetSystemLibrary.DrawDebugConeInDegrees"
+FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"

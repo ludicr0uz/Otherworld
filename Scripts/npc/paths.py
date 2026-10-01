@@ -86,6 +86,20 @@ CHARACTER_CLASS_PATH = "/Script/Engine.Character"
 CORPSE_VAR = "Corpse"
 CORPSE_LOG_PREFIX = "[NPC-CORPSE] #"
 
+# ── Debug mode's sight cone (npc/sight_cone.py) ──────────────────────────────
+#
+# While the GameMode's DebugMode is on, every live wanderer draws the cone its
+# sight sense tests (npc/senses.py): from the pawn, along its forward vector,
+# TuneSightRange long and TuneSightHalfAngle either side. SIGHT_CONE_PATROL_COLOR
+# while it patrols, SIGHT_CONE_AGGRO_COLOR once it hunts. SIGHT_CONE_STAMP_VAR
+# is the game time of the last cone drawn, which is how a headless probe (no
+# renderer) tells that the draw ran.
+SIGHT_CONE_STAMP_VAR = "SightConeDrawnAt"
+SIGHT_CONE_SIDES = 12
+SIGHT_CONE_THICKNESS = 2.0
+SIGHT_CONE_PATROL_COLOR = "(R=1.000000,G=0.850000,B=0.100000,A=1.000000)"
+SIGHT_CONE_AGGRO_COLOR = "(R=1.000000,G=0.100000,B=0.050000,A=1.000000)"
+
 # ── The behaviour tree (npc/tree.py, step_task.py, steps.py) ─────────────────
 #
 # The controller no longer loops on a Delay: on possession it runs a Behavior

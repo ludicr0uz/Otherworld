@@ -244,7 +244,7 @@ def check_debug_mode():
     check("the pellet tracer is a DrawDebugLine, not a trace that draws itself",
           bool(by_pins(wg, "LineStart", "LineEnd")),
           f"{len(by_pins(wg, 'LineStart', 'LineEnd'))} DrawDebugLine node(s)")
-    check("...and it lasts as long as the tracer always did",
+    check("...and it lasts TRACE_DEBUG_SECONDS (the rest is verify/tracer.py)",
           all(abs(float(pin_value(n, "Duration") or 0) - TRACE_DEBUG_SECONDS) < 1e-3
               for n in by_pins(wg, "LineStart", "LineEnd")),
           f"{TRACE_DEBUG_SECONDS}s")

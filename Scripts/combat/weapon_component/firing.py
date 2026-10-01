@@ -3,12 +3,12 @@ inside the accuracy cloud, and one trace per pellet around it. What a pellet
 that connects does is impact.py.
 """
 
-from combat.game_state import DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
+from combat.game_state import DEBUG_MODE_VAR
 from combat.graph import (
     BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set,
 )
 from combat.nodes import (
-    FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_DRAW_LINE, FN_GET_GAME_MODE,
+    FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_GET_GAME_MODE,
     FN_MUL_VF, FN_NORMAL, FN_PLAY_SOUND, FN_RAND_CONE, FN_SUB_II, FN_SUB_VV,
     FN_TIME_SECONDS, FN_TRACE, MACRO_FOR_LOOP, NODE_BREAK_HIT,
     NODE_CAST_GAME_MODE,
@@ -17,6 +17,7 @@ from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH
 from combat.weapon_component.accuracy import AIM_SPREAD_VAR
 from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.impact import _author_impact
+from combat.weapon_component.tracer import _author_tracer
 
 # The shot's direction, drawn once per trigger pull inside AimSpread.
 SHOT_DIRECTION_VAR = "ShotDirection"
@@ -153,40 +154,32 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     _trace_defaults(trace)
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(trace, "execute"))
 
-    # The tracer, in debug mode only. It starts at the barrel, so what you see
-    # is the line the pellet took and not a line from the camera -- which is
-    # what makes it worth having while tuning the aim solve, and what makes it
-    # wrong to leave switched on in the game.
-    seen = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR),
-                    x0 + 2620, y0 + 300))
-    showing = keep(_at(ed.add_branch_node(), x0 + 2860, y0))
-    _connect(_pin(seen, DEBUG_MODE_VAR, is_input=False), _pin(showing, "Condition"))
-    _connect(BEL.find_then_pin(trace), _pin(showing, "execute"))
-    tracer = keep(_at(_node(ed, FN_DRAW_LINE), x0 + 3100, y0 - 320))
-    _connect(muzzle, _pin(tracer, "LineStart"))
-    _connect(_pin(end, "ReturnValue", is_input=False), _pin(tracer, "LineEnd"))
-    _set(tracer, "Duration", TRACE_DEBUG_SECONDS)
-    _set(tracer, "Thickness", 1.0)
-    _connect(BEL.find_then_pin(showing), _pin(tracer, "execute"))
+    brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 2620, y0 + 760))
+    _connect(_pin(trace, "OutHit", is_input=False), _loose_pin(brk, "Hit"))
 
-    hit = keep(_at(ed.add_branch_node(), x0 + 3360, y0))
+    # The tracer, in debug mode only (tracer.py). It starts at the barrel, so
+    # what you see is the line the pellet took and not a line from the camera
+    # -- which is what makes it worth having while tuning the aim solve, and
+    # what makes it wrong to leave switched on in the game.
+    drawn, after_tracer = _author_tracer(ed, trace, brk, x0 + 2620, y0)
+    made.extend(drawn)
+
+    hit = keep(_at(ed.add_branch_node(), x0 + 3760, y0))
     _connect(_pin(trace, "ReturnValue", is_input=False), _pin(hit, "Condition"))
     # Both arms of the tracer branch carry on: whether a line was drawn has
     # nothing to do with whether the pellet connected.
-    _connect(BEL.find_then_pin(tracer), _pin(hit, "execute"))
-    _connect(BEL.find_else_pin(showing), _pin(hit, "execute"))
-    brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 3360, y0 + 300))
-    _connect(_pin(trace, "OutHit", is_input=False), _loose_pin(brk, "Hit"))
+    for tail in after_tracer:
+        _connect(tail, _pin(hit, "execute"))
 
     ed.add_comment_to_nodes(
         "Fire: one round and one cooldown stamp first, then origin at the "
         "muzzle, direction muzzle -> AimPoint drawn once inside AimSpread, "
         "then each pellet inside the weapon's own pattern. "
-        "The tracer leaves the barrel and ends where the reticle said it would "
+        "The tracer leaves the barrel and ends where the pellet stopped "
         "-- when DebugMode is on, which is the only time it is drawn at all.",
         made)
 
-    _author_impact(ed, brk, held, BEL.find_then_pin(hit), x0 + 3640, y0)
+    _author_impact(ed, brk, held, BEL.find_then_pin(hit), x0 + 4040, y0)
     # The direction goes back too, so the shot's noise cone is the pellets' line.
     return _loose_pin(loop, "Completed", is_input=False), direction
 

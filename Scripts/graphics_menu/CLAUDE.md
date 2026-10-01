@@ -93,6 +93,15 @@ mouse is the camera's.
 - **Anchored, not computed.** Each element is anchored to its corner or edge (survival bars
   bottom-left, kills and FPS top-right, banner top-centre, inventory, HP and stamina
   bottom-centre, menus centred). UMG scales them with the DPI curve (1.0 at a 1080 px shortest side).
+- **The proprietary notices** (`legal_consts.py`, `wbp_legal.py`; the game is Ellivian Inc.'s,
+  see `LICENSE.txt`) are static designer text that no graph touches. `WBP_MainMenu`'s
+  `LegalNotice` (copyright and confidentiality lines) sits bottom-centre on Root, outside both
+  panels. `WBP_HUD`'s `Watermark` sits bottom-right on Root, outside `Body` like `Fps`, so it is
+  over every screen, in the corner the inventory strip and the loot window leave free.
+  **Stamping a shared build:** set `WATERMARK_RECIPIENT` and re-run the build; it adds an
+  `ISSUED TO` line (empty = no line). Neither is a variable: a live probe reaches them as
+  children of a variable sibling's parent (`probe_legal_notices.py`, windowed, which also
+  saves the `shot showui` pictures).
 - **Still on the canvas:** the reticle and the sniper's scope (placed off the viewport centre
   and sized by the gun's cloud every frame) and the wanderers' bars (one per wanderer, placed by
   projecting its head). The task allowed it; a widget per wanderer would need a pool or a
@@ -355,6 +364,10 @@ night's (seconds, step 30). Same keys as GUN TUNING; **Enter** saves the two len
 - **Macro and library pin names:** the `ForLoop` macro's exec input is `execute` (the
   `ForEachLoop`'s is `Exec`); `Array_IsValidIndex` takes `IndexToTest`;
   `ProgressBar.SetFillColorAndOpacity` takes `InColor`.
+- **One build per warm headless editor.** A second `build_graphics_menu.py` in the same
+  `UEPY_SERVE` editor kills it without a crash report, while compiling `BP_GraphicsMenuHUD`
+  (uepy says "the listener stopped responding"). Stop it first (`touch <dir>/stop`), or let
+  the failed call be the stop: the next call boots a new one.
 - **Seeing a screen:** a `-nullrhi` probe proves the values, not the look. A `-game` run without
   `-nullrhi` (`-windowed -ResX=1280 -ResY=720`) renders on this Mac, and the console command
   `shot showui` saves the viewport with its widgets to `Saved/Screenshots/MacEditor/`.

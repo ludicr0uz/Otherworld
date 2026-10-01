@@ -43,6 +43,7 @@ from graphics_menu.cursor_checks import check_cursor
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
+from graphics_menu.legal_checks import check_legal
 from graphics_menu.umg_checks import check_hud_graph, check_trees, text_literal
 from combat.tuning import COMBAT, SHOT_VOLUME_CM
 
@@ -309,6 +310,7 @@ def main():
 
     # --- the UMG screens: their trees, and the graph that writes them
     check_trees(check)
+    check_legal(check)
     check_hud_graph(check, nodes)
     check_bar_layout(check)
     check_bar_flash(check, nodes)

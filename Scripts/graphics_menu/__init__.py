@@ -61,6 +61,9 @@ Input, settings and state
                   kneel (run after save_exit's)
   loot_draw       DrawHUD: the loot prompt, and the window's icon rows and caret
   wbp_loot        WBP_HUD's loot prompt and window (called from wbp_hud)
+  legal_consts    the proprietary notices' words and places, WATERMARK_RECIPIENT
+  wbp_legal       WBP_MainMenu's LegalNotice and WBP_HUD's Watermark (called
+                  from wbp_screens and wbp_hud)
   tune_tab        TuneTab: what a tuning tab is called (keys, variables,
                   widgets, words, save command); the shared arrows and Enter
   tune_consts     the GUN TUNING tab (T): variables, widget names, GUN_TAB
@@ -91,6 +94,7 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   profile_checks     the saved profile and save and exit
   dev_guns_checks    the dev-all-guns row, key and the five spawns
   loot_checks        the loot window: scan, keys, take, widgets
+  legal_checks       the title screen's notice and the HUD's watermark
   tune_checks        the gun tuning tab: table, CSV on the guns, panel, save, writes
   world_tune_checks    the world tuning tab: panel, save, the cycle's Sets
   cursor_checks      the mouse cursor: shown when, the row tests, the clicks

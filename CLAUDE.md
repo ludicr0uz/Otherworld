@@ -222,6 +222,10 @@ editor.
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
   and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts) (plus D: debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world, K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day and the day's and night's lengths, the lengths saved to `Scripts/world/world_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
+- **Proprietary notices:** the game is Ellivian Inc.'s (`LICENSE.txt`). The title and settings
+  pages carry a copyright and confidentiality notice, and every screen a faint
+  `ELLIVIAN INC. · CONFIDENTIAL` watermark, bottom right; `WATERMARK_RECIPIENT`
+  (`graphics_menu/legal_consts.py`) stamps a shared build with who it was given to.
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`. Food and water lie
   in both.
 - **Day and night:** a clock turns the sun and the moon across the sky. The day and the night

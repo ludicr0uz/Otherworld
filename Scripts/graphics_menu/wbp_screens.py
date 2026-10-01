@@ -11,6 +11,7 @@ import unreal
 
 from combat.graph import BEL, _must_load
 from graphics_menu import umg_author as U
+from graphics_menu.wbp_legal import author_legal_notice
 from graphics_menu.wbp_tune import author_tune_widgets
 from graphics_menu.umg_consts import (
     COL_CARET, COL_DEATH_HINT, COL_DEATH_TEXT, COL_DEATH_TITLE, COL_GOLD, COL_HINT,
@@ -80,6 +81,7 @@ def build_main_menu():
     # The designer opens on the title page; the HUD picks the page per frame.
     U.hide(capture)
     U.hide(settings)
+    author_legal_notice(bp, root)
     return U.compile_and_save(bp)
 
 

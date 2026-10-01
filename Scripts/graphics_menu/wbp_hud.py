@@ -9,6 +9,7 @@
                   WBP_InventorySlot, and under it HP and stamina side by side
     right edge    the loot window, and under the reticle its prompt (wbp_loot.py)
   Fps    (debug mode, on every screen)
+  Watermark  (bottom right, on every screen: wbp_legal.py)
 
 Every bar has a stat icon beside it (ui_art/stat_icons.py), tinted its fill
 colour, and sits with it in one group widget (HpStat, StaStat, <Stat>Stat)
@@ -27,6 +28,7 @@ from combat.graph import BEL, _must_load
 from combat.tuning import INVENTORY_SIZE
 from graphics_menu import umg_author as U
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
+from graphics_menu.wbp_legal import author_watermark
 from graphics_menu.wbp_loot import author_loot_widgets
 from graphics_menu.umg_consts import (
     BANNER_COUNT, BANNER_FONT, BANNER_OFF, BANNER_TOP, COL_EXIT_CALLED_OFF, COL_FPS,
@@ -133,4 +135,5 @@ def build_hud_widget():
     fps = U.text(bp, root, HUD_FPS, "FPS  60", FPS_FONT, COL_FPS, variable=True)
     U.at(fps, (1.0, 0.0), (1.0, 0.0), (-CORNER_MARGIN, FPS_TOP))
     U.hide(fps)
+    author_watermark(bp, root)
     return U.compile_and_save(bp)

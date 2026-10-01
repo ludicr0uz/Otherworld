@@ -20,7 +20,10 @@ and it never relies on a variable another section left behind.
               against the mesh; a pellet that strikes no body does nothing
   tracer      debug mode's pellet tracer: drawn off the trace's own hit result
   loot        the corpse loot roll on a counted kill (loot/roll.py)
-  sights      the two aim keys, each weapon's eye point, the sight camera
+  sights      the two aim keys, each weapon's eye point and sight line, the
+              sight camera: where it goes and the line it is turned onto
+  sway        the sight sway: its numbers, and the graph that turns the view
+              by the sway's change before storing it
   aim_pitch   down the sights the anim BP pitches two spine bones by AimPitch,
               which the component writes from the view pitch x SightBlend
   body_pose   the crouch, prone and guard poses: the anim BP's weighted
@@ -47,7 +50,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "sights", "sway", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife",
     "hold_pose", "throw", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

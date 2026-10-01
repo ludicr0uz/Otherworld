@@ -17,16 +17,53 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     `COMBAT.shoulder_zoom` (1.5x) on every weapon.
   - `KeySights` (middle) is down the sights: zoom is the weapon's `AdsZoom` (irons 1.5x, scope
     4x), and `sights.py` eases the camera from the boom's `SpringEndpoint` to the held weapon's
-    `SightOffset` by `SightBlend`, by **location only**. The rotation stays the boom's.
+    `SightOffset` by `SightBlend`, and **turns it onto the weapon's sight line** (below).
   - `Aiming` is either key (cloud, recoil, slowdown). `SightAiming` is the sights key alone,
     never with a consumable. `AimZoom` stores the zoom being aimed at. It isn't written on
     release, so the walk slowdown's ease-out divides by the zoom being let go of.
-  - The camera is written every frame, both ways. The template camera has no offset on the
-    boom (asserted in `aim_camera`), so SightBlend 0 is exactly home.
+  - The camera is written every frame, both ways. The template camera has no offset or turn
+    on the boom and does not take the control rotation itself (asserted in `aim_camera`), so
+    SightBlend 0 is exactly home.
   - The weapon component ticks **after the boom** (`AddTickPrerequisiteComponent`). Otherwise
     the camera is placed against last frame's boom and shimmers while strafing.
-  - `SightOffset` values (`weapon_specs.py`) were tuned in PIE. At 14 cm behind the receiver,
-    its back face filled a third of the screen. At 34 cm, the camera was inside the head.
+  - How far back the eye sits was tuned in PIE. At 14 cm behind the receiver, its back face
+    filled a third of the screen. At 34 cm, the camera was inside the head.
+- **Down the sights the view IS the gun's sight line** (`weapon_models.py`, `sights.py`):
+  - Each gun has a rear sight point and a front sight tip, measured off the mesh's vertices
+    (`*_SIGHT_REAR`, `*_SIGHT_FRONT`): the AK's notch and post, the pistol's blades and post,
+    the SMG11's peep and post, the scope's eyepiece and objective. The shotgun has no rear
+    sight, so its line skims the receiver's hump and ends on the bead.
+  - `SightOffset` is the point of that line at the eye's distance (`_eye_behind`), and
+    `SightAim` is the front tip. The camera looks from the one at the other
+    (`MakeRotFromX`, so no roll), eased from the boom's rotation by `SightBlend`. The tip is
+    therefore the middle of the view in any pose, and the shot goes to the middle of the view
+    (the aim trace starts at the camera).
+  - **Why not the control rotation:** the gun rides the arms. Against the control rotation it
+    sat 0.4° off in the rifle pose and up to 2.3° off in the pistol's while walking, so the
+    sights pointed beside the shot. The mouse still aims: it turns the control rotation, the
+    body takes its yaw and (`sight_pitch.py`) its pitch, and the camera rides the gun.
+  - The sight lines are not parallel to the barrel (the AK's falls 0.7° to the muzzle), so
+    the view sits that far off the control rotation. Nothing reads the difference.
+  - An item with no sight line (the knife: both points at its origin) keeps the boom's
+    rotation (`SIGHT_LINE_MIN_CM`).
+  - **The player's mesh always refreshes its bones** (`skin.wear_skin`). An unrendered mesh
+    keeps its last pose, and behind the scope the body is `OwnerNoSee`: the gun would freeze
+    and the view could not pitch.
+  - `probes/probe_sight_align.py` measures it per gun, standing, pitched, walking, crouched
+    and prone: eye, rear and front on the middle of the view within 0.02°. It holds
+    `SightBlend` at exactly 1 by slowing the game (time dilation 0.0001) while it measures.
+    With `--windowed` and `OW_SIGHT_SHOTS=1` it saves each gun's sight picture.
+- **Down the sights the aim sways** (`sway_tuning.py`, `weapon_component/sway.py`):
+  - Two slow sines, 0.3° sideways and 0.2° up and down, times `SightBlend` and the stance
+    (crouched 0.6, prone 0.3). It is the **control rotation** that sways, so the gun, its
+    sights and the shot go together; a gun swaying under a still camera would point its
+    sights where the shot does not go.
+  - Each frame turns the view by the change and stores what it applied (`SwayYaw`,
+    `SwayPitch`), so the mouse and the recoil work on top and letting go gives it back.
+  - **Trap: `SetControlRotation` drops a change under 0.001°.** A frame's sway step is
+    smaller than that at a high frame rate, so the offsets counted turns that never happened
+    and the view drifted 0.13° in one probe run. A step waits until it is 0.002°
+    (`SWAY_MIN_STEP_DEG`) and is then taken whole.
 - **`Scoped` (sniper only) draws a scope overlay instead of the reticle, down the sights only.**
   `T_UI_Scope` is drawn as a square of the viewport height, with black side strips (in
   `graphics_menu/scope.py`).
@@ -46,7 +83,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - The player's anim BP (`PlayerSkin.anim_bp`, not `ABP_Unarmed`) has `AimPitch`. Two
     ModifyBones on `PlayerSkin.aim_bones` (`Spine01`, `Spine`) each **add** half of it as a
     component-space roll, last in the chain before the output. The chest, arms, head and gun
-    turn rigidly, so the eye at `SightOffset` stays on the sight line at any pitch.
+    turn rigidly, and the camera turns with the gun (above).
   - The axis: the mesh is yawed 270, so the body faces component +Y, and `Roll(+a)` tips +Y
     **down**. Looking up by P is `Roll(-P)`.
   - The component writes `AimPitch = NormalizeAxis(ControlRotation.Pitch) × SightBlend`, cast

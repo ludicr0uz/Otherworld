@@ -57,6 +57,11 @@ def check_player_body():
           f"anim {_abp.get_editor_property('target_skeleton').get_name() if _abp else None}")
 
     if _mesh_comp:
+        check("the body's pose is refreshed even when it is not drawn (behind the "
+              "scope it is hidden, and the view follows the gun in its hands)",
+              _mesh_comp.get_editor_property("visibility_based_anim_tick_option")
+              == unreal.VisibilityBasedAnimTickOption.ALWAYS_TICK_POSE_AND_REFRESH_BONES,
+              str(_mesh_comp.get_editor_property("visibility_based_anim_tick_option")))
         check("the body stands in its capsule, not on top of it",
               abs(_mesh_comp.get_editor_property("relative_location").z - skin.mesh_z) < 0.01,
               str(_mesh_comp.get_editor_property("relative_location").z))

@@ -85,11 +85,15 @@ def build_weapon_item():
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     # Where the eye goes when this weapon is aimed down its sights, in the
-    # weapon's own space: behind the rear of the sight line and just above it
-    # (on the scope's axis for the sniper). The camera is moved there from the
+    # weapon's own space: on the sight line, behind the rear sight (on the
+    # scope's axis for the sniper). The camera is moved there from the
     # shoulder boom; see weapon_component/sights.py. A variable for the same
     # reason MuzzleOffset is -- the component reads it off Held.
     _declare(ed, "SightOffset", _struct_type(unreal.Vector.static_struct()))
+    # ...and what the eye looks at from there: the front sight's tip (the
+    # scope's objective). The camera is turned onto it, so the view runs down
+    # the sight line itself and the tip is the middle of the screen.
+    _declare(ed, "SightAim", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
     _declare(ed, "GripRotation", _struct_type(unreal.Rotator.static_struct()))
     _declare(ed, "SlotColor", _struct_type(unreal.LinearColor.static_struct()))
@@ -258,6 +262,7 @@ def build_weapon(spec, item_bp):
         "NextFireTime": 0.0,
         "MuzzleOffset": unreal.Vector(*spec["muzzle"]),
         "SightOffset": unreal.Vector(*spec["sight"]),
+        "SightAim": unreal.Vector(*spec["sight_front"]),
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
         "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),

@@ -229,6 +229,15 @@ def wear_skin(skin=None):
     comp.set_editor_property("anim_class", anim_class)
     comp.set_editor_property("relative_location", unreal.Vector(0.0, 0.0, skin.mesh_z))
     comp.set_editor_property("relative_rotation", _rot(yaw=skin.mesh_yaw))
+    # The pose is refreshed whether or not the body is drawn. By default an
+    # unrendered mesh keeps its last bones, and behind the sniper's scope the
+    # body is hidden from its own camera (weapon_component/sights.py): the
+    # gun would freeze in the hand, and the view, which looks down the gun's
+    # sight line, could not follow the mouse up or down.
+    always = unreal.VisibilityBasedAnimTickOption.ALWAYS_TICK_POSE_AND_REFRESH_BONES
+    comp.set_editor_property("visibility_based_anim_tick_option", always)
+    if comp.get_editor_property("visibility_based_anim_tick_option") != always:
+        raise RuntimeError("the body would still freeze its pose when not drawn")
     got = comp.get_editor_property("skeletal_mesh_asset")
     if got != mesh_asset or comp.get_editor_property("anim_class") != anim_class:
         raise RuntimeError(f"the skin did not stick: mesh={got}, "

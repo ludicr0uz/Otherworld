@@ -12,7 +12,10 @@ _author_* fragment per concern, each in its own module:
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom;
               the zoom, and the look and walk slowdowns it drives
   sights      down the sights: ease the camera from the boom to Held's
-              SightOffset; hide a scoped weapon behind its glass
+              SightOffset and turn it onto Held's sight line (towards
+              SightAim); hide a scoped weapon behind its glass
+  sway        down the sights: the view drifts on two slow sines (the control
+              rotation is turned by the change), steadied by the stance
   sight_pitch down the sights: write the anim BP's AimPitch (the view's pitch
               x SightBlend), which tips the upper body and the gun onto the aim
   pose_weights  ease the anim BP's PoseCrouch/PoseProne/GuardArms/GuardGun

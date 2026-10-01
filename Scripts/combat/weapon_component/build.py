@@ -15,6 +15,7 @@ from combat.paths import (
     WEAPON_COMP_BP_PATH,
 )
 from combat.skin import player_skin
+from combat.sway_tuning import SWAY_VARS
 from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
 from combat.weapon_component.consume import TRIGGER_SPENT
@@ -106,6 +107,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
     _declare(ed, "SightAiming", BEL.get_basic_type_by_name("bool"))
     _declare(ed, "AimZoom", _float_type())
     _declare(ed, "SightBlend", _float_type())
+    # The sight sway (sway.py): its clock, and how far it has turned the view.
+    for name in SWAY_VARS:
+        _declare(ed, name, _float_type())
     # The polled keys, as variables rather than as pin literals. Nothing
     # in this component loads them: the HUD pushes the player's binds in every
     # DrawHUD frame (see graphics_menu/settings_page._author_push_settings), which is
@@ -222,6 +226,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         # A divisor (AimZoom - 1) from the first frame, so never 1.0.
         "AimZoom": COMBAT.shoulder_zoom,
         "SightBlend": 0.0,
+        **{name: 0.0 for name in SWAY_VARS},
         **{name: _key(k) for name, k in BIND_VARS},
         # Both overwritten on the first frame of BeginPlay. Seeded with the
         # engine's own defaults, signs included, so that a BeginPlay that

@@ -62,17 +62,18 @@ def check_recoil():
     pitch_reads = sum(1 for t in flat if t.startswith("SetAimPitch"))
     # The throw's launch reads the view too, and writes nothing back.
     throw_launch = launch_nodes()
-    for label, want, n in (("written", "SetControlRotation", 2),
-                           ("read back first", "GetControlRotation", 2)):
+    # ...and the sight sway (verify/sway.py) turns it the same way: the third.
+    for label, want, n in (("written", "SetControlRotation", 3),
+                           ("read back first", "GetControlRotation", 3)):
         hits = [t for node, t in zip(wg, flat)
                 if t.startswith(want) and node not in throw_launch]
         if want == "GetControlRotation":
             hits = hits[pitch_reads:]
-        check(f"the control rotation is {label} exactly {n}x: the kick and the "
-              f"recovery", len(hits) == n, f"{len(hits)} x {want}")
+        check(f"the control rotation is {label} exactly {n}x: the kick, the "
+              f"recovery and the sight sway", len(hits) == n, f"{len(hits)} x {want}")
     makers = [n for n in wg if {"Roll", "Pitch", "Yaw"} <= in_pins(n)
               and n not in throw_launch]
-    check("both writes are rebuilt through a Make Rotator", len(makers) == 2,
+    check("every write is rebuilt through a Make Rotator", len(makers) == 3,
           str(len(makers)))
     check("...whose Roll comes from the rotation that was read, not a literal zero "
           "that would quietly decide the view never rolls",

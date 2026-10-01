@@ -96,5 +96,15 @@ def aim_camera(bp):
             if max(abs(off.x), abs(off.y), abs(off.z)) > 1e-3:
                 raise RuntimeError(f"the camera is offset from the boom's end "
                                    f"({off}); the sights would not return it there")
+            # ...and turned as the boom is, by the boom alone: down the
+            # sights the camera is turned onto the gun's sight line, which a
+            # camera following the control rotation itself would undo.
+            rot = obj.get_editor_property("relative_rotation")
+            if max(abs(rot.pitch), abs(rot.yaw), abs(rot.roll)) > 1e-3:
+                raise RuntimeError(f"the camera is turned on the boom's end "
+                                   f"({rot}); the sights would not return it there")
+            if obj.get_editor_property("use_pawn_control_rotation"):
+                raise RuntimeError("the camera takes the control rotation itself; "
+                                   "the sights could not turn it onto the gun")
     _log(f"camera: boom {CAMERA_ARM:.0f} cm, over the shoulder by "
          f"{CAMERA_SHOULDER[1]:.0f} cm right / {CAMERA_SHOULDER[2]:.0f} cm up")

@@ -39,6 +39,7 @@ from combat.weapon_component.shot_noise import _author_shot_noise
 from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
+from combat.weapon_component.sway import _author_sight_sway
 from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 
@@ -140,6 +141,11 @@ def _author_wc_tick(ed, tick):
     # of the next frame then starts from wherever this puts the camera.
     ads_exits = _author_sight_camera(ed, tick, owner_out, held, armed_out,
                                      ads_exits, 8400, -700)
+
+    # --- and the aim sways, down the sights ----------------------------------
+    # After SightBlend is written, which scales it; before the pitch below,
+    # which reads the view the sway has just turned.
+    ads_exits = _author_sight_sway(ed, tick, pc_out, ads_exits, 8400, 1200)
 
     # --- and the body pitches with the view, down the sights -----------------
     # After SightBlend is written, which scales it.

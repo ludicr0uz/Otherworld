@@ -154,6 +154,12 @@ SPRING_ARM_SOCKET = "SpringEndpoint"
 FN_SOCKET_LOC = "/Script/Engine.SceneComponent.GetSocketLocation"
 FN_COMP_SET_WORLD_LOC = "/Script/Engine.SceneComponent.K2_SetWorldLocation"
 FN_VLERP = "/Script/Engine.KismetMathLibrary.VLerp"
+# The sight camera's rotation (weapon_component/sights.py): from the boom's
+# to the look down the held weapon's sight line.
+FN_SOCKET_ROT = "/Script/Engine.SceneComponent.GetSocketRotation"
+FN_COMP_SET_WORLD_ROT = "/Script/Engine.SceneComponent.K2_SetWorldRotation"
+FN_RLERP = "/Script/Engine.KismetMathLibrary.RLerp"
+FN_VSIZE = "/Script/Engine.KismetMathLibrary.VSize"
 FN_BOOL_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_BoolToDouble"
 FN_ADD_TICK_PREREQ = "/Script/Engine.ActorComponent.AddTickPrerequisiteComponent"
 FN_SET_LISTENER_ATTENUATION = (

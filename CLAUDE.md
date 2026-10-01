@@ -208,6 +208,9 @@ editor.
   a 10-slot inventory. The guard is a procedural pose (no clip exists), as are crouch and prone on the mannequin fallback.
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
+  Down the sights the view runs along the gun's own sight line (the front sight's tip is the
+  centre of the screen, in any pose), and the aim sways slowly, sights and shot together
+  (`combat/sway_tuning.py`; steadier crouched and prone).
   The pistol reloads every 8 shots from an endless reserve. A bullet that hits a body throws
   blood; one that hits the scenery throws chips and dust off the surface (`BP_BulletImpact`).
   A body is hit only where its physics bodies are, and those are fitted to the model

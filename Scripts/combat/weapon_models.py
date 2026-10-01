@@ -57,6 +57,13 @@ SHOTGUN_MESH = f"{QUATERNIUS_GUNS}/SM_Shotgun_3"
 PISTOL_MESH = f"{QUATERNIUS_GUNS}/SM_Pistol_1"
 
 
+def _eye_behind(rear, front, eye_x):
+    """The point of the sight line (rear sight -> front sight) at `eye_x`:
+    where the eye goes, so the two sights and the eye are on one line."""
+    t = (eye_x - rear[0]) / (front[0] - rear[0])
+    return tuple(r + (f - r) * t for r, f in zip(rear, front))
+
+
 def _box(name, lo, hi):
     """An outline box from its min and max corners (cm), as a part tuple."""
     centre = tuple((a + b) / 2.0 for a, b in zip(lo, hi))
@@ -79,21 +86,31 @@ SMG_MODEL = (
 # b_gun_muzzleflash on SK_SMG11_X.
 SMG_MUZZLE = (19.5, 0.0, 8.0)
 
-# Over the folded stock: its wire lies on the receiver's back half and tops
-# out at 12.8, the highest thing on the gun, so the eye is a centimetre over
-# it. The stock's butt is the part nearest the eye, and the eye must be a near
-# plane (10 cm) behind it: that puts it 23 cm behind the grip, a little
-# further back than the shotgun's 20.
-SMG_SIGHT = (-24.0, 0.0, 13.8)
+# The sight line: the rear peep (a 3.2 mm hole in a plate behind the receiver,
+# at x -9.1) and the tip of the front post between its ears, both 11.7 up, so
+# the line runs level. It passes between the folded stock's two wires (they
+# lie at |y| 1.4-2.2, up to 12.8), through the cocking knob's U (11.3 deep,
+# the line clear of it inside |y| 0.45) and under the stock's hinge bar. The
+# stock's butt is the part nearest the eye, and the eye must be a near plane
+# (10 cm) behind it: that puts it 23 cm behind the grip.
+SMG_SIGHT_REAR = (-9.1, 0.0, 11.7)
+SMG_SIGHT_FRONT = (14.1, 0.0, 11.7)
+SMG_SIGHT = _eye_behind(SMG_SIGHT_REAR, SMG_SIGHT_FRONT, -24.0)
 
 
 def smg_outline():
     return (
         _box("Receiver",     (-11.0, -2.8, 4.2),   (16.0, 2.5, 10.6)),
         # The folded wire stock: the butt behind the receiver, the wire over it.
-        _box("Stock",        (-13.0, -2.4, 1.9),   (-1.0, 2.4, 12.8)),
-        _box("CockingKnob",  (7.0, -1.0, 10.6),    (10.0, 1.0, 12.0)),
-        _box("FrontSight",   (12.8, -1.5, 10.6),   (14.3, 1.5, 12.3)),
+        # ...as its two wires, either side of the sight line, and the butt.
+        _box("Stock",        (-13.0, -2.4, 1.9),   (-10.0, 2.4, 11.0)),
+        _box("StockWireL",   (-13.0, -2.4, 11.0),  (-1.0, -1.2, 12.8)),
+        _box("StockWireR",   (-13.0, 1.2, 11.0),   (-1.0, 2.4, 12.8)),
+        # The peep's plate under its hole, the knob under its U, and the
+        # front sight's base under the post: each stops at the sight line.
+        _box("RearSight",    (-9.2, -0.7, 10.6),   (-9.0, 0.7, 11.38)),
+        _box("CockingKnob",  (7.0, -1.0, 10.6),    (10.0, 1.0, 11.4)),
+        _box("FrontSight",   (12.8, -1.5, 10.6),   (14.3, 1.5, 11.7)),
         _box("Barrel",       (16.0, -1.0, 7.1),    (19.5, 1.0, 9.0)),
         _box("Sling",        (13.5, -1.4, -12.4),  (15.6, 1.4, 4.5)),
         # The grip is deep front to back because the magazine runs up it.
@@ -112,22 +129,28 @@ RIFLE_MODEL = (
 # b_gun_muzzleflash on SK_KA47_X.
 RIFLE_MUZZLE = (61.9, 0.0, 8.2)
 
-# Over the irons: the rear sight's leaf (x 19-25) tops out at 13.8 and the
-# front post at 13.7, so the sight line is ~13.8 and the eye a centimetre over
-# it. 17 cm back: the dust cover's rear is at x -6, and the eye must be a near
-# plane (10 cm) behind anything that close to the line; that also keeps the
-# eye 15.5 cm behind the grip, where the old rifle's was 14 (further back
-# and the camera is in the adventurer's head).
-RIFLE_SIGHT = (-17.0, 0.0, 14.8)
+# The sight line: the top of the rear leaf's notch (2.6 mm wide, 1.7 deep, at
+# x 20.35, 13.77 up) and the tip of the front post (13.30, x 59.3, between
+# ears that stand to 13.67), so the line falls 0.7 degrees to the muzzle and
+# the post's tip stands level with the notch's shoulders. The eye is 17 cm
+# back: the dust cover's rear is at x -6, and the eye must be a near plane
+# (10 cm) behind anything that close to the line; that also keeps the eye
+# 15.5 cm behind the grip (further back and the camera is in the adventurer's
+# head).
+RIFLE_SIGHT_REAR = (20.35, 0.0, 13.77)
+RIFLE_SIGHT_FRONT = (59.3, 0.0, 13.30)
+RIFLE_SIGHT = _eye_behind(RIFLE_SIGHT_REAR, RIFLE_SIGHT_FRONT, -17.0)
 
 
 def rifle_outline():
     return (
         _box("Stock",        (-28.0, -1.9, -2.5), (-10.0, 1.9, 8.3)),
         _box("Receiver",     (-6.0, -2.2, 1.5),   (26.0, 2.2, 12.4)),
-        _box("RearSight",    (19.0, -1.1, 9.0),   (25.0, 1.1, 13.8)),
+        # The rear leaf up to its notch's shoulders, and the gas block and
+        # barrel up to the front post's tip: the sight line touches both.
+        _box("RearSight",    (19.0, -1.1, 9.0),   (25.0, 1.1, 13.77)),
         _box("Handguard",    (26.0, -1.9, 5.9),   (40.0, 1.9, 13.4)),
-        _box("Barrel",       (40.0, -1.2, 6.4),   (62.0, 1.2, 13.7)),
+        _box("Barrel",       (40.0, -1.2, 6.4),   (62.0, 1.2, 13.3)),
         _box("Magazine",     (12.0, -2.2, -12.7), (26.0, 2.2, 1.0)),
         # The pistol grip below the receiver, and the loop in front of it.
         _box("Grip",         (-3.75, -1.4, -6.0), (0.75, 1.4, 1.0)),
@@ -153,9 +176,13 @@ SNIPER_MODEL = (
 # b_gun_muzzleflash on SK_KA_Val_X: the end of the integral suppressor.
 SNIPER_MUZZLE = (64.9, 0.0, 9.1)
 
-# On the scope's axis, a near plane behind the eyepiece: the HUD's glass is
-# what is seen, and the rifle hides itself before the camera gets there.
-SNIPER_SIGHT = (SCOPE_EYEPIECE_X - 10.0, 0.0, SCOPE_AXIS_Z)
+# The sight line is the scope's axis, eyepiece to objective, and the eye is on
+# it a near plane behind the eyepiece: the HUD's glass is what is seen, and
+# the rifle hides itself before the camera gets there.
+SNIPER_SIGHT_REAR = (SCOPE_EYEPIECE_X, 0.0, SCOPE_AXIS_Z)
+SNIPER_SIGHT_FRONT = (SCOPE_AT[0] + 22.8, 0.0, SCOPE_AXIS_Z)
+SNIPER_SIGHT = _eye_behind(SNIPER_SIGHT_REAR, SNIPER_SIGHT_FRONT,
+                           SCOPE_EYEPIECE_X - 10.0)
 
 
 def sniper_outline():
@@ -199,10 +226,14 @@ SHOTGUN_MUZZLE = (77.5, 0.0, 3.9)
 # the guard; putting it in the guard would hang the fist 3 cm under the wood.
 SHOTGUN_TRIGGER_REACH_CM = 4.5
 
-# Over the receiver's hump (6.8) and the bead (6.4), a centimetre up, and a
-# near plane behind the receiver's back; 12 cm behind the grip, where the
-# primitive shotgun's eye was.
-SHOTGUN_SIGHT = (-12.0, 0.0, 7.8)
+# The sight line: a shotgun has no rear sight, so the line skims the
+# receiver's hump (a fin 6.83 high at x 3.7) a millimetre over it and ends on
+# the bead's tip (6.42, x 69): the bead stands half a centimetre clear of the
+# hump, and its tip is the point of aim. The eye is a near plane behind the
+# receiver's back, 12 cm behind the grip.
+SHOTGUN_SIGHT_REAR = (3.7, 0.0, 6.93)
+SHOTGUN_SIGHT_FRONT = (69.0, 0.0, 6.42)
+SHOTGUN_SIGHT = _eye_behind(SHOTGUN_SIGHT_REAR, SHOTGUN_SIGHT_FRONT, -12.0)
 
 
 def shotgun_outline():
@@ -234,16 +265,20 @@ PISTOL_MODEL = (
 # The barrel's end, standing a centimetre proud of the slide.
 PISTOL_MUZZLE = (16.4, 0.0, 6.35)
 
-# A centimetre over the sights (rear 8.1, front 8.3) and a near plane behind
-# the slide's back.
-PISTOL_SIGHT = (-14.0, 0.0, 9.2)
+# The sight line: the top of the rear notch (two blades 8.125 high at x -1.2,
+# 4.4 mm apart) and the tip of the front post (8.29 at x 13.9, 4.4 mm wide),
+# the post's tip level with the blades. The eye is a near plane behind the
+# slide's back.
+PISTOL_SIGHT_REAR = (-1.2, 0.0, 8.125)
+PISTOL_SIGHT_FRONT = (13.9, 0.0, 8.29)
+PISTOL_SIGHT = _eye_behind(PISTOL_SIGHT_REAR, PISTOL_SIGHT_FRONT, -14.0)
 
 
 def pistol_outline():
     return (
         _box("Slide",        (-3.7, -1.6, 3.3),  (16.3, 1.6, 7.7)),
-        _box("RearSight",    (-1.7, -1.8, 7.7),  (-0.7, 1.8, 8.1)),
-        _box("FrontSight",   (13.3, -0.8, 7.7),  (15.3, 0.8, 8.3)),
+        _box("RearSight",    (-1.7, -1.8, 7.7),  (-0.7, 1.8, 8.125)),
+        _box("FrontSight",   (13.3, -0.8, 7.7),  (15.3, 0.8, 8.29)),
         _box("Frame",        (2.3, -1.6, 2.3),   (8.3, 1.6, 3.3)),
         _box("Grip",         (-3.7, -1.8, -4.5), (2.3, 1.8, 3.3)),
         _box("TriggerGuard", (3.3, -0.8, 0.9),   (8.3, 0.8, 2.3)),

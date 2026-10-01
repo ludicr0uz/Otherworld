@@ -1,5 +1,6 @@
 """verify.sights -- the two ways of aiming (shoulder and down the sights), each
-weapon's eye point, and the camera that travels from the boom to it.
+weapon's eye point and sight line, and the camera that travels from the boom
+to the one and turns onto the other.
 """
 
 import unreal
@@ -7,7 +8,7 @@ import unreal
 from combat.nodes import SPRING_ARM_SOCKET
 from combat.paths import CYLINDER
 from combat.tuning import BIND_VARS, COMBAT, SIGHTS_KEY
-from combat.weapon_component.sights import SCOPE_HIDE_BLEND
+from combat.weapon_component.sights import SCOPE_HIDE_BLEND, SIGHT_LINE_MIN_CM
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import char, w, wg
 from combat.verify.common import (
@@ -103,28 +104,54 @@ def check_two_aim_keys():
           "sniper", abs(COMBAT.shoulder_zoom - COMBAT.ads_zoom_irons) < 1e-9)
 
 
+def _blocks(box, eye, front, slack=0.1):
+    """Does the sight line, eye to front sight, pass through this box? `slack`
+    (cm) off its top: an outline box is the part's extent to the millimetre,
+    and the sights themselves top out ON the line."""
+    lo, hi = box
+    if not lo[1] < eye[1] < hi[1]:
+        return False
+    x0, x1 = max(lo[0], eye[0]), min(hi[0], front[0])
+    if x0 >= x1:
+        return False
+    rise = (front[2] - eye[2]) / (front[0] - eye[0])
+    z0, z1 = sorted(eye[2] + (x - eye[0]) * rise for x in (x0, x1))
+    return z0 < hi[2] - slack and z1 > lo[2]
+
+
 def check_eye_points():
-    # Where the camera goes, per weapon. A point inside a part would put the
-    # camera inside the gun; a point within the near clip of a part would cut
-    # it open; a point well above the gun would show sky where the gun should
-    # be. The sniper looks through its scope, so that one part is exempt and
-    # the eye must be on its axis instead.
+    # Where the camera goes, per weapon, and what it looks at. The eye, the
+    # rear sight and the front sight's tip are one line, so the view from the
+    # eye towards the tip runs down the sights. A box on that line would put
+    # the gun in front of its own sights; a part within the near clip of the
+    # eye would be cut open. The sniper looks through its scope, so that one
+    # part is exempt and the line is its axis.
     for sp in _weapon_specs():
-        got = cdo(load(sp["path"])).get_editor_property("SightOffset")
-        want = unreal.Vector(*sp["sight"])
-        check(f"{sp['display']}: SightOffset is {sp['sight']}",
-              got is not None and (got - want).length() < 1e-4,
-              str(got.to_tuple()) if got is not None else "None")
-        ex, ey, ez = sp["sight"]
+        d = cdo(load(sp["path"]))
+        for var, key, what in (("SightOffset", "sight", "the eye"),
+                               ("SightAim", "sight_front", "the front sight's tip")):
+            got = d.get_editor_property(var)
+            want = unreal.Vector(*sp[key])
+            check(f"{sp['display']}: {var} is {what}, "
+                  f"({', '.join(f'{v:.2f}' for v in sp[key])})",
+                  got is not None and (got - want).length() < 1e-4,
+                  str(got.to_tuple()) if got is not None else "None")
+        eye, rear, front = sp["sight"], sp["sight_rear"], sp["sight_front"]
+        ex, ey, ez = eye
         check(f"{sp['display']}: the eye is behind the muzzle and above the bore",
               ex < sp["muzzle"][0] and ez > sp["muzzle"][2] and abs(ey) < 1e-6,
-              f"eye {sp['sight']} muzzle {sp['muzzle']}")
+              f"eye {eye} muzzle {sp['muzzle']}")
+        to_rear = unreal.Vector(*rear) - unreal.Vector(*eye)
+        to_front = unreal.Vector(*front) - unreal.Vector(*eye)
+        check(f"{sp['display']}: the eye, the rear sight and the front sight's tip "
+              f"are one line, the eye {rear[0] - ex:.1f} cm behind the rear sight",
+              to_rear.cross(to_front).length() < 1e-6 * to_front.length()
+              and ex < rear[0] < front[0],
+              f"eye {eye} rear {rear} front {front}")
         boxes = [(p[0], _part_box(p)) for p in sp["parts"] if p[0] != "Scope"]
-        blocked = [name for name, (lo, hi) in boxes
-                   if lo[1] <= ey <= hi[1] and lo[2] <= ez <= hi[2]
-                   and hi[0] >= ex]
-        check(f"{sp['display']}: nothing on the sight line from the eye forward",
-              not blocked, str(blocked))
+        blocked = [name for name, box in boxes if _blocks(box, eye, front)]
+        check(f"{sp['display']}: nothing stands on the sight line; the sights top "
+              f"out on it", not blocked, str(blocked))
         # Parts ahead of the eye and near the line (top within 5 cm under it);
         # the grip, the magazine and a stock under the cheek are far enough
         # below it to be outside the view.
@@ -134,12 +161,13 @@ def check_eye_points():
         check(f"{sp['display']}: no part starts within the near clip "
               f"({NEAR_CLIP_CM:g} cm) ahead of the eye",
               not under, str(under))
-        tops = [hi[2] for _n, (lo, hi) in boxes
-                if lo[1] <= ey <= hi[1] and hi[0] >= ex]
-        rise = ez - max(tops) if tops else None
-        check(f"{sp['display']}: the eye skims the top of the gun (0.5-3 cm "
-              f"over it), so the gun is what the bottom of the view shows",
-              rise is not None and 0.5 <= rise <= 3.0, f"{rise}")
+        tips = [hi[2] for name, (lo, hi) in boxes
+                if lo[0] <= front[0] <= hi[0] and lo[1] < front[1] < hi[1]]
+        if not sp.get("scoped"):
+            check(f"{sp['display']}: the front sight's tip is the top of the gun "
+                  f"there, not a point in the air",
+                  bool(tips) and abs(max(tips) - front[2]) < 0.05,
+                  f"tip {front[2]} gun {max(tips) if tips else None}")
         scope = [p for p in sp["parts"] if p[0] == "Scope"]
         if sp.get("scoped"):
             lo, hi = _part_box(scope[0]) if scope else ((0, 0, 0), (0, 0, 0))
@@ -177,15 +205,12 @@ def check_sight_camera():
                   for n in sight[0]),
           str(len(sight)))
     sockets = [n for n in wg if "InSocketName" in in_pins(n)]
+    at = [n for n in sockets if "location" in _title(n).lower()]
     check(f"...both measured from the boom's {SPRING_ARM_SOCKET} socket",
-          len(sockets) == 1 and pin_value(sockets[0], "InSocketName") == SPRING_ARM_SOCKET
-          and all(sockets[0] in f for f in fed),
+          len(at) == 1 and pin_value(at[0], "InSocketName") == SPRING_ARM_SOCKET
+          and all(at[0] in f for f in fed),
           str([pin_value(n, "InSocketName") for n in sockets]))
-    check("...and only the location: the view keeps the boom's rotation, "
-          "which is the mouse's",
-          not [n for n in wg
-               if "setworldrotation" in _title(n).replace(" ", "").lower()
-               or "setworldtransform" in _title(n).replace(" ", "").lower()])
+    check_sight_look(sockets, moves)
 
     hides = [n for n in wg if "bNewHidden" in in_pins(n)]
     tucked = [n for n in hides if PIN.list_connected_pins(BEL.find_input_pin(n, "bNewHidden"))]
@@ -240,6 +265,60 @@ def check_sight_camera():
               c.get_editor_property("relative_location").length() < 1e-3
               for c in cams),
           str([c.get_editor_property("relative_location").to_tuple() for c in cams]))
+    turns = [c.get_editor_property("relative_rotation") for c in cams]
+    check("...and turned only by the boom (no turn of its own, and not taking "
+          "the control rotation itself), so the sights can turn it onto the gun",
+          bool(cams) and all(max(abs(r.pitch), abs(r.yaw), abs(r.roll)) < 1e-3
+                             for r in turns)
+          and not any(c.get_editor_property("use_pawn_control_rotation") for c in cams),
+          str([(r.pitch, r.yaw, r.roll) for r in turns]))
+
+
+def check_sight_look(sockets, moves):
+    """The camera's rotation: onto the held weapon's sight line by SightBlend,
+    and the boom's again with empty hands."""
+    turns = [n for n in wg
+             if "setworldrotation" in _title(n).replace(" ", "").lower()]
+    check("the camera is turned twice: down the sights, and level with the "
+          "boom with empty hands", len(turns) == 2, str(len(turns)))
+    check("...and never by a whole transform",
+          not [n for n in wg
+               if "setworldtransform" in _title(n).replace(" ", "").lower()])
+    fed = [_feeds(BEL.find_input_pin(n, "NewRotation")) for n in turns]
+    look = [f for f in fed if any("SightAim" in out_pins(n) for n in f)]
+    check("...one onto the line from the weapon's SightOffset to its SightAim, "
+          "the front sight's tip, so the tip is the middle of the view",
+          len(look) == 1
+          and any("SightOffset" in out_pins(n) for n in look[0])
+          and any("makerotfromx" in _title(n).replace(" ", "").lower()
+                  for n in look[0]),
+          str(len(look)))
+    lerps = [n for f in look for n in f
+             if {"A", "B", "Alpha", "bShortestPath"} <= in_pins(n)]
+    check("...eased from the boom's rotation by SightBlend, the short way round",
+          len(lerps) == 1 and pin_value(lerps[0], "bShortestPath") == "true"
+          and any("Output_Get" in out_pins(n) or "SightBlend" in out_pins(n)
+                  for n in _feeds(BEL.find_input_pin(lerps[0], "Alpha"))),
+          str(len(lerps)))
+    gates = [n for f in look for n in f
+             if abs((num_pin(n, "B") or 0.0) - SIGHT_LINE_MIN_CM) < 1e-9
+             and "A" in in_pins(n) and len(in_pins(n)) == 2]
+    check(f"...and only for an item with a sight line (longer than "
+          f"{SIGHT_LINE_MIN_CM:g} cm): the knife keeps the boom's view",
+          bool(gates) and bool(lerps)
+          and any(g in _feeds(BEL.find_input_pin(lerps[0], "Alpha")) for g in gates),
+          str(len(gates)))
+    rot = [n for n in sockets if "rotation" in _title(n).lower()]
+    check(f"...both from the boom's {SPRING_ARM_SOCKET} socket's rotation, "
+          f"which is the control rotation",
+          len(rot) == 1 and pin_value(rot[0], "InSocketName") == SPRING_ARM_SOCKET
+          and all(rot[0] in f for f in fed),
+          str([_title(n) for n in sockets]))
+    placed = [n for n in moves
+              if any(PIN.get_owning_node(q) in turns
+                     for q in PIN.list_connected_pins(BEL.find_then_pin(n)))]
+    check("...each straight after the camera is placed, in the same frame",
+          len(placed) == 2, str(len(placed)))
 
 
 def run():

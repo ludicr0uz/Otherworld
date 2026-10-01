@@ -33,8 +33,9 @@ component again.
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import (
-    CAMERA_CLASS_PATH, FN_COMP_SET_WORLD_LOC, FN_GET_COMP, FN_LE_FF, FN_OR,
-    FN_SET_FOV, FN_SET_HIDDEN, FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC,
+    CAMERA_CLASS_PATH, FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT,
+    FN_GET_COMP, FN_LE_FF, FN_OR, FN_SET_FOV, FN_SET_HIDDEN,
+    FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT,
     NODE_CAST_HEALTH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET,
 )
 from combat.paths import HEALTH_CLASS_PATH
@@ -131,6 +132,13 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
     _connect(out(cam), _pin(home, "self"))
     _connect(out(shoulder), _pin(home, "NewLocation"))
     _connect(BEL.find_then_pin(blend), _pin(home, "execute"))
+    boom_rot = keep(_at(_node(ed, FN_SOCKET_ROT), x + 1040, y + 540))
+    _connect(out(arm), _pin(boom_rot, "self"))
+    _set(boom_rot, "InSocketName", SPRING_ARM_SOCKET)
+    level = keep(_at(_node(ed, FN_COMP_SET_WORLD_ROT), x + 1300, y + 200))
+    _connect(out(cam), _pin(level, "self"))
+    _connect(out(boom_rot), _pin(level, "NewRotation"))
+    _connect(BEL.find_then_pin(home), _pin(level, "execute"))
 
     # ...and what the scope hid shows again: the body, and the gun if there
     # is one (a nested Branch, so Held is never read null).
@@ -138,7 +146,7 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
     shown = keep(_at(_node(ed, FN_SET_OWNER_NO_SEE), x + 1560, y))
     _connect(out(body, "OwnerMesh"), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", "false")
-    _connect(BEL.find_then_pin(home), _pin(shown, "execute"))
+    _connect(BEL.find_then_pin(level), _pin(shown, "execute"))
     armed = keep(_at(ed.add_branch_node(), x + 1820, y))
     _connect(armed_out, _pin(armed, "Condition"))
     _connect(BEL.find_then_pin(shown), _pin(armed, "execute"))

@@ -20,12 +20,14 @@ from combat.paths import (
 from combat.skin import player_skin
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG
 from combat.weapon_models import (
-    PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, RIFLE_MODEL, RIFLE_MUZZLE,
-    RIFLE_SIGHT, SHOTGUN_MODEL, SHOTGUN_MUZZLE, SHOTGUN_SIGHT,
-    SHOTGUN_TRIGGER_REACH_CM, SMG_MODEL,
-    SMG_MUZZLE, SMG_SIGHT, SNIPER_MODEL, SNIPER_MUZZLE, SNIPER_SIGHT,
-    pistol_outline, rifle_outline, shotgun_outline, smg_outline,
-    sniper_outline,
+    PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, PISTOL_SIGHT_FRONT,
+    PISTOL_SIGHT_REAR, RIFLE_MODEL, RIFLE_MUZZLE, RIFLE_SIGHT,
+    RIFLE_SIGHT_FRONT, RIFLE_SIGHT_REAR, SHOTGUN_MODEL, SHOTGUN_MUZZLE,
+    SHOTGUN_SIGHT, SHOTGUN_SIGHT_FRONT, SHOTGUN_SIGHT_REAR,
+    SHOTGUN_TRIGGER_REACH_CM, SMG_MODEL, SMG_MUZZLE, SMG_SIGHT,
+    SMG_SIGHT_FRONT, SMG_SIGHT_REAR, SNIPER_MODEL, SNIPER_MUZZLE, SNIPER_SIGHT,
+    SNIPER_SIGHT_FRONT, SNIPER_SIGHT_REAR, pistol_outline, rifle_outline,
+    shotgun_outline, smg_outline, sniper_outline,
 )
 from combat.tuning import (
     COMBAT, GUN_LOOT_TABLE, PISTOL_FIRE_INTERVAL, PISTOL_MAGAZINE,
@@ -177,6 +179,7 @@ def _weapon_specs():
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
     specs = (
         dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
+             sight_rear=SHOTGUN_SIGHT_REAR, sight_front=SHOTGUN_SIGHT_FRONT,
              display="Shotgun", automatic=False, damage=18.0, pellets=8, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
@@ -185,6 +188,7 @@ def _weapon_specs():
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Shotgun"]),
         dict(path=PISTOL_BP_PATH, parts=pistol_outline(), model=PISTOL_MODEL, muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
+             sight_rear=PISTOL_SIGHT_REAR, sight_front=PISTOL_SIGHT_FRONT,
              display="Pistol", automatic=False, damage=26.0, pellets=1, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
@@ -197,6 +201,7 @@ def _weapon_specs():
         # identity: it wins a fight it is already in and empties fast. The SMG11
         # is a machine pistol, so it is held in the pistol's ready pose.
         dict(path=SMG_BP_PATH, parts=smg_outline(), model=SMG_MODEL, muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
+             sight_rear=SMG_SIGHT_REAR, sight_front=SMG_SIGHT_FRONT,
              display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
              sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
@@ -207,6 +212,7 @@ def _weapon_specs():
         # Five rounds to a kill at 0.14 s apart, accurate to 90 m. The generalist,
         # and the one a player who finds it will simply keep.
         dict(path=RIFLE_BP_PATH, parts=rifle_outline(), model=RIFLE_MODEL, muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
+             sight_rear=RIFLE_SIGHT_REAR, sight_front=RIFLE_SIGHT_FRONT,
              display="Rifle", automatic=True, damage=24.0, pellets=1, range=9000.0,
              sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
@@ -220,6 +226,7 @@ def _weapon_specs():
         # runs at 600 cm/s is the difference between opening at distance and
         # being caught reloading.
         dict(path=SNIPER_BP_PATH, parts=sniper_outline(), model=SNIPER_MODEL, muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
+             sight_rear=SNIPER_SIGHT_REAR, sight_front=SNIPER_SIGHT_FRONT,
              display="Sniper", automatic=False, damage=120.0, pellets=1, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),

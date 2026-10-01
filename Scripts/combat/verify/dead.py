@@ -109,6 +109,13 @@ def check_dead_arm_lets_go():
     check(f"...the camera goes home to the boom's {SPRING_ARM_SOCKET}",
           len(home) == 1 and len(sockets) == 1
           and pin_value(sockets[0], "InSocketName") == SPRING_ARM_SOCKET)
+    level = by_pins(wg_dead, "NewRotation")
+    level = [n for n in level if "setworldrotation" in _title(n).replace(" ", "").lower()]
+    sockets = [f for h in level for f in _sources(h, "NewRotation")
+               if "InSocketName" in in_pins(f)]
+    check("...and level with it again, off the gun's sight line",
+          len(level) == 1 and len(sockets) == 1
+          and pin_value(sockets[0], "InSocketName") == SPRING_ARM_SOCKET)
     body = by_pins(wg_dead, "bNewOwnerNoSee")
     check("...the body a scope hid is shown",
           len(body) == 1 and pin_value(body[0], "bNewOwnerNoSee") == "false")

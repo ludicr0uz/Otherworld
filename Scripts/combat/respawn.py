@@ -1,11 +1,12 @@
 """Where wanderers come from and where things fall out of the world: the
-75-100 m respawn band and nav projection, the world floor, and the two
+75-100 m respawn band and nav projection (authored by replacement.py), the
+respawn delay, the world floor, and the two
 BP_HealthComponent fragments built on them -- BeginPlay's spawn numbering
 and log line, and Tick's world-floor safety net.
 """
 
 from forest_generator.npc_placement import (
-    NPC_CAPSULE_HALF_HEIGHT_CM, NPC_RESPAWN_NAV_SNAP_CM,
+    NPC_CAPSULE_HALF_HEIGHT_CM, NPC_RESPAWN_DELAY_S, NPC_RESPAWN_NAV_SNAP_CM,
     NPC_SPAWN_MAX_DISTANCE_CM, NPC_SPAWN_MIN_DISTANCE_CM,
 )
 from combat.game_state import (
@@ -39,6 +40,10 @@ from combat.paths import GAME_MODE_CLASS_PATH
 # _author_respawn_point for what happens when the projection fails.
 RESPAWN_BAND = (NPC_SPAWN_MIN_DISTANCE_CM, NPC_SPAWN_MAX_DISTANCE_CM)
 RESPAWN_NAV_SNAP = NPC_RESPAWN_NAV_SNAP_CM
+# How long the pack stays one short after a death. A variable on the component
+# (RespawnDelay) rather than a pin literal, so a probe can shorten the wait.
+RESPAWN_DELAY = NPC_RESPAWN_DELAY_S
+RESPAWN_DELAY_VAR = "RespawnDelay"
 # Search box for that projection, half-extents in cm. Deliberately wide in XY:
 # a band point that overshoots the navigable island by 20 m snaps back onto its
 # edge rather than failing, which is the common case on a map whose usable

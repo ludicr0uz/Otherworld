@@ -12,10 +12,11 @@ from combat.game_state import (
 )
 from combat.ragdoll import RAGDOLL_PROFILE
 from combat.respawn import (
-    RESPAWN_ATTEMPTS, RESPAWN_BAND, RESPAWN_LIFT, WORLD_FLOOR_Z,
+    RESPAWN_ATTEMPTS, RESPAWN_BAND, RESPAWN_DELAY, RESPAWN_DELAY_VAR,
+    RESPAWN_LIFT, WORLD_FLOOR_Z,
 )
 from combat.verify.fixtures import (
-    _montages, drain_writes, gm, h, health_bp, hg, wg,
+    _montages, drain_writes, exec_reach, gm, h, health_bp, hg, wg,
 )
 from combat.verify.common import (
     BEL, PIN, by_pins, check, graph, in_pins, num_pin, out_pins, pin_value,
@@ -78,9 +79,50 @@ def check_health_death_respawn():
           "SpawnOrigin" not in {str(v) for v in BEL.list_member_variable_names(
               health_bp, False)}
           and bool(by_pins(hg, "PlayerIndex")))
+    check_respawn_delay()
     tick = graph(health_bp).find_event_node("ReceiveTick")
     check("health ticks (otherwise nothing notices 0 HP)",
           tick is not None and bool(BEL.find_then_pin(tick).list_connected_pins()))
+
+
+def _fed_by(node, pin, var):
+    """Is ``node``'s input ``pin`` wired to a getter of the variable ``var``?"""
+    return any(var in out_pins(PIN.get_owning_node(q))
+               for q in PIN.list_connected_pins(BEL.find_input_pin(node, pin)))
+
+
+def check_respawn_delay():
+    # The replacement comes RESPAWN_DELAY seconds after the death, not with it.
+    # The wait is a variable so a probe can shorten it (probe_respawn_delay.py).
+    delay = h.get_editor_property(RESPAWN_DELAY_VAR)
+    check(f"the respawn delay defaults to {RESPAWN_DELAY:.0f} s, as a float",
+          isinstance(delay, float) and abs(delay - RESPAWN_DELAY) < 1e-6, repr(delay))
+    check("10 s, as asked for", abs(RESPAWN_DELAY - 10.0) < 1e-6, f"{RESPAWN_DELAY}")
+    waits = [n for n in by_pins(hg, "Duration")
+             if _fed_by(n, "Duration", RESPAWN_DELAY_VAR)]
+    check("one Delay waits RespawnDelay", len(waits) == 1, f"{len(waits)} node(s)")
+    after = {n.get_path_name() for w in waits
+             for n in exec_reach([BEL.find_then_pin(w)])}
+    spawns = [n for n in by_pins(hg, "Class", "SpawnTransform")
+              if _fed_by(n, "Class", "RespawnClass")]
+    check("the replacement is spawned only after that wait",
+          len(spawns) == 1 and all(n.get_path_name() in after for n in spawns),
+          f"{len(spawns)} spawn(s) of RespawnClass")
+    # Read after the wait, or the band is round where the player was at the kill.
+    asks = by_pins(hg, "Point", "QueryExtent") + by_pins(hg, "Origin", "Radius")
+    check("...and so is every respawn point chosen",
+          bool(asks) and all(n.get_path_name() in after
+                             for n in asks if "execute" in in_pins(n))
+          and all(n.get_path_name() in after for n in hg
+                  if RESPAWN_POINT_SETTER <= set(in_pins(n))),
+          f"{len(asks)} nav queries")
+    check("the corpse and the collapse do not wait for it",
+          not any("InLifespan" in in_pins(n) or "ProfileName" in in_pins(n)
+                  or "NewProfileName" in in_pins(n) for n in hg
+                  if n.get_path_name() in after))
+
+
+RESPAWN_POINT_SETTER = {"execute", "RespawnPoint"}
 
 
 # ─── Spawn numbering ─────────────────────────────────────────────────────────

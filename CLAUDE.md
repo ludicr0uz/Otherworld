@@ -217,7 +217,7 @@ editor.
   (`combat/hit_bodies.py`): a round past the head, inside the capsule, is a miss.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). Between two
-  swings a wanderer backs off a little and sidesteps round the player, facing them. They respawn 75–100 m away and leave ragdoll corpses.
+  swings a wanderer backs off a little and sidesteps round the player, facing them. A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs
   (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
   mannequin's set.

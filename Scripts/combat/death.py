@@ -268,9 +268,9 @@ def _author_corpse(ed, exec_ins, x0, y0):
         f"of lifespan (K2_DestroyActor on a controller is a no-op in the "
         f"engine; an expiring lifespan really destroys it) and the body "
         f"{CORPSE_SECONDS:.0f} s. "
-        f"The kill has already been counted and the replacement already spawned "
-        f"by the time this runs, so the pack is back to strength while the "
-        f"corpse is still falling.",
+        f"The kill has already been counted by the time this runs; the "
+        f"replacement comes later (replacement.py), off this same component, "
+        f"which is why the body has to outlast the respawn delay.",
         [owner, as_pawn, brain, possessed, has_brain, lobotomy, rot])
     return BEL.find_then_pin(rot)
 

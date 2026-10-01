@@ -150,6 +150,7 @@ Wanderer (selector)
 | `NPC_SPAWN_MIN/MAX_DISTANCE_CM` | 7500 / 10000 | clamped to `npc_usable_radius` (80 m on the 200 m map); `spawn_band()` is the only decider, and its check reports the band used |
 | `NPC_MIN_SEPARATION_CM` | 600 | |
 | `NPC_ACCEPTANCE_RADIUS_CM` | 120 | **must stay below** the melee range, or they park out of reach |
+| `NPC_RESPAWN_DELAY_S` | 10 | how long a kill leaves the pack one short; must stay under the corpse's 60 s (`combat/docs/health.md`) |
 | `NPC_MELEE_DAMAGE` / `_INTERVAL_S` | 10 / 1.5 | balanced for the **pack** (~67 dps if all ten connect) |
 
 ## Patrol and agro (`patrol.py`, `senses.py`, `agro.py`)

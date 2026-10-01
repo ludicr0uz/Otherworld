@@ -2,8 +2,18 @@
 
 Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
-## Health, respawn and the pack's numbering (`health_component.py`, `respawn.py`)
+## Health, respawn and the pack's numbering (`health_component.py`, `respawn.py`, `replacement.py`)
 
+- **A replacement comes `RESPAWN_DELAY` (10 s, `npc_placement.NPC_RESPAWN_DELAY_S`) after the death.**
+  - The death path runs to its end first (count, corpse, collapse); the wanderer's arm then waits
+    on a `Delay` and spawns (`replacement._author_replacement`). The player's location is read
+    after the wait.
+  - The wait is the component's `RespawnDelay` variable, not a pin literal, so
+    `probes/probe_respawn_delay.py` can shorten it: a headless game's clock never reaches 10 s.
+  - The `Delay` is a latent action on the dead wanderer's own component, so the delay must stay
+    under `CORPSE_SECONDS` (60), or the body is destroyed first and nothing is spawned.
+  - With no navmesh there is no replacement, and a headless game can start with no tiles: the
+    probe sends `RebuildNavigation` first.
 - **Respawns land 75–100 m from the player's current location.**
   - The band point is a *request*, stored in `RespawnPoint`, because the projection node is pure.
   - It is projected onto the navmesh (`RESPAWN_PROJECT_EXTENT`, 30 × 30 × 100 m).

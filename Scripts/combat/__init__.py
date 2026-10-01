@@ -73,7 +73,8 @@ ASSETS AND PATCHES
 
 BP_HealthComponent (health_component wires the fragments together)
   health_component  variables, defaults, the Tick's death branch
-  respawn           spawn numbering, world-floor net, respawn band
+  respawn           spawn numbering, world-floor net, respawn band and delay
+  replacement       the dead wanderer's replacement: the wait, the point, the spawn
   death             kill count, shells, ragdoll collapse, corpse, player death
   gun_drop          the gun drop: seeded roll + pick streams, loot-table draw
   debuff_drain      HP lost per stack of the GAS Debuff.HealthDrain tag

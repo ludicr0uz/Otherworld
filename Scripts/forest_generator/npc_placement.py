@@ -330,6 +330,10 @@ NPC_MIN_SEPARATION_CM = 600.0
 # the navigable island: 30 m is enough to reach back onto it from a point 100 m
 # out on a 200 m map.
 NPC_RESPAWN_NAV_SNAP_CM = 3000.0
+# How long after a wanderer dies its replacement appears, so a kill thins the
+# pack for a while instead of being undone on the spot.  Well under the 60 s a
+# corpse lies there (combat/death.py), which is what the wait hangs on.
+NPC_RESPAWN_DELAY_S = 10.0
 
 # Navmesh agent.  These are the navigation system's *default agent* values, and
 # they are deliberately not something else: the nav system overwrites whatever

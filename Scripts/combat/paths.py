@@ -30,6 +30,8 @@ SNIPER_BP_PATH = f"{WEAPON_DIR}/BP_SniperRifle"
 # knife_anim.py keys for whatever body the player wears.
 KNIFE_BP_PATH = f"{WEAPON_DIR}/BP_Knife"
 KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_KnifeSlash"
+# The axe: the other melee item (axe.py), swung through the knife's stage.
+AXE_BP_PATH = f"{WEAPON_DIR}/BP_Axe"
 # The hold poses (combat/hold_pose.py): food and water carried, the knife ready.
 HOLD_ITEM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldItem"
 HOLD_KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldKnife"

@@ -34,6 +34,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   camera            boom and aim-trace numbers, face/aim-the-camera patches
   knife             BP_Knife: the Fab M9 knife as a Melee item, its model
                     placement and measured outline, build_knife()
+  axe               BP_Axe: Quaternius's Survival Pack axe as a Melee item,
+                    swung through the knife's stage; build_axe()
   knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the
                     knife's hold pose (AnimationDataController)
   hold_pose         A_HoldItem / A_HoldKnife: food carried at the waist, the

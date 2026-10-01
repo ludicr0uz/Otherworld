@@ -78,8 +78,8 @@ def _run(p):
         return
 
     bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
-    p.check("the knife is issued with the shotgun and the pistol",
-            bag == ["BP_Shotgun_C", "BP_Pistol_C", KNIFE], str(bag))
+    p.check("the knife is issued with the shotgun and the pistol (and the axe)",
+            bag == ["BP_Shotgun_C", "BP_Pistol_C", KNIFE, "BP_Axe_C"], str(bag))
     p.check("...and the shotgun is what is held at the start",
             _held_name(p, wc) == "BP_Shotgun_C", str(_held_name(p, wc)))
     if KNIFE not in bag:

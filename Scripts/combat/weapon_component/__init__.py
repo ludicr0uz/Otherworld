@@ -64,7 +64,7 @@ BP_WeaponComponent event graph:
 
   [BeginPlay] --> cache Character + Mesh
               --> attenuation listener on the capsule
-              --> spawn BP_Shotgun, BP_Pistol and BP_Knife into Inventory
+              --> spawn BP_Shotgun, BP_Pistol, BP_Knife and BP_Axe into Inventory
               --> Equip(0)
 
   [Tick] --> Branch owner Dead or at 0 HP                    --> nothing below runs

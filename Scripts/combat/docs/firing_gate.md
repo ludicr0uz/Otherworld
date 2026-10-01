@@ -39,6 +39,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   inside the fire gate, since it reads `Held.Melee`: the Consumable branch's False arm asks
   `Melee`, and a tap off `NextKnifeTime` sets `KnifeQueued`. Anything not Melee goes on to the
   guns' ready gate, so the knife never reaches the ammunition or cooldown tests of a gun.
+  - The axe (`axe.py`) is `Melee` too and has no stage of its own: it takes this branch and
+    swings the knife's Strike (`probes/probe_axe.py`).
   - The swing and the blow are the punch's (`punch._author_swing`), run on the `KNIFE` Strike
     with its own variables (`KnifeQueued/Pending`, `NextKnifeTime`, `KnifeDueTime`, `KnifeAnim`).
     They run every frame whatever is held, so a slash put away mid-swing still lands.

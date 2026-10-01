@@ -83,13 +83,21 @@ menu polls its own copy from `DrawHUD`, which does.
   not a row of `_weapon_specs()`, whose every column and check is about a gun. Its slash clip
   `/Game/Weapons/Anims/A_KnifeSlash` is keyed from Python (`knife_anim.py`): the pack has no
   animation and no stock clip is a knife attack.
+- **The axe is the other melee item** (`axe.py`): Quaternius's Survival Pack `SM_Axe` (CC0,
+  `/Game/Sourced/Quaternius/Survival`) at 0.2, a 65 cm camp axe, head up and tipped 30° forward
+  with the bit leading, held in `A_HoldKnife` by the stretch of haft above its knob. It has
+  **no strike of its own**: `Melee` sends the fire key to the knife's stage, so it swings
+  `A_KnifeSlash` for `COMBAT.knife_damage`. An axe that hits harder or bites a tree needs its
+  own `Strike` in `weapon_component/` (`punch.py` has the two stages).
 - **Knife and food have their own hold poses, not the pistol's aim** (`hold_pose.py`):
   `A_HoldKnife` (knife up at the chest, left fist raised as a guard) and `A_HoldItem` (the
   item carried at the waist, left arm hanging), keyed off the idle by arm directions like the
   guard's. The right hand keeps the pistol pose's orientation and fingers, so the grip solve
   gives the pistol's answer and every item stays upright in the fist. The slash starts and ends
   in `A_HoldKnife`. `probes/probe_hold_poses.py` measures the hand heights in game.
-- **The shotgun, pistol and knife are issued; the SMG, rifle and sniper are found.**
+- **The shotgun, pistol, knife and axe are issued; the SMG, rifle and sniper are found.**
+  The issued items are `inventory.STARTER_CLASS_VARS`, in bag order: one class variable
+  each on the component, spawned at BeginPlay.
   - The gun drop (`gun_drop.py`) is **two seeded rolls** on two `FRandomStream`s on the
     GameMode: `GunDropRollStream < GUN_DROP_CHANCE` (10%) decides whether anything drops, then
     `RandomIntegerFromStream(GunDropPickStream, Length)` decides which.
@@ -198,6 +206,9 @@ These are feel checks a headless run can't do:
   `COMBAT.knife_impact_s` lines up with the cut, how the knife sits in the fist (the pistol
   grip's solve), and how the two hold poses read (`hold_pose.HOLD_*_DIRS`; the wrist keeps the
   pistol pose's angle on a lower forearm);
+- the axe: how it reads in the fist and over the shoulder in the knife's stance (the head
+  stands 35 cm above the hand, near the face), and swung on the knife's short slash, which
+  was keyed for a blade (`probes/probe_axe.py` only proves it is in the hand and lands);
 - the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100

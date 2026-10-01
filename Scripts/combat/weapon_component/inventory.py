@@ -23,6 +23,10 @@ from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 from combat.weapon_component.listener import _author_listener_at_character
 from combat.weapon_component.sights import _author_camera_after_boom
 
+# What the player is issued, in bag order: the component's class variables
+# BeginPlay spawns from (build.py declares and fills them).
+STARTER_CLASS_VARS = ("ShotgunClass", "PistolClass", "KnifeClass", "AxeClass")
+
 
 def _detach_rules(node):
     # KeepWorld everywhere: a dropped weapon should stay exactly where it was in
@@ -363,7 +367,7 @@ def _author_wc_begin_play(ed, begin):
     prev = _author_camera_after_boom(ed, as_char, BEL.find_then_pin(keep_pitch),
                                      2600, -1840)
     prev = _author_listener_at_character(ed, as_char, pc_out, prev, 3120, -1840)
-    for i, var in enumerate(("ShotgunClass", "PistolClass", "KnifeClass")):
+    for i, var in enumerate(STARTER_CLASS_VARS):
         cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
         spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))
         _connect(_pin(cls, var, is_input=False), _pin(spawn, "Class"))
@@ -387,7 +391,8 @@ def _author_wc_begin_play(ed, begin):
     _connect(BEL.find_then_pin(first), _pin(dirty, "execute"))
 
     ed.add_comment_to_nodes(
-        "The player starts carrying the shotgun, the pistol and the knife. "
+        "The player starts carrying the shotgun, the pistol, the knife and the "
+        "axe. "
         "They are spawned here rather "
         "than placed in the level so that a generated map needs no weapon "
         "actors in it -- nothing in Scripts/generated_levels knows weapons "

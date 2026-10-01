@@ -745,7 +745,11 @@ def _author_tick(ed, tick):
     _set(was_m, "Key", MENU_KEY)
 
     br_m = _at(ed.add_branch_node(), x0 + 560, y0)
-    _connect(_pin(was_m, "ReturnValue", is_input=False), _pin(br_m, "Condition"))
+    # The key, or a click on the panel's close row (cursor.py). Only an open
+    # panel has rows to click, so a click never opens it.
+    m_clicks = []
+    _connect(or_pause_click(ed, _pin(was_m, "ReturnValue", is_input=False), MENU_KEY,
+                            x0 - 240, y0 + 400, m_clicks), _pin(br_m, "Condition"))
     # Grass lighting catches up with Quality first, so a preset picked on the
     # previous frame is on the grass before anything else runs this one.
     # Then save and exit, the profile load and the death wipe (save_exit.py).
@@ -772,7 +776,7 @@ def _author_tick(ed, tick):
         f"{MENU_KEY} toggles the menu.  Polled on Tick rather than bound as an "
         "input action: an FInputActionValue binding would need an IA asset and "
         "an IMC entry, and neither is authorable from Python.",
-        [was_m, br_m, get_open, not_open, set_open])
+        [was_m, br_m, get_open, not_open, set_open] + m_clicks)
 
     # --- the preset keys, gated on the menu being open ----------------------
     gate_get = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 1120, y0 + 200)

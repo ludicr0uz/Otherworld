@@ -7,6 +7,7 @@ graph) and loot_checks read one table.
                                   can be searched too, and says so
     Up / Down                     move the caret
     Enter                         take the selected item into the bag
+    a click on "[TAB] close"      shuts the window, as Tab does
 
 Fixed keys, like the menu's: Up/Down/Enter are the menu's own navigation keys,
 and Tab is not a gameplay bind. E stays the pick-up: a gun a kill drops lies
@@ -36,12 +37,13 @@ LOOT_PANEL = "LootPanel"
 LOOT_ROWS_BOX = "LootRows"
 LOOT_FULL = "LootFull"
 LOOT_EMPTY = "LootEmpty"            # shown instead of rows on a body with nothing
+LOOT_CLOSE = "LootClose"            # the close button: a line a click lands on
 LOOT_ROWS = 6                       # rows the window has; a table rolls fewer
 
 LOOT_PROMPT_TEXT = f"[{LOOT_KEY.upper()}]   search the body"
 LOOT_TITLE_TEXT = "THE BODY CARRIES"
-LOOT_HINT_TEXT = (f"UP / DOWN   ·   ENTER or click takes   ·   "
-                  f"[{LOOT_KEY.upper()}] close")
+LOOT_HINT_TEXT = "UP / DOWN   ·   ENTER or click takes"
+LOOT_CLOSE_TEXT = f"[{LOOT_KEY.upper()}]   close"
 LOOT_FULL_TEXT = "BAG FULL"
 LOOT_EMPTY_TEXT = "NOTHING"
 LOOT_PANEL_W = 380.0

@@ -13,15 +13,16 @@ IsValid on LootTarget, so an empty reach is not an Accessed None per frame.
 
 The one thing it writes is the mouse's (cursor.py), because only DrawHUD
 knows where a row is: the row under the cursor -> LootSel, and a click on it
-raises LootTakeRequested, which Tick serves exactly as it serves Enter.
+raises LootTakeRequested, which Tick serves exactly as it serves Enter; a
+click on the LootClose line lowers LootOpen, as Tab does.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import FN_ARR_GET, FN_ARR_LEN, FN_IS_VALID, FN_LESS_II, MACRO_FOR_LOOP
 from combat.paths import HEALTH_CLASS_PATH
-from graphics_menu.cursor import author_row_cursor
+from graphics_menu.cursor import author_row_cursor, author_widget_click
 from graphics_menu.loot_consts import (
-    LOOT_BAG_FULL_VAR, LOOT_EMPTY, LOOT_FULL, LOOT_OPEN_VAR, LOOT_PANEL, LOOT_PROMPT,
+    LOOT_BAG_FULL_VAR, LOOT_CLOSE, LOOT_EMPTY, LOOT_FULL, LOOT_OPEN_VAR, LOOT_PANEL, LOOT_PROMPT,
     LOOT_ROWS, LOOT_ROWS_BOX, LOOT_SEL_VAR, LOOT_TAKE_VAR, LOOT_TARGET_VAR,
 )
 from graphics_menu.ui_graph import mark_rows, member, part, row_at, set_shown, show_if
@@ -115,8 +116,12 @@ def author_loot_window(ed, x0, y0, in_execs):
     icons = _get(ed, LOOT_ICONS_VAR, x0 + 1260, y0 + 300, HEALTH_CLASS_PATH, body)
     tints = _get(ed, LOOT_TINTS_VAR, x0 + 1260, y0 + 400, HEALTH_CLASS_PATH, body)
     box = part(ed, WBP_HUD, LOOT_ROWS_BOX, x0 + 1260, y0 + 500)
+    # The close button: a click on it lowers LootOpen, and Tick stands the
+    # player up off that edge exactly as it does after Tab.
+    shut = author_widget_click(ed, part(ed, WBP_HUD, LOOT_CLOSE, x0 + 1520, y0 - 2100),
+                               (LOOT_OPEN_VAR, "false"), [flow], x0 + 2040, y0 - 2600)
     hovered = author_row_cursor(
-        ed, box, LOOT_ROWS, [flow], x0 + 1520, y0 - 1400, row_var=LOOT_SEL_VAR,
+        ed, box, LOOT_ROWS, shut, x0 + 1520, y0 - 1400, row_var=LOOT_SEL_VAR,
         click=(LOOT_TAKE_VAR, "true"),
         limit=_call(ed, FN_ARR_LEN, x0 + 1520, y0 - 700, TargetArray=icons))
     flow = _author_rows(ed, icons, tints, box, hovered, x0 + 1520, y0)

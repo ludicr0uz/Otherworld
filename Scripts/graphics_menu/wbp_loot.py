@@ -6,7 +6,8 @@
                               caret and the item's icon; rows past the body's
                               contents collapsed), NOTHING on a body that
                               carries nothing, BAG FULL while the bag has no
-                              room, and the keys' hint
+                              room, the keys' hint, and LootClose "[TAB]
+                              close", the button a click shuts the window by
 
 Both start collapsed; loot_draw.py shows them and writes the rows each frame.
 """
@@ -16,7 +17,7 @@ import unreal
 from combat.graph import BEL, _must_load
 from graphics_menu import umg_author as U
 from graphics_menu.loot_consts import (
-    LOOT_EMPTY, LOOT_EMPTY_TEXT, LOOT_FULL, LOOT_FULL_TEXT, LOOT_HINT_FONT,
+    LOOT_CLOSE, LOOT_CLOSE_TEXT, LOOT_EMPTY, LOOT_EMPTY_TEXT, LOOT_FULL, LOOT_FULL_TEXT, LOOT_HINT_FONT,
     LOOT_HINT_TEXT, LOOT_PANEL,
     LOOT_PANEL_W, LOOT_PROMPT, LOOT_PROMPT_FONT, LOOT_PROMPT_TEXT, LOOT_PROMPT_Y,
     LOOT_RIGHT, LOOT_ROWS, LOOT_ROWS_BOX, LOOT_TITLE_FONT, LOOT_TITLE_TEXT,
@@ -58,4 +59,8 @@ def author_loot_widgets(bp, body):
     U.hide(full)
     hint = U.text(bp, stack, "LootHint", LOOT_HINT_TEXT, LOOT_HINT_FONT, COL_HINT)
     U.pad(hint, top=6.0)
+    # The close button. A variable: the HUD tests the cursor against it.
+    close = U.text(bp, stack, LOOT_CLOSE, LOOT_CLOSE_TEXT, ROW_FONT, COL_ROW,
+                   variable=True)
+    U.pad(close, top=8.0)
     U.hide(outer)

@@ -73,7 +73,14 @@ def probe(p):
     p.check("the next frame lowers the click, so it is served once",
             p.get(hud, CC.PAUSE_CLICK_VAR) == CC.NO_ROW, str(p.get(hud, CC.PAUSE_CLICK_VAR)))
 
-    p.set(hud, "MenuOpen", False)
+    # The close button is the last row, and its key is M: Tick shuts the panel.
+    p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_KEYS.index(C.MENU_KEY))
+    yield lambda: not p.get(hud, "MenuOpen")
+    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.check("a click on the close row shuts the panel", p.get(hud, "MenuOpen") is False)
+    yield 0.1
+    p.check("...and it stays shut once the click is lowered",
+            p.get(hud, "MenuOpen") is False)
     _draw(hud)
     p.check("closing the panel hides the cursor", _cursor(p, hud) == (False, False),
             str(_cursor(p, hud)))

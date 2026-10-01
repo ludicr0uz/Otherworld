@@ -215,14 +215,17 @@ HINT_CAPTURE_TEXT = "press any key to bind it"
 PAUSE_ROWS = "PauseRows"
 MENU_KEY, DEBUG_KEY = "M", "D"
 PAUSE_TITLE = "GRAPHICS QUALITY"
+# The close button: the last row, so the mouse can shut the panel as M does.
+PAUSE_CLOSE_ROW_LABEL = f"[{MENU_KEY}]   close"
 PAUSE_ROW_LABELS = (tuple(f"[{i + 1}]   {p.label}" for i, p in enumerate(PRESETS))
                     + (f"[{DEBUG_KEY}]   debug", EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL,
-                       TUNE_ROW_LABEL, MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL))
+                       TUNE_ROW_LABEL, MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL,
+                       PAUSE_CLOSE_ROW_LABEL))
 # The key each row names, in row order: a click on the row is that key.
 PAUSE_ROW_KEYS = PRESET_KEYS + (DEBUG_KEY, EXIT_KEY, DEV_GUNS_KEY, TUNE_KEY,
-                                MON_TUNE_KEY, WORLD_TUNE_KEY)
+                                MON_TUNE_KEY, WORLD_TUNE_KEY, MENU_KEY)
 PAUSE_DEBUG_ROW = len(PRESETS)
-PAUSE_HINT = f"[{MENU_KEY}]   close   ·   a key or a click picks"
+PAUSE_HINT = "a key or a click picks"
 PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0
 PAUSE_TITLE_FONT, PAUSE_HINT_FONT = 22.0, 15.0
 PAUSE_ROW_LABEL_W = 300.0

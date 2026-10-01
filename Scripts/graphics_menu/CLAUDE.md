@@ -13,7 +13,7 @@ This package holds the fragments. The entry point itself is still 1.2k lines, ov
 split it before extending it.
 
 **The keys:**
-- **M** toggles the panel.
+- **M** toggles the panel. Its last row, `[M] close`, is the close button for the mouse.
 - **1 / 2 / 3 / 4** pick the Low / Medium / High / Ultra presets.
 - **D** toggles debug mode (the FPS readout, wanderer numbers, pellet tracers and impact
   damage, the wanderers' sight cones).
@@ -37,9 +37,9 @@ mouse is the camera's.
 |---|---|---|---|
 | title | the caret goes there | Enter on that row | |
 | settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up | Left / Right |
-| M panel | a second caret lights | that row's key (1-4, D, X, K, T, N, O) | |
+| M panel | a second caret lights | that row's key (1-4, D, X, K, T, N, O; M on the last row, `[M] close`) | |
 | tuning tab | the caret goes there | one step up; on the hint line: save | Left / Right |
-| loot window | the caret goes there | take | |
+| loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
 | death menu | | on the hint line: restart | |
 
 - **The HUD is still the controller.** No widget is hit-testable. A row is under the cursor
@@ -53,6 +53,11 @@ mouse is the camera's.
   settings, death: `_emit_accept` lowers it), `PauseClick` (the M panel row; Tick's key polls
   are `or_pause_click`, and DrawHUD lowers it at the top of the next frame), the tabs'
   `nudge`/`save` flags and `LootTakeRequested`. That is what lets a probe click.
+- **Every menu that can be shut has a button for it.** The M panel's last row is `[M] close`
+  (its key is M, so the toggle's poll is `or_pause_click` like every other row's; closing the
+  panel takes its tuning tabs down with it). The loot window's `LootClose` line lowers
+  `LootOpen` (`loot_draw.py`), and Tick stands the player up off that edge as after Tab. The
+  settings page has its BACK row. The title and death screens have nothing to shut.
 - **The wheel is two more keys** OR'd into the Left/Right polls (`menu_nav.or_wheel`), not
   the right button: that is the shoulder aim, and the M panel does not pause.
 - **Shown is Game-and-UI, hidden is Game-only** (`author_cursor_mode`), switched only when
@@ -68,7 +73,8 @@ mouse is the camera's.
   `uepy.py --game --windowed --probe Scripts/probes/probe_menu_cursor_window.py` (a real
   window: every row of the M panel, title and settings pages found under the cursor). The
   windowed one moves the machine's pointer for a few seconds.
-- **Still needs a play session:** the click and the wheel themselves, the cursor's look, and
+- **Still needs a play session:** the click and the wheel themselves, the loot window's
+  close line under a real cursor (no probe can aim at it), the cursor's look, and
   how losing the mouse-look while the M panel or the loot window is open feels.
 
 ## The UMG screens

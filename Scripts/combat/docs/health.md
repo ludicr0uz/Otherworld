@@ -144,6 +144,16 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - Pick a direction from `LastHitFrom` (a unit vector towards the source; zero counts as Front).
   - Play the montage into `HitSlot`.
   - Set `PrevHealth = Health` on every arm.
+- **A body looking down its sights does not flinch** (`Steady`, asked first by
+  `_author_steady_gate`; that arm only writes `PrevHealth`). The damage is untouched.
+  - Only the player's is ever true: `weapon_component/steady.py` writes
+    `SightBlend > 0.01` onto the owner's health component every frame.
+  - Why: down the sights the camera rides the gun, and a flinch stops the ready pose (one
+    montage group, below), so the gun fell to the carry and the view went 57 cm down and 94°
+    round with it (`probes/probe_ads_hit.py`, measured before the gate).
+  - A flinch already playing on the frame the sights come up is ended by a re-equip
+    (`NeedsRefresh`): the equip's play of the ready pose stops it and blends straight from it.
+    On that frame only, because `IsSlotActive` stays true through the blend out.
 - **The clips are Epic's `MM_HitReact_*`, not `MM_Death_*`**, which carry the head up to 2.2 m.
   - The verifier measures every clip, including the retargeted copies: head under 30 cm, chest
     under 60°.

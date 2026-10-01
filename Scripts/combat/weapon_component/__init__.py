@@ -16,6 +16,9 @@ _author_* fragment per concern, each in its own module:
               SightAim); hide a scoped weapon behind its glass
   sway        down the sights: the view drifts on two slow sines (the control
               rotation is turned by the change), steadied by the stance
+  steady      down the sights: write the owner's health component's Steady
+              (SightBlend > 0.01), which refuses the flinch, so a hit leaves
+              the view on the target; re-equip over a flinch already playing
   sight_pitch down the sights: write the anim BP's AimPitch (the view's pitch
               x SightBlend), which tips the upper body and the gun onto the aim
   pose_weights  ease the anim BP's PoseCrouch/PoseProne/GuardArms/GuardGun

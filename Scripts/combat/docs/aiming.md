@@ -93,6 +93,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     0.1°. At the hip with the view at +30, `AimPitch` read 0.
   - The anim updates before the component ticks, so the gun trails a fast vertical flick by one
     frame.
+- **Down the sights a hit plays no flinch** (`weapon_component/steady.py`, `docs/health.md`):
+  the view rides the gun, so anything that takes the arms takes the aim. A reload still does.
 - **The camera boom sits over the right shoulder** (`camera.aim_camera()`: arm 260, socket
   offset `(0, 55, 60)`). Only pellet traces are drawn, never the two aim traces.
 - **Aiming halves walking speed** (`ads_move_speed_scale`) with a *second* `MaxWalkSpeed`

@@ -22,7 +22,7 @@ from combat.graph import (
 )
 from combat.hit_reaction import (
     HIT_REACTIONS_VAR, LAST_HIT_FROM_VAR, NEXT_REACT_VAR, PREV_HEALTH_VAR,
-    REACT_INDEX_VAR, _author_hit_reaction,
+    REACT_INDEX_VAR, STEADY_VAR, _author_hit_reaction, _author_steady_gate,
 )
 from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR,
@@ -138,6 +138,7 @@ def build_health_component(rebuild=True):
     for name in (PREV_HEALTH_VAR, NEXT_REACT_VAR):
         _declare(ed, name, _float_type())
     _declare(ed, REACT_INDEX_VAR, BEL.get_basic_type_by_name("int"))
+    _declare(ed, STEADY_VAR, BEL.get_basic_type_by_name("bool"))
 
     # SpawnOrigin used to hold where this actor started, back when a replacement
     # appeared near the dead one's own spawn point. It has to be removed
@@ -170,7 +171,9 @@ def build_health_component(rebuild=True):
     # --- Tick: took a hit and lived --------------------------------------
     # The other arm of the same branch, and that is the whole "and survived":
     # this exec pin is reached only on frames the owner is still above zero.
-    _author_hit_reaction(ed, BEL.find_else_pin(at_zero), 700, 1600)
+    # ...unless its sights are up (Steady): then the hit is only remembered.
+    steady, flinch = _author_steady_gate(ed, BEL.find_else_pin(at_zero), 100, 1600)
+    _author_hit_reaction(ed, flinch, 700, 1600, skips=(steady,))
 
     # Branch on Dead and use its *False* pin -- one node cheaper than a NOT, and
     # it is what stops the death path running again every frame after the first.
@@ -247,6 +250,7 @@ def build_health_component(rebuild=True):
         # Zero, not NEVER_DAMAGED: world time starts at zero and this is a
         # deadline, so anything at or before it means "ready now".
         NEXT_REACT_VAR: 0.0,
+        STEADY_VAR: False,
     })
     _log(f"built {HEALTH_BP_PATH} (Health = MaxHealth = {COMBAT.start_health})")
     return bp

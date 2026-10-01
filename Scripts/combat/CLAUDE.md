@@ -276,8 +276,9 @@ These are feel checks a headless run can't do:
   stand just left of the bead; the adventurer's hair shows at the top of the AK's view;
 - the sight sway (`sway_tuning.py`): whether 0.3° reads as a held breath or as drunk,
   above all through the 4x scope, and whether crouch and prone steady it enough;
-- a flinch or a reload with the sights up: the view follows the gun, so it is thrown about
-  with the arms;
+- a reload with the sights up: the view follows the gun, so it is thrown about with the
+  arms. A hit no longer does (`weapon_component/steady.py`: no flinch down the sights);
+  whether taking hits with no reaction at all reads, and the hit-then-sights blend;
 - the `GUN_ACCURACY` numbers: how wide each cloud feels at the hip, and whether the reticle's
   gap (and its 240 px cap) reads well on a real window;
 - how the death camera looks under the terrain;

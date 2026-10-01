@@ -43,6 +43,7 @@ from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
 from combat.weapon_component.sway import _author_sight_sway
 from combat.weapon_component.stance import _author_stance
+from combat.weapon_component.steady import _author_steady
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 
 # A probe's stand-in for the fire key's press: no key can be injected into a
@@ -169,6 +170,10 @@ def _author_wc_tick(ed, tick):
 
     # --- and the pose follows it (ready_pose.py) ------------------------------
     pose_exits = _author_lowered_pose_edge(ed, ads_exits)
+
+    # --- and down the sights a hit plays no flinch (steady.py) ----------------
+    # After SightBlend is written; before the equip, which it can ask for.
+    pose_exits = _author_steady(ed, owner_out, pose_exits, 3200, 1600)
 
     # --- and the pose survives being shot ------------------------------------
     # After the pose edge, because that block is what starts and stops the

@@ -120,6 +120,13 @@ NEXT_REACT_VAR = "NextReactTime"
 # The index the direction pick chose, stored rather than wired because it is
 # written on four different exec arms and read by one.
 REACT_INDEX_VAR = "ReactIndex"
+# This body is looking down its sights and does not flinch: the hit is taken,
+# the stagger is not played. Written every frame by the player's weapon
+# component (weapon_component/steady.py); nobody writes a wanderer's, which
+# stays False. Why: down the sights the view rides the gun (sights.py), and a
+# flinch takes the arms -- its montage stops the ready pose, the gun falls to
+# the carry at the knee, and the camera went there with it.
+STEADY_VAR = "Steady"
 # TEMPORARY INSTRUMENTATION, and it must stay False.
 #
 # "A gate that never opens looks identical to one that works": a -game run in
@@ -137,8 +144,26 @@ HIT_REACT_PROBE_PREFIX = "[HIT-REACT] "
 POSE_BACK_PROBE_PREFIX = "[POSE-BACK] "
 
 
-def _author_hit_reaction(ed, exec_in, x0, y0):
+def _author_steady_gate(ed, exec_in, x0, y0):
+    """Steady (sights up)? Returns ``(steady_pin, flinch_pin)``: the first
+    goes straight to the reaction's PrevHealth write (its ``skips``), so a hit
+    taken down the sights is not read later as a new one; the second is the
+    reaction's exec in."""
+    steady = _at(ed.add_get_member_variable_node(STEADY_VAR), x0, y0 + 240)
+    gate = _at(ed.add_branch_node(), x0 + 240, y0)
+    _connect(_pin(steady, STEADY_VAR, is_input=False), _pin(gate, "Condition"))
+    _connect(exec_in, _pin(gate, "execute"))
+    ed.add_comment_to_nodes(
+        f"{STEADY_VAR}: this body is looking down its sights (the player's "
+        f"weapon component writes it), where the view rides the gun. It takes "
+        f"the hit and plays no flinch, so the view stays on the target.",
+        [steady, gate])
+    return BEL.find_then_pin(gate), BEL.find_else_pin(gate)
+
+
+def _author_hit_reaction(ed, exec_in, x0, y0, skips=()):
     """Took a hit and lived: flinch. Returns ``(nodes, then_pin)``.
+    ``skips``: exec pins that only remember this frame's health.
 
     Wired onto the **False** arm of the death branch, which is what makes
     "survived" free: the frame a target's Health reaches zero the other arm is
@@ -373,7 +398,7 @@ def _author_hit_reaction(ed, exec_in, x0, y0):
                  _pin(as_char, "CastFailed", is_input=False),
                  BEL.find_else_pin(have),
                  BEL.find_else_pin(cooled),
-                 BEL.find_else_pin(took)):
+                 BEL.find_else_pin(took)) + tuple(skips):
         _connect(tail, _pin(remember, "execute"))
 
     ed.add_comment_to_nodes(

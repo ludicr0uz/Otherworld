@@ -91,7 +91,8 @@ BP_HealthComponent (health_component wires the fragments together)
   death             kill count, shells, ragdoll collapse, corpse, player death
   gun_drop          the gun drop: seeded roll + pick streams, loot-table draw
   debuff_drain      HP lost per stack of the GAS Debuff.HealthDrain tag
-  hit_reaction      flinch clips and direction pick
+  hit_reaction      flinch clips and direction pick; the Steady gate (a body
+                    looking down its sights takes the hit and plays no flinch)
   hit_zones         head/limb bone tables and multipliers
   hit_bodies        the physics bodies fitted to each model (fit_hit_bodies),
                     and body_coverage(): bodies against the mesh, ray by ray

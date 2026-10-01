@@ -8,14 +8,19 @@
 
 Only reads; loot_tick.py decides. LootNames is read only behind the IsValid
 on LootTarget, so an empty reach is not an Accessed None per frame.
+
+The one thing it writes is the mouse's (cursor.py), because only DrawHUD
+knows where a row is: the row under the cursor -> LootSel, and a click on it
+raises LootTakeRequested, which Tick serves exactly as it serves Enter.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin
 from combat.nodes import FN_ARR_GET, FN_ARR_LEN, FN_IS_VALID, FN_LESS_II, MACRO_FOR_LOOP
 from combat.paths import HEALTH_CLASS_PATH
+from graphics_menu.cursor import author_row_cursor
 from graphics_menu.loot_consts import (
     LOOT_BAG_FULL_VAR, LOOT_FULL, LOOT_OPEN_VAR, LOOT_PANEL, LOOT_PROMPT, LOOT_ROWS,
-    LOOT_ROWS_BOX, LOOT_SEL_VAR, LOOT_TARGET_VAR,
+    LOOT_ROWS_BOX, LOOT_SEL_VAR, LOOT_TAKE_VAR, LOOT_TARGET_VAR,
 )
 from graphics_menu.ui_graph import (
     mark_rows, member, part, row_at, set_shown, set_text, show_if,
@@ -94,7 +99,11 @@ def author_loot_window(ed, x0, y0, in_execs):
     names = _get(ed, LOOT_NAMES_VAR, x0 + 1260, y0 + 300, HEALTH_CLASS_PATH,
                  _get(ed, LOOT_TARGET_VAR, x0 + 1020, y0 + 300))
     box = part(ed, WBP_HUD, LOOT_ROWS_BOX, x0 + 1260, y0 + 500)
-    flow = _author_rows(ed, names, box, [flow], x0 + 1520, y0)
+    hovered = author_row_cursor(
+        ed, box, LOOT_ROWS, [flow], x0 + 1520, y0 - 1400, row_var=LOOT_SEL_VAR,
+        click=(LOOT_TAKE_VAR, "true"),
+        limit=_call(ed, FN_ARR_LEN, x0 + 1520, y0 - 700, TargetArray=names))
+    flow = _author_rows(ed, names, box, hovered, x0 + 1520, y0)
     flow = mark_rows(ed, box, LOOT_ROWS, _get(ed, LOOT_SEL_VAR, x0 + 3200, y0 + 300),
                      [flow], x0 + 3400, y0)
     full = part(ed, WBP_HUD, LOOT_FULL, x0 + 4600, y0 + 300)

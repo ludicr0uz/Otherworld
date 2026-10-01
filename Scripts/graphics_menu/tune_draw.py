@@ -13,6 +13,7 @@ MenuOpen (menu_screens.author_pause_menu), so this needs no MenuOpen test.
 
 from combat.graph import _at, _connect, _pin, _set
 from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_SUB_II
+from graphics_menu.cursor import author_row_cursor, author_widget_click
 from graphics_menu.dev_guns import _branch, _call, _get, _out
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu.ui_graph import MACRO_FOR_LOOP, mark_rows, part, row_value, set_shown, show_if
@@ -62,9 +63,16 @@ def author_tune_panel(ed, x0, y0, in_execs, tab=GUN_TAB):
     flow = set_shown(ed, panel, True, [shown], x0 + 500, y0)
 
     box = part(ed, WBP_PAUSE_MENU, tab.rows_box, x0 + 500, y0 + 400)
+    # The mouse: the row under the cursor takes the caret, a click on it is
+    # one step up (Right), and a click on the hint line saves (Enter).
+    hovered = author_row_cursor(ed, box, tab.row_count, [flow], x0 + 500, y0 - 1400,
+                                row_var=tab.row_var, click=(tab.nudge_var, 1))
+    hovered = author_widget_click(
+        ed, part(ed, WBP_PAUSE_MENU, tab.hint_widget, x0 + 500, y0 - 2000),
+        (tab.save_var, "true"), hovered, x0 + 500, y0 - 2400)
     name = _item(ed, tab.names_var, _get(ed, tab.pick_var, x0 + 760, y0 + 440, made),
                  x0 + 1000, y0 + 300, made)
-    flow, failed = row_value(ed, box, 0, name, [flow], x0 + 1000, y0)
+    flow, failed = row_value(ed, box, 0, name, hovered, x0 + 1000, y0)
     flow = _author_stats(ed, tab, box, [flow, failed], x0 + 2200, y0, made)
     flow = mark_rows(ed, box, tab.row_count, _get(ed, tab.row_var, x0 + 3800, y0 + 300, made),
                      [flow], x0 + 4000, y0)

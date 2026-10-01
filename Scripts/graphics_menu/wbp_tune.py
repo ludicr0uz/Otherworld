@@ -49,6 +49,8 @@ def _author_tab(bp, root, tab):
                    COL_CARET, variable=True)
     U.pad(saved, top=6.0)
     U.hide(saved)
-    hint = U.text(bp, stack, tab.hint_widget, tab.hint_text, TUNE_HINT_FONT, COL_HINT)
+    # A variable: a click on the hint line saves (tune_draw.py).
+    hint = U.text(bp, stack, tab.hint_widget, tab.hint_text, TUNE_HINT_FONT, COL_HINT,
+                  variable=True)
     U.pad(hint, top=6.0)
     U.hide(outer)

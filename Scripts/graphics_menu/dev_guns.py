@@ -24,6 +24,7 @@ from combat.tuning import INVENTORY_SIZE
 from graphics_menu.dev_consts import (
     DEV_GUN_CLASS_PATHS, DEV_GUNS_KEY, DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR,
 )
+from graphics_menu.menu_nav import or_pause_click
 from graphics_menu.player_parts import PAWN
 
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
@@ -171,7 +172,9 @@ def author_dev_guns(ed, pc_out, parts, in_execs, x0, y0, made):
                     Key=DEV_GUNS_KEY)
     ask = _call(ed, FN_AND, x0 + 240, y0 + 300, made,
                 A=_get(ed, "MenuOpen", x0, y0 + 440, made), B=_out(pressed))
-    raise_it, no_key = _branch(ed, _out(ask), in_execs, x0 + 480, y0, made)
+    raise_it, no_key = _branch(ed, or_pause_click(ed, _out(ask), DEV_GUNS_KEY, x0,
+                                                  y0 + 700, made),
+                               in_execs, x0 + 480, y0, made)
     raised = _setter(ed, DEV_GUNS_REQUEST_VAR, "true", [raise_it], x0 + 740, y0 - 300,
                      made)
 

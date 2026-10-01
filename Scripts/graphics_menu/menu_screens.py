@@ -2,6 +2,10 @@
 
   author_main_menu   GameStarted false: WBP_MainMenu over a hidden HUD, the
                      title or settings page by MenuPage, Up/Down/Enter on it
+
+Each also says whether the mouse cursor shows, and what a click on it does
+(cursor.py): always on the title and death screens; alive, with the M panel
+or the loot window open.
   author_death_menu  PlayerDead: WBP_DeathMenu instead of the HUD, the score,
                      and [R] restarting the level
   author_alive       neither: the HUD's Body shown, the death menu hidden
@@ -14,6 +18,11 @@ sets bTickEvenWhenPaused, so WasInputKeyJustPressed still answers.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from graphics_menu.cursor import (
+    ROW, author_cursor_mode, author_hold_fire, author_row_cursor, author_widget_click)
+from graphics_menu.cursor_consts import (
+    CURSOR_ACCEPT_VAR, CURSOR_ROW_VAR, PAUSE_CLICK_VAR)
+from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.menu_nav import _emit_accept, _emit_row_nav
 from graphics_menu.settings_page import _author_settings_page
 from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
@@ -21,7 +30,8 @@ from graphics_menu.ui_graph import (
     mark_rows, member, part, row_at, screen, set_shown, set_text,
 )
 from graphics_menu.umg_consts import (
-    DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF, DEBUG_ON, GAME_STARTED_VAR, HUD_BODY,
+    DEATH_HINT_LINE, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF, DEBUG_ON,
+    GAME_STARTED_VAR, HUD_BODY,
     MENU_ROWS, PAUSE_DEBUG_ROW, PAUSE_ROW_LABELS, PAUSE_ROWS, RESTART_KEY, ROW_VALUE,
     SETTINGS_PANEL,
     TITLE_PANEL, TITLE_ROWS, WBP_DEATH_MENU, WBP_HUD, WBP_MAIN_MENU, WBP_MENU_ROW,
@@ -35,6 +45,7 @@ KILL_COUNT_VAR = "NpcKillCount"
 FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
+FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
 FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
 FN_OPEN_LEVEL = "/Script/Engine.GameplayStatics.OpenLevel"
 FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
@@ -65,8 +76,8 @@ def author_main_menu(ed, x0, y0, in_execs):
     """The menu the game opens on, and the one thing that leaves it.
 
     Returns ``(exec_pin_when_already_started,)`` -- the path the rest of the
-    HUD hangs off. Two rows, NEW GAME and SETTINGS, chosen with the keyboard:
-    no widget takes the mouse, so a click could not say which row it means.
+    HUD hangs off. Two rows, NEW GAME and SETTINGS, chosen with the keyboard
+    or by a click on the row under the cursor.
     """
     made = []
 
@@ -79,7 +90,8 @@ def author_main_menu(ed, x0, y0, in_execs):
     _connect(_pin(started, GAME_STARTED_VAR, is_input=False), _pin(playing, "Condition"))
     for e in in_execs:
         _connect(e, _pin(playing, "execute"))
-    flow = _hide_all_but_menu(ed, [BEL.find_else_pin(playing)], x0 + 520, y0)
+    flow = _hide_all_but_menu(ed, author_cursor_mode(
+        ed, True, [BEL.find_else_pin(playing)], x0 + 520, y0 - 1400), x0 + 520, y0)
 
     # Which page the menu is showing: the title page's two rows, or the
     # settings page's -- a different panel, rows and keys.
@@ -95,9 +107,14 @@ def author_main_menu(ed, x0, y0, in_execs):
         ed, False, [BEL.find_else_pin(which)], x0 + 2560, y0 + 1200))
 
     flow = _show_page(ed, True, [BEL.find_then_pin(which)], x0 + 2560, y0)
+    # The row under the cursor takes the caret, and a click on it is Enter.
+    hovered = author_row_cursor(
+        ed, part(ed, WBP_MAIN_MENU, TITLE_ROWS, x0 + 3800, y0 - 1000), len(MENU_ROWS),
+        [flow], x0 + 4060, y0 - 1400, row_var="MenuRow",
+        click=(CURSOR_ACCEPT_VAR, "true"))
     row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 3800, y0 + 600))
     flow = mark_rows(ed, part(ed, WBP_MAIN_MENU, TITLE_ROWS, x0 + 3800, y0 + 400),
-                     len(MENU_ROWS), _pin(row, "MenuRow", is_input=False), [flow],
+                     len(MENU_ROWS), _pin(row, "MenuRow", is_input=False), hovered,
                      x0 + 4060, y0)
 
     # --- choosing a row -------------------------------------------------------
@@ -138,7 +155,8 @@ def author_main_menu(ed, x0, y0, in_execs):
     ed.add_comment_to_nodes(
         f"The main menu: WBP_MainMenu over a hidden HUD while {GAME_STARTED_VAR} "
         f"is false, which BeginPlay leaves it with while it pauses the world. "
-        f"The caret is lit on MenuRow's row; Enter or Space takes it.",
+        f"The caret is lit on MenuRow's row; Enter, Space or a click on it "
+        f"takes it.",
         made)
     return (set_shown(ed, screen(ed, WBP_MAIN_MENU, x0 + 260, y0 - 400), False,
                       [BEL.find_then_pin(playing)], x0 + 520, y0 - 400),)
@@ -158,7 +176,8 @@ def author_death_menu(ed, x0, y0, in_execs, mode_out):
         made.append(n)
         return n
 
-    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU, x0, y0 + 240), True, in_execs,
+    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU, x0, y0 + 240), True,
+                     author_cursor_mode(ed, True, in_execs, x0, y0 - 1200),
                      x0 + 260, y0)
     flow = set_shown(ed, part(ed, WBP_HUD, HUD_BODY, x0 + 260, y0 + 240), False,
                      [flow], x0 + 760, y0)
@@ -184,12 +203,26 @@ def author_death_menu(ed, x0, y0, in_execs, mode_out):
     pressed = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 3280, y0 + 300))
     _connect(_pin(pc, "ReturnValue", is_input=False), _pin(pressed, "self"))
     _set(pressed, "Key", RESTART_KEY)
+    # ...or a click on the hint line, raised and served like the title's.
+    clicked = author_widget_click(
+        ed, part(ed, WBP_DEATH_MENU, DEATH_HINT_LINE, x0 + 2000, y0 - 600),
+        (CURSOR_ACCEPT_VAR, "true"), [flow], x0 + 2000, y0 - 1000)
+    asked = keep(_at(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR),
+                     x0 + 3280, y0 + 460))
+    either = keep(_at(_node(ed, FN_OR), x0 + 3540, y0 + 300))
+    _connect(_pin(pressed, "ReturnValue", is_input=False), _pin(either, "A"))
+    _connect(_pin(asked, CURSOR_ACCEPT_VAR, is_input=False), _pin(either, "B"))
     again = keep(_at(ed.add_branch_node(), x0 + 3540, y0))
-    _connect(_pin(pressed, "ReturnValue", is_input=False), _pin(again, "Condition"))
-    _connect(flow, _pin(again, "execute"))
+    _connect(_pin(either, "ReturnValue", is_input=False), _pin(again, "Condition"))
+    for e in clicked:
+        _connect(e, _pin(again, "execute"))
+    served = keep(_at(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR),
+                      x0 + 3800, y0 - 200))
+    _set(served, CURSOR_ACCEPT_VAR, "false")
+    _connect(BEL.find_then_pin(again), _pin(served, "execute"))
     unpause = keep(_at(_node(ed, FN_SET_PAUSED), x0 + 3800, y0))
     _set(unpause, "bPaused", "false")
-    _connect(BEL.find_then_pin(again), _pin(unpause, "execute"))
+    _connect(BEL.find_then_pin(served), _pin(unpause, "execute"))
     # The current map by name, so the menu restarts whatever level is loaded.
     # bRemovePrefixString strips PIE's UEDPIE_0_.
     where = keep(_at(_node(ed, FN_LEVEL_NAME), x0 + 4060, y0))
@@ -201,7 +234,8 @@ def author_death_menu(ed, x0, y0, in_execs, mode_out):
 
     ed.add_comment_to_nodes(
         f"The death menu, instead of the HUD while the GameMode's PlayerDead is "
-        f"set and the game is paused. [{RESTART_KEY}] unpauses and reopens the "
+        f"set and the game is paused. [{RESTART_KEY}] or a click on the hint "
+        f"line unpauses and reopens the "
         f"current level, which resets the kill count with it -- the counter "
         f"lives on the GameMode, and OpenLevel builds a new one.",
         made)
@@ -217,8 +251,20 @@ def author_alive(ed, x0, y0, in_execs):
 
 def author_pause_menu(ed, x0, y0, in_execs):
     """The M panel, while MenuOpen: the caret on the Quality row, and whether
-    debug mode is on. Its labels are WBP_PauseMenu's. Returns the exec tails."""
+    debug mode is on. Its labels are WBP_PauseMenu's. Returns the exec tails.
+
+    First, for everything a living player has open: the cursor shows with
+    the panel or the loot window, and while it does a click is not a shot.
+    A click on a panel row is the row's key, served by Tick (PauseClick)."""
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0, y0 + 200)
+    looting = _at(ed.add_get_member_variable_node(LOOT_OPEN_VAR), x0 - 500, y0 - 900)
+    wanted = _at(_node(ed, FN_OR), x0 - 260, y0 - 1000)
+    _connect(_pin(_at(ed.add_get_member_variable_node("MenuOpen"), x0 - 500, y0 - 1040),
+                  "MenuOpen", is_input=False), _pin(wanted, "A"))
+    _connect(_pin(looting, LOOT_OPEN_VAR, is_input=False), _pin(wanted, "B"))
+    in_execs = author_hold_fire(ed, author_cursor_mode(
+        ed, _pin(wanted, "ReturnValue", is_input=False), in_execs, x0, y0 - 1400),
+        x0 + 2200, y0 - 1400)
     br = _at(ed.add_branch_node(), x0 + 260, y0)
     _connect(_pin(get_open, "MenuOpen", is_input=False), _pin(br, "Condition"))
     for e in in_execs:
@@ -229,9 +275,13 @@ def author_pause_menu(ed, x0, y0, in_execs):
     flow = set_shown(ed, screen(ed, WBP_PAUSE_MENU, x0 + 260, y0 + 240), True,
                      [BEL.find_then_pin(br)], x0 + 520, y0)
     rows = part(ed, WBP_PAUSE_MENU, PAUSE_ROWS, x0 + 520, y0 + 400)
+    hovered = author_row_cursor(ed, rows, len(PAUSE_ROW_LABELS), [flow], x0 + 4400,
+                                y0 - 1400, click=(PAUSE_CLICK_VAR, ROW))
     quality = _at(ed.add_get_member_variable_node("Quality"), x0 + 780, y0 + 600)
+    under = _at(ed.add_get_member_variable_node(CURSOR_ROW_VAR), x0 + 780, y0 + 740)
     flow = mark_rows(ed, rows, len(PAUSE_ROW_LABELS),
-                     _pin(quality, "Quality", is_input=False), [flow], x0 + 1040, y0)
+                     _pin(quality, "Quality", is_input=False), hovered, x0 + 1040, y0,
+                     also=_pin(under, CURSOR_ROW_VAR, is_input=False))
 
     # ON or OFF behind one branch: no SelectText, and a bool converted to text
     # reads "true", which is a variable's value and not a setting.
@@ -245,6 +295,7 @@ def author_pause_menu(ed, x0, y0, in_execs):
     off = set_text(ed, value, DEBUG_OFF, [BEL.find_else_pin(dbg_br)], x0 + 3460, y0 + 300)
     ed.add_comment_to_nodes(
         "The graphics panel (M). The caret sits on the Quality row, so it "
-        "follows the preset; debug mode's row says ON or OFF.",
+        "follows the preset, and on the row under the cursor; debug mode's "
+        "row says ON or OFF.",
         [get_open, br, quality, dbg, dbg_br])
     return [closed, on, off, missing]

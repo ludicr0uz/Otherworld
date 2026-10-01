@@ -139,6 +139,7 @@ python3 Scripts/dev/uepy.py -c "import unreal; unreal.log_warning('hi')"
 python3 Scripts/dev/uepy.py --list                 # which editors are listening
 python3 Scripts/dev/uepy.py --game --seconds 25    # headless -game run + error summary
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py   # see below
+python3 Scripts/dev/uepy.py --game --windowed --probe <probe>   # rendered, in a 1280x720 window
 python3 Scripts/dev/uepy.py --cold <script>        # force a fresh editor
 python3 Scripts/dev/uepy.py --summary <scripts>    # one line per script + its failures
 python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's editors
@@ -217,7 +218,7 @@ editor.
   the item into the bag (`Scripts/loot/CLAUDE.md`).
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
-  and a settings screen (plus K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day and the day's and night's lengths, the lengths saved to `Scripts/world/world_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
+  and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts) (plus K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day and the day's and night's lengths, the lengths saved to `Scripts/world/world_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`. Food and water lie
   in both.
@@ -391,7 +392,9 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
   between `_1` and `_2`.
 - **Killing a `-game` run on a timer** produces a `SIGSEGV` with `GracefulTerminationHandler` in
   the stack. That isn't a gameplay fault.
-- **`-nullrhi` can't prove anything that touches the window or viewport.**
+- **`-nullrhi` can't prove anything that touches the window or viewport.** `--game
+  --windowed` renders: widgets get their geometry and the engine calls `DrawHUD` itself
+  (`probe_menu_cursor_window.py`). Python still reads a widget's cached geometry as zeros.
 - **Diagnosing a frozen editor:** run `sample <pid> 5 -file /tmp/hang.txt` and read the
   `GameThread` stack. `ps -o %cpu` separates a spin (100%) from a deadlock (0%).
 

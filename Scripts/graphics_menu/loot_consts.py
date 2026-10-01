@@ -34,7 +34,8 @@ LOOT_ROWS = 6                       # rows the window has; a table rolls fewer
 
 LOOT_PROMPT_TEXT = f"[{LOOT_KEY.upper()}]   search the body"
 LOOT_TITLE_TEXT = "THE BODY CARRIES"
-LOOT_HINT_TEXT = f"UP / DOWN   ·   ENTER takes   ·   [{LOOT_KEY.upper()}] close"
+LOOT_HINT_TEXT = (f"UP / DOWN   ·   ENTER or click takes   ·   "
+                  f"[{LOOT_KEY.upper()}] close")
 LOOT_FULL_TEXT = "BAG FULL"
 LOOT_PANEL_W = 380.0
 LOOT_RIGHT = 60.0                   # px in from the right edge, centred vertically

@@ -31,7 +31,11 @@ Still drawn on the HUD canvas (placed per frame)
 Input, settings and state
   presets         the quality presets, applying one, the grass-lighting sync
   grass_tiers     showing/hiding grass tiers per preset
-  menu_nav        Up/Down caret movement and the accept keys, shared by pages
+  menu_nav        Up/Down caret movement and the accept keys, shared by pages;
+                  what a key poll gains from the mouse (wheel, a clicked row)
+  cursor_consts   the mouse cursor in the menus: its buttons, variables, rules
+  cursor          DrawHUD: showing the cursor while a menu is up, the row
+                  under it (by geometry), and what a click on it raises
   settings_rows   settings screen constants: SLIDERS, row order, KEY_POOL
   settings_input  rebinding capture, slider nudges, BACK, the save
   difficulty      the DIFFICULTY row (EASY/MEDIUM/SURVIVOR) and its push onto
@@ -87,6 +91,7 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   loot_checks        the loot window: scan, keys, take, widgets
   tune_checks        the gun tuning tab: table, CSV on the guns, panel, save, writes
   world_tune_checks    the world tuning tab: panel, save, the cycle's Sets
+  cursor_checks      the mouse cursor: shown when, the row tests, the clicks
   monster_tune_checks  the monster tuning tab: table, CSV on the controllers,
                      panel, save, writes
 """

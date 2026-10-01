@@ -38,6 +38,8 @@ from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu import world_tune_consts as WC
 from graphics_menu.world_tune_checks import check_world_tune
+from graphics_menu import cursor_consts as CC
+from graphics_menu.cursor_checks import check_cursor
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -153,9 +155,10 @@ def main():
                          TC.TUNE_KEY, TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
                          TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.MON_TUNE_KEY,
                          WC.WORLD_TUNE_KEY)
-                        + G.PRESET_KEYS + N.START_KEYS)
+                        + G.PRESET_KEYS + N.START_KEYS + CC.CURSOR_KEYS)
     check("polls exactly the menu, preset, debug, restart, start, nav, exit, "
-          "dev-all-guns, loot, gun, monster and world tuning keys",
+          "dev-all-guns, loot, gun, monster and world tuning keys, and the "
+          "cursor's click and wheel",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -520,9 +523,10 @@ def main():
     # Fourteen: and the loot window's three -- a body's health and mesh
     # (loot_find.py), and the player's bag (loot_tick.py).
     # Fifteen: and the carried guns the tuning tab writes (tune_tick.py).
+    # Sixteen: and the fire press held spent under the cursor (cursor.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 15 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 16 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -857,11 +861,14 @@ def main():
                for g in gates]))
     if armed_gate:
         other = first_after(BEL.find_else_pin(armed_gate[0]))
+        # That arm opens with the cursor's row test (cursor.py), which is
+        # what keeps the click that armed a capture out of the capture too.
         check("...and the row activation is the other arm, so the Enter that "
               "armed the capture is never seen by it",
               other is not None
-              and pin_names(other) == {"execute", "Condition"},
-              other.get_class().get_name() if other else "nothing")
+              and str(BEL.get_node_title(other)).replace("\n", " ")
+              == f"Set {CC.CURSOR_ROW_VAR}",
+              str(BEL.get_node_title(other)) if other else "nothing")
     pools = [n for n in nodes
              if n.get_class().get_name() == "K2Node_MacroInstance"
              and any("Get KeyPool" in
@@ -895,6 +902,7 @@ def main():
     check_tune(check, bp, nodes)
     check_monster_tune(check, bp, nodes)
     check_world_tune(check, bp, nodes)
+    check_cursor(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

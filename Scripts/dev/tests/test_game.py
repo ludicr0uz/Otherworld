@@ -79,5 +79,16 @@ class GameEnvTest(unittest.TestCase):
         self.assertEqual(base, {})
 
 
+class RenderArgsTest(unittest.TestCase):
+
+    def test_a_run_draws_nothing_unless_asked(self):
+        self.assertEqual(game.render_args(False), ["-nullrhi"])
+
+    def test_a_windowed_run_has_a_window_and_no_nullrhi(self):
+        args = game.render_args(True)
+        self.assertIn("-windowed", args)
+        self.assertNotIn("-nullrhi", args)
+
+
 if __name__ == "__main__":
     unittest.main()

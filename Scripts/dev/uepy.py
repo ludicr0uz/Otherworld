@@ -142,6 +142,8 @@ def parse_args():
                     help="with --game: run this probe (Scripts/probes); repeatable")
     ap.add_argument("--probe-timeout", type=float,
                     help="wall seconds allowed per probe (default 60)")
+    ap.add_argument("--windowed", action="store_true",
+                    help="with --game: render into a window instead of -nullrhi")
     ap.add_argument("--map", default=game.DEFAULT_MAP, help="level for --game")
     ap.add_argument("--seconds", type=int,
                     help=f"--game duration (default {game.GAME_SECONDS}; with "
@@ -180,7 +182,8 @@ def main():
                 sys.exit(f"[uepy] no such probe: {p}")
         seconds = args.seconds or (game.PROBE_SECONDS if probes else game.GAME_SECONDS)
         extra = [(f"/{p}/", p) for p in args.grep]
-        ok = game.run_game(engine, args.map, seconds, extra, probes, args.probe_timeout)
+        ok = game.run_game(engine, args.map, seconds, extra, probes, args.probe_timeout,
+                           args.windowed)
         return 0 if ok else 1
 
     targets = [("file", os.path.abspath(s)) for s in args.scripts]

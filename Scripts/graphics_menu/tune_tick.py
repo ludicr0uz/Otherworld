@@ -4,8 +4,10 @@ the table written onto every carried gun.
     [T] with MenuOpen                 TuneOpen = NOT TuneOpen
     MenuOpen AND TuneOpen:
         Up / Down                     TuneRow -/+ 1, kept in 0..STAT_COUNT
-        Left / Right                  TuneNudge = -1 / +1
+        Left / Right, or the wheel    TuneNudge = -1 / +1
         Enter                         TuneSaveRequested = true
+    (the mouse: tune_draw raises the same flags from a click, and a click
+     on the panel's row is [T])
     TuneNudge != 0 -> lower it, then
         TuneRow 0                     TuneWeapon steps round the guns
         else                          TuneValues[gun, stat] +/- its step, never
@@ -39,7 +41,9 @@ from combat.paths import (
     ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.weapon_specs import _weapon_specs
+from graphics_menu.cursor_consts import WHEEL_LESS, WHEEL_MORE
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from graphics_menu.menu_nav import or_pause_click, or_wheel
 from graphics_menu.loot_find import put
 from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import (
@@ -124,7 +128,8 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
     panel shows and takes the arrows. Returns the exec tails."""
     t = _call(ed, FN_AND, x0, y0 + 300, made, A=_get(ed, "MenuOpen", x0 - 240, y0 + 300, made),
               B=_pressed(ed, pc_out, tab.key, x0 - 240, y0 + 440, made))
-    flip, no_t = _branch(ed, _out(t), in_execs, x0 + 240, y0, made)
+    flip, no_t = _branch(ed, or_pause_click(ed, _out(t), tab.key, x0 - 480, y0 + 760,
+                                            made), in_execs, x0 + 240, y0, made)
     opened = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
                    A=_get(ed, tab.open_var, x0, y0 + 580, made))
     flow = put(ed, tab.open_var, _out(opened), [flip], x0 + 500, y0 - 200, made)
@@ -147,9 +152,10 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
         held = _call(ed, limit, x + 540, y0 + 300, made, A=_out(moved), B=bound)
         flow = [put(ed, tab.row_var, _out(held), [hit], x + 780, y0, made), miss]
         x += 800
-    for key, nudge in ((TUNE_LESS, -1), (TUNE_MORE, 1)):
-        hit, miss = _branch(ed, _pressed(ed, pc_out, key, x, y0 + 440, made), flow,
-                            x, y0, made)
+    for key, wheel, nudge in ((TUNE_LESS, WHEEL_LESS, -1), (TUNE_MORE, WHEEL_MORE, 1)):
+        turned = or_wheel(ed, pc_out, _pressed(ed, pc_out, key, x, y0 + 440, made),
+                          wheel, x, y0 + 600, made)
+        hit, miss = _branch(ed, turned, flow, x, y0, made)
         flow = [_setter(ed, tab.nudge_var, nudge, [hit], x + 260, y0, made), miss]
         x += 560
     ask, no_ask = _branch(ed, _pressed(ed, pc_out, TUNE_SAVE_KEY, x, y0 + 440, made),

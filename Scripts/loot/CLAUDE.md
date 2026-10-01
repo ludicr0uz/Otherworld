@@ -34,6 +34,8 @@ The code is this package (`__init__.py` is the map) plus the HUD's `graphics_men
   carries `Loot`, within `LOOT_RADIUS` (250 cm) of the player, **measured to the mesh**: the
   capsule stays where the wanderer died, the ragdoll is what the player walks to.
 - **Keys** (fixed, not binds): **Tab** opens and closes, **Up/Down** pick, **Enter** takes.
+  The mouse cursor shows with the window: the row under it is picked, and a click takes
+  (`graphics_menu/cursor.py`; DrawHUD raises the same `LootSel` / `LootTakeRequested`).
   E stays the pick-up: a dropped gun lies beside the body, and E on it must not also empty it.
   The keys only raise `LootOpen` / `LootTakeRequested`; Tick serves them, which is what lets
   a probe drive the window.

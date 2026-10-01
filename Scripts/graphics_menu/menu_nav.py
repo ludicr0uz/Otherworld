@@ -1,8 +1,14 @@
 """Keyboard navigation shared by the menu's pages: Up/Down move the caret, an
 accept key takes the row. The title page and the settings page both use it.
+
+Also what a key poll gains from the mouse (cursor_consts.py): a click raised
+as CursorAccept, the wheel as Left/Right (or_wheel), a clicked M-panel row as
+that row's key (or_pause_click).
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
+from graphics_menu.umg_consts import PAUSE_ROW_KEYS
 
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
@@ -10,9 +16,10 @@ FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
 FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
 FN_MIN_II = "/Script/Engine.KismetMathLibrary.Min"
 FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
+FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 
-# Enter and Space accept; see build_graphics_menu.py's main-menu note for why
-# the left mouse button is not a third.
+# Enter and Space accept. The left mouse button is not a third key here: a
+# click accepts only over a row, which cursor.py raises as CursorAccept.
 START_KEYS = ("Enter", "SpaceBar")
 
 # Navigation. Deliberately NOT rebindable and deliberately not in KEY_POOL: a
@@ -43,7 +50,7 @@ def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0):
         made.append(n)
         return n
 
-    flow = (in_exec,)
+    flow = tuple(in_exec) if isinstance(in_exec, (list, tuple)) else (in_exec,)
     for i, (key, step, limit, bound) in enumerate(
             ((NAV_UP, FN_SUB_II, FN_MAX_II, 0),
              (NAV_DOWN, FN_ADD_II, FN_MIN_II, last_row))):
@@ -71,11 +78,13 @@ def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0):
 
 
 def _emit_accept(ed, pc_out, x0, y0, in_exec, made):
-    """The exec that runs on the frame an accept key is pressed.
+    """The exec that runs on the frame an accept key is pressed, or a row is
+    clicked. Returns the node whose then pin that is.
 
     START_KEYS are OR'd rather than chosen between: Enter is the conventional
     one and Space is what a hand is already near, and with a caret on the panel
-    both mean "this row".
+    both mean "this row". CursorAccept is the click (cursor.py puts the caret
+    on the clicked row first); it is lowered here, as it is served.
     """
     def keep(n):
         made.append(n)
@@ -94,8 +103,45 @@ def _emit_accept(ed, pc_out, x0, y0, in_exec, made):
             _connect(any_key, _pin(either, "A"))
             _connect(got, _pin(either, "B"))
             any_key = _pin(either, "ReturnValue", is_input=False)
+    click = keep(_at(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR),
+                     x0, y0 + len(START_KEYS) * 140))
+    either = keep(_at(_node(ed, FN_OR), x0 + 260, y0 + len(START_KEYS) * 140))
+    _connect(any_key, _pin(either, "A"))
+    _connect(_pin(click, CURSOR_ACCEPT_VAR, is_input=False), _pin(either, "B"))
     go = keep(_at(ed.add_branch_node(), x0 + 520, y0 - 200))
-    _connect(any_key, _pin(go, "Condition"))
+    _connect(_pin(either, "ReturnValue", is_input=False), _pin(go, "Condition"))
     for e in in_exec:
         _connect(e, _pin(go, "execute"))
-    return go
+    served = keep(_at(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR),
+                      x0 + 520, y0 - 400))
+    _set(served, CURSOR_ACCEPT_VAR, "false")
+    _connect(BEL.find_then_pin(go), _pin(served, "execute"))
+    return served
+
+
+def or_wheel(ed, pc_out, pressed, wheel_key, x, y, made):
+    """``pressed`` (a bool pin) OR the wheel turned ``wheel_key``'s way."""
+    wheel = _at(_node(ed, FN_WAS_PRESSED), x, y)
+    _connect(pc_out, _pin(wheel, "self"))
+    _set(wheel, "Key", wheel_key)
+    either = _at(_node(ed, FN_OR), x + 260, y)
+    _connect(pressed, _pin(either, "A"))
+    _connect(_pin(wheel, "ReturnValue", is_input=False), _pin(either, "B"))
+    made += [wheel, either]
+    return _pin(either, "ReturnValue", is_input=False)
+
+
+def or_pause_click(ed, pressed, key, x, y, made):
+    """``pressed`` (the M panel's poll of ``key``) OR that key's row was
+    clicked: PauseClick is the row's index for the one Tick after the click.
+    OR'd after the MenuOpen gate, not inside it: only the open panel's rows
+    can be clicked."""
+    clicked = _at(ed.add_get_member_variable_node(PAUSE_CLICK_VAR), x, y)
+    this_row = _at(_node(ed, FN_EQ_II), x + 240, y)
+    _connect(_pin(clicked, PAUSE_CLICK_VAR, is_input=False), _pin(this_row, "A"))
+    _set(this_row, "B", PAUSE_ROW_KEYS.index(key))
+    either = _at(_node(ed, FN_OR), x + 480, y)
+    _connect(pressed, _pin(either, "A"))
+    _connect(_pin(this_row, "ReturnValue", is_input=False), _pin(either, "B"))
+    made += [clicked, this_row, either]
+    return _pin(either, "ReturnValue", is_input=False)

@@ -15,6 +15,7 @@ from graphics_menu.wbp_tune import author_tune_widgets
 from graphics_menu.umg_consts import (
     COL_CARET, COL_DEATH_HINT, COL_DEATH_TEXT, COL_DEATH_TITLE, COL_GOLD, COL_HINT,
     COL_MAIN_HINT, COL_MAIN_SUB, COL_MAIN_TITLE, COL_ROW, COL_TITLE, DEATH_HINT,
+    DEATH_HINT_LINE,
     DEATH_HINT_FONT, DEATH_PANEL_SIZE, DEATH_SCORE, DEATH_SCORE_FONT, DEATH_TITLE,
     DEATH_TITLE_FONT, GAME_SUBTITLE, GAME_TITLE, HINT_CAPTURE, HINT_CAPTURE_TEXT,
     HINT_IDLE, HINT_IDLE_TEXT, MAIN_HINT, MAIN_HINT_FONT, MAIN_PANEL_SIZE,
@@ -107,5 +108,6 @@ def build_death_menu():
           bold=True, top=18.0, bottom=18.0)
     _line(bp, stack, DEATH_SCORE, "", DEATH_SCORE_FONT, COL_DEATH_TEXT, bottom=28.0,
           variable=True)
-    _line(bp, stack, "DeathHint", DEATH_HINT, DEATH_HINT_FONT, COL_DEATH_HINT)
+    _line(bp, stack, DEATH_HINT_LINE, DEATH_HINT, DEATH_HINT_FONT, COL_DEATH_HINT,
+          variable=True)
     return U.compile_and_save(bp)

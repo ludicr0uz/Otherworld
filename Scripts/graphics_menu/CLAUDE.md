@@ -24,6 +24,51 @@ split it before extending it.
   other two.
 - **Tab** (near a looted body) opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
+- **The mouse** works every menu too (below).
+
+## The mouse cursor (`cursor.py`, `cursor_consts.py`)
+
+The cursor shows while a menu is up: the title and settings pages, the death menu, and in
+play the M panel (with its tuning tabs) and the loot window. Otherwise it is hidden and the
+mouse is the camera's.
+
+| menu | cursor over a row | left click | wheel |
+|---|---|---|---|
+| title | the caret goes there | Enter on that row | |
+| settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up | Left / Right |
+| M panel | a second caret lights | that row's key (1-4, D, X, K, T, N, O) | |
+| tuning tab | the caret goes there | one step up; on the hint line: save | Left / Right |
+| loot window | the caret goes there | take | |
+| death menu | | on the hint line: restart | |
+
+- **The HUD is still the controller.** No widget is hit-testable. A row is under the cursor
+  when `IsUnderLocation(row.GetCachedGeometry, CursorPos)`, tested in a ForLoop over the stack
+  (`author_row_cursor`), and a click is `LeftMouseButton` polled off the controller.
+- **DrawHUD, not Tick:** the title and death screens are paused. `author_cursor_read` (top of
+  the frame) stores `CursorPos` and `CursorMoved`; each menu's fragment then tests its own rows.
+- **A resting cursor does not hold the caret.** The caret follows only when the mouse moved
+  or clicked, so Up/Down still work with the cursor parked on a row.
+- **A click only raises flags, which the menu's keys already serve:** `CursorAccept` (title,
+  settings, death: `_emit_accept` lowers it), `PauseClick` (the M panel row; Tick's key polls
+  are `or_pause_click`, and DrawHUD lowers it at the top of the next frame), the tabs'
+  `nudge`/`save` flags and `LootTakeRequested`. That is what lets a probe click.
+- **The wheel is two more keys** OR'd into the Left/Right polls (`menu_nav.or_wheel`), not
+  the right button: that is the shoulder aim, and the M panel does not pause.
+- **Shown is Game-and-UI, hidden is Game-only** (`author_cursor_mode`), switched only when
+  `CursorWanted != CursorShown`. Without the Game-only call the camera stays dead after a
+  menu closes until the next click.
+- **A click on a row is not a shot.** While the cursor shows in a running game, DrawHUD sets
+  the weapon component's `TriggerSpent` every frame (`author_hold_fire`); its Tick keeps a
+  spent press spent while the fire key is down (`combat/docs/firing_gate.md`).
+- **Python reads a widget's cached geometry back as zeros**, in any run. A probe cannot aim
+  at a row; `probe_menu_cursor_window.py` sweeps the cursor down the screen instead.
+- **Probes:** `probe_menu_cursor.py` (headless: shown and hidden per screen, the held fire
+  press, each flag served) and
+  `uepy.py --game --windowed --probe Scripts/probes/probe_menu_cursor_window.py` (a real
+  window: every row of the M panel, title and settings pages found under the cursor). The
+  windowed one moves the machine's pointer for a few seconds.
+- **Still needs a play session:** the click and the wheel themselves, the cursor's look, and
+  how losing the mouse-look while the M panel or the loot window is open feels.
 
 ## The UMG screens
 
@@ -37,7 +82,8 @@ split it before extending it.
   `WBP_PauseMenu` while `MenuOpen`. `WBP_HUD` itself is never hidden, so its `Fps` text (outside
   `Body`) shows over every screen.
 - **Shown means `HitTestInvisible`, never `Visible`.** No widget may take a click or hover away
-  from the game viewport; every key is polled off the controller. The verifier asserts it.
+  from the game viewport; every key is polled off the controller, and so is the mouse
+  (`cursor.py` finds the row by its geometry). The verifier asserts it.
 - **Labels live in the designer.** Each menu line is a `WBP_MenuRow` whose `LabelText`,
   `LabelWidth` and `LabelColor` are set per instance (`wbp_screens.py`) and applied by its
   PreConstruct. The HUD writes only the caret (`SetRenderOpacity` 1 on the selected row, 0 on the
@@ -78,7 +124,7 @@ split it before extending it.
 ## Settings screen
 
 - **The main menu:** NEW GAME and SETTINGS rows, navigated with Up/Down and chosen with
-  Enter/Space. Mouse clicks are not accepted, since there is no cursor.
+  Enter/Space, or by a click on the row.
 - **The settings page:**
   - mouse sensitivity (Left/Right, clamped to a minimum above zero);
   - DIFFICULTY: EASY / MEDIUM / SURVIVOR (Left/Right cycle it; default EASY). Saved as the int

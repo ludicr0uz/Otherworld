@@ -98,6 +98,9 @@ from graphics_menu.save_exit import (                              # noqa: E402
 from graphics_menu.dev_guns import (                               # noqa: E402
     declare_dev_guns_vars, dev_guns_defaults)
 from graphics_menu.loot_draw import author_loot_window              # noqa: E402
+from graphics_menu.cursor import (                                  # noqa: E402
+    author_cursor_read, cursor_defaults, declare_cursor_vars)
+from graphics_menu.menu_nav import or_pause_click                   # noqa: E402
 from graphics_menu.monster_tune_consts import MONSTER_TAB           # noqa: E402
 from graphics_menu.monster_tune_tick import (                       # noqa: E402
     author_monster_tune_tick, declare_monster_tune_vars, monster_tune_defaults)
@@ -450,6 +453,7 @@ def _ensure_variables(ed, bp):
     declare_tune_vars(ed)
     declare_monster_tune_vars(ed)
     declare_world_tune_vars(ed)
+    declare_cursor_vars(ed)
 
 
 def _apply_defaults(bp, defaults):
@@ -789,10 +793,14 @@ def _author_tick(ed, tick):
         _set(was, "Key", PRESET_KEYS[i])
 
         br = _at(ed.add_branch_node(), bx + 300, by)
-        _connect(_pin(was, "ReturnValue", is_input=False), _pin(br, "Condition"))
+        # The key, or a click on the preset's row (cursor.py).
+        clicks = []
+        _connect(or_pause_click(ed, _pin(was, "ReturnValue", is_input=False),
+                                PRESET_KEYS[i], bx - 500, by + 280, clicks),
+                 _pin(br, "Condition"))
         _connect(flow, _pin(br, "execute"))
 
-        applied = emit_apply(ed, i, bx + 500, by, BEL.find_then_pin(br))
+        applied = emit_apply(ed, i, bx + 500, by, BEL.find_then_pin(br)) + clicks
 
         ed.add_comment_to_nodes(
             f"{PRESET_KEYS[i]} -> {preset.label}: scalability {preset.level}, "
@@ -815,7 +823,8 @@ def _author_tick(ed, tick):
     _connect(pc_out, _pin(was_d, "self"))
     _set(was_d, "Key", DEBUG_KEY)
     br_d = _at(ed.add_branch_node(), bx + 300, by)
-    _connect(_pin(was_d, "ReturnValue", is_input=False), _pin(br_d, "Condition"))
+    _connect(or_pause_click(ed, _pin(was_d, "ReturnValue", is_input=False), DEBUG_KEY,
+                            bx - 500, by + 280, []), _pin(br_d, "Condition"))
     _connect(flow, _pin(br_d, "execute"))
 
     gm = _at(_node(ed, FN_GET_GAME_MODE), bx + 500, by + 240)
@@ -1089,8 +1098,10 @@ def _author_draw(ed, x0, y0):
     # mode is on. Drawn first, so every panel after it can sit on top.
     fps_out = author_fps(ed, x0 + 3000, y0 + 16000, pushed)
 
+    # Where the mouse cursor is, before the first screen that asks (cursor.py).
     # The main menu, before the dead/alive test: a title screen is neither.
-    playing = author_main_menu(ed, x0 + 3000, y0 + 6000, fps_out)
+    playing = author_main_menu(ed, x0 + 3000, y0 + 6000,
+                               [author_cursor_read(ed, fps_out, x0 + 3000, y0 + 18000)])
 
     alive = _at(ed.add_branch_node(), x0 + 60, y0)
     dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
@@ -1217,7 +1228,7 @@ def build_hud_blueprint(rebuild=False):
                          **difficulty_defaults(), **profile_defaults(),
                          **dev_guns_defaults(), **loot_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),
-                         **world_tune_defaults()})
+                         **world_tune_defaults(), **cursor_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

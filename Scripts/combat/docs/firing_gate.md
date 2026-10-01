@@ -17,6 +17,9 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     key is still down. `TriggerSpent` is set by the consume chain, the outer gate requires
     `NOT TriggerSpent`, and `TriggerSpent &= IsInputKeyDown` runs just before the gate. Without
     it, a weapon in the next slot fired once on the same press.
+  - **The HUD raises it too.** While the mouse cursor shows over a running game (the M panel,
+    the loot window), `DrawHUD` sets `TriggerSpent` every frame, so a click on a menu row
+    neither fires, slashes nor punches (`graphics_menu/cursor.py`, `author_hold_fire`).
 - **Empty hands punch** (`weapon_component/punch.py`, tuning `COMBAT.punch_*`). The fire
   gate's False arm runs the punch's press gate: tap AND `NOT IsValid(Held)` AND not sprinting,
   not blocking, not a spent press, off cooldown (`NextPunchTime`). It reads nothing off `Held`.

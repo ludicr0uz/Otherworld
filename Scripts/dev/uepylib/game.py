@@ -101,7 +101,19 @@ def _read_json(path):
         return None
 
 
-def run_game(engine, level, seconds, extra_patterns=(), probes=(), probe_timeout=None):
+# A --game run draws nothing unless asked: -nullrhi. A windowed one renders
+# into a small window, which is the only way to check what depends on the
+# window itself (widget geometry, the mouse cursor).
+WINDOW_ARGS = ("-windowed", "-ResX=1280", "-ResY=720")
+
+
+def render_args(windowed):
+    """How the -game process draws: a window, or not at all."""
+    return list(WINDOW_ARGS) if windowed else ["-nullrhi"]
+
+
+def run_game(engine, level, seconds, extra_patterns=(), probes=(), probe_timeout=None,
+             windowed=False):
     """Boot the level in -game and summarise the log. Returns True when clean.
 
     The process is killed at the end, which the engine records as a crash via
@@ -119,7 +131,8 @@ def run_game(engine, level, seconds, extra_patterns=(), probes=(), probe_timeout
         # SKIP_MENU_SWITCH). A headless run has nobody to press Enter, so
         # without this the log would be a title screen sitting still.
         [editor_cmd(engine), uproject(), ENTRY_URL if probes else level, "-game",
-         "-nullrhi", "-unattended", "-nomenu", "-forcelogflush", f"-abslog={logfile}"],
+         *render_args(windowed), "-unattended", "-nomenu", "-forcelogflush",
+         f"-abslog={logfile}"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         env=game_env(os.environ, level, probes, results_path, probe_timeout))
     # Kill on a timer in-process rather than shelling out to `timeout`, which

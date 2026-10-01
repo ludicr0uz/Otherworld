@@ -3,9 +3,13 @@ BACK, and the save written after every change.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from graphics_menu.cursor import author_row_cursor
+from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, WHEEL_LESS, WHEEL_MORE
 from graphics_menu.difficulty import emit_difficulty_nudge
 from graphics_menu.menu_nav import (
-    NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav)
+    NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav, or_wheel)
+from graphics_menu.ui_graph import part
+from graphics_menu.umg_consts import SETTINGS_ROWS_BOX, WBP_MAIN_MENU
 from graphics_menu.settings_rows import (
     BACK_ROW, FIRST_BIND_ROW, PAGE_TITLE, SETTINGS_CLASS_PATH, SETTINGS_SLOT,
     SETTINGS_USER_INDEX, SLIDERS)
@@ -17,6 +21,7 @@ FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
 FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
+FN_LESS_II = "/Script/Engine.KismetMathLibrary.Less_IntInt"
 FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
 FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
 FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
@@ -106,8 +111,13 @@ def _author_capture(ed, x0, y0, settings_out, in_execs, made):
     made.append(writer)
 
     # --- not armed: move the caret, nudge the sensitivity, take the row -------
-    moved, nav = _emit_row_nav(ed, pc_out, BACK_ROW,
-                               BEL.find_else_pin(listening), x0 + 520, y0 + 1200)
+    # The mouse first: the row under the cursor takes the caret, and a click
+    # on it is Enter. Not while a capture is armed -- that click is the bind.
+    hovered = author_row_cursor(
+        ed, part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX, x0 + 520, y0 + 3600), BACK_ROW + 1,
+        [BEL.find_else_pin(listening)], x0 + 780, y0 + 3200, row_var="MenuRow",
+        click=(CURSOR_ACCEPT_VAR, "true"))
+    moved, nav = _emit_row_nav(ed, pc_out, BACK_ROW, hovered, x0 + 520, y0 + 1200)
     made += nav
 
     left = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 2000, y0 + 1200))
@@ -116,9 +126,28 @@ def _author_capture(ed, x0, y0, settings_out, in_execs, made):
     right = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 2000, y0 + 1340))
     _connect(pc_out, _pin(right, "self"))
     _set(right, "Key", NAV_RIGHT)
-    right_out = _pin(right, "ReturnValue", is_input=False)
+    # The wheel is Left/Right too, and a click on a row with no bind (a
+    # slider, the difficulty) is Right: one step up, or the next difficulty.
+    left_out = or_wheel(ed, pc_out, _pin(left, "ReturnValue", is_input=False),
+                        WHEEL_LESS, x0 + 2000, y0 + 2200, made)
+    right_out = or_wheel(ed, pc_out, _pin(right, "ReturnValue", is_input=False),
+                         WHEEL_MORE, x0 + 2000, y0 + 2340, made)
+    valued = keep(_at(_node(ed, FN_LESS_II), x0 + 2000, y0 + 2480))
+    _connect(_pin(keep(_at(ed.add_get_member_variable_node("MenuRow"),
+                           x0 + 1760, y0 + 2480)), "MenuRow", is_input=False),
+             _pin(valued, "A"))
+    _set(valued, "B", FIRST_BIND_ROW)
+    stepped = keep(_at(_node(ed, FN_AND), x0 + 2260, y0 + 2480))
+    _connect(_pin(keep(_at(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR),
+                           x0 + 2000, y0 + 2620)), CURSOR_ACCEPT_VAR, is_input=False),
+             _pin(stepped, "A"))
+    _connect(_pin(valued, "ReturnValue", is_input=False), _pin(stepped, "B"))
+    more = keep(_at(_node(ed, FN_OR), x0 + 2520, y0 + 2340))
+    _connect(right_out, _pin(more, "A"))
+    _connect(_pin(stepped, "ReturnValue", is_input=False), _pin(more, "B"))
+    right_out = _pin(more, "ReturnValue", is_input=False)
     either = keep(_at(_node(ed, FN_OR), x0 + 2260, y0 + 1200))
-    _connect(_pin(left, "ReturnValue", is_input=False), _pin(either, "A"))
+    _connect(left_out, _pin(either, "A"))
     _connect(right_out, _pin(either, "B"))
     either_out = _pin(either, "ReturnValue", is_input=False)
 

@@ -26,6 +26,7 @@ skips the whole fragment.
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
+from graphics_menu.menu_nav import or_pause_click
 from graphics_menu.dev_guns import author_dev_guns
 from graphics_menu.player_parts import PAWN, author_player_parts
 from graphics_menu.profile_consts import (
@@ -179,7 +180,8 @@ def _author_start(ed, pc_out, now_out, in_execs, x0, y0, made):
                     A=_get(ed, "MenuOpen", x0, y0 + 440, made), B=_out(pressed))
     idle = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
                  A=_get(ed, EXIT_PENDING_VAR, x0, y0 + 580, made))
-    go = _call(ed, FN_AND, x0 + 480, y0 + 300, made, A=_out(in_menu), B=_out(idle))
+    asked = or_pause_click(ed, _out(in_menu), EXIT_KEY, x0, y0 + 760, made)
+    go = _call(ed, FN_AND, x0 + 480, y0 + 300, made, A=asked, B=_out(idle))
     start, stay = _branch(ed, _out(go), in_execs, x0 + 720, y0, made)
     flow = _setter(ed, EXIT_PENDING_VAR, "true", [start], x0 + 980, y0, made)
     flow = _setter(ed, EXIT_STARTED_VAR, now_out, flow, x0 + 1240, y0, made)

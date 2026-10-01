@@ -31,7 +31,7 @@ WRITTEN = {
     C.WBP_MAIN_MENU: (C.TITLE_PANEL, C.TITLE_ROWS, C.SETTINGS_PANEL, C.SETTINGS_ROWS_BOX,
                       C.HINT_IDLE, C.HINT_CAPTURE),
     C.WBP_PAUSE_MENU: (C.PAUSE_ROWS,),
-    C.WBP_DEATH_MENU: (C.DEATH_SCORE,),
+    C.WBP_DEATH_MENU: (C.DEATH_SCORE, C.DEATH_HINT_LINE),
     C.WBP_MENU_ROW: (C.ROW_CARET, C.ROW_LABEL_BOX, C.ROW_LABEL, C.ROW_VALUE),
     C.WBP_INVENTORY_SLOT: (C.SLOT_ACTIVE, C.SLOT_ICON, C.SLOT_AMMO, C.SLOT_FRAME),
 }
@@ -247,11 +247,15 @@ def check_hud_graph(check, nodes):
     for n in carets:
         for pick in _sources(n, "InOpacity"):
             for eq in _sources(pick, "bPickA"):
-                selected += _source_titles(eq, "B")
+                # The M panel lights two rows: an OR of two comparisons.
+                both = _sources(eq, "A") if "OR" in _title(eq).upper() else []
+                for one in (both + _sources(eq, "B")) if both else [eq]:
+                    selected += _source_titles(one, "B")
     check("the title page, settings page, M panel, loot window and the three tuning tabs "
-          "light the selected row's caret",
-          sorted(selected) == ["Get LootSel", "Get MenuRow", "Get MenuRow", "Get MonTuneRow",
-                               "Get Quality", "Get TuneRow", "Get WorldTuneRow"],
+          "light the selected row's caret (the M panel also the row under the cursor)",
+          sorted(selected) == ["Get CursorRow", "Get LootSel", "Get MenuRow", "Get MenuRow",
+                               "Get MonTuneRow", "Get Quality", "Get TuneRow",
+                               "Get WorldTuneRow"],
           str(sorted(selected)))
 
     texts = [n for n in nodes if {"self", "InText"} <= _pins(n)]

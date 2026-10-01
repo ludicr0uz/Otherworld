@@ -31,6 +31,7 @@ FN_CHILD_AT = "/Script/UMG.PanelWidget.GetChildAt"
 FN_STR_TO_TEXT = "/Script/Engine.KismetTextLibrary.Conv_StringToText"
 FN_SELECT_FLOAT = "/Script/Engine.KismetMathLibrary.SelectFloat"
 FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
+FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
 MACRO_FOR_LOOP = ("/Engine/EditorBlueprintResources/StandardMacros"
                   ".StandardMacros:ForLoop")
 
@@ -174,8 +175,10 @@ def row_value(ed, box, index, value, execs, x, y):
     return (set_text(ed, target, value, [then], x + 800, y), failed)
 
 
-def mark_rows(ed, box, count, selected, execs, x, y):
+def mark_rows(ed, box, count, selected, execs, x, y, also=None):
     """Light the caret of row ``selected`` (an int pin) and dim the rest.
+    ``also``: a second int pin whose row is lit too (the M panel's row under
+    the cursor, beside the one its preset is on).
 
     One loop over the rows rather than one caret moved by arithmetic: the
     selection is a property of the row, which is what lets the rows be laid
@@ -198,10 +201,19 @@ def mark_rows(ed, box, count, selected, execs, x, y):
     hit = _at(_node(ed, FN_EQ_II), x + 560, y + 400)
     _connect(index, _pin(hit, "A"))
     _connect(selected, _pin(hit, "B"))
+    picked = _pin(hit, "ReturnValue", is_input=False)
+    if also is not None:
+        hover = _at(_node(ed, FN_EQ_II), x + 560, y + 560)
+        _connect(index, _pin(hover, "A"))
+        _connect(also, _pin(hover, "B"))
+        either = _at(_node(ed, FN_OR), x + 800, y + 560)
+        _connect(picked, _pin(either, "A"))
+        _connect(_pin(hover, "ReturnValue", is_input=False), _pin(either, "B"))
+        picked = _pin(either, "ReturnValue", is_input=False)
     lit = _at(_node(ed, FN_SELECT_FLOAT), x + 800, y + 400)
     _set(lit, "A", 1.0)
     _set(lit, "B", 0.0)
-    _connect(_pin(hit, "ReturnValue", is_input=False), _pin(lit, "bPickA"))
+    _connect(picked, _pin(lit, "bPickA"))
     fade = _at(_node(ed, FN_SET_OPACITY), x + 1100, y)
     _connect(member(ed, row, WBP_MENU_ROW, ROW_CARET, x + 840, y + 240),
              _pin(fade, "self"))

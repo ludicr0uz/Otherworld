@@ -87,8 +87,10 @@ def check_loot(check, bp, nodes):
               _title(n) == f"Set {LC.LOOT_OPEN_VAR}" and _feeders(n, LC.LOOT_OPEN_VAR)
               for n in nodes), str(len(polls)))
     asks = [n for n in nodes if _title(n) == f"Set {LC.LOOT_TAKE_VAR}"]
-    check("Enter raises the take and Tick lowers it (and a lost body clears it)",
-          sorted(_value(n, LC.LOOT_TAKE_VAR) for n in asks) == ["false", "false", "true"],
+    check("Enter or a click on a row raises the take and Tick lowers it (and a "
+          "lost body clears it)",
+          sorted(_value(n, LC.LOOT_TAKE_VAR) for n in asks)
+          == ["false", "false", "true", "true"],
           str([_value(n, LC.LOOT_TAKE_VAR) for n in asks]))
 
     fulls = [n for n in nodes if _title(n) == f"Set {LC.LOOT_BAG_FULL_VAR}"]

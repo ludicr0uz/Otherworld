@@ -11,12 +11,12 @@ DrawText scale x 10: Roboto's LegacyFontSize is 10, so a DrawText at 2.2 was
 22 pt and a 22 pt TextBlock is the same size at 1080p.
 """
 
-from graphics_menu.dev_consts import DEV_GUNS_ROW_LABEL
-from graphics_menu.presets import PRESETS
-from graphics_menu.profile_consts import EXIT_ROW_LABEL
-from graphics_menu.tune_consts import TUNE_ROW_LABEL
-from graphics_menu.monster_tune_consts import MON_TUNE_ROW_LABEL
-from graphics_menu.world_tune_consts import WORLD_TUNE_ROW_LABEL
+from graphics_menu.dev_consts import DEV_GUNS_KEY, DEV_GUNS_ROW_LABEL
+from graphics_menu.presets import PRESET_KEYS, PRESETS
+from graphics_menu.profile_consts import EXIT_KEY, EXIT_ROW_LABEL
+from graphics_menu.tune_consts import TUNE_KEY, TUNE_ROW_LABEL
+from graphics_menu.monster_tune_consts import MON_TUNE_KEY, MON_TUNE_ROW_LABEL
+from graphics_menu.world_tune_consts import WORLD_TUNE_KEY, WORLD_TUNE_ROW_LABEL
 from graphics_menu.settings_rows import (
     BACK_LABEL, BIND_LABELS, DIFFICULTY_LABEL, SETTINGS_TITLE, SLIDERS)
 from survival.tuning import DEHYDRATED_TAG, STARVING_TAG
@@ -53,7 +53,8 @@ UI_VAR = {asset: var for var, asset, _z in SCREENS}
 GAME_STARTED_VAR = "GameStarted"
 
 # What "shown" means. Never Visible: every key is polled off the controller,
-# so no widget may take a click or hover away from the game viewport.
+# so no widget may take a click or hover away from the game viewport. The
+# cursor finds the row it is over by the row's geometry instead (cursor.py).
 SHOWN = "HitTestInvisible"
 HIDDEN = "Collapsed"
 
@@ -192,7 +193,7 @@ HINT_IDLE, HINT_CAPTURE = "HintIdle", "HintCapture"
 GAME_TITLE = "OTHERWORLD"
 GAME_SUBTITLE = "a night in the forest"
 MENU_ROWS = ("NEW GAME", "SETTINGS")
-MAIN_HINT = "UP / DOWN  ·  ENTER selects"
+MAIN_HINT = "UP / DOWN  ·  ENTER or click selects"
 MAIN_PANEL_SIZE = (600.0, 346.0)
 MAIN_TITLE_FONT, MAIN_SUB_FONT, MAIN_HINT_FONT = 34.0, 14.0, 12.0
 MAIN_ROW_SCALE = 1.4             # the title rows, bigger than the settings rows
@@ -202,7 +203,7 @@ SETTINGS_ROW_LABELS = (tuple(sl.label for sl in SLIDERS) + (DIFFICULTY_LABEL,)
 SETTINGS_TITLE_TEXT = SETTINGS_TITLE
 SETTINGS_PANEL_W = 620.0
 SET_TITLE_FONT, SET_HINT_FONT = 22.0, 12.0
-HINT_IDLE_TEXT = "arrows adjust  ·  ENTER rebinds"
+HINT_IDLE_TEXT = "arrows or wheel adjust  ·  ENTER or click rebinds"
 HINT_CAPTURE_TEXT = "press any key to bind it"
 
 # ─── WBP_PauseMenu: the M panel ───────────────────────────────────────────────
@@ -212,8 +213,11 @@ PAUSE_TITLE = "GRAPHICS QUALITY"
 PAUSE_ROW_LABELS = (tuple(f"[{i + 1}]   {p.label}" for i, p in enumerate(PRESETS))
                     + (f"[{DEBUG_KEY}]   debug", EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL,
                        TUNE_ROW_LABEL, MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL))
+# The key each row names, in row order: a click on the row is that key.
+PAUSE_ROW_KEYS = PRESET_KEYS + (DEBUG_KEY, EXIT_KEY, DEV_GUNS_KEY, TUNE_KEY,
+                                MON_TUNE_KEY, WORLD_TUNE_KEY)
 PAUSE_DEBUG_ROW = len(PRESETS)
-PAUSE_HINT = f"[{MENU_KEY}]   close"
+PAUSE_HINT = f"[{MENU_KEY}]   close   ·   a key or a click picks"
 PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0
 PAUSE_TITLE_FONT, PAUSE_HINT_FONT = 22.0, 15.0
 PAUSE_ROW_LABEL_W = 300.0
@@ -221,11 +225,11 @@ PAUSE_ROW_SCALE = 1.25
 DEBUG_ON, DEBUG_OFF = "ON", "OFF"
 
 # ─── WBP_DeathMenu ────────────────────────────────────────────────────────────
-DEATH_SCORE = "Score"
+DEATH_SCORE, DEATH_HINT_LINE = "Score", "DeathHint"
 RESTART_KEY = "R"
 DEATH_TITLE = "YOU DIED"
 DEATH_SCORE_PREFIX = "NPCs killed:  "
-DEATH_HINT = f"[{RESTART_KEY}]   try again"
+DEATH_HINT = f"[{RESTART_KEY}] or click   try again"
 DEATH_PANEL_SIZE = (560.0, 300.0)
 DEATH_TITLE_FONT, DEATH_SCORE_FONT, DEATH_HINT_FONT = 34.0, 22.0, 16.0
 

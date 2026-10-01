@@ -114,6 +114,9 @@ def ual_clip(character, short, clip):
 CROUCH_IDLE = ("UAL1", "Crouch_Idle_Loop")
 CROUCH_WALK = ("UAL1", "Crouch_Fwd_Loop")
 PRONE_CRAWL = ("UAL1", "Swim_Fwd_Loop")
+# Searching a body: down on one knee, the hands working in front. The clip
+# kneels, works and stands again; the game holds its middle (stance_clips.py).
+SEARCH_KNEEL = ("UAL1", "Fixing_Kneeling")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
 

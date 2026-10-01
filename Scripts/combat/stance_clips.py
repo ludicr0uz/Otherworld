@@ -1,6 +1,7 @@
-"""The player's crouch and crawl as clips: the Quaternius Universal Animation
-Library's crouch (still and walking) and its face-down swim, blended over the
-locomotion by the same PoseCrouch/PoseProne weights the procedural poses read.
+"""The player's crouch, crawl and kneel as clips: the Quaternius Universal
+Animation Library's crouch (still and walking), its face-down swim and its
+kneel, blended over the locomotion by PoseCrouch/PoseProne (the weights the
+procedural poses read) and PoseKneel (the search of a body).
 
 WHERE IT SITS
 -------------
@@ -9,12 +10,21 @@ slot and the upper-body layered blend), so the aim layer, the hit slot and
 the procedural poses all apply on top of a crouched or lying body:
 
     Locomotion -> TwoWayBlend(PoseCrouch, B = crouch) -> TwoWayBlend(PoseProne,
-        B = crawl) -> DefaultSlot, LayeredBoneBlend (base)
+        B = crawl) -> TwoWayBlend(PoseKneel, B = kneel)
+        -> DefaultSlot, LayeredBoneBlend (base)
 
     crouch = TwoWayBlend(Move, A = Play crouch_idle, B = Play crouch_walk)
     crawl  = TwoWayBlend(Move, A = Evaluate prone_crawl at PRONE_REST_S,
                                B = Play prone_crawl)
+    kneel  = Evaluate search_kneel at KneelTime
     Move   = clamp(GroundSpeed / MOVE_FULL_CM_S, 0, 1)   (body_pose.move_alpha)
+
+The kneel clip goes down on a knee, works with both hands and stands again. A
+player looping it would stand up every five seconds, so it is evaluated: the
+weapon component runs KneelTime up and back down the working stretch
+(KNEEL_FROM_S..KNEEL_TO_S) for as long as the search lasts, and PoseKneel's
+ease is what kneels and stands. Under the aim layer like the other two, so
+empty hands rummage and a held gun stays held over the kneeling legs.
 
 Lying still is the crawl held on one frame (arms reaching ahead, legs
 straight): the pack has no prone idle. The clip's hips lie below the feet's
@@ -30,7 +40,7 @@ nothing here and keeps the procedural crouch and prone.
 
 from combat.aim_pitch import _feeding_all, _nodes_of
 from combat.anim_blueprint import AIM_SLOT, _slot_node
-from combat.body_pose import POSE_CROUCH, POSE_PRONE, move_alpha
+from combat.body_pose import KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, move_alpha
 from combat.graph import (
     BEL, BGE, PIN, _assets, _at, _connect, _log, _palette, _pin, _set,
 )
@@ -102,10 +112,14 @@ def _player(ed, clip, rate, x, y):
 
 
 def _evaluator(ed, clip, time, x, y):
+    """``time``: seconds into the clip, or a pin that says."""
     node = _at(_palette(ed, f"Animation|Sequences|Evaluate'{clip.get_name()}'"), x, y)
     if node.get_editor_property("node").get_editor_property("sequence") != clip:
         raise RuntimeError(f"the evaluator did not take {clip.get_name()}")
-    _set(node, "ExplicitTime", time)
+    if isinstance(time, (int, float)):
+        _set(node, "ExplicitTime", time)
+    else:
+        _connect(time, _pin(node, "ExplicitTime"))
     return node
 
 
@@ -133,7 +147,7 @@ def unpatch_stance_clips(skin):
 
 
 def patch_stance_clips(skin):
-    """Blend ``skin``'s crouch and crawl clips over its locomotion. Re-running
+    """Blend ``skin``'s crouch, crawl and kneel clips over its locomotion. Re-running
     replaces the previous blends; a skin without clips only loses them."""
     bp = _assets().load_asset(skin.anim_bp)
     if not bp:
@@ -142,7 +156,7 @@ def patch_stance_clips(skin):
     base = _remove_previous(ed)
     if skin.stance_clips:
         clips = {f: _assets().load_asset(getattr(skin, f))
-                 for f in ("crouch_idle", "crouch_walk", "prone_crawl")}
+                 for f in ("crouch_idle", "crouch_walk", "prone_crawl", "search_kneel")}
         missing = [f for f, c in clips.items() if not c]
         if missing:
             raise RuntimeError(f"no clip for {missing}: run import_quaternius.py")
@@ -160,21 +174,25 @@ def patch_stance_clips(skin):
                                      x, y + 550)), move, x + 400, y + 450)
         weights = {w: _pin(_at(ed.add_get_member_variable_node(w), x + 400, y + 800 + i * 120),
                            w, is_input=False)
-                   for i, w in enumerate((POSE_CROUCH, POSE_PRONE))}
+                   for i, w in enumerate((POSE_CROUCH, POSE_PRONE, POSE_KNEEL, KNEEL_TIME))}
         low = _blend(ed, base, _pose(crouch), weights[POSE_CROUCH], x + 800, y + 200)
         lying = _blend(ed, _pose(low), _pose(crawl), weights[POSE_PRONE], x + 1100, y + 300)
+        kneel = _evaluator(ed, clips["search_kneel"], weights[KNEEL_TIME], x + 1100, y + 700)
+        down = _blend(ed, _pose(lying), _pose(kneel), weights[POSE_KNEEL], x + 1400, y + 400)
         for c in consumers:
-            _connect(_pose(lying), c)
+            _connect(_pose(down), c)
         ed.add_comment_to_nodes(
             f"The low stances as clips (Quaternius UAL): {POSE_CROUCH} blends in the "
-            f"crouch, {POSE_PRONE} the crawl, each still or walking by GroundSpeed. "
-            "See Scripts/combat/stance_clips.py.", _mine(ed))
+            f"crouch, {POSE_PRONE} the crawl, each still or walking by GroundSpeed, "
+            f"and {POSE_KNEEL} the kneel over a body being searched, held at "
+            f"{KNEEL_TIME}. See Scripts/combat/stance_clips.py.", _mine(ed))
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{skin.anim_bp} failed to compile after the stance clips")
     _assets().save_loaded_asset(bp)
     _log(f"{bp.get_name()}: stance clips "
          + (f"{skin.crouch_idle.rsplit('/', 1)[1]}, {skin.crouch_walk.rsplit('/', 1)[1]}, "
-            f"{skin.prone_crawl.rsplit('/', 1)[1]}" if skin.stance_clips
+            f"{skin.prone_crawl.rsplit('/', 1)[1]}, "
+            f"{skin.search_kneel.rsplit('/', 1)[1]}" if skin.stance_clips
             else "none (procedural crouch and prone)"))
     return bp

@@ -9,9 +9,7 @@ import unreal
 from combat.game_state import DAMAGED_BY_PLAYER_VAR
 from combat.paths import HEALTH_BP_PATH
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, load
-from loot.consts import (
-    LOOT_CHANCES_VAR, LOOT_NAMES_VAR, LOOT_TABLE_NAMES_VAR, LOOT_TABLE_VAR, LOOT_VAR,
-)
+from loot.consts import BODY_ARRAYS, LOOT_ARRAYS, LOOT_CHANCES_VAR
 
 
 def _title(n):
@@ -39,27 +37,25 @@ def _upstream(n, limit=400):
 def check_loot_roll():
     bp = load(HEALTH_BP_PATH)
     names = {str(n) for n in BEL.list_member_variable_names(bp, False)}
-    want = (LOOT_TABLE_VAR, LOOT_CHANCES_VAR, LOOT_TABLE_NAMES_VAR, LOOT_VAR,
-            LOOT_NAMES_VAR)
+    want = (LOOT_CHANCES_VAR, *(v for pair in LOOT_ARRAYS for v in pair))
     check("BP_HealthComponent declares the loot table and the body's Loot",
           all(v in names for v in want), str([v for v in want if v not in names]))
     body = unreal.get_default_object(BEL.generated_class(bp))
     check("...and a body starts carrying nothing",
-          len(body.get_editor_property(LOOT_VAR)) == 0
-          and len(body.get_editor_property(LOOT_NAMES_VAR)) == 0)
+          all(len(body.get_editor_property(v)) == 0 for v in BODY_ARRAYS))
 
     nodes = graph(bp).list_all_nodes()
     adds = [n for n in by_pins(nodes, "TargetArray", "NewItem")
-            if any(_title(f) in (f"Get {LOOT_VAR}", f"Get {LOOT_NAMES_VAR}")
+            if any(_title(f) in [f"Get {v}" for v in BODY_ARRAYS]
                    for f in _feeders(n, "TargetArray"))]
-    check("a kill fills Loot and LootNames, one Add each",
+    check("a kill fills Loot and its names, icons and tints, one Add each",
           sorted(_title(f) for n in adds for f in _feeders(n, "TargetArray"))
-          == sorted([f"Get {LOOT_VAR}", f"Get {LOOT_NAMES_VAR}"]), str(len(adds)))
-    sources = sorted(_title(g) for n in adds for f in _feeders(n, "NewItem")
-                     for g in _feeders(f, "TargetArray"))
-    check("...from the table's own entries",
-          sources == sorted([f"Get {LOOT_TABLE_VAR}", f"Get {LOOT_TABLE_NAMES_VAR}"]),
-          str(sources))
+          == sorted(f"Get {v}" for v in BODY_ARRAYS), str(len(adds)))
+    pairs = sorted((_title(g), _title(t)) for n in adds for t in _feeders(n, "TargetArray")
+                   for f in _feeders(n, "NewItem") for g in _feeders(f, "TargetArray"))
+    check("...each from the table's own array",
+          pairs == sorted((f"Get {table}", f"Get {body}") for table, body in LOOT_ARRAYS),
+          str(pairs))
     rolls = [n for n in by_pins(nodes, "A", "B")
              if any(_title(g) == f"Get {LOOT_CHANCES_VAR}"
                     for f in _feeders(n, "B") for g in _feeders(f, "TargetArray"))

@@ -91,6 +91,16 @@ POSE_WEIGHTS = (GUARD_ARMS, GUARD_GUN, POSE_CROUCH, POSE_PRONE)
 # How fast a weight follows its target (FInterpTo speed, 1/s): a stance or a
 # guard settles in about a fifth of a second.
 POSE_BLEND_SPEED = 12.0
+# The kneel over a body being searched (stance_clips.py blends the clip in by
+# PoseKneel and holds it at KneelTime; pose_weights.py writes both). Not one
+# of POSE_WEIGHTS: no ModifyBone reads it, and going down on a knee takes
+# longer than a guard does: about half a second.
+POSE_KNEEL = "PoseKneel"
+KNEEL_TIME = "KneelTime"
+KNEEL_BLEND_SPEED = 5.0
+# The stretch of the kneel clip in which the body is down and the hands work
+# (it kneels before it, and stands after): KneelTime runs up and back down it.
+KNEEL_FROM_S, KNEEL_TO_S = 1.0, 3.9
 
 # Crouch: the thigh swings forward of hanging straight down by the first, the
 # shin back by the second -- a squat with the knees over the toes. The hip
@@ -396,7 +406,7 @@ def patch_body_pose(skin):
         raise RuntimeError(f"{skeleton.get_name()} has no {missing}")
 
     _remove_previous(ed, start_out)
-    for name in POSE_WEIGHTS:
+    for name in (*POSE_WEIGHTS, POSE_KNEEL, KNEEL_TIME):
         _declare(ed, name, _float_type())
     tail = _downstream(start_out)
     if tail is None:

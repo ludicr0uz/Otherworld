@@ -71,7 +71,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 - **On the adventurer the low stances are clips**, from the Quaternius Universal Animation
   Library (CC0; `asset_pipeline/import_quaternius.py` retargets every UAL clip onto the
-  adventurer, into `/Game/Sourced/Quaternius/UAL/Adventurer01`). `PlayerSkin` names three:
+  adventurer, into `/Game/Sourced/Quaternius/UAL/Adventurer01`). `PlayerSkin` names four (the fourth is `search_kneel`, below):
   `crouch_idle` (`Crouch_Idle_Loop`), `crouch_walk` (`Crouch_Fwd_Loop`) and `prone_crawl`. The
   packs have no crawl and no prone idle: the crawl is the face-down `Swim_Fwd_Loop` (a two-armed
   pull and a frog kick), and lying still is that clip held at 0.5 s (arms ahead, legs straight).
@@ -89,12 +89,19 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   the shotgun 33 cm up, as far apart as standing.
 - **Rates:** the crouch walk covers ~55 cm/s and plays at 2× (the most before it reads as a
   scurry; the feet slide at the crouch's 270), the crawl at 1.5×.
+- **The kneel over a searched body** is a third blend on top of those two:
+  `TwoWayBlend(PoseKneel, B = Evaluate search_kneel at KneelTime)` (`Fixing_Kneeling`). It is
+  evaluated because the clip kneels, works and stands again: `pose_weights.py` runs
+  `KneelTime` up and back down the working stretch (`KNEEL_FROM_S`..`KNEEL_TO_S`) and eases
+  `PoseKneel` from the component's `Searching` (written by the HUD's loot window,
+  `Scripts/loot/CLAUDE.md`) at `KNEEL_BLEND_SPEED`, slower than a stance. Not while prone.
+  `PoseKneel` is not one of `POSE_WEIGHTS`: no ModifyBone reads it.
 - **This module owns every TwoWayBlend and sequence node in the player's AnimGraph,** so a rerun
   removes them all and rejoins the locomotion. The weapons build strips them before anything
   compiles the anim BP (`unpatch_stance_clips`), because rerunning the import regenerates the
   clips and leaves the old players empty, which does not compile.
 - **The mannequin fallback** (and an adventurer before the import) has no clips: `PlayerSkin`
-  leaves the three fields `None` and the stances stay procedural, below.
+  leaves the four fields `None` and the stances stay procedural, below.
 
 ## Body poses (`body_pose.py`, `weapon_component/pose_weights.py`)
 

@@ -1,6 +1,7 @@
-"""The loot window's HUD Tick fragment: find the body, poll its keys, serve a take.
+"""The loot window's HUD Tick fragment: find the body, poll its keys, serve a
+take, kneel.
 
-    find the nearest body with loot (loot_find)      -> LootTarget
+    find the nearest body (loot_find)                -> LootTarget
     none in reach   -> LootOpen = false, LootTakeRequested = false
     else, with the player's weapon component:
         LootBagFull = Length(Inventory) >= INVENTORY_SIZE
@@ -9,12 +10,15 @@
             [Tab]          LootOpen = NOT LootOpen, LootSel = 0
             open: Up/Down  LootSel -/+ 1, clamped
                   Enter    LootTakeRequested = true
-        LootTakeRequested AND LootOpen -> lower it; room in the bag -> take (loot_take)
+        LootTakeRequested AND LootOpen -> lower it; room in the bag, and
+            something on the body -> take (loot_take)
+    then, on every path: the kneel follows LootOpen (loot_kneel)
 
 Tick, not DrawHUD: a -nullrhi probe never draws. The keys only raise flags,
 which is what lets probes/probe_corpse_loot.py open the window and take
 without a keyboard. Walking out of reach, or the body's lifespan ending, loses
-the target and so shuts the window; so does taking its last item.
+the target and so shuts the window. Taking the last item does not: the body
+is still there, and the window says NOTHING.
 """
 
 import unreal
@@ -23,7 +27,7 @@ from combat.graph import (
     BEL, _at, _connect, _declare, _float_type, _loose_pin, _must_load, _palette, _pin,
 )
 from combat.nodes import (
-    FN_ADD_II, FN_AND, FN_ARR_LEN, FN_GET_COMP, FN_GET_PLAYER_PAWN,
+    FN_ADD_II, FN_AND, FN_ARR_LEN, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_GREATER_II,
     FN_IS_VALID, FN_MIN_II, FN_NOT, FN_SUB_II, FN_WAS_PRESSED,
 )
 from combat.paths import (
@@ -32,10 +36,11 @@ from combat.paths import (
 from combat.tuning import INVENTORY_SIZE
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
 from graphics_menu.loot_consts import (
-    LOOT_BAG_FULL_VAR, LOOT_BEST_VAR, LOOT_DOWN, LOOT_KEY, LOOT_OPEN_VAR, LOOT_SEL_VAR,
-    LOOT_TAKE_KEY, LOOT_TAKE_VAR, LOOT_TARGET_VAR, LOOT_UP,
+    LOOT_BAG_FULL_VAR, LOOT_BEST_VAR, LOOT_DOWN, LOOT_KEY, LOOT_KNEELING_VAR,
+    LOOT_OPEN_VAR, LOOT_SEL_VAR, LOOT_TAKE_KEY, LOOT_TAKE_VAR, LOOT_TARGET_VAR, LOOT_UP,
 )
 from graphics_menu.loot_find import author_find_body, put
+from graphics_menu.loot_kneel import author_kneel
 from graphics_menu.loot_take import author_take
 from loot.consts import LOOT_NAMES_VAR, LOOT_RADIUS
 
@@ -43,7 +48,7 @@ FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
 FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 
-_BOOLS = (LOOT_OPEN_VAR, LOOT_TAKE_VAR, LOOT_BAG_FULL_VAR)
+_BOOLS = (LOOT_OPEN_VAR, LOOT_TAKE_VAR, LOOT_BAG_FULL_VAR, LOOT_KNEELING_VAR)
 
 
 def declare_loot_vars(ed):
@@ -158,9 +163,14 @@ def author_loot_tick(ed, pc_out, in_execs, x0, y0):
                                            A=_get(ed, LOOT_BAG_FULL_VAR, x0 + 260,
                                                   y0 + 300, made))),
                             [flow], x0 + 760, y0, made)
-    taken = author_take(ed, wc, pawn, [room], x0 + 1020, y0, made)
+    # A body may carry nothing: Loot[LootSel] of an empty array is not read.
+    some, bare = _branch(ed, _out(_call(ed, FN_GREATER_II, x0 + 760, y0 + 440, made,
+                                        A=_count(ed, x0 + 300, y0 + 600, made), B=0)),
+                         [room], x0 + 1020, y0, made)
+    taken = author_take(ed, wc, pawn, [some], x0 + 1280, y0, made)
     ed.add_comment_to_nodes(
-        f"Loot: the nearest dead body with Loot within the reach is LootTarget; "
-        f"[{LOOT_KEY}] opens its window, Up/Down pick, Enter takes into the bag "
-        f"(while it has room). Out of reach, the window shuts.", made[:1])
-    return taken + [idle, no_room, shut, _pin(cast, "CastFailed", is_input=False)]
+        f"Loot: the nearest dead body within the reach is LootTarget; "
+        f"[{LOOT_KEY}] kneels and opens its window, Up/Down pick, Enter takes into "
+        f"the bag (while it has room). Out of reach, the window shuts.", made[:1])
+    tails = taken + [idle, no_room, bare, shut, _pin(cast, "CastFailed", is_input=False)]
+    return author_kneel(ed, pc_out, tails, x0, y0 + 1800)

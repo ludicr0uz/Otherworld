@@ -16,7 +16,8 @@ from combat.graph import (
 from graphics_menu import umg_author as U
 from graphics_menu.umg_consts import (
     COL_CARET, COL_KILL, COL_ROW, ROW_CARET, ROW_CARET_W, ROW_COLOR_VAR, ROW_FONT,
-    ROW_LABEL, ROW_LABEL_BOX, ROW_LABEL_W, ROW_TEXT_VAR, ROW_VALUE, ROW_WIDTH_VAR,
+    ROW_ICON, ROW_ICON_H, ROW_ICON_W, ROW_LABEL, ROW_LABEL_BOX, ROW_LABEL_W,
+    ROW_TEXT_VAR, ROW_VALUE, ROW_WIDTH_VAR,
     SLOT_ACTIVE, SLOT_AMMO, SLOT_AMMO_BOTTOM, SLOT_AMMO_FONT, SLOT_AMMO_RIGHT, SLOT_BACK,
     SLOT_FRAME, SLOT_H, SLOT_ICON, SLOT_ICON_H, SLOT_ICON_TOP, SLOT_ICON_W, SLOT_W,
     WBP_INVENTORY_SLOT, WBP_MENU_ROW,
@@ -65,7 +66,14 @@ def build_menu_row():
     caret.set_editor_property("render_opacity", 0.0)
     label_box = U.sized(bp, root, ROW_LABEL_BOX, w=ROW_LABEL_W, variable=True)
     U.text(bp, label_box, ROW_LABEL, "LABEL", ROW_FONT, COL_ROW, variable=True)
-    U.text(bp, root, ROW_VALUE, "", ROW_FONT, COL_CARET, variable=True)
+    value = U.text(bp, root, ROW_VALUE, "", ROW_FONT, COL_CARET, variable=True)
+    # The loot window's rows show an item's icon here (loot_draw.py).
+    icon = U.image(bp, root, ROW_ICON, "T_UI_Slot", (ROW_ICON_W, ROW_ICON_H),
+                   variable=True)
+    U.pad(icon, v="Center")
+    U.hide(icon)
+    for w in (caret_box, label_box, value):
+        U.pad(w, v="Center")
     U.compile_and_save(bp)   # the widget variables exist once compiled
 
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")

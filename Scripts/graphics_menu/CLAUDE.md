@@ -23,7 +23,7 @@ split it before extending it.
 - **N** (panel open) opens the MONSTER TUNING tab (below).
 - **O** (panel open) opens the WORLD TUNING tab (below). Opening any tuning tab shuts the
   other two.
-- **Tab** (near a looted body) opens the loot window; **Up/Down** and **Enter** in it
+- **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 - **The mouse** works every menu too (below).
 
@@ -201,6 +201,11 @@ Run from Tick after save and exit; the design is `Scripts/loot/CLAUDE.md`. Traps
 - **The take reuses the cheat's pattern** (spawn, cast, `Dropped`, `Inventory += it`,
   `NeedsRefresh`). `dev_guns_checks._looting` tells the take's nodes apart from the cheat's.
 - **Probe:** `probe_corpse_loot.py` calls `ReceiveDrawHUD` itself to read the window.
+- **`WBP_MenuRow` has an `Icon`** after its value, collapsed; only the loot rows show it. It is
+  named as the inventory slot's is, so "Get Icon" alone does not say which: tell the loot
+  row's brush by its `Texture` coming out of an array.
+- **The kneel** (`loot_kneel.py`) runs on every tail of the loot Tick, so a lost body also
+  stands the player up. It is the HUD's 17th `GetComponentByClass`.
 
 ## The GUN TUNING tab (`tune_*.py`, `wbp_tune.py`)
 

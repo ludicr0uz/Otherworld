@@ -1,8 +1,10 @@
-"""verify.stance_clips -- the crouch and the crawl as clips (combat/stance_clips.py):
-the player's AnimGraph blends them over the locomotion by PoseCrouch and
-PoseProne, each still or walking by GroundSpeed; the crouch clips put the body
-down with the feet on the ground; and the crawl, with body_pose's lifts, lies
-on the ground still and just clears it crawling.
+"""verify.stance_clips -- the crouch, the crawl and the kneel as clips
+(combat/stance_clips.py): the player's AnimGraph blends them over the
+locomotion by PoseCrouch, PoseProne and PoseKneel, the first two still or
+walking by GroundSpeed; the crouch clips put the body down with the feet on
+the ground; the crawl, with body_pose's lifts, lies on the ground still and
+just clears it crawling; and the kneel is down for the whole stretch it is
+held over.
 
 A skin without the clips (the mannequin, or no import_quaternius.py yet) is
 checked to carry no stance blend: it poses both stances procedurally, which
@@ -14,8 +16,8 @@ import unreal
 from asset_pipeline.rig_util import _bone_world
 from combat.anim_blueprint import AIM_SLOT, _slot_name
 from combat.body_pose import (
-    MOVE_FULL_CM_S, POSE_CROUCH, POSE_PRONE, PRONE_CLIP_HIPS_Z,
-    PRONE_CRAWL_LIFT_CM, PRONE_HIPS_CM,
+    KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S, MOVE_FULL_CM_S, POSE_CROUCH, POSE_KNEEL,
+    POSE_PRONE, PRONE_CLIP_HIPS_Z, PRONE_CRAWL_LIFT_CM, PRONE_HIPS_CM,
 )
 from combat.skin import player_skin
 from combat.stance_clips import (
@@ -29,6 +31,10 @@ PRONE_TOP_CM = 80.0
 # How far a bone of the lying body may sit under the ground: a centimetre or
 # two of a knee or a foot pressed into grass.
 SINK_CM = 3.0
+# The kneel's knee on the ground: its joint sits this far under it at most on
+# the adventurer's shorter shin (measured 3.9), where the clip's own rig rests
+# the kneecap on the ground.
+KNEEL_SINK_CM = 5.0
 
 
 def _title(n):
@@ -78,25 +84,33 @@ def check_stance_graph():
         check(f"{abp.get_name()}: no stance clips on this rig, and no stance "
               "blend left in its AnimGraph", not ours, str(len(ours)))
         return
-    check(f"{abp.get_name()}: four stance blends, three players, one evaluator",
-          sorted(_cls(n) for n in ours) == sorted([BLEND_CLASS] * 4
-                                                  + [PLAYER_CLASS] * 3 + [EVALUATOR_CLASS]),
+    check(f"{abp.get_name()}: five stance blends, three players, two evaluators",
+          sorted(_cls(n) for n in ours) == sorted([BLEND_CLASS] * 5 + [PLAYER_CLASS] * 3
+                                                  + [EVALUATOR_CLASS] * 2),
           str(sorted(_cls(n) for n in ours)))
 
     slot = next((n for n in nodes if _cls(n) == "AnimGraphNode_Slot"
                  and _slot_name(n) == AIM_SLOT), None)
-    lying = _up(slot, "Source") if slot else None
+    down = _up(slot, "Source") if slot else None
+    kneel = _up(down, "B") if _cls(down) == BLEND_CLASS else None
+    check(f"the aim slot reads the kneel: {POSE_KNEEL} blends in the kneel clip, "
+          f"held at {KNEEL_TIME}",
+          _cls(down) == BLEND_CLASS and _title(_up(down, "Alpha")) == f"Get {POSE_KNEEL}"
+          and _cls(kneel) == EVALUATOR_CLASS and _clip_of(kneel) == skin.search_kneel
+          and _title(_up(kneel, "ExplicitTime")) == f"Get {KNEEL_TIME}",
+          f"{_cls(down)} <- {_clip_of(kneel)} @ {_title(_up(kneel, 'ExplicitTime')) if kneel else None}")
+    lying = _up(down, "A") if _cls(down) == BLEND_CLASS else None
     low = _up(lying, "A") if _cls(lying) == BLEND_CLASS else None
     loco = _up(low, "A") if _cls(low) == BLEND_CLASS else None
-    check("the aim slot reads the stance blends: PoseProne over PoseCrouch over "
+    check("...over the stance blends: PoseProne over PoseCrouch over "
           "the locomotion state machine",
           _cls(lying) == BLEND_CLASS and _title(_up(lying, "Alpha")) == f"Get {POSE_PRONE}"
           and _cls(low) == BLEND_CLASS and _title(_up(low, "Alpha")) == f"Get {POSE_CROUCH}"
           and _cls(loco) == "AnimGraphNode_StateMachine",
           f"{_cls(lying)} <- {_cls(low)} <- {_cls(loco)}")
-    feeds = PIN.list_connected_pins(BEL.find_output_pin(lying, "Pose")) if lying else []
+    feeds = PIN.list_connected_pins(BEL.find_output_pin(down, "Pose")) if down else []
     check("...and so does the upper-body layered blend's base (the aim layer "
-          "rides on the crouched or lying body)",
+          "rides on the crouched, lying or kneeling body)",
           sorted(_cls(PIN.get_owning_node(p)) for p in feeds)
           == ["AnimGraphNode_LayeredBoneBlend", "AnimGraphNode_Slot"],
           str([_cls(PIN.get_owning_node(p)) for p in feeds]))
@@ -195,7 +209,29 @@ def check_crawl_on_ground():
           knees > -SINK_CM and top < PRONE_TOP_CM, f"legs from {knees:.1f}, top {top:.1f}")
 
 
+def check_kneel_clip():
+    skin = player_skin()
+    if not skin.stance_clips:
+        return
+    b = skin.pose_bones
+    hips = b["hips"]
+    legs = [b["calf_l"], b["calf_r"], b["foot_l"], b["foot_r"]]
+    stand_hips = min(p[hips].z for p in _samples(load(skin.idle), [hips], n=4))
+    clip = load(skin.search_kneel)
+    length = clip.get_editor_property("sequence_length")
+    held = [{k: _bone_world(clip, k, KNEEL_FROM_S + (KNEEL_TO_S - KNEEL_FROM_S) * i / 12)
+             for k in [hips] + legs} for i in range(13)]
+    top = max(p[hips].z for p in held)
+    low = min(p[k].z for p in held for k in legs)
+    check(f"search_kneel: held over {KNEEL_FROM_S:g}..{KNEEL_TO_S:g} s of its "
+          f"{length:.1f} s, the hips stay at least 40 cm down and no knee or foot "
+          f"joint goes more than {KNEEL_SINK_CM:g} cm under the ground",
+          0.0 < KNEEL_FROM_S < KNEEL_TO_S < length and stand_hips - top >= 40.0
+          and low > -KNEEL_SINK_CM, f"hips {stand_hips:.0f} -> {top:.0f}, legs from {low:.1f}")
+
+
 def run():
     check_stance_graph()
     check_crouch_clips()
+    check_kneel_clip()
     check_crawl_on_ground()

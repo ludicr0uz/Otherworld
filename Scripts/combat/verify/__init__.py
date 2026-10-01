@@ -22,8 +22,9 @@ and it never relies on a variable another section left behind.
   body_pose   the crouch, prone and guard poses: the anim BP's weighted
               ModifyBones match body_pose.pose_plan, the plan replayed on the
               skeleton lands where each pose says, the component's weights
-  stance_clips  the crouch and crawl clips: the stance blends in the AnimGraph,
-              the crouch down with the feet planted, the crawl on the ground
+  stance_clips  the crouch, crawl and kneel clips: the stance blends in the
+              AnimGraph, the crouch down with the feet planted, the crawl on
+              the ground, the kneel down for the stretch it is held over
   block       the guard: its key, the Blocking stance, the fire gate refusing
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
               the crouch it drives, the footsteps' volume and reach per stance

@@ -2,7 +2,9 @@
 words. Constants only, so wbp_loot (the layout), loot_tick and loot_draw (the
 graph) and loot_checks read one table.
 
-    [Tab] near a body with loot   open the window (Tab again closes it)
+    [Tab] near a body             kneel and open the window (Tab again closes
+                                  it and stands up); a body with nothing on it
+                                  can be searched too, and says so
     Up / Down                     move the caret
     Enter                         take the selected item into the bag
 
@@ -24,12 +26,16 @@ LOOT_OPEN_VAR = "LootOpen"
 LOOT_SEL_VAR = "LootSel"
 LOOT_TAKE_VAR = "LootTakeRequested"
 LOOT_BAG_FULL_VAR = "LootBagFull"
+# What LootOpen was last Tick: the edge that takes and gives back the walk
+# (loot_kneel.py).
+LOOT_KNEELING_VAR = "LootKneeling"
 
 # WBP_HUD's widgets.
 LOOT_PROMPT = "LootPrompt"
 LOOT_PANEL = "LootPanel"
 LOOT_ROWS_BOX = "LootRows"
 LOOT_FULL = "LootFull"
+LOOT_EMPTY = "LootEmpty"            # shown instead of rows on a body with nothing
 LOOT_ROWS = 6                       # rows the window has; a table rolls fewer
 
 LOOT_PROMPT_TEXT = f"[{LOOT_KEY.upper()}]   search the body"
@@ -37,6 +43,7 @@ LOOT_TITLE_TEXT = "THE BODY CARRIES"
 LOOT_HINT_TEXT = (f"UP / DOWN   ·   ENTER or click takes   ·   "
                   f"[{LOOT_KEY.upper()}] close")
 LOOT_FULL_TEXT = "BAG FULL"
+LOOT_EMPTY_TEXT = "NOTHING"
 LOOT_PANEL_W = 380.0
 LOOT_RIGHT = 60.0                   # px in from the right edge, centred vertically
 LOOT_PROMPT_Y = 90.0                # px below the viewport centre

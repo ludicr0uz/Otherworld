@@ -12,6 +12,7 @@ import math
 
 from asset_pipeline.rig_util import mesh_ref_pose
 from combat.body_pose import (
+    KNEEL_BLEND_SPEED, KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S, POSE_KNEEL,
     ADDITIVE, GUARD_ARMS, GUARD_GUN, GUARD_GUN_TURN_DEG, POSE_BLEND_SPEED, POSE_CROUCH, POSE_PRONE,
     POSE_WEIGHTS, PRONE_HIPS_CM, PRONE_MOVING, _conj, _mul,
     _ref, _rotator, _turn, pose_plan,
@@ -21,7 +22,7 @@ from combat.paths import ITEM_BP_PATH
 from combat.skin import player_skin
 from combat.verify.common import BEL, PIN, cdo, check, graph, load, num_pin
 from combat.verify.fixtures import w, wg
-from combat.weapon_component.pose_weights import HELD_TWO_HANDED
+from combat.weapon_component.pose_weights import HELD_TWO_HANDED, SEARCHING_VAR
 from combat.weapon_component.stance import CROUCH, PRONE
 from combat.weapon_specs import _weapon_specs
 
@@ -277,8 +278,43 @@ def check_held_two_handed():
                   "Sniper": True}, str(got))
 
 
+def check_kneel_written():
+    """The search's kneel (stance_clips.py blends the clip in): its weight
+    and where the clip is held."""
+    puts = [n for n in wg if _title(n) == f"Set {POSE_KNEEL}"]
+    step = _source(BEL.find_input_pin(puts[0], POSE_KNEEL)) if len(puts) == 1 else None
+    check(f"BP_WeaponComponent eases {POSE_KNEEL} once a frame: FInterpTo(its own "
+          f"value, target) at {KNEEL_BLEND_SPEED:g}", step is not None
+          and num_pin(step, "InterpSpeed") == KNEEL_BLEND_SPEED
+          and _title(_source(BEL.find_input_pin(step, "Current"))) == f"Get {POSE_KNEEL}",
+          str(len(puts)))
+    src = {_title(n) for n in _feeds(BEL.find_input_pin(puts[0], POSE_KNEEL))} if puts \
+        else set()
+    check(f"...towards {SEARCHING_VAR} AND NOT prone (a prone player searches "
+          "lying down)", {f"Get {SEARCHING_VAR}", "Get Stance", "NOT Boolean"} <= src,
+          str(sorted(src)))
+    check(f"{SEARCHING_VAR} defaults to False, and nothing in the component "
+          "writes it (the HUD's loot window does)",
+          w.get_editor_property(SEARCHING_VAR) is False
+          and not [n for n in wg if _title(n) == f"Set {SEARCHING_VAR}"])
+    span = KNEEL_TO_S - KNEEL_FROM_S
+    times = [n for n in wg if _title(n) == f"Set {KNEEL_TIME}"]
+    add = _source(BEL.find_input_pin(times[0], KNEEL_TIME)) if len(times) == 1 else None
+    wave = _source(BEL.find_input_pin(add, "A")) if add else None
+    back = _source(BEL.find_input_pin(wave, "A")) if wave else None
+    lap = _source(BEL.find_input_pin(back, "A")) if back else None
+    check(f"{KNEEL_TIME} runs up and back down the clip's working stretch: "
+          f"{KNEEL_FROM_S:g} + |time mod {2 * span:g} - {span:g}|",
+          lap is not None and num_pin(add, "B") == KNEEL_FROM_S
+          and "Abs" in _title(wave).replace(" ", "")
+          and abs(num_pin(back, "B") - span) < 1e-6
+          and abs(num_pin(lap, "Divisor") - 2 * span) < 1e-6,
+          f"{len(times)} writes")
+
+
 def run():
     check_anim_bp_poses()
     check_pose_geometry()
     check_weights_written()
     check_held_two_handed()
+    check_kneel_written()

@@ -2,31 +2,34 @@
 
     no LootTarget    prompt and panel collapsed
     shut             "[TAB] search the body" under the reticle
-    open             the panel: row i shows LootTarget.LootNames[i] (rows past
-                     the end collapsed), the caret on LootSel, BAG FULL while
+    open             the panel: row i shows the icon LootTarget.LootIcons[i]
+                     tinted LootTints[i], as the inventory draws the item
+                     (rows past the end collapsed), the caret on LootSel,
+                     NOTHING on a body that carries nothing, BAG FULL while
                      LootBagFull
 
-Only reads; loot_tick.py decides. LootNames is read only behind the IsValid
-on LootTarget, so an empty reach is not an Accessed None per frame.
+Only reads; loot_tick.py decides. The body's arrays are read only behind the
+IsValid on LootTarget, so an empty reach is not an Accessed None per frame.
 
 The one thing it writes is the mouse's (cursor.py), because only DrawHUD
 knows where a row is: the row under the cursor -> LootSel, and a click on it
 raises LootTakeRequested, which Tick serves exactly as it serves Enter.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin
+from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import FN_ARR_GET, FN_ARR_LEN, FN_IS_VALID, FN_LESS_II, MACRO_FOR_LOOP
 from combat.paths import HEALTH_CLASS_PATH
 from graphics_menu.cursor import author_row_cursor
 from graphics_menu.loot_consts import (
-    LOOT_BAG_FULL_VAR, LOOT_FULL, LOOT_OPEN_VAR, LOOT_PANEL, LOOT_PROMPT, LOOT_ROWS,
-    LOOT_ROWS_BOX, LOOT_SEL_VAR, LOOT_TAKE_VAR, LOOT_TARGET_VAR,
+    LOOT_BAG_FULL_VAR, LOOT_EMPTY, LOOT_FULL, LOOT_OPEN_VAR, LOOT_PANEL, LOOT_PROMPT,
+    LOOT_ROWS, LOOT_ROWS_BOX, LOOT_SEL_VAR, LOOT_TAKE_VAR, LOOT_TARGET_VAR,
 )
-from graphics_menu.ui_graph import (
-    mark_rows, member, part, row_at, set_shown, set_text, show_if,
-)
-from graphics_menu.umg_consts import ROW_VALUE, WBP_HUD, WBP_MENU_ROW
-from loot.consts import LOOT_NAMES_VAR
+from graphics_menu.ui_graph import mark_rows, member, part, row_at, set_shown, show_if
+from graphics_menu.umg_consts import ROW_ICON, WBP_HUD, WBP_MENU_ROW
+from loot.consts import LOOT_ICONS_VAR, LOOT_TINTS_VAR
+
+FN_SET_BRUSH = "/Script/UMG.Image.SetBrushFromTexture"
+FN_SET_TINT = "/Script/UMG.Image.SetColorAndOpacity"
 
 
 def _get(ed, var, x, y, owner=None, self_out=None):
@@ -52,8 +55,16 @@ def _branch(ed, cond, execs, x, y):
     return BEL.find_then_pin(br), BEL.find_else_pin(br)
 
 
-def _author_rows(ed, names, box, in_execs, x0, y0):
-    """Row i := names[i], shown, or collapsed past the end. Returns Completed."""
+def _item(ed, array, index, x, y):
+    n = _at(_node(ed, FN_ARR_GET), x, y)
+    _connect(array, _pin(n, "TargetArray"))
+    _connect(index, _pin(n, "Index"))
+    return _pin(n, "Item", is_input=False)
+
+
+def _author_rows(ed, icons, tints, box, in_execs, x0, y0):
+    """Row i := icons[i] tinted tints[i], shown, or collapsed past the end.
+    Returns Completed."""
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
     if not loop:
         raise RuntimeError("could not create the ForLoop macro node")
@@ -65,16 +76,20 @@ def _author_rows(ed, names, box, in_execs, x0, y0):
     i = _pin(loop, "Index", is_input=False)
     row, then, _failed = row_at(ed, box, i, [_pin(loop, "LoopBody", is_input=False)],
                                 x0 + 300, y0)
-    size = _call(ed, FN_ARR_LEN, x0 + 560, y0 + 440, TargetArray=names)
+    size = _call(ed, FN_ARR_LEN, x0 + 560, y0 + 440, TargetArray=icons)
     within = _call(ed, FN_LESS_II, x0 + 800, y0 + 440, A=i, B=size)
     carried, past = _branch(ed, within, [then], x0 + 860, y0)
-    name = _at(_node(ed, FN_ARR_GET), x0 + 860, y0 + 600)
-    _connect(names, _pin(name, "TargetArray"))
-    _connect(i, _pin(name, "Index"))
-    value = member(ed, row, WBP_MENU_ROW, ROW_VALUE, x0 + 1100, y0 + 300)
-    flow = set_text(ed, value, _pin(name, "Item", is_input=False), [carried],
-                    x0 + 1360, y0)
-    set_shown(ed, row, True, [flow], x0 + 1620, y0)
+    icon = member(ed, row, WBP_MENU_ROW, ROW_ICON, x0 + 1100, y0 + 300)
+    brush = _at(_node(ed, FN_SET_BRUSH), x0 + 1360, y0)
+    _connect(icon, _pin(brush, "self"))
+    _connect(_item(ed, icons, i, x0 + 1100, y0 + 600), _pin(brush, "Texture"))
+    _connect(carried, _pin(brush, "execute"))
+    tint = _at(_node(ed, FN_SET_TINT), x0 + 1620, y0)
+    _connect(icon, _pin(tint, "self"))
+    _connect(_item(ed, tints, i, x0 + 1360, y0 + 600), _pin(tint, "InColorAndOpacity"))
+    _connect(BEL.find_then_pin(brush), _pin(tint, "execute"))
+    flow = set_shown(ed, icon, True, [BEL.find_then_pin(tint)], x0 + 1880, y0)
+    set_shown(ed, row, True, [flow], x0 + 2140, y0)
     set_shown(ed, row, False, [past], x0 + 1360, y0 + 400)
     return _pin(loop, "Completed", is_input=False)
 
@@ -96,17 +111,24 @@ def author_loot_window(ed, x0, y0, in_execs):
 
     flow = set_shown(ed, prompt, False, [shown], x0 + 1000, y0)
     flow = set_shown(ed, panel, True, [flow], x0 + 1260, y0)
-    names = _get(ed, LOOT_NAMES_VAR, x0 + 1260, y0 + 300, HEALTH_CLASS_PATH,
-                 _get(ed, LOOT_TARGET_VAR, x0 + 1020, y0 + 300))
+    body = _get(ed, LOOT_TARGET_VAR, x0 + 1020, y0 + 300)
+    icons = _get(ed, LOOT_ICONS_VAR, x0 + 1260, y0 + 300, HEALTH_CLASS_PATH, body)
+    tints = _get(ed, LOOT_TINTS_VAR, x0 + 1260, y0 + 400, HEALTH_CLASS_PATH, body)
     box = part(ed, WBP_HUD, LOOT_ROWS_BOX, x0 + 1260, y0 + 500)
     hovered = author_row_cursor(
         ed, box, LOOT_ROWS, [flow], x0 + 1520, y0 - 1400, row_var=LOOT_SEL_VAR,
         click=(LOOT_TAKE_VAR, "true"),
-        limit=_call(ed, FN_ARR_LEN, x0 + 1520, y0 - 700, TargetArray=names))
-    flow = _author_rows(ed, names, box, hovered, x0 + 1520, y0)
-    flow = mark_rows(ed, box, LOOT_ROWS, _get(ed, LOOT_SEL_VAR, x0 + 3200, y0 + 300),
-                     [flow], x0 + 3400, y0)
-    full = part(ed, WBP_HUD, LOOT_FULL, x0 + 4600, y0 + 300)
-    tails = show_if(ed, full, _get(ed, LOOT_BAG_FULL_VAR, x0 + 4600, y0 + 500), [flow],
-                    x0 + 4900, y0)
+        limit=_call(ed, FN_ARR_LEN, x0 + 1520, y0 - 700, TargetArray=icons))
+    flow = _author_rows(ed, icons, tints, box, hovered, x0 + 1520, y0)
+    flow = mark_rows(ed, box, LOOT_ROWS, _get(ed, LOOT_SEL_VAR, x0 + 3700, y0 + 300),
+                     [flow], x0 + 3900, y0)
+    bare = _at(_node(ed, FN_LESS_II), x0 + 5100, y0 + 700)
+    _connect(_call(ed, FN_ARR_LEN, x0 + 4860, y0 + 700, TargetArray=icons),
+             _pin(bare, "A"))
+    _set(bare, "B", 1)
+    said = show_if(ed, part(ed, WBP_HUD, LOOT_EMPTY, x0 + 5100, y0 + 900),
+                   _pin(bare, "ReturnValue", is_input=False), [flow], x0 + 5400, y0)
+    full = part(ed, WBP_HUD, LOOT_FULL, x0 + 6000, y0 + 300)
+    tails = show_if(ed, full, _get(ed, LOOT_BAG_FULL_VAR, x0 + 6000, y0 + 500),
+                    list(said), x0 + 6300, y0)
     return [gone, closed, *tails]

@@ -3,7 +3,7 @@
     cls = LootTarget.Loot[LootSel]
     spawn cls at the pawn, cast to BP_WeaponItem, Dropped = false,
     Inventory += it, NeedsRefresh                       (as dev_guns does)
-    LootTarget.Loot / LootNames .RemoveIndex(LootSel)
+    every body array (Loot, LootNames, LootIcons, LootTints) .RemoveIndex(LootSel)
 
 The item is spawned only now: a body carries classes, not hidden actors
 (loot/roll.py). The caller has already checked the bag has room, so the
@@ -18,7 +18,7 @@ from combat.nodes import (
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.dev_guns import _call, _get, _out, _setter
 from graphics_menu.loot_consts import LOOT_SEL_VAR, LOOT_TARGET_VAR
-from loot.consts import LOOT_NAMES_VAR, LOOT_VAR
+from loot.consts import BODY_ARRAYS, LOOT_VAR
 
 
 def _body(ed, var, x, y, made):
@@ -56,7 +56,7 @@ def author_take(ed, wc, pawn_out, in_execs, x0, y0, made):
     _connect(flow, _pin(add, "execute"))
     flow = _setter(ed, "NeedsRefresh", "true", [BEL.find_then_pin(add)], x0 + 1620, y0,
                    made, WEAPON_COMP_CLASS_PATH, wc)
-    for i, var in enumerate((LOOT_VAR, LOOT_NAMES_VAR)):
+    for i, var in enumerate(BODY_ARRAYS):
         x = x0 + 1880 + 260 * i
         gone = _call(ed, FN_ARR_REMOVE, x, y0, made,
                      TargetArray=_body(ed, var, x, y0 + 300 + 140 * i, made),

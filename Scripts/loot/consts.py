@@ -7,9 +7,13 @@ because Python cannot author a Blueprint struct:
 
     LootTable[i]       an item class a body of this kind may carry
     LootChances[i]     the chance (0..1) it does, rolled once per counted kill
-    LootTableNames[i]  what the loot window calls it
+    LootTableNames[i]  the item's own DisplayName
+    LootTableIcons[i]  its inventory icon (a white silhouette) ...
+    LootTableTints[i]  ... and the SlotColor that tints it: what the loot
+                       window draws for it
 
-    Loot[j], LootNames[j]   what this body does carry, filled at the kill
+    Loot[j], LootNames[j], LootIcons[j], LootTints[j]
+                       what this body does carry, filled at the kill
 """
 
 LOOT_TABLE_VAR = "LootTable"
@@ -17,6 +21,17 @@ LOOT_CHANCES_VAR = "LootChances"
 LOOT_TABLE_NAMES_VAR = "LootTableNames"
 LOOT_VAR = "Loot"
 LOOT_NAMES_VAR = "LootNames"
+LOOT_TABLE_ICONS_VAR = "LootTableIcons"
+LOOT_TABLE_TINTS_VAR = "LootTableTints"
+LOOT_ICONS_VAR = "LootIcons"
+LOOT_TINTS_VAR = "LootTints"
+
+# (the table's array, the body's): a hit copies entry i of each across, and a
+# take removes the row from every body array.
+LOOT_ARRAYS = ((LOOT_TABLE_VAR, LOOT_VAR), (LOOT_TABLE_NAMES_VAR, LOOT_NAMES_VAR),
+               (LOOT_TABLE_ICONS_VAR, LOOT_ICONS_VAR),
+               (LOOT_TABLE_TINTS_VAR, LOOT_TINTS_VAR))
+BODY_ARRAYS = tuple(body for _table, body in LOOT_ARRAYS)
 
 # How close the player must stand to a body to search it: the E pick-up's
 # reach (combat.tuning.PICKUP_RADIUS), measured to the ragdoll, not the capsule.

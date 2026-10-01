@@ -524,9 +524,10 @@ def main():
     # (loot_find.py), and the player's bag (loot_tick.py).
     # Fifteen: and the carried guns the tuning tab writes (tune_tick.py).
     # Sixteen: and the fire press held spent under the cursor (cursor.py).
+    # Seventeen: and the weapon component told it is Searching (loot_kneel.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 16 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 17 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,

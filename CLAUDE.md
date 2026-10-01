@@ -215,8 +215,9 @@ editor.
   (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
   mannequin's set.
 - **Corpse loot:** a wanderer the player kills carries what its loot table rolls (for now, water:
-  a canteen at 50%). Near the body, **Tab** opens a loot window; Up/Down pick and Enter takes
-  the item into the bag (`Scripts/loot/CLAUDE.md`).
+  a canteen at 50%). Near any body, loot or none, **Tab** kneels the player over it (Quaternius
+  UAL's `Fixing_Kneeling`) and opens a loot window showing what it carries as item icons;
+  Up/Down pick and Enter takes the item into the bag (`Scripts/loot/CLAUDE.md`).
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
   and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts) (plus D: debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world, K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day and the day's and night's lengths, the lengths saved to `Scripts/world/world_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,

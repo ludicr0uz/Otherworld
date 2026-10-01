@@ -27,7 +27,7 @@ from combat.weapon_component.knife import (
 from combat.weapon_component.pickup import (
     PICKUP_FORCED_VAR, PICK_BEST_VAR, PICK_GAP_VAR, PICK_NO_GAP,
 )
-from combat.weapon_component.pose_weights import HELD_TWO_HANDED
+from combat.weapon_component.pose_weights import HELD_TWO_HANDED, SEARCHING_VAR
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
     PUNCH_QUEUED_VAR,
@@ -83,6 +83,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
     # Held.TwoHanded, or false with nothing held: copied behind an IsValid
     # Branch once a frame so the guard pose never reads a null Held.
     _declare(ed, HELD_TWO_HANDED, BEL.get_basic_type_by_name("bool"))
+    # A body is being searched: the HUD writes it while its loot window is
+    # open, and the pose weights kneel the body from it.
+    _declare(ed, SEARCHING_VAR, BEL.get_basic_type_by_name("bool"))
     # Aiming down the sights. BaseFOV is cached off the camera at BeginPlay for
     # the same reason BaseSpeed is cached off the movement component; CurrentFOV
     # is stored because FInterpTo's input is its own previous output, and
@@ -199,6 +202,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         "Blocking": False,
         STANCE_VAR: STAND,
         HELD_TWO_HANDED: False,
+        SEARCHING_VAR: False,
         # 1.0 is "exactly what the controller already does", because the two
         # base scales this multiplies are the controller's own. A player who
         # never opens the settings screen therefore gets the stock feel.

@@ -4,7 +4,10 @@
 
 from combat.paths import HEALTH_BP_PATH
 from combat.verify.common import BEL, cdo, check, load
-from loot.consts import LOOT_CHANCES_VAR, LOOT_TABLE_NAMES_VAR, LOOT_TABLE_VAR
+from loot.consts import (
+    LOOT_CHANCES_VAR, LOOT_TABLE_ICONS_VAR, LOOT_TABLE_NAMES_VAR, LOOT_TABLE_TINTS_VAR,
+    LOOT_TABLE_VAR,
+)
 from loot.tables import WANDERER_LOOT
 from survival.paths import CANTEEN_BP_PATH
 
@@ -26,5 +29,14 @@ def run():
              for e in WANDERER_LOOT]
     check("...named as the inventory names the item", names == shown,
           f"{names} vs {shown}")
+    icons = list(health.get_editor_property(LOOT_TABLE_ICONS_VAR))
+    tints = list(health.get_editor_property(LOOT_TABLE_TINTS_VAR))
+    own = [cdo(load(e.item_bp)) for e in WANDERER_LOOT]
+    check("...shown as the inventory shows the item: its Icon, tinted its SlotColor",
+          len(icons) == len(tints) == len(own)
+          and all(i is not None and i == o.get_editor_property("Icon")
+                  and t.to_tuple() == o.get_editor_property("SlotColor").to_tuple()
+                  for i, t, o in zip(icons, tints, own)),
+          f"{[i.get_name() if i else None for i in icons]}")
     water = [e.chance for e in WANDERER_LOOT if e.item_bp == CANTEEN_BP_PATH]
     check("half the wanderers carry water (a canteen at 50%)", water == [0.5], str(water))

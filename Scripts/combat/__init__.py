@@ -48,8 +48,9 @@ ASSETS AND PATCHES
                     spine ModifyBones) so the gun follows the sights' pitch
   body_pose         the player's anim BP: guard poses, and crouch and prone where
                     the rig has no clips, as weighted ModifyBones, pose_plan()
-  stance_clips      the player's anim BP: the Quaternius crouch and crawl clips
-                    blended over the locomotion by PoseCrouch/PoseProne
+  stance_clips      the player's anim BP: the Quaternius crouch, crawl and kneel
+                    clips blended over the locomotion by PoseCrouch/PoseProne
+                    and (searching a body) PoseKneel
   skin              the player's body (PlayerSkin, wear_skin)
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)

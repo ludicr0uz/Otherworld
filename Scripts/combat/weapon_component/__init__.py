@@ -14,7 +14,8 @@ _author_* fragment per concern, each in its own module:
   sight_pitch down the sights: write the anim BP's AimPitch (the view's pitch
               x SightBlend), which tips the upper body and the gun onto the aim
   pose_weights  ease the anim BP's PoseCrouch/PoseProne/GuardArms/GuardGun
-              from Stance, Blocking and Held.TwoHanded (body_pose.py's poses)
+              from Stance, Blocking and Held.TwoHanded (body_pose.py's poses),
+              and PoseKneel from Searching (the HUD's loot window), with KneelTime
   accuracy    once a frame: AimSpread (the shot's cloud), RecoilScale and
               ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
   firing      the round and cooldown, the shot's one draw inside AimSpread

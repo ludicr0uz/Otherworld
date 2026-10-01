@@ -4,6 +4,8 @@ that fills a body's Loot when a wanderer is killed.
     ForLoop i over LootTable:
         RandomFloat < LootChances[i]  ->  Loot += LootTable[i]
                                           LootNames += LootTableNames[i]
+                                          LootIcons += LootTableIcons[i]
+                                          LootTints += LootTableTints[i]
 
 Spliced after the gun drop on the DamagedByPlayer arm (combat/death.py), so
 only a counted kill fills a body: the world-floor net kills the same way, and
@@ -14,12 +16,15 @@ no hidden actors and nothing is left over when its lifespan ends.
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _declare, _float_type, _node, _pin
+from combat.graph import (
+    BEL, _at, _connect, _declare, _float_type, _node, _pin, _struct_type,
+)
 from combat.nodes import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_LESS_FF, FN_SUB_II, MACRO_FOR_LOOP,
 )
 from loot.consts import (
-    LOOT_CHANCES_VAR, LOOT_NAMES_VAR, LOOT_TABLE_NAMES_VAR, LOOT_TABLE_VAR, LOOT_VAR,
+    LOOT_ARRAYS, LOOT_CHANCES_VAR, LOOT_ICONS_VAR, LOOT_NAMES_VAR, LOOT_TABLE_ICONS_VAR,
+    LOOT_TABLE_NAMES_VAR, LOOT_TABLE_TINTS_VAR, LOOT_TABLE_VAR, LOOT_TINTS_VAR, LOOT_VAR,
 )
 
 FN_RANDOM_UNIT = "/Script/Engine.KismetMathLibrary.RandomFloat"
@@ -31,9 +36,13 @@ def declare_loot_vars(ed):
     compiles before any item it names exists."""
     item = BEL.get_class_reference_type(unreal.Actor.static_class())
     text = BEL.get_basic_type_by_name("string")
+    icon = BEL.get_object_reference_type(unreal.Texture2D.static_class())
+    tint = _struct_type(unreal.LinearColor.static_struct())
     for name, kind in ((LOOT_TABLE_VAR, item), (LOOT_CHANCES_VAR, _float_type()),
                        (LOOT_TABLE_NAMES_VAR, text), (LOOT_VAR, item),
-                       (LOOT_NAMES_VAR, text)):
+                       (LOOT_NAMES_VAR, text), (LOOT_TABLE_ICONS_VAR, icon),
+                       (LOOT_ICONS_VAR, icon), (LOOT_TABLE_TINTS_VAR, tint),
+                       (LOOT_TINTS_VAR, tint)):
         _declare(ed, name, BEL.get_array_type(kind))
 
 
@@ -96,13 +105,14 @@ def author_loot_roll(ed, exec_ins, x0, y0):
     _connect(_pin(lucky, "ReturnValue", is_input=False), _pin(carried, "Condition"))
     _connect(_pin(loop, "LoopBody", is_input=False), _pin(carried, "execute"))
 
-    flow = _append(ed, LOOT_VAR, _element(ed, LOOT_TABLE_VAR, i, x0 + 1240, y0 + 460, made),
-                   BEL.find_then_pin(carried), x0 + 1500, y0, made)
-    _append(ed, LOOT_NAMES_VAR,
-            _element(ed, LOOT_TABLE_NAMES_VAR, i, x0 + 1500, y0 + 660, made),
-            flow, x0 + 1760, y0, made)
+    flow = BEL.find_then_pin(carried)
+    for k, (table, body) in enumerate(LOOT_ARRAYS):
+        x = x0 + 1500 + 260 * k
+        flow = _append(ed, body, _element(ed, table, i, x - 260, y0 + 460 + 200 * k, made),
+                       flow, x, y0, made)
     ed.add_comment_to_nodes(
         "Corpse loot: each LootTable entry is rolled once per counted kill "
-        "(RandomFloat < LootChances[i]) and, on a hit, goes into Loot/LootNames, "
-        "which the HUD's loot window lists. Filled by loot/install.py.", made)
+        "(RandomFloat < LootChances[i]) and, on a hit, goes into Loot (with its "
+        "name, icon and tint), which the HUD's loot window shows. Filled by "
+        "loot/install.py.", made)
     return _pin(loop, "Completed", is_input=False)

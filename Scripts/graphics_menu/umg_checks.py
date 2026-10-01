@@ -32,7 +32,8 @@ WRITTEN = {
                       C.HINT_IDLE, C.HINT_CAPTURE),
     C.WBP_PAUSE_MENU: (C.PAUSE_ROWS,),
     C.WBP_DEATH_MENU: (C.DEATH_SCORE, C.DEATH_HINT_LINE),
-    C.WBP_MENU_ROW: (C.ROW_CARET, C.ROW_LABEL_BOX, C.ROW_LABEL, C.ROW_VALUE),
+    C.WBP_MENU_ROW: (C.ROW_CARET, C.ROW_LABEL_BOX, C.ROW_LABEL, C.ROW_VALUE,
+                     C.ROW_ICON),
     C.WBP_INVENTORY_SLOT: (C.SLOT_ACTIVE, C.SLOT_ICON, C.SLOT_AMMO, C.SLOT_FRAME),
 }
 
@@ -271,7 +272,10 @@ def check_hud_graph(check, nodes):
     check("the debug row reads ON or OFF", literal == {C.DEBUG_ON, C.DEBUG_OFF},
           str(sorted(literal)))
 
-    brushes = [n for n in nodes if {"Texture", "bMatchSize"} <= _pins(n)]
+    # The loot window's rows set a brush too, out of the body's LootIcons
+    # (loot_checks.py checks that one).
+    brushes = [n for n in nodes if {"Texture", "bMatchSize"} <= _pins(n)
+               and not any("TargetArray" in _pins(s) for s in _sources(n, "Texture"))]
     check("each slot's icon is the carried item's own",
           len(brushes) == 1 and _source_titles(brushes[0], "Texture") == ["Get Icon"],
           str([_source_titles(n, "Texture") for n in brushes]))

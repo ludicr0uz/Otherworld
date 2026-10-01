@@ -88,12 +88,14 @@ class PlayerSkin:
     mesh_z: float = -89.0
     mesh_yaw: float = 270.0
     # The low stances' clips (stance_clips.py), retargeted from the Quaternius
-    # Universal Animation Library: crouched still and walking, and the crawl.
-    # None where the rig has none, and the stance is then posed procedurally
-    # (body_pose.py): the mannequin, or an adventurer before import_quaternius.
+    # Universal Animation Library: crouched still and walking, the crawl, and
+    # the kneel over a body being searched. None where the rig has none, and
+    # the stance is then posed procedurally (body_pose.py) and a search is made
+    # standing: the mannequin, or an adventurer before import_quaternius.
     crouch_idle: str = None
     crouch_walk: str = None
     prone_crawl: str = None
+    search_kneel: str = None
 
     @property
     def stance_clips(self):
@@ -154,6 +156,7 @@ SKIN_ADVENTURER = PlayerSkin(
     crouch_idle=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Crouch_Idle_Loop",
     crouch_walk=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Crouch_Fwd_Loop",
     prone_crawl=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Swim_Fwd_Loop",
+    search_kneel=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Fixing_Kneeling",
 )
 
 
@@ -171,14 +174,14 @@ def player_skin():
     missing = [p for p in want if not eas.does_asset_exist(p)]
     if not missing:
         stances = (SKIN_ADVENTURER.crouch_idle, SKIN_ADVENTURER.crouch_walk,
-                   SKIN_ADVENTURER.prone_crawl)
+                   SKIN_ADVENTURER.prone_crawl, SKIN_ADVENTURER.search_kneel)
         if all(eas.does_asset_exist(p) for p in stances):
             return SKIN_ADVENTURER
         # Optional, unlike the rest: without them the stances are procedural.
         _log("note: no Quaternius stance clips yet — the adventurer crouches "
              "and lies down procedurally. Run asset_pipeline/import_quaternius.py.")
-        return dataclasses.replace(SKIN_ADVENTURER, crouch_idle=None,
-                                   crouch_walk=None, prone_crawl=None)
+        return dataclasses.replace(SKIN_ADVENTURER, crouch_idle=None, crouch_walk=None,
+                                   prone_crawl=None, search_kneel=None)
     if len(missing) < len(want):
         _log(f"note: the adventurer skin is incomplete ({len(missing)} of "
              f"{len(want)} assets missing, first {missing[0]}) — wearing the "

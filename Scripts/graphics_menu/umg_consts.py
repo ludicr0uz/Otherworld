@@ -85,6 +85,11 @@ COL_EXIT_CALLED_OFF = "(R=0.900000,G=0.300000,B=0.250000,A=1.000000)"
 # and LabelColor in the designer (PreConstruct applies them), and the HUD
 # writes Caret's opacity and Value's text per frame.
 ROW_CARET, ROW_LABEL_BOX, ROW_LABEL, ROW_VALUE = "Caret", "LabelBox", "Label", "Value"
+# An item's icon after the value: collapsed, and shown only by the loot
+# window's rows, which have neither a label nor a value. The icon canvas's
+# own 2:1 at the size the art was drawn to survive (survival/icon_art.py).
+ROW_ICON = "Icon"
+ROW_ICON_W, ROW_ICON_H = 100.0, 50.0
 ROW_TEXT_VAR, ROW_WIDTH_VAR, ROW_COLOR_VAR = "LabelText", "LabelWidth", "LabelColor"
 ROW_FONT = 15.0          # the settings page's old 1.5x
 ROW_CARET_W = 36.0

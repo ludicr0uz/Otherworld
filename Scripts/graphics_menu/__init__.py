@@ -53,11 +53,13 @@ Input, settings and state
   dev_guns        the cheat's Tick fragment: K in the M panel gives one of every
                   gun not carried (run from save_exit, after the countdown)
   loot_consts     the loot window: keys (Tab, Up/Down, Enter), variables, widget names
-  loot_find       Tick: the nearest dead body with Loot in reach -> LootTarget
+  loot_find       Tick: the nearest dead body in reach, loot or none -> LootTarget
   loot_take       Tick: the selected item out of the body and into the bag
-  loot_tick       the loot window's Tick fragment: find, keys, serve a take
-                  (run after save_exit's)
-  loot_draw       DrawHUD: the loot prompt, and the window's rows and caret
+  loot_kneel      Tick: the open window is the weapon component's Searching (the
+                  kneel), and the controller ignores move input meanwhile
+  loot_tick       the loot window's Tick fragment: find, keys, serve a take,
+                  kneel (run after save_exit's)
+  loot_draw       DrawHUD: the loot prompt, and the window's icon rows and caret
   wbp_loot        WBP_HUD's loot prompt and window (called from wbp_hud)
   tune_tab        TuneTab: what a tuning tab is called (keys, variables,
                   widgets, words, save command); the shared arrows and Enter

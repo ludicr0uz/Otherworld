@@ -21,6 +21,7 @@ from combat.weapon_component.consume import (
 )
 from combat.weapon_component.dead import _author_dead_gate
 from combat.weapon_component.firing import _author_fire
+from combat.weapon_component.light import _author_light_press
 from combat.weapon_component.knife import (
     _author_knife_press, _author_knife_swing,
 )
@@ -286,9 +287,12 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(allowed, "ReturnValue", is_input=False),
              _pin(ready_gate, "Condition"))
 
-    # --- or is it something to eat (consume.py), or to swing (knife.py)? ------
+    # --- or is it something to eat (consume.py), to swing (knife.py), or to
+    # strike (light.py)? ---------------------------------------------------------
+    light_in, struck = _author_light_press(
+        ed, held, owner_out, tap, _pin(ready_gate, "execute"), 1240, -1300)
     knife_in, slash_pressed = _author_knife_press(
-        ed, held, tap, _pin(ready_gate, "execute"), 1240, -800)
+        ed, held, tap, light_in, 1240, -800)
     consumed, untapped = _author_use_gate(
         ed, held, owner_out, tap, BEL.find_then_pin(fire_gate),
         knife_in, 1240, -300)
@@ -339,7 +343,8 @@ def _author_wc_tick(ed, tick):
     # Every frame, whatever is held: the swing and the blow run on after the
     # press, and the blow lands even if the knife was put away in between.
     slash_exits = _author_knife_swing(
-        ed, (after_fire, consumed, untapped) + slash_pressed + dry_exits + punch_exits,
+        ed, (after_fire, consumed, untapped) + slash_pressed + struck + dry_exits
+        + punch_exits,
         1040, 11000)
 
     reload_gate = _at(ed.add_branch_node(), 1040, 7200)

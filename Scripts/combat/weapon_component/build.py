@@ -42,6 +42,7 @@ from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
 )
+from combat.light_tuning import CAMPFIRE_CLASS_VAR, LIGHT_WOOD_VAR, MATCHES_CLASS_VAR
 from combat.weapon_component.throw import (
     THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR,
     THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR,
@@ -51,9 +52,18 @@ from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
 
 
+def _kept_class(bp, var):
+    """A class default as the last build left it, or None on a first build."""
+    cls = BEL.generated_class(bp)
+    try:
+        return unreal.get_default_object(cls).get_editor_property(var) if cls else None
+    except Exception:                                             # noqa: BLE001
+        return None
+
+
 def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
                            knife_clip, blood_bp, impact_bp, throw_arc_bp, wood_bp,
-                           rebuild=True):
+                           matches_bp, rebuild=True):
     # Cast nodes only appear in the palette for classes that are already loaded,
     # and this graph casts to all three. Without these loads
     # create_node_from_name returns None and the failure reads as a typo in the
@@ -63,6 +73,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
             raise RuntimeError(f"could not load {path} for its cast node")
 
     bp = _create_blueprint(WEAPON_COMP_BP_PATH, unreal.ActorComponent)
+    # Re-declaring a variable empties it, and this one is build_survival.py's
+    # to fill: what an earlier build was given is put back below.
+    campfire_class = _kept_class(bp, CAMPFIRE_CLASS_VAR)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
 
@@ -171,7 +184,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # cannot be added to an array of BP_WeaponItem.
     for name in (*STARTER_CLASS_VARS, "ItemClass"):
         _declare(ed, name, BEL.get_class_reference_type(item_class))
-    for name in ("BloodClass", IMPACT_CLASS_VAR):
+    # CampfireClass is what a strike of the matches spawns (light.py). It is
+    # declared here and left None: build_survival.py fills it in.
+    for name in ("BloodClass", IMPACT_CLASS_VAR, CAMPFIRE_CLASS_VAR):
         _declare(ed, name,
                  BEL.get_class_reference_type(unreal.Actor.static_class()))
     # The empty-handed punch (punch.py): its clip on the worn rig, the press
@@ -210,6 +225,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
     _declare(ed, WOOD_SPOT_VAR, _struct_type(unreal.Vector.static_struct()))
     _declare(ed, WOOD_CLASS_VAR, BEL.get_class_reference_type(item_class))
+    # Lighting a campfire (light.py): the piece of wood the strike burns.
+    _declare(ed, LIGHT_WOOD_VAR, BEL.get_object_reference_type(item_class))
     arc_class = BEL.generated_class(throw_arc_bp)
     _declare(ed, THROW_ARC_VAR, BEL.get_object_reference_type(arc_class))
     _declare(ed, THROW_ARC_CLASS_VAR, BEL.get_class_reference_type(arc_class))
@@ -268,10 +285,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         "PistolClass": BEL.generated_class(pistol_bp),
         "KnifeClass": BEL.generated_class(knife_bp),
         "AxeClass": BEL.generated_class(axe_bp),
+        MATCHES_CLASS_VAR: BEL.generated_class(matches_bp),
         "ItemClass": item_class,
         "BloodClass": BEL.generated_class(blood_bp),
         IMPACT_CLASS_VAR: BEL.generated_class(impact_bp),
         WOOD_CLASS_VAR: BEL.generated_class(wood_bp),
+        CAMPFIRE_CLASS_VAR: campfire_class,
         CHOP_ITEM_VAR: -1,
         CHOP_COUNT_VAR: 0,
         PUNCH_ANIM_VAR: _must_load(player_skin().punch),

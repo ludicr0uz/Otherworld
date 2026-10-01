@@ -45,6 +45,9 @@ _author_* fragment per concern, each in its own module:
   chop        the knife stage's blow on something with no health: with an item
               that Chops in hand (the axe) and a tree under it, chips, a count
               on that tree, and every third blow a BP_Wood beside the trunk
+  light       an item that Lights held (the matches): the fire key burns one
+              piece of wood from Inventory into CampfireClass on the ground
+              in front of the player (behind the fire gate, after Melee)
   throw       the throw key held: the predicted arc on BP_ThrowArc; clicked:
               the item leaves hand and inventory and flies the same curve,
               landing as a Dropped item
@@ -67,13 +70,15 @@ BP_WeaponComponent event graph:
 
   [BeginPlay] --> cache Character + Mesh
               --> attenuation listener on the capsule
-              --> spawn BP_Shotgun, BP_Pistol, BP_Knife and BP_Axe into Inventory
+              --> spawn BP_Shotgun, BP_Pistol, BP_Knife, BP_Axe and BP_Matches
+                  into Inventory
               --> Equip(0)
 
   [Tick] --> Branch owner Dead or at 0 HP                    --> nothing below runs
          --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
                                         (or, if Held.Consumable, use it;
                                          if Held.Melee, slash with it;
+                                         if Held.Lights, light a campfire;
                                          or, with empty hands, punch)
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held

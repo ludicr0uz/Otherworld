@@ -31,12 +31,16 @@ BUILDERS
   survival_component  BP_SurvivalComponent: decay, grant the ability, debuffs
   consume_ability   GA_ConsumeItem
   easy_heal         GA_ConsumeItem's heal: HealthRestoreEasy onto Health, EASY only
+  campfire          BP_Campfire: what the matches light; its Tick warms a player
+                    within its radius. Also writes it onto the weapon
+                    component's CampfireClass
   install           the ability system + survival component onto the characters
   forage_level      putting the forage into a level, in the editor
   icon_art          the two inventory icons (Pillow, outside the editor)
 
 Elsewhere, because they belong to what they extend: the use event is sent by
-combat/weapon_component/consume.py, the HP drain is combat/debuff_drain.py,
+combat/weapon_component/consume.py, the matches and their strike are
+combat/matches.py and combat/weapon_component/light.py, the HP drain is combat/debuff_drain.py,
 and the bars are graphics_menu/survival_bars.py.
 
 Dependency direction: survival imports combat, never the reverse (combat only

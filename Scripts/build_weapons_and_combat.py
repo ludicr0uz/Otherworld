@@ -33,6 +33,9 @@ WHAT THIS BUILDS
                     Melee too, swung as the knife is (combat/axe.py)
   BP_Wood           child of BP_WeaponItem: a log, what a tree gives the axe
                     (combat/wood.py, weapon_component/chop.py)
+  BP_Matches        child of BP_WeaponItem: a box of matches; struck with wood
+                    in the bag, it lights a campfire (combat/matches.py,
+                    weapon_component/light.py; the campfire is survival's)
   Anims/A_KnifeSlash  the slash, keyed for the worn body (combat/knife_anim.py)
   Anims/A_HoldItem, A_HoldKnife  how food and the knife are held (combat/hold_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
@@ -70,6 +73,7 @@ from combat.graph import BEL, _apply_defaults, _log               # noqa: E402
 from combat.health_component import build_health_component        # noqa: E402
 from combat.axe import build_axe                                  # noqa: E402
 from combat.wood import build_wood                                # noqa: E402
+from combat.matches import build_matches                          # noqa: E402
 from combat.knife import build_knife                              # noqa: E402
 from combat.knife_anim import build_knife_slash                   # noqa: E402
 from combat.hold_pose import build_hold_poses                     # noqa: E402
@@ -133,6 +137,8 @@ def main():
     axe_bp = build_axe(item_bp)
     # ...and what a tree gives it.
     wood_bp = build_wood(item_bp)
+    # The fifth: the matches, which burn it.
+    matches_bp = build_matches(item_bp)
 
     blood_bp = build_blood_splash()
     impact_bp = build_bullet_impact()
@@ -146,7 +152,7 @@ def main():
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], knife_bp, axe_bp,
                                        knife_clip, blood_bp, impact_bp, throw_arc_bp,
-                                       wood_bp)
+                                       wood_bp, matches_bp)
 
     # After the weapon component, because the pickup's graph casts to it -- and
     # therefore after the health component that spawns it, which is why the
@@ -170,7 +176,7 @@ def main():
     install_on_npc(health_bp, footstep_bp)
     retire_old_assets()
 
-    _log(f"done — five weapons, a knife and an axe, ammunition, inventory, aiming down the sights, "
+    _log(f"done — five weapons, a knife, an axe and matches, ammunition, inventory, aiming down the sights, "
          f"footsteps, blood, death, drops and respawn, worn by "
          f"{skin.mesh.rsplit('/', 1)[1]}")
 

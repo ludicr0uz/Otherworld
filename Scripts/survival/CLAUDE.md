@@ -25,6 +25,7 @@ Both are read at editor **startup**, so changing either needs a restart.
 | `GE_Starving`, `GE_Dehydrated` | **Infinite** GameplayEffects. |
 | `Debuff.Starving` / `.Dehydrated` / `.HealthDrain` | The HUD names a debuff from the first two tags. `combat/debuff_drain.py` drains 0.5 HP/s per stack of the third, so both debuffs together drain twice as fast. |
 | `GA_ConsumeItem` | Triggered by the gameplay event `Event.Item.Consume`. The payload's `OptionalObject` is the item. Instanced per actor. |
+| `BP_Campfire` | Not GAS: an Actor the matches light (`campfire.py`). Its Tick warms a player near it. |
 | `BP_SurvivalComponent` | Hunger/Thirst/Temperature as Blueprint floats, because an AttributeSet needs C++. Also their decay, the ability grant at BeginPlay, and the debuff sync. |
 
 ## The flow
@@ -52,13 +53,32 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 - **Water is also corpse loot:** `build_survival.py` fills the wanderers' loot table
   (`Scripts/loot/`), a canteen at 50%, because it builds the items the table names.
 
+## The campfire (`campfire.py`)
+
+- **Lit by the matches:** a strike with wood in the bag spawns `BP_Campfire` in front of the
+  player (`combat/weapon_component/light.py`). combat holds only a class variable,
+  `BP_WeaponComponent.CampfireClass`, which `build_survival.py` writes (`install_campfire`),
+  as it fills the loot table.
+- **It warms on its own Tick,** as `BP_AmmoPickup` measures its own distance: the player's
+  pawn, valid, within `WarmRadius`, then `Temperature = min(Temperature + WarmPerSecond × dt,
+  MaxTemperature)` on its survival component. The night's cold writes the same variable
+  (`world/night_cold.py`), so the two add up: by a fire the night nets +0.9 a second.
+- **It burns out:** BeginPlay sets a life span of `CAMPFIRE_BURN_S`; the actor is destroyed.
+  It is not saved with the profile and blocks nothing (the player walks through it).
+- **The model** is Quaternius's `SM_Bonfire_Fire` at 0.4 (87 cm across) with a point light
+  that casts no shadows.
+- `probes/probe_campfire.py` cuts wood, strikes, and measures the warmth in and out of the
+  radius. It raises the fire's rate for the run and zeroes the night's cold.
+
 ## Numbers and placement (`tuning.py`)
 
 - **Rates:**
   - Hunger empties in 15 min and thirst in 10.
   - A mushroom restores +25 hunger and a canteen +40 thirst. On EASY a mushroom also heals 10.
   - Temperature is a 0–100 bar that falls at night: the day/night cycle lowers it
-    (`world/night_cold.py`, rate in `world/world_config.py`). Nothing raises it or reads it yet.
+    (`world/night_cold.py`, rate in `world/world_config.py`) and a campfire raises it
+    (below). Nothing reads it yet.
+  - A campfire warms +1 a second within 4 m and burns 180 s (`CAMPFIRE_*`).
 - **Where forage goes:** `scatter_forage` puts mushrooms 0.7–2.2 m from a trunk and canteens
   anywhere.
 - **How much:** 6 and 1.5 per hectare, capped at 300 and 80. That is 24 + 6 on the 200 m map and
@@ -92,4 +112,7 @@ These can't be proved headlessly:
   `Event.Item.Consume` from Python: 50 → 60 HP on EASY, unchanged on MEDIUM, and it lands a
   frame after the send. Run it with
   `uepy.py --game --probe Scripts/probes/probe_consume_heal.py`;
-- how the bars and the two-row strip look.
+- how the bars and the two-row strip look;
+- the campfire: whether +1 a second within 4 m and a 3 minute burn feel right against a
+  night that takes 0.1 a second, and how the fire and its light look (see
+  `Scripts/combat/CLAUDE.md` for the strike).

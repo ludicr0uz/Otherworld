@@ -43,6 +43,11 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     swings the knife's Strike (`probes/probe_axe.py`).
   - A blow that strikes something with no health goes on to `weapon_component/chop.py`
     (`_author_blow`'s `scenery`, given by the knife stage only): the axe on a tree cuts wood.
+  - **The matches light** (`weapon_component/light.py`): the Melee branch's False arm asks
+    `Held.Lights`, and a tap runs the strike (one `BP_Wood` out of `Inventory`, a campfire on
+    the ground ahead). Anything that does not Light goes on to the guns' ready gate. It reads
+    `Held`, so it sits inside the fire gate and inherits "not sprinting, not blocking, not a
+    spent press, not while V is down".
   - Wood in hand (`wood.py`) is neither Melee nor Consumable: the fire key reaches the guns'
     ready gate and "fires" no pellets, with no sound, kick or noise.
   - The swing and the blow are the punch's (`punch._author_swing`), run on the `KNIFE` Strike

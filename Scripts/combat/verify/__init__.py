@@ -49,6 +49,9 @@ and it never relies on a variable another section left behind.
   chop        chopping a tree: BP_Wood, who Chops, the stage off the knife's
               blow (the tree test, the count, the stored landing point, the
               spawn); is_chop_node
+  light       the matches and lighting a campfire: BP_Matches, who Lights,
+              the loadout, the branch off the fire gate, the wood spent, the
+              ground trace and the spawn; is_light_trace
   hold_pose   A_HoldItem / A_HoldKnife: arms, hands, fist, who holds them
   throw       the throw: its key, BP_ThrowArc, the predicted arc, the click,
               the flight on the same curve; is_throw_trace, launch_nodes
@@ -56,7 +59,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "sway", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "sway", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light",
     "hold_pose", "throw", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

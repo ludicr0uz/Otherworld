@@ -34,6 +34,9 @@ KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_KnifeSlash"
 AXE_BP_PATH = f"{WEAPON_DIR}/BP_Axe"
 # Wood: what a tree gives the axe (wood.py, weapon_component/chop.py).
 WOOD_BP_PATH = f"{WEAPON_DIR}/BP_Wood"
+# The matches: struck, with wood in the bag, to light a campfire (matches.py,
+# weapon_component/light.py).
+MATCHES_BP_PATH = f"{WEAPON_DIR}/BP_Matches"
 # The hold poses (combat/hold_pose.py): food and water carried, the knife ready.
 HOLD_ITEM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldItem"
 HOLD_KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldKnife"

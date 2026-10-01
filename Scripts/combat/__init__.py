@@ -41,6 +41,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     Chops; build_axe()
   wood              BP_Wood: Quaternius's Survival Pack log, what a tree gives
                     the axe; an item that lies Dropped, with nothing to fire
+  light_tuning      lighting a campfire: where it goes (CAMPFIRE_*), Lights and
+                    the component's MatchesClass/CampfireClass/LightWood
+  matches           BP_Matches: Quaternius's Survival Pack matchbox, the one
+                    item that Lights; build_matches()
   knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the
                     knife's hold pose (AnimationDataController)
   hold_pose         A_HoldItem / A_HoldKnife: food carried at the waist, the

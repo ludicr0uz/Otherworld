@@ -65,8 +65,8 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
 - **The cycle writes the survival component,** not the other way round: the cold is the
   world's, and `build_survival.py` runs before `build_day_night.py` (the cast node needs the
   class loaded). So `world` imports `survival.paths`. A level without a cycle has no cold.
-- **Nothing warms the player yet,** and nothing reads a low Temperature: the bar only falls,
-  and a saved profile carries it into the next game.
+- **Only a campfire warms the player** (`survival/campfire.py`, lit with the matches), and
+  nothing reads a low Temperature yet. A saved profile carries the bar into the next game.
 - **The probe raises the rate** to 20 a second for its run: a headless game's time moves too
   little for 0.1 to show.
 

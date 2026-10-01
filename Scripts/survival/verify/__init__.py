@@ -12,6 +12,9 @@ so the two suites read the same way.
   install       ability systems and the survival component on the characters
   forage        what place_forage.py put in each generated level
   loot          the corpse loot table written onto BP_HealthComponent
+  campfire      BP_Campfire: the model, the burn time, the warmth; and
+                BP_WeaponComponent.CampfireClass pointing at it
 """
 
-SECTIONS = ("tags", "items", "debuffs", "ability", "hooks", "install", "forage", "loot")
+SECTIONS = ("tags", "items", "debuffs", "ability", "hooks", "install", "forage", "loot",
+            "campfire")

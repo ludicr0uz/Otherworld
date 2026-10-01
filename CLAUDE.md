@@ -26,10 +26,10 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
 
    | system | entry points | read |
    |---|---|---|
-   | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
+   | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
    | graphics menu, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
-   | survival: GAS, debuffs, forage | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
+   | survival: GAS, debuffs, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
 | corpse loot: loot tables, the roll, the loot window | `build_survival.py` (tables), `probe_corpse_loot.py` | `Scripts/loot/CLAUDE.md` |
@@ -195,7 +195,7 @@ editor.
 
 ## Current state
 
-- **The player:** a Meshy-generated adventurer holding an issued shotgun, pistol, knife and axe. The SMG,
+- **The player:** a Meshy-generated adventurer holding an issued shotgun, pistol, knife, axe and box of matches. The SMG,
   assault rifle and sniper are found as drops. The rifle is the FPS Weapon Bundle's AK 47 and
   the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
   Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). A gun is carried lowered, in the hand of the stock idle and jog, and comes up into its
@@ -203,7 +203,7 @@ editor.
   The player can sprint, aim over the shoulder or down
   the sights (the sniper's is its scope), reload and eat, block (F; a swing from the front does a
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
-  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
+  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), light a campfire (left click with the matches in hand and wood in the bag: the wood is spent and a fire stands in front of the player for 3 minutes, warming them within 4 m: `combat/weapon_component/light.py`, `survival/campfire.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
   clips (the crawl is its face-down swim: the packs have no crawl), throw whatever is in hand (hold V to
   see the arc, click to throw, let V go to call it off; it lands as a pick-up), pick up one item at a time (E: of those in reach, the one nearest the
   point the reticle rests on), and has
@@ -240,14 +240,14 @@ editor.
 - **Day and night:** a clock turns the sun and the moon across the sky. The day and the night
   are 4 minutes each for now (`Scripts/world/world_config.py`). The night is moonlit, dim and
   starry. A level starts at a random time of day. At night the player's temperature falls
-  slowly (0.1 a second; `Scripts/world/night_cold.py`).
+  slowly (0.1 a second; `Scripts/world/night_cold.py`); beside a campfire it rises (1 a second).
 - **Save and exit:** X in the M panel saves the character's stats and inventory, but not its
   location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit calls it off. The next game loads
   the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
 - **Death:** once the player or a wanderer is dead (or at 0 HP), nothing it could do runs: the
   weapon component's Tick stops at its dead gate, the loot window shuts, and every step of a
   wanderer's tree refuses (`probes/probe_dead_no_actions.py`).
-- **Known gaps:** temperature only falls (nothing warms the player) and a low one does nothing yet. `GameDefaultMap` still points at the old
+- **Known gaps:** a low temperature does nothing yet. `GameDefaultMap` still points at the old
   `Lvl_Forest`. Feel checks that need a play session are listed per package.
 
 ## Gotchas learned the hard way

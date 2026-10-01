@@ -12,6 +12,7 @@ import unreal
 from combat.anim_blueprint import AIM_SLOT
 from combat.knife import KNIFE_DISPLAY, KNIFE_MESH
 from combat.knife_anim import FPS, FRAMES, SLASH_KEYS
+from combat.light_tuning import LIGHTS_VAR
 from combat.paths import (
     HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, KNIFE_ANIM_PATH, KNIFE_BP_PATH,
 )
@@ -157,8 +158,9 @@ def check_knife_press():
           str([_title(b) for b in before]))
     other = [PIN.get_owning_node(q) for q in
              PIN.list_connected_pins(BEL.find_else_pin(gate))]
-    check("...and anything not Melee goes on to the guns' ready gate",
-          len(other) == 1 and "Get Automatic" in
+    # ...by way of the matches' test (verify/light.py follows it from there).
+    check("...and anything not Melee goes on towards the guns' ready gate",
+          len(other) == 1 and f"Get {LIGHTS_VAR}" in
           {_title(x) for x in _feeds(BEL.find_input_pin(other[0], "Condition"))},
           str([_title(o) for o in other]))
     press = _exec_next(gate)

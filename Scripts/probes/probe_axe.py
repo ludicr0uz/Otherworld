@@ -1,6 +1,6 @@
 """The axe: issued at the start, taken in hand, and swung at a wanderer.
 
-The player must start carrying BP_Axe, last of the four issued items. The
+The player must start carrying BP_Axe, fourth of the issued items. The
 probe equips it the way Q does (EquippedIndex + NeedsRefresh) and checks it
 is drawn in the fist in the knife's ready pose, then writes KnifeQueued, which
 is all the press gate does for any Melee item (probe_knife.py says why). The
@@ -60,7 +60,7 @@ def _run(p):
 
     bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
     p.check("the axe is issued, after the shotgun, the pistol and the knife",
-            bag == ["BP_Shotgun_C", "BP_Pistol_C", "BP_Knife_C", AXE], str(bag))
+            bag[:4] == ["BP_Shotgun_C", "BP_Pistol_C", "BP_Knife_C", AXE], str(bag))
     if AXE not in bag:
         return
     axe = list(p.get(wc, "Inventory"))[bag.index(AXE)]

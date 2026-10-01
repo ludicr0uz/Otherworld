@@ -10,8 +10,9 @@ The defaults are all rebindable on the settings screen:
 
 - Left click fires. It **auto-fires while held** on the SMG and the assault rifle, a tap
   **eats or drinks** a held consumable, with the **knife** in hand it **slashes**
-  (`weapon_component/knife.py`), and with **empty hands it punches**
-  (`weapon_component/punch.py`; both in `docs/firing_gate.md`).
+  (`weapon_component/knife.py`), with the **matches** it **lights a campfire**
+  (`weapon_component/light.py`), and with **empty hands it punches**
+  (`weapon_component/punch.py`; all in `docs/firing_gate.md`).
 - A gun is **carried lowered** (the jog's own arms, the gun in the hand) and comes up into its
   ready pose while an aim key or the guard is held, and for a shot or a reload
   (`weapon_component/carry.py`, `docs/aiming.md`).
@@ -114,13 +115,28 @@ menu polls its own copy from `DrawHUD`, which does.
   the carry treats it as a gun (it rides in the lowered hand). It stands on end in its own
   frame, held like a club, because the one fist pose closes on a handle running up through it;
   the chop's spawn tips it flat, but one dropped with G stands on its end.
+- **The matches light a campfire** (`matches.py`, `weapon_component/light.py`, numbers in
+  `light_tuning.py`). `BP_Matches` is Quaternius's `SM_Matchbox` at 0.08 (a 9 cm box), flagged
+  `Lights`, carried in `A_HoldItem`. A tap of the fire key with it in hand takes one `BP_Wood`
+  out of `Inventory`, destroys it, and spawns `CampfireClass` 130 cm in front of the player,
+  on the ground a trace finds. The matches are never spent; with no wood nothing happens.
+  - **The campfire is survival's** (`survival/campfire.py`): combat only holds a class
+    variable. `build_survival.py` writes `CampfireClass`; the weapons build re-declares it
+    and puts the old value back (`build._kept_class`), so a weapons-only rebuild keeps the
+    fire. Unset, the strike is refused before any wood is spent.
+  - **`EquippedIndex` is found again after the removal** (`Array_Find(Inventory, Held)`):
+    wood ahead of the matches in the bag moves them down a slot.
+  - **The loop only remembers** (`LightWood`); the take runs once off `Completed`, as the
+    pick-up's does.
+  - The fire goes where the player faces, whatever is there: facing a trunk at arm's length
+    puts it in the tree. `probes/probe_campfire.py` runs the whole chain in a game.
 - **Knife and food have their own hold poses, not the pistol's aim** (`hold_pose.py`):
   `A_HoldKnife` (knife up at the chest, left fist raised as a guard) and `A_HoldItem` (the
   item carried at the waist, left arm hanging), keyed off the idle by arm directions like the
   guard's. The right hand keeps the pistol pose's orientation and fingers, so the grip solve
   gives the pistol's answer and every item stays upright in the fist. The slash starts and ends
   in `A_HoldKnife`. `probes/probe_hold_poses.py` measures the hand heights in game.
-- **The shotgun, pistol, knife and axe are issued; the SMG, rifle and sniper are found.**
+- **The shotgun, pistol, knife, axe and matches are issued; the SMG, rifle and sniper are found.**
   The issued items are `inventory.STARTER_CLASS_VARS`, in bag order: one class variable
   each on the component, spawned at BeginPlay.
   - The gun drop (`gun_drop.py`) is **two seeded rolls** on two `FRandomStream`s on the
@@ -238,6 +254,11 @@ These are feel checks a headless run can't do:
   read as a cut (there is no chop sound and no mark on the trunk), where the wood lands on a
   slope or among roots, and how the wood looks in the hand: the fist's joints sit up to 1.6 cm
   inside the 6 cm log (it has no handle), and a log dropped with G stands on its end;
+- the matches and the campfire: the box in the fist (it is 1.3 cm thick and the one fist
+  pose is closed on a pistol's grip, so the fingers stand up to 4 cm off it), a strike with
+  no animation, sound or message (above all the silent one with no wood), a fire that
+  appears at once 130 cm ahead, on a slope or inside whatever stands there, and how the
+  pack's flat-shaded flames and the point light read at night;
 - the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100

@@ -34,7 +34,7 @@ import math
 import os
 
 from ui_art.stat_icons import write_stat_icons
-from ui_art.tool_icons import icon_axe, icon_wood
+from ui_art.tool_icons import icon_axe, icon_matches, icon_wood
 from ui_art.vertical_bars import write_vertical_bars
 
 # Pillow is imported lazily, inside the functions that draw. The editor's
@@ -369,7 +369,7 @@ def _guard(d, x0, y0, x1, y1):
 # tells the player the wrong thing about it.
 ICON_RELATIVE_LENGTH = {
     "Pistol": 0.55, "SMG": 0.72, "Shotgun": 0.96, "Rifle": 1.00, "Sniper": 1.00,
-    "Knife": 0.50, "Axe": 0.70, "Wood": 0.60,
+    "Knife": 0.50, "Axe": 0.70, "Wood": 0.60, "Matches": 0.30,
 }
 
 
@@ -522,6 +522,7 @@ ICONS = {
     "Knife": icon_knife,
     "Axe": lambda d: icon_axe(d, SUPERSAMPLE),
     "Wood": lambda d: icon_wood(d, SUPERSAMPLE),
+    "Matches": lambda d: icon_matches(d, SUPERSAMPLE),
 }
 
 # Exact HUD sizes. Generated at the size they are drawn so the corner radius

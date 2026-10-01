@@ -18,8 +18,8 @@ from combat.tuning import HEALTH_DRAIN_TAG
 class SurvivalConfig:
     # All three bars run 0..max. Temperature is on the same 0..100 scale --
     # 100 is comfortably warm. The night lowers it (BP_DayNightCycle writes
-    # it: world/night_cold.py, the rate in world/world_config.py); nothing
-    # raises it or reads it yet.
+    # it: world/night_cold.py, the rate in world/world_config.py) and a
+    # campfire raises it (campfire.py, CAMPFIRE_* below); nothing reads it yet.
     max_hunger: float = 100.0
     max_thirst: float = 100.0
     max_temperature: float = 100.0
@@ -46,6 +46,15 @@ CANTEEN_THIRST = 40.0
 # applies.
 MUSHROOM_HEALTH_EASY = 10.0
 CANTEEN_HEALTH_EASY = 0.0
+
+# A campfire (campfire.py), lit by the matches with a piece of wood. Standing
+# within the radius raises Temperature by the rate, ten times what the night
+# takes (world_config.NIGHT_TEMPERATURE_DROP_PER_S), so a cold player is warm
+# again well inside one fire. One piece of wood burns this long, then the
+# fire is gone.
+CAMPFIRE_WARM_RADIUS_CM = 400.0
+CAMPFIRE_WARM_PER_S = 1.0
+CAMPFIRE_BURN_S = 180.0
 
 # The debuffs, as gameplay tags (declared in Config/DefaultGameplayTags.ini).
 # Each debuff grants its own tag, so the HUD can name it, plus the shared

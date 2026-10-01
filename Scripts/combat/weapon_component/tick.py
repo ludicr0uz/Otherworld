@@ -39,9 +39,7 @@ from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
 from combat.weapon_component.stance import _author_stance
-from combat.weapon_component.throw import (
-    _author_throw_aim, _author_throw_flight, _author_throw_release,
-)
+from combat.weapon_component.throw import _author_throw, _author_throw_key
 
 
 def _author_wc_tick(ed, tick):
@@ -202,13 +200,16 @@ def _author_wc_tick(ed, tick):
     armed_exit, unspent = _author_trigger_latch(ed, holding_out, pose_exits,
                                                 240, -200)
 
+    # With the throw key down the click is the throw's (throw.py), not a shot.
+    throw_wants, no_throw = _author_throw_key(ed, pc_out, key_pins["KeyThrow"],
+                                              240, 13000)
     fire_gate = _at(ed.add_branch_node(), 1040, 0)
     _connect(both(both(both(_pin(touching, "ReturnValue", is_input=False),
                             armed_out, 640),
                        both(_pin(steady, "ReturnValue", is_input=False),
                             _pin(guarded, "ReturnValue", is_input=False), 680),
                        700),
-                  unspent, 760),
+                  both(unspent, no_throw, 820), 760),
              _pin(fire_gate, "Condition"))
     _connect(armed_exit, _pin(fire_gate, "execute"))
 
@@ -382,13 +383,9 @@ def _author_wc_tick(ed, tick):
     # --- throw (throw.py) ------------------------------------------------------
     # After pick-up and before the refresh, which re-equips the emptied hand
     # on the frame of the throw, as it does after a drop.
-    aim_exits, released, start, velocity = _author_throw_aim(
-        ed, pc_out, owner_out, held, armed_out, key_pins["KeyThrow"],
-        (BEL.find_then_pin(pick_dirty),) + not_picked,
-        1040, 12800)
-    thrown = _author_throw_release(ed, held, start, velocity, released,
-                                   4200, 14000)
-    flight_exits = _author_throw_flight(ed, aim_exits + (thrown,), 1040, 15600)
+    flight_exits = _author_throw(
+        ed, pc_out, owner_out, held, armed_out, throw_wants, tap,
+        (BEL.find_then_pin(pick_dirty),) + not_picked, 1040, 12800)
 
     # --- refresh -------------------------------------------------------------
     dirty_get = _at(ed.add_get_member_variable_node("NeedsRefresh"), 1040, 4760)

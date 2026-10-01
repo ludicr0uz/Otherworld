@@ -1,12 +1,20 @@
 """The throw: hold the throw key to see where the item in hand would land,
-release it to let go. Whatever is held throws, gun, knife or food alike.
+click the fire key to let go. Letting the throw key up instead calls it off.
+Whatever is held throws, gun, knife or food alike.
 
-Three fragments, called one after another from Tick:
+While the throw key is down the fire key is the throw's alone: Tick's fire
+gate takes _author_throw_key's NOT, so the click neither fires, eats nor
+slashes. The click that threw is spent (TriggerSpent) until it comes up, so
+it cannot fire the automatic equipped in the thrown item's place.
+
+_author_throw, called from Tick, runs three fragments one after another:
 
   _author_throw_aim      while the key is held with something in hand and
                          nothing already in the air: predict the arc and draw
-                         it as dots on BP_ThrowArc (throw_arc.py)
-  _author_throw_release  on the frame the key comes up: store the launch,
+                         it as dots on BP_ThrowArc (throw_arc.py); on a click
+                         with the arc already showing, or with the key let
+                         go, wipe it
+  _author_throw_release  on the frame of that click: store the launch,
                          detach the item and take it out of the inventory,
                          exactly as a drop does
   _author_throw_flight   every frame something is in the air: move it along
@@ -19,9 +27,13 @@ somewhere the arc never promised. Position at time t is start + v t + g t^2/2
 under THROW_GRAVITY_Z, the same gravity the prediction runs under, so the item
 follows the dots and comes down on the disc at their end.
 
-ThrowKeyForced is the probe's stand-in for the held key: no key can be
-injected into a headless game (probes/probe_throw.py). It is OR'd with the key
-and is false in every real game.
+The arc's tip above the view is the held item's own ThrowArcDegrees
+(throw_tuning.THROW_PITCH_VAR), so the GUN TUNING tab can move it per gun.
+
+ThrowKeyForced and ThrowClickForced are the probe's stand-ins for the held
+key and the click: no key can be injected into a headless game
+(probes/probe_throw.py). Each is OR'd with its key and is false in every real
+game.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
@@ -38,14 +50,16 @@ from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_BOUNCE_BACK, THROW_DOT_CM,
     THROW_GRAVITY_Z, THROW_LAND_LIFT, THROW_MARK_CM, THROW_MAX_FLIGHT_S,
-    THROW_MAX_PITCH_DEG, THROW_PITCH_UP_DEG, THROW_SPEED, THROW_START_FORWARD,
+    THROW_MAX_PITCH_DEG, THROW_PITCH_VAR, THROW_SPEED, THROW_START_FORWARD,
     THROW_START_UP,
 )
-from combat.weapon_component.common import _trace_defaults
+from combat.weapon_component.common import _prop, _trace_defaults
+from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _detach_rules
 
 THROW_AIMING_VAR = "ThrowAiming"      # the arc was drawn last frame
 THROW_FORCED_VAR = "ThrowKeyForced"   # a probe holding the key
+THROW_CLICK_FORCED_VAR = "ThrowClickForced"   # a probe clicking the fire key
 THROWN_VAR = "Thrown"                 # the item in the air, or None
 THROW_START_VAR = "ThrowStart"
 THROW_VELOCITY_VAR = "ThrowVelocity"
@@ -60,13 +74,40 @@ def _out(n, name="ReturnValue"):
     return _pin(n, name, is_input=False)
 
 
-def _author_launch(ed, pc_out, owner_out, x0, y0):
+def _author_throw_key(ed, pc_out, key_pin, x0, y0):
+    """(wants, free): the throw key is down (or a probe holds it), and its
+    NOT, which Tick's fire gate takes. Plain reads: safe in a condition that
+    is pulled with empty hands."""
+    down = _at(_node(ed, FN_IS_KEY_DOWN), x0, y0)
+    _connect(pc_out, _pin(down, "self"))
+    _connect(key_pin, _pin(down, "Key"))
+    forced = _at(ed.add_get_member_variable_node(THROW_FORCED_VAR), x0, y0 + 140)
+    wants = _at(_node(ed, FN_OR), x0 + 240, y0)
+    _connect(_out(down), _pin(wants, "A"))
+    _connect(_out(forced, THROW_FORCED_VAR), _pin(wants, "B"))
+    free = _at(_node(ed, FN_NOT), x0 + 480, y0)
+    _connect(_out(wants), _pin(free, "A"))
+    return _out(wants), _out(free)
+
+
+def _author_throw(ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins,
+                  x0, y0):
+    """The whole throw, in Tick's chain: aim, release, flight. Returns the
+    exit exec pins."""
+    aim_exits, released, start, velocity = _author_throw_aim(
+        ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins, x0, y0)
+    thrown = _author_throw_release(ed, held, start, velocity, released,
+                                   x0 + 3160, y0 + 1200)
+    return _author_throw_flight(ed, aim_exits + (thrown,), x0, y0 + 2800)
+
+
+def _author_launch(ed, pc_out, owner_out, held, x0, y0):
     """(start, velocity): where a throw leaves from and how fast, as pure pins.
 
-    Along the view, tipped up THROW_PITCH_UP_DEG and capped so a throw
-    straight up does not land on the thrower. Starts ahead of the capsule
-    along the view's yaw, so neither the arc's trace nor the flight's starts
-    inside the player.
+    Along the view, tipped up the held item's ThrowArcDegrees and capped so a
+    throw straight up does not land on the thrower. Starts ahead of the
+    capsule along the view's yaw, so neither the arc's trace nor the flight's
+    starts inside the player. Reads Held: pull these only where it is valid.
     """
     view = _at(_node(ed, FN_GET_CONTROL_ROT), x0, y0)
     _connect(pc_out, _pin(view, "self"))
@@ -77,7 +118,8 @@ def _author_launch(ed, pc_out, owner_out, x0, y0):
     _connect(_out(parts, "Pitch"), _pin(signed, "Angle"))
     lifted = _at(_node(ed, FN_ADD_FF), x0 + 720, y0)
     _connect(_out(signed), _pin(lifted, "A"))
-    _set(lifted, "B", THROW_PITCH_UP_DEG)
+    tip, _tip_n = _prop(ed, THROW_PITCH_VAR, held, x0 + 480, y0 + 140)
+    _connect(tip, _pin(lifted, "B"))
     capped = _at(_node(ed, FN_CLAMP), x0 + 960, y0)
     _connect(_out(lifted), _pin(capped, "Value"))
     _set(capped, "Min", -89.0)
@@ -124,20 +166,13 @@ def _add_dot(ed, dots, location, scale, exec_in, x, y):
     return add
 
 
-def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, key_pin, exec_ins,
-                      x0, y0):
+def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
+                      exec_ins, x0, y0):
     """The key held: draw the arc. Returns (exits, released, start, velocity):
     exits run on to the next block; released is the exec pin of the frame the
-    aim ends, for _author_throw_release."""
-    start, velocity = _author_launch(ed, pc_out, owner_out, x0, y0 + 1400)
+    fire key is clicked over a shown arc, for _author_throw_release."""
+    start, velocity = _author_launch(ed, pc_out, owner_out, held, x0, y0 + 1400)
 
-    down = _at(_node(ed, FN_IS_KEY_DOWN), x0, y0 + 200)
-    _connect(pc_out, _pin(down, "self"))
-    _connect(key_pin, _pin(down, "Key"))
-    forced = _at(ed.add_get_member_variable_node(THROW_FORCED_VAR), x0, y0 + 340)
-    wants = _at(_node(ed, FN_OR), x0 + 240, y0 + 200)
-    _connect(_out(down), _pin(wants, "A"))
-    _connect(_out(forced, THROW_FORCED_VAR), _pin(wants, "B"))
     thrown = _at(ed.add_get_member_variable_node(THROWN_VAR), x0, y0 + 480)
     flying = _at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 480)
     _connect(_out(thrown, THROWN_VAR), _pin(flying, "Object"))
@@ -147,13 +182,29 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, key_pin, exec_ins,
     _connect(armed_out, _pin(ready, "A"))
     _connect(_out(idle), _pin(ready, "B"))
     aimed = _at(_node(ed, FN_AND), x0 + 720, y0 + 200)
-    _connect(_out(wants), _pin(aimed, "A"))
+    _connect(wants, _pin(aimed, "A"))
     _connect(_out(ready), _pin(aimed, "B"))
 
     gate = _at(ed.add_branch_node(), x0 + 960, y0)
     _connect(_out(aimed), _pin(gate, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(gate, "execute"))
+
+    # --- the click: the throw, if the arc was already showing ----------------
+    # ThrowAiming is still last frame's here: a click on the very frame the
+    # key goes down throws nothing, as no arc has been seen yet.
+    click_forced = _at(ed.add_get_member_variable_node(THROW_CLICK_FORCED_VAR),
+                       x0 + 480, y0 - 300)
+    clicked = _at(_node(ed, FN_OR), x0 + 720, y0 - 300)
+    _connect(tap, _pin(clicked, "A"))
+    _connect(_out(click_forced, THROW_CLICK_FORCED_VAR), _pin(clicked, "B"))
+    shown = _at(ed.add_get_member_variable_node(THROW_AIMING_VAR), x0 + 720, y0 - 160)
+    lets_go = _at(_node(ed, FN_AND), x0 + 960, y0 - 300)
+    _connect(_out(clicked), _pin(lets_go, "A"))
+    _connect(_out(shown, THROW_AIMING_VAR), _pin(lets_go, "B"))
+    click = _at(ed.add_branch_node(), x0 + 1080, y0 - 100)
+    _connect(_out(lets_go), _pin(click, "Condition"))
+    _connect(BEL.find_then_pin(gate), _pin(click, "execute"))
 
     # --- the arc actor, spawned the first time it is wanted -----------------
     arc_get = _at(ed.add_get_member_variable_node(THROW_ARC_VAR), x0 + 960, y0 - 400)
@@ -162,7 +213,7 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, key_pin, exec_ins,
     _connect(arc, _pin(have, "Object"))
     spawned = _at(ed.add_branch_node(), x0 + 1200, y0)
     _connect(_out(have), _pin(spawned, "Condition"))
-    _connect(BEL.find_then_pin(gate), _pin(spawned, "execute"))
+    _connect(BEL.find_else_pin(click), _pin(spawned, "execute"))
     cls = _at(ed.add_get_member_variable_node(THROW_ARC_CLASS_VAR), x0 + 1200, y0 + 300)
     where = _at(_node(ed, FN_GET_TRANSFORM), x0 + 1200, y0 + 420)
     _connect(owner_out, _pin(where, "self"))
@@ -234,24 +285,25 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, key_pin, exec_ins,
                x0 + 1460, y0 + 800)
     _connect(dots, _pin(wipe, "self"))
     _connect(BEL.find_then_pin(was), _pin(wipe, "execute"))
+    _connect(BEL.find_then_pin(click), _pin(wipe, "execute"))
     off = _at(ed.add_set_member_variable_node(THROW_AIMING_VAR), x0 + 1740, y0 + 800)
     _set(off, THROW_AIMING_VAR, "false")
     _connect(BEL.find_then_pin(wipe), _pin(off, "execute"))
-    # Let go with the item still in hand: that is the throw. The aim also ends
-    # when the hand empties under a held key (eaten, dropped), which throws
-    # nothing.
-    let_go = _at(_node(ed, FN_NOT), x0 + 1740, y0 + 1000)
-    _connect(_out(wants), _pin(let_go, "A"))
-    throws = _at(_node(ed, FN_AND), x0 + 1980, y0 + 1000)
-    _connect(_out(ready), _pin(throws, "A"))
-    _connect(_out(let_go), _pin(throws, "B"))
+    # Which of the two ended it? Still aimed (key down, item in hand) can only
+    # be the click: that is the throw. Otherwise the key came up, or the hand
+    # emptied under it (eaten, dropped), and nothing is thrown.
     release = _at(ed.add_branch_node(), x0 + 2000, y0 + 800)
-    _connect(_out(throws), _pin(release, "Condition"))
+    _connect(_out(aimed), _pin(release, "Condition"))
     _connect(BEL.find_then_pin(off), _pin(release, "execute"))
+    # The click is spent: still down next frame, it must not fire the
+    # automatic that takes the thrown item's place (consume.py's latch).
+    spend = _at(ed.add_set_member_variable_node(TRIGGER_SPENT), x0 + 2260, y0 + 800)
+    _set(spend, TRIGGER_SPENT, "true")
+    _connect(BEL.find_then_pin(release), _pin(spend, "execute"))
 
     exits = (BEL.find_then_pin(mark), BEL.find_else_pin(landed),
              BEL.find_else_pin(was), BEL.find_else_pin(release))
-    return exits, BEL.find_then_pin(release), start, velocity
+    return exits, BEL.find_then_pin(spend), start, velocity
 
 
 def _author_throw_release(ed, held, start, velocity, exec_in, x0, y0):

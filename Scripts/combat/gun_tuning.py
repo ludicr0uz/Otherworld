@@ -42,6 +42,8 @@ TUNE_STATS = (
     ("recoil_sights", "RecoilSightsScale", "recoil x sights", 0.05, 0.0, float),
     ("recoil_crouch", "RecoilCrouchScale", "recoil x crouch", 0.05, 0.0, float),
     ("recoil_prone", "RecoilProneScale", "recoil x prone", 0.05, 0.0, float),
+    # How far a throw of this gun is tipped up from the view (throw_tuning.py).
+    ("throw_arc", "ThrowArcDegrees", "throw arc (deg)", 1.0, 0.0, float),
 )
 TUNE_COLUMNS = tuple(s[0] for s in TUNE_STATS)
 WEAPON_COLUMN = "weapon"

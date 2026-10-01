@@ -1,6 +1,6 @@
 """verify.throw -- the throw (weapon_component/throw.py): its key, the arc
-actor, the prediction drawn while the key is held, the release, and the
-flight that follows the same curve.
+actor, the prediction drawn while the key is held, the click that lets go,
+and the flight that follows the same curve.
 
 Also the two predicates other sections use to leave the throw's nodes out of
 their sweeps: is_throw_trace (the flight's two traces) and launch_nodes (what
@@ -11,21 +11,24 @@ import math
 
 import unreal
 
-from combat.paths import MAT_THROW_ARC, SPHERE, THROW_ARC_BP_PATH
+from combat.paths import ITEM_BP_PATH, MAT_THROW_ARC, SPHERE, THROW_ARC_BP_PATH
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
-    THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_GRAVITY_Z, THROW_PITCH_UP_DEG,
-    THROW_SPEED, THROW_START_UP,
+    THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_GRAVITY_Z, THROW_MAX_PITCH_DEG,
+    THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_SPEED,
+    THROW_START_UP,
 )
 from combat.tuning import BIND_VARS, THROW_KEY
 from combat.verify.common import (
     BEL, PIN, by_pins, check, component_template, load, num_pin, pin_value,
 )
 from combat.verify.fixtures import w, wg
+from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.throw import (
-    THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_FORCED_VAR,
-    THROW_LAST_VAR, THROW_START_VAR, THROW_VELOCITY_VAR,
+    THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_CLICK_FORCED_VAR,
+    THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_VELOCITY_VAR,
 )
+from combat.weapon_specs import _weapon_specs
 
 PREDICT_PINS = ("StartPos", "LaunchVelocity", "OverrideGravityZ")
 
@@ -84,11 +87,35 @@ def check_throw_key():
           names[-1] == "KeyThrow"
           and w.get_editor_property("KeyThrow").export_text() == THROW_KEY,
           str(names))
-    check("the throw starts idle: not aiming, no probe holding the key, "
-          "nothing in the air",
+    check("the throw starts idle: not aiming, no probe holding the key or "
+          "clicking, nothing in the air",
           w.get_editor_property(THROW_AIMING_VAR) is False
           and w.get_editor_property(THROW_FORCED_VAR) is False
+          and w.get_editor_property(THROW_CLICK_FORCED_VAR) is False
           and w.get_editor_property(THROWN_VAR) is None)
+
+
+def _item_cdo(path):
+    return unreal.get_default_object(BEL.generated_class(load(path)))
+
+
+def check_arc_angle():
+    base = _item_cdo(ITEM_BP_PATH).get_editor_property(THROW_PITCH_VAR)
+    check(f"every item throws on a {THROW_PITCH_UP_DEG:g} degree arc unless it "
+          f"says otherwise: a real lob, under the {THROW_MAX_PITCH_DEG:g} degree cap",
+          isinstance(base, float) and base == THROW_PITCH_UP_DEG
+          and 20.0 <= THROW_PITCH_UP_DEG < THROW_MAX_PITCH_DEG, str(base))
+    bad = [f"{sp['display']}={got} spec {sp[THROW_PITCH_COLUMN]}"
+           for sp in _weapon_specs()
+           for got in [_item_cdo(sp["path"]).get_editor_property(THROW_PITCH_VAR)]
+           if abs(got - float(sp[THROW_PITCH_COLUMN])) > 1e-4]
+    check("...and each gun holds its own, the GUN TUNING tab's `throw_arc`",
+          not bad, "; ".join(bad))
+    tips = [n for n in launch_nodes() if _title(n) == f"Get {THROW_PITCH_VAR}"]
+    held = [_title(PIN.get_owning_node(q)) for n in tips
+            for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self"))]
+    check("the launch is tipped up by the held item's arc, not a literal",
+          len(tips) == 1 and held == ["Get Held"], f"{len(tips)} reads off {held}")
 
 
 def check_arc_actor():
@@ -158,6 +185,42 @@ def check_arc():
           len(clears) == 2, str(len(clears)))
 
 
+def _upstream(node, pin):
+    """Titles of every node feeding one input pin."""
+    return {_title(n) for n in _feeds([BEL.find_input_pin(node, pin)])}
+
+
+def check_click():
+    """Hold the throw key for the arc, click the fire key to throw."""
+    spends = [n for n in wg if _title(n) == f"Set {TRIGGER_SPENT}"
+              and pin_value(n, TRIGGER_SPENT) == "true"]
+    gates = [PIN.get_owning_node(q) for n in spends
+             for q in PIN.list_connected_pins(BEL.find_input_pin(n, "execute"))
+             if "Get KeyThrow" in _upstream(PIN.get_owning_node(q), "Condition")]
+    check("the throw spends the click, so it cannot fire what is equipped next",
+          len(gates) == 1, f"{len(spends)} spends, {len(gates)} behind the throw key")
+    clicks = [n for n in wg if _title(n) == "Branch"
+              and {f"Get {THROW_CLICK_FORCED_VAR}", f"Get {THROW_AIMING_VAR}",
+                   "Get KeyFire"} <= _upstream(n, "Condition")]
+    check("the throw is a click of the fire key (or the probe's) over an arc "
+          "already showing", len(clicks) == 1, str(len(clicks)))
+    if len(clicks) == 1 and len(gates) == 1:
+        check("...taken only while the throw key is held with something in hand, "
+              "and letting the key up throws nothing",
+              {"Get KeyThrow", "Get Held"} <= _upstream(gates[0], "Condition")
+              and "Get KeyThrow" not in _upstream(clicks[0], "Condition")
+              and any("Get KeyThrow" in _upstream(PIN.get_owning_node(q), "Condition")
+                      for q in PIN.list_connected_pins(
+                          BEL.find_input_pin(clicks[0], "execute"))))
+    # The fire gate: the Branch whose condition reads the trigger both ways.
+    fires = [n for n in wg if _title(n) == "Branch"
+             and {"Get KeyFire", "Get Sprinting", "Get Blocking", "Get KeyThrow",
+                  f"Get {THROW_FORCED_VAR}"} <= _upstream(n, "Condition")
+             and f"Get {THROW_AIMING_VAR}" not in _upstream(n, "Condition")]
+    check("with the throw key down the fire gate stays shut: the click is the "
+          "throw's, not a shot, a bite or a slash", len(fires) == 1, str(len(fires)))
+
+
 def check_release():
     preds = _predicts()
     # Set with a value: the landing's Set Thrown clears it with nothing wired.
@@ -206,7 +269,9 @@ def check_flight():
 
 def run():
     check_throw_key()
+    check_arc_angle()
     check_arc_actor()
     check_arc()
+    check_click()
     check_release()
     check_flight()

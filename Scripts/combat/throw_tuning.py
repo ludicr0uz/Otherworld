@@ -7,10 +7,18 @@ other binds, because BIND_VARS lists it.
 # The throw (weapon_component/throw.py). The item leaves from a point in front
 # of the chest, along the view tipped up a little, at one speed; the arc on
 # screen and the flight are the same ballistic curve under the same gravity,
-# so it lands where the arc said. 1100 cm/s tipped 12 degrees carries a
-# thrown item about 9 m over flat ground from a level view.
+# so it lands where the arc said. 1100 cm/s tipped 30 degrees is a lob: it
+# peaks about 1.5 m over the hand and carries a thrown item about 13 m over
+# flat ground from a level view.
+#
+# The tip is per item: THROW_PITCH_UP_DEG is BP_WeaponItem's default for
+# THROW_PITCH_VAR, which the launch reads off Held. A gun's own is its
+# gun_tuning.csv `throw_arc` cell, tuned on the GUN TUNING tab; the knife, the
+# food and the water keep the default.
 THROW_SPEED = 1100.0            # cm/s at release
-THROW_PITCH_UP_DEG = 12.0       # added to the view's pitch
+THROW_PITCH_UP_DEG = 30.0       # added to the view's pitch (the default arc)
+THROW_PITCH_COLUMN = "throw_arc"       # the spec / gun_tuning.csv column
+THROW_PITCH_VAR = "ThrowArcDegrees"    # on BP_WeaponItem
 THROW_MAX_PITCH_DEG = 80.0      # a throw straight up would land on the thrower
 THROW_START_FORWARD = 60.0      # cm ahead of the capsule's centre: clear of it
 THROW_START_UP = 50.0           # cm above it: about the shoulder

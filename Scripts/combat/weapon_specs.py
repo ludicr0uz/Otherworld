@@ -18,6 +18,7 @@ from combat.paths import (
     RIFLE_BP_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH, UI_ART_DIR,
 )
 from combat.skin import player_skin
+from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG
 from combat.weapon_models import (
     PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, RIFLE_MODEL, RIFLE_MUZZLE,
     RIFLE_SIGHT, SHOTGUN_MODEL, SHOTGUN_MUZZLE, SHOTGUN_SIGHT,
@@ -233,6 +234,7 @@ def _weapon_specs():
     for spec in specs:
         spec.update(GUN_ACCURACY[spec["display"]])
         spec.setdefault("ads_zoom", COMBAT.ads_zoom_irons)
+        spec.setdefault(THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG)
         spec.update(tuned.get(spec["display"], {}))
         # Held in both hands is what the rifle ready pose does; the guard pose
         # (body_pose.py) picks fists or the gun across the body on it.

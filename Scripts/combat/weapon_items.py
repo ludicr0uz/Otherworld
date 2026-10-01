@@ -25,6 +25,7 @@ from combat.graph import (
     _handles, _log, _must_load, _root_handle, _struct_type,
 )
 from combat.paths import ITEM_BP_PATH
+from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR
 from combat.tuning import COMBAT
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
 
@@ -133,9 +134,14 @@ def build_weapon_item():
     # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
     # Held like every other per-weapon number.
     _declare(ed, "ShotVolume", _float_type())
+    # How far a throw of this item is tipped up from the view (throw.py reads
+    # it off Held). The default is on the base, so the knife, the food and the
+    # water throw on it too; a gun's own comes from its spec.
+    _declare(ed, THROW_PITCH_VAR, _float_type())
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
+    _apply_defaults(bp, {THROW_PITCH_VAR: THROW_PITCH_UP_DEG})
     _assets().save_loaded_asset(bp)
     _log(f"built {ITEM_BP_PATH}")
     return bp
@@ -259,6 +265,7 @@ def build_weapon(spec, item_bp):
         "Scoped": bool(spec.get("scoped", False)),
         **{name: float(spec[col]) for col, name in ACCURACY_VARS},
         "ShotVolume": float(spec["shot_volume"]),
+        THROW_PITCH_VAR: float(spec[THROW_PITCH_COLUMN]),
         "Icon": _weapon_icon(spec["display"]),
         "FireSound": _must_load(spec["sound"]),
         "DryFireSound": _must_load(SND_DRY_FIRE),

@@ -55,12 +55,15 @@ def check_eating_spends_the_press():
     spends = [n for n in sets if pin_value(n, TRIGGER_SPENT) == "true"
               and not _feeders(n, TRIGGER_SPENT)]
     rearms = [n for n in sets if _feeders(n, TRIGGER_SPENT)]
-    check(f"{TRIGGER_SPENT} is written twice: spent by eating, re-armed each frame",
-          len(sets) == 2 and len(spends) == 1 and len(rearms) == 1,
+    # The throw's click is spent the same way (verify/throw.check_click).
+    check(f"{TRIGGER_SPENT} is written three times: spent by eating and by the "
+          f"throw, re-armed each frame",
+          len(sets) == 3 and len(spends) == 2 and len(rearms) == 1,
           f"{len(sets)} sets, {len(spends)} spend, {len(rearms)} re-arm")
 
     sends = by_pins(wg, "Actor", "EventTag", "Payload")
     after_send = _exec_after(sends[0]) if len(sends) == 1 else []
+    spends = [n for n in spends if n in after_send]
     check("...spent on the use event's own exec chain, after the item is gone",
           bool(spends) and spends[0] in after_send
           and any(_title(n) == "Destroy Actor" for n in after_send[:after_send.index(spends[0])]),

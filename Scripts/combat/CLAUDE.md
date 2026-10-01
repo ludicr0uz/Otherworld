@@ -14,7 +14,7 @@ The defaults are all rebindable on the settings screen:
   (`weapon_component/punch.py`; both in `docs/firing_gate.md`).
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
   **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
-  **C** toggles crouch, **Z** toggles prone, **V** throws (held: see below).
+  **C** toggles crouch, **Z** toggles prone, **V** held shows the throw's arc and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
 
@@ -106,13 +106,25 @@ menu polls its own copy from `DrawHUD`, which does.
   - Keep the `Length(DropClasses) > 0` guard, or an unfilled table indexes into nothing.
 - **Anything in hand can be thrown** (`weapon_component/throw.py`). Holding **V** draws the
   arc: `PredictProjectilePath` from a point in front of the chest, along the view tipped up
-  `THROW_PITCH_UP_DEG`, as world-space instances on `BP_ThrowArc`'s one ISM (spawned on first
-  aim; `throw_arc.py`), with a disc where it lands. Releasing it stores the launch, detaches
-  the item and takes it out of the inventory as a drop does. The flight is **kinematic**, not
+  by the held item's `ThrowArcDegrees`, as world-space instances on `BP_ThrowArc`'s one ISM
+  (spawned on first aim; `throw_arc.py`), with a disc where it lands. A click of the fire key
+  over the arc stores the launch, detaches the item and takes it out of the inventory as a
+  drop does; letting V up instead calls it off.
+  - **With V down the fire gate is shut** (`_author_throw_key`'s NOT), so the click does not
+    also fire, eat or slash, and the click that threw sets `TriggerSpent`, so it cannot fire
+    the automatic equipped in the thrown item's place.
+  - **The click needs last frame's `ThrowAiming`:** the Branch sits before the arc is drawn,
+    so a click on the frame V goes down throws nothing.
+  - **The arc is per item.** `ThrowArcDegrees` defaults to `THROW_PITCH_UP_DEG` (30) on
+    `BP_WeaponItem`, so the knife, food and water use it; a gun's is its `throw_arc` cell in
+    `gun_tuning.csv`, the GUN TUNING tab's last row.
+
+  The flight is **kinematic**, not
   physics (items are NoCollision): start + v t + g t²/2 under `THROW_GRAVITY_Z`, the arc's own
   gravity, traced frame to frame on Visibility; on a hit it backs off the surface, traces down
   to the ground and becomes an ordinary `Dropped` item. One item flies at a time. A thrown
-  item does no damage. `ThrowKeyForced` is the probe's stand-in for the key
+  item does no damage. `ThrowKeyForced` and `ThrowClickForced` are the probe's stand-ins for
+  the key and the click
   (`probes/probe_throw.py`); the throw numbers are in `throw_tuning.py`.
 - **Kill rewards happen only on the `DamagedByPlayer` arm.** That covers the kill count, the two
   shells and the gun roll. The world-floor net writes `Health = 0` down the same death path, and
@@ -131,8 +143,9 @@ live: lethality, sprint and stamina, ADS, mouse sensitivity, recoil and the hit 
 Per-weapon numbers live in `_weapon_specs()`.
 
 **Per-gun numbers can be tuned in game** (the M panel's **T** tab, `graphics_menu/tune_*.py`):
-- `gun_tuning.csv` (tracked) holds each gun's 19 tunable stats (`gun_tuning.TUNE_STATS`: damage,
-  pellets, range, interval, reload, magazine, sights zoom, shot volume and the accuracy columns).
+- `gun_tuning.csv` (tracked) holds each gun's 20 tunable stats (`gun_tuning.TUNE_STATS`: damage,
+  pellets, range, interval, reload, magazine, sights zoom, shot volume, the accuracy columns
+  and the throw's arc).
   `_weapon_specs()` lays it over its literals, so **the CSV wins**; the literals are the
   fallback for a missing cell. Edit the CSV by hand or through the tab, never only the literal.
 - The tab writes the carried guns live and Enter saves the CSV; the Blueprints change only when
@@ -194,7 +207,8 @@ These are feel checks a headless run can't do:
 - how the death camera looks under the terrain;
 - how the sights' pitch looks at steep angles (the eye swings on an arc round the spine);
 - the throw: whether V and its arc read well (dot size and spacing, the landing disc on
-  slopes), whether 11 m/s at 12° up feels right, and the item snapping from the hand to the
+  slopes), whether 11 m/s at 30° up feels right, holding V and clicking with a real
+  keyboard and mouse (the probe forces both), and the item snapping from the hand to the
   launch point (there is no throw animation);
 - the stance clips in motion (`stance_clips.py`): the crouched walk covers about 55 cm/s and
   plays at 2x, so at the crouch's 270 cm/s the feet slide; the crawl is the UAL's face-down

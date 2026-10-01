@@ -7,6 +7,8 @@ verifier's. With the shotgun issued:
 
   - one nudge up on its damage row lands on the carried shotgun's Damage;
   - pellets nudged down ten times stop at the minimum, 1, and land rounded;
+  - one nudge up on its throw arc row lands on its ThrowArcDegrees, which the
+    throw's launch reads (probe_throw.py shows the arc following it);
   - Left on the gun row wraps from the first gun to the last;
   - the pistol's numbers are untouched;
   - the save writes those numbers, and only those, into gun_tuning.csv;
@@ -22,6 +24,7 @@ import unreal
 
 from combat.gun_tuning import CSV_PATH, TUNE_STATS, read_table
 from combat.paths import WEAPON_COMP_CLASS_PATH
+from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_VAR
 from graphics_menu import tune_consts as TC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 from graphics_menu.umg_consts import ROW_CARET, ROW_VALUE
@@ -93,6 +96,14 @@ def _run(p):
     yield from _nudge(p, hud, 1 + COLS.index("pellets"), -1, times=10)
     p.check("pellets nudged down stop at the minimum and land as a whole number",
             p.get(shotgun, "PelletCount") == 1, str(p.get(shotgun, "PelletCount")))
+    arc_stat = TUNE_STATS[COLS.index(THROW_PITCH_COLUMN)]
+    arc = float(p.get(shotgun, THROW_PITCH_VAR))
+    yield from _nudge(p, hud, 1 + COLS.index(THROW_PITCH_COLUMN), 1)
+    p.check("one nudge up on the throw arc row tips the carried shotgun's throw "
+            "up by its step",
+            arc_stat[1] == THROW_PITCH_VAR
+            and abs(float(p.get(shotgun, THROW_PITCH_VAR)) - (arc + arc_stat[3])) < 1e-6,
+            f"{arc} -> {p.get(shotgun, THROW_PITCH_VAR)} deg")
     p.check("the pistol is untouched",
             [float(p.get(pistol, s[1])) for s in TUNE_STATS] == pistol_before)
 
@@ -106,7 +117,8 @@ def _run(p):
     yield lambda: not p.get(hud, TC.TUNE_SAVE_VAR)
     new = read_table()
     p.check("the save succeeds (TuneSaved)", p.get(hud, TC.TUNE_SAVED_VAR))
-    want = dict(old.get("Shotgun", {}), damage=before + TUNE_STATS[0][3], pellets=1)
+    want = dict(old.get("Shotgun", {}), damage=before + TUNE_STATS[0][3], pellets=1,
+                **{THROW_PITCH_COLUMN: arc + arc_stat[3]})
     p.check("the CSV holds the tuned shotgun", new.get("Shotgun") == want,
             str(new.get("Shotgun")))
     p.check("...and every other gun as it was",

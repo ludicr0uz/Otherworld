@@ -36,8 +36,8 @@ from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.throw import (
     THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR,
-    THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
-    THROW_VELOCITY_VAR,
+    THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR,
+    THROW_TIME_VAR, THROW_VELOCITY_VAR,
 )
 from combat.weapon_component.tick import _author_wc_tick
 
@@ -176,7 +176,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
     _declare(ed, PICKUP_FORCED_VAR, BEL.get_basic_type_by_name("bool"))
     # The throw (throw.py): the aim and the launch it stores, the item in the
     # air, and the arc actor it draws on.
-    for name in (THROW_AIMING_VAR, THROW_FORCED_VAR):
+    for name in (THROW_AIMING_VAR, THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     _declare(ed, THROWN_VAR, BEL.get_object_reference_type(item_class))
     for name in (THROW_START_VAR, THROW_VELOCITY_VAR, THROW_LAST_VAR):
@@ -250,6 +250,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         PICKUP_FORCED_VAR: False,
         THROW_AIMING_VAR: False,
         THROW_FORCED_VAR: False,
+        THROW_CLICK_FORCED_VAR: False,
         THROW_TIME_VAR: 0.0,
         THROW_ARC_CLASS_VAR: arc_class,
     })

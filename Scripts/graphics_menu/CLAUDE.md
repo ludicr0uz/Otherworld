@@ -210,14 +210,14 @@ Run from Tick after save and exit; the design is `Scripts/loot/CLAUDE.md`. Traps
 ## The GUN TUNING tab (`tune_*.py`, `wbp_tune.py`)
 
 A developer tab beside the M panel: **T with the panel open** toggles `TuneOpen`. Up/Down pick
-the gun row or one of the 19 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Right change the
+the gun row or one of the 20 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Right change the
 gun, or move the stat one step (never under its minimum); **Enter** saves
 `Scripts/combat/gun_tuning.csv`.
 
 - **The table lives on the HUD:** `TuneValues` (guns x stats, flattened), `TuneWeapons`,
   `TuneSteps`, `TuneMins`, all baked from `_weapon_specs()` (so from the CSV) at build time.
 - **Applied every Tick once touched** (`TuneTouched`): each carried item whose `DisplayName` is
-  in `TuneWeapons` gets all 19 variables (ints rounded). Every Tick rather than per nudge, so a
+  in `TuneWeapons` gets all 20 variables (ints rounded). Every Tick rather than per nudge, so a
   gun picked up afterwards gets the tuning too. Guns lying in the world get it when picked up.
 - **The save is Python**, through `PythonScriptLibrary.ExecutePythonCommand`
   (`TUNE_SAVE_COMMAND` → `tune_save.save()`), which reads the live HUD's table. Blueprint can't
@@ -225,7 +225,7 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
   packaged build: a dev tool. `TuneSaved` shows "saved to ..." until the next change.
 - **The keys only raise flags** (`TuneNudge`, `TuneSaveRequested`), which is what lets
   `probe_gun_tuning.py` tune and save. It backs up the CSV and puts it back.
-- **Still needs a play session:** the keys themselves and how the 20-row panel reads.
+- **Still needs a play session:** the keys themselves and how the 21-row panel reads.
 - **The machine is shared with MONSTER TUNING:** the keys, nudge and save are
   `tune_tick.author_tab_flow` over a `TuneTab` (`tune_tab.py`); the panel is `tune_draw` and
   `wbp_tune` over the same. Only the apply differs. The verifier tells the two save calls apart

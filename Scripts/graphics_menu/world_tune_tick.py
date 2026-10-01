@@ -4,7 +4,8 @@ table onto the level's day/night cycle.
 
     [O] with MenuOpen       WorldTuneOpen = NOT WorldTuneOpen; the other two shut
     WorldTuneOpen, and the level has a BP_DayNightCycle (GetActorOfClass, cast):
-      WorldTuneTouched      DayLengthSeconds, NightLengthSeconds := the table's
+      WorldTuneTouched      DayLengthSeconds, NightLengthSeconds,
+                            NightTemperatureDropPerSecond := the table's
       Values[0] != HourSeen a nudge moved the hour: Clock := hour_to_clock
       always                Values[0] := HourSeen := clock_to_hour(Clock)
 
@@ -45,9 +46,12 @@ def declare_world_tune_vars(ed):
 
 
 def world_tune_defaults():
-    """The built lengths; the hour cell and HourSeen both 0 until the tab
+    """The built lengths and night cold; the hour cell and HourSeen both 0 until the tab
     first opens and reads the live clock."""
-    values = [0.0, float(cfg.DAY_LENGTH_S), float(cfg.NIGHT_LENGTH_S)]
+    values = [0.0, float(cfg.DAY_LENGTH_S), float(cfg.NIGHT_LENGTH_S),
+              float(cfg.NIGHT_TEMPERATURE_DROP_PER_S)]
+    if len(values) != len(WORLD_STATS):
+        raise RuntimeError(f"{len(values)} built values for {len(WORLD_STATS)} WORLD_STATS")
     return {**tab_defaults(WORLD_TAB, [WORLD_SUBJECT], values,
                            [float(s[3]) for s in WORLD_STATS],
                            [float(s[4]) for s in WORLD_STATS]),

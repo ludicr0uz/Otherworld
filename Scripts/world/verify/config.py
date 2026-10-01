@@ -13,6 +13,11 @@ def run():
     check("world config: a night lasts world_tuning.csv's length (else 4 minutes)",
           cfg.NIGHT_LENGTH_S == tuned.get("night_length_s", 240.0),
           f"{cfg.NIGHT_LENGTH_S} s")
+    check("world config: the night's cold is world_tuning.csv's (else 0.1 a second), "
+          "and never warms",
+          cfg.NIGHT_TEMPERATURE_DROP_PER_S
+          == tuned.get("night_temperature_drop_per_s", 0.1) >= 0.0,
+          f"{cfg.NIGHT_TEMPERATURE_DROP_PER_S} per s")
     check("world config: the clock starts in the day",
           0.0 <= cfg.START_CLOCK_S < cfg.DAY_LENGTH_S, f"{cfg.START_CLOCK_S} s")
 
@@ -29,6 +34,10 @@ def run():
     check("midnight: no sun, all the stars",
           midnight["sun_lux"] == 0.0
           and midnight["star_brightness"] == cfg.STAR_BRIGHTNESS, str(midnight))
+    check("the cold is the night's: none at noon, all of it at midnight",
+          noon["night_cold_per_s"] == 0.0
+          and midnight["night_cold_per_s"] == cfg.NIGHT_TEMPERATURE_DROP_PER_S,
+          f"{noon['night_cold_per_s']} / {midnight['night_cold_per_s']}")
     check("night light is dim: the moon under 5% of the sun",
           cfg.MOON_LUX < 0.05 * cfg.SUN_LUX, f"{cfg.MOON_LUX} vs {cfg.SUN_LUX} lux")
     inside = [cfg.sun_state(t) for t in range(1, int(cfg.cycle_length()), 5)

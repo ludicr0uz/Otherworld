@@ -57,7 +57,8 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 - **Rates:**
   - Hunger empties in 15 min and thirst in 10.
   - A mushroom restores +25 hunger and a canteen +40 thirst. On EASY a mushroom also heals 10.
-  - Temperature is a 0–100 bar that nothing moves yet.
+  - Temperature is a 0–100 bar that falls at night: the day/night cycle lowers it
+    (`world/night_cold.py`, rate in `world/world_config.py`). Nothing raises it or reads it yet.
 - **Where forage goes:** `scatter_forage` puts mushrooms 0.7–2.2 m from a trunk and canteens
   anywhere.
 - **How much:** 6 and 1.5 per hectare, capped at 300 and 80. That is 24 + 6 on the 200 m map and

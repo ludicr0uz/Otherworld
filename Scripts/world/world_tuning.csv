@@ -1,3 +1,4 @@
 setting,value
 day_length_s,240
 night_length_s,240
+night_temperature_drop_per_s,0.1

@@ -7,8 +7,9 @@ one table.
     [O] with the M panel open   open / close the tab (and shut the other two)
     Up / Down, Left / Right,    as GUN TUNING (tune_tab.py), over one subject,
     Enter                       "world": the time of day (hours, live only),
-                                the day's and the night's lengths; Enter
-                                saves the lengths to world/world_tuning.csv
+                                the day's and the night's lengths, how fast
+                                the night cools the player; Enter saves all
+                                but the hour to world/world_tuning.csv
 
 The rows, their steps and minimums are world/world_tuning.WORLD_STATS.
 """
@@ -26,7 +27,8 @@ WORLD_TUNE_NUDGE_VAR = "WorldTuneNudge"
 WORLD_TUNE_SAVE_VAR = "WorldTuneSaveRequested"
 WORLD_TUNE_SAVED_VAR = "WorldTuneSaved"
 WORLD_TUNE_TOUCHED_VAR = "WorldTuneTouched"
-# WorldTuneValues[s] is WORLD_STATS[s]: the hour, the day's length, the night's.
+# WorldTuneValues[s] is WORLD_STATS[s]: the hour, the day's length, the
+# night's, the night's cold.
 WORLD_TUNE_VALUES_VAR = "WorldTuneValues"
 WORLD_TUNE_NAMES_VAR = "WorldTuneNames"
 WORLD_TUNE_STEPS_VAR = "WorldTuneSteps"
@@ -54,6 +56,6 @@ WORLD_TAB = TuneTab(
     title_text="WORLD TUNING",
     row_labels=(WORLD_SUBJECT,) + tuple(s[2] for s in WORLD_STATS),
     hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
-               "ENTER  save lengths to world_tuning.csv"),
+               "ENTER  save to world_tuning.csv"),
     saved_words="saved to Scripts/world/world_tuning.csv",
     fraction_digits=2)

@@ -7,7 +7,7 @@ from combat.verify.common import (
     pin_value,
 )
 from world import world_config as cfg
-from world.day_night_blueprint import COMPONENTS, RANDOM_START_VAR
+from world.day_night_blueprint import COMPONENTS, NIGHT_COLD_VAR, RANDOM_START_VAR
 from world.paths import DAY_NIGHT_BP_PATH, SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH, STATIC_SKY_TAG
 
 
@@ -15,7 +15,8 @@ def _check_defaults(bp):
     d = cdo(bp)
     for var, want in (("DayLengthSeconds", cfg.DAY_LENGTH_S),
                       ("NightLengthSeconds", cfg.NIGHT_LENGTH_S),
-                      ("Clock", cfg.START_CLOCK_S)):
+                      ("Clock", cfg.START_CLOCK_S),
+                      (NIGHT_COLD_VAR, cfg.NIGHT_TEMPERATURE_DROP_PER_S)):
         got = d.get_editor_property(var)
         check(f"BP_DayNightCycle.{var} defaults to world_config ({want})",
               isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
@@ -96,6 +97,48 @@ def _check_graph(bp):
           cfg.MOON_MAX_ELEVATION_DEG in mults, str(mults))
 
 
+def _title(n):
+    return str(BEL.get_node_title(n)).replace("\n", " ")
+
+
+def _feeds(pin):
+    return [_title(unreal.BlueprintGraphPinLibrary.get_owning_node(q))
+            for q in pin.list_connected_pins()]
+
+
+def _check_night_cold(bp):
+    """night_cold.py: Tick lowers the player's Temperature by the cycle's rate."""
+    nodes = graph(bp).list_all_nodes()
+    sets = [n for n in nodes if _title(n) == "Set Temperature"]
+    check("Tick writes Temperature once, on the player's survival component",
+          len(sets) == 1 and any(t.replace(" ", "").endswith("CastToBP_SurvivalComponent")
+                                 for t in _feeds(BEL.find_input_pin(sets[0], "self"))),
+          str([_title(n) for n in sets]))
+    if len(sets) != 1:
+        return
+    floors = [unreal.BlueprintGraphPinLibrary.get_owning_node(q)
+              for q in BEL.find_input_pin(sets[0], "Temperature").list_connected_pins()]
+    # A literal equal to its pin's default reads "" once loaded from disk.
+    check("...floored at 0 (FMax), so the cold never takes it below empty",
+          len(floors) == 1 and pin_value(floors[0], "B") in ("0.0", "0.000000", "", "0"),
+          str([(_title(n), pin_value(n, "B")) for n in floors]))
+    scaled = [n for n in by_pins(nodes, "A", "B")
+              if f"Get {NIGHT_COLD_VAR}" in _feeds(BEL.find_input_pin(n, "A"))]
+    flipped = [(num_pin(m, "OutRangeA"), num_pin(m, "OutRangeB"))
+               for n in scaled for q in BEL.find_input_pin(n, "B").list_connected_pins()
+               for m in [unreal.BlueprintGraphPinLibrary.get_owning_node(q)]
+               if "Get DayAmount" in _feeds(BEL.find_input_pin(m, "Value"))]
+    check(f"...by {NIGHT_COLD_VAR} x (1 - DayAmount): the night's, not the day's",
+          len(scaled) == 1 and flipped == [(1.0, 0.0)], f"{len(scaled)} {flipped}")
+    pawns = by_pins(nodes, "PlayerIndex")
+    check("...of the player's pawn, checked valid in a Branch of its own",
+          len(pawns) == 1 and any(
+              "Branch" in t for v in by_pins(nodes, "Object")
+              if "GetPlayerPawn" in _feeds(BEL.find_input_pin(v, "Object"))
+              for t in _feeds(BEL.find_output_pin(v, "ReturnValue"))),
+          str(len(pawns)))
+
+
 def run():
     bp = load(DAY_NIGHT_BP_PATH)
     check("BP_DayNightCycle exists", bp is not None, DAY_NIGHT_BP_PATH)
@@ -105,3 +148,4 @@ def run():
     _check_defaults(bp)
     _check_components(bp)
     _check_graph(bp)
+    _check_night_cold(bp)

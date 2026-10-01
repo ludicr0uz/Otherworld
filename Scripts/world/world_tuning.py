@@ -3,7 +3,7 @@ setting (``setting,value``).
 
 The CSV is the tracked copy of the numbers the in-game WORLD TUNING tab (the
 M panel's [O] tab, graphics_menu/world_tune_*.py) saves: the day's and the
-night's lengths. world_config lays it over its literals, and
+night's lengths, and how fast the night cools the player. world_config lays it over its literals, and
 build_day_night.py bakes the result into BP_DayNightCycle's defaults, so a
 length tuned in a game and saved lands in the Blueprint on the next build
 and git shows what moved.
@@ -28,6 +28,8 @@ WORLD_STATS = (
     TIME_OF_DAY_ROW,
     ("day_length_s", "DayLengthSeconds", "day length (s)", 30.0, 30.0),
     ("night_length_s", "NightLengthSeconds", "night length (s)", 30.0, 30.0),
+    ("night_temperature_drop_per_s", "NightTemperatureDropPerSecond",
+     "night cold (temp/s)", 0.01, 0.0),
 )
 SAVED_STATS = tuple(s for s in WORLD_STATS if s[0])
 SAVED_COLUMNS = tuple(s[0] for s in SAVED_STATS)

@@ -11,6 +11,7 @@ from graphics_menu import world_tune_consts as WC
 from graphics_menu.umg_checks import _tree
 from graphics_menu.world_tune_tick import world_tune_defaults
 from world.paths import DAY_NIGHT_CLASS_PATH
+from world.world_tuning import WORLD_STATS
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -42,7 +43,8 @@ def _check_widgets(check):
     labels = [str(k.get_editor_property(UC.ROW_TEXT_VAR))
               for k in (box.get_all_children() if box else [])]
     check(f"WBP_PauseMenu has the world tuning panel, its {TAB.row_count} rows "
-          f"labelled world, time of day, day and night length, and the saved line",
+          f"labelled world, time of day, day and night length, night cold, and the "
+          f"saved line",
           TAB.panel in widgets and TAB.saved_text in widgets
           and labels == list(TAB.row_labels), str(labels))
     hidden = [n for n in (TAB.panel, TAB.saved_text) if n in widgets
@@ -75,13 +77,14 @@ def _check_graph(check, nodes):
 
     cycle = DAY_NIGHT_CLASS_PATH.rsplit(".", 1)[-1][:-2]
     missing = []
-    for var in ("DayLengthSeconds", "NightLengthSeconds", "Clock"):
+    for var in [s[1] for s in WORLD_STATS if s[1]] + ["Clock"]:
         sets = [n for n in nodes if _title(n) == f"Set {var}"
                 and any(t.replace(" ", "").endswith(f"CastTo{cycle}")
                         for t in _feeds(BEL.find_input_pin(n, "self")))]
         if len(sets) != 1:
             missing.append(f"{var} x{len(sets)}")
-    check("the tab sets the cycle's day and night lengths and its Clock, once each",
+    check("the tab sets the cycle's day and night lengths, its night cold and its "
+          "Clock, once each",
           not missing, str(missing))
     finds = [n for n in nodes if "ActorClass" in _pins(n)
              and "DayNightCycle" in str(BEL.find_input_pin(n, "ActorClass").get_pin_value())]
@@ -97,7 +100,8 @@ def check_world_tune(check, bp, nodes):
     wrong = [k for k, v in world_tune_defaults().items()
              if not (_same(cdo.get_editor_property(k), v) if isinstance(v, list)
                      else cdo.get_editor_property(k) == v)]
-    check("the world tab starts shut, untouched, with the built day and night lengths",
+    check("the world tab starts shut, untouched, with the built day and night lengths "
+          "and night cold",
           not wrong, str(wrong))
     _check_widgets(check)
     _check_graph(check, nodes)

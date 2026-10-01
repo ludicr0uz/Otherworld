@@ -31,6 +31,11 @@ _NIGHT = get_preset("night")
 _TUNED = _read_tuning()
 DAY_LENGTH_S = float(_TUNED.get("day_length_s", 240.0))
 NIGHT_LENGTH_S = float(_TUNED.get("night_length_s", 240.0))
+# The night is cold: the player's Temperature (survival's 0-100 bar) falls by
+# this many points a second at full night, scaled by 1 - DayAmount through
+# twilight (world/night_cold.py). Slow: 0.1 takes 24 points off in a 4-minute
+# night. world_tuning.csv overrides it too.
+NIGHT_TEMPERATURE_DROP_PER_S = float(_TUNED.get("night_temperature_drop_per_s", 0.1))
 # Where a level starts. RANDOM_START (BP_DayNightCycle.RandomStart, Instance
 # Editable) has BeginPlay pick a clock anywhere in the cycle instead; with it
 # off, START_CLOCK_S is a little after sunrise, so the first thing the player
@@ -120,7 +125,8 @@ def sun_state(clock_s):
 
     Returns a dict: angle (0-360 over the cycle, 0-180 by day), the sun's and
     the moon's elevation in degrees, day_amount (0 night .. 1 day), the two
-    lights' intensities in lux and star_brightness. The graph authors exactly
+    lights' intensities in lux, star_brightness and night_cold_per_s (how fast
+    the player's Temperature falls). The graph authors exactly
     these sums (day_night_graph.py); the probe compares the two.
     """
     clock = clock_s % cycle_length()
@@ -142,6 +148,7 @@ def sun_state(clock_s):
         "sun_lux": SUN_LUX * day,
         "moon_lux": MOON_LUX * moon,
         "star_brightness": STAR_BRIGHTNESS * stars,
+        "night_cold_per_s": NIGHT_TEMPERATURE_DROP_PER_S * (1.0 - day),
     }
 
 # The dome is the engine's SM_SkySphere at the same scale the generator uses.

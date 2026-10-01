@@ -229,7 +229,7 @@ editor.
   Up/Down pick and Enter takes the item into the bag (`Scripts/loot/CLAUDE.md`).
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
   bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
-  and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts) (plus D: debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world, K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day and the day's and night's lengths, the lengths saved to `Scripts/world/world_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
+  and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts) (plus D: debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world, K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day the day's and night's lengths and how fast the night cools the player, all but the hour saved to `Scripts/world/world_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **Proprietary notices:** the game is Ellivian Inc.'s (`LICENSE.txt`). The title and settings
   pages carry a copyright and confidentiality notice, and every screen a faint
@@ -239,14 +239,15 @@ editor.
   in both.
 - **Day and night:** a clock turns the sun and the moon across the sky. The day and the night
   are 4 minutes each for now (`Scripts/world/world_config.py`). The night is moonlit, dim and
-  starry. A level starts at a random time of day.
+  starry. A level starts at a random time of day. At night the player's temperature falls
+  slowly (0.1 a second; `Scripts/world/night_cold.py`).
 - **Save and exit:** X in the M panel saves the character's stats and inventory, but not its
   location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit calls it off. The next game loads
   the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
 - **Death:** once the player or a wanderer is dead (or at 0 HP), nothing it could do runs: the
   weapon component's Tick stops at its dead gate, the loot window shuts, and every step of a
   wanderer's tree refuses (`probes/probe_dead_no_actions.py`).
-- **Known gaps:** temperature moves nothing yet, and nothing else reads the time of day yet. `GameDefaultMap` still points at the old
+- **Known gaps:** temperature only falls (nothing warms the player) and a low one does nothing yet. `GameDefaultMap` still points at the old
   `Lvl_Forest`. Feel checks that need a play session are listed per package.
 
 ## Gotchas learned the hard way

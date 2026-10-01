@@ -2,12 +2,13 @@
 
 `Scripts/build_day_night.py` builds `M_DayNightSky` and `BP_DayNightCycle` (both under
 `/Game/World`) and puts one cycle actor into every generated level.
-`Scripts/verify_day_night.py` checks it, and `Scripts/probes/probe_day_night.py` runs it in a
-game. The module map is in `__init__.py`.
+`Scripts/verify_day_night.py` checks it, and `Scripts/probes/probe_day_night.py` and
+`probe_night_cold.py` run it in a game. The module map is in `__init__.py`.
 
 ```bash
 python3 Scripts/dev/uepy.py Scripts/build_day_night.py Scripts/verify_day_night.py
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_day_night.py
+python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
 ```
 
 ## Settings: `world_config.py`
@@ -15,10 +16,13 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_day_night.py
 - **The world config.** `DAY_LENGTH_S` and `NIGHT_LENGTH_S` are each 240 s for testing, unless
   `world_tuning.csv` (saved by the M panel's WORLD TUNING tab, [O]) says otherwise. Change a
   number and re-run the builder.
+- **The night's cold:** `NIGHT_TEMPERATURE_DROP_PER_S` (0.1, or `world_tuning.csv`'s) is how
+  many points of the player's Temperature a second of full night takes. It is the actor's
+  `NightTemperatureDropPerSecond`. See "The night is cold" below.
 - **A level starts at a random time of day:** with `RANDOM_START` (the actor's `RandomStart`),
   BeginPlay sets `Clock` to `RandomFloatInRange(0, day + night)`. With it off, `Clock`'s default
   `START_CLOCK_S` (20 s, just after sunrise) is where it starts.
-- The two lengths, `Clock` and `RandomStart` are also Instance Editable on the placed actor, so
+- The two lengths, `Clock`, the night's cold and `RandomStart` are also Instance Editable on the placed actor, so
   one level can differ.
 - **The time of day can be set in a game** from the WORLD TUNING tab, on a 24-hour dial
   (`clock_to_hour`: sunrise 06:00, sunset 18:00). See `Scripts/graphics_menu/CLAUDE.md`.
@@ -51,6 +55,20 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_day_night.py
   would pop at dusk. The SkyLight captures the dome, so the ambient light follows the sky.
 - **`import_<Level>.py` rebuilds a level from scratch.** Re-run `build_day_night.py` after it,
   as with `place_forage.py`.
+
+## The night is cold (`night_cold.py`)
+
+- **The Tick's last step** lowers the player's `Temperature` (`BP_SurvivalComponent`) by
+  `NightTemperatureDropPerSecond × (1 − DayAmount) × dt`, floored at 0. Scaling by
+  `1 − DayAmount` brings the cold in through dusk and eases it through dawn;
+  `sun_state()`'s `night_cold_per_s` is the same sum.
+- **The cycle writes the survival component,** not the other way round: the cold is the
+  world's, and `build_survival.py` runs before `build_day_night.py` (the cast node needs the
+  class loaded). So `world` imports `survival.paths`. A level without a cycle has no cold.
+- **Nothing warms the player yet,** and nothing reads a low Temperature: the bar only falls,
+  and a saved profile carries it into the next game.
+- **The probe raises the rate** to 20 a second for its run: a headless game's time moves too
+  little for 0.1 to show.
 
 ## Traps
 

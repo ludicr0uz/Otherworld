@@ -12,8 +12,8 @@ verifier's.
   - opened, the tab's hour is the cycle's clock on the dial;
   - one nudge up moves the clock half an hour, and 25 more cross into the
     other half of the cycle, where IsDay agrees with the hour;
-  - a day length nudge lands on the cycle;
-  - the save writes the lengths into world_tuning.csv;
+  - a day length nudge lands on the cycle, and a night cold nudge;
+  - the save writes the lengths and the night cold into world_tuning.csv;
   - the panel, drawn by hand, shows the hour on its row.
 
 world_tuning.csv is set aside first and put back.
@@ -27,7 +27,7 @@ from graphics_menu import world_tune_consts as WC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
 from graphics_menu.umg_consts import ROW_VALUE
 from world import world_config as cfg
-from world.day_night_blueprint import RANDOM_START_VAR
+from world.day_night_blueprint import NIGHT_COLD_VAR, RANDOM_START_VAR
 from world.paths import DAY_NIGHT_CLASS_PATH
 from world.world_tuning import CSV_PATH, WORLD_STATS, read_table
 
@@ -37,6 +37,7 @@ WRITABLE = [(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var,
                                        TAB.save_var, "MenuOpen")]
 HOUR_STEP = WORLD_STATS[0][3]
 DAY_STEP = WORLD_STATS[1][3]
+COLD_STEP = WORLD_STATS[3][3]
 
 
 def _live_hud(p):
@@ -113,13 +114,21 @@ def _run(p):
             abs(p.get(cycle, "DayLengthSeconds") - (length + DAY_STEP)) < 1e-3,
             f"{length} -> {p.get(cycle, 'DayLengthSeconds')}")
 
+    cold = p.get(cycle, NIGHT_COLD_VAR)
+    yield from _nudge(p, hud, WC.HOUR_ROW + 3, 1)
+    p.check("a night cold nudge lands on the cycle",
+            abs(p.get(cycle, NIGHT_COLD_VAR) - (cold + COLD_STEP)) < 1e-6,
+            f"{cold} -> {p.get(cycle, NIGHT_COLD_VAR)}")
+
     p.set(hud, TAB.save_var, True)
     yield lambda: not p.get(hud, TAB.save_var)
     saved = read_table()
-    p.check("the save writes the lengths into world_tuning.csv",
+    p.check("the save writes the lengths and the night cold into world_tuning.csv",
             p.get(hud, TAB.saved_var)
             and saved.get("day_length_s") == length + DAY_STEP
-            and saved.get("night_length_s") == p.get(cycle, "NightLengthSeconds"),
+            and saved.get("night_length_s") == p.get(cycle, "NightLengthSeconds")
+            and abs(saved.get("night_temperature_drop_per_s", -1.0)
+                    - (cold + COLD_STEP)) < 1e-6,
             str(saved))
 
     ui = p.get(hud, "UiPause")

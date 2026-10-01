@@ -17,6 +17,8 @@ world_config.sun_state():
   air        SkyLight intensity, fog density and colour, DayGrade's weight:
              all night value -> day value by DayAmount
   sky        the dome's DayAmount, StarBrightness, SunDirection, MoonDirection
+  cold       the player's Temperature falls at night: night_cold.py, which
+             build_day_night.py chains on after build_graph()
 
 Everything downstream of Clock is pure and re-evaluates on each read, which is
 harmless here: Clock is set first and read unchanged for the rest of the frame.
@@ -235,7 +237,8 @@ def _author_sky(ed, chain, x0, sun_elev):
 
 
 def build_graph(bp, ed):
-    """Wipe the EventGraph and author BeginPlay and Tick."""
+    """Wipe the EventGraph and author BeginPlay and Tick. Returns (tick, the
+    Tick's chain, the x past its last node), for night_cold to extend."""
     tick, begin = _events(ed, rebuild=True)
     _author_begin_play(ed, begin)
     chain = _Chain(BEL.find_then_pin(tick))
@@ -244,3 +247,4 @@ def build_graph(bp, ed):
     x = _author_air(ed, chain, x)
     _author_sky(ed, chain, x, sun_elev)
     _log(f"{bp.get_name()}: BeginPlay takes over the sky, Tick runs the clock")
+    return tick, chain, x + 2800

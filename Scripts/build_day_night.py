@@ -14,7 +14,7 @@ import sys
 _SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _SCRIPTS)
 for _name in [m for m in sys.modules
-              if m.split(".")[0] in ("combat", "world", "forest_generator")]:
+              if m.split(".")[0] in ("combat", "world", "forest_generator", "survival")]:
     del sys.modules[_name]
 
 import unreal                                                     # noqa: E402
@@ -25,6 +25,7 @@ from world.day_night_blueprint import (                           # noqa: E402
 )
 from world.day_night_graph import build_graph                     # noqa: E402
 from world.level_placement import place_day_night                 # noqa: E402
+from world.night_cold import author_night_cold                    # noqa: E402
 from world.paths import DAY_NIGHT_BP_PATH                         # noqa: E402
 from world.sky_material import build_sky_material                 # noqa: E402
 
@@ -39,7 +40,7 @@ def build_blueprint():
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     build_components(bp)
     declare_variables(ed)
-    build_graph(bp, ed)
+    author_night_cold(ed, *build_graph(bp, ed))
     apply_config(bp)          # compiles, saves, reads the defaults back
     return bp
 

@@ -17,8 +17,9 @@ from combat.tuning import HEALTH_DRAIN_TAG
 @dataclasses.dataclass(frozen=True)
 class SurvivalConfig:
     # All three bars run 0..max. Temperature is on the same 0..100 scale --
-    # 100 is comfortably warm -- and nothing moves it yet: the bar and the
-    # variable exist so a later heat or cold source has somewhere to write.
+    # 100 is comfortably warm. The night lowers it (BP_DayNightCycle writes
+    # it: world/night_cold.py, the rate in world/world_config.py); nothing
+    # raises it or reads it yet.
     max_hunger: float = 100.0
     max_thirst: float = 100.0
     max_temperature: float = 100.0

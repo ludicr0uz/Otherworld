@@ -281,14 +281,15 @@ speed, damage per hit, melee range, time between swings, health. Same keys as GU
 
 **O with the panel open** toggles `WorldTuneOpen`. One subject row (`world`), then
 `world/world_tuning.WORLD_STATS`: the time of day (hours, step 0.5), the day's length and the
-night's (seconds, step 30). Same keys as GUN TUNING; **Enter** saves the two lengths to
+night's (seconds, step 30), and the night's cold (Temperature points a second, step 0.01,
+`world/night_cold.py`). Same keys as GUN TUNING; **Enter** saves all but the hour to
 `Scripts/world/world_tuning.csv` (the hour is never saved: a level starts at a random one).
 
 - **The hour is a 24-hour dial over the cycle's `Clock`:** sunrise 06:00, sunset 18:00, each
   half 12 hours whatever its length (`world_config.clock_to_hour`/`hour_to_clock`, which the
   graph mirrors with two `MapRangeClamped` each way).
 - **Only while the tab is open,** each Tick: `GetActorOfClass(BP_DayNightCycle)`, a cast, then
-  the lengths onto it (once touched), then `Clock := hour_to_clock(WorldTuneValues[0])` **only
+  the lengths and the night's cold onto it (once touched), then `Clock := hour_to_clock(WorldTuneValues[0])` **only
   when that cell differs from `WorldTuneHourSeen`**, then the live clock read back into both.
   Writing the hour every Tick would stop time; the read-back is what makes a nudge step from
   the hour on screen.
@@ -297,7 +298,7 @@ night's (seconds, step 30). Same keys as GUN TUNING; **Enter** saves the two len
 - **The verifier's whole-graph scans exclude this tab:** the Binds read-by-index check skips
   `Get WorldTuneValues`, and the scalability-level scan skips `MapRangeClamped` (it has a
   `Value` pin).
-- **Probe:** `probe_world_tuning.py` (7 checks: the random start, the hour on the dial, a nudge,
+- **Probe:** `probe_world_tuning.py` (8 checks: the random start, the hour on the dial, a nudge,
   crossing into the other half, a length, the CSV, the panel). It backs up the CSV and puts it
   back.
 - **Still needs a play session:** the O key, and how the sky looks when the hour jumps.

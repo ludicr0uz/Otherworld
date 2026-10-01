@@ -2,7 +2,7 @@
 ExecutePythonCommand (world_tune_consts.WORLD_TUNE_SAVE_COMMAND) on Enter.
 
 It reads the live HUD's working table (WorldTuneValues) and writes the day's
-and the night's lengths to world/world_tuning.csv, which world_config lays
+and the night's lengths and the night's cold to world/world_tuning.csv, which world_config lays
 over its literals and the next build_day_night.py bakes into
 BP_DayNightCycle (and build_graphics_menu.py into the HUD's table). The time
 of day is not saved: a level starts at a random one.
@@ -21,6 +21,6 @@ def save(path=CSV_PATH):
         raise RuntimeError(f"WorldTuneValues holds {len(values)} numbers, not "
                            f"{len(WORLD_STATS)}")
     write_table({st[0]: v for st, v in zip(WORLD_STATS, values) if st[0]}, path)
-    unreal.log_warning(f"[TUNE] saved the day and night lengths to {path}; "
+    unreal.log_warning(f"[TUNE] saved the day and night lengths and the night's cold to {path}; "
                        "build_day_night.py bakes them into the cycle")
     return path

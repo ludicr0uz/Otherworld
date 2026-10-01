@@ -23,9 +23,11 @@ from world.paths import SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH
 
 COMPONENTS = ("Sun", "Moon", "SkyLight", "SkyDome", "Fog", "NightGrade", "DayGrade")
 
-# Variables. The two lengths, Clock and RandomStart are Instance Editable, so
-# a level can run a different day, or start at a set hour, without a rebuild.
-CONFIG_VARS = ("DayLengthSeconds", "NightLengthSeconds", "Clock")
+# Variables. The two lengths, Clock, the night's cold and RandomStart are
+# Instance Editable, so a level can run a different day, or start at a set
+# hour, without a rebuild.
+NIGHT_COLD_VAR = "NightTemperatureDropPerSecond"   # night_cold.py reads it
+CONFIG_VARS = ("DayLengthSeconds", "NightLengthSeconds", "Clock", NIGHT_COLD_VAR)
 RANDOM_START_VAR = "RandomStart"   # BeginPlay picks Clock anywhere in the cycle
 STATE_FLOAT_VARS = ("DayAmount",)
 IS_DAY_VAR = "IsDay"
@@ -128,5 +130,6 @@ def apply_config(bp):
         "DayLengthSeconds": float(cfg.DAY_LENGTH_S),
         "NightLengthSeconds": float(cfg.NIGHT_LENGTH_S),
         "Clock": float(cfg.START_CLOCK_S),
+        NIGHT_COLD_VAR: float(cfg.NIGHT_TEMPERATURE_DROP_PER_S),
         RANDOM_START_VAR: bool(cfg.RANDOM_START),
     })

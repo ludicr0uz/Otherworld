@@ -154,7 +154,8 @@ def _check_clicks(check, nodes):
 
     lowered = [n for n in _sets(nodes, CC.PAUSE_CLICK_VAR)
                if not _feeders(n, CC.PAUSE_CLICK_VAR)]
-    served = sorted(int(_value(n, "B")) for n in nodes if _pins(n) == {"A", "B"}
+    # A literal 0 reads back empty once the asset is loaded from disk (row 0's).
+    served = sorted(int(_value(n, "B") or 0) for n in nodes if _pins(n) == {"A", "B"}
                     and f"Get {CC.PAUSE_CLICK_VAR}" in _feeders(n, "A"))
     check("the M panel's clicked row is lowered every frame, and each row's "
           "key poll also answers to its own row",

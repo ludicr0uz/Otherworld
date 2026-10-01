@@ -1,8 +1,10 @@
 """Keeps the ready pose playing: restarts it after a flinch or anything else
-that stopped the montage group.
+that stopped the montage group; and re-equips on the frames Lowered changes,
+which is what starts and stops it (carry.py writes Lowered).
 """
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
+from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
 from combat.nodes import (
@@ -35,7 +37,7 @@ def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
     sights for the length of the stagger, and this puts them back on the first
     frame after it, with the montage's own blend.
 
-        Held is valid AND not sprinting
+        Held is valid AND not Lowered   (carry.py: sprinting, or a gun at rest)
           AND DefaultSlot is quiet      (nothing is holding the pose)
           AND HitSlot is quiet          (we are not mid-flinch)
             -> play AimPose into DefaultSlot again
@@ -62,9 +64,9 @@ def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
 
     armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 160))
     _connect(held, _pin(armed, "Object"))
-    running = keep(_at(ed.add_get_member_variable_node("Sprinting"), x0, y0 + 280))
+    running = keep(_at(ed.add_get_member_variable_node(LOWERED_VAR), x0, y0 + 280))
     still = keep(_at(_node(ed, FN_NOT), x0 + 240, y0 + 280))
-    _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
+    _connect(_pin(running, LOWERED_VAR, is_input=False), _pin(still, "A"))
 
     aiming = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 480, y0 + 620))
     _connect(anim_out, _pin(aiming, "self"))
@@ -133,36 +135,36 @@ def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
     return (BEL.find_then_pin(join),)
 
 
-def _author_sprint_pose_edge(ed, exec_ins):
-    """Re-equip on the frames Sprinting and PoseSprinting disagree; returns the
-    exits. (Moved verbatim out of tick.py's Tick author.)"""
+def _author_lowered_pose_edge(ed, exec_ins):
+    """Re-equip on the frames Lowered and PoseLowered disagree; returns the
+    exits."""
     # Edge-triggered, not level-triggered, and that distinction is the whole
     # block. Re-equipping costs a detach, an attach and a montage restart; done
-    # every frame the player holds Shift it would restart the run's ready pose
-    # sixty times a second, which is a weapon that flickers. PoseSprinting is
-    # what the pose currently reflects, Sprinting is what it should reflect,
+    # every frame the gun is up it would restart the ready pose sixty times a
+    # second, which is a weapon that flickers. PoseLowered is what the pose
+    # currently reflects, Lowered (carry.py) is what it should reflect,
     # and only the frames where those disagree do any work.
-    now_sprint = _at(ed.add_get_member_variable_node("Sprinting"), 240, 1020)
-    now_sprint_out = _pin(now_sprint, "Sprinting", is_input=False)
-    posed = _at(ed.add_get_member_variable_node("PoseSprinting"), 240, 1140)
+    now_sprint = _at(ed.add_get_member_variable_node(LOWERED_VAR), 240, 1020)
+    now_sprint_out = _pin(now_sprint, LOWERED_VAR, is_input=False)
+    posed = _at(ed.add_get_member_variable_node(POSE_LOWERED_VAR), 240, 1140)
     changed = _at(_node(ed, FN_NEQ_BB), 520, 1060)
     _connect(now_sprint_out, _pin(changed, "A"))
-    _connect(_pin(posed, "PoseSprinting", is_input=False), _pin(changed, "B"))
+    _connect(_pin(posed, POSE_LOWERED_VAR, is_input=False), _pin(changed, "B"))
     pose_gate = _at(ed.add_branch_node(), 780, 940)
     _connect(_pin(changed, "ReturnValue", is_input=False), _pin(pose_gate, "Condition"))
     for exit_pin in exec_ins:
         _connect(exit_pin, _pin(pose_gate, "execute"))
-    remember = _at(ed.add_set_member_variable_node("PoseSprinting"), 1040, 940)
-    _connect(now_sprint_out, _pin(remember, "PoseSprinting"))
+    remember = _at(ed.add_set_member_variable_node(POSE_LOWERED_VAR), 1040, 940)
+    _connect(now_sprint_out, _pin(remember, POSE_LOWERED_VAR))
     _connect(BEL.find_then_pin(pose_gate), _pin(remember, "execute"))
     pose_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 1300, 940)
     _set(pose_dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(remember), _pin(pose_dirty, "execute"))
 
     ed.add_comment_to_nodes(
-        "Started or stopped sprinting this frame -- re-equip, which is what "
-        "starts or stops the ready pose. Edge-triggered on PoseSprinting: the "
-        "level-triggered version restarts the montage every frame Shift is "
-        "held, and the weapon strobes.",
+        "The gun was lowered or raised this frame (a sprint, an aim key, the "
+        "guard, a shot) -- re-equip, which is what starts or stops the ready "
+        "pose. Edge-triggered on PoseLowered: the level-triggered version "
+        "restarts the montage every frame, and the weapon strobes.",
         [now_sprint, posed, changed, pose_gate, remember, pose_dirty])
     return (BEL.find_then_pin(pose_dirty), BEL.find_else_pin(pose_gate))

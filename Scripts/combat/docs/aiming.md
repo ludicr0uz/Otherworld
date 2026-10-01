@@ -129,6 +129,42 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - Draw the sideways kick **once** into `RecoilYawKick`, because `RandomFloatInRange` is pure.
   - Turn the view **before** writing the reduced debts.
 
+## The carry: a gun rides lowered
+
+`weapon_component/carry.py`, numbers in `carry_tuning.py`, checks in `verify/carry.py`,
+in game `probes/probe_carry.py`.
+
+- **A gun's ready pose plays only while something holds the gun up.** Otherwise the slot is
+  stopped and the locomotion (idle, walk, jog) comes through the upper-body blend with the gun
+  in the right hand, as it always has while sprinting. No new clip: the packs have no
+  armed-carry jog.
+  `Lowered = Sprinting OR (gun AND NOT prone AND NOT (Aiming OR Blocking OR RaiseForced OR
+  now < Held.NextFireTime + CARRY_RAISE_HOLD_S))`, written once a frame behind `IsValid(Held)`.
+  - Prone keeps the gun up: the crawl's arms pull along the ground, and the stand-in shot
+    origin below is measured standing (crouched it is about 20 cm high).
+  - `Aiming` is either aim key, so over the shoulder and down the sights both raise it.
+  - A shot and a reload both write `NextFireTime`, so both raise it, and it stays up 1.5 s
+    after it could fire again.
+  - A gun is an item that is neither `Melee` nor `Consumable`: the knife and the food keep
+    their hold poses.
+  - `RaiseForced` is the probes' stand-in for an aim key. A probe that holds the sights up by
+    writing `SightBlend` must set it, or the gun is down under the sight camera.
+- **The pose follows `Lowered` on its edge** (`ready_pose.py`): `Lowered != PoseLowered` sets
+  `NeedsRefresh`, and the equip plays or stops the slot. The keepalive after a flinch asks
+  `Lowered` too.
+- **The shot is not delayed.** It leaves on the frame of the click, before the gun is up. So
+  while `Lowered`, the wall check and the pellets start not at the muzzle (at the knee,
+  pointing at the ground) but where the muzzle is about to be: `CARRY_GRIP` in the body's
+  frame plus `Held.MuzzleOffset` (`carry._author_shot_origin`, one `SelectVector` both traces
+  read).
+  - **Trap:** `CARRY_GRIP` is the nearer of the two ready poses' fists (the shotgun's). A
+    start past the real muzzle can be inside a target at arm's length, and a trace that starts
+    inside its target does not stop on it.
+  - The first frames after the click the gun is on its way up and the real muzzle is used
+    again: an automatic's second round starts from a muzzle part-raised.
+- Jogging, the barrel swings with the arm: about 90° below the horizon to 20° above it,
+  median 56° below (probe).
+
 ## How a weapon sits in the hand
 
 - **The layered blend runs in mesh space** (`mesh_space_rotation_blend = True`). In local space

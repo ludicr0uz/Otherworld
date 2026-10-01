@@ -18,6 +18,7 @@ import shutil
 
 import unreal
 
+from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.weapon_component.sights import SCOPE_HIDE_BLEND
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
@@ -27,7 +28,8 @@ HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (WEAPON_COMP_BP_PATH, "EquippedIndex"),
             (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
-            (WEAPON_COMP_BP_PATH, "SightBlend")]
+            (WEAPON_COMP_BP_PATH, "SightBlend"),
+            (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
 SNIPER = "BP_SniperRifle_C"
 SHOTGUN = "BP_Shotgun_C"
 HOLD_FRAMES = 5
@@ -91,6 +93,8 @@ def _run(p):
     hud = _live_hud(p)
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
     mesh = p.pawn().get_editor_property("mesh")
+    # No aim key is down in a probe: raise the gun as the key would.
+    p.set(wc, RAISE_FORCED_VAR, True)
     p.set(hud, DEV_GUNS_REQUEST_VAR, True)
     yield lambda: not p.get(hud, DEV_GUNS_REQUEST_VAR)
     yield from _equip(p, wc, SNIPER)

@@ -118,12 +118,17 @@ def check_keys_are_variables():
         feeders = [PIN.get_owning_node(q) for q in
                    PIN.list_connected_pins(BEL.find_input_pin(t, "Start"))]
         for n in feeders:
-            if {"T", "Location"} <= in_pins(n):                      # TransformLocation
+            # The muzzle comes through the carry's SelectVector (verify/carry.py):
+            # its B is the muzzle, its A where the muzzle will be once raised.
+            if {"A", "B", "bPickA"} <= in_pins(n) and all(
+                    {"T", "Location"} <= in_pins(PIN.get_owning_node(q))  # TransformLocation
+                    for side in ("A", "B")
+                    for q in PIN.list_connected_pins(BEL.find_input_pin(n, side))):
                 from_muzzle.append(t)
             if str(BEL.get_node_title(n)) == "GetCameraLocation":
                 from_camera.append(t)
     check("two traces start at the weapon's muzzle: the clearance check and the pellets",
-          len(from_muzzle) == 2, f"{len(from_muzzle)} fed by TransformLocation")
+          len(from_muzzle) == 2, f"{len(from_muzzle)} fed by the carry's pick of two TransformLocations")
     check("exactly one trace starts at the camera -- the one that picks the target",
           len(from_camera) == 1, f"{len(from_camera)} fed by GetCameraLocation")
     # Built as a MakeVector, not as a pin literal: that operator's B pin is a

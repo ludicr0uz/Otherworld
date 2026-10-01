@@ -12,7 +12,8 @@ from combat.nodes import (
     FN_ADD_VV, FN_CAM_LOC, FN_CAM_ROT, FN_DISTANCE, FN_FORWARD, FN_GET_CAM,
     FN_GREATER_FF, FN_IS_VALID, FN_MUL_VF, FN_TRACE, NODE_BREAK_HIT,
 )
-from combat.weapon_component.common import _muzzle_location, _trace_defaults
+from combat.weapon_component.carry import _author_shot_origin
+from combat.weapon_component.common import _trace_defaults
 
 
 def _author_resolve_aim(ed, held, exec_ins, x0, y0):
@@ -115,7 +116,8 @@ def _author_resolve_aim(ed, held, exec_ins, x0, y0):
     aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0 + 2500, y0 + 460))
     aim_out = _pin(aim_get, "AimPoint", is_input=False)
 
-    muzzle = _muzzle_location(ed, held, x0 + 2500, y0 + 1000)
+    # The muzzle, or while the gun is lowered where it is about to be (carry.py).
+    muzzle = _author_shot_origin(ed, held, x0 + 1700, y0 + 1000)
 
     clear = keep(_at(_node(ed, FN_TRACE), x0 + 3260, y0))
     _connect(muzzle, _pin(clear, "Start"))

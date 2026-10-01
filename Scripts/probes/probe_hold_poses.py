@@ -1,9 +1,11 @@
 """The hold poses in the running game: food is carried at the waist, the knife
-is held up at the chest, and a pistol is still aimed at eye level.
+is held up at the chest, and a pistol, raised, is still aimed at eye level.
 
 The probe puts a placed mushroom into the inventory (no key can be injected,
 so it writes Inventory, EquippedIndex and NeedsRefresh, as Q's equip does),
-then takes the pistol, the mushroom and the knife in hand in turn. Each must
+then takes the pistol, the mushroom and the knife in hand in turn (the pistol
+raised, as an aim key raises it: at rest a gun is carried lowered, which is
+probe_carry.py's). Each must
 play its own AimPose in the upper-body slot -- A_HoldItem for the mushroom,
 A_HoldKnife for the knife -- and the right hand must actually move: lowest
 with the mushroom, highest with the pistol, the knife in between.
@@ -18,6 +20,7 @@ import shutil
 import unreal
 
 from combat.anim_blueprint import AIM_SLOT
+from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import (
     HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, WEAPON_COMP_BP_PATH,
     WEAPON_COMP_CLASS_PATH,
@@ -27,7 +30,8 @@ from graphics_menu.profile_consts import PROFILE_SLOT
 from survival.paths import MUSHROOM_CLASS_PATH
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, "EquippedIndex"), (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
-            (WEAPON_COMP_BP_PATH, "Inventory"), (ITEM_BP_PATH, "Dropped")]
+            (WEAPON_COMP_BP_PATH, "Inventory"), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR),
+            (ITEM_BP_PATH, "Dropped")]
 
 SETTLE_S = 0.3
 APART_CM = 8.0      # how far apart the hand heights must be to count
@@ -86,6 +90,7 @@ def _run(p):
     names = [i.get_class().get_name() for i in bag]
     p.set(mushroom, "Dropped", False)
     p.set(wc, "Inventory", bag + [mushroom])
+    p.set(wc, RAISE_FORCED_VAR, True)
 
     heights = {}
     for label, index, want in (("pistol", names.index("BP_Pistol_C"), None),

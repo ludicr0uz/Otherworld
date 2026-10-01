@@ -2,6 +2,7 @@
 mobility, and sprint dropping the ready pose.
 """
 
+from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
 from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wc_cdo, wg
@@ -302,20 +303,24 @@ def check_sprint_drops_ready_pose():
     # There is no new animation -- the fix is to stop playing the ready pose, and
     # let ABP_Unarmed's own locomotion state machine through the layered blend.
 
-    check("PoseSprinting exists to make the change edge-triggered",
-          w.get_editor_property("PoseSprinting") is False,
-          str(w.get_editor_property("PoseSprinting")))
-    check("...and it matches Sprinting at start, so frame one re-equips nothing",
-          w.get_editor_property("PoseSprinting")
+    # Since the carry (verify/carry.py) the pose follows Lowered, which
+    # sprinting is one way into: Lowered and PoseLowered are the edge's pair.
+    check("PoseLowered exists to make the change edge-triggered",
+          w.get_editor_property(POSE_LOWERED_VAR) is False,
+          str(w.get_editor_property(POSE_LOWERED_VAR)))
+    check("...and it matches Lowered and Sprinting at start, so frame one "
+          "re-equips nothing",
+          w.get_editor_property(POSE_LOWERED_VAR)
+          == w.get_editor_property(LOWERED_VAR)
           == w.get_editor_property("Sprinting"))
-    check("the sprint state is remembered exactly once",
-          titles.count("Set PoseSprinting") == 1,
-          f"{titles.count('Set PoseSprinting')} writes")
+    check("the pose's state is remembered exactly once",
+          titles.count(f"Set {POSE_LOWERED_VAR}") == 1,
+          f"{titles.count(f'Set {POSE_LOWERED_VAR}')} writes")
     check("...and re-equipping happens only on the frames the two disagree",
           any("!=" in t or "NotEqual" in t.replace(" ", "") for t in titles),
           str(sorted({t for t in titles if "=" in t})))
     # The pose itself: the branch that decides whether to play or stop the slot
-    # now has a NOT Sprinting in its condition, which is what actually stops it.
+    # has a NOT Lowered in its condition, and Lowered is made of Sprinting.
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if not is_melee_play(n)]
     if plays:
         node, reached = plays[0], False
@@ -325,22 +330,29 @@ def check_sprint_drops_ready_pose():
             cond = [PIN.get_owning_node(q)
                     for q in PIN.list_connected_pins(
                         BEL.find_input_pin(gate[0], "Condition"))]
-            # Walk the two inputs of the AND looking for a Sprinting read.
+            # Walk the two inputs of the AND looking for a Lowered read.
             frontier = list(cond)
             for _ in range(6):
                 nxt = []
                 for n in frontier:
-                    if "Sprinting" in out_pins(n):
+                    if LOWERED_VAR in out_pins(n):
                         reached = True
                     for q in BEL.list_input_pins(n):
                         nxt += [PIN.get_owning_node(r)
                                 for r in PIN.list_connected_pins(q)]
                 frontier = nxt
         check("the ready pose is not played while sprinting", reached,
-              "Sprinting read found behind the pose branch's condition")
-    sprint_gets = [n for n in wg if "Sprinting" in out_pins(n)]
-    check("Sprinting is read by the fire gate, the pose edge and the pose branch",
-          len(sprint_gets) >= 4, f"{len(sprint_gets)} reads")
+              "Lowered read found behind the pose branch's condition")
+    lowered = [n for n, t in zip(wg, titles) if t == f"Set {LOWERED_VAR}"]
+    check("...and Lowered is made of Sprinting, armed or not",
+          bool(lowered) and all(
+              any("Sprinting" in out_pins(PIN.get_owning_node(q)) or any(
+                  "Sprinting" in out_pins(PIN.get_owning_node(r))
+                  for r in PIN.list_connected_pins(
+                      BEL.find_input_pin(PIN.get_owning_node(q), "A")))
+                  for q in PIN.list_connected_pins(
+                      BEL.find_input_pin(n, LOWERED_VAR)))
+              for n in lowered), f"{len(lowered)} writes")
 
 
 def run():

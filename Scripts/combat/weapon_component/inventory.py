@@ -18,6 +18,7 @@ from combat.nodes import (
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
 from combat.tuning import DROP_FORWARD, DROP_KEY
+from combat.carry_tuning import LOWERED_VAR
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 from combat.weapon_component.listener import _author_listener_at_character
 from combat.weapon_component.sights import _author_camera_after_boom
@@ -149,8 +150,10 @@ def _author_equip(ed, exec_in, x0, y0):
     animation -- it is *not playing* this one: stop the slot, and the layered
     blend has nothing left to override the locomotion state machine with, so
     the character runs with its own run cycle and the weapon goes along in the
-    hand socket where it is attached. Sprint's own block in Tick raises
-    NeedsRefresh on the frame the state flips, which is what routes back here.
+    hand socket where it is attached. The same now goes for a gun at rest
+    (carry.py): Lowered is sprinting, or a gun nothing is holding up, and the
+    pose edge in Tick (ready_pose.py) raises NeedsRefresh on the frame it
+    flips, which is what routes back here.
     """
     made = []
 
@@ -226,11 +229,12 @@ def _author_equip(ed, exec_in, x0, y0):
     _connect(held, _pin(armed, "Object"))
     # Safe to fold into one condition, unlike the fire gate's ammunition tests:
     # IsValid takes a null object as an answer rather than as an error, and
-    # Sprinting is this component's own bool. Neither read can touch Held.
-    running = keep(_at(ed.add_get_member_variable_node("Sprinting"),
+    # Lowered is this component's own bool (carry.py: sprinting, or a gun
+    # nothing is holding up). Neither read can touch Held.
+    running = keep(_at(ed.add_get_member_variable_node(LOWERED_VAR),
                        x0 + 2700, y0 + 480))
     still = keep(_at(_node(ed, FN_NOT), x0 + 2940, y0 + 480))
-    _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
+    _connect(_pin(running, LOWERED_VAR, is_input=False), _pin(still, "A"))
     shown = keep(_at(_node(ed, FN_AND), x0 + 3180, y0 + 400))
     _connect(_pin(armed, "ReturnValue", is_input=False), _pin(shown, "A"))
     _connect(_pin(still, "ReturnValue", is_input=False), _pin(shown, "B"))
@@ -268,8 +272,8 @@ def _author_equip(ed, exec_in, x0, y0):
         "animation only because patch_anim_blueprint() put a spine_01 layered "
         "blend around that slot in ABP_Unarmed -- without it the legs would "
         "freeze mid-stride. Empty hands stop the slot and locomotion returns, "
-        "and so does sprinting: you cannot fire while running, so there is "
-        "nothing for a ready pose to be ready for.",
+        "and so does Lowered: sprinting, or a gun that no aim key, guard or "
+        "shot is holding up (carry.py).",
         made)
 
 

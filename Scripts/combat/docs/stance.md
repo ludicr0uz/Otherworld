@@ -19,8 +19,9 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - Authored **without a Branch**. `SelectFloat` picks the speed and the stamina rate, and one
   write applies each.
 - **Sprinting drops the ready pose** by stopping the slot, so `ABP_Unarmed`'s run comes through.
-  It is edge-triggered: `Sprinting != PoseSprinting` sets `NeedsRefresh`. Level-triggering it
-  restarts the montage every frame and the weapon strobes.
+  Sprinting is one way into `Lowered` (the carry, `docs/aiming.md`), which is what the pose
+  follows. It is edge-triggered: `Lowered != PoseLowered` sets `NeedsRefresh`. Level-triggering
+  it restarts the montage every frame and the weapon strobes.
 - `BaseSpeed` is cached from the character at BeginPlay (600). Never hardcode it.
 
 ## Blocking

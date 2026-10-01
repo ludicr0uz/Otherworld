@@ -14,6 +14,7 @@ from combat.weapon_component.ads import _author_ads
 from combat.weapon_component.aim import _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire, _author_reload
 from combat.weapon_component.block import _author_block
+from combat.weapon_component.carry import _author_carry
 from combat.weapon_component.common import _prop
 from combat.weapon_component.consume import (
     _author_trigger_latch, _author_use_gate,
@@ -30,7 +31,7 @@ from combat.weapon_component.pickup import _author_pickup
 from combat.weapon_component.pose_weights import _author_pose_weights
 from combat.weapon_component.punch import _author_punch
 from combat.weapon_component.ready_pose import (
-    _author_ready_pose_keepalive, _author_sprint_pose_edge,
+    _author_lowered_pose_edge, _author_ready_pose_keepalive,
 )
 from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
@@ -161,11 +162,15 @@ def _author_wc_tick(ed, tick):
     # kick that use it. accuracy.py owns the formula.
     ads_exits = _author_accuracy(ed, held, armed_out, ads_exits, 16800, -700)
 
-    # --- the pose follows the sprint (ready_pose.py) --------------------------
-    pose_exits = _author_sprint_pose_edge(ed, ads_exits)
+    # --- the gun is lowered or raised (carry.py) ------------------------------
+    # After Sprinting, Aiming and Blocking are written, which it reads.
+    ads_exits = _author_carry(ed, held, armed_out, ads_exits, 19600, -700)
+
+    # --- and the pose follows it (ready_pose.py) ------------------------------
+    pose_exits = _author_lowered_pose_edge(ed, ads_exits)
 
     # --- and the pose survives being shot ------------------------------------
-    # After the sprint edge, because that block is what starts and stops the
+    # After the pose edge, because that block is what starts and stops the
     # pose deliberately, and this one only restores what something else took
     # away. See _author_ready_pose_keepalive: a hit reaction stops the ready
     # pose as a side effect of the montage group, and without this the player

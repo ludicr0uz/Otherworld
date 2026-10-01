@@ -4,6 +4,7 @@ its defaults and authors BeginPlay and Tick from the sibling modules.
 
 import unreal
 
+from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR
 from combat.game_state import DEBUG_MODE_VAR
 from combat.graph import (
     BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _events,
@@ -128,9 +129,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
     for name in ("MouseSensitivity", "ScopeSensitivity", "BaseYawScale",
                  "BasePitchScale"):
         _declare(ed, name, _float_type())
-    # What the ready pose currently reflects, as opposed to what it should.
-    # The pair is what makes the sprint pose edge-triggered; see _author_wc_tick.
-    _declare(ed, "PoseSprinting", BEL.get_basic_type_by_name("bool"))
+    # What the ready pose should reflect (carry.py writes it) and what it
+    # currently does. The pair is what makes the pose edge-triggered; see
+    # ready_pose.py.
+    for name in (LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     # Recoil. RecoilDebt/RecoilYawDebt are what has been kicked and not yet
     # given back, recovered toward zero every frame; RecoilYawKick holds the
     # one draw of the sideways component for the frame it is fired on, because
@@ -233,9 +236,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         # somehow never ran leaves the look working rather than dead.
         "BaseYawScale": 2.5,
         "BasePitchScale": -2.5,
-        # Matches Sprinting, so the first frame sees no edge and does not
+        # The two match, so the first frame sees no edge and does not
         # re-equip for nothing.
-        "PoseSprinting": False,
+        LOWERED_VAR: False,
+        POSE_LOWERED_VAR: False,
+        RAISE_FORCED_VAR: False,
         "ReloadTake": 0,
         TRIGGER_SPENT: False,
         OWNER_DEAD_VAR: False,

@@ -14,10 +14,11 @@ the ground; this probe is what caught it.)
 
 import unreal
 
+from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.skin import SKIN_ADVENTURER
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, "Stance")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, "Stance"), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
 
 SETTLE_S = 0.6
 
@@ -62,6 +63,9 @@ def probe(p):
         unreal.VisibilityBasedAnimTickOption.ALWAYS_TICK_POSE_AND_REFRESH_BONES,
         unreal.PropertyAccessChangeNotifyMode.NEVER)
     anim = mesh.get_anim_instance()
+    # The gun is held up, as an aim key holds it (no key can be injected): at
+    # rest, standing or crouched, it is carried lowered. Prone keeps it up.
+    p.set(wc, RAISE_FORCED_VAR, True)
     yield 0.5
     stand = _heights(player)
     stand_gap = _hand_gap(player)
@@ -86,9 +90,16 @@ def probe(p):
     p.check("prone: nothing of the body is under the ground",
             min(lying.values()) > -5.0, f"lowest {min(lying.values()):.1f}")
     gap = _hand_gap(player)
-    p.check("prone with the shotgun: both hands are up off the ground, as far "
-            "apart as standing (the gun is still in both)",
+    p.check("prone with the shotgun raised: both hands are up off the ground, as "
+            "far apart as standing (the gun is still in both)",
             min(lying["hand_l"], lying["hand_r"]) > 15.0 and abs(gap - stand_gap) < 3.0,
             f"hands {lying['hand_l']:.0f} / {lying['hand_r']:.0f} cm up, "
             f"{stand_gap:.1f} -> {gap:.1f} cm apart")
+    p.set(wc, RAISE_FORCED_VAR, False)
+    yield SETTLE_S
+    crawl = _heights(player)
+    p.check("...and with no key held too: prone, the gun is not lowered",
+            min(crawl["hand_l"], crawl["hand_r"]) > 15.0
+            and abs(_hand_gap(player) - stand_gap) < 3.0,
+            f"hands {crawl['hand_l']:.0f} / {crawl['hand_r']:.0f} cm up")
     p.set(wc, "Stance", 0)

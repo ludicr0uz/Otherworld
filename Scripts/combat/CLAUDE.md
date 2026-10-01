@@ -12,6 +12,9 @@ The defaults are all rebindable on the settings screen:
   **eats or drinks** a held consumable, with the **knife** in hand it **slashes**
   (`weapon_component/knife.py`), and with **empty hands it punches**
   (`weapon_component/punch.py`; both in `docs/firing_gate.md`).
+- A gun is **carried lowered** (the jog's own arms, the gun in the hand) and comes up into its
+  ready pose while an aim key or the guard is held, and for a shot or a reload
+  (`weapon_component/carry.py`, `docs/aiming.md`).
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
   **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **V** held shows the throw's arc and a click throws (see below).
@@ -166,7 +169,7 @@ touches the fire graph doesn't pay for the notes on blood.
 
 | file | covers |
 |---|---|
-| `docs/aiming.md` | shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `sway.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
+| `docs/aiming.md` | the carry (a gun rides lowered until aimed or fired: `weapon_component/carry.py`), shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `sway.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
 | `docs/stance.md` | sprint, blocking (the guard's quarter damage and stamina cost), crouch and prone (`weapon_component/stance.py`), the procedural body poses (`body_pose.py`, `weapon_component/pose_weights.py`) |
 | `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_bodies.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
 | `docs/skin.md` | the player's body: the Meshy mesh and its retarget (`skin.py`) |
@@ -188,6 +191,9 @@ These are feel checks a headless run can't do:
 - sprint held with an aim key until the stamina runs out: no key can be pressed in a headless
   game, so the latch setting (`SprintSpent`, `docs/stance.md`) is checked on the graph only.
   Whether needing to let go of Shift before the next sprint feels right;
+- the carry (`carry_tuning.py`): how a rifle reads jogging in one hand with the arm's swing
+  (there is no two-handed carry clip), whether the gun coming up in 0.25 s behind the first
+  shot reads, and whether 1.5 s is the right time to keep it up after the last one;
 - the knife: how the keyed slash reads (`knife_anim.SLASH_KEYS`), whether the blow at
   `COMBAT.knife_impact_s` lines up with the cut, how the knife sits in the fist (the pistol
   grip's solve), and how the two hold poses read (`hold_pose.HOLD_*_DIRS`; the wrist keeps the
@@ -222,7 +228,7 @@ These are feel checks a headless run can't do:
 - the stance clips in motion (`stance_clips.py`): the crouched walk covers about 55 cm/s and
   plays at 2x, so at the crouch's 270 cm/s the feet slide; the crawl is the UAL's face-down
   swim (no crawl clip exists in the packs), a two-armed pull and a frog kick, which may read
-  as swimming on dry ground; armed, only its legs show under the aim. A prone body is longer
+  as swimming on dry ground; with a gun in hand, only its legs show under the aim (prone keeps the gun up). A prone body is longer
   than its capsule, so it can clip into slopes and walls. On the mannequin fallback the
   procedural poses still apply, with the walk cycle on top of them;
 - the bullet impact on the scenery (`bullet_impact.py`): whether 1-3 cm lit chips and dust

@@ -54,8 +54,10 @@ _author_* fragment per concern, each in its own module:
               (what a block does to a swing is npc/block.py)
   stance      crouch/prone toggles -> Stance; UE's crouch at two heights, the
               crouched speed, and the footsteps' StepVolume/StepNoise
+  carry       Lowered, once a frame: sprinting, or a gun that no aim key,
+              guard, shot or reload is holding up (the ready pose is off)
   ready_pose  restart the ready pose after it is interrupted; re-equip on the
-              frames the sprint starts or stops (the pose's sprint edge)
+              frames Lowered changes (the pose's edge)
   tick        the Tick that calls all of the above
 
 BP_WeaponComponent event graph:

@@ -198,7 +198,9 @@ editor.
 - **The player:** a Meshy-generated adventurer holding an issued shotgun, pistol and knife. The SMG,
   assault rifle and sniper are found as drops. The rifle is the FPS Weapon Bundle's AK 47 and
   the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
-  Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). The player can sprint, aim over the shoulder or down
+  Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). A gun is carried lowered, in the hand of the stock idle and jog, and comes up into its
+  ready pose for an aim, a shot, a reload or the guard (`combat/weapon_component/carry.py`).
+  The player can sprint, aim over the shoulder or down
   the sights (the sniper's is its scope), reload and eat, block (F; a swing from the front does a
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
   `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library

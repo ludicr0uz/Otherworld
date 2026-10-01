@@ -17,6 +17,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     noise, SHOT_VOLUME_CM (how loud each gun is)
   sway_tuning       the sight sway's numbers (SWAY_*): angles, periods, the
                     stance's steadying, the component's variables, sway_at()
+  carry_tuning      the carry's numbers and names: how long a shot keeps the
+                    gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   throw_tuning      the throw's numbers (THROW_*): speed, angle, launch point,
                     the arc's and the flight's gravity, dots, landing
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable

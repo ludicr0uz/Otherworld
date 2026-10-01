@@ -32,6 +32,7 @@ import shutil
 
 import unreal
 
+from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.sway_tuning import (
     SWAY_CROUCH_SCALE, SWAY_MIN_STEP_DEG, SWAY_PITCH_VAR, SWAY_PRONE_SCALE, SWAY_TIME_VAR,
@@ -45,7 +46,8 @@ from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)] + [
     (WEAPON_COMP_BP_PATH, v) for v in
-    ("EquippedIndex", "NeedsRefresh", "Stance", "SightBlend", SWAY_TIME_VAR)]
+    ("EquippedIndex", "NeedsRefresh", "Stance", "SightBlend", SWAY_TIME_VAR,
+     RAISE_FORCED_VAR)]
 ML = unreal.MathLibrary
 # weapon_specs needs the editor (it solves the grips), so the sight lines are
 # read where they are written. Class name -> the gun's row.
@@ -209,6 +211,9 @@ def _run(p):
     hud = _live_hud(p)
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
     cam = p.pawn().get_component_by_class(unreal.CameraComponent)
+    # The sights are held up by writing SightBlend, with no aim key down:
+    # this is what the key would do to the carry (the gun is raised).
+    p.set(wc, RAISE_FORCED_VAR, True)
     p.set(hud, DEV_GUNS_REQUEST_VAR, True)
     yield lambda: not p.get(hud, DEV_GUNS_REQUEST_VAR)
     bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]

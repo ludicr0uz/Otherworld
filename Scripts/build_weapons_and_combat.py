@@ -19,7 +19,7 @@ combat.install._uninstall_old_shotgun) -- keep the old script only as history.
 WHAT THIS BUILDS
 ----------------
 /Game/Weapons
-  M_Gunmetal, M_GunWood, M_Blood   flat materials
+  M_Gunmetal, M_GunWood, M_Blood, M_ImpactChip, M_ImpactDust   flat materials
   Audio/A_ShotgunFire, A_PistolFire  imported from assets/generated/sounds
   BP_WeaponItem     Actor. The base class: every variable the weapon component
                     reads lives here, so the component casts once and never
@@ -33,7 +33,8 @@ WHAT THIS BUILDS
   Anims/A_HoldItem, A_HoldKnife  how food and the knife are held (combat/hold_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
   BP_WeaponComponent  inventory of 5, equip/switch/fire/drop/pick up
-  BP_BloodSplash    short-lived red burst spawned at each impact
+  BP_BloodSplash    short-lived red burst spawned at each impact on a body
+  BP_BulletImpact   short-lived chips and dust where a bullet hits the scenery
   BP_ThrowArc, M_ThrowArc  the dotted arc drawn while a throw is aimed
 """
 
@@ -57,6 +58,7 @@ from combat.stance_clips import (                                 # noqa: E402
     patch_stance_clips, unpatch_stance_clips,
 )
 from combat.blood import build_blood_splash                       # noqa: E402
+from combat.bullet_impact import build_bullet_impact              # noqa: E402
 from combat.combat_trace import build_combat_trace_switch         # noqa: E402
 from combat.footsteps import build_footstep_component             # noqa: E402
 from combat.game_state import ensure_game_mode_vars               # noqa: E402
@@ -122,6 +124,7 @@ def main():
     knife_clip = build_knife_slash(skin)
 
     blood_bp = build_blood_splash()
+    impact_bp = build_bullet_impact()
     # Before the health component: its BeginPlay casts to the GameMode, and a
     # cast node only appears in the palette for a class that is already loaded.
     ensure_game_mode_vars()
@@ -131,7 +134,7 @@ def main():
     throw_arc_bp = build_throw_arc()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], knife_bp, knife_clip,
-                                       blood_bp, throw_arc_bp)
+                                       blood_bp, impact_bp, throw_arc_bp)
 
     # After the weapon component, because the pickup's graph casts to it -- and
     # therefore after the health component that spawns it, which is why the

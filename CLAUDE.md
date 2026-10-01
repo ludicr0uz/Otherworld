@@ -26,7 +26,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
 
    | system | entry points | read |
    |---|---|---|
-   | weapons, inventory, health, death, blood, audio, hit boxes | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
+   | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
    | graphics menu, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, forage | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
@@ -208,7 +208,8 @@ editor.
   a 10-slot inventory. The guard is a procedural pose (no clip exists), as are crouch and prone on the mannequin fallback.
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
-  The pistol reloads every 8 shots from an endless reserve.
+  The pistol reloads every 8 shots from an endless reserve. A bullet that hits a body throws
+  blood; one that hits the scenery throws chips and dust off the surface (`BP_BulletImpact`).
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). They respawn 75–100 m away and leave ragdoll corpses.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs

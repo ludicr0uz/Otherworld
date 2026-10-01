@@ -41,7 +41,8 @@ SHARED AUTHORING HELPERS
                     (the shot and the player's footsteps call it)
 
 ASSETS AND PATCHES
-  materials         flat materials (gunmetal, wood, blood, brass)
+  materials         flat materials (gunmetal, wood, blood, brass, impact chip
+                    and dust)
   audio             sound names, attenuation profiles, import + link
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
   aim_pitch         the player's anim BP: AimPitch tips the upper body (two
@@ -56,7 +57,11 @@ ASSETS AND PATCHES
                     and GripLocation (the handle seated in the fist)
   settings_savegame BP_Settings
   weapon_items      BP_WeaponItem and one child per weapon
-  blood             BP_BloodSplash
+  burst             build_burst: the actor of small pieces thrown off a hit
+                    under drag and gravity (the graph both bursts below fly)
+  blood             BP_BloodSplash: the droplet layout, what a body throws
+  bullet_impact     BP_BulletImpact: the chips and dust layout, what the
+                    scenery throws where a bullet hits it
   ammo_pickup       BP_AmmoPickup
   throw_arc         BP_ThrowArc + M_ThrowArc: the dotted arc a throw is aimed
                     with (one instanced mesh of emissive spheres)

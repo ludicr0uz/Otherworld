@@ -34,6 +34,7 @@ from combat.weapon_component.punch import (
 )
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 from combat.weapon_component.stance import STANCE_VAR, STAND
+from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 from combat.weapon_component.throw import (
     THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR,
     THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR,
@@ -44,7 +45,7 @@ from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
 
 
 def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
-                           blood_bp, throw_arc_bp, rebuild=True):
+                           blood_bp, impact_bp, throw_arc_bp, rebuild=True):
     # Cast nodes only appear in the palette for classes that are already loaded,
     # and this graph casts to all three. Without these loads
     # create_node_from_name returns None and the failure reads as a typo in the
@@ -156,8 +157,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
     # cannot be added to an array of BP_WeaponItem.
     for name in ("ShotgunClass", "PistolClass", "KnifeClass", "ItemClass"):
         _declare(ed, name, BEL.get_class_reference_type(item_class))
-    _declare(ed, "BloodClass",
-             BEL.get_class_reference_type(unreal.Actor.static_class()))
+    for name in ("BloodClass", IMPACT_CLASS_VAR):
+        _declare(ed, name,
+                 BEL.get_class_reference_type(unreal.Actor.static_class()))
     # The empty-handed punch (punch.py): its clip on the worn rig, the press
     # queued for the swing, the cooldown, and the blow still to land.
     _declare(ed, PUNCH_ANIM_VAR, BEL.get_object_reference_type(
@@ -242,6 +244,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         "KnifeClass": BEL.generated_class(knife_bp),
         "ItemClass": item_class,
         "BloodClass": BEL.generated_class(blood_bp),
+        IMPACT_CLASS_VAR: BEL.generated_class(impact_bp),
         PUNCH_ANIM_VAR: _must_load(player_skin().punch),
         PUNCH_QUEUED_VAR: False,
         PUNCH_PENDING_VAR: False,

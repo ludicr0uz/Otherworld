@@ -168,7 +168,7 @@ touches the fire graph doesn't pay for the notes on blood.
 |---|---|
 | `docs/aiming.md` | shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
 | `docs/stance.md` | sprint, blocking (the guard's quarter damage and stamina cost), crouch and prone (`weapon_component/stance.py`), the procedural body poses (`body_pose.py`, `weapon_component/pose_weights.py`) |
-| `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_reaction.py`), blood (`blood.py`) |
+| `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
 | `docs/skin.md` | the player's body: the Meshy mesh and its retarget (`skin.py`) |
 | `docs/audio.md` | gun and creature sounds (`audio.py`, `Scripts/fetch_weapon_sounds.py`) |
 | `docs/firing_gate.md` | what may fire and when, eating through the fire button (`weapon_component/consume.py`), debug mode |
@@ -216,4 +216,7 @@ These are feel checks a headless run can't do:
   as swimming on dry ground; armed, only its legs show under the aim. A prone body is longer
   than its capsule, so it can clip into slopes and walls. On the mannequin fallback the
   procedural poses still apply, with the walk cycle on top of them;
+- the bullet impact on the scenery (`bullet_impact.py`): whether 1-3 cm lit chips and dust
+  read at all at range and at night (they are not emissive, as blood is not), and whether
+  0.6 s is long enough to see where a round landed. It leaves no mark behind;
 - the shotgun's index finger along the receiver, 4 cm above the guard (`docs/aiming.md`).

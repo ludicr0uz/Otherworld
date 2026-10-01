@@ -1,6 +1,7 @@
 """A pellet that connected: blood, damage, the hit zone's multiplier and the
-debug-mode damage readout. firing.py traces the pellets and calls in here on
-a hit.
+debug-mode damage readout -- or, on anything without health, the surface's
+chips and dust (surface_impact.py). firing.py traces the pellets and calls in
+here on a hit.
 """
 
 from combat.blood import (
@@ -28,14 +29,16 @@ from combat.nodes import (
 from combat.paths import HEALTH_CLASS_PATH
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
+from combat.weapon_component.surface_impact import _author_surface_impact
 
 
 def _author_impact(ed, brk, held, exec_in, x0, y0):
     """A pellet that hit something: blood, then subtract the damage.
 
-    Both are behind the health cast, so trees and terrain cost nothing and
-    produce no blood -- only things carrying BP_HealthComponent bleed. The
-    damage is the weapon's, scaled by where on the body it landed (see
+    Both are behind the health cast, so trees and terrain produce no blood
+    -- only things carrying BP_HealthComponent bleed. What the cast refuses
+    gets the bullet impact instead (_author_surface_impact). The damage is
+    the weapon's, scaled by where on the body it landed (see
     _author_hit_zone), using the target's own hit-box tables.
     """
     comp = _at(_node(ed, FN_GET_COMP), x0, y0 + 260)
@@ -79,6 +82,8 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(splash, "SpawnTransform"))
     _set(splash, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(BEL.find_then_pin(cast), _pin(splash, "execute"))
+    chipped = _author_surface_impact(
+        ed, where, _pin(cast, "CastFailed", is_input=False), x0 + 800, y0 - 420)
 
     zoned, zone_nodes, x_zone = _author_hit_zone(
         ed, brk, BEL.find_then_pin(splash), x0 + 1080, y0)
@@ -156,6 +161,11 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
         [comp, cast, blood_cls, where, facing, splash, spray_dmg, ratio, spray,
          spray_v, get_h, sub, clamp, set_h, now, stamp, blame,
          from_where])
+    ed.add_comment_to_nodes(
+        "No health component: the pellet hit the scenery, which chips and "
+        "dusts where a body would bleed. The blood's own transform -- impact "
+        "point, surface normal, scale off the round's damage.",
+        chipped)
     ed.add_comment_to_nodes(
         f"Hit boxes: the pellet's own line is traced again against the target's "
         f"physics-asset bodies alone, and the bone it strikes picks the "

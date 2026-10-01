@@ -1,10 +1,12 @@
-"""The flat materials weapons and blood are drawn with.
+"""The flat materials weapons, blood and bullet impacts are drawn with.
 """
 
 import unreal
 
 from combat.graph import _assets, _log, _must_load
-from combat.paths import MAT_BLOOD, MAT_BRASS, MAT_METAL, MAT_WOOD
+from combat.paths import (
+    MAT_BLOOD, MAT_BRASS, MAT_IMPACT_CHIP, MAT_IMPACT_DUST, MAT_METAL, MAT_WOOD,
+)
 
 
 # ─── Materials and sounds ────────────────────────────────────────────────────
@@ -21,6 +23,14 @@ BLOOD_BASE_COLOUR = (0.150, 0.014, 0.012)
 # the wrong one -- a glowing droplet cannot sit in the scene's lighting, it only
 # sits on top of it.
 BLOOD_ROUGHNESS = 0.22
+# What a bullet knocks off the scenery (bullet_impact.py). The level is a
+# forest: what a round hits is soil, bark and rock, so the chips are a dark
+# earth brown and the dust the pale grey-tan of the same stuff ground fine.
+# Dry and dull, both, which is what tells them from blood at a glance, and lit
+# like blood, for blood's reason.
+IMPACT_CHIP_COLOUR = (0.060, 0.042, 0.028)
+IMPACT_DUST_COLOUR = (0.360, 0.310, 0.240)
+IMPACT_ROUGHNESS = 0.95
 
 
 def build_materials():
@@ -34,6 +44,8 @@ def build_materials():
             (MAT_WOOD, ((0.115, 0.062, 0.030), 0.0, 0.62, None)),
             # Deliberately NOT emissive -- see BLOOD_BASE_COLOUR.
             (MAT_BLOOD, (BLOOD_BASE_COLOUR, 0.0, BLOOD_ROUGHNESS, None)),
+            (MAT_IMPACT_CHIP, (IMPACT_CHIP_COLOUR, 0.0, IMPACT_ROUGHNESS, None)),
+            (MAT_IMPACT_DUST, (IMPACT_DUST_COLOUR, 0.0, IMPACT_ROUGHNESS, None)),
             # Shells on the forest floor, at night, under trees. Emissive
             # because without it a dropped pickup is a black cylinder on black
             # ground and nobody ever finds it -- a gameplay affordance, which

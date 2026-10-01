@@ -25,6 +25,8 @@ _author_* fragment per concern, each in its own module:
   tracer      debug mode: the line each pellet flew, off the trace's own hit
               result (red to an impact, blue out to the range), and a point
   impact      a pellet that connected: blood, damage, hit zones, debug readout
+  surface_impact  a pellet that hit something with no health: BP_BulletImpact,
+              off the health cast's failed arm, at the blood's transform
   inventory   equip, drop, BeginPlay loadout
   pickup      the pick-up key takes ONE Dropped item in reach: the one nearest
               AimPoint, the point the reticle rests on
@@ -87,6 +89,7 @@ BP_WeaponComponent event graph:
         one draw in AimSpread  -> ShotDirection
         N pellets in a cone    -> LineTraceSingle each
         hit -> BP_BloodSplash at the impact + Health -= Damage
+               (no health component: BP_BulletImpact there instead)
 
 THE HYBRID AIM (why there are two traces and not one)
 ------------------------------------------------------

@@ -1,4 +1,4 @@
-# Combat: health, respawn, dying, hit boxes and blood
+# Combat: health, respawn, dying, hit boxes, blood and bullet impacts
 
 Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
@@ -132,18 +132,37 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - **Debuff drain:** `debuff_drain.py` lowers `PrevHealth` along with `Health`, so starving is not
   read as a hit.
 
-## Blood (`blood.py`)
+## Blood (`blood.py`) and bullet impacts (`bullet_impact.py`)
 
-- **19 lit droplets:** 14 of spray in a 34° cone plus 5 slow ones.
+A pellet that connects spawns one of two bursts, picked by the fire graph's health cast
+(`weapon_component/impact.py`): a hit actor with a `BP_HealthComponent` bleeds
+(`BP_BloodSplash`), anything else (terrain, trees, rocks) chips (`BP_BulletImpact`, off the
+cast's failed arm, `weapon_component/surface_impact.py`). Never both.
+
+- **Both are `burst.build_burst` actors:** the same graph, so a change to how pieces fly is
+  made once. `blood.py` and `bullet_impact.py` own only what is thrown: a seeded layout of
+  `burst.Piece`s (velocity, scale, mesh, material, turn) and the numbers.
+- **Blood: 19 lit droplets,** 14 of spray in a 34° cone plus 5 slow ones.
   - `M_Blood` is linear `(0.150, 0.014, 0.012)`, roughness 0.22, not emissive.
-- **Flight uses the closed form of `dv/dt = g − k·v`** (k = 3.6/s, g = 980):
+- **Bullet impact: 16 lit pieces,** 10 chips (cubes, each built at its own turn, since a cube
+  shows its orientation) in a 58° cone at 150–494 cm/s, plus 6 slow grains of dust (spheres).
+  - `M_ImpactChip` is a dark earth brown and `M_ImpactDust` its pale grey-tan, both roughness
+    0.95 and not emissive: dry and dull is what tells them from blood.
+  - 0.6 s, drag 2.6/s. It leaves no decal or mark behind.
+- **Flight uses the closed form of `dv/dt = g − k·v`** (blood: k = 3.6/s, g = 980):
   - `A(t) = (1 − e^(−kt))/k` and `B(t) = (t − A)/k`;
   - `local = Velocity·A + Fall·B`;
-  - fade `clamp((0.45 − Age)/0.14, 0, 1)`.
-- **Launch velocity is baked into each droplet's build-time relative location** (÷100). The layout
-  comes from a fixed seed, so the verifier recomputes it.
-- **The impact spawns it rotated to the surface normal** (`MakeRotFromX`), scaled by
-  `clamp(Damage/24, 0.65, 1.6)`.
+  - fade `clamp((0.45 − Age)/0.14, 0, 1)` (the impact: 0.6 and 0.18).
+- **Launch velocity is baked into each piece's build-time relative location** (÷100). The layouts
+  come from fixed seeds, so the verifier recomputes them.
+- **One transform spawns either burst:** at the impact point, rotated to the surface normal
+  (`MakeRotFromX`), scaled by `clamp(Damage/24, 0.65, 1.6)`.
 - **Not Niagara:** Python can't build or retune an emitter stack in 5.8.
 - **Trap:** a Kismet math node's **A** pin won't hold a literal. Keep constants on B, e.g.
   `(e^(−kt) − 1)/−k`.
+- **Trap:** a wide cone's speed draw. `burst.throw`'s `bias` under 1 leans fast (blood's 0.5),
+  over 1 leans slow (the chips' 1.4); the chips at 0.6 all left within 2x of each other.
+- **In game:** `probes/probe_bullet_impact.py` fires a shell into the ground (a burst per
+  pellet, each on its surface and facing out of it, no blood) and one into a wanderer (blood,
+  and never more bursts than pellets). A hip-fired shell is a wide cloud: pellets that miss
+  the ground carry on to a trunk, so a probe must not expect them round the reticle.

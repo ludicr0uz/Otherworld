@@ -10,6 +10,7 @@ from graphics_menu import loot_consts as LC
 from graphics_menu import umg_consts as UC
 from graphics_menu.loot_tick import loot_defaults
 from graphics_menu.umg_checks import _tree
+from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.pose_weights import SEARCHING_VAR
 from loot.consts import (
     BODY_ARRAYS, LOOT_ICONS_VAR, LOOT_RADIUS, LOOT_TINTS_VAR, LOOT_VAR,
@@ -156,6 +157,19 @@ def check_loot(check, bp, nodes):
           len(polls) == 1 and any(
               _title(n) == f"Set {LC.LOOT_OPEN_VAR}" and _feeders(n, LC.LOOT_OPEN_VAR)
               for n in nodes), str(len(polls)))
+    dying = [n for n in nodes if "Condition" in _pins(n)
+             and [_title(f) for f in _feeders(n, "Condition")] == [f"Get {OWNER_DEAD_VAR}"]]
+    shuts = [PIN.get_owning_node(q) for n in dying
+             for q in BEL.find_then_pin(n).list_connected_pins()]
+    goes_on = [PIN.get_owning_node(q) for n in dying
+               for q in BEL.find_else_pin(n).list_connected_pins()]
+    check(f"a dead player searches nobody: the weapon component's {OWNER_DEAD_VAR} "
+          "shuts the window before any loot key is polled",
+          len(dying) == 1
+          and [(_title(n), _value(n, LC.LOOT_OPEN_VAR)) for n in shuts]
+          == [(f"Set {LC.LOOT_OPEN_VAR}", "false")]
+          and [_title(n) for n in goes_on] == [f"Set {LC.LOOT_BAG_FULL_VAR}"],
+          f"{[_title(n) for n in shuts + goes_on]}")
     asks = [n for n in nodes if _title(n) == f"Set {LC.LOOT_TAKE_VAR}"]
     check("Enter or a click on a row raises the take and Tick lowers it (and a "
           "lost body clears it)",

@@ -67,6 +67,25 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     `OpenLevel`; a level opened paused stays paused.
   - Restart is polled from `DrawHUD`, which runs while paused.
   - `FullBodySlot` is spliced into `ABP_Unarmed` and asserted, though nothing plays into it yet.
+- **The dead do nothing** (`weapon_component/dead.py`): the weapon component's Tick starts at a
+  gate on its owner's health component, `Dead OR Health <= 0`, and a dead owner gets none of
+  it. Through the 2.2 s collapse the Tick used to poll every key: a dead player fired,
+  reloaded, switched, threw and ate.
+  - It is one gate at the head, not a term in each action's condition. A new action added to
+    the Tick is covered without knowing about it.
+  - `Health <= 0` as well as `Dead`, because `Dead` is written by the health component's own
+    Tick: on the frame of the killing blow either component may tick first.
+  - The dead arm lets go of what the Tick was holding (`Aiming`, `SightAiming`, `Sprinting`,
+    `Blocking`), snaps the zoom and the camera home, and shows a body and gun a scope had
+    hidden. It snaps because the eases live in the Tick that no longer runs.
+  - The verifier's `wg` is the **living** Tick. `fixtures.py` keeps the dead arm apart as
+    `wg_dead`, so "written once" checks stay about the living Tick; `verify/dead.py` checks
+    the gate and the arm.
+  - `OwnerDead` is the gate's answer, for others that act for the player. The HUD's loot
+    window reads it (`graphics_menu/loot_tick.py`): a dying player searches nobody.
+  - `FireForced` is a probe's stand-in for the fire key's press.
+    `probes/probe_dead_no_actions.py` fires with it alive, and cannot dead.
+  - A wanderer has the same rule in its steps (`Scripts/npc/CLAUDE.md`, "The corpse state").
 - **Combat trace:**
   - Toggle it in the console with `ke * CombatTraceOn` / `CombatTraceOff`, or set
     `COMBAT_TRACE_DEFAULT`.

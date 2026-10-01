@@ -1,6 +1,6 @@
 """The corpse state: the first thing the heartbeat checks once it has a pawn.
 
-    gate(possessed) --> pawn's BP_HealthComponent --> [Dead?]
+    gate(possessed) --> pawn's BP_HealthComponent --> [Dead, or at 0 HP?]
                           no, or no component --> on (stats, patrol/hunt, melee)
                           yes --> Corpse = true --> StopMovement --> log
                                   --> BrainComponent.StopLogic: the tree ends
@@ -16,15 +16,98 @@ So death is now a state the loop itself checks, on every pass, before anything
 else can run. It runs in the tree's Pulse step (npc/steps.py), and the corpse
 branch stops the Behavior Tree itself (StopLogic): nothing is left to run, so a
 corpse costs nothing more for the rest of its lifespan.
+
+That left the rest of a pass. The tree runs one step a frame, so a wanderer
+killed after its Pulse still had that pass's Chase and Swing to come: a body
+already on the ground could land one more blow. So every other step asks the
+same question before it does anything (_author_alive_gate, which steps.py puts
+at the head of each step event): a dead pawn's step fails without acting, the
+pass falls through to the tree's Idle, and the next Pulse ends the tree.
+
+Dead is "the health component says Dead, OR its Health is at zero" in both
+gates (_dead_pin): Dead is written by the health component's own Tick, which
+on the frame of the killing blow may not have run yet.
 """
 
 from combat.game_state import NPC_ID_VAR
 from npc.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from npc.nodes import (
     FN_CONCAT, FN_DISPLAY_NAME, FN_GET_COMP, FN_GET_PAWN, FN_INT_TO_STR,
-    FN_PRINT, FN_STOP_LOGIC, FN_STOP_MOVEMENT, NODE_CAST_HEALTH,
+    FN_IS_VALID, FN_LE_FF, FN_OR, FN_PRINT, FN_STOP_LOGIC, FN_STOP_MOVEMENT,
+    NODE_CAST_HEALTH,
 )
-from npc.paths import CORPSE_LOG_PREFIX, CORPSE_VAR, HEALTH_CLASS_PATH
+from npc.paths import (
+    CORPSE_LOG_PREFIX, CORPSE_VAR, HEALTH_CLASS_PATH, STEP_RESULT_VAR,
+)
+
+
+def _dead_pin(ed, health_out, keep, x, y):
+    """Dead OR Health <= 0, off a health component already cast."""
+    dead = keep(_at(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH), x, y))
+    _connect(health_out, _pin(dead, "self"))
+    hp = keep(_at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
+                  x, y + 140))
+    _connect(health_out, _pin(hp, "self"))
+    spent = keep(_at(_node(ed, FN_LE_FF), x + 240, y + 140))
+    _connect(_pin(hp, "Health", is_input=False), _pin(spent, "A"))
+    _set(spent, "B", 0.0)
+    either = keep(_at(_node(ed, FN_OR), x + 480, y))
+    _connect(_pin(dead, "Dead", is_input=False), _pin(either, "A"))
+    _connect(_pin(spent, "ReturnValue", is_input=False), _pin(either, "B"))
+    return _pin(either, "ReturnValue", is_input=False)
+
+
+def _author_alive_gate(ed, exec_in, x0, y0):
+    """The head of a step event: a step whose pawn is gone or dead fails here.
+
+        [pawn valid?] no --> StepResult = false
+          yes --> pawn's BP_HealthComponent --> [dead?] yes --> StepResult = false
+                    no, or no component --> StepResult = false --> the step
+
+    The living arms meet in a StepResult write too, so the step still hangs
+    off one exec pin; it is only the default, and every exit of the step
+    writes its own. Returns that pin.
+    """
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    def result(x, y):
+        node = keep(_at(ed.add_set_member_variable_node(STEP_RESULT_VAR), x, y))
+        _set(node, STEP_RESULT_VAR, "false")
+        return node
+
+    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 240))
+    pawn_out = _pin(pawn, "ReturnValue", is_input=False)
+    there = keep(_at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 240))
+    _connect(pawn_out, _pin(there, "Object"))
+    possessed = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+    _connect(_pin(there, "ReturnValue", is_input=False), _pin(possessed, "Condition"))
+    _connect(exec_in, _pin(possessed, "execute"))
+
+    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 480, y0 + 240))
+    _connect(pawn_out, _pin(comp, "self"))
+    _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
+    health = keep(_at(_palette(ed, NODE_CAST_HEALTH), x0 + 740, y0))
+    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(health, "Object"))
+    _connect(BEL.find_then_pin(possessed), _pin(health, "execute"))
+    health_out = _loose_pin(health, "AsBPHealthComponent", is_input=False)
+    is_dead = keep(_at(ed.add_branch_node(), x0 + 1500, y0))
+    _connect(_dead_pin(ed, health_out, keep, x0 + 1000, y0 + 240),
+             _pin(is_dead, "Condition"))
+    _connect(BEL.find_then_pin(health), _pin(is_dead, "execute"))
+
+    refused = result(x0 + 1760, y0 + 300)
+    _connect(BEL.find_else_pin(possessed), _pin(refused, "execute"))
+    _connect(BEL.find_then_pin(is_dead), _pin(refused, "execute"))
+    alive = result(x0 + 1760, y0)
+    _connect(BEL.find_else_pin(is_dead), _pin(alive, "execute"))
+    _connect(_pin(health, "CastFailed", is_input=False), _pin(alive, "execute"))
+    ed.add_comment_to_nodes(
+        "Dead, or at 0 HP, or no pawn: this step fails and does nothing.", made)
+    return BEL.find_then_pin(alive)
 
 
 def _author_corpse_gate(ed, exec_in, x0, y0):
@@ -54,11 +137,9 @@ def _author_corpse_gate(ed, exec_in, x0, y0):
     _connect(exec_in, _pin(health, "execute"))
     health_out = _loose_pin(health, "AsBPHealthComponent", is_input=False)
 
-    dead = keep(_at(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH),
-                    x0 + 720, y0 + 240))
-    _connect(health_out, _pin(dead, "self"))
     is_dead = keep(_at(ed.add_branch_node(), x0 + 960, y0))
-    _connect(_pin(dead, "Dead", is_input=False), _pin(is_dead, "Condition"))
+    _connect(_dead_pin(ed, health_out, keep, x0 + 480, y0 + 240),
+             _pin(is_dead, "Condition"))
     _connect(BEL.find_then_pin(health), _pin(is_dead, "execute"))
 
     mark = keep(_at(ed.add_set_member_variable_node(CORPSE_VAR), x0 + 1200, y0))
@@ -104,7 +185,7 @@ def _author_corpse_gate(ed, exec_in, x0, y0):
     _connect(BEL.find_then_pin(say), _pin(stop, "execute"))
 
     ed.add_comment_to_nodes(
-        "Corpse state: if this wanderer's pawn is Dead, mark the controller a "
+        "Corpse state: if this wanderer's pawn is Dead or at 0 HP, mark the controller a "
         "corpse, stop its movement, log it once, and STOP the behaviour tree. "
         "Nothing after this -- patrol, chase, melee -- runs for a corpse.",
         made)

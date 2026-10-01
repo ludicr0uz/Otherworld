@@ -6,7 +6,9 @@ What it proves: possession starts this controller's own tree; the tree holds
 the priorities (Pulse first, Hunt only while the Blackboard says Aggro, the
 senses in the order hurt, sight, touch, sound, the patrol last); every step
 the tree names is an event on the controller; and every exit of every step
-writes StepResult, which is what the task finishes with.
+writes StepResult, which is what the task finishes with; and every step but
+Pulse starts at the alive gate (npc/corpse.py), so a dead pawn's step does
+nothing. That the gate shuts in the game is probes/probe_dead_no_actions.py.
 """
 
 import unreal
@@ -17,7 +19,7 @@ from npc.paths import (
     STEP_EVENT_PREFIX, STEP_PRESENT, STEP_PULSE, STEP_RESULT_VAR, STEP_STROLL,
     STEP_SWING, STEP_VAR, step_task_path, tree_path,
 )
-from npc.verify import BEL, PIN, _close, _drivers, _ins, _lit, _title, check
+from npc.verify import BEL, PIN, _close, _drivers, _ins, _lit, _sources, _title, check
 
 # The order a pre-order walk of the tree meets the steps in: the priorities.
 WANT_STEPS = ([STEP_PULSE, STEP_CHASE, STEP_SWING, STEP_PRESENT]
@@ -135,6 +137,35 @@ def _exits(start):
     return leaves
 
 
+def _after(pin):
+    return [PIN.get_owning_node(q) for q in PIN.list_connected_pins(pin)]
+
+
+def _fails(nodes):
+    """Is this one StepResult = false write, with nothing after it?"""
+    return (len(nodes) == 1 and _title(nodes[0]) == f"Set {STEP_RESULT_VAR}"
+            and _lit(nodes[0], STEP_RESULT_VAR) == "false"
+            and not _after(BEL.find_then_pin(nodes[0])))
+
+
+def _alive_gated(event):
+    """event -> [pawn valid?] -> health cast -> [Dead or 0 HP?], both refusals
+    failing the step without running anything."""
+    first = _after(BEL.find_then_pin(event))
+    if len(first) != 1 or _title(first[0]) != "Branch":
+        return False
+    cast = _after(BEL.find_then_pin(first[0]))
+    if len(cast) != 1 or "Health" not in _title(cast[0]):
+        return False
+    gate = _after(BEL.find_then_pin(cast[0]))
+    if len(gate) != 1 or _title(gate[0]) != "Branch":
+        return False
+    return ({"Get Dead", "Get Health"}
+            <= {_title(f) for f in _sources(gate[0], "Condition")}
+            and _fails(_after(BEL.find_then_pin(gate[0])))
+            and _fails(_after(BEL.find_else_pin(first[0]))))
+
+
 def check_controller_steps(ai_path):
     tag = ai_path.rsplit("/", 1)[-1]
     bp = _load(ai_path)
@@ -156,6 +187,11 @@ def check_controller_steps(ai_path):
                     if _title(leaf) != f"Set {STEP_RESULT_VAR}"})
     check(f"{tag}: every exit of every step writes {STEP_RESULT_VAR}", not loose,
           f"{loose[:4]}")
+    pulse = f"{STEP_EVENT_PREFIX}{STEP_PULSE}"
+    ungated = sorted(name for name, ev in events.items()
+                     if name != pulse and not _alive_gated(ev))
+    check(f"{tag}: every step but Pulse fails, doing nothing, for a pawn that is "
+          f"gone, Dead or at 0 HP", not ungated and len(events) > 1, f"{ungated}")
 
     task = _load(step_task_path(ai_path))
     check(f"{tag}: its step task exists", task is not None)

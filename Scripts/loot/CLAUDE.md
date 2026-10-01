@@ -38,6 +38,8 @@ The code is this package (`__init__.py` is the map) plus the HUD's `graphics_men
   within `LOOT_RADIUS` (250 cm) of the player, **measured to the mesh**: the capsule stays
   where the wanderer died, the ragdoll is what the player walks to. A dead player is the
   nearest body to itself, hence the pawn test.
+- **A dead player searches nobody.** Behind the weapon component cast, a Branch on its
+  `OwnerDead` (`combat/weapon_component/dead.py`) shuts the window and polls no loot key.
 - **Keys** (fixed, not binds): **Tab** opens and closes, **Up/Down** pick, **Enter** takes.
   The mouse cursor shows with the window: the row under it is picked, and a click takes
   (`graphics_menu/cursor.py`; DrawHUD raises the same `LootSel` / `LootTakeRequested`).

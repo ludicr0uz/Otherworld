@@ -25,6 +25,8 @@ and it never relies on a variable another section left behind.
   stance_clips  the crouch, crawl and kneel clips: the stance blends in the
               AnimGraph, the crouch down with the feet planted, the crawl on
               the ground, the kneel down for the stretch it is held over
+  dead        the dead gate at the head of the weapon component's Tick, and
+              what the dead arm lets go of (fixtures keeps that arm out of wg)
   block       the guard: its key, the Blocking stance, the fire gate refusing
   sprint      the sprint's latch: spent at zero Stamina until the key is let go
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
@@ -41,7 +43,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife",
+    "player_body", "blood", "hit_reactions", "ragdoll", "dead", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife",
     "hold_pose", "throw", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

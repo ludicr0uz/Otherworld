@@ -12,7 +12,8 @@ from combat.paths import (
     WEAPON_COMP_BP_PATH,
 )
 from combat.tuning import DEBUFF_DRAIN_HP_PER_S
-from combat.verify.common import BEL, PIN, by_pins, cdo, graph, load, num_pin
+from combat.verify.common import BEL, PIN, by_pins, cdo, graph, load, num_pin, pin_value
+from combat.weapon_component.dead import OWNER_DEAD_VAR
 
 _eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
 
@@ -25,7 +26,61 @@ _montages = by_pins(hg, "Asset", "SlotNodeName")
 wc = load(WEAPON_COMP_BP_PATH)
 w = cdo(wc)
 wc_cdo = cdo(wc)
-wg = graph(wc).list_all_nodes()
+
+
+
+def _is_exec(pin):
+    return "exec" in str(PIN.get_pin_type_display_string(pin)).lower()
+
+
+def exec_reach(pins):
+    """Every node the exec output ``pins`` run, directly or further on."""
+    seen, todo = {}, [PIN.get_owning_node(q) for p in pins
+                      for q in PIN.list_connected_pins(p)]
+    while todo:
+        n = todo.pop()
+        if n.get_path_name() in seen:
+            continue
+        seen[n.get_path_name()] = n
+        todo += [PIN.get_owning_node(q) for p in BEL.list_output_pins(n) if _is_exec(p)
+                 for q in PIN.list_connected_pins(p)]
+    return list(seen.values())
+
+
+def _dead_arm(nodes):
+    """The dead gate's True arm (weapon_component/dead.py): what it runs, and
+    the pure nodes that feed nothing else."""
+    marks = [n for n in nodes
+             if str(BEL.get_node_title(n)) == f"Set {OWNER_DEAD_VAR}"
+             and pin_value(n, OWNER_DEAD_VAR) == "true"]
+    arm = {n.get_path_name(): n for m in marks
+           for n in [m] + exec_reach(BEL.list_output_pins(m))}
+    grew = True
+    while grew:
+        grew = False
+        for n in list(arm.values()):
+            for p in BEL.list_input_pins(n):
+                for q in PIN.list_connected_pins(p):
+                    f = PIN.get_owning_node(q)
+                    if f.get_path_name() in arm or any(
+                            _is_exec(x) for x in BEL.list_all_pins(f)):
+                        continue
+                    users = [PIN.get_owning_node(u) for o in BEL.list_output_pins(f)
+                             for u in PIN.list_connected_pins(o)]
+                    if all(u.get_path_name() in arm for u in users):
+                        arm[f.get_path_name()] = f
+                        grew = True
+    return arm
+
+
+# The weapon component's Tick is two states (weapon_component/dead.py): the
+# living Tick, which is what every section but verify/dead.py reads as ``wg``,
+# and the dead arm, which lets go of what the living one holds. Kept apart so
+# "written once" stays a statement about the living Tick.
+_wg_all = graph(wc).list_all_nodes()
+_arm = _dead_arm(_wg_all)
+wg_dead = list(_arm.values())
+wg = [n for n in _wg_all if n.get_path_name() not in _arm]
 titles = [str(BEL.get_node_title(n)).replace("\n", " ") for n in wg]
 
 gm = load(GAME_MODE_BP_PATH)

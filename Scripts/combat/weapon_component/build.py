@@ -39,7 +39,8 @@ from combat.weapon_component.throw import (
     THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR,
     THROW_TIME_VAR, THROW_VELOCITY_VAR,
 )
-from combat.weapon_component.tick import _author_wc_tick
+from combat.weapon_component.dead import OWNER_DEAD_VAR
+from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
 
 
 def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
@@ -143,6 +144,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
     _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
     # The fire press that ate an item, until it is released; see consume.py.
     _declare(ed, TRIGGER_SPENT, BEL.get_basic_type_by_name("bool"))
+    # The dead gate's answer (dead.py), and a probe's stand-in for the fire key.
+    for name in (OWNER_DEAD_VAR, FIRE_FORCED_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     # The GameMode's DebugMode, cached at the moment of firing so the pellet
     # loop can branch on a plain bool instead of casting eight times.
     _declare(ed, DEBUG_MODE_VAR, BEL.get_basic_type_by_name("bool"))
@@ -226,6 +230,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         "PoseSprinting": False,
         "ReloadTake": 0,
         TRIGGER_SPENT: False,
+        OWNER_DEAD_VAR: False,
+        FIRE_FORCED_VAR: False,
         "RecoilDebt": 0.0,
         "RecoilYawDebt": 0.0,
         "RecoilYawKick": 0.0,

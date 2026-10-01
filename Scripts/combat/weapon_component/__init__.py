@@ -6,6 +6,8 @@ authors BeginPlay (inventory.py) and Tick (tick.py). Tick calls one
 _author_* fragment per concern, each in its own module:
 
   common      _prop, trace defaults, muzzle location (shared fragments)
+  dead        the dead gate at the head of Tick: an owner who is Dead or at
+              0 HP gets none of it; the aim, zoom and camera are let go
   aim         resolve the aim point every frame (camera trace, muzzle trace)
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom;
               the zoom, and the look and walk slowdowns it drives
@@ -58,7 +60,8 @@ BP_WeaponComponent event graph:
               --> spawn BP_Shotgun, BP_Pistol and BP_Knife into Inventory
               --> Equip(0)
 
-  [Tick] --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
+  [Tick] --> Branch owner Dead or at 0 HP                    --> nothing below runs
+         --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
                                         (or, if Held.Consumable, use it;
                                          if Held.Melee, slash with it;
                                          or, with empty hands, punch)

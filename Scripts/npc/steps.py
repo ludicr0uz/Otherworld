@@ -8,6 +8,7 @@ names and finishes with StepResult, which every exit of every step writes:
                  yes -> corpse gate (Dead: corpse, StopLogic, fail)   corpse.py
                      -> stats and voice                               stats.py
                      -> patrol setup, once per life -> succeed        patrol.py
+    every other step begins: [pawn gone, dead or at 0 HP?] fail      corpse.py
     BT_Chase   move order at the player -> run speed -> succeed       chase.py
     BT_Swing   in range and off cooldown? swing -> succeed            melee.py
     BT_PlayerPresent, BT_<Sense>..., BT_Stroll                        agro.py
@@ -19,7 +20,7 @@ task reads StepResult straight after calling it.
 from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S
 from npc.agro import _author_agro_steps, _declare_agro_vars
 from npc.chase import _author_chase
-from npc.corpse import _author_corpse_gate
+from npc.corpse import _author_alive_gate, _author_corpse_gate
 from npc.graph import BEL, _at, _connect, _log, _node, _pin, _set
 from npc.melee import _author_melee
 from npc.nodes import FN_GET_PAWN, FN_IS_VALID
@@ -38,16 +39,21 @@ class _Steps:
     def __init__(self, ed):
         self.ed = ed
 
-    def event(self, name, x, y):
-        """A new BT_<name> custom event; returns its exec output."""
+    def event(self, name, x, y, gated=True):
+        """A new BT_<name> custom event; returns the exec output its work
+        hangs off. That is behind the alive gate (corpse.py), drawn to the
+        event's left, unless ``gated`` is False: Pulse, whose own corpse gate
+        is what a dead pawn has to reach."""
         full = f"{STEP_EVENT_PREFIX}{name}"
-        node = _at(self.ed.add_custom_event_node(full), x, y)
+        node = _at(self.ed.add_custom_event_node(full), x - (2300 if gated else 0), y)
         title = str(BEL.get_node_title(node)).replace(" ", "")
         # A name still held by the skeleton class comes back suffixed, and the
         # task's call by name would then miss it.
         if full.replace(" ", "") not in title or f"{full}_" in title:
             raise RuntimeError(f"custom event {full!r} came back as {title!r}")
-        return BEL.find_then_pin(node)
+        if not gated:
+            return BEL.find_then_pin(node)
+        return _author_alive_gate(self.ed, BEL.find_then_pin(node), x - 2000, y)
 
     def result_node(self, value, x, y):
         node = _at(self.ed.add_set_member_variable_node(STEP_RESULT_VAR), x, y)
@@ -72,7 +78,8 @@ def _author_pulse(ed, steps, x0, y0):
     gate = _at(ed.add_branch_node(), x0 + 300, y0 - 200)
     _connect(_pin(possessed, "ReturnValue", is_input=False),
              _pin(gate, "Condition"))
-    _connect(steps.event(STEP_PULSE, x0, y0 - 200), _pin(gate, "execute"))
+    _connect(steps.event(STEP_PULSE, x0, y0 - 200, gated=False),
+             _pin(gate, "execute"))
     _connect(BEL.find_else_pin(gate), steps.result(False, x0 + 600, y0 - 60))
 
     # First thing with a pawn: is it a corpse? A dead wanderer's tree stops

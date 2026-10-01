@@ -18,6 +18,7 @@ from combat.weapon_component.common import _prop
 from combat.weapon_component.consume import (
     _author_trigger_latch, _author_use_gate,
 )
+from combat.weapon_component.dead import _author_dead_gate
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.knife import (
     _author_knife_press, _author_knife_swing,
@@ -40,6 +41,10 @@ from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
 from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.throw import _author_throw, _author_throw_key
+
+# A probe's stand-in for the fire key's press: no key can be injected into a
+# headless game (probes/probe_dead_no_actions.py). False in every real game.
+FIRE_FORCED_VAR = "FireForced"
 
 
 def _author_wc_tick(ed, tick):
@@ -87,6 +92,12 @@ def _author_wc_tick(ed, tick):
         _connect(b, _pin(n, "B"))
         return _pin(n, "ReturnValue", is_input=False)
 
+    # --- dead? ---------------------------------------------------------------
+    # Before everything, the passive fragments included: a dead owner gets
+    # none of this Tick (dead.py).
+    alive = _author_dead_gate(ed, owner_out, held, armed_out,
+                              BEL.find_then_pin(tick), 1040, -5200)
+
     # --- aim -----------------------------------------------------------------
     # First, and unconditionally: the reticle has to be right on the frames
     # where nothing is fired, which is nearly all of them. It also leaves
@@ -94,8 +105,7 @@ def _author_wc_tick(ed, tick):
     # --- recoil recovery -----------------------------------------------------
     # First of all, because it moves the view: the aim trace below has to be
     # taken after this frame's give-back rather than one frame behind it.
-    recoil_exits = _author_recoil_recovery(ed, tick, pc_out,
-                                           BEL.find_then_pin(tick), 1040, -3600)
+    recoil_exits = _author_recoil_recovery(ed, tick, pc_out, alive, 1040, -3600)
 
     aim_exits, muzzle = _author_resolve_aim(ed, held, recoil_exits,
                                             1040, -2400)
@@ -186,7 +196,11 @@ def _author_wc_tick(ed, tick):
     _connect(_pin(_at(ed.add_get_member_variable_node("Blocking"), 480, 680),
                   "Blocking", is_input=False), _pin(guarded, "A"))
 
-    tap = pressed("KeyFire", 600)
+    tapped = _at(_node(ed, FN_OR), 760, 500)
+    _connect(pressed("KeyFire", 600), _pin(tapped, "A"))
+    _connect(_pin(_at(ed.add_get_member_variable_node(FIRE_FORCED_VAR), 480, 500),
+                  FIRE_FORCED_VAR, is_input=False), _pin(tapped, "B"))
+    tap = _pin(tapped, "ReturnValue", is_input=False)
     holding = _at(_node(ed, FN_IS_KEY_DOWN), 480, 860)
     _connect(pc_out, _pin(holding, "self"))
     _connect(key_pins["KeyFire"], _pin(holding, "Key"))

@@ -94,6 +94,17 @@ Wanderer (selector)
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and `StopLogic`: the tree
     ends. (Called inside a running task, the stop is queued until the task returns.)
+  - **Every other step starts at the alive gate** (`_author_alive_gate`, which `_Steps.event`
+    puts at the head of each step event): no pawn, or a dead one, and the step fails without
+    acting. The tree runs one step a frame, so a wanderer killed after its Pulse still had
+    that pass's Chase and Swing to come, and a body on the ground could land one more blow.
+    The failed pass falls through to Idle, and the next Pulse ends the tree.
+  - Dead is `Dead OR Health <= 0` in both gates (`_dead_pin`): `Dead` is written by the health
+    component's Tick, which on the frame of the killing blow may not have run yet.
+  - The gate's living arms meet in a `StepResult = false` write, so a step still hangs off
+    one exec pin. It is only the default: every exit of the step writes its own.
+  - `probes/probe_dead_no_actions.py` calls the Swing step directly: alive it hits the
+    player, marked Dead or at 0 HP it does not.
 
 ## The character (`BP_ForestWanderer`)
 

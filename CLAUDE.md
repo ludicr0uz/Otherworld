@@ -230,6 +230,9 @@ editor.
 - **Save and exit:** X in the M panel saves the character's stats and inventory, but not its
   location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit calls it off. The next game loads
   the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
+- **Death:** once the player or a wanderer is dead (or at 0 HP), nothing it could do runs: the
+  weapon component's Tick stops at its dead gate, the loot window shuts, and every step of a
+  wanderer's tree refuses (`probes/probe_dead_no_actions.py`).
 - **Known gaps:** temperature moves nothing yet, and nothing else reads the time of day yet. `GameDefaultMap` still points at the old
   `Lvl_Forest`. Feel checks that need a play session are listed per package.
 

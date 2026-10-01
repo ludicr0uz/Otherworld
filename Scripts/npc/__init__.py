@@ -27,6 +27,7 @@ SHARED AUTHORING HELPERS
 THE CONTROLLER'S STEPS (one fragment per concern)
   sound        play one of several sounds (voice, melee impact)
   corpse       the corpse state: a Dead pawn stops the behaviour tree for good
+               (Pulse), and the alive gate every other step starts at
   stats        this creature's health and flinch clips, once; voice on a timer
   melee        range + cooldown check, swing, damage, hit direction
   block        the player's guard: blocked damage and its stamina cost

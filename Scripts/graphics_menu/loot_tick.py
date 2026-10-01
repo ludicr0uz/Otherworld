@@ -3,6 +3,8 @@ take, kneel.
 
     find the nearest body (loot_find)                -> LootTarget
     none in reach   -> LootOpen = false, LootTakeRequested = false
+    the player dead -> the same: the dead search nobody (the weapon
+                       component's OwnerDead, combat/weapon_component/dead.py)
     else, with the player's weapon component:
         LootBagFull = Length(Inventory) >= INVENTORY_SIZE
         LootSel clamped to the body's contents (a take shortens them)
@@ -34,6 +36,7 @@ from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.tuning import INVENTORY_SIZE
+from combat.weapon_component.dead import OWNER_DEAD_VAR
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
 from graphics_menu.loot_consts import (
     LOOT_BAG_FULL_VAR, LOOT_BEST_VAR, LOOT_DOWN, LOOT_KEY, LOOT_KNEELING_VAR,
@@ -123,8 +126,6 @@ def author_loot_tick(ed, pc_out, in_execs, x0, y0):
                                          Object=_get(ed, LOOT_TARGET_VAR, x0 - 240,
                                                      y0 + 300, made))),
                           flow, x0 + 240, y0, made)
-    shut = _setter(ed, LOOT_OPEN_VAR, "false", [lost], x0 + 500, y0 + 800, made)
-    shut = _setter(ed, LOOT_TAKE_VAR, "false", [shut], x0 + 760, y0 + 800, made)
 
     pawn = _out(_call(ed, FN_GET_PLAYER_PAWN, x0 + 240, y0 + 440, made, PlayerIndex=0))
     comp = _call(ed, FN_GET_COMP, x0 + 500, y0 + 440, made, self=pawn)
@@ -135,14 +136,19 @@ def author_loot_tick(ed, pc_out, in_execs, x0, y0):
     _connect(_out(comp), _pin(cast, "Object"))
     _connect(found, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
+    # Dying is not searching: no Tab, no take, and an open window shuts.
+    dead, alive = _branch(ed, _get(ed, OWNER_DEAD_VAR, x0 + 760, y0 + 600, made,
+                                   WEAPON_COMP_CLASS_PATH, wc),
+                          [BEL.find_then_pin(cast)], x0 + 1040, y0 + 600, made)
+    shut = _setter(ed, LOOT_OPEN_VAR, "false", [lost, dead], x0 + 500, y0 + 800, made)
+    shut = _setter(ed, LOOT_TAKE_VAR, "false", [shut], x0 + 760, y0 + 800, made)
 
     carried = _call(ed, FN_ARR_LEN, x0 + 1040, y0 + 300, made,
                     TargetArray=_get(ed, "Inventory", x0 + 800, y0 + 300, made,
                                      WEAPON_COMP_CLASS_PATH, wc))
     full = _call(ed, FN_GE_II, x0 + 1280, y0 + 300, made, A=_out(carried),
                  B=INVENTORY_SIZE)
-    flow = put(ed, LOOT_BAG_FULL_VAR, _out(full), [BEL.find_then_pin(cast)],
-               x0 + 1540, y0, made)
+    flow = put(ed, LOOT_BAG_FULL_VAR, _out(full), [alive], x0 + 1540, y0, made)
     last = _call(ed, FN_SUB_II, x0 + 1540, y0 + 440, made,
                  A=_count(ed, x0 + 1060, y0 + 440, made), B=1)
     # Min then Max rather than an int Clamp: the verifier reads every Clamp

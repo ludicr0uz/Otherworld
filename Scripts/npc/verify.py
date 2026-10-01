@@ -84,6 +84,34 @@ def _drivers(n):
             for q in BEL.find_execute_pin(n).list_connected_pins()]
 
 
+def _sources(n, pin, limit=40):
+    """Every node feeding ``n``'s input ``pin`` through data links, however far back."""
+    seen, todo = {}, [BEL.find_input_pin(n, pin)]
+    while todo and len(seen) < limit:
+        for q in PIN.list_connected_pins(todo.pop()):
+            f = PIN.get_owning_node(q)
+            if f.get_path_name() not in seen:
+                seen[f.get_path_name()] = f
+                todo += [x for x in BEL.list_input_pins(f)
+                         if str(PIN.get_pin_name(x)) != "execute"]
+    return list(seen.values())
+
+
+def _events_into(n):
+    """The titles of the events whose exec chains run ``n``."""
+    seen, todo, found = set(), [n], set()
+    while todo:
+        cur = todo.pop()
+        if cur.get_path_name() in seen:
+            continue
+        seen.add(cur.get_path_name())
+        if cur.get_class().get_name().endswith("Event"):
+            found.add(_title(cur).split(" ")[0])
+        else:
+            todo += _drivers(cur)
+    return found
+
+
 def _with_literal(nodes, pin, value):
     return [n for n in nodes if pin in _ins(n) and _close(_num(n, pin), value)]
 
@@ -177,10 +205,10 @@ def check_controller(path, key):
     chase_gate = [d for m in moves for d in _drivers(m)]
     # The chase is its own step, BT_Chase, and nothing else runs into it: that
     # it runs only once aggro is the tree's Blackboard gate (verify_tree.py).
-    into_chase = [_title(d) for g in chase_gate for d in _drivers(g)]
+    # Between the event and the chase sits the alive gate (also verify_tree.py).
+    into_chase = sorted({e for g in chase_gate for e in _events_into(g)})
     check(f"{tag}: the chase is reached only from its step event, BT_{STEP_CHASE}",
-          len(chase_gate) == 1 and len(into_chase) == 1
-          and into_chase[0].startswith(f"BT_{STEP_CHASE}"), f"{into_chase}")
+          len(chase_gate) == 1 and into_chase == [f"BT_{STEP_CHASE}"], f"{into_chase}")
     warns = _titled(nodes, "PrintWarning")
     heads = [n for n in _titled(nodes, "Append") if _lit(n, "A") == AGRO_LOG_PREFIX]
     check(f"{tag}: going aggro is logged as '{AGRO_LOG_PREFIX.strip()} <sense>'",
@@ -308,9 +336,9 @@ def check_corpse_and_trace(tag, nodes, cdo):
     if len(marks) != 1:
         return
     gate = [d for d in _drivers(marks[0]) if _title(d) == "Branch"]
-    check(f"{tag}: ...when its pawn's health component reads Dead",
-          len(gate) == 1 and {_title(f) for f in _feeders(gate[0], "Condition")}
-          == {"Get Dead"})
+    check(f"{tag}: ...when its pawn's health component reads Dead, or 0 HP",
+          len(gate) == 1 and {"Get Dead", "Get Health"}
+          <= {_title(f) for f in _sources(gate[0], "Condition")})
     after = _exec_reach(marks[0])
     check(f"{tag}: a corpse's heartbeat ends -- no Delay, no move, no swing after it",
           not any(_title(n) == "Delay" or {"Goal"} <= _ins(n) or {"Dest"} <= _ins(n)

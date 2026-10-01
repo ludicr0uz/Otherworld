@@ -123,6 +123,13 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     3.5 cm limit. A thinner grip than these needs the limit or the ready pose revisited, not
     a fatter box. The SMG11's grip is 3.2 cm thick but 6.8 cm front to back (its magazine runs
     up it); its furthest joint is 3.2 cm off.
+  - **The Quaternius shotgun has a straight stock** (`Shotgun_3`): no pistol grip, and its
+    guard hangs under the wrist. The ready pose is a pistol grip's, with the index 4.5 cm
+    above the fist's centre, so no fist on the wood reaches the guard: the `Grip` box is the
+    wrist and the receiver's back belly (furthest joint 3.4 cm off), and the index lies along
+    the receiver 4.1 cm above the guard. Its row carries `trigger_reach` 4.5 for that check
+    (`SHOTGUN_TRIGGER_REACH_CM`); the others keep 2.5. The pistol (`Pistol_1`) fits like the
+    rest: 2.9 cm, index 1.7 cm off.
 - **The weapon is rigidly attached and never rotated on its own.** Aiming it per frame was tried
   and reverted. `face_the_camera()` makes the body follow the camera's yaw instead.
 - **Known limits:**

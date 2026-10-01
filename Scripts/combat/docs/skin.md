@@ -30,9 +30,13 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - **The two ready poses and the six hit reactions are retargeted onto every creature**
   (`AIM_SOURCES`, `HIT_SOURCES`), because they are played by path and no dependency walk
   finds them.
-- **Build order from nothing:** weapons (mannequin fallback) → `fetch_monsters` →
-  `import_characters` → `build_creature_materials` → `build_retarget` → `build_npc_blueprints` →
-  weapons again.
+- **Build order from nothing:** `import_quaternius` (the gun models) → weapons (mannequin
+  fallback) → `fetch_monsters` → `import_characters` → `build_creature_materials` →
+  `build_retarget` → `import_quaternius` again (the crouch and crawl clips need the adventurer's
+  IK rig) → `build_npc_blueprints` → weapons again.
+  - Rerunning `import_quaternius` regenerates the clips the anim BP plays, so the weapons build
+    must follow it. The build strips the old stance blends first (`unpatch_stance_clips`):
+    with their clips regenerated they play nothing, and the anim BP would not compile.
   - `build_retarget` deletes and rebuilds `Anims/<Creature>/` every run, so
     `build_npc_blueprints` must follow it. Otherwise four checks fail in the *level* verifier.
 - **Looking at a character:** `Scripts/dev/render_character.py` renders every character mesh to

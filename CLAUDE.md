@@ -196,12 +196,14 @@ editor.
 
 - **The player:** a Meshy-generated adventurer holding an issued shotgun, pistol and knife. The SMG,
   assault rifle and sniper are found as drops. The rifle is the FPS Weapon Bundle's AK 47 and
-  the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are still primitive shapes. The player can sprint, aim over the shoulder or down
+  the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
+  Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). The player can sprint, aim over the shoulder or down
   the sights (the sniper's is its scope), reload and eat, block (F; a swing from the front does a
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
-  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9), crouch (C) and go prone (Z), both quieter and slower, throw whatever is in hand (hold V to
+  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
+  clips (the crawl is its face-down swim: the packs have no crawl), throw whatever is in hand (hold V to
   see the arc, release to throw; it lands as a pick-up), and has
-  a 10-slot inventory. Crouch, prone and the guard are procedural poses (no clip exists).
+  a 10-slot inventory. The guard is a procedural pose (no clip exists), as are crouch and prone on the mannequin fallback.
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
   The pistol reloads every 8 shots from an endless reserve.

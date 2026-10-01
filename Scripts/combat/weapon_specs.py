@@ -1,7 +1,7 @@
-"""The five weapons as data: their primitive parts, muzzle offsets, icons
-and the _weapon_specs() table every builder and the verifier iterate.
-Adding a weapon is a row here. The SMG, the rifle and the sniper are Fab
-models, and their parts, muzzles and sights come from weapon_models.py.
+"""The five weapons as data: their muzzle offsets, icons and the
+_weapon_specs() table every builder and the verifier iterate. Adding a weapon
+is a row here. Every gun is a model now, and its parts (the measured outline),
+muzzle and sight come from weapon_models.py.
 """
 
 import unreal
@@ -10,17 +10,20 @@ from build_ui_art import ICON_NAME_FOR
 from combat.audio import (
     SND_RELOAD_PISTOL, SND_RELOAD_RIFLE, SND_RELOAD_SHOTGUN,
 )
-from combat.graph import _log, _rot
+from combat.graph import _log
 from combat.gun_tuning import read_table
-from combat.grip import _barrel_rotation, _grip_location, _grip_rotation
+from combat.grip import _grip_location, _grip_rotation
 from combat.paths import (
-    AUDIO_DIR, CUBE, CYLINDER, MAT_METAL, MAT_WOOD, PISTOL_BP_PATH,
+    AUDIO_DIR, PISTOL_BP_PATH,
     RIFLE_BP_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH, UI_ART_DIR,
 )
 from combat.skin import player_skin
 from combat.weapon_models import (
-    RIFLE_MODEL, RIFLE_MUZZLE, RIFLE_SIGHT, SMG_MODEL, SMG_MUZZLE, SMG_SIGHT,
-    SNIPER_MODEL, SNIPER_MUZZLE, SNIPER_SIGHT, rifle_outline, smg_outline,
+    PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, RIFLE_MODEL, RIFLE_MUZZLE,
+    RIFLE_SIGHT, SHOTGUN_MODEL, SHOTGUN_MUZZLE, SHOTGUN_SIGHT,
+    SHOTGUN_TRIGGER_REACH_CM, SMG_MODEL,
+    SMG_MUZZLE, SMG_SIGHT, SNIPER_MODEL, SNIPER_MUZZLE, SNIPER_SIGHT,
+    pistol_outline, rifle_outline, shotgun_outline, smg_outline,
     sniper_outline,
 )
 from combat.tuning import (
@@ -32,57 +35,6 @@ from combat.tuning import (
     SMG_RESERVE, SNIPER_FIRE_INTERVAL, SNIPER_MAGAZINE, SNIPER_RELOAD_SECONDS,
     SNIPER_RESERVE,
 )
-
-
-# Each part: (name, mesh, location, rotation, scale, material).
-# Local frame: +X is the muzzle direction, +Z is up, origin sits in the fist.
-# A Cube is 100 cm, so scale is the size in metres; a Cylinder is 100 cm tall
-# with a 50 cm radius, so scale 0.02 gives a 1 cm radius.
-
-def _shotgun_parts():
-    barrel = _barrel_rotation()
-    return (
-        ("Receiver",     CUBE,     (25.0, 0.0, 0.0),   _rot(),          (0.30, 0.055, 0.075),  MAT_METAL),
-        ("Barrel",       CYLINDER, (70.0, 0.0, 2.2),   barrel,          (0.024, 0.024, 0.60),  MAT_METAL),
-        ("MagTube",      CYLINDER, (66.0, 0.0, -2.6),  barrel,          (0.020, 0.020, 0.52),  MAT_METAL),
-        ("Pump",         CUBE,     (55.0, 0.0, -2.6),  _rot(),          (0.20, 0.050, 0.050),  MAT_WOOD),
-        ("Stock",        CUBE,     (-8.0, 0.0, -2.5),  _rot(pitch=6.0), (0.34, 0.048, 0.070),  MAT_WOOD),
-        ("Grip",         CUBE,     (8.0, 0.0, -6.0),   _rot(pitch=20.0),(0.055, 0.042, 0.085), MAT_WOOD),
-        ("TriggerGuard", CUBE,     (14.0, 0.0, -4.5),  _rot(),          (0.070, 0.030, 0.020), MAT_METAL),
-    )
-
-
-def _pistol_parts():
-    """Shorter, all-metal, and with the grip raked back under the receiver.
-
-    The silhouette is what sells which weapon is in hand at a glance, so the
-    pistol is deliberately a third the shotgun's length with no wood on it.
-    """
-    barrel = _barrel_rotation()
-    return (
-        ("Slide",        CUBE,     (14.0, 0.0, 1.5),   _rot(),           (0.17, 0.035, 0.040), MAT_METAL),
-        ("Frame",        CUBE,     (10.0, 0.0, -2.0),  _rot(),           (0.14, 0.032, 0.030), MAT_METAL),
-        ("Barrel",       CYLINDER, (24.0, 0.0, 1.5),   barrel,           (0.011, 0.011, 0.10), MAT_METAL),
-        ("Grip",         CUBE,     (1.0, 0.0, -7.5),   _rot(pitch=15.0), (0.045, 0.036, 0.095), MAT_WOOD),
-        ("TriggerGuard", CUBE,     (7.0, 0.0, -4.5),   _rot(),           (0.050, 0.026, 0.016), MAT_METAL),
-    )
-
-
-# Muzzle tip in the weapon's own space: where the barrel actually ends, so the
-# pellet cone starts at the gun rather than inside the player's chest.
-SHOTGUN_MUZZLE = (101.0, 0.0, 2.2)
-PISTOL_MUZZLE = (30.0, 0.0, 1.5)
-
-# The eye when aiming down the sights, in the same space. None of the primitive
-# guns has a modelled sight, so the sight line is the top of the gun: the eye sits a
-# centimetre or two above the highest part along the bore, and 20-ish cm
-# behind the rear of the receiver (or slide). Tuned by eye in PIE: 14 cm back
-# and the receiver's back face filled a third of the screen; 34 cm back and
-# the camera was inside the adventurer's head, whose hair crossed the view.
-# The SMG (over its receiver), the rifle (over its irons) and the sniper (on
-# its scope's axis) are in weapon_models.py.
-SHOTGUN_SIGHT = (-12.0, 0.0, 5.5)
-PISTOL_SIGHT = (-16.0, 0.0, 5.0)
 
 
 # ─── Accuracy: where the shot goes, and what it does to the view ─────────────
@@ -223,15 +175,15 @@ def _weapon_specs():
     skin = player_skin()
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
     specs = (
-        dict(path=SHOTGUN_BP_PATH, parts=_shotgun_parts(), muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
+        dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
              display="Shotgun", automatic=False, damage=18.0, pellets=8, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_RIFLE,
-             grip_rot=_grip_rotation(AIM_RIFLE),
+             grip_rot=_grip_rotation(AIM_RIFLE), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
              colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Shotgun"]),
-        dict(path=PISTOL_BP_PATH, parts=_pistol_parts(), muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
+        dict(path=PISTOL_BP_PATH, parts=pistol_outline(), model=PISTOL_MODEL, muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
              display="Pistol", automatic=False, damage=26.0, pellets=1, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),

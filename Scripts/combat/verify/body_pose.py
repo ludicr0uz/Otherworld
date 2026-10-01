@@ -3,6 +3,9 @@ carries body_pose.pose_plan() as weighted ModifyBones between the aim pitch's
 LocalToComponent and its spine bones, the plan puts the body where each pose
 says (replayed on the reference skeleton), and the weapon component eases the
 four weights from the Stance, Blocking and whether Held is two-handed.
+
+On a rig with the stance clips the crouch is not posed here and the prone is
+the crawl's corrections; verify.stance_clips checks the clips themselves.
 """
 
 import math
@@ -10,8 +13,8 @@ import math
 from asset_pipeline.rig_util import mesh_ref_pose
 from combat.body_pose import (
     ADDITIVE, GUARD_ARMS, GUARD_GUN, GUARD_GUN_TURN_DEG, POSE_BLEND_SPEED, POSE_CROUCH, POSE_PRONE,
-    POSE_WEIGHTS, PRONE_HIPS_CM, _conj, _mul, _ref, _rotator, _turn,
-    pose_plan,
+    POSE_WEIGHTS, PRONE_HIPS_CM, PRONE_MOVING, _conj, _mul,
+    _ref, _rotator, _turn, pose_plan,
 )
 from combat.aim_pitch import MODIFY_BONE_CLASS
 from combat.paths import ITEM_BP_PATH
@@ -66,6 +69,20 @@ def _literals(node, pin, names):
     return tuple(num_pin(src, n) for n in names) if src else None
 
 
+# The weights that are products, not variables: what each multiplies.
+PRODUCTS = {PRONE_MOVING: ("Get GroundSpeed",)}
+
+
+def _weighted_by(alpha, weight):
+    """Is ``alpha`` (the node on a ModifyBone's Alpha) the weight's reader?"""
+    if alpha is None:
+        return False
+    if weight not in PRODUCTS:
+        return _title(alpha) == f"Get {weight}"
+    fed = {_title(n) for pin in ("A", "B") for n in _feeds(BEL.find_input_pin(alpha, pin))}
+    return {f"Get {POSE_PRONE}", *PRODUCTS[weight]} <= fed
+
+
 def check_anim_bp_poses():
     skin = player_skin()
     abp = load(skin.anim_bp)
@@ -99,7 +116,7 @@ def check_anim_bp_poses():
         got_rot = _literals(node, "Rotation", ("Pitch", "Yaw", "Roll"))
         got_move = _literals(node, "Translation", ("X", "Y", "Z"))
         ok = (got_bone == bone and inner.get_editor_property("rotation_mode") == mode
-              and alpha is not None and _title(alpha) == f"Get {weight}"
+              and _weighted_by(alpha, weight)
               and (quat is None or (got_rot and all(
                   abs(a - b) < 1e-3 for a, b in zip(got_rot, want_rot))))
               and (move is None or (got_move and all(
@@ -160,31 +177,34 @@ def check_pose_geometry():
     def gap(p, l_bone, r_bone):
         return math.dist(p[l_bone], p[r_bone])
 
-    pos, _rot = _replay(ref, children, [s for s in plan if s[0] == POSE_CROUCH])
-    feet = [pos[b[f"foot_{s}"]][2] - rest[b[f"foot_{s}"]][2] for s in "lr"]
-    check("crouch: the feet stay on the ground (within 3 cm)",
-          all(abs(f) < 3.0 for f in feet), str([round(f, 1) for f in feet]))
-    check("crouch: the top of the body comes down at least 40 cm",
-          rest[top][2] - pos[top][2] >= 40.0, f"{rest[top][2] - pos[top][2]:.1f}")
-
-    steps = [s for s in plan if s[0] == POSE_PRONE]
-    pos, rot = _replay(ref, children, steps)
-    check(f"prone: the hips lie {PRONE_HIPS_CM:g} cm off the ground",
-          abs(pos[b["hips"]][2] - PRONE_HIPS_CM) < 0.5, f"{pos[b['hips']][2]:.1f}")
-    highest = max(p[2] for p in pos.values())
-    check("prone: nothing stands above the prone capsule (80 cm)",
-          highest < 80.0, f"{highest:.1f}")
-    check("prone: the head is ahead of the hips and the feet behind them",
-          pos[top][1] > pos[b["hips"]][1] + 30
-          and all(pos[b[f"foot_{s}"]][1] < pos[b["hips"]][1] - 50 for s in "lr"),
-          f"head {pos[top][1]:.0f}, feet {pos[b['foot_l']][1]:.0f}")
     hands = (b["hand_l"], b["hand_r"])
-    check("prone: both hands keep their distance, so a gun stays in both",
-          abs(gap(pos, *hands) - gap(rest, *hands)) < 0.5,
-          f"{gap(rest, *hands):.1f} -> {gap(pos, *hands):.1f}")
-    neck = ref[b["neck"]][0].rotation
-    check("prone: the head is brought back level (looks where it did standing)",
-          _angle(rot[b["neck"]], (neck.x, neck.y, neck.z, neck.w)) < 1.0)
+    # With the stance clips there is nothing to replay here: verify.stance_clips
+    # checks the clips, and probes/probe_stance_clips.py the armed prone in game.
+    if not skin.stance_clips:
+        pos, _rot = _replay(ref, children, [s for s in plan if s[0] == POSE_CROUCH])
+        feet = [pos[b[f"foot_{s}"]][2] - rest[b[f"foot_{s}"]][2] for s in "lr"]
+        check("crouch: the feet stay on the ground (within 3 cm)",
+              all(abs(f) < 3.0 for f in feet), str([round(f, 1) for f in feet]))
+        check("crouch: the top of the body comes down at least 40 cm",
+              rest[top][2] - pos[top][2] >= 40.0, f"{rest[top][2] - pos[top][2]:.1f}")
+
+        steps = [s for s in plan if s[0] == POSE_PRONE]
+        pos, rot = _replay(ref, children, steps)
+        check(f"prone: the hips lie {PRONE_HIPS_CM:g} cm off the ground",
+              abs(pos[b["hips"]][2] - PRONE_HIPS_CM) < 0.5, f"{pos[b['hips']][2]:.1f}")
+        highest = max(p[2] for p in pos.values())
+        check("prone: nothing stands above the prone capsule (80 cm)",
+              highest < 80.0, f"{highest:.1f}")
+        check("prone: the head is ahead of the hips and the feet behind them",
+              pos[top][1] > pos[b["hips"]][1] + 30
+              and all(pos[b[f"foot_{s}"]][1] < pos[b["hips"]][1] - 50 for s in "lr"),
+              f"head {pos[top][1]:.0f}, feet {pos[b['foot_l']][1]:.0f}")
+        check("prone: both hands keep their distance, so a gun stays in both",
+              abs(gap(pos, *hands) - gap(rest, *hands)) < 0.5,
+              f"{gap(rest, *hands):.1f} -> {gap(pos, *hands):.1f}")
+        neck = ref[b["neck"]][0].rotation
+        check("prone: the head is brought back level (looks where it did standing)",
+              _angle(rot[b["neck"]], (neck.x, neck.y, neck.z, neck.w)) < 1.0)
 
     pos, _rot = _replay(ref, children, [s for s in plan if s[0] == GUARD_ARMS])
     lh, rh = pos[b["hand_l"]], pos[b["hand_r"]]

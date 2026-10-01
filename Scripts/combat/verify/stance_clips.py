@@ -1,0 +1,201 @@
+"""verify.stance_clips -- the crouch and the crawl as clips (combat/stance_clips.py):
+the player's AnimGraph blends them over the locomotion by PoseCrouch and
+PoseProne, each still or walking by GroundSpeed; the crouch clips put the body
+down with the feet on the ground; and the crawl, with body_pose's lifts, lies
+on the ground still and just clears it crawling.
+
+A skin without the clips (the mannequin, or no import_quaternius.py yet) is
+checked to carry no stance blend: it poses both stances procedurally, which
+verify.body_pose checks.
+"""
+
+import unreal
+
+from asset_pipeline.rig_util import _bone_world
+from combat.anim_blueprint import AIM_SLOT, _slot_name
+from combat.body_pose import (
+    MOVE_FULL_CM_S, POSE_CROUCH, POSE_PRONE, PRONE_CLIP_HIPS_Z,
+    PRONE_CRAWL_LIFT_CM, PRONE_HIPS_CM,
+)
+from combat.skin import player_skin
+from combat.stance_clips import (
+    BLEND_CLASS, CROUCH_WALK_RATE, EVALUATOR_CLASS, OWN_CLASSES, PLAYER_CLASS,
+    PRONE_CRAWL_RATE, PRONE_REST_S,
+)
+from combat.verify.common import BEL, PIN, check, graph, load, num_pin
+
+# The prone capsule is 40 cm half-height: nothing of a lying body above it.
+PRONE_TOP_CM = 80.0
+# How far a bone of the lying body may sit under the ground: a centimetre or
+# two of a knee or a foot pressed into grass.
+SINK_CM = 3.0
+
+
+def _title(n):
+    return str(BEL.get_node_title(n)).replace("\n", " ")
+
+
+def _up(node, pin):
+    fed = PIN.list_connected_pins(BEL.find_input_pin(node, pin))
+    return PIN.get_owning_node(fed[0]) if fed else None
+
+
+def _feeds(node, pin, limit=12):
+    seen, stack = [], [BEL.find_input_pin(node, pin)]
+    while stack and len(seen) < limit:
+        for q in PIN.list_connected_pins(stack.pop()):
+            n = PIN.get_owning_node(q)
+            if n not in seen:
+                seen.append(n)
+                stack.extend(BEL.list_input_pins(n))
+    return {_title(n) for n in seen}
+
+
+def _cls(node):
+    return node.get_class().get_name() if node else None
+
+
+def _clip_of(node):
+    seq = node.get_editor_property("node").get_editor_property("sequence") if node else None
+    return seq.get_path_name().split(".")[0] if seq else None
+
+
+def _rate(node):
+    return node.get_editor_property("node").get_editor_property("play_rate")
+
+
+def _moved_by_speed(blend):
+    return {"Get GroundSpeed"} <= _feeds(blend, "Alpha") and \
+        not ({f"Get {POSE_CROUCH}", f"Get {POSE_PRONE}"} & _feeds(blend, "Alpha"))
+
+
+def check_stance_graph():
+    skin = player_skin()
+    abp = load(skin.anim_bp)
+    nodes = graph(abp, "AnimGraph").list_all_nodes()
+    ours = [n for n in nodes if _cls(n) in OWN_CLASSES]
+    if not skin.stance_clips:
+        check(f"{abp.get_name()}: no stance clips on this rig, and no stance "
+              "blend left in its AnimGraph", not ours, str(len(ours)))
+        return
+    check(f"{abp.get_name()}: four stance blends, three players, one evaluator",
+          sorted(_cls(n) for n in ours) == sorted([BLEND_CLASS] * 4
+                                                  + [PLAYER_CLASS] * 3 + [EVALUATOR_CLASS]),
+          str(sorted(_cls(n) for n in ours)))
+
+    slot = next((n for n in nodes if _cls(n) == "AnimGraphNode_Slot"
+                 and _slot_name(n) == AIM_SLOT), None)
+    lying = _up(slot, "Source") if slot else None
+    low = _up(lying, "A") if _cls(lying) == BLEND_CLASS else None
+    loco = _up(low, "A") if _cls(low) == BLEND_CLASS else None
+    check("the aim slot reads the stance blends: PoseProne over PoseCrouch over "
+          "the locomotion state machine",
+          _cls(lying) == BLEND_CLASS and _title(_up(lying, "Alpha")) == f"Get {POSE_PRONE}"
+          and _cls(low) == BLEND_CLASS and _title(_up(low, "Alpha")) == f"Get {POSE_CROUCH}"
+          and _cls(loco) == "AnimGraphNode_StateMachine",
+          f"{_cls(lying)} <- {_cls(low)} <- {_cls(loco)}")
+    feeds = PIN.list_connected_pins(BEL.find_output_pin(lying, "Pose")) if lying else []
+    check("...and so does the upper-body layered blend's base (the aim layer "
+          "rides on the crouched or lying body)",
+          sorted(_cls(PIN.get_owning_node(p)) for p in feeds)
+          == ["AnimGraphNode_LayeredBoneBlend", "AnimGraphNode_Slot"],
+          str([_cls(PIN.get_owning_node(p)) for p in feeds]))
+    if not (low and lying):
+        return
+
+    crouch = _up(low, "B")
+    still, walk = (_up(crouch, "A"), _up(crouch, "B")) if crouch else (None, None)
+    check("crouch: the still clip, and the walking one as GroundSpeed rises",
+          _cls(crouch) == BLEND_CLASS and _moved_by_speed(crouch)
+          and _clip_of(still) == skin.crouch_idle and _clip_of(walk) == skin.crouch_walk
+          and abs(_rate(walk) - CROUCH_WALK_RATE) < 1e-6,
+          f"{_clip_of(still)} / {_clip_of(walk)}")
+    crawl = _up(lying, "B")
+    rest, moving = (_up(crawl, "A"), _up(crawl, "B")) if crawl else (None, None)
+    check(f"prone: the crawl held at {PRONE_REST_S:g} s still, and played at "
+          f"{PRONE_CRAWL_RATE:g}x as GroundSpeed rises",
+          _cls(crawl) == BLEND_CLASS and _moved_by_speed(crawl)
+          and _cls(rest) == EVALUATOR_CLASS and _clip_of(rest) == skin.prone_crawl
+          and num_pin(rest, "ExplicitTime") == PRONE_REST_S
+          and _cls(moving) == PLAYER_CLASS and _clip_of(moving) == skin.prone_crawl
+          and abs(_rate(moving) - PRONE_CRAWL_RATE) < 1e-6,
+          f"{_clip_of(rest)} @ {num_pin(rest, 'ExplicitTime') if rest else None}")
+    clamp = _up(crouch, "Alpha") if crouch else None
+    scale = _up(clamp, "Value") if clamp else None
+    check(f"...Move is clamp(GroundSpeed x 1/{MOVE_FULL_CM_S:g}, 0, 1)",
+          clamp is not None and num_pin(clamp, "Min") == 0.0 and num_pin(clamp, "Max") == 1.0
+          and scale is not None and abs(num_pin(scale, "B") - 1.0 / MOVE_FULL_CM_S) < 1e-6)
+
+
+def _samples(clip, bones, lift=0.0, n=16):
+    length = clip.get_editor_property("sequence_length")
+    return [{b: _bone_world(clip, b, length * i / n) + _z(lift) for b in bones}
+            for i in range(n + 1)]
+
+
+def _z(z):
+    return unreal.Vector(0.0, 0.0, z)
+
+
+def check_crouch_clips():
+    skin = player_skin()
+    if not skin.stance_clips:
+        return
+    b = skin.pose_bones
+    feet = [b["foot_l"], b["foot_r"]]
+    stand = load(skin.idle)
+    head = "Head"
+    stand_head = max(p[head].z for p in _samples(stand, [head], n=4))
+    stand_feet = min(p[f].z for p in _samples(stand, feet, n=4) for f in feet)
+    for field in ("crouch_idle", "crouch_walk"):
+        poses = _samples(load(getattr(skin, field)), [head] + feet)
+        top = max(p[head].z for p in poses)
+        low = min(p[f].z for p in poses for f in feet)
+        check(f"{field}: the head comes down at least 40 cm and the feet stay "
+              "on the ground (within 8 cm of standing)",
+              stand_head - top >= 40.0 and abs(low - stand_feet) < 8.0,
+              f"head {stand_head:.0f} -> {top:.0f}, feet {stand_feet:.1f} -> {low:.1f}")
+
+
+def check_crawl_on_ground():
+    skin = player_skin()
+    if not skin.stance_clips:
+        return
+    b = skin.pose_bones
+    crawl = load(skin.prone_crawl)
+    hips = b["hips"]
+    lying = ["Head", hips, b["spine"], b["upperarm_l"], b["upperarm_r"],
+             b["hand_l"], b["hand_r"], b["calf_l"], b["calf_r"], b["foot_l"], b["foot_r"]]
+    rest_lift = PRONE_HIPS_CM - PRONE_CLIP_HIPS_Z
+    hips_z = [p[hips].z for p in _samples(crawl, [hips])]
+    check(f"the crawl's hips are where body_pose lifts them from ({PRONE_CLIP_HIPS_Z:g} cm)",
+          all(abs(z - PRONE_CLIP_HIPS_Z) < 1.0 for z in hips_z),
+          f"{min(hips_z):.1f}..{max(hips_z):.1f}")
+
+    length = crawl.get_editor_property("sequence_length")
+    still = {k: _bone_world(crawl, k, PRONE_REST_S % length) + _z(rest_lift)
+             for k in lying}
+    check(f"prone, still: the hips lie {PRONE_HIPS_CM:g} cm up and nothing is "
+          f"under the ground or above {PRONE_TOP_CM:g} cm",
+          abs(still[hips].z - PRONE_HIPS_CM) < 1.0
+          and min(p.z for p in still.values()) > -SINK_CM
+          and max(p.z for p in still.values()) < PRONE_TOP_CM,
+          f"{min(p.z for p in still.values()):.1f}..{max(p.z for p in still.values()):.1f}")
+    check("prone, still: the head is ahead of the hips and the feet behind them",
+          still["Head"].y > still[hips].y + 30
+          and all(still[b[f"foot_{s}"]].y < still[hips].y - 50 for s in "lr"),
+          f"head {still['Head'].y:.0f}, feet {still[b['foot_l']].y:.0f}")
+
+    legs = [b["calf_l"], b["calf_r"], b["foot_l"], b["foot_r"]]
+    poses = _samples(crawl, lying, lift=rest_lift + PRONE_CRAWL_LIFT_CM)
+    knees = min(p[k].z for p in poses for k in legs)
+    top = max(p[k].z for p in poses for k in lying)
+    check(f"prone, crawling: {PRONE_CRAWL_LIFT_CM:g} cm more keeps the kicking "
+          f"knees and feet out of the ground, and all of it under {PRONE_TOP_CM:g} cm",
+          knees > -SINK_CM and top < PRONE_TOP_CM, f"legs from {knees:.1f}, top {top:.1f}")
+
+
+def run():
+    check_stance_graph()
+    check_crouch_clips()
+    check_crawl_on_ground()

@@ -73,8 +73,9 @@ def grip_fit(bp, aim, parts, part, trigger=None):
 
 def check_handles_in_fist(items):
     """items: (label, blueprint path, ready pose, parts, part held by,
-    the trigger part or None)."""
-    for name, path, aim, parts, part, trigger in items:
+    the trigger part or None[, how far the index may rest off it])."""
+    for name, path, aim, parts, part, trigger, *reach in items:
+        trigger_reach = reach[0] if reach else TRIGGER_REACH_CM
         bp = load(path)
         if not bp:
             check(f"{name}: asset exists", False)
@@ -90,9 +91,11 @@ def check_handles_in_fist(items):
               fit["reach"] < JOINT_REACH_CM, f"furthest joint {fit['reach']:.2f} cm off")
         if trigger:
             check(f"{name}: the index finger is at the {trigger}",
-                  fit["trigger"] < TRIGGER_REACH_CM, f"{fit['trigger']:.2f} cm off")
+                  fit["trigger"] < trigger_reach, f"{fit['trigger']:.2f} cm off")
 
 
 def run():
     check_handles_in_fist([(s["display"], s["path"], s["aim"], s["parts"],
-                            "Grip", "TriggerGuard") for s in _weapon_specs()])
+                            "Grip", "TriggerGuard",
+                            s.get("trigger_reach", TRIGGER_REACH_CM))
+                           for s in _weapon_specs()])

@@ -28,6 +28,11 @@ Editor-side, in pipeline order:
     mixamo_import.py            unzip the packs; import X Bot and every clip onto SK_XBot
     mixamo_retarget.py          IK_XBot, RTG_<Creature>_from_XBot, batch retarget
     mixamo_locomotion.py        the creature's blend space plays the Mixamo gait; checks
+    import_quaternius.py        entry point: Quaternius zips -> UAL clips on the
+                                adventurer, gun/survival props, the zombie
+    quaternius_paths.py         constants: packs, asset paths, which clips/models play
+    quaternius_import.py        unzip; import each GLB/FBX and rename it into its pack
+    ual_retarget.py             IK_UAL1/2, RTG_<Character>_from_UAL1/2, batch retarget
     import_ui_art.py            entry point: HUD art PNGs -> textures
     fab_index.py                entry point: index Fab content -> assets/cache/fab/
     fab_inventory.py            describe a folder's assets from registry tags

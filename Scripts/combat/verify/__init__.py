@@ -21,6 +21,8 @@ and it never relies on a variable another section left behind.
   body_pose   the crouch, prone and guard poses: the anim BP's weighted
               ModifyBones match body_pose.pose_plan, the plan replayed on the
               skeleton lands where each pose says, the component's weights
+  stance_clips  the crouch and crawl clips: the stance blends in the AnimGraph,
+              the crouch down with the feet planted, the crawl on the ground
   block       the guard: its key, the Blocking stance, the fire gate refusing
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
               the crouch it drives, the footsteps' volume and reach per stance
@@ -36,7 +38,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "block", "stance", "accuracy", "punch", "knife",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "stance", "accuracy", "punch", "knife",
     "hold_pose", "throw",
     "settings_and_tuning", "firing", "consume", "drops", "loot", "noise", "combat_trace",
 )

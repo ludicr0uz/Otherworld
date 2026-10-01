@@ -1,8 +1,9 @@
-"""The SMG, the rifle and the sniper as real models: the FPS Weapon Bundle's
-SMG11, AK 47 and AS Val (Deadghost Interactive, a Fab pack under
-/Game/FPS_Weapon_Bundle), how
-each is placed in the weapon's frame, and the measured outline every grip and
-sight check reads.
+"""Every gun as a real model: the SMG, the rifle and the sniper are the FPS
+Weapon Bundle's SMG11, AK 47 and AS Val (Deadghost Interactive, a Fab pack
+under /Game/FPS_Weapon_Bundle), the shotgun and the pistol are Quaternius's
+Ultimate Gun Pack's Shotgun_3 and Pistol_1 (CC0, imported by
+asset_pipeline/import_quaternius.py). How each is placed in the weapon's
+frame, and the measured outline every grip and sight check reads.
 
 WHY AN OUTLINE AS WELL AS A MODEL
 ---------------------------------
@@ -28,8 +29,14 @@ The pack's _X/_Y are not texture variants but axis variants: SK_KA47 (_Y) and
 SK_KA47_X are the same gun lying along +Y and +X. The _X is used so no
 rotation has to be carried.
 
-Nothing here acquires the pack. A clone without it fails the build at
-_must_load with the pack's name; fab_library.json is the restore recipe.
+The Quaternius guns also point down +X with +Z up, but at no one size (the
+pistol is 1.8 m long as imported, the shotgun 5.8 m), so each carries its own
+scale to real size: the shotgun 104 cm, the pistol 20. The outlines below are
+measured on the scaled mesh.
+
+Nothing here acquires either pack. A clone without them fails the build at
+_must_load with the pack's name; fab_library.json is the Fab pack's restore
+recipe, and the Quaternius zips go in assets/cache/quaternius/.
 """
 
 from combat.graph import _rot
@@ -43,6 +50,11 @@ SMG11_MESH = f"{FAB_WEAPONS}/SMG11/SK_SMG11_X"
 AK47_MESH = f"{FAB_WEAPONS}/Ka47/SK_KA47_X"
 VAL_MESH = f"{FAB_WEAPONS}/KA_Val/SK_KA_Val_X"
 SCOPE_MESH = f"{FAB_WEAPONS}/Accessories/SM_Scope_25x56_X"
+
+# asset_pipeline/quaternius_paths.SHOTGUN_MODEL and PISTOL_MODEL.
+QUATERNIUS_GUNS = "/Game/Sourced/Quaternius/Guns"
+SHOTGUN_MESH = f"{QUATERNIUS_GUNS}/SM_Shotgun_3"
+PISTOL_MESH = f"{QUATERNIUS_GUNS}/SM_Pistol_1"
 
 
 def _box(name, lo, hi):
@@ -164,4 +176,75 @@ def sniper_outline():
         # 3.2 cm round at the objective bell.
         ("Scope", CYLINDER, (tube, 0.0, SCOPE_AXIS_Z), _barrel_rotation(),
          (0.064, 0.064, 0.436), MAT_METAL),
+    )
+
+
+# ─── Quaternius Shotgun_3: the shotgun ──────────────────────────────────────
+
+# A pump gun with a straight wooden stock (no pistol grip: the hand holds the
+# stock's wrist behind the trigger guard), a tube magazine under the barrel,
+# the wooden pump round both, and a band with the bead near the muzzle.
+SHOTGUN_SCALE = 0.18
+SHOTGUN_MODEL = (
+    ("Model", SHOTGUN_MESH, (0.0, 0.0, 0.0), _rot(), (SHOTGUN_SCALE,) * 3),
+)
+
+# The end of the barrel, on its axis.
+SHOTGUN_MUZZLE = (77.5, 0.0, 3.9)
+
+# How far the index may rest off the TriggerGuard (verify/grip_fit; the other
+# guns are held to 2.5). The ready pose is a pistol grip's: its index lies
+# 4.5 cm above the fist's centre. This gun has a straight stock and its guard
+# hangs under the wrist, so the index lies along the receiver, 4.1 cm above
+# the guard; putting it in the guard would hang the fist 3 cm under the wood.
+SHOTGUN_TRIGGER_REACH_CM = 4.5
+
+# Over the receiver's hump (6.8) and the bead (6.4), a centimetre up, and a
+# near plane behind the receiver's back; 12 cm behind the grip, where the
+# primitive shotgun's eye was.
+SHOTGUN_SIGHT = (-12.0, 0.0, 7.8)
+
+
+def shotgun_outline():
+    return (
+        _box("Stock",        (-26.6, -1.5, -10.1), (-4.6, 1.5, 3.9)),
+        # Where the right hand closes: the stock's wrist (x -4.6..1.4, z -5.4..2.4)
+        # and the back of the receiver's belly, the fist as far forward and
+        # down as the index needs to reach into the guard.
+        _box("Grip",         (-2.6, -1.4, -6.0),   (3.4, 1.4, 0.8)),
+        _box("Receiver",     (1.4, -2.2, -2.5),    (22.4, 2.2, 6.8)),
+        _box("TriggerGuard", (3.4, -0.8, -5.6),    (11.4, 0.8, -2.3)),
+        _box("Barrel",       (22.4, -1.4, 2.5),    (77.5, 1.4, 5.3)),
+        _box("MagTube",      (22.4, -1.4, -1.2),   (62.4, 1.4, 1.6)),
+        _box("Pump",         (28.4, -2.1, -2.5),   (44.4, 2.1, 5.3)),
+        # The band round barrel and tube, with the bead on top.
+        _box("MuzzleBand",   (62.4, -1.8, -1.7),   (70.4, 1.8, 6.4)),
+    )
+
+
+# ─── Quaternius Pistol_1: the pistol ────────────────────────────────────────
+
+# A service automatic: the slide over a short frame, the grip raked back with
+# the weapon's origin inside it, a rear notch and a front post on the slide.
+PISTOL_SCALE = 0.11
+PISTOL_MODEL = (
+    ("Model", PISTOL_MESH, (0.0, 0.0, 0.0), _rot(), (PISTOL_SCALE,) * 3),
+)
+
+# The barrel's end, standing a centimetre proud of the slide.
+PISTOL_MUZZLE = (16.4, 0.0, 6.35)
+
+# A centimetre over the sights (rear 8.1, front 8.3) and a near plane behind
+# the slide's back.
+PISTOL_SIGHT = (-14.0, 0.0, 9.2)
+
+
+def pistol_outline():
+    return (
+        _box("Slide",        (-3.7, -1.6, 3.3),  (16.3, 1.6, 7.7)),
+        _box("RearSight",    (-1.7, -1.8, 7.7),  (-0.7, 1.8, 8.1)),
+        _box("FrontSight",   (13.3, -0.8, 7.7),  (15.3, 0.8, 8.3)),
+        _box("Frame",        (2.3, -1.6, 2.3),   (8.3, 1.6, 3.3)),
+        _box("Grip",         (-3.7, -1.8, -4.5), (2.3, 1.8, 3.3)),
+        _box("TriggerGuard", (3.3, -0.8, 0.9),   (8.3, 0.8, 2.3)),
     )

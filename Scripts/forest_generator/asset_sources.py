@@ -252,6 +252,20 @@ GENERATED = (
              "itself when it regenerates the set.",
     ),
     AssetSource(
+        dest="Content/Sourced/Quaternius",
+        kind="generated",
+        builders=("Scripts/asset_pipeline/import_quaternius.py",),
+        note="Quaternius packs from the cache below (all CC0): the Universal "
+             "Animation Library's two GLBs (UAL1/, UAL2/: SKM_, SK_ and one A_ "
+             "per clip) and every clip retargeted onto the adventurer under "
+             "UAL/Adventurer01/ (the player's crouch and crawl); the gun and "
+             "survival packs as SM_ meshes with MI_ colours (Guns/, Survival/: "
+             "the shotgun and pistol are drawn from Guns/); the zombie "
+             "(Zombie/). Also writes IK_UAL1/2 and RTG_Adventurer01_from_UAL1/2 "
+             "into Characters/Rigs. Runs before the weapons build and again "
+             "after build_retarget.py.",
+    ),
+    AssetSource(
         dest="Content/Maps",
         kind="generated",
         builders=("Scripts/generate_forest_level.py",),
@@ -307,6 +321,16 @@ CACHE = CACHE + (
 )
 
 CACHE = CACHE + (
+    AssetSource(
+        dest="assets/cache/quaternius",
+        kind="cache",
+        builders=(),
+        note="Quaternius downloads (CC0), saved by hand under the names "
+             "asset_pipeline/quaternius_paths lists: Universal Animation "
+             "Library[Standard].zip, Universal Animation Library 2[Standard].zip, "
+             "Ultimate Gun Pack.zip, Survival Pack.zip and Zombie.zip. "
+             "import_quaternius.py unzips what it reads beside each zip.",
+    ),
     AssetSource(
         dest="assets/cache/mixamo",
         kind="cache",
@@ -368,6 +392,9 @@ RESTORE_ORDER = (
     # weapons, whose rifle and sniper are the FPS Weapon Bundle's models.
     "Scripts/asset_pipeline/fab_library.py --check",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/fab_index.py",
+    # The shotgun and pistol are Quaternius models (assets/cache/quaternius).
+    # The UAL clips need the adventurer, so this runs again further down.
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_quaternius.py",
     "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
     # After combat (the consumables are children of BP_WeaponItem) and before
     # the HUD (whose survival bars cast to BP_SurvivalComponent).
@@ -391,6 +418,11 @@ RESTORE_ORDER = (
     # each creature's IK rig and blend space; before the NPCs, whose zombie
     # controller holds the attack clip.
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_mixamo.py",
+    # The player's crouch and crawl clips, now that the adventurer has an IK
+    # rig; the weapons build then wears it with them, and the HUD follows.
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_quaternius.py",
+    "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
+    "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",
     "Scripts/generate_forest_level.py",
     # Once each printed import_<Level>.py has run: the import rebuilds the

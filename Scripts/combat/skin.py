@@ -87,6 +87,17 @@ class PlayerSkin:
     # facing +X, not of the mannequin, which is why the Meshy skin reuses them.
     mesh_z: float = -89.0
     mesh_yaw: float = 270.0
+    # The low stances' clips (stance_clips.py), retargeted from the Quaternius
+    # Universal Animation Library: crouched still and walking, and the crawl.
+    # None where the rig has none, and the stance is then posed procedurally
+    # (body_pose.py): the mannequin, or an adventurer before import_quaternius.
+    crouch_idle: str = None
+    crouch_walk: str = None
+    prone_crawl: str = None
+
+    @property
+    def stance_clips(self):
+        return self.crouch_idle is not None
 
 
 SKIN_QUINN = PlayerSkin(
@@ -115,6 +126,7 @@ SKIN_QUINN = PlayerSkin(
 # strikes, and for the same reason: a player who looks wrong is a far better
 # failure than a build that stops.
 ADVENTURER = "Adventurer01"
+UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{ADVENTURER}"
 SKIN_ADVENTURER = PlayerSkin(
     mesh=f"/Game/Sourced/Characters/SKM_{ADVENTURER}/SKM_{ADVENTURER}",
     anim_bp=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/A_{ADVENTURER}_ABP_Unarmed",
@@ -137,6 +149,11 @@ SKIN_ADVENTURER = PlayerSkin(
                               ("thigh", "UpLeg"), ("calf", "Leg"), ("foot", "Foot"))}),
     # build_retarget.py makes it for every creature (MELEE_SOURCE).
     punch=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/A_{ADVENTURER}_MM_Attack_01",
+    # asset_pipeline/import_quaternius.py (quaternius_paths.CROUCH_IDLE, ...):
+    # the UAL pack has no crawl, and its face-down swim is what crawls.
+    crouch_idle=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Crouch_Idle_Loop",
+    crouch_walk=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Crouch_Fwd_Loop",
+    prone_crawl=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Swim_Fwd_Loop",
 )
 
 
@@ -153,7 +170,15 @@ def player_skin():
             SKIN_ADVENTURER.idle, SKIN_ADVENTURER.punch)
     missing = [p for p in want if not eas.does_asset_exist(p)]
     if not missing:
-        return SKIN_ADVENTURER
+        stances = (SKIN_ADVENTURER.crouch_idle, SKIN_ADVENTURER.crouch_walk,
+                   SKIN_ADVENTURER.prone_crawl)
+        if all(eas.does_asset_exist(p) for p in stances):
+            return SKIN_ADVENTURER
+        # Optional, unlike the rest: without them the stances are procedural.
+        _log("note: no Quaternius stance clips yet — the adventurer crouches "
+             "and lies down procedurally. Run asset_pipeline/import_quaternius.py.")
+        return dataclasses.replace(SKIN_ADVENTURER, crouch_idle=None,
+                                   crouch_walk=None, prone_crawl=None)
     if len(missing) < len(want):
         _log(f"note: the adventurer skin is incomplete ({len(missing)} of "
              f"{len(want)} assets missing, first {missing[0]}) — wearing the "

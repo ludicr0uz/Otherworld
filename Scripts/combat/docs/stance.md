@@ -67,13 +67,42 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - Space does nothing while low: UE refuses a crouched jump.
   - The camera drops in one frame (no boom lag).
 
+## The crouch and crawl clips (`stance_clips.py`)
+
+- **On the adventurer the low stances are clips**, from the Quaternius Universal Animation
+  Library (CC0; `asset_pipeline/import_quaternius.py` retargets every UAL clip onto the
+  adventurer, into `/Game/Sourced/Quaternius/UAL/Adventurer01`). `PlayerSkin` names three:
+  `crouch_idle` (`Crouch_Idle_Loop`), `crouch_walk` (`Crouch_Fwd_Loop`) and `prone_crawl`. The
+  packs have no crawl and no prone idle: the crawl is the face-down `Swim_Fwd_Loop` (a two-armed
+  pull and a frog kick), and lying still is that clip held at 0.5 s (arms ahead, legs straight).
+- **Where:** between the locomotion state machine and both its readers (the aim slot and the
+  upper-body layered blend's base): `TwoWayBlend(PoseCrouch)` then `TwoWayBlend(PoseProne)`,
+  each B a still/walking `TwoWayBlend` by `Move = clamp(GroundSpeed / 60, 0, 1)`. The aim
+  layer, the hit slot and the procedural poses all apply on top.
+- **The crawl's hips lie 7.5 cm under the root,** so `body_pose` lifts them: to 16 cm by
+  `PoseProne`, and 15 cm more by `ProneMoving` (`PoseProne × Move`), because the kick drops the
+  knees 28 cm under the hips. The verifier samples the clip with both lifts.
+- **A held gun needs no correction.** The aim layer blends in mesh space over four spine joints,
+  so the chest comes out propped between the crawl's face-down chest and the aim's upright one,
+  with the arms and head level. The procedural prone's 60° chest tip, carried over, put the
+  hands 2 cm off the ground (`probes/probe_stance_clips.py` caught it); without it they hold
+  the shotgun 33 cm up, as far apart as standing.
+- **Rates:** the crouch walk covers ~55 cm/s and plays at 2× (the most before it reads as a
+  scurry; the feet slide at the crouch's 270), the crawl at 1.5×.
+- **This module owns every TwoWayBlend and sequence node in the player's AnimGraph,** so a rerun
+  removes them all and rejoins the locomotion. The weapons build strips them before anything
+  compiles the anim BP (`unpatch_stance_clips`), because rerunning the import regenerates the
+  clips and leaves the old players empty, which does not compile.
+- **The mannequin fallback** (and an adventurer before the import) has no clips: `PlayerSkin`
+  leaves the three fields `None` and the stances stay procedural, below.
+
 ## Body poses (`body_pose.py`, `weapon_component/pose_weights.py`)
 
-- **Procedural, because no clip exists.** The only crouch clips are `MM_Unarmed_Crouch_*` in the
-  experimental MoverExamples plugin (not enabled, another skeleton); there is no prone or guard
-  clip anywhere. Each pose is a set of Transform (Modify) Bone nodes in the player's anim BP,
-  every one with its **Alpha wired to a weight**: `PoseCrouch`, `PoseProne`, `GuardArms`,
-  `GuardGun`. A weight of 0 skips its nodes.
+- **Procedural where no clip exists:** the guard always, and the crouch and prone on a rig
+  without the stance clips. The only stock crouch clips are `MM_Unarmed_Crouch_*` in the
+  experimental MoverExamples plugin (not enabled, another skeleton). Each pose is a set of
+  Transform (Modify) Bone nodes in the player's anim BP, every one with its **Alpha wired to a
+  weight**: `PoseCrouch`, `PoseProne`, `GuardArms`, `GuardGun`. A weight of 0 skips its nodes.
 - **Where:** between the aim pitch's `LocalToComponent` and its two spine bones. Guard first (so
   the prone hip turn carries the guarded arms), then crouch, then prone, then the aim pitch.
   `patch_body_pose` runs after `patch_aim_pitch`, whose rerun deletes every ModifyBone; a body-pose

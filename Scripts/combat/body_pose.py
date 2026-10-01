@@ -3,12 +3,13 @@ player's anim BP, blended in by four weights the weapon component writes.
 
 WHY PROCEDURAL
 --------------
-There is no clip to play. The only crouch clips on this machine are in an
-experimental plugin on another skeleton, no prone clip exists anywhere, and
-there is no guard clip; a blend space could not be authored from Python even
-if there were. What the AnimGraph can take is Transform (Modify) Bone nodes
-(aim_pitch.py does the same for the sights' pitch), so each pose is a handful
-of them, every one with its Alpha driven by one weight:
+There is no guard clip. The crouch and the crawl now have clips (the
+Quaternius Universal Animation Library's, stance_clips.py) wherever the rig
+has them retargeted (PlayerSkin.stance_clips); the mannequin fallback, and an
+adventurer before import_quaternius.py has run, still pose both here. What
+the AnimGraph can take is Transform (Modify) Bone nodes (aim_pitch.py does
+the same for the sights' pitch), so each pose is a handful of them, every one
+with its Alpha driven by one weight:
 
     PoseCrouch  hips down, thighs forward, shins back, feet flat again, the
                 back leaning forward and the chest back upright
@@ -21,6 +22,23 @@ of them, every one with its Alpha driven by one weight:
                 keeps looking ahead
 
 A weight of 0 skips its nodes entirely, so standing costs nothing.
+
+WITH THE CLIPS the crouch is all clip, and the prone is the crawl with its
+hips lifted, since the clip's lie under the feet's root:
+
+    PoseProne     to PRONE_HIPS_CM, lying still
+    ProneMoving   PoseProne x Move, a product rather than a variable: 15 cm
+                  more while crawling, because the kick drops the knees 28 cm
+                  under the hips
+
+Move is clamp(GroundSpeed / MOVE_FULL_CM_S, 0, 1), the same the clips'
+still-or-walking blends read (stance_clips.py). A held gun needs nothing more:
+the aim layer blends in mesh space over four spine joints (anim_blueprint.py),
+so the chest comes out propped between the crawl's face-down one and the
+aim's upright one, and the arms and head keep the aim's level. Tipping it
+further (as the procedural prone does to a standing chest) drove the
+shoulders into the ground: the hands measured 2 cm up in game, against 33
+without it (probes/probe_stance_clips.py).
 
 HOW THE ANGLES ARE STATED
 -------------------------
@@ -63,7 +81,7 @@ from combat.graph import (
     BEL, BGE, PIN, _assets, _at, _connect, _declare, _float_type, _log, _node,
     _palette, _pin, _set,
 )
-from combat.nodes import FN_MAKE_ROT, FN_MAKE_VECTOR
+from combat.nodes import FN_CLAMP, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MUL_FF
 
 POSE_CROUCH = "PoseCrouch"
 POSE_PRONE = "PoseProne"
@@ -85,6 +103,19 @@ CROUCH_LEAN_DEG = 20.0
 # how far the chest is propped up off the ground.
 PRONE_HIPS_CM = 16.0
 PRONE_CHEST_LIFT_DEG = 30.0
+# With the crawl clip: its hips, measured on the adventurer's retargeted
+# A_Adventurer01_UAL1_Swim_Fwd_Loop (-7..-8 through the stroke), lifted to
+# PRONE_HIPS_CM lying still and this much higher crawling, where the kick
+# drops the knees 28 cm under the hips: they then just clear the ground.
+PRONE_CLIP_HIPS_Z = -7.5
+PRONE_CRAWL_LIFT_CM = 15.0
+# A weight that is not a variable (see WITH THE CLIPS above).
+PRONE_MOVING = "ProneMoving"
+# The ground speed (cm/s) at which the walking clips have fully taken over
+# from the still ones: a crawl is 120 and a crouched walk 270, so either is all
+# walk once under way, and a stop settles back within a step.
+MOVE_FULL_CM_S = 60.0
+GROUND_SPEED = "GroundSpeed"
 # The fists-up guard, as the LEFT arm's directions in the body frame
 # (+X left, +Y forward, +Z up); the right arm mirrors X. The elbow hangs in
 # front of the ribs and the forearm rises to put the fist before the chin.
@@ -220,6 +251,9 @@ def pose_plan(skin, ref):
     steps.append((GUARD_GUN, skin.aim_bones[-1], ADDITIVE, chest, None))
     steps.append((GUARD_GUN, b["neck"], ADDITIVE, _conj(chest), None))
 
+    if skin.stance_clips:
+        return steps + _prone_on_clip(b)
+
     thigh = _swing(DOWN, FORWARD, CROUCH_THIGH_DEG)
     # The shin, carried forward by the thigh, swings back to S behind vertical.
     shin = math.radians(CROUCH_SHIN_DEG)
@@ -246,6 +280,14 @@ def pose_plan(skin, ref):
     for bone in (b["clavicle_l"], b["clavicle_r"], b["neck"]):
         steps.append((POSE_PRONE, bone, ADDITIVE, level, None))
     return steps
+
+
+def _prone_on_clip(b):
+    """The prone's corrections on the crawl clip (stance_clips.py): lift the
+    hips onto the ground, and higher while crawling."""
+    return [(POSE_PRONE, b["hips"], IGNORE, None,
+              (0.0, 0.0, PRONE_HIPS_CM - PRONE_CLIP_HIPS_Z)),
+             (PRONE_MOVING, b["hips"], IGNORE, None, (0.0, 0.0, PRONE_CRAWL_LIFT_CM))]
 
 
 # ─── authoring ───────────────────────────────────────────────────────────────
@@ -311,6 +353,28 @@ def _modify_bone(ed, step, weight_pins, x, y):
     return mb
 
 
+def move_alpha(ed, x, y):
+    """clamp(GroundSpeed / MOVE_FULL_CM_S, 0, 1), as a pin."""
+    speed = _at(ed.add_get_member_variable_node(GROUND_SPEED), x, y)
+    scaled = _at(_node(ed, FN_MUL_FF), x + 250, y)
+    _connect(_pin(speed, GROUND_SPEED, is_input=False), _pin(scaled, "A"))
+    _set(scaled, "B", 1.0 / MOVE_FULL_CM_S)
+    clamp = _at(_node(ed, FN_CLAMP), x + 500, y)
+    _connect(_pin(scaled, "ReturnValue", is_input=False), _pin(clamp, "Value"))
+    _set(clamp, "Min", 0.0)
+    _set(clamp, "Max", 1.0)
+    return _pin(clamp, "ReturnValue", is_input=False)
+
+
+def _prone_moving(ed, prone_pin):
+    """ProneMoving: PoseProne x Move."""
+    move = move_alpha(ed, -1900, 2450)
+    product = _at(_node(ed, FN_MUL_FF), -1100, 2450)
+    _connect(move, _pin(product, "A"))
+    _connect(prone_pin, _pin(product, "B"))
+    return _pin(product, "ReturnValue", is_input=False)
+
+
 def patch_body_pose(skin):
     """Insert the guard, crouch and prone poses before the aim pitch in
     ``skin``'s anim BP. Re-running replaces the previous chain."""
@@ -339,13 +403,20 @@ def patch_body_pose(skin):
         raise RuntimeError("the LocalToComponent feeds nothing")
     PIN.break_pin_links(start_out)
 
+    plan = pose_plan(skin, ref)
+    # Only the weights the plan reads: with the stance clips nothing reads
+    # PoseCrouch here, and a getter feeding nothing would be left behind by
+    # every rerun (_remove_previous finds nodes by what they feed).
+    used = {step[0] for step in plan} | ({POSE_PRONE} if skin.stance_clips else set())
     weight_pins, made = {}, []
-    for i, name in enumerate(POSE_WEIGHTS):
+    for i, name in enumerate(w for w in POSE_WEIGHTS if w in used):
         get = _at(ed.add_get_member_variable_node(name), -1100, 1900 + i * 120)
         weight_pins[name] = _pin(get, name, is_input=False)
         made.append(get)
+    if skin.stance_clips:
+        weight_pins[PRONE_MOVING] = _prone_moving(ed, weight_pins[POSE_PRONE])
     pose = start_out
-    for i, step in enumerate(pose_plan(skin, ref)):
+    for i, step in enumerate(plan):
         mb = _modify_bone(ed, step, weight_pins, -800 + i * 300, 1900)
         _connect(pose, _pin(mb, "ComponentPose"))
         pose = _pin(mb, "Pose", is_input=False)
@@ -354,12 +425,13 @@ def patch_body_pose(skin):
     ed.add_comment_to_nodes(
         "The procedural poses, each weight (0..1, written by BP_WeaponComponent) "
         f"driving its ModifyBones' Alpha: {GUARD_ARMS} fists up, {GUARD_GUN} "
-        f"the gun across the body, {POSE_CROUCH}, {POSE_PRONE}. No clip exists "
-        "for any of them. See Scripts/combat/body_pose.py.", made)
+        f"the gun across the body, {POSE_CROUCH}, {POSE_PRONE} (with the stance "
+        f"clips: the crawl's lift, more by {PRONE_MOVING} while crawling). "
+        "See Scripts/combat/body_pose.py.", made)
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{skin.anim_bp} failed to compile after the body poses")
     _assets().save_loaded_asset(bp)
-    _log(f"{bp.get_name()}: {len(made) - len(POSE_WEIGHTS)} ModifyBones for "
+    _log(f"{bp.get_name()}: {len(plan)} ModifyBones for "
          f"{', '.join(POSE_WEIGHTS)} before the aim pitch")
     return bp

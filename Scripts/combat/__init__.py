@@ -22,10 +22,11 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     the noise record, ensure_game_mode_vars()
   gun_tuning        gun_tuning.csv: the tunable stats (TUNE_STATS: column,
                     variable, label, step, minimum), reading and writing it
-  weapon_specs      the five weapons: parts, muzzles, icons, _weapon_specs()
-  weapon_models     the SMG's, the rifle's and the sniper's Fab models (SMG11,
-                    AK 47, AS Val + scope), their muzzles and sights, and the measured outline
-                    the grip and sight checks read in place of parts
+  weapon_specs      the five weapons: muzzles, icons, _weapon_specs()
+  weapon_models     every gun's model: the SMG's, the rifle's and the sniper's Fab
+                    ones (SMG11, AK 47, AS Val + scope), the shotgun's and the pistol's
+                    Quaternius ones (Shotgun_3, Pistol_1), their muzzles and sights,
+                    and the measured outline the grip and sight checks read
   camera            boom and aim-trace numbers, face/aim-the-camera patches
   knife             BP_Knife: the Fab M9 knife as a Melee item, its model
                     placement and measured outline, build_knife()
@@ -45,8 +46,10 @@ ASSETS AND PATCHES
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
   aim_pitch         the player's anim BP: AimPitch tips the upper body (two
                     spine ModifyBones) so the gun follows the sights' pitch
-  body_pose         the player's anim BP: crouch, prone and guard poses as
-                    weighted ModifyBones (no clip exists), pose_plan()
+  body_pose         the player's anim BP: guard poses, and crouch and prone where
+                    the rig has no clips, as weighted ModifyBones, pose_plan()
+  stance_clips      the player's anim BP: the Quaternius crouch and crawl clips
+                    blended over the locomotion by PoseCrouch/PoseProne
   skin              the player's body (PlayerSkin, wear_skin)
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)

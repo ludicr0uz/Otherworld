@@ -201,7 +201,7 @@ def _reject(v, axis):
     d = v.dot(axis)
     return _unit(v.x - d * axis.x, v.y - d * axis.y, v.z - d * axis.z)
 
-def measure_clip_palm_twist(src_anim, tgt_anim, tgt_mesh, time=0.0):
+def measure_clip_palm_twist(src_anim, tgt_anim, tgt_mesh, time=0.0, src_mesh=None):
     """Residual palm roll in an actual retargeted clip, per side, in degrees.
 
     The reference-pose measurement cannot see the fix: auto-align writes into
@@ -211,8 +211,10 @@ def measure_clip_palm_twist(src_anim, tgt_anim, tgt_mesh, time=0.0):
 
     The hand cloud is rigid to its bone, so the palm frame at time t is the
     reference-pose frame carried by the bone's animated rotation.
+    ``src_mesh`` is the source's skin, the mannequin unless given: any rig
+    whose hands are named hand_l/hand_r (the Quaternius UAL's are).
     """
-    man = _load(MANNEQUIN_MESH)
+    man = src_mesh or _load(MANNEQUIN_MESH)
     out = {}
     for src_bone, tgt_bone in HAND_PAIRS:
         sf0, sn0 = hand_frame(man, src_bone)
@@ -243,7 +245,7 @@ def measure_palm_twist(target_mesh):
     return out
 
 
-def measure_clip_hand_turn(src_anim, tgt_anim, tgt_mesh, time=0.0):
+def measure_clip_hand_turn(src_anim, tgt_anim, tgt_mesh, time=0.0, src_mesh=None):
     """The whole turn from the target hand's frame onto the mannequin's, in a
     retargeted clip: {hand: (axis in the hand bone's local space, degrees)}.
 
@@ -256,8 +258,9 @@ def measure_clip_hand_turn(src_anim, tgt_anim, tgt_mesh, time=0.0):
 
     The axis is taken into the hand's local space through its rotation at the
     same instant, which is where a retarget-pose offset rotates it.
+    ``src_mesh`` as in measure_clip_palm_twist.
     """
-    man = _load(MANNEQUIN_MESH)
+    man = src_mesh or _load(MANNEQUIN_MESH)
     out = {}
     for src_bone, tgt_bone in HAND_PAIRS:
         frames = []

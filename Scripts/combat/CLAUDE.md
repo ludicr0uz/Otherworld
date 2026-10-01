@@ -32,9 +32,16 @@ menu polls its own copy from `DrawHUD`, which does.
   - equipping is an attach, and dropping is a detach;
   - `Inventory` is one typed array of `BP_WeaponItem`;
   - firing reads every stat off `Held`, with one cast and no per-weapon branching.
-- **A new weapon is a row plus a part table.** Add a row in `weapon_specs._weapon_specs()` and a
-  part table. Adding the SMG, the rifle and the sniper changed **no** node in the fire, reload or
-  gate graphs.
+- **A new weapon is a row plus a model and its outline.** Add a row in
+  `weapon_specs._weapon_specs()`. Adding the SMG, the rifle and the sniper changed **no** node
+  in the fire, reload or gate graphs.
+- **The shotgun and the pistol are Quaternius models** (`weapon_models.py`): the Ultimate Gun
+  Pack's `SM_Shotgun_3` (a pump gun with a straight wooden stock) and `SM_Pistol_1`, CC0,
+  imported by `asset_pipeline/import_quaternius.py` into `/Game/Sourced/Quaternius/Guns`
+  (zips in `assets/cache/quaternius/`). The pack is at no one size, so each row's model
+  carries its scale to real size (0.18 and 0.11: 104 cm and 20 cm). Static meshes have no
+  muzzle socket: the muzzles are the barrels' ends, measured. The shotgun's index can't reach
+  its guard from the rifle's ready pose (`docs/aiming.md`).
 - **The SMG, the rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon
   Bundle's SMG11 (`SK_SMG11_X`, a MAC-11 with its wire stock folded), AK 47 (`SK_KA47_X`) and
   AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
@@ -48,8 +55,8 @@ menu polls its own copy from `DrawHUD`, which does.
     `b_gun_muzzleflash` sockets.
   - The pack isn't committed. Without it the build stops at `_must_load`.
     `Scripts/asset_pipeline/fab_library.json` is the restore recipe.
-  - The shotgun and pistol are still primitives. The pack has no shotgun or pistol, and its
-    KA74U was not asked for.
+  - The pack has no shotgun or pistol (those are Quaternius's, above), and its KA74U was not
+    asked for.
 - **Equipping is authored once.** BeginPlay, switch, drop and pick-up only set `NeedsRefresh`.
   Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
@@ -172,7 +179,7 @@ These are feel checks a headless run can't do:
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
 - the SMG11 down its sights: the eye rides a centimetre over the folded stock's wire, 23 cm
-  behind the grip (the shotgun's is 20), which may put the adventurer's head in view;
+  behind the grip (the shotgun's is 12), which may put the adventurer's head in view;
 - the `GUN_ACCURACY` numbers: how wide each cloud feels at the hip, and whether the reticle's
   gap (and its 240 px cap) reads well on a real window;
 - how the death camera looks under the terrain;
@@ -180,5 +187,10 @@ These are feel checks a headless run can't do:
 - the throw: whether V and its arc read well (dot size and spacing, the landing disc on
   slopes), whether 11 m/s at 12° up feels right, and the item snapping from the hand to the
   launch point (there is no throw animation);
-- the body poses in motion: the walk cycle plays on top of the crouch and the prone legs, and a
-  prone body is longer than its capsule, so it can clip into slopes and walls.
+- the stance clips in motion (`stance_clips.py`): the crouched walk covers about 55 cm/s and
+  plays at 2x, so at the crouch's 270 cm/s the feet slide; the crawl is the UAL's face-down
+  swim (no crawl clip exists in the packs), a two-armed pull and a frog kick, which may read
+  as swimming on dry ground; armed, only its legs show under the aim. A prone body is longer
+  than its capsule, so it can clip into slopes and walls. On the mannequin fallback the
+  procedural poses still apply, with the walk cycle on top of them;
+- the shotgun's index finger along the receiver, 4 cm above the guard (`docs/aiming.md`).

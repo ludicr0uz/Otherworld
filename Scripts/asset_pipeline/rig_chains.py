@@ -1,4 +1,5 @@
-"""rig_chains -- the IK Rig chain tables: mannequin, Meshy and Mixamo side by side.
+"""rig_chains -- the IK Rig chain tables: mannequin, Meshy, Mixamo and the
+Quaternius UAL side by side.
 
 Constants only.  Chain names are identical on both sides so the retargeter maps
 them by exact string match (see build_retarget.py's docstring for why the chains
@@ -103,3 +104,26 @@ CHAINS_MIXAMO = {
 }
 
 RETARGET_ROOT_MIXAMO = "Hips"
+
+# ─── Quaternius UAL, the source side of RTG_<Character>_from_UAL1/2 ──────────
+#
+# The Universal Animation Library's rig is named the mannequin's way, but it is
+# a smaller tree: three spine joints (spine_01..03, not five), one neck joint,
+# ``Head`` capitalised, no twist bones, and four joints per finger where the
+# fourth (_04_leaf) is the tip's end effector.  The finger chains stop at 3
+# like every other table here.
+CHAINS_UAL = {
+    "Spine":         ("spine_01", "spine_03"),
+    "Neck":          ("neck_01", "neck_01"),
+    "Head":          ("Head", "Head"),
+    "LeftClavicle":  ("clavicle_l", "clavicle_l"),
+    "LeftArm":       ("upperarm_l", "hand_l"),
+    "RightClavicle": ("clavicle_r", "clavicle_r"),
+    "RightArm":      ("upperarm_r", "hand_r"),
+    "LeftLeg":       ("thigh_l", "ball_l"),
+    "RightLeg":      ("thigh_r", "ball_r"),
+    **_finger_chains(mannequin_finger_bone, meshy=False),
+}
+
+RETARGET_ROOT_UAL = "pelvis"
+ROOT_MOTION_BONE_UAL = "root"

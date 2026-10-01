@@ -53,6 +53,9 @@ from combat.audio import (                                        # noqa: E402
     apply_attenuation, build_sound_attenuations, import_sounds,
 )
 from combat.body_pose import patch_body_pose                      # noqa: E402
+from combat.stance_clips import (                                 # noqa: E402
+    patch_stance_clips, unpatch_stance_clips,
+)
 from combat.blood import build_blood_splash                       # noqa: E402
 from combat.combat_trace import build_combat_trace_switch         # noqa: E402
 from combat.footsteps import build_footstep_component             # noqa: E402
@@ -99,9 +102,14 @@ def main():
     # ready pose as seen through the player's own rig, so the body has to be
     # the final one before the first spec is built.
     skin = wear_skin()
+    # Before anything compiles the anim BP (see unpatch_stance_clips).
+    unpatch_stance_clips(skin)
     # Before the weapon component, whose Tick sets the AimPitch this declares.
     patch_aim_pitch(skin)
     patch_body_pose(skin)
+    # The crouch and the crawl clips under everything else (or none, and the
+    # body poses above do it procedurally).
+    patch_stance_clips(skin)
 
     item_bp = build_weapon_item()
     weapons = {}

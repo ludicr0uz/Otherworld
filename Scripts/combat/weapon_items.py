@@ -27,6 +27,7 @@ from combat.graph import (
     _handles, _log, _must_load, _root_handle, _struct_type,
 )
 from combat.paths import ITEM_BP_PATH
+from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR
 from combat.tuning import COMBAT
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
@@ -90,7 +91,11 @@ def build_weapon_item():
                        # Struck rather than fired: the fire key lights a
                        # campfire with it (weapon_component/light.py). The
                        # matches. Read behind the fire gate, as Melee is.
-                       (LIGHTS_VAR, "bool")):
+                       (LIGHTS_VAR, "bool"),
+                       # Aimed down its sights by the sights key: a gun. False
+                       # on everything else, which that key aims over the
+                       # shoulder (weapon_component/ads.py).
+                       (HAS_SIGHTS_VAR, "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     # Where the eye goes when this weapon is aimed down its sights, in the
@@ -259,6 +264,7 @@ def build_weapon(spec, item_bp):
         "Automatic": bool(spec["automatic"]),
         "Consumable": False,
         "Melee": False,
+        HAS_SIGHTS_VAR: True,
         "MagazineSize": int(spec["magazine"]),
         # Starts loaded. A weapon that had to be reloaded before its first shot
         # would be a puzzle, not a mechanic.

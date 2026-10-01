@@ -29,6 +29,12 @@ SEAT_VAR = "SightSeat"
 # headless game. False in every real game.
 SIGHTS_FORCED_VAR = "SightsForced"
 
+# On BP_WeaponItem: it has sights to aim down, which is to say it is a gun.
+# Only the guns' rows set it (weapon_items.py), so the knife, the axe, the
+# matches, wood, food and any item added later aim over the shoulder
+# whichever key is held: nothing has sights unless it says so.
+HAS_SIGHTS_VAR = "HasSights"
+
 # The gun stays up, and the body keeps the aim (SightBlend: the upper body's
 # pitch, the sway), while the camera is still this far onto the gun. Letting
 # the key go lowers the gun and levels the body, and a camera still easing

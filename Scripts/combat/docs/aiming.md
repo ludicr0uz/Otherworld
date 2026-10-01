@@ -23,7 +23,9 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     4x), and `sights.py` eases the camera from the boom's `SpringEndpoint` to the held weapon's
     `SightOffset` by `SightSeat`, and **turns it onto the weapon's sight line** (below).
   - `Aiming` is either key (cloud, recoil, slowdown). `SightAiming` is the sights key alone,
-    never with a consumable. `AimZoom` stores the zoom being aimed at. It isn't written on
+    and only with a gun in hand: an item whose `HasSights` is set, which the guns' rows alone
+    do (`weapon_items.py`). The knife, the axe, the matches, wood and food have no sights, so
+    the sights key aims them over the shoulder (`probes/probe_item_no_sights.py`). `AimZoom` stores the zoom being aimed at. It isn't written on
     release, so the walk slowdown's ease-out divides by the zoom being let go of.
   - The camera is written every frame, both ways. The template camera has no offset or turn
     on the boom and does not take the control rotation itself (asserted in `aim_camera`), so

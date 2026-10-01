@@ -200,8 +200,8 @@ editor.
   the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
   Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). A gun is carried lowered, in the hand of the stock idle and jog, and comes up into its
   ready pose for an aim, a shot, a reload or the guard (`combat/weapon_component/carry.py`).
-  The player can sprint, aim over the shoulder or down
-  the sights (the sniper's is its scope), reload and eat, block (F; a swing from the front does a
+  The player can sprint, aim over the shoulder or, with a gun, down
+  the sights (the sniper's is its scope; the knife, the axe and the other items have none, so the sights key aims them over the shoulder), reload and eat, block (F; a swing from the front does a
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
   `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), light a campfire (left click with the matches in hand and wood in the bag: the wood is spent and a fire stands in front of the player for 3 minutes, warming them within 4 m: `combat/weapon_component/light.py`, `survival/campfire.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
   clips (the crawl is its face-down swim: the packs have no crawl), throw whatever is in hand (hold V to

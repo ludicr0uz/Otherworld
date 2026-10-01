@@ -13,7 +13,7 @@ from combat.nodes import (
     FN_SET_FOV, FN_SET_PITCH_SCALE, FN_SET_YAW_SCALE, FN_SUB_FF,
     MOVEMENT_CLASS_PATH,
 )
-from combat.seat_tuning import SEATED_VAR, SIGHTS_FORCED_VAR
+from combat.seat_tuning import HAS_SIGHTS_VAR, SEATED_VAR, SIGHTS_FORCED_VAR
 from combat.tuning import AIM_KEY, COMBAT, SIGHTS_KEY
 from combat.weapon_component.common import _prop
 
@@ -26,7 +26,7 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
         sights    = IsInputKeyDown(KeySights) OR SightsForced
         Aiming    = (shoulder OR sights) AND NOT Sprinting AND IsValid(Held)
         if Aiming:
-            SightAiming = sights AND NOT Held.Consumable
+            SightAiming = sights AND Held.HasSights
             AimZoom     = SightAiming AND SightSeated ? Held.AdsZoom
                                                       : COMBAT.shoulder_zoom
             TargetFOV   = BaseFOV / AimZoom
@@ -51,12 +51,13 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
     that cannot fire, and the view would be narrow exactly when the player is
     running away and needs it wide.
 
-    Not with empty hands, because AdsZoom and Consumable are read off Held and
+    Not with empty hands, because AdsZoom and HasSights are read off Held and
     a pure Get off a null self is an Accessed None every frame. Those reads sit
     inside the true arm of the branch, where Held is known valid -- pure nodes
     are pulled by whoever reads them, so the getters simply never run on the
-    frames nothing is equipped. Food has no sights, so a consumable in hand
-    aims over the shoulder whichever key is held.
+    frames nothing is equipped. Only a gun has sights (HasSights, set by the
+    guns' rows alone), so the knife, the axe, the matches, wood and food aim
+    over the shoulder whichever key is held.
 
     AimZoom is not written on the false arm on purpose: it is left at the zoom
     being let go of, which is what the walk slowdown's ease-out normalises by.
@@ -107,13 +108,11 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
     _connect(BEL.find_then_pin(mark), _pin(zoomed, "execute"))
 
     # True arm. Held is valid here, so it can be asked about.
-    food, food_n = _prop(ed, "Consumable", held, x0 + 1240, y0 + 560)
-    keep(food_n)
-    no_food = keep(_at(_node(ed, FN_NOT_B), x0 + 1500, y0 + 560))
-    _connect(food, _pin(no_food, "A"))
+    sighted, sighted_n = _prop(ed, HAS_SIGHTS_VAR, held, x0 + 1240, y0 + 560)
+    keep(sighted_n)
     down_sights = keep(_at(_node(ed, FN_AND), x0 + 1760, y0 + 500))
     _connect(sights, _pin(down_sights, "A"))
-    _connect(_pin(no_food, "ReturnValue", is_input=False), _pin(down_sights, "B"))
+    _connect(sighted, _pin(down_sights, "B"))
     sight_on = keep(_at(ed.add_set_member_variable_node("SightAiming"),
                         x0 + 1500, y0))
     _connect(_pin(down_sights, "ReturnValue", is_input=False),

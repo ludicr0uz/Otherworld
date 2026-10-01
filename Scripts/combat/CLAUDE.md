@@ -16,7 +16,9 @@ The defaults are all rebindable on the settings screen:
 - A gun is **carried lowered** (the jog's own arms, the gun in the hand) and comes up into its
   ready pose while an aim key or the guard is held, and for a shot or a reload
   (`weapon_component/carry.py`, `docs/aiming.md`).
-- Right click aims **over the shoulder**, middle click aims **down the sights** (both held),
+- Right click aims **over the shoulder**, middle click aims **down the sights** (both held;
+  only a gun has sights, `HasSights`, so with the knife, the axe, the matches, wood or food
+  in hand the middle click aims over the shoulder too: `probes/probe_item_no_sights.py`),
   **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **V** held shows the throw's arc and a click throws (see below).
 - **R** reloads, and restarts from the death menu.

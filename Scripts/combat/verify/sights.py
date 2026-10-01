@@ -6,10 +6,13 @@ to the one and turns onto the other.
 import unreal
 
 from combat.nodes import SPRING_ARM_SOCKET
-from combat.paths import CYLINDER
+from combat.paths import (
+    AXE_BP_PATH, CYLINDER, ITEM_BP_PATH, KNIFE_BP_PATH, MATCHES_BP_PATH,
+    WOOD_BP_PATH,
+)
 from combat.seat_tuning import (
-    SEAT_HOLD, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_COS, SIGHT_SEAT_DEG,
-    SIGHTS_FORCED_VAR,
+    HAS_SIGHTS_VAR, SEAT_HOLD, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_COS,
+    SIGHT_SEAT_DEG, SIGHTS_FORCED_VAR,
 )
 from combat.tuning import BIND_VARS, COMBAT, SIGHTS_KEY
 from combat.weapon_component.sights import SCOPE_HIDE_BLEND, SIGHT_LINE_MIN_CM
@@ -81,9 +84,10 @@ def check_two_aim_keys():
         off = [x for x in writes["SightAiming"]
                if pin_value(x, "SightAiming") == "false"
                and not PIN.list_connected_pins(BEL.find_input_pin(x, "SightAiming"))]
-        check("...the one off the sights key alone, and never with food in hand",
+        check(f"...the one off the sights key alone, and only with a gun in hand "
+              f"(Held.{HAS_SIGHTS_VAR})",
               len(on) == 1 and "Get KeySights" in on[0]
-              and "Get KeyAim" not in on[0] and "Get Consumable" in on[0],
+              and "Get KeyAim" not in on[0] and f"Get {HAS_SIGHTS_VAR}" in on[0],
               str(sorted(on[0]) if on else fed))
         check(f"...or off {SIGHTS_FORCED_VAR}, the probes' stand-in for that key, "
               "which is False in a real game",
@@ -131,6 +135,22 @@ def _blocks(box, eye, front, slack=0.1):
     rise = (front[2] - eye[2]) / (front[0] - eye[0])
     z0, z1 = sorted(eye[2] + (x - eye[0]) * rise for x in (x0, x1))
     return z0 < hi[2] - slack and z1 > lo[2]
+
+
+def check_only_guns_have_sights():
+    # The sights key takes the camera onto the item only where the item says
+    # it has sights. The guns' rows say so; the base class does not, so the
+    # knife, the axe, the matches, wood, food and anything added later don't.
+    for sp in _weapon_specs():
+        got = cdo(load(sp["path"])).get_editor_property(HAS_SIGHTS_VAR)
+        check(f"{sp['display']}: a gun, so it has sights to aim down "
+              f"({HAS_SIGHTS_VAR})", got is True, str(got))
+    for what, path in (("the base item (so food, and any new item)", ITEM_BP_PATH),
+                       ("the knife", KNIFE_BP_PATH), ("the axe", AXE_BP_PATH),
+                       ("the matches", MATCHES_BP_PATH), ("wood", WOOD_BP_PATH)):
+        got = cdo(load(path)).get_editor_property(HAS_SIGHTS_VAR)
+        check(f"{what} has no sights: the sights key aims it over the shoulder",
+              got is False, str(got))
 
 
 def check_eye_points():
@@ -407,5 +427,6 @@ def check_sight_seat():
 
 def run():
     check_two_aim_keys()
+    check_only_guns_have_sights()
     check_eye_points()
     check_sight_camera()

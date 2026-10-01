@@ -40,7 +40,7 @@ from graphics_menu.gfx_tune_consts import (
     TUNER_TREE_DISTANCE_APPLIED_VAR, TUNER_VALUES_VAR,
 )
 from graphics_menu.gfx_tuner_foliage import FN_NEQ_II, author_foliage
-from graphics_menu.gfx_tuner_read import stat, whole
+from graphics_menu.gfx_tuner_read import applied, whole
 from graphics_menu.gfx_tuner_sky import author_sky
 from graphics_menu.loot_find import put
 
@@ -104,17 +104,18 @@ def _connect_exec(src, node):
 
 
 def _author_cvars(ed, in_execs, x0, y0, made):
-    """One console command per cvar stat. Returns the last then pin."""
+    """One console command per cvar stat: a whole number as an int, a
+    percentage as the fraction the cvar takes. Returns the last then pin."""
     flow, x = None, x0
     for index, st in stats_by(CVAR):
-        if st.kind is int:
+        if st.kind is int and st.scale == 1:
             words = _call(ed, FN_BUILD_INT, x, y0 + 400, made,
                           Prefix=command_prefix(st.target),
                           InInt=whole(ed, index, x - 760, y0 + 600, made))
         else:
             words = _call(ed, FN_BUILD_FLOAT, x, y0 + 400, made,
                           Prefix=command_prefix(st.target),
-                          InDouble=stat(ed, index, x - 520, y0 + 600, made))
+                          InDouble=applied(ed, index, x - 760, y0 + 600, made))
         # WorldContextObject is a hidden pin the compiler fills from self, and
         # a null SpecificPlayer is the first local player.
         run = _call(ed, FN_CONSOLE, x + 300, y0, made, Command=_out(words))

@@ -1,25 +1,28 @@
-"""The M panel's GRAPHICS TUNING tab: its key, the HUD's variables, the widget
+"""The M panel's GRAPHICS TUNING tab: its row, the HUD's variables, the widget
 names and words, and the Python command its save runs. Constants only, so
 wbp_tune (the layout), gfx_tune_tick and tune_draw (the graph), gfx_tune_save
 (the save, run inside the game) and gfx_checks read one table.
 
-    [P] with the M panel open   open / close the tab (and shut the other three)
-    Up / Down, Left / Right,    as GUN TUNING (tune_tab.py). The subject row
-    Enter                       is the quality preset: Left / Right there pick
-                                Low / Medium / High / Ultra, as the 1-4 keys
-                                do. The rows under it are that preset's
-                                numbers; Enter saves all four presets to
-                                graphics_menu/graphics_tuning.csv
+    the M panel's row           opens the tab (tune_tab.py); BACK shuts it
+    Up / Down, Left / Right,    as GUN TUNING. The subject row is the quality
+    Enter                       preset: Left / Right there pick Low / Medium /
+                                High / Ultra, and it is the only place a
+                                preset is picked. The rows under it are that
+                                preset's numbers; Enter saves all four
+                                presets to graphics_menu/graphics_tuning.csv
 
-P, not G: the weapon component polls its keys with the panel open too, and G
-drops the held gun. The rows, their steps and limits are gfx_stats.GFX_STATS.
+The tab is the one the player keeps open while looking at the picture, so it
+is small and out of the way: bottom right, a small title, and a list that
+shows GFX_VISIBLE_ROWS rows at a time behind a scroll bar (the wheel moves
+the caret, and the list follows it). The rows, their steps and limits are
+gfx_stats.GFX_STATS.
 """
 
 from graphics_menu.gfx_stats import GFX_STATS, PRESET_LABELS, STAT_COUNT
 from graphics_menu.tune_tab import TuneTab, save_command
 
-GFX_TUNE_KEY = "P"
-GFX_TUNE_ROW_LABEL = f"[{GFX_TUNE_KEY}]   graphics tuning"
+GFX_TUNE_ACTION = "graphics_tuning"  # the M panel row that opens the tab
+GFX_TUNE_ROW_LABEL = "graphics tuning"
 
 GFX_TUNE_OPEN_VAR = "GfxTuneOpen"
 GFX_TUNE_ROW_VAR = "GfxTuneRow"          # 0 = the preset row, 1.. = GFX_STATS
@@ -47,10 +50,14 @@ GFX_APPLIED_DEFAULT = -1
 # The HUD's BP_GraphicsTuner component (gfx_tuner.py), which applies a row.
 TUNER_COMPONENT = "GraphicsTuner"
 
+# The list's window, and the title's size (the other tabs: TUNE_TITLE_FONT).
+GFX_VISIBLE_ROWS = 5
+GFX_TITLE_FONT = 13.0
+
 GFX_TUNE_SAVE_COMMAND = save_command("graphics_menu.gfx_tune_save")
 
 GFX_TAB = TuneTab(
-    key=GFX_TUNE_KEY, open_var=GFX_TUNE_OPEN_VAR, row_var=GFX_TUNE_ROW_VAR,
+    action=GFX_TUNE_ACTION, open_var=GFX_TUNE_OPEN_VAR, row_var=GFX_TUNE_ROW_VAR,
     pick_var=GFX_TUNE_PICK_VAR, nudge_var=GFX_TUNE_NUDGE_VAR,
     save_var=GFX_TUNE_SAVE_VAR, saved_var=GFX_TUNE_SAVED_VAR,
     touched_var=GFX_TUNE_TOUCHED_VAR, values_var=GFX_TUNE_VALUES_VAR,
@@ -58,13 +65,14 @@ GFX_TAB = TuneTab(
     mins_var=GFX_TUNE_MINS_VAR, stat_count=STAT_COUNT,
     save_command=GFX_TUNE_SAVE_COMMAND,
     panel="GfxTunePanel", rows_box="GfxTuneRows", saved_text="GfxTuneSavedText",
+    back_widget="GfxTuneBack",
     title_widget="GfxTuneTitle", hint_widget="GfxTuneHint",
     title_text="GRAPHICS TUNING",
     row_labels=("preset",) + tuple(s.label for s in GFX_STATS),
-    hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
-               "ENTER  save to graphics_tuning.csv"),
+    hint_text="LEFT / RIGHT or click  change   ·   ENTER  save",
     saved_words="saved to Scripts/graphics_menu/graphics_tuning.csv",
-    fraction_digits=2, maxs_var=GFX_TUNE_MAXS_VAR, label_w=320.0, panel_w=600.0)
+    fraction_digits=2, maxs_var=GFX_TUNE_MAXS_VAR, label_w=280.0, panel_w=440.0,
+    title_font=GFX_TITLE_FONT, visible_rows=GFX_VISIBLE_ROWS, corner=True)
 
 assert len(PRESET_LABELS) == 4
 

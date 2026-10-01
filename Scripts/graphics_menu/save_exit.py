@@ -8,7 +8,7 @@ One fragment, run every Tick after the grass sync, in this order:
      which never draws -- can be probed.
   2. A started game whose profile has not been looked for, with the loadout
      spawned?  ProfileChecked = true; if the slot exists, profile_read.py.
-  3. X with the M panel open, and no exit running?  ExitPending, ExitStartedAt
+  3. The panel's save-and-exit row taken, no exit running?  ExitPending, ExitStartedAt
      = now, ExitAt = now + EXIT_SECONDS, and the panel closes.
   4. An exit running?  If the player was hit since it started
      (BP_HealthComponent.LastDamageTime, stamped by the wanderers' swing) it
@@ -18,7 +18,7 @@ One fragment, run every Tick after the grass sync, in this order:
      Tick, so the character stands still for the whole countdown. Every Tick
      rather than once at the X: the countdown can be started by writing its
      variables (the probe does), and the freeze follows ExitPending either way.
-  5. The dev-all-guns cheat ([K] in the panel; dev_guns.py).
+  5. The dev-all-guns cheat (its row in the panel; dev_guns.py).
 
 Everything reads off the player_parts cast chain; a pawn without the parts
 skips the whole fragment.
@@ -26,11 +26,11 @@ skips the whole fragment.
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
-from graphics_menu.menu_nav import or_pause_click
+from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.dev_guns import author_dev_guns
 from graphics_menu.player_parts import PAWN, author_player_parts
 from graphics_menu.profile_consts import (
-    EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_KEY, EXIT_PENDING_VAR, EXIT_SECONDS,
+    EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_ACTION, EXIT_PENDING_VAR, EXIT_SECONDS,
     EXIT_STARTED_VAR, NEVER, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR,
     PROFILE_SLOT, PROFILE_USER_INDEX,
 )
@@ -174,13 +174,11 @@ def _author_load_once(ed, parts, in_execs, x0, y0, made):
 
 
 def _author_start(ed, pc_out, now_out, in_execs, x0, y0, made):
-    """X in the open panel, with no exit running, starts the countdown."""
-    pressed = _call(ed, FN_WAS_PRESSED, x0, y0 + 300, made, self=pc_out, Key=EXIT_KEY)
-    in_menu = _call(ed, FN_AND, x0 + 240, y0 + 300, made,
-                    A=_get(ed, "MenuOpen", x0, y0 + 440, made), B=_out(pressed))
+    """The M panel's save-and-exit row, with no exit running, starts the
+    countdown."""
     idle = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
                  A=_get(ed, EXIT_PENDING_VAR, x0, y0 + 580, made))
-    asked = or_pause_click(ed, _out(in_menu), EXIT_KEY, x0, y0 + 760, made)
+    asked = pause_row_taken(ed, EXIT_ACTION, x0, y0 + 760, made)
     go = _call(ed, FN_AND, x0 + 480, y0 + 300, made, A=asked, B=_out(idle))
     start, stay = _branch(ed, _out(go), in_execs, x0 + 720, y0, made)
     flow = _setter(ed, EXIT_PENDING_VAR, "true", [start], x0 + 980, y0, made)
@@ -246,7 +244,7 @@ def author_save_exit_tick(ed, pc_out, in_execs, x0, y0):
     flow = _author_countdown(ed, parts, now_out, flow, x0 + 14000, y0, made)
     flow = author_dev_guns(ed, pc_out, parts, flow, x0 + 22000, y0, made)
     ed.add_comment_to_nodes(
-        f"Save and exit ([{EXIT_KEY}] in the panel, {EXIT_SECONDS:.0f} s, called off "
+        f"Save and exit (its row in the M panel, {EXIT_SECONDS:.0f} s, called off "
         f"by a hit), the saved profile loaded once a game starts, and deleted "
         f"when the player dies.", made[:1])
     return flow + dead_tails + fails

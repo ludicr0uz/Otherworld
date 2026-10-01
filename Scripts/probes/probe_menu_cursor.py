@@ -1,6 +1,8 @@
 """The mouse cursor in the menus: it shows while a menu is up and hides for
 play, a click on a menu row is not a shot, and what a click raises is served
-as the row's key.
+as the row's action. Also the M panel as a menu: an open tuning tab stands in
+place of the panel's rows, BACK's caret, and the open panel holding the
+player still.
 
 A -nullrhi run lays out no widget and has no mouse, so nothing is ever under
 the cursor here: the probe raises what a click would (CursorAccept,
@@ -13,20 +15,23 @@ from combat.paths import GAME_MODE_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLA
 from graphics_menu import cursor_consts as CC
 from graphics_menu import umg_consts as C
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
-from graphics_menu.presets import DEFAULT_PRESET, PRESET_KEYS
 from graphics_menu.settings_rows import BACK_ROW, PAGE_SETTINGS, PAGE_TITLE
 from graphics_menu.tune_consts import GUN_TAB
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (
     "MenuOpen", C.GAME_STARTED_VAR, "MenuPage", "MenuRow", LOOT_OPEN_VAR,
-    CC.CURSOR_ACCEPT_VAR, CC.PAUSE_CLICK_VAR)]
+    CC.CURSOR_ACCEPT_VAR, CC.PAUSE_CLICK_VAR, GUN_TAB.open_var, GUN_TAB.row_var)]
 WRITABLE += [(GAME_MODE_BP_PATH, "PlayerDead"),
              (WEAPON_COMP_BP_PATH, CC.TRIGGER_SPENT_VAR)]
 
 
 def _draw(hud):
     hud.call_method("ReceiveDrawHUD", (1920, 1080))
+
+
+def _up(widget):
+    return "COLLAPSED" not in str(widget.get_visibility()).upper()
 
 
 def _cursor(p, hud):
@@ -56,25 +61,61 @@ def probe(p):
     p.check("...and holds the weapon's fire press spent, so a click is not a shot",
             p.get(wc, CC.TRIGGER_SPENT_VAR) is True, str(p.get(wc, CC.TRIGGER_SPENT_VAR)))
 
-    # --- a click on an M panel row is the row's key, served by Tick -------------
-    want = (DEFAULT_PRESET + 2) % len(PRESET_KEYS)
-    before = p.get(hud, "Quality")
-    p.set(hud, CC.PAUSE_CLICK_VAR, want)
-    yield lambda: p.get(hud, "Quality") == want
-    p.check(f"a click on preset row {want} picks that preset",
-            p.get(hud, "Quality") == want, f"{before} -> {p.get(hud, 'Quality')}")
-    tab_row = C.PAUSE_ROW_KEYS.index(GUN_TAB.key)
+    yield 0.1
+    p.check("...and the open panel holds the player still: the controller ignores "
+            "move input, so the arrows only work the menu",
+            p.controller().is_move_input_ignored())
+
+    # --- a row taken (a click, or Enter on the caret's row) is served by Tick ---
+    # The debug row: taken twice, so the saved setting ends as it began.
+    debug_row = C.PAUSE_ROW_ACTIONS.index(C.DEBUG_ACTION)
+    before = p.get(mode, "DebugMode")
+    p.set(hud, CC.PAUSE_CLICK_VAR, debug_row)
+    yield lambda: p.get(mode, "DebugMode") != before
+    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    flipped = p.get(mode, "DebugMode")
+    p.set(hud, CC.PAUSE_CLICK_VAR, debug_row)
+    yield lambda: p.get(mode, "DebugMode") == before
+    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.check("taking the debug row toggles debug mode, and again toggles it back",
+            flipped != before and p.get(mode, "DebugMode") == before,
+            f"{before} -> {flipped} -> {p.get(mode, 'DebugMode')}")
+
+    ui = p.get(hud, "UiPause")
+    own, tab = (ui.get_editor_property(n) for n in (C.PAUSE_PANEL, GUN_TAB.panel))
+    p.check("with no tab open the panel shows its own rows",
+            _up(own) and not _up(tab), f"{own.get_visibility()}, {tab.get_visibility()}")
+    tab_row = C.PAUSE_ROW_ACTIONS.index(GUN_TAB.action)
+    p.set(hud, GUN_TAB.row_var, 3)
     p.set(hud, CC.PAUSE_CLICK_VAR, tab_row)
     yield lambda: p.get(hud, GUN_TAB.open_var)
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    p.check("a click on the gun tuning row opens its tab", p.get(hud, GUN_TAB.open_var))
-    p.set(hud, CC.PAUSE_CLICK_VAR, want)
+    p.check("taking the gun tuning row opens its tab, the caret on its first row",
+            p.get(hud, GUN_TAB.open_var) and p.get(hud, GUN_TAB.row_var) == 0,
+            f"row {p.get(hud, GUN_TAB.row_var)}")
     _draw(hud)
-    p.check("the next frame lowers the click, so it is served once",
+    back = ui.get_editor_property(GUN_TAB.back_widget)
+    p.check("the open tab stands in place of the panel's rows: one menu on screen",
+            _up(tab) and not _up(own), f"{own.get_visibility()}, {tab.get_visibility()}")
+    p.check("...its BACK row unlit while the caret is in the list",
+            back.get_editor_property(C.ROW_CARET).get_render_opacity() == 0.0)
+    p.set(hud, GUN_TAB.row_var, GUN_TAB.back_row)
+    _draw(hud)
+    p.check("...and lit with the caret on it",
+            back.get_editor_property(C.ROW_CARET).get_render_opacity() == 1.0)
+    # BACK itself is Enter or a click, which a probe has neither of: what it
+    # does is lower the tab's open flag.
+    p.set(hud, GUN_TAB.open_var, False)
+    _draw(hud)
+    p.check("back from the tab, the panel's own rows return",
+            _up(own) and not _up(tab), f"{own.get_visibility()}, {tab.get_visibility()}")
+    p.set(hud, CC.PAUSE_CLICK_VAR, tab_row)
+    _draw(hud)
+    p.check("the next frame lowers a taken row, so it is served once",
             p.get(hud, CC.PAUSE_CLICK_VAR) == CC.NO_ROW, str(p.get(hud, CC.PAUSE_CLICK_VAR)))
 
-    # The close button is the last row, and its key is M: Tick shuts the panel.
-    p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_KEYS.index(C.MENU_KEY))
+    # The close button is the last row: Tick shuts the panel, as M does.
+    p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_ACTIONS.index(C.CLOSE_ACTION))
     yield lambda: not p.get(hud, "MenuOpen")
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
     p.check("a click on the close row shuts the panel", p.get(hud, "MenuOpen") is False)
@@ -87,6 +128,7 @@ def probe(p):
     yield 0.2
     p.check("...and frees the fire press", p.get(wc, CC.TRIGGER_SPENT_VAR) is False,
             str(p.get(wc, CC.TRIGGER_SPENT_VAR)))
+    p.check("...and gives the walk back", not p.controller().is_move_input_ignored())
 
     # --- the loot window (Tick shuts it again: no body here) --------------------
     p.set(hud, LOOT_OPEN_VAR, True)

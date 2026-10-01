@@ -2,10 +2,10 @@
 (tune_tick.author_tab_flow, shared with the other tabs), then the preset and
 the table handed to BP_GraphicsTuner, the HUD's component that applies them.
 
-    [P] with MenuOpen          GfxTuneOpen = NOT GfxTuneOpen; the other tabs shut
+    its M panel row taken      GfxTuneOpen = NOT GfxTuneOpen; the other tabs shut
     GfxTunePick != PickSeen    Left / Right on the preset row moved the pick:
                                Quality := GfxTunePick
-    else                       GfxTunePick := Quality (the 1-4 keys moved it)
+    else                       GfxTunePick := Quality (BeginPlay set it)
     GfxTuneTouched             every look stat (gfx_stats.LOOK_FROM and up) of
                                the picked preset is copied into the other
                                presets' rows: the look is one for all four
@@ -13,8 +13,8 @@ the table handed to BP_GraphicsTuner, the HUD's component that applies them.
     Quality != GfxQualityApplied   := Quality, its Dirty := true; then
                                GfxQualityApplied := Quality, NOT GfxTuneTouched
 
-So the preset keys only set Quality (presets.emit_apply), and this is the one
-place a preset reaches the engine: BeginPlay's default, a key, a click, the
+So BeginPlay only sets Quality (presets.emit_apply), and this is the one
+place a preset reaches the engine: BeginPlay's default, the
 tab's preset row and a nudge all converge through GfxQualityApplied, which
 starts at -1 so the first Tick of every session applies.
 
@@ -32,7 +32,7 @@ from graphics_menu.gfx_stats import (
     GFX_STATS, LOOK_FROM, PRESET_LABELS, STAT_COUNT, table_values,
 )
 from graphics_menu.gfx_tune_consts import (
-    GFX_APPLIED_DEFAULT, GFX_APPLIED_VAR, GFX_TAB, GFX_TUNE_KEY,
+    GFX_APPLIED_DEFAULT, GFX_APPLIED_VAR, GFX_TAB,
     GFX_TUNE_PICK_SEEN_VAR, TUNER_BP_PATH, TUNER_CLASS_PATH, TUNER_COMPONENT,
     TUNER_DIRTY_VAR, TUNER_PRESET_VAR, TUNER_VALUES_VAR,
 )
@@ -155,7 +155,7 @@ def author_gfx_tune_tick(ed, pc_out, in_execs, x0, y0):
     flow = _author_spread(ed, flow, x0 + 11800, y0, made)
     tails = _author_hand_over(ed, flow, x0 + 14200, y0, made)
     ed.add_comment_to_nodes(
-        f"Graphics tuning ([{GFX_TUNE_KEY}] in the M panel): Up/Down pick a row, "
+        f"Graphics tuning (its row in the M panel): Up/Down pick a row, "
         f"Left/Right change the preset or a number, Enter saves graphics_tuning.csv. "
         f"The preset and its numbers go to the {TUNER_COMPONENT} component, which "
         f"applies them, whenever Quality or a number moved.", made[:1])

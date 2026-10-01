@@ -1,10 +1,10 @@
-"""The M panel's GUN TUNING tab: its keys, the HUD's variables, the widget
+"""The M panel's GUN TUNING tab: its row and keys, the HUD's variables, the widget
 names and words, and the Python command its save runs. Constants only, so
 wbp_tune (the layout), tune_tick and tune_draw (the graph), tune_save (the
 save, run inside the game) and tune_checks read one table.
 
-    [T] with the M panel open   open / close the tab (the keys below are
-                                tune_tab's, shared with MONSTER TUNING)
+    the M panel's row           opens the tab (the keys below are tune_tab's,
+                                shared by every tab); BACK shuts it
     Up / Down                   pick a row: the gun, then one row per stat
     Left / Right                on the gun row: the previous / next gun;
                                 on a stat: one step down / up (on every
@@ -19,8 +19,8 @@ fragments take.
 from combat.gun_tuning import TUNE_STATS
 from graphics_menu.tune_tab import TuneTab, save_command
 
-TUNE_KEY = "T"
-TUNE_ROW_LABEL = f"[{TUNE_KEY}]   gun tuning"
+TUNE_ACTION = "gun_tuning"         # the M panel row that opens the tab
+TUNE_ROW_LABEL = "gun tuning"
 
 # The HUD's variables. The keys only raise TuneNudge / TuneSaveRequested and
 # Tick serves them, so a probe can tune and save without a keyboard.
@@ -52,7 +52,17 @@ TUNE_HINT_TEXT = ("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                   "ENTER  save to gun_tuning.csv")
 TUNE_SAVED_WORDS = "saved to Scripts/combat/gun_tuning.csv"
 TUNE_PANEL_W = 520.0
-TUNE_POS = (700.0, 130.0)           # right of the M panel (PAUSE_POS, PAUSE_W)
+TUNE_POS = (60.0, 130.0)            # where the M panel was: an open tab replaces it
+# A tab in the corner (TuneTab.corner): its bottom-right, in from the screen's,
+# clear of the watermark (legal_consts.WATERMARK_BOTTOM).
+TUNE_CORNER_MARGIN = (24.0, 44.0)
+# The corner tab is small: tighter inside than umg_consts.PANEL_PADDING.
+TUNE_CORNER_PADDING = (24.0, 14.0, 24.0, 12.0)
+# One row of a scrolling tab (TuneTab.visible_rows), in slate units: the
+# list is a window visible_rows of these high. A WBP_MenuRow's desired
+# height at ROW_FONT, read off a rendered run (22.52): no API gives it to
+# the build.
+TUNE_ROW_H = 22.5
 TUNE_ROW_LABEL_W = 250.0
 TUNE_TITLE_FONT, TUNE_HINT_FONT = 20.0, 11.0
 
@@ -64,12 +74,13 @@ HUD_CLASS_PATH = "/Game/UI/BP_GraphicsMenuHUD.BP_GraphicsMenuHUD_C"
 TUNE_SAVE_COMMAND = save_command("graphics_menu.tune_save")
 
 GUN_TAB = TuneTab(
-    key=TUNE_KEY, open_var=TUNE_OPEN_VAR, row_var=TUNE_ROW_VAR,
+    action=TUNE_ACTION, open_var=TUNE_OPEN_VAR, row_var=TUNE_ROW_VAR,
     pick_var=TUNE_WEAPON_VAR, nudge_var=TUNE_NUDGE_VAR, save_var=TUNE_SAVE_VAR,
     saved_var=TUNE_SAVED_VAR, touched_var=TUNE_TOUCHED_VAR,
     values_var=TUNE_VALUES_VAR, names_var=TUNE_WEAPONS_VAR,
     steps_var=TUNE_STEPS_VAR, mins_var=TUNE_MINS_VAR, stat_count=STAT_COUNT,
     save_command=TUNE_SAVE_COMMAND, panel=TUNE_PANEL, rows_box=TUNE_ROWS_BOX,
     saved_text=TUNE_SAVED_TEXT, title_widget="TuneTitle", hint_widget="TuneHint",
+    back_widget="TuneBack",
     title_text=TUNE_TITLE_TEXT, row_labels=TUNE_ROW_LABELS, hint_text=TUNE_HINT_TEXT,
     saved_words=TUNE_SAVED_WORDS)

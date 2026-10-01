@@ -1,8 +1,8 @@
 """dev-all-guns: the M panel's cheat hands over every gun, once each.
 
 The request is raised by writing the HUD's DevAllGunsRequested rather than
-pressing K in the open panel (a probe has no keyboard); the key and its
-MenuOpen gate are the verifier's to check. From the issued shotgun and pistol,
+taking the cheat's row in the open panel (a probe has no keyboard or mouse);
+the row raising it is the verifier's to check. From the issued shotgun and pistol,
 with the issued knife taken away first, one request must add the SMG, rifle,
 sniper and knife, carried and not switched to; a second must add nothing.
 

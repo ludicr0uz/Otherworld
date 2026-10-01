@@ -2,7 +2,7 @@
 (tune_tick.author_tab_flow, shared with GUN TUNING), then the table onto
 every live wanderer.
 
-    [N] with MenuOpen       MonTuneOpen = NOT MonTuneOpen; TuneOpen and
+    its M panel row taken   MonTuneOpen = NOT MonTuneOpen; TuneOpen and
                             WorldTuneOpen = false
     MenuOpen AND MonTuneOpen: Up/Down, Left/Right, Enter as GUN TUNING
     MonTuneTouched -> for each creature c (MON_CONTROLLERS, in table order):
@@ -24,7 +24,7 @@ from combat.nodes import FN_ARR_GET, MACRO_FOR_EACH
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.monster_tune_consts import (
-    MON_CONTROLLERS, MON_CREATURES, MON_STAT_COUNT, MON_TUNE_KEY, MONSTER_TAB,
+    MON_CONTROLLERS, MON_CREATURES, MON_STAT_COUNT, MONSTER_TAB,
 )
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu.tune_tick import author_tab_flow, declare_tab_vars, tab_defaults
@@ -124,8 +124,8 @@ def author_monster_tune_tick(ed, pc_out, in_execs, x0, y0):
                             GFX_TAB.open_var))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
-        f"Monster tuning ([{MON_TUNE_KEY}] in the M panel): Up/Down pick a row, "
-        f"Left/Right change the creature or the stat, Enter saves monster_tuning.csv. "
-        f"Once anything is tuned, every live wanderer's controller takes its "
-        f"creature's row each Tick.", made[:1])
+        "Monster tuning (its row in the M panel): Up/Down pick a row, "
+        "Left/Right change the creature or the stat, Enter saves monster_tuning.csv. "
+        "Once anything is tuned, every live wanderer's controller takes its "
+        "creature's row each Tick.", made[:1])
     return tails

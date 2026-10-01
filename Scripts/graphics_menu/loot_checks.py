@@ -99,7 +99,10 @@ def _check_kneel(check, nodes):
           len(told) == 1 and [_title(f) for f in _feeders(told[0], SEARCHING_VAR)]
           == [f"Get {LC.LOOT_OPEN_VAR}"],
           str([[_title(f) for f in _feeders(n, SEARCHING_VAR)] for n in told]))
-    stops = [n for n in nodes if "bNewMoveInput" in _pins(n)]
+    # The M panel has a call of its own (pause_checks.py); this is the window's.
+    stops = [n for n in nodes if "bNewMoveInput" in _pins(n)
+             and f"Get {LC.LOOT_OPEN_VAR}" in [_title(f)
+                                              for f in _feeders(n, "bNewMoveInput")]]
     edge = [_title(f) for n in stops for f in _feeders(n, "execute")]
     gates = [g for n in stops for f in _feeders(n, "execute") for g in _feeders(f, "execute")
              if "Condition" in _pins(g)]

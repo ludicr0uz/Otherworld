@@ -4,7 +4,7 @@ While the countdown runs, BannerCount reads "SAVING AND EXITING IN  12"
 (whole seconds rounded up, so it never reads 0 while waiting); for
 EXIT_CALLED_OFF_SHOWN_S after a hit calls it off, BannerOff says why. The
 logic is save_exit.py's on Tick; this only reads its variables. The panel's
-"[X]   save and exit" row is a static label in WBP_PauseMenu.
+"save and exit" row is a static label in WBP_PauseMenu.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set

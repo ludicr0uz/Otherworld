@@ -244,21 +244,25 @@ def check_hud_graph(check, nodes):
     groups = {f"Get {g}" for g in C.flash_groups()}
     carets = [n for n in nodes if "InOpacity" in _pins(n)
               and not groups & set(_source_titles(n, "self"))]
-    selected = []
+    selected, backs = [], []
     for n in carets:
         for pick in _sources(n, "InOpacity"):
             for eq in _sources(pick, "bPickA"):
-                # The M panel lights two rows: an OR of two comparisons.
-                both = _sources(eq, "A") if "OR" in _title(eq).upper() else []
-                for one in (both + _sources(eq, "B")) if both else [eq]:
-                    selected += _source_titles(one, "B")
+                selected += _source_titles(eq, "B")
+                # A tab's BACK row, outside its list: lit while the caret is
+                # past the list (row >= a literal).
+                if not _sources(eq, "B"):
+                    backs += _source_titles(eq, "A")
     check("the title page, settings page, M panel, loot window and the four tuning tabs "
-          "light the selected row's caret (the M panel also the row under the cursor)",
-          sorted(selected) == ["Get CursorRow", "Get GfxTuneRow", "Get LootSel",
+          "light the selected row's caret (the M panel's is its own PauseRow)",
+          sorted(selected) == ["Get GfxTuneRow", "Get LootSel",
                                "Get MenuRow", "Get MenuRow",
-                               "Get MonTuneRow", "Get Quality", "Get TuneRow",
+                               "Get MonTuneRow", f"Get {C.PAUSE_ROW_VAR}", "Get TuneRow",
                                "Get WorldTuneRow"],
           str(sorted(selected)))
+    check("...and each tab's BACK row lights its caret while the tab's caret is on it",
+          sorted(backs) == ["Get GfxTuneRow", "Get MonTuneRow", "Get TuneRow",
+                            "Get WorldTuneRow"], str(sorted(backs)))
 
     texts = [n for n in nodes if {"self", "InText"} <= _pins(n)]
     blank = [n for n in texts if not text_literal(n) and not _sources(n, "InText")]

@@ -3,7 +3,9 @@ gfx_tuner_foliage, gfx_tuner_sky): that each number of the graphics table
 reaches the thing it names. The tab that edits the table is gfx_checks.py.
 
 A wire's stat is read off the graph: Values[Base + <literal>], through a
-Round for the int stats (gfx_tuner_read.py).
+Round for the int stats and a multiply by the stat's scale for the
+percentages (gfx_tuner_read.py). A draw distance arrives as a ratio:
+metres / (view distance x the level's metres per percent).
 """
 
 import unreal
@@ -41,8 +43,19 @@ def _literal(n, pin):
     return int(float(BEL.find_input_pin(n, pin).get_pin_value() or 0))
 
 
+def _is_scale(n):
+    """A float product with a literal B: a stat x its scale, or the view
+    distance x the level's metres per percent."""
+    return _pins(n) == {"A", "B"} and "*" in _title(n) and not _sources(n, "B")
+
+
+def _number(n, pin):
+    return float(BEL.find_input_pin(n, pin).get_pin_value() or 0)
+
+
 def _stats(n, pin):
-    """The stat indices wired into ``pin``, straight or through a Round."""
+    """The stat indices wired into ``pin``, straight, through a Round or
+    through a scale."""
     out = set()
     for src in _sources(n, pin):
         pins = _pins(src)
@@ -50,8 +63,30 @@ def _stats(n, pin):
             if f"Get {GC.TUNER_VALUES_VAR}" in _feeds(src, "TargetArray"):
                 out |= {_literal(add, "B") for add in _sources(src, "Index")
                         if f"Get {GC.TUNER_BASE_VAR}" in _feeds(add, "A")}
-        elif pins == {"A"}:
+        elif pins == {"A"} or _is_scale(src):
             out |= _stats(src, "A")
+    return out
+
+
+def _scale(n, pin):
+    """What the stat wired into ``pin`` is multiplied by on the way: 1 when
+    it arrives as the table has it."""
+    scales = [_number(src, "B") for src in _sources(n, pin) if _is_scale(src)]
+    return scales[0] if scales else 1.0
+
+
+def _metres(n, pin):
+    """The draw-distance stats wired into ``pin`` as a ratio to the level's
+    own distances: metres / (view distance % x the level's metres per %)."""
+    view, out = GS.index_of("view_distance"), set()
+    for div in _sources(n, pin):
+        if _pins(div) != {"A", "B"} or "/" not in _title(div):
+            continue
+        for s in _stats(div, "A"):
+            per_pct = GS.FULL_VIEW_M.get(GS.GFX_STATS[s].column, 0.0) * GS.PERCENT
+            if any(_is_scale(m) and _stats(m, "A") == {view}
+                   and abs(_number(m, "B") - per_pct) < 1e-6 for m in _sources(div, "B")):
+                out.add(s)
     return out
 
 
@@ -90,7 +125,8 @@ def _check_engine(check, nodes):
     check("no ApplySettings anywhere (it hangs macOS PIE on a window-mode change)",
           not [n for n in nodes if "bCheckForCommandLineOverrides" in _pins(n)])
 
-    want = {command_prefix(s.target): (i, "InInt" if s.kind is int else "InDouble")
+    want = {command_prefix(s.target):
+            (i, "InInt" if s.kind is int and s.scale == 1 else "InDouble", s.scale)
             for i, s in GS.stats_by(GS.CVAR)}
     got, loose = {}, []
     commands = [n for n in nodes if "Command" in _pins(n)]
@@ -101,9 +137,10 @@ def _check_engine(check, nodes):
             continue
         number = "InInt" if "InInt" in _pins(words[0]) else "InDouble"
         prefix = str(BEL.find_input_pin(words[0], "Prefix").get_pin_value())
-        got[prefix] = (next(iter(_stats(words[0], number)), None), number)
+        got[prefix] = (next(iter(_stats(words[0], number)), -1), number,
+                       round(_scale(words[0], number), 6))
     check(f"one console command per cvar stat ({len(want)}), each built from its own "
-          "stat's number (ints rounded), and nothing else",
+          "stat's number (ints rounded, a percentage x 0.01), and nothing else",
           got == want and not loose and len(commands) == len(want),
           str(sorted(set(got.items()) ^ set(want.items()))[:6]) + str(loose))
     # `stat fps` is a toggle, so sending it could as well switch a readout off.
@@ -141,11 +178,13 @@ def _check_distances(check, nodes):
     for n in nodes:
         if _pins(n) == {"A", "B"} and "/" in _title(n):
             applied = [t for t in _feeds(n, "B") if t.startswith("Get ")]
-            for s in _stats(n, "A"):
+            for s in _metres(n, "A"):
                 ratios[s] = applied
     want = {GS.index_of("grass_distance"): [f"Get {GC.TUNER_GRASS_DISTANCE_APPLIED_VAR}"],
             GS.index_of("tree_distance"): [f"Get {GC.TUNER_TREE_DISTANCE_APPLIED_VAR}"]}
-    check("the grass and the tree cells are scaled by wanted / applied draw distance",
+    check("the grass and the tree cells are scaled by wanted / applied, where wanted "
+          "is the stat's metres over what the level draws at the applied view "
+          "distance (so a metre is a metre at any view distance)",
           ratios == want, str(ratios))
     fades = [n for n in nodes if {"StartCullDistance", "EndCullDistance", "execute"}
              <= _pins(n)]
@@ -173,14 +212,14 @@ def _check_distances(check, nodes):
                                   .get_pin_value()).endswith("Actor"),
           str([str(BEL.find_input_pin(n, "ActorClass").get_pin_value()) for n in every]))
     stale = []
-    for var, column, rounded in (
-            (GC.TUNER_GRASS_DISTANCE_APPLIED_VAR, "grass_distance", False),
-            (GC.TUNER_TREE_DISTANCE_APPLIED_VAR, "tree_distance", False),
-            (GC.TUNER_GRASS_SHADOWS_APPLIED_VAR, "grass_shadows", True),
-            (GC.TUNER_GRASS_LAYERS_APPLIED_VAR, "grass_layers", True),
-            (GC.TUNER_LEVEL_APPLIED_VAR, "engine_quality", True)):
+    for var, column, read, rounded in (
+            (GC.TUNER_GRASS_DISTANCE_APPLIED_VAR, "grass_distance", _metres, False),
+            (GC.TUNER_TREE_DISTANCE_APPLIED_VAR, "tree_distance", _metres, False),
+            (GC.TUNER_GRASS_SHADOWS_APPLIED_VAR, "grass_shadows", _stats, True),
+            (GC.TUNER_GRASS_LAYERS_APPLIED_VAR, "grass_layers", _stats, True),
+            (GC.TUNER_LEVEL_APPLIED_VAR, "engine_quality", _stats, True)):
         sets = [n for n in nodes if _title(n) == f"Set {var}"]
-        if len(sets) != 1 or _stats(sets[0], var) != {GS.index_of(column)} or (
+        if len(sets) != 1 or read(sets[0], var) != {GS.index_of(column)} or (
                 rounded and "Get" in _feeds(sets[0], var)[0]):
             stale.append(var)
     check("each walk records what it applied, so the next apply only redoes what "
@@ -194,10 +233,12 @@ def _check_sky(check, nodes):
         sets = [n for n in nodes if _title(n) == f"Set {st.target}"
                 and any(t.replace(" ", "").endswith(f"CastTo{cycle}")
                         for t in _feeds(n, "self"))]
-        if len(sets) != 1 or _stats(sets[0], st.target) != {index} or not _ran(sets[0]):
+        if len(sets) != 1 or _stats(sets[0], st.target) != {index} or not _ran(sets[0]) \
+                or abs(_scale(sets[0], st.target) - st.scale) > 1e-6:
             wrong.append(st.target)
     check(f"each of the cycle's look multipliers ({len(GS.stats_by(GS.CYCLE))}) is set "
-          "from its own stat, on the level's BP_DayNightCycle", not wrong, str(wrong))
+          "from its own stat (a percentage x 0.01), on the level's BP_DayNightCycle",
+          not wrong, str(wrong))
     finds = [n for n in nodes if "ActorClass" in _pins(n) and "DayNightCycle" in
              str(BEL.find_input_pin(n, "ActorClass").get_pin_value())]
     check("...found with one GetActorOfClass", len(finds) == 1, str(len(finds)))

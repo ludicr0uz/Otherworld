@@ -2,13 +2,13 @@
 accept key takes the row. The title page and the settings page both use it.
 
 Also what a key poll gains from the mouse (cursor_consts.py): a click raised
-as CursorAccept, the wheel as Left/Right (or_wheel), a clicked M-panel row as
-that row's key (or_pause_click).
+as CursorAccept, the wheel as Left/Right (or_wheel); and how Tick learns
+that a row of the M panel was taken (pause_row_taken).
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
-from graphics_menu.umg_consts import PAUSE_ROW_KEYS
+from graphics_menu.umg_consts import PAUSE_ROW_ACTIONS
 
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
@@ -31,8 +31,9 @@ NAV_LEFT = "Left"
 NAV_RIGHT = "Right"
 
 
-def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0):
-    """Up and Down move MenuRow, clamped at both ends rather than wrapped.
+def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0, row_var="MenuRow"):
+    """Up and Down move ``row_var`` (the title pages' MenuRow, or the M
+    panel's PauseRow), clamped at both ends rather than wrapped.
 
     Two branches in series rather than one Select: MenuRow is read fresh by
     each, so pressing both in a frame nets to no movement instead of to
@@ -63,15 +64,15 @@ def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0):
         for e in flow:
             _connect(e, _pin(br, "execute"))
 
-        row = keep(_at(ed.add_get_member_variable_node("MenuRow"), x0 + 260, py + 400))
+        row = keep(_at(ed.add_get_member_variable_node(row_var), x0 + 260, py + 400))
         moved = keep(_at(_node(ed, step), x0 + 520, py + 400))
-        _connect(_pin(row, "MenuRow", is_input=False), _pin(moved, "A"))
+        _connect(_pin(row, row_var, is_input=False), _pin(moved, "A"))
         _set(moved, "B", 1)
         held = keep(_at(_node(ed, limit), x0 + 780, py + 400))
         _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held, "A"))
         _set(held, "B", bound)
-        put = keep(_at(ed.add_set_member_variable_node("MenuRow"), x0 + 1040, py))
-        _connect(_pin(held, "ReturnValue", is_input=False), _pin(put, "MenuRow"))
+        put = keep(_at(ed.add_set_member_variable_node(row_var), x0 + 1040, py))
+        _connect(_pin(held, "ReturnValue", is_input=False), _pin(put, row_var))
         _connect(BEL.find_then_pin(br), _pin(put, "execute"))
         flow = (BEL.find_then_pin(put), BEL.find_else_pin(br))
     return flow, made
@@ -131,17 +132,24 @@ def or_wheel(ed, pc_out, pressed, wheel_key, x, y, made):
     return _pin(either, "ReturnValue", is_input=False)
 
 
-def or_pause_click(ed, pressed, key, x, y, made):
-    """``pressed`` (the M panel's poll of ``key``) OR that key's row was
-    clicked: PauseClick is the row's index for the one Tick after the click.
-    OR'd after the MenuOpen gate, not inside it: only the open panel's rows
-    can be clicked."""
+def pause_row_taken(ed, action, x, y, made):
+    """The M panel's row for ``action`` was taken (Enter on it, or a click):
+    a bool pin. PauseClick is the row's index for the one Tick after DrawHUD
+    raised it, and only an open panel's rows can be taken, so this needs no
+    MenuOpen test. The rows have no keys of their own."""
     clicked = _at(ed.add_get_member_variable_node(PAUSE_CLICK_VAR), x, y)
     this_row = _at(_node(ed, FN_EQ_II), x + 240, y)
     _connect(_pin(clicked, PAUSE_CLICK_VAR, is_input=False), _pin(this_row, "A"))
-    _set(this_row, "B", PAUSE_ROW_KEYS.index(key))
+    _set(this_row, "B", PAUSE_ROW_ACTIONS.index(action))
+    made += [clicked, this_row]
+    return _pin(this_row, "ReturnValue", is_input=False)
+
+
+def or_pause_row(ed, pressed, action, x, y, made):
+    """``pressed`` (the poll of M, the panel's one key) OR ``action``'s row
+    was taken."""
     either = _at(_node(ed, FN_OR), x + 480, y)
     _connect(pressed, _pin(either, "A"))
-    _connect(_pin(this_row, "ReturnValue", is_input=False), _pin(either, "B"))
-    made += [clicked, this_row, either]
+    _connect(pause_row_taken(ed, action, x, y, made), _pin(either, "B"))
+    made.append(either)
     return _pin(either, "ReturnValue", is_input=False)

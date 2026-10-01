@@ -53,9 +53,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # BP_Settings' asset path. The settings screen's own contract with the combat
 # package (BIND_VARS, the sensitivity limits) lives in graphics_menu/settings_rows.py.
 from combat import paths as combat_paths                           # noqa: E402
-# The presets' names and keys. What one does: graphics_menu/presets.py.
+# The presets' names. What one does: graphics_menu/presets.py.
 from graphics_menu.presets import (                                # noqa: E402
-    DEFAULT_PRESET, PRESET_KEYS, PRESETS, emit_apply)
+    DEFAULT_PRESET, PRESETS, emit_apply)
 from graphics_menu.gfx_tune_consts import GFX_TAB, TUNER_COMPONENT   # noqa: E402
 from graphics_menu.gfx_tune_tick import (                           # noqa: E402
     author_gfx_tune_tick, declare_gfx_tune_vars, gfx_tune_defaults, install_tuner)
@@ -72,7 +72,8 @@ from graphics_menu.settings_input import _emit_save                # noqa: E402
 from graphics_menu.settings_page import _author_push_settings      # noqa: E402
 # The UMG screens: their layouts, their creation at BeginPlay, and the
 # DrawHUD fragments that write into them.
-from graphics_menu.umg_consts import GAME_STARTED_VAR               # noqa: E402
+from graphics_menu.umg_consts import (                              # noqa: E402
+    CLOSE_ACTION, DEBUG_ACTION, GAME_STARTED_VAR, PAUSE_ROW_VAR)
 from graphics_menu.wbp_hud import build_hud_widget                  # noqa: E402
 from graphics_menu.wbp_parts import (                              # noqa: E402
     build_inventory_slot, build_menu_row)
@@ -103,7 +104,9 @@ from graphics_menu.dev_guns import (                               # noqa: E402
 from graphics_menu.loot_draw import author_loot_window              # noqa: E402
 from graphics_menu.cursor import (                                  # noqa: E402
     author_cursor_read, cursor_defaults, declare_cursor_vars)
-from graphics_menu.menu_nav import or_pause_click                   # noqa: E402
+from graphics_menu.menu_nav import or_pause_row, pause_row_taken    # noqa: E402
+from graphics_menu.menu_still import (                              # noqa: E402
+    MENU_STILL_VAR, author_menu_still)
 from graphics_menu.monster_tune_consts import MONSTER_TAB           # noqa: E402
 from graphics_menu.monster_tune_tick import (                       # noqa: E402
     author_monster_tune_tick, declare_monster_tune_vars, monster_tune_defaults)
@@ -135,8 +138,7 @@ MENU_KEY = "M"
 #
 # The player's choice is kept in BP_Settings.DebugMode (default ON), so it
 # survives a restart: BeginPlay copies it onto the GameMode once the save is
-# loaded, and the D toggle writes it back and saves on the spot.
-DEBUG_KEY = "D"
+# loaded, and the M panel's debug row writes it back and saves on the spot.
 DEBUG_MODE_VAR = "DebugMode"
 
 # Where the player's health lives.  Built by build_weapons_and_combat.py; the
@@ -404,6 +406,11 @@ def _ensure_variables(ed, bp):
     asset, so nothing is referencing them at this point.
     """
     for name, kind, default in (("MenuOpen", "bool", "false"),
+                                # The M panel's caret, and whether the
+                                # controller was told to ignore move input
+                                # for the open panel (menu_still.py).
+                                (PAUSE_ROW_VAR, "int", "0"),
+                                (MENU_STILL_VAR, "bool", "false"),
                                 # This frame's copy of the GameMode's
                                 # DebugMode.  Taken once at the top of DrawHUD.
                                 ("DebugOn", "bool", "false"),
@@ -744,14 +751,16 @@ def _author_tick(ed, tick):
     _set(was_m, "Key", MENU_KEY)
 
     br_m = _at(ed.add_branch_node(), x0 + 560, y0)
-    # The key, or a click on the panel's close row (cursor.py). Only an open
-    # panel has rows to click, so a click never opens it.
+    # The key, or the panel's close row taken (Enter on it, or a click:
+    # menu_screens.py). Only an open panel has rows, so a row never opens it.
     m_clicks = []
-    _connect(or_pause_click(ed, _pin(was_m, "ReturnValue", is_input=False), MENU_KEY,
-                            x0 - 240, y0 + 400, m_clicks), _pin(br_m, "Condition"))
-    # First save and exit, the profile load and the death wipe (save_exit.py).
+    _connect(or_pause_row(ed, _pin(was_m, "ReturnValue", is_input=False), CLOSE_ACTION,
+                          x0 - 240, y0 + 400, m_clicks), _pin(br_m, "Condition"))
+    # First the open panel holds the player still (menu_still.py). Then save
+    # and exit, the profile load and the death wipe (save_exit.py).
     # Then the loot window (loot_tick.py): the body in reach, its keys, a take.
-    saved = author_save_exit_tick(ed, pc_out, [BEL.find_then_pin(tick)], x0, y0 - 4000)
+    stilled = author_menu_still(ed, pc_out, [BEL.find_then_pin(tick)], x0, y0 - 6000)
+    saved = author_save_exit_tick(ed, pc_out, stilled, x0, y0 - 4000)
     looted = author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000)
     # Then the M panel's tuning tabs (tune_tick.py and its three siblings).
     # The graphics one also hands the picked preset to the tuner component.
@@ -770,12 +779,12 @@ def _author_tick(ed, tick):
     _connect(BEL.find_then_pin(br_m), _pin(set_open, "execute"))
 
     ed.add_comment_to_nodes(
-        f"{MENU_KEY} toggles the menu.  Polled on Tick rather than bound as an "
+        f"{MENU_KEY} toggles the menu, and its close row shuts it.  Polled on Tick rather than bound as an "
         "input action: an FInputActionValue binding would need an IA asset and "
         "an IMC entry, and neither is authorable from Python.",
         [was_m, br_m, get_open, not_open, set_open] + m_clicks)
 
-    # --- the preset keys, gated on the menu being open ----------------------
+    # --- the panel's own rows, gated on the menu being open -----------------
     gate_get = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 1120, y0 + 200)
     gate = _at(ed.add_branch_node(), x0 + 1280, y0)
     _connect(_pin(gate_get, "MenuOpen", is_input=False), _pin(gate, "Condition"))
@@ -784,47 +793,18 @@ def _author_tick(ed, tick):
     _connect(BEL.find_then_pin(set_open), _pin(gate, "execute"))
     _connect(_pin(br_m, "else", is_input=False), _pin(gate, "execute"))
 
-    flow = BEL.find_then_pin(gate)
-    for i, preset in enumerate(PRESETS):
-        bx = x0 + 1500
-        by = y0 + i * 420
-
-        was = _at(_node(ed, FN_WAS_PRESSED), bx, by + 140)
-        _connect(pc_out, _pin(was, "self"))
-        _set(was, "Key", PRESET_KEYS[i])
-
-        br = _at(ed.add_branch_node(), bx + 300, by)
-        # The key, or a click on the preset's row (cursor.py).
-        clicks = []
-        _connect(or_pause_click(ed, _pin(was, "ReturnValue", is_input=False),
-                                PRESET_KEYS[i], bx - 500, by + 280, clicks),
-                 _pin(br, "Condition"))
-        _connect(flow, _pin(br, "execute"))
-
-        applied = emit_apply(ed, i, bx + 500, by, BEL.find_then_pin(br)) + clicks
-
-        ed.add_comment_to_nodes(
-            f"{PRESET_KEYS[i]} -> {preset.label}: Quality := {i}. Its row of the "
-            f"graphics table reaches the engine on the next Tick (gfx_tune_tick.py).",
-            [was, br] + applied)
-
-        # An unmatched key falls through to the next test.
-        flow = _pin(br, "else", is_input=False)
-
-    # --- D toggles debug mode -----------------------------------------------
+    # --- the debug row toggles debug mode -----------------------------------
     # Written to the GameMode rather than to this HUD: the pellet tracers are
     # drawn by BP_WeaponComponent, which can reach a GameMode and cannot reach
-    # a HUD variable.  Behind the same MenuOpen gate as the preset keys, so D
-    # is a walking key everywhere except with the menu open.
+    # a HUD variable.  The row has no key: Enter on it or a click raises
+    # PauseClick, like every other row of the panel.
     bx = x0 + 1500
-    by = y0 + len(PRESETS) * 420
-    was_d = _at(_node(ed, FN_WAS_PRESSED), bx, by + 140)
-    _connect(pc_out, _pin(was_d, "self"))
-    _set(was_d, "Key", DEBUG_KEY)
+    by = y0
     br_d = _at(ed.add_branch_node(), bx + 300, by)
-    _connect(or_pause_click(ed, _pin(was_d, "ReturnValue", is_input=False), DEBUG_KEY,
-                            bx - 500, by + 280, []), _pin(br_d, "Condition"))
-    _connect(flow, _pin(br_d, "execute"))
+    d_taken = []
+    _connect(pause_row_taken(ed, DEBUG_ACTION, bx - 500, by + 280, d_taken),
+             _pin(br_d, "Condition"))
+    _connect(BEL.find_then_pin(gate), _pin(br_d, "execute"))
 
     gm = _at(_node(ed, FN_GET_GAME_MODE), bx + 500, by + 240)
     as_gm = _at(_palette(ed, NODE_CAST_GAME_MODE), bx + 740, by)
@@ -858,11 +838,11 @@ def _author_tick(ed, tick):
                            bx + 1980, by)
 
     ed.add_comment_to_nodes(
-        f"{DEBUG_KEY} -> debug mode, held on the GameMode so the weapon "
+        "The panel's debug row -> debug mode, held on the GameMode so the weapon "
         "component can read it too, and saved to BP_Settings so it survives a "
         "restart.  It turns on the FPS readout, the pellet tracers and the "
         "wanderers' numbers.",
-        [was_d, br_d, gm, as_gm, was_on, flip, set_dbg, settings, keep_dbg,
+        d_taken + [br_d, gm, as_gm, was_on, flip, set_dbg, settings, keep_dbg,
          writer])
 
 
@@ -1223,6 +1203,7 @@ def build_hud_blueprint(rebuild=False):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
     _apply_defaults(bp, {"MenuOpen": False, "DebugOn": False,
+                         PAUSE_ROW_VAR: 0, MENU_STILL_VAR: False,
                          "Quality": DEFAULT_PRESET,
                          "MenuPage": PAGE_TITLE, "MenuRow": 0,
                          "Capturing": False,

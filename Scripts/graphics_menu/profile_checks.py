@@ -6,6 +6,7 @@ in the verifier, which is over its size budget.
 import unreal
 
 from graphics_menu import profile_consts as PC
+from graphics_menu.pause_checks import row_serves
 from graphics_menu.save_exit import profile_defaults
 
 BEL = unreal.BlueprintEditorLibrary
@@ -68,13 +69,11 @@ def check_profile(check, bp, nodes):
              if cdo.get_editor_property(k) != v}
     check("the countdown starts idle and the profile unlooked-for", not wrong, str(wrong))
 
-    polls = [n for n in nodes if {"Key", "self"} <= _pins(n)
-             and _value(n, "Key") == PC.EXIT_KEY]
-    ands = [PIN.get_owning_node(q) for n in polls
-            for q in BEL.find_output_pin(n, "ReturnValue").list_connected_pins()]
-    gates = {_title(x) for a in ands for g in ("A", "B") for x in _feeders(a, g)}
-    check(f"[{PC.EXIT_KEY}] starts the exit, only with the panel open",
-          len(polls) == 1 and "Get MenuOpen" in gates, str(sorted(gates)))
+    check("the M panel's save-and-exit row starts the exit (the row has no key: "
+          "only an open panel's row can be taken)",
+          row_serves(nodes, PC.EXIT_ACTION, PC.EXIT_PENDING_VAR)
+          and not [n for n in nodes if {"Key", "self"} <= _pins(n)
+                   and _value(n, "Key") == "X"])
 
     def _b(n):
         try:

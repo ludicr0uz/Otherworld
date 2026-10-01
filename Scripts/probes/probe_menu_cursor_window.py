@@ -16,11 +16,12 @@ import unreal
 
 from graphics_menu import cursor_consts as CC
 from graphics_menu import umg_consts as C
+from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.settings_rows import BACK_ROW, PAGE_SETTINGS, PAGE_TITLE
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in ("MenuOpen", C.GAME_STARTED_VAR, "MenuPage",
-                                       "MenuRow")]
+                                       "MenuRow", GFX_TAB.open_var, GFX_TAB.row_var)]
 STEP_PX = 6          # under the thinnest row at any window this is run in
 STEP_S = 0.04
 
@@ -56,6 +57,36 @@ def probe(p):
     yield from _sweep(p, hud, 0.12, seen)
     p.check("sweeping down the M panel puts the cursor on each row in turn",
             seen == list(range(len(C.PAUSE_ROW_LABELS))), str(seen))
+    p.check("...and the panel's caret went with it, down to its last row",
+            p.get(hud, C.PAUSE_ROW_VAR) == len(C.PAUSE_ROW_LABELS) - 1,
+            str(p.get(hud, C.PAUSE_ROW_VAR)))
+
+    # --- the graphics tab: bottom right, a window of rows over a scrolling list ----
+    tab = GFX_TAB
+    rows = p.get(hud, "UiPause").get_editor_property(tab.rows_box)
+    p.set(hud, tab.open_var, True)
+    p.set(hud, tab.row_var, 0)
+    yield 0.5
+    seen = []
+    yield from _sweep(p, hud, 0.82, seen)
+    p.check(f"sweeping down the graphics tab finds its first {tab.visible_rows} rows "
+            "and no more (the rest are scrolled out of its window), then BACK takes "
+            "the caret",
+            seen == list(range(tab.visible_rows))
+            and p.get(hud, tab.row_var) == tab.back_row,
+            f"{seen}, caret {p.get(hud, tab.row_var)} (BACK is {tab.back_row})")
+    pc.set_mouse_location(8, 8)
+    p.set(hud, tab.row_var, tab.stat_count)
+    yield 0.5
+    offset = rows.get_scroll_offset()
+    seen = []
+    yield from _sweep(p, hud, 0.82, seen)
+    p.check("with the caret on the last row the list has scrolled to its end, and "
+            f"the sweep finds the last {tab.visible_rows} rows",
+            offset > 0.0 and seen == list(range(tab.row_count - tab.visible_rows,
+                                                tab.row_count)),
+            f"offset {offset:.1f}, {seen}")
+    p.set(hud, tab.open_var, False)
     p.set(hud, "MenuOpen", False)
     yield 0.3
     p.check("closing the panel hides the cursor",

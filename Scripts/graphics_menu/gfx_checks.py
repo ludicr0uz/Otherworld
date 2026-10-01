@@ -9,6 +9,7 @@ import unreal
 from combat.verify.common import component_template
 from graphics_menu import gfx_stats as GS
 from graphics_menu import gfx_tune_consts as GC
+from graphics_menu import tune_consts as TC
 from graphics_menu import umg_consts as UC
 from graphics_menu.gfx_tune_tick import gfx_tune_defaults
 from graphics_menu.presets import DEFAULT_PRESET, PRESETS
@@ -61,6 +62,22 @@ def _check_table(check):
           set(table) == set(GS.PRESET_LABELS)
           and all(set(table[p]) == set(GS.GFX_COLUMNS) for p in table),
           f"{GS.CSV_PATH}: rows {sorted(table)}")
+    # A person's units: draw distances in metres, every scale a percentage.
+    units = {s.column: s.label for s in GS.GFX_STATS}
+    loose = [s.label for s in GS.GFX_STATS if "(x)" in s.label
+             or (s.scale != 1 and not s.label.endswith("(%)"))]
+    check("the draw distances are in metres and every scale is a percentage "
+          "(no bare multipliers)",
+          units["grass_distance"].endswith("(m)") and units["tree_distance"].endswith("(m)")
+          and not loose and GS.index_of("view_distance") >= 0, str(loose))
+    view = GS.GFX_STATS[GS.index_of("view_distance")].defaults
+    at_full = {c: [round(m / (pct * GS.PERCENT))
+                   for m, pct in zip(GS.GFX_STATS[GS.index_of(c)].defaults, view)]
+               for c in GS.FULL_VIEW_M}
+    check("...the default metres are the levels' own distances at each preset's view "
+          "distance (grass 70 m, trees 300 m at 100%)",
+          all(set(v) == {round(GS.FULL_VIEW_M[c])} for c, v in at_full.items()),
+          str(at_full))
     wanted = {"grass_distance", "tree_distance", "grass_layers", "fog", "fog_density",
               "leaf_cutouts", "brightness", "sun_light", "moon_light", "stars",
               "ambient_light"}
@@ -85,21 +102,38 @@ def _check_widgets(check):
     hidden = [n for n in (TAB.panel, TAB.saved_text) if n in widgets
               and "COLLAPSED" in str(widgets[n].get_editor_property("visibility")).upper()]
     check("...collapsed until the HUD shows it", len(hidden) == 2, str(hidden))
-    check("the M panel lists the graphics tab's key",
+    check("the M panel lists the graphics tab",
           GC.GFX_TUNE_ROW_LABEL in UC.PAUSE_ROW_LABELS, str(UC.PAUSE_ROW_LABELS))
+    # Out of the picture's way: the bottom-right corner, a small title.
+    panel = widgets.get(TAB.panel)
+    slot = panel.get_editor_property("slot") if panel else None
+    place = (slot.get_anchors().get_editor_property("minimum"),
+             slot.get_anchors().get_editor_property("maximum"),
+             slot.get_alignment(), slot.get_position()) if slot else None
+    check("the graphics panel is anchored to the bottom-right corner of the screen, "
+          "its own bottom-right a margin in from it",
+          bool(place) and all((v.x, v.y) == (1.0, 1.0) for v in place[:3])
+          and place[3].x < 0 and place[3].y < 0,
+          str([(v.x, v.y) for v in place]) if place else "no panel")
+    font = widgets[TAB.title_widget].get_editor_property("font").get_editor_property(
+        "size") if TAB.title_widget in widgets else None
+    check(f"...and its title is small ({GC.GFX_TITLE_FONT:g} pt, the other tabs' "
+          f"{TC.TUNE_TITLE_FONT:g})",
+          font is not None and abs(font - GC.GFX_TITLE_FONT) < 1e-3
+          and GC.GFX_TITLE_FONT < TC.TUNE_TITLE_FONT, str(font))
 
 
 def _check_presets(check, nodes):
-    """The preset keys and BeginPlay only set Quality; nothing in the HUD
-    graph reaches the engine."""
+    """BeginPlay and the tab's preset row only set Quality; nothing in the
+    HUD graph reaches the engine. The M panel has no preset rows or keys."""
     sets = _sets(nodes, "Quality")
     literal = sorted(int(BEL.find_input_pin(n, "Quality").get_pin_value() or 0)
                      for n in sets if not _sources(n, "Quality"))
     driven = [n for n in sets if _sources(n, "Quality")]
-    check("each preset key sets Quality to its own preset, and BeginPlay to the "
-          "default: one literal Set each",
-          literal == sorted(list(range(len(PRESETS))) + [DEFAULT_PRESET]),
-          str(literal))
+    check("BeginPlay sets Quality to the default preset: the one literal Set (the "
+          "M panel has no preset rows; the graphics tab's preset row picks one)",
+          literal == [DEFAULT_PRESET]
+          and not set(UC.PAUSE_ROW_LABELS) & {p.label for p in PRESETS}, str(literal))
     check("...and the tab's preset row sets it from GfxTunePick, the only driven Set",
           len(driven) == 1 and _feeds(driven[0], "Quality") == [f"Get {TAB.pick_var}"],
           str([_feeds(n, "Quality") for n in driven]))

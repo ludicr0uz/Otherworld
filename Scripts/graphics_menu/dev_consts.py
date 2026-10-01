@@ -1,6 +1,6 @@
-"""The M panel's dev-all-guns cheat: its key, label, request flag and guns.
+"""The M panel's dev-all-guns cheat: its row, label, request flag and guns.
 
-A testing aid: [K] with the panel open hands the player one of every gun (and
+A testing aid: its row in the open panel hands the player one of every gun (and
 the knife and the axe) it does not already carry, so a weapon can be tried without finding its drop.
 dev_guns.py authors it; the constants live here so umg_consts can label the
 row without importing a graph module.
@@ -11,12 +11,13 @@ from combat.paths import (
     SNIPER_BP_PATH,
 )
 
-# K: free in the panel and out of it. G would also drop the held gun, since
-# the weapon component polls its keys whether or not the panel is open.
-DEV_GUNS_KEY = "K"
-DEV_GUNS_ROW_LABEL = f"[{DEV_GUNS_KEY}]   dev-all-guns"
+# The M panel's row: its action (what PauseClick is matched against,
+# umg_consts.PAUSE_ROW_ACTIONS) and its words. No key of its own: a row is
+# taken with Enter or a click.
+DEV_GUNS_ACTION = "dev_guns"
+DEV_GUNS_ROW_LABEL = "dev-all-guns"
 
-# The HUD's variables. The key only raises the request; Tick serves it and
+# The HUD's variables. The row only raises the request; Tick serves it and
 # lowers it, so a probe can ask for the guns without a key press.
 DEV_GUNS_REQUEST_VAR = "DevAllGunsRequested"
 # Scratch for the "already carried?" scan of one gun class.

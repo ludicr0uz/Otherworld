@@ -1,4 +1,4 @@
-"""Gun tuning: the M panel's [T] tab changes a carried gun at once, and saves
+"""Gun tuning: the M panel's gun tuning tab changes a carried gun at once, and saves
 gun_tuning.csv.
 
 The keys are raised by writing the HUD's TuneRow / TuneWeapon / TuneNudge /

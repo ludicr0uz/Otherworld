@@ -8,6 +8,7 @@ import unreal
 
 from graphics_menu import cursor_consts as CC
 from graphics_menu import loot_consts as LC
+from graphics_menu import tune_tab as TT
 from graphics_menu import umg_consts as UC
 from graphics_menu.cursor import cursor_defaults
 from graphics_menu.monster_tune_consts import MONSTER_TAB
@@ -23,8 +24,10 @@ TABS = (GUN_TAB, MONSTER_TAB, WORLD_TAB, GFX_TAB)
 # page, the M panel, the loot window and the four tuning tabs.
 ROW_LISTS = 4 + len(TABS)
 # ...and the single lines a click lands on: the death menu's hint, the loot
-# window's close button, each tab's hint.
-CLICK_LINES = 2 + len(TABS)
+# window's close button, each tab's hint and each tab's BACK row.
+CLICK_LINES = 2 + 2 * len(TABS)
+# A scrolling tab's rows count only inside its list's window: one more test.
+WINDOWS = sum(1 for t in TABS if t.visible_rows)
 
 
 def _title(n):
@@ -103,9 +106,10 @@ def _check_rows(check, nodes):
     wrong = [n for n in tests
              if _feeders(n, "AbsoluteCoordinate") != [f"Get {CC.CURSOR_POS_VAR}"]
              or not _feeders(n, "Geometry")]
-    check(f"a row is under the cursor by its geometry: {ROW_LISTS} row lists "
-          f"and {CLICK_LINES} hint lines, none hit-testable",
-          len(tests) == ROW_LISTS + CLICK_LINES and not wrong,
+    check(f"a row is under the cursor by its geometry: {ROW_LISTS} row lists, "
+          f"{CLICK_LINES} hint and BACK lines and {WINDOWS} scrolling list's "
+          "window, none hit-testable",
+          len(tests) == ROW_LISTS + CLICK_LINES + WINDOWS and not wrong,
           f"{len(tests)} tests, {len(wrong)} not off CursorPos")
 
     rows = _sets(nodes, CC.CURSOR_ROW_VAR)
@@ -117,21 +121,23 @@ def _check_rows(check, nodes):
 
     carets = sorted(_title(n)[4:] for n in nodes if _title(n).startswith("Set ")
                     and f"Get {CC.CURSOR_ROW_VAR}" in _feeders(n, _title(n)[4:]))
-    want = sorted(["MenuRow", "MenuRow", LC.LOOT_SEL_VAR, CC.PAUSE_CLICK_VAR]
-                  + [t.row_var for t in TABS])
-    check("the row under the cursor takes the caret (title, settings, loot, "
-          "the tabs), and on the M panel a click is that row", carets == want,
-          str(carets))
+    want = sorted(["MenuRow", "MenuRow", LC.LOOT_SEL_VAR, UC.PAUSE_ROW_VAR,
+                   CC.PAUSE_CLICK_VAR] + [t.row_var for t in TABS])
+    check("the row under the cursor takes the caret (title, settings, the M "
+          "panel, loot, the tabs), and on the M panel a click takes that row",
+          carets == want, str(carets))
     stirred = [n for n in nodes if _pins(n) == {"A", "B"}
                and f"Get {CC.CURSOR_MOVED_VAR}" in _feeders(n, "A")]
+    # One per list (PauseClick is a click, not a caret), and one per BACK row.
     check("...only once the mouse moves or clicks, so a resting cursor does "
           "not hold the caret against Up/Down",
-          len(stirred) == len(want) - 1, str(len(stirred)))
+          len(stirred) == len(want) - 1 + len(TABS), str(len(stirred)))
 
 
-def _click_served(nodes, key, var):
-    """``key``'s poll OR its M-panel row clicked is the Branch that sets ``var``."""
-    row = UC.PAUSE_ROW_KEYS.index(key)
+def _click_served(nodes, key, action, var):
+    """``key``'s poll OR ``action``'s M-panel row taken is the Branch that
+    sets ``var``."""
+    row = UC.PAUSE_ROW_ACTIONS.index(action)
     for n in _sets(nodes, var):
         for q in BEL.find_input_pin(n, "execute").list_connected_pins():
             gate = PIN.get_owning_node(q)
@@ -186,11 +192,28 @@ def _check_clicks(check, nodes):
                 loose.append(_title(user))
     check("the left button is only ever read with the cursor over a row or a line",
           bool(by_key[CC.CLICK_KEY]) and not loose, str(loose))
-    # Left/Right gain the wheel on the settings page and in each tuning tab.
+    # Left/Right gain the wheel on the settings page and in each tuning tab;
+    # in a scrolling tab it is Up/Down's instead, and the list follows.
     check("the wheel is Left/Right: the settings page and the four tabs",
           len(by_key[CC.WHEEL_MORE]) == 1 + len(TABS)
           and len(by_key[CC.WHEEL_LESS]) == 1 + len(TABS),
           f"{len(by_key[CC.WHEEL_MORE])} up, {len(by_key[CC.WHEEL_LESS])} down")
+    # Each wheel poll is OR'd with a key poll: which key says what it moves.
+    paired = {}
+    for wheel in (CC.WHEEL_MORE, CC.WHEEL_LESS):
+        for n in by_key[wheel]:
+            for q in BEL.find_output_pin(n, "ReturnValue").list_connected_pins():
+                either = PIN.get_owning_node(q)
+                for a in BEL.find_input_pin(either, "A").list_connected_pins():
+                    key = _value(PIN.get_owning_node(a), "Key")
+                    paired[(wheel, key)] = paired.get((wheel, key), 0) + 1
+    check(f"...except in a scrolling tab ({WINDOWS}), where it is Up/Down: the "
+          "caret moves and the list follows it",
+          paired == {(CC.WHEEL_MORE, TT.TUNE_MORE): 1 + len(TABS) - WINDOWS,
+                     (CC.WHEEL_LESS, TT.TUNE_LESS): 1 + len(TABS) - WINDOWS,
+                     (CC.WHEEL_MORE, TT.TUNE_UP): WINDOWS,
+                     (CC.WHEEL_LESS, TT.TUNE_DOWN): WINDOWS} and WINDOWS > 0,
+          str(paired))
 
     accepts = [_value(n, CC.CURSOR_ACCEPT_VAR) for n in _sets(nodes, CC.CURSOR_ACCEPT_VAR)]
     check("a click on a title or settings row, or on the death menu's hint, "
@@ -202,23 +225,23 @@ def _check_clicks(check, nodes):
     # A literal 0 reads back empty once the asset is loaded from disk (row 0's).
     served = sorted(int(_value(n, "B") or 0) for n in nodes if _pins(n) == {"A", "B"}
                     and f"Get {CC.PAUSE_CLICK_VAR}" in _feeders(n, "A"))
-    check("the M panel's clicked row is lowered every frame, and each row's "
-          "key poll also answers to its own row",
+    check("the M panel's taken row is lowered every frame, and each row's "
+          "action answers to its own row",
           len(lowered) == 1 and _value(lowered[0], CC.PAUSE_CLICK_VAR) == str(CC.NO_ROW)
-          and served == list(range(len(UC.PAUSE_ROW_KEYS))), f"{len(lowered)}, {served}")
-    check("the M panel's last row is its close button: a click on it is "
-          f"[{UC.MENU_KEY}], which shuts the panel",
+          and served == list(range(len(UC.PAUSE_ROW_ACTIONS))), f"{len(lowered)}, {served}")
+    check("the M panel's last row is its close button: taking it shuts the "
+          f"panel, as [{UC.MENU_KEY}] does",
           UC.PAUSE_ROW_LABELS[-1] == UC.PAUSE_CLOSE_ROW_LABEL
-          and UC.PAUSE_ROW_KEYS[-1] == UC.MENU_KEY
-          and _click_served(nodes, UC.MENU_KEY, "MenuOpen"),
-          f"{UC.PAUSE_ROW_LABELS[-1]!r}, key {UC.PAUSE_ROW_KEYS[-1]}")
+          and UC.PAUSE_ROW_ACTIONS[-1] == UC.CLOSE_ACTION
+          and _click_served(nodes, UC.MENU_KEY, UC.CLOSE_ACTION, "MenuOpen"),
+          f"{UC.PAUSE_ROW_LABELS[-1]!r}, action {UC.PAUSE_ROW_ACTIONS[-1]}")
     shuts = [n for n in _sets(nodes, LC.LOOT_OPEN_VAR)
              if _value(n, LC.LOOT_OPEN_VAR) == "false" and _on_line_click(n)]
     check("a click on the loot window's close button lowers LootOpen, as "
           f"[{LC.LOOT_KEY}] does", len(shuts) == 1, str(len(shuts)))
-    check("every M panel row has a key, in row order",
-          len(UC.PAUSE_ROW_KEYS) == len(UC.PAUSE_ROW_LABELS)
-          == len(set(UC.PAUSE_ROW_KEYS)), str(UC.PAUSE_ROW_KEYS))
+    check("every M panel row has an action of its own, in row order",
+          len(UC.PAUSE_ROW_ACTIONS) == len(UC.PAUSE_ROW_LABELS)
+          == len(set(UC.PAUSE_ROW_ACTIONS)), str(UC.PAUSE_ROW_ACTIONS))
 
     steps = [n for t in TABS for n in _sets(nodes, t.nudge_var)
              if _value(n, t.nudge_var) == "1"]

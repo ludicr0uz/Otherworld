@@ -1,6 +1,6 @@
-"""The dev-all-guns cheat: the HUD Tick fragment behind the M panel's [K] row.
+"""The dev-all-guns cheat: the HUD Tick fragment behind the M panel's dev-all-guns row.
 
-    [K] with MenuOpen          -> DevAllGunsRequested = true
+    the row taken (PauseClick) -> DevAllGunsRequested = true
     DevAllGunsRequested        -> false, then for each gun class, in order:
         DevHasGun = false
         ForEach Inventory: GetObjectClass(item) == gun -> DevHasGun = true
@@ -22,9 +22,9 @@ from combat.nodes import FN_OBJECT_CLASS, MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_S
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from combat.tuning import INVENTORY_SIZE
 from graphics_menu.dev_consts import (
-    DEV_GUN_CLASS_PATHS, DEV_GUNS_KEY, DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR,
+    DEV_GUN_CLASS_PATHS, DEV_GUNS_ACTION, DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR,
 )
-from graphics_menu.menu_nav import or_pause_click
+from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.player_parts import PAWN
 
 FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
@@ -168,12 +168,8 @@ def author_dev_guns(ed, pc_out, parts, in_execs, x0, y0, made):
     """The whole fragment (see the module docstring). ``parts`` is
     player_parts'. Returns the exec tails."""
     unreal.load_asset(ITEM_BP_PATH)     # the cast node exists only for a loaded class
-    pressed = _call(ed, FN_WAS_PRESSED, x0, y0 + 300, made, self=pc_out,
-                    Key=DEV_GUNS_KEY)
-    ask = _call(ed, FN_AND, x0 + 240, y0 + 300, made,
-                A=_get(ed, "MenuOpen", x0, y0 + 440, made), B=_out(pressed))
-    raise_it, no_key = _branch(ed, or_pause_click(ed, _out(ask), DEV_GUNS_KEY, x0,
-                                                  y0 + 700, made),
+    raise_it, no_key = _branch(ed, pause_row_taken(ed, DEV_GUNS_ACTION, x0,
+                                                   y0 + 300, made),
                                in_execs, x0 + 480, y0, made)
     raised = _setter(ed, DEV_GUNS_REQUEST_VAR, "true", [raise_it], x0 + 740, y0 - 300,
                      made)
@@ -189,7 +185,7 @@ def author_dev_guns(ed, pc_out, parts, in_execs, x0, y0, made):
     dirty = _setter(ed, "NeedsRefresh", "true", flow, x, y0, made,
                     WEAPON_COMP_CLASS_PATH, wc)
     ed.add_comment_to_nodes(
-        f"dev-all-guns ([{DEV_GUNS_KEY}] in the panel): one of every gun not "
+        f"dev-all-guns (its row in the M panel): one of every gun not "
         f"already carried, while fewer than {INVENTORY_SIZE} items are. "
         f"NeedsRefresh re-equips; the held item stays held.", made[-1:])
     return [dirty, idle]

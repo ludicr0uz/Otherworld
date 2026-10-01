@@ -9,6 +9,7 @@ from graphics_menu import dev_consts as DC
 from graphics_menu import umg_consts as UC
 from graphics_menu.dev_guns import dev_guns_defaults
 from graphics_menu.loot_consts import LOOT_BAG_FULL_VAR
+from graphics_menu.pause_checks import row_serves
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -59,13 +60,11 @@ def check_dev_guns(check, bp, nodes):
              if cdo.get_editor_property(k) != v}
     check("dev-all-guns starts unrequested", not wrong, str(wrong))
 
-    polls = [n for n in nodes if {"Key", "self"} <= _pins(n)
-             and _value(n, "Key") == DC.DEV_GUNS_KEY]
-    ands = [PIN.get_owning_node(q) for n in polls
-            for q in BEL.find_output_pin(n, "ReturnValue").list_connected_pins()]
-    gates = {_title(x) for a in ands for g in ("A", "B") for x in _feeders(a, g)}
-    check(f"[{DC.DEV_GUNS_KEY}] requests the guns, only with the panel open",
-          len(polls) == 1 and "Get MenuOpen" in gates, str(sorted(gates)))
+    check("the M panel's dev-all-guns row requests the guns (the row has no key: "
+          "only an open panel's row can be taken)",
+          row_serves(nodes, DC.DEV_GUNS_ACTION, DC.DEV_GUNS_REQUEST_VAR)
+          and not [n for n in nodes if {"Key", "self"} <= _pins(n)
+                   and _value(n, "Key") == "K"])
     raises = [n for n in nodes if _title(n) == f"Set {DC.DEV_GUNS_REQUEST_VAR}"]
     check("...and the request is raised once and served once",
           sorted(_value(n, DC.DEV_GUNS_REQUEST_VAR) for n in raises) == ["false", "true"],

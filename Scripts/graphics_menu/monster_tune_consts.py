@@ -1,10 +1,10 @@
-"""The M panel's MONSTER TUNING tab: its key, the HUD's variables, the widget
+"""The M panel's MONSTER TUNING tab: its row, the HUD's variables, the widget
 names and words, and the Python command its save runs. Constants only, so
 wbp_tune (the layout), monster_tune_tick and tune_draw (the graph),
 monster_tune_save (the save, run inside the game) and monster_tune_checks
 read one table.
 
-    [N] with the M panel open   open / close the tab (and shut GUN TUNING)
+    the M panel's row           opens the tab (tune_tab.py); BACK shuts it
     Up / Down, Left / Right,    as GUN TUNING (tune_tab.py), over the
     Enter                       creatures instead of the guns; Enter saves
                                 npc/monster_tuning.csv
@@ -17,8 +17,8 @@ from forest_generator.npc_placement import NPC_VARIANTS
 from graphics_menu.tune_tab import TuneTab, save_command
 from npc.monster_tuning import MONSTER_STATS
 
-MON_TUNE_KEY = "N"
-MON_TUNE_ROW_LABEL = f"[{MON_TUNE_KEY}]   monster tuning"
+MON_TUNE_ACTION = "monster_tuning"   # the M panel row that opens the tab
+MON_TUNE_ROW_LABEL = "monster tuning"
 
 MON_TUNE_OPEN_VAR = "MonTuneOpen"
 MON_TUNE_ROW_VAR = "MonTuneRow"            # 0 = the creature row, 1.. = MONSTER_STATS
@@ -44,7 +44,7 @@ MON_CONTROLLERS = tuple(
 MON_TUNE_SAVE_COMMAND = save_command("graphics_menu.monster_tune_save")
 
 MONSTER_TAB = TuneTab(
-    key=MON_TUNE_KEY, open_var=MON_TUNE_OPEN_VAR, row_var=MON_TUNE_ROW_VAR,
+    action=MON_TUNE_ACTION, open_var=MON_TUNE_OPEN_VAR, row_var=MON_TUNE_ROW_VAR,
     pick_var=MON_TUNE_CREATURE_VAR, nudge_var=MON_TUNE_NUDGE_VAR,
     save_var=MON_TUNE_SAVE_VAR, saved_var=MON_TUNE_SAVED_VAR,
     touched_var=MON_TUNE_TOUCHED_VAR, values_var=MON_TUNE_VALUES_VAR,
@@ -52,6 +52,7 @@ MONSTER_TAB = TuneTab(
     mins_var=MON_TUNE_MINS_VAR, stat_count=MON_STAT_COUNT,
     save_command=MON_TUNE_SAVE_COMMAND,
     panel="MonTunePanel", rows_box="MonTuneRows", saved_text="MonTuneSavedText",
+    back_widget="MonTuneBack",
     title_widget="MonTuneTitle", hint_widget="MonTuneHint",
     title_text="MONSTER TUNING",
     row_labels=("creature",) + tuple(s[2] for s in MONSTER_STATS),

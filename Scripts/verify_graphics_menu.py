@@ -26,10 +26,8 @@ from graphics_menu import scope as SC
 from graphics_menu.reticle_checks import check_reticle_sights, sights_gate
 from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
-from graphics_menu import dev_consts as DC
 from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import loot_consts as LC
-from graphics_menu import tune_consts as TC
 from graphics_menu import tune_tab as TT
 from graphics_menu import monster_tune_consts as MC
 from graphics_menu.loot_checks import check_loot
@@ -37,11 +35,11 @@ from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu import world_tune_consts as WC
 from graphics_menu.world_tune_checks import check_world_tune
-from graphics_menu import gfx_tune_consts as GC
 from graphics_menu.gfx_checks import check_gfx_tune
 from graphics_menu.gfx_tuner_checks import check_gfx_tuner
 from graphics_menu import cursor_consts as CC
 from graphics_menu.cursor_checks import check_cursor
+from graphics_menu.pause_checks import check_pause_menu
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -151,17 +149,16 @@ def main():
     # not run while the game is paused, and the death menu only exists paused.
     # The main menu's start keys are polled from ReceiveDrawHUD for the same
     # reason the restart key is, and so are the four navigation keys.
-    expected_keys = set((G.MENU_KEY, UC.RESTART_KEY, G.DEBUG_KEY,
+    # The M panel's rows have no keys of their own (no preset, debug, exit,
+    # cheat or tab hotkeys): the caret and Enter, or the mouse, take a row.
+    expected_keys = set((G.MENU_KEY, UC.RESTART_KEY, UC.PAUSE_ACCEPT_KEY, CC.BACK_KEY,
                          N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
-                         PC.EXIT_KEY, DC.DEV_GUNS_KEY,
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
-                         TC.TUNE_KEY, TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
-                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.MON_TUNE_KEY,
-                         WC.WORLD_TUNE_KEY, GC.GFX_TUNE_KEY)
-                        + G.PRESET_KEYS + N.START_KEYS + CC.CURSOR_KEYS)
-    check("polls exactly the menu, preset, debug, restart, start, nav, exit, "
-          "dev-all-guns, loot, gun, monster, world and graphics tuning keys, and the "
-          "cursor's click and wheel",
+                         TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
+                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY)
+                        + N.START_KEYS + CC.CURSOR_KEYS)
+    check("polls exactly the menu, restart, start, nav, loot and tuning-tab keys "
+          "and the cursor's click and wheel: no row of the M panel has a hotkey",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the
@@ -598,7 +595,7 @@ def main():
     # --- debug mode
     # The flag lives on the GameMode, because BP_WeaponComponent draws the
     # tracers and a component cannot reach a HUD variable.
-    check(f"{G.DEBUG_KEY} toggles debug mode on the GameMode, not on the HUD",
+    check("the debug row toggles debug mode on the GameMode, not on the HUD",
           any(t == f"Set {G.DEBUG_MODE_VAR}" for t in titles),
           str(sorted({t for t in titles if G.DEBUG_MODE_VAR in t})))
     # Three reads: the toggle reads the GameMode's to flip it, DrawHUD reads
@@ -827,6 +824,7 @@ def main():
     check_gfx_tune(check, bp, nodes)
     check_gfx_tuner(check)
     check_cursor(check, bp, nodes)
+    check_pause_menu(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

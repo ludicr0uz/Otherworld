@@ -8,6 +8,16 @@ drawn, how thick the grass is and whether it is lit.
     tree draw distance moved
         every other actor whose root is an instanced mesh (the tree cells):
         its distances scaled the same way
+
+A draw distance is metres in the table, and a ratio here: what the level's
+own distances are multiplied by. The engine multiplies every cull distance
+by r.ViewDistanceScale, so
+
+    wanted = metres / (the level's metres at 100% x view distance % / 100)
+
+which makes "28 m" 28 m on the ground at any view distance, and "moved"
+also true when the view distance did. The applied variables hold ratios,
+and start at 1: a level is saved at its own distances.
     grass layers moved
         for each density tier above the first, every actor tagged
         OW_GrassTier<n>: hidden in game unless layers > n
@@ -37,6 +47,7 @@ from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
 from combat.nodes import FN_ADD_FF, FN_LESS_II, FN_MUL_FF, FN_OR, MACRO_FOR_EACH
 from forest_generator.grass_cells import GRASS_TAG, GRASS_TIERS, tier_tag
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get, _out
+from graphics_menu.gfx_stats import FULL_VIEW_M, PERCENT
 from graphics_menu.gfx_tune_consts import (
     TUNER_GRASS_DISTANCE_APPLIED_VAR, TUNER_GRASS_LAYERS_APPLIED_VAR,
     TUNER_GRASS_SHADOWS_APPLIED_VAR, TUNER_TREE_DISTANCE_APPLIED_VAR,
@@ -130,16 +141,25 @@ def _author_scale(ed, comp, ratio, in_exec, x, y, made):
     return BEL.find_then_pin(fade)
 
 
+def _wanted(ed, column_name, x, y, made):
+    """The ratio that draws ``column_name``'s metres (module docstring)."""
+    reach = _call(ed, FN_MUL_FF, x, y + 300, made,
+                  A=column(ed, "view_distance", x - 520, y + 300, made),
+                  B=round(FULL_VIEW_M[column_name] * PERCENT, 6))
+    return _out(_call(ed, FN_DIV_FF, x + 260, y, made,
+                      A=column(ed, column_name, x - 520, y, made), B=_out(reach)))
+
+
 def _ratio(ed, column_name, applied_var, x, y, made):
     return _out(_call(ed, FN_DIV_FF, x + 760, y, made,
-                      A=column(ed, column_name, x, y, made),
+                      A=_wanted(ed, column_name, x, y, made),
                       B=_get(ed, applied_var, x + 500, y + 200, made)))
 
 
 def _author_grass(ed, in_execs, x0, y0, made):
     """The grass and bush cells: lighting and distance. Returns the tails."""
     far = _call(ed, FN_NEQ_FF, x0, y0 + 300, made,
-                A=column(ed, "grass_distance", x0 - 760, y0 + 300, made),
+                A=_wanted(ed, "grass_distance", x0 - 760, y0 - 400, made),
                 B=_get(ed, TUNER_GRASS_DISTANCE_APPLIED_VAR, x0 - 240, y0 + 500, made))
     lit = _call(ed, FN_NEQ_II, x0, y0 + 700, made,
                 A=column(ed, "grass_shadows", x0 - 980, y0 + 700, made, rounded=True),
@@ -166,7 +186,7 @@ def _author_grass(ed, in_execs, x0, y0, made):
                   flow, x0 + 3200, y0, made)
 
     kept = put(ed, TUNER_GRASS_DISTANCE_APPLIED_VAR,
-               column(ed, "grass_distance", x0 + 700, y0 - 500, made), [done],
+               _wanted(ed, "grass_distance", x0 + 700, y0 - 1200, made), [done],
                x0 + 1500, y0 - 700, made)
     kept = put(ed, TUNER_GRASS_SHADOWS_APPLIED_VAR,
                column(ed, "grass_shadows", x0 + 1200, y0 - 300, made, rounded=True),
@@ -177,7 +197,7 @@ def _author_grass(ed, in_execs, x0, y0, made):
 def _author_trees(ed, in_execs, x0, y0, made):
     """The tree cells' distance. Returns the tails."""
     moved = _call(ed, FN_NEQ_FF, x0, y0 + 300, made,
-                  A=column(ed, "tree_distance", x0 - 760, y0 + 300, made),
+                  A=_wanted(ed, "tree_distance", x0 - 760, y0 - 400, made),
                   B=_get(ed, TUNER_TREE_DISTANCE_APPLIED_VAR, x0 - 240, y0 + 500, made))
     go, same = _branch(ed, _out(moved), in_execs, x0 + 240, y0, made)
     actors = _call(ed, FN_ALL_OF_CLASS, x0 + 520, y0, made)
@@ -193,7 +213,7 @@ def _author_trees(ed, in_execs, x0, y0, made):
                          x0 + 1700, y0 + 1300, made),
                   flow, x0 + 2300, y0, made)
     kept = put(ed, TUNER_TREE_DISTANCE_APPLIED_VAR,
-               column(ed, "tree_distance", x0 + 700, y0 - 500, made), [done],
+               _wanted(ed, "tree_distance", x0 + 700, y0 - 1200, made), [done],
                x0 + 1500, y0 - 700, made)
     return [kept, same]
 

@@ -1,4 +1,4 @@
-"""World tuning: a game starts at a random time of day, and the M panel's [O]
+"""World tuning: a game starts at a random time of day, and the M panel's world
 tab shows the clock as an hour, moves it, changes the day's length, and
 saves world_tuning.csv.
 

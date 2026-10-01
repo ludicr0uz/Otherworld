@@ -9,6 +9,8 @@ what it is over. cursor_consts.py has the rules in one table.
                        component's TriggerSpent up, so a click fires nothing
   author_row_cursor    a stack of rows: the one under the cursor -> CursorRow;
                        moved or clicked -> the caret; clicked -> a flag
+  author_back_row      a tab's BACK row: the caret onto it; a click, or Enter
+                       with the caret there, shuts the tab
   author_widget_click  one widget (a hint line): clicked -> a flag
 
 The HUD stays the controller. No widget is hit-testable (umg_consts.SHOWN):
@@ -28,7 +30,7 @@ from combat.graph import BEL, _at, _connect, _declare, _loose_pin, _palette, _pi
 from combat.nodes import FN_AND, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_WAS_PRESSED
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.cursor_consts import (
-    CLICK_KEY, CURSOR_BOOLS, CURSOR_INTS, CURSOR_MOVED_VAR, CURSOR_POS_VAR,
+    BACK_KEY, CLICK_KEY, CURSOR_BOOLS, CURSOR_INTS, CURSOR_MOVED_VAR, CURSOR_POS_VAR,
     CURSOR_ROW_VAR, CURSOR_SHOWN_VAR, CURSOR_WANTED_VAR, NO_ROW, PAUSE_CLICK_VAR,
     TRIGGER_SPENT_VAR,
 )
@@ -182,13 +184,15 @@ def author_hold_fire(ed, in_execs, x0, y0):
 
 
 def author_row_cursor(ed, box, count, in_execs, x0, y0, row_var=None, click=None,
-                      limit=None):
+                      limit=None, within=None):
     """Which of ``box``'s first ``count`` rows the cursor is over -> CursorRow.
 
     ``row_var``: the menu's caret, moved there when the mouse moved or
     clicked. ``click``: what a left click on a row writes (see ROW).
     ``limit``: an int pin; rows from it on are not on screen (the loot window
     collapses them, and a collapsed row keeps its last geometry).
+    ``within``: a widget the cursor must be over as well -- a scrolling
+    list's window, whose rows keep their geometry when scrolled out of it.
     Returns the exec tails."""
     made = []
     flow = _setter(ed, CURSOR_ROW_VAR, NO_ROW, in_execs, x0, y0, made)
@@ -206,6 +210,9 @@ def author_row_cursor(ed, box, count, in_execs, x0, y0, row_var=None, click=None
     if limit is not None:
         shown = _call(ed, FN_LESS_II, x0 + 1080, y0 + 500, made, A=index, B=limit)
         over = _out(_call(ed, FN_AND, x0 + 1340, y0 + 300, made, A=over, B=_out(shown)))
+    if within is not None:
+        over = _out(_call(ed, FN_AND, x0 + 1340, y0 + 700, made, A=over,
+                          B=_under(ed, within, x0 + 820, y0 + 700, made)))
     hit, _miss = _branch(ed, over, [_loose_pin(loop, "LoopBody", is_input=False)],
                          x0 + 1600, y0, made)
     put(ed, CURSOR_ROW_VAR, index, [hit], x0 + 1860, y0, made)
@@ -229,6 +236,38 @@ def author_row_cursor(ed, box, count, in_execs, x0, y0, row_var=None, click=None
                              y0, made)
         flow = [_write(ed, click, [took], x + 1820, y0, made), idle]
     return flow + tails
+
+
+def author_back_row(ed, back, row_var, back_row, open_var, in_execs, x0, y0):
+    """A menu's BACK row, a WBP_MenuRow outside its list. The cursor over it
+    (moved or clicked) puts the caret there: ``row_var`` := ``back_row``. A
+    click on it, or Enter with the caret on it, lowers ``open_var``.
+    Returns the exec tails.
+
+    DrawHUD's, though the rest of a tab's keys are Tick's: the M panel's own
+    Enter is polled in DrawHUD, before this in the same frame and only while
+    no tab is open, so the Enter that shuts a tab cannot also take the row
+    the panel's caret was left on."""
+    made = []
+    over = _under(ed, back, x0, y0 + 500, made)
+    stirred = _call(ed, FN_OR, x0 + 560, y0 + 760, made,
+                    A=_get(ed, CURSOR_MOVED_VAR, x0 + 300, y0 + 760, made),
+                    B=_clicked(ed, x0 + 300, y0 + 900, made))
+    aimed = _call(ed, FN_AND, x0 + 820, y0 + 500, made, A=over, B=_out(stirred))
+    move, rest = _branch(ed, _out(aimed), in_execs, x0 + 1080, y0, made)
+    flow = [_setter(ed, row_var, back_row, [move], x0 + 1340, y0, made), rest]
+
+    x = x0 + 1700
+    on_it = _call(ed, FN_AND, x, y0 + 300, made, A=_clicked(ed, x - 260, y0 + 300, made),
+                  B=over)
+    caret = _call(ed, FN_GE_II, x, y0 + 500, made,
+                  A=_get(ed, row_var, x - 240, y0 + 500, made), B=back_row)
+    entered = _call(ed, FN_AND, x + 260, y0 + 500, made, A=_out(caret),
+                    B=_out(_call(ed, FN_WAS_PRESSED, x, y0 + 700, made,
+                                 self=_pc(ed, x - 240, y0 + 700, made), Key=BACK_KEY)))
+    leave = _call(ed, FN_OR, x + 520, y0 + 300, made, A=_out(on_it), B=_out(entered))
+    took, idle = _branch(ed, _out(leave), flow, x + 780, y0, made)
+    return [_setter(ed, open_var, "false", [took], x + 1040, y0, made), idle]
 
 
 def author_widget_click(ed, widget, click, in_execs, x0, y0):

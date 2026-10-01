@@ -21,7 +21,8 @@ from graphics_menu.umg_consts import (
     DEATH_TITLE_FONT, GAME_SUBTITLE, GAME_TITLE, HINT_CAPTURE, HINT_CAPTURE_TEXT,
     HINT_IDLE, HINT_IDLE_TEXT, MAIN_HINT, MAIN_HINT_FONT, MAIN_PANEL_SIZE,
     MAIN_ROW_LABEL_W, MAIN_ROW_SCALE, MAIN_SUB_FONT, MAIN_TITLE_FONT, MENU_ROWS,
-    PAUSE_HINT, PAUSE_HINT_FONT, PAUSE_POS, PAUSE_ROW_LABEL_W, PAUSE_ROW_LABELS,
+    PAUSE_HINT, PAUSE_HINT_FONT, PAUSE_PANEL, PAUSE_POS, PAUSE_ROW_LABEL_W,
+    PAUSE_ROW_LABELS,
     PAUSE_ROW_SCALE, PAUSE_ROWS, PAUSE_TITLE, PAUSE_TITLE_FONT, PAUSE_W, ROW_COLOR_VAR,
     ROW_GAP, ROW_LABEL_W, ROW_TEXT_VAR, ROW_WIDTH_VAR, SET_HINT_FONT, SET_TITLE_FONT,
     SETTINGS_PANEL, SETTINGS_PANEL_W, SETTINGS_ROW_LABELS, SETTINGS_ROWS_BOX,
@@ -88,7 +89,9 @@ def build_main_menu():
 def build_pause_menu():
     bp = U.widget_blueprint(WBP_PAUSE_MENU)
     root = U.add(bp, unreal.CanvasPanel, "Root")
-    outer, stack = U.panel(bp, root, "Panel", "T_UI_Panel", min_w=PAUSE_W)
+    # A variable: the HUD collapses it while a tuning tab is open in its place.
+    outer, stack = U.panel(bp, root, PAUSE_PANEL, "T_UI_Panel", min_w=PAUSE_W,
+                           variable=True)
     U.at(outer, (0.0, 0.0), (0.0, 0.0), PAUSE_POS)
     _line(bp, stack, "PauseTitle", PAUSE_TITLE, PAUSE_TITLE_FONT, COL_TITLE, bold=True,
           bottom=18.0, centred=False)

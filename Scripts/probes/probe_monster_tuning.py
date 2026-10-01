@@ -1,4 +1,4 @@
-"""Monster tuning: the M panel's [N] tab changes live wanderers at once, and
+"""Monster tuning: the M panel's monster tuning tab changes live wanderers at once, and
 saves monster_tuning.csv.
 
 The keys are raised by writing the HUD's MonTuneRow / MonTuneCreature /

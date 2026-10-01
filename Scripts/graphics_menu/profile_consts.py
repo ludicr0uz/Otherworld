@@ -36,12 +36,11 @@ ITEM_CLASSES_FIELD = "ItemClasses"
 AMMO_FIELDS = (("ItemLoaded", "Loaded"), ("ItemReserve", "Reserve"))
 
 # --- the countdown -----------------------------------------------------------
-# X with the M panel open starts it. X rather than Enter (the PIE console) or
-# S (walking); behind the MenuOpen gate like 1-4 and D, so it is a free key
-# everywhere else.
-EXIT_KEY = "X"
+# The M panel's "save and exit" row starts it (Enter or a click on the row;
+# EXIT_ACTION is what PauseClick is matched against).
+EXIT_ACTION = "save_exit"
 EXIT_SECONDS = 15.0
-EXIT_ROW_LABEL = f"[{EXIT_KEY}]   save and exit"
+EXIT_ROW_LABEL = "save and exit"
 
 # The HUD's variables. ExitStartedAt is compared with the player's
 # BP_HealthComponent.LastDamageTime, which a wanderer's swing stamps

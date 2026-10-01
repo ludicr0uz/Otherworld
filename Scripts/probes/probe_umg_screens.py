@@ -20,7 +20,7 @@ from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in ("MenuOpen", C.GAME_STARTED_VAR, "MenuPage",
-                                       "MenuRow", "Quality")]
+                                       "MenuRow", C.PAUSE_ROW_VAR)]
 WRITABLE += [(GAME_MODE_BP_PATH, KILL_COUNT_VAR), (GAME_MODE_BP_PATH, "PlayerDead"),
              (HEALTH_BP_PATH, "Health"), (SURVIVAL_BP_PATH, "Hunger")]
 
@@ -120,12 +120,12 @@ def probe(p):
 
     # --- the M panel ----------------------------------------------------------------
     p.set(hud, "MenuOpen", True)
-    p.set(hud, "Quality", 2)
+    p.set(hud, C.PAUSE_ROW_VAR, 2)
     _draw(hud)
     rows = ui["UiPause"].get_editor_property(C.PAUSE_ROWS)
     carets = _carets(rows, len(C.PAUSE_ROW_LABELS))
     debug = _text(_row(rows, C.PAUSE_DEBUG_ROW).get_editor_property(C.ROW_VALUE))
-    p.check("M opens the panel with the caret on the current preset",
+    p.check("M opens the panel with the caret on its own row (PauseRow)",
             ui["UiPause"].get_visibility() == SHOWN
             and carets == [float(i == 2) for i in range(len(C.PAUSE_ROW_LABELS))],
             str(carets))

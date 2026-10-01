@@ -2,7 +2,7 @@
 graphics_tuning.csv beside this module, one row per preset.
 
 A preset (Low / Medium / High / Ultra) is one row of GFX_STATS. The M
-panel's GRAPHICS TUNING tab ([P], gfx_tune_*.py) shows the picked preset's
+panel's GRAPHICS TUNING tab (gfx_tune_*.py) shows the picked preset's
 row, changes a number live and saves the whole table to the CSV; the next
 build_graphics_menu.py bakes it into the HUD's table, so git shows what moved.
 BP_GraphicsTuner (gfx_tuner.py) is what turns a row into the engine's state.
@@ -19,6 +19,16 @@ scalability level (High and Ultra both run Epic, 3; BaseScalability.ini's
 view and shadow distance scales and volumetric fog for that level), the two
 console overrides, and the grass layers and grass lighting per preset.
 
+Units are the ones a person reads, not the engine's. A scale is a
+percentage (100 is the engine's own), and Stat.scale (0.01) is what turns
+it back into the number a cvar or the cycle takes. The grass and tree draw
+distances are metres: how far off the grass's base layer (the thicker
+layers and the bushes keep their proportion to it) and the trees have faded
+out. The engine multiplies every cull distance by the view distance, so the
+tuner divides it back out (gfx_tuner_foliage.py): 28 m is 28 m at any view
+distance. The defaults are the levels' own distances (FULL_VIEW_M, at a
+view distance of 100%) at each preset's view distance.
+
 Pure Python (no unreal import): the game's save and the probe import it.
 """
 
@@ -27,6 +37,7 @@ import os
 from collections import namedtuple
 
 from forest_generator.grass_cells import GRASS_TIERS
+from forest_generator.tree_cells import TREE_CULL_END_CM
 
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphics_tuning.csv")
 PRESET_COLUMN = "preset"
@@ -42,8 +53,11 @@ GRASS_SHADOWS = "grass_shadows"  # grass and bushes cast shadows and take GI
 CYCLE = "cycle"                  # a BP_DayNightCycle variable, named by target
 
 # column: the CSV's; label: the tab's row; step, lo, hi: one nudge and the
-# limits; kind: int stats are rounded on the way out; defaults: per preset.
-Stat = namedtuple("Stat", "column label step lo hi kind how target defaults")
+# limits; kind: int stats are rounded on the way out; defaults: per preset;
+# scale: the table's number x scale is what the engine is given.
+Stat = namedtuple("Stat", "column label step lo hi kind how target defaults scale",
+                  defaults=(1.0,))
+PERCENT = 0.01
 
 
 def _same(value):
@@ -54,32 +68,43 @@ def _same(value):
 _LAYERS = tuple(sum(1 for t in GRASS_TIERS if t.min_preset <= p)
                 for p in range(len(PRESET_LABELS)))
 
+# Each preset's view distance, and how far the level's own cull distances
+# reach at 100% of it: the grass's base tier and the trees, in metres.
+_VIEW_PCT = (40, 60, 100, 100)
+FULL_VIEW_M = {"grass_distance": GRASS_TIERS[0].cull_end_cm / 100.0,
+               "tree_distance": TREE_CULL_END_CM / 100.0}
+
+
+def _metres(column):
+    return tuple(round(FULL_VIEW_M[column] * pct * PERCENT) for pct in _VIEW_PCT)
+
+
 PERFORMANCE_STATS = (
     Stat("engine_quality", "engine quality (0-3)", 1, 0, 3, int, LEVEL, "", (0, 1, 3, 3)),
     Stat("resolution_pct", "resolution (%)", 5, 25, 200, int, CVAR,
          "r.ScreenPercentage", (70, 85, 100, 100)),
     Stat("shadow_quality", "shadow quality (0-5)", 1, 0, 5, int, CVAR,
          "r.ShadowQuality", (1, 2, 3, 3)),
-    Stat("shadow_distance", "shadow distance (x)", 0.1, 0.1, 3.0, float, CVAR,
-         "r.Shadow.DistanceScale", (0.6, 0.7, 1.0, 1.0)),
-    Stat("view_distance", "view distance (x)", 0.1, 0.1, 3.0, float, CVAR,
-         "r.ViewDistanceScale", (0.4, 0.6, 1.0, 1.0)),
-    Stat("grass_distance", "grass draw distance (x)", 0.1, 0.1, 4.0, float,
-         GRASS_DISTANCE, "", _same(1.0)),
-    Stat("tree_distance", "tree draw distance (x)", 0.1, 0.1, 4.0, float,
-         TREE_DISTANCE, "", _same(1.0)),
+    Stat("shadow_distance", "shadow distance (%)", 10, 10, 300, int, CVAR,
+         "r.Shadow.DistanceScale", (60, 70, 100, 100), PERCENT),
+    Stat("view_distance", "view distance (%)", 10, 10, 300, int, CVAR,
+         "r.ViewDistanceScale", _VIEW_PCT, PERCENT),
+    Stat("grass_distance", "grass draw distance (m)", 2, 10, 300, int,
+         GRASS_DISTANCE, "", _metres("grass_distance")),
+    Stat("tree_distance", "tree draw distance (m)", 10, 30, 1200, int,
+         TREE_DISTANCE, "", _metres("tree_distance")),
     Stat("grass_layers", f"grass density (layers 1-{len(GRASS_TIERS)})", 1, 1,
          len(GRASS_TIERS), int, GRASS_LAYERS, "", _LAYERS),
-    Stat("grass_shadows", "grass shadows (0/1)", 1, 0, 1, int, GRASS_SHADOWS, "",
+    Stat("grass_shadows", "grass shadows (0 off, 1 on)", 1, 0, 1, int, GRASS_SHADOWS, "",
          (0, 0, 0, 1)),
     # Leaves are masked cards: off, every leaf card draws solid (cheaper).
-    Stat("leaf_cutouts", "leaf cut-outs (0/1)", 1, 0, 1, int, CVAR,
+    Stat("leaf_cutouts", "leaf cut-outs (0 off, 1 on)", 1, 0, 1, int, CVAR,
          "r.Nanite.ProgrammableRaster", _same(1)),
     # The triangle edge Nanite aims for, in pixels: higher is a coarser canopy.
     Stat("tree_coarseness", "tree coarseness (px)", 0.25, 0.25, 8.0, float, CVAR,
          "r.Nanite.MaxPixelsPerEdge", _same(1.0)),
-    Stat("fog", "fog (0/1)", 1, 0, 1, int, CVAR, "r.Fog", _same(1)),
-    Stat("volumetric_fog", "volumetric fog (0/1)", 1, 0, 1, int, CVAR,
+    Stat("fog", "fog (0 off, 1 on)", 1, 0, 1, int, CVAR, "r.Fog", _same(1)),
+    Stat("volumetric_fog", "volumetric fog (0 off, 1 on)", 1, 0, 1, int, CVAR,
          "r.VolumetricFog", (0, 0, 1, 1)),
     Stat("global_illumination", "GI (0 off, 1 Lumen)", 1, 0, 1, int, CVAR,
          "r.DynamicGlobalIlluminationMethod", _same(1)),
@@ -92,18 +117,20 @@ LOOK_STATS = (
     # A cheat cvar: it moves in the editor binary, not in a shipping build.
     Stat("brightness", "brightness (EV)", 0.25, -5.0, 5.0, float, CVAR,
          "r.ExposureOffset", _same(0.0)),
-    Stat("sun_light", "sunlight (x)", 0.1, 0.0, 5.0, float, CYCLE, "SunScale", _same(1.0)),
-    Stat("sun_disc", "sun disc (x)", 0.1, 0.0, 5.0, float, CYCLE, "SunDiscScale",
-         _same(1.0)),
-    Stat("moon_light", "moonlight (x)", 0.1, 0.0, 10.0, float, CYCLE, "MoonScale",
-         _same(1.0)),
-    Stat("moon_disc", "moon disc (x)", 0.1, 0.0, 5.0, float, CYCLE, "MoonDiscScale",
-         _same(1.0)),
-    Stat("stars", "stars (x)", 0.1, 0.0, 5.0, float, CYCLE, "StarScale", _same(1.0)),
-    Stat("ambient_light", "ambient light (x)", 0.1, 0.0, 5.0, float, CYCLE,
-         "AmbientScale", _same(1.0)),
-    Stat("fog_density", "fog density (x)", 0.1, 0.0, 10.0, float, CYCLE, "FogScale",
-         _same(1.0)),
+    Stat("sun_light", "sunlight (%)", 10, 0, 500, int, CYCLE, "SunScale", _same(100),
+         PERCENT),
+    Stat("sun_disc", "sun disc (%)", 10, 0, 500, int, CYCLE, "SunDiscScale",
+         _same(100), PERCENT),
+    Stat("moon_light", "moonlight (%)", 10, 0, 1000, int, CYCLE, "MoonScale",
+         _same(100), PERCENT),
+    Stat("moon_disc", "moon disc (%)", 10, 0, 500, int, CYCLE, "MoonDiscScale",
+         _same(100), PERCENT),
+    Stat("stars", "stars (%)", 10, 0, 500, int, CYCLE, "StarScale", _same(100),
+         PERCENT),
+    Stat("ambient_light", "ambient light (%)", 10, 0, 500, int, CYCLE,
+         "AmbientScale", _same(100), PERCENT),
+    Stat("fog_density", "fog density (%)", 10, 0, 1000, int, CYCLE, "FogScale",
+         _same(100), PERCENT),
 )
 GFX_STATS = PERFORMANCE_STATS + LOOK_STATS
 GFX_COLUMNS = tuple(s.column for s in GFX_STATS)

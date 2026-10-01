@@ -14,7 +14,7 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
 ## Settings: `world_config.py`
 
 - **The world config.** `DAY_LENGTH_S` and `NIGHT_LENGTH_S` are each 240 s for testing, unless
-  `world_tuning.csv` (saved by the M panel's WORLD TUNING tab, [O]) says otherwise. Change a
+  `world_tuning.csv` (saved by the M panel's WORLD TUNING tab) says otherwise. Change a
   number and re-run the builder.
 - **The night's cold:** `NIGHT_TEMPERATURE_DROP_PER_S` (0.1, or `world_tuning.csv`'s) is how
   many points of the player's Temperature a second of full night takes. It is the actor's

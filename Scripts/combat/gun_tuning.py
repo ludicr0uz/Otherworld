@@ -1,7 +1,7 @@
 """The gun tuning table: gun_tuning.csv beside this module, one row per gun.
 
 The CSV is the tracked copy of every number the in-game GUN TUNING page (the
-M panel's [T] tab, graphics_menu/tune_*.py) can change. It is written by that
+M panel's gun tuning tab, graphics_menu/tune_*.py) can change. It is written by that
 page's save (graphics_menu/tune_save.py) and read by weapon_specs._weapon_specs(),
 which lays each row over the literals there. So a value tuned in a game and
 saved lands in the Blueprints the next time build_weapons_and_combat.py runs,

@@ -1,5 +1,5 @@
-"""TuneTab: what one developer tuning tab of the M panel is called -- its key,
-the HUD variables, the widget names and words, and the save's Python command.
+"""TuneTab: what one developer tuning tab of the M panel is called -- its row
+in the panel, the HUD variables, the widget names and words, and the save's Python command.
 
 The GUN TUNING tab (tune_consts.GUN_TAB), the MONSTER TUNING tab
 (monster_tune_consts.MONSTER_TAB), the WORLD TUNING tab
@@ -10,13 +10,16 @@ all take a TuneTab. Only what the table is applied to differs
 (tune_tick._author_apply: carried guns; monster_tune_tick: live controllers;
 world_tune_tick: the day/night cycle; gfx_tune_tick: BP_GraphicsTuner).
 
-    [key] with the M panel open   open / close the tab (and shut the others)
-    Up / Down                     pick a row: the subject, then one per stat
+    its row in the M panel        open the tab (and shut the others). An open
+                                  tab stands in place of the panel's rows
+    Up / Down                     pick a row: the subject, then one per stat,
+                                  then BACK (in a scrolling tab the wheel too)
     Left / Right                  the subject row: the previous / next one;
                                   a stat: one step down / up, never under
                                   its minimum (nor, where the tab has
                                   maximums, over its maximum)
-    Enter                         save the whole table to its CSV
+    Enter                         save the whole table to its CSV; on BACK,
+                                  shut the tab: the M panel's rows return
 
 Constants only.
 """
@@ -30,7 +33,7 @@ TUNE_SAVE_KEY = "Enter"
 
 @dataclass(frozen=True)
 class TuneTab:
-    key: str
+    action: str           # its M panel row (umg_consts.PAUSE_ROW_ACTIONS)
     # The HUD's variables. The keys only raise the nudge and save flags and
     # Tick serves them, so a probe can tune and save without a keyboard.
     open_var: str
@@ -50,6 +53,7 @@ class TuneTab:
     panel: str
     rows_box: str
     saved_text: str
+    back_widget: str      # a WBP_MenuRow under the list: BACK
     title_widget: str
     hint_widget: str
     title_text: str
@@ -60,10 +64,21 @@ class TuneTab:
     maxs_var: str = ""        # per stat; "" = the tab has no maximums
     label_w: float = 0.0      # the rows' label column; 0 = TUNE_ROW_LABEL_W
     panel_w: float = 0.0      # 0 = TUNE_PANEL_W
+    title_font: float = 0.0   # 0 = TUNE_TITLE_FONT
+    # The list shows this many rows at a time behind a scroll bar, and the
+    # wheel moves the caret instead of a value; 0 = every row, no scrolling.
+    visible_rows: int = 0
+    corner: bool = False      # bottom right of the screen; else where the M panel is
 
     @property
     def row_count(self):
+        """The rows of the list: the subject, then one per stat."""
         return 1 + self.stat_count
+
+    @property
+    def back_row(self):
+        """BACK's place in the caret's order: after the list."""
+        return self.row_count
 
 
 def save_command(module):

@@ -2,7 +2,7 @@
 setting (``setting,value``).
 
 The CSV is the tracked copy of the numbers the in-game WORLD TUNING tab (the
-M panel's [O] tab, graphics_menu/world_tune_*.py) saves: the day's and the
+M panel's world tuning tab, graphics_menu/world_tune_*.py) saves: the day's and the
 night's lengths, and how fast the night cools the player. world_config lays it over its literals, and
 build_day_night.py bakes the result into BP_DayNightCycle's defaults, so a
 length tuned in a game and saved lands in the Blueprint on the next build

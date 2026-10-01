@@ -1,26 +1,34 @@
-"""DrawHUD: a tuning tab's panel on WBP_PauseMenu (GUN, MONSTER or WORLD
-TUNING: any TuneTab, tune_tab.py), from the tab's variables. For the guns:
+"""DrawHUD: a tuning tab's panel on WBP_PauseMenu (any TuneTab, tune_tab.py),
+from the tab's variables. For the guns:
 
-    NOT TuneOpen   TunePanel collapsed
-    TuneOpen       shown: row 0's value is TuneWeapons[TuneWeapon], row i's
+    NOT (MenuOpen AND TuneOpen)   TunePanel collapsed
+    else           shown: row 0's value is TuneWeapons[TuneWeapon], row i's
                    is TuneValues[TuneWeapon * STAT_COUNT + i - 1] (up to
-                   the tab's fraction_digits decimals, no grouping), the caret on TuneRow, and "saved
-                   to ..." while TuneSaved
+                   the tab's fraction_digits decimals, no grouping), the
+                   caret on TuneRow -- on BACK when it is past the list --
+                   and "saved to ..." while TuneSaved. A scrolling tab's
+                   list is scrolled to the caret's row
 
-Only reads; tune_tick.py (and monster_/world_tune_tick.py) decide. WBP_PauseMenu itself is shown only while
-MenuOpen (menu_screens.author_pause_menu), so this needs no MenuOpen test.
+Reads, with one exception: BACK. Its Enter and its click lower TuneOpen here
+(cursor.author_back_row says why it is not Tick's); everything else
+tune_tick.py and its siblings decide. The M panel's own rows are hidden while
+a tab is up (menu_screens.author_pause_menu).
 """
 
-from combat.graph import _at, _connect, _pin, _set
-from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_SUB_II
-from graphics_menu.cursor import author_row_cursor, author_widget_click
+from combat.graph import BEL, _at, _connect, _pin, _set
+from combat.nodes import FN_ADD_II, FN_AND, FN_ARR_GET, FN_MIN_II, FN_SUB_II
+from graphics_menu.cursor import (
+    FN_GE_II, author_back_row, author_row_cursor, author_widget_click)
 from graphics_menu.dev_guns import _branch, _call, _get, _out
 from graphics_menu.tune_consts import GUN_TAB
-from graphics_menu.ui_graph import MACRO_FOR_LOOP, mark_rows, part, row_value, set_shown, show_if
-from graphics_menu.umg_consts import WBP_PAUSE_MENU
+from graphics_menu.ui_graph import (
+    FN_CHILD_AT, FN_SELECT_FLOAT, FN_SET_OPACITY, MACRO_FOR_LOOP, mark_rows, member,
+    part, row_value, set_shown, show_if)
+from graphics_menu.umg_consts import ROW_CARET, WBP_MENU_ROW, WBP_PAUSE_MENU
 
 FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
 FN_TO_TEXT = "/Script/Engine.KismetTextLibrary.Conv_DoubleToText"
+FN_SCROLL_TO = "/Script/UMG.ScrollBox.ScrollWidgetIntoView"
 
 
 def _item(ed, array_var, index, x, y, made):
@@ -53,29 +61,69 @@ def _author_stats(ed, tab, box, in_execs, x0, y0, made):
     return _pin(loop, "Completed", is_input=False)
 
 
+def _author_back_caret(ed, tab, back, in_execs, x0, y0, made):
+    """BACK's caret, lit while the tab's caret is past the list. Returns then."""
+    on_back = _call(ed, FN_GE_II, x0, y0 + 300, made,
+                    A=_get(ed, tab.row_var, x0 - 240, y0 + 300, made), B=tab.back_row)
+    lit = _call(ed, FN_SELECT_FLOAT, x0 + 260, y0 + 300, made, A=1.0, B=0.0,
+                bPickA=_out(on_back))
+    fade = _call(ed, FN_SET_OPACITY, x0 + 560, y0, made,
+                 self=member(ed, back, WBP_MENU_ROW, ROW_CARET, x0 + 260, y0 + 500),
+                 InOpacity=_out(lit))
+    for e in in_execs:
+        _connect(e, _pin(fade, "execute"))
+    return BEL.find_then_pin(fade)
+
+
+def _author_follow(ed, tab, box, in_execs, x0, y0, made):
+    """A scrolling tab: the caret's row brought into the list's window. On
+    BACK the list stays where it is (the last row is already in view).
+    Returns then."""
+    row = _call(ed, FN_MIN_II, x0, y0 + 300, made,
+                A=_get(ed, tab.row_var, x0 - 240, y0 + 300, made), B=tab.stat_count)
+    child = _call(ed, FN_CHILD_AT, x0 + 260, y0 + 300, made, self=box, Index=_out(row))
+    seek = _call(ed, FN_SCROLL_TO, x0 + 560, y0, made, self=box,
+                 WidgetToFind=_out(child), AnimateScroll="false")
+    for e in in_execs:
+        _connect(e, _pin(seek, "execute"))
+    return BEL.find_then_pin(seek)
+
+
 def author_tune_panel(ed, x0, y0, in_execs, tab=GUN_TAB):
     """The fragment (see the module docstring). Returns the exec tails."""
     made = []
     panel = part(ed, WBP_PAUSE_MENU, tab.panel, x0, y0 + 800)
-    shown, shut = _branch(ed, _get(ed, tab.open_var, x0, y0 + 300, made), in_execs,
-                          x0 + 240, y0, made)
+    # MenuOpen too: a tab left open under a shut panel is not on screen, and
+    # its rows keep the geometry they last had.
+    up = _call(ed, FN_AND, x0, y0 + 300, made,
+               A=_get(ed, "MenuOpen", x0 - 240, y0 + 300, made),
+               B=_get(ed, tab.open_var, x0 - 240, y0 + 440, made))
+    shown, shut = _branch(ed, _out(up), in_execs, x0 + 240, y0, made)
     closed = set_shown(ed, panel, False, [shut], x0 + 500, y0 + 600)
     flow = set_shown(ed, panel, True, [shown], x0 + 500, y0)
 
     box = part(ed, WBP_PAUSE_MENU, tab.rows_box, x0 + 500, y0 + 400)
     # The mouse: the row under the cursor takes the caret, a click on it is
-    # one step up (Right), and a click on the hint line saves (Enter).
+    # one step up (Right), and a click on the hint line saves (Enter). A
+    # scrolling list's rows count only inside its window.
     hovered = author_row_cursor(ed, box, tab.row_count, [flow], x0 + 500, y0 - 1400,
-                                row_var=tab.row_var, click=(tab.nudge_var, 1))
+                                row_var=tab.row_var, click=(tab.nudge_var, 1),
+                                within=box if tab.visible_rows else None)
     hovered = author_widget_click(
         ed, part(ed, WBP_PAUSE_MENU, tab.hint_widget, x0 + 500, y0 - 2000),
         (tab.save_var, "true"), hovered, x0 + 500, y0 - 2400)
+    back = part(ed, WBP_PAUSE_MENU, tab.back_widget, x0 + 500, y0 - 3000)
+    hovered = author_back_row(ed, back, tab.row_var, tab.back_row, tab.open_var, hovered,
+                              x0 + 500, y0 - 4400)
     name = _item(ed, tab.names_var, _get(ed, tab.pick_var, x0 + 760, y0 + 440, made),
                  x0 + 1000, y0 + 300, made)
     flow, failed = row_value(ed, box, 0, name, hovered, x0 + 1000, y0)
     flow = _author_stats(ed, tab, box, [flow, failed], x0 + 2200, y0, made)
     flow = mark_rows(ed, box, tab.row_count, _get(ed, tab.row_var, x0 + 3800, y0 + 300, made),
                      [flow], x0 + 4000, y0)
+    flow = _author_back_caret(ed, tab, back, [flow], x0 + 4000, y0 + 1400, made)
+    if tab.visible_rows:
+        flow = _author_follow(ed, tab, box, [flow], x0 + 4000, y0 + 2400, made)
     saved = part(ed, WBP_PAUSE_MENU, tab.saved_text, x0 + 5200, y0 + 300)
     tails = show_if(ed, saved, _get(ed, tab.saved_var, x0 + 5200, y0 + 500, made), [flow],
                     x0 + 5500, y0)

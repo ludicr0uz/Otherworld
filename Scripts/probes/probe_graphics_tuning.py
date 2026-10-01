@@ -1,5 +1,6 @@
-"""Graphics tuning: a quality preset reaches the engine, and the M panel's [P]
-tab changes each of its numbers live and saves graphics_tuning.csv.
+"""Graphics tuning: a quality preset reaches the engine, and the M panel's
+graphics tab changes each of its numbers live and saves graphics_tuning.csv.
+The table is in a person's units: percentages, and metres of draw distance.
 
 The keys are raised by writing the HUD's GfxTuneRow / GfxTuneNudge /
 GfxTuneSaveRequested (a probe has no keyboard); the keys themselves are the
@@ -11,9 +12,12 @@ verifier's.
   - a resolution nudge is r.ScreenPercentage; fog off is r.Fog 0, and a
     second nudge down stops at the minimum; leaf cut-outs off is the Nanite
     cvar;
-  - grass draw distance up scales a grass cell's fade and moves its max draw
-    distance as far, and leaves the trees alone; tree draw distance down does
-    the same to a tree cell and leaves the grass alone;
+  - grass draw distance up (metres) scales a grass cell's fade and moves its
+    max draw distance as far, and leaves the trees alone; tree draw distance
+    down does the same to a tree cell and leaves the grass alone;
+  - view distance up is r.ViewDistanceScale, and the grass and the trees are
+    still drawn as many metres off: the tuner divides the engine's scaling
+    of every cull distance back out;
   - grass layers and grass shadows show and light the cells;
   - sunlight and moonlight scale the light that is up, and stars, ambient
     and fog density land on the cycle; brightness is r.ExposureOffset;
@@ -119,7 +123,8 @@ def _preset_cvars(preset):
 
 
 def _cell_default(preset, stat):
-    return GS.preset_rows()[preset][GS.index_of(stat.column)]
+    """What the engine is given: the table's number x the stat's scale."""
+    return GS.preset_rows()[preset][GS.index_of(stat.column)] * stat.scale
 
 
 def _cvars_match(preset):
@@ -180,19 +185,43 @@ def _run(p):
 
     g, t = _root(grass[0]), _root(trees[0])
     g0, t0 = _distances(g), _distances(t)
+    gm0, tm0 = _cell(p, 1, "grass_distance"), _cell(p, 1, "tree_distance")
     yield from _nudge(p, hud, ROW["grass_distance"], 1, times=5)
     g1, t1 = _distances(g), _distances(t)
-    p.check("grass draw distance x1.5 scales a grass cell's fade, moves its max draw "
-            "distance as far as the fade's end, and leaves the trees alone",
-            abs(g1[0] - 1.5 * g0[0]) <= 3 and abs(g1[1] - 1.5 * g0[1]) <= 3
+    gm1 = _cell(p, 1, "grass_distance")
+    up = gm1 / gm0
+    p.check(f"grass draw distance {gm0:g} m -> {gm1:g} m scales a grass cell's fade by "
+            "as much, moves its max draw distance as far as the fade's end, and leaves "
+            "the trees alone",
+            gm1 == gm0 + 5 * STAT["grass_distance"].step
+            and abs(g1[0] - up * g0[0]) <= 3 and abs(g1[1] - up * g0[1]) <= 3
             and abs((g1[2] - g0[2]) - (g1[1] - g0[1])) <= 3 and t1 == t0,
             f"grass {g0} -> {g1}, tree {t0} -> {t1}")
     yield from _nudge(p, hud, ROW["tree_distance"], -1, times=5)
     g2, t2 = _distances(g), _distances(t)
-    p.check("tree draw distance x0.5 does the same to a tree cell, and leaves the grass",
-            abs(t2[0] - 0.5 * t0[0]) <= 3 and abs(t2[1] - 0.5 * t0[1]) <= 3
+    tm1 = _cell(p, 1, "tree_distance")
+    down = tm1 / tm0
+    p.check(f"tree draw distance {tm0:g} m -> {tm1:g} m does the same to a tree cell, "
+            "and leaves the grass",
+            tm1 == tm0 - 5 * STAT["tree_distance"].step
+            and abs(t2[0] - down * t0[0]) <= 3 and abs(t2[1] - down * t0[1]) <= 3
             and abs((t2[2] - t0[2]) - (t2[1] - t0[1])) <= 3 and g2 == g1,
             f"tree {t0} -> {t2}, grass {g1} -> {g2}")
+    # A metre is a metre: the engine multiplies every cull distance by the
+    # view distance, so on the ground a fade ends at end x r.ViewDistanceScale.
+    v0 = _cvar("r.ViewDistanceScale")
+    yield from _nudge(p, hud, ROW["view_distance"], 1, times=2)
+    v1 = _cvar("r.ViewDistanceScale")
+    g3, t3 = _distances(g), _distances(t)
+    on_ground = {"grass": (g2[1] * v0 / 100.0, g3[1] * v1 / 100.0, gm1),
+                 "tree": (t2[1] * v0 / 100.0, t3[1] * v1 / 100.0, tm1)}
+    p.check("view distance up two steps is r.ViewDistanceScale, and the grass and the "
+            "trees still end as many metres off as their rows say",
+            abs(v1 - (v0 + 2 * STAT["view_distance"].step * STAT["view_distance"].scale))
+            < 1e-6 and g3[1] < g2[1] and t3[1] < t2[1]
+            and all(abs(was - m) < 0.2 and abs(now - m) < 0.2
+                    for was, now, m in on_ground.values()),
+            f"view {v0:g} -> {v1:g}, metres (before, after, row) {on_ground}")
 
     yield from _nudge(p, hud, ROW["grass_layers"], 1, times=2)
     yield from _nudge(p, hud, ROW["grass_shadows"], 1)
@@ -218,7 +247,7 @@ def _run(p):
             p.get(hud, TAB.saved_var)
             and saved.get("Medium", {}).get("resolution_pct") == _cell(p, 1, "resolution_pct")
             and saved.get("Medium", {}).get("grass_layers") == 4.0
-            and all(abs(saved.get(label, {}).get("sun_light", 0.0) - 1.5) < 1e-6
+            and all(abs(saved.get(label, {}).get("sun_light", 0.0) - 150.0) < 1e-6
                     for label in GS.PRESET_LABELS)
             and saved.get("Low", {}).get("resolution_pct") == STAT["resolution_pct"].defaults[0],
             str({k: v.get("resolution_pct") for k, v in saved.items()}))
@@ -231,7 +260,7 @@ def _run(p):
     value = str(rows.get_child_at(ROW["sun_light"]).get_editor_property(ROW_VALUE).get_text())
     p.check("drawn, the panel shows the preset and the sunlight on its row",
             "COLLAPSED" not in str(panel.get_visibility()).upper()
-            and subject == GS.PRESET_LABELS[0] and abs(float(value) - 1.5) < 1e-6,
+            and subject == GS.PRESET_LABELS[0] and abs(float(value) - 150.0) < 1e-6,
             f"{panel.get_visibility()} {subject!r} {value!r}")
     if os.environ.get("OW_GFX_SHOTS"):
         yield 0.5
@@ -260,7 +289,7 @@ def _look(p, hud, cycle):
         p.set(cycle, "Clock", clock)
         yield 0.1
         lights[name].append(p.get(cycle, name).get_editor_property("intensity"))
-    p.check("sunlight x1.5 is the noon sun 1.5 times as bright, and moonlight x1.5 "
+    p.check("sunlight 150% is the noon sun 1.5 times as bright, and moonlight 150% "
             "the midnight moon",
             all(was > 0.0 and abs(now / was - 1.5) < 0.02 for was, now in lights.values()),
             str(lights))
@@ -271,12 +300,12 @@ def _look(p, hud, cycle):
     got = {STAT[c].target: p.get(cycle, STAT[c].target)
            for c in ("stars", "ambient_light", "fog_density", "sun_disc", "moon_disc")}
     p.check("stars, ambient light, fog density and the two discs, one step down, are "
-            "the cycle's multipliers at 0.9; brightness up is r.ExposureOffset",
+            "90%: the cycle's multipliers at 0.9; brightness up is r.ExposureOffset",
             all(abs(v - 0.9) < 1e-6 for v in got.values())
             and abs(_cvar("r.ExposureOffset") - STAT["brightness"].step) < 1e-6,
             f"{got}, r.ExposureOffset {_cvar('r.ExposureOffset')}")
     p.check("a look number is written into every preset's row",
-            all(abs(_cell(p, i, "sun_light") - 1.5) < 1e-6
-                and abs(_cell(p, i, "stars") - 0.9) < 1e-6
+            all(abs(_cell(p, i, "sun_light") - 150.0) < 1e-6
+                and abs(_cell(p, i, "stars") - 90.0) < 1e-6
                 for i in range(len(GS.PRESET_LABELS))),
             str([_cell(p, i, "sun_light") for i in range(len(GS.PRESET_LABELS))]))

@@ -14,21 +14,58 @@ This package holds the fragments. The entry point itself is still 1.2k lines, ov
 split it before extending it.
 
 **The keys:**
-- **M** toggles the panel, titled **GAME SETTINGS**. Its last row, `[M] close`, is the close
-  button for the mouse.
-- **1 / 2 / 3 / 4** pick the Low / Medium / High / Ultra presets.
-- **D** toggles debug mode (the FPS readout, wanderer numbers, pellet tracers and impact
-  damage, the wanderers' sight cones).
-- **X** (panel open) starts save and exit.
-- **K** (panel open) is the dev-all-guns cheat (below).
-- **T** (panel open) opens the GUN TUNING tab (below).
-- **N** (panel open) opens the MONSTER TUNING tab (below).
-- **O** (panel open) opens the WORLD TUNING tab (below).
-- **P** (panel open) opens the GRAPHICS TUNING tab (below). Opening any tuning tab shuts the
-  other three.
+- **M** toggles the panel, titled **GAME SETTINGS**: the only key the panel has.
+- **Up / Down** move the panel's caret and **Enter** takes the row it is on; a click on a
+  row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
+- **The rows:** `debug` (the FPS readout, wanderer numbers, pellet tracers and impact damage,
+  the wanderers' sight cones), `save and exit`, `dev-all-guns`, `gun tuning`,
+  `monster tuning`, `world tuning`, `graphics tuning`, `close`. The quality presets are not
+  rows: Low / Medium / High / Ultra is the graphics tab's first row.
+- **A tuning tab stands in place of the panel's rows**, and its **BACK** row returns to them
+  (below: "The M panel as a menu").
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 - **The mouse** works every menu too (below).
+
+## The M panel as a menu (`menu_screens.py`, `menu_nav.py`, `menu_still.py`)
+
+- **A row is an action, not a key.** `umg_consts.PAUSE_ROW_ACTIONS` names each row's action in
+  row order. Taking row *i* (Enter on the caret's row, or a click) sets `PauseClick = i` in
+  DrawHUD; the next Tick, the fragment that owns the action sees
+  `menu_nav.pause_row_taken(action)` and serves it; DrawHUD lowers `PauseClick` at the top of
+  the next frame. A probe takes a row by writing `PauseClick`.
+- **`PauseRow` is the caret.** Up / Down and Enter are polled in DrawHUD (`_author_pause_keys`),
+  only while no tab is open. Enter, not Space: the panel does not pause, and Space jumps.
+- **One menu on screen.** `WBP_PauseMenu.Panel` (the panel's own artwork and rows) is
+  collapsed while any tab's open flag is up, and the open tab's panel shows instead; the three
+  developer tabs sit where the panel does (`TUNE_POS`), the graphics tab in the corner.
+- **BACK is a `WBP_MenuRow` under each tab's list**, the caret's last stop
+  (`TuneTab.back_row`, one past the list). A click on it, or Enter with the caret on it, lowers
+  the tab's open flag. **That is DrawHUD's** (`cursor.author_back_row`), though the rest of a
+  tab's keys are Tick's: Enter is "just pressed" for the whole frame, the panel's own Enter is
+  polled in DrawHUD *before* the tab's fragment and only while no tab is open, so the Enter
+  that shuts a tab cannot also take the row the panel's caret was left on (which would open the
+  tab again). For the same reason Tick's save Enter, Left and Right skip the BACK row.
+- **Opening a tab puts its caret on its first row.** M with a tab open shuts the panel and
+  leaves the tab's flag up, so M again comes back to the tab.
+- **The open panel holds the player still** (`menu_still.py`): `SetIgnoreMoveInput` on
+  `MenuOpen`'s edges, as the loot window does (the two counts stack). The stock input mapping
+  walks on the arrows as well as WASD, so Up / Down on a row also walked the character.
+- **A scrolling list** (`TuneTab.visible_rows`, the graphics tab's 5): the rows box is a
+  `ScrollBox` inside a `SizeBox` `visible_rows x TUNE_ROW_H` high, bar always shown.
+  - Nothing is hit-testable, so the bar is a picture and the HUD scrolls: every DrawHUD,
+    `ScrollWidgetIntoView(child at the caret's row)`, unanimated.
+  - The wheel is Up / Down there (the caret moves, the list follows), not Left / Right.
+  - **A row scrolled out of the window keeps its geometry**, and lies over the hint and BACK
+    below: the row test is ANDed with "the cursor is over the box" (`author_row_cursor`'s
+    `within`).
+  - `TUNE_ROW_H` (22.5) is a `WBP_MenuRow`'s desired height read off a rendered run
+    (`get_desired_size()` works in a windowed `-game`; cached geometry still reads zeros).
+- **Probes:** `probe_menu_cursor.py` (a taken row served once, the tab in the panel's place,
+  BACK's caret, the walk taken and given back) and the windowed `probe_menu_cursor_window.py`
+  (the graphics tab's five rows under the cursor and no more, the list scrolled to its end).
+- **Still needs a play session:** Enter and the arrows themselves, the click on BACK, the
+  wheel in the scrolling list, and how the corner panel reads.
 
 ## The mouse cursor (`cursor.py`, `cursor_consts.py`)
 
@@ -40,8 +77,8 @@ mouse is the camera's.
 |---|---|---|---|
 | title | the caret goes there | Enter on that row | |
 | settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up | Left / Right |
-| M panel | a second caret lights | that row's key (1-4, D, X, K, T, N, O, P; M on the last row, `[M] close`) | |
-| tuning tab | the caret goes there | one step up; on the hint line: save | Left / Right |
+| M panel | the caret goes there | takes the row (as Enter does) | |
+| tuning tab | the caret goes there | one step up; on the hint line: save; on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
 | loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
 | death menu | | on the hint line: restart | |
 
@@ -53,16 +90,16 @@ mouse is the camera's.
 - **A resting cursor does not hold the caret.** The caret follows only when the mouse moved
   or clicked, so Up/Down still work with the cursor parked on a row.
 - **A click only raises flags, which the menu's keys already serve:** `CursorAccept` (title,
-  settings, death: `_emit_accept` lowers it), `PauseClick` (the M panel row; Tick's key polls
-  are `or_pause_click`, and DrawHUD lowers it at the top of the next frame), the tabs'
+  settings, death: `_emit_accept` lowers it), `PauseClick` (the M panel row; Tick's fragments
+  test `pause_row_taken`, and DrawHUD lowers it at the top of the next frame), the tabs'
   `nudge`/`save` flags and `LootTakeRequested`. That is what lets a probe click.
-- **Every menu that can be shut has a button for it.** The M panel's last row is `[M] close`
-  (its key is M, so the toggle's poll is `or_pause_click` like every other row's; closing the
-  panel takes its tuning tabs down with it). The loot window's `LootClose` line lowers
+- **Every menu that can be shut has a button for it.** The M panel's last row is `close`
+  (the M toggle's poll is `or_pause_row` with it), and every tuning tab has BACK. The loot window's `LootClose` line lowers
   `LootOpen` (`loot_draw.py`), and Tick stands the player up off that edge as after Tab. The
   settings page has its BACK row. The title and death screens have nothing to shut.
-- **The wheel is two more keys** OR'd into the Left/Right polls (`menu_nav.or_wheel`), not
-  the right button: that is the shoulder aim, and the M panel does not pause.
+- **The wheel is two more keys** OR'd into the Left/Right polls (`menu_nav.or_wheel`; in a
+  scrolling tab, the Up/Down polls), not the right button: that is the shoulder aim, and the
+  M panel does not pause.
 - **Shown is Game-and-UI, hidden is Game-only** (`author_cursor_mode`), switched only when
   `CursorWanted != CursorShown`. Without the Game-only call the camera stays dead after a
   menu closes until the next click.
@@ -89,7 +126,8 @@ mouse is the camera's.
   `SetVisibility`).
 - **Which screen:** `GameStarted` false → `WBP_MainMenu` (its title or settings panel by
   `MenuPage`); `PlayerDead` → `WBP_DeathMenu`; otherwise `WBP_HUD`'s `Body`, plus
-  `WBP_PauseMenu` while `MenuOpen`. `WBP_HUD` itself is never hidden, so its `Fps` text (outside
+  `WBP_PauseMenu` while `MenuOpen` (its own rows, or the open tuning tab in their place).
+  `WBP_HUD` itself is never hidden, so its `Fps` text (outside
   `Body`) shows over every screen.
 - **Shown means `HitTestInvisible`, never `Visible`.** No widget may take a click or hover away
   from the game viewport; every key is polled off the controller, and so is the mouse
@@ -123,33 +161,47 @@ mouse is the camera's.
 A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 24 numbers), and
 `graphics_tuning.csv` is the tracked copy. The defaults are what the presets always did:
 
-| preset | engine quality | `r.ShadowQuality` | `r.ScreenPercentage` | view distance | grass layers | grass shadows + DF/indirect |
-|---|---|---|---|---|---|---|
-| Low | 0 | 1 | 70 | 0.4 | 1 | off |
-| Medium | 1 | 2 | 85 | 0.6 | 2 | off |
-| High | 3 (Epic) | 3 | 100 | 1.0 | 3 | off |
-| Ultra | 3 (Epic) | 3 | 100 | 1.0 | 4 | **on** |
+| preset | engine quality | `r.ShadowQuality` | `r.ScreenPercentage` | view distance | grass / tree draw distance | grass layers | grass shadows + DF/indirect |
+|---|---|---|---|---|---|---|---|
+| Low | 0 | 1 | 70 | 40% | 28 m / 120 m | 1 | off |
+| Medium | 1 | 2 | 85 | 60% | 42 m / 180 m | 2 | off |
+| High | 3 (Epic) | 3 | 100 | 100% | 70 m / 300 m | 3 | off |
+| Ultra | 3 (Epic) | 3 | 100 | 100% | 70 m / 300 m | 4 | **on** |
 
-**P with the panel open** toggles `GfxTuneOpen`. The subject row is the preset: Left/Right
-there pick Low / Medium / High / Ultra, exactly as the 1-4 keys do. The rows under it are
-that preset's numbers; **Enter** saves all four presets to
-`Scripts/graphics_menu/graphics_tuning.csv`, which the next build bakes into the HUD.
+**The M panel's `graphics tuning` row** opens the tab (`GfxTuneOpen`). The subject row is
+the preset: Left/Right there pick Low / Medium / High / Ultra, and it is the only place a
+preset is picked. The rows under it are that preset's numbers; **Enter** saves all four
+presets to `Scripts/graphics_menu/graphics_tuning.csv`, which the next build bakes into the HUD.
+
+- **The tab is small and out of the way:** bottom right (`TuneTab.corner`), a 13 pt title, five
+  rows at a time behind a scroll bar (above: "A scrolling list").
+- **The table is in a person's units.** A scale is a percentage (100 = the engine's own) and
+  `Stat.scale` (0.01) turns it back into what the cvar or the cycle takes
+  (`gfx_tuner_read.applied`). The draw distances are **metres**.
+- **A metre is a metre at any view distance.** The engine multiplies every cull distance by
+  `r.ViewDistanceScale`, so the tuner's ratio to the level's own distances is
+  `metres / (FULL_VIEW_M x view distance % / 100)` (`gfx_tuner_foliage._wanted`;
+  `FULL_VIEW_M`: grass 70 m, the base tier's fade end, trees 300 m). The applied variables
+  hold that ratio, so nudging the view distance re-walks the cells. The grass metres are the
+  base layer's; the thicker layers and the bushes keep their proportion to it.
+- **An old CSV is in the old units.** A `graphics_tuning.csv` saved before this (0.4, 1.0)
+  reads as 0.4% and 1 m; the tracked one was rewritten.
 
 - **Performance rows are per preset:** engine quality (the scalability level), resolution,
-  shadow quality and distance, view distance, grass and tree draw distance (multipliers of
-  the level's own cull distances), grass density (layers 1-4), grass shadows, leaf cut-outs
+  shadow quality and distance (%), view distance (%), grass and tree draw distance (metres),
+  grass density (layers 1-4), grass shadows, leaf cut-outs
   (`r.Nanite.ProgrammableRaster`: off draws every leaf card solid), tree coarseness
   (`r.Nanite.MaxPixelsPerEdge`), fog and volumetric fog on/off, GI, reflections, AA.
 - **Look rows are one number for all four presets:** brightness (`r.ExposureOffset`, in
   EV), sunlight, sun disc, moonlight, moon disc, stars, ambient light and fog density,
-  each a multiplier of what `world_config` sets. A nudge writes the picked preset's look
+  each a percentage of what `world_config` sets. A nudge writes the picked preset's look
   into every row (`gfx_tune_tick._author_spread`), and the CSV is read from the first.
 - **Two owners.** The HUD holds the table and the tab (`gfx_tune_tick.py`, on the shared
   tab machine). `BP_GraphicsTuner`, an ActorComponent on the HUD (`gfx_tuner*.py`), turns a
   row into the engine's state. The HUD hands it `Values`, `Preset` and `Dirty` whenever a
   number was touched or `Quality != GfxQualityApplied`.
-- **A preset key only sets `Quality`.** BeginPlay's default, a key, a click and the tab's
-  preset row all reach the engine through that one hand-over, on the next Tick.
+- **Picking a preset only sets `Quality`.** BeginPlay's default and the tab's preset row
+  both reach the engine through that one hand-over, on the next Tick.
   `GfxQualityApplied` starts at -1, so the first Tick of every session applies Low.
 - **The console commands are needed.** `DefaultEngine.ini` pins `r.ShadowQuality` (and the
   GI, reflection and AA methods) at project-setting priority, which outranks scalability.
@@ -158,7 +210,7 @@ that preset's numbers; **Enter** saves all four presets to
   (`gfx_tuner_foliage.py`), each walk only when its own number moved: grass by the
   `OW_Grass` tag, density tiers by `OW_GrassTier<n>`, trees as "an instanced-mesh root
   that is not grass" (the levels carry no tree tag).
-- **A cell's distance is scaled by wanted / applied,** read off the component, so a level
+- **A cell's distance is scaled by wanted / applied** (ratios, above), read off the component, so a level
   reload (fresh components, fresh HUD) starts again from 1. Its max draw distance moves by
   the same centimetres as the fade's end, not by the ratio: it includes a fixed reach to
   the cell's corner (`grass_cells.cell_max_draw_cm`).
@@ -180,11 +232,12 @@ that preset's numbers; **Enter** saves all four presets to
 - **The verifier's whole-graph scans see none of this in the HUD:** the HUD graph holds no
   console command, scalability call or tag walk (asserted), which is why the apply is a
   component of its own.
-- **Probe:** `probe_graphics_tuning.py` (16 checks: Low applied at the start, a preset
-  switch, cvars, both draw distances, layers, shadows, the sun and the moon scaled, the
+- **Probe:** `probe_graphics_tuning.py` (17 checks: Low applied at the start, a preset
+  switch, cvars, both draw distances in metres, the same metres after a view distance
+  nudge, layers, shadows, the sun and the moon scaled, the
   look spread over the presets, the CSV, the panel). It backs up the CSV and puts it back.
   `OW_GFX_SHOTS=1` with `--windowed` saves a picture of the panel.
-- **Still needs a play session:** the P key, what each number does to the frame rate and
+- **Still needs a play session:** what each number does to the frame rate and
   the picture (a headless run renders nothing), and whether the limits are the useful ones.
 
 ## Settings screen
@@ -215,7 +268,7 @@ that preset's numbers; **Enter** saves all four presets to
 `save_exit.py` (the Tick fragment; `__init__.py` maps the rest) runs every Tick, after the grass
 sync:
 
-- **X with the panel open** closes it and starts a 15 s countdown (`EXIT_SECONDS`), drawn top
+- **The panel's `save and exit` row** closes it and starts a 15 s countdown (`EXIT_SECONDS`), drawn top
   centre (`profile_draw.py`). When it runs out, the player's stats and inventory go into a fresh
   `/Game/UI/BP_Profile` (a `USaveGame`, slot `OtherworldProfile`) and the current level reopens,
   which opens on the main menu.
@@ -239,23 +292,21 @@ sync:
 - **Probe:** `uepy.py --game --probe Scripts/probes/probe_save_exit.py`. It covers the freeze, a
   hit calling the exit off and freeing the pawn, the save, the reload and restore, a crafted inventory replacing the
   issued one, and the delete on death. It sets aside any real profile on disk and puts it back.
-- **Still needs a play session:** the X key itself and the 15 s at real speed (the probe
+- **Still needs a play session:** taking the row by hand and the 15 s at real speed (the probe
   writes the countdown's variables), and how the banner reads.
 
 ## The dev-all-guns cheat (`dev_guns.py`, `dev_consts.py`)
 
-A testing aid on the M panel's last row. **K with the panel open** raises the HUD's
+A testing aid on the M panel. **Its row** (`dev-all-guns`) raises the HUD's
 `DevAllGunsRequested`; the next Tick (run from `save_exit.py`, after the countdown) lowers it and,
 for each of the five guns, the knife and the axe in `DEV_GUN_CLASS_PATHS`, spawns one if none is carried and the bag has
 room (`INVENTORY_SIZE`): `Dropped = false`, `Inventory += it`, then `NeedsRefresh`. The held item
 stays held, as with a pick-up; asking twice adds nothing.
 
-- **K, not G:** the weapon component polls its keys whether the panel is open or not, so G would
-  also drop the held gun.
 - **`profile_checks` tells its `Set Dropped`/`Set NeedsRefresh` apart from the cheat's** (the
   cheat's item comes through a cast; its refresh follows no `Set EquippedIndex`).
 - **Probe:** `uepy.py --game --probe Scripts/probes/probe_dev_all_guns.py` writes the request
-  flag (no keyboard in a probe). The K key itself needs a play session.
+  flag (no keyboard in a probe). Taking the row by hand needs a play session.
 
 ## The loot window (`loot_*.py`, `wbp_loot.py`)
 
@@ -274,7 +325,7 @@ Run from Tick after save and exit; the design is `Scripts/loot/CLAUDE.md`. Traps
 
 ## The GUN TUNING tab (`tune_*.py`, `wbp_tune.py`)
 
-A developer tab beside the M panel: **T with the panel open** toggles `TuneOpen`. Up/Down pick
+A developer tab in the M panel's place: **its row** (`gun tuning`) opens it (`TuneOpen`). Up/Down pick
 the gun row or one of the 20 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Right change the
 gun, or move the stat one step (never under its minimum); **Enter** saves
 `Scripts/combat/gun_tuning.csv`.
@@ -298,7 +349,7 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
 
 ## The MONSTER TUNING tab (`monster_tune_*.py`)
 
-**N with the panel open** toggles `MonTuneOpen` (and shuts `TuneOpen`; T shuts this one). The
+**Its M panel row** opens it (`MonTuneOpen`; opening a tab shuts the others). The
 creature row, then the 13 stats of `npc/monster_tuning.MONSTER_STATS`: aggro range, aggro cone
 (half-angle), hearing, touch range, patrol radius, patrol speed, the patrol re-pick window, run
 speed, damage per hit, melee range, time between swings, health. Same keys as GUN TUNING;
@@ -324,12 +375,12 @@ speed, damage per hit, melee range, time between swings, health. Same keys as GU
 - **Probe:** `probe_monster_tuning.py` (12 checks: the live write, the floor, the wendigos
   untouched, a speed and a health nudge reaching the pawn, the wrap, the CSV, the panel). It
   backs up the CSV and puts it back.
-- **Still needs a play session:** the N key, how the 14-row panel reads, and how a tuned
+- **Still needs a play session:** how the 14-row panel reads, and how a tuned
   wanderer feels.
 
 ## The WORLD TUNING tab (`world_tune_*.py`)
 
-**O with the panel open** toggles `WorldTuneOpen`. One subject row (`world`), then
+**Its M panel row** opens it (`WorldTuneOpen`). One subject row (`world`), then
 `world/world_tuning.WORLD_STATS`: the time of day (hours, step 0.5), the day's length and the
 night's (seconds, step 30), and the night's cold (Temperature points a second, step 0.01,
 `world/night_cold.py`). Same keys as GUN TUNING; **Enter** saves all but the hour to
@@ -351,7 +402,7 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
 - **Probe:** `probe_world_tuning.py` (8 checks: the random start, the hour on the dial, a nudge,
   crossing into the other half, a length, the CSV, the panel). It backs up the CSV and puts it
   back.
-- **Still needs a play session:** the O key, and how the sky looks when the hour jumps.
+- **Still needs a play session:** how the sky looks when the hour jumps.
 
 ## HUD
 
@@ -430,6 +481,10 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
   (uepy says "the listener stopped responding"). Stop it first (`touch <dir>/stop`, then
   wait for its pid to exit: a call made while it is still shutting down fails the same
   way), or let the failed call be the stop: the next call boots a new one.
+  **The same message at 0.0 s on the first call after a boot can be a build that is
+  running.** Before any other call, wait for `[UI] done` in the editor log: the next call
+  boots a second editor, which loads the assets before the first has saved them (a verifier
+  there checks the old HUD), and both then serve one inbox. `kill -9` both afterwards.
 - **Seeing a screen:** a `-nullrhi` probe proves the values, not the look. A `-game` run without
   `-nullrhi` (`-windowed -ResX=1280 -ResY=720`) renders on this Mac, and the console command
   `shot showui` saves the viewport with its widgets to `Saved/Screenshots/MacEditor/`.

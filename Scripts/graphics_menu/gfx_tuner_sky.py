@@ -3,7 +3,8 @@ cycle's (gfx_stats.CYCLE) written onto the level's BP_DayNightCycle.
 
     the level has a BP_DayNightCycle (GetActorOfClass, cast):
         SunScale, SunDiscScale, MoonScale, MoonDiscScale, StarScale,
-        AmbientScale, FogScale := the applied preset's numbers
+        AmbientScale, FogScale := the applied preset's numbers (percentages
+        in the table, fractions here: gfx_tuner_read.applied)
 
 The cycle multiplies its own sums by them every Tick (world/
 day_night_graph.py), so a nudge shows on the next frame. A level without a
@@ -15,7 +16,7 @@ import unreal
 from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
 from graphics_menu.dev_guns import _call, _class_literal, _out
 from graphics_menu.gfx_stats import CYCLE, stats_by
-from graphics_menu.gfx_tuner_read import stat
+from graphics_menu.gfx_tuner_read import applied
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
 
 FN_ACTOR_OF_CLASS = "/Script/Engine.GameplayStatics.GetActorOfClass"
@@ -43,7 +44,7 @@ def author_sky(ed, in_execs, x0, y0, made):
         n = _at(ed.add_set_member_variable_node(st.target, DAY_NIGHT_CLASS_PATH), x + 600, y0)
         made.append(n)
         _connect(cycle, _pin(n, "self"))
-        _connect(stat(ed, index, x, y0 + 400, made), _pin(n, st.target))
+        _connect(applied(ed, index, x - 300, y0 + 400, made), _pin(n, st.target))
         _connect(flow, _pin(n, "execute"))
         flow = BEL.find_then_pin(n)
         x += 900

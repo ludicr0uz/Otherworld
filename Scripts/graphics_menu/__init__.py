@@ -14,7 +14,8 @@ The screens (widget trees, authored through the UMGToolSet plugin)
 
 The HUD graph that shows and writes them
   ui_graph        creating the screens at BeginPlay; SetText/SetVisibility/rows helpers
-  menu_screens    which screen is up: main menu (+ its keys), death menu, alive, M panel
+  menu_screens    which screen is up: main menu (+ its keys), death menu, alive,
+                  M panel (its rows unless a tuning tab is open; Up/Down/Enter)
   hud_stats       HP bar and number, the kill counter
   hud_flash       a stat bar's group blinking while the bar is low
   stamina_bar     the stamina bar's fill, amber while sprinting
@@ -32,12 +33,16 @@ Still drawn on the HUD canvas (placed per frame)
   scope           the sniper's glass, and when it replaces the crosshair
 
 Input, settings and state
-  presets         the quality presets' names and keys; picking one sets Quality
+  presets         the quality presets' names; picking one sets Quality
   menu_nav        Up/Down caret movement and the accept keys, shared by pages;
-                  what a key poll gains from the mouse (wheel, a clicked row)
+                  what a key poll gains from the wheel; Tick's test for a
+                  taken M-panel row (the rows have no hotkeys)
+  menu_still      Tick: the controller ignores move input while the M panel
+                  is open, so the arrows only work the menu
   cursor_consts   the mouse cursor in the menus: its buttons, variables, rules
   cursor          DrawHUD: showing the cursor while a menu is up, the row
-                  under it (by geometry), and what a click on it raises
+                  under it (by geometry), what a click on it raises, and a
+                  tab's BACK row
   settings_rows   settings screen constants: SLIDERS, row order, KEY_POOL
   settings_input  rebinding capture, slider nudges, BACK, the save
   difficulty      the DIFFICULTY row (EASY/MEDIUM/SURVIVOR) and its push onto
@@ -51,8 +56,8 @@ Input, settings and state
                   spawned in place of the issued loadout
   save_exit       the HUD Tick fragment: delete the profile on death, load it once
                   a game starts, X starts the 15 s exit, a hit calls it off
-  dev_consts      the dev-all-guns cheat: its key (K), row label, flags, the guns
-  dev_guns        the cheat's Tick fragment: K in the M panel gives one of every
+  dev_consts      the dev-all-guns cheat: its row, flags, the guns
+  dev_guns        the cheat's Tick fragment: its M panel row gives one of every
                   gun not carried (run from save_exit, after the countdown)
   loot_consts     the loot window: keys (Tab, Up/Down, Enter), variables, widget names
   loot_find       Tick: the nearest dead body in reach, loot or none -> LootTarget
@@ -66,22 +71,25 @@ Input, settings and state
   legal_consts    the proprietary notices' words and places, WATERMARK_RECIPIENT
   wbp_legal       WBP_MainMenu's LegalNotice and WBP_HUD's Watermark (called
                   from wbp_screens and wbp_hud)
-  tune_tab        TuneTab: what a tuning tab is called (keys, variables,
-                  widgets, words, save command); the shared arrows and Enter
-  tune_consts     the GUN TUNING tab (T): variables, widget names, GUN_TAB
+  tune_tab        TuneTab: what a tuning tab is called (its M panel row,
+                  variables, widgets, words, save command, where it sits and
+                  whether its list scrolls); the shared arrows and Enter
+  tune_tabs       TABS: the four tabs, in M panel order
+  tune_consts     the GUN TUNING tab: variables, widget names, GUN_TAB
   tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
                   the gun table onto every carried gun (run after loot_tick's)
-  tune_draw       DrawHUD: a tab's panel, the subject and its values, the caret
+  tune_draw       DrawHUD: a tab's panel, the subject and its values, the
+                  caret, BACK, a scrolling list kept on the caret's row
   tune_save       run in the game by the save: the live table into
                   combat/gun_tuning.csv
-  wbp_tune        WBP_PauseMenu's two tuning panels (called from wbp_screens)
-  monster_tune_consts  the MONSTER TUNING tab (N): variables, widget names,
+  wbp_tune        WBP_PauseMenu's four tuning panels (called from wbp_screens)
+  monster_tune_consts  the MONSTER TUNING tab: variables, widget names,
                   the creatures' controller classes, MONSTER_TAB
   monster_tune_tick    Tick: the tab's flow, then each creature's row onto
                   every live controller of its class (run after tune_tick's)
   monster_tune_save    run in the game by the save: the live table into
                   npc/monster_tuning.csv
-  world_tune_consts    the WORLD TUNING tab (O): variables, widget names,
+  world_tune_consts    the WORLD TUNING tab: variables, widget names,
                   WORLD_TAB
   world_tune_tick      Tick: the tab's flow, then the lengths and a moved hour
                   onto the day/night cycle and its clock back as the hour
@@ -90,9 +98,10 @@ Input, settings and state
                   into world/world_tuning.csv
 
 Graphics: what a preset is, the tab that tunes it, the component that applies it
-  gfx_stats            the graphics table: each stat's label, step, limits,
-                  per-preset defaults and how it is applied; graphics_tuning.csv
-  gfx_tune_consts      the GRAPHICS TUNING tab (P): variables, widget names,
+  gfx_stats            the graphics table: each stat's label, unit (percent,
+                  metres), step, limits, per-preset defaults and how it is
+                  applied; graphics_tuning.csv
+  gfx_tune_consts      the GRAPHICS TUNING tab: variables, widget names,
                   GFX_TAB; BP_GraphicsTuner's path and variables
   gfx_tune_tick        Tick: the tab's flow, the pick kept as Quality, the look
                   spread over the presets, the table handed to the tuner
@@ -101,9 +110,11 @@ Graphics: what a preset is, the tab that tunes it, the component that applies it
                   graphics_tuning.csv
   gfx_tuner            BP_GraphicsTuner, the HUD's component: Tick applies a
                   dirty row -- the scalability level, a console command per cvar
-  gfx_tuner_read       one stat of the applied preset, in the tuner's graph
-  gfx_tuner_foliage    the tuner's grass and tree cells: draw distances,
-                  density tiers, grass lighting
+  gfx_tuner_read       one stat of the applied preset, in the tuner's graph,
+                  as the table has it or as the engine takes it
+  gfx_tuner_foliage    the tuner's grass and tree cells: draw distances
+                  (metres, whatever the view distance), density tiers,
+                  grass lighting
   gfx_tuner_sky        the tuner's look multipliers onto BP_DayNightCycle
 
 verify_graphics_menu.py's checks, beside it because it is over budget
@@ -117,9 +128,12 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   tune_checks        the gun tuning tab: table, CSV on the guns, panel, save, writes
   world_tune_checks    the world tuning tab: panel, save, the cycle's Sets
   cursor_checks      the mouse cursor: shown when, the row tests, the clicks
+  pause_checks       the M panel as a menu: rows taken by caret or click (no
+                     hotkeys), one menu at a time, BACK, the scrolling list,
+                     the player held still
   monster_tune_checks  the monster tuning tab: table, CSV on the controllers,
                      panel, save, writes
-  gfx_checks         the graphics tuning tab: table, CSV, panel, the M panel's
-                     title, the preset keys, the hand-over to the tuner
+  gfx_checks         the graphics tuning tab: table, units, CSV, panel (corner,
+                     title), the M panel's title, the hand-over to the tuner
   gfx_tuner_checks   BP_GraphicsTuner: each stat reaching what it names
 """

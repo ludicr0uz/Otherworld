@@ -2,7 +2,7 @@
 creature (NPC_VARIANTS' keys).
 
 The CSV is the tracked copy of every number the in-game MONSTER TUNING tab
-(the M panel's [N] tab, graphics_menu/monster_tune_*.py) can change. That tab's
+(the M panel's monster tuning tab, graphics_menu/monster_tune_*.py) can change. That tab's
 save (graphics_menu/monster_tune_save.py) writes it, and monster_specs() lays
 it over the literals in forest_generator/npc_agro.py and npc_placement.py. The
 NPC builder bakes monster_specs() into each creature's controller as the

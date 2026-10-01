@@ -2,7 +2,7 @@
 (tune_tick.author_tab_flow, shared with GUN and MONSTER TUNING), then the
 table onto the level's day/night cycle.
 
-    [O] with MenuOpen       WorldTuneOpen = NOT WorldTuneOpen; the other tabs shut
+    its M panel row taken   WorldTuneOpen = NOT WorldTuneOpen; the other tabs shut
     WorldTuneOpen, and the level has a BP_DayNightCycle (GetActorOfClass, cast):
       WorldTuneTouched      DayLengthSeconds, NightLengthSeconds,
                             NightTemperatureDropPerSecond := the table's
@@ -27,7 +27,7 @@ from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu.tune_tick import FN_ARR_SET, author_tab_flow, declare_tab_vars, tab_defaults
 from graphics_menu.world_tune_consts import (
-    WORLD_SUBJECT, WORLD_TAB, WORLD_TUNE_HOUR_SEEN_VAR, WORLD_TUNE_KEY,
+    WORLD_SUBJECT, WORLD_TAB, WORLD_TUNE_HOUR_SEEN_VAR,
 )
 from world import world_config as cfg
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
@@ -164,8 +164,8 @@ def author_world_tune_tick(ed, pc_out, in_execs, x0, y0):
                             GFX_TAB.open_var))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
-        f"World tuning ([{WORLD_TUNE_KEY}] in the M panel): Up/Down pick a row, "
-        f"Left/Right move the time of day or a length, Enter saves the lengths to "
-        f"world_tuning.csv. While open, the table goes onto the day/night cycle "
-        f"and the cycle's clock comes back as the hour.", made[:1])
+        "World tuning (its row in the M panel): Up/Down pick a row, "
+        "Left/Right move the time of day or a length, Enter saves the lengths to "
+        "world_tuning.csv. While open, the table goes onto the day/night cycle "
+        "and the cycle's clock comes back as the hour.", made[:1])
     return tails

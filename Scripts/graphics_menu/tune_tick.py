@@ -1,13 +1,16 @@
 """The GUN TUNING tab's HUD Tick fragment: its keys, a nudge, the save, and
 the table written onto every carried gun.
 
-    [T] with MenuOpen                 TuneOpen = NOT TuneOpen
+    the M panel's row taken           TuneOpen = NOT TuneOpen, TuneRow = 0
     MenuOpen AND TuneOpen:
-        Up / Down                     TuneRow -/+ 1, kept in 0..STAT_COUNT
+        Up / Down                     TuneRow -/+ 1, kept in 0..STAT_COUNT + 1
+                                      (the last is BACK, under the list)
+      and unless the caret is on BACK:
         Left / Right, or the wheel    TuneNudge = -1 / +1
         Enter                         TuneSaveRequested = true
-    (the mouse: tune_draw raises the same flags from a click, and a click
-     on the panel's row is [T])
+    (the mouse: tune_draw raises the same flags from a click; BACK, by Enter
+     or a click, is tune_draw's too, because it must not also save. A
+     scrolling tab's wheel is Up / Down instead: the list follows the caret)
     TuneNudge != 0 -> lower it, then
         TuneRow 0                     TuneWeapon steps round the guns
         else                          TuneValues[gun, stat] +/- its step, never
@@ -19,8 +22,8 @@ the table written onto every carried gun.
                    every TUNE_STATS variable := its cell (ints rounded)
 
 The keys, the nudge and the save are any TuneTab's (tune_tab.py):
-author_tab_flow() is also MONSTER TUNING's (monster_tune_tick.py), and T
-and O (WORLD TUNING) shut this tab as T shuts them. Only _author_apply is the guns'.
+author_tab_flow() is also MONSTER TUNING's (monster_tune_tick.py), and
+opening any tab shuts the others. Only _author_apply is the guns'.
 
 Tick, not DrawHUD, like the loot window: the M panel does not pause, and a
 -nullrhi probe never draws. The keys only raise flags, so
@@ -36,7 +39,7 @@ from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, 
 from combat.gun_tuning import TUNE_STATS
 from combat.nodes import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_ARR_GET, FN_EQ_II, FN_GET_COMP,
-    FN_GET_PLAYER_PAWN, FN_MIN_II, FN_MOD_II, FN_MUL_FF, FN_NOT, FN_SUB_II,
+    FN_GET_PLAYER_PAWN, FN_LESS_II, FN_MIN_II, FN_MOD_II, FN_MUL_FF, FN_NOT, FN_SUB_II,
     FN_WAS_PRESSED, MACRO_FOR_EACH,
 )
 from combat.paths import (
@@ -46,11 +49,11 @@ from combat.weapon_specs import _weapon_specs
 from graphics_menu.cursor_consts import WHEEL_LESS, WHEEL_MORE
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
 from graphics_menu.gfx_tune_consts import GFX_TAB
-from graphics_menu.menu_nav import or_pause_click, or_wheel
+from graphics_menu.menu_nav import or_wheel, pause_row_taken
 from graphics_menu.loot_find import put
 from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import (
-    GUN_TAB, STAT_COUNT, TUNE_KEY, TUNE_TOUCHED_VAR,
+    GUN_TAB, STAT_COUNT, TUNE_TOUCHED_VAR,
     TUNE_VALUES_VAR, TUNE_WEAPONS_VAR,
 )
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
@@ -128,18 +131,22 @@ def _cell(ed, array_var, index, x, y, made):
 
 
 def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
-    """The tab's key, and with the tab open the arrows and Enter. Opening or
-    shutting it shuts the tabs whose open flags are ``closes``, so only one
-    panel shows and takes the arrows. Returns the exec tails."""
-    t = _call(ed, FN_AND, x0, y0 + 300, made, A=_get(ed, "MenuOpen", x0 - 240, y0 + 300, made),
-              B=_pressed(ed, pc_out, tab.key, x0 - 240, y0 + 440, made))
-    flip, no_t = _branch(ed, or_pause_click(ed, _out(t), tab.key, x0 - 480, y0 + 760,
-                                            made), in_execs, x0 + 240, y0, made)
+    """The tab's row in the M panel, and with the tab open the arrows and
+    Enter. Opening it shuts the tabs whose open flags are ``closes``, so only
+    one panel shows and takes the arrows, and puts the caret on the subject.
+    Returns the exec tails.
+
+    The caret runs one past the list, onto BACK (tab.back_row). There Left,
+    Right and Enter are not this fragment's: BACK has no cell to nudge, and
+    Enter on it shuts the tab, which is DrawHUD's (tune_draw.py)."""
+    flip, no_t = _branch(ed, pause_row_taken(ed, tab.action, x0 - 480, y0 + 760, made),
+                         in_execs, x0 + 240, y0, made)
     opened = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
                    A=_get(ed, tab.open_var, x0, y0 + 580, made))
     flow = put(ed, tab.open_var, _out(opened), [flip], x0 + 500, y0 - 200, made)
+    flow = _setter(ed, tab.row_var, 0, [flow], x0 + 500, y0 - 400, made)
     for i, other in enumerate(closes):
-        flow = _setter(ed, other, "false", [flow], x0 + 500 + 260 * i, y0 - 400, made)
+        flow = _setter(ed, other, "false", [flow], x0 + 760 + 260 * i, y0 - 400, made)
 
     x = x0 + 800
     active = _call(ed, FN_AND, x - 240, y0 + 300, made,
@@ -147,26 +154,38 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
                    B=_get(ed, tab.open_var, x - 480, y0 + 440, made))
     on, off = _branch(ed, _out(active), [flow, no_t], x, y0, made)
     flow = [on]
-    for key, step, limit, bound in ((TUNE_UP, FN_SUB_II, FN_MAX_II, 0),
-                                    (TUNE_DOWN, FN_ADD_II, FN_MIN_II, tab.stat_count)):
+    # A scrolling tab's wheel moves the caret (the list follows it); the
+    # others' wheel changes the value under it.
+    scrolls = tab.visible_rows > 0
+    for key, wheel, step, limit, bound in (
+            (TUNE_UP, WHEEL_MORE, FN_SUB_II, FN_MAX_II, 0),
+            (TUNE_DOWN, WHEEL_LESS, FN_ADD_II, FN_MIN_II, tab.back_row)):
         x += 300
-        hit, miss = _branch(ed, _pressed(ed, pc_out, key, x, y0 + 440, made), flow,
-                            x, y0, made)
+        asked = _pressed(ed, pc_out, key, x, y0 + 440, made)
+        if scrolls:
+            asked = or_wheel(ed, pc_out, asked, wheel, x, y0 + 600, made)
+        hit, miss = _branch(ed, asked, flow, x, y0, made)
         moved = _call(ed, step, x + 300, y0 + 300, made,
                       A=_get(ed, tab.row_var, x + 60, y0 + 300, made), B=1)
         held = _call(ed, limit, x + 540, y0 + 300, made, A=_out(moved), B=bound)
         flow = [put(ed, tab.row_var, _out(held), [hit], x + 780, y0, made), miss]
         x += 800
+    in_list = _call(ed, FN_LESS_II, x, y0 + 300, made,
+                    A=_get(ed, tab.row_var, x - 240, y0 + 300, made), B=tab.back_row)
+    listed, on_back = _branch(ed, _out(in_list), flow, x + 240, y0, made)
+    flow = [listed]
+    x += 300
     for key, wheel, nudge in ((TUNE_LESS, WHEEL_LESS, -1), (TUNE_MORE, WHEEL_MORE, 1)):
-        turned = or_wheel(ed, pc_out, _pressed(ed, pc_out, key, x, y0 + 440, made),
-                          wheel, x, y0 + 600, made)
+        turned = _pressed(ed, pc_out, key, x, y0 + 440, made)
+        if not scrolls:
+            turned = or_wheel(ed, pc_out, turned, wheel, x, y0 + 600, made)
         hit, miss = _branch(ed, turned, flow, x, y0, made)
         flow = [_setter(ed, tab.nudge_var, nudge, [hit], x + 260, y0, made), miss]
         x += 560
     ask, no_ask = _branch(ed, _pressed(ed, pc_out, TUNE_SAVE_KEY, x, y0 + 440, made),
                           flow, x, y0, made)
     asked = _setter(ed, tab.save_var, "true", [ask], x + 260, y0, made)
-    return [asked, no_ask, off]
+    return [asked, no_ask, off, on_back]
 
 
 def _author_nudge(ed, in_execs, x0, y0, made, tab, subjects):
@@ -301,7 +320,7 @@ def author_tune_tick(ed, pc_out, in_execs, x0, y0):
                             GFX_TAB.open_var))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
-        f"Gun tuning ([{TUNE_KEY}] in the M panel): Up/Down pick a row, Left/Right "
-        f"change the gun or the stat, Enter saves gun_tuning.csv. Once anything is "
-        f"tuned, every carried gun takes the table each Tick.", made[:1])
+        "Gun tuning (its row in the M panel): Up/Down pick a row, Left/Right "
+        "change the gun or the stat, Enter saves gun_tuning.csv. Once anything is "
+        "tuned, every carried gun takes the table each Tick.", made[:1])
     return tails

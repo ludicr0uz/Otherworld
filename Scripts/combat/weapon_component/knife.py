@@ -8,7 +8,9 @@
     blow    KnifePending AND now >= KnifeDueTime --> a sphere in front of the
             chest; a body with BP_HealthComponent loses COMBAT.knife_damage
 
-The swing and the blow are punch.py's, run on the KNIFE Strike. Only the
+The swing and the blow are punch.py's, run on the KNIFE Strike, with one
+addition: a blow that lands on something with no health goes on to chop.py,
+where the axe (an item that Chops) cuts a tree for wood. Only the
 press differs: the punch's gate needs empty hands and so must not read Held,
 while the knife's needs Held.Melee, which is only safe to read behind the fire
 gate's IsValid(Held) -- so it sits there, beside the Consumable branch, and
@@ -22,6 +24,7 @@ the clip is knife_anim.py's.
 from combat.graph import BEL, _at, _connect, _node, _pin
 from combat.nodes import FN_GE_FF, FN_TIME_SECONDS
 from combat.tuning import COMBAT
+from combat.weapon_component.chop import _author_chop
 from combat.weapon_component.common import _prop
 from combat.weapon_component.punch import (
     Strike, _and, _author_swing, _get, _set_bool,
@@ -68,5 +71,6 @@ def _author_knife_press(ed, held, tap, not_melee, x0, y0):
 
 def _author_knife_swing(ed, exec_ins, x0, y0):
     """The slash's swing and blow (punch.py's stages on KNIFE); returns the
-    blow stage's exits."""
-    return _author_swing(ed, KNIFE, exec_ins, x0, y0)
+    blow stage's exits. A blow on something with no health goes to chop.py:
+    with an item that Chops in hand, a tree gives wood."""
+    return _author_swing(ed, KNIFE, exec_ins, x0, y0, scenery=_author_chop)

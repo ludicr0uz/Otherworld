@@ -31,6 +31,8 @@ WHAT THIS BUILDS
                     the fire key slashes (combat/knife.py)
   BP_Axe            child of BP_WeaponItem: Quaternius's Survival Pack axe,
                     Melee too, swung as the knife is (combat/axe.py)
+  BP_Wood           child of BP_WeaponItem: a log, what a tree gives the axe
+                    (combat/wood.py, weapon_component/chop.py)
   Anims/A_KnifeSlash  the slash, keyed for the worn body (combat/knife_anim.py)
   Anims/A_HoldItem, A_HoldKnife  how food and the knife are held (combat/hold_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
@@ -67,6 +69,7 @@ from combat.game_state import ensure_game_mode_vars               # noqa: E402
 from combat.graph import BEL, _apply_defaults, _log               # noqa: E402
 from combat.health_component import build_health_component        # noqa: E402
 from combat.axe import build_axe                                  # noqa: E402
+from combat.wood import build_wood                                # noqa: E402
 from combat.knife import build_knife                              # noqa: E402
 from combat.knife_anim import build_knife_slash                   # noqa: E402
 from combat.hold_pose import build_hold_poses                     # noqa: E402
@@ -128,6 +131,8 @@ def main():
     knife_clip = build_knife_slash(skin)
     # The fourth: the axe, swung through the knife's slash.
     axe_bp = build_axe(item_bp)
+    # ...and what a tree gives it.
+    wood_bp = build_wood(item_bp)
 
     blood_bp = build_blood_splash()
     impact_bp = build_bullet_impact()
@@ -140,7 +145,8 @@ def main():
     throw_arc_bp = build_throw_arc()
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], knife_bp, axe_bp,
-                                       knife_clip, blood_bp, impact_bp, throw_arc_bp)
+                                       knife_clip, blood_bp, impact_bp, throw_arc_bp,
+                                       wood_bp)
 
     # After the weapon component, because the pickup's graph casts to it -- and
     # therefore after the health component that spawns it, which is why the

@@ -7,6 +7,7 @@ from combat.paths import GAME_MODE_BP_PATH
 from combat.tuning import AUTO_DISPLAYS, COMBAT
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, wc_cdo, wg
+from combat.verify.chop import is_chop_node
 from combat.verify.throw import launch_nodes
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins,
@@ -72,7 +73,7 @@ def check_recoil():
         check(f"the control rotation is {label} exactly {n}x: the kick, the "
               f"recovery and the sight sway", len(hits) == n, f"{len(hits)} x {want}")
     makers = [n for n in wg if {"Roll", "Pitch", "Yaw"} <= in_pins(n)
-              and n not in throw_launch]
+              and n not in throw_launch and not is_chop_node(n)]
     check("every write is rebuilt through a Make Rotator", len(makers) == 3,
           str(len(makers)))
     check("...whose Roll comes from the rotation that was read, not a literal zero "
@@ -122,7 +123,7 @@ def check_recoil():
     check("the kick, both halves, is scaled by RecoilScale: the stance and aim "
           "factors the gun's own table gives", len(scaled) == 2, str(len(scaled)))
     draws = [n for n in wg if str(BEL.get_node_title(n)).replace(" ", "").lower()
-             .startswith("randomfloatinrange")]
+             .startswith("randomfloatinrange") and not is_chop_node(n)]
     check("...drawn once per shot", len(draws) == 1, str(len(draws)))
     if draws:
         readers = {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")

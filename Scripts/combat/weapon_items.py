@@ -19,6 +19,7 @@ per weapon in every graph that touches a weapon.
 import unreal
 
 from combat.audio import SND_DRY_FIRE
+from combat.chop_tuning import CHOPS_VAR
 from combat.graph import (
     BEL, BGE, _add_component, _apply_defaults, _assets, _component_object,
     _create_blueprint, _declare, _drop_components, _find_handle, _float_type,
@@ -81,7 +82,10 @@ def build_weapon_item():
                        ("Consumable", "bool"),
                        # Swung rather than fired: the fire key slashes with it
                        # (weapon_component/knife.py). The knife (knife.py).
-                       ("Melee", "bool")):
+                       ("Melee", "bool"),
+                       # Its blow bites a tree (weapon_component/chop.py): the
+                       # axe. Read behind the blow's own IsValid(Held).
+                       (CHOPS_VAR, "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     # Where the eye goes when this weapon is aimed down its sights, in the

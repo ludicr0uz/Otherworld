@@ -13,6 +13,7 @@ from combat.tuning import (
 )
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wg
+from combat.verify.chop import is_chop_node
 from combat.verify.knife import is_melee_play, is_melee_sweep
 from combat.verify.throw import is_throw_trace
 from combat.verify.common import (
@@ -106,7 +107,8 @@ def check_keys_are_variables():
     # reach it, and the pellets fly down the muzzle line. Getting this wrong is not
     # a compile error -- it is a gun that shoots from behind the player's shoulder.
     traces = [n for n in by_pins(wg, "Start", "End", "TraceChannel")
-              if not is_melee_sweep(n) and not is_throw_trace(n)]
+              if not is_melee_sweep(n) and not is_throw_trace(n)
+              and not is_chop_node(n)]
     check("there are four traces (camera aim, muzzle clearance, pellets, drop probe)",
           len(traces) == 4, str(len(traces)))
 
@@ -269,9 +271,10 @@ def check_sprint_and_stamina():
           str(sorted(walk_titles)))
     # The hit-box multiplier has two SelectFloats of its own, each picked by a
     # table lookup; those are counted in the hit-box section, not here. So are
-    # the stance's, each picked by comparing Stance (verify/stance.py).
+    # the stance's, each picked by comparing Stance (verify/stance.py), and
+    # the side the chopped wood lands on (verify/chop.py).
     selects = [n for n in titled(wg, "SelectFloat")
-               if not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
+               if not is_chop_node(n) and not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
                           for k in ("Contains", "Equal")
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
     # Seven now: sprint picks the speed and the sign of the drain, the sights

@@ -42,6 +42,9 @@ _author_* fragment per concern, each in its own module:
   knife       a Melee item held: the fire key slashes (behind the fire gate,
               beside the Consumable branch); punch.py's swing and blow on the
               KNIFE Strike, playing A_KnifeSlash
+  chop        the knife stage's blow on something with no health: with an item
+              that Chops in hand (the axe) and a tree under it, chips, a count
+              on that tree, and every third blow a BP_Wood beside the trunk
   throw       the throw key held: the predicted arc on BP_ThrowArc; clicked:
               the item leaves hand and inventory and flies the same curve,
               landing as a Dropped item
@@ -95,6 +98,9 @@ BP_WeaponComponent event graph:
         N pellets in a cone    -> LineTraceSingle each
         hit -> BP_BloodSplash at the impact + Health -= Damage
                (no health component: BP_BulletImpact there instead)
+
+  A melee blow (punch.py) that finds no health goes to chop.py: the axe on a
+  tree throws chips and, every third blow, spawns BP_Wood beside the trunk.
 
 THE HYBRID AIM (why there are two traces and not one)
 ------------------------------------------------------

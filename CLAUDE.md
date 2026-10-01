@@ -26,7 +26,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
 
    | system | entry points | read |
    |---|---|---|
-   | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
+   | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
    | graphics menu, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, forage | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
@@ -203,7 +203,7 @@ editor.
   The player can sprint, aim over the shoulder or down
   the sights (the sniper's is its scope), reload and eat, block (F; a swing from the front does a
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
-  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
+  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
   clips (the crawl is its face-down swim: the packs have no crawl), throw whatever is in hand (hold V to
   see the arc, click to throw, let V go to call it off; it lands as a pick-up), pick up one item at a time (E: of those in reach, the one nearest the
   point the reticle rests on), and has

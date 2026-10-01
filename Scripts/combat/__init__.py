@@ -19,6 +19,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     stance's steadying, the component's variables, sway_at()
   carry_tuning      the carry's numbers and names: how long a shot keeps the
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
+  chop_tuning       chopping a tree: blows per piece of wood, where it lands
+                    (WOOD_*), Chops and the component's Chop* variables
   throw_tuning      the throw's numbers (THROW_*): speed, angle, launch point,
                     the arc's and the flight's gravity, dots, landing
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
@@ -35,7 +37,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
   knife             BP_Knife: the Fab M9 knife as a Melee item, its model
                     placement and measured outline, build_knife()
   axe               BP_Axe: Quaternius's Survival Pack axe as a Melee item,
-                    swung through the knife's stage; build_axe()
+                    swung through the knife's stage, and the one item that
+                    Chops; build_axe()
+  wood              BP_Wood: Quaternius's Survival Pack log, what a tree gives
+                    the axe; an item that lies Dropped, with nothing to fire
   knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the
                     knife's hold pose (AnimationDataController)
   hold_pose         A_HoldItem / A_HoldKnife: food carried at the waist, the

@@ -87,8 +87,33 @@ menu polls its own copy from `DrawHUD`, which does.
   `/Game/Sourced/Quaternius/Survival`) at 0.2, a 65 cm camp axe, head up and tipped 30° forward
   with the bit leading, held in `A_HoldKnife` by the stretch of haft above its knob. It has
   **no strike of its own**: `Melee` sends the fire key to the knife's stage, so it swings
-  `A_KnifeSlash` for `COMBAT.knife_damage`. An axe that hits harder or bites a tree needs its
+  `A_KnifeSlash` for `COMBAT.knife_damage`. An axe that hits harder needs its
   own `Strike` in `weapon_component/` (`punch.py` has the two stages).
+- **The axe cuts wood from a tree** (`weapon_component/chop.py`, numbers in `chop_tuning.py`).
+  The knife stage's blow passes what it struck to `_author_chop` off its failed health cast
+  (`punch._author_blow`'s `scenery`). With an item flagged `Chops` in hand (only the axe) and a
+  tree under the blow, it throws `BP_BulletImpact` chips and counts; every third blow on the
+  one tree spawns `BP_Wood` 80 cm from the cut, turned 40-80° to one side of the player, traced
+  down onto the ground and laid flat.
+  - **A tree is "an `InstancedStaticMeshComponent` the sweep struck".** The trees are untagged
+    instances of per-cell HISMs (`forest_import/trees.py`) and nothing else instanced has
+    collision. One tree is the component plus the hit's `Item` (`ChopTree`, `ChopItem`); a blow
+    on another tree starts the count over. Trees never run out and never fall: an instance
+    can't be marked or removed cheaply.
+  - **`Chops` is read behind its own `IsValid(Held)` Branch**: the blow lands after the press,
+    when the hands may be empty.
+  - **Order and purity:** `ChopCount` is stored before `ChopTree`/`ChopItem` (the pure "same
+    tree" test reads them), and the landing point goes into `WoodSpot` before the trace reads
+    it twice (it is built from random draws).
+  - `verify/chop.is_chop_node` sets the stage's nodes aside in the older whole-graph counts.
+    `probes/probe_chop_tree.py` stands the player at a trunk and swings.
+- **Wood is an item with nothing to fire** (`wood.py`): `BP_Wood`, a `BP_WeaponItem` child,
+  Quaternius's `SM_WoodLog` scaled apart (0.08 long, 0.055 across) to a 30 cm split, `Dropped`
+  by default like food, so a spawned piece is already a pick-up. It is neither `Melee` nor
+  `Consumable`, so the fire key runs the guns' path over no pellets, sound, kick or noise, and
+  the carry treats it as a gun (it rides in the lowered hand). It stands on end in its own
+  frame, held like a club, because the one fist pose closes on a handle running up through it;
+  the chop's spawn tips it flat, but one dropped with G stands on its end.
 - **Knife and food have their own hold poses, not the pistol's aim** (`hold_pose.py`):
   `A_HoldKnife` (knife up at the chest, left fist raised as a guard) and `A_HoldItem` (the
   item carried at the waist, left arm hanging), keyed off the idle by arm directions like the
@@ -209,6 +234,10 @@ These are feel checks a headless run can't do:
 - the axe: how it reads in the fist and over the shoulder in the knife's stance (the head
   stands 35 cm above the hand, near the face), and swung on the knife's short slash, which
   was keyed for a blade (`probes/probe_axe.py` only proves it is in the hand and lands);
+- chopping (`chop_tuning.py`): whether three blows a piece feels right, whether the chips
+  read as a cut (there is no chop sound and no mark on the trunk), where the wood lands on a
+  slope or among roots, and how the wood looks in the hand: the fist's joints sit up to 1.6 cm
+  inside the 6 cm log (it has no handle), and a log dropped with G stands on its end;
 - the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100

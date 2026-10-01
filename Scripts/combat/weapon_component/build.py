@@ -39,6 +39,9 @@ from combat.weapon_component.punch import (
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
+from combat.chop_tuning import (
+    CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
+)
 from combat.weapon_component.throw import (
     THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR,
     THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR,
@@ -49,7 +52,8 @@ from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
 
 
 def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
-                           knife_clip, blood_bp, impact_bp, throw_arc_bp, rebuild=True):
+                           knife_clip, blood_bp, impact_bp, throw_arc_bp, wood_bp,
+                           rebuild=True):
     # Cast nodes only appear in the palette for classes that are already loaded,
     # and this graph casts to all three. Without these loads
     # create_node_from_name returns None and the failure reads as a typo in the
@@ -198,6 +202,14 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     for name in (THROW_START_VAR, THROW_VELOCITY_VAR, THROW_LAST_VAR):
         _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
     _declare(ed, THROW_TIME_VAR, _float_type())
+    # Chopping a tree (chop.py): the tree being cut, the blows on it, where
+    # the wood lands, and the wood.
+    _declare(ed, CHOP_TREE_VAR, BEL.get_object_reference_type(
+        unreal.PrimitiveComponent.static_class()))
+    for name in (CHOP_ITEM_VAR, CHOP_COUNT_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("int"))
+    _declare(ed, WOOD_SPOT_VAR, _struct_type(unreal.Vector.static_struct()))
+    _declare(ed, WOOD_CLASS_VAR, BEL.get_class_reference_type(item_class))
     arc_class = BEL.generated_class(throw_arc_bp)
     _declare(ed, THROW_ARC_VAR, BEL.get_object_reference_type(arc_class))
     _declare(ed, THROW_ARC_CLASS_VAR, BEL.get_class_reference_type(arc_class))
@@ -259,6 +271,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         "ItemClass": item_class,
         "BloodClass": BEL.generated_class(blood_bp),
         IMPACT_CLASS_VAR: BEL.generated_class(impact_bp),
+        WOOD_CLASS_VAR: BEL.generated_class(wood_bp),
+        CHOP_ITEM_VAR: -1,
+        CHOP_COUNT_VAR: 0,
         PUNCH_ANIM_VAR: _must_load(player_skin().punch),
         PUNCH_QUEUED_VAR: False,
         PUNCH_PENDING_VAR: False,

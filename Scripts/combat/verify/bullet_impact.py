@@ -21,6 +21,7 @@ from combat.verify.common import (
     BEL, PIN, by_pins, check, component_template, components, graph, load,
     num_pin, titled,
 )
+from combat.verify.chop import is_chop_node
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 
@@ -194,7 +195,9 @@ def check_impact_spawn():
     check(f"{IMPACT_CLASS_VAR} points at BP_BulletImpact_C",
           got is not None and got.get_name() == "BP_BulletImpact_C",
           got.get_name() if got else "None")
-    chips, blood = _spawn_of(IMPACT_CLASS_VAR), _spawn_of("BloodClass")
+    # The axe's chips off a tree are the chop's (verify/chop.py).
+    chips = [n for n in _spawn_of(IMPACT_CLASS_VAR) if not is_chop_node(n)]
+    blood = _spawn_of("BloodClass")
     check("the fire graph spawns the impact once, and the blood once",
           len(chips) == 1 and len(blood) == 1,
           f"{len(chips)} impact spawn(s), {len(blood)} blood spawn(s)")

@@ -41,6 +41,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   guns' ready gate, so the knife never reaches the ammunition or cooldown tests of a gun.
   - The axe (`axe.py`) is `Melee` too and has no stage of its own: it takes this branch and
     swings the knife's Strike (`probes/probe_axe.py`).
+  - A blow that strikes something with no health goes on to `weapon_component/chop.py`
+    (`_author_blow`'s `scenery`, given by the knife stage only): the axe on a tree cuts wood.
+  - Wood in hand (`wood.py`) is neither Melee nor Consumable: the fire key reaches the guns'
+    ready gate and "fires" no pellets, with no sound, kick or noise.
   - The swing and the blow are the punch's (`punch._author_swing`), run on the `KNIFE` Strike
     with its own variables (`KnifeQueued/Pending`, `NextKnifeTime`, `KnifeDueTime`, `KnifeAnim`).
     They run every frame whatever is held, so a slash put away mid-swing still lands.

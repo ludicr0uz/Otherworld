@@ -6,8 +6,9 @@ An axe IS a BP_WeaponItem flagged `Melee`, for the reasons the knife is one
 the fire key's gate branches on `Melee` before anything gun-shaped runs. So
 with the axe in hand the fire key swings it through the knife's own stage
 (weapon_component/knife.py): the same clip, cooldown, reach and damage. It has
-no numbers of its own yet; an axe that hits harder, or bites a tree, needs its
-own Strike there.
+no numbers of its own yet; an axe that hits harder needs its own Strike there.
+What is its own is `Chops`: a blow of it that lands on a tree cuts wood
+(weapon_component/chop.py).
 
 THE MODEL AND HOW IT SITS IN THE HAND
 -------------------------------------
@@ -28,6 +29,7 @@ seats the knife's handle.
 
 import unreal
 
+from combat.chop_tuning import CHOPS_VAR
 from combat.graph import (
     BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
 )
@@ -94,6 +96,7 @@ def build_axe(item_bp):
     _apply_defaults(bp, {
         "DisplayName": AXE_DISPLAY,
         "Melee": True,
+        CHOPS_VAR: True,
         "Consumable": False,
         "Dropped": False,
         "UsesAmmo": False,

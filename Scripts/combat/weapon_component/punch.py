@@ -137,10 +137,11 @@ def _author_punch(ed, tap, armed_out, steady, guarded, unspent, exec_ins, x0, y0
                          x0 + 1260, y0)
 
 
-def _author_swing(ed, strike, exec_ins, x0, y0):
+def _author_swing(ed, strike, exec_ins, x0, y0, scenery=None):
     """Queued: clear the queue, stamp the cooldown and when the blow lands,
     and play the strike's clip; then the blow stage. ``exec_ins`` all run into
-    the swing's Branch; returns the exits of the blow stage."""
+    the swing's Branch; returns the exits of the blow stage. ``scenery`` is
+    the blow's (see _author_blow)."""
     swing = _at(ed.add_branch_node(), x0 + 240, y0)
     _connect(_get(ed, strike.queued_var, x0, y0 + 200), _pin(swing, "Condition"))
     for pin in exec_ins:
@@ -171,12 +172,16 @@ def _author_swing(ed, strike, exec_ins, x0, y0):
 
     # --- blow ----------------------------------------------------------------
     return _author_blow(ed, strike, (BEL.find_then_pin(play), BEL.find_else_pin(swing)),
-                        x0 + 3040, y0)
+                        x0 + 3040, y0, scenery)
 
 
-def _author_blow(ed, strike, exec_ins, x0, y0):
+def _author_blow(ed, strike, exec_ins, x0, y0, scenery=None):
     """Pending and due: sweep a sphere forward from the chest, and take the
-    strike's damage off the first body with a health component."""
+    strike's damage off the first body with a health component.
+
+    ``scenery(ed, brk, exec_in, x, y)``, if given, authors what the blow does
+    to something with no health, off the cast's failed arm, and returns its
+    exits (the knife's chops a tree: chop.py)."""
     now = _at(_node(ed, FN_TIME_SECONDS), x0, y0 + 460)
     due = _at(_node(ed, FN_GE_FF), x0 + 240, y0 + 460)
     _connect(_pin(now, "ReturnValue", is_input=False), _pin(due, "A"))
@@ -275,5 +280,7 @@ def _author_blow(ed, strike, exec_ins, x0, y0):
         f"loses {strike.damage:.0f} HP, stamped like a pellet hit.",
         [gate, trace, hit, cast, set_h, stamp, blame, from_where])
 
+    failed = _loose_pin(cast, "CastFailed", is_input=False)
+    missed = scenery(ed, brk, failed, x0 + 2700, y0 + 1300) if scenery else (failed,)
     return (BEL.find_then_pin(from_where), BEL.find_else_pin(gate),
-            BEL.find_else_pin(hit), _loose_pin(cast, "CastFailed", is_input=False))
+            BEL.find_else_pin(hit)) + tuple(missed)

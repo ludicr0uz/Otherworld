@@ -26,6 +26,7 @@ The generator's code lives in this package. The level-side import code is in
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
+| `npc_strafe.py` | the step a wanderer takes between two swings |
 | `lighting.py` | time-of-day presets (star_brightness 2.5, sun 0.12, exposure bias 1.6) and `SHADOW_DISTANCE_CM`. The level's rig is the static sky; at runtime `BP_DayNightCycle` replaces it and reuses these values (`Scripts/world/CLAUDE.md`) |
 | `verification.py` | the offline suite (over budget) |
 | `asset_sources.py` | what produces each `Content/` directory, and `RESTORE_ORDER` |

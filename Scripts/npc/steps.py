@@ -9,7 +9,8 @@ names and finishes with StepResult, which every exit of every step writes:
                      -> stats and voice                               stats.py
                      -> patrol setup, once per life -> succeed        patrol.py
     every other step begins: [pawn gone, dead or at 0 HP?] fail      corpse.py
-    BT_Chase   move order at the player -> run speed -> succeed       chase.py
+    BT_Chase   between two swings: step back and round -> succeed    strafe.py
+               else move order at the player -> run speed -> succeed  chase.py
     BT_Swing   in range and off cooldown? swing -> succeed            melee.py
     BT_PlayerPresent, BT_<Sense>..., BT_Stroll                        agro.py
 
@@ -18,6 +19,11 @@ task reads StepResult straight after calling it.
 """
 
 from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S
+from forest_generator.npc_strafe import (
+    NPC_STRAFE_ENGAGE_CM, NPC_STRAFE_MAX_ANGLE_DEG, NPC_STRAFE_MAX_DISTANCE_CM,
+    NPC_STRAFE_MIN_ANGLE_DEG, NPC_STRAFE_MIN_DISTANCE_CM, NPC_STRAFE_SHARE,
+    NPC_STRAFE_SPEED_SCALE,
+)
 from npc.agro import _author_agro_steps, _declare_agro_vars
 from npc.chase import _author_chase
 from npc.corpse import _author_alive_gate, _author_corpse_gate
@@ -30,6 +36,7 @@ from npc.paths import (
     STEP_CHASE, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR, STEP_SWING,
 )
 from npc.stats import _author_stats_and_voice
+from npc.strafe import _author_strafe, declare_strafe_vars
 from npc.tuned import declare_tuned_vars
 
 
@@ -109,6 +116,7 @@ def _author_steps(ed, key, melee_anim, x0, y0):
         raise RuntimeError(f"could not declare {STEP_RESULT_VAR}")
     _declare_agro_vars(ed)
     declare_tuned_vars(ed)
+    declare_strafe_vars(ed)
     spec = monster_specs(key)
     steps = _Steps(ed)
 
@@ -128,10 +136,22 @@ def _author_steps(ed, key, melee_anim, x0, y0):
         extras)
 
     cx, cy = x0 + 3000, y0 - 3000
-    chase, after_move = _author_chase(ed, steps.event(STEP_CHASE, cx - 300, cy + 200),
-                                      cx, cy)
-    ran, ran_tails, _entry = _author_walk_speed(ed, after_move, False,
-                                                stock_run_speed(key), cx + 1300, cy)
+    stock = stock_run_speed(key)
+    strafe, to_chase, strafed = _author_strafe(
+        ed, steps.event(STEP_CHASE, cx - 300, cy - 2400), stock, cx, cy - 2400)
+    for tail in strafed:
+        _connect(tail, steps.result(True, cx + 6800, cy - 2400))
+    ed.add_comment_to_nodes(
+        f"BT_Chase, between two swings: for the first {NPC_STRAFE_SHARE:.0%} of the "
+        f"cooldown, with the player within {NPC_STRAFE_ENGAGE_CM:.0f} cm, step "
+        f"{NPC_STRAFE_MIN_DISTANCE_CM:.0f}-{NPC_STRAFE_MAX_DISTANCE_CM:.0f} cm off "
+        f"them and {NPC_STRAFE_MIN_ANGLE_DEG:.0f}-{NPC_STRAFE_MAX_ANGLE_DEG:.0f} deg "
+        f"round, left or right (one pick per swing), facing them, at "
+        f"{NPC_STRAFE_SPEED_SCALE:.0%} of the run. Otherwise face the way it "
+        f"runs and chase.", strafe)
+    chase, after_move = _author_chase(ed, to_chase, cx, cy)
+    ran, ran_tails, _entry = _author_walk_speed(ed, after_move, False, stock,
+                                                cx + 1300, cy)
     chase += ran
     for tail in ran_tails:
         _connect(tail, steps.result(True, cx + 2700, cy))

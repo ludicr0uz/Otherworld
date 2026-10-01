@@ -7,7 +7,8 @@ steps, the tree, the step task, the controller and the character).
 
 - Every movement, melee and spawn-band number lives in `forest_generator/npc_placement.py`.
 - Every sense and patrol number lives in `forest_generator/npc_agro.py`.
-- Neither imports `unreal`, so the offline generator checks exactly what gets built.
+- The step between two swings is `forest_generator/npc_strafe.py`.
+- None imports `unreal`, so the offline generator checks exactly what gets built.
 - **The tunable ones are not pin literals.** Senses, patrol, run speed, melee damage/range/
   interval and health are `Tune*` variables on each controller (`tuned.py`), defaulted to
   `monster_tuning.monster_specs(key)`: `Scripts/npc/monster_tuning.csv` over the two files
@@ -15,8 +16,8 @@ steps, the tree, the step task, the controller and the character).
   saves the CSV. A new tunable is a `MONSTER_STATS` row, a `stock_specs` entry, and the
   fragment reading it with `tuned()`.
 
-`Scripts/verify_npc_blueprints.py` checks patrol, agro and the trees (`verify.py`,
-`verify_tree.py`). The level verifier owns the chase and the melee.
+`Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees and the step between swings
+(`verify.py`, `verify_tree.py`, `verify_strafe.py`). The level verifier owns the chase and the melee.
 `Scripts/probes/probe_npc_behavior_tree.py` proves the trees run in the game.
 
 Respawn, the world-floor net and the `[NPC-SPAWN]`/`[NPC-FELL]` numbering are in
@@ -31,7 +32,7 @@ Wanderer (selector)
   Alive (sequence)
     Pulse            [possessed? no: fail] → [dead? corpse, StopLogic] → stats → patrol setup
     Act (selector)
-      Hunt [BB Aggro is set]    Chase (MoveToActor : MoveToLocation) → Swing → Wait 0.5
+      Hunt [BB Aggro is set]    Chase (between swings: step off and round : MoveToActor : MoveToLocation) → Swing → Wait 0.5
       Notice                    PlayerPresent → Senses (selector): Hurt, Sight, Touch, Sound
       Patrol                    Stroll → Wait 0.5
   Idle: Wait 0.5
@@ -90,6 +91,27 @@ Wanderer (selector)
   - **The player's guard** (`block.py`) sets the per-controller `HitDamage` before the Health
     write: a quarter of `TuneMeleeDamage` and 20 of the player's stamina when the player is
     `Blocking` and faces the swing (within 60°), otherwise `TuneMeleeDamage` (10). See `Scripts/combat/docs/stance.md`, "Blocking".
+- **Between two swings it moves** (`strafe.py`, numbers in `forest_generator/npc_strafe.py`):
+  - It is the head of the Chase step, not a step of its own. With the player within 4.5 m and
+    the cooldown in its first 60%, the step sends the wanderer 210–280 cm from the player and
+    25–60° round from where it stands, left or right, at 45% of its run speed. The rest of the
+    cooldown is the ordinary chase, which brings it back into reach for the next swing, so the
+    swing rate is unchanged. Every creature does it.
+  - **One pick per swing, stored** (`StrafeYaw`, `StrafeDist`), because the random nodes are
+    pure. `StrafeFor` holds the `NextAttackTime` the pick was made for; the swing itself has no
+    new wire. The point is taken from where the two stand on each pass, so a long cooldown
+    carries it on round the player.
+  - **It faces the player while it steps:** `SetFocus(player)` (Gameplay priority, which beats
+    the Move focus path following sets), with `bOrientRotationToMovement` off and
+    `bUseControllerDesiredRotation` on. The chase arm writes both back and clears the focus.
+    They are written on the pawn at run time, so the character Blueprint is untouched.
+  - The order is `SimpleMoveToLocation`, like the stroll (the level verifier counts the chase's
+    two orders). **It needs a navmesh:** without one the wanderer stands where it swung.
+  - `verify_strafe.py` checks the graph; `probes/probe_npc_strafe.py` watches a zombie do it.
+    A headless `-game` run was found with **no navmesh tiles and none being built**; the probe
+    sends `RebuildNavigation` and waits. Not looked into further.
+  - **Feel check (needs a play session):** the body plays its forward walk while it moves back
+    and sideways (the anim Blueprints blend on speed only), so the feet slide a little.
 - **The corpse state** (`corpse.py`):
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and `StopLogic`: the tree

@@ -224,8 +224,8 @@ def check_controller(path, key):
 
     # --- speed ---------------------------------------------------------------
     speeds = _titled(nodes, "Set MaxWalkSpeed")
-    check(f"{tag}: two speed writes, the stroll and the run", len(speeds) == 2,
-          f"{len(speeds)}")
+    check(f"{tag}: three speed writes: the stroll, the run and the step between "
+          f"two swings", len(speeds) == 3, f"{len(speeds)}")
     stock = stock_run_speed(key)
     muls = _titled(nodes, "float * float")
     runs = [n for n in muls
@@ -236,7 +236,7 @@ def check_controller(path, key):
     check(f"{tag}: runs at ITS OWN run speed x TuneRunSpeed / {stock:.0f} (the "
           f"stored RunSpeed, never the live MaxWalkSpeed), and strolls at "
           f"TunePatrolSpeed of that",
-          len(runs) == 2 and len(ratios) == 2
+          len(runs) == 3 and len(ratios) == 3
           and all(_fed(r, "A", "run_speed_cms") and _close(_num(r, "B"), stock)
                   for r in ratios) and len(strolls) == 1,
           f"{len(runs)} runs, {len(strolls)} strolls")
@@ -274,9 +274,12 @@ def check_controller(path, key):
           and _fed(loose[0], "A", "patrol_radius_cm"),
           f"{len(fences)} fences")
     strolls = _titled(nodes, "SimpleMoveToLocation")
+    # The other SimpleMoveToLocation is the step between two swings
+    # (verify_strafe.py).
+    strolls = [n for n in strolls if {_title(f) for f in _feeders(n, "Goal")}
+               == {f"Get {PATROL_TARGET_VAR}"}]
     check(f"{tag}: one stroll order, to the stored PatrolTarget",
-          len(strolls) == 1 and {_title(f) for f in _feeders(strolls[0], "Goal")}
-          == {f"Get {PATROL_TARGET_VAR}"}, f"{len(strolls)}")
+          len(strolls) == 1, f"{len(strolls)}")
     windows = [n for n in nodes if {"Min", "Max"} <= _ins(n)
                and _fed(n, "Min", "patrol_repick_min_s")
                and _fed(n, "Max", "patrol_repick_max_s")]

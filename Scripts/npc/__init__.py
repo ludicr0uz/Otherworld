@@ -3,7 +3,8 @@
 Entry point: Scripts/build_npc_blueprints.py (ensure_npc_variants() builds the
 parent pair, then one child Blueprint and one AI controller per creature).
 Every number these graphs bake in lives in forest_generator/npc_placement.py
-(chase, melee) and forest_generator/npc_agro.py (senses, patrol), neither of
+(chase, melee), forest_generator/npc_agro.py (senses, patrol) and
+forest_generator/npc_strafe.py (the step between swings), none of
 which imports `unreal`, so the offline generator reads the same values.
 The senses, patrol, speed, melee and health numbers are then overlaid by
 npc/monster_tuning.csv (monster_tuning.py) and baked as the controller's
@@ -35,6 +36,8 @@ THE CONTROLLER'S STEPS (one fragment per concern)
   patrol       once-per-life setup (centre, run speed); stroll to a point
   senses       hurt, sight (cone + line of sight), touch, sound
   chase        the move order at the player (pathfinding or straight line)
+  strafe       between two swings: the head of the Chase step that sends it
+               off and round the player instead, facing them
   agro         the notice and patrol steps: player present, one per sense, stroll
   sight_cone   debug mode: the Tick that draws the sight (aggro) cone, as
                senses.py tests it, yellow on patrol and red on the hunt
@@ -49,6 +52,7 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify       patrol, agro, corpse and guard, per controller
   verify_tree  the Blackboard, each tree's priorities, the step events
   verify_sight_cone  debug mode's cone: its gates and what it is drawn from
+  verify_strafe  the step between two swings: when, where to, facing, speed
 
 THE BODY
   character    BP_ForestWanderer and one child Blueprint per creature

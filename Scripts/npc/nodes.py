@@ -94,3 +94,16 @@ FN_LITERAL_NAME = "/Script/Engine.KismetSystemLibrary.MakeLiteralName"
 NODE_EVENT_TICK = "AddEvent|EventTick"
 FN_DRAW_CONE = "/Script/Engine.KismetSystemLibrary.DrawDebugConeInDegrees"
 FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"
+
+# The step between two swings (npc/strafe.py).
+FN_LT_FF = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
+FN_RANDOM_BOOL = "/Script/Engine.KismetMathLibrary.RandomBool"
+FN_SELECT_FLOAT = "/Script/Engine.KismetMathLibrary.SelectFloat"
+FN_NORMAL_2D = "/Script/Engine.KismetMathLibrary.Vector_Normal2D"
+FN_ROTATE_AXIS = "/Script/Engine.KismetMathLibrary.RotateAngleAxis"
+FN_ADD_VV = "/Script/Engine.KismetMathLibrary.Add_VectorVector"
+FN_MUL_VV = "/Script/Engine.KismetMathLibrary.Multiply_VectorVector"
+# A focus set from a graph has Gameplay priority, above the Move priority
+# path following sets on every move, so it holds while the wanderer walks.
+FN_SET_FOCUS = "/Script/AIModule.AIController.K2_SetFocus"
+FN_CLEAR_FOCUS = "/Script/AIModule.AIController.K2_ClearFocus"

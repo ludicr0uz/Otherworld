@@ -75,6 +75,16 @@ NEXT_PATROL_VAR = "NextPatrolTime"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 CHARACTER_CLASS_PATH = "/Script/Engine.Character"
 
+# ── Between two swings (npc/strafe.py) ───────────────────────────────────────
+#
+# Picked once per swing, by the first Chase step after it: how far round the
+# player the wanderer steps (degrees, signed: left or right) and how far from
+# them it ends up. STRAFE_FOR_VAR is the NextAttackTime the pick was made
+# for, which is how the step tells a new swing from the one it already has.
+STRAFE_YAW_VAR = "StrafeYaw"
+STRAFE_DIST_VAR = "StrafeDist"
+STRAFE_FOR_VAR = "StrafeFor"
+
 # ── The corpse state (npc/corpse.py) ─────────────────────────────────────────
 #
 # The wanderer's third and last state, after patrol (Aggro false) and hunt

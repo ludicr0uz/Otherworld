@@ -16,9 +16,11 @@ from npc.paths import (
 from npc.tuned import tuned
 
 
-def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0):
+def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0, scale=None):
     """MaxWalkSpeed = RunSpeed * TuneRunSpeed / ``stock`` [* TunePatrolSpeed]
-    on the possessed Character: the run, or with ``stroll`` the patrol walk.
+    on the possessed Character: the run, or with ``stroll`` the patrol walk,
+    or with ``scale`` that fraction of the run (the step between two swings,
+    npc/strafe.py).
 
     RunSpeed is what the pawn had at setup (this creature and the level's
     per-instance gait); ``stock`` is the creature's built run speed, so the
@@ -63,6 +65,11 @@ def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0):
         _connect(speed, _pin(slowed, "A"))
         _connect(walk_out, _pin(slowed, "B"))
         speed = _pin(slowed, "ReturnValue", is_input=False)
+    if scale is not None:
+        eased = keep(_at(_node(ed, FN_MUL_FF), x0 + 960, y0 + 440))
+        _connect(speed, _pin(eased, "A"))
+        _set(eased, "B", scale)
+        speed = _pin(eased, "ReturnValue", is_input=False)
     write = keep(_at(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH),
                      x0 + 1200, y0))
     _connect(_pin(move, "CharacterMovement", is_input=False), _pin(write, "self"))

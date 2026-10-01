@@ -39,12 +39,13 @@ from combat.nodes import (
     NODE_CAST_HEALTH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET,
 )
 from combat.paths import HEALTH_CLASS_PATH
+from combat.seat_tuning import SEAT_VAR, SEATED_VAR
 
 OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
 
 # What a dead owner is no longer doing. Others read these: the wanderers'
 # swing reads Blocking, the HUD's reticle the aim.
-LET_GO_VARS = ("Aiming", "SightAiming", "Sprinting", "Blocking")
+LET_GO_VARS = ("Aiming", "SightAiming", SEATED_VAR, "Sprinting", "Blocking")
 
 
 def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
@@ -119,9 +120,12 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
     _connect(out(cam), _pin(unzoom, "self"))
     _connect(out(base, "BaseFOV"), _pin(unzoom, "InFieldOfView"))
     _connect(BEL.find_then_pin(fov), _pin(unzoom, "execute"))
+    seat = keep(_at(ed.add_set_member_variable_node(SEAT_VAR), x + 780, y - 200))
+    _set(seat, SEAT_VAR, 0.0)
+    _connect(BEL.find_then_pin(unzoom), _pin(seat, "execute"))
     blend = keep(_at(ed.add_set_member_variable_node("SightBlend"), x + 780, y))
     _set(blend, "SightBlend", 0.0)
-    _connect(BEL.find_then_pin(unzoom), _pin(blend, "execute"))
+    _connect(BEL.find_then_pin(seat), _pin(blend, "execute"))
     arm = keep(_at(_node(ed, FN_GET_COMP), x + 780, y + 400))
     _connect(owner_out, _pin(arm, "self"))
     _pin(arm, "ComponentClass").set_pin_value(SPRING_ARM_CLASS_PATH)

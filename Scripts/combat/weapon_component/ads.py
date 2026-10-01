@@ -13,6 +13,7 @@ from combat.nodes import (
     FN_SET_FOV, FN_SET_PITCH_SCALE, FN_SET_YAW_SCALE, FN_SUB_FF,
     MOVEMENT_CLASS_PATH,
 )
+from combat.seat_tuning import SEATED_VAR, SIGHTS_FORCED_VAR
 from combat.tuning import AIM_KEY, COMBAT, SIGHTS_KEY
 from combat.weapon_component.common import _prop
 
@@ -22,11 +23,12 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
     """Read the two aim keys into the aim state and the FOV to zoom to.
 
         shoulder  = IsInputKeyDown(KeyAim)
-        sights    = IsInputKeyDown(KeySights)
+        sights    = IsInputKeyDown(KeySights) OR SightsForced
         Aiming    = (shoulder OR sights) AND NOT Sprinting AND IsValid(Held)
         if Aiming:
             SightAiming = sights AND NOT Held.Consumable
-            AimZoom     = SightAiming ? Held.AdsZoom : COMBAT.shoulder_zoom
+            AimZoom     = SightAiming AND SightSeated ? Held.AdsZoom
+                                                      : COMBAT.shoulder_zoom
             TargetFOV   = BaseFOV / AimZoom
         else:
             SightAiming = false
@@ -34,6 +36,15 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
 
     Holding both keys is aiming down the sights: the sights are the stronger
     of the two, and letting go of them drops back to the shoulder.
+
+    SightsForced is a probe's stand-in for the sights key (no key can be
+    injected into a headless game); it is false in every real game.
+
+    The weapon's own zoom waits for SightSeated (seat.py, written later in the
+    frame, so this reads last frame's): until the gun is up and the camera may
+    go onto it, the sights key zooms as the shoulder does. The irons zoom the
+    same as the shoulder, so only the scope shows it: its 4x, and the glass
+    that fades in on it, arrive with the camera rather than over the shoulder.
 
     Not while sprinting, because the fire gate already refuses to shoot while
     sprinting: a zoom that stayed on through a sprint would be aiming a weapon
@@ -59,7 +70,12 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
         return _pin(n, "ReturnValue", is_input=False)
 
     shoulder = held_down("KeyAim", y0 + 300)
-    sights = held_down("KeySights", y0 + 180)
+    forced = keep(_at(ed.add_get_member_variable_node(SIGHTS_FORCED_VAR),
+                      x0, y0 + 80))
+    sights_or = keep(_at(_node(ed, FN_OR), x0 + 240, y0 + 120))
+    _connect(held_down("KeySights", y0 + 180), _pin(sights_or, "A"))
+    _connect(_pin(forced, SIGHTS_FORCED_VAR, is_input=False), _pin(sights_or, "B"))
+    sights = _pin(sights_or, "ReturnValue", is_input=False)
     either = keep(_at(_node(ed, FN_OR), x0 + 240, y0 + 240))
     _connect(shoulder, _pin(either, "A"))
     _connect(sights, _pin(either, "B"))
@@ -111,7 +127,12 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
     pick = keep(_at(_node(ed, FN_SELECT_FF), x0 + 2020, y0 + 560))
     _connect(zoom_pin, _pin(pick, "A"))
     _set(pick, "B", COMBAT.shoulder_zoom)
-    _connect(_loose_pin(sight_on, "Output_Get", is_input=False), _pin(pick, "bPickA"))
+    seated = keep(_at(ed.add_get_member_variable_node(SEATED_VAR),
+                      x0 + 1760, y0 + 840))
+    on_gun = keep(_at(_node(ed, FN_AND), x0 + 2020, y0 + 760))
+    _connect(_loose_pin(sight_on, "Output_Get", is_input=False), _pin(on_gun, "A"))
+    _connect(_pin(seated, SEATED_VAR, is_input=False), _pin(on_gun, "B"))
+    _connect(_pin(on_gun, "ReturnValue", is_input=False), _pin(pick, "bPickA"))
     chosen = keep(_at(ed.add_set_member_variable_node("AimZoom"), x0 + 1760, y0))
     _connect(_pin(pick, "ReturnValue", is_input=False), _pin(chosen, "AimZoom"))
     _connect(BEL.find_then_pin(sight_on), _pin(chosen, "execute"))

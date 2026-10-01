@@ -11,8 +11,11 @@ _author_* fragment per concern, each in its own module:
   aim         resolve the aim point every frame (camera trace, muzzle trace)
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom;
               the zoom, and the look and walk slowdowns it drives
-  sights      down the sights: ease the camera from the boom to Held's
-              SightOffset and turn it onto Held's sight line (towards
+  seat        down the sights: SightSeated (the gun is up, so the camera may
+              go onto it) and SightSeat (how far it has gone), so the view
+              stays on the target while the gun rises to it
+  sights      down the sights: ease the camera (by SightSeat) from the boom to
+              Held's SightOffset and turn it onto Held's sight line (towards
               SightAim); hide a scoped weapon behind its glass
   sway        down the sights: the view drifts on two slow sines (the control
               rotation is turned by the change), steadied by the stance

@@ -25,6 +25,7 @@ from graphics_menu import settings_rows as S
 from graphics_menu import stamina_bar as ST
 from graphics_menu import survival_bars as SB
 from graphics_menu import scope as SC
+from graphics_menu.reticle_checks import check_reticle_sights, sights_gate
 from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
 from graphics_menu import dev_consts as DC
@@ -442,7 +443,9 @@ def main():
               str(sorted(cond)))
     if gate:
         glass = after(BEL.find_then_pin(gate[0]))
-        irons = after(BEL.find_else_pin(gate[0]))
+        # Past the Branch that leaves the crosshair out down a gun's own
+        # sights (reticle_checks.py).
+        irons = after(BEL.find_else_pin(sights_gate(nodes) or gate[0]))
         # The strips are sized off the viewport; the crosshair's ticks are
         # literal pixels. That is what tells the two draws apart here.
         check("a scoped weapon draws the surround...",
@@ -700,10 +703,10 @@ def main():
     check("this frame's copy is taken once, with an answer for a failed cast",
           sum(1 for t in titles if t == "Set DebugOn") == 2,
           str(sum(1 for t in titles if t == "Set DebugOn")))
-    # Three readers: the menu row that reports the state, the NPC number, and
-    # the FPS readout.
+    # Four readers: the menu row that reports the state, the NPC number, the
+    # FPS readout, and the crosshair down a gun's sights (reticle_checks.py).
     check("the wanderer's number and the FPS readout are gated on the copy",
-          sum(1 for t in titles if t == "Get DebugOn") == 3,
+          sum(1 for t in titles if t == "Get DebugOn") == 4,
           str(sum(1 for t in titles if t == "Get DebugOn")))
     for var in (F.FPS_FRAMES_VAR, F.FPS_SINCE_VAR, F.FPS_SHOWN_VAR):
         check(f"{var} variable", var in names)
@@ -901,6 +904,7 @@ def main():
     check_difficulty(check, bp, nodes)
     check_profile(check, bp, nodes)
     check_dev_guns(check, bp, nodes)
+    check_reticle_sights(check, bp, nodes)
     check_loot(check, bp, nodes)
     check_tune(check, bp, nodes)
     check_monster_tune(check, bp, nodes)

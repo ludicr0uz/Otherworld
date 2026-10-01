@@ -12,22 +12,55 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   into `ShotDirection`; pellets fly the gun's `PelletSpreadDegrees` pattern around it. Hitscan.
 - **The reticle is nailed to the viewport centre**, and turns red when `AimBlocked`. Drawing it at
   the projected `AimPoint` was tried and reverted: it slid under parallax.
+  - **Down a gun's sights it is drawn only in debug mode.** The front sight's tip is the
+    middle of the view there (below), so the crosshair only covered it. The HUD leaves it out
+    past `SightSeat` 0.9 (`RETICLE_HIDE_SEAT`) unless `DebugOn`; the hip and the shoulder aim
+    keep it (`graphics_menu/reticle.py`).
 - **Two ways to aim** (`weapon_component/ads.py`):
   - `KeyAim` (right) is the shoulder aim: the camera stays on the boom and zooms
     `COMBAT.shoulder_zoom` (1.5x) on every weapon.
   - `KeySights` (middle) is down the sights: zoom is the weapon's `AdsZoom` (irons 1.5x, scope
     4x), and `sights.py` eases the camera from the boom's `SpringEndpoint` to the held weapon's
-    `SightOffset` by `SightBlend`, and **turns it onto the weapon's sight line** (below).
+    `SightOffset` by `SightSeat`, and **turns it onto the weapon's sight line** (below).
   - `Aiming` is either key (cloud, recoil, slowdown). `SightAiming` is the sights key alone,
     never with a consumable. `AimZoom` stores the zoom being aimed at. It isn't written on
     release, so the walk slowdown's ease-out divides by the zoom being let go of.
   - The camera is written every frame, both ways. The template camera has no offset or turn
     on the boom and does not take the control rotation itself (asserted in `aim_camera`), so
-    SightBlend 0 is exactly home.
+    SightSeat 0 is exactly home.
   - The weapon component ticks **after the boom** (`AddTickPrerequisiteComponent`). Otherwise
     the camera is placed against last frame's boom and shimmers while strafing.
   - How far back the eye sits was tuned in PIE. At 14 cm behind the receiver, its back face
     filled a third of the screen. At 34 cm, the camera was inside the head.
+- **The camera waits for the gun** (`weapon_component/seat.py`, numbers in `seat_tuning.py`).
+  A gun is carried lowered, and the sights key raises it over the ready pose's 0.25 s blend. A
+  camera that went to the gun on the key rode it up from the hip: the view dropped to the hand,
+  then swung onto the target. So the sights are two blends:
+  - `SightBlend` is the **body's**: the upper body's pitch, the sway, the steady hand. It
+    starts on the key.
+  - `SightSeat` is the **camera's**: where it is, which way it looks, when a scoped gun hides.
+    It eases toward `SightSeated`, a latch that sets once the gun's sight line is within
+    `SIGHT_SEAT_DEG` (10°) of the control rotation and clears when the key is let go. Until
+    then the camera stays on the boom, looking where the player looks, and the gun rises into
+    the view. From a gun already up (the shoulder aim, just after a shot) it latches at once.
+  - **A latch, not the angle alone:** a reload with the sights up throws the gun off the view,
+    and the camera stays on the gun through it, as it always has.
+  - **Why `SightBlend` does not wait too:** the body's pitch is part of what brings the gun onto
+    the view. A blend that waited for the gun would wait for itself.
+  - **Letting go, everything holds until the camera is home:** the carry keeps the gun up and
+    `SightBlend` keeps its target while `SightSeat > SEAT_HOLD` (0.02). Otherwise the view,
+    still easing off the gun, dips with it as it lowers and as the body's pitch comes off
+    (5.8° at a view pitch of -25, probed).
+  - **The weapon's own zoom waits for `SightSeated`** (`ads.py`): until then the sights key
+    zooms as the shoulder does. Only the scope shows it: its 4x and its glass arrive with the
+    camera, not over the shoulder.
+  - An item with no sight line (the knife) is seated at once.
+  - `SightsForced` is the probes' stand-in for the sights key. `probes/probe_sight_raise.py`
+    runs the whole raise: from a gun 70–90° off the view, the camera stays within 1.5° of the
+    control rotation all the way in and out (it latches about 0.19 s after the key). With
+    `--windowed` and `OW_RAISE_SHOTS=1` it saves the view with and without the crosshair.
+  - A probe that holds the sights by writing variables writes `SightSeat` (and `SightBlend`,
+    which the seat then holds).
 - **Down the sights the view IS the gun's sight line** (`weapon_models.py`, `sights.py`):
   - Each gun has a rear sight point and a front sight tip, measured off the mesh's vertices
     (`*_SIGHT_REAR`, `*_SIGHT_FRONT`): the AK's notch and post, the pistol's blades and post,
@@ -35,7 +68,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     sight, so its line skims the receiver's hump and ends on the bead.
   - `SightOffset` is the point of that line at the eye's distance (`_eye_behind`), and
     `SightAim` is the front tip. The camera looks from the one at the other
-    (`MakeRotFromX`, so no roll), eased from the boom's rotation by `SightBlend`. The tip is
+    (`MakeRotFromX`, so no roll), eased from the boom's rotation by `SightSeat`. The tip is
     therefore the middle of the view in any pose, and the shot goes to the middle of the view
     (the aim trace starts at the camera).
   - **Why not the control rotation:** the gun rides the arms. Against the control rotation it
@@ -51,7 +84,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     and the view could not pitch.
   - `probes/probe_sight_align.py` measures it per gun, standing, pitched, walking, crouched
     and prone: eye, rear and front on the middle of the view within 0.02°. It holds
-    `SightBlend` at exactly 1 by slowing the game (time dilation 0.0001) while it measures.
+    `SightSeat` at exactly 1 by slowing the game (time dilation 0.0001) while it measures.
     With `--windowed` and `OW_SIGHT_SHOTS=1` it saves each gun's sight picture.
 - **Down the sights the aim sways** (`sway_tuning.py`, `weapon_component/sway.py`):
   - Two slow sines, 0.3° sideways and 0.2° up and down, times `SightBlend` and the stance
@@ -71,7 +104,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     glass and the zoom are one animation.
   - It replaces the crosshair only past `shoulder_zoom + 0.02`: the hip and shoulder keep the
     crosshair. The slack is there because FInterpTo settles within rounding of 1.5x.
-  - The sniper is **hidden past SightBlend 0.9**. The eye is behind the solid scope tube,
+  - The sniper is **hidden past SightSeat 0.9**. The eye is behind the solid scope tube,
     which would fill the glass's hole. A dropped weapon is always unhidden.
   - The player's own body goes with it: `OwnerMesh` is `OwnerNoSee` on the same condition, so
     the arms' hold and recoil animation don't swing through the glass. OwnerNoSee rather than
@@ -141,7 +174,8 @@ in game `probes/probe_carry.py`.
   in the right hand, as it always has while sprinting. No new clip: the packs have no
   armed-carry jog.
   `Lowered = Sprinting OR (gun AND NOT prone AND NOT (Aiming OR Blocking OR RaiseForced OR
-  now < Held.NextFireTime + CARRY_RAISE_HOLD_S))`, written once a frame behind `IsValid(Held)`.
+  SightSeat > SEAT_HOLD OR now < Held.NextFireTime + CARRY_RAISE_HOLD_S))`, written once a
+  frame behind `IsValid(Held)`.
   - Prone keeps the gun up: the crawl's arms pull along the ground, and the stand-in shot
     origin below is measured standing (crouched it is about 20 cm high).
   - `Aiming` is either aim key, so over the shoulder and down the sights both raise it.
@@ -149,8 +183,8 @@ in game `probes/probe_carry.py`.
     after it could fire again.
   - A gun is an item that is neither `Melee` nor `Consumable`: the knife and the food keep
     their hold poses.
-  - `RaiseForced` is the probes' stand-in for an aim key. A probe that holds the sights up by
-    writing `SightBlend` must set it, or the gun is down under the sight camera.
+  - `RaiseForced` is the probes' stand-in for an aim key.
+  - The sight camera holds it up too (`SightSeat > SEAT_HOLD`), until it has left the gun.
 - **The pose follows `Lowered` on its edge** (`ready_pose.py`): `Lowered != PoseLowered` sets
   `NeedsRefresh`, and the equip plays or stops the slot. The keepalive after a flinch asks
   `Lowered` too.

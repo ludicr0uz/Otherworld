@@ -270,6 +270,12 @@ These are feel checks a headless run can't do:
   into a headless game, so only the verifier covers this);
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
+- bringing the sights up (`weapon_component/seat.py`): the view stays on the target while
+  the gun rises, then the camera travels from the boom onto the sights, about 0.4 s in all
+  from a lowered gun. Whether that reads as the sights coming up to the reticle or as a
+  wait, whether 10° (`SIGHT_SEAT_DEG`) starts the camera at the right moment, and the
+  crosshair going out at 0.9 of the way with no fade (`RETICLE_HIDE_SEAT`); sprinting out of
+  the sights still lowers the gun under a camera on its way home;
 - every gun down its sights, now that the eye is ON the sight line and the view runs down it
   (`docs/aiming.md`): the SMG11's is a 3 mm peep in a plate 15 cm from the eye, so the plate
   hides much of the view below and beside the target; the shotgun's support-hand fingers

@@ -7,6 +7,7 @@ from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR,
 )
 from combat.paths import KNIFE_BP_PATH
+from combat.seat_tuning import SEAT_HOLD, SEAT_VAR
 from combat.weapon_component.stance import PRONE, STANCE_VAR
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wg
@@ -58,7 +59,7 @@ def check_carry_state():
         return
     node, fed = armed[0]
     want = {"Sprinting", "Aiming", "Blocking", RAISE_FORCED_VAR, "Melee", "Consumable",
-            "NextFireTime", STANCE_VAR}
+            "NextFireTime", STANCE_VAR, SEAT_VAR}
     check("armed, it is made of Sprinting, Aiming, Blocking, Stance, Held's Melee "
           "and Consumable, and Held's NextFireTime against the clock",
           want <= _reads(fed)
@@ -69,6 +70,12 @@ def check_carry_state():
           f"NextFireTime",
           any(num_pin(n, "B") == CARRY_RAISE_HOLD_S for n in fed
               if "NextFireTime" in _reads(_feeds(BEL.find_input_pin(n, "A"), 2))),
+          str(sorted({num_pin(n, "B") for n in fed} - {None})))
+    check(f"...and the sight camera holds it up until it has left the gun "
+          f"({SEAT_VAR} > {SEAT_HOLD:g}), so the view easing home does not dip "
+          f"with the gun",
+          any(num_pin(n, "B") == SEAT_HOLD for n in fed
+              if SEAT_VAR in _reads(_feeds(BEL.find_input_pin(n, "A"), 2))),
           str(sorted({num_pin(n, "B") for n in fed} - {None})))
     check("...a prone body keeps the gun up: Stance is compared with PRONE",
           any(num_pin(n, "B") == PRONE for n in fed

@@ -1,6 +1,6 @@
 """Down the sniper's scope: the rifle and the player's own body leave the view.
 
-No key can be injected into a headless game, so the probe holds SightBlend at
+No key can be injected into a headless game, so the probe holds SightSeat at
 1 (the camera all the way to the eye point) by writing it every frame, which
 is what holding the sights key leads to; verify/sights.py checks the key and
 the ease. The sniper comes from the dev-all-guns request and is equipped the
@@ -20,6 +20,7 @@ import unreal
 
 from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.seat_tuning import SEAT_VAR
 from combat.weapon_component.sights import SCOPE_HIDE_BLEND
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
@@ -28,7 +29,7 @@ HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (WEAPON_COMP_BP_PATH, "EquippedIndex"),
             (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
-            (WEAPON_COMP_BP_PATH, "SightBlend"),
+            (WEAPON_COMP_BP_PATH, SEAT_VAR),
             (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
 SNIPER = "BP_SniperRifle_C"
 SHOTGUN = "BP_Shotgun_C"
@@ -62,11 +63,11 @@ def _equip(p, wc, name):
 
 
 def _hold_sights(p, wc):
-    """Keep SightBlend at 1 for a few frames; the last tick started from 1."""
+    """Keep SightSeat at 1 for a few frames; the last tick started from 1."""
     left = [HOLD_FRAMES]
 
     def step():
-        p.set(wc, "SightBlend", 1.0)
+        p.set(wc, SEAT_VAR, 1.0)
         left[0] -= 1
         return left[0] <= 0
     yield step
@@ -74,7 +75,7 @@ def _hold_sights(p, wc):
 
 def _state(p, wc, mesh):
     return (p.get(wc, "Held").get_editor_property("hidden"), mesh.get_editor_property("owner_no_see"),
-            p.get(wc, "SightBlend"))
+            p.get(wc, SEAT_VAR))
 
 
 def probe(p):
@@ -106,7 +107,7 @@ def _run(p):
 
     yield from _hold_sights(p, wc)
     hidden, no_see, blend = _state(p, wc, mesh)
-    p.check(f"down the scope (SightBlend {blend:.3f} > {SCOPE_HIDE_BLEND:g}) the "
+    p.check(f"down the scope ({SEAT_VAR} {blend:.3f} > {SCOPE_HIDE_BLEND:g}) the "
             "sniper is hidden", blend > SCOPE_HIDE_BLEND and hidden, str(hidden))
     p.check("...and the player's body is hidden from their own camera",
             no_see, str(no_see))
@@ -114,7 +115,7 @@ def _run(p):
             not p.pawn().get_editor_property("hidden") and mesh.is_visible(),
             f"{p.pawn().get_editor_property('hidden')} {mesh.is_visible()}")
 
-    yield lambda: p.get(wc, "SightBlend") < 0.05
+    yield lambda: p.get(wc, SEAT_VAR) < 0.05
     hidden, no_see, _ = _state(p, wc, mesh)
     p.check("sights down: the sniper and the body are back",
             not hidden and not no_see, f"{hidden} {no_see}")
@@ -122,6 +123,6 @@ def _run(p):
     yield from _equip(p, wc, SHOTGUN)
     yield from _hold_sights(p, wc)
     hidden, no_see, blend = _state(p, wc, mesh)
-    p.check(f"the shotgun's irons (SightBlend {blend:.3f}) hide nothing",
+    p.check(f"the shotgun's irons ({SEAT_VAR} {blend:.3f}) hide nothing",
             blend > SCOPE_HIDE_BLEND and not hidden and not no_see,
             f"{hidden} {no_see}")

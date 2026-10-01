@@ -211,7 +211,10 @@ editor.
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
   Down the sights the view runs along the gun's own sight line (the front sight's tip is the
-  centre of the screen, in any pose), and the aim sways slowly, sights and shot together
+  centre of the screen, in any pose), so there the reticle is drawn only in debug mode; the
+  hip and the shoulder aim keep it. Bringing the sights up, the view stays on the target
+  while the gun rises, and only then does the camera go onto the sights
+  (`combat/weapon_component/seat.py`). The aim sways slowly, sights and shot together
   (`combat/sway_tuning.py`; steadier crouched and prone). A hit taken down the sights plays
   no flinch, so the view stays on the target (`combat/weapon_component/steady.py`).
   The pistol reloads every 8 shots from an endless reserve. A bullet that hits a body throws

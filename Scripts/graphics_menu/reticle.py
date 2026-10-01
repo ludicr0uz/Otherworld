@@ -1,16 +1,21 @@
 """The HUD's reticle: a crosshair nailed to the centre of the viewport, red
 when the muzzle is blocked, handing over to the sniper's scope (scope.py)
-down the sights. Split out of build_graphics_menu.py, which calls
-_author_reticle from DrawHUD.
+down the sights, and to a gun's own iron sights there too: with the camera on
+the sights it is drawn only in debug mode. Split out of
+build_graphics_menu.py, which calls _author_reticle from DrawHUD.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.seat_tuning import RETICLE_HIDE_SEAT, SEAT_VAR
 from graphics_menu.scope import _author_scope, _author_scope_gate
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
 
 FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
+FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
+FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
+FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_BREAK_V2D = "/Script/Engine.KismetMathLibrary.BreakVector2D"
 FN_DRAW_RECT = "/Script/Engine.HUD.DrawRect"
 FN_FMIN = "/Script/Engine.KismetMathLibrary.FMin"
@@ -71,6 +76,13 @@ def _author_reticle(ed, x0, y0, in_execs):
     A scoped weapon draws _author_scope instead of this, never as well as it:
     the scope has a reticle of its own and two crosshairs on one centre is the
     sort of thing that reads as a bug.
+
+    Down the sights the crosshair is not drawn either: the camera looks along
+    the gun's own sight line (combat sights.py), so the front sight's tip is
+    the middle of the view and the crosshair only covered it. It goes once
+    the camera is nearly on the sights (SightSeat past RETICLE_HIDE_SEAT), so
+    the sights come up to meet it, and stays in debug mode (DebugOn), where
+    it shows that the two agree. The hip and the shoulder aim keep it.
     """
     made = []
 
@@ -194,7 +206,25 @@ def _author_reticle(ed, x0, y0, in_execs):
         ("dot",    cx,      -half_d,  cy,       -half_d,  RETICLE_DOT,   RETICLE_DOT),
     )
 
-    flow = BEL.find_else_pin(glass)
+    # Down the sights, outside debug mode, the gun's own sights are the
+    # reticle. Under `armed`, so the component is valid.
+    seat = keep(_at(ed.add_get_member_variable_node(SEAT_VAR, WEAPON_COMP_CLASS_PATH),
+                    x0 + 1260, y0 - 420))
+    _connect(as_weapon, _pin(seat, "self"))
+    on_sights = keep(_at(_node(ed, FN_GREATER), x0 + 1500, y0 - 420))
+    _connect(_pin(seat, SEAT_VAR, is_input=False), _pin(on_sights, "A"))
+    _set(on_sights, "B", RETICLE_HIDE_SEAT)
+    debug = keep(_at(ed.add_get_member_variable_node("DebugOn"), x0 + 1260, y0 - 280))
+    plain = keep(_at(_node(ed, FN_NOT), x0 + 1500, y0 - 280))
+    _connect(_pin(debug, "DebugOn", is_input=False), _pin(plain, "A"))
+    irons = keep(_at(_node(ed, FN_AND), x0 + 1740, y0 - 360))
+    _connect(_pin(on_sights, "ReturnValue", is_input=False), _pin(irons, "A"))
+    _connect(_pin(plain, "ReturnValue", is_input=False), _pin(irons, "B"))
+    hidden = keep(_at(ed.add_branch_node(), x0 + 1520, y0))
+    _connect(_pin(irons, "ReturnValue", is_input=False), _pin(hidden, "Condition"))
+    _connect(BEL.find_else_pin(glass), _pin(hidden, "execute"))
+
+    flow = BEL.find_else_pin(hidden)
     for i, (name, fx, dx, fy, dy, w, h) in enumerate(pieces):
         px = x0 + 1800 + i * 260
         r = keep(_at(_node(ed, FN_DRAW_RECT), px, y0))
@@ -212,10 +242,14 @@ def _author_reticle(ed, x0, y0, in_execs):
         "screen, so this is where the shot goes -- it turns red when the muzzle "
         "cannot reach what the camera is looking at. The ticks stand off by the "
         "held gun's accuracy cloud (ReticleSpread x half the width), so the "
-        "gap is where the shot can land: wide at the hip, closed down the sights.",
+        "gap is where the shot can land: wide at the hip, closed down the "
+        "sights. With the camera on the gun's sights (SightSeat past "
+        f"{RETICLE_HIDE_SEAT:g}) it is drawn only in debug mode: the front "
+        "sight is the middle of the view there.",
         made)
 
     return (flow,
+            BEL.find_then_pin(hidden),
             scoped_tail,
             BEL.find_else_pin(armed),
             _pin(cast, "CastFailed", is_input=False))

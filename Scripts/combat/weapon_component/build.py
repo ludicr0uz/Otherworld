@@ -15,6 +15,7 @@ from combat.paths import (
     CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
     WEAPON_COMP_BP_PATH,
 )
+from combat.seat_tuning import SEAT_VAR, SEATED_VAR, SIGHTS_FORCED_VAR
 from combat.skin import player_skin
 from combat.sway_tuning import SWAY_VARS
 from combat.tuning import BIND_VARS, COMBAT
@@ -127,6 +128,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     _declare(ed, "SightAiming", BEL.get_basic_type_by_name("bool"))
     _declare(ed, "AimZoom", _float_type())
     _declare(ed, "SightBlend", _float_type())
+    # The camera's own share of the sights (seat.py): the latch that says the
+    # gun is up, how far the camera has gone onto it, and the probes' stand-in
+    # for the sights key.
+    _declare(ed, SEATED_VAR, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, SEAT_VAR, _float_type())
+    _declare(ed, SIGHTS_FORCED_VAR, BEL.get_basic_type_by_name("bool"))
     # The sight sway (sway.py): its clock, and how far it has turned the view.
     for name in SWAY_VARS:
         _declare(ed, name, _float_type())
@@ -260,6 +267,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         # A divisor (AimZoom - 1) from the first frame, so never 1.0.
         "AimZoom": COMBAT.shoulder_zoom,
         "SightBlend": 0.0,
+        SEATED_VAR: False,
+        SEAT_VAR: 0.0,
+        SIGHTS_FORCED_VAR: False,
         **{name: 0.0 for name in SWAY_VARS},
         **{name: _key(k) for name, k in BIND_VARS},
         # Both overwritten on the first frame of BeginPlay. Seeded with the

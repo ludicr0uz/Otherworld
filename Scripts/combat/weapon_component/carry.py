@@ -4,6 +4,7 @@ off (ready_pose.py and the equip in inventory.py read it).
     Lowered = Sprinting
               OR (Held is a gun AND NOT Stance == PRONE
                   AND NOT (Aiming OR Blocking OR RaiseForced
+                           OR SightSeat > SEAT_HOLD
                            OR now < Held.NextFireTime + hold))
 
 A gun is an item that is neither Melee nor Consumable: the knife and the food
@@ -11,6 +12,9 @@ keep their hold poses, which point nothing forward. Aiming is either aim key
 (over the shoulder or down the sights). NextFireTime is written by a shot and
 by a reload, so both raise the gun and keep it up for CARRY_RAISE_HOLD_S after
 it could fire again. RaiseForced is a probe's stand-in for an aim key.
+SightSeat (seat.py) is how far the camera is onto the gun's sights: the gun
+stays up until the camera has left it, or the view, easing home after the
+sights key is let go, would dip with the gun on its way down.
 
 Prone, the gun stays up: the crawl's own arms pull along the ground, where a
 gun in the fist would be dragged through it, and the chest propped behind a
@@ -32,9 +36,11 @@ from combat.carry_tuning import (
 )
 from combat.graph import BEL, _at, _connect, _node, _pin, _set, _vec
 from combat.nodes import (
-    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_II, FN_GET_OWNER, FN_GET_TRANSFORM, FN_LESS_FF,
-    FN_NOT, FN_OR, FN_SELECT_VECTOR, FN_TIME_SECONDS, FN_TRANSFORM_LOC,
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_II, FN_GET_OWNER, FN_GET_TRANSFORM,
+    FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_OR, FN_SELECT_VECTOR, FN_TIME_SECONDS,
+    FN_TRANSFORM_LOC,
 )
+from combat.seat_tuning import SEAT_HOLD, SEAT_VAR
 from combat.weapon_component.common import _muzzle_location, _prop
 from combat.weapon_component.stance import PRONE, STANCE_VAR
 
@@ -102,6 +108,12 @@ def _author_carry(ed, held, armed_out, exec_ins, x0, y0):
     hands = gate2(FN_OR, get("Aiming", y0 + 460), get("Blocking", y0 + 560),
                   x0 + 500, y0 + 500)
     hands = gate2(FN_OR, hands, get(RAISE_FORCED_VAR, y0 + 620), x0 + 740, y0 + 540)
+    # ...or the camera, still on the gun's sights (seat.py). Literal on B.
+    on_gun = keep(_at(_node(ed, FN_GREATER_FF), x0 + 500, y0 + 1100))
+    _connect(get(SEAT_VAR, y0 + 1100), _pin(on_gun, "A"))
+    _set(on_gun, "B", SEAT_HOLD)
+    hands = gate2(FN_OR, hands, _pin(on_gun, "ReturnValue", is_input=False),
+                  x0 + 980, y0 + 480)
     ready, ready_n = _prop(ed, "NextFireTime", held, x0 + 240, y0 + 700)
     keep(ready_n)
     until = keep(_at(_node(ed, FN_ADD_FF), x0 + 500, y0 + 700))
@@ -136,7 +148,8 @@ def _author_carry(ed, held, armed_out, exec_ins, x0, y0):
     ed.add_comment_to_nodes(
         f"The carry. {LOWERED_VAR} is whether the ready pose is off: sprinting, "
         "or a gun (not Melee, not Consumable; not while prone) that no aim key, "
-        f"guard, shot or reload is holding up. A shot or a reload holds it up until "
+        f"guard, shot or reload is holding up, and that the sight camera has "
+        f"left (SightSeat under {SEAT_HOLD:g}). A shot or a reload holds it up until "
         f"{CARRY_RAISE_HOLD_S:g} s after NextFireTime. Lowered, the locomotion "
         "comes through and the gun rides in the hand, off the horizon.",
         made)

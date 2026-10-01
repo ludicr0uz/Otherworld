@@ -330,6 +330,10 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
 - **Centre:** the reticle or scope (`reticle.py`). The reticle's four ticks stand off by the held
   gun's accuracy cloud: `ReticleSpread` (weapon component) × half the viewport width, capped at
   `RETICLE_SPREAD_MAX` with an `FMin` (an `FClamp` would be read as a settings slider).
+  Down a gun's sights (the weapon component's `SightSeat` past `RETICLE_HIDE_SEAT`) the
+  reticle is drawn only in debug mode: the gun's own sights are on the centre there
+  (`reticle_checks.py`; a headless run draws nothing, so the look is
+  `probe_sight_raise.py --windowed` with `OW_RAISE_SHOTS=1`).
 - **When the player is dead:** only the death menu. `DrawHUD` branches on `GameMode.PlayerDead`
   first.
 

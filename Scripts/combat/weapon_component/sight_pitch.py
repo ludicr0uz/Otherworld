@@ -4,8 +4,9 @@ owns the bones and the axis).
 
     AimPitch = NormalizeAxis(ControlRotation.Pitch) * SightBlend
 
-SightBlend, not SightAiming: the pitch eases in with the camera's travel to the
-eye point and out again with it, so the gun never snaps. At SightBlend 0 --
+SightBlend, not SightAiming: the pitch eases in on the sights key and out once
+the camera has left the gun (sights.py holds the blend up until then), so the
+gun never snaps and the view never follows the body levelling. At SightBlend 0 --
 the hip and the shoulder aim -- it writes 0 and the body stands as it did.
 NormalizeAxis because the control rotation stores looking down as 270..360.
 

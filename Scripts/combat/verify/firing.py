@@ -89,9 +89,10 @@ def check_recoil():
                if not any(str(BEL.get_node_title(PIN.get_owning_node(q))) in pose_reads
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Current")))]
     check("the two debts recover by interpolation, alongside the zoom's and "
-          "the sight camera's",
-          len(interps) == 4,
-          f"{len(interps)} FInterpTo (2 recoil + 1 FOV + 1 SightBlend)")
+          "the sights' two (the body's blend and the camera's seat)",
+          len(interps) == 5,
+          f"{len(interps)} FInterpTo (2 recoil + 1 FOV + 1 SightBlend "
+          f"+ 1 SightSeat)")
     settling = [n for n in interps
                 if (num_pin(n, "Target") or 0.0) == 0.0
                 and abs((num_pin(n, "InterpSpeed") or 0.0)

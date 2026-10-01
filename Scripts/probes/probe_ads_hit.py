@@ -30,12 +30,14 @@ from combat.hit_reaction import STEADY_VAR, PREV_HEALTH_VAR
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
+from combat.seat_tuning import SEAT_VAR
 from combat.tuning import COMBAT
 from combat.weapon_component.common import AIM_BLEND
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 
 WRITABLE = [(HEALTH_BP_PATH, "Health"),
             (WEAPON_COMP_BP_PATH, "SightBlend"),
+            (WEAPON_COMP_BP_PATH, SEAT_VAR),
             (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
 
 HIT_HP = 5.0
@@ -76,7 +78,8 @@ def _hold(p, wc, seconds, each=None):
             each()
         dt = unreal.GameplayStatics.get_world_delta_seconds(world)
         eased = min(dt * COMBAT.ads_interp_speed, 0.9)
-        p.set(wc, "SightBlend", 1.0 / (1.0 - eased))
+        p.set(wc, SEAT_VAR, 1.0 / (1.0 - eased))     # the camera's share
+        p.set(wc, "SightBlend", 1.0)    # the body's, held there by the seat
         now = unreal.GameplayStatics.get_time_seconds(world)
         t0[0] = now if t0[0] is None else t0[0]
         return now - t0[0] >= seconds
@@ -171,7 +174,7 @@ def _run(p):
             f"moved {height:.2f} cm in height, turned {turn:.2f} deg")
 
     # --- at the hip the flinch still plays ------------------------------------
-    yield lambda: p.get(wc, "SightBlend") < 1e-3
+    yield lambda: max(p.get(wc, "SightBlend"), p.get(wc, SEAT_VAR)) < 1e-3
     yield 0.6           # past the reaction's cooldown
     p.check("at the hip the body is not steady", not p.get(health, STEADY_VAR),
             f"{STEADY_VAR} {p.get(health, STEADY_VAR)}")

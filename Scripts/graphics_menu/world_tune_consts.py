@@ -4,7 +4,7 @@ wbp_tune (the layout), world_tune_tick and tune_draw (the graph),
 world_tune_save (the save, run inside the game) and world_tune_checks read
 one table.
 
-    [O] with the M panel open   open / close the tab (and shut the other two)
+    [O] with the M panel open   open / close the tab (and shut the other tabs)
     Up / Down, Left / Right,    as GUN TUNING (tune_tab.py), over one subject,
     Enter                       "world": the time of day (hours, live only),
                                 the day's and the night's lengths, how fast

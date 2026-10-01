@@ -2,7 +2,7 @@
 (tune_tick.author_tab_flow, shared with GUN and MONSTER TUNING), then the
 table onto the level's day/night cycle.
 
-    [O] with MenuOpen       WorldTuneOpen = NOT WorldTuneOpen; the other two shut
+    [O] with MenuOpen       WorldTuneOpen = NOT WorldTuneOpen; the other tabs shut
     WorldTuneOpen, and the level has a BP_DayNightCycle (GetActorOfClass, cast):
       WorldTuneTouched      DayLengthSeconds, NightLengthSeconds,
                             NightTemperatureDropPerSecond := the table's
@@ -21,6 +21,7 @@ import unreal
 from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, _palette, _pin
 from combat.nodes import FN_ADD_FF, FN_ARR_GET
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get, _out
+from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.loot_find import put
 from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import GUN_TAB
@@ -159,7 +160,8 @@ def author_world_tune_tick(ed, pc_out, in_execs, x0, y0):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
     flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, WORLD_TAB, 1,
-                           (GUN_TAB.open_var, MONSTER_TAB.open_var))
+                           (GUN_TAB.open_var, MONSTER_TAB.open_var,
+                            GFX_TAB.open_var))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
         f"World tuning ([{WORLD_TUNE_KEY}] in the M panel): Up/Down pick a row, "

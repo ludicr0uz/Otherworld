@@ -12,6 +12,7 @@ DrawText scale x 10: Roboto's LegacyFontSize is 10, so a DrawText at 2.2 was
 """
 
 from graphics_menu.dev_consts import DEV_GUNS_KEY, DEV_GUNS_ROW_LABEL
+from graphics_menu.gfx_tune_consts import GFX_TUNE_KEY, GFX_TUNE_ROW_LABEL
 from graphics_menu.presets import PRESET_KEYS, PRESETS
 from graphics_menu.profile_consts import EXIT_KEY, EXIT_ROW_LABEL
 from graphics_menu.tune_consts import TUNE_KEY, TUNE_ROW_LABEL
@@ -214,16 +215,18 @@ HINT_CAPTURE_TEXT = "press any key to bind it"
 # ─── WBP_PauseMenu: the M panel ───────────────────────────────────────────────
 PAUSE_ROWS = "PauseRows"
 MENU_KEY, DEBUG_KEY = "M", "D"
-PAUSE_TITLE = "GRAPHICS QUALITY"
+# The panel is the game's settings, not only its graphics: the presets, debug
+# mode, save and exit, and the developer tabs.
+PAUSE_TITLE = "GAME SETTINGS"
 # The close button: the last row, so the mouse can shut the panel as M does.
 PAUSE_CLOSE_ROW_LABEL = f"[{MENU_KEY}]   close"
 PAUSE_ROW_LABELS = (tuple(f"[{i + 1}]   {p.label}" for i, p in enumerate(PRESETS))
                     + (f"[{DEBUG_KEY}]   debug", EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL,
                        TUNE_ROW_LABEL, MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL,
-                       PAUSE_CLOSE_ROW_LABEL))
+                       GFX_TUNE_ROW_LABEL, PAUSE_CLOSE_ROW_LABEL))
 # The key each row names, in row order: a click on the row is that key.
 PAUSE_ROW_KEYS = PRESET_KEYS + (DEBUG_KEY, EXIT_KEY, DEV_GUNS_KEY, TUNE_KEY,
-                                MON_TUNE_KEY, WORLD_TUNE_KEY, MENU_KEY)
+                                MON_TUNE_KEY, WORLD_TUNE_KEY, GFX_TUNE_KEY, MENU_KEY)
 PAUSE_DEBUG_ROW = len(PRESETS)
 PAUSE_HINT = "a key or a click picks"
 PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0

@@ -2,18 +2,20 @@
 the HUD variables, the widget names and words, and the save's Python command.
 
 The GUN TUNING tab (tune_consts.GUN_TAB), the MONSTER TUNING tab
-(monster_tune_consts.MONSTER_TAB) and the WORLD TUNING tab
-(world_tune_consts.WORLD_TAB) are the same machine over a different table:
+(monster_tune_consts.MONSTER_TAB), the WORLD TUNING tab
+(world_tune_consts.WORLD_TAB) and the GRAPHICS TUNING tab
+(gfx_tune_consts.GFX_TAB) are the same machine over a different table:
 tune_tick's keys, nudge and save, tune_draw's panel and wbp_tune's widgets
 all take a TuneTab. Only what the table is applied to differs
 (tune_tick._author_apply: carried guns; monster_tune_tick: live controllers;
-world_tune_tick: the day/night cycle).
+world_tune_tick: the day/night cycle; gfx_tune_tick: BP_GraphicsTuner).
 
     [key] with the M panel open   open / close the tab (and shut the others)
     Up / Down                     pick a row: the subject, then one per stat
     Left / Right                  the subject row: the previous / next one;
                                   a stat: one step down / up, never under
-                                  its minimum
+                                  its minimum (nor, where the tab has
+                                  maximums, over its maximum)
     Enter                         save the whole table to its CSV
 
 Constants only.
@@ -55,6 +57,9 @@ class TuneTab:
     hint_text: str
     saved_words: str
     fraction_digits: int = 4  # the panel's values, at most this many decimals
+    maxs_var: str = ""        # per stat; "" = the tab has no maximums
+    label_w: float = 0.0      # the rows' label column; 0 = TUNE_ROW_LABEL_W
+    panel_w: float = 0.0      # 0 = TUNE_PANEL_W
 
     @property
     def row_count(self):

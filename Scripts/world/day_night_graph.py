@@ -17,6 +17,10 @@ world_config.sun_state():
   air        SkyLight intensity, fog density and colour, DayGrade's weight:
              all night value -> day value by DayAmount
   sky        the dome's DayAmount, StarBrightness, SunDirection, MoonDirection
+  look       each light, the stars, the sky light, the fog's density and the
+             two discs are then multiplied by a look variable
+             (day_night_blueprint.LOOK_SCALE_VARS), 1 unless the GRAPHICS
+             TUNING tab moved it
   cold       the player's Temperature falls at night: night_cold.py, which
              build_day_night.py chains on after build_graph()
 
@@ -33,7 +37,10 @@ from combat.nodes import (
     MACRO_FOR_EACH,
 )
 from world import world_config as cfg
-from world.day_night_blueprint import IS_DAY_VAR, RANDOM_START_VAR, SKY_MID_VAR
+from world.day_night_blueprint import (
+    AMBIENT_SCALE_VAR, FOG_SCALE_VAR, IS_DAY_VAR, MOON_DISC_SCALE_VAR, MOON_SCALE_VAR,
+    RANDOM_START_VAR, SKY_MID_VAR, STAR_SCALE_VAR, SUN_DISC_SCALE_VAR, SUN_SCALE_VAR,
+)
 from world.paths import STATIC_SKY_TAG
 
 KML = "/Script/Engine.KismetMathLibrary"
@@ -90,6 +97,11 @@ def _get(ed, name, x, y):
 
 def _mul(ed, a, b, x, y):
     return _out(_call(ed, FN_MUL_FF, x, y, A=a, B=float(b)))
+
+
+def _scaled(ed, value, scale_var, x, y):
+    """value x one of the look multipliers (a variable, so it sits on B)."""
+    return _out(_call(ed, FN_MUL_FF, x, y, A=value, B=_get(ed, scale_var, x - 200, y + 80)))
 
 
 def _map(ed, value, in_a, in_b, out_a, out_b, x, y):
@@ -183,14 +195,17 @@ def _author_bodies(ed, chain, angle, sin):
     day = _get(ed, "DayAmount", x0, 400)
     chain.step(_call(ed, FN_LIGHT_INTENSITY, x0 + 400, 0,
                      self=_get(ed, "Sun", x0 + 200, 250),
-                     NewIntensity=_mul(ed, day, cfg.SUN_LUX, x0 + 200, 400)))
+                     NewIntensity=_scaled(ed, _mul(ed, day, cfg.SUN_LUX, x0 + 200, 400),
+                                          SUN_SCALE_VAR, x0 + 300, 1000)))
     moon_elev = _mul(ed, sin, -cfg.MOON_MAX_ELEVATION_DEG, x0 + 400, 600)
     moon_up = _map(ed, moon_elev, 0.0, cfg.MOON_FADE_DEG, 0.0, 1.0, x0 + 600, 600)
     night = _map(ed, day, 0.0, 1.0, 1.0, 0.0, x0 + 600, 800)
     moon_amount = _out(_call(ed, FN_MUL_FF, x0 + 850, 700, A=moon_up, B=night))
     chain.step(_call(ed, FN_LIGHT_INTENSITY, x0 + 1100, 0,
                      self=_get(ed, "Moon", x0 + 900, 250),
-                     NewIntensity=_mul(ed, moon_amount, cfg.MOON_LUX, x0 + 1050, 700)))
+                     NewIntensity=_scaled(
+                         ed, _mul(ed, moon_amount, cfg.MOON_LUX, x0 + 1050, 700),
+                         MOON_SCALE_VAR, x0 + 1150, 1000)))
     return x0 + 1400
 
 
@@ -200,11 +215,15 @@ def _author_air(ed, chain, x0):
     night_sky, day_sky = cfg.SKY_LIGHT_INTENSITY
     chain.step(_call(ed, FN_SKY_INTENSITY, x0 + 400, 0,
                      self=_get(ed, "SkyLight", x0 + 200, 250),
-                     NewIntensity=_map(ed, day, 0, 1, night_sky, day_sky, x0 + 200, 400)))
+                     NewIntensity=_scaled(
+                         ed, _map(ed, day, 0, 1, night_sky, day_sky, x0 + 200, 400),
+                         AMBIENT_SCALE_VAR, x0 + 300, 1000)))
     night_fog, day_fog = cfg.FOG_DENSITY
     fog = _get(ed, "Fog", x0 + 500, 250)
     chain.step(_call(ed, FN_FOG_DENSITY, x0 + 800, 0, self=fog,
-                     Value=_map(ed, day, 0, 1, night_fog, day_fog, x0 + 600, 400)))
+                     Value=_scaled(
+                         ed, _map(ed, day, 0, 1, night_fog, day_fog, x0 + 600, 400),
+                         FOG_SCALE_VAR, x0 + 700, 1000)))
     tint = _call(ed, FN_COLOR_LERP, x0 + 1000, 500,
                  A=_color(ed, cfg.FOG_COLOR[0], x0 + 800, 550),
                  B=_color(ed, cfg.FOG_COLOR[1], x0 + 800, 700), Alpha=day)
@@ -225,8 +244,14 @@ def _author_sky(ed, chain, x0, sun_elev):
     stars = _map(ed, sun_elev, 0.0, cfg.STARS_FULL_BELOW_DEG, 0.0, 1.0, x0 + 300, 500)
     chain.step(_call(ed, FN_MID_SCALAR, x0 + 600, 0, self=mid,
                      ParameterName="StarBrightness",
-                     Value=_mul(ed, stars, cfg.STAR_BRIGHTNESS, x0 + 500, 500)))
-    x = x0 + 900
+                     Value=_scaled(ed, _mul(ed, stars, cfg.STAR_BRIGHTNESS, x0 + 500, 500),
+                                   STAR_SCALE_VAR, x0 + 600, 1000)))
+    for i, (param, var) in enumerate((("SunDiscBrightness", SUN_DISC_SCALE_VAR),
+                                      ("MoonDiscBrightness", MOON_DISC_SCALE_VAR))):
+        chain.step(_call(ed, FN_MID_SCALAR, x0 + 900 + i * 300, 0, self=mid,
+                         ParameterName=param,
+                         Value=_get(ed, var, x0 + 700 + i * 300, 700)))
+    x = x0 + 1500
     for body in ("Sun", "Moon"):
         fwd = _call(ed, FN_FORWARD_OF, x - 200, 400, self=_get(ed, body, x - 400, 400))
         toward = _call(ed, FN_NEGATE_V, x - 50, 450, A=_out(fwd))
@@ -247,4 +272,4 @@ def build_graph(bp, ed):
     x = _author_air(ed, chain, x)
     _author_sky(ed, chain, x, sun_elev)
     _log(f"{bp.get_name()}: BeginPlay takes over the sky, Tick runs the clock")
-    return tick, chain, x + 2800
+    return tick, chain, x + 3400

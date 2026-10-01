@@ -30,6 +30,15 @@ NIGHT_COLD_VAR = "NightTemperatureDropPerSecond"   # night_cold.py reads it
 CONFIG_VARS = ("DayLengthSeconds", "NightLengthSeconds", "Clock", NIGHT_COLD_VAR)
 RANDOM_START_VAR = "RandomStart"   # BeginPlay picks Clock anywhere in the cycle
 STATE_FLOAT_VARS = ("DayAmount",)
+# The look multipliers, all 1 as built: the Tick graph scales the sun's and
+# the moon's light, the stars, the sky light, the fog's density and the two
+# discs by them. The M panel's GRAPHICS TUNING tab writes them
+# (graphics_menu/gfx_tuner_sky.py); nothing else does.
+SUN_SCALE_VAR, MOON_SCALE_VAR = "SunScale", "MoonScale"
+STAR_SCALE_VAR, AMBIENT_SCALE_VAR, FOG_SCALE_VAR = "StarScale", "AmbientScale", "FogScale"
+SUN_DISC_SCALE_VAR, MOON_DISC_SCALE_VAR = "SunDiscScale", "MoonDiscScale"
+LOOK_SCALE_VARS = (SUN_SCALE_VAR, MOON_SCALE_VAR, STAR_SCALE_VAR, AMBIENT_SCALE_VAR,
+                   FOG_SCALE_VAR, SUN_DISC_SCALE_VAR, MOON_DISC_SCALE_VAR)
 IS_DAY_VAR = "IsDay"
 SKY_MID_VAR = "SkyMaterial"
 
@@ -110,7 +119,7 @@ def build_components(bp):
 
 
 def declare_variables(ed):
-    for name in CONFIG_VARS + STATE_FLOAT_VARS:
+    for name in CONFIG_VARS + STATE_FLOAT_VARS + LOOK_SCALE_VARS:
         _declare(ed, name, _float_type())
     for name in (IS_DAY_VAR, RANDOM_START_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
@@ -132,4 +141,5 @@ def apply_config(bp):
         "Clock": float(cfg.START_CLOCK_S),
         NIGHT_COLD_VAR: float(cfg.NIGHT_TEMPERATURE_DROP_PER_S),
         RANDOM_START_VAR: bool(cfg.RANDOM_START),
+        **{name: 1.0 for name in LOOK_SCALE_VARS},
     })

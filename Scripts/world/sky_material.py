@@ -8,9 +8,10 @@ fades smoothly, and -- being unlit and IsSky, like M_NightSky_Starfield -- is
 what the SkyLight's real-time capture turns into the level's ambient light, so
 the fill in every shadow follows the sky without a second mechanism.
 
-BP_DayNightCycle drives four parameters every frame through a dynamic
+BP_DayNightCycle drives six parameters every frame through a dynamic
 instance: DayAmount, StarBrightness, SunDirection and MoonDirection (both
-pointing from the viewer to the body). The colours are parameters with their
+pointing from the viewer to the body), and SunDiscBrightness and
+MoonDiscBrightness (the discs' multipliers, 1 unless tuned). The colours are parameters with their
 defaults from world_config, so they can be tuned on an instance.
 """
 
@@ -23,7 +24,8 @@ from world.paths import SKY_MATERIAL_PATH, STARS_TEXTURE_PATH
 MEL = unreal.MaterialEditingLibrary
 
 # (parameter name, default) -- scalars and vectors the Custom node reads.
-SCALAR_PARAMS = (("DayAmount", 1.0), ("StarBrightness", 0.0))
+SCALAR_PARAMS = (("DayAmount", 1.0), ("StarBrightness", 0.0),
+                 ("SunDiscBrightness", 1.0), ("MoonDiscBrightness", 1.0))
 VECTOR_PARAMS = (
     ("SunDirection", [0.0, 0.0, 1.0, 0.0]),
     ("MoonDirection", [0.0, 0.0, -1.0, 0.0]),
@@ -50,8 +52,8 @@ float moonUp = saturate(m.z * 8.0 + 0.5);
 float3 sky = lerp(NightSky, lerp(DayHorizon, DayZenith, sqrt(up)), DayAmount);
 float glow = pow(saturate(sd), 6.0) * saturate(1.0 - abs(s.z) * 4.0) * (1.0 - up);
 sky += SunsetColor * glow * sunUp;
-sky += SunDiscColor * smoothstep(0.99970, 0.99980, sd) * sunUp;
-sky += MoonDiscColor * smoothstep(0.99955, 0.99965, md) * moonUp;
+sky += SunDiscColor * SunDiscBrightness * smoothstep(0.99970, 0.99980, sd) * sunUp;
+sky += MoonDiscColor * MoonDiscBrightness * smoothstep(0.99955, 0.99965, md) * moonUp;
 sky += Stars * StarBrightness * saturate(v.z * 4.0 + 0.2);
 return sky;
 """

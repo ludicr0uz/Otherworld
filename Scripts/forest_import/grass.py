@@ -6,7 +6,7 @@ forest_generator/grass_cells.py; see there for why grass is cut into cells.
 
 Grass is saved UNLIT: no shadow, no distance-field lighting, no dynamic
 indirect lighting. Those are what the Ultra preset pays for, and the graphics
-menu (graphics_menu/presets.py) switches them on at runtime per preset. Saving
+menu (graphics_menu/gfx_tuner_foliage.py) switches them on at runtime per preset. Saving
 the cheap state means a level with no menu in front of it runs cheap too.
 
 For the same reason every density tier above Low (grass_cells.GRASS_TIERS) is

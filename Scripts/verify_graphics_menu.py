@@ -18,8 +18,6 @@ import build_graphics_menu as G
 from graphics_menu.difficulty_checks import check_difficulty
 from graphics_menu import fps as F
 from graphics_menu import menu_nav as N
-from graphics_menu import grass_tiers as T
-from graphics_menu import presets as P
 from graphics_menu import reticle as R
 from graphics_menu import settings_rows as S
 from graphics_menu import stamina_bar as ST
@@ -39,6 +37,9 @@ from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu import world_tune_consts as WC
 from graphics_menu.world_tune_checks import check_world_tune
+from graphics_menu import gfx_tune_consts as GC
+from graphics_menu.gfx_checks import check_gfx_tune
+from graphics_menu.gfx_tuner_checks import check_gfx_tuner
 from graphics_menu import cursor_consts as CC
 from graphics_menu.cursor_checks import check_cursor
 from graphics_menu import hud_stats as HS
@@ -156,10 +157,10 @@ def main():
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
                          TC.TUNE_KEY, TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
                          TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.MON_TUNE_KEY,
-                         WC.WORLD_TUNE_KEY)
+                         WC.WORLD_TUNE_KEY, GC.GFX_TUNE_KEY)
                         + G.PRESET_KEYS + N.START_KEYS + CC.CURSOR_KEYS)
     check("polls exactly the menu, preset, debug, restart, start, nav, exit, "
-          "dev-all-guns, loot, gun, monster and world tuning keys, and the "
+          "dev-all-guns, loot, gun, monster, world and graphics tuning keys, and the "
           "cursor's click and wheel",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
@@ -174,95 +175,9 @@ def main():
     check("...and the menu's own keys are not in the pool it offers",
           not (nav & set(G.KEY_POOL)), str(sorted(nav & set(G.KEY_POOL))))
 
-    # --- each preset applies its own scalability level and cvars
-    # One chain per preset key, plus the BeginPlay one that applies the default.
-    expected_levels = sorted([p[1] for p in G.PRESETS]
-                             + [G.PRESETS[G.DEFAULT_PRESET][1]])
-    # "Value" alone no longer identifies SetOverallScalabilityLevel -- the
-    # settings page's FClamp has one too, and its literal is a float; so has
-    # the tuning panel's Conv_DoubleToText, and the world tab's MapRangeClamped.
-    levels = sorted(int(BEL.find_input_pin(n, "Value").get_pin_value())
-                    for n in by_pins("Value")
-                    if not {"Min", "MaximumFractionalDigits", "InRangeA"} & pin_names(n))
-    check("one scalability call per preset, plus BeginPlay's default",
-          levels == expected_levels, f"{levels} vs {expected_levels}")
-
-    commands = {BEL.find_input_pin(n, "Command").get_pin_value()
-                for n in by_pins("Command")}
-    expected_cmds = set()
-    for preset in G.PRESETS:
-        expected_cmds.update(P.console_commands(preset))
-    check("every preset's console overrides are present, and nothing else",
-          commands == expected_cmds,
-          str(sorted(commands ^ expected_cmds)) if commands != expected_cmds else "")
-    # `stat fps` is a toggle, so sending it could just as well switch the
-    # readout off; the FPS readout is drawn on the canvas instead (fps.py).
-    check("no `stat` console commands (they toggle)",
-          not any(c.startswith("stat ") for c in commands), str(sorted(commands)))
-
-    # ApplyNonResolutionSettings takes no arguments, so it is the only node in
-    # the graph whose inputs are exactly exec + self -- apart from the profile
-    # load's DestroyActor and the exit's DisableMovement, told apart by title.
-    applies = [n for n in nodes if pin_names(n) == {"execute", "self"}
-               and not any(w in str(BEL.get_node_title(n)).replace(" ", "")
-                           for w in ("Destroy", "DisableMovement"))]
-    check("ApplyNonResolutionSettings once per preset, plus BeginPlay's",
-          len(applies) == len(G.PRESETS) + 1, str(len(applies)))
-    # Regression guard, and the single most important check in this file:
-    # ApplySettings also applies *resolution*, which on macOS drives
-    # SWindow::SetWindowMode -> FMacWindow::UpdateFullScreenState and hangs the
-    # editor at 100% CPU the moment PIE starts.
-    check("no ApplySettings anywhere (it hangs macOS PIE on a window-mode change)",
-          not by_pins("bCheckForCommandLineOverrides"))
-
-    # --- grass lighting follows Quality (presets.author_grass_sync)
-    check(f"{P.GRASS_APPLIED_VAR} variable", P.GRASS_APPLIED_VAR in names)
-    check(f"{P.GRASS_APPLIED_VAR} defaults to {P.GRASS_APPLIED_DEFAULT} "
-          "(so the first Tick always applies)",
-          cdo.get_editor_property(P.GRASS_APPLIED_VAR) == P.GRASS_APPLIED_DEFAULT,
-          str(cdo.get_editor_property(P.GRASS_APPLIED_VAR)))
-    tagged = [BEL.find_input_pin(n, "Tag").get_pin_value()
-              for n in by_pins("Tag") if "ComponentClass" not in pin_names(n)]
-    want_tags = [P.GRASS_TAG] + [T.tier_tag(i) for i, _ in T.SWITCHED_TIERS]
-    check(f"grass cells are found by their tags, {', '.join(want_tags)}",
-          sorted(tagged) == sorted(want_tags), str(tagged))
-    # --- grass density follows Quality (grass_tiers.author_tier_visibility)
-    # One SetActorHiddenInGame per switched tier, each fed by Quality < the
-    # tier's first preset, and each looping over that tier's own tag.
-    hides = by_pins("bNewHidden", "self", "execute")
-    thresholds = []
-    for n in hides:
-        for src in BEL.find_input_pin(n, "bNewHidden").list_connected_pins():
-            b = BEL.find_input_pin(PIN.get_owning_node(src), "B")
-            thresholds.append(b.get_pin_value() if b else None)
-    want = [str(t.min_preset) for _, t in T.SWITCHED_TIERS]
-    check("each grass tier is hidden below its preset "
-          f"({', '.join(want)})", sorted(thresholds) == sorted(want),
-          str(thresholds))
-    check("every tier hide runs (exec wired)",
-          len(hides) == len(want) and all(
-              BEL.find_input_pin(n, "execute").list_connected_pins() for n in hides),
-          str(len(hides)))
-    for _fn, arg in P.GRASS_SETTERS:
-        setters = by_pins(arg, "self", "execute")
-        # Driven by the Quality comparison, never a literal: a literal would
-        # light (or unlight) the grass for every preset alike.
-        driven = [n for n in setters
-                  if BEL.find_input_pin(n, arg).list_connected_pins()
-                  and BEL.find_input_pin(n, "execute").list_connected_pins()]
-        check(f"{arg} is set once, from Quality", len(driven) == 1 == len(setters),
-              f"{len(driven)} driven of {len(setters)}")
-    # The comparison feeding the setters, found by following the wire back
-    # from SetCastShadow: its B literal is the first preset that lights grass.
-    thresholds = []
-    arg = P.GRASS_SETTERS[0][1]
-    for n in by_pins(arg, "self", "execute"):
-        for src in BEL.find_input_pin(n, arg).list_connected_pins():
-            b = BEL.find_input_pin(PIN.get_owning_node(src), "B")
-            thresholds.append(b.get_pin_value() if b else None)
-    check(f"grass is lit from preset {P.GRASS_LIGHTS_FROM} "
-          f"({G.PRESETS[P.GRASS_LIGHTS_FROM].label}) up",
-          thresholds == [str(P.GRASS_LIGHTS_FROM)], str(thresholds))
+    # What a preset does is no longer in this graph: the keys only set
+    # Quality (gfx_checks.py), and BP_GraphicsTuner applies the preset's row
+    # of the graphics table (gfx_tuner_checks.py).
 
     # --- what is still drawn on the canvas
     # The screens are UMG now (graphics_menu/umg_checks.py). The canvas keeps
@@ -909,6 +824,8 @@ def main():
     check_tune(check, bp, nodes)
     check_monster_tune(check, bp, nodes)
     check_world_tune(check, bp, nodes)
+    check_gfx_tune(check, bp, nodes)
+    check_gfx_tuner(check)
     check_cursor(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen

@@ -28,7 +28,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
    |---|---|---|
    | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
-   | graphics menu, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
+   | the Game Settings (M) panel, graphics presets and tuning, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
@@ -232,8 +232,8 @@ editor.
   UAL's `Fixing_Kneeling`) and opens a loot window showing what it carries as item icons;
   Up/Down pick and Enter takes the item into the bag (`Scripts/loot/CLAUDE.md`).
 - **The HUD:** UMG screens driven by an `AHUD`: HP, stamina, hunger, thirst and temperature
-  bars, a kill counter, the inventory grid, the main menu, the death menu, the graphics (M) menu
-  and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts) (plus D: debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world, K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day the day's and night's lengths and how fast the night cools the player, all but the hour saved to `Scripts/world/world_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
+  bars, a kill counter, the inventory grid, the main menu, the death menu, the Game Settings (M) panel
+  and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts) (plus D: debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world, K in the M panel: a dev-all-guns cheat, T: a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads, and N: a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads, and O: a WORLD TUNING tab that sets the time of day the day's and night's lengths and how fast the night cools the player, all but the hour saved to `Scripts/world/world_tuning.csv`, and P: a GRAPHICS TUNING tab over the Low / Medium / High / Ultra presets that changes each preset's numbers live (resolution, shadows, view, grass and tree draw distance, grass density, leaves, fog) and the look shared by all four (brightness, sun, moon, stars, ambient light, fog density), saved to `Scripts/graphics_menu/graphics_tuning.csv`), which holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
 - **Proprietary notices:** the game is Ellivian Inc.'s (`LICENSE.txt`). The title and settings
   pages carry a copyright and confidentiality notice, and every screen a faint

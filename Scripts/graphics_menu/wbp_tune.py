@@ -1,5 +1,5 @@
-"""WBP_PauseMenu's tuning panels, one per TuneTab (tune_tab.py): GUN, MONSTER
-and WORLD TUNING, in the same spot (only one is open at a time).
+"""WBP_PauseMenu's tuning panels, one per TuneTab (tune_tab.py): GUN, MONSTER,
+WORLD and GRAPHICS TUNING, in the same spot (only one is open at a time).
 
   right of the M panel   the tab's panel: a title, row_count WBP_MenuRows (the
                          subject, then one per stat, each labelled in
@@ -13,6 +13,7 @@ import unreal
 
 from combat.graph import BEL, _must_load
 from graphics_menu import umg_author as U
+from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import (
     GUN_TAB, TUNE_HINT_FONT, TUNE_PANEL_W, TUNE_POS, TUNE_ROW_LABEL_W, TUNE_TITLE_FONT,
@@ -25,12 +26,13 @@ from graphics_menu.world_tune_consts import WORLD_TAB
 
 
 def author_tune_widgets(bp, root):
-    for tab in (GUN_TAB, MONSTER_TAB, WORLD_TAB):
+    for tab in (GUN_TAB, MONSTER_TAB, WORLD_TAB, GFX_TAB):
         _author_tab(bp, root, tab)
 
 
 def _author_tab(bp, root, tab):
-    outer, stack = U.panel(bp, root, tab.panel, "T_UI_Panel", min_w=TUNE_PANEL_W,
+    outer, stack = U.panel(bp, root, tab.panel, "T_UI_Panel",
+                           min_w=tab.panel_w or TUNE_PANEL_W,
                            variable=True)
     U.at(outer, (0.0, 0.0), (0.0, 0.0), TUNE_POS)
     title = U.text(bp, stack, tab.title_widget, tab.title_text, TUNE_TITLE_FONT, COL_TITLE,
@@ -41,7 +43,7 @@ def _author_tab(bp, root, tab):
     for i, label in enumerate(tab.row_labels):
         row = U.add(bp, row_class, f"{tab.rows_box}{i}", rows)
         row.set_editor_property(ROW_TEXT_VAR, label)
-        row.set_editor_property(ROW_WIDTH_VAR, TUNE_ROW_LABEL_W)
+        row.set_editor_property(ROW_WIDTH_VAR, tab.label_w or TUNE_ROW_LABEL_W)
         row.set_editor_property(ROW_COLOR_VAR, U.slate_colour(COL_ROW))
         # The subject row stands apart from the stats under it.
         U.pad(row, bottom=8.0 if i == 0 else 0.0)

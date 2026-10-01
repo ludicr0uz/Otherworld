@@ -1,5 +1,6 @@
 """The game's UI: the UMG screens and BP_GraphicsMenuHUD, the AHUD that drives
-them. build_graphics_menu.py is the entry point and still owns BeginPlay,
+them, and BP_GraphicsTuner, the HUD's component that applies a quality
+preset. build_graphics_menu.py is the entry point and still owns BeginPlay,
 Tick, the DrawHUD skeleton and the wanderers' canvas bars.
 
 The screens (widget trees, authored through the UMGToolSet plugin)
@@ -31,8 +32,7 @@ Still drawn on the HUD canvas (placed per frame)
   scope           the sniper's glass, and when it replaces the crosshair
 
 Input, settings and state
-  presets         the quality presets, applying one, the grass-lighting sync
-  grass_tiers     showing/hiding grass tiers per preset
+  presets         the quality presets' names and keys; picking one sets Quality
   menu_nav        Up/Down caret movement and the accept keys, shared by pages;
                   what a key poll gains from the mouse (wheel, a clicked row)
   cursor_consts   the mouse cursor in the menus: its buttons, variables, rules
@@ -89,6 +89,23 @@ Input, settings and state
   world_tune_save      run in the game by the save: the day and night lengths
                   into world/world_tuning.csv
 
+Graphics: what a preset is, the tab that tunes it, the component that applies it
+  gfx_stats            the graphics table: each stat's label, step, limits,
+                  per-preset defaults and how it is applied; graphics_tuning.csv
+  gfx_tune_consts      the GRAPHICS TUNING tab (P): variables, widget names,
+                  GFX_TAB; BP_GraphicsTuner's path and variables
+  gfx_tune_tick        Tick: the tab's flow, the pick kept as Quality, the look
+                  spread over the presets, the table handed to the tuner
+                  (run after world_tune_tick's)
+  gfx_tune_save        run in the game by the save: the live table into
+                  graphics_tuning.csv
+  gfx_tuner            BP_GraphicsTuner, the HUD's component: Tick applies a
+                  dirty row -- the scalability level, a console command per cvar
+  gfx_tuner_read       one stat of the applied preset, in the tuner's graph
+  gfx_tuner_foliage    the tuner's grass and tree cells: draw distances,
+                  density tiers, grass lighting
+  gfx_tuner_sky        the tuner's look multipliers onto BP_DayNightCycle
+
 verify_graphics_menu.py's checks, beside it because it is over budget
   umg_checks         the screens' trees and the graph that creates and writes them
   hud_bar_checks     the stat bars' places, icons and low-bar blink
@@ -102,4 +119,7 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   cursor_checks      the mouse cursor: shown when, the row tests, the clicks
   monster_tune_checks  the monster tuning tab: table, CSV on the controllers,
                      panel, save, writes
+  gfx_checks         the graphics tuning tab: table, CSV, panel, the M panel's
+                     title, the preset keys, the hand-over to the tuner
+  gfx_tuner_checks   BP_GraphicsTuner: each stat reaching what it names
 """

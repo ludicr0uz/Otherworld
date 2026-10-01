@@ -7,7 +7,11 @@ from combat.verify.common import (
     pin_value,
 )
 from world import world_config as cfg
-from world.day_night_blueprint import COMPONENTS, NIGHT_COLD_VAR, RANDOM_START_VAR
+from world.day_night_blueprint import (
+    AMBIENT_SCALE_VAR, COMPONENTS, FOG_SCALE_VAR, LOOK_SCALE_VARS, MOON_DISC_SCALE_VAR,
+    MOON_SCALE_VAR, NIGHT_COLD_VAR, RANDOM_START_VAR, STAR_SCALE_VAR,
+    SUN_DISC_SCALE_VAR, SUN_SCALE_VAR,
+)
 from world.paths import DAY_NIGHT_BP_PATH, SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH, STATIC_SKY_TAG
 
 
@@ -139,6 +143,53 @@ def _check_night_cold(bp):
           str(len(pawns)))
 
 
+def _check_look(bp):
+    """The look multipliers the GRAPHICS TUNING tab writes: 1 as built, and
+    each one scaling the thing it names."""
+    d = cdo(bp)
+    off = {v: d.get_editor_property(v) for v in LOOK_SCALE_VARS
+           if abs(d.get_editor_property(v) - 1.0) > 1e-6}
+    check(f"the {len(LOOK_SCALE_VARS)} look multipliers default to 1 (the world as "
+          "world_config has it)", not off, str(off))
+    pins = unreal.BlueprintGraphPinLibrary
+    nodes = graph(bp).list_all_nodes()
+
+    def reaches(var):
+        """(pin name, the node's ParameterName literal) for every input the
+        variable drives, straight or through one multiply."""
+        out = set()
+        for n in nodes:
+            if _title(n) != f"Get {var}":
+                continue
+            for q in BEL.find_output_pin(n, var).list_connected_pins():
+                m = pins.get_owning_node(q)
+                ends = [q] if str(pins.get_pin_name(q)) != "B" else \
+                    BEL.find_output_pin(m, "ReturnValue").list_connected_pins()
+                for e in ends:
+                    owner = pins.get_owning_node(e)
+                    param = BEL.find_input_pin(owner, "ParameterName")
+                    out.add((_title(owner).replace(" ", ""),
+                             pin_value(owner, "ParameterName") if param else ""))
+        return out
+
+    wrong = []
+    for var, title, param in ((SUN_SCALE_VAR, "SetIntensity", ""),
+                              (MOON_SCALE_VAR, "SetIntensity", ""),
+                              (AMBIENT_SCALE_VAR, "SetIntensity", ""),
+                              (FOG_SCALE_VAR, "SetFogDensity", ""),
+                              (STAR_SCALE_VAR, "SetScalarParameterValue", "StarBrightness"),
+                              (SUN_DISC_SCALE_VAR, "SetScalarParameterValue",
+                               "SunDiscBrightness"),
+                              (MOON_DISC_SCALE_VAR, "SetScalarParameterValue",
+                               "MoonDiscBrightness")):
+        got = reaches(var)
+        if len(got) != 1 or not all(title in t and p == param for t, p in got):
+            wrong.append(f"{var} -> {sorted(got)}")
+    check("each multiplier scales its own output: the sun's, the moon's and the sky "
+          "light's intensity, the fog's density, the stars and the two discs",
+          not wrong, "; ".join(wrong))
+
+
 def run():
     bp = load(DAY_NIGHT_BP_PATH)
     check("BP_DayNightCycle exists", bp is not None, DAY_NIGHT_BP_PATH)
@@ -149,3 +200,4 @@ def run():
     _check_components(bp)
     _check_graph(bp)
     _check_night_cold(bp)
+    _check_look(bp)

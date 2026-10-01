@@ -11,7 +11,9 @@ the table written onto every carried gun.
     TuneNudge != 0 -> lower it, then
         TuneRow 0                     TuneWeapon steps round the guns
         else                          TuneValues[gun, stat] +/- its step, never
-                                      under its minimum; TuneTouched, NOT TuneSaved
+                                      under its minimum (nor over its maximum,
+                                      for a tab that has them); TuneTouched,
+                                      NOT TuneSaved
     TuneSaveRequested -> lower it; TuneSaved = ExecutePythonCommand(the save)
     TuneTouched -> for each carried item whose DisplayName is in TuneWeapons,
                    every TUNE_STATS variable := its cell (ints rounded)
@@ -43,6 +45,7 @@ from combat.paths import (
 from combat.weapon_specs import _weapon_specs
 from graphics_menu.cursor_consts import WHEEL_LESS, WHEEL_MORE
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.menu_nav import or_pause_click, or_wheel
 from graphics_menu.loot_find import put
 from graphics_menu.monster_tune_consts import MONSTER_TAB
@@ -57,6 +60,7 @@ FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
 FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
 FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
 FN_FMAX = "/Script/Engine.KismetMathLibrary.FMax"
+FN_FMIN = "/Script/Engine.KismetMathLibrary.FMin"
 FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
 FN_INT_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
 FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
@@ -79,7 +83,8 @@ def declare_tab_vars(ed, tab):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in _ints(tab):
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in (tab.values_var, tab.steps_var, tab.mins_var):
+    for name in filter(None, (tab.values_var, tab.steps_var, tab.mins_var,
+                              tab.maxs_var)):
         _declare(ed, name, BEL.get_array_type(_float_type()))
     _declare(ed, tab.names_var, BEL.get_array_type(BEL.get_basic_type_by_name("string")))
 
@@ -186,7 +191,9 @@ def _author_nudge(ed, in_execs, x0, y0, made, tab, subjects):
     wrapped = _call(ed, FN_MOD_II, x + 480, y0 - 300, made, A=_out(lifted), B=subjects)
     picked = put(ed, tab.pick_var, _out(wrapped), [subject], x + 720, y0 - 500, made)
 
-    # A stat row: cell := FMax(cell + nudge * step, minimum).
+    # A stat row: cell := FMax(cell + nudge * step, minimum), and with
+    # maximums FMin(that, maximum). Not an FClamp: the verifier reads every
+    # Clamp in this graph as a settings slider.
     s = _out(_call(ed, FN_SUB_II, x, y0 + 700, made,
                    A=_get(ed, tab.row_var, x - 240, y0 + 700, made), B=1))
     base = _call(ed, FN_MUL_II, x, y0 + 900, made,
@@ -201,6 +208,9 @@ def _author_nudge(ed, in_execs, x0, y0, made, tab, subjects):
                   B=_out(delta))
     kept = _call(ed, FN_FMAX, x + 1200, y0 + 800, made, A=_out(moved),
                  B=_cell(ed, tab.mins_var, s, x + 960, y0 + 1300, made))
+    if tab.maxs_var:
+        kept = _call(ed, FN_FMIN, x + 1200, y0 + 1100, made, A=_out(kept),
+                     B=_cell(ed, tab.maxs_var, s, x + 960, y0 + 1500, made))
     write = _call(ed, FN_ARR_SET, x + 1440, y0, made,
                   TargetArray=_get(ed, tab.values_var, x + 1200, y0 + 600, made))
     _connect(idx, _pin(write, "Index"))
@@ -287,7 +297,8 @@ def author_tune_tick(ed, pc_out, in_execs, x0, y0):
     made = []
     flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GUN_TAB,
                            len(tune_table()[0]),
-                           (MONSTER_TAB.open_var, WORLD_TAB.open_var))
+                           (MONSTER_TAB.open_var, WORLD_TAB.open_var,
+                            GFX_TAB.open_var))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
         f"Gun tuning ([{TUNE_KEY}] in the M panel): Up/Down pick a row, Left/Right "

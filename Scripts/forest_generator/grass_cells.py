@@ -35,8 +35,9 @@ GRASS_CELL_CM = 10000.0
 # ─── Density tiers: how grass scales with the quality preset ────────────────
 #
 # Every grass patch belongs to one tier, and a tier is drawn from its
-# ``min_preset`` up (graphics_menu/presets.py: 0 Low, 1 Medium, 2 High,
-# 3 Ultra). Each tier is its own evenly spread layer, so Low is a thinner field,
+# ``min_preset`` up (graphics_menu/gfx_stats.py: 0 Low, 1 Medium, 2 High,
+# 3 Ultra; that is each preset's default "grass layers", which the M panel's
+# GRAPHICS TUNING tab can change). Each tier is its own evenly spread layer, so Low is a thinner field,
 # not a field with holes, and each preset above it lays another layer on top.
 #
 # The upper tiers also fade out closer. Thickness only reads near the player;
@@ -45,7 +46,7 @@ GRASS_CELL_CM = 10000.0
 # go where they show.
 #
 # A tier above Low is saved HIDDEN IN GAME -- the Low state, as the grass is
-# saved unlit (forest_import/grass.py) -- and the menu unhides it -- see presets.author_grass_sync.
+# saved unlit (forest_import/grass.py) -- and the menu unhides it -- see graphics_menu/gfx_tuner_foliage.py.
 # Hidden in game, not invisible: the editor viewport still shows every tier.
 #
 #   min_preset  share of the total density   instance fade start / end (cm)

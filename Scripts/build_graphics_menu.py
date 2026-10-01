@@ -12,6 +12,8 @@ Assets produced, plus one wiring change:
            WBP_PauseMenu, WBP_DeathMenu      graphics_menu/wbp_*.py)
   /Game/UI/BP_GraphicsMenuHUD  (AHUD)       the controller: reads the game,
                                              polls the keys, writes the screens
+  /Game/UI/BP_GraphicsTuner  (component)    on the HUD: applies a quality
+                                             preset's numbers to the engine
 
   BP_ThirdPersonGameMode.HUDClass is pointed at the HUD.  That game mode is the
   project's GlobalDefaultGameMode and no generated level overrides it, so this
@@ -25,13 +27,13 @@ each is placed per frame, off the viewport centre or a projected world point.
 Event graph:
 
   [Event BeginPlay] --> create the four screens, add them to the viewport
-                    --> apply the startup preset (Low)
+                    --> Quality := the startup preset (Low)
                     --> load BP_Settings --> GameMode.DebugMode = saved
                     --> pause on the main menu (unless -nomenu)
 
-  [Event Tick] --> grass lighting for the preset, the M / 1-4 / D / X keys,
-                   save and exit (graphics_menu/save_exit.py), the loot
-                   window (graphics_menu/loot_tick.py)
+  [Event Tick] --> save and exit (graphics_menu/save_exit.py), the loot
+                   window (graphics_menu/loot_tick.py), the tuning tabs, then
+                   the M / 1-4 / D keys
 
   [Event ReceiveDrawHUD] --> DebugOn copy, settings pushed onto the weapon
                              component, difficulty onto the GameMode, FPS
@@ -51,12 +53,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # BP_Settings' asset path. The settings screen's own contract with the combat
 # package (BIND_VARS, the sensitivity limits) lives in graphics_menu/settings_rows.py.
 from combat import paths as combat_paths                           # noqa: E402
-# The presets, the chain that applies one and the grass-lighting Tick prologue
-# live in graphics_menu/presets.py; see there for why each preset is what it is.
+# The presets' names and keys. What one does: graphics_menu/presets.py.
 from graphics_menu.presets import (                                # noqa: E402
-    DEFAULT_PRESET, GRASS_APPLIED_DEFAULT, GRASS_APPLIED_VAR, PRESET_KEYS,
-    PRESETS, author_grass_sync, console_commands, emit_apply)
-from forest_generator.grass_cells import GRASS_TIERS                 # noqa: E402
+    DEFAULT_PRESET, PRESET_KEYS, PRESETS, emit_apply)
+from graphics_menu.gfx_tune_consts import GFX_TAB, TUNER_COMPONENT   # noqa: E402
+from graphics_menu.gfx_tune_tick import (                           # noqa: E402
+    author_gfx_tune_tick, declare_gfx_tune_vars, gfx_tune_defaults, install_tuner)
+from graphics_menu.gfx_tuner import build_graphics_tuner            # noqa: E402
 # The FPS readout, one of the debug-mode overlays; see graphics_menu/fps.py.
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
 # The generated art the canvas layers (the wanderers' bars) still draw with.
@@ -408,10 +411,6 @@ def _ensure_variables(ed, bp):
                                 # BeginPlay pauses the world alongside it.
                                 (GAME_STARTED_VAR, "bool", "false"),
                                 ("Quality", "int", str(DEFAULT_PRESET)),
-                                # The Quality the grass cells were last lit
-                                # for -- see presets.author_grass_sync.
-                                (GRASS_APPLIED_VAR, "int",
-                                 str(GRASS_APPLIED_DEFAULT)),
                                 # Which page of the menu panel is on screen,
                                 # and which line of it the caret is on.
                                 ("MenuPage", "int", str(PAGE_TITLE)),
@@ -453,6 +452,7 @@ def _ensure_variables(ed, bp):
     declare_tune_vars(ed)
     declare_monster_tune_vars(ed)
     declare_world_tune_vars(ed)
+    declare_gfx_tune_vars(ed)
     declare_cursor_vars(ed)
 
 
@@ -654,9 +654,8 @@ def _author_begin_play(ed, begin_play):
     made = emit_apply(ed, DEFAULT_PRESET, origin.x + 320, origin.y, created)
     label = PRESETS[DEFAULT_PRESET].label
     ed.add_comment_to_nodes(
-        f"Every session starts at {label}.  This has to *apply* the preset, not "
-        f"just point the caret at it: otherwise the panel would claim {label} "
-        "while the engine ran at whatever scalability it happened to boot with.",
+        f"Every session starts at {label}. Setting Quality applies it: the first "
+        f"Tick hands the preset's row to {TUNER_COMPONENT} (gfx_tune_tick.py).",
         made)
 
     # The settings load comes BEFORE the menu decision: the pause waits
@@ -750,18 +749,16 @@ def _author_tick(ed, tick):
     m_clicks = []
     _connect(or_pause_click(ed, _pin(was_m, "ReturnValue", is_input=False), MENU_KEY,
                             x0 - 240, y0 + 400, m_clicks), _pin(br_m, "Condition"))
-    # Grass lighting catches up with Quality first, so a preset picked on the
-    # previous frame is on the grass before anything else runs this one.
-    # Then save and exit, the profile load and the death wipe (save_exit.py).
-    synced = author_grass_sync(ed, x0, y0 - 1100, BEL.find_then_pin(tick))
+    # First save and exit, the profile load and the death wipe (save_exit.py).
     # Then the loot window (loot_tick.py): the body in reach, its keys, a take.
-    saved = author_save_exit_tick(ed, pc_out, synced, x0, y0 - 4000)
+    saved = author_save_exit_tick(ed, pc_out, [BEL.find_then_pin(tick)], x0, y0 - 4000)
     looted = author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000)
-    # Then the M panel's gun, monster and world tuning tabs (tune_tick.py,
-    # monster_tune_tick.py, world_tune_tick.py).
+    # Then the M panel's tuning tabs (tune_tick.py and its three siblings).
+    # The graphics one also hands the picked preset to the tuner component.
     tuned = author_tune_tick(ed, pc_out, looted, x0 + 44000, y0 - 4000)
     tuned = author_monster_tune_tick(ed, pc_out, tuned, x0 + 58000, y0 - 4000)
-    for tail in author_world_tune_tick(ed, pc_out, tuned, x0 + 72000, y0 - 4000):
+    tuned = author_world_tune_tick(ed, pc_out, tuned, x0 + 72000, y0 - 4000)
+    for tail in author_gfx_tune_tick(ed, pc_out, tuned, x0 + 92000, y0 - 4000):
         _connect(tail, _pin(br_m, "execute"))
 
     get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 560, y0 + 200)
@@ -807,10 +804,8 @@ def _author_tick(ed, tick):
         applied = emit_apply(ed, i, bx + 500, by, BEL.find_then_pin(br)) + clicks
 
         ed.add_comment_to_nodes(
-            f"{PRESET_KEYS[i]} -> {preset.label}: scalability {preset.level}, "
-            f"{', '.join(console_commands(preset))}, grass lighting "
-            f"{'on' if preset.grass_lights else 'off'}, grass tiers "
-            f"{', '.join(str(n) for n, t in enumerate(GRASS_TIERS) if t.min_preset <= i)}.",
+            f"{PRESET_KEYS[i]} -> {preset.label}: Quality := {i}. Its row of the "
+            f"graphics table reaches the engine on the next Tick (gfx_tune_tick.py).",
             [was, br] + applied)
 
         # An unmatched key falls through to the next test.
@@ -1145,7 +1140,8 @@ def _author_draw(ed, x0, y0):
     shown = author_pause_menu(ed, x0 + 420, y0, after_aim)
     guns = author_tune_panel(ed, x0 + 4800, y0, shown)
     monsters = author_tune_panel(ed, x0 + 11000, y0, guns, MONSTER_TAB)
-    author_tune_panel(ed, x0 + 17200, y0, monsters, WORLD_TAB)
+    world = author_tune_panel(ed, x0 + 17200, y0, monsters, WORLD_TAB)
+    author_tune_panel(ed, x0 + 23400, y0, world, GFX_TAB)
 
 
 # ─── Entry points ────────────────────────────────────────────────────────────
@@ -1163,6 +1159,8 @@ def build_hud_blueprint(rebuild=False):
     # loads create_node_from_name returns None and the error reads like a typo
     # in the node name rather than a missing asset.
     build_profile_savegame()
+    # The tuner component before the HUD that carries it and sets its variables.
+    build_graphics_tuner()
     # The screens first: the HUD's variables are typed to their classes, and
     # the cast nodes to the rows and slots need those classes loaded.
     build_menu_row()
@@ -1208,6 +1206,7 @@ def build_hud_blueprint(rebuild=False):
             raise RuntimeError(f"could not create {NODE_TICK}")
 
     _ensure_variables(ed, bp)
+    install_tuner(bp)
     origin = BEL.get_node_pos(tick)
 
     begin_play = ed.find_event_node("ReceiveBeginPlay")
@@ -1225,14 +1224,14 @@ def build_hud_blueprint(rebuild=False):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
     _apply_defaults(bp, {"MenuOpen": False, "DebugOn": False,
                          "Quality": DEFAULT_PRESET,
-                         GRASS_APPLIED_VAR: GRASS_APPLIED_DEFAULT,
                          "MenuPage": PAGE_TITLE, "MenuRow": 0,
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],
                          **difficulty_defaults(), **profile_defaults(),
                          **dev_guns_defaults(), **loot_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),
-                         **world_tune_defaults(), **cursor_defaults()})
+                         **world_tune_defaults(), **gfx_tune_defaults(),
+                         **cursor_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")
     return bp

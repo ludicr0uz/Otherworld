@@ -252,9 +252,10 @@ def check_hud_graph(check, nodes):
                 both = _sources(eq, "A") if "OR" in _title(eq).upper() else []
                 for one in (both + _sources(eq, "B")) if both else [eq]:
                     selected += _source_titles(one, "B")
-    check("the title page, settings page, M panel, loot window and the three tuning tabs "
+    check("the title page, settings page, M panel, loot window and the four tuning tabs "
           "light the selected row's caret (the M panel also the row under the cursor)",
-          sorted(selected) == ["Get CursorRow", "Get LootSel", "Get MenuRow", "Get MenuRow",
+          sorted(selected) == ["Get CursorRow", "Get GfxTuneRow", "Get LootSel",
+                               "Get MenuRow", "Get MenuRow",
                                "Get MonTuneRow", "Get Quality", "Get TuneRow",
                                "Get WorldTuneRow"],
           str(sorted(selected)))

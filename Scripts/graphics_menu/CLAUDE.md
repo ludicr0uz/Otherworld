@@ -1,7 +1,8 @@
-# The graphics menu, settings and HUD
+# The Game Settings (M) panel, settings and HUD
 
 `Scripts/build_graphics_menu.py` builds the four UMG screens (`WBP_HUD`, `WBP_MainMenu`,
-`WBP_PauseMenu`, `WBP_DeathMenu`, from the parts `WBP_MenuRow` and `WBP_InventorySlot`) and
+`WBP_PauseMenu`, `WBP_DeathMenu`, from the parts `WBP_MenuRow` and `WBP_InventorySlot`),
+`/Game/UI/BP_GraphicsTuner` (the component that applies a quality preset) and
 `/Game/UI/BP_GraphicsMenuHUD`, the `AHUD` that drives them, and sets
 `BP_ThirdPersonGameMode.HUDClass` to it. That game mode is the global default, so the HUD is in
 every level. Run `Scripts/verify_graphics_menu.py` after every edit. It is the only thing that
@@ -13,7 +14,8 @@ This package holds the fragments. The entry point itself is still 1.2k lines, ov
 split it before extending it.
 
 **The keys:**
-- **M** toggles the panel. Its last row, `[M] close`, is the close button for the mouse.
+- **M** toggles the panel, titled **GAME SETTINGS**. Its last row, `[M] close`, is the close
+  button for the mouse.
 - **1 / 2 / 3 / 4** pick the Low / Medium / High / Ultra presets.
 - **D** toggles debug mode (the FPS readout, wanderer numbers, pellet tracers and impact
   damage, the wanderers' sight cones).
@@ -21,8 +23,9 @@ split it before extending it.
 - **K** (panel open) is the dev-all-guns cheat (below).
 - **T** (panel open) opens the GUN TUNING tab (below).
 - **N** (panel open) opens the MONSTER TUNING tab (below).
-- **O** (panel open) opens the WORLD TUNING tab (below). Opening any tuning tab shuts the
-  other two.
+- **O** (panel open) opens the WORLD TUNING tab (below).
+- **P** (panel open) opens the GRAPHICS TUNING tab (below). Opening any tuning tab shuts the
+  other three.
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 - **The mouse** works every menu too (below).
@@ -37,7 +40,7 @@ mouse is the camera's.
 |---|---|---|---|
 | title | the caret goes there | Enter on that row | |
 | settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up | Left / Right |
-| M panel | a second caret lights | that row's key (1-4, D, X, K, T, N, O; M on the last row, `[M] close`) | |
+| M panel | a second caret lights | that row's key (1-4, D, X, K, T, N, O, P; M on the last row, `[M] close`) | |
 | tuning tab | the caret goes there | one step up; on the hint line: save | Left / Right |
 | loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
 | death menu | | on the hint line: restart | |
@@ -115,27 +118,74 @@ mouse is the camera's.
 - **Probe:** `probe_umg_screens.py` calls `ReceiveDrawHUD` itself (a `-nullrhi` run never
   renders, so the engine never does) and reads the widgets back.
 
-## Presets (`presets.py`)
+## Presets and the GRAPHICS TUNING tab (`gfx_*.py`, `presets.py`)
 
-| preset | scalability | `r.ShadowQuality` | `r.ScreenPercentage` | grass shadows + DF/indirect |
-|---|---|---|---|---|
-| Low | 0 | 1 | 70 | off |
-| Medium | 1 | 2 | 85 | off |
-| High | 3 (Epic) | 3 | 100 | off |
-| Ultra | 3 (Epic) | 3 | 100 | **on** |
+A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 24 numbers), and
+`graphics_tuning.csv` is the tracked copy. The defaults are what the presets always did:
 
-- **The console commands are needed.** `DefaultEngine.ini` pins `r.ShadowQuality=3` at
-  project-setting priority, which outranks scalability. A console command outranks both.
-- **Grass lighting is per component, not a cvar.** When `Quality != GrassQualityApplied`, the
-  first Tick block walks every actor tagged `OW_Grass`. The grass-lit presets must stay at the
-  top of the table, which is asserted.
-- **BeginPlay applies `DEFAULT_PRESET` (Low).** Settings are never saved, so every launch starts
-  at Low.
-- **In PIE these cvars stick to the editor viewport.** Restore it with
-  `r.ScreenPercentage 100` and `r.ShadowQuality 3`.
+| preset | engine quality | `r.ShadowQuality` | `r.ScreenPercentage` | view distance | grass layers | grass shadows + DF/indirect |
+|---|---|---|---|---|---|---|
+| Low | 0 | 1 | 70 | 0.4 | 1 | off |
+| Medium | 1 | 2 | 85 | 0.6 | 2 | off |
+| High | 3 (Epic) | 3 | 100 | 1.0 | 3 | off |
+| Ultra | 3 (Epic) | 3 | 100 | 1.0 | 4 | **on** |
+
+**P with the panel open** toggles `GfxTuneOpen`. The subject row is the preset: Left/Right
+there pick Low / Medium / High / Ultra, exactly as the 1-4 keys do. The rows under it are
+that preset's numbers; **Enter** saves all four presets to
+`Scripts/graphics_menu/graphics_tuning.csv`, which the next build bakes into the HUD.
+
+- **Performance rows are per preset:** engine quality (the scalability level), resolution,
+  shadow quality and distance, view distance, grass and tree draw distance (multipliers of
+  the level's own cull distances), grass density (layers 1-4), grass shadows, leaf cut-outs
+  (`r.Nanite.ProgrammableRaster`: off draws every leaf card solid), tree coarseness
+  (`r.Nanite.MaxPixelsPerEdge`), fog and volumetric fog on/off, GI, reflections, AA.
+- **Look rows are one number for all four presets:** brightness (`r.ExposureOffset`, in
+  EV), sunlight, sun disc, moonlight, moon disc, stars, ambient light and fog density,
+  each a multiplier of what `world_config` sets. A nudge writes the picked preset's look
+  into every row (`gfx_tune_tick._author_spread`), and the CSV is read from the first.
+- **Two owners.** The HUD holds the table and the tab (`gfx_tune_tick.py`, on the shared
+  tab machine). `BP_GraphicsTuner`, an ActorComponent on the HUD (`gfx_tuner*.py`), turns a
+  row into the engine's state. The HUD hands it `Values`, `Preset` and `Dirty` whenever a
+  number was touched or `Quality != GfxQualityApplied`.
+- **A preset key only sets `Quality`.** BeginPlay's default, a key, a click and the tab's
+  preset row all reach the engine through that one hand-over, on the next Tick.
+  `GfxQualityApplied` starts at -1, so the first Tick of every session applies Low.
+- **The console commands are needed.** `DefaultEngine.ini` pins `r.ShadowQuality` (and the
+  GI, reflection and AA methods) at project-setting priority, which outranks scalability.
+  A console command outranks both. One command per cvar stat, on every apply.
+- **Grass and tree numbers are per component, not cvars.** The tuner walks the cells
+  (`gfx_tuner_foliage.py`), each walk only when its own number moved: grass by the
+  `OW_Grass` tag, density tiers by `OW_GrassTier<n>`, trees as "an instanced-mesh root
+  that is not grass" (the levels carry no tree tag).
+- **A cell's distance is scaled by wanted / applied,** read off the component, so a level
+  reload (fresh components, fresh HUD) starts again from 1. Its max draw distance moves by
+  the same centimetres as the fade's end, not by the ratio: it includes a fixed reach to
+  the cell's corner (`grass_cells.cell_max_draw_cm`).
+- **`Multiply_IntFloat` truncates.** It is promoted to a wildcard typed by the int, so a
+  1.1 ratio became 1 and a 0.9 became 0. Convert the int and multiply floats; the verifier
+  checks it.
+- **The look rows are variables on `BP_DayNightCycle`** (`SunScale`, `MoonScale`, ...;
+  `Scripts/world/CLAUDE.md`), written by `gfx_tuner_sky.py`. A level without a cycle keeps
+  its static sky.
+- **The tab has maximums** (`GfxTuneMaxs`, an `FMin` after the shared `FMax`; the other
+  tabs have none). An `FClamp` would be read as a settings slider.
+- **`r.ExposureOffset` is a cheat cvar**: it moves in the editor binary (PIE, `-game`),
+  not in a shipping build. The save is Python, so the tab is a dev tool anyway.
+- **In PIE the cvars stick to the editor viewport.** Restore it by picking High in a game,
+  or with `r.ScreenPercentage 100`, `r.ShadowQuality 3`, `r.Fog 1`.
 - **Never call `GameUserSettings.ApplySettings`.** It applies resolution too, which hangs the Mac
   editor in PIE at 100% CPU. Use `ApplyNonResolutionSettings()`. The verifier asserts this. A
   `-nullrhi` run cannot catch the hang.
+- **The verifier's whole-graph scans see none of this in the HUD:** the HUD graph holds no
+  console command, scalability call or tag walk (asserted), which is why the apply is a
+  component of its own.
+- **Probe:** `probe_graphics_tuning.py` (16 checks: Low applied at the start, a preset
+  switch, cvars, both draw distances, layers, shadows, the sun and the moon scaled, the
+  look spread over the presets, the CSV, the panel). It backs up the CSV and puts it back.
+  `OW_GFX_SHOTS=1` with `--windowed` saves a picture of the panel.
+- **Still needs a play session:** the P key, what each number does to the frame rate and
+  the picture (a headless run renders nothing), and whether the limits are the useful ones.
 
 ## Settings screen
 
@@ -241,7 +291,7 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
 - **The keys only raise flags** (`TuneNudge`, `TuneSaveRequested`), which is what lets
   `probe_gun_tuning.py` tune and save. It backs up the CSV and puts it back.
 - **Still needs a play session:** the keys themselves and how the 21-row panel reads.
-- **The machine is shared with MONSTER TUNING:** the keys, nudge and save are
+- **The machine is shared with the other tabs:** the keys, nudge and save are
   `tune_tick.author_tab_flow` over a `TuneTab` (`tune_tab.py`); the panel is `tune_draw` and
   `wbp_tune` over the same. Only the apply differs. The verifier tells the two save calls apart
   by their command.
@@ -377,8 +427,9 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
   `ProgressBar.SetFillColorAndOpacity` takes `InColor`.
 - **One build per warm headless editor.** A second `build_graphics_menu.py` in the same
   `UEPY_SERVE` editor kills it without a crash report, while compiling `BP_GraphicsMenuHUD`
-  (uepy says "the listener stopped responding"). Stop it first (`touch <dir>/stop`), or let
-  the failed call be the stop: the next call boots a new one.
+  (uepy says "the listener stopped responding"). Stop it first (`touch <dir>/stop`, then
+  wait for its pid to exit: a call made while it is still shutting down fails the same
+  way), or let the failed call be the stop: the next call boots a new one.
 - **Seeing a screen:** a `-nullrhi` probe proves the values, not the look. A `-game` run without
   `-nullrhi` (`-windowed -ResX=1280 -ResY=720`) renders on this Mac, and the console command
   `shot showui` saves the viewport with its widgets to `Saved/Screenshots/MacEditor/`.

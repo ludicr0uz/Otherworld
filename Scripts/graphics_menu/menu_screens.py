@@ -294,7 +294,7 @@ def author_pause_menu(ed, x0, y0, in_execs):
     on = set_text(ed, value, DEBUG_ON, [BEL.find_then_pin(dbg_br)], x0 + 3460, y0)
     off = set_text(ed, value, DEBUG_OFF, [BEL.find_else_pin(dbg_br)], x0 + 3460, y0 + 300)
     ed.add_comment_to_nodes(
-        "The graphics panel (M). The caret sits on the Quality row, so it "
+        "The Game Settings panel (M). The caret sits on the Quality row, so it "
         "follows the preset, and on the row under the cursor; debug mode's "
         "row says ON or OFF.",
         [get_open, br, quality, dbg, dbg_br])

@@ -26,6 +26,11 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
   one level can differ.
 - **The time of day can be set in a game** from the WORLD TUNING tab, on a 24-hour dial
   (`clock_to_hour`: sunrise 06:00, sunset 18:00). See `Scripts/graphics_menu/CLAUDE.md`.
+- **The look multipliers** (`SunScale`, `MoonScale`, `StarScale`, `AmbientScale`, `FogScale`,
+  `SunDiscScale`, `MoonDiscScale`; `day_night_blueprint.LOOK_SCALE_VARS`) are 1 as built. Tick
+  multiplies the sun's and the moon's light, the stars, the sky light, the fog's density and
+  the two discs by them. Only the M panel's GRAPHICS TUNING tab writes them
+  (`graphics_menu/gfx_tuner_sky.py`); `sun_state()` is the world at 1.
 - The night values (moon 0.12 lux, sky light 3.0, fog, exposure, star brightness) come from
   `forest_generator/lighting.py`'s night preset, and the day values from its day preset.
 - `sun_state(clock)` does the same sums as the Tick graph. The probe compares the two, so keep

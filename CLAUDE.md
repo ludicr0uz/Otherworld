@@ -302,6 +302,9 @@ editor.
   - `get_node_title` names variable nodes (`Get DebugMode`) and many calls, but `Array_Get` is
     just `Get`. Match call nodes by their input-pin set (e.g. `{"TargetArray", "Index"}`).
   - `BEL.list_input_pins` includes `execute`. Filter it out when walking data dependencies.
+  - **A literal equal to its pin's default isn't saved.** A `0.0` reads back as `"0.0"` in the
+    editor that authored it and as `""` once loaded from disk, so a check that passes in the
+    warm editor fails in the next one. Accept both, and re-run a new check in a fresh editor.
 - **Probe PrintStrings:** splice them in, don't just connect. An exec output holds one link, so a
   plain connect severs the rest of the chain.
 - **Components:**

@@ -58,7 +58,11 @@ def check_dead_gate():
         return
     gate = gates[0]
     fed = _sources(gate, "Condition")
-    zero = [n for n in fed if {"A", "B"} <= in_pins(n) and num_pin(n, "B") == 0.0
+    # A literal equal to the pin's own default is not saved: 0.0 reads back as
+    # "0.0" in the editor that authored it and as "" once loaded from disk.
+    zero = [n for n in fed if {"A", "B"} <= in_pins(n)
+            and (num_pin(n, "B") == 0.0 or pin_value(n, "B") == "")
+            and not PIN.list_connected_pins(BEL.find_input_pin(n, "B"))
             and "Get Health" in [_title(f) for f in _sources(n, "A")]]
     check("the gate shuts on Dead OR Health <= 0, so the frame of the killing "
           "blow is covered whichever component ticks first",

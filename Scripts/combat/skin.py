@@ -82,6 +82,10 @@ class PlayerSkin:
     # The empty-handed punch (weapon_component/punch.py): MM_Attack_01 on this
     # rig, played into the upper-body slot.
     punch: str
+    # The head bone: hidden from the player's own view while the camera is on
+    # a gun's sights, where the eye point is inside or beside the head
+    # (weapon_component/head_hide.py). Its children go with it.
+    head: str
     # Mesh component transform inside the actor. The template's own numbers;
     # they are a property of a 1.8 m humanoid standing in an 88 cm capsule
     # facing +X, not of the mannequin, which is why the Meshy skin reuses them.
@@ -119,6 +123,7 @@ SKIN_QUINN = PlayerSkin(
             ("forearm", "lowerarm"), ("hand", "hand"), ("thigh", "thigh"),
             ("calf", "calf"), ("foot", "foot"))}),
     punch="/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01",
+    head="head",
 )
 
 # Built by Scripts/asset_pipeline: fetch_monsters.py -> import_characters.py ->
@@ -151,6 +156,7 @@ SKIN_ADVENTURER = PlayerSkin(
                               ("thigh", "UpLeg"), ("calf", "Leg"), ("foot", "Foot"))}),
     # build_retarget.py makes it for every creature (MELEE_SOURCE).
     punch=f"/Game/Sourced/Characters/Anims/{ADVENTURER}/A_{ADVENTURER}_MM_Attack_01",
+    head="Head",
     # asset_pipeline/import_quaternius.py (quaternius_paths.CROUCH_IDLE, ...):
     # the UAL pack has no crawl, and its face-down swim is what crawls.
     crouch_idle=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Crouch_Idle_Loop",

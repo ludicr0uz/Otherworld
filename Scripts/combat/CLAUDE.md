@@ -218,7 +218,7 @@ touches the fire graph doesn't pay for the notes on blood.
 
 | file | covers |
 |---|---|
-| `docs/aiming.md` | the carry (a gun rides lowered until aimed or fired: `weapon_component/carry.py`), shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `sway.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
+| `docs/aiming.md` | the carry (a gun rides lowered until aimed or fired: `weapon_component/carry.py`), shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch, the player's own head hidden down the sights (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `head_hide.py`, `sway.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
 | `docs/stance.md` | sprint, blocking (the guard's quarter damage and stamina cost), crouch and prone (`weapon_component/stance.py`), the procedural body poses (`body_pose.py`, `weapon_component/pose_weights.py`) |
 | `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_bodies.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
 | `docs/skin.md` | the player's body: the Meshy mesh and its retarget (`skin.py`) |
@@ -280,6 +280,9 @@ These are feel checks a headless run can't do:
   (`docs/aiming.md`): the SMG11's is a 3 mm peep in a plate 15 cm from the eye, so the plate
   hides much of the view below and beside the target; the shotgun's support-hand fingers
   stand just left of the bead; the adventurer's hair shows at the top of the AK's view;
+- the head leaving the view on the way onto the sights (`HEAD_HIDE_SEAT` 0.8): whether it is
+  seen to go, from behind, in the last of the camera's travel, and whether the headless
+  shadow is noticed with the sun behind the player;
 - the sight sway (`sway_tuning.py`): whether 0.3° reads as a held breath or as drunk,
   above all through the 4x scope, and whether crouch and prone steady it enough;
 - a reload with the sights up: the view follows the gun, so it is thrown about with the

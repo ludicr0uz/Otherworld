@@ -20,7 +20,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   seat_tuning       the sight camera's seat: how near the view the gun must
                     be before the camera goes onto it (SIGHT_SEAT_DEG),
                     SightSeated / SightSeat / SightsForced, where the HUD's
-                    crosshair gives way to the sights (RETICLE_HIDE_SEAT)
+                    crosshair gives way to the sights (RETICLE_HIDE_SEAT) and
+                    the player's own head leaves the view (HEAD_HIDE_SEAT)
   carry_tuning      the carry's numbers and names: how long a shot keeps the
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   chop_tuning       chopping a tree: blows per piece of wood, where it lands

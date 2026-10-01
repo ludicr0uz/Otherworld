@@ -17,6 +17,9 @@ _author_* fragment per concern, each in its own module:
   sights      down the sights: ease the camera (by SightSeat) from the boom to
               Held's SightOffset and turn it onto Held's sight line (towards
               SightAim); hide a scoped weapon behind its glass
+  head_hide   down the sights: the player's own head bone is hidden past
+              SightSeat HEAD_HIDE_SEAT, whatever gun is held, and shown again
+              off them (the eye point is inside or beside the head)
   sway        down the sights: the view drifts on two slow sines (the control
               rotation is turned by the change), steadied by the stance
   steady      down the sights: write the owner's health component's Steady

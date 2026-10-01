@@ -38,3 +38,11 @@ SEAT_HOLD = 0.02
 # The HUD's crosshair is not drawn past this much seat, outside debug mode:
 # the gun's own sights are on the middle of the view by then.
 RETICLE_HIDE_SEAT = 0.9
+
+# The player's own head is hidden past this much seat (head_hide.py). The eye
+# point of a gun at the shoulder is inside or beside the head, which then
+# stands in the sight picture. The camera comes at the gun from behind, over
+# the shoulder, so until the last of the travel the head is simply the back of
+# the body's head, in front of the camera where it always is; it goes just
+# before the camera reaches it, so the body is not seen headless from behind.
+HEAD_HIDE_SEAT = 0.8

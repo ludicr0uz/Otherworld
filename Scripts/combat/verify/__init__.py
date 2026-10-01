@@ -22,6 +22,8 @@ and it never relies on a variable another section left behind.
   loot        the corpse loot roll on a counted kill (loot/roll.py)
   sights      the two aim keys, each weapon's eye point and sight line, the
               sight camera: where it goes and the line it is turned onto
+  head_hide   down the sights the player's own head is hidden: the Branch on
+              SightSeat, the hide and the show, and the dead arm's show
   carry       a gun rides lowered: Lowered's formula, the pose edge on it, and
               both ready-pose plays gated by it
   sway        the sight sway: its numbers, and the graph that turns the view
@@ -61,7 +63,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "sway", "steady", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "head_hide", "sway", "steady", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light",
     "hold_pose", "throw", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

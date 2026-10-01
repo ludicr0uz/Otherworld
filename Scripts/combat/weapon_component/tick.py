@@ -38,6 +38,7 @@ from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
 )
 from combat.weapon_component.shot_noise import _author_shot_noise
+from combat.weapon_component.head_hide import _author_head_hide
 from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
@@ -144,6 +145,10 @@ def _author_wc_tick(ed, tick):
     # of the next frame then starts from wherever this puts the camera.
     ads_exits = _author_sight_camera(ed, tick, owner_out, held, armed_out,
                                      ads_exits, 8400, -700)
+
+    # --- and the player's own head leaves the sight picture (head_hide.py) ----
+    # After SightSeat is written, which it reads.
+    ads_exits = _author_head_hide(ed, ads_exits, 11200, 2600)
 
     # --- and the aim sways, down the sights ----------------------------------
     # After SightBlend is written, which scales it; before the pitch below,

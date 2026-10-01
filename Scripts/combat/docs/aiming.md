@@ -86,6 +86,24 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     and prone: eye, rear and front on the middle of the view within 0.02°. It holds
     `SightSeat` at exactly 1 by slowing the game (time dilation 0.0001) while it measures.
     With `--windowed` and `OW_SIGHT_SHOTS=1` it saves each gun's sight picture.
+- **Down the sights the player's own head is hidden** (`weapon_component/head_hide.py`,
+  `HEAD_HIDE_SEAT` in `seat_tuning.py`):
+  - The eye point of a gun at the shoulder is inside or beside the head: pieces of the head
+    stood in the AK's sight picture. Where the eye lands differs by gun, pose and stance, so
+    it is not fixed per weapon: past `SightSeat` 0.8 the skin's head bone (`PlayerSkin.head`)
+    is hidden with `HideBoneByName`, whatever is held, and shown again below it. **A new gun
+    needs nothing.** A new skin names its head bone, and the build refuses one its mesh lacks.
+  - Not `OwnerNoSee` (the scope's way, below): the arms and the gun are the sight picture.
+  - A hidden bone is drawn at zero scale, with its children. The pose, the sockets and the
+    physics bodies are untouched (`PBO_None`), so the head can still be hit.
+  - It is not per-view: the body's shadow is headless meanwhile.
+  - **0.8, not sooner:** the camera comes from behind, and a head hidden early is a headless
+    body seen from the boom. Probed: the nearest the camera comes to a head still drawn is
+    30 cm (the pistol, passing beside it), 37–52 cm on the long guns.
+  - The dead gate shows it (`dead.py`), since the Tick that would no longer runs: a player
+    killed down the sights leaves a corpse with a head.
+  - `probes/probe_head_hide.py` raises the sights on every item in the bag that has a sight
+    line, so a gun added later is covered unnamed, then kills the player down them.
 - **Down the sights the aim sways** (`sway_tuning.py`, `weapon_component/sway.py`):
   - Two slow sines, 0.3° sideways and 0.2° up and down, times `SightBlend` and the stance
     (crouched 0.6, prone 0.3). It is the **control rotation** that sways, so the gun, its

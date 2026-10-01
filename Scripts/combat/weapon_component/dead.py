@@ -5,7 +5,8 @@ key is polled. A dead owner's Tick does nothing.
                no, or no component --> OwnerDead = false --> the rest of Tick
                yes --> OwnerDead = true, and what the Tick was holding is let
                        go: the aim, the sprint and the guard; the zoom and
-                       the camera go home; a scoped gun and the body show
+                       the camera go home; a scoped gun, the body and the
+                       head the sights hid show
 
 A dead player used to fire. The player's death is a ragdoll collapse and a
 2.2 s settle before the game pauses (death.py), and through it the Tick below
@@ -40,6 +41,7 @@ from combat.nodes import (
 )
 from combat.paths import HEALTH_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SEATED_VAR
+from combat.weapon_component.head_hide import _author_head_shown
 
 OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
 
@@ -151,9 +153,12 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
     _connect(out(body, "OwnerMesh"), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", "false")
     _connect(BEL.find_then_pin(level), _pin(shown, "execute"))
+    # ...and the head the sights hid (head_hide.py).
+    headed = _author_head_shown(ed, keep, BEL.find_then_pin(shown),
+                                x + 1560, y + 400)
     armed = keep(_at(ed.add_branch_node(), x + 1820, y))
     _connect(armed_out, _pin(armed, "Condition"))
-    _connect(BEL.find_then_pin(shown), _pin(armed, "execute"))
+    _connect(headed, _pin(armed, "execute"))
     untuck = keep(_at(_node(ed, FN_SET_HIDDEN), x + 2080, y))
     _connect(held, _pin(untuck, "self"))
     _set(untuck, "bNewHidden", "false")
@@ -165,7 +170,8 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
         "this Tick -- no shot, reload, switch, drop, pick-up, throw, bite, "
         "punch or slash. The dead arm lets go of what the Tick was holding "
         f"({', '.join(LET_GO_VARS)}), snaps the zoom and the camera home and "
-        "shows the body and the gun a scope had hidden. OwnerDead is what the "
+        "shows the body and the gun a scope had hidden and the head the "
+        "sights had. OwnerDead is what the "
         "HUD's loot window reads.",
         made)
     return BEL.find_then_pin(alive)

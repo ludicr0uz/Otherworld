@@ -100,6 +100,10 @@ class PlayerSkin:
     crouch_walk: str = None
     prone_crawl: str = None
     search_kneel: str = None
+    # The overhand throw (weapon_component/throw_windup.py), from the same
+    # library, played into the upper-body slot. None where the rig has none:
+    # the item then leaves the hand on the click, with no clip.
+    throw: str = None
 
     @property
     def stance_clips(self):
@@ -163,6 +167,7 @@ SKIN_ADVENTURER = PlayerSkin(
     crouch_walk=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Crouch_Fwd_Loop",
     prone_crawl=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Swim_Fwd_Loop",
     search_kneel=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL1_Fixing_Kneeling",
+    throw=f"{UAL_ANIMS}/A_{ADVENTURER}_UAL2_OverhandThrow",
 )
 
 
@@ -179,14 +184,20 @@ def player_skin():
             SKIN_ADVENTURER.idle, SKIN_ADVENTURER.punch)
     missing = [p for p in want if not eas.does_asset_exist(p)]
     if not missing:
+        skin = SKIN_ADVENTURER
+        # Optional, unlike the rest: without it the item just leaves the hand.
+        if not eas.does_asset_exist(skin.throw):
+            _log("note: no Quaternius throw clip yet — the adventurer throws "
+                 "without one. Run asset_pipeline/import_quaternius.py.")
+            skin = dataclasses.replace(skin, throw=None)
         stances = (SKIN_ADVENTURER.crouch_idle, SKIN_ADVENTURER.crouch_walk,
                    SKIN_ADVENTURER.prone_crawl, SKIN_ADVENTURER.search_kneel)
         if all(eas.does_asset_exist(p) for p in stances):
-            return SKIN_ADVENTURER
+            return skin
         # Optional, unlike the rest: without them the stances are procedural.
         _log("note: no Quaternius stance clips yet — the adventurer crouches "
              "and lies down procedurally. Run asset_pipeline/import_quaternius.py.")
-        return dataclasses.replace(SKIN_ADVENTURER, crouch_idle=None, crouch_walk=None,
+        return dataclasses.replace(skin, crouch_idle=None, crouch_walk=None,
                                    prone_crawl=None, search_kneel=None)
     if len(missing) < len(want):
         _log(f"note: the adventurer skin is incomplete ({len(missing)} of "

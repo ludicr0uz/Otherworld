@@ -1,22 +1,26 @@
 """verify.throw -- the throw (weapon_component/throw.py): its key, the arc
-actor, the prediction drawn while the key is held, the click that lets go,
-and the flight that follows the same curve.
+actor, the prediction drawn while the key is held, the click that throws, the
+clip's wind-up before the hand lets go (throw_windup.py), and the flight that
+follows the same curve, tumbling (throw_flight.py).
 
-Also the two predicates other sections use to leave the throw's nodes out of
-their sweeps: is_throw_trace (the flight's two traces) and launch_nodes (what
-feeds the launch, which reads the control rotation).
+Also the three predicates other sections use to leave the throw's nodes out
+of their sweeps: is_throw_trace (the flight's two traces), is_throw_play (the
+clip's play node) and launch_nodes (what feeds the launch, which reads the
+control rotation).
 """
 
 import math
 
 import unreal
 
+from combat.anim_blueprint import AIM_SLOT
 from combat.paths import ITEM_BP_PATH, MAT_THROW_ARC, SPHERE, THROW_ARC_BP_PATH
+from combat.skin import player_skin
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_GRAVITY_Z, THROW_MAX_PITCH_DEG,
-    THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_SPEED,
-    THROW_START_UP,
+    THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_RELEASE_S,
+    THROW_SPEED, THROW_SPIN_DEG_S, THROW_START_FORWARD, THROW_START_UP,
 )
 from combat.tuning import BIND_VARS, THROW_KEY
 from combat.verify.common import (
@@ -25,8 +29,14 @@ from combat.verify.common import (
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.throw import (
-    THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_CLICK_FORCED_VAR,
-    THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_VELOCITY_VAR,
+    THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_CLICK_FORCED_VAR,
+    THROW_FORCED_VAR,
+)
+from combat.weapon_component.throw_flight import (
+    THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_VELOCITY_VAR,
+)
+from combat.weapon_component.throw_windup import (
+    THROW_ANIM_VAR, THROW_DUE_VAR, THROW_WINDING_VAR,
 )
 from combat.weapon_specs import _weapon_specs
 
@@ -74,6 +84,12 @@ def is_throw_trace(node):
                                 if str(PIN.get_pin_name(p)) != "execute"]))
 
 
+def is_throw_play(node):
+    """The play of the throw's clip: its Asset is ThrowAnim."""
+    return any(_title(n) == f"Get {THROW_ANIM_VAR}"
+               for n in _feeds([BEL.find_input_pin(node, "Asset")]))
+
+
 def launch_nodes():
     """The nodes that compute the throw's launch (start and velocity)."""
     return _feeds([BEL.find_input_pin(p, name) for p in _predicts()
@@ -88,8 +104,9 @@ def check_throw_key():
           and w.get_editor_property("KeyThrow").export_text() == THROW_KEY,
           str(names))
     check("the throw starts idle: not aiming, no probe holding the key or "
-          "clicking, nothing in the air",
+          "clicking, nothing winding up or in the air",
           w.get_editor_property(THROW_AIMING_VAR) is False
+          and w.get_editor_property(THROW_WINDING_VAR) is None
           and w.get_editor_property(THROW_FORCED_VAR) is False
           and w.get_editor_property(THROW_CLICK_FORCED_VAR) is False
           and w.get_editor_property(THROWN_VAR) is None)
@@ -219,6 +236,92 @@ def check_click():
              and f"Get {THROW_AIMING_VAR}" not in _upstream(n, "Condition")]
     check("with the throw key down the fire gate stays shut: the click is the "
           "throw's, not a shot, a bite or a slash", len(fires) == 1, str(len(fires)))
+    check("...and it stays shut while a throw winds up, when no arc is drawn "
+          "either",
+          len(fires) == 1 and len(gates) == 1
+          and f"Get {THROW_WINDING_VAR}" in _upstream(fires[0], "Condition")
+          and f"Get {THROW_WINDING_VAR}" in _upstream(gates[0], "Condition"))
+
+
+def _hand_at(clip, t):
+    """The grip hand's bone in the clip at t, as (ahead, up) of the capsule's
+    centre in cm: the frame the launch point is given in. A pose comes back
+    local, so it is composed up the hierarchy to the root."""
+    skin = player_skin()
+    lib = unreal.AnimationLibrary
+    xf = unreal.Transform()
+    for b in lib.find_bone_path_to_root(clip, skin.pose_bones["hand_r"]):
+        xf = xf.multiply(lib.get_bone_pose_for_time(clip, b, t, False))
+    at = xf.translation
+    yaw = math.radians(skin.mesh_yaw)
+    return at.x * math.cos(yaw) - at.y * math.sin(yaw), at.z + skin.mesh_z
+
+
+def check_windup():
+    """The click plays the throw's clip, and the item leaves the hand where
+    the clip's hand lets go."""
+    skin = player_skin()
+    anim = w.get_editor_property(THROW_ANIM_VAR)
+    check("the throw's clip is the worn skin's (none on a skin without one)",
+          (anim.get_path_name().split(".")[0] if anim else None) == skin.throw,
+          f"{anim} for {skin.throw}")
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if is_throw_play(n)]
+    check(f"...played once into {AIM_SLOT}, upper body only, at its own rate",
+          # A literal equal to its pin's default reads back empty off disk.
+          len(plays) == 1 and pin_value(plays[0], "SlotNodeName") == AIM_SLOT
+          and num_pin(plays[0], "InPlayRate") in (None, 1.0)
+          and num_pin(plays[0], "LoopCount") in (None, 1.0), str(len(plays)))
+    stamps = [n for n in wg if _title(n) == f"Set {THROW_DUE_VAR}"]
+    delay = [num_pin(PIN.get_owning_node(q), "B") for n in stamps
+             for q in PIN.list_connected_pins(BEL.find_input_pin(n, THROW_DUE_VAR))]
+    check(f"...the hand letting go {THROW_RELEASE_S:g} s into it",
+          delay == [THROW_RELEASE_S], str(delay))
+    if len(plays) == 1 and len(stamps) == 1:
+        skips = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+            BEL.find_input_pin(stamps[0], "execute"))]
+        check("...and only where there is a clip: without one the item leaves "
+              "on the click",
+              len(skips) == 1 and _title(skips[0]) == "Branch"
+              and f"Get {THROW_ANIM_VAR}" in _upstream(skips[0], "Condition"),
+              str([_title(n) for n in skips]))
+    winds = [n for n in wg if _title(n) == f"Set {THROW_WINDING_VAR}"]
+    kept = [n for n in winds if _source(n, THROW_WINDING_VAR)]
+    check("the wind-up remembers the item it is throwing, and forgets it once",
+          len(kept) == 1 and len(winds) == 2
+          and _title(PIN.get_owning_node(_source(kept[0], THROW_WINDING_VAR)))
+          == "Get Held", f"{len(kept)} of {len(winds)} sets")
+    sets = [n for n in wg if _title(n) == f"Set {THROWN_VAR}" and _source(n, THROWN_VAR)]
+    if len(sets) != 1:
+        return
+    # Walk the release's exec chain back to the Branch it hangs off.
+    node, gate = sets[0], None
+    for _ in range(8):
+        prev = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+            BEL.find_input_pin(node, "execute"))]
+        if len(prev) != 1:
+            break
+        node = prev[0]
+        if _title(node) == "Branch":
+            gate = node
+            break
+    before = ([PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(gate, "execute"))] if gate else [])
+    check("the release waits for the wind-up to come due, and runs only if the "
+          "hand still holds that item",
+          gate is not None
+          and {f"Get {THROW_WINDING_VAR}", "Get Held"} <= _upstream(gate, "Condition")
+          and len(before) == 1 and _title(before[0]) == "Branch"
+          and {f"Get {THROW_WINDING_VAR}", f"Get {THROW_DUE_VAR}"}
+          <= _upstream(before[0], "Condition"))
+    if anim is None:
+        return
+    ahead, up = _hand_at(anim, THROW_RELEASE_S)
+    check("at that moment the clip's hand is at the launch point, within 25 cm, "
+          "so the item leaves from the hand",
+          math.hypot(ahead - THROW_START_FORWARD, up - THROW_START_UP) <= 25.0
+          and THROW_RELEASE_S < anim.get_editor_property("sequence_length"),
+          f"hand {ahead:.0f} ahead, {up:.0f} up; launch {THROW_START_FORWARD:g}, "
+          f"{THROW_START_UP:g}")
 
 
 def check_release():
@@ -254,6 +357,20 @@ def check_flight():
                      for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self")))]
     check("...and it lands as a Dropped item, which pick-up looks for",
           len(lands) == 1 and pin_value(lands[0], "Dropped") == "true", str(len(lands)))
+    spins = [n for n in by_pins(wg, "DeltaRotation", "bSweep")
+             if any(_title(PIN.get_owning_node(q)) == f"Get {THROWN_VAR}"
+                    for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self")))]
+    check("the item in the air is turned every frame it flies",
+          len(spins) == 1, str(len(spins)))
+    if len(spins) == 1:
+        src = _upstream(spins[0], "DeltaRotation")
+        rates = [n for n in _feeds([BEL.find_input_pin(spins[0], "DeltaRotation")])
+                 if num_pin(n, "B") == -THROW_SPIN_DEG_S]
+        check(f"...{THROW_SPIN_DEG_S:g} degrees a second of game time, end over "
+              "end about the axis across the throw",
+              len(rates) == 1 and f"Get {THROW_VELOCITY_VAR}" in src
+              and any("DeltaSeconds" in t.replace(" ", "") for t in src)
+              and 180.0 <= THROW_SPIN_DEG_S <= 1080.0, str(sorted(src)))
     # The numbers, replayed: a level throw from the start height over flat
     # ground should carry across a clearing, not to the thrower's feet or out
     # of sight.
@@ -273,5 +390,6 @@ def run():
     check_arc_actor()
     check_arc()
     check_click()
+    check_windup()
     check_release()
     check_flight()

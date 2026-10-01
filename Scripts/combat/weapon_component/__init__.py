@@ -58,8 +58,12 @@ _author_* fragment per concern, each in its own module:
               piece of wood from Inventory into CampfireClass on the ground
               in front of the player (behind the fire gate, after Melee)
   throw       the throw key held: the predicted arc on BP_ThrowArc; clicked:
-              the item leaves hand and inventory and flies the same curve,
-              landing as a Dropped item
+              the wind-up, then the release: the item leaves hand and
+              inventory
+  throw_windup  the click plays the skin's throw clip and holds the release
+              until its hand lets go (ThrowWinding, ThrowDueTime)
+  throw_flight  the item in the air flies the arc's curve, tumbling end over
+              end, and lands as a Dropped item
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery
@@ -94,8 +98,9 @@ BP_WeaponComponent event graph:
          --> Branch WasInputKeyJustPressed(E)               --> pick up the one item
                                                                 nearest the reticle
          --> Branch IsInputKeyDown(V)                       --> draw the throw arc;
-                                                                on a click, throw held
+                                                                on a click, wind up
                                                                 (V shuts the Fire gate)
+         --> Branch IsValid(ThrowWinding) AND due           --> let go: throw held
          --> Branch IsValid(Thrown)                         --> carry it along the arc
 
   Tick also resolves the aim every frame, before the trigger is even looked at,

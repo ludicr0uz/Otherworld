@@ -26,9 +26,9 @@ from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.weapon_component.dead import LET_GO_VARS, OWNER_DEAD_VAR
-from combat.weapon_component.throw import (
-    THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR, THROWN_VAR,
-)
+from combat.weapon_component.throw import THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR
+from combat.weapon_component.throw_flight import THROWN_VAR
+from combat.weapon_component.throw_windup import THROW_WINDING_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from forest_generator.npc_placement import NPC_VARIANTS
 from graphics_menu.profile_consts import PROFILE_FORGOTTEN_VAR, PROFILE_SLOT
@@ -155,7 +155,8 @@ def _player_half(p):
     p.set(wc, THROW_CLICK_FORCED_VAR, True)
     yield 0.2
     p.check("...and throws nothing",
-            p.get(wc, THROWN_VAR) is None and len(p.get(wc, "Inventory")) == carried
+            p.get(wc, THROWN_VAR) is None and p.get(wc, THROW_WINDING_VAR) is None
+            and len(p.get(wc, "Inventory")) == carried
             and p.get(wc, "Held") == held, f"{len(p.get(wc, 'Inventory'))} carried")
     held_on = [v for v in LET_GO_VARS if p.get(wc, v)]
     p.check("...and holds no aim, sprint or guard", not held_on, str(held_on))

@@ -42,7 +42,7 @@ from asset_pipeline.quaternius_import import (                    # noqa: E402
 )
 from asset_pipeline.quaternius_paths import (                     # noqa: E402
     CROUCH_IDLE, CROUCH_WALK, PISTOL_MODEL, PRONE_CRAWL, SEARCH_KNEEL, SHOTGUN_MODEL,
-    UAL_CHARACTERS, prop_mesh, ual_clip,
+    THROW, UAL_CHARACTERS, prop_mesh, ual_clip,
 )
 from asset_pipeline.rig_util import _bone_world, _load            # noqa: E402
 from asset_pipeline.ual_retarget import retarget_ual              # noqa: E402
@@ -61,7 +61,8 @@ def _extent(clip, bones):
 def check_player_clips(check):
     who = UAL_CHARACTERS[0]
     wanted = {"crouch_idle": CROUCH_IDLE, "crouch_walk": CROUCH_WALK,
-              "prone_crawl": PRONE_CRAWL, "search_kneel": SEARCH_KNEEL}
+              "prone_crawl": PRONE_CRAWL, "search_kneel": SEARCH_KNEEL,
+              "throw": THROW}
     for field, (short, name) in wanted.items():
         path = ual_clip(who, short, name)
         check(f"combat.skin's {field} is the {short} {name} this imported",

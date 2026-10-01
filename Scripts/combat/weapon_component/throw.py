@@ -1,5 +1,5 @@
 """The throw: hold the throw key to see where the item in hand would land,
-click the fire key to let go. Letting the throw key up instead calls it off.
+click the fire key to throw it. Letting the throw key up instead calls it off.
 Whatever is held throws, gun, knife or food alike.
 
 While the throw key is down the fire key is the throw's alone: Tick's fire
@@ -7,25 +7,26 @@ gate takes _author_throw_key's NOT, so the click neither fires, eats nor
 slashes. The click that threw is spent (TriggerSpent) until it comes up, so
 it cannot fire the automatic equipped in the thrown item's place.
 
-_author_throw, called from Tick, runs three fragments one after another:
+_author_throw, called from Tick, runs four fragments one after another:
 
   _author_throw_aim      while the key is held with something in hand and
                          nothing already in the air: predict the arc and draw
                          it as dots on BP_ThrowArc (throw_arc.py); on a click
                          with the arc already showing, or with the key let
                          go, wipe it
-  _author_throw_release  on the frame of that click: store the launch,
-                         detach the item and take it out of the inventory,
-                         exactly as a drop does
+  _author_throw_windup   on the frame of that click: play the throw's clip;
+                         a moment later, when its hand lets go, run the
+                         release (throw_windup.py)
+  _author_throw_release  on that frame: store the launch, detach the item
+                         and take it out of the inventory, exactly as a drop
+                         does
   _author_throw_flight   every frame something is in the air: move it along
-                         the same curve, and when a trace between two frames
-                         hits, set it down on the ground as a dropped item
+                         the same curve, tumbling, and when a trace between
+                         two frames hits, set it down on the ground as a
+                         dropped item (throw_flight.py)
 
-The flight is kinematic, not simulated physics: every item's parts are
-NoCollision (weapon_items.build_parts), and a physics body would bounce off
-somewhere the arc never promised. Position at time t is start + v t + g t^2/2
-under THROW_GRAVITY_Z, the same gravity the prediction runs under, so the item
-follows the dots and comes down on the disc at their end.
+The launch is read on the frame of the release, not of the click: the view
+may have moved in the wind-up, and the item goes where it looks then.
 
 The arc's tip above the view is the held item's own ThrowArcDegrees
 (throw_tuning.THROW_PITCH_VAR), so the GUN TUNING tab can move it per gun.
@@ -40,34 +41,33 @@ from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, 
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_ARR_REMOVE, FN_BREAK_ROT,
     FN_CLAMP, FN_DETACH, FN_FORWARD, FN_GET_CONTROL_ROT, FN_GET_TRANSFORM,
-    FN_GREATER_FF, FN_IS_KEY_DOWN, FN_IS_VALID, FN_MAKE_ROT, FN_MAKE_TRANSFORM,
-    FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF, FN_NORMALIZE_AXIS, FN_NOT, FN_OR,
-    FN_SET_ACTOR_LOC, FN_SET_HIDDEN, FN_SUB_FF, FN_TIME_SECONDS, FN_TRACE,
-    MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN,
+    FN_IS_KEY_DOWN, FN_IS_VALID, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MUL_VF,
+    FN_NORMALIZE_AXIS, FN_NOT, FN_OR, FN_SET_ACTOR_LOC, FN_SET_HIDDEN,
+    FN_TIME_SECONDS, MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN,
 )
-from combat.paths import ITEM_CLASS_PATH, THROW_ARC_CLASS_PATH
+from combat.paths import THROW_ARC_CLASS_PATH
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
-    THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_BOUNCE_BACK, THROW_DOT_CM,
-    THROW_GRAVITY_Z, THROW_LAND_LIFT, THROW_MARK_CM, THROW_MAX_FLIGHT_S,
+    THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_DOT_CM, THROW_GRAVITY_Z, THROW_MARK_CM,
     THROW_MAX_PITCH_DEG, THROW_PITCH_VAR, THROW_SPEED, THROW_START_FORWARD,
     THROW_START_UP,
 )
-from combat.weapon_component.common import _prop, _trace_defaults
+from combat.weapon_component.common import _prop
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _detach_rules
+from combat.weapon_component.throw_flight import (
+    THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
+    THROW_VELOCITY_VAR, _author_throw_flight,
+)
+from combat.weapon_component.throw_windup import (
+    _author_throw_windup, _author_wound_down, _winding,
+)
 
 THROW_AIMING_VAR = "ThrowAiming"      # the arc was drawn last frame
 THROW_FORCED_VAR = "ThrowKeyForced"   # a probe holding the key
 THROW_CLICK_FORCED_VAR = "ThrowClickForced"   # a probe clicking the fire key
-THROWN_VAR = "Thrown"                 # the item in the air, or None
-THROW_START_VAR = "ThrowStart"
-THROW_VELOCITY_VAR = "ThrowVelocity"
-THROW_TIME_VAR = "ThrowTime"          # world time at release
-THROW_LAST_VAR = "ThrowLast"          # where the flight was last frame
 THROW_ARC_VAR = "ThrowArc"            # the BP_ThrowArc, spawned on first aim
 THROW_ARC_CLASS_VAR = "ThrowArcClass"
-FLIGHT_GROUND_CM = 5000.0             # how far down a wall-stopped item looks for ground
 
 
 def _out(n, name="ReturnValue"):
@@ -75,9 +75,9 @@ def _out(n, name="ReturnValue"):
 
 
 def _author_throw_key(ed, pc_out, key_pin, x0, y0):
-    """(wants, free): the throw key is down (or a probe holds it), and its
-    NOT, which Tick's fire gate takes. Plain reads: safe in a condition that
-    is pulled with empty hands."""
+    """(wants, free): the throw key is down (or a probe holds it); and neither
+    that nor a throw winding up, which Tick's fire gate takes. Plain reads:
+    safe in a condition that is pulled with empty hands."""
     down = _at(_node(ed, FN_IS_KEY_DOWN), x0, y0)
     _connect(pc_out, _pin(down, "self"))
     _connect(key_pin, _pin(down, "Key"))
@@ -85,20 +85,26 @@ def _author_throw_key(ed, pc_out, key_pin, x0, y0):
     wants = _at(_node(ed, FN_OR), x0 + 240, y0)
     _connect(_out(down), _pin(wants, "A"))
     _connect(_out(forced, THROW_FORCED_VAR), _pin(wants, "B"))
-    free = _at(_node(ed, FN_NOT), x0 + 480, y0)
-    _connect(_out(wants), _pin(free, "A"))
+    busy = _at(_node(ed, FN_OR), x0 + 480, y0)
+    _connect(_out(wants), _pin(busy, "A"))
+    _connect(_winding(ed, x0, y0 + 280), _pin(busy, "B"))
+    free = _at(_node(ed, FN_NOT), x0 + 720, y0)
+    _connect(_out(busy), _pin(free, "A"))
     return _out(wants), _out(free)
 
 
 def _author_throw(ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins,
                   x0, y0):
-    """The whole throw, in Tick's chain: aim, release, flight. Returns the
-    exit exec pins."""
-    aim_exits, released, start, velocity = _author_throw_aim(
+    """The whole throw, in Tick's chain: aim, wind-up, release, flight.
+    Returns the exit exec pins."""
+    aim_exits, clicked, start, velocity = _author_throw_aim(
         ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins, x0, y0)
-    thrown = _author_throw_release(ed, held, start, velocity, released,
+    let_go, called_off, waiting = _author_throw_windup(
+        ed, held, clicked, aim_exits, x0 + 3160, y0 + 2000)
+    thrown = _author_throw_release(ed, held, start, velocity, let_go,
                                    x0 + 3160, y0 + 1200)
-    return _author_throw_flight(ed, aim_exits + (thrown,), x0, y0 + 2800)
+    over = _author_wound_down(ed, (thrown, called_off), x0 + 6300, y0 + 1200)
+    return _author_throw_flight(ed, (over, waiting), x0, y0 + 2800)
 
 
 def _author_launch(ed, pc_out, owner_out, held, x0, y0):
@@ -170,14 +176,18 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
                       exec_ins, x0, y0):
     """The key held: draw the arc. Returns (exits, released, start, velocity):
     exits run on to the next block; released is the exec pin of the frame the
-    fire key is clicked over a shown arc, for _author_throw_release."""
+    fire key is clicked over a shown arc, for _author_throw_windup."""
     start, velocity = _author_launch(ed, pc_out, owner_out, held, x0, y0 + 1400)
 
     thrown = _at(ed.add_get_member_variable_node(THROWN_VAR), x0, y0 + 480)
     flying = _at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 480)
     _connect(_out(thrown, THROWN_VAR), _pin(flying, "Object"))
+    # One throw at a time: none in the air, none winding up.
+    busy = _at(_node(ed, FN_OR), x0 + 360, y0 + 600)
+    _connect(_out(flying), _pin(busy, "A"))
+    _connect(_winding(ed, x0 - 120, y0 + 700), _pin(busy, "B"))
     idle = _at(_node(ed, FN_NOT), x0 + 480, y0 + 480)
-    _connect(_out(flying), _pin(idle, "A"))
+    _connect(_out(busy), _pin(idle, "A"))
     ready = _at(_node(ed, FN_AND), x0 + 480, y0 + 300)
     _connect(armed_out, _pin(ready, "A"))
     _connect(_out(idle), _pin(ready, "B"))
@@ -308,7 +318,8 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
 
 def _author_throw_release(ed, held, start, velocity, exec_in, x0, y0):
     """Let go: the launch is stored for the flight, the item leaves the hand
-    and the inventory the way a drop's does. Returns the exit exec pin."""
+    and the inventory the way a drop's does. Returns the exit exec pin.
+    Reads Held: run it only where the hand is known to hold something."""
     now = _at(_node(ed, FN_TIME_SECONDS), x0, y0 + 300)
     prev = exec_in
     for i, (var, value) in enumerate(((THROW_START_VAR, start),
@@ -351,129 +362,3 @@ def _author_throw_release(ed, held, start, velocity, exec_in, x0, y0):
     _set(dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(reset), _pin(dirty, "execute"))
     return BEL.find_then_pin(dirty)
-
-
-def _author_throw_flight(ed, exec_ins, x0, y0):
-    """Every frame something is in the air: carry it one frame along the
-    curve, and set it down where the segment it just flew hits something.
-    Returns the exit exec pins."""
-    thrown_get = _at(ed.add_get_member_variable_node(THROWN_VAR), x0, y0 + 200)
-    thrown = _out(thrown_get, THROWN_VAR)
-    flying = _at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 200)
-    _connect(thrown, _pin(flying, "Object"))
-    gate = _at(ed.add_branch_node(), x0 + 480, y0)
-    _connect(_out(flying), _pin(gate, "Condition"))
-    for pin in exec_ins:
-        _connect(pin, _pin(gate, "execute"))
-
-    # t, and start + v t + (0, 0, g t^2 / 2)
-    now = _at(_node(ed, FN_TIME_SECONDS), x0, y0 + 500)
-    since = _at(ed.add_get_member_variable_node(THROW_TIME_VAR), x0, y0 + 620)
-    t = _at(_node(ed, FN_SUB_FF), x0 + 240, y0 + 500)
-    _connect(_out(now), _pin(t, "A"))
-    _connect(_out(since, THROW_TIME_VAR), _pin(t, "B"))
-    t_out = _out(t)
-    tt = _at(_node(ed, FN_MUL_FF), x0 + 480, y0 + 620)
-    _connect(t_out, _pin(tt, "A"))
-    _connect(t_out, _pin(tt, "B"))
-    fall = _at(_node(ed, FN_MUL_FF), x0 + 720, y0 + 620)
-    _connect(_out(tt), _pin(fall, "A"))
-    _set(fall, "B", 0.5 * THROW_GRAVITY_Z)
-    drop = _at(_node(ed, FN_MAKE_VECTOR), x0 + 960, y0 + 620)
-    _set(drop, "X", 0.0)
-    _set(drop, "Y", 0.0)
-    _connect(_out(fall), _pin(drop, "Z"))
-    ts = _at(_node(ed, FN_MAKE_VECTOR), x0 + 480, y0 + 800)
-    for axis in ("X", "Y", "Z"):
-        _connect(t_out, _pin(ts, axis))
-    vel = _at(ed.add_get_member_variable_node(THROW_VELOCITY_VAR), x0 + 480, y0 + 960)
-    vt = _at(_node(ed, FN_MUL_VF), x0 + 720, y0 + 800)
-    _connect(_out(vel, THROW_VELOCITY_VAR), _pin(vt, "A"))
-    _connect(_out(ts), _pin(vt, "B"))
-    origin = _at(ed.add_get_member_variable_node(THROW_START_VAR), x0 + 720, y0 + 960)
-    moved = _at(_node(ed, FN_ADD_VV), x0 + 960, y0 + 800)
-    _connect(_out(origin, THROW_START_VAR), _pin(moved, "A"))
-    _connect(_out(vt), _pin(moved, "B"))
-    pos = _at(_node(ed, FN_ADD_VV), x0 + 1200, y0 + 700)
-    _connect(_out(moved), _pin(pos, "A"))
-    _connect(_out(drop), _pin(pos, "B"))
-    pos_out = _out(pos)
-
-    last = _at(ed.add_get_member_variable_node(THROW_LAST_VAR), x0 + 1200, y0 + 400)
-    seg = _at(_node(ed, FN_TRACE), x0 + 1460, y0)
-    _connect(_out(last, THROW_LAST_VAR), _pin(seg, "Start"))
-    _connect(pos_out, _pin(seg, "End"))
-    _trace_defaults(seg)
-    _connect(BEL.find_then_pin(gate), _pin(seg, "execute"))
-    struck = _at(ed.add_branch_node(), x0 + 1740, y0)
-    _connect(_out(seg), _pin(struck, "Condition"))
-    _connect(BEL.find_then_pin(seg), _pin(struck, "execute"))
-
-    # --- still flying: move on, and give up on a throw into nothing ----------
-    fly = _at(_node(ed, FN_SET_ACTOR_LOC), x0 + 2000, y0 + 300)
-    _connect(thrown, _pin(fly, "self"))
-    _connect(pos_out, _pin(fly, "NewLocation"))
-    _connect(BEL.find_else_pin(struck), _pin(fly, "execute"))
-    step = _at(ed.add_set_member_variable_node(THROW_LAST_VAR), x0 + 2260, y0 + 300)
-    _connect(pos_out, _pin(step, THROW_LAST_VAR))
-    _connect(BEL.find_then_pin(fly), _pin(step, "execute"))
-    late = _at(_node(ed, FN_GREATER_FF), x0 + 2260, y0 + 500)
-    _connect(t_out, _pin(late, "A"))
-    _set(late, "B", THROW_MAX_FLIGHT_S)
-    lost = _at(ed.add_branch_node(), x0 + 2520, y0 + 300)
-    _connect(_out(late), _pin(lost, "Condition"))
-    _connect(BEL.find_then_pin(step), _pin(lost, "execute"))
-
-    # --- struck: back off what it hit, then down onto the ground -------------
-    # A floor gives the same floor back; a wall or a wanderer drops it at
-    # their foot rather than leaving it stuck to their side.
-    hit = _at(_palette(ed, NODE_BREAK_HIT), x0 + 2000, y0 - 600)
-    _connect(_out(seg, "OutHit"), _loose_pin(hit, "Hit"))
-    push = _at(_node(ed, FN_MUL_VF), x0 + 2260, y0 - 500)
-    _connect(_loose_pin(hit, "ImpactNormal", is_input=False), _pin(push, "A"))
-    b = THROW_BOUNCE_BACK
-    _connect(_vec(ed, b, b, b, x0 + 2000, y0 - 300), _pin(push, "B"))
-    back = _at(_node(ed, FN_ADD_VV), x0 + 2520, y0 - 600)
-    _connect(_loose_pin(hit, "Location", is_input=False), _pin(back, "A"))
-    _connect(_out(push), _pin(back, "B"))
-    below = _at(_node(ed, FN_ADD_VV), x0 + 2780, y0 - 500)
-    _connect(_out(back), _pin(below, "A"))
-    _connect(_vec(ed, 0.0, 0.0, -FLIGHT_GROUND_CM, x0 + 2520, y0 - 380), _pin(below, "B"))
-    floor = _at(_node(ed, FN_TRACE), x0 + 3040, y0 - 200)
-    _connect(_out(back), _pin(floor, "Start"))
-    _connect(_out(below), _pin(floor, "End"))
-    _trace_defaults(floor)
-    _connect(BEL.find_then_pin(struck), _pin(floor, "execute"))
-    grounded = _at(ed.add_branch_node(), x0 + 3300, y0 - 200)
-    _connect(_out(floor), _pin(grounded, "Condition"))
-    _connect(BEL.find_then_pin(floor), _pin(grounded, "execute"))
-    ground = _at(_palette(ed, NODE_BREAK_HIT), x0 + 3300, y0 - 600)
-    _connect(_out(floor, "OutHit"), _loose_pin(ground, "Hit"))
-    lift = _at(_node(ed, FN_ADD_VV), x0 + 3560, y0 - 500)
-    _connect(_loose_pin(ground, "Location", is_input=False), _pin(lift, "A"))
-    _connect(_vec(ed, 0.0, 0.0, THROW_LAND_LIFT, x0 + 3300, y0 - 380), _pin(lift, "B"))
-    rest = _at(_node(ed, FN_SET_ACTOR_LOC), x0 + 3820, y0 - 300)
-    _connect(thrown, _pin(rest, "self"))
-    _connect(_out(lift), _pin(rest, "NewLocation"))
-    _connect(BEL.find_then_pin(grounded), _pin(rest, "execute"))
-    hang = _at(_node(ed, FN_SET_ACTOR_LOC), x0 + 3820, y0 - 60)
-    _connect(thrown, _pin(hang, "self"))
-    _connect(_out(back), _pin(hang, "NewLocation"))
-    _connect(BEL.find_else_pin(grounded), _pin(hang, "execute"))
-
-    # --- landed: an ordinary dropped item, which E picks up ------------------
-    flag = _at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH), x0 + 4100, y0)
-    _connect(thrown, _pin(flag, "self"))
-    _set(flag, "Dropped", "true")
-    for pin in (BEL.find_then_pin(rest), BEL.find_then_pin(hang),
-                BEL.find_then_pin(lost)):
-        _connect(pin, _pin(flag, "execute"))
-    done = _at(ed.add_set_member_variable_node(THROWN_VAR), x0 + 4360, y0)
-    _connect(BEL.find_then_pin(flag), _pin(done, "execute"))
-
-    ed.add_comment_to_nodes(
-        "The thrown item's flight: start + v t + g t^2 / 2, the curve the arc "
-        "was drawn from. A trace from last frame's point to this one sets it "
-        "down; then it is an ordinary Dropped item, for E to pick up.",
-        [gate, seg, struck, fly, lost, floor, flag, done])
-    return (BEL.find_then_pin(done), BEL.find_else_pin(gate), BEL.find_else_pin(lost))

@@ -45,9 +45,15 @@ from combat.chop_tuning import (
 )
 from combat.light_tuning import CAMPFIRE_CLASS_VAR, LIGHT_WOOD_VAR, MATCHES_CLASS_VAR
 from combat.weapon_component.throw import (
-    THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR,
-    THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR, THROW_LAST_VAR, THROW_START_VAR,
-    THROW_TIME_VAR, THROW_VELOCITY_VAR,
+    THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR, THROW_CLICK_FORCED_VAR,
+    THROW_FORCED_VAR,
+)
+from combat.weapon_component.throw_flight import (
+    THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
+    THROW_VELOCITY_VAR,
+)
+from combat.weapon_component.throw_windup import (
+    THROW_ANIM_VAR, THROW_DUE_VAR, THROW_WINDING_VAR,
 )
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
@@ -224,6 +230,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     for name in (THROW_START_VAR, THROW_VELOCITY_VAR, THROW_LAST_VAR):
         _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
     _declare(ed, THROW_TIME_VAR, _float_type())
+    # ...and its wind-up (throw_windup.py): the clip, the item it is throwing
+    # and when the hand lets go.
+    _declare(ed, THROW_ANIM_VAR, BEL.get_object_reference_type(
+        unreal.AnimSequenceBase.static_class()))
+    _declare(ed, THROW_WINDING_VAR, BEL.get_object_reference_type(item_class))
+    _declare(ed, THROW_DUE_VAR, _float_type())
     # Chopping a tree (chop.py): the tree being cut, the blows on it, where
     # the wood lands, and the wood.
     _declare(ed, CHOP_TREE_VAR, BEL.get_object_reference_type(
@@ -319,6 +331,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         THROW_FORCED_VAR: False,
         THROW_CLICK_FORCED_VAR: False,
         THROW_TIME_VAR: 0.0,
+        THROW_DUE_VAR: 0.0,
+        # No entry for a skin without the clip: the variable stays None.
+        **({THROW_ANIM_VAR: _must_load(player_skin().throw)}
+           if player_skin().throw else {}),
         THROW_ARC_CLASS_VAR: arc_class,
     })
     _log(f"built {WEAPON_COMP_BP_PATH}")

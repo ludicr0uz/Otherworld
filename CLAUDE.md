@@ -205,7 +205,7 @@ editor.
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
   `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), light a campfire (left click with the matches in hand and wood in the bag: the wood is spent and a fire stands in front of the player for 3 minutes, warming them within 4 m: `combat/weapon_component/light.py`, `survival/campfire.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
   clips (the crawl is its face-down swim: the packs have no crawl), throw whatever is in hand (hold V to
-  see the arc, click to throw, let V go to call it off; it lands as a pick-up), pick up one item at a time (E: of those in reach, the one nearest the
+  see the arc, click to throw, let V go to call it off; the click plays Quaternius UAL2's `OverhandThrow` and the item leaves the hand 0.35 s in, tumbles end over end through the air and lands as a pick-up: `combat/weapon_component/throw_windup.py`, `throw_flight.py`), pick up one item at a time (E: of those in reach, the one nearest the
   point the reticle rests on), and has
   a 10-slot inventory. The guard is a procedural pose (no clip exists), as are crouch and prone on the mannequin fallback.
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and

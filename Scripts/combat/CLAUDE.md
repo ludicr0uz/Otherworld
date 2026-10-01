@@ -162,8 +162,19 @@ menu polls its own copy from `DrawHUD`, which does.
   arc: `PredictProjectilePath` from a point in front of the chest, along the view tipped up
   by the held item's `ThrowArcDegrees`, as world-space instances on `BP_ThrowArc`'s one ISM
   (spawned on first aim; `throw_arc.py`), with a disc where it lands. A click of the fire key
-  over the arc stores the launch, detaches the item and takes it out of the inventory as a
+  over the arc plays the skin's throw clip (`throw_windup.py`: Quaternius UAL2's
+  `OverhandThrow`, upper body only) and, `THROW_RELEASE_S` (0.35 s) later, where the clip's
+  hand lets go, stores the launch, detaches the item and takes it out of the inventory as a
   drop does; letting V up instead calls it off.
+  - **The wind-up is a state, `ThrowWinding`: the item being thrown.** While it is valid no
+    arc is drawn and the fire gate is shut. The release runs only if the hand still holds
+    that item (a switch or a drop in the wind-up throws nothing), and reads the launch on
+    its own frame, so the item goes where the view looks then.
+  - **A skin with no clip** (`PlayerSkin.throw` is None: the mannequin) stamps no delay, and
+    the item leaves on the frame of the click.
+  - **The release re-equips the hand** (`NeedsRefresh`), and the equip plays the next item's
+    ready pose or stops the slot, so the clip's follow-through blends out over the equip's
+    blend rather than playing to its end.
   - **With V down the fire gate is shut** (`_author_throw_key`'s NOT), so the click does not
     also fire, eat or slash, and the click that threw sets `TriggerSpent`, so it cannot fire
     the automatic equipped in the thrown item's place.
@@ -173,10 +184,12 @@ menu polls its own copy from `DrawHUD`, which does.
     `BP_WeaponItem`, so the knife, food and water use it; a gun's is its `throw_arc` cell in
     `gun_tuning.csv`, the GUN TUNING tab's last row.
 
-  The flight is **kinematic**, not
+  The flight (`throw_flight.py`) is **kinematic**, not
   physics (items are NoCollision): start + v t + g t²/2 under `THROW_GRAVITY_Z`, the arc's own
   gravity, traced frame to frame on Visibility; on a hit it backs off the surface, traces down
-  to the ground and becomes an ordinary `Dropped` item. One item flies at a time. A thrown
+  to the ground and becomes an ordinary `Dropped` item. In the air it tumbles end over end,
+  top first, `THROW_SPIN_DEG_S` (540°/s) about the level axis across the throw, added frame
+  by frame (`_author_spin`); it rests as it came down. One item flies at a time. A thrown
   item does no damage. `ThrowKeyForced` and `ThrowClickForced` are the probe's stand-ins for
   the key and the click
   (`probes/probe_throw.py`); the throw numbers are in `throw_tuning.py`.
@@ -296,8 +309,10 @@ These are feel checks a headless run can't do:
 - how the sights' pitch looks at steep angles (the eye swings on an arc round the spine);
 - the throw: whether V and its arc read well (dot size and spacing, the landing disc on
   slopes), whether 11 m/s at 30° up feels right, holding V and clicking with a real
-  keyboard and mouse (the probe forces both), and the item snapping from the hand to the
-  launch point (there is no throw animation);
+  keyboard and mouse (the probe forces both); the throw's clip: whether the 0.35 s
+  wind-up feels late, the follow-through cut short by the re-equip, how it reads with a
+  two-handed gun in the fist, crouched and prone; and whether 540°/s of tumble suits
+  every item;
 - the stance clips in motion (`stance_clips.py`): the crouched walk covers about 55 cm/s and
   plays at 2x, so at the crouch's 270 cm/s the feet slide; the crawl is the UAL's face-down
   swim (no crawl clip exists in the packs), a two-armed pull and a frog kick, which may read

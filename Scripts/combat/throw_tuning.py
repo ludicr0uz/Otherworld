@@ -1,5 +1,6 @@
 """The throw's numbers: speed, angle, where it leaves from, the gravity the arc
-and the flight share, how the arc is drawn and how an item comes to rest.
+and the flight share, how the arc is drawn, how an item tumbles and comes to
+rest, and when the throw's clip lets go.
 Constants only. The throw key itself is THROW_KEY in tuning.py, beside the
 other binds, because BIND_VARS lists it.
 """
@@ -30,3 +31,17 @@ THROW_LAND_LIFT = 12.0          # cm above the ground it comes to rest
 THROW_BOUNCE_BACK = 15.0        # cm back off a wall, before it drops to the ground
 THROW_DOT_CM = 5.0              # each dot of the arc, across
 THROW_MARK_CM = (36.0, 36.0, 3.0)   # the flat disc where the arc lands
+
+# The tumble in the air (weapon_component/throw_flight.py): end over end, top
+# first, about the level axis across the throw. 540 degrees a second is a turn
+# and a half each second: a level throw's ~1.5 s flight turns a bit over twice,
+# slow enough to read as the item it is.
+THROW_SPIN_DEG_S = 540.0
+
+# The clip (weapon_component/throw_windup.py): Quaternius UAL2's OverhandThrow,
+# played at its own rate. THROW_RELEASE_S is where its hand lets go, measured
+# off the clip on the adventurer: the right hand passes over the head at 0.30 s
+# and at 0.35 s is 55 cm ahead of the body at shoulder height, which is the
+# launch point (THROW_START_FORWARD, THROW_START_UP), before it comes down.
+THROW_RELEASE_S = 0.35
+THROW_ANIM_BLEND_S = 0.1

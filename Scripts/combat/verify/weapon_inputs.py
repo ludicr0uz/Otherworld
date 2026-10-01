@@ -16,7 +16,7 @@ from combat.verify.fixtures import titles, w, wg
 from combat.verify.chop import is_chop_node
 from combat.verify.light import is_light_trace
 from combat.verify.knife import is_melee_play, is_melee_sweep
-from combat.verify.throw import is_throw_trace
+from combat.verify.throw import is_throw_play, is_throw_trace
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, pin_value, titled,
 )
@@ -72,8 +72,10 @@ def check_keys_are_variables():
               got is not None and got.export_text() == default,
               got.export_text() if got is not None else "None")
 
-    # The punch's and the knife's clips are their own sections' (verify/punch.py, knife.py).
-    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if not is_melee_play(n)]
+    # The punch's, the knife's and the throw's clips are their own sections'
+    # (verify/punch.py, knife.py, throw.py).
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName")
+             if not is_melee_play(n) and not is_throw_play(n)]
     # TWO, and the second one is not a duplicate. A montage started in HitSlot stops
     # the ready pose in DefaultSlot -- montages are stopped per GROUP and UE 5.8
     # exposes no way to put a slot in a different group from Python -- so the flinch

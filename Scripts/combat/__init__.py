@@ -28,7 +28,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   chop_tuning       chopping a tree: blows per piece of wood, where it lands
                     (WOOD_*), Chops and the component's Chop* variables
   throw_tuning      the throw's numbers (THROW_*): speed, angle, launch point,
-                    the arc's and the flight's gravity, dots, landing
+                    the arc's and the flight's gravity, dots, landing, the
+                    tumble, when the clip's hand lets go
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()

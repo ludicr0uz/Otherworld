@@ -117,6 +117,8 @@ PRONE_CRAWL = ("UAL1", "Swim_Fwd_Loop")
 # Searching a body: down on one knee, the hands working in front. The clip
 # kneels, works and stands again; the game holds its middle (stance_clips.py).
 SEARCH_KNEEL = ("UAL1", "Fixing_Kneeling")
+# Throwing what is in hand (combat/weapon_component/throw_windup.py).
+THROW = ("UAL2", "OverhandThrow")
 # The clip the hands are calibrated on (palm_twist): hands at rest.
 PALM_CALIBRATION = ("UAL1", "Idle_Loop")
 

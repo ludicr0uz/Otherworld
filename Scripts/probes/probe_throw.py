@@ -1,32 +1,63 @@
 """The throw: holding the key draws the arc, a lob whose height is the held
 item's ThrowArcDegrees; letting the key go calls it off; a click of the fire
-key over the arc throws what is held, and it comes down where the arc said,
-as an item E can pick up.
+key over the arc plays the throw's clip and, when its hand lets go, throws
+what is held; it tumbles end over end through the air and comes down where
+the arc said, as an item E can pick up.
 
 No key can be injected into a headless game, so the probe holds the throw key
 by writing ThrowKeyForced and clicks by writing ThrowClickForced, which
 throw.py ORs with the keys and which nothing else writes (verify/throw.py
 checks the key polls themselves). The view is levelled first so the throw
 goes out across the ground in front of the player.
+
+Run with --windowed and OW_THROW_SHOTS=1 to save pictures of the wind-up and
+of the item in the air to Saved/Screenshots/MacEditor.
 """
+
+import math
+import os
 
 import unreal
 
+from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
 from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.throw_arc import ARC_COMPONENT
-from combat.throw_tuning import THROW_PITCH_UP_DEG, THROW_PITCH_VAR
-from combat.weapon_component.throw import (
-    THROWN_VAR, THROW_AIMING_VAR, THROW_ARC_VAR, THROW_CLICK_FORCED_VAR,
-    THROW_FORCED_VAR,
+from combat.anim_blueprint import AIM_SLOT
+from combat.throw_tuning import (
+    THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_RELEASE_S, THROW_SPIN_DEG_S,
 )
+from combat.weapon_component.throw import (
+    THROW_AIMING_VAR, THROW_ARC_VAR, THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR,
+)
+from combat.weapon_component.throw_flight import THROWN_VAR
+from combat.weapon_component.throw_windup import THROW_ANIM_VAR, THROW_WINDING_VAR
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
             (WEAPON_COMP_BP_PATH, THROW_CLICK_FORCED_VAR),
+            (WEAPON_COMP_BP_PATH, "EquippedIndex"),
+            (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
             (ITEM_BP_PATH, THROW_PITCH_VAR)]
 
 LANDS_WITHIN_CM = 80.0     # the disc to where it rests: back-off + lift + a sub-step
 LOB_CM = 100.0             # the default arc peaks at least this far over the hand
 FLAT_DEG = 5.0             # a tuned-down arc, to see the tuning move it
+HAND_UP_CM = 30.0          # the wind-up takes the hand this far over the capsule's centre
+SHOTS = bool(os.environ.get("OW_THROW_SHOTS"))
+SHOT_AT_S = 0.28           # into the wind-up: the hand is over the head
+
+
+def _shot(p):
+    """Save a picture of this frame (windowed runs only)."""
+    if SHOTS:
+        unreal.SystemLibrary.execute_console_command(p.pawn(), "shot")
+
+
+def _hand_z(player):
+    """The throwing hand's height over the capsule's centre, in cm."""
+    mesh = player.get_editor_property("mesh")
+    bone = next(s.pose_bones["hand_r"] for s in (SKIN_ADVENTURER, SKIN_QUINN)
+                if mesh.get_bone_index(s.pose_bones["hand_r"]) >= 0)
+    return mesh.get_socket_location(bone).z - player.get_actor_location().z
 
 
 def _peak(dots):
@@ -44,6 +75,10 @@ def _dots(p, wc):
 
 def _dist(a, b):
     return (a - b).length()
+
+
+def _now(p):
+    return unreal.GameplayStatics.get_time_seconds(p.pawn())
 
 
 def probe(p):
@@ -114,14 +149,52 @@ def probe(p):
     count = dots.get_instance_count()
     first = dots.get_instance_transform(0, True).translation
     mark = dots.get_instance_transform(count - 1, True).translation
+    # The click starts the clip; the item stays in the hand until it lets go.
+    clip = p.get(wc, THROW_ANIM_VAR)
+    anim = player.get_editor_property("mesh").get_anim_instance()
+    carried_at = _hand_z(player)
     p.set(wc, THROW_CLICK_FORCED_VAR, True)
-    yield lambda: p.get(wc, THROWN_VAR) is not None or not p.get(wc, THROW_AIMING_VAR)
-    p.set(wc, THROW_CLICK_FORCED_VAR, False)
-    p.set(wc, THROW_FORCED_VAR, False)
-    p.check("a click over the arc throws what was held",
-            p.get(wc, THROWN_VAR) == item, str(p.get(wc, THROWN_VAR)))
-    p.check("...and that click is spent, so it fires nothing",
+    yield lambda: p.get(wc, THROW_WINDING_VAR) is not None \
+        or p.get(wc, THROWN_VAR) is not None or not p.get(wc, THROW_AIMING_VAR)
+    clicked = _now(p)
+    p.check("a click over the arc is spent, so it fires nothing",
             p.get(wc, "TriggerSpent") is True)
+    p.set(wc, THROW_CLICK_FORCED_VAR, False)
+    if clip is not None:
+        p.check("a click over the arc winds up: the item still in the hand, "
+                "nothing in the air, the arc gone",
+                p.get(wc, THROW_WINDING_VAR) == item and p.get(wc, "Held") == item
+                and p.get(wc, THROWN_VAR) is None and dots.get_instance_count() == 0,
+                f"winding {p.get(wc, THROW_WINDING_VAR)}, {dots.get_instance_count()} dots")
+        yield 0.05
+        p.check(f"...playing the throw's clip into {AIM_SLOT}",
+                anim.is_playing_slot_animation(clip, AIM_SLOT), clip.get_name())
+        p.check("...with no arc drawn over it, the key still held",
+                not p.get(wc, THROW_AIMING_VAR) and dots.get_instance_count() == 0,
+                f"{dots.get_instance_count()} dots")
+    top, pictured = carried_at, False
+    while p.get(wc, THROWN_VAR) is None and p.get(wc, THROW_WINDING_VAR) is not None:
+        top = max(top, _hand_z(player))
+        # One picture, late in the wind-up: a shot stalls the frame after it.
+        if not pictured and _now(p) - clicked >= SHOT_AT_S:
+            pictured = True
+            _shot(p)
+        yield 0.01
+    waited = _now(p) - clicked
+    if clip is not None:
+        p.check("...the throwing hand coming up over the shoulder with the item "
+                "in it", top >= HAND_UP_CM and top - carried_at >= 20.0,
+                f"hand {carried_at:.0f} -> {top:.0f} cm over the capsule's centre")
+    p.set(wc, THROW_FORCED_VAR, False)
+    p.check("the hand lets go of what was held"
+            + (f" {THROW_RELEASE_S:g} s into the clip" if clip is not None
+               else " on the click (this skin has no throw clip)"),
+            p.get(wc, THROWN_VAR) == item
+            and (THROW_RELEASE_S - 0.02 <= waited
+                 and (SHOTS or waited <= THROW_RELEASE_S + 0.15)
+                 if clip is not None else waited < 0.1),
+            f"{p.get(wc, THROWN_VAR)} after {waited:.2f} s")
+    p.check("...and the wind-up is over", p.get(wc, THROW_WINDING_VAR) is None)
     p.check("...out of the hand and out of the inventory",
             p.get(wc, "Held") != item and item not in list(p.get(wc, "Inventory"))
             and len(p.get(wc, "Inventory")) == carried - 1,
@@ -131,14 +204,38 @@ def probe(p):
     p.check("...not yet a pick-up while in the air",
             item.get_editor_property("Dropped") is False)
 
+    # The tumble: the turn between two moments of the flight, in the world.
+    lib = unreal.MathLibrary
+    at0, rot0 = _now(p), item.get_actor_rotation()
     yield 0.1
+    at1, rot1 = _now(p), item.get_actor_rotation()
+    _shot(p)
     mid = item.get_actor_location()
     p.check("it flies: in the air between the hand and the mark",
             _dist(mid, first) > 20.0 and _dist(mid, mark) > 20.0,
             f"{_dist(mid, first):.0f} cm out, {_dist(mid, mark):.0f} cm to go")
+    turn = lib.compose_rotators(lib.negate_rotator(rot0), rot1)
+    quat = turn.quaternion()
+    angle = math.degrees(quat.get_angle())
+    want = THROW_SPIN_DEG_S * (at1 - at0)
+    p.check(f"...turning in the air, {THROW_SPIN_DEG_S:g} degrees a second",
+            abs(angle - want) <= max(15.0, 0.25 * want),
+            f"{angle:.0f} deg in {at1 - at0:.2f} s, {want:.0f} expected")
+    ahead = unreal.Rotator(roll=0.0, pitch=0.0, yaw=view.yaw)
+    across = lib.get_right_vector(ahead)
+    axis = quat.get_rotation_axis()
+    tipped = turn.quaternion().rotate_vector(lib.get_forward_vector(ahead))
+    p.check("...end over end, top first: about the level axis across the "
+            "throw, which takes what pointed ahead downwards",
+            abs(axis.dot(across)) > 0.95 and tipped.z < -0.3,
+            f"axis . across {axis.dot(across):+.2f}, ahead now z {tipped.z:+.2f}")
 
     yield lambda: p.get(wc, THROWN_VAR) is None
     rest = item.get_actor_location()
+    lay = item.get_actor_rotation()
+    yield 0.2
+    p.check("it stops turning where it lands",
+            lay.is_near_equal(item.get_actor_rotation(), 0.01), str(item.get_actor_rotation()))
     p.check("it comes down where the arc said",
             _dist(rest, mark) < LANDS_WITHIN_CM,
             f"{_dist(rest, mark):.0f} cm from the disc")
@@ -147,3 +244,31 @@ def probe(p):
     held = p.get(wc, "Held")
     p.check("the emptied hand takes up the next item, as after a drop",
             held is not None and held != item, str(held))
+
+    # A hand that changes in the wind-up throws nothing: the throw was of the
+    # item the click wound up with.
+    if clip is None or len(p.get(wc, "Inventory")) < 2:
+        return
+    carried = len(p.get(wc, "Inventory"))
+    p.set(wc, THROW_FORCED_VAR, True)
+    yield lambda: p.get(wc, THROW_AIMING_VAR)
+    yield 0.05
+    p.set(wc, THROW_CLICK_FORCED_VAR, True)
+    yield lambda: p.get(wc, THROW_WINDING_VAR) is not None
+    p.set(wc, THROW_CLICK_FORCED_VAR, False)
+    p.set(wc, THROW_FORCED_VAR, False)
+    wound = p.get(wc, THROW_WINDING_VAR)
+    p.set(wc, "EquippedIndex", 1)
+    p.set(wc, "NeedsRefresh", True)
+    yield lambda: p.get(wc, THROW_WINDING_VAR) is None
+    other = p.get(wc, "Held")
+    yield 0.1
+    p.check("switching to another item in the wind-up calls the throw off: "
+            "nothing in the air, nothing gone from the bag",
+            wound == held and other is not None and other != wound
+            and p.get(wc, THROWN_VAR) is None
+            and len(p.get(wc, "Inventory")) == carried
+            and wound.get_editor_property("Dropped") is False
+            and p.get(wc, "Held") == other,
+            f"wound up {wound.get_name()}, holding {other.get_name() if other else None}, "
+            f"{len(p.get(wc, 'Inventory'))} of {carried} carried")

@@ -279,9 +279,11 @@ GENERATED = (
         kind="generated",
         builders=("Scripts/build_day_night.py",),
         note="The day/night cycle: BP_DayNightCycle (sun, moon, sky light, "
-             "sky dome, fog and exposure, driven by a clock) and "
-             "Materials/M_DayNightSky. The same script places one cycle in "
-             "each generated level. Settings: Scripts/world/world_config.py.",
+             "sky dome, fog and exposure, driven by a clock), "
+             "Materials/M_DayNightSky and Textures/T_NightSkyStars (drawn "
+             "from Scripts/world/star_catalogue.csv). The same script places "
+             "one cycle in each generated level. Settings: "
+             "Scripts/world/world_config.py.",
     ),
 )
 

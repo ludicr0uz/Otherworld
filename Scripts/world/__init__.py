@@ -13,6 +13,11 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
   paths                /Game paths, class paths, the two actor tags
   sky_material         M_DayNightSky: the whole sky (gradient, glow, discs,
                        stars) in one Custom node the SkyLight captures
+  star_catalogue       star_catalogue.csv: the real stars (the Yale Bright
+                       Star Catalogue), and the fetcher that rewrites it
+  star_map             where each star stands in the world's sky and how big
+                       and bright it is drawn; the shader's sums in Python
+  star_texture         T_NightSkyStars: the catalogue drawn as a texture
   day_night_blueprint  BP_DayNightCycle's components, variables, defaults
   day_night_graph      its BeginPlay (take over the level's sky) and Tick
   night_cold           the Tick's last step: the player's Temperature falls

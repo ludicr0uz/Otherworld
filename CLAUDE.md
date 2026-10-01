@@ -245,7 +245,8 @@ editor.
   in both.
 - **Day and night:** a clock turns the sun and the moon across the sky. The day and the night
   are 4 minutes each for now (`Scripts/world/world_config.py`). The night is moonlit, dim and
-  starry. A level starts at a random time of day. At night the player's temperature falls
+  starry: the stars are the real ones (the Yale Bright Star Catalogue, as seen from 45° north:
+  Orion, the Pleiades, the Pole Star), small dots beside the moon (`Scripts/world/star_map.py`). A level starts at a random time of day. At night the player's temperature falls
   slowly (0.1 a second; `Scripts/world/night_cold.py`); beside a campfire it rises (1 a second).
 - **Save and exit:** the M panel's save-and-exit row saves the character's stats and inventory, but not its
   location, after 15 s, then returns to the main menu. The character stands still meanwhile. A hit calls it off. The next game loads

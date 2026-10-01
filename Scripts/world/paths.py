@@ -5,7 +5,8 @@ DAY_NIGHT_CLASS_PATH = f"{DAY_NIGHT_BP_PATH}.BP_DayNightCycle_C"
 SKY_MATERIAL_PATH = "/Game/World/Materials/M_DayNightSky"
 
 SKY_SPHERE_MESH_PATH = "/Engine/EngineSky/SM_SkySphere.SM_SkySphere"
-STARS_TEXTURE_PATH = "/Engine/EngineSky/T_Sky_Stars.T_Sky_Stars"
+# The star map, drawn from world/star_catalogue.csv (world/star_texture.py).
+STARS_TEXTURE_PATH = "/Game/World/Textures/T_NightSkyStars"
 
 # On the cycle actor placed in each level (so a re-run replaces it).
 DAY_NIGHT_TAG = "OW_DayNight"

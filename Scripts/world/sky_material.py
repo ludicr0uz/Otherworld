@@ -13,6 +13,12 @@ instance: DayAmount, StarBrightness, SunDirection and MoonDirection (both
 pointing from the viewer to the body), and SunDiscBrightness and
 MoonDiscBrightness (the discs' multipliers, 1 unless tuned). The colours are parameters with their
 defaults from world_config, so they can be tuned on an instance.
+
+The stars are T_NightSkyStars, a map of the real sky (world/star_map.py). A
+second Custom node, StarUV, turns the view ray into the map's coordinate: the
+ray in the equatorial frame, then right ascension and the angle from the pole.
+The frame is baked into its code, so a change to the sky's latitude or hour is
+a rebuild. The moon's disc hides the stars behind it.
 """
 
 import unreal
@@ -20,6 +26,7 @@ import unreal
 from combat.graph import _log, _must_load
 from world import world_config as cfg
 from world.paths import SKY_MATERIAL_PATH, STARS_TEXTURE_PATH
+from world.star_map import sky_basis
 
 MEL = unreal.MaterialEditingLibrary
 
@@ -38,9 +45,9 @@ VECTOR_PARAMS = (
 )
 
 # V is the camera vector (pixel -> camera), so the view ray is -V. The discs
-# are ~1.3 degrees (sun) and ~1.6 (moon) across: bigger than life, which reads
+# are ~2.6 degrees (sun) and ~3.2 (moon) across: bigger than life, which reads
 # better on a screen. Each body fades out as it drops through the horizon.
-SKY_HLSL = """
+SKY_HLSL = f"""
 float3 v = -normalize(V);
 float up = saturate(v.z);
 float3 s = normalize(SunDirection);
@@ -53,12 +60,33 @@ float3 sky = lerp(NightSky, lerp(DayHorizon, DayZenith, sqrt(up)), DayAmount);
 float glow = pow(saturate(sd), 6.0) * saturate(1.0 - abs(s.z) * 4.0) * (1.0 - up);
 sky += SunsetColor * glow * sunUp;
 sky += SunDiscColor * SunDiscBrightness * smoothstep(0.99970, 0.99980, sd) * sunUp;
-sky += MoonDiscColor * MoonDiscBrightness * smoothstep(0.99955, 0.99965, md) * moonUp;
-sky += Stars * StarBrightness * saturate(v.z * 4.0 + 0.2);
+float moonDisc = smoothstep({cfg.MOON_DISC_COS[0]}, {cfg.MOON_DISC_COS[1]}, md) * moonUp;
+sky += MoonDiscColor * MoonDiscBrightness * moonDisc;
+sky += Stars * StarBrightness * saturate(v.z * 4.0 + 0.2) * (1.0 - moonDisc);
 return sky;
 """
+
+
+def _float3(v):
+    return "float3(" + ", ".join(f"{c:.8f}" for c in v) + ")"
+
+
+def star_uv_hlsl():
+    """StarUV's code: star_map.direction_uv() in the shader. u is the right
+    ascension as a fraction of a turn, v the angle from the pole over pi."""
+    ex, ey, ez = sky_basis()
+    return f"""
+float3 v = -normalize(V);
+float3 d = float3(dot(v, {_float3(ex)}), dot(v, {_float3(ey)}), dot(v, {_float3(ez)}));
+return float2(frac(atan2(d.y, d.x) * 0.15915494), acos(clamp(d.z, -1.0, 1.0)) * 0.31830989);
+"""
+
+
+STARS_PARAM = "StarsTexture"
 CUSTOM_INPUTS = (["V", "Stars"] + [n for n, _ in SCALAR_PARAMS]
                  + [n for n, _ in VECTOR_PARAMS])
+# The two Custom nodes, the camera vector, the star map's sample, the parameters.
+EXPRESSION_COUNT = 4 + len(SCALAR_PARAMS) + len(VECTOR_PARAMS)
 
 
 def _linear(c):
@@ -70,7 +98,10 @@ def _material():
     eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
     if eas.does_asset_exist(SKY_MATERIAL_PATH):
         mat = eas.load_asset(SKY_MATERIAL_PATH)
-        MEL.delete_all_material_expressions(mat)
+        # One call deletes about half of them (it walks the list it is
+        # shortening), and a parameter left behind keeps its old default.
+        while MEL.get_num_material_expressions(mat):
+            MEL.delete_all_material_expressions(mat)
         return mat
     pkg, name = SKY_MATERIAL_PATH.rsplit("/", 1)
     mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
@@ -113,12 +144,18 @@ def build_sky_material():
     cam = _expr(mat, unreal.MaterialExpressionCameraVectorWS, -800, -300)
     _wire(cam, "", custom, "V")
 
-    coord = _expr(mat, unreal.MaterialExpressionTextureCoordinate, -1100, -150)
-    coord.set_editor_property("u_tiling", float(cfg.STAR_TILING[0]))
-    coord.set_editor_property("v_tiling", float(cfg.STAR_TILING[1]))
+    coord = _expr(mat, unreal.MaterialExpressionCustom, -1100, -150)
+    coord.set_editor_property("code", star_uv_hlsl())
+    coord.set_editor_property("description", "StarUV")
+    coord.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT2)
+    ray = unreal.CustomInput()
+    ray.set_editor_property("input_name", "V")
+    coord.set_editor_property("inputs", [ray])
+    _wire(cam, "", coord, "V")
     stars = _expr(mat, unreal.MaterialExpressionTextureSampleParameter2D, -800, -150)
-    stars.set_editor_property("parameter_name", "StarsTexture")
+    stars.set_editor_property("parameter_name", STARS_PARAM)
     stars.set_editor_property("texture", _must_load(STARS_TEXTURE_PATH))
+    stars.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR)
     _wire(coord, "", stars, "UVs")
     _wire(stars, "RGB", custom, "Stars")
 

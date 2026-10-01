@@ -3,8 +3,8 @@
 import unreal
 
 from combat.verify.common import check, load
-from world.paths import SKY_MATERIAL_PATH
-from world.sky_material import SCALAR_PARAMS, VECTOR_PARAMS
+from world.paths import SKY_MATERIAL_PATH, STARS_TEXTURE_PATH
+from world.sky_material import EXPRESSION_COUNT, SCALAR_PARAMS, STARS_PARAM, VECTOR_PARAMS
 
 MEL = unreal.MaterialEditingLibrary
 
@@ -28,3 +28,10 @@ def run():
     stats = MEL.get_statistics(mat)
     n = stats.get_editor_property("num_pixel_shader_instructions")
     check("M_DayNightSky's shader compiled", n > 0, f"{n} pixel instructions")
+    count = MEL.get_num_material_expressions(mat)
+    check("M_DayNightSky holds only what the builder authors (nothing left of an "
+          "earlier build)", count == EXPRESSION_COUNT, f"{count} expressions")
+    tex = MEL.get_material_default_texture_parameter_value(mat, STARS_PARAM)
+    check("M_DayNightSky's stars are the star map",
+          tex is not None and tex.get_path_name().split(".")[0] == STARS_TEXTURE_PATH,
+          str(tex.get_path_name() if tex else None))

@@ -1,6 +1,6 @@
 """
-build_day_night.py -- the day/night cycle: the sky material, BP_DayNightCycle,
-and one cycle actor in every generated level.
+build_day_night.py -- the day/night cycle: the star map, the sky material,
+BP_DayNightCycle, and one cycle actor in every generated level.
 
     python3 Scripts/dev/uepy.py Scripts/build_day_night.py
 
@@ -28,6 +28,7 @@ from world.level_placement import place_day_night                 # noqa: E402
 from world.night_cold import author_night_cold                    # noqa: E402
 from world.paths import DAY_NIGHT_BP_PATH                         # noqa: E402
 from world.sky_material import build_sky_material                 # noqa: E402
+from world.star_texture import build_star_texture                 # noqa: E402
 
 LEVELS = sorted(
     f"/Game/Maps/{name}"
@@ -46,6 +47,7 @@ def build_blueprint():
 
 
 def main():
+    build_star_texture()
     build_sky_material()
     build_blueprint()
     world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()

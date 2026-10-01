@@ -80,8 +80,36 @@ NIGHT_SKY_COLOR = _NIGHT["sky_dome"]["night_sky_color"]
 SUNSET_COLOR = [1.2, 0.45, 0.12, 1.0]
 SUN_DISC_COLOR = [40.0, 36.0, 30.0, 1.0]
 MOON_DISC_COLOR = [1.6, 1.7, 2.0, 1.0]
+# The moon's disc in the shader: cos of the angle from its centre where the
+# disc's edge starts and where it is full (about 3.2 degrees across).
+MOON_DISC_COS = (0.99955, 0.99965)
 STAR_BRIGHTNESS = _NIGHT["sky_dome"]["star_brightness"]
-STAR_TILING = _NIGHT["sky_dome"]["star_tiling"]
+
+# ─── The stars (T_NightSkyStars, drawn from star_catalogue.csv) ──────────────
+# The real sky as seen from STAR_LATITUDE_DEG north, at the moment the stars of
+# right ascension STAR_SIDEREAL_HOUR stand due south: a winter evening, Orion
+# to the south-east, the Plough and the Pole Star in the north. The stars do
+# not turn with the clock.
+STAR_LATITUDE_DEG = 45.0
+STAR_SIDEREAL_HOUR = 4.0
+STAR_MAP_SIZE = (4096, 2048)        # texels; one is 0.088 degrees of sky
+# A star is a Gaussian dot of this radius (sigma), small beside the moon. The
+# night's exposure burns every star it shows to white, so the bright ones are
+# told apart by size: a star brighter than STAR_SIZE_MAG grows by
+# STAR_SIZE_GROWTH a magnitude, up to STAR_SIZE_MAX times (Sirius).
+STAR_SIZE_DEG = 0.05
+STAR_SIZE_MAG = 3.0
+STAR_SIZE_GROWTH = 0.3
+STAR_SIZE_MAX = 2.2
+# Brightness: full at STAR_FULL_MAG, falling by 10^(-0.4 x STAR_CONTRAST) a
+# magnitude down to STAR_MAX_MAG, the faintest star drawn (6.5 is the naked
+# eye's limit under a dark sky).
+STAR_FULL_MAG = 0.5
+STAR_MAX_MAG = 6.5
+STAR_CONTRAST = 0.9
+STAR_COLOR_BLUE = (0.70, 0.82, 1.0)       # B-V -0.3: Rigel, Spica
+STAR_COLOR_WHITE = (1.0, 1.0, 1.0)        # B-V 0.6: the sun's own colour
+STAR_COLOR_ORANGE = (1.0, 0.72, 0.45)     # B-V 1.9: Betelgeuse, Antares
 
 # ─── Ambient, fog and exposure: night value, day value ───────────────────────
 SKY_LIGHT_INTENSITY = (_NIGHT["sky_light"]["intensity"], _DAY["sky_light"]["intensity"])

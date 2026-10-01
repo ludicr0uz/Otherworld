@@ -1,15 +1,20 @@
 # The world: day and night
 
-`Scripts/build_day_night.py` builds `M_DayNightSky` and `BP_DayNightCycle` (both under
-`/Game/World`) and puts one cycle actor into every generated level.
-`Scripts/verify_day_night.py` checks it, and `Scripts/probes/probe_day_night.py` and
-`probe_night_cold.py` run it in a game. The module map is in `__init__.py`.
+`Scripts/build_day_night.py` builds `T_NightSkyStars`, `M_DayNightSky` and `BP_DayNightCycle`
+(all under `/Game/World`) and puts one cycle actor into every generated level.
+`Scripts/verify_day_night.py` checks it, and `Scripts/probes/probe_day_night.py`,
+`probe_night_sky.py` and `probe_night_cold.py` run it in a game. The module map is in `__init__.py`.
 
 ```bash
 python3 Scripts/dev/uepy.py Scripts/build_day_night.py Scripts/verify_day_night.py
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_day_night.py
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
+python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_sky.py
+OW_SKY_SHOTS=1 python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_night_sky.py
 ```
+
+The last one saves pictures of the midnight sky (towards the moon, the Pole Star and Orion)
+to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
 
 ## Settings: `world_config.py`
 
@@ -61,6 +66,31 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
 - **`import_<Level>.py` rebuilds a level from scratch.** Re-run `build_day_night.py` after it,
   as with `place_forage.py`.
 
+## The stars are the real ones (`star_catalogue.py`, `star_map.py`, `star_texture.py`)
+
+- **The layout is the real sky.** `star_catalogue.csv` is the Yale Bright Star Catalogue
+  (9,096 stars: position, magnitude, colour index; free to use). It is committed, so a build
+  needs no network. `python3 Scripts/fetch_star_catalogue.py` rewrites it from the CDS's copy.
+- **The texture:** `T_NightSkyStars` is an equirectangular map of the whole celestial sphere
+  (u is right ascension, v runs down from the north pole), drawn from the CSV on every build.
+  It is uncompressed, without mips and never streamed, because a star is a texel or two.
+- **The frame:** the sky is the one seen from `STAR_LATITUDE_DEG` (45° north) with the stars of
+  right ascension `STAR_SIDEREAL_HOUR` (4 h) due south: Orion in the south-east, the Pleiades
+  overhead, the Pole Star in the north. South is where the sun and the moon culminate. The
+  material's `StarUV` Custom node turns the view ray into the map's coordinate, with the frame
+  baked into its code; `star_map.direction_uv()` does the same sums, and the verifier compares.
+- **The stars stand still.** They do not turn about the pole as the night goes: that needs a
+  rotation parameter driven by Tick.
+- **Size:** a star is a Gaussian dot of `STAR_SIZE_DEG` (0.05°, about 0.2° across; the moon is
+  3.2°). One brighter than magnitude 3 is drawn bigger, up to 2.2 times for Sirius. The
+  verifier holds the brightest under a sixth of the moon's width.
+- **Brightness** falls with magnitude (`STAR_CONTRAST`), down to `STAR_MAX_MAG` (6.5). The
+  night's exposure burns every star it shows to white, so it is the size that tells a bright
+  star from a faint one, and the faintest ones are lost in the sky's own glow.
+- **The moon hides the stars behind its disc.**
+- **The level's static rig** (`M_NightSky_Starfield`, what the editor viewport shows) still
+  tiles the engine's `T_Sky_Stars`. The cycle destroys it at BeginPlay, so a game never draws it.
+
 ## The night is cold (`night_cold.py`)
 
 - **The Tick's last step** lowers the player's `Temperature` (`BP_SurvivalComponent`) by
@@ -81,6 +111,10 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
   class compiles, and `set_editor_property` fails with "Failed to find property".
 - **`MaterialInstanceDynamic`'s scalar getter** is `get_scalar_parameter_value` in Python, not
   `k2_…`.
+- **`MaterialEditingLibrary.delete_all_material_expressions` deletes about half** of them per
+  call. A parameter left behind keeps its old default, and of two with one name the old one
+  won: the rebuilt material went on sampling the old star texture. Loop until
+  `get_num_material_expressions` is 0. The verifier counts the expressions.
 - **Check that a Custom-node material compiled:** `MEL.get_statistics(mat)`'s
   `num_pixel_shader_instructions` is 0 when it didn't. The verifier checks it.
 
@@ -88,5 +122,8 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_night_cold.py
 
 - **The look:** the sky colours, sunset glow, disc sizes and daytime exposure were set by
   numbers, not by eye, because `-nullrhi` can't render them. Tune them in `world_config.py`.
+- **The stars** were judged from 1280x720 pictures only: their size and how many show at the
+  night's exposure want a look on the real screen (`STAR_SIZE_DEG`, `STAR_CONTRAST`, or the
+  GRAPHICS TUNING tab's stars row).
 - **Twilight is short** (about 15 s of a 4-minute day), because the sun crosses the horizon
   fast. A longer day stretches it.

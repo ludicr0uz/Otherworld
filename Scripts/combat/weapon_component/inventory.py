@@ -1,4 +1,5 @@
-"""The inventory: equip, drop, pick up, and BeginPlay's starting loadout.
+"""The inventory: equip, drop, and BeginPlay's starting loadout. The pick-up is
+pickup.py's.
 """
 
 from combat.anim_blueprint import AIM_SLOT
@@ -6,20 +7,17 @@ from combat.graph import (
     BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec,
 )
 from combat.nodes import (
-    CAMERA_CLASS_PATH, FN_ACTOR_LOC, FN_ADD_VV, FN_ALL_ACTORS, FN_AND,
-    FN_ANIM_INSTANCE, FN_ARR_ADD, FN_ARR_LEN, FN_ARR_REMOVE, FN_ATTACH,
-    FN_DETACH, FN_DISTANCE, FN_EQ_II, FN_FORWARD, FN_GET_COMP, FN_GET_OWNER,
-    FN_GET_PC, FN_GET_PITCH_SCALE, FN_GET_TRANSFORM, FN_GET_YAW_SCALE,
-    FN_IS_VALID, FN_LESS_FF, FN_LESS_II, FN_MUL_VF, FN_NOT, FN_PLAY_SLOT,
+    CAMERA_CLASS_PATH, FN_ACTOR_LOC, FN_ADD_VV, FN_AND, FN_ANIM_INSTANCE,
+    FN_ARR_ADD, FN_ARR_REMOVE, FN_ATTACH, FN_DETACH, FN_EQ_II, FN_FORWARD,
+    FN_GET_COMP, FN_GET_OWNER, FN_GET_PC, FN_GET_PITCH_SCALE, FN_GET_TRANSFORM,
+    FN_GET_YAW_SCALE, FN_IS_VALID, FN_MUL_VF, FN_NOT, FN_PLAY_SLOT,
     FN_SET_ACTOR_LOC, FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT,
     FN_STOP_SLOT, FN_TRACE, MACRO_FOR_EACH, MOVEMENT_CLASS_PATH,
     NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN,
 )
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
-from combat.tuning import (
-    DROP_FORWARD, DROP_KEY, INVENTORY_SIZE, PICKUP_KEY, PICKUP_RADIUS,
-)
+from combat.tuning import DROP_FORWARD, DROP_KEY
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 from combat.weapon_component.listener import _author_listener_at_character
 from combat.weapon_component.sights import _author_camera_after_boom
@@ -134,103 +132,6 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
         "thing pick-up looks for.",
         made)
     return BEL.find_then_pin(reset)
-
-
-def _author_pickup(ed, owner, exec_in, x0, y0):
-    """E: take the nearest dropped weapon, if there is room for it."""
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    cls = keep(_at(ed.add_get_member_variable_node("ItemClass"), x0, y0 + 240))
-    every = keep(_at(_node(ed, FN_ALL_ACTORS), x0 + 240, y0))
-    _connect(_pin(cls, "ItemClass", is_input=False), _pin(every, "ActorClass"))
-    _connect(exec_in, _pin(every, "execute"))
-
-    loop = ed.add_macro_node(MACRO_FOR_EACH)
-    if not loop:
-        raise RuntimeError("could not create the ForEachLoop macro node")
-    keep(_at(loop, x0 + 520, y0))
-    _connect(_pin(every, "OutActors", is_input=False), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
-    element = _loose_pin(loop, "ArrayElement", is_input=False)
-
-    cast = keep(_at(_palette(ed, "Utilities|Casting|CastToBP_WeaponItem"), x0 + 820, y0))
-    _connect(element, _pin(cast, "Object"))
-    _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
-    item = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
-
-    dropped_pin, dropped_n = _prop(ed, "Dropped", item, x0 + 1100, y0 + 260)
-    keep(dropped_n)
-
-    there = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 1100, y0 + 400))
-    _connect(item, _pin(there, "self"))
-    here = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 1100, y0 + 520))
-    _connect(owner, _pin(here, "self"))
-    gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 1360, y0 + 440))
-    _connect(_pin(there, "ReturnValue", is_input=False), _pin(gap, "V1"))
-    _connect(_pin(here, "ReturnValue", is_input=False), _pin(gap, "V2"))
-    near = keep(_at(_node(ed, FN_LESS_FF), x0 + 1600, y0 + 440))
-    _connect(_pin(gap, "ReturnValue", is_input=False), _pin(near, "A"))
-    _set(near, "B", PICKUP_RADIUS)
-
-    inv = keep(_at(ed.add_get_member_variable_node("Inventory"), x0 + 1100, y0 + 660))
-    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 1360, y0 + 660))
-    _connect(_pin(inv, "Inventory", is_input=False), _pin(count, "TargetArray"))
-    room = keep(_at(_node(ed, FN_LESS_II), x0 + 1600, y0 + 660))
-    _connect(_pin(count, "ReturnValue", is_input=False), _pin(room, "A"))
-    _set(room, "B", INVENTORY_SIZE)
-
-    # The room check is inside the loop, not before it: without it a player
-    # standing on a pile would pick up every weapon at once and overflow the
-    # INVENTORY_SIZE slots the HUD draws.
-    and1 = keep(_at(_node(ed, FN_AND), x0 + 1840, y0 + 340))
-    _connect(dropped_pin, _pin(and1, "A"))
-    _connect(_pin(near, "ReturnValue", is_input=False), _pin(and1, "B"))
-    and2 = keep(_at(_node(ed, FN_AND), x0 + 2080, y0 + 420))
-    _connect(_pin(and1, "ReturnValue", is_input=False), _pin(and2, "A"))
-    _connect(_pin(room, "ReturnValue", is_input=False), _pin(and2, "B"))
-
-    take = keep(_at(ed.add_branch_node(), x0 + 2320, y0))
-    _connect(_pin(and2, "ReturnValue", is_input=False), _pin(take, "Condition"))
-    _connect(BEL.find_then_pin(cast), _pin(take, "execute"))
-
-    clear = keep(_at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH),
-                     x0 + 2580, y0))
-    _connect(item, _pin(clear, "self"))
-    _set(clear, "Dropped", "false")
-    _connect(BEL.find_then_pin(take), _pin(clear, "execute"))
-
-    inv2 = keep(_at(ed.add_get_member_variable_node("Inventory"), x0 + 2580, y0 + 300))
-    add = keep(_at(_node(ed, FN_ARR_ADD), x0 + 2840, y0))
-    _connect(_pin(inv2, "Inventory", is_input=False), _pin(add, "TargetArray"))
-    _connect(item, _pin(add, "NewItem"))
-    _connect(BEL.find_then_pin(clear), _pin(add, "execute"))
-
-    # A pick-up goes into the bag and whatever is in the hand stays there.
-    # Only empty hands take it up: after dropping or eating the last item,
-    # Held is None and EquippedIndex may be -1, so nothing would be shown.
-    # Array_Add's ReturnValue is the new item's index (an exec node's output,
-    # read once).
-    held = keep(_at(ed.add_get_member_variable_node("Held"), x0 + 2840, y0 + 300))
-    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 3100, y0 + 300))
-    _connect(_pin(held, "Held", is_input=False), _pin(armed, "Object"))
-    empty = keep(_at(ed.add_branch_node(), x0 + 3100, y0))
-    _connect(_pin(armed, "ReturnValue", is_input=False), _pin(empty, "Condition"))
-    _connect(BEL.find_then_pin(add), _pin(empty, "execute"))
-    at = keep(_at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 3360, y0 + 120))
-    _connect(_pin(add, "ReturnValue", is_input=False), _pin(at, "EquippedIndex"))
-    _connect(BEL.find_else_pin(empty), _pin(at, "execute"))
-
-    ed.add_comment_to_nodes(
-        f"{PICKUP_KEY} picks up any weapon within {PICKUP_RADIUS:.0f} cm that is "
-        f"flagged Dropped, while fewer than {INVENTORY_SIZE} are carried, into "
-        "the inventory without switching to it: the held item stays held. "
-        "Only empty hands (Held is None) take up what was picked up.",
-        made)
-    return _loose_pin(loop, "Completed", is_input=False)
 
 
 def _author_equip(ed, exec_in, x0, y0):

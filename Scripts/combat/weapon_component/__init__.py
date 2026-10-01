@@ -22,7 +22,9 @@ _author_* fragment per concern, each in its own module:
   tracer      debug mode: the line each pellet flew, off the trace's own hit
               result (red to an impact, blue out to the range), and a point
   impact      a pellet that connected: blood, damage, hit zones, debug readout
-  inventory   equip, drop, pick up, BeginPlay loadout
+  inventory   equip, drop, BeginPlay loadout
+  pickup      the pick-up key takes ONE Dropped item in reach: the one nearest
+              AimPoint, the point the reticle rests on
   listener    BeginPlay: sounds fade with the distance from the character,
               not the camera (the controller's attenuation listener override)
   ammo        reload and dry fire
@@ -61,7 +63,8 @@ BP_WeaponComponent event graph:
                                          or, with empty hands, punch)
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held
-         --> Branch WasInputKeyJustPressed(E)               --> pick up nearest
+         --> Branch WasInputKeyJustPressed(E)               --> pick up the one item
+                                                                nearest the reticle
          --> Branch IsInputKeyDown(V)                       --> draw the throw arc;
                                                                 on release, throw held
          --> Branch IsValid(Thrown)                         --> carry it along the arc

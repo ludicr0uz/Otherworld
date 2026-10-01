@@ -23,8 +23,9 @@ from combat.weapon_component.knife import (
     _author_knife_press, _author_knife_swing,
 )
 from combat.weapon_component.inventory import (
-    _author_drop, _author_equip, _author_pickup,
+    _author_drop, _author_equip,
 )
+from combat.weapon_component.pickup import _author_pickup
 from combat.weapon_component.pose_weights import _author_pose_weights
 from combat.weapon_component.punch import _author_punch
 from combat.weapon_component.ready_pose import (
@@ -368,23 +369,22 @@ def _author_wc_tick(ed, tick):
     _set(drop_dirty, "NeedsRefresh", "true")
     _connect(after_drop, _pin(drop_dirty, "execute"))
 
-    # --- pick up -------------------------------------------------------------
-    pick_gate = _at(ed.add_branch_node(), 1040, 3400)
-    _connect(pressed("KeyPickup", 3560), _pin(pick_gate, "Condition"))
-    _connect(BEL.find_then_pin(drop_dirty), _pin(pick_gate, "execute"))
-    _connect(BEL.find_else_pin(drop_gate), _pin(pick_gate, "execute"))
-    after_pick = _author_pickup(ed, owner_out, BEL.find_then_pin(pick_gate),
-                                1400, 3400)
+    # --- pick up (pickup.py) -------------------------------------------------
+    picked, not_picked = _author_pickup(
+        ed, owner_out, pressed("KeyPickup", 3560),
+        (BEL.find_then_pin(drop_dirty), BEL.find_else_pin(drop_gate)),
+        1040, 3400)
     pick_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 4900, 3400)
     _set(pick_dirty, "NeedsRefresh", "true")
-    _connect(after_pick, _pin(pick_dirty, "execute"))
+    for exit_pin in picked:
+        _connect(exit_pin, _pin(pick_dirty, "execute"))
 
     # --- throw (throw.py) ------------------------------------------------------
     # After pick-up and before the refresh, which re-equips the emptied hand
     # on the frame of the throw, as it does after a drop.
     aim_exits, released, start, velocity = _author_throw_aim(
         ed, pc_out, owner_out, held, armed_out, key_pins["KeyThrow"],
-        (BEL.find_then_pin(pick_dirty), BEL.find_else_pin(pick_gate)),
+        (BEL.find_then_pin(pick_dirty),) + not_picked,
         1040, 12800)
     thrown = _author_throw_release(ed, held, start, velocity, released,
                                    4200, 14000)

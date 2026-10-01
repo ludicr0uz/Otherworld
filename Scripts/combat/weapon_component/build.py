@@ -24,6 +24,9 @@ from combat.weapon_component.knife import (
     KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR,
     NEXT_KNIFE_VAR,
 )
+from combat.weapon_component.pickup import (
+    PICKUP_FORCED_VAR, PICK_BEST_VAR, PICK_GAP_VAR, PICK_NO_GAP,
+)
 from combat.weapon_component.pose_weights import HELD_TWO_HANDED
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
@@ -161,6 +164,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in (NEXT_KNIFE_VAR, KNIFE_DUE_VAR):
         _declare(ed, name, _float_type())
+    # The pick-up (pickup.py): the candidate nearest the reticle's point so
+    # far, its distance to that point, and the probe's stand-in for the key.
+    _declare(ed, PICK_BEST_VAR, BEL.get_object_reference_type(item_class))
+    _declare(ed, PICK_GAP_VAR, _float_type())
+    _declare(ed, PICKUP_FORCED_VAR, BEL.get_basic_type_by_name("bool"))
     # The throw (throw.py): the aim and the launch it stores, the item in the
     # air, and the arc actor it draws on.
     for name in (THROW_AIMING_VAR, THROW_FORCED_VAR):
@@ -231,6 +239,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
         KNIFE_PENDING_VAR: False,
         NEXT_KNIFE_VAR: 0.0,
         KNIFE_DUE_VAR: 0.0,
+        PICK_GAP_VAR: PICK_NO_GAP,
+        PICKUP_FORCED_VAR: False,
         THROW_AIMING_VAR: False,
         THROW_FORCED_VAR: False,
         THROW_TIME_VAR: 0.0,

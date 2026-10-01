@@ -62,6 +62,12 @@ menu polls its own copy from `DrawHUD`, which does.
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
 - **A pick-up goes into the inventory without switching.** The held item stays held. Only empty
   hands (`Held` is None, after a drop or eating the last item) take the new item up.
+- **A press picks up one item** (`weapon_component/pickup.py`): of the `Dropped` items within
+  `PICKUP_RADIUS` of the player, the one nearest `AimPoint`, the point the reticle rests on (the
+  aim resolve sets it every frame, armed or not). The loop only remembers the best candidate
+  (`PickBest`, `PickBestGap`); the take runs once, off the loop's `Completed`. A take inside the
+  loop is how one press used to empty a pile. `PickupForced` is the probe's key press
+  (`probes/probe_pickup.py`).
 - **Ammunition lives on the weapon** (`MagazineSize`/`Loaded`/`Reserve` on `BP_WeaponItem`).
   Drop a half-empty gun and it is still half-empty when picked up. The pistol is the fallback: an
   8-round magazine over an endless reserve (`InfiniteReserve`), so it reloads every 8 shots but

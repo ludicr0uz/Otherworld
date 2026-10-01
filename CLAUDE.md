@@ -203,7 +203,8 @@ editor.
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
   `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
   clips (the crawl is its face-down swim: the packs have no crawl), throw whatever is in hand (hold V to
-  see the arc, release to throw; it lands as a pick-up), and has
+  see the arc, release to throw; it lands as a pick-up), pick up one item at a time (E: of those in reach, the one nearest the
+  point the reticle rests on), and has
   a 10-slot inventory. The guard is a procedural pose (no clip exists), as are crouch and prone on the mannequin fallback.
   Each gun has its own accuracy cloud and recoil, both steadied by the shoulder aim, crouch and
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.

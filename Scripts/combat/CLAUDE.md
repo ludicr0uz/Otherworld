@@ -168,7 +168,7 @@ touches the fire graph doesn't pay for the notes on blood.
 |---|---|
 | `docs/aiming.md` | shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
 | `docs/stance.md` | sprint, blocking (the guard's quarter damage and stamina cost), crouch and prone (`weapon_component/stance.py`), the procedural body poses (`body_pose.py`, `weapon_component/pose_weights.py`) |
-| `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
+| `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_bodies.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
 | `docs/skin.md` | the player's body: the Meshy mesh and its retarget (`skin.py`) |
 | `docs/audio.md` | gun and creature sounds (`audio.py`, `Scripts/fetch_weapon_sounds.py`) |
 | `docs/firing_gate.md` | what may fire and when, eating through the fire button (`weapon_component/consume.py`), debug mode |
@@ -196,6 +196,9 @@ These are feel checks a headless run can't do:
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100
   to 61);
+- the fitted hit bodies (`hit_bodies.py`): whether a shot that looks on the zombie ever misses
+  (the bodies are one capsule a bone; `FIT_ROUNDNESS` and `FIT_END_OVERLAP` trade overhang
+  for gaps), and whether a near miss vanishing at the capsule, with no chips behind, shows;
 - the pistol emptying after 8 shots, clicking, and R refilling it to 8 (no key can be injected
   into a headless game, so only the verifier covers this);
 - the rifle-arm pose on flinching creatures;

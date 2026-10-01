@@ -97,12 +97,31 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 ## Hit boxes and hit reactions
 
-- **The capsule decides whether a character was hit; the physics asset decides where.**
+- **The capsule only stops the pellet; the physics bodies decide whether it hit, and where.**
   - `_author_hit_zone` retraces the same line with `K2_LineTraceComponent` against the struck
     `Mesh`. This ignores channels, but the mesh needs query collision
     (`install_hit_zones` raises otherwise).
-  - Head is ×1.5 and limbs ×0.75 (`COMBAT.head_multiplier`/`limb_multiplier`). A trace through the
-    capsule that finds no body counts ×1.
+  - **A trace that strikes no body is a miss:** no blood, no damage. The capsule is 68 cm across
+    and a head 18, so counting it as a body hit (as it was) made every near miss a hit.
+    The pellet stops there all the same: it does not carry on to the scenery behind.
+  - Head is ×1.5 and limbs ×0.75 (`COMBAT.head_multiplier`/`limb_multiplier`); any other body ×1.
+  - `HitPoint` is where the burst goes: the pellet's own hit, moved onto the body by the body
+    trace, so blood is on the skin and not on the capsule 10–25 cm in front of it.
+- **The bodies are fitted to the model** (`hit_bodies.py`, run by the build after
+  `tune_ragdolls`). The importer wraps each bone's vertices in a box and the box in a capsule,
+  4–8 cm proud of the skin all round. `fit_hit_bodies()` re-derives each capsule's centre,
+  radius and length from the vertices its bone carries (dominant weight; a bone with no body
+  goes to its nearest parent with one), down the longest of the importer's three axes.
+  - `SkeletalBodySetups` is protected, but each setup is a subobject named
+    `SkeletalBodySetup_<n>`: `find_object(physics_asset, name)` reaches it, and its `agg_geom`
+    is writable. Array elements come out as copies: edit one and put the array back.
+  - `body_coverage(mesh)` is the measure: a 2 cm grid of rays from the front and the side,
+    against the bodies and against the render mesh (a GeometryScript BVH). The zombie's
+    overhang went from 42% of the model's rays to 16%, its head's from 89% to 23%; about half
+    of what is left is the grid's own outline cells. The verifier bounds it.
+  - **The wendigo is not held to the overhang bound:** its head, neck and antlers are one
+    body, and one capsule round antlers is mostly air (51%). It needs bodies of its own there.
+  - The same bodies are the ragdoll, so a corpse now lies on the ground rather than above it.
 - **Hit tables are derived per character.** `HeadBones`/`LimbBones` on each character's
   HealthComponent template come from `hit_zones(mesh)`:
   - bodies come from the physics asset's **constraints**, because `SkeletalBodySetups` is protected;

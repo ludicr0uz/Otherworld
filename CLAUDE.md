@@ -210,6 +210,8 @@ editor.
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
   The pistol reloads every 8 shots from an endless reserve. A bullet that hits a body throws
   blood; one that hits the scenery throws chips and dust off the surface (`BP_BulletImpact`).
+  A body is hit only where its physics bodies are, and those are fitted to the model
+  (`combat/hit_bodies.py`): a round past the head, inside the capsule, is a miss.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). They respawn 75–100 m away and leave ragdoll corpses.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs

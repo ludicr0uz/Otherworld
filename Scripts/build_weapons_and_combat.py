@@ -73,6 +73,7 @@ from combat.install import (                                      # noqa: E402
 from combat.materials import build_materials                      # noqa: E402
 from combat.throw_arc import build_throw_arc                      # noqa: E402
 from combat.paths import AMMO_BP_PATH, HEALTH_BP_PATH             # noqa: E402
+from combat.hit_bodies import fit_hit_bodies                      # noqa: E402
 from combat.ragdoll import tune_ragdolls                          # noqa: E402
 from combat.settings_savegame import build_settings_savegame      # noqa: E402
 from combat.skin import wear_skin                                 # noqa: E402
@@ -153,6 +154,7 @@ def main():
          f"({GUN_DROP_CHANCE * 100:.0f}% per kill)")
 
     tune_ragdolls()
+    fit_hit_bodies()
     install_on_character(health_bp, weapon_bp, footstep_bp)
     install_on_npc(health_bp, footstep_bp)
     retire_old_assets()

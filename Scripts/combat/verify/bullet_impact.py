@@ -12,6 +12,7 @@ from combat.bullet_impact import (
     IMPACT_LIFETIME, _impact_pieces,
 )
 from combat.burst import BURST_PIECE_PREFIX, BURST_VELOCITY_ENCODE
+from combat.hit_zones import HIT_BONE_VAR
 from combat.materials import IMPACT_CHIP_COLOUR, IMPACT_DUST_COLOUR
 from combat.paths import (
     BULLET_IMPACT_BP_PATH, CUBE, MAT_IMPACT_CHIP, MAT_IMPACT_DUST, SPHERE,
@@ -203,12 +204,17 @@ def check_impact_spawn():
     check("the impact runs off the health cast's failed arm: what has no health",
           [pin for _n, pin in chip_exec] == ["CastFailed"],
           str([pin for _n, pin in chip_exec]))
-    check("...and the blood off the same cast's other arm, so a pellet never "
-          "spawns both",
-          len(blood_exec) == 1 and len(chip_exec) == 1
-          and blood_exec[0][1] != "CastFailed"
-          and blood_exec[0][0].get_path_name() == chip_exec[0][0].get_path_name(),
-          str([pin for _n, pin in blood_exec]))
+    # The blood sits behind the hit zone now (verify/hit_bodies.py), which the
+    # cast's other arm starts: the zone's first node is the HitBone reset.
+    cast = chip_exec[0][0] if len(chip_exec) == 1 else None
+    zone = ([str(BEL.get_node_title(PIN.get_owning_node(q)))
+             for q in PIN.list_connected_pins(BEL.find_then_pin(cast))]
+            if cast else [])
+    check("...and the blood off the same cast's other arm, behind the hit zone, "
+          "so a pellet never spawns both",
+          cast is not None and zone == [f"Set {HIT_BONE_VAR}"] and blood_exec
+          and all(n.get_path_name() != cast.get_path_name() for n, _pin in blood_exec),
+          f"the cast's then -> {zone}; blood off {[pin for _n, pin in blood_exec]}")
     chip_at, blood_at = (_fed_by(chips[0], "SpawnTransform"),
                          _fed_by(blood[0], "SpawnTransform"))
     check("both are spawned at the one transform: the impact point, turned onto "

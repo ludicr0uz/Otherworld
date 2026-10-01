@@ -77,6 +77,8 @@ BP_HealthComponent (health_component wires the fragments together)
   debuff_drain      HP lost per stack of the GAS Debuff.HealthDrain tag
   hit_reaction      flinch clips and direction pick
   hit_zones         head/limb bone tables and multipliers
+  hit_bodies        the physics bodies fitted to each model (fit_hit_bodies),
+                    and body_coverage(): bodies against the mesh, ray by ray
   ragdoll           joint limits and tune_ragdolls()
 
 BP_WeaponComponent -> the weapon_component subpackage (see its __init__)

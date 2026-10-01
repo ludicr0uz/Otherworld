@@ -16,6 +16,8 @@ and it never relies on a variable another section left behind.
   firing  consume  drops  noise  combat_trace
   bullet_impact  BP_BulletImpact: the chips and dust, the seeded layout, and
               the fire graph spawning it off the health cast's failed arm
+  hit_bodies  the physics bodies fitted to each model, measured ray by ray
+              against the mesh; a pellet that strikes no body does nothing
   tracer      debug mode's pellet tracer: drawn off the trace's own hit result
   loot        the corpse loot roll on a counted kill (loot/roll.py)
   sights      the two aim keys, each weapon's eye point, the sight camera
@@ -45,7 +47,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "dead", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife",
     "hold_pose", "throw", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

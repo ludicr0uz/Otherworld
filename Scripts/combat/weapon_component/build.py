@@ -9,7 +9,7 @@ from combat.graph import (
     BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _events,
     _float_type, _key, _log, _must_load, _post_physics_tick, _struct_type,
 )
-from combat.hit_zones import HIT_BONE_VAR
+from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import (
     CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
     WEAPON_COMP_BP_PATH,
@@ -152,6 +152,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, knife_clip,
     # loop can branch on a plain bool instead of casting eight times.
     _declare(ed, DEBUG_MODE_VAR, BEL.get_basic_type_by_name("bool"))
     _declare(ed, HIT_BONE_VAR, BEL.get_basic_type_by_name("name"))
+    _declare(ed, HIT_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
     # Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
     # return pin takes its type from its Class pin, and an Actor-typed return
     # cannot be added to an array of BP_WeaponItem.

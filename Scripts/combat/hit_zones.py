@@ -42,6 +42,10 @@ LIMB_MULT_VAR = "LimbMultiplier"
 # because it is written on three different exec arms (struck a body, threaded
 # between the limbs, hit something that is not a Character) and read by one.
 HIT_BONE_VAR = "HitBone"
+# Where the current pellet landed, on the weapon component: the trace's own
+# hit, moved onto the struck body once the body trace finds one. The capsule
+# stands up to 25 cm off the skin, and blood belongs on the skin.
+HIT_POINT_VAR = "HitPoint"
 
 
 def make_shootable(bp):
@@ -53,10 +57,10 @@ def make_shootable(bp):
     straight through the NPC and no hit was ever registered. Nothing logs this:
     the trace simply reports no hit, exactly as it would for a genuine miss.
 
-    The capsule alone is made to block, not the skeletal mesh: the capsule is
-    guaranteed present and correctly sized, whereas hitting the mesh depends on
-    the physics asset's shapes being well fitted. Capsule-only hit detection is
-    coarse but predictable.
+    The capsule alone is made to block, not the skeletal mesh: it is what the
+    aim trace and the reticle rest on. It only stops the pellet, though. Whether
+    the pellet struck the character is the physics bodies' answer (the fire
+    graph's hit-zone trace), and hit_bodies.py fits those to the model.
 
     Setting a single channel response switches the profile off its preset and
     onto "Custom", which is expected.

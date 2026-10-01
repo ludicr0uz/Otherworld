@@ -1,7 +1,8 @@
-"""A pellet that connected: blood, damage, the hit zone's multiplier and the
-debug-mode damage readout -- or, on anything without health, the surface's
-chips and dust (surface_impact.py). firing.py traces the pellets and calls in
-here on a hit.
+"""A pellet whose trace stopped on something: on a character, whether it
+struck the body at all and where (the hit zone), then blood, damage, the zone's
+multiplier and the debug-mode damage readout -- or, on anything without
+health, the surface's chips and dust (surface_impact.py). firing.py traces the
+pellets and calls in here on a hit.
 """
 
 from combat.blood import (
@@ -16,8 +17,8 @@ from combat.graph import (
 )
 from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.hit_zones import (
-    HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, LIMB_BONES_VAR,
-    LIMB_MULT_VAR,
+    HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR,
+    LIMB_BONES_VAR, LIMB_MULT_VAR,
 )
 from combat.nodes import (
     FN_ARR_CONTAINS, FN_CLAMP, FN_CONCAT, FN_DIV_FF, FN_DRAW_STRING,
@@ -37,10 +38,19 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
 
     Both are behind the health cast, so trees and terrain produce no blood
     -- only things carrying BP_HealthComponent bleed. What the cast refuses
-    gets the bullet impact instead (_author_surface_impact). The damage is
-    the weapon's, scaled by where on the body it landed (see
-    _author_hit_zone), using the target's own hit-box tables.
+    gets the bullet impact instead (_author_surface_impact). Both are also
+    behind the hit zone (_author_hit_zone): a pellet stopped by a character's
+    capsule that strikes none of its bodies passed the model by, and does
+    nothing. The damage is the weapon's, scaled by where on the body it
+    landed, using the target's own hit-box tables.
     """
+    # Where the burst goes: the trace's hit, until the hit zone moves it onto
+    # the body. Written before the cast so the scenery's chips read it too.
+    mark = _at(ed.add_set_member_variable_node(HIT_POINT_VAR), x0 - 20, y0 - 160)
+    _connect(_loose_pin(brk, "Location", is_input=False), _pin(mark, HIT_POINT_VAR))
+    _connect(exec_in, _pin(mark, "execute"))
+    exec_in = BEL.find_then_pin(mark)
+    landed = _at(ed.add_get_member_variable_node(HIT_POINT_VAR), x0 + 260, y0 + 380)
     comp = _at(_node(ed, FN_GET_COMP), x0, y0 + 260)
     _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
@@ -52,7 +62,7 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
 
     blood_cls = _at(ed.add_get_member_variable_node("BloodClass"), x0 + 520, y0 + 520)
     where = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 520, y0 + 380)
-    _connect(_loose_pin(brk, "Location", is_input=False), _pin(where, "Location"))
+    _connect(_pin(landed, HIT_POINT_VAR, is_input=False), _pin(where, "Location"))
     # How big the spray is, as a clamped ratio of the round's damage to a
     # reference one. Spawn *scale* rather than a parameter on the splash,
     # because the droplet solver works in the actor's own space: scaling the
@@ -81,12 +91,15 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
     _connect(_pin(blood_cls, "BloodClass", is_input=False), _pin(splash, "Class"))
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(splash, "SpawnTransform"))
     _set(splash, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(BEL.find_then_pin(cast), _pin(splash, "execute"))
     chipped = _author_surface_impact(
         ed, where, _pin(cast, "CastFailed", is_input=False), x0 + 800, y0 - 420)
 
+    # The zone runs BEFORE the blood it is drawn to the right of: only a
+    # pellet that struck a body (or a thing with health and no body) bleeds.
     zoned, zone_nodes, x_zone = _author_hit_zone(
-        ed, brk, BEL.find_then_pin(splash), x0 + 1080, y0)
+        ed, brk, BEL.find_then_pin(cast), x0 + 1080, y0)
+    for tail in zoned:
+        _connect(tail, _pin(splash, "execute"))
 
     get_h = _at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
                 x_zone, y0 + 300)
@@ -107,8 +120,7 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
                 x_zone + 740, y0)
     _connect(as_health, _pin(set_h, "self"))
     _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(set_h, "Health"))
-    for tail in zoned:
-        _connect(tail, _pin(set_h, "execute"))
+    _connect(BEL.find_then_pin(splash), _pin(set_h, "execute"))
     # Everything after this sits right of the zone block, as it sat right of
     # the splash before there was one.
     x0 += x_zone - (x0 + 1080)
@@ -158,7 +170,7 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
         "Clamped at zero so an overkill shot cannot drive Health negative -- "
         "the HUD bar divides by MaxHealth and the death check is Health <= 0, "
         "and both want a floor.",
-        [comp, cast, blood_cls, where, facing, splash, spray_dmg, ratio, spray,
+        [mark, landed, comp, cast, blood_cls, where, facing, splash, spray_dmg, ratio, spray,
          spray_v, get_h, sub, clamp, set_h, now, stamp, blame,
          from_where])
     ed.add_comment_to_nodes(
@@ -171,9 +183,8 @@ def _author_impact(ed, brk, held, exec_in, x0, y0):
         f"physics-asset bodies alone, and the bone it strikes picks the "
         f"multiplier off the TARGET's health component -- head "
         f"{COMBAT.head_multiplier}x, arms and legs {COMBAT.limb_multiplier}x, anything else "
-        f"1x. A pellet that clipped the capsule but threaded between the limbs "
-        f"strikes no body and counts as a body hit, which is what every hit "
-        f"was before.",
+        f"1x. A pellet that clipped the capsule but strikes no body passed "
+        f"the model by: no blood, no damage.",
         zone_nodes + worth_nodes + [dmg_n, scaled])
     ed.add_comment_to_nodes(
         "Debug mode only: the damage this pellet actually did, and the zone "
@@ -229,7 +240,7 @@ def _author_damage_readout(ed, brk, damage, worth, exec_in, x0, y0):
 
 
 def _author_hit_zone(ed, brk, exec_in, x0, y0):
-    """Which bone did this pellet strike? Written into HitBone, None for none.
+    """Did this pellet strike the body, and which bone? Written into HitBone.
 
     The pellet trace stops at the capsule -- make_shootable makes the capsule,
     not the mesh, block Visibility, and that is what keeps the aim trace and
@@ -242,12 +253,18 @@ def _author_hit_zone(ed, brk, exec_in, x0, y0):
     what matters is that the mesh has query collision at all, or it has no
     bodies at runtime -- install_hit_zones asserts that.
 
-    HitBone is cleared first, then written only by a trace that struck, which
-    covers both misses with one node: an actor that is not a Character (no
-    mesh to trace), and a pellet that clipped the capsule's edge and threaded
-    between the arms and the body.
+    The capsule is far wider than the model -- 34 cm of radius round an 18 cm
+    head -- so a trace that finds no body is a pellet that flew past the model
+    inside its capsule, and its exec ends here: it is a miss. It used to count
+    as a body hit, which made every near miss round the head a hit. The bodies
+    are fitted to the model for that reason (hit_bodies.py).
 
-    Returns (exec outs that continue to the damage, nodes made, next free x).
+    A trace that struck writes HitBone and moves HitPoint from the capsule's
+    surface onto the body's. HitBone is cleared first, for the one other way
+    on: an actor with health that is not a Character has no mesh to trace, and
+    takes the hit at 1x where the pellet's own trace landed.
+
+    Returns (exec outs that continue to the blood, nodes made, next free x).
     """
     made = []
 
@@ -284,9 +301,12 @@ def _author_hit_zone(ed, brk, exec_in, x0, y0):
     _connect(_pin(probe, "BoneName", is_input=False), _pin(note, HIT_BONE_VAR))
     _connect(BEL.find_then_pin(struck), _pin(note, "execute"))
 
-    outs = [BEL.find_then_pin(note), BEL.find_else_pin(struck),
-            _pin(as_char, "CastFailed", is_input=False)]
-    return outs, made, x0 + 1400
+    onto = keep(_at(ed.add_set_member_variable_node(HIT_POINT_VAR), x0 + 1380, y0))
+    _connect(_pin(probe, "HitLocation", is_input=False), _pin(onto, HIT_POINT_VAR))
+    _connect(BEL.find_then_pin(note), _pin(onto, "execute"))
+
+    outs = [BEL.find_then_pin(onto), _pin(as_char, "CastFailed", is_input=False)]
+    return outs, made, x0 + 1660
 
 
 def _zone_multiplier(ed, as_health, x0, y0):

@@ -5,10 +5,13 @@ from combat.graph import (
     BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set,
 )
 from combat.nodes import (
-    FN_ADD_FF, FN_AND, FN_CLAMP, FN_GREATER_FF, FN_IS_KEY_DOWN, FN_MUL_FF,
-    FN_SELECT_FF, MOVEMENT_CLASS_PATH, NODE_CAST_CHARACTER,
+    FN_ADD_FF, FN_AND, FN_CLAMP, FN_IS_KEY_DOWN, FN_LE_FF, FN_MUL_FF, FN_NOT,
+    FN_OR, FN_SELECT_FF, MOVEMENT_CLASS_PATH, NODE_CAST_CHARACTER,
 )
 from combat.tuning import COMBAT, SPRINT_KEY
+
+# Set when a held sprint runs Stamina out, cleared by letting the key go.
+SPRINT_SPENT_VAR = "SprintSpent"
 
 
 def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
@@ -18,9 +21,19 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     the two arms would otherwise be the same two writes with different numbers,
     and the pair could drift. SelectFloat picks the number, one write applies it:
 
-        Sprinting = ShiftDown AND Stamina > 0
+        SprintSpent = ShiftDown AND (SprintSpent OR Stamina <= 0)
+        Sprinting = ShiftDown AND NOT SprintSpent
         MaxWalkSpeed = Sprinting ? SPRINT_SPEED : BaseSpeed
         Stamina += (Sprinting ? -drain : +regen) * DeltaSeconds,  clamped
+
+    SprintSpent is a latch, and it is what keeps a held key from strobing. With
+    only "ShiftDown AND Stamina > 0", a sprint that ran Stamina out stopped for
+    one frame, that frame's regen put Stamina back above zero, and the next
+    frame sprinted again: Sprinting flipped every frame for as long as the key
+    was held. Everything gated on NOT Sprinting flipped with it -- the aim, so
+    the zoom and the sights camera twitched with an aim key held, and the ready
+    pose, which re-equipped every frame. Latched, a spent sprint stays off (and
+    Stamina refills) until the key is let go and pressed again.
 
     BaseSpeed is whatever the character's own MaxWalkSpeed was at BeginPlay, so
     sprinting can never leave the player permanently faster or slower than the
@@ -60,16 +73,33 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
 
     stamina = keep(_at(ed.add_get_member_variable_node("Stamina"), x0 + 240, y0 + 560))
     stamina_out = _pin(stamina, "Stamina", is_input=False)
-    left = keep(_at(_node(ed, FN_GREATER_FF), x0 + 480, y0 + 560))
-    _connect(stamina_out, _pin(left, "A"))
-    _set(left, "B", 0.0)
+    out = keep(_at(_node(ed, FN_LE_FF), x0 + 480, y0 + 560))
+    _connect(stamina_out, _pin(out, "A"))
+    _set(out, "B", 0.0)
 
+    # The latch, stored before Sprinting is: this frame's sprint reads it.
+    was_spent = keep(_at(ed.add_get_member_variable_node(SPRINT_SPENT_VAR),
+                         x0 + 240, y0 + 760))
+    done = keep(_at(_node(ed, FN_OR), x0 + 480, y0 + 720))
+    _connect(_pin(was_spent, SPRINT_SPENT_VAR, is_input=False), _pin(done, "A"))
+    _connect(_pin(out, "ReturnValue", is_input=False), _pin(done, "B"))
+    still_spent = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 640))
+    _connect(_pin(down, "ReturnValue", is_input=False), _pin(still_spent, "A"))
+    _connect(_pin(done, "ReturnValue", is_input=False), _pin(still_spent, "B"))
+    latch = keep(_at(ed.add_set_member_variable_node(SPRINT_SPENT_VAR),
+                     x0 + 480, y0))
+    _connect(_pin(still_spent, "ReturnValue", is_input=False),
+             _pin(latch, SPRINT_SPENT_VAR))
+    _connect(BEL.find_then_pin(as_char), _pin(latch, "execute"))
+
+    fresh = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 300))
+    _connect(_loose_pin(latch, "Output_Get", is_input=False), _pin(fresh, "A"))
     running = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 460))
     _connect(_pin(down, "ReturnValue", is_input=False), _pin(running, "A"))
-    _connect(_pin(left, "ReturnValue", is_input=False), _pin(running, "B"))
+    _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(running, "B"))
     mark = keep(_at(ed.add_set_member_variable_node("Sprinting"), x0 + 960, y0))
     _connect(_pin(running, "ReturnValue", is_input=False), _pin(mark, "Sprinting"))
-    _connect(BEL.find_then_pin(as_char), _pin(mark, "execute"))
+    _connect(BEL.find_then_pin(latch), _pin(mark, "execute"))
     # Read the stored flag from here on, for the same reason the NPC id is read
     # back from its variable: the AND is pure and would be re-evaluated per read.
     is_running = keep(_at(ed.add_get_member_variable_node("Sprinting"),
@@ -109,7 +139,9 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     ed.add_comment_to_nodes(
         f"{SPRINT_KEY}: {COMBAT.sprint_speed_cms:.0f} cm/s while Stamina lasts "
         f"({COMBAT.max_stamina / COMBAT.stamina_drain_per_s:.0f} s from full), refilling at "
-        f"{COMBAT.stamina_regen_per_s:.0f}/s the moment it is let go. No Branch: "
+        f"{COMBAT.stamina_regen_per_s:.0f}/s the moment it stops. A sprint that runs "
+        f"Stamina out latches {SPRINT_SPENT_VAR} until the key is let go, so a "
+        f"held key cannot flip Sprinting (and the aim with it) every frame. No Branch: "
         f"SelectFloat picks the speed and the sign of the drain, so there is one "
         f"write of each and the two arms cannot drift apart. The fire gate below "
         f"reads Sprinting -- you cannot shoot while running.",

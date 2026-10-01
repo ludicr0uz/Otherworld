@@ -42,7 +42,7 @@ _author_* fragment per concern, each in its own module:
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
-  sprint      sprint and stamina
+  sprint      sprint and stamina, and the latch that ends a spent sprint
   block       the guard: Blocking = block key AND stamina AND not sprinting
               (what a block does to a swing is npc/block.py)
   stance      crouch/prone toggles -> Stance; UE's crouch at two heights, the

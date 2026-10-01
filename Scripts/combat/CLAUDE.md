@@ -172,6 +172,9 @@ touches the fire graph doesn't pay for the notes on blood.
 
 These are feel checks a headless run can't do:
 
+- sprint held with an aim key until the stamina runs out: no key can be pressed in a headless
+  game, so the latch setting (`SprintSpent`, `docs/stance.md`) is checked on the graph only.
+  Whether needing to let go of Shift before the next sprint feels right;
 - the knife: how the keyed slash reads (`knife_anim.SLASH_KEYS`), whether the blow at
   `COMBAT.knife_impact_s` lines up with the cut, how the knife sits in the fist (the pistol
   grip's solve), and how the two hold poses read (`hold_pose.HOLD_*_DIRS`; the wrist keeps the

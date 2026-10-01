@@ -26,6 +26,7 @@ and it never relies on a variable another section left behind.
               AnimGraph, the crouch down with the feet planted, the crawl on
               the ground, the kneel down for the stretch it is held over
   block       the guard: its key, the Blocking stance, the fire gate refusing
+  sprint      the sprint's latch: spent at zero Stamina until the key is let go
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
               the crouch it drives, the footsteps' volume and reach per stance
   accuracy    the per-gun cloud and recoil factors: the table, the weapons'
@@ -40,7 +41,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "stance", "accuracy", "punch", "knife",
+    "player_body", "blood", "hit_reactions", "ragdoll", "aiming", "sights", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife",
     "hold_pose", "throw", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

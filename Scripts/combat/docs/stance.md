@@ -6,6 +6,16 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 - 900 cm/s while stamina lasts: 4 s from full, refilling at 12/s. The pack runs at 600.
 - The fire gate refuses while sprinting.
+- **A spent sprint is latched** (`SprintSpent`, `verify/sprint.py`):
+  `SprintSpent = key AND (SprintSpent OR Stamina <= 0)`, `Sprinting = key AND NOT SprintSpent`.
+  Running out ends the sprint until the key is let go and pressed again; stamina refills
+  meanwhile.
+  - **Trap:** `Sprinting = key AND Stamina > 0` alone flips every frame at zero stamina (stop,
+    regen a sliver, start, drain it). Everything gated on `NOT Sprinting` flips with it: with an
+    aim key held the zoom and the sight camera twitched, and the ready pose re-equipped every
+    frame.
+  - `probes/probe_sprint_latch.py` shows the key-up half in game (the latch clears, stamina
+    refills). No key can be pressed in a headless game, so the setting half is graph-checked.
 - Authored **without a Branch**. `SelectFloat` picks the speed and the stamina rate, and one
   write applies each.
 - **Sprinting drops the ready pose** by stopping the slot, so `ABP_Unarmed`'s run comes through.

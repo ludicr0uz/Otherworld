@@ -6,6 +6,12 @@ blade killed, down on the ground with it, and one whose corpse is gone leaves
 the blade where it lay. A gun thrown at a body takes nothing and falls at its
 foot.
 
+The body the blade wounds flinches, as it does at any damage: the health
+component's flinch is a poll of Health (hit_reaction.py), so the throw has no
+trigger of its own to forget. Here it is seen to play, away from the thrower;
+the gun, which takes nothing, plays none, and the blade that kills plays none
+either (the body ragdolls instead).
+
 The bodies are two zombies with no mind of their own, stood in turn in front
 of the player in the open; the other wanderers are gone. The keys are held
 and clicked as probe_throw_strike.py, the tree's half, does it.
@@ -22,7 +28,9 @@ import shutil
 
 import unreal
 
+from combat.anim_blueprint import HIT_SLOT
 from combat.game_state import DAMAGED_BY_PLAYER_VAR
+from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.paths import (
     BLOOD_CLASS_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH,
     WEAPON_COMP_CLASS_PATH,
@@ -57,6 +65,8 @@ TOO_FAR_CM = 600.0        # ...and from where it cannot be
 SWAY_CM = 40.0            # how far a standing body's own motion carries a blade in it
 PRESSES = 3               # of E, to take one item out of a small pile
 ON_SKIN_CM = 3.0          # the blade's lodge point, from the body it is set on
+FLINCH_WITHIN_S = 0.3     # of the throw coming to rest (the shortest clip plays 0.5 s)
+FLINCH_OVER_S = 2.0       # ...and the longest is well over by then
 
 
 def probe(p):
@@ -102,6 +112,21 @@ def _wound(p, wc, player, item, body, health, at, yaw, pitch, hp=BODY_HP):
     return (hp - float(p.get(health, "Health")),
             rest.z - floor[4].z if floor else 1.0e6,
             _flat(rest - body.get_actor_location()))
+
+
+def _flinching(body):
+    anim = body.get_editor_property("mesh").get_anim_instance()
+    return anim is not None and anim.is_slot_active(HIT_SLOT)
+
+
+def _flinch(body, within, want=True):
+    """Wait up to ``within`` s for ``body`` to be flinching (or, with
+    ``want`` False, to have stopped); returns whether it is."""
+    waited = 0.0
+    while waited < within and _flinching(body) != want:
+        yield 0.02
+        waited += 0.02
+    return _flinching(body)
 
 
 def _held_by(item):
@@ -176,6 +201,11 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
             p.get(health, DAMAGED_BY_PLAYER_VAR) is True
             and bool(_alive(p, BLOOD_CLASS_PATH) - blood),
             f"DamagedByPlayer {p.get(health, DAMAGED_BY_PLAYER_VAR)}")
+    flinched = yield from _flinch(body, FLINCH_WITHIN_S)
+    back = p.get(health, LAST_HIT_FROM_VAR)
+    p.check("...and the body flinches at it, as at any damage, away from the thrower",
+            flinched and back.dot(out) < -0.5,
+            f"{HIT_SLOT} active {flinched}, {LAST_HIT_FROM_VAR} . throw {back.dot(out):+.2f}")
     if not _in_body(p, wc, knife, "knife", body, over, off, yaw):
         return
     if SHOTS:
@@ -201,8 +231,13 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
     if not taken:
         return
 
+    still = yield from _flinch(body, FLINCH_OVER_S, want=False)
     lost, _over, off = yield from _wound(p, wc, player, gun, body, health, at, yaw,
                                          BODY_VIEW_DEG[1])
+    flinched = yield from _flinch(body, FLINCH_WITHIN_S)
+    p.check("a gun thrown at the body, which takes nothing, plays no flinch",
+            not still and not flinched and lost == 0.0,
+            f"{HIT_SLOT} active before {still}, after {flinched}")
     p.check("a gun thrown at the body strikes it, takes nothing and stays in "
             "nothing: it falls at its foot",
             lost == 0.0 and off < 150.0 and not p.get(health, DAMAGED_BY_PLAYER_VAR)
@@ -218,6 +253,8 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
     p.check(f"a thrown axe kills a body with {FRAIL_HP:g} HP",
             lost == FRAIL_HP and p.get(health, "Dead") is True,
             f"lost {lost:g}, Dead {p.get(health, 'Dead')}")
+    p.check("...and a body the blade kills does not flinch: it falls",
+            not _flinching(body), f"{HIT_SLOT} active {_flinching(body)}")
     up = axe.get_actor_location().z
     if not _in_body(p, wc, axe, "axe", body, over, off, yaw):
         return

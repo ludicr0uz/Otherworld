@@ -146,6 +146,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - Pick a direction from `LastHitFrom` (a unit vector towards the source; zero counts as Front).
   - Play the montage into `HitSlot`.
   - Set `PrevHealth = Health` on every arm.
+  - **Any damage flinches, with no trigger at the source:** a pellet, a blow, a thrown blade
+    (`weapon_component/throw_strike.py` only writes `Health` and `LastHitFrom`). A new damage
+    source needs nothing more than that. `probes/probe_throw_stick.py` sees the thrown knife's
+    flinch play, a thrown gun (no damage) play none, and a killing throw ragdoll instead.
 - **A body looking down its sights does not flinch** (`Steady`, asked first by
   `_author_steady_gate`; that arm only writes `PrevHealth`). The damage is untouched.
   - Only the player's is ever true: `weapon_component/steady.py` writes

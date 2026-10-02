@@ -31,9 +31,19 @@ def check_pickup_takes_once():
     if len(takes) != 1:
         return
 
-    # Backwards from the add: Set Dropped <- Branch(room) <- Cast(target)
-    # <- Branch(found) <- the loop's Completed.
-    flags = [n for n, _pin in _exec_from(takes[0])]
+    # Backwards from the add: Detach <- Set Dropped <- Branch(room)
+    # <- Cast(target) <- Branch(found) <- the loop's Completed.
+    looses = [n for n, _pin in _exec_from(takes[0])]
+    check("the taken item is detached from whatever it was left in (a body a "
+          "thrown blade struck), staying where it is",
+          len(looses) == 1 and "detachfromactor" in _title(looses[0]).replace(" ", "").lower()
+          and _target_as_item(looses[0], "self")
+          and all(pin_value(looses[0], r) == "KeepWorld"
+                  for r in ("LocationRule", "RotationRule", "ScaleRule")),
+          ", ".join(_title(n) for n in looses))
+    if len(looses) != 1:
+        return
+    flags = [n for n, _pin in _exec_from(looses[0])]
     check("the taken item stops being Dropped",
           len(flags) == 1 and _title(flags[0]) == "Set Dropped"
           and pin_value(flags[0], "Dropped") == "false"

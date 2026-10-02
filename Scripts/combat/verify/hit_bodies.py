@@ -12,6 +12,7 @@ from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.ragdoll import RAGDOLL_MESH_ROOT
 from combat.verify.common import BEL, PIN, check, in_pins, titled
 from combat.verify.fixtures import wg
+from combat.verify.throw_strike import is_strike_node
 
 
 def _near(a, b, tol=0.05):
@@ -82,7 +83,9 @@ def check_body_miss_is_a_miss():
     # The capsule stops the pellet and is twice the model's width. The body
     # trace used to pick the multiplier only, so a round through the air
     # beside the head still bled and still did its damage at 1x.
-    traces = [n for n in wg if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)]
+    # (A thrown blade's stage has a body trace of its own: verify/throw_strike.)
+    traces = [n for n in wg if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)
+              and not is_strike_node(n)]
     if not check_one("one body trace in the fire graph", traces):
         return
     branches = _then(traces[0])

@@ -1,14 +1,13 @@
-"""What a thrown blade strikes: thrown at a tree, the knife and the axe lodge
-in the trunk where they hit, point or bit first, and hang there as a pick-up
-that E takes back; thrown too high up the trunk to be reached, or thrown as a
-gun is, the item falls to the foot of the tree instead. Thrown at a body, each
-takes its own ThrowDamage off it, draws blood and falls at its foot; a gun
-thrown at the same body takes nothing.
+"""What a thrown blade does to a tree: the knife and the axe lodge in the
+trunk where they hit, point or bit first, and hang there as a pick-up that E
+takes back; thrown too high up the trunk to be reached, or thrown as a gun is,
+the item falls to the foot of the tree instead. (What it does to a body is
+probe_throw_stick.py's.)
 
 The player is stood THROW_FROM_CM from the nearest tree with a clear line to
 its trunk and no forage round it, and the keys are held and clicked as
-probe_throw.py does it. The body is a zombie with no mind of its own, stood in
-front of the player in the open; the other wanderers are gone.
+probe_throw.py does it. The wanderers are gone, but for one stood aside: the
+pictures are taken through its eyes.
 
 Run with --windowed and OW_THROW_SHOTS=1 to save a picture of each blade in
 the trunk to Saved/Screenshots/MacEditor, seen from beside it through the
@@ -18,16 +17,13 @@ Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
 """
 
-import math
 import os
 import shutil
 
 import unreal
 
-from combat.game_state import DAMAGED_BY_PLAYER_VAR
 from combat.paths import (
-    BLOOD_CLASS_PATH, BULLET_IMPACT_CLASS_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH,
-    WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
+    BULLET_IMPACT_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.throw_tuning import (
     LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_AXE_DAMAGE,
@@ -40,23 +36,18 @@ from combat.weapon_component.throw import (
     THROW_AIMING_VAR, THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR,
 )
 from combat.weapon_component.throw_flight import THROWN_VAR
-from combat.weapon_component.throw_strike import THROW_PAST_VAR
 from probes.probe_chop_tree import CLEAR_CM, _flat, _items, _trace, _trees
 from probes.probe_hot_blade import _of, _wanderers
 from probes.probe_knife import _file
 
-WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
-             (THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR, INTERACT_FORCED_VAR,
-              "EquippedIndex", "NeedsRefresh")]
-            + [(HEALTH_BP_PATH, "Health"), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR)])
+WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
+            (THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR, INTERACT_FORCED_VAR,
+             "EquippedIndex", "NeedsRefresh")]
 
 KNIFE, AXE = "BP_Knife_C", "BP_Axe_C"
 THROW_FROM_CM = 400.0     # the player's middle, from the bark
 PICK_FROM_CM = 75.0       # ...and when taking the blade back
-BODY_AT_CM = 300.0        # the body, in front of the player
-BODY_HP = 200.0           # room for both blades
 GUN_VIEW_DEG = -22.0      # the view tipped down, so a gun's lob meets the trunk
-BODY_VIEW_DEG = (-8.0, -30.0)   # ...and a blade's and a gun's throw the body
 HIGH_VIEW_DEG = (20.0, 25.0, 30.0, 35.0, 40.0)
 ON_GROUND_CM = 40.0       # an item this near the ground is lying on it
 ISM = unreal.InstancedStaticMeshComponent
@@ -241,39 +232,6 @@ def _falls(p, wc, player, item, label, spot, base, pitch):
     yield from _stand(p, player, near, yaw)
 
 
-def _open(p, player, at):
-    """A yaw from ``at`` with nothing in the way of a throw at a body."""
-    for deg in range(0, 360, 30):
-        reach = at + _dir(0.0, deg) * (BODY_AT_CM + 250.0)
-        floor = _trace(p, reach + unreal.Vector(0, 0, 150.0), reach - unreal.Vector(0, 0, 400.0),
-                       [player])
-        if _trace(p, at, reach, [player]) is None and floor and not isinstance(floor[10], ISM):
-            return float(deg)
-    return None
-
-
-def _wound(p, wc, player, item, body, health, at, yaw, pitch):
-    """Throw ``item`` at ``body``; returns (the health it lost, how far over
-    the ground under it the item came to rest, how far from the body)."""
-    def place():
-        body.set_actor_location(player.get_actor_location() + _dir(0.0, yaw) * BODY_AT_CM,
-                                False, True)
-
-    yield from _stand(p, player, at, yaw, pitch)
-    p.set(health, "Health", BODY_HP)
-    p.set(health, DAMAGED_BY_PLAYER_VAR, False)
-    place()
-    yield 0.1
-    place()
-    yield from _throw(p, wc, item)
-    rest = item.get_actor_location()
-    floor = _trace(p, rest + unreal.Vector(0, 0, 50.0), rest - unreal.Vector(0, 0, 500.0),
-                   [player, body])
-    return (BODY_HP - float(p.get(health, "Health")),
-            rest.z - floor[4].z if floor else 1.0e6,
-            _flat(rest - body.get_actor_location()))
-
-
 def _run(p):
     yield lambda: _of(p, "Zombie") is not None
     yield 0.5
@@ -283,13 +241,12 @@ def _run(p):
     if wc is None:
         return
     yield lambda: p.get(wc, "Held") is not None
-    # One zombie with no mind of its own; the rest are gone.
+    # One zombie with no mind of its own, to see through; the rest are gone.
     ctrl = _of(p, "Zombie")
     body = ctrl.get_controlled_pawn()
     ctrl.un_possess()
     for other in _wanderers(p):
         other.get_controlled_pawn().destroy_actor()
-    health = p.component(body, HEALTH_CLASS_PATH)
 
     bag = {i.get_class().get_name(): i for i in p.get(wc, "Inventory")}
     guns = [i for i in bag.values() if i.get_editor_property("UsesAmmo")]
@@ -327,33 +284,3 @@ def _run(p):
     yield from _falls(p, wc, player, guns[0],
                       "a gun thrown at the trunk does not lodge: it falls to the "
                       "foot of the tree", spot, base, GUN_VIEW_DEG)
-
-    # --- the body ---------------------------------------------------------------
-    at = spot[0]
-    yaw = _open(p, player, at)
-    p.check("there is open ground beside the tree to stand a body on", yaw is not None)
-    if yaw is None or not taken:
-        return
-    for item, name, want in ((knife, "knife", THROW_KNIFE_DAMAGE),
-                             (axe, "axe", THROW_AXE_DAMAGE)):
-        blood = _alive(p, BLOOD_CLASS_PATH)
-        lost, over, off = yield from _wound(p, wc, player, item, body, health, at, yaw,
-                                            BODY_VIEW_DEG[0])
-        p.check(f"a thrown {name} takes {want:g} HP off the body it strikes",
-                abs(lost - want) < 1e-3, f"lost {lost:g}")
-        p.check("...as the player's doing, and it draws blood",
-                p.get(health, DAMAGED_BY_PLAYER_VAR) is True
-                and bool(_alive(p, BLOOD_CLASS_PATH) - blood),
-                f"DamagedByPlayer {p.get(health, DAMAGED_BY_PLAYER_VAR)}")
-        p.check("...and falls to the ground at the body's feet, past the body "
-                "itself, a pick-up",
-                p.get(item, "Dropped") is True and over < ON_GROUND_CM and off < 150.0
-                and list(p.get(wc, THROW_PAST_VAR)) == [body],
-                f"{over:.0f} cm over the ground, {off:.0f} cm from it, the fall "
-                f"ignored {[a.get_name() for a in p.get(wc, THROW_PAST_VAR)]}")
-    lost, over, off = yield from _wound(p, wc, player, guns[1], body, health, at, yaw,
-                                        BODY_VIEW_DEG[1])
-    p.check("a gun thrown at the body strikes it and takes nothing",
-            lost == 0.0 and off < 150.0 and not p.get(health, DAMAGED_BY_PLAYER_VAR)
-            and not list(p.get(wc, THROW_PAST_VAR)),
-            f"lost {lost:g}, at rest {off:.0f} cm from it")

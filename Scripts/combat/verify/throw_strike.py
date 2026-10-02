@@ -1,12 +1,13 @@
 """verify.throw_strike -- what a thrown blade does to what it strikes
 (weapon_component/throw_strike.py): who has a ThrowDamage, how the knife and
 the axe sit lodged (combat/lodge.py), and the stage off the flight's hit: the
-wound and its blood, the tree test, the height it may lodge at, the chips, the
-item set into the trunk, and the fall it then skips.
+wound and its blood, the item set into the body and attached to the bone it
+struck, the tree test, the height it may lodge at, the chips, the item set
+into the trunk, and the fall both then skip.
 
 is_strike_node picks out the stage's nodes, so the older counts over the whole
-graph (blood and impact spawns, LastHitFrom writes, the chop's tree test) can
-set them aside, as they do the chop's.
+graph (blood and impact spawns, LastHitFrom writes, the chop's tree test, the
+pellet's body trace) can set them aside, as they do the chop's.
 """
 
 import functools
@@ -25,10 +26,13 @@ from combat.paths import (
 )
 from combat.throw_tuning import (
     LODGE_AXE_DEPTH_CM, LODGE_KNIFE_DEPTH_CM, LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR,
-    LODGE_TURN_VAR, THROW_AXE_DAMAGE, THROW_DAMAGE_VAR, THROW_KNIFE_DAMAGE,
+    LODGE_TURN_VAR, STICK_TRACE_PAST, THROW_AXE_DAMAGE, THROW_DAMAGE_VAR,
+    THROW_KNIFE_DAMAGE,
 )
 from combat.tuning import COMBAT, INTERACT_RADIUS
-from combat.verify.common import BEL, PIN, by_pins, check, has_in_pin, num_pin, pin_value
+from combat.verify.common import (
+    BEL, PIN, by_pins, check, has_in_pin, in_pins, num_pin, pin_value,
+)
 from combat.verify.fixtures import _is_exec, wg
 from combat.verify.throw import _item_cdo, _title, is_throw_trace
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
@@ -238,14 +242,81 @@ def check_wound():
     floors = [n for n in by_pins(wg, "Start", "End", "TraceChannel", "ActorsToIgnore")
               if [_title(f) for f in _feeders(n, "ActorsToIgnore")]
               == [f"Get {THROW_PAST_VAR}"]]
-    check(f"...and its fall passes the body by: the struck actor goes into "
-          f"{THROW_PAST_VAR} once, after the blood, and only the flight's trace "
-          "down to the ground ignores it",
-          len(adds) == 1 and _feeders(adds[0], "execute") == blood
+    check_stick(blood)
+    skins = _mine(_body_traces())
+    drops = {_title(f).replace(" ", "") for a in adds for f in _feeders(a, "execute")}
+    check(f"a body it cannot be set into drops it, and that fall passes the "
+          f"body by: the struck actor goes into {THROW_PAST_VAR} once, off the "
+          "Character cast's failed arm and the body trace's miss, and only the "
+          "flight's trace down to the ground ignores it",
+          len(adds) == 1 and len(_feeders(adds[0], "execute")) == 2
+          and drops == {"CastToCharacter", "Branch"}
+          and any(_feeders(f, "Condition") == skins
+                  for f in _feeders(adds[0], "execute") if _title(f) == "Branch")
           and any(has_in_pin(f, "Hit") for f in _feeders(adds[0], "NewItem"))
           and len(floors) == 1 and is_throw_trace(floors[0])
           and floors[0].get_path_name() in {n.get_path_name() for n in _floor()},
           f"{len(adds)} add(s), {len(floors)} trace(s)")
+
+
+def _body_traces():
+    return [n for n in wg if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)]
+
+
+def _puts():
+    """(the move that sets the item into a body, the one into a tree): told
+    apart by what the item's point is set on, a body trace's hit or the
+    flight's own."""
+    puts = _mine(by_pins(wg, "NewLocation", "NewRotation"))
+    in_body = [n for n in puts if any(n2 in _body_traces() for f in
+                                      _feeders(n, "NewLocation") for n2 in _pure_feeds(f))]
+    return in_body, [n for n in puts if n not in in_body]
+
+
+def check_stick(blood):
+    casts = _mine([n for n in wg if _title(n).replace(" ", "") == "CastToCharacter"])
+    check("a blade that wounded a body stays in it: after the blood, one cast "
+          "of the struck actor to Character, for its mesh",
+          len(casts) == 1 and _feeders(casts[0], "execute") == blood
+          and any(has_in_pin(f, "Hit") for f in _feeders(casts[0], "Object")),
+          str(len(casts)))
+    skins = _mine(_body_traces())
+    check("...one trace of that mesh's physics bodies alone",
+          len(skins) == 1 and pin_value(skins[0], "bTraceComplex").lower() == "false"
+          and [_title(f) for f in _feeders(skins[0], "self")] == ["Get Mesh"]
+          and _feeders(skins[0], "execute") == casts, str(len(skins)))
+    if len(skins) != 1:
+        return
+    start = _feeders(skins[0], "TraceStart")
+    way = _pure_feeds(skins[0])
+    bones = [n for n in way if has_in_pin(n, "TestLocation")]
+    check("...from the flight's hit towards the bone nearest it that has a "
+          f"body, {STICK_TRACE_PAST:g} times as far",
+          len(start) == 1 and has_in_pin(start[0], "Hit") and len(bones) == 1
+          and pin_value(bones[0], "bRequirePhysicsAsset") == "true"
+          and [_title(f) for f in _feeders(bones[0], "self")] == ["Get Mesh"]
+          and any(has_in_pin(f, "Hit") for f in _feeders(bones[0], "TestLocation"))
+          and any(num_pin(n, "X") == num_pin(n, "Y") == num_pin(n, "Z") == STICK_TRACE_PAST
+                  for n in way if {"X", "Y", "Z"} <= in_pins(n)),
+          f"{len(bones)} nearest-bone node(s)")
+    in_body, _in_tree = _puts()
+    found = [n for n in wg if _title(n) == "Branch" and _feeders(n, "Condition") == skins]
+    check("...where it struck one, the item in the air is set on the skin once, "
+          "as it is into a trunk",
+          len(in_body) == 1 and len(found) == 1 and _of_thrown(in_body[0])
+          and _feeders(in_body[0], "execute") == found
+          and _feeders(in_body[0], "NewLocation") != _feeders(in_body[0], "NewRotation"),
+          f"{len(in_body)} move(s), {len(found)} Branch(es)")
+    holds = _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))
+    check("...and attached to the mesh at the bone the trace struck, keeping "
+          "where it was set and its own size",
+          len(holds) == 1 and _of_thrown(holds[0])
+          and _feeders(holds[0], "execute") == in_body
+          and [_title(f) for f in _feeders(holds[0], "Parent")] == ["Get Mesh"]
+          and _feeders(holds[0], "SocketName") == skins
+          and all(pin_value(holds[0], r) == "KeepWorld"
+                  for r in ("LocationRule", "RotationRule", "ScaleRule")),
+          str(len(holds)))
 
 
 def check_lodge():
@@ -269,9 +340,13 @@ def check_lodge():
     chips = _mine(_spawns(IMPACT_CLASS_VAR))
     check("it chips the bark once, on the reachable arm",
           len(chips) == 1 and _feeders(chips[0], "execute") == highs, str(len(chips)))
-    puts = _mine(by_pins(wg, "NewLocation", "NewRotation"))
+    in_body, puts = _puts()
     check("...and is set into the trunk once: the item in the air, placed and "
-          "turned in one move", len(puts) == 1 and _of_thrown(puts[0]), str(len(puts)))
+          "turned in one move",
+          len(puts) == 1 and _of_thrown(puts[0]) and _feeders(puts[0], "execute") == chips
+          and any(has_in_pin(f, "Hit") for f in _feeders(puts[0], "NewLocation")
+                  for f in [f] + _feeders(f, "A")),
+          str(len(puts)))
     if len(puts) != 1:
         return
     turn = {_title(n) for f in _feeders(puts[0], "NewRotation")
@@ -285,12 +360,15 @@ def check_lodge():
           str(sorted(turn)))
     check(f"...its {LODGE_POINT_VAR}, turned the same way, on the hit",
           {f"Get {LODGE_POINT_VAR}", f"Get {LODGE_TURN_VAR}"} <= at, str(sorted(at)))
-    check("lodged, it skips the fall: straight on to the landing's Dropped, "
-          "so it hangs in the tree as a pick-up",
-          exits.get("Set Dropped") == puts and len(exits) == 2, str(sorted(exits)))
+    held = [n for n in _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))]
+    landed = exits.get("Set Dropped", [])
+    check("lodged, in a tree or in a body, it skips the fall: straight on to "
+          "the landing's Dropped, so it stays there as a pick-up",
+          len(landed) == 2 and all(n in landed for n in puts + held)
+          and len(exits) == 2, str(sorted(exits)))
     falls = [v for k, v in exits.items() if k != "Set Dropped"]
     check("everything else still comes down to the ground: an item that is no "
-          "blade, one that wounded a body, one that struck no tree, one too high",
+          "blade, one a body dropped, one that struck no tree, one too high",
           len(falls) == 1 and len(falls[0]) == 4, str([len(v) for v in falls]))
 
 

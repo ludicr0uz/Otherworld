@@ -233,7 +233,7 @@ menu polls its own copy from `DrawHUD`, which does.
   the key and the click
   (`probes/probe_throw.py`, and `probe_throw_melee.py` for the knife and the axe); the throw
   numbers are in `throw_tuning.py`.
-- **A thrown blade wounds a body and lodges in a tree** (`weapon_component/throw_strike.py`,
+- **A thrown blade wounds a body and stays in it, and lodges in a tree** (`weapon_component/throw_strike.py`,
   called by the flight on the frame its segment trace hits something, before the item is set
   down). The whole stage is behind one Branch, `Thrown.ThrowDamage > 0`: the base item's is 0,
   so a thrown gun, mushroom or canteen does neither. The knife's is 50 and the axe's 75
@@ -242,12 +242,33 @@ menu polls its own copy from `DrawHUD`, which does.
   - **A body** (the struck actor has a `BP_HealthComponent`) loses `ThrowDamage`, with the
     three stamps a pellet leaves (`LastDamageTime`, `DamagedByPlayer`, `LastHitFrom`: so a
     thrown blade counts the kill and enrages a wendigo), and `BloodClass` is spawned at the
-    wound. The damage is flat: no hit zones, and no hot blade's double. The item then
-    falls at the body's feet as before.
+    wound. The damage is flat: no hit zones, and no hot blade's double.
+  - **The blade stays in the body** (`_author_stick`): set on the model as it is into a
+    trunk (the same `_author_lodge`, the pose below) and attached to the mesh at the bone
+    it struck, KeepWorld, then straight to the landing's `Dropped = true`. So it goes
+    where the body goes, alive or a ragdoll, and E takes it back from within
+    `INTERACT_RADIUS` of the blade itself. Nothing else knows it is there: it is an
+    ordinary pick-up whose actor moves.
+    - **Where on the body is a second trace.** The flight's hit is on the capsule, far
+      wider than the model, so `K2_LineTraceComponent` (the mesh's physics bodies alone,
+      as the pellet's hit zone) runs from that hit towards the bone nearest it
+      (`FindClosestBone_K2`, bodies only) and `STICK_TRACE_PAST` (1.5) times as far. Its
+      `HitLocation` is the skin and its `BoneName` the attach socket. Not along the
+      flight's own line: a segment is a frame long and can end short of the model, and a
+      blade can cross the capsule beside the model, having wounded it all the same.
+    - **The take detaches** (`pickup._author_take_item`'s `DetachFromActor`, KeepWorld):
+      an item taken into the bag with something else in hand is only hidden, and would
+      ride on with the body.
+    - **A corpse's lifespan ends with the blade still in it**: the engine detaches
+      attached actors as it destroys an actor, so the blade is left where the corpse lay,
+      a pick-up still. Nothing here does that.
+    - A dead body cannot be struck at all: its capsule is NoCollision and the Ragdoll
+      profile ignores Visibility, so a throw passes through a corpse as a pellet does.
   - **`ThrowPast` is what the fall's ground trace ignores** (an Actor array on the
-    component): emptied every strike, given the body a blade wounded, so the trace down
-    cannot land the item on the body's own arm or knee. A wall, a tree or the ground must
-    never go in it: the same trace finds the ground through them.
+    component): emptied every strike, and given a body the blade could not be set into
+    (no Character, or the body trace found nothing), which drops it at its foot. The
+    trace down then cannot land the item on the body's own arm or knee. A wall, a tree or
+    the ground must never go in it: the same trace finds the ground through them.
   - **A tree** (no health, and the struck component is an `InstancedStaticMeshComponent`:
     chop's test) struck within `LODGE_MAX_HEIGHT_CM` (250) of its foot chips
     (`ImpactClass`) and keeps the item: one `SetActorLocationAndRotation`, then straight to
@@ -267,8 +288,11 @@ menu polls its own copy from `DrawHUD`, which does.
     the release's `SetActorRotation`, which `verify/weapon_inputs.py` allows once.
   - `verify/throw_strike.is_strike_node` sets the stage's nodes aside in the older
     whole-graph counts (blood and impact spawns, `LastHitFrom` writes, the chop's tree
-    cast). `probes/probe_throw_strike.py` throws both blades and a gun at a trunk and at a
-    body; with `--windowed` and `OW_THROW_SHOTS=1` it saves a picture of each lodged blade.
+    cast, the pellet's body trace). `probes/probe_throw_strike.py` throws both blades and
+    a gun at a trunk, and `probes/probe_throw_stick.py` at a body: alive, killed by the
+    throw, and gone. With `--windowed` and `OW_THROW_SHOTS=1` each saves a picture of
+    every lodged blade. A body the throw kills drops its gun beside it, and E takes the
+    item nearest the reticle: the probe presses past it.
 - **The use key is the sights key on an item with no sights** (`weapon_component/use.py`,
   names in `use_tuning.py`). `Using` is the key held (or `SightsForced`, the probes'
   stand-in), not sprinting, with a valid `Held` whose `HasSights` is false; `UsePressed` is
@@ -495,6 +519,13 @@ These are feel checks a headless run can't do:
   from the front and from the far side of a thin trunk (7 cm and 5 cm are in the wood);
   one that struck above 2.5 m dropping to the foot of the tree; and a blade thrown into a
   wendigo's capsule beside its body still wounding it (the flight has no hit zones);
+- a blade left in a body (`weapon_component/throw_strike.py`): where it sits on a walking,
+  swinging wanderer, since it goes in at the body part nearest where it met the capsule
+  (thrown at a zombie's side it is in the arm) and not always where it was aimed; whether
+  it clips through the limb as the bone turns; taking it back off a wendigo that is
+  attacking (E within 2.5 m of the blade, nearest the reticle); a blade in a corpse lying
+  under the gun the corpse dropped, where E takes whichever is nearer the reticle; and
+  the blade left hanging a little off the ground when the corpse under it goes after 60 s;
 - the stance clips in motion (`stance_clips.py`): the crouched walk covers about 55 cm/s and
   plays at 2x, so at the crouch's 270 cm/s the feet slide; the crawl is the UAL's face-down
   swim (no crawl clip exists in the packs), a two-armed pull and a frog kick, which may read

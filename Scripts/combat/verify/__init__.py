@@ -74,7 +74,8 @@ and it never relies on a variable another section left behind.
   interact    the interact key: its idle state, the probe's press, the reach,
               the ranking by AimPoint, a walk that only remembers
   pickup      interact's item kind: the take runs once, after the search, on
-              the kept target cast to an item, with room in the bag
+              the kept target cast to an item, with room in the bag, and
+              detaches it from what it was left in
   heat        the heated blade: who Heats, M_HotMetal and each item's
               instance, the glow and the cooling on the item's own Tick, the
               interact key's campfire kind, the use key's cauterising, the
@@ -85,7 +86,8 @@ and it never relies on a variable another section left behind.
   throw_melee a melee weapon's throw: the knife's and the axe's flat, fast
               arc and forward spin, and the release squaring them up to it
   throw_strike  what a thrown blade strikes: who has a ThrowDamage, the wound
-              and its blood, the tree it lodges in and how high, the pose it
+              and its blood, the body it stays in (the body trace, the attach
+              to the bone), the tree it lodges in and how high, the pose it
               is left in, the fall it skips; is_strike_node
 """
 

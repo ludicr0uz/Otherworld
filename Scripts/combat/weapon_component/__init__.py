@@ -59,7 +59,8 @@ _author_* fragment per concern, each in its own module:
               what can be interacted with (today: an item, which is picked
               up, and a campfire, which heats the blade in hand)
   pickup      interact's item kind: the Dropped items it offers, and the take
-              of the one kept into the bag
+              of the one kept into the bag, detached from what it was left in
+              (a body a thrown blade struck)
   heat        interact's campfire kind: the fires it offers while the held
               item Heats (the knife, the axe), and what makes that item Hot
               for HEAT_S (the item's own Tick cools it: combat/heat.py)
@@ -90,8 +91,10 @@ _author_* fragment per concern, each in its own module:
               end, and lands as a Dropped item; a melee weapon leaves the hand
               squared up to the throw, so it spins forward, edge first
   throw_strike  what the flight struck, for an item with a ThrowDamage (the
-              knife, the axe): a body is wounded and bleeds; a tree within
-              reach keeps the item, lodged point or bit first, a pick-up
+              knife, the axe): a body is wounded and bleeds, and keeps the
+              item, set on the model and attached to the bone it struck; a
+              tree within reach keeps it, lodged point or bit first; a pick-up
+              either way
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery

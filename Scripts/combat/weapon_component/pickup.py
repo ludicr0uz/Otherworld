@@ -5,11 +5,16 @@ level's items and offers the Dropped ones; interact.py keeps the one in reach
 nearest AimPoint as InteractTarget. _author_take_item casts that target to an
 item and takes it, once, after the search. Standing on a pile, the player
 picks the item they are looking at, and a second press takes the next.
+
+A pick-up is not always lying loose: a thrown blade is left attached to the
+body it struck (throw_strike.py). The take detaches what it takes, so an item
+that goes into the bag unseen does not ride on with the body.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import (
-    FN_ALL_ACTORS, FN_ARR_ADD, FN_ARR_LEN, FN_IS_VALID, FN_LESS_II, MACRO_FOR_EACH,
+    FN_ALL_ACTORS, FN_ARR_ADD, FN_ARR_LEN, FN_DETACH, FN_IS_VALID, FN_LESS_II,
+    MACRO_FOR_EACH,
 )
 from combat.paths import ITEM_CLASS_PATH
 from combat.tuning import INVENTORY_SIZE
@@ -96,12 +101,19 @@ def _author_take_item(ed, target, exec_in, x0, y1):
     _connect(best, _pin(clear, "self"))
     _set(clear, "Dropped", "false")
     _connect(BEL.find_then_pin(room), _pin(clear, "execute"))
+    # Off whatever it was left attached to (a blade thrown into a body),
+    # staying where it is: the equip puts it in the hand, or hides it.
+    loose = keep(_at(_node(ed, FN_DETACH), x0 + 2840, y1 - 200))
+    _connect(best, _pin(loose, "self"))
+    for rule in ("LocationRule", "RotationRule", "ScaleRule"):
+        _set(loose, rule, "KeepWorld")
+    _connect(BEL.find_then_pin(clear), _pin(loose, "execute"))
 
     inv2 = keep(_at(ed.add_get_member_variable_node("Inventory"), x0 + 2840, y1 + 300))
     add = keep(_at(_node(ed, FN_ARR_ADD), x0 + 3100, y1))
     _connect(_out(inv2, "Inventory"), _pin(add, "TargetArray"))
     _connect(best, _pin(add, "NewItem"))
-    _connect(BEL.find_then_pin(clear), _pin(add, "execute"))
+    _connect(BEL.find_then_pin(loose), _pin(add, "execute"))
 
     # A pick-up goes into the bag and whatever is in the hand stays there.
     # Only empty hands take it up: after dropping or eating the last item,
@@ -120,7 +132,8 @@ def _author_take_item(ed, target, exec_in, x0, y1):
 
     ed.add_comment_to_nodes(
         "An interact target that is an item is picked up: taken once, after "
-        f"the search, while fewer than {INVENTORY_SIZE} are carried. It goes "
+        f"the search, while fewer than {INVENTORY_SIZE} are carried, and "
+        "detached from whatever it was left in. It goes "
         "into the inventory without switching to it: the held item stays "
         "held. Only empty hands (Held is None) take it up.",
         made)

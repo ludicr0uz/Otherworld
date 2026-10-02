@@ -1,7 +1,7 @@
 """The throw's numbers: speed, angle, where it leaves from, the gravity the arc
 and the flight share, how the arc is drawn, how an item tumbles and comes to
 rest, what a melee weapon's throw has of its own, what a thrown blade does to
-a body and a tree, and when the throw's clip lets go.
+a body and a tree and how it stays in them, and when the throw's clip lets go.
 Constants only. The throw key itself is THROW_KEY in tuning.py, beside the
 other binds, because BIND_VARS lists it.
 """
@@ -77,6 +77,12 @@ MELEE_THROW = {
 # out of the model). Only within LODGE_MAX_HEIGHT_CM of the tree's foot: the
 # pick-up reaches INTERACT_RADIUS (250 cm) from the player's middle, so a
 # blade any higher could not be taken back; it falls to the foot instead.
+# Into a body it stays too, set the same way and attached to the bone it
+# struck, so it goes where the body goes and is taken back from within reach
+# of it. The flight's hit is on the body's capsule, in the air round the
+# model; the skin is found by a trace from there towards the nearest bone and
+# STICK_TRACE_PAST times as far, so it crosses the bone's body and not just
+# reaches its middle.
 THROW_DAMAGE_VAR = "ThrowDamage"       # on BP_WeaponItem, 0 by default
 THROW_KNIFE_DAMAGE = 50.0
 THROW_AXE_DAMAGE = 75.0
@@ -85,6 +91,7 @@ LODGE_POINT_VAR = "LodgePoint"         # on BP_WeaponItem
 LODGE_MAX_HEIGHT_CM = 250.0
 LODGE_KNIFE_DEPTH_CM = 7.0      # of the blade's 18.6 cm
 LODGE_AXE_DEPTH_CM = 5.0        # of the head's 25 cm from bit to poll
+STICK_TRACE_PAST = 1.5
 
 # The clip (weapon_component/throw_windup.py): Quaternius UAL2's OverhandThrow,
 # played at its own rate. THROW_RELEASE_S is where its hand lets go, measured

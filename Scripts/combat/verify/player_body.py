@@ -13,6 +13,7 @@ from combat.hit_zones import (
 from combat.skin import SKIN_QUINN, player_skin
 from combat.tuning import COMBAT
 from combat.verify.fixtures import char, npc, wg
+from combat.verify.throw_strike import is_strike_node
 from combat.verify.common import (
     BEL, PIN, _mesh_asset, check, in_pins, load, num_pin, pin_value, titled,
     zone_tables,
@@ -112,7 +113,8 @@ def check_player_body():
 
 
     wt = wg
-    zone_traces = [n for n in wt if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)]
+    zone_traces = [n for n in wt if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)
+                   and not is_strike_node(n)]
     check("one trace against the struck character's body, per pellet",
           len(zone_traces) == 1, f"{len(zone_traces)} K2_LineTraceComponent node(s)")
     if zone_traces:

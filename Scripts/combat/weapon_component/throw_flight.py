@@ -9,8 +9,8 @@ under THROW_GRAVITY_Z, the same gravity the prediction runs under, so the item
 follows the dots and comes down on the disc at their end.
 
 What it strikes on the way is throw_strike.py's: a blade (an item with a
-ThrowDamage) wounds a body before it falls at its foot, and lodges in a tree
-instead of falling, a pick-up still.
+ThrowDamage) wounds a body and stays in it, attached, and lodges in a tree;
+either way it skips the fall, a pick-up still.
 
 The tumble (_author_spin) is a turn about the level axis across the throw,
 top first, at the item's own ThrowSpinDegS a second. It is added frame by
@@ -215,7 +215,7 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
     _connect(_out(below), _pin(floor, "End"))
     _trace_defaults(floor)
     # First what a blade does to what it struck (throw_strike.py): one that
-    # lodged in a tree stays there, and skips the way down.
+    # lodged in a tree or a body stays there, and skips the way down.
     falls, lodged = _author_throw_strike(ed, thrown, hit, BEL.find_then_pin(struck),
                                          x0 + 2000, y0 - 2600)
     for pin in falls:

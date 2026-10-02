@@ -64,6 +64,7 @@ from combat.body_pose import patch_body_pose                      # noqa: E402
 from combat.stance_clips import (                                 # noqa: E402
     patch_stance_clips, unpatch_stance_clips,
 )
+from combat.support_hand import patch_support_hand                # noqa: E402
 from combat.blood import build_blood_splash                       # noqa: E402
 from combat.bullet_impact import build_bullet_impact              # noqa: E402
 from combat.combat_trace import build_combat_trace_switch         # noqa: E402
@@ -120,6 +121,8 @@ def main():
     # Before the weapon component, whose Tick sets the AimPitch this declares.
     patch_aim_pitch(skin)
     patch_body_pose(skin)
+    # After the pitch, whose chain it joins the end of.
+    patch_support_hand(skin)
     # The crouch and the crawl clips under everything else (or none, and the
     # body poses above do it procedurally).
     patch_stance_clips(skin)

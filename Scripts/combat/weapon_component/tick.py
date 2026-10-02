@@ -42,6 +42,7 @@ from combat.weapon_component.head_hide import _author_head_hide
 from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
+from combat.weapon_component.support_hand import _author_support_hand
 from combat.weapon_component.sway import _author_sight_sway
 from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.steady import _author_steady
@@ -163,6 +164,10 @@ def _author_wc_tick(ed, tick):
     # After both are written (Stance, Blocking), which set its weights.
     ads_exits = _author_pose_weights(ed, tick, held, armed_out, ads_exits,
                                      12600, -700)
+
+    # --- and the left hand holds the gun, down the sights (support_hand.py) ---
+    # After SightBlend and HeldTwoHanded are written, which it copies.
+    ads_exits = _author_support_hand(ed, ads_exits, 12600, -2100)
 
     # --- and how true the gun shoots from here -------------------------------
     # After the stance and the aim state it reads, before the trigger and the

@@ -218,7 +218,9 @@ editor.
   (`combat/weapon_component/seat.py`). Down any gun's sights the player's own head is
   hidden, so it never stands in the sight picture (`combat/weapon_component/head_hide.py`).
   The aim sways slowly, sights and shot together
-  (`combat/sway_tuning.py`; steadier crouched and prone). A hit taken down the sights plays
+  (`combat/sway_tuning.py`; steadier crouched and prone). Down the sights the left hand is
+  held on the gun (an IK onto a point in the right hand's space), so both hands move with
+  it (`combat/support_hand.py`). A hit taken down the sights plays
   no flinch, so the view stays on the target (`combat/weapon_component/steady.py`).
   The pistol reloads every 8 shots from an endless reserve. A bullet that hits a body throws
   blood; one that hits the scenery throws chips and dust off the surface (`BP_BulletImpact`).

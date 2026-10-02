@@ -32,6 +32,10 @@ and it never relies on a variable another section left behind.
               Steady gate, and the weapon component's write of it
   aim_pitch   down the sights the anim BP pitches two spine bones by AimPitch,
               which the component writes from the view pitch x SightBlend
+  support_hand  down the sights the left hand holds the gun: the anim BP's
+              Two Bone IK onto a point in the right hand's space, its weight
+              and pose written by the component from SightBlend and
+              HeldTwoHanded
   body_pose   the crouch, prone and guard poses: the anim BP's weighted
               ModifyBones match body_pose.pose_plan, the plan replayed on the
               skeleton lands where each pose says, the component's weights
@@ -64,7 +68,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "head_hide", "sway", "steady", "aim_pitch", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light",
     "hold_pose", "throw", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

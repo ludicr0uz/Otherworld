@@ -233,7 +233,7 @@ touches the fire graph doesn't pay for the notes on blood.
 
 | file | covers |
 |---|---|
-| `docs/aiming.md` | the carry (a gun rides lowered until aimed or fired: `weapon_component/carry.py`), shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch, the player's own head hidden down the sights (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `head_hide.py`, `sway.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
+| `docs/aiming.md` | the carry (a gun rides lowered until aimed or fired: `weapon_component/carry.py`), shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch, the player's own head hidden down the sights, the left hand held on the gun there (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `head_hide.py`, `sway.py`, `support_hand.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
 | `docs/stance.md` | sprint, blocking (the guard's quarter damage and stamina cost), crouch and prone (`weapon_component/stance.py`), the procedural body poses (`body_pose.py`, `weapon_component/pose_weights.py`) |
 | `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_bodies.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
 | `docs/skin.md` | the player's body: the Meshy mesh and its retarget (`skin.py`) |
@@ -303,6 +303,10 @@ These are feel checks a headless run can't do:
   shadow is noticed with the sun behind the player;
 - the sight sway (`sway_tuning.py`): whether 0.3° reads as a held breath or as drunk,
   above all through the 4x scope, and whether crouch and prone steady it enough;
+- the left hand held on the gun down the sights (`support_hand.py`): whether the hand
+  now reads as one with the gun while swaying and walking, on the AK above all; whether
+  the hand is seen to shift (0.7 cm) as the hold eases in with the sights; a throw wound
+  up down the sights keeps the left hand on the gun until the sights come off;
 - a reload with the sights up: the view follows the gun, so it is thrown about with the
   arms. A hit no longer does (`weapon_component/steady.py`: no flinch down the sights);
   whether taking hits with no reaction at all reads, and the hit-then-sights blend;

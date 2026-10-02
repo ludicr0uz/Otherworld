@@ -70,6 +70,9 @@ ASSETS AND PATCHES
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
   aim_pitch         the player's anim BP: AimPitch tips the upper body (two
                     spine ModifyBones) so the gun follows the sights' pitch
+  support_hand      the player's anim BP: down the sights a Two Bone IK holds
+                    the left hand on the gun (a point in the right hand's
+                    space), weighted by SupportHand; support_at()
   body_pose         the player's anim BP: guard poses, and crouch and prone where
                     the rig has no clips, as weighted ModifyBones, pose_plan()
   stance_clips      the player's anim BP: the Quaternius crouch, crawl and kneel

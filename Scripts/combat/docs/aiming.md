@@ -159,6 +159,28 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     0.1°. At the hip with the view at +30, `AimPitch` read 0.
   - The anim updates before the component ticks, so the gun trails a fast vertical flick by one
     frame.
+- **Down the sights the left hand is held on the gun** (`support_hand.py`,
+  `weapon_component/support_hand.py`):
+  - The gun is rigid to the right hand only. The ready pose is layered over the locomotion
+    in mesh space, so the arms keep the pose's turn but hang off a spine the legs' clip
+    twists, and the shoulders move apart. In the gun's own space the left hand slid 0.4 cm
+    standing and 1 cm walking (probed), and down the sights the camera rides the gun, so the
+    gun stood still in the view and the hand moved under it.
+  - A Two Bone IK on the left arm, last in the player's anim BP's chain (after the pitch's
+    ModifyBones), puts the hand at a point in the **right hand's bone space**: where the
+    ready clip holds it at its start (`support_at`, sampled at build time). The rifle pose
+    and the pistol pose each have a point, picked by `SupportRifle`. The joint target is the
+    forearm bone itself, so the elbow stays on the side the pose has it.
+  - The component writes `SupportHand = SightBlend` (the IK's weight) and
+    `SupportRifle = HeldTwoHanded`. **Only down the sights:** at the hip and on the shoulder
+    the upper-body slot also plays things the left hand must be free for (a throw, a
+    search), and the camera is not on the gun.
+  - The point is the clip's at its start, 0.7 cm from where the walking hand used to
+    average; it eases in with `SightBlend`.
+  - `aim_pitch._remove_previous` takes the IK out with its own nodes, so the build order is
+    the pitch, the body poses, then `patch_support_hand`.
+  - `probes/probe_sight_hands.py`: rifle and pistol, standing and walking, both hands within
+    0.05 cm of still in the gun's space over 3 s; the hold off at the hip and let go after.
 - **Down the sights a hit plays no flinch** (`weapon_component/steady.py`, `docs/health.md`):
   the view rides the gun, so anything that takes the arms takes the aim. A reload still does.
 - **The camera boom sits over the right shoulder** (`camera.aim_camera()`: arm 260, socket

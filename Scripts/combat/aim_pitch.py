@@ -29,7 +29,8 @@ At the very end of the chain, after FullBodySlot and right before the output:
         -> ModifyBone(upper) -> ComponentToLocal -> Output
 
 (body_pose.py inserts the crouch, prone and guard poses between the
-LocalToComponent and the lower ModifyBone), so it turns whatever the pose is --
+LocalToComponent and the lower ModifyBone, and support_hand.py the left hand's
+IK between the upper one and the ComponentToLocal), so it turns whatever the pose is --
 the ready pose, a flinch, a crouch -- and costs nothing when AimPitch is 0,
 which it is everywhere but down the sights. The weapon component writes
 AimPitch (weapon_component/sight_pitch.py).
@@ -55,10 +56,12 @@ NODE_MODIFY_BONE = "Animation|SkeletalControls|Transform(Modify)Bone"
 NODE_TO_COMPONENT = "Animation|ConvertSpaces|LocalToComponent"
 NODE_TO_LOCAL = "Animation|ConvertSpaces|ComponentToLocal"
 MODIFY_BONE_CLASS = "AnimGraphNode_ModifyBone"
+# The support hand's IK (support_hand.py), which sits in this chain too.
+IK_CLASS = "AnimGraphNode_TwoBoneIK"
 # Everything this module puts in the graph, by class, so a rerun can take it
 # out again. The K2 nodes feeding the rotation pins are found by walking back
 # from the ModifyBones, since the stock graph has K2 nodes of its own.
-OWN_POSE_CLASSES = (MODIFY_BONE_CLASS, "AnimGraphNode_LocalToComponentSpace",
+OWN_POSE_CLASSES = (MODIFY_BONE_CLASS, IK_CLASS, "AnimGraphNode_LocalToComponentSpace",
                     "AnimGraphNode_ComponentToLocalSpace")
 
 
@@ -102,7 +105,7 @@ def _remove_previous(ed, root):
     for n in _nodes_of(ed, "AnimGraphNode_LocalToComponentSpace"):
         fed = PIN.list_connected_pins(_pin(n, "LocalPose"))
         upstream = fed[0] if fed else upstream
-    extras = _feeding_all(_nodes_of(ed, MODIFY_BONE_CLASS))
+    extras = _feeding_all(_nodes_of(ed, MODIFY_BONE_CLASS) + _nodes_of(ed, IK_CLASS))
     ed.remove_nodes(mine + extras)
     if upstream is None:
         raise RuntimeError("an earlier aim-pitch chain was fed by nothing; "

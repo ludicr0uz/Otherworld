@@ -5,7 +5,7 @@ writes AimPitch from the view's pitch scaled by SightBlend.
 
 import unreal
 
-from combat.aim_pitch import AIM_PITCH_VAR, MODIFY_BONE_CLASS, ROLL_PER_DEGREE
+from combat.aim_pitch import AIM_PITCH_VAR, IK_CLASS, MODIFY_BONE_CLASS, ROLL_PER_DEGREE
 from combat.skin import player_skin
 from combat.verify.common import BEL, PIN, cdo, check, graph, load, num_pin
 from combat.verify.fixtures import wg
@@ -47,7 +47,8 @@ def check_anim_bp_pitch():
     check(f"{abp.get_name()} declares {AIM_PITCH_VAR} as a float, resting at 0",
           isinstance(pitch, float) and pitch == 0.0, repr(pitch))
 
-    # Output <- ComponentToLocal <- ModifyBone(upper) <- ModifyBone(lower)
+    # Output <- ComponentToLocal <- [the support hand's IK, support_hand.py]
+    #        <- ModifyBone(upper) <- ModifyBone(lower)
     #        <- [the body poses, body_pose.py] <- LocalToComponent: the whole
     # pose, whatever it is, turns last.
     roots = [n for n in nodes if n.get_class().get_name() == "AnimGraphNode_Root"]
@@ -66,6 +67,8 @@ def check_anim_bp_pitch():
         pin = "ComponentPose"
     while chain.count("body pose") > 1:
         chain.remove("body pose")
+    if IK_CLASS in chain:
+        chain.remove(IK_CLASS)
     check("the output pose is the last pose, pitched on two bones in component "
           "space", chain[:3] == ["AnimGraphNode_ComponentToLocalSpace",
                                  MODIFY_BONE_CLASS, MODIFY_BONE_CLASS]

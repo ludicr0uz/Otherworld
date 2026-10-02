@@ -55,6 +55,8 @@ from npc.stats import _author_stats_and_voice
 from npc.strafe import _author_strafe, declare_strafe_vars
 from npc.tuned import declare_tuned_vars
 from npc.ward import _author_ward, declare_ward_vars, wards
+from survival.on_hit import melee_attack, on_hit_effects
+from survival.on_hit_graph import declare_on_hit_vars
 
 
 class _Steps:
@@ -174,6 +176,7 @@ def _author_steps(ed, key, melee_anim, x0, y0):
     _declare_agro_vars(ed)
     declare_tuned_vars(ed)
     declare_strafe_vars(ed)
+    declare_on_hit_vars(ed)
     spec = monster_specs(key)
     steps = _Steps(ed)
 
@@ -226,7 +229,8 @@ def _author_steps(ed, key, melee_anim, x0, y0):
     sx, sy = x0 + 5000, y0 - 3000
     rest = steps.result_node(True, sx + 5200, sy + 600)
     swing_in = steps.event(STEP_SWING, sx - 300, sy)
-    melee = _author_melee(ed, [swing_in], rest, sx, sy, melee_anim=melee_anim)
+    melee = _author_melee(ed, [swing_in], rest, sx, sy, melee_anim=melee_anim,
+                          on_hit=on_hit_effects(melee_attack(key)))
     if melee is None:
         _connect(swing_in, _pin(rest, "execute"))
     else:

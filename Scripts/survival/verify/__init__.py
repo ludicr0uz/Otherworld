@@ -7,6 +7,7 @@ so the two suites read the same way.
   tags          the config declares every tag; the engine knows them
   items         BP_ConsumableItem, the mushroom and the canteen
   debuffs       the two GameplayEffects, and the survival component's sync
+  bleeding      GE_Bleeding: its duration, its cost, and the on-hit table's assets
   ability       GA_ConsumeItem: trigger, instancing, graph
   hooks         the combat side: the use event, the HP drain, the inventory size
   install       ability systems and the survival component on the characters
@@ -16,5 +17,5 @@ so the two suites read the same way.
                 BP_WeaponComponent.CampfireClass pointing at it
 """
 
-SECTIONS = ("tags", "items", "debuffs", "ability", "hooks", "install", "forage", "loot",
+SECTIONS = ("tags", "items", "debuffs", "bleeding", "ability", "hooks", "install", "forage", "loot",
             "campfire")

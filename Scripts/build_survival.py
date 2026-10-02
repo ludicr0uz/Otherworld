@@ -12,6 +12,8 @@ WHAT THIS BUILDS
 ----------------
 /Game/Survival
   GE_Starving, GE_Dehydrated   infinite GameplayEffects (the debuffs)
+  GE_Bleeding                  a debuff that lasts 3 minutes; a wendigo's hit
+                               can apply it (build_npc_blueprints.py, run after)
   M_MushroomCap, M_MushroomStem, M_Canteen
   BP_ConsumableItem            child of BP_WeaponItem: Consumable, restores
   BP_Mushroom, BP_WaterCanteen the food and the water
@@ -38,13 +40,14 @@ from loot.install import fill_loot_tables                          # noqa: E402
 from survival.campfire import build_campfire, install_campfire     # noqa: E402
 from survival.consumables import build_consumables                 # noqa: E402
 from survival.consume_ability import build_consume_ability         # noqa: E402
-from survival.effects import build_debuff_effects                  # noqa: E402
+from survival.effects import build_debuff_effects, build_timed_effects  # noqa: E402
 from survival.install import install_survival                      # noqa: E402
 from survival.survival_component import build_survival_component   # noqa: E402
 
 
 def main():
     effects = build_debuff_effects()
+    build_timed_effects()
     _base, items = build_consumables()
     survival_bp = build_survival_component()
     # After the component: the ability casts to it.
@@ -63,7 +66,7 @@ def main():
     install_campfire(build_campfire())
     install_survival(survival_bp)
     _log(f"done -- {', '.join(items)}, hunger, thirst, temperature, "
-         f"{len(effects)} debuffs, GA_ConsumeItem and the campfire")
+         f"{len(effects)} debuffs and the bleed, GA_ConsumeItem and the campfire")
 
 
 if __name__ == "__main__":

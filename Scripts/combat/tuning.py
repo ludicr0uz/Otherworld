@@ -25,6 +25,23 @@ CONSUME_EVENT_TAG = "Event.Item.Consume"
 HEALTH_DRAIN_TAG = "Debuff.HealthDrain"
 DEBUFF_DRAIN_HP_PER_S = 0.5    # 100 HP lasts 200 s with one debuff, 100 with two
 
+# Bleeding: a wound that takes BLEED_TOTAL_HP over BLEED_DURATION_S and then
+# closes. GE_Bleeding (Scripts/survival) lasts that long and grants this tag;
+# the health component drains at the rate the two numbers make. A tag of its
+# own, not HEALTH_DRAIN_TAG, because its rate is its own.
+BLEEDING_TAG = "Debuff.Bleeding"
+BLEED_TOTAL_HP = 50.0
+BLEED_DURATION_S = 180.0
+# Six places: what a pin literal holds, so the graph and this agree exactly.
+BLEED_HP_PER_S = round(BLEED_TOTAL_HP / BLEED_DURATION_S, 6)
+
+# Every tag the health component drains by: (tag, HP per second per stack).
+# The rates add up, so a starving, bleeding player loses both.
+HEALTH_DRAINS = (
+    (HEALTH_DRAIN_TAG, DEBUFF_DRAIN_HP_PER_S),
+    (BLEEDING_TAG, BLEED_HP_PER_S),
+)
+
 # Polled keys.  1/2/3 and M belong to the graphics menu, so the weapon keys stay
 # clear of them.
 #

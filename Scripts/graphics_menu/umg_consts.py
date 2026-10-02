@@ -19,6 +19,7 @@ from graphics_menu.monster_tune_consts import MON_TUNE_ACTION, MON_TUNE_ROW_LABE
 from graphics_menu.world_tune_consts import WORLD_TUNE_ACTION, WORLD_TUNE_ROW_LABEL
 from graphics_menu.settings_rows import (
     BACK_LABEL, BIND_LABELS, DIFFICULTY_LABEL, SETTINGS_TITLE, SLIDERS)
+from combat.tuning import BLEEDING_TAG
 from survival.tuning import DEHYDRATED_TAG, STARVING_TAG
 
 UI_DIR = "/Game/UI"
@@ -134,9 +135,10 @@ SURVIVAL_BARS = (
     ("Thirst", "H2O", "(R=0.200000,G=0.480000,B=1.000000,A=0.950000)"),
     ("Temperature", "TEMP", "(R=0.920000,G=0.360000,B=0.260000,A=0.950000)"),
 )
-# (tag, label, the bar it sits beside)
+# (tag, label, what its widget is named after: the bar it empties, or itself)
 DEBUFF_LABELS = ((STARVING_TAG, "STARVING", "Hunger"),
-                 (DEHYDRATED_TAG, "DEHYDRATED", "Thirst"))
+                 (DEHYDRATED_TAG, "DEHYDRATED", "Thirst"),
+                 (BLEEDING_TAG, "BLEEDING", "Bleeding"))
 
 # Each bar, its icon and (HP) its number sit in one group widget, and the
 # group is what flashes while the bar is low (hud_flash.py).

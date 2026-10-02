@@ -116,7 +116,7 @@ BP_HealthComponent (health_component wires the fragments together)
   replacement       the dead wanderer's replacement: the wait, the point, the spawn
   death             kill count, shells, ragdoll collapse, corpse, player death
   gun_drop          the gun drop: seeded roll + pick streams, loot-table draw
-  debuff_drain      HP lost per stack of the GAS Debuff.HealthDrain tag
+  debuff_drain      HP lost per stack of each drained GAS tag (tuning.HEALTH_DRAINS)
   hit_reaction      flinch clips and direction pick; the Steady gate (a body
                     looking down its sights takes the hit and plays no flinch)
   hit_zones         head/limb bone tables and multipliers

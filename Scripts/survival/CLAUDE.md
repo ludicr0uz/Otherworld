@@ -25,7 +25,8 @@ Both are read at editor **startup**, so changing either needs a restart.
 |---|---|
 | `AbilitySystem` component | A stock ASC on the player **and** the wanderer. It initialises itself, and `GetAbilitySystemComponent(Actor)` finds it without the C++ interface. |
 | `GE_Starving`, `GE_Dehydrated` | **Infinite** GameplayEffects. |
-| `Debuff.Starving` / `.Dehydrated` / `.HealthDrain` | The HUD names a debuff from the first two tags. `combat/debuff_drain.py` drains 0.5 HP/s per stack of the third, so both debuffs together drain twice as fast. |
+| `GE_Bleeding` | A GameplayEffect with a **duration** (180 s): the ability system takes it off. A hit puts it on (below). |
+| `Debuff.Starving` / `.Dehydrated` / `.Bleeding` / `.HealthDrain` | The HUD names a debuff from the first three tags. `combat/debuff_drain.py` drains by the rows of `combat.tuning.HEALTH_DRAINS`: 0.5 HP/s per stack of `HealthDrain` (so starving and dehydrated together drain twice as fast) and 50/180 HP/s per stack of `Bleeding`; the rates add up. |
 | `GA_ConsumeItem` | Triggered by the gameplay event `Event.Item.Consume`. The payload's `OptionalObject` is the item. Instanced per actor. |
 | `BP_Campfire` | Not GAS: an Actor the matches light (`campfire.py`). Its Tick warms a player near it. |
 | `BP_SurvivalComponent` | Hunger/Thirst/Temperature as Blueprint floats, because an AttributeSet needs C++. Also their decay, the ability grant at BeginPlay, and the debuff sync. |
@@ -44,6 +45,32 @@ Both are read at editor **startup**, so changing either needs a restart.
 The debuff sync is the only place that decides a debuff is on, and it asks the ASC
 (`GetGameplayEffectCount`). combat never names a survival asset, only the two tags in
 `combat/tuning.py`.
+
+## On-hit effects and bleeding (`on_hit.py`, `on_hit_graph.py`)
+
+- **The table:** `on_hit.ON_HIT` maps an attack's name to the effects a landed hit of it
+  rolls, each with its own chance. Today: `"melee.Wendigo"` → bleeding at 33%.
+- **The fragment:** `_author_on_hit(ed, exec_in, target, effects, x0, y0)` goes into whatever
+  graph lands the hit and takes the target as an actor pin. Per effect: a random 0..1 under
+  `chance + OnHitChanceBonus` → remove every stack the target has → spec, tags → apply. It
+  returns the exec tails. The wanderers' swing runs it for every creature (`npc/melee.py`), so
+  another creature's effect is one `ON_HIT` row and an NPC rebuild; another kind of attack
+  calls the fragment with its own name (declare the bonus variable once per graph with
+  `declare_on_hit_vars`).
+- **Bleeding:** `GE_Bleeding` lasts `BLEED_DURATION_S` (180) and its spec grants
+  `Debuff.Bleeding`; the health component drains `BLEED_TOTAL_HP / BLEED_DURATION_S` per
+  second while the tag is on (all three in `combat/tuning.py`), which is 50 HP in all. A
+  second wound **restarts** the 3 minutes and never stacks. A blocked swing rolls too. It is
+  not saved with the profile, and nothing stops it early yet.
+- **Build order:** the controllers name `GE_Bleeding` on a pin, so `build_npc_blueprints.py`
+  runs after `build_survival.py`. Without the asset the swing is built without the roll, and
+  the builder says so.
+- **`OnHitChanceBonus`** is 0 as built. `probes/probe_bleeding.py` writes -1 and +1 to make
+  the roll fail or land, then measures the bleed; `npc/verify_on_hit.py` reads the 33%.
+- **A query by tag does not find the effect** (`GetActiveEffectsWithAllTags` returns
+  nothing): the tag is granted on the spec. Ask for the tag count or the effect count.
+- **A duration is set with `import_text`** on a `GameplayEffectModifierMagnitude`, then
+  `set_editor_property("duration_magnitude", …)`; read it back with `export_text()`.
 
 ## Items
 

@@ -34,7 +34,9 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - `[NPC-FELL] ERROR #n fell to … — spawned at …` quotes the stored `SpawnedAt`, which is for
     diagnosis only.
   - Both lines are `PrintWarning` (Blueprint has no Error severity) and appear in the log only.
-- **Debuff drain** (`debuff_drain.py`) sits between the net and the death check.
+- **Debuff drain** (`debuff_drain.py`) sits between the net and the death check. It drains
+  by the rows of `tuning.HEALTH_DRAINS` (tag, HP/s per stack), summed: the survival debuffs'
+  shared tag and the bleed's own.
 
 ## Dying
 

@@ -32,7 +32,9 @@ THE CONTROLLER'S STEPS (one fragment per concern)
   corpse       the corpse state: a Dead pawn stops the behaviour tree for good
                (Pulse), and the alive gate every other step starts at
   stats        this creature's health and flinch clips, once; voice on a timer
-  melee        range + cooldown check, swing, damage, hit direction
+  melee        range + cooldown check, swing, damage, hit direction; then
+               the creature's on-hit effects, rolled onto the player by
+               survival/on_hit_graph.py (a wendigo's blow: bleeding, 33%)
   block        the player's guard: blocked damage and its stamina cost
   combat_trace the [COMBAT-TRACE] line a landed swing logs, when enabled
   patrol       once-per-life setup (centre, run speed); stroll to a point
@@ -65,6 +67,7 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_strafe  the step between two swings: when, where to, facing, speed
   verify_stalk   the wendigo's hunt: roar, sweeps, cover, legs, charge
   verify_ward    fire holding it off: the gate, the hold, the ring, the flight
+  verify_on_hit  what a landed swing leaves on the player: the roll, the apply
 
 THE BODY
   character    BP_ForestWanderer and one child Blueprint per creature

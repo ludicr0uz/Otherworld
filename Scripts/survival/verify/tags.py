@@ -4,11 +4,11 @@ import os
 
 import unreal
 
-from combat.tuning import CONSUME_EVENT_TAG, HEALTH_DRAIN_TAG
+from combat.tuning import BLEEDING_TAG, CONSUME_EVENT_TAG, HEALTH_DRAIN_TAG
 from combat.verify.common import check
 from survival.tuning import DEHYDRATED_TAG, STARVING_TAG
 
-TAGS = (CONSUME_EVENT_TAG, HEALTH_DRAIN_TAG, STARVING_TAG, DEHYDRATED_TAG)
+TAGS = (CONSUME_EVENT_TAG, HEALTH_DRAIN_TAG, STARVING_TAG, DEHYDRATED_TAG, BLEEDING_TAG)
 INI = os.path.join(os.path.dirname(__file__), "..", "..", "..", "Config",
                    "DefaultGameplayTags.ini")
 

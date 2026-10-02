@@ -11,6 +11,10 @@ steps, the tree, the step task, the controller and the character).
 - The wendigo's hunt is `forest_generator/npc_stalk.py`.
 - What fire does to it is `forest_generator/npc_ward.py`.
 - None imports `unreal`, so the offline generator checks exactly what gets built.
+- What a landed swing can leave on the player (a wendigo's: bleeding, 33%) is
+  `survival/on_hit.py`, rolled at the end of `melee.py` by `survival/on_hit_graph.py`. The
+  controllers name `GE_Bleeding`, so this build runs after `build_survival.py`
+  (`Scripts/survival/CLAUDE.md`; checked by `verify_on_hit.py`, `probes/probe_bleeding.py`).
 - **The tunable ones are not pin literals.** Senses, patrol, run speed, melee damage/range/
   interval and health are `Tune*` variables on each controller (`tuned.py`), defaulted to
   `monster_tuning.monster_specs(key)`: `Scripts/npc/monster_tuning.csv` over the two files

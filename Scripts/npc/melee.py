@@ -1,5 +1,6 @@
 """The swing: range and cooldown check, the attack montage, the damage and
-its direction, and the impact sound.
+its direction, the impact sound, and what the hit can leave on the player
+(the on-hit effects: survival/on_hit.py).
 """
 
 from combat.game_state import LAST_DAMAGE_VAR
@@ -24,6 +25,7 @@ from npc.block import _author_block_check
 from npc.combat_trace import _author_melee_trace
 from npc.sound import _author_random_sound
 from npc.tuned import tuned
+from survival.on_hit_graph import _author_on_hit
 
 
 # An object pin holds the full object path (package + object name), and it
@@ -37,7 +39,7 @@ def _melee_montage_object():
     return _resolve(NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK, "melee montage")
 
 
-def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
+def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=()):
     """Swing at the player when the chase has closed the distance.
 
     ``after_move`` is every exec pin that runs the check -- now the tree's
@@ -57,6 +59,9 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
                                 --> player Health -= HitDamage
                                 --> player LastDamageTime = now (the HUD's
                                     save-and-exit is called off by a hit)
+                                --> roll ``on_hit``, this creature's on-hit
+                                    effects, onto the player (a blocked
+                                    swing rolls them too: it still lands)
                           false -------------------------------------> Delay
 
     Range is centre-to-centre between the two capsules, which is why
@@ -264,12 +269,17 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None):
         BEL.find_then_pin(struck), x0 + 4320, y0)
     made.extend(thud)
 
+    # --- and what it leaves behind -------------------------------------------
+    # Its nodes stay out of `made`: they have their own comment box.
+    _, after_effects = _author_on_hit(ed, after_thud, player_out, on_hit,
+                                      x0 + 5400, y0 + 1400)
+
     # Every exit -- hit, missing health component, not a Character -- has to
     # reach the Delay, or the chase loop ends on the first swing and the NPC
     # stands still forever.  A cast's failure pin left dangling is exactly that
     # bug, and it only shows up in a level where the player has no health
     # component.
-    for tail in (after_thud,
+    for tail in (*after_effects,
                  _pin(hit, "CastFailed", is_input=False),
                  _pin(as_char, "CastFailed", is_input=False)):
         _connect(tail, BEL.find_execute_pin(delay))

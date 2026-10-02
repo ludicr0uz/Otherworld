@@ -28,6 +28,7 @@ from npc.verify_sight_cone import run as run_sight_cone           # noqa: E402
 from npc.verify_strafe import run as run_strafe                   # noqa: E402
 from npc.verify_stalk import run as run_stalk                     # noqa: E402
 from npc.verify_ward import run as run_ward                       # noqa: E402
+from npc.verify_on_hit import run as run_on_hit                   # noqa: E402
 
 run()
 run_tree()
@@ -35,6 +36,7 @@ run_sight_cone()
 run_strafe()
 run_stalk()
 run_ward()
+run_on_hit()
 unreal.log_warning(f"[VERIFY] {len(PASS)} passed, {len(FAIL)} failed")
 for f in FAIL:
     unreal.log_warning(f"[VERIFY]   FAILED: {f}")

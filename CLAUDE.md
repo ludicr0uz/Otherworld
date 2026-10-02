@@ -29,7 +29,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
    | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches, the use key and the stick that burns | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
    | the Game Settings (M) panel, graphics presets and tuning, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
-   | survival: GAS, debuffs, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
+   | survival: GAS, debuffs, on-hit effects and bleeding, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
 | corpse loot: loot tables, the roll, the loot window | `build_survival.py` (tables), `probe_corpse_loot.py` | `Scripts/loot/CLAUDE.md` |
@@ -232,7 +232,7 @@ editor.
   swings a wanderer backs off a little and sidesteps round the player, facing them. A wendigo
   hunts before it chases: aggro, it roars (the Mixamo zombie scream, and one of its roar
   sounds), comes in round the player in an arc, tree to tree, waiting behind each trunk, and
-  from 10 m charges straight at them (`npc/stalk.py`, `forest_generator/npc_stalk.py`). Fire held out at a wendigo (the player's `FireWard`: the burning stick, raised by the use key) keeps it from attacking: within 7 m and in front of the player it circles them instead, attacks once it is more than 90° round the fire, and after 30 s of being held off runs away for 12 s and hunts again (`npc/ward.py`, `forest_generator/npc_ward.py`). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
+  from 10 m charges straight at them (`npc/stalk.py`, `forest_generator/npc_stalk.py`). Fire held out at a wendigo (the player's `FireWard`: the burning stick, raised by the use key) keeps it from attacking: within 7 m and in front of the player it circles them instead, attacks once it is more than 90° round the fire, and after 30 s of being held off runs away for 12 s and hunts again (`npc/ward.py`, `forest_generator/npc_ward.py`). A wendigo's blow has a 33% chance of leaving the player bleeding: 50 HP drained over 3 minutes, named BLEEDING on the HUD; a second wound restarts it (`survival/on_hit.py`, the on-hit table any attack can be given a row in). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs
   (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
   mannequin's set, plus that pack's scream for its roar.

@@ -236,7 +236,7 @@ touches the fire graph doesn't pay for the notes on blood.
 
 | file | covers |
 |---|---|
-| `docs/aiming.md` | the carry (a gun rides lowered until aimed or fired: `weapon_component/carry.py`), shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch, the player's own head hidden down the sights, the left hand held on the gun there (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `head_hide.py`, `sway.py`, `support_hand.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
+| `docs/aiming.md` | the carry (a gun rides lowered until aimed or fired: `weapon_component/carry.py`), shoulder and down-the-sights aim, the accuracy cloud and recoil, the reticle and scope, sight pitch, the player's own head hidden down the sights, the camera's near plane (2 cm, so the pistol's hands are not cut open), the left hand held on the gun there (`weapon_component/ads.py`, `accuracy.py`, `sight_pitch.py`, `sights.py`, `head_hide.py`, `sway.py`, `support_hand.py`), how a weapon sits in the hand (`grip.py`, `verify/grip_fit.py`) |
 | `docs/stance.md` | sprint, blocking (the guard's quarter damage and stamina cost), crouch and prone (`weapon_component/stance.py`), the procedural body poses (`body_pose.py`, `weapon_component/pose_weights.py`) |
 | `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_bodies.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
 | `docs/skin.md` | the player's body: the Meshy mesh and its retarget (`skin.py`) |
@@ -302,6 +302,11 @@ These are feel checks a headless run can't do:
   hides much of the view below and beside the target; the shotgun's support-hand fingers
   stand just right of the bead (its thumb no longer stands left of it); the adventurer's
   hair shows at the top of the AK's view;
+- the hands down the pistol's sights, now that the near plane no longer cuts them open
+  (`NEAR_CLIP_CM`, 2 cm): both thumbs stand whole beside the slide, left of the rear
+  sight, 4-10 cm from the eye, where the skin's texture is a blur; whether they take too
+  much of the view; and anything the nearer plane shows that 10 cm hid (the player's own
+  body with the boom pulled in against a wall);
 - the shotgun's thumbs (`shotgun_pose.SHOTGUN_THUMBS`): how the right thumb reads over the
   stock's wrist from behind and at the hip (its base joint is inside the wood, as the rifle
   pose's was), whether the left one closes on the pump or hovers (its base is 3 cm off the

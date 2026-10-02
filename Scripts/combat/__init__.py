@@ -22,8 +22,11 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     SightSeated / SightSeat / SightLook / SightsForced,
                     HasSights (the
                     item flag only a gun sets), where the HUD's
-                    crosshair gives way to the sights (RETICLE_HIDE_SEAT) and
-                    the player's own head leaves the view (HEAD_HIDE_SEAT)
+                    crosshair gives way to the sights (RETICLE_HIDE_SEAT),
+                    the player's own head leaves the view (HEAD_HIDE_SEAT),
+                    and the camera's near plane (NEAR_CLIP_CM, set in
+                    Config/DefaultEngine.ini), near enough not to cut the
+                    hands open down the pistol's sights
   carry_tuning      the carry's numbers and names: how long a shot keeps the
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   chop_tuning       chopping a tree: blows per piece of wood, where it lands

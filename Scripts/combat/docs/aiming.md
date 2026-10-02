@@ -119,6 +119,25 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     killed down the sights leaves a corpse with a head.
   - `probes/probe_head_hide.py` raises the sights on every item in the bag that has a sight
     line, so a gun added later is covered unnamed, then kills the player down them.
+- **The camera's near plane is 2 cm, so the hands are not cut open** (`NEAR_CLIP_CM` in
+  `seat_tuning.py`; `Config/DefaultEngine.ini`, `[/Script/Engine.Engine] NearClipPlane`):
+  - **Why:** the eye is on the gun, and the pistol's is 14 cm behind the grip. Both thumbs
+    lie beside the slide 6-10 cm from the eye, in the view. The engine's default plane is
+    10 cm: it went through them, and the player saw into the hand and out the other side.
+    The shotgun's right thumb (6 cm) was cut the same way.
+  - **It is the engine's plane, for every view,** read at startup. A camera component has no
+    near plane of its own (`FMinimalViewInfo.PerspectiveNearClipPlane` is not set by it), and
+    `r.SetNearClipPlane` is the same global. Depth is reversed-Z, so nothing far is lost.
+  - **Not the eye moved back:** the sight picture was tuned where it is, and the thumbs
+    would still be in the view, only smaller.
+  - At 2 cm the piece of the plane in view is 2.3 x 1.3 cm; the nearest skin in view is
+    3.7 cm from the eye (the pistol's right thumb).
+  - `verify/near_clip.py` reads the ini line; `verify/sights.py` holds each gun's parts
+    clear of the same plane. `probes/probe_sight_near_clip.py` reads the plane off the
+    game's projection matrix (an ini key in the wrong section is ignored silently) and, for
+    every gun with a sight line, standing, crouched and prone, finds no hand or forearm
+    crossing the plane's piece in view; at 10 cm it finds the pistol's thumbs. With
+    `--windowed` and `OW_SIGHT_SHOTS=1` it saves each gun's sight picture.
 - **Down the sights the aim sways** (`sway_tuning.py`, `weapon_component/sway.py`):
   - Two slow sines, 0.3° sideways and 0.2° up and down, times `SightBlend` and the stance
     (crouched 0.6, prone 0.3). It is the **control rotation** that sways, so the gun, its

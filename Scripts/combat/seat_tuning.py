@@ -1,5 +1,6 @@
 """The sight camera's seat: how the camera goes from the boom onto the gun's
-sights, when it may turn onto their line, and the names it is kept under. Constants only; the graph is
+sights, when it may turn onto their line, the names it is kept under, and the
+near plane it sees the hands through (NEAR_CLIP_CM). Constants only; the graph is
 weapon_component/seat.py, read by sights.py, ads.py and carry.py, and by the
 HUD's reticle (graphics_menu/reticle.py).
 """
@@ -57,3 +58,20 @@ RETICLE_HIDE_SEAT = 0.9
 # the body's head, in front of the camera where it always is; it goes just
 # before the camera reaches it, so the body is not seen headless from behind.
 HEAD_HIDE_SEAT = 0.8
+
+# The camera's near plane (cm): nothing nearer the eye is drawn, and what
+# straddles it is cut open. It is the engine's, set for every view in
+# Config/DefaultEngine.ini ([/Script/Engine.Engine] NearClipPlane, read at
+# startup); a camera component has no near plane of its own to set from a
+# Blueprint. The engine's default is 10. Down the sights the eye is on the gun,
+# and the pistol's is a hand's length behind the grip: both thumbs lie beside
+# the slide 6-10 cm from the eye, in the view, and at 10 the plane went
+# through them, so the player saw into the hand and out the other side. At 2
+# the piece of the plane that is in view is 2.3 x 1.3 cm, and the nearest skin
+# in view is 3.7 cm from the eye (the pistol's right thumb, probed). Depth is
+# reversed-Z, so the far scenery loses nothing.
+NEAR_CLIP_CM = 2.0
+NEAR_CLIP_DEFAULT_CM = 10.0     # the engine's own, which cut the pistol's hands
+NEAR_CLIP_INI = "Config/DefaultEngine.ini"
+NEAR_CLIP_SECTION = "/Script/Engine.Engine"
+NEAR_CLIP_KEY = "NearClipPlane"

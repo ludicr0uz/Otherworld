@@ -11,8 +11,8 @@ from combat.paths import (
     WOOD_BP_PATH,
 )
 from combat.seat_tuning import (
-    HAS_SIGHTS_VAR, LOOK_VAR, SEAT_HOLD, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_COS,
-    SIGHT_SEAT_DEG, SIGHTS_FORCED_VAR,
+    HAS_SIGHTS_VAR, LOOK_VAR, NEAR_CLIP_CM, SEAT_HOLD, SEAT_VAR, SEATED_VAR,
+    SIGHT_SEAT_COS, SIGHT_SEAT_DEG, SIGHTS_FORCED_VAR,
 )
 from combat.tuning import BIND_VARS, COMBAT, SIGHTS_KEY
 from combat.weapon_component.sights import SCOPE_HIDE_BLEND, SIGHT_LINE_MIN_CM
@@ -22,8 +22,6 @@ from combat.verify.common import (
     BEL, PIN, cdo, check, component_template, components, in_pins, load,
     num_pin, out_pins, pin_value,
 )
-
-NEAR_CLIP_CM = 10.0      # the engine's default near plane
 
 
 def _title(n):

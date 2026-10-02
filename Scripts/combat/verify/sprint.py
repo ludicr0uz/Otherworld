@@ -5,11 +5,17 @@ Without it, a held sprint at zero Stamina flipped Sprinting every frame (stop,
 regen a sliver, start, drain it), and the aim, gated on NOT Sprinting, flipped
 with it: the screen twitched with an aim key held. The speed, the drain and
 the fire gate are checked in verify/weapon_inputs.py.
+
+And its direction (sprint_tuning.py): only while the player steers within 60
+degrees of the way the character faces.
 """
 
 from combat.verify.fixtures import w, wg
 from combat.verify.common import (
     BEL, PIN, check, has_in_pin, in_pins, num_pin, out_pins, pin_value,
+)
+from combat.sprint_tuning import (
+    SPRINT_AHEAD_VAR, SPRINT_CONE_HALF_ANGLE_DEG, SPRINT_CONE_MIN_DOT,
 )
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 
@@ -36,6 +42,16 @@ def _is_sprint_poll(node):
     return (in_pins(node) == {"self", "Key"}
             and "IsInputKeyDown" in _title(node)
             and any("Get KeySprint" in _title(f) for f in _feeders(node, "Key")))
+
+
+def _and_terms(nodes):
+    """The inputs of a chain of ANDs, flattened: key AND fresh AND ahead is
+    two nodes deep."""
+    terms = []
+    for f in (f for n in nodes for f in _feeders(n, "A", "B")):
+        is_and = "AND" in _title(f).upper() and in_pins(f) >= {"A", "B"}
+        terms += _and_terms([f]) if is_and else [f]
+    return terms
 
 
 def check_sprint_latch():
@@ -66,7 +82,7 @@ def check_sprint_latch():
           str([_title(n) for n in kept]))
 
     gate = _feeders(marks[0], "Sprinting")
-    terms = [f for n in gate for f in _feeders(n, "A", "B")]
+    terms = _and_terms(gate)
     check("Sprinting = key held AND NOT spent, read off the latch's own write",
           len(gate) == 1 and "AND" in _title(gate[0]).upper()
           and any(_is_sprint_poll(n) for n in terms)
@@ -86,5 +102,45 @@ def check_sprint_latch():
           after == [marks[0]], str([_title(n) for n in after]))
 
 
+def check_sprint_forward():
+    value = w.get_editor_property(SPRINT_AHEAD_VAR)
+    check(f"{SPRINT_AHEAD_VAR} starts False", value is False, repr(value))
+    check(f"the sprint's cone is {SPRINT_CONE_HALF_ANGLE_DEG:.0f} deg either "
+          f"side of forward (a dot of {SPRINT_CONE_MIN_DOT})",
+          SPRINT_CONE_HALF_ANGLE_DEG == 60.0 and SPRINT_CONE_MIN_DOT == 0.5,
+          f"{SPRINT_CONE_HALF_ANGLE_DEG}, {SPRINT_CONE_MIN_DOT}")
+    stores = [n for n in wg if has_in_pin(n, SPRINT_AHEAD_VAR)]
+    marks = [n for n in wg if has_in_pin(n, "Sprinting")]
+    check(f"{SPRINT_AHEAD_VAR} is written once a frame",
+          len(stores) == 1, f"{len(stores)} writes")
+    if len(stores) != 1 or len(marks) != 1:
+        return
+
+    tests = _feeders(stores[0], SPRINT_AHEAD_VAR)
+    dots = [f for n in tests for f in _feeders(n, "A")]
+    check("...as a dot product no less than the cone's edge",
+          len(tests) == 1 and ">=" in _title(tests[0])
+          and num_pin(tests[0], "B") == SPRINT_CONE_MIN_DOT
+          and len(dots) == 1 and "Dot" in _title(dots[0]),
+          str([_title(n) for n in tests + dots]))
+    sides = [f for n in dots for f in _feeders(n, "A", "B")]
+    steers = [f for n in sides if "Normal" in _title(n)
+              for f in _feeders(n, "A")]
+    check("...of the way the player steers, normalised, with the way the "
+          "character faces",
+          any("LastMovementInput" in _title(n).replace(" ", "") for n in steers)
+          and any("Forward" in _title(n) for n in sides),
+          str([_title(n) for n in sides + steers]))
+    check("Sprinting needs it: sideways and backwards the key does nothing",
+          stores[0] in _and_terms(_feeders(marks[0], "Sprinting")),
+          str([_title(n) for n in _and_terms(_feeders(marks[0], "Sprinting"))]))
+    # The latch is the key's and the stamina's: turning away must not spend it.
+    latches = [n for n in wg if has_in_pin(n, SPRINT_SPENT_VAR)]
+    check("...and the latch does not read it, so turning back resumes",
+          len(latches) == 1 and stores[0] not in _and_terms(
+              _feeders(latches[0], SPRINT_SPENT_VAR)))
+
+
 def run():
     check_sprint_latch()
+    check_sprint_forward()

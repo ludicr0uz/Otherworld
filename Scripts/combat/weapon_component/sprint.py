@@ -5,13 +5,48 @@ from combat.graph import (
     BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set,
 )
 from combat.nodes import (
-    FN_ADD_FF, FN_AND, FN_CLAMP, FN_IS_KEY_DOWN, FN_LE_FF, FN_MUL_FF, FN_NOT,
+    FN_ACTOR_FORWARD, FN_ADD_FF, FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF,
+    FN_IS_KEY_DOWN, FN_LAST_MOVE_INPUT, FN_LE_FF, FN_MUL_FF, FN_NORMAL, FN_NOT,
     FN_OR, FN_SELECT_FF, MOVEMENT_CLASS_PATH, NODE_CAST_CHARACTER,
+)
+from combat.sprint_tuning import (
+    SPRINT_AHEAD_VAR, SPRINT_CONE_HALF_ANGLE_DEG, SPRINT_CONE_MIN_DOT,
 )
 from combat.tuning import COMBAT, SPRINT_KEY
 
 # Set when a held sprint runs Stamina out, cleared by letting the key go.
 SPRINT_SPENT_VAR = "SprintSpent"
+
+
+def _author_ahead(ed, char_out, exec_in, keep, x0, y0):
+    """SprintAhead: is the player steering within the cone ahead of them?
+
+        SprintAhead = Normal(last movement input) . actor forward >= cos(cone)
+
+    The input, not the velocity: the velocity lags a change of direction, so a
+    sprint would carry on sideways for as long as the character took to turn
+    its momentum. No input at all normalises to zero, whose dot is 0: standing
+    still is not sprinting. Stored, because the chain is pure and the probe
+    (probes/probe_sprint_forward.py) reads it. Returns the write.
+    """
+    steer = keep(_at(_node(ed, FN_LAST_MOVE_INPUT), x0, y0))
+    _connect(char_out, _pin(steer, "self"))
+    unit = keep(_at(_node(ed, FN_NORMAL), x0 + 240, y0))
+    _connect(_pin(steer, "ReturnValue", is_input=False), _pin(unit, "A"))
+    facing = keep(_at(_node(ed, FN_ACTOR_FORWARD), x0, y0 + 140))
+    _connect(char_out, _pin(facing, "self"))
+    along = keep(_at(_node(ed, FN_DOT_VV), x0 + 480, y0))
+    _connect(_pin(unit, "ReturnValue", is_input=False), _pin(along, "A"))
+    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(along, "B"))
+    inside = keep(_at(_node(ed, FN_GE_FF), x0 + 720, y0))
+    _connect(_pin(along, "ReturnValue", is_input=False), _pin(inside, "A"))
+    _set(inside, "B", SPRINT_CONE_MIN_DOT)
+    store = keep(_at(ed.add_set_member_variable_node(SPRINT_AHEAD_VAR),
+                     x0 + 960, y0))
+    _connect(_pin(inside, "ReturnValue", is_input=False),
+             _pin(store, SPRINT_AHEAD_VAR))
+    _connect(exec_in, _pin(store, "execute"))
+    return store
 
 
 def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
@@ -22,7 +57,7 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     and the pair could drift. SelectFloat picks the number, one write applies it:
 
         SprintSpent = ShiftDown AND (SprintSpent OR Stamina <= 0)
-        Sprinting = ShiftDown AND NOT SprintSpent
+        Sprinting = ShiftDown AND NOT SprintSpent AND SprintAhead
         MaxWalkSpeed = Sprinting ? SPRINT_SPEED : BaseSpeed
         Stamina += (Sprinting ? -drain : +regen) * DeltaSeconds,  clamped
 
@@ -34,6 +69,10 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     the zoom and the sights camera twitched with an aim key held, and the ready
     pose, which re-equipped every frame. Latched, a spent sprint stays off (and
     Stamina refills) until the key is let go and pressed again.
+
+    SprintAhead (_author_ahead) keeps a sprint to the way the player faces:
+    sideways and backwards the key does nothing. It gates Sprinting only, not
+    the latch, so turning away and back with the key held resumes the sprint.
 
     BaseSpeed is whatever the character's own MaxWalkSpeed was at BeginPlay, so
     sprinting can never leave the player permanently faster or slower than the
@@ -90,15 +129,20 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
                      x0 + 480, y0))
     _connect(_pin(still_spent, "ReturnValue", is_input=False),
              _pin(latch, SPRINT_SPENT_VAR))
-    _connect(BEL.find_then_pin(as_char), _pin(latch, "execute"))
+    ahead = _author_ahead(ed, char_out, BEL.find_then_pin(as_char), keep,
+                          x0 + 240, y0 + 940)
+    _connect(BEL.find_then_pin(ahead), _pin(latch, "execute"))
 
     fresh = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 300))
     _connect(_loose_pin(latch, "Output_Get", is_input=False), _pin(fresh, "A"))
     running = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 460))
     _connect(_pin(down, "ReturnValue", is_input=False), _pin(running, "A"))
     _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(running, "B"))
+    forwards = keep(_at(_node(ed, FN_AND), x0 + 840, y0 + 300))
+    _connect(_pin(running, "ReturnValue", is_input=False), _pin(forwards, "A"))
+    _connect(_loose_pin(ahead, "Output_Get", is_input=False), _pin(forwards, "B"))
     mark = keep(_at(ed.add_set_member_variable_node("Sprinting"), x0 + 960, y0))
-    _connect(_pin(running, "ReturnValue", is_input=False), _pin(mark, "Sprinting"))
+    _connect(_pin(forwards, "ReturnValue", is_input=False), _pin(mark, "Sprinting"))
     _connect(BEL.find_then_pin(latch), _pin(mark, "execute"))
     # Read the stored flag from here on, for the same reason the NPC id is read
     # back from its variable: the AND is pure and would be re-evaluated per read.
@@ -139,7 +183,10 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     ed.add_comment_to_nodes(
         f"{SPRINT_KEY}: {COMBAT.sprint_speed_cms:.0f} cm/s while Stamina lasts "
         f"({COMBAT.max_stamina / COMBAT.stamina_drain_per_s:.0f} s from full), refilling at "
-        f"{COMBAT.stamina_regen_per_s:.0f}/s the moment it stops. A sprint that runs "
+        f"{COMBAT.stamina_regen_per_s:.0f}/s the moment it stops. Forwards only: "
+        f"{SPRINT_AHEAD_VAR} is the steering within "
+        f"{SPRINT_CONE_HALF_ANGLE_DEG:.0f} deg of the way the character faces. "
+        f"A sprint that runs "
         f"Stamina out latches {SPRINT_SPENT_VAR} until the key is let go, so a "
         f"held key cannot flip Sprinting (and the aim with it) every frame. No Branch: "
         f"SelectFloat picks the speed and the sign of the drain, so there is one "

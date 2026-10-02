@@ -38,6 +38,7 @@ from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
     PUNCH_QUEUED_VAR,
 )
+from combat.sprint_tuning import SPRINT_AHEAD_VAR
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
@@ -112,6 +113,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         _declare(ed, name, _float_type())
     _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
     _declare(ed, SPRINT_SPENT_VAR, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, SPRINT_AHEAD_VAR, BEL.get_basic_type_by_name("bool"))
     # The guard (block.py). Read by the fire gate, and by every wanderer's
     # swing, which also writes Stamina here when the guard takes the hit.
     _declare(ed, "Blocking", BEL.get_basic_type_by_name("bool"))
@@ -293,6 +295,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         "BaseSpeed": 500.0,
         "Sprinting": False,
         SPRINT_SPENT_VAR: False,
+        SPRINT_AHEAD_VAR: False,
         "Blocking": False,
         FIRE_WARD_VAR: False,
         USING_VAR: False,

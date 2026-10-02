@@ -200,6 +200,9 @@ FN_COMP_SET_REL_LOC = "/Script/Engine.SceneComponent.K2_SetRelativeLocation"
 FN_COMP_SET_SCALE = "/Script/Engine.SceneComponent.SetRelativeScale3D"
 FN_SET_ACTOR_ROT = "/Script/Engine.Actor.K2_SetActorRotation"
 FN_ACTOR_FORWARD = "/Script/Engine.Actor.GetActorForwardVector"
+# The way the player steered this frame, as the movement component consumed it:
+# the intent, not the velocity, which lags it and outlives it.
+FN_LAST_MOVE_INPUT = "/Script/Engine.Pawn.GetLastMovementInputVector"
 FN_DRAW_LINE = "/Script/Engine.KismetSystemLibrary.DrawDebugLine"
 FN_DRAW_POINT = "/Script/Engine.KismetSystemLibrary.DrawDebugPoint"
 FN_SELECT_VECTOR = "/Script/Engine.KismetMathLibrary.SelectVector"

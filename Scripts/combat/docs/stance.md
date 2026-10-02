@@ -16,6 +16,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     frame.
   - `probes/probe_sprint_latch.py` shows the key-up half in game (the latch clears, stamina
     refills). No key can be pressed in a headless game, so the setting half is graph-checked.
+- **Forwards only** (`sprint_tuning.py`, `SprintAhead`): `Sprinting` also needs the player to be
+  steering within 60° of the way the character faces (the camera's yaw), so forward and the
+  forward diagonals sprint; sideways, backwards and standing still do not, and cost no stamina.
+  - It reads the movement **input** (`GetLastMovementInputVector`), not the velocity, which lags
+    a turn. It gates `Sprinting` only, never the latch: turning back with the key held resumes.
+  - `probes/probe_sprint_forward.py` steers the pawn at angles and reads `SprintAhead`.
 - Authored **without a Branch**. `SelectFloat` picks the speed and the stamina rate, and one
   write applies each.
 - **Sprinting drops the ready pose** by stopping the slot, so `ABP_Unarmed`'s run comes through.

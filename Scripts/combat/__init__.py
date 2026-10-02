@@ -27,6 +27,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     and the camera's near plane (NEAR_CLIP_CM, set in
                     Config/DefaultEngine.ini), near enough not to cut the
                     hands open down the pistol's sights
+  sprint_tuning     the sprint's direction rule: the 60 degree cone ahead a
+                    sprint is allowed in, and the SprintAhead variable's name
   carry_tuning      the carry's numbers and names: how long a shot keeps the
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   chop_tuning       chopping a tree: blows per piece of wood, where it lands

@@ -39,11 +39,11 @@ from combat.paths import AXE_BP_PATH, CUBE, HOLD_KNIFE_ANIM_PATH, MAT_METAL
 from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_specs import _weapon_icon
+from item_icons.items import ICON_TINT
 
 # asset_pipeline/import_quaternius.py imports every Survival Pack FBX here.
 AXE_MESH = "/Game/Sourced/Quaternius/Survival/SM_Axe"
 AXE_DISPLAY = "Axe"
-AXE_COLOUR = (0.62, 0.42, 0.26)
 AXE_SCALE = 0.2
 
 # On the scaled mesh, in its own frame (cm): the stretch of haft the fist
@@ -114,7 +114,7 @@ def build_axe(item_bp):
         "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
         "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, axe_outline())),
         "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*AXE_COLOUR, 1.0),
+        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.
         "AdsZoom": float(COMBAT.ads_zoom_irons),
         "Scoped": False,

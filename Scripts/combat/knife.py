@@ -32,10 +32,10 @@ from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_models import FAB_WEAPONS
 from combat.weapon_specs import _weapon_icon
+from item_icons.items import ICON_TINT
 
 KNIFE_MESH = f"{FAB_WEAPONS}/M9_Knife/SK_M9_Knife_X"
 KNIFE_DISPLAY = "Knife"
-KNIFE_COLOUR = (0.80, 0.80, 0.72)
 
 # Measured in the mesh's frame (cm): the handle's centre and size, and the
 # blade's, which runs from the guard to the tip.
@@ -110,7 +110,7 @@ def build_knife(item_bp):
         "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
         "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, knife_outline())),
         "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*KNIFE_COLOUR, 1.0),
+        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0: the ADS speed and the scope fade divide by (AdsZoom - 1),
         # and right-click still aims with a knife in hand (as with food).
         "AdsZoom": float(COMBAT.ads_zoom_irons),

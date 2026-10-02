@@ -19,8 +19,9 @@ weapon was a coloured square with its name under it.  That is what made the UI
 look unfinished, and no amount of rearranging rectangles fixes it.
 
 DrawTexture takes a tint and a blend mode, so one generated PNG per element
-buys rounded corners, a border, a gradient and a soft shadow -- and, for the
-weapons, an actual silhouette instead of a colour swatch.
+buys rounded corners, a border, a gradient and a soft shadow.  (The items'
+icons are not drawn here: Scripts/build_item_icons.py renders each from its
+3D model.)
 
 Sizes are exact rather than stretched.  The panels are fixed-size in the HUD,
 so a texture generated at that exact size is drawn 1:1 and its corner radius
@@ -30,16 +31,12 @@ Everything is drawn at SUPERSAMPLE x and reduced, which is where the clean
 edges come from -- PIL's polygon fill is hard-edged.
 """
 
-import math
 import os
 
 from ui_art.stat_icons import write_stat_icons
-from ui_art.tool_icons import icon_axe, icon_matches, icon_wood
 from ui_art.vertical_bars import write_vertical_bars
 
-# Pillow is imported lazily, inside the functions that draw. The editor's
-# embedded Python has no Pillow but DOES need WEAPON_ICON_ROWS below, and a
-# module-level import would make this file unimportable there.
+# Pillow is imported lazily, inside the functions that draw.
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(os.path.dirname(HERE), "assets", "ui")
@@ -314,216 +311,11 @@ def _blur(radius):
     return ImageFilter.GaussianBlur(max(0.5, radius))
 
 
-# ── Weapon silhouettes ──────────────────────────────────────────────────────
+# ── Item icons ──────────────────────────────────────────────────────────────
 #
-# Side profiles facing right, drawn white on transparent so the HUD can tint
-# them per weapon.  They are silhouettes, not illustrations: at 112x50 on screen
-# the only thing that survives is the outline, and the five have to be
-# distinguishable from each other at a glance while the player is being chased.
-#
-# The first pass got that wrong and it is worth recording how: each weapon was
-# given its identifying feature, but as DETAIL -- a pump 8 units deep, a 6-unit
-# scope, a front sight post 6 x 9.  Reduced to slot size those land on two or
-# three pixels each, and two or three pixels of a 50-pixel icon is noise.  The
-# player reported "lots of small dots", which is exactly what a 3px feature
-# antialiased down to a HUD looks like.
-#
-# So the rule now is that the distinguishing feature is not a detail but the
-# BULK, and the five differ in where their bulk sits:
-#
-#     Pistol    small, and nothing else in the set is
-#     Shotgun   two full-length horizontal tubes with daylight between them
-#     SMG       a magazine dropping below the body -- a T
-#     Rifle     a raked magazine, the only slanted mass here
-#     Sniper    a scope, the only mass ABOVE the barrel
-#
-# Every one of those survives being shrunk, because shrinking a big shape
-# leaves a smaller big shape.
-
-ICON_W, ICON_H = 128, 64
-
-
-def _shape(draw, polys, rounds=(), circles=()):
-    s = SUPERSAMPLE
-    white = (255, 255, 255, 255)
-    for p in polys:
-        draw.polygon([(x * s, y * s) for x, y in p], fill=white)
-    for (x0, y0, x1, y1, r) in rounds:
-        draw.rounded_rectangle((x0 * s, y0 * s, x1 * s, y1 * s),
-                               radius=r * s, fill=white)
-    for (cx, cy, rad) in circles:
-        draw.ellipse(((cx - rad) * s, (cy - rad) * s,
-                      (cx + rad) * s, (cy + rad) * s), fill=white)
-
-
-def _guard(d, x0, y0, x1, y1):
-    """A trigger guard, as a half-loop hanging off the receiver."""
-    s = SUPERSAMPLE
-    d.arc((x0 * s, y0 * s, x1 * s, y1 * s), 0, 180,
-          fill=(255, 255, 255, 255), width=4 * s)
-
-
-# How long each weapon reads relative to the longest. Applied as a scale after
-# drawing, so the five sit in one family instead of each being hand-fitted to
-# the canvas: a pistol that fills the slot as completely as a sniper rifle
-# tells the player the wrong thing about it.
-ICON_RELATIVE_LENGTH = {
-    "Pistol": 0.55, "SMG": 0.72, "Shotgun": 0.96, "Rifle": 1.00, "Sniper": 1.00,
-    "Knife": 0.50, "Axe": 0.70, "Wood": 0.60, "Matches": 0.30,
-}
-
-
-def _icon(builder, relative=1.0):
-    """Draw, then crop to ink, scale to its share of the width, and centre.
-
-    Normalising after the fact rather than in each builder's coordinates means
-    the drawings only have to be *right*, not also pre-aligned, and the family
-    stays consistent when one of them is edited.
-    """
-    from PIL import Image, ImageDraw
-    img = _canvas(ICON_W, ICON_H)
-    builder(ImageDraw.Draw(img))
-    box = img.getbbox()
-    if box:
-        img = img.crop(box)
-    target_w = max(1, round(ICON_W * SUPERSAMPLE * 0.98 * relative))
-    scale = target_w / img.width
-    target_h = max(1, round(img.height * scale))
-    limit = round(ICON_H * SUPERSAMPLE * 0.98)
-    if target_h > limit:
-        target_w = max(1, round(target_w * limit / target_h))
-        target_h = limit
-    img = img.resize((target_w, target_h), Image.LANCZOS)
-
-    out = _canvas(ICON_W, ICON_H)
-    out.alpha_composite(img, ((out.width - target_w) // 2,
-                              (out.height - target_h) // 2))
-    return _down(out, ICON_W, ICON_H)
-
-
-# The five drawings.  Each one is built around a single feature that no other
-# weapon in the set has, and that feature is drawn FAT -- see the note above
-# _shape for why.  What each one is for:
-#
-#   Pistol    small.  It is the only short one, so size alone identifies it.
-#   Shotgun   two full-length tubes, barrel over magazine, and a fat pump.
-#   SMG       a long straight magazine dropping to the bottom of the frame.
-#   Rifle     a raked banana magazine -- the only slanted shape in the set.
-#   Sniper    a scope, which is the only mass ABOVE the barrel in the set.
-#
-# So the five differ by where their bulk sits (small / two bars / below /
-# slanted / above) rather than by detail, which is what survives the reduction
-# to 112 x 54 on screen.
-
-
-def icon_pistol(d):
-    """Compact: a short slide over a deep grip.
-
-    The whole tell is that it is SMALL -- ICON_RELATIVE_LENGTH draws it at
-    just over half the length of the rifles, so it reads before any detail
-    does.  The grip is drawn deep and heavily raked to use the height the
-    short body leaves free.
-    """
-    _shape(d, polys=[[(40, 40), (66, 40), (58, 64), (30, 64)]],   # grip, raked
-           rounds=[(30, 18, 96, 32, 3),      # slide
-                   (34, 31, 74, 41, 2)])     # frame under the slide
-    _guard(d, 56, 40, 78, 58)
-
-
-def icon_shotgun(d):
-    """Two full-length tubes and a fat pump.
-
-    Barrel over magazine tube is the one shape in the set that is a DOUBLE
-    horizontal bar, and the pump is a solid block bridging both.  The previous
-    pass drew a single thin barrel with a small forend, which at slot size was
-    the same blob as the rifle.
-    """
-    _shape(d, polys=[[(2, 18), (28, 15), (28, 40), (6, 48)]],     # stock
-           rounds=[(26, 16, 122, 26, 3),     # barrel
-                   (44, 32, 112, 40, 3),     # magazine tube, under it
-                   (26, 14, 58, 42, 3),      # receiver, joining the two
-                   (64, 31, 94, 47, 4)])     # pump, riding the tube
-    _guard(d, 44, 42, 62, 58)
-
-
-def icon_smg(d):
-    """A long straight magazine, dropping clear of the body.
-
-    Short receiver plus a magazine that reaches the bottom of the frame: the
-    silhouette is a T, which nothing else here is.
-    """
-    _shape(d, polys=[],
-           rounds=[(22, 16, 86, 34, 3),      # boxy receiver
-                   (84, 21, 104, 29, 2),     # stubby barrel
-                   (8, 20, 24, 30, 2),       # folded stock
-                   (46, 34, 62, 64, 2)])     # MAGAZINE -- the tell
-    _guard(d, 62, 34, 80, 50)
-
-
-def icon_rifle(d):
-    """Long, with a raked banana magazine.
-
-    The magazine is the only slanted mass in the set, so the rifle is told
-    apart from the shotgun by the angle rather than by any detail.
-    """
-    _shape(d, polys=[[(2, 20), (30, 17), (30, 40), (6, 48)],      # stock
-                     [(52, 38), (70, 38), (84, 61), (66, 61)]],   # banana mag
-           rounds=[(12, 24, 124, 30, 2),     # thin barrel, full length
-                   (28, 18, 72, 38, 3),      # receiver
-                   (88, 27, 114, 35, 2)])    # handguard
-    _guard(d, 40, 38, 56, 52)
-
-
-def icon_sniper(d):
-    """A scope, which is the only mass above the barrel in the set.
-
-    Drawn long and thick and sitting proud on two mounts, so "something big on
-    top" survives even when the mounts and the bipod do not.
-    """
-    _shape(d, polys=[[(0, 24), (28, 21), (28, 44), (4, 52)],      # long stock
-                     [(90, 34), (96, 34), (88, 60), (82, 60)],    # bipod legs
-                     [(96, 34), (102, 34), (110, 60), (104, 60)]],
-           rounds=[(6, 26, 126, 34, 2),      # very long barrel
-                   (26, 22, 64, 40, 3),      # receiver
-                   (34, 2, 92, 16, 5),       # SCOPE -- the tell
-                   (42, 15, 50, 27, 1),      # front mount
-                   (76, 15, 84, 27, 1)])     # rear mount
-    _guard(d, 42, 40, 58, 54)
-
-
-def icon_knife(d):
-    """A blade with a point and a crossguard: no barrel, no grip below it.
-
-    The only drawing with nothing hanging under the body and a tapered end,
-    so it reads as "not a gun" before it reads as anything else.
-    """
-    _shape(d, polys=[[(52, 24), (112, 28), (126, 34), (52, 38)]],  # blade, pointed
-           rounds=[(8, 26, 46, 38, 5),       # handle
-                   (44, 16, 52, 46, 2)])     # crossguard
-
-
-# One texture per weapon, named T_UI_Icon_<DisplayName>. The item carries a
-# Texture2D reference to its own, so the HUD draws whatever the weapon says it
-# looks like and holds no table of weapon names -- the same rule the rest of
-# the strip already follows for SlotColor and DisplayName.
-#
-# This module keeps its Pillow imports inside its functions so that the editor,
-# which has no Pillow, can still import ICON_NAME_FOR to build those defaults.
-def ICON_NAME_FOR(display):
-    return f"T_UI_Icon_{display}"
-
-
-ICONS = {
-    "Pistol": icon_pistol,
-    "Shotgun": icon_shotgun,
-    "SMG": icon_smg,
-    "Rifle": icon_rifle,
-    "Sniper": icon_sniper,
-    "Knife": icon_knife,
-    "Axe": lambda d: icon_axe(d, SUPERSAMPLE),
-    "Wood": lambda d: icon_wood(d, SUPERSAMPLE),
-    "Matches": lambda d: icon_matches(d, SUPERSAMPLE),
-}
+# Not drawn here any more. Each item's inventory icon is a picture of its own
+# 3D model, rendered by Scripts/build_item_icons.py into the same folder
+# (T_UI_Icon_<DisplayName>.png), which this script leaves alone.
 
 # Exact HUD sizes. Generated at the size they are drawn so the corner radius
 # and the hairline border land on whole pixels instead of being resampled.
@@ -579,12 +371,6 @@ def main():
 
     scope_overlay().save(os.path.join(OUT_DIR, "T_UI_Scope.png"))
     made.append("T_UI_Scope")
-
-    for display, builder in ICONS.items():
-        name = ICON_NAME_FOR(display)
-        _icon(builder, ICON_RELATIVE_LENGTH.get(display, 1.0)).save(
-            os.path.join(OUT_DIR, f"{name}.png"))
-        made.append(name)
 
     made += write_stat_icons(OUT_DIR)
     made += write_vertical_bars(OUT_DIR)

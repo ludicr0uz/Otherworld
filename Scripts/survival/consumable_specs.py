@@ -56,12 +56,10 @@ def consumable_specs():
         # grip_part: what the fingers close round (grip._grip_location).
         dict(path=MUSHROOM_BP_PATH, display="Mushroom", parts=_mushroom_parts(),
              grip_part="Stem",
-             colour=(0.86, 0.62, 0.40),
              hunger=MUSHROOM_HUNGER, thirst=MUSHROOM_THIRST,
              health_easy=MUSHROOM_HEALTH_EASY),
         dict(path=CANTEEN_BP_PATH, display="Canteen", parts=_canteen_parts(),
              grip_part="Neck",
-             colour=(0.36, 0.84, 0.78),
              hunger=CANTEEN_HUNGER, thirst=CANTEEN_THIRST,
              health_easy=CANTEEN_HEALTH_EASY),
     )

@@ -26,6 +26,7 @@ from combat.grip import _grip_location, _grip_rotation
 from combat.tuning import COMBAT
 from combat.weapon_items import build_parts
 from combat.weapon_specs import _weapon_icon
+from item_icons.items import ICON_TINT
 from survival.consumable_specs import MATERIALS, consumable_specs
 from survival.paths import CONSUMABLE_BP_PATH
 
@@ -88,7 +89,7 @@ def build_consumable(spec, base_bp):
         "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, spec["parts"],
                                                        spec["grip_part"])),
         "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
+        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0: the ADS speed and scope fade divide by (AdsZoom - 1), and
         # right-click still aims with food in hand. The irons zoom is the
         # harmless value every unscoped weapon already uses.

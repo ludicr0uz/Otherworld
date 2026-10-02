@@ -31,6 +31,7 @@ from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR
 from combat.tuning import COMBAT
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
+from item_icons.items import ICON_TINT
 
 
 def build_weapon_item():
@@ -280,7 +281,7 @@ def build_weapon(spec, item_bp):
         "SightAim": unreal.Vector(*spec["sight_front"]),
         "GripLocation": unreal.Vector(*spec["grip_loc"]),
         "GripRotation": spec["grip_rot"],
-        "SlotColor": unreal.LinearColor(*spec["colour"], 1.0),
+        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
         "AdsZoom": float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),
         "Scoped": bool(spec.get("scoped", False)),
         **{name: float(spec[col]) for col, name in ACCURACY_VARS},

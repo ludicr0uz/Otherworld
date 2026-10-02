@@ -48,6 +48,7 @@ from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
 from graphics_menu.legal_checks import check_legal
 from graphics_menu.umg_checks import check_hud_graph, check_trees, text_literal
 from combat.tuning import COMBAT, SHOT_VOLUME_CM
+from item_icons.checks import check_item_icons
 
 BEL = unreal.BlueprintEditorLibrary
 BGE = unreal.BlueprintGraphEditor
@@ -219,9 +220,7 @@ def main():
     wrong = [a for a in art if not eas.load_asset(f"{UC.UI_ART_DIR}/{a}")]
     check("every texture the screens and the canvas draw is imported",
           not wrong, "; ".join(wrong))
-    icons = [d for d in ("Pistol", "Shotgun", "SMG", "Rifle", "Sniper")
-             if not eas.load_asset(f"{UC.UI_ART_DIR}/T_UI_Icon_{d}")]
-    check("...and so is every weapon icon", not icons, "; ".join(icons))
+    check_item_icons(check)
 
     # --- the UMG screens: their trees, and the graph that writes them
     check_trees(check)

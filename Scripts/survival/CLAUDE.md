@@ -8,11 +8,13 @@ reads it back. The code is this package (`__init__.py` is the map).
 Run it after `build_weapons_and_combat.py` and before `build_graphics_menu.py`:
 
 ```bash
-python3 Scripts/build_survival_icons.py      # Pillow, outside the editor
-python3 Scripts/dev/uepy.py Scripts/asset_pipeline/import_ui_art.py Scripts/build_weapons_and_combat.py \
+python3 Scripts/dev/uepy.py Scripts/build_weapons_and_combat.py \
     Scripts/build_survival.py Scripts/build_graphics_menu.py Scripts/place_forage.py
 python3 Scripts/dev/uepy.py Scripts/verify_survival.py
 ```
+
+The mushroom's and the canteen's inventory icons are renders of their models
+(`python3 Scripts/build_item_icons.py`, `Scripts/item_icons/CLAUDE.md`).
 
 ## It is the Gameplay Ability System
 

@@ -6,7 +6,6 @@ muzzle and sight come from weapon_models.py.
 
 import unreal
 
-from build_ui_art import ICON_NAME_FOR
 from combat.audio import (
     SND_RELOAD_PISTOL, SND_RELOAD_RIFLE, SND_RELOAD_SHOTGUN,
 )
@@ -19,6 +18,7 @@ from combat.paths import (
     UI_ART_DIR,
 )
 from combat.skin import player_skin
+from item_icons.items import icon_name
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG
 from combat.weapon_models import (
     PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, PISTOL_SIGHT_FRONT,
@@ -119,17 +119,18 @@ ACCURACY_VARS = (
 
 
 def _weapon_icon(display):
-    """The weapon's HUD silhouette, or None if the UI art is not built yet.
+    """The item's inventory icon, or None if it has not been rendered yet.
 
-    Soft rather than fatal: a clone that has not run build_ui_art.py should
-    still get a working game, with an empty slot where the icon goes.
+    Soft rather than fatal, and it has to be: the icon is a picture of the
+    item's own model (Scripts/build_item_icons.py), so on a fresh clone the
+    item is built first, with an empty slot where the icon goes, and built
+    again once its icon exists.
     """
-    path = f"{UI_ART_DIR}/{ICON_NAME_FOR(display)}"
+    path = f"{UI_ART_DIR}/{icon_name(display)}"
     tex = unreal.EditorAssetLibrary.load_asset(path)
     if not tex:
         _log(f"note: {path} missing -- {display} will have no inventory icon. "
-             "Run `python3 Scripts/build_ui_art.py` then "
-             "Scripts/asset_pipeline/import_ui_art.py")
+             "Run `python3 Scripts/build_item_icons.py`, then this build again")
     return tex
 
 
@@ -186,7 +187,6 @@ def _weapon_specs():
              display="Shotgun", automatic=False, damage=18.0, pellets=8, range=4000.0,
              sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_SHOTGUN,
              grip_rot=_grip_rotation(AIM_SHOTGUN), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
-             colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Shotgun"]),
@@ -195,7 +195,6 @@ def _weapon_specs():
              display="Pistol", automatic=False, damage=26.0, pellets=1, range=6000.0,
              sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
-             colour=(0.35, 0.65, 0.95),
              uses_ammo=True, magazine=PISTOL_MAGAZINE, reserve=0, infinite_reserve=True,
              interval=PISTOL_FIRE_INTERVAL, reload_s=PISTOL_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Pistol"]),
@@ -208,7 +207,6 @@ def _weapon_specs():
              display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
              sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
-             colour=(0.45, 0.85, 0.35),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
              interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["SMG"]),
@@ -219,7 +217,6 @@ def _weapon_specs():
              display="Rifle", automatic=True, damage=24.0, pellets=1, range=9000.0,
              sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
-             colour=(0.70, 0.45, 0.95),
              uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
              interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Rifle"]),
@@ -233,7 +230,7 @@ def _weapon_specs():
              display="Sniper", automatic=False, damage=120.0, pellets=1, range=20000.0,
              sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
-             colour=(0.95, 0.30, 0.35), ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
+             ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,
              interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Sniper"]),

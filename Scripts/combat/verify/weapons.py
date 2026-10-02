@@ -166,12 +166,13 @@ def check_five_weapons():
                       all(abs(a.length() - 1.0) < 1e-3 for a in axes.values()),
                       ", ".join(f"{k} = {v.to_tuple()}" for k, v in axes.items()))
 
-        # Five weapons in five slots with no icons: the colour swatch is the only
-        # thing distinguishing them at a glance, so two the same is a real bug.
-        swatches = [cdo(load(sp["path"])).get_editor_property("SlotColor").to_tuple()
-                    for sp in _weapon_specs()]
-        check("every weapon shows a different colour in the inventory",
-              len(set(swatches)) == len(swatches), str(len(set(swatches))))
+        # Each weapon's icon is a picture of its own model, so no two slots
+        # can show the same one (item_icons/checks.py holds every item to the
+        # rest: the texture, and the white tint it is drawn in).
+        icons = [cdo(load(sp["path"])).get_editor_property("Icon") for sp in _weapon_specs()]
+        check("every weapon shows a different icon in the inventory",
+              None not in icons and len(set(icons)) == len(icons),
+              str([i.get_name() if i else None for i in icons]))
         # Same argument in the other sense: the gun you cannot see is the gun you
         # can hear, and a shared shot would make the sniper sound like the SMG.
         shots = [cdo(load(sp["path"])).get_editor_property("FireSound").get_name()

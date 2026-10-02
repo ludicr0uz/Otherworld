@@ -33,6 +33,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
 | corpse loot: loot tables, the roll, the loot window | `build_survival.py` (tables), `probe_corpse_loot.py` | `Scripts/loot/CLAUDE.md` |
+| item icons: each item's inventory icon, rendered from its 3D model | `build_item_icons.py` (run outside the editor) | `Scripts/item_icons/CLAUDE.md` |
 
 ## Code layout: small modules, one owner each
 
@@ -243,6 +244,10 @@ editor.
   bars, a kill counter, an FPS readout that is always on (debug mode or not), the inventory grid, the main menu, the death menu, the Game Settings (M) panel
   and a settings screen, all of them worked by the mouse cursor as well as the keys (hover picks a row, a click takes it, the wheel adjusts). The M panel's rows have no hotkeys: Up/Down and Enter, or a click, take one, and while it is open the arrows do not walk the character. Its rows: debug mode, which draws each pellet's trajectory and each wanderer's aggro cone in the world; save and exit; a dev-all-guns cheat; a GUN TUNING tab that changes each gun's numbers live and saves them to `Scripts/combat/gun_tuning.csv`, which the weapons build reads; a MONSTER TUNING tab that does the same for each creature's senses, patrol, speed, melee and health, saved to `Scripts/npc/monster_tuning.csv`, which the NPC build reads; a WORLD TUNING tab that sets the time of day the day's and night's lengths and how fast the night cools the player, all but the hour saved to `Scripts/world/world_tuning.csv`; and a GRAPHICS TUNING tab, the one place the Low / Medium / High / Custom preset is picked, that changes each preset's numbers live (resolution, shadows, view distance in percent, grass and tree draw distance in metres, grass density, leaves, fog) and the look shared by all four (brightness, sun, moon, stars, ambient light, fog density), saved by its SAVE DEFAULT row to `Scripts/graphics_menu/graphics_tuning.csv`, which holds every default: each preset's numbers and which preset a new player starts on. Custom is the player's own: it and the picked preset persist between sessions (`graphics_menu/gfx_save.py`). An open tab stands in place of the panel's rows and has a BACK row; the graphics tab sits bottom right, five rows at a time behind a scroll bar. The settings screen holds the difficulty (EASY / MEDIUM / SURVIVOR,
   default EASY). On EASY a mushroom also heals 10 HP; the other levels change nothing yet.
+- **Item icons:** every item's icon, in the inventory grid and in the loot window, is a
+  picture of its own 3D model, lit and fitted to the slot by `Scripts/build_item_icons.py`
+  and drawn untinted (`Scripts/item_icons/CLAUDE.md`). A new or re-modelled item gets its
+  icon from a re-run.
 - **Proprietary notices:** the game is Ellivian Inc.'s (`LICENSE.txt`). The title and settings
   pages carry a copyright and confidentiality notice, and every screen a faint
   `ELLIVIAN INC. · CONFIDENTIAL` watermark, bottom right; `WATERMARK_RECIPIENT`

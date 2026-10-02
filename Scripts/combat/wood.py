@@ -39,10 +39,10 @@ from combat.paths import CUBE, HOLD_ITEM_ANIM_PATH, MAT_METAL, WOOD_BP_PATH
 from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_specs import _weapon_icon
+from item_icons.items import ICON_TINT
 
 WOOD_MESH = "/Game/Sourced/Quaternius/Survival/SM_WoodLog"
 WOOD_DISPLAY = "Wood"
-WOOD_COLOUR = (0.55, 0.36, 0.20)
 # Along the mesh's length (its X), and across it.
 WOOD_SCALE = (0.08, 0.055, 0.055)
 
@@ -108,7 +108,7 @@ def build_wood(item_bp):
         "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
         "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, wood_outline())),
         "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*WOOD_COLOUR, 1.0),
+        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.
         "AdsZoom": float(COMBAT.ads_zoom_irons),
         "Scoped": False,

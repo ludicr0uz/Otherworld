@@ -4,7 +4,8 @@ Entry point: Scripts/build_survival.py (main() calls the build_* functions in
 dependency order), run AFTER build_weapons_and_combat.py: the consumables are
 children of combat's BP_WeaponItem. Checks: Scripts/verify_survival.py, which
 runs the survival.verify package. Forage is placed into the levels by
-Scripts/place_forage.py; the icons are drawn by Scripts/build_survival_icons.py.
+Scripts/place_forage.py; the icons are rendered from the models by
+Scripts/build_item_icons.py (the item_icons package).
 
 THE STANDARD PIECES (Gameplay Ability System, plugin GameplayAbilities)
   An AbilitySystemComponent on the player and on every wanderer.
@@ -36,7 +37,6 @@ BUILDERS
                     component's CampfireClass
   install           the ability system + survival component onto the characters
   forage_level      putting the forage into a level, in the editor
-  icon_art          the two inventory icons (Pillow, outside the editor)
 
 Elsewhere, because they belong to what they extend: the use event is sent by
 combat/weapon_component/consume.py, the matches and their strike are

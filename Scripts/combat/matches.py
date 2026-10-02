@@ -29,10 +29,10 @@ from combat.paths import CUBE, HOLD_ITEM_ANIM_PATH, MAT_METAL, MATCHES_BP_PATH
 from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_specs import _weapon_icon
+from item_icons.items import ICON_TINT
 
 MATCHES_MESH = "/Game/Sourced/Quaternius/Survival/SM_Matchbox"
 MATCHES_DISPLAY = "Matches"
-MATCHES_COLOUR = (0.90, 0.72, 0.22)
 MATCHES_SCALE = 0.08
 
 # The middle of the mesh's bounds, in its own units, and the scaled box (cm):
@@ -83,7 +83,7 @@ def build_matches(item_bp):
         "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
         "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, matches_outline())),
         "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*MATCHES_COLOUR, 1.0),
+        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.
         "AdsZoom": float(COMBAT.ads_zoom_irons),
         "Scoped": False,

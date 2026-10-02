@@ -153,17 +153,20 @@ GENERATED = (
         dest="Content/UI/Art",
         kind="generated",
         builders=("Scripts/build_ui_art.py",
-                  "Scripts/build_survival_icons.py",
-                  "Scripts/asset_pipeline/import_ui_art.py"),
-        note="The HUD's artwork: panels, inventory slots, bars, the sniper's "
-             "scope overlay and one "
-             "silhouette per weapon, plus the mushroom's and the canteen's "
-             "(build_survival_icons.py). Drawn by Pillow rather than authored, so "
+                  "Scripts/asset_pipeline/import_ui_art.py",
+                  "Scripts/build_item_icons.py"),
+        note="The HUD's artwork: panels, inventory slots, bars and the sniper's "
+             "scope overlay, drawn by Pillow rather than authored, so "
              "the look of the UI is a readable script and not a folder of "
              "PNGs nobody can regenerate. Two steps because the editor's "
              "embedded Python has no Pillow: build_ui_art.py writes assets/ui/ "
              "from outside, import_ui_art.py brings it in with the settings "
-             "that keep it crisp (UI texture group, uncompressed, no mips).",
+             "that keep it crisp (UI texture group, uncompressed, no mips). "
+             "The items' inventory icons (T_UI_Icon_*) are pictures of their "
+             "own 3D models: build_item_icons.py captures each built item in "
+             "the editor, lights and fits it outside, and imports it. It "
+             "runs after the items are built, and they are built again after "
+             "it to point at their icons.",
     ),
     AssetSource(
         dest="Content/Survival",
@@ -383,12 +386,10 @@ RESTORE_ORDER = (
     # write into assets/generated/sounds and build_weapons_and_combat.py
     # imports the lot.
     "python3 Scripts/make_creature_sounds.py",
-    # The HUD's artwork comes before the weapons, because each weapon stores a
-    # reference to its own inventory icon, and before the menu, which draws the
-    # panels, slots and bars. Two steps, not one: the generator needs Pillow and
-    # the editor's embedded Python does not have it, so it runs outside.
+    # The HUD's artwork comes before the menu, which draws the panels, slots
+    # and bars. Two steps, not one: the generator needs Pillow and the editor's
+    # embedded Python does not have it, so it runs outside.
     "python3 Scripts/build_ui_art.py",
-    "python3 Scripts/build_survival_icons.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/import_ui_art.py",
     # Fab content is re-added by hand (it needs the user's Epic sign-in):
     # --check lists what fab_library.json holds that the disk does not. Then
@@ -403,6 +404,11 @@ RESTORE_ORDER = (
     # After combat (the consumables are children of BP_WeaponItem) and before
     # the HUD (whose survival bars cast to BP_SurvivalComponent).
     "Scripts/dev/uepy.py --cold Scripts/build_survival.py",
+    # Each item's inventory icon is a picture of its own model, so the icons
+    # come after the items; the items are then built again, to point at them
+    # (the first pass logs each icon as missing).
+    "python3 Scripts/build_item_icons.py",
+    "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py Scripts/build_survival.py",
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     # The monsters come before the NPC blueprints, because the wanderers ARE
     # the monsters: BP_Wanderer_Zombie and BP_Wanderer_Wendigo need

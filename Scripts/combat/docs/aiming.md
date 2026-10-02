@@ -151,6 +151,17 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     smaller than that at a high frame rate, so the offsets counted turns that never happened
     and the view drifted 0.13° in one probe run. A step waits until it is 0.002°
     (`SWAY_MIN_STEP_DEG`) and is then taken whole.
+  - **Its speed is the gun's** (`SwayRate`, the `sway_rate` column of `gun_tuning.csv`, 0.5
+    on every gun: the periods run at 11.2 s and 7 s). The clock advances by `dt x SwayRate`,
+    so a change of rate never jumps the sway. The component's `SwayRate` is copied off
+    `Held` behind an `IsValid` Branch each frame (`weapon_component/breath.py`).
+- **The breath can be held down the sights** (`breath_tuning.py`, `weapon_component/breath.py`):
+  the hold breath key (Left Alt, not Shift, which sprints) multiplies the sway's width by
+  0.15 for up to 5 s. Run out, the player is `Winded` (the sway at 1.5x and no hold) until
+  the breath has refilled, 5 s from empty; let go early, what is left can be held again at
+  once. The width eases between the three (`BreathScale`, FInterpTo at 4), since a jump in
+  the width is a jump in the view. `BreathForced` is the probes' key
+  (`probes/probe_hold_breath.py`).
 - **`Scoped` (sniper only) draws a scope overlay instead of the reticle, down the sights only.**
   `T_UI_Scope` is drawn as a square of the viewport height, with black side strips (in
   `graphics_menu/scope.py`).

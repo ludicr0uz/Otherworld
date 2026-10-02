@@ -19,6 +19,7 @@ in the CSV, a dash on the page, and never written onto the weapon.
 import csv
 import os
 
+from combat.sway_tuning import SWAY_RATE_COLUMN, SWAY_RATE_VAR
 from combat.throw_tuning import THROW_DAMAGE_COLUMN, THROW_PITCH_COLUMN
 
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gun_tuning.csv")
@@ -49,6 +50,8 @@ TUNE_STATS = (
     ("recoil_sights", "RecoilSightsScale", "recoil x sights", 0.05, 0.0, float),
     ("recoil_crouch", "RecoilCrouchScale", "recoil x crouch", 0.05, 0.0, float),
     ("recoil_prone", "RecoilProneScale", "recoil x prone", 0.05, 0.0, float),
+    # How fast the sights wander down them: the sway's clock rate (sway_tuning.py).
+    (SWAY_RATE_COLUMN, SWAY_RATE_VAR, "sway rate", 0.05, 0.0, float),
     # How far a throw of this gun is tipped up from the view (throw_tuning.py).
     (THROW_PITCH_COLUMN, "ThrowArcDegrees", "throw arc (deg)", 1.0, 0.0, float),
     # What a throw of it takes off a body it strikes (a melee weapon's alone:

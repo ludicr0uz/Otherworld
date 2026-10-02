@@ -14,6 +14,7 @@ from combat.weapon_component.ads import _author_ads
 from combat.weapon_component.aim import _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire, _author_reload
 from combat.weapon_component.block import _author_block
+from combat.weapon_component.breath import _author_hold_breath
 from combat.weapon_component.carry import _author_carry
 from combat.weapon_component.common import _prop
 from combat.weapon_component.consume import (
@@ -163,6 +164,11 @@ def _author_wc_tick(ed, tick):
     # --- and the aim sways, down the sights ----------------------------------
     # After SightBlend is written, which scales it; before the pitch below,
     # which reads the view the sway has just turned.
+    # The held gun's sway rate and the held breath first (breath.py), which
+    # the sway reads; after SightAiming is written, which the breath reads.
+    ads_exits = (_author_hold_breath(ed, tick, pc_out, held, armed_out,
+                                     key_pins["KeyHoldBreath"], ads_exits,
+                                     8400, 3000),)
     ads_exits = _author_sight_sway(ed, tick, pc_out, ads_exits, 8400, 1200)
 
     # --- and the body pitches with the view, down the sights -----------------

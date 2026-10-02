@@ -17,7 +17,11 @@ from combat.paths import (
 )
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR, SIGHTS_FORCED_VAR
 from combat.skin import player_skin
-from combat.sway_tuning import SWAY_VARS
+from combat.breath_tuning import (
+    BREATH_FORCED_VAR, BREATH_HELD_VAR, BREATH_HOLD_S, BREATH_SCALE_VAR, BREATH_VAR,
+    WINDED_VAR,
+)
+from combat.sway_tuning import SWAY_RATE, SWAY_RATE_VAR, SWAY_VARS
 from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
 from combat.wear_tuning import NOT_CLOTHING, TAKE_OFF_VAR, WEAR_ITEM_VAR, WORN_VAR
@@ -176,6 +180,13 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # The sight sway (sway.py): its clock, and how far it has turned the view.
     for name in SWAY_VARS:
         _declare(ed, name, _float_type())
+    # Its rate (the held gun's) and the held breath (breath.py): the breath
+    # left, held this frame, winded, the scale it puts on the sway's width,
+    # and the probes' stand-in for the key.
+    for name in (SWAY_RATE_VAR, BREATH_VAR, BREATH_SCALE_VAR):
+        _declare(ed, name, _float_type())
+    for name in (BREATH_HELD_VAR, WINDED_VAR, BREATH_FORCED_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     # The polled keys, as variables rather than as pin literals. Nothing
     # in this component loads them: the HUD pushes the player's binds in every
     # DrawHUD frame (see graphics_menu/settings_page._author_push_settings), which is
@@ -350,6 +361,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         LOOK_VAR: 0.0,
         SIGHTS_FORCED_VAR: False,
         **{name: 0.0 for name in SWAY_VARS},
+        SWAY_RATE_VAR: SWAY_RATE,
+        BREATH_VAR: BREATH_HOLD_S,
+        BREATH_SCALE_VAR: 1.0,
+        BREATH_HELD_VAR: False,
+        WINDED_VAR: False,
+        BREATH_FORCED_VAR: False,
         **{name: _key(k) for name, k in BIND_VARS},
         # Both overwritten on the first frame of BeginPlay. Seeded with the
         # engine's own defaults, signs included, so that a BeginPlay that

@@ -28,6 +28,7 @@ from combat.graph import (
 )
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
+from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN, SWAY_RATE_VAR
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
 from combat.throw_tuning import (
@@ -183,6 +184,10 @@ def build_weapon_item():
     # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
     # Held like every other per-weapon number.
     _declare(ed, "ShotVolume", _float_type())
+    # How fast the sights wander down them (sway_tuning.py): the component
+    # copies Held's each frame. The default is on the base, so an item with
+    # no sights has one too, though it never sways.
+    _declare(ed, SWAY_RATE_VAR, _float_type())
     # How far a throw of this item is tipped up from the view, where the
     # reticle rests on nothing it can reach (throw_launch.py reads it off
     # Held). The default is on the base, so the knife, the food and the
@@ -205,6 +210,7 @@ def build_weapon_item():
         raise RuntimeError("BP_WeaponItem failed to compile")
     _apply_defaults(bp, {CLOTHING_SLOT_VAR: NOT_CLOTHING,
                          THROW_PITCH_VAR: THROW_PITCH_UP_DEG,
+                         SWAY_RATE_VAR: SWAY_RATE,
                          THROW_SPEED_VAR: THROW_SPEED,
                          THROW_SPIN_VAR: THROW_SPIN_DEG_S,
                          THROW_EDGE_ON_VAR: False,
@@ -337,6 +343,7 @@ def build_weapon(spec, item_bp):
         **{name: float(spec[col]) for col, name in ACCURACY_VARS},
         "ShotVolume": float(spec["shot_volume"]),
         THROW_PITCH_VAR: float(spec[THROW_PITCH_COLUMN]),
+        SWAY_RATE_VAR: float(spec[SWAY_RATE_COLUMN]),
         "Icon": _weapon_icon(spec["display"]),
         "FireSound": _must_load(spec["sound"]),
         "DryFireSound": _must_load(SND_DRY_FIRE),

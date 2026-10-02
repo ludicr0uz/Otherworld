@@ -24,7 +24,7 @@ The defaults are all rebindable on the settings screen:
   out, and with a hot knife or axe it cauterises a bleed (both below); on a cold blade, the
   matches, wood and food it does nothing yet.
   **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
-  **C** toggles crouch, **Z** toggles prone, **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
+  **C** toggles crouch, **Z** toggles prone, **Left Alt** held down the sights holds the breath (`docs/aiming.md`), **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu; **I** (the clothing panel) and Tab (the loot
   window) to the HUD.
@@ -427,13 +427,13 @@ Per-weapon numbers live in `_weapon_specs()`.
 laid over `COMBAT` and tuned in game by the menu's PLAYER TUNING tab (`docs/stance.md`).
 
 **Per-gun numbers can be tuned in game** (the M panel's **T** tab, `graphics_menu/tune_*.py`):
-- `gun_tuning.csv` (tracked) holds each gun's 20 tunable stats (`gun_tuning.TUNE_STATS`: damage,
-  pellets, range, interval, reload, magazine, sights zoom, shot volume, the accuracy columns
-  and the throw's arc).
+- `gun_tuning.csv` (tracked) holds each gun's 21 tunable stats (`gun_tuning.TUNE_STATS`: damage,
+  pellets, range, interval, reload, magazine, sights zoom, shot volume, the accuracy columns,
+  the sway's rate and the throw's arc).
 - **The melee weapons have rows too** (`Knife`, `Axe`, under the guns:
   `gun_tuning.MELEE_WEAPONS`), holding their throw alone: `throw_arc` and `throw_damage`
   (`melee_tuning.py`, which `knife.py` and `axe.py` lay over `MELEE_THROW`; the defaults
-  are `throw_tuning`'s). `throw_damage` is the table's 21st column and no gun's: a gun's
+  are `throw_tuning`'s). `throw_damage` is the table's 22nd column and no gun's: a gun's
   `ThrowDamage` stays 0, which is what keeps a thrown gun from wounding.
   `gun_tuning.columns_of(weapon)` says which columns are a weapon's own; a cell outside
   them is empty in the CSV, a dash on the tab, and never written onto the weapon. The
@@ -555,7 +555,10 @@ These are feel checks a headless run can't do:
   seen to go, from behind, in the last of the camera's travel, and whether the headless
   shadow is noticed with the sun behind the player;
 - the sight sway (`sway_tuning.py`): whether 0.3° reads as a held breath or as drunk,
-  above all through the 4x scope, and whether crouch and prone steady it enough;
+  above all through the 4x scope, and whether crouch and prone steady it enough; whether
+  the halved rate (0.5) is slow enough to time a shot, and holding the breath
+  (`breath_tuning.py`): Left Alt with a real keyboard (on a Mac it is Option), whether 5 s
+  held and 5 s winded feel right, and that nothing on the HUD shows the breath left;
 - the left hand held on the gun down the sights (`support_hand.py`): whether the hand
   now reads as one with the gun while swaying and walking, on the AK above all; whether
   the hand is seen to shift (0.7 cm) as the hold eases in with the sights; a throw wound

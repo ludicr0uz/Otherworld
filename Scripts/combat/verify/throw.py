@@ -99,9 +99,9 @@ def launch_nodes():
 
 def check_throw_key():
     names = [v for v, _k in BIND_VARS]
-    check(f"throwing is its own bind, {THROW_KEY} by default, appended last so "
-          f"no saved bind changes meaning",
-          names[-1] == "KeyThrow"
+    check(f"throwing is its own bind, {THROW_KEY} by default, appended after "
+          f"prone so no saved bind changes meaning",
+          names.index("KeyThrow") == names.index("KeyProne") + 1
           and w.get_editor_property("KeyThrow").export_text() == THROW_KEY,
           str(names))
     check("the throw starts idle: not aiming, no probe holding the key or "

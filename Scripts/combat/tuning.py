@@ -5,6 +5,7 @@ the graphs that read them live elsewhere.
 
 import dataclasses
 
+from combat.breath_tuning import HOLD_BREATH_KEY
 from combat.player_tuning import (
     JOG_SPEED, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE, cms, per_second,
 )
@@ -420,7 +421,8 @@ RELOAD_KEY = "R"
 # these defaults rather than trusting (build_graphics_menu.py's settings load).
 # KeyBlock went on the END, for the same reason: a nine-bind list refills an
 # eight-bind save once, and no existing index changes meaning. KeyCrouch and
-# KeyProne were appended the same way, and then KeyThrow.
+# KeyProne were appended the same way, then KeyThrow, then KeyHoldBreath
+# (breath_tuning.py).
 BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyAim", AIM_KEY),
              ("KeySights", SIGHTS_KEY),
@@ -432,7 +434,8 @@ BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeyBlock", BLOCK_KEY),
              ("KeyCrouch", CROUCH_KEY),
              ("KeyProne", PRONE_KEY),
-             ("KeyThrow", THROW_KEY))
+             ("KeyThrow", THROW_KEY),
+             ("KeyHoldBreath", HOLD_BREATH_KEY))
 # Shells a killed wanderer leaves behind. Two per kill against five spent per
 # magazine means the shotgun runs down unless most shots land, which is the
 # point of giving it a reserve at all.

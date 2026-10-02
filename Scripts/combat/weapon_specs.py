@@ -19,6 +19,7 @@ from combat.paths import (
 )
 from combat.skin import player_skin
 from item_icons.items import icon_name
+from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG
 from combat.weapon_models import (
     PISTOL_MODEL, PISTOL_MUZZLE, PISTOL_SIGHT, PISTOL_SIGHT_FRONT,
@@ -242,6 +243,7 @@ def _weapon_specs():
         spec.update(GUN_ACCURACY[spec["display"]])
         spec.setdefault("ads_zoom", COMBAT.ads_zoom_irons)
         spec.setdefault(THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG)
+        spec.setdefault(SWAY_RATE_COLUMN, SWAY_RATE)
         spec.update(tuned.get(spec["display"], {}))
         # Held in both hands is what the rifle ready pose does, and the
         # shotgun's, which is the rifle's but for a thumb; the guard pose

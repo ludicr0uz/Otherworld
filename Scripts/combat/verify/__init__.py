@@ -32,6 +32,8 @@ and it never relies on a variable another section left behind.
               both ready-pose plays gated by it
   sway        the sight sway: its numbers, and the graph that turns the view
               by the sway's change before storing it
+  breath      the sway's per-gun rate (SwayRate, copied off Held behind
+              IsValid) and the held breath: numbers, bind, variables, graph
   steady      down the sights a hit plays no flinch: the health component's
               Steady gate, and the weapon component's write of it
   aim_pitch   down the sights the anim BP pitches two spine bones by AimPitch,
@@ -99,7 +101,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "pickup", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",
 )

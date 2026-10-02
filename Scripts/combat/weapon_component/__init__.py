@@ -31,8 +31,11 @@ _author_* fragment per concern, each in its own module:
   head_hide   down the sights: the player's own head bone is hidden past
               SightSeat HEAD_HIDE_SEAT, whatever gun is held, and shown again
               off them (the eye point is inside or beside the head)
+  breath      SwayRate copied off Held (behind IsValid); the hold breath key
+              down the sights: Breath, BreathHeld, Winded and BreathScale
   sway        down the sights: the view drifts on two slow sines (the control
-              rotation is turned by the change), steadied by the stance
+              rotation is turned by the change), at SwayRate, steadied by the
+              stance and BreathScale
   steady      down the sights: write the owner's health component's Steady
               (SightBlend > 0.01), which refuses the flinch, so a hit leaves
               the view on the target; re-equip over a flinch already playing

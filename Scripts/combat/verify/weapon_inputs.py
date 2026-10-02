@@ -302,11 +302,12 @@ def check_sprint_and_stamina():
     # table lookup; those are counted in the hit-box section, not here. So are
     # the stance's, each picked by comparing Stance (verify/stance.py), the
     # side the chopped wood lands on (verify/chop.py), and the throw's yaw
-    # and pitch (verify/throw_aim.py).
+    # and pitch (verify/throw_aim.py), and the held breath's, picked by
+    # BreathHeld and Winded (verify/breath.py).
     throw_launch = launch_nodes()
     selects = [n for n in titled(wg, "SelectFloat")
                if not is_chop_node(n) and n not in throw_launch and not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
-                          for k in ("Contains", "Equal")
+                          for k in ("Contains", "Equal", "Get BreathHeld", "Get Winded")
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
     # Seven now: sprint picks the speed and the sign of the drain, the sights
     # key picks the zoom (the weapon's, or the shoulder's), and accuracy.py

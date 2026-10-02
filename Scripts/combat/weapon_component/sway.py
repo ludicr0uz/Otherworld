@@ -1,8 +1,9 @@
 """Down the sights the aim sways: the view drifts slowly round the point the
 mouse left it on, and the gun, its sights and the shot drift with it.
 
-    SwayTime += dt
+    SwayTime += dt x SwayRate                       (the held gun's: breath.py)
     k         = SightBlend x (prone ? SWAY_PRONE_SCALE : crouched ? SWAY_CROUCH_SCALE : 1)
+                x BreathScale                       (holding the breath: breath.py)
     yaw       = SWAY_YAW_DEG   x k x Sin(SwayTime x 2pi / SWAY_YAW_PERIOD_S)
     pitch     = SWAY_PITCH_DEG x k x Sin(SwayTime x 2pi / SWAY_PITCH_PERIOD_S)
     if |yaw - SwayYaw| > SWAY_MIN_STEP_DEG or |pitch - SwayPitch| > SWAY_MIN_STEP_DEG:
@@ -36,9 +37,10 @@ from combat.nodes import (
     FN_ABS, FN_ADD_FF, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_OR, FN_SIN,
     FN_SUB_FF,
 )
+from combat.breath_tuning import BREATH_SCALE_VAR
 from combat.sway_tuning import (
     SWAY_CROUCH_SCALE, SWAY_MIN_STEP_DEG, SWAY_PITCH_DEG, SWAY_PITCH_PERIOD_S, SWAY_PITCH_VAR,
-    SWAY_PRONE_SCALE, SWAY_TIME_VAR, SWAY_YAW_DEG, SWAY_YAW_PERIOD_S,
+    SWAY_PRONE_SCALE, SWAY_RATE_VAR, SWAY_TIME_VAR, SWAY_YAW_DEG, SWAY_YAW_PERIOD_S,
     SWAY_YAW_VAR, sway_rate,
 )
 from combat.weapon_component.accuracy import _mul, _select
@@ -58,11 +60,14 @@ def _author_sight_sway(ed, tick, pc_out, exec_ins, x0, y0):
     def out(n, name="ReturnValue"):
         return _pin(n, name, is_input=False)
 
-    # The clock.
+    # The clock, at the held gun's rate.
     was = keep(_at(ed.add_get_member_variable_node(SWAY_TIME_VAR), x0, y0 + 300))
+    rate = keep(_at(ed.add_get_member_variable_node(SWAY_RATE_VAR), x0, y0 + 160))
+    paced = _mul(ed, keep, out(tick, "DeltaSeconds"), out(rate, SWAY_RATE_VAR),
+                 x0 + 240, y0 + 160)
     later = keep(_at(_node(ed, FN_ADD_FF), x0 + 240, y0 + 300))
     _connect(out(was, SWAY_TIME_VAR), _pin(later, "A"))
-    _connect(out(tick, "DeltaSeconds"), _pin(later, "B"))
+    _connect(paced, _pin(later, "B"))
     clock = keep(_at(ed.add_set_member_variable_node(SWAY_TIME_VAR), x0 + 500, y0))
     _connect(out(later), _pin(clock, SWAY_TIME_VAR))
     for e in exec_ins:
@@ -82,7 +87,10 @@ def _author_sight_sway(ed, tick, pc_out, exec_ins, x0, y0):
                        x0 + 760, y0 + 500)
     blend = keep(_at(ed.add_get_member_variable_node("SightBlend"),
                      x0 + 760, y0 + 700))
-    amount = _mul(ed, keep, out(blend, "SightBlend"), steadied, x0 + 1020, y0 + 500)
+    sighted = _mul(ed, keep, out(blend, "SightBlend"), steadied, x0 + 1020, y0 + 500)
+    breath = keep(_at(ed.add_get_member_variable_node(BREATH_SCALE_VAR),
+                      x0 + 1020, y0 + 700))
+    amount = _mul(ed, keep, sighted, out(breath, BREATH_SCALE_VAR), x0 + 1280, y0 + 500)
 
     def wave(var, degrees, period, y):
         """(the sway now, its change since last frame, the node storing it)."""
@@ -137,9 +145,10 @@ def _author_sight_sway(ed, tick, pc_out, exec_ins, x0, y0):
     ed.add_comment_to_nodes(
         "Sight sway: down the sights the view drifts on two slow sines "
         f"({SWAY_YAW_DEG:g} deg every {SWAY_YAW_PERIOD_S:g} s sideways, "
-        f"{SWAY_PITCH_DEG:g} deg every {SWAY_PITCH_PERIOD_S:g} s up and down), "
-        f"times SightBlend and the stance (crouched {SWAY_CROUCH_SCALE:g}, "
-        f"prone {SWAY_PRONE_SCALE:g}). The control rotation is turned by the "
+        f"{SWAY_PITCH_DEG:g} deg every {SWAY_PITCH_PERIOD_S:g} s up and down, "
+        "the clock run at the gun's SwayRate), "
+        f"times SightBlend, the stance (crouched {SWAY_CROUCH_SCALE:g}, "
+        f"prone {SWAY_PRONE_SCALE:g}) and BreathScale (breath.py). The control rotation is turned by the "
         "change since it was last turned, BEFORE the offsets are stored, so "
         "the mouse and the recoil work on top and letting go gives it back; "
         f"a change under {SWAY_MIN_STEP_DEG:g} deg waits (the controller "

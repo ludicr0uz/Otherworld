@@ -84,7 +84,8 @@ def check_recoil():
 
     # The four body-pose weights and the kneel's ease with FInterpTo too
     # (verify/body_pose.py checks those); each one's Current is its own weight.
-    pose_reads = {f"Get {name}" for name in (*POSE_WEIGHTS, POSE_KNEEL)}
+    # So does the held breath's BreathScale (verify/breath.py).
+    pose_reads = {f"Get {name}" for name in (*POSE_WEIGHTS, POSE_KNEEL, "BreathScale")}
     interps = [n for n in by_pins(wg, "Current", "Target", "DeltaTime", "InterpSpeed")
                if not any(str(BEL.get_node_title(PIN.get_owning_node(q))) in pose_reads
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Current")))]
@@ -166,11 +167,11 @@ def check_automatic_fire():
         str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
         for x in downs
         for q in PIN.list_connected_pins(BEL.find_input_pin(x, "Key")))
-    check("six keys are polled held rather than tapped: sprint, the two aims "
+    check("seven keys are polled held rather than tapped: sprint, the two aims "
           "(the sights key is also the use key, polled once), the guard, the "
-          "trigger and the throw",
-          held_binds == ["Get KeyAim", "Get KeyBlock", "Get KeyFire", "Get KeySights",
-                         "Get KeySprint", "Get KeyThrow"],
+          "trigger, the throw and the held breath",
+          held_binds == ["Get KeyAim", "Get KeyBlock", "Get KeyFire", "Get KeyHoldBreath",
+                         "Get KeySights", "Get KeySprint", "Get KeyThrow"],
           str(held_binds))
 
     # THE TRAP THIS SECTION EXISTS FOR. Automatic lives on the weapon, so reading

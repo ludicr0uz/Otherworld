@@ -225,7 +225,9 @@ editor.
   (`combat/weapon_component/seat.py`). Down any gun's sights the player's own head is
   hidden, so it never stands in the sight picture (`combat/weapon_component/head_hide.py`).
   The aim sways slowly, sights and shot together
-  (`combat/sway_tuning.py`; steadier crouched and prone). Down the sights the left hand is
+  (`combat/sway_tuning.py`; steadier crouched and prone; how fast is each gun's `sway_rate` on the
+  GUN TUNING tab). Holding Left Alt down the sights holds the breath, all but stilling the sway for up to 5 s,
+  after which the player is winded and sways harder until it refills (`combat/weapon_component/breath.py`). Down the sights the left hand is
   held on the gun (an IK onto a point in the right hand's space), so both hands move with
   it (`combat/support_hand.py`). A hit taken down the sights plays
   no flinch, so the view stays on the target (`combat/weapon_component/steady.py`).

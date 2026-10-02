@@ -16,7 +16,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     the throw (THROW_*),
                     noise, SHOT_VOLUME_CM (how loud each gun is)
   sway_tuning       the sight sway's numbers (SWAY_*): angles, periods, the
-                    stance's steadying, the component's variables, sway_at()
+                    default rate (SWAY_RATE, a gun_tuning column), the stance's
+                    steadying, the component's variables, sway_at()
+  breath_tuning     holding the breath down the sights: the key, how long, the
+                    sway's scale held and winded, the variables, breath_step()
   seat_tuning       the sight camera's seat: how near the view the gun must
                     be before the camera turns onto its line (SIGHT_SEAT_DEG),
                     SightSeated / SightSeat / SightLook / SightsForced,

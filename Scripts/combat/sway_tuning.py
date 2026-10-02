@@ -18,6 +18,15 @@ SWAY_YAW_DEG = 0.30
 SWAY_PITCH_DEG = 0.20
 SWAY_YAW_PERIOD_S = 5.6
 SWAY_PITCH_PERIOD_S = 3.5
+# How fast each gun's sway runs: the clock the sines read advances at this
+# times the frame's time, so 0.5 doubles both periods (11.2 s and 7 s) and
+# halves how fast the sights wander, at the same width. Per gun: the
+# gun_tuning.csv column SWAY_RATE_COLUMN, BP_WeaponItem's SWAY_RATE_VAR,
+# copied each frame onto the component's own (sway.py). At 1.0 the sway
+# crossed the target too fast to time a shot.
+SWAY_RATE = 0.5
+SWAY_RATE_COLUMN = "sway_rate"
+SWAY_RATE_VAR = "SwayRate"
 # A low stance steadies it, as it does the cloud and the recoil.
 SWAY_CROUCH_SCALE = 0.6
 SWAY_PRONE_SCALE = 0.3
@@ -45,8 +54,9 @@ def sway_rate(period_s):
     return 2.0 * math.pi / period_s
 
 
-def sway_at(t, blend, stance_scale=1.0):
-    """(yaw, pitch) in degrees the sway holds the view off by at clock `t`."""
-    k = blend * stance_scale
+def sway_at(t, blend, stance_scale=1.0, breath_scale=1.0):
+    """(yaw, pitch) in degrees the sway holds the view off by at clock `t`
+    (the clock is already the rate's: game seconds x SwayRate)."""
+    k = blend * stance_scale * breath_scale
     return (SWAY_YAW_DEG * k * math.sin(t * sway_rate(SWAY_YAW_PERIOD_S)),
             SWAY_PITCH_DEG * k * math.sin(t * sway_rate(SWAY_PITCH_PERIOD_S)))

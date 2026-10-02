@@ -75,9 +75,10 @@ def row_serves(nodes, action, var):
 
 
 def _check_rows(check, nodes):
-    check("the M panel has no quality-preset rows and no hotkey in any row's label: "
-          "debug, save and exit, the cheat, the four tabs, close",
-          len(UC.PAUSE_ROW_LABELS) == len(UC.PAUSE_ROW_ACTIONS) == 8
+    check("the menu has no quality-preset rows and no hotkey in any row's label: "
+          "new game, settings, debug, save and exit, the cheat, the four tabs, "
+          "exit game",
+          len(UC.PAUSE_ROW_LABELS) == len(UC.PAUSE_ROW_ACTIONS) == 10
           and not any("[" in label for label in UC.PAUSE_ROW_LABELS),
           str(UC.PAUSE_ROW_LABELS))
     # Up / Down on PauseRow, kept in the rows.

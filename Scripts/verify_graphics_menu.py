@@ -42,6 +42,7 @@ from graphics_menu.gfx_tuner_checks import check_gfx_tuner
 from graphics_menu import cursor_consts as CC
 from graphics_menu.cursor_checks import check_cursor
 from graphics_menu.pause_checks import check_pause_menu
+from graphics_menu.menu_main_checks import check_main_menu
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -472,8 +473,7 @@ def main():
     # every new readout broke the count without saying what it was.
     owned = set(SHOT_VOLUME_CM) | set(S.DIFFICULTY_LABELS)
     literals = (drawn | {text_literal(n) for n in by_pins("InText")}
-                | set(UC.SETTINGS_ROW_LABELS) | set(UC.PAUSE_ROW_LABELS)
-                | set(UC.MENU_ROWS))
+                | set(UC.SETTINGS_ROW_LABELS) | set(UC.PAUSE_ROW_LABELS))
     check("no weapon or difficulty name is a literal on the HUD -- they come "
           "from data", not literals & owned, str(sorted(literals & owned)))
     blank = [n for n in texts if not BEL.find_input_pin(n, "Text").get_pin_value()
@@ -637,7 +637,8 @@ def main():
     # the page can look perfect and still be a session-only settings screen.
     for var in ("Settings", "MenuPage", "MenuRow", "Capturing", "KeyPool"):
         check(f"{var} variable", var in names)
-    check("the menu opens on the title page with the caret at the top",
+    check("the menu opens on its own rows, not the settings page, with the caret "
+          "at the top",
           cdo.get_editor_property("MenuPage") == G.PAGE_TITLE
           and cdo.get_editor_property("MenuRow") == 0
           and cdo.get_editor_property("Capturing") is False,
@@ -809,7 +810,7 @@ def main():
           str(sum(1 for t in titles if t == "Set Capturing")))
 
     # --- two pages, and getting between them
-    check("the panel has a title page and a settings page",
+    check("the menu has its own rows and a settings page, one Set each way",
           sum(1 for t in titles if t == "Set MenuPage") == 2
           and any(t == "Get MenuPage" for t in titles),
           str(sorted({t for t in titles if "MenuPage" in t})))
@@ -830,6 +831,7 @@ def main():
     check_gfx_tuner(check)
     check_cursor(check, bp, nodes)
     check_pause_menu(check, bp, nodes)
+    check_main_menu(check, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

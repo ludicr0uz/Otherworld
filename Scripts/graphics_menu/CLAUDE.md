@@ -1,4 +1,4 @@
-# The Game Settings (M) panel, settings and HUD
+# The menu (the title's, and M's in play), settings and HUD
 
 `Scripts/build_graphics_menu.py` builds the four UMG screens (`WBP_HUD`, `WBP_MainMenu`,
 `WBP_PauseMenu`, `WBP_DeathMenu`, from the parts `WBP_MenuRow` and `WBP_InventorySlot`),
@@ -13,19 +13,62 @@ shows, also run `uepy.py --game --probe Scripts/probes/probe_umg_screens.py` (an
 This package holds the fragments. The entry point itself is still 1.2k lines, over budget, so
 split it before extending it.
 
+**There is one menu** (`WBP_PauseMenu`, titled **OTHERWORLD**, off the top left at
+`PAUSE_POS`). The game opens on it, paused, and **M** brings the same one up in play, where
+it pauses nothing. The code and the notes below still call it "the M panel".
+
 **The keys:**
-- **M** toggles the panel, titled **GAME SETTINGS**: the only key the panel has.
-- **Up / Down** move the panel's caret and **Enter** takes the row it is on; a click on a
+- **M** toggles the menu in play: the only key it has. On the title it cannot be shut.
+- **Up / Down** move the menu's caret and **Enter** takes the row it is on; a click on a
   row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
-- **The rows:** `debug` (wanderer numbers, pellet tracers and impact damage,
+- **The rows:** `new game` (in play it reads `resume` and shuts the menu), `settings` (the
+  settings page), `debug` (wanderer numbers, pellet tracers and impact damage,
   the wanderers' sight cones; not the FPS readout, which is always on), `save and exit`, `dev-all-guns`, `gun tuning`,
-  `monster tuning`, `world tuning`, `graphics tuning`, `close`. The quality presets are not
+  `monster tuning`, `world tuning`, `graphics tuning`, `exit game` (quits to the desktop,
+  saving nothing). The quality presets are not
   rows: Low / Medium / High / Custom is the graphics tab's first row.
-- **A tuning tab stands in place of the panel's rows**, and its **BACK** row returns to them
-  (below: "The M panel as a menu").
+- **The settings page or a tuning tab stands in place of the menu's rows**, and its **BACK**
+  row returns to them (below: "The M panel as a menu").
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 - **The mouse** works every menu too (below).
+
+## One menu: the title's and M's (`menu_main.py`, `menu_screens.author_title`)
+
+- **The title is the menu held open.** While `GameStarted` is false DrawHUD hides the HUD's
+  `Body` and the death menu, sets `MenuOpen` and goes on to the same fragment that draws
+  the menu in play (`author_pause_menu`). There is no title page: `WBP_MainMenu` holds only
+  the settings page and the legal notice, and goes up and down with the menu.
+- **The HUD ticks under the title's pause.** Every row is served on Tick, and Event Tick
+  does not run in a paused world, so BeginPlay calls `SetTickableWhenPaused(true)` on the
+  HUD (and on its tuner component, so a preset picked on the title is applied there) on
+  its way to the pause. The first row takes it back before it unpauses, so the death
+  screen's pause still stops Tick, as it always did.
+- **The first row** (`START_ACTION`) lowers `MenuOpen`; on the title it then sets
+  `GameStarted`, stops the paused tick and unpauses, last. DrawHUD writes its label every
+  frame: `new game` or `resume`.
+- **`settings`** sets `MenuPage` to the settings page and `MenuRow` to 0. The page
+  (`WBP_MainMenu.SettingsPanel`, at `PAUSE_POS` like the menu) shows while `MenuPage` says
+  so and the menu's `Panel` is collapsed; its BACK row sets `MenuPage` back. In play the
+  page does not pause either, and its accept keys include Space, which also jumps.
+- **`exit game`** is `QuitGame` for the owning player: the one such node in the graph.
+- **What needs a game in play is kept off the title:** Tick splits on `GameStarted`
+  (`author_in_play`), and save and exit (with the profile load, the death wipe and the
+  cheat) and the loot window run only in play. On the title those rows' value column reads
+  `in game only` (`IN_GAME_ACTIONS`). The tuning tabs and debug work on the title.
+- **M is polled only in play** (a Branch on `GameStarted`, then the key): the title's menu
+  has nothing under it to go back to.
+- **Probes:** `probe_main_menu.py` pauses the game itself and shows both halves: with the
+  HUD not ticking a taken row is not served, ticking it is; save and exit does nothing
+  there; the first row starts the game, and in play only shuts the menu.
+  `probe_umg_screens.py` reads what the title shows.
+- **A probe's game never sees the real title:** `uepy.py --game` passes `-nomenu`, and
+  `probes/boot.py` waits 0.5 s of game time before the first probe, which the title's
+  pause (0.25 s in) never reaches. The real BeginPlay path was checked once by hand
+  (a windowed run without `-nomenu` and with that wait at 0: paused, the menu up, a row
+  served, new game unpausing, exit game ending the process).
+- **Still needs a play session:** the keys themselves on the title, exit game from a real
+  session, and how the title reads with the paused level behind it.
 
 ## The M panel as a menu (`menu_screens.py`, `menu_nav.py`, `menu_still.py`)
 
@@ -35,9 +78,9 @@ split it before extending it.
   `menu_nav.pause_row_taken(action)` and serves it; DrawHUD lowers `PauseClick` at the top of
   the next frame. A probe takes a row by writing `PauseClick`.
 - **`PauseRow` is the caret.** Up / Down and Enter are polled in DrawHUD (`_author_pause_keys`),
-  only while no tab is open. Enter, not Space: the panel does not pause, and Space jumps.
+  only while no tab and no settings page is open. Enter, not Space: the panel does not pause, and Space jumps.
 - **One menu on screen.** `WBP_PauseMenu.Panel` (the panel's own artwork and rows) is
-  collapsed while any tab's open flag is up, and the open tab's panel shows instead; the three
+  collapsed while the settings page is up or any tab's open flag is, and the page or the open tab's panel shows instead; the three
   developer tabs sit where the panel does (`TUNE_POS`), the graphics tab in the corner.
 - **BACK is a `WBP_MenuRow` under each tab's list**, the caret's last stop
   (`TuneTab.back_row`: one past the list, or two in the graphics tab, whose SAVE DEFAULT
@@ -70,13 +113,12 @@ split it before extending it.
 
 ## The mouse cursor (`cursor.py`, `cursor_consts.py`)
 
-The cursor shows while a menu is up: the title and settings pages, the death menu, and in
-play the M panel (with its tuning tabs) and the loot window. Otherwise it is hidden and the
+The cursor shows while a menu is up: the menu (on the title and in play, with its settings
+page and tuning tabs), the death menu, and the loot window. Otherwise it is hidden and the
 mouse is the camera's.
 
 | menu | cursor over a row | left click | wheel |
 |---|---|---|---|
-| title | the caret goes there | Enter on that row | |
 | settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up | Left / Right |
 | M panel | the caret goes there | takes the row (as Enter does) | |
 | tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
@@ -90,14 +132,14 @@ mouse is the camera's.
   the frame) stores `CursorPos` and `CursorMoved`; each menu's fragment then tests its own rows.
 - **A resting cursor does not hold the caret.** The caret follows only when the mouse moved
   or clicked, so Up/Down still work with the cursor parked on a row.
-- **A click only raises flags, which the menu's keys already serve:** `CursorAccept` (title,
+- **A click only raises flags, which the menu's keys already serve:** `CursorAccept` (
   settings, death: `_emit_accept` lowers it), `PauseClick` (the M panel row; Tick's fragments
   test `pause_row_taken`, and DrawHUD lowers it at the top of the next frame), the tabs'
   `nudge`/`save` flags and `LootTakeRequested`. That is what lets a probe click.
-- **Every menu that can be shut has a button for it.** The M panel's last row is `close`
-  (the M toggle's poll is `or_pause_row` with it), and every tuning tab has BACK. The loot window's `LootClose` line lowers
+- **Every menu that can be shut has a button for it.** The M panel's first row in play is
+  `resume` (it lowers `MenuOpen`, as M does), and every tuning tab has BACK. The loot window's `LootClose` line lowers
   `LootOpen` (`loot_draw.py`), and Tick stands the player up off that edge as after Tab. The
-  settings page has its BACK row. The title and death screens have nothing to shut.
+  settings page has its BACK row. The title's menu and the death screen have nothing to shut.
 - **The wheel is two more keys** OR'd into the Left/Right polls (`menu_nav.or_wheel`; in a
   scrolling tab, the Up/Down polls), not the right button: that is the shoulder aim, and the
   M panel does not pause.
@@ -112,7 +154,7 @@ mouse is the camera's.
 - **Probes:** `probe_menu_cursor.py` (headless: shown and hidden per screen, the held fire
   press, each flag served) and
   `uepy.py --game --windowed --probe Scripts/probes/probe_menu_cursor_window.py` (a real
-  window: every row of the M panel, title and settings pages found under the cursor). The
+  window: every row of the M panel, in play and on the title, and of the settings page found under the cursor). The
   windowed one moves the machine's pointer for a few seconds.
 - **Still needs a play session:** the click and the wheel themselves, the loot window's
   close line under a real cursor (no probe can aim at it), the cursor's look, and
@@ -125,9 +167,10 @@ mouse is the camera's.
   creates all four screens and adds them to the viewport (`ui_graph.py`); every `DrawHUD`
   shows the one the frame is on and writes the live values (`SetText`, `SetPercent`,
   `SetVisibility`).
-- **Which screen:** `GameStarted` false → `WBP_MainMenu` (its title or settings panel by
-  `MenuPage`); `PlayerDead` → `WBP_DeathMenu`; otherwise `WBP_HUD`'s `Body`, plus
-  `WBP_PauseMenu` while `MenuOpen` (its own rows, or the open tuning tab in their place).
+- **Which screen:** `GameStarted` false → the menu alone, held open (`Body` hidden);
+  `PlayerDead` → `WBP_DeathMenu`; otherwise `WBP_HUD`'s `Body`. In either of the first and
+  last, `WBP_PauseMenu` while `MenuOpen` (its own rows, or the settings page, by
+  `MenuPage`, or the open tuning tab in their place), with `WBP_MainMenu` up beside it.
   `WBP_HUD` itself is never hidden, so its `Fps` text (outside
   `Body`) shows over every screen.
 - **Shown means `HitTestInvisible`, never `Visible`.** No widget may take a click or hover away
@@ -140,11 +183,12 @@ mouse is the camera's.
   `SETTINGS_ROW_LABELS` must match `settings_rows.py`'s row numbers, which the verifier checks.
 - **Anchored, not computed.** Each element is anchored to its corner or edge (survival bars
   bottom-left, kills and FPS top-right, banner top-centre, inventory, HP and stamina
-  bottom-centre, menus centred). UMG scales them with the DPI curve (1.0 at a 1080 px shortest side).
+  bottom-centre, the death menu centred, the menu and its settings page off the top left at
+  `PAUSE_POS`). UMG scales them with the DPI curve (1.0 at a 1080 px shortest side).
 - **The proprietary notices** (`legal_consts.py`, `wbp_legal.py`; the game is Ellivian Inc.'s,
   see `LICENSE.txt`) are static designer text that no graph touches. `WBP_MainMenu`'s
-  `LegalNotice` (copyright and confidentiality lines) sits bottom-centre on Root, outside both
-  panels. `WBP_HUD`'s `Watermark` sits bottom-right on Root, outside `Body` like `Fps`, so it is
+  `LegalNotice` (copyright and confidentiality lines) sits bottom-centre on Root, outside the
+  settings panel, so it is up whenever the menu is: on the title and behind M. `WBP_HUD`'s `Watermark` sits bottom-right on Root, outside `Body` like `Fps`, so it is
   over every screen, in the corner the inventory strip and the loot window leave free.
   **Stamping a shared build:** set `WATERMARK_RECIPIENT` and re-run the build; it adds an
   `ISSUED TO` line (empty = no line). Neither is a variable: a live probe reaches them as
@@ -277,8 +321,7 @@ into the HUD. Enter on a number saves nothing in this tab.
 
 ## Settings screen
 
-- **The main menu:** NEW GAME and SETTINGS rows, navigated with Up/Down and chosen with
-  Enter/Space, or by a click on the row.
+- **The way in:** the menu's `settings` row, on the title or in play (above: "One menu").
 - **The settings page:**
   - mouse sensitivity (Left/Right, clamped to a minimum above zero);
   - DIFFICULTY: EASY / MEDIUM / SURVIVOR (Left/Right cycle it; default EASY). Saved as the int

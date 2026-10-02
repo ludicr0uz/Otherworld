@@ -29,19 +29,23 @@ Event graph:
   [Event BeginPlay] --> create the four screens, add them to the viewport
                     --> Quality := the startup preset (Low)
                     --> load BP_Settings --> GameMode.DebugMode = saved
-                    --> pause on the main menu (unless -nomenu)
+                    --> pause on the menu (unless -nomenu), with the HUD
+                        ticking while paused (graphics_menu/menu_main.py)
 
-  [Event Tick] --> save and exit (graphics_menu/save_exit.py), the loot
-                   window (graphics_menu/loot_tick.py), the tuning tabs, then
-                   the M / 1-4 / D keys
+  [Event Tick] --> in play: save and exit (graphics_menu/save_exit.py) and
+                   the loot window (graphics_menu/loot_tick.py); then, on the
+                   title too, the tuning tabs, the menu's own rows and M
+                   (graphics_menu/menu_main.py) and the debug row
 
   [Event ReceiveDrawHUD] --> DebugOn copy, settings pushed onto the weapon
                              component, difficulty onto the GameMode, FPS
-    --> GameStarted?   no: the main menu (title or settings page) and its keys
+    --> GameStarted?   no: the HUD hidden and the menu held open (the title)
     --> PlayerDead?    yes: the death menu and [R]
                        no:  HP, stamina, survival bars, kills, the wanderers'
                             bars (canvas), inventory, reticle (canvas), the
-                            save-and-exit banner, the loot window, the M panel
+                            save-and-exit banner, the loot window
+    --> the menu while MenuOpen, on the title and in play: its rows, or the
+        settings page or a tuning tab in their place
 """
 
 import os
@@ -75,7 +79,7 @@ from graphics_menu.settings_page import _author_push_settings      # noqa: E402
 # The UMG screens: their layouts, their creation at BeginPlay, and the
 # DrawHUD fragments that write into them.
 from graphics_menu.umg_consts import (                              # noqa: E402
-    CLOSE_ACTION, DEBUG_ACTION, GAME_STARTED_VAR, PAUSE_ROW_VAR)
+    DEBUG_ACTION, GAME_STARTED_VAR, PAUSE_ROW_VAR)
 from graphics_menu.wbp_hud import build_hud_widget                  # noqa: E402
 from graphics_menu.wbp_parts import (                              # noqa: E402
     build_inventory_slot, build_menu_row)
@@ -84,7 +88,7 @@ from graphics_menu.wbp_screens import (                            # noqa: E402
 from graphics_menu.ui_graph import (                               # noqa: E402
     author_create_screens, declare_ui_vars)
 from graphics_menu.menu_screens import (                           # noqa: E402
-    author_alive, author_death_menu, author_main_menu, author_pause_menu)
+    author_alive, author_death_menu, author_pause_menu, author_title)
 from graphics_menu.hud_stats import author_hp, author_kills         # noqa: E402
 from graphics_menu.hud_inventory import author_inventory            # noqa: E402
 # The stamina bar, centred under the inventory grid.
@@ -106,7 +110,9 @@ from graphics_menu.dev_guns import (                               # noqa: E402
 from graphics_menu.loot_draw import author_loot_window              # noqa: E402
 from graphics_menu.cursor import (                                  # noqa: E402
     author_cursor_read, cursor_defaults, declare_cursor_vars)
-from graphics_menu.menu_nav import or_pause_row, pause_row_taken    # noqa: E402
+from graphics_menu.menu_nav import pause_row_taken                  # noqa: E402
+from graphics_menu.menu_main import (                               # noqa: E402
+    author_in_play, author_main_rows_tick, author_title_ticks)
 from graphics_menu.menu_still import (                              # noqa: E402
     MENU_STILL_VAR, author_menu_still)
 from graphics_menu.monster_tune_consts import MONSTER_TAB           # noqa: E402
@@ -209,7 +215,6 @@ PLAYER_DEAD_VAR = "PlayerDead"
 # ─── Function paths for the graph nodes ──────────────────────────────────────
 
 FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
-FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
 FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
 FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
 FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
@@ -710,7 +715,9 @@ def _author_begin_play(ed, begin_play):
     # would freeze the game with no menu left to unpause it.
     settle = _at(_node(ed, FN_DELAY), mx + 740, my)
     _set(settle, "Duration", MENU_SETTLE_S)
-    _connect(BEL.find_then_pin(shown), _pin(settle, "execute"))
+    # The menu's rows are served on Tick, which a paused world stops.
+    _connect(author_title_ticks(ed, [BEL.find_then_pin(shown)], mx + 740, my - 500),
+             _pin(settle, "execute"))
     started = _at(ed.add_get_member_variable_node(GAME_STARTED_VAR),
                   mx + 740, my + 320)
     still_on_menu = _at(ed.add_branch_node(), mx + 1000, my)
@@ -728,9 +735,9 @@ def _author_begin_play(ed, begin_play):
     _connect(BEL.find_else_pin(shown), _pin(skip, "execute"))
 
     ed.add_comment_to_nodes(
-        f"Open on the main menu, paused {MENU_SETTLE_S}s in. {GAME_STARTED_VAR} "
-        f"defaults to false, so ReceiveDrawHUD draws the title panel instead "
-        f"of the HUD until the player starts -- see _author_main_menu. Pausing "
+        f"Open on the menu, paused {MENU_SETTLE_S}s in. {GAME_STARTED_VAR} "
+        f"defaults to false, so ReceiveDrawHUD holds the menu open over a "
+        f"hidden HUD until the player starts -- see author_title. Pausing "
         f"is what makes it a menu rather than a picture: unpaused, ten "
         f"wanderers are already running at a player who cannot move. The "
         f"delay is because a world paused on frame zero never updates its "
@@ -751,53 +758,29 @@ def _author_tick(ed, tick):
     pc = _at(_node(ed, FN_GET_OWNING_PC), x0, y0 + 180)
     pc_out = _pin(pc, "ReturnValue", is_input=False)
 
-    # --- M toggles the menu -------------------------------------------------
-    was_m = _at(_node(ed, FN_WAS_PRESSED), x0 + 260, y0 + 120)
-    _connect(pc_out, _pin(was_m, "self"))
-    _set(was_m, "Key", MENU_KEY)
-
-    br_m = _at(ed.add_branch_node(), x0 + 560, y0)
-    # The key, or the panel's close row taken (Enter on it, or a click:
-    # menu_screens.py). Only an open panel has rows, so a row never opens it.
-    m_clicks = []
-    _connect(or_pause_row(ed, _pin(was_m, "ReturnValue", is_input=False), CLOSE_ACTION,
-                          x0 - 240, y0 + 400, m_clicks), _pin(br_m, "Condition"))
-    # First the open panel holds the player still (menu_still.py). Then save
-    # and exit, the profile load and the death wipe (save_exit.py).
-    # Then the loot window (loot_tick.py): the body in reach, its keys, a take.
+    # First the open menu holds the player still (menu_still.py). Then, only
+    # with a game in play: save and exit, the profile load and the death wipe
+    # (save_exit.py), and the loot window (loot_tick.py): the body in reach,
+    # its keys, a take. The title's Tick skips them (menu_main.py).
     stilled = author_menu_still(ed, pc_out, [BEL.find_then_pin(tick)], x0, y0 - 6000)
-    saved = author_save_exit_tick(ed, pc_out, stilled, x0, y0 - 4000)
+    in_play, on_title = author_in_play(ed, stilled, x0 - 600, y0 - 4000)
+    saved = author_save_exit_tick(ed, pc_out, [in_play], x0, y0 - 4000)
     looted = author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000)
-    # Then the M panel's tuning tabs (tune_tick.py and its three siblings).
+    # Then the menu's tuning tabs (tune_tick.py and its three siblings).
     # The graphics one also hands the picked preset to the tuner component.
-    tuned = author_tune_tick(ed, pc_out, looted, x0 + 44000, y0 - 4000)
+    tuned = author_tune_tick(ed, pc_out, [*looted, on_title], x0 + 44000, y0 - 4000)
     tuned = author_monster_tune_tick(ed, pc_out, tuned, x0 + 58000, y0 - 4000)
     tuned = author_world_tune_tick(ed, pc_out, tuned, x0 + 72000, y0 - 4000)
-    for tail in author_gfx_tune_tick(ed, pc_out, tuned, x0 + 92000, y0 - 4000):
-        _connect(tail, _pin(br_m, "execute"))
+    tuned = author_gfx_tune_tick(ed, pc_out, tuned, x0 + 92000, y0 - 4000)
+    # Then the menu's own rows (new game or resume, settings, exit game) and M.
+    toggled = author_main_rows_tick(ed, pc_out, tuned, x0 + 260, y0 - 1600)
 
-    get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 560, y0 + 200)
-    not_open = _at(_node(ed, FN_NOT), x0 + 740, y0 + 200)
-    _connect(_pin(get_open, "MenuOpen", is_input=False), _pin(not_open, "A"))
-
-    set_open = _at(ed.add_set_member_variable_node("MenuOpen"), x0 + 900, y0)
-    _connect(_pin(not_open, "ReturnValue", is_input=False), _pin(set_open, "MenuOpen"))
-    _connect(BEL.find_then_pin(br_m), _pin(set_open, "execute"))
-
-    ed.add_comment_to_nodes(
-        f"{MENU_KEY} toggles the menu, and its close row shuts it.  Polled on Tick rather than bound as an "
-        "input action: an FInputActionValue binding would need an IA asset and "
-        "an IMC entry, and neither is authorable from Python.",
-        [was_m, br_m, get_open, not_open, set_open] + m_clicks)
-
-    # --- the panel's own rows, gated on the menu being open -----------------
+    # --- the menu's debug row, gated on the menu being open -----------------
     gate_get = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 1120, y0 + 200)
     gate = _at(ed.add_branch_node(), x0 + 1280, y0)
     _connect(_pin(gate_get, "MenuOpen", is_input=False), _pin(gate, "Condition"))
-    # Both arms of the toggle fall through to the gate; an exec input accepts
-    # more than one link, so no Sequence node is needed.
-    _connect(BEL.find_then_pin(set_open), _pin(gate, "execute"))
-    _connect(_pin(br_m, "else", is_input=False), _pin(gate, "execute"))
+    for tail in toggled:
+        _connect(tail, _pin(gate, "execute"))
 
     # --- the debug row toggles debug mode -----------------------------------
     # Written to the GameMode rather than to this HUD: the pellet tracers are
@@ -1084,9 +1067,10 @@ def _author_draw(ed, x0, y0):
     fps_out = author_fps(ed, x0 + 3000, y0 + 16000, pushed)
 
     # Where the mouse cursor is, before the first screen that asks (cursor.py).
-    # The main menu, before the dead/alive test: a title screen is neither.
-    playing = author_main_menu(ed, x0 + 3000, y0 + 6000,
-                               [author_cursor_read(ed, fps_out, x0 + 3000, y0 + 18000)])
+    # The title, before the dead/alive test: it is neither, and goes straight
+    # on to the menu.
+    title, playing = author_title(ed, x0 + 3000, y0 + 6000,
+                                  [author_cursor_read(ed, fps_out, x0 + 3000, y0 + 18000)])
 
     alive = _at(ed.add_branch_node(), x0 + 60, y0)
     dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
@@ -1094,8 +1078,7 @@ def _author_draw(ed, x0, y0):
                    x0 - 440, y0 + 240)
     _connect(mode_out, _pin(dead_get, "self"))
     _connect(_pin(dead_get, PLAYER_DEAD_VAR, is_input=False), _pin(alive, "Condition"))
-    for e in playing:
-        _connect(e, _pin(alive, "execute"))
+    _connect(playing, _pin(alive, "execute"))
 
     author_death_menu(ed, x0 + 3000, y0 + 3000, (BEL.find_then_pin(alive),), mode_out)
 
@@ -1121,9 +1104,10 @@ def _author_draw(ed, x0, y0):
     after_aim = author_exit_banner(ed, x0, y0 - 8200, after_aim)
     after_aim = author_loot_window(ed, x0, y0 - 9600, after_aim)
 
-    # Last: the M panel. Every path above -- written or cast-failed -- falls
-    # through to it; an exec input takes more than one link.
-    shown = author_pause_menu(ed, x0 + 420, y0, after_aim)
+    # Last: the menu. Every path above -- written or cast-failed -- falls
+    # through to it, and so does the title; an exec input takes more than one
+    # link.
+    shown = author_pause_menu(ed, x0 + 420, y0, [*after_aim, title])
     guns = author_tune_panel(ed, x0 + 4800, y0, shown)
     monsters = author_tune_panel(ed, x0 + 11000, y0, guns, MONSTER_TAB)
     world = author_tune_panel(ed, x0 + 17200, y0, monsters, WORLD_TAB)

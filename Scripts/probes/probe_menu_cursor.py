@@ -114,11 +114,13 @@ def probe(p):
     p.check("the next frame lowers a taken row, so it is served once",
             p.get(hud, CC.PAUSE_CLICK_VAR) == CC.NO_ROW, str(p.get(hud, CC.PAUSE_CLICK_VAR)))
 
-    # The close button is the last row: Tick shuts the panel, as M does.
-    p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_ACTIONS.index(C.CLOSE_ACTION))
+    # The close button is the first row, resume in play: Tick shuts the menu,
+    # as M does.
+    p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_ACTIONS.index(C.START_ACTION))
     yield lambda: not p.get(hud, "MenuOpen")
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    p.check("a click on the close row shuts the panel", p.get(hud, "MenuOpen") is False)
+    p.check("a click on the resume row shuts the menu",
+            p.get(hud, "MenuOpen") is False and p.get(hud, C.GAME_STARTED_VAR) is True)
     yield 0.1
     p.check("...and it stays shut once the click is lowered",
             p.get(hud, "MenuOpen") is False)
@@ -148,31 +150,32 @@ def probe(p):
     p.set(mode, "PlayerDead", False)
     _draw(hud)
 
-    # --- the title and settings pages: a click is the caret row's Enter ---------
+    # --- the title: the same menu, held open; its settings page's clicks ---------
     p.set(hud, C.GAME_STARTED_VAR, False)
     p.set(hud, "MenuPage", PAGE_TITLE)
-    p.set(hud, "MenuRow", 1)
     _draw(hud)
-    p.check("the title page shows the cursor, and nothing is accepted unasked",
-            _cursor(p, hud) == (True, True) and p.get(hud, "MenuPage") == PAGE_TITLE,
-            f"{_cursor(p, hud)}, page {p.get(hud, 'MenuPage')}")
-    p.set(hud, CC.CURSOR_ACCEPT_VAR, True)
-    _draw(hud)
-    p.check("a click on SETTINGS opens the settings page, and is spent",
-            p.get(hud, "MenuPage") == PAGE_SETTINGS
-            and p.get(hud, CC.CURSOR_ACCEPT_VAR) is False,
-            f"page {p.get(hud, 'MenuPage')}, accept {p.get(hud, CC.CURSOR_ACCEPT_VAR)}")
+    p.check("the title holds the menu open and shows the cursor",
+            p.get(hud, "MenuOpen") is True and _cursor(p, hud) == (True, True)
+            and p.get(hud, "MenuPage") == PAGE_TITLE,
+            f"open {p.get(hud, 'MenuOpen')}, {_cursor(p, hud)}")
+    p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_ACTIONS.index(C.SETTINGS_ACTION))
+    yield lambda: p.get(hud, "MenuPage") == PAGE_SETTINGS
+    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.check("the settings row taken opens the settings page, caret on its top row",
+            p.get(hud, "MenuPage") == PAGE_SETTINGS and p.get(hud, "MenuRow") == 0,
+            f"page {p.get(hud, 'MenuPage')}, row {p.get(hud, 'MenuRow')}")
     p.set(hud, "MenuRow", BACK_ROW)
     p.set(hud, CC.CURSOR_ACCEPT_VAR, True)
     _draw(hud)
-    p.check("a click on BACK returns to the title page",
+    p.check("a click on BACK returns to the menu's rows, and is spent",
             p.get(hud, "MenuPage") == PAGE_TITLE
             and p.get(hud, CC.CURSOR_ACCEPT_VAR) is False,
             f"page {p.get(hud, 'MenuPage')}")
-    p.set(hud, "MenuRow", 0)
-    p.set(hud, CC.CURSOR_ACCEPT_VAR, True)
-    _draw(hud)
-    p.check("a click on NEW GAME starts the game", p.get(hud, C.GAME_STARTED_VAR) is True)
+    p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_ACTIONS.index(C.START_ACTION))
+    yield lambda: p.get(hud, C.GAME_STARTED_VAR)
+    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.check("the new game row taken starts the game and shuts the menu",
+            p.get(hud, C.GAME_STARTED_VAR) is True and p.get(hud, "MenuOpen") is False)
     _draw(hud)
     p.check("...and play hides the cursor again", _cursor(p, hud) == (False, False),
             str(_cursor(p, hud)))

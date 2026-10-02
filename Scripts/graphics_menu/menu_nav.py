@@ -1,5 +1,6 @@
 """Keyboard navigation shared by the menu's pages: Up/Down move the caret, an
-accept key takes the row. The title page and the settings page both use it.
+accept key takes the row. The menu's own rows and its settings page both use
+it (the rows with Enter alone, polled in menu_screens.py).
 
 Also what a key poll gains from the mouse (cursor_consts.py): a click raised
 as CursorAccept, the wheel as Left/Right (or_wheel); and how Tick learns
@@ -32,8 +33,8 @@ NAV_RIGHT = "Right"
 
 
 def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0, row_var="MenuRow"):
-    """Up and Down move ``row_var`` (the title pages' MenuRow, or the M
-    panel's PauseRow), clamped at both ends rather than wrapped.
+    """Up and Down move ``row_var`` (the settings page's MenuRow, or the
+    menu's PauseRow), clamped at both ends rather than wrapped.
 
     Two branches in series rather than one Select: MenuRow is read fresh by
     each, so pressing both in a frame nets to no movement instead of to
@@ -143,13 +144,3 @@ def pause_row_taken(ed, action, x, y, made):
     _set(this_row, "B", PAUSE_ROW_ACTIONS.index(action))
     made += [clicked, this_row]
     return _pin(this_row, "ReturnValue", is_input=False)
-
-
-def or_pause_row(ed, pressed, action, x, y, made):
-    """``pressed`` (the poll of M, the panel's one key) OR ``action``'s row
-    was taken."""
-    either = _at(_node(ed, FN_OR), x + 480, y)
-    _connect(pressed, _pin(either, "A"))
-    _connect(pause_row_taken(ed, action, x, y, made), _pin(either, "B"))
-    made.append(either)
-    return _pin(either, "ReturnValue", is_input=False)

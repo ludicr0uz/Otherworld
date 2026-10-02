@@ -1,7 +1,8 @@
 """The mouse cursor in the menus: its buttons, the HUD's variables, the words.
 
-    a menu is up        the cursor shows (title, settings, death, the M panel
-                        and its tuning tabs, the loot window)
+    a menu is up        the cursor shows (the menu, on the title and in play,
+                        with its settings page and tuning tabs; death; the
+                        loot window)
     over a row          the caret goes to it, once the mouse moves or clicks
     left click          the row's Enter (on the M panel: the row is taken)
     wheel up / down     Right / Left: a slider, the difficulty, a tuning stat
@@ -31,7 +32,7 @@ CURSOR_MOVED_VAR = "CursorMoved"
 # The row under the cursor in the list being tested, NO_ROW when none.
 CURSOR_ROW_VAR = "CursorRow"
 NO_ROW = -1
-# Raised by a click on a row of a DrawHUD-polled menu (title, settings, the
+# Raised by a click on a row of a DrawHUD-polled menu (settings, the
 # death menu's hint); the menu's accept lowers it as it serves it, which is
 # what lets a probe click without a mouse.
 CURSOR_ACCEPT_VAR = "CursorAccept"

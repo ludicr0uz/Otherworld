@@ -28,8 +28,8 @@ WRITTEN = {
                + tuple(C.stat_bar(s) for s, _l, _c in C.SURVIVAL_BARS)
                + tuple(C.stat_group(s) for s, _l, _c in C.SURVIVAL_BARS)
                + tuple(C.debuff_text(s) for _t, _l, s in C.DEBUFF_LABELS),
-    C.WBP_MAIN_MENU: (C.TITLE_PANEL, C.TITLE_ROWS, C.SETTINGS_PANEL, C.SETTINGS_ROWS_BOX,
-                      C.HINT_IDLE, C.HINT_CAPTURE),
+    C.WBP_MAIN_MENU: (C.SETTINGS_PANEL, C.SETTINGS_ROWS_BOX, C.HINT_IDLE,
+                      C.HINT_CAPTURE),
     C.WBP_PAUSE_MENU: (C.PAUSE_ROWS,),
     C.WBP_DEATH_MENU: (C.DEATH_SCORE, C.DEATH_HINT_LINE),
     C.WBP_MENU_ROW: (C.ROW_CARET, C.ROW_LABEL_BOX, C.ROW_LABEL, C.ROW_VALUE,
@@ -99,9 +99,9 @@ def check_trees(check):
           not missing, str(missing))
 
     main, pause = trees[C.WBP_MAIN_MENU], trees[C.WBP_PAUSE_MENU]
-    title_rows = _labels(main, C.TITLE_ROWS)
-    check("the title page's rows are NEW GAME then SETTINGS, the order MenuRow picks",
-          title_rows == list(C.MENU_ROWS), str(title_rows))
+    check("the title has no page of its own: WBP_MainMenu holds the settings page "
+          "and nothing else with rows",
+          not {"TitlePanel", "TitleRows"} & set(main), str(sorted(main)))
     rows = _labels(main, C.SETTINGS_ROWS_BOX)
     check(f"the settings page has its {S.SETTINGS_ROWS} rows in the order MenuRow "
           "indexes them",
@@ -113,16 +113,20 @@ def check_trees(check):
     check("...with one bind row per BIND_VARS entry",
           len(S.BIND_LABELS) == len(S.BIND_VARS), f"{len(S.BIND_LABELS)} labels")
     pause_rows = _labels(pause, C.PAUSE_ROWS)
-    check("the M panel lists the presets, then debug, then save and exit",
+    check("the menu lists new game first, then settings, debug, save and exit, "
+          "the cheat and the tabs, and exit game last",
           pause_rows == list(C.PAUSE_ROW_LABELS)
-          and pause_rows[C.PAUSE_DEBUG_ROW].endswith("debug"), str(pause_rows))
+          and pause_rows[C.PAUSE_START_ROW] == C.START_ROW_LABEL
+          and pause_rows[1] == C.SETTINGS_ROW_LABEL
+          and pause_rows[C.PAUSE_DEBUG_ROW].endswith("debug")
+          and pause_rows[-1] == C.QUIT_ROW_LABEL, str(pause_rows))
 
     texts = set()
     for tree in trees.values():
         for w, _var in tree.values():
             if isinstance(w, unreal.TextBlock):
                 texts.add(str(w.get_editor_property("text")))
-    want = {C.GAME_TITLE, C.GAME_SUBTITLE, C.MAIN_HINT, C.SETTINGS_TITLE_TEXT,
+    want = {C.GAME_TITLE, C.SETTINGS_TITLE_TEXT,
             C.HINT_IDLE_TEXT, C.HINT_CAPTURE_TEXT, C.PAUSE_TITLE, C.PAUSE_HINT,
             C.DEATH_TITLE, C.DEATH_HINT, EXIT_CALLED_OFF_TEXT}
     want |= {label for _s, label, _c in C.SURVIVAL_BARS}
@@ -176,11 +180,23 @@ def check_trees(check):
              C.HUD_BODY: ((0.0, 0.0, 1.0, 1.0), (0.0, 0.0))}
     wrong = [n for n, want_at in edges.items() if anchor(hud, n) != want_at]
     centred = ((0.5, 0.5, 0.5, 0.5), (0.5, 0.5))
-    wrong += [n for n in (C.TITLE_PANEL, C.SETTINGS_PANEL) if anchor(main, n) != centred]
     if anchor(trees[C.WBP_DEATH_MENU], "Panel") != centred:
         wrong.append("the death panel")
-    check("each HUD element is anchored to its corner or edge, each menu centred",
+    check("each HUD element is anchored to its corner or edge, the death menu centred",
           not wrong, str(wrong))
+
+    def place(tree, name):
+        w = tree.get(name, (None, False))[0]
+        if not w:
+            return None
+        s = w.get_editor_property("slot")
+        return anchor(tree, name), (s.get_position().x, s.get_position().y)
+    top_left = (((0.0, 0.0, 0.0, 0.0), (0.0, 0.0)), C.PAUSE_POS)
+    places = {"the menu": place(pause, C.PAUSE_PANEL),
+              "the settings page": place(main, C.SETTINGS_PANEL)}
+    check(f"the menu sits where the M panel always did ({C.PAUSE_POS}, off the top "
+          "left), and its settings page in the same place",
+          all(at == top_left for at in places.values()), str(places))
     fps = hud.get(C.HUD_FPS, (None, False))[0]
     parent = fps.get_parent().get_name() if fps and fps.get_parent() else None
     check("the FPS readout sits outside Body, so it shows over every screen",
@@ -260,10 +276,9 @@ def check_hud_graph(check, nodes):
                 if not _sources(eq, "B"):
                     at_or_past = ">=" in _title(eq) or "GreaterEqual" in _title(eq).replace(" ", "")
                     (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
-    check("the title page, settings page, M panel, loot window and the four tuning tabs "
-          "light the selected row's caret (the M panel's is its own PauseRow)",
-          sorted(selected) == ["Get GfxTuneRow", "Get LootSel",
-                               "Get MenuRow", "Get MenuRow",
+    check("the settings page, the menu, loot window and the four tuning tabs "
+          "light the selected row's caret (the menu's is its own PauseRow)",
+          sorted(selected) == ["Get GfxTuneRow", "Get LootSel", "Get MenuRow",
                                "Get MonTuneRow", f"Get {C.PAUSE_ROW_VAR}", "Get TuneRow",
                                "Get WorldTuneRow"],
           str(sorted(selected)))
@@ -275,7 +290,9 @@ def check_hud_graph(check, nodes):
 
     texts = [n for n in nodes if {"self", "InText"} <= _pins(n)]
     blank = [n for n in texts if not text_literal(n) and not _sources(n, "InText")]
-    check("every SetText has a literal or a wire", not blank, f"{len(blank)} empty")
+    check("every SetText has a literal or a wire, but the one per in-game-only row "
+          "that clears its value once a game is in play",
+          len(blank) == len(C.IN_GAME_ACTIONS), f"{len(blank)} empty")
     written = sorted(t for n in texts for t in _source_titles(n, "self")
                      if t.startswith("Get ") and _sources(n, "InText"))
     for name in (C.HP_NUM, C.KILLS, C.DEATH_SCORE, C.HUD_FPS, C.EQUIPPED_NAME,
@@ -283,8 +300,11 @@ def check_hud_graph(check, nodes):
         check(f"{name} is written from the game, not a literal",
               f"Get {name}" in written)
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}
-    check("the debug row reads ON or OFF", literal == {C.DEBUG_ON, C.DEBUG_OFF},
-          str(sorted(literal)))
+    check("the menu's rows are the only literals written: debug reads ON or OFF, "
+          "the first row new game or resume, and on the title the rows that need "
+          "a game say so",
+          literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
+                      C.IN_GAME_ONLY, ""}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons
     # (loot_checks.py checks that one).

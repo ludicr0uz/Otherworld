@@ -1,10 +1,12 @@
-"""The three menu screens' layouts: WBP_MainMenu (the title page and the
-settings page), WBP_PauseMenu (the M panel) and WBP_DeathMenu.
+"""The three menu screens' layouts: WBP_PauseMenu (the menu: the game opens
+on it and M brings it up), WBP_MainMenu (its settings page, and the legal
+notice) and WBP_DeathMenu.
 
 Every menu line is a WBP_MenuRow whose label is set here, in the designer, so
 what each screen says can be read (and changed) in the UMG editor. The HUD
 graph writes only what changes: which row the caret is on, the value column,
-the death screen's score, and which settings hint shows.
+the first row's words (new game, or resume in play), the death screen's
+score, and which settings hint shows.
 """
 
 import unreal
@@ -14,19 +16,16 @@ from graphics_menu import umg_author as U
 from graphics_menu.wbp_legal import author_legal_notice
 from graphics_menu.wbp_tune import author_tune_widgets
 from graphics_menu.umg_consts import (
-    COL_CARET, COL_DEATH_HINT, COL_DEATH_TEXT, COL_DEATH_TITLE, COL_GOLD, COL_HINT,
-    COL_MAIN_HINT, COL_MAIN_SUB, COL_MAIN_TITLE, COL_ROW, COL_TITLE, DEATH_HINT,
-    DEATH_HINT_LINE,
+    COL_CARET, COL_DEATH_HINT, COL_DEATH_TEXT, COL_DEATH_TITLE, COL_HINT,
+    COL_MAIN_HINT, COL_ROW, COL_TITLE, DEATH_HINT, DEATH_HINT_LINE,
     DEATH_HINT_FONT, DEATH_PANEL_SIZE, DEATH_SCORE, DEATH_SCORE_FONT, DEATH_TITLE,
-    DEATH_TITLE_FONT, GAME_SUBTITLE, GAME_TITLE, HINT_CAPTURE, HINT_CAPTURE_TEXT,
-    HINT_IDLE, HINT_IDLE_TEXT, MAIN_HINT, MAIN_HINT_FONT, MAIN_PANEL_SIZE,
-    MAIN_ROW_LABEL_W, MAIN_ROW_SCALE, MAIN_SUB_FONT, MAIN_TITLE_FONT, MENU_ROWS,
+    DEATH_TITLE_FONT, HINT_CAPTURE, HINT_CAPTURE_TEXT, HINT_IDLE, HINT_IDLE_TEXT,
     PAUSE_HINT, PAUSE_HINT_FONT, PAUSE_PANEL, PAUSE_POS, PAUSE_ROW_LABEL_W,
     PAUSE_ROW_LABELS,
     PAUSE_ROW_SCALE, PAUSE_ROWS, PAUSE_TITLE, PAUSE_TITLE_FONT, PAUSE_W, ROW_COLOR_VAR,
     ROW_GAP, ROW_LABEL_W, ROW_TEXT_VAR, ROW_WIDTH_VAR, SET_HINT_FONT, SET_TITLE_FONT,
     SETTINGS_PANEL, SETTINGS_PANEL_W, SETTINGS_ROW_LABELS, SETTINGS_ROWS_BOX,
-    SETTINGS_TITLE_TEXT, TITLE_PANEL, TITLE_ROWS, WBP_DEATH_MENU, WBP_MAIN_MENU,
+    SETTINGS_TITLE_TEXT, WBP_DEATH_MENU, WBP_MAIN_MENU,
     WBP_MENU_ROW, WBP_PAUSE_MENU,
 )
 
@@ -60,18 +59,10 @@ def build_main_menu():
     bp = U.widget_blueprint(WBP_MAIN_MENU)
     root = U.add(bp, unreal.CanvasPanel, "Root")
 
-    title, stack = U.panel(bp, root, TITLE_PANEL, "T_UI_Panel", *MAIN_PANEL_SIZE,
-                           variable=True)
-    U.at(title, *CENTRE)
-    _line(bp, stack, "GameTitle", GAME_TITLE, MAIN_TITLE_FONT, COL_MAIN_TITLE, bold=True)
-    _line(bp, stack, "GameSubtitle", GAME_SUBTITLE, MAIN_SUB_FONT, COL_MAIN_SUB,
-          bottom=24.0)
-    _rows(bp, stack, TITLE_ROWS, MENU_ROWS, MAIN_ROW_LABEL_W, COL_GOLD, MAIN_ROW_SCALE)
-    _line(bp, stack, "MainHint", MAIN_HINT, MAIN_HINT_FONT, COL_MAIN_HINT, top=6.0)
-
     settings, stack = U.panel(bp, root, SETTINGS_PANEL, "T_UI_Panel",
                               min_w=SETTINGS_PANEL_W, variable=True)
-    U.at(settings, *CENTRE)
+    # Where the menu is: the page stands in its place.
+    U.at(settings, (0.0, 0.0), (0.0, 0.0), PAUSE_POS)
     _line(bp, stack, "SettingsTitle", SETTINGS_TITLE_TEXT, SET_TITLE_FONT, COL_TITLE,
           bold=True, bottom=18.0, centred=False)
     _rows(bp, stack, SETTINGS_ROWS_BOX, SETTINGS_ROW_LABELS, ROW_LABEL_W, COL_ROW)
@@ -79,7 +70,7 @@ def build_main_menu():
           top=4.0, variable=True, centred=False)
     capture = _line(bp, stack, HINT_CAPTURE, HINT_CAPTURE_TEXT, SET_HINT_FONT,
                     COL_CARET, top=4.0, variable=True, centred=False)
-    # The designer opens on the title page; the HUD picks the page per frame.
+    # The menu opens on its own rows; the HUD shows this page in their place.
     U.hide(capture)
     U.hide(settings)
     author_legal_notice(bp, root)
@@ -89,7 +80,8 @@ def build_main_menu():
 def build_pause_menu():
     bp = U.widget_blueprint(WBP_PAUSE_MENU)
     root = U.add(bp, unreal.CanvasPanel, "Root")
-    # A variable: the HUD collapses it while a tuning tab is open in its place.
+    # A variable: the HUD collapses it while the settings page or a tuning tab
+    # is open in its place.
     outer, stack = U.panel(bp, root, PAUSE_PANEL, "T_UI_Panel", min_w=PAUSE_W,
                            variable=True)
     U.at(outer, (0.0, 0.0), (0.0, 0.0), PAUSE_POS)

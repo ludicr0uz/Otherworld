@@ -90,8 +90,8 @@ def _check_widgets(check):
     widgets = {name: w for name, (w, _var) in _tree(UC.WBP_PAUSE_MENU).items()}
     title = widgets.get("PauseTitle")
     words = str(title.get_editor_property("text")) if title else ""
-    check('the M panel is titled "GAME SETTINGS"',
-          UC.PAUSE_TITLE == "GAME SETTINGS" and words == UC.PAUSE_TITLE, repr(words))
+    check("the menu is titled with the game's name",
+          UC.PAUSE_TITLE == UC.GAME_TITLE and words == UC.PAUSE_TITLE, repr(words))
     box = widgets.get(TAB.rows_box)
     labels = [str(k.get_editor_property(UC.ROW_TEXT_VAR))
               for k in (box.get_all_children() if box else [])]

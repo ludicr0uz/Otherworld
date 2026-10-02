@@ -16,8 +16,9 @@ loot window's is (loot_kneel.py; the two counts stack, and each gives back
 its own). MenuStill is that edge's memory. Tick, not DrawHUD: a -nullrhi run
 never draws, and the probe has to see it.
 
-The title, settings and death screens need none of this: the world is paused
-under them.
+The same on the title, where the menu is held open: the world is paused
+under it, the HUD ticks all the same (menu_main.py), and the first row gives
+the walk back as it starts the game. The death screen needs none of this.
 """
 
 from combat.graph import BEL, _connect, _pin

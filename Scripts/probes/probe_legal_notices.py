@@ -16,7 +16,7 @@ from graphics_menu import umg_consts as C
 from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, v) for v in (C.GAME_STARTED_VAR, "MenuPage")]
+WRITABLE = [(HUD_BP_PATH, v) for v in (C.GAME_STARTED_VAR, "MenuPage", "MenuOpen")]
 SHOWN = unreal.SlateVisibility.HIT_TEST_INVISIBLE
 
 
@@ -49,10 +49,10 @@ def probe(p):
     yield 0.5
     hud = p.hud()
     main, overlay = p.get(hud, C.UI_VAR[C.WBP_MAIN_MENU]), p.get(hud, "UiHud")
-    notice, mark = (_find(main, C.TITLE_PANEL, L.LEGAL_NOTICE),
+    notice, mark = (_find(main, C.SETTINGS_PANEL, L.LEGAL_NOTICE),
                     _find(overlay, C.HUD_BODY, L.WATERMARK))
 
-    # --- the title page, then the settings page ----------------------------------
+    # --- the title's menu, then its settings page ----------------------------------
     p.set(hud, C.GAME_STARTED_VAR, False)
     p.set(hud, "MenuPage", PAGE_TITLE)
     yield 0.5
@@ -76,6 +76,7 @@ def probe(p):
     # --- the game: the watermark beside the strip, then with the loot window -----
     p.set(hud, "MenuPage", PAGE_TITLE)
     p.set(hud, C.GAME_STARTED_VAR, True)
+    p.set(hud, "MenuOpen", False)
     yield 0.5
     body = overlay.get_editor_property(C.HUD_BODY)
     # is_visible reads a widget's own flag, not its parents': the notice goes

@@ -10,12 +10,15 @@ The screens (widget trees, authored through the UMGToolSet plugin)
   wbp_parts       WBP_MenuRow (caret, label, value) and WBP_InventorySlot
   wbp_hud         WBP_HUD: survival bars (bottom left), kills, banner, inventory
                   grid with HP and stamina under it, FPS; an icon by every bar
-  wbp_screens     WBP_MainMenu (title + settings pages), WBP_PauseMenu, WBP_DeathMenu
+  wbp_screens     WBP_PauseMenu (the menu: the title's, and M's in play),
+                  WBP_MainMenu (its settings page), WBP_DeathMenu
 
 The HUD graph that shows and writes them
   ui_graph        creating the screens at BeginPlay; SetText/SetVisibility/rows helpers
-  menu_screens    which screen is up: main menu (+ its keys), death menu, alive,
-                  M panel (its rows unless a tuning tab is open; Up/Down/Enter)
+  menu_screens    which screen is up: the title (the menu held open over a
+                  hidden HUD), death menu, alive, and the menu itself (its
+                  rows unless the settings page or a tuning tab is open in
+                  their place; Up/Down/Enter)
   hud_stats       HP bar and number, the kill counter
   hud_flash       a stat bar's group blinking while the bar is low
   stamina_bar     the stamina bar's fill, amber while sprinting
@@ -38,6 +41,9 @@ Input, settings and state
   menu_nav        Up/Down caret movement and the accept keys, shared by pages;
                   what a key poll gains from the wheel; Tick's test for a
                   taken M-panel row (the rows have no hotkeys)
+  menu_main       Tick: the menu's own rows (new game or resume, settings,
+                  exit game) and M; BeginPlay's "tick while paused" for the
+                  title; Tick's split on a game in play
   menu_still      Tick: the controller ignores move input while the M panel
                   is open, so the arrows only work the menu
   cursor_consts   the mouse cursor in the menus: its buttons, variables, rules
@@ -137,6 +143,9 @@ verify_graphics_menu.py's checks, beside it because it is over budget
                      weapons, panel, save, writes, the rows that are not a weapon's
   world_tune_checks    the world tuning tab: panel, save, the cycle's Sets
   cursor_checks      the mouse cursor: shown when, the row tests, the clicks
+  menu_main_checks   the one menu: the title holds it open and ticks under
+                     its pause, the first row starts or resumes, settings
+                     opens its page in the rows' place, exit game quits
   pause_checks       the M panel as a menu: rows taken by caret or click (no
                      hotkeys), one menu at a time, BACK, the scrolling list,
                      the player held still

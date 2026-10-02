@@ -49,8 +49,8 @@ SCREENS = (("UiHud", WBP_HUD, 0),
            ("UiDeath", WBP_DEATH_MENU, 30))
 UI_VAR = {asset: var for var, asset, _z in SCREENS}
 
-# The HUD variable that picks the title screens over the game: false until
-# NEW GAME (or -nomenu), and BeginPlay pauses the world alongside it.
+# The HUD variable that tells the title from a game in play: false until the
+# menu's new-game row (or -nomenu), and BeginPlay pauses the world alongside it.
 GAME_STARTED_VAR = "GameStarted"
 
 # What "shown" means. Never Visible: every key is polled off the controller,
@@ -74,8 +74,6 @@ COL_HP_FILL = "(R=0.750000,G=0.130000,B=0.120000,A=0.950000)"
 COL_ST_FILL = "(R=0.320000,G=0.720000,B=0.880000,A=0.950000)"
 COL_ST_SPENT = "(R=0.820000,G=0.560000,B=0.180000,A=0.950000)"
 COL_DEBUFF = "(R=0.950000,G=0.300000,B=0.220000,A=1.000000)"
-COL_MAIN_TITLE = "(R=0.920000,G=0.945000,B=1.000000,A=1.000000)"
-COL_MAIN_SUB = "(R=0.520000,G=0.560000,B=0.630000,A=1.000000)"
 COL_DEATH_TITLE = "(R=0.880000,G=0.220000,B=0.180000,A=1.000000)"
 COL_DEATH_TEXT = "(R=0.900000,G=0.900000,B=0.920000,A=1.000000)"
 COL_DEATH_HINT = "(R=0.700000,G=0.720000,B=0.760000,A=1.000000)"
@@ -193,18 +191,11 @@ LOW_FRACTION = 0.25
 FLASH_HZ = 2.0
 FLASH_DIM = 0.25
 
-# ─── WBP_MainMenu: the title page and the settings page ───────────────────────
-TITLE_PANEL, TITLE_ROWS = "TitlePanel", "TitleRows"
+# ─── WBP_MainMenu: the settings page (and the legal notice) ───────────────────
+# The page the menu's settings row opens, in the menu's own place.
 SETTINGS_PANEL, SETTINGS_ROWS_BOX = "SettingsPanel", "SettingsRows"
 HINT_IDLE, HINT_CAPTURE = "HintIdle", "HintCapture"
 GAME_TITLE = "OTHERWORLD"
-GAME_SUBTITLE = "a night in the forest"
-MENU_ROWS = ("NEW GAME", "SETTINGS")
-MAIN_HINT = "UP / DOWN  ·  ENTER or click selects"
-MAIN_PANEL_SIZE = (600.0, 346.0)
-MAIN_TITLE_FONT, MAIN_SUB_FONT, MAIN_HINT_FONT = 34.0, 14.0, 12.0
-MAIN_ROW_SCALE = 1.4             # the title rows, bigger than the settings rows
-MAIN_ROW_LABEL_W = 170.0
 SETTINGS_ROW_LABELS = (tuple(sl.label for sl in SLIDERS) + (DIFFICULTY_LABEL,)
                        + BIND_LABELS + (BACK_LABEL,))
 SETTINGS_TITLE_TEXT = SETTINGS_TITLE
@@ -213,31 +204,41 @@ SET_TITLE_FONT, SET_HINT_FONT = 22.0, 12.0
 HINT_IDLE_TEXT = "arrows or wheel adjust  ·  ENTER or click rebinds"
 HINT_CAPTURE_TEXT = "press any key to bind it"
 
-# ─── WBP_PauseMenu: the M panel ───────────────────────────────────────────────
+# ─── WBP_PauseMenu: the menu ──────────────────────────────────────────────────
+# One menu: the game opens on it, paused, and M brings the same one up in play.
 PAUSE_ROWS = "PauseRows"
-# The panel's own artwork and rows. A variable: an open tuning tab stands in
-# its place, so only one menu is ever on screen.
+# The menu's own artwork and rows. A variable: the settings page or an open
+# tuning tab stands in its place, so only one menu is ever on screen.
 PAUSE_PANEL = "Panel"
-# M opens and shuts the panel: the one key the panel has. Its rows have none:
+# M opens and shuts the menu in play: the one key it has. Its rows have none:
 # Up / Down move the caret (PAUSE_ROW_VAR), Enter or a click takes the row.
 MENU_KEY = "M"
-PAUSE_ACCEPT_KEY = "Enter"       # not Space: the panel does not pause, and Space jumps
+PAUSE_ACCEPT_KEY = "Enter"       # not Space: the menu does not pause, and Space jumps
 PAUSE_ROW_VAR = "PauseRow"
-# The panel is the game's settings: debug mode, save and exit, and the
-# developer tabs. The quality presets are the GRAPHICS TUNING tab's first row.
-PAUSE_TITLE = "GAME SETTINGS"
-DEBUG_ACTION, CLOSE_ACTION = "debug", "close"
+PAUSE_TITLE = GAME_TITLE
+START_ACTION, SETTINGS_ACTION = "start", "settings"
+DEBUG_ACTION, QUIT_ACTION = "debug", "quit"
+# The first row starts the game from the title; in play it shuts the menu, as
+# M does, and says so (the HUD writes its label every frame).
+START_ROW_LABEL, RESUME_ROW_LABEL = "new game", "resume"
+SETTINGS_ROW_LABEL = "settings"
 DEBUG_ROW_LABEL = "debug"
-# The close button: the last row, shutting the panel as M does.
-PAUSE_CLOSE_ROW_LABEL = "close"
-PAUSE_ROW_LABELS = (DEBUG_ROW_LABEL, EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL,
-                    TUNE_ROW_LABEL, MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL,
-                    GFX_TUNE_ROW_LABEL, PAUSE_CLOSE_ROW_LABEL)
+# The last row leaves the game for the desktop, saving nothing.
+QUIT_ROW_LABEL = "exit game"
+PAUSE_ROW_LABELS = (START_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_ROW_LABEL,
+                    EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL, TUNE_ROW_LABEL,
+                    MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL, GFX_TUNE_ROW_LABEL,
+                    QUIT_ROW_LABEL)
 # What each row does, in row order: taking row i raises PauseClick = i, and
 # Tick's fragment for that action serves it (menu_nav.pause_row_taken).
-PAUSE_ROW_ACTIONS = (DEBUG_ACTION, EXIT_ACTION, DEV_GUNS_ACTION, TUNE_ACTION,
-                     MON_TUNE_ACTION, WORLD_TUNE_ACTION, GFX_TUNE_ACTION, CLOSE_ACTION)
+PAUSE_ROW_ACTIONS = (START_ACTION, SETTINGS_ACTION, DEBUG_ACTION, EXIT_ACTION,
+                     DEV_GUNS_ACTION, TUNE_ACTION, MON_TUNE_ACTION,
+                     WORLD_TUNE_ACTION, GFX_TUNE_ACTION, QUIT_ACTION)
+PAUSE_START_ROW = PAUSE_ROW_ACTIONS.index(START_ACTION)
 PAUSE_DEBUG_ROW = PAUSE_ROW_ACTIONS.index(DEBUG_ACTION)
+# The rows that need a game in play: on the title they do nothing and say so.
+IN_GAME_ACTIONS = (EXIT_ACTION, DEV_GUNS_ACTION)
+IN_GAME_ONLY = "in game only"
 PAUSE_HINT = "UP / DOWN  ·  ENTER or click selects"
 PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0
 PAUSE_TITLE_FONT, PAUSE_HINT_FONT = 22.0, 15.0

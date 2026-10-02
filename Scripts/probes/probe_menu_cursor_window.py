@@ -21,7 +21,8 @@ from graphics_menu.settings_rows import BACK_ROW, PAGE_SETTINGS, PAGE_TITLE
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in ("MenuOpen", C.GAME_STARTED_VAR, "MenuPage",
-                                       "MenuRow", GFX_TAB.open_var, GFX_TAB.row_var)]
+                                       "MenuRow", C.PAUSE_ROW_VAR, GFX_TAB.open_var,
+                                       GFX_TAB.row_var)]
 STEP_PX = 6          # under the thinnest row at any window this is run in
 STEP_S = 0.04
 
@@ -98,32 +99,37 @@ def probe(p):
     p.check("closing the panel hides the cursor",
             not pc.get_editor_property("show_mouse_cursor"))
 
-    # --- the title page: the caret follows the cursor -----------------------------
+    # --- the title: the same menu, in the same place -----------------------------
     p.set(hud, C.GAME_STARTED_VAR, False)
     p.set(hud, "MenuPage", PAGE_TITLE)
-    p.set(hud, "MenuRow", 0)
+    p.set(hud, C.PAUSE_ROW_VAR, 0)
     yield 0.5
     seen = []
-    yield from _sweep(p, hud, 0.5, seen)
-    p.check("sweeping down the title page finds NEW GAME, then SETTINGS",
-            seen == list(range(len(C.MENU_ROWS))), str(seen))
-    p.check("...and the caret went with it", p.get(hud, "MenuRow") == len(C.MENU_ROWS) - 1,
-            str(p.get(hud, "MenuRow")))
+    yield from _sweep(p, hud, 0.12, seen)
+    p.check("sweeping down the title's menu finds every row, new game to exit game",
+            p.get(hud, "MenuOpen") is True
+            and seen == list(range(len(C.PAUSE_ROW_LABELS))), str(seen))
+    p.check("...and the caret went with it",
+            p.get(hud, C.PAUSE_ROW_VAR) == len(C.PAUSE_ROW_LABELS) - 1,
+            str(p.get(hud, C.PAUSE_ROW_VAR)))
     yield 0.3
     p.check("...and stays once the cursor has moved off the rows",
-            p.get(hud, "MenuRow") == len(C.MENU_ROWS) - 1, str(p.get(hud, "MenuRow")))
+            p.get(hud, C.PAUSE_ROW_VAR) == len(C.PAUSE_ROW_LABELS) - 1,
+            str(p.get(hud, C.PAUSE_ROW_VAR)))
 
     # --- the settings page ----------------------------------------------------------
     p.set(hud, "MenuPage", PAGE_SETTINGS)
     p.set(hud, "MenuRow", 0)
     yield 0.5
     seen = []
-    yield from _sweep(p, hud, 0.5, seen)
+    # The page stands where the menu does.
+    yield from _sweep(p, hud, 0.12, seen)
     p.check("sweeping down the settings page finds every row down to BACK",
             seen == list(range(BACK_ROW + 1)) and p.get(hud, "MenuRow") == BACK_ROW,
             f"{seen}, caret {p.get(hud, 'MenuRow')}")
     p.set(hud, "MenuPage", PAGE_TITLE)
     p.set(hud, C.GAME_STARTED_VAR, True)
+    p.set(hud, "MenuOpen", False)
     yield 0.3
     p.check("back in play the cursor is hidden",
             not pc.get_editor_property("show_mouse_cursor"))

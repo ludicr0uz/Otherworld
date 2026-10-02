@@ -132,6 +132,12 @@ def probe(p):
             str(carets))
     p.check("...and the debug row says whether debug mode is on",
             debug == (C.DEBUG_ON if p.get(hud, "DebugOn") else C.DEBUG_OFF), f"'{debug}'")
+    first = _text(_row(rows, C.PAUSE_START_ROW).get_editor_property(C.ROW_LABEL))
+    needs = [_text(_row(rows, C.PAUSE_ROW_ACTIONS.index(a)).get_editor_property(C.ROW_VALUE))
+             for a in C.IN_GAME_ACTIONS]
+    p.check("...and in play its first row reads resume, and no row says it needs a game",
+            first == C.RESUME_ROW_LABEL and needs == [""] * len(needs),
+            f"'{first}', {needs}")
     p.set(hud, "MenuOpen", False)
     _draw(hud)
     p.check("...and closing it takes it down", ui["UiPause"].get_visibility() == HIDDEN)
@@ -151,20 +157,32 @@ def probe(p):
                 for debug, (on, vis, words) in seen.items()),
             str({d: (on, str(vis.name), words) for d, (on, vis, words) in seen.items()}))
 
-    # --- the title page and the settings page ------------------------------------------
+    # --- the title: the same menu, alone; and its settings page ---------------------
     p.set(hud, C.GAME_STARTED_VAR, False)
     p.set(hud, "MenuPage", 0)
-    p.set(hud, "MenuRow", 1)
+    p.set(hud, C.PAUSE_ROW_VAR, 1)
     _draw(hud)
-    main = ui["UiMain"]
-    title, settings = (main.get_editor_property(C.TITLE_PANEL),
+    main, pause = ui["UiMain"], ui["UiPause"]
+    panel, settings = (pause.get_editor_property(C.PAUSE_PANEL),
                        main.get_editor_property(C.SETTINGS_PANEL))
-    p.check("before a game starts the title page is up, over a hidden HUD",
-            main.get_visibility() == SHOWN and title.get_visibility() == SHOWN
+    p.check("before a game starts the menu is up, held open, over a hidden HUD",
+            p.get(hud, "MenuOpen") is True and pause.get_visibility() == SHOWN
+            and panel.get_visibility() == SHOWN and main.get_visibility() == SHOWN
             and settings.get_visibility() == HIDDEN and body.get_visibility() == HIDDEN,
-            f"main {main.get_visibility()}, body {body.get_visibility()}")
-    carets = _carets(main.get_editor_property(C.TITLE_ROWS), len(C.MENU_ROWS))
-    p.check("...with the caret on MenuRow's row", carets == [0.0, 1.0], str(carets))
+            f"pause {pause.get_visibility()}, panel {panel.get_visibility()}, "
+            f"body {body.get_visibility()}")
+    rows = pause.get_editor_property(C.PAUSE_ROWS)
+    carets = _carets(rows, len(C.PAUSE_ROW_LABELS))
+    p.check("...with the caret on PauseRow's row",
+            carets == [float(i == 1) for i in range(len(C.PAUSE_ROW_LABELS))], str(carets))
+    first = _text(_row(rows, C.PAUSE_START_ROW).get_editor_property(C.ROW_LABEL))
+    needs = [_text(_row(rows, C.PAUSE_ROW_ACTIONS.index(a)).get_editor_property(C.ROW_VALUE))
+             for a in C.IN_GAME_ACTIONS]
+    last = str(_row(rows, len(C.PAUSE_ROW_LABELS) - 1).get_editor_property(C.ROW_TEXT_VAR))
+    p.check("...its first row reads new game, its last exit game, and the rows that "
+            "need a game say so",
+            first == C.START_ROW_LABEL and last == C.QUIT_ROW_LABEL
+            and needs == [C.IN_GAME_ONLY] * len(needs), f"'{first}', '{last}', {needs}")
 
     p.set(hud, "MenuPage", 1)
     p.set(hud, "MenuRow", FIRST_BIND_ROW)
@@ -172,14 +190,20 @@ def probe(p):
     rows = main.get_editor_property(C.SETTINGS_ROWS_BOX)
     values = [_text(_row(rows, i).get_editor_property(C.ROW_VALUE))
               for i in range(len(C.SETTINGS_ROW_LABELS))]
-    p.check("the settings page replaces the title page",
-            settings.get_visibility() == SHOWN and title.get_visibility() == HIDDEN)
+    p.check("the settings page stands in the menu's place",
+            settings.get_visibility() == SHOWN and panel.get_visibility() == HIDDEN)
     p.check("...every setting row shows its value and BACK shows none",
             all(values[:-1]) and values[-1] == ""
             and values[DIFFICULTY_ROW] in DIFFICULTY_LABELS, str(values))
     carets = _carets(rows, len(C.SETTINGS_ROW_LABELS))
     p.check("...and the caret is on MenuRow's row",
             carets.index(1.0) == FIRST_BIND_ROW and carets.count(1.0) == 1, str(carets))
+    p.set(hud, "MenuPage", 0)
+    _draw(hud)
+    p.check("...and back on the menu's rows the page is gone",
+            settings.get_visibility() == HIDDEN and panel.get_visibility() == SHOWN)
+    # The title held the menu open; the game below starts with it shut.
+    p.set(hud, "MenuOpen", False)
 
     # --- dead ----------------------------------------------------------------------------
     p.set(hud, C.GAME_STARTED_VAR, True)

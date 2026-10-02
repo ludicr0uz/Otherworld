@@ -73,6 +73,11 @@ NPC_CLASS_PATH = f"{NPC_BP_PATH}.BP_ForestWanderer_C"
 ITEM_CLASS_PATH = f"{ITEM_BP_PATH}.BP_WeaponItem_C"
 HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
+# On BP_WeaponComponent: the player is holding fire out in front of them (a
+# lit stick). Nothing in combat reads it; a creature afraid of fire does
+# (npc/ward.py), and keeps off the side the player faces while it is true.
+# Whatever lights the stick writes it.
+FIRE_WARD_VAR = "FireWard"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
 BULLET_IMPACT_CLASS_PATH = f"{BULLET_IMPACT_BP_PATH}.BP_BulletImpact_C"
 AMMO_CLASS_PATH = f"{AMMO_BP_PATH}.BP_AmmoPickup_C"

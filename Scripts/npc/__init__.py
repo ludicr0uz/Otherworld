@@ -5,7 +5,8 @@ parent pair, then one child Blueprint and one AI controller per creature).
 Every number these graphs bake in lives in forest_generator/npc_placement.py
 (chase, melee), forest_generator/npc_agro.py (senses, patrol) and
 forest_generator/npc_strafe.py (the step between swings) and
-forest_generator/npc_stalk.py (the wendigo's hunt), none of
+forest_generator/npc_stalk.py (the wendigo's hunt) and
+forest_generator/npc_ward.py (fire holding it off), none of
 which imports `unreal`, so the offline generator reads the same values.
 The senses, patrol, speed, melee and health numbers are then overlaid by
 npc/monster_tuning.csv (monster_tuning.py) and baked as the controller's
@@ -44,6 +45,9 @@ THE CONTROLLER'S STEPS (one fragment per concern)
                good, which is the charge (Chase takes over)
   stalk_cover  ...the next tree: the sweeps for one, the spot behind its
                trunk, and what makes a spot cover
+  ward         a fire-fearing creature's Ward step (the wendigo): while the
+               player holds fire out at it, it circles instead of attacking;
+               past the fire the step fails; held off long enough, it runs
   agro         the notice and patrol steps: player present, one per sense, stroll
   sight_cone   debug mode: the Tick that draws the sight (aggro) cone, as
                senses.py tests it, yellow on patrol and red on the hunt
@@ -60,6 +64,7 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_sight_cone  debug mode's cone: its gates and what it is drawn from
   verify_strafe  the step between two swings: when, where to, facing, speed
   verify_stalk   the wendigo's hunt: roar, sweeps, cover, legs, charge
+  verify_ward    fire holding it off: the gate, the hold, the ring, the flight
 
 THE BODY
   character    BP_ForestWanderer and one child Blueprint per creature
@@ -67,5 +72,5 @@ THE BODY
 Dependency direction: paths/nodes -> graph -> fragments -> steps ->
 step_task/tree -> controller -> character -> entry point. No module imports
 the entry point. The only combat imports are its data modules (game_state,
-paths, tuning).
+paths, tuning): the player's Blocking and FireWard are read by name.
 """

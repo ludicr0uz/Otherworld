@@ -205,6 +205,11 @@ menu polls its own copy from `DrawHUD`, which does.
   item does no damage. `ThrowKeyForced` and `ThrowClickForced` are the probe's stand-ins for
   the key and the click
   (`probes/probe_throw.py`); the throw numbers are in `throw_tuning.py`.
+- **`FireWard` is fire held out in front of the player** (`paths.FIRE_WARD_VAR`, a bool on
+  `BP_WeaponComponent`, false by default). Combat only declares it. A wendigo reads it and
+  keeps off the side the player faces while it is true (`Scripts/npc/CLAUDE.md`, "Fire
+  holds the wendigo off"). Nothing raises it yet: whatever lights a stick writes it, true
+  while the fire is held out and false when it is lowered, burns out or leaves the hand.
 - **Kill rewards happen only on the `DamagedByPlayer` arm.** That covers the kill count, the two
   shells and the gun roll. The world-floor net writes `Health = 0` down the same death path, and
   it must not pay out.

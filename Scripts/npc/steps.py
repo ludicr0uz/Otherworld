@@ -9,6 +9,9 @@ names and finishes with StepResult, which every exit of every step writes:
                      -> stats and voice                               stats.py
                      -> patrol setup, once per life -> succeed        patrol.py
     every other step begins: [pawn gone, dead or at 0 HP?] fail      corpse.py
+    BT_Ward    (a creature afraid of fire only) held off by the      ward.py
+               player's fire: circle them, or run away -> succeed;
+               no fire between them: fail, and the tree goes on to attack
     BT_Stalk   (a stalker only) roar, then tree to tree round the     stalk.py
                player -> succeed; close enough: fail, for good, and
                the tree goes on to Chase
@@ -26,6 +29,10 @@ from forest_generator.npc_stalk import (
     NPC_STALK_ARC_DEG, NPC_STALK_BEHIND_CM, NPC_STALK_CHARGE_CM,
     NPC_STALK_HIDE_MAX_S, NPC_STALK_HIDE_MIN_S, NPC_STALK_ROAR, NPC_STALK_ROAR_S,
 )
+from forest_generator.npc_ward import (
+    NPC_WARD_ARC_DEG, NPC_WARD_FLEE_S, NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S,
+    NPC_WARD_RANGE_CM, NPC_WARD_RING_CM,
+)
 from forest_generator.npc_strafe import (
     NPC_STRAFE_ENGAGE_CM, NPC_STRAFE_MAX_ANGLE_DEG, NPC_STRAFE_MAX_DISTANCE_CM,
     NPC_STRAFE_MIN_ANGLE_DEG, NPC_STRAFE_MIN_DISTANCE_CM, NPC_STRAFE_SHARE,
@@ -41,12 +48,13 @@ from npc.monster_tuning import monster_specs, stock_run_speed
 from npc.patrol import _author_patrol_setup, _author_walk_speed
 from npc.paths import (
     STEP_CHASE, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
-    STEP_SWING,
+    STEP_SWING, STEP_WARD,
 )
 from npc.stalk import _author_stalk, declare_stalk_vars, roar_object
 from npc.stats import _author_stats_and_voice
 from npc.strafe import _author_strafe, declare_strafe_vars
 from npc.tuned import declare_tuned_vars
+from npc.ward import _author_ward, declare_ward_vars, wards
 
 
 class _Steps:
@@ -136,6 +144,23 @@ def _author_stalk_step(ed, steps, key, x0, y0):
         f"open.", cover)
 
 
+def _author_ward_step(ed, steps, key, x0, y0):
+    """BT_Ward, for a creature of NPC_WARD_FEARS: held off by the player's
+    fire. After the Stalk step's variables are declared: a flight resets them."""
+    declare_ward_vars(ed)
+    made = _author_ward(ed, steps.event(STEP_WARD, x0 - 300, y0), steps.result,
+                        stock_run_speed(key), key in NPC_STALK_ROAR, x0, y0)
+    ed.add_comment_to_nodes(
+        f"BT_Ward, tried before the attack: while the player holds fire out "
+        f"(FireWard), within {NPC_WARD_RANGE_CM:.0f} cm and "
+        f"{NPC_WARD_HALF_ANGLE_DEG:.0f} deg of where they face, it does not "
+        f"attack. It circles them {NPC_WARD_RING_CM:.0f} cm off, "
+        f"{NPC_WARD_ARC_DEG:.0f} deg further round a pass, facing them; past "
+        f"the fire the step fails and the attack runs. Held off "
+        f"{NPC_WARD_HOLD_S:.0f} s, it runs away for {NPC_WARD_FLEE_S:.0f} s.",
+        made)
+
+
 def _author_steps(ed, key, melee_anim, x0, y0):
     """Author every step event into creature ``key``'s controller graph.
     Its numbers are read off the Tune* variables (npc/tuned.py); ``spec``
@@ -169,6 +194,8 @@ def _author_steps(ed, key, melee_anim, x0, y0):
 
     if key in NPC_STALK_ROAR:
         _author_stalk_step(ed, steps, key, x0 + 3000, y0 - 14000)
+    if wards(key):
+        _author_ward_step(ed, steps, key, x0 + 3000, y0 - 22000)
 
     cx, cy = x0 + 3000, y0 - 3000
     stock = stock_run_speed(key)

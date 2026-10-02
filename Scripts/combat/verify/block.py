@@ -1,10 +1,12 @@
 """verify.block -- the player's guard (weapon_component/block.py): its key,
 the Blocking stance it writes, and the fire gate refusing while it is up.
+Also the other thing a wanderer reads off the player: FireWard, fire held out.
 
 What a block does to a swing is authored into the wanderers' controllers
 (npc/block.py) and checked by verify_npc_blueprints.py.
 """
 
+from combat.paths import FIRE_WARD_VAR
 from combat.tuning import BIND_VARS, BLOCK_KEY, COMBAT
 from combat.verify.fixtures import w, wg
 from combat.verify.common import BEL, PIN, check, in_pins, pin_value
@@ -88,7 +90,15 @@ def check_fire_refused_while_blocking():
           str(len(gates)))
 
 
+def check_fire_ward():
+    check(f"{FIRE_WARD_VAR} is a bool that starts false: no fire is held out "
+          f"until something lights one (the wendigo reads it, npc/ward.py)",
+          w.get_editor_property(FIRE_WARD_VAR) is False,
+          repr(w.get_editor_property(FIRE_WARD_VAR)))
+
+
 def run():
     check_block_key()
+    check_fire_ward()
     check_blocking_stance()
     check_fire_refused_while_blocking()

@@ -9,6 +9,7 @@ steps, the tree, the step task, the controller and the character).
 - Every sense and patrol number lives in `forest_generator/npc_agro.py`.
 - The step between two swings is `forest_generator/npc_strafe.py`.
 - The wendigo's hunt is `forest_generator/npc_stalk.py`.
+- What fire does to it is `forest_generator/npc_ward.py`.
 - None imports `unreal`, so the offline generator checks exactly what gets built.
 - **The tunable ones are not pin literals.** Senses, patrol, run speed, melee damage/range/
   interval and health are `Tune*` variables on each controller (`tuned.py`), defaulted to
@@ -18,7 +19,7 @@ steps, the tree, the step task, the controller and the character).
   fragment reading it with `tuned()`.
 
 `Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees, the step between swings and
-the wendigo's hunt (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`). The level verifier owns the chase and the melee.
+the wendigo's hunt and the fire that holds it off (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_ward.py`). The level verifier owns the chase and the melee.
 `Scripts/probes/probe_npc_behavior_tree.py` proves the trees run in the game.
 
 Respawn, the world-floor net and the `[NPC-SPAWN]`/`[NPC-FELL]` numbering are in
@@ -34,7 +35,9 @@ Wanderer (selector)
     Pulse            [possessed? no: fail] → [dead? corpse, StopLogic] → stats → patrol setup
     Act (selector)
       Hunt [BB Aggro is set]    Chase (between swings: step off and round : MoveToActor : MoveToLocation) → Swing → Wait 0.5
-                                (the wendigo: Approach (selector): Stalk, Chase → Swing → Wait 0.5)
+                                (the wendigo: Approach (selector): Stalk, Chase → Swing → Wait 0.5,
+                                 and ahead of it all: Engage (selector): Ward, Attack (sequence):
+                                 Approach, Swing → Wait 0.5)
       Notice                    PlayerPresent → Senses (selector): Hurt, Sight, Touch, Sound
       Patrol                    Stroll → Wait 0.5
   Idle: Wait 0.5
@@ -155,6 +158,45 @@ Wanderer (selector)
   - **Feel check (needs a play session):** the roar is upper body only, on standing legs; the
     wait behind a trunk has no crouch or peek; a wendigo shot while it hunts carries on
     hunting; and its 4–9 s voice still sounds from behind its tree.
+- **Fire holds the wendigo off** (`ward.py`, numbers in `forest_generator/npc_ward.py`):
+  - It is one more step, `BT_Ward`, in a selector with the whole attack (the approach and
+    the Swing, now a sequence of their own). Only the creatures in `NPC_WARD_FEARS` get the
+    event, its variables and the tree nodes.
+  - **The step succeeds while it is held off or running away, and fails otherwise.** A
+    success has given its own move order and ends the pass at the Wait, so the Swing is
+    never reached: nothing in the melee was touched.
+  - **Held off** is all three: the player's `FireWard` is up (a bool on
+    `BP_WeaponComponent`, `combat/paths.FIRE_WARD_VAR`), the wendigo is within 7 m, and it
+    stands within 90° of where the player's body faces. It then circles them 4 m off, 50°
+    further round on every pass, facing them, at 60% of its run.
+  - **Past the fire it attacks.** More than 90° round, the step fails and Stalk, Chase and
+    Swing run as ever. A player who turns with it holds it off again.
+  - **One way round per hold** (`WardSide`, a coin when the hold begins), turned about when
+    a pass of a hold under way finds it standing still (a trunk in its way).
+  - **30 s of being held off and it runs:** `WardSince` is when the hold began, and a hold
+    broken for under 2 s (`WardLast`) is the same hold, so getting round once does not
+    start the count over. It runs straight away from the player for 12 s
+    (`WardFleeUntil`), 15 m ahead of itself per order, snapped onto the navmesh; off the
+    navmesh (the map's edge) it gets no order and stands. The flight is the step's first
+    Branch: it runs whether or not the fire is still up.
+  - **A flight starts the hunt over:** `StalkRoarUntil`, `StalkLegUntil` and
+    `StalkCharging` go back to zero, so it comes back with a roar and tree to tree. The
+    Ward step is authored after the Stalk step for that reason (it writes its variables).
+  - **Nothing in the game raises `FireWard` yet.** Whatever lights a stick writes it;
+    `probes/probe_wendigo_ward.py` writes it itself.
+  - **The player's body faces where the controller looks:** its yaw is written from the
+    control rotation every frame, so a probe turns the player with
+    `set_control_rotation`. `set_actor_rotation` is undone by the next frame.
+  - **`WardSince` is tested against exactly 0** (`Equal (Float)`), not `<= 0`: a probe that
+    writes a hold's start back in time gets a negative game time early in a run.
+  - A weapons build from before the flag has no `FireWard`: `ward.wards()` then leaves the
+    step out, with a log line, and `verify_ward.py` fails until the weapons are rebuilt.
+  - `verify_ward.py` checks the graph; `verify.py` and `verify_strafe.py` count a
+    controller's nodes outside this step too.
+  - **Feel check (needs a play session):** a wendigo that was never aggro before it met
+    the fire roars, standing, once it gets round it (its hunt's first pass); it circles in
+    its forward run, feet sliding, as the strafe does; 50° a pass at 4 m is quick, so a
+    player has to keep turning; and nothing shows it is afraid (no clip, no sound).
 - **The corpse state** (`corpse.py`):
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and `StopLogic`: the tree

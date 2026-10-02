@@ -109,6 +109,22 @@ STALK_LEGS_VAR = "StalkLegs"
 STALK_CHARGING_VAR = "StalkCharging"
 STALK_IGNORE_VAR = "StalkIgnore"
 
+# ── Held off by fire (npc/ward.py) ──────────────────────────────────────────
+#
+# Per controller, on the creatures of forest_generator/npc_ward.NPC_WARD_FEARS
+# only. All game times, 0 until first written:
+#   WARD_SINCE_VAR       when this hold began; 0: none is under way
+#   WARD_LAST_VAR        the last pass that was held off (a hold broken for
+#                        longer than the grace starts over)
+#   WARD_SIDE_VAR        +1 or -1: which way round the player it circles
+#   WARD_FLEE_UNTIL_VAR  it runs away until then
+#   WARD_FLEE_GOAL_VAR   where the pass's run-away order points
+WARD_SINCE_VAR = "WardSince"
+WARD_LAST_VAR = "WardLast"
+WARD_SIDE_VAR = "WardSide"
+WARD_FLEE_UNTIL_VAR = "WardFleeUntil"
+WARD_FLEE_GOAL_VAR = "WardFleeGoal"
+
 # ── The corpse state (npc/corpse.py) ─────────────────────────────────────────
 #
 # The wanderer's third and last state, after patrol (Aggro false) and hunt
@@ -152,6 +168,7 @@ STEP_VAR = "Step"                   # on the task, instance editable
 STEP_EVENT_PREFIX = "BT_"
 
 STEP_PULSE = "Pulse"          # possessed? corpse? stats, voice, patrol setup
+STEP_WARD = "Ward"            # held off by fire: circle, or run; fails to attack
 STEP_STALK = "Stalk"          # a stalker's roar and legs; fails once it charges
 STEP_CHASE = "Chase"          # the move order at the player
 STEP_SWING = "Swing"          # the melee check and swing

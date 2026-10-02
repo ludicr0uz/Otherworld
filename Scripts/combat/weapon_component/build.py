@@ -12,8 +12,8 @@ from combat.graph import (
 )
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import (
-    CHARACTER_BP_PATH, HEALTH_BP_PATH, ITEM_BP_PATH, THROW_ARC_BP_PATH,
-    WEAPON_COMP_BP_PATH,
+    CHARACTER_BP_PATH, FIRE_WARD_VAR, HEALTH_BP_PATH, ITEM_BP_PATH,
+    THROW_ARC_BP_PATH, WEAPON_COMP_BP_PATH,
 )
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR, SIGHTS_FORCED_VAR
 from combat.skin import player_skin
@@ -110,6 +110,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # The guard (block.py). Read by the fire gate, and by every wanderer's
     # swing, which also writes Stamina here when the guard takes the hit.
     _declare(ed, "Blocking", BEL.get_basic_type_by_name("bool"))
+    # Fire held out in front of the player (a lit stick). Written by whatever
+    # lights one; read only by the wanderers afraid of fire (npc/ward.py).
+    _declare(ed, FIRE_WARD_VAR, BEL.get_basic_type_by_name("bool"))
     # Standing, crouched or prone (stance.py). Written only by the stance
     # block; the movement component and the footsteps are told from it.
     _declare(ed, STANCE_VAR, BEL.get_basic_type_by_name("int"))
@@ -274,6 +277,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         "Sprinting": False,
         SPRINT_SPENT_VAR: False,
         "Blocking": False,
+        FIRE_WARD_VAR: False,
         STANCE_VAR: STAND,
         HELD_TWO_HANDED: False,
         SEARCHING_VAR: False,

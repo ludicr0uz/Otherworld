@@ -17,7 +17,8 @@ A stalker's controller (the wendigo's) has one more step, BT_Stalk, with
 speed writes, move orders and focuses of its own. This file and
 verify_strafe.py count what a controller holds OUTSIDE that step
 (outside_step), so one set of counts fits every creature; the step's own are
-npc/verify_stalk.py's.
+npc/verify_stalk.py's. The same goes for BT_Ward, the step of a creature
+afraid of fire, and npc/verify_ward.py.
 """
 
 import unreal
@@ -32,7 +33,7 @@ from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, DEBUG_MODE_
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
-    HIT_DAMAGE_VAR, RUN_SPEED_VAR, STEP_CHASE, STEP_EVENT_PREFIX, STEP_STALK,
+    HIT_DAMAGE_VAR, RUN_SPEED_VAR, STEP_CHASE, STEP_EVENT_PREFIX, STEP_STALK, STEP_WARD,
 )
 from npc.block import BLOCK_MIN_DOT
 from npc.monster_tuning import MONSTER_STATS, TUNED_VAR, monster_specs, stock_run_speed
@@ -176,7 +177,7 @@ def check_controller(path, key):
     if not bp:
         return
     ed = unreal.BlueprintGraphEditor.get_graph_editor_by_name(bp, "EventGraph")
-    nodes = outside_step(ed.list_all_nodes(), STEP_STALK)
+    nodes = outside_step(outside_step(ed.list_all_nodes(), STEP_STALK), STEP_WARD)
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     check(f"{tag}: the graph compiles clean", not ed.list_nodes_with_errors())
     check_corpse_and_trace(tag, nodes, cdo)

@@ -8,6 +8,8 @@ Behavior Tree (BT_<controller>), authored as the RUNTIME tree.
           Hunt (sequence)  [Blackboard: Aggro is set]
             Chase, Swing, Wait 0.5
             (a stalker: Approach (selector): Stalk, Chase -- then Swing, Wait)
+            (afraid of fire: Engage (selector): Ward, Attack (sequence):
+             the approach, Swing -- then Wait)
           Notice (sequence)
             PlayerPresent
             Senses (selector): Hurt, Sight, Touch, Sound    (priority order)
@@ -25,6 +27,13 @@ comes in from tree to tree, having given its own move order, and fails once
 it is close: the Approach selector then runs Chase, on that pass and every
 one after.
 
+A creature afraid of fire (forest_generator/npc_ward.NPC_WARD_FEARS: the
+wendigo) tries its Ward step (npc/ward.py) before any of that. Held off, or
+running away, the step succeeds and the pass is over: the approach and the
+Swing sit together in a sequence the selector never reaches, which is what
+keeps it from attacking. With no fire between them the step fails and the
+attack runs as it always did. The Wait stays outside, one for both.
+
 Why the runtime tree and not the editor graph: Python can write a
 BehaviorTree's RootNode and each composite's Children, but it cannot build
 the editor's graph nodes. It does not need to. An asset with no editor graph
@@ -41,7 +50,7 @@ from forest_generator.npc_placement import NPC_REPATH_SECONDS
 from npc.graph import _asset_sub, _log
 from npc.paths import (
     BB_AGGRO_KEY, BB_PATH, BB_REASON_KEY, STEP_CHASE, STEP_PRESENT, STEP_PULSE,
-    STEP_STALK, STEP_STROLL, STEP_SWING, STEP_VAR,
+    STEP_STALK, STEP_STROLL, STEP_SWING, STEP_VAR, STEP_WARD,
 )
 
 _KEY_TYPES = {BB_AGGRO_KEY: "BlackboardKeyType_Bool",
@@ -134,10 +143,10 @@ def _key_is_set(bt, key):
     return node
 
 
-def fill_tree(bt, bb, task_class, senses, stalks=False):
+def fill_tree(bt, bb, task_class, senses, stalks=False, wards=False):
     """Write the tree above into ``bt`` and save it. ``senses`` is the sense
     step names in priority order (npc/steps.py); ``stalks`` puts the Stalk
-    step ahead of Chase."""
+    step ahead of Chase, ``wards`` the Ward step ahead of the whole attack."""
     sel, seq = unreal.BTComposite_Selector, unreal.BTComposite_Sequence
 
     def step(name):
@@ -146,8 +155,11 @@ def fill_tree(bt, bb, task_class, senses, stalks=False):
     approach = step(STEP_CHASE)
     if stalks:
         approach = (_composite(bt, sel, "Approach", [step(STEP_STALK), approach]), [])
-    hunt = _composite(bt, seq, "Hunt", [approach, step(STEP_SWING),
-                                        (_wait(bt, "Re-path"), [])])
+    attack = [approach, step(STEP_SWING)]
+    if wards:
+        attack = [(_composite(bt, sel, "Engage", [
+            step(STEP_WARD), (_composite(bt, seq, "Attack", attack), [])]), [])]
+    hunt = _composite(bt, seq, "Hunt", attack + [(_wait(bt, "Re-path"), [])])
     feel = _composite(bt, sel, "Senses", [step(s) for s in senses])
     notice = _composite(bt, seq, "Notice", [step(STEP_PRESENT), (feel, [])])
     patrol = _composite(bt, seq, "Patrol", [step(STEP_STROLL),
@@ -161,5 +173,6 @@ def fill_tree(bt, bb, task_class, senses, stalks=False):
     bt.set_editor_property("root_node", root)
     _asset_sub().save_loaded_asset(bt, False)
     _log(f"built {bt.get_path_name()} (senses {', '.join(senses)}"
-         f"{'; stalks before it chases' if stalks else ''})")
+         f"{'; stalks before it chases' if stalks else ''}"
+         f"{'; held off by fire' if wards else ''})")
     return bt

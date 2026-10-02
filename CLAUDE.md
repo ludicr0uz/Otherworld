@@ -232,7 +232,7 @@ editor.
   swings a wanderer backs off a little and sidesteps round the player, facing them. A wendigo
   hunts before it chases: aggro, it roars (the Mixamo zombie scream, and one of its roar
   sounds), comes in round the player in an arc, tree to tree, waiting behind each trunk, and
-  from 10 m charges straight at them (`npc/stalk.py`, `forest_generator/npc_stalk.py`). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
+  from 10 m charges straight at them (`npc/stalk.py`, `forest_generator/npc_stalk.py`). Fire held out at a wendigo (the player's `FireWard`, which nothing raises yet: there is no lit stick) keeps it from attacking: within 7 m and in front of the player it circles them instead, attacks once it is more than 90° round the fire, and after 30 s of being held off runs away for 12 s and hunts again (`npc/ward.py`, `forest_generator/npc_ward.py`). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs
   (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
   mannequin's set, plus that pack's scream for its roar.

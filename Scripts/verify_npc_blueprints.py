@@ -9,7 +9,8 @@ Scripts/npc/verify.py (patrol, agro, corpse, guard) and Scripts/npc/verify_tree.
 (the Blackboard, the Behavior Trees and their steps),
 Scripts/npc/verify_sight_cone.py (debug mode's sight cone),
 Scripts/npc/verify_strafe.py (the step back and round between two swings) and
-Scripts/npc/verify_stalk.py (the wendigo's roar, tree-to-tree hunt and charge).
+Scripts/npc/verify_stalk.py (the wendigo's roar, tree-to-tree hunt and charge)
+and Scripts/npc/verify_ward.py (fire holding the wendigo off).
 """
 
 import os
@@ -26,12 +27,14 @@ from npc.verify_tree import run as run_tree                       # noqa: E402
 from npc.verify_sight_cone import run as run_sight_cone           # noqa: E402
 from npc.verify_strafe import run as run_strafe                   # noqa: E402
 from npc.verify_stalk import run as run_stalk                     # noqa: E402
+from npc.verify_ward import run as run_ward                       # noqa: E402
 
 run()
 run_tree()
 run_sight_cone()
 run_strafe()
 run_stalk()
+run_ward()
 unreal.log_warning(f"[VERIFY] {len(PASS)} passed, {len(FAIL)} failed")
 for f in FAIL:
     unreal.log_warning(f"[VERIFY]   FAILED: {f}")

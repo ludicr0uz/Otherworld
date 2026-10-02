@@ -47,6 +47,7 @@ and it never relies on a variable another section left behind.
   dead        the dead gate at the head of the weapon component's Tick, and
               what the dead arm lets go of (fixtures keeps that arm out of wg)
   block       the guard: its key, the Blocking stance, the fire gate refusing
+              (and FireWard, fire held out, which only starts false)
   sprint      the sprint's latch: spent at zero Stamina until the key is let go
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
               the crouch it drives, the footsteps' volume and reach per stance

@@ -10,7 +10,7 @@ from forest_generator.npc_stalk import NPC_STALK_ROAR
 from npc.paths import (
     AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS, HIT_SOUNDS_VAR, REACTIONS_VAR,
     STEP_CHASE, STEP_PRESENT, STEP_PULSE, STEP_STALK, STEP_STROLL, STEP_SWING,
-    VOICES_VAR,
+    STEP_WARD, VOICES_VAR,
     step_task_path, tree_path,
 )
 from npc.nodes import FN_RUN_BT, NODE_EVENT_POSSESS
@@ -24,6 +24,7 @@ from npc.steps import _author_steps
 from npc.tree import build_blackboard, fill_tree, fresh_tree
 from npc.monster_tuning import monster_specs
 from npc.tuned import write_tuned_defaults
+from npc.ward import wards
 
 
 def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
@@ -151,12 +152,15 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     write_tuned_defaults(cdo, spec)
 
     # A stalker (the wendigo) has one more step, ahead of Chase (npc/stalk.py).
-    stalks = key in NPC_STALK_ROAR
+    # One afraid of fire (the wendigo again) has another, ahead of the whole
+    # attack (npc/ward.py).
+    stalks, warded = key in NPC_STALK_ROAR, wards(key)
     task = build_step_task(bp, step_task_path(path),
-                           [STEP_PULSE] + [STEP_STALK] * stalks
+                           [STEP_PULSE] + [STEP_WARD] * warded
+                           + [STEP_STALK] * stalks
                            + [STEP_CHASE, STEP_SWING, STEP_PRESENT]
                            + senses + [STEP_STROLL])
-    fill_tree(bt, bb, task, senses, stalks=stalks)
+    fill_tree(bt, bb, task, senses, stalks=stalks, wards=warded)
     eas.save_loaded_asset(bp)
     _log(f"built {path} ({len(cdo.get_editor_property(REACTIONS_VAR))} hit "
          f"reactions, health {spec['health']:.0f}"

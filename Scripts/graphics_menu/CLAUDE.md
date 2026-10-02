@@ -208,7 +208,7 @@ mouse is the camera's.
 
 ## Presets and the GRAPHICS TUNING tab (`gfx_*.py`, `presets.py`)
 
-A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 24 numbers), and
+A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 28 numbers), and
 `graphics_tuning.csv` is the tracked copy. The defaults are what the presets always did:
 
 | preset | engine quality | `r.ShadowQuality` | `r.ScreenPercentage` | view distance | grass / tree draw distance | grass layers | grass shadows + DF/indirect |
@@ -266,10 +266,12 @@ into the HUD. Enter on a number saves nothing in this tab.
   shadow quality and distance (%), view distance (%), grass and tree draw distance (metres),
   grass density (layers 1-4), grass shadows, leaf cut-outs
   (`r.Nanite.ProgrammableRaster`: off draws every leaf card solid), tree coarseness
-  (`r.Nanite.MaxPixelsPerEdge`), fog and volumetric fog on/off, GI, reflections, AA.
+  (`r.Nanite.MaxPixelsPerEdge`), fog and volumetric fog on/off, GI, reflections, AA,
+  wind on/off and wind distance (metres; below).
 - **Look rows are one number for all four presets:** brightness (`r.ExposureOffset`, in
   EV), sunlight, sun disc, moonlight, moon disc, stars, ambient light and fog density,
-  each a percentage of what `world_config` sets. A nudge writes the picked preset's look
+  each a percentage of what `world_config` sets, and wind strength and wind speed, each a
+  percentage of `forest_generator/wind.py`'s. A nudge writes the picked preset's look
   into every row (`gfx_tune_tick._author_spread`), and the CSV is read from the first.
 - **Two owners.** The HUD holds the table and the tab (`gfx_tune_tick.py`, on the shared
   tab machine). `BP_GraphicsTuner`, an ActorComponent on the HUD (`gfx_tuner*.py`), turns a
@@ -296,6 +298,17 @@ into the HUD. Enter on a number saves nothing in this tab.
 - **The look rows are variables on `BP_DayNightCycle`** (`SunScale`, `MoonScale`, ...;
   `Scripts/world/CLAUDE.md`), written by `gfx_tuner_sky.py`. A level without a cycle keeps
   its static sky.
+- **Wind** (`gfx_tuner_wind.py`; what moves is `Scripts/forest_generator/CLAUDE.md`).
+  The grass's and the trees' materials carry it as world-position offset, read from
+  `MPC_Wind`'s `Strength` and `Speed`. The wind row walks every instanced-mesh cell
+  (`SetEvaluateWorldPositionOffset`), so off takes the offset's cost away too, not only
+  the motion; the strength is also zeroed. The wind distance is each cell's
+  `SetWorldPositionOffsetDisableDistance`: an instance further off stands still. It is
+  plain metres from the camera, and the defaults (50 / 80 / 120 / 200 m) are long
+  because a 30 m one left every tree in a rendered shot still. Strength and speed go to
+  `MPC_Wind` on every apply. A speed nudge jumps the sway once (time x speed).
+  Leaf cut-outs off (`r.Nanite.ProgrammableRaster 0`) stops Nanite evaluating WPO too, so
+  it stills the wind as well. Probe: `probe_wind.py` (9 checks).
 - **The tab has maximums** (`GfxTuneMaxs`, an `FMin` after the shared `FMax`; the other
   tabs have none). An `FClamp` would be read as a settings slider.
 - **`r.ExposureOffset` is a cheat cvar**: it moves in the editor binary (PIE, `-game`),

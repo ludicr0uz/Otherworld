@@ -28,6 +28,7 @@ The generator's code lives in this package. The level-side import code is in
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
 | `npc_strafe.py` | the step a wanderer takes between two swings |
+| `wind.py` | the wind's numbers: `MPC_Wind`, amplitudes and frequencies. `forest_import/wind.py` writes it into the materials (below) |
 | `lighting.py` | time-of-day presets (star_brightness 2.5, sun 0.12, exposure bias 1.6) and `SHADOW_DISTANCE_CM`. The level's rig is the static sky; at runtime `BP_DayNightCycle` replaces it and reuses these values (`Scripts/world/CLAUDE.md`) |
 | `verification.py` | the offline suite (over budget) |
 | `asset_sources.py` | what produces each `Content/` directory, and `RESTORE_ORDER` |
@@ -126,6 +127,20 @@ level from scratch, which drops the forage and the day/night cycle actor.
     every tree.
 - **Past `TREE_LEAF_MASK_DISTANCE_CM` (60 m), leaves draw without their opacity mask.** This is a
   performance trade; tune it by eye.
+- **Wind is world-position offset** (`wind.py`, `forest_import/wind.py`), scaled by
+  `MPC_Wind.Strength` and `.Speed`, which the graphics menu sets
+  (`Scripts/graphics_menu/CLAUDE.md`, "Wind"):
+  - `M_ProcFoliage` (grass, bushes) leans and sways by its vertex alpha, in waves across
+    the field; it is rebuilt whole by `foliage_assets.build_material`.
+  - **`M_Master_Bark` and `M_Master_Foliage` have no builder** (it was deleted), so the wind
+    is **patched** into them: every node it adds has the desc `OW_Wind`, and a re-run deletes
+    those first. Both bend by `(local height / 15 m)^2` (the mesh's origin is the trunk
+    base), so trunk, branches and leaves move together; the leaves flutter on top. The rocks,
+    stumps, shrubs and ferns on these masters get the same bend, which is tiny at their height.
+  - The level import runs it (`ensure_foliage_assets`), and the level verifiers check it
+    (`verify_wind`); standalone: `uepy.py Scripts/forest_import/wind.py`.
+  - `PreSkinnedPosition` is the local position under Nanite too. A tree that does not move
+    in a shot is most likely past the WPO disable distance the graphics menu set.
 - **The directional light's shadow range is set through
   `dynamic_shadow_distance_movable_light`,** even though the light is Stationary, because
   static lighting is off.

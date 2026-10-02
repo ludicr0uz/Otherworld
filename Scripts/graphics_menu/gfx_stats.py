@@ -18,7 +18,7 @@ Two kinds of row:
 
   performance   each preset has its own number (what makes Low cheaper)
   look          one number for all four presets: brightness, the sun, the
-                moon, the stars, the fog. A nudge writes it into every
+                moon, the stars, the fog, the wind's strength and speed. A nudge writes it into every
                 preset's row, and the CSV reads it from the first row.
 
 The defaults are what the presets did before the tab existed: the engine's
@@ -45,6 +45,7 @@ from collections import namedtuple
 
 from forest_generator.grass_cells import GRASS_TIERS
 from forest_generator.tree_cells import TREE_CULL_END_CM
+from forest_generator.wind import MAX_STRENGTH, PARAM_SPEED, PARAM_STRENGTH
 
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphics_tuning.csv")
 PRESET_COLUMN = "preset"
@@ -63,6 +64,8 @@ TREE_DISTANCE = "tree_distance"      # the tree cells' cull distances
 GRASS_LAYERS = "grass_layers"    # how many density tiers are shown
 GRASS_SHADOWS = "grass_shadows"  # grass and bushes cast shadows and take GI
 CYCLE = "cycle"                  # a BP_DayNightCycle variable, named by target
+WIND = "wind"                    # the grass and tree cells' world-position offset
+WIND_PARAM = "wind_param"        # an MPC_Wind scalar, named by target
 
 # column: the CSV's; label: the tab's row; step, lo, hi: one nudge and the
 # limits; kind: int stats are rounded on the way out; defaults: per preset;
@@ -124,6 +127,11 @@ PERFORMANCE_STATS = (
          "r.ReflectionMethod", _same(1)),
     Stat("anti_aliasing", "AA (0, 1 FXAA, 2 TAA, 4 TSR)", 1, 0, 4, int, CVAR,
          "r.AntiAliasingMethod", _same(2)),
+    # Wind is world-position offset: off, the cells skip it (and Nanite its
+    # programmable raster); past the distance an instance stands still.
+    Stat("wind", "wind (0 off, 1 on)", 1, 0, 1, int, WIND, "", _same(1)),
+    Stat("wind_distance", "wind distance (m)", 10, 10, 500, int, WIND, "",
+         (50, 80, 120, 200)),
 )
 LOOK_STATS = (
     # A cheat cvar: it moves in the editor binary, not in a shipping build.
@@ -142,6 +150,11 @@ LOOK_STATS = (
     Stat("ambient_light", "ambient light (%)", 10, 0, 500, int, CYCLE,
          "AmbientScale", _same(100), PERCENT),
     Stat("fog_density", "fog density (%)", 10, 0, 1000, int, CYCLE, "FogScale",
+         _same(100), PERCENT),
+    # How far the grass and the trees bend, and how fast (forest_generator/wind.py).
+    Stat("wind_strength", "wind strength (%)", 10, 0, round(MAX_STRENGTH * 100), int,
+         WIND_PARAM, PARAM_STRENGTH, _same(100), PERCENT),
+    Stat("wind_speed", "wind speed (%)", 10, 10, 500, int, WIND_PARAM, PARAM_SPEED,
          _same(100), PERCENT),
 )
 GFX_STATS = PERFORMANCE_STATS + LOOK_STATS

@@ -18,10 +18,13 @@ Opaque, two-sided, Two Sided Foliage shading, no textures:
     AO          = lerp(RootOcclusion, 1, VertexColor.a)
     Roughness, Specular: parameters
 
+    WPO         = wind (forest_import/wind.py): lean and sway x VertexColor.a
+
 Opaque is the point (see foliage_meshes.py): Nanite rasterises it on the
 fixed-function path, where the masked scans and the tree leaves need the
-programmable one. No world-position offset either, for the same reason -- so
-no wind; it would put every blade back on the programmable path.
+programmable one. The wind's world-position offset would put every blade back
+on the programmable path, so it is the graphics menu's to switch off per
+component (graphics_menu/gfx_tuner_wind.py): with WPO off a cell skips it.
 """
 
 import os
@@ -34,6 +37,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from forest_generator.foliage_meshes import (  # noqa: E402
     BUSH_RECIPES, GRASS_RECIPES, MI_BUSH, MI_GRASS, PROC_FOLIAGE_DIR,
     PROC_MATERIAL, build)
+from forest_import.wind import (  # noqa: E402
+    author_grass_wind, ensure_collection, ensure_wind, verify_wind)
 
 MEL = unreal.MaterialEditingLibrary
 MP = unreal.MaterialProperty
@@ -131,6 +136,7 @@ def build_material():
                                   "", MP.MP_ROUGHNESS)
     MEL.connect_material_property(_scalar(mat, "Specular", 0.25, -200, 800),
                                   "", MP.MP_SPECULAR)
+    author_grass_wind(mat, ensure_collection(), (vc, "A"))
 
     MEL.recompile_material(mat)
     unreal.EditorAssetLibrary.save_loaded_asset(mat)
@@ -222,7 +228,8 @@ def build_mesh(recipe, material, preserve_area=True):
 
 def ensure_foliage_assets():
     """Build the material, its two instances and every mesh. Returns the
-    meshes by recipe name."""
+    meshes by recipe name. The tree masters' wind goes in first."""
+    ensure_wind()
     mat = build_material()
     mi_grass = build_instance(MI_GRASS, mat, 1)
     mi_bush = build_instance(MI_BUSH, mat, 2)
@@ -239,7 +246,8 @@ def ensure_foliage_assets():
 
 def verify_foliage_assets(check):
     """The built assets are what the performance case rests on: Nanite on,
-    opaque, no collision, no WPO. ``check`` is the verify script's harness."""
+    opaque, no collision, and the wind. ``check`` is the verify script's harness."""
+    verify_wind(check)
     eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
     mat = eas.load_asset(PROC_MATERIAL)
     check("M_ProcFoliage Exists", bool(mat))

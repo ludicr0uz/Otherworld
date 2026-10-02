@@ -9,6 +9,7 @@ only hands it the table (gfx_tune_tick.py); what a number does is here.
         every cvar stat        ExecuteConsoleCommand("<cvar> <number>")
         the foliage            gfx_tuner_foliage.py
         the sky                gfx_tuner_sky.py
+        the wind               gfx_tuner_wind.py
 
 The console commands are needed, and come after the scalability level.
 Config/DefaultEngine.ini pins r.ShadowQuality (and the GI, reflection and
@@ -37,11 +38,13 @@ from graphics_menu.gfx_tune_consts import (
     TUNER_BASE_VAR, TUNER_BP_PATH, TUNER_DIRTY_VAR, TUNER_GRASS_DISTANCE_APPLIED_VAR,
     TUNER_GRASS_LAYERS_APPLIED_VAR, TUNER_GRASS_SHADOWS_APPLIED_VAR,
     TUNER_LEVEL_APPLIED_VAR, TUNER_NEVER, TUNER_PRESET_VAR,
-    TUNER_TREE_DISTANCE_APPLIED_VAR, TUNER_VALUES_VAR,
+    TUNER_TREE_DISTANCE_APPLIED_VAR, TUNER_VALUES_VAR, TUNER_WIND_APPLIED_VAR,
+    TUNER_WIND_DISTANCE_APPLIED_VAR,
 )
 from graphics_menu.gfx_tuner_foliage import FN_NEQ_II, author_foliage
 from graphics_menu.gfx_tuner_read import applied, whole
 from graphics_menu.gfx_tuner_sky import author_sky
+from graphics_menu.gfx_tuner_wind import author_wind
 from graphics_menu.loot_find import put
 
 FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
@@ -53,7 +56,8 @@ FN_BUILD_FLOAT = "/Script/Engine.KismetStringLibrary.BuildString_Double"
 FN_BUILD_INT = "/Script/Engine.KismetStringLibrary.BuildString_Int"
 
 INT_VARS = (TUNER_PRESET_VAR, TUNER_BASE_VAR, TUNER_LEVEL_APPLIED_VAR,
-            TUNER_GRASS_SHADOWS_APPLIED_VAR, TUNER_GRASS_LAYERS_APPLIED_VAR)
+            TUNER_GRASS_SHADOWS_APPLIED_VAR, TUNER_GRASS_LAYERS_APPLIED_VAR,
+            TUNER_WIND_APPLIED_VAR, TUNER_WIND_DISTANCE_APPLIED_VAR)
 FLOAT_VARS = (TUNER_GRASS_DISTANCE_APPLIED_VAR, TUNER_TREE_DISTANCE_APPLIED_VAR)
 
 
@@ -62,6 +66,7 @@ def tuner_defaults():
             TUNER_DIRTY_VAR: False, TUNER_LEVEL_APPLIED_VAR: TUNER_NEVER,
             TUNER_GRASS_SHADOWS_APPLIED_VAR: TUNER_NEVER,
             TUNER_GRASS_LAYERS_APPLIED_VAR: TUNER_NEVER,
+            TUNER_WIND_APPLIED_VAR: TUNER_NEVER, TUNER_WIND_DISTANCE_APPLIED_VAR: TUNER_NEVER,
             TUNER_GRASS_DISTANCE_APPLIED_VAR: 1.0, TUNER_TREE_DISTANCE_APPLIED_VAR: 1.0}
 
 
@@ -137,12 +142,13 @@ def _author_tick(ed, tick):
     tails = _author_level(ed, [flow], 2200, 0, made)
     flow = _author_cvars(ed, tails, 5000, 0, made)
     tails = author_foliage(ed, [flow], 5000, 3000, made)
-    author_sky(ed, tails, 5000, 6000, made)
+    tails = author_sky(ed, tails, 5000, 6000, made)
+    author_wind(ed, tails, 5000, 9000, made)
     ed.add_comment_to_nodes(
         "A preset's row of the graphics table, applied when the HUD marks it "
         "Dirty: the scalability level, one console command per cvar stat, the "
         "grass and tree cells (gfx_tuner_foliage.py), the day/night cycle's "
-        "look (gfx_tuner_sky.py).", made[:1])
+        "look (gfx_tuner_sky.py), the wind (gfx_tuner_wind.py).", made[:1])
 
 
 def build_graphics_tuner(rebuild=True):

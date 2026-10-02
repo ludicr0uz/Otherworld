@@ -1,5 +1,5 @@
 """verify_graphics_menu.py's checks for BP_GraphicsTuner (gfx_tuner,
-gfx_tuner_foliage, gfx_tuner_sky): that each number of the graphics table
+gfx_tuner_foliage, gfx_tuner_sky, gfx_tuner_wind): that each number of the graphics table
 reaches the thing it names. The tab that edits the table is gfx_checks.py.
 
 A wire's stat is read off the graph: Values[Base + <literal>], through a
@@ -15,6 +15,7 @@ from graphics_menu import gfx_stats as GS
 from graphics_menu import gfx_tune_consts as GC
 from graphics_menu.gfx_tuner import command_prefix, tuner_defaults
 from graphics_menu.gfx_tuner_foliage import GRASS_SETTERS, SWITCHED_TIERS
+from graphics_menu.gfx_tuner_wind import CM_PER_M
 from world.paths import DAY_NIGHT_CLASS_PATH
 
 BEL = unreal.BlueprintEditorLibrary
@@ -207,9 +208,9 @@ def _check_distances(check, nodes):
           len(fades) == 2 and not loose, str(loose))
     every = [n for n in nodes if "ActorClass" in _pins(n) and "OutActors" in {
         str(PIN.get_pin_name(p)) for p in BEL.list_output_pins(n)}]
-    check("the tree walk is every actor (trees carry no tag), minus the grass",
-          len(every) == 1 and str(BEL.find_input_pin(every[0], "ActorClass")
-                                  .get_pin_value()).endswith("Actor"),
+    check("the tree walk and the wind walk are every actor (trees carry no tag)",
+          len(every) == 2 and all(str(BEL.find_input_pin(n, "ActorClass")
+                                      .get_pin_value()).endswith("Actor") for n in every),
           str([str(BEL.find_input_pin(n, "ActorClass").get_pin_value()) for n in every]))
     stale = []
     for var, column, read, rounded in (
@@ -217,7 +218,9 @@ def _check_distances(check, nodes):
             (GC.TUNER_TREE_DISTANCE_APPLIED_VAR, "tree_distance", _metres, False),
             (GC.TUNER_GRASS_SHADOWS_APPLIED_VAR, "grass_shadows", _stats, True),
             (GC.TUNER_GRASS_LAYERS_APPLIED_VAR, "grass_layers", _stats, True),
-            (GC.TUNER_LEVEL_APPLIED_VAR, "engine_quality", _stats, True)):
+            (GC.TUNER_LEVEL_APPLIED_VAR, "engine_quality", _stats, True),
+            (GC.TUNER_WIND_APPLIED_VAR, "wind", _stats, True),
+            (GC.TUNER_WIND_DISTANCE_APPLIED_VAR, "wind_distance", _stats, True)):
         sets = [n for n in nodes if _title(n) == f"Set {var}"]
         if len(sets) != 1 or read(sets[0], var) != {GS.index_of(column)} or (
                 rounded and "Get" in _feeds(sets[0], var)[0]):
@@ -244,6 +247,52 @@ def _check_sky(check, nodes):
     check("...found with one GetActorOfClass", len(finds) == 1, str(len(finds)))
 
 
+def _check_wind(check, nodes):
+    wind, reach = GS.index_of("wind"), GS.index_of("wind_distance")
+    flags = [n for n in nodes if {"NewValue", "self", "execute"} <= _pins(n)
+             and any("Greater" in t or ">=" in t for t in _feeds(n, "NewValue"))]
+    ok = (len(flags) == 1 and _ran(flags[0]) and all(
+        _stats(c, "A") == {wind} and _literal(c, "B") == 1
+        for c in _sources(flags[0], "NewValue")))
+    check("every cell's SetEvaluateWorldPositionOffset is set once, from wind >= 1",
+          bool(ok), str(len(flags)))
+    dists = [n for n in nodes if {"NewValue", "self", "execute"} <= _pins(n)
+             and n not in flags]
+    ok = (len(dists) == 1 and _ran(dists[0]) and _stats(dists[0], "NewValue") == {reach}
+          and abs(_scale(dists[0], "NewValue") - CM_PER_M) < 1e-6)
+    check("...and its WPO disable distance once, from wind distance (m x 100)",
+          bool(ok), str(len(dists)))
+    params = {}
+    for n in nodes:
+        if {"Collection", "ParameterName", "ParameterValue", "execute"} <= _pins(n):
+            name = str(BEL.find_input_pin(n, "ParameterName").get_pin_value())
+            mpc = str(BEL.find_input_pin(n, "Collection").get_pin_value())
+            params.setdefault(name, []).append((n, "MPC_Wind" in mpc and _ran(n)))
+    wrong = []
+    for index, st in GS.stats_by(GS.WIND_PARAM):
+        got = params.get(st.target, [])
+        if len(got) != 1 or not got[0][1]:
+            wrong.append(st.target)
+            continue
+        n = got[0][0]
+        if st.target == "Strength":
+            # The strength x the wind switch, so off is still even if a cell
+            # was missed.
+            muls = _sources(n, "ParameterValue")
+            ok = len(muls) == 1 and _stats(muls[0], "A") == {index} and abs(
+                _scale(muls[0], "A") - st.scale) < 1e-6 and any(
+                _stats(c, "InInt") == {wind} for c in _sources(muls[0], "B"))
+        else:
+            ok = _stats(n, "ParameterValue") == {index} and abs(
+                _scale(n, "ParameterValue") - st.scale) < 1e-6
+        if not ok:
+            wrong.append(st.target)
+    check(f"MPC_Wind's {len(GS.stats_by(GS.WIND_PARAM))} scalars are set from their own "
+          "stats (a percentage x 0.01; the strength x the wind switch)",
+          not wrong and len(params) == len(GS.stats_by(GS.WIND_PARAM)),
+          str(wrong) + str(sorted(params)))
+
+
 def check_gfx_tuner(check):
     bp = unreal.load_asset(GC.TUNER_BP_PATH)
     check("BP_GraphicsTuner exists", bp is not None, GC.TUNER_BP_PATH)
@@ -268,3 +317,4 @@ def check_gfx_tuner(check):
     _check_grass(check, nodes)
     _check_distances(check, nodes)
     _check_sky(check, nodes)
+    _check_wind(check, nodes)

@@ -142,6 +142,8 @@ Graphics: what a preset is, the tab that tunes it, the component that applies it
                   (metres, whatever the view distance), density tiers,
                   grass lighting
   gfx_tuner_sky        the tuner's look multipliers onto BP_DayNightCycle
+  gfx_tuner_wind       the tuner's wind: WPO on/off and its distance on every
+                  cell, MPC_Wind's strength and speed
 
 verify_graphics_menu.py's checks, beside it because it is over budget
   umg_checks         the screens' trees and the graph that creates and writes them

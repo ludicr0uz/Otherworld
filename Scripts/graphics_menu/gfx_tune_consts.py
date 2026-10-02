@@ -101,6 +101,8 @@ TUNER_GRASS_DISTANCE_APPLIED_VAR = "GrassDistanceApplied"
 TUNER_TREE_DISTANCE_APPLIED_VAR = "TreeDistanceApplied"
 TUNER_GRASS_SHADOWS_APPLIED_VAR = "GrassShadowsApplied"
 TUNER_GRASS_LAYERS_APPLIED_VAR = "GrassLayersApplied"
+TUNER_WIND_APPLIED_VAR = "WindApplied"
+TUNER_WIND_DISTANCE_APPLIED_VAR = "WindDistanceApplied"   # metres
 TUNER_NEVER = -1
 
 # ─── BP_GraphicsSave: what the player's graphics keep between sessions ───────

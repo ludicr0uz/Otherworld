@@ -1,5 +1,5 @@
-preset,default,engine_quality,resolution_pct,shadow_quality,shadow_distance,view_distance,grass_distance,tree_distance,grass_layers,grass_shadows,leaf_cutouts,tree_coarseness,fog,volumetric_fog,global_illumination,reflections,anti_aliasing,brightness,sun_light,sun_disc,moon_light,moon_disc,stars,ambient_light,fog_density
-Low,1,0,70,1,60,40,100,120,3,0,1,1,1,0,1,1,2,0,100,100,100,100,100,100,100
-Medium,0,1,85,3,70,70,180,180,4,0,1,1.5,1,0,1,1,2,0,100,100,100,100,100,100,100
-High,0,3,100,3,100,100,70,300,3,0,1,1,1,1,1,1,2,0,100,100,100,100,100,100,100
-Custom,0,3,100,3,100,100,70,300,4,1,1,1,1,1,1,1,2,0,100,100,100,100,100,100,100
+preset,default,engine_quality,resolution_pct,shadow_quality,shadow_distance,view_distance,grass_distance,tree_distance,grass_layers,grass_shadows,leaf_cutouts,tree_coarseness,fog,volumetric_fog,global_illumination,reflections,anti_aliasing,wind,wind_distance,brightness,sun_light,sun_disc,moon_light,moon_disc,stars,ambient_light,fog_density,wind_strength,wind_speed
+Low,1,0,70,1,60,40,100,120,3,0,1,1,1,0,1,1,2,1,50,0,100,100,100,100,100,100,100,100,100
+Medium,0,1,85,3,70,70,180,180,4,0,1,1.5,1,0,1,1,2,1,80,0,100,100,100,100,100,100,100,100,100
+High,0,3,100,3,100,100,70,300,3,0,1,1,1,1,1,1,2,1,120,0,100,100,100,100,100,100,100,100,100
+Custom,0,3,100,3,100,100,70,300,4,1,1,1,1,1,1,1,2,1,200,0,100,100,100,100,100,100,100,100,100

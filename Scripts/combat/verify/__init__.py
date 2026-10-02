@@ -65,6 +65,10 @@ and it never relies on a variable another section left behind.
   hold_pose   A_HoldItem / A_HoldKnife: arms, hands, fist, who holds them
   shotgun_pose  A_AimShotgun: the rifle pose but for the thumbs, where they
               point and sit on the shotgun, the grip unchanged
+  interact    the interact key: its idle state, the probe's press, the reach,
+              the ranking by AimPoint, a walk that only remembers
+  pickup      interact's item kind: the take runs once, after the search, on
+              the kept target cast to an item, with room in the bag
   throw       the throw: its key, BP_ThrowArc, the predicted arc, the click,
               the clip's wind-up, the tumbling flight on the same curve;
               is_throw_trace, is_throw_play, launch_nodes
@@ -73,6 +77,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
     "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light",
-    "hold_pose", "shotgun_pose", "throw", "pickup",
+    "hold_pose", "shotgun_pose", "throw", "interact", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

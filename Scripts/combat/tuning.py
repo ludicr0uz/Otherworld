@@ -44,7 +44,9 @@ AIM_KEY = "RightMouseButton"
 SIGHTS_KEY = "MiddleMouseButton"
 SWITCH_KEY = "Q"
 DROP_KEY = "G"
-PICKUP_KEY = "E"
+# Pressed to interact with whatever the reticle rests on
+# (weapon_component/interact.py). An item lying there is picked up.
+INTERACT_KEY = "E"
 SPRINT_KEY = "LeftShift"
 # Held to guard (weapon_component/block.py). F because it sits under the left
 # hand beside the movement keys and nothing else here uses it; rebindable.
@@ -57,7 +59,7 @@ PRONE_KEY = "Z"
 # beside C under the left hand, and nothing else here uses it; rebindable.
 THROW_KEY = "V"
 
-PICKUP_RADIUS = 250.0      # cm; how close you must be to press E
+INTERACT_RADIUS = 250.0    # cm; how close you must be to press E
 DROP_FORWARD = 120.0       # cm in front of the player a dropped weapon lands
 
 # ─── The combat config ───────────────────────────────────────────────────────
@@ -397,7 +399,7 @@ BIND_VARS = (("KeyFire", FIRE_KEY),
              ("KeySprint", SPRINT_KEY),
              ("KeySwitch", SWITCH_KEY),
              ("KeyDrop", DROP_KEY),
-             ("KeyPickup", PICKUP_KEY),
+             ("KeyInteract", INTERACT_KEY),
              ("KeyReload", RELOAD_KEY),
              ("KeyBlock", BLOCK_KEY),
              ("KeyCrouch", CROUCH_KEY),

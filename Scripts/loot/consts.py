@@ -33,6 +33,6 @@ LOOT_ARRAYS = ((LOOT_TABLE_VAR, LOOT_VAR), (LOOT_TABLE_NAMES_VAR, LOOT_NAMES_VAR
                (LOOT_TABLE_TINTS_VAR, LOOT_TINTS_VAR))
 BODY_ARRAYS = tuple(body for _table, body in LOOT_ARRAYS)
 
-# How close the player must stand to a body to search it: the E pick-up's
-# reach (combat.tuning.PICKUP_RADIUS), measured to the ragdoll, not the capsule.
+# How close the player must stand to a body to search it: the E interact's
+# reach (combat.tuning.INTERACT_RADIUS), measured to the ragdoll, not the capsule.
 LOOT_RADIUS = 250.0

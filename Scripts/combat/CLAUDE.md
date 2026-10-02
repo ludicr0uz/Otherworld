@@ -19,7 +19,7 @@ The defaults are all rebindable on the settings screen:
 - Right click aims **over the shoulder**, middle click aims **down the sights** (both held;
   only a gun has sights, `HasSights`, so with the knife, the axe, the matches, wood or food
   in hand the middle click aims over the shoulder too: `probes/probe_item_no_sights.py`),
-  **Q** cycles, **G** drops, **E** picks up, **Shift** sprints, **F** blocks (held),
+  **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up), **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **V** held shows the throw's arc and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
@@ -71,12 +71,21 @@ menu polls its own copy from `DrawHUD`, which does.
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
 - **A pick-up goes into the inventory without switching.** The held item stays held. Only empty
   hands (`Held` is None, after a drop or eating the last item) take the new item up.
-- **A press picks up one item** (`weapon_component/pickup.py`): of the `Dropped` items within
-  `PICKUP_RADIUS` of the player, the one nearest `AimPoint`, the point the reticle rests on (the
-  aim resolve sets it every frame, armed or not). The loop only remembers the best candidate
-  (`PickBest`, `PickBestGap`); the take runs once, off the loop's `Completed`. A take inside the
-  loop is how one press used to empty a pile. `PickupForced` is the probe's key press
+- **E is Interact, and picking up is one kind of it** (`weapon_component/interact.py`). The key
+  (`KeyInteract`, `INTERACT_KEY`) knows nothing about items. Each kind of thing is a
+  `(candidates, act)` pair in `interact.KINDS`: `candidates` walks its things and offers some,
+  `act` casts the kept target to its kind and does its thing. Of the candidates offered within
+  `INTERACT_RADIUS` of the player, the one nearest `AimPoint`, the point the reticle rests on
+  (the aim resolve sets it every frame, armed or not), is kept (`InteractTarget`, an Actor, and
+  `InteractGap`). A walk only remembers; the act runs once, after the last walk's `Completed`,
+  by the first kind whose cast takes the target. `InteractForced` is the probe's key press
   (`probes/probe_pickup.py`).
+  - **To add something to interact with,** write its pair in a module of its own and add it to
+    `KINDS`. Don't poll the key anywhere else.
+  - **The one kind today is an item** (`weapon_component/pickup.py`): it offers the `Dropped`
+    items and takes the target into the bag. A take inside the walk is how one press used to
+    empty a pile.
+  - Searching a body is Tab, not this key (`Scripts/loot/CLAUDE.md`).
 - **Ammunition lives on the weapon** (`MagazineSize`/`Loaded`/`Reserve` on `BP_WeaponItem`).
   Drop a half-empty gun and it is still half-empty when picked up. The pistol is the fallback: an
   8-round magazine over an endless reserve (`InfiniteReserve`), so it reloads every 8 shots but

@@ -31,7 +31,7 @@ from combat.chop_tuning import CHOPS_PER_WOOD
 from combat.light_tuning import CAMPFIRE_AHEAD_CM, CAMPFIRE_CLASS_VAR, LIGHTS_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.weapon_component.knife import KNIFE_QUEUED_VAR
-from combat.weapon_component.pickup import PICKUP_FORCED_VAR
+from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from probes.probe_chop_tree import (
     AXE, CLEAR_CM, WOOD, _equip, _flat, _items, _stand, _swing, _trace, _trees,
@@ -49,7 +49,7 @@ from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
              ("EquippedIndex", "NeedsRefresh", "Inventory", KNIFE_QUEUED_VAR,
-              PICKUP_FORCED_VAR, FIRE_FORCED_VAR)]
+              INTERACT_FORCED_VAR, FIRE_FORCED_VAR)]
             + [(SURVIVAL_BP_PATH, "Temperature"), (CAMPFIRE_BP_PATH, WARM_RATE_VAR),
                (DAY_NIGHT_BP_PATH, NIGHT_COLD_VAR)])
 
@@ -120,8 +120,8 @@ def _cut_wood(p, player, wc):
     yield from _equip(p, wc, AXE)
     for _ in range(CHOPS_PER_WOOD):
         yield from _swing(p, wc)
-    p.set(wc, PICKUP_FORCED_VAR, True)
-    yield lambda: not p.get(wc, PICKUP_FORCED_VAR)
+    p.set(wc, INTERACT_FORCED_VAR, True)
+    yield lambda: not p.get(wc, INTERACT_FORCED_VAR)
     yield 0.05
     return _bag(p, wc).count(WOOD) == 1
 

@@ -44,8 +44,11 @@ _author_* fragment per concern, each in its own module:
   surface_impact  a pellet that hit something with no health: BP_BulletImpact,
               off the health cast's failed arm, at the blood's transform
   inventory   equip, drop, BeginPlay loadout
-  pickup      the pick-up key takes ONE Dropped item in reach: the one nearest
-              AimPoint, the point the reticle rests on
+  interact    the interact key acts on ONE thing in reach: the candidate
+              nearest AimPoint, the point the reticle rests on. KINDS lists
+              what can be interacted with (today: an item, which is picked up)
+  pickup      interact's item kind: the Dropped items it offers, and the take
+              of the one kept into the bag
   listener    BeginPlay: sounds fade with the distance from the character,
               not the camera (the controller's attenuation listener override)
   ammo        reload and dry fire
@@ -99,8 +102,10 @@ BP_WeaponComponent event graph:
                                          or, with empty hands, punch)
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held
-         --> Branch WasInputKeyJustPressed(E)               --> pick up the one item
-                                                                nearest the reticle
+         --> Branch WasInputKeyJustPressed(E)               --> interact with the one
+                                                                thing nearest the
+                                                                reticle (an item:
+                                                                pick it up)
          --> Branch IsInputKeyDown(V)                       --> draw the throw arc;
                                                                 on a click, wind up
                                                                 (V shuts the Fire gate)

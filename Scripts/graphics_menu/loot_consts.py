@@ -10,8 +10,8 @@ graph) and loot_checks read one table.
     a click on "[TAB] close"      shuts the window, as Tab does
 
 Fixed keys, like the menu's: Up/Down/Enter are the menu's own navigation keys,
-and Tab is not a gameplay bind. E stays the pick-up: a gun a kill drops lies
-beside the body, and E on it must not also empty the body.
+and Tab is not a gameplay bind. E stays interact, which picks up: a gun a kill
+drops lies beside the body, and E on it must not also empty the body.
 """
 
 LOOT_KEY = "Tab"

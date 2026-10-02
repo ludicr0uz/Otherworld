@@ -28,7 +28,7 @@ from combat.weapon_component.knife import (
 from combat.weapon_component.inventory import (
     _author_drop, _author_equip,
 )
-from combat.weapon_component.pickup import _author_pickup
+from combat.weapon_component.interact import _author_interact
 from combat.weapon_component.pose_weights import _author_pose_weights
 from combat.weapon_component.punch import _author_punch
 from combat.weapon_component.ready_pose import (
@@ -415,9 +415,9 @@ def _author_wc_tick(ed, tick):
     _set(drop_dirty, "NeedsRefresh", "true")
     _connect(after_drop, _pin(drop_dirty, "execute"))
 
-    # --- pick up (pickup.py) -------------------------------------------------
-    picked, not_picked = _author_pickup(
-        ed, owner_out, pressed("KeyPickup", 3560),
+    # --- interact (interact.py): an item in reach is picked up ---------------
+    picked, not_picked = _author_interact(
+        ed, owner_out, pressed("KeyInteract", 3560),
         (BEL.find_then_pin(drop_dirty), BEL.find_else_pin(drop_gate)),
         1040, 3400)
     pick_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 4900, 3400)
@@ -426,7 +426,7 @@ def _author_wc_tick(ed, tick):
         _connect(exit_pin, _pin(pick_dirty, "execute"))
 
     # --- throw (throw.py) ------------------------------------------------------
-    # After pick-up and before the refresh, which re-equips the emptied hand
+    # After interact and before the refresh, which re-equips the emptied hand
     # on the frame of the throw, as it does after a drop.
     flight_exits = _author_throw(
         ed, pc_out, owner_out, held, armed_out, throw_wants, tap,

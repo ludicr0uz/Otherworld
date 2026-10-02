@@ -22,15 +22,16 @@ from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.firing import SHOT_DIRECTION_VAR
+from combat.weapon_component.interact import (
+    INTERACT_FORCED_VAR, INTERACT_GAP_VAR, INTERACT_NO_GAP, INTERACT_TARGET_VAR,
+    RETIRED_VARS,
+)
 from combat.weapon_component.inventory import (
     STARTER_CLASS_VARS, _author_wc_begin_play,
 )
 from combat.weapon_component.knife import (
     KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR,
     NEXT_KNIFE_VAR,
-)
-from combat.weapon_component.pickup import (
-    PICKUP_FORCED_VAR, PICK_BEST_VAR, PICK_GAP_VAR, PICK_NO_GAP,
 )
 from combat.weapon_component.pose_weights import HELD_TWO_HANDED, SEARCHING_VAR
 from combat.weapon_component.punch import (
@@ -218,11 +219,16 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in (NEXT_KNIFE_VAR, KNIFE_DUE_VAR):
         _declare(ed, name, _float_type())
-    # The pick-up (pickup.py): the candidate nearest the reticle's point so
-    # far, its distance to that point, and the probe's stand-in for the key.
-    _declare(ed, PICK_BEST_VAR, BEL.get_object_reference_type(item_class))
-    _declare(ed, PICK_GAP_VAR, _float_type())
-    _declare(ed, PICKUP_FORCED_VAR, BEL.get_basic_type_by_name("bool"))
+    # Interact (interact.py): the candidate nearest the reticle's point so
+    # far (any actor: an item is one kind of it), its distance to that point,
+    # and the probe's stand-in for the key. The names it had as the pick-up
+    # are taken off a component built before the rename.
+    for name in RETIRED_VARS:
+        ed.remove_member_variable(name)
+    _declare(ed, INTERACT_TARGET_VAR,
+             BEL.get_object_reference_type(unreal.Actor.static_class()))
+    _declare(ed, INTERACT_GAP_VAR, _float_type())
+    _declare(ed, INTERACT_FORCED_VAR, BEL.get_basic_type_by_name("bool"))
     # The throw (throw.py): the aim and the launch it stores, the item in the
     # air, and the arc actor it draws on.
     for name in (THROW_AIMING_VAR, THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR):
@@ -327,8 +333,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         KNIFE_PENDING_VAR: False,
         NEXT_KNIFE_VAR: 0.0,
         KNIFE_DUE_VAR: 0.0,
-        PICK_GAP_VAR: PICK_NO_GAP,
-        PICKUP_FORCED_VAR: False,
+        INTERACT_GAP_VAR: INTERACT_NO_GAP,
+        INTERACT_FORCED_VAR: False,
         THROW_AIMING_VAR: False,
         THROW_FORCED_VAR: False,
         THROW_CLICK_FORCED_VAR: False,

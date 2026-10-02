@@ -182,7 +182,7 @@ def check_keys_are_variables():
           "(shotgun, pistol, blood)")
     check("damage is clamped at zero", bool(by_pins(wg, "Value", "Min", "Max")))
     check("switching wraps with a modulo", bool(by_pins(wg, "A", "B")))
-    check("pick-up searches the world for weapons", bool(by_pins(wg, "ActorClass")))
+    check("interact searches the world for items to pick up", bool(by_pins(wg, "ActorClass")))
     _check_pickup_keeps_held()
     check("dropping detaches the weapon",
           bool(by_pins(wg, "LocationRule", "RotationRule", "ScaleRule")))

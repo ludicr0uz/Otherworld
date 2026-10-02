@@ -8,8 +8,8 @@ next press must take that one: the order follows the reticle, not the order
 the actors come in. A press with nothing in reach takes nothing.
 
 No key can be injected into a headless game, so the probe presses the key by
-writing PickupForced, which pickup.py ORs with the key and clears on the press
-(verify/pickup.py checks the graph around it).
+writing InteractForced, which interact.py ORs with the key and clears on the
+press (verify/interact.py checks the graph around it).
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout with room in the bag, and put back at the end.
@@ -22,11 +22,11 @@ import shutil
 import unreal
 
 from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.tuning import INVENTORY_SIZE, PICKUP_RADIUS
-from combat.weapon_component.pickup import PICKUP_FORCED_VAR
+from combat.tuning import INVENTORY_SIZE, INTERACT_RADIUS
+from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, PICKUP_FORCED_VAR)]
+WRITABLE = [(WEAPON_COMP_BP_PATH, INTERACT_FORCED_VAR)]
 
 RING_CM = 150.0        # how far from the player the three items are laid
 DOWN_CM = 60.0         # below the capsule's centre: about knee height
@@ -56,13 +56,13 @@ def _in_reach(p, player):
     every = unreal.GameplayStatics.get_all_actors_of_class(
         p.world(), p.load_class(ITEM_CLASS_PATH))
     near = [i for i in every if i.get_editor_property("Dropped")
-            and _dist(i.get_actor_location(), here) < PICKUP_RADIUS]
+            and _dist(i.get_actor_location(), here) < INTERACT_RADIUS]
     return sorted(near, key=lambda i: _dist(i.get_actor_location(), aim))
 
 
 def _press(p, wc):
-    p.set(wc, PICKUP_FORCED_VAR, True)
-    yield lambda: not p.get(wc, PICKUP_FORCED_VAR)
+    p.set(wc, INTERACT_FORCED_VAR, True)
+    yield lambda: not p.get(wc, INTERACT_FORCED_VAR)
     yield 0.05
 
 

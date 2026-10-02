@@ -1,5 +1,5 @@
-"""The inventory: equip, drop, and BeginPlay's starting loadout. The pick-up is
-pickup.py's.
+"""The inventory: equip, drop, and BeginPlay's starting loadout. Interact is
+interact.py's, and picking an item up pickup.py's.
 """
 
 from combat.anim_blueprint import AIM_SLOT

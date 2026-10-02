@@ -1,4 +1,4 @@
-"""Weapon, foley and creature sound assets: the names, the three attenuation
+"""Weapon, foley and creature sound assets: the names, the four attenuation
 profiles, importing the .wav files and linking every SoundWave to its profile.
 """
 
@@ -9,6 +9,7 @@ import unreal
 
 from combat.graph import _assets, _log
 from combat.paths import AUDIO_DIR
+from npc.monster_tuning import monster_specs
 
 
 # The mechanical sounds. All of these, and the five gunshots, are now cut from
@@ -61,8 +62,9 @@ RETIRED_SOUNDS = (f"{AUDIO_DIR}/A_Reload",)
 CREATURE_AUDIO_DIR = "/Game/Audio"
 FOOTSTEP_NAMES = tuple(f"A_Footstep_{i:02d}" for i in (1, 2, 3, 4))
 MELEE_HIT_NAMES = tuple(f"A_MeleeHit_{i:02d}" for i in (1, 2, 3))
+WENDIGO_ROAR_NAMES = tuple(f"A_WendigoRoar_{i:02d}" for i in (1, 2, 3))
 CREATURE_VOICE_NAMES = (tuple(f"A_ZombieGrowl_{i:02d}" for i in (1, 2, 3))
-                        + tuple(f"A_WendigoRoar_{i:02d}" for i in (1, 2, 3)))
+                        + WENDIGO_ROAR_NAMES)
 CREATURE_SOUND_NAMES = FOOTSTEP_NAMES + MELEE_HIT_NAMES + CREATURE_VOICE_NAMES
 
 # ── How far each of them carries ─────────────────────────────────────────────
@@ -74,7 +76,7 @@ CREATURE_SOUND_NAMES = FOOTSTEP_NAMES + MELEE_HIT_NAMES + CREATURE_VOICE_NAMES
 # volume, dead centre, from anywhere on a 200 m map. That -- not the call
 # sites, which were already PlaySoundAtLocation -- is why the audio was flat.
 #
-# Three profiles rather than one, because how far a noise carries is a fact
+# A profile per kind of noise rather than one, because how far a noise carries is a fact
 # about the noise. A rifle report across a forest and a boot in leaf litter
 # differ by orders of magnitude, and one shared falloff has to be wrong for at
 # least one of them: sized for the gun, every footstep in the level is audible;
@@ -142,7 +144,24 @@ ATT_CREATURE = AttenuationProfile("A_Att_Creature", 150.0, 3850.0)
 # 15 m. Footsteps, the dry click and the reload clack: small mechanical noises
 # that in the real world do not reach the next clearing.
 ATT_FOLEY = AttenuationProfile("A_Att_Foley", 100.0, 1400.0)
-ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_FOLEY)
+# A wendigo roars as it goes aggro, so the roar has to reach a player it has
+# only just seen: it carries this many times the wendigo's aggro range (its
+# sight, monster_tuning.csv's vision_range_cm: 35 m, so 61 m), and never past
+# the 100 m ceiling. Sized from the tuned range when the build runs, so a range
+# saved from the MONSTER TUNING tab moves the roar with the next weapons build.
+ROAR_REACH_X_AGGRO = 1.75
+ROAR_CREATURE = "Wendigo"
+
+
+def roar_reach_cm():
+    """How far the wendigo's roar is heard, in cm."""
+    return min(ROAR_REACH_X_AGGRO * monster_specs(ROAR_CREATURE)["vision_range_cm"],
+               AUDIBLE_LIMIT_CM)
+
+
+ATT_ROAR = AttenuationProfile("A_Att_WendigoRoar", ATT_CREATURE.radius_cm,
+                              roar_reach_cm() - ATT_CREATURE.radius_cm)
+ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY)
 
 # Which sound gets which, and the only table that says so. Every sound in the
 # game is a WORLD sound -- something in the level made it, at a place -- so
@@ -163,7 +182,8 @@ ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_FOLEY)
 SOUND_ATTENUATION = dict(
     [(n, ATT_GUNFIRE) for n in GUNSHOT_NAMES]
     + [(n, ATT_FOLEY) for n in HANDLING_NAMES + FOOTSTEP_NAMES]
-    + [(n, ATT_CREATURE) for n in MELEE_HIT_NAMES + CREATURE_VOICE_NAMES])
+    + [(n, ATT_CREATURE) for n in MELEE_HIT_NAMES + CREATURE_VOICE_NAMES]
+    + [(n, ATT_ROAR) for n in WENDIGO_ROAR_NAMES])
 
 # <project>/assets/generated/sounds -- this file is Scripts/combat/audio.py.
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(

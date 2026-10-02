@@ -145,7 +145,7 @@ GENERATED = (
              "from the sound cache -- see CACHE below. The rifle and the "
              "sniper wear the FPS Weapon Bundle's models (a Fab pack under "
              "/Game/FPS_Weapon_Bundle), so that pack must be in first. "
-             "The three A_Att_* USoundAttenuation profiles every sound in the "
+             "The four A_Att_* USoundAttenuation profiles every sound in the "
              "game points at are built by the same script but live in "
              "/Game/Audio, because the foley half of the sounds does.",
     ),

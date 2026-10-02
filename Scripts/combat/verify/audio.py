@@ -7,15 +7,17 @@ import wave as _wave
 import unreal
 
 from combat.audio import (
-    ATTENUATIONS, ATT_DB_AT_MAX, ATT_FOLEY, ATT_GUNFIRE, AUDIBLE_LIMIT_CM,
-    CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES, RETIRED_SOUNDS,
-    SOUND_ATTENUATION, SOUND_NAMES, SOUND_SRC_DIR,
+    ATTENUATIONS, ATT_DB_AT_MAX, ATT_FOLEY, ATT_GUNFIRE, ATT_ROAR, AUDIBLE_LIMIT_CM,
+    CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES, RETIRED_SOUNDS, ROAR_CREATURE,
+    ROAR_REACH_X_AGGRO, SOUND_ATTENUATION, SOUND_NAMES, SOUND_SRC_DIR,
+    WENDIGO_ROAR_NAMES,
 )
 from combat.paths import AUDIO_DIR
 from combat.tuning import AUTO_DISPLAYS
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import _eas, wg
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, load
+from npc.monster_tuning import monster_specs
 
 
 # ─── The sounds themselves ───────────────────────────────────────────────────
@@ -154,6 +156,17 @@ def check_distance_and_direction():
           ATT_FOLEY.audible_cm * 4 < ATT_GUNFIRE.audible_cm,
           f"{ATT_FOLEY.audible_cm / 100.0:.0f} m vs "
           f"{ATT_GUNFIRE.audible_cm / 100.0:.0f} m")
+
+    # A roar is the wendigo going aggro, so it must reach a player at the very
+    # edge of the range it can go aggro from. Read from the tuning table here,
+    # not from the profile, so a range saved without a rebuild fails.
+    _aggro = monster_specs(ROAR_CREATURE)["vision_range_cm"]
+    _want = min(ROAR_REACH_X_AGGRO * _aggro, AUDIBLE_LIMIT_CM)
+    check(f"a wendigo's roar carries {ROAR_REACH_X_AGGRO:g}x its aggro range "
+          f"({_aggro / 100.0:g} m)",
+          abs(ATT_ROAR.audible_cm - _want) < 1e-3 and ATT_ROAR.audible_cm >= _aggro
+          and all(SOUND_ATTENUATION[n] is ATT_ROAR for n in WENDIGO_ROAR_NAMES),
+          f"{ATT_ROAR.audible_cm / 100.0:g} m")
 
     # THE SWEEP THAT MAKES "NOTHING WAS MISSED" TRUE. It walks the two audio
     # folders on disk rather than SOUND_NAMES + CREATURE_SOUND_NAMES, so a

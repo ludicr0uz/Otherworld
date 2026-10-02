@@ -20,10 +20,15 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - **Where each sound fires:**
   - The dry click fires on the ready gate's False arm when `empty AND cooled AND tapped`.
   - The reload clack fires only on the reload's True arm.
-- **Attenuation:** three `USoundAttenuation` assets in `/Game/Audio`, all `NATURAL_SOUND` and
+- **Attenuation:** four `USoundAttenuation` assets in `/Game/Audio`, all `NATURAL_SOUND` and
   spherical:
   - `A_Att_Gunfire`: 2 m → 100 m, with a low-pass;
   - `A_Att_Creature`: 1.5 → 40 m;
+  - `A_Att_WendigoRoar`: 1.5 m → 1.75 × the wendigo's aggro range (`ROAR_REACH_X_AGGRO`;
+    35 m of sight, so 61 m), so a roar is always heard by the player it is for. The range is
+    read from `npc/monster_tuning.csv` when the weapons build runs: after saving a new aggro
+    range from the MONSTER TUNING tab, re-run `build_weapons_and_combat.py` (the verifier
+    fails until then). Capped at the 100 m ceiling;
   - `A_Att_Foley`: 1 → 15 m.
 - **A sound with no attenuation plays at full volume from anywhere.** `apply_attenuation()` sets
   it **on the asset**, sweeps both audio folders, and raises on a wave with no profile.

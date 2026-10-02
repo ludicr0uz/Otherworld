@@ -290,8 +290,11 @@ def check_light_at_fire():
         return
     tests = _ran_by(keep[0])
     src = _pure_feeds(tests[0]) if len(tests) == 1 else []
+    # The stick's own walk of the fires: the interact key has another, for
+    # heating a blade (verify/heat.py).
     walks = [n for n in by_pins(wg, "ActorClass")
-             if [_title(f) for f in _feeders(n, "ActorClass")] == [f"Get {CAMPFIRE_CLASS_VAR}"]]
+             if [_title(f) for f in _feeders(n, "ActorClass")] == [f"Get {CAMPFIRE_CLASS_VAR}"]
+             and _ran_by(n) == forget]
     check(f"...over every {CAMPFIRE_CLASS_VAR} actor, kept if within "
           f"{STICK_LIGHT_RADIUS_CM:g} cm of the player",
           len(walks) == 1 and _ran_by(walks[0]) == forget

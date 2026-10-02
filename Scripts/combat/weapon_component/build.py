@@ -45,6 +45,7 @@ from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
 )
 from combat.light_tuning import CAMPFIRE_CLASS_VAR, LIGHT_WOOD_VAR, MATCHES_CLASS_VAR
+from combat.heat_tuning import BLOW_DAMAGE_VAR
 from combat.torch_tuning import (
     NEAR_FIRE_VAR, STICK_CLASS_VAR, WARD_CARRY_VAR, WARD_ITEM_VAR,
 )
@@ -229,6 +230,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in (NEXT_PUNCH_VAR, PUNCH_DUE_VAR):
         _declare(ed, name, _float_type())
+    # What the knife's blow takes off the body it met (hot_blow.py).
+    _declare(ed, BLOW_DAMAGE_VAR, _float_type())
     # The knife's slash (knife.py): the same four, on the knife's own clip.
     _declare(ed, KNIFE_ANIM_VAR, BEL.get_object_reference_type(
         unreal.AnimSequenceBase.static_class()))
@@ -356,6 +359,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         KNIFE_PENDING_VAR: False,
         NEXT_KNIFE_VAR: 0.0,
         KNIFE_DUE_VAR: 0.0,
+        BLOW_DAMAGE_VAR: 0.0,
         INTERACT_GAP_VAR: INTERACT_NO_GAP,
         INTERACT_FORCED_VAR: False,
         THROW_AIMING_VAR: False,

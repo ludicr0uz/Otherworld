@@ -61,6 +61,11 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     the item, how long it burns and how near a campfire lights
                     it (STICK_*), the component's StickClass/NearFire/WardItem/
                     WardCarryPose
+  heat_tuning       the heated blade: Heats / Hot / CoolTime / HeatMaterial on
+                    the item, how long it stays hot (HEAT_S), what its blow
+                    does to a creature afraid of fire (HOT_BLOW_SCALE,
+                    FIRE_FEAR_TAG), the component's BlowDamage, the glow's
+                    colour, light and material parameters
   stick             BP_Stick: Quaternius's Survival Pack torch, bare and
                     burning, and its glow; its own Tick puts it out and shows
                     the one or the other; build_stick()
@@ -98,6 +103,10 @@ ASSETS AND PATCHES
                     and GripLocation (the handle seated in the fist)
   settings_savegame BP_Settings
   weapon_items      BP_WeaponItem and one child per weapon
+  heat              the item's side of a heated blade: M_HotMetal (an additive
+                    overlay masked along the model's own axis) and an
+                    instance per item, the HeatGlow light, and the Tick that
+                    cools it and shows the glow; build_heated_model()
   burst             build_burst: the actor of small pieces thrown off a hit
                     under drag and gravity (the graph both bursts below fly)
   blood             BP_BloodSplash: the droplet layout, what a body throws

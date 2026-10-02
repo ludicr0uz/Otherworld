@@ -61,7 +61,9 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
   `Debuff.Bleeding`; the health component drains `BLEED_TOTAL_HP / BLEED_DURATION_S` per
   second while the tag is on (all three in `combat/tuning.py`), which is 50 HP in all. A
   second wound **restarts** the 3 minutes and never stacks. A blocked swing rolls too. It is
-  not saved with the profile, and nothing stops it early yet.
+  not saved with the profile. One thing stops it early: the use key with a hot knife or axe
+  in hand (heated at a campfire) removes it, by the tag
+  (`combat/weapon_component/cauterize.py`, `probes/probe_hot_blade.py`).
 - **Build order:** the controllers name `GE_Bleeding` on a pin, so `build_npc_blueprints.py`
   runs after `build_survival.py`. Without the asset the swing is built without the roll, and
   the builder says so.

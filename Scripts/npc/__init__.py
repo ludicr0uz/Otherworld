@@ -70,7 +70,8 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
 
 THE BODY
-  character    BP_ForestWanderer and one child Blueprint per creature
+  character    BP_ForestWanderer and one child Blueprint per creature (each
+               afraid of fire tagged FearsFire, which a hot blade's blow reads)
 
 Dependency direction: paths/nodes -> graph -> fragments -> steps ->
 step_task/tree -> controller -> character -> entry point. No module imports

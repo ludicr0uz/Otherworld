@@ -137,11 +137,11 @@ def _author_punch(ed, tap, armed_out, steady, guarded, unspent, exec_ins, x0, y0
                          x0 + 1260, y0)
 
 
-def _author_swing(ed, strike, exec_ins, x0, y0, scenery=None):
+def _author_swing(ed, strike, exec_ins, x0, y0, scenery=None, damage=None):
     """Queued: clear the queue, stamp the cooldown and when the blow lands,
     and play the strike's clip; then the blow stage. ``exec_ins`` all run into
-    the swing's Branch; returns the exits of the blow stage. ``scenery`` is
-    the blow's (see _author_blow)."""
+    the swing's Branch; returns the exits of the blow stage. ``scenery`` and
+    ``damage`` are the blow's (see _author_blow)."""
     swing = _at(ed.add_branch_node(), x0 + 240, y0)
     _connect(_get(ed, strike.queued_var, x0, y0 + 200), _pin(swing, "Condition"))
     for pin in exec_ins:
@@ -172,12 +172,17 @@ def _author_swing(ed, strike, exec_ins, x0, y0, scenery=None):
 
     # --- blow ----------------------------------------------------------------
     return _author_blow(ed, strike, (BEL.find_then_pin(play), BEL.find_else_pin(swing)),
-                        x0 + 3040, y0, scenery)
+                        x0 + 3040, y0, scenery, damage)
 
 
-def _author_blow(ed, strike, exec_ins, x0, y0, scenery=None):
+def _author_blow(ed, strike, exec_ins, x0, y0, scenery=None, damage=None):
     """Pending and due: sweep a sphere forward from the chest, and take the
     strike's damage off the first body with a health component.
+
+    ``damage(ed, body, exec_in, x, y)``, if given, authors what this blow
+    takes off the body it met, between the cast and the write, and returns
+    (the amount's pin, its exits); without one it is the strike's damage, a
+    literal (the knife's is hot_blow.py).
 
     ``scenery(ed, brk, exec_in, x, y)``, if given, authors what the blow does
     to something with no health, off the cast's failed arm, and returns its
@@ -241,7 +246,13 @@ def _author_blow(ed, strike, exec_ins, x0, y0, scenery=None):
     _connect(as_health, _pin(get_h, "self"))
     sub = _at(_node(ed, FN_SUB_FF), x0 + 3200, y0 + 300)
     _connect(_pin(get_h, "Health", is_input=False), _pin(sub, "A"))
-    _set(sub, "B", strike.damage)
+    met = (BEL.find_then_pin(cast),)
+    if damage:
+        amount, met = damage(ed, _loose_pin(brk, "HitActor", is_input=False),
+                             met[0], x0 + 2960, y0 - 900)
+        _connect(amount, _pin(sub, "B"))
+    else:
+        _set(sub, "B", strike.damage)
     clamp = _at(_node(ed, FN_CLAMP), x0 + 3440, y0 + 300)
     _connect(_pin(sub, "ReturnValue", is_input=False), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
@@ -250,7 +261,8 @@ def _author_blow(ed, strike, exec_ins, x0, y0, scenery=None):
                 x0 + 3700, y0)
     _connect(as_health, _pin(set_h, "self"))
     _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(set_h, "Health"))
-    _connect(BEL.find_then_pin(cast), _pin(set_h, "execute"))
+    for pin in met:
+        _connect(pin, _pin(set_h, "execute"))
 
     # The same three stamps a pellet leaves (impact.py): the health bar, the
     # kill's credit, and which way the flinch goes.

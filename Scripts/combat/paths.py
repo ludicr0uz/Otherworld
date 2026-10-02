@@ -19,6 +19,11 @@ MAT_BRASS = f"{WEAPON_DIR}/M_Brass"
 MAT_IMPACT_CHIP = f"{WEAPON_DIR}/M_ImpactChip"
 MAT_IMPACT_DUST = f"{WEAPON_DIR}/M_ImpactDust"
 MAT_THROW_ARC = f"{WEAPON_DIR}/M_ThrowArc"
+# What a heated blade glows with (heat.py): the overlay, and each item's
+# instance of it, which says where its metal is.
+MAT_HOT_METAL = f"{WEAPON_DIR}/M_HotMetal"
+MAT_HOT_KNIFE = f"{WEAPON_DIR}/MI_HotKnife"
+MAT_HOT_AXE = f"{WEAPON_DIR}/MI_HotAxe"
 
 ITEM_BP_PATH = f"{WEAPON_DIR}/BP_WeaponItem"
 SHOTGUN_BP_PATH = f"{WEAPON_DIR}/BP_Shotgun"

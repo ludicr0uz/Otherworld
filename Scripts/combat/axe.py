@@ -34,10 +34,13 @@ from combat.graph import (
     BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
 )
 from combat.grip import _grip_location, _grip_rotation, _rotate_vector
+from combat.heat import build_heated_model, build_hot_instance
+from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.knife import _placed
-from combat.paths import AXE_BP_PATH, CUBE, HOLD_KNIFE_ANIM_PATH, MAT_METAL
+from combat.paths import (
+    AXE_BP_PATH, CUBE, HOLD_KNIFE_ANIM_PATH, MAT_HOT_AXE, MAT_METAL,
+)
 from combat.tuning import COMBAT
-from combat.weapon_items import build_model
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 
@@ -53,6 +56,12 @@ HANDLE_SIZE = (3.3, 2.6, 12.0)
 HEAD_CENTRE = (-4.8, 0.0, 37.5)
 HEAD_SIZE = (25.2, 3.6, 23.4)
 TILT_DEG = 30.0
+# Heated, the head glows (heat.py): past HOT_START_CM up the scaled mesh's +Z,
+# where the head begins, coming in over HOT_FADE_CM. The overlay measures in
+# the mesh's own units, so both go to it divided by AXE_SCALE.
+HOT_AXIS = (0.0, 0.0, 1.0)
+HOT_START_CM = 25.7
+HOT_FADE_CM = 2.0
 
 
 def head_rotation():
@@ -86,17 +95,22 @@ def axe_outline():
 
 
 def build_axe(item_bp):
-    """BP_Axe: the model on Body, and the base class's defaults for an axe."""
+    """BP_Axe: the model on Body, the glow of its head heated (heat.py), and
+    the base class's defaults for an axe."""
     bp = _create_blueprint(AXE_BP_PATH, BEL.generated_class(item_bp))
-    build_model(bp, axe_model())
-    if not BEL.compile_blueprint(bp):
-        raise RuntimeError(f"{AXE_BP_PATH} failed to compile")
+    (_n, _m, loc, rot, _s), = axe_model()
+    build_heated_model(bp, axe_model(), _placed(HEAD_CENTRE, rot, loc))
     aim = HOLD_KNIFE_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
         "DisplayName": AXE_DISPLAY,
         "Melee": True,
         CHOPS_VAR: True,
+        HEATS_VAR: True,
+        HOT_VAR: False,
+        COOL_VAR: 0.0,
+        HEAT_MATERIAL_VAR: build_hot_instance(
+            MAT_HOT_AXE, HOT_AXIS, HOT_START_CM / AXE_SCALE, HOT_FADE_CM / AXE_SCALE),
         "Consumable": False,
         "Dropped": False,
         "UsesAmmo": False,

@@ -11,10 +11,13 @@ _author_* fragment per concern, each in its own module:
   aim         resolve the aim point every frame (camera trace, muzzle trace)
   use         the use key: the sights key on an item with no sights -> Using /
               UsePressed (and the one poll of that key, which ads aims a gun
-              on). KINDS lists what a use does (today: the stick)
+              on). KINDS lists what a use does (today: the stick, and a
+              hot blade)
   torch       use's stick kind: a press at a campfire lights a stick that
               Burns; a Lit one is held out while Using (FireWard, written on
               every arm), its AimPose swapped for its UsePose
+  cauterize   use's hot-blade kind: a press with a Hot item in hand takes
+              the bleed off the player, by the tag its spec grants
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom
               (the sights key aims only while it is not Using); the zoom, and
               the look and walk slowdowns it drives
@@ -53,9 +56,13 @@ _author_* fragment per concern, each in its own module:
   inventory   equip, drop, BeginPlay loadout
   interact    the interact key acts on ONE thing in reach: the candidate
               nearest AimPoint, the point the reticle rests on. KINDS lists
-              what can be interacted with (today: an item, which is picked up)
+              what can be interacted with (today: an item, which is picked
+              up, and a campfire, which heats the blade in hand)
   pickup      interact's item kind: the Dropped items it offers, and the take
               of the one kept into the bag
+  heat        interact's campfire kind: the fires it offers while the held
+              item Heats (the knife, the axe), and what makes that item Hot
+              for HEAT_S (the item's own Tick cools it: combat/heat.py)
   listener    BeginPlay: sounds fade with the distance from the character,
               not the camera (the controller's attenuation listener override)
   ammo        reload and dry fire
@@ -65,6 +72,9 @@ _author_* fragment per concern, each in its own module:
   knife       a Melee item held: the fire key slashes (behind the fire gate,
               beside the Consumable branch); punch.py's swing and blow on the
               KNIFE Strike, playing A_KnifeSlash
+  hot_blow    what the knife stage's blow takes (BlowDamage): the strike's
+              damage, doubled with a Hot item in hand off a body tagged
+              FearsFire (the wendigo)
   chop        the knife stage's blow on something with no health: with an item
               that Chops in hand (the axe) and a tree under it, chips, a count
               on that tree, and every third blow a BP_Wood beside the trunk

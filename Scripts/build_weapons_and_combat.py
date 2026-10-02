@@ -85,6 +85,7 @@ from combat.install import (                                      # noqa: E402
     install_on_character, install_on_npc, retire_old_assets,
 )
 from combat.materials import build_materials                      # noqa: E402
+from combat.heat import build_hot_material                        # noqa: E402
 from combat.throw_arc import build_throw_arc                      # noqa: E402
 from combat.paths import AMMO_BP_PATH, HEALTH_BP_PATH             # noqa: E402
 from combat.hit_bodies import fit_hit_bodies                      # noqa: E402
@@ -101,6 +102,8 @@ from combat.weapon_specs import DROP_TICKETS, _weapon_specs       # noqa: E402
 
 def main():
     build_materials()
+    # Before the knife and the axe, whose glow is an instance of it.
+    build_hot_material()
     import_sounds()
     # Both halves have to exist before either can name the other, so the link
     # is a third step rather than something import_sounds() does on the way

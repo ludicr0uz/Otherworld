@@ -6,7 +6,9 @@
     swing   KnifeQueued --> NextKnifeTime, KnifeDueTime, KnifePending,
             A_KnifeSlash (KnifeAnim) into the upper-body slot
     blow    KnifePending AND now >= KnifeDueTime --> a sphere in front of the
-            chest; a body with BP_HealthComponent loses COMBAT.knife_damage
+            chest; a body with BP_HealthComponent loses COMBAT.knife_damage,
+            or twice that off a creature afraid of fire while the blade in
+            hand is hot (hot_blow.py)
 
 The swing and the blow are punch.py's, run on the KNIFE Strike, with one
 addition: a blow that lands on something with no health goes on to chop.py,
@@ -26,6 +28,7 @@ from combat.nodes import FN_GE_FF, FN_TIME_SECONDS
 from combat.tuning import COMBAT
 from combat.weapon_component.chop import _author_chop
 from combat.weapon_component.common import _prop
+from combat.weapon_component.hot_blow import author_hot_blow
 from combat.weapon_component.punch import (
     Strike, _and, _author_swing, _get, _set_bool,
 )
@@ -72,5 +75,8 @@ def _author_knife_press(ed, held, tap, not_melee, x0, y0):
 def _author_knife_swing(ed, exec_ins, x0, y0):
     """The slash's swing and blow (punch.py's stages on KNIFE); returns the
     blow stage's exits. A blow on something with no health goes to chop.py:
-    with an item that Chops in hand, a tree gives wood."""
-    return _author_swing(ed, KNIFE, exec_ins, x0, y0, scenery=_author_chop)
+    with an item that Chops in hand, a tree gives wood. What it takes off a
+    body is hot_blow.py's: more, with a hot blade, off a creature afraid of
+    fire."""
+    return _author_swing(ed, KNIFE, exec_ins, x0, y0, scenery=_author_chop,
+                         damage=author_hot_blow(KNIFE))

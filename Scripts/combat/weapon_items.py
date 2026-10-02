@@ -28,6 +28,7 @@ from combat.graph import (
 )
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
+from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR
 from combat.tuning import COMBAT
@@ -101,9 +102,19 @@ def build_weapon_item():
                        # Lit at a campfire by the use key, and burning: the
                        # stick (stick.py, weapon_component/torch.py).
                        (BURNS_VAR, "bool"),
-                       (LIT_VAR, "bool")):
+                       (LIT_VAR, "bool"),
+                       # Heated at a campfire by the interact key, and hot:
+                       # the knife and the axe (heat.py,
+                       # weapon_component/heat.py).
+                       (HEATS_VAR, "bool"),
+                       (HOT_VAR, "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
     _declare(ed, BURN_OUT_VAR, _float_type())
+    _declare(ed, COOL_VAR, _float_type())
+    # The overlay a hot blade's model wears (heat.py). None on everything
+    # that does not heat.
+    _declare(ed, HEAT_MATERIAL_VAR, BEL.get_object_reference_type(
+        unreal.MaterialInterface.static_class()))
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     # Where the eye goes when this weapon is aimed down its sights, in the
     # weapon's own space: on the sight line, behind the rear sight (on the

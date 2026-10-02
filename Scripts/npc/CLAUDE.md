@@ -196,6 +196,11 @@ Wanderer (selector)
     `set_control_rotation`. `set_actor_rotation` is undone by the next frame.
   - **`WardSince` is tested against exactly 0** (`Equal (Float)`), not `<= 0`: a probe that
     writes a hold's start back in time gets a negative game time early in a run.
+  - **A creature afraid of fire carries the `FearsFire` actor tag**
+    (`combat/heat_tuning.FIRE_FEAR_TAG`), written on its variant's CDO by
+    `character.build_variant_blueprint` for the keys in `NPC_WARD_FEARS`, and an empty list
+    on every other. Combat reads it: a hot blade's blow does double damage to a tagged body
+    (`combat/weapon_component/hot_blow.py`). A placed wanderer inherits it from its class.
   - A weapons build from before the flag has no `FireWard`: `ward.wards()` then leaves the
     step out, with a log line, and `verify_ward.py` fails until the weapons are rebuilt.
   - `verify_ward.py` checks the graph; `verify.py` and `verify_strafe.py` count a

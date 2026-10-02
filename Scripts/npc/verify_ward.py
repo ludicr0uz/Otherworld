@@ -15,6 +15,7 @@ probes/probe_wendigo_ward.py's.
 
 import unreal
 
+from combat.heat_tuning import FIRE_FEAR_TAG
 from combat.paths import FIRE_WARD_VAR
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM, NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
@@ -80,6 +81,15 @@ def check_settings():
     keys = {v.key for v in NPC_VARIANTS}
     check("ward: every creature afraid of fire is a creature",
           set(NPC_WARD_FEARS) <= keys, f"{sorted(set(NPC_WARD_FEARS) - keys)}")
+    # What a hot blade's blow reads (combat/weapon_component/hot_blow.py): the
+    # actor tag, on the creatures afraid of fire and on no other.
+    tagged = {v.key: [str(t) for t in unreal.get_default_object(
+        unreal.load_class(None, f"{v.blueprint}.{v.blueprint.rsplit('/', 1)[-1]}_C")
+    ).get_editor_property("tags")] for v in NPC_VARIANTS}
+    check(f"ward: a creature afraid of fire carries the {FIRE_FEAR_TAG} actor "
+          "tag, and no other creature does",
+          all(tags == ([FIRE_FEAR_TAG] if key in NPC_WARD_FEARS else [])
+              for key, tags in tagged.items()), str(tagged))
     check("ward: the ring it circles on is outside its reach and inside the "
           "fire's range, and getting round the fire means a quarter turn or more",
           NPC_MELEE_RANGE_CM < NPC_WARD_RING_CM < NPC_WARD_RANGE_CM

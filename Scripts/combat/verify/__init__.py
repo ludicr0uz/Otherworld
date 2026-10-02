@@ -75,6 +75,10 @@ and it never relies on a variable another section left behind.
               the ranking by AimPoint, a walk that only remembers
   pickup      interact's item kind: the take runs once, after the search, on
               the kept target cast to an item, with room in the bag
+  heat        the heated blade: who Heats, M_HotMetal and each item's
+              instance, the glow and the cooling on the item's own Tick, the
+              interact key's campfire kind, the use key's cauterising, the
+              doubled blow on a body tagged FearsFire
   throw       the throw: its key, BP_ThrowArc, the predicted arc, the click,
               the clip's wind-up, the tumbling flight on the same curve;
               is_throw_trace, is_throw_play, launch_nodes
@@ -83,6 +87,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
     "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "interact", "pickup",
+    "hold_pose", "shotgun_pose", "throw", "interact", "pickup", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

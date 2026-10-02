@@ -7,6 +7,8 @@ from forest_generator.npc_placement import (
     NPC_MELEE_MONTAGE_FALLBACK, NPC_RUN_SPEED_CMS,
     NPC_RUN_SPEED_CMS as _NPC_RUN_SPEED_CMS,
 )
+from combat.heat_tuning import FIRE_FEAR_TAG
+from forest_generator.npc_ward import NPC_WARD_FEARS
 from npc.paths import (
     MESH_RELATIVE_YAW_DEG, MESH_RELATIVE_Z_CM, NPC_BP_PATH,
 )
@@ -210,6 +212,12 @@ def build_variant_blueprint(base_bp, variant):
     if abs(got - speed) > 1e-3:
         raise RuntimeError(
             f"{variant.key}: MaxWalkSpeed stayed at {got}, wanted {speed}")
+
+    # Whether fire hurts it more: a creature afraid of fire carries the actor
+    # tag a hot blade's blow reads (combat/weapon_component/hot_blow.py).
+    # Written for every creature, empty included: this builder edits in place.
+    tags = [unreal.Name(FIRE_FEAR_TAG)] if variant.key in NPC_WARD_FEARS else []
+    cdo.set_editor_property("tags", tags)
 
     # Its own controller, because the attack clip inside it belongs to this
     # creature's skeleton and will not play on any other -- and because its

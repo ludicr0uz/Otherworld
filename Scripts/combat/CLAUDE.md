@@ -20,8 +20,9 @@ The defaults are all rebindable on the settings screen:
   Only a gun has sights (`HasSights`): with anything else in hand the middle click is the
   **use key** (`weapon_component/use.py`) and does not aim at all
   (`probes/probe_item_no_sights.py`). It lights a stick at a campfire and holds a burning one
-  out (below); on the knife, the axe, the matches, wood and food it does nothing yet.
-  **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up), **Shift** sprints, **F** blocks (held),
+  out, and with a hot knife or axe it cauterises a bleed (both below); on a cold blade, the
+  matches, wood and food it does nothing yet.
+  **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **V** held shows the throw's arc and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
@@ -84,9 +85,15 @@ menu polls its own copy from `DrawHUD`, which does.
   (`probes/probe_pickup.py`).
   - **To add something to interact with,** write its pair in a module of its own and add it to
     `KINDS`. Don't poll the key anywhere else.
-  - **The one kind today is an item** (`weapon_component/pickup.py`): it offers the `Dropped`
+  - **One kind is an item** (`weapon_component/pickup.py`): it offers the `Dropped`
     items and takes the target into the bag. A take inside the walk is how one press used to
     empty a pile.
+  - **The other is a campfire** (`weapon_component/heat.py`), offered only while the held
+    item `Heats`. It has no cast: a kind's `act` may test the target any way it likes (here
+    `ClassIsChildOf` against `CampfireClass`) as long as it hands on the exec pin a target
+    that is not its own leaves by.
+  - `verify/interact.py` counts one reach test, one ranking and one keep **per kind**
+    (`len(KINDS)`).
   - Searching a body is Tab, not this key (`Scripts/loot/CLAUDE.md`).
 - **Ammunition lives on the weapon** (`MagazineSize`/`Loaded`/`Reserve` on `BP_WeaponItem`).
   Drop a half-empty gun and it is still half-empty when picked up. The pistol is the fallback: an
@@ -242,6 +249,34 @@ menu polls its own copy from `DrawHUD`, which does.
     the hand re-equips, so the equip and the keep-alive play it with no branch of their
     own. `WardItem` is the stick that is up and `WardCarryPose` what to put back; the
     lowering is tested before the raising. `probes/probe_lit_stick.py` runs all of it.
+- **A blade is heated at a campfire** (`heat.py`, `weapon_component/heat.py`, numbers in
+  `heat_tuning.py`). With an item flagged `Heats` in hand (the knife, the axe), E on a
+  campfire in reach (`INTERACT_RADIUS`) sets it `Hot` until `CoolTime`, `HEAT_S` (20 s) on;
+  a press on a hot one starts the time again. Nothing is spent.
+  - **It cools on its own Tick,** in the hand, in the bag and on the ground, as the stick
+    burns: `heat.build_heated_model` wipes the item's graph, builds the model and authors
+    the Tick, for the stick's reason (its nodes name its components).
+  - **The glow is an overlay material, not a second mesh:** `M_HotMetal`, unlit and
+    additive, masked along an axis of the model component's own space, so the blade glows
+    and the handle does not. Each item has an instance (`MI_HotKnife`, `MI_HotAxe`:
+    `Axis`, `Start`, `Fade`, measured off the mesh; a scaled static mesh's are in mesh
+    units). `HeatMaterial` on the item is what its Tick puts on `Model` while `Hot`, with a
+    dim red point light, `HeatGlow`. The material is flagged `used_with_skeletal_mesh` by
+    the builder: the knife is one, and a game cannot set the flag itself.
+  - **Emissive above about 1 blooms out to white-yellow.** `HOT_EMISSIVE` is 1.0.
+  - **The use key on a hot blade cauterises** (`weapon_component/cauterize.py`, a kind in
+    `use.KINDS`): a press calls `RemoveActiveEffectsWithGrantedTags(Debuff.Bleeding)` on
+    the player's ability system. The bleed is named by its tag because survival's
+    `GE_Bleeding` is built after this graph. The blade stays hot.
+  - **A hot blade's blow does double damage to a creature afraid of fire**
+    (`weapon_component/hot_blow.py`, the blow's `damage` fragment in `punch._author_blow`).
+    The knife stage's blow reads `BlowDamage`, written just before the health is: the
+    strike's damage, or `HOT_BLOW_SCALE` (2) times it when `Held` is valid, `Held.Hot`,
+    and the body carries the `FearsFire` actor tag (three nested Branches). The tag is the
+    creature's (`Scripts/npc/CLAUDE.md`): combat never names a wendigo. A punch has no
+    such fragment and takes its literal.
+  - `probes/probe_hot_blade.py` runs all of it in a game; with `--windowed` and
+    `OW_HOT_SHOTS=1` it saves a picture of each hot blade from in front of the player.
 - **Kill rewards happen only on the `DamagedByPlayer` arm.** That covers the kill count, the two
   shells and the gun roll. The world-floor net writes `Health = 0` down the same death path, and
   it must not pay out.
@@ -330,6 +365,12 @@ These are feel checks a headless run can't do:
   (and the silent press with no fire in reach), whether 2 minutes of burning and 3 m of
   reach feel right, whether a torch burning down unseen in the bag reads as fair, and the
   middle click no longer aiming a knife or an axe over the shoulder;
+- the heated blade (`heat_tuning.py`): heating it with no animation, sound or message
+  (and the silent press with a cold fire out of reach, or with the stick in hand), nothing
+  on the HUD saying it is hot or how long is left, whether 20 s is long enough to reach a
+  wendigo, the flat red of the axe's whole head by day (the overlay adds one colour, and
+  the top of the haft inside the head glows with it), the glow and its light at night,
+  and cauterising with no animation, sound or cost;
 - the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100

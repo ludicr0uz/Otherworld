@@ -11,8 +11,9 @@ sights to bring up, so the key is free, and what it does is the held item's
 own: each kind of use is a fragment in KINDS, run every frame after Using and
 UsePressed are written, which asks its own question of Held (a flag on
 BP_WeaponItem, read behind a Branch on Using or UsePressed, where Held is
-known valid). Today there is one kind: a stick that Burns (torch.py). An
-item no kind answers for does nothing on the key.
+known valid). Today there are two kinds: a stick that Burns (torch.py) and a
+blade that is Hot (cauterize.py). An item no kind answers for does nothing on
+the key.
 
 Held.HasSights is read on the true arm of an IsValid(Held) Branch, never in
 a folded condition: a pure Get off a null Held is an Accessed None a frame.
@@ -29,11 +30,12 @@ from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import FN_AND, FN_IS_KEY_DOWN, FN_NOT, FN_OR
 from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
 from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
+from combat.weapon_component.cauterize import _author_cauterize
 from combat.weapon_component.common import _prop
 from combat.weapon_component.torch import _author_torch
 
 # One fragment per kind of use, run in this order every frame.
-KINDS = (_author_torch,)
+KINDS = (_author_torch, _author_cauterize)
 KIND_PITCH = 2000   # graph units between two kinds' rows of nodes
 
 

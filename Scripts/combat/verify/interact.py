@@ -3,7 +3,7 @@ press keeps one target, the candidate in reach nearest AimPoint. A walk only
 remembers the best candidate; nothing is done to one inside it.
 
 What is done to the target after the search is its kind's: an item is picked
-up (verify/pickup.py).
+up (verify/pickup.py), a campfire heats the blade in hand (verify/heat.py).
 """
 
 from combat.tuning import BIND_VARS, INTERACT_KEY, INTERACT_RADIUS
@@ -11,7 +11,7 @@ from combat.verify.common import BEL, PIN, by_pins, check, num_pin, pin_value
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.interact import (
     INTERACT_FORCED_VAR, INTERACT_GAP_VAR, INTERACT_NO_GAP, INTERACT_TARGET_VAR,
-    RETIRED_VARS,
+    KINDS, RETIRED_VARS,
 )
 
 
@@ -82,8 +82,11 @@ def check_interact_keeps_one():
              and any({"V1", "V2"} <= {str(PIN.get_pin_name(p))
                                       for p in BEL.list_input_pins(s)}
                      for s in _sources(n, "A"))]
-    check(f"a candidate lies within {INTERACT_RADIUS:.0f} cm of the player",
-          len(reach) == 1, f"{len(reach)} reach test(s)")
+    # One offer per kind of thing the key acts on (interact.KINDS).
+    kinds = len(KINDS)
+    check(f"a candidate of each of the {kinds} kinds lies within "
+          f"{INTERACT_RADIUS:.0f} cm of the player",
+          len(reach) == kinds, f"{len(reach)} reach test(s)")
 
     gaps = _aim_gaps()
     ranks = [n for n in by_pins(wg, "A", "B")
@@ -91,24 +94,24 @@ def check_interact_keeps_one():
              and any(s in gaps for s in _sources(n, "A"))]
     check("candidates are ranked by their distance to AimPoint, the reticle's "
           f"point: nearer than {INTERACT_GAP_VAR} wins",
-          len(ranks) == 1, f"{len(ranks)} comparison(s), {len(gaps)} gap(s)")
+          len(ranks) == kinds, f"{len(ranks)} comparison(s), {len(gaps)} gap(s)")
 
     keeps = [n for n in wg if _title(n) == f"Set {INTERACT_TARGET_VAR}"]
     kept = [n for n in keeps if _sources(n, INTERACT_TARGET_VAR)]
     forgot = [n for n in keeps if not _sources(n, INTERACT_TARGET_VAR)]
-    check("each press forgets the last target before it searches",
-          len(forgot) == 1 and len(kept) == 1,
+    check("each press forgets the last target before it searches, and each "
+          "kind's walk keeps in one place",
+          len(forgot) == 1 and len(kept) == kinds,
           f"{len(forgot)} clear(s), {len(kept)} keep(s)")
-    if len(kept) != 1:
-        return
 
-    after = _then(kept[0])
-    check("the walk only remembers the nearest: it writes the candidate and "
-          "its gap and stops there",
-          len(after) == 1 and _title(after[0]) == f"Set {INTERACT_GAP_VAR}"
-          and any(s in gaps for s in _sources(after[0], INTERACT_GAP_VAR))
-          and not _then(after[0]),
-          ", ".join(_title(n) for n in after))
+    for keep in kept:
+        after = _then(keep)
+        check("a walk only remembers the nearest: it writes the candidate and "
+              "its gap and stops there",
+              len(after) == 1 and _title(after[0]) == f"Set {INTERACT_GAP_VAR}"
+              and any(s in gaps for s in _sources(after[0], INTERACT_GAP_VAR))
+              and not _then(after[0]),
+              ", ".join(_title(n) for n in after))
 
 
 def run():

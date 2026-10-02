@@ -14,8 +14,9 @@ within INTERACT_RADIUS of the player is kept in InteractTarget when it is
 nearer AimPoint, the point the reticle rests on (aim.py resolves it every
 frame, armed or not), than the one kept so far. Nothing is done inside a walk.
 After the last one the target goes down the kinds' acts in order, and the first
-whose cast takes it acts on it, once. Today there is one kind: an item lying
-on the ground, which is picked up (pickup.py). A new kind is a new pair.
+whose cast takes it acts on it, once. Today there are two kinds: an item
+lying on the ground, which is picked up (pickup.py), and a campfire, which
+heats the knife or the axe in hand (heat.py). A new kind is a new pair.
 
 InteractForced is the probe's stand-in for the key press: no key can be
 injected into a headless game (probes/probe_pickup.py). It is OR'd with the
@@ -27,6 +28,7 @@ from combat.nodes import (
     FN_ACTOR_LOC, FN_AND, FN_DISTANCE, FN_IS_VALID, FN_LESS_FF, FN_OR,
 )
 from combat.tuning import INTERACT_KEY, INTERACT_RADIUS
+from combat.weapon_component.heat import _author_fire_candidates, _author_heat_item
 from combat.weapon_component.pickup import _author_item_candidates, _author_take_item
 
 INTERACT_TARGET_VAR = "InteractTarget"   # the nearest candidate so far, or None
@@ -41,7 +43,8 @@ RETIRED_VARS = ("KeyPickup", "PickBest", "PickBestGap", "PickupForced")
 
 # (candidates, act) per kind of thing the key acts on, in the order their
 # casts are tried.
-KINDS = ((_author_item_candidates, _author_take_item),)
+KINDS = ((_author_item_candidates, _author_take_item),
+         (_author_fire_candidates, _author_heat_item))
 KIND_PITCH = 2000   # graph units between two kinds' rows of nodes
 
 
@@ -174,6 +177,6 @@ def _author_interact(ed, owner, pressed, exec_ins, x0, y0):
         f"offer within {INTERACT_RADIUS:.0f} cm of the player, the one nearest "
         "AimPoint, the point the reticle rests on (InteractTarget). The act "
         "runs once, after the search, by the kind whose cast takes the target. "
-        "An item lying there is picked up.",
+        "An item lying there is picked up; a campfire heats the blade in hand.",
         made)
     return acted, idle

@@ -19,6 +19,7 @@ from combat.verify.fixtures import (
     _montages, drain_subtracts, drain_writes, h, hg, wg,
 )
 from combat.verify.knife import is_melee_write
+from combat.verify.throw_strike import is_strike_node
 from combat.verify.common import (
     BEL, PIN, _mesh_asset, by_pins, check, component_template, has_in_pin,
     load, num_pin, pin_value, titled,
@@ -240,9 +241,10 @@ def check_flinching():
     # know the reaction exists to make it fire -- only to make it point the right
     # way.
     # (The punch's and the knife's blows write it too; verify/punch.py and
-    # verify/knife.py check those.)
+    # verify/knife.py check those; a thrown blade's is verify/throw_strike.py's.)
     _from_writes = [n for n in wg if has_in_pin(n, LAST_HIT_FROM_VAR)
-                    and not is_melee_write(n, LAST_HIT_FROM_VAR)]
+                    and not is_melee_write(n, LAST_HIT_FROM_VAR)
+                    and not is_strike_node(n)]
     check(f"the pellet loop records {LAST_HIT_FROM_VAR} where it lands",
           len(_from_writes) == 1, str(len(_from_writes)))
     if _from_writes:

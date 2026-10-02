@@ -89,6 +89,9 @@ _author_* fragment per concern, each in its own module:
   throw_flight  the item in the air flies the arc's curve, tumbling end over
               end, and lands as a Dropped item; a melee weapon leaves the hand
               squared up to the throw, so it spins forward, edge first
+  throw_strike  what the flight struck, for an item with a ThrowDamage (the
+              knife, the axe): a body is wounded and bleeds; a tree within
+              reach keeps the item, lodged point or bit first, a pick-up
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery
@@ -131,7 +134,10 @@ BP_WeaponComponent event graph:
                                                                 on a click, wind up
                                                                 (V shuts the Fire gate)
          --> Branch IsValid(ThrowWinding) AND due           --> let go: throw held
-         --> Branch IsValid(Thrown)                         --> carry it along the arc
+         --> Branch IsValid(Thrown)                         --> carry it along the arc;
+                                                                where it strikes, a
+                                                                blade wounds a body or
+                                                                lodges in a tree
 
   Tick also resolves the aim every frame, before the trigger is even looked at,
   because the reticle depends on it:

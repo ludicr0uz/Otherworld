@@ -8,6 +8,10 @@ somewhere the arc never promised. Position at time t is start + v t + g t^2/2
 under THROW_GRAVITY_Z, the same gravity the prediction runs under, so the item
 follows the dots and comes down on the disc at their end.
 
+What it strikes on the way is throw_strike.py's: a blade (an item with a
+ThrowDamage) wounds a body before it falls at its foot, and lodges in a tree
+instead of falling, a pick-up still.
+
 The tumble (_author_spin) is a turn about the level axis across the throw,
 top first, at the item's own ThrowSpinDegS a second. It is added frame by
 frame to whatever way the item lay as it left the hand, and it stops where
@@ -35,6 +39,7 @@ from combat.throw_tuning import (
     THROW_MAX_FLIGHT_S, THROW_SPIN_VAR,
 )
 from combat.weapon_component.common import _prop, _trace_defaults
+from combat.weapon_component.throw_strike import THROW_PAST_VAR, _author_throw_strike
 
 THROWN_VAR = "Thrown"                 # the item in the air, or None
 THROW_START_VAR = "ThrowStart"
@@ -209,7 +214,15 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
     _connect(_out(back), _pin(floor, "Start"))
     _connect(_out(below), _pin(floor, "End"))
     _trace_defaults(floor)
-    _connect(BEL.find_then_pin(struck), _pin(floor, "execute"))
+    # First what a blade does to what it struck (throw_strike.py): one that
+    # lodged in a tree stays there, and skips the way down.
+    falls, lodged = _author_throw_strike(ed, thrown, hit, BEL.find_then_pin(struck),
+                                         x0 + 2000, y0 - 2600)
+    for pin in falls:
+        _connect(pin, _pin(floor, "execute"))
+    # ...and the way down passes by a body it wounded, which would catch it.
+    past = _at(ed.add_get_member_variable_node(THROW_PAST_VAR), x0 + 2780, y0 - 60)
+    _connect(_out(past, THROW_PAST_VAR), _pin(floor, "ActorsToIgnore"))
     grounded = _at(ed.add_branch_node(), x0 + 3300, y0 - 200)
     _connect(_out(floor), _pin(grounded, "Condition"))
     _connect(BEL.find_then_pin(floor), _pin(grounded, "execute"))
@@ -232,7 +245,7 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
     _connect(thrown, _pin(flag, "self"))
     _set(flag, "Dropped", "true")
     for pin in (BEL.find_then_pin(rest), BEL.find_then_pin(hang),
-                BEL.find_then_pin(lost)):
+                BEL.find_then_pin(lost)) + lodged:
         _connect(pin, _pin(flag, "execute"))
     done = _at(ed.add_set_member_variable_node(THROWN_VAR), x0 + 4360, y0)
     _connect(BEL.find_then_pin(flag), _pin(done, "execute"))
@@ -240,6 +253,7 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
     ed.add_comment_to_nodes(
         "The thrown item's flight: start + v t + g t^2 / 2, the curve the arc "
         "was drawn from, tumbling as it goes. A trace from last frame's point to this one sets it "
-        "down; then it is an ordinary Dropped item, for E to pick up.",
+        "down, after what a blade does to what it struck; then it is an "
+        "ordinary Dropped item, for E to pick up.",
         [gate, seg, struck, fly, lost, floor, flag, done])
     return (BEL.find_then_pin(done), BEL.find_else_pin(gate), BEL.find_else_pin(lost))

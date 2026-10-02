@@ -28,6 +28,7 @@ from combat.verify.fixtures import w, wg
 from combat.verify.grip_fit import FIST_MISS_CM, JOINT_REACH_CM, grip_fit
 from combat.verify.knife import is_knife_sweep
 from combat.verify.punch import _feeders, _title, is_punch_sweep
+from combat.verify.throw_strike import is_strike_node
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 from combat.weapon_specs import _weapon_specs
 from combat.wood import (
@@ -68,8 +69,9 @@ def _ran_by(node):
 
 
 def _casts():
+    # A thrown blade asks the same of what it struck (verify/throw_strike.py).
     return [n for n in wg if "instancedstaticmesh" in _squash(n)
-            and has_in_pin(n, "Object")]
+            and has_in_pin(n, "Object") and not is_strike_node(n)]
 
 
 def _spawns(var):

@@ -36,7 +36,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   throw_tuning      the throw's numbers (THROW_*): speed, angle, launch point,
                     the arc's and the flight's gravity, dots, landing, the
                     tumble, a melee weapon's own flat fast spinning throw
-                    (MELEE_THROW), when the clip's hand lets go
+                    (MELEE_THROW), a thrown blade's damage and how deep
+                    and how high it lodges in a tree (THROW_*_DAMAGE,
+                    LODGE_*), when the clip's hand lets go
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
@@ -106,6 +108,8 @@ ASSETS AND PATCHES
   skin              the player's body (PlayerSkin, wear_skin)
   grip              hand-grip socket maths for holding a weapon: GripRotation
                     and GripLocation (the handle seated in the fist)
+  lodge             how a thrown blade sits in the tree it lodged in, out of
+                    its model: lodge_pose -> LodgeTurn, LodgePoint
   settings_savegame BP_Settings
   weapon_items      BP_WeaponItem and one child per weapon
   heat              the item's side of a heated blade: M_HotMetal (an additive

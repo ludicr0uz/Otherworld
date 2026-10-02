@@ -32,7 +32,11 @@ from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.paths import (
     CUBE, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH, MAT_HOT_KNIFE, MAT_METAL,
 )
-from combat.throw_tuning import MELEE_THROW
+from combat.lodge import lodge_pose
+from combat.throw_tuning import (
+    LODGE_KNIFE_DEPTH_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, MELEE_THROW,
+    THROW_DAMAGE_VAR, THROW_KNIFE_DAMAGE,
+)
 from combat.tuning import COMBAT
 from combat.weapon_models import FAB_WEAPONS
 from combat.weapon_specs import _weapon_icon
@@ -90,6 +94,15 @@ def knife_outline():
                                             ("Blade", BLADE_CENTRE, BLADE_SIZE)))
 
 
+def knife_lodge():
+    """How the knife sits in a tree it was thrown into (lodge.lodge_pose):
+    point first, LODGE_KNIFE_DEPTH_CM of the blade in the wood."""
+    (_n, _m, loc, rot, _s), = knife_model()
+    along = _rotate_vector(rot, unreal.Vector(0.0, 0.0, -1.0))
+    tip = (0.0, 0.0, BLADE_CENTRE[2] - BLADE_SIZE[2] / 2.0)
+    return lodge_pose(along, _placed(tip, rot, loc), LODGE_KNIFE_DEPTH_CM)
+
+
 def build_knife(item_bp):
     """BP_Knife: the model on Body, the glow of its blade heated (heat.py),
     and the base class's defaults for a knife."""
@@ -98,11 +111,16 @@ def build_knife(item_bp):
     build_heated_model(bp, knife_model(), _placed(BLADE_CENTRE, rot, loc))
     aim = HOLD_KNIFE_ANIM_PATH
     grip_rot = _grip_rotation(aim)
+    lodge = knife_lodge()
     _apply_defaults(bp, {
         "DisplayName": KNIFE_DISPLAY,
         "Melee": True,
         # Thrown hard and flat, spinning forward, edge first.
         **MELEE_THROW,
+        # ...and it wounds what it strikes, and lodges in a tree.
+        THROW_DAMAGE_VAR: THROW_KNIFE_DAMAGE,
+        LODGE_TURN_VAR: lodge[0],
+        LODGE_POINT_VAR: lodge[1],
         HEATS_VAR: True,
         HOT_VAR: False,
         COOL_VAR: 0.0,

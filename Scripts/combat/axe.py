@@ -40,7 +40,11 @@ from combat.knife import _placed
 from combat.paths import (
     AXE_BP_PATH, CUBE, HOLD_KNIFE_ANIM_PATH, MAT_HOT_AXE, MAT_METAL,
 )
-from combat.throw_tuning import MELEE_THROW
+from combat.lodge import lodge_pose
+from combat.throw_tuning import (
+    LODGE_AXE_DEPTH_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, MELEE_THROW,
+    THROW_AXE_DAMAGE, THROW_DAMAGE_VAR,
+)
 from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
@@ -95,6 +99,15 @@ def axe_outline():
                                             ("Head", HEAD_CENTRE, HEAD_SIZE)))
 
 
+def axe_lodge():
+    """How the axe sits in a tree it was thrown into (lodge.lodge_pose): bit
+    first, LODGE_AXE_DEPTH_CM of the head in the wood, the haft hanging."""
+    (_n, _m, loc, rot, _s), = axe_model()
+    along = _rotate_vector(rot, unreal.Vector(-1.0, 0.0, 0.0))
+    bit = (HEAD_CENTRE[0] - HEAD_SIZE[0] / 2.0, 0.0, HEAD_CENTRE[2])
+    return lodge_pose(along, _placed(bit, rot, loc), LODGE_AXE_DEPTH_CM)
+
+
 def build_axe(item_bp):
     """BP_Axe: the model on Body, the glow of its head heated (heat.py), and
     the base class's defaults for an axe."""
@@ -103,11 +116,16 @@ def build_axe(item_bp):
     build_heated_model(bp, axe_model(), _placed(HEAD_CENTRE, rot, loc))
     aim = HOLD_KNIFE_ANIM_PATH
     grip_rot = _grip_rotation(aim)
+    lodge = axe_lodge()
     _apply_defaults(bp, {
         "DisplayName": AXE_DISPLAY,
         "Melee": True,
         # Thrown hard and flat, spinning forward, edge first.
         **MELEE_THROW,
+        # ...and it wounds what it strikes, and lodges in a tree.
+        THROW_DAMAGE_VAR: THROW_AXE_DAMAGE,
+        LODGE_TURN_VAR: lodge[0],
+        LODGE_POINT_VAR: lodge[1],
         CHOPS_VAR: True,
         HEATS_VAR: True,
         HOT_VAR: False,

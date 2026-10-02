@@ -59,6 +59,7 @@ from combat.weapon_component.throw_flight import (
     THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
     THROW_VELOCITY_VAR,
 )
+from combat.weapon_component.throw_strike import THROW_PAST_VAR
 from combat.weapon_component.throw_windup import (
     THROW_ANIM_VAR, THROW_DUE_VAR, THROW_WINDING_VAR,
 )
@@ -259,6 +260,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     for name in (THROW_START_VAR, THROW_VELOCITY_VAR, THROW_LAST_VAR):
         _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
     _declare(ed, THROW_TIME_VAR, _float_type())
+    # What the thrown item's fall to the ground ignores (throw_strike.py).
+    _declare(ed, THROW_PAST_VAR, BEL.get_array_type(
+        BEL.get_object_reference_type(unreal.Actor.static_class())))
     # ...and its wind-up (throw_windup.py): the clip, the item it is throwing
     # and when the hand lets go.
     _declare(ed, THROW_ANIM_VAR, BEL.get_object_reference_type(

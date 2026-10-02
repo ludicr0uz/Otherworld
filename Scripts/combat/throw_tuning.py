@@ -1,7 +1,7 @@
 """The throw's numbers: speed, angle, where it leaves from, the gravity the arc
 and the flight share, how the arc is drawn, how an item tumbles and comes to
-rest, what a melee weapon's throw has of its own, and when the throw's clip
-lets go.
+rest, what a melee weapon's throw has of its own, what a thrown blade does to
+a body and a tree, and when the throw's clip lets go.
 Constants only. The throw key itself is THROW_KEY in tuning.py, beside the
 other binds, because BIND_VARS lists it.
 """
@@ -65,6 +65,26 @@ MELEE_THROW = {
     THROW_SPIN_VAR: THROW_MELEE_SPIN_DEG_S,
     THROW_EDGE_ON_VAR: True,
 }
+
+# A thrown blade strikes (weapon_component/throw_strike.py). THROW_DAMAGE_VAR is
+# what it takes off the first body its flight meets: 0 on the base item, so a
+# thrown gun or mushroom does nothing, and more than the slash's 35 on a
+# blade, since the throw costs the weapon until it is picked up again.
+# Into a tree it lodges: turned by LODGE_TURN_VAR about its own level axis so
+# that what goes into the wood (the knife's point, the axe's bit) leads along
+# the flight, and set so that LODGE_POINT_VAR, a point of its own frame that
+# deep behind the point or the bit, is on the bark (combat/lodge.py works both
+# out of the model). Only within LODGE_MAX_HEIGHT_CM of the tree's foot: the
+# pick-up reaches INTERACT_RADIUS (250 cm) from the player's middle, so a
+# blade any higher could not be taken back; it falls to the foot instead.
+THROW_DAMAGE_VAR = "ThrowDamage"       # on BP_WeaponItem, 0 by default
+THROW_KNIFE_DAMAGE = 50.0
+THROW_AXE_DAMAGE = 75.0
+LODGE_TURN_VAR = "LodgeTurn"           # on BP_WeaponItem, a rotator
+LODGE_POINT_VAR = "LodgePoint"         # on BP_WeaponItem
+LODGE_MAX_HEIGHT_CM = 250.0
+LODGE_KNIFE_DEPTH_CM = 7.0      # of the blade's 18.6 cm
+LODGE_AXE_DEPTH_CM = 5.0        # of the head's 25 cm from bit to poll
 
 # The clip (weapon_component/throw_windup.py): Quaternius UAL2's OverhandThrow,
 # played at its own rate. THROW_RELEASE_S is where its hand lets go, measured

@@ -205,18 +205,34 @@ menu polls its own copy from `DrawHUD`, which does.
   - **The click needs last frame's `ThrowAiming`:** the Branch sits before the arc is drawn,
     so a click on the frame V goes down throws nothing.
   - **The arc is per item.** `ThrowArcDegrees` defaults to `THROW_PITCH_UP_DEG` (30) on
-    `BP_WeaponItem`, so the knife, food and water use it; a gun's is its `throw_arc` cell in
-    `gun_tuning.csv`, the GUN TUNING tab's last row.
+    `BP_WeaponItem`, so food and water use it; a gun's is its `throw_arc` cell in
+    `gun_tuning.csv`, the GUN TUNING tab's last row. So are the speed (`ThrowSpeed`, 1100
+    cm/s) and the tumble (`ThrowSpinDegS`, 540°/s): the launch reads the one off `Held`, the
+    flight the other off `Thrown`.
+  - **A melee weapon is thrown, not lobbed** (`throw_tuning.MELEE_THROW`, spread into the
+    knife's and the axe's defaults; a sword's builder would do the same): 8° up at 1800 cm/s,
+    which rises 30 cm over the hand and carries 15 m, against the lob's 1.5 m over 13 m, and
+    1080°/s of spin. Its `ThrowEdgeOn` makes the release square it up
+    (`throw_flight._author_square`): `MakeRotFromX(ThrowVelocity)` on the detached item, so
+    its X runs along the throw and its Y level across it. Every melee model is built blade
+    up, edge towards +X, so the blade's plane is then the plane it flies in and the tumble,
+    which turns about the across axis, is a throwing axe's forward spin, edge first. A new
+    melee model must be built the same way round, or it spins flat-on.
+    - The flag is its own bool, not `Melee`: the verifier counts the Branches that ask
+      `Held.Melee` (one: the fire gate's).
+    - That SetActorRotation is the only one in the graph, and `verify/weapon_inputs.py`
+      requires it to come after a detach: nothing turns a weapon still in the hand.
 
   The flight (`throw_flight.py`) is **kinematic**, not
   physics (items are NoCollision): start + v t + g t²/2 under `THROW_GRAVITY_Z`, the arc's own
   gravity, traced frame to frame on Visibility; on a hit it backs off the surface, traces down
   to the ground and becomes an ordinary `Dropped` item. In the air it tumbles end over end,
-  top first, `THROW_SPIN_DEG_S` (540°/s) about the level axis across the throw, added frame
-  by frame (`_author_spin`); it rests as it came down. One item flies at a time. A thrown
+  top first, its own `ThrowSpinDegS` (`THROW_SPIN_DEG_S`, 540°/s, by default) about the level
+  axis across the throw, added frame by frame (`_author_spin`); it rests as it came down. One item flies at a time. A thrown
   item does no damage. `ThrowKeyForced` and `ThrowClickForced` are the probe's stand-ins for
   the key and the click
-  (`probes/probe_throw.py`); the throw numbers are in `throw_tuning.py`.
+  (`probes/probe_throw.py`, and `probe_throw_melee.py` for the knife and the axe); the throw
+  numbers are in `throw_tuning.py`.
 - **The use key is the sights key on an item with no sights** (`weapon_component/use.py`,
   names in `use_tuning.py`). `Using` is the key held (or `SightsForced`, the probes'
   stand-in), not sprinting, with a valid `Held` whose `HasSights` is false; `UsePressed` is
@@ -433,7 +449,10 @@ These are feel checks a headless run can't do:
   keyboard and mouse (the probe forces both); the throw's clip: whether the 0.35 s
   wind-up feels late, the follow-through cut short by the re-equip, how it reads with a
   two-handed gun in the fist, crouched and prone; and whether 540°/s of tumble suits
-  every item;
+  every item; a melee weapon's throw: whether 18 m/s at 8° up reads as thrown hard rather
+  than shot, whether three turns a second reads as a spin or a blur, and the snap as the
+  knife or the axe squares up to the throw on leaving the hand (it lands as it came down,
+  never stuck in what it hit, and does no damage);
 - the stance clips in motion (`stance_clips.py`): the crouched walk covers about 55 cm/s and
   plays at 2x, so at the crouch's 270 cm/s the feet slide; the crawl is the UAL's face-down
   swim (no crawl clip exists in the packs), a two-armed pull and a frog kick, which may read

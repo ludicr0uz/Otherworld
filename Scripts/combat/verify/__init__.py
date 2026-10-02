@@ -82,11 +82,13 @@ and it never relies on a variable another section left behind.
   throw       the throw: its key, BP_ThrowArc, the predicted arc, the click,
               the clip's wind-up, the tumbling flight on the same curve;
               is_throw_trace, is_throw_play, launch_nodes
+  throw_melee a melee weapon's throw: the knife's and the axe's flat, fast
+              arc and forward spin, and the release squaring them up to it
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
     "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "interact", "pickup", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_melee", "interact", "pickup", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

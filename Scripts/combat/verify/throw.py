@@ -20,7 +20,8 @@ from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_GRAVITY_Z, THROW_MAX_PITCH_DEG,
     THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_RELEASE_S,
-    THROW_SPEED, THROW_SPIN_DEG_S, THROW_START_FORWARD, THROW_START_UP,
+    THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_VAR, THROW_START_FORWARD,
+    THROW_START_UP,
 )
 from combat.tuning import BIND_VARS, THROW_KEY
 from combat.verify.common import (
@@ -133,6 +134,22 @@ def check_arc_angle():
             for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self"))]
     check("the launch is tipped up by the held item's arc, not a literal",
           len(tips) == 1 and held == ["Get Held"], f"{len(tips)} reads off {held}")
+    speeds = [n for n in launch_nodes() if _title(n) == f"Get {THROW_SPEED_VAR}"]
+    held = [_title(PIN.get_owning_node(q)) for n in speeds
+            for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self"))]
+    check("...and leaves at the held item's speed, not a literal",
+          len(speeds) == 1 and held == ["Get Held"], f"{len(speeds)} reads off {held}")
+
+
+def _carry(speed, pitch_deg):
+    """(metres carried, cm risen over the hand, seconds in the air) of a level
+    throw from the start height over flat ground."""
+    a = math.radians(pitch_deg)
+    vx, vz = speed * math.cos(a), speed * math.sin(a)
+    h = 96.0 + THROW_START_UP
+    g = -THROW_GRAVITY_Z
+    t = (vz + math.sqrt(vz * vz + 2 * g * h)) / g
+    return vx * t / 100.0, vz * vz / (2 * g), t
 
 
 def check_arc_actor():
@@ -364,24 +381,24 @@ def check_flight():
           len(spins) == 1, str(len(spins)))
     if len(spins) == 1:
         src = _upstream(spins[0], "DeltaRotation")
-        rates = [n for n in _feeds([BEL.find_input_pin(spins[0], "DeltaRotation")])
-                 if num_pin(n, "B") == -THROW_SPIN_DEG_S]
-        check(f"...{THROW_SPIN_DEG_S:g} degrees a second of game time, end over "
-              "end about the axis across the throw",
-              len(rates) == 1 and f"Get {THROW_VELOCITY_VAR}" in src
-              and any("DeltaSeconds" in t.replace(" ", "") for t in src)
-              and 180.0 <= THROW_SPIN_DEG_S <= 1080.0, str(sorted(src)))
+        fed = _feeds([BEL.find_input_pin(spins[0], "DeltaRotation")])
+        rates = [n for n in fed if _title(n) == f"Get {THROW_SPIN_VAR}"]
+        of = [_title(PIN.get_owning_node(q)) for n in rates
+              for q in PIN.list_connected_pins(BEL.find_input_pin(n, "self"))]
+        back = [n for n in fed if num_pin(n, "B") == -1.0]
+        check(f"...its own {THROW_SPIN_VAR} degrees a second of game time, end "
+              "over end, top first, about the axis across the throw",
+              len(rates) == 1 and of == [f"Get {THROWN_VAR}"] and len(back) == 1
+              and f"Get {THROW_VELOCITY_VAR}" in src
+              and any("DeltaSeconds" in t.replace(" ", "") for t in src),
+              str(sorted(src)))
     # The numbers, replayed: a level throw from the start height over flat
     # ground should carry across a clearing, not to the thrower's feet or out
     # of sight.
-    a = math.radians(THROW_PITCH_UP_DEG)
-    vx, vz = THROW_SPEED * math.cos(a), THROW_SPEED * math.sin(a)
-    h = 96.0 + THROW_START_UP
-    g = -THROW_GRAVITY_Z
-    t = (vz + math.sqrt(vz * vz + 2 * g * h)) / g
+    far, _rise, t = _carry(THROW_SPEED, THROW_PITCH_UP_DEG)
     check("a level throw carries 5-15 m over flat ground, inside the predicted "
-          "THROW_ARC_SIM_S", 500.0 <= vx * t <= 1500.0 and t < THROW_ARC_SIM_S,
-          f"{vx * t / 100:.1f} m in {t:.2f} s")
+          "THROW_ARC_SIM_S", 5.0 <= far <= 15.0 and t < THROW_ARC_SIM_S,
+          f"{far:.1f} m in {t:.2f} s")
 
 
 def run():

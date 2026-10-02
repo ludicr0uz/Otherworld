@@ -87,7 +87,8 @@ _author_* fragment per concern, each in its own module:
   throw_windup  the click plays the skin's throw clip and holds the release
               until its hand lets go (ThrowWinding, ThrowDueTime)
   throw_flight  the item in the air flies the arc's curve, tumbling end over
-              end, and lands as a Dropped item
+              end, and lands as a Dropped item; a melee weapon leaves the hand
+              squared up to the throw, so it spins forward, edge first
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
   recoil      view turn, kick, recovery

@@ -1,6 +1,7 @@
 """The throw's numbers: speed, angle, where it leaves from, the gravity the arc
 and the flight share, how the arc is drawn, how an item tumbles and comes to
-rest, and when the throw's clip lets go.
+rest, what a melee weapon's throw has of its own, and when the throw's clip
+lets go.
 Constants only. The throw key itself is THROW_KEY in tuning.py, beside the
 other binds, because BIND_VARS lists it.
 """
@@ -12,11 +13,13 @@ other binds, because BIND_VARS lists it.
 # peaks about 1.5 m over the hand and carries a thrown item about 13 m over
 # flat ground from a level view.
 #
-# The tip is per item: THROW_PITCH_UP_DEG is BP_WeaponItem's default for
-# THROW_PITCH_VAR, which the launch reads off Held. A gun's own is its
-# gun_tuning.csv `throw_arc` cell, tuned on the GUN TUNING tab; the knife, the
-# food and the water keep the default.
-THROW_SPEED = 1100.0            # cm/s at release
+# The tip and the speed are per item: THROW_PITCH_UP_DEG and THROW_SPEED are
+# BP_WeaponItem's defaults for THROW_PITCH_VAR and THROW_SPEED_VAR, which the
+# launch reads off Held. A gun's own tip is its gun_tuning.csv `throw_arc`
+# cell, tuned on the GUN TUNING tab; the food and the water keep the defaults,
+# and a melee weapon has MELEE_THROW (below).
+THROW_SPEED = 1100.0            # cm/s at release (the default speed)
+THROW_SPEED_VAR = "ThrowSpeed"         # on BP_WeaponItem
 THROW_PITCH_UP_DEG = 30.0       # added to the view's pitch (the default arc)
 THROW_PITCH_COLUMN = "throw_arc"       # the spec / gun_tuning.csv column
 THROW_PITCH_VAR = "ThrowArcDegrees"    # on BP_WeaponItem
@@ -35,8 +38,33 @@ THROW_MARK_CM = (36.0, 36.0, 3.0)   # the flat disc where the arc lands
 # The tumble in the air (weapon_component/throw_flight.py): end over end, top
 # first, about the level axis across the throw. 540 degrees a second is a turn
 # and a half each second: a level throw's ~1.5 s flight turns a bit over twice,
-# slow enough to read as the item it is.
+# slow enough to read as the item it is. Per item too: the default for
+# THROW_SPIN_VAR, which the flight reads off the item in the air.
 THROW_SPIN_DEG_S = 540.0
+THROW_SPIN_VAR = "ThrowSpinDegS"       # on BP_WeaponItem
+
+# A melee weapon is thrown, not lobbed: hard and nearly flat, spinning forward
+# like a throwing axe or a throwing knife. 1800 cm/s tipped 8 degrees rises
+# about 30 cm over the hand and carries about 15 m over flat ground from a
+# level view, in under a second, against the lob's 1.5 m rise over 13 m.
+# THROW_EDGE_ON_VAR squares the item up as it leaves the hand: its own X along
+# the throw and its Y level across it, so the plane its blade lies in (every
+# melee model is built blade up, edge towards +X: knife.py, axe.py) is the
+# plane it flies in, and the tumble about the across axis turns the blade
+# forward over the handle, edge first. Three turns a second is a turn every
+# 6 m of the flight.
+THROW_MELEE_PITCH_UP_DEG = 8.0
+THROW_MELEE_SPEED = 1800.0
+THROW_MELEE_SPIN_DEG_S = 1080.0
+THROW_EDGE_ON_VAR = "ThrowEdgeOn"      # on BP_WeaponItem, false by default
+# What a melee item's builder adds to its defaults (knife.py, axe.py; a sword
+# would too).
+MELEE_THROW = {
+    THROW_PITCH_VAR: THROW_MELEE_PITCH_UP_DEG,
+    THROW_SPEED_VAR: THROW_MELEE_SPEED,
+    THROW_SPIN_VAR: THROW_MELEE_SPIN_DEG_S,
+    THROW_EDGE_ON_VAR: True,
+}
 
 # The clip (weapon_component/throw_windup.py): Quaternius UAL2's OverhandThrow,
 # played at its own rate. THROW_RELEASE_S is where its hand lets go, measured

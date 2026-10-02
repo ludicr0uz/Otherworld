@@ -32,6 +32,7 @@ from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.paths import (
     CUBE, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH, MAT_HOT_KNIFE, MAT_METAL,
 )
+from combat.throw_tuning import MELEE_THROW
 from combat.tuning import COMBAT
 from combat.weapon_models import FAB_WEAPONS
 from combat.weapon_specs import _weapon_icon
@@ -100,6 +101,8 @@ def build_knife(item_bp):
     _apply_defaults(bp, {
         "DisplayName": KNIFE_DISPLAY,
         "Melee": True,
+        # Thrown hard and flat, spinning forward, edge first.
+        **MELEE_THROW,
         HEATS_VAR: True,
         HOT_VAR: False,
         COOL_VAR: 0.0,

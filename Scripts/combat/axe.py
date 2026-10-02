@@ -40,6 +40,7 @@ from combat.knife import _placed
 from combat.paths import (
     AXE_BP_PATH, CUBE, HOLD_KNIFE_ANIM_PATH, MAT_HOT_AXE, MAT_METAL,
 )
+from combat.throw_tuning import MELEE_THROW
 from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
@@ -105,6 +106,8 @@ def build_axe(item_bp):
     _apply_defaults(bp, {
         "DisplayName": AXE_DISPLAY,
         "Melee": True,
+        # Thrown hard and flat, spinning forward, edge first.
+        **MELEE_THROW,
         CHOPS_VAR: True,
         HEATS_VAR: True,
         HOT_VAR: False,

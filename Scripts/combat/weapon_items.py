@@ -30,7 +30,10 @@ from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
-from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR
+from combat.throw_tuning import (
+    THROW_EDGE_ON_VAR, THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR,
+    THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_DEG_S, THROW_SPIN_VAR,
+)
 from combat.tuning import COMBAT
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
 from item_icons.items import ICON_TINT
@@ -178,10 +181,19 @@ def build_weapon_item():
     # it off Held). The default is on the base, so the knife, the food and the
     # water throw on it too; a gun's own comes from its spec.
     _declare(ed, THROW_PITCH_VAR, _float_type())
+    # How fast it leaves the hand and how fast it tumbles in the air, and
+    # whether it leaves squared up to the throw, edge first: a melee weapon's
+    # are its own (throw_tuning.MELEE_THROW).
+    _declare(ed, THROW_SPEED_VAR, _float_type())
+    _declare(ed, THROW_SPIN_VAR, _float_type())
+    _declare(ed, THROW_EDGE_ON_VAR, BEL.get_basic_type_by_name("bool"))
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
-    _apply_defaults(bp, {THROW_PITCH_VAR: THROW_PITCH_UP_DEG})
+    _apply_defaults(bp, {THROW_PITCH_VAR: THROW_PITCH_UP_DEG,
+                         THROW_SPEED_VAR: THROW_SPEED,
+                         THROW_SPIN_VAR: THROW_SPIN_DEG_S,
+                         THROW_EDGE_ON_VAR: False})
     _assets().save_loaded_asset(bp)
     _log(f"built {ITEM_BP_PATH}")
     return bp

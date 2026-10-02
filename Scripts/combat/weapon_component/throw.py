@@ -29,7 +29,10 @@ The launch is read on the frame of the release, not of the click: the view
 may have moved in the wind-up, and the item goes where it looks then.
 
 The arc's tip above the view is the held item's own ThrowArcDegrees
-(throw_tuning.THROW_PITCH_VAR), so the GUN TUNING tab can move it per gun.
+(throw_tuning.THROW_PITCH_VAR), so the GUN TUNING tab can move it per gun, and
+its speed the item's ThrowSpeed: a melee weapon's are flat and fast
+(throw_tuning.MELEE_THROW), and it leaves the hand squared up to the throw
+(throw_flight._author_square).
 
 ThrowKeyForced and ThrowClickForced are the probe's stand-ins for the held
 key and the click: no key can be injected into a headless game
@@ -41,7 +44,8 @@ from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, 
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_ARR_REMOVE, FN_BREAK_ROT,
     FN_CLAMP, FN_DETACH, FN_FORWARD, FN_GET_CONTROL_ROT, FN_GET_TRANSFORM,
-    FN_IS_KEY_DOWN, FN_IS_VALID, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MUL_VF,
+    FN_IS_KEY_DOWN, FN_IS_VALID, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MAKE_VECTOR,
+    FN_MUL_VF,
     FN_NORMALIZE_AXIS, FN_NOT, FN_OR, FN_SET_ACTOR_LOC, FN_SET_HIDDEN,
     FN_TIME_SECONDS, MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN,
 )
@@ -49,7 +53,7 @@ from combat.paths import THROW_ARC_CLASS_PATH
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_DOT_CM, THROW_GRAVITY_Z, THROW_MARK_CM,
-    THROW_MAX_PITCH_DEG, THROW_PITCH_VAR, THROW_SPEED, THROW_START_FORWARD,
+    THROW_MAX_PITCH_DEG, THROW_PITCH_VAR, THROW_SPEED_VAR, THROW_START_FORWARD,
     THROW_START_UP,
 )
 from combat.weapon_component.common import _prop
@@ -57,7 +61,7 @@ from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _detach_rules
 from combat.weapon_component.throw_flight import (
     THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
-    THROW_VELOCITY_VAR, _author_throw_flight,
+    THROW_VELOCITY_VAR, _author_square, _author_throw_flight,
 )
 from combat.weapon_component.throw_windup import (
     _author_throw_windup, _author_wound_down, _winding,
@@ -111,7 +115,7 @@ def _author_launch(ed, pc_out, owner_out, held, x0, y0):
     """(start, velocity): where a throw leaves from and how fast, as pure pins.
 
     Along the view, tipped up the held item's ThrowArcDegrees and capped so a
-    throw straight up does not land on the thrower. Starts ahead of the
+    throw straight up does not land on the thrower, at its ThrowSpeed. Starts ahead of the
     capsule along the view's yaw, so neither the arc's trace nor the flight's
     starts inside the player. Reads Held: pull these only where it is valid.
     """
@@ -137,8 +141,12 @@ def _author_launch(ed, pc_out, owner_out, held, x0, y0):
     _connect(_out(aim), _pin(along, "InRot"))
     velocity = _at(_node(ed, FN_MUL_VF), x0 + 1680, y0)
     _connect(_out(along), _pin(velocity, "A"))
-    _connect(_vec(ed, THROW_SPEED, THROW_SPEED, THROW_SPEED, x0 + 1440, y0 + 140),
-             _pin(velocity, "B"))
+    # Vector x float is a wildcard whose B is a vector: the speed, three times.
+    speed, _speed_n = _prop(ed, THROW_SPEED_VAR, held, x0 + 1200, y0 + 140)
+    speeds = _at(_node(ed, FN_MAKE_VECTOR), x0 + 1440, y0 + 140)
+    for axis in ("X", "Y", "Z"):
+        _connect(speed, _pin(speeds, axis))
+    _connect(_out(speeds), _pin(velocity, "B"))
 
     flat = _at(_node(ed, FN_MAKE_ROT), x0 + 1200, y0 + 300)
     _connect(_out(parts, "Yaw"), _pin(flat, "Yaw"))
@@ -345,13 +353,15 @@ def _author_throw_release(ed, held, start, velocity, exec_in, x0, y0):
     _connect(held, _pin(put, "self"))
     _connect(start, _pin(put, "NewLocation"))
     _connect(BEL.find_then_pin(shown), _pin(put, "execute"))
+    squared = _author_square(ed, held, BEL.find_then_pin(put), x0 + 1820, y0 - 500)
 
     inv = _at(ed.add_get_member_variable_node("Inventory"), x0 + 1820, y0 + 300)
     idx = _at(ed.add_get_member_variable_node("EquippedIndex"), x0 + 1820, y0 + 420)
     remove = _at(_node(ed, FN_ARR_REMOVE), x0 + 2080, y0)
     _connect(_out(inv, "Inventory"), _pin(remove, "TargetArray"))
     _connect(_out(idx, "EquippedIndex"), _pin(remove, "IndexToRemove"))
-    _connect(BEL.find_then_pin(put), _pin(remove, "execute"))
+    for pin in squared:
+        _connect(pin, _pin(remove, "execute"))
     # Held set with nothing connected clears it, as in _author_drop.
     clear = _at(ed.add_set_member_variable_node("Held"), x0 + 2340, y0)
     _connect(BEL.find_then_pin(remove), _pin(clear, "execute"))

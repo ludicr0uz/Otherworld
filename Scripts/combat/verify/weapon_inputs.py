@@ -24,6 +24,20 @@ from combat.verify.common import (
 
 # ─── The weapon component ────────────────────────────────────────────────────
 
+def _after_detach(node, limit=12):
+    """Whether a DetachFromActor runs before this node, on its exec chain."""
+    seen, stack = set(), [node]
+    while stack and len(seen) < limit:
+        for q in PIN.list_connected_pins(BEL.find_input_pin(stack.pop(), "execute")):
+            n = PIN.get_owning_node(q)
+            if "detach" in str(BEL.get_node_title(n)).lower():
+                return True
+            if n not in seen:
+                seen.add(n)
+                stack.append(n)
+    return False
+
+
 def check_weapon_component():
     check("tick group is PostPhysics, so input is already processed",
           w.get_editor_property("primary_component_tick").get_editor_property("tick_group")
@@ -158,9 +172,15 @@ def check_keys_are_variables():
     # A held weapon is rigidly attached and never rotated on its own. Driving its
     # rotation from the aim was tried and reverted: the gun swivelled out of the
     # hand and spun a full turn as the camera came round.
-    check("nothing rotates the held weapon out of the hand",
-          not titled(wg, "Set Actor Rotation"),
-          f"{len(titled(wg, 'Set Actor Rotation'))} SetActorRotation node(s)")
+    # The one turn there is comes after the hand has let go: the throw's
+    # release detaches a melee weapon, then squares it up to the throw
+    # (throw_flight._author_square).
+    turns = titled(wg, "Set Actor Rotation")
+    held_turns = [n for n in turns if not _after_detach(n)]
+    check("nothing rotates the held weapon in the hand: the only turn is the "
+          "throw's, after the item is detached",
+          len(turns) <= 1 and not held_turns,
+          f"{len(turns)} SetActorRotation node(s), {len(held_turns)} not after a detach")
     # No trace draws itself any more: DrawDebugType is an enum literal on the pin
     # and an enum pin cannot be driven, so "only in debug mode" is inexpressible
     # there. The tracer is a DrawDebugLine behind a Branch instead.

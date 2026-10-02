@@ -7,11 +7,12 @@ other binds, because BIND_VARS lists it.
 """
 
 # The throw (weapon_component/throw.py). The item leaves from a point in front
-# of the chest, along the view tipped up a little, at one speed; the arc on
-# screen and the flight are the same ballistic curve under the same gravity,
-# so it lands where the arc said. 1100 cm/s tipped 30 degrees is a lob: it
-# peaks about 1.5 m over the hand and carries a thrown item about 13 m over
-# flat ground from a level view.
+# of the chest at one speed, at the point the reticle rests on or, with none
+# in reach, along the view tipped up a little; the arc on screen and the
+# flight are the same ballistic curve under the same gravity, so it lands
+# where the arc said. 1100 cm/s tipped 30 degrees is a lob: it peaks about
+# 1.5 m over the hand and carries a thrown item about 13 m over flat ground
+# from a level view.
 #
 # The tip and the speed are per item: THROW_PITCH_UP_DEG and THROW_SPEED are
 # BP_WeaponItem's defaults for THROW_PITCH_VAR and THROW_SPEED_VAR, which the
@@ -26,6 +27,14 @@ THROW_PITCH_VAR = "ThrowArcDegrees"    # on BP_WeaponItem
 THROW_MAX_PITCH_DEG = 80.0      # a throw straight up would land on the thrower
 THROW_START_FORWARD = 60.0      # cm ahead of the capsule's centre: clear of it
 THROW_START_UP = 50.0           # cm above it: about the shoulder
+# Every throw is sent at the point the reticle rests on (AimPoint), pitched so
+# its curve passes through it (weapon_component/throw_launch.py): the arc
+# stands under the reticle and ends on it. The tip above (THROW_PITCH_UP_DEG,
+# per item) is for a point the item's speed cannot reach, and the sky: it
+# then goes out tipped over the view, a lob. Nor is a point nearer than this
+# ahead of the launch point aimed at (a wall at the player's shoulder, a trunk
+# between the camera and the player): that too goes out along the view.
+THROW_AIM_MIN_AHEAD = 100.0     # cm
 THROW_GRAVITY_Z = -980.0        # cm/s^2, the arc's and the flight's gravity
 THROW_ARC_SIM_S = 3.0           # how far ahead the arc is predicted
 THROW_ARC_HZ = 20.0             # dots per second of flight: ~55 cm apart
@@ -53,6 +62,9 @@ THROW_SPIN_VAR = "ThrowSpinDegS"       # on BP_WeaponItem
 # plane it flies in, and the tumble about the across axis turns the blade
 # forward over the handle, edge first. Three turns a second is a turn every
 # 6 m of the flight.
+# At that speed it reaches a point the reticle rests on out to 33 m over level
+# ground, against the lob's 12 m; THROW_MELEE_PITCH_UP_DEG is its tip over the
+# view past that, and at the sky.
 THROW_MELEE_PITCH_UP_DEG = 8.0
 THROW_MELEE_SPEED = 1800.0
 THROW_MELEE_SPIN_DEG_S = 1080.0
@@ -100,3 +112,12 @@ STICK_TRACE_PAST = 1.5
 # launch point (THROW_START_FORWARD, THROW_START_UP), before it comes down.
 THROW_RELEASE_S = 0.35
 THROW_ANIM_BLEND_S = 0.1
+
+# Getting ready to throw (throw_pose.py, weapon_component/throw_ready.py):
+# while the throw key is held the arm is cocked, in the clip's own pose at
+# THROW_READY_S, where its hand is furthest back: 62 cm behind the body and
+# 50 cm up, beside the head. The click plays the clip on from there, so the
+# hand lets go THROW_RELEASE_S - THROW_READY_S after it.
+THROW_READY_S = 7.0 / 30.0      # the clip's frame 7
+THROW_WINDUP_S = THROW_RELEASE_S - THROW_READY_S   # click to release
+THROW_READY_BLEND_S = 0.15      # the arm going up, and coming down called off

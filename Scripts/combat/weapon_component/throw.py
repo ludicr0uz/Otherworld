@@ -11,9 +11,10 @@ _author_throw, called from Tick, runs four fragments one after another:
 
   _author_throw_aim      while the key is held with something in hand and
                          nothing already in the air: predict the arc and draw
-                         it as dots on BP_ThrowArc (throw_arc.py); on a click
-                         with the arc already showing, or with the key let
-                         go, wipe it
+                         it as dots on BP_ThrowArc (throw_arc.py), the arm
+                         cocked meanwhile (throw_ready.py); on a click with
+                         the arc already showing, or with the key let go,
+                         wipe it, and let go the arm comes down
   _author_throw_windup   on the frame of that click: play the throw's clip;
                          a moment later, when its hand lets go, run the
                          release (throw_windup.py)
@@ -28,11 +29,14 @@ _author_throw, called from Tick, runs four fragments one after another:
 The launch is read on the frame of the release, not of the click: the view
 may have moved in the wind-up, and the item goes where it looks then.
 
-The arc's tip above the view is the held item's own ThrowArcDegrees
-(throw_tuning.THROW_PITCH_VAR), so the GUN TUNING tab can move it per gun, and
-its speed the item's ThrowSpeed: a melee weapon's are flat and fast
-(throw_tuning.MELEE_THROW), and it leaves the hand squared up to the throw
-(throw_flight._author_square).
+The launch is throw_launch.py's: a throw is sent at the point the reticle
+rests on, pitched to pass through it, so the arc stands under the reticle and
+ends on it. Where the item's speed cannot reach that point, or it is the sky,
+the throw is tipped above the view by the held item's own ThrowArcDegrees
+(throw_tuning.THROW_PITCH_VAR), which the GUN TUNING tab can move per gun.
+The speed is the item's ThrowSpeed: a melee weapon's is fast, so it flies
+flat and reaches far (throw_tuning.MELEE_THROW), and it leaves the hand
+squared up to the throw (throw_flight._author_square).
 
 ThrowKeyForced and ThrowClickForced are the probe's stand-ins for the held
 key and the click: no key can be injected into a headless game
@@ -42,26 +46,24 @@ game.
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
 from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_ARR_REMOVE, FN_BREAK_ROT,
-    FN_CLAMP, FN_DETACH, FN_FORWARD, FN_GET_CONTROL_ROT, FN_GET_TRANSFORM,
-    FN_IS_KEY_DOWN, FN_IS_VALID, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MAKE_VECTOR,
-    FN_MUL_VF,
-    FN_NORMALIZE_AXIS, FN_NOT, FN_OR, FN_SET_ACTOR_LOC, FN_SET_HIDDEN,
-    FN_TIME_SECONDS, MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN,
+    FN_AND, FN_ARR_REMOVE, FN_DETACH, FN_GET_TRANSFORM, FN_IS_KEY_DOWN,
+    FN_IS_VALID, FN_MAKE_TRANSFORM, FN_NOT, FN_OR, FN_SET_ACTOR_LOC,
+    FN_SET_HIDDEN, FN_TIME_SECONDS, MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN,
 )
 from combat.paths import THROW_ARC_CLASS_PATH
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_DOT_CM, THROW_GRAVITY_Z, THROW_MARK_CM,
-    THROW_MAX_PITCH_DEG, THROW_PITCH_VAR, THROW_SPEED_VAR, THROW_START_FORWARD,
-    THROW_START_UP,
 )
-from combat.weapon_component.common import _prop
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _detach_rules
 from combat.weapon_component.throw_flight import (
     THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
     THROW_VELOCITY_VAR, _author_square, _author_throw_flight,
+)
+from combat.weapon_component.throw_launch import _author_launch
+from combat.weapon_component.throw_ready import (
+    _author_ready_down, _author_throw_ready,
 )
 from combat.weapon_component.throw_windup import (
     _author_throw_windup, _author_wound_down, _winding,
@@ -109,62 +111,6 @@ def _author_throw(ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins,
                                    x0 + 3160, y0 + 1200)
     over = _author_wound_down(ed, (thrown, called_off), x0 + 6300, y0 + 1200)
     return _author_throw_flight(ed, (over, waiting), x0, y0 + 2800)
-
-
-def _author_launch(ed, pc_out, owner_out, held, x0, y0):
-    """(start, velocity): where a throw leaves from and how fast, as pure pins.
-
-    Along the view, tipped up the held item's ThrowArcDegrees and capped so a
-    throw straight up does not land on the thrower, at its ThrowSpeed. Starts ahead of the
-    capsule along the view's yaw, so neither the arc's trace nor the flight's
-    starts inside the player. Reads Held: pull these only where it is valid.
-    """
-    view = _at(_node(ed, FN_GET_CONTROL_ROT), x0, y0)
-    _connect(pc_out, _pin(view, "self"))
-    parts = _at(_node(ed, FN_BREAK_ROT), x0 + 240, y0)
-    _connect(_out(view), _pin(parts, "InRot"))
-    # The controller's pitch comes back 0..360; 350 is ten degrees down.
-    signed = _at(_node(ed, FN_NORMALIZE_AXIS), x0 + 480, y0)
-    _connect(_out(parts, "Pitch"), _pin(signed, "Angle"))
-    lifted = _at(_node(ed, FN_ADD_FF), x0 + 720, y0)
-    _connect(_out(signed), _pin(lifted, "A"))
-    tip, _tip_n = _prop(ed, THROW_PITCH_VAR, held, x0 + 480, y0 + 140)
-    _connect(tip, _pin(lifted, "B"))
-    capped = _at(_node(ed, FN_CLAMP), x0 + 960, y0)
-    _connect(_out(lifted), _pin(capped, "Value"))
-    _set(capped, "Min", -89.0)
-    _set(capped, "Max", THROW_MAX_PITCH_DEG)
-    aim = _at(_node(ed, FN_MAKE_ROT), x0 + 1200, y0)
-    _connect(_out(capped), _pin(aim, "Pitch"))
-    _connect(_out(parts, "Yaw"), _pin(aim, "Yaw"))
-    along = _at(_node(ed, FN_FORWARD), x0 + 1440, y0)
-    _connect(_out(aim), _pin(along, "InRot"))
-    velocity = _at(_node(ed, FN_MUL_VF), x0 + 1680, y0)
-    _connect(_out(along), _pin(velocity, "A"))
-    # Vector x float is a wildcard whose B is a vector: the speed, three times.
-    speed, _speed_n = _prop(ed, THROW_SPEED_VAR, held, x0 + 1200, y0 + 140)
-    speeds = _at(_node(ed, FN_MAKE_VECTOR), x0 + 1440, y0 + 140)
-    for axis in ("X", "Y", "Z"):
-        _connect(speed, _pin(speeds, axis))
-    _connect(_out(speeds), _pin(velocity, "B"))
-
-    flat = _at(_node(ed, FN_MAKE_ROT), x0 + 1200, y0 + 300)
-    _connect(_out(parts, "Yaw"), _pin(flat, "Yaw"))
-    ahead_dir = _at(_node(ed, FN_FORWARD), x0 + 1440, y0 + 300)
-    _connect(_out(flat), _pin(ahead_dir, "InRot"))
-    ahead = _at(_node(ed, FN_MUL_VF), x0 + 1680, y0 + 300)
-    _connect(_out(ahead_dir), _pin(ahead, "A"))
-    f = THROW_START_FORWARD
-    _connect(_vec(ed, f, f, f, x0 + 1440, y0 + 440), _pin(ahead, "B"))
-    here = _at(_node(ed, FN_ACTOR_LOC), x0 + 1680, y0 + 560)
-    _connect(owner_out, _pin(here, "self"))
-    raised = _at(_node(ed, FN_ADD_VV), x0 + 1920, y0 + 560)
-    _connect(_out(here), _pin(raised, "A"))
-    _connect(_vec(ed, 0.0, 0.0, THROW_START_UP, x0 + 1680, y0 + 700), _pin(raised, "B"))
-    start = _at(_node(ed, FN_ADD_VV), x0 + 2160, y0 + 300)
-    _connect(_out(raised), _pin(start, "A"))
-    _connect(_out(ahead), _pin(start, "B"))
-    return _out(start), _out(velocity)
 
 
 def _add_dot(ed, dots, location, scale, exec_in, x, y):
@@ -274,13 +220,16 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     on = _at(ed.add_set_member_variable_node(THROW_AIMING_VAR), x0 + 2560, y0)
     _set(on, THROW_AIMING_VAR, "true")
     _connect(BEL.find_then_pin(predict), _pin(on, "execute"))
+    # The arm is cocked for as long as the arc shows (throw_ready.py).
+    posed = _author_throw_ready(ed, BEL.find_then_pin(on), x0 + 2560, y0 - 1400)
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     _at(loop, x0 + 2820, y0)
     _connect(_out(predict, "OutPathPositions"), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(on), _loose_pin(loop, "Exec"))
+    for pin in posed:
+        _connect(pin, _loose_pin(loop, "Exec"))
     d = THROW_DOT_CM / 100.0
     _add_dot(ed, dots, _loose_pin(loop, "ArrayElement", is_input=False), (d, d, d),
              _loose_pin(loop, "LoopBody", is_input=False), x0 + 3100, y0 - 300)
@@ -319,8 +268,11 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _set(spend, TRIGGER_SPENT, "true")
     _connect(BEL.find_then_pin(release), _pin(spend, "execute"))
 
+    # Called off: the cocked arm comes down.
+    lowered = _author_ready_down(ed, BEL.find_else_pin(release), x0 + 2260, y0 + 1000)
+
     exits = (BEL.find_then_pin(mark), BEL.find_else_pin(landed),
-             BEL.find_else_pin(was), BEL.find_else_pin(release))
+             BEL.find_else_pin(was), lowered)
     return exits, BEL.find_then_pin(spend), start, velocity
 
 

@@ -173,20 +173,16 @@ def _local_rotations(skin, dirs, idle, pistol):
     return out
 
 
-def _build_one(skin, path, dirs):
-    idle = _assets().load_asset(skin.idle)
-    pistol = _assets().load_asset(skin.aim_pistol)
-    if idle is None or pistol is None:
-        raise RuntimeError(f"could not load {skin.idle} or {skin.aim_pistol}")
-    rots = _local_rotations(skin, dirs, idle, pistol)
-    clip = _copy_of(skin.idle, path)
+def _key_constant(clip, xfs):
+    """Make ``clip`` a held pose: {track: local Transform}, the same on every
+    frame, in place of whatever tracks it had; saved."""
     n = FRAMES + 1
     ctrl = clip.controller
     ctrl.open_bracket(unreal.Text("Key a hold pose"), False)
     ctrl.remove_all_bone_tracks(False)
     ctrl.set_frame_rate(unreal.FrameRate(FPS, 1), False)
     ctrl.set_number_of_frames(unreal.FrameNumber(FRAMES), False)
-    for track, xf in sorted(rots.items()):
+    for track, xf in sorted(xfs.items()):
         if not ctrl.add_bone_curve(track, False):
             raise RuntimeError(f"could not add a track for {track}")
         if not ctrl.set_bone_track_keys(track, [xf.translation] * n, [xf.rotation] * n,
@@ -194,6 +190,16 @@ def _build_one(skin, path, dirs):
             raise RuntimeError(f"could not key {track}")
     ctrl.close_bracket(False)
     _assets().save_loaded_asset(clip, False)
+
+
+def _build_one(skin, path, dirs):
+    idle = _assets().load_asset(skin.idle)
+    pistol = _assets().load_asset(skin.aim_pistol)
+    if idle is None or pistol is None:
+        raise RuntimeError(f"could not load {skin.idle} or {skin.aim_pistol}")
+    rots = _local_rotations(skin, dirs, idle, pistol)
+    clip = _copy_of(skin.idle, path)
+    _key_constant(clip, rots)
     _log(f"built {path} ({len(rots)} tracks off {skin.idle.rsplit('/', 1)[-1]}, "
          f"turned {sorted(dirs)})")
     return clip

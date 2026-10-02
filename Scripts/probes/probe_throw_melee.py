@@ -5,7 +5,10 @@ in, and turns in that plane, top first, until it lands where the arc said.
 
 The keys are held and clicked as probe_throw.py does it (ThrowKeyForced,
 ThrowClickForced), and the view is levelled first. The gun that is in hand at
-the start gives the lob the melee arcs are measured against.
+the start gives the lob the melee arcs are measured against. The blades are
+then thrown with the view tipped down at the ground some metres ahead: a
+throw goes to the point the reticle rests on (probe_throw_reticle.py), and a
+far one would be reached on a higher arc.
 
 Run with --windowed and OW_THROW_SHOTS=1 to save a picture of each item in
 the air to Saved/Screenshots/MacEditor.
@@ -33,7 +36,10 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
             (WEAPON_COMP_BP_PATH, "NeedsRefresh")]
 
 LANDS_WITHIN_CM = 80.0     # the disc to where it rests, as in probe_throw.py
+OPEN_CM = 3000.0           # the reticle's point is out of the gun's reach past this
 FLAT_CM = 50.0             # a melee arc peaks no further than this over the hand
+BLADE_PITCH = -10.0        # the view while a blade is thrown: at the ground ahead
+ON_POINT_CM = 20.0         # the arc's end to the point the reticle rests on
 SAMPLE_S = 0.08            # between two looks at the spin: under half a turn
 SHOTS = bool(os.environ.get("OW_THROW_SHOTS"))
 
@@ -83,6 +89,7 @@ def _throw(p, wc, item, name, lob_rise, lob_bow):
     yield from _aim(p, wc, item)
     dots = _dots(p, wc)
     first, mark, rise, bow = _arc(dots)
+    aim = p.get(wc, "AimPoint")
     p.check(f"the {name}'s arc is nearly flat where the gun's is a lob",
             rise < FLAT_CM and rise < lob_rise / 3.0,
             f"peaks {rise:.0f} cm over the hand, the gun's {lob_rise:.0f}")
@@ -100,12 +107,15 @@ def _throw(p, wc, item, name, lob_rise, lob_bow):
 
     velocity = p.get(wc, THROW_VELOCITY_VAR)
     speed = velocity.length()
-    p.check(f"...at its own {MELEE_THROW[THROW_SPEED_VAR]:g} cm/s, "
+    up = math.degrees(math.asin(velocity.z / speed))
+    p.check(f"...at its own {MELEE_THROW[THROW_SPEED_VAR]:g} cm/s, at the point "
+            "the reticle rests on: no higher than its "
             f"{MELEE_THROW[THROW_PITCH_VAR]:g} degrees over the view",
             abs(speed - MELEE_THROW[THROW_SPEED_VAR]) < 1.0
-            and abs(math.degrees(math.asin(velocity.z / speed))
-                    - MELEE_THROW[THROW_PITCH_VAR]) < 0.5,
-            f"{speed:.0f} cm/s, {math.degrees(math.asin(velocity.z / speed)):.1f} deg up")
+            and (mark - aim).length() < ON_POINT_CM
+            and up < BLADE_PITCH + MELEE_THROW[THROW_PITCH_VAR] + 0.5,
+            f"{speed:.0f} cm/s, {up:.1f} deg up, the arc ending "
+            f"{(mark - aim).length():.0f} cm from the point")
     heading = unreal.Vector(velocity.x, velocity.y, 0.0).normal()
     across = unreal.Vector(-heading.y, heading.x, 0.0)
 
@@ -170,10 +180,16 @@ def probe(p):
     if not guns or not melee:
         return
 
+    # Level, and turned to where the reticle rests on nothing the gun could
+    # reach: its throw is then the lob.
     pc = p.controller()
     view = pc.get_control_rotation()
-    pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=0.0, yaw=view.yaw))
-    yield 0.05
+    for step in range(24):
+        view = unreal.Rotator(roll=0.0, pitch=0.0, yaw=view.yaw + 15.0 * bool(step))
+        pc.set_control_rotation(view)
+        yield 0.1
+        if (p.get(wc, "AimPoint") - player.get_actor_location()).length() > OPEN_CM:
+            break
 
     # The lob every other item is thrown on, off a gun's arc.
     gun = guns[0]
@@ -187,6 +203,8 @@ def probe(p):
             f"peaks {lob_rise:.0f} cm over the hand, strays {lob_bow:.0f} cm "
             "from the straight line")
 
+    pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=BLADE_PITCH, yaw=view.yaw))
+    yield 0.05
     for item in melee:
         name = str(item.get_editor_property("DisplayName")).lower()
         yield from _throw(p, wc, item, name, lob_rise, lob_bow)

@@ -178,8 +178,9 @@ def build_weapon_item():
     # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
     # Held like every other per-weapon number.
     _declare(ed, "ShotVolume", _float_type())
-    # How far a throw of this item is tipped up from the view (throw.py reads
-    # it off Held). The default is on the base, so the knife, the food and the
+    # How far a throw of this item is tipped up from the view, where the
+    # reticle rests on nothing it can reach (throw_launch.py reads it off
+    # Held). The default is on the base, so the knife, the food and the
     # water throw on it too; a gun's own comes from its spec.
     _declare(ed, THROW_PITCH_VAR, _float_type())
     # How fast it leaves the hand and how fast it tumbles in the air, and

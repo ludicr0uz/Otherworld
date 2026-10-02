@@ -33,12 +33,14 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   chop_tuning       chopping a tree: blows per piece of wood, where it lands
                     (WOOD_*), Chops and the component's Chop* variables
-  throw_tuning      the throw's numbers (THROW_*): speed, angle, launch point,
-                    the arc's and the flight's gravity, dots, landing, the
-                    tumble, a melee weapon's own flat fast spinning throw
-                    (MELEE_THROW), a thrown blade's damage and how deep
-                    and how high it lodges in a tree (THROW_*_DAMAGE,
-                    LODGE_*), when the clip's hand lets go
+  throw_tuning      the throw's numbers (THROW_*): speed, the lob's angle,
+                    launch point, how near a point the reticle rests on is
+                    still aimed at, the arc's and the flight's gravity, dots,
+                    landing, the tumble, a melee weapon's own flat fast
+                    spinning throw (MELEE_THROW), a thrown blade's damage and
+                    how deep and how high it lodges in a tree
+                    (THROW_*_DAMAGE, LODGE_*), when the clip's hand lets go
+                    and where in the clip the ready pose is taken
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
@@ -79,6 +81,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   hold_pose         A_HoldItem / A_HoldKnife / A_HoldTorch / A_WardTorch: food
                     carried at the waist, the knife up in a fighting stance, the
                     stick carried as a torch and held out, keyed off the idle
+  throw_pose        A_ThrowReady: the arm cocked while a throw is aimed, the
+                    skin's throw clip stopped where its hand is furthest back
   shotgun_pose      A_AimShotgun: the shotgun's ready pose, the rifle's with
                     the right thumb over the stock's wrist, the left along
                     the pump (SHOTGUN_THUMBS), and the left hand under the

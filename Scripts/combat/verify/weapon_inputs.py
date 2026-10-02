@@ -16,7 +16,8 @@ from combat.verify.fixtures import titles, w, wg
 from combat.verify.chop import is_chop_node
 from combat.verify.light import is_light_trace
 from combat.verify.knife import is_melee_play, is_melee_sweep
-from combat.verify.throw import is_throw_play, is_throw_trace
+from combat.verify.throw import is_throw_play, is_throw_trace, launch_nodes
+from combat.verify.throw_aim import is_ready_node
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, pin_value, titled,
 )
@@ -86,10 +87,12 @@ def check_keys_are_variables():
               got is not None and got.export_text() == default,
               got.export_text() if got is not None else "None")
 
-    # The punch's, the knife's and the throw's clips are their own sections'
-    # (verify/punch.py, knife.py, throw.py).
+    # The punch's, the knife's and the throw's clips, and the throw's ready
+    # pose, are their own sections' (verify/punch.py, knife.py, throw.py,
+    # throw_aim.py).
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName")
-             if not is_melee_play(n) and not is_throw_play(n)]
+             if not is_melee_play(n) and not is_throw_play(n)
+             and not is_ready_node(n)]
     # TWO, and the second one is not a duplicate. A montage started in HitSlot stops
     # the ready pose in DefaultSlot -- montages are stopped per GROUP and UE 5.8
     # exposes no way to put a slot in a different group from Python -- so the flinch
@@ -162,9 +165,12 @@ def check_keys_are_variables():
                   for axis in "XYZ")
               for n in titled(wg, "MakeVector")),
           f"{DROP_FORWARD:.0f} cm ahead")
-    # One subtraction off AimPoint: the pellet direction.
+    # One subtraction off AimPoint: the pellet direction. (The throw's launch
+    # takes its own, from its start: verify/throw_aim.py.)
+    throw_launch = launch_nodes()
     deltas = [n for n in titled(wg, "vector - vector")
-              if any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get AimPoint"
+              if n not in throw_launch
+              and any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get AimPoint"
                      for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A")))]
     check("the pellet direction is muzzle -> AimPoint, not camera forward",
           len(deltas) == 1, f"{len(deltas)} vector subtractions driven by AimPoint")
@@ -294,10 +300,12 @@ def check_sprint_and_stamina():
           str(sorted(walk_titles)))
     # The hit-box multiplier has two SelectFloats of its own, each picked by a
     # table lookup; those are counted in the hit-box section, not here. So are
-    # the stance's, each picked by comparing Stance (verify/stance.py), and
-    # the side the chopped wood lands on (verify/chop.py).
+    # the stance's, each picked by comparing Stance (verify/stance.py), the
+    # side the chopped wood lands on (verify/chop.py), and the throw's yaw
+    # and pitch (verify/throw_aim.py).
+    throw_launch = launch_nodes()
     selects = [n for n in titled(wg, "SelectFloat")
-               if not is_chop_node(n) and not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
+               if not is_chop_node(n) and n not in throw_launch and not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
                           for k in ("Contains", "Equal")
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
     # Seven now: sprint picks the speed and the sign of the drain, the sights

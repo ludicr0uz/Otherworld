@@ -13,7 +13,7 @@ from combat.graph import (
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import (
     CHARACTER_BP_PATH, FIRE_WARD_VAR, HEALTH_BP_PATH, ITEM_BP_PATH,
-    THROW_ARC_BP_PATH, WEAPON_COMP_BP_PATH,
+    THROW_ARC_BP_PATH, THROW_READY_ANIM_PATH, WEAPON_COMP_BP_PATH,
 )
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR, SIGHTS_FORCED_VAR
 from combat.skin import player_skin
@@ -59,6 +59,7 @@ from combat.weapon_component.throw_flight import (
     THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
     THROW_VELOCITY_VAR,
 )
+from combat.weapon_component.throw_ready import THROW_READY_ANIM_VAR
 from combat.weapon_component.throw_strike import THROW_PAST_VAR
 from combat.weapon_component.throw_windup import (
     THROW_ANIM_VAR, THROW_DUE_VAR, THROW_WINDING_VAR,
@@ -267,6 +268,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # and when the hand lets go.
     _declare(ed, THROW_ANIM_VAR, BEL.get_object_reference_type(
         unreal.AnimSequenceBase.static_class()))
+    # The pose the arm waits in while the key is held (throw_ready.py).
+    _declare(ed, THROW_READY_ANIM_VAR, BEL.get_object_reference_type(
+        unreal.AnimSequenceBase.static_class()))
     _declare(ed, THROW_WINDING_VAR, BEL.get_object_reference_type(item_class))
     _declare(ed, THROW_DUE_VAR, _float_type())
     # Chopping a tree (chop.py): the tree being cut, the blows on it, where
@@ -375,7 +379,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         THROW_TIME_VAR: 0.0,
         THROW_DUE_VAR: 0.0,
         # No entry for a skin without the clip: the variable stays None.
-        **({THROW_ANIM_VAR: _must_load(player_skin().throw)}
+        **({THROW_ANIM_VAR: _must_load(player_skin().throw),
+            THROW_READY_ANIM_VAR: _must_load(THROW_READY_ANIM_PATH)}
            if player_skin().throw else {}),
         THROW_ARC_CLASS_VAR: arc_class,
     })

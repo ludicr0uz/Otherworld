@@ -51,6 +51,8 @@ HOLD_ITEM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldItem"
 HOLD_KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldKnife"
 HOLD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldTorch"
 WARD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_WardTorch"
+# The arm cocked while a throw is aimed (combat/throw_pose.py).
+THROW_READY_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_ThrowReady"
 # The shotgun's ready pose (combat/shotgun_pose.py): the rifle's, with the
 # thumb over a straight stock's wrist.
 SHOTGUN_AIM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_AimShotgun"

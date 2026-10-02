@@ -1,14 +1,17 @@
-"""The throw: holding the key draws the arc, a lob whose height is the held
-item's ThrowArcDegrees; letting the key go calls it off; a click of the fire
-key over the arc plays the throw's clip and, when its hand lets go, throws
+"""The throw: holding the key draws the arc, with nothing under the reticle
+in reach a lob whose height is the held item's ThrowArcDegrees, and cocks the arm, ready to throw; letting the key go
+calls it off and brings the arm down; a click of the fire key over the arc
+plays the throw's clip on from that pose and, when its hand lets go, throws
 what is held; it tumbles end over end through the air and comes down where
 the arc said, as an item E can pick up.
 
 No key can be injected into a headless game, so the probe holds the throw key
 by writing ThrowKeyForced and clicks by writing ThrowClickForced, which
 throw.py ORs with the keys and which nothing else writes (verify/throw.py
-checks the key polls themselves). The view is levelled first so the throw
-goes out across the ground in front of the player.
+checks the key polls themselves). The view is levelled first, and turned to
+where the reticle rests on nothing near, so the throw is the lob and goes out
+across the ground in front of the player (a throw at a point in reach is
+probe_throw_reticle.py's).
 
 Run with --windowed and OW_THROW_SHOTS=1 to save pictures of the wind-up and
 of the item in the air to Saved/Screenshots/MacEditor.
@@ -24,12 +27,13 @@ from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PA
 from combat.throw_arc import ARC_COMPONENT
 from combat.anim_blueprint import AIM_SLOT
 from combat.throw_tuning import (
-    THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_RELEASE_S, THROW_SPIN_DEG_S,
+    THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_SPIN_DEG_S, THROW_WINDUP_S,
 )
 from combat.weapon_component.throw import (
     THROW_AIMING_VAR, THROW_ARC_VAR, THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR,
 )
 from combat.weapon_component.throw_flight import THROWN_VAR
+from combat.weapon_component.throw_ready import THROW_READY_ANIM_VAR
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR, THROW_WINDING_VAR
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
@@ -39,11 +43,13 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
             (ITEM_BP_PATH, THROW_PITCH_VAR)]
 
 LANDS_WITHIN_CM = 80.0     # the disc to where it rests: back-off + lift + a sub-step
+OPEN_CM = 3000.0           # the reticle's point is out of every item's reach past this
 LOB_CM = 100.0             # the default arc peaks at least this far over the hand
 FLAT_DEG = 5.0             # a tuned-down arc, to see the tuning move it
 HAND_UP_CM = 30.0          # the wind-up takes the hand this far over the capsule's centre
+READY_UP_CM = 45.0         # the ready pose holds the hand this far over it
 SHOTS = bool(os.environ.get("OW_THROW_SHOTS"))
-SHOT_AT_S = 0.28           # into the wind-up: the hand is over the head
+SHOT_AT_S = 0.05           # into the wind-up: the hand is over the head
 
 
 def _shot(p):
@@ -95,9 +101,19 @@ def probe(p):
 
     pc = p.controller()
     view = pc.get_control_rotation()
-    pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=0.0, yaw=view.yaw))
-    yield 0.05
+    for step in range(24):
+        view = unreal.Rotator(roll=0.0, pitch=0.0, yaw=view.yaw + 15.0 * bool(step))
+        pc.set_control_rotation(view)
+        yield 0.1
+        if _dist(p.get(wc, "AimPoint"), player.get_actor_location()) > OPEN_CM:
+            break
+    p.check("the level view can be turned to where the reticle rests on nothing "
+            "in reach", _dist(p.get(wc, "AimPoint"), player.get_actor_location()) > OPEN_CM,
+            f"{_dist(p.get(wc, 'AimPoint'), player.get_actor_location()) / 100.0:.0f} m")
 
+    clip = p.get(wc, THROW_ANIM_VAR)
+    ready = p.get(wc, THROW_READY_ANIM_VAR)
+    anim = player.get_editor_property("mesh").get_anim_instance()
     p.set(wc, THROW_FORCED_VAR, True)
     yield lambda: p.get(wc, THROW_AIMING_VAR)
     yield 0.05
@@ -107,6 +123,15 @@ def probe(p):
     if count < 2:
         p.set(wc, THROW_FORCED_VAR, False)
         return
+    if ready is not None:
+        # The arm going up, over the pose's blend.
+        yield 0.3
+        _shot(p)
+        p.check("...and cocks the arm, ready to throw: the ready pose held in "
+                f"{AIM_SLOT}, the hand up beside the head with the item in it",
+                anim.is_playing_slot_animation(ready, AIM_SLOT)
+                and _hand_z(player) >= READY_UP_CM,
+                f"hand {_hand_z(player):.0f} cm over the capsule's centre")
     first = dots.get_instance_transform(0, True).translation
     mark = dots.get_instance_transform(count - 1, True).translation
     here = player.get_actor_location()
@@ -136,6 +161,13 @@ def probe(p):
     p.set(wc, THROW_CLICK_FORCED_VAR, True)
     yield 0.05
     p.set(wc, THROW_CLICK_FORCED_VAR, False)
+    if ready is not None:
+        yield 0.4
+        p.check("letting the key go brings the arm down: the ready pose is "
+                "out of the slot and the hand back where it carries the item",
+                not anim.is_playing_slot_animation(ready, AIM_SLOT)
+                and _hand_z(player) < HAND_UP_CM,
+                f"hand {_hand_z(player):.0f} cm over the capsule's centre")
     p.check("letting the key go throws nothing, and a click without the arc "
             "throws nothing either",
             p.get(wc, "Held") == item and p.get(wc, THROWN_VAR) is None
@@ -143,6 +175,7 @@ def probe(p):
             and dots.get_instance_count() == 0,
             f"held {p.get(wc, 'Held')}, {dots.get_instance_count()} dots")
 
+    carried_at = _hand_z(player)
     p.set(wc, THROW_FORCED_VAR, True)
     yield lambda: p.get(wc, THROW_AIMING_VAR)
     yield 0.05
@@ -150,9 +183,6 @@ def probe(p):
     first = dots.get_instance_transform(0, True).translation
     mark = dots.get_instance_transform(count - 1, True).translation
     # The click starts the clip; the item stays in the hand until it lets go.
-    clip = p.get(wc, THROW_ANIM_VAR)
-    anim = player.get_editor_property("mesh").get_anim_instance()
-    carried_at = _hand_z(player)
     p.set(wc, THROW_CLICK_FORCED_VAR, True)
     yield lambda: p.get(wc, THROW_WINDING_VAR) is not None \
         or p.get(wc, THROWN_VAR) is not None or not p.get(wc, THROW_AIMING_VAR)
@@ -166,7 +196,7 @@ def probe(p):
                 p.get(wc, THROW_WINDING_VAR) == item and p.get(wc, "Held") == item
                 and p.get(wc, THROWN_VAR) is None and dots.get_instance_count() == 0,
                 f"winding {p.get(wc, THROW_WINDING_VAR)}, {dots.get_instance_count()} dots")
-        yield 0.05
+        yield 0.03
         p.check(f"...playing the throw's clip into {AIM_SLOT}",
                 anim.is_playing_slot_animation(clip, AIM_SLOT), clip.get_name())
         p.check("...with no arc drawn over it, the key still held",
@@ -187,11 +217,12 @@ def probe(p):
                 f"hand {carried_at:.0f} -> {top:.0f} cm over the capsule's centre")
     p.set(wc, THROW_FORCED_VAR, False)
     p.check("the hand lets go of what was held"
-            + (f" {THROW_RELEASE_S:g} s into the clip" if clip is not None
+            + (f" {THROW_WINDUP_S:.2f} s after the click, the clip played on "
+               "from the ready pose" if clip is not None
                else " on the click (this skin has no throw clip)"),
             p.get(wc, THROWN_VAR) == item
-            and (THROW_RELEASE_S - 0.02 <= waited
-                 and (SHOTS or waited <= THROW_RELEASE_S + 0.15)
+            and (THROW_WINDUP_S - 0.02 <= waited
+                 and (SHOTS or waited <= THROW_WINDUP_S + 0.15)
                  if clip is not None else waited < 0.1),
             f"{p.get(wc, THROWN_VAR)} after {waited:.2f} s")
     p.check("...and the wind-up is over", p.get(wc, THROW_WINDING_VAR) is None)

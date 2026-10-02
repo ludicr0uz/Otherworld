@@ -21,7 +21,7 @@ from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_GRAVITY_Z, THROW_MAX_PITCH_DEG,
     THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR, THROW_RELEASE_S,
     THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_VAR, THROW_START_FORWARD,
-    THROW_START_UP,
+    THROW_START_UP, THROW_WINDUP_S,
 )
 from combat.tuning import BIND_VARS, THROW_KEY
 from combat.verify.common import (
@@ -291,8 +291,10 @@ def check_windup():
     stamps = [n for n in wg if _title(n) == f"Set {THROW_DUE_VAR}"]
     delay = [num_pin(PIN.get_owning_node(q), "B") for n in stamps
              for q in PIN.list_connected_pins(BEL.find_input_pin(n, THROW_DUE_VAR))]
-    check(f"...the hand letting go {THROW_RELEASE_S:g} s into it",
-          delay == [THROW_RELEASE_S], str(delay))
+    check(f"...the hand letting go {THROW_RELEASE_S:g} s into it: "
+          f"{THROW_WINDUP_S:.3f} s after the click, which starts it part way in",
+          len(delay) == 1 and delay[0] is not None
+          and abs(delay[0] - THROW_WINDUP_S) < 1e-4, str(delay))
     if len(plays) == 1 and len(stamps) == 1:
         skips = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
             BEL.find_input_pin(stamps[0], "execute"))]

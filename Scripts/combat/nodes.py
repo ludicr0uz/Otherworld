@@ -175,6 +175,9 @@ FN_DEG_TAN = "/Script/Engine.KismetMathLibrary.DegTan"
 # footstep belongs to the player rather than to one of the wanderers who share
 # the footstep component.
 FN_MAX_FF = "/Script/Engine.KismetMathLibrary.FMax"
+FN_SQRT = "/Script/Engine.KismetMathLibrary.Sqrt"
+FN_DEG_ATAN2 = "/Script/Engine.KismetMathLibrary.DegAtan2"
+FN_VEC_TO_ROT = "/Script/Engine.KismetMathLibrary.Conv_VectorToRotator"
 FN_IS_PLAYER_CONTROLLED = "/Script/Engine.Pawn.IsPlayerControlled"
 FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
 FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"

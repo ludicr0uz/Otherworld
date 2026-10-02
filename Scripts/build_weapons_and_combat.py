@@ -38,6 +38,7 @@ WHAT THIS BUILDS
                     weapon_component/light.py; the campfire is survival's)
   Anims/A_KnifeSlash  the slash, keyed for the worn body (combat/knife_anim.py)
   Anims/A_HoldItem, A_HoldKnife  how food and the knife are held (combat/hold_pose.py)
+  Anims/A_ThrowReady  the arm cocked while a throw is aimed (combat/throw_pose.py)
   Anims/A_AimShotgun             the shotgun's ready pose: the thumb over the stock (combat/shotgun_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
   BP_WeaponComponent  inventory of 5, equip/switch/fire/drop/pick up
@@ -87,6 +88,7 @@ from combat.install import (                                      # noqa: E402
 from combat.materials import build_materials                      # noqa: E402
 from combat.heat import build_hot_material                        # noqa: E402
 from combat.throw_arc import build_throw_arc                      # noqa: E402
+from combat.throw_pose import build_throw_ready                   # noqa: E402
 from combat.paths import AMMO_BP_PATH, HEALTH_BP_PATH             # noqa: E402
 from combat.hit_bodies import fit_hit_bodies                      # noqa: E402
 from combat.ragdoll import tune_ragdolls                          # noqa: E402
@@ -142,6 +144,8 @@ def main():
         weapons[spec["display"]] = build_weapon(spec, item_bp)
     # Before the knife and the consumables, whose grips are solved in them.
     build_hold_poses(skin)
+    # The arm cocked while a throw is aimed: the throw clip, stopped.
+    build_throw_ready(skin)
     # The third starter item: a melee item, not a row of the gun table.
     knife_bp = build_knife(item_bp)
     knife_clip = build_knife_slash(skin)

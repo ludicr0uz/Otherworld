@@ -85,8 +85,14 @@ _author_* fragment per concern, each in its own module:
   throw       the throw key held: the predicted arc on BP_ThrowArc; clicked:
               the wind-up, then the release: the item leaves hand and
               inventory
-  throw_windup  the click plays the skin's throw clip and holds the release
-              until its hand lets go (ThrowWinding, ThrowDueTime)
+  throw_launch  where a throw leaves from and how fast, as pure pins: at
+              AimPoint, pitched so its curve passes through the point the
+              reticle rests on; out of the item's reach, tipped over the view
+  throw_ready the arm cocked (ThrowReadyAnim held in the slot) while the arc
+              is drawn, and the re-equip that brings it down, called off
+  throw_windup  the click plays the skin's throw clip on from the ready
+              pose's moment and holds the release until its hand lets go
+              (ThrowWinding, ThrowDueTime)
   throw_flight  the item in the air flies the arc's curve, tumbling end over
               end, and lands as a Dropped item; a melee weapon leaves the hand
               squared up to the throw, so it spins forward, edge first
@@ -133,7 +139,9 @@ BP_WeaponComponent event graph:
                                                                 thing nearest the
                                                                 reticle (an item:
                                                                 pick it up)
-         --> Branch IsInputKeyDown(V)                       --> draw the throw arc;
+         --> Branch IsInputKeyDown(V)                       --> cock the arm and draw
+                                                                the throw arc, which
+                                                                ends on AimPoint;
                                                                 on a click, wind up
                                                                 (V shuts the Fire gate)
          --> Branch IsValid(ThrowWinding) AND due           --> let go: throw held

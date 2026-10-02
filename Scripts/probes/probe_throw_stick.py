@@ -47,8 +47,8 @@ from probes.probe_chop_tree import _flat, _trace
 from probes.probe_hot_blade import _wanderers
 from probes.probe_knife import _file
 from probes.probe_throw_strike import (
-    AXE, ISM, KNIFE, ON_GROUND_CM, SHOTS, _alive, _dir, _picture, _stand, _take,
-    _throw,
+    AXE, ISM, KNIFE, ON_GROUND_CM, SHOTS, _alive, _dir, _picture, _reticle_on,
+    _stand, _take, _throw,
 )
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
@@ -59,7 +59,8 @@ WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
 BODY_AT_CM = 300.0        # the body, in front of the player
 BODY_HP = 200.0           # room for a blade
 FRAIL_HP = 50.0           # ...and a body the axe kills
-BODY_VIEW_DEG = (-8.0, -30.0)   # the view for a blade's throw at the body, and a gun's
+BODY_VIEW_DEG = -8.0      # the view for a throw at the body
+ON_TARGET_CM = 60.0       # the reticle's point, from the body's middle
 TAKE_FROM_CM = 130.0      # the player's middle from the body's, taking a blade back
 TOO_FAR_CM = 600.0        # ...and from where it cannot be
 SWAY_CM = 40.0            # how far a standing body's own motion carries a blade in it
@@ -91,10 +92,12 @@ def _open(p, player, at):
     return None
 
 
-def _wound(p, wc, player, item, body, health, at, yaw, pitch, hp=BODY_HP):
+def _wound(p, wc, player, item, body, health, at, yaw, pitch, hp=BODY_HP,
+           reticle=False):
     """Throw ``item`` at ``body``, which has ``hp``; returns (the health it
     lost, how far over the ground under it the item came to rest, how far
-    from the body)."""
+    from the body). With ``reticle`` the view is turned to put the reticle on
+    the body first, and the throw goes to its point."""
     def place():
         body.set_actor_location(player.get_actor_location() + _dir(0.0, yaw) * BODY_AT_CM,
                                 False, True)
@@ -105,6 +108,11 @@ def _wound(p, wc, player, item, body, health, at, yaw, pitch, hp=BODY_HP):
     place()
     yield 0.1
     place()
+    if reticle:
+        aimed = yield from _reticle_on(p, wc, player, body.get_actor_location(),
+                                       pitch, yaw)
+        p.check("the reticle is put on the body", aimed < ON_TARGET_CM,
+                f"its point {aimed:.0f} cm from the body's middle")
     yield from _throw(p, wc, item)
     rest = item.get_actor_location()
     floor = _trace(p, rest + unreal.Vector(0, 0, 50.0), rest - unreal.Vector(0, 0, 500.0),
@@ -194,7 +202,7 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
     # --- alive: it stays in, goes where the body goes, and comes back ----------
     blood = _alive(p, BLOOD_CLASS_PATH)
     lost, over, off = yield from _wound(p, wc, player, knife, body, health, at, yaw,
-                                        BODY_VIEW_DEG[0])
+                                        BODY_VIEW_DEG)
     p.check(f"a thrown knife takes {THROW_KNIFE_DAMAGE:g} HP off the body it strikes",
             abs(lost - THROW_KNIFE_DAMAGE) < 1e-3, f"lost {lost:g}")
     p.check("...as the player's doing, and it draws blood",
@@ -233,7 +241,7 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
 
     still = yield from _flinch(body, FLINCH_OVER_S, want=False)
     lost, _over, off = yield from _wound(p, wc, player, gun, body, health, at, yaw,
-                                         BODY_VIEW_DEG[1])
+                                         BODY_VIEW_DEG, reticle=True)
     flinched = yield from _flinch(body, FLINCH_WITHIN_S)
     p.check("a gun thrown at the body, which takes nothing, plays no flinch",
             not still and not flinched and lost == 0.0,
@@ -249,7 +257,7 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
 
     # --- killed by it: the blade goes down with the body, and comes back -------
     lost, over, off = yield from _wound(p, wc, player, axe, body, health, at, yaw,
-                                        BODY_VIEW_DEG[0], FRAIL_HP)
+                                        BODY_VIEW_DEG, FRAIL_HP)
     p.check(f"a thrown axe kills a body with {FRAIL_HP:g} HP",
             lost == FRAIL_HP and p.get(health, "Dead") is True,
             f"lost {lost:g}, Dead {p.get(health, 'Dead')}")
@@ -274,7 +282,7 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
     # --- the body gone: the blade is left where it lay -------------------------
     health = p.component(second, HEALTH_CLASS_PATH)
     lost, over, off = yield from _wound(p, wc, player, knife, second, health, at, yaw,
-                                        BODY_VIEW_DEG[0])
+                                        BODY_VIEW_DEG)
     if not _in_body(p, wc, knife, "knife, thrown at a second body,", second, over, off, yaw):
         return
     was = knife.get_actor_location()

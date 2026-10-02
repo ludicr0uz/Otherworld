@@ -1,12 +1,17 @@
 """The throw's wind-up: the click starts the overhand throw's clip, and the
-item leaves the hand THROW_RELEASE_S later, where the clip's hand lets go.
+item leaves the hand where the clip's hand lets go, THROW_RELEASE_S into it.
+
+The clip is played on from THROW_READY_S, the moment the ready pose was taken
+at (throw_ready.py holds the arm there while the key is down), so the arm
+goes forward out of the pose it waited in and the hand lets go
+THROW_WINDUP_S (the difference) after the click.
 
 Two stages, each a Branch on the component's own variables (a component Tick
 cannot hold a Delay), the way punch.py's swing and blow are:
 
   start   the click over the arc (throw.py's exec) --> ThrowWinding = Held;
-          with a clip (ThrowAnim), ThrowDueTime = now + THROW_RELEASE_S and
-          the clip into the upper-body slot
+          with a clip (ThrowAnim), ThrowDueTime = now + THROW_WINDUP_S and
+          the clip into the upper-body slot, from THROW_READY_S
   due     IsValid(ThrowWinding) AND now >= ThrowDueTime --> if it is still
           what is held, throw.py's release; either way ThrowWinding is cleared
 
@@ -29,7 +34,9 @@ from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import (
     FN_ANIM_INSTANCE, FN_GE_FF, FN_IS_VALID, FN_PLAY_SLOT, FN_TIME_SECONDS,
 )
-from combat.throw_tuning import THROW_ANIM_BLEND_S, THROW_RELEASE_S
+from combat.throw_tuning import (
+    THROW_ANIM_BLEND_S, THROW_READY_S, THROW_RELEASE_S, THROW_WINDUP_S,
+)
 from combat.weapon_component.punch import _and, _get, _stamp
 
 THROW_ANIM_VAR = "ThrowAnim"          # the skin's throw clip, or None
@@ -64,7 +71,7 @@ def _author_throw_windup(ed, held, started, exec_ins, x0, y0):
     clip = _at(ed.add_branch_node(), x0 + 260, y0)
     _connect(_out(has), _pin(clip, "Condition"))
     _connect(BEL.find_then_pin(keep), _pin(clip, "execute"))
-    step = _stamp(ed, THROW_DUE_VAR, THROW_RELEASE_S, BEL.find_then_pin(clip),
+    step = _stamp(ed, THROW_DUE_VAR, THROW_WINDUP_S, BEL.find_then_pin(clip),
                   x0 + 520, y0)
     anim = _at(_node(ed, FN_ANIM_INSTANCE), x0 + 1000, y0 + 300)
     _connect(_get(ed, "OwnerMesh", x0 + 760, y0 + 300), _pin(anim, "self"))
@@ -76,6 +83,8 @@ def _author_throw_windup(ed, held, started, exec_ins, x0, y0):
     _set(play, "BlendOutTime", THROW_ANIM_BLEND_S)
     _set(play, "InPlayRate", 1.0)
     _set(play, "LoopCount", 1)
+    # On from the ready pose's moment (throw_ready.py held the arm there).
+    _set(play, "InTimeToStartMontageAt", THROW_READY_S)
     _connect(step, _pin(play, "execute"))
 
     # --- due: the hand lets go ----------------------------------------------
@@ -97,9 +106,11 @@ def _author_throw_windup(ed, held, started, exec_ins, x0, y0):
     _connect(BEL.find_then_pin(gate), _pin(still, "execute"))
 
     ed.add_comment_to_nodes(
-        f"The throw's wind-up: the click plays the clip into {AIM_SLOT} and "
-        f"the item leaves the hand {THROW_RELEASE_S:g} s later, if the hand "
-        "still holds it. A skin with no clip lets go at once.",
+        f"The throw's wind-up: the click plays the clip into {AIM_SLOT}, on "
+        f"from the ready pose's {THROW_READY_S:.3f} s, and the item leaves "
+        f"the hand {THROW_RELEASE_S:g} s into it, {THROW_WINDUP_S:.3f} s "
+        "later, if the hand still holds it. A skin with no clip lets go at "
+        "once.",
         [keep, clip, play, gate, still])
     return BEL.find_then_pin(still), BEL.find_else_pin(still), BEL.find_else_pin(gate)
 

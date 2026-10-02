@@ -17,6 +17,7 @@ Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
 """
 
+import math
 import os
 import shutil
 
@@ -47,7 +48,8 @@ WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
 KNIFE, AXE = "BP_Knife_C", "BP_Axe_C"
 THROW_FROM_CM = 400.0     # the player's middle, from the bark
 PICK_FROM_CM = 75.0       # ...and when taking the blade back
-GUN_VIEW_DEG = -22.0      # the view tipped down, so a gun's lob meets the trunk
+GUN_VIEW_DEG = 0.0        # the view for a gun's throw: level, the reticle on the trunk
+ON_TARGET_CM = 60.0       # the reticle's point, from the middle of what it was put on
 HIGH_VIEW_DEG = (20.0, 25.0, 30.0, 35.0, 40.0)
 ON_GROUND_CM = 40.0       # an item this near the ground is lying on it
 ISM = unreal.InstancedStaticMeshComponent
@@ -118,6 +120,22 @@ def _stand(p, player, at, yaw, pitch=0.0):
         at, unreal.Rotator(pitch=0.0, yaw=yaw, roll=0.0), False, True)
     p.controller().set_control_rotation(unreal.Rotator(pitch=pitch, yaw=yaw, roll=0.0))
     yield 0.2
+
+
+def _reticle_on(p, wc, player, target, pitch, yaw):
+    """Turn the view, at ``pitch``, until the reticle rests on what stands at
+    ``target``: the camera is off to one side of the player's own line, so
+    facing a thing does not put the reticle on it. Returns how far the
+    reticle's point is from ``target`` over the ground, in cm."""
+    cam = unreal.GameplayStatics.get_player_camera_manager(player, 0)
+    for _ in range(3):
+        p.controller().set_control_rotation(unreal.Rotator(pitch=pitch, yaw=yaw, roll=0.0))
+        yield 0.1
+        to = target - cam.get_camera_location()
+        yaw = math.degrees(math.atan2(to.y, to.x))
+    p.controller().set_control_rotation(unreal.Rotator(pitch=pitch, yaw=yaw, roll=0.0))
+    yield 0.1
+    return _flat(p.get(wc, "AimPoint") - target)
 
 
 def _throw(p, wc, item):
@@ -217,18 +235,23 @@ def _lodge(p, wc, player, item, name, spot, base, eye):
             taken and gap < INTERACT_RADIUS, f"{gap:.0f} cm away")
 
 
-def _falls(p, wc, player, item, label, spot, base, pitch):
+def _falls(p, wc, player, item, label, spot, base, pitch, reticle=False):
     """Throw ``item`` at the trunk with the view at ``pitch``: it must come
-    down to the ground at the tree's foot."""
+    down to the ground at the tree's foot. With ``reticle`` the view is turned
+    to put the reticle on the trunk first: the throw goes to its point."""
     at, yaw, near, ground, _view = spot
     yield from _stand(p, player, at, yaw, pitch)
+    aimed = 0.0
+    if reticle:
+        aimed = yield from _reticle_on(p, wc, player, base, pitch, yaw)
     yield from _throw(p, wc, item)
     rest = item.get_actor_location()
     p.check(label,
             p.get(item, "Dropped") is True and abs(rest.z - ground) < ON_GROUND_CM + 30.0
-            and _flat(rest - base) < 200.0,
+            and _flat(rest - base) < 200.0 and aimed < ON_TARGET_CM,
             f"{rest.z - ground:.0f} cm over the ground, {_flat(rest - base):.0f} cm "
-            "from the tree's middle")
+            "from the tree's middle"
+            + (f", the reticle {aimed:.0f} cm from it" if reticle else ""))
     yield from _stand(p, player, near, yaw)
 
 
@@ -283,4 +306,4 @@ def _run(p):
     p.check("...where E takes it back", taken)
     yield from _falls(p, wc, player, guns[0],
                       "a gun thrown at the trunk does not lodge: it falls to the "
-                      "foot of the tree", spot, base, GUN_VIEW_DEG)
+                      "foot of the tree", spot, base, GUN_VIEW_DEG, reticle=True)

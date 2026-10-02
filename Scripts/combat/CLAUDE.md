@@ -23,7 +23,7 @@ The defaults are all rebindable on the settings screen:
   out, and with a hot knife or axe it cauterises a bleed (both below); on a cold blade, the
   matches, wood and food it does nothing yet.
   **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
-  **C** toggles crouch, **Z** toggles prone, **V** held shows the throw's arc and a click throws (see below).
+  **C** toggles crouch, **Z** toggles prone, **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - 1/2/3/4, M and D belong to the graphics menu.
 
@@ -183,19 +183,51 @@ menu polls its own copy from `DrawHUD`, which does.
   - Setting `Dropped = true` on the spawned actor is the entire handover.
   - Keep the `Length(DropClasses) > 0` guard, or an unfilled table indexes into nothing.
 - **Anything in hand can be thrown** (`weapon_component/throw.py`). Holding **V** draws the
-  arc: `PredictProjectilePath` from a point in front of the chest, along the view tipped up
-  by the held item's `ThrowArcDegrees`, as world-space instances on `BP_ThrowArc`'s one ISM
+  arc: `PredictProjectilePath` from a point in front of the chest, at the point the reticle
+  rests on (below), as world-space instances on `BP_ThrowArc`'s one ISM
   (spawned on first aim; `throw_arc.py`), with a disc where it lands. A click of the fire key
   over the arc plays the skin's throw clip (`throw_windup.py`: Quaternius UAL2's
-  `OverhandThrow`, upper body only) and, `THROW_RELEASE_S` (0.35 s) later, where the clip's
-  hand lets go, stores the launch, detaches the item and takes it out of the inventory as a
+  `OverhandThrow`, upper body only) and, where the clip's hand lets go (`THROW_RELEASE_S`,
+  0.35 s into it), stores the launch, detaches the item and takes it out of the inventory as a
   drop does; letting V up instead calls it off.
+  - **A throw goes where the reticle is** (`weapon_component/throw_launch.py`, the launch
+    as pure pins). Its yaw is the bearing from the launch point to `AimPoint`, and its
+    pitch the one whose curve passes through `AimPoint` at the item's `ThrowSpeed`, the
+    flatter of the two (`DegAtan2` over a root: the docstring has the formula). So the arc
+    lies in the upright plane through the reticle's point, stands under the reticle on
+    screen and ends on it. The launch point is 55 cm to one side of the camera's line:
+    along the view's own yaw the arc ran beside the reticle and never met it.
+    - **Out of reach, or at the sky, it is a lob:** the root's inside goes negative past
+      what the speed reaches (about 12 m at the default 1100 cm/s, 33 m for a blade), and
+      the pitch is then the view's tipped up by the item's `ThrowArcDegrees`, as every
+      throw was before. The two meet with a step at the edge of the reach.
+    - **A point under `THROW_AIM_MIN_AHEAD` (100 cm) ahead of the launch point is not
+      aimed at** (a wall at the shoulder, a trunk between the camera and the player):
+      the throw goes out along the view's yaw, tipped.
+    - `AimPoint` is where the reticle rests, which with something in hand is the first
+      surface on the line from the shot's origin (`aim.py`), not always the camera's.
+    - **A probe that faces a thing has not aimed at it:** the camera's line runs beside
+      the player's. `probes/probe_throw_strike._reticle_on` turns the view until the
+      reticle is on a target; `probes/probe_throw_reticle.py` checks the arc against
+      `AimPoint` near, far and at the sky.
+  - **While V is held the arm is cocked** (`weapon_component/throw_ready.py`):
+    `A_ThrowReady` (`throw_pose.py`) is the throw clip stopped at `THROW_READY_S` (frame
+    7, the hand furthest back), held looping in the upper-body slot for as long as the
+    arc is drawn. It is asked for every frame by what the slot is playing
+    (`IsPlayingSlotAnimation`), not on the key's edge, so it comes back after a flinch or
+    a re-equip, and never starts under a flinch (the ready pose's own rule,
+    `ready_pose.py`). The click plays the clip on from that moment
+    (`InTimeToStartMontageAt`), so the hand lets go `THROW_WINDUP_S` (0.12 s) after it.
+    Letting V up sets `NeedsRefresh`: the equip puts the item's own pose back, or stops
+    the slot under a lowered gun. A skin with no throw clip has no ready pose.
+    - `verify/throw_aim.is_ready_node` sets its two nodes aside in the older count of
+      the slot's plays.
   - **The wind-up is a state, `ThrowWinding`: the item being thrown.** While it is valid no
     arc is drawn and the fire gate is shut. The release runs only if the hand still holds
     that item (a switch or a drop in the wind-up throws nothing), and reads the launch on
     its own frame, so the item goes where the view looks then.
   - **A skin with no clip** (`PlayerSkin.throw` is None: the mannequin) stamps no delay, and
-    the item leaves on the frame of the click.
+    the item leaves on the frame of the click, from no ready pose.
   - **The release re-equips the hand** (`NeedsRefresh`), and the equip plays the next item's
     ready pose or stops the slot, so the clip's follow-through blends out over the equip's
     blend rather than playing to its end.
@@ -204,15 +236,17 @@ menu polls its own copy from `DrawHUD`, which does.
     the automatic equipped in the thrown item's place.
   - **The click needs last frame's `ThrowAiming`:** the Branch sits before the arc is drawn,
     so a click on the frame V goes down throws nothing.
-  - **The arc is per item.** `ThrowArcDegrees` defaults to `THROW_PITCH_UP_DEG` (30) on
+  - **The lob's arc is per item.** `ThrowArcDegrees` defaults to `THROW_PITCH_UP_DEG` (30) on
     `BP_WeaponItem`, so food and water use it; a gun's is its `throw_arc` cell in
-    `gun_tuning.csv`, the GUN TUNING tab's last row. So are the speed (`ThrowSpeed`, 1100
+    `gun_tuning.csv`, the GUN TUNING tab's last row. It is the tip over the view of a
+    throw at nothing in reach. Per item too are the speed (`ThrowSpeed`, 1100
     cm/s) and the tumble (`ThrowSpinDegS`, 540°/s): the launch reads the one off `Held`, the
     flight the other off `Thrown`.
   - **A melee weapon is thrown, not lobbed** (`throw_tuning.MELEE_THROW`, spread into the
-    knife's and the axe's defaults; a sword's builder would do the same): 8° up at 1800 cm/s,
-    which rises 30 cm over the hand and carries 15 m, against the lob's 1.5 m over 13 m, and
-    1080°/s of spin. Its `ThrowEdgeOn` makes the release square it up
+    knife's and the axe's defaults; a sword's builder would do the same): 1800 cm/s, so its
+    curve to a point 10 m off is nearly flat and it reaches 33 m; 8° up at nothing in
+    reach, which rises 30 cm over the hand and carries 15 m, against the lob's 1.5 m over
+    13 m; and 1080°/s of spin. Its `ThrowEdgeOn` makes the release square it up
     (`throw_flight._author_square`): `MakeRotFromX(ThrowVelocity)` on the detached item, so
     its X runs along the throw and its Y level across it. Every melee model is built blade
     up, edge towards +X, so the blade's plane is then the plane it flies in and the tumble,
@@ -506,9 +540,19 @@ These are feel checks a headless run can't do:
 - how the sights' pitch looks at steep angles (the eye swings on an arc round the spine);
 - the throw: whether V and its arc read well (dot size and spacing, the landing disc on
   slopes), whether 11 m/s at 30° up feels right, holding V and clicking with a real
-  keyboard and mouse (the probe forces both); the throw's clip: whether the 0.35 s
-  wind-up feels late, the follow-through cut short by the re-equip, how it reads with a
-  two-handed gun in the fist, crouched and prone; and whether 540°/s of tumble suits
+  keyboard and mouse (the probe forces both); the throw's clip: whether the release
+  0.12 s after the click feels right, the follow-through cut short by the re-equip, how
+  it reads with a two-handed gun in the fist, crouched and prone;
+- the throw at the reticle (`weapon_component/throw_launch.py`): whether the arc reads
+  as under the reticle (it starts 55 cm to one side and closes on the point); the arc
+  jumping as the reticle crosses the edge of a near thing onto far ground, or leaves
+  the item's reach (12 m for a lobbed item: just inside it the throw goes up at about
+  45°, just outside it is the tipped lob); a gun thrown straight at a point 3 m off at
+  11 m/s, which is fast for a lob;
+- the ready pose (`throw_pose.py`): how the cocked arm reads from behind with a long gun
+  in the fist (seen once, in one windowed shot: the shotgun stands up beside the head),
+  the 0.15 s it takes going up and coming down, holding it while walking, crouched and
+  prone, and with the left hand of a two-handed gun left where the pose puts it; and whether 540°/s of tumble suits
   every item; a melee weapon's throw: whether 18 m/s at 8° up reads as thrown hard rather
   than shot, whether three turns a second reads as a spin or a blur, and the snap as the
   knife or the axe squares up to the throw on leaving the hand;

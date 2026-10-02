@@ -8,7 +8,8 @@ forest_generator/npc_strafe.py (the step between swings) and
 forest_generator/npc_stalk.py (the wendigo's hunt) and
 forest_generator/npc_ward.py (fire holding it off), none of
 which imports `unreal`, so the offline generator reads the same values.
-The senses, patrol, speed, melee and health numbers are then overlaid by
+The senses, patrol, speed, melee and health numbers, and those of the hunt
+and the fire that a developer tunes, are then overlaid by
 npc/monster_tuning.csv (monster_tuning.py) and baked as the controller's
 Tune* variable defaults (tuned.py), not as pin literals. The
 noise record the senses listen to, and the per-gun ShotVolume, are combat's
@@ -18,8 +19,8 @@ DATA (constants -- no Blueprint authoring)
   paths        /Game paths, the controller's variable names, mesh offsets
   nodes        FN_* function paths, NODE_* palette names
   monster_tuning  the tunable stats (MONSTER_STATS), monster_tuning.csv and
-               monster_specs(): the CSV over npc_agro/npc_placement's
-               literals, per creature. Pure Python (the game's save uses it)
+               monster_specs(): the CSV over npc_agro/npc_placement/
+               npc_stalk/npc_ward's literals, per creature. Pure Python (the game's save uses it)
 
 SHARED AUTHORING HELPERS
   graph        create/load a Blueprint, pins, connect, _set, _resolve

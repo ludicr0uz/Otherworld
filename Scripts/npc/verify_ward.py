@@ -26,7 +26,7 @@ from forest_generator.npc_ward import (
     NPC_WARD_ARC_DEG, NPC_WARD_FEARS, NPC_WARD_FLEE_NAV_EXTENT_CM,
     NPC_WARD_FLEE_S, NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S,
     NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
-    NPC_WARD_RING_CM, NPC_WARD_SPEED_SCALE, NPC_WARD_STALLED_CMS,
+    NPC_WARD_RING_CM, NPC_WARD_STALLED_CMS,
     NPC_WARD_TURN_MAX_S, NPC_WARD_TURN_MIN_S,
 )
 from npc.paths import (
@@ -35,10 +35,9 @@ from npc.paths import (
     WARD_LAST_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR, WARD_TURN_AT_VAR,
 )
 from npc.verify import (
-    BEL, PIN, _close, _drivers, _exec_reach, _feeders, _ins, _lit, _num,
+    BEL, PIN, _close, _drivers, _exec_reach, _fed, _feeders, _ins, _lit, _num,
     _sources, _title, _titled, check, step_nodes,
 )
-from npc.ward import WARD_MIN_DOT
 
 
 def _titles(nodes):
@@ -124,17 +123,18 @@ def check_held(tag, own):
     fed = _titles(_sources(gate, "Condition", limit=200))
     near, front = _tests(gate, "float <= float"), _tests(gate, "float > float")
     check(f"{tag}: held off only with the fire up, within "
-          f"{NPC_WARD_RANGE_CM:.0f} cm (flat)...",
-          len(near) == 1 and _close(_num(near[0], "B"), NPC_WARD_RANGE_CM)
+          f"TuneWardRange (flat)...",
+          len(near) == 1 and _fed(near[0], "B", "ward_range_cm")
           and _titles(_feeders(near[0], "A")) == {"Distance2D (Vector)"}
-          and "OR Boolean" not in fed, f"{[_lit(n, 'B') for n in near]}")
-    check(f"{tag}: ...and within {NPC_WARD_HALF_ANGLE_DEG:.0f} deg of where the "
+          and "OR Boolean" not in fed, f"{len(near)} tests")
+    edges = [c for t in front for c in _feeders(t, "B")]
+    check(f"{tag}: ...and within DegCos(TuneWardHalfAngle) of where the "
           f"player faces: further round, it is past the fire",
           len(front) == 1 and _titles(_feeders(front[0], "A")) == {"Dot Product"}
-          and (_close(_num(front[0], "B"), WARD_MIN_DOT)
-               or (WARD_MIN_DOT == 0.0 and _zero(front[0], "B")))
+          and len(edges) == 1 and _title(edges[0]) == "Cos (Degrees)"
+          and _fed(edges[0], "A", "ward_half_angle_deg")
           and {"GetActorForwardVector", "Normalize 2D (Vector)", "GetPlayerPawn"} <= fed,
-          f"{[_lit(n, 'B') for n in front]} of {WARD_MIN_DOT}")
+          f"{_titles(edges)}")
     casts = [d for d in _drivers(gate) if "WeaponComponent" in _title(d)]
     valid = [d for c in casts for d in _drivers(c) if _title(d) == "Branch"]
     check(f"{tag}: the fire is read off the player's weapon component, behind a "
@@ -195,7 +195,7 @@ def check_hold(tag, own, gate):
     times = _titled(own, f"Set {WARD_TURN_AT_VAR}")
     sums = [a for t in times for a in _feeders(t, WARD_TURN_AT_VAR)]
     throws = [r for a in sums for r in _feeders(a, "B")]
-    check(f"{tag}: ...which is {NPC_WARD_TURN_MIN_S:g}-{NPC_WARD_TURN_MAX_S:g} s "
+    check(f"{tag}: ...which is TuneWardTurnMin-Max s "
           f"(one throw each) after the hold began, and after each turn",
           len(times) == 2 and len(thrown) == 1 and len(flips) == 1
           and [t for t in times if t in _after(BEL.find_then_pin(thrown[0]))]
@@ -204,8 +204,8 @@ def check_hold(tag, own, gate):
           and all(_title(a) == "float + float"
                   and _titles(_feeders(a, "A")) == {"GetTimeSeconds"} for a in sums)
           and all(_title(r) == "RandomFloatInRange"
-                  and _close(_num(r, "Min"), NPC_WARD_TURN_MIN_S)
-                  and _close(_num(r, "Max"), NPC_WARD_TURN_MAX_S)
+                  and _fed(r, "Min", "ward_turn_min_s")
+                  and _fed(r, "Max", "ward_turn_max_s")
                   and len(PIN.list_connected_pins(
                       BEL.find_output_pin(r, "ReturnValue"))) == 1 for r in throws),
           f"{len(times)} writes of {WARD_TURN_AT_VAR}")
@@ -216,13 +216,13 @@ def check_hold(tag, own, gate):
           and _titles(_feeders(stamps[0], WARD_LAST_VAR)) == {"GetTimeSeconds"}
           and len(_drivers(stamps[0])) == 3)
     limits = [t for b in spent for t in _tests(b, "float >= float")]
-    check(f"{tag}: held off {NPC_WARD_HOLD_S:.0f} s (now - {WARD_SINCE_VAR}), "
+    check(f"{tag}: held off TuneWardHold s (now - {WARD_SINCE_VAR}), "
           f"it gives up",
           len(spent) == 1 and _title(spent[0]) == "Branch" and len(limits) == 1
-          and _close(_num(limits[0], "B"), NPC_WARD_HOLD_S)
+          and _fed(limits[0], "B", "ward_hold_s")
           and {"GetTimeSeconds", f"Get {WARD_SINCE_VAR}"}
           <= _titles(_sources(spent[0], "Condition")),
-          f"{[_lit(t, 'B') for t in limits]}")
+          f"{len(limits)} limits")
     return spent[0] if len(spent) == 1 else None
 
 
@@ -240,8 +240,8 @@ def check_circle(tag, own, spent):
     turns = [n for n in goal if _title(n) == "Rotate Vector Around Axis"]
     arcs = [m for t in turns for m in _feeders(t, "AngleDeg")]
     rings = [n for n in goal if _title(n) == "MakeVector"
-             and all(_close(_num(n, axis), NPC_WARD_RING_CM) for axis in "XYZ")]
-    check(f"{tag}: ...to a point {NPC_WARD_RING_CM:.0f} cm from the player, "
+             and all(_fed(n, axis, "ward_ring_cm") for axis in "XYZ")]
+    check(f"{tag}: ...to a point TuneWardRing from the player, "
           f"{NPC_WARD_ARC_DEG:.0f} deg further round them than it stands, the "
           f"hold's way",
           len(turns) == 1 and len(arcs) == 1 and len(rings) == 1
@@ -250,8 +250,8 @@ def check_circle(tag, own, spent):
           and _titles(_feeders(turns[0], "InVect")) == {"Normalize 2D (Vector)"})
     paces = [n for n in ring if _title(n) == "Set MaxWalkSpeed"]
     scale = [n for p in paces for n in _sources(p, "MaxWalkSpeed")
-             if _title(n) == "float * float" and _close(_num(n, "B"), NPC_WARD_SPEED_SCALE)]
-    check(f"{tag}: ...at {NPC_WARD_SPEED_SCALE:.0%} of its run",
+             if _title(n) == "float * float" and _fed(n, "B", "ward_speed_scale")]
+    check(f"{tag}: ...at TuneWardSpeed of its run",
           len(paces) == 1 and len(scale) == 1 and paces[0] in _exec_reach(moves[0]))
 
 
@@ -259,10 +259,10 @@ def check_flight(tag, own, event, spent, key):
     gave_up = _exec_reach(_after(BEL.find_then_pin(spent))[0])
     untils = _titled(own, f"Set {WARD_FLEE_UNTIL_VAR}")
     lasts = [a for u in untils for a in _feeders(u, WARD_FLEE_UNTIL_VAR)]
-    check(f"{tag}: giving up, it runs for {NPC_WARD_FLEE_S:.0f} s, and the "
+    check(f"{tag}: giving up, it runs for TuneWardFlee s, and the "
           f"hold is over ({WARD_SINCE_VAR} back to 0)",
           len(untils) == 1 and untils[0] in gave_up and len(lasts) == 1
-          and _close(_num(lasts[0], "B"), NPC_WARD_FLEE_S)
+          and _fed(lasts[0], "B", "ward_flee_s")
           and _titles(_feeders(lasts[0], "A")) == {"GetTimeSeconds"}
           and len([s for s in _titled(gave_up, f"Set {WARD_SINCE_VAR}")
                    if _zero(s, WARD_SINCE_VAR)]) == 1)
@@ -320,7 +320,7 @@ def check_flight(tag, own, event, spent, key):
     paces = [n for n in run if _title(n) == "Set MaxWalkSpeed"]
     check(f"{tag}: ...at its full run",
           len(paces) == 1 and not any(
-              _close(_num(n, "B"), NPC_WARD_SPEED_SCALE)
+              _fed(n, "B", "ward_speed_scale")
               for n in _sources(paces[0], "MaxWalkSpeed") if _title(n) == "float * float"))
 
 

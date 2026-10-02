@@ -20,10 +20,7 @@ import math
 import unreal
 
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
-from forest_generator.npc_stalk import (
-    NPC_STALK_CHARGE_CM, NPC_STALK_TURN_MAX_S, NPC_STALK_TURN_MIN_S,
-)
-from npc.monster_tuning import TUNED_VAR
+from npc.monster_tuning import TUNED_VAR, monster_specs
 from npc.paths import (
     AGGRO_VAR, ENRAGED_VAR, NPC_DIR, STALK_CHARGING_VAR, STALK_LEGS_VAR,
     STALK_ROAR_UNTIL_VAR, STALK_SIDE_VAR, STALK_TURN_AT_VAR,
@@ -31,6 +28,12 @@ from npc.paths import (
 from probes.probe_wendigo_stalk import (
     START_CM, _about, _on_navmesh, _stand_in_sight, _walk_speed, _wendigos,
 )
+
+# The tuned numbers (the MONSTER TUNING tab's rows): monster_tuning.csv's, as built.
+_SPEC = monster_specs("Wendigo")
+STALK_CHARGE_CM = _SPEC["stalk_charge_cm"]
+STALK_TURN_MAX_S = _SPEC["stalk_turn_max_s"]
+STALK_TURN_MIN_S = _SPEC["stalk_turn_min_s"]
 
 WENDIGO_AI = f"{NPC_DIR}/BP_ForestWandererAI_Wendigo"
 WRITABLE = [(WENDIGO_AI, STALK_TURN_AT_VAR), (HEALTH_BP_PATH, "DamagedByPlayer")]
@@ -89,16 +92,16 @@ def probe(p):
             and float(p.get(ctrl, STALK_SIDE_VAR)) == -side,
             f"side {side:+.0f} -> {float(p.get(ctrl, STALK_SIDE_VAR)):+.0f}, "
             f"{int(p.get(ctrl, STALK_LEGS_VAR)) - legs} more legs")
-    p.check(f"...and the turn after that is {NPC_STALK_TURN_MIN_S:g}-"
-            f"{NPC_STALK_TURN_MAX_S:g} s on",
-            NPC_STALK_TURN_MIN_S - BEAT_S <= ahead <= NPC_STALK_TURN_MAX_S + BEAT_S,
+    p.check(f"...and the turn after that is {STALK_TURN_MIN_S:g}-"
+            f"{STALK_TURN_MAX_S:g} s on",
+            STALK_TURN_MIN_S - BEAT_S <= ahead <= STALK_TURN_MAX_S + BEAT_S,
             f"{ahead:.1f} s")
 
     # --- the shot ---------------------------------------------------------------
     before = _sample(npc, player)
     legs, shot_at = int(p.get(ctrl, STALK_LEGS_VAR)), p.time()
     p.check("it is shot outside the charge range, still hunting",
-            before["gap"] > NPC_STALK_CHARGE_CM + 200.0
+            before["gap"] > STALK_CHARGE_CM + 200.0
             and not p.get(ctrl, STALK_CHARGING_VAR) and not p.get(ctrl, ENRAGED_VAR),
             f"{before['gap'] / 100:.1f} m off")
     p.set(p.component(npc, HEALTH_CLASS_PATH), "DamagedByPlayer", True)

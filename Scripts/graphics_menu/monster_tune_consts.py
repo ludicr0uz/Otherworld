@@ -11,6 +11,9 @@ read one table.
 
 The stats, their steps and minimums are npc/monster_tuning.MONSTER_STATS;
 each is a Tune* variable on every creature's AI controller (npc/tuned.py).
+With the wendigo's hunt and what fire does to it there are more rows than
+the panel is tall, so the list scrolls: MON_VISIBLE_ROWS at a time, and the
+wheel moves the caret (tune_tab.TuneTab.visible_rows).
 """
 
 from forest_generator.npc_placement import NPC_VARIANTS
@@ -35,6 +38,10 @@ MON_TUNE_STEPS_VAR = "MonTuneSteps"
 MON_TUNE_MINS_VAR = "MonTuneMins"
 
 MON_STAT_COUNT = len(MONSTER_STATS)
+# The list's window, and the label column: "fire: holds it off within (cm)"
+# is wider than the other tabs' labels.
+MON_VISIBLE_ROWS = 14
+MON_LABEL_W = 300.0
 MON_CREATURES = tuple(v.key for v in NPC_VARIANTS)
 # Each creature's controller class, which the HUD writes the table onto.
 MON_CONTROLLERS = tuple(
@@ -58,4 +65,5 @@ MONSTER_TAB = TuneTab(
     row_labels=("creature",) + tuple(s[2] for s in MONSTER_STATS),
     hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                "ENTER  save to monster_tuning.csv"),
-    saved_words="saved to Scripts/npc/monster_tuning.csv")
+    saved_words="saved to Scripts/npc/monster_tuning.csv",
+    label_w=MON_LABEL_W, visible_rows=MON_VISIBLE_ROWS)

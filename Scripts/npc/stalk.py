@@ -36,9 +36,12 @@ charge. The numbers are forest_generator/npc_stalk.py's.
               face the way it runs -> SimpleMoveToLocation(StalkCover)
               -> the leg speed                                         succeed
 
-A leg is run faster than the chase (NPC_STALK_RUN_SCALE of the run speed);
+A leg is run faster than the chase (TuneStalkSpeed of the run speed);
 the Chase step writes the run speed back on its first pass, so the charge is
-at the run. Enraged is its own latch, apart from StalkCharging, which a
+at the run. The charge range, the catch-up range, the leg speed, the wait
+behind a trunk and the time between two turns are the controller's
+TuneStalk* variables (npc/tuned.py: the MONSTER TUNING tab's "hunt:" rows),
+defaulted to npc_stalk.py's numbers. Enraged is its own latch, apart from StalkCharging, which a
 flight from fire clears (npc/ward.py): a wendigo that has been shot comes
 back from one charging, not hunting.
 
@@ -56,11 +59,8 @@ counts the chase's MoveToActor and MoveToLocation, one of each.
 """
 
 from forest_generator.npc_stalk import (
-    NPC_STALK_ARRIVE_CM, NPC_STALK_CATCH_UP_CM, NPC_STALK_CHARGE_CM,
-    NPC_STALK_HIDE_MAX_S, NPC_STALK_HIDE_MIN_S, NPC_STALK_OPEN_ARRIVE_CM,
-    NPC_STALK_ROAR_BLEND_S, NPC_STALK_ROAR_S,
-    NPC_STALK_RUN_SCALE, NPC_STALK_STALLED_CMS, NPC_STALK_TURN_MAX_S,
-    NPC_STALK_TURN_MIN_S,
+    NPC_STALK_ARRIVE_CM, NPC_STALK_OPEN_ARRIVE_CM, NPC_STALK_ROAR_BLEND_S,
+    NPC_STALK_ROAR_S, NPC_STALK_STALLED_CMS,
 )
 from npc.graph import (
     BEL, _Graph, _asset_sub, _connect, _log, _loose_pin, _mesh_object, _palette,
@@ -84,6 +84,7 @@ from npc.senses import _author_hurt
 from npc.sound import _author_random_sound
 from npc.stalk_cover import _author_cover, declare_cover_vars
 from npc.strafe import _author_facing
+from npc.tuned import tuned_pin
 
 
 def declare_stalk_vars(ed):
@@ -130,8 +131,9 @@ def _author_rage(g, exec_in, pins, result, x0, y0):
 def _author_turn_time(g, exec_in, since, x0, y0):
     """StalkTurnAt = ``since`` (a game time pin) + one throw of the time
     between two turns. Returns the Set's then pin."""
-    throw = g.call(FN_RANDOM_FLOAT, x0, y0 + 460, Min=NPC_STALK_TURN_MIN_S,
-                   Max=NPC_STALK_TURN_MAX_S)
+    throw = g.call(FN_RANDOM_FLOAT, x0, y0 + 460)
+    _connect(tuned_pin(g, "stalk_turn_min_s", x0 - 260, y0 + 460), _pin(throw, "Min"))
+    _connect(tuned_pin(g, "stalk_turn_max_s", x0 - 260, y0 + 600), _pin(throw, "Max"))
     due = g.op(FN_ADD_FF, since, out(throw), x0 + 240, y0 + 300)
     return g.put(STALK_TURN_AT_VAR, exec_in, x0 + 480, y0, pin=due)
 
@@ -195,7 +197,8 @@ def _author_roar(g, exec_in, pins, roar_anim, x0, y0):
 def _author_catch_up(g, exec_in, pins, stock, result, x0, y0):
     """Too far off to stalk: straight at the player, at the speed of a leg.
     Returns the exec pin of a pass that is near enough to hunt."""
-    beyond = g.op(FN_GT_FF, pins["gap"], NPC_STALK_CATCH_UP_CM, x0, y0 + 300)
+    beyond = g.op(FN_GT_FF, pins["gap"],
+                  tuned_pin(g, "stalk_catch_up_cm", x0 - 260, y0 + 440), x0, y0 + 300)
     far = g.branch(beyond, exec_in, x0 + 260, y0)
     # No leg is under way: the first pass inside the range picks one.
     step = g.put(STALK_LEG_UNTIL_VAR, BEL.find_then_pin(far), x0 + 560, y0 - 900,
@@ -210,7 +213,7 @@ def _author_catch_up(g, exec_in, pins, stock, result, x0, y0):
     _connect(step, _pin(run, "execute"))
     ran, tails, _entry = _author_walk_speed(g.ed, [BEL.find_then_pin(run)], False,
                                             stock, x0 + 2900, y0 - 900,
-                                            scale=NPC_STALK_RUN_SCALE)
+                                            scale="stalk_run_scale")
     g.made.extend(ran)
     for tail in tails:
         _connect(tail, result(True, x0 + 4400, y0 - 900))
@@ -243,8 +246,9 @@ def _author_leg(g, exec_in, pins, stock, result, x0, y0):
     step = g.put(STALK_ARRIVED_VAR, BEL.find_then_pin(covered), x0 + 960, y0,
                  literal="true")
     # One throw per leg.
-    wait = g.call(FN_RANDOM_FLOAT, x0 + 900, y0 + 460, Min=NPC_STALK_HIDE_MIN_S,
-                  Max=NPC_STALK_HIDE_MAX_S)
+    wait = g.call(FN_RANDOM_FLOAT, x0 + 900, y0 + 460)
+    _connect(tuned_pin(g, "stalk_hide_min_s", x0 + 640, y0 + 460), _pin(wait, "Min"))
+    _connect(tuned_pin(g, "stalk_hide_max_s", x0 + 640, y0 + 600), _pin(wait, "Max"))
     until = g.op(FN_ADD_FF, pins["now"], out(wait), x0 + 1140, y0 + 300)
     step = g.put(STALK_LEG_UNTIL_VAR, step, x0 + 1380, y0, pin=until)
     watch, step = _author_facing(g.ed, [step], pins["player"], x0 + 1700, y0)
@@ -261,7 +265,7 @@ def _author_leg(g, exec_in, pins, stock, result, x0, y0):
     stalled = g.branch(slow, BEL.find_else_pin(there), x0 + 1380, y0 + 800)
     ran, tails, _entry = _author_walk_speed(g.ed, [BEL.find_else_pin(stalled)], False,
                                             stock, x0 + 1700, y0 + 1300,
-                                            scale=NPC_STALK_RUN_SCALE)
+                                            scale="stalk_run_scale")
     g.made.extend(ran)
     for tail in tails:
         _connect(tail, result(True, x0 + 3200, y0 + 1300))
@@ -313,7 +317,9 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock, x0, y0):
     # --- close enough: charge ------------------------------------------------
     near = _author_catch_up(g, BEL.find_else_pin(roaring), pins, stock, result,
                             x0 + 1900, y0 - 2400)
-    inside = g.op(FN_LE_FF, pins["gap"], NPC_STALK_CHARGE_CM, x0 + 2000, y0 + 300)
+    inside = g.op(FN_LE_FF, pins["gap"],
+                  tuned_pin(g, "stalk_charge_cm", x0 + 1740, y0 + 440),
+                  x0 + 2000, y0 + 300)
     close = g.branch(inside, near, x0 + 2260, y0)
     charge = [BEL.find_then_pin(close)]
 
@@ -340,7 +346,7 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock, x0, y0):
     _connect(step, _pin(run, "execute"))
     ran, tails, _entry = _author_walk_speed(ed, [BEL.find_then_pin(run)], False, stock,
                                             x0 + 11000, y0 + 4200,
-                                            scale=NPC_STALK_RUN_SCALE)
+                                            scale="stalk_run_scale")
     for tail in tails:
         _connect(tail, result(True, x0 + 12500, y0 + 4200))
     return g.made, cover + ahead + ran

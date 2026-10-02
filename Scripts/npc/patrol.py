@@ -20,7 +20,9 @@ def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0, scale=None):
     """MaxWalkSpeed = RunSpeed * TuneRunSpeed / ``stock`` [* TunePatrolSpeed]
     on the possessed Character: the run, or with ``stroll`` the patrol walk,
     or with ``scale`` that fraction of the run (the step between two swings,
-    npc/strafe.py).
+    npc/strafe.py). A ``scale`` that is a string is a MONSTER_STATS column:
+    the fraction is that Tune variable (a wendigo's leg, its prowl round a
+    fire).
 
     RunSpeed is what the pawn had at setup (this creature and the level's
     per-instance gait); ``stock`` is the creature's built run speed, so the
@@ -68,7 +70,12 @@ def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0, scale=None):
     if scale is not None:
         eased = keep(_at(_node(ed, FN_MUL_FF), x0 + 960, y0 + 440))
         _connect(speed, _pin(eased, "A"))
-        _set(eased, "B", scale)
+        if isinstance(scale, str):
+            share, share_out = tuned(ed, scale, x0 + 720, y0 + 720)
+            keep(share)
+            _connect(share_out, _pin(eased, "B"))
+        else:
+            _set(eased, "B", scale)
         speed = _pin(eased, "ReturnValue", is_input=False)
     write = keep(_at(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH),
                      x0 + 1200, y0))

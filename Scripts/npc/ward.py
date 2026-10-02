@@ -28,6 +28,11 @@ from where the player's body faces to where the wendigo stands, so a wendigo
 that gets further round than the half angle is past the fire: the step
 fails, and the charge and the swing are the ordinary ones.
 
+The range, the half angle (through DegCos), the ring, the prowl speed, the
+time between two turns, the hold and the flight are the controller's
+TuneWard* variables (npc/tuned.py: the MONSTER TUNING tab's "fire:" rows),
+defaulted to npc_ward.py's numbers.
+
 The fire is the player's: FireWard on BP_WeaponComponent (combat/paths.py),
 read through a cast behind an IsValid Branch, as a condition is pulled even
 when its object is null.
@@ -36,23 +41,18 @@ SimpleMoveToLocation, as the stroll, the strafe and the stalk are: the level
 verifier counts the chase's MoveToActor and MoveToLocation, one of each.
 """
 
-import math
-
 import unreal
 
 from combat.paths import FIRE_WARD_VAR, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from forest_generator.npc_ward import (
     NPC_WARD_ARC_DEG, NPC_WARD_FEARS, NPC_WARD_FLEE_NAV_EXTENT_CM,
-    NPC_WARD_FLEE_S, NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S,
-    NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
-    NPC_WARD_RING_CM, NPC_WARD_SPEED_SCALE, NPC_WARD_STALLED_CMS,
-    NPC_WARD_TURN_MAX_S, NPC_WARD_TURN_MIN_S,
+    NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S, NPC_WARD_STALLED_CMS,
 )
 from npc.graph import (
     BEL, _Graph, _asset_sub, _connect, _log, _loose_pin, _palette, _pin, out,
 )
 from npc.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_DISTANCE_2D, FN_DOT_VV,
+    FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_DEG_COS, FN_DISTANCE_2D, FN_DOT_VV,
     FN_EQ_FF, FN_FORWARD, FN_GE_FF, FN_GET_COMP, FN_GET_CONTROLLER, FN_GET_PAWN,
     FN_GET_PLAYER_PAWN, FN_GT_FF, FN_IS_VALID, FN_LE_FF, FN_LT_FF,
     FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VV, FN_NORMAL_2D, FN_OR, FN_PROJECT_NAV,
@@ -66,11 +66,7 @@ from npc.paths import (
 )
 from npc.patrol import _author_walk_speed
 from npc.strafe import _author_facing
-
-# Dot(the player's forward, the unit bearing to the wendigo) at the edge of
-# "in front". Rounded: cos(90 deg) is not quite 0 in floating point.
-WARD_MIN_DOT = round(math.cos(math.radians(NPC_WARD_HALF_ANGLE_DEG)), 4)
-
+from npc.tuned import tuned_pin
 
 def wards(key):
     """Does creature ``key`` get the step? It has to fear fire, and the
@@ -107,8 +103,14 @@ def declare_ward_vars(ed):
 
 
 def _thrice(g, value, x, y):
-    """A vector of three of ``value``: vector x float is a wildcard node."""
-    return out(g.call(FN_MAKE_VECTOR, x, y, X=value, Y=value, Z=value))
+    """A vector of three of ``value`` (a number or a pin): vector x float is
+    a wildcard node."""
+    if isinstance(value, (int, float)):
+        return out(g.call(FN_MAKE_VECTOR, x, y, X=value, Y=value, Z=value))
+    node = g.call(FN_MAKE_VECTOR, x, y)
+    for axis in "XYZ":
+        _connect(value, _pin(node, axis))
+    return out(node)
 
 
 def _author_held(g, exec_in, pins, x0, y0):
@@ -129,11 +131,14 @@ def _author_held(g, exec_in, pins, x0, y0):
     _connect(_loose_pin(cast, "AsBPWeaponComponent", is_input=False),
              _pin(fire, "self"))
 
-    near = g.op(FN_LE_FF, pins["gap"], NPC_WARD_RANGE_CM, x0 + 840, y0 + 400)
+    near = g.op(FN_LE_FF, pins["gap"],
+                tuned_pin(g, "ward_range_cm", x0 + 580, y0 + 440), x0 + 840, y0 + 400)
     facing = g.call(FN_FORWARD, x0 + 540, y0 + 560)
     _connect(pins["player"], _pin(facing, "self"))
     dot = g.op(FN_DOT_VV, out(facing), pins["bearing"], x0 + 840, y0 + 560)
-    front = g.op(FN_GT_FF, dot, WARD_MIN_DOT, x0 + 1080, y0 + 560)
+    edge = g.call(FN_DEG_COS, x0 + 840, y0 + 720)
+    _connect(tuned_pin(g, "ward_half_angle_deg", x0 + 580, y0 + 720), _pin(edge, "A"))
+    front = g.op(FN_GT_FF, dot, out(edge), x0 + 1080, y0 + 560)
     lit = g.op(FN_AND, _pin(fire, FIRE_WARD_VAR, is_input=False), near,
                x0 + 1080, y0 + 300)
     held = g.branch(g.op(FN_AND, lit, front, x0 + 1320, y0 + 400),
@@ -146,8 +151,9 @@ def _author_held(g, exec_in, pins, x0, y0):
 def _author_turn_time(g, exec_in, pins, x0, y0):
     """WardTurnAt = now + one throw of the time between two turns. Returns
     the Set's then pin."""
-    throw = g.call(FN_RANDOM_FLOAT, x0, y0 + 460, Min=NPC_WARD_TURN_MIN_S,
-                   Max=NPC_WARD_TURN_MAX_S)
+    throw = g.call(FN_RANDOM_FLOAT, x0, y0 + 460)
+    _connect(tuned_pin(g, "ward_turn_min_s", x0 - 260, y0 + 460), _pin(throw, "Min"))
+    _connect(tuned_pin(g, "ward_turn_max_s", x0 - 260, y0 + 600), _pin(throw, "Max"))
     due = g.op(FN_ADD_FF, pins["now"], out(throw), x0 + 240, y0 + 300)
     return g.put(WARD_TURN_AT_VAR, exec_in, x0 + 480, y0, pin=due)
 
@@ -192,7 +198,8 @@ def _author_hold(g, exec_in, pins, x0, y0):
                     x0 + 1900, y0, pin=pins["now"])
     so_far = g.op(FN_SUB_FF, pins["now"], g.get(WARD_SINCE_VAR, x0 + 1900, y0 + 440),
                   x0 + 2140, y0 + 300)
-    spent = g.op(FN_GE_FF, so_far, NPC_WARD_HOLD_S, x0 + 2380, y0 + 300)
+    spent = g.op(FN_GE_FF, so_far, tuned_pin(g, "ward_hold_s", x0 + 2140, y0 + 440),
+                 x0 + 2380, y0 + 300)
     return g.branch(spent, stamped, x0 + 2640, y0)
 
 
@@ -209,7 +216,8 @@ def _author_circle(g, exec_in, pins, stock, x0, y0):
     _connect(out(g.call(FN_MAKE_VECTOR, x0 + 1940, y0 + 700, Z=1.0)),
              _pin(round_them, "Axis"))
     reach = g.op(FN_MUL_VV, out(round_them),
-                 _thrice(g, NPC_WARD_RING_CM, x0 + 2200, y0 + 700), x0 + 2460, y0 + 400)
+                 _thrice(g, tuned_pin(g, "ward_ring_cm", x0 + 1940, y0 + 860),
+                         x0 + 2200, y0 + 700), x0 + 2460, y0 + 400)
     spot = g.op(FN_ADD_VV, pins["player_loc"], reach, x0 + 2700, y0 + 400)
     me = g.call(FN_GET_CONTROLLER, x0 + 2700, y0 + 600)
     _connect(pins["self_pawn"], _pin(me, "self"))
@@ -219,7 +227,7 @@ def _author_circle(g, exec_in, pins, stock, x0, y0):
     _connect(step, _pin(go, "execute"))
     prowl, tails, _entry = _author_walk_speed(
         g.ed, [BEL.find_then_pin(go)], False, stock, x0 + 3260, y0,
-        scale=NPC_WARD_SPEED_SCALE)
+        scale="ward_speed_scale")
     g.made.extend(prowl)
     return tails
 
@@ -294,7 +302,9 @@ def _author_ward(ed, exec_in, result, stock, restalks, x0, y0):
 
     # --- held off long enough: it gives up ------------------------------------
     gone = g.put(WARD_FLEE_UNTIL_VAR, BEL.find_then_pin(spent), x0 + 6300, y0 + 1600,
-                 pin=g.op(FN_ADD_FF, pins["now"], NPC_WARD_FLEE_S, x0 + 6040, y0 + 1900))
+                 pin=g.op(FN_ADD_FF, pins["now"],
+                          tuned_pin(g, "ward_flee_s", x0 + 5780, y0 + 2040),
+                          x0 + 6040, y0 + 1900))
     gone = g.put(WARD_SINCE_VAR, gone, x0 + 6600, y0 + 1600, literal=0.0)
     if restalks:
         # Back from its flight it hunts as it first did: the roar, then tree

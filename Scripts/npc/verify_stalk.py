@@ -34,7 +34,7 @@ from npc.paths import (
     STEP_RESULT_VAR, STEP_STALK, VOICES_VAR,
 )
 from npc.verify import (
-    BEL, PIN, _close, _drivers, _exec_reach, _feeders, _lit, _num, _sources,
+    BEL, PIN, _close, _drivers, _exec_reach, _fed, _feeders, _lit, _num, _sources,
     _title, _titled, check, step_nodes,
 )
 from npc.verify_stalk_cover import (
@@ -49,13 +49,17 @@ def _result(nodes, value):
 
 
 def _limit(branch, measure, bound):
-    """Is ``branch``'s condition one "<measure> <= bound"?"""
+    """Is ``branch``'s condition one "<measure> <= bound"? ``bound`` is a
+    number, or the MONSTER_STATS column whose Tune variable it is."""
     tests = _feeders(branch, "Condition")
+    if not (len(tests) == 1 and _title(tests[0]) == "float <= float"
+            and _titles(_feeders(tests[0], "A")) == {measure}):
+        return False
+    if isinstance(bound, str):
+        return _fed(tests[0], "B", bound)
     # A 0 is the pin's default, which a graph loaded from disk holds as "".
-    return (len(tests) == 1 and _title(tests[0]) == "float <= float"
-            and (_close(_num(tests[0], "B"), bound)
-                 or (bound == 0.0 and _lit(tests[0], "B") == ""))
-            and _titles(_feeders(tests[0], "A")) == {measure})
+    return (_close(_num(tests[0], "B"), bound)
+            or (bound == 0.0 and _lit(tests[0], "B") == ""))
 
 
 def check_settings():
@@ -134,8 +138,8 @@ def _turn_time(stamp):
     throws = [t for a in sums for t in _feeders(a, "B")]
     if not (len(sums) == 1 and _title(sums[0]) == "float + float"
             and len(throws) == 1 and _title(throws[0]) == "RandomFloatInRange"
-            and _close(_num(throws[0], "Min"), NPC_STALK_TURN_MIN_S)
-            and _close(_num(throws[0], "Max"), NPC_STALK_TURN_MAX_S)
+            and _fed(throws[0], "Min", "stalk_turn_min_s")
+            and _fed(throws[0], "Max", "stalk_turn_max_s")
             and len(PIN.list_connected_pins(
                 BEL.find_output_pin(throws[0], "ReturnValue"))) == 1):
         return None
@@ -162,7 +166,7 @@ def check_turns(tag, own):
     again = [s for f in flips for s in _after(BEL.find_then_pin(f))]
     first = [s for s in stamps if s not in again]
     roars = _titled(own, f"Set {STALK_ROAR_UNTIL_VAR}")
-    check(f"{tag}: ...{NPC_STALK_TURN_MIN_S:g}-{NPC_STALK_TURN_MAX_S:g} s (one "
+    check(f"{tag}: ...TuneStalkTurnMin-Max s (one "
           f"throw) after the last turn, or after the roar's end",
           len(stamps) == 2 and len(again) == 1 and again[0] in stamps
           and _titles(_turn_time(again[0]) or []) == {"GetTimeSeconds"}
@@ -224,11 +228,11 @@ def check_rage(tag, own, event, cdo):
 def check_charge(tag, own, event):
     flags = _titled(own, f"Set {STALK_CHARGING_VAR}")
     gates = [d for f in flags for d in _drivers(f)]
-    check(f"{tag}: within {NPC_STALK_CHARGE_CM:.0f} cm of the player it charges: "
+    check(f"{tag}: within TuneStalkCharge of the player it charges: "
           f"StalkCharging is set and the step fails",
           len(flags) == 1 and _is(flags[0], STALK_CHARGING_VAR, True)
           and len([g for g in gates
-                   if _limit(g, "Distance2D (Vector)", NPC_STALK_CHARGE_CM)
+                   if _limit(g, "Distance2D (Vector)", "stalk_charge_cm")
                    and flags[0] in _after(BEL.find_then_pin(g))]) == 1
           and _result(_after(BEL.find_then_pin(flags[0])), False))
     still = [g for g in gates if _title(g) == "Branch"
@@ -254,22 +258,22 @@ def check_charge(tag, own, event):
 
 def _leg_speed(node):
     """Is this a MaxWalkSpeed write of the leg's share of the tuned run?"""
+    shares = [m for m in _feeders(node, "MaxWalkSpeed") if _title(m) == "float * float"]
     return ("Get TuneRunSpeed" in _titles(_sources(node, "MaxWalkSpeed"))
-            and [_num(m, "B") for m in _feeders(node, "MaxWalkSpeed")
-                 if _title(m) == "float * float"] == [NPC_STALK_RUN_SCALE])
+            and len(shares) == 1 and _fed(shares[0], "B", "stalk_run_scale"))
 
 
 def check_catch_up(tag, own):
     """Too far off to stalk, it runs straight at the player."""
     gates = [b for b in _titled(own, "Branch")
              if any(_title(t) == "float > float"
-                    and _close(_num(t, "B"), NPC_STALK_CATCH_UP_CM)
+                    and _fed(t, "B", "stalk_catch_up_cm")
                     and _titles(_feeders(t, "A")) == {"Distance2D (Vector)"}
                     for t in _feeders(b, "Condition"))]
     roars = [b for b in _titled(own, "Branch")
              if {"float < float", "GetTimeSeconds", f"Get {STALK_ROAR_UNTIL_VAR}"}
              == _titles(_sources(b, "Condition"))]
-    check(f"{tag}: further than {NPC_STALK_CATCH_UP_CM / 100:.0f} m from the "
+    check(f"{tag}: further than TuneStalkCatchUp from the "
           f"player, once it has roared, it does not stalk",
           len(gates) == 1 and len(roars) == 1
           and gates[0] in _after(BEL.find_else_pin(roars[0])), f"{len(gates)} gates")
@@ -285,7 +289,7 @@ def check_catch_up(tag, own):
           and runs[0] in _exec_reach(_titled(far, "ClearFocus")[0]))
     speeds = _titled(far, "Set MaxWalkSpeed")
     ends = _titled(far, f"Set {STEP_RESULT_VAR}")
-    check(f"{tag}: ...at the speed of a leg ({NPC_STALK_RUN_SCALE:.0%} of its "
+    check(f"{tag}: ...at the speed of a leg (TuneStalkSpeed of its "
           f"run), and the step succeeds: no charge, no chase",
           len(speeds) == 1 and _leg_speed(speeds[0]) and len(runs) == 1
           and speeds[0] in _exec_reach(runs[0])
@@ -298,7 +302,7 @@ def check_catch_up(tag, own):
           and not _feeders(clears[0], STALK_LEG_UNTIL_VAR)
           and not _with(far, "Start", "End", "Radius"))
     charges = [b for b in _after(BEL.find_else_pin(gates[0]))
-               if _limit(b, "Distance2D (Vector)", NPC_STALK_CHARGE_CM)]
+               if _limit(b, "Distance2D (Vector)", "stalk_charge_cm")]
     check(f"{tag}: inside it, the hunt goes on as before",
           len(charges) == 1 and len(_after(BEL.find_else_pin(gates[0]))) == 1)
 
@@ -315,7 +319,7 @@ def check_legs(tag, own, settled):
           and len(clears) == 1
           and bool(settled) and all(clears[0] in _exec_reach(s) for s in settled))
     speeds = _titled(own, "Set MaxWalkSpeed")
-    check(f"{tag}: it runs its legs at {NPC_STALK_RUN_SCALE:.0%} of its run "
+    check(f"{tag}: it runs its legs at TuneStalkSpeed of its run "
           f"speed: written after the order, and on every pass of a leg",
           len(speeds) == 3 and len(runs) == 1
           and len([s for s in speeds if s in _exec_reach(runs[0])]) == 1
@@ -353,11 +357,11 @@ def check_legs(tag, own, settled):
              if _title(n) == f"Set {STALK_LEG_UNTIL_VAR}"]
     throws = [n for w in waits for n in _sources(w, STALK_LEG_UNTIL_VAR)
               if _title(n) == "RandomFloatInRange"]
-    check(f"{tag}: behind a trunk it waits {NPC_STALK_HIDE_MIN_S:g}-"
-          f"{NPC_STALK_HIDE_MAX_S:g} s (one throw), watching the player",
+    check(f"{tag}: behind a trunk it waits TuneStalkHideMin-"
+          f"Max s (one throw), watching the player",
           len(waits) == 1 and len(throws) == 1
-          and _close(_num(throws[0], "Min"), NPC_STALK_HIDE_MIN_S)
-          and _close(_num(throws[0], "Max"), NPC_STALK_HIDE_MAX_S)
+          and _fed(throws[0], "Min", "stalk_hide_min_s")
+          and _fed(throws[0], "Max", "stalk_hide_max_s")
           and len(PIN.list_connected_pins(
               BEL.find_output_pin(throws[0], "ReturnValue"))) == 1
           and "SelectFloat" not in _titles(_sources(waits[0], STALK_LEG_UNTIL_VAR))

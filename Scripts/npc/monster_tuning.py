@@ -11,6 +11,12 @@ reads, so a value tuned in a game and saved lands in the Blueprints the next
 time build_npc_blueprints.py runs, then build_graphics_menu.py (the HUD's
 copy of the table), and git shows what moved.
 
+The "hunt:" rows are how a wendigo stalks (forest_generator/npc_stalk.py) and
+the "fire:" rows what a burning stick does to it (npc_ward.py). Every
+creature has the columns, since the tab is one table, but only the graphs of
+one that hunts (NPC_STALK_ROAR) or fears fire (NPC_WARD_FEARS) read them: on
+the zombie they change nothing.
+
 A column or row the CSV lacks falls back to the literal. Pure Python (no
 unreal import): the game's save imports it too.
 """
@@ -23,6 +29,16 @@ from forest_generator.npc_placement import (
     NPC_ACCEPTANCE_RADIUS_CM, NPC_MELEE_DAMAGE, NPC_MELEE_INTERVAL_S,
     NPC_MELEE_RANGE_CM, NPC_RUN_SPEED_CMS, NPC_VARIANTS,
 )
+from forest_generator.npc_stalk import (
+    NPC_STALK_CATCH_UP_CM, NPC_STALK_CHARGE_CM, NPC_STALK_HIDE_MAX_S,
+    NPC_STALK_HIDE_MIN_S, NPC_STALK_RUN_SCALE, NPC_STALK_TURN_MAX_S,
+    NPC_STALK_TURN_MIN_S,
+)
+from forest_generator.npc_ward import (
+    NPC_WARD_FLEE_S, NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
+    NPC_WARD_RING_CM, NPC_WARD_SPEED_SCALE, NPC_WARD_TURN_FLOOR_S,
+    NPC_WARD_TURN_MAX_S, NPC_WARD_TURN_MIN_S,
+)
 
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "monster_tuning.csv")
 CREATURE_COLUMN = "creature"
@@ -31,7 +47,9 @@ CREATURE_COLUMN = "creature"
 # (CSV column, the controller's variable, the tab's label, step, minimum).
 # Left/Right on the tab move a value one step and never under its minimum.
 # Every stat is a float. The melee range's minimum keeps it above the chase's
-# acceptance radius, or a wanderer would park out of its own reach.
+# acceptance radius, or a wanderer would park out of its own reach. The hunt's
+# and the fire's rows (see the module docstring) come last; a turn is never
+# under NPC_WARD_TURN_FLOOR_S apart.
 MONSTER_STATS = (
     ("vision_range_cm", "TuneSightRange", "aggro range (cm)", 100.0, 0.0),
     ("vision_half_angle_deg", "TuneSightHalfAngle", "aggro cone (deg each side)", 5.0, 0.0),
@@ -47,6 +65,26 @@ MONSTER_STATS = (
      NPC_ACCEPTANCE_RADIUS_CM + 10.0),
     ("melee_interval_s", "TuneMeleeInterval", "between swings (s)", 0.1, 0.1),
     ("health", "TuneHealth", "health", 10.0, 10.0),
+    ("stalk_charge_cm", "TuneStalkCharge", "hunt: charge from (cm)", 50.0, 300.0),
+    ("stalk_catch_up_cm", "TuneStalkCatchUp", "hunt: run straight beyond (cm)",
+     500.0, 2000.0),
+    ("stalk_run_scale", "TuneStalkSpeed", "hunt: speed x run", 0.05, 0.5),
+    ("stalk_hide_min_s", "TuneStalkHideMin", "hunt: behind a tree min (s)", 0.25, 0.0),
+    ("stalk_hide_max_s", "TuneStalkHideMax", "hunt: behind a tree max (s)", 0.25, 0.0),
+    ("stalk_turn_min_s", "TuneStalkTurnMin", "hunt: turns round min (s)", 0.5,
+     NPC_WARD_TURN_FLOOR_S),
+    ("stalk_turn_max_s", "TuneStalkTurnMax", "hunt: turns round max (s)", 0.5,
+     NPC_WARD_TURN_FLOOR_S),
+    ("ward_range_cm", "TuneWardRange", "fire: holds it off within (cm)", 50.0, 100.0),
+    ("ward_half_angle_deg", "TuneWardHalfAngle", "fire: cone (deg each side)", 5.0, 5.0),
+    ("ward_ring_cm", "TuneWardRing", "fire: circles at (cm)", 25.0, 100.0),
+    ("ward_speed_scale", "TuneWardSpeed", "fire: circling speed x run", 0.05, 0.05),
+    ("ward_turn_min_s", "TuneWardTurnMin", "fire: turns round min (s)", 0.5,
+     NPC_WARD_TURN_FLOOR_S),
+    ("ward_turn_max_s", "TuneWardTurnMax", "fire: turns round max (s)", 0.5,
+     NPC_WARD_TURN_FLOOR_S),
+    ("ward_hold_s", "TuneWardHold", "fire: gives up after (s)", 1.0, 1.0),
+    ("ward_flee_s", "TuneWardFlee", "fire: runs away for (s)", 1.0, 0.0),
 )
 MONSTER_COLUMNS = tuple(s[0] for s in MONSTER_STATS)
 TUNED_VAR = {s[0]: s[1] for s in MONSTER_STATS}
@@ -83,6 +121,21 @@ def stock_specs(key):
         "melee_range_cm": NPC_MELEE_RANGE_CM,
         "melee_interval_s": NPC_MELEE_INTERVAL_S,
         "health": _variant(key).health,
+        "stalk_charge_cm": NPC_STALK_CHARGE_CM,
+        "stalk_catch_up_cm": NPC_STALK_CATCH_UP_CM,
+        "stalk_run_scale": NPC_STALK_RUN_SCALE,
+        "stalk_hide_min_s": NPC_STALK_HIDE_MIN_S,
+        "stalk_hide_max_s": NPC_STALK_HIDE_MAX_S,
+        "stalk_turn_min_s": NPC_STALK_TURN_MIN_S,
+        "stalk_turn_max_s": NPC_STALK_TURN_MAX_S,
+        "ward_range_cm": NPC_WARD_RANGE_CM,
+        "ward_half_angle_deg": NPC_WARD_HALF_ANGLE_DEG,
+        "ward_ring_cm": NPC_WARD_RING_CM,
+        "ward_speed_scale": NPC_WARD_SPEED_SCALE,
+        "ward_turn_min_s": NPC_WARD_TURN_MIN_S,
+        "ward_turn_max_s": NPC_WARD_TURN_MAX_S,
+        "ward_hold_s": NPC_WARD_HOLD_S,
+        "ward_flee_s": NPC_WARD_FLEE_S,
     }
 
 

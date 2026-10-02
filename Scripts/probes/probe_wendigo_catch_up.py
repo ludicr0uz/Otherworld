@@ -19,13 +19,17 @@ import math
 
 import unreal
 
-from forest_generator.npc_stalk import NPC_STALK_CATCH_UP_CM
+from npc.monster_tuning import monster_specs
 from npc.paths import (
     AGGRO_VAR, STALK_CHARGING_VAR, STALK_LEGS_VAR, STALK_ROAR_UNTIL_VAR,
 )
 from probes.probe_wendigo_stalk import (
     START_CM, _about, _on_navmesh, _stand_in_sight, _walk_speed, _wendigos,
 )
+
+# The tuned numbers (the MONSTER TUNING tab's rows): monster_tuning.csv's, as built.
+_SPEC = monster_specs("Wendigo")
+STALK_CATCH_UP_CM = _SPEC["stalk_catch_up_cm"]
 
 SAMPLE_S = 0.1
 BEAT_S = 0.7            # the tree's 0.5 s beat, and a sample or two
@@ -49,7 +53,7 @@ def _corners(p):
     for reach in CORNERS_CM:
         for sx, sy in ((1.0, 1.0), (1.0, -1.0)):
             a, b = _ground(p, reach * sx, reach * sy), _ground(p, -reach * sx, -reach * sy)
-            if a and b and _about(a, b)[0] > NPC_STALK_CATCH_UP_CM + 1000.0:
+            if a and b and _about(a, b)[0] > STALK_CATCH_UP_CM + 1000.0:
                 return a, b
     return None
 
@@ -84,7 +88,7 @@ def probe(p):
 
     # --- far apart: no stalking ------------------------------------------------
     corners = _corners(p)
-    p.check(f"the map has two corners over {NPC_STALK_CATCH_UP_CM / 100:.0f} m apart "
+    p.check(f"the map has two corners over {STALK_CATCH_UP_CM / 100:.0f} m apart "
             f"to stand them in", corners is not None)
     if corners is None:
         return
@@ -108,7 +112,7 @@ def probe(p):
         yield SAMPLE_S
     p.check(f"{samples[0]['gap'] / 100:.0f} m from the player it picks no tree "
             f"and does not charge",
-            samples[0]["gap"] > NPC_STALK_CATCH_UP_CM
+            samples[0]["gap"] > STALK_CATCH_UP_CM
             and all(s["legs"] == legs and not s["charging"] for s in samples),
             f"{samples[-1]['legs'] - legs} legs picked")
     running = [s for s in samples if s["speed"] > 200.0]

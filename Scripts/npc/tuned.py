@@ -28,6 +28,13 @@ def tuned(ed, column, x, y):
     return node, _pin(node, var, is_input=False)
 
 
+def tuned_pin(g, column, x, y):
+    """The same Get, kept by a npc.graph._Graph: its output pin."""
+    node, pin = tuned(g.ed, column, x, y)
+    g.made.append(node)
+    return pin
+
+
 def write_tuned_defaults(cdo, specs):
     """specs: {column: value}. Written and read back."""
     for col, var, *_rest in MONSTER_STATS:

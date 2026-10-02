@@ -385,21 +385,36 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
 ## The MONSTER TUNING tab (`monster_tune_*.py`)
 
 **Its M panel row** opens it (`MonTuneOpen`; opening a tab shuts the others). The
-creature row, then the 13 stats of `npc/monster_tuning.MONSTER_STATS`: aggro range, aggro cone
+creature row, then the 28 stats of `npc/monster_tuning.MONSTER_STATS`: aggro range, aggro cone
 (half-angle), hearing, touch range, patrol radius, patrol speed, the patrol re-pick window, run
-speed, damage per hit, melee range, time between swings, health. Same keys as GUN TUNING;
-**Enter** saves `Scripts/npc/monster_tuning.csv`.
+speed, damage per hit, melee range, time between swings, health; then the wendigo's hunt
+(`hunt:` rows: the charge range, the catch-up range, the leg speed, the wait behind a tree, the
+time between two turns) and what fire does to it (`fire:` rows: the range and the cone it is
+held off in, the ring it circles on and how fast, the time between two turns, how long until it
+gives up and how long it runs). Same keys as GUN TUNING; **Enter** saves
+`Scripts/npc/monster_tuning.csv`.
+
+- **The list scrolls:** 14 rows at a time behind a scroll bar (`MON_VISIBLE_ROWS`,
+  `TuneTab.visible_rows`, as GRAPHICS TUNING's), so here the wheel moves the caret, not the
+  value under it.
+- **The `hunt:` and `fire:` rows are on every creature,** since the tab is one table of
+  creatures x stats, but only a creature that hunts (`NPC_STALK_ROAR`) or fears fire
+  (`NPC_WARD_FEARS`) has graphs that read them: on the zombie they change nothing.
 
 - **Each number is a `Tune*` variable on the creature's AI controller** (`npc/tuned.py`), which
   every NPC graph reads instead of a pin literal. The HUD's table (`MonTuneValues`, creatures x
   stats) is baked from `monster_specs()` (so the CSV) at build time.
 - **Applied every Tick once touched** (`MonTuneTouched`): for each creature, `GetAllActorsOfClass`
-  of its controller class, a cast, and 13 Sets from the table (the cell index is a literal on
+  of its controller class, a cast, and 28 Sets from the table (the cell index is a literal on
   `Array_Get`, known at build time). A wanderer spawned or respawned later gets it within a Tick.
 - **What "immediately" means per stat:** senses, patrol and melee take effect on the
   wanderer's next tree pass (0.5 s). The Chase and Stroll steps rewrite `MaxWalkSpeed` every
   pass, so speeds do too. Health is re-applied when `TuneHealth` differs from the controller's
-  `AppliedHealth`: a live wanderer jumps to the new maximum, **full**.
+  `AppliedHealth`: a live wanderer jumps to the new maximum, **full**. The hunt's and the
+  fire's numbers are read on the pass that uses them: a leg under way keeps the wait and the
+  turn time it threw, and takes a new speed on its next pass.
+- **No row has a maximum.** The fire's cone goes through `DegCos`, as the aggro cone does: past
+  180° it narrows again. A `min` row nudged over its `max` row still throws between the two.
 - **The CSV feeds two builds:** `build_npc_blueprints.py` (the controllers' defaults), then
   `build_graphics_menu.py` (the HUD's table). `verify_npc_blueprints` and `monster_tune_checks`
   compare against the CSV, so a saved tuning passes them once rebuilt. The level verifiers pin
@@ -409,8 +424,10 @@ speed, damage per hit, melee range, time between swings, health. Same keys as GU
   `ForestWandererAI` classes, and the Binds read-by-index check skips `Get MonTuneValues`.
 - **Probe:** `probe_monster_tuning.py` (12 checks: the live write, the floor, the wendigos
   untouched, a speed and a health nudge reaching the pawn, the wrap, the CSV, the panel). It
-  backs up the CSV and puts it back.
-- **Still needs a play session:** how the 14-row panel reads, and how a tuned
+  backs up the CSV and puts it back. `probe_wendigo_tuning.py` (10 checks) does the same for
+  the wendigo's rows: the nudge on every wendigo and no zombie, the floor, a leg run at the
+  tuned speed, a charge from the tuned range, the CSV.
+- **Still needs a play session:** how the scrolling panel reads, and how a tuned
   wanderer feels.
 
 ## The WORLD TUNING tab (`world_tune_*.py`)

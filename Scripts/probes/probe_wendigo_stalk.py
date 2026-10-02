@@ -23,17 +23,21 @@ import math
 import unreal
 
 from forest_generator.npc_placement import NAV_REACHABLE_EXTENT_CM
-from forest_generator.npc_stalk import (
-    NPC_STALK_CHARGE_CM, NPC_STALK_HIDE_MIN_S, NPC_STALK_ROAR, NPC_STALK_ROAR_S,
-    NPC_STALK_RUN_SCALE, NPC_STALK_TURN_MAX_S, NPC_STALK_TURN_MIN_S,
-    cover_trees,
-)
-from npc.monster_tuning import TUNED_VAR
+from forest_generator.npc_stalk import NPC_STALK_ROAR, NPC_STALK_ROAR_S, cover_trees
+from npc.monster_tuning import TUNED_VAR, monster_specs
 from npc.paths import (
     AGGRO_VAR, STALK_ARRIVED_VAR, STALK_CHARGING_VAR, STALK_COVER_VAR,
     STALK_HIDDEN_VAR, STALK_LEGS_VAR, STALK_ROAR_UNTIL_VAR, STALK_SIDE_VAR,
     STALK_TURN_AT_VAR,
 )
+
+# The tuned numbers (the MONSTER TUNING tab's rows): monster_tuning.csv's, as built.
+_SPEC = monster_specs("Wendigo")
+STALK_CHARGE_CM = _SPEC["stalk_charge_cm"]
+STALK_HIDE_MIN_S = _SPEC["stalk_hide_min_s"]
+STALK_RUN_SCALE = _SPEC["stalk_run_scale"]
+STALK_TURN_MAX_S = _SPEC["stalk_turn_max_s"]
+STALK_TURN_MIN_S = _SPEC["stalk_turn_min_s"]
 
 START_CM = 3200.0     # inside the wendigo's sight, a few legs outside the charge
 SAMPLE_S = 0.1
@@ -130,8 +134,8 @@ def _turned_on_time(before, leg):
     if leg["side"] == before["side"]:
         return leg["t"] < before["turn_at"] + BEAT_S
     return (leg["side"] == -before["side"] and leg["t"] >= before["turn_at"] - BEAT_S
-            and NPC_STALK_TURN_MIN_S - BEAT_S <= leg["turn_at"] - leg["t"]
-            <= NPC_STALK_TURN_MAX_S + BEAT_S)
+            and STALK_TURN_MIN_S - BEAT_S <= leg["turn_at"] - leg["t"]
+            <= STALK_TURN_MAX_S + BEAT_S)
 
 
 def _stand_in_sight(p, ctrl, npc, player):
@@ -187,8 +191,8 @@ def probe(p):
     side = float(p.get(ctrl, STALK_SIDE_VAR))
     turn_at = float(p.get(ctrl, STALK_TURN_AT_VAR))
     p.check("...and it has picked a side to come round, and when to turn about",
-            side in (1.0, -1.0) and NPC_STALK_TURN_MIN_S <= turn_at - roar_until
-            <= NPC_STALK_TURN_MAX_S,
+            side in (1.0, -1.0) and STALK_TURN_MIN_S <= turn_at - roar_until
+            <= STALK_TURN_MAX_S,
             f"side {side:+.0f}, the turn {turn_at - roar_until:.1f} s after the roar")
     yield lambda: anim.get_current_active_montage() is not None or p.time() > roar_until
     montage = anim.get_current_active_montage()
@@ -249,7 +253,7 @@ def probe(p):
             f"{[round(t) for t in turns]} deg, sides {[int(leg['side']) for leg in legs]}")
     picks = [dict(side=side, turn_at=turn_at)] + legs
     p.check("...the side turned about only once its time was up, the next "
-            f"turn then {NPC_STALK_TURN_MIN_S:g}-{NPC_STALK_TURN_MAX_S:g} s on",
+            f"turn then {STALK_TURN_MIN_S:g}-{STALK_TURN_MAX_S:g} s on",
             all(_turned_on_time(a, b) for a, b in zip(picks, picks[1:])),
             f"{sum(a['side'] != b['side'] for a, b in zip(picks, picks[1:]))} turns "
             f"in {len(legs)} legs")
@@ -265,7 +269,7 @@ def probe(p):
     waits = [s for s in samples if s["arrived"] and s["hidden"] and not s["charging"]]
     held = len([s for s in waits if s["speed"] <= STILL_CMS]) * SAMPLE_S
     p.check("...and behind it the wendigo waits, facing the player",
-            held >= NPC_STALK_HIDE_MIN_S * 0.5
+            held >= STALK_HIDE_MIN_S * 0.5
             and max([s["facing"] for s in waits] or [0.0]) >= FACING_DOT,
             f"{held:.1f} s still over {len({s['legs'] for s in waits})} covers")
 
@@ -278,9 +282,9 @@ def probe(p):
             f"at most")
 
     charge = [s for s in samples if s["charging"]]
-    p.check(f"inside {NPC_STALK_CHARGE_CM / 100:.0f} m it charges",
-            len(charge) > 0 and charge[0]["gap"] <= NPC_STALK_CHARGE_CM
-            and all(not s["charging"] for s in samples if s["gap"] > NPC_STALK_CHARGE_CM + 50.0),
+    p.check(f"inside {STALK_CHARGE_CM / 100:.0f} m it charges",
+            len(charge) > 0 and charge[0]["gap"] <= STALK_CHARGE_CM
+            and all(not s["charging"] for s in samples if s["gap"] > STALK_CHARGE_CM + 50.0),
             f"at {charge[0]['gap'] / 100:.1f} m" if charge else "never")
     if not charge:
         return
@@ -289,10 +293,10 @@ def probe(p):
               if s["legs"] > 0 and not s["arrived"] and not s["charging"]
               and s["speed"] > 200.0]
     chased = sorted(s["walk"] for s in running)
-    p.check(f"it ran its legs at {NPC_STALK_RUN_SCALE:.0%} of the speed it charges at",
+    p.check(f"it ran its legs at {STALK_RUN_SCALE:.0%} of the speed it charges at",
             len(hunted) > 0 and len(chased) > 0
             and abs(sorted(hunted)[len(hunted) // 2]
-                    / chased[len(chased) // 2] - NPC_STALK_RUN_SCALE) < 0.02,
+                    / chased[len(chased) // 2] - STALK_RUN_SCALE) < 0.02,
             f"{sorted(hunted)[len(hunted) // 2] if hunted else 0:.0f} cm/s on a leg, "
             f"{chased[len(chased) // 2] if chased else 0:.0f} on the charge")
     p.check("...picking no more trees, straight at the player",

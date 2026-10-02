@@ -17,10 +17,20 @@ steps, the tree, the step task, the controller and the character).
   (`Scripts/survival/CLAUDE.md`; checked by `verify_on_hit.py`, `probes/probe_bleeding.py`).
 - **The tunable ones are not pin literals.** Senses, patrol, run speed, melee damage/range/
   interval and health are `Tune*` variables on each controller (`tuned.py`), defaulted to
-  `monster_tuning.monster_specs(key)`: `Scripts/npc/monster_tuning.csv` over the two files
-  above. The M panel's MONSTER TUNING tab (`graphics_menu/CLAUDE.md`) writes them live and
+  `monster_tuning.monster_specs(key)`: `Scripts/npc/monster_tuning.csv` over the files
+  above. So are the wendigo's hunt (`TuneStalk*`: charge range, catch-up range, leg speed,
+  the wait behind a tree, the time between turns) and what fire does to it (`TuneWard*`:
+  range, cone, ring, prowl speed, the time between turns, the hold, the flight). Every
+  controller has those variables, but only a creature with the Stalk or Ward step reads
+  them. The rest of `npc_stalk.py` and `npc_ward.py` (the cover search, the trunk width,
+  the roar) are still literals, and the numbers quoted in the sections below are the built
+  defaults. The M panel's MONSTER TUNING tab (`graphics_menu/CLAUDE.md`) writes them live and
   saves the CSV. A new tunable is a `MONSTER_STATS` row, a `stock_specs` entry, and the
-  fragment reading it with `tuned()`.
+  fragment reading it with `tuned()` (`tuned_pin()` in a `_Graph` fragment; a speed share is
+  `_author_walk_speed(scale="<column>")`), then the CSV rewritten with the new column
+  (`write_table` over `monster_specs`) and both builds. A check or a probe of a tuned number
+  reads `_fed(node, pin, column)` or `monster_specs(key)`, never the literal: a saved tuning
+  must still pass.
 
 `Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees, the step between swings and
 the wendigo's hunt and the fire that holds it off (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_stalk_cover.py`, `verify_ward.py`). The level verifier owns the chase and the melee.

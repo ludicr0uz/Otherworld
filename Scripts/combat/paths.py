@@ -40,6 +40,9 @@ MATCHES_BP_PATH = f"{WEAPON_DIR}/BP_Matches"
 # The hold poses (combat/hold_pose.py): food and water carried, the knife ready.
 HOLD_ITEM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldItem"
 HOLD_KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldKnife"
+# The shotgun's ready pose (combat/shotgun_pose.py): the rifle's, with the
+# thumb over a straight stock's wrist.
+SHOTGUN_AIM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_AimShotgun"
 HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"

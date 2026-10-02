@@ -236,6 +236,11 @@ SHOTGUN_SIGHT_FRONT = (69.0, 0.0, 6.42)
 SHOTGUN_SIGHT = _eye_behind(SHOTGUN_SIGHT_REAR, SHOTGUN_SIGHT_FRONT, -12.0)
 
 
+# The stock's wrist, where the right hand closes: its min and max corners,
+# measured. The thumb goes over its top (shotgun_pose.py).
+SHOTGUN_WRIST = ((-4.6, -1.5, -5.4), (1.4, 1.5, 2.4))
+
+
 def shotgun_outline():
     return (
         _box("Stock",        (-26.6, -1.5, -10.1), (-4.6, 1.5, 3.9)),

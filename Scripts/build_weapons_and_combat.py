@@ -38,6 +38,7 @@ WHAT THIS BUILDS
                     weapon_component/light.py; the campfire is survival's)
   Anims/A_KnifeSlash  the slash, keyed for the worn body (combat/knife_anim.py)
   Anims/A_HoldItem, A_HoldKnife  how food and the knife are held (combat/hold_pose.py)
+  Anims/A_AimShotgun             the shotgun's ready pose: the thumb over the stock (combat/shotgun_pose.py)
   BP_HealthComponent  Health/MaxHealth + death, despawn and respawn
   BP_WeaponComponent  inventory of 5, equip/switch/fire/drop/pick up
   BP_BloodSplash    short-lived red burst spawned at each impact on a body
@@ -78,6 +79,7 @@ from combat.matches import build_matches                          # noqa: E402
 from combat.knife import build_knife                              # noqa: E402
 from combat.knife_anim import build_knife_slash                   # noqa: E402
 from combat.hold_pose import build_hold_poses                     # noqa: E402
+from combat.shotgun_pose import build_shotgun_pose                # noqa: E402
 from combat.install import (                                      # noqa: E402
     install_on_character, install_on_npc, retire_old_assets,
 )
@@ -127,6 +129,9 @@ def main():
     # body poses above do it procedurally).
     patch_stance_clips(skin)
 
+    # Before the weapons: the shotgun's row names it, and its grip is solved
+    # in it.
+    build_shotgun_pose(skin)
     item_bp = build_weapon_item()
     weapons = {}
     for spec in _weapon_specs():

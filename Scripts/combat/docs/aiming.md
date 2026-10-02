@@ -294,6 +294,28 @@ in game `probes/probe_carry.py`.
     the receiver 4.1 cm above the guard. Its row carries `trigger_reach` 4.5 for that check
     (`SHOTGUN_TRIGGER_REACH_CM`); the others keep 2.5. The pistol (`Pistol_1`) fits like the
     rest: 2.9 cm, index 1.7 cm off.
+- **The shotgun has a ready pose of its own, `A_AimShotgun`** (`shotgun_pose.py`): the rifle
+  pose with both thumbs re-keyed, built before the weapons.
+  - **Why:** the rifle pose lays the right thumb forward along a pistol grip and stands the
+    left one up the handguard, both far under the AK's and the Val's sight lines (14 cm above
+    the grip). The shotgun's line skims the receiver 7 cm above it: down its sights the left
+    thumb's last joint stood 3 cm ABOVE the line, a finger beside the bead, and the right
+    thumb came up from the bottom of the view, 5-15 cm from the eye.
+  - **What it holds:** the right thumb over the top of the stock's wrist and down its left
+    side; the left along the pump's left side, under the barrel's top. Each joint's line is
+    swung onto a direction in the WEAPON's frame (`SHOTGUN_THUMBS`), so the numbers read
+    against `shotgun_outline()` whatever body is worn.
+  - **Everything else is the rifle pose,** re-keyed from it on every build, so the grip's
+    solve, the fist and the support hand's point are the same against either
+    (`verify/shotgun_pose.py`). `weapon_specs.two_handed_poses()` is what "held in both
+    hands" means now: `TwoHanded` no longer follows `aim == rifle pose` alone.
+  - **Another long gun with a low sight line** takes the same pose, or a pose of its own
+    from the same module with its own directions.
+  - `probes/probe_shotgun_thumb.py` reads the live thumbs down the sights (and the rifle's,
+    left alone); with `--windowed` and `OW_SIGHT_SHOTS=1` it saves the sight picture.
+  - **Trap:** a headless editor (the warm one, `UnrealEditor-Cmd`) never ticks its world, so
+    a SkeletalMesh or PoseableMesh spawned there stays in the reference pose and a
+    SceneCapture of it shows nothing of a clip. Look at a pose in a `--windowed` game.
 - **The weapon is rigidly attached and never rotated on its own.** Aiming it per frame was tried
   and reverted. `face_the_camera()` makes the body follow the camera's yaw instead.
 - **Known limits:**

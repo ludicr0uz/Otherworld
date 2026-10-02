@@ -15,7 +15,8 @@ from combat.gun_tuning import read_table
 from combat.grip import _grip_location, _grip_rotation
 from combat.paths import (
     AUDIO_DIR, PISTOL_BP_PATH,
-    RIFLE_BP_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH, UI_ART_DIR,
+    RIFLE_BP_PATH, SHOTGUN_AIM_ANIM_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH,
+    UI_ART_DIR,
 )
 from combat.skin import player_skin
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG
@@ -177,12 +178,14 @@ def _weapon_specs():
     """
     skin = player_skin()
     AIM_RIFLE, AIM_PISTOL = skin.aim_rifle, skin.aim_pistol
+    # The rifle's pose with the thumb over a straight stock (shotgun_pose.py).
+    AIM_SHOTGUN = SHOTGUN_AIM_ANIM_PATH
     specs = (
         dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
              sight_rear=SHOTGUN_SIGHT_REAR, sight_front=SHOTGUN_SIGHT_FRONT,
              display="Shotgun", automatic=False, damage=18.0, pellets=8, range=4000.0,
-             sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_RIFLE,
-             grip_rot=_grip_rotation(AIM_RIFLE), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
+             sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_SHOTGUN,
+             grip_rot=_grip_rotation(AIM_SHOTGUN), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
              colour=(0.85, 0.45, 0.10),
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
@@ -243,11 +246,17 @@ def _weapon_specs():
         spec.setdefault("ads_zoom", COMBAT.ads_zoom_irons)
         spec.setdefault(THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG)
         spec.update(tuned.get(spec["display"], {}))
-        # Held in both hands is what the rifle ready pose does; the guard pose
+        # Held in both hands is what the rifle ready pose does, and the
+        # shotgun's, which is the rifle's but for a thumb; the guard pose
         # (body_pose.py) picks fists or the gun across the body on it.
-        spec["two_handed"] = spec["aim"] == AIM_RIFLE
+        spec["two_handed"] = spec["aim"] in two_handed_poses(skin)
         spec["grip_loc"] = _grip_location(spec["aim"], spec["grip_rot"], spec["parts"])
     return specs
+
+
+def two_handed_poses(skin):
+    """The ready poses that hold a gun in both hands."""
+    return (skin.aim_rifle, SHOTGUN_AIM_ANIM_PATH)
 
 
 # Which of the five a killed wanderer can be carrying, in loot-table order. The

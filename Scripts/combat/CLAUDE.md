@@ -47,12 +47,15 @@ menu polls its own copy from `DrawHUD`, which does.
   (zips in `assets/cache/quaternius/`). The pack is at no one size, so each row's model
   carries its scale to real size (0.18 and 0.11: 104 cm and 20 cm). Static meshes have no
   muzzle socket: the muzzles are the barrels' ends, measured. The shotgun's index can't reach
-  its guard from the rifle's ready pose (`docs/aiming.md`).
+  its guard from the rifle's ready pose (`docs/aiming.md`). The shotgun is held in a pose of
+  its own, `A_AimShotgun` (`shotgun_pose.py`): the rifle's, with the right thumb over the
+  stock's wrist and the left along the pump, out of its low sight line.
 - **The SMG, the rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon
   Bundle's SMG11 (`SK_SMG11_X`, a MAC-11 with its wire stock folded), AK 47 (`SK_KA47_X`) and
   AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
   - **The SMG is held like the pistol:** its row's `aim` is the pistol's ready pose, so the grip
-    is solved against it and it is one-handed (`TwoHanded` follows `aim`), guarding with fists.
+    is solved against it and it is one-handed (`TwoHanded` follows `aim`:
+    `weapon_specs.two_handed_poses()`), guarding with fists.
   - A row with a `model` builds the model instead of its `parts`. Its `parts` are then the
     model's **measured outline**: boxes that are never built, which the grip solve and the sight
     checks read exactly as they read a primitive gun's parts. Re-measure them if the mesh changes.
@@ -297,7 +300,12 @@ These are feel checks a headless run can't do:
 - every gun down its sights, now that the eye is ON the sight line and the view runs down it
   (`docs/aiming.md`): the SMG11's is a 3 mm peep in a plate 15 cm from the eye, so the plate
   hides much of the view below and beside the target; the shotgun's support-hand fingers
-  stand just left of the bead; the adventurer's hair shows at the top of the AK's view;
+  stand just right of the bead (its thumb no longer stands left of it); the adventurer's
+  hair shows at the top of the AK's view;
+- the shotgun's thumbs (`shotgun_pose.SHOTGUN_THUMBS`): how the right thumb reads over the
+  stock's wrist from behind and at the hip (its base joint is inside the wood, as the rifle
+  pose's was), whether the left one closes on the pump or hovers (its base is 3 cm off the
+  wood), and both on the mannequin fallback, where only the directions were carried over;
 - the head leaving the view on the way onto the sights (`HEAD_HIDE_SEAT` 0.8): whether it is
   seen to go, from behind, in the last of the camera's travel, and whether the headless
   shadow is noticed with the sun behind the player;

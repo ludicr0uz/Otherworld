@@ -70,6 +70,13 @@ class PlayerSkin:
     # round, and the weapon's handle is put there. The thumb wraps the other
     # way and is not in; the index's outer joints rest on the trigger.
     grip_fingers: tuple
+    # The grip hand's thumb, its three joints from the palm out. The rifle
+    # ready pose lays it forward along a pistol grip's side; shotgun_pose.py
+    # turns it over a straight stock's wrist...
+    grip_thumb: tuple
+    # ...and the other hand's, the one under the fore-end, which the rifle
+    # pose stands up beside the barrel.
+    support_thumb: tuple
     # The two spine joints that pitch the upper body onto the aim down the
     # sights, lower first; each takes half (aim_pitch.py). Everything above
     # them -- chest, arms, head and the weapon in the hand -- turns rigidly.
@@ -119,6 +126,8 @@ SKIN_QUINN = PlayerSkin(
     idle="/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle",
     grip_fingers=tuple(tuple(f"{f}_{j:02d}_r" for j in (1, 2, 3))
                        for f in ("index", "middle", "ring", "pinky")),
+    grip_thumb=tuple(f"thumb_{j:02d}_r" for j in (1, 2, 3)),
+    support_thumb=tuple(f"thumb_{j:02d}_l" for j in (1, 2, 3)),
     aim_bones=("spine_03", "spine_05"),
     pose_bones=dict(
         hips="pelvis", spine="spine_01", neck="neck_01",
@@ -150,6 +159,8 @@ SKIN_ADVENTURER = PlayerSkin(
     # asset_pipeline/finger_rig.py adds these, named the Mixamo way.
     grip_fingers=tuple(tuple(f"RightHand{f}{j}" for j in (1, 2, 3))
                        for f in ("Index", "Middle", "Ring", "Pinky")),
+    grip_thumb=tuple(f"RightHandThumb{j}" for j in (1, 2, 3)),
+    support_thumb=tuple(f"LeftHandThumb{j}" for j in (1, 2, 3)),
     # Meshy numbers its spine backwards: Hips -> Spine02 -> Spine01 -> Spine.
     aim_bones=("Spine01", "Spine"),
     pose_bones=dict(

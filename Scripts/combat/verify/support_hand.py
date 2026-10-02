@@ -15,7 +15,7 @@ from combat.verify.aim_pitch import _feeds, _pose_source, _title
 from combat.verify.common import BEL, PIN, cdo, check, graph, load, num_pin
 from combat.verify.fixtures import wg
 from combat.weapon_component.pose_weights import HELD_TWO_HANDED
-from combat.weapon_specs import _weapon_specs
+from combat.weapon_specs import _weapon_specs, two_handed_poses
 
 BONE_SPACE = unreal.BoneControlSpace.BCS_BONE_SPACE
 
@@ -105,8 +105,9 @@ def check_component_writes_support_hand():
               any(n.get_class().get_name() == "K2Node_DynamicCast" for n in target),
               str([_title(n) for n in target]))
     odd = [s["display"] for s in _weapon_specs()
-           if s["two_handed"] != (s["aim"] == skin.aim_rifle)]
-    check(f"every gun held in the rifle pose is two-handed, and no other: "
+           if s["two_handed"] != (s["aim"] in two_handed_poses(skin))]
+    check(f"every gun held in the rifle pose (or the shotgun's, which is the "
+          f"rifle's but for the thumbs) is two-handed, and no other: "
           f"{HELD_TWO_HANDED} names the pose", not odd, str(odd))
 
 

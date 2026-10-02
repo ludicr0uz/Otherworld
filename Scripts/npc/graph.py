@@ -1,6 +1,7 @@
 """Authoring helpers every NPC module shares: create/load a Blueprint, find
-and connect pins, place nodes, set a pin literal and prove it landed, and
-resolve a creature asset against its mannequin fallback.
+and connect pins, place nodes, set a pin literal and prove it landed, _Graph
+(the node shapes a long fragment repeats), and resolve a creature asset
+against its mannequin fallback.
 """
 
 import unreal
@@ -132,6 +133,68 @@ def _set(node, name, value):
     if got.lower() == str(value).lower() or got.endswith(f"::{value}"):
         return
     raise RuntimeError(f"pin {name!r} would not take {value!r} — reads back {got!r}")
+
+
+class _Graph:
+    """The node shapes a long fragment repeats (npc/stalk.py, stalk_cover.py),
+    over the helpers above. ``made`` collects every node, for the caller's
+    comment box."""
+
+    def __init__(self, ed):
+        self.ed, self.made = ed, []
+
+    def keep(self, node, x, y):
+        self.made.append(_at(node, x, y))
+        return node
+
+    def call(self, fn, x, y, **literals):
+        node = self.keep(_node(self.ed, fn), x, y)
+        for pin, value in literals.items():
+            _set(node, pin, value)
+        return node
+
+    def op(self, fn, a, b, x, y):
+        """A two-input maths node: ``a`` is a pin, ``b`` a pin or a number.
+        Returns its output pin. A wired first: these are wildcards until
+        then, and a wildcard B takes no literal."""
+        node = self.keep(_node(self.ed, fn), x, y)
+        _connect(a, _pin(node, "A"))
+        if isinstance(b, (int, float)):
+            _set(node, "B", b)
+        else:
+            _connect(b, _pin(node, "B"))
+        return out(node)
+
+    def get(self, var, x, y):
+        node = self.keep(self.ed.add_get_member_variable_node(var), x, y)
+        return _pin(node, var, is_input=False)
+
+    def put(self, var, exec_in, x, y, pin=None, literal=None):
+        """Write ``var`` from a pin or a literal; returns the Set's then pin.
+        ``exec_in`` is one exec pin or several."""
+        node = self.keep(self.ed.add_set_member_variable_node(var), x, y)
+        if pin is not None:
+            _connect(pin, _pin(node, var))
+        else:
+            _set(node, var, literal)
+        for source in (exec_in if isinstance(exec_in, list) else [exec_in]):
+            _connect(source, _pin(node, "execute"))
+        return BEL.find_then_pin(node)
+
+    def branch(self, condition, exec_in, x, y):
+        """A Branch on ``condition`` (None: always true), run by ``exec_in``."""
+        node = self.keep(self.ed.add_branch_node(), x, y)
+        if condition is None:       # a join: several exec wires into one
+            _set(node, "Condition", "true")
+        else:
+            _connect(condition, _pin(node, "Condition"))
+        for source in (exec_in if isinstance(exec_in, list) else [exec_in]):
+            _connect(source, _pin(node, "execute"))
+        return node
+
+
+def out(node, name="ReturnValue"):
+    return _pin(node, name, is_input=False)
 
 
 # ── Body and animation ───────────────────────────────────────────────────────

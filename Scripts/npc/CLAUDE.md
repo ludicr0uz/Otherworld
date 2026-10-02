@@ -8,6 +8,7 @@ steps, the tree, the step task, the controller and the character).
 - Every movement, melee and spawn-band number lives in `forest_generator/npc_placement.py`.
 - Every sense and patrol number lives in `forest_generator/npc_agro.py`.
 - The step between two swings is `forest_generator/npc_strafe.py`.
+- The wendigo's hunt is `forest_generator/npc_stalk.py`.
 - None imports `unreal`, so the offline generator checks exactly what gets built.
 - **The tunable ones are not pin literals.** Senses, patrol, run speed, melee damage/range/
   interval and health are `Tune*` variables on each controller (`tuned.py`), defaulted to
@@ -16,8 +17,8 @@ steps, the tree, the step task, the controller and the character).
   saves the CSV. A new tunable is a `MONSTER_STATS` row, a `stock_specs` entry, and the
   fragment reading it with `tuned()`.
 
-`Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees and the step between swings
-(`verify.py`, `verify_tree.py`, `verify_strafe.py`). The level verifier owns the chase and the melee.
+`Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees, the step between swings and
+the wendigo's hunt (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`). The level verifier owns the chase and the melee.
 `Scripts/probes/probe_npc_behavior_tree.py` proves the trees run in the game.
 
 Respawn, the world-floor net and the `[NPC-SPAWN]`/`[NPC-FELL]` numbering are in
@@ -33,6 +34,7 @@ Wanderer (selector)
     Pulse            [possessed? no: fail] → [dead? corpse, StopLogic] → stats → patrol setup
     Act (selector)
       Hunt [BB Aggro is set]    Chase (between swings: step off and round : MoveToActor : MoveToLocation) → Swing → Wait 0.5
+                                (the wendigo: Approach (selector): Stalk, Chase → Swing → Wait 0.5)
       Notice                    PlayerPresent → Senses (selector): Hurt, Sight, Touch, Sound
       Patrol                    Stroll → Wait 0.5
   Idle: Wait 0.5
@@ -112,6 +114,47 @@ Wanderer (selector)
     sends `RebuildNavigation` and waits. Not looked into further.
   - **Feel check (needs a play session):** the body plays its forward walk while it moves back
     and sideways (the anim Blueprints blend on speed only), so the feet slide a little.
+- **The wendigo hunts before it chases** (`stalk.py`, `stalk_cover.py`, numbers in
+  `forest_generator/npc_stalk.py`):
+  - It is one more step, `BT_Stalk`, ahead of Chase in a selector of the two. Only the
+    creatures in `NPC_STALK_ROAR` get the event, its variables and the tree node; a new
+    stalker is a row there (its roar clip) and an entry in `mixamo_paths.ROAR_CREATURES`.
+  - **The step succeeds while it hunts and fails for good to charge.** A pass that succeeds
+    has given its own move order, so Chase is not reached; once `StalkCharging` is set the
+    step fails first thing, every pass, and the chase (and its strafe) is all that runs.
+  - **Roar:** the first pass stops it, faces the player, and plays the roar clip into
+    `DefaultSlot` (upper body, like the swing) and one of its `Voices`. It stands 2.4 s. The
+    clip is the Mixamo Scary pack's zombie scream, retargeted onto the wendigo alone by
+    `import_mixamo.py`; without it the roar is sound only.
+  - **Legs:** one side for the whole hunt (`StalkSide`, a coin at the roar). Each leg sweeps a
+    2 m sphere along a line at the player, 35 / 50 / 20° round them from where it stands,
+    from 3 m to 12 m closer. The first tree struck is the candidate; the spot is 170 cm past
+    its trunk, seen from the player. It runs there (`SimpleMoveToLocation`), waits 1–2.5 s
+    facing the player, and picks the next. No cover on any line: a leg 6 m closer in the
+    open, not waited at.
+  - **A tree is an instanced mesh the sweep struck** (as for the axe), and it stands where
+    `GetInstanceTransform(HitItem)` says. Never the impact point: the sphere mostly touches
+    crowns, metres from the trunk, and a sweep that starts inside one has no impact point.
+  - **Not every tree is cover.** A sapling's stem is a few centimetres across and the island
+    trees lean off their own foot. A spot counts only if a line from it to the player strikes
+    a tree, it is at least 1 m closer than the wendigo stands, no nearer the player than 12 m
+    (outside the charge range, or the run there would set the charge off), and on the
+    navmesh.
+  - **The sweep ignores what the pawn stands on** (`GetMovementBaseActor`: the terrain, one
+    mesh, which a sphere that wide drags along on any slope) and the pawn: `bIgnoreSelf` in a
+    controller graph is the controller.
+  - **It never stands.** Within 10 m it charges; so does a leg it is not moving on half a
+    second after the order (no path), and a pick with no cover and no navmesh under the open
+    spot either. Before that rule, an open spot off the navmesh was re-picked every pass and
+    the wendigo stood at 30 m for good. A leg still running after 6 s is re-picked.
+  - `verify_stalk.py` checks the graph; `probes/probe_wendigo_stalk.py` watches one hunt.
+    `verify.py` and `verify_strafe.py` count a controller's nodes outside this step
+    (`outside_step`), so their counts are the same for every creature.
+  - **Maths nodes are wildcards until wired:** wire A, then set B (`stalk_cover._Graph.op`). A
+    literal set first is refused.
+  - **Feel check (needs a play session):** the roar is upper body only, on standing legs; the
+    wait behind a trunk has no crouch or peek; a wendigo shot while it hunts carries on
+    hunting; and its 4–9 s voice still sounds from behind its tree.
 - **The corpse state** (`corpse.py`):
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and `StopLogic`: the tree

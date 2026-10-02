@@ -228,10 +228,13 @@ editor.
   (`combat/hit_bodies.py`): a round past the head, inside the capsule, is a miss.
 - **The wanderers:** ten zombies and wendigos that patrol until they notice the player, then
   chase and melee, each driven by a Behavior Tree (`BT_ForestWandererAI_<Creature>`). Between two
-  swings a wanderer backs off a little and sidesteps round the player, facing them. A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
+  swings a wanderer backs off a little and sidesteps round the player, facing them. A wendigo
+  hunts before it chases: aggro, it roars (the Mixamo zombie scream, and one of its roar
+  sounds), comes in round the player in an arc, tree to tree, waiting behind each trunk, and
+  from 10 m charges straight at them (`npc/stalk.py`, `forest_generator/npc_stalk.py`). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs
   (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
-  mannequin's set.
+  mannequin's set, plus that pack's scream for its roar.
 - **Corpse loot:** a wanderer the player kills carries what its loot table rolls (for now, water:
   a canteen at 50%). Near any body, loot or none, **Tab** kneels the player over it (Quaternius
   UAL's `Fixing_Kneeling`) and opens a loot window showing what it carries as item icons;

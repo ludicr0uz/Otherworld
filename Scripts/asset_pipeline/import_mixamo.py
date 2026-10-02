@@ -16,7 +16,9 @@ reads are mixamo_paths.PACKS.  Then:
     4. the creature's blend space plays the Mixamo idle/walk/run
        (mixamo_locomotion); its melee clip is NPC_VARIANTS's, so
        rebuild the NPCs afterwards: build_npc_blueprints.py
-    5. check it all, and log [VERIFY] lines like the suites do
+    5. the roar alone onto each of mixamo_paths.ROAR_CREATURES (the
+       wendigo), for the hunt's first beat (npc/stalk.py)
+    6. check it all, and log [VERIFY] lines like the suites do
 
 A new pack is a PACKS entry; a new clip in a role is a LOCOMOTION or MELEE
 edit.  Every clip of every pack is retargeted regardless of role.
@@ -41,12 +43,13 @@ from asset_pipeline.mixamo_locomotion import (                    # noqa: E402
     apply_locomotion, check_mixamo_set,
 )
 from asset_pipeline.mixamo_paths import (                         # noqa: E402
-    MELEE, MIXAMO_CREATURES, MIXAMO_ROOT, mixamo_clip,
+    MELEE, MIXAMO_CREATURES, MIXAMO_ROOT, ROAR, ROAR_CREATURES, mixamo_clip,
 )
 from asset_pipeline.mixamo_retarget import (                      # noqa: E402
     build_xbot_rig, retarget_clips,
 )
 from forest_generator.npc_placement import NPC_VARIANTS            # noqa: E402
+from forest_generator.npc_stalk import NPC_STALK_ROAR              # noqa: E402
 
 
 def main():
@@ -63,6 +66,8 @@ def main():
     for creature in MIXAMO_CREATURES:
         retarget_clips(rig, creature, list(clips.values()))
         apply_locomotion(creature)
+    for creature in ROAR_CREATURES:
+        retarget_clips(rig, creature, [clips[ROAR]])
 
     results = []
 
@@ -77,6 +82,18 @@ def main():
         check(f"{creature} Wanderer Swings The Mixamo Attack",
               all(v.melee == mixamo_clip(creature, *MELEE) for v in worn),
               f"(NPC_VARIANTS melee: {[v.melee for v in worn]})")
+    for creature in ROAR_CREATURES:
+        roar = unreal.EditorAssetLibrary.load_asset(mixamo_clip(creature, *ROAR))
+        mesh = unreal.EditorAssetLibrary.load_asset(
+            f"/Game/Sourced/Characters/SKM_{creature}/SKM_{creature}")
+        check(f"{creature} Mixamo Roar Clip On Its Skeleton",
+              roar is not None
+              and roar.get_editor_property("skeleton") == mesh.get_editor_property("skeleton"))
+        worn = [v.key for v in NPC_VARIANTS if v.mesh.endswith(f"SKM_{creature}")]
+        check(f"{creature} Wanderer Roars The Mixamo Scream",
+              bool(worn) and all(NPC_STALK_ROAR.get(k) == mixamo_clip(creature, *ROAR)
+                                 for k in worn),
+              f"(NPC_STALK_ROAR: {NPC_STALK_ROAR})")
     unreal.log_warning(f"[VERIFY] {sum(results)}/{len(results)} checks passed")
 
 

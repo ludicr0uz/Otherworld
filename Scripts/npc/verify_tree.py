@@ -9,21 +9,35 @@ the tree names is an event on the controller; and every exit of every step
 writes StepResult, which is what the task finishes with; and every step but
 Pulse starts at the alive gate (npc/corpse.py), so a dead pawn's step does
 nothing. That the gate shuts in the game is probes/probe_dead_no_actions.py.
+
+A stalker's tree (forest_generator/npc_stalk.NPC_STALK_ROAR) has one more
+step, Stalk, ahead of Chase in a selector of the two; want_steps() is the
+order for a given controller.
 """
 
 import unreal
 
 from forest_generator.npc_placement import NPC_REPATH_SECONDS, NPC_VARIANTS
+from forest_generator.npc_stalk import NPC_STALK_ROAR
 from npc.paths import (
     AI_BP_PATH, BB_AGGRO_KEY, BB_PATH, BB_REASON_KEY, SENSE_STEPS, STEP_CHASE,
-    STEP_EVENT_PREFIX, STEP_PRESENT, STEP_PULSE, STEP_RESULT_VAR, STEP_STROLL,
-    STEP_SWING, STEP_VAR, step_task_path, tree_path,
+    STEP_EVENT_PREFIX, STEP_PRESENT, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
+    STEP_STROLL, STEP_SWING, STEP_VAR, step_task_path, tree_path,
 )
 from npc.verify import BEL, PIN, _close, _drivers, _ins, _lit, _sources, _title, check
 
-# The order a pre-order walk of the tree meets the steps in: the priorities.
-WANT_STEPS = ([STEP_PULSE, STEP_CHASE, STEP_SWING, STEP_PRESENT]
-              + [name for _, name in SENSE_STEPS] + [STEP_STROLL])
+def stalks(ai_path):
+    """Is this the controller of a creature that hunts before it chases?"""
+    return any(v.ai_blueprint == ai_path and v.key in NPC_STALK_ROAR
+               for v in NPC_VARIANTS)
+
+
+def want_steps(ai_path):
+    """The order a pre-order walk of this controller's tree meets the steps
+    in: the priorities."""
+    return ([STEP_PULSE] + [STEP_STALK] * stalks(ai_path)
+            + [STEP_CHASE, STEP_SWING, STEP_PRESENT]
+            + [name for _, name in SENSE_STEPS] + [STEP_STROLL])
 
 
 def _load(path):
@@ -83,8 +97,9 @@ def check_tree(ai_path):
     steps = [(n, d, up) for n, d, up in walked
              if task_class and n.get_class() == task_class]
     order = [str(n.get_editor_property(STEP_VAR)) for n, _, _ in steps]
-    check(f"{tag}: the steps, in priority order: {', '.join(WANT_STEPS)}",
-          order == WANT_STEPS, f"{order}")
+    want = want_steps(ai_path)
+    check(f"{tag}: the steps, in priority order: {', '.join(want)}",
+          order == want, f"{order}")
     check(f"{tag}: every task in the tree is the controller's step task",
           all(n.get_class() == task_class for n, _, _ in walked
               if isinstance(n, unreal.BTTaskNode)
@@ -93,9 +108,19 @@ def check_tree(ai_path):
     def above(step):
         return [up for n, _, up in steps if str(n.get_editor_property(STEP_VAR)) == step]
 
-    hunt = [up for s in (STEP_CHASE, STEP_SWING) for up in above(s)]
-    check(f"{tag}: Chase and Swing run only under the Blackboard's '{BB_AGGRO_KEY} is set'",
-          len(hunt) == 2 and all(any(_gates_on_aggro(d) for _, d in up) for up in hunt))
+    hunting = [STEP_STALK] * stalks(ai_path) + [STEP_CHASE, STEP_SWING]
+    hunt = [up for s in hunting for up in above(s)]
+    check(f"{tag}: {', '.join(hunting[:-1])} and {hunting[-1]} run only under the "
+          f"Blackboard's '{BB_AGGRO_KEY} is set'",
+          len(hunt) == len(hunting)
+          and all(any(_gates_on_aggro(d) for _, d in up) for up in hunt))
+    if stalks(ai_path):
+        over = [up[-1][0] for s in (STEP_STALK, STEP_CHASE) for up in above(s)]
+        check(f"{tag}: Stalk and Chase share one selector, Stalk first: Chase "
+              f"runs on the pass Stalk fails",
+              len(over) == 2 and over[0] == over[1]
+              and isinstance(over[0], unreal.BTComposite_Selector)
+              and order[1:3] == [STEP_STALK, STEP_CHASE])
     calm = [up for s in [STEP_PRESENT, STEP_STROLL] + [n for _, n in SENSE_STEPS]
             for up in above(s)]
     check(f"{tag}: ...and nothing else does (notice and patrol are not gated on it)",
@@ -180,7 +205,8 @@ def check_controller_steps(ai_path):
     check(f"{tag}: no Delay loop is left", not any(_title(n) == "Delay" for n in nodes))
     events = {_title(n).split(" ")[0]: n for n in nodes
               if n.get_class().get_name() == "K2Node_CustomEvent"}
-    missing = [s for s in WANT_STEPS if f"{STEP_EVENT_PREFIX}{s}" not in events]
+    missing = [s for s in want_steps(ai_path)
+               if f"{STEP_EVENT_PREFIX}{s}" not in events]
     check(f"{tag}: every step the tree names is an event here", not missing, f"{missing}")
     loose = sorted({f"{name}: {_title(leaf)}" for name, ev in events.items()
                     for leaf in _exits(ev)

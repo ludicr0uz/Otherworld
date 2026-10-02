@@ -107,3 +107,24 @@ FN_MUL_VV = "/Script/Engine.KismetMathLibrary.Multiply_VectorVector"
 # path following sets on every move, so it holds while the wanderer walks.
 FN_SET_FOCUS = "/Script/AIModule.AIController.K2_SetFocus"
 FN_CLEAR_FOCUS = "/Script/AIModule.AIController.K2_ClearFocus"
+
+# The wendigo's hunt (npc/stalk.py, stalk_cover.py).
+FN_SPHERE_TRACE = "/Script/Engine.KismetSystemLibrary.SphereTraceSingle"
+FN_LINE_TRACE = "/Script/Engine.KismetSystemLibrary.LineTraceSingle"
+FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
+FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
+# What the pawn stands on: the terrain, which the sweep for a tree ignores.
+FN_MOVEMENT_BASE = "/Script/Engine.Pawn.GetMovementBaseActor"
+# Pure (it is const): read the bool, branch, then read the transform.
+FN_INSTANCE_TRANSFORM = ("/Script/Engine.InstancedStaticMeshComponent"
+                         ".GetInstanceTransform")
+FN_BREAK_TRANSFORM = "/Script/Engine.KismetMathLibrary.BreakTransform"
+FN_BREAK_VECTOR = "/Script/Engine.KismetMathLibrary.BreakVector"
+FN_DISTANCE_2D = "/Script/Engine.KismetMathLibrary.Vector_Distance2D"
+FN_FMAX = "/Script/Engine.KismetMathLibrary.FMax"
+FN_IN_RANGE = "/Script/Engine.KismetMathLibrary.InRange_FloatFloat"
+FN_VELOCITY = "/Script/Engine.Actor.GetVelocity"
+FN_VSIZE_XY = "/Script/Engine.KismetMathLibrary.VSizeXY"
+FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
+NODE_BREAK_HIT = "Collision|BreakHitResult"
+NODE_CAST_INSTANCED = "Utilities|Casting|CastToInstancedStaticMeshComponent"

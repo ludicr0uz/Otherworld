@@ -16,6 +16,7 @@ for each creature in npc_placement.NPC_VARIANTS:
       Wanderer (selector)
         Alive (sequence): Pulse, then Act (selector):
           Hunt [Blackboard Aggro is set]: Chase, Swing, Wait 0.5
+            (the wendigo: Approach (selector): Stalk, Chase -- then the same)
           Notice: PlayerPresent, then Senses (selector): Hurt, Sight, Touch, Sound
           Patrol: Stroll, Wait 0.5
         Idle: Wait 0.5

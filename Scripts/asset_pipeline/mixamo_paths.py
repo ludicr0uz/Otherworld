@@ -98,6 +98,13 @@ LOCOMOTION = {0.0: ("Scary", "ZombieIdle"),
               600.0: ("Scary", "ZombieRun")}
 MELEE = ("Scary", "ZombieAttack")
 
+# The wendigo's roar, played when it goes aggro (npc/stalk.py): the Scary
+# pack's scream. A creature here gets that one clip and nothing else of the
+# packs. forest_generator/npc_stalk.py spells the result out as a literal;
+# import_mixamo.py checks the two agree.
+ROAR = ("Scary", "ZombieScream")
+ROAR_CREATURES = ("Wendigo01",)
+
 # rate = meant speed / clip speed, clamped, because a shamble played three
 # times over reads as a twitch rather than a hurry.
 RATE_SCALE_RANGE = (0.5, 2.0)

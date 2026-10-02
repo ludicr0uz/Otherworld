@@ -12,6 +12,12 @@ The chase and melee half of these graphs is still checked by the level
 verifier (verify_<Level>.py); this file owns what npc/agro.py, patrol.py,
 senses.py, corpse.py, combat_trace.py and block.py added. The behaviour tree
 and the step events are npc/verify_tree.py's.
+
+A stalker's controller (the wendigo's) has one more step, BT_Stalk, with
+speed writes, move orders and focuses of its own. This file and
+verify_strafe.py count what a controller holds OUTSIDE that step
+(outside_step), so one set of counts fits every creature; the step's own are
+npc/verify_stalk.py's.
 """
 
 import unreal
@@ -26,7 +32,7 @@ from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, DEBUG_MODE_
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, AI_BP_PATH, CORPSE_LOG_PREFIX, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR,
-    HIT_DAMAGE_VAR, RUN_SPEED_VAR, STEP_CHASE,
+    HIT_DAMAGE_VAR, RUN_SPEED_VAR, STEP_CHASE, STEP_EVENT_PREFIX, STEP_STALK,
 )
 from npc.block import BLOCK_MIN_DOT
 from npc.monster_tuning import MONSTER_STATS, TUNED_VAR, monster_specs, stock_run_speed
@@ -170,7 +176,7 @@ def check_controller(path, key):
     if not bp:
         return
     ed = unreal.BlueprintGraphEditor.get_graph_editor_by_name(bp, "EventGraph")
-    nodes = ed.list_all_nodes()
+    nodes = outside_step(ed.list_all_nodes(), STEP_STALK)
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     check(f"{tag}: the graph compiles clean", not ed.list_nodes_with_errors())
     check_corpse_and_trace(tag, nodes, cdo)
@@ -326,6 +332,29 @@ def _exec_reach(start):
                 continue
             todo += [PIN.get_owning_node(q) for q in PIN.list_connected_pins(pin)]
     return list(seen.values())
+
+
+def step_nodes(nodes, step):
+    """Every node of the ``step`` event: the event, what its exec chain runs,
+    and every pure node feeding those. Empty when the graph has no such step."""
+    name = f"{STEP_EVENT_PREFIX}{step}"
+    own = {}
+    for event in nodes:
+        if (event.get_class().get_name() != "K2Node_CustomEvent"
+                or _title(event).split(" ")[0] != name):
+            continue
+        for n in _exec_reach(event):
+            own[n.get_path_name()] = n
+            for pin in _ins(n) - {"execute"}:
+                own.update((s.get_path_name(), s)
+                           for s in _sources(n, pin, limit=10 ** 6))
+    return list(own.values())
+
+
+def outside_step(nodes, step):
+    """``nodes`` without step_nodes(nodes, step)."""
+    own = {n.get_path_name() for n in step_nodes(nodes, step)}
+    return [n for n in nodes if n.get_path_name() not in own]
 
 
 def check_corpse_and_trace(tag, nodes, cdo):

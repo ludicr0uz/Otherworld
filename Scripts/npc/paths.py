@@ -85,6 +85,30 @@ STRAFE_YAW_VAR = "StrafeYaw"
 STRAFE_DIST_VAR = "StrafeDist"
 STRAFE_FOR_VAR = "StrafeFor"
 
+# ── The wendigo's hunt (npc/stalk.py, stalk_cover.py) ───────────────────────
+#
+# Per controller, on the creatures of forest_generator/npc_stalk.NPC_STALK_ROAR
+# only. The hunt runs roar -> legs -> charge, and never back:
+#   STALK_ROAR_UNTIL_VAR   when the roar ends; 0 until it has roared
+#   STALK_SIDE_VAR         +1 or -1: which way round the player, for the hunt
+#   STALK_COVER_VAR        where this leg ends
+#   STALK_HIDDEN_VAR       ...which is behind a tree (false: in the open)
+#   STALK_LEG_UNTIL_VAR    running: when the leg is given up; arrived: when
+#                          the wait behind the trunk ends. 0: pick a leg
+#   STALK_ARRIVED_VAR      it has reached this leg's spot
+#   STALK_LEGS_VAR         legs picked so far (the probe counts them)
+#   STALK_CHARGING_VAR     close enough: the Stalk step fails from now on
+#   STALK_IGNORE_VAR       what the sweep for a tree ignores (ground, own pawn)
+STALK_ROAR_UNTIL_VAR = "StalkRoarUntil"
+STALK_SIDE_VAR = "StalkSide"
+STALK_COVER_VAR = "StalkCover"
+STALK_HIDDEN_VAR = "StalkHidden"
+STALK_LEG_UNTIL_VAR = "StalkLegUntil"
+STALK_ARRIVED_VAR = "StalkArrived"
+STALK_LEGS_VAR = "StalkLegs"
+STALK_CHARGING_VAR = "StalkCharging"
+STALK_IGNORE_VAR = "StalkIgnore"
+
 # ── The corpse state (npc/corpse.py) ─────────────────────────────────────────
 #
 # The wanderer's third and last state, after patrol (Aggro false) and hunt
@@ -128,6 +152,7 @@ STEP_VAR = "Step"                   # on the task, instance editable
 STEP_EVENT_PREFIX = "BT_"
 
 STEP_PULSE = "Pulse"          # possessed? corpse? stats, voice, patrol setup
+STEP_STALK = "Stalk"          # a stalker's roar and legs; fails once it charges
 STEP_CHASE = "Chase"          # the move order at the player
 STEP_SWING = "Swing"          # the melee check and swing
 STEP_PRESENT = "PlayerPresent"

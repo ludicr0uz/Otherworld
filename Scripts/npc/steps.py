@@ -9,6 +9,9 @@ names and finishes with StepResult, which every exit of every step writes:
                      -> stats and voice                               stats.py
                      -> patrol setup, once per life -> succeed        patrol.py
     every other step begins: [pawn gone, dead or at 0 HP?] fail      corpse.py
+    BT_Stalk   (a stalker only) roar, then tree to tree round the     stalk.py
+               player -> succeed; close enough: fail, for good, and
+               the tree goes on to Chase
     BT_Chase   between two swings: step back and round -> succeed    strafe.py
                else move order at the player -> run speed -> succeed  chase.py
     BT_Swing   in range and off cooldown? swing -> succeed            melee.py
@@ -19,6 +22,10 @@ task reads StepResult straight after calling it.
 """
 
 from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S
+from forest_generator.npc_stalk import (
+    NPC_STALK_ARC_DEG, NPC_STALK_BEHIND_CM, NPC_STALK_CHARGE_CM,
+    NPC_STALK_HIDE_MAX_S, NPC_STALK_HIDE_MIN_S, NPC_STALK_ROAR, NPC_STALK_ROAR_S,
+)
 from forest_generator.npc_strafe import (
     NPC_STRAFE_ENGAGE_CM, NPC_STRAFE_MAX_ANGLE_DEG, NPC_STRAFE_MAX_DISTANCE_CM,
     NPC_STRAFE_MIN_ANGLE_DEG, NPC_STRAFE_MIN_DISTANCE_CM, NPC_STRAFE_SHARE,
@@ -33,8 +40,10 @@ from npc.nodes import FN_GET_PAWN, FN_IS_VALID
 from npc.monster_tuning import monster_specs, stock_run_speed
 from npc.patrol import _author_patrol_setup, _author_walk_speed
 from npc.paths import (
-    STEP_CHASE, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR, STEP_SWING,
+    STEP_CHASE, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
+    STEP_SWING,
 )
+from npc.stalk import _author_stalk, declare_stalk_vars, roar_object
 from npc.stats import _author_stats_and_voice
 from npc.strafe import _author_strafe, declare_strafe_vars
 from npc.tuned import declare_tuned_vars
@@ -104,6 +113,29 @@ def _author_pulse(ed, steps, x0, y0):
     return [own_pawn, possessed, gate], extras, setup
 
 
+def _author_stalk_step(ed, steps, key, x0, y0):
+    """BT_Stalk, for a creature of NPC_STALK_ROAR: the hunt before the chase."""
+    declare_stalk_vars(ed)
+    hunt, cover = _author_stalk(
+        ed, steps.event(STEP_STALK, x0 - 300, y0), steps.result,
+        roar_object(NPC_STALK_ROAR[key]), stock_run_speed(key), x0, y0)
+    ed.add_comment_to_nodes(
+        f"BT_Stalk, tried before BT_Chase: on the first pass roar "
+        f"({NPC_STALK_ROAR_S:g} s, standing, facing the player). Then a leg at "
+        f"a time: run to the next tree, wait behind it "
+        f"{NPC_STALK_HIDE_MIN_S:g}-{NPC_STALK_HIDE_MAX_S:g} s watching the "
+        f"player, pick the next. Within {NPC_STALK_CHARGE_CM:.0f} cm the step "
+        f"fails for good and BT_Chase charges.", hunt)
+    ed.add_comment_to_nodes(
+        f"The next tree: a sphere swept at the player along a line "
+        f"{' / '.join(f'{a:.0f}' for a in NPC_STALK_ARC_DEG)} deg round them "
+        f"(always the same way), ignoring the ground and this pawn. The first "
+        f"instanced mesh it strikes is a tree; the spot is "
+        f"{NPC_STALK_BEHIND_CM:.0f} cm past its trunk, seen from the player, "
+        f"snapped onto the navmesh. No tree on any line: on round, in the "
+        f"open.", cover)
+
+
 def _author_steps(ed, key, melee_anim, x0, y0):
     """Author every step event into creature ``key``'s controller graph.
     Its numbers are read off the Tune* variables (npc/tuned.py); ``spec``
@@ -134,6 +166,9 @@ def _author_steps(ed, key, melee_anim, x0, y0):
         f"component, and Unreal keeps a child Blueprint's override of one in an "
         f"InheritableComponentHandler that Python cannot reach.",
         extras)
+
+    if key in NPC_STALK_ROAR:
+        _author_stalk_step(ed, steps, key, x0 + 3000, y0 - 14000)
 
     cx, cy = x0 + 3000, y0 - 3000
     stock = stock_run_speed(key)

@@ -55,6 +55,11 @@ THE CONTROLLER'S STEPS (one fragment per concern)
                player holds fire out at it, it circles instead of attacking,
                turning about every couple of seconds;
                past the fire the step fails; held off long enough, it runs
+  ward_roar    ...its two roars at the fire: one part way through the hold,
+               one at its end before it runs; a blow that lands on the
+               player (melee's ``clears``) starts the hold over
+  roar         the bellow itself: stop, face the player, the roar clip and a
+               voice. The hunt's first pass and the fire's two both play it
   agro         the notice and patrol steps: player present, one per sense, stroll
   sight_cone   debug mode: the Tick that draws the sight (aggro) cone, as
                senses.py tests it, yellow on patrol and red on the hunt
@@ -75,6 +80,8 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_stalk_cover  ...its next tree: sweeps, the trunk's width, the same
                  tree between the spot and the player, the open
   verify_ward    fire holding it off: the gate, the hold, the ring, the flight
+  verify_ward_roar  ...its roars at the fire: the throw, the two roars, the
+                 stand, and the blow that starts the hold over
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
 
 THE BODY

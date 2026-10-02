@@ -59,27 +59,24 @@ counts the chase's MoveToActor and MoveToLocation, one of each.
 """
 
 from forest_generator.npc_stalk import (
-    NPC_STALK_ARRIVE_CM, NPC_STALK_OPEN_ARRIVE_CM, NPC_STALK_ROAR_BLEND_S,
-    NPC_STALK_ROAR_S, NPC_STALK_STALLED_CMS,
+    NPC_STALK_ARRIVE_CM, NPC_STALK_OPEN_ARRIVE_CM, NPC_STALK_ROAR_S,
+    NPC_STALK_STALLED_CMS,
 )
-from npc.graph import (
-    BEL, _Graph, _asset_sub, _connect, _log, _loose_pin, _mesh_object, _palette,
-    _pin, out,
-)
+from npc.graph import BEL, _Graph, _connect, _pin, out
 from npc.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ANIM_INSTANCE, FN_DISTANCE_2D,
+    FN_ACTOR_LOC, FN_ADD_FF, FN_DISTANCE_2D,
     FN_GET_CONTROLLER, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_GT_FF, FN_LE_FF,
     FN_LT_FF,
-    FN_MUL_FF, FN_PLAY_SLOT, FN_RANDOM_BOOL, FN_RANDOM_FLOAT, FN_SELECT_FLOAT,
-    FN_SIMPLE_MOVE, FN_STOP_MOVEMENT, FN_TIME_SECONDS, FN_VELOCITY, FN_VSIZE_XY,
-    NODE_CAST_CHARACTER,
+    FN_MUL_FF, FN_RANDOM_BOOL, FN_RANDOM_FLOAT, FN_SELECT_FLOAT,
+    FN_SIMPLE_MOVE, FN_TIME_SECONDS, FN_VELOCITY, FN_VSIZE_XY,
 )
 from npc.paths import (
-    CHARACTER_CLASS_PATH, ENRAGED_VAR, MELEE_SLOT, STALK_ARRIVED_VAR,
+    ENRAGED_VAR, STALK_ARRIVED_VAR,
     STALK_CHARGING_VAR, STALK_COVER_VAR, STALK_HIDDEN_VAR, STALK_LEG_UNTIL_VAR,
     STALK_ROAR_UNTIL_VAR, STALK_SIDE_VAR, STALK_TURN_AT_VAR, VOICES_VAR,
 )
 from npc.patrol import _author_walk_speed
+from npc.roar import _author_bellow
 from npc.senses import _author_hurt
 from npc.sound import _author_random_sound
 from npc.stalk_cover import _author_cover, declare_cover_vars
@@ -97,17 +94,6 @@ def declare_stalk_vars(ed):
         if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind)):
             raise RuntimeError(f"could not declare {name}")
     declare_cover_vars(ed)
-
-
-def roar_object(roar_anim):
-    """The roar clip as an object path, or None when the asset pipeline has
-    not produced it (asset_pipeline/import_mixamo.py): the wendigo then
-    stands and roars with its voice alone."""
-    if roar_anim and _asset_sub().does_asset_exist(roar_anim):
-        return _mesh_object(roar_anim)
-    _log(f"note: no roar clip at {roar_anim} -- run "
-         f"Scripts/asset_pipeline/import_mixamo.py. The roar is sound only.")
-    return None
 
 
 def _author_rage(g, exec_in, pins, result, x0, y0):
@@ -161,37 +147,7 @@ def _author_roar(g, exec_in, pins, roar_anim, x0, y0):
     step = g.put(STALK_SIDE_VAR, step, x0 + 540, y0, pin=out(side))
     step = _author_turn_time(g, step, ends, x0 - 900, y0 - 700)
 
-    halt = g.call(FN_STOP_MOVEMENT, x0 + 840, y0)
-    _connect(step, _pin(halt, "execute"))
-    watch, step = _author_facing(g.ed, [BEL.find_then_pin(halt)], pins["player"],
-                                 x0 + 1100, y0)
-    g.made.extend(watch)
-
-    # Through the pawn's own AnimInstance, as the swing is (npc/melee.py), and
-    # into the same upper-body slot: the legs stand, the chest and arms roar.
-    as_char = g.keep(_palette(g.ed, NODE_CAST_CHARACTER), x0 + 2800, y0)
-    _connect(pins["self_pawn"], _pin(as_char, "Object"))
-    _connect(step, _pin(as_char, "execute"))
-    voiced = [_pin(as_char, "CastFailed", is_input=False)]
-    if roar_anim:
-        mesh = g.keep(g.ed.add_get_member_variable_node("Mesh", CHARACTER_CLASS_PATH),
-                      x0 + 2800, y0 + 300)
-        _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
-        anim = g.call(FN_ANIM_INSTANCE, x0 + 3040, y0 + 300)
-        _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
-        roar = g.call(FN_PLAY_SLOT, x0 + 3300, y0, Asset=roar_anim,
-                      SlotNodeName=MELEE_SLOT, BlendInTime=NPC_STALK_ROAR_BLEND_S,
-                      BlendOutTime=NPC_STALK_ROAR_BLEND_S)
-        _connect(out(anim), _pin(roar, "self"))
-        _connect(BEL.find_then_pin(as_char), _pin(roar, "execute"))
-        voiced.append(BEL.find_then_pin(roar))
-    else:
-        voiced.append(BEL.find_then_pin(as_char))
-    join = g.branch(None, voiced, x0 + 3700, y0)
-    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"],
-                                       BEL.find_then_pin(join), x0 + 3960, y0)
-    g.made.extend(sound)
-    return step
+    return _author_bellow(g, step, pins, roar_anim, x0 + 840, y0)
 
 
 def _author_catch_up(g, exec_in, pins, stock, result, x0, y0):

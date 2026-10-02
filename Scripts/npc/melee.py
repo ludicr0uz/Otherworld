@@ -39,7 +39,8 @@ def _melee_montage_object():
     return _resolve(NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK, "melee montage")
 
 
-def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=()):
+def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
+                  clears=()):
     """Swing at the player when the chase has closed the distance.
 
     ``after_move`` is every exec pin that runs the check -- now the tree's
@@ -62,6 +63,9 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=()):
                                 --> roll ``on_hit``, this creature's on-hit
                                     effects, onto the player (a blocked
                                     swing rolls them too: it still lands)
+                                --> each of ``clears`` = 0: the controller's
+                                    own timers a landed blow starts over
+                                    (the fire's hold: npc/ward_roar.py)
                           false -------------------------------------> Delay
 
     Range is centre-to-centre between the two capsules, which is why
@@ -268,6 +272,14 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=()):
         ed, HIT_SOUNDS_VAR, _pin(player_loc, "ReturnValue", is_input=False),
         BEL.find_then_pin(struck), x0 + 4320, y0)
     made.extend(thud)
+
+    # --- and the timers it starts over --------------------------------------
+    for i, name in enumerate(clears):
+        cleared = keep(_at(ed.add_set_member_variable_node(name),
+                           x0 + 6200 + 300 * i, y0))
+        _set(cleared, name, 0.0)
+        _connect(after_thud, _pin(cleared, "execute"))
+        after_thud = BEL.find_then_pin(cleared)
 
     # --- and what it leaves behind -------------------------------------------
     # Its nodes stay out of `made`: they have their own comment box.

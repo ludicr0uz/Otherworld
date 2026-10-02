@@ -8,7 +8,8 @@ circles the player on the ring, facing them, the way round a coin when the
 hold begins and turned about every couple of seconds; a hold
 long enough ends in a flight, straight away from the player on the navmesh,
 which also starts a stalker's hunt over; and every held or fleeing pass
-succeeds. And that a creature which does not fear fire has no such step.
+succeeds. Its two roars, and the blow that starts a hold over, are
+npc/verify_ward_roar.py's. And that a creature which does not fear fire has no such step.
 That the step sits ahead of the attack in the tree is npc/verify_tree.py's,
 and that a wendigo does all this in the game is
 probes/probe_wendigo_ward.py's.
@@ -26,13 +27,14 @@ from forest_generator.npc_ward import (
     NPC_WARD_ARC_DEG, NPC_WARD_FEARS, NPC_WARD_FLEE_NAV_EXTENT_CM,
     NPC_WARD_FLEE_S, NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S,
     NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
-    NPC_WARD_RING_CM, NPC_WARD_STALLED_CMS,
+    NPC_WARD_RING_CM, NPC_WARD_ROAR_S, NPC_WARD_STALLED_CMS,
     NPC_WARD_TURN_MAX_S, NPC_WARD_TURN_MIN_S,
 )
 from npc.paths import (
     AI_BP_PATH, STALK_CHARGING_VAR, STALK_LEG_UNTIL_VAR, STALK_ROAR_UNTIL_VAR,
     STEP_RESULT_VAR, STEP_WARD, WARD_FLEE_GOAL_VAR, WARD_FLEE_UNTIL_VAR,
-    WARD_LAST_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR, WARD_TURN_AT_VAR,
+    WARD_LAST_VAR, WARD_ROAR_AT_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR,
+    WARD_TURN_AT_VAR,
 )
 from npc.verify import (
     BEL, PIN, _close, _drivers, _exec_reach, _fed, _feeders, _ins, _lit, _num,
@@ -227,7 +229,13 @@ def check_hold(tag, own, gate):
 
 
 def check_circle(tag, own, spent):
-    ring = _exec_reach(_after(BEL.find_else_pin(spent))[0])
+    # Past the roar a hold gives part way through (npc/verify_ward_roar.py).
+    due = [b for b in _titled(_exec_reach(_after(BEL.find_else_pin(spent))[0]), "Branch")
+           if f"Get {WARD_ROAR_AT_VAR}" in _titles(_sources(b, "Condition"))]
+    check(f"{tag}: a held pass with no roar to give goes on round", len(due) == 1)
+    if len(due) != 1:
+        return
+    ring = _exec_reach(_after(BEL.find_else_pin(due[0]))[0])
     moves = [n for n in ring if _title(n) == "SimpleMoveToLocation"]
     looks = _titled(ring, "SetFocus")
     check(f"{tag}: still held, it faces the player and moves",
@@ -259,11 +267,13 @@ def check_flight(tag, own, event, spent, key):
     gave_up = _exec_reach(_after(BEL.find_then_pin(spent))[0])
     untils = _titled(own, f"Set {WARD_FLEE_UNTIL_VAR}")
     lasts = [a for u in untils for a in _feeders(u, WARD_FLEE_UNTIL_VAR)]
-    check(f"{tag}: giving up, it runs for TuneWardFlee s, and the "
-          f"hold is over ({WARD_SINCE_VAR} back to 0)",
+    runs = [a for s in lasts for a in _feeders(s, "A")]
+    check(f"{tag}: giving up, it runs for TuneWardFlee s once it has roared "
+          f"({NPC_WARD_ROAR_S:g} s), and the hold is over ({WARD_SINCE_VAR} back to 0)",
           len(untils) == 1 and untils[0] in gave_up and len(lasts) == 1
-          and _fed(lasts[0], "B", "ward_flee_s")
-          and _titles(_feeders(lasts[0], "A")) == {"GetTimeSeconds"}
+          and _close(_num(lasts[0], "B"), NPC_WARD_ROAR_S)
+          and len(runs) == 1 and _fed(runs[0], "B", "ward_flee_s")
+          and _titles(_feeders(runs[0], "A")) == {"GetTimeSeconds"}
           and len([s for s in _titled(gave_up, f"Set {WARD_SINCE_VAR}")
                    if _zero(s, WARD_SINCE_VAR)]) == 1)
     resets = {v: [s for s in _titled(gave_up, f"Set {v}") if _zero(s, v)]
@@ -289,9 +299,9 @@ def check_flight(tag, own, event, spent, key):
     run = _exec_reach(_after(BEL.find_then_pin(heads[0]))[0])
     moves = [n for n in run if _title(n) == "SimpleMoveToLocation"]
     check(f"{tag}: the flight faces the way it goes and gives one move order, "
-          f"which giving up reaches on the same pass",
+          f"which the pass that gives up does not reach (it roars)",
           len(moves) == 1 and len(_titled(run, "ClearFocus")) == 1
-          and not _titled(run, "SetFocus") and moves[0] in gave_up
+          and not _titled(run, "SetFocus") and moves[0] not in gave_up
           and _titles(_feeders(moves[0], "Goal")) == {f"Get {WARD_FLEE_GOAL_VAR}"})
     goals = _titled(run, f"Set {WARD_FLEE_GOAL_VAR}")
     aimed = [s for s in goals if "Normalize 2D (Vector)"
@@ -346,8 +356,8 @@ def check_ward(path, key):
     check(f"{tag}: it starts with no hold, no side, no turn and no flight: five reals at 0",
           all(isinstance(v, float) and v == 0.0 for v in held.values()), f"{held}")
     check(f"{tag}: the step gives no blow and no order but its own two: no "
-          f"montage, no MoveTo, two SimpleMoveToLocation",
-          not any({"SlotNodeName"} <= _ins(n) or {"Dest"} <= _ins(n)
+          f"MoveTo, no damage, two SimpleMoveToLocation",
+          not any({"Dest"} <= _ins(n)
                   or _title(n) in ("Move To Actor", "MoveToActor", "Set Health")
                   for n in own)
           and len(_titled(own, "SimpleMoveToLocation")) == 2)

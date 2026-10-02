@@ -16,7 +16,11 @@ wendigo is stood in front of the player, inside the fire's range:
   - held, the way it circles turns about once its time is up (written due:
     the wait is 2-4.5 s), and the next turn is thrown 2-4.5 s on;
   - with the hold all but run out (WardSince written back; 30 s is a long
-    headless wait) it runs away, and its hunt is reset for its return.
+    headless wait) it gives up: once its roar is over it runs away, and its
+    hunt is reset for its return.
+
+Its roars at the fire, and the blow that starts a hold over, are
+probes/probe_wendigo_ward_roar.py's.
 
 That a wendigo with no fire in front of it hunts and swings as before is
 probes/probe_wendigo_stalk.py's.
@@ -34,10 +38,12 @@ from combat.paths import (
 from combat.seat_tuning import SIGHTS_FORCED_VAR
 from combat.torch_tuning import BURN_OUT_VAR, LIT_VAR
 from forest_generator.npc_placement import NAV_REACHABLE_EXTENT_CM
+from forest_generator.npc_ward import NPC_WARD_ROAR_S
 from npc.monster_tuning import TUNED_VAR, monster_specs
 from npc.paths import (
     AGGRO_VAR, NPC_DIR, STALK_CHARGING_VAR, STALK_ROAR_UNTIL_VAR,
-    WARD_FLEE_UNTIL_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR, WARD_TURN_AT_VAR,
+    WARD_FLEE_UNTIL_VAR, WARD_ROAR_UNTIL_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR,
+    WARD_TURN_AT_VAR,
 )
 from probes.probe_knife import _file
 
@@ -274,15 +280,17 @@ def _run(p):
         _face(p, player, npc)
         yield SAMPLE_S
     until = float(p.get(ctrl, WARD_FLEE_UNTIL_VAR))
-    p.check(f"held off {WARD_HOLD_S:.0f} s, it gives up: it will run for "
-            f"{WARD_FLEE_S:.0f} s",
-            abs(until - p.time() - WARD_FLEE_S) < 1.0,
+    p.check(f"held off {WARD_HOLD_S:.0f} s, it gives up: it will roar, and "
+            f"then run for {WARD_FLEE_S:.0f} s",
+            abs(until - p.time() - NPC_WARD_ROAR_S - WARD_FLEE_S) < 1.0,
             f"{until - p.time():.1f} s to go")
     p.check("...and its hunt starts over for when it comes back",
             float(p.get(ctrl, STALK_ROAR_UNTIL_VAR)) == 0.0
             and not p.get(ctrl, STALK_CHARGING_VAR)
             and float(p.get(ctrl, WARD_SINCE_VAR)) == 0.0)
     p.set(comp, SIGHTS_FORCED_VAR, False)   # it runs with the fire down too
+    roared = float(p.get(ctrl, WARD_ROAR_UNTIL_VAR))
+    yield lambda: p.time() >= roared        # its roar first (probe_wendigo_ward_roar.py)
     start = _state(p, ctrl, npc, player)
     fled = [start]
     while p.time() < until and len(fled) < FLEE_WATCH_S / SAMPLE_S:

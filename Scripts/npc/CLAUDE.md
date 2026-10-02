@@ -33,7 +33,7 @@ steps, the tree, the step task, the controller and the character).
   must still pass.
 
 `Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees, the step between swings and
-the wendigo's hunt and the fire that holds it off (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_stalk_cover.py`, `verify_ward.py`). The level verifier owns the chase and the melee.
+the wendigo's hunt and the fire that holds it off (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_stalk_cover.py`, `verify_ward.py`, `verify_ward_roar.py`). The level verifier owns the chase and the melee.
 `Scripts/probes/probe_npc_behavior_tree.py` proves the trees run in the game.
 
 Respawn, the world-floor net and the `[NPC-SPAWN]`/`[NPC-FELL]` numbering are in
@@ -242,6 +242,20 @@ Wanderer (selector)
     (`WardFleeUntil`), 15 m ahead of itself per order, snapped onto the navmesh; off the
     navmesh (the map's edge) it gets no order and stands. The flight is the step's first
     Branch: it runs whether or not the fire is still up.
+  - **Held off, it roars twice** (`ward_roar.py`; the bellow itself, shared with the
+    hunt's first pass, is `roar.py`): once 13–17 s into the hold (`WardRoarAt`, one throw
+    when the hold begins, 0 once given) and once at the hold's end, before it runs. Each
+    time it stands for the roar's 2.4 s, facing the player (`WardRoarUntil`), so the
+    flight is the roar and then its 12 s. The first roar is tested behind the held check
+    and the stamp of `WardLast`: it is longer than the 2 s grace, and stamped it does not
+    break the hold; and a wendigo whose fire goes down mid-roar attacks at once. Standing
+    still also turns the way round about, so it comes out of a roar either way.
+    Neither time is tuned: with `TuneWardHold` under the first roar's time, only the
+    last one is given.
+  - **A blow that lands on the player starts the hold over:** the Swing step writes
+    `WardSince` back to 0 after the damage (`melee._author_melee`'s `clears`, a blocked
+    blow too), so the next held pass begins a new hold: 30 s again, and the first roar
+    thrown anew.
   - **A flight starts the hunt over:** `StalkRoarUntil`, `StalkLegUntil` and
     `StalkCharging` go back to zero, so it comes back with a roar and tree to tree. The
     Ward step is authored after the Stalk step for that reason (it writes its variables).
@@ -262,12 +276,14 @@ Wanderer (selector)
     (`combat/weapon_component/hot_blow.py`). A placed wanderer inherits it from its class.
   - A weapons build from before the flag has no `FireWard`: `ward.wards()` then leaves the
     step out, with a log line, and `verify_ward.py` fails until the weapons are rebuilt.
-  - `verify_ward.py` checks the graph; `verify.py` and `verify_strafe.py` count a
-    controller's nodes outside this step too.
+  - `verify_ward.py` checks the graph and `verify_ward_roar.py` the roars and the blow;
+    `verify.py` and `verify_strafe.py` count a controller's nodes outside this step too.
+    In the game: `probes/probe_wendigo_ward.py` and `probe_wendigo_ward_roar.py`.
   - **Feel check (needs a play session):** a wendigo that was never aggro before it met
     the fire roars, standing, once it gets round it (its hunt's first pass); it circles in
     its forward run, feet sliding, as the strafe does; 50° a pass at 4 m is quick, so a
-    player has to keep turning; and nothing shows it is afraid (no clip, no sound).
+    player has to keep turning; the roars at the fire are the hunt's clip, upper body on
+    standing legs; and its fear shows only in them and the flight (no clip of its own).
 - **The corpse state** (`corpse.py`):
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and `StopLogic`: the tree

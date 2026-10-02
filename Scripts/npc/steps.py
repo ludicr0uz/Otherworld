@@ -32,7 +32,7 @@ from forest_generator.npc_stalk import (
 )
 from forest_generator.npc_ward import (
     NPC_WARD_ARC_DEG, NPC_WARD_FLEE_S, NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S,
-    NPC_WARD_RANGE_CM, NPC_WARD_RING_CM,
+    NPC_WARD_RANGE_CM, NPC_WARD_RING_CM, NPC_WARD_ROAR_AT_S, NPC_WARD_ROAR_VARY_S,
 )
 from forest_generator.npc_strafe import (
     NPC_STRAFE_ENGAGE_CM, NPC_STRAFE_MAX_ANGLE_DEG, NPC_STRAFE_MAX_DISTANCE_CM,
@@ -49,9 +49,10 @@ from npc.monster_tuning import monster_specs, stock_run_speed
 from npc.patrol import _author_patrol_setup, _author_walk_speed
 from npc.paths import (
     STEP_CHASE, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
-    STEP_SWING, STEP_WARD,
+    STEP_SWING, STEP_WARD, WARD_SINCE_VAR,
 )
-from npc.stalk import _author_stalk, declare_stalk_vars, roar_object
+from npc.roar import roar_object
+from npc.stalk import _author_stalk, declare_stalk_vars
 from npc.stats import _author_stats_and_voice
 from npc.strafe import _author_strafe, declare_strafe_vars
 from npc.tuned import declare_tuned_vars
@@ -156,6 +157,7 @@ def _author_ward_step(ed, steps, key, x0, y0):
     fire. After the Stalk step's variables are declared: a flight resets them."""
     declare_ward_vars(ed)
     made = _author_ward(ed, steps.event(STEP_WARD, x0 - 300, y0), steps.result,
+                        roar_object(NPC_STALK_ROAR.get(key)),
                         stock_run_speed(key), key in NPC_STALK_ROAR, x0, y0)
     ed.add_comment_to_nodes(
         f"BT_Ward, tried before the attack: while the player holds fire out "
@@ -164,7 +166,11 @@ def _author_ward_step(ed, steps, key, x0, y0):
         f"attack. It circles them {NPC_WARD_RING_CM:.0f} cm off, "
         f"{NPC_WARD_ARC_DEG:.0f} deg further round a pass, facing them; past "
         f"the fire the step fails and the attack runs. Held off "
-        f"{NPC_WARD_HOLD_S:.0f} s, it runs away for {NPC_WARD_FLEE_S:.0f} s.",
+        f"{NPC_WARD_HOLD_S:.0f} s, it roars and runs away for "
+        f"{NPC_WARD_FLEE_S:.0f} s; it roars once before that too, "
+        f"{NPC_WARD_ROAR_AT_S - NPC_WARD_ROAR_VARY_S:.0f}-"
+        f"{NPC_WARD_ROAR_AT_S + NPC_WARD_ROAR_VARY_S:.0f} s in. A blow it "
+        f"lands on the player (BT_Swing) starts the hold over.",
         made)
 
 
@@ -202,7 +208,8 @@ def _author_steps(ed, key, melee_anim, x0, y0):
 
     if key in NPC_STALK_ROAR:
         _author_stalk_step(ed, steps, key, x0 + 3000, y0 - 14000)
-    if wards(key):
+    warded = wards(key)
+    if warded:
         _author_ward_step(ed, steps, key, x0 + 3000, y0 - 22000)
 
     cx, cy = x0 + 3000, y0 - 3000
@@ -235,7 +242,9 @@ def _author_steps(ed, key, melee_anim, x0, y0):
     rest = steps.result_node(True, sx + 5200, sy + 600)
     swing_in = steps.event(STEP_SWING, sx - 300, sy)
     melee = _author_melee(ed, [swing_in], rest, sx, sy, melee_anim=melee_anim,
-                          on_hit=on_hit_effects(melee_attack(key)))
+                          on_hit=on_hit_effects(melee_attack(key)),
+                          # A blow that lands ends the hold the fire had it in.
+                          clears=(WARD_SINCE_VAR,) if warded else ())
     if melee is None:
         _connect(swing_in, _pin(rest, "execute"))
     else:

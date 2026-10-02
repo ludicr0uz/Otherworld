@@ -2,20 +2,25 @@
 attack (stalk, chase, swing) while the wanderer is aggro. The numbers are
 forest_generator/npc_ward.py's.
 
-    BT_Ward -> [now < WardFleeUntil?]                 it is running away: (run)
+    BT_Ward -> [now < WardFleeUntil?]  it is running away:
+                 [now < WardRoarUntil?]  its last roar first       succeed
+                 (run)
        -> [no player, or no weapon component on them?]             fail
        -> [FireWard AND within the range AND in front of the player?]
             no                                         fail: the attack runs
        -> [no hold under way, or the last held pass too long ago?]
             yes  WardSince = now, WardSide = +1 or -1,
-                 WardTurnAt = now + 2-4.5 s
+                 WardTurnAt = now + 2-4.5 s, WardRoarAt = now + 13-17 s
             no   [standing still, or WardTurnAt <= now?]
                  WardSide = -WardSide, WardTurnAt = now + 2-4.5 s
        -> WardLast = now
        -> [now - WardSince >= the hold?]
-            yes  WardFleeUntil = now + the flight, WardSince = 0
-                 (a stalker: its hunt starts over, roar and all)  -> (run)
-            no   face the player -> SimpleMoveToLocation(a point on the ring,
+            yes  WardFleeUntil = now + the roar + the flight, WardSince = 0
+                 (a stalker: its hunt starts over, roar and all)
+                 -> it roars (ward_roar.py), standing              succeed
+            no   [roaring, or WardRoarAt up?]  it stands and roars, the
+                 once a hold (ward_roar.py)                        succeed
+                 face the player -> SimpleMoveToLocation(a point on the ring,
                  further round them from where it stands) -> the prowl speed
                                                                    succeed
     (run)  face the way it goes -> WardFleeGoal = straight away from the
@@ -46,7 +51,8 @@ import unreal
 from combat.paths import FIRE_WARD_VAR, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from forest_generator.npc_ward import (
     NPC_WARD_ARC_DEG, NPC_WARD_FEARS, NPC_WARD_FLEE_NAV_EXTENT_CM,
-    NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S, NPC_WARD_STALLED_CMS,
+    NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S, NPC_WARD_ROAR_S,
+    NPC_WARD_STALLED_CMS,
 )
 from npc.graph import (
     BEL, _Graph, _asset_sub, _connect, _log, _loose_pin, _palette, _pin, out,
@@ -67,6 +73,9 @@ from npc.paths import (
 from npc.patrol import _author_walk_speed
 from npc.strafe import _author_facing
 from npc.tuned import tuned_pin
+from npc.ward_roar import (
+    _author_roar_time, _author_roar_wait, _author_roars, declare_ward_roar_vars,
+)
 
 def wards(key):
     """Does creature ``key`` get the step? It has to fear fire, and the
@@ -100,6 +109,7 @@ def declare_ward_vars(ed):
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, kind):
             raise RuntimeError(f"could not declare {name}")
+    declare_ward_roar_vars(ed)
 
 
 def _thrice(g, value, x, y):
@@ -160,7 +170,7 @@ def _author_turn_time(g, exec_in, pins, x0, y0):
 
 def _author_hold(g, exec_in, pins, x0, y0):
     """The hold's own state, for a pass that is held off: when it began, which
-    way round and until when, the stamp. Returns the Branch on "held off long
+    way round and until when, when it first roars, the stamp. Returns the Branch on "held off long
     enough"."""
     idle = g.op(FN_SUB_FF, pins["now"], g.get(WARD_LAST_VAR, x0 - 240, y0 + 440),
                 x0, y0 + 300)
@@ -177,6 +187,7 @@ def _author_hold(g, exec_in, pins, x0, y0):
     _connect(out(g.call(FN_RANDOM_BOOL, x0 + 860, y0 + 300)), _pin(coin, "bPickA"))
     picked = g.put(WARD_SIDE_VAR, began, x0 + 1340, y0, pin=out(coin))
     picked = _author_turn_time(g, picked, pins, x0 + 1340, y0 - 800)
+    picked = _author_roar_time(g, picked, pins, x0 + 2200, y0 - 800)
     # --- the same hold: stopped by something, or its time that way round is
     # up? Round the other way. ------------------------------------------------
     moving = g.call(FN_VELOCITY, x0 + 740, y0 + 900)
@@ -265,10 +276,11 @@ def _author_flight(g, exec_in, pins, stock, x0, y0):
     return tails
 
 
-def _author_ward(ed, exec_in, result, stock, restalks, x0, y0):
+def _author_ward(ed, exec_in, result, roar_anim, stock, restalks, x0, y0):
     """Author BT_Ward. ``exec_in`` is the step's exec pin (behind the alive
     gate), ``result(value, x, y)`` makes a StepResult write and returns its
-    exec input, ``stock`` is the creature's built run speed
+    exec input, ``roar_anim`` is roar.roar_object()'s answer, ``stock`` is
+    the creature's built run speed
     (patrol._author_walk_speed), and ``restalks`` says it is a stalker, whose
     hunt a flight starts over. Returns the nodes made, for a comment box.
     """
@@ -295,6 +307,10 @@ def _author_ward(ed, exec_in, result, stock, restalks, x0, y0):
     running = g.op(FN_LT_FF, pins["now"], g.get(WARD_FLEE_UNTIL_VAR, x0 + 480, y0 + 160),
                    x0 + 720, y0 + 160)
     fleeing = g.branch(running, exec_in, x0 + 980, y0)
+    # It roars before it runs: the flight's first passes stand.
+    standing, away = _author_roar_wait(g, BEL.find_then_pin(fleeing), pins,
+                                       x0 + 980, y0 + 1300)
+    _connect(standing, result(True, x0 + 1800, y0 + 1100))
     held, refused = _author_held(g, BEL.find_else_pin(fleeing), pins, x0 + 1300, y0)
     for i, pin in enumerate(refused):
         _connect(pin, result(False, x0 + 1900 + 300 * i, y0 - 240))
@@ -302,9 +318,11 @@ def _author_ward(ed, exec_in, result, stock, restalks, x0, y0):
 
     # --- held off long enough: it gives up ------------------------------------
     gone = g.put(WARD_FLEE_UNTIL_VAR, BEL.find_then_pin(spent), x0 + 6300, y0 + 1600,
-                 pin=g.op(FN_ADD_FF, pins["now"],
-                          tuned_pin(g, "ward_flee_s", x0 + 5780, y0 + 2040),
-                          x0 + 6040, y0 + 1900))
+                 pin=g.op(FN_ADD_FF,
+                          g.op(FN_ADD_FF, pins["now"],
+                               tuned_pin(g, "ward_flee_s", x0 + 5540, y0 + 2040),
+                               x0 + 5800, y0 + 1900),
+                          NPC_WARD_ROAR_S, x0 + 6040, y0 + 1900))
     gone = g.put(WARD_SINCE_VAR, gone, x0 + 6600, y0 + 1600, literal=0.0)
     if restalks:
         # Back from its flight it hunts as it first did: the roar, then tree
@@ -312,12 +330,16 @@ def _author_ward(ed, exec_in, result, stock, restalks, x0, y0):
         gone = g.put(STALK_ROAR_UNTIL_VAR, gone, x0 + 6900, y0 + 1600, literal=0.0)
         gone = g.put(STALK_LEG_UNTIL_VAR, gone, x0 + 7200, y0 + 1600, literal=0.0)
         gone = g.put(STALK_CHARGING_VAR, gone, x0 + 7500, y0 + 1600, literal="false")
-    for tail in _author_flight(g, [BEL.find_then_pin(fleeing), gone], pins, stock,
-                               x0 + 7900, y0 + 1600):
+    for tail in _author_flight(g, [away], pins, stock, x0 + 7900, y0 + 1600):
         _connect(tail, result(True, x0 + 13200, y0 + 1600))
 
+    # --- its two roars: one part way through the hold, one at its end ----------
+    circling, roared = _author_roars(g, BEL.find_else_pin(spent), gone, pins,
+                                     roar_anim, x0 + 6300, y0 - 2600)
+    for tail in roared:
+        _connect(tail, result(True, x0 + 14000, y0 - 2800))
+
     # --- still held: round them ------------------------------------------------
-    for tail in _author_circle(g, BEL.find_else_pin(spent), pins, stock,
-                               x0 + 6300, y0):
+    for tail in _author_circle(g, circling, pins, stock, x0 + 6300, y0):
         _connect(tail, result(True, x0 + 11200, y0))
     return g.made

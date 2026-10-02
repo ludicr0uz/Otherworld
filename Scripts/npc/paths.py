@@ -126,12 +126,16 @@ ENRAGED_VAR = "Enraged"
 #   WARD_TURN_AT_VAR     when that is next turned about
 #   WARD_FLEE_UNTIL_VAR  it runs away until then
 #   WARD_FLEE_GOAL_VAR   where the pass's run-away order points
+#   WARD_ROAR_AT_VAR     when this hold's first roar is due; 0 once given
+#   WARD_ROAR_UNTIL_VAR  it stands roaring until then (npc/ward_roar.py)
 WARD_SINCE_VAR = "WardSince"
 WARD_LAST_VAR = "WardLast"
 WARD_SIDE_VAR = "WardSide"
 WARD_TURN_AT_VAR = "WardTurnAt"
 WARD_FLEE_UNTIL_VAR = "WardFleeUntil"
 WARD_FLEE_GOAL_VAR = "WardFleeGoal"
+WARD_ROAR_AT_VAR = "WardRoarAt"
+WARD_ROAR_UNTIL_VAR = "WardRoarUntil"
 
 # ── The corpse state (npc/corpse.py) ─────────────────────────────────────────
 #

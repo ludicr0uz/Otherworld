@@ -28,11 +28,16 @@ while the wanderer is aggro:
             NPC_WARD_GRACE_S is the same hold), it runs straight away from
             the player for NPC_WARD_FLEE_S, and then hunts again from where
             that left it.
+  roars     twice a hold, standing, facing the player: once about
+            NPC_WARD_ROAR_AT_S in (give or take NPC_WARD_ROAR_VARY_S), and
+            once at the hold's end, before it runs. A blow it lands on the
+            player starts the hold, and both, over.
 """
 
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM
 from forest_generator.npc_stalk import (
-    NPC_STALK_CHARGE_CM, NPC_STALK_TURN_MAX_S, NPC_STALK_TURN_MIN_S)
+    NPC_STALK_CHARGE_CM, NPC_STALK_ROAR_S, NPC_STALK_TURN_MAX_S,
+    NPC_STALK_TURN_MIN_S)
 
 # Who is afraid of fire. A creature without a row walks through it.
 NPC_WARD_FEARS = ("Wendigo",)
@@ -64,7 +69,13 @@ NPC_WARD_HOLD_S = 30.0
 # A hold it broke (it got round, or the fire went down) and was back in
 # within this is the same hold, and the count carries on.
 NPC_WARD_GRACE_S = 2.0
-# How long it runs, and how far ahead of itself each move order is put.
+# Held off, it roars: once this long into the hold, give or take the variance
+# (one throw per hold), and once at the hold's end, before it runs. The roar
+# is the hunt's (npc_stalk.NPC_STALK_ROAR: its clip, and how long it stands).
+NPC_WARD_ROAR_AT_S = 15.0
+NPC_WARD_ROAR_VARY_S = 2.0
+NPC_WARD_ROAR_S = NPC_STALK_ROAR_S
+# How long it runs, once it has roared, and how far ahead of itself each move order is put.
 NPC_WARD_FLEE_S = 12.0
 NPC_WARD_FLEE_STEP_CM = 1500.0
 # The spot it runs to is snapped onto the navmesh within this box: tall,
@@ -79,4 +90,7 @@ assert 0.0 < NPC_WARD_HALF_ANGLE_DEG < 180.0
 assert 0.0 < NPC_WARD_ARC_DEG < NPC_WARD_HALF_ANGLE_DEG
 assert 0.0 < NPC_WARD_SPEED_SCALE <= 1.0
 assert 0.0 < NPC_WARD_GRACE_S < NPC_WARD_HOLD_S
+# The first roar is over before the hold's end, and its own is another.
+assert 0.0 < NPC_WARD_ROAR_AT_S - NPC_WARD_ROAR_VARY_S
+assert NPC_WARD_ROAR_AT_S + NPC_WARD_ROAR_VARY_S + NPC_WARD_ROAR_S < NPC_WARD_HOLD_S
 assert NPC_WARD_TURN_FLOOR_S <= NPC_WARD_TURN_MIN_S < NPC_WARD_TURN_MAX_S

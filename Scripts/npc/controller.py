@@ -9,8 +9,8 @@ from forest_generator.npc_placement import NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
 from npc.paths import (
     AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS, HIT_SOUNDS_VAR, REACTIONS_VAR,
-    STEP_CHASE, STEP_PRESENT, STEP_PULSE, STEP_STALK, STEP_STROLL, STEP_SWING,
-    STEP_WARD, VOICES_VAR,
+    STEP_CHASE, STEP_DRAWN, STEP_PRESENT, STEP_PULSE, STEP_STALK, STEP_STROLL,
+    STEP_SWING, STEP_WARD, VOICES_VAR,
     step_task_path, tree_path,
 )
 from npc.nodes import FN_RUN_BT, NODE_EVENT_POSSESS
@@ -18,6 +18,7 @@ from npc.graph import (
     _asset_sub, _at, BEL, BGE, _connect, _create_blueprint, _log, _node,
     _palette, _set,
 )
+from npc.drawn import draws
 from npc.sight_cone import _author_sight_cone
 from npc.step_task import build_step_task, clear_step_task
 from npc.steps import _author_steps
@@ -153,14 +154,15 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
 
     # A stalker (the wendigo) has one more step, ahead of Chase (npc/stalk.py).
     # One afraid of fire (the wendigo again) has another, ahead of the whole
-    # attack (npc/ward.py).
-    stalks, warded = key in NPC_STALK_ROAR, wards(key)
+    # attack (npc/ward.py). One a fire draws (the zombie) has one ahead of
+    # the stroll (npc/drawn.py).
+    stalks, warded, drawn = key in NPC_STALK_ROAR, wards(key), draws(key)
     task = build_step_task(bp, step_task_path(path),
                            [STEP_PULSE] + [STEP_WARD] * warded
                            + [STEP_STALK] * stalks
                            + [STEP_CHASE, STEP_SWING, STEP_PRESENT]
-                           + senses + [STEP_STROLL])
-    fill_tree(bt, bb, task, senses, stalks=stalks, wards=warded)
+                           + senses + [STEP_DRAWN] * drawn + [STEP_STROLL])
+    fill_tree(bt, bb, task, senses, stalks=stalks, wards=warded, draws=drawn)
     eas.save_loaded_asset(bp)
     _log(f"built {path} ({len(cdo.get_editor_property(REACTIONS_VAR))} hit "
          f"reactions, health {spec['health']:.0f}"

@@ -136,3 +136,8 @@ FN_OBJECT_NAME = "/Script/Engine.KismetSystemLibrary.GetObjectName"
 FN_EQ_SS = "/Script/Engine.KismetStringLibrary.EqualEqual_StrStr"
 NODE_BREAK_HIT = "Collision|BreakHitResult"
 NODE_CAST_INSTANCED = "Utilities|Casting|CastToInstancedStaticMeshComponent"
+
+# Drawn to a fire (npc/drawn.py). FindNearestActor is pure: its actor is read
+# once, into a variable.
+FN_ALL_ACTORS = "/Script/Engine.GameplayStatics.GetAllActorsOfClass"
+FN_NEAREST_ACTOR = "/Script/Engine.GameplayStatics.FindNearestActor"

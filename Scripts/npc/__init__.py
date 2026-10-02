@@ -6,7 +6,8 @@ Every number these graphs bake in lives in forest_generator/npc_placement.py
 (chase, melee), forest_generator/npc_agro.py (senses, patrol) and
 forest_generator/npc_strafe.py (the step between swings) and
 forest_generator/npc_stalk.py (the wendigo's hunt) and
-forest_generator/npc_ward.py (fire holding it off), none of
+forest_generator/npc_ward.py (fire holding it off) and
+forest_generator/npc_drawn.py (a fire drawing the zombies), none of
 which imports `unreal`, so the offline generator reads the same values.
 The senses, patrol, speed, melee and health numbers, and those of the hunt
 and the fire that a developer tunes, are then overlaid by
@@ -60,6 +61,10 @@ THE CONTROLLER'S STEPS (one fragment per concern)
                player (melee's ``clears``) starts the hold over
   roar         the bellow itself: stop, face the player, the roar clip and a
                voice. The hunt's first pass and the fire's two both play it
+  drawn        a creature a fire draws (the zombie): its Drawn step, the
+               state between patrol and hunt. A campfire burning within
+               200 m and it walks there at its patrol walk and stands by it;
+               none, and the step fails to the stroll
   agro         the notice and patrol steps: player present, one per sense, stroll
   sight_cone   debug mode: the Tick that draws the sight (aggro) cone, as
                senses.py tests it, yellow on patrol and red on the hunt
@@ -82,6 +87,8 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_ward    fire holding it off: the gate, the hold, the ring, the flight
   verify_ward_roar  ...its roars at the fire: the throw, the two roars, the
                  stand, and the blow that starts the hold over
+  verify_drawn   the fire that draws a zombie: the fire it finds, the range,
+                 the walk, the stand, and its place in the tree
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
 
 THE BODY
@@ -91,5 +98,6 @@ THE BODY
 Dependency direction: paths/nodes -> graph -> fragments -> steps ->
 step_task/tree -> controller -> character -> entry point. No module imports
 the entry point. The only combat imports are its data modules (game_state,
-paths, tuning): the player's Blocking and FireWard are read by name.
+paths, tuning): the player's Blocking and FireWard are read by name. The
+only survival imports are its paths (the campfire's class) and on_hit.
 """

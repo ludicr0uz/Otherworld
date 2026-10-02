@@ -12,7 +12,8 @@ Scripts/npc/verify_strafe.py (the step back and round between two swings) and
 Scripts/npc/verify_stalk.py and verify_stalk_cover.py (the wendigo's roar,
 tree-to-tree hunt and charge)
 and Scripts/npc/verify_ward.py and verify_ward_roar.py (fire holding the
-wendigo off, and its roars at it).
+wendigo off, and its roars at it)
+and Scripts/npc/verify_drawn.py (the fire that draws a zombie).
 """
 
 import os
@@ -31,6 +32,7 @@ from npc.verify_strafe import run as run_strafe                   # noqa: E402
 from npc.verify_stalk import run as run_stalk                     # noqa: E402
 from npc.verify_ward import run as run_ward                       # noqa: E402
 from npc.verify_ward_roar import run as run_ward_roar             # noqa: E402
+from npc.verify_drawn import run as run_drawn                     # noqa: E402
 from npc.verify_on_hit import run as run_on_hit                   # noqa: E402
 
 run()
@@ -40,6 +42,7 @@ run_strafe()
 run_stalk()
 run_ward()
 run_ward_roar()
+run_drawn()
 run_on_hit()
 unreal.log_warning(f"[VERIFY] {len(PASS)} passed, {len(FAIL)} failed")
 for f in FAIL:

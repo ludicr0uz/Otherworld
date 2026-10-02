@@ -137,6 +137,17 @@ WARD_FLEE_GOAL_VAR = "WardFleeGoal"
 WARD_ROAR_AT_VAR = "WardRoarAt"
 WARD_ROAR_UNTIL_VAR = "WardRoarUntil"
 
+# ── Drawn to a fire (npc/drawn.py) ───────────────────────────────────────────
+#
+# Per controller, on the creatures of forest_generator/npc_drawn.NPC_DRAWN_BY_FIRE
+# only. Drawn is the state between patrol and hunt: it is what the last Drawn
+# step found, and that step runs only while the wanderer is not aggro, so a
+# reader wants "Drawn and not Aggro".
+#   DRAWN_VAR      a fire within reach has it walking there (or standing by it)
+#   DRAWN_TO_VAR   that fire: the target it moves towards
+DRAWN_VAR = "Drawn"
+DRAWN_TO_VAR = "DrawnTo"
+
 # ── The corpse state (npc/corpse.py) ─────────────────────────────────────────
 #
 # The wanderer's third and last state, after patrol (Aggro false) and hunt
@@ -185,6 +196,7 @@ STEP_STALK = "Stalk"          # a stalker's roar and legs; fails once it charges
 STEP_CHASE = "Chase"          # the move order at the player
 STEP_SWING = "Swing"          # the melee check and swing
 STEP_PRESENT = "PlayerPresent"
+STEP_DRAWN = "Drawn"          # a fire in reach: walk to it; fails with none
 STEP_STROLL = "Stroll"        # the patrol step
 # One step per sense, in priority order: the tree's Senses selector tries
 # them left to right, and the first that answers wins.

@@ -17,7 +17,8 @@ from forest_generator.npc_strafe import (
     NPC_STRAFE_SPEED_SCALE,
 )
 from npc.paths import (
-    AI_BP_PATH, PATROL_TARGET_VAR, STEP_CHASE, STEP_EVENT_PREFIX, STEP_STALK, STEP_WARD,
+    AI_BP_PATH, PATROL_TARGET_VAR, STEP_CHASE, STEP_DRAWN, STEP_EVENT_PREFIX,
+    STEP_STALK, STEP_WARD,
     STRAFE_DIST_VAR, STRAFE_FOR_VAR, STRAFE_YAW_VAR,
 )
 from npc.strafe import DESIRED_FLAG, ORIENT_FLAG
@@ -66,9 +67,10 @@ def check_strafe(path):
         check(f"{tag}: exists, for its step between swings", False)
         return
     ed = unreal.BlueprintGraphEditor.get_graph_editor_by_name(bp, "EventGraph")
-    # Not a stalker's hunt, nor the step that fire holds it off in: each has
-    # move orders and focuses of its own.
-    nodes = outside_step(outside_step(ed.list_all_nodes(), STEP_STALK), STEP_WARD)
+    # Not a stalker's hunt, nor the step that fire holds it off in, nor the
+    # one a fire draws it in: each has move orders and focuses of its own.
+    nodes = outside_step(outside_step(outside_step(
+        ed.list_all_nodes(), STEP_STALK), STEP_WARD), STEP_DRAWN)
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     held = [cdo.get_editor_property(v)
             for v in (STRAFE_YAW_VAR, STRAFE_DIST_VAR, STRAFE_FOR_VAR)]

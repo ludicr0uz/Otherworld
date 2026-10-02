@@ -17,16 +17,21 @@ order for a given controller.
 A creature afraid of fire (forest_generator/npc_ward.NPC_WARD_FEARS) has a
 Ward step ahead of all of that, in a selector with the attack: a pass on
 which fire holds it off never reaches the Swing.
+
+A creature a fire draws (forest_generator/npc_drawn.NPC_DRAWN_BY_FIRE) has a
+Drawn step ahead of the Stroll, in a selector of the two (npc/verify_drawn.py
+checks that, and the step itself).
 """
 
 import unreal
 
+from forest_generator.npc_drawn import NPC_DRAWN_BY_FIRE
 from forest_generator.npc_placement import NPC_REPATH_SECONDS, NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
 from forest_generator.npc_ward import NPC_WARD_FEARS
 from npc.paths import (
     AI_BP_PATH, BB_AGGRO_KEY, BB_PATH, BB_REASON_KEY, SENSE_STEPS, STEP_CHASE,
-    STEP_EVENT_PREFIX, STEP_PRESENT, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
+    STEP_DRAWN, STEP_EVENT_PREFIX, STEP_PRESENT, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
     STEP_STROLL, STEP_SWING, STEP_VAR, STEP_WARD, step_task_path, tree_path,
 )
 from npc.verify import BEL, PIN, _close, _drivers, _ins, _lit, _sources, _title, check
@@ -43,13 +48,22 @@ def warded(ai_path):
                for v in NPC_VARIANTS)
 
 
+def drawn(ai_path):
+    """Is this the controller of a creature a fire draws? The parent
+    controller wears the first creature's steps (npc/controller.py)."""
+    key = next((v.key for v in NPC_VARIANTS if v.ai_blueprint == ai_path),
+               NPC_VARIANTS[0].key)
+    return key in NPC_DRAWN_BY_FIRE
+
+
 def want_steps(ai_path):
     """The order a pre-order walk of this controller's tree meets the steps
     in: the priorities."""
     return ([STEP_PULSE] + [STEP_WARD] * warded(ai_path)
             + [STEP_STALK] * stalks(ai_path)
             + [STEP_CHASE, STEP_SWING, STEP_PRESENT]
-            + [name for _, name in SENSE_STEPS] + [STEP_STROLL])
+            + [name for _, name in SENSE_STEPS]
+            + [STEP_DRAWN] * drawn(ai_path) + [STEP_STROLL])
 
 
 def _load(path):
@@ -145,7 +159,8 @@ def check_tree(ai_path):
               and all(over[0] in up and any(
                   isinstance(c, unreal.BTComposite_Sequence)
                   for c in up[up.index(over[0]) + 1:]) for up in inner))
-    calm = [up for s in [STEP_PRESENT, STEP_STROLL] + [n for _, n in SENSE_STEPS]
+    calm = [up for s in [STEP_PRESENT, STEP_STROLL, STEP_DRAWN]
+            + [n for _, n in SENSE_STEPS]
             for up in above(s)]
     check(f"{tag}: ...and nothing else does (notice and patrol are not gated on it)",
           calm and not any(_gates_on_aggro(d) for up in calm for _, d in up))

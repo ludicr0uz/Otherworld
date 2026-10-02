@@ -18,12 +18,17 @@ names and finishes with StepResult, which every exit of every step writes:
     BT_Chase   between two swings: step back and round -> succeed    strafe.py
                else move order at the player -> run speed -> succeed  chase.py
     BT_Swing   in range and off cooldown? swing -> succeed            melee.py
-    BT_PlayerPresent, BT_<Sense>..., BT_Stroll                        agro.py
+    BT_PlayerPresent, BT_<Sense>...                                   agro.py
+    BT_Drawn   (a creature a fire draws only) a campfire burns in     drawn.py
+               reach: walk to it, slowly, or stand by it -> succeed;
+               none: fail, and the tree goes on to the stroll
+    BT_Stroll                                                         agro.py
 
 Each event runs to its end in one call: no Delay and no latent node, so the
 task reads StepResult straight after calling it.
 """
 
+from forest_generator.npc_drawn import NPC_DRAWN_ARRIVE_CM, NPC_DRAWN_RANGE_CM
 from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S
 from forest_generator.npc_stalk import (
     NPC_STALK_ARC_DEG, NPC_STALK_BEHIND_CM, NPC_STALK_CHARGE_CM,
@@ -42,14 +47,15 @@ from forest_generator.npc_strafe import (
 from npc.agro import _author_agro_steps, _declare_agro_vars
 from npc.chase import _author_chase
 from npc.corpse import _author_alive_gate, _author_corpse_gate
+from npc.drawn import _author_drawn, declare_drawn_vars, draws
 from npc.graph import BEL, _at, _connect, _log, _node, _pin, _set
 from npc.melee import _author_melee
 from npc.nodes import FN_GET_PAWN, FN_IS_VALID
 from npc.monster_tuning import monster_specs, stock_run_speed
 from npc.patrol import _author_patrol_setup, _author_walk_speed
 from npc.paths import (
-    STEP_CHASE, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR, STEP_STALK,
-    STEP_SWING, STEP_WARD, WARD_SINCE_VAR,
+    STEP_CHASE, STEP_DRAWN, STEP_EVENT_PREFIX, STEP_PULSE, STEP_RESULT_VAR,
+    STEP_STALK, STEP_SWING, STEP_WARD, WARD_SINCE_VAR,
 )
 from npc.roar import roar_object
 from npc.stalk import _author_stalk, declare_stalk_vars
@@ -174,6 +180,19 @@ def _author_ward_step(ed, steps, key, x0, y0):
         made)
 
 
+def _author_drawn_step(ed, steps, key, x0, y0):
+    """BT_Drawn, for a creature of NPC_DRAWN_BY_FIRE: a fire draws it."""
+    declare_drawn_vars(ed)
+    made = _author_drawn(ed, steps.event(STEP_DRAWN, x0 - 300, y0), steps.result,
+                         stock_run_speed(key), x0, y0)
+    ed.add_comment_to_nodes(
+        f"BT_Drawn, tried after the senses and before BT_Stroll: with a "
+        f"campfire burning within {NPC_DRAWN_RANGE_CM / 100:.0f} m (the "
+        f"nearest, DrawnTo) it is Drawn: it walks to the fire at its patrol "
+        f"walk and stands {NPC_DRAWN_ARRIVE_CM:.0f} cm off. With none the "
+        f"step fails and it strolls.", made)
+
+
 def _author_steps(ed, key, melee_anim, x0, y0):
     """Author every step event into creature ``key``'s controller graph.
     Its numbers are read off the Tune* variables (npc/tuned.py); ``spec``
@@ -211,6 +230,8 @@ def _author_steps(ed, key, melee_anim, x0, y0):
     warded = wards(key)
     if warded:
         _author_ward_step(ed, steps, key, x0 + 3000, y0 - 22000)
+    if draws(key):
+        _author_drawn_step(ed, steps, key, x0 + 3000, y0 - 30000)
 
     cx, cy = x0 + 3000, y0 - 3000
     stock = stock_run_speed(key)

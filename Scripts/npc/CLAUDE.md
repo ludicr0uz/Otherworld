@@ -10,6 +10,7 @@ steps, the tree, the step task, the controller and the character).
 - The step between two swings is `forest_generator/npc_strafe.py`.
 - The wendigo's hunt is `forest_generator/npc_stalk.py`.
 - What fire does to it is `forest_generator/npc_ward.py`.
+- The fire that draws a zombie is `forest_generator/npc_drawn.py`.
 - None imports `unreal`, so the offline generator checks exactly what gets built.
 - What a landed swing can leave on the player (a wendigo's: bleeding, 33%) is
   `survival/on_hit.py`, rolled at the end of `melee.py` by `survival/on_hit_graph.py`. The
@@ -33,7 +34,7 @@ steps, the tree, the step task, the controller and the character).
   must still pass.
 
 `Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees, the step between swings and
-the wendigo's hunt and the fire that holds it off (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_stalk_cover.py`, `verify_ward.py`, `verify_ward_roar.py`). The level verifier owns the chase and the melee.
+the wendigo's hunt and the fire that holds it off, and the fire that draws a zombie (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_stalk_cover.py`, `verify_ward.py`, `verify_ward_roar.py`, `verify_drawn.py`). The level verifier owns the chase and the melee.
 `Scripts/probes/probe_npc_behavior_tree.py` proves the trees run in the game.
 
 Respawn, the world-floor net and the `[NPC-SPAWN]`/`[NPC-FELL]` numbering are in
@@ -54,6 +55,7 @@ Wanderer (selector)
                                  Approach, Swing → Wait 0.5)
       Notice                    PlayerPresent → Senses (selector): Hurt, Sight, Touch, Sound
       Patrol                    Stroll → Wait 0.5
+                                (the zombie: Wander (selector): Drawn, Stroll → Wait 0.5)
   Idle: Wait 0.5
 ```
 
@@ -284,6 +286,35 @@ Wanderer (selector)
     its forward run, feet sliding, as the strafe does; 50° a pass at 4 m is quick, so a
     player has to keep turning; the roars at the fire are the hunt's clip, upper body on
     standing legs; and its fear shows only in them and the flight (no clip of its own).
+- **A fire draws the zombies** (`drawn.py`, numbers in `forest_generator/npc_drawn.py`):
+  - It is one more step, `BT_Drawn`, in a selector with the Stroll and ahead of it. Only the
+    creatures in `NPC_DRAWN_BY_FIRE` get the event, its two variables and the tree node.
+  - **Drawn is the state between patrol and hunt.** With a campfire burning within 200 m
+    (flat; the nearest of several, kept in `DrawnTo`) the step sets `Drawn`, orders the
+    zombie to the fire (`SimpleMoveToLocation`) at its patrol walk (`TunePatrolSpeed`, written
+    after the order as the Stroll does) and succeeds, so the Stroll is not reached. Within
+    3 m of the fire it stops and stands.
+  - **The senses still run first:** Notice is ahead of Patrol, so a drawn zombie that sees,
+    touches or hears the player goes aggro as ever. A fire lit beside the player brings the
+    zombies to the player. `Drawn` is what the last Drawn step found, and an aggro zombie
+    never runs it again: read "Drawn and not Aggro".
+  - **Let go:** no fire that near (it burnt out: the actor is destroyed) and the step clears
+    `Drawn` and fails. The zombie strolls again about where it spawned (`PatrolHome` is not
+    moved), so it walks back.
+  - **The step looks for the fire, every pass** (`GetAllActorsOfClass(BP_Campfire)`, then
+    `FindNearestActor`, pure: read once into `DrawnTo`). The fire does not tell the zombies
+    when it is lit: the controllers are separate Blueprints, so it would need a cast per
+    creature. So a zombie that comes within 200 m of a fire already burning (a respawn) is
+    drawn too. This build runs after `build_survival.py`; without `BP_Campfire`,
+    `drawn.draws()` leaves the step out with a log line and `verify_drawn.py` fails.
+  - **None of it is tuned:** the range and the stand-off are literals, and the speed is the
+    patrol's own share.
+  - `verify_drawn.py` checks the graph and the tree; `probes/probe_zombie_drawn.py` lights a
+    fire and watches a zombie walk to it. `verify.py` and `verify_strafe.py` count a
+    controller's nodes outside this step too.
+  - **Feel check (needs a play session):** whether the patrol walk is the right "slowly"
+    (a zombie 200 m off takes about 110 s of a fire's 180); the zombies gather 3 m off and
+    stand, with no clip of their own; and they walk home once the fire is out.
 - **The corpse state** (`corpse.py`):
   - It checks the pawn's `Dead` before anything else, every pass.
   - Then: `Corpse = true`, `StopMovement`, one `[NPC-CORPSE]` line, and `StopLogic`: the tree

@@ -13,6 +13,8 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
      - `dev-team` runs a queue of tasks, one headless Claude session each (its pieces are
        `devteam/`). A session started that way has no one to ask, so it decides and reports
        instead. The one exception is a Fab asset (see "Fab assets" below).
+       It reads the task file again after each task, so an item added to `tasks.md` during a
+       run is run in that run, and a waiting one ticked or deleted there is not.
      - Their unit tests: `python3 -m unittest discover -s Scripts/dev/tests`. Run them after
        changing anything in `Scripts/dev` or `Scripts/probes`.
    - `Scripts/probes/` holds probes: checks that run inside a headless game (see below).

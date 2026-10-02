@@ -1,8 +1,14 @@
+import contextlib
+import importlib.machinery
+import importlib.util
+import io
 import json
 import os
 import shutil
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import _paths  # noqa: F401
 
@@ -12,7 +18,7 @@ from devteam.session import (
     FAIL_MARK, Narrator, build_cmd, build_fix_prompt, build_prompt, session_env,
 )
 from devteam import triage
-from devteam.tasks import Task, parse_tasks, tick
+from devteam.tasks import Task, parse_tasks, requeue, tick
 
 
 class TasksTest(unittest.TestCase):
@@ -40,11 +46,159 @@ class TasksTest(unittest.TestCase):
                 fh.write("- [ ] a\n- [ ] b\n  effort: low\n")
             with open(path) as fh:
                 tasks = parse_tasks(fh.read())
-            tick(path, tasks[1])
+            self.assertTrue(tick(path, tasks[1]))
             with open(path) as fh:
                 self.assertEqual(fh.read(), "- [ ] a\n- [x] b\n  effort: low\n")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertFalse(tick(path, tasks[1]))   # nothing unticked to find
+                self.assertFalse(tick(path + ".gone", tasks[0]))
         finally:
             shutil.rmtree(tmp)
+
+
+class RequeueTest(unittest.TestCase):
+    """The queue after the task file is read again, mid-run."""
+
+    def test_an_added_task_joins_the_queue_in_file_order(self):
+        (b,) = parse_tasks("- [ ] b\n")
+        queue, added, dropped = requeue(
+            [b], [], parse_tasks("- [x] a\n- [ ] new first\n- [ ] b\n- [ ] new last\n"))
+        self.assertEqual([t.text for t in queue], ["new first", "b", "new last"])
+        self.assertEqual([t.text for t in added], ["new first", "new last"])
+        self.assertEqual(dropped, [])
+
+    def test_nothing_new_leaves_the_queue_alone(self):
+        waiting = parse_tasks("- [ ] b\n- [ ] c\n")
+        queue, added, dropped = requeue(waiting, [], parse_tasks("- [x] a\n- [ ] b\n- [ ] c\n"))
+        self.assertEqual([t.text for t in queue], ["b", "c"])
+        self.assertEqual((added, dropped), ([], []))
+
+    def test_a_waiting_task_ticked_or_deleted_is_dropped(self):
+        waiting = parse_tasks("- [ ] b\n- [ ] c\n- [ ] d\n")
+        queue, added, dropped = requeue(waiting, [], parse_tasks("- [x] b\n- [ ] d\n"))
+        self.assertEqual([t.text for t in queue], ["d"])
+        self.assertEqual(added, [])
+        self.assertEqual([t.text for t in dropped], ["b", "c"])
+
+    def test_a_failed_task_is_not_queued_again(self):
+        (failed,) = parse_tasks("- [ ] a\n")
+        queue, added, _dropped = requeue([], [failed], parse_tasks("- [ ] a\n- [ ] b\n"))
+        self.assertEqual([t.text for t in queue], ["b"])
+        self.assertEqual([t.text for t in added], ["b"])
+
+    def test_a_second_copy_of_a_failed_task_is_new_work(self):
+        (failed,) = parse_tasks("- [ ] a\n")
+        queue, added, _dropped = requeue([], [failed], parse_tasks("- [ ] a\n- [ ] a\n"))
+        self.assertEqual([t.text for t in queue], ["a"])
+        self.assertEqual(len(added), 1)
+
+    def test_a_waiting_task_keeps_its_triage_unless_the_file_has_a_hint(self):
+        waiting = parse_tasks("- [ ] b\n- [ ] c\n")
+        for t in waiting:
+            t.effort, t.triage = "low", "one constant"
+        queue, _added, _dropped = requeue(
+            waiting, [], parse_tasks("- [ ] b\n- [ ] c\n  effort: high\n"))
+        self.assertEqual([(t.effort, t.triage) for t in queue],
+                         [("low", "one constant"), ("high", None)])
+
+    def test_the_queue_carries_the_file_s_new_line_numbers(self):
+        (b,) = parse_tasks("- [ ] b\n")
+        queue, _added, _dropped = requeue([b], [], parse_tasks("# queue\n\n- [ ] new\n- [ ] b\n"))
+        self.assertEqual([t.line for t in queue], [2, 3])
+
+
+def load_cli():
+    """Scripts/dev/dev-team as a module (it has no .py to import it by)."""
+    path = os.path.join(_paths.DEV, "dev-team")
+    loader = importlib.machinery.SourceFileLoader("dev_team_cli", path)
+    spec = importlib.util.spec_from_loader("dev_team_cli", loader)
+    module = importlib.util.module_from_spec(spec)
+    with mock.patch.object(sys, "dont_write_bytecode", True):
+        loader.exec_module(module)
+    return module
+
+
+class LoopTest(unittest.TestCase):
+    """dev-team's own loop, with the session, the editors and git stubbed out."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.path = os.path.join(self.tmp, "tasks.md")
+        self.cli = load_cli()
+        self.ran = []
+
+    def write(self, text, mode="w"):
+        with open(self.path, mode) as fh:
+            fh.write(text)
+
+    def run_cli(self, during, *flags, fail=()):
+        """Run the queue; ``during`` maps a task's text to what its session
+        does to the task file while it works. Returns (exit code, output)."""
+        def run_one(task, n, total, *_rest):
+            self.ran.append((n, total, task.text))
+            if task.text in during:
+                during[task.text]()
+            ok = task.text not in fail
+            return ok, ["report" if ok else "FAILED: no"], {}, None, None
+
+        out = io.StringIO()
+        argv = ["dev-team", "-t", self.path, "--no-triage", "--no-gate", *flags]
+        with mock.patch.multiple(self.cli, run_one=run_one, close_editors=lambda: True,
+                                 git_head=lambda root: None,
+                                 LOG_ROOT=os.path.join(self.tmp, "logs")), \
+                mock.patch.object(self.cli.server, "stop", lambda serve_dir: False), \
+                mock.patch.object(sys, "argv", argv), \
+                contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as stop:
+            self.cli.main()
+        return stop.exception.code, out.getvalue()
+
+    def test_a_task_added_during_the_last_task_is_run(self):
+        self.write("- [ ] a\n")
+        code, out = self.run_cli({"a": lambda: self.write("- [ ] b\n  more\n", "a")})
+        self.assertEqual(self.ran, [(1, 1, "a"), (2, 2, "b\nmore")])
+        self.assertEqual(code, 0)
+        self.assertIn("1 new task(s) in tasks.md", out)
+        with open(self.path) as fh:
+            self.assertEqual(fh.read(), "- [x] a\n- [x] b\n  more\n")
+
+    def test_the_total_grows_and_the_file_s_order_is_kept(self):
+        self.write("- [ ] a\n- [ ] c\n")
+        self.run_cli({"a": lambda: self.write("- [ ] a\n- [ ] b\n- [ ] c\n")})
+        self.assertEqual(self.ran, [(1, 2, "a"), (2, 3, "b"), (3, 3, "c")])
+
+    def test_a_waiting_task_deleted_from_the_file_is_not_run(self):
+        self.write("- [ ] a\n- [ ] b\n")
+        code, out = self.run_cli({"a": lambda: self.write("- [ ] a\n")})
+        self.assertEqual(self.ran, [(1, 2, "a")])
+        self.assertEqual(code, 0)
+        self.assertIn("so not run: b", out)
+
+    def test_a_failed_task_is_not_picked_up_again(self):
+        self.write("- [ ] a\n- [ ] b\n")
+        code, _out = self.run_cli({}, "--keep-going", fail=("a",))
+        self.assertEqual([text for _n, _total, text in self.ran], ["a", "b"])
+        self.assertEqual(code, 1)
+        with open(self.path) as fh:
+            self.assertEqual(fh.read(), "- [ ] a\n- [x] b\n")
+
+    def test_a_failure_stops_the_run_before_the_file_is_read_again(self):
+        self.write("- [ ] a\n")
+        code, out = self.run_cli({"a": lambda: self.write("- [ ] b\n", "a")}, fail=("a",))
+        self.assertEqual(len(self.ran), 1)
+        self.assertEqual(code, 1)
+        self.assertNotIn("new task(s)", out)
+
+    def test_a_task_file_that_goes_away_keeps_the_queue(self):
+        self.write("- [ ] a\n- [ ] b\n")
+        gone = []
+
+        def remove():
+            if not gone:
+                gone.append(os.rename(self.path, self.path + ".gone"))
+        _code, out = self.run_cli({"a": remove, "b": remove})
+        self.assertEqual([text for _n, _total, text in self.ran], ["a", "b"])
+        self.assertIn("keeping the queue as it was", out)
 
 
 def row(label, passed, failed, failures=()):

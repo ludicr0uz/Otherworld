@@ -32,6 +32,11 @@ A task that finishes is ticked (``- [x]``) in the file as soon as it does, so
 re-running the same file resumes where the last run stopped. A failed task
 stops the run (later tasks may depend on it) unless --keep-going is given.
 
+The file is read again after each task, so it can be edited while a run is
+going: an item added to it is run in this run, in the file's order (and sized
+by triage like the rest), and a waiting item ticked or deleted there is not
+run. The run ends when the file has no unticked item it has not tried.
+
 **Editors.** Before each task, every editor of this project is closed: asked
 through its inbox to save its dirty packages and quit, and terminated only if
 it does not. If an editor cannot be closed, the run stops rather than work
@@ -93,7 +98,7 @@ from devteam.accounting import (                                    # noqa: E402
 from devteam.session import (                                       # noqa: E402
     build_cmd, build_fix_prompt, build_prompt, run_session, session_env,
 )
-from devteam.tasks import Task, parse_tasks, tick                   # noqa: E402
+from devteam.tasks import Task, parse_tasks, requeue, tick          # noqa: E402
 from devteam.triage import triage                                   # noqa: E402
 from uepylib import editors, server                                 # noqa: E402
 
@@ -146,6 +151,53 @@ def load_tasks(args):
         sys.exit(f"dev-team: no task file at {task_file}")
     with open(task_file) as f:
         return task_file, parse_tasks(f.read())
+
+
+def size(tasks, args):
+    """Triage the tasks that have no effort yet. Returns what the call cost."""
+    if not (args.triage and not args.effort):
+        return 0.0
+    unsized = [t for t in tasks if not t.effort]
+    cost, error = triage(unsized, ROOT)
+    lowered = sum(1 for t in unsized if t.triage)
+    print(f"  triage: {error}" if error else
+          f"  triage: {lowered} of {len(unsized)} task(s) at low effort, "
+          f"the rest at the default (${cost:.2f})")
+    return cost
+
+
+def describe(n, task):
+    hints = ", ".join(f"{k} {v}" for k, v in (("effort", task.effort), ("model", task.model))
+                      if v)
+    if task.triage:
+        hints += f" -- triage: {task.triage}"
+    return f"  {n}. {task.title}" + (f"  [{hints}]" if hints else "")
+
+
+def reread(task_file, pending, attempted, args, n):
+    """The queue after a task: the task file as it is now (tasks.requeue).
+
+    Returns (queue, triage cost). A file that cannot be read leaves the queue
+    as it was."""
+    try:
+        with open(task_file) as f:
+            fresh = parse_tasks(f.read())
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"dev-team: could not read {task_file} again ({exc}) "
+              "-- keeping the queue as it was")
+        return pending, 0.0
+    queue, added, dropped = requeue(pending, attempted, fresh)
+    for task in dropped:
+        print(f"dev-team: no longer in {os.path.basename(task_file)}, "
+              f"so not run: {task.title}")
+    if not added:
+        return queue, 0.0
+    print(f"dev-team: {len(added)} new task(s) in {os.path.basename(task_file)}")
+    cost = size(added, args)
+    for i, task in enumerate(queue, n + 1):
+        if task in added:
+            print(describe(i, task))
+    return queue, cost
 
 
 def close_editors():
@@ -250,19 +302,9 @@ def main():
         sys.exit("dev-team: nothing to do (no unticked tasks)")
     skipped = len(tasks) - len(todo)
     print(f"dev-team: {len(todo)} task(s)" + (f", {skipped} already done" if skipped else ""))
-    triage_cost = 0.0
-    if args.triage and not args.effort:
-        unsized = [t for t in todo if not t.effort]
-        triage_cost, error = triage(unsized, ROOT)
-        lowered = sum(1 for t in unsized if t.triage)
-        print(f"  triage: {error}" if error else
-              f"  triage: {lowered} of {len(unsized)} task(s) at low effort, "
-              f"the rest at the default (${triage_cost:.2f})")
+    triage_cost = size(todo, args)
     for i, t in enumerate(todo, 1):
-        hints = ", ".join(f"{k} {v}" for k, v in (("effort", t.effort), ("model", t.model)) if v)
-        if t.triage:
-            hints += f" -- triage: {t.triage}"
-        print(f"  {i}. {t.title}" + (f"  [{hints}]" if hints else ""))
+        print(describe(i, t))
     if args.dry_run:
         return
 
@@ -274,23 +316,26 @@ def main():
         f.write(f"# dev-team run {stamp}\n")
 
     outcomes, total_cost, cache = [], triage_cost, {}
-    for n, task in enumerate(todo, 1):
-        print(f"\n[{n}/{len(todo)}] {task.title}")
+    attempted = []      # run already and still unticked: not to be queued again
+    while todo:
+        # The total moves when the task file is edited mid-run (reread, below).
+        task, n, total = todo[0], len(outcomes) + 1, len(outcomes) + len(todo)
+        print(f"\n[{n}/{total}] {task.title}")
         if not close_editors():
             print("dev-team: stopping -- an editor of this project is still running")
             break
         before = git_head(ROOT)
         try:
             ok, reports, result, gate_table, swept = run_one(
-                task, n, len(todo), args, run_dir, progress, cache)
+                task, n, total, args, run_dir, progress, cache)
         except KeyboardInterrupt:
             print("\ndev-team: interrupted -- this task stays unticked")
-            outcomes.append((task, "interrupted"))
+            outcomes.append((todo.pop(0), "interrupted"))
             break
         except fab.FabStop as stop:
             print(f"\ndev-team: stopped while waiting for Fab asset {stop} "
                   "-- this task stays unticked")
-            outcomes.append((task, "stopped"))
+            outcomes.append((todo.pop(0), "stopped"))
             break
         cost = result.get("total_cost_usd") or 0.0
         total_cost += cost
@@ -315,8 +360,9 @@ def main():
                     + (f"### Verifier gate\n\n{gate_table}\n\n" if gate_table else "")
                     + f"### Report\n\n{report or '(no report)'}\n")
         outcomes.append((task, status))
-        if ok and task_file and task.line is not None:
-            tick(task_file, task)
+        todo.pop(0)
+        if not (ok and task_file and task.line is not None and tick(task_file, task)):
+            attempted.append(task)
         cache.clear()
         if ok and swept:
             # The next task's baseline, as long as nothing changes in between.
@@ -324,16 +370,18 @@ def main():
         if not ok and not args.keep_going:
             print("dev-team: stopping (use --keep-going to continue past failures)")
             break
+        if task_file:
+            todo, cost = reread(task_file, todo, attempted, args, n)
+            total_cost += cost
 
     if server.stop(SERVE_DIR):
         print("\ndev-team: stopped the last session's warm editor")
     print(f"\ndev-team: finished -- ${total_cost:.2f} total, progress in {progress}")
     for task, status in outcomes:
         print(f"  {status:>11}  {task.title}")
-    for task in todo[len(outcomes):]:
+    for task in todo:
         print(f"  {'not run':>11}  {task.title}")
-    sys.exit(0 if all(s == "done" for _t, s in outcomes)
-             and len(outcomes) == len(todo) else 1)
+    sys.exit(0 if all(s == "done" for _t, s in outcomes) and not todo else 1)
 
 
 if __name__ == "__main__":

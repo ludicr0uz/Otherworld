@@ -46,6 +46,7 @@ from combat.weapon_component.support_hand import _author_support_hand
 from combat.weapon_component.sway import _author_sight_sway
 from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.steady import _author_steady
+from combat.weapon_component.use import _author_use
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 
 # A probe's stand-in for the fire key's press: no key can be injected into a
@@ -134,12 +135,19 @@ def _author_wc_tick(ed, tick):
     sprint_exits = _author_stance(ed, pc_out, owner_out, key_pins,
                                   sprint_exits, 1040, -9000)
 
+    # --- the use key (use.py) --------------------------------------------------
+    # After the sprint, which it reads; before the aim, which reads Using to
+    # know the sights key is not aiming this frame.
+    sprint_exits, sights_key = _author_use(
+        ed, pc_out, owner_out, held, armed_out, key_pins["KeySights"],
+        sprint_exits, 1040, -20000)
+
     # --- aim down the sights -------------------------------------------------
     # After the sprint block, which writes Sprinting, and before the trigger,
     # which the cone width now depends on: polled in any other order the zoom
     # and the spread would disagree by a frame.
     ads_exits = _author_ads(ed, tick, pc_out, owner_out, held, armed_out,
-                            key_pins, sprint_exits, 1040, -700)
+                            key_pins, sights_key, sprint_exits, 1040, -700)
 
     # --- and where the camera is, down the sights ----------------------------
     # After the aim state it reads (SightAiming). The camera trace at the top

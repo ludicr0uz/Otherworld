@@ -39,15 +39,16 @@ from combat.nodes import (
     FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT,
     NODE_CAST_HEALTH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET,
 )
-from combat.paths import HEALTH_CLASS_PATH
+from combat.paths import FIRE_WARD_VAR, HEALTH_CLASS_PATH
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR
 from combat.weapon_component.head_hide import _author_head_shown
 
 OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
 
 # What a dead owner is no longer doing. Others read these: the wanderers'
-# swing reads Blocking, the HUD's reticle the aim.
-LET_GO_VARS = ("Aiming", "SightAiming", SEATED_VAR, "Sprinting", "Blocking")
+# swing reads Blocking, the HUD's reticle the aim, a wendigo FireWard.
+LET_GO_VARS = ("Aiming", "SightAiming", SEATED_VAR, "Sprinting", "Blocking",
+               FIRE_WARD_VAR)
 
 
 def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):

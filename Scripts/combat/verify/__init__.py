@@ -63,7 +63,12 @@ and it never relies on a variable another section left behind.
   light       the matches and lighting a campfire: BP_Matches, who Lights,
               the loadout, the branch off the fire gate, the wood spent, the
               ground trace and the spawn; is_light_trace
-  hold_pose   A_HoldItem / A_HoldKnife: arms, hands, fist, who holds them
+  torch       the stick and the use key: BP_Stick's two models and its own
+              burn-out, the torch poses, the loadout, Using/UsePressed off the
+              sights key (which then does not aim), the light at a campfire,
+              FireWard, the raised pose's swap
+  hold_pose   every hold pose's arms; A_HoldItem / A_HoldKnife: hands, fist,
+              who holds them
   shotgun_pose  A_AimShotgun: the rifle pose but for the thumbs, where they
               point and sit on the shotgun, the grip unchanged
   interact    the interact key: its idle state, the probe's press, the reach,
@@ -77,7 +82,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "interact", "pickup",
     "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
 )

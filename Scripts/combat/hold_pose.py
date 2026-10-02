@@ -1,6 +1,7 @@
-"""The hold poses: A_HoldItem (food and water carried in the right hand) and
-A_HoldKnife (the knife up, ready to fight), AnimSequences keyed here for
-whatever body the player wears.
+"""The hold poses: A_HoldItem (food and water carried in the right hand),
+A_HoldKnife (the knife up, ready to fight), A_HoldTorch (the stick carried
+as a torch) and A_WardTorch (it held out at a creature), AnimSequences keyed
+here for whatever body the player wears.
 
 WHY NOT THE PISTOL'S POSE
 -------------------------
@@ -28,6 +29,12 @@ across the fingers).
     A_HoldKnife  a fighting stance: the right elbow before the ribs, the
                  forearm rising so the knife is at the chest, blade up; the
                  left fist up before the chin as a guard
+    A_HoldTorch  the stick carried as a torch: the right elbow out from the
+                 ribs, the forearm rising, so the fist is at the shoulder
+                 and the fire beside the head, clear of the face
+    A_WardTorch  the torch held out (the use key, weapon_component/torch.py):
+                 the right arm straight ahead at the shoulder's height, the
+                 fire at arm's length between the player and what they face
 
 Constant clips (a held pose, as the ADS poses are). The slash
 (knife_anim.py) is keyed off A_HoldKnife, so it starts and ends in it.
@@ -38,7 +45,10 @@ import unreal
 from asset_pipeline.rig_util import mesh_ref_pose, visible_bone_xf
 from combat.body_pose import _between, _conj, _mul, _norm
 from combat.graph import _assets, _log
-from combat.paths import HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH
+from combat.paths import (
+    HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH,
+    WARD_TORCH_ANIM_PATH,
+)
 
 FPS = 30
 FRAMES = 30
@@ -55,10 +65,20 @@ HOLD_KNIFE_DIRS = {
     "upperarm_l": (0.10, 0.50, -0.86),
     "forearm_l": (-0.20, 0.40, 0.89),
 }
+HOLD_TORCH_DIRS = {
+    "upperarm_r": (-0.45, 0.35, -0.82),
+    "forearm_r": (-0.15, 0.55, 0.82),
+}
+WARD_TORCH_DIRS = {
+    "upperarm_r": (-0.10, 0.99, 0.10),
+    "forearm_r": (0.05, 0.98, 0.20),
+}
 CHILD = {"upperarm": "forearm", "forearm": "hand"}
 
 HOLD_POSES = ((HOLD_ITEM_ANIM_PATH, HOLD_ITEM_DIRS),
-              (HOLD_KNIFE_ANIM_PATH, HOLD_KNIFE_DIRS))
+              (HOLD_KNIFE_ANIM_PATH, HOLD_KNIFE_DIRS),
+              (HOLD_TORCH_ANIM_PATH, HOLD_TORCH_DIRS),
+              (WARD_TORCH_ANIM_PATH, WARD_TORCH_DIRS))
 
 
 def _q(rot):
@@ -180,6 +200,6 @@ def _build_one(skin, path, dirs):
 
 
 def build_hold_poses(skin):
-    """Key A_HoldItem and A_HoldKnife for ``skin``'s body; returns
+    """Key every hold pose (HOLD_POSES) for ``skin``'s body; returns
     {path: clip}."""
     return {path: _build_one(skin, path, dirs) for path, dirs in HOLD_POSES}

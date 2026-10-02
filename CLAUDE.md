@@ -26,7 +26,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
 
    | system | entry points | read |
    |---|---|---|
-   | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
+   | weapons, inventory, health, death, blood, bullet impacts, audio, hit boxes, chopping trees for wood, the matches, the use key and the stick that burns | `build_`/`verify_weapons_and_combat.py` | `Scripts/combat/CLAUDE.md` |
    | NPCs: behaviour tree, pack, patrol and agro | `build_`/`verify_npc_blueprints.py` | `Scripts/npc/CLAUDE.md` |
    | the Game Settings (M) panel, graphics presets and tuning, settings, HUD | `build_`/`verify_graphics_menu.py` | `Scripts/graphics_menu/CLAUDE.md` |
    | survival: GAS, debuffs, forage, the campfire | `build_`/`verify_survival.py`, `place_forage.py` | `Scripts/survival/CLAUDE.md` |
@@ -196,15 +196,15 @@ editor.
 
 ## Current state
 
-- **The player:** a Meshy-generated adventurer holding an issued shotgun, pistol, knife, axe and box of matches. The SMG,
+- **The player:** a Meshy-generated adventurer holding an issued shotgun, pistol, knife, axe, box of matches and stick. The SMG,
   assault rifle and sniper are found as drops. The rifle is the FPS Weapon Bundle's AK 47 and
   the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
   Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). A gun is carried lowered, in the hand of the stock idle and jog, and comes up into its
   ready pose for an aim, a shot, a reload or the guard (`combat/weapon_component/carry.py`).
   The player can sprint, aim over the shoulder or, with a gun, down
-  the sights (the sniper's is its scope; the knife, the axe and the other items have none, so the sights key aims them over the shoulder), reload and eat, block (F; a swing from the front does a
+  the sights (the sniper's is its scope; the knife, the axe and the other items have none, so with one of them in hand the sights key is the use key and does not aim: `combat/weapon_component/use.py`), reload and eat, block (F; a swing from the front does a
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
-  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), light a campfire (left click with the matches in hand and wood in the bag: the wood is spent and a fire stands in front of the player for 3 minutes, warming them within 4 m: `combat/weapon_component/light.py`, `survival/campfire.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
+  `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), light a campfire (left click with the matches in hand and wood in the bag: the wood is spent and a fire stands in front of the player for 3 minutes, warming them within 4 m: `combat/weapon_component/light.py`, `survival/campfire.py`), light the stick at a campfire (the use key with it in hand, within 3 m of a fire: it burns for 2 minutes, carried up like a torch and lighting the ground round it, then is a stick again) and hold the burning stick out in front (the use key held: `combat/stick.py`, `combat/weapon_component/torch.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library
   clips (the crawl is its face-down swim: the packs have no crawl), throw whatever is in hand (hold V to
   see the arc, click to throw, let V go to call it off; the click plays Quaternius UAL2's `OverhandThrow` and the item leaves the hand 0.35 s in, tumbles end over end through the air and lands as a pick-up: `combat/weapon_component/throw_windup.py`, `throw_flight.py`), interact with one thing at a time (E: of those in reach, the one nearest the
   point the reticle rests on; an item lying there is picked up, and items are all it acts on so far: `combat/weapon_component/interact.py`), and has
@@ -232,7 +232,7 @@ editor.
   swings a wanderer backs off a little and sidesteps round the player, facing them. A wendigo
   hunts before it chases: aggro, it roars (the Mixamo zombie scream, and one of its roar
   sounds), comes in round the player in an arc, tree to tree, waiting behind each trunk, and
-  from 10 m charges straight at them (`npc/stalk.py`, `forest_generator/npc_stalk.py`). Fire held out at a wendigo (the player's `FireWard`, which nothing raises yet: there is no lit stick) keeps it from attacking: within 7 m and in front of the player it circles them instead, attacks once it is more than 90° round the fire, and after 30 s of being held off runs away for 12 s and hunts again (`npc/ward.py`, `forest_generator/npc_ward.py`). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
+  from 10 m charges straight at them (`npc/stalk.py`, `forest_generator/npc_stalk.py`). Fire held out at a wendigo (the player's `FireWard`: the burning stick, raised by the use key) keeps it from attacking: within 7 m and in front of the player it circles them instead, attacks once it is more than 90° round the fire, and after 30 s of being held off runs away for 12 s and hunts again (`npc/ward.py`, `forest_generator/npc_ward.py`). A killed one is replaced 10 s later, 75–100 m away, and leaves a ragdoll corpse.
   The zombie idles, shambles, runs and swings with Mixamo's zombie packs
   (`asset_pipeline/import_mixamo.py`, zips in `assets/cache/mixamo/`); the wendigo keeps the
   mannequin's set, plus that pack's scream for its roar.

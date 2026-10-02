@@ -28,6 +28,7 @@ from combat.graph import (
 )
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
+from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR
 from combat.tuning import COMBAT
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
@@ -96,8 +97,13 @@ def build_weapon_item():
                        # Aimed down its sights by the sights key: a gun. False
                        # on everything else, which that key aims over the
                        # shoulder (weapon_component/ads.py).
-                       (HAS_SIGHTS_VAR, "bool")):
+                       (HAS_SIGHTS_VAR, "bool"),
+                       # Lit at a campfire by the use key, and burning: the
+                       # stick (stick.py, weapon_component/torch.py).
+                       (BURNS_VAR, "bool"),
+                       (LIT_VAR, "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
+    _declare(ed, BURN_OUT_VAR, _float_type())
     _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
     # Where the eye goes when this weapon is aimed down its sights, in the
     # weapon's own space: on the sight line, behind the rear sight (on the
@@ -127,6 +133,10 @@ def build_weapon_item():
         _declare(ed, name,
                  BEL.get_object_reference_type(unreal.SoundBase.static_class()))
     _declare(ed, "AimPose",
+             BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
+    # The pose a lit stick is raised in while the use key holds it out
+    # (weapon_component/torch.py). None on everything else.
+    _declare(ed, USE_POSE_VAR,
              BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
     # Held in both hands (the rifle ready pose). The guard reads it to raise
     # the gun across the body instead of the fists (body_pose.py). False on

@@ -1,7 +1,7 @@
 """The matches and the campfire: a strike with wood in the bag lights a fire in
 front of the player, and standing near it raises the player's Temperature.
 
-The player must start carrying BP_Matches, last of the five issued items. A
+The player must start carrying BP_Matches, fifth of the six issued items. A
 strike is the fire key with the matches in hand; FireForced stands in for the
 key (no key can be injected into a headless game).
 
@@ -55,6 +55,7 @@ WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
 
 MATCHES = "BP_Matches_C"
 STARTERS = ["BP_Shotgun_C", "BP_Pistol_C", "BP_Knife_C", AXE, MATCHES]
+ISSUED = STARTERS + ["BP_Stick_C"]   # the stick is issued after them (probe_lit_stick.py)
 RATE = 20.0
 COOL = 50.0               # a Temperature with room to rise
 WATCH = 0.3
@@ -142,7 +143,7 @@ def _run(p):
 
     bag = _bag(p, wc)
     p.check("the matches are issued, after the shotgun, the pistol, the knife and the axe",
-            bag == STARTERS, str(bag))
+            bag == ISSUED, str(bag))
     if MATCHES not in bag:
         return
     matches = list(p.get(wc, "Inventory"))[bag.index(MATCHES)]
@@ -161,7 +162,7 @@ def _run(p):
             and not matches.get_editor_property("hidden"), _held_name(p, wc))
     yield from _strike(p, wc)
     p.check("a strike with no wood in the bag lights nothing and spends nothing",
-            not _fires(p) and _bag(p, wc) == STARTERS and p.get(wc, "Held") == matches,
+            not _fires(p) and _bag(p, wc) == ISSUED and p.get(wc, "Held") == matches,
             f"fires {len(_fires(p))}, bag {_bag(p, wc)}")
 
     got = yield from _cut_wood(p, player, wc)
@@ -175,7 +176,7 @@ def _run(p):
     p.set(wc, "Inventory", [log] + [i for i in items if i != log])
     yield from _equip(p, wc, MATCHES)
     p.check("the bag turned round: the wood first, the matches last and in hand",
-            _bag(p, wc) == [WOOD] + STARTERS and p.get(wc, "Held") == matches
+            _bag(p, wc) == [WOOD] + ISSUED and p.get(wc, "Held") == matches
             and p.get(wc, "EquippedIndex") == len(STARTERS),
             f"{_bag(p, wc)} index {p.get(wc, 'EquippedIndex')}")
 
@@ -185,7 +186,7 @@ def _run(p):
     p.check("a strike with wood in the bag lights one campfire", len(fires) == 1,
             str(len(fires)))
     p.check("...spends the wood: out of the bag and out of the world",
-            _bag(p, wc) == STARTERS and not _items(p, WOOD),
+            _bag(p, wc) == ISSUED and not _items(p, WOOD),
             f"{_bag(p, wc)}, wood in the world {len(_items(p, WOOD))}")
     p.check("...keeps the matches, still in hand, EquippedIndex following them down a slot",
             p.get(wc, "Held") == matches and not matches.get_editor_property("hidden")

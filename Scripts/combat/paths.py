@@ -37,9 +37,15 @@ WOOD_BP_PATH = f"{WEAPON_DIR}/BP_Wood"
 # The matches: struck, with wood in the bag, to light a campfire (matches.py,
 # weapon_component/light.py).
 MATCHES_BP_PATH = f"{WEAPON_DIR}/BP_Matches"
-# The hold poses (combat/hold_pose.py): food and water carried, the knife ready.
+# The stick: lit at a campfire, a torch until it burns out (stick.py,
+# weapon_component/torch.py).
+STICK_BP_PATH = f"{WEAPON_DIR}/BP_Stick"
+# The hold poses (combat/hold_pose.py): food and water carried, the knife
+# ready, the stick carried as a torch and held out at a creature.
 HOLD_ITEM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldItem"
 HOLD_KNIFE_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldKnife"
+HOLD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_HoldTorch"
+WARD_TORCH_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_WardTorch"
 # The shotgun's ready pose (combat/shotgun_pose.py): the rifle's, with the
 # thumb over a straight stock's wrist.
 SHOTGUN_AIM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_AimShotgun"
@@ -74,9 +80,9 @@ ITEM_CLASS_PATH = f"{ITEM_BP_PATH}.BP_WeaponItem_C"
 HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 WEAPON_COMP_CLASS_PATH = f"{WEAPON_COMP_BP_PATH}.BP_WeaponComponent_C"
 # On BP_WeaponComponent: the player is holding fire out in front of them (a
-# lit stick). Nothing in combat reads it; a creature afraid of fire does
+# lit stick, raised by the use key: weapon_component/torch.py writes it every
+# frame). Nothing in combat reads it; a creature afraid of fire does
 # (npc/ward.py), and keeps off the side the player faces while it is true.
-# Whatever lights the stick writes it.
 FIRE_WARD_VAR = "FireWard"
 BLOOD_CLASS_PATH = f"{BLOOD_BP_PATH}.BP_BloodSplash_C"
 BULLET_IMPACT_CLASS_PATH = f"{BULLET_IMPACT_BP_PATH}.BP_BulletImpact_C"

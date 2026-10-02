@@ -56,10 +56,19 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     the component's MatchesClass/CampfireClass/LightWood
   matches           BP_Matches: Quaternius's Survival Pack matchbox, the one
                     item that Lights; build_matches()
+  use_tuning        the use key's names: Using / UsePressed / UseWas
+  torch_tuning      the stick that burns: Burns / Lit / BurnOutTime / UsePose on
+                    the item, how long it burns and how near a campfire lights
+                    it (STICK_*), the component's StickClass/NearFire/WardItem/
+                    WardCarryPose
+  stick             BP_Stick: Quaternius's Survival Pack torch, bare and
+                    burning, and its glow; its own Tick puts it out and shows
+                    the one or the other; build_stick()
   knife_anim        A_KnifeSlash: the slash keyed bone by bone onto the
                     knife's hold pose (AnimationDataController)
-  hold_pose         A_HoldItem / A_HoldKnife: food carried at the waist, the
-                    knife up in a fighting stance, keyed off the idle
+  hold_pose         A_HoldItem / A_HoldKnife / A_HoldTorch / A_WardTorch: food
+                    carried at the waist, the knife up in a fighting stance, the
+                    stick carried as a torch and held out, keyed off the idle
   shotgun_pose      A_AimShotgun: the shotgun's ready pose, the rifle's with
                     the right thumb over the stock's wrist and the left along
                     the pump (SHOTGUN_THUMBS), keyed off the rifle pose

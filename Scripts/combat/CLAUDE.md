@@ -16,9 +16,11 @@ The defaults are all rebindable on the settings screen:
 - A gun is **carried lowered** (the jog's own arms, the gun in the hand) and comes up into its
   ready pose while an aim key or the guard is held, and for a shot or a reload
   (`weapon_component/carry.py`, `docs/aiming.md`).
-- Right click aims **over the shoulder**, middle click aims **down the sights** (both held;
-  only a gun has sights, `HasSights`, so with the knife, the axe, the matches, wood or food
-  in hand the middle click aims over the shoulder too: `probes/probe_item_no_sights.py`),
+- Right click aims **over the shoulder**, middle click aims **down the sights** (both held).
+  Only a gun has sights (`HasSights`): with anything else in hand the middle click is the
+  **use key** (`weapon_component/use.py`) and does not aim at all
+  (`probes/probe_item_no_sights.py`). It lights a stick at a campfire and holds a burning one
+  out (below); on the knife, the axe, the matches, wood and food it does nothing yet.
   **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up), **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **V** held shows the throw's arc and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
@@ -144,13 +146,14 @@ menu polls its own copy from `DrawHUD`, which does.
     pick-up's does.
   - The fire goes where the player faces, whatever is there: facing a trunk at arm's length
     puts it in the tree. `probes/probe_campfire.py` runs the whole chain in a game.
-- **Knife and food have their own hold poses, not the pistol's aim** (`hold_pose.py`):
-  `A_HoldKnife` (knife up at the chest, left fist raised as a guard) and `A_HoldItem` (the
-  item carried at the waist, left arm hanging), keyed off the idle by arm directions like the
-  guard's. The right hand keeps the pistol pose's orientation and fingers, so the grip solve
+- **Knife, food and the stick have their own hold poses, not the pistol's aim**
+  (`hold_pose.py`): `A_HoldKnife` (knife up at the chest, left fist raised as a guard),
+  `A_HoldItem` (the item carried at the waist, left arm hanging), `A_HoldTorch` (the stick
+  up beside the head) and `A_WardTorch` (it held out at arm's length), keyed off the idle by
+  arm directions like the guard's. The right hand keeps the pistol pose's orientation and fingers, so the grip solve
   gives the pistol's answer and every item stays upright in the fist. The slash starts and ends
   in `A_HoldKnife`. `probes/probe_hold_poses.py` measures the hand heights in game.
-- **The shotgun, pistol, knife, axe and matches are issued; the SMG, rifle and sniper are found.**
+- **The shotgun, pistol, knife, axe, matches and a stick are issued; the SMG, rifle and sniper are found.**
   The issued items are `inventory.STARTER_CLASS_VARS`, in bag order: one class variable
   each on the component, spawned at BeginPlay.
   - The gun drop (`gun_drop.py`) is **two seeded rolls** on two `FRandomStream`s on the
@@ -205,11 +208,40 @@ menu polls its own copy from `DrawHUD`, which does.
   item does no damage. `ThrowKeyForced` and `ThrowClickForced` are the probe's stand-ins for
   the key and the click
   (`probes/probe_throw.py`); the throw numbers are in `throw_tuning.py`.
+- **The use key is the sights key on an item with no sights** (`weapon_component/use.py`,
+  names in `use_tuning.py`). `Using` is the key held (or `SightsForced`, the probes'
+  stand-in), not sprinting, with a valid `Held` whose `HasSights` is false; `UsePressed` is
+  its first frame. The stage runs before the aim, which reads `Using` so the key does not
+  also aim, and hands the aim the one poll of the key.
+  - **A use is a fragment in `use.KINDS`,** run every frame after those two are written,
+    which asks its own flag of `Held` behind a Branch on `Using` or `UsePressed` (false with
+    empty hands, so `Held` is valid there). To add one, write it in a module of its own and
+    add it to `KINDS`. Don't poll the key anywhere else.
+  - `HasSights` is read on the true arm of an `IsValid(Held)` Branch, never folded into the
+    key's condition.
+- **The stick burns** (`stick.py`, `weapon_component/torch.py`, numbers in `torch_tuning.py`).
+  `BP_Stick` is Quaternius's `SM_WoodenTorch` at 0.18 (48 cm), flagged `Burns`, the sixth
+  issued item. A press of the use key within `STICK_LIGHT_RADIUS_CM` (3 m) of a campfire
+  (any `CampfireClass` actor) sets it `Lit` until `BurnOutTime`, `STICK_BURN_S` (120 s) on.
+  - **It burns on its own Tick,** in the hand, in the bag (hidden) and on the ground, and
+    shows `SM_WoodenTorch_Fire` and a point light in place of the bare model while `Lit`.
+    Burnt out it is a stick again and can be relit: nothing is spent.
+  - **Its graph names its components,** so `build_stick` wipes the graph before it rebuilds
+    the model: with last build's nodes still reading the dropped components, the compile
+    fails.
+  - **The carry does not lower it** (`carry.py`: `Burns` joins `Melee` and `Consumable`):
+    it is carried up in `A_HoldTorch`.
 - **`FireWard` is fire held out in front of the player** (`paths.FIRE_WARD_VAR`, a bool on
-  `BP_WeaponComponent`, false by default). Combat only declares it. A wendigo reads it and
-  keeps off the side the player faces while it is true (`Scripts/npc/CLAUDE.md`, "Fire
-  holds the wendigo off"). Nothing raises it yet: whatever lights a stick writes it, true
-  while the fire is held out and false when it is lowered, burns out or leaves the hand.
+  `BP_WeaponComponent`). `torch.py` writes it on every arm, every frame: true while `Using`
+  with a `Lit` item in hand, false otherwise, so the key let go, a sprint, a burn-out, a
+  drop, a throw or a switch all lower it with no code of their own; the dead gate lets it
+  go too. A wendigo reads it (`Scripts/npc/CLAUDE.md`, "Fire holds the wendigo off").
+  **Nothing else may write it**: a probe that set it by hand is overwritten on the next
+  frame (`probes/probe_wendigo_ward.py` holds out a real stick).
+  - **Held out, the stick's `AimPose` is swapped for its `UsePose`** (`A_WardTorch`) and
+    the hand re-equips, so the equip and the keep-alive play it with no branch of their
+    own. `WardItem` is the stick that is up and `WardCarryPose` what to put back; the
+    lowering is tested before the raising. `probes/probe_lit_stick.py` runs all of it.
 - **Kill rewards happen only on the `DamagedByPlayer` arm.** That covers the kill count, the two
   shells and the gun roll. The world-floor net writes `Health = 0` down the same death path, and
   it must not pay out.
@@ -291,6 +323,13 @@ These are feel checks a headless run can't do:
   no animation, sound or message (above all the silent one with no wood), a fire that
   appears at once 130 cm ahead, on a slope or inside whatever stands there, and how the
   pack's flat-shaded flames and the point light read at night;
+- the stick (`stick.py`, `hold_pose.HOLD_TORCH_DIRS`, `WARD_TORCH_DIRS`): how the torch
+  reads carried beside the head and held out at arm's length (both keyed, both only looked
+  at from behind in one windowed shot), the fist on a 3.8 cm handle, the pack's flat-shaded
+  flames and the 7 m point light at night, lighting it with no animation, sound or message
+  (and the silent press with no fire in reach), whether 2 minutes of burning and 3 m of
+  reach feel right, whether a torch burning down unseen in the bag reads as fair, and the
+  middle click no longer aiming a knife or an axe over the shoulder;
 - the punch's feel: whether the blow at `COMBAT.punch_impact_s` lines up with the fist in
   `MM_Attack_01`, and whether a flinch cutting the swing short (same montage group) reads;
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100

@@ -69,6 +69,9 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
   It is not saved with the profile and blocks nothing (the player walks through it).
 - **The model** is Quaternius's `SM_Bonfire_Fire` at 0.4 (87 cm across) with a point light
   that casts no shadows.
+- **A stick takes its fire:** the use key with `BP_Stick` in hand, within 3 m of any
+  `CampfireClass` actor, lights it (`combat/weapon_component/torch.py`; combat's, and it
+  knows the fire only by that class variable).
 - `probes/probe_campfire.py` cuts wood, strikes, and measures the warmth in and out of the
   radius. It raises the fire's rate for the run and zeroes the night's cold.
 

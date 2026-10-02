@@ -13,17 +13,18 @@ from combat.nodes import (
     FN_SET_FOV, FN_SET_PITCH_SCALE, FN_SET_YAW_SCALE, FN_SUB_FF,
     MOVEMENT_CLASS_PATH,
 )
-from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
+from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.tuning import AIM_KEY, COMBAT, SIGHTS_KEY
+from combat.use_tuning import USING_VAR
 from combat.weapon_component.common import _prop
 
 
-def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
-                      x0, y0):
+def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
+                      exec_ins, keep, x0, y0):
     """Read the two aim keys into the aim state and the FOV to zoom to.
 
         shoulder  = IsInputKeyDown(KeyAim)
-        sights    = IsInputKeyDown(KeySights) OR SightsForced
+        sights    = (IsInputKeyDown(KeySights) OR SightsForced) AND NOT Using
         Aiming    = (shoulder OR sights) AND NOT Sprinting AND IsValid(Held)
         if Aiming:
             SightAiming = sights AND Held.HasSights
@@ -37,7 +38,9 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
     of the two, and letting go of them drops back to the shoulder.
 
     SightsForced is a probe's stand-in for the sights key (no key can be
-    injected into a headless game); it is false in every real game.
+    injected into a headless game); it is false in every real game. The key
+    and its stand-in are polled once, by use.py, which hands the pin in
+    (``sights_key``).
 
     The weapon's own zoom starts on the sights key, as the camera's travel
     onto the gun does (seat.py's SightSeat, eased at the same speed), so the
@@ -55,8 +58,10 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
     inside the true arm of the branch, where Held is known valid -- pure nodes
     are pulled by whoever reads them, so the getters simply never run on the
     frames nothing is equipped. Only a gun has sights (HasSights, set by the
-    guns' rows alone), so the knife, the axe, the matches, wood and food aim
-    over the shoulder whichever key is held.
+    guns' rows alone). With anything else in hand the sights key is the use
+    key (use.py, which ran earlier this frame and wrote Using), so it does
+    not aim at all: the knife, the axe, the matches, wood, food and the stick
+    aim over the shoulder on the shoulder key alone.
 
     AimZoom is not written on the false arm on purpose: it is left at the zoom
     being let go of, which is what the walk slowdown's ease-out normalises by.
@@ -70,12 +75,15 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, exec_ins, keep,
         return _pin(n, "ReturnValue", is_input=False)
 
     shoulder = held_down("KeyAim", y0 + 300)
-    forced = keep(_at(ed.add_get_member_variable_node(SIGHTS_FORCED_VAR),
-                      x0, y0 + 80))
-    sights_or = keep(_at(_node(ed, FN_OR), x0 + 240, y0 + 120))
-    _connect(held_down("KeySights", y0 + 180), _pin(sights_or, "A"))
-    _connect(_pin(forced, SIGHTS_FORCED_VAR, is_input=False), _pin(sights_or, "B"))
-    sights = _pin(sights_or, "ReturnValue", is_input=False)
+    # The same key uses an item that has no sights (use.py): then it is not
+    # an aim key this frame.
+    using = keep(_at(ed.add_get_member_variable_node(USING_VAR), x0, y0 - 40))
+    not_using = keep(_at(_node(ed, FN_NOT_B), x0 + 240, y0 - 40))
+    _connect(_pin(using, USING_VAR, is_input=False), _pin(not_using, "A"))
+    sights_and = keep(_at(_node(ed, FN_AND), x0 + 480, y0 + 60))
+    _connect(sights_key, _pin(sights_and, "A"))
+    _connect(_pin(not_using, "ReturnValue", is_input=False), _pin(sights_and, "B"))
+    sights = _pin(sights_and, "ReturnValue", is_input=False)
     either = keep(_at(_node(ed, FN_OR), x0 + 240, y0 + 240))
     _connect(shoulder, _pin(either, "A"))
     _connect(sights, _pin(either, "B"))
@@ -376,7 +384,7 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep,
 
 
 def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
-                exec_ins, x0, y0):
+                sights_key, exec_ins, x0, y0):
     """Either aim key held: zoom the camera, and slow the mouse and the legs.
 
     The shoulder aim (KeyAim) keeps the camera on its boom and zooms by
@@ -397,7 +405,7 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
         return n
 
     aimed, still = _author_aim_state(ed, pc_out, held, armed_out, key_pins,
-                                     exec_ins, keep, x0, y0)
+                                     sights_key, exec_ins, keep, x0, y0)
     flow, moved = _author_zoom(ed, tick, pc_out, owner_out, aimed, keep, x0, y0)
     exits = _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow,
                                  keep, x0, y0)

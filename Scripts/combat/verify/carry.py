@@ -12,6 +12,7 @@ from combat.weapon_component.stance import PRONE, STANCE_VAR
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import titles, w, wg
 from combat.verify.knife import is_melee_play
+from combat.torch_tuning import BURNS_VAR
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins,
 )
@@ -59,9 +60,9 @@ def check_carry_state():
         return
     node, fed = armed[0]
     want = {"Sprinting", "Aiming", "Blocking", RAISE_FORCED_VAR, "Melee", "Consumable",
-            "NextFireTime", STANCE_VAR, SEAT_VAR}
-    check("armed, it is made of Sprinting, Aiming, Blocking, Stance, Held's Melee "
-          "and Consumable, and Held's NextFireTime against the clock",
+            BURNS_VAR, "NextFireTime", STANCE_VAR, SEAT_VAR}
+    check("armed, it is made of Sprinting, Aiming, Blocking, Stance, Held's Melee, "
+          "Consumable and Burns, and Held's NextFireTime against the clock",
           want <= _reads(fed)
           and any("GetTimeSeconds" in str(BEL.get_node_title(n)).replace(" ", "")
                   for n in fed),

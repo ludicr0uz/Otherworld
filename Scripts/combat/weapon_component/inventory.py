@@ -20,6 +20,7 @@ from combat.skin import player_skin
 from combat.tuning import DROP_FORWARD, DROP_KEY
 from combat.carry_tuning import LOWERED_VAR
 from combat.light_tuning import MATCHES_CLASS_VAR
+from combat.torch_tuning import STICK_CLASS_VAR
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 from combat.weapon_component.listener import _author_listener_at_character
 from combat.weapon_component.sights import _author_camera_after_boom
@@ -27,7 +28,7 @@ from combat.weapon_component.sights import _author_camera_after_boom
 # What the player is issued, in bag order: the component's class variables
 # BeginPlay spawns from (build.py declares and fills them).
 STARTER_CLASS_VARS = ("ShotgunClass", "PistolClass", "KnifeClass", "AxeClass",
-                      MATCHES_CLASS_VAR)
+                      MATCHES_CLASS_VAR, STICK_CLASS_VAR)
 
 
 def _detach_rules(node):
@@ -394,7 +395,7 @@ def _author_wc_begin_play(ed, begin):
 
     ed.add_comment_to_nodes(
         "The player starts carrying the shotgun, the pistol, the knife, the "
-        "axe and the matches. "
+        "axe, the matches and a stick. "
         "They are spawned here rather "
         "than placed in the level so that a generated map needs no weapon "
         "actors in it -- nothing in Scripts/generated_levels knows weapons "

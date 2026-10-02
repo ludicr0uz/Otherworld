@@ -124,8 +124,8 @@ def check_matches_loadout():
     got = w.get_editor_property(MATCHES_CLASS_VAR)
     check(f"{MATCHES_CLASS_VAR} points at BP_Matches_C",
           got is not None and got.get_name() == "BP_Matches_C", str(got))
-    check("the matches are issued last, after the axe",
-          STARTER_CLASS_VARS[-2:] == ("AxeClass", MATCHES_CLASS_VAR), str(STARTER_CLASS_VARS))
+    check("the matches are issued fifth, after the axe",
+          STARTER_CLASS_VARS[3:5] == ("AxeClass", MATCHES_CLASS_VAR), str(STARTER_CLASS_VARS))
     spawned = [_title(f) for n in by_pins(wg, "Class", "SpawnTransform")
                for f in _feeders(n, "Class")]
     check("...spawned once by BeginPlay", spawned.count(f"Get {MATCHES_CLASS_VAR}") == 1,

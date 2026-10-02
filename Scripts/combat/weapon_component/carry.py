@@ -7,8 +7,10 @@ off (ready_pose.py and the equip in inventory.py read it).
                            OR SightSeat > SEAT_HOLD
                            OR now < Held.NextFireTime + hold))
 
-A gun is an item that is neither Melee nor Consumable: the knife and the food
-keep their hold poses, which point nothing forward. Aiming is either aim key
+A gun is an item that is neither Melee nor Consumable, and does not Burn: the
+knife, the food and the stick keep their hold poses, which point nothing
+forward (the stick's is a torch held up: lowered, its fire would hang at the
+knee). Aiming is either aim key
 (over the shoulder or down the sights). NextFireTime is written by a shot and
 by a reload, so both raise the gun and keep it up for CARRY_RAISE_HOLD_S after
 it could fire again. RaiseForced is a probe's stand-in for an aim key.
@@ -41,6 +43,7 @@ from combat.nodes import (
     FN_TRANSFORM_LOC,
 )
 from combat.seat_tuning import SEAT_HOLD, SEAT_VAR
+from combat.torch_tuning import BURNS_VAR
 from combat.weapon_component.common import _muzzle_location, _prop
 from combat.weapon_component.stance import PRONE, STANCE_VAR
 
@@ -100,9 +103,13 @@ def _author_carry(ed, held, armed_out, exec_ins, x0, y0):
     # --- is it a gun? ---------------------------------------------------------
     melee, melee_n = _prop(ed, "Melee", held, x0 + 240, y0 + 200)
     food, food_n = _prop(ed, "Consumable", held, x0 + 240, y0 + 320)
+    burns, burns_n = _prop(ed, BURNS_VAR, held, x0 + 240, y0 + 80)
     keep(melee_n)
     keep(food_n)
-    gun = negate(gate2(FN_OR, melee, food, x0 + 500, y0 + 260), x0 + 740, y0 + 260)
+    keep(burns_n)
+    held_up = gate2(FN_OR, gate2(FN_OR, melee, food, x0 + 500, y0 + 260), burns,
+                    x0 + 500, y0 + 120)
+    gun = negate(held_up, x0 + 740, y0 + 260)
 
     # --- is anything holding it up? -------------------------------------------
     hands = gate2(FN_OR, get("Aiming", y0 + 460), get("Blocking", y0 + 560),
@@ -147,7 +154,7 @@ def _author_carry(ed, held, armed_out, exec_ins, x0, y0):
 
     ed.add_comment_to_nodes(
         f"The carry. {LOWERED_VAR} is whether the ready pose is off: sprinting, "
-        "or a gun (not Melee, not Consumable; not while prone) that no aim key, "
+        "or a gun (not Melee, not Consumable, not the stick; not while prone) that no aim key, "
         f"guard, shot or reload is holding up, and that the sight camera has "
         f"left (SightSeat under {SEAT_HOLD:g}). A shot or a reload holds it up until "
         f"{CARRY_RAISE_HOLD_S:g} s after NextFireTime. Lowered, the locomotion "

@@ -9,8 +9,15 @@ _author_* fragment per concern, each in its own module:
   dead        the dead gate at the head of Tick: an owner who is Dead or at
               0 HP gets none of it; the aim, zoom and camera are let go
   aim         resolve the aim point every frame (camera trace, muzzle trace)
-  ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom;
-              the zoom, and the look and walk slowdowns it drives
+  use         the use key: the sights key on an item with no sights -> Using /
+              UsePressed (and the one poll of that key, which ads aims a gun
+              on). KINDS lists what a use does (today: the stick)
+  torch       use's stick kind: a press at a campfire lights a stick that
+              Burns; a Lit one is held out while Using (FireWard, written on
+              every arm), its AimPose swapped for its UsePose
+  ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom
+              (the sights key aims only while it is not Using); the zoom, and
+              the look and walk slowdowns it drives
   seat        down the sights: SightSeat (how far the camera has gone onto
               the gun, from the key: one motion), SightSeated (the gun is up)
               and SightLook (how far the camera has turned onto its line,
@@ -90,8 +97,8 @@ BP_WeaponComponent event graph:
 
   [BeginPlay] --> cache Character + Mesh
               --> attenuation listener on the capsule
-              --> spawn BP_Shotgun, BP_Pistol, BP_Knife, BP_Axe and BP_Matches
-                  into Inventory
+              --> spawn BP_Shotgun, BP_Pistol, BP_Knife, BP_Axe, BP_Matches and
+                  BP_Stick into Inventory
               --> Equip(0)
 
   [Tick] --> Branch owner Dead or at 0 HP                    --> nothing below runs
@@ -100,6 +107,9 @@ BP_WeaponComponent event graph:
                                          if Held.Melee, slash with it;
                                          if Held.Lights, light a campfire;
                                          or, with empty hands, punch)
+         --> Branch IsInputKeyDown(MiddleMouse), no sights   --> use the held item
+                                        (a stick at a campfire: light it;
+                                         a burning stick: hold it out)
          --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
          --> Branch WasInputKeyJustPressed(G)               --> drop held
          --> Branch WasInputKeyJustPressed(E)               --> interact with the one

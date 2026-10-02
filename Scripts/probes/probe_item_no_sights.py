@@ -1,11 +1,13 @@
-"""Only a gun is aimed down its sights: the knife, the axe and the matches are not.
+"""Only a gun is aimed down its sights: the knife, the axe, the matches and the
+stick are not. With them the sights key is the use key, and does not aim.
 
 Each issued item is taken in hand the way Q does (EquippedIndex + NeedsRefresh)
 and the sights key is held (SightsForced: no key can be injected into a
-headless game). With the knife, the axe or the matches the key must aim over
-the shoulder: Aiming, but never SightAiming, and the camera never leaves the
-boom (SightSeated false, SightSeat 0) on any frame. With the shotgun and the
-pistol, the positive case, the same key must bring the camera onto the sights.
+headless game). With the knife, the axe, the matches or the stick the key must
+not aim at all: Using, never Aiming or SightAiming, and the camera never
+leaves the boom (SightSeated false, SightSeat 0) on any frame. With the
+shotgun and the pistol, the positive case, the same key must bring the camera
+onto the sights, and is not Using.
 
 Any profile on disk is set aside first, so the game starts on the issued
 loadout, and put back at the end.
@@ -20,18 +22,17 @@ from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import (
     HAS_SIGHTS_VAR, SEAT_VAR, SEATED_VAR, SIGHTS_FORCED_VAR,
 )
-from combat.tuning import COMBAT
+from combat.use_tuning import USING_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, v)
             for v in ("EquippedIndex", "NeedsRefresh", SIGHTS_FORCED_VAR)]
 
 ITEMS = (("BP_Knife_C", "the knife"), ("BP_Axe_C", "the axe"),
-         ("BP_Matches_C", "the matches"))
+         ("BP_Matches_C", "the matches"), ("BP_Stick_C", "the stick"))
 GUNS = (("BP_Shotgun_C", "the shotgun"), ("BP_Pistol_C", "the pistol"))
 
 HELD_S = 0.8            # longer than a gun takes to come up and seat the camera
-ZOOM_TOL = 0.05
 
 
 def _file():
@@ -61,7 +62,7 @@ def _item(p, wc, bag, cls, label):
             str(held.get_editor_property(HAS_SIGHTS_VAR)))
 
     p.set(wc, SIGHTS_FORCED_VAR, True)
-    seen = {"frames": 0, "sight": 0, "seated": 0, "seat": 0.0, "aiming": 0}
+    seen = {"frames": 0, "sight": 0, "seated": 0, "seat": 0.0, "aiming": 0, "using": 0}
     t0 = unreal.GameplayStatics.get_time_seconds(p.world())
 
     def watch():
@@ -70,6 +71,7 @@ def _item(p, wc, bag, cls, label):
         seen["seated"] += bool(p.get(wc, SEATED_VAR))
         seen["seat"] = max(seen["seat"], p.get(wc, SEAT_VAR))
         seen["aiming"] += bool(p.get(wc, "Aiming"))
+        seen["using"] += bool(p.get(wc, USING_VAR))
         return unreal.GameplayStatics.get_time_seconds(p.world()) - t0 > HELD_S
     yield _until(watch)
 
@@ -81,12 +83,11 @@ def _item(p, wc, bag, cls, label):
             f"({SEATED_VAR} False, {SEAT_VAR} 0)",
             seen["seated"] == 0 and seen["seat"] == 0.0,
             f"{SEATED_VAR} on {seen['seated']} frames, {SEAT_VAR} up to {seen['seat']:.4f}")
-    zoom = p.get(wc, "AimZoom")
-    p.check(f"{label}: ...the key aims over the shoulder instead (Aiming, "
-            f"{COMBAT.shoulder_zoom:g}x)",
-            seen["aiming"] >= seen["frames"] - 1
-            and abs(zoom - COMBAT.shoulder_zoom) < ZOOM_TOL,
-            f"Aiming on {seen['aiming']} of {seen['frames']} frames, AimZoom {zoom:.2f}")
+    p.check(f"{label}: ...the key is the use key instead ({USING_VAR}), and does not "
+            f"aim over the shoulder either (Aiming False)",
+            seen["using"] >= seen["frames"] - 1 and seen["aiming"] == 0,
+            f"{USING_VAR} on {seen['using']}, Aiming on {seen['aiming']} of "
+            f"{seen['frames']} frames")
     p.set(wc, SIGHTS_FORCED_VAR, False)
 
 
@@ -100,7 +101,8 @@ def _gun(p, wc, bag, cls, label):
     yield _until(lambda: p.get(wc, SEAT_VAR) > 0.9999)
     p.check(f"{label}: the sights key still brings the camera onto the gun "
             f"(SightAiming, {SEATED_VAR}, {SEAT_VAR} 1)",
-            p.get(wc, "SightAiming") and p.get(wc, SEATED_VAR),
+            p.get(wc, "SightAiming") and p.get(wc, SEATED_VAR)
+            and not p.get(wc, USING_VAR),
             f"{SEAT_VAR} {p.get(wc, SEAT_VAR):.4f}")
     p.set(wc, SIGHTS_FORCED_VAR, False)
 
@@ -122,7 +124,8 @@ def _run(p):
     yield _until(lambda: p.get(wc, "Held") is not None)
     bag = [i.get_class().get_name() for i in p.get(wc, "Inventory")]
     wanted = [c for c, _l in ITEMS + GUNS]
-    p.check("the knife, the axe, the matches, the shotgun and the pistol are issued",
+    p.check("the knife, the axe, the matches, the stick, the shotgun and the pistol "
+            "are issued",
             set(wanted) <= set(bag), str(bag))
     for cls, label in ITEMS:
         if cls in bag:

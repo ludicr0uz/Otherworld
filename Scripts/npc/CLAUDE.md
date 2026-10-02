@@ -182,8 +182,11 @@ Wanderer (selector)
   - **A flight starts the hunt over:** `StalkRoarUntil`, `StalkLegUntil` and
     `StalkCharging` go back to zero, so it comes back with a roar and tree to tree. The
     Ward step is authored after the Stalk step for that reason (it writes its variables).
-  - **Nothing in the game raises `FireWard` yet.** Whatever lights a stick writes it;
-    `probes/probe_wendigo_ward.py` writes it itself.
+  - **`FireWard` is raised by a burning stick held out** (the use key:
+    `combat/weapon_component/torch.py`, which writes it every frame; `Scripts/combat/CLAUDE.md`).
+    A probe cannot write it by hand (the next frame overwrites it):
+    `probes/probe_wendigo_ward.py` takes the issued stick in hand, sets it `Lit` and
+    holds the use key (`SightsForced`).
   - **The player's body faces where the controller looks:** its yaw is written from the
     control rotation every frame, so a probe turns the player with
     `set_control_rotation`. `set_actor_rotation` is undone by the next frame.

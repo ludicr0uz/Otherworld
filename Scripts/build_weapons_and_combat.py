@@ -76,6 +76,7 @@ from combat.health_component import build_health_component        # noqa: E402
 from combat.axe import build_axe                                  # noqa: E402
 from combat.wood import build_wood                                # noqa: E402
 from combat.matches import build_matches                          # noqa: E402
+from combat.stick import build_stick                              # noqa: E402
 from combat.knife import build_knife                              # noqa: E402
 from combat.knife_anim import build_knife_slash                   # noqa: E402
 from combat.hold_pose import build_hold_poses                     # noqa: E402
@@ -147,6 +148,8 @@ def main():
     wood_bp = build_wood(item_bp)
     # The fifth: the matches, which burn it.
     matches_bp = build_matches(item_bp)
+    # The sixth: a stick, lit at the fire they make.
+    stick_bp = build_stick(item_bp)
 
     blood_bp = build_blood_splash()
     impact_bp = build_bullet_impact()
@@ -160,7 +163,7 @@ def main():
     weapon_bp = build_weapon_component(item_bp, weapons["Shotgun"],
                                        weapons["Pistol"], knife_bp, axe_bp,
                                        knife_clip, blood_bp, impact_bp, throw_arc_bp,
-                                       wood_bp, matches_bp)
+                                       wood_bp, matches_bp, stick_bp)
 
     # After the weapon component, because the pickup's graph casts to it -- and
     # therefore after the health component that spawns it, which is why the
@@ -184,7 +187,7 @@ def main():
     install_on_npc(health_bp, footstep_bp)
     retire_old_assets()
 
-    _log(f"done — five weapons, a knife, an axe and matches, ammunition, inventory, aiming down the sights, "
+    _log(f"done — five weapons, a knife, an axe, matches and a stick, ammunition, inventory, aiming down the sights, "
          f"footsteps, blood, death, drops and respawn, worn by "
          f"{skin.mesh.rsplit('/', 1)[1]}")
 

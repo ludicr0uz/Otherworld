@@ -25,8 +25,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     (below).
   - `Aiming` is either key (cloud, recoil, slowdown). `SightAiming` is the sights key alone,
     and only with a gun in hand: an item whose `HasSights` is set, which the guns' rows alone
-    do (`weapon_items.py`). The knife, the axe, the matches, wood and food have no sights, so
-    the sights key aims them over the shoulder (`probes/probe_item_no_sights.py`). `AimZoom` stores the zoom being aimed at. It isn't written on
+    do (`weapon_items.py`). The knife, the axe, the matches, wood, food and the stick have no
+    sights: with one in hand the sights key is the use key (`weapon_component/use.py` writes
+    `Using`, which this block reads) and does not aim at all; only the shoulder key aims
+    them (`probes/probe_item_no_sights.py`). `AimZoom` stores the zoom being aimed at. It isn't written on
     release, so the walk slowdown's ease-out divides by the zoom being let go of.
   - The camera is written every frame, both ways. The template camera has no offset or turn
     on the boom and does not take the control rotation itself (asserted in `aim_camera`), so

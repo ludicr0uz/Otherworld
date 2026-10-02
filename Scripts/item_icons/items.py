@@ -57,6 +57,7 @@ ITEMS = (
     Item("Axe", f"{WEAPON_DIR}/BP_Axe", roll=-60.0, length=0.70),
     Item("Wood", f"{WEAPON_DIR}/BP_Wood", pitch=25.0, roll=90.0, length=0.60),
     Item("Matches", f"{WEAPON_DIR}/BP_Matches", length=0.30),
+    Item("Stick", f"{WEAPON_DIR}/BP_Stick", roll=-60.0, length=0.60),
     Item("Mushroom", f"{SURVIVAL_DIR}/BP_Mushroom", length=0.40),
     Item("Canteen", f"{SURVIVAL_DIR}/BP_WaterCanteen", length=0.40),
 )

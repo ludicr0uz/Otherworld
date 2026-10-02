@@ -2,8 +2,10 @@
 wendigo in front of them does not attack; it circles; past the fire it
 attacks; and held off long enough it runs away.
 
-npc/verify_ward.py reads the graph; this watches one wendigo do it. Nothing
-in the game lights a stick yet, so the probe raises FireWard itself. The
+npc/verify_ward.py reads the graph; this watches one wendigo do it. The fire
+is the game's own: the player takes the issued stick in hand, it is set
+burning (Lit, written: lighting it at a campfire is probe_lit_stick.py's),
+and the use key is held (SightsForced), which is what raises FireWard. The
 wendigo is stood in front of the player, inside the fire's range:
 
   - it goes aggro and is held: no swing, kept out of reach, facing the
@@ -19,10 +21,16 @@ probes/probe_wendigo_stalk.py's.
 """
 
 import math
+import os
+import shutil
 
 import unreal
 
-from combat.paths import FIRE_WARD_VAR, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.paths import (
+    FIRE_WARD_VAR, ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
+)
+from combat.seat_tuning import SIGHTS_FORCED_VAR
+from combat.torch_tuning import BURN_OUT_VAR, LIT_VAR
 from forest_generator.npc_placement import NAV_REACHABLE_EXTENT_CM
 from forest_generator.npc_ward import (
     NPC_WARD_FLEE_S, NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
@@ -33,9 +41,15 @@ from npc.paths import (
     AGGRO_VAR, NPC_DIR, STALK_CHARGING_VAR, STALK_ROAR_UNTIL_VAR,
     WARD_FLEE_UNTIL_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR,
 )
+from probes.probe_knife import _file
 
 WENDIGO_AI = f"{NPC_DIR}/BP_ForestWandererAI_Wendigo"
-WRITABLE = [(WEAPON_COMP_BP_PATH, FIRE_WARD_VAR), (WENDIGO_AI, WARD_SINCE_VAR)]
+WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
+             ("EquippedIndex", "NeedsRefresh", SIGHTS_FORCED_VAR)]
+            + [(ITEM_BP_PATH, LIT_VAR), (ITEM_BP_PATH, BURN_OUT_VAR),
+               (WENDIGO_AI, WARD_SINCE_VAR)])
+
+STICK = "BP_Stick_C"
 
 START_CM = 600.0      # inside the fire's range, outside the wendigo's reach
 SAMPLE_S = 0.1
@@ -87,6 +101,35 @@ def _turn(a, b):
 
 
 def probe(p):
+    # Any profile on disk is set aside, so the game starts on the issued
+    # loadout (the stick), and put back at the end.
+    backup = _file() + ".probe-backup"
+    if os.path.exists(_file()):
+        shutil.move(_file(), backup)
+    try:
+        yield from _run(p)
+    finally:
+        if os.path.exists(backup):
+            shutil.move(backup, _file())
+
+
+def _burning_stick(p, comp):
+    """Take the issued stick in hand and set it burning; None without one."""
+    bag = list(p.get(comp, "Inventory"))
+    names = [i.get_class().get_name() for i in bag]
+    if STICK not in names:
+        return None
+    stick = bag[names.index(STICK)]
+    p.set(comp, "EquippedIndex", names.index(STICK))
+    p.set(comp, "NeedsRefresh", True)
+    yield lambda: p.get(comp, "Held") == stick
+    p.set(stick, BURN_OUT_VAR, p.time() + 1.0e6)
+    p.set(stick, LIT_VAR, True)
+    yield 0.1
+    return stick
+
+
+def _run(p):
     yield lambda: len(_wendigos(p)) > 0
     yield 0.5
     ctrl = _wendigos(p)[0]
@@ -108,7 +151,14 @@ def probe(p):
             and float(p.get(ctrl, WARD_FLEE_UNTIL_VAR)) == 0.0)
 
     # --- held ----------------------------------------------------------------
-    p.set(comp, FIRE_WARD_VAR, True)
+    stick = yield from _burning_stick(p, comp)
+    p.check("the player has the issued stick in hand, burning, and the fire is still "
+            "down until the use key is held",
+            stick is not None and p.get(comp, FIRE_WARD_VAR) is False)
+    if stick is None:
+        return
+    p.set(comp, SIGHTS_FORCED_VAR, True)
+    yield lambda: bool(p.get(comp, FIRE_WARD_VAR))
     home = player.get_actor_location()
     yaw = player.get_actor_rotation().yaw
     ahead = unreal.Vector(math.cos(math.radians(yaw)), math.sin(math.radians(yaw)), 0.0)
@@ -198,7 +248,7 @@ def probe(p):
             float(p.get(ctrl, STALK_ROAR_UNTIL_VAR)) == 0.0
             and not p.get(ctrl, STALK_CHARGING_VAR)
             and float(p.get(ctrl, WARD_SINCE_VAR)) == 0.0)
-    p.set(comp, FIRE_WARD_VAR, False)       # it runs with the fire down too
+    p.set(comp, SIGHTS_FORCED_VAR, False)   # it runs with the fire down too
     start = _state(p, ctrl, npc, player)
     fled = [start]
     while p.time() < until and len(fled) < FLEE_WATCH_S / SAMPLE_S:

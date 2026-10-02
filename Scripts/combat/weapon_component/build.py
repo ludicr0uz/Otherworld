@@ -45,6 +45,10 @@ from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOP_ITEM_VAR, CHOP_TREE_VAR, WOOD_CLASS_VAR, WOOD_SPOT_VAR,
 )
 from combat.light_tuning import CAMPFIRE_CLASS_VAR, LIGHT_WOOD_VAR, MATCHES_CLASS_VAR
+from combat.torch_tuning import (
+    NEAR_FIRE_VAR, STICK_CLASS_VAR, WARD_CARRY_VAR, WARD_ITEM_VAR,
+)
+from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
 from combat.weapon_component.throw import (
     THROW_AIMING_VAR, THROW_ARC_CLASS_VAR, THROW_ARC_VAR, THROW_CLICK_FORCED_VAR,
     THROW_FORCED_VAR,
@@ -71,7 +75,7 @@ def _kept_class(bp, var):
 
 def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
                            knife_clip, blood_bp, impact_bp, throw_arc_bp, wood_bp,
-                           matches_bp, rebuild=True):
+                           matches_bp, stick_bp, rebuild=True):
     # Cast nodes only appear in the palette for classes that are already loaded,
     # and this graph casts to all three. Without these loads
     # create_node_from_name returns None and the failure reads as a typo in the
@@ -110,9 +114,19 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # The guard (block.py). Read by the fire gate, and by every wanderer's
     # swing, which also writes Stamina here when the guard takes the hit.
     _declare(ed, "Blocking", BEL.get_basic_type_by_name("bool"))
-    # Fire held out in front of the player (a lit stick). Written by whatever
-    # lights one; read only by the wanderers afraid of fire (npc/ward.py).
+    # Fire held out in front of the player: a lit stick, raised by the use
+    # key (torch.py writes it every frame). Read only by the wanderers afraid
+    # of fire (npc/ward.py).
     _declare(ed, FIRE_WARD_VAR, BEL.get_basic_type_by_name("bool"))
+    # The use key (use.py): held on an item with no sights, its press, and
+    # last frame's answer. And its one kind, the stick (torch.py): whether a
+    # press found a campfire in reach, the stick that is raised and the pose
+    # to put back on it.
+    for name in (USING_VAR, USE_PRESSED_VAR, USE_WAS_VAR, NEAR_FIRE_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, WARD_ITEM_VAR, BEL.get_object_reference_type(item_class))
+    _declare(ed, WARD_CARRY_VAR, BEL.get_object_reference_type(
+        unreal.AnimSequence.static_class()))
     # Standing, crouched or prone (stance.py). Written only by the stance
     # block; the movement component and the footsteps are told from it.
     _declare(ed, STANCE_VAR, BEL.get_basic_type_by_name("int"))
@@ -278,6 +292,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         SPRINT_SPENT_VAR: False,
         "Blocking": False,
         FIRE_WARD_VAR: False,
+        USING_VAR: False,
+        USE_PRESSED_VAR: False,
+        USE_WAS_VAR: False,
+        NEAR_FIRE_VAR: False,
         STANCE_VAR: STAND,
         HELD_TWO_HANDED: False,
         SEARCHING_VAR: False,
@@ -320,6 +338,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         "KnifeClass": BEL.generated_class(knife_bp),
         "AxeClass": BEL.generated_class(axe_bp),
         MATCHES_CLASS_VAR: BEL.generated_class(matches_bp),
+        STICK_CLASS_VAR: BEL.generated_class(stick_bp),
         "ItemClass": item_class,
         "BloodClass": BEL.generated_class(blood_bp),
         IMPACT_CLASS_VAR: BEL.generated_class(impact_bp),

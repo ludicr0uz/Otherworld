@@ -2,8 +2,9 @@
 moves the view, the sights and the shot together.
 
 No key can be injected into a headless game, so the probe holds SightBlend
-(the body's share of the sights) and SightSeat (the camera's) at 1 by writing
-them every frame, as probe_scope_hide does. The Tick then eases the seat
+(the body's share of the sights), SightSeat and SightLook (the camera's: where
+it is and which way it looks) at 1 by writing them every frame, as
+probe_scope_hide does. The Tick then eases the seat and the look
 one step towards 0 (SightAiming is false), so to settle a pose the probe
 writes the value that step lands near 1 from, and to MEASURE it slows the
 game to a ten-thousandth (global time dilation): the step is then a millionth
@@ -35,7 +36,7 @@ import unreal
 
 from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.seat_tuning import SEAT_VAR
+from combat.seat_tuning import LOOK_VAR, SEAT_VAR
 from combat.sway_tuning import (
     SWAY_CROUCH_SCALE, SWAY_MIN_STEP_DEG, SWAY_PITCH_VAR, SWAY_PRONE_SCALE, SWAY_TIME_VAR,
     SWAY_YAW_DEG, SWAY_YAW_PERIOD_S, SWAY_YAW_VAR, sway_at,
@@ -48,7 +49,7 @@ from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)] + [
     (WEAPON_COMP_BP_PATH, v) for v in
-    ("EquippedIndex", "NeedsRefresh", "Stance", "SightBlend", SEAT_VAR,
+    ("EquippedIndex", "NeedsRefresh", "Stance", "SightBlend", SEAT_VAR, LOOK_VAR,
      SWAY_TIME_VAR, RAISE_FORCED_VAR)]
 ML = unreal.MathLibrary
 # weapon_specs needs the editor (it solves the grips), so the sight lines are
@@ -106,6 +107,7 @@ def _hold(p, wc, frames=None, seconds=None, each=None, walk=False, still=False):
         dt = unreal.GameplayStatics.get_world_delta_seconds(world)
         eased = 0.0 if still else min(dt * COMBAT.ads_interp_speed, 0.9)
         p.set(wc, SEAT_VAR, 1.0 / (1.0 - eased))
+        p.set(wc, LOOK_VAR, 1.0 / (1.0 - eased))
         p.set(wc, "SightBlend", 1.0)    # held there by the seat (sights.py)
         if walk:
             p.pawn().add_movement_input(p.pawn().get_actor_forward_vector(), 1.0)
@@ -147,7 +149,8 @@ class _Worst(object):
             self.sway = (p.get(wc, SWAY_YAW_VAR), p.get(wc, SWAY_PITCH_VAR),
                          p.get(wc, SWAY_TIME_VAR))
         self.blend = max(self.blend, abs(p.get(wc, "SightBlend") - 1.0),
-                         abs(p.get(wc, SEAT_VAR) - 1.0))
+                         abs(p.get(wc, SEAT_VAR) - 1.0),
+                         abs(p.get(wc, LOOK_VAR) - 1.0))
         self.eye = max(self.eye, (eye - unreal.Vector(*self.spec["sight"])).length())
         self.front = max(self.front, off(self.spec["sight_front"]))
         self.rear = max(self.rear, off(self.spec["sight_rear"]))
@@ -156,7 +159,7 @@ class _Worst(object):
 
     def report(self, what):
         p = self.p
-        p.check(f"{what}: the sights are held (SightBlend and {SEAT_VAR} 1 over "
+        p.check(f"{what}: the sights are held (SightBlend, {SEAT_VAR} and {LOOK_VAR} 1 over "
                 f"{self.n} frames)",
                 self.n >= SAMPLES and self.blend < 1e-4, f"off by {self.blend:.6f}")
         p.check(f"{what}: the camera is at the eye point",
@@ -250,7 +253,7 @@ def _run(p):
             p.set(wc, "Stance", stance)
             yield from _measure(p, wc, cam, spec, f"{gun}, {label}")
         p.set(wc, "Stance", 0)
-        yield lambda: max(p.get(wc, "SightBlend"), p.get(wc, SEAT_VAR)) < 1e-3
+        yield lambda: max(p.get(wc, "SightBlend"), p.get(wc, SEAT_VAR), p.get(wc, LOOK_VAR)) < 1e-3
 
     yield from _sway(p, wc, cam, specs[name])
 
@@ -293,7 +296,7 @@ def _sway(p, wc, cam, spec):
                 f"view moved {ML.normalize_axis(yaw - yaw0):.4f}, {pitch - pitch0:.4f}")
     p.set(wc, "Stance", 0)
 
-    yield lambda: max(p.get(wc, "SightBlend"), p.get(wc, SEAT_VAR)) < 1e-4
+    yield lambda: max(p.get(wc, "SightBlend"), p.get(wc, SEAT_VAR), p.get(wc, LOOK_VAR)) < 1e-4
     yield 0.1
     yaw, pitch = at_rest()
     p.check("sights down: the sway gave the view back",

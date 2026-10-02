@@ -285,12 +285,15 @@ These are feel checks a headless run can't do:
   into a headless game, so only the verifier covers this);
 - the rifle-arm pose on flinching creatures;
 - whether a sustained SMG burst reads as a burst;
-- bringing the sights up (`weapon_component/seat.py`): the view stays on the target while
-  the gun rises, then the camera travels from the boom onto the sights, about 0.4 s in all
-  from a lowered gun. Whether that reads as the sights coming up to the reticle or as a
-  wait, whether 10° (`SIGHT_SEAT_DEG`) starts the camera at the right moment, and the
-  crosshair going out at 0.9 of the way with no fade (`RETICLE_HIDE_SEAT`); sprinting out of
-  the sights still lowers the gun under a camera on its way home;
+- bringing the sights up (`weapon_component/seat.py`): from the key the camera travels in
+  one motion from the boom onto the sights, zooming as it goes, while the view stays on the
+  target and the gun rises into it, about 0.3 s in all from a lowered gun. Whether that
+  reads as one move; whether the camera reaching the eye point just before the gun is level
+  (0.9 of the way when the gun is 10° off, `SIGHT_SEAT_DEG`) shows the gun still coming up
+  from below, and whether its path bowing about 30 cm toward the rising gun is seen; the
+  crosshair going out at 0.9 of the way with no fade (`RETICLE_HIDE_SEAT`), now before the
+  sights have settled on the middle; the scope's glass closing while the rifle is still
+  rising; sprinting out of the sights still lowers the gun under a camera on its way home;
 - every gun down its sights, now that the eye is ON the sight line and the view runs down it
   (`docs/aiming.md`): the SMG11's is a 3 mm peep in a plate 15 cm from the eye, so the plate
   hides much of the view below and beside the target; the shotgun's support-hand fingers

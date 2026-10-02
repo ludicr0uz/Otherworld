@@ -11,12 +11,13 @@ _author_* fragment per concern, each in its own module:
   aim         resolve the aim point every frame (camera trace, muzzle trace)
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom;
               the zoom, and the look and walk slowdowns it drives
-  seat        down the sights: SightSeated (the gun is up, so the camera may
-              go onto it) and SightSeat (how far it has gone), so the view
-              stays on the target while the gun rises to it
+  seat        down the sights: SightSeat (how far the camera has gone onto
+              the gun, from the key: one motion), SightSeated (the gun is up)
+              and SightLook (how far the camera has turned onto its line,
+              from then), so the view stays on the target while the gun rises
   sights      down the sights: ease the camera (by SightSeat) from the boom to
-              Held's SightOffset and turn it onto Held's sight line (towards
-              SightAim); hide a scoped weapon behind its glass
+              Held's SightOffset and turn it (by SightLook) onto Held's sight
+              line (towards SightAim); hide a scoped weapon behind its glass
   head_hide   down the sights: the player's own head bone is hidden past
               SightSeat HEAD_HIDE_SEAT, whatever gun is held, and shown again
               off them (the eye point is inside or beside the head)

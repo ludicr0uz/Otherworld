@@ -18,8 +18,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   sway_tuning       the sight sway's numbers (SWAY_*): angles, periods, the
                     stance's steadying, the component's variables, sway_at()
   seat_tuning       the sight camera's seat: how near the view the gun must
-                    be before the camera goes onto it (SIGHT_SEAT_DEG),
-                    SightSeated / SightSeat / SightsForced, HasSights (the
+                    be before the camera turns onto its line (SIGHT_SEAT_DEG),
+                    SightSeated / SightSeat / SightLook / SightsForced,
+                    HasSights (the
                     item flag only a gun sets), where the HUD's
                     crosshair gives way to the sights (RETICLE_HIDE_SEAT) and
                     the player's own head leaves the view (HEAD_HIDE_SEAT)

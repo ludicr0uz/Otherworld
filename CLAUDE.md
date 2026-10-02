@@ -212,8 +212,9 @@ editor.
   prone; down the sights a shot goes exactly to the centre, and the reticle opens with the cloud.
   Down the sights the view runs along the gun's own sight line (the front sight's tip is the
   centre of the screen, in any pose), so there the reticle is drawn only in debug mode; the
-  hip and the shoulder aim keep it. Bringing the sights up, the view stays on the target
-  while the gun rises, and only then does the camera go onto the sights
+  hip and the shoulder aim keep it. Bringing the sights up is one motion from the key: the camera
+  travels from where it is onto the sights, zooming as it goes, and the view stays on the
+  target while the gun rises into it
   (`combat/weapon_component/seat.py`). Down any gun's sights the player's own head is
   hidden, so it never stands in the sight picture (`combat/weapon_component/head_hide.py`).
   The aim sways slowly, sights and shot together

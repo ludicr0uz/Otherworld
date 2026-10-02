@@ -7,7 +7,7 @@ probes/probe_dead_no_actions.py.
 """
 
 from combat.nodes import SPRING_ARM_SOCKET
-from combat.seat_tuning import SEAT_VAR
+from combat.seat_tuning import LOOK_VAR, SEAT_VAR
 from combat.verify.common import BEL, PIN, by_pins, check, in_pins, num_pin, pin_value
 from combat.verify.fixtures import exec_reach, w, wg, wg_dead
 from combat.weapon_component.dead import LET_GO_VARS, OWNER_DEAD_VAR
@@ -100,12 +100,13 @@ def check_dead_arm_lets_go():
         check(f"a dead owner stops {name}",
               len(sets) == 1 and pin_value(sets[0], name) == "false",
               f"{[pin_value(n, name) for n in sets]}")
-    seats = [n for n in wg_dead if _title(n) == f"Set {SEAT_VAR}"]
-    check(f"...the sight camera's seat is cleared ({SEAT_VAR} 0), so the next "
-          f"life starts on the boom",
-          len(seats) == 1 and (num_pin(seats[0], SEAT_VAR) or 0.0) == 0.0
-          and not PIN.list_connected_pins(BEL.find_input_pin(seats[0], SEAT_VAR)),
-          str(len(seats)))
+    for var, what in ((SEAT_VAR, "seat"), (LOOK_VAR, "look")):
+        seats = [n for n in wg_dead if _title(n) == f"Set {var}"]
+        check(f"...the sight camera's {what} is cleared ({var} 0), so the next "
+              f"life starts on the boom",
+              len(seats) == 1 and (num_pin(seats[0], var) or 0.0) == 0.0
+              and not PIN.list_connected_pins(BEL.find_input_pin(seats[0], var)),
+              str(len(seats)))
     fov = by_pins(wg_dead, "InFieldOfView")
     check("...the zoom snaps back to BaseFOV",
           len(fov) == 1 and [_title(f) for f in _sources(fov[0], "InFieldOfView")]

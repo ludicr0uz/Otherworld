@@ -21,7 +21,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     `COMBAT.shoulder_zoom` (1.5x) on every weapon.
   - `KeySights` (middle) is down the sights: zoom is the weapon's `AdsZoom` (irons 1.5x, scope
     4x), and `sights.py` eases the camera from the boom's `SpringEndpoint` to the held weapon's
-    `SightOffset` by `SightSeat`, and **turns it onto the weapon's sight line** (below).
+    `SightOffset` by `SightSeat`, and **turns it onto the weapon's sight line** by `SightLook`
+    (below).
   - `Aiming` is either key (cloud, recoil, slowdown). `SightAiming` is the sights key alone,
     and only with a gun in hand: an item whose `HasSights` is set, which the guns' rows alone
     do (`weapon_items.py`). The knife, the axe, the matches, wood and food have no sights, so
@@ -34,35 +35,47 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     the camera is placed against last frame's boom and shimmers while strafing.
   - How far back the eye sits was tuned in PIE. At 14 cm behind the receiver, its back face
     filled a third of the screen. At 34 cm, the camera was inside the head.
-- **The camera waits for the gun** (`weapon_component/seat.py`, numbers in `seat_tuning.py`).
-  A gun is carried lowered, and the sights key raises it over the ready pose's 0.25 s blend. A
-  camera that went to the gun on the key rode it up from the hip: the view dropped to the hand,
-  then swung onto the target. So the sights are two blends:
+- **One motion from the key; only the turn waits for the gun** (`weapon_component/seat.py`,
+  numbers in `seat_tuning.py`). A gun is carried lowered, and the sights key raises it over
+  the ready pose's 0.25 s blend, from 70–95° off the view. The sights are three blends, all at
+  the zoom's speed:
   - `SightBlend` is the **body's**: the upper body's pitch, the sway, the steady hand. It
     starts on the key.
-  - `SightSeat` is the **camera's**: where it is, which way it looks, when a scoped gun hides.
-    It eases toward `SightSeated`, a latch that sets once the gun's sight line is within
-    `SIGHT_SEAT_DEG` (10°) of the control rotation and clears when the key is let go. Until
-    then the camera stays on the boom, looking where the player looks, and the gun rises into
-    the view. From a gun already up (the shoulder aim, just after a shot) it latches at once.
+  - `SightSeat` is the **camera's travel**: where it is, when a scoped gun, the head and the
+    crosshair go. It eases toward `SightAiming`, so it starts on the key too, and the weapon's
+    own zoom (`ads.py`) starts with it: the camera leaves wherever it is (the boom's end,
+    zoomed by the shoulder aim or not) for the eye point and zooms as it goes.
+  - `SightLook` is the **camera's turn** onto the gun's sight line. It eases toward
+    `SightSeated`, a latch that sets once the sight line is within `SIGHT_SEAT_DEG` (10°) of
+    the control rotation and clears when the key is let go. Until then the camera looks where
+    the player looks, and the gun rises into the view. From a gun already up (the shoulder
+    aim, just after a shot) it latches at once.
+  - **Why the travel does not wait:** it used to (`SightSeat` eased toward the latch, and the
+    weapon's zoom waited for it too). The sights key then zoomed on the boom exactly as the
+    shoulder aim does for 0.2 s, stopped, and only then moved the camera: two moves that read
+    as a jerk.
+  - **Why the turn does:** a camera turned onto the gun's line from the key looked down at the
+    hand, then swung onto the target with the arms. What the turn takes from the gun is the
+    last few degrees only (under 1.5°, probed).
+  - **The travel bows toward the rising gun:** its end point is the gun's eye, which starts at
+    the hip. The camera only ever gets nearer to where it ends up, and strays about 30 cm
+    from the straight line over 270 cm (probed).
   - **A latch, not the angle alone:** a reload with the sights up throws the gun off the view,
     and the camera stays on the gun through it, as it always has.
-  - **Why `SightBlend` does not wait too:** the body's pitch is part of what brings the gun onto
+  - **Why `SightBlend` does not wait:** the body's pitch is part of what brings the gun onto
     the view. A blend that waited for the gun would wait for itself.
   - **Letting go, everything holds until the camera is home:** the carry keeps the gun up and
     `SightBlend` keeps its target while `SightSeat > SEAT_HOLD` (0.02). Otherwise the view,
     still easing off the gun, dips with it as it lowers and as the body's pitch comes off
     (5.8° at a view pitch of -25, probed).
-  - **The weapon's own zoom waits for `SightSeated`** (`ads.py`): until then the sights key
-    zooms as the shoulder does. Only the scope shows it: its 4x and its glass arrive with the
-    camera, not over the shoulder.
-  - An item with no sight line (the knife) is seated at once.
+  - An item with no sight line is seated at once.
   - `SightsForced` is the probes' stand-in for the sights key. `probes/probe_sight_raise.py`
-    runs the whole raise: from a gun 70–90° off the view, the camera stays within 1.5° of the
-    control rotation all the way in and out (it latches about 0.19 s after the key). With
-    `--windowed` and `OW_RAISE_SHOTS=1` it saves the view with and without the crosshair.
-  - A probe that holds the sights by writing variables writes `SightSeat` (and `SightBlend`,
-    which the seat then holds).
+    runs the whole raise: `SightSeat` rises on every frame from the key and is past 0.9 when
+    the gun latches (about 0.19 s after the key), the zoom's progress matches it frame for
+    frame, and the camera stays within 1.5° of the control rotation all the way in and out.
+    With `--windowed` and `OW_RAISE_SHOTS=1` it saves the view with and without the crosshair.
+  - A probe that holds the sights by writing variables writes `SightSeat` and `SightLook`
+    (and `SightBlend`, which the seat then holds).
 - **Down the sights the view IS the gun's sight line** (`weapon_models.py`, `sights.py`):
   - Each gun has a rear sight point and a front sight tip, measured off the mesh's vertices
     (`*_SIGHT_REAR`, `*_SIGHT_FRONT`): the AK's notch and post, the pistol's blades and post,
@@ -70,7 +83,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     sight, so its line skims the receiver's hump and ends on the bead.
   - `SightOffset` is the point of that line at the eye's distance (`_eye_behind`), and
     `SightAim` is the front tip. The camera looks from the one at the other
-    (`MakeRotFromX`, so no roll), eased from the boom's rotation by `SightSeat`. The tip is
+    (`MakeRotFromX`, so no roll), eased from the boom's rotation by `SightLook`. The tip is
     therefore the middle of the view in any pose, and the shot goes to the middle of the view
     (the aim trace starts at the camera).
   - **Why not the control rotation:** the gun rides the arms. Against the control rotation it

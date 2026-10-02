@@ -40,7 +40,7 @@ from combat.nodes import (
     NODE_CAST_HEALTH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET,
 )
 from combat.paths import HEALTH_CLASS_PATH
-from combat.seat_tuning import SEAT_VAR, SEATED_VAR
+from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR
 from combat.weapon_component.head_hide import _author_head_shown
 
 OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
@@ -125,9 +125,12 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
     seat = keep(_at(ed.add_set_member_variable_node(SEAT_VAR), x + 780, y - 200))
     _set(seat, SEAT_VAR, 0.0)
     _connect(BEL.find_then_pin(unzoom), _pin(seat, "execute"))
+    look = keep(_at(ed.add_set_member_variable_node(LOOK_VAR), x + 780, y - 100))
+    _set(look, LOOK_VAR, 0.0)
+    _connect(BEL.find_then_pin(seat), _pin(look, "execute"))
     blend = keep(_at(ed.add_set_member_variable_node("SightBlend"), x + 780, y))
     _set(blend, "SightBlend", 0.0)
-    _connect(BEL.find_then_pin(seat), _pin(blend, "execute"))
+    _connect(BEL.find_then_pin(look), _pin(blend, "execute"))
     arm = keep(_at(_node(ed, FN_GET_COMP), x + 780, y + 400))
     _connect(owner_out, _pin(arm, "self"))
     _pin(arm, "ComponentClass").set_pin_value(SPRING_ARM_CLASS_PATH)

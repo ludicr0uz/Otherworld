@@ -3,9 +3,10 @@ weapon's eye point (SightOffset) and turns onto its sight line (towards
 SightAim, the front sight's tip), so the player looks through the gun's own
 sights in first person. ads.py decides *whether* the player is down the
 sights (SightAiming) and how far to zoom; this module owns only where the
-camera is and which way it looks; seat.py decides *when* it may go (SightSeat:
-only once the gun is up, so the view stays on the target while the gun rises
-to it).
+camera is and which way it looks; seat.py decides how far it has gone
+(SightSeat, from the key: one motion from wherever the camera is) and how far
+it has turned onto the sight line (SightLook: only once the gun is up, so the
+view stays on the target while the gun rises to it).
 
 Why the camera is moved rather than a second camera switched to: the camera is
 what everything else already reads -- the FOV zoom, the aim trace (off the
@@ -84,11 +85,11 @@ def _author_sight_line(ed, keep, held, xform, eye_out, x, y):
             _pin(has_line, "ReturnValue", is_input=False))
 
 
-def _author_sight_look(ed, keep, line_out, has_line_out, boom_rot, seat_out,
+def _author_sight_look(ed, keep, line_out, has_line_out, boom_rot, look_out,
                        x, y):
     """The camera's rotation down the sights, as a pure chain:
 
-        RLerp(boom's, MakeRotFromX(line), SightSeat x (|line| > 1 cm), shortest)
+        RLerp(boom's, MakeRotFromX(line), SightLook x (|line| > 1 cm), shortest)
 
     MakeRotFromX has no roll, so a canted gun does not tip the horizon.
     """
@@ -97,7 +98,7 @@ def _author_sight_look(ed, keep, line_out, has_line_out, boom_rot, seat_out,
     weight = keep(_at(_node(ed, FN_BOOL_TO_FLOAT), x + 1300, y + 140))
     _connect(has_line_out, _pin(weight, "InBool"))
     alpha = keep(_at(_node(ed, FN_MUL_FF), x + 1560, y + 140))
-    _connect(seat_out, _pin(alpha, "A"))
+    _connect(look_out, _pin(alpha, "A"))
     _connect(_pin(weight, "ReturnValue", is_input=False), _pin(alpha, "B"))
     turn = keep(_at(_node(ed, FN_RLERP), x + 1820, y))
     _connect(boom_rot, _pin(turn, "A"))
@@ -146,24 +147,27 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
         shoulder   = CameraBoom.GetSocketLocation(SpringEndpoint)
         if IsValid(Held):
             eye = TransformLocation(Held.GetTransform(), Held.SightOffset)
-            SightSeated, SightSeat = ...                  (seat.py)
+            SightSeat, SightSeated, SightLook = ...       (seat.py)
             Camera.SetWorldLocation(VLerp(shoulder, eye, SightSeat))
             Camera.SetWorldRotation(RLerp(boom's, look down the sight line,
-                                          SightSeat))     (_author_sight_look)
+                                          SightLook))     (_author_sight_look)
         else:
-            SightSeated, SightSeat = false, 0
+            SightSeat, SightSeated, SightLook = 0, false, 0
             Camera.SetWorldLocation(shoulder)
             Camera.SetWorldRotation(boom's)
 
     SightBlend is the body's share of the sights (the pitch, the sway, the
     steady hand): it starts on the key and lasts until the camera has left
-    the gun. SightSeat is the camera's, and starts only when the gun is up: the view stays where the player is looking, on
-    the boom, while the gun rises, and then travels onto the sights. Both
-    ease at the zoom's speed, and ads.py holds the zoom at the shoulder's
-    until the camera is seated, so the sniper's glass (which fades on the
-    zoom) closes around the view as it gets there.
+    the gun. SightSeat is the camera's travel, and starts on the key too: one
+    motion from wherever the camera is to the eye point. SightLook is its
+    turn onto the sight line, and starts only when the gun is up: until then
+    the view keeps looking where the player is looking, so it does not ride
+    the gun's line up from the hip. All three ease at the zoom's speed, and
+    ads.py takes the weapon's own zoom on the same key, so the sniper's glass
+    (which fades on the zoom) closes around the view as it gets there.
 
-    Written every frame, both ways. At SightSeat 0 the write puts the camera
+    Written every frame, both ways. At SightSeat and SightLook 0 the write
+    puts the camera
     exactly where and as the boom already holds it (the template's camera has
     no offset or turn of its own, which camera.aim_camera asserts), so there
     is no "restore" path to forget; and with empty hands -- a weapon dropped
@@ -238,7 +242,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
     line_out, has_line_out = _author_sight_line(
         ed, keep, held, xform, _pin(eye, "ReturnValue", is_input=False),
         x0 + 1260, y0 + 1000)
-    seated, seat_out = _author_sight_seat(
+    seated, seat_out, look_out = _author_sight_seat(
         ed, tick, keep, line_out, has_line_out, boom_rot_out,
         BEL.find_then_pin(armed), x0 + 1260, y0 - 900)
     mix = keep(_at(_node(ed, FN_VLERP), x0 + 1780, y0 + 420))
@@ -250,7 +254,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
     _connect(_pin(mix, "ReturnValue", is_input=False), _pin(to_sight, "NewLocation"))
     _connect(seated, _pin(to_sight, "execute"))
     look = _author_sight_look(ed, keep, line_out, has_line_out, boom_rot_out,
-                              seat_out, x0 + 1260, y0 + 1000)
+                              look_out, x0 + 1260, y0 + 1000)
     to_line = keep(_at(_node(ed, FN_COMP_SET_WORLD_ROT), x0 + 2300, y0))
     _connect(cam_out, _pin(to_line, "self"))
     _connect(look, _pin(to_line, "NewRotation"))
@@ -299,15 +303,16 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
     _connect(BEL.find_then_pin(level), _pin(shown, "execute"))
 
     ed.add_comment_to_nodes(
-        "Down the sights: the camera eases (SightSeat, at the zoom's own "
-        f"{COMBAT.ads_interp_speed:g}) from the boom's end to the held "
-        "weapon's SightOffset, and turns from the boom's rotation onto the "
+        "Down the sights: from the key, the camera eases (SightSeat, at the "
+        f"zoom's own {COMBAT.ads_interp_speed:g}) in one motion from the "
+        "boom's end to the held weapon's SightOffset. It turns (SightLook) "
+        "from the boom's rotation onto the "
         "weapon's sight line (the eye towards SightAim, the front sight's "
         "tip), so the sights are on the middle of the view, where the shot "
-        "goes. It waits on the boom until the gun is up (SightSeated: the "
+        "goes. The turn waits until the gun is up (SightSeated: the "
         f"sight line within {SIGHT_SEAT_DEG:g} deg of the view), so the view "
         "stays on the target while the gun rises to it. Written every frame "
-        "both ways, so at SightSeat 0 it is "
+        "both ways, so at SightSeat and SightLook 0 it is "
         "exactly where and as the boom holds it and there is no restore "
         "path; with empty hands it goes straight home. A scoped "
         f"weapon hides past SightSeat {SCOPE_HIDE_BLEND:g}, out of its own "

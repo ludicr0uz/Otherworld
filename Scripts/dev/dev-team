@@ -59,6 +59,12 @@ to allow less. Any action that would prompt is denied, not waited on. No MCP
 servers are loaded (--strict-mcp-config): no task uses them, and their tools
 would be re-read on every turn.
 
+**Fast mode.** A task runs in fast mode (the same Opus, faster output) while
+the five-hour session limit is under half used, going by the last reading a
+session streamed (devteam/fast.py). --fast on / --fast off override the rule.
+Fast mode is billed to usage credits, not to the plan; where it cannot run,
+the session runs at standard speed and its ``session`` line says why.
+
 **Fab assets need you.** Sessions cannot sign in to Fab, so an asset a task
 needs is asked of you at this terminal: a task's ``fab:`` hints before its
 session starts, and a session whose report opens with FAB-REQUIRED after it
@@ -90,7 +96,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(1, os.path.dirname(HERE))        # Scripts/: asset_pipeline
 
-from devteam import fab, gate                                       # noqa: E402
+from devteam import fab, fast, gate                                       # noqa: E402
 from devteam.accounting import (                                    # noqa: E402
     describe_time, describe_tokens, git, git_head, merge_results, tag_commit,
     token_usage,
@@ -129,6 +135,9 @@ def parse_args():
     p.add_argument("--no-triage", dest="triage", action="store_false",
                    help="don't size the queue first (devteam/triage.py): every "
                         "task without an effort: hint runs at the default effort")
+    p.add_argument("--fast", choices=fast.MODES, default="auto",
+                   help="fast mode: auto (default: while the session limit is under "
+                        f"{fast.THRESHOLD:.0%}% used), on, or off")
     p.add_argument("--budget", type=float, metavar="USD", help="per-task spending cap")
     p.add_argument("--no-gate", dest="gate", action="store_false",
                    help="skip the verifier sweeps before and after each task")
@@ -230,7 +239,7 @@ def sweep(label, log_path):
     return rows
 
 
-def run_one(task, n, total, args, run_dir, progress, cache):
+def run_one(task, n, total, args, run_dir, progress, cache, meter):
     """One task, gate included.
 
     Returns (ok, reports, result, gate_table, final sweep or None)."""
@@ -247,16 +256,19 @@ def run_one(task, n, total, args, run_dir, progress, cache):
         baseline = cache.get(state) or sweep("baseline", sweep_log)
     prompt = build_prompt(task, n, total, progress,
                           gate.table(baseline) if baseline else None, args.commit)
+    # Decided once: the task's follow-ups keep the speed its session began at.
+    task.fast, why = meter.decide(time.time())
+    print(f"    fast mode {'on' if task.fast else 'off'} -- {why}")
     common = dict(model=task.model or args.model, effort=task.effort or args.effort,
-                  budget=args.budget)
+                  budget=args.budget, fast=task.fast)
     ok, report, result = run_session(
         build_cmd(prompt, args.permission_mode, name=f"dev-team {n}/{total}: {task.title}",
-                  **common), ROOT, log_path, env)
+                  **common), ROOT, log_path, env, meter.see)
 
     def resume(follow_prompt):
         return run_session(build_cmd(follow_prompt, args.permission_mode,
                                      resume=result["session_id"], **common),
-                           ROOT, log_path, env)
+                           ROOT, log_path, env, meter.see)
 
     ok, reports, result = fab.follow_up(ok, report, result, resume, close_editors, **ask)
     gate_table = None
@@ -277,7 +289,7 @@ def run_one(task, n, total, args, run_dir, progress, cache):
         fix_opts = dict(common, effort=args.effort) if task.triage else common
         ok, report, fixed = run_session(
             build_cmd(fix, args.permission_mode, resume=result["session_id"], **fix_opts),
-            ROOT, log_path, env)
+            ROOT, log_path, env, meter.see)
         result = merge_results(result, fixed)
         reports.append(report)
         if not ok:
@@ -317,6 +329,7 @@ def main():
 
     outcomes, total_cost, cache = [], triage_cost, {}
     attempted = []      # run already and still unticked: not to be queued again
+    meter = fast.Meter(args.fast, fast.last_seen(LOG_ROOT))
     while todo:
         # The total moves when the task file is edited mid-run (reread, below).
         task, n, total = todo[0], len(outcomes) + 1, len(outcomes) + len(todo)
@@ -327,7 +340,7 @@ def main():
         before = git_head(ROOT)
         try:
             ok, reports, result, gate_table, swept = run_one(
-                task, n, total, args, run_dir, progress, cache)
+                task, n, total, args, run_dir, progress, cache, meter)
         except KeyboardInterrupt:
             print("\ndev-team: interrupted -- this task stays unticked")
             outcomes.append((todo.pop(0), "interrupted"))
@@ -356,7 +369,8 @@ def main():
                     f"Session: {result.get('session_id', '?')}{commits}\n"
                     f"Time: {took}\nTokens: {tokens}\n"
                     f"Effort: {task.effort or args.effort or 'default'}"
-                    + (f" (triage: {task.triage})" if task.triage else "") + "\n\n"
+                    + (f" (triage: {task.triage})" if task.triage else "")
+                    + (", fast mode" if task.fast else "") + "\n\n"
                     + (f"### Verifier gate\n\n{gate_table}\n\n" if gate_table else "")
                     + f"### Report\n\n{report or '(no report)'}\n")
         outcomes.append((task, status))

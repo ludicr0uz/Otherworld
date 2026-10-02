@@ -4,19 +4,22 @@ Called by the generated import_<Level>.py (step 5) and verify_<Level>.py
 (step 4). The cells, labels and cull distances come from
 forest_generator/tree_cells.py; see there for why trees are cut into cells.
 
-Nanite is pinned on. The tree meshes are dense scans (hundreds of thousands of
-triangles and up) with masked, two-sided leaf cards, and that is expensive on
-Nanite -- looking up into the canopy is where the frame rate falls. The obvious
-escape, ``disallow_nanite`` on the component, draws the mesh's fallback
-instead, and it was tried: the fallbacks (auto-built, relative error 1.0) have
-**zero triangles in the leaf section** -- the simplifier deletes small
-disconnected cards first -- so every tree rendered bare. Turning Nanite off on
-the asset renders the full scan instead, which is worse. So the component stays
-on Nanite until the leaves have a real classic-render mesh.
+Nanite is pinned on. What the trees cost is triangles: on this Mac Nanite
+rasterises every one of them through the hardware path, and a canopy of
+thousands of small leaves is drawn leaf by leaf however far away it is
+(graphisOptimizationStrategy.md has the measurements; the masked leaf cards,
+long blamed here, are about 1.5 ms of it). So the meshes planted are not the
+scans but cut-down copies of them -- forest_generator/tree_meshes.py -- and the
+scans themselves are never planted or written to.
 
-What Nanite does allow is dropping the leaves' opacity mask past a distance
+``disallow_nanite`` on the component would draw the mesh's fallback instead.
+The scans' own fallbacks had no leaves left (the simplifier deletes small
+disconnected cards first), so every tree rendered bare; the copies are built
+with a fallback that keeps its foliage, but nothing uses it yet.
+
+Nanite also allows dropping the leaves' opacity mask past a distance
 (TREE_LEAF_MASK_DISTANCE_CM, see tree_cells.py), which takes distant canopy off
-Nanite's expensive masked raster path.
+its masked raster path.
 """
 
 from collections import defaultdict
@@ -120,7 +123,7 @@ def verify_trees(check, actors, expected_counts, expected_total):
                     if str(c.get_collision_profile_name()) != "BlockAll"]
         check(f"{spec} Collision Profile BlockAll", not passable, str(passable[:3]))
         classic = [l for l, c in comps if c.get_editor_property("disallow_nanite")]
-        check(f"{spec} Renders Nanite (fallback has no leaves)", not classic,
+        check(f"{spec} Renders Nanite", not classic,
               str(classic[:3]))
         unmasked = {c.get_editor_property("nanite_pixel_programmable_distance")
                     for _, c in comps}

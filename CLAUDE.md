@@ -160,6 +160,9 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
   `uepy_inbox.serve()`), later calls reuse it. dev-team sets it per session
   (`Saved/uepy/devteam`), closes the project's editors before each task, and stops the warm
   one before each verifier sweep.
+  If a script crashes or hangs that editor, `uepy.py` kills it, boots a fresh one and runs the
+  script again by itself (`uepylib/warm.py`), saying so in one line; don't kill or restart it by
+  hand. A script it still reports as failed took two editors down in a row.
 - **`--game`** counts `Blueprint Runtime Error`, `Accessed None`, `NPC-SPAWN` and `NPC-FELL`.
 - **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`. Never
   rebuild Blueprints under a running game.

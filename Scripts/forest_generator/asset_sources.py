@@ -204,7 +204,10 @@ GENERATED = (
              "the reason the repository is code only. Procedural/ -- the "
              "grass patches, bushes and M_ProcFoliage -- is built from "
              "forest_generator/foliage_meshes.py by "
-             "forest_import/foliage_assets.py, which the level import runs.",
+             "forest_import/foliage_assets.py, which the level import runs. "
+             "Trees/ -- the tree meshes the levels plant, cut-down copies of "
+             "the scans -- is built from forest_generator/tree_meshes.py by "
+             "forest_import/tree_assets.py, which the level import also runs.",
     ),
     AssetSource(
         dest="Content/Sourced/Characters",

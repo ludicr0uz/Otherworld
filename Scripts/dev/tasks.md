@@ -107,5 +107,84 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [x] Star size is currently too large: each individual star is too large relative to the
       moon. The moon's size is good. Stars should also be laid out like a real night sky
       rather than randomly.
-- [ ] Update FPS metric to be always shown regardless of whether debug mode is enabled or not. Add another custom FPS setting that persists. (So Low / Med / High / Custom as 4 options). Add a save default button for the graphics setting that should modify the csv that defines the default (that I can commit later). Defaults should be driven by the CSV.
-
+- [x] Update FPS metric to be always shown regardless of whether debug mode is enabled or not. Add another custom FPS setting that persists. (So Low / Med / High / Custom as 4 options). Add a save default button for the graphics setting that should modify the csv that defines the default (that I can commit later). Defaults should be driven by the CSV.
+- [x] During ADS there is unnecessary jerky movement as the camera first goes into shoulder
+      aim, then transitions to ADS in two steps. Simplify this to be one smooth motion from
+      the current camera location into the ADS view.
+- [x] For AKM ADS hover movement, the hand holding the weapon is not synchronized with the
+      weapon movement. The hand and weapon should move in sync.
+- [x] For shotgun holding ADS animation, the thumb sticks out upwards which is unnatural.
+      Implement different thumb placement for shotgun compared to rifles.
+- [x] Fix pistol ADS where the user can see through the hand holding the pistol.
+- [x] Implement a new hunting state for wendigos. When they aggro on you, they should first roar
+      (using the zombie roar animation and roaring sound). They should run towards you in a
+      semicircle, stopping behind nearby obstacles (e.g., trees) and coming closer to you tree
+      after tree while hiding behind them. When they are at close range, they should charge
+      directly at you.
+- [x] Refactor the E button from a "Pick Up Items" button to a generic "Interact" button. If
+      interact is pointed at an item, the item gets picked up. No functional change, just
+      refactor the usage to a generic interact system for future expansion.
+- [x] Create a process to generate item icons based on 3D models and create 2D images for use
+      in the UI. Update existing 2D cartoony item icons with icons generated from the 3D models.
+- [x] When holding a lit stick in front of a wendigo, it should prevent the wendigo from
+      attacking. The wendigo should try to go around the fire to attack from the side or back.
+      If it successfully moves at least 90 degrees around the torch, it should attack. After
+      being held off for 30 seconds, the wendigo should run away.
+- [x] When a stick is used near a campfire, it should light and become a lit stick that can be
+      carried in hand like a torch until it burns out. Repurpose the scope/ADS button as a
+      generic "use item" button when a non-weapon is selected. With a burning stick selected,
+      pressing this button should raise the stick forward for warding away fire-afraid creatures.
+- [x] Add a bleeding debuff that players have a 33% chance of getting when hit by a wendigo.
+      Implement generic on-hit chance logic that can be extended to other attacks in the future.
+      The bleeding debuff drains 50 health total over 3 minutes.
+- [x] When a knife or axe is equipped, using it on a fire (interact button) should heat it up,
+      making it glow red and keeping it hot for 20 seconds. If the player has a bleeding debuff,
+      using the heated knife stops the bleeding (cauterizing the wound). Hitting a wendigo with
+      a burning knife should deal double damage.
+- [x] For wendigos, increase their movement speed when running in the semicircle. Alternate the
+      semicircle direction at varying intervals. If a wendigo is shot, it should enter "enraged"
+      mode and charge directly at the player to attack.
+- [x] Sprinting should only be allowed in forward-facing directions. Disable sprinting sideways
+      or backwards; allow sprinting only within 60 degrees left or right of forward.
+- [x] Fix the shotgun grip hand alignment. The hand grip does not properly align with the
+      shotgun; the curled fingers on the right side stick out unnaturally.
+- [x] When throwing a melee weapon, it should fly in a more direct trajectory with less curve
+      than other items. Axes and swords should fly in a forward spinning trajectory, like a
+      throwing axe or throwing knife.
+- [x] Thrown melee weapons should do damage when hitting an enemy. When hitting a tree, the
+      item should get stuck in the tree and be retrievable.
+- [x] When a thrown melee weapon hits an enemy, it should stick to the enemy at the impact
+      area and should be retrievable in the vicinity, whether the enemy is dead or alive.
+- [x] Increase the wendigo's roar audible distance to be 1.75 times its aggro range so that
+      it's always heard.
+- [x] Refine wendigo hunting behavior: run directly towards player if over 150m away (catch-up
+      state at same hunting speed), don't use small trees to hide behind, don't pause without
+      trees (keep running or charge), change strafe direction at random intervals (at least 1s)
+      roughly twice as often when warded by torch, increase hunting movement speed by 30%, don't
+      hide behind transparent/thin trees, increase tree search range by 50% when hunting.
+- [x] In the monster tuning tab, add various tunable parameters around wendiego behavior so they
+      can be adjusted through the developer menu.
+- [x] When being warded away by a torch, the wendigo should roar periodically: once after 15
+      seconds (with +/-2 second variance) and once at 30 seconds right before it runs away. If
+      the wendigo hits the player, the 30-second timer resets.
+- [x] When a fire is started, zombies in a 200 meter radius should be slowly drawn to it. Add
+      a new "Drawn" state for zombies that slowly moves them towards the target (fire).
+- [x] Implement dev team script to check for additional tasks after completing a task. After
+      each task completion, reload the tasks.md file to detect newly added items so the script
+      automatically picks up new work in subsequent sessions.
+- [x] Implement a generic "taking hit" animation system for models when they take damage. When
+      a thrown weapon hits a model and deals damage, it should trigger an impact animation.
+      This should be generic so that any damage taken results in a "taking hit" animation. This may be implemented already, looking to confirm that this is extended to damage inflicted from thrown weapons. 
+- [x] Implement the thrown trajectory to be aligned vertically with the reticle. For thrown weapons, the weapon should fly where the reticle is aimed. While holding the throw button, character should be in a "getting ready to throw" animation. 
+- [x] Headshots from thrown weapons should also apply a headshot multiplier. Thrown damage should also be tunable for melee weapons in the weapon tuning menu.
+- [ ] Implement an exit game button in the main menu. Consolidate the menu that appears when
+      pressing 'm' with the main menu into one unified menu. When pressing 'm' during gameplay,
+      the same consolidated menu appears. Keep the menu placement the same as the current 'm'
+      menu location.
+- [ ] Update player jog speed to 4m/s and sprint speed to 6m/s. Double the sprint duration available at full bar. The current recharge time should stay enough to fully recharge the sprint bar. This should be configurable in the player tuning options.
+- [ ] Implement a clothing system for the main character. Shirt, jacket, hat, glasses, boots, pants, gloves, backpack. Looted clothing items be stored in the current inventory slots until equipped. Using them should equip them. Do not implement drawings/models for the equipped clothing yet. Just implement the state - in inventory, vs equipped in the proper slot. Implement the "i" button to show what's currently equipped - inventory screen. Implement test clothing items to be spawned in front of the character at start on the 200 x 200 map.
+- [ ] Reduce the rate at which the ADS aimer hovers around target. Right now it moves around too fast making it difficult to shoot. Make this rate configurable in weapon tuning. Implement a hold breath button 
+- [ ] Implement wind for trees and grass, configurable in the graphics menu if its enabled or disabled. And settings around it. 
+- [ ] When the knife is held for the throw animation, character should hold it by the blade rather than by the handle. 
+- [ ] Items should not be lootable if they are vertically too far away from the character. It seems right now only the horizontal distnace is checked. 
+- [ ] Generate a new adventurer model with meshy API in boxers as default. This will be a preparation for implementing clothing.

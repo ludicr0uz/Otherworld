@@ -12,7 +12,14 @@ user's editor is sent reaches it and nothing it is sent reaches the user's.
 ``stop()`` asks it to exit (a ``stop`` file) and kills it only if it does not.
 
 Only one boots at a time: the first caller holds ``booting`` (its pid) and a
-second one waits for the heartbeat instead of starting a rival editor.
+second one waits for the heartbeat instead of starting a rival editor. And
+only one runs at a time: an editor that is still there but no longer answers
+(crashed into its handler, or hung) is killed before another is booted, so two
+never serve one inbox.
+
+"Up" means ``serve()``'s own heartbeat (``"serving": true``). The editor is
+started with $UEPY_SERVING, which keeps uepy_inbox's Slate-tick listener out
+of it: that listener used to beat and take the first job during start-up.
 """
 
 import os
@@ -64,11 +71,17 @@ def _claim_boot(directory):
     return False
 
 
+def _serving(directory):
+    """The heartbeat of a serve() loop on ``directory``, or None."""
+    beat = inbox.heartbeat(directory)
+    return beat if beat and beat.get("serving") else None
+
+
 def _wait_for_beat(directory, alive, timeout):
-    """Wait for a heartbeat while ``alive()`` holds."""
+    """Wait for serve()'s heartbeat while ``alive()`` holds."""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if inbox.heartbeat(directory):
+        if _serving(directory):
             return True
         if not alive():
             return False
@@ -80,15 +93,18 @@ def ensure(engine, directory, boot_timeout=300):
     """A listening server on ``directory``, booting one if needed. True if
     one is listening when this returns."""
     os.makedirs(directory, exist_ok=True)
-    if inbox.heartbeat(directory):
+    if _serving(directory):
         return True
     if not _claim_boot(directory):
         log("warm editor: another call is booting it; waiting")
         booter = os.path.join(directory, BOOTING)
         return _wait_for_beat(
-            directory, lambda: inbox.pid_alive(_read_pid(booter)) or inbox.heartbeat(directory),
+            directory, lambda: inbox.pid_alive(_read_pid(booter)) or _serving(directory),
             boot_timeout)
     try:
+        gone = discard(directory)
+        if gone:
+            log(f"warm editor: pid {gone} was still there but not answering; killed it")
         for leftover in (STOP, "heartbeat"):
             try:
                 os.remove(os.path.join(directory, leftover))
@@ -97,7 +113,7 @@ def ensure(engine, directory, boot_timeout=300):
         driver = os.path.join(directory, "serve_driver.py")
         with open(driver, "w", encoding="utf-8") as fh:
             fh.write(DRIVER)
-        env = dict(os.environ, UEPY_INBOX_DIR=directory)
+        env = dict(os.environ, UEPY_INBOX_DIR=directory, UEPY_SERVING="1")
         env.pop("UEPY_SERVE", None)
         started = time.time()
         log(f"warm editor: booting one for this session ({directory})")
@@ -141,6 +157,42 @@ def _kill(pid):
             time.sleep(0.25)
         if not inbox.pid_alive(pid):
             return
+
+
+def _is_server(pid, directory):
+    """True if ``pid`` is an editor serving ``directory``: its command line
+    names the driver in it. A pid file outlives its process, and the number
+    may by now belong to something else."""
+    ps = subprocess.run(["ps", "-o", "command=", "-p", str(pid)],
+                        capture_output=True, text=True)
+    return "UnrealEditor" in ps.stdout and directory in ps.stdout
+
+
+def discard(directory, is_server=_is_server):
+    """Kill the editor recorded for ``directory`` if its process is still
+    there, without asking: for one that crashed or hung, where there is nothing
+    left to save and SIGTERM is not answered. Returns its pid, or None if
+    there was nothing to kill."""
+    pid = _read_pid(os.path.join(directory, PID))
+    if pid is None or not inbox.pid_alive(pid) or not is_server(pid, directory):
+        return None
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return None
+    deadline = time.time() + 10.0
+    while time.time() < deadline and inbox.pid_alive(pid):
+        try:
+            os.waitpid(pid, os.WNOHANG)      # reap it if it is this caller's child
+        except OSError:
+            pass
+        time.sleep(0.1)
+    for leftover in ("heartbeat", PID):
+        try:
+            os.remove(os.path.join(directory, leftover))
+        except OSError:
+            pass
+    return pid
 
 
 def stop(directory, seconds=STOP_SECONDS):

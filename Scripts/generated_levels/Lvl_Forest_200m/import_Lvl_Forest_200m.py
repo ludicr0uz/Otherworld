@@ -338,54 +338,17 @@ unreal.log_warning("[GEN] 5. Planting trees...")
 TREE_DATA = [{"spec": "HISM_Tree_Leafy_Island_01", "x": 5617.45, "y": 890.11, "z": 16.8, "yaw": 80.36, "scale": 2.44}, {"spec": "HISM_Tree_Leafy_Island_01", "x": -2864.25, "y": -5772.98, "z": 342.05, "yaw": 31.3, "scale": 3.427}, {"spec": "HISM_Tree_Leafy_Island_01", "x": 3921.25, "y": 742.84, "z": 69.01, "yaw": 181.93, "scale": 2.35}, {"spec": "HISM_Tree_Leafy_Island_01", "x": 286.56, "y": 860.52, "z": -48.64, "yaw": 196.18, "scale": 3.04}, {"spec": "HISM_Tree_Leafy_Island_01", "x": -2048.76, "y": -1286.96, "z": -159.78, "yaw": 2.34, "scale": 3.295}, {"spec": "HISM_Tree_Leafy_Island_01", "x": -2236.12, "y": -6617.81, "z": 408.85, "yaw": 55.97, "scale": 2.544}, {"spec": "HISM_Tree_Leafy_Island_01", "x": -4227.18, "y": 6987.04, "z": 671.25, "yaw": 34.82, "scale": 2.148}, {"spec": "HISM_Tree_Leafy_Island_01", "x": -5812.07, "y": -4434.25, "z": 292.54, "yaw": 262.7, "scale": 3.291}, {"spec": "HISM_Tree_Leafy_Island_01", "x": 4813.09, "y": -820.84, "z": 12.72, "yaw": 198.73, "scale": 2.606}, {"spec": "HISM_Tree_Leafy_Island_01", "x": -5271.65, "y": -4858.94, "z": 312.3, "yaw": 207.85, "scale": 3.379}, {"spec": "HISM_Tree_Leafy_Island_01", "x": 5940.62, "y": 1759.33, "z": 112.66, "yaw": 104.18, "scale": 2.365}, {"spec": "HISM_Tree_Leafy_Island_01", "x": 142.71, "y": 1314.65, "z": -34.59, "yaw": 100.07, "scale": 2.162}, {"spec": "HISM_Tree_Leafy_Island_01", "x": -3737.45, "y": 4248.33, "z": 186.23, "yaw": 75.42, "scale": 2.592}, {"spec": "HISM_Tree_Leafy_Island_01", "x": 2564.94, "y": -1078.43, "z": 95.89, "yaw": 219.29, "scale": 3.037}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -266.11, "y": -2017.41, "z": -36.18, "yaw": 136.6, "scale": 2.261}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -5366.02, "y": -6486.39, "z": 695.01, "yaw": 246.46, "scale": 2.891}, {"spec": "HISM_Tree_Leafy_Island_02", "x": 1183.06, "y": -7177.4, "z": 351.46, "yaw": 11.56, "scale": 2.366}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -351.57, "y": 3140.92, "z": -23.2, "yaw": 339.45, "scale": 2.338}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -2978.77, "y": 6921.94, "z": 505.21, "yaw": 142.43, "scale": 3.049}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -7573.12, "y": 2002.79, "z": 591.09, "yaw": 88.79, "scale": 2.424}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -406.15, "y": 5062.4, "z": 46.34, "yaw": 323.22, "scale": 2.935}, {"spec": "HISM_Tree_Leafy_Island_02", "x": 730.91, "y": 3744.66, "z": -117.99, "yaw": 183.43, "scale": 3.596}, {"spec": "HISM_Tree_Leafy_Island_02", "x": 1347.8, "y": 411.08, "z": -34.81, "yaw": 225.88, "scale": 2.175}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -6071.84, "y": 3231.5, "z": 244.09, "yaw": 137.38, "scale": 2.102}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -8328.43, "y": -1540.75, "z": 815.5, "yaw": 309.88, "scale": 3.554}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -144.43, "y": -776.23, "z": -49.45, "yaw": 193.31, "scale": 3.091}, {"spec": "HISM_Tree_Leafy_Island_02", "x": -1759.84, "y": -2153.65, "z": -71.51, "yaw": 156.52, "scale": 2.178}, {"spec": "HISM_Tree_Leafy_Island_02", "x": 4061.82, "y": -1212.91, "z": 24.11, "yaw": 94.82, "scale": 3.401}, {"spec": "HISM_Tree_Fir_A", "x": 1995.75, "y": 4149.59, "z": -196.96, "yaw": 313.39, "scale": 3.625}, {"spec": "HISM_Tree_Fir_A", "x": -1945.39, "y": -2320.22, "z": -74.17, "yaw": 55.02, "scale": 3.018}, {"spec": "HISM_Tree_Fir_A", "x": -6445.14, "y": -1628.05, "z": 289.0, "yaw": 190.93, "scale": 3.357}, {"spec": "HISM_Tree_Fir_A", "x": -316.49, "y": 629.37, "z": -33.1, "yaw": 334.48, "scale": 1.839}, {"spec": "HISM_Tree_Fir_A", "x": 3708.25, "y": -6581.2, "z": 377.09, "yaw": 20.85, "scale": 2.415}, {"spec": "HISM_Tree_Fir_A", "x": 7133.0, "y": -2469.77, "z": 451.15, "yaw": 174.96, "scale": 1.971}, {"spec": "HISM_Tree_Fir_A", "x": 82.53, "y": -1237.11, "z": -59.97, "yaw": 46.22, "scale": 3.332}, {"spec": "HISM_Tree_Fir_A", "x": -4193.18, "y": -1356.73, "z": -93.53, "yaw": 314.08, "scale": 2.33}, {"spec": "HISM_Tree_Fir_A", "x": 951.04, "y": 3885.79, "z": -131.35, "yaw": 262.78, "scale": 2.879}, {"spec": "HISM_Tree_Fir_A", "x": -857.97, "y": 2100.51, "z": -90.09, "yaw": 233.96, "scale": 3.79}, {"spec": "HISM_Tree_Fir_A", "x": -4092.1, "y": -453.75, "z": -132.51, "yaw": 80.89, "scale": 2.042}, {"spec": "HISM_Tree_Fir_A", "x": -2836.42, "y": -1758.05, "z": -123.91, "yaw": 79.28, "scale": 2.26}, {"spec": "HISM_Tree_Fir_A", "x": -851.89, "y": -919.87, "z": -40.64, "yaw": 325.95, "scale": 2.258}, {"spec": "HISM_Tree_Fir_A", "x": 6683.3, "y": 3189.01, "z": 480.79, "yaw": 240.83, "scale": 2.276}, {"spec": "HISM_Tree_Fir_A", "x": 1597.82, "y": 1751.81, "z": -50.47, "yaw": 205.58, "scale": 3.671}, {"spec": "HISM_Tree_Fir_A", "x": 946.72, "y": -4283.46, "z": -144.76, "yaw": 68.55, "scale": 3.415}, {"spec": "HISM_Tree_Fir_A", "x": -1321.55, "y": 611.25, "z": -47.65, "yaw": 168.13, "scale": 2.647}, {"spec": "HISM_Tree_Fir_A", "x": 6825.33, "y": 4855.97, "z": 866.74, "yaw": 122.15, "scale": 2.605}, {"spec": "HISM_Tree_Fir_A", "x": 62.65, "y": 7420.78, "z": 422.47, "yaw": 161.5, "scale": 2.18}, {"spec": "HISM_Tree_Fir_A", "x": -711.91, "y": 3926.66, "z": 20.75, "yaw": 332.38, "scale": 2.3}, {"spec": "HISM_Tree_Fir_A", "x": 2676.45, "y": -3180.0, "z": -124.96, "yaw": 18.21, "scale": 2.901}, {"spec": "HISM_Tree_Fir_A", "x": 4371.12, "y": -7283.42, "z": 711.86, "yaw": 333.49, "scale": 3.738}, {"spec": "HISM_Tree_Pine_A", "x": 3674.07, "y": 6330.96, "z": 297.78, "yaw": 76.95, "scale": 4.214}, {"spec": "HISM_Tree_Pine_A", "x": 3571.24, "y": 1378.65, "z": 61.98, "yaw": 354.71, "scale": 3.947}, {"spec": "HISM_Tree_Pine_A", "x": 588.16, "y": -2705.39, "z": -43.76, "yaw": 152.28, "scale": 4.138}, {"spec": "HISM_Tree_Pine_A", "x": 8163.7, "y": -234.85, "z": 463.92, "yaw": 258.63, "scale": 4.389}, {"spec": "HISM_Tree_Pine_A", "x": -551.78, "y": 1825.86, "z": -47.44, "yaw": 208.5, "scale": 5.422}, {"spec": "HISM_Tree_Pine_A", "x": -62.7, "y": -4928.72, "z": 17.85, "yaw": 210.3, "scale": 3.143}, {"spec": "HISM_Tree_Pine_A", "x": 2780.39, "y": -3692.49, "z": -135.85, "yaw": 345.88, "scale": 3.394}, {"spec": "HISM_Tree_Pine_A", "x": 519.86, "y": 1218.62, "z": -39.27, "yaw": 243.08, "scale": 4.488}, {"spec": "HISM_Tree_Pine_A", "x": 1848.87, "y": 1733.73, "z": -9.14, "yaw": 88.64, "scale": 5.226}, {"spec": "HISM_Tree_Pine_A", "x": -3904.86, "y": -3638.45, "z": 113.98, "yaw": 210.12, "scale": 4.048}, {"spec": "HISM_Tree_Deciduous", "x": 4381.25, "y": -1905.54, "z": 12.62, "yaw": 257.83, "scale": 2.847}, {"spec": "HISM_Tree_Deciduous", "x": -2031.91, "y": 1560.1, "z": -143.14, "yaw": 108.0, "scale": 3.642}, {"spec": "HISM_Tree_Deciduous", "x": 37.09, "y": -3165.96, "z": -33.6, "yaw": 164.98, "scale": 2.623}, {"spec": "HISM_Tree_Deciduous", "x": 8485.39, "y": -208.16, "z": 598.49, "yaw": 76.74, "scale": 2.625}, {"spec": "HISM_Tree_Deciduous", "x": 5495.01, "y": -5207.78, "z": 509.49, "yaw": 56.79, "scale": 3.128}, {"spec": "HISM_Tree_Deciduous", "x": -2073.0, "y": -6898.47, "z": 422.58, "yaw": 355.4, "scale": 3.54}, {"spec": "HISM_Tree_Deciduous", "x": 5794.01, "y": 285.03, "z": -10.82, "yaw": 107.78, "scale": 3.889}, {"spec": "HISM_Tree_Deciduous", "x": 5447.25, "y": -2199.19, "z": 92.3, "yaw": 41.55, "scale": 2.728}]
 
 # Tree spec → mesh/material config
-TREE_CONFIGS = {
-    "HISM_Tree_Leafy_Island_01": {
-        "mesh": "/Game/Forest/Scanned/island_tree_01/island_tree_01_1k/StaticMeshes/SM_island_tree_01.SM_island_tree_01",
-        "mats": [
-            "/Game/Forest/Materials/Instances/MI_IslandTree01_Trunk",
-            "/Game/Forest/Materials/Instances/MI_IslandTree01_Leaves",
-            "/Game/Forest/Materials/Instances/MI_IslandTree01_Branches",
-        ],
-    },
-    "HISM_Tree_Leafy_Island_02": {
-        "mesh": "/Game/Forest/Scanned/island_tree_02/island_tree_02_1k/StaticMeshes/SM_island_tree_02.SM_island_tree_02",
-        "mats": [
-            "/Game/Forest/Materials/Instances/MI_IslandTree02_Trunk",
-            "/Game/Forest/Materials/Instances/MI_IslandTree02_Leaves",
-            "/Game/Forest/Materials/Instances/MI_IslandTree02_Branches",
-        ],
-    },
-    "HISM_Tree_Fir_A": {
-        "mesh": "/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/StaticMeshes/fir_tree_01_a_LOD0.fir_tree_01_a_LOD0",
-        "mats": [
-            "/Game/Forest/Materials/Instances/MI_FirTree01_Bark",
-            "/Game/Forest/Materials/Instances/MI_FirTree01_TrunkA",
-            "/Game/Forest/Materials/Instances/MI_FirTree01_Twig",
-            "/Game/Forest/Materials/Instances/MI_FirTree01_Bark",
-        ],
-    },
-    "HISM_Tree_Pine_A": {
-        "mesh": "/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/StaticMeshes/pine_sapling_small_a.pine_sapling_small_a",
-        "mats": [
-            "/Game/Forest/Materials/Instances/MI_PineSapling_Bark",
-            "/Game/Forest/Materials/Instances/MI_PineSapling_Twig",
-        ],
-    },
-    "HISM_Tree_Deciduous": {
-        "mesh": "/Game/Forest/Scanned/tree_small_02/tree_small_02_1k/StaticMeshes/SM_tree_small_02.SM_tree_small_02",
-        "mats": [
-            "/Game/Forest/Materials/Instances/MI_TreeSmall02_Branches",
-            "/Game/Forest/Materials/Instances/MI_TreeSmall02_Leaves",
-            "/Game/Forest/Materials/Instances/MI_TreeSmall02_Trunk",
-        ],
-    },
-}
+TREE_CONFIGS = json.loads(r"""{"HISM_Tree_Leafy_Island_01": {"mesh": "/Game/Forest/Trees/SM_IslandTree_01.SM_IslandTree_01", "mats": ["/Game/Forest/Materials/Instances/MI_IslandTree01_Trunk", "/Game/Forest/Materials/Instances/MI_IslandTree01_Leaves", "/Game/Forest/Materials/Instances/MI_IslandTree01_Branches"]}, "HISM_Tree_Leafy_Island_02": {"mesh": "/Game/Forest/Trees/SM_IslandTree_02.SM_IslandTree_02", "mats": ["/Game/Forest/Materials/Instances/MI_IslandTree02_Trunk", "/Game/Forest/Materials/Instances/MI_IslandTree02_Leaves", "/Game/Forest/Materials/Instances/MI_IslandTree02_Branches"]}, "HISM_Tree_Fir_A": {"mesh": "/Game/Forest/Trees/SM_Fir_A.SM_Fir_A", "mats": ["/Game/Forest/Materials/Instances/MI_FirTree01_Bark", "/Game/Forest/Materials/Instances/MI_FirTree01_TrunkA", "/Game/Forest/Materials/Instances/MI_FirTree01_Twig", "/Game/Forest/Materials/Instances/MI_FirTree01_Bark"]}, "HISM_Tree_Pine_A": {"mesh": "/Game/Forest/Trees/SM_PineSapling_A.SM_PineSapling_A", "mats": ["/Game/Forest/Materials/Instances/MI_PineSapling_Bark", "/Game/Forest/Materials/Instances/MI_PineSapling_Twig"]}, "HISM_Tree_Deciduous": {"mesh": "/Game/Forest/Trees/SM_TreeSmall_02.SM_TreeSmall_02", "mats": ["/Game/Forest/Materials/Instances/MI_TreeSmall02_Branches", "/Game/Forest/Materials/Instances/MI_TreeSmall02_Leaves", "/Game/Forest/Materials/Instances/MI_TreeSmall02_Trunk"]}}""")
 
 # Per-cell HISMs with a cull distance, kept on Nanite -- see
 # forest_import/trees.py and forest_generator/tree_cells.py.
 if r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts" not in sys.path:
     sys.path.insert(0, r"/Users/alexeysukhov/Documents/Unreal Projects/Otherworld/Scripts")
 from forest_import import trees as trees_import
+# The trees planted from a copy of a scan -- see
+# forest_import/tree_assets.py. Built once, then skipped.
+from forest_import import tree_assets
+tree_assets.ensure_tree_assets()
 trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
                          editor_asset_sub)
 

@@ -23,6 +23,7 @@ The generator's code lives in this package. The level-side import code is in
 |---|---|
 | `terrain.py` | heightfield and OBJ |
 | `tree_placement.py` | `DEFAULT_TREE_SPECS` and the scatter (`MIN_TREE_SPACING_CM` 150, checked through a spatial hash) |
+| `tree_meshes.py` | the meshes the trees are planted from: a recipe per species (`TREE_MESH_RECIPES`) that cuts a scan down. `forest_import/tree_assets.py` builds them under `/Game/Forest/Trees`; the level import calls it |
 | `grass_placement.py` | `DEFAULT_GRASS_SPECS` and a stratified scatter |
 | `npc_placement.py` | NPC numbers (see `Scripts/npc/CLAUDE.md`) |
 | `npc_agro.py` | sense and patrol numbers |
@@ -97,12 +98,30 @@ level from scratch, which drops the forage and the day/night cycle actor.
   - they cull at 60–90 m × `r.ViewDistanceScale`.
 - **The scanned grass meshes are only 15–32 cm tall.** Scale them to the target height from their
   real bounds at plant time. The offline check caps the upscale at 2.4×.
-- **Trees are dense Nanite scans** (25–112 MB each). They are planted in the same per-cell HISMs
-  as the grass (`tree_cells.py`, `forest_import/trees.py`).
-  - Never switch Nanite off on a tree asset: it takes 25+ minutes per mesh in the game-thread
+- **Trees are cut-down copies of dense scans.** The scans (0.14–4.2 M triangles, 13–112 MB) stay
+  under `/Game/Forest/Scanned` as imported; the levels plant the copies under
+  `/Game/Forest/Trees` (33–240 k triangles), in the same per-cell HISMs as the grass
+  (`tree_cells.py`, `forest_import/trees.py`).
+  - Never write to a mesh under `/Game/Forest/Scanned`, and never plant one. To change a tree,
+    change its recipe in `tree_meshes.py`; the next import rebuilds it (the five take about two
+    minutes, then are skipped until a recipe changes).
+  - **Never set a field on the struct a scan's `get_editor_property("nanite_settings")`
+    returns.** It is still bound to the mesh: the edit lands on the scan in memory and marks
+    its package dirty, and the editor then offers to save (or, after a crash, to restore) it
+    over the original. Build a fresh `unreal.MeshNaniteSettings()`. The level verifier's
+    "Scan Left Unmodified" checks guard this.
+  - What a tree costs is how many leaves it has, not how many triangles each leaf has: Nanite
+    here rasterises everything in hardware and draws a crown leaf by leaf. A recipe drops a
+    share of the leaves and grows the rest. The numbers behind each choice are in the
+    `tree_meshes.py` docstring and `graphisOptimizationStrategy.md`.
+  - Re-measure with `Scripts/probes/probe_perf_audit_1km.py`, with no editor open: an open
+    editor's viewport shares the GPU and moves the numbers by a millisecond or two.
+  - Never switch Nanite off on a scan: it takes 25+ minutes per mesh in the game-thread
     simplifier.
-  - Never set `disallow_nanite` on the tree HISMs: the fallbacks have 0 leaf triangles.
-  - `get_number_verts` reports the fallback's count, not the scan's.
+  - `disallow_nanite` on the tree HISMs draws the fallback mesh, which is thinner in the crown
+    than the Nanite one. Measured, it is 2–5 ms cheaper than Nanite on this Mac, but it has no
+    LODs and nothing uses it.
+  - `get_number_verts` and `get_num_triangles` report the fallback's count, not the mesh's.
   - Trees fade out at 250–300 m × `r.ViewDistanceScale`. Collision and the navmesh still cover
     every tree.
 - **Past `TREE_LEAF_MASK_DISTANCE_CM` (60 m), leaves draw without their opacity mask.** This is a

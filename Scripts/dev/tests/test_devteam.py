@@ -12,10 +12,11 @@ from unittest import mock
 
 import _paths  # noqa: F401
 
-from devteam import gate
+from devteam import fast, gate
 from devteam.accounting import describe_time, merge_results, token_usage
 from devteam.session import (
-    FAIL_MARK, Narrator, build_cmd, build_fix_prompt, build_prompt, session_env,
+    FAIL_MARK, Narrator, build_cmd, build_fix_prompt, build_prompt, fast_note,
+    session_env,
 )
 from devteam import triage
 from devteam.tasks import Task, parse_tasks, requeue, tick
@@ -310,6 +311,23 @@ class SessionTest(unittest.TestCase):
         self.assertFalse([r for r in allow if r in ("Bash", "Bash(*)", "Bash(python3 *)")])
         self.assertEqual(cmd[cmd.index("--permission-mode") + 1], "auto")
 
+    def test_cmd_asks_for_fast_mode_only_when_told(self):
+        def settings(cmd):
+            return json.loads(cmd[cmd.index("--settings") + 1])
+        self.assertNotIn("fastMode", settings(build_cmd("go", "auto")))
+        fast_cmd = settings(build_cmd("go", "auto", resume="abc", fast=True))
+        self.assertIs(fast_cmd["fastMode"], True)
+        self.assertIn("Bash(cd *)", fast_cmd["permissions"]["allow"])
+
+    def test_fast_note_speaks_only_when_fast_mode_was_asked_for(self):
+        self.assertEqual(fast_note({"fast_mode_state": "on"}), "fast mode on")
+        self.assertEqual(fast_note({"fast_mode_state": "off",
+                                    "fast_mode_disabled_reason": "sdk_opt_in_required"}), "")
+        self.assertEqual(fast_note({"fast_mode_state": "off",
+                                    "fast_mode_disabled_reason": "extra_usage_disabled"}),
+                         "fast mode off: extra_usage_disabled")
+        self.assertEqual(fast_note({}), "")
+
     def test_prompt_describes_the_warm_editor(self):
         prompt = build_prompt(Task("Do X"), 1, 1, "/p", "| t |", True)
         self.assertIn("UEPY_SERVE", prompt)
@@ -322,6 +340,60 @@ class SessionTest(unittest.TestCase):
             "command": f'cd "{root}/Scripts"; ls'}}), "Bash: [Scripts] ls")
         self.assertEqual(n.describe({"name": "Read", "input": {
             "file_path": f"{root}/CLAUDE.md"}}), "Read: CLAUDE.md")
+
+
+def limits(used, resets):
+    return {"status": "allowed", "unifiedWindows": {
+        "five_hour": {"utilization": used, "resetsAt": resets},
+        "seven_day": {"utilization": 0.9, "resetsAt": resets}}}
+
+
+class FastTest(unittest.TestCase):
+
+    def test_fast_while_the_session_limit_is_under_half(self):
+        self.assertTrue(fast.Meter("auto", limits(0.49, 2000)).decide(1000)[0])
+        on, why = fast.Meter("auto", limits(0.5, 2000)).decide(1000)
+        self.assertFalse(on)
+        self.assertIn("50%", why)
+
+    def test_the_weekly_window_is_not_the_session_limit(self):
+        self.assertEqual(fast.utilization(limits(0.2, 2000), 1000), 0.2)
+
+    def test_a_reading_from_a_window_that_has_reset_is_an_empty_window(self):
+        self.assertEqual(fast.utilization(limits(0.8, 900), 1000), 0.0)
+        self.assertTrue(fast.Meter("auto", limits(0.8, 900)).decide(1000)[0])
+
+    def test_no_reading_runs_at_standard_speed(self):
+        for info in (None, {}, {"unifiedWindows": {"seven_day": {"utilization": 0.1}}}):
+            self.assertIsNone(fast.utilization(info, 1000))
+            self.assertFalse(fast.Meter("auto", info).decide(1000)[0])
+
+    def test_on_and_off_override_the_rule(self):
+        self.assertTrue(fast.Meter("on", limits(0.9, 2000)).decide(1000)[0])
+        self.assertFalse(fast.Meter("off", limits(0.1, 2000)).decide(1000)[0])
+
+    def test_a_session_updates_the_reading(self):
+        meter = fast.Meter("auto", limits(0.1, 2000))
+        meter.see(limits(0.6, 2000))
+        meter.see(None)                              # an event with nothing in it
+        self.assertFalse(meter.decide(1000)[0])
+
+    def test_last_seen_reads_the_newest_transcript(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            for stamp, used, age in (("20260101-000000", 0.7, 100), ("20260102-000000", 0.3, 0)):
+                os.makedirs(os.path.join(tmp, stamp))
+                path = os.path.join(tmp, stamp, "task-01.jsonl")
+                with open(path, "w") as fh:
+                    fh.write(json.dumps({"type": "assistant"}) + "\nnot json\n")
+                    for u in (0.01, used):
+                        fh.write(json.dumps({"type": "rate_limit_event",
+                                             "rate_limit_info": limits(u, 2000)}) + "\n")
+                os.utime(path, (1000 - age, 1000 - age))
+            self.assertEqual(fast.utilization(fast.last_seen(tmp), 1000), 0.3)
+            self.assertIsNone(fast.last_seen(os.path.join(tmp, "nowhere")))
+        finally:
+            shutil.rmtree(tmp)
 
 
 class TriageTest(unittest.TestCase):

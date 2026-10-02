@@ -32,8 +32,10 @@ own (UEPY_SERVE): the first call boots it (20-40 s), later calls reuse it, so \
 a run costs about what the script itself takes. It is warm: modules under \
 Scripts/ are re-imported for every call, but assets earlier calls loaded stay \
 loaded, as in any open editor. Do not pass --cold (it stops the warm editor \
-first, then pays a full boot). If a call reports the editor stopped \
-responding, a script crashed it; the next call boots a new one. uepy.py \
+first, then pays a full boot). If a script crashes or hangs the warm editor, \
+uepy.py kills it, boots a fresh one and runs that script again by itself, \
+saying so in one line: do not kill or restart the editor yourself. A script \
+reported as failed that way took down two editors in a row. uepy.py \
 prints a summary per script (UEPY_OUTPUT=summary: verifier counts, failed \
 checks, traceback tails, plus the path of the full log); pass --full to see \
 everything. To check behaviour in the running game, write a probe and \
@@ -135,13 +137,16 @@ def build_fix_prompt(problems, table, commit):
 
 
 def build_cmd(prompt, permission_mode, name=None, model=None, effort=None,
-              budget=None, resume=None):
+              budget=None, resume=None, fast=False):
     # --strict-mcp-config with no --mcp-config: no MCP servers at all. The
     # claude.ai connectors (Docs, Drive) add tools to every turn and no task
     # here uses them; ENABLE_CLAUDEAI_MCP_SERVERS=false in session_env() too.
+    # A headless session runs in fast mode only when its --settings say so
+    # (devteam/fast.py decides).
+    settings = dict(SETTINGS, fastMode=True) if fast else SETTINGS
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--permission-mode", permission_mode, "--strict-mcp-config",
-           "--settings", json.dumps(SETTINGS)]
+           "--settings", json.dumps(settings)]
     if resume:
         cmd += ["--resume", resume]
     elif name:
@@ -195,8 +200,21 @@ def note(text):
     return text if len(text) <= 200 else text[:197] + "..."
 
 
-def run_session(cmd, root, log_path, env):
-    """Run one session, narrating it. Returns (ok, report, result event)."""
+def fast_note(event):
+    """What a session's init event says about fast mode, or "" when there is
+    nothing to say: it was not asked for, which is what an unopted headless
+    session reports."""
+    state, why = event.get("fast_mode_state"), event.get("fast_mode_disabled_reason")
+    if state == "on":
+        return "fast mode on"
+    if why and why != "sdk_opt_in_required":
+        return f"fast mode {state or 'off'}: {why}"
+    return ""
+
+
+def run_session(cmd, root, log_path, env, on_limits=None):
+    """Run one session, narrating it. Returns (ok, report, result event).
+    ``on_limits`` is handed each rate_limit_info the session streams."""
     narrator = Narrator(root)
     result = {}
     # A text block is printed only once a tool call follows it: the last one
@@ -216,7 +234,12 @@ def run_session(cmd, root, log_path, env):
                     print(f"    {line.rstrip()}")
                     continue
                 if event.get("type") == "system" and event.get("subtype") == "init":
-                    print(f"    session {event.get('session_id')}")
+                    note_fast = fast_note(event)
+                    print(f"    session {event.get('session_id')}"
+                          + (f"  ({note_fast})" if note_fast else ""))
+                elif event.get("type") == "rate_limit_event":
+                    if on_limits:
+                        on_limits(event.get("rate_limit_info"))
                 elif event.get("type") == "assistant" and not event.get("parent_tool_use_id"):
                     for block in event.get("message", {}).get("content", []):
                         if block.get("type") == "text" and block.get("text", "").strip():

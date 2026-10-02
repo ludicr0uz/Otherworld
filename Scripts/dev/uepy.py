@@ -30,7 +30,9 @@ what decides.
 **$UEPY_SERVE=<dir>** gives the caller a warm editor of its own: the first
 call boots a headless editor serving the inbox in <dir> (uepylib/server.py),
 and later calls run in it. It never touches the user's editor. dev-team sets
-it per task and stops the editor before its verifier sweep.
+it per task and stops the editor before its verifier sweep. A script whose
+warm editor crashes or hangs under it is run again in a fresh one
+(uepylib/warm.py); it is reported as failed only if that one goes too.
 
 **$UEPY_COLD=1** forces every run cold.
 
@@ -44,7 +46,7 @@ import re
 import sys
 import time
 
-from uepylib import cold, editors, game, inbox, remote, server
+from uepylib import cold, editors, game, inbox, remote, server, warm
 from uepylib.paths import (
     editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox, set_project,
 )
@@ -207,17 +209,19 @@ def main():
         forced_cold = args.cold or os.environ.get("UEPY_COLD") == "1"
         if forced_cold and not args.cold:
             log("UEPY_COLD=1: not using any open editor")
-        warm = serve_inbox()
-        if warm and forced_cold and server.stop(warm):
+        serve_dir = serve_inbox()
+        if serve_dir and forced_cold and server.stop(serve_dir):
             # A cold run writes packages the warm editor would not see, and it
             # would later save its stale copies over them.
             log("stopped this session's warm editor for the cold run; the next "
                 "call boots it again")
-        if warm and not forced_cold:
+        if serve_dir and not forced_cold:
             # This caller's own editor: booted on first use, reused after.
             # Never multicast, which could reach the user's editor.
-            if server.ensure(engine, warm, args.boot_timeout):
-                outcome = inbox.run_inbox(targets, report, warm, args.allow_pie)
+            # warm.run drops each target it reports, so a cold run below
+            # (no warm editor could be booted) takes only what is left.
+            outcome = warm.run(engine, serve_dir, targets, report, args.allow_pie,
+                               args.boot_timeout)
         elif not forced_cold:
             # Inbox first: a single file stat, while multicast discovery costs
             # a fixed 2.5 s and, here, always costs it for nothing.

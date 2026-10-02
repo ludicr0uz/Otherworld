@@ -20,8 +20,12 @@ listening on it, and cold-boots only when neither is available.
 
 Everything runs on the game thread inside the tick callback, which is exactly
 where editor scripting has to run -- the same place -ExecutePythonScript would
-put it. A headless editor has no Slate tick, so there ``serve()`` polls the
-inbox from a blocking loop instead (the warm editor dev-team sessions use).
+put it. A headless editor serves from a blocking loop instead: ``serve()``
+(the warm editor dev-team sessions use). That editor is started with
+$UEPY_SERVING set, and there ``start()`` registers nothing: a headless editor
+does get a few Slate ticks while it starts up, and a tick listener took the
+first job then, before ``serve()`` existed, with a heartbeat that went stale
+under the client while the job ran on.
 """
 
 import json
@@ -37,7 +41,8 @@ POLL_SECONDS = 0.25          # how often the inbox is checked
 HEARTBEAT_SECONDS = 1.0      # how often liveness is published
 RESULT_TTL_SECONDS = 300.0   # results nobody collected are swept after this
 
-_state = {"handle": None, "last_poll": 0.0, "last_beat": 0.0, "serving": False}
+_state = {"handle": None, "last_poll": 0.0, "last_beat": 0.0, "serving": False,
+          "job": None}
 
 
 def inbox_dir():
@@ -228,6 +233,10 @@ def _beat(path, now, busy=None):
         # judges liveness by the pid alone, so a 60 s build is not given up on
         # after 6 s.
         "busy": busy,
+        # Written by serve()'s loop: the client waits for this before it sends
+        # a warm editor its first job, and allows such a beat a longer silence
+        # (the loop collects garbage between jobs).
+        "serving": bool(_state.get("serving")),
     })
     _state["last_beat"] = now
 
@@ -265,7 +274,11 @@ def _run_pending(path):
 
         _beat(path, time.time(), busy=job_id)
         started = time.time()
-        ok, output = _execute(job)
+        _state["job"] = job_id
+        try:
+            ok, output = _execute(job)
+        finally:
+            _state["job"] = None
         _write_atomic(os.path.join(path, job_id + ".result"), {
             "success": ok,
             "output": output,
@@ -280,6 +293,12 @@ def _tick(_delta):
     """Slate post-tick. Must never raise: an exception here kills the ticker."""
     if _state.get("serving"):
         return True             # serve() owns the inbox; a nested run would re-enter
+    if _state.get("job"):
+        # A job that pumps Slate (a slow task, a save's thumbnail) ticks this
+        # from inside itself. Beating here would overwrite the busy beat with
+        # an idle one that then goes stale, and polling would start the next
+        # job inside this one.
+        return True
     now = time.time()
     try:
         path = inbox_dir()
@@ -339,7 +358,12 @@ def serve():
 
 
 def start():
-    """Register the tick callback (idempotent)."""
+    """Register the tick callback (idempotent). Not in an editor started to
+    serve(): that loop owns its inbox from the first beat."""
+    if os.environ.get("UEPY_SERVING"):
+        unreal.log_warning("[uepy-inbox] not listening on the Slate tick: "
+                           "this editor serves its inbox (UEPY_SERVING)")
+        return None
     if _state["handle"] is not None:
         return _state["handle"]
     _state["handle"] = unreal.register_slate_post_tick_callback(_tick)

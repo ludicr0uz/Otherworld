@@ -455,6 +455,10 @@ def _write_unreal_import_script(
         for s in DEFAULT_GRASS_SPECS
     }
     grass_configs_json = json.dumps(grass_configs)
+    tree_configs_json = json.dumps({
+        s.name: {"mesh": s.mesh_path, "mats": list(s.material_paths)}
+        for s in DEFAULT_TREE_SPECS
+    })
     bush_configs_json = json.dumps({
         s.name: {"mesh": s.mesh_path, "mats": list(s.material_paths)}
         for s in DEFAULT_BUSH_SPECS
@@ -829,54 +833,17 @@ def _write_unreal_import_script(
         TREE_DATA = {json.dumps(tree_data)}
 
         # Tree spec → mesh/material config
-        TREE_CONFIGS = {{
-            "HISM_Tree_Leafy_Island_01": {{
-                "mesh": "/Game/Forest/Scanned/island_tree_01/island_tree_01_1k/StaticMeshes/SM_island_tree_01.SM_island_tree_01",
-                "mats": [
-                    "/Game/Forest/Materials/Instances/MI_IslandTree01_Trunk",
-                    "/Game/Forest/Materials/Instances/MI_IslandTree01_Leaves",
-                    "/Game/Forest/Materials/Instances/MI_IslandTree01_Branches",
-                ],
-            }},
-            "HISM_Tree_Leafy_Island_02": {{
-                "mesh": "/Game/Forest/Scanned/island_tree_02/island_tree_02_1k/StaticMeshes/SM_island_tree_02.SM_island_tree_02",
-                "mats": [
-                    "/Game/Forest/Materials/Instances/MI_IslandTree02_Trunk",
-                    "/Game/Forest/Materials/Instances/MI_IslandTree02_Leaves",
-                    "/Game/Forest/Materials/Instances/MI_IslandTree02_Branches",
-                ],
-            }},
-            "HISM_Tree_Fir_A": {{
-                "mesh": "/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/StaticMeshes/fir_tree_01_a_LOD0.fir_tree_01_a_LOD0",
-                "mats": [
-                    "/Game/Forest/Materials/Instances/MI_FirTree01_Bark",
-                    "/Game/Forest/Materials/Instances/MI_FirTree01_TrunkA",
-                    "/Game/Forest/Materials/Instances/MI_FirTree01_Twig",
-                    "/Game/Forest/Materials/Instances/MI_FirTree01_Bark",
-                ],
-            }},
-            "HISM_Tree_Pine_A": {{
-                "mesh": "/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/StaticMeshes/pine_sapling_small_a.pine_sapling_small_a",
-                "mats": [
-                    "/Game/Forest/Materials/Instances/MI_PineSapling_Bark",
-                    "/Game/Forest/Materials/Instances/MI_PineSapling_Twig",
-                ],
-            }},
-            "HISM_Tree_Deciduous": {{
-                "mesh": "/Game/Forest/Scanned/tree_small_02/tree_small_02_1k/StaticMeshes/SM_tree_small_02.SM_tree_small_02",
-                "mats": [
-                    "/Game/Forest/Materials/Instances/MI_TreeSmall02_Branches",
-                    "/Game/Forest/Materials/Instances/MI_TreeSmall02_Leaves",
-                    "/Game/Forest/Materials/Instances/MI_TreeSmall02_Trunk",
-                ],
-            }},
-        }}
+        TREE_CONFIGS = json.loads(r"""{tree_configs_json}""")
 
         # Per-cell HISMs with a cull distance, kept on Nanite -- see
         # forest_import/trees.py and forest_generator/tree_cells.py.
         if r"{scripts_dir}" not in sys.path:
             sys.path.insert(0, r"{scripts_dir}")
         from forest_import import trees as trees_import
+        # The trees planted from a copy of a scan -- see
+        # forest_import/tree_assets.py. Built once, then skipped.
+        from forest_import import tree_assets
+        tree_assets.ensure_tree_assets()
         trees_import.plant_trees(TREE_DATA, TREE_CONFIGS, editor_actor_sub,
                                  editor_asset_sub)
 
@@ -1353,6 +1320,8 @@ def _write_unreal_verify_script(
         from forest_import import trees as trees_import
         trees_import.verify_trees(check, actors, EXPECTED_SPEC_COUNTS,
                                   EXPECTED_TREE_COUNT)
+        from forest_import import tree_assets
+        tree_assets.verify_tree_assets(check)
 
         # ── 5. Grass cells (forest_import/grass.py) ─────────────────────────
         if EXPECTED_GRASS_COUNT > 0:

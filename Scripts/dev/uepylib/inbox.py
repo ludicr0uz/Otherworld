@@ -25,6 +25,9 @@ EDITOR_FRESH_SECONDS = 6.0    # a heartbeat older than this means "not running"
 # A -game run beats only when it gets a frame, and a busy headless frame can
 # take many seconds: 6 s declared a live game dead mid-job.
 GAME_FRESH_SECONDS = 30.0
+# A serve() loop (the warm editor) beats between jobs and collects garbage
+# after each one, which after a big build is not done in 6 s.
+SERVING_FRESH_SECONDS = 30.0
 POLL = 0.05
 TIMEOUT = 1800.0
 
@@ -38,6 +41,8 @@ def heartbeat(directory, fresh=EDITOR_FRESH_SECONDS):
         return None
     # A job holds the listener's thread, so it cannot beat until the job ends.
     # It names the job in its last beat: busy is alive while its pid is.
+    if beat.get("serving"):
+        fresh = max(fresh, SERVING_FRESH_SECONDS)
     if time.time() - float(beat.get("time", 0)) > fresh and not beat.get("busy"):
         return None
     # A killed process leaves its last beat behind, still "fresh" for a while.
@@ -74,8 +79,21 @@ def send(directory, kind, value, allow_pie=False):
     return os.path.join(directory, job_id + ".result")
 
 
-def _collect(result_path, directory, fresh, timeout):
-    """Wait for a result. Returns (dict or None, why-not)."""
+DIED = "the listener stopped responding -- is it still running?"
+
+
+def _take_back(result_path):
+    """Withdraw a job, or the next listener to start would run it."""
+    try:
+        os.remove(result_path[: -len(".result")] + ".request")
+    except OSError:
+        pass
+
+
+def _collect(result_path, directory, fresh, timeout, watch=None):
+    """Wait for a result. Returns (dict or None, why-not). ``watch`` is called
+    while waiting and ends the wait by returning a reason (uepylib/warm.py:
+    the editor crashed or hung with its process still there)."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         if os.path.exists(result_path):
@@ -87,14 +105,28 @@ def _collect(result_path, directory, fresh, timeout):
             except (OSError, ValueError):
                 pass
         if heartbeat(directory, fresh) is None and not os.path.exists(result_path):
-            # Take the job back, or the next listener to start would run it.
-            try:
-                os.remove(result_path[: -len(".result")] + ".request")
-            except OSError:
-                pass
-            return None, "the listener stopped responding -- is it still running?"
+            _take_back(result_path)
+            return None, DIED
+        why = watch() if watch else None
+        if why and not os.path.exists(result_path):
+            _take_back(result_path)
+            return None, why
         time.sleep(POLL)
+    _take_back(result_path)
     return None, f"timed out after {timeout:.0f}s"
+
+
+def run_job(directory, kind, value, allow_pie=False, fresh=EDITOR_FRESH_SECONDS,
+            timeout=TIMEOUT, watch=None):
+    """Send one target and wait for it. Returns (TargetResult, "") or, when
+    no result came back, (None, why)."""
+    result_path = send(directory, kind, value, allow_pie)
+    result, why = _collect(result_path, directory, fresh, timeout, watch)
+    if result is None:
+        return None, why
+    return TargetResult(label_for(kind, value), result.get("success"),
+                        result.get("seconds", 0.0),
+                        str(result.get("output", "")).rstrip()), ""
 
 
 def run_inbox(targets, report, directory, allow_pie=False, fresh=EDITOR_FRESH_SECONDS,
@@ -106,15 +138,12 @@ def run_inbox(targets, report, directory, allow_pie=False, fresh=EDITOR_FRESH_SE
         return None
     log(f"live {what} via inbox: {describe(beat)}")
     for kind, value in targets:
-        label = label_for(kind, value)
-        result_path = send(directory, kind, value, allow_pie)
-        result, why = _collect(result_path, directory, fresh, timeout)
+        result, why = run_job(directory, kind, value, allow_pie, fresh, timeout)
         if result is None:
+            label = label_for(kind, value)
             log(f"{label}: {why}")
             report(TargetResult(label, False, 0.0, why))
             return False
-        text = str(result.get("output", "")).rstrip()
-        report(TargetResult(label, result.get("success"),
-                            result.get("seconds", 0.0), text))
+        report(result)
     return True
 

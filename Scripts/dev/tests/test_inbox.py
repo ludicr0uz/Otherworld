@@ -26,10 +26,10 @@ class InboxTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    def beat(self, pid=None, age=0.0, busy=None):
+    def beat(self, pid=None, age=0.0, busy=None, serving=False):
         with open(os.path.join(self.dir, "heartbeat"), "w") as fh:
             json.dump({"pid": pid or os.getpid(), "time": time.time() - age,
-                       "project": "P.uproject", "busy": busy}, fh)
+                       "project": "P.uproject", "busy": busy, "serving": serving}, fh)
 
     def test_a_busy_listener_is_alive_however_old_its_beat(self):
         self.beat(age=600, busy="job1")
@@ -50,6 +50,13 @@ class InboxTest(unittest.TestCase):
         self.beat(age=inbox.EDITOR_FRESH_SECONDS + 1)
         self.assertIsNone(inbox.heartbeat(self.dir))
         self.assertIsNotNone(inbox.heartbeat(self.dir, fresh=inbox.GAME_FRESH_SECONDS))
+
+    def test_a_serving_loop_may_be_silent_for_longer(self):
+        # It collects garbage between jobs, which after a big build takes a while.
+        self.beat(age=inbox.EDITOR_FRESH_SECONDS + 5, serving=True)
+        self.assertIsNotNone(inbox.heartbeat(self.dir))
+        self.beat(age=inbox.SERVING_FRESH_SECONDS + 1, serving=True)
+        self.assertIsNone(inbox.heartbeat(self.dir))
 
     def test_fresh_heartbeat_of_a_dead_process(self):
         # A killed game leaves a beat that is still "fresh" for a while.
@@ -106,6 +113,43 @@ class InboxTest(unittest.TestCase):
         ok = inbox.run_inbox([("code", "a")], got.append, self.dir, timeout=5)
         self.assertFalse(ok)
         self.assertFalse(got[0].ok)
+        self.assertEqual([n for n in os.listdir(self.dir) if n.endswith(".request")], [])
+
+    def test_a_watch_ends_the_wait_and_takes_the_job_back(self):
+        self.beat(age=600, busy="job1")          # alive and busy: would wait for ever
+        calls = []
+
+        def watch():
+            calls.append(1)
+            return "the editor crashed" if len(calls) > 3 else None
+
+        result, why = inbox.run_job(self.dir, "code", "a", timeout=5, watch=watch)
+        self.assertIsNone(result)
+        self.assertEqual(why, "the editor crashed")
+        self.assertEqual([n for n in os.listdir(self.dir) if n.endswith(".request")], [])
+
+    def test_a_result_that_is_there_beats_the_watch(self):
+        self.beat()
+        real_send = inbox.send
+
+        def send_and_answer(directory, kind, value, allow_pie=False):
+            path = real_send(directory, kind, value, allow_pie)
+            with open(path, "w") as fh:
+                json.dump({"success": True, "output": "done", "seconds": 1.0}, fh)
+            return path
+
+        inbox.send = send_and_answer
+        try:
+            result, why = inbox.run_job(self.dir, "file", "/x/b.py", watch=lambda: "crashed")
+        finally:
+            inbox.send = real_send
+        self.assertEqual((result.label, result.ok, result.text, why), ("b.py", True, "done", ""))
+
+    def test_a_timeout_takes_the_job_back(self):
+        self.beat(age=600, busy="job1")
+        result, why = inbox.run_job(self.dir, "code", "a", timeout=0.2)
+        self.assertIsNone(result)
+        self.assertIn("timed out", why)
         self.assertEqual([n for n in os.listdir(self.dir) if n.endswith(".request")], [])
 
 

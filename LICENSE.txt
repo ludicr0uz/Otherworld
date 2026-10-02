@@ -1,0 +1,56 @@
+OTHERWORLD — PROPRIETARY AND CONFIDENTIAL
+Copyright (c) 2026 Ellivian Inc. All rights reserved.
+
+This software, including its executable build, source files, scripts, game
+design, artwork, audio, levels and documentation (together, the "Software"),
+is the property of Ellivian Inc. and is protected by copyright and other
+intellectual property laws. The Software is licensed, not sold.
+
+1. LIMITED EVALUATION LICENSE
+   Ellivian Inc. grants you a personal, non-exclusive, non-transferable,
+   revocable license to install and run the copy of the Software provided to
+   you, solely to play-test and evaluate it, and to give feedback to
+   Ellivian Inc.
+
+2. RESTRICTIONS
+   Unless Ellivian Inc. has given you written permission, you may not:
+   a. copy, share, upload, sell, rent, lend or otherwise distribute the
+      Software, or give anyone else access to it;
+   b. publish, stream, record for public release, or post screenshots or
+      videos of the Software;
+   c. reverse engineer, decompile, disassemble or unpack the Software, or
+      extract its assets, except where applicable law expressly allows it;
+   d. modify the Software or make derivative works from it;
+   e. remove or alter any copyright notice, watermark or this license.
+
+3. CONFIDENTIALITY
+   The Software is unreleased and confidential. Do not disclose its content,
+   features or your feedback to anyone other than Ellivian Inc.
+
+4. FEEDBACK
+   Ellivian Inc. may use any feedback you give about the Software freely and
+   without obligation to you.
+
+5. THIRD-PARTY CONTENT
+   The Software includes third-party content, such as Unreal Engine (Epic
+   Games, Inc.) and licensed models, animations, textures and sounds. That
+   content belongs to its owners and is used under their own licenses. Nothing
+   in this license grants you any right to it.
+
+6. TERMINATION
+   This license ends automatically if you break any of its terms, or when
+   Ellivian Inc. tells you that it has ended. When it ends, you must delete
+   every copy of the Software you have.
+
+7. NO WARRANTY
+   The Software is a pre-release build provided "AS IS", without warranty of
+   any kind, express or implied. It may contain bugs, crash, or lose data.
+
+8. LIMITATION OF LIABILITY
+   To the fullest extent the law allows, Ellivian Inc. is not liable for any
+   damages arising from your use of, or inability to use, the Software.
+
+By installing or running the Software, you agree to these terms. If you do
+not agree, do not install or run it, and delete it.
+
+Contact: Ellivian Inc. — [contact email]

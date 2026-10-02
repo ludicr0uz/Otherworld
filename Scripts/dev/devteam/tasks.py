@@ -33,6 +33,7 @@ class Task(object):
         self.text, self.line, self.done = text, line, done
         self.effort, self.model = effort, model
         self.triage = None          # why devteam/triage.py lowered the effort
+        self.fast = False           # devteam/fast.py: its session runs in fast mode
         self.fab = list(fab or [])
 
     @property

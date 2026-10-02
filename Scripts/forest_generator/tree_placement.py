@@ -11,6 +11,8 @@ import random
 from dataclasses import dataclass, field
 
 from .terrain import get_exact_mesh_z
+from .tree_meshes import (
+    FIR_A, ISLAND_01, ISLAND_02, PINE_SAPLING_A, TREE_SMALL_02)
 
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -29,43 +31,32 @@ class TreeSpec:
     min_dist_from_center: float = 700.0  # cm — keep spawn zone clear
 
 
-# The five tree categories matching the Lvl_Forest style
+# The five tree categories matching the Lvl_Forest style. Every mesh is a
+# cut-down copy of a scan (tree_meshes.py), never the scan itself.
 DEFAULT_TREE_SPECS = [
     # Broadleaf island trees (leafy canopy)
     TreeSpec(
         name="HISM_Tree_Leafy_Island_01",
-        mesh_path="/Game/Forest/Scanned/island_tree_01/island_tree_01_1k/StaticMeshes/SM_island_tree_01.SM_island_tree_01",
-        material_paths=[
-            "/Game/Forest/Materials/Instances/MI_IslandTree01_Trunk",
-            "/Game/Forest/Materials/Instances/MI_IslandTree01_Leaves",
-            "/Game/Forest/Materials/Instances/MI_IslandTree01_Branches",
-        ],
+        mesh_path=ISLAND_01.object_path,
+        material_paths=list(ISLAND_01.material_paths),
         count_per_hectare=7.0,
         scale_min=2.0, scale_max=3.6,
         sink_base_cm=40.0, sink_ref_scale=2.5,
     ),
     TreeSpec(
         name="HISM_Tree_Leafy_Island_02",
-        mesh_path="/Game/Forest/Scanned/island_tree_02/island_tree_02_1k/StaticMeshes/SM_island_tree_02.SM_island_tree_02",
-        material_paths=[
-            "/Game/Forest/Materials/Instances/MI_IslandTree02_Trunk",
-            "/Game/Forest/Materials/Instances/MI_IslandTree02_Leaves",
-            "/Game/Forest/Materials/Instances/MI_IslandTree02_Branches",
-        ],
+        mesh_path=ISLAND_02.object_path,
+        material_paths=list(ISLAND_02.material_paths),
         count_per_hectare=7.0,
         scale_min=2.0, scale_max=3.6,
         sink_base_cm=40.0, sink_ref_scale=2.5,
     ),
-    # Evergreen fir
+    # Evergreen fir: the tall one, 34-72 m at this scale, whose crowns close
+    # over the forest (tree_meshes.py has what that costs).
     TreeSpec(
         name="HISM_Tree_Fir_A",
-        mesh_path="/Game/Forest/Scanned/fir_tree_01/fir_tree_01_1k/StaticMeshes/fir_tree_01_a_LOD0.fir_tree_01_a_LOD0",
-        material_paths=[
-            "/Game/Forest/Materials/Instances/MI_FirTree01_Bark",
-            "/Game/Forest/Materials/Instances/MI_FirTree01_TrunkA",
-            "/Game/Forest/Materials/Instances/MI_FirTree01_Twig",
-            "/Game/Forest/Materials/Instances/MI_FirTree01_Bark",
-        ],
+        mesh_path=FIR_A.object_path,
+        material_paths=list(FIR_A.material_paths),
         count_per_hectare=11.0,
         scale_min=1.8, scale_max=3.8,
         sink_base_cm=45.0, sink_ref_scale=2.5,
@@ -73,11 +64,8 @@ DEFAULT_TREE_SPECS = [
     # Pine saplings
     TreeSpec(
         name="HISM_Tree_Pine_A",
-        mesh_path="/Game/Forest/Scanned/pine_sapling_small/pine_sapling_small_1k/StaticMeshes/pine_sapling_small_a.pine_sapling_small_a",
-        material_paths=[
-            "/Game/Forest/Materials/Instances/MI_PineSapling_Bark",
-            "/Game/Forest/Materials/Instances/MI_PineSapling_Twig",
-        ],
+        mesh_path=PINE_SAPLING_A.object_path,
+        material_paths=list(PINE_SAPLING_A.material_paths),
         count_per_hectare=5.0,
         scale_min=3.0, scale_max=5.5,
         sink_base_cm=35.0, sink_ref_scale=4.0,
@@ -85,12 +73,8 @@ DEFAULT_TREE_SPECS = [
     # Deciduous small trees
     TreeSpec(
         name="HISM_Tree_Deciduous",
-        mesh_path="/Game/Forest/Scanned/tree_small_02/tree_small_02_1k/StaticMeshes/SM_tree_small_02.SM_tree_small_02",
-        material_paths=[
-            "/Game/Forest/Materials/Instances/MI_TreeSmall02_Branches",
-            "/Game/Forest/Materials/Instances/MI_TreeSmall02_Leaves",
-            "/Game/Forest/Materials/Instances/MI_TreeSmall02_Trunk",
-        ],
+        mesh_path=TREE_SMALL_02.object_path,
+        material_paths=list(TREE_SMALL_02.material_paths),
         count_per_hectare=4.0,
         scale_min=2.5, scale_max=4.2,
         sink_base_cm=40.0, sink_ref_scale=3.0,
@@ -99,9 +83,10 @@ DEFAULT_TREE_SPECS = [
 
 
 # Multiplier on every spec's count_per_hectare. 0.5 halves the forest the specs
-# above describe (3400 -> 1700 trees on the 1 km map): the scanned
-# trees' masked leaf cards are the dominant GPU cost, and per-tree it is
-# roughly linear. Override per map with generate_forest_level.py --tree-density.
+# above describe (3400 -> 1700 trees on the 1 km map): the trees are the
+# dominant GPU cost -- their triangle count, measured, not the masked leaf
+# cards (graphisOptimizationStrategy.md) -- and per tree it is roughly linear.
+# Override per map with generate_forest_level.py --tree-density.
 DEFAULT_TREE_DENSITY = 0.5
 
 

@@ -26,9 +26,10 @@ STEP_PX = 6          # under the thinnest row at any window this is run in
 STEP_S = 0.04
 
 
-def _sweep(p, hud, x_fraction, seen):
+def _sweep(p, hud, x_fraction, seen, caret_var=None, carets=None):
     """Walk the cursor down the viewport at ``x_fraction`` of its width,
-    appending each new CursorRow to ``seen``."""
+    appending each new CursorRow to ``seen`` (and, asked, each new value of
+    the menu's caret ``caret_var`` to ``carets``)."""
     size = unreal.WidgetLayoutLibrary.get_viewport_size(p.world())
     pc = p.controller()
     for y in range(STEP_PX, int(size.y) - STEP_PX, STEP_PX):
@@ -37,6 +38,10 @@ def _sweep(p, hud, x_fraction, seen):
         row = p.get(hud, CC.CURSOR_ROW_VAR)
         if row != CC.NO_ROW and (not seen or seen[-1] != row):
             seen.append(row)
+        if caret_var is not None:
+            caret = p.get(hud, caret_var)
+            if not carets or carets[-1] != caret:
+                carets.append(caret)
 
 
 def probe(p):
@@ -67,14 +72,15 @@ def probe(p):
     p.set(hud, tab.open_var, True)
     p.set(hud, tab.row_var, 0)
     yield 0.5
-    seen = []
-    yield from _sweep(p, hud, 0.82, seen)
+    seen, carets = [], []
+    yield from _sweep(p, hud, 0.82, seen, tab.row_var, carets)
     p.check(f"sweeping down the graphics tab finds its first {tab.visible_rows} rows "
-            "and no more (the rest are scrolled out of its window), then BACK takes "
-            "the caret",
+            "and no more (the rest are scrolled out of its window), then SAVE DEFAULT "
+            "and then BACK take the caret",
             seen == list(range(tab.visible_rows))
-            and p.get(hud, tab.row_var) == tab.back_row,
-            f"{seen}, caret {p.get(hud, tab.row_var)} (BACK is {tab.back_row})")
+            and carets[-2:] == [tab.save_row, tab.back_row],
+            f"{seen}, carets {carets} (SAVE DEFAULT is {tab.save_row}, BACK "
+            f"{tab.back_row})")
     pc.set_mouse_location(8, 8)
     p.set(hud, tab.row_var, tab.stat_count)
     yield 0.5

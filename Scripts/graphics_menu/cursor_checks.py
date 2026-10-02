@@ -107,7 +107,7 @@ def _check_rows(check, nodes):
              if _feeders(n, "AbsoluteCoordinate") != [f"Get {CC.CURSOR_POS_VAR}"]
              or not _feeders(n, "Geometry")]
     check(f"a row is under the cursor by its geometry: {ROW_LISTS} row lists, "
-          f"{CLICK_LINES} hint and BACK lines and {WINDOWS} scrolling list's "
+          f"{CLICK_LINES} hint (or save row) and BACK lines and {WINDOWS} scrolling list's "
           "window, none hit-testable",
           len(tests) == ROW_LISTS + CLICK_LINES + WINDOWS and not wrong,
           f"{len(tests)} tests, {len(wrong)} not off CursorPos")
@@ -128,10 +128,12 @@ def _check_rows(check, nodes):
           carets == want, str(carets))
     stirred = [n for n in nodes if _pins(n) == {"A", "B"}
                and f"Get {CC.CURSOR_MOVED_VAR}" in _feeders(n, "A")]
-    # One per list (PauseClick is a click, not a caret), and one per BACK row.
+    # One per list (PauseClick is a click, not a caret), one per BACK row and
+    # one per save row (the graphics tab's SAVE DEFAULT).
+    buttons = len(TABS) + sum(1 for t in TABS if t.save_widget)
     check("...only once the mouse moves or clicks, so a resting cursor does "
           "not hold the caret against Up/Down",
-          len(stirred) == len(want) - 1 + len(TABS), str(len(stirred)))
+          len(stirred) == len(want) - 1 + buttons, str(len(stirred)))
 
 
 def _click_served(nodes, key, action, var):

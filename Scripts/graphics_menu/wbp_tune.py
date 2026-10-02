@@ -6,7 +6,9 @@ in place of the M panel's own rows (menu_screens.author_pause_menu).
   (TUNE_POS), or the     subject, then one per stat, each labelled in the
   bottom-right corner    designer; the HUD writes the value column and the
   (tab.corner)           caret), "saved to ..." after a save, the keys' hint,
-                         and BACK, a row of its own under the list
+                         a save row if the tab has one (tab.save_widget:
+                         GRAPHICS TUNING's SAVE DEFAULT), and BACK, a row
+                         of its own under the list
 
 A tab with visible_rows keeps its list in a ScrollBox that many rows high:
 the bar always shows, and the HUD scrolls the caret's row into view
@@ -84,6 +86,11 @@ def _author_tab(bp, root, tab):
     hint = U.text(bp, stack, tab.hint_widget, tab.hint_text, TUNE_HINT_FONT, COL_HINT,
                   variable=True)
     U.pad(hint, top=6.0)
+    if tab.save_widget:
+        # The save, as a row of its own: Enter on it or a click (tune_tick.py,
+        # tune_draw.py). Such a tab's hint is only words.
+        save = _row(bp, stack, tab.save_widget, tab.save_label, width, variable=True)
+        U.pad(save, top=8.0)
     # BACK: the caret's last stop. Enter on it or a click shuts the tab.
     back = _row(bp, stack, tab.back_widget, BACK_LABEL, width, variable=True)
     U.pad(back, top=8.0)

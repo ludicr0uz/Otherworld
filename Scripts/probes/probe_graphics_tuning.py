@@ -6,8 +6,10 @@ The keys are raised by writing the HUD's GfxTuneRow / GfxTuneNudge /
 GfxTuneSaveRequested (a probe has no keyboard); the keys themselves are the
 verifier's.
 
-  - the game starts on Low, applied: its console variables, one grass layer,
-    unlit grass;
+  - with no graphics save, the game starts on the CSV's default preset (Low),
+    applied: its console variables, one grass layer, unlit grass. The level
+    is reopened first with the player's save set aside, so that is what it
+    finds whatever the player last picked;
   - Right on the preset row is Medium: Quality, the cvars, a second layer;
   - a resolution nudge is r.ScreenPercentage; fog off is r.Fog 0, and a
     second nudge down stops at the minimum; leaf cut-outs off is the Nanite
@@ -23,10 +25,15 @@ verifier's.
     and fog density land on the cycle; brightness is r.ExposureOffset;
   - the look numbers are in every preset's row, so Left back to Low keeps
     them while the resolution goes back to Low's;
-  - the save writes the table into graphics_tuning.csv;
-  - the panel, drawn by hand, shows the preset and the value on its row.
+  - SAVE DEFAULT writes the table into graphics_tuning.csv, and the picked
+    preset as its default;
+  - the panel, drawn by hand, shows the preset and the value on its row;
+  - Custom, picked and nudged, is in the player's save, and the level
+    reopened comes back on Custom with that number, applied, while Medium
+    is the built table's again: only Custom is the player's.
 
-graphics_tuning.csv is set aside first and put back.
+graphics_tuning.csv and the player's graphics save (Saved/SaveGames/
+OtherworldGraphics.sav) are set aside first and put back.
 
 A headless run draws nothing. For the look of the panel, run it rendered
 with OW_GFX_SHOTS=1: `shot showui` saves the M panel with the tab open to
@@ -59,21 +66,46 @@ SL = unreal.SystemLibrary
 HISM = unreal.HierarchicalInstancedStaticMeshComponent
 
 
-def _live_hud(p):
+def _live_hud(p, not_this=None):
     try:
         hud = p.hud()
     except Exception:
         return None
-    return hud if hud is not None and p.get(hud, PROFILE_CHECKED_VAR) else None
+    if hud is None or (not_this is not None and hud == not_this):
+        return None
+    return hud if p.get(hud, PROFILE_CHECKED_VAR) else None
+
+
+def _save_file():
+    return os.path.join(unreal.Paths.project_saved_dir(), "SaveGames",
+                        f"{GC.GFX_SAVE_SLOT}.sav")
 
 
 def probe(p):
     backup = GS.CSV_PATH + ".probe-backup"
     shutil.copy2(GS.CSV_PATH, backup)
+    save, kept = _save_file(), _save_file() + ".probe-backup"
+    if os.path.exists(save):
+        shutil.move(save, kept)
     try:
-        yield from _run(p)
+        yield from _run(p, backup)
     finally:
         shutil.move(backup, GS.CSV_PATH)
+        if os.path.exists(save):
+            os.remove(save)
+        if os.path.exists(kept):
+            shutil.move(kept, save)
+
+
+def _reopened(p, hud):
+    """Open the level again; wait for its new HUD and that HUD's first
+    hand-over to the tuner. Yields; the new HUD is p.hud() afterwards."""
+    unreal.GameplayStatics.open_level(p.world(), p.map_path, True, "")
+    yield lambda: _live_hud(p, not_this=hud) is not None
+    new = p.hud()
+    yield lambda: (p.get(new, GC.GFX_APPLIED_VAR) == p.get(new, "Quality")
+                   and not p.get(p.get(new, GC.TUNER_COMPONENT), GC.TUNER_DIRTY_VAR))
+    yield 0.1
 
 
 def _nudge(p, hud, row, step, times=1):
@@ -133,17 +165,23 @@ def _cvars_match(preset):
     return all(abs(got[n] - want[n]) < 1e-3 for n in want), f"{got} vs {want}"
 
 
-def _run(p):
+def _run(p, built_csv):
     yield lambda: _live_hud(p) is not None
+    # This game's BeginPlay read the player's own save. It is set aside now,
+    # so the level reopened is a player with none.
+    yield from _reopened(p, _live_hud(p))
     hud, cycle = _live_hud(p), p.actor_of(DAY_NIGHT_CLASS_PATH)
-    tuner = p.get(hud, GC.TUNER_COMPONENT)
-    yield lambda: p.get(hud, GC.GFX_APPLIED_VAR) == 0 and not p.get(tuner, GC.TUNER_DIRTY_VAR)
-    yield 0.1
+    default = GS.default_preset()
+    p.check("with no graphics save the game starts on graphics_tuning.csv's default "
+            f"preset ({GS.PRESET_LABELS[default]}), and writes no save for it",
+            p.get(hud, "Quality") == default == 0 and not os.path.exists(_save_file()),
+            f"Quality {p.get(hud, 'Quality')}, default {default}, "
+            f"save on disk {os.path.exists(_save_file())}")
     grass = _tagged(p, GRASS_TAG)
     tiers = {t: _tagged(p, tier_tag(t)) for t in (1, 2, 3)}
     trees = _trees(p)
     ok, detail = _cvars_match(0)
-    p.check("the game starts on Low, applied: its resolution, shadow quality, view "
+    p.check("...Low, applied: its resolution, shadow quality, view "
             "distance and volumetric fog are the console's",
             p.get(hud, "Quality") == 0 and ok, detail)
     p.check("...one grass layer drawn, and no grass casting shadows",
@@ -243,8 +281,9 @@ def _run(p):
     p.set(hud, TAB.save_var, True)
     yield lambda: not p.get(hud, TAB.save_var)
     saved = GS.read_table()
-    p.check("the save writes all four presets into graphics_tuning.csv",
-            p.get(hud, TAB.saved_var)
+    p.check("SAVE DEFAULT writes all four presets into graphics_tuning.csv, Low (the "
+            "picked one) still its default",
+            p.get(hud, TAB.saved_var) and GS.default_preset() == 0
             and saved.get("Medium", {}).get("resolution_pct") == _cell(p, 1, "resolution_pct")
             and saved.get("Medium", {}).get("grass_layers") == 4.0
             and all(abs(saved.get(label, {}).get("sun_light", 0.0) - 150.0) < 1e-6
@@ -267,8 +306,56 @@ def _run(p):
         SL.execute_console_command(p.world(), "shot showui")
         p.note("shot showui: the M panel with the graphics tab open")
         yield 0.5
+    yield from _custom(p, hud, built_csv)
+
+
+def _custom(p, hud, built_csv):
+    """Custom is the player's: picked and nudged, it is there after a reopen."""
+    custom, medium = GS.CUSTOM_PRESET, 1
+    step = STAT["resolution_pct"].step
+    built = GS.preset_rows(built_csv)
+    res = GS.index_of("resolution_pct")
+    yield from _nudge(p, hud, 0, -1)                    # Left from Low wraps to Custom
+    yield from _nudge(p, hud, ROW["resolution_pct"], -1, times=3)
+    want = built[custom][res] - 3 * step
+    p.check("Left from Low is Custom, and three resolution nudges down are its row's "
+            "and the console's",
+            p.get(hud, "Quality") == custom and _cell(p, custom, "resolution_pct") == want
+            and abs(_cvar("r.ScreenPercentage") - want) < 1e-3,
+            f"Quality {p.get(hud, 'Quality')}, cell {_cell(p, custom, 'resolution_pct')}, "
+            f"console {_cvar('r.ScreenPercentage')}, want {want}")
+    kept = unreal.GameplayStatics.load_game_from_slot(GC.GFX_SAVE_SLOT, GC.GFX_SAVE_USER_INDEX)
+    table = [float(v) for v in kept.get_editor_property(GC.GFX_SAVE_TABLE_FIELD)] if kept else []
+    p.check("the pick and the table are in the player's save at once",
+            bool(kept) and kept.get_editor_property(GC.GFX_SAVE_QUALITY_FIELD) == custom
+            and len(table) == GC.GFX_SAVE_TABLE_LEN
+            and table[custom * GS.STAT_COUNT + res] == want,
+            f"{_save_file()}: {os.path.exists(_save_file())}, {len(table)} numbers")
+    p.set(hud, TAB.save_var, True)
+    yield lambda: not p.get(hud, TAB.save_var)
+    p.check("SAVE DEFAULT on Custom makes it the CSV's default preset, with its number",
+            GS.default_preset() == custom
+            and GS.read_table().get("Custom", {}).get("resolution_pct") == want,
+            f"default {GS.default_preset()}, "
+            f"{GS.read_table().get('Custom', {}).get('resolution_pct')}")
+    session_medium = _cell(p, medium, "resolution_pct")
     p.set(hud, TAB.open_var, False)
     p.set(hud, "MenuOpen", False)
+
+    yield from _reopened(p, hud)
+    hud = p.hud()
+    p.check("the level reopened is on Custom with the player's number, applied",
+            p.get(hud, "Quality") == custom and p.get(hud, TAB.pick_var) == custom
+            and _cell(p, custom, "resolution_pct") == want
+            and abs(_cvar("r.ScreenPercentage") - want) < 1e-3,
+            f"Quality {p.get(hud, 'Quality')}, cell {_cell(p, custom, 'resolution_pct')}, "
+            f"console {_cvar('r.ScreenPercentage')}, want {want}")
+    p.check("...and only Custom is the player's: Medium, nudged last session, is the "
+            "built table's again",
+            session_medium != built[medium][res]
+            and _cell(p, medium, "resolution_pct") == built[medium][res],
+            f"last session {session_medium}, now {_cell(p, medium, 'resolution_pct')}, "
+            f"built {built[medium][res]}")
 
 
 def _look(p, hud, cycle):

@@ -1,14 +1,15 @@
-"""The FPS readout: one of the debug-mode overlays, WBP_HUD's Fps text.
+"""The FPS readout: WBP_HUD's Fps text, always on screen.
 
 Authored into BP_GraphicsMenuHUD's ReceiveDrawHUD by build_graphics_menu.py,
-behind the HUD's DebugOn copy, so it shows exactly when debug mode is on.
+on every frame of every screen. It is not one of the debug-mode overlays (it
+used to be): it shows whether debug mode is on or off.
 
 It used to be the engine's own ``stat fps``, sent once from BeginPlay. That
 command is a TOGGLE, not a switch: the stat state lives on the viewport, which
 in PIE outlives the session, so every other Play turned the readout *off* --
-and there is no console form that asks for "on". Drawing it here makes its
-state a plain branch on DebugOn, with nothing to fall out of step. It sits
-outside WBP_HUD's Body, so it shows on the title and death screens too.
+and there is no console form that asks for "on". Drawing it here leaves
+nothing to fall out of step. It sits outside WBP_HUD's Body, so it shows on
+the title and death screens too.
 
 The number is frames counted over a half-second window of *real* time
 (GetRealTimeSeconds keeps running while the game is paused, which the main
@@ -17,7 +18,7 @@ with every frame's delta.
 """
 
 from combat.graph import BEL, _at, _connect, _declare, _float_type, _node, _pin, _set
-from graphics_menu.ui_graph import part, set_shown, set_text
+from graphics_menu.ui_graph import part, set_text
 from graphics_menu.umg_consts import HUD_FPS, WBP_HUD
 
 FPS_FRAMES_VAR = "FpsFrames"   # frames drawn since FpsSince
@@ -46,7 +47,7 @@ def declare_fps_vars(ed):
 
 
 def author_fps(ed, x0, y0, in_execs):
-    """DebugOn ? count, maybe refresh, show : hide. Returns the exec pins out."""
+    """Count the frame, maybe refresh, show. Returns the exec pins out."""
     made = []
 
     def keep(n):
@@ -57,18 +58,14 @@ def author_fps(ed, x0, y0, in_execs):
         return _pin(keep(_at(ed.add_get_member_variable_node(var), x, y)), var,
                     is_input=False)
 
-    on = keep(_at(ed.add_branch_node(), x0 + 240, y0))
-    _connect(get("DebugOn", x0, y0 + 200), _pin(on, "Condition"))
-    for e in in_execs:
-        _connect(e, _pin(on, "execute"))
-
     # FpsFrames += 1
     plus = keep(_at(_node(ed, _FN_ADD_II), x0 + 480, y0 + 240))
     _connect(get(FPS_FRAMES_VAR, x0 + 240, y0 + 240), _pin(plus, "A"))
     _set(plus, "B", 1)
     count = keep(_at(ed.add_set_member_variable_node(FPS_FRAMES_VAR), x0 + 720, y0))
     _connect(_pin(plus, "ReturnValue", is_input=False), _pin(count, FPS_FRAMES_VAR))
-    _connect(BEL.find_then_pin(on), _pin(count, "execute"))
+    for e in in_execs:
+        _connect(e, _pin(count, "execute"))
 
     # Window closed? elapsed = now - FpsSince > FPS_WINDOW_S
     now = _pin(keep(_at(_node(ed, _FN_REAL_TIME), x0 + 720, y0 + 400)),
@@ -112,14 +109,12 @@ def author_fps(ed, x0, y0, in_execs):
     wrote = set_text(ed, readout, _pin(line, "ReturnValue", is_input=False),
                      [BEL.find_then_pin(since), BEL.find_else_pin(refresh)],
                      x0 + 2880, y0)
-    shown = set_shown(ed, readout, True, [wrote], x0 + 3140, y0)
-    hidden = set_shown(ed, part(ed, WBP_HUD, HUD_FPS, x0 + 240, y0 + 700), False,
-                       [BEL.find_else_pin(on)], x0 + 480, y0 + 700)
 
     ed.add_comment_to_nodes(
-        f"FPS readout (debug mode only): frames counted over {FPS_WINDOW_S}s of "
-        "real time, so it keeps counting under the paused menus. Drawn here "
-        "rather than with `stat fps`, which is a toggle and so could not be "
-        "tied to debug mode.",
+        f"FPS readout (always, debug mode or not): frames counted over "
+        f"{FPS_WINDOW_S}s of real time, so it keeps counting under the paused "
+        "menus. Drawn here rather than with `stat fps`, which is a toggle.",
         made)
-    return (shown, hidden)
+    # Never shown or hidden from here: the widget is visible in the designer
+    # (wbp_hud.py) and stays so.
+    return (wrote,)

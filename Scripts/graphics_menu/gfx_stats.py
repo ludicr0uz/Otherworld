@@ -1,11 +1,18 @@
 """The graphics tuning table: what a quality preset is, number by number, and
 graphics_tuning.csv beside this module, one row per preset.
 
-A preset (Low / Medium / High / Ultra) is one row of GFX_STATS. The M
+A preset (Low / Medium / High / Custom) is one row of GFX_STATS. The M
 panel's GRAPHICS TUNING tab (gfx_tune_*.py) shows the picked preset's
-row, changes a number live and saves the whole table to the CSV; the next
-build_graphics_menu.py bakes it into the HUD's table, so git shows what moved.
-BP_GraphicsTuner (gfx_tuner.py) is what turns a row into the engine's state.
+row and changes a number live; its SAVE DEFAULT row saves the whole table to
+the CSV, and the next build_graphics_menu.py bakes it into the HUD's table,
+so git shows what moved. BP_GraphicsTuner (gfx_tuner.py) is what turns a row
+into the engine's state.
+
+The CSV is the defaults, all of them: each preset's numbers, and in its
+"default" column (1 on one row) the preset a player with no save starts on.
+Custom is the player's own row: the CSV has what it starts as, and what the
+player makes of it is kept between sessions (gfx_save.py), with the preset
+they picked. Custom took Ultra's place and its defaults.
 
 Two kinds of row:
 
@@ -15,7 +22,7 @@ Two kinds of row:
                 preset's row, and the CSV reads it from the first row.
 
 The defaults are what the presets did before the tab existed: the engine's
-scalability level (High and Ultra both run Epic, 3; BaseScalability.ini's
+scalability level (High and Custom both run Epic, 3; BaseScalability.ini's
 view and shadow distance scales and volumetric fog for that level), the two
 console overrides, and the grass layers and grass lighting per preset.
 
@@ -41,7 +48,12 @@ from forest_generator.tree_cells import TREE_CULL_END_CM
 
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphics_tuning.csv")
 PRESET_COLUMN = "preset"
-PRESET_LABELS = ("Low", "Medium", "High", "Ultra")
+PRESET_LABELS = ("Low", "Medium", "High", "Custom")
+# The player's own preset, kept between sessions (gfx_save.py).
+CUSTOM_PRESET = PRESET_LABELS.index("Custom")
+# 1 on the row of the preset a player with no save starts on.
+DEFAULT_COLUMN = "default"
+FALLBACK_DEFAULT_PRESET = 0  # Low: no CSV, or no row marked
 
 # How BP_GraphicsTuner applies a stat (Stat.how); Stat.target says to what.
 LEVEL = "level"                  # GameUserSettings' overall scalability level
@@ -138,7 +150,7 @@ STAT_COUNT = len(GFX_STATS)
 # The look stats are the tail of a row: index LOOK_FROM and up.
 LOOK_FROM = len(PERFORMANCE_STATS)
 
-assert len(set(GFX_COLUMNS)) == STAT_COUNT
+assert len(set(GFX_COLUMNS)) == STAT_COUNT and DEFAULT_COLUMN not in GFX_COLUMNS
 assert all(len(s.defaults) == len(PRESET_LABELS) and s.lo <= min(s.defaults)
            and max(s.defaults) <= s.hi for s in GFX_STATS)
 assert all(len(set(s.defaults)) == 1 for s in LOOK_STATS)
@@ -179,6 +191,19 @@ def preset_rows(path=CSV_PATH):
     return rows
 
 
+def default_preset(path=CSV_PATH):
+    """The index of the preset the CSV marks as the default: the first row
+    whose "default" column is not 0."""
+    if os.path.exists(path):
+        with open(path, newline="") as f:
+            for row in csv.DictReader(f):
+                preset = (row.get(PRESET_COLUMN) or "").strip()
+                mark = (row.get(DEFAULT_COLUMN) or "").strip()
+                if preset in PRESET_LABELS and mark and float(mark) != 0.0:
+                    return PRESET_LABELS.index(preset)
+    return FALLBACK_DEFAULT_PRESET
+
+
 def table_values(path=CSV_PATH):
     """preset_rows(), flattened: values[preset * STAT_COUNT + stat]."""
     return [v for row in preset_rows(path) for v in row]
@@ -191,11 +216,14 @@ def format_value(value, kind):
     return f"{round(float(value), 6):g}"
 
 
-def write_table(rows, path=CSV_PATH):
-    """rows: one list of STAT_COUNT numbers per preset, in PRESET_LABELS order."""
+def write_table(rows, default=None, path=CSV_PATH):
+    """rows: one list of STAT_COUNT numbers per preset, in PRESET_LABELS order.
+    default: the preset to mark as the default; None keeps the file's."""
+    if default is None:
+        default = default_preset(path)
     with open(path, "w", newline="") as f:
         out = csv.writer(f, lineterminator="\n")
-        out.writerow((PRESET_COLUMN,) + GFX_COLUMNS)
-        for label, row in zip(PRESET_LABELS, rows):
-            out.writerow([label] + [format_value(v, s.kind)
-                                    for v, s in zip(row, GFX_STATS)])
+        out.writerow((PRESET_COLUMN, DEFAULT_COLUMN) + GFX_COLUMNS)
+        for p, (label, row) in enumerate(zip(PRESET_LABELS, rows)):
+            out.writerow([label, int(p == default)]
+                         + [format_value(v, s.kind) for v, s in zip(row, GFX_STATS)])

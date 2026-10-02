@@ -134,8 +134,10 @@ def _check_presets(check, nodes):
           "M panel has no preset rows; the graphics tab's preset row picks one)",
           literal == [DEFAULT_PRESET]
           and not set(UC.PAUSE_ROW_LABELS) & {p.label for p in PRESETS}, str(literal))
-    check("...and the tab's preset row sets it from GfxTunePick, the only driven Set",
-          len(driven) == 1 and _feeds(driven[0], "Quality") == [f"Get {TAB.pick_var}"],
+    picked = [n for n in driven if _feeds(n, "Quality") == [f"Get {TAB.pick_var}"]]
+    check("...and the tab's preset row sets it from GfxTunePick; the one other driven "
+          "Set is the save's pick at BeginPlay (gfx_save_checks.py)",
+          len(picked) == 1 and len(driven) == 2,
           str([_feeds(n, "Quality") for n in driven]))
     follows = [n for n in _sets(nodes, TAB.pick_var)
                if _feeds(n, TAB.pick_var) == ["Get Quality"]]
@@ -154,7 +156,7 @@ def _check_graph(check, nodes):
     runs = [n for n in nodes if "PythonCommand" in _pins(n)
             and str(BEL.find_input_pin(n, "PythonCommand").get_pin_value())
             == TAB.save_command]
-    check("Enter on the graphics tab runs gfx_tune_save through "
+    check("the graphics tab's SAVE DEFAULT runs gfx_tune_save through "
           "ExecutePythonCommand, once, into GfxTuneSaved",
           len(runs) == 1 and f"Set {TAB.saved_var}" in [
               _title(PIN.get_owning_node(q))
@@ -165,13 +167,18 @@ def _check_graph(check, nodes):
               and f"Get {TAB.values_var}" in _feeds(n, "TargetArray")]
     nudged = [n for n in writes if any("Min" in t for t in _feeds(n, "Item"))]
     held = [f for n in nudged for m in _sources(n, "Item") for f in _feeds(m, "A")]
-    spread = [n for n in writes if n not in nudged]
+    # The third write is BeginPlay's: the saved Custom row (gfx_save_checks.py).
+    loaded = [n for n in writes if any("TargetArray" in _pins(s) for s in _sources(n, "Item"))
+              and not _sources(n, "Item")[0] in nudged
+              and any(f"Get {GC.GFX_SAVE_TABLE_FIELD}" in _feeds(s, "TargetArray")
+                      for s in _sources(n, "Item"))]
+    spread = [n for n in writes if n not in nudged and n not in loaded]
     check("a graphics nudge writes GfxTuneValues, held between the stat's minimum "
           "and maximum (FMin of FMax)",
           len(nudged) == 1 and any("Max" in t for t in held), f"{len(nudged)}: {held}")
     check("...and a second write spreads the picked preset's look stats over every "
           f"preset (stat index >= {GS.LOOK_FROM})",
-          len(writes) == 2 and len(spread) == 1
+          len(writes) == 3 and len(spread) == 1 and len(loaded) == 1
           and any(str(BEL.find_input_pin(n, "B").get_pin_value()) == str(GS.LOOK_FROM)
                   for n in nodes if "GreaterEqual" in _title(n).replace(" ", "")
                   or ">=" in _title(n)),

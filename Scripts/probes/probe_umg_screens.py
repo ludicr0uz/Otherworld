@@ -10,7 +10,7 @@ set by writing the HUD's and the game's variables: a probe has no keyboard.
 
 import unreal
 
-from combat.game_state import KILL_COUNT_VAR
+from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR
 from combat.paths import (
     GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH,
 )
@@ -22,6 +22,7 @@ HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in ("MenuOpen", C.GAME_STARTED_VAR, "MenuPage",
                                        "MenuRow", C.PAUSE_ROW_VAR)]
 WRITABLE += [(GAME_MODE_BP_PATH, KILL_COUNT_VAR), (GAME_MODE_BP_PATH, "PlayerDead"),
+             (GAME_MODE_BP_PATH, DEBUG_MODE_VAR),
              (HEALTH_BP_PATH, "Health"), (SURVIVAL_BP_PATH, "Hunger")]
 
 SHOWN = unreal.SlateVisibility.HIT_TEST_INVISIBLE
@@ -134,6 +135,21 @@ def probe(p):
     p.set(hud, "MenuOpen", False)
     _draw(hud)
     p.check("...and closing it takes it down", ui["UiPause"].get_visibility() == HIDDEN)
+
+    # --- the FPS readout: on screen whatever debug mode says --------------------------
+    fps = ui["UiHud"].get_editor_property(C.HUD_FPS)
+    was, seen = p.get(mode, DEBUG_MODE_VAR), {}
+    for debug in (False, True):
+        p.set(mode, DEBUG_MODE_VAR, debug)
+        _draw(hud)
+        seen[debug] = (p.get(hud, "DebugOn"), fps.get_visibility(), _text(fps))
+    p.set(mode, DEBUG_MODE_VAR, was)
+    _draw(hud)
+    p.check("the FPS readout is on screen with debug mode off, and with it on",
+            all(on == debug and vis not in (HIDDEN, unreal.SlateVisibility.HIDDEN)
+                and words.startswith("FPS  ") and words[5:].isdigit()
+                for debug, (on, vis, words) in seen.items()),
+            str({d: (on, str(vis.name), words) for d, (on, vis, words) in seen.items()}))
 
     # --- the title page and the settings page ------------------------------------------
     p.set(hud, C.GAME_STARTED_VAR, False)

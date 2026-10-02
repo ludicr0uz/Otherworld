@@ -7,7 +7,8 @@ the table written onto every carried gun.
                                       (the last is BACK, under the list)
       and unless the caret is on BACK:
         Left / Right, or the wheel    TuneNudge = -1 / +1
-        Enter                         TuneSaveRequested = true
+        Enter                         TuneSaveRequested = true (a tab with a
+                                      save row: only with the caret on it)
     (the mouse: tune_draw raises the same flags from a click; BACK, by Enter
      or a click, is tune_draw's too, because it must not also save. A
      scrolling tab's wheel is Up / Down instead: the list follows the caret)
@@ -136,9 +137,11 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
     one panel shows and takes the arrows, and puts the caret on the subject.
     Returns the exec tails.
 
-    The caret runs one past the list, onto BACK (tab.back_row). There Left,
+    The caret runs past the list, onto BACK (tab.back_row). There Left,
     Right and Enter are not this fragment's: BACK has no cell to nudge, and
-    Enter on it shuts the tab, which is DrawHUD's (tune_draw.py)."""
+    Enter on it shuts the tab, which is DrawHUD's (tune_draw.py). A tab with
+    a save row (tab.save_widget) stops on it before BACK, and Enter saves
+    there and nowhere else."""
     flip, no_t = _branch(ed, pause_row_taken(ed, tab.action, x0 - 480, y0 + 760, made),
                          in_execs, x0 + 240, y0, made)
     opened = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
@@ -171,7 +174,7 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
         flow = [put(ed, tab.row_var, _out(held), [hit], x + 780, y0, made), miss]
         x += 800
     in_list = _call(ed, FN_LESS_II, x, y0 + 300, made,
-                    A=_get(ed, tab.row_var, x - 240, y0 + 300, made), B=tab.back_row)
+                    A=_get(ed, tab.row_var, x - 240, y0 + 300, made), B=tab.row_count)
     listed, on_back = _branch(ed, _out(in_list), flow, x + 240, y0, made)
     flow = [listed]
     x += 300
@@ -182,10 +185,20 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
         hit, miss = _branch(ed, turned, flow, x, y0, made)
         flow = [_setter(ed, tab.nudge_var, nudge, [hit], x + 260, y0, made), miss]
         x += 560
-    ask, no_ask = _branch(ed, _pressed(ed, pc_out, TUNE_SAVE_KEY, x, y0 + 440, made),
-                          flow, x, y0, made)
-    asked = _setter(ed, tab.save_var, "true", [ask], x + 260, y0, made)
-    return [asked, no_ask, off, on_back]
+    if not tab.save_widget:
+        ask, no_ask = _branch(ed, _pressed(ed, pc_out, TUNE_SAVE_KEY, x, y0 + 440, made),
+                              flow, x, y0, made)
+        asked = _setter(ed, tab.save_var, "true", [ask], x + 260, y0, made)
+        return [asked, no_ask, off, on_back]
+    # Past the list: Enter on the save row. Nested, not ANDed, so the key is
+    # only polled there.
+    on_save = _call(ed, FN_EQ_II, x, y0 + 900, made,
+                    A=_get(ed, tab.row_var, x - 240, y0 + 900, made), B=tab.save_row)
+    there, on_back = _branch(ed, _out(on_save), [on_back], x + 240, y0 + 700, made)
+    ask, no_ask = _branch(ed, _pressed(ed, pc_out, TUNE_SAVE_KEY, x + 300, y0 + 1140, made),
+                          [there], x + 540, y0 + 700, made)
+    asked = _setter(ed, tab.save_var, "true", [ask], x + 800, y0 + 700, made)
+    return [*flow, asked, no_ask, off, on_back]
 
 
 def _author_nudge(ed, in_execs, x0, y0, made, tab, subjects):

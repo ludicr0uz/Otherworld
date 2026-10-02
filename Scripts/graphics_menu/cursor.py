@@ -9,6 +9,8 @@ what it is over. cursor_consts.py has the rules in one table.
                        component's TriggerSpent up, so a click fires nothing
   author_row_cursor    a stack of rows: the one under the cursor -> CursorRow;
                        moved or clicked -> the caret; clicked -> a flag
+  author_button_row    a tab's SAVE DEFAULT row: the caret onto it; a click
+                       raises its flag
   author_back_row      a tab's BACK row: the caret onto it; a click, or Enter
                        with the caret there, shuts the tab
   author_widget_click  one widget (a hint line): clicked -> a flag
@@ -268,6 +270,26 @@ def author_back_row(ed, back, row_var, back_row, open_var, in_execs, x0, y0):
     leave = _call(ed, FN_OR, x + 520, y0 + 300, made, A=_out(on_it), B=_out(entered))
     took, idle = _branch(ed, _out(leave), flow, x + 780, y0, made)
     return [_setter(ed, open_var, "false", [took], x + 1040, y0, made), idle]
+
+
+def author_button_row(ed, button, row_var, row, click, in_execs, x0, y0):
+    """A button that is a WBP_MenuRow outside its menu's list (a tab's SAVE
+    DEFAULT). The cursor over it (moved or clicked) puts the caret there:
+    ``row_var`` := ``row``. A click on it writes ``click`` (a variable and a
+    literal); Enter with the caret on it is the menu's own keys'.
+    Returns the exec tails."""
+    made = []
+    over = _under(ed, button, x0, y0 + 500, made)
+    stirred = _call(ed, FN_OR, x0 + 560, y0 + 760, made,
+                    A=_get(ed, CURSOR_MOVED_VAR, x0 + 300, y0 + 760, made),
+                    B=_clicked(ed, x0 + 300, y0 + 900, made))
+    aimed = _call(ed, FN_AND, x0 + 820, y0 + 500, made, A=over, B=_out(stirred))
+    move, rest = _branch(ed, _out(aimed), in_execs, x0 + 1080, y0, made)
+    flow = [_setter(ed, row_var, row, [move], x0 + 1340, y0, made), rest]
+    on_it = _call(ed, FN_AND, x0 + 1700, y0 + 300, made,
+                  A=_clicked(ed, x0 + 1440, y0 + 300, made), B=over)
+    took, idle = _branch(ed, _out(on_it), flow, x0 + 1960, y0, made)
+    return [_write(ed, click, [took], x0 + 2220, y0, made), idle]
 
 
 def author_widget_click(ed, widget, click, in_execs, x0, y0):

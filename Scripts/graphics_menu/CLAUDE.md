@@ -17,10 +17,10 @@ split it before extending it.
 - **M** toggles the panel, titled **GAME SETTINGS**: the only key the panel has.
 - **Up / Down** move the panel's caret and **Enter** takes the row it is on; a click on a
   row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
-- **The rows:** `debug` (the FPS readout, wanderer numbers, pellet tracers and impact damage,
-  the wanderers' sight cones), `save and exit`, `dev-all-guns`, `gun tuning`,
+- **The rows:** `debug` (wanderer numbers, pellet tracers and impact damage,
+  the wanderers' sight cones; not the FPS readout, which is always on), `save and exit`, `dev-all-guns`, `gun tuning`,
   `monster tuning`, `world tuning`, `graphics tuning`, `close`. The quality presets are not
-  rows: Low / Medium / High / Ultra is the graphics tab's first row.
+  rows: Low / Medium / High / Custom is the graphics tab's first row.
 - **A tuning tab stands in place of the panel's rows**, and its **BACK** row returns to them
   (below: "The M panel as a menu").
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
@@ -40,7 +40,8 @@ split it before extending it.
   collapsed while any tab's open flag is up, and the open tab's panel shows instead; the three
   developer tabs sit where the panel does (`TUNE_POS`), the graphics tab in the corner.
 - **BACK is a `WBP_MenuRow` under each tab's list**, the caret's last stop
-  (`TuneTab.back_row`, one past the list). A click on it, or Enter with the caret on it, lowers
+  (`TuneTab.back_row`: one past the list, or two in the graphics tab, whose SAVE DEFAULT
+  row comes between). A click on it, or Enter with the caret on it, lowers
   the tab's open flag. **That is DrawHUD's** (`cursor.author_back_row`), though the rest of a
   tab's keys are Tick's: Enter is "just pressed" for the whole frame, the panel's own Enter is
   polled in DrawHUD *before* the tab's fragment and only while no tab is open, so the Enter
@@ -78,7 +79,7 @@ mouse is the camera's.
 | title | the caret goes there | Enter on that row | |
 | settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up | Left / Right |
 | M panel | the caret goes there | takes the row (as Enter does) | |
-| tuning tab | the caret goes there | one step up; on the hint line: save; on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
+| tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
 | loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
 | death menu | | on the hint line: restart | |
 
@@ -166,12 +167,37 @@ A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 24 numbers
 | Low | 0 | 1 | 70 | 40% | 28 m / 120 m | 1 | off |
 | Medium | 1 | 2 | 85 | 60% | 42 m / 180 m | 2 | off |
 | High | 3 (Epic) | 3 | 100 | 100% | 70 m / 300 m | 3 | off |
-| Ultra | 3 (Epic) | 3 | 100 | 100% | 70 m / 300 m | 4 | **on** |
+| Custom (starts as) | 3 (Epic) | 3 | 100 | 100% | 70 m / 300 m | 4 | **on** |
 
 **The M panel's `graphics tuning` row** opens the tab (`GfxTuneOpen`). The subject row is
-the preset: Left/Right there pick Low / Medium / High / Ultra, and it is the only place a
-preset is picked. The rows under it are that preset's numbers; **Enter** saves all four
-presets to `Scripts/graphics_menu/graphics_tuning.csv`, which the next build bakes into the HUD.
+the preset: Left/Right there pick Low / Medium / High / Custom, and it is the only place a
+preset is picked. The rows under it are that preset's numbers. Under the list, the
+**SAVE DEFAULT** row (Enter on it, or a click) saves all four presets, and the picked one
+as the default, to `Scripts/graphics_menu/graphics_tuning.csv`, which the next build bakes
+into the HUD. Enter on a number saves nothing in this tab.
+
+- **The CSV is the defaults, all of them.** Each preset's numbers, and in its `default`
+  column (1 on one row; `gfx_stats.default_preset`, `presets.DEFAULT_PRESET`) the preset a
+  player with no save starts on. No file or no mark: Low. The CSV is read at build time, so
+  a SAVE DEFAULT shows in a game after the next `build_graphics_menu.py`.
+- **Custom is the player's own preset, and it persists** (`gfx_save.py`). It took Ultra's
+  place and its defaults. Every change of the pick or of a number goes into
+  `/Game/UI/BP_GraphicsSave` (a `USaveGame`, slot `OtherworldGraphics`: `SavedQuality` and
+  `SavedTable`, the whole table) from the hand-over in `gfx_tune_tick.py`. BeginPlay sets
+  `Quality` to the CSV's default, then lays the save over it: the saved pick, and **only
+  Custom's row** of the saved table. Low, Medium and High are the CSV's for every player; a
+  session's nudges to them last the session unless SAVE DEFAULT writes them.
+  - **The first hand-over of a session is not saved** (`GfxQualityApplied` still -1): it is
+    what was just loaded. So a player who never touches the tab has no save file.
+  - **A saved table of another length is ignored**, pick and all: it is another build's
+    (`STAT_COUNT` moved), and its Custom row would land on the wrong stats.
+  - **A look number nudged on any preset is in Custom's row too** (the spread, below), so
+    it is kept with Custom and comes back when Custom is picked. SAVE DEFAULT writes the
+    look of the picked preset, the one on screen, to every row of the CSV.
+  - **The save is a Blueprint SaveGame, so it works in a packaged build;** SAVE DEFAULT is
+    Python and does not.
+  - **`SavedQuality`, not `Quality`:** the verifier counts the HUD's own `Set Quality`
+    nodes by title.
 
 - **The tab is small and out of the way:** bottom right (`TuneTab.corner`), a 13 pt title, five
   rows at a time behind a scroll bar (above: "A scrolling list").
@@ -202,7 +228,8 @@ presets to `Scripts/graphics_menu/graphics_tuning.csv`, which the next build bak
   number was touched or `Quality != GfxQualityApplied`.
 - **Picking a preset only sets `Quality`.** BeginPlay's default and the tab's preset row
   both reach the engine through that one hand-over, on the next Tick.
-  `GfxQualityApplied` starts at -1, so the first Tick of every session applies Low.
+  `GfxQualityApplied` starts at -1, so the first Tick of every session applies whatever
+  BeginPlay left in `Quality` (the saved pick, else the CSV's default).
 - **The console commands are needed.** `DefaultEngine.ini` pins `r.ShadowQuality` (and the
   GI, reflection and AA methods) at project-setting priority, which outranks scalability.
   A console command outranks both. One command per cvar stat, on every apply.
@@ -232,11 +259,19 @@ presets to `Scripts/graphics_menu/graphics_tuning.csv`, which the next build bak
 - **The verifier's whole-graph scans see none of this in the HUD:** the HUD graph holds no
   console command, scalability call or tag walk (asserted), which is why the apply is a
   component of its own.
-- **Probe:** `probe_graphics_tuning.py` (17 checks: Low applied at the start, a preset
+- **Probe:** `probe_graphics_tuning.py` (23 checks: with no save, the CSV's default
+  applied at the start, a preset
   switch, cvars, both draw distances in metres, the same metres after a view distance
   nudge, layers, shadows, the sun and the moon scaled, the
-  look spread over the presets, the CSV, the panel). It backs up the CSV and puts it back.
+  look spread over the presets, SAVE DEFAULT's CSV and default preset, the panel, Custom
+  in the save and back after the level reopens while Medium is the built table's again).
+  It reopens the level twice (`open_level`, once with no save and once with one), and sets
+  aside the CSV and `Saved/SaveGames/OtherworldGraphics.sav` and puts them back.
   `OW_GFX_SHOTS=1` with `--windowed` saves a picture of the panel.
+  `probe_menu_cursor_window.py` (windowed) sweeps the cursor onto SAVE DEFAULT, then BACK.
+- **Run a tab's probe in a game of its own.** Batched after `probe_umg_screens.py` in one
+  `--game` call, the monster and world probes time out: that probe leaves the game on the
+  title page.
 - **Still needs a play session:** what each number does to the frame rate and
   the picture (a headless run renders nothing), and whether the limits are the useful ones.
 
@@ -420,7 +455,8 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
   `GetRealTimeSeconds` so it still blinks under the paused M panel. Real time moves only
   between frames, so a probe must draw once a frame to see it
   (`probe_hud_low_flash.py`).
-- **Top-right:** the kill counter, and the FPS readout in debug mode only.
+- **Top-right:** the kill counter, and the FPS readout: always, debug mode or not
+  (`fps.py`; visible in the designer, and no node shows or hides it).
 - **Wanderers:** a projected health bar over each one, plus its number in debug mode.
 - **Bottom:** the 10-slot inventory grid, in two rows of five (`INVENTORY_COLUMNS`, 84 x 59
   slots, `hud_inventory.py`), with loaded/reserve counts for weapons that use ammo. Slot *i*

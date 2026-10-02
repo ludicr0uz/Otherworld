@@ -21,6 +21,10 @@ world_tune_tick: the day/night cycle; gfx_tune_tick: BP_GraphicsTuner).
     Enter                         save the whole table to its CSV; on BACK,
                                   shut the tab: the M panel's rows return
 
+A tab with a save_widget (GRAPHICS TUNING's SAVE DEFAULT) has a row for the
+save instead, between the list and BACK: Enter saves only with the caret on
+it, as does a click on it, and Enter on a number does nothing.
+
 Constants only.
 """
 
@@ -69,6 +73,10 @@ class TuneTab:
     # wheel moves the caret instead of a value; 0 = every row, no scrolling.
     visible_rows: int = 0
     corner: bool = False      # bottom right of the screen; else where the M panel is
+    # A WBP_MenuRow between the list and BACK that saves, and its words;
+    # "" = Enter anywhere in the list saves (and a click on the hint).
+    save_widget: str = ""
+    save_label: str = ""
 
     @property
     def row_count(self):
@@ -76,9 +84,16 @@ class TuneTab:
         return 1 + self.stat_count
 
     @property
-    def back_row(self):
-        """BACK's place in the caret's order: after the list."""
+    def save_row(self):
+        """The save row's place in the caret's order: after the list. Only
+        for a tab with a save_widget."""
         return self.row_count
+
+    @property
+    def back_row(self):
+        """BACK's place in the caret's order: last, after the list and the
+        save row if there is one."""
+        return self.row_count + (1 if self.save_widget else 0)
 
 
 def save_command(module):

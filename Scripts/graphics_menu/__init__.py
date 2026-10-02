@@ -21,7 +21,7 @@ The HUD graph that shows and writes them
   stamina_bar     the stamina bar's fill, amber while sprinting
   survival_bars   hunger/thirst/temperature fills and the debuff names
   hud_inventory   the inventory grid and the equipped weapon's name
-  fps             the debug-mode FPS readout
+  fps             the FPS readout, always on screen
   profile_draw    the save-and-exit countdown banner
   settings_page   the settings page's values and hint; pushing settings onto the weapon
 
@@ -33,7 +33,8 @@ Still drawn on the HUD canvas (placed per frame)
   scope           the sniper's glass, and when it replaces the crosshair
 
 Input, settings and state
-  presets         the quality presets' names; picking one sets Quality
+  presets         the quality presets' names and the CSV's default one;
+                  picking one sets Quality
   menu_nav        Up/Down caret movement and the accept keys, shared by pages;
                   what a key poll gains from the wheel; Tick's test for a
                   taken M-panel row (the rows have no hotkeys)
@@ -72,8 +73,9 @@ Input, settings and state
   wbp_legal       WBP_MainMenu's LegalNotice and WBP_HUD's Watermark (called
                   from wbp_screens and wbp_hud)
   tune_tab        TuneTab: what a tuning tab is called (its M panel row,
-                  variables, widgets, words, save command, where it sits and
-                  whether its list scrolls); the shared arrows and Enter
+                  variables, widgets, words, save command, where it sits,
+                  whether its list scrolls and whether the save is a row of
+                  its own); the shared arrows and Enter
   tune_tabs       TABS: the four tabs, in M panel order
   tune_consts     the GUN TUNING tab: variables, widget names, GUN_TAB
   tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
@@ -100,14 +102,19 @@ Input, settings and state
 Graphics: what a preset is, the tab that tunes it, the component that applies it
   gfx_stats            the graphics table: each stat's label, unit (percent,
                   metres), step, limits, per-preset defaults and how it is
-                  applied; graphics_tuning.csv
+                  applied; graphics_tuning.csv, which also names the default
+                  preset
   gfx_tune_consts      the GRAPHICS TUNING tab: variables, widget names,
-                  GFX_TAB; BP_GraphicsTuner's path and variables
+                  GFX_TAB; BP_GraphicsTuner's path and variables;
+                  BP_GraphicsSave's path, slot and fields
   gfx_tune_tick        Tick: the tab's flow, the pick kept as Quality, the look
                   spread over the presets, the table handed to the tuner
+                  and, on a change, kept in the player's save
                   (run after world_tune_tick's)
-  gfx_tune_save        run in the game by the save: the live table into
-                  graphics_tuning.csv
+  gfx_tune_save        run in the game by SAVE DEFAULT: the live table, and
+                  the picked preset as the default, into graphics_tuning.csv
+  gfx_save             BP_GraphicsSave, the SaveGame the player's pick and
+                  Custom row are kept in; BeginPlay's load of it, Tick's save
   gfx_tuner            BP_GraphicsTuner, the HUD's component: Tick applies a
                   dirty row -- the scalability level, a console command per cvar
   gfx_tuner_read       one stat of the applied preset, in the tuner's graph,
@@ -136,4 +143,6 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   gfx_checks         the graphics tuning tab: table, units, CSV, panel (corner,
                      title), the M panel's title, the hand-over to the tuner
   gfx_tuner_checks   BP_GraphicsTuner: each stat reaching what it names
+  gfx_save_checks    BP_GraphicsSave, its load and save in the HUD graph, the
+                     CSV's default preset, the graphics tab's SAVE DEFAULT row
 """

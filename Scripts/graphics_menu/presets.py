@@ -12,14 +12,16 @@ place the player picks a preset) and BeginPlay's default go through one path.
 from collections import namedtuple
 
 from combat.graph import _at, _connect, _pin, _set
-from graphics_menu.gfx_stats import PRESET_LABELS
+from graphics_menu.gfx_stats import PRESET_LABELS, default_preset
 
 # One preset, in the order the GRAPHICS TUNING tab's preset row steps through.
 Preset = namedtuple("Preset", "label")
 PRESETS = tuple(Preset(label) for label in PRESET_LABELS)
-# The preset every session starts at. Settings are never saved, so every
-# launch starts here; the first Tick applies it (gfx_tune_tick.py).
-DEFAULT_PRESET = 0  # Low
+# The preset a player with no graphics save starts on: the row
+# graphics_tuning.csv marks in its "default" column, as it stood at the
+# build. BeginPlay then lays the save over it (gfx_save.py), and the first
+# Tick applies whichever it is (gfx_tune_tick.py).
+DEFAULT_PRESET = default_preset()
 
 
 def emit_apply(ed, index, x, y, in_exec):

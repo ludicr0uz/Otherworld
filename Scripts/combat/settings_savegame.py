@@ -36,7 +36,7 @@ def build_settings_savegame(rebuild=True):
     # settings screen walks the rows with one ForEachLoop and one Array_Set, and
     # BIND_VARS is what says which index means which action.
     _declare(ed, "Binds", BEL.get_array_type(_struct_type(unreal.Key.static_struct())))
-    # Whether the developer overlays (FPS readout, tracers, wanderer numbers)
+    # Whether the developer overlays (tracers, wanderer numbers)
     # are on. ON by default, and a save written before this field existed loads
     # it as the default too. The HUD copies it onto the GameMode's DebugMode at
     # BeginPlay and writes it back whenever D flips it.

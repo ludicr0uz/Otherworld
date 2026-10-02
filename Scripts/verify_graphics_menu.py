@@ -36,6 +36,8 @@ from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu import world_tune_consts as WC
 from graphics_menu.world_tune_checks import check_world_tune
 from graphics_menu.gfx_checks import check_gfx_tune
+from graphics_menu.gfx_save_checks import check_gfx_save
+from graphics_menu.gfx_tune_consts import GFX_SAVE_SLOT
 from graphics_menu.gfx_tuner_checks import check_gfx_tuner
 from graphics_menu import cursor_consts as CC
 from graphics_menu.cursor_checks import check_cursor
@@ -615,10 +617,11 @@ def main():
     check("this frame's copy is taken once, with an answer for a failed cast",
           sum(1 for t in titles if t == "Set DebugOn") == 2,
           str(sum(1 for t in titles if t == "Set DebugOn")))
-    # Four readers: the menu row that reports the state, the NPC number, the
-    # FPS readout, and the crosshair down a gun's sights (reticle_checks.py).
-    check("the wanderer's number and the FPS readout are gated on the copy",
-          sum(1 for t in titles if t == "Get DebugOn") == 4,
+    # Three readers: the menu row that reports the state, the NPC number and
+    # the crosshair down a gun's sights (reticle_checks.py). Not the FPS
+    # readout: that is on screen whatever debug mode says (umg_checks.py).
+    check("the wanderer's number is gated on the copy, and the FPS readout is not",
+          sum(1 for t in titles if t == "Get DebugOn") == 3,
           str(sum(1 for t in titles if t == "Get DebugOn")))
     for var in (F.FPS_FRAMES_VAR, F.FPS_SINCE_VAR, F.FPS_SHOWN_VAR):
         check(f"{var} variable", var in names)
@@ -648,16 +651,18 @@ def main():
           len(set(pool)) == len(pool))
 
     # --- the save itself
-    # The profile's slot is check_profile's business.
+    # The profile's slot is check_profile's business, the graphics save's
+    # check_gfx_save's.
+    other_slots = (PC.PROFILE_SLOT, GFX_SAVE_SLOT)
     slots = [n for n in by_pins("SlotName")
-             if BEL.find_input_pin(n, "SlotName").get_pin_value() != PC.PROFILE_SLOT]
+             if BEL.find_input_pin(n, "SlotName").get_pin_value() not in other_slots]
     check("the settings are read and written through a named save slot",
           bool(slots) and {BEL.find_input_pin(n, "SlotName").get_pin_value()
                            for n in slots} == {G.SETTINGS_SLOT},
           str(sorted({BEL.find_input_pin(n, "SlotName").get_pin_value()
                       for n in slots})))
     writes = [n for n in by_pins("SaveGameObject", "SlotName")
-              if BEL.find_input_pin(n, "SlotName").get_pin_value() != PC.PROFILE_SLOT]
+              if BEL.find_input_pin(n, "SlotName").get_pin_value() not in other_slots]
     # BeginPlay's repair of a save from an older build, a rebind, one nudge per
     # slider, the difficulty's nudge, and the debug toggle. Written at the moment of the change and not
     # on leaving the page, because a game quit from the settings screen still
@@ -822,6 +827,7 @@ def main():
     check_monster_tune(check, bp, nodes)
     check_world_tune(check, bp, nodes)
     check_gfx_tune(check, bp, nodes)
+    check_gfx_save(check, nodes)
     check_gfx_tuner(check)
     check_cursor(check, bp, nodes)
     check_pause_menu(check, bp, nodes)

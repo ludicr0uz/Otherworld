@@ -185,6 +185,9 @@ def check_trees(check):
     parent = fps.get_parent().get_name() if fps and fps.get_parent() else None
     check("the FPS readout sits outside Body, so it shows over every screen",
           parent == "Root", str(parent))
+    seen = str(fps.get_editor_property("visibility")).upper() if fps else "none"
+    check("...and is visible in the designer: on screen whether debug mode is on or off",
+          bool(fps) and "COLLAPSED" not in seen and "HIDDEN" not in seen, seen)
 
 
 def check_hud_graph(check, nodes):
@@ -222,7 +225,9 @@ def check_hud_graph(check, nodes):
         on, off = toggles(var)
         check(f"{asset.rsplit('/', 1)[1]} is shown from exactly one place",
               on == 1 and off >= 2, f"shown {on}, hidden {off}")
-    for name in (C.HUD_FPS, C.BANNER_COUNT, C.BANNER_OFF, C.HINT_IDLE, C.HINT_CAPTURE,
+    check("the FPS readout is always on screen, debug mode or not: nothing in the "
+          "graph shows or hides it", toggles(C.HUD_FPS) == (0, 0), str(toggles(C.HUD_FPS)))
+    for name in (C.BANNER_COUNT, C.BANNER_OFF, C.HINT_IDLE, C.HINT_CAPTURE,
                  *(C.debuff_text(s) for _t, _l, s in C.DEBUFF_LABELS)):
         on, off = toggles(name)
         check(f"{name} is shown and hidden by its own condition", on == 1 and off >= 1,
@@ -244,15 +249,17 @@ def check_hud_graph(check, nodes):
     groups = {f"Get {g}" for g in C.flash_groups()}
     carets = [n for n in nodes if "InOpacity" in _pins(n)
               and not groups & set(_source_titles(n, "self"))]
-    selected, backs = [], []
+    selected, backs, saves = [], [], []
     for n in carets:
         for pick in _sources(n, "InOpacity"):
             for eq in _sources(pick, "bPickA"):
                 selected += _source_titles(eq, "B")
                 # A tab's BACK row, outside its list: lit while the caret is
-                # past the list (row >= a literal).
+                # past the list (row >= a literal). A tab's save row, between
+                # the two: lit while the caret is on it (row == a literal).
                 if not _sources(eq, "B"):
-                    backs += _source_titles(eq, "A")
+                    at_or_past = ">=" in _title(eq) or "GreaterEqual" in _title(eq).replace(" ", "")
+                    (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
     check("the title page, settings page, M panel, loot window and the four tuning tabs "
           "light the selected row's caret (the M panel's is its own PauseRow)",
           sorted(selected) == ["Get GfxTuneRow", "Get LootSel",
@@ -263,6 +270,8 @@ def check_hud_graph(check, nodes):
     check("...and each tab's BACK row lights its caret while the tab's caret is on it",
           sorted(backs) == ["Get GfxTuneRow", "Get MonTuneRow", "Get TuneRow",
                             "Get WorldTuneRow"], str(sorted(backs)))
+    check("...and the graphics tab's SAVE DEFAULT row lights its own while the caret "
+          "is on it", saves == ["Get GfxTuneRow"], str(saves))
 
     texts = [n for n in nodes if {"self", "InText"} <= _pins(n)]
     blank = [n for n in texts if not text_literal(n) and not _sources(n, "InText")]

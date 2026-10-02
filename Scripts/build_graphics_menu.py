@@ -60,7 +60,9 @@ from graphics_menu.gfx_tune_consts import GFX_TAB, TUNER_COMPONENT   # noqa: E40
 from graphics_menu.gfx_tune_tick import (                           # noqa: E402
     author_gfx_tune_tick, declare_gfx_tune_vars, gfx_tune_defaults, install_tuner)
 from graphics_menu.gfx_tuner import build_graphics_tuner            # noqa: E402
-# The FPS readout, one of the debug-mode overlays; see graphics_menu/fps.py.
+from graphics_menu.gfx_save import (                                # noqa: E402
+    author_load_graphics, build_graphics_savegame)
+# The FPS readout, on screen whatever debug mode says; see graphics_menu/fps.py.
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
 # The generated art the canvas layers (the wanderers' bars) still draw with.
 from graphics_menu.canvas import _draw_texture                      # noqa: E402
@@ -661,8 +663,9 @@ def _author_begin_play(ed, begin_play):
     made = emit_apply(ed, DEFAULT_PRESET, origin.x + 320, origin.y, created)
     label = PRESETS[DEFAULT_PRESET].label
     ed.add_comment_to_nodes(
-        f"Every session starts at {label}. Setting Quality applies it: the first "
-        f"Tick hands the preset's row to {TUNER_COMPONENT} (gfx_tune_tick.py).",
+        f"A player with no graphics save starts at {label}, graphics_tuning.csv's "
+        f"default. Setting Quality applies it: the first Tick hands the preset's "
+        f"row to {TUNER_COMPONENT} (gfx_tune_tick.py).",
         made)
 
     # The settings load comes BEFORE the menu decision: the pause waits
@@ -676,6 +679,9 @@ def _author_begin_play(ed, begin_play):
                                          BEL.find_then_pin(made[-1]))
     loaded_tails = _author_restore_debug(ed, origin.x + 320, origin.y + 2300,
                                          loaded_tails)
+    # The player's own preset and Custom row, over the default set above.
+    loaded_tails = author_load_graphics(ed, loaded_tails, origin.x + 320,
+                                        origin.y + 3400)
 
     # --- open paused, on the menu -------------------------------------------
     # Pausing is what makes the menu a menu. Without it the level is live
@@ -840,7 +846,7 @@ def _author_tick(ed, tick):
     ed.add_comment_to_nodes(
         "The panel's debug row -> debug mode, held on the GameMode so the weapon "
         "component can read it too, and saved to BP_Settings so it survives a "
-        "restart.  It turns on the FPS readout, the pellet tracers and the "
+        "restart.  It turns on the pellet tracers and the "
         "wanderers' numbers.",
         d_taken + [br_d, gm, as_gm, was_on, flip, set_dbg, settings, keep_dbg,
          writer])
@@ -1073,8 +1079,8 @@ def _author_draw(ed, x0, y0):
     pushed = _author_push_settings(ed, x0 + 3000, y0 + 14000,
                                    (*to_mode, BEL.find_then_pin(no_dbg)))
 
-    # The FPS readout, in every state -- title, game, death -- while debug
-    # mode is on. Drawn first, so every panel after it can sit on top.
+    # The FPS readout, in every state -- title, game, death -- and whether
+    # debug mode is on or off. Drawn first, so every panel after it can sit on top.
     fps_out = author_fps(ed, x0 + 3000, y0 + 16000, pushed)
 
     # Where the mouse cursor is, before the first screen that asks (cursor.py).
@@ -1139,6 +1145,7 @@ def build_hud_blueprint(rebuild=False):
     # loads create_node_from_name returns None and the error reads like a typo
     # in the node name rather than a missing asset.
     build_profile_savegame()
+    build_graphics_savegame()
     # The tuner component before the HUD that carries it and sets its variables.
     build_graphics_tuner()
     # The screens first: the HUD's variables are typed to their classes, and

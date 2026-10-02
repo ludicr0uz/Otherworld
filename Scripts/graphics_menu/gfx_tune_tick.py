@@ -10,13 +10,18 @@ the table handed to BP_GraphicsTuner, the HUD's component that applies them.
                                the picked preset is copied into the other
                                presets' rows: the look is one for all four
     GfxTuneTouched, or         the tuner's Values := GfxTuneValues, its Preset
-    Quality != GfxQualityApplied   := Quality, its Dirty := true; then
-                               GfxQualityApplied := Quality, NOT GfxTuneTouched
+    Quality != GfxQualityApplied   := Quality, its Dirty := true; unless this
+                               is the session's first hand-over, the pick and
+                               the table into the player's save (gfx_save.py);
+                               then GfxQualityApplied := Quality, NOT
+                               GfxTuneTouched
 
-So BeginPlay only sets Quality (presets.emit_apply), and this is the one
-place a preset reaches the engine: BeginPlay's default, the
-tab's preset row and a nudge all converge through GfxQualityApplied, which
-starts at -1 so the first Tick of every session applies.
+So BeginPlay only sets Quality (presets.emit_apply: the CSV's default, then
+gfx_save's load over it), and this is the one place a preset reaches the
+engine: BeginPlay's Quality, the tab's preset row and a nudge all converge
+through GfxQualityApplied, which starts at -1 so the first Tick of every
+session applies. That first hand-over is what was just loaded, so it is not
+saved again; every later one is a change the player made, and is.
 
 The pick follows Quality rather than the other way round on a Tick where
 neither moved, so the tab always shows the preset that is running.
@@ -28,6 +33,7 @@ from combat.graph import (
 )
 from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_MOD_II, FN_OR, MACRO_FOR_LOOP
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from graphics_menu.gfx_save import author_keep_graphics
 from graphics_menu.gfx_stats import (
     GFX_STATS, LOOK_FROM, PRESET_LABELS, STAT_COUNT, table_values,
 )
@@ -139,9 +145,16 @@ def _author_hand_over(ed, in_execs, x0, y0, made):
         flow = [BEL.find_then_pin(n)]
     flow = _setter(ed, TUNER_DIRTY_VAR, "true", flow, x0 + 1200, y0, made,
                    TUNER_CLASS_PATH, tuner)
-    flow = put(ed, GFX_APPLIED_VAR, _get(ed, "Quality", x0 + 1260, y0 + 300, made),
-               [flow], x0 + 1520, y0, made)
-    done = _setter(ed, GFX_TAB.touched_var, "false", [flow], x0 + 1800, y0, made)
+    # Read before GfxQualityApplied is written below: -1 is the session's
+    # first hand-over, which is the save itself (or the defaults).
+    again = _call(ed, FN_NEQ_II, x0 + 1480, y0 + 300, made,
+                  A=_get(ed, GFX_APPLIED_VAR, x0 + 1240, y0 + 300, made),
+                  B=GFX_APPLIED_DEFAULT)
+    keep, first = _branch(ed, _out(again), [flow], x0 + 1720, y0, made)
+    kept = author_keep_graphics(ed, [keep], x0 + 2000, y0 - 700, made)
+    flow = put(ed, GFX_APPLIED_VAR, _get(ed, "Quality", x0 + 3500, y0 + 300, made),
+               [*kept, first], x0 + 3760, y0, made)
+    done = _setter(ed, GFX_TAB.touched_var, "false", [flow], x0 + 4040, y0, made)
     return [done, idle]
 
 
@@ -156,7 +169,8 @@ def author_gfx_tune_tick(ed, pc_out, in_execs, x0, y0):
     tails = _author_hand_over(ed, flow, x0 + 14200, y0, made)
     ed.add_comment_to_nodes(
         f"Graphics tuning (its row in the M panel): Up/Down pick a row, "
-        f"Left/Right change the preset or a number, Enter saves graphics_tuning.csv. "
-        f"The preset and its numbers go to the {TUNER_COMPONENT} component, which "
-        f"applies them, whenever Quality or a number moved.", made[:1])
+        f"Left/Right change the preset or a number, SAVE DEFAULT saves "
+        f"graphics_tuning.csv. The preset and its numbers go to the {TUNER_COMPONENT} "
+        f"component, which applies them, whenever Quality or a number moved; the "
+        f"pick and the Custom row are kept in the player's save.", made[:1])
     return tails

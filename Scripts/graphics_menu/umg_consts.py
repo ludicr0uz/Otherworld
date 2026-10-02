@@ -107,7 +107,7 @@ SLOT_AMMO_RIGHT, SLOT_AMMO_BOTTOM = 6.0, 3.0
 
 # ─── WBP_HUD ──────────────────────────────────────────────────────────────────
 # Body holds everything the death and title screens hide; Fps sits beside it
-# because the debug readout shows on every screen.
+# because the FPS readout shows on every screen.
 HUD_BODY, HUD_FPS = "Body", "Fps"
 HP_BAR, HP_NUM = "HpBar", "HpNum"
 KILLS = "Kills"

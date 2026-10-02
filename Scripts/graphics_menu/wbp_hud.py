@@ -8,7 +8,7 @@
     bottom centre the equipped weapon's name, the 2 x 5 inventory grid of
                   WBP_InventorySlot, and under it HP and stamina side by side
     right edge    the loot window, and under the reticle its prompt (wbp_loot.py)
-  Fps    (debug mode, on every screen)
+  Fps    (always, on every screen: debug mode or not)
   Watermark  (bottom right, on every screen: wbp_legal.py)
 
 Every bar has a stat icon beside it (ui_art/stat_icons.py), tinted its fill
@@ -134,6 +134,5 @@ def build_hud_widget():
 
     fps = U.text(bp, root, HUD_FPS, "FPS  60", FPS_FONT, COL_FPS, variable=True)
     U.at(fps, (1.0, 0.0), (1.0, 0.0), (-CORNER_MARGIN, FPS_TOP))
-    U.hide(fps)
     author_watermark(bp, root)
     return U.compile_and_save(bp)

@@ -43,8 +43,10 @@ THE CONTROLLER'S STEPS (one fragment per concern)
   strafe       between two swings: the head of the Chase step that sends it
                off and round the player instead, facing them
   stalk        a stalker's Stalk step (the wendigo): roar, then a leg at a
-               time to the next tree and a wait behind it, then fail for
-               good, which is the charge (Chase takes over)
+               time to the next tree (faster than its run, the way round
+               turned about every few seconds) and a wait behind it, then
+               fail for good, which is the charge (Chase takes over). Hurt
+               by the player it is Enraged: the step fails from the start
   stalk_cover  ...the next tree: the sweeps for one, the spot behind its
                trunk, and what makes a spot cover
   ward         a fire-fearing creature's Ward step (the wendigo): while the
@@ -65,7 +67,8 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_tree  the Blackboard, each tree's priorities, the step events
   verify_sight_cone  debug mode's cone: its gates and what it is drawn from
   verify_strafe  the step between two swings: when, where to, facing, speed
-  verify_stalk   the wendigo's hunt: roar, sweeps, cover, legs, charge
+  verify_stalk   the wendigo's hunt: roar, turns, rage, sweeps, cover, legs,
+                 charge
   verify_ward    fire holding it off: the gate, the hold, the ring, the flight
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
 

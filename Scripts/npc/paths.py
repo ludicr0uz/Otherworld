@@ -90,7 +90,8 @@ STRAFE_FOR_VAR = "StrafeFor"
 # Per controller, on the creatures of forest_generator/npc_stalk.NPC_STALK_ROAR
 # only. The hunt runs roar -> legs -> charge, and never back:
 #   STALK_ROAR_UNTIL_VAR   when the roar ends; 0 until it has roared
-#   STALK_SIDE_VAR         +1 or -1: which way round the player, for the hunt
+#   STALK_SIDE_VAR         +1 or -1: which way round the player, for now
+#   STALK_TURN_AT_VAR      when the side is next turned about (at a leg's pick)
 #   STALK_COVER_VAR        where this leg ends
 #   STALK_HIDDEN_VAR       ...which is behind a tree (false: in the open)
 #   STALK_LEG_UNTIL_VAR    running: when the leg is given up; arrived: when
@@ -99,8 +100,10 @@ STRAFE_FOR_VAR = "StrafeFor"
 #   STALK_LEGS_VAR         legs picked so far (the probe counts them)
 #   STALK_CHARGING_VAR     close enough: the Stalk step fails from now on
 #   STALK_IGNORE_VAR       what the sweep for a tree ignores (ground, own pawn)
+#   ENRAGED_VAR            the player has hurt it: no hunt, the charge, for good
 STALK_ROAR_UNTIL_VAR = "StalkRoarUntil"
 STALK_SIDE_VAR = "StalkSide"
+STALK_TURN_AT_VAR = "StalkTurnAt"
 STALK_COVER_VAR = "StalkCover"
 STALK_HIDDEN_VAR = "StalkHidden"
 STALK_LEG_UNTIL_VAR = "StalkLegUntil"
@@ -108,6 +111,7 @@ STALK_ARRIVED_VAR = "StalkArrived"
 STALK_LEGS_VAR = "StalkLegs"
 STALK_CHARGING_VAR = "StalkCharging"
 STALK_IGNORE_VAR = "StalkIgnore"
+ENRAGED_VAR = "Enraged"
 
 # ── Held off by fire (npc/ward.py) ──────────────────────────────────────────
 #

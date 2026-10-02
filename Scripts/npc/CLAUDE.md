@@ -133,7 +133,22 @@ Wanderer (selector)
     `DefaultSlot` (upper body, like the swing) and one of its `Voices`. It stands 2.4 s. The
     clip is the Mixamo Scary pack's zombie scream, retargeted onto the wendigo alone by
     `import_mixamo.py`; without it the roar is sound only.
-  - **Legs:** one side for the whole hunt (`StalkSide`, a coin at the roar). Each leg sweeps a
+  - **Legs are run at 130% of its run speed** (`NPC_STALK_RUN_SCALE`, about the player's
+    sprint), written after the order and on every pass of a leg. The Chase step writes the
+    run speed back on its first pass, so the charge is at the run.
+  - **The way round alternates.** `StalkSide` is a coin at the roar, and `StalkTurnAt` a
+    game time thrown with it (the roar's end + 4–9 s). The first leg picked once that time
+    is up goes the other way and throws the next (now + 4–9 s). It turns only at a pick,
+    never in the middle of a leg or of a wait: a leg and its wait are 3–8 s, so it is one
+    to three legs each way.
+  - **Shot, it is enraged** (`Enraged` on the controller, never cleared): the step's first
+    Branch fails it, so there is no roar, no tree and no arc, only the Chase. What sets it
+    is the hurt sense's own flag (`DamagedByPlayer`: a pellet, a blade, a fist), read by
+    `senses._author_hurt` right behind that Branch, with one of its voices the once. It is
+    a latch of its own, apart from `StalkCharging`, which a flight from fire clears: a
+    shot wendigo comes back from a flight charging. **Fire still holds an enraged one
+    off** (the Ward step is ahead of the whole attack).
+  - **Legs:** each leg sweeps a
     2 m sphere along a line at the player, 35 / 50 / 20° round them from where it stands,
     from 3 m to 12 m closer. The first tree struck is the candidate; the spot is 170 cm past
     its trunk, seen from the player. It runs there (`SimpleMoveToLocation`), waits 1–2.5 s
@@ -154,14 +169,17 @@ Wanderer (selector)
     second after the order (no path), and a pick with no cover and no navmesh under the open
     spot either. Before that rule, an open spot off the navmesh was re-picked every pass and
     the wendigo stood at 30 m for good. A leg still running after 6 s is re-picked.
-  - `verify_stalk.py` checks the graph; `probes/probe_wendigo_stalk.py` watches one hunt.
+  - `verify_stalk.py` checks the graph; `probes/probe_wendigo_stalk.py` watches one hunt
+    (with whatever turns fall in it); `probes/probe_wendigo_rage.py` makes a turn come due
+    and shoots one on its hunt and one on patrol.
     `verify.py` and `verify_strafe.py` count a controller's nodes outside this step
     (`outside_step`), so their counts are the same for every creature.
   - **Maths nodes are wildcards until wired:** wire A, then set B (`stalk_cover._Graph.op`). A
     literal set first is refused.
   - **Feel check (needs a play session):** the roar is upper body only, on standing legs; the
-    wait behind a trunk has no crouch or peek; a wendigo shot while it hunts carries on
-    hunting; and its 4–9 s voice still sounds from behind its tree.
+    wait behind a trunk has no crouch or peek; its 4–9 s voice still sounds from behind its
+    tree; at 130% the legs outrun the blend space's top (the feet slide a little); and
+    rage shows only as a voice and the charge (no clip, and no faster than its run).
 - **Fire holds the wendigo off** (`ward.py`, numbers in `forest_generator/npc_ward.py`):
   - It is one more step, `BT_Ward`, in a selector with the whole attack (the approach and
     the Swing, now a sequence of their own). Only the creatures in `NPC_WARD_FEARS` get the

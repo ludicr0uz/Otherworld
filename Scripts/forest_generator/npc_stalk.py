@@ -12,14 +12,21 @@ aggro. In order:
   roar    the first pass: it stops, faces the player, and plays its roar clip
           and one of its voices. It stands for NPC_STALK_ROAR_S.
   stalk   one leg at a time. A leg ends behind a tree that is closer to the
-          player than the wendigo is, and round them from where it stands,
-          always the same way round (one side per hunt): the path is an arc
-          that closes in. It runs there, waits NPC_STALK_HIDE_*_S behind the
-          trunk, and picks the next.
+          player than the wendigo is, and round them from where it stands:
+          the path is an arc that closes in. It runs there, faster than it
+          chases (NPC_STALK_RUN_SCALE), waits NPC_STALK_HIDE_*_S behind the
+          trunk, and picks the next. The way round is a coin at the roar,
+          turned about every NPC_STALK_TURN_*_S: the first leg picked once
+          that time is up goes the other way.
   charge  within NPC_STALK_CHARGE_CM the step fails for good, and the tree
           falls through to the ordinary Chase: straight at the player. It
           charges from further off too, rather than stand: when a leg has
           nowhere to end, or it is not moving half a second into one.
+  rage    a wendigo the player has hurt (a shot, a blade, a fist: the hurt
+          sense's own flag) is Enraged, for good: the step fails first
+          thing, with one of its voices the once, so there is no roar, no
+          tree and no arc, only the charge. Fire still holds it off
+          (npc_ward.py), and after a flight it comes straight back.
 
 FINDING THE TREE. A sphere is swept along a line that points at the player,
 NPC_STALK_ARC_DEG round them from the wendigo, from NPC_STALK_ADVANCE_MIN_CM
@@ -63,6 +70,17 @@ NPC_STALK_CHARGE_CM = 1000.0
 # Round the player per leg, from where the wendigo stands, tried in this
 # order. Four or five legs of the first is about a semicircle.
 NPC_STALK_ARC_DEG = (35.0, 50.0, 20.0)
+
+# How fast it runs a leg, as a fraction of its run (the chase and the charge):
+# the arc is the long way in, and at its run it was easy to keep in the
+# sights. A tuned 690 cm/s comes to about the player's sprint (900).
+NPC_STALK_RUN_SCALE = 1.3
+
+# The way round is turned about this long after the roar ends, and after
+# each turn: one throw per turn. A leg and its wait are 3-8 s, so it is a
+# leg or two, sometimes three, each way.
+NPC_STALK_TURN_MIN_S = 4.0
+NPC_STALK_TURN_MAX_S = 9.0
 
 # How much closer to the player a leg's tree may be.
 NPC_STALK_ADVANCE_MIN_CM = 300.0
@@ -111,3 +129,5 @@ assert 0.0 < NPC_STALK_GAIN_MIN_CM < NPC_STALK_ADVANCE_MIN_CM
 assert NPC_STALK_ADVANCE_MIN_CM < NPC_STALK_OPEN_ADVANCE_CM < NPC_STALK_ADVANCE_MAX_CM
 assert NPC_STALK_HIDE_MIN_S < NPC_STALK_HIDE_MAX_S < NPC_STALK_LEG_TIMEOUT_S
 assert NPC_STALK_ARRIVE_CM < NPC_STALK_BEHIND_CM
+assert NPC_STALK_RUN_SCALE > 1.0
+assert 0.0 < NPC_STALK_TURN_MIN_S < NPC_STALK_TURN_MAX_S

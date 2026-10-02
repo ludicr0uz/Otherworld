@@ -28,6 +28,7 @@ from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S
 from forest_generator.npc_stalk import (
     NPC_STALK_ARC_DEG, NPC_STALK_BEHIND_CM, NPC_STALK_CHARGE_CM,
     NPC_STALK_HIDE_MAX_S, NPC_STALK_HIDE_MIN_S, NPC_STALK_ROAR, NPC_STALK_ROAR_S,
+    NPC_STALK_RUN_SCALE, NPC_STALK_TURN_MAX_S, NPC_STALK_TURN_MIN_S,
 )
 from forest_generator.npc_ward import (
     NPC_WARD_ARC_DEG, NPC_WARD_FLEE_S, NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S,
@@ -130,16 +131,20 @@ def _author_stalk_step(ed, steps, key, x0, y0):
         ed, steps.event(STEP_STALK, x0 - 300, y0), steps.result,
         roar_object(NPC_STALK_ROAR[key]), stock_run_speed(key), x0, y0)
     ed.add_comment_to_nodes(
-        f"BT_Stalk, tried before BT_Chase: on the first pass roar "
+        f"BT_Stalk, tried before BT_Chase. Hurt by the player it is Enraged, "
+        f"for good: the step fails at once and BT_Chase charges. Otherwise: "
+        f"on the first pass roar "
         f"({NPC_STALK_ROAR_S:g} s, standing, facing the player). Then a leg at "
-        f"a time: run to the next tree, wait behind it "
+        f"a time: run to the next tree at {NPC_STALK_RUN_SCALE:.0%} of its run "
+        f"speed, wait behind it "
         f"{NPC_STALK_HIDE_MIN_S:g}-{NPC_STALK_HIDE_MAX_S:g} s watching the "
         f"player, pick the next. Within {NPC_STALK_CHARGE_CM:.0f} cm the step "
         f"fails for good and BT_Chase charges.", hunt)
     ed.add_comment_to_nodes(
         f"The next tree: a sphere swept at the player along a line "
         f"{' / '.join(f'{a:.0f}' for a in NPC_STALK_ARC_DEG)} deg round them "
-        f"(always the same way), ignoring the ground and this pawn. The first "
+        f"(the way of StalkSide, turned about every {NPC_STALK_TURN_MIN_S:g}-"
+        f"{NPC_STALK_TURN_MAX_S:g} s), ignoring the ground and this pawn. The first "
         f"instanced mesh it strikes is a tree; the spot is "
         f"{NPC_STALK_BEHIND_CM:.0f} cm past its trunk, seen from the player, "
         f"snapped onto the navmesh. No tree on any line: on round, in the "

@@ -28,7 +28,12 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     Config/DefaultEngine.ini), near enough not to cut the
                     hands open down the pistol's sights
   sprint_tuning     the sprint's direction rule: the 60 degree cone ahead a
-                    sprint is allowed in, and the SprintAhead variable's name
+                    sprint is allowed in, and the SprintAhead variable's name;
+                    the names of the speed and stamina rates the sprint reads
+  player_tuning     player_tuning.csv: jog and sprint speed (m/s), how long a
+                    full bar sprints and an empty one refills (s); what the
+                    menu's PLAYER TUNING tab saves and COMBAT is built from
+  player_pace       the jog: the character's own MaxWalkSpeed, set at install
   carry_tuning      the carry's numbers and names: how long a shot keeps the
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   chop_tuning       chopping a tree: blows per piece of wood, where it lands

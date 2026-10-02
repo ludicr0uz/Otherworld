@@ -1,5 +1,7 @@
-"""The sprint's direction rule: its numbers and names. Constants only; the
-graph is weapon_component/sprint.py. (The speed and the stamina are COMBAT's.)
+"""The sprint's direction rule, and the names of the numbers the sprint
+reads off the component. Constants only; the graph is
+weapon_component/sprint.py. (The speed and the stamina are COMBAT's, which
+takes them from player_tuning.csv.)
 """
 
 import math
@@ -15,3 +17,14 @@ SPRINT_CONE_MIN_DOT = round(math.cos(math.radians(SPRINT_CONE_HALF_ANGLE_DEG)), 
 
 # Stored once a frame, before Sprinting: is the player steering into the cone?
 SPRINT_AHEAD_VAR = "SprintAhead"
+
+# What the sprint graph reads instead of literals, so the menu's PLAYER
+# TUNING tab can change them in a running game (graphics_menu/
+# player_tune_tick.py). Built from COMBAT; cm/s and stamina points a second.
+# The jog has no variable of its own: it is BaseSpeed, cached off the
+# character at BeginPlay.
+BASE_SPEED_VAR = "BaseSpeed"
+SPRINT_SPEED_VAR = "SprintSpeed"
+STAMINA_DRAIN_VAR = "StaminaDrainPerSecond"
+STAMINA_REGEN_VAR = "StaminaRegenPerSecond"
+SPRINT_RATE_VARS = (SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR)

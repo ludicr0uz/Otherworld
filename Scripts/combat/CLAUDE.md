@@ -421,6 +421,9 @@ menu polls its own copy from `DrawHUD`, which does.
 live: lethality, sprint and stamina, ADS, mouse sensitivity, recoil and the hit reactions.
 Per-weapon numbers live in `_weapon_specs()`.
 
+**The jog, the sprint and the stamina bar's times are `player_tuning.csv`'s** (`player_tuning.py`),
+laid over `COMBAT` and tuned in game by the menu's PLAYER TUNING tab (`docs/stance.md`).
+
 **Per-gun numbers can be tuned in game** (the M panel's **T** tab, `graphics_menu/tune_*.py`):
 - `gun_tuning.csv` (tracked) holds each gun's 20 tunable stats (`gun_tuning.TUNE_STATS`: damage,
   pellets, range, interval, reload, magazine, sights zoom, shot volume, the accuracy columns

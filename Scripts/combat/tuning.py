@@ -5,6 +5,14 @@ the graphs that read them live elsewhere.
 
 import dataclasses
 
+from combat.player_tuning import (
+    JOG_SPEED, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE, cms, per_second,
+)
+from combat.player_tuning import table as _player_table
+
+# player_tuning.csv over its defaults: jog, sprint, how long the bar lasts.
+_PLAYER = _player_table()
+
 
 # ─── Tuning ──────────────────────────────────────────────────────────────────
 
@@ -127,16 +135,18 @@ class CombatConfig:
     limb_multiplier: float = 0.75
 
     # --- sprint and stamina --------------------------------------------------
-    # The walking speed is NOT here: BeginPlay caches whatever the character's
-    # MaxWalkSpeed already is into BaseSpeed and restores that. A literal would
-    # silently fight any later change to the character's own default.
-    sprint_speed_cms: float = 900.0
+    # player_tuning.csv's numbers (the menu's PLAYER TUNING tab saves it), in
+    # the component's units. The jog is the character's own MaxWalkSpeed
+    # (player_pace.set_jog_speed): BeginPlay caches that into BaseSpeed and
+    # sprint restores it, so the graph holds no walking-speed literal.
+    jog_speed_cms: float = cms(_PLAYER[JOG_SPEED])
+    sprint_speed_cms: float = cms(_PLAYER[SPRINT_SPEED])
     max_stamina: float = 100.0
-    # 4 s of sprint from full, a little over 8 s to refill. Deliberately
-    # asymmetric: sprint is the escape from a pack that runs at 600 cm/s, so it
-    # has to be worth spending and it has to cost something to have spent.
-    stamina_drain_per_s: float = 25.0
-    stamina_regen_per_s: float = 12.0
+    # 8 s of sprint from full, a little over 8 s to refill. The wanderers run
+    # at 600 cm/s, so a sprint only keeps a zombie's distance; it has to cost
+    # something to have spent.
+    stamina_drain_per_s: float = per_second(100.0, _PLAYER[SPRINT_DURATION])
+    stamina_regen_per_s: float = per_second(100.0, _PLAYER[STAMINA_RECHARGE])
 
     # --- blocking ------------------------------------------------------------
     # Held BLOCK_KEY, armed or not. A wanderer's swing that lands within
@@ -358,14 +368,15 @@ class CombatConfig:
     shot_noise_cone_half_angle_deg: float = 30.0
     shot_noise_cone_range_scale: float = 1.6
     # The player's footsteps carry this far at this speed, and in proportion
-    # to speed either side of it: 12 m at a 600 cm/s run, 18 m at a 900 cm/s
-    # sprint, 6 m at the half-speed walk aiming costs. Proportional rather
-    # than a walk/sprint pair so that anything else that changes the player's
-    # speed changes their noise for free. Only the PLAYER's footsteps are a
-    # noise -- the wanderers share the footstep component and must not wake
-    # each other up.
+    # to speed either side of it: 12 m at the 400 cm/s jog, 18 m at the
+    # 600 cm/s sprint, 6 m at the half-speed walk aiming costs (what each
+    # gait carried when the jog was 600 and the sprint 900). Proportional
+    # rather than a jog/sprint pair so that anything else that changes the
+    # player's speed changes their noise for free. Only the PLAYER's footsteps
+    # are a noise -- the wanderers share the footstep component and must not
+    # wake each other up.
     footstep_noise_range_cm: float = 1200.0
-    footstep_noise_reference_speed_cms: float = 600.0
+    footstep_noise_reference_speed_cms: float = 400.0
 
 
 COMBAT = CombatConfig()

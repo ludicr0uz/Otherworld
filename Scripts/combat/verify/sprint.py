@@ -6,17 +6,25 @@ regen a sliver, start, drain it), and the aim, gated on NOT Sprinting, flipped
 with it: the screen twitched with an aim key held. The speed, the drain and
 the fire gate are checked in verify/weapon_inputs.py.
 
+Its numbers (player_tuning.csv through COMBAT): the jog on the character, the
+sprint's speed and the stamina's two rates as variables the graph reads.
+
 And its direction (sprint_tuning.py): only while the player steers within 60
 degrees of the way the character faces.
 """
 
-from combat.verify.fixtures import w, wg
+from combat.player_tuning import (
+    JOG_SPEED, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE, cms, table,
+)
+from combat.verify.fixtures import char, w, wg
 from combat.verify.common import (
-    BEL, PIN, check, has_in_pin, in_pins, num_pin, out_pins, pin_value,
+    BEL, PIN, cdo, check, has_in_pin, in_pins, num_pin, out_pins, pin_value,
 )
 from combat.sprint_tuning import (
     SPRINT_AHEAD_VAR, SPRINT_CONE_HALF_ANGLE_DEG, SPRINT_CONE_MIN_DOT,
+    SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR,
 )
+from combat.tuning import COMBAT
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 
 
@@ -141,6 +149,41 @@ def check_sprint_forward():
               _feeders(latches[0], SPRINT_SPENT_VAR)))
 
 
+def check_sprint_rates():
+    tuned = table()
+    jog = cdo(char).get_editor_property("character_movement").get_editor_property(
+        "max_walk_speed")
+    check(f"the player jogs at player_tuning.csv's {tuned[JOG_SPEED]:g} m/s: the "
+          f"character's own MaxWalkSpeed, which BeginPlay caches as BaseSpeed",
+          abs(jog - cms(tuned[JOG_SPEED])) < 1e-3
+          and abs(COMBAT.jog_speed_cms - jog) < 1e-3, f"{jog} cm/s")
+    full = COMBAT.max_stamina
+    for var, want, words in (
+            (SPRINT_SPEED_VAR, cms(tuned[SPRINT_SPEED]),
+             f"sprints at {tuned[SPRINT_SPEED]:g} m/s"),
+            (STAMINA_DRAIN_VAR, full / tuned[SPRINT_DURATION],
+             f"a full bar sprints for {tuned[SPRINT_DURATION]:g} s"),
+            (STAMINA_REGEN_VAR, full / tuned[STAMINA_RECHARGE],
+             f"an empty one refills in {tuned[STAMINA_RECHARGE]:g} s")):
+        value = w.get_editor_property(var)
+        check(f"...{words} ({var}, a float)",
+              isinstance(value, float) and abs(value - want) < 1e-6, repr(value))
+    # Variables, not literals: the PLAYER TUNING tab writes them in play.
+    selects = [n for n in wg if in_pins(n) >= {"A", "B", "bPickA"}]
+    speed = [n for n in selects
+             if {_title(f) for f in _feeders(n, "A", "B")}
+             == {f"Get {SPRINT_SPEED_VAR}", "Get BaseSpeed"}]
+    check("the sprint picks SprintSpeed or BaseSpeed, both read off the component",
+          len(speed) == 1, f"{len(speed)} of {len(selects)} selects")
+    rate = [n for n in selects
+            if f"Get {STAMINA_REGEN_VAR}" in {_title(f) for f in _feeders(n, "B")}
+            and any(f"Get {STAMINA_DRAIN_VAR}" in {_title(g) for g in _feeders(f, "A")}
+                    and num_pin(f, "B") == -1.0 for f in _feeders(n, "A"))]
+    check("...and the stamina's rate is minus the drain or the regen, both variables",
+          len(rate) == 1, f"{len(rate)} of {len(selects)} selects")
+
+
 def run():
     check_sprint_latch()
     check_sprint_forward()
+    check_sprint_rates()

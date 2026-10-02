@@ -11,6 +11,7 @@ from combat.nodes import (
 )
 from combat.sprint_tuning import (
     SPRINT_AHEAD_VAR, SPRINT_CONE_HALF_ANGLE_DEG, SPRINT_CONE_MIN_DOT,
+    SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR,
 )
 from combat.tuning import COMBAT, SPRINT_KEY
 
@@ -58,8 +59,12 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
 
         SprintSpent = ShiftDown AND (SprintSpent OR Stamina <= 0)
         Sprinting = ShiftDown AND NOT SprintSpent AND SprintAhead
-        MaxWalkSpeed = Sprinting ? SPRINT_SPEED : BaseSpeed
-        Stamina += (Sprinting ? -drain : +regen) * DeltaSeconds,  clamped
+        MaxWalkSpeed = Sprinting ? SprintSpeed : BaseSpeed
+        Stamina += (Sprinting ? -StaminaDrainPerSecond
+                              : +StaminaRegenPerSecond) * DeltaSeconds,  clamped
+
+    The three rates are variables (sprint_tuning.SPRINT_RATE_VARS), built from
+    COMBAT, so the menu's PLAYER TUNING tab can write them in a running game.
 
     SprintSpent is a latch, and it is what keeps a held key from strobing. With
     only "ShiftDown AND Stamina > 0", a sprint that ran Stamina out stopped for
@@ -152,7 +157,8 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
 
     base = keep(_at(ed.add_get_member_variable_node("BaseSpeed"), x0 + 1200, y0 + 300))
     pick_speed = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 300))
-    _set(pick_speed, "A", COMBAT.sprint_speed_cms)
+    fast = keep(_at(ed.add_get_member_variable_node(SPRINT_SPEED_VAR), x0 + 1200, y0 + 160))
+    _connect(_pin(fast, SPRINT_SPEED_VAR, is_input=False), _pin(pick_speed, "A"))
     _connect(_pin(base, "BaseSpeed", is_input=False), _pin(pick_speed, "B"))
     _connect(running_out, _pin(pick_speed, "bPickA"))
     apply_speed = keep(_at(ed.add_set_member_variable_node(
@@ -163,8 +169,14 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     _connect(BEL.find_then_pin(mark), _pin(apply_speed, "execute"))
 
     rate = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 620))
-    _set(rate, "A", -COMBAT.stamina_drain_per_s)
-    _set(rate, "B", COMBAT.stamina_regen_per_s)
+    # Variables, not literals: the PLAYER TUNING tab writes them in play.
+    drain = keep(_at(ed.add_get_member_variable_node(STAMINA_DRAIN_VAR), x0 + 960, y0 + 620))
+    spent = keep(_at(_node(ed, FN_MUL_FF), x0 + 1200, y0 + 620))
+    _connect(_pin(drain, STAMINA_DRAIN_VAR, is_input=False), _pin(spent, "A"))
+    _set(spent, "B", -1.0)
+    regen = keep(_at(ed.add_get_member_variable_node(STAMINA_REGEN_VAR), x0 + 1200, y0 + 780))
+    _connect(_pin(spent, "ReturnValue", is_input=False), _pin(rate, "A"))
+    _connect(_pin(regen, STAMINA_REGEN_VAR, is_input=False), _pin(rate, "B"))
     _connect(running_out, _pin(rate, "bPickA"))
     step = keep(_at(_node(ed, FN_MUL_FF), x0 + 1700, y0 + 620))
     _connect(_pin(rate, "ReturnValue", is_input=False), _pin(step, "A"))
@@ -181,7 +193,8 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     _connect(BEL.find_then_pin(apply_speed), _pin(spend, "execute"))
 
     ed.add_comment_to_nodes(
-        f"{SPRINT_KEY}: {COMBAT.sprint_speed_cms:.0f} cm/s while Stamina lasts "
+        f"{SPRINT_KEY}: {SPRINT_SPEED_VAR} ({COMBAT.sprint_speed_cms:.0f} cm/s as built) "
+        f"while Stamina lasts "
         f"({COMBAT.max_stamina / COMBAT.stamina_drain_per_s:.0f} s from full), refilling at "
         f"{COMBAT.stamina_regen_per_s:.0f}/s the moment it stops. Forwards only: "
         f"{SPRINT_AHEAD_VAR} is the steering within "

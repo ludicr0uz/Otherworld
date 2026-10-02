@@ -82,7 +82,7 @@ Input, settings and state
                   variables, widgets, words, save command, where it sits,
                   whether its list scrolls and whether the save is a row of
                   its own); the shared arrows and Enter
-  tune_tabs       TABS: the four tabs, in M panel order
+  tune_tabs       TABS: the five tabs, in M panel order; other_open_vars
   tune_consts     the GUN TUNING tab: variables, widget names, GUN_TAB
   tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
                   the gun table onto every carried gun, and the knife's and
@@ -91,7 +91,7 @@ Input, settings and state
                   caret, BACK, a scrolling list kept on the caret's row
   tune_save       run in the game by the save: the live table into
                   combat/gun_tuning.csv
-  wbp_tune        WBP_PauseMenu's four tuning panels (called from wbp_screens)
+  wbp_tune        WBP_PauseMenu's five tuning panels (called from wbp_screens)
   monster_tune_consts  the MONSTER TUNING tab: variables, widget names,
                   the creatures' controller classes, MONSTER_TAB
   monster_tune_tick    Tick: the tab's flow, then each creature's row onto
@@ -105,6 +105,13 @@ Input, settings and state
                   (run after monster_tune_tick's)
   world_tune_save      run in the game by the save: the day and night lengths
                   into world/world_tuning.csv
+  player_tune_consts   the PLAYER TUNING tab: variables, widget names,
+                  PLAYER_TAB
+  player_tune_tick     Tick: the tab's flow, then the jog, the sprint's speed
+                  and the stamina's two rates onto the player's weapon
+                  component (run after gfx_tune_tick's)
+  player_tune_save     run in the game by the save: the speeds and the
+                  stamina bar's times into combat/player_tuning.csv
 
 Graphics: what a preset is, the tab that tunes it, the component that applies it
   gfx_stats            the graphics table: each stat's label, unit (percent,
@@ -142,6 +149,8 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   tune_checks        the gun tuning tab: table, CSV on the guns and the melee
                      weapons, panel, save, writes, the rows that are not a weapon's
   world_tune_checks    the world tuning tab: panel, save, the cycle's Sets
+  player_tune_checks   the player tuning tab: table, panel, save, the weapon
+                     component's Sets
   cursor_checks      the mouse cursor: shown when, the row tests, the clicks
   menu_main_checks   the one menu: the title holds it open and ticks under
                      its pause, the first row starts or resumes, settings

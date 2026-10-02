@@ -21,10 +21,8 @@ import unreal
 from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, _palette, _pin
 from combat.nodes import FN_ADD_FF, FN_ARR_GET
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get, _out
-from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.loot_find import put
-from graphics_menu.monster_tune_consts import MONSTER_TAB
-from graphics_menu.tune_consts import GUN_TAB
+from graphics_menu.tune_tabs import other_open_vars
 from graphics_menu.tune_tick import FN_ARR_SET, author_tab_flow, declare_tab_vars, tab_defaults
 from graphics_menu.world_tune_consts import (
     WORLD_SUBJECT, WORLD_TAB, WORLD_TUNE_HOUR_SEEN_VAR,
@@ -160,8 +158,7 @@ def author_world_tune_tick(ed, pc_out, in_execs, x0, y0):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
     flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, WORLD_TAB, 1,
-                           (GUN_TAB.open_var, MONSTER_TAB.open_var,
-                            GFX_TAB.open_var))
+                           other_open_vars(WORLD_TAB))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made)
     ed.add_comment_to_nodes(
         "World tuning (its row in the M panel): Up/Down pick a row, "

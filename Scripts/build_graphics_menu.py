@@ -118,6 +118,9 @@ from graphics_menu.menu_still import (                              # noqa: E402
 from graphics_menu.monster_tune_consts import MONSTER_TAB           # noqa: E402
 from graphics_menu.monster_tune_tick import (                       # noqa: E402
     author_monster_tune_tick, declare_monster_tune_vars, monster_tune_defaults)
+from graphics_menu.player_tune_consts import PLAYER_TAB             # noqa: E402
+from graphics_menu.player_tune_tick import (                        # noqa: E402
+    author_player_tune_tick, declare_player_tune_vars, player_tune_defaults)
 from graphics_menu.tune_draw import author_tune_panel               # noqa: E402
 from graphics_menu.tune_tick import (                               # noqa: E402
     author_tune_tick, declare_tune_vars, tune_defaults)
@@ -466,6 +469,7 @@ def _ensure_variables(ed, bp):
     declare_tune_vars(ed)
     declare_monster_tune_vars(ed)
     declare_world_tune_vars(ed)
+    declare_player_tune_vars(ed)
     declare_gfx_tune_vars(ed)
     declare_cursor_vars(ed)
 
@@ -766,12 +770,13 @@ def _author_tick(ed, tick):
     in_play, on_title = author_in_play(ed, stilled, x0 - 600, y0 - 4000)
     saved = author_save_exit_tick(ed, pc_out, [in_play], x0, y0 - 4000)
     looted = author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000)
-    # Then the menu's tuning tabs (tune_tick.py and its three siblings).
+    # Then the menu's tuning tabs (tune_tick.py and its four siblings).
     # The graphics one also hands the picked preset to the tuner component.
     tuned = author_tune_tick(ed, pc_out, [*looted, on_title], x0 + 44000, y0 - 4000)
     tuned = author_monster_tune_tick(ed, pc_out, tuned, x0 + 58000, y0 - 4000)
     tuned = author_world_tune_tick(ed, pc_out, tuned, x0 + 72000, y0 - 4000)
     tuned = author_gfx_tune_tick(ed, pc_out, tuned, x0 + 92000, y0 - 4000)
+    tuned = author_player_tune_tick(ed, pc_out, tuned, x0 + 108000, y0 - 4000)
     # Then the menu's own rows (new game or resume, settings, exit game) and M.
     toggled = author_main_rows_tick(ed, pc_out, tuned, x0 + 260, y0 - 1600)
 
@@ -1111,7 +1116,8 @@ def _author_draw(ed, x0, y0):
     guns = author_tune_panel(ed, x0 + 4800, y0, shown)
     monsters = author_tune_panel(ed, x0 + 11000, y0, guns, MONSTER_TAB)
     world = author_tune_panel(ed, x0 + 17200, y0, monsters, WORLD_TAB)
-    author_tune_panel(ed, x0 + 23400, y0, world, GFX_TAB)
+    gfx = author_tune_panel(ed, x0 + 23400, y0, world, GFX_TAB)
+    author_tune_panel(ed, x0 + 29600, y0, gfx, PLAYER_TAB)
 
 
 # ─── Entry points ────────────────────────────────────────────────────────────
@@ -1203,6 +1209,7 @@ def build_hud_blueprint(rebuild=False):
                          **dev_guns_defaults(), **loot_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),
                          **world_tune_defaults(), **gfx_tune_defaults(),
+                         **player_tune_defaults(),
                          **cursor_defaults()})
     _asset_sub().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")

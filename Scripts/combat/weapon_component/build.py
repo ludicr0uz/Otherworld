@@ -38,7 +38,10 @@ from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
     PUNCH_QUEUED_VAR,
 )
-from combat.sprint_tuning import SPRINT_AHEAD_VAR
+from combat.sprint_tuning import (
+    SPRINT_AHEAD_VAR, SPRINT_RATE_VARS, SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR,
+    STAMINA_REGEN_VAR,
+)
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 from combat.weapon_component.stance import STANCE_VAR, STAND
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
@@ -112,8 +115,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     _declare(ed, "AimBlocked", BEL.get_basic_type_by_name("bool"))
     # Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's
     # HP bar; BaseSpeed is cached off the character at BeginPlay, never a
-    # literal. Sprinting is what the fire gate refuses on.
-    for name in ("Stamina", "MaxStamina", "BaseSpeed"):
+    # literal. Sprinting is what the fire gate refuses on. The sprint's speed
+    # and the stamina's two rates are variables so the PLAYER TUNING tab can
+    # write them.
+    for name in ("Stamina", "MaxStamina", "BaseSpeed", *SPRINT_RATE_VARS):
         _declare(ed, name, _float_type())
     _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
     _declare(ed, SPRINT_SPENT_VAR, BEL.get_basic_type_by_name("bool"))
@@ -304,9 +309,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         "NeedsRefresh": True,
         "Stamina": COMBAT.max_stamina,
         "MaxStamina": COMBAT.max_stamina,
-        # Overwritten on the first frame of BeginPlay; this is only what the
-        # bar would divide by if that somehow never ran.
-        "BaseSpeed": 500.0,
+        # Overwritten on the first frame of BeginPlay with the character's
+        # own walk speed, which is this same number (player_pace.py).
+        "BaseSpeed": COMBAT.jog_speed_cms,
+        SPRINT_SPEED_VAR: COMBAT.sprint_speed_cms,
+        STAMINA_DRAIN_VAR: COMBAT.stamina_drain_per_s,
+        STAMINA_REGEN_VAR: COMBAT.stamina_regen_per_s,
         "Sprinting": False,
         SPRINT_SPENT_VAR: False,
         SPRINT_AHEAD_VAR: False,

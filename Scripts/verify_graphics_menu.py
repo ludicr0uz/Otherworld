@@ -33,6 +33,8 @@ from graphics_menu import monster_tune_consts as MC
 from graphics_menu.loot_checks import check_loot
 from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
+from graphics_menu import player_tune_consts as PTC
+from graphics_menu.player_tune_checks import check_player_tune
 from graphics_menu import world_tune_consts as WC
 from graphics_menu.world_tune_checks import check_world_tune
 from graphics_menu.gfx_checks import check_gfx_tune
@@ -444,9 +446,10 @@ def main():
     # Fifteen: and the carried guns the tuning tab writes (tune_tick.py).
     # Sixteen: and the fire press held spent under the cursor (cursor.py).
     # Seventeen: and the weapon component told it is Searching (loot_kneel.py).
+    # Eighteen: and the weapon component the player tab writes (player_tune_tick.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 17 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 18 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -712,11 +715,12 @@ def main():
               str(sum(1 for t in titles if t == f"Set {slider.var}")))
     # Literal indices only: the settings page's own Array_Get and Array_Set
     # take theirs from the loop and from MenuRow, and those are not the push.
-    # Nor are the monster and world tuning tabs' cells (literal, off
-    # MonTuneValues and WorldTuneValues).
+    # Nor are the monster, world and player tuning tabs' cells (literal, off
+    # MonTuneValues, WorldTuneValues and PlayerTuneValues).
     reads = [n for n in by_pins("TargetArray", "Index")
              if not BEL.find_input_pin(n, "Index").list_connected_pins()
-             and not {f"Get {MC.MON_TUNE_VALUES_VAR}", f"Get {WC.WORLD_TUNE_VALUES_VAR}"} & {
+             and not {f"Get {MC.MON_TUNE_VALUES_VAR}", f"Get {WC.WORLD_TUNE_VALUES_VAR}",
+                      f"Get {PTC.PLAYER_TUNE_VALUES_VAR}"} & {
                  str(BEL.get_node_title(PIN.get_owning_node(q)))
                  for q in BEL.find_input_pin(n, "TargetArray").list_connected_pins()}]
     check("...read out of Binds by index, one per action",
@@ -826,6 +830,7 @@ def main():
     check_tune(check, bp, nodes)
     check_monster_tune(check, bp, nodes)
     check_world_tune(check, bp, nodes)
+    check_player_tune(check, bp, nodes)
     check_gfx_tune(check, bp, nodes)
     check_gfx_save(check, nodes)
     check_gfx_tuner(check)

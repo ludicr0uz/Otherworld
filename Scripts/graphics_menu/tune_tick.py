@@ -54,16 +54,14 @@ from combat.paths import (
 from combat.weapon_specs import _weapon_specs
 from graphics_menu.cursor_consts import WHEEL_LESS, WHEEL_MORE
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
-from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.menu_nav import or_wheel, pause_row_taken
 from graphics_menu.loot_find import put
-from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import (
     GUN_TAB, STAT_COUNT, TUNE_LIVE_VAR, TUNE_TOUCHED_VAR,
     TUNE_VALUES_VAR, TUNE_WEAPONS_VAR,
 )
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
-from graphics_menu.world_tune_consts import WORLD_TAB
+from graphics_menu.tune_tabs import other_open_vars
 
 FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
 FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
@@ -356,8 +354,7 @@ def author_tune_tick(ed, pc_out, in_execs, x0, y0):
     made = []
     weapons = len(tune_table()[0])
     flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GUN_TAB, weapons,
-                           (MONSTER_TAB.open_var, WORLD_TAB.open_var,
-                            GFX_TAB.open_var))
+                           other_open_vars(GUN_TAB))
     tails = _author_apply(ed, flow, x0 + 10400, y0, made, weapons - len(melee_specs()))
     ed.add_comment_to_nodes(
         "Gun tuning (its row in the M panel): Up/Down pick a row, Left/Right "

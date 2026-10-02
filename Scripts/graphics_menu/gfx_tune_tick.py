@@ -43,12 +43,10 @@ from graphics_menu.gfx_tune_consts import (
     TUNER_DIRTY_VAR, TUNER_PRESET_VAR, TUNER_VALUES_VAR,
 )
 from graphics_menu.loot_find import put
-from graphics_menu.monster_tune_consts import MONSTER_TAB
-from graphics_menu.tune_consts import GUN_TAB
+from graphics_menu.tune_tabs import other_open_vars
 from graphics_menu.tune_tick import (
     FN_ARR_SET, FN_GE_II, FN_MUL_II, author_tab_flow, declare_tab_vars, tab_defaults,
 )
-from graphics_menu.world_tune_consts import WORLD_TAB
 
 FN_NEQ_II = "/Script/Engine.KismetMathLibrary.NotEqual_IntInt"
 
@@ -163,7 +161,7 @@ def author_gfx_tune_tick(ed, pc_out, in_execs, x0, y0):
     made = []
     flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GFX_TAB,
                            len(PRESET_LABELS),
-                           (GUN_TAB.open_var, MONSTER_TAB.open_var, WORLD_TAB.open_var))
+                           other_open_vars(GFX_TAB))
     flow = [_author_pick(ed, flow, x0 + 10400, y0, made)]
     flow = _author_spread(ed, flow, x0 + 11800, y0, made)
     tails = _author_hand_over(ed, flow, x0 + 14200, y0, made)

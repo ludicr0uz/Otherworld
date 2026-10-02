@@ -4,7 +4,17 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 ## Sprint
 
-- 900 cm/s while stamina lasts: 4 s from full, refilling at 12/s. The pack runs at 600.
+- The jog is 400 cm/s, the sprint 600 while stamina lasts: 8 s from full, refilling in 8.33 s.
+  The pack runs at 600, so a sprint keeps a zombie's distance and no more.
+- **The numbers are `player_tuning.csv`'s** (`player_tuning.py`: m/s and seconds), laid over
+  `COMBAT` and tuned in game by the menu's PLAYER TUNING tab
+  (`graphics_menu/player_tune_*.py`). The graph reads variables, not literals: `BaseSpeed`
+  (the jog, cached at BeginPlay off the character's `MaxWalkSpeed`, which
+  `player_pace.set_jog_speed` sets), `SprintSpeed`, `StaminaDrainPerSecond`,
+  `StaminaRegenPerSecond` (`sprint_tuning.SPRINT_RATE_VARS`).
+  `probes/probe_player_tuning.py` reads them on the live player and times the refill.
+- **Footstep noise is per gait, as before:** its reference speed followed the jog down to 400,
+  so a jog still carries 12 m and a sprint 18 m.
 - The fire gate refuses while sprinting.
 - **A spent sprint is latched** (`SprintSpent`, `verify/sprint.py`):
   `SprintSpent = key AND (SprintSpent OR Stamina <= 0)`, `Sprinting = key AND NOT SprintSpent`.

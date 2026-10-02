@@ -276,15 +276,16 @@ def check_hud_graph(check, nodes):
                 if not _sources(eq, "B"):
                     at_or_past = ">=" in _title(eq) or "GreaterEqual" in _title(eq).replace(" ", "")
                     (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
-    check("the settings page, the menu, loot window and the four tuning tabs "
+    check("the settings page, the menu, loot window and the five tuning tabs "
           "light the selected row's caret (the menu's is its own PauseRow)",
-          sorted(selected) == ["Get GfxTuneRow", "Get LootSel", "Get MenuRow",
-                               "Get MonTuneRow", f"Get {C.PAUSE_ROW_VAR}", "Get TuneRow",
-                               "Get WorldTuneRow"],
+          sorted(selected) == sorted(
+              ["Get GfxTuneRow", "Get LootSel", "Get MenuRow", "Get MonTuneRow",
+               f"Get {C.PAUSE_ROW_VAR}", "Get PlayerTuneRow", "Get TuneRow",
+               "Get WorldTuneRow"]),
           str(sorted(selected)))
     check("...and each tab's BACK row lights its caret while the tab's caret is on it",
-          sorted(backs) == ["Get GfxTuneRow", "Get MonTuneRow", "Get TuneRow",
-                            "Get WorldTuneRow"], str(sorted(backs)))
+          sorted(backs) == ["Get GfxTuneRow", "Get MonTuneRow", "Get PlayerTuneRow",
+                            "Get TuneRow", "Get WorldTuneRow"], str(sorted(backs)))
     check("...and the graphics tab's SAVE DEFAULT row lights its own while the caret "
           "is on it", saves == ["Get GfxTuneRow"], str(saves))
 

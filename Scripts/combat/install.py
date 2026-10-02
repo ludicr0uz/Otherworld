@@ -14,6 +14,7 @@ from combat.graph import (
 from combat.hit_reaction import install_hit_reactions
 from combat.hit_zones import install_hit_zones, make_shootable
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
+from combat.player_pace import set_jog_speed
 from combat.weapon_component.stance import allow_crouch
 
 
@@ -59,6 +60,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     aim_camera(bp)
     face_the_camera(bp)
     allow_crouch(bp)
+    set_jog_speed(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)

@@ -24,7 +24,7 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 - **The rows:** `new game` (in play it reads `resume` and shuts the menu), `settings` (the
   settings page), `debug` (wanderer numbers, pellet tracers and impact damage,
   the wanderers' sight cones; not the FPS readout, which is always on), `save and exit`, `dev-all-guns`, `gun tuning`,
-  `monster tuning`, `world tuning`, `graphics tuning`, `exit game` (quits to the desktop,
+  `monster tuning`, `world tuning`, `player tuning`, `graphics tuning`, `exit game` (quits to the desktop,
   saving nothing). The quality presets are not
   rows: Low / Medium / High / Custom is the graphics tab's first row.
 - **The settings page or a tuning tab stands in place of the menu's rows**, and its **BACK**
@@ -80,7 +80,7 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 - **`PauseRow` is the caret.** Up / Down and Enter are polled in DrawHUD (`_author_pause_keys`),
   only while no tab and no settings page is open. Enter, not Space: the panel does not pause, and Space jumps.
 - **One menu on screen.** `WBP_PauseMenu.Panel` (the panel's own artwork and rows) is
-  collapsed while the settings page is up or any tab's open flag is, and the page or the open tab's panel shows instead; the three
+  collapsed while the settings page is up or any tab's open flag is, and the page or the open tab's panel shows instead; the four
   developer tabs sit where the panel does (`TUNE_POS`), the graphics tab in the corner.
 - **BACK is a `WBP_MenuRow` under each tab's list**, the caret's last stop
   (`TuneTab.back_row`: one past the list, or two in the graphics tab, whose SAVE DEFAULT
@@ -486,6 +486,35 @@ gives up and how long it runs). Same keys as GUN TUNING; **Enter** saves
   tuned speed, a charge from the tuned range, the CSV.
 - **Still needs a play session:** how the scrolling panel reads, and how a tuned
   wanderer feels.
+
+## The PLAYER TUNING tab (`player_tune_*.py`)
+
+**Its menu row** opens it (`PlayerTuneOpen`). One subject row (`player`), then
+`combat/player_tuning.PLAYER_STATS`: the jog's speed and the sprint's (m/s, step 0.25), how
+long a full stamina bar sprints and how long an empty one refills (seconds, step 0.5). Same
+keys as GUN TUNING; **Enter** saves `Scripts/combat/player_tuning.csv`.
+
+- **The table is in a person's units, the component in its own.** Once touched
+  (`PlayerTuneTouched`), every Tick: the pawn's `BP_WeaponComponent`, a cast, then
+  `BaseSpeed` and `SprintSpeed` := m/s x 100, `StaminaDrainPerSecond` and
+  `StaminaRegenPerSecond` := the component's `MaxStamina` / seconds
+  (`player_tune_tick.APPLIES`; `combat/player_tuning.cms` and `per_second` are the build's
+  same sums). Every Tick, so a respawned player takes it too. The rows' minimums (0.5) keep
+  the divisions off zero.
+- **The jog is `BaseSpeed`.** The sprint writes `MaxWalkSpeed` from it every frame, and the
+  aim's slowdown and the low stances scale it, so one write moves all of them. The built
+  jog is the character's own `MaxWalkSpeed` (`combat/player_pace.py`), which the
+  component's BeginPlay caches.
+- **The CSV feeds** `combat/tuning.COMBAT` (so `build_weapons_and_combat.py`: the character's
+  walk speed and the component's defaults, then `build_graphics_menu.py`, the HUD's table).
+  `verify_weapons_and_combat` (`combat/verify/sprint.py`) checks both against it.
+- **The verifier's whole-graph scans exclude this tab:** the Binds read-by-index check skips
+  `Get PlayerTuneValues`; the component-lookup count includes its one.
+- **Probe:** `probe_player_tuning.py` (8 checks: the built jog, sprint and rates, the refill
+  timed on the game's clock, a nudge of each row on the live player, the CSV, the panel). It
+  backs up the CSV and puts it back.
+- **Still needs a play session:** how a 4 m/s jog and a 6 m/s sprint feel against the
+  wanderers (a zombie runs at 6), and how the jog clip reads at the slower speed.
 
 ## The WORLD TUNING tab (`world_tune_*.py`)
 

@@ -1,5 +1,5 @@
 """WBP_PauseMenu's tuning panels, one per TuneTab (tune_tab.py): GUN, MONSTER,
-WORLD and GRAPHICS TUNING. Only one is open at a time, and an open one stands
+WORLD, PLAYER and GRAPHICS TUNING. Only one is open at a time, and an open one stands
 in place of the M panel's own rows (menu_screens.author_pause_menu).
 
   where the M panel is   the tab's panel: a title, row_count WBP_MenuRows (the

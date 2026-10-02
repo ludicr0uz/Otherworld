@@ -1,0 +1,5 @@
+setting,value
+jog_speed_mps,4
+sprint_speed_mps,6
+sprint_duration_s,8
+stamina_recharge_s,8.33

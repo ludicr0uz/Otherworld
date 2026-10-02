@@ -11,17 +11,13 @@ from graphics_menu import loot_consts as LC
 from graphics_menu import tune_tab as TT
 from graphics_menu import umg_consts as UC
 from graphics_menu.cursor import cursor_defaults
-from graphics_menu.monster_tune_consts import MONSTER_TAB
-from graphics_menu.gfx_tune_consts import GFX_TAB
-from graphics_menu.tune_consts import GUN_TAB
+from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_checks import _tree
-from graphics_menu.world_tune_consts import WORLD_TAB
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
-TABS = (GUN_TAB, MONSTER_TAB, WORLD_TAB, GFX_TAB)
 # The row stacks the cursor is tested against: the menu (the title's too), its
-# settings page, the loot window and the four tuning tabs.
+# settings page, the loot window and the tuning tabs.
 ROW_LISTS = 3 + len(TABS)
 # ...and the single lines a click lands on: the death menu's hint, the loot
 # window's close button, each tab's hint and each tab's BACK row.
@@ -212,7 +208,7 @@ def _check_clicks(check, nodes):
           bool(by_key[CC.CLICK_KEY]) and not loose, str(loose))
     # Left/Right gain the wheel on the settings page and in each tuning tab;
     # in a scrolling tab it is Up/Down's instead, and the list follows.
-    check("the wheel is Left/Right: the settings page and the four tabs",
+    check("the wheel is Left/Right: the settings page and the tabs",
           len(by_key[CC.WHEEL_MORE]) == 1 + len(TABS)
           and len(by_key[CC.WHEEL_LESS]) == 1 + len(TABS),
           f"{len(by_key[CC.WHEEL_MORE])} up, {len(by_key[CC.WHEEL_LESS])} down")

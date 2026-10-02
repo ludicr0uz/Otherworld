@@ -13,8 +13,10 @@ while the wanderer is aggro:
             the wendigo is within NPC_WARD_RANGE_CM, and it stands within
             NPC_WARD_HALF_ANGLE_DEG of where the player faces. It does not
             swing. It circles them NPC_WARD_RING_CM off, NPC_WARD_ARC_DEG
-            further round on every pass, facing them, one way round for the
-            whole hold (the other way when something stops it).
+            further round on every pass, facing them. The way round is a
+            coin when the hold begins, turned about every
+            NPC_WARD_TURN_*_S (twice as often as its hunt's arc turns), and
+            when something stops it.
   flanked   it has come further round than NPC_WARD_HALF_ANGLE_DEG: the
             fire is no longer between them, the step fails, and the attack
             runs. A player who turns with it holds it off again.
@@ -25,7 +27,8 @@ while the wanderer is aggro:
 """
 
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM
-from forest_generator.npc_stalk import NPC_STALK_CHARGE_CM
+from forest_generator.npc_stalk import (
+    NPC_STALK_CHARGE_CM, NPC_STALK_TURN_MAX_S, NPC_STALK_TURN_MIN_S)
 
 # Who is afraid of fire. A creature without a row walks through it.
 NPC_WARD_FEARS = ("Wendigo",)
@@ -45,6 +48,12 @@ NPC_WARD_SPEED_SCALE = 0.6
 # Slower than this, flat, on a pass of a hold already under way: something
 # is in its way (a trunk, a ledge), and it goes round the other way.
 NPC_WARD_STALLED_CMS = 20.0
+# The way round is turned about this long after the hold begins, and after
+# each turn: one throw per turn, half the hunt's (npc_stalk.py), so it turns
+# about twice as often in front of a fire, and never under a second apart.
+NPC_WARD_TURN_FLOOR_S = 1.0
+NPC_WARD_TURN_MIN_S = max(NPC_WARD_TURN_FLOOR_S, NPC_STALK_TURN_MIN_S / 2.0)
+NPC_WARD_TURN_MAX_S = NPC_STALK_TURN_MAX_S / 2.0
 
 # Held off this long, it gives up and runs.
 NPC_WARD_HOLD_S = 30.0
@@ -66,3 +75,4 @@ assert 0.0 < NPC_WARD_HALF_ANGLE_DEG < 180.0
 assert 0.0 < NPC_WARD_ARC_DEG < NPC_WARD_HALF_ANGLE_DEG
 assert 0.0 < NPC_WARD_SPEED_SCALE <= 1.0
 assert 0.0 < NPC_WARD_GRACE_S < NPC_WARD_HOLD_S
+assert NPC_WARD_TURN_FLOOR_S <= NPC_WARD_TURN_MIN_S < NPC_WARD_TURN_MAX_S

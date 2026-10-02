@@ -44,13 +44,15 @@ THE CONTROLLER'S STEPS (one fragment per concern)
                off and round the player instead, facing them
   stalk        a stalker's Stalk step (the wendigo): roar, then a leg at a
                time to the next tree (faster than its run, the way round
-               turned about every few seconds) and a wait behind it, then
+               turned about every few seconds) and a wait behind it (none
+               in the open: it runs on; past 150 m straight at them), then
                fail for good, which is the charge (Chase takes over). Hurt
                by the player it is Enraged: the step fails from the start
   stalk_cover  ...the next tree: the sweeps for one, the spot behind its
-               trunk, and what makes a spot cover
+               trunk, and what makes a spot cover (a trunk wide enough)
   ward         a fire-fearing creature's Ward step (the wendigo): while the
-               player holds fire out at it, it circles instead of attacking;
+               player holds fire out at it, it circles instead of attacking,
+               turning about every couple of seconds;
                past the fire the step fails; held off long enough, it runs
   agro         the notice and patrol steps: player present, one per sense, stroll
   sight_cone   debug mode: the Tick that draws the sight (aggro) cone, as
@@ -67,8 +69,10 @@ CHECKS (Scripts/verify_npc_blueprints.py)
   verify_tree  the Blackboard, each tree's priorities, the step events
   verify_sight_cone  debug mode's cone: its gates and what it is drawn from
   verify_strafe  the step between two swings: when, where to, facing, speed
-  verify_stalk   the wendigo's hunt: roar, turns, rage, sweeps, cover, legs,
+  verify_stalk   the wendigo's hunt: roar, turns, rage, catch-up, legs,
                  charge
+  verify_stalk_cover  ...its next tree: sweeps, the trunk's width, the same
+                 tree between the spot and the player, the open
   verify_ward    fire holding it off: the gate, the hold, the ring, the flight
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
 

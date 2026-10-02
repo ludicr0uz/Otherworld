@@ -13,6 +13,8 @@ wendigo is stood in front of the player, inside the fire's range:
   - the player does not turn, so it gets past the fire, and then it attacks;
   - the player turns the fire on it: the swings stop and it is back on the
     ring;
+  - held, the way it circles turns about once its time is up (written due:
+    the wait is 2-4.5 s), and the next turn is thrown 2-4.5 s on;
   - with the hold all but run out (WardSince written back; 30 s is a long
     headless wait) it runs away, and its hunt is reset for its return.
 
@@ -34,12 +36,12 @@ from combat.torch_tuning import BURN_OUT_VAR, LIT_VAR
 from forest_generator.npc_placement import NAV_REACHABLE_EXTENT_CM
 from forest_generator.npc_ward import (
     NPC_WARD_FLEE_S, NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
-    NPC_WARD_RING_CM,
+    NPC_WARD_RING_CM, NPC_WARD_TURN_MAX_S, NPC_WARD_TURN_MIN_S,
 )
 from npc.monster_tuning import TUNED_VAR
 from npc.paths import (
     AGGRO_VAR, NPC_DIR, STALK_CHARGING_VAR, STALK_ROAR_UNTIL_VAR,
-    WARD_FLEE_UNTIL_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR,
+    WARD_FLEE_UNTIL_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR, WARD_TURN_AT_VAR,
 )
 from probes.probe_knife import _file
 
@@ -47,7 +49,7 @@ WENDIGO_AI = f"{NPC_DIR}/BP_ForestWandererAI_Wendigo"
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
              ("EquippedIndex", "NeedsRefresh", SIGHTS_FORCED_VAR)]
             + [(ITEM_BP_PATH, LIT_VAR), (ITEM_BP_PATH, BURN_OUT_VAR),
-               (WENDIGO_AI, WARD_SINCE_VAR)])
+               (WENDIGO_AI, WARD_SINCE_VAR), (WENDIGO_AI, WARD_TURN_AT_VAR)])
 
 STICK = "BP_Stick_C"
 
@@ -57,6 +59,7 @@ FACING_DOT = 0.7      # within 45 degrees of the player
 HELD_S = 1.2          # how long the first hold is watched
 FLANK_SAMPLES = 150   # 15 s of game time to get round and swing
 FLEE_WATCH_S = 3.0
+BEAT_S = 0.7          # the tree's 0.5 s beat, and a sample or two
 
 
 def _wendigos(p):
@@ -229,6 +232,31 @@ def _run(p):
             all(s["swung"] == swings for s in again) and again[-1]["gap"] > reach + 50.0
             and again[-1]["gap"] <= NPC_WARD_RANGE_CM,
             f"{again[-1]['gap']:.0f} cm off (the ring is {NPC_WARD_RING_CM:.0f})")
+
+    # --- the way round turns about once its time is up -------------------------
+    side, due = float(p.get(ctrl, WARD_SIDE_VAR)), float(p.get(ctrl, WARD_TURN_AT_VAR))
+    p.check(f"the hold has a time to turn about, no more than "
+            f"{NPC_WARD_TURN_MAX_S:g} s on",
+            -BEAT_S <= due - p.time() <= NPC_WARD_TURN_MAX_S + BEAT_S,
+            f"{due - p.time():.1f} s on")
+    p.set(ctrl, WARD_TURN_AT_VAR, p.time())
+    turned_at = p.time()
+    for _ in range(20):
+        if float(p.get(ctrl, WARD_SIDE_VAR)) != side:
+            break
+        _face(p, player, npc)
+        yield SAMPLE_S
+    ahead = float(p.get(ctrl, WARD_TURN_AT_VAR)) - p.time()
+    p.check("that time up, it circles the other way within a beat, still held",
+            float(p.get(ctrl, WARD_SIDE_VAR)) == -side
+            and p.time() - turned_at <= BEAT_S
+            and float(p.get(ctrl, "NextAttackTime")) == swings,
+            f"side {side:+.0f} -> {float(p.get(ctrl, WARD_SIDE_VAR)):+.0f} in "
+            f"{p.time() - turned_at:.1f} s")
+    p.check(f"...and the turn after that is {NPC_WARD_TURN_MIN_S:g}-"
+            f"{NPC_WARD_TURN_MAX_S:g} s on",
+            NPC_WARD_TURN_MIN_S - BEAT_S <= ahead <= NPC_WARD_TURN_MAX_S + BEAT_S,
+            f"{ahead:.1f} s")
 
     # --- held off long enough --------------------------------------------------
     p.check("it has not run yet: the hold is short of its "

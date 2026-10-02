@@ -8,8 +8,9 @@ npc/stalk.py.
          sweep a sphere along the line at the player, from a little closer
          than the wendigo stands to a lot closer
          [struck an instanced mesh, and that instance has a transform?]
+           [its mesh is one whose trunk hides a wendigo, at this scale?]
            StalkCover = the tree + (tree - player, flat, unit) * BEHIND
-           [a line from there to the player strikes a tree?]
+           [a line from there to the player strikes that same tree?]
            [closer than the pawn stands, outside the charge range, and on
             the navmesh?] StalkCover = the snapped point, StalkHidden = true
                           -> out
@@ -27,9 +28,15 @@ which is what the spot is measured from, not the point the sphere touched
 (a branch, or nothing at all when the sweep starts inside the crown).
 
 WHAT COVER IS. Not every tree hides anything: a sapling's stem is a few
-centimetres across, and some trunks lean off their own foot. So the spot is
-tested the way the player would see it: a line from it to the player has to
-strike a tree, any tree, before it reaches them.
+centimetres across and its twigs are seen through, and some trunks lean off
+their own foot. Two tests. The tree has to be of a mesh, and of a scale,
+whose trunk is as wide as the wendigo (npc_stalk.cover_trees(): the least
+scale per mesh, told by the mesh's name and picked through a chain of
+SelectFloats that ends on a scale no tree has). And the spot is tested the way the player would see it: a
+line from it to the player has to strike that same tree (the same component
+and instance) before it reaches them. Trees collide by their own triangles,
+leaves and all, so "any tree" let the twigs of a sapling ten metres on
+count as a hiding place.
 
 The terrain is one mesh and blocks the same channel, and a sphere this wide
 drags along it on any slope. So the sweep ignores what the pawn stands on
@@ -49,20 +56,26 @@ from forest_generator.npc_stalk import (
     NPC_STALK_LEG_TIMEOUT_S,
     NPC_STALK_NAV_EXTENT_CM, NPC_STALK_OPEN_ADVANCE_CM,
     NPC_STALK_OPEN_NAV_EXTENT_CM,
-    NPC_STALK_SWEEP_LIFT_CM, NPC_STALK_SWEEP_RADIUS_CM,
+    NPC_STALK_SWEEP_LIFT_CM, NPC_STALK_SWEEP_RADIUS_CM, cover_trees,
 )
 from npc.graph import BEL, _Graph, _connect, _loose_pin, _palette, _pin, out
 from npc.nodes import (
     FN_ADD_FF, FN_ADD_II, FN_ADD_VV, FN_ARR_ADD, FN_ARR_CLEAR,
-    FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_DISTANCE_2D, FN_FMAX,
-    FN_IN_RANGE, FN_INSTANCE_TRANSFORM, FN_LINE_TRACE, FN_MAKE_VECTOR, FN_MOVEMENT_BASE, FN_MUL_FF, FN_MUL_VV, FN_NORMAL_2D,
-    FN_PROJECT_NAV, FN_ROTATE_AXIS, FN_SPHERE_TRACE, FN_SUB_FF, FN_SUB_VV,
-    NODE_BREAK_HIT, NODE_CAST_INSTANCED,
+    FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_DISTANCE_2D, FN_EQ_II,
+    FN_EQ_OO, FN_EQ_SS, FN_FMAX, FN_GE_FF, FN_IN_RANGE, FN_INSTANCE_TRANSFORM,
+    FN_LINE_TRACE, FN_MAKE_VECTOR, FN_MOVEMENT_BASE, FN_MUL_FF, FN_MUL_VV,
+    FN_NORMAL_2D, FN_OBJECT_NAME, FN_PROJECT_NAV, FN_ROTATE_AXIS, FN_SELECT_FLOAT,
+    FN_SPHERE_TRACE, FN_SUB_FF, FN_SUB_VV, NODE_BREAK_HIT, NODE_CAST_INSTANCED,
 )
 from npc.paths import (
     STALK_ARRIVED_VAR, STALK_COVER_VAR, STALK_HIDDEN_VAR, STALK_IGNORE_VAR,
     STALK_LEG_UNTIL_VAR, STALK_LEGS_VAR, STALK_SIDE_VAR,
+    STATIC_MESH_COMP_CLASS_PATH,
 )
+
+# What the chain of least scales ends on: a mesh that is not cover at any
+# scale (a sapling, or one no row names) needs a scale no tree has.
+NO_COVER_SCALE = 1000000.0
 
 
 def declare_cover_vars(ed):
@@ -99,6 +112,33 @@ def _along(g, origin, direction, reach, x, y):
     _connect(origin, _pin(point, "A"))
     _connect(out(step), _pin(point, "B"))
     return out(point)
+
+
+def _author_wide(g, exec_in, tree, scale, x0, y0):
+    """Is this tree's trunk wide enough to hide behind? ``tree`` is the pin
+    of the instanced component the sweep struck and ``scale`` that of the
+    instance's scale (a vector). Returns the Branch."""
+    mesh = g.keep(g.ed.add_get_member_variable_node(
+        "StaticMesh", STATIC_MESH_COMP_CLASS_PATH), x0, y0 + 300)
+    _connect(tree, _pin(mesh, "self"))
+    # By name: an object pin of an Equal node takes no asset literal.
+    named = g.call(FN_OBJECT_NAME, x0, y0 + 620)
+    _connect(_pin(mesh, "StaticMesh", is_input=False), _pin(named, "Object"))
+    least = None
+    for i, (path, scale_min) in enumerate(cover_trees()):
+        same = g.call(FN_EQ_SS, x0 + 240, y0 + 300 + 160 * i, B=path.rsplit(".", 1)[-1])
+        _connect(out(named), _pin(same, "A"))
+        pick = g.call(FN_SELECT_FLOAT, x0 + 480, y0 + 300 + 160 * i, A=scale_min)
+        _connect(out(same), _pin(pick, "bPickA"))
+        if least is None:
+            _pin(pick, "B").set_pin_value(str(NO_COVER_SCALE))
+        else:
+            _connect(least, _pin(pick, "B"))
+        least = out(pick)
+    size = g.call(FN_BREAK_VECTOR, x0, y0 + 460)
+    _connect(scale, _pin(size, "InVec"))
+    return g.branch(g.op(FN_GE_FF, out(size, "X"), least, x0 + 720, y0 + 300),
+                    exec_in, x0 + 960, y0)
 
 
 def _author_try(g, exec_in, angle, pins, x0, y0):
@@ -156,7 +196,10 @@ def _author_try(g, exec_in, angle, pins, x0, y0):
     stood = g.call(FN_ADD_VV, x0 + 3420, y0 + 300)
     _connect(out(spot), _pin(stood, "A"))
     _connect(pins["half_height"], _pin(stood, "B"))
-    raw = g.put(STALK_COVER_VAR, BEL.find_then_pin(known), x0 + 3660, y0,
+    its = _loose_pin(tree, "AsInstancedStaticMeshComponent", is_input=False)
+    wide = _author_wide(g, BEL.find_then_pin(known), its, out(trunk, "Scale"),
+                        x0 + 2200, y0 - 900)
+    raw = g.put(STALK_COVER_VAR, BEL.find_then_pin(wide), x0 + 3660, y0,
                 pin=out(stood))
 
     # --- ...out of the player's sight ------------------------------------------
@@ -170,9 +213,13 @@ def _author_try(g, exec_in, angle, pins, x0, y0):
     blocked = g.branch(out(line), BEL.find_then_pin(line), x0 + 4260, y0 - 300)
     between = g.keep(_palette(g.ed, NODE_BREAK_HIT), x0 + 4260, y0 - 100)
     _connect(out(line, "OutHit"), _pin(between, "Hit"))
-    shade = g.keep(_palette(g.ed, NODE_CAST_INSTANCED), x0 + 4560, y0 - 300)
-    _connect(_loose_pin(between, "HitComponent", is_input=False), _pin(shade, "Object"))
-    _connect(BEL.find_then_pin(blocked), _pin(shade, "execute"))
+    # That tree, and no other: the same cell and the same instance of it.
+    cell = g.op(FN_EQ_OO, _loose_pin(between, "HitComponent", is_input=False), its,
+                x0 + 4560, y0 - 100)
+    item = g.op(FN_EQ_II, _loose_pin(between, "HitItem", is_input=False),
+                _loose_pin(hit, "HitItem", is_input=False), x0 + 4560, y0 + 60)
+    shade = g.branch(g.op(FN_AND, cell, item, x0 + 4800, y0 - 100),
+                     BEL.find_then_pin(blocked), x0 + 4600, y0 - 300)
     raw = BEL.find_then_pin(shade)
 
     # --- ...a step in (the sphere may have touched a crown, metres from its
@@ -192,8 +239,8 @@ def _author_try(g, exec_in, angle, pins, x0, y0):
                     pin=out(on_nav, "ProjectedLocation"))
     found = g.put(STALK_HIDDEN_VAR, snapped, x0 + 5500, y0, literal="true")
     missed = [BEL.find_else_pin(struck), _loose_pin(tree, "CastFailed", is_input=False),
-              BEL.find_else_pin(known), BEL.find_else_pin(blocked),
-              _loose_pin(shade, "CastFailed", is_input=False),
+              BEL.find_else_pin(known), BEL.find_else_pin(wide),
+              BEL.find_else_pin(blocked), BEL.find_else_pin(shade),
               BEL.find_else_pin(walkable)]
     return found, missed, heading
 

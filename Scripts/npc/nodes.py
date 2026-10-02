@@ -128,5 +128,11 @@ FN_IN_RANGE = "/Script/Engine.KismetMathLibrary.InRange_FloatFloat"
 FN_VELOCITY = "/Script/Engine.Actor.GetVelocity"
 FN_VSIZE_XY = "/Script/Engine.KismetMathLibrary.VSizeXY"
 FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
+FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
+FN_EQ_OO = "/Script/Engine.KismetMathLibrary.EqualEqual_ObjectObject"
+# An object pin of EqualEqual_ObjectObject takes no asset literal, so a mesh
+# is told by its name (npc/stalk_cover.py).
+FN_OBJECT_NAME = "/Script/Engine.KismetSystemLibrary.GetObjectName"
+FN_EQ_SS = "/Script/Engine.KismetStringLibrary.EqualEqual_StrStr"
 NODE_BREAK_HIT = "Collision|BreakHitResult"
 NODE_CAST_INSTANCED = "Utilities|Casting|CastToInstancedStaticMeshComponent"

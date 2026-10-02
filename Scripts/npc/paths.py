@@ -74,6 +74,8 @@ PATROL_TARGET_VAR = "PatrolTarget"
 NEXT_PATROL_VAR = "NextPatrolTime"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 CHARACTER_CLASS_PATH = "/Script/Engine.Character"
+# Whose StaticMesh a tree's cell is read through (npc/stalk_cover.py).
+STATIC_MESH_COMP_CLASS_PATH = "/Script/Engine.StaticMeshComponent"
 
 # ── Between two swings (npc/strafe.py) ───────────────────────────────────────
 #
@@ -121,11 +123,13 @@ ENRAGED_VAR = "Enraged"
 #   WARD_LAST_VAR        the last pass that was held off (a hold broken for
 #                        longer than the grace starts over)
 #   WARD_SIDE_VAR        +1 or -1: which way round the player it circles
+#   WARD_TURN_AT_VAR     when that is next turned about
 #   WARD_FLEE_UNTIL_VAR  it runs away until then
 #   WARD_FLEE_GOAL_VAR   where the pass's run-away order points
 WARD_SINCE_VAR = "WardSince"
 WARD_LAST_VAR = "WardLast"
 WARD_SIDE_VAR = "WardSide"
+WARD_TURN_AT_VAR = "WardTurnAt"
 WARD_FLEE_UNTIL_VAR = "WardFleeUntil"
 WARD_FLEE_GOAL_VAR = "WardFleeGoal"
 

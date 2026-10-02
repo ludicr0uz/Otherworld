@@ -23,7 +23,7 @@ steps, the tree, the step task, the controller and the character).
   fragment reading it with `tuned()`.
 
 `Scripts/verify_npc_blueprints.py` checks patrol, agro, the trees, the step between swings and
-the wendigo's hunt and the fire that holds it off (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_ward.py`). The level verifier owns the chase and the melee.
+the wendigo's hunt and the fire that holds it off (`verify.py`, `verify_tree.py`, `verify_strafe.py`, `verify_stalk.py`, `verify_stalk_cover.py`, `verify_ward.py`). The level verifier owns the chase and the melee.
 `Scripts/probes/probe_npc_behavior_tree.py` proves the trees run in the game.
 
 Respawn, the world-floor net and the `[NPC-SPAWN]`/`[NPC-FELL]` numbering are in
@@ -133,9 +133,14 @@ Wanderer (selector)
     `DefaultSlot` (upper body, like the swing) and one of its `Voices`. It stands 2.4 s. The
     clip is the Mixamo Scary pack's zombie scream, retargeted onto the wendigo alone by
     `import_mixamo.py`; without it the roar is sound only.
-  - **Legs are run at 130% of its run speed** (`NPC_STALK_RUN_SCALE`, about the player's
-    sprint), written after the order and on every pass of a leg. The Chase step writes the
-    run speed back on its first pass, so the charge is at the run.
+  - **Legs are run at 169% of its run speed** (`NPC_STALK_RUN_SCALE`: 130%, and 30% on top;
+    a tuned 690 cm/s is 1166, faster than the player's sprint of 900), written after the
+    order and on every pass of a leg. The Chase step writes the run speed back on its first
+    pass, so the charge is at the run.
+  - **Past 150 m it does not stalk** (`NPC_STALK_CATCH_UP_CM`): once it has roared, a pass
+    that far from the player orders it straight at them (`SimpleMoveToLocation`, their
+    spot) at the speed of a leg, zeroes `StalkLegUntil` and succeeds. The first pass inside
+    picks a leg. An enraged one never gets there: it charges, at its run.
   - **The way round alternates.** `StalkSide` is a coin at the roar, and `StalkTurnAt` a
     game time thrown with it (the roar's end + 4–9 s). The first leg picked once that time
     is up goes the other way and throws the next (now + 4–9 s). It turns only at a pick,
@@ -149,19 +154,39 @@ Wanderer (selector)
     shot wendigo comes back from a flight charging. **Fire still holds an enraged one
     off** (the Ward step is ahead of the whole attack).
   - **Legs:** each leg sweeps a
-    2 m sphere along a line at the player, 35 / 50 / 20° round them from where it stands,
-    from 3 m to 12 m closer. The first tree struck is the candidate; the spot is 170 cm past
+    3 m sphere along a line at the player, 35 / 50 / 20° round them from where it stands,
+    from 3 m to 18 m closer (half as far and as wide again as the 12 m and 2 m it began
+    with). The first tree struck is the candidate; the spot is 170 cm past
     its trunk, seen from the player. It runs there (`SimpleMoveToLocation`), waits 1–2.5 s
     facing the player, and picks the next. No cover on any line: a leg 6 m closer in the
-    open, not waited at.
+    open.
+  - **In the open it never stops.** A leg with no tree at its end is over 7 m short of its
+    spot (`NPC_STALK_OPEN_ARRIVE_CM`: more than it runs in the half second between two
+    passes), and that same pass picks the next leg, so the new order arrives while it is
+    still running. Before, it ran the leg out, stood, and was re-ordered a pass or two later.
   - **A tree is an instanced mesh the sweep struck** (as for the axe), and it stands where
     `GetInstanceTransform(HitItem)` says. Never the impact point: the sphere mostly touches
     crowns, metres from the trunk, and a sweep that starts inside one has no impact point.
-  - **Not every tree is cover.** A sapling's stem is a few centimetres across and the island
-    trees lean off their own foot. A spot counts only if a line from it to the player strikes
-    a tree, it is at least 1 m closer than the wendigo stands, no nearer the player than 12 m
-    (outside the charge range, or the run there would set the charge off), and on the
+  - **Not every tree is cover.** A sapling's stem is a few centimetres across, its twigs
+    are seen through, and the island trees lean off their own foot. Two tests:
+    - **The trunk is as wide as the wendigo**: 45 cm at chest height
+      (`NPC_STALK_TRUNK_MIN_CM`). `NPC_STALK_TRUNK_CM` holds each planted species' width
+      there at scale 1, measured with line traces across the trunk in the level, and
+      `cover_trees()` turns it into the least scale per mesh. The graph tells the mesh by
+      its name (`GetObjectName` of the cell's `StaticMesh`) and reads the scale off the
+      instance's transform. The pine sapling (1.2 cm a unit of scale) is never cover; the
+      small deciduous tree is from 3.2x; the fir and the island trees nearly always are.
+      **A new species needs a row**, or the verifier fails.
+    - **A line from the spot to the player strikes that same tree** (the same component
+      and `HitItem`). It used to be any tree: trees collide by their own triangles
+      (`CTF_UseComplexAsSimple`), leaves included, so a sapling's twigs ten metres further
+      on counted as a hiding place.
+
+    And the spot is at least 1 m closer than the wendigo stands, no nearer the player than
+    12 m (outside the charge range, or the run there would set the charge off), and on the
     navmesh.
+  - **An object pin of `Equal (Object)` takes no asset literal** (`set_pin_value` reads back
+    empty), which is why the mesh is compared by name.
   - **The sweep ignores what the pawn stands on** (`GetMovementBaseActor`: the terrain, one
     mesh, which a sphere that wide drags along on any slope) and the pawn: `bIgnoreSelf` in a
     controller graph is the controller.
@@ -169,16 +194,19 @@ Wanderer (selector)
     second after the order (no path), and a pick with no cover and no navmesh under the open
     spot either. Before that rule, an open spot off the navmesh was re-picked every pass and
     the wendigo stood at 30 m for good. A leg still running after 6 s is re-picked.
-  - `verify_stalk.py` checks the graph; `probes/probe_wendigo_stalk.py` watches one hunt
+  - `verify_stalk.py` checks the graph (`verify_stalk_cover.py` the next tree);
+    `probes/probe_wendigo_stalk.py` watches one hunt
     (with whatever turns fall in it); `probes/probe_wendigo_rage.py` makes a turn come due
-    and shoots one on its hunt and one on patrol.
+    and shoots one on its hunt and one on patrol; `probes/probe_wendigo_catch_up.py` stands
+    the two in opposite corners of the map, 250 m apart.
     `verify.py` and `verify_strafe.py` count a controller's nodes outside this step
     (`outside_step`), so their counts are the same for every creature.
   - **Maths nodes are wildcards until wired:** wire A, then set B (`stalk_cover._Graph.op`). A
     literal set first is refused.
   - **Feel check (needs a play session):** the roar is upper body only, on standing legs; the
     wait behind a trunk has no crouch or peek; its 4–9 s voice still sounds from behind its
-    tree; at 130% the legs outrun the blend space's top (the feet slide a little); and
+    tree; at 169% the legs outrun the blend space's top (the feet slide) and it outruns a
+    sprinting player; whether 45 cm is the right trunk; and
     rage shows only as a voice and the charge (no clip, and no faster than its run).
 - **Fire holds the wendigo off** (`ward.py`, numbers in `forest_generator/npc_ward.py`):
   - It is one more step, `BT_Ward`, in a selector with the whole attack (the approach and
@@ -193,8 +221,11 @@ Wanderer (selector)
     further round on every pass, facing them, at 60% of its run.
   - **Past the fire it attacks.** More than 90° round, the step fails and Stalk, Chase and
     Swing run as ever. A player who turns with it holds it off again.
-  - **One way round per hold** (`WardSide`, a coin when the hold begins), turned about when
-    a pass of a hold under way finds it standing still (a trunk in its way).
+  - **The way round** is `WardSide`, a coin when the hold begins, turned about every
+    2–4.5 s (`WardTurnAt`, one throw per turn: half the hunt's 4–9 s, so twice as often,
+    and never under 1 s) and when a pass of a hold under way finds it standing still (a
+    trunk in its way). 50° a pass is 90° in a second, so a turn does not keep it from
+    getting round a player who stands still.
   - **30 s of being held off and it runs:** `WardSince` is when the hold began, and a hold
     broken for under 2 s (`WardLast`) is the same hold, so getting round once does not
     start the count over. It runs straight away from the player for 12 s

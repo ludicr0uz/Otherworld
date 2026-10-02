@@ -9,7 +9,8 @@ Scripts/npc/verify.py (patrol, agro, corpse, guard) and Scripts/npc/verify_tree.
 (the Blackboard, the Behavior Trees and their steps),
 Scripts/npc/verify_sight_cone.py (debug mode's sight cone),
 Scripts/npc/verify_strafe.py (the step back and round between two swings) and
-Scripts/npc/verify_stalk.py (the wendigo's roar, tree-to-tree hunt and charge)
+Scripts/npc/verify_stalk.py and verify_stalk_cover.py (the wendigo's roar,
+tree-to-tree hunt and charge)
 and Scripts/npc/verify_ward.py (fire holding the wendigo off).
 """
 

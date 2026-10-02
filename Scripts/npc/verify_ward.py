@@ -4,7 +4,8 @@ off the saved controllers. Run through Scripts/verify_npc_blueprints.py.
 What it proves, of each fire-fearing creature's BT_Ward: it is held only
 while the player's FireWard is up, it is within the range and it stands in
 front of them, and otherwise the step fails; held, it gives no blow and
-circles the player on the ring, facing them, one way round per hold; a hold
+circles the player on the ring, facing them, the way round a coin when the
+hold begins and turned about every couple of seconds; a hold
 long enough ends in a flight, straight away from the player on the navmesh,
 which also starts a stalker's hunt over; and every held or fleeing pass
 succeeds. And that a creature which does not fear fire has no such step.
@@ -18,17 +19,20 @@ import unreal
 from combat.heat_tuning import FIRE_FEAR_TAG
 from combat.paths import FIRE_WARD_VAR
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM, NPC_VARIANTS
-from forest_generator.npc_stalk import NPC_STALK_ROAR
+from forest_generator.npc_stalk import (
+    NPC_STALK_ROAR, NPC_STALK_TURN_MAX_S, NPC_STALK_TURN_MIN_S,
+)
 from forest_generator.npc_ward import (
     NPC_WARD_ARC_DEG, NPC_WARD_FEARS, NPC_WARD_FLEE_NAV_EXTENT_CM,
     NPC_WARD_FLEE_S, NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S,
     NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
     NPC_WARD_RING_CM, NPC_WARD_SPEED_SCALE, NPC_WARD_STALLED_CMS,
+    NPC_WARD_TURN_MAX_S, NPC_WARD_TURN_MIN_S,
 )
 from npc.paths import (
     AI_BP_PATH, STALK_CHARGING_VAR, STALK_LEG_UNTIL_VAR, STALK_ROAR_UNTIL_VAR,
     STEP_RESULT_VAR, STEP_WARD, WARD_FLEE_GOAL_VAR, WARD_FLEE_UNTIL_VAR,
-    WARD_LAST_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR,
+    WARD_LAST_VAR, WARD_SIDE_VAR, WARD_SINCE_VAR, WARD_TURN_AT_VAR,
 )
 from npc.verify import (
     BEL, PIN, _close, _drivers, _exec_reach, _feeders, _ins, _lit, _num,
@@ -96,6 +100,14 @@ def check_settings():
           and NPC_WARD_HALF_ANGLE_DEG >= 90.0,
           f"{NPC_MELEE_RANGE_CM} < {NPC_WARD_RING_CM} < {NPC_WARD_RANGE_CM}, "
           f"{NPC_WARD_HALF_ANGLE_DEG} deg")
+    mean = (NPC_WARD_TURN_MIN_S + NPC_WARD_TURN_MAX_S) / 2.0
+    hunt = (NPC_STALK_TURN_MIN_S + NPC_STALK_TURN_MAX_S) / 2.0
+    check("ward: the way round turns about twice as often as the hunt's arc "
+          "does, at times that vary, never under 1 s apart",
+          1.0 <= NPC_WARD_TURN_MIN_S < NPC_WARD_TURN_MAX_S
+          and 1.5 <= hunt / mean <= 2.5,
+          f"{NPC_WARD_TURN_MIN_S:g}-{NPC_WARD_TURN_MAX_S:g} s against "
+          f"{NPC_STALK_TURN_MIN_S:g}-{NPC_STALK_TURN_MAX_S:g} s")
     check("ward: held off for 30 s, it runs",
           _close(NPC_WARD_HOLD_S, 30.0) and NPC_WARD_FLEE_S > 0.0)
 
@@ -157,7 +169,7 @@ def check_hold(tag, own, gate):
     coins = [n for s in sides for n in _sources(s, WARD_SIDE_VAR)
              if _title(n) == "RandomBool"]
     thrown = [s for s in sides if "RandomBool" in _titles(_sources(s, WARD_SIDE_VAR))]
-    check(f"{tag}: ...with one way round for the hold: a coin thrown once, read once",
+    check(f"{tag}: ...with the way round a coin thrown once, read once",
           len(coins) == 1 and len(thrown) == 1 and len(begins) == 1
           and thrown[0] in _exec_reach(begins[0])
           and len(PIN.list_connected_pins(
@@ -174,6 +186,29 @@ def check_hold(tag, own, gate):
           and [_num(t, "B") for t in _tests(stuck[0], "float < float")]
           == [NPC_WARD_STALLED_CMS]
           and [_num(m, "B") for m in _feeders(flips[0], WARD_SIDE_VAR)] == [-1.0])
+    due = [t for b in stuck for t in _tests(b, "float <= float")]
+    check(f"{tag}: ...or when {WARD_TURN_AT_VAR} is up, either one",
+          len(stuck) == 1 and len(due) == 1
+          and _titles(_feeders(stuck[0], "Condition")) == {"OR Boolean"}
+          and _titles(_feeders(due[0], "A")) == {f"Get {WARD_TURN_AT_VAR}"}
+          and _titles(_feeders(due[0], "B")) == {"GetTimeSeconds"})
+    times = _titled(own, f"Set {WARD_TURN_AT_VAR}")
+    sums = [a for t in times for a in _feeders(t, WARD_TURN_AT_VAR)]
+    throws = [r for a in sums for r in _feeders(a, "B")]
+    check(f"{tag}: ...which is {NPC_WARD_TURN_MIN_S:g}-{NPC_WARD_TURN_MAX_S:g} s "
+          f"(one throw each) after the hold began, and after each turn",
+          len(times) == 2 and len(thrown) == 1 and len(flips) == 1
+          and [t for t in times if t in _after(BEL.find_then_pin(thrown[0]))]
+          and [t for t in times if t in _after(BEL.find_then_pin(flips[0]))]
+          and len(sums) == 2 and len(throws) == 2 and throws[0] != throws[1]
+          and all(_title(a) == "float + float"
+                  and _titles(_feeders(a, "A")) == {"GetTimeSeconds"} for a in sums)
+          and all(_title(r) == "RandomFloatInRange"
+                  and _close(_num(r, "Min"), NPC_WARD_TURN_MIN_S)
+                  and _close(_num(r, "Max"), NPC_WARD_TURN_MAX_S)
+                  and len(PIN.list_connected_pins(
+                      BEL.find_output_pin(r, "ReturnValue"))) == 1 for r in throws),
+          f"{len(times)} writes of {WARD_TURN_AT_VAR}")
     stamps = _titled(own, f"Set {WARD_LAST_VAR}")
     spent = [b for s in stamps for b in _after(BEL.find_then_pin(s))]
     check(f"{tag}: every held pass stamps {WARD_LAST_VAR}",
@@ -306,8 +341,9 @@ def check_ward(path, key):
         return
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     held = {v: cdo.get_editor_property(v) for v in (
-        WARD_SINCE_VAR, WARD_LAST_VAR, WARD_SIDE_VAR, WARD_FLEE_UNTIL_VAR)}
-    check(f"{tag}: it starts with no hold, no side and no flight: four reals at 0",
+        WARD_SINCE_VAR, WARD_LAST_VAR, WARD_SIDE_VAR, WARD_TURN_AT_VAR,
+        WARD_FLEE_UNTIL_VAR)}
+    check(f"{tag}: it starts with no hold, no side, no turn and no flight: five reals at 0",
           all(isinstance(v, float) and v == 0.0 for v in held.values()), f"{held}")
     check(f"{tag}: the step gives no blow and no order but its own two: no "
           f"montage, no MoveTo, two SimpleMoveToLocation",

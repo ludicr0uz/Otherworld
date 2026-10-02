@@ -10,8 +10,10 @@ moment it goes aggro until it has swung at them:
   - then it runs legs, faster than it chases, each to a spot closer to the
     player and round them, the way its side says; the side is turned about
     only once its time is up, and the next turn is then 4-9 s on;
-  - a spot it took for cover has a tree between it and the player, and it
-    waits there;
+  - a spot it took for cover has a tree between it and the player, one
+    whose trunk is wide enough to hide it (never a sapling), and it waits
+    there;
+  - a leg that ends in the open is not stopped at: it runs on into the next;
   - inside the charge range it stops picking trees, runs at the player and
     swings.
 """
@@ -24,6 +26,7 @@ from forest_generator.npc_placement import NAV_REACHABLE_EXTENT_CM
 from forest_generator.npc_stalk import (
     NPC_STALK_CHARGE_CM, NPC_STALK_HIDE_MIN_S, NPC_STALK_ROAR, NPC_STALK_ROAR_S,
     NPC_STALK_RUN_SCALE, NPC_STALK_TURN_MAX_S, NPC_STALK_TURN_MIN_S,
+    cover_trees,
 )
 from npc.monster_tuning import TUNED_VAR
 from npc.paths import (
@@ -40,6 +43,8 @@ FACING_DOT = 0.7      # within 45 degrees of the player
 STILL_CMS = 30.0
 CENTRE_CM = 88.0      # a spot is on the ground; the pawn's centre is this far up
 BEAT_S = 0.7          # the tree's 0.5 s beat, and a sample or two
+SPIN_UP_S = 1.0       # from a standstill (the roar, a wait) up to a run
+STOOD_SAMPLES = 3     # this many still samples in a row is standing
 ROAR_CLIP = NPC_STALK_ROAR["Wendigo"].rsplit("/", 1)[-1]
 
 
@@ -66,13 +71,42 @@ def _montage_clips(montage):
 
 
 def _tree_between(npc, spot, player):
-    """Does a line from ``spot`` to the player strike a tree first?"""
+    """The tree a line from ``spot`` to the player strikes first, as (its
+    mesh's object path, its scale); None when it strikes none."""
     hit = unreal.SystemLibrary.line_trace_single(
         npc, spot + unreal.Vector(0.0, 0.0, CENTRE_CM), player.get_actor_location(),
         unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [npc],
         unreal.DrawDebugTrace.NONE, True)
-    comp = hit.to_tuple()[10] if hit else None
-    return isinstance(comp, unreal.InstancedStaticMeshComponent)
+    parts = hit.to_tuple() if hit else None
+    if not parts or not isinstance(parts[10], unreal.InstancedStaticMeshComponent):
+        return None
+    comp, item = parts[10], parts[13]
+    return (comp.get_editor_property("static_mesh").get_path_name(),
+            comp.get_instance_transform(item, True).scale3d.x)
+
+
+def _hides(tree):
+    """Is ``tree`` (_tree_between's answer) wide enough to hide a wendigo?"""
+    least = dict(cover_trees()).get(tree[0]) if tree else None
+    return least is not None and tree[1] >= least - 0.01
+
+
+def _stood_in_open(samples, legs):
+    """The longest it stood still, in samples, on a leg that ends in the
+    open -- but for the start of one run from a standstill."""
+    worst = run = 0
+    for s in samples:
+        k = s["legs"]
+        if k == 0 or s["charging"] or legs[k - 1]["hidden"]:
+            run = 0
+            continue
+        from_rest = k == 1 or legs[k - 2]["hidden"]
+        if from_rest and s["t"] - legs[k - 1]["t"] < SPIN_UP_S:
+            run = 0
+            continue
+        run = run + 1 if s["speed"] <= STILL_CMS else 0
+        worst = max(worst, run)
+    return worst
 
 
 def _about(point, centre):
@@ -176,7 +210,7 @@ def probe(p):
                              t=p.time(), side=float(p.get(ctrl, STALK_SIDE_VAR)),
                              turn_at=float(p.get(ctrl, STALK_TURN_AT_VAR)),
                              hidden=bool(p.get(ctrl, STALK_HIDDEN_VAR)),
-                             shaded=_tree_between(npc, spot, player)))
+                             tree=_tree_between(npc, spot, player)))
         samples.append(dict(
             t=p.time(), at=at, gap=gap, speed=math.hypot(vel.x, vel.y),
             facing=(fwd.x * (home.x - at.x) + fwd.y * (home.y - at.y)) / (gap or 1.0),
@@ -221,15 +255,27 @@ def probe(p):
             f"in {len(legs)} legs")
     covers = [leg for leg in legs if leg["hidden"]]
     p.check("a spot taken for cover has a tree between it and the player",
-            len(covers) > 0 and all(leg["shaded"] for leg in covers),
-            f"{sum(leg['shaded'] for leg in covers)} of {len(covers)} covers; "
+            len(covers) > 0 and all(leg["tree"] for leg in covers),
+            f"{sum(bool(leg['tree']) for leg in covers)} of {len(covers)} covers; "
             f"{len(legs) - len(covers)} legs in the open")
+    p.check("...one wide enough to hide it: no sapling, no slight tree",
+            len(covers) > 0 and all(_hides(leg["tree"]) for leg in covers),
+            ", ".join(f"{leg['tree'][0].rsplit('.', 1)[-1]} x{leg['tree'][1]:.2f}"
+                      for leg in covers if leg["tree"]))
     waits = [s for s in samples if s["arrived"] and s["hidden"] and not s["charging"]]
     held = len([s for s in waits if s["speed"] <= STILL_CMS]) * SAMPLE_S
     p.check("...and behind it the wendigo waits, facing the player",
             held >= NPC_STALK_HIDE_MIN_S * 0.5
             and max([s["facing"] for s in waits] or [0.0]) >= FACING_DOT,
             f"{held:.1f} s still over {len({s['legs'] for s in waits})} covers")
+
+    in_open = [s for s in samples if s["legs"] > 0 and not s["charging"]
+               and not legs[s["legs"] - 1]["hidden"]]
+    stood = _stood_in_open(samples, legs)
+    p.check("on a leg in the open it does not stop: it runs on into the next",
+            stood < STOOD_SAMPLES,
+            f"{len(in_open)} samples in the open, still for {stood * SAMPLE_S:.1f} s "
+            f"at most")
 
     charge = [s for s in samples if s["charging"]]
     p.check(f"inside {NPC_STALK_CHARGE_CM / 100:.0f} m it charges",

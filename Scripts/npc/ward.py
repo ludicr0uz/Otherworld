@@ -7,8 +7,10 @@ forest_generator/npc_ward.py's.
        -> [FireWard AND within the range AND in front of the player?]
             no                                         fail: the attack runs
        -> [no hold under way, or the last held pass too long ago?]
-            yes  WardSince = now, WardSide = +1 or -1
-            no   [standing still?] WardSide = -WardSide
+            yes  WardSince = now, WardSide = +1 or -1,
+                 WardTurnAt = now + 2-4.5 s
+            no   [standing still, or WardTurnAt <= now?]
+                 WardSide = -WardSide, WardTurnAt = now + 2-4.5 s
        -> WardLast = now
        -> [now - WardSince >= the hold?]
             yes  WardFleeUntil = now + the flight, WardSince = 0
@@ -44,6 +46,7 @@ from forest_generator.npc_ward import (
     NPC_WARD_FLEE_S, NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S,
     NPC_WARD_HALF_ANGLE_DEG, NPC_WARD_HOLD_S, NPC_WARD_RANGE_CM,
     NPC_WARD_RING_CM, NPC_WARD_SPEED_SCALE, NPC_WARD_STALLED_CMS,
+    NPC_WARD_TURN_MAX_S, NPC_WARD_TURN_MIN_S,
 )
 from npc.graph import (
     BEL, _Graph, _asset_sub, _connect, _log, _loose_pin, _palette, _pin, out,
@@ -53,13 +56,13 @@ from npc.nodes import (
     FN_EQ_FF, FN_FORWARD, FN_GE_FF, FN_GET_COMP, FN_GET_CONTROLLER, FN_GET_PAWN,
     FN_GET_PLAYER_PAWN, FN_GT_FF, FN_IS_VALID, FN_LE_FF, FN_LT_FF,
     FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VV, FN_NORMAL_2D, FN_OR, FN_PROJECT_NAV,
-    FN_RANDOM_BOOL, FN_ROTATE_AXIS, FN_SELECT_FLOAT, FN_SIMPLE_MOVE, FN_SUB_FF,
+    FN_RANDOM_BOOL, FN_RANDOM_FLOAT, FN_ROTATE_AXIS, FN_SELECT_FLOAT, FN_SIMPLE_MOVE, FN_SUB_FF,
     FN_SUB_VV, FN_TIME_SECONDS, FN_VELOCITY, FN_VSIZE_XY, NODE_CAST_WEAPON,
 )
 from npc.paths import (
     STALK_CHARGING_VAR, STALK_LEG_UNTIL_VAR, STALK_ROAR_UNTIL_VAR,
     WARD_FLEE_GOAL_VAR, WARD_FLEE_UNTIL_VAR, WARD_LAST_VAR, WARD_SIDE_VAR,
-    WARD_SINCE_VAR,
+    WARD_SINCE_VAR, WARD_TURN_AT_VAR,
 )
 from npc.patrol import _author_walk_speed
 from npc.strafe import _author_facing
@@ -95,7 +98,7 @@ def declare_ward_vars(ed):
     """All zero by default: no hold, no side, not fleeing."""
     kinds = {name: BEL.get_basic_type_by_name("real")
              for name in (WARD_SINCE_VAR, WARD_LAST_VAR, WARD_SIDE_VAR,
-                          WARD_FLEE_UNTIL_VAR)}
+                          WARD_TURN_AT_VAR, WARD_FLEE_UNTIL_VAR)}
     kinds[WARD_FLEE_GOAL_VAR] = BEL.get_struct_type(unreal.Vector.static_struct())
     for name, kind in kinds.items():
         ed.remove_member_variable(name)
@@ -140,9 +143,19 @@ def _author_held(g, exec_in, pins, x0, y0):
         BEL.find_else_pin(held)]
 
 
+def _author_turn_time(g, exec_in, pins, x0, y0):
+    """WardTurnAt = now + one throw of the time between two turns. Returns
+    the Set's then pin."""
+    throw = g.call(FN_RANDOM_FLOAT, x0, y0 + 460, Min=NPC_WARD_TURN_MIN_S,
+                   Max=NPC_WARD_TURN_MAX_S)
+    due = g.op(FN_ADD_FF, pins["now"], out(throw), x0 + 240, y0 + 300)
+    return g.put(WARD_TURN_AT_VAR, exec_in, x0 + 480, y0, pin=due)
+
+
 def _author_hold(g, exec_in, pins, x0, y0):
     """The hold's own state, for a pass that is held off: when it began, which
-    way round, the stamp. Returns the Branch on "held off long enough"."""
+    way round and until when, the stamp. Returns the Branch on "held off long
+    enough"."""
     idle = g.op(FN_SUB_FF, pins["now"], g.get(WARD_LAST_VAR, x0 - 240, y0 + 440),
                 x0, y0 + 300)
     lapsed = g.op(FN_GT_FF, idle, NPC_WARD_GRACE_S, x0 + 240, y0 + 300)
@@ -157,18 +170,23 @@ def _author_hold(g, exec_in, pins, x0, y0):
     coin = g.call(FN_SELECT_FLOAT, x0 + 1100, y0 + 300, A=1.0, B=-1.0)
     _connect(out(g.call(FN_RANDOM_BOOL, x0 + 860, y0 + 300)), _pin(coin, "bPickA"))
     picked = g.put(WARD_SIDE_VAR, began, x0 + 1340, y0, pin=out(coin))
-    # --- the same hold: stopped by something? Round the other way. -----------
+    picked = _author_turn_time(g, picked, pins, x0 + 1340, y0 - 800)
+    # --- the same hold: stopped by something, or its time that way round is
+    # up? Round the other way. ------------------------------------------------
     moving = g.call(FN_VELOCITY, x0 + 740, y0 + 900)
     _connect(pins["self_pawn"], _pin(moving, "self"))
     pace = g.call(FN_VSIZE_XY, x0 + 980, y0 + 900)
     _connect(out(moving), _pin(pace, "A"))
-    stalled = g.branch(g.op(FN_LT_FF, out(pace), NPC_WARD_STALLED_CMS,
-                            x0 + 1220, y0 + 900),
+    up = g.op(FN_LE_FF, g.get(WARD_TURN_AT_VAR, x0 + 980, y0 + 1300), pins["now"],
+              x0 + 1220, y0 + 1300)
+    still = g.op(FN_LT_FF, out(pace), NPC_WARD_STALLED_CMS, x0 + 1220, y0 + 900)
+    stalled = g.branch(g.op(FN_OR, still, up, x0 + 1460, y0 + 1100),
                        BEL.find_else_pin(fresh), x0 + 1040, y0 + 700)
     other = g.op(FN_MUL_FF, g.get(WARD_SIDE_VAR, x0 + 1100, y0 + 1100), -1.0,
                  x0 + 1340, y0 + 1000)
     turned = g.put(WARD_SIDE_VAR, BEL.find_then_pin(stalled), x0 + 1580, y0 + 700,
                    pin=other)
+    turned = _author_turn_time(g, turned, pins, x0 + 1580, y0 + 1500)
 
     stamped = g.put(WARD_LAST_VAR, [picked, turned, BEL.find_else_pin(stalled)],
                     x0 + 1900, y0, pin=pins["now"])

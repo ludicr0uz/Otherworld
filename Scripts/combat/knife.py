@@ -19,23 +19,31 @@ grip runs up and down through the fist, so the knife's handle does too: the
 model is turned over, blade up, and tipped 30 deg forward, a hammer grip with
 the edge leading. `Grip` in the outline is the handle, so grip._grip_location
 seats it in the fist exactly as it seats a pistol's grip.
+
+Thrown, it is held the other way, by the blade (knife_throw_grip): turned
+end for end about the across axis, so the blade runs down through the fist and
+the handle stands up over it, with the blade's middle seated in the fist of
+A_ThrowReady (throw_pose.py). weapon_component/throw_ready.py puts it there
+while the arm is cocked.
 """
 
 import unreal
 
 from combat.graph import (
-    BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
+    BEL, _assets, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
 )
 from combat.grip import _grip_location, _grip_rotation, _rotate_vector
 from combat.heat import build_heated_model, build_hot_instance
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.paths import (
     CUBE, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH, MAT_HOT_KNIFE, MAT_METAL,
+    THROW_READY_ANIM_PATH,
 )
 from combat.lodge import lodge_pose
 from combat.melee_tuning import melee_throw
 from combat.throw_tuning import (
     LODGE_KNIFE_DEPTH_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, MELEE_THROW,
+    THROW_GRIP_LOC_VAR, THROW_GRIP_ROT_VAR, THROW_GRIP_VAR,
 )
 from combat.tuning import COMBAT
 from combat.weapon_models import FAB_WEAPONS
@@ -103,6 +111,23 @@ def knife_lodge():
     return lodge_pose(along, _placed(tip, rot, loc), LODGE_KNIFE_DEPTH_CM)
 
 
+def knife_throw_grip(grip_rot):
+    """(ThrowGripLocation, ThrowGripRotation): the knife held by its blade in
+    the ready-to-throw pose. The hammer grip turned 180 deg about the weapon's
+    own Y (end for end, edge still leading), then the Blade part seated at
+    the fist of A_ThrowReady. None if there is no ready pose (no throw clip),
+    in which case the knife is thrown from the hammer grip."""
+    if not _assets().does_asset_exist(THROW_READY_ANIM_PATH):
+        return None
+    one = unreal.Vector(1.0, 1.0, 1.0)
+    over = unreal.Transform(rotation=unreal.Quat(0.0, 1.0, 0.0, 0.0).rotator(),
+                            scale=one)
+    hand = unreal.Transform(rotation=grip_rot, scale=one)
+    rot = unreal.MathLibrary.compose_transforms(over, hand).rotation.rotator()
+    loc = _grip_location(THROW_READY_ANIM_PATH, rot, knife_outline(), part="Blade")
+    return unreal.Vector(*loc), rot
+
+
 def build_knife(item_bp):
     """BP_Knife: the model on Body, the glow of its blade heated (heat.py),
     and the base class's defaults for a knife."""
@@ -112,6 +137,7 @@ def build_knife(item_bp):
     aim = HOLD_KNIFE_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     lodge = knife_lodge()
+    throw_grip = knife_throw_grip(grip_rot)
     _apply_defaults(bp, {
         "DisplayName": KNIFE_DISPLAY,
         "Melee": True,
@@ -122,6 +148,10 @@ def build_knife(item_bp):
         **melee_throw(KNIFE_DISPLAY),
         LODGE_TURN_VAR: lodge[0],
         LODGE_POINT_VAR: lodge[1],
+        # Cocked for the throw, held by the blade (throw_ready.py).
+        THROW_GRIP_VAR: throw_grip is not None,
+        THROW_GRIP_LOC_VAR: throw_grip[0] if throw_grip else unreal.Vector(),
+        THROW_GRIP_ROT_VAR: throw_grip[1] if throw_grip else unreal.Rotator(),
         HEATS_VAR: True,
         HOT_VAR: False,
         COOL_VAR: 0.0,

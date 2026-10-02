@@ -91,7 +91,8 @@ _author_* fragment per concern, each in its own module:
   throw_launch  where a throw leaves from and how fast, as pure pins: at
               AimPoint, pitched so its curve passes through the point the
               reticle rests on; out of the item's reach, tipped over the view
-  throw_ready the arm cocked (ThrowReadyAnim held in the slot) while the arc
+  throw_ready the arm cocked (ThrowReadyAnim held in the slot), and an item
+              with ThrowGrip (the knife) moved into it, by the blade, while the arc
               is drawn, and the re-equip that brings it down, called off
   throw_windup  the click plays the skin's throw clip on from the ready
               pose's moment and holds the release until its hand lets go

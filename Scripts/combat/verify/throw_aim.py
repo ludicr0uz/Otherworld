@@ -2,7 +2,8 @@
 the launch heading for the point the reticle rests on and pitched to pass
 through it (weapon_component/throw_launch.py), and the ready pose held
 while the key is down (throw_pose.py, weapon_component/throw_ready.py), which
-the click's clip plays on from.
+the click's clip plays on from, and the knife held by its blade in it
+(knife.knife_throw_grip).
 
 Also is_ready_node, which the older sweep over the slot's plays uses to leave
 the ready pose's two nodes out.
@@ -10,15 +11,20 @@ the ready pose's two nodes out.
 
 import math
 
+import unreal
+
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
-from combat.paths import THROW_READY_ANIM_PATH
+from combat.paths import KNIFE_BP_PATH, THROW_READY_ANIM_PATH
 from combat.skin import player_skin
+from combat.grip import fist_in_socket, part_placement
+from combat.knife import knife_outline
 from combat.throw_tuning import (
+    THROW_GRIP_LOC_VAR, THROW_GRIP_ROT_VAR, THROW_GRIP_VAR,
     THROW_AIM_MIN_AHEAD, THROW_GRAVITY_Z, THROW_MELEE_SPEED, THROW_PITCH_VAR,
     THROW_READY_S, THROW_RELEASE_S, THROW_SPEED, THROW_WINDUP_S,
 )
 from combat.verify.common import (
-    BEL, PIN, by_pins, check, has_in_pin, load, num_pin, pin_value,
+    BEL, PIN, by_pins, cdo, check, has_in_pin, load, num_pin, pin_value,
 )
 from combat.verify.fixtures import w, wg
 from combat.verify.throw import (
@@ -201,7 +207,43 @@ def check_ready_graph():
           == (w.get_editor_property(THROW_ANIM_VAR) is None))
 
 
+def check_blade_grip():
+    """The knife, cocked to throw, is held by the blade: its saved throw grip
+    puts the Blade's middle at the ready pose's fist, the handle clear of it,
+    and the graph moves it there on the frame the pose starts."""
+    d = cdo(load(KNIFE_BP_PATH))
+    want = player_skin().throw is not None
+    check("the knife is thrown from a blade grip (on a skin with a throw clip)",
+          bool(d.get_editor_property(THROW_GRIP_VAR)) == want)
+    if not want:
+        return
+    xf = unreal.Transform(location=d.get_editor_property(THROW_GRIP_LOC_VAR),
+                          rotation=d.get_editor_property(THROW_GRIP_ROT_VAR),
+                          scale=unreal.Vector(1.0, 1.0, 1.0))
+    fist, _fingers = fist_in_socket(THROW_READY_ANIM_PATH)
+    at = {name: unreal.MathLibrary.transform_location(
+              xf, part_placement(knife_outline(), name)[0])
+          for name in ("Blade", "Grip")}
+    miss = (at["Blade"] - fist).length()
+    clear = (at["Grip"] - fist).length()
+    check("...the blade's middle in the fist of the ready pose, the handle "
+          "out of it", miss < 0.5 and clear > 8.0,
+          f"blade {miss:.1f} cm off the fist, handle {clear:.1f} cm")
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName")
+             if is_ready_node(n) and has_in_pin(n, "LoopCount")]
+    nxt = ([PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_then_pin(plays[0]))] if len(plays) == 1 else [])
+    moves = ([PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_then_pin(nxt[0]))] if len(nxt) == 1 else [])
+    check("...moved into it, behind a Branch on ThrowGrip, as the ready pose "
+          "starts",
+          len(nxt) == 1 and f"Get {THROW_GRIP_VAR}" in _upstream(nxt[0], "Condition")
+          and len(moves) == 1 and "RelativeLocation" in _title(moves[0]).replace(" ", ""),
+          str([_title(n) for n in nxt + moves]))
+
+
 def run():
     check_reticle()
     check_ready_pose()
     check_ready_graph()
+    check_blade_grip()

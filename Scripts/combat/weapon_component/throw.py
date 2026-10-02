@@ -221,7 +221,7 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _set(on, THROW_AIMING_VAR, "true")
     _connect(BEL.find_then_pin(predict), _pin(on, "execute"))
     # The arm is cocked for as long as the arc shows (throw_ready.py).
-    posed = _author_throw_ready(ed, BEL.find_then_pin(on), x0 + 2560, y0 - 1400)
+    posed = _author_throw_ready(ed, held, BEL.find_then_pin(on), x0 + 2560, y0 - 1400)
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:

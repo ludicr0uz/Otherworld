@@ -108,6 +108,14 @@ THROW_AXE_DAMAGE = 75.0
 LODGE_TURN_VAR = "LodgeTurn"           # on BP_WeaponItem, a rotator
 LODGE_POINT_VAR = "LodgePoint"         # on BP_WeaponItem
 LODGE_MAX_HEIGHT_CM = 250.0
+# Held for the throw by the blade, not the handle (the knife): while the arm
+# is cocked and through the wind-up, weapon_component/throw_ready.py moves an
+# item with THROW_GRIP_VAR to its ThrowGripLocation/Rotation, the blade seated
+# in the fist of A_ThrowReady (knife.py solves them); the re-equip after a
+# called-off throw puts its own grip back.
+THROW_GRIP_VAR = "ThrowGrip"                  # on BP_WeaponItem, a bool
+THROW_GRIP_LOC_VAR = "ThrowGripLocation"      # in the grip socket's frame
+THROW_GRIP_ROT_VAR = "ThrowGripRotation"
 LODGE_KNIFE_DEPTH_CM = 7.0      # of the blade's 18.6 cm
 LODGE_AXE_DEPTH_CM = 5.0        # of the head's 25 cm from bit to poll
 STICK_TRACE_PAST = 1.5

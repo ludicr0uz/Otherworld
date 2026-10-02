@@ -6,10 +6,12 @@ pose where its hand is furthest back.
         IsValid(ThrowReadyAnim) AND it is not what AIM_SLOT is playing
           AND HitSlot is quiet
             --> play it into AIM_SLOT, looping
+            --> Held.ThrowGrip? move Held to its ThrowGripLocation/Rotation
+                (the knife, held by the blade: knife.py)
 
     the frame the key is let go with nothing thrown:
-        NeedsRefresh = true    the equip puts the item's own pose back, or
-                               stops the slot under a lowered gun
+        NeedsRefresh = true    the equip puts the item's own pose and grip
+                               back, or stops the slot under a lowered gun
 
 Level-triggered on what the slot is playing, not on the key's edge, so the
 pose comes back by itself after anything that took the slot in the meantime:
@@ -30,9 +32,12 @@ from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import (
     FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NOT, FN_PLAY_SLOT,
+    FN_SET_REL_LOC, FN_SET_REL_ROT,
 )
-from combat.throw_tuning import THROW_READY_BLEND_S
-from combat.weapon_component.common import AIM_LOOPS
+from combat.throw_tuning import (
+    THROW_GRIP_LOC_VAR, THROW_GRIP_ROT_VAR, THROW_GRIP_VAR, THROW_READY_BLEND_S,
+)
+from combat.weapon_component.common import AIM_LOOPS, _prop
 
 THROW_READY_ANIM_VAR = "ThrowReadyAnim"   # A_ThrowReady, or None
 
@@ -43,9 +48,10 @@ def _out(n, name="ReturnValue"):
     return _pin(n, name, is_input=False)
 
 
-def _author_throw_ready(ed, exec_in, x0, y0):
-    """Hold the ready pose in the slot; returns the exits. Run it on every
-    frame of the aim."""
+def _author_throw_ready(ed, item, exec_in, x0, y0):
+    """Hold the ready pose in the slot, and an item thrown by its blade in
+    its throw grip; returns the exits. Run it on every frame of the aim, when
+    ``item`` (Held) is valid."""
     made = []
 
     def keep(n):
@@ -94,13 +100,35 @@ def _author_throw_ready(ed, exec_in, x0, y0):
     _set(play, "LoopCount", AIM_LOOPS)
     _connect(BEL.find_then_pin(gate), _pin(play, "execute"))
 
+    # Held by the blade? Moved on the frame the pose starts, the same frame
+    # after any re-equip (which put the hand's own grip back).
+    by_blade, n = _prop(ed, THROW_GRIP_VAR, item, x0 + 1760, y0 + 300)
+    keep(n)
+    blade = keep(_at(ed.add_branch_node(), x0 + 2040, y0))
+    _connect(by_blade, _pin(blade, "Condition"))
+    _connect(BEL.find_then_pin(play), _pin(blade, "execute"))
+    loc, n = _prop(ed, THROW_GRIP_LOC_VAR, item, x0 + 2040, y0 + 300)
+    keep(n)
+    put = keep(_at(_node(ed, FN_SET_REL_LOC), x0 + 2320, y0))
+    _connect(item, _pin(put, "self"))
+    _connect(loc, _pin(put, "NewRelativeLocation"))
+    _connect(BEL.find_then_pin(blade), _pin(put, "execute"))
+    rot, n = _prop(ed, THROW_GRIP_ROT_VAR, item, x0 + 2320, y0 + 300)
+    keep(n)
+    turn = keep(_at(_node(ed, FN_SET_REL_ROT), x0 + 2600, y0))
+    _connect(item, _pin(turn, "self"))
+    _connect(rot, _pin(turn, "NewRelativeRotation"))
+    _connect(BEL.find_then_pin(put), _pin(turn, "execute"))
+
     ed.add_comment_to_nodes(
         "Getting ready to throw (throw_ready.py): while the arc is drawn the "
         f"arm is cocked, the ready pose held in {AIM_SLOT}. Asked every frame "
         "of what the slot is playing, so it comes back after a flinch or a "
-        f"re-equip; never under a flinch ({HIT_SLOT}), which it would stop.",
+        f"re-equip; never under a flinch ({HIT_SLOT}), which it would stop. "
+        "An item thrown by its blade (ThrowGrip) is moved into its throw grip.",
         made)
-    return (BEL.find_then_pin(play), BEL.find_else_pin(gate))
+    return (BEL.find_then_pin(turn), BEL.find_else_pin(blade),
+            BEL.find_else_pin(gate))
 
 
 def _author_ready_down(ed, exec_in, x, y):

@@ -33,6 +33,7 @@ from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
 from combat.throw_tuning import (
     LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_DAMAGE_VAR,
+    THROW_GRIP_LOC_VAR, THROW_GRIP_ROT_VAR, THROW_GRIP_VAR,
     THROW_EDGE_ON_VAR, THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG, THROW_PITCH_VAR,
     THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_DEG_S, THROW_SPIN_VAR,
 )
@@ -205,6 +206,10 @@ def build_weapon_item():
     _declare(ed, THROW_DAMAGE_VAR, _float_type())
     _declare(ed, LODGE_TURN_VAR, _struct_type(unreal.Rotator.static_struct()))
     _declare(ed, LODGE_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
+    # Held by the blade while the throw is cocked (throw_tuning.THROW_GRIP_VAR).
+    _declare(ed, THROW_GRIP_VAR, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, THROW_GRIP_LOC_VAR, _struct_type(unreal.Vector.static_struct()))
+    _declare(ed, THROW_GRIP_ROT_VAR, _struct_type(unreal.Rotator.static_struct()))
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
@@ -216,7 +221,10 @@ def build_weapon_item():
                          THROW_EDGE_ON_VAR: False,
                          THROW_DAMAGE_VAR: 0.0,
                          LODGE_TURN_VAR: unreal.Rotator(0.0, 0.0, 0.0),
-                         LODGE_POINT_VAR: unreal.Vector(0.0, 0.0, 0.0)})
+                         LODGE_POINT_VAR: unreal.Vector(0.0, 0.0, 0.0),
+                         THROW_GRIP_VAR: False,
+                         THROW_GRIP_LOC_VAR: unreal.Vector(0.0, 0.0, 0.0),
+                         THROW_GRIP_ROT_VAR: unreal.Rotator(0.0, 0.0, 0.0)})
     _assets().save_loaded_asset(bp)
     _log(f"built {ITEM_BP_PATH}")
     return bp

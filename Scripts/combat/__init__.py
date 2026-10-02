@@ -64,7 +64,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     and the measured outline the grip and sight checks read
   camera            boom and aim-trace numbers, face/aim-the-camera patches
   knife             BP_Knife: the Fab M9 knife as a Melee item, its model
-                    placement and measured outline, build_knife()
+                    placement and measured outline, its blade grip for the
+                    throw (knife_throw_grip), build_knife()
   axe               BP_Axe: Quaternius's Survival Pack axe as a Melee item,
                     swung through the knife's stage, and the one item that
                     Chops; build_axe()

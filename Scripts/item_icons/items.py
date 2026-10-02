@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 WEAPON_DIR = "/Game/Weapons"
 SURVIVAL_DIR = "/Game/Survival"
+CLOTHING_DIR = "/Game/Clothing"
 UI_ART_DIR = "/Game/UI/Art"
 
 # The texture, and the canvas the HUD's slot (78 x 35) and the loot window's
@@ -60,6 +61,16 @@ ITEMS = (
     Item("Stick", f"{WEAPON_DIR}/BP_Stick", roll=-60.0, length=0.60),
     Item("Mushroom", f"{SURVIVAL_DIR}/BP_Mushroom", length=0.40),
     Item("Canteen", f"{SURVIVAL_DIR}/BP_WaterCanteen", length=0.40),
+    # The garments' stand-in models (Scripts/clothing/specs.py), seen from
+    # above and in front, as they lie on the ground.
+    Item("Hat", f"{CLOTHING_DIR}/BP_Hat", pitch=35.0, length=0.55),
+    Item("Glasses", f"{CLOTHING_DIR}/BP_Glasses", yaw=0.0, pitch=20.0, length=0.50),
+    Item("Shirt", f"{CLOTHING_DIR}/BP_Shirt", pitch=35.0, length=0.55),
+    Item("Jacket", f"{CLOTHING_DIR}/BP_Jacket", pitch=35.0, length=0.60),
+    Item("Gloves", f"{CLOTHING_DIR}/BP_Gloves", pitch=35.0, length=0.45),
+    Item("Pants", f"{CLOTHING_DIR}/BP_Pants", pitch=35.0, length=0.60),
+    Item("Boots", f"{CLOTHING_DIR}/BP_Boots", pitch=25.0, length=0.50),
+    Item("Backpack", f"{CLOTHING_DIR}/BP_Backpack", pitch=20.0, length=0.45),
 )
 
 DISPLAYS = tuple(i.display for i in ITEMS)

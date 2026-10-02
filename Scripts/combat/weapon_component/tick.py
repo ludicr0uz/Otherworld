@@ -47,6 +47,7 @@ from combat.weapon_component.sway import _author_sight_sway
 from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.steady import _author_steady
 from combat.weapon_component.use import _author_use
+from combat.weapon_component.wear import _author_take_off, _author_wear_gate
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 
 # A probe's stand-in for the fire key's press: no key can be injected into a
@@ -316,9 +317,9 @@ def _author_wc_tick(ed, tick):
         ed, held, owner_out, tap, _pin(ready_gate, "execute"), 1240, -1300)
     knife_in, slash_pressed = _author_knife_press(
         ed, held, tap, light_in, 1240, -800)
-    consumed, untapped = _author_use_gate(
+    used, untapped = _author_use_gate(
         ed, held, owner_out, tap, BEL.find_then_pin(fire_gate),
-        knife_in, 1240, -300)
+        knife_in, _author_wear_gate, 1240, -300)
 
     ed.add_comment_to_nodes(
         "The trigger is being touched, the weapon is out and the player is not "
@@ -366,7 +367,7 @@ def _author_wc_tick(ed, tick):
     # Every frame, whatever is held: the swing and the blow run on after the
     # press, and the blow lands even if the knife was put away in between.
     slash_exits = _author_knife_swing(
-        ed, (after_fire, consumed, untapped) + slash_pressed + struck + dry_exits
+        ed, (after_fire, *used, untapped) + slash_pressed + struck + dry_exits
         + punch_exits,
         1040, 11000)
 
@@ -439,6 +440,9 @@ def _author_wc_tick(ed, tick):
     flight_exits = _author_throw(
         ed, pc_out, owner_out, held, armed_out, throw_wants, tap,
         (BEL.find_then_pin(pick_dirty),) + not_picked, 1040, 12800)
+
+    # --- take a garment off (wear.py): the I panel's request ---------------
+    flight_exits = _author_take_off(ed, flight_exits, 1040, 15800)
 
     # --- refresh -------------------------------------------------------------
     dirty_get = _at(ed.add_get_member_variable_node("NeedsRefresh"), 1040, 4760)

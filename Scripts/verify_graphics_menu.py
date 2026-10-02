@@ -28,9 +28,11 @@ from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
 from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import loot_consts as LC
+from graphics_menu import wear_consts as WEAR
 from graphics_menu import tune_tab as TT
 from graphics_menu import monster_tune_consts as MC
 from graphics_menu.loot_checks import check_loot
+from graphics_menu.wear_checks import check_wear
 from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu import player_tune_consts as PTC
@@ -160,10 +162,11 @@ def main():
     expected_keys = set((G.MENU_KEY, UC.RESTART_KEY, UC.PAUSE_ACCEPT_KEY, CC.BACK_KEY,
                          N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
+                         WEAR.WEAR_KEY, WEAR.WEAR_UP, WEAR.WEAR_DOWN, WEAR.WEAR_TAKE_KEY,
                          TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
                          TT.TUNE_MORE, TT.TUNE_SAVE_KEY)
                         + N.START_KEYS + CC.CURSOR_KEYS)
-    check("polls exactly the menu, restart, start, nav, loot and tuning-tab keys "
+    check("polls exactly the menu, restart, start, nav, loot, I panel and tuning-tab keys "
           "and the cursor's click and wheel: no row of the M panel has a hotkey",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
@@ -447,9 +450,11 @@ def main():
     # Sixteen: and the fire press held spent under the cursor (cursor.py).
     # Seventeen: and the weapon component told it is Searching (loot_kneel.py).
     # Eighteen: and the weapon component the player tab writes (player_tune_tick.py).
+    # Twenty: and the I panel's two -- the take-off it asks for (wear_tick.py)
+    # and the Worn it lists (wear_draw.py).
     wanted.add(SB.SURVIVAL_CLASS_PATH)
     check("HUD looks up health (player + NPC), the weapon and survival components",
-          len(lookups) == 18 and all(any(w in f for f in found) for w in wanted),
+          len(lookups) == 20 and all(any(w in f for f in found) for w in wanted),
           f"{len(lookups)} lookups: {sorted(found)}")
 
     # The canvas's sized draws: a wanderer's fill from its health fraction,
@@ -827,6 +832,7 @@ def main():
     check_dev_guns(check, bp, nodes)
     check_reticle_sights(check, bp, nodes)
     check_loot(check, bp, nodes)
+    check_wear(check, bp, nodes)
     check_tune(check, bp, nodes)
     check_monster_tune(check, bp, nodes)
     check_world_tune(check, bp, nodes)

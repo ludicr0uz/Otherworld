@@ -75,6 +75,11 @@ Input, settings and state
                   kneel (run after save_exit's)
   loot_draw       DrawHUD: the loot prompt, and the window's icon rows and caret
   wbp_loot        WBP_HUD's loot prompt and window (called from wbp_hud)
+  wear_consts     the I panel: keys (I, Up/Down, Enter), variables, widget names
+  wear_tick       the I panel's Tick fragment: keys, the take-off asked of the
+                  weapon component (TakeOffSlot), the walk held while open
+  wear_draw       DrawHUD: the I panel's rows (what Worn holds) and caret
+  wbp_wear        WBP_HUD's I panel (called from wbp_hud)
   legal_consts    the proprietary notices' words and places, WATERMARK_RECIPIENT
   wbp_legal       WBP_MainMenu's LegalNotice and WBP_HUD's Watermark (called
                   from wbp_screens and wbp_hud)
@@ -145,6 +150,7 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   profile_checks     the saved profile and save and exit
   dev_guns_checks    the dev-all-guns row, key and the five spawns
   loot_checks        the loot window: scan, keys, take, widgets
+  wear_checks        the I panel: widgets, keys, the take-off ask, the rows
   legal_checks       the title screen's notice and the HUD's watermark
   tune_checks        the gun tuning tab: table, CSV on the guns and the melee
                      weapons, panel, save, writes, the rows that are not a weapon's

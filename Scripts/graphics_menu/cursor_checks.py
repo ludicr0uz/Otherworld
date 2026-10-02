@@ -13,15 +13,17 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.cursor import cursor_defaults
 from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_checks import _tree
+from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_SEL_VAR
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
 # The row stacks the cursor is tested against: the menu (the title's too), its
-# settings page, the loot window and the tuning tabs.
-ROW_LISTS = 3 + len(TABS)
+# settings page, the loot window, the I panel and the tuning tabs.
+ROW_LISTS = 4 + len(TABS)
 # ...and the single lines a click lands on: the death menu's hint, the loot
-# window's close button, each tab's hint and each tab's BACK row.
-CLICK_LINES = 2 + 2 * len(TABS)
+# window's and the I panel's close buttons, each tab's hint and each tab's
+# BACK row.
+CLICK_LINES = 3 + 2 * len(TABS)
 # A scrolling tab's rows count only inside its list's window: one more test.
 WINDOWS = sum(1 for t in TABS if t.visible_rows)
 
@@ -52,15 +54,24 @@ def _check_show(check, nodes):
     always = [n for n in wishes if not _feeders(n, CC.CURSOR_WANTED_VAR)
               and _value(n, CC.CURSOR_WANTED_VAR) == "true"]
     alive = [n for n in wishes if _feeders(n, CC.CURSOR_WANTED_VAR)]
+    def ored(node):
+        """The variables an OR tree over Gets reads."""
+        out = set()
+        for pin in ("A", "B"):
+            for q in BEL.find_input_pin(node, pin).list_connected_pins():
+                f = PIN.get_owning_node(q)
+                out |= ored(f) if _title(f).startswith("OR") else {_title(f)}
+        return out
+
     asked = set()
     for n in alive:
         for q in BEL.find_input_pin(n, CC.CURSOR_WANTED_VAR).list_connected_pins():
-            either = PIN.get_owning_node(q)
-            asked |= set(_feeders(either, "A") + _feeders(either, "B"))
+            asked |= ored(PIN.get_owning_node(q))
     check("the cursor is asked for on the death screen, and otherwise while the "
-          "menu (held open on the title) or the loot window is open",
+          "menu (held open on the title), the loot window or the I panel is open",
           len(always) == 1 and len(alive) == 1
-          and asked == {"Get MenuOpen", f"Get {LC.LOOT_OPEN_VAR}"},
+          and asked == {"Get MenuOpen", f"Get {LC.LOOT_OPEN_VAR}",
+                        f"Get {WEAR_OPEN_VAR}"},
           f"{len(always)} always, {len(alive)} alive from {sorted(asked)}")
 
     shows = [n for n in nodes if CC_SHOW in _pins(n) and "self" in _pins(n)]
@@ -117,10 +128,10 @@ def _check_rows(check, nodes):
 
     carets = sorted(_title(n)[4:] for n in nodes if _title(n).startswith("Set ")
                     and f"Get {CC.CURSOR_ROW_VAR}" in _feeders(n, _title(n)[4:]))
-    want = sorted(["MenuRow", LC.LOOT_SEL_VAR, UC.PAUSE_ROW_VAR,
+    want = sorted(["MenuRow", LC.LOOT_SEL_VAR, WEAR_SEL_VAR, UC.PAUSE_ROW_VAR,
                    CC.PAUSE_CLICK_VAR] + [t.row_var for t in TABS])
     check("the row under the cursor takes the caret (the menu, its settings "
-          "page, loot, the tabs), and on the menu a click takes that row",
+          "page, loot, the I panel, the tabs), and on the menu a click takes that row",
           carets == want, str(carets))
     stirred = [n for n in nodes if _pins(n) == {"A", "B"}
                and f"Get {CC.CURSOR_MOVED_VAR}" in _feeders(n, "A")]

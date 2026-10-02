@@ -108,6 +108,9 @@ from graphics_menu.save_exit import (                              # noqa: E402
 from graphics_menu.dev_guns import (                               # noqa: E402
     declare_dev_guns_vars, dev_guns_defaults)
 from graphics_menu.loot_draw import author_loot_window              # noqa: E402
+from graphics_menu.wear_draw import author_wear_panel               # noqa: E402
+from graphics_menu.wear_tick import (                               # noqa: E402
+    author_wear_tick, declare_wear_vars, wear_defaults)
 from graphics_menu.cursor import (                                  # noqa: E402
     author_cursor_read, cursor_defaults, declare_cursor_vars)
 from graphics_menu.menu_nav import pause_row_taken                  # noqa: E402
@@ -466,6 +469,7 @@ def _ensure_variables(ed, bp):
     declare_profile_vars(ed)
     declare_dev_guns_vars(ed)
     declare_loot_vars(ed)
+    declare_wear_vars(ed)
     declare_tune_vars(ed)
     declare_monster_tune_vars(ed)
     declare_world_tune_vars(ed)
@@ -770,6 +774,8 @@ def _author_tick(ed, tick):
     in_play, on_title = author_in_play(ed, stilled, x0 - 600, y0 - 4000)
     saved = author_save_exit_tick(ed, pc_out, [in_play], x0, y0 - 4000)
     looted = author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000)
+    # The I panel (wear_tick.py): what the player wears, and a take-off.
+    looted = author_wear_tick(ed, pc_out, looted, x0 + 30000, y0 - 9000)
     # Then the menu's tuning tabs (tune_tick.py and its four siblings).
     # The graphics one also hands the picked preset to the tuner component.
     tuned = author_tune_tick(ed, pc_out, [*looted, on_title], x0 + 44000, y0 - 4000)
@@ -1108,6 +1114,7 @@ def _author_draw(ed, x0, y0):
     after_aim = _author_reticle(ed, x0, y0 - 6800, after_inv)
     after_aim = author_exit_banner(ed, x0, y0 - 8200, after_aim)
     after_aim = author_loot_window(ed, x0, y0 - 9600, after_aim)
+    after_aim = author_wear_panel(ed, x0, y0 - 14000, after_aim)
 
     # Last: the menu. Every path above -- written or cast-failed -- falls
     # through to it, and so does the title; an exec input takes more than one
@@ -1206,7 +1213,7 @@ def build_hud_blueprint(rebuild=False):
                          "Capturing": False,
                          "KeyPool": [_key(k) for k in KEY_POOL],
                          **difficulty_defaults(), **profile_defaults(),
-                         **dev_guns_defaults(), **loot_defaults(),
+                         **dev_guns_defaults(), **loot_defaults(), **wear_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),
                          **world_tune_defaults(), **gfx_tune_defaults(),
                          **player_tune_defaults(),

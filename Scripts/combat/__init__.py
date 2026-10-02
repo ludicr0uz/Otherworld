@@ -72,6 +72,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
   matches           BP_Matches: Quaternius's Survival Pack matchbox, the one
                     item that Lights; build_matches()
   use_tuning        the use key's names: Using / UsePressed / UseWas
+  wear_tuning       clothing: the eight slots (WEAR_SLOTS), ClothingSlot on the
+                    item, Worn / TakeOffSlot / WearItem on the component
   torch_tuning      the stick that burns: Burns / Lit / BurnOutTime / UsePose on
                     the item, how long it burns and how near a campfire lights
                     it (STICK_*), the component's StickClass/NearFire/WardItem/

@@ -104,6 +104,9 @@ _author_* fragment per concern, each in its own module:
               either way
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
+  wear        clothing: the fire key on a garment (a Consumable with a
+              ClothingSlot) wears it, into Worn[slot], swapping out what was
+              there; TakeOffSlot (the I panel's ask) takes one off into the bag
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
   sprint      sprint and stamina, and the latch that ends a spent sprint
@@ -127,7 +130,8 @@ BP_WeaponComponent event graph:
 
   [Tick] --> Branch owner Dead or at 0 HP                    --> nothing below runs
          --> Branch WasInputKeyJustPressed(LeftMouseButton) --> Fire
-                                        (or, if Held.Consumable, use it;
+                                        (or, if Held.Consumable, use it:
+                                         a garment is worn, food eaten;
                                          if Held.Melee, slash with it;
                                          if Held.Lights, light a campfire;
                                          or, with empty hands, punch)
@@ -150,6 +154,8 @@ BP_WeaponComponent event graph:
                                                                 where it strikes, a
                                                                 blade wounds a body or
                                                                 lodges in a tree
+         --> Branch TakeOffSlot >= 0                        --> that garment off,
+                                                                into the bag
 
   Tick also resolves the aim every frame, before the trigger is even looked at,
   because the reticle depends on it:

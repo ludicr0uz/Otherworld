@@ -36,6 +36,7 @@ from combat.throw_tuning import (
     THROW_SPEED, THROW_SPEED_VAR, THROW_SPIN_DEG_S, THROW_SPIN_VAR,
 )
 from combat.tuning import COMBAT
+from combat.wear_tuning import CLOTHING_SLOT_VAR, NOT_CLOTHING
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
 from item_icons.items import ICON_TINT
 
@@ -113,6 +114,10 @@ def build_weapon_item():
                        (HEATS_VAR, "bool"),
                        (HOT_VAR, "bool")):
         _declare(ed, name, BEL.get_basic_type_by_name(kind))
+    # The slot a garment is worn in (wear_tuning.WEAR_SLOTS' index), or
+    # NOT_CLOTHING: the weapon component wears an item whose slot is >= 0
+    # (weapon_component/wear.py). Scripts/clothing sets it on each garment.
+    _declare(ed, CLOTHING_SLOT_VAR, BEL.get_basic_type_by_name("int"))
     _declare(ed, BURN_OUT_VAR, _float_type())
     _declare(ed, COOL_VAR, _float_type())
     # The overlay a hot blade's model wears (heat.py). None on everything
@@ -198,7 +203,8 @@ def build_weapon_item():
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
-    _apply_defaults(bp, {THROW_PITCH_VAR: THROW_PITCH_UP_DEG,
+    _apply_defaults(bp, {CLOTHING_SLOT_VAR: NOT_CLOTHING,
+                         THROW_PITCH_VAR: THROW_PITCH_UP_DEG,
                          THROW_SPEED_VAR: THROW_SPEED,
                          THROW_SPIN_VAR: THROW_SPIN_DEG_S,
                          THROW_EDGE_ON_VAR: False,

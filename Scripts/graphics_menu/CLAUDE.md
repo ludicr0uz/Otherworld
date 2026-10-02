@@ -31,6 +31,10 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   row returns to them (below: "The M panel as a menu").
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
+- **I** opens the clothing panel, what the player wears (`wear_*.py`,
+  `Scripts/clothing/CLAUDE.md`); **Up/Down** and **Enter** in it take a garment off. It
+  does not pause, holds the walk while open, and hides under the menu; with the loot
+  window open too, the arrows and Enter are the loot window's.
 - **The mouse** works every menu too (below).
 
 ## One menu: the title's and M's (`menu_main.py`, `menu_screens.author_title`)
@@ -114,7 +118,7 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 ## The mouse cursor (`cursor.py`, `cursor_consts.py`)
 
 The cursor shows while a menu is up: the menu (on the title and in play, with its settings
-page and tuning tabs), the death menu, and the loot window. Otherwise it is hidden and the
+page and tuning tabs), the death menu, the loot window and the I panel. Otherwise it is hidden and the
 mouse is the camera's.
 
 | menu | cursor over a row | left click | wheel |
@@ -123,6 +127,7 @@ mouse is the camera's.
 | M panel | the caret goes there | takes the row (as Enter does) | |
 | tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
 | loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
+| I panel | the caret goes there | take that garment off; on the `[I] close` line: shut | |
 | death menu | | on the hint line: restart | |
 
 - **The HUD is still the controller.** No widget is hit-testable. A row is under the cursor
@@ -400,6 +405,20 @@ Run from Tick after save and exit; the design is `Scripts/loot/CLAUDE.md`. Traps
   row's brush by its `Texture` coming out of an array.
 - **The kneel** (`loot_kneel.py`) runs on every tail of the loot Tick, so a lost body also
   stands the player up. It is the HUD's 17th `GetComponentByClass`.
+
+## The I panel (`wear_*.py`, `wbp_wear.py`)
+
+What the player wears; the design is `Scripts/clothing/CLAUDE.md`. Run from Tick after the
+loot window, in play only. Traps met here:
+
+- **The HUD only asks.** Enter or a click raises `WearTakeOffRequested`; Tick lowers it and
+  writes `WearSel` into the weapon component's `TakeOffSlot`, which serves it on its own
+  Tick. A probe opens the panel and takes off by writing the HUD's three variables.
+- **Its own dead gate and its own walk edge** (`WearStill`): `loot_checks` and
+  `pause_checks` pick out the loot's and the menu's from theirs.
+- **It adds two `GetComponentByClass`** (the take-off's and the rows'): the HUD has 20.
+- **The cursor's wish is an OR tree** (MenuOpen, LootOpen, WearOpen); `cursor_checks`
+  walks it.
 
 ## The GUN TUNING tab (`tune_*.py`, `wbp_tune.py`)
 

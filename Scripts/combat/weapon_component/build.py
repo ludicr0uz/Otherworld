@@ -20,7 +20,9 @@ from combat.skin import player_skin
 from combat.sway_tuning import SWAY_VARS
 from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
+from combat.wear_tuning import NOT_CLOTHING, TAKE_OFF_VAR, WEAR_ITEM_VAR, WORN_VAR
 from combat.weapon_component.consume import TRIGGER_SPENT
+from combat.weapon_component.wear import WEAR_SLOT_VAR
 from combat.weapon_component.firing import SHOT_DIRECTION_VAR
 from combat.weapon_component.interact import (
     INTERACT_FORCED_VAR, INTERACT_GAP_VAR, INTERACT_NO_GAP, INTERACT_TARGET_VAR,
@@ -215,6 +217,13 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
     # The fire press that ate an item, until it is released; see consume.py.
     _declare(ed, TRIGGER_SPENT, BEL.get_basic_type_by_name("bool"))
+    # The clothing worn, one entry per wear_tuning.WEAR_SLOTS slot (grown by
+    # the first wear into it), the I panel's take-off request, and the
+    # garment and slot a wear or a take-off is moving (wear.py).
+    _declare(ed, WORN_VAR, BEL.get_array_type(BEL.get_object_reference_type(item_class)))
+    _declare(ed, WEAR_ITEM_VAR, BEL.get_object_reference_type(item_class))
+    for name in (TAKE_OFF_VAR, WEAR_SLOT_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("int"))
     # The dead gate's answer (dead.py), and a probe's stand-in for the fire key.
     for name in (OWNER_DEAD_VAR, FIRE_FORCED_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
@@ -354,6 +363,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         RAISE_FORCED_VAR: False,
         "ReloadTake": 0,
         TRIGGER_SPENT: False,
+        TAKE_OFF_VAR: NOT_CLOTHING,
+        WEAR_SLOT_VAR: NOT_CLOTHING,
         OWNER_DEAD_VAR: False,
         FIRE_FORCED_VAR: False,
         "RecoilDebt": 0.0,

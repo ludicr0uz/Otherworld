@@ -12,6 +12,7 @@ import unreal
 
 from combat.tuning import INVENTORY_SIZE
 from graphics_menu import settings_rows as S
+from graphics_menu.wear_consts import WEAR_NONE_TEXT, WEAR_SEL_VAR
 from graphics_menu import umg_consts as C
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
 from graphics_menu.umg_author import toolset
@@ -276,10 +277,11 @@ def check_hud_graph(check, nodes):
                 if not _sources(eq, "B"):
                     at_or_past = ">=" in _title(eq) or "GreaterEqual" in _title(eq).replace(" ", "")
                     (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
-    check("the settings page, the menu, loot window and the five tuning tabs "
+    check("the settings page, the menu, loot window, I panel and the five tuning tabs "
           "light the selected row's caret (the menu's is its own PauseRow)",
           sorted(selected) == sorted(
               ["Get GfxTuneRow", "Get LootSel", "Get MenuRow", "Get MonTuneRow",
+               f"Get {WEAR_SEL_VAR}",
                f"Get {C.PAUSE_ROW_VAR}", "Get PlayerTuneRow", "Get TuneRow",
                "Get WorldTuneRow"]),
           str(sorted(selected)))
@@ -302,10 +304,10 @@ def check_hud_graph(check, nodes):
               f"Get {name}" in written)
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}
     check("the menu's rows are the only literals written: debug reads ON or OFF, "
-          "the first row new game or resume, and on the title the rows that need "
-          "a game say so",
+          "the first row new game or resume, on the title the rows that need "
+          "a game say so, and the I panel's empty slot",
           literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
-                      C.IN_GAME_ONLY, ""}, str(sorted(literal)))
+                      C.IN_GAME_ONLY, WEAR_NONE_TEXT, ""}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons
     # (loot_checks.py checks that one).
@@ -316,4 +318,5 @@ def check_hud_graph(check, nodes):
           str([_source_titles(n, "Texture") for n in brushes]))
     guards = [n for n in nodes if {"TargetArray", "IndexToTest"} <= _pins(n)]
     check("an inventory slot reads its item only behind IsValidIndex, and so "
-          "does the equipped name", len(guards) == 2, str(len(guards)))
+          "do the equipped name and the I panel's worn slots", len(guards) == 3,
+          str(len(guards)))

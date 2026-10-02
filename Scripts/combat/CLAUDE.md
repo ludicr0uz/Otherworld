@@ -9,7 +9,8 @@ the code is this package (`__init__.py` is the map) and the verifier's sections 
 The defaults are all rebindable on the settings screen:
 
 - Left click fires. It **auto-fires while held** on the SMG and the assault rifle, a tap
-  **eats or drinks** a held consumable, with the **knife** in hand it **slashes**
+  **eats or drinks** a held consumable, **wears** a held garment (`weapon_component/wear.py`,
+  `Scripts/clothing/CLAUDE.md`), with the **knife** in hand it **slashes**
   (`weapon_component/knife.py`), with the **matches** it **lights a campfire**
   (`weapon_component/light.py`), and with **empty hands it punches**
   (`weapon_component/punch.py`; all in `docs/firing_gate.md`).
@@ -25,7 +26,8 @@ The defaults are all rebindable on the settings screen:
   **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
-- 1/2/3/4, M and D belong to the graphics menu.
+- 1/2/3/4, M and D belong to the graphics menu; **I** (the clothing panel) and Tab (the loot
+  window) to the HUD.
 
 The keys are CDO defaults on `BP_WeaponComponent`. The HUD pushes them from `BP_Settings`
 every frame. Sprint and every other key live on the component, not on the character, because

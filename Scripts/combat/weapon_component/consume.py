@@ -61,14 +61,15 @@ def _author_trigger_latch(ed, holding, exec_ins, x0, y0):
             _pin(free, "ReturnValue", is_input=False))
 
 
-def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, x0, y0):
+def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, wear_gate, x0, y0):
     """Branch a Consumable off the fire gate; a tap uses it.
 
     A Consumable is used rather than fired, and only on the tap: a held button
     must not eat a stack of mushrooms at frame rate. Inside the fire gate for
     the same reason the ammunition test is -- Consumable is read off Held --
     and so it also inherits "not while sprinting". A non-consumable goes on to
-    `not_edible` (the ready gate). Returns the exits: used, and not tapped.
+    `not_edible` (the ready gate). Returns the exits: [eaten, worn], and not
+    tapped.
     """
     edible, edible_n = _prop(ed, "Consumable", held, x0, y0)
     use_gate = _at(ed.add_branch_node(), x0 + 240, y0)
@@ -78,13 +79,18 @@ def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, x0, y0):
     use_tap = _at(ed.add_branch_node(), x0 + 480, y0)
     _connect(tap, _pin(use_tap, "Condition"))
     _connect(BEL.find_then_pin(use_gate), _pin(use_tap, "execute"))
-    consumed = _author_consume(ed, held, owner, BEL.find_then_pin(use_tap),
-                               x0 + 160, y0 + 6100)
+    # A garment is Consumable too, and its use is wearing it: `wear_gate`
+    # (wear._author_wear_gate, handed in by tick.py) takes the tap and hands
+    # back what is not a garment, which is eaten.
+    worn, not_garment = wear_gate(ed, held, BEL.find_then_pin(use_tap),
+                                  x0 + 720, y0, x0 + 160, y0 + 7300)
+    consumed = _author_consume(ed, held, owner, not_garment, x0 + 160, y0 + 6100)
     ed.add_comment_to_nodes(
         "The held item is Consumable: a tap uses it (consume.py) instead of "
-        "firing it, and a held button does nothing.",
+        "firing it, and a held button does nothing. A garment's use is to "
+        "wear it (wear.py).",
         [edible_n, use_gate, use_tap])
-    return consumed, BEL.find_else_pin(use_tap)
+    return [consumed, worn], BEL.find_else_pin(use_tap)
 
 
 def _author_consume(ed, held, owner, exec_in, x0, y0):

@@ -180,6 +180,15 @@ GENERATED = (
              "in the levels is placed by Scripts/place_forage.py.",
     ),
     AssetSource(
+        dest="Content/Clothing",
+        kind="generated",
+        builders=("Scripts/build_clothing.py",),
+        note="The eight garments (BP_Hat ... BP_Backpack: children of "
+             "BP_WeaponItem, worn by the fire key) and their flat materials. "
+             "Needs Content/Weapons first. The same script lays one of each "
+             "in front of Lvl_Forest_200m's PlayerStart.",
+    ),
+    AssetSource(
         dest="Content/UI",
         kind="generated",
         builders=("Scripts/build_graphics_menu.py",),
@@ -279,8 +288,9 @@ GENERATED = (
         builders=("Scripts/generate_forest_level.py",),
         note="Lvl_Forest_200m.umap (--size 200) and Lvl_Forest_1000m.umap "
              "(--size 1000), each with its World Partition sidecars. The "
-             "forage (place_forage.py) and the day/night cycle actor "
-             "(build_day_night.py) are added to them afterwards.",
+             "forage (place_forage.py), the test garments (build_clothing.py) "
+             "and the day/night cycle actor (build_day_night.py) are added to "
+             "them afterwards.",
     ),
     AssetSource(
         dest="Content/World",
@@ -407,11 +417,14 @@ RESTORE_ORDER = (
     # After combat (the consumables are children of BP_WeaponItem) and before
     # the HUD (whose survival bars cast to BP_SurvivalComponent).
     "Scripts/dev/uepy.py --cold Scripts/build_survival.py",
+    # The garments are BP_WeaponItems too.
+    "Scripts/dev/uepy.py --cold Scripts/build_clothing.py",
     # Each item's inventory icon is a picture of its own model, so the icons
     # come after the items; the items are then built again, to point at them
     # (the first pass logs each icon as missing).
     "python3 Scripts/build_item_icons.py",
-    "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py Scripts/build_survival.py",
+    "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py Scripts/build_survival.py "
+    "Scripts/build_clothing.py",
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     # The monsters come before the NPC blueprints, because the wanderers ARE
     # the monsters: BP_Wanderer_Zombie and BP_Wanderer_Wendigo need
@@ -441,6 +454,8 @@ RESTORE_ORDER = (
     # Once each printed import_<Level>.py has run: the import rebuilds the
     # level from nothing, forage included.
     "Scripts/dev/uepy.py --cold Scripts/place_forage.py",
+    # ...and the test garments in front of the 200 m map's start.
+    "Scripts/dev/uepy.py --cold Scripts/build_clothing.py",
     # Also after the imports: it tags each level's static sky and adds the
     # day/night cycle that replaces it at BeginPlay.
     "Scripts/dev/uepy.py --cold Scripts/build_day_night.py",

@@ -55,10 +55,11 @@ def check_eating_spends_the_press():
     spends = [n for n in sets if pin_value(n, TRIGGER_SPENT) == "true"
               and not _feeders(n, TRIGGER_SPENT)]
     rearms = [n for n in sets if _feeders(n, TRIGGER_SPENT)]
-    # The throw's click is spent the same way (verify/throw.check_click).
-    check(f"{TRIGGER_SPENT} is written three times: spent by eating and by the "
-          f"throw, re-armed each frame",
-          len(sets) == 3 and len(spends) == 2 and len(rearms) == 1,
+    # The throw's click is spent the same way (verify/throw.check_click), and
+    # so is the press that puts a garment on (verify/wear.py).
+    check(f"{TRIGGER_SPENT} is written four times: spent by eating, by wearing and "
+          f"by the throw, re-armed each frame",
+          len(sets) == 4 and len(spends) == 3 and len(rearms) == 1,
           f"{len(sets)} sets, {len(spends)} spend, {len(rearms)} re-arm")
 
     sends = by_pins(wg, "Actor", "EventTag", "Payload")

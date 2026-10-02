@@ -14,6 +14,8 @@ and it never relies on a variable another section left behind.
   anim_blueprint  weapons  grip_fit  audio  health  weapon_inputs  install
   player_body  blood  hit_reactions  ragdoll  aiming  settings_and_tuning
   firing  consume  drops  noise  combat_trace
+  wear        clothing: the wear behind the Consumable tap, the take-off the
+              I panel asks for (TakeOffSlot), Worn and ClothingSlot's defaults
   bullet_impact  BP_BulletImpact: the chips and dust, the seeded layout, and
               the fire graph spawning it off the health cast's failed arm
   hit_bodies  the physics bodies fitted to each model, measured ray by ray
@@ -99,5 +101,5 @@ SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
     "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "pickup", "heat",
-    "settings_and_tuning", "firing", "tracer", "consume", "drops", "loot", "noise", "combat_trace",
+    "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",
 )

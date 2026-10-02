@@ -13,6 +13,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     root CLAUDE.md. The verifier pins that exactly one Branch reads `Automatic`, together with
     `Loaded` and `NextFireTime`.
   - Consumables branch off it: `Held.Consumable` plus a tap goes to `weapon_component/consume.py`.
+    A garment is Consumable too: behind the tap, `Held.ClothingSlot >= 0` sends it to
+    `weapon_component/wear.py` instead, which wears it and spends the press the same way.
   - **The press that eats is spent.** Eating equips the next item in the same frame, while the
     key is still down. `TriggerSpent` is set by the consume chain, the outer gate requires
     `NOT TriggerSpent`, and `TriggerSpent &= IsInputKeyDown` runs just before the gate. Without

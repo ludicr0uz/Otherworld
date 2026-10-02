@@ -65,6 +65,8 @@ FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
 FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
 FN_ARR_REMOVE = "/Script/Engine.KismetArrayLibrary.Array_Remove"
 FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
+FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
+FN_ARR_VALID = "/Script/Engine.KismetArrayLibrary.Array_IsValidIndex"
 
 FN_ADD_VV = "/Script/Engine.KismetMathLibrary.Add_VectorVector"
 FN_SUB_VV = "/Script/Engine.KismetMathLibrary.Subtract_VectorVector"

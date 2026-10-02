@@ -160,8 +160,12 @@ def check_loot(check, bp, nodes):
           len(polls) == 1 and any(
               _title(n) == f"Set {LC.LOOT_OPEN_VAR}" and _feeders(n, LC.LOOT_OPEN_VAR)
               for n in nodes), str(len(polls)))
+    # The I panel has a dead gate of its own (wear_tick.py): the loot's is
+    # the one that shuts the loot window.
     dying = [n for n in nodes if "Condition" in _pins(n)
-             and [_title(f) for f in _feeders(n, "Condition")] == [f"Get {OWNER_DEAD_VAR}"]]
+             and [_title(f) for f in _feeders(n, "Condition")] == [f"Get {OWNER_DEAD_VAR}"]
+             and any(_title(PIN.get_owning_node(q)) == f"Set {LC.LOOT_OPEN_VAR}"
+                     for q in BEL.find_then_pin(n).list_connected_pins())]
     shuts = [PIN.get_owning_node(q) for n in dying
              for q in BEL.find_then_pin(n).list_connected_pins()]
     goes_on = [PIN.get_owning_node(q) for n in dying

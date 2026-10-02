@@ -28,6 +28,7 @@ from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
 from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
 from graphics_menu.loot_find import put
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
+from graphics_menu.wear_consts import WEAR_OPEN_VAR
 from graphics_menu.menu_nav import _emit_row_nav
 from graphics_menu.settings_page import _author_settings_page
 from graphics_menu.settings_rows import PAGE_TITLE
@@ -241,6 +242,12 @@ def author_pause_menu(ed, x0, y0, in_execs):
     _connect(_pin(_at(ed.add_get_member_variable_node("MenuOpen"), x0 - 500, y0 - 1040),
                   "MenuOpen", is_input=False), _pin(wanted, "A"))
     _connect(_pin(looting, LOOT_OPEN_VAR, is_input=False), _pin(wanted, "B"))
+    # ...or the I panel (wear_draw.py).
+    wearing = _at(ed.add_get_member_variable_node(WEAR_OPEN_VAR), x0 - 260, y0 - 760)
+    wanted_any = _at(_node(ed, FN_OR), x0 - 20, y0 - 1000)
+    _connect(_pin(wanted, "ReturnValue", is_input=False), _pin(wanted_any, "A"))
+    _connect(_pin(wearing, WEAR_OPEN_VAR, is_input=False), _pin(wanted_any, "B"))
+    wanted = wanted_any
     in_execs = author_hold_fire(ed, author_cursor_mode(
         ed, _pin(wanted, "ReturnValue", is_input=False), in_execs, x0, y0 - 1400),
         x0 + 2200, y0 - 1400)

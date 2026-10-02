@@ -60,7 +60,9 @@ from combat.weapon_component.throw_flight import (
     THROW_VELOCITY_VAR,
 )
 from combat.weapon_component.throw_ready import THROW_READY_ANIM_VAR
-from combat.weapon_component.throw_strike import THROW_PAST_VAR
+from combat.weapon_component.throw_strike import (
+    THROW_BONE_VAR, THROW_PAST_VAR, THROW_SKIN_VAR,
+)
 from combat.weapon_component.throw_windup import (
     THROW_ANIM_VAR, THROW_DUE_VAR, THROW_WINDING_VAR,
 )
@@ -264,6 +266,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # What the thrown item's fall to the ground ignores (throw_strike.py).
     _declare(ed, THROW_PAST_VAR, BEL.get_array_type(
         BEL.get_object_reference_type(unreal.Actor.static_class())))
+    # ...and the bone of the body the blade is set into, None for no bone,
+    # and where on that bone's body.
+    _declare(ed, THROW_BONE_VAR, BEL.get_basic_type_by_name("name"))
+    _declare(ed, THROW_SKIN_VAR, _struct_type(unreal.Vector.static_struct()))
     # ...and its wind-up (throw_windup.py): the clip, the item it is throwing
     # and when the hand lets go.
     _declare(ed, THROW_ANIM_VAR, BEL.get_object_reference_type(

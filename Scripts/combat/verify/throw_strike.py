@@ -1,9 +1,10 @@
 """verify.throw_strike -- what a thrown blade does to what it strikes
 (weapon_component/throw_strike.py): who has a ThrowDamage, how the knife and
-the axe sit lodged (combat/lodge.py), and the stage off the flight's hit: the
-wound and its blood, the item set into the body and attached to the bone it
-struck, the tree test, the height it may lodge at, the chips, the item set
-into the trunk, and the fall both then skip.
+the axe sit lodged (combat/lodge.py), and the stage off the flight's hit: where
+on the body it went in, the wound (the head's worth more) and its blood, the
+item set into the body and attached to the bone it struck, the tree test, the
+height it may lodge at, the chips, the item set into the trunk, and the fall
+both then skip.
 
 is_strike_node picks out the stage's nodes, so the older counts over the whole
 graph (blood and impact spawns, LastHitFrom writes, the chop's tree test, the
@@ -15,19 +16,20 @@ import math
 
 import unreal
 
-from combat.axe import axe_lodge
+from combat.axe import AXE_DISPLAY, axe_lodge
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
 from combat.grip import _rotate_vector
 from combat.hit_reaction import LAST_HIT_FROM_VAR
-from combat.knife import knife_lodge
+from combat.hit_zones import HEAD_BONES_VAR, HEAD_MULT_VAR
+from combat.knife import KNIFE_DISPLAY, knife_lodge
+from combat.melee_tuning import throw_damage
 from combat.paths import (
     AXE_BP_PATH, ITEM_BP_PATH, KNIFE_BP_PATH, MATCHES_BP_PATH, STICK_BP_PATH,
     WOOD_BP_PATH,
 )
 from combat.throw_tuning import (
     LODGE_AXE_DEPTH_CM, LODGE_KNIFE_DEPTH_CM, LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR,
-    LODGE_TURN_VAR, STICK_TRACE_PAST, THROW_AXE_DAMAGE, THROW_DAMAGE_VAR,
-    THROW_KNIFE_DAMAGE,
+    LODGE_TURN_VAR, STICK_LINE_REACH_CM, STICK_TRACE_PAST, THROW_DAMAGE_VAR,
 )
 from combat.tuning import COMBAT, INTERACT_RADIUS
 from combat.verify.common import (
@@ -37,7 +39,9 @@ from combat.verify.fixtures import _is_exec, wg
 from combat.verify.throw import _item_cdo, _title, is_throw_trace
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 from combat.weapon_component.throw_flight import THROWN_VAR
-from combat.weapon_component.throw_strike import THROW_PAST_VAR
+from combat.weapon_component.throw_strike import (
+    THROW_BONE_VAR, THROW_PAST_VAR, THROW_SKIN_VAR,
+)
 from combat.weapon_specs import _weapon_specs
 
 # The player's middle over the ground (the capsule's half height), and how far
@@ -155,11 +159,14 @@ def check_blades():
     check("...which no gun does, nor the wood, the matches or the stick",
           not bad, "; ".join(bad))
     for name, path, damage, lodge, depth in (
-            ("knife", KNIFE_BP_PATH, THROW_KNIFE_DAMAGE, knife_lodge, LODGE_KNIFE_DEPTH_CM),
-            ("axe", AXE_BP_PATH, THROW_AXE_DAMAGE, axe_lodge, LODGE_AXE_DEPTH_CM)):
+            ("knife", KNIFE_BP_PATH, throw_damage(KNIFE_DISPLAY), knife_lodge,
+             LODGE_KNIFE_DEPTH_CM),
+            ("axe", AXE_BP_PATH, throw_damage(AXE_DISPLAY), axe_lodge,
+             LODGE_AXE_DEPTH_CM)):
         cdo = _item_cdo(path)
         got = cdo.get_editor_property(THROW_DAMAGE_VAR)
-        check(f"a thrown {name} takes {damage:g} HP: more than a slash, since "
+        check(f"a thrown {name} takes {damage:g} HP (its gun_tuning.csv row's, "
+              "the GUN TUNING tab's `throw_damage`): more than a slash, since "
               "the throw costs the weapon, and less than a wanderer's all",
               got == damage and COMBAT.knife_damage < damage < 100.0, str(got))
         turn, point = cdo.get_editor_property(LODGE_TURN_VAR), \
@@ -220,10 +227,52 @@ def check_wound():
     check(f"...by the thrown item's {THROW_DAMAGE_VAR}, clamped at zero",
           {f"Get {THROW_DAMAGE_VAR}", "Get Health"} <= fed
           and any("Clamp" in t for t in fed), str(sorted(fed)))
-    cast = _feeders(writes[0], "execute")
-    check("...behind the health cast of the actor the flight struck",
-          len(cast) == 1 and "HealthComponent" in _title(cast[0]).replace(" ", ""),
-          str([_title(c) for c in cast]))
+    picks = [n for n in _pure_feeds(writes[0]) if {"A", "B", "bPickA"} <= in_pins(n)]
+    tests = [f for n in picks for f in _feeders(n, "bPickA")]
+    check(f"...times the struck body's own {HEAD_MULT_VAR} where the bone the "
+          f"blade went in at ({THROW_BONE_VAR}) is one of its {HEAD_BONES_VAR}, "
+          "and whole anywhere else",
+          len(picks) == 1 and num_pin(picks[0], "B") == 1.0
+          and [_title(f) for f in _feeders(picks[0], "A")] == [f"Get {HEAD_MULT_VAR}"]
+          and len(tests) == 1
+          and [_title(f) for f in _feeders(tests[0], "TargetArray")]
+          == [f"Get {HEAD_BONES_VAR}"]
+          and [_title(f) for f in _feeders(tests[0], "ItemToFind")]
+          == [f"Get {THROW_BONE_VAR}"],
+          f"{len(picks)} Select(s), {len(tests)} test(s)")
+    marks = _mine([n for n in wg if _title(n) == f"Set {THROW_BONE_VAR}"])
+    none = [n for n in marks if not _feeders(n, THROW_BONE_VAR)]
+    cast = [c for n in none for c in _feeders(n, "execute")]
+    check(f"the stage is behind the health cast of the actor the flight struck: "
+          f"it empties {THROW_BONE_VAR} first",
+          len(marks) == 3 and len(none) == 1
+          and pin_value(none[0], THROW_BONE_VAR) in ("", "None")
+          and len(cast) == 1 and "HealthComponent" in _title(cast[0]).replace(" ", ""),
+          f"{len(marks)} write(s), behind {[_title(c) for c in cast]}")
+    line, nearest = _skins()
+    told = [n for n in marks if _feeders(n, THROW_BONE_VAR)]
+    spots = _mine([n for n in wg if _title(n) == f"Set {THROW_SKIN_VAR}"])
+    check(f"each of the two body traces that strikes notes its bone and its "
+          f"point: {THROW_BONE_VAR}, then {THROW_SKIN_VAR}, off its own hit",
+          len(line) == 1 and len(nearest) == 1 and len(told) == 2 and len(spots) == 2
+          and sorted(t.get_path_name() for sp in spots for t in _feeders(sp, "execute"))
+          == sorted(t.get_path_name() for t in told)
+          and all(_feeders(sp, THROW_SKIN_VAR) == _feeders(t, THROW_BONE_VAR)
+                  and _feeders(t, THROW_BONE_VAR)[0] in line + nearest
+                  for sp in spots for t in _feeders(sp, "execute"))
+          and {f.get_path_name() for t in told for f in _feeders(t, THROW_BONE_VAR)}
+          == {n.get_path_name() for n in line + nearest},
+          f"{len(told)} bone(s), {len(spots)} point(s)")
+    ways = _feeders(writes[0], "execute")
+    before = sorted(_title(f).replace(" ", "") for f in ways)
+    check("...and the wound comes after the body's skin is looked for, on all "
+          "four of its ways out: struck on the blade's line, struck towards "
+          "the nearest bone, both missed, and a body that is no Character",
+          before == sorted([f"Set{THROW_SKIN_VAR}"] * 2 + ["CastToCharacter", "Branch"])
+          and all(sp in ways for sp in spots)
+          and any(_feeders(f, "Condition") == nearest for f in ways
+                  if _title(f) == "Branch"),
+          str(before))
     stamps = {v: _mine([n for n in wg if _title(n) == f"Set {v}"])
               for v in (LAST_DAMAGE_VAR, DAMAGED_BY_PLAYER_VAR, LAST_HIT_FROM_VAR)}
     check("...stamped as a pellet's hit is: the health bar, the kill's credit "
@@ -243,16 +292,13 @@ def check_wound():
               if [_title(f) for f in _feeders(n, "ActorsToIgnore")]
               == [f"Get {THROW_PAST_VAR}"]]
     check_stick(blood)
-    skins = _mine(_body_traces())
-    drops = {_title(f).replace(" ", "") for a in adds for f in _feeders(a, "execute")}
+    drops = [f for a in adds for f in _feeders(a, "execute")]
     check(f"a body it cannot be set into drops it, and that fall passes the "
           f"body by: the struck actor goes into {THROW_PAST_VAR} once, off the "
-          "Character cast's failed arm and the body trace's miss, and only the "
+          f"arm on which {THROW_BONE_VAR} is no bone (the Character cast "
+          "failed, or the body trace missed), and only the "
           "flight's trace down to the ground ignores it",
-          len(adds) == 1 and len(_feeders(adds[0], "execute")) == 2
-          and drops == {"CastToCharacter", "Branch"}
-          and any(_feeders(f, "Condition") == skins
-                  for f in _feeders(adds[0], "execute") if _title(f) == "Branch")
+          len(adds) == 1 and drops == _stuck_gates()
           and any(has_in_pin(f, "Hit") for f in _feeders(adds[0], "NewItem"))
           and len(floors) == 1 and is_throw_trace(floors[0])
           and floors[0].get_path_name() in {n.get_path_name() for n in _floor()},
@@ -263,57 +309,95 @@ def _body_traces():
     return [n for n in wg if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)]
 
 
+def _skins():
+    """(the body trace on along the blade's own line, the one towards the
+    nearest bone): told apart by the nearest-bone node feeding the second."""
+    traces = _mine(_body_traces())
+    nearest = [n for n in traces
+               if any(has_in_pin(f, "TestLocation") for f in _pure_feeds(n))]
+    return [n for n in traces if n not in nearest], nearest
+
+
 def _puts():
     """(the move that sets the item into a body, the one into a tree): told
-    apart by what the item's point is set on, a body trace's hit or the
-    flight's own."""
+    apart by what the item's point is set on, the body's skin or the flight's
+    own hit."""
     puts = _mine(by_pins(wg, "NewLocation", "NewRotation"))
-    in_body = [n for n in puts if any(n2 in _body_traces() for f in
-                                      _feeders(n, "NewLocation") for n2 in _pure_feeds(f))]
+    in_body = [n for n in puts
+               if any(_title(n2) == f"Get {THROW_SKIN_VAR}"
+                      for f in _feeders(n, "NewLocation") for n2 in _pure_feeds(f))]
     return in_body, [n for n in puts if n not in in_body]
+
+
+def _stuck_gates():
+    """The Branches that ask whether ThrowBone is a bone: is the blade to be
+    left in the body."""
+    return _mine([n for n in wg if _title(n) == "Branch"
+                  and any(_title(f) == f"Get {THROW_BONE_VAR}"
+                          and pin_value(c, "B") in ("", "None")
+                          for c in _feeders(n, "Condition") for f in _feeders(c, "A"))])
+
+
+def _from_hit(node, pin):
+    return any(has_in_pin(f, "Hit") for f in _feeders(node, pin))
 
 
 def check_stick(blood):
     casts = _mine([n for n in wg if _title(n).replace(" ", "") == "CastToCharacter"])
-    check("a blade that wounded a body stays in it: after the blood, one cast "
-          "of the struck actor to Character, for its mesh",
-          len(casts) == 1 and _feeders(casts[0], "execute") == blood
-          and any(has_in_pin(f, "Hit") for f in _feeders(casts[0], "Object")),
-          str(len(casts)))
-    skins = _mine(_body_traces())
-    check("...one trace of that mesh's physics bodies alone",
-          len(skins) == 1 and pin_value(skins[0], "bTraceComplex").lower() == "false"
-          and [_title(f) for f in _feeders(skins[0], "self")] == ["Get Mesh"]
-          and _feeders(skins[0], "execute") == casts, str(len(skins)))
-    if len(skins) != 1:
+    check("where the blade went into the body: one cast of the struck actor "
+          "to Character, for its mesh",
+          len(casts) == 1
+          and [_title(f) for f in _feeders(casts[0], "execute")] == [f"Set {THROW_BONE_VAR}"]
+          and _from_hit(casts[0], "Object"), str(len(casts)))
+    line, nearest = _skins()
+    check("...two traces of that mesh's physics bodies alone",
+          len(line) == 1 and len(nearest) == 1
+          and all(pin_value(n, "bTraceComplex").lower() == "false"
+                  and [_title(f) for f in _feeders(n, "self")] == ["Get Mesh"]
+                  for n in line + nearest), f"{len(line)} + {len(nearest)}")
+    if len(line) != 1 or len(nearest) != 1:
         return
-    start = _feeders(skins[0], "TraceStart")
-    way = _pure_feeds(skins[0])
+    way = _pure_feeds(line[0])
+    check("...the first on along the blade's own line: from the flight's hit "
+          f"the way its segment flew, {STICK_LINE_REACH_CM:g} cm far",
+          _feeders(line[0], "execute") == casts and _from_hit(line[0], "TraceStart")
+          and not _from_hit(line[0], "TraceEnd")
+          and any("Normal" in _title(n) for n in way)
+          and any(num_pin(n, "X") == num_pin(n, "Y") == num_pin(n, "Z")
+                  == STICK_LINE_REACH_CM for n in way if {"X", "Y", "Z"} <= in_pins(n)),
+          str(sorted(_title(n) for n in way)))
+    missed = [n for n in wg if _title(n) == "Branch" and _feeders(n, "Condition") == line]
+    way = _pure_feeds(nearest[0])
     bones = [n for n in way if has_in_pin(n, "TestLocation")]
-    check("...from the flight's hit towards the bone nearest it that has a "
-          f"body, {STICK_TRACE_PAST:g} times as far",
-          len(start) == 1 and has_in_pin(start[0], "Hit") and len(bones) == 1
+    check("...the second only where that struck nothing: from the flight's hit "
+          f"towards the bone nearest it that has a body, {STICK_TRACE_PAST:g} "
+          "times as far",
+          len(missed) == 1 and _feeders(nearest[0], "execute") == missed
+          and _from_hit(nearest[0], "TraceStart") and len(bones) == 1
           and pin_value(bones[0], "bRequirePhysicsAsset") == "true"
           and [_title(f) for f in _feeders(bones[0], "self")] == ["Get Mesh"]
-          and any(has_in_pin(f, "Hit") for f in _feeders(bones[0], "TestLocation"))
+          and _from_hit(bones[0], "TestLocation")
           and any(num_pin(n, "X") == num_pin(n, "Y") == num_pin(n, "Z") == STICK_TRACE_PAST
                   for n in way if {"X", "Y", "Z"} <= in_pins(n)),
           f"{len(bones)} nearest-bone node(s)")
     in_body, _in_tree = _puts()
-    found = [n for n in wg if _title(n) == "Branch" and _feeders(n, "Condition") == skins]
-    check("...where it struck one, the item in the air is set on the skin once, "
-          "as it is into a trunk",
+    found = _stuck_gates()
+    check("a blade that wounded a body stays in it: after the blood, where "
+          f"{THROW_BONE_VAR} is a bone, the item in the air is set on the skin "
+          f"({THROW_SKIN_VAR}) once, as it is into a trunk",
           len(in_body) == 1 and len(found) == 1 and _of_thrown(in_body[0])
           and _feeders(in_body[0], "execute") == found
+          and _feeders(found[0], "execute") == blood
           and _feeders(in_body[0], "NewLocation") != _feeders(in_body[0], "NewRotation"),
           f"{len(in_body)} move(s), {len(found)} Branch(es)")
     holds = _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))
-    check("...and attached to the mesh at the bone the trace struck, keeping "
+    check("...and attached to the mesh at the bone it struck, keeping "
           "where it was set and its own size",
           len(holds) == 1 and _of_thrown(holds[0])
           and _feeders(holds[0], "execute") == in_body
           and [_title(f) for f in _feeders(holds[0], "Parent")] == ["Get Mesh"]
-          and _feeders(holds[0], "SocketName") == skins
+          and [_title(f) for f in _feeders(holds[0], "SocketName")]
+          == [f"Get {THROW_BONE_VAR}"]
           and all(pin_value(holds[0], r) == "KeepWorld"
                   for r in ("LocationRule", "RotationRule", "ScaleRule")),
           str(len(holds)))

@@ -271,25 +271,41 @@ menu polls its own copy from `DrawHUD`, which does.
   called by the flight on the frame its segment trace hits something, before the item is set
   down). The whole stage is behind one Branch, `Thrown.ThrowDamage > 0`: the base item's is 0,
   so a thrown gun, mushroom or canteen does neither. The knife's is 50 and the axe's 75
-  (`throw_tuning.py`), against the slash's 35: the throw costs the weapon until it is picked
-  up again.
+  (the defaults in `throw_tuning.py`; each is its `throw_damage` cell in `gun_tuning.csv`,
+  the GUN TUNING tab's last row: see Tuning), against the slash's 35: the throw costs the
+  weapon until it is picked up again.
   - **A body** (the struck actor has a `BP_HealthComponent`) loses `ThrowDamage`, with the
     three stamps a pellet leaves (`LastDamageTime`, `DamagedByPlayer`, `LastHitFrom`: so a
     thrown blade counts the kill and enrages a wendigo), and `BloodClass` is spawned at the
-    wound. The damage is flat: no hit zones, and no hot blade's double.
+    wound. No hot blade's double.
+  - **A blade in the head does more** (`_head_worth`): the damage is times the struck
+    body's own `HeadMultiplier` (1.5, the pellet's: `hit_zones.py`) where the bone the
+    blade went in at is one of its `HeadBones`. Only the head: a limb takes it whole.
+    That bone is the one the blade is then left in, so a blade seen in the head was a
+    head shot. So where it went in (`_author_skin`, below) is found **before** the wound,
+    and two variables on the component carry it across: `ThrowBone` (a Name, None for a
+    body the blade could not be set into) and `ThrowSkin` (the point on that bone's body).
+    `probes/probe_throw_head.py` throws both blades at a zombie's head and at its middle.
+    - A probe that aims at the head must aim at the middle of the head's **body**
+      (`_head_middle`): the `Head` bone itself is the base of the skull, and the reticle
+      there is on the neck, which the `Spine` body covers.
   - **The blade stays in the body** (`_author_stick`): set on the model as it is into a
     trunk (the same `_author_lodge`, the pose below) and attached to the mesh at the bone
     it struck, KeepWorld, then straight to the landing's `Dropped = true`. So it goes
     where the body goes, alive or a ragdoll, and E takes it back from within
     `INTERACT_RADIUS` of the blade itself. Nothing else knows it is there: it is an
     ordinary pick-up whose actor moves.
-    - **Where on the body is a second trace.** The flight's hit is on the capsule, far
-      wider than the model, so `K2_LineTraceComponent` (the mesh's physics bodies alone,
-      as the pellet's hit zone) runs from that hit towards the bone nearest it
-      (`FindClosestBone_K2`, bodies only) and `STICK_TRACE_PAST` (1.5) times as far. Its
-      `HitLocation` is the skin and its `BoneName` the attach socket. Not along the
-      flight's own line: a segment is a frame long and can end short of the model, and a
-      blade can cross the capsule beside the model, having wounded it all the same.
+    - **Where on the body is a trace of the mesh's physics bodies alone**
+      (`K2_LineTraceComponent`, as the pellet's hit zone), since the flight's hit is on
+      the capsule, far wider than the model. First **on along the blade's own line**:
+      from that hit the way the segment flew and `STICK_LINE_REACH_CM` (120) far (not the
+      segment itself, which is a frame long and can end short of the model). What that
+      strikes is what the blade struck. A blade can also cross the capsule beside the
+      model, having wounded it all the same: then, and only then, a second trace runs
+      from the hit towards the bone nearest it (`FindClosestBone_K2`, bodies only) and
+      `STICK_TRACE_PAST` (1.5) times as far. The one that strikes writes its `BoneName`
+      to `ThrowBone` and its `HitLocation` to `ThrowSkin`, which the set and the attach
+      read after the wound.
     - **The take detaches** (`pickup._author_take_item`'s `DetachFromActor`, KeepWorld):
       an item taken into the bag with something else in hand is only hidden, and would
       ride on with the body.
@@ -300,7 +316,7 @@ menu polls its own copy from `DrawHUD`, which does.
       profile ignores Visibility, so a throw passes through a corpse as a pellet does.
   - **`ThrowPast` is what the fall's ground trace ignores** (an Actor array on the
     component): emptied every strike, and given a body the blade could not be set into
-    (no Character, or the body trace found nothing), which drops it at its foot. The
+    (no Character, or neither body trace found anything: `ThrowBone` is None), which drops it at its foot. The
     trace down then cannot land the item on the body's own arm or knee. A wall, a tree or
     the ground must never go in it: the same trace finds the ground through them.
   - **A tree** (no health, and the struck component is an `InstancedStaticMeshComponent`:
@@ -409,6 +425,14 @@ Per-weapon numbers live in `_weapon_specs()`.
 - `gun_tuning.csv` (tracked) holds each gun's 20 tunable stats (`gun_tuning.TUNE_STATS`: damage,
   pellets, range, interval, reload, magazine, sights zoom, shot volume, the accuracy columns
   and the throw's arc).
+- **The melee weapons have rows too** (`Knife`, `Axe`, under the guns:
+  `gun_tuning.MELEE_WEAPONS`), holding their throw alone: `throw_arc` and `throw_damage`
+  (`melee_tuning.py`, which `knife.py` and `axe.py` lay over `MELEE_THROW`; the defaults
+  are `throw_tuning`'s). `throw_damage` is the table's 21st column and no gun's: a gun's
+  `ThrowDamage` stays 0, which is what keeps a thrown gun from wounding.
+  `gun_tuning.columns_of(weapon)` says which columns are a weapon's own; a cell outside
+  them is empty in the CSV, a dash on the tab, and never written onto the weapon. The
+  slash's damage is not there: it is `COMBAT.knife_damage`, a literal in the blow's graph.
   `_weapon_specs()` lays it over its literals, so **the CSV wins**; the literals are the
   fallback for a missing cell. Edit the CSV by hand or through the tab, never only the literal.
 - The tab writes the carried guns live and Enter saves the CSV; the Blueprints change only when
@@ -557,7 +581,9 @@ These are feel checks a headless run can't do:
   than shot, whether three turns a second reads as a spin or a blur, and the snap as the
   knife or the axe squares up to the throw on leaving the hand;
 - a thrown blade's strike (`throw_tuning.py`): whether 50 and 75 HP are worth giving the
-  weapon up for; a hit with no sound, on a body or in the wood; the blade always going in
+  weapon up for, and 75 and 112 in the head (a thrown axe in the head kills a full-health
+  wanderer); how often a throw at a moving wanderer's head is in the head, the blade
+  leaving the hand to the left of and below the camera; a hit with no sound, on a body or in the wood; the blade always going in
   point or bit first whatever its spin was at the moment it struck, and only into a tree
   (off a rock or the ground it still falls flat); how the lodged knife and axe read
   from the front and from the far side of a thin trunk (7 cm and 5 cm are in the wood);

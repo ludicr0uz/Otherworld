@@ -18,7 +18,7 @@ other binds, because BIND_VARS lists it.
 # BP_WeaponItem's defaults for THROW_PITCH_VAR and THROW_SPEED_VAR, which the
 # launch reads off Held. A gun's own tip is its gun_tuning.csv `throw_arc`
 # cell, tuned on the GUN TUNING tab; the food and the water keep the defaults,
-# and a melee weapon has MELEE_THROW (below).
+# and a melee weapon has MELEE_THROW (below), its tip a cell of that CSV too.
 THROW_SPEED = 1100.0            # cm/s at release (the default speed)
 THROW_SPEED_VAR = "ThrowSpeed"         # on BP_WeaponItem
 THROW_PITCH_UP_DEG = 30.0       # added to the view's pitch (the default arc)
@@ -92,10 +92,17 @@ MELEE_THROW = {
 # Into a body it stays too, set the same way and attached to the bone it
 # struck, so it goes where the body goes and is taken back from within reach
 # of it. The flight's hit is on the body's capsule, in the air round the
-# model; the skin is found by a trace from there towards the nearest bone and
-# STICK_TRACE_PAST times as far, so it crosses the bone's body and not just
-# reaches its middle.
+# model; the skin is found by a trace from there on the way the blade flew,
+# STICK_LINE_REACH_CM far (across any capsule: a wanderer's is 68 cm wide),
+# or, that striking nothing, towards the nearest bone and STICK_TRACE_PAST
+# times as far, so it crosses the bone's body and not just reaches its middle.
+# In the head it takes that times the body's own HeadMultiplier (the
+# pellet's: hit_zones.py), the head being where the blade is left.
+# THROW_KNIFE_DAMAGE and THROW_AXE_DAMAGE are the defaults: each blade's own
+# is its gun_tuning.csv `throw_damage` cell, tuned on the GUN TUNING tab
+# (melee_tuning.py), as its tip over the view is its `throw_arc` cell.
 THROW_DAMAGE_VAR = "ThrowDamage"       # on BP_WeaponItem, 0 by default
+THROW_DAMAGE_COLUMN = "throw_damage"   # the gun_tuning.csv column
 THROW_KNIFE_DAMAGE = 50.0
 THROW_AXE_DAMAGE = 75.0
 LODGE_TURN_VAR = "LodgeTurn"           # on BP_WeaponItem, a rotator
@@ -104,6 +111,7 @@ LODGE_MAX_HEIGHT_CM = 250.0
 LODGE_KNIFE_DEPTH_CM = 7.0      # of the blade's 18.6 cm
 LODGE_AXE_DEPTH_CM = 5.0        # of the head's 25 cm from bit to poll
 STICK_TRACE_PAST = 1.5
+STICK_LINE_REACH_CM = 120.0
 
 # The clip (weapon_component/throw_windup.py): Quaternius UAL2's OverhandThrow,
 # played at its own rate. THROW_RELEASE_S is where its hand lets go, measured

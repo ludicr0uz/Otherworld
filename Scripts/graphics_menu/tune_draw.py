@@ -4,7 +4,9 @@ from the tab's variables. For the guns:
     NOT (MenuOpen AND TuneOpen)   TunePanel collapsed
     else           shown: row 0's value is TuneWeapons[TuneWeapon], row i's
                    is TuneValues[TuneWeapon * STAT_COUNT + i - 1] (up to
-                   the tab's fraction_digits decimals, no grouping), the
+                   the tab's fraction_digits decimals, no grouping; a dash
+                   where the tab's live mask says the stat is not the
+                   subject's own), the
                    caret on TuneRow -- on BACK when it is past the list, or
                    on the save row of a tab that has one --
                    and "saved to ..." while TuneSaved. A scrolling tab's
@@ -21,7 +23,7 @@ from combat.nodes import FN_ADD_II, FN_AND, FN_ARR_GET, FN_MIN_II, FN_SUB_II
 from graphics_menu.cursor import (
     FN_GE_II, author_back_row, author_button_row, author_row_cursor, author_widget_click)
 from graphics_menu.dev_guns import _branch, _call, _get, _out
-from graphics_menu.tune_consts import GUN_TAB
+from graphics_menu.tune_consts import GUN_TAB, TUNE_DASH
 from graphics_menu.ui_graph import (
     FN_CHILD_AT, FN_EQ_II, FN_SELECT_FLOAT, FN_SET_OPACITY, MACRO_FOR_LOOP, mark_rows, member,
     part, row_value, set_shown, show_if)
@@ -29,6 +31,8 @@ from graphics_menu.umg_consts import ROW_CARET, WBP_MENU_ROW, WBP_PAUSE_MENU
 
 FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
 FN_TO_TEXT = "/Script/Engine.KismetTextLibrary.Conv_DoubleToText"
+FN_TEXT_TO_STR = "/Script/Engine.KismetTextLibrary.Conv_TextToString"
+FN_SELECT_STR = "/Script/Engine.KismetMathLibrary.SelectString"
 FN_SCROLL_TO = "/Script/UMG.ScrollBox.ScrollWidgetIntoView"
 
 
@@ -57,8 +61,17 @@ def _author_stats(ed, tab, box, in_execs, x0, y0, made):
     words = _call(ed, FN_TO_TEXT, x0 + 1020, y0 + 500, made,
                   Value=_item(ed, tab.values_var, _out(idx), x0 + 780, y0 + 500, made),
                   bUseGrouping="false", MaximumFractionalDigits=tab.fraction_digits)
-    row_value(ed, box, i, ("text", _out(words)),
-              [_pin(loop, "LoopBody", is_input=False)], x0 + 1300, y0)
+    value = ("text", _out(words))
+    if tab.live_var:
+        # A String here: the number, or the dash of a stat that is not the
+        # subject's own. The dash on B, the pin that holds a literal.
+        number = _call(ed, FN_TEXT_TO_STR, x0 + 1020, y0 + 700, made, InText=_out(words))
+        value = _out(_call(ed, FN_SELECT_STR, x0 + 1020, y0 + 860, made, A=_out(number),
+                           B=TUNE_DASH,
+                           bPickA=_item(ed, tab.live_var, _out(idx), x0 + 780, y0 + 860,
+                                        made)))
+    row_value(ed, box, i, value, [_pin(loop, "LoopBody", is_input=False)],
+              x0 + 1300, y0)
     return _pin(loop, "Completed", is_input=False)
 
 

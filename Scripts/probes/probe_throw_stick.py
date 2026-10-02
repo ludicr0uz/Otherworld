@@ -35,9 +35,9 @@ from combat.paths import (
     BLOOD_CLASS_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH,
     WEAPON_COMP_CLASS_PATH,
 )
+from combat.melee_tuning import throw_damage
 from combat.throw_tuning import (
-    LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_AXE_DAMAGE, THROW_DAMAGE_VAR,
-    THROW_KNIFE_DAMAGE,
+    LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_DAMAGE_VAR,
 )
 from combat.tuning import INTERACT_RADIUS
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
@@ -203,8 +203,9 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
     blood = _alive(p, BLOOD_CLASS_PATH)
     lost, over, off = yield from _wound(p, wc, player, knife, body, health, at, yaw,
                                         BODY_VIEW_DEG)
-    p.check(f"a thrown knife takes {THROW_KNIFE_DAMAGE:g} HP off the body it strikes",
-            abs(lost - THROW_KNIFE_DAMAGE) < 1e-3, f"lost {lost:g}")
+    hit = throw_damage("Knife")
+    p.check(f"a thrown knife takes {hit:g} HP off the body it strikes",
+            abs(lost - hit) < 1e-3, f"lost {lost:g}")
     p.check("...as the player's doing, and it draws blood",
             p.get(health, DAMAGED_BY_PLAYER_VAR) is True
             and bool(_alive(p, BLOOD_CLASS_PATH) - blood),
@@ -320,7 +321,7 @@ def _run(p):
     sharp = {n: float(p.get(i, THROW_DAMAGE_VAR)) for n, i in bag.items()
              if p.get(i, THROW_DAMAGE_VAR) > 0.0}
     p.check("of what the player is issued, the knife and the axe have a ThrowDamage",
-            sharp == {KNIFE: THROW_KNIFE_DAMAGE, AXE: THROW_AXE_DAMAGE} and bool(guns),
+            sharp == {KNIFE: throw_damage("Knife"), AXE: throw_damage("Axe")} and bool(guns),
             str(sharp))
     if set(sharp) != {KNIFE, AXE} or not guns:
         return

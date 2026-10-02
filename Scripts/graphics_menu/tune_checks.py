@@ -5,7 +5,13 @@ in the verifier, which is over its size budget.
 
 import unreal
 
-from combat.gun_tuning import CSV_PATH, TUNE_COLUMNS, TUNE_STATS, read_table
+from combat.axe import AXE_DISPLAY
+from combat.gun_tuning import (
+    CSV_PATH, GUN_COLUMNS, MELEE_COLUMNS, MELEE_WEAPONS, TUNE_COLUMNS, TUNE_STATS,
+    columns_of, read_table,
+)
+from combat.knife import KNIFE_DISPLAY
+from combat.paths import AXE_BP_PATH, KNIFE_BP_PATH
 from combat.weapon_specs import _weapon_specs
 from graphics_menu import tune_consts as TC
 from graphics_menu import umg_consts as UC
@@ -31,22 +37,39 @@ def _same(a, b):
         for x, y in zip(a, b))
 
 
+def _weapons():
+    """[(DisplayName, Blueprint path)]: the guns, then the melee weapons."""
+    return ([(sp["display"], sp["path"]) for sp in _weapon_specs()]
+            + [(KNIFE_DISPLAY, KNIFE_BP_PATH), (AXE_DISPLAY, AXE_BP_PATH)])
+
+
 def _check_csv(check):
     table = read_table()
-    guns = [sp["display"] for sp in _weapon_specs()]
-    check("gun_tuning.csv has a row for every gun, and a cell for every stat",
-          set(table) == set(guns)
-          and all(set(table[g]) == set(TUNE_COLUMNS) for g in guns),
+    names = [name for name, _path in _weapons()]
+    check("gun_tuning.csv has a row for every gun and each melee weapon, and a "
+          "cell for every stat that is the weapon's own, and no other",
+          set(table) == set(names)
+          and all(set(table[g]) == set(columns_of(g)) for g in names),
           f"{CSV_PATH}: rows {sorted(table)}")
+    guns = len(_weapon_specs())
+    check("...the melee weapons, which are the knife and the axe, hold only "
+          "their throw; a gun holds everything but a throw's damage",
+          tuple(names[guns:]) == MELEE_WEAPONS
+          and all(columns_of(g) == MELEE_COLUMNS for g in names[guns:])
+          and all(len(columns_of(g)) == len(TUNE_COLUMNS) - 1 for g in names[:guns]),
+          str(names[guns:]))
     bad = []
-    for sp in _weapon_specs():
-        cdo = unreal.get_default_object(BEL.generated_class(unreal.load_asset(sp["path"])))
+    for name, path in _weapons():
+        cdo = unreal.get_default_object(BEL.generated_class(unreal.load_asset(path)))
         for col, var, _label, _step, _min, _kind in TUNE_STATS:
-            want = table.get(sp["display"], {}).get(col)
+            if col not in columns_of(name):
+                continue
+            want = table.get(name, {}).get(col)
             got = cdo.get_editor_property(var)
             if want is None or abs(float(got) - float(want)) > 1e-4:
-                bad.append(f"{sp['display']}.{var}={got} csv {want}")
-    check(f"every gun holds its gun_tuning.csv row ({len(TUNE_STATS)} stats each)",
+                bad.append(f"{name}.{var}={got} csv {want}")
+    check(f"every gun holds its gun_tuning.csv row ({len(TUNE_STATS) - 1} stats each), "
+          f"and the knife and the axe theirs ({len(MELEE_COLUMNS)})",
           not bad, "; ".join(bad[:6]))
 
 
@@ -98,6 +121,46 @@ def _check_graph(check, nodes):
             missing.append(var)
     check(f"every tuned stat is written onto the carried gun ({len(TUNE_STATS)} Sets, "
           "ints rounded)", not missing, str(missing))
+    _check_melee(check, nodes)
+
+
+def _from_live(pin):
+    """Is this bool pin a cell of TuneLive?"""
+    return any(_title(PIN.get_owning_node(q)) == f"Get {TC.TUNE_LIVE_VAR}"
+               for src in pin.list_connected_pins()
+               for q in BEL.find_input_pin(PIN.get_owning_node(src), "TargetArray")
+               .list_connected_pins()
+               if "TargetArray" in _pins(PIN.get_owning_node(src)))
+
+
+def _check_melee(check, nodes):
+    """The melee weapons' rows: only their own stats move, show and land."""
+    guards = [n for n in nodes if _title(n) == "Branch"
+              and _from_live(BEL.find_input_pin(n, "Condition"))]
+    writes = [n for n in nodes if {"TargetArray", "Index", "Item", "bSizeToFit"} <= _pins(n)
+              and any(_title(PIN.get_owning_node(q)) == f"Get {TC.TUNE_VALUES_VAR}"
+                      for q in BEL.find_input_pin(n, "TargetArray").list_connected_pins())]
+    gated = [n for n in writes
+             if any(PIN.get_owning_node(q) in guards
+                    for q in BEL.find_input_pin(n, "execute").list_connected_pins())]
+    check(f"a nudge moves only a stat that is the shown weapon's own: the write "
+          f"is behind one Branch on its {TC.TUNE_LIVE_VAR} cell",
+          len(guards) == 1 and gated == writes and len(writes) == 1,
+          f"{len(guards)} Branch(es), {len(gated)} of {len(writes)} write(s)")
+    per_var = {}
+    for _col, var, *_rest in TUNE_STATS:
+        per_var[var] = len([n for n in nodes if _title(n) == f"Set {var}"
+                            and BEL.find_input_pin(n, "self").list_connected_pins()])
+    want = {var: (col in MELEE_COLUMNS) + (col in GUN_COLUMNS) for col, var, *_r in TUNE_STATS}
+    check("the table is written per kind: a carried gun takes its own stats, a "
+          f"carried melee weapon only its throw's ({len(MELEE_COLUMNS)} Sets)",
+          per_var == want, str({v: n for v, n in per_var.items() if n != want[v]}))
+    picks = [n for n in nodes if {"A", "B", "bPickA"} <= _pins(n)
+             and _from_live(BEL.find_input_pin(n, "bPickA"))]
+    check(f"the panel shows a {TC.TUNE_DASH!r} for a stat that is not the weapon's own",
+          len(picks) == 1
+          and str(BEL.find_input_pin(picks[0], "B").get_pin_value()) == TC.TUNE_DASH,
+          str(len(picks)))
 
 
 def check_tune(check, bp, nodes):

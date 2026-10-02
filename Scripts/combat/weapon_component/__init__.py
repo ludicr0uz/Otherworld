@@ -97,8 +97,9 @@ _author_* fragment per concern, each in its own module:
               end, and lands as a Dropped item; a melee weapon leaves the hand
               squared up to the throw, so it spins forward, edge first
   throw_strike  what the flight struck, for an item with a ThrowDamage (the
-              knife, the axe): a body is wounded and bleeds, and keeps the
-              item, set on the model and attached to the bone it struck; a
+              knife, the axe): a body is wounded (more in the head) and
+              bleeds, and keeps the item, set on the model and attached to
+              the bone it struck (a trace on along the blade's line); a
               tree within reach keeps it, lodged point or bit first; a pick-up
               either way
   consume     the fire key on a Consumable: send the GAS use event, spend it,

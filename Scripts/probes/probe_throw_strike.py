@@ -26,10 +26,10 @@ import unreal
 from combat.paths import (
     BULLET_IMPACT_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
+from combat.melee_tuning import throw_damage
 from combat.throw_tuning import (
-    LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_AXE_DAMAGE,
-    THROW_DAMAGE_VAR, THROW_KNIFE_DAMAGE, THROW_MELEE_PITCH_UP_DEG,
-    THROW_START_FORWARD, THROW_START_UP,
+    LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_DAMAGE_VAR,
+    THROW_MELEE_PITCH_UP_DEG, THROW_START_FORWARD, THROW_START_UP,
 )
 from combat.tuning import INTERACT_RADIUS
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
@@ -276,7 +276,7 @@ def _run(p):
     sharp = {n: float(p.get(i, THROW_DAMAGE_VAR)) for n, i in bag.items()
              if p.get(i, THROW_DAMAGE_VAR) > 0.0}
     p.check("of what the player is issued, the knife and the axe have a ThrowDamage",
-            sharp == {KNIFE: THROW_KNIFE_DAMAGE, AXE: THROW_AXE_DAMAGE} and len(guns) >= 2,
+            sharp == {KNIFE: throw_damage("Knife"), AXE: throw_damage("Axe")} and len(guns) >= 2,
             str(sharp))
     if set(sharp) != {KNIFE, AXE} or len(guns) < 2:
         return

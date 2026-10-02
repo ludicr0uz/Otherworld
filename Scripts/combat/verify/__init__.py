@@ -88,8 +88,9 @@ and it never relies on a variable another section left behind.
               is down, and the clip playing on from it; is_ready_node
   throw_melee a melee weapon's throw: the knife's and the axe's flat, fast
               arc and forward spin, and the release squaring them up to it
-  throw_strike  what a thrown blade strikes: who has a ThrowDamage, the wound
-              and its blood, the body it stays in (the body trace, the attach
+  throw_strike  what a thrown blade strikes: who has a ThrowDamage, where it
+              went into the body (the two body traces), the wound (the head's
+              multiplier) and its blood, the body it stays in (the attach
               to the bone), the tree it lodges in and how high, the pose it
               is left in, the fall it skips; is_strike_node
 """

@@ -33,9 +33,9 @@ from combat.paths import (
     CUBE, HOLD_KNIFE_ANIM_PATH, KNIFE_BP_PATH, MAT_HOT_KNIFE, MAT_METAL,
 )
 from combat.lodge import lodge_pose
+from combat.melee_tuning import melee_throw
 from combat.throw_tuning import (
     LODGE_KNIFE_DEPTH_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, MELEE_THROW,
-    THROW_DAMAGE_VAR, THROW_KNIFE_DAMAGE,
 )
 from combat.tuning import COMBAT
 from combat.weapon_models import FAB_WEAPONS
@@ -117,8 +117,9 @@ def build_knife(item_bp):
         "Melee": True,
         # Thrown hard and flat, spinning forward, edge first.
         **MELEE_THROW,
-        # ...and it wounds what it strikes, and lodges in a tree.
-        THROW_DAMAGE_VAR: THROW_KNIFE_DAMAGE,
+        # ...and it wounds what it strikes, and lodges in a tree. Its tip
+        # and its damage are its gun_tuning.csv row's (melee_tuning.py).
+        **melee_throw(KNIFE_DISPLAY),
         LODGE_TURN_VAR: lodge[0],
         LODGE_POINT_VAR: lodge[1],
         HEATS_VAR: True,

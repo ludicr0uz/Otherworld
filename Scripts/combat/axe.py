@@ -41,9 +41,9 @@ from combat.paths import (
     AXE_BP_PATH, CUBE, HOLD_KNIFE_ANIM_PATH, MAT_HOT_AXE, MAT_METAL,
 )
 from combat.lodge import lodge_pose
+from combat.melee_tuning import melee_throw
 from combat.throw_tuning import (
     LODGE_AXE_DEPTH_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, MELEE_THROW,
-    THROW_AXE_DAMAGE, THROW_DAMAGE_VAR,
 )
 from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_icon
@@ -122,8 +122,9 @@ def build_axe(item_bp):
         "Melee": True,
         # Thrown hard and flat, spinning forward, edge first.
         **MELEE_THROW,
-        # ...and it wounds what it strikes, and lodges in a tree.
-        THROW_DAMAGE_VAR: THROW_AXE_DAMAGE,
+        # ...and it wounds what it strikes, and lodges in a tree. Its tip
+        # and its damage are its gun_tuning.csv row's (melee_tuning.py).
+        **melee_throw(AXE_DISPLAY),
         LODGE_TURN_VAR: lodge[0],
         LODGE_POINT_VAR: lodge[1],
         CHOPS_VAR: True,

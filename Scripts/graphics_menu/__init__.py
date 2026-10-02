@@ -79,7 +79,8 @@ Input, settings and state
   tune_tabs       TABS: the four tabs, in M panel order
   tune_consts     the GUN TUNING tab: variables, widget names, GUN_TAB
   tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
-                  the gun table onto every carried gun (run after loot_tick's)
+                  the gun table onto every carried gun, and the knife's and
+                  the axe's throw rows onto them (run after loot_tick's)
   tune_draw       DrawHUD: a tab's panel, the subject and its values, the
                   caret, BACK, a scrolling list kept on the caret's row
   tune_save       run in the game by the save: the live table into
@@ -132,7 +133,8 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   dev_guns_checks    the dev-all-guns row, key and the five spawns
   loot_checks        the loot window: scan, keys, take, widgets
   legal_checks       the title screen's notice and the HUD's watermark
-  tune_checks        the gun tuning tab: table, CSV on the guns, panel, save, writes
+  tune_checks        the gun tuning tab: table, CSV on the guns and the melee
+                     weapons, panel, save, writes, the rows that are not a weapon's
   world_tune_checks    the world tuning tab: panel, save, the cycle's Sets
   cursor_checks      the mouse cursor: shown when, the row tests, the clicks
   pause_checks       the M panel as a menu: rows taken by caret or click (no

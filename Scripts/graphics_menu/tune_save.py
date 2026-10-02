@@ -3,13 +3,14 @@ ExecutePythonCommand (tune_consts.TUNE_SAVE_COMMAND) when Enter is pressed.
 
 It reads the live HUD's working table (TuneWeapons, TuneValues) and writes
 combat/gun_tuning.csv through combat.gun_tuning, which the next
-build_weapons_and_combat.py bakes into the guns. Reading needs no Instance
+build_weapons_and_combat.py bakes into the guns, and into the knife and the
+axe, whose rows hold their throw alone. Reading needs no Instance
 Editable flag; only writing a Blueprint variable from Python does.
 """
 
 import unreal
 
-from combat.gun_tuning import CSV_PATH, TUNE_STATS, write_table
+from combat.gun_tuning import CSV_PATH, TUNE_STATS, columns_of, write_table
 from graphics_menu.tune_consts import HUD_CLASS_PATH, TUNE_VALUES_VAR, TUNE_WEAPONS_VAR
 
 
@@ -33,7 +34,9 @@ def save(path=CSV_PATH):
     if len(values) != n * len(guns):
         raise RuntimeError(f"TuneValues holds {len(values)} numbers, not "
                            f"{len(guns)} guns x {n} stats")
-    rows = [(gun, {st[0]: values[w * n + s] for s, st in enumerate(TUNE_STATS)})
+    # Only each weapon's own columns: the rest of its row stays empty.
+    rows = [(gun, {st[0]: values[w * n + s] for s, st in enumerate(TUNE_STATS)
+                   if st[0] in columns_of(gun)})
             for w, gun in enumerate(guns)]
     write_table(rows, path)
     unreal.log_warning(f"[TUNE] saved {len(rows)} guns to {path}; "

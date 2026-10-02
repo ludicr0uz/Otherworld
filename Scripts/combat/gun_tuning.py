@@ -9,10 +9,17 @@ and git shows what moved.
 
 A column or row the CSV lacks falls back to the literal in weapon_specs /
 tuning.py. Pure Python (no unreal import): the game's save imports it too.
+
+The melee weapons have rows as well (MELEE_WEAPONS, under the guns), read by
+melee_tuning.py for the knife's and the axe's builders. Not every column is
+every weapon's: columns_of() says which are, and a cell outside them is empty
+in the CSV, a dash on the page, and never written onto the weapon.
 """
 
 import csv
 import os
+
+from combat.throw_tuning import THROW_DAMAGE_COLUMN, THROW_PITCH_COLUMN
 
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gun_tuning.csv")
 
@@ -43,10 +50,24 @@ TUNE_STATS = (
     ("recoil_crouch", "RecoilCrouchScale", "recoil x crouch", 0.05, 0.0, float),
     ("recoil_prone", "RecoilProneScale", "recoil x prone", 0.05, 0.0, float),
     # How far a throw of this gun is tipped up from the view (throw_tuning.py).
-    ("throw_arc", "ThrowArcDegrees", "throw arc (deg)", 1.0, 0.0, float),
+    (THROW_PITCH_COLUMN, "ThrowArcDegrees", "throw arc (deg)", 1.0, 0.0, float),
+    # What a throw of it takes off a body it strikes (a melee weapon's alone:
+    # a gun's stays 0, which is what keeps a thrown gun from wounding).
+    (THROW_DAMAGE_COLUMN, "ThrowDamage", "throw damage", 1.0, 0.0, float),
 )
 TUNE_COLUMNS = tuple(s[0] for s in TUNE_STATS)
 WEAPON_COLUMN = "weapon"
+
+# The melee weapons' rows, by DisplayName (knife.py, axe.py), and the only
+# columns that are theirs: the throw. The slash is COMBAT's (tuning.py).
+MELEE_WEAPONS = ("Knife", "Axe")
+MELEE_COLUMNS = (THROW_PITCH_COLUMN, THROW_DAMAGE_COLUMN)
+GUN_COLUMNS = tuple(c for c in TUNE_COLUMNS if c != THROW_DAMAGE_COLUMN)
+
+
+def columns_of(weapon):
+    """The columns that are this weapon's own."""
+    return MELEE_COLUMNS if weapon in MELEE_WEAPONS else GUN_COLUMNS
 
 
 def _cell(text, kind):
@@ -77,10 +98,11 @@ def format_value(value, kind):
 
 
 def write_table(rows, path=CSV_PATH):
-    """rows: [(gun, {column: value})], in the order the CSV lists them."""
+    """rows: [(weapon, {column: value})], in the order the CSV lists them.
+    A column the weapon's values lack (not its own: columns_of) is left empty."""
     with open(path, "w", newline="") as f:
         out = csv.writer(f, lineterminator="\n")
         out.writerow((WEAPON_COLUMN,) + TUNE_COLUMNS)
         for gun, values in rows:
-            out.writerow([gun] + [format_value(values[c], kind)
+            out.writerow([gun] + [format_value(values[c], kind) if c in values else ""
                                   for c, _v, _l, _s, _m, kind in TUNE_STATS])

@@ -361,14 +361,27 @@ Run from Tick after save and exit; the design is `Scripts/loot/CLAUDE.md`. Traps
 ## The GUN TUNING tab (`tune_*.py`, `wbp_tune.py`)
 
 A developer tab in the M panel's place: **its row** (`gun tuning`) opens it (`TuneOpen`). Up/Down pick
-the gun row or one of the 20 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Right change the
+the gun row or one of the 21 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Right change the
 gun, or move the stat one step (never under its minimum); **Enter** saves
 `Scripts/combat/gun_tuning.csv`.
+
+- **The knife and the axe are subjects too,** after the five guns, with only their throw's
+  rows: `throw arc` and `throw damage` (`combat/melee_tuning.py`). A stat that is not the
+  shown weapon's own (`gun_tuning.columns_of`: a gun has no throw damage, a melee weapon
+  nothing but its throw) shows a dash and a nudge on it does nothing.
+  - `TuneLive` is the mask: a bool per cell, as `TuneValues`, baked by `tune_defaults()`.
+    It is the tab's `live_var` (`tune_tab.py`; "" on the other three tabs): `tune_draw`
+    picks the number or `TUNE_DASH` on it, and `_author_nudge` Branches on it before the
+    write, so nothing is touched or marked unsaved.
+  - The apply Branches on where the item is in `TuneWeapons` (the guns first): a gun
+    takes `GUN_COLUMNS`, a melee weapon `MELEE_COLUMNS`. So `ThrowArcDegrees` has two
+    Sets, and a knife is never given a gun's pellets or magazine.
+  - The save writes each weapon's own columns and leaves the rest of its row empty.
 
 - **The table lives on the HUD:** `TuneValues` (guns x stats, flattened), `TuneWeapons`,
   `TuneSteps`, `TuneMins`, all baked from `_weapon_specs()` (so from the CSV) at build time.
 - **Applied every Tick once touched** (`TuneTouched`): each carried item whose `DisplayName` is
-  in `TuneWeapons` gets all 20 variables (ints rounded). Every Tick rather than per nudge, so a
+  in `TuneWeapons` gets every variable that is its own (ints rounded). Every Tick rather than per nudge, so a
   gun picked up afterwards gets the tuning too. Guns lying in the world get it when picked up.
 - **The save is Python**, through `PythonScriptLibrary.ExecutePythonCommand`
   (`TUNE_SAVE_COMMAND` → `tune_save.save()`), which reads the live HUD's table. Blueprint can't
@@ -376,7 +389,8 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
   packaged build: a dev tool. `TuneSaved` shows "saved to ..." until the next change.
 - **The keys only raise flags** (`TuneNudge`, `TuneSaveRequested`), which is what lets
   `probe_gun_tuning.py` tune and save. It backs up the CSV and puts it back.
-- **Still needs a play session:** the keys themselves and how the 21-row panel reads.
+- **Still needs a play session:** the keys themselves, how the 22-row panel reads, and
+  how the knife's and the axe's rows of dashes read above their two numbers.
 - **The machine is shared with the other tabs:** the keys, nudge and save are
   `tune_tick.author_tab_flow` over a `TuneTab` (`tune_tab.py`); the panel is `tune_draw` and
   `wbp_tune` over the same. Only the apply differs. The verifier tells the two save calls apart

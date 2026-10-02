@@ -9,10 +9,16 @@ verifier's. With the shotgun issued:
   - pellets nudged down ten times stop at the minimum, 1, and land rounded;
   - one nudge up on its throw arc row lands on its ThrowArcDegrees, which the
     throw's launch reads (probe_throw.py shows the arc following it);
-  - Left on the gun row wraps from the first gun to the last;
+  - with the knife shown, a nudge up on its throw damage row lands on the
+    carried knife's ThrowDamage, and one on its damage row, which is not a
+    melee weapon's, moves nothing; nor does one on the shotgun's throw damage
+    row, which is not a gun's;
+  - Left on the gun row wraps from the first gun to the last weapon;
   - the pistol's numbers are untouched;
-  - the save writes those numbers, and only those, into gun_tuning.csv;
-  - the panel, drawn by hand, shows the gun and the value on the caret's row.
+  - the save writes those numbers, and only those, into gun_tuning.csv, the
+    knife's row holding its throw alone;
+  - the panel, drawn by hand, shows the gun and the value on the caret's row,
+    and a dash on a row that is not the shown weapon's.
 
 gun_tuning.csv and any saved profile are set aside first and put back.
 """
@@ -22,9 +28,12 @@ import shutil
 
 import unreal
 
-from combat.gun_tuning import CSV_PATH, TUNE_STATS, read_table
+from combat.gun_tuning import CSV_PATH, MELEE_COLUMNS, TUNE_STATS, read_table
+from combat.knife import KNIFE_DISPLAY
 from combat.paths import WEAPON_COMP_CLASS_PATH
-from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_VAR
+from combat.throw_tuning import (
+    THROW_DAMAGE_COLUMN, THROW_DAMAGE_VAR, THROW_PITCH_COLUMN, THROW_PITCH_VAR,
+)
 from graphics_menu import tune_consts as TC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 from graphics_menu.umg_consts import ROW_CARET, ROW_VALUE
@@ -107,8 +116,42 @@ def _run(p):
     p.check("the pistol is untouched",
             [float(p.get(pistol, s[1])) for s in TUNE_STATS] == pistol_before)
 
+    # The melee rows: only the throw is the knife's, and its damage no gun's.
+    knife = _gun(p, wc, KNIFE_DISPLAY)
+    p.check("the knife is carried, and the table lists it after the guns",
+            knife is not None and KNIFE_DISPLAY in guns[2:], str(guns))
+    if knife is None or KNIFE_DISPLAY not in guns:
+        return
+    hit_row = 1 + COLS.index(THROW_DAMAGE_COLUMN)
+    hit_stat = TUNE_STATS[COLS.index(THROW_DAMAGE_COLUMN)]
+    yield from _nudge(p, hud, hit_row, 1)
+    p.check("a nudge on the shotgun's throw damage row, which is no gun's, "
+            "moves nothing: a thrown gun still takes nothing",
+            float(p.get(shotgun, THROW_DAMAGE_VAR)) == 0.0
+            and float(p.get(hud, TC.TUNE_VALUES_VAR)[COLS.index(THROW_DAMAGE_COLUMN)]) == 0.0,
+            str(p.get(shotgun, THROW_DAMAGE_VAR)))
+    k = guns.index(KNIFE_DISPLAY)
+    p.set(hud, TC.TUNE_WEAPON_VAR, k)
+    hit, slash = float(p.get(knife, THROW_DAMAGE_VAR)), float(p.get(knife, "Damage"))
+    yield from _nudge(p, hud, hit_row, 1)
+    p.check("with the knife shown, one nudge up on its throw damage row raises "
+            "the carried knife's ThrowDamage by its step",
+            hit_stat[1] == THROW_DAMAGE_VAR
+            and abs(float(p.get(knife, THROW_DAMAGE_VAR)) - (hit + hit_stat[3])) < 1e-6,
+            f"{hit} -> {p.get(knife, THROW_DAMAGE_VAR)}")
+    cells = [float(v) for v in p.get(hud, TC.TUNE_VALUES_VAR)]
+    yield from _nudge(p, hud, 1 + COLS.index("damage"), 1)
+    p.check("...and one on its damage row, which is not a melee weapon's, moves nothing",
+            float(p.get(knife, "Damage")) == slash
+            and [float(v) for v in p.get(hud, TC.TUNE_VALUES_VAR)] == cells,
+            f"{slash} -> {p.get(knife, 'Damage')}")
+    p.check("the shotgun is as it was tuned, the knife's rows aside",
+            abs(float(p.get(shotgun, "Damage")) - (before + TUNE_STATS[0][3])) < 1e-6
+            and p.get(shotgun, "PelletCount") == 1)
+
+    p.set(hud, TC.TUNE_WEAPON_VAR, 0)
     yield from _nudge(p, hud, 0, -1)
-    p.check("Left on the gun row wraps to the last gun",
+    p.check("Left on the gun row wraps to the last weapon",
             p.get(hud, TC.TUNE_WEAPON_VAR) == len(guns) - 1,
             str(p.get(hud, TC.TUNE_WEAPON_VAR)))
 
@@ -121,8 +164,14 @@ def _run(p):
                 **{THROW_PITCH_COLUMN: arc + arc_stat[3]})
     p.check("the CSV holds the tuned shotgun", new.get("Shotgun") == want,
             str(new.get("Shotgun")))
-    p.check("...and every other gun as it was",
-            all(new.get(g) == old.get(g) for g in guns if g != "Shotgun"))
+    p.check("...and the tuned knife, its row its throw alone",
+            new.get(KNIFE_DISPLAY) == dict(old.get(KNIFE_DISPLAY, {}),
+                                           **{THROW_DAMAGE_COLUMN: hit + hit_stat[3]})
+            and set(new.get(KNIFE_DISPLAY, {})) == set(MELEE_COLUMNS),
+            str(new.get(KNIFE_DISPLAY)))
+    p.check("...and every other weapon as it was",
+            all(new.get(g) == old.get(g) for g in guns
+                if g not in ("Shotgun", KNIFE_DISPLAY)))
 
     ui = p.get(hud, "UiPause")
     panel, rows = (ui.get_editor_property(n) for n in (TC.TUNE_PANEL, TC.TUNE_ROWS_BOX))
@@ -140,6 +189,15 @@ def _run(p):
             and float(value) == before + TUNE_STATS[0][3]
             and row.get_editor_property(ROW_CARET).get_render_opacity() == 1.0,
             f"{panel.get_visibility()} {shown!r} {value!r}")
+    p.set(hud, TC.TUNE_WEAPON_VAR, k)
+    hud.call_method("ReceiveDrawHUD", (1920, 1080))
+    shown = str(gun_row.get_editor_property(ROW_VALUE).get_text())
+    value = str(row.get_editor_property(ROW_VALUE).get_text())
+    thrown = str(rows.get_child_at(hit_row).get_editor_property(ROW_VALUE).get_text())
+    p.check("with the knife shown, its damage row is a dash and its throw "
+            "damage row its number",
+            shown == KNIFE_DISPLAY and value == TC.TUNE_DASH
+            and float(thrown) == hit + hit_stat[3], f"{shown!r} {value!r} {thrown!r}")
     p.set(hud, TC.TUNE_OPEN_VAR, False)
     hud.call_method("ReceiveDrawHUD", (1920, 1080))
     p.check("shut, the panel is collapsed",

@@ -45,7 +45,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
   game_state        GameMode + health-component variable names, debug mode,
                     the noise record, ensure_game_mode_vars()
   gun_tuning        gun_tuning.csv: the tunable stats (TUNE_STATS: column,
-                    variable, label, step, minimum), reading and writing it
+                    variable, label, step, minimum), which are whose
+                    (columns_of: a gun's, a melee weapon's), reading and writing it
+  melee_tuning      the knife's and the axe's rows of that table: their
+                    throw's arc and damage, defaults under the CSV's cells
   weapon_specs      the five weapons: muzzles, icons, _weapon_specs()
   weapon_models     every gun's model: the SMG's, the rifle's and the sniper's Fab
                     ones (SMG11, AK 47, AS Val + scope), the shotgun's and the pistol's

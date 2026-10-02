@@ -6,10 +6,14 @@ hits something, before it sets the item down:
 
     Thrown.ThrowDamage > 0                       (else it falls, as any item)
       --> the struck actor has a BP_HealthComponent: a body
-            Health -= ThrowDamage, stamped as a pellet hit is; blood at the
-            wound
-            the body is a Character, and a trace of its mesh from the hit
-            towards its nearest bone finds one of its physics bodies
+            ThrowBone = None; the body is a Character, and a trace of its
+            mesh finds one of its physics bodies: on along the blade's own
+            line or, that missing, from the hit towards its nearest bone
+              --> ThrowBone = that body's bone, ThrowSkin = where on it
+            Health -= ThrowDamage, times the body's HeadMultiplier where
+            ThrowBone is one of its HeadBones; stamped as a pellet hit is;
+            blood at the wound
+            ThrowBone is a bone
               --> the item set into the body there, and attached to that
                   bone --> lodged
               (else it falls at the body's foot)
@@ -19,9 +23,16 @@ hits something, before it sets the item down:
               --> chips off the bark; the item set into the trunk --> lodged
 
 ThrowDamage is the item's own (throw_tuning.py): 0 on the base, so a thrown
-gun, mushroom or canteen does neither and comes to rest as it always did. The
-damage is flat: no hit zones and no hot blade's double, which are the pellet's
-and the blow's.
+gun, mushroom or canteen does neither and comes to rest as it always did.
+
+A BLADE IN THE HEAD does more: the damage is times the struck body's own
+HeadMultiplier (hit_zones.py: the pellet's) where the bone the blade is set
+into is one of its HeadBones. That bone is the one the item is then attached
+to, so what the player sees is what was counted: a blade left in the head was
+a head shot. So the body's skin is found before the wound, and ThrowBone
+carries the bone from there to the wound and to the attach (None: it could
+not be set into the body). Only the head: a limb takes the blade whole, and
+there is no hot blade's double, which is the blow's.
 
 LODGED, the item is where the flight left it, turned and set by its own
 LodgeTurn and LodgePoint (combat/lodge.py): its X along the segment it
@@ -38,12 +49,17 @@ IN A BODY it is set the same way, and then attached to the bone it struck
 fallen, a pick-up all the while, and E takes it back from within reach of it
 (pickup.py detaches what it takes). The flight's hit is on the capsule, which
 is far wider than the model (hit_zones.make_shootable), so where on the body
-is a second trace, of the mesh's physics bodies alone, from that hit towards
-the bone nearest it and STICK_TRACE_PAST times as far: the model's skin
-nearest where the blade came in, and the bone that skin moves with. The
-flight's own line would not do: a segment is one frame long and may end short
-of the model, and a blade can cross the capsule beside the model, which has
-wounded the body all the same. A corpse's lifespan ends with the item still
+is a trace of the mesh's physics bodies alone (_author_skin). First on along
+the blade's own line: from that hit the way the segment flew, and
+STICK_LINE_REACH_CM far, not the segment itself, which is one frame long and
+may end short of the model. What that strikes is what the blade struck: aimed
+at the head, it is in the head. A blade can also cross the capsule beside the
+model, which has wounded the body all the same: then the trace is from the hit
+towards the bone nearest it and STICK_TRACE_PAST times as far, the model's
+skin nearest where the blade came in, and the bone that skin moves with. (The
+nearest bone alone would not do for the first: it is nearest the point of the
+capsule the blade came in at, not what the blade was going to.) A corpse's
+lifespan ends with the item still
 in it: the engine detaches an actor's attached actors as it destroys it, so
 the item is left where the corpse lay.
 
@@ -58,7 +74,8 @@ not be in it.)
 
 Thrown is valid throughout: the flight's gate asked.
 
-Owns ThrowPast, which build.py declares and the flight's ground trace reads.
+Owns ThrowPast, which build.py declares and the flight's ground trace reads,
+and ThrowBone and ThrowSkin, which build.py declares too.
 """
 
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
@@ -66,21 +83,28 @@ from combat.graph import (
     BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec,
 )
 from combat.hit_reaction import LAST_HIT_FROM_VAR
+from combat.hit_zones import HEAD_BONES_VAR, HEAD_MULT_VAR
 from combat.nodes import (
-    FN_ADD_VV, FN_ARR_ADD, FN_ATTACH, FN_BREAK_VECTOR, FN_CLAMP, FN_GET_COMP,
-    FN_GREATER_FF, FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_NORMAL,
-    FN_ROT_FROM_X, FN_SUB_FF, FN_SUB_VV, FN_TIME_SECONDS, FN_TRACE_COMPONENT, INF,
-    NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_SPAWN,
+    FN_ADD_VV, FN_ARR_ADD, FN_ARR_CONTAINS, FN_ATTACH, FN_BREAK_VECTOR, FN_CLAMP,
+    FN_GET_COMP, FN_GREATER_FF, FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF,
+    FN_NORMAL, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV, FN_TIME_SECONDS,
+    FN_TRACE_COMPONENT, INF, NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_SPAWN,
 )
 from combat.paths import HEALTH_CLASS_PATH
 from combat.throw_tuning import (
-    LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, STICK_TRACE_PAST,
-    THROW_DAMAGE_VAR,
+    LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, STICK_LINE_REACH_CM,
+    STICK_TRACE_PAST, THROW_DAMAGE_VAR,
 )
 from combat.weapon_component.common import _prop
 from combat.weapon_component.surface_impact import _author_surface_impact
 
 THROW_PAST_VAR = "ThrowPast"          # the actors the fall to the ground ignores
+# The bone of the body the blade is set into, a Name on the component: None
+# for a body it cannot be set into. Written before the wound, which reads it
+# for the head, and read again after it by the attach. ThrowSkin is the point
+# of that bone's body the blade struck: where it is set.
+THROW_BONE_VAR = "ThrowBone"
+THROW_SKIN_VAR = "ThrowSkin"
 
 NODE_CAST_INSTANCED = "Utilities|Casting|CastToInstancedStaticMeshComponent"
 FN_INSTANCE_TRANSFORM = "/Script/Engine.InstancedStaticMeshComponent.GetInstanceTransform"
@@ -90,6 +114,7 @@ FN_ROTATE_VECTOR = "/Script/Engine.KismetMathLibrary.GreaterGreater_VectorRotato
 FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
 FN_SET_LOC_ROT = "/Script/Engine.Actor.K2_SetActorLocationAndRotation"
 FN_CLOSEST_BONE = "/Script/Engine.SkinnedMeshComponent.FindClosestBone_K2"
+FN_NE_NAME = "/Script/Engine.KismetMathLibrary.NotEqual_NameName"
 
 
 def _out(n, name="ReturnValue"):
@@ -106,7 +131,28 @@ def _z(ed, vector, x, y):
     return _out(parts, "Z")
 
 
-def _author_wound(ed, as_health, damage, brk, exec_in, x0, y0):
+def _head_worth(ed, as_health, damage, x0, y0):
+    """``damage`` on this body where ThrowBone says the blade went in: times
+    its HeadMultiplier in one of its HeadBones, as it is anywhere else. A pure
+    float pin, and the nodes."""
+    bone = _at(ed.add_get_member_variable_node(THROW_BONE_VAR), x0, y0 + 140)
+    heads, heads_n = _prop(ed, HEAD_BONES_VAR, as_health, x0, y0, HEALTH_CLASS_PATH)
+    in_head = _at(_node(ed, FN_ARR_CONTAINS), x0 + 240, y0)
+    _connect(heads, _loose_pin(in_head, "TargetArray"))
+    _connect(_out(bone, THROW_BONE_VAR), _loose_pin(in_head, "ItemToFind"))
+    worth, worth_n = _prop(ed, HEAD_MULT_VAR, as_health, x0 + 240, y0 + 140,
+                           HEALTH_CLASS_PATH)
+    scale = _at(_node(ed, FN_SELECT_FF), x0 + 480, y0)
+    _connect(worth, _pin(scale, "A"))
+    _set(scale, "B", 1.0)
+    _connect(_out(in_head), _pin(scale, "bPickA"))
+    dealt = _at(_node(ed, FN_MUL_FF), x0 + 720, y0)
+    _connect(damage, _pin(dealt, "A"))
+    _connect(_out(scale), _pin(dealt, "B"))
+    return _out(dealt), [bone, heads_n, in_head, worth_n, scale, dealt]
+
+
+def _author_wound(ed, as_health, damage, brk, execs, x0, y0):
     """Take ``damage`` off the body and leave the three stamps a pellet does
     (impact.py): the health bar, the kill's credit, which way the flinch
     goes. Returns the exec pin after them, and the nodes."""
@@ -124,7 +170,8 @@ def _author_wound(ed, as_health, damage, brk, exec_in, x0, y0):
                 x0 + 740, y0)
     _connect(as_health, _pin(set_h, "self"))
     _connect(_out(clamp), _pin(set_h, "Health"))
-    _connect(exec_in, _pin(set_h, "execute"))
+    for pin in execs:
+        _connect(pin, _pin(set_h, "execute"))
     now = _at(_node(ed, FN_TIME_SECONDS), x0 + 740, y0 + 300)
     stamp = _at(ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH),
                 x0 + 1000, y0)
@@ -177,22 +224,76 @@ def _author_lodge(ed, thrown, brk, on, exec_in, x0, y0):
     return BEL.find_then_pin(put), put
 
 
-def _author_stick(ed, thrown, brk, exec_in, x0, y0):
-    """Leave the item in the body it wounded: set into the model where the
-    blade came in, and attached to the bone there. Returns (the exec pin a
-    stuck item leaves by, the ones an item that could not be set leaves by,
-    the nodes)."""
+def _body_trace(ed, mesh_out, start, end, exec_in, x0, y0):
+    """One trace of the mesh's physics bodies alone, and the Branch on
+    whether it struck one. Returns (the trace, the Branch)."""
+    skin = _at(_node(ed, FN_TRACE_COMPONENT), x0, y0)
+    _connect(mesh_out, _pin(skin, "self"))
+    _connect(start, _pin(skin, "TraceStart"))
+    _connect(end, _pin(skin, "TraceEnd"))
+    # Simple collision: the physics asset's bodies, each of which names its bone.
+    _set(skin, "bTraceComplex", "false")
+    _set(skin, "bShowTrace", "false")
+    _set(skin, "bPersistentShowTrace", "false")
+    _connect(exec_in, _pin(skin, "execute"))
+    found = _at(ed.add_branch_node(), x0 + 320, y0)
+    _connect(_out(skin), _pin(found, "Condition"))
+    _connect(BEL.find_then_pin(skin), _pin(found, "execute"))
+    return skin, found
+
+
+def _note(ed, skin, exec_in, x0, y0):
+    """ThrowBone, ThrowSkin := what the trace ``skin`` struck. Returns the
+    exec pin after them, and the two nodes."""
+    bone = _at(ed.add_set_member_variable_node(THROW_BONE_VAR), x0, y0)
+    _connect(_out(skin, "BoneName"), _pin(bone, THROW_BONE_VAR))
+    _connect(exec_in, _pin(bone, "execute"))
+    at = _at(ed.add_set_member_variable_node(THROW_SKIN_VAR), x0 + 260, y0)
+    _connect(_out(skin, "HitLocation"), _pin(at, THROW_SKIN_VAR))
+    _connect(BEL.find_then_pin(bone), _pin(at, "execute"))
+    return BEL.find_then_pin(at), [bone, at]
+
+
+def _author_skin(ed, brk, exec_in, x0, y0):
+    """Where on the body the blade went in, before the wound: ThrowBone and
+    ThrowSkin := the bone and the point of the physics body the blade's own
+    line strikes, or failing that the one a trace towards the nearest bone
+    does; ThrowBone left None for a body that is no Character, or where both
+    find nothing. Returns (the exec pins it leaves by, the mesh, the nodes)."""
+    none = _at(ed.add_set_member_variable_node(THROW_BONE_VAR), x0 - 280, y0)
+    _connect(exec_in, _pin(none, "execute"))    # its pin left at None
     as_char = _at(_palette(ed, NODE_CAST_CHARACTER), x0, y0)
     _connect(_hit(brk, "HitActor"), _pin(as_char, "Object"))
-    _connect(exec_in, _pin(as_char, "execute"))
-    step = BEL.find_then_pin(as_char)
+    _connect(BEL.find_then_pin(none), _pin(as_char, "execute"))
     mesh = _at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
                x0, y0 + 300)
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
     mesh_out = _out(mesh, "Mesh")
-    # The capsule's hit is in the air round the model: the way in from it is
-    # towards the nearest bone that has a body, and on past it.
-    near = _at(_node(ed, FN_CLOSEST_BONE), x0 + 280, y0 + 300)
+
+    # The blade's own line: on from the capsule's hit the way the segment
+    # flew, far enough to cross the capsule. What that strikes is what the
+    # blade struck, the head or a hand.
+    flew = _at(_node(ed, FN_SUB_VV), x0 + 280, y0 - 500)
+    _connect(_hit(brk, "TraceEnd"), _pin(flew, "A"))
+    _connect(_hit(brk, "TraceStart"), _pin(flew, "B"))
+    along = _at(_node(ed, FN_NORMAL), x0 + 520, y0 - 500)
+    _connect(_out(flew), _pin(along, "A"))
+    on = _at(_node(ed, FN_MUL_VF), x0 + 760, y0 - 500)
+    _connect(_out(along), _pin(on, "A"))
+    r = STICK_LINE_REACH_CM
+    _connect(_vec(ed, r, r, r, x0 + 520, y0 - 340), _pin(on, "B"))
+    through = _at(_node(ed, FN_ADD_VV), x0 + 1000, y0 - 500)
+    _connect(_hit(brk, "ImpactPoint"), _pin(through, "A"))
+    _connect(_out(on), _pin(through, "B"))
+    line, struck = _body_trace(ed, mesh_out, _hit(brk, "ImpactPoint"), _out(through),
+                               BEL.find_then_pin(as_char), x0 + 1300, y0)
+    on_line, line_nodes = _note(ed, line, BEL.find_then_pin(struck), x0 + 1900, y0)
+
+    # It crossed the capsule beside the model, and has wounded it all the
+    # same: the way in is then towards the nearest bone that has a body, and
+    # on past it.
+    step = BEL.find_else_pin(struck)
+    near = _at(_node(ed, FN_CLOSEST_BONE), x0 + 1900, y0 + 700)
     _connect(mesh_out, _pin(near, "self"))
     _connect(_hit(brk, "ImpactPoint"), _pin(near, "TestLocation"))
     _set(near, "bRequirePhysicsAsset", "true")
@@ -201,42 +302,48 @@ def _author_stick(ed, thrown, brk, exec_in, x0, y0):
     if runs and runs.is_valid():
         _connect(step, runs)
         step = BEL.find_then_pin(near)
-    inward = _at(_node(ed, FN_SUB_VV), x0 + 560, y0 + 300)
+    inward = _at(_node(ed, FN_SUB_VV), x0 + 2180, y0 + 700)
     _connect(_out(near, "BoneLocation"), _pin(inward, "A"))
     _connect(_hit(brk, "ImpactPoint"), _pin(inward, "B"))
-    far = _at(_node(ed, FN_MUL_VF), x0 + 800, y0 + 300)
+    far = _at(_node(ed, FN_MUL_VF), x0 + 2420, y0 + 700)
     _connect(_out(inward), _pin(far, "A"))
     s = STICK_TRACE_PAST
-    _connect(_vec(ed, s, s, s, x0 + 560, y0 + 460), _pin(far, "B"))
-    end = _at(_node(ed, FN_ADD_VV), x0 + 1040, y0 + 300)
+    _connect(_vec(ed, s, s, s, x0 + 2180, y0 + 860), _pin(far, "B"))
+    end = _at(_node(ed, FN_ADD_VV), x0 + 2660, y0 + 700)
     _connect(_hit(brk, "ImpactPoint"), _pin(end, "A"))
     _connect(_out(far), _pin(end, "B"))
-    skin = _at(_node(ed, FN_TRACE_COMPONENT), x0 + 1300, y0)
-    _connect(mesh_out, _pin(skin, "self"))
-    _connect(_hit(brk, "ImpactPoint"), _pin(skin, "TraceStart"))
-    _connect(_out(end), _pin(skin, "TraceEnd"))
-    # Simple collision: the physics asset's bodies, each of which names its bone.
-    _set(skin, "bTraceComplex", "false")
-    _set(skin, "bShowTrace", "false")
-    _set(skin, "bPersistentShowTrace", "false")
-    _connect(step, _pin(skin, "execute"))
-    found = _at(ed.add_branch_node(), x0 + 1620, y0)
-    _connect(_out(skin), _pin(found, "Condition"))
-    _connect(BEL.find_then_pin(skin), _pin(found, "execute"))
-    set_in, put = _author_lodge(ed, thrown, brk, _out(skin, "HitLocation"),
-                                BEL.find_then_pin(found), x0 + 1880, y0)
-    hold = _at(_node(ed, FN_ATTACH), x0 + 3700, y0)
+    skin, found = _body_trace(ed, mesh_out, _hit(brk, "ImpactPoint"), _out(end), step,
+                              x0 + 2920, y0 + 400)
+    nearest, near_nodes = _note(ed, skin, BEL.find_then_pin(found), x0 + 3520, y0 + 400)
+    return ((on_line, nearest, _loose_pin(as_char, "CastFailed", is_input=False),
+             BEL.find_else_pin(found)),
+            mesh_out,
+            [none, as_char, line, struck, skin, found] + line_nodes + near_nodes)
+
+
+def _author_stick(ed, thrown, brk, mesh_out, exec_in, x0, y0):
+    """Leave the item in the body it wounded, if _author_skin found where
+    (ThrowBone is a bone): set into the model at ThrowSkin, and attached to
+    that bone. Returns (the exec pin a stuck item leaves by, the one an item
+    that could not be set leaves by, the nodes)."""
+    bone = _at(ed.add_get_member_variable_node(THROW_BONE_VAR), x0 - 240, y0 + 300)
+    is_set = _at(_node(ed, FN_NE_NAME), x0, y0 + 300)
+    _connect(_out(bone, THROW_BONE_VAR), _pin(is_set, "A"))   # B is left at None
+    found = _at(ed.add_branch_node(), x0 + 260, y0)
+    _connect(_out(is_set), _pin(found, "Condition"))
+    _connect(exec_in, _pin(found, "execute"))
+    at = _at(ed.add_get_member_variable_node(THROW_SKIN_VAR), x0 + 260, y0 + 300)
+    set_in, put = _author_lodge(ed, thrown, brk, _out(at, THROW_SKIN_VAR),
+                                BEL.find_then_pin(found), x0 + 520, y0)
+    hold = _at(_node(ed, FN_ATTACH), x0 + 2340, y0)
     _connect(thrown, _pin(hold, "self"))
     _connect(mesh_out, _pin(hold, "Parent"))
-    _connect(_out(skin, "BoneName"), _pin(hold, "SocketName"))
+    _connect(_out(bone, THROW_BONE_VAR), _pin(hold, "SocketName"))
     # Where the lodge just put it, and its own size on a scaled model.
     for rule in ("LocationRule", "RotationRule", "ScaleRule"):
         _set(hold, rule, "KeepWorld")
     _connect(set_in, _pin(hold, "execute"))
-    return (BEL.find_then_pin(hold),
-            (_loose_pin(as_char, "CastFailed", is_input=False),
-             BEL.find_else_pin(found)),
-            [as_char, skin, found, put, hold])
+    return BEL.find_then_pin(hold), BEL.find_else_pin(found), [found, put, hold]
 
 
 def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
@@ -262,9 +369,13 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
     body = _at(_palette(ed, NODE_CAST_HEALTH), x0 + 760, y0)
     _connect(_out(comp), _pin(body, "Object"))
     _connect(BEL.find_then_pin(bites), _pin(body, "execute"))
-    wounded, wound_nodes = _author_wound(
-        ed, _loose_pin(body, "AsBPHealthComponent", is_input=False), damage, brk,
-        BEL.find_then_pin(body), x0 + 1040, y0)
+    as_health = _loose_pin(body, "AsBPHealthComponent", is_input=False)
+    # Where it went in comes first: the wound asks whether that is the head.
+    known, mesh_out, skin_nodes = _author_skin(
+        ed, brk, BEL.find_then_pin(body), x0 + 1320, y0 - 1600)
+    dealt, worth_nodes = _head_worth(ed, as_health, damage, x0 + 240, y0 + 560)
+    wounded, wound_nodes = _author_wound(ed, as_health, dealt, brk, known,
+                                         x0 + 1040, y0)
     # The one transform serves the blood and the chips, as a pellet's does:
     # the hit, +X turned out along the surface normal.
     facing = _at(_node(ed, FN_ROT_FROM_X), x0 + 2600, y0 + 440)
@@ -281,12 +392,12 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
     # ...and the blade stays in the body. One it cannot be set into drops
     # it, and that fall to the ground passes the body by.
     stuck, dropped, stick_nodes = _author_stick(
-        ed, thrown, brk, BEL.find_then_pin(blood), x0 + 3440, y0 - 900)
-    aside = _at(_node(ed, FN_ARR_ADD), x0 + 5400, y0)
+        ed, thrown, brk, mesh_out, BEL.find_then_pin(blood),
+        x0 + 3700, y0 - 300)
+    aside = _at(_node(ed, FN_ARR_ADD), x0 + 6400, y0)
     _connect(_out(past, THROW_PAST_VAR), _pin(aside, "TargetArray"))
     _connect(_hit(brk, "HitActor"), _pin(aside, "NewItem"))
-    for pin in dropped:
-        _connect(pin, _pin(aside, "execute"))
+    _connect(dropped, _pin(aside, "execute"))
 
     # --- a tree, struck low enough to be taken back -----------------------------
     y1 = y0 + 900
@@ -322,9 +433,12 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
 
     ed.add_comment_to_nodes(
         f"What the flight struck, for an item with a {THROW_DAMAGE_VAR} (a "
-        "blade). A body with health loses that much, stamped like a pellet "
-        "hit, and bleeds; the item is set into the model (a trace of its mesh "
-        "from the hit towards the nearest bone) and attached to the bone "
+        "blade). Where it went into a body with health is found first (a "
+        "trace of its mesh on along the way it flew, or failing that from the "
+        f"hit towards the nearest bone: {THROW_BONE_VAR}, {THROW_SKIN_VAR}). "
+        "The body loses that much, times its "
+        f"{HEAD_MULT_VAR} for a bone of its head, stamped like a pellet hit, "
+        "and bleeds; the item is set into the model and attached to the bone "
         "there, a pick-up that goes where the body goes. A body it cannot be "
         f"set into drops it at its foot, past it ({THROW_PAST_VAR}: what the "
         "fall's trace ignores, emptied first). A tree (an instanced "
@@ -332,7 +446,7 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
         f"and the item lodges in it: {LODGE_POINT_VAR} on the bark, turned by "
         f"{LODGE_TURN_VAR} along the way it flew, left there to be picked up.",
         [fresh, damage_n, bites, body, blood, aside, tree, reachable, chipped, put]
-        + wound_nodes + stick_nodes)
+        + wound_nodes + skin_nodes + worth_nodes + stick_nodes)
     falls = (BEL.find_else_pin(bites), BEL.find_then_pin(aside),
              _loose_pin(tree, "CastFailed", is_input=False),
              BEL.find_else_pin(reachable))

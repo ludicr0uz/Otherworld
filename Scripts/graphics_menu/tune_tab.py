@@ -66,6 +66,9 @@ class TuneTab:
     saved_words: str
     fraction_digits: int = 4  # the panel's values, at most this many decimals
     maxs_var: str = ""        # per stat; "" = the tab has no maximums
+    # Per cell, as values_var: is this stat the subject's own? One that is
+    # not shows a dash and does not move; "" = every cell is.
+    live_var: str = ""
     label_w: float = 0.0      # the rows' label column; 0 = TUNE_ROW_LABEL_W
     panel_w: float = 0.0      # 0 = TUNE_PANEL_W
     title_font: float = 0.0   # 0 = TUNE_TITLE_FONT

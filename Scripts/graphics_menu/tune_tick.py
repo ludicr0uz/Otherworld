@@ -17,10 +17,14 @@ the table written onto every carried gun.
         else                          TuneValues[gun, stat] +/- its step, never
                                       under its minimum (nor over its maximum,
                                       for a tab that has them); TuneTouched,
-                                      NOT TuneSaved
+                                      NOT TuneSaved. In a tab with a live
+                                      mask, only a cell that is the subject's
+                                      own (TuneLive): the others stay
     TuneSaveRequested -> lower it; TuneSaved = ExecutePythonCommand(the save)
     TuneTouched -> for each carried item whose DisplayName is in TuneWeapons,
-                   every TUNE_STATS variable := its cell (ints rounded)
+                   every TUNE_STATS variable that is its own := its cell
+                   (ints rounded): a gun's, or for the melee weapons listed
+                   after the guns only the throw's (gun_tuning.columns_of)
 
 The keys, the nudge and the save are any TuneTab's (tune_tab.py):
 author_tab_flow() is also MONSTER TUNING's (monster_tune_tick.py), and
@@ -37,7 +41,8 @@ lands on the next shot.
 import unreal
 
 from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, _palette, _pin
-from combat.gun_tuning import TUNE_STATS
+from combat.gun_tuning import GUN_COLUMNS, MELEE_COLUMNS, TUNE_COLUMNS, TUNE_STATS, columns_of
+from combat.melee_tuning import melee_specs
 from combat.nodes import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_ARR_GET, FN_EQ_II, FN_GET_COMP,
     FN_GET_PLAYER_PAWN, FN_LESS_II, FN_MIN_II, FN_MOD_II, FN_MUL_FF, FN_NOT, FN_SUB_II,
@@ -54,7 +59,7 @@ from graphics_menu.menu_nav import or_wheel, pause_row_taken
 from graphics_menu.loot_find import put
 from graphics_menu.monster_tune_consts import MONSTER_TAB
 from graphics_menu.tune_consts import (
-    GUN_TAB, STAT_COUNT, TUNE_TOUCHED_VAR,
+    GUN_TAB, STAT_COUNT, TUNE_LIVE_VAR, TUNE_TOUCHED_VAR,
     TUNE_VALUES_VAR, TUNE_WEAPONS_VAR,
 )
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
@@ -90,6 +95,8 @@ def declare_tab_vars(ed, tab):
     for name in filter(None, (tab.values_var, tab.steps_var, tab.mins_var,
                               tab.maxs_var)):
         _declare(ed, name, BEL.get_array_type(_float_type()))
+    if tab.live_var:
+        _declare(ed, tab.live_var, BEL.get_array_type(BEL.get_basic_type_by_name("bool")))
     _declare(ed, tab.names_var, BEL.get_array_type(BEL.get_basic_type_by_name("string")))
 
 
@@ -106,18 +113,23 @@ def declare_tune_vars(ed):
 
 
 def tune_table():
-    """(guns, values): the built guns' DisplayNames and their TUNE_STATS
-    cells, flattened gun by gun -- the specs, so gun_tuning.csv's numbers."""
-    specs = _weapon_specs()
-    guns = [sp["display"] for sp in specs]
-    values = [float(sp[col]) for sp in specs for col, *_rest in TUNE_STATS]
-    return guns, values
+    """(weapons, values, live): the built guns' DisplayNames, then the melee
+    weapons'; their TUNE_STATS cells, flattened weapon by weapon -- the
+    specs, so gun_tuning.csv's numbers; and per cell whether the stat is that
+    weapon's own. A cell that is not holds 0 and is never read."""
+    rows = ([(sp["display"], sp) for sp in _weapon_specs()] + melee_specs())
+    names = [name for name, _spec in rows]
+    live = [col in columns_of(name) for name, _spec in rows for col in TUNE_COLUMNS]
+    values = [float(spec[col]) if col in columns_of(name) else 0.0
+              for name, spec in rows for col in TUNE_COLUMNS]
+    return names, values, live
 
 
 def tune_defaults():
-    guns, values = tune_table()
-    return tab_defaults(GUN_TAB, guns, values, [float(st[3]) for st in TUNE_STATS],
-                        [float(st[4]) for st in TUNE_STATS])
+    names, values, live = tune_table()
+    return {**tab_defaults(GUN_TAB, names, values, [float(st[3]) for st in TUNE_STATS],
+                           [float(st[4]) for st in TUNE_STATS]),
+            TUNE_LIVE_VAR: live}
 
 
 def _pressed(ed, pc_out, key, x, y, made):
@@ -247,11 +259,17 @@ def _author_nudge(ed, in_execs, x0, y0, made, tab, subjects):
                   TargetArray=_get(ed, tab.values_var, x + 1200, y0 + 600, made))
     _connect(idx, _pin(write, "Index"))
     _connect(_out(kept), _pin(write, "Item"))
+    stays = []
+    if tab.live_var:
+        # A stat that is not the subject's own: nothing moves, nothing is touched.
+        stat, dead = _branch(ed, _cell(ed, tab.live_var, idx, x + 960, y0 + 500, made),
+                             [stat], x + 1200, y0 + 300, made)
+        stays = [dead]
     _connect(stat, _pin(write, "execute"))
     flow = _setter(ed, tab.touched_var, "true", [BEL.find_then_pin(write)],
                    x + 1740, y0, made)
     flow = _setter(ed, tab.saved_var, "false", [flow], x + 2000, y0, made)
-    lowered = _setter(ed, tab.nudge_var, 0, [flow, picked], x + 2260, y0, made)
+    lowered = _setter(ed, tab.nudge_var, 0, [flow, picked, *stays], x + 2260, y0, made)
     return [lowered, still]
 
 
@@ -266,8 +284,10 @@ def _author_save(ed, in_execs, x0, y0, made, tab):
     return [done, idle]
 
 
-def _author_apply(ed, in_execs, x0, y0, made):
-    """TuneTouched: the table onto every carried gun. Returns the exec tails."""
+def _author_apply(ed, in_execs, x0, y0, made, guns):
+    """TuneTouched: the table onto every carried weapon it lists, each stat
+    that is the weapon's own. ``guns``: how many of TuneWeapons are guns, the
+    rest being melee weapons. Returns the exec tails."""
     go, idle = _branch(ed, _get(ed, TUNE_TOUCHED_VAR, x0 - 240, y0 + 300, made),
                        in_execs, x0, y0, made)
     pawn = _out(_call(ed, FN_GET_PLAYER_PAWN, x0, y0 + 440, made, PlayerIndex=0))
@@ -299,20 +319,27 @@ def _author_apply(ed, in_execs, x0, y0, made):
     tuned, _other = _branch(ed, _out(known), [_loose_pin(loop, "LoopBody", is_input=False)],
                             x + 480, y0, made)
     base = _out(_call(ed, FN_MUL_II, x + 480, y0 + 440, made, A=_out(find), B=STAT_COUNT))
-    flow = tuned
-    x += 760
-    for s, (_col, var, _label, _step, _min, kind) in enumerate(TUNE_STATS):
-        idx = _out(_call(ed, FN_ADD_II, x, y0 + 300, made, A=base, B=s))
-        value = _cell(ed, TUNE_VALUES_VAR, idx, x + 240, y0 + 440, made)
-        if kind is int:
-            value = _out(_call(ed, FN_ROUND, x + 240, y0 + 600, made, A=value))
-        n = _at(ed.add_set_member_variable_node(var, ITEM_CLASS_PATH), x + 480, y0)
-        made.append(n)
-        _connect(item, _pin(n, "self"))
-        _connect(value, _pin(n, var))
-        _connect(flow, _pin(n, "execute"))
-        flow = BEL.find_then_pin(n)
-        x += 600
+    # The guns are listed first: past them it is a melee weapon, which takes
+    # only its own columns.
+    melee = _call(ed, FN_GE_II, x + 480, y0 + 640, made, A=_out(find), B=guns)
+    blade, gun = _branch(ed, _out(melee), [tuned], x + 760, y0, made)
+    x += 1060
+    for flow, columns, y in ((gun, GUN_COLUMNS, y0), (blade, MELEE_COLUMNS, y0 + 1200)):
+        at = x
+        for s, (col, var, _label, _step, _min, kind) in enumerate(TUNE_STATS):
+            if col not in columns:
+                continue
+            idx = _out(_call(ed, FN_ADD_II, at, y + 300, made, A=base, B=s))
+            value = _cell(ed, TUNE_VALUES_VAR, idx, at + 240, y + 440, made)
+            if kind is int:
+                value = _out(_call(ed, FN_ROUND, at + 240, y + 600, made, A=value))
+            n = _at(ed.add_set_member_variable_node(var, ITEM_CLASS_PATH), at + 480, y)
+            made.append(n)
+            _connect(item, _pin(n, "self"))
+            _connect(value, _pin(n, var))
+            _connect(flow, _pin(n, "execute"))
+            flow = BEL.find_then_pin(n)
+            at += 600
     return [idle, _pin(cast, "CastFailed", is_input=False)]
 
 
@@ -327,13 +354,14 @@ def author_tab_flow(ed, pc_out, in_execs, x0, y0, made, tab, subjects, closes):
 def author_tune_tick(ed, pc_out, in_execs, x0, y0):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
-    flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GUN_TAB,
-                           len(tune_table()[0]),
+    weapons = len(tune_table()[0])
+    flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GUN_TAB, weapons,
                            (MONSTER_TAB.open_var, WORLD_TAB.open_var,
                             GFX_TAB.open_var))
-    tails = _author_apply(ed, flow, x0 + 10400, y0, made)
+    tails = _author_apply(ed, flow, x0 + 10400, y0, made, weapons - len(melee_specs()))
     ed.add_comment_to_nodes(
         "Gun tuning (its row in the M panel): Up/Down pick a row, Left/Right "
         "change the gun or the stat, Enter saves gun_tuning.csv. Once anything is "
-        "tuned, every carried gun takes the table each Tick.", made[:1])
+        "tuned, every carried gun takes the table each Tick, and the knife and "
+        "the axe their throw's rows.", made[:1])
     return tails

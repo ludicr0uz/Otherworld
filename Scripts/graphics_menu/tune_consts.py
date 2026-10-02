@@ -11,6 +11,10 @@ save, run inside the game) and tune_checks read one table.
                                 carried copy of that gun, at once)
     Enter                       save every gun's numbers to gun_tuning.csv
 
+The melee weapons (the knife, the axe) are subjects too, after the guns, with
+only their throw's rows: a stat that is not the shown weapon's own
+(gun_tuning.columns_of) shows a dash and does not move (TuneLive).
+
 The stats, their steps and minimums are combat/gun_tuning.TUNE_STATS. GUN_TAB
 is the same names as a TuneTab (tune_tab.py), which is what the shared
 fragments take.
@@ -35,6 +39,10 @@ TUNE_TOUCHED_VAR = "TuneTouched"    # something was tuned: apply every Tick
 # from the built specs (so gun_tuning.csv), the page's working copy.
 TUNE_VALUES_VAR = "TuneValues"
 TUNE_WEAPONS_VAR = "TuneWeapons"    # the guns' DisplayNames, in spec order
+# TuneLive[w * len(TUNE_STATS) + s]: is stat s weapon w's own (a gun has no
+# throw damage, a melee weapon only its throw)?
+TUNE_LIVE_VAR = "TuneLive"
+TUNE_DASH = "-"                     # what a row that is not shows
 TUNE_STEPS_VAR = "TuneSteps"        # per stat
 TUNE_MINS_VAR = "TuneMins"          # per stat
 
@@ -78,7 +86,8 @@ GUN_TAB = TuneTab(
     pick_var=TUNE_WEAPON_VAR, nudge_var=TUNE_NUDGE_VAR, save_var=TUNE_SAVE_VAR,
     saved_var=TUNE_SAVED_VAR, touched_var=TUNE_TOUCHED_VAR,
     values_var=TUNE_VALUES_VAR, names_var=TUNE_WEAPONS_VAR,
-    steps_var=TUNE_STEPS_VAR, mins_var=TUNE_MINS_VAR, stat_count=STAT_COUNT,
+    steps_var=TUNE_STEPS_VAR, mins_var=TUNE_MINS_VAR, live_var=TUNE_LIVE_VAR,
+    stat_count=STAT_COUNT,
     save_command=TUNE_SAVE_COMMAND, panel=TUNE_PANEL, rows_box=TUNE_ROWS_BOX,
     saved_text=TUNE_SAVED_TEXT, title_widget="TuneTitle", hint_widget="TuneHint",
     back_widget="TuneBack",

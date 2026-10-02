@@ -326,6 +326,18 @@ in game `probes/probe_carry.py`.
     side; the left along the pump's left side, under the barrel's top. Each joint's line is
     swung onto a direction in the WEAPON's frame (`SHOTGUN_THUMBS`), so the numbers read
     against `shotgun_outline()` whatever body is worn.
+  - **The left hand lies under the pump.** The rifle pose cups a handguard as deep as the
+    AK's, palm on edge. The pump is a 5 cm bar (`weapon_models.SHOTGUN_PUMP`): the index's and
+    the middle's knuckles stood 2 cm inside it, and the fingers came out of its right side and
+    stood 3-5 cm off it. The hand is turned about its own wrist (`SUPPORT_PALM`: the wrist to
+    the middle knuckle, and the line across the knuckles) and each finger joint swung onto a
+    direction (`SUPPORT_FINGERS`): under the wood, up its right side, the tip in at the
+    barrel. The wrist does not move, so the support hand's IK point is the rifle pose's and
+    the anim BP needed no third point. `probes/probe_shotgun_hands.py` reads the live joints
+    against the pump at the hip and down the sights; with `--windowed` and `OW_GRIP_SHOTS=1`
+    it saves pictures of both hands from round the gun (its view target is a spare item
+    from the bag: a game cannot spawn a camera from Python, and moving the pawn's own
+    detached camera changes nothing).
   - **Everything else is the rifle pose,** re-keyed from it on every build, so the grip's
     solve, the fist and the support hand's point are the same against either
     (`verify/shotgun_pose.py`). `weapon_specs.two_handed_poses()` is what "held in both

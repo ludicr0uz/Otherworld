@@ -240,6 +240,10 @@ SHOTGUN_SIGHT = _eye_behind(SHOTGUN_SIGHT_REAR, SHOTGUN_SIGHT_FRONT, -12.0)
 # measured. The thumb goes over its top (shotgun_pose.py).
 SHOTGUN_WRIST = ((-4.6, -1.5, -5.4), (1.4, 1.5, 2.4))
 
+# The pump, where the left hand closes: the wood round the magazine tube,
+# under the barrel (which runs y -1.4..1.4, z 2.5..5.3 above it), measured.
+SHOTGUN_PUMP = ((28.4, -2.1, -2.5), (44.4, 2.1, 2.3))
+
 
 def shotgun_outline():
     return (

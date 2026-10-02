@@ -77,6 +77,10 @@ class PlayerSkin:
     # ...and the other hand's, the one under the fore-end, which the rifle
     # pose stands up beside the barrel.
     support_thumb: tuple
+    # That hand's four closing fingers, index first, as grip_fingers: the
+    # rifle pose cups a deep handguard with them, and shotgun_pose.py closes
+    # them on a pump.
+    support_fingers: tuple
     # The two spine joints that pitch the upper body onto the aim down the
     # sights, lower first; each takes half (aim_pitch.py). Everything above
     # them -- chest, arms, head and the weapon in the hand -- turns rigidly.
@@ -128,6 +132,8 @@ SKIN_QUINN = PlayerSkin(
                        for f in ("index", "middle", "ring", "pinky")),
     grip_thumb=tuple(f"thumb_{j:02d}_r" for j in (1, 2, 3)),
     support_thumb=tuple(f"thumb_{j:02d}_l" for j in (1, 2, 3)),
+    support_fingers=tuple(tuple(f"{f}_{j:02d}_l" for j in (1, 2, 3))
+                          for f in ("index", "middle", "ring", "pinky")),
     aim_bones=("spine_03", "spine_05"),
     pose_bones=dict(
         hips="pelvis", spine="spine_01", neck="neck_01",
@@ -161,6 +167,8 @@ SKIN_ADVENTURER = PlayerSkin(
                        for f in ("Index", "Middle", "Ring", "Pinky")),
     grip_thumb=tuple(f"RightHandThumb{j}" for j in (1, 2, 3)),
     support_thumb=tuple(f"LeftHandThumb{j}" for j in (1, 2, 3)),
+    support_fingers=tuple(tuple(f"LeftHand{f}{j}" for j in (1, 2, 3))
+                          for f in ("Index", "Middle", "Ring", "Pinky")),
     # Meshy numbers its spine backwards: Hips -> Spine02 -> Spine01 -> Spine.
     aim_bones=("Spine01", "Spine"),
     pose_bones=dict(

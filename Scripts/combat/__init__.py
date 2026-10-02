@@ -77,8 +77,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     carried at the waist, the knife up in a fighting stance, the
                     stick carried as a torch and held out, keyed off the idle
   shotgun_pose      A_AimShotgun: the shotgun's ready pose, the rifle's with
-                    the right thumb over the stock's wrist and the left along
-                    the pump (SHOTGUN_THUMBS), keyed off the rifle pose
+                    the right thumb over the stock's wrist, the left along
+                    the pump (SHOTGUN_THUMBS), and the left hand under the
+                    pump with its fingers closed on it (SUPPORT_PALM,
+                    SUPPORT_FINGERS), keyed off the rifle pose
 
 SHARED AUTHORING HELPERS
   graph             node/pin/connect/set, variables, components, events

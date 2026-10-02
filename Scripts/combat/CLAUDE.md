@@ -52,7 +52,9 @@ menu polls its own copy from `DrawHUD`, which does.
   muzzle socket: the muzzles are the barrels' ends, measured. The shotgun's index can't reach
   its guard from the rifle's ready pose (`docs/aiming.md`). The shotgun is held in a pose of
   its own, `A_AimShotgun` (`shotgun_pose.py`): the rifle's, with the right thumb over the
-  stock's wrist and the left along the pump, out of its low sight line.
+  stock's wrist and the left along the pump, out of its low sight line, and the left hand
+  turned under the pump with its fingers closed on the wood (the rifle pose cups a deep
+  handguard: its knuckles stood inside the pump and its fingers out to the right).
 - **The SMG, the rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon
   Bundle's SMG11 (`SK_SMG11_X`, a MAC-11 with its wire stock folded), AK 47 (`SK_KA47_X`) and
   AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
@@ -403,8 +405,13 @@ These are feel checks a headless run can't do:
   body with the boom pulled in against a wall);
 - the shotgun's thumbs (`shotgun_pose.SHOTGUN_THUMBS`): how the right thumb reads over the
   stock's wrist from behind and at the hip (its base joint is inside the wood, as the rifle
-  pose's was), whether the left one closes on the pump or hovers (its base is 3 cm off the
+  pose's was), whether the left one closes on the pump or hovers (its base is 5 cm off the
   wood), and both on the mannequin fallback, where only the directions were carried over;
+- the shotgun's left hand (`shotgun_pose.SUPPORT_PALM`, `SUPPORT_FINGERS`): how the wrist
+  reads now the hand is turned 16° down under the pump on the rifle pose's forearm, the
+  fingertips leaning forward up the pump's right side, and the right hand, left as the rifle
+  pose has it (a pistol grip's fist on a straight stock: its fingers run into the receiver's
+  belly and the guard);
 - the head leaving the view on the way onto the sights (`HEAD_HIDE_SEAT` 0.8): whether it is
   seen to go, from behind, in the last of the camera's travel, and whether the headless
   shadow is noticed with the sun behind the player;

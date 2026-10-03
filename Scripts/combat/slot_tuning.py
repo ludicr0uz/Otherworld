@@ -54,6 +54,7 @@ SLOT_PICK_VAR = "SlotPick"        # scratch: the slot a search settled on
 SLOT_REQUEST_VAR = "SlotRequest"  # bring this slot's item to hand (a key, a click)
 MOVE_FROM_VAR = "MoveFrom"        # a drag on the HUD: from this slot ...
 MOVE_TO_VAR = "MoveTo"            # ... to this one, swapping if it is filled
+NEXT_REQUEST_VAR = "NextRequest"  # Q: bring the next filled bag slot's item to hand
 SLOT_WANT_VAR = "SlotWant"        # the request's copies, read after it is lowered
 MOVE_SRC_VAR, MOVE_DST_VAR = "MoveSrc", "MoveDst"
 # A drag released outside the inventory: set this slot's item down on the

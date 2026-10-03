@@ -5,8 +5,11 @@ them and the equip follows.
     keys (with the switch block's place in Tick):
         1 2 3 4         SlotRequest = primary / secondary / pistol / melee
         5 6 7 8 9       SlotRequest = the bag's first five slots
-        Q               SlotRequest = the next filled weapon slot after the
-                        one the hand's item came from
+        Q               NextRequest, served at once: SlotRequest = the next
+                        filled bag slot after the one the hand's item came
+                        from, round the bag (the first filled one when the
+                        hand's item is not the bag's); the weapon slots are
+                        not on it, they have 1-4
     the request (a key, or the HUD: a bag slot picked in the I panel):
         the slot holds an item ->
             the hand's item (if any) goes home first: the first slot from
@@ -27,9 +30,9 @@ the end of last frame.
 """
 
 from combat.slot_tuning import (
-    BAG_LAST, HAND, HAND_FROM_VAR, MELEE_SLOT, MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR,
-    MOVE_TO_VAR, NO_REQUEST, PRIMARY, SLOT_COUNT, SLOT_KEYS, SLOT_PICK_VAR,
-    SLOT_REQUEST_VAR, SLOT_VAR, SLOT_WANT_VAR,
+    BAG_FIRST, BAG_LAST, BAG_SIZE, HAND, HAND_FROM_VAR, MOVE_DST_VAR, MOVE_FROM_VAR,
+    MOVE_SRC_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST, PRIMARY, SLOT_COUNT, SLOT_KEYS,
+    SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_VAR, SLOT_WANT_VAR,
 )
 from combat.paths import ITEM_CLASS_PATH
 from uebp.g import _G
@@ -39,8 +42,6 @@ from uebp.nodes.actor import FN_WAS_PRESSED
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_LE_II, FN_MOD_II, FN_NEQ_II, FN_OR,
     FN_SELECT_II, FN_SUB_II)
-
-WEAPON_SLOT_COUNT = MELEE_SLOT - PRIMARY + 1
 
 
 def _author_find_home(g, item, freed, execs):
@@ -122,7 +123,7 @@ def _author_slot_move(g, in_execs):
 
 
 def _author_slot_keys(ed, pc_out, switch_pressed, in_execs):
-    """1-9 and Q raise SlotRequest (see the module docstring). Returns the
+    """1-9 raise SlotRequest and Q the next filled bag slot's (see the module docstring). Returns the
     exec tails."""
     g = _G(ed, ITEM_CLASS_PATH)
     flow = list(in_execs)
@@ -132,24 +133,30 @@ def _author_slot_keys(ed, pc_out, switch_pressed, in_execs):
         flow = [g.put(SLOT_REQUEST_VAR, str(slot), [hit]), miss]
 
     hit, miss = g.branch(switch_pressed, flow)
-    flow = g.put(SLOT_PICK_VAR, str(NO_REQUEST), [hit])
+    flow = [g.put(NEXT_REQUEST_VAR, "1", [hit]), miss]
+
+    # The next filled bag slot after the one the hand's item came from, round.
+    serve, idle = g.branch(op(g, FN_GE_II, g.get(NEXT_REQUEST_VAR), 0), flow)
+    flow = g.put(NEXT_REQUEST_VAR, str(NO_REQUEST), [serve])
+    flow = g.put(SLOT_PICK_VAR, str(NO_REQUEST), [flow])
     came = g.get(HAND_FROM_VAR)
-    weapon_from = op(g, FN_AND, op(g, FN_GE_II, came, PRIMARY), op(g, FN_LE_II, came, MELEE_SLOT))
-    base = out(g.call(FN_SELECT_II, A=came, B=MELEE_SLOT, bPickA=weapon_from))
-    off, body, done = for_loop(g, 1, WEAPON_SLOT_COUNT, [flow])
-    # ((base - 1 + off) mod 4) + 1: the weapon slots after base, round.
-    step = op(g, FN_ADD_II, op(g, FN_SUB_II, base, 1), off)
-    c = op(g, FN_ADD_II, op(g, FN_MOD_II, step, WEAPON_SLOT_COUNT), PRIMARY)
+    bag_from = op(g, FN_AND, op(g, FN_GE_II, came, BAG_FIRST), op(g, FN_LE_II, came, BAG_LAST))
+    base = out(g.call(FN_SELECT_II, A=came, B=BAG_LAST, bPickA=bag_from))
+    off, body, done = for_loop(g, 1, BAG_SIZE, [flow])
+    # ((base - BAG_FIRST + off) mod BAG_SIZE) + BAG_FIRST: the bag slots after base, round.
+    step = op(g, FN_ADD_II, op(g, FN_SUB_II, base, BAG_FIRST), off)
+    c = op(g, FN_ADD_II, op(g, FN_MOD_II, step, BAG_SIZE), BAG_FIRST)
     look, _ = g.branch(op(g, FN_LESS_II, g.get(SLOT_PICK_VAR), 0), [body])
     there, _ = g.branch(valid(g, slot_at(g, c)), [look])
     g.put(SLOT_PICK_VAR, c, [there])
-    found, none = g.branch(op(g, FN_GE_II, g.get(SLOT_PICK_VAR), PRIMARY), [done])
+    found, none = g.branch(op(g, FN_GE_II, g.get(SLOT_PICK_VAR), BAG_FIRST), [done])
     asked = g.put(SLOT_REQUEST_VAR, g.get(SLOT_PICK_VAR), [found])
     ed.add_comment_to_nodes(
         "1-4 bring a weapon slot's item to hand, 5-9 the bag's first five, Q the "
-        "next filled weapon slot (slot_moves.py). Each only raises SlotRequest.",
+        "next filled bag slot's (NextRequest; slot_moves.py). Each only raises "
+        "SlotRequest.",
         g.made[:3])
-    return [asked, none, miss]
+    return [asked, none, idle]
 
 
 def _author_slot_serve(ed, in_execs):

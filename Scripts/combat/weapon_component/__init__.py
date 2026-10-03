@@ -62,7 +62,7 @@ _author_* fragment per concern, each in its own module:
               off the health cast's failed arm, at the blood's transform
   inventory   equip, drop, BeginPlay loadout (each issued item into its slot)
   slot_nodes  the slot fragments' shared shapes: loops, SlotItems[c], fits()
-  slot_moves  1-9 and Q ask for a slot (SlotRequest); the request (the hand's
+  slot_moves  1-9 ask for a slot (SlotRequest), Q for the bag's next item; the request (the hand's
               item home, the asked one up) and the HUD's drag (MoveFrom/To)
   slot_sync   last before the refresh: SlotItems rebuilt from each item's
               Slot, UNPLACED items placed (a weapon in its weapon slot
@@ -159,7 +159,7 @@ BP_WeaponComponent event graph:
          --> Branch IsInputKeyDown(MiddleMouse), no sights   --> use the held item
                                         (a stick at a campfire: light it;
                                          a burning stick: hold it out)
-         --> Branch WasInputKeyJustPressed(Q)               --> cycle equipped
+         --> Branch WasInputKeyJustPressed(Q)               --> the bag's next item
          --> Branch WasInputKeyJustPressed(G)               --> drop held
          --> Branch WasInputKeyJustPressed(E)               --> interact with the one
                                                                 thing nearest the

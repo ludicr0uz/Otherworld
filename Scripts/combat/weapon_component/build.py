@@ -24,7 +24,7 @@ from combat.breath_tuning import (
 )
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_VAR, SWAY_VARS
 from combat.slot_tuning import (
-    DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR,
+    DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, NEXT_REQUEST_VAR,
     HAND_FROM_VAR, HAS_ROOM_VAR, MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR, MOVE_TO_VAR,
     NO_REQUEST, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
     STARTER_HAND_FROM,
@@ -97,7 +97,7 @@ from combat.weapon_component import vars as WV
 # the issued shotgun's: build_weapon_component overrides it).
 SLOT_INT_VARS = (HAND_FROM_VAR, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
                  MOVE_FROM_VAR, MOVE_TO_VAR, MOVE_SRC_VAR, MOVE_DST_VAR,
-                 DROP_REQUEST_VAR, DROP_WANT_VAR)
+                 DROP_REQUEST_VAR, DROP_WANT_VAR, NEXT_REQUEST_VAR)
 
 
 def _kept_class(bp, var):

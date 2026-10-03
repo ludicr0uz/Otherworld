@@ -9,8 +9,8 @@ about in a game.
 
 from combat.paths import AXE_BP_PATH, ITEM_BP_PATH, KNIFE_BP_PATH
 from combat.slot_tuning import (
-    BAG_FIRST, BAG_LAST, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, LONG_GUN, MELEE_KIND, MELEE_SLOT,
-    MOVE_FROM_VAR, MOVE_TO_VAR, NO_REQUEST, NOT_A_WEAPON, PISTOL_KIND, PISTOL_SLOT,
+    BAG_FIRST, BAG_LAST, BAG_SIZE, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, LONG_GUN, MELEE_KIND, MELEE_SLOT,
+    MOVE_FROM_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST, NOT_A_WEAPON, PISTOL_KIND, PISTOL_SLOT,
     PRIMARY, SECONDARY, SLOT_COUNT, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_REQUEST_VAR, SLOT_VAR,
     STARTER_HAND_FROM, STARTER_SLOTS, UNPLACED, WEAPON_KIND_VAR, fits,
 )
@@ -157,6 +157,16 @@ def check_keys():
     want = {v: s for v, _k, s in SLOT_KEYS}
     check("each number key asks for its slot: 1-4 the weapon slots, 5-9 the bag's first five",
           asked == want, str(asked))
+    spans = [(num_pin(w, "FirstIndex"), num_pin(w, "LastIndex"))
+             for w in by_pins(wg, "FirstIndex", "LastIndex")]
+    spans = [s for s in spans if s == (1.0, float(BAG_SIZE))]
+    raised = [n for n in wg if _title(n) == f"Set {NEXT_REQUEST_VAR}"]
+    check(f"Q raises {NEXT_REQUEST_VAR}, which is lowered as it is served, and the search "
+          f"it starts steps round the bag's {BAG_SIZE} slots, not the weapon slots",
+          sorted(pin_value(n, NEXT_REQUEST_VAR) for n in raised) == [str(NO_REQUEST), "1"]
+          and len(spans) == 1, f"{[pin_value(n, NEXT_REQUEST_VAR) for n in raised]}, {spans}")
+    check(f"{NEXT_REQUEST_VAR} starts at {NO_REQUEST}: no request",
+          wc_cdo.get_editor_property(NEXT_REQUEST_VAR) == NO_REQUEST)
 
 
 def run():

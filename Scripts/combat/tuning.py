@@ -71,7 +71,7 @@ FIRE_KEY = "LeftMouseButton"
 # because the other two are taken and it is on every mouse; it is rebindable.
 AIM_KEY = "RightMouseButton"
 SIGHTS_KEY = "MiddleMouseButton"
-SWITCH_KEY = "Q"        # the next filled weapon slot (weapon_component/slot_moves.py)
+SWITCH_KEY = "Q"        # the next filled bag slot (weapon_component/slot_moves.py)
 DROP_KEY = "G"
 # Pressed to interact with whatever the reticle rests on
 # (weapon_component/interact.py). An item lying there is picked up.

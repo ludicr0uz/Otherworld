@@ -30,7 +30,7 @@ The defaults are all rebindable on the settings screen:
   matches, wood and food it does nothing yet.
   **1-4** bring the primary, secondary, pistol or melee slot's item to hand (the same key
   again puts it back: empty hands), **5-9** the bag's first five slots, **Q** the next filled
-  weapon slot (all fixed keys, not settings binds: see "The slots" below), **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
+  bag slot, round the bag (not the weapon slots: `NextRequest`, `probes/probe_slots.py`) (all fixed keys, not settings binds: see "The slots" below), **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **Left Alt** held down the sights holds the breath (`docs/aiming.md`), **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
 - M belongs to the graphics menu; **I** (the inventory: the backpack and the worn

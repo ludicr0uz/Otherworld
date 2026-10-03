@@ -167,6 +167,19 @@ def remesh(spec, input_task_id: str) -> tuple:
 
 
 def rig(spec, refine_task_id: str) -> str:
+    """Generate skeleton and weights.
+
+    height_meters is the only skeleton parameter Meshy's API exposes. For
+    compatibility with a reference skeleton (e.g., Adventurer01 for humanoids),
+    skeleton_template should be set on the spec and included in the prompt so
+    Meshy understands the constraint. The prompt is the primary channel for
+    skeleton guidance because Meshy's documented API lacks explicit skeleton
+    parameters for things like "matching Adventurer01 bone proportions".
+
+    If spec.skeleton_template is set, it is recorded in the state for
+    verification and documentation, and the prompt should already include
+    specific guidance (e.g., "skeleton compatible with Adventurer01 rig").
+    """
     body = {
         "input_task_id": refine_task_id,
         "height_meters": spec.height_meters,

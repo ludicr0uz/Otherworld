@@ -43,6 +43,13 @@ class MonsterSpec:
     monster from a protagonist; what makes the adventurer the player is that
     ``build_weapons_and_combat.py`` wears it and ``npc_placement.NPC_VARIANTS``
     does not list it.
+
+    For humanoid male models, skeleton_template ensures the generated skeleton
+    is compatible with a reference skeleton (e.g., Adventurer01). This prevents
+    the costly re-tuning that happens when proportions diverge (different bone
+    lengths, spine count, etc.). Set to "adventurer01_humanoid" for any male
+    humanoid that should retarget to Adventurer01's UAL clips and weapon poses
+    without extensive re-authoring.
     """
 
     id: str
@@ -56,14 +63,16 @@ class MonsterSpec:
     provider: str = "meshy"
     license: str = "meshy-commercial"
     note: str = ""
+    skeleton_template: str = ""  # e.g., "adventurer01_humanoid" for Meshy compatibility
 
 
 MONSTERS = (
     MonsterSpec(
         id="zombie_01",
         prompt=(
-            "Realistic horror game zombie, modern era humanoid male, decaying "
-            "flesh, torn and bloody hospital gown, exposed bone visible on the "
+            "Realistic horror game zombie, modern era humanoid male with human "
+            "proportions and standard humanoid skeleton compatible with Adventurer01 rig, "
+            "decaying flesh, torn and bloody hospital gown, exposed bone visible on the "
             "jawline and ribcage, pallid grey mottled skin, sunken glowing "
             "eyes, A-pose, highly detailed, PBR textures, dark survival horror "
             "aesthetic, Unreal Engine 5 style, photorealistic, 4k resolution, "
@@ -71,6 +80,7 @@ MONSTERS = (
         ),
         height_meters=QUINN_HEIGHT_M,
         dest="/Game/Sourced/Characters/SKM_Zombie01",
+        skeleton_template="adventurer01_humanoid",
         note="The easy case: human proportions, human silhouette. If the "
              "shared-skeleton idea fails here it fails everywhere.",
     ),
@@ -112,17 +122,18 @@ ADVENTURER = MonsterSpec(
     id="adventurer_01",
     prompt=(
         "Realistic survival horror game protagonist, modern era human male "
-        "monster hunter, weathered rugged face with short stubble and cropped "
-        "dark hair, worn waxed canvas field jacket with the sleeves pushed up "
-        "over a dark hooded base layer, low-profile chest rig with pouches and "
-        "straps, reinforced work trousers tucked into scuffed leather boots, "
-        "fingerless gloves, mud-stained and blood-flecked practical gear, no "
-        "backpack, A-pose, highly detailed, PBR textures, dark survival horror "
-        "aesthetic, Unreal Engine 5 style, photorealistic, 4k resolution, "
-        "symmetrical posture for rigging"
+        "monster hunter with standard humanoid skeleton, weathered rugged face "
+        "with short stubble and cropped dark hair, worn waxed canvas field jacket "
+        "with the sleeves pushed up over a dark hooded base layer, low-profile "
+        "chest rig with pouches and straps, reinforced work trousers tucked into "
+        "scuffed leather boots, fingerless gloves, mud-stained and blood-flecked "
+        "practical gear, no backpack, A-pose, highly detailed, PBR textures, dark "
+        "survival horror aesthetic, Unreal Engine 5 style, photorealistic, 4k "
+        "resolution, symmetrical posture for rigging"
     ),
     height_meters=QUINN_HEIGHT_M,
     dest="/Game/Sourced/Characters/SKM_Adventurer01",
+    skeleton_template="adventurer01_humanoid",
     note="The player. Ordinary human proportions on purpose -- this is the "
          "easiest thing Meshy's pose estimation can be asked for, and the "
          "player is the one character a bad rig cannot be hidden on.",
@@ -146,17 +157,18 @@ ADVENTURER_BASE = MonsterSpec(
     # first try, worded as a "survival horror protagonist ... wearing only
     # boxer shorts", came back in camo cargo trousers and combat boots.
     prompt=(
-        "Full body 3D character, an adult man wearing nothing but plain dark "
-        "grey cotton boxer shorts underwear, barefoot with bare toes, bare "
-        "knees and bare legs, shirtless with a bare chest, lean athletic "
-        "build, weathered rugged face with short stubble and cropped dark "
-        "hair, base mesh for a clothing system, A-pose with the arms angled "
-        "down and away from the body, hands open with fingers apart, "
-        "photorealistic skin, PBR textures, Unreal Engine 5 style, 4k "
-        "resolution, symmetrical posture for rigging"
+        "Full body 3D character, an adult man with standard humanoid skeleton "
+        "compatible with Adventurer01 rig, wearing nothing but plain dark grey "
+        "cotton boxer shorts underwear, barefoot with bare toes, bare knees and "
+        "bare legs, shirtless with a bare chest, lean athletic build, weathered "
+        "rugged face with short stubble and cropped dark hair, base mesh for a "
+        "clothing system, A-pose with the arms angled down and away from the "
+        "body, hands open with fingers apart, photorealistic skin, PBR textures, "
+        "Unreal Engine 5 style, 4k resolution, symmetrical posture for rigging"
     ),
     height_meters=QUINN_HEIGHT_M,
     dest="/Game/Sourced/Characters/SKM_Adventurer02",
+    skeleton_template="adventurer01_humanoid",
     note="The player in boxers, the base the garments go on. The same face "
          "and height as adventurer_01, so moving the player onto it changes "
          "the clothes and nothing else.",

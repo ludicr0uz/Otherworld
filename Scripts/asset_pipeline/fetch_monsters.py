@@ -79,6 +79,7 @@ def run_spec(spec) -> dict:
     state["prompt"] = spec.prompt
     state["license"] = spec.license
     state["dest"] = spec.dest
+    state["skeleton_template"] = spec.skeleton_template
     # The importer checks arrival scale against this. Without it that check
     # silently falls back to a default and validates nothing.
     state["height_meters"] = spec.height_meters

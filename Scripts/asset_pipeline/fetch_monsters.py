@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from asset_pipeline import catalog                      # noqa: E402
 from asset_pipeline.providers import meshy              # noqa: E402
+from asset_pipeline.verify_skeleton_compatibility import verify_spec  # noqa: E402
 
 GEN_PATH = "/openapi/v2/text-to-3d"
 RIG_PATH = "/openapi/v1/rigging"
@@ -134,6 +135,20 @@ def run_spec(spec) -> dict:
     spent = sum((s.get("consumed_credits") or 0) for s in state["stages"].values())
     print(f"  done -- {spent} credits, cached in "
           f"{os.path.relpath(state['cache_dir'], meshy.PROJECT_DIR)}", flush=True)
+
+    # Verify skeleton compatibility if skeleton_template is set
+    if spec.skeleton_template:
+        print(f"  verifying skeleton compatibility...", flush=True)
+        compatible, report = verify_spec(spec)
+        print(f"  {report}", flush=True)
+        if not compatible:
+            print(
+                f"  ⚠ WARNING: {spec.id} may not be compatible with "
+                f"{spec.skeleton_template}. This may require extensive re-tuning "
+                f"of animations, hit zones, and weapon poses during import.",
+                flush=True
+            )
+
     return state
 
 

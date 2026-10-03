@@ -66,16 +66,37 @@ If skeleton_template is set and the prompt includes compatibility guidance:
 - ✓ Weapons and items fit in hand positions without extensive tuning
 - ✓ Weapons build takes ~4 minutes, not 25+
 
-## Verification
+## Automated Verification
 
-After generation, the import process should verify:
+The `verify_skeleton_compatibility.py` script runs automatically after generation as part of the fetch_monsters pipeline. It checks:
 
-1. **Bone count and names** — check against Adventurer01's skeleton
-2. **Physics bodies** — ensure Head and Spine01 exist and are positioned correctly
-3. **Height scale** — verify arrival height matches spec.height_meters
-4. **Bone proportions** — spot-check key bones (clavicle, thigh, forearm lengths)
+1. **Skeleton template is set** — confirms the spec declared compatibility intent
+2. **Height matches reference** — within 5% of QUINN_HEIGHT_M (1.80 m)
+3. **Rigged FBX exists** — the generation completed all stages
+4. **Bone structure** — verifies required bones exist and hierarchy matches (extensible; see code)
+5. **Bone count** — checks against expected range (65-80 bones typical)
 
-If verification fails, the model may not be compatible despite the prompt guidance. In that case, add issues to the next Meshy request or escalate to manual retargeting (the old path).
+### Running verification manually
+
+```bash
+# Check a specific spec
+python3 Scripts/asset_pipeline/verify_skeleton_compatibility.py zombie_01
+
+# Check all specs with skeleton_template set
+python3 Scripts/asset_pipeline/verify_skeleton_compatibility.py
+
+# Check all specs (even those without template)
+python3 Scripts/asset_pipeline/verify_skeleton_compatibility.py --all
+```
+
+### What happens if verification fails
+
+If incompatibility is detected:
+
+⚠ **Minor issues** (height variance, etc.) → logged as warnings, model still imported but may need fine-tuning  
+❌ **Major issues** (missing required bones, wrong spine count) → flagged during import, may require re-generation with improved prompt
+
+The report is saved in task.json for future reference and debugging.
 
 ## Future Work
 

@@ -133,7 +133,8 @@ Wanderer (selector)
     two orders). **It needs a navmesh:** without one the wanderer stands where it swung.
   - `verify_strafe.py` checks the graph; `probes/probe_npc_strafe.py` watches a zombie do it.
     A headless `-game` run was found with **no navmesh tiles and none being built**; the probe
-    sends `RebuildNavigation` and waits. Not looked into further.
+    sends `RebuildNavigation` and waits. The cause was a `RecastNavMesh` saved into the map
+    (`forest_generator/CLAUDE.md`, Navmesh).
   - **Feel check (needs a play session):** the body plays its forward walk while it moves back
     and sideways (the anim Blueprints blend on speed only), so the feet slide a little.
 - **The wendigo hunts before it chases** (`stalk.py`, `stalk_cover.py`, numbers in

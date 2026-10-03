@@ -72,6 +72,15 @@ level from scratch, which drops the forage and the day/night cycle actor.
     reuses them: 0 tiles, and frozen NPCs.
   - The import script strips nav data immediately before saving, and runtime generation is
     `DYNAMIC`, set in the level and in `DefaultEngine.ini`.
+  - **Any later save puts one back,** because the editor re-creates the actor whenever the
+    level is open. A game world loads it and never builds a tile: only nav data the game
+    spawns itself is rebuilt at start. PIE hides it (it copies the editor's tiles); a packaged
+    or `-game` run has wanderers that never leave their spawn.
+  - So scripts save a level through `world/level_save.py` (`save_level`), which strips it, and
+    `uepy.py --close-editors` strips it from a dirty level. A save by hand in the editor
+    (Ctrl+S) still writes it.
+  - `python3 Scripts/dev/check_saved_navmesh.py` reads the maps on disk and says which carry
+    one. Run it before packaging.
 - **The editor and PIE need `bForceRebuildOnLoad=True`** (`DefaultEngine.ini`).
   - `-game` spawns a fresh RecastNavMesh and builds it.
   - The editor treats the one it re-creates on open as loaded, skips the load-time rebuild and

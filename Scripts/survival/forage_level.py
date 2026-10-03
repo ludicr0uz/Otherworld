@@ -26,6 +26,7 @@ from survival.forage_placement import scatter_forage
 from survival.terrain_heights import TriangleHeights
 from survival.paths import CANTEEN_CLASS_PATH, MUSHROOM_CLASS_PATH
 from survival.tuning import FORAGE_SEED
+from world.level_save import save_level
 
 FORAGE_TAG = "OW_Forage"
 FORAGE_LIFT_CM = 1.0       # sit on the ground, not in it
@@ -115,8 +116,7 @@ def place_forage(level_path):
     if missed:
         raise RuntimeError(f"{level_path}: {missed} forage spots are off the "
                            "terrain mesh; nothing saved")
-    if not les.save_current_level():
-        raise RuntimeError(f"could not save {level_path}")
+    save_level(level_path)
     _log(f"{level_path}: placed {placed} around {len(trunks)} trunks "
          f"({len(stale)} old forage removed)")
     return placed

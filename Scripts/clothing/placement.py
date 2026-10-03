@@ -15,6 +15,7 @@ import unreal
 from combat.log import _log
 from clothing.specs import GARMENTS
 from survival.forage_level import _terrain_heights
+from world.level_save import save_level
 
 TEST_LEVEL = "/Game/Maps/Lvl_Forest_200m"
 TEST_TAG = "OW_TestClothing"
@@ -67,8 +68,7 @@ def place_test_clothing(level_path=TEST_LEVEL):
             unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw + 180.0))
         actor.set_actor_label(f"TestClothing_{garment.display}")
         actor.set_editor_property("tags", [unreal.Name(TEST_TAG)])
-    if not les.save_current_level():
-        raise RuntimeError(f"could not save {level_path}")
+    save_level(level_path)
     _log(f"{level_path}: {len(GARMENTS)} test garments {AHEAD_CM / 100:.0f} m in front "
          f"of the PlayerStart ({len(stale)} old ones removed)")
     return len(GARMENTS)

@@ -18,6 +18,7 @@ import unreal
 
 from combat.log import _log
 from world.paths import DAY_NIGHT_CLASS_PATH, DAY_NIGHT_TAG, SKY_SPHERE_MESH_PATH, STATIC_SKY_TAG
+from world.level_save import save_level
 
 RIG_CLASSES = (unreal.DirectionalLight, unreal.SkyLight, unreal.ExponentialHeightFog,
                unreal.VolumetricCloud)
@@ -65,8 +66,7 @@ def place_day_night(level_path):
     cycle.set_actor_label(CYCLE_LABEL)
     cycle.set_editor_property("tags", [unreal.Name(DAY_NIGHT_TAG)])
 
-    if not les.save_current_level():
-        raise RuntimeError(f"could not save {level_path}")
+    save_level(level_path)
     labels = sorted(a.get_actor_label() for a in rig)
     _log(f"{level_path}: day/night cycle placed; static sky tagged: {labels}")
     return labels

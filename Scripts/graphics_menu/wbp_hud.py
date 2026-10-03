@@ -1,7 +1,7 @@
 """WBP_HUD: the in-game overlay's layout.
 
   Body   (hidden on the title and death screens)
-    bottom left   the FOOD / H2O / TEMP bars, standing vertical, each over its
+    bottom left   the hunger, thirst and temperature bars, standing vertical, each over its
                   icon; the debuff names stacked above them
     top right     the kill counter
     top centre    the save-and-exit countdown, or why it was called off
@@ -46,7 +46,7 @@ from graphics_menu.umg_consts import (
     HUD_BODY, HUD_FPS, ICON_GAP, KILLS, KILLS_FONT, KILLS_TOP,
     SLOT_GAP, SLOT_W, STAMINA_BAR, STAT_ICON, STRIP_BOTTOM, ST_BAR_SIZE, ST_GROUP,
     ST_ICON, SURVIVAL, SURVIVAL_BARS, SURVIVAL_LEFT, SV_BAR_SIZE, SV_COLUMN_GAP,
-    SV_LABEL_FONT, VITALS, VITALS_GAP, VITALS_OVER, WBP_HUD,
+    VITALS, VITALS_GAP, VITALS_OVER, WBP_HUD,
     debuff_text, stat_bar, stat_group, stat_icon,
 )
 from ui_art.stat_icons import stat_icon_name
@@ -61,7 +61,7 @@ def _icon(bp, parent, name, stat, tint):
 
 def _author_survival(bp, body):
     """Bottom left: one column per survival stat -- its bar filling upwards,
-    its icon and its label under it -- with the debuff names above them."""
+    its icon under it -- with the debuff names above them."""
     stack = U.add(bp, unreal.VerticalBox, SURVIVAL, body)
     U.at(stack, (0.0, 1.0), (0.0, 1.0), (SURVIVAL_LEFT, -STRIP_BOTTOM))
     for _tag, label, stat in DEBUFF_LABELS:
@@ -71,15 +71,13 @@ def _author_survival(bp, body):
         U.hide(name)
 
     row = U.add(bp, unreal.HorizontalBox, "SurvivalBars", stack)
-    for i, (stat, label, fill) in enumerate(SURVIVAL_BARS):
+    for i, (stat, fill) in enumerate(SURVIVAL_BARS):
         col = U.add(bp, unreal.VerticalBox, stat_group(stat), row, variable=True)
         U.pad(col, left=0.0 if i == 0 else SV_COLUMN_GAP, v="Bottom")
         sv = U.bar(bp, col, stat_bar(stat), SV_BAR_SIZE, fill, vertical=True)
         U.pad(sv.get_parent(), h="Center")
         icon = _icon(bp, col, stat_icon(stat), stat, fill)
         U.pad(icon, top=ICON_GAP, h="Center")
-        caption = U.text(bp, col, f"{stat}Label", label, SV_LABEL_FONT, COL_LABEL)
-        U.pad(caption, top=2.0, h="Center")
 
 
 def _author_vitals(bp, strip):

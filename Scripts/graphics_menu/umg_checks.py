@@ -27,8 +27,8 @@ WRITTEN = {
     C.WBP_HUD: (C.HUD_BODY, C.HUD_FPS, C.HP_BAR, C.HP_NUM, C.KILLS, C.BANNER_COUNT,
                 C.BANNER_OFF, IC.HAND_BOX, IC.WEAPON_BOX, IC.BAG_BOX, IC.BAG_PANEL,
                 C.EQUIPPED_NAME, C.STAMINA_BAR, C.HP_GROUP, C.ST_GROUP)
-               + tuple(C.stat_bar(s) for s, _l, _c in C.SURVIVAL_BARS)
-               + tuple(C.stat_group(s) for s, _l, _c in C.SURVIVAL_BARS)
+               + tuple(C.stat_bar(s) for s, _c in C.SURVIVAL_BARS)
+               + tuple(C.stat_group(s) for s, _c in C.SURVIVAL_BARS)
                + tuple(C.debuff_text(s) for _t, _l, s in C.DEBUFF_LABELS),
     C.WBP_MAIN_MENU: (C.SETTINGS_PANEL, C.SETTINGS_ROWS_BOX, C.HINT_IDLE,
                       C.HINT_CAPTURE),
@@ -132,7 +132,6 @@ def check_trees(check):
     want = {C.GAME_TITLE, C.SETTINGS_TITLE_TEXT,
             C.HINT_IDLE_TEXT, C.HINT_CAPTURE_TEXT, C.PAUSE_TITLE, C.PAUSE_HINT,
             C.DEATH_TITLE, C.DEATH_HINT, EXIT_CALLED_OFF_TEXT}
-    want |= {label for _s, label, _c in C.SURVIVAL_BARS}
     want |= {label for _t, label, _s in C.DEBUFF_LABELS}
     check("the screens' static text is in the designer, where it can be edited",
           want <= texts, str(sorted(want - texts)))
@@ -284,7 +283,7 @@ def check_hud_graph(check, nodes):
     percents = [n for n in nodes if "InPercent" in _pins(n)]
     targets = sorted(t for n in percents for t in _source_titles(n, "self"))
     want_bars = sorted(f"Get {b}" for b in (C.HP_BAR, C.STAMINA_BAR)
-                       + tuple(C.stat_bar(s) for s, _l, _c in C.SURVIVAL_BARS))
+                       + tuple(C.stat_bar(s) for s, _c in C.SURVIVAL_BARS))
     check("HP, stamina and the three survival bars are filled from a fraction",
           targets == want_bars and all(_sources(n, "InPercent") for n in percents),
           str(targets))

@@ -652,8 +652,8 @@ glimmers, `world/item_highlight.py`). Same keys as GUN SETTINGS; **Enter** saves
 
 **What it shows each frame:**
 
-- **Bottom-left:** the FOOD / H2O / TEMP bars, vertical and filling from the bottom
-  (`survival_bars.py`), each over its icon and label; STARVING and DEHYDRATED stack above
+- **Bottom-left:** the hunger, thirst and temperature bars, vertical and filling from the bottom
+  (`survival_bars.py`), each over its icon (no caption: the icon names it); STARVING and DEHYDRATED stack above
   them, read from the ASC's tags. Vertical bars use `T_UI_BarV`/`T_UI_BarTrackV`
   (`ui_art/vertical_bars.py`): the horizontal art stood upright shades along the bar, so a
   nearly empty fill showed only its dark foot and read as another colour.

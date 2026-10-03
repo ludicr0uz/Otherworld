@@ -13,7 +13,7 @@ from ui_art.stat_icons import stat_icon_name
 # bar -> (its icon widget, the stat its texture is drawn for, the icon's tint)
 ICONS = {C.HP_BAR: (C.HP_ICON, "Health", C.COL_HP_FILL),
          C.STAMINA_BAR: (C.ST_ICON, "Stamina", C.COL_ST_FILL)}
-ICONS.update({C.stat_bar(s): (C.stat_icon(s), s, fill) for s, _l, fill in C.SURVIVAL_BARS})
+ICONS.update({C.stat_bar(s): (C.stat_icon(s), s, fill) for s, fill in C.SURVIVAL_BARS})
 
 
 def _children(tree, name):
@@ -35,12 +35,13 @@ def check_bar_layout(check):
                      [C.ST_ICON, f"{C.STAMINA_BAR}Box"]), str(vitals))
 
     columns = _children(hud, "SurvivalBars")
-    want = [C.stat_group(s) for s, _l, _c in C.SURVIVAL_BARS]
+    want = [C.stat_group(s) for s, _c in C.SURVIVAL_BARS]
     shapes = {g: _children(hud, g) for g in want}
-    check("bottom left: one column per survival stat, its bar over its icon",
-          columns == want and all(shapes[C.stat_group(s)][:2]
+    check("bottom left: one column per survival stat, its bar over its icon, "
+          "and no caption",
+          columns == want and all(shapes[C.stat_group(s)]
                                   == [f"{C.stat_bar(s)}Box", C.stat_icon(s)]
-                                  for s, _l, _c in C.SURVIVAL_BARS),
+                                  for s, _c in C.SURVIVAL_BARS),
           f"{columns}: {shapes}")
     stack = _children(hud, C.SURVIVAL)
     check("...with the debuff names stacked above them",
@@ -49,7 +50,7 @@ def check_bar_layout(check):
 
     up = unreal.ProgressBarFillType.BOTTOM_TO_TOP
     fills = {}
-    for s, _l, _c in C.SURVIVAL_BARS:
+    for s, _c in C.SURVIVAL_BARS:
         bar = hud.get(C.stat_bar(s), (None, False))[0]
         box = hud.get(f"{C.stat_bar(s)}Box", (None, False))[0]
         style = bar.get_editor_property("widget_style") if bar else None

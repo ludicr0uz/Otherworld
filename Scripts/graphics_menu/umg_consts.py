@@ -131,13 +131,13 @@ def debuff_text(stat):
     return f"{stat}Debuff"
 
 
-# (stat, label, fill colour): hunger, thirst and temperature, standing as
-# vertical bars in the bottom-left corner -- they change over minutes and are
-# read at a glance.
+# (stat, fill colour): hunger, thirst and temperature, standing as vertical
+# bars in the bottom-left corner -- they change over minutes and are read at a
+# glance. No caption: each bar's icon says which it is.
 SURVIVAL_BARS = (
-    ("Hunger", "FOOD", "(R=0.860000,G=0.580000,B=0.220000,A=0.950000)"),
-    ("Thirst", "H2O", "(R=0.200000,G=0.480000,B=1.000000,A=0.950000)"),
-    ("Temperature", "TEMP", "(R=0.920000,G=0.360000,B=0.260000,A=0.950000)"),
+    ("Hunger", "(R=0.860000,G=0.580000,B=0.220000,A=0.950000)"),
+    ("Thirst", "(R=0.200000,G=0.480000,B=1.000000,A=0.950000)"),
+    ("Temperature", "(R=0.920000,G=0.360000,B=0.260000,A=0.950000)"),
 )
 # (tag, label, what its widget is named after: the bar it empties, or itself)
 DEBUFF_LABELS = ((STARVING_TAG, "STARVING", "Hunger"),
@@ -164,7 +164,7 @@ def stat_icon(stat):
 def flash_groups():
     """{group widget: the bar it blinks for}, every bar on the HUD."""
     groups = {HP_GROUP: HP_BAR, ST_GROUP: STAMINA_BAR}
-    groups.update({stat_group(s): stat_bar(s) for s, _l, _c in SURVIVAL_BARS})
+    groups.update({stat_group(s): stat_bar(s) for s, _c in SURVIVAL_BARS})
     return groups
 
 
@@ -180,7 +180,7 @@ ICON_GAP = 6.0                   # between an icon and its bar
 SURVIVAL = "Survival"
 SV_BAR_SIZE = (16.0, 140.0)
 SV_COLUMN_GAP = 14.0
-SV_LABEL_FONT, DEBUFF_FONT = 10.0, 11.0
+DEBUFF_FONT = 11.0
 CORNER_MARGIN = 40.0             # the kill counter and FPS, in from the right
 SURVIVAL_LEFT = 24.0             # the survival columns, in from the left
 FPS_TOP, FPS_FONT = 40.0, 16.0

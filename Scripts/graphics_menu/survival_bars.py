@@ -89,7 +89,7 @@ def author_survival_bars(ed, in_execs):
     survival = _loose_pin(cast, "AsBPSurvivalComponent", is_input=False)
 
     flow = then(cast)
-    for stat, _label, _colour in SURVIVAL_BARS:
+    for stat, _colour in SURVIVAL_BARS:
         flow = _author_bar(ed, survival, stat, flow)
     exits = _author_debuff_labels(ed, pawn_out, flow)
     return exits + (out(cast, "CastFailed"),)

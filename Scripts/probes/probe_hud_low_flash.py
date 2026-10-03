@@ -49,16 +49,16 @@ def probe(p):
     dim, full = round(C.FLASH_DIM, 3), 1.0
     p.check("HP at 10% blinks between full and dim",
             seen[C.HP_GROUP] == {full, dim}, str(sorted(seen[C.HP_GROUP])))
-    p.check("FOOD at 10% blinks between full and dim",
+    p.check("hunger at 10% blinks between full and dim",
             seen[hunger] == {full, dim}, str(sorted(seen[hunger])))
     t = p.get(survival, "Thirst") / p.get(survival, "MaxThirst")
-    p.check(f"H2O at {t:.0%} stays steady at full", seen[thirst] == {full},
+    p.check(f"thirst at {t:.0%} stays steady at full", seen[thirst] == {full},
             str(sorted(seen[thirst])))
 
     p.set(health, "Health", p.get(health, "MaxHealth"))
     p.set(survival, "Hunger", p.get(survival, "MaxHunger"))
     seen = {g: set() for g in groups}
     yield from _sample(hud, ui, groups, 1.0, seen)
-    p.check("refilled, HP and FOOD stop blinking at full opacity",
+    p.check("refilled, HP and hunger stop blinking at full opacity",
             seen[C.HP_GROUP] == {full} and seen[hunger] == {full},
             f"HP {sorted(seen[C.HP_GROUP])}, FOOD {sorted(seen[hunger])}")

@@ -3,7 +3,7 @@ the Image widget that shows it (the same one-white-texture rule as T_UI_Bar).
 
     HP           a heart
     Stamina      a lightning bolt
-    Hunger       a mushroom -- what the forest feeds you
+    Hunger       a chicken leg
     Thirst       a drop
     Temperature  a thermometer
 
@@ -45,11 +45,13 @@ def _bolt(d):
                    (21, 2)]), fill=WHITE)
 
 
-def _mushroom(d):
-    d.pieslice(_box(2, 4, 30, 30), 180, 360, fill=WHITE)      # cap
-    d.rounded_rectangle(_box(12, 16, 20, 29), radius=3 * SS, fill=WHITE)
-    for cx, cy, r in ((10, 11, 2.2), (19, 8, 1.8), (23, 13, 1.6)):  # spots
-        d.ellipse(_box(cx - r, cy - r, cx + r, cy + r), fill=CLEAR)
+def _chicken_leg(d):
+    d.ellipse(_box(11, 2, 30, 21), fill=WHITE)                 # the meat
+    d.polygon(_xy([(12, 9), (23, 20), (12, 23), (9, 20)]), fill=WHITE)  # tapering
+    d.line(_box(13, 19, 6.5, 25.5), fill=WHITE, width=int(3.4 * SS))   # the bone
+    for cx, cy in ((4.6, 24.2), (7.8, 27.4)):                  # its two knobs
+        d.ellipse(_box(cx - 2.7, cy - 2.7, cx + 2.7, cy + 2.7), fill=WHITE)
+    d.arc(_box(17, 5, 27, 15), 285, 15, fill=CLEAR, width=int(1.4 * SS))  # gloss
 
 
 def _drop(d):
@@ -65,7 +67,7 @@ def _thermometer(d):
         d.line(_box(20, y, 25, y), fill=WHITE, width=2 * SS)
 
 
-GLYPHS = {"Health": _heart, "Stamina": _bolt, "Hunger": _mushroom,
+GLYPHS = {"Health": _heart, "Stamina": _bolt, "Hunger": _chicken_leg,
           "Thirst": _drop, "Temperature": _thermometer}
 
 

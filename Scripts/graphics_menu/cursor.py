@@ -4,7 +4,8 @@ what it is over. cursor_consts.py has the rules in one table.
   author_cursor_read   top of DrawHUD: where the cursor is, whether it moved;
                        last frame's M-panel click lowered
   author_cursor_mode   a screen's wish (shown or not) onto the controller:
-                       bShowMouseCursor and the input mode, on a change only
+                       bShowMouseCursor and the input mode, on a change --
+                       and every frame of the title, until the game starts
   author_hold_fire     while it shows in a running game: the weapon
                        component's TriggerSpent up, so a click fires nothing
   author_row_cursor    a stack of rows: the one under the cursor -> CursorRow;
@@ -38,8 +39,10 @@ from graphics_menu.cursor_consts import (
 )
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_find import put
-from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PC, FN_WAS_PRESSED
-from uebp.nodes.math import FN_AND, FN_GE_II, FN_LESS_II, FN_OR, FN_VEC2_NE, FN_XOR
+from graphics_menu.umg_consts import GAME_STARTED_VAR
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PC, FN_IS_KEY_DOWN, FN_WAS_PRESSED
+from uebp.nodes.math import (
+    FN_AND, FN_GE_II, FN_LESS_II, FN_NOT, FN_OR, FN_VEC2_NE, FN_XOR)
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from uebp.nodes.umg import (
@@ -112,13 +115,30 @@ def author_cursor_read(ed, in_execs):
     return flow
 
 
+def _on_title(ed, made):
+    """The title stands, wanting the cursor, and the left button is up."""
+    idle = _call(ed, FN_NOT, made, A=out(_call(
+        ed, FN_IS_KEY_DOWN, made, self=_pc(ed, made), Key=CLICK_KEY)))
+    title = _call(ed, FN_NOT, made, A=_get(ed, GAME_STARTED_VAR, made))
+    waiting = _call(ed, FN_AND, made, A=out(title), B=out(idle))
+    return out(_call(ed, FN_AND, made, A=_get(ed, CURSOR_WANTED_VAR, made), B=out(waiting)))
+
+
 def author_cursor_mode(ed, want, in_execs):
-    """The cursor shown (``want`` True, or a bool pin) or hidden, applied only
+    """The cursor shown (``want`` True, or a bool pin) or hidden, applied
     when it differs from what the controller has. Returns the exec tails.
 
     Shown is Game-and-UI: the cursor is free and a click is still a key the
     controller is polled for. Hidden is Game-only, which takes the mouse back
-    for the camera -- without it the view stays dead until the next click."""
+    for the camera -- without it the view stays dead until the next click.
+
+    On the title it is applied every frame, not once: a launched game's
+    window becomes the active one some frames in, and the viewport then
+    captures the mouse (its launch capture) over a mode set before that, so
+    the menu took no click until a key or a switch of windows undid it. Not
+    while the left button is down: a press holds the capture its drag needs.
+    (SetFocusToGameViewport is not part of it: called every frame it left
+    CursorRow empty by the end of the frame, in probe_menu_cursor_window.py.)"""
     made = []
     if want is True:
         flow = _setter(ed, CURSOR_WANTED_VAR, "true", in_execs, made)
@@ -127,7 +147,8 @@ def author_cursor_mode(ed, want, in_execs):
     changed = _call(ed, FN_XOR, made,
                     A=_get(ed, CURSOR_WANTED_VAR, made),
                     B=_get(ed, CURSOR_SHOWN_VAR, made))
-    switch, same = _branch(ed, out(changed), [flow], made)
+    due = _call(ed, FN_OR, made, A=out(changed), B=_on_title(ed, made))
+    switch, same = _branch(ed, out(due), [flow], made)
     flow = put(ed, CURSOR_SHOWN_VAR, _get(ed, CURSOR_WANTED_VAR, made), [switch], made)
     pc = _pc(ed, made)
     show = ed.add_set_member_variable_node(SHOW_CURSOR_PROP, PC_CLASS_PATH)
@@ -141,9 +162,10 @@ def author_cursor_mode(ed, want, in_execs):
     taken = _call(ed, FN_MODE_GAME, made, PlayerController=pc)
     _connect(off, _pin(taken, "execute"))
     ed.add_comment_to_nodes(
-        "The mouse cursor, shown while a menu is up. Only on a change: "
-        "bShowMouseCursor, and Game-and-UI (cursor free) or Game-only (the "
-        "mouse back to the camera).", made)
+        "The mouse cursor, shown while a menu is up. On a change, and every "
+        "frame of the title (a launched game's window takes the mouse after "
+        "the first one): bShowMouseCursor, and Game-and-UI (cursor free) or "
+        "Game-only (the mouse back to the camera).", made)
     return [then(free), then(taken), same]
 
 

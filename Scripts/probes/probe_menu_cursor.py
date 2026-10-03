@@ -61,6 +61,13 @@ def probe(p):
             str(_cursor(p, hud)))
     p.check("...and holds the weapon's fire press spent, so a click is not a shot",
             p.get(wc, CC.TRIGGER_SPENT_VAR) is True, str(p.get(wc, CC.TRIGGER_SPENT_VAR)))
+    # Something else takes the cursor off the controller, as the window's
+    # launch capture takes the mouse: in play the mode is given on a change only.
+    p.controller().set_editor_property("show_mouse_cursor", False)
+    _draw(hud)
+    p.check("...and gives the cursor's mode on a change only: taken away behind "
+            "its back, it stays away", _cursor(p, hud) == (False, True), str(_cursor(p, hud)))
+    p.controller().set_editor_property("show_mouse_cursor", True)
 
     yield 0.1
     p.check("...and the open panel holds the player still: the controller ignores "
@@ -159,6 +166,11 @@ def probe(p):
             p.get(hud, "MenuOpen") is True and _cursor(p, hud) == (True, True)
             and p.get(hud, "MenuPage") == PAGE_TITLE,
             f"open {p.get(hud, 'MenuOpen')}, {_cursor(p, hud)}")
+    p.controller().set_editor_property("show_mouse_cursor", False)
+    _draw(hud)
+    p.check("...and gives the cursor's mode again every frame: taken away behind "
+            "its back (a launched game's window takes the mouse), it is back",
+            _cursor(p, hud) == (True, True), str(_cursor(p, hud)))
     p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_ROW_ACTIONS.index(C.SETTINGS_ACTION))
     yield lambda: p.get(hud, "MenuPage") == PAGE_SETTINGS
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)

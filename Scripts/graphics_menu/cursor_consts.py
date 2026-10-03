@@ -22,7 +22,9 @@ CURSOR_KEYS = (CLICK_KEY,)
 BACK_KEY = "Enter"
 
 # What the frame's screens ask for, and what the controller was last given:
-# the input mode is switched only when the two differ.
+# the input mode is switched only when the two differ -- and, on the title,
+# given again every frame the left button is up (cursor.author_cursor_mode):
+# the window of a launched game can take the mouse after the first frame.
 CURSOR_WANTED_VAR = "CursorWanted"
 CURSOR_SHOWN_VAR = "CursorShown"
 # Where the cursor was last frame (desktop space, as a widget's cached

@@ -87,10 +87,28 @@ def _check_show(check, nodes):
           len(shows) == len(wishes) and all(
               _feeders(n, CC_SHOW) == [f"Get {CC.CURSOR_WANTED_VAR}"] for n in shows),
           str([_feeders(n, CC_SHOW) for n in shows]))
+    def reads(node, pin, depth=6):
+        """The titles of the pure nodes behind ``pin``, a few links deep."""
+        found = set()
+        for q in BEL.find_input_pin(node, pin).list_connected_pins():
+            f = PIN.get_owning_node(q)
+            found.add(_title(f))
+            if depth:
+                for name in _pins(f) - {"self", "execute"}:
+                    found |= reads(f, name, depth - 1)
+        return found
+
     gates = [n for n in nodes if _pins(n) == {"execute", "Condition"}
-             and any("XOR" in t.upper() for t in _feeders(n, "Condition"))]
-    check("...only on a change (wanted XOR shown), not every frame",
+             and any("XOR" in t.upper() for t in reads(n, "Condition", 1))]
+    check("...only on a change (wanted XOR shown), not every frame of play",
           len(gates) == len(wishes), str(len(gates)))
+    again = [reads(n, "Condition") for n in gates]
+    check("...and on the title every frame the left button is up: a launched "
+          "game's window takes the mouse after the first one",
+          bool(again) and all(
+              f"Get {UC.GAME_STARTED_VAR}" in r and f"Get {CC.CURSOR_WANTED_VAR}" in r
+              and any("KeyDown" in t.replace(" ", "") for t in r) for r in again),
+          str([sorted(r) for r in again]))
     free = [n for n in nodes if "InMouseLockMode" in _pins(n)]
     taken = [n for n in nodes if _pins(n) == {"execute", "PlayerController", "bFlushInput"}]
     check("shown is Game-and-UI with the cursor kept through a click; hidden "
@@ -261,6 +279,17 @@ def _check_scroll_drag(check, nodes):
           and len(ats) == WINDOWS, f"{wrong}, grabs {grabs}, {len(ats)} writes")
 
 
+def _title_wait(user):
+    """``user`` is the cursor mode's "the left button is up", ANDed with "the
+    game has not started": the title giving its input mode again."""
+    if _pins(user) != {"A"}:
+        return False
+    return any(f"Get {UC.GAME_STARTED_VAR}" in _feeders(f, "A")
+               for u in _users(user) for pin in ("A", "B") if pin in _pins(u)
+               for q in BEL.find_input_pin(u, pin).list_connected_pins()
+               for f in [PIN.get_owning_node(q)] if _pins(f) == {"A"})
+
+
 def _check_clicks(check, nodes):
     polls = [n for n in nodes if {"Key", "self"} <= _pins(n)]
     by_key = {k: [n for n in polls if _value(n, "Key") == k] for k in CC.CURSOR_KEYS}
@@ -272,7 +301,7 @@ def _check_clicks(check, nodes):
                 continue        # the click Branch after the on-a-row Branch
             others = _feeders(user, "A") + _feeders(user, "B")
             if not any(CC.CURSOR_MOVED_VAR in t or "Under" in t for t in others) \
-                    and not _on_slot(user):
+                    and not _on_slot(user) and not _title_wait(user):
                 loose.append(_title(user))
     check("the left button is only ever read with the cursor over a row or a line "
           "(or, in the I panel, a slot: InvOver, or a drag begun on one)",

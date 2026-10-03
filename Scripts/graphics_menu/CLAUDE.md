@@ -172,6 +172,15 @@ caret whenever the mouse was nudged), and the verifier checks nothing polls its 
 - **Shown is Game-and-UI, hidden is Game-only** (`author_cursor_mode`), switched only when
   `CursorWanted != CursorShown`. Without the Game-only call the camera stays dead after a
   menu closes until the next click.
+- **On the title the mode is given again every frame** the left button is up (`_on_title`:
+  wanted, `GameStarted` false, button up). A launched build's window becomes the active one
+  some frames in, and the viewport's launch capture then took the mouse over a mode set once
+  before it: the title took no click until a key or a switch of windows. For the same reason
+  `bCaptureMouseOnLaunch` is False in `DefaultInput.ini` (the game opens on a menu; Game-only
+  takes the mouse when play starts). Not while the button is down: a press holds the capture
+  a drag needs.
+  - **Do not call `SetFocusToGameViewport` there:** every frame, it left `CursorRow` empty at
+    the end of the frame (`probe_menu_cursor_window.py` found no row on the title).
 - **A click on a row is not a shot.** While the cursor shows in a running game, DrawHUD sets
   the weapon component's `TriggerSpent` every frame (`author_hold_fire`); its Tick keeps a
   spent press spent while the fire key is down (`combat/docs/firing_gate.md`).
@@ -182,7 +191,8 @@ caret whenever the mouse was nudged), and the verifier checks nothing polls its 
   `uepy.py --game --windowed --probe Scripts/probes/probe_menu_cursor_window.py` (a real
   window: every row of the M panel, in play and on the title, and of the settings page found under the cursor). The
   windowed one moves the machine's pointer for a few seconds.
-- **Still needs a play session:** the click itself, the loot window's
+- **Still needs a play session:** the click itself (and, in a packaged build, the first
+  click on the title straight after launch, with no key pressed), the loot window's
   close line under a real cursor (no probe can aim at it), the cursor's look, and
   how losing the mouse-look while the M panel or the loot window is open feels.
 

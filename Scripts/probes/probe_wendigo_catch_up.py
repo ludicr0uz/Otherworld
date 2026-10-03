@@ -5,7 +5,9 @@ again once it is near.
 npc/verify_stalk.py reads the graph; this watches one wendigo do it. It is
 stood where it can see the player and left to roar and start its hunt. Then
 the two are put in opposite corners of the map, further apart than the
-catch-up range:
+catch-up range, and its StalkOrigin written to the player's corner (a player
+who has run that far from where they stood is charged instead:
+probes/probe_wendigo_fled.py):
 
   - it picks no tree and does not charge: it runs at the player, at the speed
     it ran its leg at;
@@ -21,7 +23,8 @@ import unreal
 
 from npc.monster_tuning import monster_specs
 from npc.paths import (
-    AGGRO_VAR, STALK_CHARGING_VAR, STALK_LEGS_VAR, STALK_ROAR_UNTIL_VAR,
+    AGGRO_VAR, NPC_DIR, STALK_CHARGING_VAR, STALK_LEGS_VAR, STALK_ORIGIN_VAR,
+    STALK_ROAR_UNTIL_VAR,
 )
 from probes.probe_wendigo_stalk import (
     START_CM, _about, _on_navmesh, _stand_in_sight, _walk_speed, _wendigos,
@@ -30,6 +33,8 @@ from probes.probe_wendigo_stalk import (
 # The tuned numbers (the MONSTER SETTINGS tab's rows): monster_tuning.csv's, as built.
 _SPEC = monster_specs("Wendigo")
 STALK_CATCH_UP_CM = _SPEC["stalk_catch_up_cm"]
+
+WRITABLE = [(f"{NPC_DIR}/BP_ForestWandererAI_Wendigo", STALK_ORIGIN_VAR)]
 
 SAMPLE_S = 0.1
 BEAT_S = 0.7            # the tree's 0.5 s beat, and a sample or two
@@ -95,6 +100,8 @@ def probe(p):
     spawn = player.get_actor_location()
     _put(player, corners[0])
     _put(npc, corners[1])
+    # The player it hunts stood there all along: they have not run off.
+    p.set(ctrl, STALK_ORIGIN_VAR, player.get_actor_location())
     yield BEAT_S                # a pass of the tree
     legs = int(p.get(ctrl, STALK_LEGS_VAR))
     samples = []
@@ -130,6 +137,7 @@ def probe(p):
     # --- near again: the hunt goes on. Back where the player began, on the
     # flat of the spawn clearing, where a spot in their sight is found. ----------
     player.set_actor_location(spawn, False, True)
+    p.set(ctrl, STALK_ORIGIN_VAR, spawn)
     yaw = _stand_in_sight(p, ctrl, npc, player)
     limit = p.time() + LEG_WAIT_S
     yield lambda: (int(p.get(ctrl, STALK_LEGS_VAR)) > legs

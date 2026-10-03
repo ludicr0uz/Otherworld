@@ -30,8 +30,8 @@ from forest_generator.npc_placement import (
     NPC_MELEE_RANGE_CM, NPC_RUN_SPEED_CMS, NPC_VARIANTS,
 )
 from forest_generator.npc_stalk import (
-    NPC_STALK_CATCH_UP_CM, NPC_STALK_CHARGE_CM, NPC_STALK_HIDE_MAX_S,
-    NPC_STALK_HIDE_MIN_S, NPC_STALK_RUN_SCALE, NPC_STALK_TURN_MAX_S,
+    NPC_STALK_CATCH_UP_CM, NPC_STALK_CHARGE_CM, NPC_STALK_FLED_CM,
+    NPC_STALK_HIDE_MAX_S, NPC_STALK_HIDE_MIN_S, NPC_STALK_RUN_SCALE, NPC_STALK_TURN_MAX_S,
     NPC_STALK_TURN_MIN_S,
 )
 from forest_generator.npc_ward import (
@@ -68,6 +68,7 @@ MONSTER_STATS = (
     ("stalk_charge_cm", "TuneStalkCharge", "hunt: charge from (cm)", 50.0, 300.0),
     ("stalk_catch_up_cm", "TuneStalkCatchUp", "hunt: run straight beyond (cm)",
      500.0, 2000.0),
+    ("stalk_fled_cm", "TuneStalkFled", "hunt: charge if they run off (cm)", 100.0, 300.0),
     ("stalk_run_scale", "TuneStalkSpeed", "hunt: speed x run", 0.05, 0.5),
     ("stalk_hide_min_s", "TuneStalkHideMin", "hunt: behind a tree min (s)", 0.25, 0.0),
     ("stalk_hide_max_s", "TuneStalkHideMax", "hunt: behind a tree max (s)", 0.25, 0.0),
@@ -123,6 +124,7 @@ def stock_specs(key):
         "health": _variant(key).health,
         "stalk_charge_cm": NPC_STALK_CHARGE_CM,
         "stalk_catch_up_cm": NPC_STALK_CATCH_UP_CM,
+        "stalk_fled_cm": NPC_STALK_FLED_CM,
         "stalk_run_scale": NPC_STALK_RUN_SCALE,
         "stalk_hide_min_s": NPC_STALK_HIDE_MIN_S,
         "stalk_hide_max_s": NPC_STALK_HIDE_MAX_S,

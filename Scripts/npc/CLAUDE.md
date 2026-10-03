@@ -22,7 +22,7 @@ Graphs are authored with `Scripts/uebp` (root `CLAUDE.md`): no coordinates, node
 - **The tunable ones are not pin literals.** Senses, patrol, run speed, melee damage/range/
   interval and health are `Tune*` variables on each controller (`tuned.py`), defaulted to
   `monster_tuning.monster_specs(key)`: `Scripts/npc/monster_tuning.csv` over the files
-  above. So are the wendigo's hunt (`TuneStalk*`: charge range, catch-up range, leg speed,
+  above. So are the wendigo's hunt (`TuneStalk*`: charge range, catch-up range, how far the player may run, leg speed,
   the wait behind a tree, the time between turns) and what fire does to it (`TuneWard*`:
   range, cone, ring, prowl speed, the time between turns, the hold, the flight). Every
   controller has those variables, but only a creature with the Stalk or Ward step reads
@@ -157,6 +157,14 @@ Wanderer (selector)
     that far from the player orders it straight at them (`SimpleMoveToLocation`, their
     spot) at the speed of a leg, zeroes `StalkLegUntil` and succeeds. The first pass inside
     picks a leg. An enraged one never gets there: it charges, at its run.
+  - **A player who runs off is charged** (`NPC_STALK_FLED_CM`, `TuneStalkFled`: 30 m). The
+    roar stores where the player stands (`StalkOrigin`); once it has roared, a pass that
+    finds them further than that from the spot (flat) sets `StalkCharging` and fails, ahead
+    of the catch-up and the legs, whatever it was doing. It is measured from the roar's
+    spot, not from the wendigo: a player who walks about inside 30 m is still hunted. A
+    flight from fire zeroes `StalkRoarUntil`, so the next hunt's roar takes a new spot.
+    `probes/probe_wendigo_fled.py` watches it; `probe_wendigo_catch_up.py`, which stands
+    the player in a far corner, writes `StalkOrigin` there so it still tests the catch-up.
   - **The way round alternates.** `StalkSide` is a coin at the roar, and `StalkTurnAt` a
     game time thrown with it (the roar's end + 4–9 s). The first leg picked once that time
     is up goes the other way and throws the next (now + 4–9 s). It turns only at a pick,

@@ -528,10 +528,11 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
 ## The MONSTER SETTINGS tab (`monster_tune_*.py`)
 
 **Its M panel row** opens it (`MonTuneOpen`; opening a tab shuts the others). The
-creature row, then the 28 stats of `npc/monster_tuning.MONSTER_STATS`: aggro range, aggro cone
+creature row, then the 29 stats of `npc/monster_tuning.MONSTER_STATS`: aggro range, aggro cone
 (half-angle), hearing, touch range, patrol radius, patrol speed, the patrol re-pick window, run
 speed, damage per hit, melee range, time between swings, health; then the wendigo's hunt
-(`hunt:` rows: the charge range, the catch-up range, the leg speed, the wait behind a tree, the
+(`hunt:` rows: the charge range, the catch-up range, how far the player may run before it
+charges, the leg speed, the wait behind a tree, the
 time between two turns) and what fire does to it (`fire:` rows: the range and the cone it is
 held off in, the ring it circles on and how fast, the time between two turns, how long until it
 gives up and how long it runs). Same keys as GUN SETTINGS; **Enter** saves

@@ -2,7 +2,7 @@
 tree, hiding behind each, and charges once it is close.
 
 Constants only -- no `unreal` import -- like npc_placement.py, npc_agro.py and
-npc_strafe.py. NPC_STALK_CHARGE_CM, _CATCH_UP_CM, _RUN_SCALE, _HIDE_*_S and
+npc_strafe.py. NPC_STALK_CHARGE_CM, _CATCH_UP_CM, _FLED_CM, _RUN_SCALE, _HIDE_*_S and
 _TURN_*_S are defaults: the game reads the controller's TuneStalk* variables,
 which npc/monster_tuning.csv and the M panel's MONSTER SETTINGS tab can change
 (npc/monster_tuning.py). The builder is Scripts/npc/stalk.py (the step) and
@@ -14,6 +14,8 @@ aggro. In order:
 
   roar    the first pass: it stops, faces the player, and plays its roar clip
           and one of its voices. It stands for NPC_STALK_ROAR_S.
+  fled    the player further than NPC_STALK_FLED_CM from where they stood
+          at the roar has run off: it charges, there and then.
   catch up  further from the player than NPC_STALK_CATCH_UP_CM there is no
           arc and no tree: it runs straight at them, at the speed of a leg,
           and hunts from where that brings it.
@@ -99,6 +101,11 @@ NPC_STALK_RUN_SCALE = 1.69
 # player, at the speed of a leg, until it is inside.
 NPC_STALK_CATCH_UP_CM = 15000.0
 
+# The hunt is for a player who stands their ground. One who has run this far
+# (flat) from where they stood when it roared is fleeing: no more trees, it
+# charges. A jog covers it in 7-8 s, a sprint in 5.
+NPC_STALK_FLED_CM = 3000.0
+
 # The way round is turned about this long after the roar ends, and after
 # each turn: one throw per turn. A leg and its wait are 3-8 s, so it is a
 # leg or two, sometimes three, each way.
@@ -182,6 +189,7 @@ def cover_trees(specs=DEFAULT_TREE_SPECS):
 
 assert NPC_MELEE_RANGE_CM < NPC_STALK_CHARGE_CM < NPC_STALK_COVER_MIN_CM
 assert NPC_STALK_CHARGE_CM < NPC_STALK_CATCH_UP_CM
+assert NPC_STALK_FLED_CM > 0.0
 assert NPC_STALK_ARRIVE_CM < NPC_STALK_OPEN_ARRIVE_CM
 assert cover_trees()
 # A run in the open from the nearest cover there can be ends inside the

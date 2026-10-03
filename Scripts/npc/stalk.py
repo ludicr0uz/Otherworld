@@ -9,9 +9,12 @@ charge. The numbers are forest_generator/npc_stalk.py's.
        -> [StalkCharging?]                             fail: Chase runs
        -> [StalkRoarUntil is 0?]  the first pass:
               StalkRoarUntil = now + the roar, StalkSide = +1 or -1,
-              StalkTurnAt = the roar's end + 4-9 s
+              StalkTurnAt = the roar's end + 4-9 s,
+              StalkOrigin = where the player stands
               stop, face the player, play the roar clip and a voice    succeed
        -> [now < StalkRoarUntil?]  still roaring                       succeed
+       -> [player further than TuneStalkFled from StalkOrigin?]  they
+              have run off: StalkCharging = true       fail: Chase runs
        -> [player further off than the catch-up range?]
               StalkLegUntil = 0 (no leg: a pick, once it is inside)
               face the way it runs -> SimpleMoveToLocation(the player's
@@ -39,7 +42,7 @@ charge. The numbers are forest_generator/npc_stalk.py's.
 A leg is run faster than the chase (TuneStalkSpeed of the run speed);
 the Chase step writes the run speed back on its first pass, so the charge is
 at the run. The charge range, the catch-up range, the leg speed, the wait
-behind a trunk and the time between two turns are the controller's
+behind a trunk, how far the player may run and the time between two turns are the controller's
 TuneStalk* variables (npc/tuned.py: the MONSTER SETTINGS tab's "hunt:" rows),
 defaulted to npc_stalk.py's numbers. Enraged is its own latch, apart from StalkCharging, which a
 flight from fire clears (npc/ward.py): a wendigo that has been shot comes
@@ -58,6 +61,8 @@ SimpleMoveToLocation, as the stroll and the strafe are: the level verifier
 counts the chase's MoveToActor and MoveToLocation, one of each.
 """
 
+import unreal
+
 from forest_generator.npc_stalk import (
     NPC_STALK_ARRIVE_CM, NPC_STALK_OPEN_ARRIVE_CM, NPC_STALK_ROAR_S,
     NPC_STALK_STALLED_CMS,
@@ -67,7 +72,7 @@ from uebp.graph import BEL, _connect, _pin, else_, out, then
 from npc.paths import (
     ENRAGED_VAR, STALK_ARRIVED_VAR,
     STALK_CHARGING_VAR, STALK_COVER_VAR, STALK_HIDDEN_VAR, STALK_LEG_UNTIL_VAR,
-    STALK_ROAR_UNTIL_VAR, STALK_SIDE_VAR, STALK_TURN_AT_VAR, VOICES_VAR,
+    STALK_ORIGIN_VAR, STALK_ROAR_UNTIL_VAR, STALK_SIDE_VAR, STALK_TURN_AT_VAR, VOICES_VAR,
 )
 from npc.patrol import _author_walk_speed
 from npc.roar import _author_bellow
@@ -93,6 +98,11 @@ def declare_stalk_vars(ed):
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind)):
             raise RuntimeError(f"could not declare {name}")
+    # Where the player stood when it roared: the zero vector until then.
+    ed.remove_member_variable(STALK_ORIGIN_VAR)
+    if not ed.add_member_variable(
+            STALK_ORIGIN_VAR, BEL.get_struct_type(unreal.Vector.static_struct())):
+        raise RuntimeError(f"could not declare {STALK_ORIGIN_VAR}")
     declare_cover_vars(ed)
 
 
@@ -142,8 +152,22 @@ def _author_roar(g, exec_in, pins, roar_anim):
     _connect(out(g.call(FN_RANDOM_BOOL)), _pin(side, "bPickA"))
     step = g.put(STALK_SIDE_VAR, step, pin=out(side))
     step = _author_turn_time(g, step, ends)
+    # Where the player is hunted from: one who runs far from it is charged.
+    step = g.put(STALK_ORIGIN_VAR, step, pin=pins["player_loc"])
 
     return _author_bellow(g, step, pins, roar_anim)
+
+
+def _author_fled(g, exec_in, pins):
+    """The player has run off from where they stood at the roar: no more
+    trees. Returns ``(fled, stayed)``: the exec pin of a pass that charges,
+    for the caller, and that of one whose player is still there."""
+    run = g.call(FN_DISTANCE_2D)
+    _connect(pins["player_loc"], _pin(run, "V1"))
+    _connect(g.get(STALK_ORIGIN_VAR), _pin(run, "V2"))
+    off = g.op(FN_GREATER_FF, out(run), tuned_pin(g, "stalk_fled_cm"))
+    fled = g.branch(off, exec_in)
+    return then(fled), else_(fled)
 
 
 def _author_catch_up(g, exec_in, pins, stock, result):
@@ -256,11 +280,14 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
     roaring = g.branch(during, else_(first))
     _connect(then(roaring), result(True))
 
+    # --- the player has run off: charge ---------------------------------------
+    fled, stayed = _author_fled(g, else_(roaring), pins)
+
     # --- close enough: charge ------------------------------------------------
-    near = _author_catch_up(g, else_(roaring), pins, stock, result)
+    near = _author_catch_up(g, stayed, pins, stock, result)
     inside = g.op(FN_LE_FF, pins["gap"], tuned_pin(g, "stalk_charge_cm"))
     close = g.branch(inside, near)
-    charge = [then(close)]
+    charge = [fled, then(close)]
 
     # --- a leg under way, or a new one ---------------------------------------
     before = g.op(FN_LESS_FF, pins["now"], g.get(STALK_LEG_UNTIL_VAR))
@@ -268,7 +295,8 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
     stalled, onward = _author_leg(g, then(on_leg), pins, stock, result)
     charge.append(stalled)
     cover, picked, lost = _author_cover(ed, _author_turn(g, [else_(on_leg), onward], pins), pins)
-    # Close enough, standing still on a leg, or nowhere to go: all one charge.
+    # The player gone, close enough, standing still on a leg, or nowhere to
+    # go: all one charge.
     _connect(g.put(STALK_CHARGING_VAR, charge + [lost], literal="true"), result(False))
     ahead, step = _author_facing(ed, picked, None)
     me = g.call(FN_GET_CONTROLLER)

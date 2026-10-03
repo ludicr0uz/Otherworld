@@ -20,8 +20,8 @@ import unreal
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM, NPC_VARIANTS
 from forest_generator.npc_stalk import (
     NPC_STALK_ARC_DEG, NPC_STALK_ARRIVE_CM, NPC_STALK_CATCH_UP_CM,
-    NPC_STALK_CHARGE_CM, NPC_STALK_COVER_MIN_CM, NPC_STALK_HIDE_MAX_S,
-    NPC_STALK_HIDE_MIN_S, NPC_STALK_LEG_TIMEOUT_S, NPC_STALK_OPEN_ARRIVE_CM,
+    NPC_STALK_CHARGE_CM, NPC_STALK_COVER_MIN_CM, NPC_STALK_FLED_CM,
+    NPC_STALK_HIDE_MAX_S, NPC_STALK_HIDE_MIN_S, NPC_STALK_LEG_TIMEOUT_S, NPC_STALK_OPEN_ARRIVE_CM,
     NPC_STALK_ROAR, NPC_STALK_ROAR_S,
     NPC_STALK_RUN_SCALE, NPC_STALK_STALLED_CMS, NPC_STALK_TURN_MAX_S,
     NPC_STALK_TURN_MIN_S,
@@ -30,7 +30,7 @@ from combat.game_state import DAMAGED_BY_PLAYER_VAR
 from npc.paths import (
     AI_BP_PATH, ENRAGED_VAR, MELEE_SLOT, STALK_ARRIVED_VAR, STALK_CHARGING_VAR,
     STALK_COVER_VAR, STALK_HIDDEN_VAR, STALK_IGNORE_VAR, STALK_LEG_UNTIL_VAR,
-    STALK_LEGS_VAR, STALK_ROAR_UNTIL_VAR, STALK_SIDE_VAR, STALK_TURN_AT_VAR,
+    STALK_LEGS_VAR, STALK_ORIGIN_VAR, STALK_ROAR_UNTIL_VAR, STALK_SIDE_VAR, STALK_TURN_AT_VAR,
     STEP_RESULT_VAR, STEP_STALK, VOICES_VAR,
 )
 from npc.verify import (
@@ -81,6 +81,8 @@ def check_settings():
           "on top), and past 150 m it runs straight at the player",
           _close(NPC_STALK_RUN_SCALE, 1.3 * 1.3)
           and _close(NPC_STALK_CATCH_UP_CM, 15000.0))
+    check("stalk: a player who has run 30 m from where they stood at the roar "
+          "is charged", _close(NPC_STALK_FLED_CM, 3000.0))
     check_cover_settings()
 
 
@@ -245,7 +247,7 @@ def check_charge(tag, own, event):
             and flags[0] in _after(BEL.find_else_pin(g))]
     check(f"{tag}: ...and rather than stand: when it is not moving on a leg, "
           f"and when a leg has nowhere to end",
-          len(gates) == 3 and len(still) == 1 and len(lost) == 1,
+          len(gates) == 4 and len(still) == 1 and len(lost) == 1,
           f"{sorted(_title(g) for g in gates)}")
     heads = [b for b in _titled(own, "Branch")
              if _titles(_feeders(b, "Condition")) == {f"Get {STALK_CHARGING_VAR}"}]
@@ -254,6 +256,47 @@ def check_charge(tag, own, event):
           and all(n in _exec_reach(heads[0]) for n in own
                   if _title(n).startswith("Set Stalk"))
           and heads[0] in _exec_reach(event))
+
+
+def _fled_gates(own):
+    """The Branches on "the player is further than TuneStalkFled from
+    StalkOrigin"."""
+    return [b for b in _titled(own, "Branch")
+            if any(_title(t) == "float > float" and _fed(t, "B", "stalk_fled_cm")
+                   and any(_title(d) == "Distance2D (Vector)"
+                           and _titles(_feeders(d, "V1")) == {"Get Actor Location"}
+                           and "GetPlayerPawn" in _titles(_sources(d, "V1"))
+                           and _titles(_feeders(d, "V2")) == {f"Get {STALK_ORIGIN_VAR}"}
+                           for d in _feeders(t, "A"))
+                   for t in _feeders(b, "Condition"))]
+
+
+def check_fled(tag, own):
+    """A player who runs off from where they stood is charged."""
+    stamps = _titled(own, f"Set {STALK_ORIGIN_VAR}")
+    roars = _titled(own, f"Set {STALK_ROAR_UNTIL_VAR}")
+    check(f"{tag}: the roar notes where the player stands (StalkOrigin), "
+          f"and nothing else writes it",
+          len(stamps) == 1 and len(roars) == 1 and stamps[0] in _exec_reach(roars[0])
+          and _titles(_feeders(stamps[0], STALK_ORIGIN_VAR)) == {"Get Actor Location"}
+          and "GetPlayerPawn" in _titles(_sources(stamps[0], STALK_ORIGIN_VAR)))
+    gates = _fled_gates(own)
+    waits = [b for b in _titled(own, "Branch")
+             if {"float < float", "GetTimeSeconds", f"Get {STALK_ROAR_UNTIL_VAR}"}
+             == _titles(_sources(b, "Condition"))]
+    flags = _titled(own, f"Set {STALK_CHARGING_VAR}")
+    check(f"{tag}: once it has roared, a player further than TuneStalkFled "
+          f"from there has run off: it charges, whatever it was doing",
+          len(gates) == 1 and len(waits) == 1 and len(flags) == 1
+          and gates[0] in _after(BEL.find_else_pin(waits[0]))
+          and _after(BEL.find_then_pin(gates[0])) == [flags[0]], f"{len(gates)} gates")
+    hunt = [n for g in gates for n in _exec_reach(g) if n is not g]
+    check(f"{tag}: ...and every other part of the hunt (the catch-up, the "
+          f"legs, the next tree) is behind that test",
+          len(gates) == 1
+          and all(n in hunt for n in own
+                  if _title(n) in ("SimpleMoveToLocation", f"Set {STALK_LEG_UNTIL_VAR}",
+                                   f"Set {STALK_COVER_VAR}")))
 
 
 def _leg_speed(node):
@@ -270,13 +313,11 @@ def check_catch_up(tag, own):
                     and _fed(t, "B", "stalk_catch_up_cm")
                     and _titles(_feeders(t, "A")) == {"Distance2D (Vector)"}
                     for t in _feeders(b, "Condition"))]
-    roars = [b for b in _titled(own, "Branch")
-             if {"float < float", "GetTimeSeconds", f"Get {STALK_ROAR_UNTIL_VAR}"}
-             == _titles(_sources(b, "Condition"))]
-    check(f"{tag}: further than TuneStalkCatchUp from the "
-          f"player, once it has roared, it does not stalk",
-          len(gates) == 1 and len(roars) == 1
-          and gates[0] in _after(BEL.find_else_pin(roars[0])), f"{len(gates)} gates")
+    stays = _fled_gates(own)
+    check(f"{tag}: further than TuneStalkCatchUp from a player who has "
+          f"stayed where they were, it does not stalk",
+          len(gates) == 1 and len(stays) == 1
+          and gates[0] in _after(BEL.find_else_pin(stays[0])), f"{len(gates)} gates")
     if len(gates) != 1:
         return
     far = _exec_reach(_after(BEL.find_then_pin(gates[0]))[0])
@@ -405,6 +446,7 @@ def check_stalk(path, key):
     check_turns(tag, own)
     check_rage(tag, own, events[0], cdo)
     check_charge(tag, own, events[0])
+    check_fled(tag, own)
     check_catch_up(tag, own)
     check_legs(tag, own, check_cover(tag, own))
 

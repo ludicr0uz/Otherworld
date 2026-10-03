@@ -10,7 +10,7 @@ set by writing the HUD's and the game's variables: a probe has no keyboard.
 
 import unreal
 
-from combat.slot_tuning import HAND, SLOT_ITEMS_VAR
+from combat.slot_tuning import HAND, SLOT_ITEMS_VAR, WEAPON_SLOTS
 from graphics_menu.inv_consts import BAG_PANEL, SLOT_BOXES
 from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR
 from combat.paths import (
@@ -127,8 +127,14 @@ def probe(p):
     p.check("each gun that uses ammunition shows loaded / reserve", counted == want,
             f"{counted} vs {want}")
     bag = ui["UiHud"].get_editor_property(BAG_PANEL)
-    p.check("the backpack is hidden until I", bag.get_visibility() == HIDDEN,
+    p.check("the backpack shows with the I panel shut", bag.get_visibility() == SHOWN,
             str(bag.get_visibility()))
+    # An empty slot's silhouette: only a slot that has one (the weapon slots).
+    ghosts = [c.get_editor_property(C.SLOT_GHOST).get_visibility() == SHOWN for c in cells]
+    p.check("an empty weapon slot shows its kind's silhouette; a filled one, the hand's "
+            "and the bag's show none",
+            ghosts == [code in WEAPON_SLOTS and not s for code, s in enumerate(slots)]
+            and any(ghosts), f"{ghosts}")
 
     # --- the M panel ----------------------------------------------------------------
     p.set(hud, "MenuOpen", True)

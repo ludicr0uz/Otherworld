@@ -31,22 +31,25 @@ import unreal
 
 from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.tuning import INTERACT_RADIUS
-from combat.wear_tuning import NOT_CLOTHING, TAKE_OFF_VAR, WEAR_SLOTS, WORN_VAR
+from combat.wear_tuning import (
+    NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR, WEAR_SLOTS, WORN_VAR,
+)
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from clothing.placement import AHEAD_CM
 from clothing.specs import GARMENTS
 from graphics_menu.inv_consts import BAG_PANEL
 from graphics_menu.profile_consts import PROFILE_SLOT
-from graphics_menu.umg_consts import ROW_VALUE
+from graphics_menu.umg_consts import SLOT_AMMO, SLOT_GHOST, SLOT_ICON
 from graphics_menu.wear_consts import (
-    WEAR_NONE_TEXT, WEAR_OPEN_VAR, WEAR_PANEL, WEAR_ROWS_BOX, WEAR_SEL_VAR, WEAR_TAKE_VAR,
+    WEAR_OPEN_VAR, WEAR_PANEL, WEAR_SEL_VAR, WEAR_SLOTS_BOX, WEAR_TAKE_VAR,
 )
+from probes.probe_clothing_drag import drag_checks
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
              ("EquippedIndex", "NeedsRefresh", INTERACT_FORCED_VAR, FIRE_FORCED_VAR,
-              WORN_VAR)]
+              WORN_VAR, TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR)]
             + [(HUD_BP_PATH, v) for v in (WEAR_OPEN_VAR, WEAR_SEL_VAR, WEAR_TAKE_VAR)])
 
 RING_CM = 150.0
@@ -210,20 +213,31 @@ def _run(p):
 
     # What the panel shows: DrawHUD by hand (a -nullrhi run never draws).
     ui = p.get(hud, "UiHud")
-    panel, rows = ui.get_editor_property(WEAR_PANEL), ui.get_editor_property(WEAR_ROWS_BOX)
+    panel, grid = ui.get_editor_property(WEAR_PANEL), ui.get_editor_property(WEAR_SLOTS_BOX)
+    shown = unreal.SlateVisibility.HIT_TEST_INVISIBLE
     p.set(hud, WEAR_OPEN_VAR, True)
     hud.call_method("ReceiveDrawHUD", (1920, 1080))
-    said = [str(rows.get_child_at(i).get_editor_property(ROW_VALUE).get_text())
-            for i in range(len(WEAR_SLOTS))]
-    want = [WEAR_NONE_TEXT] * len(WEAR_SLOTS)
-    want[_slot("Shirt")] = "Shirt"
-    p.check("the open I panel shows, each slot reading what is worn there or a dash",
-            panel.get_visibility() != unreal.SlateVisibility.COLLAPSED and said == want,
-            str(said))
+    cells = [grid.get_child_at(i) for i in range(len(WEAR_SLOTS))]
+
+    def up(name):
+        return [c.get_editor_property(name).get_visibility() == shown for c in cells]
+
+    want = [i == _slot("Shirt") for i in range(len(WEAR_SLOTS))]
+    drawn = cells[_slot("Shirt")].get_editor_property(SLOT_ICON).get_editor_property(
+        "brush").get_editor_property("resource_object")
+    p.check("the open I panel shows, each worn slot the icon of what is worn there, or "
+            "the garment's silhouette, and no count",
+            panel.get_visibility() != unreal.SlateVisibility.COLLAPSED
+            and up(SLOT_ICON) == want and up(SLOT_GHOST) == [not w for w in want]
+            and not any(up(SLOT_AMMO)) and drawn == p.get(shirt, "Icon"),
+            f"icons {up(SLOT_ICON)}, ghosts {up(SLOT_GHOST)}, "
+            f"{drawn.get_name() if drawn else None}")
     p.set(hud, WEAR_OPEN_VAR, False)
     hud.call_method("ReceiveDrawHUD", (1920, 1080))
     bag = ui.get_editor_property(BAG_PANEL)
-    p.check("...and shut, the worn rows still show (bottom right) and the backpack "
-            "under them is collapsed",
+    p.check("...and shut, the worn slots still show (bottom right) and so does the "
+            "backpack under them",
             panel.get_visibility() != unreal.SlateVisibility.COLLAPSED
-            and bag.get_visibility() == unreal.SlateVisibility.COLLAPSED)
+            and bag.get_visibility() != unreal.SlateVisibility.COLLAPSED)
+
+    yield from drag_checks(p, wc, hat, jacket, shirt, _slot, _worn_at, _bag, _hold)

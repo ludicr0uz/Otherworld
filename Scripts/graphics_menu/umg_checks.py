@@ -12,7 +12,8 @@ import unreal
 
 from graphics_menu import inv_consts as IC
 from graphics_menu import settings_rows as S
-from graphics_menu.wear_consts import WEAR_NONE_TEXT, WEAR_SEL_VAR
+from graphics_menu.wear_consts import WEAR_SEL_VAR
+from item_icons.items import icon_name
 from graphics_menu import umg_consts as C
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
 from graphics_menu.umg_author import toolset
@@ -35,7 +36,8 @@ WRITTEN = {
     C.WBP_DEATH_MENU: (C.DEATH_SCORE, C.DEATH_HINT_LINE),
     C.WBP_MENU_ROW: (C.ROW_CARET, C.ROW_LABEL_BOX, C.ROW_LABEL, C.ROW_VALUE,
                      C.ROW_ICON),
-    C.WBP_INVENTORY_SLOT: (C.SLOT_ACTIVE, C.SLOT_ICON, C.SLOT_AMMO, C.SLOT_FRAME),
+    C.WBP_INVENTORY_SLOT: (C.SLOT_ACTIVE, C.SLOT_GHOST, C.SLOT_ICON, C.SLOT_AMMO,
+                           C.SLOT_FRAME),
 }
 
 
@@ -169,17 +171,29 @@ def check_trees(check):
     strip = hud.get("Strip", (None, False))[0]
     order = [str(w.get_name()) for w in strip.get_all_children()] if strip else []
     pad = grid.get_editor_property("slot_padding").left if grid else None
-    check("the hand slot over the weapon slots and their keys, HP and stamina under "
+    check("the hand slot over the weapon slots (no captions), HP and stamina under "
           "them, the slots a gap apart",
-          order == [C.EQUIPPED_NAME, IC.HAND_BOX, IC.WEAPON_BOX, IC.WEAPON_LABELS, C.VITALS]
+          order == [C.EQUIPPED_NAME, IC.HAND_BOX, IC.WEAPON_BOX, C.VITALS]
           and pad == C.SLOT_GAP / 2.0, f"{order}, gap {pad}")
+    ghosts = [g.get_name() if g else None for g in
+              (k.get_editor_property(C.SLOT_GHOST_VAR) for k in cells(IC.WEAPON_BOX)[1])]
+    want_ghosts = [icon_name(d) for d in IC.WEAPON_GHOSTS]
+    ghost = slot.get(C.SLOT_GHOST, (None, False))[0]
+    alpha = ghost.get_editor_property("color_and_opacity").a if ghost else None
+    check(f"an empty weapon slot shows its kind's silhouette, translucent: {want_ghosts}; "
+          "the hand's and the bag's slots have none",
+          ghosts == want_ghosts and alpha is not None and 0.05 < alpha < 0.5
+          and not any(k.get_editor_property(C.SLOT_GHOST_VAR)
+                      for name in (IC.HAND_BOX, IC.BAG_BOX) for k in cells(name)[1]),
+          f"{ghosts}, alpha {alpha}")
     bag = hud.get(IC.BAG_PANEL, (None, False))[0]
     kit = hud.get(IC.KIT, (None, False))[0]
     kit_order = [str(w.get_name()) for w in kit.get_all_children()] if kit else []
-    check("bottom right, the worn panel over the bag, which is collapsed until I",
+    check("bottom right, the worn panel over the bag, which is not collapsed (always "
+          "shown, I or not)",
           kit_order[-1:] == [IC.BAG_PANEL] and len(kit_order) == 2
           and bag is not None
-          and "COLLAPSED" in str(bag.get_editor_property("visibility")).upper(),
+          and "COLLAPSED" not in str(bag.get_editor_property("visibility")).upper(),
           str(kit_order))
 
     def anchor(tree, name):
@@ -287,22 +301,19 @@ def check_hud_graph(check, nodes):
     for n in carets:
         for pick in _sources(n, "InOpacity"):
             for eq in _sources(pick, "bPickA"):
-                # The I panel's caret is WearSel only while it is open: a
-                # SelectInt of it (wear_draw.py).
                 for b in _sources(eq, "B"):
-                    selected += (_source_titles(b, "A") if "Select" in _title(b)
-                                 else [_title(b)])
+                    selected.append(_title(b))
                 # A tab's BACK row, outside its list: lit while the caret is
                 # past the list (row >= a literal). A tab's save row, between
                 # the two: lit while the caret is on it (row == a literal).
                 if not _sources(eq, "B"):
                     at_or_past = ">=" in _title(eq) or "GreaterEqual" in _title(eq).replace(" ", "")
                     (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
-    check("the settings page, the menu, loot window, I panel and the five tuning tabs "
+    # The I panel has no rows: its caret is a lit slot (wear_checks.py).
+    check("the settings page, the menu, loot window and the five tuning tabs "
           "light the selected row's caret (the menu's is its own PauseRow)",
           sorted(selected) == sorted(
               ["Get GfxTuneRow", "Get LootSel", "Get MenuRow", "Get MonTuneRow",
-               f"Get {WEAR_SEL_VAR}",
                f"Get {C.PAUSE_ROW_VAR}", "Get PlayerTuneRow", "Get TuneRow",
                "Get WorldTuneRow"]),
           str(sorted(selected)))
@@ -325,19 +336,22 @@ def check_hud_graph(check, nodes):
               f"Get {name}" in written)
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}
     check("the menu's rows are the only literals written: debug reads ON or OFF, "
-          "the first row new game or resume, on the title the rows that need "
-          "a game say so, and the I panel's empty slot",
+          "the first row new game or resume, and on the title the rows that need "
+          "a game say so",
           literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
-                      C.IN_GAME_ONLY, WEAR_NONE_TEXT, ""}, str(sorted(literal)))
+                      C.IN_GAME_ONLY, ""}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons
     # (loot_checks.py checks that one).
     brushes = [n for n in nodes if {"Texture", "bMatchSize"} <= _pins(n)
                and not any("TargetArray" in _pins(s) for s in _sources(n, "Texture"))]
-    check("each slot's icon is the carried item's own",
-          len(brushes) == 1 and _source_titles(brushes[0], "Texture") == ["Get Icon"],
+    check("each slot's icon is the carried item's own, and each worn slot's the "
+          "worn garment's",
+          len(brushes) == 2
+          and all(_source_titles(n, "Texture") == ["Get Icon"] for n in brushes),
           str([_source_titles(n, "Texture") for n in brushes]))
     guards = [n for n in nodes if {"TargetArray", "IndexToTest"} <= _pins(n)]
     check("an inventory slot reads its item only behind IsValidIndex, and so "
-          "do the equipped name, the I panel's worn slots and its drag's start",
-          len(guards) == 4, str(len(guards)))
+          "do the equipped name, the I panel's worn slots and its drag's start (on "
+          "a slot, on a worn slot)",
+          len(guards) == 5, str(len(guards)))

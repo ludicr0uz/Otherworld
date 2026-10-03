@@ -24,3 +24,8 @@ TAKE_OFF_VAR = "TakeOffSlot"          # on the component: a slot to take off
                                       # into the bag this Tick, or NOT_CLOTHING
 WEAR_ITEM_VAR = "WearItem"            # the garment being put on, held still
                                       # while Held is cleared
+TAKE_OFF_TO_VAR = "TakeOffTo"          # with TakeOffSlot: the hand or the bag slot
+                                      # a drag dropped it on, or UNPLACED (-1)
+WEAR_REQUEST_VAR = "WearRequest"      # on the component: a slot code whose item
+                                      # is to be worn (a drag onto the worn
+                                      # grid), or NOT_CLOTHING

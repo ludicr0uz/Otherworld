@@ -6,10 +6,12 @@ defaults; probes/probe_clothing.py runs both in a game.
 """
 
 from combat.paths import ITEM_BP_PATH
+from combat.slot_tuning import SLOT_VAR
 from combat.verify.common import BEL, PIN, cdo, check, in_pins, load, pin_value
 from combat.verify.fixtures import wc_cdo, wg
 from combat.wear_tuning import (
-    CLOTHING_SLOT_VAR, NOT_CLOTHING, TAKE_OFF_VAR, WEAR_ITEM_VAR, WORN_VAR,
+    CLOTHING_SLOT_VAR, NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR,
+    WEAR_REQUEST_VAR, WORN_VAR,
 )
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.wear import WEAR_SLOT_VAR
@@ -71,7 +73,7 @@ def check_wear_state():
     worn = wc_cdo.get_editor_property(WORN_VAR)
     check(f"the weapon component has {WORN_VAR}, an empty array the wear grows",
           worn is not None and len(worn) == 0, repr(worn))
-    for var in (TAKE_OFF_VAR, WEAR_SLOT_VAR):
+    for var in (TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR, WEAR_SLOT_VAR):
         check(f"{var} starts at {NOT_CLOTHING}",
               wc_cdo.get_editor_property(var) == NOT_CLOTHING,
               repr(wc_cdo.get_editor_property(var)))
@@ -97,9 +99,10 @@ def check_wear():
                              f"Set {TRIGGER_SPENT}"]), str(titles))
     sets = [n for n in wg if "bSizeToFit" in in_pins(n)
             and any(_title(f) == f"Get {WORN_VAR}" for f in _feeders(n, "TargetArray"))]
-    check(f"{WORN_VAR} is written twice (the wear, the take-off), the wear's grown to fit",
-          len(sets) == 2 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
-          == ["false", "true"], str([pin_value(n, "bSizeToFit") for n in sets]))
+    check(f"{WORN_VAR} is written three times (the wear, the dragged wear, the take-off), "
+          "the wears' grown to fit",
+          len(sets) == 3 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
+          == ["false", "true", "true"], str([pin_value(n, "bSizeToFit") for n in sets]))
 
 
 def check_take_off():
@@ -109,18 +112,42 @@ def check_take_off():
         return
     titles = [_title(n) for n in _chain(
         PIN.get_owning_node(PIN.list_connected_pins(BEL.find_then_pin(gates[0]))[0]))]
-    check(f"...copied, lowered, then Worn[slot] back into the bag (behind its valid "
-          f"index, a garment there and room), the slot emptied and the hand re-equipped",
-          _in_order(titles, [f"Set {WEAR_SLOT_VAR}", f"Set {TAKE_OFF_VAR}", "Branch",
-                             "Branch", "Branch", "Add", "Set Array Elem",
-                             "Set NeedsRefresh"]), str(titles))
+    check(f"...copied, lowered (and {TAKE_OFF_TO_VAR} with it), then Worn[slot] back into "
+          f"the bag (behind its valid index, a garment there and room), given its slot, "
+          f"the worn slot emptied and the hand re-equipped",
+          _in_order(titles, [f"Set {WEAR_SLOT_VAR}", f"Set {TAKE_OFF_VAR}",
+                             f"Set {TAKE_OFF_TO_VAR}", "Branch", "Branch", "Branch", "Add",
+                             f"Set {SLOT_VAR}", "Set Array Elem", "Set NeedsRefresh"]),
+          str(titles))
     lowered = [n for n in wg if _title(n) == f"Set {TAKE_OFF_VAR}"]
     check(f"...and {TAKE_OFF_VAR} is lowered to {NOT_CLOTHING}, by that one Set",
           len(lowered) == 1 and pin_value(lowered[0], TAKE_OFF_VAR) == str(NOT_CLOTHING),
           str([pin_value(n, TAKE_OFF_VAR) for n in lowered]))
 
 
+def check_wear_request():
+    gates = _gated_on(WEAR_REQUEST_VAR)
+    check(f"one Branch serves {WEAR_REQUEST_VAR} >= 0 (a drag onto the worn grid)",
+          len(gates) == 1, str(len(gates)))
+    if not gates:
+        return
+    titles = [_title(n) for n in _chain(
+        PIN.get_owning_node(PIN.list_connected_pins(BEL.find_then_pin(gates[0]))[0]))]
+    check("...the slot's item stored and the request lowered, then a garment out of "
+          "Inventory, the old one back in the slot it left, into Worn, hidden, "
+          "unplaced and the hand re-equipped",
+          _in_order(titles, [f"Set {WEAR_ITEM_VAR}", f"Set {WEAR_REQUEST_VAR}", "Branch",
+                             f"Set {WEAR_SLOT_VAR}", "Branch", "Remove", "Add",
+                             f"Set {SLOT_VAR}", "Set Array Elem", "Hidden",
+                             f"Set {SLOT_VAR}", "Set NeedsRefresh"]), str(titles))
+    lowered = [n for n in wg if _title(n) == f"Set {WEAR_REQUEST_VAR}"]
+    check(f"...and {WEAR_REQUEST_VAR} is lowered to {NOT_CLOTHING}, by that one Set",
+          len(lowered) == 1 and pin_value(lowered[0], WEAR_REQUEST_VAR) == str(NOT_CLOTHING),
+          str([pin_value(n, WEAR_REQUEST_VAR) for n in lowered]))
+
+
 def run():
     check_wear_state()
     check_wear()
     check_take_off()
+    check_wear_request()

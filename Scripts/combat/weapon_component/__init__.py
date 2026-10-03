@@ -115,7 +115,10 @@ _author_* fragment per concern, each in its own module:
               and spend the press so it cannot fire what is equipped next
   wear        clothing: the fire key on a garment (a Consumable with a
               ClothingSlot) wears it, into Worn[slot], swapping out what was
-              there; TakeOffSlot (the I panel's ask) takes one off into the bag
+              there; TakeOffSlot (the I panel's ask) takes one off into the bag,
+              or into the hand or bag slot a drag dropped it on (TakeOffTo)
+  wear_drag   WearRequest (the I panel's drag onto the worn grid): a slot's
+              garment is worn from wherever it is carried
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
   sprint      sprint and stamina, and the latch that ends a spent sprint

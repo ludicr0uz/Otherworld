@@ -11,8 +11,14 @@
     every Tick, before the refresh: TakeOffSlot a slot (the I panel asks,
     graphics_menu/wear_tick.py):
         TakeOffSlot = NOT_CLOTHING
+        SlotPick = TakeOffTo, TakeOffTo = UNPLACED
         Worn[slot] valid and HasRoom (a bag slot or the hand free) ->
-            Inventory += Worn[slot], Worn[slot] = None, NeedsRefresh
+            Inventory += Worn[slot], its Slot = SlotPick if that is the hand
+            or a bag slot (a drag dropped it there; the slot sync sends it to
+            the first free bag slot if another item has that one), else
+            UNPLACED; Worn[slot] = None, NeedsRefresh
+
+Dragging a slot's garment onto the worn grid is wear_drag.py's.
 
 A worn garment is the same actor that was picked up: out of Inventory, so the
 equip loop never shows it, and hidden here once, since it leaves the bag from
@@ -27,17 +33,21 @@ IsValidIndex: it starts empty and is grown by the first wear into a slot.
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
 from combat.nodes import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_ARR_REMOVE, FN_ARR_SET, FN_ARR_VALID,
-    FN_IS_VALID, FN_LESS_II, FN_MIN_II, FN_SET_HIDDEN, FN_SUB_II,
+    FN_AND, FN_EQ_II, FN_IS_VALID, FN_LESS_II, FN_MIN_II, FN_OR, FN_SELECT_II,
+    FN_SET_HIDDEN, FN_SUB_II,
 )
 from combat.paths import ITEM_CLASS_PATH
-from combat.slot_tuning import HAS_ROOM_VAR, SLOT_VAR, UNPLACED
+from combat.slot_tuning import (
+    BAG_FIRST, BAG_LAST, HAND, HAS_ROOM_VAR, SLOT_PICK_VAR, SLOT_VAR, UNPLACED,
+)
 from combat.wear_tuning import (
-    CLOTHING_SLOT_VAR, NOT_CLOTHING, TAKE_OFF_VAR, WEAR_ITEM_VAR, WORN_VAR,
+    CLOTHING_SLOT_VAR, NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR, WORN_VAR,
 )
 from combat.weapon_component.common import _G
 from combat.weapon_component.consume import TRIGGER_SPENT
 
 FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
+FN_LE_II = "/Script/Engine.KismetMathLibrary.LessEqual_IntInt"
 WEAR_SLOT_VAR = "WearSlot"     # the slot WearItem goes into (declared in build.py)
 
 
@@ -130,6 +140,10 @@ def _author_take_off(ed, in_execs, x0, y0):
     flow = g.put(WEAR_SLOT_VAR, g.get(TAKE_OFF_VAR, x0 + 280, y0 + 300), [serve],
                  x0 + 520, y0)
     flow = g.put(TAKE_OFF_VAR, str(NOT_CLOTHING), [flow], x0 + 780, y0)
+    # Where a drag dropped it, copied and lowered with the request.
+    flow = g.put(SLOT_PICK_VAR, g.get(TAKE_OFF_TO_VAR, x0 + 540, y0 - 300), [flow],
+                 x0 + 780, y0 - 300)
+    flow = g.put(TAKE_OFF_TO_VAR, str(UNPLACED), [flow], x0 + 1040, y0 - 300)
     slot = g.get(WEAR_SLOT_VAR, x0 + 1040, y0 + 300)
     valid, item = _worn_at(g, slot, x0 + 1040, y0 + 440)
     there, nothing = g.branch(valid, [flow], x0 + 1300, y0)
@@ -139,8 +153,19 @@ def _author_take_off(ed, in_execs, x0, y0):
     fits, full = g.branch(room, [worn], x0 + 1820, y0)
     back = g.call(FN_ARR_ADD, x0 + 2080, y0, [fits],
                   TargetArray=g.get("Inventory", x0 + 1820, y0 + 300), NewItem=item)
+    # The hand or a bag slot only: a garment fits no weapon slot.
+    to = g.get(SLOT_PICK_VAR, x0 + 1820, y0 + 900)
+    in_bag = g.call(FN_AND, x0 + 2340, y0 + 1040,
+                    A=_out(g.call(FN_GE_II, x0 + 2080, y0 + 1040, A=to, B=BAG_FIRST)),
+                    B=_out(g.call(FN_LE_II, x0 + 2080, y0 + 1180, A=to, B=BAG_LAST)))
+    place = g.call(FN_OR, x0 + 2600, y0 + 900,
+                   A=_out(g.call(FN_EQ_II, x0 + 2080, y0 + 900, A=to, B=HAND)),
+                   B=_out(in_bag))
+    code = g.call(FN_SELECT_II, x0 + 2860, y0 + 900, A=to, B=UNPLACED, bPickA=_out(place))
+    placed = g.iput(item, SLOT_VAR, _out(code), [BEL.find_then_pin(back)], x0 + 2340,
+                    y0 - 300)
     # Item left unconnected: Worn[slot] = None.
-    off = g.call(FN_ARR_SET, x0 + 2340, y0, [BEL.find_then_pin(back)],
+    off = g.call(FN_ARR_SET, x0 + 2340, y0, [placed],
                  TargetArray=g.get(WORN_VAR, x0 + 2100, y0 + 300),
                  Index=g.get(WEAR_SLOT_VAR, x0 + 2100, y0 + 440))
     flow = g.put("NeedsRefresh", "true", [BEL.find_then_pin(off)], x0 + 2600, y0)

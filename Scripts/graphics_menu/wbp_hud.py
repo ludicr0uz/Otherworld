@@ -6,11 +6,11 @@
     top right     the kill counter
     top centre    the save-and-exit countdown, or why it was called off
     bottom centre the held item's name, the hand slot, the four weapon slots
-                  under it (WBP_InventorySlot) and their keys, and under them
-                  HP and stamina side by side
+                  under it (WBP_InventorySlot; an empty one shows its kind's
+                  silhouette), and under them HP and stamina side by side
     right edge    the loot window, and under the reticle its prompt (wbp_loot.py)
     bottom right  the Kit: what the player wears (wbp_wear.py), and under it
-                  the 2 x 5 backpack, shown with I
+                  the 2 x 5 backpack; both always shown
   Fps    (always, on every screen: debug mode or not)
   Watermark  (bottom right, on every screen: wbp_legal.py)
 
@@ -27,7 +27,6 @@ they are placed per frame from the viewport centre and from world positions.
 
 import unreal
 
-from combat.graph import BEL, _must_load
 from combat.slot_tuning import BAG_SIZE
 from graphics_menu import umg_author as U
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
@@ -35,9 +34,9 @@ from graphics_menu.wbp_legal import author_watermark
 from graphics_menu.wbp_loot import author_loot_widgets
 from graphics_menu.inv_consts import (
     BAG_BOX, BAG_COLUMNS, BAG_LABEL_TEXTS, BAG_LABELS, BAG_PANEL, HAND_BOX, HAND_GAP,
-    INV_LABEL_FONT, KIT, KIT_BOTTOM, KIT_SCALE, WEAPON_BOX, WEAPON_LABEL_TEXTS,
-    WEAPON_LABELS,
+    INV_LABEL_FONT, KIT, KIT_BOTTOM, WEAPON_BOX, WEAPON_GHOSTS,
 )
+from graphics_menu.wbp_parts import slot_grid
 from graphics_menu.wbp_wear import author_wear_portrait, author_wear_widgets
 from graphics_menu.umg_consts import (
     BANNER_COUNT, BANNER_FONT, BANNER_OFF, BANNER_TOP, COL_EXIT_CALLED_OFF, COL_FPS,
@@ -47,7 +46,7 @@ from graphics_menu.umg_consts import (
     HUD_BODY, HUD_FPS, ICON_GAP, KILLS, KILLS_FONT, KILLS_TOP,
     SLOT_GAP, SLOT_W, STAMINA_BAR, STAT_ICON, STRIP_BOTTOM, ST_BAR_SIZE, ST_GROUP,
     ST_ICON, SURVIVAL, SURVIVAL_BARS, SURVIVAL_LEFT, SV_BAR_SIZE, SV_COLUMN_GAP,
-    SV_LABEL_FONT, VITALS, VITALS_GAP, VITALS_OVER, WBP_HUD, WBP_INVENTORY_SLOT,
+    SV_LABEL_FONT, VITALS, VITALS_GAP, VITALS_OVER, WBP_HUD,
     debuff_text, stat_bar, stat_group, stat_icon,
 )
 from ui_art.stat_icons import stat_icon_name
@@ -105,18 +104,6 @@ def _author_vitals(bp, strip):
     U.pad(bar.get_parent(), v="Center")
 
 
-def _grid(bp, parent, name, cells, columns, prefix):
-    """A UniformGridPanel of ``cells`` WBP_InventorySlots, a gap apart."""
-    grid = U.add(bp, unreal.UniformGridPanel, name, parent, variable=True)
-    half = SLOT_GAP / 2.0
-    grid.set_editor_property("slot_padding", unreal.Margin(half, half, half, half))
-    slot_class = BEL.generated_class(_must_load(WBP_INVENTORY_SLOT))
-    for i in range(cells):
-        cell = U.add(bp, slot_class, f"{prefix}{i}", grid)
-        U.cell(cell, i // columns, i % columns)
-    return grid
-
-
 def _labels(bp, parent, name, texts):
     """A row of small captions, one a slot wide, over or under a grid."""
     row = U.add(bp, unreal.HorizontalBox, name, parent)
@@ -128,36 +115,33 @@ def _labels(bp, parent, name, texts):
 
 
 def _author_strip(bp, body):
-    """The held item's name, the hand slot, the weapon slots under it and
-    their keys, then the vitals: stood on the bottom edge."""
+    """The held item's name, the hand slot, the weapon slots under it (no
+    captions: an empty one shows its kind's silhouette), then the vitals:
+    stood on the bottom edge."""
     strip = U.add(bp, unreal.VerticalBox, "Strip", body)
     U.at(strip, (0.5, 1.0), (0.5, 1.0), (0.0, -STRIP_BOTTOM))
 
     name = U.text(bp, strip, EQUIPPED_NAME, "", EQUIPPED_FONT, COL_GOLD, variable=True)
     U.pad(name, bottom=EQUIPPED_GAP, h="Center")
-    hand = _grid(bp, strip, HAND_BOX, 1, 1, "Hand")
+    hand = slot_grid(bp, strip, HAND_BOX, 1, 1, "Hand")
     U.pad(hand, bottom=HAND_GAP, h="Center")
-    weapons = _grid(bp, strip, WEAPON_BOX, len(WEAPON_LABEL_TEXTS), len(WEAPON_LABEL_TEXTS),
-                    "Weapon")
+    weapons = slot_grid(bp, strip, WEAPON_BOX, len(WEAPON_GHOSTS), len(WEAPON_GHOSTS),
+                        "Weapon", ghosts=WEAPON_GHOSTS)
     U.pad(weapons, h="Center")
-    U.pad(_labels(bp, strip, WEAPON_LABELS, WEAPON_LABEL_TEXTS), h="Center")
     _author_vitals(bp, strip)
 
 
 def _author_kit(bp, body):
-    """Bottom right: what is worn (always), and under it the backpack, its
-    top row's quick keys over it (shown with I); left of them, with I, the
-    character's portrait."""
+    """Bottom right: what is worn, and under it the backpack, its top row's
+    quick keys over it (both always shown; the HUD collapses them under the
+    menu); left of them, with I, the character's portrait."""
     kit = U.add(bp, unreal.VerticalBox, KIT, body)
     U.at(kit, (1.0, 1.0), (1.0, 1.0), (-CORNER_MARGIN, -KIT_BOTTOM))
-    scale = U.scaled(bp, kit, "WearScale", KIT_SCALE)
-    U.pad(scale, h="Right")
-    author_wear_widgets(bp, scale)
+    U.pad(author_wear_widgets(bp, kit), h="Right")
     bag = U.add(bp, unreal.VerticalBox, BAG_PANEL, kit, variable=True)
     U.pad(bag, top=8.0, h="Right")
     _labels(bp, bag, BAG_LABELS, BAG_LABEL_TEXTS)
-    _grid(bp, bag, BAG_BOX, BAG_SIZE, BAG_COLUMNS, "Bag")
-    U.hide(bag)
+    slot_grid(bp, bag, BAG_BOX, BAG_SIZE, BAG_COLUMNS, "Bag")
     author_wear_portrait(bp, body)
 
 

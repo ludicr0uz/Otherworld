@@ -1,5 +1,6 @@
 """The two widgets the screens are built from: WBP_MenuRow (one line of any
-menu: caret, label, value) and WBP_InventorySlot (one cell of the strip).
+menu: caret, label, value) and WBP_InventorySlot (one cell of the strip, of
+the bag or of the worn grid), and the grid of slots the HUD lays them in.
 
 A menu row carries its own label. Each instance's LabelText, LabelWidth and
 LabelColor are set in the parent screen's designer and applied by the row's
@@ -11,23 +12,26 @@ row) and the value column (a slider's number, a key's name, ON/OFF).
 import unreal
 
 from combat.graph import (
-    BEL, BGE, _apply_defaults, _at, _connect, _declare, _float_type, _node, _palette, _pin,
+    BEL, BGE, _apply_defaults, _at, _connect, _declare, _float_type, _must_load, _node,
+    _palette, _pin,
 )
 from graphics_menu import umg_author as U
 from graphics_menu.umg_consts import (
-    COL_CARET, COL_KILL, COL_ROW, ROW_CARET, ROW_CARET_W, ROW_COLOR_VAR, ROW_FONT,
+    COL_CARET, COL_GHOST, COL_KILL, COL_ROW, ROW_CARET, ROW_CARET_W, ROW_COLOR_VAR, ROW_FONT,
     ROW_ICON, ROW_ICON_H, ROW_ICON_W, ROW_LABEL, ROW_LABEL_BOX, ROW_LABEL_W,
     ROW_TEXT_VAR, ROW_VALUE, ROW_WIDTH_VAR,
     SLOT_ACTIVE, SLOT_AMMO, SLOT_AMMO_BOTTOM, SLOT_AMMO_FONT, SLOT_AMMO_RIGHT, SLOT_BACK,
-    SLOT_FRAME, SLOT_H, SLOT_ICON, SLOT_ICON_H, SLOT_ICON_TOP, SLOT_ICON_W, SLOT_W,
-    WBP_INVENTORY_SLOT, WBP_MENU_ROW,
+    SLOT_FRAME, SLOT_GAP, SLOT_GHOST, SLOT_GHOST_VAR, SLOT_H, SLOT_ICON, SLOT_ICON_H,
+    SLOT_ICON_TOP, SLOT_ICON_W, SLOT_W, UI_ART_DIR, WBP_INVENTORY_SLOT, WBP_MENU_ROW,
 )
+from item_icons.items import icon_name
 
 NODE_PRE_CONSTRUCT = "AddEvent|UserInterface|EventPreConstruct"
 FN_STR_TO_TEXT = "/Script/Engine.KismetTextLibrary.Conv_StringToText"
 FN_SET_TEXT = "/Script/UMG.TextBlock.SetText"
 FN_SET_TEXT_COLOUR = "/Script/UMG.TextBlock.SetColorAndOpacity"
 FN_SET_WIDTH = "/Script/UMG.SizeBox.SetWidthOverride"
+FN_SET_BRUSH = "/Script/UMG.Image.SetBrushFromTexture"
 
 
 def _author_pre_construct(bp):
@@ -98,7 +102,9 @@ def build_menu_row():
 def build_inventory_slot():
     """An empty slot, with the carried-item layers collapsed until the HUD
     fills them: the lit background and frame of the equipped slot, the
-    weapon's icon, and its rounds-in-gun / rounds-in-reserve."""
+    weapon's icon, and its rounds-in-gun / rounds-in-reserve; and the Ghost,
+    the instance's GhostTexture drawn translucent (PreConstruct sets it),
+    which the HUD shows in an empty slot that has one."""
     bp = U.widget_blueprint(WBP_INVENTORY_SLOT)
     root = U.sized(bp, None, "Cell", w=SLOT_W, h=SLOT_H)
     stack = U.add(bp, unreal.Overlay, "Stack", root)
@@ -106,13 +112,45 @@ def build_inventory_slot():
     U.pad(back, h="Fill", v="Fill")
     active = U.image(bp, stack, SLOT_ACTIVE, "T_UI_SlotActive", variable=True)
     U.pad(active, h="Fill", v="Fill")
+    ghost = U.image(bp, stack, SLOT_GHOST, "T_UI_Slot", (SLOT_ICON_W, SLOT_ICON_H),
+                    variable=True, tint=COL_GHOST)
     icon = U.image(bp, stack, SLOT_ICON, "T_UI_Slot", (SLOT_ICON_W, SLOT_ICON_H),
                    variable=True)
-    U.pad(icon, top=SLOT_ICON_TOP, h="Center", v="Top")
+    for w in (ghost, icon):
+        U.pad(w, top=SLOT_ICON_TOP, h="Center", v="Top")
     ammo = U.text(bp, stack, SLOT_AMMO, "", SLOT_AMMO_FONT, COL_KILL, variable=True)
     U.pad(ammo, right=SLOT_AMMO_RIGHT, bottom=SLOT_AMMO_BOTTOM, h="Right", v="Bottom")
     frame = U.image(bp, stack, SLOT_FRAME, "T_UI_SlotFrame", variable=True)
     U.pad(frame, h="Fill", v="Fill")
-    for w in (active, icon, ammo, frame):
+    for w in (active, ghost, icon, ammo, frame):
         U.hide(w)
+    U.compile_and_save(bp)   # the widget variables exist once compiled
+
+    ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
+    _declare(ed, SLOT_GHOST_VAR,
+             BEL.get_object_reference_type(unreal.Texture2D.static_class()))
+    BEL.set_blueprint_variable_instance_editable(bp, SLOT_GHOST_VAR, True)
+    ed.remove_nodes(ed.list_all_nodes())
+    pre = _palette(ed, NODE_PRE_CONSTRUCT)
+    put = _at(_node(ed, FN_SET_BRUSH), 560, 0)
+    for var, pin, y in ((SLOT_GHOST, "self", 80), (SLOT_GHOST_VAR, "Texture", 200)):
+        got = _at(ed.add_get_member_variable_node(var), 300, y)
+        _connect(_pin(got, var, is_input=False), _pin(put, pin))
+    _connect(BEL.find_then_pin(pre), _pin(put, "execute"))
     return U.compile_and_save(bp)
+
+
+def slot_grid(bp, parent, name, cells, columns, prefix, ghosts=None):
+    """A UniformGridPanel of ``cells`` WBP_InventorySlots, a gap apart.
+    ``ghosts``: per cell, the item whose icon is its empty silhouette."""
+    grid = U.add(bp, unreal.UniformGridPanel, name, parent, variable=True)
+    half = SLOT_GAP / 2.0
+    grid.set_editor_property("slot_padding", unreal.Margin(half, half, half, half))
+    slot_class = BEL.generated_class(_must_load(WBP_INVENTORY_SLOT))
+    for i in range(cells):
+        cell = U.add(bp, slot_class, f"{prefix}{i}", grid)
+        if ghosts:
+            cell.set_editor_property(
+                SLOT_GHOST_VAR, _must_load(f"{UI_ART_DIR}/{icon_name(ghosts[i])}"))
+        U.cell(cell, i // columns, i % columns)
+    return grid

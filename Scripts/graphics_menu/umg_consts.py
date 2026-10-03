@@ -99,6 +99,11 @@ ROW_GAP = 14.0           # px under each row
 # ─── WBP_InventorySlot ────────────────────────────────────────────────────────
 SLOT_BACK, SLOT_ACTIVE, SLOT_ICON, SLOT_AMMO, SLOT_FRAME = (
     "Back", "Active", "Icon", "Ammo", "Frame")
+# An empty slot's silhouette of what belongs in it (a weapon slot's kind, a
+# worn slot's garment): the Ghost image, drawing the instance's GhostTexture
+# (set per cell in the designer, as a menu row's label is) translucent.
+SLOT_GHOST, SLOT_GHOST_VAR = "Ghost", "GhostTexture"
+COL_GHOST = "(R=1.000000,G=1.000000,B=1.000000,A=0.220000)"
 SLOT_W, SLOT_H = 84.0, 59.0
 SLOT_GAP = 7.0
 SLOT_ICON_W, SLOT_ICON_H, SLOT_ICON_TOP = 78.0, 35.0, 2.0

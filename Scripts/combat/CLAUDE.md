@@ -108,7 +108,9 @@ menu polls its own copy from `DrawHUD`, which does.
     counting as free: a gun goes back to its weapon slot, anything else to the bag; no home,
     nothing moves). An empty slot takes the hand's item back if it came from there
     (`HandFrom`): 1 twice puts the gun away. **A drag is `MoveFrom`/`MoveTo`** (the HUD's,
-    `graphics_menu/inv_drag.py`): moved if it fits, swapped if the other fits back.
+    `graphics_menu/inv_drag.py`): moved if it fits, swapped if the other fits back. A drag
+    to or from a worn slot is clothing's: `TakeOffTo` with `TakeOffSlot`, and `WearRequest`
+    (`weapon_component/wear.py`, `wear_drag.py`; `Scripts/clothing/CLAUDE.md`).
   - **The number keys are fixed** (`SLOT_KEYS`, variables on the component, as every key):
     not in `BIND_VARS`, so the settings page does not rebind them.
   - **Probes equip by writing `EquippedIndex`**: `probes/context.py` turns that write into

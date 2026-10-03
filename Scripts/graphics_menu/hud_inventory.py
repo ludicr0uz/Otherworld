@@ -8,8 +8,11 @@ and no idea which of them has a magazine. One loop over the fifteen slot
 codes (combat/slot_tuning.py): code c's widget is the hand's cell, a weapon
 cell or a bag cell (inv_consts.SLOT_BOXES), and it shows the component's
 SlotItems[c], read behind IsValidIndex and then IsValid; an empty slot is
-emptied, every frame, so a dropped weapon leaves no ghost behind. The bag's
-grid shows only with the I panel open.
+emptied, every frame, so a dropped weapon leaves nothing behind; an empty
+slot that has a silhouette (its GhostTexture: the weapon slots, the worn
+ones) shows it. All three grids are always shown, but the bag's hides under
+the menu. wear_draw.py fills the worn grid's slots with the same two
+fragments.
 
 A lit slot gets a lit background AND a lit frame over its icon -- a lit
 edge alone was reported as not reading: the hand's, the bag slot under the
@@ -24,8 +27,8 @@ from graphics_menu.ui_graph import (
     FN_CHILD_AT, MACRO_FOR_LOOP, member, part, set_shown, set_text, show_if,
 )
 from graphics_menu.umg_consts import (
-    EQUIPPED_NAME, SLOT_ACTIVE, SLOT_AMMO, SLOT_FRAME, SLOT_ICON, WBP_HUD,
-    WBP_INVENTORY_SLOT,
+    EQUIPPED_NAME, SLOT_ACTIVE, SLOT_AMMO, SLOT_FRAME, SLOT_GHOST, SLOT_GHOST_VAR,
+    SLOT_ICON, WBP_HUD, WBP_INVENTORY_SLOT,
 )
 from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_PORTRAIT, WEAR_SEL_VAR
 
@@ -80,22 +83,29 @@ def _author_equipped_name(ed, inv, equipped, exec_in, x0, y0):
             set_shown(ed, name, False, [BEL.find_else_pin(br)], x0 + 1040, y0 + 200))
 
 
-def _author_filled_slot(ed, slot, item, is_equipped, exec_in, x0, y0):
-    """Icon in the item's colour, its ammunition if it counts any, and the
-    equipped slot's lit layers. Returns the exec tails."""
+def _author_filled_slot(ed, slot, item, is_equipped, exec_in, x0, y0, ammo=True):
+    """Icon in the item's colour (the empty slot's silhouette put away), its
+    ammunition if it counts any (``ammo`` False: a worn slot, which counts
+    none), and the equipped slot's lit layers. Returns the exec tails."""
     def w(name, py):
         return member(ed, slot, WBP_INVENTORY_SLOT, name, x0, py)
 
     icon = w(SLOT_ICON, y0 + 300)
+    no_ghost = set_shown(ed, w(SLOT_GHOST, y0 - 200), False, [exec_in], x0, y0 - 300)
     brush = _at(_node(ed, FN_SET_BRUSH), x0 + 260, y0)
     _connect(icon, _pin(brush, "self"))
     _connect(_get(ed, item, "Icon", x0, y0 + 440), _pin(brush, "Texture"))
-    _connect(exec_in, _pin(brush, "execute"))
+    _connect(no_ghost, _pin(brush, "execute"))
     tint = _at(_node(ed, FN_SET_TINT), x0 + 520, y0)
     _connect(icon, _pin(tint, "self"))
     _connect(_get(ed, item, "SlotColor", x0 + 260, y0 + 440), _pin(tint, "InColorAndOpacity"))
     _connect(BEL.find_then_pin(brush), _pin(tint, "execute"))
     flow = set_shown(ed, icon, True, [BEL.find_then_pin(tint)], x0 + 780, y0)
+    active, frame = w(SLOT_ACTIVE, y0 + 900), w(SLOT_FRAME, y0 + 1000)
+    if not ammo:
+        tails = (set_shown(ed, w(SLOT_AMMO, y0 + 700), False, [flow], x0 + 1040, y0),)
+        lit = show_if(ed, active, is_equipped, tails, x0 + 1300, y0)
+        return show_if(ed, frame, is_equipped, lit, x0 + 1820, y0)
 
     # "3 / 15": rounds in the gun, rounds in reserve. Only for a weapon that
     # uses ammunition. The pistol reloads every eight shots over an endless
@@ -124,17 +134,22 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, x0, y0):
     tails = (set_shown(ed, ammo, True, [wrote], x0 + 2040, y0),
              set_shown(ed, ammo, False, [BEL.find_else_pin(counted)], x0 + 2040, y0 + 200))
 
-    active, frame = w(SLOT_ACTIVE, y0 + 900), w(SLOT_FRAME, y0 + 1000)
     lit = show_if(ed, active, is_equipped, tails, x0 + 2300, y0)
     return show_if(ed, frame, is_equipped, lit, x0 + 2820, y0)
 
 
 def _author_empty_slot(ed, slot, execs, x0, y0):
+    """Every carried-item layer collapsed, and the slot's silhouette shown
+    if it has one. Returns the exec tails."""
     flow = tuple(execs)
     for i, name in enumerate((SLOT_ICON, SLOT_AMMO, SLOT_ACTIVE, SLOT_FRAME)):
         target = member(ed, slot, WBP_INVENTORY_SLOT, name, x0 + i * 260, y0 + 240)
         flow = (set_shown(ed, target, False, flow, x0 + i * 260, y0),)
-    return flow
+    has = _at(_node(ed, FN_IS_VALID), x0 + 1040, y0 + 400)
+    _connect(member(ed, slot, WBP_INVENTORY_SLOT, SLOT_GHOST_VAR, x0 + 1040, y0 + 540),
+             _pin(has, "Object"))
+    return show_if(ed, member(ed, slot, WBP_INVENTORY_SLOT, SLOT_GHOST, x0 + 1040, y0 + 240),
+                   _pin(has, "ReturnValue", is_input=False), flow, x0 + 1300, y0)
 
 
 def _slot_widget(ed, code, x0, y0):
@@ -222,7 +237,7 @@ def author_inventory(ed, x0, y0, in_execs):
     _connect(as_weapon, _pin(items, "self"))
     items = _pin(items, SLOT_ITEMS_VAR, is_input=False)
 
-    # The bag's grid only with the I panel open, and never under the menu.
+    # The bag's grid always, but never under the menu.
     open_ = _at(ed.add_get_member_variable_node(WEAR_OPEN_VAR), x0 + 1760, y0 + 700)
     menu = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 1760, y0 + 840)
     no_menu = _at(_node(ed, FN_NOT), x0 + 2000, y0 + 840)
@@ -231,8 +246,8 @@ def author_inventory(ed, x0, y0, in_execs):
     _connect(_pin(open_, WEAR_OPEN_VAR, is_input=False), _pin(bag_up, "A"))
     _connect(_pin(no_menu, "ReturnValue", is_input=False), _pin(bag_up, "B"))
     shown = show_if(ed, part(ed, WBP_HUD, BAG_PANEL, x0 + 1760, y0 + 1000),
-                    _pin(bag_up, "ReturnValue", is_input=False), named, x0 + 2000, y0)
-    # The character's portrait with it.
+                    _pin(no_menu, "ReturnValue", is_input=False), named, x0 + 2000, y0)
+    # The character's portrait with the I panel open.
     shown = show_if(ed, part(ed, WBP_HUD, WEAR_PORTRAIT, x0 + 1760, y0 - 700),
                     _pin(bag_up, "ReturnValue", is_input=False), list(shown),
                     x0 + 2000, y0 - 600)
@@ -271,6 +286,6 @@ def author_inventory(ed, x0, y0, in_execs):
         "slot) shows SlotItems[c] -- its own icon in its own SlotColor, "
         "rounds-in-gun / rounds-in-reserve if it uses ammunition, and a lit "
         "background and frame on the hand, the caret and a drag's start. Empty "
-        "slots are emptied.", [cast, loop, as_slot, carried])
+        "slots are emptied, down to their silhouette.", [cast, loop, as_slot, carried])
     return (_loose_pin(loop, "Completed", is_input=False),
             _pin(cast, "CastFailed", is_input=False))

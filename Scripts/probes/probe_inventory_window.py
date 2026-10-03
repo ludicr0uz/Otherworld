@@ -34,13 +34,14 @@ def probe(p):
     yield 1.0
     hud = p.hud()
     ui = p.get(hud, "UiHud")
-    p.check("the hand slot, the weapon slots and the worn panel show with I shut",
+    p.check("the hand slot, the weapon slots, the worn slots and the backpack show "
+            "with I shut",
             all(ui.get_editor_property(n).get_visibility() in DRAWN
                 for n in (HAND_BOX, WEAPON_BOX))
-            and ui.get_editor_property(WEAR_PANEL).get_visibility()
-            != unreal.SlateVisibility.COLLAPSED,
+            and all(ui.get_editor_property(n).get_visibility()
+                    != unreal.SlateVisibility.COLLAPSED for n in (WEAR_PANEL, BAG_PANEL)),
             str([str(ui.get_editor_property(n).get_visibility())
-                 for n in (HAND_BOX, WEAPON_BOX, WEAR_PANEL)]))
+                 for n in (HAND_BOX, WEAPON_BOX, WEAR_PANEL, BAG_PANEL)]))
     p.check("...and the character's portrait does not",
             ui.get_editor_property(WEAR_PORTRAIT).get_visibility()
             == unreal.SlateVisibility.COLLAPSED)
@@ -48,7 +49,7 @@ def probe(p):
     yield 1.0
     p.set(hud, WEAR_OPEN_VAR, True)
     yield 1.0
-    p.check("...and with I open the backpack shows too",
+    p.check("...and with I open the backpack still shows",
             ui.get_editor_property(BAG_PANEL).get_visibility() == SHOWN)
     p.check("...and so does the character's portrait",
             ui.get_editor_property(WEAR_PORTRAIT).get_visibility() == SHOWN)

@@ -31,10 +31,12 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   row returns to them (below: "The M panel as a menu").
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
-- **I** opens the inventory (the I panel): the backpack shows under the worn garments,
-  bottom right, and the character's portrait left of them (`wear_*.py`, `inv_*.py`, `Scripts/clothing/CLAUDE.md`). **Up/Down** run the
-  caret over the worn rows, then the bag's slots; **Enter** takes a garment off, or brings
-  a bag slot's item to hand; the mouse drags an item from slot to slot (below). It does not
+- **I** opens the inventory (the I panel): the worn garments and the backpack, bottom
+  right, are always shown, and I puts the caret and the mouse on them and the character's
+  portrait left of them (`wear_*.py`, `inv_*.py`, `Scripts/clothing/CLAUDE.md`). **Up/Down** run the
+  caret over the worn slots, then the bag's slots; **Enter** takes a garment off, or brings
+  a bag slot's item to hand; the mouse drags an item from slot to slot, a worn garment
+  onto the hand or a bag slot, or a carried one onto the worn grid (below). It does not
   pause, holds the walk while open, and hides under the menu; with the loot window open
   too, the arrows and Enter are the loot window's. **1-9** are the weapon component's
   (`combat/slot_tuning.py`).
@@ -130,7 +132,7 @@ mouse is the camera's.
 | M panel | the caret goes there | takes the row (as Enter does) | |
 | tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
 | loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
-| I panel | the caret goes there (a worn row) | take that garment off; on the `[I] inventory` line: shut; on a slot: bring it to hand; a press on one slot and a release on another: move it there | |
+| I panel | the caret goes there (a worn slot) | on a worn slot: take that garment off; on the `[I] inventory` line: shut; on a slot: bring it to hand; a press on one slot and a release on another: move it there (a worn garment off into it, a carried one onto the worn grid worn) | |
 | death menu | | on the hint line: restart | |
 
 - **The HUD is still the controller.** No widget is hit-testable. A row is under the cursor
@@ -435,25 +437,47 @@ loot window, in play only. Traps met here:
 - **Its own dead gate and its own walk edge** (`WearStill`): `loot_checks` and
   `pause_checks` pick out the loot's and the menu's from theirs.
 - **It adds two `GetComponentByClass`** (the take-off's and the rows'): the HUD has 20.
-- **The worn rows are always up** (bottom right, in the `Kit` over the bag, at
-  `KIT_SCALE`); only the caret, the mouse and the bag wait for `WearOpen`. Shut, the
-  cursor is hidden and a click is a shot, so no click is read there.
-- **The caret runs on into the bag:** `WearSel` 0-7 are the worn rows, 8-17 the bag's
+- **The worn slots and the bag are always up** (bottom right, the `Kit`); only the caret,
+  the mouse and the portrait wait for `WearOpen`. Shut, the cursor is hidden and a click
+  is a shot, so no click is read there.
+- **A worn slot is a `WBP_InventorySlot`,** as a bag slot is: `WearSlots`, two rows of
+  four, cell *i* showing `Worn[i]`'s own `Icon` and no text. `wear_draw.py` fills it with
+  `hud_inventory`'s two fragments (`ammo=False`: the verifier counts one ammunition
+  read, the slots'). The caret is the lit slot, not a `>`.
+- **An empty slot's silhouette is the slot's own:** `WBP_InventorySlot.GhostTexture`,
+  Instance Editable, set per cell in `WBP_HUD` (`wbp_parts.slot_grid(ghosts=…)`) and put
+  into the `Ghost` image by the slot's PreConstruct, as a menu row's label is. It is an
+  item's icon drawn at `COL_GHOST`'s alpha: a rifle, a rifle, a pistol and a knife in the
+  weapon slots (`inv_consts.WEAPON_GHOSTS`), each garment in its worn slot
+  (`wear_consts.WEAR_GHOSTS`); the hand and the bag have none. The HUD shows it in an
+  empty slot only where the texture is valid, and collapses it in a filled one. The
+  weapon slots have no captions any more.
+- **The caret runs on into the bag:** `WearSel` 0-7 are the worn slots, 8-17 the bag's
   slots (`inv_consts.BAG_SEL_FIRST`); Enter on a bag slot sets the weapon component's
   `SlotRequest` instead of `TakeOffSlot`.
 - **The drag is DrawHUD's** (`inv_drag.py`): the slot under the cursor is `InvOver` (the
-  three grids are three row lists to `author_row_cursor`), a press on a filled slot sets
-  `InvDragFrom`, and the release asks the weapon component for the move (`MoveTo`, then
-  `MoveFrom`) or, on the same slot, for that slot in hand (`SlotRequest`). The component
-  decides what fits. Its press and release are read with `InvOver`/`InvDragFrom`, not a
-  geometry test of their own: `cursor_checks._on_slot` allows that.
+  four grids, `inv_consts.DRAG_BOXES`, are four row lists to `author_row_cursor`; a worn
+  cell *i* is code `WORN_CODE_FIRST + i`, the HUD's own, and moves `WearSel`), a press on
+  a filled slot sets `InvDragFrom`, and the release asks the weapon component: slot to
+  slot the move (`MoveTo`, then `MoveFrom`); a worn garment onto a slot the take-off into
+  it (`TakeOffTo`, then `TakeOffSlot`); a slot's item onto the worn grid the wear
+  (`WearRequest`: into the garment's own slot, whichever cell it lands on); on the same
+  slot, that slot in hand (`SlotRequest`) or, worn, the take-off Enter asks for
+  (`WearTakeOffRequested`). The component decides what fits. Its press and release are
+  read with `InvOver`/`InvDragFrom`, not a geometry test of their own:
+  `cursor_checks._on_slot` allows that. It runs before the worn slots are drawn, so the
+  caret and the drag's start are lit the same frame.
+- **A click on a worn slot is the release, not the press:** the press starts the drag,
+  so a take-off on the press would leave nothing to drag.
 - **The character's portrait** (`WearPortrait`, `wbp_wear.author_wear_portrait`): a picture
   of the player's body from the front, a canvas child of `Body` left of the Kit (not in
   it: `umg_checks` holds the Kit to its two children). `hud_inventory.py` shows it on the
   bag's own condition (WearOpen and no menu). The picture is a render
   (`Scripts/item_icons/CLAUDE.md`), so it does not change with what is worn or held.
   `probe_inventory_window.py` (windowed) saves the screen with it up.
-- **Still needs a play session:** dragging with a real mouse (no probe can aim at a cell),
+- **Still needs a play session:** dragging with a real mouse (no probe can aim at a cell:
+  `probe_clothing_drag.py` writes the component's requests instead), the silhouettes'
+  alpha on a bright ground,
   how the Kit reads over the watermark and beside the loot window on a 720p screen, and
   the 1-9 keys themselves.
 - **The cursor's wish is an OR tree** (MenuOpen, LootOpen, WearOpen); `cursor_checks`
@@ -620,17 +644,19 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
   (`fps.py`; visible in the designer, and no node shows or hides it).
 - **Wanderers:** a projected health bar over each one, plus its number in debug mode.
 - **Bottom centre:** the held item's name, the hand slot (`HandSlot`), and under it the four
-  weapon slots in a row (`WeaponSlots`: primary, secondary, pistol, melee, captioned with
-  their keys), 84 x 59 slots with loaded/reserve counts for weapons that use ammo
+  weapon slots in a row (`WeaponSlots`: primary, secondary, pistol, melee; no captions:
+  an empty one shows its kind's translucent silhouette), 84 x 59 slots with loaded/reserve counts for weapons that use ammo
   (`hud_inventory.py`). Under them, side by side in the `Vitals` row: HP (icon, bar,
   number, `hud_stats.py`) and stamina (icon, bar, `stamina_bar.py`); all in one
   bottom-anchored stack in `WBP_HUD`.
-- **Bottom right:** the `Kit`: the worn panel (always), and under it the backpack's ten
-  slots in two rows of five, the top row captioned 5-9 (`BagSlots`, shown with I).
+- **Bottom right:** the `Kit`, always shown: the worn slots (`WearSlots`, two rows of four,
+  a garment's icon or its silhouette), and under them the backpack's ten slots in two rows
+  of five, the top row captioned 5-9 (`BagSlots`).
 - **One loop draws every slot:** code *c* (`combat/slot_tuning.py`) is the hand's cell,
   a weapon cell or a bag cell (`SelectObject` over the three grids' `GetChildAt`, which is
   None past a grid's end), and shows the weapon component's `SlotItems[c]`, read behind
-  `IsValidIndex` and then `IsValid`; an empty slot is emptied every frame. Lit: the hand's
+  `IsValidIndex` and then `IsValid`; an empty slot is emptied every frame, down to its
+  silhouette if it has one. Lit: the hand's
   slot, the bag slot under the I panel's caret, and a drag's start.
 - **Centre:** the reticle or scope (`reticle.py`). The reticle's four ticks stand off by the held
   gun's accuracy cloud: `ReticleSpread` (weapon component) × half the viewport width, capped at

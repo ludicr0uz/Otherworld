@@ -50,6 +50,7 @@ from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.steady import _author_steady
 from combat.weapon_component.use import _author_use
 from combat.weapon_component.wear import _author_take_off, _author_wear_gate
+from combat.weapon_component.wear_drag import _author_wear_request
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 
 # A probe's stand-in for the fire key's press: no key can be injected into a
@@ -421,6 +422,8 @@ def _author_wc_tick(ed, tick):
 
     # --- take a garment off (wear.py): the I panel's request ---------------
     flight_exits = _author_take_off(ed, flight_exits, 1040, 15800)
+    # --- and a slot's garment dragged onto the worn grid (wear_drag.py) -----
+    flight_exits = _author_wear_request(ed, flight_exits, 6400, 15800)
 
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.

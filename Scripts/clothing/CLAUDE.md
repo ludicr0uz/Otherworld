@@ -44,10 +44,18 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
   component's own Tick serves it (into the bag while there is room, `HasRoom`: a bag slot
   or the hand free; the slot emptied).
   The HUD never touches the bag.
-- **The worn panel** sits bottom right, over the backpack, and is always shown (the menu
-  hides it): one row per slot, the worn garment's `DisplayName` or `-`. **I** opens the
-  inventory: the backpack shows under it, the caret runs over the worn rows and then the
-  bag. It does not pause; the walk is held while it is open (its own `SetIgnoreMoveInput`
+- **The mouse does both, in the I panel** (`graphics_menu/inv_drag.py` asks,
+  `probes/probe_clothing_drag.py` checks): a worn garment dragged onto the hand or a bag
+  slot is taken off into it (`TakeOffTo` with `TakeOffSlot`; a filled slot or a weapon
+  slot sends it to the bag's first free one), and a carried garment dragged onto the worn
+  grid is worn (`WearRequest`, a slot code: `weapon_component/wear_drag.py`), from the bag
+  or the hand, into its own slot whichever cell it lands on; one already worn there takes
+  the slot it left.
+- **The worn panel** sits bottom right, over the backpack, and both are always shown (the
+  menu hides them): one inventory slot per worn slot, in two rows of four, showing the worn
+  garment's icon, or the garment's translucent silhouette while nothing is worn there. No
+  text. **I** opens the inventory: the caret (a lit slot) runs over the worn slots and
+  then the bag, and the mouse drags. It does not pause; the walk is held while it is open (its own `SetIgnoreMoveInput`
   edge, `WearStill`), the cursor shows with it, and with the loot window open as well the
   arrows and Enter are the loot window's.
 - **The test garments**: one of each, in a row across the view 3 m in front of
@@ -81,5 +89,5 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
   what was worn is lost on save and exit.
 - No loot table names a garment yet (`Scripts/loot/tables.py`); a looted one would go into
   the bag like any item.
-- **Still needs a play session:** the I key and the panel's look (now scaled to 0.75 over the
-  bag), the cursor on its rows, and how the stand-in models read on the ground.
+- **Still needs a play session:** the I key and the panel's look, the cursor on its
+  slots, dragging a garment on and off, and how the stand-in models read on the ground.

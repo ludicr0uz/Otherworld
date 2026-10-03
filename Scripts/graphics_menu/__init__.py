@@ -7,7 +7,8 @@ The screens (widget trees, authored through the UMGToolSet plugin)
   umg_consts      screen paths, the widget names the HUD writes, labels, layout,
                   palette -- constants only
   umg_author      building a Widget Blueprint's tree from Python: add, style, slot
-  wbp_parts       WBP_MenuRow (caret, label, value) and WBP_InventorySlot
+  wbp_parts       WBP_MenuRow (caret, label, value), WBP_InventorySlot (with
+                  its empty silhouette, GhostTexture) and the grid of slots
   wbp_hud         WBP_HUD: survival bars (bottom left), kills, banner, the hand
                   slot over the weapon slots with HP and stamina under them,
                   the Kit (worn panel over the bag, bottom right), FPS; an icon
@@ -25,12 +26,15 @@ The HUD graph that shows and writes them
   hud_flash       a stat bar's group blinking while the bar is low
   stamina_bar     the stamina bar's fill, amber while sprinting
   survival_bars   hunger/thirst/temperature fills and the debuff names
-  hud_inventory   the inventory's slots (hand, weapons, bag: SlotItems) and the
-                  held item's name; the bag shown with I
-  inv_consts      the inventory's widgets, the drag's variables, the caret's
-                  run from the worn rows into the bag
+  hud_inventory   the inventory's slots (hand, weapons, bag: SlotItems), all
+                  always shown, an empty one's silhouette, and the held
+                  item's name
+  inv_consts      the inventory's widgets, the drag's variables and cells (the
+                  worn ones too), the weapon slots' silhouettes, the caret's
+                  run from the worn slots into the bag
   inv_drag        DrawHUD, the I panel open: the slot under the cursor, a drag
-                  (MoveFrom/MoveTo) and a click (SlotRequest)
+                  (MoveFrom/MoveTo; a worn garment off, TakeOffTo; a carried
+                  one on, WearRequest) and a click (SlotRequest, the take-off)
   fps             the FPS readout, always on screen
   profile_draw    the save-and-exit countdown banner
   settings_page   the settings page's values and hint; pushing settings onto the weapon
@@ -86,9 +90,11 @@ Input, settings and state
   wear_tick       the I panel's Tick fragment: keys, the take-off (TakeOffSlot)
                   or a bag slot to hand (SlotRequest) asked of the weapon
                   component, the walk held while open
-  wear_draw       DrawHUD: the worn rows (what Worn holds, always shown), and
-                  with the I panel open the caret, the mouse and the drag
-  wbp_wear        WBP_HUD's worn panel (called from wbp_hud, in the Kit)
+  wear_draw       DrawHUD: the worn slots (Worn's icons, or each slot's
+                  silhouette; always shown), and with the I panel open the
+                  lit caret, the mouse and the drag
+  wbp_wear        WBP_HUD's worn panel, a grid of inventory slots (called from
+                  wbp_hud, in the Kit), and the portrait
   legal_consts    the proprietary notices' words and places, WATERMARK_RECIPIENT
   wbp_legal       WBP_MainMenu's LegalNotice and WBP_HUD's Watermark (called
                   from wbp_screens and wbp_hud)

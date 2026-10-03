@@ -90,6 +90,7 @@ from combat.heat import build_hot_material                        # noqa: E402
 from combat.throw_arc import build_throw_arc                      # noqa: E402
 from combat.throw_pose import build_throw_ready                   # noqa: E402
 from combat.paths import AMMO_BP_PATH, HEALTH_BP_PATH             # noqa: E402
+from combat.player_gait import patch_gait                         # noqa: E402
 from combat.hit_bodies import fit_hit_bodies                      # noqa: E402
 from combat.ragdoll import tune_ragdolls                          # noqa: E402
 from combat.settings_savegame import build_settings_savegame      # noqa: E402
@@ -134,6 +135,8 @@ def main():
     # The crouch and the crawl clips under everything else (or none, and the
     # body poses above do it procedurally).
     patch_stance_clips(skin)
+    # The jog's speed onto the blend space's jog row, or the player walks.
+    patch_gait(skin)
 
     # Before the weapons: the shotgun's row names it, and its grip is solved
     # in it.

@@ -13,17 +13,24 @@ And its direction (sprint_tuning.py): only while the player steers within 60
 degrees of the way the character faces.
 """
 
+import unreal
+
 from combat.player_tuning import (
     JOG_SPEED, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE, cms, table,
 )
 from combat.verify.fixtures import char, w, wg
 from combat.verify.common import (
-    BEL, PIN, cdo, check, has_in_pin, in_pins, num_pin, out_pins, pin_value,
+    BEL, BGE, PIN, cdo, check, has_in_pin, in_pins, load, num_pin, out_pins,
+    pin_value,
 )
 from combat.sprint_tuning import (
     SPRINT_AHEAD_VAR, SPRINT_CONE_HALF_ANGLE_DEG, SPRINT_CONE_MIN_DOT,
     SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR,
 )
+from combat.player_gait import (
+    JOG_ROW_CMS, STOCK_DIR, gait_scale, is_scale_node, speed_feeders,
+)
+from combat.skin import player_skin
 from combat.tuning import COMBAT
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 
@@ -149,6 +156,42 @@ def check_sprint_forward():
               _feeders(latches[0], SPRINT_SPENT_VAR)))
 
 
+def check_player_gait():
+    """The jog plays the jog clip: the body's anim Blueprint scales GroundSpeed
+    onto the blend space's jog row (player_gait.py)."""
+    skin = player_skin()
+    if skin.anim_bp.startswith(STOCK_DIR):
+        unreal.log_warning("[VERIFY] player gait: the mannequin's anim "
+                           "Blueprint, left in cm/s")
+        return
+    ed = BGE.get_graph_editor_by_name(load(skin.anim_bp), "EventGraph")
+    _setter, feeders = speed_feeders(ed)
+    scales = [n for n in feeders if is_scale_node(n)]
+    check("the player's anim Blueprint scales GroundSpeed before the blend "
+          "space reads it",
+          len(feeders) == 1 and len(scales) == 1
+          and {"Vector Length XY"} == {_title(f) for f in _feeders(scales[0], "A")},
+          str([_title(n) for n in feeders]))
+    scale = num_pin(scales[0], "B") if scales else None
+    check(f"...by {JOG_ROW_CMS:g} over the jog's speed, so at "
+          f"player_tuning.csv's jog the blend space is on its jog row, not "
+          f"between it and the walk's",
+          scale is not None and abs(scale - gait_scale()) < 1e-3
+          and abs(COMBAT.jog_speed_cms * scale - JOG_ROW_CMS) < 1.0,
+          f"x {scale}, want {gait_scale():.4f}")
+    bs = load(skin.anim_bp.replace("ABP_Unarmed", "BS_Idle_Walk_Run"))
+    rows = {}
+    for s in (bs.get_editor_property("sample_data") if bs else []):
+        clip = s.get_editor_property("animation")
+        rows.setdefault(round(s.get_editor_property("sample_value").y, 1), set()).add(
+            "Jog" if clip and "_Jog_" in clip.get_name() else "other")
+    check(f"...and that row, at {JOG_ROW_CMS:g}, holds the jog clips alone, as the "
+          f"blend space was baked",
+          rows.get(JOG_ROW_CMS) == {"Jog"} and len(rows) == 3
+          and len(bs.get_editor_property("sample_data")) == 27,
+          str({k: sorted(v) for k, v in sorted(rows.items())}))
+
+
 def check_sprint_rates():
     tuned = table()
     jog = cdo(char).get_editor_property("character_movement").get_editor_property(
@@ -187,3 +230,4 @@ def run():
     check_sprint_latch()
     check_sprint_forward()
     check_sprint_rates()
+    check_player_gait()

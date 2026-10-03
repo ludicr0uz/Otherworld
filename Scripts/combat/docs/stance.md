@@ -5,6 +5,18 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 ## Sprint
 
 - The jog is 400 cm/s, the sprint 600 while stamina lasts: 8 s from full, refilling in 8.33 s.
+- **The jog plays the jog clip** (`player_gait.py`). The body's blend space has its walk
+  clips at 300 cm/s and its jog clips at 600, so at the 400 cm/s jog the player moved in a
+  blend that was two thirds walk. The body's anim Blueprint now sets
+  `GroundSpeed = VectorLengthXY(Velocity) x 600 / jog speed`: the jog is on the jog row, the
+  aim's half speed on the walk row, and a sprint, past the last row, keeps the jog clip.
+  `GroundSpeed` is therefore in the blend space's units, not cm/s. The scale is baked from
+  `player_tuning.csv` by the weapons build. `probes/probe_player_gait.py` measures the foot's
+  lift against each clip's.
+  - **A blend space's rows cannot be moved from Python.** The game looks samples up in data
+    baked by `UBlendSpace::ResampleData`, which only the blend space editor's widget calls:
+    samples moved, added or reordered through `sample_data` save, but the game reads the old
+    layout by index (tried: standing still played the jog clips).
   The pack runs at 600, so a sprint keeps a zombie's distance and no more.
 - **The numbers are `player_tuning.csv`'s** (`player_tuning.py`: m/s and seconds), laid over
   `COMBAT` and tuned in game by the menu's PLAYER SETTINGS tab

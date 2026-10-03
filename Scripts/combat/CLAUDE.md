@@ -519,6 +519,10 @@ These are feel checks a headless run can't do:
 - sprint held with an aim key until the stamina runs out: no key can be pressed in a headless
   game, so the latch setting (`SprintSpent`, `docs/stance.md`) is checked on the graph only.
   Whether needing to let go of Shift before the next sprint feels right;
+- the jog (`player_gait.py`): the jog clip covers about 470 cm/s and plays at rate 1 under a
+  400 cm/s jog, so the feet slide a little; a sprint plays the same clip at the same rate
+  (there is no sprint clip), so only the ground's speed tells the two apart; and a jog nudged
+  on the PLAYER SETTINGS tab drifts off the jog row until the next weapons build;
 - the carry (`carry_tuning.py`): how a rifle reads jogging in one hand with the arm's swing
   (there is no two-handed carry clip), whether the gun coming up in 0.25 s behind the first
   shot reads, and whether 1.5 s is the right time to keep it up after the last one;

@@ -37,6 +37,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     full bar sprints and an empty one refills (s); what the
                     menu's PLAYER SETTINGS tab saves and COMBAT is built from
   player_pace       the jog: the character's own MaxWalkSpeed, set at install
+  player_gait       the jog plays the jog clip: GroundSpeed scaled in the
+                    body's anim Blueprint so the jog's speed is the blend
+                    space's jog row
   carry_tuning      the carry's numbers and names: how long a shot keeps the
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered
   chop_tuning       chopping a tree: blows per piece of wood, where it lands

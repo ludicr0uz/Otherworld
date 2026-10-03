@@ -5,7 +5,7 @@ What a preset *is* -- its scalability level, console overrides, grass layers
 and lighting, and the look numbers shared by all four -- is one row of the
 graphics table (gfx_stats.py, graphics_tuning.csv). gfx_tune_tick.py hands
 the row to the HUD's BP_GraphicsTuner component whenever Quality moves, and
-gfx_tuner.py applies it. So the GRAPHICS TUNING tab's preset row (the one
+gfx_tuner.py applies it. So the GRAPHICS SETTINGS tab's preset row (the one
 place the player picks a preset) and BeginPlay's default go through one path.
 """
 
@@ -14,7 +14,7 @@ from collections import namedtuple
 from combat.graph import _at, _connect, _pin, _set
 from graphics_menu.gfx_stats import PRESET_LABELS, default_preset
 
-# One preset, in the order the GRAPHICS TUNING tab's preset row steps through.
+# One preset, in the order the GRAPHICS SETTINGS tab's preset row steps through.
 Preset = namedtuple("Preset", "label")
 PRESETS = tuple(Preset(label) for label in PRESET_LABELS)
 # The preset a player with no graphics save starts on: the row

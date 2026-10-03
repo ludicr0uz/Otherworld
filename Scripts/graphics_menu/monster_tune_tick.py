@@ -1,10 +1,10 @@
-"""The MONSTER TUNING tab's HUD Tick fragment: the tab's keys, nudge and save
-(tune_tick.author_tab_flow, shared with GUN TUNING), then the table onto
+"""The MONSTER SETTINGS tab's HUD Tick fragment: the tab's keys, nudge and save
+(tune_tick.author_tab_flow, shared with GUN SETTINGS), then the table onto
 every live wanderer.
 
     its M panel row taken   MonTuneOpen = NOT MonTuneOpen; TuneOpen and
                             WorldTuneOpen = false
-    MenuOpen AND MonTuneOpen: Up/Down, Left/Right, Enter as GUN TUNING
+    MenuOpen AND MonTuneOpen: Up/Down, Left/Right, Enter as GUN SETTINGS
     MonTuneTouched -> for each creature c (MON_CONTROLLERS, in table order):
                       every live BP_ForestWandererAI_<c> (GetAllActorsOfClass)
                       gets each Tune* variable := MonTuneValues[c, stat]

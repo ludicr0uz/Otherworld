@@ -7,7 +7,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 - The jog is 400 cm/s, the sprint 600 while stamina lasts: 8 s from full, refilling in 8.33 s.
   The pack runs at 600, so a sprint keeps a zombie's distance and no more.
 - **The numbers are `player_tuning.csv`'s** (`player_tuning.py`: m/s and seconds), laid over
-  `COMBAT` and tuned in game by the menu's PLAYER TUNING tab
+  `COMBAT` and tuned in game by the menu's PLAYER SETTINGS tab
   (`graphics_menu/player_tune_*.py`). The graph reads variables, not literals: `BaseSpeed`
   (the jog, cached at BeginPlay off the character's `MaxWalkSpeed`, which
   `player_pace.set_jog_speed` sets), `SprintSpeed`, `StaminaDrainPerSecond`,

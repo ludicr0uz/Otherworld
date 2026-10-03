@@ -32,7 +32,7 @@ RANDOM_START_VAR = "RandomStart"   # BeginPlay picks Clock anywhere in the cycle
 STATE_FLOAT_VARS = ("DayAmount",)
 # The look multipliers, all 1 as built: the Tick graph scales the sun's and
 # the moon's light, the stars, the sky light, the fog's density and the two
-# discs by them. The M panel's GRAPHICS TUNING tab writes them
+# discs by them. The M panel's GRAPHICS SETTINGS tab writes them
 # (graphics_menu/gfx_tuner_sky.py); nothing else does.
 SUN_SCALE_VAR, MOON_SCALE_VAR = "SunScale", "MoonScale"
 STAR_SCALE_VAR, AMBIENT_SCALE_VAR, FOG_SCALE_VAR = "StarScale", "AmbientScale", "FogScale"

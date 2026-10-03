@@ -21,10 +21,10 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 - **M** toggles the menu in play: the only key it has. On the title it cannot be shut.
 - **Up / Down** move the menu's caret and **Enter** takes the row it is on; a click on a
   row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
-- **The rows:** `new game` (in play it reads `resume` and shuts the menu), `settings` (the
-  settings page), `debug` (wanderer numbers, pellet tracers and impact damage,
-  the wanderers' sight cones; not the FPS readout, which is always on), `save and exit`, `dev-all-guns`, `gun tuning`,
-  `monster tuning`, `world tuning`, `player tuning`, `graphics tuning`, `exit game` (quits to the desktop,
+- **The rows:** `New Game` (in play it reads `Resume` and shuts the menu), `Settings` (the
+  settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
+  the wanderers' sight cones; not the FPS readout, which is always on), `Save and Exit`, `Dev All Guns`, `Gun Settings`,
+  `Monster Settings`, `World Settings`, `Player Settings`, `Graphics Settings`, `Exit Game` (quits to the desktop,
   saving nothing). The quality presets are not
   rows: Low / Medium / High / Custom is the graphics tab's first row.
 - **The settings page or a tuning tab stands in place of the menu's rows**, and its **BACK**
@@ -209,7 +209,7 @@ mouse is the camera's.
 - **Probe:** `probe_umg_screens.py` calls `ReceiveDrawHUD` itself (a `-nullrhi` run never
   renders, so the engine never does) and reads the widgets back.
 
-## Presets and the GRAPHICS TUNING tab (`gfx_*.py`, `presets.py`)
+## Presets and the GRAPHICS SETTINGS tab (`gfx_*.py`, `presets.py`)
 
 A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 28 numbers), and
 `graphics_tuning.csv` is the tracked copy. The defaults are what the presets always did:
@@ -221,7 +221,7 @@ A preset is **one row of the graphics table** (`gfx_stats.GFX_STATS`, 28 numbers
 | High | 3 (Epic) | 3 | 100 | 100% | 70 m / 300 m | 3 | off |
 | Custom (starts as) | 3 (Epic) | 3 | 100 | 100% | 70 m / 300 m | 4 | **on** |
 
-**The M panel's `graphics tuning` row** opens the tab (`GfxTuneOpen`). The subject row is
+**The M panel's `Graphics Settings` row** opens the tab (`GfxTuneOpen`). The subject row is
 the preset: Left/Right there pick Low / Medium / High / Custom, and it is the only place a
 preset is picked. The rows under it are that preset's numbers. Under the list, the
 **SAVE DEFAULT** row (Enter on it, or a click) saves all four presets, and the picked one
@@ -453,9 +453,9 @@ loot window, in play only. Traps met here:
 - **The cursor's wish is an OR tree** (MenuOpen, LootOpen, WearOpen); `cursor_checks`
   walks it.
 
-## The GUN TUNING tab (`tune_*.py`, `wbp_tune.py`)
+## The GUN SETTINGS tab (`tune_*.py`, `wbp_tune.py`)
 
-A developer tab in the M panel's place: **its row** (`gun tuning`) opens it (`TuneOpen`). Up/Down pick
+A developer tab in the M panel's place: **its row** (`Gun Settings`) opens it (`TuneOpen`). Up/Down pick
 the gun row or one of the 21 stat rows (`combat/gun_tuning.TUNE_STATS`); Left/Right change the
 gun, or move the stat one step (never under its minimum); **Enter** saves
 `Scripts/combat/gun_tuning.csv`.
@@ -491,7 +491,7 @@ gun, or move the stat one step (never under its minimum); **Enter** saves
   `wbp_tune` over the same. Only the apply differs. The verifier tells the two save calls apart
   by their command.
 
-## The MONSTER TUNING tab (`monster_tune_*.py`)
+## The MONSTER SETTINGS tab (`monster_tune_*.py`)
 
 **Its M panel row** opens it (`MonTuneOpen`; opening a tab shuts the others). The
 creature row, then the 28 stats of `npc/monster_tuning.MONSTER_STATS`: aggro range, aggro cone
@@ -500,11 +500,11 @@ speed, damage per hit, melee range, time between swings, health; then the wendig
 (`hunt:` rows: the charge range, the catch-up range, the leg speed, the wait behind a tree, the
 time between two turns) and what fire does to it (`fire:` rows: the range and the cone it is
 held off in, the ring it circles on and how fast, the time between two turns, how long until it
-gives up and how long it runs). Same keys as GUN TUNING; **Enter** saves
+gives up and how long it runs). Same keys as GUN SETTINGS; **Enter** saves
 `Scripts/npc/monster_tuning.csv`.
 
 - **The list scrolls:** 14 rows at a time behind a scroll bar (`MON_VISIBLE_ROWS`,
-  `TuneTab.visible_rows`, as GRAPHICS TUNING's), so here the wheel moves the caret, not the
+  `TuneTab.visible_rows`, as GRAPHICS SETTINGS's), so here the wheel moves the caret, not the
   value under it.
 - **The `hunt:` and `fire:` rows are on every creature,** since the tab is one table of
   creatures x stats, but only a creature that hunts (`NPC_STALK_ROAR`) or fears fire
@@ -539,12 +539,12 @@ gives up and how long it runs). Same keys as GUN TUNING; **Enter** saves
 - **Still needs a play session:** how the scrolling panel reads, and how a tuned
   wanderer feels.
 
-## The PLAYER TUNING tab (`player_tune_*.py`)
+## The PLAYER SETTINGS tab (`player_tune_*.py`)
 
 **Its menu row** opens it (`PlayerTuneOpen`). One subject row (`player`), then
 `combat/player_tuning.PLAYER_STATS`: the jog's speed and the sprint's (m/s, step 0.25), how
 long a full stamina bar sprints and how long an empty one refills (seconds, step 0.5). Same
-keys as GUN TUNING; **Enter** saves `Scripts/combat/player_tuning.csv`.
+keys as GUN SETTINGS; **Enter** saves `Scripts/combat/player_tuning.csv`.
 
 - **The table is in a person's units, the component in its own.** Once touched
   (`PlayerTuneTouched`), every Tick: the pawn's `BP_WeaponComponent`, a cast, then
@@ -568,12 +568,12 @@ keys as GUN TUNING; **Enter** saves `Scripts/combat/player_tuning.csv`.
 - **Still needs a play session:** how a 4 m/s jog and a 6 m/s sprint feel against the
   wanderers (a zombie runs at 6), and how the jog clip reads at the slower speed.
 
-## The WORLD TUNING tab (`world_tune_*.py`)
+## The WORLD SETTINGS tab (`world_tune_*.py`)
 
 **Its M panel row** opens it (`WorldTuneOpen`). One subject row (`world`), then
 `world/world_tuning.WORLD_STATS`: the time of day (hours, step 0.5), the day's length and the
 night's (seconds, step 30), and the night's cold (Temperature points a second, step 0.01,
-`world/night_cold.py`). Same keys as GUN TUNING; **Enter** saves all but the hour to
+`world/night_cold.py`). Same keys as GUN SETTINGS; **Enter** saves all but the hour to
 `Scripts/world/world_tuning.csv` (the hour is never saved: a level starts at a random one).
 
 - **The hour is a 24-hour dial over the cycle's `Clock`:** sunrise 06:00, sunset 18:00, each

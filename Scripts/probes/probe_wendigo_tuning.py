@@ -1,4 +1,4 @@
-"""The MONSTER TUNING tab's "hunt:" and "fire:" rows change a live wendigo's
+"""The MONSTER SETTINGS tab's "hunt:" and "fire:" rows change a live wendigo's
 hunt at once (npc/monster_tuning.MONSTER_STATS, the TuneStalk* and TuneWard*
 variables its Stalk and Ward steps read).
 

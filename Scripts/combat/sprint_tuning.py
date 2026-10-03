@@ -19,7 +19,7 @@ SPRINT_CONE_MIN_DOT = round(math.cos(math.radians(SPRINT_CONE_HALF_ANGLE_DEG)), 
 SPRINT_AHEAD_VAR = "SprintAhead"
 
 # What the sprint graph reads instead of literals, so the menu's PLAYER
-# TUNING tab can change them in a running game (graphics_menu/
+# SETTINGS tab can change them in a running game (graphics_menu/
 # player_tune_tick.py). Built from COMBAT; cm/s and stamina points a second.
 # The jog has no variable of its own: it is BaseSpeed, cached off the
 # character at BeginPlay.

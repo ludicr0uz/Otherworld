@@ -47,7 +47,7 @@ from npc.paths import (
 )
 from probes.probe_knife import _file
 
-# The tuned numbers (the MONSTER TUNING tab's rows): monster_tuning.csv's, as built.
+# The tuned numbers (the MONSTER SETTINGS tab's rows): monster_tuning.csv's, as built.
 _SPEC = monster_specs("Wendigo")
 WARD_FLEE_S = _SPEC["ward_flee_s"]
 WARD_HALF_ANGLE_DEG = _SPEC["ward_half_angle_deg"]

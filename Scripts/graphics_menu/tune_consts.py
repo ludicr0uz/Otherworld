@@ -1,4 +1,4 @@
-"""The M panel's GUN TUNING tab: its row and keys, the HUD's variables, the widget
+"""The M panel's GUN SETTINGS tab: its row and keys, the HUD's variables, the widget
 names and words, and the Python command its save runs. Constants only, so
 wbp_tune (the layout), tune_tick and tune_draw (the graph), tune_save (the
 save, run inside the game) and tune_checks read one table.
@@ -24,7 +24,7 @@ from combat.gun_tuning import TUNE_STATS
 from graphics_menu.tune_tab import TuneTab, save_command
 
 TUNE_ACTION = "gun_tuning"         # the M panel row that opens the tab
-TUNE_ROW_LABEL = "gun tuning"
+TUNE_ROW_LABEL = "Gun Settings"
 
 # The HUD's variables. The keys only raise TuneNudge / TuneSaveRequested and
 # Tick serves them, so a probe can tune and save without a keyboard.
@@ -53,7 +53,7 @@ TUNE_ROW_COUNT = 1 + STAT_COUNT
 TUNE_PANEL = "TunePanel"
 TUNE_ROWS_BOX = "TuneRows"
 TUNE_SAVED_TEXT = "TuneSavedText"
-TUNE_TITLE_TEXT = "GUN TUNING"
+TUNE_TITLE_TEXT = "GUN SETTINGS"
 TUNE_GUN_LABEL = "gun"
 TUNE_ROW_LABELS = (TUNE_GUN_LABEL,) + tuple(s[2] for s in TUNE_STATS)
 TUNE_HINT_TEXT = ("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "

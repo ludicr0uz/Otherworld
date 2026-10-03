@@ -139,7 +139,7 @@ class CombatConfig:
     limb_multiplier: float = 0.75
 
     # --- sprint and stamina --------------------------------------------------
-    # player_tuning.csv's numbers (the menu's PLAYER TUNING tab saves it), in
+    # player_tuning.csv's numbers (the menu's PLAYER SETTINGS tab saves it), in
     # the component's units. The jog is the character's own MaxWalkSpeed
     # (player_pace.set_jog_speed): BeginPlay caches that into BaseSpeed and
     # sprint restores it, so the graph holds no walking-speed literal.

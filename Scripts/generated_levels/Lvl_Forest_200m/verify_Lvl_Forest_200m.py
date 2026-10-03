@@ -409,7 +409,7 @@ if EXPECTED_NPCS:
         check("NPC Melee Cooldown Variable", "NextAttackTime" in names,
               f"(variables: {sorted(names)})")
         # The numbers are the controller's TuneMelee* variables (the
-        # M panel's MONSTER TUNING tab writes them live; npc/tuned.py),
+        # M panel's MONSTER SETTINGS tab writes them live; npc/tuned.py),
         # so the check is each variable's default and that the graph
         # reads it. A value tuned into npc/monster_tuning.csv lands
         # here too: regenerate the level to move these expectations.

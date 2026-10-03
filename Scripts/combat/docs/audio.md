@@ -27,7 +27,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - `A_Att_WendigoRoar`: 1.5 m → 1.75 × the wendigo's aggro range (`ROAR_REACH_X_AGGRO`;
     35 m of sight, so 61 m), so a roar is always heard by the player it is for. The range is
     read from `npc/monster_tuning.csv` when the weapons build runs: after saving a new aggro
-    range from the MONSTER TUNING tab, re-run `build_weapons_and_combat.py` (the verifier
+    range from the MONSTER SETTINGS tab, re-run `build_weapons_and_combat.py` (the verifier
     fails until then). Capped at the 100 m ceiling;
   - `A_Att_Foley`: 1 → 15 m.
 - **A sound with no attenuation plays at full volume from anywhere.** `apply_attenuation()` sets

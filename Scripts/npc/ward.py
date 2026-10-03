@@ -35,7 +35,7 @@ fails, and the charge and the swing are the ordinary ones.
 
 The range, the half angle (through DegCos), the ring, the prowl speed, the
 time between two turns, the hold and the flight are the controller's
-TuneWard* variables (npc/tuned.py: the MONSTER TUNING tab's "fire:" rows),
+TuneWard* variables (npc/tuned.py: the MONSTER SETTINGS tab's "fire:" rows),
 defaulted to npc_ward.py's numbers.
 
 The fire is the player's: FireWard on BP_WeaponComponent (combat/paths.py),

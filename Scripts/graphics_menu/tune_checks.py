@@ -1,4 +1,4 @@
-"""verify_graphics_menu.py's checks for the GUN TUNING tab (tune_tick,
+"""verify_graphics_menu.py's checks for the GUN SETTINGS tab (tune_tick,
 tune_draw, wbp_tune, and gun_tuning.csv reaching the guns). Here rather than
 in the verifier, which is over its size budget.
 """
@@ -90,7 +90,7 @@ def _check_widgets(check):
 
 
 def _check_graph(check, nodes):
-    # MONSTER TUNING has its own, with its own command (monster_tune_checks).
+    # MONSTER SETTINGS has its own, with its own command (monster_tune_checks).
     calls = [n for n in nodes if "PythonCommand" in _pins(n)]
     runs = [n for n in calls if str(BEL.find_input_pin(n, "PythonCommand")
                                     .get_pin_value()) == TC.TUNE_SAVE_COMMAND]

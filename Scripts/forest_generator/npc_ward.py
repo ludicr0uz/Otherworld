@@ -5,7 +5,7 @@ after long enough of being held off it runs away.
 Constants only -- no `unreal` import -- like npc_stalk.py and npc_strafe.py.
 NPC_WARD_RANGE_CM, _HALF_ANGLE_DEG, _RING_CM, _SPEED_SCALE, _TURN_*_S, _HOLD_S
 and _FLEE_S are defaults: the game reads the controller's TuneWard* variables,
-which npc/monster_tuning.csv and the M panel's MONSTER TUNING tab can change
+which npc/monster_tuning.csv and the M panel's MONSTER SETTINGS tab can change
 (npc/monster_tuning.py).
 The builder is Scripts/npc/ward.py, the checks Scripts/npc/verify_ward.py
 and, in the game, Scripts/probes/probe_wendigo_ward.py.

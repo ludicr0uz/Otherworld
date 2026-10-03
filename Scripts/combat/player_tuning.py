@@ -1,7 +1,7 @@
 """The player tuning table: player_tuning.csv beside this module, one row per
 setting (``setting,value``).
 
-The CSV is the tracked copy of the numbers the in-game PLAYER TUNING tab (the
+The CSV is the tracked copy of the numbers the in-game PLAYER SETTINGS tab (the
 menu's player tuning row, graphics_menu/player_tune_*.py) saves: how fast the
 player jogs and sprints, how long a full stamina bar sprints for and how long
 an empty one takes to refill. tuning.py lays it over its literals, and

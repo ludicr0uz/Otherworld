@@ -33,7 +33,7 @@ The launch is throw_launch.py's: a throw is sent at the point the reticle
 rests on, pitched to pass through it, so the arc stands under the reticle and
 ends on it. Where the item's speed cannot reach that point, or it is the sky,
 the throw is tipped above the view by the held item's own ThrowArcDegrees
-(throw_tuning.THROW_PITCH_VAR), which the GUN TUNING tab can move per gun.
+(throw_tuning.THROW_PITCH_VAR), which the GUN SETTINGS tab can move per gun.
 The speed is the item's ThrowSpeed: a melee weapon's is fast, so it flies
 flat and reaches far (throw_tuning.MELEE_THROW), and it leaves the hand
 squared up to the throw (throw_flight._author_square).

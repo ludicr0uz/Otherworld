@@ -142,7 +142,7 @@ def probe(p):
     p.check("the item stays in hand while the arc is shown",
             p.get(wc, "Held") == item and p.get(wc, THROWN_VAR) is None)
 
-    # The arc's height is the held item's own number, which GUN TUNING writes.
+    # The arc's height is the held item's own number, which GUN SETTINGS writes.
     lob = _peak(dots)
     p.check(f"the default arc ({THROW_PITCH_UP_DEG:g} deg) is a lob over the hand",
             p.get(item, THROW_PITCH_VAR) == THROW_PITCH_UP_DEG and lob > LOB_CM,

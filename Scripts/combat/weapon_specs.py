@@ -170,7 +170,7 @@ def _weapon_specs():
     are merged into each row here, so the accuracy of all five reads as one
     table.
 
-    Every number the GUN TUNING page can change is then overridden by its
+    Every number the GUN SETTINGS page can change is then overridden by its
     cell in gun_tuning.csv, so the literals here are the defaults a missing
     cell falls back to, and the CSV is what gets built.
 
@@ -237,7 +237,7 @@ def _weapon_specs():
              interval=SNIPER_FIRE_INTERVAL, reload_s=SNIPER_RELOAD_SECONDS,
              shot_volume=SHOT_VOLUME_CM["Sniper"]),
     )
-    # gun_tuning.csv last: what the in-game GUN TUNING page saved wins over
+    # gun_tuning.csv last: what the in-game GUN SETTINGS page saved wins over
     # every literal above (gun_tuning.py lists the columns it may hold).
     tuned = read_table()
     for spec in specs:

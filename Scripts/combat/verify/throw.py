@@ -127,7 +127,7 @@ def check_arc_angle():
            for sp in _weapon_specs()
            for got in [_item_cdo(sp["path"]).get_editor_property(THROW_PITCH_VAR)]
            if abs(got - float(sp[THROW_PITCH_COLUMN])) > 1e-4]
-    check("...and each gun holds its own, the GUN TUNING tab's `throw_arc`",
+    check("...and each gun holds its own, the GUN SETTINGS tab's `throw_arc`",
           not bad, "; ".join(bad))
     tips = [n for n in launch_nodes() if _title(n) == f"Get {THROW_PITCH_VAR}"]
     held = [_title(PIN.get_owning_node(q)) for n in tips

@@ -36,7 +36,7 @@ def _author_stats_and_voice(ed, exec_ins, x0, y0, voice_min, voice_max):
                                               no  ----------------------> on
 
     AppliedHealth starts at 0, so the first pass after possession applies it;
-    after that only the MONSTER TUNING tab changing TuneHealth does, and a
+    after that only the MONSTER SETTINGS tab changing TuneHealth does, and a
     live wanderer then stands at its new maximum, full.
 
     Health is applied HERE, from this controller's TuneHealth, rather

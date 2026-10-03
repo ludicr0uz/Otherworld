@@ -1,4 +1,4 @@
-"""The GUN TUNING tab's HUD Tick fragment: its keys, a nudge, the save, and
+"""The GUN SETTINGS tab's HUD Tick fragment: its keys, a nudge, the save, and
 the table written onto every carried gun.
 
     the M panel's row taken           TuneOpen = NOT TuneOpen, TuneRow = 0
@@ -27,7 +27,7 @@ the table written onto every carried gun.
                    after the guns only the throw's (gun_tuning.columns_of)
 
 The keys, the nudge and the save are any TuneTab's (tune_tab.py):
-author_tab_flow() is also MONSTER TUNING's (monster_tune_tick.py), and
+author_tab_flow() is also MONSTER SETTINGS's (monster_tune_tick.py), and
 opening any tab shuts the others. Only _author_apply is the guns'.
 
 Tick, not DrawHUD, like the loot window: the M panel does not pause, and a

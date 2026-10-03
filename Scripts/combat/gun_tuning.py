@@ -1,6 +1,6 @@
 """The gun tuning table: gun_tuning.csv beside this module, one row per gun.
 
-The CSV is the tracked copy of every number the in-game GUN TUNING page (the
+The CSV is the tracked copy of every number the in-game GUN SETTINGS page (the
 M panel's gun tuning tab, graphics_menu/tune_*.py) can change. It is written by that
 page's save (graphics_menu/tune_save.py) and read by weapon_specs._weapon_specs(),
 which lays each row over the literals there. So a value tuned in a game and

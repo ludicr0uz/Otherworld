@@ -166,7 +166,7 @@ def check_blades():
         cdo = _item_cdo(path)
         got = cdo.get_editor_property(THROW_DAMAGE_VAR)
         check(f"a thrown {name} takes {damage:g} HP (its gun_tuning.csv row's, "
-              "the GUN TUNING tab's `throw_damage`): more than a slash, since "
+              "the GUN SETTINGS tab's `throw_damage`): more than a slash, since "
               "the throw costs the weapon, and less than a wanderer's all",
               got == damage and COMBAT.knife_damage < damage < 100.0, str(got))
         turn, point = cdo.get_editor_property(LODGE_TURN_VAR), \

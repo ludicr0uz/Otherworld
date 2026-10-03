@@ -90,7 +90,7 @@ def check_breath_vars():
            for sp in _weapon_specs()
            for got in [_item_cdo(sp["path"]).get_editor_property(SWAY_RATE_VAR)]
            if abs(got - float(sp[SWAY_RATE_COLUMN])) > 1e-4]
-    check(f"every gun holds its own sway rate, the GUN TUNING tab's "
+    check(f"every gun holds its own sway rate, the GUN SETTINGS tab's "
           f"`{SWAY_RATE_COLUMN}` (the base's is {SWAY_RATE:g})",
           isinstance(base, float) and abs(base - SWAY_RATE) < 1e-9 and not bad,
           "; ".join(bad) or str(base))

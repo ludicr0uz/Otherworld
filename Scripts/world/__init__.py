@@ -8,7 +8,7 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
                        sun_state() does the Tick's sums in Python,
                        clock_to_hour() the tuning dial's
   world_tuning         world_tuning.csv: the lengths and the night's cold the
-                       M panel's WORLD TUNING tab saves, laid over
+                       M panel's WORLD SETTINGS tab saves, laid over
                        world_config's
   paths                /Game paths, class paths, the two actor tags
   sky_material         M_DayNightSky: the whole sky (gradient, glow, discs,

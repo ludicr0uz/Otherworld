@@ -1,4 +1,4 @@
-"""verify_graphics_menu.py's checks for the MONSTER TUNING tab
+"""verify_graphics_menu.py's checks for the MONSTER SETTINGS tab
 (monster_tune_tick, tune_draw and wbp_tune over MONSTER_TAB, and
 monster_tuning.csv reaching the controllers). Beside tune_checks.py, which
 checks the same machine for the guns.

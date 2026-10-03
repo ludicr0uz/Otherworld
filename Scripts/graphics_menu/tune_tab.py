@@ -1,9 +1,9 @@
 """TuneTab: what one developer tuning tab of the M panel is called -- its row
 in the panel, the HUD variables, the widget names and words, and the save's Python command.
 
-The GUN TUNING tab (tune_consts.GUN_TAB), the MONSTER TUNING tab
-(monster_tune_consts.MONSTER_TAB), the WORLD TUNING tab
-(world_tune_consts.WORLD_TAB) and the GRAPHICS TUNING tab
+The GUN SETTINGS tab (tune_consts.GUN_TAB), the MONSTER SETTINGS tab
+(monster_tune_consts.MONSTER_TAB), the WORLD SETTINGS tab
+(world_tune_consts.WORLD_TAB) and the GRAPHICS SETTINGS tab
 (gfx_tune_consts.GFX_TAB) are the same machine over a different table:
 tune_tick's keys, nudge and save, tune_draw's panel and wbp_tune's widgets
 all take a TuneTab. Only what the table is applied to differs
@@ -21,7 +21,7 @@ world_tune_tick: the day/night cycle; gfx_tune_tick: BP_GraphicsTuner).
     Enter                         save the whole table to its CSV; on BACK,
                                   shut the tab: the M panel's rows return
 
-A tab with a save_widget (GRAPHICS TUNING's SAVE DEFAULT) has a row for the
+A tab with a save_widget (GRAPHICS SETTINGS's SAVE DEFAULT) has a row for the
 save instead, between the list and BACK: Enter saves only with the caret on
 it, as does a click on it, and Enter on a number does nothing.
 

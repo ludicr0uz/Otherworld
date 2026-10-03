@@ -1,4 +1,4 @@
-"""The PLAYER TUNING tab's HUD Tick fragment: the tab's keys, nudge and save
+"""The PLAYER SETTINGS tab's HUD Tick fragment: the tab's keys, nudge and save
 (tune_tick.author_tab_flow, shared with the other tabs), then the table onto
 the player's weapon component, which owns the sprint.
 

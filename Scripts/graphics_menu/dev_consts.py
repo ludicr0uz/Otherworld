@@ -15,7 +15,7 @@ from combat.paths import (
 # umg_consts.PAUSE_ROW_ACTIONS) and its words. No key of its own: a row is
 # taken with Enter or a click.
 DEV_GUNS_ACTION = "dev_guns"
-DEV_GUNS_ROW_LABEL = "dev-all-guns"
+DEV_GUNS_ROW_LABEL = "Dev All Guns"
 
 # The HUD's variables. The row only raises the request; Tick serves it and
 # lowers it, so a probe can ask for the guns without a key press.

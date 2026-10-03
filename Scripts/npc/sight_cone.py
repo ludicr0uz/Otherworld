@@ -8,7 +8,7 @@
 
 The cone is the sight sense's own volume (senses._author_sight): the same
 origin, the same forward vector, and the same two Tune variables, so the MONSTER
-TUNING tab moves the drawn cone and the sense together. It is a full cone,
+SETTINGS tab moves the drawn cone and the sense together. It is a full cone,
 not a fan on the ground, because the test is a dot product in three
 dimensions. What it cannot show is the third condition, line of sight: a
 player inside the cone and behind a trunk is still unseen.

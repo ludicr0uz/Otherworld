@@ -2,7 +2,7 @@
 entry, holding this creature's numbers.
 
 Every sense, patrol, melee, speed and health fragment reads its number off
-one of these rather than a pin literal, so the M panel's MONSTER TUNING tab
+one of these rather than a pin literal, so the M panel's MONSTER SETTINGS tab
 can change a live wanderer by writing its controller (the HUD does, every
 Tick once something is tuned: graphics_menu/monster_tune_tick.py). Their
 defaults are the creature's monster_specs(), written onto the CDO after the

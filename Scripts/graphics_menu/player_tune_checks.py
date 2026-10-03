@@ -1,4 +1,4 @@
-"""verify_graphics_menu.py's checks for the PLAYER TUNING tab
+"""verify_graphics_menu.py's checks for the PLAYER SETTINGS tab
 (player_tune_tick, tune_draw and wbp_tune over PLAYER_TAB). Beside
 world_tune_checks.py, which checks the same machine for the day and night.
 player_tuning.csv reaching the character and BP_WeaponComponent is

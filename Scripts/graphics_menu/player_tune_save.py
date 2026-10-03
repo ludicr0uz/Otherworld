@@ -1,4 +1,4 @@
-"""The PLAYER TUNING tab's save, run inside the game by the HUD's
+"""The PLAYER SETTINGS tab's save, run inside the game by the HUD's
 ExecutePythonCommand (player_tune_consts.PLAYER_TUNE_SAVE_COMMAND) on Enter.
 
 It reads the live HUD's working table (PlayerTuneValues) and writes the jog's

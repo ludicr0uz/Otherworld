@@ -19,7 +19,7 @@ rule would be a new AgroSettings field and a branch at the top of the yes arm.
 The per-creature numbers are the controller's Tune* variables (npc/tuned.py),
 whose defaults are this creature's npc/monster_tuning.monster_specs(): the
 AgroSettings in forest_generator/npc_agro.py under monster_tuning.csv. The
-M panel's MONSTER TUNING tab writes them on a live wanderer.
+M panel's MONSTER SETTINGS tab writes them on a live wanderer.
 """
 
 import unreal

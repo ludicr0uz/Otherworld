@@ -56,7 +56,7 @@ def check_sight_cone(path):
           and fed("Direction") == ["GetActorForwardVector"],
           f"{fed('Origin')}, {fed('Direction')}")
     check(f"{tag}: ...{sight_range} long and {half} either side, so the MONSTER "
-          f"TUNING tab moves it",
+          f"SETTINGS tab moves it",
           fed("Length") == [f"Get {sight_range}"]
           and fed("AngleWidth") == [f"Get {half}"]
           and fed("AngleHeight") == [f"Get {half}"],

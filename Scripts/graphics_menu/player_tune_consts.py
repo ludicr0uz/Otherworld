@@ -1,11 +1,11 @@
-"""The menu's PLAYER TUNING tab: its row, the HUD's variables, the widget
+"""The menu's PLAYER SETTINGS tab: its row, the HUD's variables, the widget
 names and words, and the Python command its save runs. Constants only, so
 wbp_tune (the layout), player_tune_tick and tune_draw (the graph),
 player_tune_save (the save, run inside the game) and player_tune_checks read
 one table.
 
     the menu's row              opens the tab (tune_tab.py); BACK shuts it
-    Up / Down, Left / Right,    as GUN TUNING (tune_tab.py), over one subject,
+    Up / Down, Left / Right,    as GUN SETTINGS (tune_tab.py), over one subject,
     Enter                       "player": the jog's and the sprint's speed
                                 (m/s), how long a full stamina bar sprints
                                 and an empty one refills (s); Enter saves
@@ -18,7 +18,7 @@ from combat.player_tuning import PLAYER_STATS
 from graphics_menu.tune_tab import TuneTab, save_command
 
 PLAYER_TUNE_ACTION = "player_tuning"   # the menu row that opens the tab
-PLAYER_TUNE_ROW_LABEL = "player tuning"
+PLAYER_TUNE_ROW_LABEL = "Player Settings"
 
 PLAYER_TUNE_OPEN_VAR = "PlayerTuneOpen"
 PLAYER_TUNE_ROW_VAR = "PlayerTuneRow"        # 0 = the subject row, 1.. = PLAYER_STATS
@@ -49,7 +49,7 @@ PLAYER_TAB = TuneTab(
     panel="PlayerTunePanel", rows_box="PlayerTuneRows",
     saved_text="PlayerTuneSavedText", back_widget="PlayerTuneBack",
     title_widget="PlayerTuneTitle", hint_widget="PlayerTuneHint",
-    title_text="PLAYER TUNING",
+    title_text="PLAYER SETTINGS",
     row_labels=(PLAYER_SUBJECT,) + tuple(s[1] for s in PLAYER_STATS),
     hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                "ENTER  save to player_tuning.csv"),

@@ -27,7 +27,7 @@ SHARED AUTHORING HELPERS
   graph        create/load a Blueprint, pins, connect, _set, _resolve
   tuned        the controller's Tune* variables: declare, read, CDO defaults.
                Every fragment below reads its numbers off them, which is
-               what lets the M panel's MONSTER TUNING tab change a live one
+               what lets the M panel's MONSTER SETTINGS tab change a live one
 
 THE CONTROLLER'S STEPS (one fragment per concern)
   sound        play one of several sounds (voice, melee impact)

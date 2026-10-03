@@ -168,7 +168,7 @@ def check_sprint_rates():
         value = w.get_editor_property(var)
         check(f"...{words} ({var}, a float)",
               isinstance(value, float) and abs(value - want) < 1e-6, repr(value))
-    # Variables, not literals: the PLAYER TUNING tab writes them in play.
+    # Variables, not literals: the PLAYER SETTINGS tab writes them in play.
     selects = [n for n in wg if in_pins(n) >= {"A", "B", "bPickA"}]
     speed = [n for n in selects
              if {_title(f) for f in _feeders(n, "A", "B")}

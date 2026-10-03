@@ -4,7 +4,7 @@ tree, hiding behind each, and charges once it is close.
 Constants only -- no `unreal` import -- like npc_placement.py, npc_agro.py and
 npc_strafe.py. NPC_STALK_CHARGE_CM, _CATCH_UP_CM, _RUN_SCALE, _HIDE_*_S and
 _TURN_*_S are defaults: the game reads the controller's TuneStalk* variables,
-which npc/monster_tuning.csv and the M panel's MONSTER TUNING tab can change
+which npc/monster_tuning.csv and the M panel's MONSTER SETTINGS tab can change
 (npc/monster_tuning.py). The builder is Scripts/npc/stalk.py (the step) and
 stalk_cover.py (the next tree), the checks Scripts/npc/verify_stalk.py and, in
 the game, Scripts/probes/probe_wendigo_stalk.py.

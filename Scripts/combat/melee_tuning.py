@@ -1,5 +1,5 @@
 """The melee weapons' rows of the gun tuning table (gun_tuning.csv): what the
-GUN TUNING tab can change of the knife and the axe, which is their throw.
+GUN SETTINGS tab can change of the knife and the axe, which is their throw.
 
     throw_arc       the tip over the view of a throw at nothing in reach
     throw_damage    what a thrown one takes off a body it strikes

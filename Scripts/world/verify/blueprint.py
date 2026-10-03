@@ -144,7 +144,7 @@ def _check_night_cold(bp):
 
 
 def _check_look(bp):
-    """The look multipliers the GRAPHICS TUNING tab writes: 1 as built, and
+    """The look multipliers the GRAPHICS SETTINGS tab writes: 1 as built, and
     each one scaling the thing it names."""
     d = cdo(bp)
     off = {v: d.get_editor_property(v) for v in LOOK_SCALE_VARS

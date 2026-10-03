@@ -1,5 +1,5 @@
-"""The WORLD TUNING tab's HUD Tick fragment: the tab's keys, nudge and save
-(tune_tick.author_tab_flow, shared with GUN and MONSTER TUNING), then the
+"""The WORLD SETTINGS tab's HUD Tick fragment: the tab's keys, nudge and save
+(tune_tick.author_tab_flow, shared with GUN and MONSTER SETTINGS), then the
 table onto the level's day/night cycle.
 
     its M panel row taken   WorldTuneOpen = NOT WorldTuneOpen; the other tabs shut

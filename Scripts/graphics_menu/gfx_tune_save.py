@@ -1,4 +1,4 @@
-"""The GRAPHICS TUNING tab's SAVE DEFAULT, run inside the game by the HUD's
+"""The GRAPHICS SETTINGS tab's SAVE DEFAULT, run inside the game by the HUD's
 ExecutePythonCommand (gfx_tune_consts.GFX_TUNE_SAVE_COMMAND).
 
 It reads the live HUD's working table (GfxTuneValues) and writes all four

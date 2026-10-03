@@ -1,4 +1,4 @@
-"""The WORLD TUNING tab's save, run inside the game by the HUD's
+"""The WORLD SETTINGS tab's save, run inside the game by the HUD's
 ExecutePythonCommand (world_tune_consts.WORLD_TUNE_SAVE_COMMAND) on Enter.
 
 It reads the live HUD's working table (WorldTuneValues) and writes the day's

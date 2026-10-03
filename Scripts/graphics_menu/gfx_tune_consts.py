@@ -1,10 +1,10 @@
-"""The M panel's GRAPHICS TUNING tab: its row, the HUD's variables, the widget
+"""The M panel's GRAPHICS SETTINGS tab: its row, the HUD's variables, the widget
 names and words, and the Python command its save runs. Constants only, so
 wbp_tune (the layout), gfx_tune_tick and tune_draw (the graph), gfx_tune_save
 (the save, run inside the game) and gfx_checks read one table.
 
     the M panel's row           opens the tab (tune_tab.py); BACK shuts it
-    Up / Down, Left / Right     as GUN TUNING. The subject row is the quality
+    Up / Down, Left / Right     as GUN SETTINGS. The subject row is the quality
                                 preset: Left / Right there pick Low / Medium /
                                 High / Custom, and it is the only place a
                                 preset is picked. The rows under it are that
@@ -28,7 +28,7 @@ from graphics_menu.gfx_stats import GFX_STATS, PRESET_LABELS, STAT_COUNT
 from graphics_menu.tune_tab import TuneTab, save_command
 
 GFX_TUNE_ACTION = "graphics_tuning"  # the M panel row that opens the tab
-GFX_TUNE_ROW_LABEL = "graphics tuning"
+GFX_TUNE_ROW_LABEL = "Graphics Settings"
 
 GFX_TUNE_OPEN_VAR = "GfxTuneOpen"
 GFX_TUNE_ROW_VAR = "GfxTuneRow"          # 0 = the preset row, 1.. = GFX_STATS
@@ -75,7 +75,7 @@ GFX_TAB = TuneTab(
     back_widget="GfxTuneBack", save_widget="GfxTuneSaveDefault",
     save_label=GFX_SAVE_DEFAULT_LABEL,
     title_widget="GfxTuneTitle", hint_widget="GfxTuneHint",
-    title_text="GRAPHICS TUNING",
+    title_text="GRAPHICS SETTINGS",
     row_labels=("preset",) + tuple(s.label for s in GFX_STATS),
     hint_text="LEFT / RIGHT or click  change   ·   Custom is remembered",
     saved_words="default saved to Scripts/graphics_menu/graphics_tuning.csv",

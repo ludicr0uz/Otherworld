@@ -148,7 +148,7 @@ ATT_FOLEY = AttenuationProfile("A_Att_Foley", 100.0, 1400.0)
 # only just seen: it carries this many times the wendigo's aggro range (its
 # sight, monster_tuning.csv's vision_range_cm: 35 m, so 61 m), and never past
 # the 100 m ceiling. Sized from the tuned range when the build runs, so a range
-# saved from the MONSTER TUNING tab moves the roar with the next weapons build.
+# saved from the MONSTER SETTINGS tab moves the roar with the next weapons build.
 ROAR_REACH_X_AGGRO = 1.75
 ROAR_CREATURE = "Wendigo"
 

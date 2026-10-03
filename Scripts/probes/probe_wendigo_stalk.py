@@ -31,7 +31,7 @@ from npc.paths import (
     STALK_TURN_AT_VAR,
 )
 
-# The tuned numbers (the MONSTER TUNING tab's rows): monster_tuning.csv's, as built.
+# The tuned numbers (the MONSTER SETTINGS tab's rows): monster_tuning.csv's, as built.
 _SPEC = monster_specs("Wendigo")
 STALK_CHARGE_CM = _SPEC["stalk_charge_cm"]
 STALK_HIDE_MIN_S = _SPEC["stalk_hide_min_s"]

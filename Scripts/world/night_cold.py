@@ -7,7 +7,7 @@ Temperature (BP_SurvivalComponent) falls while the sun is down.
                        - NightTemperatureDropPerSecond * (1 - DayAmount) * dt, 0)
 
 The rate is the cycle's NightTemperatureDropPerSecond (Instance Editable;
-world_config.NIGHT_TEMPERATURE_DROP_PER_S, a WORLD TUNING row saved to
+world_config.NIGHT_TEMPERATURE_DROP_PER_S, a WORLD SETTINGS row saved to
 world_tuning.csv). It scales by how much night there is, 1 - DayAmount, so
 the cold comes in through dusk and eases through dawn rather than switching
 at sunset: world_config.sun_state()'s night_cold_per_s is the same sum.

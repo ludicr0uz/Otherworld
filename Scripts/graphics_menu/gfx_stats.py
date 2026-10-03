@@ -2,7 +2,7 @@
 graphics_tuning.csv beside this module, one row per preset.
 
 A preset (Low / Medium / High / Custom) is one row of GFX_STATS. The M
-panel's GRAPHICS TUNING tab (gfx_tune_*.py) shows the picked preset's
+panel's GRAPHICS SETTINGS tab (gfx_tune_*.py) shows the picked preset's
 row and changes a number live; its SAVE DEFAULT row saves the whole table to
 the CSV, and the next build_graphics_menu.py bakes it into the HUD's table,
 so git shows what moved. BP_GraphicsTuner (gfx_tuner.py) is what turns a row

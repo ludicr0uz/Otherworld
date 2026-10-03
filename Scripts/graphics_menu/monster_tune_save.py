@@ -1,4 +1,4 @@
-"""The MONSTER TUNING tab's save, run inside the game by the HUD's
+"""The MONSTER SETTINGS tab's save, run inside the game by the HUD's
 ExecutePythonCommand (monster_tune_consts.MON_TUNE_SAVE_COMMAND) on Enter.
 
 It reads the live HUD's working table (MonTuneCreatures, MonTuneValues) and

@@ -119,7 +119,7 @@ def check_trees(check):
           pause_rows == list(C.PAUSE_ROW_LABELS)
           and pause_rows[C.PAUSE_START_ROW] == C.START_ROW_LABEL
           and pause_rows[1] == C.SETTINGS_ROW_LABEL
-          and pause_rows[C.PAUSE_DEBUG_ROW].endswith("debug")
+          and pause_rows[C.PAUSE_DEBUG_ROW] == C.DEBUG_ROW_LABEL
           and pause_rows[-1] == C.QUIT_ROW_LABEL, str(pause_rows))
 
     texts = set()

@@ -279,7 +279,7 @@ menu polls its own copy from `DrawHUD`, which does.
     so a click on the frame V goes down throws nothing.
   - **The lob's arc is per item.** `ThrowArcDegrees` defaults to `THROW_PITCH_UP_DEG` (30) on
     `BP_WeaponItem`, so food and water use it; a gun's is its `throw_arc` cell in
-    `gun_tuning.csv`, the GUN TUNING tab's last row. It is the tip over the view of a
+    `gun_tuning.csv`, the GUN SETTINGS tab's last row. It is the tip over the view of a
     throw at nothing in reach. Per item too are the speed (`ThrowSpeed`, 1100
     cm/s) and the tumble (`ThrowSpinDegS`, 540°/s): the launch reads the one off `Held`, the
     flight the other off `Thrown`.
@@ -313,7 +313,7 @@ menu polls its own copy from `DrawHUD`, which does.
   down). The whole stage is behind one Branch, `Thrown.ThrowDamage > 0`: the base item's is 0,
   so a thrown gun, mushroom or canteen does neither. The knife's is 50 and the axe's 75
   (the defaults in `throw_tuning.py`; each is its `throw_damage` cell in `gun_tuning.csv`,
-  the GUN TUNING tab's last row: see Tuning), against the slash's 35: the throw costs the
+  the GUN SETTINGS tab's last row: see Tuning), against the slash's 35: the throw costs the
   weapon until it is picked up again.
   - **A body** (the struck actor has a `BP_HealthComponent`) loses `ThrowDamage`, with the
     three stamps a pellet leaves (`LastDamageTime`, `DamagedByPlayer`, `LastHitFrom`: so a
@@ -463,7 +463,7 @@ live: lethality, sprint and stamina, ADS, mouse sensitivity, recoil and the hit 
 Per-weapon numbers live in `_weapon_specs()`.
 
 **The jog, the sprint and the stamina bar's times are `player_tuning.csv`'s** (`player_tuning.py`),
-laid over `COMBAT` and tuned in game by the menu's PLAYER TUNING tab (`docs/stance.md`).
+laid over `COMBAT` and tuned in game by the menu's PLAYER SETTINGS tab (`docs/stance.md`).
 
 **Per-gun numbers can be tuned in game** (the M panel's **T** tab, `graphics_menu/tune_*.py`):
 - `gun_tuning.csv` (tracked) holds each gun's 21 tunable stats (`gun_tuning.TUNE_STATS`: damage,

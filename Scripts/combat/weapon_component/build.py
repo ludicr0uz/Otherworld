@@ -135,7 +135,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's
     # HP bar; BaseSpeed is cached off the character at BeginPlay, never a
     # literal. Sprinting is what the fire gate refuses on. The sprint's speed
-    # and the stamina's two rates are variables so the PLAYER TUNING tab can
+    # and the stamina's two rates are variables so the PLAYER SETTINGS tab can
     # write them.
     for name in ("Stamina", "MaxStamina", "BaseSpeed", *SPRINT_RATE_VARS):
         _declare(ed, name, _float_type())

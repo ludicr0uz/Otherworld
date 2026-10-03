@@ -1,5 +1,5 @@
 """WBP_PauseMenu's tuning panels, one per TuneTab (tune_tab.py): GUN, MONSTER,
-WORLD, PLAYER and GRAPHICS TUNING. Only one is open at a time, and an open one stands
+WORLD, PLAYER and GRAPHICS SETTINGS. Only one is open at a time, and an open one stands
 in place of the M panel's own rows (menu_screens.author_pause_menu).
 
   where the M panel is   the tab's panel: a title, row_count WBP_MenuRows (the
@@ -7,7 +7,7 @@ in place of the M panel's own rows (menu_screens.author_pause_menu).
   bottom-right corner    designer; the HUD writes the value column and the
   (tab.corner)           caret), "saved to ..." after a save, the keys' hint,
                          a save row if the tab has one (tab.save_widget:
-                         GRAPHICS TUNING's SAVE DEFAULT), and BACK, a row
+                         GRAPHICS SETTINGS's SAVE DEFAULT), and BACK, a row
                          of its own under the list
 
 A tab with visible_rows keeps its list in a ScrollBox that many rows high:

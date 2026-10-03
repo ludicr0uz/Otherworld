@@ -41,7 +41,7 @@ ITEM_FIELDS = (("ItemLoaded", "Loaded"), ("ItemReserve", "Reserve"), ("ItemSlot"
 # EXIT_ACTION is what PauseClick is matched against).
 EXIT_ACTION = "save_exit"
 EXIT_SECONDS = 15.0
-EXIT_ROW_LABEL = "save and exit"
+EXIT_ROW_LABEL = "Save and Exit"
 
 # The HUD's variables. ExitStartedAt is compared with the player's
 # BP_HealthComponent.LastDamageTime, which a wanderer's swing stamps

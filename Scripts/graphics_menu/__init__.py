@@ -97,7 +97,7 @@ Input, settings and state
                   whether its list scrolls and whether the save is a row of
                   its own); the shared arrows and Enter
   tune_tabs       TABS: the five tabs, in M panel order; other_open_vars
-  tune_consts     the GUN TUNING tab: variables, widget names, GUN_TAB
+  tune_consts     the GUN SETTINGS tab: variables, widget names, GUN_TAB
   tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
                   the gun table onto every carried gun, and the knife's and
                   the axe's throw rows onto them (run after loot_tick's)
@@ -106,20 +106,20 @@ Input, settings and state
   tune_save       run in the game by the save: the live table into
                   combat/gun_tuning.csv
   wbp_tune        WBP_PauseMenu's five tuning panels (called from wbp_screens)
-  monster_tune_consts  the MONSTER TUNING tab: variables, widget names,
+  monster_tune_consts  the MONSTER SETTINGS tab: variables, widget names,
                   the creatures' controller classes, MONSTER_TAB
   monster_tune_tick    Tick: the tab's flow, then each creature's row onto
                   every live controller of its class (run after tune_tick's)
   monster_tune_save    run in the game by the save: the live table into
                   npc/monster_tuning.csv
-  world_tune_consts    the WORLD TUNING tab: variables, widget names,
+  world_tune_consts    the WORLD SETTINGS tab: variables, widget names,
                   WORLD_TAB
   world_tune_tick      Tick: the tab's flow, then the lengths and a moved hour
                   onto the day/night cycle and its clock back as the hour
                   (run after monster_tune_tick's)
   world_tune_save      run in the game by the save: the day and night lengths
                   into world/world_tuning.csv
-  player_tune_consts   the PLAYER TUNING tab: variables, widget names,
+  player_tune_consts   the PLAYER SETTINGS tab: variables, widget names,
                   PLAYER_TAB
   player_tune_tick     Tick: the tab's flow, then the jog, the sprint's speed
                   and the stamina's two rates onto the player's weapon
@@ -132,7 +132,7 @@ Graphics: what a preset is, the tab that tunes it, the component that applies it
                   metres), step, limits, per-preset defaults and how it is
                   applied; graphics_tuning.csv, which also names the default
                   preset
-  gfx_tune_consts      the GRAPHICS TUNING tab: variables, widget names,
+  gfx_tune_consts      the GRAPHICS SETTINGS tab: variables, widget names,
                   GFX_TAB; BP_GraphicsTuner's path and variables;
                   BP_GraphicsSave's path, slot and fields
   gfx_tune_tick        Tick: the tab's flow, the pick kept as Quality, the look

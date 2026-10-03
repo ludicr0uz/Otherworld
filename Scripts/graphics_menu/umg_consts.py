@@ -220,11 +220,11 @@ START_ACTION, SETTINGS_ACTION = "start", "settings"
 DEBUG_ACTION, QUIT_ACTION = "debug", "quit"
 # The first row starts the game from the title; in play it shuts the menu, as
 # M does, and says so (the HUD writes its label every frame).
-START_ROW_LABEL, RESUME_ROW_LABEL = "new game", "resume"
-SETTINGS_ROW_LABEL = "settings"
-DEBUG_ROW_LABEL = "debug"
+START_ROW_LABEL, RESUME_ROW_LABEL = "New Game", "Resume"
+SETTINGS_ROW_LABEL = "Settings"
+DEBUG_ROW_LABEL = "Debug"
 # The last row leaves the game for the desktop, saving nothing.
-QUIT_ROW_LABEL = "exit game"
+QUIT_ROW_LABEL = "Exit Game"
 PAUSE_ROW_LABELS = (START_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_ROW_LABEL,
                     EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL, TUNE_ROW_LABEL,
                     MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL, PLAYER_TUNE_ROW_LABEL,

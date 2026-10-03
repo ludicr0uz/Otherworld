@@ -37,7 +37,7 @@ GRASS_CELL_CM = 10000.0
 # Every grass patch belongs to one tier, and a tier is drawn from its
 # ``min_preset`` up (graphics_menu/gfx_stats.py: 0 Low, 1 Medium, 2 High,
 # 3 Ultra; that is each preset's default "grass layers", which the M panel's
-# GRAPHICS TUNING tab can change). Each tier is its own evenly spread layer, so Low is a thinner field,
+# GRAPHICS SETTINGS tab can change). Each tier is its own evenly spread layer, so Low is a thinner field,
 # not a field with holes, and each preset above it lays another layer on top.
 #
 # The upper tiers also fade out closer. Thickness only reads near the player;

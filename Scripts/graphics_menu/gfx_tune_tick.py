@@ -1,4 +1,4 @@
-"""The GRAPHICS TUNING tab's HUD Tick fragment: the tab's keys, nudge and save
+"""The GRAPHICS SETTINGS tab's HUD Tick fragment: the tab's keys, nudge and save
 (tune_tick.author_tab_flow, shared with the other tabs), then the preset and
 the table handed to BP_GraphicsTuner, the HUD's component that applies them.
 

@@ -20,7 +20,7 @@ world_config.sun_state():
   look       each light, the stars, the sky light, the fog's density and the
              two discs are then multiplied by a look variable
              (day_night_blueprint.LOOK_SCALE_VARS), 1 unless the GRAPHICS
-             TUNING tab moved it
+             SETTINGS tab moved it
   cold       the player's Temperature falls at night: night_cold.py, which
              build_day_night.py chains on after build_graph()
 

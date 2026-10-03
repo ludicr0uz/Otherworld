@@ -1,4 +1,4 @@
-"""The GUN TUNING tab's save, run inside the game by the HUD's
+"""The GUN SETTINGS tab's save, run inside the game by the HUD's
 ExecutePythonCommand (tune_consts.TUNE_SAVE_COMMAND) when Enter is pressed.
 
 It reads the live HUD's working table (TuneWeapons, TuneValues) and writes

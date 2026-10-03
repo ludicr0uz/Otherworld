@@ -27,7 +27,7 @@ _NIGHT = get_preset("night")
 # One cycle is a day followed by a night. The clock runs from 0 (sunrise) to
 # DAY_LENGTH_S (sunset) to DAY_LENGTH_S + NIGHT_LENGTH_S (the next sunrise).
 # 4 + 4 minutes for testing; a real day wants something like 20 + 10.
-# world_tuning.csv (saved by the M panel's WORLD TUNING tab) overrides both.
+# world_tuning.csv (saved by the M panel's WORLD SETTINGS tab) overrides both.
 _TUNED = _read_tuning()
 DAY_LENGTH_S = float(_TUNED.get("day_length_s", 240.0))
 NIGHT_LENGTH_S = float(_TUNED.get("night_length_s", 240.0))
@@ -43,7 +43,7 @@ NIGHT_TEMPERATURE_DROP_PER_S = float(_TUNED.get("night_temperature_drop_per_s", 
 RANDOM_START = True
 START_CLOCK_S = 20.0
 
-# ─── Hours: how the WORLD TUNING tab shows the clock ─────────────────────────
+# ─── Hours: how the WORLD SETTINGS tab shows the clock ─────────────────────────
 # However long the day and the night last, each is 12 hours on the tab's
 # 24-hour dial: sunrise is SUNRISE_HOUR, sunset 12 hours later.
 SUNRISE_HOUR = 6.0

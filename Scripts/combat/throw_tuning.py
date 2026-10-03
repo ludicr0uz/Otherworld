@@ -17,7 +17,7 @@ other binds, because BIND_VARS lists it.
 # The tip and the speed are per item: THROW_PITCH_UP_DEG and THROW_SPEED are
 # BP_WeaponItem's defaults for THROW_PITCH_VAR and THROW_SPEED_VAR, which the
 # launch reads off Held. A gun's own tip is its gun_tuning.csv `throw_arc`
-# cell, tuned on the GUN TUNING tab; the food and the water keep the defaults,
+# cell, tuned on the GUN SETTINGS tab; the food and the water keep the defaults,
 # and a melee weapon has MELEE_THROW (below), its tip a cell of that CSV too.
 THROW_SPEED = 1100.0            # cm/s at release (the default speed)
 THROW_SPEED_VAR = "ThrowSpeed"         # on BP_WeaponItem
@@ -99,7 +99,7 @@ MELEE_THROW = {
 # In the head it takes that times the body's own HeadMultiplier (the
 # pellet's: hit_zones.py), the head being where the blade is left.
 # THROW_KNIFE_DAMAGE and THROW_AXE_DAMAGE are the defaults: each blade's own
-# is its gun_tuning.csv `throw_damage` cell, tuned on the GUN TUNING tab
+# is its gun_tuning.csv `throw_damage` cell, tuned on the GUN SETTINGS tab
 # (melee_tuning.py), as its tip over the view is its `throw_arc` cell.
 THROW_DAMAGE_VAR = "ThrowDamage"       # on BP_WeaponItem, 0 by default
 THROW_DAMAGE_COLUMN = "throw_damage"   # the gun_tuning.csv column

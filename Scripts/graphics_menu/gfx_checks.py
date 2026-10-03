@@ -1,4 +1,4 @@
-"""verify_graphics_menu.py's checks for the GRAPHICS TUNING tab on the HUD
+"""verify_graphics_menu.py's checks for the GRAPHICS SETTINGS tab on the HUD
 (gfx_tune_tick, tune_draw and wbp_tune over GFX_TAB), the table it holds and
 the M panel's title. What the numbers do to the engine is BP_GraphicsTuner's:
 gfx_tuner_checks.py.

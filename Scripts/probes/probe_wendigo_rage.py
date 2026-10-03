@@ -29,7 +29,7 @@ from probes.probe_wendigo_stalk import (
     START_CM, _about, _on_navmesh, _stand_in_sight, _walk_speed, _wendigos,
 )
 
-# The tuned numbers (the MONSTER TUNING tab's rows): monster_tuning.csv's, as built.
+# The tuned numbers (the MONSTER SETTINGS tab's rows): monster_tuning.csv's, as built.
 _SPEC = monster_specs("Wendigo")
 STALK_CHARGE_CM = _SPEC["stalk_charge_cm"]
 STALK_TURN_MAX_S = _SPEC["stalk_turn_max_s"]

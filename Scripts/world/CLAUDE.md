@@ -19,7 +19,7 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
 ## Settings: `world_config.py`
 
 - **The world config.** `DAY_LENGTH_S` and `NIGHT_LENGTH_S` are each 240 s for testing, unless
-  `world_tuning.csv` (saved by the M panel's WORLD TUNING tab) says otherwise. Change a
+  `world_tuning.csv` (saved by the M panel's WORLD SETTINGS tab) says otherwise. Change a
   number and re-run the builder.
 - **The night's cold:** `NIGHT_TEMPERATURE_DROP_PER_S` (0.1, or `world_tuning.csv`'s) is how
   many points of the player's Temperature a second of full night takes. It is the actor's
@@ -29,12 +29,12 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
   `START_CLOCK_S` (20 s, just after sunrise) is where it starts.
 - The two lengths, `Clock`, the night's cold and `RandomStart` are also Instance Editable on the placed actor, so
   one level can differ.
-- **The time of day can be set in a game** from the WORLD TUNING tab, on a 24-hour dial
+- **The time of day can be set in a game** from the WORLD SETTINGS tab, on a 24-hour dial
   (`clock_to_hour`: sunrise 06:00, sunset 18:00). See `Scripts/graphics_menu/CLAUDE.md`.
 - **The look multipliers** (`SunScale`, `MoonScale`, `StarScale`, `AmbientScale`, `FogScale`,
   `SunDiscScale`, `MoonDiscScale`; `day_night_blueprint.LOOK_SCALE_VARS`) are 1 as built. Tick
   multiplies the sun's and the moon's light, the stars, the sky light, the fog's density and
-  the two discs by them. Only the M panel's GRAPHICS TUNING tab writes them
+  the two discs by them. Only the M panel's GRAPHICS SETTINGS tab writes them
   (`graphics_menu/gfx_tuner_sky.py`); `sun_state()` is the world at 1.
 - The night values (moon 0.12 lux, sky light 3.0, fog, exposure, star brightness) come from
   `forest_generator/lighting.py`'s night preset, and the day values from its day preset.
@@ -124,6 +124,6 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
   numbers, not by eye, because `-nullrhi` can't render them. Tune them in `world_config.py`.
 - **The stars** were judged from 1280x720 pictures only: their size and how many show at the
   night's exposure want a look on the real screen (`STAR_SIZE_DEG`, `STAR_CONTRAST`, or the
-  GRAPHICS TUNING tab's stars row).
+  GRAPHICS SETTINGS tab's stars row).
 - **Twilight is short** (about 15 s of a 4-minute day), because the sun crosses the horizon
   fast. A longer day stretches it.

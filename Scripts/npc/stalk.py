@@ -40,7 +40,7 @@ A leg is run faster than the chase (TuneStalkSpeed of the run speed);
 the Chase step writes the run speed back on its first pass, so the charge is
 at the run. The charge range, the catch-up range, the leg speed, the wait
 behind a trunk and the time between two turns are the controller's
-TuneStalk* variables (npc/tuned.py: the MONSTER TUNING tab's "hunt:" rows),
+TuneStalk* variables (npc/tuned.py: the MONSTER SETTINGS tab's "hunt:" rows),
 defaulted to npc_stalk.py's numbers. Enraged is its own latch, apart from StalkCharging, which a
 flight from fire clears (npc/ward.py): a wendigo that has been shot comes
 back from one charging, not hunting.

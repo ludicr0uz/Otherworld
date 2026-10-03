@@ -25,7 +25,7 @@ steps, the tree, the step task, the controller and the character).
   controller has those variables, but only a creature with the Stalk or Ward step reads
   them. The rest of `npc_stalk.py` and `npc_ward.py` (the cover search, the trunk width,
   the roar) are still literals, and the numbers quoted in the sections below are the built
-  defaults. The M panel's MONSTER TUNING tab (`graphics_menu/CLAUDE.md`) writes them live and
+  defaults. The M panel's MONSTER SETTINGS tab (`graphics_menu/CLAUDE.md`) writes them live and
   saves the CSV. A new tunable is a `MONSTER_STATS` row, a `stock_specs` entry, and the
   fragment reading it with `tuned()` (`tuned_pin()` in a `_Graph` fragment; a speed share is
   `_author_walk_speed(scale="<column>")`), then the CSV rewritten with the new column
@@ -397,7 +397,7 @@ Wanderer (selector)
   `PrintWarning`, which also puts it on screen, so it is gated on the GameMode's `DebugMode`.
 - **Debug mode also draws each live wanderer's sight (aggro) cone** (`sight_cone.py`): from the
   pawn, along its forward vector, `TuneSightRange` long and `TuneSightHalfAngle` either side —
-  the sight sense's own inputs, so the MONSTER TUNING tab moves the cone and the sense together.
+  the sight sense's own inputs, so the MONSTER SETTINGS tab moves the cone and the sense together.
   Yellow on patrol, red once aggro.
   - It is the controller's own **Tick**, not a tree step: the steps run on the tree's 0.5 s
     beat. One frame per draw (`Duration` 0). Gates are nested Branches: `DebugMode`, a pawn,

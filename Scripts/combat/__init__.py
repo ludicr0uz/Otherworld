@@ -35,7 +35,7 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     the names of the speed and stamina rates the sprint reads
   player_tuning     player_tuning.csv: jog and sprint speed (m/s), how long a
                     full bar sprints and an empty one refills (s); what the
-                    menu's PLAYER TUNING tab saves and COMBAT is built from
+                    menu's PLAYER SETTINGS tab saves and COMBAT is built from
   player_pace       the jog: the character's own MaxWalkSpeed, set at install
   carry_tuning      the carry's numbers and names: how long a shot keeps the
                     gun up (CARRY_RAISE_HOLD_S), Lowered / PoseLowered

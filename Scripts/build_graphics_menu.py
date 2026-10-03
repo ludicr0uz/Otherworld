@@ -116,6 +116,7 @@ from graphics_menu.dev_guns import (                               # noqa: E402
 from graphics_menu.loot_draw import author_loot_window              # noqa: E402
 from graphics_menu.wear_draw import author_wear_panel               # noqa: E402
 from graphics_menu.inv_drag import declare_inv_vars, inv_defaults   # noqa: E402
+from graphics_menu.inv_carry import carry_defaults, declare_carry_vars   # noqa: E402
 from graphics_menu.wear_tick import (                               # noqa: E402
     author_wear_tick, declare_wear_vars, wear_defaults)
 from graphics_menu.cursor import (                                  # noqa: E402
@@ -292,6 +293,7 @@ def _ensure_variables(ed, bp):
     declare_loot_vars(ed)
     declare_wear_vars(ed)
     declare_inv_vars(ed)
+    declare_carry_vars(ed)
     declare_tune_vars(ed)
     declare_monster_tune_vars(ed)
     declare_world_tune_vars(ed)
@@ -980,6 +982,7 @@ def build_hud_blueprint(rebuild=False):
                          MV.KeyPool: [_key(k) for k in KEY_POOL],
                          **difficulty_defaults(), **profile_defaults(),
                          **dev_guns_defaults(), **loot_defaults(), **wear_defaults(), **inv_defaults(),
+                         **carry_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),
                          **world_tune_defaults(), **gfx_tune_defaults(),
                          **player_tune_defaults(),

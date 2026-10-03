@@ -12,6 +12,10 @@ mouse) read one table. The slot codes are combat/slot_tuning.py's.
         drag a worn garment onto the hand or a bag slot   take it off into it
         drag a carried garment onto the worn grid          wear it
         click a slot     bring it to hand (a bag or a weapon slot)
+        drag anything out of the inventory (released over none of
+            INV_AREAS)   set it down on the ground (the component's DropRequest)
+    while a drag is on, its item's icon is carried on the cursor (DRAG_ICON)
+    and the mouse does not turn the view (inv_carry.py)
 """
 
 from combat.slot_tuning import (
@@ -51,6 +55,14 @@ KIT_BOTTOM = 44.0                   # the kit's bottom edge, over the watermark
 DRAG_FROM_VAR = "InvDragFrom"
 INV_OVER_VAR = "InvOver"
 NO_SLOT = -1
+# The look input is held (a drag is on): SetIgnoreLookInput's edge memory.
+LOOK_HELD_VAR = "InvLookHeld"
+# The dragged item's icon, carried on the cursor: an Image on WBP_HUD's root.
+DRAG_ICON = "DragIcon"
+# The inventory's area: a drag released over none of these (and so over no
+# slot) is a drop on the ground; over one of them but between two slots it
+# is called off.
+INV_AREAS = (KIT, HAND_BOX, WEAPON_BOX)
 # WearSel runs over the worn rows, then the bag: the caret's index of the
 # bag's first slot.
 BAG_SEL_FIRST = WEAR_ROWS

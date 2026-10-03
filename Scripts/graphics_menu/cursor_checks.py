@@ -10,7 +10,7 @@ from graphics_menu import cursor_consts as CC
 from graphics_menu import loot_consts as LC
 from graphics_menu import umg_consts as UC
 from graphics_menu.cursor import cursor_defaults
-from graphics_menu.inv_consts import DRAG_FROM_VAR, INV_OVER_VAR, SLOT_BOXES
+from graphics_menu.inv_consts import DRAG_FROM_VAR, INV_AREAS, INV_OVER_VAR, SLOT_BOXES
 from graphics_menu.tune_scroll import hidden_rows, rows_per_window, thumb_half
 from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_checks import _tree
@@ -30,6 +30,10 @@ CLICK_LINES = 3 + 2 * len(TABS)
 # Its bar's drag reads the list's box twice more: the press on it, and how far
 # down it the cursor is (tune_scroll.py).
 WINDOWS = sum(1 for t in TABS if t.visible_rows)
+# The inventory's drag: a release over no slot is tested against each of the
+# inventory's areas, and the carried icon is placed by one read of the
+# cursor in the Body's space (inv_drag.py, inv_carry.py).
+DRAG_TESTS = len(INV_AREAS) + 1
 
 
 def _title(n):
@@ -119,8 +123,10 @@ def _check_rows(check, nodes):
              or not _feeders(n, "Geometry")]
     check(f"a row is under the cursor by its geometry: {ROW_LISTS} row lists, "
           f"{CLICK_LINES} hint (or save row) and BACK lines and {WINDOWS} scrolling list's "
-          "window (and its bar: the press, and where the drag is), none hit-testable",
-          len(tests) == ROW_LISTS + CLICK_LINES + 3 * WINDOWS and not wrong,
+          "window (and its bar: the press, and where the drag is), and the "
+          f"inventory drag's {DRAG_TESTS} (its areas, and the carried icon's place), "
+          "none hit-testable",
+          len(tests) == ROW_LISTS + CLICK_LINES + 3 * WINDOWS + DRAG_TESTS and not wrong,
           f"{len(tests)} tests, {len(wrong)} not off CursorPos")
 
     rows = _sets(nodes, CC.CURSOR_ROW_VAR)

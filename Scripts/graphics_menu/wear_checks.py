@@ -6,13 +6,15 @@ combat/verify/wear.py's.
 
 import unreal
 
+from combat.slot_tuning import DROP_REQUEST_VAR
 from combat.wear_tuning import TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR, WORN_VAR
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from graphics_menu import umg_consts as UC
 from graphics_menu import wear_consts as WC
 from graphics_menu.umg_checks import _tree
 from graphics_menu.wear_tick import WEAR_STILL_VAR, wear_defaults
-from graphics_menu.inv_consts import DRAG_FROM_VAR
+from graphics_menu.inv_carry import carry_defaults
+from graphics_menu.inv_consts import DRAG_FROM_VAR, DRAG_ICON, LOOK_HELD_VAR, NO_SLOT
 from item_icons.items import UI_ART_DIR, icon_name
 from item_icons.portrait import PORTRAIT_TEXTURE
 
@@ -139,9 +141,47 @@ def _check_draw(check, nodes):
 
     icons = [n for n in nodes if _title(n) == "Get Icon" and off_worn(n)]
     names = [n for n in nodes if _title(n) == "Get DisplayName" and off_worn(n)]
-    check("...each slot's picture the worn garment's own Icon, read off Worn[i], and "
-          "no name written",
-          len(icons) == 1 and not names, f"{len(icons)} icons, {len(names)} names")
+    check("...each slot's picture the worn garment's own Icon, read off Worn[i] (and "
+          "the icon a drag carries, off the dragged one), and no name written",
+          len(icons) == 2 and not names, f"{len(icons)} icons, {len(names)} names")
+
+
+def _check_carry(check, bp, nodes):
+    """inv_carry.py, and inv_drag.py's drop: the icon on the cursor, the
+    look held, the drag out of the inventory."""
+    icon = _tree(UC.WBP_HUD).get(DRAG_ICON)
+    check(f"WBP_HUD has {DRAG_ICON}, the icon a drag carries: a variable, collapsed "
+          "until one is on",
+          icon is not None and icon[1]
+          and "COLLAPSED" in str(icon[0].get_editor_property("visibility")).upper())
+    moves = [n for n in nodes if "Translation" in _pins(n)
+             and [_title(f) for f in _feeders(n, "self")] == [f"Get {DRAG_ICON}"]]
+    place = [_title(g) for n in moves for f in _feeders(n, "Translation")
+             for g in _feeders(f, "AbsoluteCoordinate")]
+    check("...moved onto the cursor every frame a drag is on (its translation the "
+          "cursor's place in the HUD's own space)",
+          len(moves) == 1 and place == ["Get CursorPos"], f"{len(moves)} moves, {place}")
+    asks = [n for n in nodes if _title(n) == f"Set {DROP_REQUEST_VAR}"]
+    check(f"a drag released outside the inventory asks the weapon component to set "
+          f"the item down: its {DROP_REQUEST_VAR} := {DRAG_FROM_VAR}, once",
+          len(asks) == 1
+          and [_title(f) for f in _feeders(asks[0], DROP_REQUEST_VAR)]
+          == [f"Get {DRAG_FROM_VAR}"]
+          and any("Cast" in _title(f) for f in _feeders(asks[0], "self")), str(len(asks)))
+    ends = [_value(n, DRAG_FROM_VAR) for n in nodes if _title(n) == f"Set {DRAG_FROM_VAR}"
+            and not _feeders(n, DRAG_FROM_VAR)]
+    check("a drag ends on the release, and when the panel is not open",
+          ends == [str(NO_SLOT)] * 2, str(ends))
+    holds = [n for n in nodes if "bNewLookInput" in _pins(n)
+             and [_title(f) for f in _feeders(n, "bNewLookInput")]
+             == [f"Get {LOOK_HELD_VAR}"]]
+    edge = [_title(f) for n in holds for f in _feeders(n, "execute")]
+    check("while a drag is on the mouse does not turn the view: SetIgnoreLookInput, "
+          "told on the drag's edges only",
+          len(holds) == 1 and edge == [f"Set {LOOK_HELD_VAR}"], str(edge))
+    cdo = unreal.get_default_object(BEL.generated_class(bp))
+    wrong = {k: v for k, v in carry_defaults().items() if cdo.get_editor_property(k) != v}
+    check("...and the look starts free", not wrong, str(wrong))
 
 
 def check_wear(check, bp, nodes):
@@ -149,6 +189,7 @@ def check_wear(check, bp, nodes):
     _check_portrait(check, nodes)
     _check_keys(check, nodes)
     _check_draw(check, nodes)
+    _check_carry(check, bp, nodes)
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     wrong = {k: v for k, v in wear_defaults().items() if cdo.get_editor_property(k) != v}
     check("the I panel's variables start shut, on the first slot", not wrong, str(wrong))

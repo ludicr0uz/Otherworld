@@ -50,7 +50,8 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
   slot sends it to the bag's first free one), and a carried garment dragged onto the worn
   grid is worn (`WearRequest`, a slot code: `weapon_component/wear_drag.py`), from the bag
   or the hand, into its own slot whichever cell it lands on; one already worn there takes
-  the slot it left.
+  the slot it left. A worn garment dragged out of the inventory is set down on the
+  ground, as any item is (`DropRequest`: `weapon_component/drop_request.py`).
 - **The worn panel** sits bottom right, over the backpack, and both are always shown (the
   menu hides them): one inventory slot per worn slot, in two rows of four, showing the worn
   garment's icon, or the garment's translucent silhouette while nothing is worn there. No

@@ -47,6 +47,7 @@ from combat.weapon_component.steady import _author_steady
 from combat.weapon_component.use import _author_use
 from combat.weapon_component.wear import _author_take_off, _author_wear_gate
 from combat.weapon_component.wear_drag import _author_wear_request
+from combat.weapon_component.drop_request import _author_drop_request
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
@@ -400,6 +401,8 @@ def _author_wc_tick(ed, tick):
     flight_exits = _author_take_off(ed, flight_exits)
     # --- and a slot's garment dragged onto the worn grid (wear_drag.py) -----
     flight_exits = _author_wear_request(ed, flight_exits)
+    # --- and an item dragged out of the inventory (drop_request.py) ---------
+    flight_exits = _author_drop_request(ed, flight_exits)
 
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.

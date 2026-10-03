@@ -345,12 +345,13 @@ def check_hud_graph(check, nodes):
     brushes = [n for n in nodes if {"Texture", "bMatchSize"} <= _pins(n)
                and not any("TargetArray" in _pins(s) for s in _sources(n, "Texture"))]
     check("each slot's icon is the carried item's own, and each worn slot's the "
-          "worn garment's",
-          len(brushes) == 2
+          "worn garment's; the icon a drag carries is its item's too (a slot's, a "
+          "worn one's)",
+          len(brushes) == 4
           and all(_source_titles(n, "Texture") == ["Get Icon"] for n in brushes),
           str([_source_titles(n, "Texture") for n in brushes]))
     guards = [n for n in nodes if {"TargetArray", "IndexToTest"} <= _pins(n)]
     check("an inventory slot reads its item only behind IsValidIndex, and so "
-          "do the equipped name, the I panel's worn slots and its drag's start (on "
-          "a slot, on a worn slot)",
-          len(guards) == 5, str(len(guards)))
+          "do the equipped name, the I panel's worn slots, its drag's start (on "
+          "a slot, on a worn slot) and the icon the drag carries (the same two)",
+          len(guards) == 7, str(len(guards)))

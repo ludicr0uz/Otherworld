@@ -36,7 +36,11 @@ The HUD graph that shows and writes them
                   run from the worn slots into the bag
   inv_drag        DrawHUD, the I panel open: the slot under the cursor, a drag
                   (MoveFrom/MoveTo; a worn garment off, TakeOffTo; a carried
-                  one on, WearRequest) and a click (SlotRequest, the take-off)
+                  one on, WearRequest; out of the inventory onto the ground,
+                  DropRequest) and a click (SlotRequest, the take-off)
+  inv_carry       DrawHUD: the dragged item's icon carried on the cursor, the
+                  look input held while a drag is on, a drag called off when
+                  the panel shuts
   fps             the FPS readout, always on screen
   profile_draw    the save-and-exit countdown banner
   settings_page   the settings page's values and hint; pushing settings onto the weapon

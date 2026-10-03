@@ -121,6 +121,9 @@ _author_* fragment per concern, each in its own module:
               or into the hand or bag slot a drag dropped it on (TakeOffTo)
   wear_drag   WearRequest (the I panel's drag onto the worn grid): a slot's
               garment is worn from wherever it is carried
+  drop_request  DropRequest (the I panel's drag released outside the
+              inventory): a slot's item or a worn garment is set down on the
+              ground ahead, as the drop key sets the held one down
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
   sprint      sprint and stamina, and the latch that ends a spent sprint

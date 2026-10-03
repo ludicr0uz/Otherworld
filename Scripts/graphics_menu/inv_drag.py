@@ -18,7 +18,16 @@
             slot to worn -> WearRequest := InvDragFrom (worn if a garment,
                 into its own slot whichever cell it was dropped on)
             worn to worn -> nothing
+        over no slot:
+            outside the inventory (none of INV_AREAS under the cursor) ->
+                DropRequest := InvDragFrom (set down on the ground: a slot's
+                item, or a worn garment, whose code the component reads as
+                SLOT_COUNT + its worn slot)
+            between two slots -> nothing
         InvDragFrom := NO_SLOT
+
+While the drag is on, inv_carry.py draws the item's icon on the cursor and
+holds the view still.
 
 The HUD only asks, as the I panel's take-off does: the weapon component
 serves the request on its own Tick (combat/weapon_component/slot_moves.py),
@@ -29,14 +38,14 @@ is (cursor.py); a -nullrhi probe writes the component's variables instead.
 from uebp.graph import BEL, _connect, _declare, _pin, out, then
 from combat.paths import WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import (
-    MOVE_FROM_VAR, MOVE_TO_VAR, PRIMARY, SLOT_ITEMS_VAR, SLOT_REQUEST_VAR,
+    DROP_REQUEST_VAR, MOVE_FROM_VAR, MOVE_TO_VAR, PRIMARY, SLOT_ITEMS_VAR, SLOT_REQUEST_VAR,
 )
 from combat.wear_tuning import TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR, WORN_VAR
-from graphics_menu.cursor import _clicked, _pc, author_row_cursor
+from graphics_menu.cursor import _clicked, _pc, _under, author_row_cursor
 from graphics_menu.cursor_consts import CLICK_KEY, CURSOR_ROW_VAR
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.inv_consts import (
-    DRAG_BOXES, DRAG_FROM_VAR, INV_OVER_VAR, NO_SLOT, WORN_CODE_FIRST,
+    DRAG_BOXES, DRAG_FROM_VAR, INV_AREAS, INV_OVER_VAR, NO_SLOT, WORN_CODE_FIRST,
 )
 from graphics_menu.loot_find import put
 from graphics_menu.ui_graph import part
@@ -44,7 +53,7 @@ from graphics_menu.umg_consts import WBP_HUD
 from graphics_menu.wear_consts import WEAR_SEL_VAR, WEAR_SLOTS_BOX, WEAR_TAKE_VAR
 from uebp.nodes.actor import FN_RELEASED
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_VALID
-from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_SUB_II
+from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_OR, FN_SUB_II
 from uebp.nodes.system import FN_IS_VALID
 
 
@@ -151,8 +160,16 @@ def _author_release(ed, wc, in_execs, made):
     wearing = _put_on(ed, wc, WEAR_REQUEST_VAR, start, [wear], made)
     flow = _put_on(ed, wc, MOVE_TO_VAR, over, [move], made)
     flow = _put_on(ed, wc, MOVE_FROM_VAR, start, [flow], made)
+    # Over no slot: outside the inventory it is set down on the ground. The
+    # HUD's code for a worn cell is the component's (SLOT_COUNT + the slot).
+    inside = _under(ed, part(ed, WBP_HUD, INV_AREAS[0]), made)
+    for area in INV_AREAS[1:]:
+        inside = out(_call(ed, FN_OR, made, A=inside,
+                           B=_under(ed, part(ed, WBP_HUD, area), made)))
+    kept, away = _branch(ed, inside, [off], made)
+    dropped = _put_on(ed, wc, DROP_REQUEST_VAR, start, [away], made)
     done = _setter(ed, DRAG_FROM_VAR, NO_SLOT,
-                   [took, asked, hand, taken, stays, wearing, flow, off], made)
+                   [took, asked, hand, taken, stays, wearing, flow, kept, dropped], made)
     return [done, still]
 
 
@@ -168,6 +185,7 @@ def author_inv_drag(ed, wc, in_execs):
         "filled slot starts a drag; the release on the same slot asks for it "
         "in hand (SlotRequest) or, worn, off (WearTakeOffRequested); on another "
         "asks for the move (MoveFrom/MoveTo), the take-off into it (TakeOffTo, "
-        "TakeOffSlot) or the wear (WearRequest). The weapon component decides "
+        "TakeOffSlot) or the wear (WearRequest); outside the inventory, for the "
+        "item set down on the ground (DropRequest). The weapon component decides "
         "what fits (inv_drag.py).", made[:4])
     return flow

@@ -55,6 +55,7 @@ FN_SET_MOVEMENT_MODE = "/Script/Engine.CharacterMovementComponent.SetMovementMod
 # RotationInput would make the kick scale with the sensitivity slider.
 FN_GET_CONTROL_ROT = "/Script/Engine.Controller.GetControlRotation"
 FN_GET_PAWN = "/Script/Engine.Controller.K2_GetPawn"
+FN_IGNORE_LOOK = "/Script/Engine.Controller.SetIgnoreLookInput"
 FN_IGNORE_MOVE = "/Script/Engine.Controller.SetIgnoreMoveInput"
 FN_LINE_OF_SIGHT = "/Script/Engine.Controller.LineOfSightTo"
 FN_SET_CONTROL_ROT = "/Script/Engine.Controller.SetControlRotation"

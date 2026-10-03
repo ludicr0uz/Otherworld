@@ -133,8 +133,9 @@ def check_keys_are_variables():
     traces = [n for n in by_pins(wg, "Start", "End", "TraceChannel")
               if not is_melee_sweep(n) and not is_throw_trace(n)
               and not is_chop_node(n) and not is_light_trace(n)]
-    check("there are four traces (camera aim, muzzle clearance, pellets, drop probe)",
-          len(traces) == 4, str(len(traces)))
+    check("there are five traces (camera aim, muzzle clearance, pellets, the drop key's "
+          "probe and the dragged drop's)",
+          len(traces) == 5, str(len(traces)))
 
 
 

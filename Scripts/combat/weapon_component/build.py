@@ -24,6 +24,7 @@ from combat.breath_tuning import (
 )
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_VAR, SWAY_VARS
 from combat.slot_tuning import (
+    DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR,
     HAND_FROM_VAR, HAS_ROOM_VAR, MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR, MOVE_TO_VAR,
     NO_REQUEST, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
     STARTER_HAND_FROM,
@@ -95,7 +96,8 @@ from combat.weapon_component import vars as WV
 # The slots' int variables, all NO_REQUEST at rest (HandFrom's default is
 # the issued shotgun's: build_weapon_component overrides it).
 SLOT_INT_VARS = (HAND_FROM_VAR, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
-                 MOVE_FROM_VAR, MOVE_TO_VAR, MOVE_SRC_VAR, MOVE_DST_VAR)
+                 MOVE_FROM_VAR, MOVE_TO_VAR, MOVE_SRC_VAR, MOVE_DST_VAR,
+                 DROP_REQUEST_VAR, DROP_WANT_VAR)
 
 
 def _kept_class(bp, var):
@@ -214,6 +216,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # garment and slot a wear or a take-off is moving (wear.py).
     _declare(ed, WORN_VAR, BEL.get_array_type(BEL.get_object_reference_type(item_class)))
     _declare(ed, WEAR_ITEM_VAR, BEL.get_object_reference_type(item_class))
+    # The item a drag out of the inventory is setting down (drop_request.py).
+    _declare(ed, DROP_ITEM_VAR, BEL.get_object_reference_type(item_class))
     for name in (TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR, WEAR_SLOT_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
     # The dead gate's answer (dead.py), and a probe's stand-in for the fire key.

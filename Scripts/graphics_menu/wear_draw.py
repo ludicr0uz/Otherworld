@@ -24,6 +24,7 @@ from combat.wear_tuning import WORN_VAR
 from graphics_menu.cursor import author_widget_click
 from graphics_menu.hud_inventory import _author_empty_slot, _author_filled_slot
 from graphics_menu.inv_consts import DRAG_FROM_VAR, WORN_CODE_FIRST
+from graphics_menu.inv_carry import author_carry_end, author_carry_icon
 from graphics_menu.inv_drag import author_inv_drag
 from graphics_menu.ui_graph import part, set_shown
 from graphics_menu.umg_consts import WBP_HUD
@@ -126,6 +127,8 @@ def author_wear_panel(ed, in_execs):
     flow = author_widget_click(ed, part(ed, WBP_HUD, WEAR_CLOSE),
                                (WEAR_OPEN_VAR, "false"), [opened])
     flow = author_inv_drag(ed, wc, flow)
+    flow = author_carry_icon(ed, wc, worn, flow)
     box = part(ed, WBP_HUD, WEAR_SLOTS_BOX)
     done = _author_slots(ed, worn, box, flow + [idle])
-    return [closed, done, out(cast, "CastFailed")]
+    # A drag's end with the panel shut, and the look held while one is on.
+    return author_carry_end(ed, [closed, done, out(cast, "CastFailed")])

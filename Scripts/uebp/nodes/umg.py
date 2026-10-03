@@ -23,6 +23,7 @@ FN_SET_TEXT_COLOUR = "/Script/UMG.TextBlock.SetColorAndOpacity"
 FN_ADD_TO_VIEWPORT = "/Script/UMG.UserWidget.AddToViewport"
 
 FN_GEOMETRY = "/Script/UMG.Widget.GetCachedGeometry"
+FN_SET_TRANSLATION = "/Script/UMG.Widget.SetRenderTranslation"
 FN_SET_OPACITY = "/Script/UMG.Widget.SetRenderOpacity"
 FN_SET_WIDGET_VISIBILITY = "/Script/UMG.Widget.SetVisibility"
 

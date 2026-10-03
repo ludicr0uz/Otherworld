@@ -33,7 +33,8 @@ from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
 from graphics_menu.wbp_legal import author_watermark
 from graphics_menu.wbp_loot import author_loot_widgets
 from graphics_menu.inv_consts import (
-    BAG_BOX, BAG_COLUMNS, BAG_LABEL_TEXTS, BAG_LABELS, BAG_PANEL, HAND_BOX, HAND_GAP,
+    BAG_BOX, BAG_COLUMNS, BAG_LABEL_TEXTS, BAG_LABELS, BAG_PANEL, DRAG_ICON, HAND_BOX,
+    HAND_GAP,
     INV_LABEL_FONT, KIT, KIT_BOTTOM, WEAPON_BOX, WEAPON_GHOSTS,
 )
 from graphics_menu.wbp_parts import slot_grid
@@ -44,7 +45,7 @@ from graphics_menu.umg_consts import (
     CORNER_MARGIN, DEBUFF_FONT, DEBUFF_LABELS, EQUIPPED_FONT, EQUIPPED_GAP, EQUIPPED_NAME,
     FPS_FONT, FPS_TOP, HP_BAR, HP_BAR_SIZE, HP_GROUP, HP_ICON, HP_NUM, HP_NUM_FONT,
     HUD_BODY, HUD_FPS, ICON_GAP, KILLS, KILLS_FONT, KILLS_TOP,
-    SLOT_GAP, SLOT_W, STAMINA_BAR, STAT_ICON, STRIP_BOTTOM, ST_BAR_SIZE, ST_GROUP,
+    SLOT_GAP, SLOT_ICON_H, SLOT_ICON_W, SLOT_W, STAMINA_BAR, STAT_ICON, STRIP_BOTTOM, ST_BAR_SIZE, ST_GROUP,
     ST_ICON, SURVIVAL, SURVIVAL_BARS, SURVIVAL_LEFT, SV_BAR_SIZE, SV_COLUMN_GAP,
     VITALS, VITALS_GAP, VITALS_OVER, WBP_HUD,
     debuff_text, stat_bar, stat_group, stat_icon,
@@ -133,7 +134,7 @@ def _author_kit(bp, body):
     """Bottom right: what is worn, and under it the backpack, its top row's
     quick keys over it (both always shown; the HUD collapses them under the
     menu); left of them, with I, the character's portrait."""
-    kit = U.add(bp, unreal.VerticalBox, KIT, body)
+    kit = U.add(bp, unreal.VerticalBox, KIT, body, variable=True)
     U.at(kit, (1.0, 1.0), (1.0, 1.0), (-CORNER_MARGIN, -KIT_BOTTOM))
     U.pad(author_wear_widgets(bp, kit), h="Right")
     bag = U.add(bp, unreal.VerticalBox, BAG_PANEL, kit, variable=True)
@@ -164,4 +165,9 @@ def build_hud_widget():
     fps = U.text(bp, root, HUD_FPS, "FPS  60", FPS_FONT, COL_FPS, variable=True)
     U.at(fps, (1.0, 0.0), (1.0, 0.0), (-CORNER_MARGIN, FPS_TOP))
     author_watermark(bp, root)
+    # The item a drag carries (inv_carry.py): last, so over everything; its
+    # centre on the canvas's corner, moved to the cursor by its translation.
+    drag = U.image(bp, root, DRAG_ICON, "T_UI_Slot", (SLOT_ICON_W, SLOT_ICON_H), variable=True)
+    U.at(drag, (0.0, 0.0), (0.5, 0.5), (0.0, 0.0), size=(SLOT_ICON_W, SLOT_ICON_H))
+    U.hide(drag)
     return U.compile_and_save(bp)

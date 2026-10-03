@@ -1,12 +1,15 @@
 """verify.wear -- putting a garment on and taking one off.
 
 Mirrors weapon_component/wear.py: the wear behind the Consumable tap, and the
-take-off the I panel asks for (TakeOffSlot). Checked on the wiring and the
+take-off the I panel asks for (TakeOffSlot); wear_drag.py's WearRequest; and
+drop_request.py's DropRequest (an item dragged out of the inventory). Checked on the wiring and the
 defaults; probes/probe_clothing.py runs both in a game.
 """
 
 from combat.paths import ITEM_BP_PATH
-from combat.slot_tuning import SLOT_VAR
+from combat.slot_tuning import (
+    DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, NO_REQUEST, SLOT_VAR,
+)
 from combat.verify.common import BEL, PIN, cdo, check, in_pins, load, pin_value
 from combat.verify.fixtures import wc_cdo, wg
 from combat.wear_tuning import (
@@ -99,10 +102,10 @@ def check_wear():
                              f"Set {TRIGGER_SPENT}"]), str(titles))
     sets = [n for n in wg if "bSizeToFit" in in_pins(n)
             and any(_title(f) == f"Get {WORN_VAR}" for f in _feeders(n, "TargetArray"))]
-    check(f"{WORN_VAR} is written three times (the wear, the dragged wear, the take-off), "
-          "the wears' grown to fit",
-          len(sets) == 3 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
-          == ["false", "true", "true"], str([pin_value(n, "bSizeToFit") for n in sets]))
+    check(f"{WORN_VAR} is written four times (the wear, the dragged wear, the take-off, "
+          "the drag out of the inventory), the wears' grown to fit",
+          len(sets) == 4 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
+          == ["false", "false", "true", "true"], str([pin_value(n, "bSizeToFit") for n in sets]))
 
 
 def check_take_off():
@@ -146,8 +149,36 @@ def check_wear_request():
           str([pin_value(n, WEAR_REQUEST_VAR) for n in lowered]))
 
 
+def check_drop_request():
+    gates = _gated_on(DROP_REQUEST_VAR)
+    check(f"one Branch serves {DROP_REQUEST_VAR} >= 0 (a drag out of the inventory)",
+          len(gates) == 1, str(len(gates)))
+    if not gates:
+        return
+    titles = [_title(n) for n in _chain(
+        PIN.get_owning_node(PIN.list_connected_pins(BEL.find_then_pin(gates[0]))[0]))]
+    check("...the request copied and lowered, the slot's item stored and taken out of "
+          "Inventory, then set down: Dropped, detached, shown, traced onto the ground, "
+          "unplaced and the hand re-equipped",
+          _in_order(titles, [f"Set {DROP_WANT_VAR}", f"Set {DROP_REQUEST_VAR}",
+                             f"Set {DROP_ITEM_VAR}", "Branch", f"Set {DROP_ITEM_VAR}",
+                             "Branch", "Remove", "Branch", "Set Dropped", "Detach",
+                             "Hidden", "Line Trace", "Branch", "Set Actor Location",
+                             f"Set {SLOT_VAR}", "Set NeedsRefresh"]), str(titles))
+    lowered = [n for n in wg if _title(n) == f"Set {DROP_REQUEST_VAR}"]
+    check(f"...and {DROP_REQUEST_VAR} is lowered to {NO_REQUEST}, by that one Set",
+          len(lowered) == 1 and pin_value(lowered[0], DROP_REQUEST_VAR) == str(NO_REQUEST),
+          str([pin_value(n, DROP_REQUEST_VAR) for n in lowered]))
+    stored = [n for n in wg if _title(n) == f"Set {DROP_ITEM_VAR}"]
+    check(f"...{DROP_ITEM_VAR} is cleared, then stored off SlotItems or off {WORN_VAR}: "
+          "three Sets",
+          len(stored) == 3 and sorted(len(_feeders(n, DROP_ITEM_VAR)) for n in stored)
+          == [0, 1, 1], str(len(stored)))
+
+
 def run():
     check_wear_state()
     check_wear()
     check_take_off()
     check_wear_request()
+    check_drop_request()

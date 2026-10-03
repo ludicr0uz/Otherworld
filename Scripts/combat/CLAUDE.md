@@ -115,7 +115,12 @@ menu polls its own copy from `DrawHUD`, which does.
     (`HandFrom`): 1 twice puts the gun away. **A drag is `MoveFrom`/`MoveTo`** (the HUD's,
     `graphics_menu/inv_drag.py`): moved if it fits, swapped if the other fits back. A drag
     to or from a worn slot is clothing's: `TakeOffTo` with `TakeOffSlot`, and `WearRequest`
-    (`weapon_component/wear.py`, `wear_drag.py`; `Scripts/clothing/CLAUDE.md`).
+    (`weapon_component/wear.py`, `wear_drag.py`; `Scripts/clothing/CLAUDE.md`). **A drag let go
+    outside the inventory is `DropRequest`** (`weapon_component/drop_request.py`): a slot
+    code, or `SLOT_COUNT` + a worn slot. The item leaves `Inventory` (or `Worn`) and is set
+    down as G sets the held one down (`inventory._author_set_down`, shared by both), its
+    Slot UNPLACED; the slot sync and the refresh empty the hand if it was the hand's.
+    `probes/probe_inventory_drag.py` runs it.
   - **The number keys are fixed** (`SLOT_KEYS`, variables on the component, as every key):
     not in `BIND_VARS`, so the settings page does not rebind them.
   - **Probes equip by writing `EquippedIndex`**: `probes/context.py` turns that write into

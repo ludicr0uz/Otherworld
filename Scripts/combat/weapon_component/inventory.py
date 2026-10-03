@@ -42,27 +42,24 @@ def _detach_rules(node):
         _set(node, rule, "KeepWorld")
 
 
-def _author_drop(ed, held, owner, exec_in):
-    """Detach the held weapon, drop it on the ground in front of the player."""
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
+def _author_set_down(ed, item, owner, exec_in, keep):
+    """``item`` becomes a pick-up on the ground in front of ``owner``: Dropped,
+    detached, shown, and set on the terrain under a point DROP_FORWARD ahead.
+    The G drop's and a drag out of the inventory's (drop_request.py). Returns
+    the two exec tails (landed, and left in the air over no ground)."""
     flag = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
-    _connect(held, _pin(flag, "self"))
+    _connect(item, _pin(flag, "self"))
     _set(flag, IV.Dropped, True)
     _connect(exec_in, _pin(flag, "execute"))
 
     off = keep(_node(ed, FN_DETACH))
-    _connect(held, _pin(off, "self"))
+    _connect(item, _pin(off, "self"))
     _detach_rules(off)
     _connect(then(flag), _pin(off, "execute"))
     # Shown on the way out: a sniper dropped while down its scope was hidden
     # by the sight camera (sights.py), and nothing else would ever show it.
     shown = keep(_node(ed, FN_SET_HIDDEN))
-    _connect(held, _pin(shown, "self"))
+    _connect(item, _pin(shown, "self"))
     _set(shown, "bNewHidden", False)
     _connect(then(off), _pin(shown, "execute"))
 
@@ -110,14 +107,26 @@ def _author_drop(ed, held, owner, exec_in):
     _connect(_vec(ed, 0.0, 0.0, 12.0), _pin(lift, "B"))
 
     on_ground = keep(_node(ed, FN_SET_ACTOR_LOC))
-    _connect(held, _pin(on_ground, "self"))
+    _connect(item, _pin(on_ground, "self"))
     _connect(out(lift), _pin(on_ground, "NewLocation"))
     _connect(then(landed), _pin(on_ground, "execute"))
 
     in_air = keep(_node(ed, FN_SET_ACTOR_LOC))
-    _connect(held, _pin(in_air, "self"))
+    _connect(item, _pin(in_air, "self"))
     _connect(out(start), _pin(in_air, "NewLocation"))
     _connect(else_(landed), _pin(in_air, "execute"))
+    return then(on_ground), then(in_air)
+
+
+def _author_drop(ed, held, owner, exec_in):
+    """Detach the held weapon, drop it on the ground in front of the player."""
+    made = []
+
+    def keep(n):
+        made.append(n)
+        return n
+
+    on_ground, in_air = _author_set_down(ed, held, owner, exec_in, keep)
 
     # Both placements rejoin here; an exec input takes more than one link.
     inv = keep(ed.add_get_member_variable_node(WV.Inventory))
@@ -125,8 +134,8 @@ def _author_drop(ed, held, owner, exec_in):
     remove = keep(_node(ed, FN_ARR_REMOVE))
     _connect(out(inv, WV.Inventory), _pin(remove, "TargetArray"))
     _connect(out(idx, WV.EquippedIndex), _pin(remove, "IndexToRemove"))
-    _connect(then(on_ground), _pin(remove, "execute"))
-    _connect(then(in_air), _pin(remove, "execute"))
+    _connect(on_ground, _pin(remove, "execute"))
+    _connect(in_air, _pin(remove, "execute"))
 
     # Held is set with its input pin left unconnected, which is how a Blueprint
     # object variable is cleared to None.

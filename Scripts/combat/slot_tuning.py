@@ -55,6 +55,11 @@ MOVE_FROM_VAR = "MoveFrom"        # a drag on the HUD: from this slot ...
 MOVE_TO_VAR = "MoveTo"            # ... to this one, swapping if it is filled
 SLOT_WANT_VAR = "SlotWant"        # the request's copies, read after it is lowered
 MOVE_SRC_VAR, MOVE_DST_VAR = "MoveSrc", "MoveDst"
+# A drag released outside the inventory: set this slot's item down on the
+# ground. A slot code, or SLOT_COUNT + a worn slot (wear_tuning.WEAR_SLOTS).
+DROP_REQUEST_VAR = "DropRequest"
+DROP_WANT_VAR = "DropWant"        # its copy, read after it is lowered
+DROP_ITEM_VAR = "DropItem"        # the item being set down, held still
 
 # The number keys: (component variable, default key, the slot it brings to
 # hand). 1-4 the weapon slots, 5-9 the bag's first five. Fixed keys on the

@@ -480,10 +480,27 @@ loot window, in play only. Traps met here:
   it (`TakeOffTo`, then `TakeOffSlot`); a slot's item onto the worn grid the wear
   (`WearRequest`: into the garment's own slot, whichever cell it lands on); on the same
   slot, that slot in hand (`SlotRequest`) or, worn, the take-off Enter asks for
-  (`WearTakeOffRequested`). The component decides what fits. Its press and release are
+  (`WearTakeOffRequested`); over no slot and outside the inventory (none of
+  `inv_consts.INV_AREAS`, the Kit and the hand's and weapons' grids, under the cursor), the
+  item set down on the ground (`DropRequest`, the drag's own code: a worn cell's is the
+  component's too); between two slots, nothing. The component decides what fits. Its press and release are
   read with `InvOver`/`InvDragFrom`, not a geometry test of their own:
   `cursor_checks._on_slot` allows that. It runs before the worn slots are drawn, so the
   caret and the drag's start are lit the same frame.
+- **A drag carries its item's icon on the cursor** (`inv_carry.py`): `DragIcon`, one Image
+  on `WBP_HUD`'s root (last, so over everything), its centre on the canvas's corner and its
+  render translation the cursor's place in the Body's space (`AbsoluteToLocal` of
+  `CursorPos`), its brush the dragged item's `Icon`.
+  - **The look is held while a drag is on:** the cursor shows in Game-and-UI, where the
+    left button held captures the mouse and the view turned with the drag.
+    `SetIgnoreLookInput` counts its calls, so it is made on the drag's edges only
+    (`InvLookHeld`), as the walk's is.
+  - **`author_carry_end` runs on every path of the panel's draw,** not only the open one:
+    a drag is called off (and the look given back) when I shuts the panel, the menu comes
+    up or the player dies with the button still down.
+  - `probe_inventory_drag.py` checks the drops, the look and the icon headless;
+    `probe_inventory_window.py` (windowed) puts the cursor mid-window and saves the screen
+    with the icon on it.
 - **A click on a worn slot is the release, not the press:** the press starts the drag,
   so a take-off on the press would leave nothing to drag.
 - **The character's portrait** (`WearPortrait`, `wbp_wear.author_wear_portrait`): a picture
@@ -493,7 +510,9 @@ loot window, in play only. Traps met here:
   (`Scripts/item_icons/CLAUDE.md`), so it does not change with what is worn or held.
   `probe_inventory_window.py` (windowed) saves the screen with it up.
 - **Still needs a play session:** dragging with a real mouse (no probe can aim at a cell:
-  `probe_clothing_drag.py` writes the component's requests instead), the silhouettes'
+  `probe_clothing_drag.py` and `probe_inventory_drag.py` write the component's requests
+  and the HUD's `InvDragFrom` instead: whether the view really stays still under a held
+  button, and the release outside the inventory), the silhouettes'
   alpha on a bright ground,
   how the Kit reads over the watermark and beside the loot window on a 720p screen, and
   the 1-9 keys themselves.

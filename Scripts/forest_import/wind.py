@@ -110,9 +110,9 @@ class _Graph:
             world_position_shader_offset=(
                 unreal.WorldPositionIncludedOffsets.WPT_EXCLUDE_ALL_SHADER_OFFSETS))
 
-    def along(self, pos, per_cm):
-        """Cycles along the wind: dot(pos, DIRECTION) / wavelength."""
-        dot = self.expr(unreal.MaterialExpressionDotProduct, pos, self.vec(W.DIRECTION))
+    def along(self, pos, axis, per_cm):
+        """Cycles along ``axis``: dot(pos, axis) / wavelength."""
+        dot = self.expr(unreal.MaterialExpressionDotProduct, pos, self.vec(axis))
         return self.mul(dot, self.const(1.0 / per_cm))
 
     def wave(self, t, hz, phase):
@@ -124,10 +124,44 @@ class _Graph:
         """Seconds x MPC_Wind.Speed."""
         return self.mul(self.expr(unreal.MaterialExpressionTime), self.param(W.PARAM_SPEED))
 
-    def push(self, amount, amp_cm, axis=W.DIRECTION):
-        """axis x amount x amp_cm x MPC_Wind.Strength: a WPO vector."""
+    def field(self, t, pos, hz, cm, cross_cm):
+        """Two wave trains crossing on GUST_HEADINGS, -1..1: it varies in
+        patches over the ground, and the patches travel downwind."""
+        (share, axis), (cross_share, cross_axis) = W.GUST_HEADINGS
+        main = self.wave(t, hz, self.along(pos, axis, cm))
+        cross = self.wave(t, hz * W.CROSS_RATE, self.along(pos, cross_axis, cross_cm))
+        return self.add(self.mul(main, self.const(share)),
+                        self.mul(cross, self.const(cross_share)))
+
+    def instance_random(self):
+        return self.expr(unreal.MaterialExpressionPerInstanceRandom)
+
+    def heading(self, turns):
+        """(along, across): DIRECTION turned by ``turns``, and the unit
+        vector 90 degrees left of that."""
+        cos = self.expr(unreal.MaterialExpressionCosine, turns)
+        sin = self.sine(turns)
+        wind, cross = self.vec(W.DIRECTION), self.vec(W.CROSSWIND)
+        along = self.add(self.mul(wind, cos), self.mul(cross, sin))
+        across = self.expr(unreal.MaterialExpressionSubtract,
+                           self.mul(cross, cos), self.mul(wind, sin))
+        return along, across
+
+    def veer(self, t, pos, veer_turns, scatter_turns, hz, cm, cross_cm):
+        """Turns off DIRECTION here and now: the drifting field's, plus the
+        instance's own (-scatter..scatter, from PerInstanceRandom)."""
+        own = self.mul(self.add(self.instance_random(), self.const(-0.5)),
+                       self.const(2.0 * scatter_turns))
+        return self.add(self.mul(self.field(t, pos, hz, cm, cross_cm),
+                                 self.const(veer_turns)), own)
+
+    def push(self, amount, amp_cm, axis):
+        """axis x amount x amp_cm x MPC_Wind.Strength: a WPO vector.
+        ``axis`` is a node (a heading) or a constant xyz."""
+        if isinstance(axis, tuple):
+            axis = self.vec(axis)
         scaled = self.mul(amount, self.mul(self.param(W.PARAM_STRENGTH), self.const(amp_cm)))
-        return self.mul(self.vec(axis), scaled)
+        return self.mul(axis, scaled)
 
 
 def _height(g):
@@ -138,17 +172,27 @@ def _height(g):
 
 
 def _tree_sway(g):
-    """Every tree's bend: (h / ref)^2 x (0.35 + 0.35 gust + 0.3 sway)."""
+    """Every tree's bend: (h / ref)^2 x (0.35 + 0.35 gust + own sway) along
+    its heading, and a share of its own sway across it."""
     t = g.time()
+    pos = g.world_pos()
     h = g.expr(unreal.MaterialExpressionSaturate,
                g.mul(_height(g), g.const(1.0 / W.TREE_REF_HEIGHT_CM)))
     bend = g.mul(h, h)
-    gust = g.wave(t, W.TREE_GUST_HZ, g.along(g.world_pos(), W.TREE_GUST_CM))
-    own = g.wave(t, W.TREE_SWAY_HZ,
-                 g.mul(g.expr(unreal.MaterialExpressionPerInstanceRandom), g.const(-1.0)))
+    gust = g.field(t, pos, W.TREE_GUST_HZ, W.TREE_GUST_CM, W.TREE_CROSS_GUST_CM)
+    own = g.wave(t, W.TREE_SWAY_HZ, g.mul(g.instance_random(), g.const(-1.0)))
     amount = g.add(g.const(0.35), g.add(g.mul(gust, g.const(0.35)),
-                                        g.mul(own, g.const(0.3))))
-    return g.push(g.mul(amount, bend), W.TREE_AMP_CM)
+                                        g.mul(own, g.const(W.TREE_OWN_SWAY))))
+    # Across the heading at another rate and phase, so the two never line up.
+    rock = g.wave(t, W.TREE_SWAY_HZ * W.TREE_CROSS_SWAY_RATE,
+                  g.mul(g.instance_random(), g.const(-3.7)))
+    along, across = g.heading(g.veer(
+        t, pos, W.TREE_VEER_TURNS, W.TREE_SCATTER_TURNS, W.TREE_VEER_HZ,
+        W.TREE_VEER_CM, W.TREE_CROSS_VEER_CM))
+    return g.add(
+        g.push(g.mul(amount, bend), W.TREE_AMP_CM, along),
+        g.push(g.mul(rock, bend), W.TREE_AMP_CM * W.TREE_OWN_SWAY * W.TREE_CROSS_SWAY,
+               across))
 
 
 def _leaf_flutter(g):
@@ -162,17 +206,20 @@ def _leaf_flutter(g):
 
 
 def author_grass_wind(mat, mpc, weight, x0=-1200, y0=1100):
-    """M_ProcFoliage's WPO: lean and sway downwind in rolling waves, x
-    ``weight`` (the vertex colour's alpha: 0 at the root, 1 at the tip)."""
+    """M_ProcFoliage's WPO: lean and sway along the clump's own heading in
+    rolling gusts, x ``weight`` (the vertex colour's alpha: 0 at the root, 1
+    at the tip)."""
     g = _Graph(mat, mpc, x0, y0)
     t = g.time()
-    sway = g.wave(t, W.GRASS_SWAY_HZ, g.along(g.world_pos(), W.GRASS_WAVE_CM))
-    flutter = g.wave(t, W.GRASS_FLUTTER_HZ,
-                     g.mul(g.expr(unreal.MaterialExpressionPerInstanceRandom),
-                           g.const(-1.0)))
+    pos = g.world_pos()
+    sway = g.field(t, pos, W.GRASS_SWAY_HZ, W.GRASS_WAVE_CM, W.GRASS_CROSS_WAVE_CM)
+    flutter = g.wave(t, W.GRASS_FLUTTER_HZ, g.mul(g.instance_random(), g.const(-1.0)))
     amount = g.add(g.add(g.const(0.55), g.mul(sway, g.const(0.45))),
                    g.mul(flutter, g.const(W.GRASS_FLUTTER)))
-    wpo = g.push(g.mul(amount, weight), W.GRASS_AMP_CM)
+    along, _ = g.heading(g.veer(
+        t, pos, W.GRASS_VEER_TURNS, W.GRASS_SCATTER_TURNS, W.GRASS_VEER_HZ,
+        W.GRASS_VEER_CM, W.GRASS_CROSS_VEER_CM))
+    wpo = g.push(g.mul(amount, weight), W.GRASS_AMP_CM, along)
     MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
     mat.set_editor_property("max_world_position_offset_displacement",
                             W.GRASS_MAX_DISPLACEMENT_CM)
@@ -241,6 +288,14 @@ def verify_wind(check):
               bool(wpo) and reads == set(W.MPC_DEFAULTS), f"wpo={bool(wpo)} reads={reads}")
         check(f"{name} Wind Is Bounded",
               mat.get_editor_property("max_world_position_offset_displacement") > 0)
+        # One heading for everything is a wall of wind: the push's axis is
+        # turned (a Cosine exists for nothing else) by the instance's own
+        # angle and a field over the ground.
+        kinds = {type(e) for e in _wind_exprs(mat)}
+        need = {unreal.MaterialExpressionCosine, unreal.MaterialExpressionPerInstanceRandom,
+                unreal.MaterialExpressionWorldPosition}
+        check(f"{name} Wind's Heading Varies From Instance To Instance And Over The Ground",
+              need <= kinds, str(sorted(k.__name__ for k in need - kinds)))
 
 
 if __name__ == "__main__":

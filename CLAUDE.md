@@ -270,7 +270,8 @@ editor.
   `ELLIVIAN INC. · CONFIDENTIAL` watermark, bottom right; `WATERMARK_RECIPIENT`
   (`graphics_menu/legal_consts.py`) stamps a shared build with who it was given to.
 - **Wind:** the grass and the trees sway in the wind (world-position offset in their materials,
-  `forest_generator/wind.py`); the graphics menu's GRAPHICS TUNING tab switches it on or off
+  `forest_generator/wind.py`), each clump and tree along a heading of its own that veers about
+  the prevailing wind, in gusts that cross the map in patches; the graphics menu's GRAPHICS TUNING tab switches it on or off
   per preset, sets how far off it still moves, and its strength and speed
   (`graphics_menu/gfx_tuner_wind.py`).
 - **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`. Food and water lie

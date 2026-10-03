@@ -130,8 +130,15 @@ level from scratch, which drops the forage and the day/night cycle actor.
 - **Wind is world-position offset** (`wind.py`, `forest_import/wind.py`), scaled by
   `MPC_Wind.Strength` and `.Speed`, which the graphics menu sets
   (`Scripts/graphics_menu/CLAUDE.md`, "Wind"):
-  - `M_ProcFoliage` (grass, bushes) leans and sways by its vertex alpha, in waves across
-    the field; it is rebuilt whole by `foliage_assets.build_material`.
+  - **Nothing is pushed straight along `DIRECTION`**, which is only the prevailing wind. Each
+    clump's and each tree's heading veers off it: by a field that drifts over the ground (two
+    crossing wave trains, `GUST_HEADINGS`, so it changes in patches) plus an angle of the
+    instance's own (`PerInstanceRandom`). The gusts are the same two trains, and a tree also
+    rocks across its heading. The numbers are the `*_VEER_*`, `*_SCATTER_TURNS` and
+    `*_CROSS_*` constants; `verify_wind` checks each material turns its heading.
+  - `M_ProcFoliage` (grass, bushes) leans and sways by its vertex alpha, in gusts across
+    the field; it is rebuilt whole by `foliage_assets.build_material` (to rebuild it alone:
+    `foliage_assets.build_material()`, no level import needed).
   - **`M_Master_Bark` and `M_Master_Foliage` have no builder** (it was deleted), so the wind
     is **patched** into them: every node it adds has the desc `OW_Wind`, and a re-run deletes
     those first. Both bend by `(local height / 15 m)^2` (the mesh's origin is the trunk

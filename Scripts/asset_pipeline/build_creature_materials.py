@@ -136,6 +136,8 @@ def _specs():
     if not os.path.isdir(CACHE_ROOT):
         return out
     for sid in sorted(os.listdir(CACHE_ROOT)):
+        if sid.startswith("_"):      # set aside: see import_characters._specs
+            continue
         state = os.path.join(CACHE_ROOT, sid, "task.json")
         if os.path.exists(state):
             with open(state) as fh:

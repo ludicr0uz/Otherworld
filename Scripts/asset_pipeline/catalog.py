@@ -181,20 +181,27 @@ ADVENTURER_BASE = MonsterSpec(
 # player_body.PLAYER_BODY does.
 #
 # Tight, not loose: a boxer short's hem hangs off the thigh, skins to the
-# wrong bone and would poke through trousers drawn over it. The pose is left
-# to ``pose_mode`` and said once, as adventurer_01's prompt says it:
-# adventurer_02's "arms angled down and away from the body" came back with the
-# arms hung behind the shoulders, 39 degrees off adventurer_01's.
+# wrong bone and would poke through trousers drawn over it. And not the word
+# "boxer": the first try, worded "tight-fitting boxer briefs", came back in
+# loose boxing shorts with a wide waistband (kept in the cache as
+# _adventurer_03_attempt1, preview only). "Compression shorts" is the garment
+# that is skin-tight by name.
+#
+# The pose is spelled out as well as set by ``pose_mode``: that first try,
+# which said only "A-pose", stood with its arms raised level and its palms up.
 ADVENTURER_03 = MonsterSpec(
     id="adventurer_03",
     prompt=(
         "Full body 3D character, an adult man wearing nothing but plain dark "
-        "grey tight-fitting boxer briefs underwear, snug on the hips and "
-        "thighs, barefoot with bare toes, bare knees and bare legs, shirtless "
-        "with a bare chest, lean athletic build, weathered rugged face with "
-        "short stubble and cropped dark hair, base mesh for a clothing "
-        "system, standing upright, A-pose, photorealistic skin, PBR textures, "
-        "Unreal Engine 5 style, 4k resolution, symmetrical posture for rigging"
+        "grey skin-tight compression shorts underwear ending at the upper "
+        "thigh, no loose fabric, barefoot with bare toes, bare knees and bare "
+        "legs, shirtless with a bare chest, lean athletic build, weathered "
+        "rugged face with short stubble and cropped dark hair, base mesh for "
+        "a clothing system, standing upright in an A-pose with straight arms "
+        "lowered 45 degrees from the body and palms facing down, feet "
+        "parallel and shoulder width apart, photorealistic skin, PBR "
+        "textures, Unreal Engine 5 style, 4k resolution, symmetrical posture "
+        "for rigging"
     ),
     height_meters=QUINN_HEIGHT_M,
     dest="/Game/Sourced/Characters/SKM_Adventurer03",

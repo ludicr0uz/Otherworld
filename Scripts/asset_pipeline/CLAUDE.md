@@ -74,9 +74,26 @@ bound and never add a number for one character.**
 
 ## Where this stands (2026-10-03)
 
-`adventurer_03` is in the catalog and **not generated**: the first request came back
-`HTTP 402 "API key credit limit reached"` (the account had 900 credits; the limit is the
-key's own, set in Meshy's dashboard, and only the user can raise it). Nothing was spent. When
-the key allows it again, the three commands at the top of this file are all that is left,
-within the 80 credits the user allowed; then set `CLOTHING_BASE_BODY` to it and leave the
-player on `adventurer_01` unless told otherwise.
+- `adventurer_03` (the man in skin-tight shorts) is generated, imported and proven: worn, it
+  passes every verifier and the slots, throw, clothing, stance, shotgun-hands, sight-hands,
+  hold-pose and gait probes, with nothing in the repo tuned for it. It took two previews: the
+  first, worded "boxer briefs", came back in loose boxing shorts
+  (`assets/cache/meshy/_adventurer_03_attempt1`, preview only). 60 credits in all.
+- The player is left on `adventurer_01`; `adventurer_03` is the clothing base body
+  (`CLOTHING_BASE_BODY`). Wearing it is the one command at the top.
+- Three more things turned out to be one body's accident, and are general now: which side of
+  a flat open hand is the palm (`palm_twist.hand_frame`: the two hands vote together), a
+  handle no easing fully fits (`grip._eased` goes as far as it may), and how the guard's lean
+  is checked (off the chest's own turn, not where the neck ends up).
+
+## Looking at a generated body
+
+- **Don't judge a texture from a cold capture.** `Scripts/dev/render_character.py`, and the
+  portrait before `item_icons/capture._full_textures`, photograph a body a moment after the
+  editor starts, on its lowest mips: a Meshy atlas is hundreds of islands packed edge to edge,
+  and at those mips every island wears its neighbour's colour (skin blotches on dark shorts).
+  Look at it in a windowed game instead:
+  `OW_HOT_SHOTS=1 python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_hot_blade.py`
+  saves front views to `Saved/Screenshots/MacEditor/`.
+- The stage thumbnails Meshy returns are saved beside the model
+  (`<id>_<stage>_thumbnail.png`): look at the preview's before paying for the rest.

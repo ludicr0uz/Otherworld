@@ -77,14 +77,12 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 
 - Nothing is drawn worn, and a worn garment does nothing (no warmth, no carry space).
 - **The base body** is not worn: the player still wears `SKM_Adventurer01` (dressed).
-  Which body is the base is `asset_pipeline/player_body.py` `CLOTHING_BASE_BODY`
-  (`adventurer_02` today, the man in loose boxers, imported and rigged; `verify/base_body.py`
-  checks it). Its replacement is described and not generated yet: `adventurer_03`, the same
-  man in tight boxer briefs, made to swap in for the player's body (`catalog.ADVENTURER_03`).
-  Once it is generated, point `CLOTHING_BASE_BODY` at it; wearing it is
-  `python3 Scripts/asset_pipeline/swap_player_body.py adventurer_03`
-  (`Scripts/asset_pipeline/CLAUDE.md` has the whole procedure, and why no number is
-  re-measured for a new body any more).
+  The base is `SKM_Adventurer03`, the same man in skin-tight shorts, generated to swap in
+  for the player's body (`asset_pipeline/player_body.py` `CLOTHING_BASE_BODY`;
+  `verify/base_body.py` checks it). Worn as a rehearsal it passed every verifier and probe.
+  Wearing it for good is `python3 Scripts/asset_pipeline/swap_player_body.py adventurer_03`
+  (`Scripts/asset_pipeline/CLAUDE.md`). `SKM_Adventurer02`, the first try in loose boxers,
+  is kept only as test data.
 - The saved profile (`graphics_menu/CLAUDE.md`, "Save and exit") stores the bag, not `Worn`:
   what was worn is lost on save and exit.
 - No loot table names a garment yet (`Scripts/loot/tables.py`); a looted one would go into

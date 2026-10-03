@@ -117,8 +117,19 @@ def _eig3(m):
     return out
 
 
-def hand_frame(mesh, bone):
-    """(finger direction, palm normal) for one hand, in component space."""
+def _other_hand(mesh, bone):
+    """The same hand on the other side, by name, or None."""
+    for a, b in (("Left", "Right"), ("Right", "Left"), ("_l", "_r"), ("_r", "_l")):
+        if a in bone:
+            other = bone.replace(a, b)
+            return other if other in mesh_ref_pose(mesh) else None
+    return None
+
+
+def _hand_cloud(mesh, bone):
+    """(wrist, centroid, flat axis, skew along it) of the vertices one hand
+    moves: the flat axis is the thinnest of the cloud's three, unsigned, and
+    the skew is the cloud's third moment along it, in standard deviations."""
     family, order = _descendants(mesh, bone)
     # The mesh's rest, not the skeleton's: the cloud below is the mesh's, and
     # on the mannequin the two wrists are 2.8 cm apart (see mesh_ref_pose).
@@ -163,7 +174,30 @@ def hand_frame(mesh, bone):
         s1 += proj * proj
         s3 += proj ** 3
     sigma = math.sqrt(s1 / n) or 1.0
-    if (s3 / n) / (sigma ** 3) < 0:
+    return wrist, c, normal, (s3 / n) / (sigma ** 3)
+
+
+def hand_frame(mesh, bone):
+    """(finger direction, palm normal) for one hand, in component space.
+
+    Which way the flat axis is the palm's is read off the cloud's skew along
+    it, and one hand's skew can be next to nothing: a generated hand held flat
+    and open (adventurer_03's left: -0.03, where a hand with any curl in it
+    reads 0.2-0.5) came out palm side wrong, and its pinky was skinned to
+    nothing. A body's hands are mirror images, so the two vote together: the
+    other hand's axis is mirrored across the body and its skew added. Every
+    body before that one reads as it did (both hands already agreed).
+    """
+    wrist, c, normal, skew = _hand_cloud(mesh, bone)
+    other = _other_hand(mesh, bone)
+    if other:
+        _w, _c, theirs, their_skew = _hand_cloud(mesh, other)
+        mirrored = unreal.Vector(-theirs.x, theirs.y, theirs.z)
+        along = mirrored.dot(normal)
+        # Hands posed alike only: a body with one palm turned votes alone.
+        if abs(along) > 0.5:
+            skew += their_skew if along > 0 else -their_skew
+    if skew < 0:
         normal = unreal.Vector(-normal.x, -normal.y, -normal.z)
 
     finger = _unit(c[0] - wrist.x, c[1] - wrist.y, c[2] - wrist.z)

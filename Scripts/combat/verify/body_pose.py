@@ -13,7 +13,8 @@ import math
 from asset_pipeline.rig_util import mesh_ref_pose
 from combat.body_pose import (
     KNEEL_BLEND_SPEED, KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S, POSE_KNEEL,
-    ADDITIVE, GUARD_ARMS, GUARD_GUN, GUARD_GUN_TURN_DEG, POSE_BLEND_SPEED, POSE_CROUCH, POSE_PRONE,
+    ADDITIVE, GUARD_ARMS, GUARD_GUN, GUARD_GUN_LEAN_DEG, GUARD_GUN_TURN_DEG,
+    POSE_BLEND_SPEED, POSE_CROUCH, POSE_PRONE,
     POSE_WEIGHTS, PRONE_HIPS_CM, PRONE_MOVING, _conj, _mul,
     _ref, _rotator, _turn, pose_plan,
 )
@@ -224,10 +225,22 @@ def check_pose_geometry():
         dx, dy = (p[b["clavicle_l"]][i] - p[b["clavicle_r"]][i] for i in (0, 1))
         return math.degrees(math.atan2(dy, dx))
     turned = yaw(rest) - yaw(pos)
+    # The lean is read off the chest's own turn: how far it tips straight up
+    # back from the way the turned chest faces. (Where the neck ends up says
+    # nothing: a rig whose neck joint sits behind its chest joint carries it
+    # forward in the turn.)
+    chest = skin.aim_bones[-1]
+    was = ref[chest][0].rotation
+    added = _mul(rot[chest], _conj((was.x, was.y, was.z, was.w)))
+    r = math.radians(GUARD_GUN_TURN_DEG)
+    ahead = (math.sin(r), math.cos(r), 0.0)
+    back = -sum(u * a for u, a in zip(_turn(added, (0.0, 0.0, 1.0)), ahead))
+    leaned = math.degrees(math.asin(max(-1.0, min(1.0, back))))
     check(f"gun guard: the shoulders turn left by {GUARD_GUN_TURN_DEG:g} deg "
-          "and the chest leans back",
+          f"and the chest leans back by {GUARD_GUN_LEAN_DEG:g}",
           abs(turned - GUARD_GUN_TURN_DEG) < 2.0
-          and pos[b["neck"]][1] < rest[b["neck"]][1], f"{turned:.1f}")
+          and abs(leaned - GUARD_GUN_LEAN_DEG) < 2.0,
+          f"turned {turned:.1f}, leaned {leaned:.1f}")
 
 
 def check_weights_written():

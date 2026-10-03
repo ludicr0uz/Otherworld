@@ -47,20 +47,22 @@ from asset_pipeline.skeleton_probe import (             # noqa: E402
 )
 
 # ── Tolerances ───────────────────────────────────────────────────────────────
-# From the four rigs cached on 2026-10-03, each against adventurer_01
+# From the five rigs cached on 2026-10-03, each against adventurer_01
 # (``--table adventurer_01`` prints it; worst segment per group):
 #
 #                    arms            clavicles       legs            spine
 #                    angle  length   angle  length   angle  length   angle  length
 #   adventurer_01     0.0   1.00      0.0   1.00      0.0   1.00      0.0   1.00
 #   adventurer_02    24.6   0.83     39.4   1.48      4.3   1.19      6.4   1.58
+#   adventurer_03    11.1   0.83     24.7   1.27      6.6   1.18     22.5   1.50
 #   zombie_01        35.6   1.05      2.9   0.98     10.9   1.18      1.0   0.83
 #   wendigo_01       55.7   1.56     22.3   1.20     57.6   1.48     49.9   4.55
 #
 # adventurer_02 is the body that did NOT swap in as generated (its clavicles
 # run 39 degrees behind adventurer_01's, and its hold poses fell short by up to
 # 10 cm); the wendigo is not a man. So the first line is drawn well under
-# adventurer_02 and the second between it and the wendigo.
+# adventurer_02 and the second between it and the wendigo. adventurer_03 was
+# generated after the lines were drawn, read "normalise", and swapped in.
 #
 # Past these a rig needs the import-time normalising:
 NORMALISE_ANGLE_DEG = 10.0
@@ -333,7 +335,7 @@ def print_table(reference_id):
     print(f"against {reference_id} (worst segment per group: angle deg, length ratio)")
     print(f"  {'':<16s}" + "".join(f"{g:>16s}" for g in GROUP_ORDER) + "   verdict")
     for sid in sorted(os.listdir(CACHE_ROOT)):
-        if not rigged_glb(sid):
+        if sid.startswith("_") or not rigged_glb(sid):
             continue
         report = check(sid, reference_id)
         cells = "".join(

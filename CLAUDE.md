@@ -262,8 +262,9 @@ editor.
   onto the hand or a bag slot and a carried one onto the worn slots to wear it
   (`combat/weapon_component/wear_drag.py`), and a portrait of the character, facing
   forward, stands left of the panel (a render of the player's body: `item_icons/portrait.py`). Only the state exists: nothing is drawn worn and wearing changes nothing. The body
-  the garments will be drawn on is generated: the adventurer in boxers (`SKM_Adventurer02`,
-  Meshy, rigged and animated like the player's), not yet worn. One of
+  the garments will be drawn on is generated: the adventurer in skin-tight shorts
+  (`SKM_Adventurer03`, Meshy), made to swap in for the player's body and not yet worn
+  (`Scripts/asset_pipeline/CLAUDE.md`). One of
   each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).
 - **Item icons:** every item's icon, in the inventory grid and in the loot window, is a
   picture of its own 3D model, lit and fitted to the slot by `Scripts/build_item_icons.py`

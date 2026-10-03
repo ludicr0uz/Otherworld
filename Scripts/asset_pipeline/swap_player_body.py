@@ -16,7 +16,9 @@ from it, in the order they must run:
        deleted through the editor first, which takes minutes apiece
     5. the weapons, survival, menu and clothing builds, in a fresh editor
        (the weapons build poses every weapon in the worn body's hands)
-    6. the verifiers
+    6. build_item_icons.py Character   the I panel's portrait, a picture of
+       the body the built character now wears
+    7. the verifiers
 
 Close the editor first: every step runs cold, and a cold build under an open
 editor is overwritten by it (CLAUDE.md, "Never cold-run a builder").
@@ -40,6 +42,8 @@ IMPORT = ("asset_pipeline/import_body.py",)
 CLIPS = ("asset_pipeline/import_quaternius.py",)
 BUILDS = ("build_weapons_and_combat.py", "build_survival.py",
           "build_graphics_menu.py", "build_clothing.py")
+# Run as it is, not through uepy.py: it drives the editor itself.
+PORTRAIT = ("build_item_icons.py", "Character")
 VERIFIERS = ("verify_weapons_and_combat.py", "verify_survival.py",
              "verify_graphics_menu.py", "verify_clothing.py",
              "verify_npc_blueprints.py")
@@ -69,7 +73,7 @@ def steps(check_only=False):
         return [verify]
     return [("import any body not imported yet", IMPORT),
             ("the stance, kneel and throw clips", CLIPS),
-            ("the builds", BUILDS), verify]
+            ("the builds", BUILDS), ("the I panel's portrait", PORTRAIT), verify]
 
 
 def clear_pose_clips():
@@ -84,6 +88,8 @@ def clear_pose_clips():
 
 
 def command(scripts):
+    if scripts is PORTRAIT:
+        return [sys.executable, os.path.join(SCRIPTS, PORTRAIT[0]), *PORTRAIT[1:]]
     return [sys.executable, UEPY, "--cold", "--summary",
             *(os.path.join(SCRIPTS, s) for s in scripts)]
 

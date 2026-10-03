@@ -32,7 +32,7 @@ PLAYER_BODY = "adventurer_01"
 
 # The catalog id of the body the garments are drawn on (Scripts/clothing): the
 # player with every clothing slot empty.
-CLOTHING_BASE_BODY = "adventurer_02"
+CLOTHING_BASE_BODY = "adventurer_03"
 
 
 def name_of(spec_id):

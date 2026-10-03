@@ -76,6 +76,10 @@ def _specs():
     if not os.path.isdir(CACHE_ROOT):
         return out
     for sid in sorted(os.listdir(CACHE_ROOT)):
+        # A folder set aside (an attempt that was generated again) keeps its
+        # task.json, with the same id as the one that replaced it.
+        if sid.startswith("_"):
+            continue
         state_path = os.path.join(CACHE_ROOT, sid, "task.json")
         if os.path.exists(state_path):
             with open(state_path) as fh:

@@ -313,8 +313,7 @@ def wrapping_joints(fingers):
 # stick's, 0.62 cm deep on the adventurer in boxers). So where any wrapping
 # joint would sink past the first, the handle is eased off the middle by the
 # least that brings them out to it, and never by more than the second (the
-# verifier allows 0.5 cm of sink and 0.5 cm off the fist's middle); a handle
-# that even that does not fit stays at the middle.
+# verifier allows 0.5 cm of sink and 0.5 cm off the fist's middle).
 SEAT_SINK_CM = 0.35
 SEAT_EASE_MAX_CM = 0.4
 _EASE_STEP_CM = 0.05
@@ -347,10 +346,10 @@ def _eased(loc, grip_rot, parts, part, fingers):
             if sink < best[0] - 1e-6:
                 best = (sink, at, reach)
         if best[0] <= SEAT_SINK_CM:
-            return best[1], best[2]
-    # A handle no easing fits (a log with no handle, a matchbox): the middle
-    # of the fist is still the best place for it.
-    return loc, 0.0
+            break
+    # A handle no easing fits (a log with no handle, in a small hand) is left
+    # where the joints stand least far into it.
+    return best[1], best[2]
 
 
 def _grip_location(aim_pose_path, grip_rot, parts, part="Grip"):

@@ -127,6 +127,29 @@ def _capture(world, item, out_dir):
             a.destroy_actor()
 
 
+def _full_textures(mesh, body):
+    """Have the body's textures in at full size before it is photographed.
+
+    A generated body's atlas is hundreds of small islands packed edge to edge,
+    skin beside cloth. At the low mips a freshly loaded texture starts on,
+    every island's edge is its neighbour's colour: the man in dark shorts came
+    out blotched with skin, and his skin veined with black, in a picture taken
+    a moment after the editor started. In the game the textures have streamed
+    in and none of it shows.
+    """
+    mel = unreal.MaterialEditingLibrary
+    body.set_editor_property("force_mip_streaming", True)
+    for slot in mesh.get_editor_property("materials"):
+        mi = slot.get_editor_property("material_interface")
+        if not isinstance(mi, unreal.MaterialInstanceConstant):
+            continue
+        for name in mel.get_texture_parameter_names(mi):
+            tex = mel.get_material_instance_texture_parameter_value(mi, name)
+            if tex:
+                tex.set_force_mip_levels_to_be_resident(60.0)
+    body.prestream_textures(60.0, True)
+
+
 def capture_portrait():
     """Write the character's passes: the player's body, posed, from the front."""
     mesh, pose = unreal.load_asset(PORTRAIT_MESH), unreal.load_asset(PORTRAIT_POSE)
@@ -153,6 +176,7 @@ def capture_portrait():
         else:
             _log(f"note: {PORTRAIT_POSE} is missing: the portrait is the bind pose")
         body.set_skinned_asset_and_update(mesh)
+        _full_textures(mesh, body)
         _shoot(_world(), actor, unreal.Rotator(roll=0.0, pitch=0.0, yaw=PORTRAIT_YAW + 180.0),
                os.path.join(PASSES_DIR, PORTRAIT), PORTRAIT, spawned)
         return True

@@ -24,8 +24,7 @@ injected into a headless game (probes/probe_pickup.py). It is OR'd with the
 key, the press clears it, and it is false in every real game.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_ABS, FN_ACTOR_LOC, FN_AND, FN_BREAK_VECTOR, FN_DISTANCE, FN_IS_VALID,
     FN_LESS_FF, FN_OR, FN_SUB_VV,
@@ -115,10 +114,10 @@ def _author_offer(ed, owner, candidate, offered, exec_in):
     _connect(exec_in, _pin(better, "execute"))
     remember = keep(ed.add_set_member_variable_node(INTERACT_TARGET_VAR))
     _connect(candidate, _pin(remember, INTERACT_TARGET_VAR))
-    _connect(BEL.find_then_pin(better), _pin(remember, "execute"))
+    _connect(then(better), _pin(remember, "execute"))
     at_gap = keep(ed.add_set_member_variable_node(INTERACT_GAP_VAR))
     _connect(out(aim_gap, "ReturnValue"), _pin(at_gap, INTERACT_GAP_VAR))
-    _connect(BEL.find_then_pin(remember), _pin(at_gap, "execute"))
+    _connect(then(remember), _pin(at_gap, "execute"))
 
     ed.add_comment_to_nodes(
         f"A candidate the walk offers, within {INTERACT_RADIUS:.0f} cm of the "
@@ -151,17 +150,17 @@ def _author_interact(ed, owner, pressed, exec_ins):
 
     spent = keep(ed.add_set_member_variable_node(INTERACT_FORCED_VAR))
     _set(spent, INTERACT_FORCED_VAR, "false")
-    _connect(BEL.find_then_pin(gate), _pin(spent, "execute"))
+    _connect(then(gate), _pin(spent, "execute"))
     # InteractTarget is set with its input pin left unconnected, which is how
     # a Blueprint object variable is cleared to None.
     forget = keep(ed.add_set_member_variable_node(INTERACT_TARGET_VAR))
-    _connect(BEL.find_then_pin(spent), _pin(forget, "execute"))
+    _connect(then(spent), _pin(forget, "execute"))
     far = keep(ed.add_set_member_variable_node(INTERACT_GAP_VAR))
     _set(far, INTERACT_GAP_VAR, INTERACT_NO_GAP)
-    _connect(BEL.find_then_pin(forget), _pin(far, "execute"))
+    _connect(then(forget), _pin(far, "execute"))
 
     # --- the search: every kind's walk in turn, each offering its candidates --
-    flow = BEL.find_then_pin(far)
+    flow = then(far)
     for candidates, _act in KINDS:
         candidate, offered, body, flow = candidates(ed, flow)
         _author_offer(ed, owner, candidate, offered, body)
@@ -175,8 +174,8 @@ def _author_interact(ed, owner, pressed, exec_ins):
     _connect(out(any_target, "ReturnValue"), _pin(found, "Condition"))
     _connect(flow, _pin(found, "execute"))
 
-    acted, idle = (), (BEL.find_else_pin(gate), BEL.find_else_pin(found))
-    flow = BEL.find_then_pin(found)
+    acted, idle = (), (else_(gate), else_(found))
+    flow = then(found)
     for _candidates, act in KINDS:
         did, did_not, flow = act(ed, target, flow)
         acted += did

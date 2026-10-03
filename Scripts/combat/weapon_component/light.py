@@ -28,8 +28,8 @@ and the take runs once, off Completed. Tuning is light_tuning.py.
 """
 
 from combat.chop_tuning import WOOD_CLASS_VAR
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
-from uebp.graph import out
+from uebp.graph import (
+    _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.light_tuning import (
     CAMPFIRE_AHEAD_CM, CAMPFIRE_CLASS_VAR, CAMPFIRE_FEET_CM, CAMPFIRE_TRACE_DOWN_CM,
     CAMPFIRE_TRACE_UP_CM, LIGHT_WOOD_VAR, LIGHTS_VAR,
@@ -47,7 +47,7 @@ FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
 
 
 def _get(ed, name):
-    return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
+    return out(ed.add_get_member_variable_node(name), name)
 
 
 def _author_light_press(ed, held, owner, tap, not_lighter):
@@ -57,16 +57,16 @@ def _author_light_press(ed, held, owner, tap, not_lighter):
     lights, lights_n = _prop(ed, LIGHTS_VAR, held)
     gate = ed.add_branch_node()
     _connect(lights, _pin(gate, "Condition"))
-    _connect(BEL.find_else_pin(gate), not_lighter)
+    _connect(else_(gate), not_lighter)
     press = ed.add_branch_node()
     _connect(tap, _pin(press, "Condition"))
-    _connect(BEL.find_then_pin(gate), _pin(press, "execute"))
-    exits = _author_campfire(ed, held, owner, BEL.find_then_pin(press))
+    _connect(then(gate), _pin(press, "execute"))
+    exits = _author_campfire(ed, held, owner, then(press))
     ed.add_comment_to_nodes(
         "The held item Lights (the matches): a tap strikes it (light.py) "
         "instead of firing it. Anything else goes on to the guns' ready gate.",
         [lights_n, gate, press])
-    return _pin(gate, "execute"), exits + (BEL.find_else_pin(press),)
+    return _pin(gate, "execute"), exits + (else_(press),)
 
 
 def _author_campfire(ed, held, owner, exec_in):
@@ -82,14 +82,14 @@ def _author_campfire(ed, held, owner, exec_in):
     # --- the wood to burn -----------------------------------------------------
     # Set with its input unconnected: None, so last strike's wood is forgotten.
     forget = ed.add_set_member_variable_node(LIGHT_WOOD_VAR)
-    _connect(BEL.find_then_pin(known), _pin(forget, "execute"))
+    _connect(then(known), _pin(forget, "execute"))
     inv = _get(ed, "Inventory")
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     loop
     _connect(inv, _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(forget), _loose_pin(loop, "Exec"))
+    _connect(then(forget), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
     kind = _node(ed, FN_OBJECT_CLASS)
     _connect(item, _pin(kind, "Object"))
@@ -101,7 +101,7 @@ def _author_campfire(ed, held, owner, exec_in):
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(burns, "execute"))
     pick = ed.add_set_member_variable_node(LIGHT_WOOD_VAR)
     _connect(item, _pin(pick, LIGHT_WOOD_VAR))
-    _connect(BEL.find_then_pin(burns), _pin(pick, "execute"))
+    _connect(then(burns), _pin(pick, "execute"))
 
     wood = _get(ed, LIGHT_WOOD_VAR)
     is_there = _node(ed, FN_IS_VALID)
@@ -114,17 +114,17 @@ def _author_campfire(ed, held, owner, exec_in):
     remove = _node(ed, FN_ARR_REMOVE_ITEM)
     _connect(inv, _pin(remove, "TargetArray"))
     _connect(wood, _pin(remove, "Item"))
-    _connect(BEL.find_then_pin(has_wood), _pin(remove, "execute"))
+    _connect(then(has_wood), _pin(remove, "execute"))
     gone = _node(ed, FN_DESTROY)
     _connect(wood, _pin(gone, "self"))
-    _connect(BEL.find_then_pin(remove), _pin(gone, "execute"))
+    _connect(then(remove), _pin(gone, "execute"))
     # Find is pure: read here, after the removal, it sees the shorter array.
     slot = _node(ed, FN_ARR_FIND)
     _connect(inv, _pin(slot, "TargetArray"))
     _connect(held, _pin(slot, "ItemToFind"))
     stay = ed.add_set_member_variable_node("EquippedIndex")
     _connect(out(slot), _pin(stay, "EquippedIndex"))
-    _connect(BEL.find_then_pin(gone), _pin(stay, "execute"))
+    _connect(then(gone), _pin(stay, "execute"))
 
     # --- the ground in front of the player, and the fire ----------------------
     here = _node(ed, FN_ACTOR_LOC)
@@ -150,7 +150,7 @@ def _author_campfire(ed, held, owner, exec_in):
     _connect(offset(CAMPFIRE_TRACE_UP_CM), _pin(floor, "Start"))
     _connect(offset(-CAMPFIRE_TRACE_DOWN_CM), _pin(floor, "End"))
     _trace_defaults(floor)
-    _connect(BEL.find_then_pin(stay), _pin(floor, "execute"))
+    _connect(then(stay), _pin(floor, "execute"))
     ground = _palette(ed, NODE_BREAK_HIT)
     _connect(out(floor, "OutHit"), _loose_pin(ground, "Hit"))
     # No ground under it (the map's edge): at the height of the player's feet.
@@ -164,7 +164,7 @@ def _author_campfire(ed, held, owner, exec_in):
     _connect(cls, _pin(fire, "Class"))
     _connect(out(at), _pin(fire, "SpawnTransform"))
     _set(fire, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(BEL.find_then_pin(floor), _pin(fire, "execute"))
+    _connect(then(floor), _pin(fire, "execute"))
 
     ed.add_comment_to_nodes(
         "A strike of the matches. With a campfire class to spawn and a piece "
@@ -174,5 +174,4 @@ def _author_campfire(ed, held, owner, exec_in):
         "front of the player, on the ground a trace finds there. The matches "
         "are not spent; with no wood, nothing happens.",
         [known, forget, loop, burns, pick, has_wood, remove, gone, stay, floor, fire])
-    return (BEL.find_then_pin(fire), BEL.find_else_pin(known),
-            BEL.find_else_pin(has_wood))
+    return (then(fire), else_(known), else_(has_wood))

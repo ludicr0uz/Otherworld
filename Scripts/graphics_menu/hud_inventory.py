@@ -19,7 +19,7 @@ edge alone was reported as not reading: the hand's, the bag slot under the
 I panel's caret, and the slot a drag started on.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.nodes import FN_AND, FN_IS_VALID, FN_LESS_II, FN_NOT, FN_OR, FN_SUB_II
 from combat.slot_tuning import HAND, SLOT_COUNT, SLOT_ITEMS_VAR
 from graphics_menu.inv_consts import BAG_PANEL, DRAG_FROM_VAR, SEL_TO_CODE, SLOT_BOXES
@@ -61,14 +61,13 @@ def _item(ed, inv, index):
     got = _node(ed, FN_ARR_GET)
     _connect(inv, _loose_pin(got, "TargetArray"))
     _connect(index, _pin(got, "Index"))
-    return (_pin(valid, "ReturnValue", is_input=False),
-            _loose_pin(got, "Item", is_input=False))
+    return (out(valid), _loose_pin(got, "Item", is_input=False))
 
 
 def _get(ed, item, var):
     n = ed.add_get_member_variable_node(var, ITEM_CLASS_PATH)
     _connect(item, _pin(n, "self"))
-    return _pin(n, var, is_input=False)
+    return out(n, var)
 
 
 def _author_equipped_name(ed, inv, equipped, exec_in):
@@ -77,8 +76,8 @@ def _author_equipped_name(ed, inv, equipped, exec_in):
     _connect(valid, _pin(br, "Condition"))
     _connect(exec_in, _pin(br, "execute"))
     name = part(ed, WBP_HUD, EQUIPPED_NAME)
-    said = set_text(ed, name, _get(ed, item, "DisplayName"), [BEL.find_then_pin(br)])
-    return (set_shown(ed, name, True, [said]), set_shown(ed, name, False, [BEL.find_else_pin(br)]))
+    said = set_text(ed, name, _get(ed, item, "DisplayName"), [then(br)])
+    return (set_shown(ed, name, True, [said]), set_shown(ed, name, False, [else_(br)]))
 
 
 def _author_filled_slot(ed, slot, item, is_equipped, exec_in, ammo=True):
@@ -97,8 +96,8 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, ammo=True):
     tint = _node(ed, FN_SET_TINT)
     _connect(icon, _pin(tint, "self"))
     _connect(_get(ed, item, "SlotColor"), _pin(tint, "InColorAndOpacity"))
-    _connect(BEL.find_then_pin(brush), _pin(tint, "execute"))
-    flow = set_shown(ed, icon, True, [BEL.find_then_pin(tint)])
+    _connect(then(brush), _pin(tint, "execute"))
+    flow = set_shown(ed, icon, True, [then(tint)])
     active, frame = w(SLOT_ACTIVE), w(SLOT_FRAME)
     if not ammo:
         tails = (set_shown(ed, w(SLOT_AMMO), False, [flow]),)
@@ -114,23 +113,21 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, ammo=True):
     _connect(_get(ed, item, "Reserve"), _pin(reserve, "InInt"))
     spare = _node(ed, FN_SELECT_STR)
     _set(spare, "A", INFINITE_RESERVE_TEXT)
-    _connect(_pin(reserve, "ReturnValue", is_input=False), _pin(spare, "B"))
+    _connect(out(reserve), _pin(spare, "B"))
     _connect(_get(ed, item, "InfiniteReserve"), _pin(spare, "bPickA"))
     sep = _node(ed, FN_CONCAT)
     _set(sep, "A", " / ")
-    _connect(_pin(spare, "ReturnValue", is_input=False), _pin(sep, "B"))
+    _connect(out(spare), _pin(sep, "B"))
     count = _node(ed, FN_CONCAT)
-    _connect(_pin(loaded, "ReturnValue", is_input=False), _pin(count, "A"))
-    _connect(_pin(sep, "ReturnValue", is_input=False), _pin(count, "B"))
+    _connect(out(loaded), _pin(count, "A"))
+    _connect(out(sep), _pin(count, "B"))
 
     ammo = w(SLOT_AMMO)
     counted = ed.add_branch_node()
     _connect(_get(ed, item, "UsesAmmo"), _pin(counted, "Condition"))
     _connect(flow, _pin(counted, "execute"))
-    wrote = set_text(ed, ammo, _pin(count, "ReturnValue", is_input=False),
-                     [BEL.find_then_pin(counted)])
-    tails = (set_shown(ed, ammo, True, [wrote]),
-             set_shown(ed, ammo, False, [BEL.find_else_pin(counted)]))
+    wrote = set_text(ed, ammo, out(count), [then(counted)])
+    tails = (set_shown(ed, ammo, True, [wrote]), set_shown(ed, ammo, False, [else_(counted)]))
 
     lit = show_if(ed, active, is_equipped, tails)
     return show_if(ed, frame, is_equipped, lit)
@@ -145,8 +142,7 @@ def _author_empty_slot(ed, slot, execs):
         flow = (set_shown(ed, target, False, flow),)
     has = _node(ed, FN_IS_VALID)
     _connect(member(ed, slot, WBP_INVENTORY_SLOT, SLOT_GHOST_VAR), _pin(has, "Object"))
-    return show_if(ed, member(ed, slot, WBP_INVENTORY_SLOT, SLOT_GHOST),
-                   _pin(has, "ReturnValue", is_input=False), flow)
+    return show_if(ed, member(ed, slot, WBP_INVENTORY_SLOT, SLOT_GHOST), out(has), flow)
 
 
 def _slot_widget(ed, code):
@@ -161,31 +157,30 @@ def _slot_widget(ed, code):
         _set(at, "B", first)
         child = _node(ed, FN_CHILD_AT)
         _connect(part(ed, WBP_HUD, box), _pin(child, "self"))
-        _connect(_pin(at, "ReturnValue", is_input=False), _pin(child, "Index"))
-        kids.append(_pin(child, "ReturnValue", is_input=False))
+        _connect(out(at), _pin(child, "Index"))
+        kids.append(out(child))
     in_bag = _node(ed, FN_LESS_II)
     _connect(code, _pin(in_bag, "A"))
     _set(in_bag, "B", first_bag)
     near = _node(ed, FN_SELECT_OBJ)
     _connect(kids[1], _pin(near, "A"))
     _connect(kids[2], _pin(near, "B"))
-    _connect(_pin(in_bag, "ReturnValue", is_input=False), _pin(near, "bSelectA"))
+    _connect(out(in_bag), _pin(near, "bSelectA"))
     is_hand = _node(ed, FN_EQ_II)
     _connect(code, _pin(is_hand, "A"))
     _set(is_hand, "B", HAND)
     pick = _node(ed, FN_SELECT_OBJ)
     _connect(kids[0], _pin(pick, "A"))
-    _connect(_pin(near, "ReturnValue", is_input=False), _pin(pick, "B"))
-    _connect(_pin(is_hand, "ReturnValue", is_input=False), _pin(pick, "bSelectA"))
-    return _pin(pick, "ReturnValue", is_input=False), _pin(is_hand, "ReturnValue",
-                                                         is_input=False)
+    _connect(out(near), _pin(pick, "B"))
+    _connect(out(is_hand), _pin(pick, "bSelectA"))
+    return out(pick), out(is_hand)
 
 
 def _lit(ed, code, is_hand):
     """The hand's slot, the bag slot under the open panel's caret, and the
     slot a drag started on (a pure bool)."""
     def var(name):
-        return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
+        return out(ed.add_get_member_variable_node(name), name)
 
     def node(fn, a, b):
         n = _node(ed, fn)
@@ -194,7 +189,7 @@ def _lit(ed, code, is_hand):
             _set(n, "B", b)
         else:
             _connect(b, _pin(n, "B"))
-        return _pin(n, "ReturnValue", is_input=False)
+        return out(n)
 
     sel_code = node(FN_SUB_II, var(WEAR_SEL_VAR), SEL_TO_CODE)
     caret = node(FN_AND, var(WEAR_OPEN_VAR), node(FN_EQ_II, code, sel_code))
@@ -208,39 +203,37 @@ def author_inventory(ed, in_execs):
     pawn = _node(ed, FN_GET_PLAYER_PAWN)
     _set(pawn, "PlayerIndex", 0)
     comp = _node(ed, FN_GET_COMP)
-    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     cast = _palette(ed, NODE_CAST_WEAPON)
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(out(comp), _pin(cast, "Object"))
     for e in in_execs:
         _connect(e, _pin(cast, "execute"))
     as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
     inv = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(inv, "self"))
-    inv = _pin(inv, "Inventory", is_input=False)
+    inv = out(inv, "Inventory")
     equipped = ed.add_get_member_variable_node("EquippedIndex", WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(equipped, "self"))
-    equipped = _pin(equipped, "EquippedIndex", is_input=False)
+    equipped = out(equipped, "EquippedIndex")
 
-    named = _author_equipped_name(ed, inv, equipped, BEL.find_then_pin(cast))
+    named = _author_equipped_name(ed, inv, equipped, then(cast))
 
     items = ed.add_get_member_variable_node(SLOT_ITEMS_VAR, WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(items, "self"))
-    items = _pin(items, SLOT_ITEMS_VAR, is_input=False)
+    items = out(items, SLOT_ITEMS_VAR)
 
     # The bag's grid always, but never under the menu.
     open_ = ed.add_get_member_variable_node(WEAR_OPEN_VAR)
     menu = ed.add_get_member_variable_node("MenuOpen")
     no_menu = _node(ed, FN_NOT)
-    _connect(_pin(menu, "MenuOpen", is_input=False), _pin(no_menu, "A"))
+    _connect(out(menu, "MenuOpen"), _pin(no_menu, "A"))
     bag_up = _node(ed, FN_AND)
-    _connect(_pin(open_, WEAR_OPEN_VAR, is_input=False), _pin(bag_up, "A"))
-    _connect(_pin(no_menu, "ReturnValue", is_input=False), _pin(bag_up, "B"))
-    shown = show_if(ed, part(ed, WBP_HUD, BAG_PANEL),
-                    _pin(no_menu, "ReturnValue", is_input=False), named)
+    _connect(out(open_, WEAR_OPEN_VAR), _pin(bag_up, "A"))
+    _connect(out(no_menu), _pin(bag_up, "B"))
+    shown = show_if(ed, part(ed, WBP_HUD, BAG_PANEL), out(no_menu), named)
     # The character's portrait with the I panel open.
-    shown = show_if(ed, part(ed, WBP_HUD, WEAR_PORTRAIT),
-                    _pin(bag_up, "ReturnValue", is_input=False), list(shown))
+    shown = show_if(ed, part(ed, WBP_HUD, WEAR_PORTRAIT), out(bag_up), list(shown))
 
     # Slot code c, over every code.
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
@@ -261,19 +254,18 @@ def author_inventory(ed, in_execs):
     valid, item = _item(ed, items, index)
     carried = ed.add_branch_node()
     _connect(valid, _pin(carried, "Condition"))
-    _connect(BEL.find_then_pin(as_slot), _pin(carried, "execute"))
+    _connect(then(as_slot), _pin(carried, "execute"))
     there = _node(ed, FN_IS_VALID)
     _connect(item, _pin(there, "Object"))
     filled = ed.add_branch_node()
-    _connect(_pin(there, "ReturnValue", is_input=False), _pin(filled, "Condition"))
-    _connect(BEL.find_then_pin(carried), _pin(filled, "execute"))
-    _author_filled_slot(ed, slot, item, _lit(ed, index, is_hand), BEL.find_then_pin(filled))
-    _author_empty_slot(ed, slot, (BEL.find_else_pin(carried), BEL.find_else_pin(filled)))
+    _connect(out(there), _pin(filled, "Condition"))
+    _connect(then(carried), _pin(filled, "execute"))
+    _author_filled_slot(ed, slot, item, _lit(ed, index, is_hand), then(filled))
+    _author_empty_slot(ed, slot, (else_(carried), else_(filled)))
     ed.add_comment_to_nodes(
         "The inventory's slots: code c's widget (the hand, a weapon slot, a bag "
         "slot) shows SlotItems[c] -- its own icon in its own SlotColor, "
         "rounds-in-gun / rounds-in-reserve if it uses ammunition, and a lit "
         "background and frame on the hand, the caret and a drag's start. Empty "
         "slots are emptied, down to their silhouette.", [cast, loop, as_slot, carried])
-    return (_loose_pin(loop, "Completed", is_input=False),
-            _pin(cast, "CastFailed", is_input=False))
+    return (_loose_pin(loop, "Completed", is_input=False), out(cast, "CastFailed"))

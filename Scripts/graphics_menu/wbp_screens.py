@@ -11,7 +11,7 @@ score, and which settings hint shows.
 
 import unreal
 
-from combat.graph import BEL, _must_load
+from uebp.graph import BEL, _must_load
 from graphics_menu import umg_author as U
 from graphics_menu.wbp_legal import author_legal_notice
 from graphics_menu.wbp_tune import author_tune_widgets

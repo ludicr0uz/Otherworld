@@ -38,7 +38,7 @@ and its view keeps the boom's rotation (sights.py).
 With empty hands all three are cleared, so the camera is home (_author_unseat).
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, then
 from combat.nodes import (
     FN_AND, FN_BOOL_TO_FLOAT, FN_DOT_VV, FN_FORWARD, FN_GREATER_FF,
     FN_INTERP_FF, FN_NORMAL, FN_NOT, FN_OR,
@@ -95,10 +95,9 @@ def _author_sight_seat(ed, tick, keep, line_out, has_line_out, boom_rot_out,
         return put
 
     # The travel starts on the key; the turn waits for the latch.
-    seat = eased(SEAT_VAR, out(wanted, "SightAiming"), BEL.find_then_pin(seated))
-    look = eased(LOOK_VAR, _loose_pin(seated, "Output_Get", is_input=False),
-                 BEL.find_then_pin(seat))
-    return (BEL.find_then_pin(look),
+    seat = eased(SEAT_VAR, out(wanted, "SightAiming"), then(seated))
+    look = eased(LOOK_VAR, _loose_pin(seated, "Output_Get", is_input=False), then(seat))
+    return (then(look),
             _loose_pin(seat, "Output_Get", is_input=False),
             _loose_pin(look, "Output_Get", is_input=False))
 
@@ -111,8 +110,8 @@ def _author_unseat(ed, keep, exec_in):
     _connect(exec_in, _pin(seated, "execute"))
     seat = keep(ed.add_set_member_variable_node(SEAT_VAR))
     _set(seat, SEAT_VAR, 0.0)
-    _connect(BEL.find_then_pin(seated), _pin(seat, "execute"))
+    _connect(then(seated), _pin(seat, "execute"))
     look = keep(ed.add_set_member_variable_node(LOOK_VAR))
     _set(look, LOOK_VAR, 0.0)
-    _connect(BEL.find_then_pin(seat), _pin(look, "execute"))
-    return BEL.find_then_pin(look)
+    _connect(then(seat), _pin(look, "execute"))
+    return then(look)

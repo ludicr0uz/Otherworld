@@ -12,7 +12,7 @@ from combat.game_state import (
     DAMAGED_BY_PLAYER_VAR, DAMAGE_TEXT_COLOR, DEBUG_MODE_VAR, LAST_DAMAGE_VAR,
     TRACE_DEBUG_SECONDS,
 )
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, _vec, out, then
 from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR,
@@ -47,20 +47,20 @@ def _author_impact(ed, brk, held, exec_in):
     mark = ed.add_set_member_variable_node(HIT_POINT_VAR)
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(mark, HIT_POINT_VAR))
     _connect(exec_in, _pin(mark, "execute"))
-    exec_in = BEL.find_then_pin(mark)
+    exec_in = then(mark)
     landed = ed.add_get_member_variable_node(HIT_POINT_VAR)
     comp = _node(ed, FN_GET_COMP)
     _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
 
     cast = _palette(ed, NODE_CAST_HEALTH)
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(out(comp), _pin(cast, "Object"))
     _connect(exec_in, _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
     blood_cls = ed.add_get_member_variable_node("BloodClass")
     where = _node(ed, FN_MAKE_TRANSFORM)
-    _connect(_pin(landed, HIT_POINT_VAR, is_input=False), _pin(where, "Location"))
+    _connect(out(landed, HIT_POINT_VAR), _pin(where, "Location"))
     # How big the spray is, as a clamped ratio of the round's damage to a
     # reference one. Spawn *scale* rather than a parameter on the splash,
     # because the droplet solver works in the actor's own space: scaling the
@@ -72,28 +72,28 @@ def _author_impact(ed, brk, held, exec_in):
     _connect(spray_dmg_pin, _pin(ratio, "A"))
     _set(ratio, "B", BLOOD_REFERENCE_DAMAGE)
     spray = _node(ed, FN_CLAMP)
-    _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(spray, "Value"))
+    _connect(out(ratio), _pin(spray, "Value"))
     _set(spray, "Min", BLOOD_SCALE_MIN)
     _set(spray, "Max", BLOOD_SCALE_MAX)
     spray_v = _node(ed, FN_MUL_VF)
     _connect(_vec(ed, 1.0, 1.0, 1.0), _pin(spray_v, "A"))
-    _connect(_pin(spray, "ReturnValue", is_input=False), _pin(spray_v, "B"))
-    _connect(_pin(spray_v, "ReturnValue", is_input=False), _pin(where, "Scale"))
+    _connect(out(spray), _pin(spray_v, "B"))
+    _connect(out(spray_v), _pin(where, "Scale"))
     # Point the splash's +X down the surface normal: BP_BloodSplash throws its
     # cone along its own forward, so this is what makes the spray come *out of*
     # the wound instead of along an arbitrary world axis.
     facing = _node(ed, FN_ROT_FROM_X)
     _connect(_loose_pin(brk, "ImpactNormal", is_input=False), _pin(facing, "X"))
-    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(where, "Rotation"))
+    _connect(out(facing), _pin(where, "Rotation"))
     splash = _palette(ed, NODE_SPAWN)
-    _connect(_pin(blood_cls, "BloodClass", is_input=False), _pin(splash, "Class"))
-    _connect(_pin(where, "ReturnValue", is_input=False), _pin(splash, "SpawnTransform"))
+    _connect(out(blood_cls, "BloodClass"), _pin(splash, "Class"))
+    _connect(out(where), _pin(splash, "SpawnTransform"))
     _set(splash, "CollisionHandlingOverride", "AlwaysSpawn")
-    chipped = _author_surface_impact(ed, where, _pin(cast, "CastFailed", is_input=False))
+    chipped = _author_surface_impact(ed, where, out(cast, "CastFailed"))
 
     # The zone runs BEFORE the blood it is drawn to the right of: only a
     # pellet that struck a body (or a thing with health and no body) bleeds.
-    zoned, zone_nodes = _author_hit_zone(ed, brk, BEL.find_then_pin(cast))
+    zoned, zone_nodes = _author_hit_zone(ed, brk, then(cast))
     for tail in zoned:
         _connect(tail, _pin(splash, "execute"))
 
@@ -105,16 +105,16 @@ def _author_impact(ed, brk, held, exec_in):
     _connect(dmg_pin, _pin(scaled, "A"))
     _connect(worth, _pin(scaled, "B"))
     sub = _node(ed, FN_SUB_FF)
-    _connect(_pin(get_h, "Health", is_input=False), _pin(sub, "A"))
-    _connect(_pin(scaled, "ReturnValue", is_input=False), _pin(sub, "B"))
+    _connect(out(get_h, "Health"), _pin(sub, "A"))
+    _connect(out(scaled), _pin(sub, "B"))
     clamp = _node(ed, FN_CLAMP)
-    _connect(_pin(sub, "ReturnValue", is_input=False), _pin(clamp, "Value"))
+    _connect(out(sub), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", INF)
     set_h = ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH)
     _connect(as_health, _pin(set_h, "self"))
-    _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(set_h, "Health"))
-    _connect(BEL.find_then_pin(splash), _pin(set_h, "execute"))
+    _connect(out(clamp), _pin(set_h, "Health"))
+    _connect(then(splash), _pin(set_h, "execute"))
 
     # Stamp the hit. Two things read this and nothing else writes it:
     #
@@ -129,13 +129,13 @@ def _author_impact(ed, brk, held, exec_in):
     now = _node(ed, FN_TIME_SECONDS)
     stamp = ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(stamp, "self"))
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(stamp, LAST_DAMAGE_VAR))
-    _connect(BEL.find_then_pin(set_h), _pin(stamp, "execute"))
+    _connect(out(now), _pin(stamp, LAST_DAMAGE_VAR))
+    _connect(then(set_h), _pin(stamp, "execute"))
 
     blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(blame, "self"))
     _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
-    _connect(BEL.find_then_pin(stamp), _pin(blame, "execute"))
+    _connect(then(stamp), _pin(blame, "execute"))
 
     # ...and which way it came from, for the flinch. The IMPACT NORMAL, not the
     # shot's own direction reversed: it is already in the hit result, it already
@@ -147,10 +147,9 @@ def _author_impact(ed, brk, held, exec_in):
     _connect(as_health, _pin(from_where, "self"))
     _connect(_loose_pin(brk, "ImpactNormal", is_input=False),
              _pin(from_where, LAST_HIT_FROM_VAR))
-    _connect(BEL.find_then_pin(blame), _pin(from_where, "execute"))
+    _connect(then(blame), _pin(from_where, "execute"))
 
-    shown = _author_damage_readout(ed, brk, _pin(scaled, "ReturnValue", is_input=False),
-                                   worth, BEL.find_then_pin(from_where))
+    shown = _author_damage_readout(ed, brk, out(scaled), worth, then(from_where))
 
     ed.add_comment_to_nodes(
         "Clamped at zero so an overkill shot cannot drive Health negative -- "
@@ -199,7 +198,7 @@ def _author_damage_readout(ed, brk, damage, worth, exec_in):
 
     seen = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR))
     showing = keep(ed.add_branch_node())
-    _connect(_pin(seen, DEBUG_MODE_VAR, is_input=False), _pin(showing, "Condition"))
+    _connect(out(seen, DEBUG_MODE_VAR), _pin(showing, "Condition"))
     _connect(exec_in, _pin(showing, "execute"))
 
     dmg_str = keep(_node(ed, FN_FLOAT_TO_STR))
@@ -207,21 +206,21 @@ def _author_damage_readout(ed, brk, damage, worth, exec_in):
     mult_str = keep(_node(ed, FN_FLOAT_TO_STR))
     _connect(worth, _pin(mult_str, "InDouble"))
     lead = keep(_node(ed, FN_CONCAT))
-    _connect(_pin(dmg_str, "ReturnValue", is_input=False), _pin(lead, "A"))
+    _connect(out(dmg_str), _pin(lead, "A"))
     _set(lead, "B", " (x")
     body = keep(_node(ed, FN_CONCAT))
-    _connect(_pin(lead, "ReturnValue", is_input=False), _pin(body, "A"))
-    _connect(_pin(mult_str, "ReturnValue", is_input=False), _pin(body, "B"))
+    _connect(out(lead), _pin(body, "A"))
+    _connect(out(mult_str), _pin(body, "B"))
     text = keep(_node(ed, FN_CONCAT))
-    _connect(_pin(body, "ReturnValue", is_input=False), _pin(text, "A"))
+    _connect(out(body), _pin(text, "A"))
     _set(text, "B", ")")
 
     draw = keep(_node(ed, FN_DRAW_STRING))
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(draw, "TextLocation"))
-    _connect(_pin(text, "ReturnValue", is_input=False), _pin(draw, "Text"))
+    _connect(out(text), _pin(draw, "Text"))
     _set(draw, "TextColor", DAMAGE_TEXT_COLOR)
     _set(draw, "Duration", TRACE_DEBUG_SECONDS)
-    _connect(BEL.find_then_pin(showing), _pin(draw, "execute"))
+    _connect(then(showing), _pin(draw, "execute"))
     return made
 
 
@@ -264,12 +263,12 @@ def _author_hit_zone(ed, brk, exec_in):
 
     as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(as_char, "Object"))
-    _connect(BEL.find_then_pin(clear), _pin(as_char, "execute"))
+    _connect(then(clear), _pin(as_char, "execute"))
     mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
 
     probe = keep(_node(ed, FN_TRACE_COMPONENT))
-    _connect(_pin(mesh, "Mesh", is_input=False), _pin(probe, "self"))
+    _connect(out(mesh, "Mesh"), _pin(probe, "self"))
     _connect(_loose_pin(brk, "TraceStart", is_input=False), _pin(probe, "TraceStart"))
     _connect(_loose_pin(brk, "TraceEnd", is_input=False), _pin(probe, "TraceEnd"))
     # Simple collision is the physics asset's capsules and spheres, which is
@@ -277,20 +276,20 @@ def _author_hit_zone(ed, brk, exec_in):
     _set(probe, "bTraceComplex", "false")
     _set(probe, "bShowTrace", "false")
     _set(probe, "bPersistentShowTrace", "false")
-    _connect(BEL.find_then_pin(as_char), _pin(probe, "execute"))
+    _connect(then(as_char), _pin(probe, "execute"))
 
     struck = keep(ed.add_branch_node())
-    _connect(_pin(probe, "ReturnValue", is_input=False), _pin(struck, "Condition"))
-    _connect(BEL.find_then_pin(probe), _pin(struck, "execute"))
+    _connect(out(probe), _pin(struck, "Condition"))
+    _connect(then(probe), _pin(struck, "execute"))
     note = keep(ed.add_set_member_variable_node(HIT_BONE_VAR))
-    _connect(_pin(probe, "BoneName", is_input=False), _pin(note, HIT_BONE_VAR))
-    _connect(BEL.find_then_pin(struck), _pin(note, "execute"))
+    _connect(out(probe, "BoneName"), _pin(note, HIT_BONE_VAR))
+    _connect(then(struck), _pin(note, "execute"))
 
     onto = keep(ed.add_set_member_variable_node(HIT_POINT_VAR))
-    _connect(_pin(probe, "HitLocation", is_input=False), _pin(onto, HIT_POINT_VAR))
-    _connect(BEL.find_then_pin(note), _pin(onto, "execute"))
+    _connect(out(probe, "HitLocation"), _pin(onto, HIT_POINT_VAR))
+    _connect(then(note), _pin(onto, "execute"))
 
-    outs = [BEL.find_then_pin(onto), _pin(as_char, "CastFailed", is_input=False)]
+    outs = [then(onto), out(as_char, "CastFailed")]
     return outs, made
 
 
@@ -307,7 +306,7 @@ def _zone_multiplier(ed, as_health):
         return n
 
     bone = keep(ed.add_get_member_variable_node(HIT_BONE_VAR))
-    bone_out = _pin(bone, HIT_BONE_VAR, is_input=False)
+    bone_out = out(bone, HIT_BONE_VAR)
 
     def member(table):
         pin, n = _prop(ed, table, as_health, HEALTH_CLASS_PATH)
@@ -315,7 +314,7 @@ def _zone_multiplier(ed, as_health):
         test = keep(_node(ed, FN_ARR_CONTAINS))
         _connect(pin, _loose_pin(test, "TargetArray"))
         _connect(bone_out, _loose_pin(test, "ItemToFind"))
-        return _pin(test, "ReturnValue", is_input=False)
+        return out(test)
 
     def worth(var):
         pin, n = _prop(ed, var, as_health, HEALTH_CLASS_PATH)
@@ -331,6 +330,6 @@ def _zone_multiplier(ed, as_health):
     is_head = member(HEAD_BONES_VAR)
     pick = keep(_node(ed, FN_SELECT_FF))
     _connect(worth(HEAD_MULT_VAR), _pin(pick, "A"))
-    _connect(_pin(limb_or_body, "ReturnValue", is_input=False), _pin(pick, "B"))
+    _connect(out(limb_or_body), _pin(pick, "B"))
     _connect(is_head, _pin(pick, "bPickA"))
-    return _pin(pick, "ReturnValue", is_input=False), made
+    return out(pick), made

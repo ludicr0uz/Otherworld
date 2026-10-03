@@ -20,7 +20,7 @@ attached to. Drawn for one frame (Duration 0) and redrawn the next.
 
 from combat.game_state import DEBUG_MODE_VAR
 from combat.paths import GAME_MODE_CLASS_PATH
-from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from npc.nodes import (
     FN_ACTOR_LOC, FN_DRAW_CONE, FN_FORWARD, FN_GET_GAME_MODE, FN_GET_PAWN,
     FN_IS_VALID, FN_SELECT_COLOR, FN_TIME_SECONDS, NODE_CAST_GAME_MODE,
@@ -67,19 +67,19 @@ def _author_sight_cone(ed):
     mode = keep(_node(ed, FN_GET_GAME_MODE))
     as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
     _connect(out(mode), _pin(as_mode, "Object"))
-    _connect(BEL.find_then_pin(tick), _pin(as_mode, "execute"))
+    _connect(then(tick), _pin(as_mode, "execute"))
     flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(flag, "self"))
-    debugging = branch(out(flag, DEBUG_MODE_VAR), BEL.find_then_pin(as_mode))
+    debugging = branch(out(flag, DEBUG_MODE_VAR), then(as_mode))
 
     # Nested, not ANDed: a Branch pulls its whole condition, and the cone's
     # inputs read the pawn (see the root CLAUDE.md, "Evaluation order").
     pawn = keep(_node(ed, FN_GET_PAWN))
     valid = keep(_node(ed, FN_IS_VALID))
     _connect(out(pawn), _pin(valid, "Object"))
-    bodied = branch(out(valid), BEL.find_then_pin(debugging))
-    dead = branch(get(CORPSE_VAR), BEL.find_then_pin(bodied))
+    bodied = branch(out(valid), then(debugging))
+    dead = branch(get(CORPSE_VAR), then(bodied))
 
     here = keep(_node(ed, FN_ACTOR_LOC))
     _connect(out(pawn), _pin(here, "self"))
@@ -103,12 +103,12 @@ def _author_sight_cone(ed):
     _connect(out(colour), _pin(cone, "LineColor"))
     _set(cone, "Duration", 0.0)
     _set(cone, "Thickness", SIGHT_CONE_THICKNESS)
-    _connect(BEL.find_else_pin(dead), _pin(cone, "execute"))
+    _connect(else_(dead), _pin(cone, "execute"))
 
     now = keep(_node(ed, FN_TIME_SECONDS))
     stamp = keep(ed.add_set_member_variable_node(SIGHT_CONE_STAMP_VAR))
     _connect(out(now), _pin(stamp, SIGHT_CONE_STAMP_VAR))
-    _connect(BEL.find_then_pin(cone), _pin(stamp, "execute"))
+    _connect(then(cone), _pin(stamp, "execute"))
 
     ed.add_comment_to_nodes(
         "Debug mode only: this wanderer's sight cone, redrawn every frame from "

@@ -29,8 +29,7 @@ keep walking, crouched or prone.
 """
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NOT, FN_PLAY_SLOT,
     FN_SET_REL_LOC, FN_SET_REL_ROT,
@@ -94,7 +93,7 @@ def _author_throw_ready(ed, item, exec_in):
     _set(play, "BlendOutTime", THROW_READY_BLEND_S)
     _set(play, "InPlayRate", 1.0)
     _set(play, "LoopCount", AIM_LOOPS)
-    _connect(BEL.find_then_pin(gate), _pin(play, "execute"))
+    _connect(then(gate), _pin(play, "execute"))
 
     # Held by the blade? Moved on the frame the pose starts, the same frame
     # after any re-equip (which put the hand's own grip back).
@@ -102,19 +101,19 @@ def _author_throw_ready(ed, item, exec_in):
     keep(n)
     blade = keep(ed.add_branch_node())
     _connect(by_blade, _pin(blade, "Condition"))
-    _connect(BEL.find_then_pin(play), _pin(blade, "execute"))
+    _connect(then(play), _pin(blade, "execute"))
     loc, n = _prop(ed, THROW_GRIP_LOC_VAR, item)
     keep(n)
     put = keep(_node(ed, FN_SET_REL_LOC))
     _connect(item, _pin(put, "self"))
     _connect(loc, _pin(put, "NewRelativeLocation"))
-    _connect(BEL.find_then_pin(blade), _pin(put, "execute"))
+    _connect(then(blade), _pin(put, "execute"))
     rot, n = _prop(ed, THROW_GRIP_ROT_VAR, item)
     keep(n)
     turn = keep(_node(ed, FN_SET_REL_ROT))
     _connect(item, _pin(turn, "self"))
     _connect(rot, _pin(turn, "NewRelativeRotation"))
-    _connect(BEL.find_then_pin(put), _pin(turn, "execute"))
+    _connect(then(put), _pin(turn, "execute"))
 
     ed.add_comment_to_nodes(
         "Getting ready to throw (throw_ready.py): while the arc is drawn the "
@@ -123,8 +122,7 @@ def _author_throw_ready(ed, item, exec_in):
         f"re-equip; never under a flinch ({HIT_SLOT}), which it would stop. "
         "An item thrown by its blade (ThrowGrip) is moved into its throw grip.",
         made)
-    return (BEL.find_then_pin(turn), BEL.find_else_pin(blade),
-            BEL.find_else_pin(gate))
+    return (then(turn), else_(blade), else_(gate))
 
 
 def _author_ready_down(ed, exec_in):
@@ -133,4 +131,4 @@ def _author_ready_down(ed, exec_in):
     dirty = ed.add_set_member_variable_node("NeedsRefresh")
     _set(dirty, "NeedsRefresh", "true")
     _connect(exec_in, _pin(dirty, "execute"))
-    return BEL.find_then_pin(dirty)
+    return then(dirty)

@@ -16,7 +16,8 @@ variable stays None and the arm stays where it was.
 
 import unreal
 
-from combat.graph import _assets, _log
+from combat.log import _log
+from uebp.graph import _assets
 from combat.hold_pose import _copy_of, _key_constant
 from combat.paths import THROW_READY_ANIM_PATH
 from combat.throw_tuning import THROW_READY_S

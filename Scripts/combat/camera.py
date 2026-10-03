@@ -4,7 +4,8 @@ range, and the two character patches (face the camera, aim the camera).
 
 import unreal
 
-from combat.graph import BEL, _component_object, _handles, _log
+from combat.log import _log
+from uebp.graph import BEL, _component_object, _handles
 
 
 # --- the shooting camera -----------------------------------------------------

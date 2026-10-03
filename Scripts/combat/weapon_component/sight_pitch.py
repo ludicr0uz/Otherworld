@@ -17,7 +17,7 @@ another anim BP simply fails the cast and keeps the level pose.
 import unreal
 
 from combat.aim_pitch import AIM_PITCH_VAR
-from combat.graph import BEL, _connect, _node, _palette, _pin
+from uebp.graph import BEL, _connect, _node, _palette, _pin, out, then
 from combat.nodes import (
     FN_ANIM_INSTANCE, FN_BREAK_ROT, FN_GET_CONTROL_ROT, FN_MUL_FF,
     FN_NORMALIZE_AXIS,
@@ -46,19 +46,19 @@ def _author_sight_pitch(ed, pc_out, exec_ins):
     view = keep(_node(ed, FN_GET_CONTROL_ROT))
     _connect(pc_out, _pin(view, "self"))
     parts = keep(_node(ed, FN_BREAK_ROT))
-    _connect(_pin(view, "ReturnValue", is_input=False), _pin(parts, "InRot"))
+    _connect(out(view), _pin(parts, "InRot"))
     signed = keep(_node(ed, FN_NORMALIZE_AXIS))
-    _connect(_pin(parts, "Pitch", is_input=False), _pin(signed, "Angle"))
+    _connect(out(parts, "Pitch"), _pin(signed, "Angle"))
     blend = keep(ed.add_get_member_variable_node("SightBlend"))
     scaled = keep(_node(ed, FN_MUL_FF))
-    _connect(_pin(signed, "ReturnValue", is_input=False), _pin(scaled, "A"))
-    _connect(_pin(blend, "SightBlend", is_input=False), _pin(scaled, "B"))
+    _connect(out(signed), _pin(scaled, "A"))
+    _connect(out(blend, "SightBlend"), _pin(scaled, "B"))
 
     mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(anim, "self"))
+    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
     cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
-    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(out(anim), _pin(cast, "Object"))
     for e in exec_ins:
         _connect(e, _pin(cast, "execute"))
     as_anim = next(p for p in BEL.list_output_pins(cast)
@@ -67,12 +67,12 @@ def _author_sight_pitch(ed, pc_out, exec_ins):
 
     put = keep(ed.add_set_member_variable_node(AIM_PITCH_VAR, anim_class))
     _connect(as_anim, _pin(put, "self"))
-    _connect(_pin(scaled, "ReturnValue", is_input=False), _pin(put, AIM_PITCH_VAR))
-    _connect(BEL.find_then_pin(cast), _pin(put, "execute"))
+    _connect(out(scaled), _pin(put, AIM_PITCH_VAR))
+    _connect(then(cast), _pin(put, "execute"))
 
     ed.add_comment_to_nodes(
         f"Down the sights the body pitches with the view: {AIM_PITCH_VAR} = "
         "the control pitch (signed) x SightBlend, onto the player's anim BP, "
         "which tips the upper body and the gun by it (Scripts/combat/"
         "aim_pitch.py). 0 at the hip and on the shoulder.", made)
-    return (BEL.find_then_pin(put), _pin(cast, "CastFailed", is_input=False))
+    return (then(put), out(cast, "CastFailed"))

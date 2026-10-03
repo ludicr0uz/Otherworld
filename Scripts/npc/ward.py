@@ -54,9 +54,8 @@ from forest_generator.npc_ward import (
     NPC_WARD_FLEE_STEP_CM, NPC_WARD_GRACE_S, NPC_WARD_ROAR_S,
     NPC_WARD_STALLED_CMS,
 )
-from npc.graph import (
-    BEL, _Graph, _asset_sub, _connect, _log, _loose_pin, _palette, _pin, out,
-)
+from npc.graph import _Graph, _log
+from uebp.graph import BEL, _assets, _connect, _loose_pin, _palette, _pin, else_, out, then
 from npc.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_DEG_COS, FN_DISTANCE_2D, FN_DOT_VV,
     FN_EQ_FF, FN_FORWARD, FN_GE_FF, FN_GET_COMP, FN_GET_CONTROLLER, FN_GET_PAWN,
@@ -84,7 +83,7 @@ def wards(key):
     nothing, and a log line saying why."""
     if key not in NPC_WARD_FEARS:
         return False
-    eas = _asset_sub()
+    eas = _assets()
     bp = (eas.load_asset(WEAPON_COMP_BP_PATH)
           if eas.does_asset_exist(WEAPON_COMP_BP_PATH) else None)
     try:
@@ -134,7 +133,7 @@ def _author_held(g, exec_in, pins):
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     cast = g.keep(_palette(g.ed, NODE_CAST_WEAPON))
     _connect(out(comp), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(present), _pin(cast, "execute"))
+    _connect(then(present), _pin(cast, "execute"))
     fire = g.keep(g.ed.add_get_member_variable_node(FIRE_WARD_VAR, WEAPON_COMP_CLASS_PATH))
     _connect(_loose_pin(cast, "AsBPWeaponComponent", is_input=False),
              _pin(fire, "self"))
@@ -146,11 +145,9 @@ def _author_held(g, exec_in, pins):
     edge = g.call(FN_DEG_COS)
     _connect(tuned_pin(g, "ward_half_angle_deg"), _pin(edge, "A"))
     front = g.op(FN_GT_FF, dot, out(edge))
-    lit = g.op(FN_AND, _pin(fire, FIRE_WARD_VAR, is_input=False), near)
-    held = g.branch(g.op(FN_AND, lit, front), BEL.find_then_pin(cast))
-    return BEL.find_then_pin(held), [
-        BEL.find_else_pin(present), _pin(cast, "CastFailed", is_input=False),
-        BEL.find_else_pin(held)]
+    lit = g.op(FN_AND, out(fire, FIRE_WARD_VAR), near)
+    held = g.branch(g.op(FN_AND, lit, front), then(cast))
+    return then(held), [else_(present), out(cast, "CastFailed"), else_(held)]
 
 
 def _author_turn_time(g, exec_in, pins):
@@ -173,7 +170,7 @@ def _author_hold(g, exec_in, pins):
     unstarted = g.op(FN_EQ_FF, g.get(WARD_SINCE_VAR), 0.0)
     fresh = g.branch(g.op(FN_OR, lapsed, unstarted), exec_in)
     # --- a new hold: one throw for the way round, as the stalk's is -----------
-    began = g.put(WARD_SINCE_VAR, BEL.find_then_pin(fresh), pin=pins["now"])
+    began = g.put(WARD_SINCE_VAR, then(fresh), pin=pins["now"])
     coin = g.call(FN_SELECT_FLOAT, A=1.0, B=-1.0)
     _connect(out(g.call(FN_RANDOM_BOOL)), _pin(coin, "bPickA"))
     picked = g.put(WARD_SIDE_VAR, began, pin=out(coin))
@@ -187,12 +184,12 @@ def _author_hold(g, exec_in, pins):
     _connect(out(moving), _pin(pace, "A"))
     up = g.op(FN_LE_FF, g.get(WARD_TURN_AT_VAR), pins["now"])
     still = g.op(FN_LT_FF, out(pace), NPC_WARD_STALLED_CMS)
-    stalled = g.branch(g.op(FN_OR, still, up), BEL.find_else_pin(fresh))
+    stalled = g.branch(g.op(FN_OR, still, up), else_(fresh))
     other = g.op(FN_MUL_FF, g.get(WARD_SIDE_VAR), -1.0)
-    turned = g.put(WARD_SIDE_VAR, BEL.find_then_pin(stalled), pin=other)
+    turned = g.put(WARD_SIDE_VAR, then(stalled), pin=other)
     turned = _author_turn_time(g, turned, pins)
 
-    stamped = g.put(WARD_LAST_VAR, [picked, turned, BEL.find_else_pin(stalled)], pin=pins["now"])
+    stamped = g.put(WARD_LAST_VAR, [picked, turned, else_(stalled)], pin=pins["now"])
     so_far = g.op(FN_SUB_FF, pins["now"], g.get(WARD_SINCE_VAR))
     spent = g.op(FN_GE_FF, so_far, tuned_pin(g, "ward_hold_s"))
     return g.branch(spent, stamped)
@@ -217,7 +214,7 @@ def _author_circle(g, exec_in, pins, stock):
     _connect(spot, _pin(go, "Goal"))
     _connect(step, _pin(go, "execute"))
     prowl, tails, _entry = _author_walk_speed(
-        g.ed, [BEL.find_then_pin(go)], False, stock,
+        g.ed, [then(go)], False, stock,
         scale="ward_speed_scale")
     g.made.extend(prowl)
     return tails
@@ -238,16 +235,14 @@ def _author_flight(g, exec_in, pins, stock):
                         **dict(zip("XYZ", NPC_WARD_FLEE_NAV_EXTENT_CM)))),
              _pin(on_nav, "QueryExtent"))
     walkable = g.branch(out(on_nav), aimed)
-    snapped = g.put(WARD_FLEE_GOAL_VAR, BEL.find_then_pin(walkable),
-                    pin=out(on_nav, "ProjectedLocation"))
+    snapped = g.put(WARD_FLEE_GOAL_VAR, then(walkable), pin=out(on_nav, "ProjectedLocation"))
     me = g.call(FN_GET_CONTROLLER)
     _connect(pins["self_pawn"], _pin(me, "self"))
     go = g.call(FN_SIMPLE_MOVE)
     _connect(out(me), _pin(go, "Controller"))
     _connect(g.get(WARD_FLEE_GOAL_VAR), _pin(go, "Goal"))
     _connect(snapped, _pin(go, "execute"))
-    ran, tails, _entry = _author_walk_speed(
-        g.ed, [BEL.find_then_pin(go), BEL.find_else_pin(walkable)], False, stock)
+    ran, tails, _entry = _author_walk_speed(g.ed, [then(go), else_(walkable)], False, stock)
     g.made.extend(ran)
     return tails
 
@@ -282,15 +277,15 @@ def _author_ward(ed, exec_in, result, roar_anim, stock, restalks):
     running = g.op(FN_LT_FF, pins["now"], g.get(WARD_FLEE_UNTIL_VAR))
     fleeing = g.branch(running, exec_in)
     # It roars before it runs: the flight's first passes stand.
-    standing, away = _author_roar_wait(g, BEL.find_then_pin(fleeing), pins)
+    standing, away = _author_roar_wait(g, then(fleeing), pins)
     _connect(standing, result(True))
-    held, refused = _author_held(g, BEL.find_else_pin(fleeing), pins)
+    held, refused = _author_held(g, else_(fleeing), pins)
     for pin in refused:
         _connect(pin, result(False))
     spent = _author_hold(g, held, pins)
 
     # --- held off long enough: it gives up ------------------------------------
-    gone = g.put(WARD_FLEE_UNTIL_VAR, BEL.find_then_pin(spent),
+    gone = g.put(WARD_FLEE_UNTIL_VAR, then(spent),
                  pin=g.op(FN_ADD_FF,
                           g.op(FN_ADD_FF, pins["now"],
                                tuned_pin(g, "ward_flee_s")),
@@ -306,7 +301,7 @@ def _author_ward(ed, exec_in, result, roar_anim, stock, restalks):
         _connect(tail, result(True))
 
     # --- its two roars: one part way through the hold, one at its end ----------
-    circling, roared = _author_roars(g, BEL.find_else_pin(spent), gone, pins, roar_anim)
+    circling, roared = _author_roars(g, else_(spent), gone, pins, roar_anim)
     for tail in roared:
         _connect(tail, result(True))
 

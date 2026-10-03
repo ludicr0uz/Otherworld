@@ -12,10 +12,10 @@ night is not an aim aid.
 
 import unreal
 
-from combat.graph import (
-    BEL, _add_component, _assets, _component_object, _create_blueprint,
-    _drop_components, _log, _root_handle,
-)
+from combat.log import _log
+from uebp.graph import (
+    BEL, _add_component, _assets, _component_object, _create_blueprint, _drop_components,
+    _root_handle)
 from combat.materials import build_flat_material
 from combat.paths import MAT_THROW_ARC, SPHERE, THROW_ARC_BP_PATH
 

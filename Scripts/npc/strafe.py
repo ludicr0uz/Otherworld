@@ -32,7 +32,7 @@ from forest_generator.npc_strafe import (
     NPC_STRAFE_MIN_ANGLE_DEG, NPC_STRAFE_MIN_DISTANCE_CM, NPC_STRAFE_SHARE,
     NPC_STRAFE_SPEED_SCALE,
 )
-from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_CLEAR_FOCUS, FN_DISTANCE,
     FN_GET_CONTROLLER, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_LE_FF, FN_LT_FF,
@@ -73,26 +73,26 @@ def _author_facing(ed, exec_in, focus):
     """
     pawn = _node(ed, FN_GET_PAWN)
     as_char = _palette(ed, NODE_CAST_CHARACTER)
-    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(as_char, "Object"))
+    _connect(out(pawn), _pin(as_char, "Object"))
     for pin in exec_in:
         _connect(pin, _pin(as_char, "execute"))
     move = ed.add_get_member_variable_node("CharacterMovement", CHARACTER_CLASS_PATH)
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(move, "self"))
-    made, last = [pawn, as_char, move], BEL.find_then_pin(as_char)
+    made, last = [pawn, as_char, move], then(as_char)
     for flag, on in ((ORIENT_FLAG, focus is None), (DESIRED_FLAG, focus is not None)):
         write = ed.add_set_member_variable_node(flag, MOVEMENT_CLASS_PATH)
-        _connect(_pin(move, "CharacterMovement", is_input=False), _pin(write, "self"))
+        _connect(out(move, "CharacterMovement"), _pin(write, "self"))
         _set(write, flag, "true" if on else "false")
         _connect(last, _pin(write, "execute"))
         made.append(write)
-        last = BEL.find_then_pin(write)
+        last = then(write)
     look = _node(ed, FN_CLEAR_FOCUS if focus is None else FN_SET_FOCUS)
     if focus is not None:
         _connect(focus, _pin(look, "NewFocus"))
     # A pawn that is not a Character has no such flags, and still carries on.
-    for pin in (last, _pin(as_char, "CastFailed", is_input=False)):
+    for pin in (last, out(as_char, "CastFailed")):
         _connect(pin, _pin(look, "execute"))
-    return made + [look], BEL.find_then_pin(look)
+    return made + [look], then(look)
 
 
 def _author_strafe(ed, exec_in, stock):
@@ -150,7 +150,7 @@ def _author_strafe(ed, exec_in, stock):
     _connect(exec_in, _pin(off, "execute"))
 
     # --- no: the chase, facing the way it runs -------------------------------
-    ahead, to_chase = _author_facing(ed, [BEL.find_else_pin(off)], None)
+    ahead, to_chase = _author_facing(ed, [else_(off)], None)
     made.extend(ahead)
 
     # --- yes: one pick per swing ---------------------------------------------
@@ -160,7 +160,7 @@ def _author_strafe(ed, exec_in, stock):
     _connect(next_out, _pin(fresh, "B"))
     pick = keep(ed.add_branch_node())
     _connect(out(fresh), _pin(pick, "Condition"))
-    _connect(BEL.find_then_pin(off), _pin(pick, "execute"))
+    _connect(then(off), _pin(pick, "execute"))
 
     angle = keep(_node(ed, FN_RANDOM_FLOAT))
     _set(angle, "Min", NPC_STRAFE_MIN_ANGLE_DEG)
@@ -175,21 +175,20 @@ def _author_strafe(ed, exec_in, stock):
     _connect(out(side), _pin(yaw, "B"))
     set_yaw = keep(ed.add_set_member_variable_node(STRAFE_YAW_VAR))
     _connect(out(yaw), _pin(set_yaw, STRAFE_YAW_VAR))
-    _connect(BEL.find_then_pin(pick), _pin(set_yaw, "execute"))
+    _connect(then(pick), _pin(set_yaw, "execute"))
 
     far = keep(_node(ed, FN_RANDOM_FLOAT))
     _set(far, "Min", NPC_STRAFE_MIN_DISTANCE_CM)
     _set(far, "Max", NPC_STRAFE_MAX_DISTANCE_CM)
     set_dist = keep(ed.add_set_member_variable_node(STRAFE_DIST_VAR))
     _connect(out(far), _pin(set_dist, STRAFE_DIST_VAR))
-    _connect(BEL.find_then_pin(set_yaw), _pin(set_dist, "execute"))
+    _connect(then(set_yaw), _pin(set_dist, "execute"))
     set_for = keep(ed.add_set_member_variable_node(STRAFE_FOR_VAR))
     _connect(next_out, _pin(set_for, STRAFE_FOR_VAR))
-    _connect(BEL.find_then_pin(set_dist), _pin(set_for, "execute"))
+    _connect(then(set_dist), _pin(set_for, "execute"))
 
     # --- eyes on the player, whichever way the feet go -----------------------
-    watch, watching = _author_facing(
-        ed, [BEL.find_then_pin(set_for), BEL.find_else_pin(pick)], out(player))
+    watch, watching = _author_facing(ed, [then(set_for), else_(pick)], out(player))
     made.extend(watch)
 
     # --- the point: round the player from here, and out ----------------------
@@ -225,6 +224,6 @@ def _author_strafe(ed, exec_in, stock):
     _connect(watching, _pin(step, "execute"))
 
     eased, tails, _entry = _author_walk_speed(
-        ed, [BEL.find_then_pin(step)], False, stock,
+        ed, [then(step)], False, stock,
         scale=NPC_STRAFE_SPEED_SCALE)
     return made + eased, to_chase, tails

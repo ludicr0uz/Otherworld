@@ -20,9 +20,8 @@ food is, upright in the fist: the box's middle is the item's origin.
 import unreal
 
 from combat.chop_tuning import CHOPS_VAR
-from combat.graph import (
-    BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
-)
+from combat.log import _log
+from uebp.graph import BEL, _apply_defaults, _create_blueprint, _must_load, _rot
 from combat.grip import _grip_location, _grip_rotation
 from combat.light_tuning import LIGHTS_VAR
 from combat.paths import CUBE, HOLD_ITEM_ANIM_PATH, MAT_METAL, MATCHES_BP_PATH

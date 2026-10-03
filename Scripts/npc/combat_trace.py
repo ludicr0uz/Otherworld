@@ -17,7 +17,7 @@ Log only, never on screen: ten wanderers around the player write a line every
 
 from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, NPC_ID_VAR
 from combat.paths import GAME_MODE_CLASS_PATH
-from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.nodes import (
     FN_BOOL_TO_STR, FN_CONCAT, FN_DISPLAY_NAME, FN_FLOAT_TO_STR,
     FN_GET_COMP, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_PRINT, FN_VEC_TO_STR,
@@ -42,7 +42,7 @@ def _author_concat(ed, keep, parts):
             _set(join, "B", part)
         else:
             _connect(part, _pin(join, "B"))
-        acc = _pin(join, "ReturnValue", is_input=False)
+        acc = out(join)
     return acc
 
 
@@ -66,32 +66,32 @@ def _author_melee_trace(ed, exec_in, self_pawn_out, self_loc_out, player_out,
     def to_str(fn, in_pin, src):
         n = keep(_node(ed, fn))
         _connect(src, _pin(n, in_pin))
-        return _pin(n, "ReturnValue", is_input=False)
+        return out(n)
 
     mode = keep(_node(ed, FN_GET_GAME_MODE))
     as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(out(mode), _pin(as_mode, "Object"))
     _connect(exec_in, _pin(as_mode, "execute"))
     flag = keep(ed.add_get_member_variable_node(COMBAT_TRACE_VAR, GAME_MODE_CLASS_PATH))
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(flag, "self"))
     tracing = keep(ed.add_branch_node())
-    _connect(_pin(flag, COMBAT_TRACE_VAR, is_input=False), _pin(tracing, "Condition"))
-    _connect(BEL.find_then_pin(as_mode), _pin(tracing, "execute"))
+    _connect(out(flag, COMBAT_TRACE_VAR), _pin(tracing, "Condition"))
+    _connect(then(as_mode), _pin(tracing, "execute"))
 
     # The attacker's own health component: its number, health and Dead flag.
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(self_pawn_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
     mine = keep(_palette(ed, NODE_CAST_HEALTH))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(mine, "Object"))
-    _connect(BEL.find_then_pin(tracing), _pin(mine, "execute"))
+    _connect(out(comp), _pin(mine, "Object"))
+    _connect(then(tracing), _pin(mine, "execute"))
     mine_out = _loose_pin(mine, "AsBPHealthComponent", is_input=False)
 
     def field(owner_out, name):
         g = keep(ed.add_get_member_variable_node(name, HEALTH_CLASS_PATH))
         _connect(owner_out, _pin(g, "self"))
-        return _pin(g, name, is_input=False)
+        return out(g, name)
 
     npc_id = to_str(FN_INT_TO_STR, "InInt", field(mine_out, NPC_ID_VAR))
     npc_hp = to_str(FN_FLOAT_TO_STR, "InDouble", field(mine_out, "Health"))
@@ -105,7 +105,7 @@ def _author_melee_trace(ed, exec_in, self_pawn_out, self_loc_out, player_out,
 
     # What this swing dealt, after the player's guard (npc/block.py).
     dealt = to_str(FN_FLOAT_TO_STR, "InDouble",
-                   _pin(keep(ed.add_get_member_variable_node(HIT_DAMAGE_VAR)), HIT_DAMAGE_VAR, is_input=False))
+                   out(keep(ed.add_get_member_variable_node(HIT_DAMAGE_VAR)), HIT_DAMAGE_VAR))
 
     line = _author_concat(ed, keep, [
         f"{COMBAT_TRACE_PREFIX}melee #", npc_id, " ", npc_name,
@@ -119,14 +119,11 @@ def _author_melee_trace(ed, exec_in, self_pawn_out, self_loc_out, player_out,
     _set(say, "bPrintToScreen", "false")
     _set(say, "bPrintToLog", "true")
     _set(say, "Duration", 0.0)
-    _connect(BEL.find_then_pin(mine), _pin(say, "execute"))
+    _connect(then(mine), _pin(say, "execute"))
 
     ed.add_comment_to_nodes(
         f"Combat trace (off unless the GameMode's {COMBAT_TRACE_VAR} is on): log "
         f"who landed this swing -- its number, where it stood -- and where the "
         f"target stood.", made)
-    tails = [BEL.find_then_pin(say),
-             _pin(mine, "CastFailed", is_input=False),
-             BEL.find_else_pin(tracing),
-             _pin(as_mode, "CastFailed", is_input=False)]
+    tails = [then(say), out(mine, "CastFailed"), else_(tracing), out(as_mode, "CastFailed")]
     return made, tails

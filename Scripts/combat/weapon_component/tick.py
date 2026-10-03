@@ -2,7 +2,7 @@
 aim/fire/inventory/sprint/recoil/ammo fragments in order.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.weapon_component.accuracy import _author_accuracy
 from combat.nodes import (
     FN_AND, FN_GET_OWNER, FN_GET_PC, FN_GE_FF, FN_GREATER_II, FN_IS_KEY_DOWN,
@@ -71,16 +71,16 @@ def _author_wc_tick(ed, tick):
     """
     pc = _node(ed, FN_GET_PC)
     _set(pc, "PlayerIndex", 0)
-    pc_out = _pin(pc, "ReturnValue", is_input=False)
+    pc_out = out(pc)
 
     owner = _node(ed, FN_GET_OWNER)
-    owner_out = _pin(owner, "ReturnValue", is_input=False)
+    owner_out = out(owner)
 
     held_get = ed.add_get_member_variable_node("Held")
-    held = _pin(held_get, "Held", is_input=False)
+    held = out(held_get, "Held")
     armed = _node(ed, FN_IS_VALID)
     _connect(held, _pin(armed, "Object"))
-    armed_out = _pin(armed, "ReturnValue", is_input=False)
+    armed_out = out(armed)
 
     # One Get per bind, reused by every poll below -- an output pin takes any
     # number of links. The Key pins are DRIVEN rather than set to a literal,
@@ -89,24 +89,24 @@ def _author_wc_tick(ed, tick):
     key_pins = {}
     for name, _default in BIND_VARS:
         getter = ed.add_get_member_variable_node(name)
-        key_pins[name] = _pin(getter, name, is_input=False)
+        key_pins[name] = out(getter, name)
 
     def pressed(var):
         n = _node(ed, FN_WAS_PRESSED)
         _connect(pc_out, _pin(n, "self"))
         _connect(key_pins[var], _pin(n, "Key"))
-        return _pin(n, "ReturnValue", is_input=False)
+        return out(n)
 
     def both(a, b):
         n = _node(ed, FN_AND)
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
-        return _pin(n, "ReturnValue", is_input=False)
+        return out(n)
 
     # --- dead? ---------------------------------------------------------------
     # Before everything, the passive fragments included: a dead owner gets
     # none of this Tick (dead.py).
-    alive = _author_dead_gate(ed, owner_out, held, armed_out, BEL.find_then_pin(tick))
+    alive = _author_dead_gate(ed, owner_out, held, armed_out, then(tick))
 
     # --- aim -----------------------------------------------------------------
     # First, and unconditionally: the reticle has to be right on the frames
@@ -222,24 +222,21 @@ def _author_wc_tick(ed, tick):
     # reads that actually decide are the same two pins the weapon is asked
     # about below.
     steady = _node(ed, FN_NOT)
-    _connect(_pin(ed.add_get_member_variable_node("Sprinting"),
-                  "Sprinting", is_input=False), _pin(steady, "A"))
+    _connect(out(ed.add_get_member_variable_node("Sprinting"), "Sprinting"), _pin(steady, "A"))
 
     # Guarding is not shooting: a separate NOT, so the Sprinting read the
     # verifier walks keeps its own NOT.
     guarded = _node(ed, FN_NOT)
-    _connect(_pin(ed.add_get_member_variable_node("Blocking"),
-                  "Blocking", is_input=False), _pin(guarded, "A"))
+    _connect(out(ed.add_get_member_variable_node("Blocking"), "Blocking"), _pin(guarded, "A"))
 
     tapped = _node(ed, FN_OR)
     _connect(pressed("KeyFire"), _pin(tapped, "A"))
-    _connect(_pin(ed.add_get_member_variable_node(FIRE_FORCED_VAR),
-                  FIRE_FORCED_VAR, is_input=False), _pin(tapped, "B"))
-    tap = _pin(tapped, "ReturnValue", is_input=False)
+    _connect(out(ed.add_get_member_variable_node(FIRE_FORCED_VAR), FIRE_FORCED_VAR), _pin(tapped, "B"))
+    tap = out(tapped)
     holding = _node(ed, FN_IS_KEY_DOWN)
     _connect(pc_out, _pin(holding, "self"))
     _connect(key_pins["KeyFire"], _pin(holding, "Key"))
-    holding_out = _pin(holding, "ReturnValue", is_input=False)
+    holding_out = out(holding)
     touching = _node(ed, FN_OR)
     _connect(tap, _pin(touching, "A"))
     _connect(holding_out, _pin(touching, "B"))
@@ -251,10 +248,10 @@ def _author_wc_tick(ed, tick):
     # With the throw key down the click is the throw's (throw.py), not a shot.
     throw_wants, no_throw = _author_throw_key(ed, pc_out, key_pins["KeyThrow"])
     fire_gate = ed.add_branch_node()
-    _connect(both(both(both(_pin(touching, "ReturnValue", is_input=False),
+    _connect(both(both(both(out(touching),
                             armed_out),
-                       both(_pin(steady, "ReturnValue", is_input=False),
-                            _pin(guarded, "ReturnValue", is_input=False))),
+                       both(out(steady),
+                            out(guarded))),
                   both(unspent, no_throw)),
              _pin(fire_gate, "Condition"))
     _connect(armed_exit, _pin(fire_gate, "execute"))
@@ -275,13 +272,13 @@ def _author_wc_tick(ed, tick):
     _connect(limited, _pin(unlimited, "A"))
     # OR, so an item without ammunition never consults a magazine it does not have.
     has_ammo = _node(ed, FN_OR)
-    _connect(_pin(unlimited, "ReturnValue", is_input=False), _pin(has_ammo, "A"))
-    _connect(_pin(rounds, "ReturnValue", is_input=False), _pin(has_ammo, "B"))
+    _connect(out(unlimited), _pin(has_ammo, "A"))
+    _connect(out(rounds), _pin(has_ammo, "B"))
 
     when, when_n = _prop(ed, "NextFireTime", held)
     right_now = _node(ed, FN_TIME_SECONDS)
     cooled = _node(ed, FN_GE_FF)
-    _connect(_pin(right_now, "ReturnValue", is_input=False), _pin(cooled, "A"))
+    _connect(out(right_now), _pin(cooled, "A"))
     _connect(when, _pin(cooled, "B"))
 
     # Held trigger, or tapped trigger? Now that Held is known valid, the
@@ -294,25 +291,24 @@ def _author_wc_tick(ed, tick):
     _connect(auto_pin, _pin(spraying, "B"))
     trigger = _node(ed, FN_OR)
     _connect(tap, _pin(trigger, "A"))
-    _connect(_pin(spraying, "ReturnValue", is_input=False), _pin(trigger, "B"))
-    trigger_out = _pin(trigger, "ReturnValue", is_input=False)
+    _connect(out(spraying), _pin(trigger, "B"))
+    trigger_out = out(trigger)
 
     ready = _node(ed, FN_AND)
-    _connect(_pin(has_ammo, "ReturnValue", is_input=False), _pin(ready, "A"))
-    _connect(_pin(cooled, "ReturnValue", is_input=False), _pin(ready, "B"))
+    _connect(out(has_ammo), _pin(ready, "A"))
+    _connect(out(cooled), _pin(ready, "B"))
     allowed = _node(ed, FN_AND)
-    _connect(_pin(ready, "ReturnValue", is_input=False), _pin(allowed, "A"))
+    _connect(out(ready), _pin(allowed, "A"))
     _connect(trigger_out, _pin(allowed, "B"))
     ready_gate = ed.add_branch_node()
-    _connect(_pin(allowed, "ReturnValue", is_input=False),
-             _pin(ready_gate, "Condition"))
+    _connect(out(allowed), _pin(ready_gate, "Condition"))
 
     # --- or is it something to eat (consume.py), to swing (knife.py), or to
     # strike (light.py)? ---------------------------------------------------------
     light_in, struck = _author_light_press(ed, held, owner_out, tap, _pin(ready_gate, "execute"))
     knife_in, slash_pressed = _author_knife_press(ed, held, tap, light_in)
     used, untapped = _author_use_gate(
-        ed, held, owner_out, tap, BEL.find_then_pin(fire_gate),
+        ed, held, owner_out, tap, then(fire_gate),
         knife_in, _author_wear_gate)
 
     ed.add_comment_to_nodes(
@@ -329,7 +325,7 @@ def _author_wc_tick(ed, tick):
     # The kick lands before the round is spent, which costs nothing and reads
     # in the right order. It cannot bend the shot that caused it: the pellets
     # fly down the AimPoint resolved at the top of this frame.
-    kicked = _author_recoil_kick(ed, held, pc_out, BEL.find_then_pin(ready_gate))
+    kicked = _author_recoil_kick(ed, held, pc_out, then(ready_gate))
     fired, flew = _author_fire(ed, held, muzzle, kicked)
     # ...and the wanderers hear it. After the pellets, so a shot is heard
     # whether or not it hit anything.
@@ -338,17 +334,17 @@ def _author_wc_tick(ed, tick):
     # --- the click, when the gate said no ------------------------------------
     dry_exits = _author_dry_fire(
         ed, held, muzzle,
-        _pin(has_ammo, "ReturnValue", is_input=False),
-        _pin(cooled, "ReturnValue", is_input=False), tap,
-        BEL.find_else_pin(ready_gate))
+        out(has_ammo),
+        out(cooled), tap,
+        else_(ready_gate))
 
     # --- or, with empty hands, a punch (punch.py) ------------------------------
     # Off the fire gate's False arm, which is where every empty-handed frame
     # goes: the gate needs IsValid(Held), and the punch needs it false.
     punch_exits = _author_punch(
-        ed, tap, armed_out, _pin(steady, "ReturnValue", is_input=False),
-        _pin(guarded, "ReturnValue", is_input=False), unspent,
-        (BEL.find_else_pin(fire_gate),))
+        ed, tap, armed_out, out(steady),
+        out(guarded), unspent,
+        (else_(fire_gate),))
 
     # --- reload --------------------------------------------------------------
     # Shares its key with the death menu's "try again", and that is safe rather
@@ -367,18 +363,18 @@ def _author_wc_tick(ed, tick):
     _connect(both(pressed("KeyReload"), armed_out), _pin(reload_gate, "Condition"))
     for exit_pin in slash_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
-    reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate))
+    reload_exits = _author_reload(ed, held, then(reload_gate))
 
     # --- the slots' keys (slot_moves.py): 1-9 and Q ask for a slot ---------
     slot_exits = _author_slot_keys(ed, pc_out, pressed("KeySwitch"),
-                                   reload_exits + (BEL.find_else_pin(reload_gate),))
+                                   reload_exits + (else_(reload_gate),))
 
     # --- drop ----------------------------------------------------------------
     drop_gate = ed.add_branch_node()
     _connect(both(pressed("KeyDrop"), armed_out), _pin(drop_gate, "Condition"))
     for exit_pin in slot_exits:
         _connect(exit_pin, _pin(drop_gate, "execute"))
-    after_drop = _author_drop(ed, held, owner_out, BEL.find_then_pin(drop_gate))
+    after_drop = _author_drop(ed, held, owner_out, then(drop_gate))
     drop_dirty = ed.add_set_member_variable_node("NeedsRefresh")
     _set(drop_dirty, "NeedsRefresh", "true")
     _connect(after_drop, _pin(drop_dirty, "execute"))
@@ -386,7 +382,7 @@ def _author_wc_tick(ed, tick):
     # --- interact (interact.py): an item in reach is picked up ---------------
     picked, not_picked = _author_interact(
         ed, owner_out, pressed("KeyInteract"),
-        (BEL.find_then_pin(drop_dirty), BEL.find_else_pin(drop_gate)))
+        (then(drop_dirty), else_(drop_gate)))
     pick_dirty = ed.add_set_member_variable_node("NeedsRefresh")
     _set(pick_dirty, "NeedsRefresh", "true")
     for exit_pin in picked:
@@ -397,7 +393,7 @@ def _author_wc_tick(ed, tick):
     # on the frame of the throw, as it does after a drop.
     flight_exits = _author_throw(
         ed, pc_out, owner_out, held, armed_out, throw_wants, tap,
-        (BEL.find_then_pin(pick_dirty),) + not_picked)
+        (then(pick_dirty),) + not_picked)
 
     # --- take a garment off (wear.py): the I panel's request ---------------
     flight_exits = _author_take_off(ed, flight_exits)
@@ -412,11 +408,10 @@ def _author_wc_tick(ed, tick):
     # --- refresh -------------------------------------------------------------
     dirty_get = ed.add_get_member_variable_node("NeedsRefresh")
     refresh_gate = ed.add_branch_node()
-    _connect(_pin(dirty_get, "NeedsRefresh", is_input=False),
-             _pin(refresh_gate, "Condition"))
+    _connect(out(dirty_get, "NeedsRefresh"), _pin(refresh_gate, "Condition"))
     for exit_pin in flight_exits:
         _connect(exit_pin, _pin(refresh_gate, "execute"))
     settle = ed.add_set_member_variable_node("NeedsRefresh")
     _set(settle, "NeedsRefresh", "false")
-    _connect(BEL.find_then_pin(refresh_gate), _pin(settle, "execute"))
-    _author_equip(ed, BEL.find_then_pin(settle))
+    _connect(then(refresh_gate), _pin(settle, "execute"))
+    _author_equip(ed, then(settle))

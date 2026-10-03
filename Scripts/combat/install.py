@@ -7,10 +7,10 @@ import unreal
 
 from combat.audio import RETIRED_SOUNDS
 from combat.camera import aim_camera, face_the_camera
-from combat.graph import (
-    BEL, _add_component, _assets, _component_object, _drop_components,
-    _handles, _log, _root_handle,
-)
+from combat.log import _log
+from uebp.graph import (
+    BEL, _add_component, _assets, _component_object, _drop_components, _handles,
+    _root_handle)
 from combat.hit_reaction import install_hit_reactions
 from combat.hit_zones import install_hit_zones, make_shootable
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH

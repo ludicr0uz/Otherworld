@@ -18,7 +18,8 @@ from combat.game_state import (
     COMBAT_TRACE_OFF_EVENT, COMBAT_TRACE_ON_EVENT, COMBAT_TRACE_PREFIX,
     COMBAT_TRACE_VAR,
 )
-from combat.graph import BEL, BGE, _apply_defaults, _assets, _connect, _log, _node, _pin, _set
+from combat.log import _log
+from uebp.graph import BGE, _apply_defaults, _assets, _connect, _node, _pin, _set, then
 from uebp.layout import arrange
 from combat.nodes import FN_PRINT
 from combat.paths import GAME_MODE_BP_PATH
@@ -30,14 +31,14 @@ def _author_switch(ed, event_name, value):
     event = ed.add_custom_event_node(event_name)
     flip = ed.add_set_member_variable_node(COMBAT_TRACE_VAR)
     _set(flip, COMBAT_TRACE_VAR, "true" if value else "false")
-    _connect(BEL.find_then_pin(event), _pin(flip, "execute"))
+    _connect(then(event), _pin(flip, "execute"))
 
     say = _node(ed, FN_PRINT)
     _set(say, "InString", f"{COMBAT_TRACE_PREFIX}{'on' if value else 'off'}")
     _set(say, "bPrintToScreen", "true")
     _set(say, "bPrintToLog", "true")
     _set(say, "Duration", 3.0)
-    _connect(BEL.find_then_pin(flip), _pin(say, "execute"))
+    _connect(then(flip), _pin(say, "execute"))
     return [event, flip, say]
 
 

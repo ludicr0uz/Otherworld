@@ -5,9 +5,8 @@ plus ensure_game_mode_vars() which declares them.
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _assets, _declare, _float_type, _log, _struct_type,
-)
+from combat.log import _log
+from uebp.graph import BEL, BGE, _assets, _declare, _float_type, _struct_type
 from uebp.layout import arrange
 from combat.difficulty import DIFFICULTY_VAR
 from combat.paths import GAME_MODE_BP_PATH

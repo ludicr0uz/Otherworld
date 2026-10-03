@@ -1,7 +1,7 @@
 """Sprint and stamina, authored into the weapon component's Tick.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
 from combat.nodes import (
     FN_ACTOR_FORWARD, FN_ADD_FF, FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF,
     FN_IS_KEY_DOWN, FN_LAST_MOVE_INPUT, FN_LE_FF, FN_MUL_FF, FN_NORMAL, FN_NOT,
@@ -31,18 +31,17 @@ def _author_ahead(ed, char_out, exec_in, keep):
     steer = keep(_node(ed, FN_LAST_MOVE_INPUT))
     _connect(char_out, _pin(steer, "self"))
     unit = keep(_node(ed, FN_NORMAL))
-    _connect(_pin(steer, "ReturnValue", is_input=False), _pin(unit, "A"))
+    _connect(out(steer), _pin(unit, "A"))
     facing = keep(_node(ed, FN_ACTOR_FORWARD))
     _connect(char_out, _pin(facing, "self"))
     along = keep(_node(ed, FN_DOT_VV))
-    _connect(_pin(unit, "ReturnValue", is_input=False), _pin(along, "A"))
-    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(along, "B"))
+    _connect(out(unit), _pin(along, "A"))
+    _connect(out(facing), _pin(along, "B"))
     inside = keep(_node(ed, FN_GE_FF))
-    _connect(_pin(along, "ReturnValue", is_input=False), _pin(inside, "A"))
+    _connect(out(along), _pin(inside, "A"))
     _set(inside, "B", SPRINT_CONE_MIN_DOT)
     store = keep(ed.add_set_member_variable_node(SPRINT_AHEAD_VAR))
-    _connect(_pin(inside, "ReturnValue", is_input=False),
-             _pin(store, SPRINT_AHEAD_VAR))
+    _connect(out(inside), _pin(store, SPRINT_AHEAD_VAR))
     _connect(exec_in, _pin(store, "execute"))
     return store
 
@@ -129,8 +128,8 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     latch = keep(ed.add_set_member_variable_node(SPRINT_SPENT_VAR))
     _connect(_pin(still_spent, "ReturnValue", is_input=False),
              _pin(latch, SPRINT_SPENT_VAR))
-    ahead = _author_ahead(ed, char_out, BEL.find_then_pin(as_char), keep)
-    _connect(BEL.find_then_pin(ahead), _pin(latch, "execute"))
+    ahead = _author_ahead(ed, char_out, then(as_char), keep)
+    _connect(then(ahead), _pin(latch, "execute"))
 
     fresh = keep(_node(ed, FN_NOT))
     _connect(_loose_pin(latch, "Output_Get", is_input=False), _pin(fresh, "A"))
@@ -142,7 +141,7 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     _connect(_loose_pin(ahead, "Output_Get", is_input=False), _pin(forwards, "B"))
     mark = keep(ed.add_set_member_variable_node("Sprinting"))
     _connect(_pin(forwards, "ReturnValue", is_input=False), _pin(mark, "Sprinting"))
-    _connect(BEL.find_then_pin(latch), _pin(mark, "execute"))
+    _connect(then(latch), _pin(mark, "execute"))
     # Read the stored flag from here on, for the same reason the NPC id is read
     # back from its variable: the AND is pure and would be re-evaluated per read.
     is_running = keep(ed.add_get_member_variable_node("Sprinting"))
@@ -158,7 +157,7 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     _connect(movement_out, _pin(apply_speed, "self"))
     _connect(_pin(pick_speed, "ReturnValue", is_input=False),
              _pin(apply_speed, "MaxWalkSpeed"))
-    _connect(BEL.find_then_pin(mark), _pin(apply_speed, "execute"))
+    _connect(then(mark), _pin(apply_speed, "execute"))
 
     rate = keep(_node(ed, FN_SELECT_FF))
     # Variables, not literals: the PLAYER SETTINGS tab writes them in play.
@@ -182,7 +181,7 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     _set(held_in, "Max", COMBAT.max_stamina)
     spend = keep(ed.add_set_member_variable_node("Stamina"))
     _connect(_pin(held_in, "ReturnValue", is_input=False), _pin(spend, "Stamina"))
-    _connect(BEL.find_then_pin(apply_speed), _pin(spend, "execute"))
+    _connect(then(apply_speed), _pin(spend, "execute"))
 
     ed.add_comment_to_nodes(
         f"{SPRINT_KEY}: {SPRINT_SPEED_VAR} ({COMBAT.sprint_speed_cms:.0f} cm/s as built) "
@@ -198,5 +197,4 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
         f"write of each and the two arms cannot drift apart. The fire gate below "
         f"reads Sprinting -- you cannot shoot while running.",
         made)
-    return (BEL.find_then_pin(spend),
-            _pin(as_char, "CastFailed", is_input=False))
+    return (then(spend), _pin(as_char, "CastFailed", is_input=False))

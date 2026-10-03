@@ -26,7 +26,7 @@ runs for a dead owner.
 
 import unreal
 
-from combat.graph import BEL, _assets, _connect, _node, _pin, _set
+from uebp.graph import _assets, _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import FN_GREATER_FF, FN_HIDE_BONE, FN_UNHIDE_BONE
 from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR
 from combat.skin import player_skin
@@ -58,10 +58,10 @@ def _author_head_shown(ed, keep, exec_in):
     """OwnerMesh.UnHideBoneByName(head). Returns the exec pin to carry on from."""
     body = keep(ed.add_get_member_variable_node("OwnerMesh"))
     show = keep(_node(ed, FN_UNHIDE_BONE))
-    _connect(_pin(body, "OwnerMesh", is_input=False), _pin(show, "self"))
+    _connect(out(body, "OwnerMesh"), _pin(show, "self"))
     _set(show, "BoneName", head_bone())
     _connect(exec_in, _pin(show, "execute"))
-    return BEL.find_then_pin(show)
+    return then(show)
 
 
 def _author_head_hide(ed, exec_ins):
@@ -74,20 +74,20 @@ def _author_head_hide(ed, exec_ins):
 
     seat = keep(ed.add_get_member_variable_node(SEAT_VAR))
     past = keep(_node(ed, FN_GREATER_FF))
-    _connect(_pin(seat, SEAT_VAR, is_input=False), _pin(past, "A"))
+    _connect(out(seat, SEAT_VAR), _pin(past, "A"))
     _set(past, "B", HEAD_HIDE_SEAT)
     on_sights = keep(ed.add_branch_node())
-    _connect(_pin(past, "ReturnValue", is_input=False), _pin(on_sights, "Condition"))
+    _connect(out(past), _pin(on_sights, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(on_sights, "execute"))
 
     body = keep(ed.add_get_member_variable_node("OwnerMesh"))
     hide = keep(_node(ed, FN_HIDE_BONE))
-    _connect(_pin(body, "OwnerMesh", is_input=False), _pin(hide, "self"))
+    _connect(out(body, "OwnerMesh"), _pin(hide, "self"))
     _set(hide, "BoneName", head_bone())
     _set(hide, "PhysBodyOption", PHYS_BODY_OP)
-    _connect(BEL.find_then_pin(on_sights), _pin(hide, "execute"))
-    shown = _author_head_shown(ed, keep, BEL.find_else_pin(on_sights))
+    _connect(then(on_sights), _pin(hide, "execute"))
+    shown = _author_head_shown(ed, keep, else_(on_sights))
 
     ed.add_comment_to_nodes(
         f"Down the sights (SightSeat > {HEAD_HIDE_SEAT:g}) the player's own "
@@ -96,4 +96,4 @@ def _author_head_hide(ed, exec_ins):
         "picture. Whatever gun is held, so no weapon needs an eye point that "
         "clears the head. Render only: the pose and the hit bodies stay. "
         "Shown again the frame the camera is back off the gun.", made)
-    return (BEL.find_then_pin(hide), shown)
+    return (then(hide), shown)

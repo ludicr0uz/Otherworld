@@ -23,8 +23,7 @@ to. What needs a game in play (save and exit, the loot window, the cheat) is
 kept off the title by author_in_play, which splits Tick's chain.
 """
 
-from combat.graph import BEL, _connect, _pin
-from uebp.graph import out
+from uebp.graph import _connect, _pin, out, then
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.loot_find import put
@@ -45,7 +44,7 @@ FN_COMP_TICK_PAUSED = "/Script/Engine.ActorComponent.SetTickableWhenPaused"
 def _then(node, in_execs):
     for e in in_execs:
         _connect(e, _pin(node, "execute"))
-    return BEL.find_then_pin(node)
+    return then(node)
 
 
 def author_title_ticks(ed, in_execs):

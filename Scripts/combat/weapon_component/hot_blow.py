@@ -17,8 +17,7 @@ creatures of forest_generator/npc_ward.NPC_WARD_FEARS: the wendigo), and this
 only reads it, so a zombie takes a hot blade as it takes a cold one.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.heat_tuning import (
     BLOW_DAMAGE_VAR, FIRE_FEAR_TAG, HOT_BLOW_SCALE, HOT_VAR,
 )
@@ -52,20 +51,20 @@ def author_hot_blow(strike):
         _connect(held, _pin(armed, "Object"))
         gate = keep(ed.add_branch_node())
         _connect(out(armed), _pin(gate, "Condition"))
-        _connect(BEL.find_then_pin(plain), _pin(gate, "execute"))
+        _connect(then(plain), _pin(gate, "execute"))
         hot_pin, hot_n = _prop(ed, HOT_VAR, held)
         keep(hot_n)
         hot = keep(ed.add_branch_node())
         _connect(hot_pin, _pin(hot, "Condition"))
-        _connect(BEL.find_then_pin(gate), _pin(hot, "execute"))
+        _connect(then(gate), _pin(hot, "execute"))
         fears = keep(_node(ed, FN_ACTOR_HAS_TAG))
         _connect(body, _pin(fears, "self"))
         _set(fears, "Tag", FIRE_FEAR_TAG)
         burns = keep(ed.add_branch_node())
         _connect(out(fears), _pin(burns, "Condition"))
-        _connect(BEL.find_then_pin(hot), _pin(burns, "execute"))
+        _connect(then(hot), _pin(burns, "execute"))
         seared = put(strike.damage * HOT_BLOW_SCALE)
-        _connect(BEL.find_then_pin(burns), _pin(seared, "execute"))
+        _connect(then(burns), _pin(seared, "execute"))
 
         amount = keep(ed.add_get_member_variable_node(BLOW_DAMAGE_VAR))
         ed.add_comment_to_nodes(
@@ -74,7 +73,5 @@ def author_hot_blow(strike):
             f"that with a hot blade in hand off a body tagged {FIRE_FEAR_TAG} "
             "(a creature afraid of fire).",
             made)
-        return (out(amount, BLOW_DAMAGE_VAR),
-                (BEL.find_else_pin(gate), BEL.find_else_pin(hot),
-                 BEL.find_else_pin(burns), BEL.find_then_pin(seared)))
+        return (out(amount, BLOW_DAMAGE_VAR), (else_(gate), else_(hot), else_(burns), then(seared)))
     return _author

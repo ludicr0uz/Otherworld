@@ -39,7 +39,7 @@ _must_load with the pack's name; fab_library.json is the Fab pack's restore
 recipe, and the Quaternius zips go in assets/cache/quaternius/.
 """
 
-from combat.graph import _rot
+from uebp.graph import _rot
 from combat.grip import _barrel_rotation
 from combat.paths import CUBE, CYLINDER, MAT_METAL
 

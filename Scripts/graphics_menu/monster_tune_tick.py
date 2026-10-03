@@ -19,7 +19,7 @@ so a wanderer that respawns or spawns later gets the tuning too.
 
 import unreal
 
-from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
+from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out, then
 from combat.nodes import FN_ARR_GET, MACRO_FOR_EACH
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.monster_tune_consts import (
@@ -73,8 +73,8 @@ def _author_creature(ed, c, bp_path, class_path, in_execs, made):
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     made.append(loop)
-    _connect(_pin(find, "OutActors", is_input=False), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(find), _loose_pin(loop, "Exec"))
+    _connect(out(find, "OutActors"), _loose_pin(loop, "Array"))
+    _connect(then(find), _loose_pin(loop, "Exec"))
 
     name = bp_path.rsplit("/", 1)[-1]
     cast = _palette(ed, f"Utilities|Casting|CastTo{name}")
@@ -85,19 +85,19 @@ def _author_creature(ed, c, bp_path, class_path, in_execs, made):
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     ai = _as_pin(cast)
 
-    flow = BEL.find_then_pin(cast)
+    flow = then(cast)
     for s, (_col, var, *_rest) in enumerate(MONSTER_STATS):
         # The cell's index is known at build time: a literal on Array_Get.
         cell = _call(ed, FN_ARR_GET, made,
                      TargetArray=_get(ed, MONSTER_TAB.values_var, made),
                      Index=c * MON_STAT_COUNT + s)
-        value = _pin(cell, "Item", is_input=False)
+        value = out(cell, "Item")
         n = ed.add_set_member_variable_node(var, class_path)
         made.append(n)
         _connect(ai, _pin(n, "self"))
         _connect(value, _pin(n, var))
         _connect(flow, _pin(n, "execute"))
-        flow = BEL.find_then_pin(n)
+        flow = then(n)
     return _loose_pin(loop, "Completed", is_input=False)
 
 

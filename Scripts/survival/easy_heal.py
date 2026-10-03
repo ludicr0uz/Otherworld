@@ -15,7 +15,8 @@ failing means no heal. Every exit is handed back for EndAbility.
 """
 
 from combat.difficulty import DIFFICULTY_VAR, EASY
-from combat.graph import BEL, _connect, _loose_pin, _must_load, _node, _palette, _pin, _set
+from uebp.graph import (
+    BEL, _connect, _loose_pin, _must_load, _node, _palette, _pin, _set, else_, out, then)
 from combat.nodes import (
     FN_ADD_FF, FN_CLAMP, FN_EQ_II, FN_GET_COMP, FN_GET_GAME_MODE,
     NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
@@ -46,25 +47,25 @@ def _author_easy_heal(ed, in_exec, item, avatar):
     if world and world.is_valid():
         _connect(avatar, world)
     as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(out(mode), _pin(as_mode, "Object"))
     _connect(in_exec, _pin(as_mode, "execute"))
     mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
 
     level = keep(ed.add_get_member_variable_node(DIFFICULTY_VAR, GAME_MODE_CLASS_PATH))
     _connect(mode_out, _pin(level, "self"))
     easy = keep(_node(ed, FN_EQ_II))
-    _connect(_pin(level, DIFFICULTY_VAR, is_input=False), _pin(easy, "A"))
+    _connect(out(level, DIFFICULTY_VAR), _pin(easy, "A"))
     _set(easy, "B", EASY)
     on_easy = keep(ed.add_branch_node())
-    _connect(_pin(easy, "ReturnValue", is_input=False), _pin(on_easy, "Condition"))
-    _connect(BEL.find_then_pin(as_mode), _pin(on_easy, "execute"))
+    _connect(out(easy), _pin(on_easy, "Condition"))
+    _connect(then(as_mode), _pin(on_easy, "execute"))
 
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(avatar, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
     as_health = keep(_palette(ed, NODE_CAST_HEALTH))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_health, "Object"))
-    _connect(BEL.find_then_pin(on_easy), _pin(as_health, "execute"))
+    _connect(out(comp), _pin(as_health, "Object"))
+    _connect(then(on_easy), _pin(as_health, "execute"))
     health = _loose_pin(as_health, "AsBPHealthComponent", is_input=False)
 
     now = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
@@ -74,22 +75,22 @@ def _author_easy_heal(ed, in_exec, item, avatar):
     gain = keep(ed.add_get_member_variable_node(RESTORE_VAR, CONSUMABLE_CLASS_PATH))
     _connect(item, _pin(gain, "self"))
     more = keep(_node(ed, FN_ADD_FF))
-    _connect(_pin(now, "Health", is_input=False), _pin(more, "A"))
-    _connect(_pin(gain, RESTORE_VAR, is_input=False), _pin(more, "B"))
+    _connect(out(now, "Health"), _pin(more, "A"))
+    _connect(out(gain, RESTORE_VAR), _pin(more, "B"))
     clamp = keep(_node(ed, FN_CLAMP))
-    _connect(_pin(more, "ReturnValue", is_input=False), _pin(clamp, "Value"))
+    _connect(out(more), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
-    _connect(_pin(top, "MaxHealth", is_input=False), _pin(clamp, "Max"))
+    _connect(out(top, "MaxHealth"), _pin(clamp, "Max"))
     write = keep(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(health, _pin(write, "self"))
-    _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(write, "Health"))
-    _connect(BEL.find_then_pin(as_health), _pin(write, "execute"))
+    _connect(out(clamp), _pin(write, "Health"))
+    _connect(then(as_health), _pin(write, "execute"))
 
     ed.add_comment_to_nodes(
         f"EASY only: the item's {RESTORE_VAR} onto the avatar's health, clamped "
         f"to MaxHealth. The difficulty is the GameMode's {DIFFICULTY_VAR}, which "
         "the HUD copies from the settings save.", made)
-    return made, (BEL.find_then_pin(write),
-                  _pin(as_mode, "CastFailed", is_input=False),
-                  BEL.find_else_pin(on_easy),
-                  _pin(as_health, "CastFailed", is_input=False))
+    return made, (then(write),
+                  out(as_mode, "CastFailed"),
+                  else_(on_easy),
+                  out(as_health, "CastFailed"))

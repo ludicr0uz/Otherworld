@@ -6,8 +6,7 @@ tells which stat a wire carries. The table is in a person's units
 (gfx_stats.py); applied() is the number in the engine's.
 """
 
-from combat.graph import _connect, _pin
-from uebp.graph import out
+from uebp.graph import _connect, _pin, out
 from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_MUL_FF
 from graphics_menu.dev_guns import _call, _get
 from graphics_menu.gfx_stats import GFX_STATS, index_of
@@ -21,7 +20,7 @@ def stat(ed, index, made):
     at = _call(ed, FN_ADD_II, made, A=_get(ed, TUNER_BASE_VAR, made), B=index)
     cell = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, TUNER_VALUES_VAR, made))
     _connect(out(at), _pin(cell, "Index"))
-    return _pin(cell, "Item", is_input=False)
+    return out(cell, "Item")
 
 
 def applied(ed, index, made):

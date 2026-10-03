@@ -11,8 +11,7 @@ body it struck (throw_strike.py). The take detaches what it takes, so an item
 that goes into the bag unseen does not ride on with the body.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.nodes import FN_ALL_ACTORS, FN_ARR_ADD, FN_DETACH, MACRO_FOR_EACH
 from combat.paths import ITEM_CLASS_PATH
 from combat.slot_tuning import HAS_ROOM_VAR, SLOT_VAR, UNPLACED
@@ -44,7 +43,7 @@ def _author_item_candidates(ed, exec_in):
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
     _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
+    _connect(then(every), _loose_pin(loop, "Exec"))
     element = _loose_pin(loop, "ArrayElement", is_input=False)
 
     cast = keep(_palette(ed, ITEM_CAST))
@@ -59,8 +58,7 @@ def _author_item_candidates(ed, exec_in):
         "The items the interact key may pick up: every item in the level "
         "flagged Dropped.",
         made)
-    return (item, dropped_pin, BEL.find_then_pin(cast),
-            _loose_pin(loop, "Completed", is_input=False))
+    return (item, dropped_pin, then(cast), _loose_pin(loop, "Completed", is_input=False))
 
 
 def _author_take_item(ed, target, exec_in):
@@ -85,25 +83,25 @@ def _author_take_item(ed, target, exec_in):
     fits = keep(ed.add_get_member_variable_node(HAS_ROOM_VAR))
     room = keep(ed.add_branch_node())
     _connect(out(fits, HAS_ROOM_VAR), _pin(room, "Condition"))
-    _connect(BEL.find_then_pin(cast), _pin(room, "execute"))
+    _connect(then(cast), _pin(room, "execute"))
 
     clear = keep(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH))
     _connect(best, _pin(clear, "self"))
     _set(clear, "Dropped", "false")
-    _connect(BEL.find_then_pin(room), _pin(clear, "execute"))
+    _connect(then(room), _pin(clear, "execute"))
     # Off whatever it was left attached to (a blade thrown into a body),
     # staying where it is: the equip puts it in the hand, or hides it.
     loose = keep(_node(ed, FN_DETACH))
     _connect(best, _pin(loose, "self"))
     for rule in ("LocationRule", "RotationRule", "ScaleRule"):
         _set(loose, rule, "KeepWorld")
-    _connect(BEL.find_then_pin(clear), _pin(loose, "execute"))
+    _connect(then(clear), _pin(loose, "execute"))
 
     inv2 = keep(ed.add_get_member_variable_node("Inventory"))
     add = keep(_node(ed, FN_ARR_ADD))
     _connect(out(inv2, "Inventory"), _pin(add, "TargetArray"))
     _connect(best, _pin(add, "NewItem"))
-    _connect(BEL.find_then_pin(loose), _pin(add, "execute"))
+    _connect(then(loose), _pin(add, "execute"))
 
     # Where it goes is the slot sync's (slot_sync.py): UNPLACED, it takes
     # the first free bag slot, or the hand if the bag is full. Whatever is
@@ -111,7 +109,7 @@ def _author_take_item(ed, target, exec_in):
     place = keep(ed.add_set_member_variable_node(SLOT_VAR, ITEM_CLASS_PATH))
     _connect(best, _pin(place, "self"))
     _set(place, SLOT_VAR, UNPLACED)
-    _connect(BEL.find_then_pin(add), _pin(place, "execute"))
+    _connect(then(add), _pin(place, "execute"))
 
     ed.add_comment_to_nodes(
         "An interact target that is an item is picked up: taken once, after "
@@ -119,6 +117,6 @@ def _author_take_item(ed, target, exec_in):
         "detached from whatever it was left in. It goes in UNPLACED: the slot "
         "sync puts it in the bag, or in empty hands when the bag is full.",
         made)
-    taken = (BEL.find_then_pin(place),)
-    idle = (BEL.find_else_pin(room),)
-    return taken, idle, _pin(cast, "CastFailed", is_input=False)
+    taken = (then(place),)
+    idle = (else_(room),)
+    return taken, idle, out(cast, "CastFailed")

@@ -24,8 +24,7 @@ nothing applied, so a reload converges through the same walk.
 
 import unreal
 
-from combat.graph import _connect, _pin
-from uebp.graph import out
+from uebp.graph import _connect, _pin, out
 from combat.nodes import FN_MUL_FF
 from forest_generator.wind import MPC_NAME, MPC_PATH
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
@@ -71,8 +70,7 @@ def _author_walk(ed, in_execs, made):
     actors = _call(ed, FN_ALL_OF_CLASS, made)
     _class_literal(actors, "ActorClass", ACTOR_CLASS_PATH)
     _connect(go, _pin(actors, "execute"))
-    actor, body, done = _for_each(ed, _pin(actors, "OutActors", is_input=False),
-                                  _pin(actors, "then", is_input=False), made)
+    actor, body, done = _for_each(ed, out(actors, "OutActors"), out(actors, "then"), made)
     comp, flow = _root_mesh(ed, actor, body, made)
     wpo = _call(ed, FN_SET_WPO, made, self=comp,
                 NewValue=out(_call(ed, FN_GE_II, made,
@@ -80,7 +78,7 @@ def _author_walk(ed, in_execs, made):
                                              rounded=True), B=1)))
     _connect(flow, _pin(wpo, "execute"))
     reach = _call(ed, FN_SET_WPO_DISTANCE, made, self=comp, NewValue=_distance_cm(ed, made))
-    _connect(_pin(wpo, "then", is_input=False), _pin(reach, "execute"))
+    _connect(out(wpo, "then"), _pin(reach, "execute"))
 
     kept = put(ed, TUNER_WIND_APPLIED_VAR, column(ed, "wind", made, rounded=True), [done], made)
     kept = put(ed, TUNER_WIND_DISTANCE_APPLIED_VAR,
@@ -101,7 +99,7 @@ def _author_params(ed, in_execs, made):
         _class_literal(s, "Collection", MPC_OBJECT_PATH)
         for e in flow:
             _connect(e, _pin(s, "execute"))
-        flow = [_pin(s, "then", is_input=False)]
+        flow = [out(s, "then")]
     return flow
 
 

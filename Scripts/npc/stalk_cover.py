@@ -58,7 +58,8 @@ from forest_generator.npc_stalk import (
     NPC_STALK_OPEN_NAV_EXTENT_CM,
     NPC_STALK_SWEEP_LIFT_CM, NPC_STALK_SWEEP_RADIUS_CM, cover_trees,
 )
-from npc.graph import BEL, _Graph, _connect, _loose_pin, _palette, _pin, out
+from npc.graph import _Graph
+from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, else_, out, then
 from npc.nodes import (
     FN_ADD_FF, FN_ADD_II, FN_ADD_VV, FN_ARR_ADD, FN_ARR_CLEAR,
     FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_DISTANCE_2D, FN_EQ_II,
@@ -122,7 +123,7 @@ def _author_wide(g, exec_in, tree, scale):
     _connect(tree, _pin(mesh, "self"))
     # By name: an object pin of an Equal node takes no asset literal.
     named = g.call(FN_OBJECT_NAME)
-    _connect(_pin(mesh, "StaticMesh", is_input=False), _pin(named, "Object"))
+    _connect(out(mesh, "StaticMesh"), _pin(named, "Object"))
     least = None
     for path, scale_min in cover_trees():
         same = g.call(FN_EQ_SS, B=path.rsplit(".", 1)[-1])
@@ -159,19 +160,19 @@ def _author_try(g, exec_in, angle, pins):
     _connect(g.get(STALK_IGNORE_VAR), _pin(sweep, "ActorsToIgnore"))
     for source in exec_in:
         _connect(source, _pin(sweep, "execute"))
-    struck = g.branch(out(sweep), BEL.find_then_pin(sweep))
+    struck = g.branch(out(sweep), then(sweep))
     hit = g.keep(_palette(g.ed, NODE_BREAK_HIT))
     _connect(out(sweep, "OutHit"), _pin(hit, "Hit"))
 
     # --- is it a tree, and where does its trunk stand? ------------------------
     tree = g.keep(_palette(g.ed, NODE_CAST_INSTANCED))
     _connect(_loose_pin(hit, "HitComponent", is_input=False), _pin(tree, "Object"))
-    _connect(BEL.find_then_pin(struck), _pin(tree, "execute"))
+    _connect(then(struck), _pin(tree, "execute"))
     stands = g.call(FN_INSTANCE_TRANSFORM, bWorldSpace="true")
     _connect(_loose_pin(tree, "AsInstancedStaticMeshComponent", is_input=False),
              _pin(stands, "self"))
     _connect(_loose_pin(hit, "HitItem", is_input=False), _pin(stands, "InstanceIndex"))
-    known = g.branch(out(stands), BEL.find_then_pin(tree))
+    known = g.branch(out(stands), then(tree))
     trunk = g.call(FN_BREAK_TRANSFORM)
     _connect(out(stands, "OutInstanceTransform"), _pin(trunk, "InTransform"))
 
@@ -192,8 +193,8 @@ def _author_try(g, exec_in, angle, pins):
     _connect(out(spot), _pin(stood, "A"))
     _connect(pins["half_height"], _pin(stood, "B"))
     its = _loose_pin(tree, "AsInstancedStaticMeshComponent", is_input=False)
-    wide = _author_wide(g, BEL.find_then_pin(known), its, out(trunk, "Scale"))
-    raw = g.put(STALK_COVER_VAR, BEL.find_then_pin(wide), pin=out(stood))
+    wide = _author_wide(g, then(known), its, out(trunk, "Scale"))
+    raw = g.put(STALK_COVER_VAR, then(wide), pin=out(stood))
 
     # --- ...out of the player's sight ------------------------------------------
     stored = g.get(STALK_COVER_VAR)
@@ -203,15 +204,15 @@ def _author_try(g, exec_in, angle, pins):
     _connect(pins["player_loc"], _pin(line, "End"))
     _connect(g.get(STALK_IGNORE_VAR), _pin(line, "ActorsToIgnore"))
     _connect(raw, _pin(line, "execute"))
-    blocked = g.branch(out(line), BEL.find_then_pin(line))
+    blocked = g.branch(out(line), then(line))
     between = g.keep(_palette(g.ed, NODE_BREAK_HIT))
     _connect(out(line, "OutHit"), _pin(between, "Hit"))
     # That tree, and no other: the same cell and the same instance of it.
     cell = g.op(FN_EQ_OO, _loose_pin(between, "HitComponent", is_input=False), its)
     item = g.op(FN_EQ_II, _loose_pin(between, "HitItem", is_input=False),
                 _loose_pin(hit, "HitItem", is_input=False))
-    shade = g.branch(g.op(FN_AND, cell, item), BEL.find_then_pin(blocked))
-    raw = BEL.find_then_pin(shade)
+    shade = g.branch(g.op(FN_AND, cell, item), then(blocked))
+    raw = then(shade)
 
     # --- ...a step in (the sphere may have touched a crown, metres from its
     # trunk), and somewhere it can stand ---------------------------------------
@@ -226,13 +227,12 @@ def _author_try(g, exec_in, angle, pins):
     _connect(pins["nav_extent"], _pin(on_nav, "QueryExtent"))
     good = g.op(FN_AND, out(gains), out(on_nav))
     walkable = g.branch(good, raw)
-    snapped = g.put(STALK_COVER_VAR, BEL.find_then_pin(walkable),
-                    pin=out(on_nav, "ProjectedLocation"))
+    snapped = g.put(STALK_COVER_VAR, then(walkable), pin=out(on_nav, "ProjectedLocation"))
     found = g.put(STALK_HIDDEN_VAR, snapped, literal="true")
-    missed = [BEL.find_else_pin(struck), _loose_pin(tree, "CastFailed", is_input=False),
-              BEL.find_else_pin(known), BEL.find_else_pin(wide),
-              BEL.find_else_pin(blocked), BEL.find_else_pin(shade),
-              BEL.find_else_pin(walkable)]
+    missed = [else_(struck), _loose_pin(tree, "CastFailed", is_input=False),
+              else_(known), else_(wide),
+              else_(blocked), else_(shade),
+              else_(walkable)]
     return found, missed, heading
 
 
@@ -261,13 +261,13 @@ def _author_cover(ed, exec_in, pins):
     _connect(step, _pin(clear, "execute"))
     ground = g.call(FN_MOVEMENT_BASE)
     _connect(pins["self_pawn"], _pin(ground, "Pawn"))
-    step = BEL.find_then_pin(clear)
+    step = then(clear)
     for actor in (out(ground), pins["self_pawn"]):
         add = g.call(FN_ARR_ADD)
         _connect(g.get(STALK_IGNORE_VAR), _pin(add, "TargetArray"))
         _connect(actor, _pin(add, "NewItem"))
         _connect(step, _pin(add, "execute"))
-        step = BEL.find_then_pin(add)
+        step = then(add)
 
     # --- shared by every angle -----------------------------------------------
     away = g.call(FN_SUB_VV)
@@ -316,7 +316,6 @@ def _author_cover(ed, exec_in, pins):
                         **dict(zip("XYZ", NPC_STALK_OPEN_NAV_EXTENT_CM)))),
              _pin(on_nav, "QueryExtent"))
     walkable = g.branch(out(on_nav), bare)
-    snapped = g.put(STALK_COVER_VAR, BEL.find_then_pin(walkable),
-                    pin=out(on_nav, "ProjectedLocation"))
+    snapped = g.put(STALK_COVER_VAR, then(walkable), pin=out(on_nav, "ProjectedLocation"))
     tails.append(g.put(STALK_HIDDEN_VAR, snapped, literal="false"))
-    return g.made, tails, BEL.find_else_pin(walkable)
+    return g.made, tails, else_(walkable)

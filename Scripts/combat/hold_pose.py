@@ -44,7 +44,8 @@ import unreal
 
 from asset_pipeline.rig_util import mesh_ref_pose, visible_bone_xf
 from combat.body_pose import CLAVICLE_DIR, _between, _conj, _mul, _norm
-from combat.graph import _assets, _log
+from combat.log import _log
+from uebp.graph import _assets
 from combat.paths import (
     HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH,
     WARD_TORCH_ANIM_PATH,

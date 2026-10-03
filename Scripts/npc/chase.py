@@ -15,7 +15,7 @@ from npc.nodes import (
     FN_ACTOR_LOC, FN_AND_B, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_MAKE_VECTOR,
     FN_MOVE_TO_ACTOR, FN_MOVE_TO_LOCATION, FN_PROJECT_NAV,
 )
-from npc.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
 
 
 def _author_chase(ed, exec_in):
@@ -26,7 +26,7 @@ def _author_chase(ed, exec_in):
 
     # Goal = the player pawn
     _set(get_pawn, "PlayerIndex", 0)
-    _connect(_pin(get_pawn, "ReturnValue", is_input=False), _pin(move_to, "Goal"))
+    _connect(out(get_pawn), _pin(move_to, "Goal"))
 
     # Pathfinding is what makes it run around the trees rather than into them.
     _set(move_to, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
@@ -53,30 +53,30 @@ def _author_chase(ed, exec_in):
     reach = _node(ed, FN_MAKE_VECTOR)
     for axis, value in zip(("X", "Y", "Z"), NAV_REACHABLE_EXTENT_CM):
         _set(reach, axis, value)
-    reach_out = _pin(reach, "ReturnValue", is_input=False)
+    reach_out = out(reach)
 
     goal_loc = _node(ed, FN_ACTOR_LOC)
-    _connect(_pin(get_pawn, "ReturnValue", is_input=False), _pin(goal_loc, "self"))
-    goal_out = _pin(goal_loc, "ReturnValue", is_input=False)
+    _connect(out(get_pawn), _pin(goal_loc, "self"))
+    goal_out = out(goal_loc)
     goal_on = _node(ed, FN_PROJECT_NAV)
     _connect(goal_out, _pin(goal_on, "Point"))
     _connect(reach_out, _pin(goal_on, "QueryExtent"))
 
     here_pawn = _node(ed, FN_GET_PAWN)
     here_loc = _node(ed, FN_ACTOR_LOC)
-    _connect(_pin(here_pawn, "ReturnValue", is_input=False), _pin(here_loc, "self"))
+    _connect(out(here_pawn), _pin(here_loc, "self"))
     here_on = _node(ed, FN_PROJECT_NAV)
-    _connect(_pin(here_loc, "ReturnValue", is_input=False), _pin(here_on, "Point"))
+    _connect(out(here_loc), _pin(here_on, "Point"))
     _connect(reach_out, _pin(here_on, "QueryExtent"))
 
     both_on = _node(ed, FN_AND_B)
-    _connect(_pin(goal_on, "ReturnValue", is_input=False), _pin(both_on, "A"))
-    _connect(_pin(here_on, "ReturnValue", is_input=False), _pin(both_on, "B"))
+    _connect(out(goal_on), _pin(both_on, "A"))
+    _connect(out(here_on), _pin(both_on, "B"))
 
     pathable = ed.add_branch_node()
-    _connect(_pin(both_on, "ReturnValue", is_input=False), _pin(pathable, "Condition"))
+    _connect(out(both_on), _pin(pathable, "Condition"))
     _connect(exec_in, _pin(pathable, "execute"))
-    _connect(BEL.find_then_pin(pathable), BEL.find_execute_pin(move_to))
+    _connect(then(pathable), BEL.find_execute_pin(move_to))
 
     # --- the straight line ---------------------------------------------------
     # Not a teleport, not AddMovementInput, and not a second Tick: this is the
@@ -96,8 +96,8 @@ def _author_chase(ed, exec_in):
     _set(direct, "bProjectDestinationToNavigation", "false")
     _set(direct, "bStopOnOverlap", "true")
     _set(direct, "bCanStrafe", "false")
-    _connect(BEL.find_else_pin(pathable), BEL.find_execute_pin(direct))
+    _connect(else_(pathable), BEL.find_execute_pin(direct))
 
     nodes = [move_to, get_pawn, reach, goal_loc, goal_on, here_pawn, here_loc,
              here_on, both_on, pathable, direct]
-    return nodes, [BEL.find_then_pin(move_to), BEL.find_then_pin(direct)]
+    return nodes, [then(move_to), then(direct)]

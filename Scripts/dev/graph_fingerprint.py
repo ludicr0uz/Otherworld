@@ -74,7 +74,7 @@ def literal(text):
 
 
 def value(v, depth=0):
-    """A CDO default as JSON, by combat.graph._same's rules: structs through
+    """A CDO default as JSON, by uebp.graph._same's rules: structs through
     to_tuple(), objects by path, FKey through export_text(), arrays by element."""
     if v is None or isinstance(v, (bool, int, str)):
         return v

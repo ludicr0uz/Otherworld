@@ -41,7 +41,8 @@ nothing here and keeps the procedural crouch and prone.
 from combat.aim_pitch import _feeding_all, _nodes_of
 from combat.anim_blueprint import AIM_SLOT, _slot_node
 from combat.body_pose import KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, move_alpha
-from combat.graph import BEL, BGE, PIN, _assets, _connect, _log, _palette, _pin, _set
+from combat.log import _log
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _palette, _pin, _set, out
 from uebp.layout import arrange
 
 BLEND_CLASS = "AnimGraphNode_TwoWayBlend"
@@ -131,7 +132,7 @@ def _blend(ed, a, b, alpha):
 
 
 def _pose(node):
-    return _pin(node, "Pose", is_input=False)
+    return out(node, "Pose")
 
 
 def unpatch_stance_clips(skin):
@@ -167,8 +168,7 @@ def patch_stance_clips(skin):
                         _pose(_player(ed, clips["crouch_walk"], CROUCH_WALK_RATE)), move)
         crawl = _blend(ed, _pose(_evaluator(ed, clips["prone_crawl"], PRONE_REST_S)),
                        _pose(_player(ed, clips["prone_crawl"], PRONE_CRAWL_RATE)), move)
-        weights = {w: _pin(ed.add_get_member_variable_node(w),
-                           w, is_input=False)
+        weights = {w: out(ed.add_get_member_variable_node(w), w)
                    for i, w in enumerate((POSE_CROUCH, POSE_PRONE, POSE_KNEEL, KNEEL_TIME))}
         low = _blend(ed, base, _pose(crouch), weights[POSE_CROUCH])
         lying = _blend(ed, _pose(low), _pose(crawl), weights[POSE_PRONE])

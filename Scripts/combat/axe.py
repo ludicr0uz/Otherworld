@@ -31,9 +31,8 @@ import unreal
 
 from combat.slot_tuning import MELEE_KIND, WEAPON_KIND_VAR
 from combat.chop_tuning import CHOPS_VAR
-from combat.graph import (
-    BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
-)
+from combat.log import _log
+from uebp.graph import BEL, _apply_defaults, _create_blueprint, _must_load, _rot
 from combat.grip import _grip_location, _grip_rotation, _rotate_vector
 from combat.heat import build_heated_model, build_hot_instance
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR

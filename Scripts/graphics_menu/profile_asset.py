@@ -7,9 +7,8 @@ loaded profile starts wherever the level puts the player.
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _create_blueprint, _declare, _float_type, _log, _must_load,
-)
+from combat.log import _log
+from uebp.graph import BEL, BGE, _create_blueprint, _declare, _float_type, _must_load
 from uebp.layout import arrange
 from combat.paths import ITEM_BP_PATH
 from graphics_menu.profile_consts import (

@@ -37,7 +37,8 @@ This module holds the socket and grip maths behind that.
 
 import unreal
 
-from combat.graph import _assets, _component_object, _handles, _log, _rot
+from combat.log import _log
+from uebp.graph import _assets, _component_object, _handles, _rot
 from combat.paths import CHARACTER_BP_PATH
 from combat.skin import player_skin
 

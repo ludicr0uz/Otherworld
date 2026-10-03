@@ -27,10 +27,9 @@ The pick follows Quality rather than the other way round on a Tick where
 neither moved, so the tab always shows the preset that is running.
 """
 
-from combat.graph import (
-    BEL, _add_component, _connect, _declare, _drop_components, _loose_pin, _must_load,
-    _pin, _root_handle)
-from uebp.graph import out
+from uebp.graph import (
+    BEL, _add_component, _connect, _declare, _drop_components, _loose_pin, _must_load, _pin,
+    _root_handle, out, then)
 from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_MOD_II, FN_OR, MACRO_FOR_LOOP
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_save import author_keep_graphics
@@ -97,19 +96,19 @@ def _author_spread(ed, in_execs, made):
     _loose_pin(loop, "FirstIndex").set_pin_value("0")
     _loose_pin(loop, "LastIndex").set_pin_value(str(len(PRESET_LABELS) * STAT_COUNT - 1))
     _connect(go, _pin(loop, "execute"))
-    i = _pin(loop, "Index", is_input=False)
+    i = out(loop, "Index")
     s = out(_call(ed, FN_MOD_II, made, A=i, B=STAT_COUNT))
     look = _call(ed, FN_GE_II, made, A=s, B=LOOK_FROM)
-    copy, _skip = _branch(ed, out(look), [_pin(loop, "LoopBody", is_input=False)], made)
+    copy, _skip = _branch(ed, out(look), [out(loop, "LoopBody")], made)
     base = _call(ed, FN_MUL_II, made, A=_get(ed, GFX_TAB.pick_var, made), B=STAT_COUNT)
     source = _call(ed, FN_ADD_II, made, A=out(base), B=s)
     cell = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, GFX_TAB.values_var, made))
     _connect(out(source), _pin(cell, "Index"))
     write = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, GFX_TAB.values_var, made))
     _connect(i, _pin(write, "Index"))
-    _connect(_pin(cell, "Item", is_input=False), _pin(write, "Item"))
+    _connect(out(cell, "Item"), _pin(write, "Item"))
     _connect(copy, _pin(write, "execute"))
-    return [_pin(loop, "Completed", is_input=False), idle]
+    return [out(loop, "Completed"), idle]
 
 
 def _author_hand_over(ed, in_execs, made):
@@ -127,7 +126,7 @@ def _author_hand_over(ed, in_execs, made):
         _connect(_get(ed, source, made), _pin(n, var))
         for e in flow:
             _connect(e, _pin(n, "execute"))
-        flow = [BEL.find_then_pin(n)]
+        flow = [then(n)]
     flow = _setter(ed, TUNER_DIRTY_VAR, "true", flow, made, TUNER_CLASS_PATH, tuner)
     # Read before GfxQualityApplied is written below: -1 is the session's
     # first hand-over, which is the save itself (or the defaults).

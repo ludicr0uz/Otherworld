@@ -21,8 +21,7 @@ so WasInputKeyJustPressed still answers. What a taken row does is Tick's
 (menu_main.py), which the HUD keeps running under the paused title.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from graphics_menu.cursor import (
     ROW, author_cursor_mode, author_hold_fire, author_row_cursor, author_widget_click)
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
@@ -106,17 +105,16 @@ def author_death_menu(ed, in_execs, mode_out):
     kills = keep(ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH))
     _connect(mode_out, _pin(kills, "self"))
     kills_str = keep(_node(ed, FN_INT_TO_STR))
-    _connect(_pin(kills, KILL_COUNT_VAR, is_input=False), _pin(kills_str, "InInt"))
+    _connect(out(kills, KILL_COUNT_VAR), _pin(kills_str, "InInt"))
     score_text = keep(_node(ed, FN_CONCAT))
     _set(score_text, "A", DEATH_SCORE_PREFIX)
-    _connect(_pin(kills_str, "ReturnValue", is_input=False), _pin(score_text, "B"))
-    flow = set_text(ed, part(ed, WBP_DEATH_MENU, DEATH_SCORE),
-                    _pin(score_text, "ReturnValue", is_input=False), [flow])
+    _connect(out(kills_str), _pin(score_text, "B"))
+    flow = set_text(ed, part(ed, WBP_DEATH_MENU, DEATH_SCORE), out(score_text), [flow])
 
     # --- the restart itself --------------------------------------------------
     pc = keep(_node(ed, FN_GET_OWNING_PC))
     pressed = keep(_node(ed, FN_WAS_PRESSED))
-    _connect(_pin(pc, "ReturnValue", is_input=False), _pin(pressed, "self"))
+    _connect(out(pc), _pin(pressed, "self"))
     _set(pressed, "Key", RESTART_KEY)
     # ...or a click on the hint line, raised and served like the title's.
     clicked = author_widget_click(
@@ -124,26 +122,26 @@ def author_death_menu(ed, in_execs, mode_out):
         (CURSOR_ACCEPT_VAR, "true"), [flow])
     asked = keep(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR))
     either = keep(_node(ed, FN_OR))
-    _connect(_pin(pressed, "ReturnValue", is_input=False), _pin(either, "A"))
-    _connect(_pin(asked, CURSOR_ACCEPT_VAR, is_input=False), _pin(either, "B"))
+    _connect(out(pressed), _pin(either, "A"))
+    _connect(out(asked, CURSOR_ACCEPT_VAR), _pin(either, "B"))
     again = keep(ed.add_branch_node())
-    _connect(_pin(either, "ReturnValue", is_input=False), _pin(again, "Condition"))
+    _connect(out(either), _pin(again, "Condition"))
     for e in clicked:
         _connect(e, _pin(again, "execute"))
     served = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
     _set(served, CURSOR_ACCEPT_VAR, "false")
-    _connect(BEL.find_then_pin(again), _pin(served, "execute"))
+    _connect(then(again), _pin(served, "execute"))
     unpause = keep(_node(ed, FN_SET_PAUSED))
     _set(unpause, "bPaused", "false")
-    _connect(BEL.find_then_pin(served), _pin(unpause, "execute"))
+    _connect(then(served), _pin(unpause, "execute"))
     # The current map by name, so the menu restarts whatever level is loaded.
     # bRemovePrefixString strips PIE's UEDPIE_0_.
     where = keep(_node(ed, FN_LEVEL_NAME))
     _set(where, "bRemovePrefixString", "true")
-    _connect(BEL.find_then_pin(unpause), _pin(where, "execute"))
+    _connect(then(unpause), _pin(where, "execute"))
     reopen = keep(_node(ed, FN_OPEN_LEVEL))
-    _connect(_pin(where, "ReturnValue", is_input=False), _pin(reopen, "LevelName"))
-    _connect(BEL.find_then_pin(where), _pin(reopen, "execute"))
+    _connect(out(where), _pin(reopen, "LevelName"))
+    _connect(then(where), _pin(reopen, "execute"))
 
     ed.add_comment_to_nodes(
         f"The death menu, instead of the HUD while the GameMode's PlayerDead is "
@@ -219,27 +217,25 @@ def author_pause_menu(ed, in_execs):
     get_open = ed.add_get_member_variable_node("MenuOpen")
     looting = ed.add_get_member_variable_node(LOOT_OPEN_VAR)
     wanted = _node(ed, FN_OR)
-    _connect(_pin(ed.add_get_member_variable_node("MenuOpen"),
-                  "MenuOpen", is_input=False), _pin(wanted, "A"))
-    _connect(_pin(looting, LOOT_OPEN_VAR, is_input=False), _pin(wanted, "B"))
+    _connect(out(ed.add_get_member_variable_node("MenuOpen"), "MenuOpen"), _pin(wanted, "A"))
+    _connect(out(looting, LOOT_OPEN_VAR), _pin(wanted, "B"))
     # ...or the I panel (wear_draw.py).
     wearing = ed.add_get_member_variable_node(WEAR_OPEN_VAR)
     wanted_any = _node(ed, FN_OR)
-    _connect(_pin(wanted, "ReturnValue", is_input=False), _pin(wanted_any, "A"))
-    _connect(_pin(wearing, WEAR_OPEN_VAR, is_input=False), _pin(wanted_any, "B"))
+    _connect(out(wanted), _pin(wanted_any, "A"))
+    _connect(out(wearing, WEAR_OPEN_VAR), _pin(wanted_any, "B"))
     wanted = wanted_any
-    in_execs = author_hold_fire(ed, author_cursor_mode(
-        ed, _pin(wanted, "ReturnValue", is_input=False), in_execs))
+    in_execs = author_hold_fire(ed, author_cursor_mode(ed, out(wanted), in_execs))
     br = ed.add_branch_node()
-    _connect(_pin(get_open, "MenuOpen", is_input=False), _pin(br, "Condition"))
+    _connect(out(get_open, "MenuOpen"), _pin(br, "Condition"))
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
     # WBP_MainMenu goes up and down with the menu: its legal notice is on
     # every page of it, and its settings panel is one of the pages.
-    closed = set_shown(ed, screen(ed, WBP_PAUSE_MENU), False, [BEL.find_else_pin(br)])
+    closed = set_shown(ed, screen(ed, WBP_PAUSE_MENU), False, [else_(br)])
     closed = set_shown(ed, screen(ed, WBP_MAIN_MENU), False, [closed])
 
-    flow = set_shown(ed, screen(ed, WBP_PAUSE_MENU), True, [BEL.find_then_pin(br)])
+    flow = set_shown(ed, screen(ed, WBP_PAUSE_MENU), True, [then(br)])
     flow = set_shown(ed, screen(ed, WBP_MAIN_MENU), True, [flow])
     panel = part(ed, WBP_PAUSE_MENU, PAUSE_PANEL)
     settings = part(ed, WBP_MAIN_MENU, SETTINGS_PANEL)
@@ -258,8 +254,7 @@ def author_pause_menu(ed, in_execs):
                                 click=(PAUSE_CLICK_VAR, ROW))
     keyed = _author_pause_keys(ed, hovered, made)
     caret = ed.add_get_member_variable_node(PAUSE_ROW_VAR)
-    flow = mark_rows(ed, rows, len(PAUSE_ROW_LABELS),
-                     _pin(caret, PAUSE_ROW_VAR, is_input=False), keyed)
+    flow = mark_rows(ed, rows, len(PAUSE_ROW_LABELS), out(caret, PAUSE_ROW_VAR), keyed)
     worded = _author_row_words(ed, rows, [flow], made)
 
     # ON or OFF behind one branch: no SelectText, and a bool converted to text
@@ -268,10 +263,10 @@ def author_pause_menu(ed, in_execs):
     value = member(ed, debug_row, WBP_MENU_ROW, ROW_VALUE)
     dbg = ed.add_get_member_variable_node("DebugOn")
     dbg_br = ed.add_branch_node()
-    _connect(_pin(dbg, "DebugOn", is_input=False), _pin(dbg_br, "Condition"))
+    _connect(out(dbg, "DebugOn"), _pin(dbg_br, "Condition"))
     _connect(found, _pin(dbg_br, "execute"))
-    on = set_text(ed, value, DEBUG_ON, [BEL.find_then_pin(dbg_br)])
-    off = set_text(ed, value, DEBUG_OFF, [BEL.find_else_pin(dbg_br)])
+    on = set_text(ed, value, DEBUG_ON, [then(dbg_br)])
+    off = set_text(ed, value, DEBUG_OFF, [else_(dbg_br)])
     ed.add_comment_to_nodes(
         "The menu: the title's, and M's in play. Its rows show unless the "
         "settings page or a tuning tab is open in their place. The caret is "

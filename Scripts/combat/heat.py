@@ -26,9 +26,10 @@ numbers (knife.py, axe.py).
 
 import unreal
 
-from combat.graph import (
+from combat.log import _log
+from uebp.graph import (
     BEL, BGE, _add_component, _assets, _component_object, _connect, _drop_components,
-    _events, _find_handle, _log, _must_load, _node, _pin, _set)
+    _events, _find_handle, _must_load, _node, _pin, _set, else_, then)
 from uebp.layout import arrange
 from combat.heat_tuning import (
     COOL_VAR, HEAT_GLOW, HEAT_GLOW_COLOUR, HEAT_GLOW_INTENSITY,
@@ -154,29 +155,29 @@ def _author_cooling(ed, tick):
     _connect(out(spent), _pin(over, "B"))
     cooled = ed.add_branch_node()
     _connect(out(over), _pin(cooled, "Condition"))
-    _connect(BEL.find_then_pin(tick), _pin(cooled, "execute"))
+    _connect(then(tick), _pin(cooled, "execute"))
     cold = ed.add_set_member_variable_node(HOT_VAR)
     _set(cold, HOT_VAR, "false")
-    _connect(BEL.find_then_pin(cooled), _pin(cold, "execute"))
+    _connect(then(cooled), _pin(cold, "execute"))
 
     # Read after the write above: a pure Get is pulled when its reader runs.
     hot = get(HOT_VAR)
     which = ed.add_branch_node()
     _connect(hot, _pin(which, "Condition"))
-    for e in (BEL.find_then_pin(cold), BEL.find_else_pin(cooled)):
+    for e in (then(cold), else_(cooled)):
         _connect(e, _pin(which, "execute"))
     wear = _node(ed, FN_SET_OVERLAY)
     _connect(get(MODEL), _pin(wear, "self"))
     _connect(get(HEAT_MATERIAL_VAR), _pin(wear, "NewOverlayMaterial"))
-    _connect(BEL.find_then_pin(which), _pin(wear, "execute"))
+    _connect(then(which), _pin(wear, "execute"))
     # Its material pin is left unconnected: no overlay.
     bare = _node(ed, FN_SET_OVERLAY)
     _connect(get(MODEL), _pin(bare, "self"))
-    _connect(BEL.find_else_pin(which), _pin(bare, "execute"))
+    _connect(else_(which), _pin(bare, "execute"))
     show = _node(ed, FN_SET_VISIBILITY)
     _connect(get(HEAT_GLOW), _pin(show, "self"))
     _connect(hot, _pin(show, "bNewVisibility"))
-    for e in (BEL.find_then_pin(wear), BEL.find_then_pin(bare)):
+    for e in (then(wear), then(bare)):
         _connect(e, _pin(show, "execute"))
     ed.add_comment_to_nodes(
         f"A hot blade is cold again at {COOL_VAR} (the interact key at a "

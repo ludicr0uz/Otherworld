@@ -43,8 +43,7 @@ read behind the Branch on Using or UsePressed, which are false with empty
 hands. Numbers and names: torch_tuning.py.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ALL_ACTORS, FN_AND, FN_DISTANCE, FN_IS_VALID,
@@ -103,29 +102,27 @@ def _author_torch(ed, held, owner, exec_ins):
 
     # --- is the fire held out? -------------------------------------------------
     using = branch(get(USING_VAR), exec_ins)
-    lit = branch(held_prop(LIT_VAR), (BEL.find_then_pin(using),))
+    lit = branch(held_prop(LIT_VAR), (then(using),))
     out_ = put(FIRE_WARD_VAR, "true")
-    _connect(BEL.find_then_pin(lit), _pin(out_, "execute"))
+    _connect(then(lit), _pin(out_, "execute"))
     idle = put(FIRE_WARD_VAR, "false")
-    _connect(BEL.find_else_pin(using), _pin(idle, "execute"))
+    _connect(else_(using), _pin(idle, "execute"))
     unlit = put(FIRE_WARD_VAR, "false")
-    _connect(BEL.find_else_pin(lit), _pin(unlit, "execute"))
+    _connect(else_(lit), _pin(unlit, "execute"))
 
     # --- not burning: a press at a campfire lights it ---------------------------
-    wants = branch(gate2(FN_AND, get(USE_PRESSED_VAR),
-                         held_prop(BURNS_VAR)),
-                   (BEL.find_then_pin(unlit),))
+    wants = branch(gate2(FN_AND, get(USE_PRESSED_VAR), held_prop(BURNS_VAR)), (then(unlit),))
     forget = put(NEAR_FIRE_VAR, "false")
-    _connect(BEL.find_then_pin(wants), _pin(forget, "execute"))
+    _connect(then(wants), _pin(forget, "execute"))
     every = keep(_node(ed, FN_ALL_ACTORS))
     _connect(get(CAMPFIRE_CLASS_VAR), _pin(every, "ActorClass"))
-    _connect(BEL.find_then_pin(forget), _pin(every, "execute"))
+    _connect(then(forget), _pin(every, "execute"))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
     _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
+    _connect(then(every), _loose_pin(loop, "Exec"))
     there = keep(_node(ed, FN_ACTOR_LOC))
     _connect(_loose_pin(loop, "ArrayElement", is_input=False), _pin(there, "self"))
     here = keep(_node(ed, FN_ACTOR_LOC))
@@ -138,7 +135,7 @@ def _author_torch(ed, held, owner, exec_ins):
     _set(close, "B", STICK_LIGHT_RADIUS_CM)
     near = branch(out(close), (_loose_pin(loop, "LoopBody", is_input=False),))
     found = put(NEAR_FIRE_VAR, "true")
-    _connect(BEL.find_then_pin(near), _pin(found, "execute"))
+    _connect(then(near), _pin(found, "execute"))
 
     at_fire = branch(get(NEAR_FIRE_VAR), (_loose_pin(loop, "Completed", is_input=False),))
     now = keep(_node(ed, FN_TIME_SECONDS))
@@ -148,15 +145,13 @@ def _author_torch(ed, held, owner, exec_ins):
     burn = keep(ed.add_set_member_variable_node(BURN_OUT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(burn, "self"))
     _connect(out(until), _pin(burn, BURN_OUT_VAR))
-    _connect(BEL.find_then_pin(at_fire), _pin(burn, "execute"))
+    _connect(then(at_fire), _pin(burn, "execute"))
     light = keep(ed.add_set_member_variable_node(LIT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(light, "self"))
     _set(light, LIT_VAR, "true")
-    _connect(BEL.find_then_pin(burn), _pin(light, "execute"))
+    _connect(then(burn), _pin(light, "execute"))
 
-    settled = (BEL.find_then_pin(out_), BEL.find_then_pin(idle),
-               BEL.find_else_pin(wants), BEL.find_else_pin(at_fire),
-               BEL.find_then_pin(light))
+    settled = (then(out_), then(idle), else_(wants), else_(at_fire), then(light))
 
     # --- the pose follows: lower the stick that is up, then raise ----------------
     ward = get(FIRE_WARD_VAR)
@@ -171,28 +166,27 @@ def _author_torch(ed, held, owner, exec_ins):
     back = keep(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH))
     _connect(item, _pin(back, "self"))
     _connect(get(WARD_CARRY_VAR), _pin(back, "AimPose"))
-    _connect(BEL.find_then_pin(lower), _pin(back, "execute"))
+    _connect(then(lower), _pin(back, "execute"))
     # Set with its input unconnected: None.
     clear = put(WARD_ITEM_VAR, None)
-    _connect(BEL.find_then_pin(back), _pin(clear, "execute"))
+    _connect(then(back), _pin(clear, "execute"))
     down = put("NeedsRefresh", "true")
-    _connect(BEL.find_then_pin(clear), _pin(down, "execute"))
+    _connect(then(clear), _pin(down, "execute"))
 
     # Pure, and read after the lowering above: it sees WardItem cleared.
-    raise_ = branch(gate2(FN_AND, ward, negate(out(up))),
-                    (BEL.find_then_pin(down), BEL.find_else_pin(lower)))
+    raise_ = branch(gate2(FN_AND, ward, negate(out(up))), (then(down), else_(lower)))
     whose = put(WARD_ITEM_VAR, None)
     _connect(held, _pin(whose, WARD_ITEM_VAR))
-    _connect(BEL.find_then_pin(raise_), _pin(whose, "execute"))
+    _connect(then(raise_), _pin(whose, "execute"))
     carry = put(WARD_CARRY_VAR, None)
     _connect(held_prop("AimPose"), _pin(carry, WARD_CARRY_VAR))
-    _connect(BEL.find_then_pin(whose), _pin(carry, "execute"))
+    _connect(then(whose), _pin(carry, "execute"))
     swap = keep(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH))
     _connect(held, _pin(swap, "self"))
     _connect(held_prop(USE_POSE_VAR), _pin(swap, "AimPose"))
-    _connect(BEL.find_then_pin(carry), _pin(swap, "execute"))
+    _connect(then(carry), _pin(swap, "execute"))
     rise = put("NeedsRefresh", "true")
-    _connect(BEL.find_then_pin(swap), _pin(rise, "execute"))
+    _connect(then(swap), _pin(rise, "execute"))
 
     ed.add_comment_to_nodes(
         "The use key on a stick (torch.py). A burning one is held out while "
@@ -203,4 +197,4 @@ def _author_torch(ed, held, owner, exec_ins):
         f"({WARD_ITEM_VAR} is the stick, {WARD_CARRY_VAR} what to put back), "
         "and each change re-equips, which blends the arm up or down.",
         made)
-    return (BEL.find_then_pin(rise), BEL.find_else_pin(raise_))
+    return (then(rise), else_(raise_))

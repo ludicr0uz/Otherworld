@@ -28,7 +28,8 @@ The mannequin fallback's ABP_Unarmed is left alone: its speed is in cm/s for
 whatever else wears it.
 """
 
-from combat.graph import BEL, BGE, PIN, _assets, _connect, _log, _node, _pin, _set
+from combat.log import _log
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _node, _pin, _set, out
 from uebp.layout import arrange
 from combat.nodes import FN_MUL_FF
 from combat.tuning import COMBAT
@@ -76,12 +77,12 @@ def patch_gait(skin):
     scale = feeders[0]
     if not is_scale_node(scale):
         # First build on this anim Blueprint: splice the multiply in.
-        length = _pin(scale, "ReturnValue", is_input=False)
+        length = out(scale)
         value = _pin(setter, GROUND_SPEED)
         PIN.break_pin_links(value)
         scale = _node(ed, FN_MUL_FF)
         _connect(length, _pin(scale, "A"))
-        _connect(_pin(scale, "ReturnValue", is_input=False), value)
+        _connect(out(scale), value)
     # The constant is on B: a math node's A holds no literal.
     _set(scale, "B", round(gait_scale(), 4))
     arrange(ed)

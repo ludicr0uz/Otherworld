@@ -3,7 +3,7 @@
 health cast's failed arm.
 """
 
-from combat.graph import _connect, _palette, _pin, _set
+from uebp.graph import _connect, _palette, _pin, _set, out
 from combat.nodes import NODE_SPAWN
 
 IMPACT_CLASS_VAR = "ImpactClass"   # BP_BulletImpact, a default set by build.py
@@ -21,9 +21,8 @@ def _author_surface_impact(ed, where, exec_in):
     """
     cls = ed.add_get_member_variable_node(IMPACT_CLASS_VAR)
     chipped = _palette(ed, NODE_SPAWN)
-    _connect(_pin(cls, IMPACT_CLASS_VAR, is_input=False), _pin(chipped, "Class"))
-    _connect(_pin(where, "ReturnValue", is_input=False),
-             _pin(chipped, "SpawnTransform"))
+    _connect(out(cls, IMPACT_CLASS_VAR), _pin(chipped, "Class"))
+    _connect(out(where), _pin(chipped, "SpawnTransform"))
     _set(chipped, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(exec_in, _pin(chipped, "execute"))
     return [cls, chipped]

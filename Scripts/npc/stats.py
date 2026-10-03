@@ -12,7 +12,7 @@ from npc.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_GET_COMP, FN_GET_PAWN, FN_GE_FF, FN_NE_FF,
     FN_RANDOM_FLOAT, FN_TIME_SECONDS, NODE_CAST_HEALTH,
 )
-from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from npc.sound import _author_random_sound
 from npc.tuned import tuned
 
@@ -97,18 +97,18 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
     as_health = keep(_palette(ed, NODE_CAST_HEALTH))
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_health, "Object"))
-    _connect(BEL.find_then_pin(first), _pin(as_health, "execute"))
+    _connect(then(first), _pin(as_health, "execute"))
     health_out = _loose_pin(as_health, "AsBPHealthComponent", is_input=False)
 
     set_max = keep(ed.add_set_member_variable_node("MaxHealth", HEALTH_CLASS_PATH))
     _connect(health_out, _pin(set_max, "self"))
     _connect(want_out, _pin(set_max, "MaxHealth"))
-    _connect(BEL.find_then_pin(as_health), _pin(set_max, "execute"))
+    _connect(then(as_health), _pin(set_max, "execute"))
 
     set_now = keep(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(health_out, _pin(set_now, "self"))
     _connect(want_out, _pin(set_now, "Health"))
-    _connect(BEL.find_then_pin(set_max), _pin(set_now, "execute"))
+    _connect(then(set_max), _pin(set_now, "execute"))
 
     # ...and this creature's own hit reactions, onto the same component, in the
     # same breath and for the same reason.  A plain array-to-array copy: the
@@ -119,14 +119,14 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
     mine = keep(ed.add_get_member_variable_node(REACTIONS_VAR))
     _connect(_pin(mine, REACTIONS_VAR, is_input=False),
              _pin(set_reacts, REACTIONS_VAR))
-    _connect(BEL.find_then_pin(set_now), _pin(set_reacts, "execute"))
+    _connect(then(set_now), _pin(set_reacts, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(STATS_APPLIED_VAR))
     _set(mark, STATS_APPLIED_VAR, "true")
-    _connect(BEL.find_then_pin(set_reacts), _pin(mark, "execute"))
+    _connect(then(set_reacts), _pin(mark, "execute"))
     took = keep(ed.add_set_member_variable_node(APPLIED_HEALTH_VAR))
     _connect(want_out, _pin(took, APPLIED_HEALTH_VAR))
-    _connect(BEL.find_then_pin(mark), _pin(took, "execute"))
+    _connect(then(mark), _pin(took, "execute"))
 
     # --- every few seconds: a noise -----------------------------------------
     now = keep(_node(ed, FN_TIME_SECONDS))
@@ -139,12 +139,10 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
     _connect(_pin(due, "ReturnValue", is_input=False), _pin(speak, "Condition"))
     # Every way into the voice check: stats just applied, stats already
     # current, or the component was not there to apply them to.
-    for tail in (BEL.find_then_pin(took),
-                 BEL.find_else_pin(first),
-                 _pin(as_health, "CastFailed", is_input=False)):
+    for tail in (then(took), else_(first), _pin(as_health, "CastFailed", is_input=False)):
         _connect(tail, _pin(speak, "execute"))
 
-    voiced, after_voice = _author_random_sound(ed, VOICES_VAR, where_out, BEL.find_then_pin(speak))
+    voiced, after_voice = _author_random_sound(ed, VOICES_VAR, where_out, then(speak))
     made.extend(voiced)
 
     gap = keep(_node(ed, FN_RANDOM_FLOAT))
@@ -160,6 +158,6 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
     # One exec out, whether or not it spoke this pass.
     out = keep(ed.add_branch_node())
     _set(out, "Condition", "true")
-    _connect(BEL.find_then_pin(rearm), _pin(out, "execute"))
-    _connect(BEL.find_else_pin(speak), _pin(out, "execute"))
-    return made, BEL.find_then_pin(out)
+    _connect(then(rearm), _pin(out, "execute"))
+    _connect(else_(speak), _pin(out, "execute"))
+    return made, then(out)

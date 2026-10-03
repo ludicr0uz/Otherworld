@@ -4,7 +4,7 @@ cone down the aim line, written into the GameMode's noise record.
 
 import math
 
-from combat.graph import _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, out
 from combat.noise import _author_make_noise
 from combat.nodes import FN_MUL_FF
 from combat.tuning import COMBAT
@@ -31,7 +31,7 @@ def _author_shot_noise(ed, held, muzzle, direction, exec_in):
     made, then = _author_make_noise(
         ed, exec_in, muzzle, volume,
         direction=direction,
-        cone_reach=_pin(ahead, "ReturnValue", is_input=False),
+        cone_reach=out(ahead),
         cone_cos=math.cos(math.radians(COMBAT.shot_noise_cone_half_angle_deg)))
     ed.add_comment_to_nodes(
         f"The shot's noise: heard all round out to the weapon's ShotVolume, "

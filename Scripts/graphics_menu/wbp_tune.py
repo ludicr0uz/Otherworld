@@ -20,7 +20,7 @@ Starts collapsed; tune_draw.py shows it while the tab is open and writes the row
 
 import unreal
 
-from combat.graph import BEL, _must_load
+from uebp.graph import BEL, _must_load
 from graphics_menu import umg_author as U
 from graphics_menu.settings_rows import BACK_LABEL
 from graphics_menu.tune_consts import (

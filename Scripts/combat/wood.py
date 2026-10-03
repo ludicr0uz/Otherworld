@@ -31,9 +31,8 @@ dropped log stands on its end; the one a tree gives is laid flat by the spawn
 import unreal
 
 from combat.chop_tuning import CHOPS_VAR
-from combat.graph import (
-    BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
-)
+from combat.log import _log
+from uebp.graph import BEL, _apply_defaults, _create_blueprint, _must_load, _rot
 from combat.grip import _grip_location, _grip_rotation, _rotate_vector
 from combat.paths import CUBE, HOLD_ITEM_ANIM_PATH, MAT_METAL, WOOD_BP_PATH
 from combat.tuning import COMBAT

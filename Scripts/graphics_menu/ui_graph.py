@@ -11,8 +11,9 @@ on a path where the widget exists, and a cast that fails still carries on to
 the rest of the frame.
 """
 
-from combat.graph import (
-    BEL, _connect, _declare, _loose_pin, _must_load, _node, _palette, _pin, _set)
+from uebp.graph import (
+    BEL, _connect, _declare, _loose_pin, _must_load, _node, _palette, _pin, _set, else_, out,
+    then)
 from graphics_menu.umg_consts import (
     HIDDEN, ROW_CARET, ROW_VALUE, SCREENS, SHOWN, UI_VAR, WBP_HUD, WBP_MENU_ROW,
     class_path,
@@ -39,7 +40,7 @@ def _wire(execs, node):
     pin = _pin(node, "execute")
     for e in execs:
         _connect(e, pin)
-    return BEL.find_then_pin(node)
+    return then(node)
 
 
 # ─── The screens themselves ──────────────────────────────────────────────────
@@ -56,7 +57,7 @@ def author_create_screens(ed, exec_in):
     """BeginPlay: create each screen for the owning player, keep it, add it to
     the viewport -- collapsed, all but WBP_HUD. DrawHUD decides what shows.
     Returns the exec pin that follows."""
-    pc = _pin(_node(ed, FN_GET_OWNING_PC), "ReturnValue", is_input=False)
+    pc = out(_node(ed, FN_GET_OWNING_PC))
     flow, made = exec_in, []
     for var, asset, z in SCREENS:
         make = _palette(ed, NODE_CREATE_WIDGET)
@@ -64,16 +65,16 @@ def author_create_screens(ed, exec_in):
         _connect(pc, _pin(make, "OwningPlayer"))
         _connect(flow, _pin(make, "execute"))
         keep = ed.add_set_member_variable_node(var)
-        _connect(_pin(make, "ReturnValue", is_input=False), _pin(keep, var))
-        _connect(BEL.find_then_pin(make), _pin(keep, "execute"))
-        got = _pin(ed.add_get_member_variable_node(var), var, is_input=False)
+        _connect(out(make), _pin(keep, var))
+        _connect(then(make), _pin(keep, "execute"))
+        got = out(ed.add_get_member_variable_node(var), var)
         add = _node(ed, FN_ADD_TO_VIEWPORT)
         _connect(got, _pin(add, "self"))
         _set(add, "ZOrder", z)
-        _connect(BEL.find_then_pin(keep), _pin(add, "execute"))
+        _connect(then(keep), _pin(add, "execute"))
         # The HUD screen itself stays up: its Body is what DrawHUD toggles,
         # and its FPS readout shows over every other screen.
-        flow = set_shown(ed, got, asset == WBP_HUD, [BEL.find_then_pin(add)])
+        flow = set_shown(ed, got, asset == WBP_HUD, [then(add)])
         made += [make, keep, add]
     ed.add_comment_to_nodes(
         "The UMG screens, created once and kept: the HUD, the M panel, the "
@@ -85,14 +86,14 @@ def author_create_screens(ed, exec_in):
 def screen(ed, asset):
     """The HUD's reference to the screen built from ``asset``."""
     var = UI_VAR[asset]
-    return _pin(ed.add_get_member_variable_node(var), var, is_input=False)
+    return out(ed.add_get_member_variable_node(var), var)
 
 
 def member(ed, owner, owner_asset, name):
     """Widget ``name`` of ``owner``, an instance of ``owner_asset``'s class."""
     n = ed.add_get_member_variable_node(name, class_path(owner_asset))
     _connect(owner, _pin(n, "self"))
-    return _pin(n, name, is_input=False)
+    return out(n, name)
 
 
 def part(ed, asset, name):
@@ -114,8 +115,7 @@ def show_if(ed, target, condition, execs):
     br = ed.add_branch_node()
     _connect(condition, _pin(br, "Condition"))
     _wire(execs, br)
-    return (set_shown(ed, target, True, [BEL.find_then_pin(br)]),
-            set_shown(ed, target, False, [BEL.find_else_pin(br)]))
+    return (set_shown(ed, target, True, [then(br)]), set_shown(ed, target, False, [else_(br)]))
 
 
 def set_text(ed, target, value, execs):
@@ -130,7 +130,7 @@ def set_text(ed, target, value, execs):
     else:
         conv = _node(ed, FN_STR_TO_TEXT)
         _connect(value, _pin(conv, "InString"))
-        _connect(_pin(conv, "ReturnValue", is_input=False), _pin(n, "InText"))
+        _connect(out(conv), _pin(n, "InText"))
     return _wire(execs, n)
 
 
@@ -156,10 +156,9 @@ def row_at(ed, box, index, execs):
     else:
         _connect(index, _pin(child, "Index"))
     cast = _palette(ed, NODE_CAST_ROW)
-    _connect(_pin(child, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(out(child), _pin(cast, "Object"))
     then = _wire(execs, cast)
-    return (_loose_pin(cast, "AsWBPMenuRow", is_input=False), then,
-            _pin(cast, "CastFailed", is_input=False))
+    return (_loose_pin(cast, "AsWBPMenuRow", is_input=False), then, out(cast, "CastFailed"))
 
 
 def row_value(ed, box, index, value, execs):
@@ -194,21 +193,21 @@ def mark_rows(ed, box, count, selected, execs, also=None):
     hit = _node(ed, FN_EQ_II)
     _connect(index, _pin(hit, "A"))
     _connect(selected, _pin(hit, "B"))
-    picked = _pin(hit, "ReturnValue", is_input=False)
+    picked = out(hit)
     if also is not None:
         hover = _node(ed, FN_EQ_II)
         _connect(index, _pin(hover, "A"))
         _connect(also, _pin(hover, "B"))
         either = _node(ed, FN_OR)
         _connect(picked, _pin(either, "A"))
-        _connect(_pin(hover, "ReturnValue", is_input=False), _pin(either, "B"))
-        picked = _pin(either, "ReturnValue", is_input=False)
+        _connect(out(hover), _pin(either, "B"))
+        picked = out(either)
     lit = _node(ed, FN_SELECT_FLOAT)
     _set(lit, "A", 1.0)
     _set(lit, "B", 0.0)
     _connect(picked, _pin(lit, "bPickA"))
     fade = _node(ed, FN_SET_OPACITY)
     _connect(member(ed, row, WBP_MENU_ROW, ROW_CARET), _pin(fade, "self"))
-    _connect(_pin(lit, "ReturnValue", is_input=False), _pin(fade, "InOpacity"))
+    _connect(out(lit), _pin(fade, "InOpacity"))
     _wire([then], fade)
     return _loose_pin(loop, "Completed", is_input=False)

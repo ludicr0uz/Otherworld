@@ -35,7 +35,8 @@ from combat.slot_tuning import (
     MOVE_TO_VAR, NO_REQUEST, PRIMARY, SLOT_COUNT, SLOT_KEYS, SLOT_PICK_VAR,
     SLOT_REQUEST_VAR, SLOT_VAR, SLOT_WANT_VAR,
 )
-from combat.weapon_component.common import _G
+from combat.paths import ITEM_CLASS_PATH
+from uebp.g import _G
 from combat.weapon_component.slot_nodes import (
     FN_GE_II, FN_LE_II, FN_NE_II, fits, for_loop,
     not_, op, slot_at, valid,
@@ -126,7 +127,7 @@ def _author_slot_move(g, in_execs):
 def _author_slot_keys(ed, pc_out, switch_pressed, in_execs):
     """1-9 and Q raise SlotRequest (see the module docstring). Returns the
     exec tails."""
-    g = _G(ed)
+    g = _G(ed, ITEM_CLASS_PATH)
     flow = list(in_execs)
     for var, _key, slot in SLOT_KEYS:
         pressed = out(g.call(FN_WAS_PRESSED, self=pc_out, Key=g.get(var)))
@@ -156,7 +157,7 @@ def _author_slot_keys(ed, pc_out, switch_pressed, in_execs):
 
 def _author_slot_serve(ed, in_execs):
     """The request, then the move. Returns the exec tails."""
-    g = _G(ed)
+    g = _G(ed, ITEM_CLASS_PATH)
     tails = _author_slot_request(g, in_execs)
     tails = _author_slot_move(g, tails)
     ed.add_comment_to_nodes(

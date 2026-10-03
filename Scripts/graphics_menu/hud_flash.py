@@ -9,7 +9,7 @@ game time would freeze the blink half-way. Opacity rather than visibility, so
 the group keeps its space and nothing around it moves.
 """
 
-from combat.graph import _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, out
 from graphics_menu.ui_graph import FN_SELECT_FLOAT, FN_SET_OPACITY, _wire
 from graphics_menu.umg_consts import FLASH_DIM, FLASH_HZ, LOW_FRACTION
 
@@ -30,23 +30,23 @@ def author_flash(ed, group, fraction, execs):
 
     now = _node(ed, FN_REAL_TIME)
     beats = _node(ed, FN_MUL)
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(beats, "A"))
+    _connect(out(now), _pin(beats, "A"))
     _set(beats, "B", FLASH_HZ)
     phase = _node(ed, FN_FRACTION)
-    _connect(_pin(beats, "ReturnValue", is_input=False), _pin(phase, "A"))
+    _connect(out(beats), _pin(phase, "A"))
     off = _node(ed, FN_GREATER)
-    _connect(_pin(phase, "ReturnValue", is_input=False), _pin(off, "A"))
+    _connect(out(phase), _pin(off, "A"))
     _set(off, "B", 0.5)
 
     dim = _node(ed, FN_AND)
-    _connect(_pin(low, "ReturnValue", is_input=False), _pin(dim, "A"))
-    _connect(_pin(off, "ReturnValue", is_input=False), _pin(dim, "B"))
+    _connect(out(low), _pin(dim, "A"))
+    _connect(out(off), _pin(dim, "B"))
     pick = _node(ed, FN_SELECT_FLOAT)
     _set(pick, "A", FLASH_DIM)
     _set(pick, "B", 1.0)
-    _connect(_pin(dim, "ReturnValue", is_input=False), _pin(pick, "bPickA"))
+    _connect(out(dim), _pin(pick, "bPickA"))
 
     fade = _node(ed, FN_SET_OPACITY)
     _connect(group, _pin(fade, "self"))
-    _connect(_pin(pick, "ReturnValue", is_input=False), _pin(fade, "InOpacity"))
+    _connect(out(pick), _pin(fade, "InOpacity"))
     return _wire(execs, fade)

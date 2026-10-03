@@ -9,7 +9,7 @@ import unreal
 from combat.audio import (
     SND_RELOAD_PISTOL, SND_RELOAD_RIFLE, SND_RELOAD_SHOTGUN,
 )
-from combat.graph import _log
+from combat.log import _log
 from combat.gun_tuning import read_table
 from combat.grip import _grip_location, _grip_rotation
 from combat.paths import (

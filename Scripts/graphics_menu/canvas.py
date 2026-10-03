@@ -5,7 +5,7 @@ scope and the wanderers' bars. Everything else is a UMG screen (umg_consts.py
 has their palette).
 """
 
-from combat.graph import _node, _set
+from uebp.graph import _node, _set
 from graphics_menu.umg_consts import UI_ART_DIR
 
 FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"

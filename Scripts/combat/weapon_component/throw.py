@@ -44,8 +44,8 @@ key and the click: no key can be injected into a headless game
 game.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
-from uebp.graph import out
+from uebp.graph import (
+    _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.nodes import (
     FN_AND, FN_ARR_REMOVE, FN_DETACH, FN_GET_TRANSFORM, FN_IS_KEY_DOWN,
     FN_IS_VALID, FN_MAKE_TRANSFORM, FN_NOT, FN_OR, FN_SET_ACTOR_LOC,
@@ -161,7 +161,7 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _connect(out(shown, THROW_AIMING_VAR), _pin(lets_go, "B"))
     click = ed.add_branch_node()
     _connect(out(lets_go), _pin(click, "Condition"))
-    _connect(BEL.find_then_pin(gate), _pin(click, "execute"))
+    _connect(then(gate), _pin(click, "execute"))
 
     # --- the arc actor, spawned the first time it is wanted -----------------
     arc_get = ed.add_get_member_variable_node(THROW_ARC_VAR)
@@ -170,7 +170,7 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _connect(arc, _pin(have, "Object"))
     spawned = ed.add_branch_node()
     _connect(out(have), _pin(spawned, "Condition"))
-    _connect(BEL.find_else_pin(click), _pin(spawned, "execute"))
+    _connect(else_(click), _pin(spawned, "execute"))
     cls = ed.add_get_member_variable_node(THROW_ARC_CLASS_VAR)
     where = _node(ed, FN_GET_TRANSFORM)
     _connect(owner_out, _pin(where, "self"))
@@ -178,18 +178,18 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _connect(out(cls, THROW_ARC_CLASS_VAR), _pin(spawn, "Class"))
     _connect(out(where), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(BEL.find_else_pin(spawned), _pin(spawn, "execute"))
+    _connect(else_(spawned), _pin(spawn, "execute"))
     keep = ed.add_set_member_variable_node(THROW_ARC_VAR)
     _connect(out(spawn), _pin(keep, THROW_ARC_VAR))
-    _connect(BEL.find_then_pin(spawn), _pin(keep, "execute"))
+    _connect(then(spawn), _pin(keep, "execute"))
 
     dots_get = ed.add_get_member_variable_node(ARC_COMPONENT, THROW_ARC_CLASS_PATH)
     _connect(arc, _pin(dots_get, "self"))
     dots = out(dots_get, ARC_COMPONENT)
     clear = _node(ed, "/Script/Engine.InstancedStaticMeshComponent.ClearInstances")
     _connect(dots, _pin(clear, "self"))
-    _connect(BEL.find_then_pin(spawned), _pin(clear, "execute"))
-    _connect(BEL.find_then_pin(keep), _pin(clear, "execute"))
+    _connect(then(spawned), _pin(clear, "execute"))
+    _connect(then(keep), _pin(clear, "execute"))
 
     # --- the arc: the engine's own ballistic prediction, traced -------------
     predict = _node(ed, "/Script/Engine.GameplayStatics."
@@ -206,12 +206,12 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _set(predict, "SimFrequency", THROW_ARC_HZ)
     _set(predict, "MaxSimTime", THROW_ARC_SIM_S)
     _set(predict, "OverrideGravityZ", THROW_GRAVITY_Z)
-    _connect(BEL.find_then_pin(clear), _pin(predict, "execute"))
+    _connect(then(clear), _pin(predict, "execute"))
     on = ed.add_set_member_variable_node(THROW_AIMING_VAR)
     _set(on, THROW_AIMING_VAR, "true")
-    _connect(BEL.find_then_pin(predict), _pin(on, "execute"))
+    _connect(then(predict), _pin(on, "execute"))
     # The arm is cocked for as long as the arc shows (throw_ready.py).
-    posed = _author_throw_ready(ed, held, BEL.find_then_pin(on))
+    posed = _author_throw_ready(ed, held, then(on))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
@@ -231,38 +231,37 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _connect(out(predict, "OutHit"), _loose_pin(hit, "Hit"))
     mark = _add_dot(ed, dots, _loose_pin(hit, "Location", is_input=False),
                     tuple(c / 100.0 for c in THROW_MARK_CM),
-                    BEL.find_then_pin(landed))
+                    then(landed))
 
     # --- not aiming: was it, last frame? Then the aim ends here -------------
     was_get = ed.add_get_member_variable_node(THROW_AIMING_VAR)
     was = ed.add_branch_node()
     _connect(out(was_get, THROW_AIMING_VAR), _pin(was, "Condition"))
-    _connect(BEL.find_else_pin(gate), _pin(was, "execute"))
+    _connect(else_(gate), _pin(was, "execute"))
     wipe = _node(ed, "/Script/Engine.InstancedStaticMeshComponent.ClearInstances")
     _connect(dots, _pin(wipe, "self"))
-    _connect(BEL.find_then_pin(was), _pin(wipe, "execute"))
-    _connect(BEL.find_then_pin(click), _pin(wipe, "execute"))
+    _connect(then(was), _pin(wipe, "execute"))
+    _connect(then(click), _pin(wipe, "execute"))
     off = ed.add_set_member_variable_node(THROW_AIMING_VAR)
     _set(off, THROW_AIMING_VAR, "false")
-    _connect(BEL.find_then_pin(wipe), _pin(off, "execute"))
+    _connect(then(wipe), _pin(off, "execute"))
     # Which of the two ended it? Still aimed (key down, item in hand) can only
     # be the click: that is the throw. Otherwise the key came up, or the hand
     # emptied under it (eaten, dropped), and nothing is thrown.
     release = ed.add_branch_node()
     _connect(out(aimed), _pin(release, "Condition"))
-    _connect(BEL.find_then_pin(off), _pin(release, "execute"))
+    _connect(then(off), _pin(release, "execute"))
     # The click is spent: still down next frame, it must not fire the
     # automatic that takes the thrown item's place (consume.py's latch).
     spend = ed.add_set_member_variable_node(TRIGGER_SPENT)
     _set(spend, TRIGGER_SPENT, "true")
-    _connect(BEL.find_then_pin(release), _pin(spend, "execute"))
+    _connect(then(release), _pin(spend, "execute"))
 
     # Called off: the cocked arm comes down.
-    lowered = _author_ready_down(ed, BEL.find_else_pin(release))
+    lowered = _author_ready_down(ed, else_(release))
 
-    exits = (BEL.find_then_pin(mark), BEL.find_else_pin(landed),
-             BEL.find_else_pin(was), lowered)
-    return exits, BEL.find_then_pin(spend), start, velocity
+    exits = (then(mark), else_(landed), else_(was), lowered)
+    return exits, then(spend), start, velocity
 
 
 def _author_throw_release(ed, held, start, velocity, exec_in):
@@ -279,7 +278,7 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
         n = ed.add_set_member_variable_node(var)
         _connect(value, _pin(n, var))
         _connect(prev, _pin(n, "execute"))
-        prev = BEL.find_then_pin(n)
+        prev = then(n)
 
     off = _node(ed, FN_DETACH)
     _connect(held, _pin(off, "self"))
@@ -289,12 +288,12 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     shown = _node(ed, FN_SET_HIDDEN)
     _connect(held, _pin(shown, "self"))
     _set(shown, "bNewHidden", "false")
-    _connect(BEL.find_then_pin(off), _pin(shown, "execute"))
+    _connect(then(off), _pin(shown, "execute"))
     put = _node(ed, FN_SET_ACTOR_LOC)
     _connect(held, _pin(put, "self"))
     _connect(start, _pin(put, "NewLocation"))
-    _connect(BEL.find_then_pin(shown), _pin(put, "execute"))
-    squared = _author_square(ed, held, BEL.find_then_pin(put))
+    _connect(then(shown), _pin(put, "execute"))
+    squared = _author_square(ed, held, then(put))
 
     inv = ed.add_get_member_variable_node("Inventory")
     idx = ed.add_get_member_variable_node("EquippedIndex")
@@ -305,11 +304,11 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
         _connect(pin, _pin(remove, "execute"))
     # Held set with nothing connected clears it, as in _author_drop.
     clear = ed.add_set_member_variable_node("Held")
-    _connect(BEL.find_then_pin(remove), _pin(clear, "execute"))
+    _connect(then(remove), _pin(clear, "execute"))
     reset = ed.add_set_member_variable_node("EquippedIndex")
     _set(reset, "EquippedIndex", 0)
-    _connect(BEL.find_then_pin(clear), _pin(reset, "execute"))
+    _connect(then(clear), _pin(reset, "execute"))
     dirty = ed.add_set_member_variable_node("NeedsRefresh")
     _set(dirty, "NeedsRefresh", "true")
-    _connect(BEL.find_then_pin(reset), _pin(dirty, "execute"))
-    return BEL.find_then_pin(dirty)
+    _connect(then(reset), _pin(dirty, "execute"))
+    return then(dirty)

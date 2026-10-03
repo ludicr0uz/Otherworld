@@ -19,8 +19,7 @@ the request, which is what lets a probe ask for the guns without a key press
 
 import unreal
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.nodes import FN_OBJECT_CLASS, MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import SLOT_COUNT
@@ -73,7 +72,7 @@ def _setter(ed, var, value, in_execs, made, owner=None, self_out=None):
     for e in in_execs:
         _connect(e, _pin(n, "execute"))
     made.append(n)
-    return BEL.find_then_pin(n)
+    return then(n)
 
 
 def _get(ed, var, made, owner=None, self_out=None):
@@ -82,7 +81,7 @@ def _get(ed, var, made, owner=None, self_out=None):
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
     made.append(n)
-    return _pin(n, var, is_input=False)
+    return out(n, var)
 
 
 def _call(ed, fn, made, **inputs):
@@ -102,7 +101,7 @@ def _branch(ed, cond, in_execs, made):
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
     made.append(br)
-    return BEL.find_then_pin(br), BEL.find_else_pin(br)
+    return then(br), else_(br)
 
 
 def _author_give_one(ed, gun, wc, pawn_out, in_execs, made):
@@ -140,18 +139,18 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, made):
     _connect(give, _pin(spawn, "execute"))
     cast = _palette(ed, NODE_CAST_ITEM)
     made.append(cast)
-    _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(spawn), _pin(cast, "execute"))
+    _connect(out(spawn), _pin(cast, "Object"))
+    _connect(then(spawn), _pin(cast, "execute"))
     item = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
 
     # Carried, not lying in the world.
-    flow = _setter(ed, "Dropped", "false", [BEL.find_then_pin(cast)], made, ITEM_CLASS_PATH, item)
+    flow = _setter(ed, "Dropped", "false", [then(cast)], made, ITEM_CLASS_PATH, item)
     add = _call(ed, FN_ARR_ADD, made,
                 TargetArray=_get(ed, "Inventory", made,
                                  WEAPON_COMP_CLASS_PATH, wc))
     _connect(item, _loose_pin(add, "NewItem"))
     _connect(flow, _pin(add, "execute"))
-    return [BEL.find_then_pin(add), skip, _pin(cast, "CastFailed", is_input=False)]
+    return [then(add), skip, out(cast, "CastFailed")]
 
 
 def author_dev_guns(ed, pc_out, parts, in_execs, made):

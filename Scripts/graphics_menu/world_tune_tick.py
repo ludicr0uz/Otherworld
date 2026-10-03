@@ -18,8 +18,8 @@ time passing. Only while open: nothing else moves the table.
 
 import unreal
 
-from combat.graph import BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import (
+    BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, out, then)
 from combat.nodes import FN_ADD_FF, FN_ARR_GET
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
 from graphics_menu.loot_find import put
@@ -61,7 +61,7 @@ def world_tune_defaults():
 def _value(ed, s, made):
     """WorldTuneValues[s], a literal index."""
     cell = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, WORLD_TAB.values_var, made), Index=s)
-    return _pin(cell, "Item", is_input=False)
+    return out(cell, "Item")
 
 
 def _map(ed, value, in_a, in_b, out_a, out_b, made):
@@ -98,7 +98,7 @@ def _set_on(ed, cyc, var, value, in_execs, made):
     _connect(value, _pin(n, var))
     for e in in_execs:
         _connect(e, _pin(n, "execute"))
-    return BEL.find_then_pin(n)
+    return then(n)
 
 
 def _author_apply(ed, in_execs, made):
@@ -115,11 +115,11 @@ def _author_apply(ed, in_execs, made):
         raise RuntimeError("no cast node for BP_DayNightCycle")
     made.append(cast)
     _connect(out(find), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(find), _pin(cast, "execute"))
+    _connect(then(find), _pin(cast, "execute"))
     cyc = _loose_pin(cast, "AsBPDayNightCycle", is_input=False)
-    none = _pin(cast, "CastFailed", is_input=False)
+    none = out(cast, "CastFailed")
 
-    go, keep = _branch(ed, _get(ed, WORLD_TAB.touched_var, made), [BEL.find_then_pin(cast)], made)
+    go, keep = _branch(ed, _get(ed, WORLD_TAB.touched_var, made), [then(cast)], made)
     flow = go
     for s, (_col, var, *_rest) in enumerate(WORLD_STATS):
         if var:
@@ -139,7 +139,7 @@ def _author_apply(ed, in_execs, made):
     _connect(hour, _pin(store, "Item"))
     for e in (flow, same):
         _connect(e, _pin(store, "execute"))
-    seen = put(ed, WORLD_TUNE_HOUR_SEEN_VAR, hour, [BEL.find_then_pin(store)], made)
+    seen = put(ed, WORLD_TUNE_HOUR_SEEN_VAR, hour, [then(store)], made)
     return [seen, none, shut]
 
 

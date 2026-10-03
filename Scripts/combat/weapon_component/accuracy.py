@@ -23,7 +23,7 @@ SightAiming, CurrentFOV) and stance.py (Stance) in the Tick, and before the
 trigger.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_DEG_TAN, FN_DIV_FF, FN_EQ_II, FN_MUL_FF, FN_SELECT_FF,
 )
@@ -45,27 +45,27 @@ def _select(ed, keep, a, b, pick):
         else:
             _connect(v, _pin(n, name))
     _connect(pick, _pin(n, "bPickA"))
-    return _pin(n, "ReturnValue", is_input=False)
+    return out(n)
 
 
 def _mul(ed, keep, a, b):
     n = keep(_node(ed, FN_MUL_FF))
     _connect(a, _pin(n, "A"))
     _connect(b, _pin(n, "B"))
-    return _pin(n, "ReturnValue", is_input=False)
+    return out(n)
 
 
 def _factors(ed, keep, held, kind, sights):
     """aim(kind) x stance(kind), where kind is "Spread" or "Recoil" and
     `sights` is what down the sights gives (0.0, or a Held pin)."""
     stance = keep(ed.add_get_member_variable_node(STANCE_VAR))
-    stance_out = _pin(stance, STANCE_VAR, is_input=False)
+    stance_out = out(stance, STANCE_VAR)
     is_low = {}
     for value in (CROUCH, PRONE):
         eq = keep(_node(ed, FN_EQ_II))
         _connect(stance_out, _pin(eq, "A"))
         _set(eq, "B", value)
-        is_low[value] = _pin(eq, "ReturnValue", is_input=False)
+        is_low[value] = out(eq)
 
     def held_scale(suffix):
         pin, n = _prop(ed, f"{kind}{suffix}Scale", held)
@@ -77,9 +77,8 @@ def _factors(ed, keep, held, kind, sights):
 
     aiming = keep(ed.add_get_member_variable_node("Aiming"))
     sighting = keep(ed.add_get_member_variable_node("SightAiming"))
-    shoulder = _select(ed, keep, held_scale("Shoulder"), 1.0,
-                       _pin(aiming, "Aiming", is_input=False))
-    aim_f = _select(ed, keep, sights, shoulder, _pin(sighting, "SightAiming", is_input=False))
+    shoulder = _select(ed, keep, held_scale("Shoulder"), 1.0, out(aiming, "Aiming"))
+    aim_f = _select(ed, keep, sights, shoulder, out(sighting, "SightAiming"))
     return _mul(ed, keep, stance_f, aim_f)
 
 
@@ -106,37 +105,36 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
 
     put_spread = keep(ed.add_set_member_variable_node(AIM_SPREAD_VAR))
     _connect(spread, _pin(put_spread, AIM_SPREAD_VAR))
-    _connect(BEL.find_then_pin(gate), _pin(put_spread, "execute"))
+    _connect(then(gate), _pin(put_spread, "execute"))
     put_kick = keep(ed.add_set_member_variable_node(RECOIL_SCALE_VAR))
     _connect(kick, _pin(put_kick, RECOIL_SCALE_VAR))
-    _connect(BEL.find_then_pin(put_spread), _pin(put_kick, "execute"))
+    _connect(then(put_spread), _pin(put_kick, "execute"))
 
     # The reticle: the cloud's half-angle over the half field of view, both as
     # tangents, which is where a ray at that angle crosses the screen.
     cloud = keep(ed.add_get_member_variable_node(AIM_SPREAD_VAR))
     cloud_tan = keep(_node(ed, FN_DEG_TAN))
-    _connect(_pin(cloud, AIM_SPREAD_VAR, is_input=False), _pin(cloud_tan, "A"))
+    _connect(out(cloud, AIM_SPREAD_VAR), _pin(cloud_tan, "A"))
     fov = keep(ed.add_get_member_variable_node("CurrentFOV"))
     half_fov = keep(_node(ed, FN_MUL_FF))
-    _connect(_pin(fov, "CurrentFOV", is_input=False), _pin(half_fov, "A"))
+    _connect(out(fov, "CurrentFOV"), _pin(half_fov, "A"))
     _set(half_fov, "B", 0.5)
     fov_tan = keep(_node(ed, FN_DEG_TAN))
-    _connect(_pin(half_fov, "ReturnValue", is_input=False), _pin(fov_tan, "A"))
+    _connect(out(half_fov), _pin(fov_tan, "A"))
     ratio = keep(_node(ed, FN_DIV_FF))
-    _connect(_pin(cloud_tan, "ReturnValue", is_input=False), _pin(ratio, "A"))
-    _connect(_pin(fov_tan, "ReturnValue", is_input=False), _pin(ratio, "B"))
+    _connect(out(cloud_tan), _pin(ratio, "A"))
+    _connect(out(fov_tan), _pin(ratio, "B"))
     put_reticle = keep(ed.add_set_member_variable_node(RETICLE_SPREAD_VAR))
-    _connect(_pin(ratio, "ReturnValue", is_input=False),
-             _pin(put_reticle, RETICLE_SPREAD_VAR))
-    _connect(BEL.find_then_pin(put_kick), _pin(put_reticle, "execute"))
+    _connect(out(ratio), _pin(put_reticle, RETICLE_SPREAD_VAR))
+    _connect(then(put_kick), _pin(put_reticle, "execute"))
 
     # Empty hands: nothing to draw, nothing to kick.
-    flow = BEL.find_else_pin(gate)
+    flow = else_(gate)
     for var in ACCURACY_OUT_VARS:
         clear = keep(ed.add_set_member_variable_node(var))
         _set(clear, var, 0.0)
         _connect(flow, _pin(clear, "execute"))
-        flow = BEL.find_then_pin(clear)
+        flow = then(clear)
 
     ed.add_comment_to_nodes(
         "Accuracy: AimSpread (the cloud the next shot is drawn in; zero down "
@@ -145,4 +143,4 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
         "HUD draws). Each is the held gun's own number times its aim and "
         "stance factors (GUN_ACCURACY in weapon_specs.py).",
         made)
-    return (BEL.find_then_pin(put_reticle), flow)
+    return (then(put_reticle), flow)

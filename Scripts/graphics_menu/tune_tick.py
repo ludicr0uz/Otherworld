@@ -40,8 +40,8 @@ lands on the next shot.
 
 import unreal
 
-from combat.graph import BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import (
+    BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, out, then)
 from combat.gun_tuning import GUN_COLUMNS, MELEE_COLUMNS, TUNE_COLUMNS, TUNE_STATS, columns_of
 from combat.melee_tuning import melee_specs
 from combat.nodes import (
@@ -139,7 +139,7 @@ def _cell(ed, array_var, index, made):
     """HUD array ``array_var`` [index]: the Item pin."""
     n = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, array_var, made))
     _connect(index, _pin(n, "Index"))
-    return _pin(n, "Item", is_input=False)
+    return out(n, "Item")
 
 
 def _author_keys(ed, pc_out, in_execs, made, tab, closes):
@@ -238,7 +238,7 @@ def _author_nudge(ed, in_execs, made, tab, subjects):
         stat, dead = _branch(ed, _cell(ed, tab.live_var, idx, made), [stat], made)
         stays = [dead]
     _connect(stat, _pin(write, "execute"))
-    flow = _setter(ed, tab.touched_var, "true", [BEL.find_then_pin(write)], made)
+    flow = _setter(ed, tab.touched_var, "true", [then(write)], made)
     flow = _setter(ed, tab.saved_var, "false", [flow], made)
     lowered = _setter(ed, tab.nudge_var, 0, [flow, picked, *stays], made)
     return [lowered, still]
@@ -250,7 +250,7 @@ def _author_save(ed, in_execs, made, tab):
     flow = _setter(ed, tab.save_var, "false", [serve], made)
     run = _call(ed, FN_EXEC_PYTHON, made, PythonCommand=tab.save_command)
     _connect(flow, _pin(run, "execute"))
-    done = put(ed, tab.saved_var, out(run), [BEL.find_then_pin(run)], made)
+    done = put(ed, tab.saved_var, out(run), [then(run)], made)
     return [done, idle]
 
 
@@ -275,7 +275,7 @@ def _author_apply(ed, in_execs, made, guns):
         raise RuntimeError("could not create the ForEachLoop macro node")
     made.append(loop)
     _connect(_get(ed, "Inventory", made, WEAPON_COMP_CLASS_PATH, wc), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(cast), _loose_pin(loop, "Exec"))
+    _connect(then(cast), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
     find = _call(ed, FN_ARR_FIND, made, TargetArray=_get(ed, TUNE_WEAPONS_VAR, made))
@@ -300,8 +300,8 @@ def _author_apply(ed, in_execs, made, guns):
             _connect(item, _pin(n, "self"))
             _connect(value, _pin(n, var))
             _connect(flow, _pin(n, "execute"))
-            flow = BEL.find_then_pin(n)
-    return [idle, _pin(cast, "CastFailed", is_input=False)]
+            flow = then(n)
+    return [idle, out(cast, "CastFailed")]
 
 
 def author_tab_flow(ed, pc_out, in_execs, made, tab, subjects, closes):

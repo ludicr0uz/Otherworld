@@ -12,7 +12,9 @@ import math
 
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.tuning import COMBAT
-from npc.graph import _asset_sub, BEL, _connect, _log, _loose_pin, _node, _palette, _pin, _set
+from npc.graph import _log
+from uebp.graph import (
+    _assets, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then)
 from npc.nodes import (
     FN_AND, FN_CLAMP, FN_DOT_VV, FN_FORWARD, FN_GET_COMP, FN_GE_FF, FN_MUL_FF,
     FN_SUB_FF, NODE_CAST_WEAPON,
@@ -53,18 +55,18 @@ def _author_block_check(ed, exec_in, player_out, bearing_out):
     full = keep(ed.add_set_member_variable_node(HIT_DAMAGE_VAR))
     _connect(damage_out, _pin(full, HIT_DAMAGE_VAR))
 
-    eas = _asset_sub()
+    eas = _assets()
     if not (eas.does_asset_exist(WEAPON_COMP_BP_PATH)
             and eas.load_asset(WEAPON_COMP_BP_PATH)):
         _log(f"note: {WEAPON_COMP_BP_PATH} not found — the player cannot block")
         _connect(exec_in, _pin(full, "execute"))
-        return made, [BEL.find_then_pin(full)]
+        return made, [then(full)]
 
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(player_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     cast = keep(_palette(ed, NODE_CAST_WEAPON))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(out(comp), _pin(cast, "Object"))
     _connect(exec_in, _pin(cast, "execute"))
     as_wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
@@ -73,42 +75,42 @@ def _author_block_check(ed, exec_in, player_out, bearing_out):
     facing = keep(_node(ed, FN_FORWARD))
     _connect(player_out, _pin(facing, "self"))
     dot = keep(_node(ed, FN_DOT_VV))
-    _connect(_pin(facing, "ReturnValue", is_input=False), _pin(dot, "A"))
+    _connect(out(facing), _pin(dot, "A"))
     _connect(bearing_out, _pin(dot, "B"))
     in_front = keep(_node(ed, FN_GE_FF))
-    _connect(_pin(dot, "ReturnValue", is_input=False), _pin(in_front, "A"))
+    _connect(out(dot), _pin(in_front, "A"))
     _set(in_front, "B", round(BLOCK_MIN_DOT, 4))
     both = keep(_node(ed, FN_AND))
-    _connect(_pin(guard, "Blocking", is_input=False), _pin(both, "A"))
-    _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(both, "B"))
+    _connect(out(guard, "Blocking"), _pin(both, "A"))
+    _connect(out(in_front), _pin(both, "B"))
 
     blocked = keep(ed.add_branch_node())
-    _connect(_pin(both, "ReturnValue", is_input=False), _pin(blocked, "Condition"))
-    _connect(BEL.find_then_pin(cast), _pin(blocked, "execute"))
+    _connect(out(both), _pin(blocked, "Condition"))
+    _connect(then(cast), _pin(blocked, "execute"))
 
     stamina = keep(ed.add_get_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(stamina, "self"))
     spent = keep(_node(ed, FN_SUB_FF))
-    _connect(_pin(stamina, "Stamina", is_input=False), _pin(spent, "A"))
+    _connect(out(stamina, "Stamina"), _pin(spent, "A"))
     _set(spent, "B", COMBAT.block_stamina_per_hit)
     floor = keep(_node(ed, FN_CLAMP))
-    _connect(_pin(spent, "ReturnValue", is_input=False), _pin(floor, "Value"))
+    _connect(out(spent), _pin(floor, "Value"))
     _set(floor, "Min", 0.0)
     _set(floor, "Max", INF)
     pay = keep(ed.add_set_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(pay, "self"))
-    _connect(_pin(floor, "ReturnValue", is_input=False), _pin(pay, "Stamina"))
-    _connect(BEL.find_then_pin(blocked), _pin(pay, "execute"))
+    _connect(out(floor), _pin(pay, "Stamina"))
+    _connect(then(blocked), _pin(pay, "execute"))
 
     soft = keep(ed.add_set_member_variable_node(HIT_DAMAGE_VAR))
     less = keep(_node(ed, FN_MUL_FF))
     _connect(damage_out, _pin(less, "A"))
     _set(less, "B", COMBAT.block_damage_scale)
-    _connect(_pin(less, "ReturnValue", is_input=False), _pin(soft, HIT_DAMAGE_VAR))
-    _connect(BEL.find_then_pin(pay), _pin(soft, "execute"))
+    _connect(out(less), _pin(soft, HIT_DAMAGE_VAR))
+    _connect(then(pay), _pin(soft, "execute"))
 
-    _connect(BEL.find_else_pin(blocked), _pin(full, "execute"))
-    _connect(_pin(cast, "CastFailed", is_input=False), _pin(full, "execute"))
+    _connect(else_(blocked), _pin(full, "execute"))
+    _connect(out(cast, "CastFailed"), _pin(full, "execute"))
 
     ed.add_comment_to_nodes(
         f"The player's guard: blocking and facing this wanderer (within "
@@ -117,4 +119,4 @@ def _author_block_check(ed, exec_in, player_out, bearing_out):
         f"{COMBAT.block_stamina_per_hit:.0f} stamina. The player's own Tick "
         f"drops the guard when stamina reaches 0.",
         made)
-    return made, [BEL.find_then_pin(soft), BEL.find_then_pin(full)]
+    return made, [then(soft), then(full)]

@@ -10,7 +10,8 @@ DropClasses, filled with one entry per ticket by build_weapons_and_combat.main()
 from combat.game_state import (
     GUN_PICK_STREAM_VAR, GUN_ROLL_STREAM_VAR, GUN_STREAMS_SEEDED_VAR,
 )
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
+from uebp.graph import (
+    _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.nodes import (
     FN_ADD_VV, FN_AND, FN_ARR_GET, FN_ARR_LEN, FN_GREATER_II, FN_LESS_FF,
     FN_MAKE_TRANSFORM, FN_SEED_STREAM, FN_SET_STREAM_SEED, FN_STREAM_FLOAT,
@@ -44,23 +45,22 @@ def _author_seed_streams(ed, mode_out, exec_in, keep):
     """
     seeded = keep(_mode_var(ed, mode_out, GUN_STREAMS_SEEDED_VAR))
     first = keep(ed.add_branch_node())
-    _connect(_pin(seeded, GUN_STREAMS_SEEDED_VAR, is_input=False),
-             _pin(first, "Condition"))
+    _connect(out(seeded, GUN_STREAMS_SEEDED_VAR), _pin(first, "Condition"))
     _connect(exec_in, _pin(first, "execute"))
 
-    step = BEL.find_else_pin(first)
+    step = else_(first)
     for i, name in enumerate((GUN_ROLL_STREAM_VAR, GUN_PICK_STREAM_VAR)):
         stream = keep(_mode_var(ed, mode_out, name))
         seed = keep(_node(ed, FN_SET_STREAM_SEED if GUN_DROP_SEED else FN_SEED_STREAM))
-        _connect(_pin(stream, name, is_input=False), _pin(seed, "Stream"))
+        _connect(out(stream, name), _pin(seed, "Stream"))
         if GUN_DROP_SEED:
             _set(seed, "NewSeed", GUN_DROP_SEED + i)
         _connect(step, _pin(seed, "execute"))
-        step = BEL.find_then_pin(seed)
+        step = then(seed)
     done = keep(_mode_var(ed, mode_out, GUN_STREAMS_SEEDED_VAR, setter=True))
     _set(done, GUN_STREAMS_SEEDED_VAR, "true")
     _connect(step, _pin(done, "execute"))
-    return BEL.find_then_pin(first), BEL.find_then_pin(done)
+    return then(first), then(done)
 
 
 def _author_gun_drop(ed, mode_out, at, exec_in):
@@ -104,35 +104,35 @@ def _author_gun_drop(ed, mode_out, at, exec_in):
 
     rolls = keep(_mode_var(ed, mode_out, GUN_ROLL_STREAM_VAR))
     roll = keep(_node(ed, FN_STREAM_FLOAT))
-    _connect(_pin(rolls, GUN_ROLL_STREAM_VAR, is_input=False), _pin(roll, "Stream"))
+    _connect(out(rolls, GUN_ROLL_STREAM_VAR), _pin(roll, "Stream"))
     lucky = keep(_node(ed, FN_LESS_FF))
-    _connect(_pin(roll, "ReturnValue", is_input=False), _pin(lucky, "A"))
+    _connect(out(roll), _pin(lucky, "A"))
     _set(lucky, "B", GUN_DROP_CHANCE)
 
     table = keep(ed.add_get_member_variable_node("DropClasses"))
-    table_out = _pin(table, "DropClasses", is_input=False)
+    table_out = out(table, "DropClasses")
     how_many = keep(_node(ed, FN_ARR_LEN))
     _connect(table_out, _pin(how_many, "TargetArray"))
     stocked = keep(_node(ed, FN_GREATER_II))
-    _connect(_pin(how_many, "ReturnValue", is_input=False), _pin(stocked, "A"))
+    _connect(out(how_many), _pin(stocked, "A"))
     _set(stocked, "B", 0)
 
     worth = keep(_node(ed, FN_AND))
-    _connect(_pin(lucky, "ReturnValue", is_input=False), _pin(worth, "A"))
-    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(worth, "B"))
+    _connect(out(lucky), _pin(worth, "A"))
+    _connect(out(stocked), _pin(worth, "B"))
     rare = keep(ed.add_branch_node())
-    _connect(_pin(worth, "ReturnValue", is_input=False), _pin(rare, "Condition"))
+    _connect(out(worth), _pin(rare, "Condition"))
     for pin in ready:
         _connect(pin, _pin(rare, "execute"))
 
     # RandomIntegerFromStream is [0, Max), so the length is the top as it is.
     picks = keep(_mode_var(ed, mode_out, GUN_PICK_STREAM_VAR))
     which = keep(_node(ed, FN_STREAM_INT))
-    _connect(_pin(picks, GUN_PICK_STREAM_VAR, is_input=False), _pin(which, "Stream"))
-    _connect(_pin(how_many, "ReturnValue", is_input=False), _pin(which, "Max"))
+    _connect(out(picks, GUN_PICK_STREAM_VAR), _pin(which, "Stream"))
+    _connect(out(how_many), _pin(which, "Max"))
     pick = keep(_node(ed, FN_ARR_GET))
     _connect(table_out, _pin(pick, "TargetArray"))
-    _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
+    _connect(out(which), _pin(pick, "Index"))
 
     # Clear of the shells, which are already sitting on the corpse: two pickups
     # at the same point read as one object and the player collects the ammo
@@ -141,26 +141,26 @@ def _author_gun_drop(ed, mode_out, at, exec_in):
     _connect(at, _pin(beside, "A"))
     _connect(_vec(ed, GUN_DROP_FORWARD, 0.0, 0.0), _pin(beside, "B"))
     where = keep(_node(ed, FN_MAKE_TRANSFORM))
-    _connect(_pin(beside, "ReturnValue", is_input=False), _pin(where, "Location"))
+    _connect(out(beside), _pin(where, "Location"))
     _connect(_vec(ed, 1.0, 1.0, 1.0), _pin(where, "Scale"))
 
     spawn = keep(_palette(ed, NODE_SPAWN))
-    _connect(_pin(pick, "Item", is_input=False), _pin(spawn, "Class"))
-    _connect(_pin(where, "ReturnValue", is_input=False), _pin(spawn, "SpawnTransform"))
+    _connect(out(pick, "Item"), _pin(spawn, "Class"))
+    _connect(out(where), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(BEL.find_then_pin(rare), _pin(spawn, "execute"))
+    _connect(then(rare), _pin(spawn, "execute"))
 
     # DropClasses is typed as class-of-Actor, for the same reason AmmoClass is:
     # this component has to compile in a pass where BP_WeaponItem's generated
     # class is not available to type a pin against. The cost is this cast.
     as_item = keep(_palette(ed, NODE_CAST_ITEM))
-    _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(as_item, "Object"))
-    _connect(BEL.find_then_pin(spawn), _pin(as_item, "execute"))
+    _connect(out(spawn), _pin(as_item, "Object"))
+    _connect(then(spawn), _pin(as_item, "execute"))
     loose = keep(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH))
     _connect(_loose_pin(as_item, "AsBPWeaponItem", is_input=False),
              _pin(loose, "self"))
     _set(loose, "Dropped", "true")
-    _connect(BEL.find_then_pin(as_item), _pin(loose, "execute"))
+    _connect(then(as_item), _pin(loose, "execute"))
 
     total = sum(w for _, w in GUN_LOOT_TABLE)
     shares = ", ".join(f"{name} {GUN_DROP_CHANCE * w / total * 100:.0f}%"
@@ -172,6 +172,4 @@ def _author_gun_drop(ed, mode_out, at, exec_in):
         "counted kill. Dropped=true is the whole handover: from here it is an "
         "ordinary weapon on the ground and E picks it up with no new code.",
         made)
-    return (BEL.find_then_pin(loose),
-            _pin(as_item, "CastFailed", is_input=False),
-            BEL.find_else_pin(rare))
+    return (then(loose), out(as_item, "CastFailed"), else_(rare))

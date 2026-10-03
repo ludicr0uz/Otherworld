@@ -36,7 +36,7 @@ which is what the pose followed before there was a carry.
 from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, RAISE_FORCED_VAR,
 )
-from combat.graph import BEL, _connect, _node, _pin, _set, _vec
+from uebp.graph import _connect, _node, _pin, _set, _vec, else_, out, then
 from combat.nodes import (
     FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_II, FN_GET_OWNER, FN_GET_TRANSFORM,
     FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_OR, FN_SELECT_VECTOR, FN_TIME_SECONDS,
@@ -55,21 +55,21 @@ def _author_shot_origin(ed, held):
     real = _muzzle_location(ed, held)
     owner = _node(ed, FN_GET_OWNER)
     body = _node(ed, FN_GET_TRANSFORM)
-    _connect(_pin(owner, "ReturnValue", is_input=False), _pin(body, "self"))
+    _connect(out(owner), _pin(body, "self"))
     off_pin, _off = _prop(ed, "MuzzleOffset", held)
     grip = _vec(ed, *CARRY_GRIP)
     ahead = _node(ed, FN_ADD_VV)
     _connect(off_pin, _pin(ahead, "A"))
     _connect(grip, _pin(ahead, "B"))
     raised = _node(ed, FN_TRANSFORM_LOC)
-    _connect(_pin(body, "ReturnValue", is_input=False), _pin(raised, "T"))
-    _connect(_pin(ahead, "ReturnValue", is_input=False), _pin(raised, "Location"))
+    _connect(out(body), _pin(raised, "T"))
+    _connect(out(ahead), _pin(raised, "Location"))
     down = ed.add_get_member_variable_node(LOWERED_VAR)
     pick = _node(ed, FN_SELECT_VECTOR)
-    _connect(_pin(raised, "ReturnValue", is_input=False), _pin(pick, "A"))
+    _connect(out(raised), _pin(pick, "A"))
     _connect(real, _pin(pick, "B"))
-    _connect(_pin(down, LOWERED_VAR, is_input=False), _pin(pick, "bPickA"))
-    return _pin(pick, "ReturnValue", is_input=False)
+    _connect(out(down, LOWERED_VAR), _pin(pick, "bPickA"))
+    return out(pick)
 
 
 def _author_carry(ed, held, armed_out, exec_ins):
@@ -82,18 +82,18 @@ def _author_carry(ed, held, armed_out, exec_ins):
 
     def get(name):
         n = keep(ed.add_get_member_variable_node(name))
-        return _pin(n, name, is_input=False)
+        return out(n, name)
 
     def gate2(fn, a, b):
         n = keep(_node(ed, fn))
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
-        return _pin(n, "ReturnValue", is_input=False)
+        return out(n)
 
     def negate(a):
         n = keep(_node(ed, FN_NOT))
         _connect(a, _pin(n, "A"))
-        return _pin(n, "ReturnValue", is_input=False)
+        return out(n)
 
     gate = keep(ed.add_branch_node())
     _connect(armed_out, _pin(gate, "Condition"))
@@ -117,15 +117,14 @@ def _author_carry(ed, held, armed_out, exec_ins):
     on_gun = keep(_node(ed, FN_GREATER_FF))
     _connect(get(SEAT_VAR), _pin(on_gun, "A"))
     _set(on_gun, "B", SEAT_HOLD)
-    hands = gate2(FN_OR, hands, _pin(on_gun, "ReturnValue", is_input=False))
+    hands = gate2(FN_OR, hands, out(on_gun))
     ready, ready_n = _prop(ed, "NextFireTime", held)
     keep(ready_n)
     until = keep(_node(ed, FN_ADD_FF))
     _connect(ready, _pin(until, "A"))
     _set(until, "B", CARRY_RAISE_HOLD_S)
     now = keep(_node(ed, FN_TIME_SECONDS))
-    fresh = gate2(FN_LESS_FF, _pin(now, "ReturnValue", is_input=False),
-                  _pin(until, "ReturnValue", is_input=False))
+    fresh = gate2(FN_LESS_FF, out(now), out(until))
     raised = gate2(FN_OR, hands, fresh)
 
     gun_down = gate2(FN_AND, gun, negate(raised))
@@ -133,19 +132,19 @@ def _author_carry(ed, held, armed_out, exec_ins):
     lying = keep(_node(ed, FN_EQ_II))
     _connect(get(STANCE_VAR), _pin(lying, "A"))
     _set(lying, "B", PRONE)
-    upright = negate(_pin(lying, "ReturnValue", is_input=False))
+    upright = negate(out(lying))
     gun_down = gate2(FN_AND, gun_down, upright)
     down = gate2(FN_OR, get("Sprinting"), gun_down)
 
     mark = keep(ed.add_set_member_variable_node(LOWERED_VAR))
     _connect(down, _pin(mark, LOWERED_VAR))
-    _connect(BEL.find_then_pin(gate), _pin(mark, "execute"))
+    _connect(then(gate), _pin(mark, "execute"))
 
     # --- empty hands: the pose follows the sprint alone -----------------------
     running = keep(ed.add_get_member_variable_node("Sprinting"))
     plain = keep(ed.add_set_member_variable_node(LOWERED_VAR))
-    _connect(_pin(running, "Sprinting", is_input=False), _pin(plain, LOWERED_VAR))
-    _connect(BEL.find_else_pin(gate), _pin(plain, "execute"))
+    _connect(out(running, "Sprinting"), _pin(plain, LOWERED_VAR))
+    _connect(else_(gate), _pin(plain, "execute"))
 
     ed.add_comment_to_nodes(
         f"The carry. {LOWERED_VAR} is whether the ready pose is off: sprinting, "
@@ -155,4 +154,4 @@ def _author_carry(ed, held, armed_out, exec_ins):
         f"{CARRY_RAISE_HOLD_S:g} s after NextFireTime. Lowered, the locomotion "
         "comes through and the gun rides in the hand, off the horizon.",
         made)
-    return (BEL.find_then_pin(mark), BEL.find_then_pin(plain))
+    return (then(mark), then(plain))

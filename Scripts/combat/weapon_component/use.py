@@ -26,8 +26,7 @@ exits` in a module of its own and add it to KINDS. Don't poll the key
 anywhere else.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import FN_AND, FN_IS_KEY_DOWN, FN_NOT, FN_OR
 from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
 from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
@@ -78,20 +77,20 @@ def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins):
     keep(sighted_n)
     mark = keep(ed.add_set_member_variable_node(USING_VAR))
     _connect(gate2(FN_AND, free, negate(sighted)), _pin(mark, USING_VAR))
-    _connect(BEL.find_then_pin(gate), _pin(mark, "execute"))
+    _connect(then(gate), _pin(mark, "execute"))
     idle = keep(ed.add_set_member_variable_node(USING_VAR))
     _set(idle, USING_VAR, "false")
-    _connect(BEL.find_else_pin(gate), _pin(idle, "execute"))
+    _connect(else_(gate), _pin(idle, "execute"))
 
     # The press: read against last frame's Using before that is overwritten.
     using = get(USING_VAR)
     press = keep(ed.add_set_member_variable_node(USE_PRESSED_VAR))
     _connect(gate2(FN_AND, using, negate(get(USE_WAS_VAR))), _pin(press, USE_PRESSED_VAR))
-    for e in (BEL.find_then_pin(mark), BEL.find_then_pin(idle)):
+    for e in (then(mark), then(idle)):
         _connect(e, _pin(press, "execute"))
     was = keep(ed.add_set_member_variable_node(USE_WAS_VAR))
     _connect(using, _pin(was, USE_WAS_VAR))
-    _connect(BEL.find_then_pin(press), _pin(was, "execute"))
+    _connect(then(press), _pin(was, "execute"))
 
     ed.add_comment_to_nodes(
         f"The use key (use.py). With an item that has no sights in hand, the "
@@ -100,7 +99,7 @@ def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins):
         f"its sights (ads.py). What a use does is each kind's own, below.",
         made)
 
-    exits = (BEL.find_then_pin(was),)
+    exits = (then(was),)
     for kind in KINDS:
         exits = kind(ed, held, owner_out, exits)
     return exits, key

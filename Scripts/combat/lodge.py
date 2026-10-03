@@ -12,7 +12,7 @@ import math
 
 import unreal
 
-from combat.graph import _rot
+from uebp.graph import _rot
 from combat.grip import _rotate_vector
 
 

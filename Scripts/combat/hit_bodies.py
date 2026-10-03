@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import unreal
 
 from combat.capsule_fit import fit_capsules
-from combat.graph import _log
+from combat.log import _log
 from combat.ragdoll import RAGDOLL_MESH_ROOT
 
 # body_coverage()'s grid, and how much of what it finds the verifier allows.

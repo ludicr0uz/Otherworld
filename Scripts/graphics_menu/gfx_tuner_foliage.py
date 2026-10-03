@@ -43,8 +43,7 @@ found as "an instanced-mesh root that is not grass". The walk over every
 actor happens only when the tree distance moves.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
 from combat.nodes import FN_ADD_FF, FN_LESS_II, FN_MUL_FF, FN_OR, MACRO_FOR_EACH
 from forest_generator.grass_cells import GRASS_TAG, GRASS_TIERS, tier_tag
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
@@ -110,8 +109,7 @@ def _root_mesh(ed, actor, in_exec, made):
     made.append(cast)
     _connect(out(root), _pin(cast, "Object"))
     _connect(in_exec, _pin(cast, "execute"))
-    return (_loose_pin(cast, "AsInstancedStaticMeshComponent", is_input=False),
-            BEL.find_then_pin(cast))
+    return (_loose_pin(cast, "AsInstancedStaticMeshComponent", is_input=False), then(cast))
 
 
 def _author_scale(ed, comp, ratio, in_exec, made):
@@ -119,7 +117,7 @@ def _author_scale(ed, comp, ratio, in_exec, made):
     culls = _call(ed, FN_GET_CULLS, made, self=comp)
     ends = {}
     for name in ("Start", "End"):
-        was = _pin(culls, f"Out{name}CullDistance", is_input=False)
+        was = out(culls, f"Out{name}CullDistance")
         # Not Multiply_IntFloat: it is promoted to a wildcard that takes its
         # type from the int, and the ratio is truncated on the way in.
         scaled = _call(ed, FN_MUL_FF, made, B=ratio,
@@ -136,8 +134,8 @@ def _author_scale(ed, comp, ratio, in_exec, made):
     _connect(in_exec, _pin(far, "execute"))
     fade = _call(ed, FN_SET_CULLS, made, self=comp,
                  StartCullDistance=ends["Start"][1], EndCullDistance=ends["End"][1])
-    _connect(BEL.find_then_pin(far), _pin(fade, "execute"))
-    return BEL.find_then_pin(fade)
+    _connect(then(far), _pin(fade, "execute"))
+    return then(fade)
 
 
 def _wanted(ed, column_name, made):
@@ -167,15 +165,14 @@ def _author_grass(ed, in_execs, made):
 
     cells = _call(ed, FN_WITH_TAG, made, Tag=GRASS_TAG)
     _connect(go, _pin(cells, "execute"))
-    cell, body, done = _for_each(ed, _pin(cells, "OutActors", is_input=False),
-                                 BEL.find_then_pin(cells), made)
+    cell, body, done = _for_each(ed, out(cells, "OutActors"), then(cells), made)
     comp, flow = _root_mesh(ed, cell, body, made)
     on = out(_call(ed, FN_GE_II, made, A=column(ed, "grass_shadows", made, rounded=True), B=1))
     for fn, arg in GRASS_SETTERS:
         s = _call(ed, fn, made, self=comp)
         _connect(on, _pin(s, arg))
         _connect(flow, _pin(s, "execute"))
-        flow = BEL.find_then_pin(s)
+        flow = then(s)
     _author_scale(ed, comp,
                   _ratio(ed, "grass_distance", TUNER_GRASS_DISTANCE_APPLIED_VAR, made),
                   flow, made)
@@ -197,8 +194,7 @@ def _author_trees(ed, in_execs, made):
     actors = _call(ed, FN_ALL_OF_CLASS, made)
     _class_literal(actors, "ActorClass", ACTOR_CLASS_PATH)
     _connect(go, _pin(actors, "execute"))
-    actor, body, done = _for_each(ed, _pin(actors, "OutActors", is_input=False),
-                                  BEL.find_then_pin(actors), made)
+    actor, body, done = _for_each(ed, out(actors, "OutActors"), then(actors), made)
     grass = _call(ed, FN_HAS_TAG, made, self=actor, Tag=GRASS_TAG)
     _skip, other = _branch(ed, out(grass), [body], made)
     comp, flow = _root_mesh(ed, actor, other, made)
@@ -219,8 +215,7 @@ def _author_layers(ed, in_execs, made):
     for tier in SWITCHED_TIERS:
         cells = _call(ed, FN_WITH_TAG, made, Tag=tier_tag(tier))
         _connect(flow, _pin(cells, "execute"))
-        cell, body, flow = _for_each(ed, _pin(cells, "OutActors", is_input=False),
-                                     BEL.find_then_pin(cells), made)
+        cell, body, flow = _for_each(ed, out(cells, "OutActors"), then(cells), made)
         below = _call(ed, FN_LESS_II, made,
                       A=column(ed, "grass_layers", made, rounded=True),
                       B=tier + 1)

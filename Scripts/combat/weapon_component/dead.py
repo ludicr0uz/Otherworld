@@ -32,7 +32,7 @@ OwnerDead is for whoever else acts for the player: the HUD's loot window
 component again.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from combat.nodes import (
     CAMERA_CLASS_PATH, FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT,
     FN_GET_COMP, FN_LE_FF, FN_OR, FN_SET_FOV, FN_SET_HIDDEN,
@@ -84,25 +84,25 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     _connect(out(spent), _pin(dead, "B"))
     gate = keep(ed.add_branch_node())
     _connect(out(dead), _pin(gate, "Condition"))
-    _connect(BEL.find_then_pin(cast), _pin(gate, "execute"))
+    _connect(then(cast), _pin(gate, "execute"))
 
     # Alive, or nothing to die with: one setter both arms run into, so the
     # rest of the Tick still hangs off a single exec pin.
     alive = keep(ed.add_set_member_variable_node(OWNER_DEAD_VAR))
     _set(alive, OWNER_DEAD_VAR, "false")
-    _connect(BEL.find_else_pin(gate), _pin(alive, "execute"))
+    _connect(else_(gate), _pin(alive, "execute"))
     _connect(_pin(cast, "CastFailed", is_input=False), _pin(alive, "execute"))
 
     # Dead. Nothing below reaches the rest of the Tick.
     gone = keep(ed.add_set_member_variable_node(OWNER_DEAD_VAR))
     _set(gone, OWNER_DEAD_VAR, "true")
-    _connect(BEL.find_then_pin(gate), _pin(gone, "execute"))
-    flow = BEL.find_then_pin(gone)
+    _connect(then(gate), _pin(gone, "execute"))
+    flow = then(gone)
     for name in LET_GO_VARS:
         drop = keep(ed.add_set_member_variable_node(name))
         _set(drop, name, "false")
         _connect(flow, _pin(drop, "execute"))
-        flow = BEL.find_then_pin(drop)
+        flow = then(drop)
 
     # The zoom and the camera, home at once (ads.py and sights.py ease them,
     # and neither runs again).
@@ -116,16 +116,16 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     unzoom = keep(_node(ed, FN_SET_FOV))
     _connect(out(cam), _pin(unzoom, "self"))
     _connect(out(base, "BaseFOV"), _pin(unzoom, "InFieldOfView"))
-    _connect(BEL.find_then_pin(fov), _pin(unzoom, "execute"))
+    _connect(then(fov), _pin(unzoom, "execute"))
     seat = keep(ed.add_set_member_variable_node(SEAT_VAR))
     _set(seat, SEAT_VAR, 0.0)
-    _connect(BEL.find_then_pin(unzoom), _pin(seat, "execute"))
+    _connect(then(unzoom), _pin(seat, "execute"))
     look = keep(ed.add_set_member_variable_node(LOOK_VAR))
     _set(look, LOOK_VAR, 0.0)
-    _connect(BEL.find_then_pin(seat), _pin(look, "execute"))
+    _connect(then(seat), _pin(look, "execute"))
     blend = keep(ed.add_set_member_variable_node("SightBlend"))
     _set(blend, "SightBlend", 0.0)
-    _connect(BEL.find_then_pin(look), _pin(blend, "execute"))
+    _connect(then(look), _pin(blend, "execute"))
     arm = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(arm, "self"))
     _pin(arm, "ComponentClass").set_pin_value(SPRING_ARM_CLASS_PATH)
@@ -135,14 +135,14 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     home = keep(_node(ed, FN_COMP_SET_WORLD_LOC))
     _connect(out(cam), _pin(home, "self"))
     _connect(out(shoulder), _pin(home, "NewLocation"))
-    _connect(BEL.find_then_pin(blend), _pin(home, "execute"))
+    _connect(then(blend), _pin(home, "execute"))
     boom_rot = keep(_node(ed, FN_SOCKET_ROT))
     _connect(out(arm), _pin(boom_rot, "self"))
     _set(boom_rot, "InSocketName", SPRING_ARM_SOCKET)
     level = keep(_node(ed, FN_COMP_SET_WORLD_ROT))
     _connect(out(cam), _pin(level, "self"))
     _connect(out(boom_rot), _pin(level, "NewRotation"))
-    _connect(BEL.find_then_pin(home), _pin(level, "execute"))
+    _connect(then(home), _pin(level, "execute"))
 
     # ...and what the scope hid shows again: the body, and the gun if there
     # is one (a nested Branch, so Held is never read null).
@@ -150,16 +150,16 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     shown = keep(_node(ed, FN_SET_OWNER_NO_SEE))
     _connect(out(body, "OwnerMesh"), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", "false")
-    _connect(BEL.find_then_pin(level), _pin(shown, "execute"))
+    _connect(then(level), _pin(shown, "execute"))
     # ...and the head the sights hid (head_hide.py).
-    headed = _author_head_shown(ed, keep, BEL.find_then_pin(shown))
+    headed = _author_head_shown(ed, keep, then(shown))
     armed = keep(ed.add_branch_node())
     _connect(armed_out, _pin(armed, "Condition"))
     _connect(headed, _pin(armed, "execute"))
     untuck = keep(_node(ed, FN_SET_HIDDEN))
     _connect(held, _pin(untuck, "self"))
     _set(untuck, "bNewHidden", "false")
-    _connect(BEL.find_then_pin(armed), _pin(untuck, "execute"))
+    _connect(then(armed), _pin(untuck, "execute"))
 
     ed.add_comment_to_nodes(
         "The dead gate, before any key is polled: an owner whose health "
@@ -171,4 +171,4 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
         "sights had. OwnerDead is what the "
         "HUD's loot window reads.",
         made)
-    return BEL.find_then_pin(alive)
+    return then(alive)

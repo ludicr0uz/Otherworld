@@ -17,14 +17,14 @@ empties Held. The gate reads the stored WearSlot, not ClothingSlot, so
 verify/wear.py still finds one Branch on Held.ClothingSlot.
 """
 
-from combat.graph import BEL, _set
-from uebp.graph import out
+from uebp.graph import _set, out, then
 from combat.nodes import FN_ARR_ADD, FN_ARR_SET, FN_IS_VALID, FN_SET_HIDDEN
 from combat.slot_tuning import SLOT_VAR, UNPLACED
 from combat.wear_tuning import (
     CLOTHING_SLOT_VAR, NOT_CLOTHING, WEAR_ITEM_VAR, WEAR_REQUEST_VAR, WORN_VAR,
 )
-from combat.weapon_component.common import _G
+from combat.paths import ITEM_CLASS_PATH
+from uebp.g import _G
 from combat.weapon_component.slot_nodes import slot_at
 from combat.weapon_component.wear import FN_GE_II, WEAR_SLOT_VAR, _worn_at
 
@@ -35,7 +35,7 @@ SLOT_ITEMS = "SlotItems"
 
 def _author_wear_request(ed, in_execs):
     """Serve WearRequest (see the module docstring). Returns the exits."""
-    g = _G(ed)
+    g = _G(ed, ITEM_CLASS_PATH)
     asked = g.call(FN_GE_II, A=g.get(WEAR_REQUEST_VAR), B=0)
     serve, idle = g.branch(out(asked), in_execs)
     code = g.get(WEAR_REQUEST_VAR)
@@ -53,17 +53,17 @@ def _author_wear_request(ed, in_execs):
 
     # The slot already holds one: it comes off into the slot this one leaves.
     valid, old = _worn_at(g, slot)
-    full, empty = g.branch(valid, [BEL.find_then_pin(taken)])
+    full, empty = g.branch(valid, [then(taken)])
     worn, bare = g.branch(out(g.call(FN_IS_VALID, Object=old)), [full])
     back = g.call(FN_ARR_ADD, [worn], TargetArray=g.get("Inventory"), NewItem=old)
-    swapped = g.iput(old, SLOT_VAR, g.iget(item, SLOT_VAR), [BEL.find_then_pin(back)])
+    swapped = g.iput(old, SLOT_VAR, g.iget(item, SLOT_VAR), [then(back)])
 
     put_on = g.call(FN_ARR_SET, [swapped, bare, empty],
                     TargetArray=g.get(WORN_VAR), Index=slot, Item=item)
     _set(put_on, "bSizeToFit", "true")
-    hide = g.call(FN_SET_HIDDEN, [BEL.find_then_pin(put_on)], self=item)
+    hide = g.call(FN_SET_HIDDEN, [then(put_on)], self=item)
     _set(hide, "bNewHidden", "true")
-    flow = g.iput(item, SLOT_VAR, str(UNPLACED), [BEL.find_then_pin(hide)])
+    flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(hide)])
     flow = g.put("NeedsRefresh", "true", [flow])
     ed.add_comment_to_nodes(
         f"{WEAR_REQUEST_VAR}: the I panel's drag of a slot's item onto the worn grid. "

@@ -27,8 +27,8 @@ the release would have made of it.
 Owns the variables the release (throw.py) stores the launch in.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
-from uebp.graph import out
+from uebp.graph import (
+    _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.nodes import (
     FN_ADD_VV, FN_GREATER_FF, FN_IS_VALID, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF,
     FN_NORMAL, FN_ROT_FROM_X, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT, FN_SUB_FF,
@@ -76,11 +76,11 @@ def _author_square(ed, held, exec_in):
     turn = _node(ed, FN_SET_ACTOR_ROT)
     _connect(held, _pin(turn, "self"))
     _connect(out(along), _pin(turn, "NewRotation"))
-    _connect(BEL.find_then_pin(gate), _pin(turn, "execute"))
+    _connect(then(gate), _pin(turn, "execute"))
     ed.add_comment_to_nodes(
         "A melee weapon leaves the hand squared up to the throw: its blade in "
         "the plane it flies in, edge first.", [gate, along, turn])
-    return BEL.find_then_pin(turn), BEL.find_else_pin(gate)
+    return then(turn), else_(gate)
 
 
 def _author_spin(ed, thrown, exec_in):
@@ -117,7 +117,7 @@ def _author_spin(ed, thrown, exec_in):
     ed.add_comment_to_nodes(
         f"The tumble: the item's {THROW_SPIN_VAR} degrees a second about the "
         "level axis across the throw, top first.", [across, turn, spin])
-    return BEL.find_then_pin(spin)
+    return then(spin)
 
 
 def _author_throw_flight(ed, exec_ins):
@@ -171,25 +171,25 @@ def _author_throw_flight(ed, exec_ins):
     _connect(out(last, THROW_LAST_VAR), _pin(seg, "Start"))
     _connect(pos_out, _pin(seg, "End"))
     _trace_defaults(seg)
-    _connect(BEL.find_then_pin(gate), _pin(seg, "execute"))
+    _connect(then(gate), _pin(seg, "execute"))
     struck = ed.add_branch_node()
     _connect(out(seg), _pin(struck, "Condition"))
-    _connect(BEL.find_then_pin(seg), _pin(struck, "execute"))
+    _connect(then(seg), _pin(struck, "execute"))
 
     # --- still flying: move on, and give up on a throw into nothing ----------
     fly = _node(ed, FN_SET_ACTOR_LOC)
     _connect(thrown, _pin(fly, "self"))
     _connect(pos_out, _pin(fly, "NewLocation"))
-    _connect(BEL.find_else_pin(struck), _pin(fly, "execute"))
+    _connect(else_(struck), _pin(fly, "execute"))
     step = ed.add_set_member_variable_node(THROW_LAST_VAR)
     _connect(pos_out, _pin(step, THROW_LAST_VAR))
-    _connect(_author_spin(ed, thrown, BEL.find_then_pin(fly)), _pin(step, "execute"))
+    _connect(_author_spin(ed, thrown, then(fly)), _pin(step, "execute"))
     late = _node(ed, FN_GREATER_FF)
     _connect(t_out, _pin(late, "A"))
     _set(late, "B", THROW_MAX_FLIGHT_S)
     lost = ed.add_branch_node()
     _connect(out(late), _pin(lost, "Condition"))
-    _connect(BEL.find_then_pin(step), _pin(lost, "execute"))
+    _connect(then(step), _pin(lost, "execute"))
 
     # --- struck: back off what it hit, then down onto the ground -------------
     # A floor gives the same floor back; a wall or a wanderer drops it at
@@ -212,7 +212,7 @@ def _author_throw_flight(ed, exec_ins):
     _trace_defaults(floor)
     # First what a blade does to what it struck (throw_strike.py): one that
     # lodged in a tree or a body stays there, and skips the way down.
-    falls, lodged = _author_throw_strike(ed, thrown, hit, BEL.find_then_pin(struck))
+    falls, lodged = _author_throw_strike(ed, thrown, hit, then(struck))
     for pin in falls:
         _connect(pin, _pin(floor, "execute"))
     # ...and the way down passes by a body it wounded, which would catch it.
@@ -220,7 +220,7 @@ def _author_throw_flight(ed, exec_ins):
     _connect(out(past, THROW_PAST_VAR), _pin(floor, "ActorsToIgnore"))
     grounded = ed.add_branch_node()
     _connect(out(floor), _pin(grounded, "Condition"))
-    _connect(BEL.find_then_pin(floor), _pin(grounded, "execute"))
+    _connect(then(floor), _pin(grounded, "execute"))
     ground = _palette(ed, NODE_BREAK_HIT)
     _connect(out(floor, "OutHit"), _loose_pin(ground, "Hit"))
     lift = _node(ed, FN_ADD_VV)
@@ -229,21 +229,20 @@ def _author_throw_flight(ed, exec_ins):
     rest = _node(ed, FN_SET_ACTOR_LOC)
     _connect(thrown, _pin(rest, "self"))
     _connect(out(lift), _pin(rest, "NewLocation"))
-    _connect(BEL.find_then_pin(grounded), _pin(rest, "execute"))
+    _connect(then(grounded), _pin(rest, "execute"))
     hang = _node(ed, FN_SET_ACTOR_LOC)
     _connect(thrown, _pin(hang, "self"))
     _connect(out(back), _pin(hang, "NewLocation"))
-    _connect(BEL.find_else_pin(grounded), _pin(hang, "execute"))
+    _connect(else_(grounded), _pin(hang, "execute"))
 
     # --- landed: an ordinary dropped item, which E picks up ------------------
     flag = ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH)
     _connect(thrown, _pin(flag, "self"))
     _set(flag, "Dropped", "true")
-    for pin in (BEL.find_then_pin(rest), BEL.find_then_pin(hang),
-                BEL.find_then_pin(lost)) + lodged:
+    for pin in (then(rest), then(hang), then(lost)) + lodged:
         _connect(pin, _pin(flag, "execute"))
     done = ed.add_set_member_variable_node(THROWN_VAR)
-    _connect(BEL.find_then_pin(flag), _pin(done, "execute"))
+    _connect(then(flag), _pin(done, "execute"))
 
     ed.add_comment_to_nodes(
         "The thrown item's flight: start + v t + g t^2 / 2, the curve the arc "
@@ -251,4 +250,4 @@ def _author_throw_flight(ed, exec_ins):
         "down, after what a blade does to what it struck; then it is an "
         "ordinary Dropped item, for E to pick up.",
         [gate, seg, struck, fly, lost, floor, flag, done])
-    return (BEL.find_then_pin(done), BEL.find_else_pin(gate), BEL.find_else_pin(lost))
+    return (then(done), else_(gate), else_(lost))

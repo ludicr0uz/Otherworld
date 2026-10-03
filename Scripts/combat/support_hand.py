@@ -44,9 +44,10 @@ poses, then this.
 import unreal
 
 from combat.aim_pitch import IK_CLASS, _feeding, _nodes_of
-from combat.graph import (
-    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _log, _palette, _pin,
-    _struct_type)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _palette, _pin, _struct_type,
+    out)
 from uebp.layout import arrange
 
 SUPPORT_HAND_VAR = "SupportHand"
@@ -121,7 +122,7 @@ def _remove_previous(ed):
     """Take out an earlier run's IK and join the pose round it again."""
     for ik in _nodes_of(ed, IK_CLASS):
         fed = PIN.list_connected_pins(_pin(ik, "ComponentPose"))
-        feeds = PIN.list_connected_pins(_pin(ik, "Pose", is_input=False))
+        feeds = PIN.list_connected_pins(out(ik, "Pose"))
         ed.remove_nodes([ik] + _feeding(ik))
         if fed and feeds:
             _connect(fed[0], feeds[0])
@@ -161,13 +162,12 @@ def patch_support_hand(skin):
 
     ik = _two_bone_ik(ed, skin)
     _connect(upstream, _pin(ik, "ComponentPose"))
-    _connect(_pin(ik, "Pose", is_input=False), pose_in)
+    _connect(out(ik, "Pose"), pose_in)
 
     weight = ed.add_get_member_variable_node(SUPPORT_HAND_VAR)
-    _connect(_pin(weight, SUPPORT_HAND_VAR, is_input=False), _pin(ik, "Alpha"))
+    _connect(out(weight, SUPPORT_HAND_VAR), _pin(ik, "Alpha"))
     point = ed.add_get_member_variable_node(SUPPORT_POINT_VAR)
-    _connect(_pin(point, SUPPORT_POINT_VAR, is_input=False),
-             _pin(ik, "EffectorLocation"))
+    _connect(out(point, SUPPORT_POINT_VAR), _pin(ik, "EffectorLocation"))
     ed.add_comment_to_nodes(
         f"Down the sights the left hand holds the gun: a Two Bone IK puts "
         f"{skin.pose_bones['hand_l']} at {SUPPORT_POINT_VAR}, a point in "

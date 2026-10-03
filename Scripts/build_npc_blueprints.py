@@ -60,7 +60,8 @@ from npc.character import (                                     # noqa: E402
     build_npc_blueprint, build_variant_blueprint,
 )
 from npc.controller import build_ai_controller_blueprint         # noqa: E402
-from npc.graph import _asset_sub, _log                           # noqa: E402
+from npc.graph import _log                                        # noqa: E402
+from uebp.graph import _assets                                    # noqa: E402
 from npc.paths import AI_BP_PATH, NPC_BP_PATH                    # noqa: E402
 
 
@@ -73,7 +74,7 @@ def ensure_npc_blueprints(force=False):
     Idempotent: with ``force=False`` existing assets are reused, which keeps
     re-generating a level cheap and preserves any hand edits.
     """
-    eas = _asset_sub()
+    eas = _assets()
     if not force and eas.does_asset_exist(NPC_BP_PATH) and eas.does_asset_exist(AI_BP_PATH):
         _log("NPC blueprints already exist — reusing")
         return eas.load_asset(NPC_BP_PATH)
@@ -89,7 +90,7 @@ def ensure_npc_variants(force=False):
     shared parent and is kept because the verify scripts address it by name.
     """
     base = ensure_npc_blueprints(force=force)
-    eas = _asset_sub()
+    eas = _assets()
     out = {}
     for variant in NPC_VARIANTS:
         if not force and eas.does_asset_exist(variant.blueprint):

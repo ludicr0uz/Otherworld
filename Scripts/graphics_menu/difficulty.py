@@ -9,7 +9,7 @@ DrawHUD, so GA_ConsumeItem reads one world-scoped int and never loads the save
 """
 
 from combat.difficulty import DIFFICULTY_VAR
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import BEL, _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from combat.paths import GAME_MODE_CLASS_PATH
 from graphics_menu.settings_rows import (
     DIFFICULTY_LABELS, DIFFICULTY_ROW, SETTINGS_CLASS_PATH)
@@ -44,8 +44,8 @@ def author_difficulty_name(ed, settings_out, made):
     _connect(settings_out, _pin(level, "self"))
     labels = ed.add_get_member_variable_node(LABELS_VAR)
     name = _node(ed, FN_ARR_GET)
-    _connect(_pin(labels, LABELS_VAR, is_input=False), _loose_pin(name, "TargetArray"))
-    _connect(_pin(level, DIFFICULTY_VAR, is_input=False), _pin(name, "Index"))
+    _connect(out(labels, LABELS_VAR), _loose_pin(name, "TargetArray"))
+    _connect(out(level, DIFFICULTY_VAR), _pin(name, "Index"))
     made += [level, labels, name]
     return _loose_pin(name, "Item", is_input=False)
 
@@ -64,14 +64,13 @@ def emit_difficulty_nudge(ed, settings_out, either_out, right_out, in_execs, mad
 
     count = len(DIFFICULTY_LABELS)
     here = keep(_node(ed, FN_EQ_II))
-    _connect(_pin(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow", is_input=False),
-             _pin(here, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(here, "A"))
     _set(here, "B", DIFFICULTY_ROW)
     adjusting = keep(_node(ed, FN_AND))
     _connect(either_out, _pin(adjusting, "A"))
-    _connect(_pin(here, "ReturnValue", is_input=False), _pin(adjusting, "B"))
+    _connect(out(here), _pin(adjusting, "B"))
     cycling = keep(ed.add_branch_node())
-    _connect(_pin(adjusting, "ReturnValue", is_input=False), _pin(cycling, "Condition"))
+    _connect(out(adjusting), _pin(cycling, "Condition"))
     for e in in_execs:
         _connect(e, _pin(cycling, "execute"))
 
@@ -82,16 +81,16 @@ def emit_difficulty_nudge(ed, settings_out, either_out, right_out, in_execs, mad
     now = keep(ed.add_get_member_variable_node(DIFFICULTY_VAR, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(now, "self"))
     total = keep(_node(ed, FN_ADD_II))
-    _connect(_pin(now, DIFFICULTY_VAR, is_input=False), _pin(total, "A"))
-    _connect(_pin(delta, "ReturnValue", is_input=False), _pin(total, "B"))
+    _connect(out(now, DIFFICULTY_VAR), _pin(total, "A"))
+    _connect(out(delta), _pin(total, "B"))
     wrapped = keep(_node(ed, FN_MOD_II))
-    _connect(_pin(total, "ReturnValue", is_input=False), _pin(wrapped, "A"))
+    _connect(out(total), _pin(wrapped, "A"))
     _set(wrapped, "B", count)
     store = keep(ed.add_set_member_variable_node(DIFFICULTY_VAR, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(store, "self"))
-    _connect(_pin(wrapped, "ReturnValue", is_input=False), _pin(store, DIFFICULTY_VAR))
-    _connect(BEL.find_then_pin(cycling), _pin(store, "execute"))
-    return BEL.find_then_pin(store), BEL.find_else_pin(cycling)
+    _connect(out(wrapped), _pin(store, DIFFICULTY_VAR))
+    _connect(then(cycling), _pin(store, "execute"))
+    return then(store), else_(cycling)
 
 
 def author_push_difficulty(ed, in_exec, mode_out):
@@ -103,20 +102,20 @@ def author_push_difficulty(ed, in_exec, mode_out):
     IsValid(Settings), which BeginPlay fills. Returns the exec tails.
     """
     got = ed.add_get_member_variable_node("Settings")
-    settings_out = _pin(got, "Settings", is_input=False)
+    settings_out = out(got, "Settings")
     ok = _node(ed, FN_IS_VALID)
     _connect(settings_out, _pin(ok, "Object"))
     have = ed.add_branch_node()
-    _connect(_pin(ok, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(out(ok), _pin(have, "Condition"))
     _connect(in_exec, _pin(have, "execute"))
     level = ed.add_get_member_variable_node(DIFFICULTY_VAR, SETTINGS_CLASS_PATH)
     _connect(settings_out, _pin(level, "self"))
     push = ed.add_set_member_variable_node(DIFFICULTY_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(push, "self"))
-    _connect(_pin(level, DIFFICULTY_VAR, is_input=False), _pin(push, DIFFICULTY_VAR))
-    _connect(BEL.find_then_pin(have), _pin(push, "execute"))
+    _connect(out(level, DIFFICULTY_VAR), _pin(push, DIFFICULTY_VAR))
+    _connect(then(have), _pin(push, "execute"))
     ed.add_comment_to_nodes(
         f"The settings' {DIFFICULTY_VAR} onto the GameMode, every frame, so "
         "gameplay (GA_ConsumeItem's easy heal) reads it without the save.",
         [got, ok, have, level, push])
-    return BEL.find_then_pin(push), BEL.find_else_pin(have)
+    return then(push), else_(have)

@@ -30,8 +30,7 @@ the punch and the slash: the legs keep walking.
 """
 
 from combat.anim_blueprint import AIM_SLOT
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_ANIM_INSTANCE, FN_GE_FF, FN_IS_VALID, FN_PLAY_SLOT, FN_TIME_SECONDS,
 )
@@ -67,8 +66,8 @@ def _author_throw_windup(ed, held, started, exec_ins):
     _connect(_get(ed, THROW_ANIM_VAR), _pin(has, "Object"))
     clip = ed.add_branch_node()
     _connect(out(has), _pin(clip, "Condition"))
-    _connect(BEL.find_then_pin(keep), _pin(clip, "execute"))
-    step = _stamp(ed, THROW_DUE_VAR, THROW_WINDUP_S, BEL.find_then_pin(clip))
+    _connect(then(keep), _pin(clip, "execute"))
+    step = _stamp(ed, THROW_DUE_VAR, THROW_WINDUP_S, then(clip))
     anim = _node(ed, FN_ANIM_INSTANCE)
     _connect(_get(ed, "OwnerMesh"), _pin(anim, "self"))
     play = _node(ed, FN_PLAY_SLOT)
@@ -90,7 +89,7 @@ def _author_throw_windup(ed, held, started, exec_ins):
     _connect(_get(ed, THROW_DUE_VAR), _pin(due, "B"))
     gate = ed.add_branch_node()
     _connect(_and(ed, _winding(ed), out(due)), _pin(gate, "Condition"))
-    for pin in tuple(exec_ins) + (BEL.find_then_pin(play), BEL.find_else_pin(clip)):
+    for pin in tuple(exec_ins) + (then(play), else_(clip)):
         _connect(pin, _pin(gate, "execute"))
     # Nested, not folded into the gate: it is asked only of a winding throw.
     same = _node(ed, FN_SAME_OBJECT)
@@ -98,7 +97,7 @@ def _author_throw_windup(ed, held, started, exec_ins):
     _connect(held, _pin(same, "B"))
     still = ed.add_branch_node()
     _connect(out(same), _pin(still, "Condition"))
-    _connect(BEL.find_then_pin(gate), _pin(still, "execute"))
+    _connect(then(gate), _pin(still, "execute"))
 
     ed.add_comment_to_nodes(
         f"The throw's wind-up: the click plays the clip into {AIM_SLOT}, on "
@@ -107,7 +106,7 @@ def _author_throw_windup(ed, held, started, exec_ins):
         "later, if the hand still holds it. A skin with no clip lets go at "
         "once.",
         [keep, clip, play, gate, still])
-    return BEL.find_then_pin(still), BEL.find_else_pin(still), BEL.find_else_pin(gate)
+    return then(still), else_(still), else_(gate)
 
 
 def _author_wound_down(ed, exec_ins):
@@ -116,4 +115,4 @@ def _author_wound_down(ed, exec_ins):
     clear = ed.add_set_member_variable_node(THROW_WINDING_VAR)
     for pin in exec_ins:
         _connect(pin, _pin(clear, "execute"))
-    return BEL.find_then_pin(clear)
+    return then(clear)

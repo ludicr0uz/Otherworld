@@ -2,7 +2,7 @@
 BACK, and the save written after every change.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from graphics_menu.cursor import author_row_cursor
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, WHEEL_LESS, WHEEL_MORE
 from graphics_menu.difficulty import emit_difficulty_nudge
@@ -43,7 +43,7 @@ def _emit_save(ed, settings_out, in_exec):
     _set(n, "SlotName", SETTINGS_SLOT)
     _set(n, "UserIndex", SETTINGS_USER_INDEX)
     _connect(in_exec, _pin(n, "execute"))
-    return BEL.find_then_pin(n), n
+    return then(n), n
 
 
 def _author_capture(ed, settings_out, in_execs, made):
@@ -63,11 +63,11 @@ def _author_capture(ed, settings_out, in_execs, made):
         return n
 
     pc = keep(_node(ed, FN_GET_OWNING_PC))
-    pc_out = _pin(pc, "ReturnValue", is_input=False)
+    pc_out = out(pc)
 
     armed = keep(ed.add_get_member_variable_node("Capturing"))
     listening = keep(ed.add_branch_node())
-    _connect(_pin(armed, "Capturing", is_input=False), _pin(listening, "Condition"))
+    _connect(out(armed, "Capturing"), _pin(listening, "Condition"))
     for e in in_execs:
         _connect(e, _pin(listening, "execute"))
 
@@ -77,34 +77,34 @@ def _author_capture(ed, settings_out, in_execs, made):
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
-    _connect(_pin(pool, "KeyPool", is_input=False), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(listening), _loose_pin(loop, "Exec"))
+    _connect(out(pool, "KeyPool"), _loose_pin(loop, "Array"))
+    _connect(then(listening), _loose_pin(loop, "Exec"))
     candidate = _loose_pin(loop, "ArrayElement", is_input=False)
 
     hit = keep(_node(ed, FN_WAS_PRESSED))
     _connect(pc_out, _pin(hit, "self"))
     _connect(candidate, _pin(hit, "Key"))
     took = keep(ed.add_branch_node())
-    _connect(_pin(hit, "ReturnValue", is_input=False), _pin(took, "Condition"))
+    _connect(out(hit), _pin(took, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(took, "execute"))
 
     # Binds[MenuRow - FIRST_BIND_ROW]: the sliders sit above the binds, so the
     # subtraction is the whole of that mapping.
     row = keep(ed.add_get_member_variable_node("MenuRow"))
     slot = keep(_node(ed, FN_SUB_II))
-    _connect(_pin(row, "MenuRow", is_input=False), _pin(slot, "A"))
+    _connect(out(row, "MenuRow"), _pin(slot, "A"))
     _set(slot, "B", FIRST_BIND_ROW)
     binds = keep(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(binds, "self"))
     write = keep(_node(ed, FN_ARR_SET))
-    _connect(_pin(binds, "Binds", is_input=False), _loose_pin(write, "TargetArray"))
-    _connect(_pin(slot, "ReturnValue", is_input=False), _pin(write, "Index"))
+    _connect(out(binds, "Binds"), _loose_pin(write, "TargetArray"))
+    _connect(out(slot), _pin(write, "Index"))
     _connect(candidate, _loose_pin(write, "Item"))
-    _connect(BEL.find_then_pin(took), _pin(write, "execute"))
+    _connect(then(took), _pin(write, "execute"))
     done = keep(ed.add_set_member_variable_node("Capturing"))
     _set(done, "Capturing", "false")
-    _connect(BEL.find_then_pin(write), _pin(done, "execute"))
-    _, writer = _emit_save(ed, settings_out, BEL.find_then_pin(done))
+    _connect(then(write), _pin(done, "execute"))
+    _, writer = _emit_save(ed, settings_out, then(done))
     made.append(writer)
 
     # --- not armed: move the caret, nudge the sensitivity, take the row -------
@@ -112,7 +112,7 @@ def _author_capture(ed, settings_out, in_execs, made):
     # on it is Enter. Not while a capture is armed -- that click is the bind.
     hovered = author_row_cursor(
         ed, part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX), BACK_ROW + 1,
-        [BEL.find_else_pin(listening)], row_var="MenuRow",
+        [else_(listening)], row_var="MenuRow",
         click=(CURSOR_ACCEPT_VAR, "true"))
     moved, nav = _emit_row_nav(ed, pc_out, BACK_ROW, hovered)
     made += nav
@@ -125,24 +125,23 @@ def _author_capture(ed, settings_out, in_execs, made):
     _set(right, "Key", NAV_RIGHT)
     # The wheel is Left/Right too, and a click on a row with no bind (a
     # slider, the difficulty) is Right: one step up, or the next difficulty.
-    left_out = or_wheel(ed, pc_out, _pin(left, "ReturnValue", is_input=False), WHEEL_LESS, made)
-    right_out = or_wheel(ed, pc_out, _pin(right, "ReturnValue", is_input=False), WHEEL_MORE, made)
+    left_out = or_wheel(ed, pc_out, out(left), WHEEL_LESS, made)
+    right_out = or_wheel(ed, pc_out, out(right), WHEEL_MORE, made)
     valued = keep(_node(ed, FN_LESS_II))
-    _connect(_pin(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow", is_input=False),
-             _pin(valued, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(valued, "A"))
     _set(valued, "B", FIRST_BIND_ROW)
     stepped = keep(_node(ed, FN_AND))
-    _connect(_pin(keep(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR)), CURSOR_ACCEPT_VAR, is_input=False),
+    _connect(out(keep(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR)), CURSOR_ACCEPT_VAR),
              _pin(stepped, "A"))
-    _connect(_pin(valued, "ReturnValue", is_input=False), _pin(stepped, "B"))
+    _connect(out(valued), _pin(stepped, "B"))
     more = keep(_node(ed, FN_OR))
     _connect(right_out, _pin(more, "A"))
-    _connect(_pin(stepped, "ReturnValue", is_input=False), _pin(more, "B"))
-    right_out = _pin(more, "ReturnValue", is_input=False)
+    _connect(out(stepped), _pin(more, "B"))
+    right_out = out(more)
     either = keep(_node(ed, FN_OR))
     _connect(left_out, _pin(either, "A"))
     _connect(right_out, _pin(either, "B"))
-    either_out = _pin(either, "ReturnValue", is_input=False)
+    either_out = out(either)
 
     # One nudge block per slider, in series: each one's "not me" arm and its
     # saved tail both carry on into the next, and the last pair into accept.
@@ -160,30 +159,28 @@ def _author_capture(ed, settings_out, in_execs, made):
     # are its control, and arming a capture there would bind a key to a row
     # that has none -- so only rows from FIRST_BIND_ROW down arm one.
     leaving = keep(_node(ed, FN_EQ_II))
-    _connect(_pin(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow", is_input=False),
-             _pin(leaving, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(leaving, "A"))
     _set(leaving, "B", BACK_ROW)
     back = keep(ed.add_branch_node())
-    _connect(_pin(leaving, "ReturnValue", is_input=False), _pin(back, "Condition"))
-    _connect(BEL.find_then_pin(go), _pin(back, "execute"))
+    _connect(out(leaving), _pin(back, "Condition"))
+    _connect(then(go), _pin(back, "execute"))
 
     to_title = keep(ed.add_set_member_variable_node("MenuPage"))
     _set(to_title, "MenuPage", PAGE_TITLE)
-    _connect(BEL.find_then_pin(back), _pin(to_title, "execute"))
+    _connect(then(back), _pin(to_title, "execute"))
     home = keep(ed.add_set_member_variable_node("MenuRow"))
     _set(home, "MenuRow", 0)
-    _connect(BEL.find_then_pin(to_title), _pin(home, "execute"))
+    _connect(then(to_title), _pin(home, "execute"))
 
     bindable = keep(_node(ed, FN_GE_II))
-    _connect(_pin(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow", is_input=False),
-             _pin(bindable, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(bindable, "A"))
     _set(bindable, "B", FIRST_BIND_ROW)
     arming = keep(ed.add_branch_node())
-    _connect(_pin(bindable, "ReturnValue", is_input=False), _pin(arming, "Condition"))
-    _connect(BEL.find_else_pin(back), _pin(arming, "execute"))
+    _connect(out(bindable), _pin(arming, "Condition"))
+    _connect(else_(back), _pin(arming, "execute"))
     arm = keep(ed.add_set_member_variable_node("Capturing"))
     _set(arm, "Capturing", "true")
-    _connect(BEL.find_then_pin(arming), _pin(arm, "execute"))
+    _connect(then(arming), _pin(arm, "execute"))
 
 
 def _emit_nudge(ed, slider, row, settings_out, either_out, right_out, in_execs, made):
@@ -199,14 +196,13 @@ def _emit_nudge(ed, slider, row, settings_out, either_out, right_out, in_execs, 
         return n
 
     here = keep(_node(ed, FN_EQ_II))
-    _connect(_pin(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow", is_input=False),
-             _pin(here, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(here, "A"))
     _set(here, "B", row)
     adjusting = keep(_node(ed, FN_AND))
     _connect(either_out, _pin(adjusting, "A"))
-    _connect(_pin(here, "ReturnValue", is_input=False), _pin(adjusting, "B"))
+    _connect(out(here), _pin(adjusting, "B"))
     nudging = keep(ed.add_branch_node())
-    _connect(_pin(adjusting, "ReturnValue", is_input=False), _pin(nudging, "Condition"))
+    _connect(out(adjusting), _pin(nudging, "Condition"))
     for e in in_execs:
         _connect(e, _pin(nudging, "execute"))
 
@@ -217,16 +213,16 @@ def _emit_nudge(ed, slider, row, settings_out, either_out, right_out, in_execs, 
     now = keep(ed.add_get_member_variable_node(slider.var, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(now, "self"))
     total = keep(_node(ed, FN_ADD))
-    _connect(_pin(now, slider.var, is_input=False), _pin(total, "A"))
-    _connect(_pin(delta, "ReturnValue", is_input=False), _pin(total, "B"))
+    _connect(out(now, slider.var), _pin(total, "A"))
+    _connect(out(delta), _pin(total, "B"))
     held = keep(_node(ed, FN_FCLAMP))
-    _connect(_pin(total, "ReturnValue", is_input=False), _loose_pin(held, "Value"))
+    _connect(out(total), _loose_pin(held, "Value"))
     _set(held, "Min", slider.lo)
     _set(held, "Max", slider.hi)
     store = keep(ed.add_set_member_variable_node(slider.var, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(store, "self"))
-    _connect(_pin(held, "ReturnValue", is_input=False), _pin(store, slider.var))
-    _connect(BEL.find_then_pin(nudging), _pin(store, "execute"))
-    saved, writer = _emit_save(ed, settings_out, BEL.find_then_pin(store))
+    _connect(out(held), _pin(store, slider.var))
+    _connect(then(nudging), _pin(store, "execute"))
+    saved, writer = _emit_save(ed, settings_out, then(store))
     made.append(writer)
-    return (saved, BEL.find_else_pin(nudging))
+    return (saved, else_(nudging))

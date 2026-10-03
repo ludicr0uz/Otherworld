@@ -18,8 +18,7 @@ tune_tick.py and its siblings decide. The M panel's own rows are hidden while
 a tab is up (menu_screens.author_pause_menu).
 """
 
-from combat.graph import BEL, _connect, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _pin, _set, out, then
 from combat.nodes import FN_ADD_II, FN_AND, FN_ARR_GET, FN_MIN_II, FN_SUB_II
 from graphics_menu.cursor import (
     FN_GE_II, author_back_row, author_button_row, author_row_cursor, author_widget_click)
@@ -40,7 +39,7 @@ FN_SCROLL_TO = "/Script/UMG.ScrollBox.ScrollWidgetIntoView"
 def _item(ed, array_var, index, made):
     n = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, array_var, made))
     _connect(index, _pin(n, "Index"))
-    return _pin(n, "Item", is_input=False)
+    return out(n, "Item")
 
 
 def _author_stats(ed, tab, box, in_execs, made):
@@ -54,7 +53,7 @@ def _author_stats(ed, tab, box, in_execs, made):
     _set(loop, "LastIndex", tab.stat_count)
     for e in in_execs:
         _connect(e, _pin(loop, "execute"))
-    i = _pin(loop, "Index", is_input=False)
+    i = out(loop, "Index")
     base = _call(ed, FN_MUL_II, made, A=_get(ed, tab.pick_var, made), B=tab.stat_count)
     s = _call(ed, FN_SUB_II, made, A=i, B=1)
     idx = _call(ed, FN_ADD_II, made, A=out(base), B=out(s))
@@ -70,8 +69,8 @@ def _author_stats(ed, tab, box, in_execs, made):
                            B=TUNE_DASH,
                            bPickA=_item(ed, tab.live_var, out(idx),
                                         made)))
-    row_value(ed, box, i, value, [_pin(loop, "LoopBody", is_input=False)])
-    return _pin(loop, "Completed", is_input=False)
+    row_value(ed, box, i, value, [out(loop, "LoopBody")])
+    return out(loop, "Completed")
 
 
 def _author_under_caret(ed, tab, widget, test, row, in_execs, made):
@@ -85,7 +84,7 @@ def _author_under_caret(ed, tab, widget, test, row, in_execs, made):
                  InOpacity=out(lit))
     for e in in_execs:
         _connect(e, _pin(fade, "execute"))
-    return BEL.find_then_pin(fade)
+    return then(fade)
 
 
 def _author_follow(ed, tab, box, in_execs, made):
@@ -97,7 +96,7 @@ def _author_follow(ed, tab, box, in_execs, made):
     seek = _call(ed, FN_SCROLL_TO, made, self=box, WidgetToFind=out(child), AnimateScroll="false")
     for e in in_execs:
         _connect(e, _pin(seek, "execute"))
-    return BEL.find_then_pin(seek)
+    return then(seek)
 
 
 def author_tune_panel(ed, in_execs, tab=GUN_TAB):

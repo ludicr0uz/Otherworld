@@ -1,10 +1,9 @@
 """The node shapes the slot fragments share (slot_sync.py, slot_moves.py):
 loops, SlotItems[code], and the rule for what fits where. Pure helpers on
-common._G; no fragment of its own.
+uebp.g._G; no fragment of its own.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _loose_pin, _pin, _set, out
 from combat.nodes import (
     FN_AND, FN_ARR_GET, FN_EQ_II, FN_IS_VALID, FN_LESS_II, FN_NOT, FN_OR,
     MACRO_FOR_EACH, MACRO_FOR_LOOP,

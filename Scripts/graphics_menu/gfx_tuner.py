@@ -28,11 +28,10 @@ command, tag and Clamp in that graph as its own, and this is one owner for
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _apply_defaults, _create_blueprint, _declare, _events, _float_type, _log,
-    _pin,
-)
-from uebp.graph import out
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, _apply_defaults, _create_blueprint, _declare, _events, _float_type, _pin, out,
+    then)
 from uebp.layout import arrange
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_stats import CVAR, LEVEL, STAT_COUNT, stats_by, table_values
@@ -96,11 +95,10 @@ def _author_level(ed, in_execs, made):
     gus = _call(ed, FN_GET_GUS, made)
     _connect_exec(go, gus)
     level = _call(ed, FN_SET_OVERALL, made, self=out(gus), Value=whole(ed, index, made))
-    _connect_exec(BEL.find_then_pin(gus), level)
+    _connect_exec(then(gus), level)
     apply = _call(ed, FN_APPLY, made, self=out(gus))
-    _connect_exec(BEL.find_then_pin(level), apply)
-    kept = put(ed, TUNER_LEVEL_APPLIED_VAR, whole(ed, index, made),
-               [BEL.find_then_pin(apply)], made)
+    _connect_exec(then(level), apply)
+    kept = put(ed, TUNER_LEVEL_APPLIED_VAR, whole(ed, index, made), [then(apply)], made)
     return [kept, same]
 
 
@@ -127,13 +125,13 @@ def _author_cvars(ed, in_execs, made):
         run = _call(ed, FN_CONSOLE, made, Command=out(words))
         for e in ([flow] if flow else in_execs):
             _connect_exec(e, run)
-        flow = BEL.find_then_pin(run)
+        flow = then(run)
     return flow
 
 
 def _author_tick(ed, tick):
     made = []
-    go, _idle = _branch(ed, _get(ed, TUNER_DIRTY_VAR, made), [BEL.find_then_pin(tick)], made)
+    go, _idle = _branch(ed, _get(ed, TUNER_DIRTY_VAR, made), [then(tick)], made)
     flow = _setter(ed, TUNER_DIRTY_VAR, "false", [go], made)
     base = _call(ed, FN_MUL_II, made, A=_get(ed, TUNER_PRESET_VAR, made), B=STAT_COUNT)
     flow = put(ed, TUNER_BASE_VAR, out(base), [flow], made)

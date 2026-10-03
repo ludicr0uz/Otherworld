@@ -35,8 +35,7 @@ Everything here is pure and reads Held: pull these pins only where it is
 valid. AimPoint is this frame's, resolved at the head of Tick.
 """
 
-from combat.graph import _connect, _node, _pin, _set, _vec
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, _vec, out
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_BREAK_ROT, FN_BREAK_VECTOR,
     FN_CLAMP, FN_DEG_ATAN2, FN_DOT_VV, FN_FORWARD, FN_GE_FF, FN_GET_CONTROL_ROT,

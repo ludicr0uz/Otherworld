@@ -5,7 +5,8 @@ collision) on a character.
 
 import unreal
 
-from combat.graph import _component_object, _find_handle, _handles, _log
+from combat.log import _log
+from uebp.graph import _component_object, _find_handle, _handles
 from combat.tuning import COMBAT
 
 

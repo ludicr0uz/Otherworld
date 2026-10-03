@@ -23,7 +23,8 @@ a rebuild. The moon's disc hides the stars behind it.
 
 import unreal
 
-from combat.graph import _log, _must_load
+from combat.log import _log
+from uebp.graph import _must_load
 from world import world_config as cfg
 from world.paths import SKY_MATERIAL_PATH, STARS_TEXTURE_PATH
 from world.star_map import sky_basis

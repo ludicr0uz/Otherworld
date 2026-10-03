@@ -43,7 +43,7 @@ def conventions(module, receiver):
     if receiver == "g":
         if package == "npc":
             return _class(module, "npc.graph", "_Graph")
-        return _class(module, "combat.weapon_component.common", "_G")
+        return _class(module, "uebp.g", "_G")
     if receiver == "k" and package == "npc":
         return _class(module, "npc.senses", "_Maker")
     if receiver == "steps" and package == "npc":

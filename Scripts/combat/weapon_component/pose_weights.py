@@ -31,7 +31,7 @@ from combat.body_pose import (
     GUARD_ARMS, GUARD_GUN, KNEEL_BLEND_SPEED, KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S,
     POSE_BLEND_SPEED, POSE_CROUCH, POSE_KNEEL, POSE_PRONE,
 )
-from combat.graph import BEL, _connect, _node, _palette, _pin, _set
+from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_ABS, FN_ADD_FF, FN_AND, FN_ANIM_INSTANCE, FN_BOOL_TO_FLOAT, FN_EQ_II,
     FN_INTERP_FF, FN_NOT, FN_SUB_FF, FN_TIME_SECONDS,
@@ -61,18 +61,17 @@ def _author_held_two_handed(ed, held, armed_out, exec_ins):
     flag = ed.add_get_member_variable_node("TwoHanded", ITEM_CLASS_PATH)
     _connect(held, _pin(flag, "self"))
     copy = ed.add_set_member_variable_node(HELD_TWO_HANDED)
-    _connect(_pin(flag, "TwoHanded", is_input=False), _pin(copy, HELD_TWO_HANDED))
-    _connect(BEL.find_then_pin(gate), _pin(copy, "execute"))
+    _connect(out(flag, "TwoHanded"), _pin(copy, HELD_TWO_HANDED))
+    _connect(then(gate), _pin(copy, "execute"))
     clear = ed.add_set_member_variable_node(HELD_TWO_HANDED)
     _set(clear, HELD_TWO_HANDED, "false")
-    _connect(BEL.find_else_pin(gate), _pin(clear, "execute"))
+    _connect(else_(gate), _pin(clear, "execute"))
     point = ed.add_get_member_variable_node(SUPPORT_POINT_VAR, ITEM_CLASS_PATH)
     _connect(held, _pin(point, "self"))
     keep = ed.add_set_member_variable_node(HELD_SUPPORT_POINT)
-    _connect(_pin(point, SUPPORT_POINT_VAR, is_input=False),
-             _pin(keep, HELD_SUPPORT_POINT))
-    _connect(BEL.find_then_pin(copy), _pin(keep, "execute"))
-    return (BEL.find_then_pin(keep), BEL.find_then_pin(clear))
+    _connect(out(point, SUPPORT_POINT_VAR), _pin(keep, HELD_SUPPORT_POINT))
+    _connect(then(copy), _pin(keep, "execute"))
+    return (then(keep), then(clear))
 
 
 def _targets(ed):
@@ -113,17 +112,17 @@ def _kneel_time(ed):
     span = KNEEL_TO_S - KNEEL_FROM_S
     now = _node(ed, FN_TIME_SECONDS)
     lap = _node(ed, FN_FMOD)
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(lap, "Dividend"))
+    _connect(out(now), _pin(lap, "Dividend"))
     _set(lap, "Divisor", 2.0 * span)
     back = _node(ed, FN_SUB_FF)
-    _connect(_pin(lap, "Remainder", is_input=False), _pin(back, "A"))
+    _connect(out(lap, "Remainder"), _pin(back, "A"))
     _set(back, "B", span)
     wave = _node(ed, FN_ABS)
-    _connect(_pin(back, "ReturnValue", is_input=False), _pin(wave, "A"))
+    _connect(out(back), _pin(wave, "A"))
     at = _node(ed, FN_ADD_FF)
-    _connect(_pin(wave, "ReturnValue", is_input=False), _pin(at, "A"))
+    _connect(out(wave), _pin(at, "A"))
     _set(at, "B", KNEEL_FROM_S)
-    return _pin(at, "ReturnValue", is_input=False)
+    return out(at)
 
 
 def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
@@ -138,9 +137,9 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
 
     mesh = ed.add_get_member_variable_node("OwnerMesh")
     anim = _node(ed, FN_ANIM_INSTANCE)
-    _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(anim, "self"))
+    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
     cast = _palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2])
-    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(out(anim), _pin(cast, "Object"))
     for e in copied:
         _connect(e, _pin(cast, "execute"))
     as_anim = next(p for p in BEL.list_output_pins(cast)
@@ -148,7 +147,7 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
                    .startswith("As"))
 
     targets = _targets(ed)
-    tail = BEL.find_then_pin(cast)
+    tail = then(cast)
     for weight, speed in ((POSE_CROUCH, POSE_BLEND_SPEED), (POSE_PRONE, POSE_BLEND_SPEED),
                           (GUARD_ARMS, POSE_BLEND_SPEED), (GUARD_GUN, POSE_BLEND_SPEED),
                           (POSE_KNEEL, KNEEL_BLEND_SPEED)):
@@ -157,20 +156,20 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
         now = ed.add_get_member_variable_node(weight, anim_class)
         _connect(as_anim, _pin(now, "self"))
         step = _node(ed, FN_INTERP_FF)
-        _connect(_pin(now, weight, is_input=False), _pin(step, "Current"))
-        _connect(_pin(target, "ReturnValue", is_input=False), _pin(step, "Target"))
-        _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
+        _connect(out(now, weight), _pin(step, "Current"))
+        _connect(out(target), _pin(step, "Target"))
+        _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
         _set(step, "InterpSpeed", speed)
         put = ed.add_set_member_variable_node(weight, anim_class)
         _connect(as_anim, _pin(put, "self"))
-        _connect(_pin(step, "ReturnValue", is_input=False), _pin(put, weight))
+        _connect(out(step), _pin(put, weight))
         _connect(tail, _pin(put, "execute"))
-        tail = BEL.find_then_pin(put)
+        tail = then(put)
     held_at = ed.add_set_member_variable_node(KNEEL_TIME, anim_class)
     _connect(as_anim, _pin(held_at, "self"))
     _connect(_kneel_time(ed), _pin(held_at, KNEEL_TIME))
     _connect(tail, _pin(held_at, "execute"))
-    tail = BEL.find_then_pin(held_at)
+    tail = then(held_at)
 
     ed.add_comment_to_nodes(
         f"The body poses: {POSE_CROUCH} / {POSE_PRONE} from the Stance, "
@@ -180,4 +179,4 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
         f"{POSE_KNEEL} from {SEARCHING_VAR} (speed {KNEEL_BLEND_SPEED:g}), with "
         f"{KNEEL_TIME} running up and down the kneel clip's working stretch.",
         [n for n in ed.list_all_nodes() if n.get_name() not in before])
-    return (tail, _pin(cast, "CastFailed", is_input=False))
+    return (tail, out(cast, "CastFailed"))

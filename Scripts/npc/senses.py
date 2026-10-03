@@ -21,7 +21,7 @@ from combat.game_state import (
 )
 from combat.paths import GAME_MODE_CLASS_PATH
 from combat.tuning import COMBAT
-from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.nodes import (
     FN_ACTOR_LOC, FN_AND, FN_DISTANCE, FN_DOT_VV, FN_FORWARD, FN_GET_COMP,
     FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_GE_FF, FN_LE_FF,
@@ -52,7 +52,7 @@ class _Maker:
         return out
 
     def out(self, node, name="ReturnValue"):
-        return _pin(node, name, is_input=False)
+        return out(node, name)
 
 
 def _locations(k):
@@ -94,9 +94,8 @@ def _author_hurt(ed, exec_in):
     flag = k(ed.add_get_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH))
     _connect(_loose_pin(as_health, "AsBPHealthComponent", is_input=False),
              _pin(flag, "self"))
-    hurt = _branch(k, k.out(flag, DAMAGED_BY_PLAYER_VAR), [BEL.find_then_pin(as_health)])
-    return k.made, BEL.find_then_pin(hurt), [
-        BEL.find_else_pin(hurt), _pin(as_health, "CastFailed", is_input=False)]
+    hurt = _branch(k, k.out(flag, DAMAGED_BY_PLAYER_VAR), [then(as_health)])
+    return k.made, then(hurt), [else_(hurt), out(as_health, "CastFailed")]
 
 
 def _author_sight(ed, exec_in):
@@ -146,7 +145,7 @@ def _author_sight(ed, exec_in):
     _connect(k.out(in_cone), _pin(seen, "A"))
     _connect(k.out(clear), _pin(seen, "B"))
     sees = _branch(k, k.out(seen), exec_in)
-    return k.made, BEL.find_then_pin(sees), [BEL.find_else_pin(sees)]
+    return k.made, then(sees), [else_(sees)]
 
 
 def _author_touch(ed, exec_in):
@@ -160,7 +159,7 @@ def _author_touch(ed, exec_in):
     _connect(k.out(gap), _pin(close, "A"))
     _connect(k.tuned("touch_range_cm"), _pin(close, "B"))
     bumped = _branch(k, k.out(close), exec_in)
-    return k.made, BEL.find_then_pin(bumped), [BEL.find_else_pin(bumped)]
+    return k.made, then(bumped), [else_(bumped)]
 
 
 def _author_hearing(ed, exec_in):
@@ -239,6 +238,5 @@ def _author_hearing(ed, exec_in):
     heard = k.fn(FN_AND)
     _connect(k.out(recent), _pin(heard, "A"))
     _connect(k.out(reached), _pin(heard, "B"))
-    hears = _branch(k, k.out(heard), [BEL.find_then_pin(as_mode)])
-    return k.made, BEL.find_then_pin(hears), [
-        BEL.find_else_pin(hears), _pin(as_mode, "CastFailed", is_input=False)]
+    hears = _branch(k, k.out(heard), [then(as_mode)])
+    return k.made, then(hears), [else_(hears), out(as_mode, "CastFailed")]

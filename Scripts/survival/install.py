@@ -13,9 +13,8 @@ nor depends on combat.install -- either builder can be re-run alone.
 
 import unreal
 
-from combat.graph import (
-    BEL, _add_component, _assets, _drop_components, _log, _root_handle,
-)
+from combat.log import _log
+from uebp.graph import BEL, _add_component, _assets, _drop_components, _root_handle
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH
 from forest_generator.npc_placement import NPC_VARIANTS
 from survival.paths import ASC_COMPONENT, SURVIVAL_COMPONENT

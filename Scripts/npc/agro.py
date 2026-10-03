@@ -27,9 +27,10 @@ import unreal
 from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
 from combat.paths import GAME_MODE_BP_PATH, GAME_MODE_CLASS_PATH
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
-from npc.graph import (
-    BEL, _asset_sub, _connect, _log, _loose_pin, _name_literal, _node, _palette, _pin,
-    _set)
+from npc.graph import _log
+from uebp.graph import (
+    BEL, _assets, _connect, _loose_pin, _name_literal, _node, _palette, _pin, _set, else_,
+    out, then)
 from npc.nodes import (
     FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_CONCAT, FN_DISPLAY_NAME,
     FN_GET_BLACKBOARD, FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
@@ -69,7 +70,7 @@ def _noise_record_exists():
     declares it; a project that has not run that builder gets deaf wanderers
     (sight, touch and hurt still work) rather than a graph that will not
     compile. Loading it is also what puts its cast node in the palette."""
-    bp = _asset_sub().load_asset(GAME_MODE_BP_PATH)
+    bp = _assets().load_asset(GAME_MODE_BP_PATH)
     return bool(bp) and NOISE_TIME_VAR in {
         str(v) for v in BEL.list_member_variable_names(bp, False)}
 
@@ -95,42 +96,41 @@ def _author_enter_agro(ed, reasons, chase_in):
         why = keep(ed.add_set_member_variable_node(AGGRO_REASON_VAR))
         _set(why, AGGRO_REASON_VAR, sense)
         _connect(exec_pin, _pin(why, "execute"))
-        _connect(BEL.find_then_pin(why), _pin(flip, "execute"))
+        _connect(then(why), _pin(flip, "execute"))
 
-    after = [BEL.find_then_pin(flip)]
+    after = [then(flip)]
 
     reason = keep(ed.add_get_member_variable_node(AGGRO_REASON_VAR))
     head = keep(_node(ed, FN_CONCAT))
     _set(head, "A", AGRO_LOG_PREFIX)
-    _connect(_pin(reason, AGGRO_REASON_VAR, is_input=False), _pin(head, "B"))
+    _connect(out(reason, AGGRO_REASON_VAR), _pin(head, "B"))
     pawn = keep(_node(ed, FN_GET_PAWN))
     name = keep(_node(ed, FN_DISPLAY_NAME))
-    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(name, "Object"))
+    _connect(out(pawn), _pin(name, "Object"))
     who = keep(_node(ed, FN_CONCAT))
     _set(who, "A", " -- ")
-    _connect(_pin(name, "ReturnValue", is_input=False), _pin(who, "B"))
+    _connect(out(name), _pin(who, "B"))
     line = keep(_node(ed, FN_CONCAT))
-    _connect(_pin(head, "ReturnValue", is_input=False), _pin(line, "A"))
-    _connect(_pin(who, "ReturnValue", is_input=False), _pin(line, "B"))
+    _connect(out(head), _pin(line, "A"))
+    _connect(out(who), _pin(line, "B"))
     # A developer line: PrintWarning puts it on screen as well as in the log,
     # so it is written only while the GameMode's DebugMode is on. One line per
     # wanderer per life.
     mode = keep(_node(ed, FN_GET_GAME_MODE))
     as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(out(mode), _pin(as_mode, "Object"))
     for pin in after:
         _connect(pin, _pin(as_mode, "execute"))
     flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(flag, "self"))
     debugging = keep(ed.add_branch_node())
-    _connect(_pin(flag, DEBUG_MODE_VAR, is_input=False), _pin(debugging, "Condition"))
-    _connect(BEL.find_then_pin(as_mode), _pin(debugging, "execute"))
+    _connect(out(flag, DEBUG_MODE_VAR), _pin(debugging, "Condition"))
+    _connect(then(as_mode), _pin(debugging, "execute"))
     say = keep(_node(ed, FN_WARN))
-    _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
-    _connect(BEL.find_then_pin(debugging), _pin(say, "execute"))
-    for tail in (BEL.find_then_pin(say), BEL.find_else_pin(debugging),
-                 _pin(as_mode, "CastFailed", is_input=False)):
+    _connect(out(line), _pin(say, "InString"))
+    _connect(then(debugging), _pin(say, "execute"))
+    for tail in (then(say), else_(debugging), out(as_mode, "CastFailed")):
         _connect(tail, chase_in)
     return made
 
@@ -148,8 +148,8 @@ def _author_tell_blackboard(ed, done_in):
 
     pawn = keep(_node(ed, FN_GET_PAWN))
     board = keep(_node(ed, FN_GET_BLACKBOARD))
-    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(board, "Target"))
-    board_out = _pin(board, "ReturnValue", is_input=False)
+    _connect(out(pawn), _pin(board, "Target"))
+    board_out = out(board)
     flag = keep(_node(ed, FN_BB_SET_BOOL))
     _connect(board_out, _pin(flag, "self"))
     _connect(_name_literal(ed, BB_AGGRO_KEY), _pin(flag, "KeyName"))
@@ -158,9 +158,9 @@ def _author_tell_blackboard(ed, done_in):
     why = keep(_node(ed, FN_BB_SET_STRING))
     _connect(board_out, _pin(why, "self"))
     _connect(_name_literal(ed, BB_REASON_KEY), _pin(why, "KeyName"))
-    _connect(_pin(reason, AGGRO_REASON_VAR, is_input=False), _pin(why, "StringValue"))
-    _connect(BEL.find_then_pin(flag), _pin(why, "execute"))
-    _connect(BEL.find_then_pin(why), done_in)
+    _connect(out(reason, AGGRO_REASON_VAR), _pin(why, "StringValue"))
+    _connect(then(flag), _pin(why, "execute"))
+    _connect(then(why), done_in)
     return made, _pin(flag, "execute")
 
 
@@ -170,12 +170,12 @@ def _author_player_present(ed, exec_in, yes_in, no_in):
     player = _node(ed, FN_GET_PLAYER_PAWN)
     _set(player, "PlayerIndex", 0)
     there = _node(ed, FN_IS_VALID)
-    _connect(_pin(player, "ReturnValue", is_input=False), _pin(there, "Object"))
+    _connect(out(player), _pin(there, "Object"))
     present = ed.add_branch_node()
-    _connect(_pin(there, "ReturnValue", is_input=False), _pin(present, "Condition"))
+    _connect(out(there), _pin(present, "Condition"))
     _connect(exec_in, _pin(present, "execute"))
-    _connect(BEL.find_then_pin(present), yes_in)
-    _connect(BEL.find_else_pin(present), no_in)
+    _connect(then(present), yes_in)
+    _connect(else_(present), no_in)
     return [player, there, present]
 
 

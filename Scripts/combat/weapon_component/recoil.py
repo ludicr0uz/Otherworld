@@ -2,7 +2,7 @@
 recovery back toward the aim the player was holding.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_ABS, FN_ADD_FF, FN_BREAK_ROT, FN_GET_CONTROL_ROT, FN_GREATER_FF,
     FN_INTERP_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT,
@@ -44,25 +44,25 @@ def _author_turn_view(ed, pc_out, pitch_delta, yaw_delta, exec_in):
     now = keep(_node(ed, FN_GET_CONTROL_ROT))
     _connect(pc_out, _pin(now, "self"))
     brk = keep(_node(ed, FN_BREAK_ROT))
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(brk, "InRot"))
+    _connect(out(now), _pin(brk, "InRot"))
 
     lifted = keep(_node(ed, FN_ADD_FF))
-    _connect(_pin(brk, "Pitch", is_input=False), _pin(lifted, "A"))
+    _connect(out(brk, "Pitch"), _pin(lifted, "A"))
     _connect(pitch_delta, _pin(lifted, "B"))
     swung = keep(_node(ed, FN_ADD_FF))
-    _connect(_pin(brk, "Yaw", is_input=False), _pin(swung, "A"))
+    _connect(out(brk, "Yaw"), _pin(swung, "A"))
     _connect(yaw_delta, _pin(swung, "B"))
 
     aimed = keep(_node(ed, FN_MAKE_ROT))
-    _connect(_pin(brk, "Roll", is_input=False), _pin(aimed, "Roll"))
-    _connect(_pin(lifted, "ReturnValue", is_input=False), _pin(aimed, "Pitch"))
-    _connect(_pin(swung, "ReturnValue", is_input=False), _pin(aimed, "Yaw"))
+    _connect(out(brk, "Roll"), _pin(aimed, "Roll"))
+    _connect(out(lifted), _pin(aimed, "Pitch"))
+    _connect(out(swung), _pin(aimed, "Yaw"))
 
     turn = keep(_node(ed, FN_SET_CONTROL_ROT))
     _connect(pc_out, _pin(turn, "self"))
-    _connect(_pin(aimed, "ReturnValue", is_input=False), _pin(turn, "NewRotation"))
+    _connect(out(aimed), _pin(turn, "NewRotation"))
     _connect(exec_in, _pin(turn, "execute"))
-    return BEL.find_then_pin(turn), made
+    return then(turn), made
 
 
 def _author_recoil_kick(ed, held, pc_out, exec_in):
@@ -102,49 +102,47 @@ def _author_recoil_kick(ed, held, pc_out, exec_in):
     # How much of it this frame's stance and aim let through: RecoilScale,
     # written by accuracy.py from the gun's own factors.
     scale = keep(ed.add_get_member_variable_node(RECOIL_SCALE_VAR))
-    scale_out = _pin(scale, RECOIL_SCALE_VAR, is_input=False)
+    scale_out = out(scale, RECOIL_SCALE_VAR)
     up = keep(_node(ed, FN_MUL_FF))
     _connect(per_shot, _pin(up, "A"))
     _connect(scale_out, _pin(up, "B"))
-    up_out = _pin(up, "ReturnValue", is_input=False)
+    up_out = out(up)
 
     swing, swing_n = _prop(ed, "RecoilYaw", held)
     keep(swing_n)
     span = keep(_node(ed, FN_MUL_FF))
     _connect(swing, _pin(span, "A"))
     _connect(scale_out, _pin(span, "B"))
-    span_out = _pin(span, "ReturnValue", is_input=False)
+    span_out = out(span)
     mirrored = keep(_node(ed, FN_MUL_FF))
     _connect(span_out, _pin(mirrored, "A"))
     _set(mirrored, "B", -1.0)
     draw = keep(_node(ed, FN_RANDOM_FLOAT))
-    _connect(_pin(mirrored, "ReturnValue", is_input=False), _pin(draw, "Min"))
+    _connect(out(mirrored), _pin(draw, "Min"))
     _connect(span_out, _pin(draw, "Max"))
     hold = keep(ed.add_set_member_variable_node("RecoilYawKick"))
-    _connect(_pin(draw, "ReturnValue", is_input=False), _pin(hold, "RecoilYawKick"))
+    _connect(out(draw), _pin(hold, "RecoilYawKick"))
     _connect(exec_in, _pin(hold, "execute"))
 
     owed = keep(ed.add_get_member_variable_node("RecoilDebt"))
     charge = keep(_node(ed, FN_ADD_FF))
-    _connect(_pin(owed, "RecoilDebt", is_input=False), _pin(charge, "A"))
+    _connect(out(owed, "RecoilDebt"), _pin(charge, "A"))
     _connect(up_out, _pin(charge, "B"))
     bill = keep(ed.add_set_member_variable_node("RecoilDebt"))
-    _connect(_pin(charge, "ReturnValue", is_input=False), _pin(bill, "RecoilDebt"))
-    _connect(BEL.find_then_pin(hold), _pin(bill, "execute"))
+    _connect(out(charge), _pin(bill, "RecoilDebt"))
+    _connect(then(hold), _pin(bill, "execute"))
 
     drawn = keep(ed.add_get_member_variable_node("RecoilYawKick"))
-    drawn_out = _pin(drawn, "RecoilYawKick", is_input=False)
+    drawn_out = out(drawn, "RecoilYawKick")
     owed_yaw = keep(ed.add_get_member_variable_node("RecoilYawDebt"))
     charge_yaw = keep(_node(ed, FN_ADD_FF))
-    _connect(_pin(owed_yaw, "RecoilYawDebt", is_input=False), _pin(charge_yaw, "A"))
+    _connect(out(owed_yaw, "RecoilYawDebt"), _pin(charge_yaw, "A"))
     _connect(drawn_out, _pin(charge_yaw, "B"))
     bill_yaw = keep(ed.add_set_member_variable_node("RecoilYawDebt"))
-    _connect(_pin(charge_yaw, "ReturnValue", is_input=False),
-             _pin(bill_yaw, "RecoilYawDebt"))
-    _connect(BEL.find_then_pin(bill), _pin(bill_yaw, "execute"))
+    _connect(out(charge_yaw), _pin(bill_yaw, "RecoilYawDebt"))
+    _connect(then(bill), _pin(bill_yaw, "execute"))
 
-    turned, turn_nodes = _author_turn_view(
-        ed, pc_out, up_out, drawn_out, BEL.find_then_pin(bill_yaw))
+    turned, turn_nodes = _author_turn_view(ed, pc_out, up_out, drawn_out, then(bill_yaw))
     made.extend(turn_nodes)
 
     ed.add_comment_to_nodes(
@@ -190,24 +188,24 @@ def _author_recoil_recovery(ed, tick, pc_out, exec_in):
         return n
 
     owed = keep(ed.add_get_member_variable_node("RecoilDebt"))
-    owed_out = _pin(owed, "RecoilDebt", is_input=False)
+    owed_out = out(owed, "RecoilDebt")
     owed_yaw = keep(ed.add_get_member_variable_node("RecoilYawDebt"))
-    owed_yaw_out = _pin(owed_yaw, "RecoilYawDebt", is_input=False)
+    owed_yaw_out = out(owed_yaw, "RecoilYawDebt")
 
     size = keep(_node(ed, FN_ABS))
     _connect(owed_out, _pin(size, "A"))
     size_yaw = keep(_node(ed, FN_ABS))
     _connect(owed_yaw_out, _pin(size_yaw, "A"))
     total = keep(_node(ed, FN_ADD_FF))
-    _connect(_pin(size, "ReturnValue", is_input=False), _pin(total, "A"))
-    _connect(_pin(size_yaw, "ReturnValue", is_input=False), _pin(total, "B"))
+    _connect(out(size), _pin(total, "A"))
+    _connect(out(size_yaw), _pin(total, "B"))
     # FInterpTo snaps to its target once the remaining distance is negligible,
     # so the debt reaches exactly zero and this gate really does close.
     owing = keep(_node(ed, FN_GREATER_FF))
-    _connect(_pin(total, "ReturnValue", is_input=False), _pin(owing, "A"))
+    _connect(out(total), _pin(owing, "A"))
     _set(owing, "B", 0.001)
     gate = keep(ed.add_branch_node())
-    _connect(_pin(owing, "ReturnValue", is_input=False), _pin(gate, "Condition"))
+    _connect(out(owing), _pin(gate, "Condition"))
     _connect(exec_in, _pin(gate, "execute"))
 
     deltas = []
@@ -215,26 +213,25 @@ def _author_recoil_recovery(ed, tick, pc_out, exec_in):
         step = keep(_node(ed, FN_INTERP_FF))
         _connect(current, _pin(step, "Current"))
         _set(step, "Target", 0.0)
-        _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
+        _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
         _set(step, "InterpSpeed", COMBAT.recoil_recovery_speed)
         paid = keep(_node(ed, FN_SUB_FF))
-        _connect(_pin(step, "ReturnValue", is_input=False), _pin(paid, "A"))
+        _connect(out(step), _pin(paid, "A"))
         _connect(current, _pin(paid, "B"))
         given = keep(_node(ed, FN_MUL_FF))
-        _connect(_pin(paid, "ReturnValue", is_input=False), _pin(given, "A"))
+        _connect(out(paid), _pin(given, "A"))
         _set(given, "B", COMBAT.recoil_recovery_fraction)
-        deltas.append((step, _pin(given, "ReturnValue", is_input=False)))
+        deltas.append((step, out(given)))
 
-    turned, turn_nodes = _author_turn_view(
-        ed, pc_out, deltas[0][1], deltas[1][1], BEL.find_then_pin(gate))
+    turned, turn_nodes = _author_turn_view(ed, pc_out, deltas[0][1], deltas[1][1], then(gate))
     made.extend(turn_nodes)
 
     flow = turned
     for (step, _delta), var in zip(deltas, ("RecoilDebt", "RecoilYawDebt")):
         settle = keep(ed.add_set_member_variable_node(var))
-        _connect(_pin(step, "ReturnValue", is_input=False), _pin(settle, var))
+        _connect(out(step), _pin(settle, var))
         _connect(flow, _pin(settle, "execute"))
-        flow = BEL.find_then_pin(settle)
+        flow = then(settle)
 
     ed.add_comment_to_nodes(
         f"Recoil recovery: both debts FInterpTo zero at "
@@ -246,4 +243,4 @@ def _author_recoil_recovery(ed, tick, pc_out, exec_in):
         f"view is turned before the debts are written, because both give-backs "
         f"are pure and would read the already-reduced value otherwise.",
         made)
-    return (flow, BEL.find_else_pin(gate))
+    return (flow, else_(gate))

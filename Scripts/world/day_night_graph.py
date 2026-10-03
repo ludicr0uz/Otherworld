@@ -29,8 +29,8 @@ harmless here: Clock is set first and read unchanged for the rest of the frame.
 Constants sit on B pins or range pins (a Kismet A pin will not hold a literal).
 """
 
-from combat.graph import BEL, _connect, _events, _log, _loose_pin, _node, _pin, _set
-from uebp.graph import out
+from combat.log import _log
+from uebp.graph import _connect, _events, _loose_pin, _node, _pin, _set, out, then
 from combat.nodes import (
     FN_ADD_FF, FN_DESTROY, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT,
     MACRO_FOR_EACH,
@@ -71,7 +71,7 @@ class _Chain:
 
     def step(self, node):
         _connect(self.then, _pin(node, "execute"))
-        self.then = BEL.find_then_pin(node)
+        self.then = then(node)
         return node
 
 
@@ -119,7 +119,7 @@ def _set_var(ed, chain, name, value_pin):
 def _author_begin_play(ed, begin):
     """Destroy the level's tagged sky rig, make the dome's dynamic material,
     then (RandomStart) pick the starting clock."""
-    chain = _Chain(BEL.find_then_pin(begin))
+    chain = _Chain(then(begin))
     found = chain.step(_call(ed, FN_ACTORS_WITH_TAG, Tag=STATIC_SKY_TAG))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
@@ -246,7 +246,7 @@ def build_graph(bp, ed):
     Tick's chain), for night_cold to extend."""
     tick, begin = _events(ed, rebuild=True)
     _author_begin_play(ed, begin)
-    chain = _Chain(BEL.find_then_pin(tick))
+    chain = _Chain(then(tick))
     angle, sin, sun_elev = _author_clock(ed, tick, chain)
     _author_bodies(ed, chain, angle, sin)
     _author_air(ed, chain)

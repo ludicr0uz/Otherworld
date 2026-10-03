@@ -32,7 +32,7 @@ too small to take is left to grow until it is taken whole; stored regardless,
 the view drifted off by the dropped steps (0.13 degrees in one probe run).
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, then
 from combat.nodes import (
     FN_ABS, FN_ADD_FF, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_OR, FN_SIN,
     FN_SUB_FF,
@@ -124,15 +124,14 @@ def _author_sight_sway(ed, tick, pc_out, exec_ins):
     _connect(far(pitch_step), _pin(either, "B"))
     gate = keep(ed.add_branch_node())
     _connect(out(either), _pin(gate, "Condition"))
-    _connect(BEL.find_then_pin(clock), _pin(gate, "execute"))
+    _connect(then(clock), _pin(gate, "execute"))
 
-    turned, turn_nodes = _author_turn_view(
-        ed, pc_out, pitch_step, yaw_step, BEL.find_then_pin(gate))
+    turned, turn_nodes = _author_turn_view(ed, pc_out, pitch_step, yaw_step, then(gate))
     made.extend(turn_nodes)
     put_yaw
     _connect(turned, _pin(put_yaw, "execute"))
     put_pitch
-    _connect(BEL.find_then_pin(put_yaw), _pin(put_pitch, "execute"))
+    _connect(then(put_yaw), _pin(put_pitch, "execute"))
 
     ed.add_comment_to_nodes(
         "Sight sway: down the sights the view drifts on two slow sines "
@@ -147,4 +146,4 @@ def _author_sight_sway(ed, tick, pc_out, exec_ins):
         "would drop it). The gun, "
         "its sights and the shot all follow the view, so they stay together.",
         made)
-    return (BEL.find_then_pin(put_pitch), BEL.find_else_pin(gate))
+    return (then(put_pitch), else_(gate))

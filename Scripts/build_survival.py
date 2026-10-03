@@ -35,7 +35,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "combat", "survival", "loot", "item_icons")]:
     del sys.modules[_name]
 
-from combat.graph import BEL, _apply_defaults, _log                 # noqa: E402
+from combat.log import _log                                       # noqa: E402
+from uebp.graph import BEL, _apply_defaults                       # noqa: E402
 from loot.install import fill_loot_tables                          # noqa: E402
 from survival.campfire import build_campfire, install_campfire     # noqa: E402
 from survival.consumables import build_consumables                 # noqa: E402

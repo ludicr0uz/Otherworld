@@ -36,7 +36,8 @@ import math
 import unreal
 
 from combat.body_pose import _mul, _conj
-from combat.graph import _assets, _log
+from combat.log import _log
+from uebp.graph import _assets
 from combat.paths import HOLD_KNIFE_ANIM_PATH, KNIFE_ANIM_PATH
 from combat.tuning import COMBAT
 

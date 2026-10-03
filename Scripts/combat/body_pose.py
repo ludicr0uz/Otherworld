@@ -79,9 +79,10 @@ from asset_pipeline.rig_util import _bone_world
 from combat.aim_pitch import (
     MODIFY_BONE_CLASS, NODE_MODIFY_BONE, _feeding_all, _nodes_of,
 )
-from combat.graph import (
-    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _log, _node, _palette, _pin,
-    _set)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _node, _palette, _pin, _set,
+    out)
 from uebp.layout import arrange
 from combat.nodes import FN_CLAMP, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MUL_FF
 
@@ -342,7 +343,7 @@ def _remove_previous(ed, start_out):
     names = {n.get_name() for n in mine}
     nxt = _downstream(start_out)
     while nxt is not None and PIN.get_owning_node(nxt).get_name() in names:
-        nxt = _downstream(_pin(PIN.get_owning_node(nxt), "Pose", is_input=False))
+        nxt = _downstream(out(PIN.get_owning_node(nxt), "Pose"))
     ed.remove_nodes(mine + _feeding_all(mine))
     if nxt is None:
         raise RuntimeError("an earlier body-pose chain fed nothing; refusing to "
@@ -375,12 +376,12 @@ def _modify_bone(ed, step, weight_pins):
         _set(rot, "Pitch", round(pitch, 4))
         _set(rot, "Yaw", round(yaw, 4))
         _set(rot, "Roll", round(roll, 4))
-        _connect(_pin(rot, "ReturnValue", is_input=False), _pin(mb, "Rotation"))
+        _connect(out(rot), _pin(mb, "Rotation"))
     if move is not None:
         vec = _node(ed, FN_MAKE_VECTOR)
         for axis, value in zip("XYZ", move):
             _set(vec, axis, round(value, 3))
-        _connect(_pin(vec, "ReturnValue", is_input=False), _pin(mb, "Translation"))
+        _connect(out(vec), _pin(mb, "Translation"))
     return mb
 
 
@@ -388,13 +389,13 @@ def move_alpha(ed):
     """clamp(GroundSpeed / MOVE_FULL_CM_S, 0, 1), as a pin."""
     speed = ed.add_get_member_variable_node(GROUND_SPEED)
     scaled = _node(ed, FN_MUL_FF)
-    _connect(_pin(speed, GROUND_SPEED, is_input=False), _pin(scaled, "A"))
+    _connect(out(speed, GROUND_SPEED), _pin(scaled, "A"))
     _set(scaled, "B", 1.0 / MOVE_FULL_CM_S)
     clamp = _node(ed, FN_CLAMP)
-    _connect(_pin(scaled, "ReturnValue", is_input=False), _pin(clamp, "Value"))
+    _connect(out(scaled), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", 1.0)
-    return _pin(clamp, "ReturnValue", is_input=False)
+    return out(clamp)
 
 
 def _prone_moving(ed, prone_pin):
@@ -403,7 +404,7 @@ def _prone_moving(ed, prone_pin):
     product = _node(ed, FN_MUL_FF)
     _connect(move, _pin(product, "A"))
     _connect(prone_pin, _pin(product, "B"))
-    return _pin(product, "ReturnValue", is_input=False)
+    return out(product)
 
 
 def patch_body_pose(skin):
@@ -418,7 +419,7 @@ def patch_body_pose(skin):
         raise RuntimeError(f"{skin.anim_bp}: expected the aim pitch's one "
                            f"LocalToComponent, found {len(to_cs)} -- run "
                            "patch_aim_pitch first")
-    start_out = _pin(to_cs[0], "ComponentPose", is_input=False)
+    start_out = out(to_cs[0], "ComponentPose")
     skeleton = bp.get_editor_property("target_skeleton")
     ref = _ref(skeleton)
     wanted = set(skin.pose_bones.values()) | {skin.aim_bones[-1]}
@@ -442,7 +443,7 @@ def patch_body_pose(skin):
     weight_pins, made = {}, []
     for name in (w for w in POSE_WEIGHTS if w in used):
         get = ed.add_get_member_variable_node(name)
-        weight_pins[name] = _pin(get, name, is_input=False)
+        weight_pins[name] = out(get, name)
         made.append(get)
     if skin.stance_clips:
         weight_pins[PRONE_MOVING] = _prone_moving(ed, weight_pins[POSE_PRONE])
@@ -450,7 +451,7 @@ def patch_body_pose(skin):
     for step in plan:
         mb = _modify_bone(ed, step, weight_pins)
         _connect(pose, _pin(mb, "ComponentPose"))
-        pose = _pin(mb, "Pose", is_input=False)
+        pose = out(mb, "Pose")
         made.append(mb)
     _connect(pose, tail)
     ed.add_comment_to_nodes(

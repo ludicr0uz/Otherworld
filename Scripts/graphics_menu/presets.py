@@ -11,7 +11,7 @@ place the player picks a preset) and BeginPlay's default go through one path.
 
 from collections import namedtuple
 
-from combat.graph import _connect, _pin, _set
+from uebp.graph import _connect, _pin, _set
 from graphics_menu.gfx_stats import PRESET_LABELS, default_preset
 
 # One preset, in the order the GRAPHICS SETTINGS tab's preset row steps through.

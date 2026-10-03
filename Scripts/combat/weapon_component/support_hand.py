@@ -19,7 +19,7 @@ another anim BP simply fails the cast.
 
 import unreal
 
-from combat.graph import BEL, _connect, _node, _palette, _pin
+from uebp.graph import BEL, _connect, _node, _palette, _pin, out, then
 from combat.nodes import FN_ANIM_INSTANCE
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
@@ -42,27 +42,27 @@ def _author_support_hand(ed, exec_ins):
 
     mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(anim, "self"))
+    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
     cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
-    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(cast, "Object"))
+    _connect(out(anim), _pin(cast, "Object"))
     for e in exec_ins:
         _connect(e, _pin(cast, "execute"))
     as_anim = next(p for p in BEL.list_output_pins(cast)
                    if str(unreal.BlueprintGraphPinLibrary.get_pin_name(p))
                    .startswith("As"))
 
-    tail = BEL.find_then_pin(cast)
+    tail = then(cast)
     for var, source in ((SUPPORT_HAND_VAR, "SightBlend"), (SUPPORT_POINT_VAR, HELD_SUPPORT_POINT)):
         value = keep(ed.add_get_member_variable_node(source))
         put = keep(ed.add_set_member_variable_node(var, anim_class))
         _connect(as_anim, _pin(put, "self"))
-        _connect(_pin(value, source, is_input=False), _pin(put, var))
+        _connect(out(value, source), _pin(put, var))
         _connect(tail, _pin(put, "execute"))
-        tail = BEL.find_then_pin(put)
+        tail = then(put)
 
     ed.add_comment_to_nodes(
         f"Down the sights the left hand holds the gun: {SUPPORT_HAND_VAR} = "
         f"SightBlend and {SUPPORT_POINT_VAR} = {HELD_SUPPORT_POINT}, onto the "
         "player's anim BP, whose Two Bone IK they drive (Scripts/combat/"
         "support_hand.py). 0 at the hip and on the shoulder.", made)
-    return (tail, _pin(cast, "CastFailed", is_input=False))
+    return (tail, out(cast, "CastFailed"))

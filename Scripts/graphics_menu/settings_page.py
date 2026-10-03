@@ -3,7 +3,7 @@ BP_WeaponComponent every frame. Its input half is settings_input.py; its
 constants are settings_rows.py.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from graphics_menu.difficulty import author_difficulty_name
 from graphics_menu.settings_input import _author_capture
 from graphics_menu.settings_rows import (
@@ -48,37 +48,37 @@ def _author_push_settings(ed, in_execs):
         return n
 
     got = keep(ed.add_get_member_variable_node("Settings"))
-    settings_out = _pin(got, "Settings", is_input=False)
+    settings_out = out(got, "Settings")
     ok = keep(_node(ed, FN_IS_VALID))
     _connect(settings_out, _pin(ok, "Object"))
     have = keep(ed.add_branch_node())
-    _connect(_pin(ok, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(out(ok), _pin(have, "Condition"))
     for e in in_execs:
         _connect(e, _pin(have, "execute"))
 
     pawn = keep(_node(ed, FN_GET_PLAYER_PAWN))
     _set(pawn, "PlayerIndex", 0)
     comp = keep(_node(ed, FN_GET_COMP))
-    _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
+    _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     cast = keep(_palette(ed, NODE_CAST_WEAPON))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(have), _pin(cast, "execute"))
+    _connect(out(comp), _pin(cast, "Object"))
+    _connect(then(have), _pin(cast, "execute"))
     as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
-    flow = BEL.find_then_pin(cast)
+    flow = then(cast)
     for i, slider in enumerate(SLIDERS):
         value = keep(ed.add_get_member_variable_node(slider.var, SETTINGS_CLASS_PATH))
         _connect(settings_out, _pin(value, "self"))
         push = keep(ed.add_set_member_variable_node(slider.var, WEAPON_COMP_CLASS_PATH))
         _connect(as_weapon, _pin(push, "self"))
-        _connect(_pin(value, slider.var, is_input=False), _pin(push, slider.var))
+        _connect(out(value, slider.var), _pin(push, slider.var))
         _connect(flow, _pin(push, "execute"))
-        flow = BEL.find_then_pin(push)
+        flow = then(push)
 
     binds = keep(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(binds, "self"))
-    binds_out = _pin(binds, "Binds", is_input=False)
+    binds_out = out(binds, "Binds")
     for i, (var, _default) in enumerate(BIND_VARS):
         item = keep(_node(ed, FN_ARR_GET))
         _connect(binds_out, _loose_pin(item, "TargetArray"))
@@ -87,7 +87,7 @@ def _author_push_settings(ed, in_execs):
         _connect(as_weapon, _pin(put, "self"))
         _connect(_loose_pin(item, "Item", is_input=False), _pin(put, var))
         _connect(flow, _pin(put, "execute"))
-        flow = BEL.find_then_pin(put)
+        flow = then(put)
 
     ed.add_comment_to_nodes(
         "The player's settings, pushed onto BP_WeaponComponent every frame. "
@@ -97,8 +97,7 @@ def _author_push_settings(ed, in_execs):
         "documented keys. Guarded on IsValid(Settings) because the alternative "
         "is an Accessed None per frame forever if BeginPlay's load ever failed.",
         made)
-    return (flow, _pin(cast, "CastFailed", is_input=False),
-            BEL.find_else_pin(have))
+    return (flow, out(cast, "CastFailed"), else_(have))
 
 
 def _author_settings_page(ed, in_exec):
@@ -119,20 +118,19 @@ def _author_settings_page(ed, in_exec):
         return n
 
     settings = keep(ed.add_get_member_variable_node("Settings"))
-    settings_out = _pin(settings, "Settings", is_input=False)
+    settings_out = out(settings, "Settings")
     rows = part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX)
 
     row = keep(ed.add_get_member_variable_node("MenuRow"))
-    flow = (mark_rows(ed, rows, SETTINGS_ROWS, _pin(row, "MenuRow", is_input=False), [in_exec]),)
+    flow = (mark_rows(ed, rows, SETTINGS_ROWS, out(row, "MenuRow"), [in_exec]),)
 
     # --- the slider rows: the value each is set to --------------------------
     for i, slider in enumerate(SLIDERS):
         value = keep(ed.add_get_member_variable_node(slider.var, SETTINGS_CLASS_PATH))
         _connect(settings_out, _pin(value, "self"))
         value_str = keep(_node(ed, FN_FLOAT_TO_STR))
-        _connect(_pin(value, slider.var, is_input=False),
-                 _loose_pin(value_str, "InDouble"))
-        flow = row_value(ed, rows, i, _pin(value_str, "ReturnValue", is_input=False), flow)
+        _connect(out(value, slider.var), _loose_pin(value_str, "InDouble"))
+        flow = row_value(ed, rows, i, out(value_str), flow)
 
     # --- the difficulty: the name it is set to ------------------------------
     flow = row_value(ed, rows, DIFFICULTY_ROW, author_difficulty_name(ed, settings_out, made), flow)
@@ -144,7 +142,7 @@ def _author_settings_page(ed, in_exec):
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
-    _connect(_pin(binds, "Binds", is_input=False), _loose_pin(loop, "Array"))
+    _connect(out(binds, "Binds"), _loose_pin(loop, "Array"))
     for e in flow:
         _connect(e, _loose_pin(loop, "Exec"))
     index = _loose_pin(loop, "ArrayIndex", is_input=False)
@@ -155,21 +153,20 @@ def _author_settings_page(ed, in_exec):
     # Key_GetName does not exist -- and it hands back Text, which SetText takes.
     shown = keep(_node(ed, FN_KEY_DISPLAY))
     _connect(_loose_pin(loop, "ArrayElement", is_input=False), _loose_pin(shown, "Key"))
-    row_value(ed, rows, _pin(at_row, "ReturnValue", is_input=False),
-              ("text", _pin(shown, "ReturnValue", is_input=False)),
+    row_value(ed, rows, out(at_row),
+              ("text", out(shown)),
               [_loose_pin(loop, "LoopBody", is_input=False)])
 
     # The hint says something different while a capture is armed, or the
     # screen looks frozen: two lines in the designer, one shown.
     arming = keep(ed.add_get_member_variable_node("Capturing"))
     hinting = keep(ed.add_branch_node())
-    _connect(_pin(arming, "Capturing", is_input=False), _pin(hinting, "Condition"))
+    _connect(out(arming, "Capturing"), _pin(hinting, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(hinting, "execute"))
     idle = part(ed, WBP_MAIN_MENU, HINT_IDLE)
     armed = part(ed, WBP_MAIN_MENU, HINT_CAPTURE)
-    on_tail = set_shown(ed, idle, False, [set_shown(ed, armed, True, [BEL.find_then_pin(hinting)])])
-    off_tail = set_shown(ed, armed, False, [set_shown(
-        ed, idle, True, [BEL.find_else_pin(hinting)])])
+    on_tail = set_shown(ed, idle, False, [set_shown(ed, armed, True, [then(hinting)])])
+    off_tail = set_shown(ed, armed, False, [set_shown(ed, idle, True, [else_(hinting)])])
 
     _author_capture(ed, settings_out, (on_tail, off_tail), made)
 

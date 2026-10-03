@@ -21,8 +21,7 @@ the mouse-look (cursor.py).
 
 import unreal
 
-from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
 from combat.nodes import FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_NEQ_BB
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.weapon_component.pose_weights import SEARCHING_VAR
@@ -50,7 +49,7 @@ def author_kneel(ed, pc_out, in_execs):
     pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
     here, no_pawn = _branch(ed, out(_call(ed, FN_IS_VALID, made,
                                            Object=pawn)),
-                            [BEL.find_then_pin(still), same], made)
+                            [then(still), same], made)
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node
@@ -63,9 +62,9 @@ def author_kneel(ed, pc_out, in_execs):
     made.append(told)
     _connect(wc, _pin(told, "self"))
     _connect(is_open(), _pin(told, SEARCHING_VAR))
-    _connect(BEL.find_then_pin(cast), _pin(told, "execute"))
+    _connect(then(cast), _pin(told, "execute"))
     ed.add_comment_to_nodes(
         "The kneel: while the loot window is open the player's weapon component "
         "is Searching (its pose weights kneel the body) and the controller "
         "ignores move input, taken and given back on LootOpen's edges.", made)
-    return [BEL.find_then_pin(told), no_pawn, _pin(cast, "CastFailed", is_input=False)]
+    return [then(told), no_pawn, out(cast, "CastFailed")]

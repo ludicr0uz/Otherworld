@@ -27,7 +27,8 @@ from combat.slot_tuning import (
     BAG_FIRST, BAG_LAST, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, MELEE_SLOT, PRIMARY,
     SLOT_COUNT, SLOT_ITEMS_VAR, SLOT_PICK_VAR, SLOT_VAR, UNPLACED,
 )
-from combat.weapon_component.common import _G
+from combat.paths import ITEM_CLASS_PATH
+from uebp.g import _G
 from combat.weapon_component.slot_nodes import (
     FN_ARR_CLEAR, FN_ARR_FIND, FN_ARR_RESIZE, FN_GE_II, FN_NE_OO,
     fits, for_each, for_loop, not_, op,
@@ -109,7 +110,7 @@ def _author_after(g, execs):
 
 def _author_slot_sync(ed, in_execs):
     """The whole sync (see the module docstring). Returns the exec tails."""
-    g = _G(ed)
+    g = _G(ed, ITEM_CLASS_PATH)
     flow = _author_claim(g, in_execs)
     flow = _author_place(g, [flow])
     tails = _author_after(g, [flow])

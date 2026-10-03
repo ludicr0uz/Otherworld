@@ -9,7 +9,8 @@ SlotColor, so the loot window shows what the inventory will.
 
 import unreal
 
-from combat.graph import BEL, _apply_defaults, _log, _must_load
+from combat.log import _log
+from uebp.graph import BEL, _apply_defaults, _must_load
 from combat.paths import HEALTH_BP_PATH
 from loot.consts import (
     LOOT_CHANCES_VAR, LOOT_TABLE_ICONS_VAR, LOOT_TABLE_NAMES_VAR, LOOT_TABLE_TINTS_VAR,

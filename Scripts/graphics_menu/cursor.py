@@ -28,8 +28,7 @@ there: probes/probe_menu_cursor.py raises the flags a click would.
 
 import unreal
 
-from combat.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, _set
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, _set, out, then
 from combat.nodes import FN_AND, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_WAS_PRESSED
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.cursor_consts import (
@@ -107,7 +106,7 @@ def author_cursor_read(ed, in_execs):
     for e in in_execs:
         _connect(e, _pin(pos, "execute"))
     moved = _call(ed, FN_VEC2_NE, made, A=out(pos), B=_get(ed, CURSOR_POS_VAR, made))
-    flow = put(ed, CURSOR_MOVED_VAR, out(moved), [BEL.find_then_pin(pos)], made)
+    flow = put(ed, CURSOR_MOVED_VAR, out(moved), [then(pos)], made)
     flow = put(ed, CURSOR_POS_VAR, out(pos), [flow], made)
     flow = _setter(ed, PAUSE_CLICK_VAR, NO_ROW, [flow], made)
     ed.add_comment_to_nodes(
@@ -140,7 +139,7 @@ def author_cursor_mode(ed, want, in_execs):
     _connect(pc, _pin(show, "self"))
     _connect(_get(ed, CURSOR_WANTED_VAR, made), _pin(show, SHOW_CURSOR_PROP))
     _connect(flow, _pin(show, "execute"))
-    on, off = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), [BEL.find_then_pin(show)], made)
+    on, off = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), [then(show)], made)
     free = _call(ed, FN_MODE_GAME_UI, made, PlayerController=pc, bHideCursorDuringCapture="false")
     _connect(on, _pin(free, "execute"))
     taken = _call(ed, FN_MODE_GAME, made, PlayerController=pc)
@@ -149,7 +148,7 @@ def author_cursor_mode(ed, want, in_execs):
         "The mouse cursor, shown while a menu is up. Only on a change: "
         "bShowMouseCursor, and Game-and-UI (cursor free) or Game-only (the "
         "mouse back to the camera).", made)
-    return [BEL.find_then_pin(free), BEL.find_then_pin(taken), same]
+    return [then(free), then(taken), same]
 
 
 def author_hold_fire(ed, in_execs):
@@ -167,12 +166,12 @@ def author_hold_fire(ed, in_execs):
     made.append(cast)
     _connect(out(comp), _pin(cast, "Object"))
     _connect(held, _pin(cast, "execute"))
-    spent = _setter(ed, TRIGGER_SPENT_VAR, "true", [BEL.find_then_pin(cast)], made, WEAPON_COMP_CLASS_PATH,
+    spent = _setter(ed, TRIGGER_SPENT_VAR, "true", [then(cast)], made, WEAPON_COMP_CLASS_PATH,
                     _loose_pin(cast, "AsBPWeaponComponent", is_input=False))
     ed.add_comment_to_nodes(
         "A click on a menu row is not a shot: the cursor showing keeps the "
         "weapon component's fire press spent.", made)
-    return [spent, free, _pin(cast, "CastFailed", is_input=False)]
+    return [spent, free, out(cast, "CastFailed")]
 
 
 def author_row_cursor(ed, box, count, in_execs, row_var=None, click=None,

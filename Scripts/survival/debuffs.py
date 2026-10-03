@@ -22,7 +22,7 @@ returned handle, which points at the same spec. Wiring two AddGrantedTags to
 the spec node directly would build two specs and apply the one with one tag.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_ADD_GRANTED_TAG, FN_APPLY_SPEC_TO_SELF, FN_EFFECT_COUNT, FN_GREATER_II,
     FN_LE_FF, FN_MAKE_CONTEXT, FN_MAKE_SPEC, FN_NEQ_BB, FN_REMOVE_EFFECT,
@@ -40,31 +40,31 @@ def _author_debuff_sync(ed, asc, stat, effect_var, tags, exec_in):
 
     value = keep(ed.add_get_member_variable_node(stat))
     empty = keep(_node(ed, FN_LE_FF))
-    _connect(_pin(value, stat, is_input=False), _pin(empty, "A"))
+    _connect(out(value, stat), _pin(empty, "A"))
     _set(empty, "B", 0.0)
-    want = _pin(empty, "ReturnValue", is_input=False)
+    want = out(empty)
 
     effect = keep(ed.add_get_member_variable_node(effect_var))
-    effect_out = _pin(effect, effect_var, is_input=False)
+    effect_out = out(effect, effect_var)
     count = keep(_node(ed, FN_EFFECT_COUNT))
     _connect(asc, _pin(count, "self"))
     _connect(effect_out, _pin(count, "SourceGameplayEffect"))
     _set(count, "bEnforceOnGoingCheck", "true")
     active = keep(_node(ed, FN_GREATER_II))
-    _connect(_pin(count, "ReturnValue", is_input=False), _pin(active, "A"))
+    _connect(out(count), _pin(active, "A"))
     _set(active, "B", 0)
 
     differ = keep(_node(ed, FN_NEQ_BB))
     _connect(want, _pin(differ, "A"))
-    _connect(_pin(active, "ReturnValue", is_input=False), _pin(differ, "B"))
+    _connect(out(active), _pin(differ, "B"))
     changed = keep(ed.add_branch_node())
-    _connect(_pin(differ, "ReturnValue", is_input=False), _pin(changed, "Condition"))
+    _connect(out(differ), _pin(changed, "Condition"))
     for e in exec_in:
         _connect(e, _pin(changed, "execute"))
 
     which = keep(ed.add_branch_node())
     _connect(want, _pin(which, "Condition"))
-    _connect(BEL.find_then_pin(changed), _pin(which, "execute"))
+    _connect(then(changed), _pin(which, "execute"))
 
     # --- apply: a spec, its tags, then onto the owner ------------------------
     context = keep(_node(ed, FN_MAKE_CONTEXT))
@@ -73,16 +73,16 @@ def _author_debuff_sync(ed, asc, stat, effect_var, tags, exec_in):
     _connect(asc, _pin(spec, "self"))
     _connect(effect_out, _pin(spec, "GameplayEffectClass"))
     _set(spec, "Level", 1.0)
-    _connect(_pin(context, "ReturnValue", is_input=False), _pin(spec, "Context"))
-    handle = _pin(spec, "ReturnValue", is_input=False)
-    flow = BEL.find_then_pin(which)
+    _connect(out(context), _pin(spec, "Context"))
+    handle = out(spec)
+    flow = then(which)
     for tag in tags:
         grant = keep(_node(ed, FN_ADD_GRANTED_TAG))
         _connect(handle, _pin(grant, "SpecHandle"))
         _set(grant, "NewGameplayTag", f'(TagName="{tag}")')
         _connect(flow, _pin(grant, "execute"))
-        handle = _pin(grant, "ReturnValue", is_input=False)
-        flow = BEL.find_then_pin(grant)
+        handle = out(grant)
+        flow = then(grant)
     apply = keep(_node(ed, FN_APPLY_SPEC_TO_SELF))
     _connect(asc, _pin(apply, "self"))
     _connect(handle, _pin(apply, "SpecHandle"))
@@ -93,12 +93,11 @@ def _author_debuff_sync(ed, asc, stat, effect_var, tags, exec_in):
     _connect(asc, _pin(remove, "self"))
     _connect(effect_out, _pin(remove, "GameplayEffect"))
     _set(remove, "StacksToRemove", -1)
-    _connect(BEL.find_else_pin(which), _pin(remove, "execute"))
+    _connect(else_(which), _pin(remove, "execute"))
 
     ed.add_comment_to_nodes(
         f"{stat} at zero <-> {effect_var} active. Only the frames where the two "
         f"disagree do anything: apply it with {', '.join(tags)} granted on the "
         "spec, or remove it.",
         made)
-    return (BEL.find_then_pin(apply), BEL.find_then_pin(remove),
-            BEL.find_else_pin(changed))
+    return (then(apply), then(remove), else_(changed))

@@ -18,7 +18,7 @@ import re
 
 import unreal
 
-from combat.graph import BEL, BGE, _assets, _must_load
+from uebp.graph import BEL, BGE, _assets, _must_load
 from graphics_menu.umg_consts import PANEL_PADDING, UI_ART_DIR, UI_FONT
 
 _COLOUR = re.compile(r"R=([\d.]+),G=([\d.]+),B=([\d.]+),A=([\d.]+)")

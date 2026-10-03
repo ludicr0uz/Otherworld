@@ -21,7 +21,7 @@ import random
 
 import unreal
 
-from combat.graph import _log
+from combat.log import _log
 from survival.forage_placement import scatter_forage
 from survival.terrain_heights import TriangleHeights
 from survival.paths import CANTEEN_CLASS_PATH, MUSHROOM_CLASS_PATH

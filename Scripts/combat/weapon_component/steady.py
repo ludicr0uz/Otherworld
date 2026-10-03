@@ -32,7 +32,7 @@ After sights.py, which writes SightBlend, and before the equip.
 """
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from combat.hit_reaction import STEADY_VAR
 from combat.nodes import (
     FN_AND, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GREATER_FF, FN_IS_SLOT_ACTIVE,
@@ -91,15 +91,15 @@ def _author_steady(ed, owner_out, exec_ins):
 
     mid = keep(ed.add_branch_node())
     _connect(out(caught), _pin(mid, "Condition"))
-    _connect(BEL.find_then_pin(cast), _pin(mid, "execute"))
+    _connect(then(cast), _pin(mid, "execute"))
     dirty = keep(ed.add_set_member_variable_node("NeedsRefresh"))
     _set(dirty, "NeedsRefresh", "true")
-    _connect(BEL.find_then_pin(mid), _pin(dirty, "execute"))
+    _connect(then(mid), _pin(dirty, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(STEADY_VAR, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(mark, "self"))
     _connect(out(steady), _pin(mark, STEADY_VAR))
-    for tail in (BEL.find_then_pin(dirty), BEL.find_else_pin(mid)):
+    for tail in (then(dirty), else_(mid)):
         _connect(tail, _pin(mark, "execute"))
 
     ed.add_comment_to_nodes(
@@ -108,4 +108,4 @@ def _author_steady(ed, owner_out, exec_ins):
         f"the view, which rides the gun, on the target. A flinch already "
         f"playing on the frame the sights come up is ended by re-equipping, "
         f"which plays the ready pose straight back into {AIM_SLOT}.", made)
-    return (BEL.find_then_pin(mark), _pin(cast, "CastFailed", is_input=False))
+    return (then(mark), _pin(cast, "CastFailed", is_input=False))

@@ -16,9 +16,10 @@ child of a shared one) and a cast is the only typed way to reach its events.
 
 import unreal
 
-from npc.graph import (
-    BEL, BGE, _asset_sub, _connect, _create_blueprint, _log, _name_literal, _node,
-    _palette, _pin, _set)
+from npc.graph import _log
+from uebp.graph import (
+    BEL, BGE, _assets, _connect, _create_blueprint, _name_literal, _node, _palette, _pin,
+    _set, else_, out, then)
 from uebp.layout import arrange
 from npc.nodes import FN_EQ_NAME, FN_FINISH_EXECUTE, NODE_EVENT_EXECUTE_AI
 from npc.paths import STEP_EVENT_PREFIX, STEP_RESULT_VAR, STEP_VAR
@@ -50,7 +51,7 @@ def clear_step_task(path):
     controller's events are wiped: otherwise the controller's compile
     recompiles this dependent against events that are gone, and logs an
     error per call node."""
-    eas = _asset_sub()
+    eas = _assets()
     if not eas.does_asset_exist(path):
         return
     bp = eas.load_asset(path)
@@ -76,33 +77,33 @@ def build_step_task(ai_bp, path, steps):
     class_path = ai_class.get_path_name()
     execute = _palette(ed, NODE_EVENT_EXECUTE_AI)
     cast = _palette(ed, f"Utilities|Casting|CastTo{ai_bp.get_name()}")
-    _connect(_pin(execute, "OwnerController", is_input=False), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(execute), _pin(cast, "execute"))
+    _connect(out(execute, "OwnerController"), _pin(cast, "Object"))
+    _connect(then(execute), _pin(cast, "execute"))
     ctrl = _cast_out(cast)
 
     done = _node(ed, FN_FINISH_EXECUTE)
     result = ed.add_get_member_variable_node(STEP_RESULT_VAR, class_path)
     _connect(ctrl, _pin(result, "self"))
-    _connect(_pin(result, STEP_RESULT_VAR, is_input=False), _pin(done, "bSuccess"))
+    _connect(out(result, STEP_RESULT_VAR), _pin(done, "bSuccess"))
     failed = _node(ed, FN_FINISH_EXECUTE)
     _set(failed, "bSuccess", "false")
-    _connect(_pin(cast, "CastFailed", is_input=False), _pin(failed, "execute"))
+    _connect(out(cast, "CastFailed"), _pin(failed, "execute"))
 
     step = ed.add_get_member_variable_node(STEP_VAR)
-    step_out = _pin(step, STEP_VAR, is_input=False)
-    prev = BEL.find_then_pin(cast)
+    step_out = out(step, STEP_VAR)
+    prev = then(cast)
     for name in steps:
         same = _node(ed, FN_EQ_NAME)
         _connect(step_out, _pin(same, "A"))
         _connect(_name_literal(ed, name), _pin(same, "B"))
         which = ed.add_branch_node()
-        _connect(_pin(same, "ReturnValue", is_input=False), _pin(which, "Condition"))
+        _connect(out(same), _pin(which, "Condition"))
         _connect(prev, _pin(which, "execute"))
         call = _event_call(ed, class_path, f"{STEP_EVENT_PREFIX}{name}")
         _connect(ctrl, _pin(call, "self"))
-        _connect(BEL.find_then_pin(which), BEL.find_execute_pin(call))
-        _connect(BEL.find_then_pin(call), _pin(done, "execute"))
-        prev = BEL.find_else_pin(which)
+        _connect(then(which), BEL.find_execute_pin(call))
+        _connect(then(call), _pin(done, "execute"))
+        prev = else_(which)
     _connect(prev, _pin(failed, "execute"))
 
     arrange(ed)
@@ -110,6 +111,6 @@ def build_step_task(ai_bp, path, steps):
         raise RuntimeError(f"{path} failed to compile")
     if ed.list_nodes_with_errors():
         raise RuntimeError(f"{path} has nodes with errors")
-    _asset_sub().save_loaded_asset(bp)
+    _assets().save_loaded_asset(bp)
     _log(f"built {path} ({len(steps)} steps)")
     return BEL.generated_class(bp)

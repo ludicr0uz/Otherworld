@@ -6,7 +6,7 @@ the fist and +Z is up, so an item standing on the ground and an item held in
 the hand are the same actor with nothing flipped.
 """
 
-from combat.graph import _rot
+from uebp.graph import _rot
 from combat.paths import CYLINDER, MAT_METAL, SPHERE
 from survival.paths import (
     CANTEEN_BP_PATH, MAT_CANTEEN, MAT_MUSHROOM_CAP, MAT_MUSHROOM_STEM,

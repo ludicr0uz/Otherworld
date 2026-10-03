@@ -12,10 +12,8 @@ from forest_generator.npc_ward import NPC_WARD_FEARS
 from npc.paths import (
     MESH_RELATIVE_YAW_DEG, MESH_RELATIVE_Z_CM, NPC_BP_PATH,
 )
-from npc.graph import (
-    _asset_sub, BEL, _create_blueprint, _log, _mesh_object, _resolve,
-    _try_set,
-)
+from npc.graph import _log, _mesh_object
+from uebp.graph import BEL, _assets, _create_blueprint, _resolve, _try_set
 from npc.controller import build_ai_controller_blueprint
 
 
@@ -24,7 +22,7 @@ from npc.controller import build_ai_controller_blueprint
 def build_npc_blueprint(ai_bp):
     """Create BP_ForestWanderer and point it at the AI controller."""
     bp = _create_blueprint(NPC_BP_PATH, unreal.Character)
-    eas = _asset_sub()
+    eas = _assets()
 
     generated = BEL.generated_class(bp)
     cdo = unreal.get_default_object(generated)
@@ -133,7 +131,7 @@ def _first_existing(*pkgs):
     """The first of ``pkgs`` on disk, else the last: _resolve's fallback slot
     takes one path, and a creature's own retargeted attack beats the
     mannequin's."""
-    eas = _asset_sub()
+    eas = _assets()
     return next((p for p in pkgs if p and eas.does_asset_exist(p)), pkgs[-1])
 
 
@@ -159,7 +157,7 @@ def build_variant_blueprint(base_bp, variant):
 
     Adding a creature is therefore an entry in NPC_VARIANTS and nothing else.
     """
-    eas = _asset_sub()
+    eas = _assets()
     parent_class = BEL.generated_class(base_bp)
     if not parent_class:
         raise RuntimeError("base NPC blueprint has no generated class")

@@ -7,7 +7,7 @@ as CursorAccept, the wheel as Left/Right (or_wheel); and how Tick learns
 that a row of the M panel was taken (pause_row_taken).
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
 from graphics_menu.umg_consts import PAUSE_ROW_ACTIONS
 
@@ -59,21 +59,21 @@ def _emit_row_nav(ed, pc_out, last_row, in_exec, row_var="MenuRow"):
         _connect(pc_out, _pin(was, "self"))
         _set(was, "Key", key)
         br = keep(ed.add_branch_node())
-        _connect(_pin(was, "ReturnValue", is_input=False), _pin(br, "Condition"))
+        _connect(out(was), _pin(br, "Condition"))
         for e in flow:
             _connect(e, _pin(br, "execute"))
 
         row = keep(ed.add_get_member_variable_node(row_var))
         moved = keep(_node(ed, step))
-        _connect(_pin(row, row_var, is_input=False), _pin(moved, "A"))
+        _connect(out(row, row_var), _pin(moved, "A"))
         _set(moved, "B", 1)
         held = keep(_node(ed, limit))
-        _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held, "A"))
+        _connect(out(moved), _pin(held, "A"))
         _set(held, "B", bound)
         put = keep(ed.add_set_member_variable_node(row_var))
-        _connect(_pin(held, "ReturnValue", is_input=False), _pin(put, row_var))
-        _connect(BEL.find_then_pin(br), _pin(put, "execute"))
-        flow = (BEL.find_then_pin(put), BEL.find_else_pin(br))
+        _connect(out(held), _pin(put, row_var))
+        _connect(then(br), _pin(put, "execute"))
+        flow = (then(put), else_(br))
     return flow, made
 
 
@@ -95,25 +95,25 @@ def _emit_accept(ed, pc_out, in_exec, made):
         was = keep(_node(ed, FN_WAS_PRESSED))
         _connect(pc_out, _pin(was, "self"))
         _set(was, "Key", key)
-        got = _pin(was, "ReturnValue", is_input=False)
+        got = out(was)
         if any_key is None:
             any_key = got
         else:
             either = keep(_node(ed, FN_OR))
             _connect(any_key, _pin(either, "A"))
             _connect(got, _pin(either, "B"))
-            any_key = _pin(either, "ReturnValue", is_input=False)
+            any_key = out(either)
     click = keep(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR))
     either = keep(_node(ed, FN_OR))
     _connect(any_key, _pin(either, "A"))
-    _connect(_pin(click, CURSOR_ACCEPT_VAR, is_input=False), _pin(either, "B"))
+    _connect(out(click, CURSOR_ACCEPT_VAR), _pin(either, "B"))
     go = keep(ed.add_branch_node())
-    _connect(_pin(either, "ReturnValue", is_input=False), _pin(go, "Condition"))
+    _connect(out(either), _pin(go, "Condition"))
     for e in in_exec:
         _connect(e, _pin(go, "execute"))
     served = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
     _set(served, CURSOR_ACCEPT_VAR, "false")
-    _connect(BEL.find_then_pin(go), _pin(served, "execute"))
+    _connect(then(go), _pin(served, "execute"))
     return served
 
 
@@ -124,9 +124,9 @@ def or_wheel(ed, pc_out, pressed, wheel_key, made):
     _set(wheel, "Key", wheel_key)
     either = _node(ed, FN_OR)
     _connect(pressed, _pin(either, "A"))
-    _connect(_pin(wheel, "ReturnValue", is_input=False), _pin(either, "B"))
+    _connect(out(wheel), _pin(either, "B"))
     made += [wheel, either]
-    return _pin(either, "ReturnValue", is_input=False)
+    return out(either)
 
 
 def pause_row_taken(ed, action, made):
@@ -136,7 +136,7 @@ def pause_row_taken(ed, action, made):
     MenuOpen test. The rows have no keys of their own."""
     clicked = ed.add_get_member_variable_node(PAUSE_CLICK_VAR)
     this_row = _node(ed, FN_EQ_II)
-    _connect(_pin(clicked, PAUSE_CLICK_VAR, is_input=False), _pin(this_row, "A"))
+    _connect(out(clicked, PAUSE_CLICK_VAR), _pin(this_row, "A"))
     _set(this_row, "B", PAUSE_ROW_ACTIONS.index(action))
     made += [clicked, this_row]
-    return _pin(this_row, "ReturnValue", is_input=False)
+    return out(this_row)

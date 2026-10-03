@@ -16,7 +16,7 @@ after it (as with place_forage.py).
 
 import unreal
 
-from combat.graph import _log
+from combat.log import _log
 from world.paths import DAY_NIGHT_CLASS_PATH, DAY_NIGHT_TAG, SKY_SPHERE_MESH_PATH, STATIC_SKY_TAG
 
 RIG_CLASSES = (unreal.DirectionalLight, unreal.SkyLight, unreal.ExponentialHeightFog,

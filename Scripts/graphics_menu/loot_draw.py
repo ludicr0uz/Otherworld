@@ -17,7 +17,7 @@ raises LootTakeRequested, which Tick serves exactly as it serves Enter; a
 click on the LootClose line lowers LootOpen, as Tab does.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
 from combat.nodes import FN_ARR_GET, FN_ARR_LEN, FN_IS_VALID, FN_LESS_II, MACRO_FOR_LOOP
 from combat.paths import HEALTH_CLASS_PATH
 from graphics_menu.cursor import author_row_cursor, author_widget_click
@@ -38,14 +38,14 @@ def _get(ed, var, owner=None, self_out=None):
             else ed.add_get_member_variable_node(var))
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
-    return _pin(n, var, is_input=False)
+    return out(n, var)
 
 
 def _call(ed, fn, **inputs):
     n = _node(ed, fn)
     for name, pin in inputs.items():
         _connect(pin, _pin(n, name))
-    return _pin(n, "ReturnValue", is_input=False)
+    return out(n)
 
 
 def _branch(ed, cond, execs):
@@ -53,14 +53,14 @@ def _branch(ed, cond, execs):
     _connect(cond, _pin(br, "Condition"))
     for e in execs:
         _connect(e, _pin(br, "execute"))
-    return BEL.find_then_pin(br), BEL.find_else_pin(br)
+    return then(br), else_(br)
 
 
 def _item(ed, array, index):
     n = _node(ed, FN_ARR_GET)
     _connect(array, _pin(n, "TargetArray"))
     _connect(index, _pin(n, "Index"))
-    return _pin(n, "Item", is_input=False)
+    return out(n, "Item")
 
 
 def _author_rows(ed, icons, tints, box, in_execs):
@@ -74,8 +74,8 @@ def _author_rows(ed, icons, tints, box, in_execs):
     _pin(loop, "LastIndex").set_pin_value(str(LOOT_ROWS - 1))
     for e in in_execs:
         _connect(e, _pin(loop, "execute"))
-    i = _pin(loop, "Index", is_input=False)
-    row, then, _failed = row_at(ed, box, i, [_pin(loop, "LoopBody", is_input=False)])
+    i = out(loop, "Index")
+    row, then, _failed = row_at(ed, box, i, [out(loop, "LoopBody")])
     size = _call(ed, FN_ARR_LEN, TargetArray=icons)
     within = _call(ed, FN_LESS_II, A=i, B=size)
     carried, past = _branch(ed, within, [then])
@@ -91,7 +91,7 @@ def _author_rows(ed, icons, tints, box, in_execs):
     flow = set_shown(ed, icon, True, [BEL.find_then_pin(tint)])
     set_shown(ed, row, True, [flow])
     set_shown(ed, row, False, [past])
-    return _pin(loop, "Completed", is_input=False)
+    return out(loop, "Completed")
 
 
 def author_loot_window(ed, in_execs):
@@ -125,8 +125,7 @@ def author_loot_window(ed, in_execs):
     bare = _node(ed, FN_LESS_II)
     _connect(_call(ed, FN_ARR_LEN, TargetArray=icons), _pin(bare, "A"))
     _set(bare, "B", 1)
-    said = show_if(ed, part(ed, WBP_HUD, LOOT_EMPTY),
-                   _pin(bare, "ReturnValue", is_input=False), [flow])
+    said = show_if(ed, part(ed, WBP_HUD, LOOT_EMPTY), out(bare), [flow])
     full = part(ed, WBP_HUD, LOOT_FULL)
     tails = show_if(ed, full, _get(ed, LOOT_BAG_FULL_VAR), list(said))
     return [gone, closed, *tails]

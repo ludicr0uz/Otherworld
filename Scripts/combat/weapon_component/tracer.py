@@ -18,7 +18,7 @@ from combat.game_state import (
     DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS, TRACER_HIT_COLOR, TRACER_MISS_COLOR,
     TRACER_POINT_SIZE, TRACER_THICKNESS,
 )
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_DRAW_LINE, FN_DRAW_POINT, FN_SELECT_COLOR, FN_SELECT_VECTOR,
 )
@@ -38,9 +38,9 @@ def _author_tracer(ed, trace, brk):
 
     seen = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR))
     showing = keep(ed.add_branch_node())
-    _connect(_pin(seen, DEBUG_MODE_VAR, is_input=False), _pin(showing, "Condition"))
-    _connect(BEL.find_then_pin(trace), _pin(showing, "execute"))
-    connected = _pin(trace, "ReturnValue", is_input=False)
+    _connect(out(seen, DEBUG_MODE_VAR), _pin(showing, "Condition"))
+    _connect(then(trace), _pin(showing, "execute"))
+    connected = out(trace)
 
     stop = keep(_node(ed, FN_SELECT_VECTOR))
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(stop, "A"))
@@ -53,17 +53,17 @@ def _author_tracer(ed, trace, brk):
 
     line = keep(_node(ed, FN_DRAW_LINE))
     _connect(_loose_pin(brk, "TraceStart", is_input=False), _pin(line, "LineStart"))
-    _connect(_pin(stop, "ReturnValue", is_input=False), _pin(line, "LineEnd"))
-    _connect(_pin(colour, "ReturnValue", is_input=False), _pin(line, "LineColor"))
+    _connect(out(stop), _pin(line, "LineEnd"))
+    _connect(out(colour), _pin(line, "LineColor"))
     _set(line, "Duration", TRACE_DEBUG_SECONDS)
     _set(line, "Thickness", TRACER_THICKNESS)
-    _connect(BEL.find_then_pin(showing), _pin(line, "execute"))
+    _connect(then(showing), _pin(line, "execute"))
 
     point = keep(_node(ed, FN_DRAW_POINT))
-    _connect(_pin(stop, "ReturnValue", is_input=False), _pin(point, "Position"))
-    _connect(_pin(colour, "ReturnValue", is_input=False), _pin(point, "PointColor"))
+    _connect(out(stop), _pin(point, "Position"))
+    _connect(out(colour), _pin(point, "PointColor"))
     _set(point, "Size", TRACER_POINT_SIZE)
     _set(point, "Duration", TRACE_DEBUG_SECONDS)
-    _connect(BEL.find_then_pin(line), _pin(point, "execute"))
+    _connect(then(line), _pin(point, "execute"))
 
-    return made, [BEL.find_then_pin(point), BEL.find_else_pin(showing)]
+    return made, [then(point), else_(showing)]

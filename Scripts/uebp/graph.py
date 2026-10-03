@@ -124,6 +124,10 @@ def then(node):
     return BEL.find_then_pin(node)
 
 
+def else_(node):
+    return BEL.find_else_pin(node)
+
+
 def _create_blueprint(path, parent_class):
     eas = _assets()
     if eas.does_asset_exist(path):

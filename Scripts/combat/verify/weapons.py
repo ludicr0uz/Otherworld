@@ -3,7 +3,7 @@
 
 import unreal
 
-from combat.graph import _rot
+from uebp.graph import _rot
 from combat.grip import (
     _pure_rotation, _rotate_vector, socket_in_mesh, socket_pose_axes,
 )

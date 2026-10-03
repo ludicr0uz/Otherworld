@@ -17,7 +17,8 @@ menu and the death menu both are), so it reads steadily instead of flickering
 with every frame's delta.
 """
 
-from combat.graph import BEL, _connect, _declare, _float_type, _node, _pin, _set
+from uebp.graph import (
+    BEL, _connect, _declare, _float_type, _node, _pin, _set, else_, out, then)
 from graphics_menu.ui_graph import part, set_text
 from graphics_menu.umg_consts import HUD_FPS, WBP_HUD
 
@@ -55,57 +56,56 @@ def author_fps(ed, in_execs):
         return n
 
     def get(var):
-        return _pin(keep(ed.add_get_member_variable_node(var)), var, is_input=False)
+        return out(keep(ed.add_get_member_variable_node(var)), var)
 
     # FpsFrames += 1
     plus = keep(_node(ed, _FN_ADD_II))
     _connect(get(FPS_FRAMES_VAR), _pin(plus, "A"))
     _set(plus, "B", 1)
     count = keep(ed.add_set_member_variable_node(FPS_FRAMES_VAR))
-    _connect(_pin(plus, "ReturnValue", is_input=False), _pin(count, FPS_FRAMES_VAR))
+    _connect(out(plus), _pin(count, FPS_FRAMES_VAR))
     for e in in_execs:
         _connect(e, _pin(count, "execute"))
 
     # Window closed? elapsed = now - FpsSince > FPS_WINDOW_S
-    now = _pin(keep(_node(ed, _FN_REAL_TIME)), "ReturnValue", is_input=False)
+    now = out(keep(_node(ed, _FN_REAL_TIME)))
     elapsed = keep(_node(ed, _FN_SUB))
     _connect(now, _pin(elapsed, "A"))
     _connect(get(FPS_SINCE_VAR), _pin(elapsed, "B"))
-    elapsed_out = _pin(elapsed, "ReturnValue", is_input=False)
+    elapsed_out = out(elapsed)
     due = keep(_node(ed, _FN_GREATER))
     _connect(elapsed_out, _pin(due, "A"))
     _set(due, "B", FPS_WINDOW_S)
     refresh = keep(ed.add_branch_node())
-    _connect(_pin(due, "ReturnValue", is_input=False), _pin(refresh, "Condition"))
-    _connect(BEL.find_then_pin(count), _pin(refresh, "execute"))
+    _connect(out(due), _pin(refresh, "Condition"))
+    _connect(then(count), _pin(refresh, "execute"))
 
     # FpsShown = round(FpsFrames / elapsed); FpsFrames = 0; FpsSince = now
     frames = keep(_node(ed, _FN_CONV_INT))
     _connect(get(FPS_FRAMES_VAR), _pin(frames, "InInt"))
     rate = keep(_node(ed, _FN_DIV))
-    _connect(_pin(frames, "ReturnValue", is_input=False), _pin(rate, "A"))
+    _connect(out(frames), _pin(rate, "A"))
     _connect(elapsed_out, _pin(rate, "B"))
     rounded = keep(_node(ed, _FN_ROUND))
-    _connect(_pin(rate, "ReturnValue", is_input=False), _pin(rounded, "A"))
+    _connect(out(rate), _pin(rounded, "A"))
     shown = keep(ed.add_set_member_variable_node(FPS_SHOWN_VAR))
-    _connect(_pin(rounded, "ReturnValue", is_input=False), _pin(shown, FPS_SHOWN_VAR))
-    _connect(BEL.find_then_pin(refresh), _pin(shown, "execute"))
+    _connect(out(rounded), _pin(shown, FPS_SHOWN_VAR))
+    _connect(then(refresh), _pin(shown, "execute"))
     reset = keep(ed.add_set_member_variable_node(FPS_FRAMES_VAR))
     _set(reset, FPS_FRAMES_VAR, 0)
-    _connect(BEL.find_then_pin(shown), _pin(reset, "execute"))
+    _connect(then(shown), _pin(reset, "execute"))
     since = keep(ed.add_set_member_variable_node(FPS_SINCE_VAR))
     _connect(now, _pin(since, FPS_SINCE_VAR))
-    _connect(BEL.find_then_pin(reset), _pin(since, "execute"))
+    _connect(then(reset), _pin(since, "execute"))
 
     # "FPS  60", in WBP_HUD's top-right corner above the kill counter.
     as_text = keep(_node(ed, _FN_INT_TO_STR))
     _connect(get(FPS_SHOWN_VAR), _pin(as_text, "InInt"))
     line = keep(_node(ed, _FN_CONCAT))
     _set(line, "A", FPS_PREFIX)
-    _connect(_pin(as_text, "ReturnValue", is_input=False), _pin(line, "B"))
+    _connect(out(as_text), _pin(line, "B"))
     readout = part(ed, WBP_HUD, HUD_FPS)
-    wrote = set_text(ed, readout, _pin(line, "ReturnValue", is_input=False),
-                     [BEL.find_then_pin(since), BEL.find_else_pin(refresh)])
+    wrote = set_text(ed, readout, out(line), [then(since), else_(refresh)])
 
     ed.add_comment_to_nodes(
         f"FPS readout (always, debug mode or not): frames counted over "

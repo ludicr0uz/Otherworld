@@ -13,8 +13,7 @@ cycle fails the cast and keeps its static sky.
 
 import unreal
 
-from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out, then
 from graphics_menu.dev_guns import _call, _class_literal
 from graphics_menu.gfx_stats import CYCLE, stats_by
 from graphics_menu.gfx_tuner_read import applied
@@ -37,15 +36,15 @@ def author_sky(ed, in_execs, made):
         raise RuntimeError("no cast node for BP_DayNightCycle")
     made.append(cast)
     _connect(out(find), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(find), _pin(cast, "execute"))
+    _connect(then(find), _pin(cast, "execute"))
     cycle = _loose_pin(cast, "AsBPDayNightCycle", is_input=False)
 
-    flow = BEL.find_then_pin(cast)
+    flow = then(cast)
     for index, st in stats_by(CYCLE):
         n = ed.add_set_member_variable_node(st.target, DAY_NIGHT_CLASS_PATH)
         made.append(n)
         _connect(cycle, _pin(n, "self"))
         _connect(applied(ed, index, made), _pin(n, st.target))
         _connect(flow, _pin(n, "execute"))
-        flow = BEL.find_then_pin(n)
-    return [flow, _pin(cast, "CastFailed", is_input=False)]
+        flow = then(n)
+    return [flow, out(cast, "CastFailed")]

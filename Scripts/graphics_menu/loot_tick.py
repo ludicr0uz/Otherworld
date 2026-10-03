@@ -26,9 +26,8 @@ is still there, and the window says NOTHING.
 
 import unreal
 
-from combat.graph import (
-    BEL, _connect, _declare, _float_type, _loose_pin, _must_load, _palette, _pin)
-from uebp.graph import out
+from uebp.graph import (
+    BEL, _connect, _declare, _float_type, _loose_pin, _must_load, _palette, _pin, out, then)
 from combat.nodes import (
     FN_ADD_II, FN_AND, FN_ARR_LEN, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_GREATER_II,
     FN_IS_VALID, FN_MIN_II, FN_NOT, FN_SUB_II, FN_WAS_PRESSED,
@@ -127,7 +126,7 @@ def author_loot_tick(ed, pc_out, in_execs):
     # Dying is not searching: no Tab, no take, and an open window shuts.
     dead, alive = _branch(ed, _get(ed, OWNER_DEAD_VAR, made,
                                    WEAPON_COMP_CLASS_PATH, wc),
-                          [BEL.find_then_pin(cast)], made)
+                          [then(cast)], made)
     shut = _setter(ed, LOOT_OPEN_VAR, "false", [lost, dead], made)
     shut = _setter(ed, LOOT_TAKE_VAR, "false", [shut], made)
 
@@ -159,5 +158,5 @@ def author_loot_tick(ed, pc_out, in_execs):
         f"Loot: the nearest dead body within the reach is LootTarget; "
         f"[{LOOT_KEY}] kneels and opens its window, Up/Down pick, Enter takes into "
         f"the bag (while it has room). Out of reach, the window shuts.", made[:1])
-    tails = taken + [idle, no_room, bare, shut, _pin(cast, "CastFailed", is_input=False)]
+    tails = taken + [idle, no_room, bare, shut, out(cast, "CastFailed")]
     return author_kneel(ed, pc_out, tails)

@@ -25,8 +25,7 @@ edge's memory.
 
 import unreal
 
-from combat.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, out, then
 from combat.nodes import (
     FN_ADD_II, FN_AND, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_LESS_II, FN_MIN_II, FN_NEQ_BB,
     FN_NOT, FN_SUB_II, FN_WAS_PRESSED,
@@ -103,7 +102,7 @@ def _author_still(ed, pc_out, in_execs, made):
     still = _call(ed, FN_IGNORE_MOVE, made, self=pc_out,
                   bNewMoveInput=_get(ed, WEAR_OPEN_VAR, made))
     _connect(flow, _pin(still, "execute"))
-    return [BEL.find_then_pin(still), same]
+    return [then(still), same]
 
 
 def author_wear_tick(ed, pc_out, in_execs):
@@ -122,7 +121,7 @@ def author_wear_tick(ed, pc_out, in_execs):
     # The dead wear nothing new: no I, no take-off, and an open panel shuts.
     dead, alive = _branch(ed, _get(ed, OWNER_DEAD_VAR, made,
                                    WEAPON_COMP_CLASS_PATH, wc),
-                          [BEL.find_then_pin(cast)], made)
+                          [then(cast)], made)
     shut = _setter(ed, WEAR_OPEN_VAR, "false", [dead], made)
     shut = _setter(ed, WEAR_TAKE_VAR, "false", [shut], made)
 
@@ -147,8 +146,7 @@ def author_wear_tick(ed, pc_out, in_execs):
     _connect(wc, _pin(brought, "self"))
     _connect(out(code), _pin(brought, SLOT_REQUEST_VAR))
     _connect(bag, _pin(brought, "execute"))
-    tails = [BEL.find_then_pin(asked), BEL.find_then_pin(brought), idle, shut,
-             _pin(cast, "CastFailed", is_input=False)]
+    tails = [then(asked), then(brought), idle, shut, out(cast, "CastFailed")]
     tails = _author_still(ed, pc_out, tails, made)
     ed.add_comment_to_nodes(
         f"The I panel: [{WEAR_KEY}] opens what the player wears, Up/Down pick a "

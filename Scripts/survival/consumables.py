@@ -16,10 +16,9 @@ HungerRestore, ThirstRestore, and HealthRestoreEasy (applied on EASY only).
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare,
-    _float_type, _log, _must_load,
-)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _float_type, _must_load)
 from uebp.layout import arrange
 from combat.materials import build_flat_material
 from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH

@@ -4,10 +4,9 @@ both read, so rebinds, sensitivity and debug mode survive a restart.
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _apply_defaults, _create_blueprint, _declare, _float_type, _key,
-    _log, _struct_type,
-)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, _apply_defaults, _create_blueprint, _declare, _float_type, _key, _struct_type)
 from uebp.layout import arrange
 from combat.difficulty import DEFAULT_DIFFICULTY, DIFFICULTY_VAR
 from combat.paths import SETTINGS_BP_PATH, SETTINGS_SLOT

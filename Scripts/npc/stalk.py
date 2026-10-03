@@ -62,7 +62,8 @@ from forest_generator.npc_stalk import (
     NPC_STALK_ARRIVE_CM, NPC_STALK_OPEN_ARRIVE_CM, NPC_STALK_ROAR_S,
     NPC_STALK_STALLED_CMS,
 )
-from npc.graph import BEL, _Graph, _connect, _pin, out
+from npc.graph import _Graph
+from uebp.graph import BEL, _connect, _pin, else_, out, then
 from npc.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_DISTANCE_2D,
     FN_GET_CONTROLLER, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_GT_FF, FN_LE_FF,
@@ -100,10 +101,10 @@ def _author_rage(g, exec_in, pins, result):
     """The head of the step: a wendigo the player has hurt does not hunt.
     Returns the exec pins of one that is not enraged, for the hunt."""
     raged = g.branch(g.get(ENRAGED_VAR), exec_in)
-    _connect(BEL.find_then_pin(raged), result(False))
+    _connect(then(raged), result(False))
     # The hurt sense's own read (BP_HealthComponent.DamagedByPlayer): what
     # woke it is what enrages it, so a shot from any range does both.
-    read, shot, unhurt = _author_hurt(g.ed, [BEL.find_else_pin(raged)])
+    read, shot, unhurt = _author_hurt(g.ed, [else_(raged)])
     g.made.extend(read)
     step = g.put(ENRAGED_VAR, shot, literal="true")
     sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], step)
@@ -128,9 +129,9 @@ def _author_turn(g, exec_in, pins):
     up = g.op(FN_LE_FF, g.get(STALK_TURN_AT_VAR), pins["now"])
     due = g.branch(up, exec_in)
     about = g.op(FN_MUL_FF, g.get(STALK_SIDE_VAR), -1.0)
-    step = g.put(STALK_SIDE_VAR, BEL.find_then_pin(due), pin=about)
+    step = g.put(STALK_SIDE_VAR, then(due), pin=about)
     step = _author_turn_time(g, step, pins["now"])
-    return [step, BEL.find_else_pin(due)]
+    return [step, else_(due)]
 
 
 def _author_roar(g, exec_in, pins, roar_anim):
@@ -152,7 +153,7 @@ def _author_catch_up(g, exec_in, pins, stock, result):
     beyond = g.op(FN_GT_FF, pins["gap"], tuned_pin(g, "stalk_catch_up_cm"))
     far = g.branch(beyond, exec_in)
     # No leg is under way: the first pass inside the range picks one.
-    step = g.put(STALK_LEG_UNTIL_VAR, BEL.find_then_pin(far), literal=0.0)
+    step = g.put(STALK_LEG_UNTIL_VAR, then(far), literal=0.0)
     ahead, step = _author_facing(g.ed, [step], None)
     g.made.extend(ahead)
     me = g.call(FN_GET_CONTROLLER)
@@ -161,13 +162,13 @@ def _author_catch_up(g, exec_in, pins, stock, result):
     _connect(out(me), _pin(run, "Controller"))
     _connect(pins["player_loc"], _pin(run, "Goal"))
     _connect(step, _pin(run, "execute"))
-    ran, tails, _entry = _author_walk_speed(g.ed, [BEL.find_then_pin(run)], False,
+    ran, tails, _entry = _author_walk_speed(g.ed, [then(run)], False,
                                             stock,
                                             scale="stalk_run_scale")
     g.made.extend(ran)
     for tail in tails:
         _connect(tail, result(True))
-    return BEL.find_else_pin(far)
+    return else_(far)
 
 
 def _author_leg(g, exec_in, pins, stock, result):
@@ -177,7 +178,7 @@ def _author_leg(g, exec_in, pins, stock, result):
     the caller to charge on, and that of one near the end of a leg in the
     open, for the caller to pick the next on -- it does not stop there."""
     hiding = g.branch(g.get(STALK_ARRIVED_VAR), exec_in)
-    _connect(BEL.find_then_pin(hiding), result(True))
+    _connect(then(hiding), result(True))
 
     left = g.call(FN_DISTANCE_2D)
     _connect(pins["self_loc"], _pin(left, "V1"))
@@ -187,11 +188,11 @@ def _author_leg(g, exec_in, pins, stock, result):
     reach = g.call(FN_SELECT_FLOAT, A=NPC_STALK_ARRIVE_CM, B=NPC_STALK_OPEN_ARRIVE_CM)
     _connect(g.get(STALK_HIDDEN_VAR), _pin(reach, "bPickA"))
     close = g.op(FN_LE_FF, out(left), out(reach))
-    there = g.branch(close, BEL.find_else_pin(hiding))
-    covered = g.branch(g.get(STALK_HIDDEN_VAR), BEL.find_then_pin(there))
+    there = g.branch(close, else_(hiding))
+    covered = g.branch(g.get(STALK_HIDDEN_VAR), then(there))
 
     # --- arrived: wait behind the trunk, watching the player -----------------
-    step = g.put(STALK_ARRIVED_VAR, BEL.find_then_pin(covered), literal="true")
+    step = g.put(STALK_ARRIVED_VAR, then(covered), literal="true")
     # One throw per leg.
     wait = g.call(FN_RANDOM_FLOAT)
     _connect(tuned_pin(g, "stalk_hide_min_s"), _pin(wait, "Min"))
@@ -209,14 +210,14 @@ def _author_leg(g, exec_in, pins, stock, result):
     _connect(pins["self_pawn"], _pin(moving, "self"))
     _connect(out(moving), _pin(pace, "A"))
     slow = g.op(FN_LT_FF, out(pace), NPC_STALK_STALLED_CMS)
-    stalled = g.branch(slow, BEL.find_else_pin(there))
-    ran, tails, _entry = _author_walk_speed(g.ed, [BEL.find_else_pin(stalled)], False,
+    stalled = g.branch(slow, else_(there))
+    ran, tails, _entry = _author_walk_speed(g.ed, [else_(stalled)], False,
                                             stock,
                                             scale="stalk_run_scale")
     g.made.extend(ran)
     for tail in tails:
         _connect(tail, result(True))
-    return BEL.find_then_pin(stalled), BEL.find_else_pin(covered)
+    return then(stalled), else_(covered)
 
 
 def _author_stalk(ed, exec_in, result, roar_anim, stock):
@@ -246,30 +247,28 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
 
     # --- the charge: this step is over, for good -----------------------------
     charging = g.branch(g.get(STALK_CHARGING_VAR), calm)
-    _connect(BEL.find_then_pin(charging), result(False))
+    _connect(then(charging), result(False))
 
     # --- the roar ------------------------------------------------------------
     unroared = g.op(FN_LE_FF, g.get(STALK_ROAR_UNTIL_VAR), 0.0)
-    first = g.branch(unroared, BEL.find_else_pin(charging))
-    _connect(_author_roar(g, BEL.find_then_pin(first), pins, roar_anim), result(True))
+    first = g.branch(unroared, else_(charging))
+    _connect(_author_roar(g, then(first), pins, roar_anim), result(True))
     during = g.op(FN_LT_FF, pins["now"], g.get(STALK_ROAR_UNTIL_VAR))
-    roaring = g.branch(during, BEL.find_else_pin(first))
-    _connect(BEL.find_then_pin(roaring), result(True))
+    roaring = g.branch(during, else_(first))
+    _connect(then(roaring), result(True))
 
     # --- close enough: charge ------------------------------------------------
-    near = _author_catch_up(g, BEL.find_else_pin(roaring), pins, stock, result)
+    near = _author_catch_up(g, else_(roaring), pins, stock, result)
     inside = g.op(FN_LE_FF, pins["gap"], tuned_pin(g, "stalk_charge_cm"))
     close = g.branch(inside, near)
-    charge = [BEL.find_then_pin(close)]
+    charge = [then(close)]
 
     # --- a leg under way, or a new one ---------------------------------------
     before = g.op(FN_LT_FF, pins["now"], g.get(STALK_LEG_UNTIL_VAR))
-    on_leg = g.branch(before, BEL.find_else_pin(close))
-    stalled, onward = _author_leg(g, BEL.find_then_pin(on_leg), pins, stock, result)
+    on_leg = g.branch(before, else_(close))
+    stalled, onward = _author_leg(g, then(on_leg), pins, stock, result)
     charge.append(stalled)
-    cover, picked, lost = _author_cover(
-        ed, _author_turn(g, [BEL.find_else_pin(on_leg), onward], pins),
-        pins)
+    cover, picked, lost = _author_cover(ed, _author_turn(g, [else_(on_leg), onward], pins), pins)
     # Close enough, standing still on a leg, or nowhere to go: all one charge.
     _connect(g.put(STALK_CHARGING_VAR, charge + [lost], literal="true"), result(False))
     ahead, step = _author_facing(ed, picked, None)
@@ -279,8 +278,7 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
     _connect(out(me), _pin(run, "Controller"))
     _connect(g.get(STALK_COVER_VAR), _pin(run, "Goal"))
     _connect(step, _pin(run, "execute"))
-    ran, tails, _entry = _author_walk_speed(ed, [BEL.find_then_pin(run)], False, stock,
-                                            scale="stalk_run_scale")
+    ran, tails, _entry = _author_walk_speed(ed, [then(run)], False, stock, scale="stalk_run_scale")
     for tail in tails:
         _connect(tail, result(True))
     return g.made, cover + ahead + ran

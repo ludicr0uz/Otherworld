@@ -7,7 +7,7 @@ logic is save_exit.py's on Tick; this only reads its variables. The panel's
 "save and exit" row is a static label in WBP_PauseMenu.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from graphics_menu.profile_consts import (
     EXIT_AT_VAR, EXIT_BANNER_PREFIX, EXIT_CALLED_OFF_SHOWN_S, EXIT_CALLED_OFF_VAR,
     EXIT_PENDING_VAR,
@@ -32,13 +32,13 @@ def author_exit_banner(ed, in_execs):
         return n
 
     def get(var):
-        return _pin(keep(ed.add_get_member_variable_node(var)), var, is_input=False)
+        return out(keep(ed.add_get_member_variable_node(var)), var)
 
     br = keep(ed.add_branch_node())
     _connect(get(EXIT_PENDING_VAR), _pin(br, "Condition"))
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
-    now = _pin(keep(_node(ed, FN_TIME_SECONDS)), "ReturnValue", is_input=False)
+    now = out(keep(_node(ed, FN_TIME_SECONDS)))
     count = part(ed, WBP_HUD, BANNER_COUNT)
     called_off = part(ed, WBP_HUD, BANNER_OFF)
 
@@ -47,25 +47,25 @@ def author_exit_banner(ed, in_execs):
     _connect(get(EXIT_AT_VAR), _pin(remaining, "A"))
     _connect(now, _pin(remaining, "B"))
     whole = keep(_node(ed, FN_CEIL))
-    _connect(_pin(remaining, "ReturnValue", is_input=False), _pin(whole, "A"))
+    _connect(out(remaining), _pin(whole, "A"))
     digits = keep(_node(ed, FN_INT_TO_STR))
-    _connect(_pin(whole, "ReturnValue", is_input=False), _pin(digits, "InInt"))
+    _connect(out(whole), _pin(digits, "InInt"))
     line = keep(_node(ed, FN_CONCAT))
     _set(line, "A", EXIT_BANNER_PREFIX)
-    _connect(_pin(digits, "ReturnValue", is_input=False), _pin(line, "B"))
-    flow = set_text(ed, count, _pin(line, "ReturnValue", is_input=False), [BEL.find_then_pin(br)])
+    _connect(out(digits), _pin(line, "B"))
+    flow = set_text(ed, count, out(line), [then(br)])
     flow = set_shown(ed, count, True, [flow])
     counting = set_shown(ed, called_off, False, [flow])
 
     # --- or, for a moment after a hit, why it stopped -------------------------
-    idle = set_shown(ed, count, False, [BEL.find_else_pin(br)])
+    idle = set_shown(ed, count, False, [else_(br)])
     ago = keep(_node(ed, FN_SUB))
     _connect(now, _pin(ago, "A"))
     _connect(get(EXIT_CALLED_OFF_VAR), _pin(ago, "B"))
     recent = keep(_node(ed, FN_LESS))
-    _connect(_pin(ago, "ReturnValue", is_input=False), _pin(recent, "A"))
+    _connect(out(ago), _pin(recent, "A"))
     _set(recent, "B", EXIT_CALLED_OFF_SHOWN_S)
-    tails = show_if(ed, called_off, _pin(recent, "ReturnValue", is_input=False), [idle])
+    tails = show_if(ed, called_off, out(recent), [idle])
     ed.add_comment_to_nodes(
         "Save and exit: the countdown while it runs, and for "
         f"{EXIT_CALLED_OFF_SHOWN_S:.0f} s after a hit calls it off, why it stopped.",

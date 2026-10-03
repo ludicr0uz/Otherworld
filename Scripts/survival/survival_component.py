@@ -23,9 +23,10 @@ carries this component, which is exactly the set of actors that get hungry.
 
 import unreal
 
-from combat.graph import (
+from combat.log import _log
+from uebp.graph import (
     BEL, BGE, _apply_defaults, _connect, _create_blueprint, _declare, _events, _float_type,
-    _log, _node, _pin, _set)
+    _node, _pin, _set, out, then)
 from uebp.layout import arrange
 from combat.nodes import (
     FN_AND, FN_CLAMP, FN_GET_ASC, FN_GET_OWNER, FN_GIVE_ABILITY, FN_IS_VALID,
@@ -41,32 +42,30 @@ STATS = ("Hunger", "Thirst", "Temperature")
 def _author_begin_play(ed, begin):
     owner = _node(ed, FN_GET_OWNER)
     lookup = _node(ed, FN_GET_ASC)
-    _connect(_pin(owner, "ReturnValue", is_input=False), _pin(lookup, "Actor"))
+    _connect(out(owner), _pin(lookup, "Actor"))
     keep_asc = ed.add_set_member_variable_node("AbilitySystem")
-    _connect(_pin(lookup, "ReturnValue", is_input=False),
-             _pin(keep_asc, "AbilitySystem"))
-    _connect(BEL.find_then_pin(begin), _pin(keep_asc, "execute"))
+    _connect(out(lookup), _pin(keep_asc, "AbilitySystem"))
+    _connect(then(begin), _pin(keep_asc, "execute"))
 
-    asc = _pin(ed.add_get_member_variable_node("AbilitySystem"), "AbilitySystem", is_input=False)
-    ability = _pin(ed.add_get_member_variable_node("ConsumeAbility"),
-                   "ConsumeAbility", is_input=False)
+    asc = out(ed.add_get_member_variable_node("AbilitySystem"), "AbilitySystem")
+    ability = out(ed.add_get_member_variable_node("ConsumeAbility"), "ConsumeAbility")
     has_asc = _node(ed, FN_IS_VALID)
     _connect(asc, _pin(has_asc, "Object"))
     has_ability = _node(ed, FN_IS_VALID_CLASS)
     _connect(ability, _pin(has_ability, "Class"))
     both = _node(ed, FN_AND)
-    _connect(_pin(has_asc, "ReturnValue", is_input=False), _pin(both, "A"))
-    _connect(_pin(has_ability, "ReturnValue", is_input=False), _pin(both, "B"))
+    _connect(out(has_asc), _pin(both, "A"))
+    _connect(out(has_ability), _pin(both, "B"))
     can = ed.add_branch_node()
-    _connect(_pin(both, "ReturnValue", is_input=False), _pin(can, "Condition"))
-    _connect(BEL.find_then_pin(keep_asc), _pin(can, "execute"))
+    _connect(out(both), _pin(can, "Condition"))
+    _connect(then(keep_asc), _pin(can, "execute"))
 
     give = _node(ed, FN_GIVE_ABILITY)
     _connect(asc, _pin(give, "self"))
     _connect(ability, _pin(give, "AbilityClass"))
     _set(give, "Level", 1)
     _set(give, "InputID", -1)
-    _connect(BEL.find_then_pin(can), _pin(give, "execute"))
+    _connect(then(can), _pin(give, "execute"))
 
     ed.add_comment_to_nodes(
         "Find the owner's AbilitySystemComponent (installed next to this "
@@ -81,23 +80,23 @@ def _author_decay(ed, tick, stat, rate_var, max_var, exec_in):
     rate = ed.add_get_member_variable_node(rate_var)
     top = ed.add_get_member_variable_node(max_var)
     step = _node(ed, FN_MUL_FF)
-    _connect(_pin(rate, rate_var, is_input=False), _pin(step, "A"))
-    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "B"))
+    _connect(out(rate, rate_var), _pin(step, "A"))
+    _connect(out(tick, "DeltaSeconds"), _pin(step, "B"))
     less = _node(ed, FN_SUB_FF)
-    _connect(_pin(now, stat, is_input=False), _pin(less, "A"))
-    _connect(_pin(step, "ReturnValue", is_input=False), _pin(less, "B"))
+    _connect(out(now, stat), _pin(less, "A"))
+    _connect(out(step), _pin(less, "B"))
     clamp = _node(ed, FN_CLAMP)
-    _connect(_pin(less, "ReturnValue", is_input=False), _pin(clamp, "Value"))
+    _connect(out(less), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
-    _connect(_pin(top, max_var, is_input=False), _pin(clamp, "Max"))
+    _connect(out(top, max_var), _pin(clamp, "Max"))
     write = ed.add_set_member_variable_node(stat)
-    _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(write, stat))
+    _connect(out(clamp), _pin(write, stat))
     _connect(exec_in, _pin(write, "execute"))
-    return BEL.find_then_pin(write)
+    return then(write)
 
 
 def _author_tick(ed, tick):
-    flow = BEL.find_then_pin(tick)
+    flow = then(tick)
     flow = _author_decay(ed, tick, "Hunger", "HungerDecay", "MaxHunger", flow)
     flow = _author_decay(ed, tick, "Thirst", "ThirstDecay", "MaxThirst", flow)
 
@@ -105,14 +104,14 @@ def _author_tick(ed, tick):
     # AbilitySystem, and a pure Get with a null self in a Branch condition is
     # an Accessed None on every frame (CLAUDE.md, the fire-gate gotcha).
     asc_get = ed.add_get_member_variable_node("AbilitySystem")
-    asc = _pin(asc_get, "AbilitySystem", is_input=False)
+    asc = out(asc_get, "AbilitySystem")
     valid = _node(ed, FN_IS_VALID)
     _connect(asc, _pin(valid, "Object"))
     gate = ed.add_branch_node()
-    _connect(_pin(valid, "ReturnValue", is_input=False), _pin(gate, "Condition"))
+    _connect(out(valid), _pin(gate, "Condition"))
     _connect(flow, _pin(gate, "execute"))
 
-    exits = (BEL.find_then_pin(gate),)
+    exits = (then(gate),)
     for stat, effect_var, tags in DEBUFFS:
         exits = _author_debuff_sync(ed, asc, stat, effect_var, tags, exits)
     ed.add_comment_to_nodes(

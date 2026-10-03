@@ -23,8 +23,7 @@ pure Get with a null self is an Accessed None on every frame.
 
 import unreal
 
-from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out
 from combat.nodes import (
     FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_MAX_FF, FN_MUL_FF, FN_SUB_FF,
 )

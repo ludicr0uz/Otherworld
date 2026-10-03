@@ -7,7 +7,8 @@ import dataclasses
 import unreal
 
 from asset_pipeline.player_body import PLAYER_NAME
-from combat.graph import BEL, _assets, _component_object, _handles, _log, _rot
+from combat.log import _log
+from uebp.graph import BEL, _assets, _component_object, _handles, _rot
 from combat.paths import CHARACTER_BP_PATH
 
 

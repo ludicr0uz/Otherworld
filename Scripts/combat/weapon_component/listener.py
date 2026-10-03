@@ -14,7 +14,7 @@ the left. The override follows the component and never needs refreshing. A
 restart opens the level again, and the new character's BeginPlay sets it again.
 """
 
-from combat.graph import BEL, _connect, _node, _pin
+from uebp.graph import _connect, _node, _pin, out, then
 from combat.nodes import FN_SET_LISTENER_ATTENUATION
 
 
@@ -28,12 +28,11 @@ def _author_listener_at_character(ed, as_char, pc_out, exec_in):
     _connect(as_char, _pin(capsule, "self"))
     listen = _node(ed, FN_SET_LISTENER_ATTENUATION)
     _connect(pc_out, _pin(listen, "self"))
-    _connect(_pin(capsule, "CapsuleComponent", is_input=False),
-             _pin(listen, "AttachToComponent"))
+    _connect(out(capsule, "CapsuleComponent"), _pin(listen, "AttachToComponent"))
     _connect(exec_in, _pin(listen, "execute"))
     ed.add_comment_to_nodes(
         "Sounds fade with the distance from the character, not from the "
         "camera, so aiming down the sights does not make the footsteps "
         "louder. Panning still follows the camera.",
         [capsule, listen])
-    return BEL.find_then_pin(listen)
+    return then(listen)

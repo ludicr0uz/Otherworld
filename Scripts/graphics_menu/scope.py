@@ -7,7 +7,7 @@ shoulder aim (1.5x, COMBAT.shoulder_zoom) keeps the crosshair, and the glass
 only arrives with zoom past that -- which only the sights give it.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, out, then
 from combat.tuning import COMBAT
 from graphics_menu.canvas import _draw_texture
 
@@ -63,15 +63,15 @@ def _author_scope_gate(ed, as_weapon, scoped_out, keep):
     now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
     zoom = keep(_node(ed, FN_DIV))
-    _connect(_pin(base, "BaseFOV", is_input=False), _pin(zoom, "A"))
-    _connect(_pin(now, "CurrentFOV", is_input=False), _pin(zoom, "B"))
+    _connect(out(base, "BaseFOV"), _pin(zoom, "A"))
+    _connect(out(now, "CurrentFOV"), _pin(zoom, "B"))
     past = keep(_node(ed, FN_GREATER))
-    _connect(_pin(zoom, "ReturnValue", is_input=False), _pin(past, "A"))
+    _connect(out(zoom), _pin(past, "A"))
     _set(past, "B", COMBAT.shoulder_zoom + SCOPE_GATE_SLACK)
     both = keep(_node(ed, FN_AND))
     _connect(scoped_out, _pin(both, "A"))
-    _connect(_pin(past, "ReturnValue", is_input=False), _pin(both, "B"))
-    return _pin(both, "ReturnValue", is_input=False)
+    _connect(out(past), _pin(both, "B"))
+    return out(both)
 
 
 def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
@@ -112,24 +112,24 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     left = keep(_node(ed, FN_SUB))
     _connect(cx, _pin(left, "A"))
     _connect(cy, _pin(left, "B"))
-    left_out = _pin(left, "ReturnValue", is_input=False)
+    left_out = out(left)
     right = keep(_node(ed, FN_ADD))
     _connect(cx, _pin(right, "A"))
     _connect(cy, _pin(right, "B"))
     bar_w = keep(_node(ed, FN_FMAX))
     _connect(left_out, _pin(bar_w, "A"))
     _set(bar_w, "B", 0.0)
-    bar_w_out = _pin(bar_w, "ReturnValue", is_input=False)
+    bar_w_out = out(bar_w)
 
     base = keep(ed.add_get_member_variable_node("BaseFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(base, "self"))
     now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
     zoom = keep(_node(ed, FN_DIV))
-    _connect(_pin(base, "BaseFOV", is_input=False), _pin(zoom, "A"))
-    _connect(_pin(now, "CurrentFOV", is_input=False), _pin(zoom, "B"))
+    _connect(out(base, "BaseFOV"), _pin(zoom, "A"))
+    _connect(out(now, "CurrentFOV"), _pin(zoom, "B"))
     travelled = keep(_node(ed, FN_SUB))
-    _connect(_pin(zoom, "ReturnValue", is_input=False), _pin(travelled, "A"))
+    _connect(out(zoom), _pin(travelled, "A"))
     _set(travelled, "B", COMBAT.shoulder_zoom)
 
     # The denominator is this weapon's own zoom, not the config's scope
@@ -139,23 +139,23 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     ads = keep(ed.add_get_member_variable_node("AdsZoom", ITEM_CLASS_PATH))
     _connect(held_out, _pin(ads, "self"))
     span = keep(_node(ed, FN_SUB))
-    _connect(_pin(ads, "AdsZoom", is_input=False), _pin(span, "A"))
+    _connect(out(ads, "AdsZoom"), _pin(span, "A"))
     _set(span, "B", COMBAT.shoulder_zoom)
 
     frac = keep(_node(ed, FN_DIV))
-    _connect(_pin(travelled, "ReturnValue", is_input=False), _pin(frac, "A"))
-    _connect(_pin(span, "ReturnValue", is_input=False), _pin(frac, "B"))
+    _connect(out(travelled), _pin(frac, "A"))
+    _connect(out(span), _pin(frac, "B"))
     alpha = keep(_node(ed, FN_FCLAMP))
-    _connect(_pin(frac, "ReturnValue", is_input=False), _loose_pin(alpha, "Value"))
+    _connect(out(frac), _loose_pin(alpha, "Value"))
     _set(alpha, "Min", 0.0)
     _set(alpha, "Max", 1.0)
-    alpha_out = _pin(alpha, "ReturnValue", is_input=False)
+    alpha_out = out(alpha)
 
     ink = keep(_node(ed, FN_MAKE_COLOR))
     for ch in ("R", "G", "B"):
         _set(ink, ch, 0.0)
     _connect(alpha_out, _pin(ink, "A"))
-    ink_out = _pin(ink, "ReturnValue", is_input=False)
+    ink_out = out(ink)
     tint = keep(_node(ed, FN_MAKE_COLOR))
     for ch in ("R", "G", "B"):
         _set(tint, ch, 1.0)
@@ -167,20 +167,20 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
         if at_x is None:
             _set(r, "ScreenX", 0.0)
         else:
-            _connect(_pin(at_x, "ReturnValue", is_input=False), _pin(r, "ScreenX"))
+            _connect(out(at_x), _pin(r, "ScreenX"))
         _set(r, "ScreenY", 0.0)
         _connect(bar_w_out, _pin(r, "ScreenW"))
         _connect(height, _pin(r, "ScreenH"))
         _connect(ink_out, _pin(r, "RectColor"))
         _connect(flow, _pin(r, "execute"))
-        flow = BEL.find_then_pin(r)
+        flow = then(r)
 
     glass = keep(_draw_texture(ed, SCOPE_TEX))
     _connect(left_out, _pin(glass, "ScreenX"))
     _set(glass, "ScreenY", 0.0)
     _connect(height, _pin(glass, "ScreenW"))
     _connect(height, _pin(glass, "ScreenH"))
-    _connect(_pin(tint, "ReturnValue", is_input=False), _pin(glass, "TintColor"))
+    _connect(out(tint), _pin(glass, "TintColor"))
     _connect(flow, _pin(glass, "execute"))
 
     ed.add_comment_to_nodes(
@@ -190,4 +190,4 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
         "the weapon's AdsZoom -- the glass and the zoom are one animation.",
         made)
 
-    return BEL.find_then_pin(glass)
+    return then(glass)

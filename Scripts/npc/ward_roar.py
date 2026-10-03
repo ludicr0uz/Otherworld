@@ -27,7 +27,7 @@ flight starts over, and so does the throw for the first roar.
 from forest_generator.npc_ward import (
     NPC_WARD_ROAR_AT_S, NPC_WARD_ROAR_S, NPC_WARD_ROAR_VARY_S,
 )
-from npc.graph import BEL, out
+from uebp.graph import BEL, else_, out, then
 from npc.nodes import FN_ADD_FF, FN_AND, FN_GT_FF, FN_LE_FF, FN_LT_FF, FN_RANDOM_FLOAT
 from npc.paths import WARD_ROAR_AT_VAR, WARD_ROAR_UNTIL_VAR
 from npc.roar import _author_bellow
@@ -56,7 +56,7 @@ def _author_roar_wait(g, exec_in, pins):
     of a pass that is, and that of one that is not."""
     during = g.op(FN_LT_FF, pins["now"], g.get(WARD_ROAR_UNTIL_VAR))
     roaring = g.branch(during, exec_in)
-    return BEL.find_then_pin(roaring), BEL.find_else_pin(roaring)
+    return then(roaring), else_(roaring)
 
 
 def _author_roars(g, held_on, gave_up, pins, roar_anim):
@@ -69,8 +69,8 @@ def _author_roars(g, held_on, gave_up, pins, roar_anim):
     armed = g.op(FN_GT_FF, g.get(WARD_ROAR_AT_VAR), 0.0)
     up = g.op(FN_LE_FF, g.get(WARD_ROAR_AT_VAR), pins["now"])
     due = g.branch(g.op(FN_AND, armed, up), onward)
-    given = g.put(WARD_ROAR_AT_VAR, BEL.find_then_pin(due), literal=0.0)
+    given = g.put(WARD_ROAR_AT_VAR, then(due), literal=0.0)
     ends = g.op(FN_ADD_FF, pins["now"], NPC_WARD_ROAR_S)
     step = g.put(WARD_ROAR_UNTIL_VAR, [given, gave_up], pin=ends)
     step = _author_bellow(g, step, pins, roar_anim)
-    return BEL.find_else_pin(due), [standing, step]
+    return else_(due), [standing, step]

@@ -54,7 +54,8 @@ editor writes its graph back over the runtime tree when it saves.
 import unreal
 
 from forest_generator.npc_placement import NPC_REPATH_SECONDS
-from npc.graph import _asset_sub, _log
+from npc.graph import _log
+from uebp.graph import _assets
 from npc.paths import (
     BB_AGGRO_KEY, BB_PATH, BB_REASON_KEY, STEP_CHASE, STEP_DRAWN, STEP_PRESENT,
     STEP_PULSE, STEP_STALK, STEP_STROLL, STEP_SWING, STEP_VAR, STEP_WARD,
@@ -75,7 +76,7 @@ def _create(path, cls, factory):
 
 def build_blackboard():
     """BB_ForestWanderer: SelfActor (the factory's), Aggro, AggroReason."""
-    eas = _asset_sub()
+    eas = _assets()
     bb = (eas.load_asset(BB_PATH) if eas.does_asset_exist(BB_PATH)
           else _create(BB_PATH, unreal.BlackboardData, unreal.BlackboardDataFactory()))
     keys = [k for k in bb.get_editor_property("keys")
@@ -95,7 +96,7 @@ def fresh_tree(path):
     """An empty BehaviorTree at ``path``: the old one deleted first, so no
     stale editor graph survives (see the module docstring). If the delete is
     refused, the old asset is reused and its runtime tree replaced."""
-    eas = _asset_sub()
+    eas = _assets()
     if eas.does_asset_exist(path) and not eas.delete_asset(path):
         _log(f"note: could not delete {path}; rebuilding its tree in place "
              f"(an editor graph saved in it would now be stale)")
@@ -182,7 +183,7 @@ def fill_tree(bt, bb, task_class, senses, stalks=False, wards=False,
 
     bt.set_editor_property("blackboard_asset", bb)
     bt.set_editor_property("root_node", root)
-    _asset_sub().save_loaded_asset(bt, False)
+    _assets().save_loaded_asset(bt, False)
     _log(f"built {bt.get_path_name()} (senses {', '.join(senses)}"
          f"{'; stalks before it chases' if stalks else ''}"
          f"{'; held off by fire' if wards else ''}"

@@ -21,9 +21,10 @@ for the player and every wanderer, and never learns what a stance is.
 import unreal
 
 from combat.footsteps import FOOTSTEP_BP_PATH
-from combat.graph import (
-    BEL, _component_object, _connect, _handles, _log, _loose_pin, _node, _palette, _pin,
-    _set)
+from combat.log import _log
+from uebp.graph import (
+    _component_object, _connect, _handles, _loose_pin, _node, _palette, _pin, _set, else_,
+    out, then)
 from combat.nodes import (
     FN_ABS, FN_AND, FN_CAPSULE_HALF_HEIGHT, FN_CROUCH, FN_EQ_II, FN_GET_COMP,
     FN_GREATER_FF, FN_IS_CROUCHING, FN_MUL_FF, FN_SELECT_FF, FN_SELECT_II,
@@ -73,12 +74,12 @@ def _by_stance(ed, stance_out, crouch, prone):
     low = _node(ed, FN_SELECT_FF)
     _set(low, "A", crouch)
     _set(low, "B", 1.0)
-    _connect(_pin(is_crouch, "ReturnValue", is_input=False), _pin(low, "bPickA"))
+    _connect(out(is_crouch), _pin(low, "bPickA"))
     pick = _node(ed, FN_SELECT_FF)
     _set(pick, "A", prone)
-    _connect(_pin(low, "ReturnValue", is_input=False), _pin(pick, "B"))
-    _connect(_pin(is_prone, "ReturnValue", is_input=False), _pin(pick, "bPickA"))
-    return _pin(pick, "ReturnValue", is_input=False)
+    _connect(out(low), _pin(pick, "B"))
+    _connect(out(is_prone), _pin(pick, "bPickA"))
+    return out(pick)
 
 
 def _author_stance_toggle(ed, pc_out, key_pins, exec_in):
@@ -92,7 +93,7 @@ def _author_stance_toggle(ed, pc_out, key_pins, exec_in):
     the escape, the same reason it wins over the guard. Returns the Set node.
     """
     stance = ed.add_get_member_variable_node(STANCE_VAR)
-    stance_out = _pin(stance, STANCE_VAR, is_input=False)
+    stance_out = out(stance, STANCE_VAR)
 
     def toggled(var, target):
         pressed = _node(ed, FN_WAS_PRESSED)
@@ -104,9 +105,8 @@ def _author_stance_toggle(ed, pc_out, key_pins, exec_in):
         flip = _node(ed, FN_SELECT_II)
         _set(flip, "A", STAND)
         _set(flip, "B", target)
-        _connect(_pin(already, "ReturnValue", is_input=False), _pin(flip, "bPickA"))
-        return (_pin(pressed, "ReturnValue", is_input=False),
-                _pin(flip, "ReturnValue", is_input=False))
+        _connect(out(already), _pin(flip, "bPickA"))
+        return (out(pressed), out(flip))
 
     c_pressed, c_flip = toggled("KeyCrouch", CROUCH)
     p_pressed, p_flip = toggled("KeyProne", PRONE)
@@ -116,16 +116,15 @@ def _author_stance_toggle(ed, pc_out, key_pins, exec_in):
     _connect(c_pressed, _pin(after_c, "bPickA"))
     after_p = _node(ed, FN_SELECT_II)
     _connect(p_flip, _pin(after_p, "A"))
-    _connect(_pin(after_c, "ReturnValue", is_input=False), _pin(after_p, "B"))
+    _connect(out(after_c), _pin(after_p, "B"))
     _connect(p_pressed, _pin(after_p, "bPickA"))
     stood = _node(ed, FN_SELECT_II)
     _set(stood, "A", STAND)
-    _connect(_pin(after_p, "ReturnValue", is_input=False), _pin(stood, "B"))
-    _connect(_pin(ed.add_get_member_variable_node("Sprinting"),
-                  "Sprinting", is_input=False), _pin(stood, "bPickA"))
+    _connect(out(after_p), _pin(stood, "B"))
+    _connect(out(ed.add_get_member_variable_node("Sprinting"), "Sprinting"), _pin(stood, "bPickA"))
 
     mark = ed.add_set_member_variable_node(STANCE_VAR)
-    _connect(_pin(stood, "ReturnValue", is_input=False), _pin(mark, STANCE_VAR))
+    _connect(out(stood), _pin(mark, STANCE_VAR))
     _connect(exec_in, _pin(mark, "execute"))
     return mark
 
@@ -150,13 +149,13 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
         _connect(e, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    mark = _author_stance_toggle(ed, pc_out, key_pins, BEL.find_then_pin(as_char))
+    mark = _author_stance_toggle(ed, pc_out, key_pins, then(as_char))
     stance = ed.add_get_member_variable_node(STANCE_VAR)
-    stance_out = _pin(stance, STANCE_VAR, is_input=False)
+    stance_out = out(stance, STANCE_VAR)
 
     movement = ed.add_get_member_variable_node("CharacterMovement", "/Script/Engine.Character")
     _connect(char_out, _pin(movement, "self"))
-    movement_out = _pin(movement, "CharacterMovement", is_input=False)
+    movement_out = out(movement, "CharacterMovement")
 
     # --- how fast a low stance moves -----------------------------------------
     # The movement component reads MaxWalkSpeedCrouched instead of
@@ -164,24 +163,23 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     # latter simply do not apply down here.
     scale = _by_stance(ed, stance_out, COMBAT.crouch_speed_scale, COMBAT.prone_speed_scale)
     speed = _node(ed, FN_MUL_FF)
-    _connect(_pin(ed.add_get_member_variable_node("BaseSpeed"),
-                  "BaseSpeed", is_input=False), _pin(speed, "A"))
+    _connect(out(ed.add_get_member_variable_node("BaseSpeed"), "BaseSpeed"), _pin(speed, "A"))
     _connect(scale, _pin(speed, "B"))
     pace = ed.add_set_member_variable_node("MaxWalkSpeedCrouched", MOVEMENT_CLASS_PATH)
     _connect(movement_out, _pin(pace, "self"))
-    _connect(_pin(speed, "ReturnValue", is_input=False), _pin(pace, "MaxWalkSpeedCrouched"))
-    _connect(BEL.find_then_pin(mark), _pin(pace, "execute"))
+    _connect(out(speed), _pin(pace, "MaxWalkSpeedCrouched"))
+    _connect(then(mark), _pin(pace, "execute"))
 
     # --- stand, or crouch to the stance's height -----------------------------
     standing = _node(ed, FN_EQ_II)
     _connect(stance_out, _pin(standing, "A"))
     _set(standing, "B", STAND)
     up = ed.add_branch_node()
-    _connect(_pin(standing, "ReturnValue", is_input=False), _pin(up, "Condition"))
-    _connect(BEL.find_then_pin(pace), _pin(up, "execute"))
+    _connect(out(standing), _pin(up, "Condition"))
+    _connect(then(pace), _pin(up, "execute"))
     rise = _node(ed, FN_UNCROUCH)
     _connect(char_out, _pin(rise, "self"))
-    _connect(BEL.find_then_pin(up), _pin(rise, "execute"))
+    _connect(then(up), _pin(rise, "execute"))
 
     height = _node(ed, FN_SELECT_FF)
     _set(height, "A", COMBAT.prone_half_height_cm)
@@ -189,49 +187,49 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     is_prone = _node(ed, FN_EQ_II)
     _connect(stance_out, _pin(is_prone, "A"))
     _set(is_prone, "B", PRONE)
-    _connect(_pin(is_prone, "ReturnValue", is_input=False), _pin(height, "bPickA"))
-    height_out = _pin(height, "ReturnValue", is_input=False)
+    _connect(out(is_prone), _pin(height, "bPickA"))
+    height_out = out(height)
 
     capsule = ed.add_get_member_variable_node("CapsuleComponent", "/Script/Engine.Character")
     _connect(char_out, _pin(capsule, "self"))
     now_h = _node(ed, FN_CAPSULE_HALF_HEIGHT)
-    _connect(_pin(capsule, "CapsuleComponent", is_input=False), _pin(now_h, "self"))
+    _connect(out(capsule, "CapsuleComponent"), _pin(now_h, "self"))
     off = _node(ed, FN_SUB_FF)
-    _connect(_pin(now_h, "ReturnValue", is_input=False), _pin(off, "A"))
+    _connect(out(now_h), _pin(off, "A"))
     _connect(height_out, _pin(off, "B"))
     off_abs = _node(ed, FN_ABS)
-    _connect(_pin(off, "ReturnValue", is_input=False), _pin(off_abs, "A"))
+    _connect(out(off), _pin(off_abs, "A"))
     wrong = _node(ed, FN_GREATER_FF)
-    _connect(_pin(off_abs, "ReturnValue", is_input=False), _pin(wrong, "A"))
+    _connect(out(off_abs), _pin(wrong, "A"))
     _set(wrong, "B", HEIGHT_SLACK_CM)
     crouched = _node(ed, FN_IS_CROUCHING)
     _connect(movement_out, _pin(crouched, "self"))
     resize = _node(ed, FN_AND)
-    _connect(_pin(crouched, "ReturnValue", is_input=False), _pin(resize, "A"))
-    _connect(_pin(wrong, "ReturnValue", is_input=False), _pin(resize, "B"))
+    _connect(out(crouched), _pin(resize, "A"))
+    _connect(out(wrong), _pin(resize, "B"))
 
     restart = ed.add_branch_node()
-    _connect(_pin(resize, "ReturnValue", is_input=False), _pin(restart, "Condition"))
-    _connect(BEL.find_else_pin(up), _pin(restart, "execute"))
-    _connect(BEL.find_then_pin(restart), _pin(rise, "execute"))
+    _connect(out(resize), _pin(restart, "Condition"))
+    _connect(else_(up), _pin(restart, "execute"))
+    _connect(then(restart), _pin(rise, "execute"))
     size = ed.add_set_member_variable_node("CrouchedHalfHeight", MOVEMENT_CLASS_PATH)
     _connect(movement_out, _pin(size, "self"))
     _connect(height_out, _pin(size, "CrouchedHalfHeight"))
-    _connect(BEL.find_else_pin(restart), _pin(size, "execute"))
+    _connect(else_(restart), _pin(size, "execute"))
     duck = _node(ed, FN_CROUCH)
     _connect(char_out, _pin(duck, "self"))
-    _connect(BEL.find_then_pin(size), _pin(duck, "execute"))
+    _connect(then(size), _pin(duck, "execute"))
 
     # --- and how loud the feet are -------------------------------------------
     comp = _node(ed, FN_GET_COMP)
     _connect(owner_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(FOOTSTEP_CLASS_PATH)
     as_feet = _palette(ed, NODE_CAST_FOOTSTEP)
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_feet, "Object"))
-    for e in (BEL.find_then_pin(rise), BEL.find_then_pin(duck)):
+    _connect(out(comp), _pin(as_feet, "Object"))
+    for e in (then(rise), then(duck)):
         _connect(e, _pin(as_feet, "execute"))
     feet = _loose_pin(as_feet, "AsBPFootstepComponent", is_input=False)
-    tail = BEL.find_then_pin(as_feet)
+    tail = then(as_feet)
     for var, crouch, prone in (
             ("StepVolume", COMBAT.crouch_step_volume, COMBAT.prone_step_volume),
             ("StepNoise", COMBAT.crouch_step_noise, COMBAT.prone_step_noise)):
@@ -240,7 +238,7 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
         _connect(feet, _pin(write, "self"))
         _connect(value, _pin(write, var))
         _connect(tail, _pin(write, "execute"))
-        tail = BEL.find_then_pin(write)
+        tail = then(write)
 
     ed.add_comment_to_nodes(
         f"{CROUCH_KEY} toggles crouch, {PRONE_KEY} toggles prone, sprinting "
@@ -253,5 +251,4 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
         f"x{COMBAT.prone_step_volume}, noise reach x{COMBAT.crouch_step_noise} / "
         f"x{COMBAT.prone_step_noise}.",
         [n for n in ed.list_all_nodes() if n.get_name() not in before])
-    return (tail, _pin(as_char, "CastFailed", is_input=False),
-            _pin(as_feet, "CastFailed", is_input=False))
+    return (tail, out(as_char, "CastFailed"), out(as_feet, "CastFailed"))

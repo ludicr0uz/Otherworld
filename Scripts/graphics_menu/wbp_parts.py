@@ -11,9 +11,9 @@ row) and the value column (a slider's number, a key's name, ON/OFF).
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _apply_defaults, _connect, _declare, _float_type, _must_load, _node,
-    _palette, _pin)
+from uebp.graph import (
+    BEL, BGE, _apply_defaults, _connect, _declare, _float_type, _must_load, _node, _palette,
+    _pin, out, then)
 from uebp.layout import arrange
 from graphics_menu import umg_author as U
 from graphics_menu.umg_consts import (
@@ -41,24 +41,24 @@ def _author_pre_construct(bp):
     pre = _palette(ed, NODE_PRE_CONSTRUCT)
 
     def get(var):
-        return _pin(ed.add_get_member_variable_node(var), var, is_input=False)
+        return out(ed.add_get_member_variable_node(var), var)
 
     as_text = _node(ed, FN_STR_TO_TEXT)
     _connect(get(ROW_TEXT_VAR), _pin(as_text, "InString"))
     put = _node(ed, FN_SET_TEXT)
     _connect(get(ROW_LABEL), _pin(put, "self"))
-    _connect(_pin(as_text, "ReturnValue", is_input=False), _pin(put, "InText"))
-    _connect(BEL.find_then_pin(pre), _pin(put, "execute"))
+    _connect(out(as_text), _pin(put, "InText"))
+    _connect(then(pre), _pin(put, "execute"))
 
     tint = _node(ed, FN_SET_TEXT_COLOUR)
     _connect(get(ROW_LABEL), _pin(tint, "self"))
     _connect(get(ROW_COLOR_VAR), _pin(tint, "InColorAndOpacity"))
-    _connect(BEL.find_then_pin(put), _pin(tint, "execute"))
+    _connect(then(put), _pin(tint, "execute"))
 
     width = _node(ed, FN_SET_WIDTH)
     _connect(get(ROW_LABEL_BOX), _pin(width, "self"))
     _connect(get(ROW_WIDTH_VAR), _pin(width, "InWidthOverride"))
-    _connect(BEL.find_then_pin(tint), _pin(width, "execute"))
+    _connect(then(tint), _pin(width, "execute"))
     arrange(ed)
 
 
@@ -136,8 +136,8 @@ def build_inventory_slot():
     put = _node(ed, FN_SET_BRUSH)
     for var, pin in ((SLOT_GHOST, "self"), (SLOT_GHOST_VAR, "Texture")):
         got = ed.add_get_member_variable_node(var)
-        _connect(_pin(got, var, is_input=False), _pin(put, pin))
-    _connect(BEL.find_then_pin(pre), _pin(put, "execute"))
+        _connect(out(got, var), _pin(put, pin))
+    _connect(then(pre), _pin(put, "execute"))
     arrange(ed)
     return U.compile_and_save(bp)
 

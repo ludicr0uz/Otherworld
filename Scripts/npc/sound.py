@@ -6,7 +6,7 @@ from npc.nodes import (
     FN_ARR_GET, FN_ARR_LEN, FN_GREATER_II, FN_PLAY_SOUND, FN_RAND_INT,
     FN_SUB_II,
 )
-from npc.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 
 
 # ─── Playing one of several sounds ──────────────────────────────────────────
@@ -33,39 +33,39 @@ def _author_random_sound(ed, var_name, at_pin, exec_in):
         return n
 
     table = keep(ed.add_get_member_variable_node(var_name))
-    table_out = _pin(table, var_name, is_input=False)
+    table_out = out(table, var_name)
 
     count = keep(_node(ed, FN_ARR_LEN))
     _connect(table_out, _pin(count, "TargetArray"))
     stocked = keep(_node(ed, FN_GREATER_II))
-    _connect(_pin(count, "ReturnValue", is_input=False), _pin(stocked, "A"))
+    _connect(out(count), _pin(stocked, "A"))
     _set(stocked, "B", 0)
 
     have = keep(ed.add_branch_node())
-    _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(have, "Condition"))
+    _connect(out(stocked), _pin(have, "Condition"))
     _connect(exec_in, _pin(have, "execute"))
 
     # RandomIntegerInRange is inclusive at both ends, so the top is length - 1.
     top = keep(_node(ed, FN_SUB_II))
-    _connect(_pin(count, "ReturnValue", is_input=False), _pin(top, "A"))
+    _connect(out(count), _pin(top, "A"))
     _set(top, "B", 1)
     which = keep(_node(ed, FN_RAND_INT))
     _set(which, "Min", 0)
-    _connect(_pin(top, "ReturnValue", is_input=False), _pin(which, "Max"))
+    _connect(out(top), _pin(which, "Max"))
     pick = keep(_node(ed, FN_ARR_GET))
     _connect(table_out, _pin(pick, "TargetArray"))
-    _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
+    _connect(out(which), _pin(pick, "Index"))
 
     play = keep(_node(ed, FN_PLAY_SOUND))
-    _connect(_pin(pick, "Item", is_input=False), _pin(play, "Sound"))
+    _connect(out(pick, "Item"), _pin(play, "Sound"))
     _connect(at_pin, _pin(play, "Location"))
-    _connect(BEL.find_then_pin(have), _pin(play, "execute"))
+    _connect(then(have), _pin(play, "execute"))
 
     # A join node so the caller has ONE exec to carry on from whether or not
     # there was a sound to play. Without it the empty-array path dangles and
     # the chase loop ends the first time a wanderer tries to speak.
     join = keep(ed.add_branch_node())
     _set(join, "Condition", "true")
-    _connect(BEL.find_then_pin(play), _pin(join, "execute"))
-    _connect(BEL.find_else_pin(have), _pin(join, "execute"))
-    return made, BEL.find_then_pin(join)
+    _connect(then(play), _pin(join, "execute"))
+    _connect(else_(have), _pin(join, "execute"))
+    return made, then(join)

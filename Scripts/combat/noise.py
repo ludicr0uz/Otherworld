@@ -28,7 +28,7 @@ from combat.game_state import (
     NOISE_CONE_COS_VAR, NOISE_CONE_RANGE_VAR, NOISE_DIRECTION_VAR,
     NOISE_LOCATION_VAR, NOISE_RANGE_VAR, NOISE_TIME_VAR,
 )
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from combat.nodes import (
     FN_GET_GAME_MODE, FN_GE_FF, FN_MAX_FF, FN_OR, FN_SUB_FF, FN_TIME_SECONDS,
     NODE_CAST_GAME_MODE,
@@ -100,10 +100,10 @@ def _author_make_noise(ed, exec_in, location, reach,
     _connect(_pin(louder, "ReturnValue", is_input=False), _pin(either, "B"))
     lands = keep(ed.add_branch_node())
     _connect(_pin(either, "ReturnValue", is_input=False), _pin(lands, "Condition"))
-    _connect(BEL.find_then_pin(as_mode), _pin(lands, "execute"))
+    _connect(then(as_mode), _pin(lands, "execute"))
 
     # --- write it ------------------------------------------------------------
-    tail = BEL.find_then_pin(lands)
+    tail = then(lands)
 
     def write(name, value_pin=None, literal=None):
         nonlocal tail
@@ -114,7 +114,7 @@ def _author_make_noise(ed, exec_in, location, reach,
         else:
             _set(n, name, literal)
         _connect(tail, _pin(n, "execute"))
-        tail = BEL.find_then_pin(n)
+        tail = then(n)
 
     write(NOISE_TIME_VAR, now_out)
     write(NOISE_LOCATION_VAR, location)
@@ -130,7 +130,6 @@ def _author_make_noise(ed, exec_in, location, reach,
     # the GameMode was the one this project builds.
     out = keep(ed.add_branch_node())
     _set(out, "Condition", "true")
-    for pin in (tail, BEL.find_else_pin(lands),
-                _pin(as_mode, "CastFailed", is_input=False)):
+    for pin in (tail, else_(lands), _pin(as_mode, "CastFailed", is_input=False)):
         _connect(pin, _pin(out, "execute"))
-    return made, BEL.find_then_pin(out)
+    return made, then(out)

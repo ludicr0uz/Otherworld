@@ -21,8 +21,7 @@ the walk is over nothing and the test is false. Held is read behind its own
 IsValid Branch in both halves: empty hands are offered nothing.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from combat.heat_tuning import COOL_VAR, HEAT_S, HEATS_VAR, HOT_VAR
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
@@ -58,7 +57,7 @@ def _author_fire_candidates(ed, exec_in):
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
     _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
-    _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
+    _connect(then(every), _loose_pin(loop, "Exec"))
 
     held = keep(ed.add_get_member_variable_node("Held"))
     armed = keep(_node(ed, FN_IS_VALID))
@@ -74,7 +73,7 @@ def _author_fire_candidates(ed, exec_in):
         f"{CAMPFIRE_CLASS_VAR} actor, while the held item {HEATS_VAR}.",
         made)
     return (_loose_pin(loop, "ArrayElement", is_input=False), heats_pin,
-            BEL.find_then_pin(gate), _loose_pin(loop, "Completed", is_input=False))
+            then(gate), _loose_pin(loop, "Completed", is_input=False))
 
 
 def _author_heat_item(ed, target, exec_in):
@@ -106,7 +105,7 @@ def _author_heat_item(ed, target, exec_in):
     _connect(held, _pin(armed, "Object"))
     gate = keep(ed.add_branch_node())
     _connect(out(armed), _pin(gate, "Condition"))
-    _connect(BEL.find_then_pin(mine), _pin(gate, "execute"))
+    _connect(then(mine), _pin(gate, "execute"))
 
     now = keep(_node(ed, FN_TIME_SECONDS))
     until = keep(_node(ed, FN_ADD_FF))
@@ -115,15 +114,15 @@ def _author_heat_item(ed, target, exec_in):
     cool = keep(ed.add_set_member_variable_node(COOL_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(cool, "self"))
     _connect(out(until), _pin(cool, COOL_VAR))
-    _connect(BEL.find_then_pin(gate), _pin(cool, "execute"))
+    _connect(then(gate), _pin(cool, "execute"))
     hot = keep(ed.add_set_member_variable_node(HOT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(hot, "self"))
     _set(hot, HOT_VAR, "true")
-    _connect(BEL.find_then_pin(cool), _pin(hot, "execute"))
+    _connect(then(cool), _pin(hot, "execute"))
 
     ed.add_comment_to_nodes(
         "An interact target that is a campfire heats the held item: it is "
         f"{HOT_VAR} until {COOL_VAR}, {HEAT_S:g} s on. The item's own Tick "
         "shows the glow and cools it (combat/heat.py).",
         made)
-    return (BEL.find_then_pin(hot),), (BEL.find_else_pin(gate),), BEL.find_else_pin(mine)
+    return (then(hot),), (else_(gate),), else_(mine)

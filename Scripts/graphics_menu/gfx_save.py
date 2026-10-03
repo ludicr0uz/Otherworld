@@ -29,10 +29,10 @@ and a probe can set its slot aside without touching the player's keybinds.
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _connect, _create_blueprint, _declare, _float_type, _log, _loose_pin,
-    _must_load, _palette, _pin)
-from uebp.graph import out
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, _connect, _create_blueprint, _declare, _float_type, _loose_pin, _must_load,
+    _palette, _pin, out, then)
 from uebp.layout import arrange
 from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_EQ_II, FN_MIN_II, MACRO_FOR_LOOP
 from graphics_menu.dev_guns import _branch, _call, _get
@@ -77,7 +77,7 @@ def _cast(ed, obj_out, in_execs, made):
     for e in in_execs:
         _connect(e, _pin(cast, "execute"))
     return (_loose_pin(cast, "AsBPGraphicsSave", is_input=False),
-            BEL.find_then_pin(cast), _pin(cast, "CastFailed", is_input=False))
+            then(cast), out(cast, "CastFailed"))
 
 
 def _field(ed, save, name, made):
@@ -105,15 +105,13 @@ def author_load_graphics(ed, in_execs):
     _loose_pin(loop, "FirstIndex").set_pin_value("0")
     _loose_pin(loop, "LastIndex").set_pin_value(str(STAT_COUNT - 1))
     _connect(fits, _pin(loop, "execute"))
-    cell = out(_call(ed, FN_ADD_II, made,
-                      A=_pin(loop, "Index", is_input=False),
-                      B=CUSTOM_PRESET * STAT_COUNT))
+    cell = out(_call(ed, FN_ADD_II, made, A=out(loop, "Index"), B=CUSTOM_PRESET * STAT_COUNT))
     kept = _call(ed, FN_ARR_GET, made, TargetArray=_field(ed, save, GFX_SAVE_TABLE_FIELD, made))
     _connect(cell, _pin(kept, "Index"))
     write = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, GFX_TUNE_VALUES_VAR, made))
     _connect(cell, _pin(write, "Index"))
-    _connect(_pin(kept, "Item", is_input=False), _pin(write, "Item"))
-    _connect(_pin(loop, "LoopBody", is_input=False), _pin(write, "execute"))
+    _connect(out(kept, "Item"), _pin(write, "Item"))
+    _connect(out(loop, "LoopBody"), _pin(write, "execute"))
 
     # Min then Max, not a Clamp: the verifier reads every Clamp in this graph
     # as a settings slider.
@@ -121,7 +119,7 @@ def author_load_graphics(ed, in_execs):
                 A=_field(ed, save, GFX_SAVE_QUALITY_FIELD, made),
                 B=len(PRESET_LABELS) - 1)
     held = _call(ed, FN_MAX_II, made, A=out(top), B=0)
-    picked = put(ed, "Quality", out(held), [_pin(loop, "Completed", is_input=False)], made)
+    picked = put(ed, "Quality", out(held), [out(loop, "Completed")], made)
     ed.add_comment_to_nodes(
         f"The player's graphics, from slot {GFX_SAVE_SLOT!r}: the preset they picked "
         f"and their Custom row, over the built defaults. Low, Medium and High stay "
@@ -143,8 +141,8 @@ def author_keep_graphics(ed, in_execs, made):
         _connect(save, _pin(n, "self"))
         _connect(_get(ed, source, made), _pin(n, field))
         _connect(flow, _pin(n, "execute"))
-        flow = BEL.find_then_pin(n)
+        flow = then(n)
     saved = _call(ed, FN_WRITE_SAVE, made, SaveGameObject=save,
                   SlotName=GFX_SAVE_SLOT, UserIndex=GFX_SAVE_USER_INDEX)
     _connect(flow, _pin(saved, "execute"))
-    return [BEL.find_then_pin(saved), failed]
+    return [then(saved), failed]

@@ -36,8 +36,8 @@ from combat.chop_tuning import (
     WOOD_CLASS_VAR, WOOD_GROUND_CM, WOOD_LIE_PITCH_DEG, WOOD_LIFT_CM, WOOD_OUT_CM,
     WOOD_SIDE_DEG, WOOD_SPOT_VAR,
 )
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
-from uebp.graph import out
+from uebp.graph import (
+    _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.nodes import (
     FN_ADD_II, FN_ADD_VV, FN_AND, FN_BREAK_VECTOR, FN_EQ_II, FN_IS_VALID,
     FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF, FN_NORMAL,
@@ -55,7 +55,7 @@ FN_ROTATE_ABOUT = "/Script/Engine.KismetMathLibrary.RotateAngleAxis"
 
 
 def _get(ed, name):
-    return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
+    return out(ed.add_get_member_variable_node(name), name)
 
 
 def _store(ed, var, exec_in, pin=None, literal=None):
@@ -66,7 +66,7 @@ def _store(ed, var, exec_in, pin=None, literal=None):
     else:
         _set(s, var, literal)
     _connect(exec_in, _pin(s, "execute"))
-    return BEL.find_then_pin(s)
+    return then(s)
 
 
 def _author_chop(ed, brk, exec_in):
@@ -82,14 +82,14 @@ def _author_chop(ed, brk, exec_in):
     chops, chops_n = _prop(ed, CHOPS_VAR, held)
     bites = ed.add_branch_node()
     _connect(chops, _pin(bites, "Condition"))
-    _connect(BEL.find_then_pin(armed), _pin(bites, "execute"))
+    _connect(then(armed), _pin(bites, "execute"))
 
     struck = _loose_pin(brk, "HitComponent", is_input=False)
     which = _loose_pin(brk, "HitItem", is_input=False)
     cut = _loose_pin(brk, "ImpactPoint", is_input=False)
     tree = _palette(ed, NODE_CAST_INSTANCED)
     _connect(struck, _pin(tree, "Object"))
-    _connect(BEL.find_then_pin(bites), _pin(tree, "execute"))
+    _connect(then(bites), _pin(tree, "execute"))
 
     # --- chips off the cut, as a bullet throws them ----------------------------
     face = _node(ed, FN_ROT_FROM_X)
@@ -97,7 +97,7 @@ def _author_chop(ed, brk, exec_in):
     where = _node(ed, FN_MAKE_TRANSFORM)
     _connect(cut, _pin(where, "Location"))
     _connect(out(face), _pin(where, "Rotation"))
-    _cls, chipped = _author_surface_impact(ed, where, BEL.find_then_pin(tree))
+    _cls, chipped = _author_surface_impact(ed, where, then(tree))
 
     # --- the count, on this tree ----------------------------------------------
     same_comp = _node(ed, FN_EQ_OBJECTS)
@@ -117,7 +117,7 @@ def _author_chop(ed, brk, exec_in):
     _set(count, "B", 1)
     _connect(out(same), _pin(count, "bPickA"))
     # The count first: it is the one write that reads ChopTree and ChopItem.
-    step = _store(ed, CHOP_COUNT_VAR, BEL.find_then_pin(chipped), pin=out(count))
+    step = _store(ed, CHOP_COUNT_VAR, then(chipped), pin=out(count))
     step = _store(ed, CHOP_TREE_VAR, step, pin=struck)
     step = _store(ed, CHOP_ITEM_VAR, step, pin=which)
 
@@ -127,7 +127,7 @@ def _author_chop(ed, brk, exec_in):
     felled = ed.add_branch_node()
     _connect(out(enough), _pin(felled, "Condition"))
     _connect(step, _pin(felled, "execute"))
-    step = _store(ed, CHOP_COUNT_VAR, BEL.find_then_pin(felled), literal=0)
+    step = _store(ed, CHOP_COUNT_VAR, then(felled), literal=0)
 
     # --- where it lands: beside the trunk, on the player's side ---------------
     back = _node(ed, FN_SUB_VV)
@@ -196,10 +196,10 @@ def _author_chop(ed, brk, exec_in):
     _connect(out(yaw), _pin(at, "Rotation"))
     cls = ed.add_get_member_variable_node(WOOD_CLASS_VAR)
     wood = _palette(ed, NODE_SPAWN)
-    _connect(_pin(cls, WOOD_CLASS_VAR, is_input=False), _pin(wood, "Class"))
+    _connect(out(cls, WOOD_CLASS_VAR), _pin(wood, "Class"))
     _connect(out(at), _pin(wood, "SpawnTransform"))
     _set(wood, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(BEL.find_then_pin(floor), _pin(wood, "execute"))
+    _connect(then(floor), _pin(wood, "execute"))
 
     ed.add_comment_to_nodes(
         "A melee blow that struck something with no health. With an item that "
@@ -209,6 +209,6 @@ def _author_chop(ed, brk, exec_in):
         "of the player, set down on the ground. The wood is Dropped by default: "
         "E picks it up.",
         [armed, chops_n, bites, tree, chipped, felled, floor, wood])
-    return (BEL.find_then_pin(wood), BEL.find_else_pin(armed),
-            BEL.find_else_pin(bites), _loose_pin(tree, "CastFailed", is_input=False),
-            BEL.find_else_pin(felled))
+    return (then(wood), else_(armed),
+            else_(bites), _loose_pin(tree, "CastFailed", is_input=False),
+            else_(felled))

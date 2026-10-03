@@ -26,8 +26,7 @@ where what fits where is known. DrawHUD because only it knows where a cell
 is (cursor.py); a -nullrhi probe writes the component's variables instead.
 """
 
-from combat.graph import BEL, _connect, _declare, _pin
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _declare, _pin, out, then
 from combat.nodes import FN_AND, FN_EQ_II, FN_IS_VALID, FN_LESS_II, FN_SUB_II
 from combat.paths import WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import (
@@ -72,7 +71,7 @@ def _put_on(ed, wc, var, value, in_execs, made):
     _connect(value, _pin(n, var))
     for e in in_execs:
         _connect(e, _pin(n, "execute"))
-    return BEL.find_then_pin(n)
+    return then(n)
 
 
 def _author_over(ed, in_execs, made):
@@ -107,7 +106,7 @@ def _author_press(ed, wc, in_execs, made):
                           [on_worn], made)
     garment = _call(ed, FN_ARR_GET, made, TargetArray=worn, Index=at)
     dressed, bare = _branch(ed, out(_call(ed, FN_IS_VALID, made,
-                                           Object=_pin(garment, "Item", is_input=False))),
+                                           Object=out(garment, "Item"))),
                             [known], made)
     items = _get(ed, SLOT_ITEMS_VAR, made, WEAPON_COMP_CLASS_PATH, wc)
     there, past = _branch(ed, out(_call(ed, FN_ARR_VALID, made,
@@ -115,7 +114,7 @@ def _author_press(ed, wc, in_execs, made):
                           [hit], made)
     item = _call(ed, FN_ARR_GET, made, TargetArray=items, Index=over)
     filled, empty = _branch(ed, out(_call(ed, FN_IS_VALID, made,
-                                           Object=_pin(item, "Item", is_input=False))),
+                                           Object=out(item, "Item"))),
                             [there], made)
     began = put(ed, DRAG_FROM_VAR, over, [filled, dressed], made)
     return [began, empty, past, miss, wild, bare]

@@ -23,7 +23,7 @@ can be injected into a headless game). Tuning is COMBAT.knife_* in tuning.py;
 the clip is knife_anim.py's.
 """
 
-from combat.graph import BEL, _connect, _node, _pin
+from uebp.graph import _connect, _node, _pin, else_, out, then
 from combat.nodes import FN_GE_FF, FN_TIME_SECONDS
 from combat.tuning import COMBAT
 from combat.weapon_component.chop import _author_chop
@@ -52,22 +52,22 @@ def _author_knife_press(ed, held, tap, not_melee):
     melee, melee_n = _prop(ed, MELEE_VAR, held)
     gate = ed.add_branch_node()
     _connect(melee, _pin(gate, "Condition"))
-    _connect(BEL.find_else_pin(gate), not_melee)
+    _connect(else_(gate), not_melee)
 
     now = _node(ed, FN_TIME_SECONDS)
     rested = _node(ed, FN_GE_FF)
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(rested, "A"))
+    _connect(out(now), _pin(rested, "A"))
     _connect(_get(ed, NEXT_KNIFE_VAR), _pin(rested, "B"))
     press = ed.add_branch_node()
-    _connect(_and(ed, tap, _pin(rested, "ReturnValue", is_input=False)), _pin(press, "Condition"))
-    _connect(BEL.find_then_pin(gate), _pin(press, "execute"))
-    queued = _set_bool(ed, KNIFE_QUEUED_VAR, True, BEL.find_then_pin(press))
+    _connect(_and(ed, tap, out(rested)), _pin(press, "Condition"))
+    _connect(then(gate), _pin(press, "execute"))
+    queued = _set_bool(ed, KNIFE_QUEUED_VAR, True, then(press))
     ed.add_comment_to_nodes(
         "A Melee item (the knife) is swung, not fired: a tap off cooldown queues "
         "a slash (KnifeQueued), which the knife's swing stage plays. Anything "
         "else goes on to the guns' ready gate.",
         [melee_n, gate, now, rested, press])
-    return _pin(gate, "execute"), (queued, BEL.find_else_pin(press))
+    return _pin(gate, "execute"), (queued, else_(press))
 
 
 def _author_knife_swing(ed, exec_ins):

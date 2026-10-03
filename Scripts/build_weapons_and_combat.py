@@ -72,7 +72,8 @@ from combat.bullet_impact import build_bullet_impact              # noqa: E402
 from combat.combat_trace import build_combat_trace_switch         # noqa: E402
 from combat.footsteps import build_footstep_component             # noqa: E402
 from combat.game_state import ensure_game_mode_vars               # noqa: E402
-from combat.graph import BEL, _apply_defaults, _log               # noqa: E402
+from combat.log import _log                                       # noqa: E402
+from uebp.graph import BEL, _apply_defaults                       # noqa: E402
 from combat.health_component import build_health_component        # noqa: E402
 from combat.axe import build_axe                                  # noqa: E402
 from combat.wood import build_wood                                # noqa: E402

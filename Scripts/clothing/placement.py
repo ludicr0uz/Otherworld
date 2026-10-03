@@ -12,7 +12,7 @@ import math
 
 import unreal
 
-from combat.graph import _log
+from combat.log import _log
 from clothing.specs import GARMENTS
 from survival.forage_level import _terrain_heights
 

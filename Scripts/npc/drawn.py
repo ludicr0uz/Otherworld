@@ -34,7 +34,8 @@ import unreal
 from forest_generator.npc_drawn import (
     NPC_DRAWN_ARRIVE_CM, NPC_DRAWN_BY_FIRE, NPC_DRAWN_RANGE_CM,
 )
-from npc.graph import BEL, _Graph, _asset_sub, _connect, _log, _pin, out
+from npc.graph import _Graph, _log
+from uebp.graph import BEL, _assets, _connect, _pin, else_, out, then
 from npc.nodes import (
     FN_ACTOR_LOC, FN_ALL_ACTORS, FN_DISTANCE_2D, FN_GET_CONTROLLER, FN_GET_PAWN,
     FN_GT_FF, FN_IS_VALID, FN_LE_FF, FN_NEAREST_ACTOR, FN_SIMPLE_MOVE,
@@ -51,7 +52,7 @@ def draws(key):
     never built has zombies that take no notice, and a log line saying why."""
     if key not in NPC_DRAWN_BY_FIRE:
         return False
-    if _asset_sub().does_asset_exist(CAMPFIRE_BP_PATH):
+    if _assets().does_asset_exist(CAMPFIRE_BP_PATH):
         return True
     _log(f"note: {CAMPFIRE_BP_PATH} does not exist -- run build_survival.py "
          f"first. {key} is not drawn to a fire.")
@@ -85,7 +86,7 @@ def _author_drawn(ed, exec_in, result, stock):
     nearest = g.call(FN_NEAREST_ACTOR)
     _connect(out(here), _pin(nearest, "Origin"))
     _connect(out(fires, "OutActors"), _pin(nearest, "ActorsToCheck"))
-    kept = g.put(DRAWN_TO_VAR, BEL.find_then_pin(fires), pin=out(nearest))
+    kept = g.put(DRAWN_TO_VAR, then(fires), pin=out(nearest))
 
     fire = g.get(DRAWN_TO_VAR)
     lit = g.call(FN_IS_VALID)
@@ -98,13 +99,12 @@ def _author_drawn(ed, exec_in, result, stock):
     _connect(out(here), _pin(gap, "V1"))
     _connect(out(there), _pin(gap, "V2"))
     near = g.op(FN_LE_FF, out(gap), NPC_DRAWN_RANGE_CM)
-    reached = g.branch(near, BEL.find_then_pin(burning))
+    reached = g.branch(near, then(burning))
 
-    let_go = g.put(DRAWN_VAR,
-                   [BEL.find_else_pin(burning), BEL.find_else_pin(reached)], literal="false")
+    let_go = g.put(DRAWN_VAR, [else_(burning), else_(reached)], literal="false")
     _connect(let_go, result(False))
 
-    drawn = g.put(DRAWN_VAR, BEL.find_then_pin(reached), literal="true")
+    drawn = g.put(DRAWN_VAR, then(reached), literal="true")
     far = g.op(FN_GT_FF, out(gap), NPC_DRAWN_ARRIVE_CM)
     walking = g.branch(far, drawn)
 
@@ -113,13 +113,13 @@ def _author_drawn(ed, exec_in, result, stock):
     go = g.call(FN_SIMPLE_MOVE)
     _connect(out(me), _pin(go, "Controller"))
     _connect(out(there), _pin(go, "Goal"))
-    _connect(BEL.find_then_pin(walking), _pin(go, "execute"))
-    walked, tails, _entry = _author_walk_speed(ed, [BEL.find_then_pin(go)], True, stock)
+    _connect(then(walking), _pin(go, "execute"))
+    walked, tails, _entry = _author_walk_speed(ed, [then(go)], True, stock)
 
     stand = g.call(FN_STOP_MOVEMENT)
-    _connect(BEL.find_else_pin(walking), _pin(stand, "execute"))
+    _connect(else_(walking), _pin(stand, "execute"))
 
     done = result(True)
-    for tail in tails + [BEL.find_then_pin(stand)]:
+    for tail in tails + [then(stand)]:
         _connect(tail, done)
     return g.made + walked

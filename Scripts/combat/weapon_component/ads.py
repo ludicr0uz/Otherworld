@@ -6,7 +6,7 @@ recoil.py read for the tighter cone and the steadier kick (either way of
 aiming earns them), and what sights.py reads to move the camera onto the gun.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     CAMERA_CLASS_PATH, FN_AND, FN_CLAMP, FN_DIV_FF, FN_GET_COMP, FN_INTERP_FF,
     FN_IS_KEY_DOWN, FN_LERP, FN_MUL_FF, FN_NOT_B, FN_OR, FN_SELECT_FF,
@@ -72,18 +72,18 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
         n = keep(_node(ed, FN_IS_KEY_DOWN))
         _connect(pc_out, _pin(n, "self"))
         _connect(key_pins[var], _pin(n, "Key"))
-        return _pin(n, "ReturnValue", is_input=False)
+        return out(n)
 
     shoulder = held_down("KeyAim")
     # The same key uses an item that has no sights (use.py): then it is not
     # an aim key this frame.
     using = keep(ed.add_get_member_variable_node(USING_VAR))
     not_using = keep(_node(ed, FN_NOT_B))
-    _connect(_pin(using, USING_VAR, is_input=False), _pin(not_using, "A"))
+    _connect(out(using, USING_VAR), _pin(not_using, "A"))
     sights_and = keep(_node(ed, FN_AND))
     _connect(sights_key, _pin(sights_and, "A"))
-    _connect(_pin(not_using, "ReturnValue", is_input=False), _pin(sights_and, "B"))
-    sights = _pin(sights_and, "ReturnValue", is_input=False)
+    _connect(out(not_using), _pin(sights_and, "B"))
+    sights = out(sights_and)
     either = keep(_node(ed, FN_OR))
     _connect(shoulder, _pin(either, "A"))
     _connect(sights, _pin(either, "B"))
@@ -92,27 +92,27 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     # before this block -- so this reads the flag rather than the key.
     running = keep(ed.add_get_member_variable_node("Sprinting"))
     still = keep(_node(ed, FN_NOT_B))
-    _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
+    _connect(out(running, "Sprinting"), _pin(still, "A"))
 
     can = keep(_node(ed, FN_AND))
-    _connect(_pin(either, "ReturnValue", is_input=False), _pin(can, "A"))
-    _connect(_pin(still, "ReturnValue", is_input=False), _pin(can, "B"))
+    _connect(out(either), _pin(can, "A"))
+    _connect(out(still), _pin(can, "B"))
     wants = keep(_node(ed, FN_AND))
-    _connect(_pin(can, "ReturnValue", is_input=False), _pin(wants, "A"))
+    _connect(out(can), _pin(wants, "A"))
     _connect(armed_out, _pin(wants, "B"))
 
     mark = keep(ed.add_set_member_variable_node("Aiming"))
-    _connect(_pin(wants, "ReturnValue", is_input=False), _pin(mark, "Aiming"))
+    _connect(out(wants), _pin(mark, "Aiming"))
     for e in exec_ins:
         _connect(e, _pin(mark, "execute"))
 
     base = keep(ed.add_get_member_variable_node("BaseFOV"))
-    base_out = _pin(base, "BaseFOV", is_input=False)
+    base_out = out(base, "BaseFOV")
 
     aiming = keep(ed.add_get_member_variable_node("Aiming"))
     zoomed = keep(ed.add_branch_node())
-    _connect(_pin(aiming, "Aiming", is_input=False), _pin(zoomed, "Condition"))
-    _connect(BEL.find_then_pin(mark), _pin(zoomed, "execute"))
+    _connect(out(aiming, "Aiming"), _pin(zoomed, "Condition"))
+    _connect(then(mark), _pin(zoomed, "execute"))
 
     # True arm. Held is valid here, so it can be asked about.
     sighted, sighted_n = _prop(ed, HAS_SIGHTS_VAR, held)
@@ -121,9 +121,8 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     _connect(sights, _pin(down_sights, "A"))
     _connect(sighted, _pin(down_sights, "B"))
     sight_on = keep(ed.add_set_member_variable_node("SightAiming"))
-    _connect(_pin(down_sights, "ReturnValue", is_input=False),
-             _pin(sight_on, "SightAiming"))
-    _connect(BEL.find_then_pin(zoomed), _pin(sight_on, "execute"))
+    _connect(out(down_sights), _pin(sight_on, "SightAiming"))
+    _connect(then(zoomed), _pin(sight_on, "execute"))
 
     # The weapon's zoom down its sights, the shoulder's for everything else.
     # The literal is on B, which is the pin a Kismet node lets hold one.
@@ -135,26 +134,25 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     _connect(_loose_pin(sight_on, "Output_Get", is_input=False),
              _pin(pick, "bPickA"))
     chosen = keep(ed.add_set_member_variable_node("AimZoom"))
-    _connect(_pin(pick, "ReturnValue", is_input=False), _pin(chosen, "AimZoom"))
-    _connect(BEL.find_then_pin(sight_on), _pin(chosen, "execute"))
+    _connect(out(pick), _pin(chosen, "AimZoom"))
+    _connect(then(sight_on), _pin(chosen, "execute"))
 
     narrow = keep(_node(ed, FN_DIV_FF))
     _connect(base_out, _pin(narrow, "A"))
     _connect(_loose_pin(chosen, "Output_Get", is_input=False), _pin(narrow, "B"))
     want_in = keep(ed.add_set_member_variable_node("TargetFOV"))
-    _connect(_pin(narrow, "ReturnValue", is_input=False), _pin(want_in, "TargetFOV"))
-    _connect(BEL.find_then_pin(chosen), _pin(want_in, "execute"))
+    _connect(out(narrow), _pin(want_in, "TargetFOV"))
+    _connect(then(chosen), _pin(want_in, "execute"))
 
     # False arm: not aiming at all, so not down the sights either.
     sight_off = keep(ed.add_set_member_variable_node("SightAiming"))
     _set(sight_off, "SightAiming", "false")
-    _connect(BEL.find_else_pin(zoomed), _pin(sight_off, "execute"))
+    _connect(else_(zoomed), _pin(sight_off, "execute"))
     want_out = keep(ed.add_set_member_variable_node("TargetFOV"))
     _connect(base_out, _pin(want_out, "TargetFOV"))
-    _connect(BEL.find_then_pin(sight_off), _pin(want_out, "execute"))
+    _connect(then(sight_off), _pin(want_out, "execute"))
 
-    return ((BEL.find_then_pin(want_in), BEL.find_then_pin(want_out)),
-            _pin(still, "ReturnValue", is_input=False))
+    return ((then(want_in), then(want_out)), out(still))
 
 
 def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
@@ -174,12 +172,12 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     have = keep(ed.add_get_member_variable_node("CurrentFOV"))
     want = keep(ed.add_get_member_variable_node("TargetFOV"))
     step = keep(_node(ed, FN_INTERP_FF))
-    _connect(_pin(have, "CurrentFOV", is_input=False), _pin(step, "Current"))
-    _connect(_pin(want, "TargetFOV", is_input=False), _pin(step, "Target"))
-    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
+    _connect(out(have, "CurrentFOV"), _pin(step, "Current"))
+    _connect(out(want, "TargetFOV"), _pin(step, "Target"))
+    _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
     _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
     moved = keep(ed.add_set_member_variable_node("CurrentFOV"))
-    _connect(_pin(step, "ReturnValue", is_input=False), _pin(moved, "CurrentFOV"))
+    _connect(out(step), _pin(moved, "CurrentFOV"))
     for tail in exec_ins:
         _connect(tail, _pin(moved, "execute"))
 
@@ -187,7 +185,7 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     _connect(owner_out, _pin(cam, "self"))
     _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
     apply_fov = keep(_node(ed, FN_SET_FOV))
-    _connect(_pin(cam, "ReturnValue", is_input=False), _pin(apply_fov, "self"))
+    _connect(out(cam), _pin(apply_fov, "self"))
     # Driven from the SET node's own pass-through output, not from a fresh
     # getter: the setter passes the value it wrote straight out, so this cannot
     # read a stale CurrentFOV the way a second Get would if anything were ever
@@ -196,7 +194,7 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     # what it writes.
     _connect(_loose_pin(moved, "Output_Get", is_input=False),
              _pin(apply_fov, "InFieldOfView"))
-    _connect(BEL.find_then_pin(moved), _pin(apply_fov, "execute"))
+    _connect(then(moved), _pin(apply_fov, "execute"))
 
     # --- and slow the mouse by the same curve --------------------------------
     # Not "if aiming, use the slow number": the factor is read straight off how
@@ -213,10 +211,10 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     base_again = keep(ed.add_get_member_variable_node("BaseFOV"))
     ratio = keep(_node(ed, FN_DIV_FF))
     _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(ratio, "A"))
-    _connect(_pin(base_again, "BaseFOV", is_input=False), _pin(ratio, "B"))
+    _connect(out(base_again, "BaseFOV"), _pin(ratio, "B"))
     eased = keep(_node(ed, FN_LERP))
     _set(eased, "A", 1.0)
-    _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(eased, "B"))
+    _connect(out(ratio), _pin(eased, "B"))
     _set(eased, "Alpha", COMBAT.ads_sens_compensation)
 
     # The scope's extra slowdown, on zoom past the irons:
@@ -227,16 +225,16 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     # Irons never get past their own zoom, so this is 1 for every weapon but the
     # sniper, and on the sniper it arrives with the zoom.
     zoom_now = keep(_node(ed, FN_DIV_FF))
-    _connect(_pin(base_again, "BaseFOV", is_input=False), _pin(zoom_now, "A"))
+    _connect(out(base_again, "BaseFOV"), _pin(zoom_now, "A"))
     _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_now, "B"))
     beyond = keep(_node(ed, FN_SUB_FF))
-    _connect(_pin(zoom_now, "ReturnValue", is_input=False), _pin(beyond, "A"))
+    _connect(out(zoom_now), _pin(beyond, "A"))
     _set(beyond, "B", COMBAT.ads_zoom_irons)
     beyond_frac = keep(_node(ed, FN_DIV_FF))
-    _connect(_pin(beyond, "ReturnValue", is_input=False), _pin(beyond_frac, "A"))
+    _connect(out(beyond), _pin(beyond_frac, "A"))
     _set(beyond_frac, "B", COMBAT.ads_zoom_scope - COMBAT.ads_zoom_irons)
     past = keep(_node(ed, FN_CLAMP))
-    _connect(_pin(beyond_frac, "ReturnValue", is_input=False), _pin(past, "Value"))
+    _connect(out(beyond_frac), _pin(past, "Value"))
     _set(past, "Min", 0.0)
     _set(past, "Max", 1.0)
     # B is the player's ScopeSensitivity (settings screen, pushed by the HUD),
@@ -244,32 +242,30 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     glass = keep(_node(ed, FN_LERP))
     _set(glass, "A", 1.0)
     glass_sens = keep(ed.add_get_member_variable_node("ScopeSensitivity"))
-    _connect(_pin(glass_sens, "ScopeSensitivity", is_input=False),
-             _pin(glass, "B"))
-    _connect(_pin(past, "ReturnValue", is_input=False), _pin(glass, "Alpha"))
+    _connect(out(glass_sens, "ScopeSensitivity"), _pin(glass, "B"))
+    _connect(out(past), _pin(glass, "Alpha"))
     scoped = keep(_node(ed, FN_MUL_FF))
-    _connect(_pin(eased, "ReturnValue", is_input=False), _pin(scoped, "A"))
-    _connect(_pin(glass, "ReturnValue", is_input=False), _pin(scoped, "B"))
+    _connect(out(eased), _pin(scoped, "A"))
+    _connect(out(glass), _pin(scoped, "B"))
 
     sens = keep(ed.add_get_member_variable_node("MouseSensitivity"))
     factor = keep(_node(ed, FN_MUL_FF))
-    _connect(_pin(scoped, "ReturnValue", is_input=False), _pin(factor, "A"))
-    _connect(_pin(sens, "MouseSensitivity", is_input=False), _pin(factor, "B"))
-    factor_out = _pin(factor, "ReturnValue", is_input=False)
+    _connect(out(scoped), _pin(factor, "A"))
+    _connect(out(sens, "MouseSensitivity"), _pin(factor, "B"))
+    factor_out = out(factor)
 
-    flow = BEL.find_then_pin(apply_fov)
+    flow = then(apply_fov)
     for var, setter, arg in (("BaseYawScale", FN_SET_YAW_SCALE, "NewValue"),
                              ("BasePitchScale", FN_SET_PITCH_SCALE, "NewValue")):
         base_scale = keep(ed.add_get_member_variable_node(var))
         scaled = keep(_node(ed, FN_MUL_FF))
-        _connect(_pin(base_scale, var, is_input=False), _pin(scaled, "A"))
+        _connect(out(base_scale, var), _pin(scaled, "A"))
         _connect(factor_out, _pin(scaled, "B"))
         put = keep(_node(ed, setter))
         _connect(pc_out, _pin(put, "self"))
-        _connect(_pin(scaled, "ReturnValue", is_input=False),
-                 _loose_pin(put, arg))
+        _connect(out(scaled), _loose_pin(put, arg))
         _connect(flow, _pin(put, "execute"))
-        flow = BEL.find_then_pin(put)
+        flow = then(put)
 
     return flow, moved
 
@@ -310,15 +306,15 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep):
     _connect(still, _pin(steady, "A"))
     _connect(armed_out, _pin(steady, "B"))
     slow_gate = keep(ed.add_branch_node())
-    _connect(_pin(steady, "ReturnValue", is_input=False), _pin(slow_gate, "Condition"))
+    _connect(out(steady), _pin(slow_gate, "Condition"))
     _connect(flow, _pin(slow_gate, "execute"))
 
     base_third = keep(ed.add_get_member_variable_node("BaseFOV"))
     zoom_ratio = keep(_node(ed, FN_DIV_FF))
-    _connect(_pin(base_third, "BaseFOV", is_input=False), _pin(zoom_ratio, "A"))
+    _connect(out(base_third, "BaseFOV"), _pin(zoom_ratio, "A"))
     _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_ratio, "B"))
     so_far = keep(_node(ed, FN_SUB_FF))
-    _connect(_pin(zoom_ratio, "ReturnValue", is_input=False), _pin(so_far, "A"))
+    _connect(out(zoom_ratio), _pin(so_far, "A"))
     _set(so_far, "B", 1.0)
 
     # The denominator is the zoom being aimed at, not the config's: 4x down
@@ -328,30 +324,30 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep):
     # left at the zoom being let go of, which is what the ease-out travels.
     zoom_again = keep(ed.add_get_member_variable_node("AimZoom"))
     span = keep(_node(ed, FN_SUB_FF))
-    _connect(_pin(zoom_again, "AimZoom", is_input=False), _pin(span, "A"))
+    _connect(out(zoom_again, "AimZoom"), _pin(span, "A"))
     _set(span, "B", 1.0)
 
     frac = keep(_node(ed, FN_DIV_FF))
-    _connect(_pin(so_far, "ReturnValue", is_input=False), _pin(frac, "A"))
-    _connect(_pin(span, "ReturnValue", is_input=False), _pin(frac, "B"))
+    _connect(out(so_far), _pin(frac, "A"))
+    _connect(out(span), _pin(frac, "B"))
     # Clamped because the FInterpTo can overshoot its target by a fraction on a
     # long frame, and an unclamped progress of 1.02 is a walk speed below the
     # configured floor -- small, but it would be a number nobody chose.
     progress = keep(_node(ed, FN_CLAMP))
-    _connect(_pin(frac, "ReturnValue", is_input=False), _pin(progress, "Value"))
+    _connect(out(frac), _pin(progress, "Value"))
     _set(progress, "Min", 0.0)
     _set(progress, "Max", 1.0)
 
     slowed = keep(_node(ed, FN_LERP))
     _set(slowed, "A", 1.0)
     _set(slowed, "B", COMBAT.ads_move_speed_scale)
-    _connect(_pin(progress, "ReturnValue", is_input=False), _pin(slowed, "Alpha"))
+    _connect(out(progress), _pin(slowed, "Alpha"))
     # Off BaseSpeed, not off the speed that is currently set: this runs every
     # frame, so a factor applied to the live value would compound.
     walked = keep(ed.add_get_member_variable_node("BaseSpeed"))
     speed = keep(_node(ed, FN_MUL_FF))
-    _connect(_pin(walked, "BaseSpeed", is_input=False), _pin(speed, "A"))
-    _connect(_pin(slowed, "ReturnValue", is_input=False), _pin(speed, "B"))
+    _connect(out(walked, "BaseSpeed"), _pin(speed, "A"))
+    _connect(out(slowed), _pin(speed, "B"))
 
     # No cast: GetComponentByClass reshapes its return pin to the class chosen
     # on ComponentClass, so this wires straight into the movement component's
@@ -362,12 +358,11 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep):
     _connect(owner_out, _pin(legs, "self"))
     _pin(legs, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
     apply_speed = keep(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
-    _connect(_pin(legs, "ReturnValue", is_input=False), _pin(apply_speed, "self"))
-    _connect(_pin(speed, "ReturnValue", is_input=False),
-             _pin(apply_speed, "MaxWalkSpeed"))
-    _connect(BEL.find_then_pin(slow_gate), _pin(apply_speed, "execute"))
+    _connect(out(legs), _pin(apply_speed, "self"))
+    _connect(out(speed), _pin(apply_speed, "MaxWalkSpeed"))
+    _connect(then(slow_gate), _pin(apply_speed, "execute"))
 
-    return (BEL.find_then_pin(apply_speed), BEL.find_else_pin(slow_gate))
+    return (then(apply_speed), else_(slow_gate))
 
 
 def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,

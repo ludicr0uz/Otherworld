@@ -30,7 +30,7 @@ on the frame of the killing blow may not have run yet.
 """
 
 from combat.game_state import NPC_ID_VAR
-from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.nodes import (
     FN_CONCAT, FN_DISPLAY_NAME, FN_GET_COMP, FN_GET_PAWN, FN_INT_TO_STR,
     FN_IS_VALID, FN_LE_FF, FN_OR, FN_PRINT, FN_STOP_LOGIC, FN_STOP_MOVEMENT,
@@ -48,12 +48,12 @@ def _dead_pin(ed, health_out, keep):
     hp = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(health_out, _pin(hp, "self"))
     spent = keep(_node(ed, FN_LE_FF))
-    _connect(_pin(hp, "Health", is_input=False), _pin(spent, "A"))
+    _connect(out(hp, "Health"), _pin(spent, "A"))
     _set(spent, "B", 0.0)
     either = keep(_node(ed, FN_OR))
-    _connect(_pin(dead, "Dead", is_input=False), _pin(either, "A"))
-    _connect(_pin(spent, "ReturnValue", is_input=False), _pin(either, "B"))
-    return _pin(either, "ReturnValue", is_input=False)
+    _connect(out(dead, "Dead"), _pin(either, "A"))
+    _connect(out(spent), _pin(either, "B"))
+    return out(either)
 
 
 def _author_alive_gate(ed, exec_in):
@@ -79,33 +79,33 @@ def _author_alive_gate(ed, exec_in):
         return node
 
     pawn = keep(_node(ed, FN_GET_PAWN))
-    pawn_out = _pin(pawn, "ReturnValue", is_input=False)
+    pawn_out = out(pawn)
     there = keep(_node(ed, FN_IS_VALID))
     _connect(pawn_out, _pin(there, "Object"))
     possessed = keep(ed.add_branch_node())
-    _connect(_pin(there, "ReturnValue", is_input=False), _pin(possessed, "Condition"))
+    _connect(out(there), _pin(possessed, "Condition"))
     _connect(exec_in, _pin(possessed, "execute"))
 
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(pawn_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
     health = keep(_palette(ed, NODE_CAST_HEALTH))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(health, "Object"))
-    _connect(BEL.find_then_pin(possessed), _pin(health, "execute"))
+    _connect(out(comp), _pin(health, "Object"))
+    _connect(then(possessed), _pin(health, "execute"))
     health_out = _loose_pin(health, "AsBPHealthComponent", is_input=False)
     is_dead = keep(ed.add_branch_node())
     _connect(_dead_pin(ed, health_out, keep), _pin(is_dead, "Condition"))
-    _connect(BEL.find_then_pin(health), _pin(is_dead, "execute"))
+    _connect(then(health), _pin(is_dead, "execute"))
 
     refused = result()
-    _connect(BEL.find_else_pin(possessed), _pin(refused, "execute"))
-    _connect(BEL.find_then_pin(is_dead), _pin(refused, "execute"))
+    _connect(else_(possessed), _pin(refused, "execute"))
+    _connect(then(is_dead), _pin(refused, "execute"))
     alive = result()
-    _connect(BEL.find_else_pin(is_dead), _pin(alive, "execute"))
-    _connect(_pin(health, "CastFailed", is_input=False), _pin(alive, "execute"))
+    _connect(else_(is_dead), _pin(alive, "execute"))
+    _connect(out(health, "CastFailed"), _pin(alive, "execute"))
     ed.add_comment_to_nodes(
         "Dead, or at 0 HP, or no pawn: this step fails and does nothing.", made)
-    return BEL.find_then_pin(alive)
+    return then(alive)
 
 
 def _author_corpse_gate(ed, exec_in):
@@ -126,63 +126,63 @@ def _author_corpse_gate(ed, exec_in):
         return n
 
     pawn = keep(_node(ed, FN_GET_PAWN))
-    pawn_out = _pin(pawn, "ReturnValue", is_input=False)
+    pawn_out = out(pawn)
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(pawn_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
     health = keep(_palette(ed, NODE_CAST_HEALTH))
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(health, "Object"))
+    _connect(out(comp), _pin(health, "Object"))
     _connect(exec_in, _pin(health, "execute"))
     health_out = _loose_pin(health, "AsBPHealthComponent", is_input=False)
 
     is_dead = keep(ed.add_branch_node())
     _connect(_dead_pin(ed, health_out, keep), _pin(is_dead, "Condition"))
-    _connect(BEL.find_then_pin(health), _pin(is_dead, "execute"))
+    _connect(then(health), _pin(is_dead, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(CORPSE_VAR))
     _set(mark, CORPSE_VAR, "true")
-    _connect(BEL.find_then_pin(is_dead), _pin(mark, "execute"))
+    _connect(then(is_dead), _pin(mark, "execute"))
     halt = keep(_node(ed, FN_STOP_MOVEMENT))
-    _connect(BEL.find_then_pin(mark), _pin(halt, "execute"))
+    _connect(then(mark), _pin(halt, "execute"))
 
     # "[NPC-CORPSE] #7 BP_ForestWanderer_Zombie_C_3 is a corpse: ..." -- once
     # per death, since the loop ends right after it.
     npc_id = keep(ed.add_get_member_variable_node(NPC_ID_VAR, HEALTH_CLASS_PATH))
     _connect(health_out, _pin(npc_id, "self"))
     id_str = keep(_node(ed, FN_INT_TO_STR))
-    _connect(_pin(npc_id, NPC_ID_VAR, is_input=False), _pin(id_str, "InInt"))
+    _connect(out(npc_id, NPC_ID_VAR), _pin(id_str, "InInt"))
     name = keep(_node(ed, FN_DISPLAY_NAME))
     _connect(pawn_out, _pin(name, "Object"))
     head = keep(_node(ed, FN_CONCAT))
     _set(head, "A", CORPSE_LOG_PREFIX)
-    _connect(_pin(id_str, "ReturnValue", is_input=False), _pin(head, "B"))
+    _connect(out(id_str), _pin(head, "B"))
     spaced = keep(_node(ed, FN_CONCAT))
-    _connect(_pin(head, "ReturnValue", is_input=False), _pin(spaced, "A"))
+    _connect(out(head), _pin(spaced, "A"))
     _set(spaced, "B", " ")
     named = keep(_node(ed, FN_CONCAT))
-    _connect(_pin(spaced, "ReturnValue", is_input=False), _pin(named, "A"))
-    _connect(_pin(name, "ReturnValue", is_input=False), _pin(named, "B"))
+    _connect(out(spaced), _pin(named, "A"))
+    _connect(out(name), _pin(named, "B"))
     line = keep(_node(ed, FN_CONCAT))
-    _connect(_pin(named, "ReturnValue", is_input=False), _pin(line, "A"))
+    _connect(out(named), _pin(line, "A"))
     _set(line, "B", " is a corpse: heartbeat stopped, it no longer chases or swings")
     say = keep(_node(ed, FN_PRINT))
-    _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
+    _connect(out(line), _pin(say, "InString"))
     _set(say, "bPrintToScreen", "false")
     _set(say, "bPrintToLog", "true")
     _set(say, "Duration", 0.0)
-    _connect(BEL.find_then_pin(halt), _pin(say, "execute"))
+    _connect(then(halt), _pin(say, "execute"))
     # The tree ends here. StopLogic called from inside a running task is
     # queued by the BehaviorTreeComponent and applied once the task returns.
     brain = keep(ed.add_get_member_variable_node("BrainComponent"))
     stop = keep(_node(ed, FN_STOP_LOGIC))
-    _connect(_pin(brain, "BrainComponent", is_input=False), _pin(stop, "self"))
+    _connect(out(brain, "BrainComponent"), _pin(stop, "self"))
     _set(stop, "Reason", "corpse")
-    _connect(BEL.find_then_pin(say), _pin(stop, "execute"))
+    _connect(then(say), _pin(stop, "execute"))
 
     ed.add_comment_to_nodes(
         "Corpse state: if this wanderer's pawn is Dead or at 0 HP, mark the controller a "
         "corpse, stop its movement, log it once, and STOP the behaviour tree. "
         "Nothing after this -- patrol, chase, melee -- runs for a corpse.",
         made)
-    alive = [BEL.find_else_pin(is_dead), _pin(health, "CastFailed", is_input=False)]
-    return made, alive, BEL.find_then_pin(stop)
+    alive = [else_(is_dead), out(health, "CastFailed")]
+    return made, alive, then(stop)

@@ -42,9 +42,10 @@ before this builder in the build order.
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _log, _node, _palette, _pin,
-    _set)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _node, _palette, _pin, _set,
+    out)
 from uebp.layout import arrange
 from combat.nodes import FN_MAKE_ROT, FN_MUL_FF
 
@@ -135,8 +136,8 @@ def _modify_bone(ed, bone, pitch_out):
     _connect(pitch_out, _pin(half, "A"))
     _set(half, "B", ROLL_PER_DEGREE)
     rot = _node(ed, FN_MAKE_ROT)
-    _connect(_pin(half, "ReturnValue", is_input=False), _pin(rot, "Roll"))
-    _connect(_pin(rot, "ReturnValue", is_input=False), _pin(mb, "Rotation"))
+    _connect(out(half), _pin(rot, "Roll"))
+    _connect(out(rot), _pin(mb, "Rotation"))
     return mb
 
 
@@ -172,19 +173,19 @@ def patch_aim_pitch(skin):
     PIN.break_pin_links(_pin(root, "Result"))
 
     pitch = ed.add_get_member_variable_node(AIM_PITCH_VAR)
-    pitch_out = _pin(pitch, AIM_PITCH_VAR, is_input=False)
+    pitch_out = out(pitch, AIM_PITCH_VAR)
     to_cs = _palette(ed, NODE_TO_COMPONENT)
     _connect(upstream, _pin(to_cs, "LocalPose"))
-    pose = _pin(to_cs, "ComponentPose", is_input=False)
+    pose = out(to_cs, "ComponentPose")
     made = [pitch, to_cs]
     for bone in skin.aim_bones:
         mb = _modify_bone(ed, bone, pitch_out)
         _connect(pose, _pin(mb, "ComponentPose"))
-        pose = _pin(mb, "Pose", is_input=False)
+        pose = out(mb, "Pose")
         made.append(mb)
     to_ls = _palette(ed, NODE_TO_LOCAL)
     _connect(pose, _pin(to_ls, "ComponentPose"))
-    _connect(_pin(to_ls, "Pose", is_input=False), _pin(root, "Result"))
+    _connect(out(to_ls, "Pose"), _pin(root, "Result"))
     made.append(to_ls)
     ed.add_comment_to_nodes(
         f"Down the sights, the upper body tips onto the aim: {AIM_PITCH_VAR} "

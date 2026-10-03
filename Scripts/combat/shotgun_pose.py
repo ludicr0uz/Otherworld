@@ -66,7 +66,8 @@ from asset_pipeline.rig_util import mesh_ref_pose
 from asset_pipeline.two_hands import reach
 from combat import pump_seat
 from combat.body_pose import _between, _conj, _mul, _norm, _turn
-from combat.graph import _assets, _log
+from combat.log import _log
+from uebp.graph import _assets
 from combat.grip import (
     _grip_location, _grip_rotation, _grip_socket, part_placement,
 )

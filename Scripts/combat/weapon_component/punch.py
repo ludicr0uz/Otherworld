@@ -28,7 +28,8 @@ import dataclasses
 
 from combat.anim_blueprint import AIM_SLOT
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
+from uebp.graph import (
+    _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.nodes import (
     FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_ANIM_INSTANCE,
@@ -76,30 +77,30 @@ def _and(ed, a, b):
     n = _node(ed, FN_AND)
     _connect(a, _pin(n, "A"))
     _connect(b, _pin(n, "B"))
-    return _pin(n, "ReturnValue", is_input=False)
+    return out(n)
 
 
 def _get(ed, name):
-    return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
+    return out(ed.add_get_member_variable_node(name), name)
 
 
 def _stamp(ed, var, delay, exec_in):
     """var = now + delay; returns the exec pin after the Set."""
     now = _node(ed, FN_TIME_SECONDS)
     later = _node(ed, FN_ADD_FF)
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(later, "A"))
+    _connect(out(now), _pin(later, "A"))
     _set(later, "B", delay)
     s = ed.add_set_member_variable_node(var)
-    _connect(_pin(later, "ReturnValue", is_input=False), _pin(s, var))
+    _connect(out(later), _pin(s, var))
     _connect(exec_in, _pin(s, "execute"))
-    return BEL.find_then_pin(s)
+    return then(s)
 
 
 def _set_bool(ed, var, value, exec_in):
     s = ed.add_set_member_variable_node(var)
     _set(s, var, "true" if value else "false")
     _connect(exec_in, _pin(s, "execute"))
-    return BEL.find_then_pin(s)
+    return then(s)
 
 
 def _author_punch(ed, tap, armed_out, steady, guarded, unspent, exec_ins):
@@ -112,21 +113,21 @@ def _author_punch(ed, tap, armed_out, steady, guarded, unspent, exec_ins):
     _connect(armed_out, _pin(bare, "A"))
     now = _node(ed, FN_TIME_SECONDS)
     rested = _node(ed, FN_GE_FF)
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(rested, "A"))
+    _connect(out(now), _pin(rested, "A"))
     _connect(_get(ed, NEXT_PUNCH_VAR), _pin(rested, "B"))
-    cond = _and(ed, _and(ed, tap, _pin(bare, "ReturnValue", is_input=False)),
+    cond = _and(ed, _and(ed, tap, out(bare)),
                 _and(ed, _and(ed, steady, guarded),
-                     _and(ed, unspent, _pin(rested, "ReturnValue", is_input=False))))
+                     _and(ed, unspent, out(rested))))
     press = ed.add_branch_node()
     _connect(cond, _pin(press, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(press, "execute"))
-    queued = _set_bool(ed, PUNCH_QUEUED_VAR, True, BEL.find_then_pin(press))
+    queued = _set_bool(ed, PUNCH_QUEUED_VAR, True, then(press))
 
     ed.add_comment_to_nodes(
         "Empty hands: the fire key throws a punch. The press only queues it "
         "(PunchQueued), so the swing can be started without a key.", [press])
-    return _author_swing(ed, PUNCH, (queued, BEL.find_else_pin(press)))
+    return _author_swing(ed, PUNCH, (queued, else_(press)))
 
 
 def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
@@ -138,7 +139,7 @@ def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
     _connect(_get(ed, strike.queued_var), _pin(swing, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(swing, "execute"))
-    step = _set_bool(ed, strike.queued_var, False, BEL.find_then_pin(swing))
+    step = _set_bool(ed, strike.queued_var, False, then(swing))
     step = _stamp(ed, strike.next_var, strike.interval_s, step)
     step = _stamp(ed, strike.due_var, strike.impact_s, step)
     step = _set_bool(ed, strike.pending_var, True, step)
@@ -147,7 +148,7 @@ def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
     anim = _node(ed, FN_ANIM_INSTANCE)
     _connect(mesh, _pin(anim, "self"))
     play = _node(ed, FN_PLAY_SLOT)
-    _connect(_pin(anim, "ReturnValue", is_input=False), _pin(play, "self"))
+    _connect(out(anim), _pin(play, "self"))
     _connect(_get(ed, strike.anim_var), _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
     _set(play, "BlendInTime", PUNCH_BLEND_S)
@@ -162,7 +163,7 @@ def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
         [swing, play])
 
     # --- blow ----------------------------------------------------------------
-    return _author_blow(ed, strike, (BEL.find_then_pin(play), BEL.find_else_pin(swing)), scenery, damage)
+    return _author_blow(ed, strike, (then(play), else_(swing)), scenery, damage)
 
 
 def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
@@ -179,73 +180,71 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     exits (the knife's chops a tree: chop.py)."""
     now = _node(ed, FN_TIME_SECONDS)
     due = _node(ed, FN_GE_FF)
-    _connect(_pin(now, "ReturnValue", is_input=False), _pin(due, "A"))
+    _connect(out(now), _pin(due, "A"))
     _connect(_get(ed, strike.due_var), _pin(due, "B"))
     gate = ed.add_branch_node()
-    _connect(_and(ed, _get(ed, strike.pending_var),
-                  _pin(due, "ReturnValue", is_input=False)),
-             _pin(gate, "Condition"))
+    _connect(_and(ed, _get(ed, strike.pending_var), out(due)), _pin(gate, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(gate, "execute"))
-    step = _set_bool(ed, strike.pending_var, False, BEL.find_then_pin(gate))
+    step = _set_bool(ed, strike.pending_var, False, then(gate))
 
     owner = _node(ed, FN_GET_OWNER)
-    owner_out = _pin(owner, "ReturnValue", is_input=False)
+    owner_out = out(owner)
     loc = _node(ed, FN_ACTOR_LOC)
     _connect(owner_out, _pin(loc, "self"))
     chest = _node(ed, FN_ADD_VV)
-    _connect(_pin(loc, "ReturnValue", is_input=False), _pin(chest, "A"))
+    _connect(out(loc), _pin(chest, "A"))
     _connect(_vec(ed, 0.0, 0.0, strike.chest_cm), _pin(chest, "B"))
-    chest_out = _pin(chest, "ReturnValue", is_input=False)
+    chest_out = out(chest)
     fwd = _node(ed, FN_ACTOR_FORWARD)
     _connect(owner_out, _pin(fwd, "self"))
     # Multiply_VectorFloat's B is promoted to a vector: drive it with one.
     reach = _node(ed, FN_MUL_VF)
-    _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(reach, "A"))
+    _connect(out(fwd), _pin(reach, "A"))
     r = strike.reach_cm
     _connect(_vec(ed, r, r, r), _pin(reach, "B"))
     end = _node(ed, FN_ADD_VV)
     _connect(chest_out, _pin(end, "A"))
-    _connect(_pin(reach, "ReturnValue", is_input=False), _pin(end, "B"))
+    _connect(out(reach), _pin(end, "B"))
 
     trace = _node(ed, FN_SPHERE_TRACE)
     _connect(chest_out, _pin(trace, "Start"))
-    _connect(_pin(end, "ReturnValue", is_input=False), _pin(trace, "End"))
+    _connect(out(end), _pin(trace, "End"))
     _set(trace, "Radius", strike.radius_cm)
     _trace_defaults(trace)
     _connect(step, _pin(trace, "execute"))
 
     hit = ed.add_branch_node()
-    _connect(_pin(trace, "ReturnValue", is_input=False), _pin(hit, "Condition"))
-    _connect(BEL.find_then_pin(trace), _pin(hit, "execute"))
+    _connect(out(trace), _pin(hit, "Condition"))
+    _connect(then(trace), _pin(hit, "execute"))
     brk = _palette(ed, NODE_BREAK_HIT)
-    _connect(_pin(trace, "OutHit", is_input=False), _loose_pin(brk, "Hit"))
+    _connect(out(trace, "OutHit"), _loose_pin(brk, "Hit"))
 
     comp = _node(ed, FN_GET_COMP)
     _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
     cast = _palette(ed, NODE_CAST_HEALTH)
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(hit), _pin(cast, "execute"))
+    _connect(out(comp), _pin(cast, "Object"))
+    _connect(then(hit), _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
     get_h = ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH)
     _connect(as_health, _pin(get_h, "self"))
     sub = _node(ed, FN_SUB_FF)
-    _connect(_pin(get_h, "Health", is_input=False), _pin(sub, "A"))
-    met = (BEL.find_then_pin(cast),)
+    _connect(out(get_h, "Health"), _pin(sub, "A"))
+    met = (then(cast),)
     if damage:
         amount, met = damage(ed, _loose_pin(brk, "HitActor", is_input=False), met[0])
         _connect(amount, _pin(sub, "B"))
     else:
         _set(sub, "B", strike.damage)
     clamp = _node(ed, FN_CLAMP)
-    _connect(_pin(sub, "ReturnValue", is_input=False), _pin(clamp, "Value"))
+    _connect(out(sub), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", INF)
     set_h = ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH)
     _connect(as_health, _pin(set_h, "self"))
-    _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(set_h, "Health"))
+    _connect(out(clamp), _pin(set_h, "Health"))
     for pin in met:
         _connect(pin, _pin(set_h, "execute"))
 
@@ -254,17 +253,17 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     now2 = _node(ed, FN_TIME_SECONDS)
     stamp = ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(stamp, "self"))
-    _connect(_pin(now2, "ReturnValue", is_input=False), _pin(stamp, LAST_DAMAGE_VAR))
-    _connect(BEL.find_then_pin(set_h), _pin(stamp, "execute"))
+    _connect(out(now2), _pin(stamp, LAST_DAMAGE_VAR))
+    _connect(then(set_h), _pin(stamp, "execute"))
     blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(blame, "self"))
     _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
-    _connect(BEL.find_then_pin(stamp), _pin(blame, "execute"))
+    _connect(then(stamp), _pin(blame, "execute"))
     from_where = ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(from_where, "self"))
     _connect(_loose_pin(brk, "ImpactNormal", is_input=False),
              _pin(from_where, LAST_HIT_FROM_VAR))
-    _connect(BEL.find_then_pin(blame), _pin(from_where, "execute"))
+    _connect(then(blame), _pin(from_where, "execute"))
 
     ed.add_comment_to_nodes(
         f"The {strike.name}'s blow, {strike.impact_s} s into the swing: a "
@@ -275,5 +274,4 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
 
     failed = _loose_pin(cast, "CastFailed", is_input=False)
     missed = scenery(ed, brk, failed) if scenery else (failed,)
-    return (BEL.find_then_pin(from_where), BEL.find_else_pin(gate),
-            BEL.find_else_pin(hit)) + tuple(missed)
+    return (then(from_where), else_(gate), else_(hit)) + tuple(missed)

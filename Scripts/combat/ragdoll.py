@@ -6,7 +6,8 @@ import math
 
 import unreal
 
-from combat.graph import _assets, _log
+from combat.log import _log
+from uebp.graph import _assets
 
 
 # --- dying: the collapse, and how long a corpse lies there -------------------

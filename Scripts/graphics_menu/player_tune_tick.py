@@ -19,8 +19,7 @@ scale it. A row's minimum (PLAYER_STATS) keeps the two divisions off zero.
 
 import unreal
 
-from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out, then
 from combat.nodes import FN_ARR_GET, FN_DIV_FF, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_MUL_FF
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.player_tuning import (
@@ -61,7 +60,7 @@ def player_tune_defaults():
 def _value(ed, s, made):
     """PlayerTuneValues[s], a literal index."""
     cell = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, PLAYER_TAB.values_var, made), Index=s)
-    return _pin(cell, "Item", is_input=False)
+    return out(cell, "Item")
 
 
 def _author_apply(ed, in_execs, made):
@@ -80,7 +79,7 @@ def _author_apply(ed, in_execs, made):
     _connect(go, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
-    flow = BEL.find_then_pin(cast)
+    flow = then(cast)
     for s, (col, *_rest) in enumerate(PLAYER_STATS):
         var, kind = APPLIES[col]
         cell = _value(ed, s, made)
@@ -94,8 +93,8 @@ def _author_apply(ed, in_execs, made):
         _connect(wc, _pin(n, "self"))
         _connect(value, _pin(n, var))
         _connect(flow, _pin(n, "execute"))
-        flow = BEL.find_then_pin(n)
-    return [flow, idle, _pin(cast, "CastFailed", is_input=False)]
+        flow = then(n)
+    return [flow, idle, out(cast, "CastFailed")]
 
 
 def author_player_tune_tick(ed, pc_out, in_execs):

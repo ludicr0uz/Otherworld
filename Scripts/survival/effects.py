@@ -33,7 +33,8 @@ grants; survival.tuning.DEBUFFS is where that is written down.
 
 import unreal
 
-from combat.graph import BEL, _assets, _create_blueprint, _log
+from combat.log import _log
+from uebp.graph import BEL, _assets, _create_blueprint
 from combat.tuning import BLEED_DURATION_S
 from survival.paths import BLEEDING_GE_PATH, DEHYDRATED_GE_PATH, STARVING_GE_PATH
 

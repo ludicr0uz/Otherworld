@@ -32,11 +32,11 @@ light at the flames' height lights the ground round it at night.
 
 import unreal
 
-from combat.graph import (
+from combat.log import _log
+from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _component_object, _connect,
-    _create_blueprint, _declare, _drop_components, _events, _float_type, _log, _loose_pin,
-    _must_load, _node, _palette, _pin, _root_handle, _set)
-from uebp.graph import out
+    _create_blueprint, _declare, _drop_components, _events, _float_type, _loose_pin,
+    _must_load, _node, _palette, _pin, _root_handle, _set, out, then)
 from uebp.layout import arrange
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
@@ -99,7 +99,7 @@ def _author_warmth(ed, tick):
     _connect(out(pawn), _pin(is_there, "Object"))
     there = ed.add_branch_node()
     _connect(out(is_there), _pin(there, "Condition"))
-    _connect(BEL.find_then_pin(tick), _pin(there, "execute"))
+    _connect(then(tick), _pin(there, "execute"))
 
     theirs = _node(ed, FN_ACTOR_LOC)
     _connect(out(pawn), _pin(theirs, "self"))
@@ -112,7 +112,7 @@ def _author_warmth(ed, tick):
     _connect(get(WARM_RADIUS_VAR), _pin(close, "B"))
     near = ed.add_branch_node()
     _connect(out(close), _pin(near, "Condition"))
-    _connect(BEL.find_then_pin(there), _pin(near, "execute"))
+    _connect(then(there), _pin(near, "execute"))
 
     comp = _node(ed, FN_GET_COMP)
     _connect(out(pawn), _pin(comp, "self"))
@@ -123,7 +123,7 @@ def _author_warmth(ed, tick):
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_SurvivalComponent")
     _connect(out(comp), _pin(cast, "Object"))
-    _connect(BEL.find_then_pin(near), _pin(cast, "execute"))
+    _connect(then(near), _pin(cast, "execute"))
     survival = _loose_pin(cast, "AsBPSurvivalComponent", is_input=False)
 
     def theirs_var(name):
@@ -161,7 +161,7 @@ def build_campfire(rebuild=True):
 
     life = _node(ed, FN_LIFESPAN)
     _set(life, "InLifespan", CAMPFIRE_BURN_S)
-    _connect(BEL.find_then_pin(begin), _pin(life, "execute"))
+    _connect(then(begin), _pin(life, "execute"))
     _author_warmth(ed, tick)
 
     arrange(ed)

@@ -28,9 +28,10 @@ ability cannot).
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, _assets, _connect, _create_blueprint, _log, _loose_pin, _must_load, _node,
-    _palette, _pin, _set)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, _assets, _connect, _create_blueprint, _loose_pin, _must_load, _node, _palette,
+    _pin, _set, out, then)
 from uebp.layout import arrange
 from combat.nodes import (
     FN_ADD_FF, FN_AVATAR, FN_CLAMP, FN_END_ABILITY, FN_GET_COMP,
@@ -56,20 +57,20 @@ def _author_graph(ed):
     as_item = _palette(ed, NODE_CAST_CONSUMABLE)
     _connect(_loose_pin(data, "OptionalObject", is_input=False),
              _pin(as_item, "Object"))
-    _connect(BEL.find_then_pin(event), _pin(as_item, "execute"))
+    _connect(then(event), _pin(as_item, "execute"))
     item = _loose_pin(as_item, "AsBPConsumableItem", is_input=False)
 
     avatar = _node(ed, FN_AVATAR)
-    avatar_out = _pin(avatar, "ReturnValue", is_input=False)
+    avatar_out = out(avatar)
     comp = _node(ed, FN_GET_COMP)
     _connect(avatar_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(SURVIVAL_CLASS_PATH)
     as_survival = _palette(ed, NODE_CAST_SURVIVAL)
-    _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_survival, "Object"))
-    _connect(BEL.find_then_pin(as_item), _pin(as_survival, "execute"))
+    _connect(out(comp), _pin(as_survival, "Object"))
+    _connect(then(as_item), _pin(as_survival, "execute"))
     survival = _loose_pin(as_survival, "AsBPSurvivalComponent", is_input=False)
 
-    flow = BEL.find_then_pin(as_survival)
+    flow = then(as_survival)
     for stat, restore in RESTORES:
         now = ed.add_get_member_variable_node(stat, SURVIVAL_CLASS_PATH)
         _connect(survival, _pin(now, "self"))
@@ -78,17 +79,17 @@ def _author_graph(ed):
         gain = ed.add_get_member_variable_node(restore, CONSUMABLE_CLASS_PATH)
         _connect(item, _pin(gain, "self"))
         more = _node(ed, FN_ADD_FF)
-        _connect(_pin(now, stat, is_input=False), _pin(more, "A"))
-        _connect(_pin(gain, restore, is_input=False), _pin(more, "B"))
+        _connect(out(now, stat), _pin(more, "A"))
+        _connect(out(gain, restore), _pin(more, "B"))
         clamp = _node(ed, FN_CLAMP)
-        _connect(_pin(more, "ReturnValue", is_input=False), _pin(clamp, "Value"))
+        _connect(out(more), _pin(clamp, "Value"))
         _set(clamp, "Min", 0.0)
-        _connect(_pin(top, f"Max{stat}", is_input=False), _pin(clamp, "Max"))
+        _connect(out(top, f"Max{stat}"), _pin(clamp, "Max"))
         write = ed.add_set_member_variable_node(stat, SURVIVAL_CLASS_PATH)
         _connect(survival, _pin(write, "self"))
-        _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(write, stat))
+        _connect(out(clamp), _pin(write, stat))
         _connect(flow, _pin(write, "execute"))
-        flow = BEL.find_then_pin(write)
+        flow = then(write)
 
     _heal_nodes, healed = _author_easy_heal(ed, flow, item, avatar_out)
 
@@ -96,8 +97,7 @@ def _author_graph(ed):
     # not-easy arm: an ability left active would block the next activation of
     # this instance.
     end = _node(ed, FN_END_ABILITY)
-    for e in (*healed, _pin(as_item, "CastFailed", is_input=False),
-              _pin(as_survival, "CastFailed", is_input=False)):
+    for e in (*healed, out(as_item, "CastFailed"), out(as_survival, "CastFailed")):
         _connect(e, _pin(end, "execute"))
 
     ed.add_comment_to_nodes(

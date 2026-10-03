@@ -9,9 +9,8 @@ it stores, and a Branch on it that succeeds the step without a move order.
 """
 
 from forest_generator.npc_stalk import NPC_STALK_ROAR_BLEND_S
-from npc.graph import (
-    BEL, _asset_sub, _connect, _log, _loose_pin, _mesh_object, _palette, _pin, out,
-)
+from npc.graph import _log, _mesh_object
+from uebp.graph import _assets, _connect, _loose_pin, _palette, _pin, out, then
 from npc.nodes import (
     FN_ANIM_INSTANCE, FN_PLAY_SLOT, FN_STOP_MOVEMENT, NODE_CAST_CHARACTER,
 )
@@ -24,7 +23,7 @@ def roar_object(roar_anim):
     """The roar clip as an object path, or None when the asset pipeline has
     not produced it (asset_pipeline/import_mixamo.py): the wendigo then
     stands and roars with its voice alone."""
-    if roar_anim and _asset_sub().does_asset_exist(roar_anim):
+    if roar_anim and _assets().does_asset_exist(roar_anim):
         return _mesh_object(roar_anim)
     _log(f"note: no roar clip at {roar_anim} -- run "
          f"Scripts/asset_pipeline/import_mixamo.py. The roar is sound only.")
@@ -38,7 +37,7 @@ def _author_bellow(g, exec_in, pins, roar_anim):
     on."""
     halt = g.call(FN_STOP_MOVEMENT)
     _connect(exec_in, _pin(halt, "execute"))
-    watch, step = _author_facing(g.ed, [BEL.find_then_pin(halt)], pins["player"])
+    watch, step = _author_facing(g.ed, [then(halt)], pins["player"])
     g.made.extend(watch)
 
     # Through the pawn's own AnimInstance, as the swing is (npc/melee.py), and
@@ -46,21 +45,21 @@ def _author_bellow(g, exec_in, pins, roar_anim):
     as_char = g.keep(_palette(g.ed, NODE_CAST_CHARACTER))
     _connect(pins["self_pawn"], _pin(as_char, "Object"))
     _connect(step, _pin(as_char, "execute"))
-    voiced = [_pin(as_char, "CastFailed", is_input=False)]
+    voiced = [out(as_char, "CastFailed")]
     if roar_anim:
         mesh = g.keep(g.ed.add_get_member_variable_node("Mesh", CHARACTER_CLASS_PATH))
         _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
         anim = g.call(FN_ANIM_INSTANCE)
-        _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
+        _connect(out(mesh, "Mesh"), _pin(anim, "self"))
         roar = g.call(FN_PLAY_SLOT, Asset=roar_anim,
                       SlotNodeName=MELEE_SLOT, BlendInTime=NPC_STALK_ROAR_BLEND_S,
                       BlendOutTime=NPC_STALK_ROAR_BLEND_S)
         _connect(out(anim), _pin(roar, "self"))
-        _connect(BEL.find_then_pin(as_char), _pin(roar, "execute"))
-        voiced.append(BEL.find_then_pin(roar))
+        _connect(then(as_char), _pin(roar, "execute"))
+        voiced.append(then(roar))
     else:
-        voiced.append(BEL.find_then_pin(as_char))
+        voiced.append(then(as_char))
     join = g.branch(None, voiced)
-    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], BEL.find_then_pin(join))
+    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], then(join))
     g.made.extend(sound)
     return step

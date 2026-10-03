@@ -7,7 +7,7 @@ and the stamina it costs -- is resolved by the wanderer that swings
 That graph reads Blocking and writes Stamina on this component.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, out, then
 from combat.nodes import FN_AND, FN_GREATER_FF, FN_IS_KEY_DOWN, FN_NOT
 from combat.tuning import BLOCK_KEY, COMBAT
 
@@ -36,22 +36,22 @@ def _author_block(ed, pc_out, key_pin, exec_ins):
 
     stamina = keep(ed.add_get_member_variable_node("Stamina"))
     left = keep(_node(ed, FN_GREATER_FF))
-    _connect(_pin(stamina, "Stamina", is_input=False), _pin(left, "A"))
+    _connect(out(stamina, "Stamina"), _pin(left, "A"))
     _set(left, "B", 0.0)
 
     running = keep(ed.add_get_member_variable_node("Sprinting"))
     still = keep(_node(ed, FN_NOT))
-    _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
+    _connect(out(running, "Sprinting"), _pin(still, "A"))
 
     able = keep(_node(ed, FN_AND))
-    _connect(_pin(left, "ReturnValue", is_input=False), _pin(able, "A"))
-    _connect(_pin(still, "ReturnValue", is_input=False), _pin(able, "B"))
+    _connect(out(left), _pin(able, "A"))
+    _connect(out(still), _pin(able, "B"))
     guard = keep(_node(ed, FN_AND))
-    _connect(_pin(down, "ReturnValue", is_input=False), _pin(guard, "A"))
-    _connect(_pin(able, "ReturnValue", is_input=False), _pin(guard, "B"))
+    _connect(out(down), _pin(guard, "A"))
+    _connect(out(able), _pin(guard, "B"))
 
     mark = keep(ed.add_set_member_variable_node("Blocking"))
-    _connect(_pin(guard, "ReturnValue", is_input=False), _pin(mark, "Blocking"))
+    _connect(out(guard), _pin(mark, "Blocking"))
     for e in exec_ins:
         _connect(e, _pin(mark, "execute"))
 
@@ -63,4 +63,4 @@ def _author_block(ed, pc_out, key_pin, exec_ins):
         f"{COMBAT.block_stamina_per_hit:.0f} stamina (resolved in the NPC's "
         f"melee). The fire gate refuses while Blocking.",
         made)
-    return BEL.find_then_pin(mark)
+    return then(mark)

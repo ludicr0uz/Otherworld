@@ -3,7 +3,8 @@
 
 import unreal
 
-from combat.graph import _assets, _log, _must_load
+from combat.log import _log
+from uebp.graph import _assets, _must_load
 from combat.paths import (
     MAT_BLOOD, MAT_BRASS, MAT_IMPACT_CHIP, MAT_IMPACT_DUST, MAT_METAL, MAT_WOOD,
 )

@@ -6,10 +6,10 @@ import unreal
 
 from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR
 from combat.game_state import DEBUG_MODE_VAR
-from combat.graph import (
-    BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _events,
-    _float_type, _key, _log, _must_load, _post_physics_tick, _struct_type,
-)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _events, _float_type,
+    _key, _must_load, _post_physics_tick, _struct_type)
 from uebp.layout import arrange
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import (

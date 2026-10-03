@@ -18,8 +18,7 @@ exactly as it serves Enter, and a drag wears or takes off).
 
 import unreal
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin
-from uebp.graph import out
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, else_, out, then
 from combat.nodes import (
     FN_ADD_II, FN_AND, FN_ARR_GET, FN_ARR_VALID, FN_EQ_II, FN_GET_COMP, FN_GET_PLAYER_PAWN,
     FN_IS_VALID, FN_NOT, FN_OR, MACRO_FOR_LOOP,
@@ -46,7 +45,7 @@ def _get(ed, var, owner=None, self_out=None):
             else ed.add_get_member_variable_node(var))
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
-    return _pin(n, var, is_input=False)
+    return out(n, var)
 
 
 def _call(ed, fn, **inputs):
@@ -64,7 +63,7 @@ def _branch(ed, cond, execs):
     _connect(cond, _pin(br, "Condition"))
     for e in execs:
         _connect(e, _pin(br, "execute"))
-    return BEL.find_then_pin(br), BEL.find_else_pin(br)
+    return then(br), else_(br)
 
 
 def _author_slots(ed, worn, box, in_execs):
@@ -80,14 +79,14 @@ def _author_slots(ed, worn, box, in_execs):
     _pin(loop, "LastIndex").set_pin_value(str(WEAR_ROWS - 1))
     for e in in_execs:
         _connect(e, _pin(loop, "execute"))
-    i = _pin(loop, "Index", is_input=False)
+    i = out(loop, "Index")
     cast = _palette(ed, NODE_CAST_SLOT)
     _connect(out(_call(ed, FN_CHILD_AT, self=box, Index=i)), _pin(cast, "Object"))
-    _connect(_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
+    _connect(out(loop, "LoopBody"), _pin(cast, "execute"))
     slot = _loose_pin(cast, "AsWBPInventorySlot", is_input=False)
     there, past = _branch(ed, out(_call(ed, FN_ARR_VALID,
                                          TargetArray=worn, IndexToTest=i)),
-                          [BEL.find_then_pin(cast)])
+                          [then(cast)])
     item = _loose_pin(_call(ed, FN_ARR_GET, TargetArray=worn, Index=i), "Item", is_input=False)
     worn_one, bare = _branch(ed, out(_call(ed, FN_IS_VALID, Object=item)), [there])
     caret = _call(ed, FN_AND,
@@ -99,7 +98,7 @@ def _author_slots(ed, worn, box, in_execs):
     lit = _call(ed, FN_OR, A=out(caret), B=out(dragged))
     _author_filled_slot(ed, slot, item, out(lit), worn_one, ammo=False)
     _author_empty_slot(ed, slot, (bare, past))
-    return _pin(loop, "Completed", is_input=False)
+    return out(loop, "Completed")
 
 
 def author_wear_panel(ed, in_execs):
@@ -123,11 +122,11 @@ def author_wear_panel(ed, in_execs):
     # The mouse only with the panel open: shut, the cursor is hidden and a
     # click is a shot. Before the slots are drawn, so the caret it moves and
     # the drag it starts are lit this frame.
-    opened, idle = _branch(ed, _get(ed, WEAR_OPEN_VAR), [BEL.find_then_pin(cast)])
+    opened, idle = _branch(ed, _get(ed, WEAR_OPEN_VAR), [then(cast)])
     # The close button: a click on it lowers WearOpen, as I does.
     flow = author_widget_click(ed, part(ed, WBP_HUD, WEAR_CLOSE),
                                (WEAR_OPEN_VAR, "false"), [opened])
     flow = author_inv_drag(ed, wc, flow)
     box = part(ed, WBP_HUD, WEAR_SLOTS_BOX)
     done = _author_slots(ed, worn, box, flow + [idle])
-    return [closed, done, _pin(cast, "CastFailed", is_input=False)]
+    return [closed, done, out(cast, "CastFailed")]

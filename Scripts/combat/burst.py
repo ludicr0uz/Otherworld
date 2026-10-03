@@ -10,10 +10,11 @@ from collections import namedtuple
 
 import unreal
 
-from combat.graph import (
+from combat.log import _log
+from uebp.graph import (
     BEL, BGE, _add_component, _assets, _component_object, _connect, _create_blueprint,
-    _declare, _drop_components, _events, _float_type, _log, _loose_pin, _must_load, _node,
-    _pin, _root_handle, _rot, _set, _struct_type, _vec)
+    _declare, _drop_components, _events, _float_type, _loose_pin, _must_load, _node, _pin,
+    _root_handle, _rot, _set, _struct_type, _vec, out, then)
 from uebp.layout import arrange
 from combat.nodes import (
     FN_ADD_FF, FN_ADD_VV, FN_ARR_ADD, FN_ARR_GET, FN_BREAK_TRANSFORM,
@@ -158,65 +159,60 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     if not gather:
         raise RuntimeError("could not create the ForEachLoop macro node")
     gather
-    _connect(_pin(found, "ReturnValue", is_input=False), _loose_pin(gather, "Array"))
-    _connect(BEL.find_then_pin(begin), _loose_pin(gather, "Exec"))
+    _connect(out(found), _loose_pin(gather, "Array"))
+    _connect(then(begin), _loose_pin(gather, "Exec"))
     blob = _loose_pin(gather, "ArrayElement", is_input=False)
 
     rel = _node(ed, FN_COMP_REL_XFORM)
     _connect(blob, _pin(rel, "self"))
     parts = _node(ed, FN_BREAK_TRANSFORM)
-    _connect(_pin(rel, "ReturnValue", is_input=False), _pin(parts, "InTransform"))
+    _connect(out(rel), _pin(parts, "InTransform"))
 
     keep_blob = _node(ed, FN_ARR_ADD)
-    _connect(_pin(ed.add_get_member_variable_node("Blobs"),
-                  "Blobs", is_input=False),
-             _pin(keep_blob, "TargetArray"))
+    _connect(out(ed.add_get_member_variable_node("Blobs"), "Blobs"), _pin(keep_blob, "TargetArray"))
     _connect(blob, _pin(keep_blob, "NewItem"))
     _connect(_loose_pin(gather, "LoopBody", is_input=False), _pin(keep_blob, "execute"))
 
     keep_vel = _node(ed, FN_ARR_ADD)
-    _connect(_pin(ed.add_get_member_variable_node("Velocity"),
-                  "Velocity", is_input=False),
+    _connect(out(ed.add_get_member_variable_node("Velocity"), "Velocity"),
              _pin(keep_vel, "TargetArray"))
     _connect(_loose_pin(parts, "Location", is_input=False), _pin(keep_vel, "NewItem"))
-    _connect(BEL.find_then_pin(keep_blob), _pin(keep_vel, "execute"))
+    _connect(then(keep_blob), _pin(keep_vel, "execute"))
 
     # Uniform by construction, so X is the whole story.
     axes = _node(ed, FN_BREAK_VECTOR)
     _connect(_loose_pin(parts, "Scale", is_input=False), _pin(axes, "InVec"))
     keep_size = _node(ed, FN_ARR_ADD)
-    _connect(_pin(ed.add_get_member_variable_node("Size"),
-                  "Size", is_input=False),
-             _pin(keep_size, "TargetArray"))
-    _connect(_pin(axes, "X", is_input=False), _pin(keep_size, "NewItem"))
-    _connect(BEL.find_then_pin(keep_vel), _pin(keep_size, "execute"))
+    _connect(out(ed.add_get_member_variable_node("Size"), "Size"), _pin(keep_size, "TargetArray"))
+    _connect(out(axes, "X"), _pin(keep_size, "NewItem"))
+    _connect(then(keep_vel), _pin(keep_size, "execute"))
 
     here = _node(ed, FN_GET_TRANSFORM)
     local_g = _node(ed, FN_INV_XFORM_DIR)
-    _connect(_pin(here, "ReturnValue", is_input=False), _pin(local_g, "T"))
+    _connect(out(here), _pin(local_g, "T"))
     _connect(_vec(ed, 0.0, 0.0, -gravity), _pin(local_g, "Direction"))
     pin_fall = ed.add_set_member_variable_node("Fall")
-    _connect(_pin(local_g, "ReturnValue", is_input=False), _pin(pin_fall, "Fall"))
+    _connect(out(local_g), _pin(pin_fall, "Fall"))
     _connect(_loose_pin(gather, "Completed", is_input=False), _pin(pin_fall, "execute"))
 
     life = _node(ed, FN_LIFESPAN)
     _set(life, "InLifespan", lifetime)
-    _connect(BEL.find_then_pin(pin_fall), _pin(life, "execute"))
+    _connect(then(pin_fall), _pin(life, "execute"))
 
     # --- Tick: two scalars for the whole burst, then one pass over it --------
     age_get = ed.add_get_member_variable_node("Age")
     add = _node(ed, FN_ADD_FF)
-    _connect(_pin(age_get, "Age", is_input=False), _pin(add, "A"))
-    _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(add, "B"))
+    _connect(out(age_get, "Age"), _pin(add, "A"))
+    _connect(out(tick, "DeltaSeconds"), _pin(add, "B"))
     age_set = ed.add_set_member_variable_node("Age")
-    _connect(_pin(add, "ReturnValue", is_input=False), _pin(age_set, "Age"))
-    _connect(BEL.find_then_pin(tick), _pin(age_set, "execute"))
+    _connect(out(add), _pin(age_set, "Age"))
+    _connect(then(tick), _pin(age_set, "execute"))
     # Read the *stored* age from here on. The add is pure, so every re-read of
     # its output would recompute it -- harmless while the inputs hold still, but
     # the stored value is the one the next frame accumulates from, and the two
     # should not be allowed to drift apart.
     age = ed.add_get_member_variable_node("Age")
-    age_out = _pin(age, "Age", is_input=False)
+    age_out = out(age, "Age")
 
     # A = (1 - e^(-k t)) / k, written as (e^(-k t) - 1) / -k. Algebraically the
     # same; the difference is that every constant then lands on a B pin, and
@@ -226,14 +222,14 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     _connect(age_out, _pin(decay, "A"))
     _set(decay, "B", -drag)
     gone_frac = _node(ed, FN_EXP)
-    _connect(_pin(decay, "ReturnValue", is_input=False), _pin(gone_frac, "A"))
+    _connect(out(decay), _pin(gone_frac, "A"))
     spent = _node(ed, FN_SUB_FF)
-    _connect(_pin(gone_frac, "ReturnValue", is_input=False), _pin(spent, "A"))
+    _connect(out(gone_frac), _pin(spent, "A"))
     _set(spent, "B", 1.0)
     a_term = _node(ed, FN_DIV_FF)
-    _connect(_pin(spent, "ReturnValue", is_input=False), _pin(a_term, "A"))
+    _connect(out(spent), _pin(a_term, "A"))
     _set(a_term, "B", -drag)
-    a_out = _pin(a_term, "ReturnValue", is_input=False)
+    a_out = out(a_term)
     # A in centimetres, for the velocities stored in metres per second. Done
     # once here rather than per droplet, and not on the Multiply_VectorFloat
     # itself -- that node's float pin rejects a literal default, reading back
@@ -241,16 +237,16 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     a_cm = _node(ed, FN_MUL_FF)
     _connect(a_out, _pin(a_cm, "A"))
     _set(a_cm, "B", BURST_VELOCITY_ENCODE)
-    a_cm_out = _pin(a_cm, "ReturnValue", is_input=False)
+    a_cm_out = out(a_cm)
 
     # B = (t - A) / k
     lag = _node(ed, FN_SUB_FF)
     _connect(age_out, _pin(lag, "A"))
     _connect(a_out, _pin(lag, "B"))
     b_term = _node(ed, FN_DIV_FF)
-    _connect(_pin(lag, "ReturnValue", is_input=False), _pin(b_term, "A"))
+    _connect(out(lag), _pin(b_term, "A"))
     _set(b_term, "B", drag)
-    b_out = _pin(b_term, "ReturnValue", is_input=False)
+    b_out = out(b_term)
 
     # fade = clamp((lifetime - age) / tail, 0, 1): flat, then a hard cut. Both
     # signs flipped for the same B-pin reason as the A term above.
@@ -258,44 +254,44 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     _connect(age_out, _pin(left, "A"))
     _set(left, "B", lifetime)
     tail = _node(ed, FN_DIV_FF)
-    _connect(_pin(left, "ReturnValue", is_input=False), _pin(tail, "A"))
+    _connect(out(left), _pin(tail, "A"))
     _set(tail, "B", -fade_tail)
     fade = _node(ed, FN_CLAMP)
-    _connect(_pin(tail, "ReturnValue", is_input=False), _pin(fade, "Value"))
+    _connect(out(tail), _pin(fade, "Value"))
     _set(fade, "Min", 0.0)
     _set(fade, "Max", 1.0)
-    fade_out = _pin(fade, "ReturnValue", is_input=False)
+    fade_out = out(fade)
 
     blobs_get = ed.add_get_member_variable_node("Blobs")
     fly = ed.add_macro_node(MACRO_FOR_EACH)
     if not fly:
         raise RuntimeError("could not create the ForEachLoop macro node")
     fly
-    _connect(_pin(blobs_get, "Blobs", is_input=False), _loose_pin(fly, "Array"))
-    _connect(BEL.find_then_pin(age_set), _loose_pin(fly, "Exec"))
+    _connect(out(blobs_get, "Blobs"), _loose_pin(fly, "Array"))
+    _connect(then(age_set), _loose_pin(fly, "Exec"))
     each = _loose_pin(fly, "ArrayElement", is_input=False)
     index = _loose_pin(fly, "ArrayIndex", is_input=False)
 
     vel_arr = ed.add_get_member_variable_node("Velocity")
     vel = _node(ed, FN_ARR_GET)
-    _connect(_pin(vel_arr, "Velocity", is_input=False), _pin(vel, "TargetArray"))
+    _connect(out(vel_arr, "Velocity"), _pin(vel, "TargetArray"))
     _connect(index, _pin(vel, "Index"))
     thrown = _node(ed, FN_MUL_VF)
-    _connect(_pin(vel, "Item", is_input=False), _pin(thrown, "A"))
+    _connect(out(vel, "Item"), _pin(thrown, "A"))
     _connect(a_cm_out, _pin(thrown, "B"))
 
     fall_get = ed.add_get_member_variable_node("Fall")
     dropped = _node(ed, FN_MUL_VF)
-    _connect(_pin(fall_get, "Fall", is_input=False), _pin(dropped, "A"))
+    _connect(out(fall_get, "Fall"), _pin(dropped, "A"))
     _connect(b_out, _pin(dropped, "B"))
 
     offset = _node(ed, FN_ADD_VV)
-    _connect(_pin(thrown, "ReturnValue", is_input=False), _pin(offset, "A"))
-    _connect(_pin(dropped, "ReturnValue", is_input=False), _pin(offset, "B"))
+    _connect(out(thrown), _pin(offset, "A"))
+    _connect(out(dropped), _pin(offset, "B"))
 
     put = _node(ed, FN_COMP_SET_REL_LOC)
     _connect(each, _pin(put, "self"))
-    _connect(_pin(offset, "ReturnValue", is_input=False), _pin(put, "NewLocation"))
+    _connect(out(offset), _pin(put, "NewLocation"))
     # No sweep: the droplets have no collision and the spray is meant to pass
     # through the surface it came off, not to be stopped by it.
     _set(put, "bSweep", "false")
@@ -304,18 +300,18 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
 
     size_arr = ed.add_get_member_variable_node("Size")
     born = _node(ed, FN_ARR_GET)
-    _connect(_pin(size_arr, "Size", is_input=False), _pin(born, "TargetArray"))
+    _connect(out(size_arr, "Size"), _pin(born, "TargetArray"))
     _connect(index, _pin(born, "Index"))
     now_size = _node(ed, FN_MUL_FF)
-    _connect(_pin(born, "Item", is_input=False), _pin(now_size, "A"))
+    _connect(out(born, "Item"), _pin(now_size, "A"))
     _connect(fade_out, _pin(now_size, "B"))
     size_v = _node(ed, FN_MUL_VF)
     _connect(_vec(ed, 1.0, 1.0, 1.0), _pin(size_v, "A"))
-    _connect(_pin(now_size, "ReturnValue", is_input=False), _pin(size_v, "B"))
+    _connect(out(now_size), _pin(size_v, "B"))
     shrink = _node(ed, FN_COMP_SET_SCALE)
     _connect(each, _pin(shrink, "self"))
-    _connect(_pin(size_v, "ReturnValue", is_input=False), _pin(shrink, "NewScale3D"))
-    _connect(BEL.find_then_pin(put), _pin(shrink, "execute"))
+    _connect(out(size_v), _pin(shrink, "NewScale3D"))
+    _connect(then(put), _pin(shrink, "execute"))
 
     ed.add_comment_to_nodes(
         note,

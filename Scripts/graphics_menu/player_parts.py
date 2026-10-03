@@ -7,7 +7,7 @@ its own. A pawn without one of the components (a level where combat or
 survival was never built) fails the chain and gets no profile.
 """
 
-from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, out, then
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from survival.paths import NODE_CAST_SURVIVAL, SURVIVAL_CLASS_PATH
 
@@ -37,7 +37,7 @@ def author_player_parts(ed, in_execs, made):
     """
     pawn = _node(ed, FN_GET_PLAYER_PAWN)
     made.append(pawn)
-    pawn_out = _pin(pawn, "ReturnValue", is_input=False)
+    pawn_out = out(pawn)
     parts = {PAWN: pawn_out}
     fails = []
     flow = list(in_execs)
@@ -46,20 +46,20 @@ def author_player_parts(ed, in_execs, made):
         _connect(pawn_out, _pin(comp, "self"))
         _pin(comp, "ComponentClass").set_pin_value(class_path)
         cast = _palette(ed, cast_name)
-        _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
+        _connect(out(comp), _pin(cast, "Object"))
         for e in flow:
             _connect(e, _pin(cast, "execute"))
         made += [comp, cast]
         parts[class_path] = _loose_pin(cast, as_name, is_input=False)
-        fails.append(_pin(cast, "CastFailed", is_input=False))
-        flow = [BEL.find_then_pin(cast)]
+        fails.append(out(cast, "CastFailed"))
+        flow = [then(cast)]
     mode = _node(ed, FN_GET_GAME_MODE)
     as_mode = _palette(ed, _CAST_MODE)
-    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
+    _connect(out(mode), _pin(as_mode, "Object"))
     for e in flow:
         _connect(e, _pin(as_mode, "execute"))
     made += [mode, as_mode]
     parts[MODE] = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
-    fails.append(_pin(as_mode, "CastFailed", is_input=False))
-    return BEL.find_then_pin(as_mode), fails, parts
+    fails.append(out(as_mode, "CastFailed"))
+    return then(as_mode), fails, parts
 

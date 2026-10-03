@@ -35,7 +35,7 @@ from combat.breath_tuning import (
     BREATH_RECOVER_S, BREATH_SCALE_VAR, BREATH_SWAY_SCALE, BREATH_VAR,
     BREATH_WINDED_SCALE, WINDED_VAR,
 )
-from combat.graph import BEL, _connect, _node, _pin, _set
+from uebp.graph import _connect, _node, _pin, _set, else_, then
 from combat.nodes import (
     FN_ADD_FF, FN_AND, FN_CLAMP, FN_INTERP_FF, FN_IS_KEY_DOWN, FN_LE_FF,
     FN_LESS_FF, FN_NOT_B, FN_OR,
@@ -74,7 +74,7 @@ def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins):
         _connect(value, _pin(n, var))
         for e in flow:
             _connect(e, _pin(n, "execute"))
-        return [BEL.find_then_pin(n)]
+        return [then(n)]
 
     dt = out(tick, "DeltaSeconds")
 
@@ -85,8 +85,8 @@ def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins):
         _connect(e, _pin(armed, "execute"))
     rate, rate_n = _prop(ed, SWAY_RATE_VAR, held)
     keep(rate_n)
-    flow = store(SWAY_RATE_VAR, rate, [BEL.find_then_pin(armed)])
-    flow.append(BEL.find_else_pin(armed))
+    flow = store(SWAY_RATE_VAR, rate, [then(armed)])
+    flow.append(else_(armed))
 
     # Held: the key (or its stand-in), down the sights, not winded.
     down = call(FN_IS_KEY_DOWN, self=pc_out, Key=key_pin)

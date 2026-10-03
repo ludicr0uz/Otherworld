@@ -14,8 +14,9 @@ from npc.paths import (
     step_task_path, tree_path,
 )
 from npc.nodes import FN_RUN_BT, NODE_EVENT_POSSESS
-from npc.graph import (
-    _asset_sub, BEL, BGE, _connect, _create_blueprint, _log, _node, _palette, _set)
+from npc.graph import _log
+from uebp.graph import (
+    BEL, BGE, _assets, _connect, _create_blueprint, _node, _palette, _set, then)
 from uebp.layout import arrange
 from npc.drawn import draws
 from npc.sight_cone import _author_sight_cone
@@ -81,7 +82,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
         _log(f"{path} graph already authored — reusing")
         if not BEL.compile_blueprint(bp):
             raise RuntimeError(f"{path} failed to compile")
-        _asset_sub().save_loaded_asset(bp)
+        _assets().save_loaded_asset(bp)
         return bp
     _log("wiping the existing AI graph")
     clear_step_task(step_task_path(path))
@@ -109,7 +110,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     possess = _palette(ed, NODE_EVENT_POSSESS)
     run = _node(ed, FN_RUN_BT)
     _set(run, "BTAsset", bt.get_path_name())
-    _connect(BEL.find_then_pin(possess), BEL.find_execute_pin(run))
+    _connect(then(possess), BEL.find_execute_pin(run))
     ed.add_comment_to_nodes(
         f"On possession, run {bt.get_name()}. The tree (npc/tree.py) decides "
         f"what this wanderer does; the BT_* events below are its steps.",
@@ -128,7 +129,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     # raising: /Game/Audio is built from assets/generated/sounds, which a
     # checkout that has not run Scripts/make_creature_sounds.py does not have,
     # and the graph already guards an empty array.
-    eas = _asset_sub()
+    eas = _assets()
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     for var, wanted in ((VOICES_VAR, voices), (HIT_SOUNDS_VAR, hit_sounds)):
         found = [eas.load_asset(a) for a in wanted if eas.does_asset_exist(a)]

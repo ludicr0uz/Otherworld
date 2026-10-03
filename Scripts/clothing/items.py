@@ -12,7 +12,8 @@ so one placed in a level is already a pick-up.
 
 import unreal
 
-from combat.graph import BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot
+from combat.log import _log
+from uebp.graph import BEL, _apply_defaults, _create_blueprint, _must_load, _rot
 from combat.grip import _grip_location, _grip_rotation
 from combat.materials import build_flat_material
 from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH

@@ -48,7 +48,8 @@ from npc.agro import _author_agro_steps, _declare_agro_vars
 from npc.chase import _author_chase
 from npc.corpse import _author_alive_gate, _author_corpse_gate
 from npc.drawn import _author_drawn, declare_drawn_vars, draws
-from npc.graph import BEL, _connect, _log, _node, _pin, _set
+from npc.graph import _log
+from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
 from npc.melee import _author_melee
 from npc.nodes import FN_GET_PAWN, FN_IS_VALID
 from npc.monster_tuning import monster_specs, stock_run_speed
@@ -86,8 +87,8 @@ class _Steps:
         if full.replace(" ", "") not in title or f"{full}_" in title:
             raise RuntimeError(f"custom event {full!r} came back as {title!r}")
         if not gated:
-            return BEL.find_then_pin(node)
-        return _author_alive_gate(self.ed, BEL.find_then_pin(node))
+            return then(node)
+        return _author_alive_gate(self.ed, then(node))
 
     def result_node(self, value):
         node = self.ed.add_set_member_variable_node(STEP_RESULT_VAR)
@@ -107,18 +108,16 @@ def _author_pulse(ed, steps):
     # pawn can be gone (destroyed, unpossessed) while the controller lives.
     own_pawn = _node(ed, FN_GET_PAWN)
     possessed = _node(ed, FN_IS_VALID)
-    _connect(_pin(own_pawn, "ReturnValue", is_input=False),
-             _pin(possessed, "Object"))
+    _connect(out(own_pawn), _pin(possessed, "Object"))
     gate = ed.add_branch_node()
-    _connect(_pin(possessed, "ReturnValue", is_input=False),
-             _pin(gate, "Condition"))
+    _connect(out(possessed), _pin(gate, "Condition"))
     _connect(steps.event(STEP_PULSE, gated=False), _pin(gate, "execute"))
-    _connect(BEL.find_else_pin(gate), steps.result(False))
+    _connect(else_(gate), steps.result(False))
 
     # First thing with a pawn: is it a corpse? A dead wanderer's tree stops
     # there, so nothing below -- stats, voice, patrol, chase, melee -- can run
     # for it. See npc/corpse.py.
-    _, alive, ended = _author_corpse_gate(ed, BEL.find_then_pin(gate))
+    _, alive, ended = _author_corpse_gate(ed, then(gate))
     _connect(ended, steps.result(False))
     # This creature's health, applied when it changes, and its voice on a timer. Both
     # need the pawn, which is why they sit after the gate.

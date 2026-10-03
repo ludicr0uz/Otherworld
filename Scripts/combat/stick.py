@@ -35,10 +35,11 @@ mesh's origin, in A_HoldTorch (hold_pose.py).
 import unreal
 
 from combat.chop_tuning import CHOPS_VAR
-from combat.graph import (
+from combat.log import _log
+from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _component_object, _connect,
-    _create_blueprint, _drop_components, _events, _find_handle, _log, _must_load, _node,
-    _pin, _rot, _set)
+    _create_blueprint, _drop_components, _events, _find_handle, _must_load, _node, _pin,
+    _rot, _set, else_, then)
 from uebp.layout import arrange
 from combat.grip import _grip_location, _grip_rotation
 from combat.light_tuning import LIGHTS_VAR
@@ -128,24 +129,24 @@ def _author_burn(ed, tick):
     _connect(out(spent), _pin(over, "B"))
     burnt = ed.add_branch_node()
     _connect(out(over), _pin(burnt, "Condition"))
-    _connect(BEL.find_then_pin(tick), _pin(burnt, "execute"))
+    _connect(then(tick), _pin(burnt, "execute"))
     dark = ed.add_set_member_variable_node(LIT_VAR)
     _set(dark, LIT_VAR, "false")
-    _connect(BEL.find_then_pin(burnt), _pin(dark, "execute"))
+    _connect(then(burnt), _pin(dark, "execute"))
 
     # Read after the write above: a pure Get is pulled when its reader runs.
     lit = get(LIT_VAR)
     unlit = _node(ed, FN_NOT)
     _connect(lit, _pin(unlit, "A"))
     made = [burnt, dark]
-    prev = (BEL.find_then_pin(dark), BEL.find_else_pin(burnt))
+    prev = (then(dark), else_(burnt))
     for name, shown in ((MODEL, out(unlit)), (FLAME, lit), (GLOW, lit)):
         show = _node(ed, FN_SET_VISIBILITY)
         _connect(get(name), _pin(show, "self"))
         _connect(shown, _pin(show, "bNewVisibility"))
         for e in prev:
             _connect(e, _pin(show, "execute"))
-        prev = (BEL.find_then_pin(show),)
+        prev = (then(show),)
         made.append(show)
     ed.add_comment_to_nodes(
         f"A lit stick burns out at {BURN_OUT_VAR} (the use key's stage wrote "

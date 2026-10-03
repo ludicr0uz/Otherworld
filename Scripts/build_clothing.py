@@ -25,7 +25,7 @@ for _name in [m for m in sys.modules
 
 import unreal                                                     # noqa: E402
 
-from combat.graph import _log                                     # noqa: E402
+from combat.log import _log                                       # noqa: E402
 from clothing.items import build_garments                         # noqa: E402
 from clothing.placement import TEST_LEVEL, place_test_clothing    # noqa: E402
 

@@ -21,11 +21,11 @@ import unreal
 from combat.audio import SND_DRY_FIRE
 from combat.chop_tuning import CHOPS_VAR
 from combat.light_tuning import LIGHTS_VAR
-from combat.graph import (
-    BEL, BGE, _add_component, _apply_defaults, _assets, _component_object,
-    _create_blueprint, _declare, _drop_components, _find_handle, _float_type,
-    _handles, _log, _must_load, _root_handle, _struct_type,
-)
+from combat.log import _log
+from uebp.graph import (
+    BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _create_blueprint,
+    _declare, _drop_components, _find_handle, _float_type, _handles, _must_load,
+    _root_handle, _struct_type)
 from uebp.layout import arrange
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR

@@ -7,7 +7,8 @@ import os
 
 import unreal
 
-from combat.graph import _assets, _log
+from combat.log import _log
+from uebp.graph import _assets
 from combat.paths import AUDIO_DIR
 from npc.monster_tuning import monster_specs
 

@@ -5,7 +5,7 @@ probed by real traces.
 import unreal
 
 from combat.game_state import DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
-from combat.graph import _component_object, _handles
+from uebp.graph import _component_object, _handles
 from combat.grip import _mesh_bone_names
 from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, hit_zones,

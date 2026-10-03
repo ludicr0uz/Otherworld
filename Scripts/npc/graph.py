@@ -1,16 +1,11 @@
-"""Authoring helpers every NPC module shares. The node/pin/connect/set ones
-live in uebp/graph.py and are re-imported here, a temporary shim (removed in
-Phase 2 of Scripts/dev/plans/remove_graph_literals.md); what is the NPC
-package's own is _Graph (the node shapes a long fragment repeats) and the
-creature asset paths.
+"""What the NPC package's authoring modules share on top of uebp: the
+package's log line, _Graph (the node shapes a long fragment repeats) and a
+creature asset's object path.
 """
 
-from uebp.graph import (
-    BEL, BGE, PIN, _assets, _connect, _create_blueprint, _loose_pin, _name_literal, _node,
-    _palette, _pin, _resolve, _set, _try_set, make_log, out)
+from uebp.graph import _connect, _node, _pin, _set, make_log, out, then
 
 _log = make_log("NPC")
-_asset_sub = _assets
 
 
 class _Graph:
@@ -45,7 +40,7 @@ class _Graph:
 
     def get(self, var):
         node = self.keep(self.ed.add_get_member_variable_node(var))
-        return _pin(node, var, is_input=False)
+        return out(node, var)
 
     def put(self, var, exec_in, pin=None, literal=None):
         """Write ``var`` from a pin or a literal; returns the Set's then pin.
@@ -57,7 +52,7 @@ class _Graph:
             _set(node, var, literal)
         for source in (exec_in if isinstance(exec_in, list) else [exec_in]):
             _connect(source, _pin(node, "execute"))
-        return BEL.find_then_pin(node)
+        return then(node)
 
     def branch(self, condition, exec_in):
         """A Branch on ``condition`` (None: always true), run by ``exec_in``."""

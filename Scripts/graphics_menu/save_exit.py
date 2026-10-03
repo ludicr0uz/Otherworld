@@ -24,8 +24,7 @@ Everything reads off the player_parts cast chain; a pawn without the parts
 skips the whole fragment.
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.dev_guns import author_dev_guns
@@ -82,7 +81,7 @@ def _chain(node, in_execs):
     if pin and pin.is_valid():
         for e in in_execs:
             _connect(e, pin)
-        return [BEL.find_then_pin(node)]
+        return [then(node)]
     return list(in_execs)
 
 
@@ -96,7 +95,7 @@ def _setter(ed, var, value, in_execs, made):
     for e in in_execs:
         _connect(e, _pin(n, "execute"))
     made.append(n)
-    return [BEL.find_then_pin(n)]
+    return [then(n)]
 
 
 def _get(ed, var, made, owner=None, self_out=None):
@@ -105,7 +104,7 @@ def _get(ed, var, made, owner=None, self_out=None):
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
     made.append(n)
-    return _pin(n, var, is_input=False)
+    return out(n, var)
 
 
 def _call(ed, fn, made, **inputs):
@@ -126,7 +125,7 @@ def _branch(ed, cond, in_execs, made):
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
     made.append(br)
-    return BEL.find_then_pin(br), BEL.find_else_pin(br)
+    return then(br), else_(br)
 
 
 def _author_forget_on_death(ed, health, in_execs, made):

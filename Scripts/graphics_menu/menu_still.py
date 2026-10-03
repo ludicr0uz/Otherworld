@@ -21,8 +21,7 @@ under it, the HUD ticks all the same (menu_main.py), and the first row gives
 the walk back as it starts the game. The death screen needs none of this.
 """
 
-from combat.graph import BEL, _connect, _pin
-from uebp.graph import out
+from uebp.graph import _connect, _pin, out, then
 from combat.nodes import FN_NEQ_BB
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_find import put
@@ -45,4 +44,4 @@ def author_menu_still(ed, pc_out, in_execs):
         "The M panel holds the player still: the controller ignores move input "
         "while it is open, taken and given back on MenuOpen's edges, so the "
         "arrows only work the menu.", made)
-    return [BEL.find_then_pin(still), same]
+    return [then(still), same]

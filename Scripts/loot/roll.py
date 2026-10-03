@@ -16,7 +16,8 @@ no hidden actors and nothing is left over when its lifespan ends.
 
 import unreal
 
-from combat.graph import BEL, _connect, _declare, _float_type, _node, _pin, _struct_type
+from uebp.graph import (
+    BEL, _connect, _declare, _float_type, _node, _pin, _struct_type, out, then)
 from combat.nodes import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_LESS_FF, FN_SUB_II, MACRO_FOR_LOOP,
 )
@@ -47,7 +48,7 @@ def declare_loot_vars(ed):
 def _get(ed, var, made):
     n = ed.add_get_member_variable_node(var)
     made.append(n)
-    return _pin(n, var, is_input=False)
+    return out(n, var)
 
 
 def _element(ed, var, index, made):
@@ -55,7 +56,7 @@ def _element(ed, var, index, made):
     made.append(n)
     _connect(_get(ed, var, made), _pin(n, "TargetArray"))
     _connect(index, _pin(n, "Index"))
-    return _pin(n, "Item", is_input=False)
+    return out(n, "Item")
 
 
 def _append(ed, var, item, exec_in, made):
@@ -64,7 +65,7 @@ def _append(ed, var, item, exec_in, made):
     _connect(_get(ed, var, made), _pin(n, "TargetArray"))
     _connect(item, _pin(n, "NewItem"))
     _connect(exec_in, _pin(n, "execute"))
-    return BEL.find_then_pin(n)
+    return then(n)
 
 
 def author_loot_roll(ed, exec_ins):
@@ -79,7 +80,7 @@ def author_loot_roll(ed, exec_ins):
     _connect(_get(ed, LOOT_TABLE_VAR, made), _pin(size, "TargetArray"))
     last = _node(ed, FN_SUB_II)
     made.append(last)
-    _connect(_pin(size, "ReturnValue", is_input=False), _pin(last, "A"))
+    _connect(out(size), _pin(last, "A"))
     _pin(last, "B").set_pin_value("1")
 
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
@@ -88,22 +89,22 @@ def author_loot_roll(ed, exec_ins):
     loop
     made.append(loop)
     _pin(loop, "FirstIndex").set_pin_value("0")
-    _connect(_pin(last, "ReturnValue", is_input=False), _pin(loop, "LastIndex"))
+    _connect(out(last), _pin(loop, "LastIndex"))
     for e in exec_ins:
         _connect(e, _pin(loop, "execute"))
-    i = _pin(loop, "Index", is_input=False)
+    i = out(loop, "Index")
 
     draw = _node(ed, FN_RANDOM_UNIT)
     lucky = _node(ed, FN_LESS_FF)
     made += [draw, lucky]
-    _connect(_pin(draw, "ReturnValue", is_input=False), _pin(lucky, "A"))
+    _connect(out(draw), _pin(lucky, "A"))
     _connect(_element(ed, LOOT_CHANCES_VAR, i, made), _pin(lucky, "B"))
     carried = ed.add_branch_node()
     made.append(carried)
-    _connect(_pin(lucky, "ReturnValue", is_input=False), _pin(carried, "Condition"))
-    _connect(_pin(loop, "LoopBody", is_input=False), _pin(carried, "execute"))
+    _connect(out(lucky), _pin(carried, "Condition"))
+    _connect(out(loop, "LoopBody"), _pin(carried, "execute"))
 
-    flow = BEL.find_then_pin(carried)
+    flow = then(carried)
     for table, body in LOOT_ARRAYS:
         flow = _append(ed, body, _element(ed, table, i, made), flow, made)
     ed.add_comment_to_nodes(
@@ -111,4 +112,4 @@ def author_loot_roll(ed, exec_ins):
         "(RandomFloat < LootChances[i]) and, on a hit, goes into Loot (with its "
         "name, icon and tint), which the HUD's loot window shows. Filled by "
         "loot/install.py.", made)
-    return _pin(loop, "Completed", is_input=False)
+    return out(loop, "Completed")

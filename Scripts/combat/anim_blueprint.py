@@ -34,7 +34,8 @@ this is the file that splices them into ABP_Unarmed.
 
 import unreal
 
-from combat.graph import BEL, BGE, PIN, _assets, _connect, _log, _palette, _pin
+from combat.log import _log
+from uebp.graph import BEL, BGE, PIN, _assets, _connect, _palette, _pin, out
 from uebp.layout import arrange
 from combat.paths import ABP_PATH
 
@@ -207,8 +208,8 @@ def _ensure_full_body_slot(ed):
 
     slot = _name_slot(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"), FULL_BODY_SLOT)
     PIN.break_pin_links(_pin(rig, "Source"))
-    _connect(_pin(upstream, "Pose", is_input=False), _pin(slot, "Source"))
-    _connect(_pin(slot, "Pose", is_input=False), _pin(rig, "Source"))
+    _connect(out(upstream, "Pose"), _pin(slot, "Source"))
+    _connect(out(slot, "Pose"), _pin(rig, "Source"))
     return slot
 
 
@@ -271,7 +272,7 @@ def patch_anim_blueprint():
     # The aim blend is the one DefaultSlot feeds, found by following the wire
     # rather than by taking the first LayeredBoneBlend in the list: there are
     # two of them now and list order is not graph order.
-    fed = PIN.list_connected_pins(_pin(aim_slot, "Pose", is_input=False))
+    fed = PIN.list_connected_pins(out(aim_slot, "Pose"))
     aim_blend = PIN.get_owning_node(fed[0]) if fed else None
     fresh = aim_blend is None or \
         aim_blend.get_class().get_name() != "AnimGraphNode_LayeredBoneBlend"
@@ -293,11 +294,10 @@ def patch_anim_blueprint():
         # A pose output legally drives more than one input here, so the
         # locomotion pose reaches both the blend's base and the slot's source
         # without needing a cached-pose pair.
-        _connect(_pin(loco, "Pose", is_input=False), _pin(aim_blend, "BasePose"))
+        _connect(out(loco, "Pose"), _pin(aim_blend, "BasePose"))
         PIN.break_pin_links(_pin(rig, "Source"))
-        _connect(_pin(aim_slot, "Pose", is_input=False),
-                 _pin(aim_blend, "BlendPoses_0"))
-        _connect(_pin(aim_blend, "Pose", is_input=False), _pin(rig, "Source"))
+        _connect(out(aim_slot, "Pose"), _pin(aim_blend, "BlendPoses_0"))
+        _connect(out(aim_blend, "Pose"), _pin(rig, "Source"))
 
     _configure_blend(aim_blend)
     _ensure_hit_slot(ed, aim_blend)

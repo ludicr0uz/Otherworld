@@ -22,7 +22,8 @@ The roll is a pure node read once, by its Branch. The spec is pure too: each
 AddGrantedTag reads the previous one's returned handle (survival/debuffs.py).
 """
 
-from combat.graph import BEL, _assets, _connect, _float_type, _log, _node, _pin, _set
+from combat.log import _log
+from uebp.graph import _assets, _connect, _float_type, _node, _pin, _set, else_, out, then
 from combat.nodes import (
     FN_ADD_FF, FN_ADD_GRANTED_TAG, FN_APPLY_SPEC_TO_SELF, FN_GET_ASC, FN_IS_VALID,
     FN_LESS_FF, FN_MAKE_CONTEXT, FN_MAKE_SPEC, FN_RANDOM_FLOAT, FN_REMOVE_EFFECT,
@@ -63,27 +64,27 @@ def _author_on_hit(ed, exec_in, target, effects):
 
     lookup = keep(_node(ed, FN_GET_ASC))
     _connect(target, _pin(lookup, "Actor"))
-    asc = _pin(lookup, "ReturnValue", is_input=False)
+    asc = out(lookup)
     valid = keep(_node(ed, FN_IS_VALID))
     _connect(asc, _pin(valid, "Object"))
     gate = keep(ed.add_branch_node())
-    _connect(_pin(valid, "ReturnValue", is_input=False), _pin(gate, "Condition"))
+    _connect(out(valid), _pin(gate, "Condition"))
     _connect(exec_in, _pin(gate, "execute"))
 
-    flows = [BEL.find_then_pin(gate)]
+    flows = [then(gate)]
     for effect in ready:
         roll = keep(_node(ed, FN_RANDOM_FLOAT))
         _set(roll, "Min", 0.0)
         _set(roll, "Max", 1.0)
         bonus = keep(ed.add_get_member_variable_node(ON_HIT_BONUS_VAR))
         odds = keep(_node(ed, FN_ADD_FF))
-        _connect(_pin(bonus, ON_HIT_BONUS_VAR, is_input=False), _pin(odds, "A"))
+        _connect(out(bonus, ON_HIT_BONUS_VAR), _pin(odds, "A"))
         _set(odds, "B", effect.chance)
         under = keep(_node(ed, FN_LESS_FF))
-        _connect(_pin(roll, "ReturnValue", is_input=False), _pin(under, "A"))
-        _connect(_pin(odds, "ReturnValue", is_input=False), _pin(under, "B"))
+        _connect(out(roll), _pin(under, "A"))
+        _connect(out(odds), _pin(under, "B"))
         lands = keep(ed.add_branch_node())
-        _connect(_pin(under, "ReturnValue", is_input=False), _pin(lands, "Condition"))
+        _connect(out(under), _pin(lands, "Condition"))
         for flow in flows:
             _connect(flow, _pin(lands, "execute"))
 
@@ -91,7 +92,7 @@ def _author_on_hit(ed, exec_in, target, effects):
         _connect(asc, _pin(remove, "self"))
         _set(remove, "GameplayEffect", effect.effect_class)
         _set(remove, "StacksToRemove", -1)
-        _connect(BEL.find_then_pin(lands), _pin(remove, "execute"))
+        _connect(then(lands), _pin(remove, "execute"))
 
         context = keep(_node(ed, FN_MAKE_CONTEXT))
         _connect(asc, _pin(context, "self"))
@@ -99,21 +100,21 @@ def _author_on_hit(ed, exec_in, target, effects):
         _connect(asc, _pin(spec, "self"))
         _set(spec, "GameplayEffectClass", effect.effect_class)
         _set(spec, "Level", 1.0)
-        _connect(_pin(context, "ReturnValue", is_input=False), _pin(spec, "Context"))
-        handle = _pin(spec, "ReturnValue", is_input=False)
-        flow = BEL.find_then_pin(remove)
+        _connect(out(context), _pin(spec, "Context"))
+        handle = out(spec)
+        flow = then(remove)
         for tag in effect.tags:
             grant = keep(_node(ed, FN_ADD_GRANTED_TAG))
             _connect(handle, _pin(grant, "SpecHandle"))
             _set(grant, "NewGameplayTag", f'(TagName="{tag}")')
             _connect(flow, _pin(grant, "execute"))
-            handle = _pin(grant, "ReturnValue", is_input=False)
-            flow = BEL.find_then_pin(grant)
+            handle = out(grant)
+            flow = then(grant)
         apply = keep(_node(ed, FN_APPLY_SPEC_TO_SELF))
         _connect(asc, _pin(apply, "self"))
         _connect(handle, _pin(apply, "SpecHandle"))
         _connect(flow, _pin(apply, "execute"))
-        flows = [BEL.find_then_pin(apply), BEL.find_else_pin(lands)]
+        flows = [then(apply), else_(lands)]
 
     ed.add_comment_to_nodes(
         "On hit: " + "; ".join(
@@ -121,4 +122,4 @@ def _author_on_hit(ed, exec_in, target, effects):
             f"({', '.join(e.tags)}), any it already has replaced" for e in ready)
         + f". {ON_HIT_BONUS_VAR} (0 as built) is added to each chance.",
         made)
-    return made, flows + [BEL.find_else_pin(gate)]
+    return made, flows + [else_(gate)]

@@ -269,12 +269,13 @@ def apply(module, edits, write):
         if end > floor:
             skipped += 1
             continue
+        whole_lines = src[start:end].endswith("\n")
         src, floor, done = src[:start] + new + src[end:], start, done + 1
         line_start = src.rfind("\n", 0, start) + 1
         line_end = src.find("\n", start)
         line_end = len(src) if line_end < 0 else line_end
         line = src[line_start:line_end]
-        if line.strip() == "" and (start != end or new == "") and line != "":
+        if line.strip() == "" and start != end and new == "" and not whole_lines:
             src = src[:line_start] + src[line_end + 1:]
         elif line != line.rstrip():
             src = src[:line_start] + line.rstrip() + src[line_end:]
@@ -282,6 +283,68 @@ def apply(module, edits, write):
         with open(module.path, "w") as fh:
             fh.write(src)
     return done, skipped
+
+
+# ─── Import statements ───────────────────────────────────────────────────────
+
+IMPORT_WIDTH = 95
+
+
+def import_text(module_name, names, comment=""):
+    """``from m import a, b``, wrapped in parentheses past IMPORT_WIDTH."""
+    one = f"from {module_name} import {', '.join(names)}"
+    if comment:
+        comment = "  " + comment.strip()
+        if len(one) <= 64:
+            return one.ljust(66) + comment.strip()
+    if len(one) + len(comment) <= IMPORT_WIDTH:
+        return one + comment
+    lines, row = [], "   "
+    for name in names:
+        if len(row) + len(name) + 2 > IMPORT_WIDTH - 3:
+            lines.append(row + ",")
+            row = "   "
+        row += (" " if row == "   " else ", ") + name
+    lines.append(row + ")")
+    return f"from {module_name} import ({comment}\n" + "\n".join(lines)
+
+
+def import_edits(module, moves, renames=None):
+    """Edits that re-home imported names. ``moves``: {(from module, name): to
+    module}; a name moved to ``None`` is dropped. ``renames``: {(from module,
+    name): new name}. Top-level ``from`` imports only; each target module ends
+    with one statement, where its first source statement stood."""
+    renames = renames or {}
+    froms = [n for n in module.tree.body if isinstance(n, ast.ImportFrom) and n.module]
+    wanted, touched = {}, []
+    for node in froms:
+        if not any((node.module, a.name) in moves for a in node.names):
+            continue
+        touched.append(node)
+        for a in node.names:
+            target = moves.get((node.module, a.name), node.module)
+            name = renames.get((node.module, a.name), a.name)
+            if target:
+                wanted.setdefault(target, []).append(
+                    name + (f" as {a.asname}" if a.asname else ""))
+    if not touched:
+        return []
+    merged = [n for n in froms if n.module in wanted and n not in touched]
+    for node in merged:
+        wanted[node.module] += [a.name + (f" as {a.asname}" if a.asname else "")
+                                for a in node.names]
+    edits, first = [], min(touched + merged, key=lambda n: n.lineno)
+    for node in touched + merged:
+        a, b = module.span(node)
+        line_end = module.src.find("\n", b)
+        comment = module.src[b:line_end] if "#" in module.src[b:line_end] else ""
+        text = ""
+        if node is first:
+            text = "\n".join(import_text(m, sorted(set(names)), comment.rstrip())
+                             for m, names in sorted(wanted.items()))
+        end = b + len(comment) if text or comment else b
+        edits.append((a, end, text))
+    return edits
 
 
 # ─── Does every call still fit its function? ─────────────────────────────────

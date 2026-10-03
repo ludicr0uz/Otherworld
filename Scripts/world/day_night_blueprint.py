@@ -14,10 +14,9 @@ with one set of values runs every level the same way.
 
 import unreal
 
-from combat.graph import (
-    BEL, _add_component, _apply_defaults, _component_object, _declare,
-    _drop_components, _float_type, _must_load, _root_handle,
-)
+from uebp.graph import (
+    BEL, _add_component, _apply_defaults, _component_object, _declare, _drop_components,
+    _float_type, _must_load, _root_handle)
 from world import world_config as cfg
 from world.paths import SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH
 

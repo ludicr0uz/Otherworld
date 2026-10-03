@@ -13,7 +13,7 @@ import zlib
 
 import unreal
 
-from combat.graph import _log
+from combat.log import _log
 from world import world_config as cfg
 from world.paths import STARS_TEXTURE_PATH
 from world.star_catalogue import load_stars

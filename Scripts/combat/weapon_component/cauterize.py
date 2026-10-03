@@ -18,8 +18,7 @@ The blade stays hot: the press does not spend its heat. Held.Hot is read
 behind the Branch on UsePressed, which is false with empty hands (use.py).
 """
 
-from combat.graph import BEL, _connect, _node, _pin, _set
-from uebp.graph import out
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.heat_tuning import HOT_VAR
 from combat.nodes import FN_GET_ASC, FN_IS_VALID, GAS
 from combat.tuning import BLEEDING_TAG
@@ -48,7 +47,7 @@ def _author_cauterize(ed, held, owner, exec_ins):
     keep(hot_n)
     hot = keep(ed.add_branch_node())
     _connect(hot_pin, _pin(hot, "Condition"))
-    _connect(BEL.find_then_pin(press), _pin(hot, "execute"))
+    _connect(then(press), _pin(hot, "execute"))
 
     lookup = keep(_node(ed, FN_GET_ASC))
     _connect(owner, _pin(lookup, "Actor"))
@@ -57,15 +56,14 @@ def _author_cauterize(ed, held, owner, exec_ins):
     _connect(asc, _pin(valid, "Object"))
     able = keep(ed.add_branch_node())
     _connect(out(valid), _pin(able, "Condition"))
-    _connect(BEL.find_then_pin(hot), _pin(able, "execute"))
+    _connect(then(hot), _pin(able, "execute"))
     seal = keep(_node(ed, FN_REMOVE_GRANTING))
     _connect(asc, _pin(seal, "self"))
     _set(seal, "Tags", CAUTERIZE_TAGS)
-    _connect(BEL.find_then_pin(able), _pin(seal, "execute"))
+    _connect(then(able), _pin(seal, "execute"))
 
     ed.add_comment_to_nodes(
         "The use key on a hot blade (cauterize.py): a press takes every "
         f"effect granting {BLEEDING_TAG} off the player. The blade stays hot.",
         made)
-    return (BEL.find_else_pin(press), BEL.find_else_pin(hot),
-            BEL.find_else_pin(able), BEL.find_then_pin(seal))
+    return (else_(press), else_(hot), else_(able), then(seal))

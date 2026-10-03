@@ -14,7 +14,7 @@ Both start collapsed; loot_draw.py shows them and writes the rows each frame.
 
 import unreal
 
-from combat.graph import BEL, _must_load
+from uebp.graph import BEL, _must_load
 from graphics_menu import umg_author as U
 from graphics_menu.loot_consts import (
     LOOT_CLOSE, LOOT_CLOSE_TEXT, LOOT_EMPTY, LOOT_EMPTY_TEXT, LOOT_FULL, LOOT_FULL_TEXT, LOOT_HINT_FONT,

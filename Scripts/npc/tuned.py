@@ -10,7 +10,7 @@ compile (write_tuned_defaults), because add_member_variable's own default
 does not apply.
 """
 
-from npc.graph import BEL, _pin
+from uebp.graph import BEL, out
 from npc.monster_tuning import MONSTER_STATS, TUNED_VAR
 
 
@@ -25,7 +25,7 @@ def tuned(ed, column):
     """A Get of the Tune variable for ``column``: ``(node, output pin)``."""
     var = TUNED_VAR[column]
     node = ed.add_get_member_variable_node(var)
-    return node, _pin(node, var, is_input=False)
+    return node, out(node, var)
 
 
 def tuned_pin(g, column):

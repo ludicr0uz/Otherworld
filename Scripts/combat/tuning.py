@@ -10,6 +10,7 @@ from combat.player_tuning import (
     JOG_SPEED, SPRINT_DURATION, SPRINT_SPEED, STAMINA_RECHARGE, cms, per_second,
 )
 from combat.player_tuning import table as _player_table
+from combat.slot_tuning import BAG_SIZE
 
 # player_tuning.csv over its defaults: jog, sprint, how long the bar lasts.
 _PLAYER = _player_table()
@@ -17,7 +18,9 @@ _PLAYER = _player_table()
 
 # ─── Tuning ──────────────────────────────────────────────────────────────────
 
-INVENTORY_SIZE = 10
+# The backpack's slots (slot_tuning.BAG_SIZE): the hand and the four weapon
+# slots are on top of these.
+INVENTORY_SIZE = BAG_SIZE
 
 # The gameplay event the fire key sends when the held item is Consumable
 # rather than a gun (see weapon_component/consume.py). The weapon component
@@ -51,8 +54,8 @@ HEALTH_DRAINS = (
     (BLEEDING_TAG, BLEED_HP_PER_S),
 )
 
-# Polled keys.  1/2/3 and M belong to the graphics menu, so the weapon keys stay
-# clear of them.
+# Polled keys. 1-9 are the inventory's slots (slot_tuning.SLOT_KEYS), M the
+# graphics menu's.
 #
 # Every one of them is polled on the weapon component's Tick rather than bound
 # as an input action, for the same reason: BP_ThirdPersonCharacter's graph is
@@ -68,7 +71,7 @@ FIRE_KEY = "LeftMouseButton"
 # because the other two are taken and it is on every mouse; it is rebindable.
 AIM_KEY = "RightMouseButton"
 SIGHTS_KEY = "MiddleMouseButton"
-SWITCH_KEY = "Q"
+SWITCH_KEY = "Q"        # the next filled weapon slot (weapon_component/slot_moves.py)
 DROP_KEY = "G"
 # Pressed to interact with whatever the reticle rests on
 # (weapon_component/interact.py). An item lying there is picked up.

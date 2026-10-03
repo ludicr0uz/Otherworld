@@ -2,16 +2,20 @@
 
 from combat.paths import HEALTH_BP_PATH, WEAPON_COMP_BP_PATH
 from combat.tuning import CONSUME_EVENT_TAG, HEALTH_DRAINS, INVENTORY_SIZE
+from combat.slot_tuning import BAG_SIZE, HAS_ROOM_VAR
 from combat.verify.common import (
-    by_pins, check, graph, in_pins, load, num_pin, pin_value,
+    BEL, PIN, by_pins, check, graph, in_pins, load, num_pin, pin_value,
 )
 
 
 def run():
-    check("the inventory holds 10", INVENTORY_SIZE == 10)
+    check("the backpack holds 10", INVENTORY_SIZE == BAG_SIZE == 10)
     wg = graph(load(WEAPON_COMP_BP_PATH)).list_all_nodes()
-    rooms = [n for n in by_pins(wg, "A", "B") if pin_value(n, "B") == str(INVENTORY_SIZE)]
-    check("pick-up refuses past INVENTORY_SIZE", len(rooms) >= 1)
+    rooms = [n for n in by_pins(wg, "Condition")
+             if any(f"Get {HAS_ROOM_VAR}" == str(BEL.get_node_title(PIN.get_owning_node(q)))
+                    for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Condition")))]
+    check(f"pick-up refuses with no room ({HAS_ROOM_VAR}: no free bag slot, no empty hand)",
+          len(rooms) >= 1)
     sends = by_pins(wg, "Actor", "EventTag", "Payload")
     check("the fire key can send exactly one use event", len(sends) == 1, str(len(sends)))
     if sends:

@@ -581,7 +581,7 @@ def main():
     # Read off the item like SlotColor and DisplayName are, so the strip stays
     # a view of whatever is carried and knows nothing about shotguns.
     # (The profile's save reads Loaded and Reserve off each item too.)
-    saved_ammo = {item_var for _f, item_var in PC.AMMO_FIELDS}
+    saved_ammo = {item_var for _f, item_var in PC.ITEM_FIELDS}
     for var in ("UsesAmmo", "Loaded", "Reserve"):
         check(f"the slot reads the weapon's own {var}",
               sum(1 for t in titles if t == f"Get {var}")

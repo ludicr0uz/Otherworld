@@ -11,6 +11,7 @@ from graphics_menu import loot_consts as LC
 from graphics_menu import tune_tab as TT
 from graphics_menu import umg_consts as UC
 from graphics_menu.cursor import cursor_defaults
+from graphics_menu.inv_consts import DRAG_FROM_VAR, INV_OVER_VAR, SLOT_BOXES
 from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_checks import _tree
 from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_SEL_VAR
@@ -18,8 +19,9 @@ from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_SEL_VAR
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
 # The row stacks the cursor is tested against: the menu (the title's too), its
-# settings page, the loot window, the I panel and the tuning tabs.
-ROW_LISTS = 4 + len(TABS)
+# settings page, the loot window, the I panel, the tuning tabs, and the
+# inventory's three grids of slots (inv_drag.py).
+ROW_LISTS = 4 + len(TABS) + len(SLOT_BOXES)
 # ...and the single lines a click lands on: the death menu's hint, the loot
 # window's and the I panel's close buttons, each tab's hint and each tab's
 # BACK row.
@@ -203,6 +205,20 @@ def _on_line_click(n):
     return False
 
 
+def _on_slot(user):
+    """``user`` (an AND) also tests the slot under the cursor or the drag:
+    a node feeding it reads InvOver or InvDragFrom (inv_drag.py)."""
+    for pin in ("A", "B"):
+        for q in BEL.find_input_pin(user, pin).list_connected_pins():
+            feeder = PIN.get_owning_node(q)
+            for inner in ("A", "B"):
+                if inner in _pins(feeder) and any(
+                        t in (f"Get {INV_OVER_VAR}", f"Get {DRAG_FROM_VAR}")
+                        for t in _feeders(feeder, inner)):
+                    return True
+    return False
+
+
 def _check_clicks(check, nodes):
     polls = [n for n in nodes if {"Key", "self"} <= _pins(n)]
     by_key = {k: [n for n in polls if _value(n, "Key") == k] for k in CC.CURSOR_KEYS}
@@ -213,9 +229,11 @@ def _check_clicks(check, nodes):
             if _pins(user) == {"execute", "Condition"}:
                 continue        # the click Branch after the on-a-row Branch
             others = _feeders(user, "A") + _feeders(user, "B")
-            if not any(CC.CURSOR_MOVED_VAR in t or "Under" in t for t in others):
+            if not any(CC.CURSOR_MOVED_VAR in t or "Under" in t for t in others) \
+                    and not _on_slot(user):
                 loose.append(_title(user))
-    check("the left button is only ever read with the cursor over a row or a line",
+    check("the left button is only ever read with the cursor over a row or a line "
+          "(or, in the I panel, a slot: InvOver, or a drag begun on one)",
           bool(by_key[CC.CLICK_KEY]) and not loose, str(loose))
     # Left/Right gain the wheel on the settings page and in each tuning tab;
     # in a scrolling tab it is Up/Down's instead, and the list follows.

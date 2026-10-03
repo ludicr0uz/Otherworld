@@ -29,6 +29,7 @@ seats the knife's handle.
 
 import unreal
 
+from combat.slot_tuning import MELEE_KIND, WEAPON_KIND_VAR
 from combat.chop_tuning import CHOPS_VAR
 from combat.graph import (
     BEL, _apply_defaults, _create_blueprint, _log, _must_load, _rot,
@@ -120,6 +121,7 @@ def build_axe(item_bp):
     _apply_defaults(bp, {
         "DisplayName": AXE_DISPLAY,
         "Melee": True,
+        WEAPON_KIND_VAR: MELEE_KIND,
         # Thrown hard and flat, spinning forward, edge first.
         **MELEE_THROW,
         # ...and it wounds what it strikes, and lodges in a tree. Its tip

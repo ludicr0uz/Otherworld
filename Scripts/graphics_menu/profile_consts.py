@@ -31,9 +31,10 @@ KILLS_FIELD = "Kills"
 EQUIPPED_FIELD = "EquippedIndex"
 
 # The inventory, as parallel arrays indexed like BP_WeaponComponent.Inventory:
-# which class each slot holds, and the ammunition that lives on each item.
+# which class each item is, the ammunition that lives on each item, and the
+# slot it is in (combat/slot_tuning.py: the hand, a weapon slot, the bag).
 ITEM_CLASSES_FIELD = "ItemClasses"
-AMMO_FIELDS = (("ItemLoaded", "Loaded"), ("ItemReserve", "Reserve"))
+ITEM_FIELDS = (("ItemLoaded", "Loaded"), ("ItemReserve", "Reserve"), ("ItemSlot", "Slot"))
 
 # --- the countdown -----------------------------------------------------------
 # The M panel's "save and exit" row starts it (Enter or a click on the row;

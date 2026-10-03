@@ -12,7 +12,7 @@ from combat.graph import (
 )
 from combat.paths import ITEM_BP_PATH
 from graphics_menu.profile_consts import (
-    AMMO_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
+    ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
     PROFILE_BP_PATH, PROFILE_SLOT, STAT_FIELDS,
 )
 
@@ -32,7 +32,7 @@ def build_profile_savegame():
     item_class = BEL.generated_class(_must_load(ITEM_BP_PATH))
     _declare(ed, ITEM_CLASSES_FIELD,
              BEL.get_array_type(BEL.get_class_reference_type(item_class)))
-    for field, _item_var in AMMO_FIELDS:
+    for field, _item_var in ITEM_FIELDS:
         _declare(ed, field, BEL.get_array_type(int_type))
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_Profile failed to compile")

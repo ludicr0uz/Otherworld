@@ -4,7 +4,7 @@ Here rather than in the verifier, which is over its size budget.
 
 import unreal
 
-from combat.tuning import INVENTORY_SIZE
+from combat.slot_tuning import SLOT_COUNT
 from graphics_menu import dev_consts as DC
 from graphics_menu import umg_consts as UC
 from graphics_menu.dev_guns import dev_guns_defaults
@@ -83,9 +83,9 @@ def check_dev_guns(check, bp, nodes):
     check("...skipping a gun already carried (its class tested against the bag)",
           not unchecked, f"untested {unchecked}; tests {tests}")
     rooms = [n for n in nodes if _pins(n) == {"A", "B"} and not _looting(n)
-             and _value(n, "B") == str(INVENTORY_SIZE)
+             and _value(n, "B") == str(SLOT_COUNT)
              and any("Length" in _title(f) for f in _feeders(n, "A"))]
-    check(f"...and only while fewer than {INVENTORY_SIZE} items are carried",
+    check(f"...and only while fewer than {SLOT_COUNT} items (one per slot) are carried",
           len(rooms) == len(DC.DEV_GUN_CLASS_PATHS), str(len(rooms)))
 
     carried = [n for n in nodes if _title(n) == "Set Dropped" and not _looting(n)

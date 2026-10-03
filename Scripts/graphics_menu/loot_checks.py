@@ -5,7 +5,7 @@ over its size budget.
 
 import unreal
 
-from combat.tuning import INVENTORY_SIZE
+from combat.slot_tuning import HAS_ROOM_VAR
 from graphics_menu import loot_consts as LC
 from graphics_menu import umg_consts as UC
 from graphics_menu.loot_tick import loot_defaults
@@ -186,9 +186,11 @@ def check_loot(check, bp, nodes):
 
     fulls = [n for n in nodes if _title(n) == f"Set {LC.LOOT_BAG_FULL_VAR}"]
     tests = [t for n in fulls for t in _feeders(n, LC.LOOT_BAG_FULL_VAR)]
-    check(f"the bag is full at {INVENTORY_SIZE} items",
-          len(tests) == 1 and _value(tests[0], "B") == str(INVENTORY_SIZE),
-          str([_value(t, "B") for t in tests]))
+    check(f"the bag is full when the weapon component has no room ({HAS_ROOM_VAR}: no "
+          "bag slot and no empty hand)",
+          len(tests) == 1
+          and [_title(f) for f in _feeders(tests[0], "A")] == [f"Get {HAS_ROOM_VAR}"],
+          str([[_title(f) for f in _feeders(t, "A")] for t in tests]))
 
     spawns = [n for n in nodes if {"Class", "SpawnTransform"} <= _pins(n)
               and any(_title(g) == f"Get {LOOT_VAR}"

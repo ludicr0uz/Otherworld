@@ -188,7 +188,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [x] When the knife is held for the throw animation, character should hold it by the blade rather than by the handle. 
 - [x] Items should not be lootable if they are vertically too far away from the character. It seems right now only the horizontal distnace is checked. 
 - [x] Generate a new adventurer model with meshy API in boxers as default. This will be a preparation for implementing clothing.
-- [ ] Re-work how inventory is organized. There will be item in hands (center slot on the scren)
+- [x] Re-work how inventory is organized. There will be item in hands (center slot on the scren)
       + 4 weapon slots (storage slots) - shown underneat it + 10 backpack slots (backpack visible
       when I is pressed). Hand slot always visible, and 4 weapon slots always visible underneath
       it. The selected weapon is in the hand slot. If no weapon is selected, pressing one moves

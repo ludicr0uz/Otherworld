@@ -16,7 +16,7 @@ import shutil
 import unreal
 
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.tuning import INVENTORY_SIZE
+from combat.slot_tuning import SLOT_COUNT
 from graphics_menu.dev_consts import DEV_GUN_CLASS_PATHS, DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 
@@ -82,7 +82,7 @@ def _run(p):
     p.check("every gun is in the inventory", all(g in after for g in GUNS),
             f"{before} -> {after}")
     p.check("...once each", all(after.count(g) == 1 for g in GUNS), str(after))
-    p.check(f"...within the {INVENTORY_SIZE} slots", len(after) <= INVENTORY_SIZE,
+    p.check(f"...within the {SLOT_COUNT} slots", len(after) <= SLOT_COUNT,
             str(len(after)))
     items = list(p.get(wc, "Inventory"))
     p.check("the given guns are carried, not lying in the world",

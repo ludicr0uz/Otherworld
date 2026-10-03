@@ -10,7 +10,7 @@ import re
 
 import unreal
 
-from combat.tuning import INVENTORY_SIZE
+from graphics_menu import inv_consts as IC
 from graphics_menu import settings_rows as S
 from graphics_menu.wear_consts import WEAR_NONE_TEXT, WEAR_SEL_VAR
 from graphics_menu import umg_consts as C
@@ -24,8 +24,8 @@ PIN = unreal.BlueprintGraphPinLibrary
 # of its screen, or the HUD's member reads have nothing to read.
 WRITTEN = {
     C.WBP_HUD: (C.HUD_BODY, C.HUD_FPS, C.HP_BAR, C.HP_NUM, C.KILLS, C.BANNER_COUNT,
-                C.BANNER_OFF, C.SLOTS, C.EQUIPPED_NAME, C.STAMINA_BAR, C.HP_GROUP,
-                C.ST_GROUP)
+                C.BANNER_OFF, IC.HAND_BOX, IC.WEAPON_BOX, IC.BAG_BOX, IC.BAG_PANEL,
+                C.EQUIPPED_NAME, C.STAMINA_BAR, C.HP_GROUP, C.ST_GROUP)
                + tuple(C.stat_bar(s) for s, _l, _c in C.SURVIVAL_BARS)
                + tuple(C.stat_group(s) for s, _l, _c in C.SURVIVAL_BARS)
                + tuple(C.debuff_text(s) for _t, _l, s in C.DEBUFF_LABELS),
@@ -136,16 +136,24 @@ def check_trees(check):
           want <= texts, str(sorted(want - texts)))
 
     hud = trees[C.WBP_HUD]
-    grid = hud.get(C.SLOTS, (None, False))[0]
-    cells = list(grid.get_all_children()) if grid else []
-    places = sorted((c.get_editor_property("slot").get_editor_property("row"),
-                     c.get_editor_property("slot").get_editor_property("column"))
-                    for c in cells)
-    check(f"the grid holds {INVENTORY_SIZE} slots, {C.INVENTORY_COLUMNS} to a row",
-          len(cells) == INVENTORY_SIZE
-          and all(c.get_class().get_name() == "WBP_InventorySlot_C" for c in cells)
-          and places == [(i // C.INVENTORY_COLUMNS, i % C.INVENTORY_COLUMNS)
-                         for i in range(INVENTORY_SIZE)], str(places))
+
+    def cells(name):
+        grid = hud.get(name, (None, False))[0]
+        kids = list(grid.get_all_children()) if grid else []
+        return grid, kids, sorted(
+            (c.get_editor_property("slot").get_editor_property("row"),
+             c.get_editor_property("slot").get_editor_property("column")) for c in kids)
+
+    layout = {}
+    for name, _first, count in IC.SLOT_BOXES:
+        grid, kids, places = cells(name)
+        columns = IC.BAG_COLUMNS if name == IC.BAG_BOX else count
+        layout[name] = (len(kids) == count and all(
+            c.get_class().get_name() == "WBP_InventorySlot_C" for c in kids)
+            and places == [(i // columns, i % columns) for i in range(count)], places)
+    check("the hand slot, the 4 weapon slots in a row and the bag's 10 in rows of 5",
+          all(ok for ok, _p in layout.values()), str({k: p for k, (_o, p) in layout.items()}))
+    grid = hud.get(IC.WEAPON_BOX, (None, False))[0]
     slot = trees[C.WBP_INVENTORY_SLOT]
     cell = slot.get("Cell", (None, False))[0]
     icon = slot.get(C.SLOT_ICON, (None, False))[0]
@@ -161,9 +169,18 @@ def check_trees(check):
     strip = hud.get("Strip", (None, False))[0]
     order = [str(w.get_name()) for w in strip.get_all_children()] if strip else []
     pad = grid.get_editor_property("slot_padding").left if grid else None
-    check("HP and stamina sit under the grid, whose slots are a gap apart",
-          order == [C.EQUIPPED_NAME, C.SLOTS, C.VITALS] and pad == C.SLOT_GAP / 2.0,
-          f"{order}, gap {pad}")
+    check("the hand slot over the weapon slots and their keys, HP and stamina under "
+          "them, the slots a gap apart",
+          order == [C.EQUIPPED_NAME, IC.HAND_BOX, IC.WEAPON_BOX, IC.WEAPON_LABELS, C.VITALS]
+          and pad == C.SLOT_GAP / 2.0, f"{order}, gap {pad}")
+    bag = hud.get(IC.BAG_PANEL, (None, False))[0]
+    kit = hud.get(IC.KIT, (None, False))[0]
+    kit_order = [str(w.get_name()) for w in kit.get_all_children()] if kit else []
+    check("bottom right, the worn panel over the bag, which is collapsed until I",
+          kit_order[-1:] == [IC.BAG_PANEL] and len(kit_order) == 2
+          and bag is not None
+          and "COLLAPSED" in str(bag.get_editor_property("visibility")).upper(),
+          str(kit_order))
 
     def anchor(tree, name):
         w = tree.get(name, (None, False))[0]
@@ -270,7 +287,11 @@ def check_hud_graph(check, nodes):
     for n in carets:
         for pick in _sources(n, "InOpacity"):
             for eq in _sources(pick, "bPickA"):
-                selected += _source_titles(eq, "B")
+                # The I panel's caret is WearSel only while it is open: a
+                # SelectInt of it (wear_draw.py).
+                for b in _sources(eq, "B"):
+                    selected += (_source_titles(b, "A") if "Select" in _title(b)
+                                 else [_title(b)])
                 # A tab's BACK row, outside its list: lit while the caret is
                 # past the list (row >= a literal). A tab's save row, between
                 # the two: lit while the caret is on it (row == a literal).
@@ -318,5 +339,5 @@ def check_hud_graph(check, nodes):
           str([_source_titles(n, "Texture") for n in brushes]))
     guards = [n for n in nodes if {"TargetArray", "IndexToTest"} <= _pins(n)]
     check("an inventory slot reads its item only behind IsValidIndex, and so "
-          "do the equipped name and the I panel's worn slots", len(guards) == 3,
-          str(len(guards)))
+          "do the equipped name, the I panel's worn slots and its drag's start",
+          len(guards) == 4, str(len(guards)))

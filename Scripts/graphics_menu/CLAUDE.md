@@ -31,10 +31,13 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   row returns to them (below: "The M panel as a menu").
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
-- **I** opens the clothing panel, what the player wears (`wear_*.py`,
-  `Scripts/clothing/CLAUDE.md`); **Up/Down** and **Enter** in it take a garment off. It
-  does not pause, holds the walk while open, and hides under the menu; with the loot
-  window open too, the arrows and Enter are the loot window's.
+- **I** opens the inventory (the I panel): the backpack shows under the worn garments,
+  bottom right (`wear_*.py`, `inv_*.py`, `Scripts/clothing/CLAUDE.md`). **Up/Down** run the
+  caret over the worn rows, then the bag's slots; **Enter** takes a garment off, or brings
+  a bag slot's item to hand; the mouse drags an item from slot to slot (below). It does not
+  pause, holds the walk while open, and hides under the menu; with the loot window open
+  too, the arrows and Enter are the loot window's. **1-9** are the weapon component's
+  (`combat/slot_tuning.py`).
 - **The mouse** works every menu too (below).
 
 ## One menu: the title's and M's (`menu_main.py`, `menu_screens.author_title`)
@@ -127,7 +130,7 @@ mouse is the camera's.
 | M panel | the caret goes there | takes the row (as Enter does) | |
 | tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
 | loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
-| I panel | the caret goes there | take that garment off; on the `[I] close` line: shut | |
+| I panel | the caret goes there (a worn row) | take that garment off; on the `[I] inventory` line: shut; on a slot: bring it to hand; a press on one slot and a release on another: move it there | |
 | death menu | | on the hint line: restart | |
 
 - **The HUD is still the controller.** No widget is hit-testable. A row is under the cursor
@@ -369,7 +372,9 @@ sync:
   `/Game/UI/BP_Profile` (a `USaveGame`, slot `OtherworldProfile`) and the current level reopens,
   which opens on the main menu.
 - **Stored:** Health, Stamina, Hunger, Thirst, Temperature, the kill count, the equipped slot,
-  and each carried item's class, `Loaded` and `Reserve`. **Never the location**; the verifier
+  and each carried item's class, `Loaded`, `Reserve` and `Slot` (`ITEM_FIELDS`: where it
+  was carried; a profile saved before slots had no `ItemSlot`, and loads with the first
+  item in hand and the rest in the bag). **Never the location**; the verifier
   asserts BP_Profile has no other field.
 - **The character can't move during the countdown.** Every Tick it waits, the pawn's
   `CharacterMovement` gets `DisableMovement` (keyed off `ExitPending`, not the X press, so the
@@ -395,8 +400,8 @@ sync:
 
 A testing aid on the M panel. **Its row** (`dev-all-guns`) raises the HUD's
 `DevAllGunsRequested`; the next Tick (run from `save_exit.py`, after the countdown) lowers it and,
-for each of the five guns, the knife and the axe in `DEV_GUN_CLASS_PATHS`, spawns one if none is carried and the bag has
-room (`INVENTORY_SIZE`): `Dropped = false`, `Inventory += it`, then `NeedsRefresh`. The held item
+for each of the five guns, the knife and the axe in `DEV_GUN_CLASS_PATHS`, spawns one if none is carried and fewer
+items than slots are carried (`SLOT_COUNT`: the slot sync puts a gun in the bag, the hand or its weapon slot): `Dropped = false`, `Inventory += it`, then `NeedsRefresh`. The held item
 stays held, as with a pick-up; asking twice adds nothing.
 
 - **`profile_checks` tells its `Set Dropped`/`Set NeedsRefresh` apart from the cheat's** (the
@@ -430,6 +435,21 @@ loot window, in play only. Traps met here:
 - **Its own dead gate and its own walk edge** (`WearStill`): `loot_checks` and
   `pause_checks` pick out the loot's and the menu's from theirs.
 - **It adds two `GetComponentByClass`** (the take-off's and the rows'): the HUD has 20.
+- **The worn rows are always up** (bottom right, in the `Kit` over the bag, at
+  `KIT_SCALE`); only the caret, the mouse and the bag wait for `WearOpen`. Shut, the
+  cursor is hidden and a click is a shot, so no click is read there.
+- **The caret runs on into the bag:** `WearSel` 0-7 are the worn rows, 8-17 the bag's
+  slots (`inv_consts.BAG_SEL_FIRST`); Enter on a bag slot sets the weapon component's
+  `SlotRequest` instead of `TakeOffSlot`.
+- **The drag is DrawHUD's** (`inv_drag.py`): the slot under the cursor is `InvOver` (the
+  three grids are three row lists to `author_row_cursor`), a press on a filled slot sets
+  `InvDragFrom`, and the release asks the weapon component for the move (`MoveTo`, then
+  `MoveFrom`) or, on the same slot, for that slot in hand (`SlotRequest`). The component
+  decides what fits. Its press and release are read with `InvOver`/`InvDragFrom`, not a
+  geometry test of their own: `cursor_checks._on_slot` allows that.
+- **Still needs a play session:** dragging with a real mouse (no probe can aim at a cell),
+  how the Kit reads over the watermark and beside the loot window on a 720p screen, and
+  the 1-9 keys themselves.
 - **The cursor's wish is an OR tree** (MenuOpen, LootOpen, WearOpen); `cursor_checks`
   walks it.
 
@@ -593,12 +613,19 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
 - **Top-right:** the kill counter, and the FPS readout: always, debug mode or not
   (`fps.py`; visible in the designer, and no node shows or hides it).
 - **Wanderers:** a projected health bar over each one, plus its number in debug mode.
-- **Bottom:** the 10-slot inventory grid, in two rows of five (`INVENTORY_COLUMNS`, 84 x 59
-  slots, `hud_inventory.py`), with loaded/reserve counts for weapons that use ammo. Slot *i*
-  shows `Inventory[i]`, read only behind `IsValidIndex`; a slot past the end is emptied every
-  frame. Under the grid, side by side in the `Vitals` row: HP (icon, bar, number,
-  `hud_stats.py`) and stamina (icon, bar, `stamina_bar.py`); all in one bottom-anchored
-  stack in `WBP_HUD`.
+- **Bottom centre:** the held item's name, the hand slot (`HandSlot`), and under it the four
+  weapon slots in a row (`WeaponSlots`: primary, secondary, pistol, melee, captioned with
+  their keys), 84 x 59 slots with loaded/reserve counts for weapons that use ammo
+  (`hud_inventory.py`). Under them, side by side in the `Vitals` row: HP (icon, bar,
+  number, `hud_stats.py`) and stamina (icon, bar, `stamina_bar.py`); all in one
+  bottom-anchored stack in `WBP_HUD`.
+- **Bottom right:** the `Kit`: the worn panel (always), and under it the backpack's ten
+  slots in two rows of five, the top row captioned 5-9 (`BagSlots`, shown with I).
+- **One loop draws every slot:** code *c* (`combat/slot_tuning.py`) is the hand's cell,
+  a weapon cell or a bag cell (`SelectObject` over the three grids' `GetChildAt`, which is
+  None past a grid's end), and shows the weapon component's `SlotItems[c]`, read behind
+  `IsValidIndex` and then `IsValid`; an empty slot is emptied every frame. Lit: the hand's
+  slot, the bag slot under the I panel's caret, and a drag's start.
 - **Centre:** the reticle or scope (`reticle.py`). The reticle's four ticks stand off by the held
   gun's accuracy cloud: `ReticleSpread` (weapon component) × half the viewport width, capped at
   `RETICLE_SPREAD_MAX` with an `FMin` (an `FClamp` would be read as a settings slider).

@@ -24,27 +24,32 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 
 ## The design
 
-- **A garment is a `BP_WeaponItem`**, as food is: the bag is an array of it, so E picks one up,
-  G drops it, Q cycles to it, V throws it and the strip draws it, with no new code. It is
+- **A garment is a `BP_WeaponItem`**, as food is: the bag is an array of it, so E picks one up
+  (into a bag slot), G drops it, a number key or a click brings its slot to hand, V throws
+  it and the slots draw it, with no new code. It is
   `Dropped` by default, so a placed one is a pick-up.
 - **In the bag until worn.** A pick-up only puts it in a slot of the bag. **Using it wears it:**
   the fire key with it in hand. It is `Consumable` (the fire key uses it instead of firing),
   and its `ClothingSlot` (the slot's index; `NOT_CLOTHING`, -1, on every other item) makes that
   use a wear rather than the GAS eat event (`wear._author_wear_gate`, handed to
   `consume._author_use_gate` by `tick.py`, so consume never imports wear).
-- **A worn garment is the same actor:** out of `Inventory`, into `Worn[slot]`, hidden. Wearing
+- **A worn garment is the same actor:** out of `Inventory`, into `Worn[slot]`, hidden, its
+  inventory `Slot` UNPLACED (`combat/slot_tuning.py`), so taken off it finds a bag slot. Wearing
   one into a filled slot puts the old one back in the bag (there is room: the new one just
   left it). The press is spent (`TriggerSpent`) as eating spends it.
 - **`Worn` starts empty and the first wear into a slot grows it** (`Array_Set`, size to fit).
   Every read of it is behind `IsValidIndex`, then `IsValid`.
 - **Taking one off is the I panel's**: Up/Down and Enter (or a click) raise the HUD's
   `WearTakeOffRequested`; its Tick sets the weapon component's `TakeOffSlot`, and the
-  component's own Tick serves it (into the bag while there is room, the slot emptied).
+  component's own Tick serves it (into the bag while there is room, `HasRoom`: a bag slot
+  or the hand free; the slot emptied).
   The HUD never touches the bag.
-- **The I panel** sits on the left edge, centred: one row per slot, the worn garment's
-  `DisplayName` or `-`. It does not pause; the walk is held while it is open (its own
-  `SetIgnoreMoveInput` edge, `WearStill`), the cursor shows with it, and with the loot window
-  open as well the arrows and Enter are the loot window's. The menu hides it.
+- **The worn panel** sits bottom right, over the backpack, and is always shown (the menu
+  hides it): one row per slot, the worn garment's `DisplayName` or `-`. **I** opens the
+  inventory: the backpack shows under it, the caret runs over the worn rows and then the
+  bag. It does not pause; the walk is held while it is open (its own `SetIgnoreMoveInput`
+  edge, `WearStill`), the cursor shows with it, and with the loot window open as well the
+  arrows and Enter are the loot window's.
 - **The test garments**: one of each, in a row across the view 3 m in front of
   `Lvl_Forest_200m`'s PlayerStart, 55 cm apart (tag `OW_TestClothing`; `build_clothing.py`
   places them, idempotently, and saves the level). Regenerating the level drops them, as it
@@ -79,5 +84,5 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
   what was worn is lost on save and exit.
 - No loot table names a garment yet (`Scripts/loot/tables.py`); a looted one would go into
   the bag like any item.
-- **Still needs a play session:** the I key and the panel's look, the cursor on its rows, and
-  how the stand-in models read on the ground.
+- **Still needs a play session:** the I key and the panel's look (now scaled to 0.75 over the
+  bag), the cursor on its rows, and how the stand-in models read on the ground.

@@ -17,6 +17,7 @@ import shutil
 
 import unreal
 
+from combat.slot_tuning import BAG_FIRST, HAND
 from combat.game_state import KILL_COUNT_VAR
 from combat.paths import (
     GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, PISTOL_BP_PATH,
@@ -36,12 +37,14 @@ WRITABLE = [(HUD_BP_PATH, EXIT_PENDING_VAR), (HUD_BP_PATH, EXIT_AT_VAR),
             (WEAPON_COMP_BP_PATH, "EquippedIndex")]
 # ...and every field of the crafted profile the load is tested with.
 PROFILE_FIELDS = ("Health", "Stamina", "Hunger", "Thirst", "Temperature", "Kills",
-                  "EquippedIndex", "ItemClasses", "ItemLoaded", "ItemReserve")
+                  "EquippedIndex", "ItemClasses", "ItemLoaded", "ItemReserve", "ItemSlot")
 WRITABLE += [(PROFILE_BP_PATH, f) for f in PROFILE_FIELDS]
 
 HEALTH, HUNGER, KILLS, EQUIPPED = 55.0, 40.0, 7, 1
-# A profile nothing issues, for the load: a mushroom and a part-loaded SMG.
+# A profile nothing issues, for the load: a mushroom and a part-loaded SMG,
+# in the bag and in hand (combat/slot_tuning.py's codes).
 CRAFTED = ((MUSHROOM_CLASS_PATH, 0, 0), (f"{SMG_BP_PATH}.BP_SMG_C", 3, 11))
+CRAFTED_SLOTS = (BAG_FIRST, HAND)
 GS = unreal.GameplayStatics
 
 
@@ -119,7 +122,8 @@ def _run(p):
     p.set(health, "Health", HEALTH)
     p.set(survival, "Hunger", HUNGER)
     p.set(p.game_mode(), KILL_COUNT_VAR, KILLS)
-    p.set(wc, "EquippedIndex", EQUIPPED)
+    p.set(wc, "EquippedIndex", EQUIPPED)      # the pistol to hand (context.hold)
+    yield lambda: p.get(wc, "EquippedIndex") == EQUIPPED
     carried = _inventory(p, wc)
     _start_exit(p, hud, 0.3)
     yield _saved
@@ -167,6 +171,7 @@ def _run(p):
     p.set(crafted, "ItemClasses", [p.load_class(c) for c, _l, _r in CRAFTED])
     p.set(crafted, "ItemLoaded", [l for _c, l, _r in CRAFTED])
     p.set(crafted, "ItemReserve", [r for _c, _l, r in CRAFTED])
+    p.set(crafted, "ItemSlot", list(CRAFTED_SLOTS))
     GS.save_game_to_slot(crafted, PROFILE_SLOT, PROFILE_USER_INDEX)
     GS.open_level(p.world(), p.map_path, True, "")
     yield lambda: _live_hud(p, not_this=hud) is not None

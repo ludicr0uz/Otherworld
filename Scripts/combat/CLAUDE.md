@@ -23,11 +23,13 @@ The defaults are all rebindable on the settings screen:
   (`probes/probe_item_no_sights.py`). It lights a stick at a campfire and holds a burning one
   out, and with a hot knife or axe it cauterises a bleed (both below); on a cold blade, the
   matches, wood and food it does nothing yet.
-  **Q** cycles, **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
+  **1-4** bring the primary, secondary, pistol or melee slot's item to hand (the same key
+  again puts it back: empty hands), **5-9** the bag's first five slots, **Q** the next filled
+  weapon slot (all fixed keys, not settings binds: see "The slots" below), **G** drops, **E** interacts (an item in reach is picked up; a campfire heats the knife or axe in hand), **Shift** sprints, **F** blocks (held),
   **C** toggles crouch, **Z** toggles prone, **Left Alt** held down the sights holds the breath (`docs/aiming.md`), **V** held cocks the arm and shows the throw's arc, which ends on the reticle's point, and a click throws (see below).
 - **R** reloads, and restarts from the death menu.
-- 1/2/3/4, M and D belong to the graphics menu; **I** (the clothing panel) and Tab (the loot
-  window) to the HUD.
+- M belongs to the graphics menu; **I** (the inventory: the backpack and the worn
+  garments, with drag and drop) and Tab (the loot window) to the HUD.
 
 The keys are CDO defaults on `BP_WeaponComponent`. The HUD pushes them from `BP_Settings`
 every frame. Sprint and every other key live on the component, not on the character, because
@@ -73,11 +75,43 @@ menu polls its own copy from `DrawHUD`, which does.
     `Scripts/asset_pipeline/fab_library.json` is the restore recipe.
   - The pack has no shotgun or pistol (those are Quaternius's, above), and its KA74U was not
     asked for.
-- **Equipping is authored once.** BeginPlay, switch, drop and pick-up only set `NeedsRefresh`.
-  Tick's last block consumes it and runs the single equip sequence. Weapons are spawned once at
+- **Equipping is authored once.** BeginPlay, a slot key, drop and pick-up only change an
+  item's `Slot` or `Inventory`; the slot sync raises `NeedsRefresh` when the hand slot's item
+  is not `Held`. Tick's last block consumes it and runs the single equip sequence (which
+  empties `Held` first, so a hand slot with nothing in it is empty hands). Weapons are spawned once at
   BeginPlay and then hidden or shown, never destroyed, so a dropped weapon is the same actor.
-- **A pick-up goes into the inventory without switching.** The held item stays held. Only empty
-  hands (`Held` is None, after a drop or eating the last item) take the new item up.
+- **The slots** (`slot_tuning.py`; `weapon_component/slot_sync.py`, `slot_moves.py`; checks
+  `verify/slots.py`; `probes/probe_slots.py`). Everything carried is still in `Inventory`;
+  each item says where it is itself, in its `Slot`: 0 the hand, 1-4 the primary,
+  secondary, pistol and melee slots, 5-14 the backpack's ten, -1 UNPLACED. So an item that
+  leaves `Inventory` (eaten, dropped, thrown, worn) leaves its slot, and nothing else is told.
+  - **`WeaponKind` on the item is the weapon slot it belongs in:** the pistol's the pistol
+    slot, every other gun's the primary (a long gun fits the secondary too), the knife's
+    and the axe's the melee. Everything else is `NOT_A_WEAPON` and fits no weapon slot; the
+    hand and the bag take anything (`slot_tuning.fits`, mirrored by `slot_nodes.fits`).
+  - **The slot sync is the last fragment before the refresh.** It rebuilds `SlotItems`
+    (15 entries, the HUD's view) from the items' Slots (a second claim on a code is
+    UNPLACED), puts each UNPLACED item in the first free bag slot, else the empty hand,
+    else a free weapon slot it fits, then writes `EquippedIndex` (the hand's item's index,
+    -1 for empty hands) and `HasRoom` (a bag slot or the hand free). **Nothing else writes
+    the hand:** the old writes of `EquippedIndex` (drop, throw, eating, wearing, light) are
+    overwritten by it the same frame.
+  - **A pick-up, a take-off and the loot window go in UNPLACED**, after testing `HasRoom`:
+    into the bag, or empty hands with the bag full; with the bag full and something in
+    hand nothing is picked up. The held item stays held. After a drop, a throw or eating the
+    last one the hands stay empty: nothing comes up unasked.
+  - **A request is `SlotRequest`** (a number key, Q, Enter on a bag slot in the I panel, a
+    click on a slot): a filled slot's item comes to hand, the hand's item going home first
+    (the first slot from the primary on that it fits and that is free, the asked slot
+    counting as free: a gun goes back to its weapon slot, anything else to the bag; no home,
+    nothing moves). An empty slot takes the hand's item back if it came from there
+    (`HandFrom`): 1 twice puts the gun away. **A drag is `MoveFrom`/`MoveTo`** (the HUD's,
+    `graphics_menu/inv_drag.py`): moved if it fits, swapped if the other fits back.
+  - **The number keys are fixed** (`SLOT_KEYS`, variables on the component, as every key):
+    not in `BIND_VARS`, so the settings page does not rebind them.
+  - **Probes equip by writing `EquippedIndex`**: `probes/context.py` turns that write into
+    a `SlotRequest` for the item's slot (`Probe.hold`), and `boot.py` makes `SlotRequest`
+    writable for any probe that lists `EquippedIndex`.
 - **E is Interact, and picking up is one kind of it** (`weapon_component/interact.py`). The key
   (`KeyInteract`, `INTERACT_KEY`) knows nothing about items. Each kind of thing is a
   `(candidates, act)` pair in `interact.KINDS`: `candidates` walks its things and offers some,
@@ -152,7 +186,8 @@ menu polls its own copy from `DrawHUD`, which does.
     and puts the old value back (`build._kept_class`), so a weapons-only rebuild keeps the
     fire. Unset, the strike is refused before any wood is spent.
   - **`EquippedIndex` is found again after the removal** (`Array_Find(Inventory, Held)`):
-    wood ahead of the matches in the bag moves them down a slot.
+    wood ahead of the matches in the bag moves them down a slot. (The slot sync writes it
+    again at the end of the Tick, from the hand's slot.)
   - **The loop only remembers** (`LightWood`); the take runs once off `Completed`, as the
     pick-up's does.
   - The fire goes where the player faces, whatever is there: facing a trunk at arm's length
@@ -165,8 +200,10 @@ menu polls its own copy from `DrawHUD`, which does.
   gives the pistol's answer and every item stays upright in the fist. The slash starts and ends
   in `A_HoldKnife`. `probes/probe_hold_poses.py` measures the hand heights in game.
 - **The shotgun, pistol, knife, axe, matches and a stick are issued; the SMG, rifle and sniper are found.**
-  The issued items are `inventory.STARTER_CLASS_VARS`, in bag order: one class variable
-  each on the component, spawned at BeginPlay.
+  The issued items are `inventory.STARTER_CLASS_VARS`: one class variable each on the
+  component, spawned at BeginPlay into `slot_tuning.STARTER_SLOTS` (the shotgun in hand, out
+  of the primary slot; the pistol and the knife in theirs; the axe, the matches and the
+  stick in the bag).
   - The gun drop (`gun_drop.py`) is **two seeded rolls** on two `FRandomStream`s on the
     GameMode: `GunDropRollStream < GUN_DROP_CHANCE` (10%) decides whether anything drops, then
     `RandomIntegerFromStream(GunDropPickStream, Length)` decides which.

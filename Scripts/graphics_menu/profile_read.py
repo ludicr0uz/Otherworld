@@ -22,7 +22,7 @@ from combat.nodes import MACRO_FOR_EACH, NODE_SPAWN
 from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.player_parts import MODE, PAWN
 from graphics_menu.profile_consts import (
-    AMMO_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
+    ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
     NODE_CAST_PROFILE, PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX,
     STAT_FIELDS,
 )
@@ -77,7 +77,7 @@ def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, x0, y0, made):
     flow = BEL.find_then_pin(held)
 
     x = x0 + 1360
-    for field, item_var in AMMO_FIELDS:
+    for field, item_var in ITEM_FIELDS:
         arr = _at(ed.add_get_member_variable_node(field, PROFILE_CLASS_PATH),
                   x, y0 + 300)
         _connect(prof, _pin(arr, "self"))

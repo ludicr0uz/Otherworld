@@ -7,6 +7,7 @@ import unreal
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.camera import AIM_TRACE_RANGE
 from combat.paths import PISTOL_BP_PATH, SHOTGUN_BP_PATH
+from combat.slot_tuning import SLOT_KEYS, SLOT_VAR, UNPLACED
 from combat.tuning import (
     BIND_VARS, COMBAT, DROP_FORWARD, PISTOL_MAGAZINE, SHOTGUN_MAGAZINE,
     SHOTGUN_RESERVE,
@@ -72,7 +73,10 @@ def check_keys_are_variables():
     # The fire key appears TWICE and that is the whole of automatic fire: once as
     # WasInputKeyJustPressed (a tap) and once as IsInputKeyDown (a hold). Sprint
     # and aim are the other two held keys.
-    want_keys = sorted([f"Get {v}" for v, _k in BIND_VARS] + ["Get KeyFire"])
+    # And the slots' number keys (slot_tuning.SLOT_KEYS), fixed rather than
+    # bound, but variables all the same.
+    want_keys = sorted([f"Get {v}" for v, _k in BIND_VARS] + ["Get KeyFire"]
+                       + [f"Get {v}" for v, _k, _s in SLOT_KEYS])
     check(f"polls exactly {want_keys}", sorted(driven) == want_keys, str(sorted(driven)))
     # One Get per bind, reused by every poll -- an output pin takes any number of
     # links, so eight polls come off seven reads.
@@ -81,7 +85,7 @@ def check_keys_are_variables():
              in {f"Get {v}" for v, _k in BIND_VARS}]
     check("one read per bind, shared by the polls that use it",
           len(reads) == len(BIND_VARS), str(len(reads)))
-    for var, default in BIND_VARS:
+    for var, default in BIND_VARS + tuple((v, k) for v, k, _s in SLOT_KEYS):
         got = w.get_editor_property(var)
         check(f"{var} defaults to {default}, the key this file documents",
               got is not None and got.export_text() == default,
@@ -224,41 +228,20 @@ def _linked(node, pin_name):
 
 
 def _check_pickup_keeps_held():
-    """A pick-up joins the inventory without switching to it.
-
-    The only EquippedIndex write fed by an Array_Add must run off the else arm
-    of a Branch on IsValid(Held): empty hands take the item up, a held item
-    stays held.
+    """A pick-up joins the inventory without switching to it: the item it
+    adds is set UNPLACED, for the slot sync to put in the bag (or in empty
+    hands, with the bag full), and no Array_Add feeds EquippedIndex.
     """
     adds = by_pins(wg, "TargetArray", "NewItem")
-    straight = [(a, n) for a in adds for n in _linked(a, "ReturnValue")
+    straight = [n for a in adds for n in _linked(a, "ReturnValue")
                 if "EquippedIndex" in str(BEL.get_node_title(n))]
-    switches = [n for _, n in straight]
-    # BeginPlay's loadout adds too, then equips slot 0: only a write of the
-    # added item's own index counts as switching to it.
     check("pick-up does not switch straight to what it picked up",
-          not any(n in _linked(a, "then") for a, n in straight),
-          f"{len(adds)} Array_Add node(s)")
-
-    def only_when_empty(n):
-        links = PIN.list_connected_pins(BEL.find_execute_pin(n))
-        if not links:
-            return False
-        for q in links:
-            branch = PIN.get_owning_node(q)
-            if str(PIN.get_pin_name(q)) != "else":
-                return False
-            cond = PIN.list_connected_pins(BEL.find_input_pin(branch, "Condition"))
-            valid = [PIN.get_owning_node(c) for c in cond]
-            if not any("Get Held" in str(BEL.get_node_title(PIN.get_owning_node(h)))
-                       for v in valid if "Object" in in_pins(v)
-                       for h in PIN.list_connected_pins(BEL.find_input_pin(v, "Object"))):
-                return False
-        return True
-
-    check("only empty hands (Held not valid) take up a picked-up item",
-          len(switches) == 1 and only_when_empty(switches[0]),
-          f"{len(switches)} EquippedIndex write(s) fed by Array_Add")
+          not straight, f"{len(straight)} EquippedIndex write(s) fed by Array_Add")
+    placed = [n for a in adds for n in _linked(a, "then")
+              if str(BEL.get_node_title(n)).replace("\n", " ").startswith(f"Set {SLOT_VAR}")
+              and pin_value(n, SLOT_VAR) == str(UNPLACED)]
+    check("...it is set UNPLACED: the slot sync finds it a bag slot, or the hand",
+          len(placed) == 1, f"{len(placed)} Set {SLOT_VAR} = {UNPLACED} after an add")
 
 
 # ─── Sprint and stamina ──────────────────────────────────────────────────────

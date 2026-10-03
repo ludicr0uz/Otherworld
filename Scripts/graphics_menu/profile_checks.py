@@ -53,7 +53,7 @@ def _check_asset(check):
     check("...the kill count and the equipped slot as ints",
           all(isinstance(v, int) and not isinstance(v, bool) for v in ints),
           str([type(v).__name__ for v in ints]))
-    arrays = [PC.ITEM_CLASSES_FIELD] + [f for f, _v in PC.AMMO_FIELDS]
+    arrays = [PC.ITEM_CLASSES_FIELD] + [f for f, _v in PC.ITEM_FIELDS]
     check("...and the inventory as class/Loaded/Reserve arrays",
           all(isinstance(cdo.get_editor_property(f), unreal.Array) for f in arrays))
     names = {str(n) for n in BEL.list_member_variable_names(bp, False)}

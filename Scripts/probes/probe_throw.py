@@ -272,14 +272,17 @@ def probe(p):
             f"{_dist(rest, mark):.0f} cm from the disc")
     p.check("...as a Dropped item, which E picks up",
             item.get_editor_property("Dropped") is True)
-    held = p.get(wc, "Held")
-    p.check("the emptied hand takes up the next item, as after a drop",
-            held is not None and held != item, str(held))
+    p.check("the emptied hand stays empty, as after a drop: nothing comes up "
+            "out of a slot unasked (combat/slot_tuning.py)",
+            p.get(wc, "Held") is None, str(p.get(wc, "Held")))
 
     # A hand that changes in the wind-up throws nothing: the throw was of the
     # item the click wound up with.
     if clip is None or len(p.get(wc, "Inventory")) < 2:
         return
+    p.set(wc, "EquippedIndex", 0)             # the first item to hand (context.hold)
+    yield lambda: p.get(wc, "Held") is not None
+    held = p.get(wc, "Held")
     carried = len(p.get(wc, "Inventory"))
     p.set(wc, THROW_FORCED_VAR, True)
     yield lambda: p.get(wc, THROW_AIMING_VAR)

@@ -36,6 +36,7 @@ from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from clothing.placement import AHEAD_CM
 from clothing.specs import GARMENTS
+from graphics_menu.inv_consts import BAG_PANEL
 from graphics_menu.profile_consts import PROFILE_SLOT
 from graphics_menu.umg_consts import ROW_VALUE
 from graphics_menu.wear_consts import (
@@ -221,5 +222,8 @@ def _run(p):
             str(said))
     p.set(hud, WEAR_OPEN_VAR, False)
     hud.call_method("ReceiveDrawHUD", (1920, 1080))
-    p.check("...and shut, it is collapsed",
-            panel.get_visibility() == unreal.SlateVisibility.COLLAPSED)
+    bag = ui.get_editor_property(BAG_PANEL)
+    p.check("...and shut, the worn rows still show (bottom right) and the backpack "
+            "under them is collapsed",
+            panel.get_visibility() != unreal.SlateVisibility.COLLAPSED
+            and bag.get_visibility() == unreal.SlateVisibility.COLLAPSED)

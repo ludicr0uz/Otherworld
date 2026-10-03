@@ -9,8 +9,10 @@
     then NeedsRefresh, so the weapon component re-equips what it holds and
     hides the rest -- the held item stays held, as with a pick-up.
 
-A gun already carried is skipped, so pressing it twice adds nothing, and the
-INVENTORY_SIZE slots the HUD draws are never overflowed. The key only raises
+A gun already carried is skipped, so pressing it twice adds nothing, and no
+more items are carried than there are SLOT_COUNT slots: the weapon
+component's slot sync puts each new one in a free bag slot, the hand, or
+the weapon slot it fits. The key only raises
 the request, which is what lets a probe ask for the guns without a key press
 (probes/probe_dev_all_guns.py).
 """
@@ -20,7 +22,7 @@ import unreal
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import FN_OBJECT_CLASS, MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
-from combat.tuning import INVENTORY_SIZE
+from combat.slot_tuning import SLOT_COUNT
 from graphics_menu.dev_consts import (
     DEV_GUN_CLASS_PATHS, DEV_GUNS_ACTION, DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR,
 )
@@ -132,7 +134,7 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, x0, y0, made):
                   TargetArray=_get(ed, "Inventory", x0, y1 + 300, made,
                                    WEAPON_COMP_CLASS_PATH, wc))
     room = _call(ed, FN_LESS_II, x0 + 500, y1 + 300, made, A=_out(count),
-                 B=INVENTORY_SIZE)
+                 B=SLOT_COUNT)
     new = _call(ed, FN_NOT, x0 + 500, y1 + 440, made,
                 A=_get(ed, DEV_HAS_GUN_VAR, x0 + 260, y1 + 440, made))
     want = _call(ed, FN_AND, x0 + 740, y1 + 300, made, A=_out(room), B=_out(new))
@@ -186,6 +188,6 @@ def author_dev_guns(ed, pc_out, parts, in_execs, x0, y0, made):
                     WEAPON_COMP_CLASS_PATH, wc)
     ed.add_comment_to_nodes(
         f"dev-all-guns (its row in the M panel): one of every gun not "
-        f"already carried, while fewer than {INVENTORY_SIZE} items are. "
+        f"already carried, while fewer than {SLOT_COUNT} items are. "
         f"NeedsRefresh re-equips; the held item stays held.", made[-1:])
     return [dirty, idle]

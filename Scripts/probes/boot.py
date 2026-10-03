@@ -29,6 +29,8 @@ import traceback
 
 import unreal
 
+from combat.slot_tuning import SLOT_REQUEST_VAR
+
 from probes.context import Probe
 from probes.runner import DEFAULT_TIMEOUT, Ledger, ProbeRun, Queue
 
@@ -163,7 +165,11 @@ def start():
     _state["queue"] = Queue(runs)
     _state["since"] = time.time()
 
-    _state["writable"] = sorted({pair for _l, _f, w in loaded for pair in map(tuple, w)})
+    writable = {pair for _l, _f, w in loaded for pair in map(tuple, w)}
+    # A write of the weapon component's EquippedIndex is a request for an item
+    # in hand (context.hold): the request is what is written.
+    writable |= {(bp, SLOT_REQUEST_VAR) for bp, var in writable if var == "EquippedIndex"}
+    _state["writable"] = sorted(writable)
     _state["handle"] = unreal.register_slate_post_tick_callback(_tick)
 
 

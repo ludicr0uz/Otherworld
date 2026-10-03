@@ -6,9 +6,9 @@
     every body array (Loot, LootNames, LootIcons, LootTints) .RemoveIndex(LootSel)
 
 The item is spawned only now: a body carries classes, not hidden actors
-(loot/roll.py). The caller has already checked the bag has room, so the
-INVENTORY_SIZE slots the HUD draws are never overflowed. The held item stays
-held, as with a pick-up.
+(loot/roll.py). The caller has already checked there is room (the weapon
+component's HasRoom), so the slot sync finds the new item a bag slot, or
+the hand. The held item stays held, as with a pick-up.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin, _set

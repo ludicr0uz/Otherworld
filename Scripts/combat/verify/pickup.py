@@ -6,8 +6,8 @@ How the target is chosen is verify/interact.py's. That a pick-up joins the
 inventory without switching to it is verify/weapon_inputs.py's.
 """
 
-from combat.tuning import INVENTORY_SIZE
-from combat.verify.common import by_pins, check, num_pin, pin_value
+from combat.slot_tuning import HAS_ROOM_VAR
+from combat.verify.common import by_pins, check, pin_value
 from combat.verify.fixtures import wg
 from combat.verify.interact import _exec_from, _reads, _sources, _title
 from combat.weapon_component.interact import INTERACT_TARGET_VAR
@@ -53,9 +53,9 @@ def check_pickup_takes_once():
         return
     rooms = _exec_from(flags[0])
     fits = [c for n, _pin in rooms for c in _sources(n, "Condition")]
-    check(f"...only while fewer than {INVENTORY_SIZE} are carried",
+    check(f"...only while there is room ({HAS_ROOM_VAR}: a bag slot or the hand free)",
           len(rooms) == 1 and rooms[0][1] == "then" and len(fits) == 1
-          and num_pin(fits[0], "B") == float(INVENTORY_SIZE),
+          and _title(fits[0]) == f"Get {HAS_ROOM_VAR}",
           f"{len(rooms)} gate(s)")
     if len(rooms) != 1:
         return

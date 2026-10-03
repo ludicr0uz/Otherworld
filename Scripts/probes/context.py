@@ -90,10 +90,33 @@ class Probe(object):
         Without edit notifications: the default fires PostEditChange, which on
         a live component re-runs its owner's construction script -- the actor
         gets fresh components and the one just written is a dead copy.
+
+        The weapon component's EquippedIndex is the slot sync's to write
+        (combat/weapon_component/slot_sync.py): a probe that writes it is
+        asking for Inventory[value] in hand, which is hold()'s.
         """
         import unreal
+        if name == EQUIPPED_INDEX and _is_weapon_component(obj):
+            self.hold(obj, value)
+            return
         obj.set_editor_property(name, value,
                                 unreal.PropertyAccessChangeNotifyMode.NEVER)
+
+    def hold(self, wc, index):
+        """Bring Inventory[index] to hand, as a number key or a click on its
+        slot does: its slot goes into the component's SlotRequest, and the
+        next Tick it is held (the hand's item goes home first). Already in
+        hand, or past the end of the bag: nothing. boot.py makes SlotRequest
+        writable for any probe that writes EquippedIndex."""
+        import unreal
+        from combat.slot_tuning import HAND, SLOT_REQUEST_VAR, SLOT_VAR
+        bag = list(wc.get_editor_property("Inventory"))
+        if not 0 <= index < len(bag):
+            return
+        slot = bag[index].get_editor_property(SLOT_VAR)
+        if slot > HAND:
+            wc.set_editor_property(SLOT_REQUEST_VAR, slot,
+                                   unreal.PropertyAccessChangeNotifyMode.NEVER)
 
     def tag(self, name):
         import unreal
@@ -113,3 +136,10 @@ class Probe(object):
         if instigator is not None:
             data.set_editor_property("instigator", instigator)
         unreal.AbilitySystemLibrary.send_gameplay_event_to_actor(actor, tag, data)
+
+
+EQUIPPED_INDEX = "EquippedIndex"
+
+
+def _is_weapon_component(obj):
+    return obj.get_class().get_name() == "BP_WeaponComponent_C"

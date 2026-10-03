@@ -17,7 +17,7 @@ from combat.nodes import MACRO_FOR_EACH
 from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.player_parts import MODE
 from graphics_menu.profile_consts import (
-    AMMO_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
+    ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
     NODE_CAST_PROFILE, PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX,
     STAT_FIELDS,
 )
@@ -84,7 +84,7 @@ def author_write_profile(ed, in_exec, parts, x0, y0, made):
     _connect(item, _pin(kind, "Object"))
     made.append(kind)
     sources = [(ITEM_CLASSES_FIELD, _pin(kind, "ReturnValue", is_input=False))]
-    for field, item_var in AMMO_FIELDS:
+    for field, item_var in ITEM_FIELDS:
         got = _at(ed.add_get_member_variable_node(item_var, ITEM_CLASS_PATH),
                   x + 560, y0 + 440 + 140 * len(sources))
         _connect(item, _pin(got, "self"))

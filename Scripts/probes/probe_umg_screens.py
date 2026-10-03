@@ -10,6 +10,8 @@ set by writing the HUD's and the game's variables: a probe has no keyboard.
 
 import unreal
 
+from combat.slot_tuning import HAND, SLOT_ITEMS_VAR
+from graphics_menu.inv_consts import BAG_PANEL, SLOT_BOXES
 from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR
 from combat.paths import (
     GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH,
@@ -96,28 +98,37 @@ def probe(p):
     p.check("the kill counter reads the GameMode's count", kills == f"KILLS  {KILLS}",
             f"'{kills}'")
 
-    items = list(p.get(wc, "Inventory"))
-    equipped = p.get(wc, "EquippedIndex")
-    grid = ui["UiHud"].get_editor_property(C.SLOTS)
-    icons = [grid.get_child_at(i).get_editor_property(C.SLOT_ICON).get_visibility()
-             for i in range(grid.get_children_count())]
-    p.check("a slot shows an icon exactly when something is carried in it",
-            bool(items) and icons == [SHOWN] * len(items) + [HIDDEN] * (len(icons) - len(items)),
-            f"{len(items)} carried: {[str(v.name) for v in icons]}")
-    lit = [grid.get_child_at(i).get_editor_property(C.SLOT_FRAME).get_visibility() == SHOWN
-           for i in range(grid.get_children_count())]
+    # The slots (combat/slot_tuning.py): code c is the hand's cell, a weapon
+    # cell or a bag cell, and shows SlotItems[c].
+    slots = list(p.get(wc, SLOT_ITEMS_VAR))
+    cells = []
+    for box, first, count in SLOT_BOXES:
+        grid = ui["UiHud"].get_editor_property(box)
+        cells += [grid.get_child_at(i) for i in range(count)]
+    icons = [c.get_editor_property(C.SLOT_ICON).get_visibility() for c in cells]
+    p.check("a slot shows an icon exactly when something is in it (the hand, the "
+            "weapon slots, the bag)",
+            len(slots) == len(cells) and any(slots)
+            and icons == [SHOWN if s else HIDDEN for s in slots],
+            f"{[_name(p, s) for s in slots]}: {[str(v.name) for v in icons]}")
+    lit = [c.get_editor_property(C.SLOT_FRAME).get_visibility() == SHOWN for c in cells]
     name = _text(ui["UiHud"].get_editor_property(C.EQUIPPED_NAME))
-    p.check("only the equipped slot is lit, and its name is over the grid",
-            lit.count(True) == 1 and lit.index(True) == equipped
-            and name == str(p.get(items[equipped], "DisplayName")),
-            f"lit {lit}, name '{name}', equipped {equipped}")
-    counted = [(i, _text(grid.get_child_at(i).get_editor_property(C.SLOT_AMMO)))
-               for i, item in enumerate(items) if p.get(item, "UsesAmmo")]
+    held = p.get(wc, "Held")
+    p.check("only the hand's slot is lit (the I panel shut), and the held item's name "
+            "is over it",
+            lit == [i == HAND for i in range(len(cells))] and held is not None
+            and name == str(p.get(held, "DisplayName")),
+            f"lit {lit}, name '{name}'")
+    counted = [(i, _text(c.get_editor_property(C.SLOT_AMMO)))
+               for i, (c, it) in enumerate(zip(cells, slots)) if it and p.get(it, "UsesAmmo")]
     want = [(i, f"{p.get(it, 'Loaded')} / "
                 f"{chr(0x221e) if p.get(it, 'InfiniteReserve') else p.get(it, 'Reserve')}")
-            for i, it in enumerate(items) if p.get(it, "UsesAmmo")]
+            for i, it in enumerate(slots) if it and p.get(it, "UsesAmmo")]
     p.check("each gun that uses ammunition shows loaded / reserve", counted == want,
             f"{counted} vs {want}")
+    bag = ui["UiHud"].get_editor_property(BAG_PANEL)
+    p.check("the backpack is hidden until I", bag.get_visibility() == HIDDEN,
+            str(bag.get_visibility()))
 
     # --- the M panel ----------------------------------------------------------------
     p.set(hud, "MenuOpen", True)
@@ -220,3 +231,7 @@ def probe(p):
     _draw(hud)
     p.check("alive again: the HUD is back and the death menu gone",
             body.get_visibility() == SHOWN and ui["UiDeath"].get_visibility() == HIDDEN)
+
+
+def _name(p, item):
+    return str(p.get(item, "DisplayName")) if item else "-"

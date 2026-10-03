@@ -28,9 +28,8 @@ from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
 from combat.paths import GAME_MODE_BP_PATH, GAME_MODE_CLASS_PATH
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
 from npc.graph import (
-    BEL, _asset_sub, _at, _connect, _log, _loose_pin, _name_literal, _node,
-    _palette, _pin, _set,
-)
+    BEL, _asset_sub, _connect, _log, _loose_pin, _name_literal, _node, _palette, _pin,
+    _set)
 from npc.nodes import (
     FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_CONCAT, FN_DISPLAY_NAME,
     FN_GET_BLACKBOARD, FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
@@ -75,7 +74,7 @@ def _noise_record_exists():
         str(v) for v in BEL.list_member_variable_names(bp, False)}
 
 
-def _author_enter_agro(ed, reasons, chase_in, x0, y0):
+def _author_enter_agro(ed, reasons, chase_in):
     """Every sense's "yes" lands here: name the sense, flip the switch.
     ``chase_in`` is what runs after (the Blackboard write).
 
@@ -90,48 +89,44 @@ def _author_enter_agro(ed, reasons, chase_in, x0, y0):
         made.append(n)
         return n
 
-    flip = keep(_at(ed.add_set_member_variable_node(AGGRO_VAR), x0 + 300, y0))
+    flip = keep(ed.add_set_member_variable_node(AGGRO_VAR))
     _set(flip, AGGRO_VAR, "true")
-    for i, (sense, exec_pin) in enumerate(reasons):
-        why = keep(_at(ed.add_set_member_variable_node(AGGRO_REASON_VAR),
-                       x0, y0 + 160 * i))
+    for sense, exec_pin in reasons:
+        why = keep(ed.add_set_member_variable_node(AGGRO_REASON_VAR))
         _set(why, AGGRO_REASON_VAR, sense)
         _connect(exec_pin, _pin(why, "execute"))
         _connect(BEL.find_then_pin(why), _pin(flip, "execute"))
 
     after = [BEL.find_then_pin(flip)]
 
-    reason = keep(_at(ed.add_get_member_variable_node(AGGRO_REASON_VAR),
-                      x0 + 1800, y0 + 300))
-    head = keep(_at(_node(ed, FN_CONCAT), x0 + 2040, y0 + 300))
+    reason = keep(ed.add_get_member_variable_node(AGGRO_REASON_VAR))
+    head = keep(_node(ed, FN_CONCAT))
     _set(head, "A", AGRO_LOG_PREFIX)
     _connect(_pin(reason, AGGRO_REASON_VAR, is_input=False), _pin(head, "B"))
-    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0 + 1800, y0 + 440))
-    name = keep(_at(_node(ed, FN_DISPLAY_NAME), x0 + 2040, y0 + 440))
+    pawn = keep(_node(ed, FN_GET_PAWN))
+    name = keep(_node(ed, FN_DISPLAY_NAME))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(name, "Object"))
-    who = keep(_at(_node(ed, FN_CONCAT), x0 + 2280, y0 + 440))
+    who = keep(_node(ed, FN_CONCAT))
     _set(who, "A", " -- ")
     _connect(_pin(name, "ReturnValue", is_input=False), _pin(who, "B"))
-    line = keep(_at(_node(ed, FN_CONCAT), x0 + 2520, y0 + 300))
+    line = keep(_node(ed, FN_CONCAT))
     _connect(_pin(head, "ReturnValue", is_input=False), _pin(line, "A"))
     _connect(_pin(who, "ReturnValue", is_input=False), _pin(line, "B"))
     # A developer line: PrintWarning puts it on screen as well as in the log,
     # so it is written only while the GameMode's DebugMode is on. One line per
     # wanderer per life.
-    mode = keep(_at(_node(ed, FN_GET_GAME_MODE), x0 + 2280, y0 + 160))
-    as_mode = keep(_at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 2520, y0 - 160))
+    mode = keep(_node(ed, FN_GET_GAME_MODE))
+    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     for pin in after:
         _connect(pin, _pin(as_mode, "execute"))
-    flag = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
-                                                    GAME_MODE_CLASS_PATH),
-                    x0 + 2760, y0 + 160))
+    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(flag, "self"))
-    debugging = keep(_at(ed.add_branch_node(), x0 + 3000, y0 - 160))
+    debugging = keep(ed.add_branch_node())
     _connect(_pin(flag, DEBUG_MODE_VAR, is_input=False), _pin(debugging, "Condition"))
     _connect(BEL.find_then_pin(as_mode), _pin(debugging, "execute"))
-    say = keep(_at(_node(ed, FN_WARN), x0 + 3240, y0))
+    say = keep(_node(ed, FN_WARN))
     _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
     _connect(BEL.find_then_pin(debugging), _pin(say, "execute"))
     for tail in (BEL.find_then_pin(say), BEL.find_else_pin(debugging),
@@ -140,7 +135,7 @@ def _author_enter_agro(ed, reasons, chase_in, x0, y0):
     return made
 
 
-def _author_tell_blackboard(ed, done_in, x0, y0):
+def _author_tell_blackboard(ed, done_in):
     """Mirror Aggro and AggroReason into the Blackboard, where the tree's Hunt
     branch reads them (npc/tree.py). The controller's own variables stay the
     record every graph reads; the Blackboard is what the tree and its debugger
@@ -151,33 +146,32 @@ def _author_tell_blackboard(ed, done_in, x0, y0):
         made.append(n)
         return n
 
-    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 300))
-    board = keep(_at(_node(ed, FN_GET_BLACKBOARD), x0 + 240, y0 + 300))
+    pawn = keep(_node(ed, FN_GET_PAWN))
+    board = keep(_node(ed, FN_GET_BLACKBOARD))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(board, "Target"))
     board_out = _pin(board, "ReturnValue", is_input=False)
-    flag = keep(_at(_node(ed, FN_BB_SET_BOOL), x0 + 480, y0))
+    flag = keep(_node(ed, FN_BB_SET_BOOL))
     _connect(board_out, _pin(flag, "self"))
-    _connect(_name_literal(ed, BB_AGGRO_KEY, x0 + 240, y0 + 440), _pin(flag, "KeyName"))
+    _connect(_name_literal(ed, BB_AGGRO_KEY), _pin(flag, "KeyName"))
     _set(flag, "BoolValue", "true")
-    reason = keep(_at(ed.add_get_member_variable_node(AGGRO_REASON_VAR),
-                      x0 + 480, y0 + 300))
-    why = keep(_at(_node(ed, FN_BB_SET_STRING), x0 + 760, y0))
+    reason = keep(ed.add_get_member_variable_node(AGGRO_REASON_VAR))
+    why = keep(_node(ed, FN_BB_SET_STRING))
     _connect(board_out, _pin(why, "self"))
-    _connect(_name_literal(ed, BB_REASON_KEY, x0 + 480, y0 + 440), _pin(why, "KeyName"))
+    _connect(_name_literal(ed, BB_REASON_KEY), _pin(why, "KeyName"))
     _connect(_pin(reason, AGGRO_REASON_VAR, is_input=False), _pin(why, "StringValue"))
     _connect(BEL.find_then_pin(flag), _pin(why, "execute"))
     _connect(BEL.find_then_pin(why), done_in)
     return made, _pin(flag, "execute")
 
 
-def _author_player_present(ed, exec_in, yes_in, no_in, x0, y0):
+def _author_player_present(ed, exec_in, yes_in, no_in):
     """No player pawn (before possession, between a death and a restart): no
     sense can say anything, so the tree goes on to the patrol."""
-    player = _at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 300)
+    player = _node(ed, FN_GET_PLAYER_PAWN)
     _set(player, "PlayerIndex", 0)
-    there = _at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 300)
+    there = _node(ed, FN_IS_VALID)
     _connect(_pin(player, "ReturnValue", is_input=False), _pin(there, "Object"))
-    present = _at(ed.add_branch_node(), x0 + 480, y0)
+    present = ed.add_branch_node()
     _connect(_pin(there, "ReturnValue", is_input=False), _pin(present, "Condition"))
     _connect(exec_in, _pin(present, "execute"))
     _connect(BEL.find_then_pin(present), yes_in)
@@ -185,11 +179,11 @@ def _author_player_present(ed, exec_in, yes_in, no_in, x0, y0):
     return [player, there, present]
 
 
-def _author_agro_steps(ed, step, result, stock, x0, y0):
+def _author_agro_steps(ed, step, result, stock):
     """Author the tree's notice and patrol steps as controller events.
 
-    ``step(name, x, y)`` makes the custom event BT_<name> and returns its exec
-    output; ``result(value, x, y)`` makes a StepResult write and returns its
+    ``step(name)`` makes the custom event BT_<name> and returns its exec
+    output; ``result(value)`` makes a StepResult write and returns its
     exec input (npc/steps.py). Every sense is its own step, and the tree's
     Senses selector (npc/tree.py) holds the priority order: a sense's "yes"
     names itself, flips the switch, mirrors it into the Blackboard and
@@ -199,46 +193,36 @@ def _author_agro_steps(ed, step, result, stock, x0, y0):
     the step names of the senses authored, in priority order.
     """
     made = []
-    made += _author_player_present(
-        ed, step(STEP_PRESENT, x0 + 3000, y0), result(True, x0 + 3800, y0),
-        result(False, x0 + 3800, y0 + 160), x0 + 3240, y0)
+    made += _author_player_present(ed, step(STEP_PRESENT), result(True), result(False))
 
     noise = _noise_record_exists()
     if not noise:
         _log(f"note: {GAME_MODE_BP_PATH} has no noise record -- the wanderers "
              f"will not hear (run build_weapons_and_combat.py first)")
-    fragments = {"hurt": lambda e, x, y: _author_hurt(ed, e, x, y),
-                 "sight": lambda e, x, y: _author_sight(ed, e, x, y),
-                 "touch": lambda e, x, y: _author_touch(ed, e, x, y),
-                 "sound": lambda e, x, y: _author_hearing(ed, e, x, y)}
+    fragments = {"hurt": _author_hurt, "sight": _author_sight,
+                 "touch": _author_touch, "sound": _author_hearing}
     reasons, senses = [], []
-    y = y0 + 1400
     for sense, name in SENSE_STEPS:
         if sense == "sound" and not noise:
             continue
-        nodes, yes, nothing = fragments[sense](
-            [step(name, x0 + 3700, y)], x0 + 4000, y)
+        nodes, yes, nothing = fragments[sense](ed, [step(name)])
         made.extend(nodes)
-        missed = result(False, x0 + 7000, y + 600)
+        missed = result(False)
         for pin in nothing:
             _connect(pin, missed)
         reasons.append((sense, yes))
         senses.append(name)
-        y += 1200
 
-    told = result(True, x0 + 16000, y0)
-    tell, tell_in = _author_tell_blackboard(ed, told, x0 + 15000, y0)
+    told = result(True)
+    tell, tell_in = _author_tell_blackboard(ed, told)
     made.extend(tell)
-    made.extend(_author_enter_agro(ed, reasons, tell_in, x0 + 11600, y0))
+    made.extend(_author_enter_agro(ed, reasons, tell_in))
     # After the stroll order, the walking speed: every pass, so a tuned one
     # lands at once (patrol._author_walk_speed).
-    walked, walk_tails, walk_in = _author_walk_speed(ed, [], True, stock,
-                                                      x0 + 14200, y0 + 2800)
+    walked, walk_tails, walk_in = _author_walk_speed(ed, [], True, stock)
     made.extend(walked)
-    rested = result(True, x0 + 15600, y0 + 2800)
+    rested = result(True)
     for tail in walk_tails:
         _connect(tail, rested)
-    made.extend(_author_patrol_step(
-        ed, [step(STEP_STROLL, x0 + 11300, y0 + 2800)], walk_in,
-        x0 + 11600, y0 + 2800))
+    made.extend(_author_patrol_step(ed, [step(STEP_STROLL)], walk_in))
     return made, senses

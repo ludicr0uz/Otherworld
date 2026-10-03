@@ -45,9 +45,9 @@ import unreal
 
 from combat.aim_pitch import IK_CLASS, _feeding, _nodes_of
 from combat.graph import (
-    BEL, BGE, PIN, _assets, _at, _connect, _declare, _float_type, _log,
-    _palette, _pin, _struct_type,
-)
+    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _log, _palette, _pin,
+    _struct_type)
+from uebp.layout import arrange
 
 SUPPORT_HAND_VAR = "SupportHand"
 # The point, on the anim BP; and under the same name, each gun's own on
@@ -88,11 +88,11 @@ def target_bone(inner, prop):
                .get_editor_property("bone_name"))
 
 
-def _two_bone_ik(ed, skin, x, y):
+def _two_bone_ik(ed, skin):
     """The IK on the left hand: effector in the right hand's space, the elbow
     held where the pose has it."""
     bones = skin.pose_bones
-    ik = _at(_palette(ed, NODE_TWO_BONE_IK), x, y)
+    ik = _palette(ed, NODE_TWO_BONE_IK)
     inner = ik.get_editor_property("node")
     ref = unreal.BoneReference()
     ref.set_editor_property("bone_name", bones["hand_l"])
@@ -159,13 +159,13 @@ def patch_support_hand(skin):
     upstream = fed[0]
     PIN.break_pin_links(pose_in)
 
-    ik = _two_bone_ik(ed, skin, 300, 1500)
+    ik = _two_bone_ik(ed, skin)
     _connect(upstream, _pin(ik, "ComponentPose"))
     _connect(_pin(ik, "Pose", is_input=False), pose_in)
 
-    weight = _at(ed.add_get_member_variable_node(SUPPORT_HAND_VAR), 0, 1760)
+    weight = ed.add_get_member_variable_node(SUPPORT_HAND_VAR)
     _connect(_pin(weight, SUPPORT_HAND_VAR, is_input=False), _pin(ik, "Alpha"))
-    point = _at(ed.add_get_member_variable_node(SUPPORT_POINT_VAR), 0, 1900)
+    point = ed.add_get_member_variable_node(SUPPORT_POINT_VAR)
     _connect(_pin(point, SUPPORT_POINT_VAR, is_input=False),
              _pin(ik, "EffectorLocation"))
     ed.add_comment_to_nodes(
@@ -176,6 +176,7 @@ def patch_support_hand(skin):
         f"{SUPPORT_HAND_VAR} (0..1, SightBlend) is its weight. BP_WeaponComponent "
         "writes both. See Scripts/combat/support_hand.py.", [ik, weight, point])
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{skin.anim_bp} failed to compile after the support hand")
     _assets().save_loaded_asset(bp)

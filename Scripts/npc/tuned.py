@@ -10,7 +10,7 @@ compile (write_tuned_defaults), because add_member_variable's own default
 does not apply.
 """
 
-from npc.graph import BEL, _at, _pin
+from npc.graph import BEL, _pin
 from npc.monster_tuning import MONSTER_STATS, TUNED_VAR
 
 
@@ -21,16 +21,16 @@ def declare_tuned_vars(ed):
             raise RuntimeError(f"could not declare {var}")
 
 
-def tuned(ed, column, x, y):
+def tuned(ed, column):
     """A Get of the Tune variable for ``column``: ``(node, output pin)``."""
     var = TUNED_VAR[column]
-    node = _at(ed.add_get_member_variable_node(var), x, y)
+    node = ed.add_get_member_variable_node(var)
     return node, _pin(node, var, is_input=False)
 
 
-def tuned_pin(g, column, x, y):
+def tuned_pin(g, column):
     """The same Get, kept by a npc.graph._Graph: its output pin."""
-    node, pin = tuned(g.ed, column, x, y)
+    node, pin = tuned(g.ed, column)
     g.made.append(node)
     return pin
 

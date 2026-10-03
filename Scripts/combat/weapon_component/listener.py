@@ -14,20 +14,19 @@ the left. The override follows the component and never needs refreshing. A
 restart opens the level again, and the new character's BeginPlay sets it again.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin
+from combat.graph import BEL, _connect, _node, _pin
 from combat.nodes import FN_SET_LISTENER_ATTENUATION
 
 
-def _author_listener_at_character(ed, as_char, pc_out, exec_in, x0, y0):
+def _author_listener_at_character(ed, as_char, pc_out, exec_in):
     """Pin the player controller's attenuation listener to the capsule.
 
     The offset pin stays empty, which compiles as zero: the listener is the
     capsule's centre. Returns the then pin.
     """
-    capsule = _at(ed.add_get_member_variable_node(
-        "CapsuleComponent", "/Script/Engine.Character"), x0, y0 + 160)
+    capsule = ed.add_get_member_variable_node("CapsuleComponent", "/Script/Engine.Character")
     _connect(as_char, _pin(capsule, "self"))
-    listen = _at(_node(ed, FN_SET_LISTENER_ATTENUATION), x0 + 260, y0)
+    listen = _node(ed, FN_SET_LISTENER_ATTENUATION)
     _connect(pc_out, _pin(listen, "self"))
     _connect(_pin(capsule, "CapsuleComponent", is_input=False),
              _pin(listen, "AttachToComponent"))

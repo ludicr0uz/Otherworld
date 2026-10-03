@@ -35,7 +35,7 @@ from combat.breath_tuning import (
     BREATH_RECOVER_S, BREATH_SCALE_VAR, BREATH_SWAY_SCALE, BREATH_VAR,
     BREATH_WINDED_SCALE, WINDED_VAR,
 )
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from combat.nodes import (
     FN_ADD_FF, FN_AND, FN_CLAMP, FN_INTERP_FF, FN_IS_KEY_DOWN, FN_LE_FF,
     FN_LESS_FF, FN_NOT_B, FN_OR,
@@ -45,8 +45,7 @@ from combat.weapon_component.accuracy import _mul, _select
 from combat.weapon_component.common import _prop
 
 
-def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins,
-                        x0, y0):
+def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins):
     """Copy Held's sway rate, then hold or let go of the breath and ease the
     sway's scale. Returns the exec pin to carry on from."""
     made = []
@@ -58,11 +57,11 @@ def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins,
     def out(n, name="ReturnValue"):
         return _pin(n, name, is_input=False)
 
-    def get(var, x, y):
-        return out(keep(_at(ed.add_get_member_variable_node(var), x, y)), var)
+    def get(var):
+        return out(keep(ed.add_get_member_variable_node(var)), var)
 
-    def call(fn, x, y, **ins):
-        n = keep(_at(_node(ed, fn), x, y))
+    def call(fn, **ins):
+        n = keep(_node(ed, fn))
         for name, v in ins.items():
             if isinstance(v, (int, float)):
                 _set(n, name, v)
@@ -70,8 +69,8 @@ def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins,
                 _connect(v, _pin(n, name))
         return n
 
-    def store(var, value, flow, x):
-        n = keep(_at(ed.add_set_member_variable_node(var), x, y0))
+    def store(var, value, flow):
+        n = keep(ed.add_set_member_variable_node(var))
         _connect(value, _pin(n, var))
         for e in flow:
             _connect(e, _pin(n, "execute"))
@@ -80,54 +79,46 @@ def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins,
     dt = out(tick, "DeltaSeconds")
 
     # The gun's rate, behind the Branch that knows Held is there.
-    armed = keep(_at(ed.add_branch_node(), x0, y0))
+    armed = keep(ed.add_branch_node())
     _connect(armed_out, _pin(armed, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(armed, "execute"))
-    rate, rate_n = _prop(ed, SWAY_RATE_VAR, held, x0, y0 + 300)
+    rate, rate_n = _prop(ed, SWAY_RATE_VAR, held)
     keep(rate_n)
-    flow = store(SWAY_RATE_VAR, rate, [BEL.find_then_pin(armed)], x0 + 300)
+    flow = store(SWAY_RATE_VAR, rate, [BEL.find_then_pin(armed)])
     flow.append(BEL.find_else_pin(armed))
 
     # Held: the key (or its stand-in), down the sights, not winded.
-    down = call(FN_IS_KEY_DOWN, x0 + 600, y0 + 300, self=pc_out, Key=key_pin)
-    key = call(FN_OR, x0 + 860, y0 + 300, A=out(down),
-               B=get(BREATH_FORCED_VAR, x0 + 600, y0 + 440))
-    calm = call(FN_NOT_B, x0 + 860, y0 + 560, A=get(WINDED_VAR, x0 + 600, y0 + 560))
-    sighted = call(FN_AND, x0 + 1120, y0 + 440, A=get("SightAiming", x0 + 860, y0 + 440),
-                   B=out(calm))
-    holding = call(FN_AND, x0 + 1380, y0 + 300, A=out(key), B=out(sighted))
-    flow = store(BREATH_HELD_VAR, out(holding), flow, x0 + 1640)
+    down = call(FN_IS_KEY_DOWN, self=pc_out, Key=key_pin)
+    key = call(FN_OR, A=out(down), B=get(BREATH_FORCED_VAR))
+    calm = call(FN_NOT_B, A=get(WINDED_VAR))
+    sighted = call(FN_AND, A=get("SightAiming"), B=out(calm))
+    holding = call(FN_AND, A=out(key), B=out(sighted))
+    flow = store(BREATH_HELD_VAR, out(holding), flow)
 
     # The breath drains while held and refills while not.
-    is_held = get(BREATH_HELD_VAR, x0 + 1900, y0 + 440)
-    per_s = _select(ed, keep, -1.0, BREATH_HOLD_S / BREATH_RECOVER_S, is_held,
-                    x0 + 2160, y0 + 440)
-    step = _mul(ed, keep, per_s, dt, x0 + 2420, y0 + 440)
-    more = call(FN_ADD_FF, x0 + 2680, y0 + 300, A=get(BREATH_VAR, x0 + 2420, y0 + 300),
-                B=step)
-    kept = call(FN_CLAMP, x0 + 2940, y0 + 300, Value=out(more), Min=0.0,
-                Max=BREATH_HOLD_S)
-    flow = store(BREATH_VAR, out(kept), flow, x0 + 3200)
+    is_held = get(BREATH_HELD_VAR)
+    per_s = _select(ed, keep, -1.0, BREATH_HOLD_S / BREATH_RECOVER_S, is_held)
+    step = _mul(ed, keep, per_s, dt)
+    more = call(FN_ADD_FF, A=get(BREATH_VAR), B=step)
+    kept = call(FN_CLAMP, Value=out(more), Min=0.0, Max=BREATH_HOLD_S)
+    flow = store(BREATH_VAR, out(kept), flow)
 
     # Winded: run out, and until the breath is whole again.
-    left = get(BREATH_VAR, x0 + 3460, y0 + 300)
-    empty = call(FN_LE_FF, x0 + 3720, y0 + 300, A=left, B=0.0)
-    short = call(FN_LESS_FF, x0 + 3720, y0 + 440, A=left, B=BREATH_HOLD_S)
-    still = call(FN_AND, x0 + 3980, y0 + 440, A=get(WINDED_VAR, x0 + 3720, y0 + 580),
-                 B=out(short))
-    winded = call(FN_OR, x0 + 4240, y0 + 300, A=out(empty), B=out(still))
-    flow = store(WINDED_VAR, out(winded), flow, x0 + 4500)
+    left = get(BREATH_VAR)
+    empty = call(FN_LE_FF, A=left, B=0.0)
+    short = call(FN_LESS_FF, A=left, B=BREATH_HOLD_S)
+    still = call(FN_AND, A=get(WINDED_VAR), B=out(short))
+    winded = call(FN_OR, A=out(empty), B=out(still))
+    flow = store(WINDED_VAR, out(winded), flow)
 
     # The sway's width eases to what the breath makes it.
-    rest = _select(ed, keep, BREATH_WINDED_SCALE, 1.0,
-                   get(WINDED_VAR, x0 + 4760, y0 + 580), x0 + 5020, y0 + 580)
-    target = _select(ed, keep, BREATH_SWAY_SCALE, rest,
-                     get(BREATH_HELD_VAR, x0 + 4760, y0 + 440), x0 + 5280, y0 + 440)
-    eased = call(FN_INTERP_FF, x0 + 5540, y0 + 300,
-                 Current=get(BREATH_SCALE_VAR, x0 + 5280, y0 + 300), Target=target,
+    rest = _select(ed, keep, BREATH_WINDED_SCALE, 1.0, get(WINDED_VAR))
+    target = _select(ed, keep, BREATH_SWAY_SCALE, rest, get(BREATH_HELD_VAR))
+    eased = call(FN_INTERP_FF,
+                 Current=get(BREATH_SCALE_VAR), Target=target,
                  DeltaTime=dt, InterpSpeed=BREATH_EASE_SPEED)
-    flow = store(BREATH_SCALE_VAR, out(eased), flow, x0 + 5800)
+    flow = store(BREATH_SCALE_VAR, out(eased), flow)
 
     ed.add_comment_to_nodes(
         f"Hold breath: SwayRate is Held's (behind IsValid). Down the sights the "

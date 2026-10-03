@@ -18,7 +18,7 @@ exactly as it serves Enter, and a drag wears or takes off).
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin
 from uebp.graph import out
 from combat.nodes import (
     FN_ADD_II, FN_AND, FN_ARR_GET, FN_ARR_VALID, FN_EQ_II, FN_GET_COMP, FN_GET_PLAYER_PAWN,
@@ -41,16 +41,16 @@ from graphics_menu.wear_consts import (
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 
 
-def _get(ed, var, x, y, owner=None, self_out=None):
-    n = _at(ed.add_get_member_variable_node(var, owner) if owner
-            else ed.add_get_member_variable_node(var), x, y)
+def _get(ed, var, owner=None, self_out=None):
+    n = (ed.add_get_member_variable_node(var, owner) if owner
+            else ed.add_get_member_variable_node(var))
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
     return _pin(n, var, is_input=False)
 
 
-def _call(ed, fn, x, y, **inputs):
-    n = _at(_node(ed, fn), x, y)
+def _call(ed, fn, **inputs):
+    n = _node(ed, fn)
     for name, pin in inputs.items():
         if isinstance(pin, int):
             _pin(n, name).set_pin_value(str(pin))
@@ -59,15 +59,15 @@ def _call(ed, fn, x, y, **inputs):
     return n
 
 
-def _branch(ed, cond, execs, x, y):
-    br = _at(ed.add_branch_node(), x, y)
+def _branch(ed, cond, execs):
+    br = ed.add_branch_node()
     _connect(cond, _pin(br, "Condition"))
     for e in execs:
         _connect(e, _pin(br, "execute"))
     return BEL.find_then_pin(br), BEL.find_else_pin(br)
 
 
-def _author_slots(ed, worn, box, in_execs, x0, y0):
+def _author_slots(ed, worn, box, in_execs):
     """Cell i of the worn grid shows Worn[i] as any inventory slot shows its
     item (hud_inventory's two fragments): its icon, lit under the open
     panel's caret and at a drag's start; nothing worn, the slot's silhouette.
@@ -75,64 +75,59 @@ def _author_slots(ed, worn, box, in_execs, x0, y0):
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
     if not loop:
         raise RuntimeError("could not create the ForLoop macro node")
-    _at(loop, x0, y0)
+    loop
     _pin(loop, "FirstIndex").set_pin_value("0")
     _pin(loop, "LastIndex").set_pin_value(str(WEAR_ROWS - 1))
     for e in in_execs:
         _connect(e, _pin(loop, "execute"))
     i = _pin(loop, "Index", is_input=False)
-    cast = _at(_palette(ed, NODE_CAST_SLOT), x0 + 560, y0)
-    _connect(out(_call(ed, FN_CHILD_AT, x0 + 300, y0 + 240, self=box, Index=i)),
-             _pin(cast, "Object"))
+    cast = _palette(ed, NODE_CAST_SLOT)
+    _connect(out(_call(ed, FN_CHILD_AT, self=box, Index=i)), _pin(cast, "Object"))
     _connect(_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     slot = _loose_pin(cast, "AsWBPInventorySlot", is_input=False)
-    there, past = _branch(ed, out(_call(ed, FN_ARR_VALID, x0 + 600, y0 + 500,
+    there, past = _branch(ed, out(_call(ed, FN_ARR_VALID,
                                          TargetArray=worn, IndexToTest=i)),
-                          [BEL.find_then_pin(cast)], x0 + 860, y0)
-    item = _loose_pin(_call(ed, FN_ARR_GET, x0 + 860, y0 + 500, TargetArray=worn, Index=i),
-                      "Item", is_input=False)
-    worn_one, bare = _branch(ed, out(_call(ed, FN_IS_VALID, x0 + 1120, y0 + 500,
-                                            Object=item)), [there], x0 + 1120, y0)
-    caret = _call(ed, FN_AND, x0 + 1120, y0 + 900,
-                  A=_get(ed, WEAR_OPEN_VAR, x0 + 600, y0 + 900),
-                  B=out(_call(ed, FN_EQ_II, x0 + 860, y0 + 1040, A=i,
-                               B=_get(ed, WEAR_SEL_VAR, x0 + 600, y0 + 1040))))
-    code = _call(ed, FN_ADD_II, x0 + 600, y0 + 1200, A=i, B=WORN_CODE_FIRST)
-    dragged = _call(ed, FN_EQ_II, x0 + 860, y0 + 1200, A=out(code),
-                    B=_get(ed, DRAG_FROM_VAR, x0 + 600, y0 + 1340))
-    lit = _call(ed, FN_OR, x0 + 1120, y0 + 1200, A=out(caret), B=out(dragged))
-    _author_filled_slot(ed, slot, item, out(lit), worn_one, x0 + 1400, y0, ammo=False)
-    _author_empty_slot(ed, slot, (bare, past), x0 + 1400, y0 + 1600)
+                          [BEL.find_then_pin(cast)])
+    item = _loose_pin(_call(ed, FN_ARR_GET, TargetArray=worn, Index=i), "Item", is_input=False)
+    worn_one, bare = _branch(ed, out(_call(ed, FN_IS_VALID, Object=item)), [there])
+    caret = _call(ed, FN_AND,
+                  A=_get(ed, WEAR_OPEN_VAR),
+                  B=out(_call(ed, FN_EQ_II, A=i,
+                               B=_get(ed, WEAR_SEL_VAR))))
+    code = _call(ed, FN_ADD_II, A=i, B=WORN_CODE_FIRST)
+    dragged = _call(ed, FN_EQ_II, A=out(code), B=_get(ed, DRAG_FROM_VAR))
+    lit = _call(ed, FN_OR, A=out(caret), B=out(dragged))
+    _author_filled_slot(ed, slot, item, out(lit), worn_one, ammo=False)
+    _author_empty_slot(ed, slot, (bare, past))
     return _pin(loop, "Completed", is_input=False)
 
 
-def author_wear_panel(ed, x0, y0, in_execs):
+def author_wear_panel(ed, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
-    panel = part(ed, WBP_HUD, WEAR_PANEL, x0, y0 + 1000)
-    not_menu = _call(ed, FN_NOT, x0, y0 + 440, A=_get(ed, "MenuOpen", x0 - 240, y0 + 440))
-    shown, shut = _branch(ed, out(not_menu), in_execs, x0 + 480, y0)
-    closed = set_shown(ed, panel, False, [shut], x0 + 740, y0 + 700)
-    flow = set_shown(ed, panel, True, [shown], x0 + 740, y0)
+    panel = part(ed, WBP_HUD, WEAR_PANEL)
+    not_menu = _call(ed, FN_NOT, A=_get(ed, "MenuOpen"))
+    shown, shut = _branch(ed, out(not_menu), in_execs)
+    closed = set_shown(ed, panel, False, [shut])
+    flow = set_shown(ed, panel, True, [shown])
 
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, x0 + 740, y0 + 440))
-    comp = _call(ed, FN_GET_COMP, x0 + 1000, y0 + 440, self=pawn)
+    pawn = out(_call(ed, FN_GET_PLAYER_PAWN))
+    comp = _call(ed, FN_GET_COMP, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node
-    cast = _at(_palette(ed, NODE_CAST_WEAPON), x0 + 1000, y0)
+    cast = _palette(ed, NODE_CAST_WEAPON)
     _connect(out(comp), _pin(cast, "Object"))
     _connect(flow, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
-    worn = _get(ed, WORN_VAR, x0 + 1300, y0 + 300, WEAPON_COMP_CLASS_PATH, wc)
+    worn = _get(ed, WORN_VAR, WEAPON_COMP_CLASS_PATH, wc)
 
     # The mouse only with the panel open: shut, the cursor is hidden and a
     # click is a shot. Before the slots are drawn, so the caret it moves and
     # the drag it starts are lit this frame.
-    opened, idle = _branch(ed, _get(ed, WEAR_OPEN_VAR, x0 + 1300, y0 + 600),
-                           [BEL.find_then_pin(cast)], x0 + 1560, y0)
+    opened, idle = _branch(ed, _get(ed, WEAR_OPEN_VAR), [BEL.find_then_pin(cast)])
     # The close button: a click on it lowers WearOpen, as I does.
-    flow = author_widget_click(ed, part(ed, WBP_HUD, WEAR_CLOSE, x0 + 1820, y0 - 2100),
-                               (WEAR_OPEN_VAR, "false"), [opened], x0 + 2340, y0 - 2600)
-    flow = author_inv_drag(ed, wc, flow, x0 + 1820, y0 + 4000)
-    box = part(ed, WBP_HUD, WEAR_SLOTS_BOX, x0 + 1820, y0 + 500)
-    done = _author_slots(ed, worn, box, flow + [idle], x0 + 2300, y0)
+    flow = author_widget_click(ed, part(ed, WBP_HUD, WEAR_CLOSE),
+                               (WEAR_OPEN_VAR, "false"), [opened])
+    flow = author_inv_drag(ed, wc, flow)
+    box = part(ed, WBP_HUD, WEAR_SLOTS_BOX)
+    done = _author_slots(ed, worn, box, flow + [idle])
     return [closed, done, _pin(cast, "CastFailed", is_input=False)]

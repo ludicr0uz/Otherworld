@@ -19,7 +19,7 @@ another anim BP simply fails the cast.
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _node, _palette, _pin
+from combat.graph import BEL, _connect, _node, _palette, _pin
 from combat.nodes import FN_ANIM_INSTANCE
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
@@ -27,7 +27,7 @@ from combat.weapon_component.pose_weights import HELD_SUPPORT_POINT
 from combat.weapon_component.sight_pitch import _anim_class_path
 
 
-def _author_support_hand(ed, exec_ins, x0, y0):
+def _author_support_hand(ed, exec_ins):
     """Set the anim instance's SupportHand and SupportPoint. Returns the exec
     pins to carry on from. After SightBlend and HeldSupportPoint are written."""
     anim_class = _anim_class_path(player_skin())
@@ -40,11 +40,10 @@ def _author_support_hand(ed, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    mesh = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0, y0 + 160))
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 260, y0 + 160))
+    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(anim, "self"))
-    cast = keep(_at(_palette(ed, "Utilities|Casting|CastTo"
-                                 + anim_class.rsplit(".", 1)[1][:-2]), x0 + 520, y0))
+    cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(_pin(anim, "ReturnValue", is_input=False), _pin(cast, "Object"))
     for e in exec_ins:
         _connect(e, _pin(cast, "execute"))
@@ -53,12 +52,9 @@ def _author_support_hand(ed, exec_ins, x0, y0):
                    .startswith("As"))
 
     tail = BEL.find_then_pin(cast)
-    for i, (var, source) in enumerate(((SUPPORT_HAND_VAR, "SightBlend"),
-                                       (SUPPORT_POINT_VAR, HELD_SUPPORT_POINT))):
-        value = keep(_at(ed.add_get_member_variable_node(source),
-                         x0 + 780 + i * 300, y0 + 300))
-        put = keep(_at(ed.add_set_member_variable_node(var, anim_class),
-                       x0 + 1040 + i * 300, y0))
+    for var, source in ((SUPPORT_HAND_VAR, "SightBlend"), (SUPPORT_POINT_VAR, HELD_SUPPORT_POINT)):
+        value = keep(ed.add_get_member_variable_node(source))
+        put = keep(ed.add_set_member_variable_node(var, anim_class))
         _connect(as_anim, _pin(put, "self"))
         _connect(_pin(value, source, is_input=False), _pin(put, var))
         _connect(tail, _pin(put, "execute"))

@@ -17,7 +17,7 @@ starts wherever the level puts it.
 """
 
 from combat.game_state import KILL_COUNT_VAR
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import MACRO_FOR_EACH, NODE_SPAWN
 from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.player_parts import MODE, PAWN
@@ -36,30 +36,28 @@ FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
 FN_GET_TRANSFORM = "/Script/Engine.Actor.GetTransform"
 
 
-def _for_each(ed, array_out, exec_in, x, y, made):
+def _for_each(ed, array_out, exec_in, made):
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    _at(loop, x, y)
+    loop
     _connect(array_out, _loose_pin(loop, "Array"))
     _connect(exec_in, _loose_pin(loop, "Exec"))
     made.append(loop)
     return loop
 
 
-def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, x0, y0, made):
+def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, made):
     """The saved items, spawned and carried. Returns the loop's Completed."""
-    classes = _at(ed.add_get_member_variable_node(ITEM_CLASSES_FIELD, PROFILE_CLASS_PATH),
-                  x0, y0 + 240)
+    classes = ed.add_get_member_variable_node(ITEM_CLASSES_FIELD, PROFILE_CLASS_PATH)
     _connect(prof, _pin(classes, "self"))
     made.append(classes)
-    loop = _for_each(ed, _pin(classes, ITEM_CLASSES_FIELD, is_input=False), exec_in,
-                     x0 + 260, y0, made)
+    loop = _for_each(ed, _pin(classes, ITEM_CLASSES_FIELD, is_input=False), exec_in, made)
     index = _loose_pin(loop, "ArrayIndex", is_input=False)
 
-    where = _at(_node(ed, FN_GET_TRANSFORM), x0 + 560, y0 + 300)
+    where = _node(ed, FN_GET_TRANSFORM)
     _connect(pawn_out, _pin(where, "self"))
-    spawn = _at(_palette(ed, NODE_SPAWN), x0 + 800, y0)
+    spawn = _palette(ed, NODE_SPAWN)
     _connect(_loose_pin(loop, "ArrayElement", is_input=False), _pin(spawn, "Class"))
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
@@ -68,35 +66,29 @@ def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, x0, y0, made):
     item = _pin(spawn, "ReturnValue", is_input=False)
 
     # Carried, not lying in the world: a consumable defaults to Dropped.
-    held = _at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH),
-               x0 + 1100, y0)
+    held = ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH)
     _connect(item, _pin(held, "self"))
     _set(held, "Dropped", "false")
     _connect(BEL.find_then_pin(spawn), _pin(held, "execute"))
     made.append(held)
     flow = BEL.find_then_pin(held)
 
-    x = x0 + 1360
     for field, item_var in ITEM_FIELDS:
-        arr = _at(ed.add_get_member_variable_node(field, PROFILE_CLASS_PATH),
-                  x, y0 + 300)
+        arr = ed.add_get_member_variable_node(field, PROFILE_CLASS_PATH)
         _connect(prof, _pin(arr, "self"))
-        at = _at(_node(ed, FN_ARR_GET), x + 240, y0 + 300)
+        at = _node(ed, FN_ARR_GET)
         _connect(_pin(arr, field, is_input=False), _loose_pin(at, "TargetArray"))
         _connect(index, _pin(at, "Index"))
-        put = _at(ed.add_set_member_variable_node(item_var, ITEM_CLASS_PATH),
-                  x + 480, y0)
+        put = ed.add_set_member_variable_node(item_var, ITEM_CLASS_PATH)
         _connect(item, _pin(put, "self"))
         _connect(_loose_pin(at, "Item", is_input=False), _pin(put, item_var))
         _connect(flow, _pin(put, "execute"))
         made += [arr, at, put]
         flow = BEL.find_then_pin(put)
-        x += 740
 
-    inv = _at(ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH),
-              x, y0 + 300)
+    inv = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
     _connect(wc, _pin(inv, "self"))
-    add = _at(_node(ed, FN_ARR_ADD), x + 240, y0)
+    add = _node(ed, FN_ARR_ADD)
     _connect(_pin(inv, "Inventory", is_input=False), _loose_pin(add, "TargetArray"))
     _connect(item, _loose_pin(add, "NewItem"))
     _connect(flow, _pin(add, "execute"))
@@ -104,14 +96,14 @@ def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, x0, y0, made):
     return _loose_pin(loop, "Completed", is_input=False)
 
 
-def author_read_profile(ed, in_exec, parts, x0, y0, made):
+def author_read_profile(ed, in_exec, parts, made):
     """Load the profile slot onto ``parts`` (player_parts). Returns the exec
     pins that continue: applied, or the save would not cast."""
-    load = _at(_node(ed, FN_LOAD_SAVE), x0, y0)
+    load = _node(ed, FN_LOAD_SAVE)
     _set(load, "SlotName", PROFILE_SLOT)
     _set(load, "UserIndex", PROFILE_USER_INDEX)
     _connect(in_exec, _pin(load, "execute"))
-    cast = _at(_palette(ed, NODE_CAST_PROFILE), x0 + 260, y0)
+    cast = _palette(ed, NODE_CAST_PROFILE)
     _connect(_pin(load, "ReturnValue", is_input=False), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(load), _pin(cast, "execute"))
     made += [load, cast]
@@ -119,37 +111,31 @@ def author_read_profile(ed, in_exec, parts, x0, y0, made):
     flow = BEL.find_then_pin(cast)
     wc = parts[WEAPON_COMP_CLASS_PATH]
 
-    x = x0 + 520
     copies = [(parts[owner], owner, var, field) for field, owner, var in STAT_FIELDS]
     copies += [(parts[MODE], GAME_MODE_CLASS_PATH, KILL_COUNT_VAR, KILLS_FIELD)]
     for dst_out, dst_class, dst_var, field in copies:
         flow = copy_var(ed, prof, PROFILE_CLASS_PATH, field, dst_out, dst_class,
-                     dst_var, flow, x, y0, made)
-        x += 520
+                     dst_var, flow, made)
 
     # --- out with the issued loadout ----------------------------------------
-    old = _at(ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH),
-              x, y0 + 240)
+    old = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
     _connect(wc, _pin(old, "self"))
     made.append(old)
     old_out = _pin(old, "Inventory", is_input=False)
-    drop_all = _for_each(ed, old_out, flow, x + 260, y0, made)
-    gone = _at(_node(ed, FN_DESTROY), x + 560, y0)
+    drop_all = _for_each(ed, old_out, flow, made)
+    gone = _node(ed, FN_DESTROY)
     _connect(_loose_pin(drop_all, "ArrayElement", is_input=False), _pin(gone, "self"))
     _connect(_loose_pin(drop_all, "LoopBody", is_input=False), _pin(gone, "execute"))
-    wipe = _at(_node(ed, FN_ARR_CLEAR), x + 820, y0 - 300)
+    wipe = _node(ed, FN_ARR_CLEAR)
     _connect(old_out, _loose_pin(wipe, "TargetArray"))
     _connect(_loose_pin(drop_all, "Completed", is_input=False), _pin(wipe, "execute"))
     made += [gone, wipe]
 
     # --- in with the saved one ----------------------------------------------
-    done = _author_respawn_items(ed, prof, wc, parts[PAWN], BEL.find_then_pin(wipe),
-                                 x + 1080, y0, made)
-    x += 1080 + 3200
+    done = _author_respawn_items(ed, prof, wc, parts[PAWN], BEL.find_then_pin(wipe), made)
     flow = copy_var(ed, prof, PROFILE_CLASS_PATH, EQUIPPED_FIELD, wc,
-                 WEAPON_COMP_CLASS_PATH, "EquippedIndex", done, x, y0, made)
-    dirty = _at(ed.add_set_member_variable_node("NeedsRefresh", WEAPON_COMP_CLASS_PATH),
-                x + 520, y0)
+                 WEAPON_COMP_CLASS_PATH, "EquippedIndex", done, made)
+    dirty = ed.add_set_member_variable_node("NeedsRefresh", WEAPON_COMP_CLASS_PATH)
     _connect(wc, _pin(dirty, "self"))
     _set(dirty, "NeedsRefresh", "true")
     _connect(flow, _pin(dirty, "execute"))

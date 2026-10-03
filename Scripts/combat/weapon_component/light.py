@@ -28,7 +28,7 @@ and the take runs once, off Completed. Tuning is light_tuning.py.
 """
 
 from combat.chop_tuning import WOOD_CLASS_VAR
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
 from uebp.graph import out
 from combat.light_tuning import (
     CAMPFIRE_AHEAD_CM, CAMPFIRE_CLASS_VAR, CAMPFIRE_FEET_CM, CAMPFIRE_TRACE_DOWN_CM,
@@ -46,23 +46,22 @@ FN_ARR_REMOVE_ITEM = "/Script/Engine.KismetArrayLibrary.Array_RemoveItem"
 FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
 
 
-def _get(ed, name, x, y):
-    return _pin(_at(ed.add_get_member_variable_node(name), x, y), name, is_input=False)
+def _get(ed, name):
+    return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
 
 
-def _author_light_press(ed, held, owner, tap, not_lighter, x0, y0):
+def _author_light_press(ed, held, owner, tap, not_lighter):
     """Branch an item that Lights off the fire gate; a tap strikes it. Anything
     else goes on to ``not_lighter`` (the ready gate). Returns (the gate's exec
     input, its exits)."""
-    lights, lights_n = _prop(ed, LIGHTS_VAR, held, x0, y0 + 160)
-    gate = _at(ed.add_branch_node(), x0 + 240, y0)
+    lights, lights_n = _prop(ed, LIGHTS_VAR, held)
+    gate = ed.add_branch_node()
     _connect(lights, _pin(gate, "Condition"))
     _connect(BEL.find_else_pin(gate), not_lighter)
-    press = _at(ed.add_branch_node(), x0 + 480, y0)
+    press = ed.add_branch_node()
     _connect(tap, _pin(press, "Condition"))
     _connect(BEL.find_then_pin(gate), _pin(press, "execute"))
-    exits = _author_campfire(ed, held, owner, BEL.find_then_pin(press),
-                             x0 + 160, y0 + 16000)
+    exits = _author_campfire(ed, held, owner, BEL.find_then_pin(press))
     ed.add_comment_to_nodes(
         "The held item Lights (the matches): a tap strikes it (light.py) "
         "instead of firing it. Anything else goes on to the guns' ready gate.",
@@ -70,98 +69,98 @@ def _author_light_press(ed, held, owner, tap, not_lighter, x0, y0):
     return _pin(gate, "execute"), exits + (BEL.find_else_pin(press),)
 
 
-def _author_campfire(ed, held, owner, exec_in, x0, y0):
+def _author_campfire(ed, held, owner, exec_in):
     """The strike: spend a piece of wood from Inventory, and spawn
     CampfireClass on the ground in front of ``owner``. Returns its exits."""
-    cls = _get(ed, CAMPFIRE_CLASS_VAR, x0, y0 + 200)
-    is_fire = _at(_node(ed, FN_IS_VALID_CLASS), x0 + 240, y0 + 200)
+    cls = _get(ed, CAMPFIRE_CLASS_VAR)
+    is_fire = _node(ed, FN_IS_VALID_CLASS)
     _connect(cls, _pin(is_fire, "Class"))
-    known = _at(ed.add_branch_node(), x0 + 480, y0)
+    known = ed.add_branch_node()
     _connect(out(is_fire), _pin(known, "Condition"))
     _connect(exec_in, _pin(known, "execute"))
 
     # --- the wood to burn -----------------------------------------------------
     # Set with its input unconnected: None, so last strike's wood is forgotten.
-    forget = _at(ed.add_set_member_variable_node(LIGHT_WOOD_VAR), x0 + 740, y0)
+    forget = ed.add_set_member_variable_node(LIGHT_WOOD_VAR)
     _connect(BEL.find_then_pin(known), _pin(forget, "execute"))
-    inv = _get(ed, "Inventory", x0 + 740, y0 + 300)
+    inv = _get(ed, "Inventory")
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    _at(loop, x0 + 1000, y0)
+    loop
     _connect(inv, _loose_pin(loop, "Array"))
     _connect(BEL.find_then_pin(forget), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
-    kind = _at(_node(ed, FN_OBJECT_CLASS), x0 + 1300, y0 + 300)
+    kind = _node(ed, FN_OBJECT_CLASS)
     _connect(item, _pin(kind, "Object"))
-    is_wood = _at(_node(ed, FN_EQ_CLASSES), x0 + 1560, y0 + 300)
+    is_wood = _node(ed, FN_EQ_CLASSES)
     _connect(out(kind), _pin(is_wood, "A"))
-    _connect(_get(ed, WOOD_CLASS_VAR, x0 + 1300, y0 + 460), _pin(is_wood, "B"))
-    burns = _at(ed.add_branch_node(), x0 + 1820, y0 + 160)
+    _connect(_get(ed, WOOD_CLASS_VAR), _pin(is_wood, "B"))
+    burns = ed.add_branch_node()
     _connect(out(is_wood), _pin(burns, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(burns, "execute"))
-    pick = _at(ed.add_set_member_variable_node(LIGHT_WOOD_VAR), x0 + 2080, y0 + 160)
+    pick = ed.add_set_member_variable_node(LIGHT_WOOD_VAR)
     _connect(item, _pin(pick, LIGHT_WOOD_VAR))
     _connect(BEL.find_then_pin(burns), _pin(pick, "execute"))
 
-    wood = _get(ed, LIGHT_WOOD_VAR, x0 + 2080, y0 + 460)
-    is_there = _at(_node(ed, FN_IS_VALID), x0 + 2340, y0 + 460)
+    wood = _get(ed, LIGHT_WOOD_VAR)
+    is_there = _node(ed, FN_IS_VALID)
     _connect(wood, _pin(is_there, "Object"))
-    has_wood = _at(ed.add_branch_node(), x0 + 2600, y0)
+    has_wood = ed.add_branch_node()
     _connect(out(is_there), _pin(has_wood, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(has_wood, "execute"))
 
     # --- spend it -------------------------------------------------------------
-    remove = _at(_node(ed, FN_ARR_REMOVE_ITEM), x0 + 2860, y0)
+    remove = _node(ed, FN_ARR_REMOVE_ITEM)
     _connect(inv, _pin(remove, "TargetArray"))
     _connect(wood, _pin(remove, "Item"))
     _connect(BEL.find_then_pin(has_wood), _pin(remove, "execute"))
-    gone = _at(_node(ed, FN_DESTROY), x0 + 3120, y0)
+    gone = _node(ed, FN_DESTROY)
     _connect(wood, _pin(gone, "self"))
     _connect(BEL.find_then_pin(remove), _pin(gone, "execute"))
     # Find is pure: read here, after the removal, it sees the shorter array.
-    slot = _at(_node(ed, FN_ARR_FIND), x0 + 3120, y0 + 300)
+    slot = _node(ed, FN_ARR_FIND)
     _connect(inv, _pin(slot, "TargetArray"))
     _connect(held, _pin(slot, "ItemToFind"))
-    stay = _at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 3380, y0)
+    stay = ed.add_set_member_variable_node("EquippedIndex")
     _connect(out(slot), _pin(stay, "EquippedIndex"))
     _connect(BEL.find_then_pin(gone), _pin(stay, "execute"))
 
     # --- the ground in front of the player, and the fire ----------------------
-    here = _at(_node(ed, FN_ACTOR_LOC), x0 + 3380, y0 + 300)
+    here = _node(ed, FN_ACTOR_LOC)
     _connect(owner, _pin(here, "self"))
-    ahead = _at(_node(ed, FN_ACTOR_FORWARD), x0 + 3380, y0 + 460)
+    ahead = _node(ed, FN_ACTOR_FORWARD)
     _connect(owner, _pin(ahead, "self"))
     # Multiply_VectorFloat's B is promoted to a vector: drive it with one.
-    reach = _at(_node(ed, FN_MUL_VF), x0 + 3640, y0 + 460)
+    reach = _node(ed, FN_MUL_VF)
     _connect(out(ahead), _pin(reach, "A"))
     r = CAMPFIRE_AHEAD_CM
-    _connect(_vec(ed, r, r, r, x0 + 3380, y0 + 620), _pin(reach, "B"))
-    spot = _at(_node(ed, FN_ADD_VV), x0 + 3900, y0 + 300)
+    _connect(_vec(ed, r, r, r), _pin(reach, "B"))
+    spot = _node(ed, FN_ADD_VV)
     _connect(out(here), _pin(spot, "A"))
     _connect(out(reach), _pin(spot, "B"))
 
-    def offset(z, x, y):
-        n = _at(_node(ed, FN_ADD_VV), x, y)
+    def offset(z):
+        n = _node(ed, FN_ADD_VV)
         _connect(out(spot), _pin(n, "A"))
-        _connect(_vec(ed, 0.0, 0.0, z, x - 260, y + 140), _pin(n, "B"))
+        _connect(_vec(ed, 0.0, 0.0, z), _pin(n, "B"))
         return out(n)
 
-    floor = _at(_node(ed, FN_TRACE), x0 + 4420, y0)
-    _connect(offset(CAMPFIRE_TRACE_UP_CM, x0 + 4160, y0 + 300), _pin(floor, "Start"))
-    _connect(offset(-CAMPFIRE_TRACE_DOWN_CM, x0 + 4160, y0 + 600), _pin(floor, "End"))
+    floor = _node(ed, FN_TRACE)
+    _connect(offset(CAMPFIRE_TRACE_UP_CM), _pin(floor, "Start"))
+    _connect(offset(-CAMPFIRE_TRACE_DOWN_CM), _pin(floor, "End"))
     _trace_defaults(floor)
     _connect(BEL.find_then_pin(stay), _pin(floor, "execute"))
-    ground = _at(_palette(ed, NODE_BREAK_HIT), x0 + 4700, y0 + 300)
+    ground = _palette(ed, NODE_BREAK_HIT)
     _connect(out(floor, "OutHit"), _loose_pin(ground, "Hit"))
     # No ground under it (the map's edge): at the height of the player's feet.
-    rests = _at(_node(ed, FN_SELECT_VECTOR), x0 + 4960, y0 + 300)
+    rests = _node(ed, FN_SELECT_VECTOR)
     _connect(_loose_pin(ground, "Location", is_input=False), _pin(rests, "A"))
-    _connect(offset(-CAMPFIRE_FEET_CM, x0 + 4700, y0 + 900), _pin(rests, "B"))
+    _connect(offset(-CAMPFIRE_FEET_CM), _pin(rests, "B"))
     _connect(out(floor), _pin(rests, "bPickA"))
-    at = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 5220, y0 + 300)
+    at = _node(ed, FN_MAKE_TRANSFORM)
     _connect(out(rests), _pin(at, "Location"))
-    fire = _at(_palette(ed, NODE_SPAWN), x0 + 5480, y0)
+    fire = _palette(ed, NODE_SPAWN)
     _connect(cls, _pin(fire, "Class"))
     _connect(out(at), _pin(fire, "SpawnTransform"))
     _set(fire, "CollisionHandlingOverride", "AlwaysSpawn")

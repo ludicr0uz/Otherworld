@@ -30,7 +30,7 @@ An item with no sight line (the knife: both points at its origin) keeps the
 boom's rotation; the look is weighted by whether the line has any length.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
 from combat.nodes import (
     CAMERA_CLASS_PATH, FN_ADD_TICK_PREREQ, FN_AND, FN_BOOL_TO_FLOAT,
     FN_COMP_SET_WORLD_LOC, FN_GET_COMP, FN_GET_TRANSFORM, FN_GREATER_FF,
@@ -61,46 +61,45 @@ SCOPE_HIDE_BLEND = 0.9
 SIGHT_LINE_MIN_CM = 1.0
 
 
-def _author_sight_line(ed, keep, held, xform, eye_out, x, y):
+def _author_sight_line(ed, keep, held, xform, eye_out):
     """The held weapon's sight line in the world, as a pure chain:
 
         line = TransformLocation(Held, Held.SightAim) - eye
 
     Returns (the line, whether it is one: longer than SIGHT_LINE_MIN_CM).
     """
-    aim_pin, aim_n = _prop(ed, "SightAim", held, x, y + 140)
+    aim_pin, aim_n = _prop(ed, "SightAim", held)
     keep(aim_n)
-    front = keep(_at(_node(ed, FN_TRANSFORM_LOC), x + 260, y))
+    front = keep(_node(ed, FN_TRANSFORM_LOC))
     _connect(_pin(xform, "ReturnValue", is_input=False), _pin(front, "T"))
     _connect(aim_pin, _pin(front, "Location"))
-    line = keep(_at(_node(ed, FN_SUB_VV), x + 520, y))
+    line = keep(_node(ed, FN_SUB_VV))
     _connect(_pin(front, "ReturnValue", is_input=False), _pin(line, "A"))
     _connect(eye_out, _pin(line, "B"))
-    length = keep(_at(_node(ed, FN_VSIZE), x + 780, y + 140))
+    length = keep(_node(ed, FN_VSIZE))
     _connect(_pin(line, "ReturnValue", is_input=False), _pin(length, "A"))
-    has_line = keep(_at(_node(ed, FN_GREATER_FF), x + 1040, y + 140))
+    has_line = keep(_node(ed, FN_GREATER_FF))
     _connect(_pin(length, "ReturnValue", is_input=False), _pin(has_line, "A"))
     _set(has_line, "B", SIGHT_LINE_MIN_CM)
     return (_pin(line, "ReturnValue", is_input=False),
             _pin(has_line, "ReturnValue", is_input=False))
 
 
-def _author_sight_look(ed, keep, line_out, has_line_out, boom_rot, look_out,
-                       x, y):
+def _author_sight_look(ed, keep, line_out, has_line_out, boom_rot, look_out):
     """The camera's rotation down the sights, as a pure chain:
 
         RLerp(boom's, MakeRotFromX(line), SightLook x (|line| > 1 cm), shortest)
 
     MakeRotFromX has no roll, so a canted gun does not tip the horizon.
     """
-    look = keep(_at(_node(ed, FN_ROT_FROM_X), x + 780, y))
+    look = keep(_node(ed, FN_ROT_FROM_X))
     _connect(line_out, _pin(look, "X"))
-    weight = keep(_at(_node(ed, FN_BOOL_TO_FLOAT), x + 1300, y + 140))
+    weight = keep(_node(ed, FN_BOOL_TO_FLOAT))
     _connect(has_line_out, _pin(weight, "InBool"))
-    alpha = keep(_at(_node(ed, FN_MUL_FF), x + 1560, y + 140))
+    alpha = keep(_node(ed, FN_MUL_FF))
     _connect(look_out, _pin(alpha, "A"))
     _connect(_pin(weight, "ReturnValue", is_input=False), _pin(alpha, "B"))
-    turn = keep(_at(_node(ed, FN_RLERP), x + 1820, y))
+    turn = keep(_node(ed, FN_RLERP))
     _connect(boom_rot, _pin(turn, "A"))
     _connect(_pin(look, "ReturnValue", is_input=False), _pin(turn, "B"))
     _connect(_pin(alpha, "ReturnValue", is_input=False), _pin(turn, "Alpha"))
@@ -108,15 +107,15 @@ def _author_sight_look(ed, keep, line_out, has_line_out, boom_rot, look_out,
     return _pin(turn, "ReturnValue", is_input=False)
 
 
-def _boom(ed, owner_out, x, y):
+def _boom(ed, owner_out):
     """The owner's SpringArmComponent, as a pure node."""
-    arm = _at(_node(ed, FN_GET_COMP), x, y)
+    arm = _node(ed, FN_GET_COMP)
     _connect(owner_out, _pin(arm, "self"))
     _pin(arm, "ComponentClass").set_pin_value(SPRING_ARM_CLASS_PATH)
     return arm
 
 
-def _author_camera_after_boom(ed, owner_out, exec_in, x0, y0):
+def _author_camera_after_boom(ed, owner_out, exec_in):
     """BeginPlay: tick this component after the camera boom.
 
     Both tick in TG_PostPhysics, in no promised order. The boom moves its end
@@ -125,8 +124,8 @@ def _author_camera_after_boom(ed, owner_out, exec_in, x0, y0):
     moved, the camera would sit one frame's walk off the sight -- a few
     centimetres of shimmer while strafing with the sights up.
     """
-    arm = _boom(ed, owner_out, x0, y0 + 160)
-    after = _at(_node(ed, FN_ADD_TICK_PREREQ), x0 + 260, y0)
+    arm = _boom(ed, owner_out)
+    after = _node(ed, FN_ADD_TICK_PREREQ)
     _connect(_pin(arm, "ReturnValue", is_input=False),
              _pin(after, "PrerequisiteComponent"))
     _connect(exec_in, _pin(after, "execute"))
@@ -137,8 +136,7 @@ def _author_camera_after_boom(ed, owner_out, exec_in, x0, y0):
     return BEL.find_then_pin(after)
 
 
-def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
-                         x0, y0):
+def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     """Ease the camera between the boom's end and the weapon's eye point.
 
         SightBlend = FInterpTo(SightBlend,
@@ -191,71 +189,69 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
     # The body holds the aim until the camera has left the gun (last frame's
     # SightSeat): letting go, a view still easing home would otherwise follow
     # the gun as the upper body's pitch came off it.
-    wanted = keep(_at(ed.add_get_member_variable_node("SightAiming"), x0, y0 + 300))
-    seat_was = keep(_at(ed.add_get_member_variable_node(SEAT_VAR), x0 - 260, y0 + 420))
-    on_gun = keep(_at(_node(ed, FN_GREATER_FF), x0, y0 + 540))
+    wanted = keep(ed.add_get_member_variable_node("SightAiming"))
+    seat_was = keep(ed.add_get_member_variable_node(SEAT_VAR))
+    on_gun = keep(_node(ed, FN_GREATER_FF))
     _connect(_pin(seat_was, SEAT_VAR, is_input=False), _pin(on_gun, "A"))
     _set(on_gun, "B", SEAT_HOLD)
-    either = keep(_at(_node(ed, FN_OR), x0 + 120, y0 + 420))
+    either = keep(_node(ed, FN_OR))
     _connect(_pin(wanted, "SightAiming", is_input=False), _pin(either, "A"))
     _connect(_pin(on_gun, "ReturnValue", is_input=False), _pin(either, "B"))
-    as_float = keep(_at(_node(ed, FN_BOOL_TO_FLOAT), x0 + 240, y0 + 300))
+    as_float = keep(_node(ed, FN_BOOL_TO_FLOAT))
     _connect(_pin(either, "ReturnValue", is_input=False), _pin(as_float, "InBool"))
-    have = keep(_at(ed.add_get_member_variable_node("SightBlend"), x0, y0 + 420))
-    step = keep(_at(_node(ed, FN_INTERP_FF), x0 + 480, y0 + 300))
+    have = keep(ed.add_get_member_variable_node("SightBlend"))
+    step = keep(_node(ed, FN_INTERP_FF))
     _connect(_pin(have, "SightBlend", is_input=False), _pin(step, "Current"))
     _connect(_pin(as_float, "ReturnValue", is_input=False), _pin(step, "Target"))
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
     _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
-    blend = keep(_at(ed.add_set_member_variable_node("SightBlend"), x0 + 740, y0))
+    blend = keep(ed.add_set_member_variable_node("SightBlend"))
     _connect(_pin(step, "ReturnValue", is_input=False), _pin(blend, "SightBlend"))
     for e in exec_ins:
         _connect(e, _pin(blend, "execute"))
 
-    arm = keep(_boom(ed, owner_out, x0 + 740, y0 + 420))
-    shoulder = keep(_at(_node(ed, FN_SOCKET_LOC), x0 + 1000, y0 + 420))
+    arm = keep(_boom(ed, owner_out))
+    shoulder = keep(_node(ed, FN_SOCKET_LOC))
     _connect(_pin(arm, "ReturnValue", is_input=False), _pin(shoulder, "self"))
     _set(shoulder, "InSocketName", SPRING_ARM_SOCKET)
     shoulder_out = _pin(shoulder, "ReturnValue", is_input=False)
-    boom_rot = keep(_at(_node(ed, FN_SOCKET_ROT), x0 + 1000, y0 + 1000))
+    boom_rot = keep(_node(ed, FN_SOCKET_ROT))
     _connect(_pin(arm, "ReturnValue", is_input=False), _pin(boom_rot, "self"))
     _set(boom_rot, "InSocketName", SPRING_ARM_SOCKET)
     boom_rot_out = _pin(boom_rot, "ReturnValue", is_input=False)
 
-    cam = keep(_at(_node(ed, FN_GET_COMP), x0 + 1000, y0 + 560))
+    cam = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(cam, "self"))
     _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
     cam_out = _pin(cam, "ReturnValue", is_input=False)
 
-    armed = keep(_at(ed.add_branch_node(), x0 + 1000, y0))
+    armed = keep(ed.add_branch_node())
     _connect(armed_out, _pin(armed, "Condition"))
     _connect(BEL.find_then_pin(blend), _pin(armed, "execute"))
 
     # True arm: Held is valid, so its transform and SightOffset can be read.
-    xform = keep(_at(_node(ed, FN_GET_TRANSFORM), x0 + 1260, y0 + 700))
+    xform = keep(_node(ed, FN_GET_TRANSFORM))
     _connect(held, _pin(xform, "self"))
-    off_pin, off_n = _prop(ed, "SightOffset", held, x0 + 1260, y0 + 840)
+    off_pin, off_n = _prop(ed, "SightOffset", held)
     keep(off_n)
-    eye = keep(_at(_node(ed, FN_TRANSFORM_LOC), x0 + 1520, y0 + 700))
+    eye = keep(_node(ed, FN_TRANSFORM_LOC))
     _connect(_pin(xform, "ReturnValue", is_input=False), _pin(eye, "T"))
     _connect(off_pin, _pin(eye, "Location"))
     line_out, has_line_out = _author_sight_line(
-        ed, keep, held, xform, _pin(eye, "ReturnValue", is_input=False),
-        x0 + 1260, y0 + 1000)
+        ed, keep, held, xform, _pin(eye, "ReturnValue", is_input=False))
     seated, seat_out, look_out = _author_sight_seat(
         ed, tick, keep, line_out, has_line_out, boom_rot_out,
-        BEL.find_then_pin(armed), x0 + 1260, y0 - 900)
-    mix = keep(_at(_node(ed, FN_VLERP), x0 + 1780, y0 + 420))
+        BEL.find_then_pin(armed))
+    mix = keep(_node(ed, FN_VLERP))
     _connect(shoulder_out, _pin(mix, "A"))
     _connect(_pin(eye, "ReturnValue", is_input=False), _pin(mix, "B"))
     _connect(seat_out, _pin(mix, "Alpha"))
-    to_sight = keep(_at(_node(ed, FN_COMP_SET_WORLD_LOC), x0 + 2040, y0))
+    to_sight = keep(_node(ed, FN_COMP_SET_WORLD_LOC))
     _connect(cam_out, _pin(to_sight, "self"))
     _connect(_pin(mix, "ReturnValue", is_input=False), _pin(to_sight, "NewLocation"))
     _connect(seated, _pin(to_sight, "execute"))
-    look = _author_sight_look(ed, keep, line_out, has_line_out, boom_rot_out,
-                              look_out, x0 + 1260, y0 + 1000)
-    to_line = keep(_at(_node(ed, FN_COMP_SET_WORLD_ROT), x0 + 2300, y0))
+    look = _author_sight_look(ed, keep, line_out, has_line_out, boom_rot_out, look_out)
+    to_line = keep(_node(ed, FN_COMP_SET_WORLD_ROT))
     _connect(cam_out, _pin(to_line, "self"))
     _connect(look, _pin(to_line, "NewRotation"))
     _connect(BEL.find_then_pin(to_sight), _pin(to_line, "execute"))
@@ -263,41 +259,39 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins,
     # ...and a scoped weapon gets out of its own scope's way. Written every
     # frame on Held, which is the one weapon the equip sequence shows, so the
     # frame the sights come down (or Held changes) it is visible again.
-    scoped, scoped_n = _prop(ed, "Scoped", held, x0 + 2040, y0 + 700)
+    scoped, scoped_n = _prop(ed, "Scoped", held)
     keep(scoped_n)
-    far_in = keep(_at(_node(ed, FN_GREATER_FF), x0 + 2040, y0 + 840))
+    far_in = keep(_node(ed, FN_GREATER_FF))
     _connect(seat_out, _pin(far_in, "A"))
     _set(far_in, "B", SCOPE_HIDE_BLEND)
-    behind_glass = keep(_at(_node(ed, FN_AND), x0 + 2300, y0 + 760))
+    behind_glass = keep(_node(ed, FN_AND))
     _connect(scoped, _pin(behind_glass, "A"))
     _connect(_pin(far_in, "ReturnValue", is_input=False), _pin(behind_glass, "B"))
-    tuck = keep(_at(_node(ed, FN_SET_HIDDEN), x0 + 2560, y0))
+    tuck = keep(_node(ed, FN_SET_HIDDEN))
     _connect(held, _pin(tuck, "self"))
     _connect(_pin(behind_glass, "ReturnValue", is_input=False),
              _pin(tuck, "bNewHidden"))
     _connect(BEL.find_then_pin(to_line), _pin(tuck, "execute"))
-    body = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 2560, y0 + 700))
-    bare = keep(_at(_node(ed, FN_SET_OWNER_NO_SEE), x0 + 2820, y0))
+    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    bare = keep(_node(ed, FN_SET_OWNER_NO_SEE))
     _connect(_pin(body, "OwnerMesh", is_input=False), _pin(bare, "self"))
     _connect(_pin(behind_glass, "ReturnValue", is_input=False),
              _pin(bare, "bNewOwnerNoSee"))
     _connect(BEL.find_then_pin(tuck), _pin(bare, "execute"))
 
     # False arm: nothing to look down, so the camera goes home.
-    home = keep(_at(_node(ed, FN_COMP_SET_WORLD_LOC), x0 + 2040, y0 + 240))
+    home = keep(_node(ed, FN_COMP_SET_WORLD_LOC))
     _connect(cam_out, _pin(home, "self"))
     _connect(shoulder_out, _pin(home, "NewLocation"))
-    _connect(_author_unseat(ed, keep, BEL.find_else_pin(armed),
-                            x0 + 1260, y0 + 240),
-             _pin(home, "execute"))
-    level = keep(_at(_node(ed, FN_COMP_SET_WORLD_ROT), x0 + 2040, y0 + 480))
+    _connect(_author_unseat(ed, keep, BEL.find_else_pin(armed)), _pin(home, "execute"))
+    level = keep(_node(ed, FN_COMP_SET_WORLD_ROT))
     _connect(cam_out, _pin(level, "self"))
     _connect(boom_rot_out, _pin(level, "NewRotation"))
     _connect(BEL.find_then_pin(home), _pin(level, "execute"))
     # ...and the body shows again: a sniper dropped while scoped leaves no
     # scope to hide behind.
-    body_home = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 2040, y0 + 400))
-    shown = keep(_at(_node(ed, FN_SET_OWNER_NO_SEE), x0 + 2300, y0 + 240))
+    body_home = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    shown = keep(_node(ed, FN_SET_OWNER_NO_SEE))
     _connect(_pin(body_home, "OwnerMesh", is_input=False), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", "false")
     _connect(BEL.find_then_pin(level), _pin(shown, "execute"))

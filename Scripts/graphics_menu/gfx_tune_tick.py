@@ -28,9 +28,8 @@ neither moved, so the tab always shows the preset that is running.
 """
 
 from combat.graph import (
-    BEL, _add_component, _at, _connect, _declare, _drop_components, _loose_pin,
-    _must_load, _pin, _root_handle,
-)
+    BEL, _add_component, _connect, _declare, _drop_components, _loose_pin, _must_load,
+    _pin, _root_handle)
 from uebp.graph import out
 from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_MOD_II, FN_OR, MACRO_FOR_LOOP
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
@@ -75,97 +74,80 @@ def gfx_tune_defaults():
             GFX_TUNE_PICK_SEEN_VAR: 0, GFX_APPLIED_VAR: GFX_APPLIED_DEFAULT}
 
 
-def _author_pick(ed, in_execs, x0, y0, made):
+def _author_pick(ed, in_execs, made):
     """The pick and Quality kept as one (module docstring). Returns then."""
-    moved = _call(ed, FN_NEQ_II, x0, y0 + 300, made,
-                  A=_get(ed, GFX_TAB.pick_var, x0 - 240, y0 + 300, made),
-                  B=_get(ed, GFX_TUNE_PICK_SEEN_VAR, x0 - 240, y0 + 440, made))
-    picked, followed = _branch(ed, out(moved), in_execs, x0 + 240, y0, made)
-    picked = put(ed, "Quality", _get(ed, GFX_TAB.pick_var, x0 + 260, y0 - 200, made),
-                 [picked], x0 + 520, y0 - 300, made)
-    followed = put(ed, GFX_TAB.pick_var, _get(ed, "Quality", x0 + 260, y0 + 500, made),
-                   [followed], x0 + 520, y0 + 300, made)
+    moved = _call(ed, FN_NEQ_II, made,
+                  A=_get(ed, GFX_TAB.pick_var, made),
+                  B=_get(ed, GFX_TUNE_PICK_SEEN_VAR, made))
+    picked, followed = _branch(ed, out(moved), in_execs, made)
+    picked = put(ed, "Quality", _get(ed, GFX_TAB.pick_var, made), [picked], made)
+    followed = put(ed, GFX_TAB.pick_var, _get(ed, "Quality", made), [followed], made)
     return put(ed, GFX_TUNE_PICK_SEEN_VAR,
-               _get(ed, GFX_TAB.pick_var, x0 + 560, y0 + 700, made), [picked, followed],
-               x0 + 820, y0, made)
+               _get(ed, GFX_TAB.pick_var, made), [picked, followed], made)
 
 
-def _author_spread(ed, in_execs, x0, y0, made):
+def _author_spread(ed, in_execs, made):
     """Touched: the picked preset's look stats into every preset's row.
     Returns the exec tails."""
-    go, idle = _branch(ed, _get(ed, GFX_TAB.touched_var, x0 - 240, y0 + 300, made),
-                       in_execs, x0, y0, made)
+    go, idle = _branch(ed, _get(ed, GFX_TAB.touched_var, made), in_execs, made)
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
     if not loop:
         raise RuntimeError("could not create the ForLoop macro node")
-    made.append(_at(loop, x0 + 260, y0))
+    made.append(loop)
     _loose_pin(loop, "FirstIndex").set_pin_value("0")
     _loose_pin(loop, "LastIndex").set_pin_value(str(len(PRESET_LABELS) * STAT_COUNT - 1))
     _connect(go, _pin(loop, "execute"))
     i = _pin(loop, "Index", is_input=False)
-    s = out(_call(ed, FN_MOD_II, x0 + 560, y0 + 300, made, A=i, B=STAT_COUNT))
-    look = _call(ed, FN_GE_II, x0 + 800, y0 + 300, made, A=s, B=LOOK_FROM)
-    copy, _skip = _branch(ed, out(look), [_pin(loop, "LoopBody", is_input=False)],
-                          x0 + 1040, y0, made)
-    base = _call(ed, FN_MUL_II, x0 + 800, y0 + 600, made,
-                 A=_get(ed, GFX_TAB.pick_var, x0 + 560, y0 + 600, made), B=STAT_COUNT)
-    source = _call(ed, FN_ADD_II, x0 + 1040, y0 + 600, made, A=out(base), B=s)
-    cell = _call(ed, FN_ARR_GET, x0 + 1280, y0 + 600, made,
-                 TargetArray=_get(ed, GFX_TAB.values_var, x0 + 1040, y0 + 800, made))
+    s = out(_call(ed, FN_MOD_II, made, A=i, B=STAT_COUNT))
+    look = _call(ed, FN_GE_II, made, A=s, B=LOOK_FROM)
+    copy, _skip = _branch(ed, out(look), [_pin(loop, "LoopBody", is_input=False)], made)
+    base = _call(ed, FN_MUL_II, made, A=_get(ed, GFX_TAB.pick_var, made), B=STAT_COUNT)
+    source = _call(ed, FN_ADD_II, made, A=out(base), B=s)
+    cell = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, GFX_TAB.values_var, made))
     _connect(out(source), _pin(cell, "Index"))
-    write = _call(ed, FN_ARR_SET, x0 + 1560, y0, made,
-                  TargetArray=_get(ed, GFX_TAB.values_var, x0 + 1300, y0 + 300, made))
+    write = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, GFX_TAB.values_var, made))
     _connect(i, _pin(write, "Index"))
     _connect(_pin(cell, "Item", is_input=False), _pin(write, "Item"))
     _connect(copy, _pin(write, "execute"))
     return [_pin(loop, "Completed", is_input=False), idle]
 
 
-def _author_hand_over(ed, in_execs, x0, y0, made):
+def _author_hand_over(ed, in_execs, made):
     """Touched or a new Quality: the table and the preset onto the tuner.
     Returns the exec tails."""
-    new = _call(ed, FN_NEQ_II, x0 - 240, y0 + 500, made,
-                A=_get(ed, "Quality", x0 - 480, y0 + 500, made),
-                B=_get(ed, GFX_APPLIED_VAR, x0 - 480, y0 + 640, made))
-    stale = _call(ed, FN_OR, x0, y0 + 300, made,
-                  A=_get(ed, GFX_TAB.touched_var, x0 - 240, y0 + 300, made), B=out(new))
-    go, idle = _branch(ed, out(stale), in_execs, x0 + 240, y0, made)
-    tuner = _get(ed, TUNER_COMPONENT, x0 + 260, y0 + 500, made)
+    new = _call(ed, FN_NEQ_II, made, A=_get(ed, "Quality", made), B=_get(ed, GFX_APPLIED_VAR, made))
+    stale = _call(ed, FN_OR, made, A=_get(ed, GFX_TAB.touched_var, made), B=out(new))
+    go, idle = _branch(ed, out(stale), in_execs, made)
+    tuner = _get(ed, TUNER_COMPONENT, made)
     flow = [go]
-    for i, (var, source) in enumerate(((TUNER_VALUES_VAR, GFX_TAB.values_var),
-                                       (TUNER_PRESET_VAR, "Quality"))):
-        n = _at(ed.add_set_member_variable_node(var, TUNER_CLASS_PATH),
-                x0 + 560 + i * 320, y0)
+    for var, source in ((TUNER_VALUES_VAR, GFX_TAB.values_var), (TUNER_PRESET_VAR, "Quality")):
+        n = ed.add_set_member_variable_node(var, TUNER_CLASS_PATH)
         made.append(n)
         _connect(tuner, _pin(n, "self"))
-        _connect(_get(ed, source, x0 + 300 + i * 320, y0 + 700, made), _pin(n, var))
+        _connect(_get(ed, source, made), _pin(n, var))
         for e in flow:
             _connect(e, _pin(n, "execute"))
         flow = [BEL.find_then_pin(n)]
-    flow = _setter(ed, TUNER_DIRTY_VAR, "true", flow, x0 + 1200, y0, made,
-                   TUNER_CLASS_PATH, tuner)
+    flow = _setter(ed, TUNER_DIRTY_VAR, "true", flow, made, TUNER_CLASS_PATH, tuner)
     # Read before GfxQualityApplied is written below: -1 is the session's
     # first hand-over, which is the save itself (or the defaults).
-    again = _call(ed, FN_NEQ_II, x0 + 1480, y0 + 300, made,
-                  A=_get(ed, GFX_APPLIED_VAR, x0 + 1240, y0 + 300, made),
-                  B=GFX_APPLIED_DEFAULT)
-    keep, first = _branch(ed, out(again), [flow], x0 + 1720, y0, made)
-    kept = author_keep_graphics(ed, [keep], x0 + 2000, y0 - 700, made)
-    flow = put(ed, GFX_APPLIED_VAR, _get(ed, "Quality", x0 + 3500, y0 + 300, made),
-               [*kept, first], x0 + 3760, y0, made)
-    done = _setter(ed, GFX_TAB.touched_var, "false", [flow], x0 + 4040, y0, made)
+    again = _call(ed, FN_NEQ_II, made, A=_get(ed, GFX_APPLIED_VAR, made), B=GFX_APPLIED_DEFAULT)
+    keep, first = _branch(ed, out(again), [flow], made)
+    kept = author_keep_graphics(ed, [keep], made)
+    flow = put(ed, GFX_APPLIED_VAR, _get(ed, "Quality", made), [*kept, first], made)
+    done = _setter(ed, GFX_TAB.touched_var, "false", [flow], made)
     return [done, idle]
 
 
-def author_gfx_tune_tick(ed, pc_out, in_execs, x0, y0):
+def author_gfx_tune_tick(ed, pc_out, in_execs):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
-    flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, GFX_TAB,
+    flow = author_tab_flow(ed, pc_out, in_execs, made, GFX_TAB,
                            len(PRESET_LABELS),
                            other_open_vars(GFX_TAB))
-    flow = [_author_pick(ed, flow, x0 + 10400, y0, made)]
-    flow = _author_spread(ed, flow, x0 + 11800, y0, made)
-    tails = _author_hand_over(ed, flow, x0 + 14200, y0, made)
+    flow = [_author_pick(ed, flow, made)]
+    flow = _author_spread(ed, flow, made)
+    tails = _author_hand_over(ed, flow, made)
     ed.add_comment_to_nodes(
         f"Graphics tuning (its row in the M panel): Up/Down pick a row, "
         f"Left/Right change the preset or a number, SAVE DEFAULT saves "

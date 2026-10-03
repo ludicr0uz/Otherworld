@@ -21,7 +21,7 @@ the mouse-look (cursor.py).
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
+from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
 from uebp.graph import out
 from combat.nodes import FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_NEQ_BB
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
@@ -34,39 +34,35 @@ FN_IGNORE_MOVE = "/Script/Engine.Controller.SetIgnoreMoveInput"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 
 
-def author_kneel(ed, pc_out, in_execs, x0, y0):
+def author_kneel(ed, pc_out, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
     made = []
 
-    def is_open(x, y):
-        return _get(ed, LOOT_OPEN_VAR, x, y, made)
+    def is_open():
+        return _get(ed, LOOT_OPEN_VAR, made)
 
-    changed = _call(ed, FN_NEQ_BB, x0 + 240, y0 + 300, made, A=is_open(x0, y0 + 300),
-                    B=_get(ed, LOOT_KNEELING_VAR, x0, y0 + 440, made))
-    edge, same = _branch(ed, out(changed), in_execs, x0 + 500, y0, made)
-    flow = put(ed, LOOT_KNEELING_VAR, is_open(x0 + 520, y0 + 300), [edge],
-               x0 + 760, y0, made)
-    still = _call(ed, FN_IGNORE_MOVE, x0 + 1020, y0, made, self=pc_out,
-                  bNewMoveInput=is_open(x0 + 780, y0 + 300))
+    changed = _call(ed, FN_NEQ_BB, made, A=is_open(), B=_get(ed, LOOT_KNEELING_VAR, made))
+    edge, same = _branch(ed, out(changed), in_execs, made)
+    flow = put(ed, LOOT_KNEELING_VAR, is_open(), [edge], made)
+    still = _call(ed, FN_IGNORE_MOVE, made, self=pc_out, bNewMoveInput=is_open())
     _connect(flow, _pin(still, "execute"))
 
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, x0 + 1020, y0 + 440, made, PlayerIndex=0))
-    here, no_pawn = _branch(ed, out(_call(ed, FN_IS_VALID, x0 + 1280, y0 + 440, made,
+    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    here, no_pawn = _branch(ed, out(_call(ed, FN_IS_VALID, made,
                                            Object=pawn)),
-                            [BEL.find_then_pin(still), same], x0 + 1540, y0, made)
-    comp = _call(ed, FN_GET_COMP, x0 + 1540, y0 + 440, made, self=pawn)
+                            [BEL.find_then_pin(still), same], made)
+    comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node
-    cast = _at(_palette(ed, NODE_CAST_WEAPON), x0 + 1800, y0)
+    cast = _palette(ed, NODE_CAST_WEAPON)
     made.append(cast)
     _connect(out(comp), _pin(cast, "Object"))
     _connect(here, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
-    told = _at(ed.add_set_member_variable_node(SEARCHING_VAR, WEAPON_COMP_CLASS_PATH),
-               x0 + 2100, y0)
+    told = ed.add_set_member_variable_node(SEARCHING_VAR, WEAPON_COMP_CLASS_PATH)
     made.append(told)
     _connect(wc, _pin(told, "self"))
-    _connect(is_open(x0 + 1820, y0 + 300), _pin(told, SEARCHING_VAR))
+    _connect(is_open(), _pin(told, SEARCHING_VAR))
     _connect(BEL.find_then_pin(cast), _pin(told, "execute"))
     ed.add_comment_to_nodes(
         "The kneel: while the loot window is open the player's weapon component "

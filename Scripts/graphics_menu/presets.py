@@ -11,7 +11,7 @@ place the player picks a preset) and BeginPlay's default go through one path.
 
 from collections import namedtuple
 
-from combat.graph import _at, _connect, _pin, _set
+from combat.graph import _connect, _pin, _set
 from graphics_menu.gfx_stats import PRESET_LABELS, default_preset
 
 # One preset, in the order the GRAPHICS SETTINGS tab's preset row steps through.
@@ -24,14 +24,14 @@ PRESETS = tuple(Preset(label) for label in PRESET_LABELS)
 DEFAULT_PRESET = default_preset()
 
 
-def emit_apply(ed, index, x, y, in_exec):
+def emit_apply(ed, index, in_exec):
     """Set Quality to preset ``index``, hooked to ``in_exec``.
 
     BeginPlay's, for the startup default; the tab's preset row sets Quality
     from its pick (gfx_tune_tick.py).
     Returns the nodes it made, for the caller to wrap in a comment.
     """
-    set_q = _at(ed.add_set_member_variable_node("Quality"), x, y)
+    set_q = ed.add_set_member_variable_node("Quality")
     _set(set_q, "Quality", index)
     _connect(in_exec, _pin(set_q, "execute"))
     return [set_q]

@@ -32,7 +32,7 @@ OwnerDead is for whoever else acts for the player: the HUD's loot window
 component again.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import (
     CAMERA_CLASS_PATH, FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT,
     FN_GET_COMP, FN_LE_FF, FN_OR, FN_SET_FOV, FN_SET_HIDDEN,
@@ -51,7 +51,7 @@ LET_GO_VARS = ("Aiming", "SightAiming", SEATED_VAR, "Sprinting", "Blocking",
                FIRE_WARD_VAR)
 
 
-def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
+def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     """See the module docstring. Returns the exec pin a living owner's Tick
     carries on from."""
     made = []
@@ -63,107 +63,100 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in, x0, y0):
     def out(n, name="ReturnValue"):
         return _pin(n, name, is_input=False)
 
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0, y0 + 260))
+    comp = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
-    cast = keep(_at(_palette(ed, NODE_CAST_HEALTH), x0 + 260, y0))
+    cast = keep(_palette(ed, NODE_CAST_HEALTH))
     _connect(out(comp), _pin(cast, "Object"))
     _connect(exec_in, _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
     # Behind the cast, so neither read is ever pulled off a null component.
-    marked = keep(_at(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH),
-                      x0 + 520, y0 + 260))
+    marked = keep(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH))
     _connect(as_health, _pin(marked, "self"))
-    hp = keep(_at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
-                  x0 + 520, y0 + 400))
+    hp = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(as_health, _pin(hp, "self"))
-    spent = keep(_at(_node(ed, FN_LE_FF), x0 + 760, y0 + 400))
+    spent = keep(_node(ed, FN_LE_FF))
     _connect(out(hp, "Health"), _pin(spent, "A"))
     _set(spent, "B", 0.0)
-    dead = keep(_at(_node(ed, FN_OR), x0 + 1000, y0 + 300))
+    dead = keep(_node(ed, FN_OR))
     _connect(out(marked, "Dead"), _pin(dead, "A"))
     _connect(out(spent), _pin(dead, "B"))
-    gate = keep(_at(ed.add_branch_node(), x0 + 1240, y0))
+    gate = keep(ed.add_branch_node())
     _connect(out(dead), _pin(gate, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(gate, "execute"))
 
     # Alive, or nothing to die with: one setter both arms run into, so the
     # rest of the Tick still hangs off a single exec pin.
-    alive = keep(_at(ed.add_set_member_variable_node(OWNER_DEAD_VAR),
-                     x0 + 1500, y0 - 200))
+    alive = keep(ed.add_set_member_variable_node(OWNER_DEAD_VAR))
     _set(alive, OWNER_DEAD_VAR, "false")
     _connect(BEL.find_else_pin(gate), _pin(alive, "execute"))
     _connect(_pin(cast, "CastFailed", is_input=False), _pin(alive, "execute"))
 
     # Dead. Nothing below reaches the rest of the Tick.
-    x, y = x0 + 1500, y0 + 200
-    gone = keep(_at(ed.add_set_member_variable_node(OWNER_DEAD_VAR), x, y))
+    gone = keep(ed.add_set_member_variable_node(OWNER_DEAD_VAR))
     _set(gone, OWNER_DEAD_VAR, "true")
     _connect(BEL.find_then_pin(gate), _pin(gone, "execute"))
     flow = BEL.find_then_pin(gone)
     for name in LET_GO_VARS:
-        x += 260
-        drop = keep(_at(ed.add_set_member_variable_node(name), x, y))
+        drop = keep(ed.add_set_member_variable_node(name))
         _set(drop, name, "false")
         _connect(flow, _pin(drop, "execute"))
         flow = BEL.find_then_pin(drop)
 
     # The zoom and the camera, home at once (ads.py and sights.py ease them,
     # and neither runs again).
-    x += 300
-    cam = keep(_at(_node(ed, FN_GET_COMP), x, y + 400))
+    cam = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(cam, "self"))
     _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
-    base = keep(_at(ed.add_get_member_variable_node("BaseFOV"), x, y + 260))
-    fov = keep(_at(ed.add_set_member_variable_node("CurrentFOV"), x + 260, y))
+    base = keep(ed.add_get_member_variable_node("BaseFOV"))
+    fov = keep(ed.add_set_member_variable_node("CurrentFOV"))
     _connect(out(base, "BaseFOV"), _pin(fov, "CurrentFOV"))
     _connect(flow, _pin(fov, "execute"))
-    unzoom = keep(_at(_node(ed, FN_SET_FOV), x + 520, y))
+    unzoom = keep(_node(ed, FN_SET_FOV))
     _connect(out(cam), _pin(unzoom, "self"))
     _connect(out(base, "BaseFOV"), _pin(unzoom, "InFieldOfView"))
     _connect(BEL.find_then_pin(fov), _pin(unzoom, "execute"))
-    seat = keep(_at(ed.add_set_member_variable_node(SEAT_VAR), x + 780, y - 200))
+    seat = keep(ed.add_set_member_variable_node(SEAT_VAR))
     _set(seat, SEAT_VAR, 0.0)
     _connect(BEL.find_then_pin(unzoom), _pin(seat, "execute"))
-    look = keep(_at(ed.add_set_member_variable_node(LOOK_VAR), x + 780, y - 100))
+    look = keep(ed.add_set_member_variable_node(LOOK_VAR))
     _set(look, LOOK_VAR, 0.0)
     _connect(BEL.find_then_pin(seat), _pin(look, "execute"))
-    blend = keep(_at(ed.add_set_member_variable_node("SightBlend"), x + 780, y))
+    blend = keep(ed.add_set_member_variable_node("SightBlend"))
     _set(blend, "SightBlend", 0.0)
     _connect(BEL.find_then_pin(look), _pin(blend, "execute"))
-    arm = keep(_at(_node(ed, FN_GET_COMP), x + 780, y + 400))
+    arm = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(arm, "self"))
     _pin(arm, "ComponentClass").set_pin_value(SPRING_ARM_CLASS_PATH)
-    shoulder = keep(_at(_node(ed, FN_SOCKET_LOC), x + 1040, y + 400))
+    shoulder = keep(_node(ed, FN_SOCKET_LOC))
     _connect(out(arm), _pin(shoulder, "self"))
     _set(shoulder, "InSocketName", SPRING_ARM_SOCKET)
-    home = keep(_at(_node(ed, FN_COMP_SET_WORLD_LOC), x + 1300, y))
+    home = keep(_node(ed, FN_COMP_SET_WORLD_LOC))
     _connect(out(cam), _pin(home, "self"))
     _connect(out(shoulder), _pin(home, "NewLocation"))
     _connect(BEL.find_then_pin(blend), _pin(home, "execute"))
-    boom_rot = keep(_at(_node(ed, FN_SOCKET_ROT), x + 1040, y + 540))
+    boom_rot = keep(_node(ed, FN_SOCKET_ROT))
     _connect(out(arm), _pin(boom_rot, "self"))
     _set(boom_rot, "InSocketName", SPRING_ARM_SOCKET)
-    level = keep(_at(_node(ed, FN_COMP_SET_WORLD_ROT), x + 1300, y + 200))
+    level = keep(_node(ed, FN_COMP_SET_WORLD_ROT))
     _connect(out(cam), _pin(level, "self"))
     _connect(out(boom_rot), _pin(level, "NewRotation"))
     _connect(BEL.find_then_pin(home), _pin(level, "execute"))
 
     # ...and what the scope hid shows again: the body, and the gun if there
     # is one (a nested Branch, so Held is never read null).
-    body = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x + 1300, y + 400))
-    shown = keep(_at(_node(ed, FN_SET_OWNER_NO_SEE), x + 1560, y))
+    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    shown = keep(_node(ed, FN_SET_OWNER_NO_SEE))
     _connect(out(body, "OwnerMesh"), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", "false")
     _connect(BEL.find_then_pin(level), _pin(shown, "execute"))
     # ...and the head the sights hid (head_hide.py).
-    headed = _author_head_shown(ed, keep, BEL.find_then_pin(shown),
-                                x + 1560, y + 400)
-    armed = keep(_at(ed.add_branch_node(), x + 1820, y))
+    headed = _author_head_shown(ed, keep, BEL.find_then_pin(shown))
+    armed = keep(ed.add_branch_node())
     _connect(armed_out, _pin(armed, "Condition"))
     _connect(headed, _pin(armed, "execute"))
-    untuck = keep(_at(_node(ed, FN_SET_HIDDEN), x + 2080, y))
+    untuck = keep(_node(ed, FN_SET_HIDDEN))
     _connect(held, _pin(untuck, "self"))
     _set(untuck, "bNewHidden", "false")
     _connect(BEL.find_then_pin(armed), _pin(untuck, "execute"))

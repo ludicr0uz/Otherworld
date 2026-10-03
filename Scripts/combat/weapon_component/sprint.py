@@ -1,9 +1,7 @@
 """Sprint and stamina, authored into the weapon component's Tick.
 """
 
-from combat.graph import (
-    BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set,
-)
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import (
     FN_ACTOR_FORWARD, FN_ADD_FF, FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF,
     FN_IS_KEY_DOWN, FN_LAST_MOVE_INPUT, FN_LE_FF, FN_MUL_FF, FN_NORMAL, FN_NOT,
@@ -19,7 +17,7 @@ from combat.tuning import COMBAT, SPRINT_KEY
 SPRINT_SPENT_VAR = "SprintSpent"
 
 
-def _author_ahead(ed, char_out, exec_in, keep, x0, y0):
+def _author_ahead(ed, char_out, exec_in, keep):
     """SprintAhead: is the player steering within the cone ahead of them?
 
         SprintAhead = Normal(last movement input) . actor forward >= cos(cone)
@@ -30,27 +28,26 @@ def _author_ahead(ed, char_out, exec_in, keep, x0, y0):
     still is not sprinting. Stored, because the chain is pure and the probe
     (probes/probe_sprint_forward.py) reads it. Returns the write.
     """
-    steer = keep(_at(_node(ed, FN_LAST_MOVE_INPUT), x0, y0))
+    steer = keep(_node(ed, FN_LAST_MOVE_INPUT))
     _connect(char_out, _pin(steer, "self"))
-    unit = keep(_at(_node(ed, FN_NORMAL), x0 + 240, y0))
+    unit = keep(_node(ed, FN_NORMAL))
     _connect(_pin(steer, "ReturnValue", is_input=False), _pin(unit, "A"))
-    facing = keep(_at(_node(ed, FN_ACTOR_FORWARD), x0, y0 + 140))
+    facing = keep(_node(ed, FN_ACTOR_FORWARD))
     _connect(char_out, _pin(facing, "self"))
-    along = keep(_at(_node(ed, FN_DOT_VV), x0 + 480, y0))
+    along = keep(_node(ed, FN_DOT_VV))
     _connect(_pin(unit, "ReturnValue", is_input=False), _pin(along, "A"))
     _connect(_pin(facing, "ReturnValue", is_input=False), _pin(along, "B"))
-    inside = keep(_at(_node(ed, FN_GE_FF), x0 + 720, y0))
+    inside = keep(_node(ed, FN_GE_FF))
     _connect(_pin(along, "ReturnValue", is_input=False), _pin(inside, "A"))
     _set(inside, "B", SPRINT_CONE_MIN_DOT)
-    store = keep(_at(ed.add_set_member_variable_node(SPRINT_AHEAD_VAR),
-                     x0 + 960, y0))
+    store = keep(ed.add_set_member_variable_node(SPRINT_AHEAD_VAR))
     _connect(_pin(inside, "ReturnValue", is_input=False),
              _pin(store, SPRINT_AHEAD_VAR))
     _connect(exec_in, _pin(store, "execute"))
     return store
 
 
-def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
+def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     """Hold Shift to run, while there is stamina left to spend.
 
     Written without a single Branch, which is not cleverness for its own sake:
@@ -100,95 +97,90 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins, x0, y0):
     # A cast, because MaxWalkSpeed lives on the CharacterMovementComponent and
     # GetOwner only promises an Actor. Its failure pin is a continuation: a
     # weapon component on something that is not a Character still has to fire.
-    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0, y0))
+    as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(owner_out, _pin(as_char, "Object"))
     for e in exec_ins:
         _connect(e, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    movement = keep(_at(ed.add_get_member_variable_node(
-        "CharacterMovement", "/Script/Engine.Character"), x0 + 240, y0 + 240))
+    movement = keep(ed.add_get_member_variable_node(
+        "CharacterMovement", "/Script/Engine.Character"))
     _connect(char_out, _pin(movement, "self"))
     movement_out = _pin(movement, "CharacterMovement", is_input=False)
 
-    down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0 + 240, y0 + 420))
+    down = keep(_node(ed, FN_IS_KEY_DOWN))
     _connect(pc_out, _pin(down, "self"))
     _connect(key_pin, _pin(down, "Key"))
 
-    stamina = keep(_at(ed.add_get_member_variable_node("Stamina"), x0 + 240, y0 + 560))
+    stamina = keep(ed.add_get_member_variable_node("Stamina"))
     stamina_out = _pin(stamina, "Stamina", is_input=False)
-    out = keep(_at(_node(ed, FN_LE_FF), x0 + 480, y0 + 560))
+    out = keep(_node(ed, FN_LE_FF))
     _connect(stamina_out, _pin(out, "A"))
     _set(out, "B", 0.0)
 
     # The latch, stored before Sprinting is: this frame's sprint reads it.
-    was_spent = keep(_at(ed.add_get_member_variable_node(SPRINT_SPENT_VAR),
-                         x0 + 240, y0 + 760))
-    done = keep(_at(_node(ed, FN_OR), x0 + 480, y0 + 720))
+    was_spent = keep(ed.add_get_member_variable_node(SPRINT_SPENT_VAR))
+    done = keep(_node(ed, FN_OR))
     _connect(_pin(was_spent, SPRINT_SPENT_VAR, is_input=False), _pin(done, "A"))
     _connect(_pin(out, "ReturnValue", is_input=False), _pin(done, "B"))
-    still_spent = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 640))
+    still_spent = keep(_node(ed, FN_AND))
     _connect(_pin(down, "ReturnValue", is_input=False), _pin(still_spent, "A"))
     _connect(_pin(done, "ReturnValue", is_input=False), _pin(still_spent, "B"))
-    latch = keep(_at(ed.add_set_member_variable_node(SPRINT_SPENT_VAR),
-                     x0 + 480, y0))
+    latch = keep(ed.add_set_member_variable_node(SPRINT_SPENT_VAR))
     _connect(_pin(still_spent, "ReturnValue", is_input=False),
              _pin(latch, SPRINT_SPENT_VAR))
-    ahead = _author_ahead(ed, char_out, BEL.find_then_pin(as_char), keep,
-                          x0 + 240, y0 + 940)
+    ahead = _author_ahead(ed, char_out, BEL.find_then_pin(as_char), keep)
     _connect(BEL.find_then_pin(ahead), _pin(latch, "execute"))
 
-    fresh = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 300))
+    fresh = keep(_node(ed, FN_NOT))
     _connect(_loose_pin(latch, "Output_Get", is_input=False), _pin(fresh, "A"))
-    running = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 460))
+    running = keep(_node(ed, FN_AND))
     _connect(_pin(down, "ReturnValue", is_input=False), _pin(running, "A"))
     _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(running, "B"))
-    forwards = keep(_at(_node(ed, FN_AND), x0 + 840, y0 + 300))
+    forwards = keep(_node(ed, FN_AND))
     _connect(_pin(running, "ReturnValue", is_input=False), _pin(forwards, "A"))
     _connect(_loose_pin(ahead, "Output_Get", is_input=False), _pin(forwards, "B"))
-    mark = keep(_at(ed.add_set_member_variable_node("Sprinting"), x0 + 960, y0))
+    mark = keep(ed.add_set_member_variable_node("Sprinting"))
     _connect(_pin(forwards, "ReturnValue", is_input=False), _pin(mark, "Sprinting"))
     _connect(BEL.find_then_pin(latch), _pin(mark, "execute"))
     # Read the stored flag from here on, for the same reason the NPC id is read
     # back from its variable: the AND is pure and would be re-evaluated per read.
-    is_running = keep(_at(ed.add_get_member_variable_node("Sprinting"),
-                          x0 + 960, y0 + 460))
+    is_running = keep(ed.add_get_member_variable_node("Sprinting"))
     running_out = _pin(is_running, "Sprinting", is_input=False)
 
-    base = keep(_at(ed.add_get_member_variable_node("BaseSpeed"), x0 + 1200, y0 + 300))
-    pick_speed = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 300))
-    fast = keep(_at(ed.add_get_member_variable_node(SPRINT_SPEED_VAR), x0 + 1200, y0 + 160))
+    base = keep(ed.add_get_member_variable_node("BaseSpeed"))
+    pick_speed = keep(_node(ed, FN_SELECT_FF))
+    fast = keep(ed.add_get_member_variable_node(SPRINT_SPEED_VAR))
     _connect(_pin(fast, SPRINT_SPEED_VAR, is_input=False), _pin(pick_speed, "A"))
     _connect(_pin(base, "BaseSpeed", is_input=False), _pin(pick_speed, "B"))
     _connect(running_out, _pin(pick_speed, "bPickA"))
-    apply_speed = keep(_at(ed.add_set_member_variable_node(
-        "MaxWalkSpeed", MOVEMENT_CLASS_PATH), x0 + 1700, y0))
+    apply_speed = keep(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
     _connect(movement_out, _pin(apply_speed, "self"))
     _connect(_pin(pick_speed, "ReturnValue", is_input=False),
              _pin(apply_speed, "MaxWalkSpeed"))
     _connect(BEL.find_then_pin(mark), _pin(apply_speed, "execute"))
 
-    rate = keep(_at(_node(ed, FN_SELECT_FF), x0 + 1440, y0 + 620))
+    rate = keep(_node(ed, FN_SELECT_FF))
     # Variables, not literals: the PLAYER SETTINGS tab writes them in play.
-    drain = keep(_at(ed.add_get_member_variable_node(STAMINA_DRAIN_VAR), x0 + 960, y0 + 620))
-    spent = keep(_at(_node(ed, FN_MUL_FF), x0 + 1200, y0 + 620))
+    drain = keep(ed.add_get_member_variable_node(STAMINA_DRAIN_VAR))
+    spent = keep(_node(ed, FN_MUL_FF))
     _connect(_pin(drain, STAMINA_DRAIN_VAR, is_input=False), _pin(spent, "A"))
     _set(spent, "B", -1.0)
-    regen = keep(_at(ed.add_get_member_variable_node(STAMINA_REGEN_VAR), x0 + 1200, y0 + 780))
+    regen = keep(ed.add_get_member_variable_node(STAMINA_REGEN_VAR))
     _connect(_pin(spent, "ReturnValue", is_input=False), _pin(rate, "A"))
     _connect(_pin(regen, STAMINA_REGEN_VAR, is_input=False), _pin(rate, "B"))
     _connect(running_out, _pin(rate, "bPickA"))
-    step = keep(_at(_node(ed, FN_MUL_FF), x0 + 1700, y0 + 620))
+    step = keep(_node(ed, FN_MUL_FF))
     _connect(_pin(rate, "ReturnValue", is_input=False), _pin(step, "A"))
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "B"))
-    moved = keep(_at(_node(ed, FN_ADD_FF), x0 + 1940, y0 + 620))
+    moved = keep(_node(ed, FN_ADD_FF))
     _connect(stamina_out, _pin(moved, "A"))
     _connect(_pin(step, "ReturnValue", is_input=False), _pin(moved, "B"))
-    held_in = keep(_at(_node(ed, FN_CLAMP), x0 + 2180, y0 + 620))
+    held_in = keep(_node(ed, FN_CLAMP))
     _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held_in, "Value"))
     _set(held_in, "Min", 0.0)
     _set(held_in, "Max", COMBAT.max_stamina)
-    spend = keep(_at(ed.add_set_member_variable_node("Stamina"), x0 + 2420, y0))
+    spend = keep(ed.add_set_member_variable_node("Stamina"))
     _connect(_pin(held_in, "ReturnValue", is_input=False), _pin(spend, "Stamina"))
     _connect(BEL.find_then_pin(apply_speed), _pin(spend, "execute"))
 

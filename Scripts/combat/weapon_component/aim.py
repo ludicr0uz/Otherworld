@@ -5,9 +5,7 @@ are ads.py; where the camera sits while aiming down the sights is sights.py.
 """
 
 from combat.camera import AIM_TRACE_RANGE, BLOCKED_SLACK
-from combat.graph import (
-    BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec,
-)
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
 from combat.nodes import (
     FN_ADD_VV, FN_CAM_LOC, FN_CAM_ROT, FN_DISTANCE, FN_FORWARD, FN_GET_CAM,
     FN_GREATER_FF, FN_IS_VALID, FN_MUL_VF, FN_TRACE, NODE_BREAK_HIT,
@@ -16,7 +14,7 @@ from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.common import _trace_defaults
 
 
-def _author_resolve_aim(ed, held, exec_ins, x0, y0):
+def _author_resolve_aim(ed, held, exec_ins):
     """Work out where this frame's shot lands. The hybrid of the two obvious wrongs.
 
     Aiming purely from the muzzle is honest and unplayable: the barrel sits below
@@ -52,32 +50,30 @@ def _author_resolve_aim(ed, held, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    cam = keep(_at(_node(ed, FN_GET_CAM), x0, y0 + 260))
+    cam = keep(_node(ed, FN_GET_CAM))
     _set(cam, "PlayerIndex", 0)
     cam_out = _pin(cam, "ReturnValue", is_input=False)
-    cam_loc = keep(_at(_node(ed, FN_CAM_LOC), x0 + 240, y0 + 260))
+    cam_loc = keep(_node(ed, FN_CAM_LOC))
     _connect(cam_out, _pin(cam_loc, "self"))
     cam_loc_out = _pin(cam_loc, "ReturnValue", is_input=False)
-    cam_rot = keep(_at(_node(ed, FN_CAM_ROT), x0 + 240, y0 + 400))
+    cam_rot = keep(_node(ed, FN_CAM_ROT))
     _connect(cam_out, _pin(cam_rot, "self"))
-    fwd = keep(_at(_node(ed, FN_FORWARD), x0 + 480, y0 + 400))
+    fwd = keep(_node(ed, FN_FORWARD))
     _connect(_pin(cam_rot, "ReturnValue", is_input=False), _pin(fwd, "InRot"))
-    reach = keep(_at(_node(ed, FN_MUL_VF), x0 + 720, y0 + 400))
+    reach = keep(_node(ed, FN_MUL_VF))
     _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(reach, "A"))
     # The length goes in as a *vector* literal, not a float one. UE 5 promotes
     # Multiply_VectorFloat to a wildcard operator, and with nothing connected
     # its B pin is a vector -- which is a struct pin, which rejects every
     # literal format there is. Multiplying component-wise by (R, R, R) is the
     # same arithmetic and actually survives the save.
-    _connect(_vec(ed, AIM_TRACE_RANGE, AIM_TRACE_RANGE, AIM_TRACE_RANGE,
-                  x0 + 480, y0 + 560),
-             _pin(reach, "B"))
-    sky = keep(_at(_node(ed, FN_ADD_VV), x0 + 960, y0 + 320))
+    _connect(_vec(ed, AIM_TRACE_RANGE, AIM_TRACE_RANGE, AIM_TRACE_RANGE), _pin(reach, "B"))
+    sky = keep(_node(ed, FN_ADD_VV))
     _connect(cam_loc_out, _pin(sky, "A"))
     _connect(_pin(reach, "ReturnValue", is_input=False), _pin(sky, "B"))
     sky_out = _pin(sky, "ReturnValue", is_input=False)
 
-    look = keep(_at(_node(ed, FN_TRACE), x0 + 1200, y0))
+    look = keep(_node(ed, FN_TRACE))
     _connect(cam_loc_out, _pin(look, "Start"))
     _connect(sky_out, _pin(look, "End"))
     # Never drawn: this line runs from the camera through the player's own head
@@ -87,71 +83,71 @@ def _author_resolve_aim(ed, held, exec_ins, x0, y0):
     for e in exec_ins:
         _connect(e, _pin(look, "execute"))
 
-    look_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 1200, y0 + 560))
+    look_brk = keep(_palette(ed, NODE_BREAK_HIT))
     _connect(_pin(look, "OutHit", is_input=False), _loose_pin(look_brk, "Hit"))
-    saw = keep(_at(ed.add_branch_node(), x0 + 1480, y0))
+    saw = keep(ed.add_branch_node())
     _connect(_pin(look, "ReturnValue", is_input=False), _pin(saw, "Condition"))
     _connect(BEL.find_then_pin(look), _pin(saw, "execute"))
 
-    on_surface = keep(_at(ed.add_set_member_variable_node("AimPoint"), x0 + 1740, y0 - 160))
+    on_surface = keep(ed.add_set_member_variable_node("AimPoint"))
     _connect(_loose_pin(look_brk, "Location", is_input=False), _pin(on_surface, "AimPoint"))
     _connect(BEL.find_then_pin(saw), _pin(on_surface, "execute"))
-    at_sky = keep(_at(ed.add_set_member_variable_node("AimPoint"), x0 + 1740, y0 + 220))
+    at_sky = keep(ed.add_set_member_variable_node("AimPoint"))
     _connect(sky_out, _pin(at_sky, "AimPoint"))
     _connect(BEL.find_else_pin(saw), _pin(at_sky, "execute"))
 
-    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 2000, y0 + 320))
+    armed = keep(_node(ed, FN_IS_VALID))
     _connect(held, _pin(armed, "Object"))
-    holding = keep(_at(ed.add_branch_node(), x0 + 2240, y0))
+    holding = keep(ed.add_branch_node())
     _connect(_pin(armed, "ReturnValue", is_input=False), _pin(holding, "Condition"))
     _connect(BEL.find_then_pin(on_surface), _pin(holding, "execute"))
     _connect(BEL.find_then_pin(at_sky), _pin(holding, "execute"))
 
     # Empty-handed: there is nothing to draw a reticle for, and no muzzle to
     # trace from -- reading one off a null weapon is how Accessed None happens.
-    unarmed = keep(_at(ed.add_set_member_variable_node("AimValid"), x0 + 2500, y0 + 700))
+    unarmed = keep(ed.add_set_member_variable_node("AimValid"))
     _set(unarmed, "AimValid", "false")
     _connect(BEL.find_else_pin(holding), _pin(unarmed, "execute"))
 
-    aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0 + 2500, y0 + 460))
+    aim_get = keep(ed.add_get_member_variable_node("AimPoint"))
     aim_out = _pin(aim_get, "AimPoint", is_input=False)
 
     # The muzzle, or while the gun is lowered where it is about to be (carry.py).
-    muzzle = _author_shot_origin(ed, held, x0 + 1700, y0 + 1000)
+    muzzle = _author_shot_origin(ed, held)
 
-    clear = keep(_at(_node(ed, FN_TRACE), x0 + 3260, y0))
+    clear = keep(_node(ed, FN_TRACE))
     _connect(muzzle, _pin(clear, "Start"))
     _connect(aim_out, _pin(clear, "End"))
     _trace_defaults(clear)
     _connect(BEL.find_then_pin(holding), _pin(clear, "execute"))
 
-    clear_brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 2760, y0 + 560))
+    clear_brk = keep(_palette(ed, NODE_BREAK_HIT))
     _connect(_pin(clear, "OutHit", is_input=False), _loose_pin(clear_brk, "Hit"))
-    stopped = keep(_at(ed.add_branch_node(), x0 + 3040, y0))
+    stopped = keep(ed.add_branch_node())
     _connect(_pin(clear, "ReturnValue", is_input=False), _pin(stopped, "Condition"))
     _connect(BEL.find_then_pin(clear), _pin(stopped, "execute"))
 
-    short_by = keep(_at(_node(ed, FN_DISTANCE), x0 + 3040, y0 + 700))
+    short_by = keep(_node(ed, FN_DISTANCE))
     _connect(_loose_pin(clear_brk, "Location", is_input=False), _pin(short_by, "V1"))
     _connect(aim_out, _pin(short_by, "V2"))
-    far_short = keep(_at(_node(ed, FN_GREATER_FF), x0 + 3280, y0 + 700))
+    far_short = keep(_node(ed, FN_GREATER_FF))
     _connect(_pin(short_by, "ReturnValue", is_input=False), _pin(far_short, "A"))
     _set(far_short, "B", BLOCKED_SLACK)
 
-    mark = keep(_at(ed.add_set_member_variable_node("AimBlocked"), x0 + 3300, y0 - 160))
+    mark = keep(ed.add_set_member_variable_node("AimBlocked"))
     _connect(_pin(far_short, "ReturnValue", is_input=False), _pin(mark, "AimBlocked"))
     _connect(BEL.find_then_pin(stopped), _pin(mark, "execute"))
     # The aim point moves to where the barrel's own line actually ends, so the
     # reticle sits on the near wall rather than on the enemy behind it.
-    reality = keep(_at(ed.add_set_member_variable_node("AimPoint"), x0 + 3560, y0 - 160))
+    reality = keep(ed.add_set_member_variable_node("AimPoint"))
     _connect(_loose_pin(clear_brk, "Location", is_input=False), _pin(reality, "AimPoint"))
     _connect(BEL.find_then_pin(mark), _pin(reality, "execute"))
 
-    open_shot = keep(_at(ed.add_set_member_variable_node("AimBlocked"), x0 + 3300, y0 + 260))
+    open_shot = keep(ed.add_set_member_variable_node("AimBlocked"))
     _set(open_shot, "AimBlocked", "false")
     _connect(BEL.find_else_pin(stopped), _pin(open_shot, "execute"))
 
-    ready = keep(_at(ed.add_set_member_variable_node("AimValid"), x0 + 3840, y0))
+    ready = keep(ed.add_set_member_variable_node("AimValid"))
     _set(ready, "AimValid", "true")
     _connect(BEL.find_then_pin(reality), _pin(ready, "execute"))
     _connect(BEL.find_then_pin(open_shot), _pin(ready, "execute"))

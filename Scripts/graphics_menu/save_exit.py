@@ -24,7 +24,7 @@ Everything reads off the player_parts cast chain; a pawn without the parts
 skips the whole fragment.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from uebp.graph import out
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.menu_nav import pause_row_taken
@@ -86,9 +86,9 @@ def _chain(node, in_execs):
     return list(in_execs)
 
 
-def _setter(ed, var, value, in_execs, x, y, made):
+def _setter(ed, var, value, in_execs, made):
     """Set a HUD variable to a literal (or, if ``value`` is a pin, to it)."""
-    n = _at(ed.add_set_member_variable_node(var), x, y)
+    n = ed.add_set_member_variable_node(var)
     if isinstance(value, str):
         _set(n, var, value)
     else:
@@ -99,18 +99,18 @@ def _setter(ed, var, value, in_execs, x, y, made):
     return [BEL.find_then_pin(n)]
 
 
-def _get(ed, var, x, y, made, owner=None, self_out=None):
-    n = _at(ed.add_get_member_variable_node(var, owner) if owner
-            else ed.add_get_member_variable_node(var), x, y)
+def _get(ed, var, made, owner=None, self_out=None):
+    n = (ed.add_get_member_variable_node(var, owner) if owner
+            else ed.add_get_member_variable_node(var))
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
     made.append(n)
     return _pin(n, var, is_input=False)
 
 
-def _call(ed, fn, x, y, made, **inputs):
+def _call(ed, fn, made, **inputs):
     """A math/test node with its inputs wired (pins) or set (literals)."""
-    n = _at(_node(ed, fn), x, y)
+    n = _node(ed, fn)
     for name, v in inputs.items():
         if isinstance(v, (str, int, float)):
             _set(n, name, v)
@@ -120,8 +120,8 @@ def _call(ed, fn, x, y, made, **inputs):
     return n
 
 
-def _branch(ed, cond, in_execs, x, y, made):
-    br = _at(ed.add_branch_node(), x, y)
+def _branch(ed, cond, in_execs, made):
+    br = ed.add_branch_node()
     _connect(cond, _pin(br, "Condition"))
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
@@ -129,117 +129,102 @@ def _branch(ed, cond, in_execs, x, y, made):
     return BEL.find_then_pin(br), BEL.find_else_pin(br)
 
 
-def _author_forget_on_death(ed, health, in_execs, x0, y0, made):
+def _author_forget_on_death(ed, health, in_execs, made):
     """Returns (alive exec, [tails of the dead arm])."""
-    hp = _get(ed, "Health", x0, y0 + 300, made, HEALTH_CLASS_PATH, health)
-    dead, alive = _branch(ed, out(_call(ed, FN_LE, x0 + 240, y0 + 300, made,
-                                         A=hp, B=0.0)),
-                          in_execs, x0 + 480, y0, made)
-    done, fresh = _branch(ed, _get(ed, PROFILE_FORGOTTEN_VAR, x0 + 480, y0 + 300, made),
-                          [dead], x0 + 740, y0, made)
-    wipe = _call(ed, FN_DELETE_SAVE, x0 + 1000, y0, made,
-                 SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
+    hp = _get(ed, "Health", made, HEALTH_CLASS_PATH, health)
+    dead, alive = _branch(ed, out(_call(ed, FN_LE, made, A=hp, B=0.0)), in_execs, made)
+    done, fresh = _branch(ed, _get(ed, PROFILE_FORGOTTEN_VAR, made), [dead], made)
+    wipe = _call(ed, FN_DELETE_SAVE, made, SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
     flow = _chain(wipe, [fresh])
-    flow = _setter(ed, PROFILE_FORGOTTEN_VAR, "true", flow, x0 + 1260, y0, made)
-    flow = _setter(ed, EXIT_PENDING_VAR, "false", flow, x0 + 1520, y0, made)
+    flow = _setter(ed, PROFILE_FORGOTTEN_VAR, "true", flow, made)
+    flow = _setter(ed, EXIT_PENDING_VAR, "false", flow, made)
     return alive, flow + [done]
 
 
-def _author_load_once(ed, parts, in_execs, x0, y0, made):
+def _author_load_once(ed, parts, in_execs, made):
     """Returns the exec pins that continue, loaded or not."""
-    started = _get(ed, "GameStarted", x0, y0 + 300, made)
-    unchecked = _call(ed, FN_NOT, x0, y0 + 440, made,
-                      A=_get(ed, PROFILE_CHECKED_VAR, x0 - 240, y0 + 440, made))
-    due = _call(ed, FN_AND, x0 + 240, y0 + 300, made, A=started, B=out(unchecked))
-    look, skip = _branch(ed, out(due), in_execs, x0 + 480, y0, made)
+    started = _get(ed, "GameStarted", made)
+    unchecked = _call(ed, FN_NOT, made, A=_get(ed, PROFILE_CHECKED_VAR, made))
+    due = _call(ed, FN_AND, made, A=started, B=out(unchecked))
+    look, skip = _branch(ed, out(due), in_execs, made)
 
     # Only once the weapon component has spawned the issued loadout, or the
     # saved items would be added and the issued ones after them.
-    inv = _get(ed, "Inventory", x0 + 480, y0 + 300, made, WEAPON_COMP_CLASS_PATH,
-               parts[WEAPON_COMP_CLASS_PATH])
-    count = _call(ed, FN_ARR_LEN, x0 + 720, y0 + 300, made, TargetArray=inv)
-    armed = _call(ed, FN_GREATER_II, x0 + 960, y0 + 300, made, A=out(count), B=0)
-    ready, not_yet = _branch(ed, out(armed), [look], x0 + 1200, y0, made)
-    flow = _setter(ed, PROFILE_CHECKED_VAR, "true", [ready], x0 + 1460, y0, made)
+    inv = _get(ed, "Inventory", made, WEAPON_COMP_CLASS_PATH, parts[WEAPON_COMP_CLASS_PATH])
+    count = _call(ed, FN_ARR_LEN, made, TargetArray=inv)
+    armed = _call(ed, FN_GREATER_II, made, A=out(count), B=0)
+    ready, not_yet = _branch(ed, out(armed), [look], made)
+    flow = _setter(ed, PROFILE_CHECKED_VAR, "true", [ready], made)
 
-    exists = _call(ed, FN_SAVE_EXISTS, x0 + 1720, y0 + 300, made,
-                   SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
+    exists = _call(ed, FN_SAVE_EXISTS, made, SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
     flow = _chain(exists, flow)
-    have, none = _branch(ed, out(exists), flow, x0 + 1980, y0, made)
-    loaded = author_read_profile(ed, have, parts, x0 + 2240, y0, made)
+    have, none = _branch(ed, out(exists), flow, made)
+    loaded = author_read_profile(ed, have, parts, made)
     return loaded + [none, not_yet, skip]
 
 
-def _author_start(ed, pc_out, now_out, in_execs, x0, y0, made):
+def _author_start(ed, pc_out, now_out, in_execs, made):
     """The M panel's save-and-exit row, with no exit running, starts the
     countdown."""
-    idle = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
-                 A=_get(ed, EXIT_PENDING_VAR, x0, y0 + 580, made))
-    asked = pause_row_taken(ed, EXIT_ACTION, x0, y0 + 760, made)
-    go = _call(ed, FN_AND, x0 + 480, y0 + 300, made, A=asked, B=out(idle))
-    start, stay = _branch(ed, out(go), in_execs, x0 + 720, y0, made)
-    flow = _setter(ed, EXIT_PENDING_VAR, "true", [start], x0 + 980, y0, made)
-    flow = _setter(ed, EXIT_STARTED_VAR, now_out, flow, x0 + 1240, y0, made)
-    deadline = _call(ed, FN_ADD, x0 + 1240, y0 + 300, made, A=now_out, B=EXIT_SECONDS)
-    flow = _setter(ed, EXIT_AT_VAR, out(deadline), flow, x0 + 1500, y0, made)
-    flow = _setter(ed, "MenuOpen", "false", flow, x0 + 1760, y0, made)
+    idle = _call(ed, FN_NOT, made, A=_get(ed, EXIT_PENDING_VAR, made))
+    asked = pause_row_taken(ed, EXIT_ACTION, made)
+    go = _call(ed, FN_AND, made, A=asked, B=out(idle))
+    start, stay = _branch(ed, out(go), in_execs, made)
+    flow = _setter(ed, EXIT_PENDING_VAR, "true", [start], made)
+    flow = _setter(ed, EXIT_STARTED_VAR, now_out, flow, made)
+    deadline = _call(ed, FN_ADD, made, A=now_out, B=EXIT_SECONDS)
+    flow = _setter(ed, EXIT_AT_VAR, out(deadline), flow, made)
+    flow = _setter(ed, "MenuOpen", "false", flow, made)
     return flow + [stay]
 
 
-def _movement_call(ed, moves, fn, in_execs, x, y, made):
+def _movement_call(ed, moves, fn, in_execs, made):
     """``fn`` on the pawn's CharacterMovement; returns (node, what follows)."""
-    call = _call(ed, fn, x, y, made, self=moves)
+    call = _call(ed, fn, made, self=moves)
     return call, _chain(call, in_execs)
 
 
-def _author_countdown(ed, parts, now_out, in_execs, x0, y0, made):
+def _author_countdown(ed, parts, now_out, in_execs, made):
     """A running exit: called off by a hit, or saved and left when it is due."""
-    running, idle = _branch(ed, _get(ed, EXIT_PENDING_VAR, x0, y0 + 300, made),
-                            in_execs, x0 + 240, y0, made)
-    struck = _get(ed, "LastDamageTime", x0 + 240, y0 + 300, made, HEALTH_CLASS_PATH,
-                  parts[HEALTH_CLASS_PATH])
-    since = _call(ed, FN_GREATER, x0 + 480, y0 + 300, made, A=struck,
-                  B=_get(ed, EXIT_STARTED_VAR, x0 + 240, y0 + 440, made))
-    hit, unhurt = _branch(ed, out(since), [running], x0 + 720, y0, made)
-    off = _setter(ed, EXIT_PENDING_VAR, "false", [hit], x0 + 980, y0 - 300, made)
-    off = _setter(ed, EXIT_CALLED_OFF_VAR, now_out, off, x0 + 1240, y0 - 300, made)
-    comp = _call(ed, FN_GET_COMP, x0 + 1240, y0 + 600, made, self=parts[PAWN])
+    running, idle = _branch(ed, _get(ed, EXIT_PENDING_VAR, made), in_execs, made)
+    struck = _get(ed, "LastDamageTime", made, HEALTH_CLASS_PATH, parts[HEALTH_CLASS_PATH])
+    since = _call(ed, FN_GREATER, made, A=struck, B=_get(ed, EXIT_STARTED_VAR, made))
+    hit, unhurt = _branch(ed, out(since), [running], made)
+    off = _setter(ed, EXIT_PENDING_VAR, "false", [hit], made)
+    off = _setter(ed, EXIT_CALLED_OFF_VAR, now_out, off, made)
+    comp = _call(ed, FN_GET_COMP, made, self=parts[PAWN])
     _pin(comp, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
     moves = out(comp)
-    walk, off = _movement_call(ed, moves, FN_SET_MOVEMENT_MODE, off,
-                               x0 + 1500, y0 - 600, made)
+    walk, off = _movement_call(ed, moves, FN_SET_MOVEMENT_MODE, off, made)
     _set(walk, "NewMovementMode", "MOVE_Walking")
 
-    ripe = _call(ed, FN_GE, x0 + 980, y0 + 300, made, A=now_out,
-                 B=_get(ed, EXIT_AT_VAR, x0 + 740, y0 + 440, made))
-    leave, wait = _branch(ed, out(ripe), [unhurt], x0 + 1240, y0, made)
+    ripe = _call(ed, FN_GE, made, A=now_out, B=_get(ed, EXIT_AT_VAR, made))
+    leave, wait = _branch(ed, out(ripe), [unhurt], made)
     # Standing still while the countdown runs; the reopened level brings a
     # fresh pawn, so only the hit arm has to give the movement back.
-    _, wait = _movement_call(ed, moves, FN_DISABLE_MOVEMENT, [wait],
-                             x0 + 1500, y0 + 600, made)
-    flow = _setter(ed, EXIT_PENDING_VAR, "false", [leave], x0 + 1500, y0, made)
-    written = author_write_profile(ed, flow[0], parts, x0 + 1760, y0, made)
+    _, wait = _movement_call(ed, moves, FN_DISABLE_MOVEMENT, [wait], made)
+    flow = _setter(ed, EXIT_PENDING_VAR, "false", [leave], made)
+    written = author_write_profile(ed, flow[0], parts, made)
 
     # The current map by name, so the exit reopens whatever level is loaded,
     # and a reopened level opens on the main menu (GameStarted is false again).
-    where = _call(ed, FN_LEVEL_NAME, x0 + 6800, y0, made, bRemovePrefixString="true")
+    where = _call(ed, FN_LEVEL_NAME, made, bRemovePrefixString="true")
     flow = _chain(where, written)
-    reopen = _call(ed, FN_OPEN_LEVEL, x0 + 7060, y0, made, LevelName=out(where))
+    reopen = _call(ed, FN_OPEN_LEVEL, made, LevelName=out(where))
     _chain(reopen, flow)
     return off + wait + [idle]
 
 
-def author_save_exit_tick(ed, pc_out, in_execs, x0, y0):
+def author_save_exit_tick(ed, pc_out, in_execs):
     """The whole fragment (see the module docstring). Returns the tails."""
     made = []
-    ok, fails, parts = author_player_parts(ed, in_execs, x0, y0 - 600, made)
-    now_out = out(_call(ed, FN_TIME_SECONDS, x0, y0 + 900, made))
-    alive, dead_tails = _author_forget_on_death(ed, parts[HEALTH_CLASS_PATH],
-                                                [ok], x0 + 2400, y0, made)
-    flow = _author_load_once(ed, parts, [alive], x0 + 4400, y0, made)
-    flow = _author_start(ed, pc_out, now_out, flow, x0 + 12000, y0, made)
-    flow = _author_countdown(ed, parts, now_out, flow, x0 + 14000, y0, made)
-    flow = author_dev_guns(ed, pc_out, parts, flow, x0 + 22000, y0, made)
+    ok, fails, parts = author_player_parts(ed, in_execs, made)
+    now_out = out(_call(ed, FN_TIME_SECONDS, made))
+    alive, dead_tails = _author_forget_on_death(ed, parts[HEALTH_CLASS_PATH], [ok], made)
+    flow = _author_load_once(ed, parts, [alive], made)
+    flow = _author_start(ed, pc_out, now_out, flow, made)
+    flow = _author_countdown(ed, parts, now_out, flow, made)
+    flow = author_dev_guns(ed, pc_out, parts, flow, made)
     ed.add_comment_to_nodes(
         f"Save and exit (its row in the M panel, {EXIT_SECONDS:.0f} s, called off "
         f"by a hit), the saved profile loaded once a game starts, and deleted "

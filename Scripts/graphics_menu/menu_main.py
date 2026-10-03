@@ -48,13 +48,13 @@ def _then(node, in_execs):
     return BEL.find_then_pin(node)
 
 
-def author_title_ticks(ed, in_execs, x0, y0):
+def author_title_ticks(ed, in_execs):
     """BeginPlay, on its way to the paused title: the HUD and its tuner tick
     while paused. Returns the then pin."""
     made = []
-    hud = _call(ed, FN_ACTOR_TICK_PAUSED, x0, y0, made, bTickableWhenPaused="true")
-    tuner = _call(ed, FN_COMP_TICK_PAUSED, x0 + 300, y0, made,
-                  self=_get(ed, TUNER_COMPONENT, x0, y0 + 240, made),
+    hud = _call(ed, FN_ACTOR_TICK_PAUSED, made, bTickableWhenPaused="true")
+    tuner = _call(ed, FN_COMP_TICK_PAUSED, made,
+                  self=_get(ed, TUNER_COMPONENT, made),
                   bTickableWhenPaused="true")
     flow = _then(tuner, [_then(hud, in_execs)])
     ed.add_comment_to_nodes(
@@ -64,66 +64,56 @@ def author_title_ticks(ed, in_execs, x0, y0):
     return flow
 
 
-def author_in_play(ed, in_execs, x0, y0):
+def author_in_play(ed, in_execs):
     """Tick's split on GameStarted. Returns ``(in_play, on_title)``."""
     made = []
-    return _branch(ed, _get(ed, GAME_STARTED_VAR, x0, y0 + 240, made), in_execs,
-                   x0 + 260, y0, made)
+    return _branch(ed, _get(ed, GAME_STARTED_VAR, made), in_execs, made)
 
 
-def _author_start(ed, in_execs, x0, y0, made):
+def _author_start(ed, in_execs, made):
     """The first row: resume in play, new game on the title."""
-    take, rest = _branch(ed, pause_row_taken(ed, START_ACTION, x0 - 480, y0 + 300, made),
-                         in_execs, x0 + 240, y0, made)
-    flow = _setter(ed, "MenuOpen", "false", [take], x0 + 500, y0, made)
-    resumed, fresh = _branch(ed, _get(ed, GAME_STARTED_VAR, x0 + 500, y0 + 300, made),
-                             [flow], x0 + 760, y0, made)
-    flow = _setter(ed, GAME_STARTED_VAR, "true", [fresh], x0 + 1020, y0 + 200, made)
-    still = _call(ed, FN_ACTOR_TICK_PAUSED, x0 + 1280, y0 + 200, made,
-                  bTickableWhenPaused="false")
+    take, rest = _branch(ed, pause_row_taken(ed, START_ACTION, made), in_execs, made)
+    flow = _setter(ed, "MenuOpen", "false", [take], made)
+    resumed, fresh = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [flow], made)
+    flow = _setter(ed, GAME_STARTED_VAR, "true", [fresh], made)
+    still = _call(ed, FN_ACTOR_TICK_PAUSED, made, bTickableWhenPaused="false")
     # Unpause LAST. GameStarted is already up, so the very next frame draws
     # the HUD rather than the title, and the world never runs behind a menu.
-    resume = _call(ed, FN_SET_PAUSED, x0 + 1560, y0 + 200, made, bPaused="false")
+    resume = _call(ed, FN_SET_PAUSED, made, bPaused="false")
     return [_then(resume, [_then(still, [flow])]), resumed, rest]
 
 
-def _author_settings(ed, in_execs, x0, y0, made):
+def _author_settings(ed, in_execs, made):
     """The settings row: its page in the rows' place, caret at its top."""
-    take, rest = _branch(ed, pause_row_taken(ed, SETTINGS_ACTION, x0 - 480, y0 + 300,
-                                             made), in_execs, x0 + 240, y0, made)
-    flow = _setter(ed, "MenuPage", PAGE_SETTINGS, [take], x0 + 500, y0, made)
-    return [_setter(ed, "MenuRow", 0, [flow], x0 + 760, y0, made), rest]
+    take, rest = _branch(ed, pause_row_taken(ed, SETTINGS_ACTION, made), in_execs, made)
+    flow = _setter(ed, "MenuPage", PAGE_SETTINGS, [take], made)
+    return [_setter(ed, "MenuRow", 0, [flow], made), rest]
 
 
-def _author_quit(ed, pc_out, in_execs, x0, y0, made):
+def _author_quit(ed, pc_out, in_execs, made):
     """The exit-game row: out to the desktop, saving nothing."""
-    take, rest = _branch(ed, pause_row_taken(ed, QUIT_ACTION, x0 - 480, y0 + 300, made),
-                         in_execs, x0 + 240, y0, made)
-    quit_game = _call(ed, FN_QUIT, x0 + 500, y0, made, SpecificPlayer=pc_out)
+    take, rest = _branch(ed, pause_row_taken(ed, QUIT_ACTION, made), in_execs, made)
+    quit_game = _call(ed, FN_QUIT, made, SpecificPlayer=pc_out)
     return [_then(quit_game, [take]), rest]
 
 
-def _author_toggle(ed, pc_out, in_execs, x0, y0, made):
+def _author_toggle(ed, pc_out, in_execs, made):
     """M in play flips MenuOpen. Nested, not ANDed with GameStarted, so the
     key is only polled in play."""
-    in_play, on_title = _branch(ed, _get(ed, GAME_STARTED_VAR, x0, y0 + 300, made),
-                                in_execs, x0 + 240, y0, made)
-    pressed = _call(ed, FN_WAS_PRESSED, x0 + 240, y0 + 300, made, self=pc_out,
-                    Key=MENU_KEY)
-    flip, idle = _branch(ed, out(pressed), [in_play], x0 + 500, y0, made)
-    flipped = _call(ed, FN_NOT, x0 + 500, y0 + 300, made,
-                    A=_get(ed, "MenuOpen", x0 + 260, y0 + 440, made))
-    return [put(ed, "MenuOpen", out(flipped), [flip], x0 + 760, y0, made), idle,
-            on_title]
+    in_play, on_title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), in_execs, made)
+    pressed = _call(ed, FN_WAS_PRESSED, made, self=pc_out, Key=MENU_KEY)
+    flip, idle = _branch(ed, out(pressed), [in_play], made)
+    flipped = _call(ed, FN_NOT, made, A=_get(ed, "MenuOpen", made))
+    return [put(ed, "MenuOpen", out(flipped), [flip], made), idle, on_title]
 
 
-def author_main_rows_tick(ed, pc_out, in_execs, x0, y0):
+def author_main_rows_tick(ed, pc_out, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
     made = []
-    flow = _author_start(ed, in_execs, x0, y0, made)
-    flow = _author_settings(ed, flow, x0 + 2200, y0, made)
-    flow = _author_quit(ed, pc_out, flow, x0 + 3600, y0, made)
-    flow = _author_toggle(ed, pc_out, flow, x0 + 4800, y0, made)
+    flow = _author_start(ed, in_execs, made)
+    flow = _author_settings(ed, flow, made)
+    flow = _author_quit(ed, pc_out, flow, made)
+    flow = _author_toggle(ed, pc_out, flow, made)
     ed.add_comment_to_nodes(
         f"The menu's own rows, and {MENU_KEY}. The first row starts the game "
         f"from the title (unpausing last) and shuts the menu in play; settings "

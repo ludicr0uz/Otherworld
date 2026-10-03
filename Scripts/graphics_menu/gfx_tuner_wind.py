@@ -51,69 +51,63 @@ MPC_OBJECT_PATH = f"{MPC_PATH}.{MPC_NAME}"
 CM_PER_M = 100
 
 
-def _distance_cm(ed, x, y, made):
-    return out(_call(ed, FN_MUL_II, x + 520, y, made,
-                      A=column(ed, "wind_distance", x, y, made, rounded=True), B=CM_PER_M))
+def _distance_cm(ed, made):
+    return out(_call(ed, FN_MUL_II, made,
+                      A=column(ed, "wind_distance", made, rounded=True), B=CM_PER_M))
 
 
-def _author_walk(ed, in_execs, x0, y0, made):
+def _author_walk(ed, in_execs, made):
     """Every cell's WPO switch and distance, when either moved. Returns the
     exec tails."""
-    on = _call(ed, FN_NEQ_II, x0, y0 + 300, made,
-               A=column(ed, "wind", x0 - 980, y0 + 300, made, rounded=True),
-               B=_get(ed, TUNER_WIND_APPLIED_VAR, x0 - 240, y0 + 500, made))
-    far = _call(ed, FN_NEQ_II, x0, y0 + 700, made,
-                A=column(ed, "wind_distance", x0 - 980, y0 + 700, made, rounded=True),
-                B=_get(ed, TUNER_WIND_DISTANCE_APPLIED_VAR, x0 - 240, y0 + 900, made))
-    moved = _call(ed, FN_OR_BB, x0 + 240, y0 + 300, made, A=out(on), B=out(far))
-    go, same = _branch(ed, out(moved), in_execs, x0 + 480, y0, made)
+    on = _call(ed, FN_NEQ_II, made,
+               A=column(ed, "wind", made, rounded=True),
+               B=_get(ed, TUNER_WIND_APPLIED_VAR, made))
+    far = _call(ed, FN_NEQ_II, made,
+                A=column(ed, "wind_distance", made, rounded=True),
+                B=_get(ed, TUNER_WIND_DISTANCE_APPLIED_VAR, made))
+    moved = _call(ed, FN_OR_BB, made, A=out(on), B=out(far))
+    go, same = _branch(ed, out(moved), in_execs, made)
 
-    actors = _call(ed, FN_ALL_OF_CLASS, x0 + 760, y0, made)
+    actors = _call(ed, FN_ALL_OF_CLASS, made)
     _class_literal(actors, "ActorClass", ACTOR_CLASS_PATH)
     _connect(go, _pin(actors, "execute"))
     actor, body, done = _for_each(ed, _pin(actors, "OutActors", is_input=False),
-                                  _pin(actors, "then", is_input=False), x0 + 1060, y0, made)
-    comp, flow = _root_mesh(ed, actor, body, x0 + 1360, y0, made)
-    wpo = _call(ed, FN_SET_WPO, x0 + 2000, y0, made, self=comp,
-                NewValue=out(_call(ed, FN_GE_II, x0 + 1700, y0 + 500, made,
-                                    A=column(ed, "wind", x0 + 700, y0 + 500, made,
+                                  _pin(actors, "then", is_input=False), made)
+    comp, flow = _root_mesh(ed, actor, body, made)
+    wpo = _call(ed, FN_SET_WPO, made, self=comp,
+                NewValue=out(_call(ed, FN_GE_II, made,
+                                    A=column(ed, "wind", made,
                                              rounded=True), B=1)))
     _connect(flow, _pin(wpo, "execute"))
-    reach = _call(ed, FN_SET_WPO_DISTANCE, x0 + 2300, y0, made, self=comp,
-                  NewValue=_distance_cm(ed, x0 + 1200, y0 + 800, made))
+    reach = _call(ed, FN_SET_WPO_DISTANCE, made, self=comp, NewValue=_distance_cm(ed, made))
     _connect(_pin(wpo, "then", is_input=False), _pin(reach, "execute"))
 
-    kept = put(ed, TUNER_WIND_APPLIED_VAR,
-               column(ed, "wind", x0 + 1000, y0 - 600, made, rounded=True), [done],
-               x0 + 1500, y0 - 700, made)
+    kept = put(ed, TUNER_WIND_APPLIED_VAR, column(ed, "wind", made, rounded=True), [done], made)
     kept = put(ed, TUNER_WIND_DISTANCE_APPLIED_VAR,
-               column(ed, "wind_distance", x0 + 1500, y0 - 600, made, rounded=True),
-               [kept], x0 + 2000, y0 - 700, made)
+               column(ed, "wind_distance", made, rounded=True),
+               [kept], made)
     return [kept, same]
 
 
-def _author_params(ed, in_execs, x0, y0, made):
+def _author_params(ed, in_execs, made):
     """MPC_Wind's scalars, one SetScalarParameterValue each. Returns then."""
-    on = out(_call(ed, FN_INT_TO_FLOAT, x0, y0 + 900, made,
-                    InInt=column(ed, "wind", x0 - 980, y0 + 900, made, rounded=True)))
-    flow, x = in_execs, x0
+    on = out(_call(ed, FN_INT_TO_FLOAT, made, InInt=column(ed, "wind", made, rounded=True)))
+    flow = in_execs
     for index, st in stats_by(WIND_PARAM):
-        value = applied(ed, index, x - 760, y0 + 500, made)
+        value = applied(ed, index, made)
         if st.target == "Strength":
-            value = out(_call(ed, FN_MUL_FF, x + 200, y0 + 700, made, A=value, B=on))
-        s = _call(ed, FN_SET_MPC_SCALAR, x + 500, y0, made,
-                  ParameterName=st.target, ParameterValue=value)
+            value = out(_call(ed, FN_MUL_FF, made, A=value, B=on))
+        s = _call(ed, FN_SET_MPC_SCALAR, made, ParameterName=st.target, ParameterValue=value)
         _class_literal(s, "Collection", MPC_OBJECT_PATH)
         for e in flow:
             _connect(e, _pin(s, "execute"))
         flow = [_pin(s, "then", is_input=False)]
-        x += 1200
     return flow
 
 
-def author_wind(ed, in_execs, x0, y0, made):
+def author_wind(ed, in_execs, made):
     """The whole fragment (module docstring). Returns the exec tails."""
     if not unreal.load_asset(MPC_PATH):    # an object literal needs the asset
         raise RuntimeError(f"{MPC_PATH} is missing -- run forest_import/wind.py first")
-    flow = _author_walk(ed, in_execs, x0, y0, made)
-    return _author_params(ed, flow, x0 + 3200, y0, made)
+    flow = _author_walk(ed, in_execs, made)
+    return _author_params(ed, flow, made)

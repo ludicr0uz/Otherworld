@@ -29,7 +29,7 @@ keep walking, crouched or prone.
 """
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from uebp.graph import out
 from combat.nodes import (
     FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NOT, FN_PLAY_SLOT,
@@ -45,7 +45,7 @@ THROW_READY_ANIM_VAR = "ThrowReadyAnim"   # A_ThrowReady, or None
 FN_IS_PLAYING_SLOT = "/Script/Engine.AnimInstance.IsPlayingSlotAnimation"
 
 
-def _author_throw_ready(ed, item, exec_in, x0, y0):
+def _author_throw_ready(ed, item, exec_in):
     """Hold the ready pose in the slot, and an item thrown by its blade in
     its throw grip; returns the exits. Run it on every frame of the aim, when
     ``item`` (Held) is valid."""
@@ -55,39 +55,38 @@ def _author_throw_ready(ed, item, exec_in, x0, y0):
         made.append(n)
         return n
 
-    def get(name, x, y):
-        return out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
+    def get(name):
+        return out(keep(ed.add_get_member_variable_node(name)), name)
 
-    def both(a, b, x, y):
-        n = keep(_at(_node(ed, FN_AND), x, y))
+    def both(a, b):
+        n = keep(_node(ed, FN_AND))
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
         return out(n)
 
-    def negate(a, x, y):
-        n = keep(_at(_node(ed, FN_NOT), x, y))
+    def negate(a):
+        n = keep(_node(ed, FN_NOT))
         _connect(a, _pin(n, "A"))
         return out(n)
 
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 240, y0 + 300))
-    _connect(get("OwnerMesh", x0, y0 + 300), _pin(anim, "self"))
-    pose = get(THROW_READY_ANIM_VAR, x0, y0 + 440)
-    has = keep(_at(_node(ed, FN_IS_VALID), x0 + 480, y0 + 440))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
+    _connect(get("OwnerMesh"), _pin(anim, "self"))
+    pose = get(THROW_READY_ANIM_VAR)
+    has = keep(_node(ed, FN_IS_VALID))
     _connect(pose, _pin(has, "Object"))
-    held = keep(_at(_node(ed, FN_IS_PLAYING_SLOT), x0 + 480, y0 + 580))
+    held = keep(_node(ed, FN_IS_PLAYING_SLOT))
     _connect(out(anim), _pin(held, "self"))
     _connect(pose, _pin(held, "Asset"))
     _set(held, "SlotNodeName", AIM_SLOT)
-    flinching = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 480, y0 + 760))
+    flinching = keep(_node(ed, FN_IS_SLOT_ACTIVE))
     _connect(out(anim), _pin(flinching, "self"))
     _set(flinching, "SlotNodeName", HIT_SLOT)
-    free = both(negate(out(held), x0 + 760, y0 + 580),
-                negate(out(flinching), x0 + 760, y0 + 760), x0 + 1000, y0 + 640)
-    gate = keep(_at(ed.add_branch_node(), x0 + 1480, y0))
-    _connect(both(out(has), free, x0 + 1240, y0 + 440), _pin(gate, "Condition"))
+    free = both(negate(out(held)), negate(out(flinching)))
+    gate = keep(ed.add_branch_node())
+    _connect(both(out(has), free), _pin(gate, "Condition"))
     _connect(exec_in, _pin(gate, "execute"))
 
-    play = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 1760, y0))
+    play = keep(_node(ed, FN_PLAY_SLOT))
     _connect(out(anim), _pin(play, "self"))
     _connect(pose, _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
@@ -99,20 +98,20 @@ def _author_throw_ready(ed, item, exec_in, x0, y0):
 
     # Held by the blade? Moved on the frame the pose starts, the same frame
     # after any re-equip (which put the hand's own grip back).
-    by_blade, n = _prop(ed, THROW_GRIP_VAR, item, x0 + 1760, y0 + 300)
+    by_blade, n = _prop(ed, THROW_GRIP_VAR, item)
     keep(n)
-    blade = keep(_at(ed.add_branch_node(), x0 + 2040, y0))
+    blade = keep(ed.add_branch_node())
     _connect(by_blade, _pin(blade, "Condition"))
     _connect(BEL.find_then_pin(play), _pin(blade, "execute"))
-    loc, n = _prop(ed, THROW_GRIP_LOC_VAR, item, x0 + 2040, y0 + 300)
+    loc, n = _prop(ed, THROW_GRIP_LOC_VAR, item)
     keep(n)
-    put = keep(_at(_node(ed, FN_SET_REL_LOC), x0 + 2320, y0))
+    put = keep(_node(ed, FN_SET_REL_LOC))
     _connect(item, _pin(put, "self"))
     _connect(loc, _pin(put, "NewRelativeLocation"))
     _connect(BEL.find_then_pin(blade), _pin(put, "execute"))
-    rot, n = _prop(ed, THROW_GRIP_ROT_VAR, item, x0 + 2320, y0 + 300)
+    rot, n = _prop(ed, THROW_GRIP_ROT_VAR, item)
     keep(n)
-    turn = keep(_at(_node(ed, FN_SET_REL_ROT), x0 + 2600, y0))
+    turn = keep(_node(ed, FN_SET_REL_ROT))
     _connect(item, _pin(turn, "self"))
     _connect(rot, _pin(turn, "NewRelativeRotation"))
     _connect(BEL.find_then_pin(put), _pin(turn, "execute"))
@@ -128,10 +127,10 @@ def _author_throw_ready(ed, item, exec_in, x0, y0):
             BEL.find_else_pin(gate))
 
 
-def _author_ready_down(ed, exec_in, x, y):
+def _author_ready_down(ed, exec_in):
     """The aim was called off: re-equip, which puts the held item's own pose
     back in the slot (or stops it, under a lowered gun). Returns the exit."""
-    dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), x, y)
+    dirty = ed.add_set_member_variable_node("NeedsRefresh")
     _set(dirty, "NeedsRefresh", "true")
     _connect(exec_in, _pin(dirty, "execute"))
     return BEL.find_then_pin(dirty)

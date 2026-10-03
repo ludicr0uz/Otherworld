@@ -15,9 +15,7 @@ failing means no heal. Every exit is handed back for EndAbility.
 """
 
 from combat.difficulty import DIFFICULTY_VAR, EASY
-from combat.graph import (
-    BEL, _at, _connect, _loose_pin, _must_load, _node, _palette, _pin, _set,
-)
+from combat.graph import BEL, _connect, _loose_pin, _must_load, _node, _palette, _pin, _set
 from combat.nodes import (
     FN_ADD_FF, FN_CLAMP, FN_EQ_II, FN_GET_COMP, FN_GET_GAME_MODE,
     NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
@@ -30,7 +28,7 @@ from survival.paths import CONSUMABLE_CLASS_PATH
 RESTORE_VAR = "HealthRestoreEasy"
 
 
-def _author_easy_heal(ed, in_exec, item, avatar, x0, y0):
+def _author_easy_heal(ed, in_exec, item, avatar):
     """Returns (nodes made, the exec pins that must reach EndAbility)."""
     # Both casts exist in the palette only for loaded classes.
     for path in (GAME_MODE_BP_PATH, HEALTH_BP_PATH):
@@ -41,55 +39,48 @@ def _author_easy_heal(ed, in_exec, item, avatar, x0, y0):
         made.append(n)
         return n
 
-    mode = keep(_at(_node(ed, FN_GET_GAME_MODE), x0, y0 + 300))
+    mode = keep(_node(ed, FN_GET_GAME_MODE))
     # An ability supplies its own world context, so the pin is normally hidden;
     # where it is shown, the avatar's world is the one to ask.
     world = BEL.find_input_pin(mode, "WorldContextObject")
     if world and world.is_valid():
         _connect(avatar, world)
-    as_mode = keep(_at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 260, y0))
+    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     _connect(in_exec, _pin(as_mode, "execute"))
     mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
 
-    level = keep(_at(ed.add_get_member_variable_node(DIFFICULTY_VAR,
-                                                     GAME_MODE_CLASS_PATH),
-                     x0 + 260, y0 + 300))
+    level = keep(ed.add_get_member_variable_node(DIFFICULTY_VAR, GAME_MODE_CLASS_PATH))
     _connect(mode_out, _pin(level, "self"))
-    easy = keep(_at(_node(ed, FN_EQ_II), x0 + 520, y0 + 300))
+    easy = keep(_node(ed, FN_EQ_II))
     _connect(_pin(level, DIFFICULTY_VAR, is_input=False), _pin(easy, "A"))
     _set(easy, "B", EASY)
-    on_easy = keep(_at(ed.add_branch_node(), x0 + 780, y0))
+    on_easy = keep(ed.add_branch_node())
     _connect(_pin(easy, "ReturnValue", is_input=False), _pin(on_easy, "Condition"))
     _connect(BEL.find_then_pin(as_mode), _pin(on_easy, "execute"))
 
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 780, y0 + 300))
+    comp = keep(_node(ed, FN_GET_COMP))
     _connect(avatar, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
-    as_health = keep(_at(_palette(ed, NODE_CAST_HEALTH), x0 + 1040, y0))
+    as_health = keep(_palette(ed, NODE_CAST_HEALTH))
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_health, "Object"))
     _connect(BEL.find_then_pin(on_easy), _pin(as_health, "execute"))
     health = _loose_pin(as_health, "AsBPHealthComponent", is_input=False)
 
-    now = keep(_at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
-                   x0 + 1300, y0 + 300))
+    now = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(health, _pin(now, "self"))
-    top = keep(_at(ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH),
-                   x0 + 1300, y0 + 420))
+    top = keep(ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH))
     _connect(health, _pin(top, "self"))
-    gain = keep(_at(ed.add_get_member_variable_node(RESTORE_VAR,
-                                                    CONSUMABLE_CLASS_PATH),
-                    x0 + 1300, y0 + 540))
+    gain = keep(ed.add_get_member_variable_node(RESTORE_VAR, CONSUMABLE_CLASS_PATH))
     _connect(item, _pin(gain, "self"))
-    more = keep(_at(_node(ed, FN_ADD_FF), x0 + 1540, y0 + 360))
+    more = keep(_node(ed, FN_ADD_FF))
     _connect(_pin(now, "Health", is_input=False), _pin(more, "A"))
     _connect(_pin(gain, RESTORE_VAR, is_input=False), _pin(more, "B"))
-    clamp = keep(_at(_node(ed, FN_CLAMP), x0 + 1780, y0 + 360))
+    clamp = keep(_node(ed, FN_CLAMP))
     _connect(_pin(more, "ReturnValue", is_input=False), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _connect(_pin(top, "MaxHealth", is_input=False), _pin(clamp, "Max"))
-    write = keep(_at(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH),
-                     x0 + 1780, y0))
+    write = keep(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(health, _pin(write, "self"))
     _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(write, "Health"))
     _connect(BEL.find_then_pin(as_health), _pin(write, "execute"))

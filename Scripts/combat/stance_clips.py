@@ -41,9 +41,8 @@ nothing here and keeps the procedural crouch and prone.
 from combat.aim_pitch import _feeding_all, _nodes_of
 from combat.anim_blueprint import AIM_SLOT, _slot_node
 from combat.body_pose import KNEEL_TIME, POSE_CROUCH, POSE_KNEEL, POSE_PRONE, move_alpha
-from combat.graph import (
-    BEL, BGE, PIN, _assets, _at, _connect, _log, _palette, _pin, _set,
-)
+from combat.graph import BEL, BGE, PIN, _assets, _connect, _log, _palette, _pin, _set
+from uebp.layout import arrange
 
 BLEND_CLASS = "AnimGraphNode_TwoWayBlend"
 PLAYER_CLASS = "AnimGraphNode_SequencePlayer"
@@ -98,8 +97,8 @@ def _remove_previous(ed):
     return base
 
 
-def _player(ed, clip, rate, x, y):
-    node = _at(_palette(ed, f"Animation|Sequences|Play'{clip.get_name()}'"), x, y)
+def _player(ed, clip, rate):
+    node = _palette(ed, f"Animation|Sequences|Play'{clip.get_name()}'")
     inner = node.get_editor_property("node")
     inner.set_editor_property("play_rate", rate)
     inner.set_editor_property("loop_animation", True)
@@ -111,9 +110,9 @@ def _player(ed, clip, rate, x, y):
     return node
 
 
-def _evaluator(ed, clip, time, x, y):
+def _evaluator(ed, clip, time):
     """``time``: seconds into the clip, or a pin that says."""
-    node = _at(_palette(ed, f"Animation|Sequences|Evaluate'{clip.get_name()}'"), x, y)
+    node = _palette(ed, f"Animation|Sequences|Evaluate'{clip.get_name()}'")
     if node.get_editor_property("node").get_editor_property("sequence") != clip:
         raise RuntimeError(f"the evaluator did not take {clip.get_name()}")
     if isinstance(time, (int, float)):
@@ -123,8 +122,8 @@ def _evaluator(ed, clip, time, x, y):
     return node
 
 
-def _blend(ed, a, b, alpha, x, y):
-    node = _at(_palette(ed, "Animation|Blends|TwoWayBlend"), x, y)
+def _blend(ed, a, b, alpha):
+    node = _palette(ed, "Animation|Blends|TwoWayBlend")
     _connect(a, _pin(node, "A"))
     _connect(b, _pin(node, "B"))
     _connect(alpha, _pin(node, "Alpha"))
@@ -163,22 +162,18 @@ def patch_stance_clips(skin):
         consumers = PIN.list_connected_pins(base)
         PIN.break_pin_links(base)
 
-        x, y = -2200, -900
-        move = move_alpha(ed, x, y + 700)
-        crouch = _blend(ed, _pose(_player(ed, clips["crouch_idle"], 1.0, x, y)),
-                        _pose(_player(ed, clips["crouch_walk"], CROUCH_WALK_RATE,
-                                      x, y + 200)), move, x + 400, y + 100)
-        crawl = _blend(ed, _pose(_evaluator(ed, clips["prone_crawl"], PRONE_REST_S,
-                                            x, y + 400)),
-                       _pose(_player(ed, clips["prone_crawl"], PRONE_CRAWL_RATE,
-                                     x, y + 550)), move, x + 400, y + 450)
-        weights = {w: _pin(_at(ed.add_get_member_variable_node(w), x + 400, y + 800 + i * 120),
+        move = move_alpha(ed)
+        crouch = _blend(ed, _pose(_player(ed, clips["crouch_idle"], 1.0)),
+                        _pose(_player(ed, clips["crouch_walk"], CROUCH_WALK_RATE)), move)
+        crawl = _blend(ed, _pose(_evaluator(ed, clips["prone_crawl"], PRONE_REST_S)),
+                       _pose(_player(ed, clips["prone_crawl"], PRONE_CRAWL_RATE)), move)
+        weights = {w: _pin(ed.add_get_member_variable_node(w),
                            w, is_input=False)
                    for i, w in enumerate((POSE_CROUCH, POSE_PRONE, POSE_KNEEL, KNEEL_TIME))}
-        low = _blend(ed, base, _pose(crouch), weights[POSE_CROUCH], x + 800, y + 200)
-        lying = _blend(ed, _pose(low), _pose(crawl), weights[POSE_PRONE], x + 1100, y + 300)
-        kneel = _evaluator(ed, clips["search_kneel"], weights[KNEEL_TIME], x + 1100, y + 700)
-        down = _blend(ed, _pose(lying), _pose(kneel), weights[POSE_KNEEL], x + 1400, y + 400)
+        low = _blend(ed, base, _pose(crouch), weights[POSE_CROUCH])
+        lying = _blend(ed, _pose(low), _pose(crawl), weights[POSE_PRONE])
+        kneel = _evaluator(ed, clips["search_kneel"], weights[KNEEL_TIME])
+        down = _blend(ed, _pose(lying), _pose(kneel), weights[POSE_KNEEL])
         for c in consumers:
             _connect(_pose(down), c)
         ed.add_comment_to_nodes(
@@ -187,6 +182,7 @@ def patch_stance_clips(skin):
             f"and {POSE_KNEEL} the kneel over a body being searched, held at "
             f"{KNEEL_TIME}. See Scripts/combat/stance_clips.py.", _mine(ed))
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{skin.anim_bp} failed to compile after the stance clips")
     _assets().save_loaded_asset(bp)

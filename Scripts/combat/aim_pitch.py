@@ -43,9 +43,9 @@ before this builder in the build order.
 import unreal
 
 from combat.graph import (
-    BEL, BGE, PIN, _assets, _at, _connect, _declare, _float_type, _log, _node,
-    _palette, _pin, _set,
-)
+    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _log, _node, _palette, _pin,
+    _set)
+from uebp.layout import arrange
 from combat.nodes import FN_MAKE_ROT, FN_MUL_FF
 
 AIM_PITCH_VAR = "AimPitch"
@@ -113,9 +113,9 @@ def _remove_previous(ed, root):
     _connect(upstream, _pin(root, "Result"))
 
 
-def _modify_bone(ed, bone, pitch_out, x, y):
+def _modify_bone(ed, bone, pitch_out):
     """A ModifyBone adding Roll(AimPitch * ROLL_PER_DEGREE) to ``bone``."""
-    mb = _at(_palette(ed, NODE_MODIFY_BONE), x, y)
+    mb = _palette(ed, NODE_MODIFY_BONE)
     inner = mb.get_editor_property("node")
     ref = unreal.BoneReference()
     ref.set_editor_property("bone_name", bone)
@@ -131,10 +131,10 @@ def _modify_bone(ed, bone, pitch_out, x, y):
             != unreal.BoneModificationMode.BMM_ADDITIVE):
         raise RuntimeError(f"the ModifyBone on {bone} did not keep its settings")
 
-    half = _at(_node(ed, FN_MUL_FF), x - 520, y + 260)
+    half = _node(ed, FN_MUL_FF)
     _connect(pitch_out, _pin(half, "A"))
     _set(half, "B", ROLL_PER_DEGREE)
-    rot = _at(_node(ed, FN_MAKE_ROT), x - 260, y + 260)
+    rot = _node(ed, FN_MAKE_ROT)
     _connect(_pin(half, "ReturnValue", is_input=False), _pin(rot, "Roll"))
     _connect(_pin(rot, "ReturnValue", is_input=False), _pin(mb, "Rotation"))
     return mb
@@ -171,18 +171,18 @@ def patch_aim_pitch(skin):
     upstream = fed[0]
     PIN.break_pin_links(_pin(root, "Result"))
 
-    pitch = _at(ed.add_get_member_variable_node(AIM_PITCH_VAR), -1100, 1500)
+    pitch = ed.add_get_member_variable_node(AIM_PITCH_VAR)
     pitch_out = _pin(pitch, AIM_PITCH_VAR, is_input=False)
-    to_cs = _at(_palette(ed, NODE_TO_COMPONENT), -800, 1200)
+    to_cs = _palette(ed, NODE_TO_COMPONENT)
     _connect(upstream, _pin(to_cs, "LocalPose"))
     pose = _pin(to_cs, "ComponentPose", is_input=False)
     made = [pitch, to_cs]
-    for i, bone in enumerate(skin.aim_bones):
-        mb = _modify_bone(ed, bone, pitch_out, -400 + i * 320, 1200)
+    for bone in skin.aim_bones:
+        mb = _modify_bone(ed, bone, pitch_out)
         _connect(pose, _pin(mb, "ComponentPose"))
         pose = _pin(mb, "Pose", is_input=False)
         made.append(mb)
-    to_ls = _at(_palette(ed, NODE_TO_LOCAL), 300, 1200)
+    to_ls = _palette(ed, NODE_TO_LOCAL)
     _connect(pose, _pin(to_ls, "ComponentPose"))
     _connect(_pin(to_ls, "Pose", is_input=False), _pin(root, "Result"))
     made.append(to_ls)
@@ -192,6 +192,7 @@ def patch_aim_pitch(skin):
         f"{' and '.join(skin.aim_bones)}, as a component-space roll -- the "
         "body faces component +Y. See Scripts/combat/aim_pitch.py.", made)
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{skin.anim_bp} failed to compile after the aim pitch")
     _assets().save_loaded_asset(bp)

@@ -15,9 +15,8 @@ from npc.paths import (
 )
 from npc.nodes import FN_RUN_BT, NODE_EVENT_POSSESS
 from npc.graph import (
-    _asset_sub, _at, BEL, BGE, _connect, _create_blueprint, _log, _node,
-    _palette, _set,
-)
+    _asset_sub, BEL, BGE, _connect, _create_blueprint, _log, _node, _palette, _set)
+from uebp.layout import arrange
 from npc.drawn import draws
 from npc.sight_cone import _author_sight_cone
 from npc.step_task import build_step_task, clear_step_task
@@ -107,8 +106,8 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
 
     # Possession starts the tree. BeginPlay would be too early: a controller's
     # BeginPlay runs before it has possessed anything.
-    possess = _palette(ed, NODE_EVENT_POSSESS, 0.0, -600.0)
-    run = _at(_node(ed, FN_RUN_BT), 300, -600)
+    possess = _palette(ed, NODE_EVENT_POSSESS)
+    run = _node(ed, FN_RUN_BT)
     _set(run, "BTAsset", bt.get_path_name())
     _connect(BEL.find_then_pin(possess), BEL.find_execute_pin(run))
     ed.add_comment_to_nodes(
@@ -116,10 +115,11 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
         f"what this wanderer does; the BT_* events below are its steps.",
         [possess, run])
 
-    senses = _author_steps(ed, key, melee_anim, 0, 0)
+    senses = _author_steps(ed, key, melee_anim)
     # Debug mode's sight cone, on a Tick of its own (npc/sight_cone.py).
-    _author_sight_cone(ed, -3600, -600)
+    _author_sight_cone(ed)
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
 

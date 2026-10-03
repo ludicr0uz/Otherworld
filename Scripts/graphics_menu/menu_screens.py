@@ -21,7 +21,7 @@ so WasInputKeyJustPressed still answers. What a taken row does is Tick's
 (menu_main.py), which the HUD keeps running under the paused title.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from uebp.graph import out
 from graphics_menu.cursor import (
     ROW, author_cursor_mode, author_hold_fire, author_row_cursor, author_widget_click)
@@ -61,7 +61,7 @@ FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
 FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 
 
-def author_title(ed, x0, y0, in_execs):
+def author_title(ed, in_execs):
     """Before the game starts the menu stands alone: nothing of the HUD or
     the death menu under it, and it is open -- MenuOpen is held up, so the
     title needs no drawing of its own and M has nothing to shut.
@@ -70,13 +70,10 @@ def author_title(ed, x0, y0, in_execs):
     (author_pause_menu), the second to the rest of the HUD.
     """
     made = []
-    started, title = _branch(ed, _get(ed, GAME_STARTED_VAR, x0, y0 + 240, made),
-                             in_execs, x0 + 260, y0, made)
-    flow = set_shown(ed, part(ed, WBP_HUD, HUD_BODY, x0 + 260, y0 + 440), False,
-                     [title], x0 + 760, y0 + 200)
-    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU, x0 + 760, y0 + 440), False, [flow],
-                     x0 + 1020, y0 + 200)
-    flow = _setter(ed, "MenuOpen", "true", [flow], x0 + 1280, y0 + 200, made)
+    started, title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), in_execs, made)
+    flow = set_shown(ed, part(ed, WBP_HUD, HUD_BODY), False, [title])
+    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU), False, [flow])
+    flow = _setter(ed, "MenuOpen", "true", [flow], made)
     ed.add_comment_to_nodes(
         f"The title: while {GAME_STARTED_VAR} is false, which BeginPlay leaves "
         f"it with while it pauses the world, the menu is held open over a "
@@ -85,7 +82,7 @@ def author_title(ed, x0, y0, in_execs):
     return flow, started
 
 
-def author_death_menu(ed, x0, y0, in_execs, mode_out):
+def author_death_menu(ed, in_execs, mode_out):
     """What is on screen once the player is dead and the game is paused:
     WBP_DeathMenu instead of the HUD, not over it -- a reticle and an
     inventory over a death screen read as a game still being played.
@@ -99,61 +96,52 @@ def author_death_menu(ed, x0, y0, in_execs, mode_out):
         made.append(n)
         return n
 
-    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU, x0, y0 + 240), True,
-                     author_cursor_mode(ed, True, in_execs, x0, y0 - 1200),
-                     x0 + 260, y0)
-    flow = set_shown(ed, part(ed, WBP_HUD, HUD_BODY, x0 + 260, y0 + 240), False,
-                     [flow], x0 + 760, y0)
-    flow = set_shown(ed, screen(ed, WBP_PAUSE_MENU, x0 + 760, y0 + 240), False,
-                     [flow], x0 + 1020, y0)
-    flow = set_shown(ed, screen(ed, WBP_MAIN_MENU, x0 + 760, y0 - 240), False,
-                     [flow], x0 + 1020, y0 - 240)
+    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU), True, author_cursor_mode(ed, True, in_execs))
+    flow = set_shown(ed, part(ed, WBP_HUD, HUD_BODY), False, [flow])
+    flow = set_shown(ed, screen(ed, WBP_PAUSE_MENU), False, [flow])
+    flow = set_shown(ed, screen(ed, WBP_MAIN_MENU), False, [flow])
 
     # The same counter the corner shows, read again so the final score is the
     # live number rather than a copy taken when the player fell.
-    kills = keep(_at(ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH),
-                     x0 + 1020, y0 + 500))
+    kills = keep(ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH))
     _connect(mode_out, _pin(kills, "self"))
-    kills_str = keep(_at(_node(ed, FN_INT_TO_STR), x0 + 1260, y0 + 500))
+    kills_str = keep(_node(ed, FN_INT_TO_STR))
     _connect(_pin(kills, KILL_COUNT_VAR, is_input=False), _pin(kills_str, "InInt"))
-    score_text = keep(_at(_node(ed, FN_CONCAT), x0 + 1500, y0 + 500))
+    score_text = keep(_node(ed, FN_CONCAT))
     _set(score_text, "A", DEATH_SCORE_PREFIX)
     _connect(_pin(kills_str, "ReturnValue", is_input=False), _pin(score_text, "B"))
-    flow = set_text(ed, part(ed, WBP_DEATH_MENU, DEATH_SCORE, x0 + 1500, y0 + 700),
-                    _pin(score_text, "ReturnValue", is_input=False), [flow],
-                    x0 + 1760, y0)
+    flow = set_text(ed, part(ed, WBP_DEATH_MENU, DEATH_SCORE),
+                    _pin(score_text, "ReturnValue", is_input=False), [flow])
 
     # --- the restart itself --------------------------------------------------
-    pc = keep(_at(_node(ed, FN_GET_OWNING_PC), x0 + 3040, y0 + 300))
-    pressed = keep(_at(_node(ed, FN_WAS_PRESSED), x0 + 3280, y0 + 300))
+    pc = keep(_node(ed, FN_GET_OWNING_PC))
+    pressed = keep(_node(ed, FN_WAS_PRESSED))
     _connect(_pin(pc, "ReturnValue", is_input=False), _pin(pressed, "self"))
     _set(pressed, "Key", RESTART_KEY)
     # ...or a click on the hint line, raised and served like the title's.
     clicked = author_widget_click(
-        ed, part(ed, WBP_DEATH_MENU, DEATH_HINT_LINE, x0 + 2000, y0 - 600),
-        (CURSOR_ACCEPT_VAR, "true"), [flow], x0 + 2000, y0 - 1000)
-    asked = keep(_at(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR),
-                     x0 + 3280, y0 + 460))
-    either = keep(_at(_node(ed, FN_OR), x0 + 3540, y0 + 300))
+        ed, part(ed, WBP_DEATH_MENU, DEATH_HINT_LINE),
+        (CURSOR_ACCEPT_VAR, "true"), [flow])
+    asked = keep(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR))
+    either = keep(_node(ed, FN_OR))
     _connect(_pin(pressed, "ReturnValue", is_input=False), _pin(either, "A"))
     _connect(_pin(asked, CURSOR_ACCEPT_VAR, is_input=False), _pin(either, "B"))
-    again = keep(_at(ed.add_branch_node(), x0 + 3540, y0))
+    again = keep(ed.add_branch_node())
     _connect(_pin(either, "ReturnValue", is_input=False), _pin(again, "Condition"))
     for e in clicked:
         _connect(e, _pin(again, "execute"))
-    served = keep(_at(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR),
-                      x0 + 3800, y0 - 200))
+    served = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
     _set(served, CURSOR_ACCEPT_VAR, "false")
     _connect(BEL.find_then_pin(again), _pin(served, "execute"))
-    unpause = keep(_at(_node(ed, FN_SET_PAUSED), x0 + 3800, y0))
+    unpause = keep(_node(ed, FN_SET_PAUSED))
     _set(unpause, "bPaused", "false")
     _connect(BEL.find_then_pin(served), _pin(unpause, "execute"))
     # The current map by name, so the menu restarts whatever level is loaded.
     # bRemovePrefixString strips PIE's UEDPIE_0_.
-    where = keep(_at(_node(ed, FN_LEVEL_NAME), x0 + 4060, y0))
+    where = keep(_node(ed, FN_LEVEL_NAME))
     _set(where, "bRemovePrefixString", "true")
     _connect(BEL.find_then_pin(unpause), _pin(where, "execute"))
-    reopen = keep(_at(_node(ed, FN_OPEN_LEVEL), x0 + 4320, y0))
+    reopen = keep(_node(ed, FN_OPEN_LEVEL))
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(reopen, "LevelName"))
     _connect(BEL.find_then_pin(where), _pin(reopen, "execute"))
 
@@ -166,65 +154,56 @@ def author_death_menu(ed, x0, y0, in_execs, mode_out):
         made)
 
 
-def author_alive(ed, x0, y0, in_execs):
+def author_alive(ed, in_execs):
     """Playing and alive: the death menu down, the HUD's Body up."""
-    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU, x0, y0 + 240), False, in_execs,
-                     x0 + 260, y0)
-    return (set_shown(ed, part(ed, WBP_HUD, HUD_BODY, x0 + 260, y0 + 240), True,
-                      [flow], x0 + 760, y0),)
+    flow = set_shown(ed, screen(ed, WBP_DEATH_MENU), False, in_execs)
+    return (set_shown(ed, part(ed, WBP_HUD, HUD_BODY), True, [flow]),)
 
 
-def _any_tab_open(ed, x, y, made):
+def _any_tab_open(ed, made):
     """A tuning tab is open: a bool pin. At most one is (opening one shuts
     the others), and it stands in the panel's place."""
-    flags = [_get(ed, tab.open_var, x, y + 140 * i, made) for i, tab in enumerate(TABS)]
+    flags = [_get(ed, tab.open_var, made) for i, tab in enumerate(TABS)]
     either = flags[0]
-    for i, flag in enumerate(flags[1:]):
-        either = out(_call(ed, FN_OR, x + 260 * (i + 1), y + 140 * i, made,
-                            A=either, B=flag))
+    for flag in flags[1:]:
+        either = out(_call(ed, FN_OR, made, A=either, B=flag))
     return either
 
 
-def _author_pause_keys(ed, in_execs, x0, y0, made):
+def _author_pause_keys(ed, in_execs, made):
     """Up / Down move the panel's caret; Enter takes the row it is on, as a
     click on the row does: PauseClick, which Tick serves. Returns the tails.
 
     DrawHUD rather than Tick, like the settings page's keys, though the menu
     pauses nothing in play: the row is raised in the same place for the key and the
     mouse, and top-of-frame lowers it once Tick has had its one look."""
-    pc_out = out(_call(ed, FN_GET_OWNING_PC, x0, y0 + 400, made))
-    moved, nav_nodes = _emit_row_nav(ed, pc_out, len(PAUSE_ROW_LABELS) - 1, in_execs,
-                                     x0 + 240, y0 + 1200, row_var=PAUSE_ROW_VAR)
+    pc_out = out(_call(ed, FN_GET_OWNING_PC, made))
+    moved, nav_nodes = _emit_row_nav(ed, pc_out, len(PAUSE_ROW_LABELS) - 1, in_execs, row_var=PAUSE_ROW_VAR)
     made += nav_nodes
-    enter = _call(ed, FN_WAS_PRESSED, x0 + 1740, y0 + 400, made, self=pc_out,
-                  Key=PAUSE_ACCEPT_KEY)
-    take, idle = _branch(ed, out(enter), moved, x0 + 2000, y0, made)
-    taken = put(ed, PAUSE_CLICK_VAR, _get(ed, PAUSE_ROW_VAR, x0 + 2000, y0 + 400, made),
-                [take], x0 + 2260, y0, made)
+    enter = _call(ed, FN_WAS_PRESSED, made, self=pc_out, Key=PAUSE_ACCEPT_KEY)
+    take, idle = _branch(ed, out(enter), moved, made)
+    taken = put(ed, PAUSE_CLICK_VAR, _get(ed, PAUSE_ROW_VAR, made), [take], made)
     return [taken, idle]
 
 
-def _author_row_words(ed, rows, in_execs, x0, y0, made):
+def _author_row_words(ed, rows, in_execs, made):
     """What the rows say that depends on whether a game is in play: the first
     row is new game on the title and resume in play, and the rows that need
     a game say so on the title. Returns the exec tails."""
-    def by_state(index, widget, playing_says, title_says, execs, x):
-        row, found, missing = row_at(ed, rows, index, execs, x, y0)
-        text = member(ed, row, WBP_MENU_ROW, widget, x + 540, y0 + 300)
-        playing, title = _branch(ed, _get(ed, GAME_STARTED_VAR, x + 540, y0 + 500, made),
-                                 [found], x + 800, y0, made)
-        return [set_text(ed, text, playing_says, [playing], x + 1060, y0),
-                set_text(ed, text, title_says, [title], x + 1060, y0 + 300), missing]
+    def by_state(index, widget, playing_says, title_says, execs):
+        row, found, missing = row_at(ed, rows, index, execs)
+        text = member(ed, row, WBP_MENU_ROW, widget)
+        playing, title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [found], made)
+        return [set_text(ed, text, playing_says, [playing]),
+                set_text(ed, text, title_says, [title]), missing]
 
-    flow = by_state(PAUSE_START_ROW, ROW_LABEL, RESUME_ROW_LABEL, START_ROW_LABEL,
-                    in_execs, x0)
-    for i, action in enumerate(IN_GAME_ACTIONS):
-        flow = by_state(PAUSE_ROW_ACTIONS.index(action), ROW_VALUE, "", IN_GAME_ONLY,
-                        flow, x0 + 1500 * (i + 1))
+    flow = by_state(PAUSE_START_ROW, ROW_LABEL, RESUME_ROW_LABEL, START_ROW_LABEL, in_execs)
+    for action in IN_GAME_ACTIONS:
+        flow = by_state(PAUSE_ROW_ACTIONS.index(action), ROW_VALUE, "", IN_GAME_ONLY, flow)
     return flow
 
 
-def author_pause_menu(ed, x0, y0, in_execs):
+def author_pause_menu(ed, in_execs):
     """The menu, while MenuOpen: on the title (author_title holds it open)
     and in play, where M toggles it. The caret is on PauseRow. Its labels are
     WBP_PauseMenu's. Returns the exec tails.
@@ -237,71 +216,62 @@ def author_pause_menu(ed, x0, y0, in_execs):
     and its BACK row brings these back. A row is taken with Enter or a click,
     which raises PauseClick for Tick; the rows have no keys of their own."""
     made = []
-    get_open = _at(ed.add_get_member_variable_node("MenuOpen"), x0, y0 + 200)
-    looting = _at(ed.add_get_member_variable_node(LOOT_OPEN_VAR), x0 - 500, y0 - 900)
-    wanted = _at(_node(ed, FN_OR), x0 - 260, y0 - 1000)
-    _connect(_pin(_at(ed.add_get_member_variable_node("MenuOpen"), x0 - 500, y0 - 1040),
+    get_open = ed.add_get_member_variable_node("MenuOpen")
+    looting = ed.add_get_member_variable_node(LOOT_OPEN_VAR)
+    wanted = _node(ed, FN_OR)
+    _connect(_pin(ed.add_get_member_variable_node("MenuOpen"),
                   "MenuOpen", is_input=False), _pin(wanted, "A"))
     _connect(_pin(looting, LOOT_OPEN_VAR, is_input=False), _pin(wanted, "B"))
     # ...or the I panel (wear_draw.py).
-    wearing = _at(ed.add_get_member_variable_node(WEAR_OPEN_VAR), x0 - 260, y0 - 760)
-    wanted_any = _at(_node(ed, FN_OR), x0 - 20, y0 - 1000)
+    wearing = ed.add_get_member_variable_node(WEAR_OPEN_VAR)
+    wanted_any = _node(ed, FN_OR)
     _connect(_pin(wanted, "ReturnValue", is_input=False), _pin(wanted_any, "A"))
     _connect(_pin(wearing, WEAR_OPEN_VAR, is_input=False), _pin(wanted_any, "B"))
     wanted = wanted_any
     in_execs = author_hold_fire(ed, author_cursor_mode(
-        ed, _pin(wanted, "ReturnValue", is_input=False), in_execs, x0, y0 - 1400),
-        x0 + 2200, y0 - 1400)
-    br = _at(ed.add_branch_node(), x0 + 260, y0)
+        ed, _pin(wanted, "ReturnValue", is_input=False), in_execs))
+    br = ed.add_branch_node()
     _connect(_pin(get_open, "MenuOpen", is_input=False), _pin(br, "Condition"))
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
     # WBP_MainMenu goes up and down with the menu: its legal notice is on
     # every page of it, and its settings panel is one of the pages.
-    closed = set_shown(ed, screen(ed, WBP_PAUSE_MENU, x0 + 260, y0 + 600), False,
-                       [BEL.find_else_pin(br)], x0 + 520, y0 + 600)
-    closed = set_shown(ed, screen(ed, WBP_MAIN_MENU, x0 + 260, y0 + 800), False,
-                       [closed], x0 + 780, y0 + 600)
+    closed = set_shown(ed, screen(ed, WBP_PAUSE_MENU), False, [BEL.find_else_pin(br)])
+    closed = set_shown(ed, screen(ed, WBP_MAIN_MENU), False, [closed])
 
-    flow = set_shown(ed, screen(ed, WBP_PAUSE_MENU, x0 + 260, y0 + 240), True,
-                     [BEL.find_then_pin(br)], x0 + 520, y0)
-    flow = set_shown(ed, screen(ed, WBP_MAIN_MENU, x0 + 260, y0 + 400), True,
-                     [flow], x0 + 780, y0)
-    panel = part(ed, WBP_PAUSE_MENU, PAUSE_PANEL, x0 + 520, y0 + 2400)
-    settings = part(ed, WBP_MAIN_MENU, SETTINGS_PANEL, x0 + 520, y0 + 2600)
-    on_rows = _call(ed, FN_EQ_II, x0 + 780, y0 + 2900, made,
-                    A=_get(ed, "MenuPage", x0 + 520, y0 + 2900, made), B=PAGE_TITLE)
-    on_menu, on_settings = _branch(ed, out(on_rows), [flow], x0 + 1040, y0 + 2000, made)
-    _author_settings_page(ed, x0, y0 + 9000, set_shown(
-        ed, settings, True, [set_shown(ed, panel, False, [on_settings],
-                                       x0 + 1300, y0 + 2600)], x0 + 1560, y0 + 2600))
-    flow = set_shown(ed, settings, False, [on_menu], x0 + 1300, y0 + 2000)
+    flow = set_shown(ed, screen(ed, WBP_PAUSE_MENU), True, [BEL.find_then_pin(br)])
+    flow = set_shown(ed, screen(ed, WBP_MAIN_MENU), True, [flow])
+    panel = part(ed, WBP_PAUSE_MENU, PAUSE_PANEL)
+    settings = part(ed, WBP_MAIN_MENU, SETTINGS_PANEL)
+    on_rows = _call(ed, FN_EQ_II, made, A=_get(ed, "MenuPage", made), B=PAGE_TITLE)
+    on_menu, on_settings = _branch(ed, out(on_rows), [flow], made)
+    _author_settings_page(ed, set_shown(
+        ed, settings, True, [set_shown(ed, panel, False, [on_settings])]))
+    flow = set_shown(ed, settings, False, [on_menu])
 
-    in_tab, in_panel = _branch(ed, _any_tab_open(ed, x0 + 520, y0 + 1600, made), [flow],
-                               x0 + 1300, y0 + 1400, made)
-    tabbed = set_shown(ed, panel, False, [in_tab], x0 + 1560, y0 + 1800)
-    flow = set_shown(ed, panel, True, [in_panel], x0 + 1560, y0 + 1400)
+    in_tab, in_panel = _branch(ed, _any_tab_open(ed, made), [flow], made)
+    tabbed = set_shown(ed, panel, False, [in_tab])
+    flow = set_shown(ed, panel, True, [in_panel])
 
-    rows = part(ed, WBP_PAUSE_MENU, PAUSE_ROWS, x0 + 520, y0 + 400)
-    hovered = author_row_cursor(ed, rows, len(PAUSE_ROW_LABELS), [flow], x0 + 4400,
-                                y0 - 1400, row_var=PAUSE_ROW_VAR,
+    rows = part(ed, WBP_PAUSE_MENU, PAUSE_ROWS)
+    hovered = author_row_cursor(ed, rows, len(PAUSE_ROW_LABELS), [flow], row_var=PAUSE_ROW_VAR,
                                 click=(PAUSE_CLICK_VAR, ROW))
-    keyed = _author_pause_keys(ed, hovered, x0 + 4400, y0 - 4400, made)
-    caret = _at(ed.add_get_member_variable_node(PAUSE_ROW_VAR), x0 + 780, y0 + 600)
+    keyed = _author_pause_keys(ed, hovered, made)
+    caret = ed.add_get_member_variable_node(PAUSE_ROW_VAR)
     flow = mark_rows(ed, rows, len(PAUSE_ROW_LABELS),
-                     _pin(caret, PAUSE_ROW_VAR, is_input=False), keyed, x0 + 1040, y0)
-    worded = _author_row_words(ed, rows, [flow], x0 + 2400, y0 - 7000, made)
+                     _pin(caret, PAUSE_ROW_VAR, is_input=False), keyed)
+    worded = _author_row_words(ed, rows, [flow], made)
 
     # ON or OFF behind one branch: no SelectText, and a bool converted to text
     # reads "true", which is a variable's value and not a setting.
-    debug_row, found, missing = row_at(ed, rows, PAUSE_DEBUG_ROW, worded, x0 + 2400, y0)
-    value = member(ed, debug_row, WBP_MENU_ROW, ROW_VALUE, x0 + 2940, y0 + 300)
-    dbg = _at(ed.add_get_member_variable_node("DebugOn"), x0 + 2940, y0 + 500)
-    dbg_br = _at(ed.add_branch_node(), x0 + 3200, y0)
+    debug_row, found, missing = row_at(ed, rows, PAUSE_DEBUG_ROW, worded)
+    value = member(ed, debug_row, WBP_MENU_ROW, ROW_VALUE)
+    dbg = ed.add_get_member_variable_node("DebugOn")
+    dbg_br = ed.add_branch_node()
     _connect(_pin(dbg, "DebugOn", is_input=False), _pin(dbg_br, "Condition"))
     _connect(found, _pin(dbg_br, "execute"))
-    on = set_text(ed, value, DEBUG_ON, [BEL.find_then_pin(dbg_br)], x0 + 3460, y0)
-    off = set_text(ed, value, DEBUG_OFF, [BEL.find_else_pin(dbg_br)], x0 + 3460, y0 + 300)
+    on = set_text(ed, value, DEBUG_ON, [BEL.find_then_pin(dbg_br)])
+    off = set_text(ed, value, DEBUG_OFF, [BEL.find_else_pin(dbg_br)])
     ed.add_comment_to_nodes(
         "The menu: the title's, and M's in play. Its rows show unless the "
         "settings page or a tuning tab is open in their place. The caret is "

@@ -11,7 +11,7 @@ component's HasRoom), so the slot sync finds the new item a bag slot, or
 the hand. The held item stays held, as with a pick-up.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _palette, _pin, _set
 from uebp.graph import out
 from combat.nodes import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_REMOVE, FN_GET_TRANSFORM, NODE_CAST_ITEM, NODE_SPAWN,
@@ -22,46 +22,42 @@ from graphics_menu.loot_consts import LOOT_SEL_VAR, LOOT_TARGET_VAR
 from loot.consts import BODY_ARRAYS, LOOT_VAR
 
 
-def _body(ed, var, x, y, made):
+def _body(ed, var, made):
     """LootTarget's array ``var``."""
-    return _get(ed, var, x, y, made, HEALTH_CLASS_PATH,
-                _get(ed, LOOT_TARGET_VAR, x - 240, y, made))
+    return _get(ed, var, made, HEALTH_CLASS_PATH, _get(ed, LOOT_TARGET_VAR, made))
 
 
-def author_take(ed, wc, pawn_out, in_execs, x0, y0, made):
+def author_take(ed, wc, pawn_out, in_execs, made):
     """The take (see the module docstring). ``wc`` is the player's cast weapon
     component. Returns the exec tails."""
-    sel = _get(ed, LOOT_SEL_VAR, x0, y0 + 460, made)
-    cls = _call(ed, FN_ARR_GET, x0 + 260, y0 + 300, made,
-                TargetArray=_body(ed, LOOT_VAR, x0, y0 + 300, made), Index=sel)
-    where = _call(ed, FN_GET_TRANSFORM, x0 + 260, y0 + 600, made, self=pawn_out)
-    spawn = _at(_palette(ed, NODE_SPAWN), x0 + 520, y0)
+    sel = _get(ed, LOOT_SEL_VAR, made)
+    cls = _call(ed, FN_ARR_GET, made, TargetArray=_body(ed, LOOT_VAR, made), Index=sel)
+    where = _call(ed, FN_GET_TRANSFORM, made, self=pawn_out)
+    spawn = _palette(ed, NODE_SPAWN)
     made.append(spawn)
     _connect(_pin(cls, "Item", is_input=False), _pin(spawn, "Class"))
     _connect(out(where), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
     for e in in_execs:
         _connect(e, _pin(spawn, "execute"))
-    cast = _at(_palette(ed, NODE_CAST_ITEM), x0 + 820, y0)
+    cast = _palette(ed, NODE_CAST_ITEM)
     made.append(cast)
     _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(spawn), _pin(cast, "execute"))
     item = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
 
-    flow = _setter(ed, "Dropped", "false", [BEL.find_then_pin(cast)], x0 + 1100, y0,
-                   made, ITEM_CLASS_PATH, item)
-    add = _call(ed, FN_ARR_ADD, x0 + 1360, y0, made,
-                TargetArray=_get(ed, "Inventory", x0 + 1100, y0 + 300, made,
+    flow = _setter(ed, "Dropped", "false", [BEL.find_then_pin(cast)], made, ITEM_CLASS_PATH, item)
+    add = _call(ed, FN_ARR_ADD, made,
+                TargetArray=_get(ed, "Inventory", made,
                                  WEAPON_COMP_CLASS_PATH, wc))
     _connect(item, _loose_pin(add, "NewItem"))
     _connect(flow, _pin(add, "execute"))
-    flow = _setter(ed, "NeedsRefresh", "true", [BEL.find_then_pin(add)], x0 + 1620, y0,
+    flow = _setter(ed, "NeedsRefresh", "true", [BEL.find_then_pin(add)],
                    made, WEAPON_COMP_CLASS_PATH, wc)
-    for i, var in enumerate(BODY_ARRAYS):
-        x = x0 + 1880 + 260 * i
-        gone = _call(ed, FN_ARR_REMOVE, x, y0, made,
-                     TargetArray=_body(ed, var, x, y0 + 300 + 140 * i, made),
-                     IndexToRemove=_get(ed, LOOT_SEL_VAR, x, y0 + 600, made))
+    for var in BODY_ARRAYS:
+        gone = _call(ed, FN_ARR_REMOVE, made,
+                     TargetArray=_body(ed, var, made),
+                     IndexToRemove=_get(ed, LOOT_SEL_VAR, made))
         _connect(flow, _pin(gone, "execute"))
         flow = BEL.find_then_pin(gone)
     return [flow, _pin(cast, "CastFailed", is_input=False)]

@@ -5,9 +5,9 @@ package's own is _Graph (the node shapes a long fragment repeats) and the
 creature asset paths.
 """
 
-from uebp.graph import (  # noqa: F401
-    BEL, BGE, PIN, _assets, _at, _connect, _create_blueprint, _loose_pin, _name_literal,
-    _node, _palette, _pin, _resolve, _set, _try_set, make_log, out)
+from uebp.graph import (
+    BEL, BGE, PIN, _assets, _connect, _create_blueprint, _loose_pin, _name_literal, _node,
+    _palette, _pin, _resolve, _set, _try_set, make_log, out)
 
 _log = make_log("NPC")
 _asset_sub = _assets
@@ -21,21 +21,21 @@ class _Graph:
     def __init__(self, ed):
         self.ed, self.made = ed, []
 
-    def keep(self, node, x, y):
-        self.made.append(_at(node, x, y))
+    def keep(self, node):
+        self.made.append(node)
         return node
 
-    def call(self, fn, x, y, **literals):
-        node = self.keep(_node(self.ed, fn), x, y)
+    def call(self, fn, **literals):
+        node = self.keep(_node(self.ed, fn))
         for pin, value in literals.items():
             _set(node, pin, value)
         return node
 
-    def op(self, fn, a, b, x, y):
+    def op(self, fn, a, b):
         """A two-input maths node: ``a`` is a pin, ``b`` a pin or a number.
         Returns its output pin. A wired first: these are wildcards until
         then, and a wildcard B takes no literal."""
-        node = self.keep(_node(self.ed, fn), x, y)
+        node = self.keep(_node(self.ed, fn))
         _connect(a, _pin(node, "A"))
         if isinstance(b, (int, float)):
             _set(node, "B", b)
@@ -43,14 +43,14 @@ class _Graph:
             _connect(b, _pin(node, "B"))
         return out(node)
 
-    def get(self, var, x, y):
-        node = self.keep(self.ed.add_get_member_variable_node(var), x, y)
+    def get(self, var):
+        node = self.keep(self.ed.add_get_member_variable_node(var))
         return _pin(node, var, is_input=False)
 
-    def put(self, var, exec_in, x, y, pin=None, literal=None):
+    def put(self, var, exec_in, pin=None, literal=None):
         """Write ``var`` from a pin or a literal; returns the Set's then pin.
         ``exec_in`` is one exec pin or several."""
-        node = self.keep(self.ed.add_set_member_variable_node(var), x, y)
+        node = self.keep(self.ed.add_set_member_variable_node(var))
         if pin is not None:
             _connect(pin, _pin(node, var))
         else:
@@ -59,9 +59,9 @@ class _Graph:
             _connect(source, _pin(node, "execute"))
         return BEL.find_then_pin(node)
 
-    def branch(self, condition, exec_in, x, y):
+    def branch(self, condition, exec_in):
         """A Branch on ``condition`` (None: always true), run by ``exec_in``."""
-        node = self.keep(self.ed.add_branch_node(), x, y)
+        node = self.keep(self.ed.add_branch_node())
         if condition is None:       # a join: several exec wires into one
             _set(node, "Condition", "true")
         else:

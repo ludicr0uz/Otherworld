@@ -7,9 +7,7 @@ loot rolled after it is loot/roll.py.
 from combat.game_state import (
     DAMAGED_BY_PLAYER_VAR, DEAD_LOG_PREFIX, KILL_COUNT_VAR, PLAYER_DEAD_VAR,
 )
-from combat.graph import (
-    BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec,
-)
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
 from combat.gun_drop import _author_gun_drop
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_II, FN_ADD_VV, FN_CONCAT, FN_DELAY,
@@ -39,7 +37,7 @@ CONTROLLER_RETIRE_SECONDS = 0.1
 DEATH_PAUSE_SECONDS = 2.2
 
 
-def _author_kill_count(ed, exec_in, x0, y0):
+def _author_kill_count(ed, exec_in):
     """Count this death on the GameMode, if a pellet is what caused it.
 
     Spliced between "this one despawns" and the respawn, so it sees exactly the
@@ -51,25 +49,23 @@ def _author_kill_count(ed, exec_in, x0, y0):
     Returns the exec pins to carry on from -- both of them, because a wanderer
     that died unshot still has to be replaced.
     """
-    earned = _at(ed.add_get_member_variable_node(DAMAGED_BY_PLAYER_VAR), x0, y0 + 240)
-    shot = _at(ed.add_branch_node(), x0 + 240, y0)
+    earned = ed.add_get_member_variable_node(DAMAGED_BY_PLAYER_VAR)
+    shot = ed.add_branch_node()
     _connect(_pin(earned, DAMAGED_BY_PLAYER_VAR, is_input=False), _pin(shot, "Condition"))
     _connect(exec_in, _pin(shot, "execute"))
 
-    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 + 480, y0 + 240)
-    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 720, y0)
+    mode = _node(ed, FN_GET_GAME_MODE)
+    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     _connect(BEL.find_then_pin(shot), _pin(as_mode, "execute"))
     mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
 
-    tally = _at(ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH),
-                x0 + 960, y0 + 240)
+    tally = ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(tally, "self"))
-    one_more = _at(_node(ed, FN_ADD_II), x0 + 1200, y0 + 240)
+    one_more = _node(ed, FN_ADD_II)
     _connect(_pin(tally, KILL_COUNT_VAR, is_input=False), _pin(one_more, "A"))
     _set(one_more, "B", 1)
-    write = _at(ed.add_set_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH),
-                x0 + 1440, y0)
+    write = ed.add_set_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(write, "self"))
     _connect(_pin(one_more, "ReturnValue", is_input=False), _pin(write, KILL_COUNT_VAR))
     _connect(BEL.find_then_pin(as_mode), _pin(write, "execute"))
@@ -82,21 +78,20 @@ def _author_kill_count(ed, exec_in, x0, y0):
     # Spawned before the owner is destroyed, at the owner's feet plus a lift --
     # the corpse's origin is at the capsule centre, so a drop placed exactly
     # there is inside the body on the frame it appears.
-    corpse = _at(_node(ed, FN_GET_OWNER), x0 + 1680, y0 + 380)
-    fell_at = _at(_node(ed, FN_ACTOR_LOC), x0 + 1920, y0 + 380)
+    corpse = _node(ed, FN_GET_OWNER)
+    fell_at = _node(ed, FN_ACTOR_LOC)
     _connect(_pin(corpse, "ReturnValue", is_input=False), _pin(fell_at, "self"))
-    lifted = _at(_node(ed, FN_ADD_VV), x0 + 2160, y0 + 380)
+    lifted = _node(ed, FN_ADD_VV)
     _connect(_pin(fell_at, "ReturnValue", is_input=False), _pin(lifted, "A"))
-    _connect(_vec(ed, 0.0, 0.0, AMMO_PICKUP_LIFT, x0 + 1920, y0 + 520),
-             _pin(lifted, "B"))
-    where = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 2400, y0 + 380)
+    _connect(_vec(ed, 0.0, 0.0, AMMO_PICKUP_LIFT), _pin(lifted, "B"))
+    where = _node(ed, FN_MAKE_TRANSFORM)
     _connect(_pin(lifted, "ReturnValue", is_input=False), _pin(where, "Location"))
     # A struct pin cannot be given a literal, and an unset Scale pin compiles to
     # the zero vector -- which spawns the pickup at zero size, invisible.
-    _connect(_vec(ed, 1.0, 1.0, 1.0, x0 + 2160, y0 + 560), _pin(where, "Scale"))
+    _connect(_vec(ed, 1.0, 1.0, 1.0), _pin(where, "Scale"))
 
-    ammo_cls = _at(ed.add_get_member_variable_node("AmmoClass"), x0 + 2400, y0 + 240)
-    drop = _at(_palette(ed, NODE_SPAWN), x0 + 2660, y0)
+    ammo_cls = ed.add_get_member_variable_node("AmmoClass")
+    drop = _palette(ed, NODE_SPAWN)
     _connect(_pin(ammo_cls, "AmmoClass", is_input=False), _pin(drop, "Class"))
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(drop, "SpawnTransform"))
     _set(drop, "CollisionHandlingOverride", "AlwaysSpawn")
@@ -112,15 +107,15 @@ def _author_kill_count(ed, exec_in, x0, y0):
 
     gun_exits = _author_gun_drop(ed, mode_out,
                                  _pin(lifted, "ReturnValue", is_input=False),
-                                 BEL.find_then_pin(drop), x0, y0 + 1000)
+                                 BEL.find_then_pin(drop))
     # Then what the body carries, for the loot window (loot/roll.py). After the
     # gun drop, on the same counted-kill arm.
-    looted = author_loot_roll(ed, gun_exits, x0 + 5200, y0 + 1000)
+    looted = author_loot_roll(ed, gun_exits)
     return (looted, _pin(as_mode, "CastFailed", is_input=False),
             BEL.find_else_pin(shot))
 
 
-def _author_death_collapse(ed, exec_ins, x0, y0):
+def _author_death_collapse(ed, exec_ins):
     """The body goes down, physically, and stops being in the way.
 
     Shared by the player and by every wanderer, which is the point: there is
@@ -148,42 +143,37 @@ def _author_death_collapse(ed, exec_ins, x0, y0):
 
     Returns the exec to carry on with.
     """
-    owner = _at(_node(ed, FN_GET_OWNER), x0, y0 + 240)
-    as_char = _at(_palette(ed, NODE_CAST_CHARACTER), x0 + 240, y0)
+    owner = _node(ed, FN_GET_OWNER)
+    as_char = _palette(ed, NODE_CAST_CHARACTER)
     _connect(_pin(owner, "ReturnValue", is_input=False), _pin(as_char, "Object"))
     for tail in exec_ins:
         _connect(tail, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    movement = _at(ed.add_get_member_variable_node("CharacterMovement",
-                                                   "/Script/Engine.Character"),
-                   x0 + 480, y0 + 240)
+    movement = ed.add_get_member_variable_node("CharacterMovement", "/Script/Engine.Character")
     _connect(char_out, _pin(movement, "self"))
-    stop = _at(_node(ed, FN_DISABLE_MOVEMENT), x0 + 720, y0)
+    stop = _node(ed, FN_DISABLE_MOVEMENT)
     _connect(_pin(movement, "CharacterMovement", is_input=False), _pin(stop, "self"))
     _connect(BEL.find_then_pin(as_char), _pin(stop, "execute"))
 
-    capsule = _at(ed.add_get_member_variable_node("CapsuleComponent",
-                                                  "/Script/Engine.Character"),
-                  x0 + 960, y0 + 240)
+    capsule = ed.add_get_member_variable_node("CapsuleComponent", "/Script/Engine.Character")
     _connect(char_out, _pin(capsule, "self"))
-    intangible = _at(_node(ed, FN_SET_COLLISION), x0 + 1200, y0)
+    intangible = _node(ed, FN_SET_COLLISION)
     _connect(_pin(capsule, "CapsuleComponent", is_input=False),
              _pin(intangible, "self"))
     _set(intangible, "NewType", "NoCollision")
     _connect(BEL.find_then_pin(stop), _pin(intangible, "execute"))
 
-    mesh = _at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
-               x0 + 1440, y0 + 240)
+    mesh = ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character")
     _connect(char_out, _pin(mesh, "self"))
     mesh_out = _pin(mesh, "Mesh", is_input=False)
 
-    loosen = _at(_node(ed, FN_SET_PROFILE), x0 + 1680, y0)
+    loosen = _node(ed, FN_SET_PROFILE)
     _connect(mesh_out, _pin(loosen, "self"))
     _set(loosen, "InCollisionProfileName", RAGDOLL_PROFILE)
     _connect(BEL.find_then_pin(intangible), _pin(loosen, "execute"))
 
-    limp = _at(_node(ed, FN_SIMULATE_ALL), x0 + 1920, y0)
+    limp = _node(ed, FN_SIMULATE_ALL)
     _connect(mesh_out, _pin(limp, "self"))
     _set(limp, "bNewSimulate", "true")
     _connect(BEL.find_then_pin(loosen), _pin(limp, "execute"))
@@ -204,7 +194,7 @@ def _author_death_collapse(ed, exec_ins, x0, y0):
             _pin(as_char, "CastFailed", is_input=False))
 
 
-def _author_corpse(ed, exec_ins, x0, y0):
+def _author_corpse(ed, exec_ins):
     """Everything a dead wanderer has to stop doing, and when it goes away.
 
     The collapse is shared (see _author_death_collapse); this is the half that
@@ -231,9 +221,9 @@ def _author_corpse(ed, exec_ins, x0, y0):
     would be a latent action on a component belonging to the actor it is
     waiting to destroy.
     """
-    owner = _at(_node(ed, FN_GET_OWNER), x0, y0 + 240)
+    owner = _node(ed, FN_GET_OWNER)
     owner_out = _pin(owner, "ReturnValue", is_input=False)
-    as_pawn = _at(_palette(ed, NODE_CAST_PAWN), x0 + 240, y0)
+    as_pawn = _palette(ed, NODE_CAST_PAWN)
     _connect(owner_out, _pin(as_pawn, "Object"))
     for tail in exec_ins:
         _connect(tail, _pin(as_pawn, "execute"))
@@ -241,21 +231,21 @@ def _author_corpse(ed, exec_ins, x0, y0):
     # GetController, not the Controller member: APawn::Controller is not marked
     # BlueprintReadOnly, and a get-variable node for it compiles as a warning
     # today and an error in a future release.
-    brain = _at(_node(ed, FN_GET_CONTROLLER), x0 + 480, y0 + 240)
+    brain = _node(ed, FN_GET_CONTROLLER)
     _connect(_loose_pin(as_pawn, "AsPawn", is_input=False), _pin(brain, "self"))
     brain_out = _pin(brain, "ReturnValue", is_input=False)
-    possessed = _at(_node(ed, FN_IS_VALID), x0 + 720, y0 + 240)
+    possessed = _node(ed, FN_IS_VALID)
     _connect(brain_out, _pin(possessed, "Object"))
-    has_brain = _at(ed.add_branch_node(), x0 + 960, y0)
+    has_brain = ed.add_branch_node()
     _connect(_pin(possessed, "ReturnValue", is_input=False), _pin(has_brain, "Condition"))
     _connect(BEL.find_then_pin(as_pawn), _pin(has_brain, "execute"))
 
-    lobotomy = _at(_node(ed, FN_LIFESPAN), x0 + 1200, y0)
+    lobotomy = _node(ed, FN_LIFESPAN)
     _connect(brain_out, _pin(lobotomy, "self"))
     _set(lobotomy, "InLifespan", CONTROLLER_RETIRE_SECONDS)
     _connect(BEL.find_then_pin(has_brain), _pin(lobotomy, "execute"))
 
-    rot = _at(_node(ed, FN_LIFESPAN), x0 + 1440, y0)
+    rot = _node(ed, FN_LIFESPAN)
     _connect(owner_out, _pin(rot, "self"))
     _set(rot, "InLifespan", CORPSE_SECONDS)
     for tail in (BEL.find_then_pin(lobotomy),
@@ -275,7 +265,7 @@ def _author_corpse(ed, exec_ins, x0, y0):
     return BEL.find_then_pin(rot)
 
 
-def _author_player_death(ed, exec_ins, x0, y0):
+def _author_player_death(ed, exec_ins):
     """The player is down: wait for the fall, then pause and open the menu.
 
     This is the DespawnOnDeath-false arm, and it now starts from a body that is
@@ -294,17 +284,16 @@ def _author_player_death(ed, exec_ins, x0, y0):
     to find the player's pawn, find this component and cast to it, every frame,
     to read one bool that the GameMode already exists to hold.
     """
-    wait = _at(_node(ed, FN_DELAY), x0, y0)
+    wait = _node(ed, FN_DELAY)
     _set(wait, "Duration", DEATH_PAUSE_SECONDS)
     for tail in exec_ins:
         _connect(tail, _pin(wait, "execute"))
 
-    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 + 240, y0 + 240)
-    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 480, y0)
+    mode = _node(ed, FN_GET_GAME_MODE)
+    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     _connect(BEL.find_then_pin(wait), _pin(as_mode, "execute"))
-    tell = _at(ed.add_set_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH),
-               x0 + 720, y0)
+    tell = ed.add_set_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH)
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(tell, "self"))
     _set(tell, PLAYER_DEAD_VAR, "true")
@@ -314,17 +303,15 @@ def _author_player_death(ed, exec_ins, x0, y0):
     # death path silently did nothing look exactly the same from outside, and
     # the menu that would tell them apart is drawn on a canvas that a headless
     # run has nobody looking at.
-    score = _at(ed.add_get_member_variable_node(KILL_COUNT_VAR,
-                                                GAME_MODE_CLASS_PATH),
-                x0 + 720, y0 + 400)
+    score = ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH)
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(score, "self"))
-    score_str = _at(_node(ed, FN_INT_TO_STR), x0 + 960, y0 + 400)
+    score_str = _node(ed, FN_INT_TO_STR)
     _connect(_pin(score, KILL_COUNT_VAR, is_input=False), _pin(score_str, "InInt"))
-    dead_line = _at(_node(ed, FN_CONCAT), x0 + 1200, y0 + 400)
+    dead_line = _node(ed, FN_CONCAT)
     _set(dead_line, "A", DEAD_LOG_PREFIX)
     _connect(_pin(score_str, "ReturnValue", is_input=False), _pin(dead_line, "B"))
-    say_dead = _at(_node(ed, FN_PRINT), x0 + 1200, y0)
+    say_dead = _node(ed, FN_PRINT)
     _connect(_pin(dead_line, "ReturnValue", is_input=False), _pin(say_dead, "InString"))
     # Log only: the menu is what says it on screen, and it says it better.
     _set(say_dead, "bPrintToScreen", "false")
@@ -335,7 +322,7 @@ def _author_player_death(ed, exec_ins, x0, y0):
     # Pause last, and on every arm: with the flag set the HUD draws the menu,
     # and with the game paused nothing moves behind it. The HUD polls its
     # restart key from the PlayerController, which ticks through a pause.
-    freeze = _at(_node(ed, FN_SET_PAUSED), x0 + 1460, y0)
+    freeze = _node(ed, FN_SET_PAUSED)
     _set(freeze, "bPaused", "true")
     for tail in (BEL.find_then_pin(say_dead),
                  _pin(as_mode, "CastFailed", is_input=False)):

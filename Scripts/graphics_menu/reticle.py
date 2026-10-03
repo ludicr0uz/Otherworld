@@ -5,7 +5,7 @@ the sights it is drawn only in debug mode. Split out of
 build_graphics_menu.py, which calls _author_reticle from DrawHUD.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.seat_tuning import RETICLE_HIDE_SEAT, SEAT_VAR
 from graphics_menu.scope import _author_scope, _author_scope_gate
 
@@ -48,7 +48,7 @@ COL_RETICLE = "(R=0.960000,G=0.960000,B=0.970000,A=0.900000)"
 COL_RETICLE_BLOCKED = "(R=0.950000,G=0.250000,B=0.200000,A=0.950000)"
 
 
-def _author_reticle(ed, x0, y0, in_execs):
+def _author_reticle(ed, in_execs):
     """A crosshair pinned to the centre of the screen.
 
     It was briefly drawn at the projected impact point instead, on the theory
@@ -90,107 +90,98 @@ def _author_reticle(ed, x0, y0, in_execs):
         made.append(n)
         return n
 
-    pawn = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 300))
+    pawn = keep(_node(ed, FN_GET_PLAYER_PAWN))
     _set(pawn, "PlayerIndex", 0)
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 240, y0 + 300))
+    comp = keep(_node(ed, FN_GET_COMP))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
 
-    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 500, y0))
+    cast = keep(_palette(ed, NODE_CAST_WEAPON))
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
     for e in in_execs:
         _connect(e, _pin(cast, "execute"))
     as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
-    valid = keep(_at(ed.add_get_member_variable_node("AimValid",
-                                                     WEAPON_COMP_CLASS_PATH),
-                     x0 + 760, y0 + 300))
+    valid = keep(ed.add_get_member_variable_node("AimValid", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(valid, "self"))
-    blocked = keep(_at(ed.add_get_member_variable_node("AimBlocked",
-                                                       WEAPON_COMP_CLASS_PATH),
-                       x0 + 760, y0 + 420))
+    blocked = keep(ed.add_get_member_variable_node("AimBlocked", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(blocked, "self"))
 
     # Empty hands draw nothing: a reticle with no weapon behind it points at a
     # shot that cannot be taken.
-    armed = keep(_at(ed.add_branch_node(), x0 + 1020, y0))
+    armed = keep(ed.add_branch_node())
     _connect(_pin(valid, "AimValid", is_input=False), _pin(armed, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(armed, "execute"))
 
     # Centre from the viewport, not from a constant: DrawRect works in canvas
     # pixels, which change with the window.
-    size = keep(_at(_node(ed, FN_VIEWPORT), x0 + 1020, y0 + 560))
-    wh = keep(_at(_node(ed, FN_BREAK_V2D), x0 + 1260, y0 + 560))
+    size = keep(_node(ed, FN_VIEWPORT))
+    wh = keep(_node(ed, FN_BREAK_V2D))
     _connect(_pin(size, "ReturnValue", is_input=False), _loose_pin(wh, "InVec"))
 
-    def half(axis, py):
-        n = keep(_at(_node(ed, FN_MUL), x0 + 1500, py))
+    def half(axis):
+        n = keep(_node(ed, FN_MUL))
         _connect(_loose_pin(wh, axis, is_input=False), _pin(n, "A"))
         _set(n, "B", 0.5)
         return _pin(n, "ReturnValue", is_input=False)
 
-    cx = half("X", y0 + 560)
-    cy = half("Y", y0 + 700)
+    cx = half("X")
+    cy = half("Y")
 
     # Held is read here rather than in _author_scope because both arms of the
     # branch below are downstream of it, and because AimValid is exactly the
     # weapon component's answer to "is Held valid" -- it is set false on the
     # empty-handed path, so under `armed` this Get cannot be an Accessed None.
-    held = keep(_at(ed.add_get_member_variable_node("Held",
-                                                    WEAPON_COMP_CLASS_PATH),
-                    x0 + 760, y0 + 540))
+    held = keep(ed.add_get_member_variable_node("Held", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(held, "self"))
     held_out = _pin(held, "Held", is_input=False)
-    scoped = keep(_at(ed.add_get_member_variable_node("Scoped", ITEM_CLASS_PATH),
-                      x0 + 1020, y0 + 540))
+    scoped = keep(ed.add_get_member_variable_node("Scoped", ITEM_CLASS_PATH))
     _connect(held_out, _pin(scoped, "self"))
-    glass = keep(_at(ed.add_branch_node(), x0 + 1260, y0))
+    glass = keep(ed.add_branch_node())
     _connect(_author_scope_gate(ed, as_weapon,
-                                _pin(scoped, "Scoped", is_input=False), keep,
-                                x0 + 1020, y0 + 1000),
+                                _pin(scoped, "Scoped", is_input=False), keep),
              _pin(glass, "Condition"))
     _connect(BEL.find_then_pin(armed), _pin(glass, "execute"))
 
-    scoped_tail = _author_scope(ed, x0 + 4000, y0, BEL.find_then_pin(glass),
+    scoped_tail = _author_scope(ed, BEL.find_then_pin(glass),
                                 as_weapon, held_out, cx, cy,
                                 _loose_pin(wh, "Y", is_input=False))
 
-    colour = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1500, y0 + 840))
+    colour = keep(_node(ed, FN_SELECT_COLOR))
     _set(colour, "A", COL_RETICLE_BLOCKED)
     _set(colour, "B", COL_RETICLE)
     _connect(_pin(blocked, "AimBlocked", is_input=False), _pin(colour, "bPickA"))
     colour_out = _pin(colour, "ReturnValue", is_input=False)
 
-    def offset(src, by, px, py):
+    def offset(src, by):
         """centre + by, as a node -- DrawRect wants the corner, we have the middle."""
-        n = keep(_at(_node(ed, FN_ADD), px, py))
+        n = keep(_node(ed, FN_ADD))
         _connect(src, _pin(n, "A"))
         _set(n, "B", by)
         return _pin(n, "ReturnValue", is_input=False)
 
     # The cloud's radius on screen, and the centre pushed out by it each way
     # for the four ticks. The dot stays on the true centre.
-    reticle_spread = keep(_at(ed.add_get_member_variable_node(
-        "ReticleSpread", WEAPON_COMP_CLASS_PATH), x0 + 1260, y0 + 1300))
+    reticle_spread = keep(ed.add_get_member_variable_node("ReticleSpread", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(reticle_spread, "self"))
-    spread_px = keep(_at(_node(ed, FN_MUL), x0 + 1500, y0 + 1300))
+    spread_px = keep(_node(ed, FN_MUL))
     _connect(_pin(reticle_spread, "ReticleSpread", is_input=False), _pin(spread_px, "A"))
     _connect(cx, _pin(spread_px, "B"))
     # FMin, not FClamp: ReticleSpread is never negative, and the verifier
     # reads every FClamp on this HUD as a settings slider.
-    capped = keep(_at(_node(ed, FN_FMIN), x0 + 1740, y0 + 1300))
+    capped = keep(_node(ed, FN_FMIN))
     _connect(_pin(spread_px, "ReturnValue", is_input=False), _pin(capped, "A"))
     _set(capped, "B", RETICLE_SPREAD_MAX)
     capped_out = _pin(capped, "ReturnValue", is_input=False)
 
-    def pushed(centre, fn, py):
-        n = keep(_at(_node(ed, fn), x0 + 1980, py))
+    def pushed(centre, fn):
+        n = keep(_node(ed, fn))
         _connect(centre, _pin(n, "A"))
         _connect(capped_out, _pin(n, "B"))
         return _pin(n, "ReturnValue", is_input=False)
 
-    left_x, right_x = pushed(cx, FN_SUB, y0 + 1200), pushed(cx, FN_ADD, y0 + 1320)
-    top_y, bottom_y = pushed(cy, FN_SUB, y0 + 1440), pushed(cy, FN_ADD, y0 + 1560)
+    left_x, right_x = pushed(cx, FN_SUB), pushed(cx, FN_ADD)
+    top_y, bottom_y = pushed(cy, FN_SUB), pushed(cy, FN_ADD)
 
     half_t = RETICLE_THICK / 2.0
     half_d = RETICLE_DOT / 2.0
@@ -208,31 +199,29 @@ def _author_reticle(ed, x0, y0, in_execs):
 
     # Down the sights, outside debug mode, the gun's own sights are the
     # reticle. Under `armed`, so the component is valid.
-    seat = keep(_at(ed.add_get_member_variable_node(SEAT_VAR, WEAPON_COMP_CLASS_PATH),
-                    x0 + 1260, y0 - 420))
+    seat = keep(ed.add_get_member_variable_node(SEAT_VAR, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(seat, "self"))
-    on_sights = keep(_at(_node(ed, FN_GREATER), x0 + 1500, y0 - 420))
+    on_sights = keep(_node(ed, FN_GREATER))
     _connect(_pin(seat, SEAT_VAR, is_input=False), _pin(on_sights, "A"))
     _set(on_sights, "B", RETICLE_HIDE_SEAT)
-    debug = keep(_at(ed.add_get_member_variable_node("DebugOn"), x0 + 1260, y0 - 280))
-    plain = keep(_at(_node(ed, FN_NOT), x0 + 1500, y0 - 280))
+    debug = keep(ed.add_get_member_variable_node("DebugOn"))
+    plain = keep(_node(ed, FN_NOT))
     _connect(_pin(debug, "DebugOn", is_input=False), _pin(plain, "A"))
-    irons = keep(_at(_node(ed, FN_AND), x0 + 1740, y0 - 360))
+    irons = keep(_node(ed, FN_AND))
     _connect(_pin(on_sights, "ReturnValue", is_input=False), _pin(irons, "A"))
     _connect(_pin(plain, "ReturnValue", is_input=False), _pin(irons, "B"))
-    hidden = keep(_at(ed.add_branch_node(), x0 + 1520, y0))
+    hidden = keep(ed.add_branch_node())
     _connect(_pin(irons, "ReturnValue", is_input=False), _pin(hidden, "Condition"))
     _connect(BEL.find_else_pin(glass), _pin(hidden, "execute"))
 
     flow = BEL.find_else_pin(hidden)
-    for i, (name, fx, dx, fy, dy, w, h) in enumerate(pieces):
-        px = x0 + 1800 + i * 260
-        r = keep(_at(_node(ed, FN_DRAW_RECT), px, y0))
+    for name, fx, dx, fy, dy, w, h in pieces:
+        r = keep(_node(ed, FN_DRAW_RECT))
         _set(r, "ScreenW", w)
         _set(r, "ScreenH", h)
         _connect(colour_out, _pin(r, "RectColor"))
-        _connect(offset(fx, dx, px, y0 + 300), _pin(r, "ScreenX"))
-        _connect(offset(fy, dy, px, y0 + 440), _pin(r, "ScreenY"))
+        _connect(offset(fx, dx), _pin(r, "ScreenX"))
+        _connect(offset(fy, dy), _pin(r, "ScreenY"))
         _connect(flow, _pin(r, "execute"))
         flow = BEL.find_then_pin(r)
 

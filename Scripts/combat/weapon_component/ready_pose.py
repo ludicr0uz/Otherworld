@@ -5,7 +5,7 @@ which is what starts and stops it (carry.py writes Lowered).
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
 from combat.nodes import (
     FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NEQ_BB, FN_NOT,
@@ -14,7 +14,7 @@ from combat.nodes import (
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 
 
-def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
+def _author_ready_pose_keepalive(ed, held, exec_ins):
     """Put the ready pose back after a hit reaction has taken it away.
 
     THIS IS NOT BELT AND BRACES, it is the price of the second slot.
@@ -57,47 +57,47 @@ def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    mesh = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0, y0 + 500))
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 240, y0 + 500))
+    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(anim, "self"))
     anim_out = _pin(anim, "ReturnValue", is_input=False)
 
-    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 160))
+    armed = keep(_node(ed, FN_IS_VALID))
     _connect(held, _pin(armed, "Object"))
-    running = keep(_at(ed.add_get_member_variable_node(LOWERED_VAR), x0, y0 + 280))
-    still = keep(_at(_node(ed, FN_NOT), x0 + 240, y0 + 280))
+    running = keep(ed.add_get_member_variable_node(LOWERED_VAR))
+    still = keep(_node(ed, FN_NOT))
     _connect(_pin(running, LOWERED_VAR, is_input=False), _pin(still, "A"))
 
-    aiming = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 480, y0 + 620))
+    aiming = keep(_node(ed, FN_IS_SLOT_ACTIVE))
     _connect(anim_out, _pin(aiming, "self"))
     _set(aiming, "SlotNodeName", AIM_SLOT)
-    no_pose = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 620))
+    no_pose = keep(_node(ed, FN_NOT))
     _connect(_pin(aiming, "ReturnValue", is_input=False), _pin(no_pose, "A"))
 
-    flinching = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 480, y0 + 760))
+    flinching = keep(_node(ed, FN_IS_SLOT_ACTIVE))
     _connect(anim_out, _pin(flinching, "self"))
     _set(flinching, "SlotNodeName", HIT_SLOT)
-    settled = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 760))
+    settled = keep(_node(ed, FN_NOT))
     _connect(_pin(flinching, "ReturnValue", is_input=False), _pin(settled, "A"))
 
-    ready = keep(_at(_node(ed, FN_AND), x0 + 480, y0 + 220))
+    ready = keep(_node(ed, FN_AND))
     _connect(_pin(armed, "ReturnValue", is_input=False), _pin(ready, "A"))
     _connect(_pin(still, "ReturnValue", is_input=False), _pin(ready, "B"))
-    quiet = keep(_at(_node(ed, FN_AND), x0 + 960, y0 + 680))
+    quiet = keep(_node(ed, FN_AND))
     _connect(_pin(no_pose, "ReturnValue", is_input=False), _pin(quiet, "A"))
     _connect(_pin(settled, "ReturnValue", is_input=False), _pin(quiet, "B"))
-    needed = keep(_at(_node(ed, FN_AND), x0 + 1200, y0 + 400))
+    needed = keep(_node(ed, FN_AND))
     _connect(_pin(ready, "ReturnValue", is_input=False), _pin(needed, "A"))
     _connect(_pin(quiet, "ReturnValue", is_input=False), _pin(needed, "B"))
 
-    gate = keep(_at(ed.add_branch_node(), x0 + 1440, y0))
+    gate = keep(ed.add_branch_node())
     _connect(_pin(needed, "ReturnValue", is_input=False), _pin(gate, "Condition"))
     for tail in exec_ins:
         _connect(tail, _pin(gate, "execute"))
 
-    pose_pin, pose_n = _prop(ed, "AimPose", held, x0 + 1440, y0 + 300)
+    pose_pin, pose_n = _prop(ed, "AimPose", held)
     keep(pose_n)
-    replay = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 1720, y0))
+    replay = keep(_node(ed, FN_PLAY_SLOT))
     _connect(anim_out, _pin(replay, "self"))
     _connect(pose_pin, _pin(replay, "Asset"))
     _set(replay, "SlotNodeName", AIM_SLOT)
@@ -114,12 +114,12 @@ def _author_ready_pose_keepalive(ed, held, exec_ins, x0, y0):
         # the restart is silent and the only other evidence is a slot weight
         # sampled from outside, which cannot be caught in the 0.05 s gap
         # between two flinches when ten wanderers are hitting the player.
-        say = keep(_at(_node(ed, FN_WARN), x0 + 1980, y0 + 300))
+        say = keep(_node(ed, FN_WARN))
         _set(say, "InString", POSE_BACK_PROBE_PREFIX + "ready pose restarted")
         _connect(after_replay, _pin(say, "execute"))
         after_replay = BEL.find_then_pin(say)
 
-    join = keep(_at(ed.add_branch_node(), x0 + 2240, y0))
+    join = keep(ed.add_branch_node())
     _set(join, "Condition", "true")
     _connect(after_replay, _pin(join, "execute"))
     _connect(BEL.find_else_pin(gate), _pin(join, "execute"))
@@ -144,20 +144,20 @@ def _author_lowered_pose_edge(ed, exec_ins):
     # second, which is a weapon that flickers. PoseLowered is what the pose
     # currently reflects, Lowered (carry.py) is what it should reflect,
     # and only the frames where those disagree do any work.
-    now_sprint = _at(ed.add_get_member_variable_node(LOWERED_VAR), 240, 1020)
+    now_sprint = ed.add_get_member_variable_node(LOWERED_VAR)
     now_sprint_out = _pin(now_sprint, LOWERED_VAR, is_input=False)
-    posed = _at(ed.add_get_member_variable_node(POSE_LOWERED_VAR), 240, 1140)
-    changed = _at(_node(ed, FN_NEQ_BB), 520, 1060)
+    posed = ed.add_get_member_variable_node(POSE_LOWERED_VAR)
+    changed = _node(ed, FN_NEQ_BB)
     _connect(now_sprint_out, _pin(changed, "A"))
     _connect(_pin(posed, POSE_LOWERED_VAR, is_input=False), _pin(changed, "B"))
-    pose_gate = _at(ed.add_branch_node(), 780, 940)
+    pose_gate = ed.add_branch_node()
     _connect(_pin(changed, "ReturnValue", is_input=False), _pin(pose_gate, "Condition"))
     for exit_pin in exec_ins:
         _connect(exit_pin, _pin(pose_gate, "execute"))
-    remember = _at(ed.add_set_member_variable_node(POSE_LOWERED_VAR), 1040, 940)
+    remember = ed.add_set_member_variable_node(POSE_LOWERED_VAR)
     _connect(now_sprint_out, _pin(remember, POSE_LOWERED_VAR))
     _connect(BEL.find_then_pin(pose_gate), _pin(remember, "execute"))
-    pose_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 1300, 940)
+    pose_dirty = ed.add_set_member_variable_node("NeedsRefresh")
     _set(pose_dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(remember), _pin(pose_dirty, "execute"))
 

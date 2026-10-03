@@ -10,6 +10,7 @@ import unreal
 from combat.graph import (
     BEL, BGE, _create_blueprint, _declare, _float_type, _log, _must_load,
 )
+from uebp.layout import arrange
 from combat.paths import ITEM_BP_PATH
 from graphics_menu.profile_consts import (
     ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
@@ -34,6 +35,7 @@ def build_profile_savegame():
              BEL.get_array_type(BEL.get_class_reference_type(item_class)))
     for field, _item_var in ITEM_FIELDS:
         _declare(ed, field, BEL.get_array_type(int_type))
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_Profile failed to compile")
     unreal.get_editor_subsystem(unreal.EditorAssetSubsystem).save_loaded_asset(bp)

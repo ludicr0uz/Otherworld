@@ -55,9 +55,9 @@ import unreal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # The authoring helpers every builder shares.
-from uebp.graph import (                                           # noqa: E402
-    BEL, BGE, PIN, _assets, _at, _connect, _create_blueprint, _key, _loose_pin, _node,
-    _palette, _pin, _set, make_log)
+from uebp.graph import (
+    BEL, BGE, PIN, _assets, _connect, _create_blueprint, _key, _loose_pin, _node, _palette,
+    _pin, _set, make_log)
 # BP_Settings' asset path. The settings screen's own contract with the combat
 # package (BIND_VARS, the sensitivity limits) lives in graphics_menu/settings_rows.py.
 from combat import paths as combat_paths                           # noqa: E402
@@ -91,6 +91,7 @@ from graphics_menu.wbp_screens import (                            # noqa: E402
     build_death_menu, build_main_menu, build_pause_menu)
 from graphics_menu.ui_graph import (                               # noqa: E402
     author_create_screens, declare_ui_vars)
+from uebp.layout import arrange                                 # noqa: E402
 from graphics_menu.menu_screens import (                           # noqa: E402
     author_alive, author_death_menu, author_pause_menu, author_title)
 from graphics_menu.hud_stats import author_hp, author_kills         # noqa: E402
@@ -411,7 +412,7 @@ def _chain(node, in_exec):
     return in_exec
 
 
-def _author_load_settings(ed, x0, y0, in_exec):
+def _author_load_settings(ed, in_exec):
     """BeginPlay: bring the saved settings in, or start a fresh set.
 
     Two ways to end up with a BP_Settings and one repair. The repair -- refill
@@ -427,24 +428,24 @@ def _author_load_settings(ed, x0, y0, in_exec):
         made.append(n)
         return n
 
-    exists = keep(_at(_node(ed, FN_SAVE_EXISTS), x0, y0 + 240))
+    exists = keep(_node(ed, FN_SAVE_EXISTS))
     _set(exists, "SlotName", SETTINGS_SLOT)
     _set(exists, "UserIndex", SETTINGS_USER_INDEX)
     flow = _chain(exists, in_exec)
 
-    have = keep(_at(ed.add_branch_node(), x0 + 260, y0))
+    have = keep(ed.add_branch_node())
     _connect(_pin(exists, "ReturnValue", is_input=False), _pin(have, "Condition"))
     _connect(flow, _pin(have, "execute"))
 
-    loaded = keep(_at(_node(ed, FN_LOAD_SAVE), x0 + 520, y0))
+    loaded = keep(_node(ed, FN_LOAD_SAVE))
     _set(loaded, "SlotName", SETTINGS_SLOT)
     _set(loaded, "UserIndex", SETTINGS_USER_INDEX)
     after_load = _chain(loaded, BEL.find_then_pin(have))
 
-    as_saved = keep(_at(_palette(ed, NODE_CAST_SETTINGS), x0 + 780, y0))
+    as_saved = keep(_palette(ed, NODE_CAST_SETTINGS))
     _connect(_pin(loaded, "ReturnValue", is_input=False), _pin(as_saved, "Object"))
     _connect(after_load, _pin(as_saved, "execute"))
-    took = keep(_at(ed.add_set_member_variable_node("Settings"), x0 + 1040, y0))
+    took = keep(ed.add_set_member_variable_node("Settings"))
     _connect(_loose_pin(as_saved, "AsBPSettings", is_input=False),
              _pin(took, "Settings"))
     _connect(BEL.find_then_pin(as_saved), _pin(took, "execute"))
@@ -453,55 +454,50 @@ def _author_load_settings(ed, x0, y0, in_exec):
     # same situation as no save at all -- so the failed arm joins the create
     # path rather than leaving Settings null and every read below an
     # Accessed None.
-    fresh = keep(_at(_node(ed, FN_CREATE_SAVE), x0 + 520, y0 + 460))
+    fresh = keep(_node(ed, FN_CREATE_SAVE))
     _pin(fresh, "SaveGameClass").set_pin_value(SETTINGS_CLASS_PATH)
     for e in (BEL.find_else_pin(have),
               _pin(as_saved, "CastFailed", is_input=False)):
         _connect(e, _pin(fresh, "execute"))
-    as_new = keep(_at(_palette(ed, NODE_CAST_SETTINGS), x0 + 780, y0 + 460))
+    as_new = keep(_palette(ed, NODE_CAST_SETTINGS))
     _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(as_new, "Object"))
     _connect(BEL.find_then_pin(fresh), _pin(as_new, "execute"))
-    made_it = keep(_at(ed.add_set_member_variable_node("Settings"),
-                       x0 + 1040, y0 + 460))
+    made_it = keep(ed.add_set_member_variable_node("Settings"))
     _connect(_loose_pin(as_new, "AsBPSettings", is_input=False),
              _pin(made_it, "Settings"))
     _connect(BEL.find_then_pin(as_new), _pin(made_it, "execute"))
 
-    got = keep(_at(ed.add_get_member_variable_node("Settings"),
-                   x0 + 1300, y0 + 700))
+    got = keep(ed.add_get_member_variable_node("Settings"))
     settings_out = _pin(got, "Settings", is_input=False)
-    binds = keep(_at(ed.add_get_member_variable_node("Binds",
-                                                     SETTINGS_CLASS_PATH),
-                     x0 + 1300, y0 + 840))
+    binds = keep(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(binds, "self"))
     binds_out = _pin(binds, "Binds", is_input=False)
 
-    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 1560, y0 + 840))
+    count = keep(_node(ed, FN_ARR_LEN))
     _connect(binds_out, _loose_pin(count, "TargetArray"))
-    short = keep(_at(_node(ed, FN_NEQ_II), x0 + 1800, y0 + 840))
+    short = keep(_node(ed, FN_NEQ_II))
     _connect(_pin(count, "ReturnValue", is_input=False), _pin(short, "A"))
     _set(short, "B", len(BIND_VARS))
 
-    repair = keep(_at(ed.add_branch_node(), x0 + 2060, y0 + 240))
+    repair = keep(ed.add_branch_node())
     _connect(_pin(short, "ReturnValue", is_input=False), _pin(repair, "Condition"))
     for e in (BEL.find_then_pin(took), BEL.find_then_pin(made_it),
               _pin(as_new, "CastFailed", is_input=False)):
         _connect(e, _pin(repair, "execute"))
 
-    wipe = keep(_at(_node(ed, FN_ARR_CLEAR), x0 + 2320, y0 + 240))
+    wipe = keep(_node(ed, FN_ARR_CLEAR))
     _connect(binds_out, _loose_pin(wipe, "TargetArray"))
     _connect(BEL.find_then_pin(repair), _pin(wipe, "execute"))
     flow = BEL.find_then_pin(wipe)
-    for i, (_var, key) in enumerate(BIND_VARS):
-        add = keep(_at(_node(ed, FN_ARR_ADD), x0 + 2580 + i * 260, y0 + 240))
+    for _var, key in BIND_VARS:
+        add = keep(_node(ed, FN_ARR_ADD))
         _connect(binds_out, _loose_pin(add, "TargetArray"))
         # Bare key name, never struct text: FKey exports as just its name, so
         # '(KeyName="Q")' imports back as a key literally called "(".
         _set(add, "NewItem", key)
         _connect(flow, _pin(add, "execute"))
         flow = BEL.find_then_pin(add)
-    saved, writer = _emit_save(ed, settings_out, flow,
-                               x0 + 2580 + len(BIND_VARS) * 260, y0 + 240)
+    saved, writer = _emit_save(ed, settings_out, flow)
     made.append(writer)
 
     ed.add_comment_to_nodes(
@@ -515,24 +511,22 @@ def _author_load_settings(ed, x0, y0, in_exec):
     return (saved, BEL.find_else_pin(repair))
 
 
-def _author_restore_debug(ed, x0, y0, in_execs):
+def _author_restore_debug(ed, in_execs):
     """BeginPlay: GameMode.DebugMode = Settings.DebugMode.
 
     The save is the record and the GameMode is where the game reads it, so the
     one copy happens as soon as Settings is known to be valid. A GameMode that
     is not BP_ThirdPersonGameMode has nowhere to put it, and goes on without.
     """
-    gm = _at(_node(ed, FN_GET_GAME_MODE), x0, y0 + 240)
-    as_gm = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 260, y0)
+    gm = _node(ed, FN_GET_GAME_MODE)
+    as_gm = _palette(ed, NODE_CAST_GAME_MODE)
     _connect(_pin(gm, "ReturnValue", is_input=False), _pin(as_gm, "Object"))
     for e in in_execs:
         _connect(e, _pin(as_gm, "execute"))
-    settings = _at(ed.add_get_member_variable_node("Settings"), x0 + 260, y0 + 400)
-    saved = _at(ed.add_get_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH),
-                x0 + 520, y0 + 400)
+    settings = ed.add_get_member_variable_node("Settings")
+    saved = ed.add_get_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH)
     _connect(_pin(settings, "Settings", is_input=False), _pin(saved, "self"))
-    put = _at(ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH),
-              x0 + 780, y0)
+    put = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
     _connect(_loose_pin(as_gm, "AsBPThirdPersonGameMode", is_input=False),
              _pin(put, "self"))
     _connect(_pin(saved, DEBUG_MODE_VAR, is_input=False), _pin(put, DEBUG_MODE_VAR))
@@ -547,11 +541,9 @@ def _author_restore_debug(ed, x0, y0, in_execs):
 # ─── Event BeginPlay: the startup default ────────────────────────────────────
 
 def _author_begin_play(ed, begin_play):
-    origin = BEL.get_node_pos(begin_play)
     # The UMG screens before anything else, so they exist by the first DrawHUD.
-    created = author_create_screens(ed, BEL.find_then_pin(begin_play),
-                                    origin.x + 320, origin.y - 2400)
-    made = emit_apply(ed, DEFAULT_PRESET, origin.x + 320, origin.y, created)
+    created = author_create_screens(ed, BEL.find_then_pin(begin_play))
+    made = emit_apply(ed, DEFAULT_PRESET, created)
     label = PRESETS[DEFAULT_PRESET].label
     ed.add_comment_to_nodes(
         f"A player with no graphics save starts at {label}, graphics_tuning.csv's "
@@ -566,13 +558,10 @@ def _author_begin_play(ed, begin_play):
     # The settings only have to exist by the first DrawHUD, and putting disk
     # access in front of the preset would let a failed load hide a failed
     # preset.
-    loaded_tails = _author_load_settings(ed, origin.x + 320, origin.y + 1100,
-                                         BEL.find_then_pin(made[-1]))
-    loaded_tails = _author_restore_debug(ed, origin.x + 320, origin.y + 2300,
-                                         loaded_tails)
+    loaded_tails = _author_load_settings(ed, BEL.find_then_pin(made[-1]))
+    loaded_tails = _author_restore_debug(ed, loaded_tails)
     # The player's own preset and Custom row, over the default set above.
-    loaded_tails = author_load_graphics(ed, loaded_tails, origin.x + 320,
-                                        origin.y + 3400)
+    loaded_tails = author_load_graphics(ed, loaded_tails)
 
     # --- open paused, on the menu -------------------------------------------
     # Pausing is what makes the menu a menu. Without it the level is live
@@ -583,14 +572,13 @@ def _author_begin_play(ed, begin_play):
     # below silently reads an empty string, which means the switch would never
     # be seen and every headless run would sit on the menu. It warns, loudly,
     # and verify_graphics_menu fails on node warnings for exactly this reason.
-    mx, my = origin.x + 320, origin.y - 900
-    cmdline = _at(_node(ed, FN_COMMAND_LINE), mx, my + 320)
-    skipping = _at(_node(ed, FN_CONTAINS), mx + 240, my + 320)
+    cmdline = _node(ed, FN_COMMAND_LINE)
+    skipping = _node(ed, FN_CONTAINS)
     _connect(_pin(cmdline, "ReturnValue", is_input=False), _pin(skipping, "SearchIn"))
     _set(skipping, "Substring", SKIP_MENU_SWITCH)
-    wants_menu = _at(_node(ed, FN_NOT), mx + 480, my + 320)
+    wants_menu = _node(ed, FN_NOT)
     _connect(_pin(skipping, "ReturnValue", is_input=False), _pin(wants_menu, "A"))
-    shown = _at(ed.add_branch_node(), mx + 480, my)
+    shown = ed.add_branch_node()
     _connect(_pin(wants_menu, "ReturnValue", is_input=False), _pin(shown, "Condition"))
     for tail in loaded_tails:
         _connect(tail, _pin(cmdline, "execute"))
@@ -599,24 +587,21 @@ def _author_begin_play(ed, begin_play):
     # Not paused on frame zero -- see MENU_SETTLE_S. And only if the player has
     # not already pressed Enter inside that window: pausing after NEW GAME
     # would freeze the game with no menu left to unpause it.
-    settle = _at(_node(ed, FN_DELAY), mx + 740, my)
+    settle = _node(ed, FN_DELAY)
     _set(settle, "Duration", MENU_SETTLE_S)
     # The menu's rows are served on Tick, which a paused world stops.
-    _connect(author_title_ticks(ed, [BEL.find_then_pin(shown)], mx + 740, my - 500),
-             _pin(settle, "execute"))
-    started = _at(ed.add_get_member_variable_node(GAME_STARTED_VAR),
-                  mx + 740, my + 320)
-    still_on_menu = _at(ed.add_branch_node(), mx + 1000, my)
+    _connect(author_title_ticks(ed, [BEL.find_then_pin(shown)]), _pin(settle, "execute"))
+    started = ed.add_get_member_variable_node(GAME_STARTED_VAR)
+    still_on_menu = ed.add_branch_node()
     _connect(_pin(started, GAME_STARTED_VAR, is_input=False),
              _pin(still_on_menu, "Condition"))
     _connect(BEL.find_then_pin(settle), _pin(still_on_menu, "execute"))
-    hold = _at(_node(ed, FN_SET_PAUSED), mx + 1260, my)
+    hold = _node(ed, FN_SET_PAUSED)
     _set(hold, "bPaused", "true")
     _connect(BEL.find_else_pin(still_on_menu), _pin(hold, "execute"))
 
     # Straight into the game, for a run with nobody to press Enter.
-    skip = _at(ed.add_set_member_variable_node(GAME_STARTED_VAR),
-               mx + 740, my + 480)
+    skip = ed.add_set_member_variable_node(GAME_STARTED_VAR)
     _set(skip, GAME_STARTED_VAR, "true")
     _connect(BEL.find_else_pin(shown), _pin(skip, "execute"))
 
@@ -637,36 +622,33 @@ def _author_begin_play(ed, begin_play):
 # ─── Event Tick: input ───────────────────────────────────────────────────────
 
 def _author_tick(ed, tick):
-    origin = BEL.get_node_pos(tick)
-    x0, y0 = origin.x, origin.y
-
     # One PlayerController read feeds every key test and every console command.
-    pc = _at(_node(ed, FN_GET_OWNING_PC), x0, y0 + 180)
+    pc = _node(ed, FN_GET_OWNING_PC)
     pc_out = _pin(pc, "ReturnValue", is_input=False)
 
     # First the open menu holds the player still (menu_still.py). Then, only
     # with a game in play: save and exit, the profile load and the death wipe
     # (save_exit.py), and the loot window (loot_tick.py): the body in reach,
     # its keys, a take. The title's Tick skips them (menu_main.py).
-    stilled = author_menu_still(ed, pc_out, [BEL.find_then_pin(tick)], x0, y0 - 6000)
-    in_play, on_title = author_in_play(ed, stilled, x0 - 600, y0 - 4000)
-    saved = author_save_exit_tick(ed, pc_out, [in_play], x0, y0 - 4000)
-    looted = author_loot_tick(ed, pc_out, saved, x0 + 30000, y0 - 4000)
+    stilled = author_menu_still(ed, pc_out, [BEL.find_then_pin(tick)])
+    in_play, on_title = author_in_play(ed, stilled)
+    saved = author_save_exit_tick(ed, pc_out, [in_play])
+    looted = author_loot_tick(ed, pc_out, saved)
     # The I panel (wear_tick.py): what the player wears, and a take-off.
-    looted = author_wear_tick(ed, pc_out, looted, x0 + 30000, y0 - 9000)
+    looted = author_wear_tick(ed, pc_out, looted)
     # Then the menu's tuning tabs (tune_tick.py and its four siblings).
     # The graphics one also hands the picked preset to the tuner component.
-    tuned = author_tune_tick(ed, pc_out, [*looted, on_title], x0 + 44000, y0 - 4000)
-    tuned = author_monster_tune_tick(ed, pc_out, tuned, x0 + 58000, y0 - 4000)
-    tuned = author_world_tune_tick(ed, pc_out, tuned, x0 + 72000, y0 - 4000)
-    tuned = author_gfx_tune_tick(ed, pc_out, tuned, x0 + 92000, y0 - 4000)
-    tuned = author_player_tune_tick(ed, pc_out, tuned, x0 + 108000, y0 - 4000)
+    tuned = author_tune_tick(ed, pc_out, [*looted, on_title])
+    tuned = author_monster_tune_tick(ed, pc_out, tuned)
+    tuned = author_world_tune_tick(ed, pc_out, tuned)
+    tuned = author_gfx_tune_tick(ed, pc_out, tuned)
+    tuned = author_player_tune_tick(ed, pc_out, tuned)
     # Then the menu's own rows (new game or resume, settings, exit game) and M.
-    toggled = author_main_rows_tick(ed, pc_out, tuned, x0 + 260, y0 - 1600)
+    toggled = author_main_rows_tick(ed, pc_out, tuned)
 
     # --- the menu's debug row, gated on the menu being open -----------------
-    gate_get = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 1120, y0 + 200)
-    gate = _at(ed.add_branch_node(), x0 + 1280, y0)
+    gate_get = ed.add_get_member_variable_node("MenuOpen")
+    gate = ed.add_branch_node()
     _connect(_pin(gate_get, "MenuOpen", is_input=False), _pin(gate, "Condition"))
     for tail in toggled:
         _connect(tail, _pin(gate, "execute"))
@@ -676,44 +658,34 @@ def _author_tick(ed, tick):
     # drawn by BP_WeaponComponent, which can reach a GameMode and cannot reach
     # a HUD variable.  The row has no key: Enter on it or a click raises
     # PauseClick, like every other row of the panel.
-    bx = x0 + 1500
-    by = y0
-    br_d = _at(ed.add_branch_node(), bx + 300, by)
+    br_d = ed.add_branch_node()
     d_taken = []
-    _connect(pause_row_taken(ed, DEBUG_ACTION, bx - 500, by + 280, d_taken),
-             _pin(br_d, "Condition"))
+    _connect(pause_row_taken(ed, DEBUG_ACTION, d_taken), _pin(br_d, "Condition"))
     _connect(BEL.find_then_pin(gate), _pin(br_d, "execute"))
 
-    gm = _at(_node(ed, FN_GET_GAME_MODE), bx + 500, by + 240)
-    as_gm = _at(_palette(ed, NODE_CAST_GAME_MODE), bx + 740, by)
+    gm = _node(ed, FN_GET_GAME_MODE)
+    as_gm = _palette(ed, NODE_CAST_GAME_MODE)
     _connect(_pin(gm, "ReturnValue", is_input=False), _pin(as_gm, "Object"))
     _connect(BEL.find_then_pin(br_d), _pin(as_gm, "execute"))
     gm_out = _loose_pin(as_gm, "AsBPThirdPersonGameMode", is_input=False)
 
-    was_on = _at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
-                                                 GAME_MODE_CLASS_PATH),
-                 bx + 980, by + 240)
+    was_on = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
     _connect(gm_out, _pin(was_on, "self"))
-    flip = _at(_node(ed, FN_NOT), bx + 1220, by + 240)
+    flip = _node(ed, FN_NOT)
     _connect(_pin(was_on, DEBUG_MODE_VAR, is_input=False), _pin(flip, "A"))
-    set_dbg = _at(ed.add_set_member_variable_node(DEBUG_MODE_VAR,
-                                                  GAME_MODE_CLASS_PATH),
-                  bx + 1460, by)
+    set_dbg = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
     _connect(gm_out, _pin(set_dbg, "self"))
     _connect(_pin(flip, "ReturnValue", is_input=False), _pin(set_dbg, DEBUG_MODE_VAR))
     _connect(BEL.find_then_pin(as_gm), _pin(set_dbg, "execute"))
 
     # ...and into the save, written on the spot like every other setting.
-    settings = _at(ed.add_get_member_variable_node("Settings"), bx + 1460, by + 400)
+    settings = ed.add_get_member_variable_node("Settings")
     settings_out = _pin(settings, "Settings", is_input=False)
-    keep_dbg = _at(ed.add_set_member_variable_node(DEBUG_MODE_VAR,
-                                                   SETTINGS_CLASS_PATH),
-                   bx + 1720, by)
+    keep_dbg = ed.add_set_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH)
     _connect(settings_out, _pin(keep_dbg, "self"))
     _connect(_pin(flip, "ReturnValue", is_input=False), _pin(keep_dbg, DEBUG_MODE_VAR))
     _connect(BEL.find_then_pin(set_dbg), _pin(keep_dbg, "execute"))
-    _, writer = _emit_save(ed, settings_out, BEL.find_then_pin(keep_dbg),
-                           bx + 1980, by)
+    _, writer = _emit_save(ed, settings_out, BEL.find_then_pin(keep_dbg))
 
     ed.add_comment_to_nodes(
         "The panel's debug row -> debug mode, held on the GameMode so the weapon "
@@ -726,19 +698,19 @@ def _author_tick(ed, tick):
 
 # ─── The health readout ──────────────────────────────────────────────────────
 
-def _vec(ed, x, y, z, px, py):
+def _vec(ed, x, y, z):
     """A constant vector as a node, because struct pins reject text defaults.
 
     set_pin_value on an FVector pin returns False for every format and leaves
     the pin empty, which the compiler reads as the zero vector.
     """
-    n = _at(_node(ed, FN_MAKE_VECTOR), px, py)
+    n = _node(ed, FN_MAKE_VECTOR)
     for axis, value in (("X", x), ("Y", y), ("Z", z)):
         _set(n, axis, float(value))
     return _pin(n, "ReturnValue", is_input=False)
 
 
-def _author_npc_bars(ed, x0, y0, in_execs):
+def _author_npc_bars(ed, in_execs):
     """A health bar floating over every NPC, in screen space.
 
     Drawn on the HUD canvas rather than as a widget component on the NPC: UMG
@@ -746,7 +718,7 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     a 3D bar would need a material and a facing update. Project() turns the
     world point above each head into canvas pixels, which is all DrawRect needs.
     """
-    every = _at(_node(ed, FN_ALL_ACTORS), x0, y0)
+    every = _node(ed, FN_ALL_ACTORS)
     _pin(every, "ActorClass").set_pin_value(NPC_CLASS_PATH)
     for e in in_execs:
         _connect(e, _pin(every, "execute"))
@@ -754,42 +726,40 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    _at(loop, x0 + 280, y0)
+    loop
     _connect(_pin(every, "OutActors", is_input=False), _loose_pin(loop, "Array"))
     _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
     npc = _loose_pin(loop, "ArrayElement", is_input=False)
 
-    comp = _at(_node(ed, FN_GET_COMP), x0 + 580, y0 + 260)
+    comp = _node(ed, FN_GET_COMP)
     _connect(npc, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
 
-    cast = _at(_palette(ed, NODE_CAST_HEALTH), x0 + 840, y0)
+    cast = _palette(ed, NODE_CAST_HEALTH)
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    health = _at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
-                 x0 + 1100, y0 + 260)
+    health = ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH)
     _connect(as_health, _pin(health, "self"))
-    max_health = _at(ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH),
-                     x0 + 1100, y0 + 380)
+    max_health = ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH)
     _connect(as_health, _pin(max_health, "self"))
 
-    where = _at(_node(ed, FN_ACTOR_LOC), x0 + 1100, y0 + 520)
+    where = _node(ed, FN_ACTOR_LOC)
     _connect(npc, _pin(where, "self"))
-    above = _at(_node(ed, FN_ADD_VV), x0 + 1360, y0 + 520)
+    above = _node(ed, FN_ADD_VV)
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(above, "A"))
-    _connect(_vec(ed, 0.0, 0.0, NPC_BAR_Z, x0 + 1100, y0 + 660), _pin(above, "B"))
+    _connect(_vec(ed, 0.0, 0.0, NPC_BAR_Z), _pin(above, "B"))
 
-    proj = _at(_node(ed, FN_PROJECT), x0 + 1620, y0 + 520)
+    proj = _node(ed, FN_PROJECT)
     _connect(_pin(above, "ReturnValue", is_input=False), _pin(proj, "Location"))
-    parts = _at(_node(ed, FN_BREAK_VECTOR), x0 + 1860, y0 + 520)
+    parts = _node(ed, FN_BREAK_VECTOR)
     _connect(_pin(proj, "ReturnValue", is_input=False), _loose_pin(parts, "InVec"))
 
     # Project returns the depth in Z, and it is negative for anything behind the
     # camera -- without this test those NPCs get their bars mirrored onto the
     # screen as if they were in front.
-    in_front = _at(_node(ed, FN_GREATER), x0 + 2120, y0 + 640)
+    in_front = _node(ed, FN_GREATER)
     _connect(_pin(parts, "Z", is_input=False), _pin(in_front, "A"))
     _set(in_front, "B", 0.0)
 
@@ -799,64 +769,61 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     # is aiming into. LastDamageTime is stamped by the pellet that did the
     # damage (see _author_impact), and defaults far enough in the past that
     # nothing is showing a bar at level start.
-    hurt_at = _at(ed.add_get_member_variable_node(LAST_DAMAGE_VAR,
-                                                  HEALTH_CLASS_PATH),
-                  x0 + 1100, y0 + 940)
+    hurt_at = ed.add_get_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(hurt_at, "self"))
-    now = _at(_node(ed, FN_TIME_SECONDS), x0 + 1100, y0 + 1080)
-    since = _at(_node(ed, FN_SUB), x0 + 1620, y0 + 940)
+    now = _node(ed, FN_TIME_SECONDS)
+    since = _node(ed, FN_SUB)
     _connect(_pin(now, "ReturnValue", is_input=False), _pin(since, "A"))
     _connect(_pin(hurt_at, LAST_DAMAGE_VAR, is_input=False), _pin(since, "B"))
-    recent = _at(_node(ed, FN_LE), x0 + 1860, y0 + 940)
+    recent = _node(ed, FN_LE)
     _connect(_pin(since, "ReturnValue", is_input=False), _pin(recent, "A"))
     _set(recent, "B", NPC_BAR_SECONDS)
 
     # ...and still alive. A killed wanderer now lies where it fell for a minute
     # (see CORPSE_SECONDS), and it was shot a moment ago by definition, so
     # without this every corpse wears an empty bar for its first five seconds.
-    gone = _at(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH),
-               x0 + 1100, y0 + 1200)
+    gone = ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH)
     _connect(as_health, _pin(gone, "self"))
-    alive = _at(_node(ed, FN_NOT), x0 + 1620, y0 + 1200)
+    alive = _node(ed, FN_NOT)
     _connect(_pin(gone, "Dead", is_input=False), _pin(alive, "A"))
 
     # Safe to fold into one AND: every half is arithmetic on values already
     # read, so pulling them costs two comparisons and has no side effect. (The
     # NPC melee gate could not do this -- there, one half of the AND dragged a
     # whole location chain behind it. See the pure-node note in CLAUDE.md.)
-    breathing = _at(_node(ed, FN_AND), x0 + 1860, y0 + 1080)
+    breathing = _node(ed, FN_AND)
     _connect(_pin(recent, "ReturnValue", is_input=False), _pin(breathing, "A"))
     _connect(_pin(alive, "ReturnValue", is_input=False), _pin(breathing, "B"))
 
-    showing = _at(_node(ed, FN_AND), x0 + 2120, y0 + 800)
+    showing = _node(ed, FN_AND)
     _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(showing, "A"))
     _connect(_pin(breathing, "ReturnValue", is_input=False), _pin(showing, "B"))
 
-    visible = _at(ed.add_branch_node(), x0 + 2380, y0)
+    visible = ed.add_branch_node()
     _connect(_pin(showing, "ReturnValue", is_input=False), _pin(visible, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(visible, "execute"))
 
-    left = _at(_node(ed, FN_SUB), x0 + 2380, y0 + 300)
+    left = _node(ed, FN_SUB)
     _connect(_pin(parts, "X", is_input=False), _pin(left, "A"))
     _set(left, "B", NPC_BAR[0] / 2.0)          # centre the bar on the head
     left_out = _pin(left, "ReturnValue", is_input=False)
     top_out = _pin(parts, "Y", is_input=False)
 
-    frac = _at(_node(ed, FN_DIV), x0 + 2380, y0 + 440)
+    frac = _node(ed, FN_DIV)
     _connect(_pin(health, "Health", is_input=False), _pin(frac, "A"))
     _connect(_pin(max_health, "MaxHealth", is_input=False), _pin(frac, "B"))
-    fill_w = _at(_node(ed, FN_MUL), x0 + 2620, y0 + 440)
+    fill_w = _node(ed, FN_MUL)
     _connect(_pin(frac, "ReturnValue", is_input=False), _pin(fill_w, "A"))
     _set(fill_w, "B", NPC_BAR[0])
 
-    back = _draw_texture(ed, x0 + 2640, y0, "T_UI_BarTrack")
+    back = _draw_texture(ed, "T_UI_BarTrack")
     _set(back, "ScreenW", NPC_BAR[0])
     _set(back, "ScreenH", NPC_BAR[1])
     _connect(left_out, _pin(back, "ScreenX"))
     _connect(top_out, _pin(back, "ScreenY"))
     _connect(BEL.find_then_pin(visible), _pin(back, "execute"))
 
-    fill = _draw_texture(ed, x0 + 2900, y0, "T_UI_Bar", tint=COL_NPC_FILL)
+    fill = _draw_texture(ed, "T_UI_Bar", tint=COL_NPC_FILL)
     _set(fill, "ScreenW", NPC_BAR[0])
     _set(fill, "ScreenH", NPC_BAR[1])
     _connect(left_out, _pin(fill, "ScreenX"))
@@ -867,16 +834,15 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     # The wanderer's number, just left of its bar. Read off the NPC's own health
     # component rather than kept in a list here: the HUD never has to be told
     # that a wanderer died and another took its place.
-    nid = _at(ed.add_get_member_variable_node(NPC_ID_VAR, HEALTH_CLASS_PATH),
-              x0 + 1100, y0 + 800)
+    nid = ed.add_get_member_variable_node(NPC_ID_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(nid, "self"))
-    nid_str = _at(_node(ed, FN_INT_TO_STR), x0 + 1360, y0 + 800)
+    nid_str = _node(ed, FN_INT_TO_STR)
     _connect(_pin(nid, NPC_ID_VAR, is_input=False), _pin(nid_str, "InInt"))
 
-    id_x = _at(_node(ed, FN_SUB), x0 + 2620, y0 + 700)
+    id_x = _node(ed, FN_SUB)
     _connect(left_out, _pin(id_x, "A"))
     _set(id_x, "B", NPC_ID_WIDTH + NPC_ID_GAP)
-    id_y = _at(_node(ed, FN_SUB), x0 + 2620, y0 + 840)
+    id_y = _node(ed, FN_SUB)
     _connect(top_out, _pin(id_y, "A"))
     _set(id_y, "B", NPC_ID_RISE)
 
@@ -884,12 +850,12 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     # is matched to a body on screen, which is a thing a developer does and not
     # a thing the game is. DebugOn is this frame's copy of the GameMode's flag,
     # taken once in _author_draw.
-    numbered = _at(ed.add_get_member_variable_node("DebugOn"), x0 + 2900, y0 + 300)
-    labelled = _at(ed.add_branch_node(), x0 + 3160, y0)
+    numbered = ed.add_get_member_variable_node("DebugOn")
+    labelled = ed.add_branch_node()
     _connect(_pin(numbered, "DebugOn", is_input=False), _pin(labelled, "Condition"))
     _connect(BEL.find_then_pin(fill), _pin(labelled, "execute"))
 
-    number = _at(_node(ed, FN_DRAW_TEXT), x0 + 3420, y0)
+    number = _node(ed, FN_DRAW_TEXT)
     _connect(_pin(nid_str, "ReturnValue", is_input=False), _pin(number, "Text"))
     _set(number, "TextColor", COL_NPC_ID)
     _set(number, "Scale", NPC_ID_SCALE)
@@ -911,15 +877,13 @@ def _author_npc_bars(ed, x0, y0, in_execs):
     return (_loose_pin(loop, "Completed", is_input=False),)
 
 
-def _author_draw(ed, x0, y0):
-    draw = ed.create_node_from_name(NODE_DRAW_HUD, unreal.Vector2D(x0, y0), [])
-    if not draw:
-        raise RuntimeError(f"could not create {NODE_DRAW_HUD}")
+def _author_draw(ed):
+    draw = _palette(ed, NODE_DRAW_HUD)
 
     # Dead or alive, before anything is drawn. The death menu replaces the HUD
     # rather than covering it, so this branch is the first thing in the frame.
-    mode = _at(_node(ed, FN_GET_GAME_MODE), x0 - 700, y0 + 240)
-    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), x0 - 440, y0)
+    mode = _node(ed, FN_GET_GAME_MODE)
+    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     _connect(BEL.find_then_pin(draw), _pin(as_mode, "execute"))
     mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
@@ -930,14 +894,12 @@ def _author_draw(ed, x0, y0):
     # code, and a Get with an invalid self is an "Accessed None" per wanderer
     # per frame.  Copying it once gives that path a real answer -- false -- and
     # costs one node.
-    on_get = _at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
-                                                 GAME_MODE_CLASS_PATH),
-                 x0 - 440, y0 + 380)
+    on_get = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(on_get, "self"))
-    copy_dbg = _at(ed.add_set_member_variable_node("DebugOn"), x0 - 180, y0 + 380)
+    copy_dbg = ed.add_set_member_variable_node("DebugOn")
     _connect(_pin(on_get, DEBUG_MODE_VAR, is_input=False), _pin(copy_dbg, "DebugOn"))
     _connect(BEL.find_then_pin(as_mode), _pin(copy_dbg, "execute"))
-    no_dbg = _at(ed.add_set_member_variable_node("DebugOn"), x0 - 180, y0 + 620)
+    no_dbg = ed.add_set_member_variable_node("DebugOn")
     _set(no_dbg, "DebugOn", "false")
     _connect(_pin(as_mode, "CastFailed", is_input=False), _pin(no_dbg, "execute"))
 
@@ -946,63 +908,58 @@ def _author_draw(ed, x0, y0):
     # that has to happen on every frame in every state -- a sensitivity changed
     # on the settings screen has to be in effect the moment the world unpauses.
     # The difficulty onto the GameMode first, where there is one to write.
-    to_mode = author_push_difficulty(ed, x0 + 3000, y0 + 13400,
-                                     BEL.find_then_pin(copy_dbg), mode_out)
-    pushed = _author_push_settings(ed, x0 + 3000, y0 + 14000,
-                                   (*to_mode, BEL.find_then_pin(no_dbg)))
+    to_mode = author_push_difficulty(ed, BEL.find_then_pin(copy_dbg), mode_out)
+    pushed = _author_push_settings(ed, (*to_mode, BEL.find_then_pin(no_dbg)))
 
     # The FPS readout, in every state -- title, game, death -- and whether
     # debug mode is on or off. Drawn first, so every panel after it can sit on top.
-    fps_out = author_fps(ed, x0 + 3000, y0 + 16000, pushed)
+    fps_out = author_fps(ed, pushed)
 
     # Where the mouse cursor is, before the first screen that asks (cursor.py).
     # The title, before the dead/alive test: it is neither, and goes straight
     # on to the menu.
-    title, playing = author_title(ed, x0 + 3000, y0 + 6000,
-                                  [author_cursor_read(ed, fps_out, x0 + 3000, y0 + 18000)])
+    title, playing = author_title(ed, [author_cursor_read(ed, fps_out)])
 
-    alive = _at(ed.add_branch_node(), x0 + 60, y0)
-    dead_get = _at(ed.add_get_member_variable_node(PLAYER_DEAD_VAR,
-                                                   GAME_MODE_CLASS_PATH),
-                   x0 - 440, y0 + 240)
+    alive = ed.add_branch_node()
+    dead_get = ed.add_get_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(dead_get, "self"))
     _connect(_pin(dead_get, PLAYER_DEAD_VAR, is_input=False), _pin(alive, "Condition"))
     _connect(playing, _pin(alive, "execute"))
 
-    author_death_menu(ed, x0 + 3000, y0 + 3000, (BEL.find_then_pin(alive),), mode_out)
+    author_death_menu(ed, (BEL.find_then_pin(alive),), mode_out)
 
     # A GameMode that is not BP_ThirdPersonGameMode cannot say whether the
     # player is dead, so it is treated as alive and the HUD shows as normal --
     # a missing death menu is recoverable, a missing HUD is not.
-    living = author_alive(ed, x0 + 300, y0 - 600, (BEL.find_else_pin(alive),))
+    living = author_alive(ed, (BEL.find_else_pin(alive),))
 
     # The stat bars and the kill counter, into WBP_HUD.
-    after_hp = author_hp(ed, x0, y0 - 900, living)
-    after_st = _author_stamina(ed, x0, y0 - 1600, after_hp)
-    after_sv = author_survival_bars(ed, x0 + 9000, y0 - 1600, after_st)
-    after_kills = author_kills(ed, x0, y0 - 2300, after_sv)
+    after_hp = author_hp(ed, living)
+    after_st = _author_stamina(ed, after_hp)
+    after_sv = author_survival_bars(ed, after_st)
+    after_kills = author_kills(ed, after_sv)
 
     # The wanderers' bars, still on the canvas: one per wanderer, placed by
     # projecting its head each frame. Then the inventory grid.
-    after_npc = _author_npc_bars(ed, x0, y0 - 3200, after_kills)
-    after_inv = author_inventory(ed, x0, y0 - 5000, after_npc)
+    after_npc = _author_npc_bars(ed, after_kills)
+    after_inv = author_inventory(ed, after_npc)
 
     # The crosshair or scope, also on the canvas: centred off the viewport
     # and sized by the gun's cloud every frame.
-    after_aim = _author_reticle(ed, x0, y0 - 6800, after_inv)
-    after_aim = author_exit_banner(ed, x0, y0 - 8200, after_aim)
-    after_aim = author_loot_window(ed, x0, y0 - 9600, after_aim)
-    after_aim = author_wear_panel(ed, x0, y0 - 14000, after_aim)
+    after_aim = _author_reticle(ed, after_inv)
+    after_aim = author_exit_banner(ed, after_aim)
+    after_aim = author_loot_window(ed, after_aim)
+    after_aim = author_wear_panel(ed, after_aim)
 
     # Last: the menu. Every path above -- written or cast-failed -- falls
     # through to it, and so does the title; an exec input takes more than one
     # link.
-    shown = author_pause_menu(ed, x0 + 420, y0, [*after_aim, title])
-    guns = author_tune_panel(ed, x0 + 4800, y0, shown)
-    monsters = author_tune_panel(ed, x0 + 11000, y0, guns, MONSTER_TAB)
-    world = author_tune_panel(ed, x0 + 17200, y0, monsters, WORLD_TAB)
-    gfx = author_tune_panel(ed, x0 + 23400, y0, world, GFX_TAB)
-    author_tune_panel(ed, x0 + 29600, y0, gfx, PLAYER_TAB)
+    shown = author_pause_menu(ed, [*after_aim, title])
+    guns = author_tune_panel(ed, shown)
+    monsters = author_tune_panel(ed, guns, MONSTER_TAB)
+    world = author_tune_panel(ed, monsters, WORLD_TAB)
+    gfx = author_tune_panel(ed, world, GFX_TAB)
+    author_tune_panel(ed, gfx, PLAYER_TAB)
 
 
 # ─── Entry points ────────────────────────────────────────────────────────────
@@ -1063,25 +1020,20 @@ def build_hud_blueprint(rebuild=False):
     if not tick:
         # A fresh Blueprint ships disabled Tick/BeginPlay placeholders, but a
         # wiped graph has none, so put them back from the palette.
-        tick = ed.create_node_from_name(NODE_TICK, unreal.Vector2D(0.0, 0.0), [])
-        if not tick:
-            raise RuntimeError(f"could not create {NODE_TICK}")
+        tick = _palette(ed, NODE_TICK)
 
     _ensure_variables(ed, bp)
     install_tuner(bp)
-    origin = BEL.get_node_pos(tick)
 
     begin_play = ed.find_event_node("ReceiveBeginPlay")
     if not begin_play:
-        begin_play = ed.create_node_from_name(
-            NODE_BEGIN_PLAY, unreal.Vector2D(float(origin.x), float(origin.y - 500)), [])
-        if not begin_play:
-            raise RuntimeError(f"could not create {NODE_BEGIN_PLAY}")
+        begin_play = _palette(ed, NODE_BEGIN_PLAY)
     _author_begin_play(ed, begin_play)
 
     _author_tick(ed, tick)
-    _author_draw(ed, origin.x, origin.y + 1800)
+    _author_draw(ed)
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
     _apply_defaults(bp, {"MenuOpen": False, "DebugOn": False,

@@ -20,7 +20,7 @@ attached to. Drawn for one frame (Duration 0) and redrawn the next.
 
 from combat.game_state import DEBUG_MODE_VAR
 from combat.paths import GAME_MODE_CLASS_PATH
-from npc.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from npc.nodes import (
     FN_ACTOR_LOC, FN_DRAW_CONE, FN_FORWARD, FN_GET_GAME_MODE, FN_GET_PAWN,
     FN_IS_VALID, FN_SELECT_COLOR, FN_TIME_SECONDS, NODE_CAST_GAME_MODE,
@@ -33,7 +33,7 @@ from npc.paths import (
 from npc.tuned import tuned
 
 
-def _author_sight_cone(ed, x0, y0):
+def _author_sight_cone(ed):
     """Author the Tick that draws this wanderer's sight cone in debug mode.
 
     Needs the Tune*, Aggro and Corpse variables declared (npc/steps.py).
@@ -45,59 +45,56 @@ def _author_sight_cone(ed, x0, y0):
         raise RuntimeError(f"could not declare {SIGHT_CONE_STAMP_VAR}")
     made = []
 
-    def keep(n, x, y):
-        made.append(_at(n, x, y))
+    def keep(n):
+        made.append(n)
         return n
 
     def out(n, name="ReturnValue"):
         return _pin(n, name, is_input=False)
 
-    def branch(condition, exec_in, x, y):
-        b = keep(ed.add_branch_node(), x, y)
+    def branch(condition, exec_in):
+        b = keep(ed.add_branch_node())
         _connect(condition, _pin(b, "Condition"))
         _connect(exec_in, _pin(b, "execute"))
         return b
 
-    def get(name, x, y):
-        return out(keep(ed.add_get_member_variable_node(name), x, y), name)
+    def get(name):
+        return out(keep(ed.add_get_member_variable_node(name)), name)
 
-    tick = keep(_palette(ed, NODE_EVENT_TICK), x0, y0)
+    tick = keep(_palette(ed, NODE_EVENT_TICK))
     # The flag first: with debug mode off, which is how the game is played,
     # a wanderer's Tick costs one cast and one branch.
-    mode = keep(_node(ed, FN_GET_GAME_MODE), x0, y0 + 300)
-    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE), x0 + 260, y0)
+    mode = keep(_node(ed, FN_GET_GAME_MODE))
+    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
     _connect(out(mode), _pin(as_mode, "Object"))
     _connect(BEL.find_then_pin(tick), _pin(as_mode, "execute"))
-    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH),
-                x0 + 520, y0 + 300)
+    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(flag, "self"))
-    debugging = branch(out(flag, DEBUG_MODE_VAR), BEL.find_then_pin(as_mode),
-                       x0 + 780, y0)
+    debugging = branch(out(flag, DEBUG_MODE_VAR), BEL.find_then_pin(as_mode))
 
     # Nested, not ANDed: a Branch pulls its whole condition, and the cone's
     # inputs read the pawn (see the root CLAUDE.md, "Evaluation order").
-    pawn = keep(_node(ed, FN_GET_PAWN), x0 + 780, y0 + 300)
-    valid = keep(_node(ed, FN_IS_VALID), x0 + 1020, y0 + 300)
+    pawn = keep(_node(ed, FN_GET_PAWN))
+    valid = keep(_node(ed, FN_IS_VALID))
     _connect(out(pawn), _pin(valid, "Object"))
-    bodied = branch(out(valid), BEL.find_then_pin(debugging), x0 + 1260, y0)
-    dead = branch(get(CORPSE_VAR, x0 + 1260, y0 + 300), BEL.find_then_pin(bodied),
-                  x0 + 1500, y0)
+    bodied = branch(out(valid), BEL.find_then_pin(debugging))
+    dead = branch(get(CORPSE_VAR), BEL.find_then_pin(bodied))
 
-    here = keep(_node(ed, FN_ACTOR_LOC), x0 + 1500, y0 + 300)
+    here = keep(_node(ed, FN_ACTOR_LOC))
     _connect(out(pawn), _pin(here, "self"))
-    facing = keep(_node(ed, FN_FORWARD), x0 + 1500, y0 + 440)
+    facing = keep(_node(ed, FN_FORWARD))
     _connect(out(pawn), _pin(facing, "self"))
-    colour = keep(_node(ed, FN_SELECT_COLOR), x0 + 1500, y0 + 860)
+    colour = keep(_node(ed, FN_SELECT_COLOR))
     _set(colour, "A", SIGHT_CONE_AGGRO_COLOR)
     _set(colour, "B", SIGHT_CONE_PATROL_COLOR)
-    _connect(get(AGGRO_VAR, x0 + 1260, y0 + 860), _pin(colour, "bPickA"))
+    _connect(get(AGGRO_VAR), _pin(colour, "bPickA"))
 
-    cone = keep(_node(ed, FN_DRAW_CONE), x0 + 1800, y0)
+    cone = keep(_node(ed, FN_DRAW_CONE))
     _connect(out(here), _pin(cone, "Origin"))
     _connect(out(facing), _pin(cone, "Direction"))
-    reach_n, reach = tuned(ed, "vision_range_cm", x0 + 1500, y0 + 580)
-    half_n, half = tuned(ed, "vision_half_angle_deg", x0 + 1500, y0 + 700)
+    reach_n, reach = tuned(ed, "vision_range_cm")
+    half_n, half = tuned(ed, "vision_half_angle_deg")
     made.extend((reach_n, half_n))
     _connect(reach, _pin(cone, "Length"))
     _connect(half, _pin(cone, "AngleWidth"))
@@ -108,8 +105,8 @@ def _author_sight_cone(ed, x0, y0):
     _set(cone, "Thickness", SIGHT_CONE_THICKNESS)
     _connect(BEL.find_else_pin(dead), _pin(cone, "execute"))
 
-    now = keep(_node(ed, FN_TIME_SECONDS), x0 + 1800, y0 + 500)
-    stamp = keep(ed.add_set_member_variable_node(SIGHT_CONE_STAMP_VAR), x0 + 2200, y0)
+    now = keep(_node(ed, FN_TIME_SECONDS))
+    stamp = keep(ed.add_set_member_variable_node(SIGHT_CONE_STAMP_VAR))
     _connect(out(now), _pin(stamp, SIGHT_CONE_STAMP_VAR))
     _connect(BEL.find_then_pin(cone), _pin(stamp, "execute"))
 

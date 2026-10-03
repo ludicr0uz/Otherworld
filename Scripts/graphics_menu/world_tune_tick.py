@@ -18,7 +18,7 @@ time passing. Only while open: nothing else moves the table.
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, _palette, _pin
+from combat.graph import BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin
 from uebp.graph import out
 from combat.nodes import FN_ADD_FF, FN_ARR_GET
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
@@ -58,42 +58,41 @@ def world_tune_defaults():
             WORLD_TUNE_HOUR_SEEN_VAR: 0.0}
 
 
-def _value(ed, s, x, y, made):
+def _value(ed, s, made):
     """WorldTuneValues[s], a literal index."""
-    cell = _call(ed, FN_ARR_GET, x + 240, y, made,
-                 TargetArray=_get(ed, WORLD_TAB.values_var, x, y, made), Index=s)
+    cell = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, WORLD_TAB.values_var, made), Index=s)
     return _pin(cell, "Item", is_input=False)
 
 
-def _map(ed, value, in_a, in_b, out_a, out_b, x, y, made):
+def _map(ed, value, in_a, in_b, out_a, out_b, made):
     """MapRangeClamped; each bound a literal or a pin."""
-    return out(_call(ed, FN_MAP_CLAMPED, x, y, made, Value=value, InRangeA=in_a,
+    return out(_call(ed, FN_MAP_CLAMPED, made, Value=value, InRangeA=in_a,
                       InRangeB=in_b, OutRangeA=out_a, OutRangeB=out_b))
 
 
-def _hour_to_clock(ed, hour, day, night, x, y, made):
+def _hour_to_clock(ed, hour, day, night, made):
     """phase = (hour - SUNRISE + 24) % 24; the day half maps 0..12 h onto
     0..day, the night half 12..24 h onto 0..night after it."""
-    lifted = _call(ed, FN_ADD_FF, x, y, made, A=hour, B=24.0 - cfg.SUNRISE_HOUR)
-    phase = out(_call(ed, FN_PERCENT_FF, x + 240, y, made, A=out(lifted), B=24.0))
+    lifted = _call(ed, FN_ADD_FF, made, A=hour, B=24.0 - cfg.SUNRISE_HOUR)
+    phase = out(_call(ed, FN_PERCENT_FF, made, A=out(lifted), B=24.0))
     half = cfg.HALF_HOURS
-    a = _map(ed, phase, 0.0, half, 0.0, day, x + 480, y, made)
-    b = _map(ed, phase, half, 24.0, 0.0, night, x + 480, y + 300, made)
-    return out(_call(ed, FN_ADD_FF, x + 720, y, made, A=a, B=b))
+    a = _map(ed, phase, 0.0, half, 0.0, day, made)
+    b = _map(ed, phase, half, 24.0, 0.0, night, made)
+    return out(_call(ed, FN_ADD_FF, made, A=a, B=b))
 
 
-def _clock_to_hour(ed, clock, day, night, x, y, made):
+def _clock_to_hour(ed, clock, day, night, made):
     """The inverse: 12 h across each half, then round the dial from sunrise."""
-    total = out(_call(ed, FN_ADD_FF, x, y + 300, made, A=day, B=night))
-    a = _map(ed, clock, 0.0, day, 0.0, cfg.HALF_HOURS, x + 240, y, made)
-    b = _map(ed, clock, day, total, 0.0, cfg.HALF_HOURS, x + 240, y + 300, made)
-    phase = _call(ed, FN_ADD_FF, x + 480, y, made, A=a, B=b)
-    shifted = _call(ed, FN_ADD_FF, x + 720, y, made, A=out(phase), B=cfg.SUNRISE_HOUR)
-    return out(_call(ed, FN_PERCENT_FF, x + 960, y, made, A=out(shifted), B=24.0))
+    total = out(_call(ed, FN_ADD_FF, made, A=day, B=night))
+    a = _map(ed, clock, 0.0, day, 0.0, cfg.HALF_HOURS, made)
+    b = _map(ed, clock, day, total, 0.0, cfg.HALF_HOURS, made)
+    phase = _call(ed, FN_ADD_FF, made, A=a, B=b)
+    shifted = _call(ed, FN_ADD_FF, made, A=out(phase), B=cfg.SUNRISE_HOUR)
+    return out(_call(ed, FN_PERCENT_FF, made, A=out(shifted), B=24.0))
 
 
-def _set_on(ed, cyc, var, value, in_execs, x, y, made):
-    n = _at(ed.add_set_member_variable_node(var, DAY_NIGHT_CLASS_PATH), x, y)
+def _set_on(ed, cyc, var, value, in_execs, made):
+    n = ed.add_set_member_variable_node(var, DAY_NIGHT_CLASS_PATH)
     made.append(n)
     _connect(cyc, _pin(n, "self"))
     _connect(value, _pin(n, var))
@@ -102,17 +101,16 @@ def _set_on(ed, cyc, var, value, in_execs, x, y, made):
     return BEL.find_then_pin(n)
 
 
-def _author_apply(ed, in_execs, x0, y0, made):
+def _author_apply(ed, in_execs, made):
     """The table onto the cycle, and its clock back (module docstring).
     Returns the exec tails."""
-    on, shut = _branch(ed, _get(ed, WORLD_TAB.open_var, x0 - 240, y0 + 300, made),
-                       in_execs, x0, y0, made)
-    find = _call(ed, FN_ACTOR_OF_CLASS, x0 + 260, y0, made)
+    on, shut = _branch(ed, _get(ed, WORLD_TAB.open_var, made), in_execs, made)
+    find = _call(ed, FN_ACTOR_OF_CLASS, made)
     _class_literal(find, "ActorClass", DAY_NIGHT_CLASS_PATH)
     _connect(on, _pin(find, "execute"))
     if not unreal.load_asset(DAY_NIGHT_BP_PATH):   # the cast exists only for a loaded class
         raise RuntimeError(f"{DAY_NIGHT_BP_PATH} is missing -- run build_day_night.py first")
-    cast = _at(_palette(ed, NODE_CAST_CYCLE), x0 + 560, y0)
+    cast = _palette(ed, NODE_CAST_CYCLE)
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_DayNightCycle")
     made.append(cast)
@@ -121,46 +119,35 @@ def _author_apply(ed, in_execs, x0, y0, made):
     cyc = _loose_pin(cast, "AsBPDayNightCycle", is_input=False)
     none = _pin(cast, "CastFailed", is_input=False)
 
-    x = x0 + 900
-    go, keep = _branch(ed, _get(ed, WORLD_TAB.touched_var, x - 240, y0 + 300, made),
-                       [BEL.find_then_pin(cast)], x, y0, made)
+    go, keep = _branch(ed, _get(ed, WORLD_TAB.touched_var, made), [BEL.find_then_pin(cast)], made)
     flow = go
     for s, (_col, var, *_rest) in enumerate(WORLD_STATS):
         if var:
-            x += 600
-            flow = _set_on(ed, cyc, var, _value(ed, s, x - 300, y0 + 440, made),
-                           [flow], x, y0, made)
+            flow = _set_on(ed, cyc, var, _value(ed, s, made), [flow], made)
 
-    x += 600
-    day = _get(ed, "DayLengthSeconds", x, y0 + 900, made, DAY_NIGHT_CLASS_PATH, cyc)
-    night = _get(ed, "NightLengthSeconds", x, y0 + 1040, made, DAY_NIGHT_CLASS_PATH, cyc)
-    moved = _call(ed, FN_NEQ_FF, x, y0 + 300, made, A=_value(ed, 0, x - 480, y0 + 300, made),
-                  B=_get(ed, WORLD_TUNE_HOUR_SEEN_VAR, x - 240, y0 + 440, made))
-    write, same = _branch(ed, out(moved), [flow, keep], x + 240, y0, made)
-    clock = _hour_to_clock(ed, _value(ed, 0, x + 240, y0 + 600, made), day, night,
-                           x + 480, y0 + 600, made)
-    flow = _set_on(ed, cyc, "Clock", clock, [write], x + 1400, y0, made)
+    day = _get(ed, "DayLengthSeconds", made, DAY_NIGHT_CLASS_PATH, cyc)
+    night = _get(ed, "NightLengthSeconds", made, DAY_NIGHT_CLASS_PATH, cyc)
+    moved = _call(ed, FN_NEQ_FF, made, A=_value(ed, 0, made),
+                  B=_get(ed, WORLD_TUNE_HOUR_SEEN_VAR, made))
+    write, same = _branch(ed, out(moved), [flow, keep], made)
+    clock = _hour_to_clock(ed, _value(ed, 0, made), day, night, made)
+    flow = _set_on(ed, cyc, "Clock", clock, [write], made)
 
-    x += 1800
-    now = _get(ed, "Clock", x, y0 + 600, made, DAY_NIGHT_CLASS_PATH, cyc)
-    hour = _clock_to_hour(ed, now, day, night, x + 240, y0 + 600, made)
-    store = _call(ed, FN_ARR_SET, x + 1500, y0, made,
-                  TargetArray=_get(ed, WORLD_TAB.values_var, x + 1260, y0 + 300, made),
-                  Index=0)
+    now = _get(ed, "Clock", made, DAY_NIGHT_CLASS_PATH, cyc)
+    hour = _clock_to_hour(ed, now, day, night, made)
+    store = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, WORLD_TAB.values_var, made), Index=0)
     _connect(hour, _pin(store, "Item"))
     for e in (flow, same):
         _connect(e, _pin(store, "execute"))
-    seen = put(ed, WORLD_TUNE_HOUR_SEEN_VAR, hour, [BEL.find_then_pin(store)],
-               x + 1800, y0, made)
+    seen = put(ed, WORLD_TUNE_HOUR_SEEN_VAR, hour, [BEL.find_then_pin(store)], made)
     return [seen, none, shut]
 
 
-def author_world_tune_tick(ed, pc_out, in_execs, x0, y0):
+def author_world_tune_tick(ed, pc_out, in_execs):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
-    flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, WORLD_TAB, 1,
-                           other_open_vars(WORLD_TAB))
-    tails = _author_apply(ed, flow, x0 + 10400, y0, made)
+    flow = author_tab_flow(ed, pc_out, in_execs, made, WORLD_TAB, 1, other_open_vars(WORLD_TAB))
+    tails = _author_apply(ed, flow, made)
     ed.add_comment_to_nodes(
         "World tuning (its row in the M panel): Up/Down pick a row, "
         "Left/Right move the time of day or a length, Enter saves the lengths to "

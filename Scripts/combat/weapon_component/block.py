@@ -7,12 +7,12 @@ and the stamina it costs -- is resolved by the wanderer that swings
 That graph reads Blocking and writes Stamina on this component.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from combat.nodes import FN_AND, FN_GREATER_FF, FN_IS_KEY_DOWN, FN_NOT
 from combat.tuning import BLOCK_KEY, COMBAT
 
 
-def _author_block(ed, pc_out, key_pin, exec_ins, x0, y0):
+def _author_block(ed, pc_out, key_pin, exec_ins):
     """Blocking = BlockKeyDown AND Stamina > 0 AND NOT Sprinting.
 
     Nothing reads Held, so the guard works with empty hands, a gun or a
@@ -30,27 +30,27 @@ def _author_block(ed, pc_out, key_pin, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0, y0 + 240))
+    down = keep(_node(ed, FN_IS_KEY_DOWN))
     _connect(pc_out, _pin(down, "self"))
     _connect(key_pin, _pin(down, "Key"))
 
-    stamina = keep(_at(ed.add_get_member_variable_node("Stamina"), x0, y0 + 380))
-    left = keep(_at(_node(ed, FN_GREATER_FF), x0 + 240, y0 + 380))
+    stamina = keep(ed.add_get_member_variable_node("Stamina"))
+    left = keep(_node(ed, FN_GREATER_FF))
     _connect(_pin(stamina, "Stamina", is_input=False), _pin(left, "A"))
     _set(left, "B", 0.0)
 
-    running = keep(_at(ed.add_get_member_variable_node("Sprinting"), x0, y0 + 500))
-    still = keep(_at(_node(ed, FN_NOT), x0 + 240, y0 + 500))
+    running = keep(ed.add_get_member_variable_node("Sprinting"))
+    still = keep(_node(ed, FN_NOT))
     _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
 
-    able = keep(_at(_node(ed, FN_AND), x0 + 480, y0 + 440))
+    able = keep(_node(ed, FN_AND))
     _connect(_pin(left, "ReturnValue", is_input=False), _pin(able, "A"))
     _connect(_pin(still, "ReturnValue", is_input=False), _pin(able, "B"))
-    guard = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 300))
+    guard = keep(_node(ed, FN_AND))
     _connect(_pin(down, "ReturnValue", is_input=False), _pin(guard, "A"))
     _connect(_pin(able, "ReturnValue", is_input=False), _pin(guard, "B"))
 
-    mark = keep(_at(ed.add_set_member_variable_node("Blocking"), x0 + 960, y0))
+    mark = keep(ed.add_set_member_variable_node("Blocking"))
     _connect(_pin(guard, "ReturnValue", is_input=False), _pin(mark, "Blocking"))
     for e in exec_ins:
         _connect(e, _pin(mark, "execute"))

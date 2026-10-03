@@ -26,6 +26,7 @@ from combat.graph import (
     _create_blueprint, _declare, _drop_components, _find_handle, _float_type,
     _handles, _log, _must_load, _root_handle, _struct_type,
 )
+from uebp.layout import arrange
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.support_hand import SUPPORT_POINT_VAR
@@ -224,6 +225,7 @@ def build_weapon_item():
     _declare(ed, THROW_GRIP_LOC_VAR, _struct_type(unreal.Vector.static_struct()))
     _declare(ed, THROW_GRIP_ROT_VAR, _struct_type(unreal.Rotator.static_struct()))
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
     _apply_defaults(bp, {CLOTHING_SLOT_VAR: NOT_CLOTHING,

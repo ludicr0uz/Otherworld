@@ -24,7 +24,7 @@ Runs before the death check in the same Tick, so a drain that crosses zero
 kills on the frame it happens, through the ordinary death path.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from combat.hit_reaction import PREV_HEALTH_VAR
 from combat.nodes import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_GET_ASC, FN_GET_OWNER, FN_GREATER_II,
@@ -35,7 +35,7 @@ from combat.tuning import HEALTH_DRAINS
 FN_INT_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
 
 
-def _author_debuff_drain(ed, tick, exec_ins, x0, y0):
+def _author_debuff_drain(ed, tick, exec_ins):
     """Returns the exec pins every path through the drain ends on."""
     made = []
 
@@ -43,23 +43,23 @@ def _author_debuff_drain(ed, tick, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    owner = keep(_at(_node(ed, FN_GET_OWNER), x0, y0 + 300))
-    lookup = keep(_at(_node(ed, FN_GET_ASC), x0 + 240, y0 + 300))
+    owner = keep(_node(ed, FN_GET_OWNER))
+    lookup = keep(_node(ed, FN_GET_ASC))
     _connect(_pin(owner, "ReturnValue", is_input=False), _pin(lookup, "Actor"))
     asc = _pin(lookup, "ReturnValue", is_input=False)
 
     # Two safe reads folded together: IsValid takes null as an answer, and Dead
     # is this component's own bool. The tag count is NOT folded in -- it reads
     # off the ability system, so it waits behind this gate.
-    has = keep(_at(_node(ed, FN_IS_VALID), x0 + 480, y0 + 300))
+    has = keep(_node(ed, FN_IS_VALID))
     _connect(asc, _pin(has, "Object"))
-    dead = keep(_at(ed.add_get_member_variable_node("Dead"), x0 + 480, y0 + 420))
-    alive = keep(_at(_node(ed, FN_NOT), x0 + 720, y0 + 420))
+    dead = keep(ed.add_get_member_variable_node("Dead"))
+    alive = keep(_node(ed, FN_NOT))
     _connect(_pin(dead, "Dead", is_input=False), _pin(alive, "A"))
-    both = keep(_at(_node(ed, FN_AND), x0 + 960, y0 + 360))
+    both = keep(_node(ed, FN_AND))
     _connect(_pin(has, "ReturnValue", is_input=False), _pin(both, "A"))
     _connect(_pin(alive, "ReturnValue", is_input=False), _pin(both, "B"))
-    gate = keep(_at(ed.add_branch_node(), x0 + 1200, y0))
+    gate = keep(ed.add_branch_node())
     _connect(_pin(both, "ReturnValue", is_input=False), _pin(gate, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(gate, "execute"))
@@ -67,50 +67,48 @@ def _author_debuff_drain(ed, tick, exec_ins, x0, y0):
     # One row per drained tag: its stack count, and that count times its rate.
     # The counts add up to "is anything draining?", the products to the rate.
     stacks_out = rate_out = None
-    for i, (tag, hp_per_s) in enumerate(HEALTH_DRAINS):
-        y = y0 + 300 + i * 320
-        stacks = keep(_at(_node(ed, FN_TAG_COUNT), x0 + 1200, y))
+    for tag, hp_per_s in HEALTH_DRAINS:
+        stacks = keep(_node(ed, FN_TAG_COUNT))
         _connect(asc, _pin(stacks, "self"))
         _set(stacks, "GameplayTag", f'(TagName="{tag}")')
         count_out = _pin(stacks, "ReturnValue", is_input=False)
-        as_float = keep(_at(_node(ed, FN_INT_TO_FLOAT), x0 + 1440, y + 140))
+        as_float = keep(_node(ed, FN_INT_TO_FLOAT))
         _connect(count_out, _pin(as_float, "InInt"))
-        per_s = keep(_at(_node(ed, FN_MUL_FF), x0 + 1680, y + 140))
+        per_s = keep(_node(ed, FN_MUL_FF))
         _connect(_pin(as_float, "ReturnValue", is_input=False), _pin(per_s, "A"))
         _set(per_s, "B", hp_per_s)
         per_s_out = _pin(per_s, "ReturnValue", is_input=False)
         if stacks_out is None:
             stacks_out, rate_out = count_out, per_s_out
             continue
-        more = keep(_at(_node(ed, FN_ADD_II), x0 + 1440, y))
+        more = keep(_node(ed, FN_ADD_II))
         _connect(stacks_out, _pin(more, "A"))
         _connect(count_out, _pin(more, "B"))
         stacks_out = _pin(more, "ReturnValue", is_input=False)
-        faster = keep(_at(_node(ed, FN_ADD_FF), x0 + 1920, y + 140))
+        faster = keep(_node(ed, FN_ADD_FF))
         _connect(rate_out, _pin(faster, "A"))
         _connect(per_s_out, _pin(faster, "B"))
         rate_out = _pin(faster, "ReturnValue", is_input=False)
 
-    y = y0 + 300 + len(HEALTH_DRAINS) * 320
-    any_ = keep(_at(_node(ed, FN_GREATER_II), x0 + 1680, y))
+    any_ = keep(_node(ed, FN_GREATER_II))
     _connect(stacks_out, _pin(any_, "A"))
     _set(any_, "B", 0)
-    draining = keep(_at(ed.add_branch_node(), x0 + 1680, y0))
+    draining = keep(ed.add_branch_node())
     _connect(_pin(any_, "ReturnValue", is_input=False), _pin(draining, "Condition"))
     _connect(BEL.find_then_pin(gate), _pin(draining, "execute"))
 
-    loss = keep(_at(_node(ed, FN_MUL_FF), x0 + 2160, y + 140))
+    loss = keep(_node(ed, FN_MUL_FF))
     _connect(rate_out, _pin(loss, "A"))
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(loss, "B"))
     loss_out = _pin(loss, "ReturnValue", is_input=False)
 
     prev = BEL.find_then_pin(draining)
-    for i, var in enumerate(("Health", PREV_HEALTH_VAR)):
-        now = keep(_at(ed.add_get_member_variable_node(var), x0 + 2160, y + 300 + i * 120))
-        less = keep(_at(_node(ed, FN_SUB_FF), x0 + 2400, y + 300 + i * 120))
+    for var in ("Health", PREV_HEALTH_VAR):
+        now = keep(ed.add_get_member_variable_node(var))
+        less = keep(_node(ed, FN_SUB_FF))
         _connect(_pin(now, var, is_input=False), _pin(less, "A"))
         _connect(loss_out, _pin(less, "B"))
-        write = keep(_at(ed.add_set_member_variable_node(var), x0 + 2400 + i * 260, y0))
+        write = keep(ed.add_set_member_variable_node(var))
         _connect(_pin(less, "ReturnValue", is_input=False), _pin(write, var))
         _connect(prev, _pin(write, "execute"))
         prev = BEL.find_then_pin(write)

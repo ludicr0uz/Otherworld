@@ -19,7 +19,7 @@ so a wanderer that respawns or spawns later gets the tuning too.
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
+from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
 from combat.nodes import FN_ARR_GET, MACRO_FOR_EACH
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.monster_tune_consts import (
@@ -59,17 +59,17 @@ def _as_pin(cast):
     raise RuntimeError("the cast has no As<Class> pin")
 
 
-def _author_creature(ed, c, bp_path, class_path, in_execs, x0, y0, made):
+def _author_creature(ed, c, bp_path, class_path, in_execs, made):
     """Creature ``c``'s row onto every live controller of its class. Returns
     the loop's Completed pin."""
     bp = unreal.load_asset(bp_path)      # for its class pin and cast node
     if not bp:
         raise RuntimeError(f"{bp_path} is missing -- run build_npc_blueprints.py first")
-    find = _call(ed, FN_GET_ALL_ACTORS, x0, y0, made)
+    find = _call(ed, FN_GET_ALL_ACTORS, made)
     _pin(find, "ActorClass").set_pin_value(class_path)
     for e in in_execs:
         _connect(e, _pin(find, "execute"))
-    loop = _at(ed.add_macro_node(MACRO_FOR_EACH), x0 + 300, y0)
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     made.append(loop)
@@ -77,7 +77,7 @@ def _author_creature(ed, c, bp_path, class_path, in_execs, x0, y0, made):
     _connect(BEL.find_then_pin(find), _loose_pin(loop, "Exec"))
 
     name = bp_path.rsplit("/", 1)[-1]
-    cast = _at(_palette(ed, f"Utilities|Casting|CastTo{name}"), x0 + 600, y0)
+    cast = _palette(ed, f"Utilities|Casting|CastTo{name}")
     if not BEL.list_input_pins(cast):
         raise RuntimeError(f"no cast node for {name}")
     made.append(cast)
@@ -85,41 +85,38 @@ def _author_creature(ed, c, bp_path, class_path, in_execs, x0, y0, made):
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     ai = _as_pin(cast)
 
-    flow, x = BEL.find_then_pin(cast), x0 + 900
+    flow = BEL.find_then_pin(cast)
     for s, (_col, var, *_rest) in enumerate(MONSTER_STATS):
         # The cell's index is known at build time: a literal on Array_Get.
-        cell = _call(ed, FN_ARR_GET, x + 240, y0 + 440, made,
-                     TargetArray=_get(ed, MONSTER_TAB.values_var, x, y0 + 440, made),
+        cell = _call(ed, FN_ARR_GET, made,
+                     TargetArray=_get(ed, MONSTER_TAB.values_var, made),
                      Index=c * MON_STAT_COUNT + s)
         value = _pin(cell, "Item", is_input=False)
-        n = _at(ed.add_set_member_variable_node(var, class_path), x + 480, y0)
+        n = ed.add_set_member_variable_node(var, class_path)
         made.append(n)
         _connect(ai, _pin(n, "self"))
         _connect(value, _pin(n, var))
         _connect(flow, _pin(n, "execute"))
         flow = BEL.find_then_pin(n)
-        x += 600
     return _loose_pin(loop, "Completed", is_input=False)
 
 
-def _author_apply(ed, in_execs, x0, y0, made):
+def _author_apply(ed, in_execs, made):
     """MonTuneTouched: the table onto every live wanderer. Returns the tails."""
-    go, idle = _branch(ed, _get(ed, MONSTER_TAB.touched_var, x0 - 240, y0 + 300, made),
-                       in_execs, x0, y0, made)
+    go, idle = _branch(ed, _get(ed, MONSTER_TAB.touched_var, made), in_execs, made)
     flow = [go]
     for c, (_key, bp_path, class_path) in enumerate(MON_CONTROLLERS):
-        flow = [_author_creature(ed, c, bp_path, class_path, flow,
-                                 x0 + 300, y0 + c * 1200, made)]
+        flow = [_author_creature(ed, c, bp_path, class_path, flow, made)]
     return flow + [idle]
 
 
-def author_monster_tune_tick(ed, pc_out, in_execs, x0, y0):
+def author_monster_tune_tick(ed, pc_out, in_execs):
     """The whole fragment (see the module docstring). Returns the exec tails."""
     made = []
-    flow = author_tab_flow(ed, pc_out, in_execs, x0, y0, made, MONSTER_TAB,
+    flow = author_tab_flow(ed, pc_out, in_execs, made, MONSTER_TAB,
                            len(MON_CREATURES),
                            other_open_vars(MONSTER_TAB))
-    tails = _author_apply(ed, flow, x0 + 10400, y0, made)
+    tails = _author_apply(ed, flow, made)
     ed.add_comment_to_nodes(
         "Monster tuning (its row in the M panel): Up/Down pick a row, "
         "Left/Right change the creature or the stat, Enter saves monster_tuning.csv. "

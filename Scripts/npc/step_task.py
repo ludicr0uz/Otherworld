@@ -17,9 +17,9 @@ child of a shared one) and a cast is the only typed way to reach its events.
 import unreal
 
 from npc.graph import (
-    BEL, BGE, _asset_sub, _at, _connect, _create_blueprint, _log,
-    _name_literal, _node, _palette, _pin, _set,
-)
+    BEL, BGE, _asset_sub, _connect, _create_blueprint, _log, _name_literal, _node,
+    _palette, _pin, _set)
+from uebp.layout import arrange
 from npc.nodes import FN_EQ_NAME, FN_FINISH_EXECUTE, NODE_EVENT_EXECUTE_AI
 from npc.paths import STEP_EVENT_PREFIX, STEP_RESULT_VAR, STEP_VAR
 
@@ -74,38 +74,38 @@ def build_step_task(ai_bp, path, steps):
 
     ai_class = BEL.generated_class(ai_bp)
     class_path = ai_class.get_path_name()
-    execute = _palette(ed, NODE_EVENT_EXECUTE_AI, 0.0, 0.0)
-    cast = _at(_palette(ed, f"Utilities|Casting|CastTo{ai_bp.get_name()}"), 300, 0)
+    execute = _palette(ed, NODE_EVENT_EXECUTE_AI)
+    cast = _palette(ed, f"Utilities|Casting|CastTo{ai_bp.get_name()}")
     _connect(_pin(execute, "OwnerController", is_input=False), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(execute), _pin(cast, "execute"))
     ctrl = _cast_out(cast)
 
-    done = _at(_node(ed, FN_FINISH_EXECUTE), 1400, -300)
-    result = _at(ed.add_get_member_variable_node(STEP_RESULT_VAR, class_path), 1100, -200)
+    done = _node(ed, FN_FINISH_EXECUTE)
+    result = ed.add_get_member_variable_node(STEP_RESULT_VAR, class_path)
     _connect(ctrl, _pin(result, "self"))
     _connect(_pin(result, STEP_RESULT_VAR, is_input=False), _pin(done, "bSuccess"))
-    failed = _at(_node(ed, FN_FINISH_EXECUTE), 1400, 300 + 300 * len(steps))
+    failed = _node(ed, FN_FINISH_EXECUTE)
     _set(failed, "bSuccess", "false")
     _connect(_pin(cast, "CastFailed", is_input=False), _pin(failed, "execute"))
 
-    step = _at(ed.add_get_member_variable_node(STEP_VAR), 300, 300)
+    step = ed.add_get_member_variable_node(STEP_VAR)
     step_out = _pin(step, STEP_VAR, is_input=False)
     prev = BEL.find_then_pin(cast)
-    for i, name in enumerate(steps):
-        y = 300 * i
-        same = _at(_node(ed, FN_EQ_NAME), 500, y + 150)
+    for name in steps:
+        same = _node(ed, FN_EQ_NAME)
         _connect(step_out, _pin(same, "A"))
-        _connect(_name_literal(ed, name, 300, y + 250), _pin(same, "B"))
-        which = _at(ed.add_branch_node(), 800, y)
+        _connect(_name_literal(ed, name), _pin(same, "B"))
+        which = ed.add_branch_node()
         _connect(_pin(same, "ReturnValue", is_input=False), _pin(which, "Condition"))
         _connect(prev, _pin(which, "execute"))
-        call = _at(_event_call(ed, class_path, f"{STEP_EVENT_PREFIX}{name}"), 1100, y)
+        call = _event_call(ed, class_path, f"{STEP_EVENT_PREFIX}{name}")
         _connect(ctrl, _pin(call, "self"))
         _connect(BEL.find_then_pin(which), BEL.find_execute_pin(call))
         _connect(BEL.find_then_pin(call), _pin(done, "execute"))
         prev = BEL.find_else_pin(which)
     _connect(prev, _pin(failed, "execute"))
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
     if ed.list_nodes_with_errors():

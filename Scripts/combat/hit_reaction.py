@@ -8,9 +8,8 @@ import unreal
 from forest_generator.npc_placement import NPC_HIT_REACTION_CLIPS
 from combat.anim_blueprint import HIT_SLOT, UPPER_BODY_ROOT
 from combat.graph import (
-    BEL, _assets, _at, _component_object, _connect, _handles, _log,
-    _loose_pin, _node, _palette, _pin, _set,
-)
+    BEL, _assets, _component_object, _connect, _handles, _log, _loose_pin, _node, _palette,
+    _pin, _set)
 from combat.nodes import (
     FN_ABS, FN_ACTOR_FORWARD, FN_ACTOR_RIGHT, FN_ADD_FF, FN_ADD_II,
     FN_ANIM_INSTANCE, FN_ARR_GET, FN_ARR_LEN, FN_CLAMP_II, FN_CONCAT,
@@ -144,13 +143,13 @@ HIT_REACT_PROBE_PREFIX = "[HIT-REACT] "
 POSE_BACK_PROBE_PREFIX = "[POSE-BACK] "
 
 
-def _author_steady_gate(ed, exec_in, x0, y0):
+def _author_steady_gate(ed, exec_in):
     """Steady (sights up)? Returns ``(steady_pin, flinch_pin)``: the first
     goes straight to the reaction's PrevHealth write (its ``skips``), so a hit
     taken down the sights is not read later as a new one; the second is the
     reaction's exec in."""
-    steady = _at(ed.add_get_member_variable_node(STEADY_VAR), x0, y0 + 240)
-    gate = _at(ed.add_branch_node(), x0 + 240, y0)
+    steady = ed.add_get_member_variable_node(STEADY_VAR)
+    gate = ed.add_branch_node()
     _connect(_pin(steady, STEADY_VAR, is_input=False), _pin(gate, "Condition"))
     _connect(exec_in, _pin(gate, "execute"))
     ed.add_comment_to_nodes(
@@ -161,7 +160,7 @@ def _author_steady_gate(ed, exec_in, x0, y0):
     return BEL.find_then_pin(gate), BEL.find_else_pin(gate)
 
 
-def _author_hit_reaction(ed, exec_in, x0, y0, skips=()):
+def _author_hit_reaction(ed, exec_in, skips=()):
     """Took a hit and lived: flinch. Returns ``(nodes, then_pin)``.
     ``skips``: exec pins that only remember this frame's health.
 
@@ -205,149 +204,141 @@ def _author_hit_reaction(ed, exec_in, x0, y0, skips=()):
         return n
 
     # --- did Health go down this frame? --------------------------------------
-    now_h = keep(_at(ed.add_get_member_variable_node("Health"), x0, y0 + 240))
-    was_h = keep(_at(ed.add_get_member_variable_node(PREV_HEALTH_VAR), x0, y0 + 360))
-    dropped = keep(_at(_node(ed, FN_LESS_FF), x0 + 240, y0 + 240))
+    now_h = keep(ed.add_get_member_variable_node("Health"))
+    was_h = keep(ed.add_get_member_variable_node(PREV_HEALTH_VAR))
+    dropped = keep(_node(ed, FN_LESS_FF))
     _connect(_pin(now_h, "Health", is_input=False), _pin(dropped, "A"))
     _connect(_pin(was_h, PREV_HEALTH_VAR, is_input=False), _pin(dropped, "B"))
-    took = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+    took = keep(ed.add_branch_node())
     _connect(_pin(dropped, "ReturnValue", is_input=False), _pin(took, "Condition"))
     _connect(exec_in, _pin(took, "execute"))
 
     # --- is the last one finished? -------------------------------------------
-    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 480, y0 + 380))
+    now = keep(_node(ed, FN_TIME_SECONDS))
     now_out = _pin(now, "ReturnValue", is_input=False)
-    due = keep(_at(ed.add_get_member_variable_node(NEXT_REACT_VAR), x0 + 480, y0 + 500))
-    ready = keep(_at(_node(ed, FN_GE_FF), x0 + 720, y0 + 380))
+    due = keep(ed.add_get_member_variable_node(NEXT_REACT_VAR))
+    ready = keep(_node(ed, FN_GE_FF))
     _connect(now_out, _pin(ready, "A"))
     _connect(_pin(due, NEXT_REACT_VAR, is_input=False), _pin(ready, "B"))
-    cooled = keep(_at(ed.add_branch_node(), x0 + 960, y0))
+    cooled = keep(ed.add_branch_node())
     _connect(_pin(ready, "ReturnValue", is_input=False), _pin(cooled, "Condition"))
     _connect(BEL.find_then_pin(took), _pin(cooled, "execute"))
 
     # --- does this body have any reactions at all? ---------------------------
-    clips = keep(_at(ed.add_get_member_variable_node(HIT_REACTIONS_VAR),
-                     x0 + 960, y0 + 620))
+    clips = keep(ed.add_get_member_variable_node(HIT_REACTIONS_VAR))
     clips_out = _pin(clips, HIT_REACTIONS_VAR, is_input=False)
-    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 1200, y0 + 620))
+    count = keep(_node(ed, FN_ARR_LEN))
     _connect(clips_out, _pin(count, "TargetArray"))
     count_out = _pin(count, "ReturnValue", is_input=False)
-    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 1440, y0 + 620))
+    stocked = keep(_node(ed, FN_GREATER_II))
     _connect(count_out, _pin(stocked, "A"))
     _set(stocked, "B", 0)
-    have = keep(_at(ed.add_branch_node(), x0 + 1680, y0))
+    have = keep(ed.add_branch_node())
     _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(have, "Condition"))
     _connect(BEL.find_then_pin(cooled), _pin(have, "execute"))
 
     # --- which way did it come from? -----------------------------------------
-    owner = keep(_at(_node(ed, FN_GET_OWNER), x0 + 1680, y0 + 760))
+    owner = keep(_node(ed, FN_GET_OWNER))
     owner_out = _pin(owner, "ReturnValue", is_input=False)
-    fwd = keep(_at(_node(ed, FN_ACTOR_FORWARD), x0 + 1920, y0 + 760))
+    fwd = keep(_node(ed, FN_ACTOR_FORWARD))
     _connect(owner_out, _pin(fwd, "self"))
-    rgt = keep(_at(_node(ed, FN_ACTOR_RIGHT), x0 + 1920, y0 + 880))
+    rgt = keep(_node(ed, FN_ACTOR_RIGHT))
     _connect(owner_out, _pin(rgt, "self"))
-    came = keep(_at(ed.add_get_member_variable_node(LAST_HIT_FROM_VAR),
-                    x0 + 1920, y0 + 1000))
+    came = keep(ed.add_get_member_variable_node(LAST_HIT_FROM_VAR))
     came_out = _pin(came, LAST_HIT_FROM_VAR, is_input=False)
 
-    ahead = keep(_at(_node(ed, FN_DOT_VV), x0 + 2160, y0 + 760))
+    ahead = keep(_node(ed, FN_DOT_VV))
     _connect(came_out, _pin(ahead, "A"))
     _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(ahead, "B"))
     ahead_out = _pin(ahead, "ReturnValue", is_input=False)
-    beside = keep(_at(_node(ed, FN_DOT_VV), x0 + 2160, y0 + 900))
+    beside = keep(_node(ed, FN_DOT_VV))
     _connect(came_out, _pin(beside, "A"))
     _connect(_pin(rgt, "ReturnValue", is_input=False), _pin(beside, "B"))
     beside_out = _pin(beside, "ReturnValue", is_input=False)
 
-    fore_aft = keep(_at(_node(ed, FN_ABS), x0 + 2400, y0 + 760))
+    fore_aft = keep(_node(ed, FN_ABS))
     _connect(ahead_out, _pin(fore_aft, "A"))
-    lateral = keep(_at(_node(ed, FN_ABS), x0 + 2400, y0 + 900))
+    lateral = keep(_node(ed, FN_ABS))
     _connect(beside_out, _pin(lateral, "A"))
-    axis = keep(_at(_node(ed, FN_GE_FF), x0 + 2640, y0 + 760))
+    axis = keep(_node(ed, FN_GE_FF))
     _connect(_pin(fore_aft, "ReturnValue", is_input=False), _pin(axis, "A"))
     _connect(_pin(lateral, "ReturnValue", is_input=False), _pin(axis, "B"))
-    front_back = keep(_at(ed.add_branch_node(), x0 + 2880, y0))
+    front_back = keep(ed.add_branch_node())
     _connect(_pin(axis, "ReturnValue", is_input=False), _pin(front_back, "Condition"))
     _connect(BEL.find_then_pin(have), _pin(front_back, "execute"))
 
     # Front, and one of the three Epic authored. The random draw is the only
     # thing that keeps a firefight from looking like one animation on a loop,
     # and Front is where it is worth spending because it is the common case.
-    facing = keep(_at(_node(ed, FN_GE_FF), x0 + 2880, y0 + 380))
+    facing = keep(_node(ed, FN_GE_FF))
     _connect(ahead_out, _pin(facing, "A"))
     _set(facing, "B", 0.0)
-    from_front = keep(_at(ed.add_branch_node(), x0 + 3120, y0 - 260))
+    from_front = keep(ed.add_branch_node())
     _connect(_pin(facing, "ReturnValue", is_input=False), _pin(from_front, "Condition"))
     _connect(BEL.find_then_pin(front_back), _pin(from_front, "execute"))
 
-    spread = keep(_at(_node(ed, FN_RAND_INT), x0 + 3120, y0 + 380))
+    spread = keep(_node(ed, FN_RAND_INT))
     _set(spread, "Min", 0)
     _set(spread, "Max", HIT_DIR_FRONT[1] - 1)
-    front_idx = keep(_at(_node(ed, FN_ADD_II), x0 + 3360, y0 + 380))
+    front_idx = keep(_node(ed, FN_ADD_II))
     _connect(_pin(spread, "ReturnValue", is_input=False), _pin(front_idx, "A"))
     _set(front_idx, "B", HIT_DIR_FRONT[0])
 
     arms = []
-    pick_front = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
-                          x0 + 3600, y0 - 400))
+    pick_front = keep(ed.add_set_member_variable_node(REACT_INDEX_VAR))
     _connect(_pin(front_idx, "ReturnValue", is_input=False),
              _pin(pick_front, REACT_INDEX_VAR))
     _connect(BEL.find_then_pin(from_front), _pin(pick_front, "execute"))
     arms.append(BEL.find_then_pin(pick_front))
 
-    pick_back = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
-                         x0 + 3600, y0 - 180))
+    pick_back = keep(ed.add_set_member_variable_node(REACT_INDEX_VAR))
     _set(pick_back, REACT_INDEX_VAR, HIT_DIR_BACK[0])
     _connect(BEL.find_else_pin(from_front), _pin(pick_back, "execute"))
     arms.append(BEL.find_then_pin(pick_back))
 
-    to_right = keep(_at(_node(ed, FN_GE_FF), x0 + 2880, y0 + 500))
+    to_right = keep(_node(ed, FN_GE_FF))
     _connect(beside_out, _pin(to_right, "A"))
     _set(to_right, "B", 0.0)
-    from_side = keep(_at(ed.add_branch_node(), x0 + 3120, y0 + 40))
+    from_side = keep(ed.add_branch_node())
     _connect(_pin(to_right, "ReturnValue", is_input=False), _pin(from_side, "Condition"))
     _connect(BEL.find_else_pin(front_back), _pin(from_side, "execute"))
 
-    pick_right = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
-                          x0 + 3600, y0 + 40))
+    pick_right = keep(ed.add_set_member_variable_node(REACT_INDEX_VAR))
     _set(pick_right, REACT_INDEX_VAR, HIT_DIR_RIGHT[0])
     _connect(BEL.find_then_pin(from_side), _pin(pick_right, "execute"))
     arms.append(BEL.find_then_pin(pick_right))
 
-    pick_left = keep(_at(ed.add_set_member_variable_node(REACT_INDEX_VAR),
-                         x0 + 3600, y0 + 260))
+    pick_left = keep(ed.add_set_member_variable_node(REACT_INDEX_VAR))
     _set(pick_left, REACT_INDEX_VAR, HIT_DIR_LEFT[0])
     _connect(BEL.find_else_pin(from_side), _pin(pick_left, "execute"))
     arms.append(BEL.find_then_pin(pick_left))
 
     # --- play it, into HitSlot, on whatever body this is ---------------------
-    chosen = keep(_at(ed.add_get_member_variable_node(REACT_INDEX_VAR),
-                      x0 + 3840, y0 + 620))
-    last = keep(_at(_node(ed, FN_SUB_II), x0 + 3840, y0 + 760))
+    chosen = keep(ed.add_get_member_variable_node(REACT_INDEX_VAR))
+    last = keep(_node(ed, FN_SUB_II))
     _connect(count_out, _pin(last, "A"))
     _set(last, "B", 1)
-    safe = keep(_at(_node(ed, FN_CLAMP_II), x0 + 4080, y0 + 620))
+    safe = keep(_node(ed, FN_CLAMP_II))
     _connect(_pin(chosen, REACT_INDEX_VAR, is_input=False), _pin(safe, "Value"))
     _set(safe, "Min", 0)
     _connect(_pin(last, "ReturnValue", is_input=False), _pin(safe, "Max"))
-    clip = keep(_at(_node(ed, FN_ARR_GET), x0 + 4320, y0 + 620))
+    clip = keep(_node(ed, FN_ARR_GET))
     _connect(clips_out, _pin(clip, "TargetArray"))
     _connect(_pin(safe, "ReturnValue", is_input=False), _pin(clip, "Index"))
 
     # Through the owner's own AnimInstance, so this works on the player, on a
     # zombie and on a wendigo without knowing which it is holding.
-    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0 + 3840, y0))
+    as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(owner_out, _pin(as_char, "Object"))
     for tail in arms:
         _connect(tail, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
-    mesh = keep(_at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
-                    x0 + 4080, y0 + 340))
+    mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
     _connect(char_out, _pin(mesh, "self"))
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 4320, y0 + 340))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
 
-    play = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 4560, y0))
+    play = keep(_node(ed, FN_PLAY_SLOT))
     _connect(_pin(anim, "ReturnValue", is_input=False), _pin(play, "self"))
     _connect(_pin(clip, "Item", is_input=False), _pin(play, "Asset"))
     _set(play, "SlotNodeName", HIT_SLOT)
@@ -358,31 +349,30 @@ def _author_hit_reaction(ed, exec_in, x0, y0, skips=()):
     _connect(BEL.find_then_pin(as_char), _pin(play, "execute"))
 
     # A deadline, not a countdown: nothing has to tick it.
-    when = keep(_at(_node(ed, FN_ADD_FF), x0 + 4560, y0 + 480))
+    when = keep(_node(ed, FN_ADD_FF))
     _connect(now_out, _pin(when, "A"))
     _set(when, "B", COMBAT.hit_react_cooldown_s)
-    rearm = keep(_at(ed.add_set_member_variable_node(NEXT_REACT_VAR),
-                     x0 + 4820, y0))
+    rearm = keep(ed.add_set_member_variable_node(NEXT_REACT_VAR))
     _connect(_pin(when, "ReturnValue", is_input=False), _pin(rearm, NEXT_REACT_VAR))
     _connect(BEL.find_then_pin(play), _pin(rearm, "execute"))
 
     after_play = BEL.find_then_pin(rearm)
     if HIT_REACT_PROBE:
-        who = keep(_at(_node(ed, FN_GET_OWNER), x0 + 4820, y0 + 700))
-        who_name = keep(_at(_node(ed, FN_DISPLAY_NAME), x0 + 5060, y0 + 700))
+        who = keep(_node(ed, FN_GET_OWNER))
+        who_name = keep(_node(ed, FN_DISPLAY_NAME))
         _connect(_pin(who, "ReturnValue", is_input=False), _pin(who_name, "Object"))
-        head = keep(_at(_node(ed, FN_CONCAT), x0 + 5300, y0 + 700))
+        head = keep(_node(ed, FN_CONCAT))
         _set(head, "A", HIT_REACT_PROBE_PREFIX)
         _connect(_pin(who_name, "ReturnValue", is_input=False), _pin(head, "B"))
-        idx_str = keep(_at(_node(ed, FN_INT_TO_STR), x0 + 5060, y0 + 840))
+        idx_str = keep(_node(ed, FN_INT_TO_STR))
         _connect(_pin(safe, "ReturnValue", is_input=False), _pin(idx_str, "InInt"))
-        tail_str = keep(_at(_node(ed, FN_CONCAT), x0 + 5300, y0 + 840))
+        tail_str = keep(_node(ed, FN_CONCAT))
         _set(tail_str, "A", " clip ")
         _connect(_pin(idx_str, "ReturnValue", is_input=False), _pin(tail_str, "B"))
-        line = keep(_at(_node(ed, FN_CONCAT), x0 + 5540, y0 + 700))
+        line = keep(_node(ed, FN_CONCAT))
         _connect(_pin(head, "ReturnValue", is_input=False), _pin(line, "A"))
         _connect(_pin(tail_str, "ReturnValue", is_input=False), _pin(line, "B"))
-        say = keep(_at(_node(ed, FN_WARN), x0 + 5540, y0 + 480))
+        say = keep(_node(ed, FN_WARN))
         _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
         _connect(after_play, _pin(say, "execute"))
         after_play = BEL.find_then_pin(say)
@@ -391,8 +381,7 @@ def _author_hit_reaction(ed, exec_in, x0, y0, skips=()):
     # Including the ones that did not react. Skipping it on the cooldown arm
     # would make the NEXT hit compare against a health from before this one and
     # fire the moment the cooldown lapses, with nothing new having happened.
-    remember = keep(_at(ed.add_set_member_variable_node(PREV_HEALTH_VAR),
-                        x0 + 5080, y0))
+    remember = keep(ed.add_set_member_variable_node(PREV_HEALTH_VAR))
     _connect(_pin(now_h, "Health", is_input=False), _pin(remember, PREV_HEALTH_VAR))
     for tail in (after_play,
                  _pin(as_char, "CastFailed", is_input=False),

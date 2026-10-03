@@ -7,7 +7,7 @@ shoulder aim (1.5x, COMBAT.shoulder_zoom) keeps the crosshair, and the glass
 only arrives with zoom past that -- which only the sights give it.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
 from combat.tuning import COMBAT
 from graphics_menu.canvas import _draw_texture
 
@@ -45,7 +45,7 @@ SCOPE_TEX = "T_UI_Scope"
 SCOPE_GATE_SLACK = 0.02
 
 
-def _author_scope_gate(ed, as_weapon, scoped_out, keep, x0, y0):
+def _author_scope_gate(ed, as_weapon, scoped_out, keep):
     """The condition for drawing the scope instead of the crosshair.
 
         Held.Scoped AND BaseFOV / CurrentFOV > shoulder_zoom + SCOPE_GATE_SLACK
@@ -58,27 +58,23 @@ def _author_scope_gate(ed, as_weapon, scoped_out, keep, x0, y0):
 
     Returns the condition pin.
     """
-    base = keep(_at(ed.add_get_member_variable_node("BaseFOV",
-                                                    WEAPON_COMP_CLASS_PATH),
-                    x0, y0))
+    base = keep(ed.add_get_member_variable_node("BaseFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(base, "self"))
-    now = keep(_at(ed.add_get_member_variable_node("CurrentFOV",
-                                                   WEAPON_COMP_CLASS_PATH),
-                   x0, y0 + 120))
+    now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
-    zoom = keep(_at(_node(ed, FN_DIV), x0 + 240, y0))
+    zoom = keep(_node(ed, FN_DIV))
     _connect(_pin(base, "BaseFOV", is_input=False), _pin(zoom, "A"))
     _connect(_pin(now, "CurrentFOV", is_input=False), _pin(zoom, "B"))
-    past = keep(_at(_node(ed, FN_GREATER), x0 + 480, y0))
+    past = keep(_node(ed, FN_GREATER))
     _connect(_pin(zoom, "ReturnValue", is_input=False), _pin(past, "A"))
     _set(past, "B", COMBAT.shoulder_zoom + SCOPE_GATE_SLACK)
-    both = keep(_at(_node(ed, FN_AND), x0 + 720, y0 - 60))
+    both = keep(_node(ed, FN_AND))
     _connect(scoped_out, _pin(both, "A"))
     _connect(_pin(past, "ReturnValue", is_input=False), _pin(both, "B"))
     return _pin(both, "ReturnValue", is_input=False)
 
 
-def _author_scope(ed, x0, y0, in_exec, as_weapon, held_out, cx, cy, height):
+def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     """The world blacked out except for a circle, with the sniper's reticle in it.
 
     Three draws: two black rects for the strips either side, and T_UI_Scope as
@@ -113,30 +109,26 @@ def _author_scope(ed, x0, y0, in_exec, as_weapon, held_out, cx, cy, height):
     # cx - cy is both the square's left edge and the width of each side strip,
     # because the square is the viewport's height wide and centred: the two
     # leftovers are equal by construction.
-    left = keep(_at(_node(ed, FN_SUB), x0, y0 + 300))
+    left = keep(_node(ed, FN_SUB))
     _connect(cx, _pin(left, "A"))
     _connect(cy, _pin(left, "B"))
     left_out = _pin(left, "ReturnValue", is_input=False)
-    right = keep(_at(_node(ed, FN_ADD), x0, y0 + 440))
+    right = keep(_node(ed, FN_ADD))
     _connect(cx, _pin(right, "A"))
     _connect(cy, _pin(right, "B"))
-    bar_w = keep(_at(_node(ed, FN_FMAX), x0 + 240, y0 + 300))
+    bar_w = keep(_node(ed, FN_FMAX))
     _connect(left_out, _pin(bar_w, "A"))
     _set(bar_w, "B", 0.0)
     bar_w_out = _pin(bar_w, "ReturnValue", is_input=False)
 
-    base = keep(_at(ed.add_get_member_variable_node("BaseFOV",
-                                                    WEAPON_COMP_CLASS_PATH),
-                    x0, y0 + 600))
+    base = keep(ed.add_get_member_variable_node("BaseFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(base, "self"))
-    now = keep(_at(ed.add_get_member_variable_node("CurrentFOV",
-                                                   WEAPON_COMP_CLASS_PATH),
-                   x0, y0 + 720))
+    now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
-    zoom = keep(_at(_node(ed, FN_DIV), x0 + 240, y0 + 600))
+    zoom = keep(_node(ed, FN_DIV))
     _connect(_pin(base, "BaseFOV", is_input=False), _pin(zoom, "A"))
     _connect(_pin(now, "CurrentFOV", is_input=False), _pin(zoom, "B"))
-    travelled = keep(_at(_node(ed, FN_SUB), x0 + 480, y0 + 600))
+    travelled = keep(_node(ed, FN_SUB))
     _connect(_pin(zoom, "ReturnValue", is_input=False), _pin(travelled, "A"))
     _set(travelled, "B", COMBAT.shoulder_zoom)
 
@@ -144,35 +136,34 @@ def _author_scope(ed, x0, y0, in_exec, as_weapon, held_out, cx, cy, height):
     # figure: the scope and the zoom factor are separate facts about a
     # weapon, and a 6x scope
     # would otherwise be fully opaque a third of the way in.
-    ads = keep(_at(ed.add_get_member_variable_node("AdsZoom", ITEM_CLASS_PATH),
-                   x0 + 240, y0 + 840))
+    ads = keep(ed.add_get_member_variable_node("AdsZoom", ITEM_CLASS_PATH))
     _connect(held_out, _pin(ads, "self"))
-    span = keep(_at(_node(ed, FN_SUB), x0 + 480, y0 + 840))
+    span = keep(_node(ed, FN_SUB))
     _connect(_pin(ads, "AdsZoom", is_input=False), _pin(span, "A"))
     _set(span, "B", COMBAT.shoulder_zoom)
 
-    frac = keep(_at(_node(ed, FN_DIV), x0 + 720, y0 + 600))
+    frac = keep(_node(ed, FN_DIV))
     _connect(_pin(travelled, "ReturnValue", is_input=False), _pin(frac, "A"))
     _connect(_pin(span, "ReturnValue", is_input=False), _pin(frac, "B"))
-    alpha = keep(_at(_node(ed, FN_FCLAMP), x0 + 960, y0 + 600))
+    alpha = keep(_node(ed, FN_FCLAMP))
     _connect(_pin(frac, "ReturnValue", is_input=False), _loose_pin(alpha, "Value"))
     _set(alpha, "Min", 0.0)
     _set(alpha, "Max", 1.0)
     alpha_out = _pin(alpha, "ReturnValue", is_input=False)
 
-    ink = keep(_at(_node(ed, FN_MAKE_COLOR), x0 + 1200, y0 + 600))
+    ink = keep(_node(ed, FN_MAKE_COLOR))
     for ch in ("R", "G", "B"):
         _set(ink, ch, 0.0)
     _connect(alpha_out, _pin(ink, "A"))
     ink_out = _pin(ink, "ReturnValue", is_input=False)
-    tint = keep(_at(_node(ed, FN_MAKE_COLOR), x0 + 1200, y0 + 760))
+    tint = keep(_node(ed, FN_MAKE_COLOR))
     for ch in ("R", "G", "B"):
         _set(tint, ch, 1.0)
     _connect(alpha_out, _pin(tint, "A"))
 
     flow = in_exec
-    for i, at_x in enumerate((None, right)):
-        r = keep(_at(_node(ed, FN_DRAW_RECT), x0 + 1460 + i * 260, y0))
+    for at_x in (None, right):
+        r = keep(_node(ed, FN_DRAW_RECT))
         if at_x is None:
             _set(r, "ScreenX", 0.0)
         else:
@@ -184,7 +175,7 @@ def _author_scope(ed, x0, y0, in_exec, as_weapon, held_out, cx, cy, height):
         _connect(flow, _pin(r, "execute"))
         flow = BEL.find_then_pin(r)
 
-    glass = keep(_draw_texture(ed, x0 + 1980, y0, SCOPE_TEX))
+    glass = keep(_draw_texture(ed, SCOPE_TEX))
     _connect(left_out, _pin(glass, "ScreenX"))
     _set(glass, "ScreenY", 0.0)
     _connect(height, _pin(glass, "ScreenW"))

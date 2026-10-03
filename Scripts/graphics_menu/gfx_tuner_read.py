@@ -16,31 +16,29 @@ from graphics_menu.gfx_tune_consts import TUNER_BASE_VAR, TUNER_VALUES_VAR
 FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
 
 
-def stat(ed, index, x, y, made):
+def stat(ed, index, made):
     """Stat ``index`` of the applied preset: a float pin."""
-    at = _call(ed, FN_ADD_II, x, y, made, A=_get(ed, TUNER_BASE_VAR, x - 240, y, made),
-               B=index)
-    cell = _call(ed, FN_ARR_GET, x + 240, y, made,
-                 TargetArray=_get(ed, TUNER_VALUES_VAR, x, y + 140, made))
+    at = _call(ed, FN_ADD_II, made, A=_get(ed, TUNER_BASE_VAR, made), B=index)
+    cell = _call(ed, FN_ARR_GET, made, TargetArray=_get(ed, TUNER_VALUES_VAR, made))
     _connect(out(at), _pin(cell, "Index"))
     return _pin(cell, "Item", is_input=False)
 
 
-def applied(ed, index, x, y, made):
+def applied(ed, index, made):
     """Stat ``index`` as the engine takes it: the table's number x the stat's
     scale (a percentage as a fraction). A float pin."""
-    cell = stat(ed, index, x, y, made)
+    cell = stat(ed, index, made)
     scale = GFX_STATS[index].scale
     if scale == 1:
         return cell
-    return out(_call(ed, FN_MUL_FF, x + 480, y, made, A=cell, B=scale))
+    return out(_call(ed, FN_MUL_FF, made, A=cell, B=scale))
 
 
-def whole(ed, index, x, y, made):
+def whole(ed, index, made):
     """The same, rounded: an int pin."""
-    return out(_call(ed, FN_ROUND, x + 480, y, made, A=stat(ed, index, x, y, made)))
+    return out(_call(ed, FN_ROUND, made, A=stat(ed, index, made)))
 
 
-def column(ed, name, x, y, made, rounded=False):
+def column(ed, name, made, rounded=False):
     """A stat by its CSV column."""
-    return (whole if rounded else stat)(ed, index_of(name), x, y, made)
+    return (whole if rounded else stat)(ed, index_of(name), made)

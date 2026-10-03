@@ -24,9 +24,9 @@ carries this component, which is exactly the set of actors that get hungry.
 import unreal
 
 from combat.graph import (
-    BEL, BGE, _apply_defaults, _at, _connect, _create_blueprint, _declare,
-    _events, _float_type, _log, _node, _pin, _set,
-)
+    BEL, BGE, _apply_defaults, _connect, _create_blueprint, _declare, _events, _float_type,
+    _log, _node, _pin, _set)
+from uebp.layout import arrange
 from combat.nodes import (
     FN_AND, FN_CLAMP, FN_GET_ASC, FN_GET_OWNER, FN_GIVE_ABILITY, FN_IS_VALID,
     FN_IS_VALID_CLASS, FN_MUL_FF, FN_SUB_FF,
@@ -39,30 +39,29 @@ STATS = ("Hunger", "Thirst", "Temperature")
 
 
 def _author_begin_play(ed, begin):
-    owner = _at(_node(ed, FN_GET_OWNER), 240, -760)
-    lookup = _at(_node(ed, FN_GET_ASC), 480, -760)
+    owner = _node(ed, FN_GET_OWNER)
+    lookup = _node(ed, FN_GET_ASC)
     _connect(_pin(owner, "ReturnValue", is_input=False), _pin(lookup, "Actor"))
-    keep_asc = _at(ed.add_set_member_variable_node("AbilitySystem"), 720, -900)
+    keep_asc = ed.add_set_member_variable_node("AbilitySystem")
     _connect(_pin(lookup, "ReturnValue", is_input=False),
              _pin(keep_asc, "AbilitySystem"))
     _connect(BEL.find_then_pin(begin), _pin(keep_asc, "execute"))
 
-    asc = _pin(_at(ed.add_get_member_variable_node("AbilitySystem"), 720, -620),
-               "AbilitySystem", is_input=False)
-    ability = _pin(_at(ed.add_get_member_variable_node("ConsumeAbility"), 720, -500),
+    asc = _pin(ed.add_get_member_variable_node("AbilitySystem"), "AbilitySystem", is_input=False)
+    ability = _pin(ed.add_get_member_variable_node("ConsumeAbility"),
                    "ConsumeAbility", is_input=False)
-    has_asc = _at(_node(ed, FN_IS_VALID), 960, -620)
+    has_asc = _node(ed, FN_IS_VALID)
     _connect(asc, _pin(has_asc, "Object"))
-    has_ability = _at(_node(ed, FN_IS_VALID_CLASS), 960, -500)
+    has_ability = _node(ed, FN_IS_VALID_CLASS)
     _connect(ability, _pin(has_ability, "Class"))
-    both = _at(_node(ed, FN_AND), 1200, -560)
+    both = _node(ed, FN_AND)
     _connect(_pin(has_asc, "ReturnValue", is_input=False), _pin(both, "A"))
     _connect(_pin(has_ability, "ReturnValue", is_input=False), _pin(both, "B"))
-    can = _at(ed.add_branch_node(), 1440, -900)
+    can = ed.add_branch_node()
     _connect(_pin(both, "ReturnValue", is_input=False), _pin(can, "Condition"))
     _connect(BEL.find_then_pin(keep_asc), _pin(can, "execute"))
 
-    give = _at(_node(ed, FN_GIVE_ABILITY), 1700, -900)
+    give = _node(ed, FN_GIVE_ABILITY)
     _connect(asc, _pin(give, "self"))
     _connect(ability, _pin(give, "AbilityClass"))
     _set(give, "Level", 1)
@@ -76,22 +75,22 @@ def _author_begin_play(ed, begin):
         [owner, lookup, keep_asc, has_asc, has_ability, both, can, give])
 
 
-def _author_decay(ed, tick, stat, rate_var, max_var, exec_in, x0, y0):
+def _author_decay(ed, tick, stat, rate_var, max_var, exec_in):
     """stat = clamp(stat - rate * DeltaSeconds, 0, max). Returns the set's then."""
-    now = _at(ed.add_get_member_variable_node(stat), x0, y0 + 300)
-    rate = _at(ed.add_get_member_variable_node(rate_var), x0, y0 + 420)
-    top = _at(ed.add_get_member_variable_node(max_var), x0, y0 + 540)
-    step = _at(_node(ed, FN_MUL_FF), x0 + 240, y0 + 420)
+    now = ed.add_get_member_variable_node(stat)
+    rate = ed.add_get_member_variable_node(rate_var)
+    top = ed.add_get_member_variable_node(max_var)
+    step = _node(ed, FN_MUL_FF)
     _connect(_pin(rate, rate_var, is_input=False), _pin(step, "A"))
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "B"))
-    less = _at(_node(ed, FN_SUB_FF), x0 + 480, y0 + 300)
+    less = _node(ed, FN_SUB_FF)
     _connect(_pin(now, stat, is_input=False), _pin(less, "A"))
     _connect(_pin(step, "ReturnValue", is_input=False), _pin(less, "B"))
-    clamp = _at(_node(ed, FN_CLAMP), x0 + 720, y0 + 300)
+    clamp = _node(ed, FN_CLAMP)
     _connect(_pin(less, "ReturnValue", is_input=False), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _connect(_pin(top, max_var, is_input=False), _pin(clamp, "Max"))
-    write = _at(ed.add_set_member_variable_node(stat), x0 + 960, y0)
+    write = ed.add_set_member_variable_node(stat)
     _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(write, stat))
     _connect(exec_in, _pin(write, "execute"))
     return BEL.find_then_pin(write)
@@ -99,24 +98,23 @@ def _author_decay(ed, tick, stat, rate_var, max_var, exec_in, x0, y0):
 
 def _author_tick(ed, tick):
     flow = BEL.find_then_pin(tick)
-    flow = _author_decay(ed, tick, "Hunger", "HungerDecay", "MaxHunger", flow, 240, 0)
-    flow = _author_decay(ed, tick, "Thirst", "ThirstDecay", "MaxThirst", flow, 1480, 0)
+    flow = _author_decay(ed, tick, "Hunger", "HungerDecay", "MaxHunger", flow)
+    flow = _author_decay(ed, tick, "Thirst", "ThirstDecay", "MaxThirst", flow)
 
     # Nested, not folded into each sync's condition: every sync reads off
     # AbilitySystem, and a pure Get with a null self in a Branch condition is
     # an Accessed None on every frame (CLAUDE.md, the fire-gate gotcha).
-    asc_get = _at(ed.add_get_member_variable_node("AbilitySystem"), 2720, 300)
+    asc_get = ed.add_get_member_variable_node("AbilitySystem")
     asc = _pin(asc_get, "AbilitySystem", is_input=False)
-    valid = _at(_node(ed, FN_IS_VALID), 2960, 300)
+    valid = _node(ed, FN_IS_VALID)
     _connect(asc, _pin(valid, "Object"))
-    gate = _at(ed.add_branch_node(), 3200, 0)
+    gate = ed.add_branch_node()
     _connect(_pin(valid, "ReturnValue", is_input=False), _pin(gate, "Condition"))
     _connect(flow, _pin(gate, "execute"))
 
     exits = (BEL.find_then_pin(gate),)
-    for i, (stat, effect_var, tags) in enumerate(DEBUFFS):
-        exits = _author_debuff_sync(ed, asc, stat, effect_var, tags, exits,
-                                    3500, i * 1000)
+    for stat, effect_var, tags in DEBUFFS:
+        exits = _author_debuff_sync(ed, asc, stat, effect_var, tags, exits)
     ed.add_comment_to_nodes(
         "Hunger and thirst fall every frame; at zero the matching debuff "
         "GameplayEffect goes on, and comes off when something is eaten.",
@@ -150,6 +148,7 @@ def build_survival_component(rebuild=True):
     _author_begin_play(ed, begin)
     _author_tick(ed, tick)
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_SurvivalComponent failed to compile")
     _apply_defaults(bp, {

@@ -19,7 +19,7 @@ the request, which is what lets a probe ask for the guns without a key press
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from uebp.graph import out
 from combat.nodes import FN_OBJECT_CLASS, MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
@@ -64,9 +64,9 @@ def _class_literal(node, pin_name, class_path):
         raise RuntimeError(f"class pin {pin_name!r} would not take {class_path!r}: {got!r}")
 
 
-def _setter(ed, var, value, in_execs, x, y, made, owner=None, self_out=None):
-    n = _at(ed.add_set_member_variable_node(var, owner) if owner
-            else ed.add_set_member_variable_node(var), x, y)
+def _setter(ed, var, value, in_execs, made, owner=None, self_out=None):
+    n = (ed.add_set_member_variable_node(var, owner) if owner
+            else ed.add_set_member_variable_node(var))
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
     _set(n, var, value)
@@ -76,17 +76,17 @@ def _setter(ed, var, value, in_execs, x, y, made, owner=None, self_out=None):
     return BEL.find_then_pin(n)
 
 
-def _get(ed, var, x, y, made, owner=None, self_out=None):
-    n = _at(ed.add_get_member_variable_node(var, owner) if owner
-            else ed.add_get_member_variable_node(var), x, y)
+def _get(ed, var, made, owner=None, self_out=None):
+    n = (ed.add_get_member_variable_node(var, owner) if owner
+            else ed.add_get_member_variable_node(var))
     if self_out is not None:
         _connect(self_out, _pin(n, "self"))
     made.append(n)
     return _pin(n, var, is_input=False)
 
 
-def _call(ed, fn, x, y, made, **inputs):
-    n = _at(_node(ed, fn), x, y)
+def _call(ed, fn, made, **inputs):
+    n = _node(ed, fn)
     for name, v in inputs.items():
         if isinstance(v, (str, int, float)):
             _set(n, name, v)
@@ -96,8 +96,8 @@ def _call(ed, fn, x, y, made, **inputs):
     return n
 
 
-def _branch(ed, cond, in_execs, x, y, made):
-    br = _at(ed.add_branch_node(), x, y)
+def _branch(ed, cond, in_execs, made):
+    br = ed.add_branch_node()
     _connect(cond, _pin(br, "Condition"))
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
@@ -105,84 +105,68 @@ def _branch(ed, cond, in_execs, x, y, made):
     return BEL.find_then_pin(br), BEL.find_else_pin(br)
 
 
-def _author_give_one(ed, gun, wc, pawn_out, in_execs, x0, y0, made):
+def _author_give_one(ed, gun, wc, pawn_out, in_execs, made):
     """One gun class: skipped if carried or the bag is full, else spawned and
     carried. Returns the exec tails."""
-    flow = _setter(ed, DEV_HAS_GUN_VAR, "false", in_execs, x0, y0, made)
-    inv = _get(ed, "Inventory", x0, y0 + 300, made, WEAPON_COMP_CLASS_PATH, wc)
-    loop = _at(ed.add_macro_node(MACRO_FOR_EACH), x0 + 260, y0)
+    flow = _setter(ed, DEV_HAS_GUN_VAR, "false", in_execs, made)
+    inv = _get(ed, "Inventory", made, WEAPON_COMP_CLASS_PATH, wc)
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     made.append(loop)
     _connect(inv, _loose_pin(loop, "Array"))
     _connect(flow, _loose_pin(loop, "Exec"))
-    cls = _call(ed, FN_OBJECT_CLASS, x0 + 560, y0 + 300, made,
-                Object=_loose_pin(loop, "ArrayElement", is_input=False))
-    same = _call(ed, FN_CLASS_EQ, x0 + 800, y0 + 300, made, A=out(cls))
+    cls = _call(ed, FN_OBJECT_CLASS, made, Object=_loose_pin(loop, "ArrayElement", is_input=False))
+    same = _call(ed, FN_CLASS_EQ, made, A=out(cls))
     _class_literal(same, "B", gun)
-    held, _other = _branch(ed, out(same),
-                           [_loose_pin(loop, "LoopBody", is_input=False)],
-                           x0 + 1040, y0, made)
-    _setter(ed, DEV_HAS_GUN_VAR, "true", [held], x0 + 1300, y0, made)
+    held, _other = _branch(ed, out(same), [_loose_pin(loop, "LoopBody", is_input=False)], made)
+    _setter(ed, DEV_HAS_GUN_VAR, "true", [held], made)
 
     # After the scan: a gun not carried, while there is room for it.
-    y1 = y0 + 700
-    count = _call(ed, FN_ARR_LEN, x0 + 260, y1 + 300, made,
-                  TargetArray=_get(ed, "Inventory", x0, y1 + 300, made,
+    count = _call(ed, FN_ARR_LEN, made,
+                  TargetArray=_get(ed, "Inventory", made,
                                    WEAPON_COMP_CLASS_PATH, wc))
-    room = _call(ed, FN_LESS_II, x0 + 500, y1 + 300, made, A=out(count),
-                 B=SLOT_COUNT)
-    new = _call(ed, FN_NOT, x0 + 500, y1 + 440, made,
-                A=_get(ed, DEV_HAS_GUN_VAR, x0 + 260, y1 + 440, made))
-    want = _call(ed, FN_AND, x0 + 740, y1 + 300, made, A=out(room), B=out(new))
-    give, skip = _branch(ed, out(want),
-                         [_loose_pin(loop, "Completed", is_input=False)],
-                         x0 + 980, y1, made)
+    room = _call(ed, FN_LESS_II, made, A=out(count), B=SLOT_COUNT)
+    new = _call(ed, FN_NOT, made, A=_get(ed, DEV_HAS_GUN_VAR, made))
+    want = _call(ed, FN_AND, made, A=out(room), B=out(new))
+    give, skip = _branch(ed, out(want), [_loose_pin(loop, "Completed", is_input=False)], made)
 
-    where = _call(ed, FN_GET_TRANSFORM, x0 + 1000, y1 + 300, made, self=pawn_out)
-    spawn = _at(_palette(ed, NODE_SPAWN), x0 + 1240, y1)
+    where = _call(ed, FN_GET_TRANSFORM, made, self=pawn_out)
+    spawn = _palette(ed, NODE_SPAWN)
     made.append(spawn)
     _class_literal(spawn, "Class", gun)
     _connect(out(where), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(give, _pin(spawn, "execute"))
-    cast = _at(_palette(ed, NODE_CAST_ITEM), x0 + 1540, y1)
+    cast = _palette(ed, NODE_CAST_ITEM)
     made.append(cast)
     _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(spawn), _pin(cast, "execute"))
     item = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
 
     # Carried, not lying in the world.
-    flow = _setter(ed, "Dropped", "false", [BEL.find_then_pin(cast)], x0 + 1840, y1,
-                   made, ITEM_CLASS_PATH, item)
-    add = _call(ed, FN_ARR_ADD, x0 + 2100, y1, made,
-                TargetArray=_get(ed, "Inventory", x0 + 1840, y1 + 300, made,
+    flow = _setter(ed, "Dropped", "false", [BEL.find_then_pin(cast)], made, ITEM_CLASS_PATH, item)
+    add = _call(ed, FN_ARR_ADD, made,
+                TargetArray=_get(ed, "Inventory", made,
                                  WEAPON_COMP_CLASS_PATH, wc))
     _connect(item, _loose_pin(add, "NewItem"))
     _connect(flow, _pin(add, "execute"))
     return [BEL.find_then_pin(add), skip, _pin(cast, "CastFailed", is_input=False)]
 
 
-def author_dev_guns(ed, pc_out, parts, in_execs, x0, y0, made):
+def author_dev_guns(ed, pc_out, parts, in_execs, made):
     """The whole fragment (see the module docstring). ``parts`` is
     player_parts'. Returns the exec tails."""
     unreal.load_asset(ITEM_BP_PATH)     # the cast node exists only for a loaded class
-    raise_it, no_key = _branch(ed, pause_row_taken(ed, DEV_GUNS_ACTION, x0,
-                                                   y0 + 300, made),
-                               in_execs, x0 + 480, y0, made)
-    raised = _setter(ed, DEV_GUNS_REQUEST_VAR, "true", [raise_it], x0 + 740, y0 - 300,
-                     made)
+    raise_it, no_key = _branch(ed, pause_row_taken(ed, DEV_GUNS_ACTION, made), in_execs, made)
+    raised = _setter(ed, DEV_GUNS_REQUEST_VAR, "true", [raise_it], made)
 
-    serve, idle = _branch(ed, _get(ed, DEV_GUNS_REQUEST_VAR, x0 + 740, y0 + 300, made),
-                          [raised, no_key], x0 + 1000, y0, made)
-    flow = [_setter(ed, DEV_GUNS_REQUEST_VAR, "false", [serve], x0 + 1260, y0, made)]
+    serve, idle = _branch(ed, _get(ed, DEV_GUNS_REQUEST_VAR, made), [raised, no_key], made)
+    flow = [_setter(ed, DEV_GUNS_REQUEST_VAR, "false", [serve], made)]
     wc = parts[WEAPON_COMP_CLASS_PATH]
-    x = x0 + 1520
     for gun in DEV_GUN_CLASS_PATHS:
-        flow = _author_give_one(ed, gun, wc, parts[PAWN], flow, x, y0, made)
-        x += 2600
-    dirty = _setter(ed, "NeedsRefresh", "true", flow, x, y0, made,
-                    WEAPON_COMP_CLASS_PATH, wc)
+        flow = _author_give_one(ed, gun, wc, parts[PAWN], flow, made)
+    dirty = _setter(ed, "NeedsRefresh", "true", flow, made, WEAPON_COMP_CLASS_PATH, wc)
     ed.add_comment_to_nodes(
         f"dev-all-guns (its row in the M panel): one of every gun not "
         f"already carried, while fewer than {SLOT_COUNT} items are. "

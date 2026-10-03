@@ -22,7 +22,7 @@ held down fires it -- an automatic on the next frame, anything on a press that
 is still reported.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import (
     FN_AND, FN_ARR_LEN, FN_ARR_REMOVE, FN_DESTROY, FN_MIN_II, FN_NOT,
     FN_SEND_GAMEPLAY_EVENT, FN_SUB_II, NODE_MAKE_EVENT_DATA,
@@ -34,7 +34,7 @@ from combat.weapon_component.common import _prop
 TRIGGER_SPENT = "TriggerSpent"
 
 
-def _author_trigger_latch(ed, holding, exec_ins, x0, y0):
+def _author_trigger_latch(ed, holding, exec_ins):
     """Re-arm the trigger once the fire key is up: TriggerSpent &= holding.
 
     One unconditional Set per frame, before the fire gate. Returns the exit
@@ -42,16 +42,16 @@ def _author_trigger_latch(ed, holding, exec_ins, x0, y0):
     pulled when the gate runs, after this Set, so the release frame is
     already armed.
     """
-    spent = _at(ed.add_get_member_variable_node(TRIGGER_SPENT), x0, y0 + 160)
+    spent = ed.add_get_member_variable_node(TRIGGER_SPENT)
     spent_out = _pin(spent, TRIGGER_SPENT, is_input=False)
-    still = _at(_node(ed, FN_AND), x0 + 260, y0 + 160)
+    still = _node(ed, FN_AND)
     _connect(spent_out, _pin(still, "A"))
     _connect(holding, _pin(still, "B"))
-    latch = _at(ed.add_set_member_variable_node(TRIGGER_SPENT), x0 + 520, y0)
+    latch = ed.add_set_member_variable_node(TRIGGER_SPENT)
     _connect(_pin(still, "ReturnValue", is_input=False), _pin(latch, TRIGGER_SPENT))
     for exit_pin in exec_ins:
         _connect(exit_pin, _pin(latch, "execute"))
-    free = _at(_node(ed, FN_NOT), x0 + 520, y0 + 160)
+    free = _node(ed, FN_NOT)
     _connect(spent_out, _pin(free, "A"))
     ed.add_comment_to_nodes(
         "The press that ate an item stays spent until the fire key is up, so it "
@@ -61,7 +61,7 @@ def _author_trigger_latch(ed, holding, exec_ins, x0, y0):
             _pin(free, "ReturnValue", is_input=False))
 
 
-def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, wear_gate, x0, y0):
+def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, wear_gate):
     """Branch a Consumable off the fire gate; a tap uses it.
 
     A Consumable is used rather than fired, and only on the tap: a held button
@@ -71,20 +71,19 @@ def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, wear_gate, x0, y
     `not_edible` (the ready gate). Returns the exits: [eaten, worn], and not
     tapped.
     """
-    edible, edible_n = _prop(ed, "Consumable", held, x0, y0)
-    use_gate = _at(ed.add_branch_node(), x0 + 240, y0)
+    edible, edible_n = _prop(ed, "Consumable", held)
+    use_gate = ed.add_branch_node()
     _connect(edible, _pin(use_gate, "Condition"))
     _connect(exec_in, _pin(use_gate, "execute"))
     _connect(BEL.find_else_pin(use_gate), not_edible)
-    use_tap = _at(ed.add_branch_node(), x0 + 480, y0)
+    use_tap = ed.add_branch_node()
     _connect(tap, _pin(use_tap, "Condition"))
     _connect(BEL.find_then_pin(use_gate), _pin(use_tap, "execute"))
     # A garment is Consumable too, and its use is wearing it: `wear_gate`
     # (wear._author_wear_gate, handed in by tick.py) takes the tap and hands
     # back what is not a garment, which is eaten.
-    worn, not_garment = wear_gate(ed, held, BEL.find_then_pin(use_tap),
-                                  x0 + 720, y0, x0 + 160, y0 + 7300)
-    consumed = _author_consume(ed, held, owner, not_garment, x0 + 160, y0 + 6100)
+    worn, not_garment = wear_gate(ed, held, BEL.find_then_pin(use_tap))
+    consumed = _author_consume(ed, held, owner, not_garment)
     ed.add_comment_to_nodes(
         "The held item is Consumable: a tap uses it (consume.py) instead of "
         "firing it, and a held button does nothing. A garment's use is to "
@@ -93,7 +92,7 @@ def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, wear_gate, x0, y
     return [consumed, worn], BEL.find_else_pin(use_tap)
 
 
-def _author_consume(ed, held, owner, exec_in, x0, y0):
+def _author_consume(ed, held, owner, exec_in):
     """Send the use event, then remove and destroy the held item.
 
     Returns the exec pin to carry on from. The equipped index stays where it
@@ -107,55 +106,55 @@ def _author_consume(ed, held, owner, exec_in, x0, y0):
         made.append(n)
         return n
 
-    payload = keep(_at(_palette(ed, NODE_MAKE_EVENT_DATA), x0, y0 + 300))
+    payload = keep(_palette(ed, NODE_MAKE_EVENT_DATA))
     _connect(held, _loose_pin(payload, "OptionalObject"))
     _connect(owner, _loose_pin(payload, "Instigator"))
     _connect(owner, _loose_pin(payload, "Target"))
 
-    send = keep(_at(_node(ed, FN_SEND_GAMEPLAY_EVENT), x0 + 320, y0))
+    send = keep(_node(ed, FN_SEND_GAMEPLAY_EVENT))
     _connect(owner, _pin(send, "Actor"))
     _set(send, "EventTag", f'(TagName="{CONSUME_EVENT_TAG}")')
     _connect(BEL.list_output_pins(payload)[0], _pin(send, "Payload"))
     _connect(exec_in, _pin(send, "execute"))
 
-    inv = keep(_at(ed.add_get_member_variable_node("Inventory"), x0 + 320, y0 + 300))
+    inv = keep(ed.add_get_member_variable_node("Inventory"))
     inv_out = _pin(inv, "Inventory", is_input=False)
-    idx = keep(_at(ed.add_get_member_variable_node("EquippedIndex"), x0 + 320, y0 + 420))
+    idx = keep(ed.add_get_member_variable_node("EquippedIndex"))
     idx_out = _pin(idx, "EquippedIndex", is_input=False)
-    remove = keep(_at(_node(ed, FN_ARR_REMOVE), x0 + 620, y0))
+    remove = keep(_node(ed, FN_ARR_REMOVE))
     _connect(inv_out, _pin(remove, "TargetArray"))
     _connect(idx_out, _pin(remove, "IndexToRemove"))
     _connect(BEL.find_then_pin(send), _pin(remove, "execute"))
 
-    gone = keep(_at(_node(ed, FN_DESTROY), x0 + 900, y0))
+    gone = keep(_node(ed, FN_DESTROY))
     _connect(held, _pin(gone, "self"))
     _connect(BEL.find_then_pin(remove), _pin(gone, "execute"))
 
     # Held is set with its input pin left unconnected: that clears it to None,
     # the same way dropping does.
-    clear = keep(_at(ed.add_set_member_variable_node("Held"), x0 + 1180, y0))
+    clear = keep(ed.add_set_member_variable_node("Held"))
     _connect(BEL.find_then_pin(gone), _pin(clear, "execute"))
 
     # Min(EquippedIndex, Length - 1). Length is pure, so it is read here --
     # after the removal above -- and sees the shorter array.
-    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 900, y0 + 300))
+    count = keep(_node(ed, FN_ARR_LEN))
     _connect(inv_out, _pin(count, "TargetArray"))
-    last = keep(_at(_node(ed, FN_SUB_II), x0 + 1180, y0 + 300))
+    last = keep(_node(ed, FN_SUB_II))
     _connect(_pin(count, "ReturnValue", is_input=False), _pin(last, "A"))
     _set(last, "B", 1)
-    clamp = keep(_at(_node(ed, FN_MIN_II), x0 + 1440, y0 + 300))
+    clamp = keep(_node(ed, FN_MIN_II))
     _connect(idx_out, _pin(clamp, "A"))
     _connect(_pin(last, "ReturnValue", is_input=False), _pin(clamp, "B"))
-    stay = keep(_at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 1440, y0))
+    stay = keep(ed.add_set_member_variable_node("EquippedIndex"))
     _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(stay, "EquippedIndex"))
     _connect(BEL.find_then_pin(clear), _pin(stay, "execute"))
 
-    dirty = keep(_at(ed.add_set_member_variable_node("NeedsRefresh"), x0 + 1700, y0))
+    dirty = keep(ed.add_set_member_variable_node("NeedsRefresh"))
     _set(dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(stay), _pin(dirty, "execute"))
 
     # The press is spent; _author_trigger_latch re-arms it on release.
-    spend = keep(_at(ed.add_set_member_variable_node(TRIGGER_SPENT), x0 + 1960, y0))
+    spend = keep(ed.add_set_member_variable_node(TRIGGER_SPENT))
     _set(spend, TRIGGER_SPENT, "true")
     _connect(BEL.find_then_pin(dirty), _pin(spend, "execute"))
 

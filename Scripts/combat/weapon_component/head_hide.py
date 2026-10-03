@@ -26,7 +26,7 @@ runs for a dead owner.
 
 import unreal
 
-from combat.graph import BEL, _assets, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _assets, _connect, _node, _pin, _set
 from combat.nodes import FN_GREATER_FF, FN_HIDE_BONE, FN_UNHIDE_BONE
 from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR
 from combat.skin import player_skin
@@ -54,17 +54,17 @@ def head_bone():
     return skin.head
 
 
-def _author_head_shown(ed, keep, exec_in, x, y):
+def _author_head_shown(ed, keep, exec_in):
     """OwnerMesh.UnHideBoneByName(head). Returns the exec pin to carry on from."""
-    body = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x, y + 160))
-    show = keep(_at(_node(ed, FN_UNHIDE_BONE), x + 260, y))
+    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    show = keep(_node(ed, FN_UNHIDE_BONE))
     _connect(_pin(body, "OwnerMesh", is_input=False), _pin(show, "self"))
     _set(show, "BoneName", head_bone())
     _connect(exec_in, _pin(show, "execute"))
     return BEL.find_then_pin(show)
 
 
-def _author_head_hide(ed, exec_ins, x0, y0):
+def _author_head_hide(ed, exec_ins):
     """See the module docstring. Returns the exec pins to carry on from."""
     made = []
 
@@ -72,23 +72,22 @@ def _author_head_hide(ed, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    seat = keep(_at(ed.add_get_member_variable_node(SEAT_VAR), x0, y0 + 160))
-    past = keep(_at(_node(ed, FN_GREATER_FF), x0 + 260, y0 + 160))
+    seat = keep(ed.add_get_member_variable_node(SEAT_VAR))
+    past = keep(_node(ed, FN_GREATER_FF))
     _connect(_pin(seat, SEAT_VAR, is_input=False), _pin(past, "A"))
     _set(past, "B", HEAD_HIDE_SEAT)
-    on_sights = keep(_at(ed.add_branch_node(), x0 + 520, y0))
+    on_sights = keep(ed.add_branch_node())
     _connect(_pin(past, "ReturnValue", is_input=False), _pin(on_sights, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(on_sights, "execute"))
 
-    body = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 780, y0 + 160))
-    hide = keep(_at(_node(ed, FN_HIDE_BONE), x0 + 1040, y0))
+    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    hide = keep(_node(ed, FN_HIDE_BONE))
     _connect(_pin(body, "OwnerMesh", is_input=False), _pin(hide, "self"))
     _set(hide, "BoneName", head_bone())
     _set(hide, "PhysBodyOption", PHYS_BODY_OP)
     _connect(BEL.find_then_pin(on_sights), _pin(hide, "execute"))
-    shown = _author_head_shown(ed, keep, BEL.find_else_pin(on_sights),
-                               x0 + 780, y0 + 400)
+    shown = _author_head_shown(ed, keep, BEL.find_else_pin(on_sights))
 
     ed.add_comment_to_nodes(
         f"Down the sights (SightSeat > {HEAD_HIDE_SEAT:g}) the player's own "

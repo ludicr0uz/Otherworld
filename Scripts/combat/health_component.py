@@ -16,10 +16,9 @@ from combat.game_state import (
     SPAWNED_AT_VAR,
 )
 from combat.graph import (
-    BEL, BGE, _apply_defaults, _assets, _at, _connect, _create_blueprint,
-    _declare, _events, _float_type, _log, _node, _pin, _post_physics_tick,
-    _set, _struct_type,
-)
+    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _declare, _events,
+    _float_type, _log, _node, _pin, _post_physics_tick, _set, _struct_type)
+from uebp.layout import arrange
 from combat.hit_reaction import (
     HIT_REACTIONS_VAR, LAST_HIT_FROM_VAR, NEXT_REACT_VAR, PREV_HEALTH_VAR,
     REACT_INDEX_VAR, STEADY_VAR, _author_hit_reaction, _author_steady_gate,
@@ -151,20 +150,19 @@ def build_health_component(rebuild=True):
     lost, write_off = _author_world_floor_net(ed, tick)
 
     # --- Tick: has it died this frame? ---------------------------------------
-    health = _at(ed.add_get_member_variable_node("Health"), 240, 240)
-    dying = _at(_node(ed, FN_LE_FF), 460, 240)
+    health = ed.add_get_member_variable_node("Health")
+    dying = _node(ed, FN_LE_FF)
     _connect(_pin(health, "Health", is_input=False), _pin(dying, "A"))
     _set(dying, "B", 0.0)
 
-    at_zero = _at(ed.add_branch_node(), 700, 0)
+    at_zero = ed.add_branch_node()
     _connect(_pin(dying, "ReturnValue", is_input=False), _pin(at_zero, "Condition"))
     # Both arms of the net fall through the debuff drain to here. The Health
     # getter above is pure, so it is read at *this* branch -- after the net's
     # write and the drain's -- and a wanderer written off this frame, or a
     # starving player drained past zero, dies this frame.
     drained = _author_debuff_drain(
-        ed, tick, (BEL.find_then_pin(write_off), BEL.find_else_pin(lost)),
-        -2600, -1400)
+        ed, tick, (BEL.find_then_pin(write_off), BEL.find_else_pin(lost)))
     for e in drained:
         _connect(e, _pin(at_zero, "execute"))
 
@@ -172,47 +170,46 @@ def build_health_component(rebuild=True):
     # The other arm of the same branch, and that is the whole "and survived":
     # this exec pin is reached only on frames the owner is still above zero.
     # ...unless its sights are up (Steady): then the hit is only remembered.
-    steady, flinch = _author_steady_gate(ed, BEL.find_else_pin(at_zero), 100, 1600)
-    _author_hit_reaction(ed, flinch, 700, 1600, skips=(steady,))
+    steady, flinch = _author_steady_gate(ed, BEL.find_else_pin(at_zero))
+    _author_hit_reaction(ed, flinch, skips=(steady,))
 
     # Branch on Dead and use its *False* pin -- one node cheaper than a NOT, and
     # it is what stops the death path running again every frame after the first.
-    dead_get = _at(ed.add_get_member_variable_node("Dead"), 700, 240)
-    already = _at(ed.add_branch_node(), 940, 0)
+    dead_get = ed.add_get_member_variable_node("Dead")
+    already = ed.add_branch_node()
     _connect(_pin(dead_get, "Dead", is_input=False), _pin(already, "Condition"))
     _connect(BEL.find_then_pin(at_zero), _pin(already, "execute"))
 
-    mark = _at(ed.add_set_member_variable_node("Dead"), 1180, 0)
+    mark = ed.add_set_member_variable_node("Dead")
     _set(mark, "Dead", "true")
     _connect(BEL.find_else_pin(already), _pin(mark, "execute"))
 
-    despawn_get = _at(ed.add_get_member_variable_node("DespawnOnDeath"), 1180, 240)
-    should = _at(ed.add_branch_node(), 1420, 0)
+    despawn_get = ed.add_get_member_variable_node("DespawnOnDeath")
+    should = ed.add_branch_node()
     _connect(_pin(despawn_get, "DespawnOnDeath", is_input=False), _pin(should, "Condition"))
     _connect(BEL.find_then_pin(mark), _pin(should, "execute"))
 
     # --- count it, leave a corpse, and later a replacement -------------------------
-    counted = _author_kill_count(ed, BEL.find_then_pin(should), 1420, -1600)
+    counted = _author_kill_count(ed, BEL.find_then_pin(should))
 
     # The corpse straight off the count: dying does not wait for the
     # replacement, which comes RESPAWN_DELAY seconds later (replacement.py).
-    corpsed = _author_corpse(ed, counted, 8220, 0)
+    corpsed = _author_corpse(ed, counted)
 
     # Both arms of the death branch collapse the same way and through the same
     # nodes: the player straight off the branch, the wanderer once its
     # brain is gone.
-    fell, no_body = _author_death_collapse(
-        ed, (corpsed, BEL.find_else_pin(should)), 9900, 0)
+    fell, no_body = _author_death_collapse(ed, (corpsed, BEL.find_else_pin(should)))
     # ...and only the player gets a menu out of it. A second read of
     # DespawnOnDeath rather than routing the two arms separately, so there is
     # exactly one place that says what dying looks like.
-    mine_again = _at(ed.add_get_member_variable_node("DespawnOnDeath"), 12060, 240)
-    is_player = _at(ed.add_branch_node(), 12300, 0)
+    mine_again = ed.add_get_member_variable_node("DespawnOnDeath")
+    is_player = ed.add_branch_node()
     _connect(_pin(mine_again, "DespawnOnDeath", is_input=False),
              _pin(is_player, "Condition"))
     for tail in (fell, no_body):
         _connect(tail, _pin(is_player, "execute"))
-    _author_player_death(ed, (BEL.find_else_pin(is_player),), 12540, 0)
+    _author_player_death(ed, (BEL.find_else_pin(is_player),))
     # ...and only a wanderer a replacement, once it is down.
     _author_replacement(ed, BEL.find_then_pin(is_player))
 
@@ -226,6 +223,7 @@ def build_health_component(rebuild=True):
          mine_again, is_player])
 
     _post_physics_tick(bp)
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_HealthComponent failed to compile")
     _apply_defaults(bp, {

@@ -3,13 +3,13 @@
 health cast's failed arm.
 """
 
-from combat.graph import _at, _connect, _palette, _pin, _set
+from combat.graph import _connect, _palette, _pin, _set
 from combat.nodes import NODE_SPAWN
 
 IMPACT_CLASS_VAR = "ImpactClass"   # BP_BulletImpact, a default set by build.py
 
 
-def _author_surface_impact(ed, where, exec_in, x, y):
+def _author_surface_impact(ed, where, exec_in):
     """Spawn ImpactClass at ``where``, the transform the blood is spawned at.
 
     The one transform serves both bursts, because both want the same three
@@ -19,8 +19,8 @@ def _author_surface_impact(ed, where, exec_in, x, y):
     BP_HealthComponent bleeds and anything else chips, so a pellet never
     spawns both. Returns the nodes made.
     """
-    cls = _at(ed.add_get_member_variable_node(IMPACT_CLASS_VAR), x, y + 180)
-    chipped = _at(_palette(ed, NODE_SPAWN), x + 280, y)
+    cls = ed.add_get_member_variable_node(IMPACT_CLASS_VAR)
+    chipped = _palette(ed, NODE_SPAWN)
     _connect(_pin(cls, IMPACT_CLASS_VAR, is_input=False), _pin(chipped, "Class"))
     _connect(_pin(where, "ReturnValue", is_input=False),
              _pin(chipped, "SpawnTransform"))

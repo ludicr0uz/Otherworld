@@ -16,9 +16,7 @@ no hidden actors and nothing is left over when its lifespan ends.
 
 import unreal
 
-from combat.graph import (
-    BEL, _at, _connect, _declare, _float_type, _node, _pin, _struct_type,
-)
+from combat.graph import BEL, _connect, _declare, _float_type, _node, _pin, _struct_type
 from combat.nodes import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_LESS_FF, FN_SUB_II, MACRO_FOR_LOOP,
 )
@@ -46,40 +44,40 @@ def declare_loot_vars(ed):
         _declare(ed, name, BEL.get_array_type(kind))
 
 
-def _get(ed, var, x, y, made):
-    n = _at(ed.add_get_member_variable_node(var), x, y)
+def _get(ed, var, made):
+    n = ed.add_get_member_variable_node(var)
     made.append(n)
     return _pin(n, var, is_input=False)
 
 
-def _element(ed, var, index, x, y, made):
-    n = _at(_node(ed, FN_ARR_GET), x, y)
+def _element(ed, var, index, made):
+    n = _node(ed, FN_ARR_GET)
     made.append(n)
-    _connect(_get(ed, var, x - 240, y, made), _pin(n, "TargetArray"))
+    _connect(_get(ed, var, made), _pin(n, "TargetArray"))
     _connect(index, _pin(n, "Index"))
     return _pin(n, "Item", is_input=False)
 
 
-def _append(ed, var, item, exec_in, x, y, made):
-    n = _at(_node(ed, FN_ARR_ADD), x, y)
+def _append(ed, var, item, exec_in, made):
+    n = _node(ed, FN_ARR_ADD)
     made.append(n)
-    _connect(_get(ed, var, x - 240, y + 200, made), _pin(n, "TargetArray"))
+    _connect(_get(ed, var, made), _pin(n, "TargetArray"))
     _connect(item, _pin(n, "NewItem"))
     _connect(exec_in, _pin(n, "execute"))
     return BEL.find_then_pin(n)
 
 
-def author_loot_roll(ed, exec_ins, x0, y0):
+def author_loot_roll(ed, exec_ins):
     """The roll (see the module docstring). Returns the exec pin after it.
 
     RandomFloat is pure, so the Branch pulls exactly one draw per entry. An
     empty table (a build where install.py has not run) loops zero times.
     """
     made = []
-    size = _at(_node(ed, FN_ARR_LEN), x0, y0 + 300)
+    size = _node(ed, FN_ARR_LEN)
     made.append(size)
-    _connect(_get(ed, LOOT_TABLE_VAR, x0 - 240, y0 + 300, made), _pin(size, "TargetArray"))
-    last = _at(_node(ed, FN_SUB_II), x0 + 240, y0 + 300)
+    _connect(_get(ed, LOOT_TABLE_VAR, made), _pin(size, "TargetArray"))
+    last = _node(ed, FN_SUB_II)
     made.append(last)
     _connect(_pin(size, "ReturnValue", is_input=False), _pin(last, "A"))
     _pin(last, "B").set_pin_value("1")
@@ -87,7 +85,7 @@ def author_loot_roll(ed, exec_ins, x0, y0):
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
     if not loop:
         raise RuntimeError("could not create the ForLoop macro node")
-    _at(loop, x0 + 480, y0)
+    loop
     made.append(loop)
     _pin(loop, "FirstIndex").set_pin_value("0")
     _connect(_pin(last, "ReturnValue", is_input=False), _pin(loop, "LastIndex"))
@@ -95,21 +93,19 @@ def author_loot_roll(ed, exec_ins, x0, y0):
         _connect(e, _pin(loop, "execute"))
     i = _pin(loop, "Index", is_input=False)
 
-    draw = _at(_node(ed, FN_RANDOM_UNIT), x0 + 760, y0 + 300)
-    lucky = _at(_node(ed, FN_LESS_FF), x0 + 1000, y0 + 300)
+    draw = _node(ed, FN_RANDOM_UNIT)
+    lucky = _node(ed, FN_LESS_FF)
     made += [draw, lucky]
     _connect(_pin(draw, "ReturnValue", is_input=False), _pin(lucky, "A"))
-    _connect(_element(ed, LOOT_CHANCES_VAR, i, x0 + 760, y0 + 460, made), _pin(lucky, "B"))
-    carried = _at(ed.add_branch_node(), x0 + 1240, y0)
+    _connect(_element(ed, LOOT_CHANCES_VAR, i, made), _pin(lucky, "B"))
+    carried = ed.add_branch_node()
     made.append(carried)
     _connect(_pin(lucky, "ReturnValue", is_input=False), _pin(carried, "Condition"))
     _connect(_pin(loop, "LoopBody", is_input=False), _pin(carried, "execute"))
 
     flow = BEL.find_then_pin(carried)
-    for k, (table, body) in enumerate(LOOT_ARRAYS):
-        x = x0 + 1500 + 260 * k
-        flow = _append(ed, body, _element(ed, table, i, x - 260, y0 + 460 + 200 * k, made),
-                       flow, x, y0, made)
+    for table, body in LOOT_ARRAYS:
+        flow = _append(ed, body, _element(ed, table, i, made), flow, made)
     ed.add_comment_to_nodes(
         "Corpse loot: each LootTable entry is rolled once per counted kill "
         "(RandomFloat < LootChances[i]) and, on a hit, goes into Loot (with its "

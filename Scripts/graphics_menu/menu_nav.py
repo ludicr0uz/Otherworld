@@ -7,7 +7,7 @@ as CursorAccept, the wheel as Left/Right (or_wheel); and how Tick learns
 that a row of the M panel was taken (pause_row_taken).
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
 from graphics_menu.umg_consts import PAUSE_ROW_ACTIONS
 
@@ -32,7 +32,7 @@ NAV_LEFT = "Left"
 NAV_RIGHT = "Right"
 
 
-def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0, row_var="MenuRow"):
+def _emit_row_nav(ed, pc_out, last_row, in_exec, row_var="MenuRow"):
     """Up and Down move ``row_var`` (the settings page's MenuRow, or the
     menu's PauseRow), clamped at both ends rather than wrapped.
 
@@ -53,33 +53,31 @@ def _emit_row_nav(ed, pc_out, last_row, in_exec, x0, y0, row_var="MenuRow"):
         return n
 
     flow = tuple(in_exec) if isinstance(in_exec, (list, tuple)) else (in_exec,)
-    for i, (key, step, limit, bound) in enumerate(
-            ((NAV_UP, FN_SUB_II, FN_MAX_II, 0),
-             (NAV_DOWN, FN_ADD_II, FN_MIN_II, last_row))):
-        py = y0 + i * 420
-        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0, py + 260))
+    for key, step, limit, bound in ((NAV_UP, FN_SUB_II, FN_MAX_II, 0),
+                                    (NAV_DOWN, FN_ADD_II, FN_MIN_II, last_row)):
+        was = keep(_node(ed, FN_WAS_PRESSED))
         _connect(pc_out, _pin(was, "self"))
         _set(was, "Key", key)
-        br = keep(_at(ed.add_branch_node(), x0 + 260, py))
+        br = keep(ed.add_branch_node())
         _connect(_pin(was, "ReturnValue", is_input=False), _pin(br, "Condition"))
         for e in flow:
             _connect(e, _pin(br, "execute"))
 
-        row = keep(_at(ed.add_get_member_variable_node(row_var), x0 + 260, py + 400))
-        moved = keep(_at(_node(ed, step), x0 + 520, py + 400))
+        row = keep(ed.add_get_member_variable_node(row_var))
+        moved = keep(_node(ed, step))
         _connect(_pin(row, row_var, is_input=False), _pin(moved, "A"))
         _set(moved, "B", 1)
-        held = keep(_at(_node(ed, limit), x0 + 780, py + 400))
+        held = keep(_node(ed, limit))
         _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held, "A"))
         _set(held, "B", bound)
-        put = keep(_at(ed.add_set_member_variable_node(row_var), x0 + 1040, py))
+        put = keep(ed.add_set_member_variable_node(row_var))
         _connect(_pin(held, "ReturnValue", is_input=False), _pin(put, row_var))
         _connect(BEL.find_then_pin(br), _pin(put, "execute"))
         flow = (BEL.find_then_pin(put), BEL.find_else_pin(br))
     return flow, made
 
 
-def _emit_accept(ed, pc_out, x0, y0, in_exec, made):
+def _emit_accept(ed, pc_out, in_exec, made):
     """The exec that runs on the frame an accept key is pressed, or a row is
     clicked. Returns the node whose then pin that is.
 
@@ -93,53 +91,51 @@ def _emit_accept(ed, pc_out, x0, y0, in_exec, made):
         return n
 
     any_key = None
-    for i, key in enumerate(START_KEYS):
-        was = keep(_at(_node(ed, FN_WAS_PRESSED), x0, y0 + i * 140))
+    for key in START_KEYS:
+        was = keep(_node(ed, FN_WAS_PRESSED))
         _connect(pc_out, _pin(was, "self"))
         _set(was, "Key", key)
         got = _pin(was, "ReturnValue", is_input=False)
         if any_key is None:
             any_key = got
         else:
-            either = keep(_at(_node(ed, FN_OR), x0 + 260, y0 + i * 140))
+            either = keep(_node(ed, FN_OR))
             _connect(any_key, _pin(either, "A"))
             _connect(got, _pin(either, "B"))
             any_key = _pin(either, "ReturnValue", is_input=False)
-    click = keep(_at(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR),
-                     x0, y0 + len(START_KEYS) * 140))
-    either = keep(_at(_node(ed, FN_OR), x0 + 260, y0 + len(START_KEYS) * 140))
+    click = keep(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR))
+    either = keep(_node(ed, FN_OR))
     _connect(any_key, _pin(either, "A"))
     _connect(_pin(click, CURSOR_ACCEPT_VAR, is_input=False), _pin(either, "B"))
-    go = keep(_at(ed.add_branch_node(), x0 + 520, y0 - 200))
+    go = keep(ed.add_branch_node())
     _connect(_pin(either, "ReturnValue", is_input=False), _pin(go, "Condition"))
     for e in in_exec:
         _connect(e, _pin(go, "execute"))
-    served = keep(_at(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR),
-                      x0 + 520, y0 - 400))
+    served = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
     _set(served, CURSOR_ACCEPT_VAR, "false")
     _connect(BEL.find_then_pin(go), _pin(served, "execute"))
     return served
 
 
-def or_wheel(ed, pc_out, pressed, wheel_key, x, y, made):
+def or_wheel(ed, pc_out, pressed, wheel_key, made):
     """``pressed`` (a bool pin) OR the wheel turned ``wheel_key``'s way."""
-    wheel = _at(_node(ed, FN_WAS_PRESSED), x, y)
+    wheel = _node(ed, FN_WAS_PRESSED)
     _connect(pc_out, _pin(wheel, "self"))
     _set(wheel, "Key", wheel_key)
-    either = _at(_node(ed, FN_OR), x + 260, y)
+    either = _node(ed, FN_OR)
     _connect(pressed, _pin(either, "A"))
     _connect(_pin(wheel, "ReturnValue", is_input=False), _pin(either, "B"))
     made += [wheel, either]
     return _pin(either, "ReturnValue", is_input=False)
 
 
-def pause_row_taken(ed, action, x, y, made):
+def pause_row_taken(ed, action, made):
     """The M panel's row for ``action`` was taken (Enter on it, or a click):
     a bool pin. PauseClick is the row's index for the one Tick after DrawHUD
     raised it, and only an open panel's rows can be taken, so this needs no
     MenuOpen test. The rows have no keys of their own."""
-    clicked = _at(ed.add_get_member_variable_node(PAUSE_CLICK_VAR), x, y)
-    this_row = _at(_node(ed, FN_EQ_II), x + 240, y)
+    clicked = ed.add_get_member_variable_node(PAUSE_CLICK_VAR)
+    this_row = _node(ed, FN_EQ_II)
     _connect(_pin(clicked, PAUSE_CLICK_VAR, is_input=False), _pin(this_row, "A"))
     _set(this_row, "B", PAUSE_ROW_ACTIONS.index(action))
     made += [clicked, this_row]

@@ -20,6 +20,7 @@ from combat.graph import (
     BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare,
     _float_type, _log, _must_load,
 )
+from uebp.layout import arrange
 from combat.materials import build_flat_material
 from combat.paths import HOLD_ITEM_ANIM_PATH, ITEM_BP_PATH
 from combat.grip import _grip_location, _grip_rotation
@@ -43,6 +44,7 @@ def build_consumable_item():
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     for name in ("HungerRestore", "ThirstRestore", "HealthRestoreEasy"):
         _declare(ed, name, _float_type())
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ConsumableItem failed to compile")
     _apply_defaults(bp, {"Consumable": True, "HungerRestore": 0.0,

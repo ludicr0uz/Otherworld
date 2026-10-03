@@ -27,9 +27,9 @@ numbers (knife.py, axe.py).
 import unreal
 
 from combat.graph import (
-    BEL, BGE, _add_component, _assets, _at, _component_object, _connect,
-    _drop_components, _events, _find_handle, _log, _must_load, _node, _pin, _set,
-)
+    BEL, BGE, _add_component, _assets, _component_object, _connect, _drop_components,
+    _events, _find_handle, _log, _must_load, _node, _pin, _set)
+from uebp.layout import arrange
 from combat.heat_tuning import (
     COOL_VAR, HEAT_GLOW, HEAT_GLOW_COLOUR, HEAT_GLOW_INTENSITY,
     HEAT_GLOW_RADIUS_CM, HEAT_MATERIAL_VAR, HEAT_S, HOT_AXIS_PARAM, HOT_COLOUR,
@@ -139,42 +139,42 @@ def build_hot_instance(path, axis, start, fade):
 
 def _author_cooling(ed, tick):
     """Tick: a blade whose time is up is cold, then show it as Hot says."""
-    def get(name, x, y):
-        return _pin(_at(ed.add_get_member_variable_node(name), x, y), name, is_input=False)
+    def get(name):
+        return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
 
     def out(n):
         return _pin(n, "ReturnValue", is_input=False)
 
-    now = _at(_node(ed, FN_TIME_SECONDS), 300, 320)
-    spent = _at(_node(ed, FN_GE_FF), 560, 320)
+    now = _node(ed, FN_TIME_SECONDS)
+    spent = _node(ed, FN_GE_FF)
     _connect(out(now), _pin(spent, "A"))
-    _connect(get(COOL_VAR, 300, 460), _pin(spent, "B"))
-    over = _at(_node(ed, FN_AND), 820, 240)
-    _connect(get(HOT_VAR, 560, 200), _pin(over, "A"))
+    _connect(get(COOL_VAR), _pin(spent, "B"))
+    over = _node(ed, FN_AND)
+    _connect(get(HOT_VAR), _pin(over, "A"))
     _connect(out(spent), _pin(over, "B"))
-    cooled = _at(ed.add_branch_node(), 1080, 0)
+    cooled = ed.add_branch_node()
     _connect(out(over), _pin(cooled, "Condition"))
     _connect(BEL.find_then_pin(tick), _pin(cooled, "execute"))
-    cold = _at(ed.add_set_member_variable_node(HOT_VAR), 1340, -120)
+    cold = ed.add_set_member_variable_node(HOT_VAR)
     _set(cold, HOT_VAR, "false")
     _connect(BEL.find_then_pin(cooled), _pin(cold, "execute"))
 
     # Read after the write above: a pure Get is pulled when its reader runs.
-    hot = get(HOT_VAR, 1340, 320)
-    which = _at(ed.add_branch_node(), 1600, 0)
+    hot = get(HOT_VAR)
+    which = ed.add_branch_node()
     _connect(hot, _pin(which, "Condition"))
     for e in (BEL.find_then_pin(cold), BEL.find_else_pin(cooled)):
         _connect(e, _pin(which, "execute"))
-    wear = _at(_node(ed, FN_SET_OVERLAY), 1900, -160)
-    _connect(get(MODEL, 1600, 320), _pin(wear, "self"))
-    _connect(get(HEAT_MATERIAL_VAR, 1600, 440), _pin(wear, "NewOverlayMaterial"))
+    wear = _node(ed, FN_SET_OVERLAY)
+    _connect(get(MODEL), _pin(wear, "self"))
+    _connect(get(HEAT_MATERIAL_VAR), _pin(wear, "NewOverlayMaterial"))
     _connect(BEL.find_then_pin(which), _pin(wear, "execute"))
     # Its material pin is left unconnected: no overlay.
-    bare = _at(_node(ed, FN_SET_OVERLAY), 1900, 200)
-    _connect(get(MODEL, 1600, 560), _pin(bare, "self"))
+    bare = _node(ed, FN_SET_OVERLAY)
+    _connect(get(MODEL), _pin(bare, "self"))
     _connect(BEL.find_else_pin(which), _pin(bare, "execute"))
-    show = _at(_node(ed, FN_SET_VISIBILITY), 2260, 0)
-    _connect(get(HEAT_GLOW, 1900, 480), _pin(show, "self"))
+    show = _node(ed, FN_SET_VISIBILITY)
+    _connect(get(HEAT_GLOW), _pin(show, "self"))
     _connect(hot, _pin(show, "bNewVisibility"))
     for e in (BEL.find_then_pin(wear), BEL.find_then_pin(bare)):
         _connect(e, _pin(show, "execute"))
@@ -208,8 +208,10 @@ def build_heated_model(bp, model, glow_at):
     glow.set_editor_property("cast_shadows", False)
     glow.set_editor_property("visible", False)
     # The components are variables of the class only once it has compiled.
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
     _author_cooling(ed, tick)
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")

@@ -21,12 +21,12 @@ Not while sprinting, for the reason the aim is not (ads.py): the hands are
 running. SightsForced is the probes' stand-in for the key, as it is for the
 sights.
 
-To add a use, write its fragment `(ed, held, owner, exec_ins, x0, y0) ->
+To add a use, write its fragment `(ed, held, owner, exec_ins) ->
 exits` in a module of its own and add it to KINDS. Don't poll the key
 anywhere else.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from uebp.graph import out
 from combat.nodes import FN_AND, FN_IS_KEY_DOWN, FN_NOT, FN_OR
 from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
@@ -37,11 +37,9 @@ from combat.weapon_component.torch import _author_torch
 
 # One fragment per kind of use, run in this order every frame.
 KINDS = (_author_torch, _author_cauterize)
-KIND_PITCH = 2000   # graph units between two kinds' rows of nodes
 
 
-def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins,
-                x0, y0):
+def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins):
     """Write Using and UsePressed, then run each kind of use. Returns (the
     exits, the key's pin: held or forced, which ads.py aims a gun on, so the
     key is polled once)."""
@@ -51,52 +49,47 @@ def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins,
         made.append(n)
         return n
 
-    def get(name, x, y):
-        return out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
+    def get(name):
+        return out(keep(ed.add_get_member_variable_node(name)), name)
 
-    def gate2(fn, a, b, x, y):
-        n = keep(_at(_node(ed, fn), x, y))
+    def gate2(fn, a, b):
+        n = keep(_node(ed, fn))
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
         return out(n)
 
-    def negate(a, x, y):
-        n = keep(_at(_node(ed, FN_NOT), x, y))
+    def negate(a):
+        n = keep(_node(ed, FN_NOT))
         _connect(a, _pin(n, "A"))
         return out(n)
 
-    down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0, y0 + 200))
+    down = keep(_node(ed, FN_IS_KEY_DOWN))
     _connect(pc_out, _pin(down, "self"))
     _connect(sights_key, _pin(down, "Key"))
-    key = gate2(FN_OR, out(down), get(SIGHTS_FORCED_VAR, x0, y0 + 340),
-                x0 + 260, y0 + 240)
-    free = gate2(FN_AND, key, negate(get("Sprinting", x0, y0 + 460), x0 + 260, y0 + 460),
-                 x0 + 520, y0 + 300)
+    key = gate2(FN_OR, out(down), get(SIGHTS_FORCED_VAR))
+    free = gate2(FN_AND, key, negate(get("Sprinting")))
 
-    gate = keep(_at(ed.add_branch_node(), x0 + 780, y0))
+    gate = keep(ed.add_branch_node())
     _connect(armed_out, _pin(gate, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(gate, "execute"))
     # True arm: Held is valid, so it can be asked whether it has sights.
-    sighted, sighted_n = _prop(ed, HAS_SIGHTS_VAR, held, x0 + 780, y0 + 300)
+    sighted, sighted_n = _prop(ed, HAS_SIGHTS_VAR, held)
     keep(sighted_n)
-    mark = keep(_at(ed.add_set_member_variable_node(USING_VAR), x0 + 1300, y0))
-    _connect(gate2(FN_AND, free, negate(sighted, x0 + 1040, y0 + 300), x0 + 1040, y0 + 180),
-             _pin(mark, USING_VAR))
+    mark = keep(ed.add_set_member_variable_node(USING_VAR))
+    _connect(gate2(FN_AND, free, negate(sighted)), _pin(mark, USING_VAR))
     _connect(BEL.find_then_pin(gate), _pin(mark, "execute"))
-    idle = keep(_at(ed.add_set_member_variable_node(USING_VAR), x0 + 1300, y0 + 500))
+    idle = keep(ed.add_set_member_variable_node(USING_VAR))
     _set(idle, USING_VAR, "false")
     _connect(BEL.find_else_pin(gate), _pin(idle, "execute"))
 
     # The press: read against last frame's Using before that is overwritten.
-    using = get(USING_VAR, x0 + 1560, y0 + 300)
-    press = keep(_at(ed.add_set_member_variable_node(USE_PRESSED_VAR), x0 + 2080, y0))
-    _connect(gate2(FN_AND, using, negate(get(USE_WAS_VAR, x0 + 1560, y0 + 440),
-                                         x0 + 1820, y0 + 440), x0 + 1820, y0 + 300),
-             _pin(press, USE_PRESSED_VAR))
+    using = get(USING_VAR)
+    press = keep(ed.add_set_member_variable_node(USE_PRESSED_VAR))
+    _connect(gate2(FN_AND, using, negate(get(USE_WAS_VAR))), _pin(press, USE_PRESSED_VAR))
     for e in (BEL.find_then_pin(mark), BEL.find_then_pin(idle)):
         _connect(e, _pin(press, "execute"))
-    was = keep(_at(ed.add_set_member_variable_node(USE_WAS_VAR), x0 + 2340, y0))
+    was = keep(ed.add_set_member_variable_node(USE_WAS_VAR))
     _connect(using, _pin(was, USE_WAS_VAR))
     _connect(BEL.find_then_pin(press), _pin(was, "execute"))
 
@@ -108,6 +101,6 @@ def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins,
         made)
 
     exits = (BEL.find_then_pin(was),)
-    for i, kind in enumerate(KINDS):
-        exits = kind(ed, held, owner_out, exits, x0, y0 - (i + 1) * KIND_PITCH)
+    for kind in KINDS:
+        exits = kind(ed, held, owner_out, exits)
     return exits, key

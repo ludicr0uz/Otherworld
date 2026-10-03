@@ -32,7 +32,7 @@ too small to take is left to grow until it is taken whole; stored regardless,
 the view drifted off by the dropped steps (0.13 degrees in one probe run).
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from combat.nodes import (
     FN_ABS, FN_ADD_FF, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_OR, FN_SIN,
     FN_SUB_FF,
@@ -48,7 +48,7 @@ from combat.weapon_component.recoil import _author_turn_view
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
 
 
-def _author_sight_sway(ed, tick, pc_out, exec_ins, x0, y0):
+def _author_sight_sway(ed, tick, pc_out, exec_ins):
     """Turn the view by the change in the sway since it was last turned.
     Returns the exec pins to carry on from."""
     made = []
@@ -61,85 +61,77 @@ def _author_sight_sway(ed, tick, pc_out, exec_ins, x0, y0):
         return _pin(n, name, is_input=False)
 
     # The clock, at the held gun's rate.
-    was = keep(_at(ed.add_get_member_variable_node(SWAY_TIME_VAR), x0, y0 + 300))
-    rate = keep(_at(ed.add_get_member_variable_node(SWAY_RATE_VAR), x0, y0 + 160))
-    paced = _mul(ed, keep, out(tick, "DeltaSeconds"), out(rate, SWAY_RATE_VAR),
-                 x0 + 240, y0 + 160)
-    later = keep(_at(_node(ed, FN_ADD_FF), x0 + 240, y0 + 300))
+    was = keep(ed.add_get_member_variable_node(SWAY_TIME_VAR))
+    rate = keep(ed.add_get_member_variable_node(SWAY_RATE_VAR))
+    paced = _mul(ed, keep, out(tick, "DeltaSeconds"), out(rate, SWAY_RATE_VAR))
+    later = keep(_node(ed, FN_ADD_FF))
     _connect(out(was, SWAY_TIME_VAR), _pin(later, "A"))
     _connect(paced, _pin(later, "B"))
-    clock = keep(_at(ed.add_set_member_variable_node(SWAY_TIME_VAR), x0 + 500, y0))
+    clock = keep(ed.add_set_member_variable_node(SWAY_TIME_VAR))
     _connect(out(later), _pin(clock, SWAY_TIME_VAR))
     for e in exec_ins:
         _connect(e, _pin(clock, "execute"))
 
     # How much of it: the camera's travel times the stance.
-    stance = keep(_at(ed.add_get_member_variable_node(STANCE_VAR), x0, y0 + 500))
+    stance = keep(ed.add_get_member_variable_node(STANCE_VAR))
     is_low = {}
-    for value, dy in ((CROUCH, 0), (PRONE, 120)):
-        eq = keep(_at(_node(ed, FN_EQ_II), x0 + 240, y0 + 500 + dy))
+    for value in (CROUCH, PRONE):
+        eq = keep(_node(ed, FN_EQ_II))
         _connect(out(stance, STANCE_VAR), _pin(eq, "A"))
         _set(eq, "B", value)
         is_low[value] = out(eq)
-    crouched = _select(ed, keep, SWAY_CROUCH_SCALE, 1.0, is_low[CROUCH],
-                       x0 + 500, y0 + 500)
-    steadied = _select(ed, keep, SWAY_PRONE_SCALE, crouched, is_low[PRONE],
-                       x0 + 760, y0 + 500)
-    blend = keep(_at(ed.add_get_member_variable_node("SightBlend"),
-                     x0 + 760, y0 + 700))
-    sighted = _mul(ed, keep, out(blend, "SightBlend"), steadied, x0 + 1020, y0 + 500)
-    breath = keep(_at(ed.add_get_member_variable_node(BREATH_SCALE_VAR),
-                      x0 + 1020, y0 + 700))
-    amount = _mul(ed, keep, sighted, out(breath, BREATH_SCALE_VAR), x0 + 1280, y0 + 500)
+    crouched = _select(ed, keep, SWAY_CROUCH_SCALE, 1.0, is_low[CROUCH])
+    steadied = _select(ed, keep, SWAY_PRONE_SCALE, crouched, is_low[PRONE])
+    blend = keep(ed.add_get_member_variable_node("SightBlend"))
+    sighted = _mul(ed, keep, out(blend, "SightBlend"), steadied)
+    breath = keep(ed.add_get_member_variable_node(BREATH_SCALE_VAR))
+    amount = _mul(ed, keep, sighted, out(breath, BREATH_SCALE_VAR))
 
-    def wave(var, degrees, period, y):
+    def wave(var, degrees, period):
         """(the sway now, its change since last frame, the node storing it)."""
-        t = keep(_at(ed.add_get_member_variable_node(SWAY_TIME_VAR), x0 + 760, y))
-        phase = keep(_at(_node(ed, FN_MUL_FF), x0 + 1020, y))
+        t = keep(ed.add_get_member_variable_node(SWAY_TIME_VAR))
+        phase = keep(_node(ed, FN_MUL_FF))
         _connect(out(t, SWAY_TIME_VAR), _pin(phase, "A"))
         _set(phase, "B", sway_rate(period))
-        sine = keep(_at(_node(ed, FN_SIN), x0 + 1280, y))
+        sine = keep(_node(ed, FN_SIN))
         _connect(out(phase), _pin(sine, "A"))
-        sized = keep(_at(_node(ed, FN_MUL_FF), x0 + 1540, y))
+        sized = keep(_node(ed, FN_MUL_FF))
         _connect(out(sine), _pin(sized, "A"))
         _set(sized, "B", degrees)
-        now = _mul(ed, keep, out(sized), amount, x0 + 1800, y)
-        had = keep(_at(ed.add_get_member_variable_node(var), x0 + 1800, y + 140))
-        step = keep(_at(_node(ed, FN_SUB_FF), x0 + 2060, y))
+        now = _mul(ed, keep, out(sized), amount)
+        had = keep(ed.add_get_member_variable_node(var))
+        step = keep(_node(ed, FN_SUB_FF))
         _connect(now, _pin(step, "A"))
         _connect(out(had, var), _pin(step, "B"))
         store = keep(ed.add_set_member_variable_node(var))
         _connect(now, _pin(store, var))
         return out(step), store
 
-    yaw_step, put_yaw = wave(SWAY_YAW_VAR, SWAY_YAW_DEG, SWAY_YAW_PERIOD_S,
-                             y0 + 900)
-    pitch_step, put_pitch = wave(SWAY_PITCH_VAR, SWAY_PITCH_DEG,
-                                 SWAY_PITCH_PERIOD_S, y0 + 1200)
+    yaw_step, put_yaw = wave(SWAY_YAW_VAR, SWAY_YAW_DEG, SWAY_YAW_PERIOD_S)
+    pitch_step, put_pitch = wave(SWAY_PITCH_VAR, SWAY_PITCH_DEG, SWAY_PITCH_PERIOD_S)
 
     # Worth taking? (Either axis: the controller compares the whole rotation.)
-    def far(step, y):
-        size = keep(_at(_node(ed, FN_ABS), x0 + 2320, y))
+    def far(step):
+        size = keep(_node(ed, FN_ABS))
         _connect(step, _pin(size, "A"))
-        over = keep(_at(_node(ed, FN_GREATER_FF), x0 + 2580, y))
+        over = keep(_node(ed, FN_GREATER_FF))
         _connect(out(size), _pin(over, "A"))
         _set(over, "B", SWAY_MIN_STEP_DEG)
         return out(over)
 
-    either = keep(_at(_node(ed, FN_OR), x0 + 2840, y0 + 1000))
-    _connect(far(yaw_step, y0 + 900), _pin(either, "A"))
-    _connect(far(pitch_step, y0 + 1200), _pin(either, "B"))
-    gate = keep(_at(ed.add_branch_node(), x0 + 3100, y0))
+    either = keep(_node(ed, FN_OR))
+    _connect(far(yaw_step), _pin(either, "A"))
+    _connect(far(pitch_step), _pin(either, "B"))
+    gate = keep(ed.add_branch_node())
     _connect(out(either), _pin(gate, "Condition"))
     _connect(BEL.find_then_pin(clock), _pin(gate, "execute"))
 
     turned, turn_nodes = _author_turn_view(
-        ed, pc_out, pitch_step, yaw_step, BEL.find_then_pin(gate),
-        x0 + 3400, y0)
+        ed, pc_out, pitch_step, yaw_step, BEL.find_then_pin(gate))
     made.extend(turn_nodes)
-    _at(put_yaw, x0 + 4700, y0)
+    put_yaw
     _connect(turned, _pin(put_yaw, "execute"))
-    _at(put_pitch, x0 + 4960, y0)
+    put_pitch
     _connect(BEL.find_then_pin(put_yaw), _pin(put_pitch, "execute"))
 
     ed.add_comment_to_nodes(

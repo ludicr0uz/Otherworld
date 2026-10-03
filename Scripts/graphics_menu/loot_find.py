@@ -16,7 +16,7 @@ its own body, hence the pawn test.
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from uebp.graph import out
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ALL_ACTORS, FN_DISTANCE, FN_GET_COMP, FN_GET_PLAYER_PAWN,
@@ -33,10 +33,10 @@ CHARACTER_CLASS_PATH = "/Script/Engine.Character"
 MESH_CLASS_PATH = "/Script/Engine.SkeletalMeshComponent"
 
 
-def put(ed, var, value, in_execs, x, y, made):
+def put(ed, var, value, in_execs, made):
     """Set one of the HUD's own variables from a pin (or, with None, clear an
     object reference). Returns the then pin."""
-    n = _at(ed.add_set_member_variable_node(var), x, y)
+    n = ed.add_set_member_variable_node(var)
     made.append(n)
     if value is not None:
         _connect(value, _pin(n, var))
@@ -45,24 +45,24 @@ def put(ed, var, value, in_execs, x, y, made):
     return BEL.find_then_pin(n)
 
 
-def author_find_body(ed, in_execs, x0, y0, made):
+def author_find_body(ed, in_execs, made):
     """The scan (see the module docstring). Returns the exec tails."""
     unreal.load_asset(HEALTH_BP_PATH)      # the cast node exists only for a loaded class
-    flow = put(ed, LOOT_TARGET_VAR, None, in_execs, x0, y0, made)
-    best = _at(ed.add_set_member_variable_node(LOOT_BEST_VAR), x0 + 260, y0)
+    flow = put(ed, LOOT_TARGET_VAR, None, in_execs, made)
+    best = ed.add_set_member_variable_node(LOOT_BEST_VAR)
     made.append(best)
     _set(best, LOOT_BEST_VAR, LOOT_RADIUS)
     _connect(flow, _pin(best, "execute"))
 
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, x0 + 260, y0 + 300, made, PlayerIndex=0))
-    here, no_pawn = _branch(ed, out(_call(ed, FN_IS_VALID, x0 + 500, y0 + 300, made,
+    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    here, no_pawn = _branch(ed, out(_call(ed, FN_IS_VALID, made,
                                            Object=pawn)),
-                            [BEL.find_then_pin(best)], x0 + 760, y0, made)
-    everyone = _at(_node(ed, FN_ALL_ACTORS), x0 + 1020, y0)
+                            [BEL.find_then_pin(best)], made)
+    everyone = _node(ed, FN_ALL_ACTORS)
     made.append(everyone)
     _pin(everyone, "ActorClass").set_pin_value(CHARACTER_CLASS_PATH)
     _connect(here, _pin(everyone, "execute"))
-    loop = _at(ed.add_macro_node(MACRO_FOR_EACH), x0 + 1300, y0)
+    loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     made.append(loop)
@@ -70,34 +70,31 @@ def author_find_body(ed, in_execs, x0, y0, made):
     _connect(BEL.find_then_pin(everyone), _loose_pin(loop, "Exec"))
     who = _loose_pin(loop, "ArrayElement", is_input=False)
 
-    health = _call(ed, FN_GET_COMP, x0 + 1600, y0 + 300, made, self=who)
+    health = _call(ed, FN_GET_COMP, made, self=who)
     _pin(health, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
-    cast = _at(_palette(ed, NODE_CAST_HEALTH), x0 + 1860, y0)
+    cast = _palette(ed, NODE_CAST_HEALTH)
     made.append(cast)
     _connect(out(health), _pin(cast, "Object"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     comp = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    dead, _alive = _branch(ed, _get(ed, "Dead", x0 + 1860, y0 + 300, made,
+    dead, _alive = _branch(ed, _get(ed, "Dead", made,
                                     HEALTH_CLASS_PATH, comp),
-                           [BEL.find_then_pin(cast)], x0 + 2140, y0, made)
-    other, _self = _branch(ed, out(_call(ed, FN_NEQ_OO, x0 + 2380, y0 + 440, made,
-                                          A=who, B=pawn)),
-                           [dead], x0 + 2640, y0, made)
-    mesh = _call(ed, FN_GET_COMP, x0 + 2640, y0 + 300, made, self=who)
+                           [BEL.find_then_pin(cast)], made)
+    other, _self = _branch(ed, out(_call(ed, FN_NEQ_OO, made, A=who, B=pawn)), [dead], made)
+    mesh = _call(ed, FN_GET_COMP, made, self=who)
     _pin(mesh, "ComponentClass").set_pin_value(MESH_CLASS_PATH)
-    shaped, _no_mesh = _branch(ed, out(_call(ed, FN_IS_VALID, x0 + 2900, y0 + 300, made,
+    shaped, _no_mesh = _branch(ed, out(_call(ed, FN_IS_VALID, made,
                                               Object=out(mesh))),
-                               [other], x0 + 3160, y0, made)
+                               [other], made)
 
-    at = _call(ed, FN_COMP_LOC, x0 + 3160, y0 + 300, made, self=out(mesh))
-    me = _call(ed, FN_ACTOR_LOC, x0 + 3160, y0 + 440, made, self=pawn)
-    far = _call(ed, FN_DISTANCE, x0 + 3420, y0 + 300, made, V1=out(at), V2=out(me))
-    nearer, _further = _branch(ed, out(_call(ed, FN_LESS_FF, x0 + 3660, y0 + 300, made,
+    at = _call(ed, FN_COMP_LOC, made, self=out(mesh))
+    me = _call(ed, FN_ACTOR_LOC, made, self=pawn)
+    far = _call(ed, FN_DISTANCE, made, V1=out(at), V2=out(me))
+    nearer, _further = _branch(ed, out(_call(ed, FN_LESS_FF, made,
                                               A=out(far),
-                                              B=_get(ed, LOOT_BEST_VAR, x0 + 3420,
-                                                     y0 + 440, made))),
-                               [shaped], x0 + 3920, y0, made)
-    flow = put(ed, LOOT_BEST_VAR, out(far), [nearer], x0 + 4180, y0, made)
-    put(ed, LOOT_TARGET_VAR, comp, [flow], x0 + 4440, y0, made)
+                                              B=_get(ed, LOOT_BEST_VAR, made))),
+                               [shaped], made)
+    flow = put(ed, LOOT_BEST_VAR, out(far), [nearer], made)
+    put(ed, LOOT_TARGET_VAR, comp, [flow], made)
     return [_loose_pin(loop, "Completed", is_input=False), no_pawn]

@@ -31,30 +31,28 @@ def roar_object(roar_anim):
     return None
 
 
-def _author_bellow(g, exec_in, pins, roar_anim, x0, y0):
+def _author_bellow(g, exec_in, pins, roar_anim):
     """Stop, face the player, play the roar clip (``roar_anim``:
     roar_object()'s answer) and a voice. ``pins`` has the caller's
     ``self_pawn``, ``self_loc`` and ``player``. Returns the exec pin it ends
     on."""
-    halt = g.call(FN_STOP_MOVEMENT, x0, y0)
+    halt = g.call(FN_STOP_MOVEMENT)
     _connect(exec_in, _pin(halt, "execute"))
-    watch, step = _author_facing(g.ed, [BEL.find_then_pin(halt)], pins["player"],
-                                 x0 + 260, y0)
+    watch, step = _author_facing(g.ed, [BEL.find_then_pin(halt)], pins["player"])
     g.made.extend(watch)
 
     # Through the pawn's own AnimInstance, as the swing is (npc/melee.py), and
     # into the same upper-body slot: the legs stand, the chest and arms roar.
-    as_char = g.keep(_palette(g.ed, NODE_CAST_CHARACTER), x0 + 1960, y0)
+    as_char = g.keep(_palette(g.ed, NODE_CAST_CHARACTER))
     _connect(pins["self_pawn"], _pin(as_char, "Object"))
     _connect(step, _pin(as_char, "execute"))
     voiced = [_pin(as_char, "CastFailed", is_input=False)]
     if roar_anim:
-        mesh = g.keep(g.ed.add_get_member_variable_node("Mesh", CHARACTER_CLASS_PATH),
-                      x0 + 1960, y0 + 300)
+        mesh = g.keep(g.ed.add_get_member_variable_node("Mesh", CHARACTER_CLASS_PATH))
         _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
-        anim = g.call(FN_ANIM_INSTANCE, x0 + 2200, y0 + 300)
+        anim = g.call(FN_ANIM_INSTANCE)
         _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
-        roar = g.call(FN_PLAY_SLOT, x0 + 2460, y0, Asset=roar_anim,
+        roar = g.call(FN_PLAY_SLOT, Asset=roar_anim,
                       SlotNodeName=MELEE_SLOT, BlendInTime=NPC_STALK_ROAR_BLEND_S,
                       BlendOutTime=NPC_STALK_ROAR_BLEND_S)
         _connect(out(anim), _pin(roar, "self"))
@@ -62,8 +60,7 @@ def _author_bellow(g, exec_in, pins, roar_anim, x0, y0):
         voiced.append(BEL.find_then_pin(roar))
     else:
         voiced.append(BEL.find_then_pin(as_char))
-    join = g.branch(None, voiced, x0 + 2860, y0)
-    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"],
-                                       BEL.find_then_pin(join), x0 + 3120, y0)
+    join = g.branch(None, voiced)
+    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], BEL.find_then_pin(join))
     g.made.extend(sound)
     return step

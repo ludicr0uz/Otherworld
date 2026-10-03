@@ -43,8 +43,8 @@ def _node(ed, function_path):
     return n
 
 
-def _palette(ed, name, x=0.0, y=0.0):
-    n = ed.create_node_from_name(name, unreal.Vector2D(float(x), float(y)), [])
+def _palette(ed, name):
+    n = ed.create_node_from_name(name, unreal.Vector2D(0.0, 0.0), [])
     if not n:
         raise RuntimeError(f"palette node {name!r} could not be created")
     return n
@@ -122,11 +122,6 @@ def out(node, name="ReturnValue"):
 
 def then(node):
     return BEL.find_then_pin(node)
-
-
-def _at(node, x, y):
-    BEL.set_node_pos(node, unreal.IntPoint(int(x), int(y)))
-    return node
 
 
 def _create_blueprint(path, parent_class):
@@ -358,7 +353,7 @@ def _key(name):
     return k
 
 
-def _vec(ed, x, y, z, px, py):
+def _vec(ed, x, y, z):
     """A constant vector, as a MakeVector node rather than as a pin default.
 
     A struct pin refuses set_pin_value outright -- every format returns False
@@ -366,7 +361,7 @@ def _vec(ed, x, y, z, px, py):
     zero vector. A zero scale on a spawn transform makes the actor invisible,
     so these have to be real nodes.
     """
-    n = _at(_node(ed, FN_MAKE_VECTOR), px, py)
+    n = _node(ed, FN_MAKE_VECTOR)
     for axis, value in (("X", x), ("Y", y), ("Z", z)):
         _set(n, axis, float(value))
     return _pin(n, "ReturnValue", is_input=False)
@@ -385,10 +380,10 @@ def _events(ed, rebuild):
             ed.remove_nodes(nodes)
     tick = ed.find_event_node("ReceiveTick")
     if not tick:
-        tick = _palette(ed, NODE_TICK, 0, 0)
+        tick = _palette(ed, NODE_TICK)
     begin = ed.find_event_node("ReceiveBeginPlay")
     if not begin:
-        begin = _palette(ed, NODE_BEGIN_PLAY, 0, -900)
+        begin = _palette(ed, NODE_BEGIN_PLAY)
     return tick, begin
 
 
@@ -422,10 +417,10 @@ def _try_set(obj, prop, value):
         unreal.log_warning(f"[NPC] could not set {prop}: {exc}")
 
 
-def _name_literal(ed, value, x, y):
+def _name_literal(ed, value):
     """A MakeLiteralName node holding ``value``; returns its output pin. See
     FN_LITERAL_NAME for which pins need it."""
-    n = _at(_node(ed, FN_LITERAL_NAME), x, y)
+    n = _node(ed, FN_LITERAL_NAME)
     _set(n, "Value", value)
     return _pin(n, "ReturnValue", is_input=False)
 

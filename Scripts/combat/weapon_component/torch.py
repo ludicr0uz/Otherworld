@@ -43,7 +43,7 @@ read behind the Branch on Using or UsePressed, which are false with empty
 hands. Numbers and names: torch_tuning.py.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
 from uebp.graph import out
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
@@ -61,7 +61,7 @@ from combat.weapon_component.common import _prop
 FN_NEQ_OBJECTS = "/Script/Engine.KismetMathLibrary.NotEqual_ObjectObject"
 
 
-def _author_torch(ed, held, owner, exec_ins, x0, y0):
+def _author_torch(ed, held, owner, exec_ins):
     """See the module docstring. Returns the exits."""
     made = []
 
@@ -69,92 +69,87 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    def get(name, x, y):
-        return out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
+    def get(name):
+        return out(keep(ed.add_get_member_variable_node(name)), name)
 
-    def put(name, value, x, y):
-        n = keep(_at(ed.add_set_member_variable_node(name), x, y))
+    def put(name, value):
+        n = keep(ed.add_set_member_variable_node(name))
         if value is not None:
             _set(n, name, value)
         return n
 
-    def held_prop(name, x, y):
-        pin, n = _prop(ed, name, held, x, y)
+    def held_prop(name):
+        pin, n = _prop(ed, name, held)
         keep(n)
         return pin
 
-    def gate2(fn, a, b, x, y):
-        n = keep(_at(_node(ed, fn), x, y))
+    def gate2(fn, a, b):
+        n = keep(_node(ed, fn))
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
         return out(n)
 
-    def negate(a, x, y):
-        n = keep(_at(_node(ed, FN_NOT), x, y))
+    def negate(a):
+        n = keep(_node(ed, FN_NOT))
         _connect(a, _pin(n, "A"))
         return out(n)
 
-    def branch(cond, exec_in, x, y):
-        n = keep(_at(ed.add_branch_node(), x, y))
+    def branch(cond, exec_in):
+        n = keep(ed.add_branch_node())
         _connect(cond, _pin(n, "Condition"))
         for e in exec_in:
             _connect(e, _pin(n, "execute"))
         return n
 
     # --- is the fire held out? -------------------------------------------------
-    using = branch(get(USING_VAR, x0, y0 + 200), exec_ins, x0 + 260, y0)
-    lit = branch(held_prop(LIT_VAR, x0 + 260, y0 + 200),
-                 (BEL.find_then_pin(using),), x0 + 520, y0)
-    out_ = put(FIRE_WARD_VAR, "true", x0 + 780, y0 - 200)
+    using = branch(get(USING_VAR), exec_ins)
+    lit = branch(held_prop(LIT_VAR), (BEL.find_then_pin(using),))
+    out_ = put(FIRE_WARD_VAR, "true")
     _connect(BEL.find_then_pin(lit), _pin(out_, "execute"))
-    idle = put(FIRE_WARD_VAR, "false", x0 + 780, y0 + 600)
+    idle = put(FIRE_WARD_VAR, "false")
     _connect(BEL.find_else_pin(using), _pin(idle, "execute"))
-    unlit = put(FIRE_WARD_VAR, "false", x0 + 780, y0 + 200)
+    unlit = put(FIRE_WARD_VAR, "false")
     _connect(BEL.find_else_pin(lit), _pin(unlit, "execute"))
 
     # --- not burning: a press at a campfire lights it ---------------------------
-    wants = branch(gate2(FN_AND, get(USE_PRESSED_VAR, x0 + 780, y0 + 400),
-                         held_prop(BURNS_VAR, x0 + 780, y0 + 500), x0 + 1040, y0 + 420),
-                   (BEL.find_then_pin(unlit),), x0 + 1300, y0 + 200)
-    forget = put(NEAR_FIRE_VAR, "false", x0 + 1560, y0 + 200)
+    wants = branch(gate2(FN_AND, get(USE_PRESSED_VAR),
+                         held_prop(BURNS_VAR)),
+                   (BEL.find_then_pin(unlit),))
+    forget = put(NEAR_FIRE_VAR, "false")
     _connect(BEL.find_then_pin(wants), _pin(forget, "execute"))
-    every = keep(_at(_node(ed, FN_ALL_ACTORS), x0 + 1820, y0 + 200))
-    _connect(get(CAMPFIRE_CLASS_VAR, x0 + 1560, y0 + 440), _pin(every, "ActorClass"))
+    every = keep(_node(ed, FN_ALL_ACTORS))
+    _connect(get(CAMPFIRE_CLASS_VAR), _pin(every, "ActorClass"))
     _connect(BEL.find_then_pin(forget), _pin(every, "execute"))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    keep(_at(loop, x0 + 2100, y0 + 200))
+    keep(loop)
     _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
     _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
-    there = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 2400, y0 + 440))
+    there = keep(_node(ed, FN_ACTOR_LOC))
     _connect(_loose_pin(loop, "ArrayElement", is_input=False), _pin(there, "self"))
-    here = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 2400, y0 + 560))
+    here = keep(_node(ed, FN_ACTOR_LOC))
     _connect(owner, _pin(here, "self"))
-    gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 2660, y0 + 480))
+    gap = keep(_node(ed, FN_DISTANCE))
     _connect(out(there), _pin(gap, "V1"))
     _connect(out(here), _pin(gap, "V2"))
-    close = keep(_at(_node(ed, FN_LE_FF), x0 + 2920, y0 + 480))
+    close = keep(_node(ed, FN_LE_FF))
     _connect(out(gap), _pin(close, "A"))
     _set(close, "B", STICK_LIGHT_RADIUS_CM)
-    near = branch(out(close), (_loose_pin(loop, "LoopBody", is_input=False),),
-                  x0 + 3180, y0 + 320)
-    found = put(NEAR_FIRE_VAR, "true", x0 + 3440, y0 + 320)
+    near = branch(out(close), (_loose_pin(loop, "LoopBody", is_input=False),))
+    found = put(NEAR_FIRE_VAR, "true")
     _connect(BEL.find_then_pin(near), _pin(found, "execute"))
 
-    at_fire = branch(get(NEAR_FIRE_VAR, x0 + 3180, y0 + 120),
-                     (_loose_pin(loop, "Completed", is_input=False),), x0 + 3440, y0 + 60)
-    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 3440, y0 - 200))
-    until = keep(_at(_node(ed, FN_ADD_FF), x0 + 3700, y0 - 200))
+    at_fire = branch(get(NEAR_FIRE_VAR), (_loose_pin(loop, "Completed", is_input=False),))
+    now = keep(_node(ed, FN_TIME_SECONDS))
+    until = keep(_node(ed, FN_ADD_FF))
     _connect(out(now), _pin(until, "A"))
     _set(until, "B", STICK_BURN_S)
-    burn = keep(_at(ed.add_set_member_variable_node(BURN_OUT_VAR, ITEM_CLASS_PATH),
-                    x0 + 3960, y0 + 60))
+    burn = keep(ed.add_set_member_variable_node(BURN_OUT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(burn, "self"))
     _connect(out(until), _pin(burn, BURN_OUT_VAR))
     _connect(BEL.find_then_pin(at_fire), _pin(burn, "execute"))
-    light = keep(_at(ed.add_set_member_variable_node(LIT_VAR, ITEM_CLASS_PATH),
-                     x0 + 4220, y0 + 60))
+    light = keep(ed.add_set_member_variable_node(LIT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(light, "self"))
     _set(light, LIT_VAR, "true")
     _connect(BEL.find_then_pin(burn), _pin(light, "execute"))
@@ -164,44 +159,39 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
                BEL.find_then_pin(light))
 
     # --- the pose follows: lower the stick that is up, then raise ----------------
-    ward = get(FIRE_WARD_VAR, x0 + 4480, y0 + 300)
-    item = get(WARD_ITEM_VAR, x0 + 4480, y0 + 420)
-    up = keep(_at(_node(ed, FN_IS_VALID), x0 + 4740, y0 + 420))
+    ward = get(FIRE_WARD_VAR)
+    item = get(WARD_ITEM_VAR)
+    up = keep(_node(ed, FN_IS_VALID))
     _connect(item, _pin(up, "Object"))
-    other = keep(_at(_node(ed, FN_NEQ_OBJECTS), x0 + 4740, y0 + 560))
+    other = keep(_node(ed, FN_NEQ_OBJECTS))
     _connect(item, _pin(other, "A"))
     _connect(held, _pin(other, "B"))
-    stale = gate2(FN_OR, negate(ward, x0 + 4740, y0 + 300), out(other),
-                  x0 + 5000, y0 + 440)
-    lower = branch(gate2(FN_AND, out(up), stale, x0 + 5260, y0 + 420), settled,
-                   x0 + 5520, y0)
-    back = keep(_at(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH),
-                    x0 + 5780, y0 - 200))
+    stale = gate2(FN_OR, negate(ward), out(other))
+    lower = branch(gate2(FN_AND, out(up), stale), settled)
+    back = keep(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH))
     _connect(item, _pin(back, "self"))
-    _connect(get(WARD_CARRY_VAR, x0 + 5520, y0 - 300), _pin(back, "AimPose"))
+    _connect(get(WARD_CARRY_VAR), _pin(back, "AimPose"))
     _connect(BEL.find_then_pin(lower), _pin(back, "execute"))
     # Set with its input unconnected: None.
-    clear = put(WARD_ITEM_VAR, None, x0 + 6040, y0 - 200)
+    clear = put(WARD_ITEM_VAR, None)
     _connect(BEL.find_then_pin(back), _pin(clear, "execute"))
-    down = put("NeedsRefresh", "true", x0 + 6300, y0 - 200)
+    down = put("NeedsRefresh", "true")
     _connect(BEL.find_then_pin(clear), _pin(down, "execute"))
 
     # Pure, and read after the lowering above: it sees WardItem cleared.
-    raise_ = branch(gate2(FN_AND, ward, negate(out(up), x0 + 6300, y0 + 420),
-                          x0 + 6560, y0 + 320),
-                    (BEL.find_then_pin(down), BEL.find_else_pin(lower)), x0 + 6820, y0)
-    whose = put(WARD_ITEM_VAR, None, x0 + 7080, y0 - 200)
+    raise_ = branch(gate2(FN_AND, ward, negate(out(up))),
+                    (BEL.find_then_pin(down), BEL.find_else_pin(lower)))
+    whose = put(WARD_ITEM_VAR, None)
     _connect(held, _pin(whose, WARD_ITEM_VAR))
     _connect(BEL.find_then_pin(raise_), _pin(whose, "execute"))
-    carry = put(WARD_CARRY_VAR, None, x0 + 7340, y0 - 200)
-    _connect(held_prop("AimPose", x0 + 7080, y0 + 200), _pin(carry, WARD_CARRY_VAR))
+    carry = put(WARD_CARRY_VAR, None)
+    _connect(held_prop("AimPose"), _pin(carry, WARD_CARRY_VAR))
     _connect(BEL.find_then_pin(whose), _pin(carry, "execute"))
-    swap = keep(_at(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH),
-                    x0 + 7600, y0 - 200))
+    swap = keep(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH))
     _connect(held, _pin(swap, "self"))
-    _connect(held_prop(USE_POSE_VAR, x0 + 7340, y0 + 200), _pin(swap, "AimPose"))
+    _connect(held_prop(USE_POSE_VAR), _pin(swap, "AimPose"))
     _connect(BEL.find_then_pin(carry), _pin(swap, "execute"))
-    rise = put("NeedsRefresh", "true", x0 + 7860, y0 - 200)
+    rise = put("NeedsRefresh", "true")
     _connect(BEL.find_then_pin(swap), _pin(rise, "execute"))
 
     ed.add_comment_to_nodes(

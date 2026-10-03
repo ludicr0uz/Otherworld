@@ -5,7 +5,7 @@ scope and the wanderers' bars. Everything else is a UMG screen (umg_consts.py
 has their palette).
 """
 
-from combat.graph import _at, _node, _set
+from combat.graph import _node, _set
 from graphics_menu.umg_consts import UI_ART_DIR
 
 FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"
@@ -24,7 +24,7 @@ FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"
 # UI_ART_DIR, where the UMG screens' brushes find them too.
 
 
-def _draw_texture(ed, x, y, tex, w=None, h=None, tint=None):
+def _draw_texture(ed, tex, w=None, h=None, tint=None):
     """A DrawTexture node with its UV rectangle set to the whole texture.
 
     The UV pins are NORMALISED (HUD.h: "in normalized UV distance"), so the
@@ -34,7 +34,7 @@ def _draw_texture(ed, x, y, tex, w=None, h=None, tint=None):
     120x84 slot became a grid of amber borders and the 600x346 panel shrank
     to one transparent corner texel per pixel, i.e. vanished.
     """
-    n = _at(_node(ed, FN_DRAW_TEXTURE), x, y)
+    n = _node(ed, FN_DRAW_TEXTURE)
     _set(n, "Texture", f"{UI_ART_DIR}/{tex}.{tex}")
     if w is not None:
         _set(n, "ScreenW", w)

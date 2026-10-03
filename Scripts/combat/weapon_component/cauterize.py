@@ -18,7 +18,7 @@ The blade stays hot: the press does not spend its heat. Held.Hot is read
 behind the Branch on UsePressed, which is false with empty hands (use.py).
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from uebp.graph import out
 from combat.heat_tuning import HOT_VAR
 from combat.nodes import FN_GET_ASC, FN_IS_VALID, GAS
@@ -31,7 +31,7 @@ FN_REMOVE_GRANTING = f"{GAS}.AbilitySystemComponent.RemoveActiveEffectsWithGrant
 CAUTERIZE_TAGS = f'(GameplayTags=((TagName="{BLEEDING_TAG}")))'
 
 
-def _author_cauterize(ed, held, owner, exec_ins, x0, y0):
+def _author_cauterize(ed, held, owner, exec_ins):
     """See the module docstring. Returns the exits."""
     made = []
 
@@ -39,26 +39,26 @@ def _author_cauterize(ed, held, owner, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    pressed_n = keep(_at(ed.add_get_member_variable_node(USE_PRESSED_VAR), x0, y0 + 200))
-    press = keep(_at(ed.add_branch_node(), x0 + 260, y0))
+    pressed_n = keep(ed.add_get_member_variable_node(USE_PRESSED_VAR))
+    press = keep(ed.add_branch_node())
     _connect(out(pressed_n, USE_PRESSED_VAR), _pin(press, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(press, "execute"))
-    hot_pin, hot_n = _prop(ed, HOT_VAR, held, x0 + 260, y0 + 200)
+    hot_pin, hot_n = _prop(ed, HOT_VAR, held)
     keep(hot_n)
-    hot = keep(_at(ed.add_branch_node(), x0 + 520, y0))
+    hot = keep(ed.add_branch_node())
     _connect(hot_pin, _pin(hot, "Condition"))
     _connect(BEL.find_then_pin(press), _pin(hot, "execute"))
 
-    lookup = keep(_at(_node(ed, FN_GET_ASC), x0 + 520, y0 + 300))
+    lookup = keep(_node(ed, FN_GET_ASC))
     _connect(owner, _pin(lookup, "Actor"))
     asc = out(lookup)
-    valid = keep(_at(_node(ed, FN_IS_VALID), x0 + 780, y0 + 300))
+    valid = keep(_node(ed, FN_IS_VALID))
     _connect(asc, _pin(valid, "Object"))
-    able = keep(_at(ed.add_branch_node(), x0 + 1040, y0))
+    able = keep(ed.add_branch_node())
     _connect(out(valid), _pin(able, "Condition"))
     _connect(BEL.find_then_pin(hot), _pin(able, "execute"))
-    seal = keep(_at(_node(ed, FN_REMOVE_GRANTING), x0 + 1300, y0))
+    seal = keep(_node(ed, FN_REMOVE_GRANTING))
     _connect(asc, _pin(seal, "self"))
     _set(seal, "Tags", CAUTERIZE_TAGS)
     _connect(BEL.find_then_pin(able), _pin(seal, "execute"))

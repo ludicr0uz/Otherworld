@@ -3,9 +3,7 @@ interact.py's, and picking an item up pickup.py's.
 """
 
 from combat.anim_blueprint import AIM_SLOT
-from combat.graph import (
-    BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec,
-)
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
 from combat.nodes import (
     CAMERA_CLASS_PATH, FN_ACTOR_LOC, FN_ADD_VV, FN_AND, FN_ANIM_INSTANCE,
     FN_ARR_ADD, FN_ARR_REMOVE, FN_ATTACH, FN_DETACH, FN_EQ_II, FN_FORWARD,
@@ -39,7 +37,7 @@ def _detach_rules(node):
         _set(node, rule, "KeepWorld")
 
 
-def _author_drop(ed, held, owner, exec_in, x0, y0):
+def _author_drop(ed, held, owner, exec_in):
     """Detach the held weapon, drop it on the ground in front of the player."""
     made = []
 
@@ -47,48 +45,47 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
         made.append(n)
         return n
 
-    flag = keep(_at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH), x0, y0))
+    flag = keep(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH))
     _connect(held, _pin(flag, "self"))
     _set(flag, "Dropped", "true")
     _connect(exec_in, _pin(flag, "execute"))
 
-    off = keep(_at(_node(ed, FN_DETACH), x0 + 280, y0))
+    off = keep(_node(ed, FN_DETACH))
     _connect(held, _pin(off, "self"))
     _detach_rules(off)
     _connect(BEL.find_then_pin(flag), _pin(off, "execute"))
     # Shown on the way out: a sniper dropped while down its scope was hidden
     # by the sight camera (sights.py), and nothing else would ever show it.
-    shown = keep(_at(_node(ed, FN_SET_HIDDEN), x0 + 540, y0 - 160))
+    shown = keep(_node(ed, FN_SET_HIDDEN))
     _connect(held, _pin(shown, "self"))
     _set(shown, "bNewHidden", "false")
     _connect(BEL.find_then_pin(off), _pin(shown, "execute"))
 
-    loc = keep(_at(_node(ed, FN_ACTOR_LOC), x0, y0 + 300))
+    loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(owner, _pin(loc, "self"))
-    rot = keep(_at(_node(ed, "/Script/Engine.Actor.K2_GetActorRotation"), x0, y0 + 420))
+    rot = keep(_node(ed, "/Script/Engine.Actor.K2_GetActorRotation"))
     _connect(owner, _pin(rot, "self"))
-    fwd = keep(_at(_node(ed, FN_FORWARD), x0 + 240, y0 + 420))
+    fwd = keep(_node(ed, FN_FORWARD))
     _connect(_pin(rot, "ReturnValue", is_input=False), _pin(fwd, "InRot"))
-    ahead = keep(_at(_node(ed, FN_MUL_VF), x0 + 480, y0 + 420))
+    ahead = keep(_node(ed, FN_MUL_VF))
     _connect(_pin(fwd, "ReturnValue", is_input=False), _pin(ahead, "A"))
     # A vector literal, for the same reason as the aim ray: with nothing
     # connected, this operator's B pin is a struct pin and will not take a
     # number. Until _set started reading pins back, this silently stayed empty
     # and dropped weapons landed on the player's own feet.
-    _connect(_vec(ed, DROP_FORWARD, DROP_FORWARD, DROP_FORWARD, x0 + 240, y0 + 560),
-             _pin(ahead, "B"))
-    start = keep(_at(_node(ed, FN_ADD_VV), x0 + 720, y0 + 340))
+    _connect(_vec(ed, DROP_FORWARD, DROP_FORWARD, DROP_FORWARD), _pin(ahead, "B"))
+    start = keep(_node(ed, FN_ADD_VV))
     _connect(_pin(loc, "ReturnValue", is_input=False), _pin(start, "A"))
     _connect(_pin(ahead, "ReturnValue", is_input=False), _pin(start, "B"))
 
-    down = keep(_at(_node(ed, FN_ADD_VV), x0 + 960, y0 + 460))
+    down = keep(_node(ed, FN_ADD_VV))
     _connect(_pin(start, "ReturnValue", is_input=False), _pin(down, "A"))
-    _connect(_vec(ed, 0.0, 0.0, -400.0, x0 + 720, y0 + 580), _pin(down, "B"))
+    _connect(_vec(ed, 0.0, 0.0, -400.0), _pin(down, "B"))
 
     # Trace down so the weapon lands on the terrain instead of hanging at hip
     # height. The forest floor is a mesh, not a plane, so a fixed Z would float
     # or bury it depending on where the player is standing.
-    ground = keep(_at(_node(ed, FN_TRACE), x0 + 1220, y0))
+    ground = keep(_node(ed, FN_TRACE))
     _connect(_pin(start, "ReturnValue", is_input=False), _pin(ground, "Start"))
     _connect(_pin(down, "ReturnValue", is_input=False), _pin(ground, "End"))
     _set(ground, "TraceChannel", "TraceTypeQuery1")
@@ -97,30 +94,30 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
     _set(ground, "DrawDebugType", "None")
     _connect(BEL.find_then_pin(shown), _pin(ground, "execute"))
 
-    landed = keep(_at(ed.add_branch_node(), x0 + 1500, y0))
+    landed = keep(ed.add_branch_node())
     _connect(_pin(ground, "ReturnValue", is_input=False), _pin(landed, "Condition"))
     _connect(BEL.find_then_pin(ground), _pin(landed, "execute"))
-    brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 1500, y0 + 300))
+    brk = keep(_palette(ed, NODE_BREAK_HIT))
     _connect(_pin(ground, "OutHit", is_input=False), _loose_pin(brk, "Hit"))
 
-    lift = keep(_at(_node(ed, FN_ADD_VV), x0 + 1760, y0 + 300))
+    lift = keep(_node(ed, FN_ADD_VV))
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(lift, "A"))
-    _connect(_vec(ed, 0.0, 0.0, 12.0, x0 + 1520, y0 + 440), _pin(lift, "B"))
+    _connect(_vec(ed, 0.0, 0.0, 12.0), _pin(lift, "B"))
 
-    on_ground = keep(_at(_node(ed, FN_SET_ACTOR_LOC), x0 + 2020, y0 - 120))
+    on_ground = keep(_node(ed, FN_SET_ACTOR_LOC))
     _connect(held, _pin(on_ground, "self"))
     _connect(_pin(lift, "ReturnValue", is_input=False), _pin(on_ground, "NewLocation"))
     _connect(BEL.find_then_pin(landed), _pin(on_ground, "execute"))
 
-    in_air = keep(_at(_node(ed, FN_SET_ACTOR_LOC), x0 + 2020, y0 + 120))
+    in_air = keep(_node(ed, FN_SET_ACTOR_LOC))
     _connect(held, _pin(in_air, "self"))
     _connect(_pin(start, "ReturnValue", is_input=False), _pin(in_air, "NewLocation"))
     _connect(BEL.find_else_pin(landed), _pin(in_air, "execute"))
 
     # Both placements rejoin here; an exec input takes more than one link.
-    inv = keep(_at(ed.add_get_member_variable_node("Inventory"), x0 + 2300, y0 + 240))
-    idx = keep(_at(ed.add_get_member_variable_node("EquippedIndex"), x0 + 2300, y0 + 360))
-    remove = keep(_at(_node(ed, FN_ARR_REMOVE), x0 + 2540, y0))
+    inv = keep(ed.add_get_member_variable_node("Inventory"))
+    idx = keep(ed.add_get_member_variable_node("EquippedIndex"))
+    remove = keep(_node(ed, FN_ARR_REMOVE))
     _connect(_pin(inv, "Inventory", is_input=False), _pin(remove, "TargetArray"))
     _connect(_pin(idx, "EquippedIndex", is_input=False), _pin(remove, "IndexToRemove"))
     _connect(BEL.find_then_pin(on_ground), _pin(remove, "execute"))
@@ -128,9 +125,9 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
 
     # Held is set with its input pin left unconnected, which is how a Blueprint
     # object variable is cleared to None.
-    clear = keep(_at(ed.add_set_member_variable_node("Held"), x0 + 2800, y0))
+    clear = keep(ed.add_set_member_variable_node("Held"))
     _connect(BEL.find_then_pin(remove), _pin(clear, "execute"))
-    reset = keep(_at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 3060, y0))
+    reset = keep(ed.add_set_member_variable_node("EquippedIndex"))
     _set(reset, "EquippedIndex", 0)
     _connect(BEL.find_then_pin(clear), _pin(reset, "execute"))
 
@@ -143,7 +140,7 @@ def _author_drop(ed, held, owner, exec_in, x0, y0):
     return BEL.find_then_pin(reset)
 
 
-def _author_equip(ed, exec_in, x0, y0):
+def _author_equip(ed, exec_in):
     """Show exactly one weapon in the hand, hide the rest, play its ready pose.
 
     Weapons are spawned once and kept: equipping hides and shows actors rather
@@ -169,41 +166,41 @@ def _author_equip(ed, exec_in, x0, y0):
         made.append(n)
         return n
 
-    inv = keep(_at(ed.add_get_member_variable_node("Inventory"), x0, y0 + 240))
+    inv = keep(ed.add_get_member_variable_node("Inventory"))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    keep(_at(loop, x0 + 260, y0))
+    keep(loop)
     _connect(_pin(inv, "Inventory", is_input=False), _loose_pin(loop, "Array"))
     # Empty first: with EquippedIndex -1 (nothing in the hand slot) no turn of
     # the loop sets Held, and the hands are empty rather than still holding
     # what was put away.
-    empty = keep(_at(ed.add_set_member_variable_node("Held"), x0, y0 - 200))
+    empty = keep(ed.add_set_member_variable_node("Held"))
     _connect(exec_in, _pin(empty, "execute"))
     _connect(BEL.find_then_pin(empty), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
-    idx = keep(_at(ed.add_get_member_variable_node("EquippedIndex"), x0 + 560, y0 + 320))
-    same = keep(_at(_node(ed, FN_EQ_II), x0 + 800, y0 + 260))
+    idx = keep(ed.add_get_member_variable_node("EquippedIndex"))
+    same = keep(_node(ed, FN_EQ_II))
     _connect(_loose_pin(loop, "ArrayIndex", is_input=False), _pin(same, "A"))
     _connect(_pin(idx, "EquippedIndex", is_input=False), _pin(same, "B"))
 
-    chosen = keep(_at(ed.add_branch_node(), x0 + 1040, y0))
+    chosen = keep(ed.add_branch_node())
     _connect(_pin(same, "ReturnValue", is_input=False), _pin(chosen, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(chosen, "execute"))
 
-    show = keep(_at(_node(ed, FN_SET_HIDDEN), x0 + 1300, y0 - 160))
+    show = keep(_node(ed, FN_SET_HIDDEN))
     _connect(item, _pin(show, "self"))
     _set(show, "bNewHidden", "false")
     _connect(BEL.find_then_pin(chosen), _pin(show, "execute"))
 
-    hide = keep(_at(_node(ed, FN_SET_HIDDEN), x0 + 1300, y0 + 420))
+    hide = keep(_node(ed, FN_SET_HIDDEN))
     _connect(item, _pin(hide, "self"))
     _set(hide, "bNewHidden", "true")
     _connect(BEL.find_else_pin(chosen), _pin(hide, "execute"))
 
-    mesh = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 1300, y0 + 40))
-    attach = keep(_at(_node(ed, FN_ATTACH), x0 + 1580, y0 - 160))
+    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    attach = keep(_node(ed, FN_ATTACH))
     _connect(item, _pin(attach, "self"))
     _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(attach, "Parent"))
     _set(attach, "SocketName", player_skin().grip)
@@ -214,9 +211,9 @@ def _author_equip(ed, exec_in, x0, y0):
         _set(attach, rule, "SnapToTarget")
     _connect(BEL.find_then_pin(show), _pin(attach, "execute"))
 
-    gl_pin, gl_n = _prop(ed, "GripLocation", item, x0 + 1580, y0 + 120)
+    gl_pin, gl_n = _prop(ed, "GripLocation", item)
     keep(gl_n)
-    put = keep(_at(_node(ed, FN_SET_REL_LOC), x0 + 1860, y0 - 160))
+    put = keep(_node(ed, FN_SET_REL_LOC))
     _connect(item, _pin(put, "self"))
     _connect(gl_pin, _pin(put, "NewRelativeLocation"))
     _connect(BEL.find_then_pin(attach), _pin(put, "execute"))
@@ -224,45 +221,44 @@ def _author_equip(ed, exec_in, x0, y0):
     # The resting orientation only. From the next frame on, Tick points the
     # held weapon at the aim point; this just stops it being visibly wrong for
     # the one frame in between.
-    gr_pin, gr_n = _prop(ed, "GripRotation", item, x0 + 1860, y0 + 120)
+    gr_pin, gr_n = _prop(ed, "GripRotation", item)
     keep(gr_n)
-    turn = keep(_at(_node(ed, FN_SET_REL_ROT), x0 + 2140, y0 - 160))
+    turn = keep(_node(ed, FN_SET_REL_ROT))
     _connect(item, _pin(turn, "self"))
     _connect(gr_pin, _pin(turn, "NewRelativeRotation"))
     _connect(BEL.find_then_pin(put), _pin(turn, "execute"))
 
-    hold = keep(_at(ed.add_set_member_variable_node("Held"), x0 + 2420, y0 - 160))
+    hold = keep(ed.add_set_member_variable_node("Held"))
     _connect(item, _pin(hold, "Held"))
     _connect(BEL.find_then_pin(turn), _pin(hold, "execute"))
 
     # --- once the loop is done, drive the ready pose -------------------------
-    held_get = keep(_at(ed.add_get_member_variable_node("Held"), x0 + 2700, y0 + 300))
+    held_get = keep(ed.add_get_member_variable_node("Held"))
     held = _pin(held_get, "Held", is_input=False)
-    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 2940, y0 + 300))
+    armed = keep(_node(ed, FN_IS_VALID))
     _connect(held, _pin(armed, "Object"))
     # Safe to fold into one condition, unlike the fire gate's ammunition tests:
     # IsValid takes a null object as an answer rather than as an error, and
     # Lowered is this component's own bool (carry.py: sprinting, or a gun
     # nothing is holding up). Neither read can touch Held.
-    running = keep(_at(ed.add_get_member_variable_node(LOWERED_VAR),
-                       x0 + 2700, y0 + 480))
-    still = keep(_at(_node(ed, FN_NOT), x0 + 2940, y0 + 480))
+    running = keep(ed.add_get_member_variable_node(LOWERED_VAR))
+    still = keep(_node(ed, FN_NOT))
     _connect(_pin(running, LOWERED_VAR, is_input=False), _pin(still, "A"))
-    shown = keep(_at(_node(ed, FN_AND), x0 + 3180, y0 + 400))
+    shown = keep(_node(ed, FN_AND))
     _connect(_pin(armed, "ReturnValue", is_input=False), _pin(shown, "A"))
     _connect(_pin(still, "ReturnValue", is_input=False), _pin(shown, "B"))
-    posing = keep(_at(ed.add_branch_node(), x0 + 3420, y0))
+    posing = keep(ed.add_branch_node())
     _connect(_pin(shown, "ReturnValue", is_input=False), _pin(posing, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(posing, "execute"))
 
-    mesh2 = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 3180, y0 + 440))
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 3420, y0 + 440))
+    mesh2 = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(_pin(mesh2, "OwnerMesh", is_input=False), _pin(anim, "self"))
     anim_out = _pin(anim, "ReturnValue", is_input=False)
 
-    pose_pin, pose_n = _prop(ed, "AimPose", held, x0 + 3420, y0 + 200)
+    pose_pin, pose_n = _prop(ed, "AimPose", held)
     keep(pose_n)
-    play = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 3700, y0 - 100))
+    play = keep(_node(ed, FN_PLAY_SLOT))
     _connect(anim_out, _pin(play, "self"))
     _connect(pose_pin, _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
@@ -272,7 +268,7 @@ def _author_equip(ed, exec_in, x0, y0):
     _set(play, "LoopCount", AIM_LOOPS)
     _connect(BEL.find_then_pin(posing), _pin(play, "execute"))
 
-    stop = keep(_at(_node(ed, FN_STOP_SLOT), x0 + 3700, y0 + 200))
+    stop = keep(_node(ed, FN_STOP_SLOT))
     _connect(anim_out, _pin(stop, "self"))
     _set(stop, "InBlendOutTime", AIM_BLEND)
     _set(stop, "SlotNodeName", AIM_SLOT)
@@ -298,16 +294,15 @@ def _author_wc_begin_play(ed, begin):
         made.append(n)
         return n
 
-    owner = keep(_at(_node(ed, FN_GET_OWNER), 240, -1060))
-    cast = keep(_at(_palette(ed, NODE_CAST_CHAR), 500, -1200))
+    owner = keep(_node(ed, FN_GET_OWNER))
+    cast = keep(_palette(ed, NODE_CAST_CHAR))
     _connect(_pin(owner, "ReturnValue", is_input=False), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(begin), _pin(cast, "execute"))
     as_char = _loose_pin(cast, "AsBPThirdPersonCharacter", is_input=False)
 
-    mesh = keep(_at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
-                    780, -1020))
+    mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
     _connect(as_char, _pin(mesh, "self"))
-    remember = keep(_at(ed.add_set_member_variable_node("OwnerMesh"), 1040, -1200))
+    remember = keep(ed.add_set_member_variable_node("OwnerMesh"))
     _connect(_pin(mesh, "Mesh", is_input=False), _pin(remember, "OwnerMesh"))
     _connect(BEL.find_then_pin(cast), _pin(remember, "execute"))
 
@@ -316,13 +311,12 @@ def _author_wc_begin_play(ed, begin):
     # any later change to BP_ThirdPersonCharacter's movement defaults, and the
     # symptom -- "the player walks at the wrong speed, but only after
     # sprinting once" -- would point at the sprint code instead of at the copy.
-    movement = keep(_at(ed.add_get_member_variable_node(
-        "CharacterMovement", "/Script/Engine.Character"), 1040, -1560))
+    movement = keep(ed.add_get_member_variable_node(
+        "CharacterMovement", "/Script/Engine.Character"))
     _connect(as_char, _pin(movement, "self"))
-    walk = keep(_at(ed.add_get_member_variable_node(
-        "MaxWalkSpeed", MOVEMENT_CLASS_PATH), 1300, -1560))
+    walk = keep(ed.add_get_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
     _connect(_pin(movement, "CharacterMovement", is_input=False), _pin(walk, "self"))
-    cache = keep(_at(ed.add_set_member_variable_node("BaseSpeed"), 1300, -1420))
+    cache = keep(ed.add_set_member_variable_node("BaseSpeed"))
     _connect(_pin(walk, "MaxWalkSpeed", is_input=False), _pin(cache, "BaseSpeed"))
     _connect(BEL.find_then_pin(remember), _pin(cache, "execute"))
 
@@ -330,19 +324,18 @@ def _author_wc_begin_play(ed, begin):
     # with the same failure mode: a literal 90 here would silently fight the
     # camera asset, and the symptom -- "the view is subtly wrong, but only
     # after aiming once" -- would point at the ADS code rather than at the copy.
-    cam = keep(_at(_node(ed, FN_GET_COMP), 1040, -1700))
+    cam = keep(_node(ed, FN_GET_COMP))
     _connect(as_char, _pin(cam, "self"))
     _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
-    fov = keep(_at(ed.add_get_member_variable_node("FieldOfView", CAMERA_CLASS_PATH),
-                   1300, -1700))
+    fov = keep(ed.add_get_member_variable_node("FieldOfView", CAMERA_CLASS_PATH))
     _connect(_pin(cam, "ReturnValue", is_input=False), _pin(fov, "self"))
     fov_out = _pin(fov, "FieldOfView", is_input=False)
-    base_fov = keep(_at(ed.add_set_member_variable_node("BaseFOV"), 1560, -1700))
+    base_fov = keep(ed.add_set_member_variable_node("BaseFOV"))
     _connect(fov_out, _pin(base_fov, "BaseFOV"))
     _connect(BEL.find_then_pin(cache), _pin(base_fov, "execute"))
     # Start the interpolation where the camera already is, or the first frame
     # lerps from zero and the view snaps open.
-    now_fov = keep(_at(ed.add_set_member_variable_node("CurrentFOV"), 1820, -1700))
+    now_fov = keep(ed.add_set_member_variable_node("CurrentFOV"))
     _connect(fov_out, _pin(now_fov, "CurrentFOV"))
     _connect(BEL.find_then_pin(base_fov), _pin(now_fov, "execute"))
 
@@ -353,52 +346,48 @@ def _author_wc_begin_play(ed, begin):
     # chance of inverting the player's vertical look, and the symptom -- "the
     # mouse is upside down, but only after aiming once" -- would send whoever
     # chased it into the ADS code rather than into this line.
-    pc = keep(_at(_node(ed, FN_GET_PC), 1040, -1840))
+    pc = keep(_node(ed, FN_GET_PC))
     _set(pc, "PlayerIndex", 0)
     pc_out = _pin(pc, "ReturnValue", is_input=False)
-    yaw_now = keep(_at(_node(ed, FN_GET_YAW_SCALE), 1300, -1840))
+    yaw_now = keep(_node(ed, FN_GET_YAW_SCALE))
     _connect(pc_out, _pin(yaw_now, "self"))
-    keep_yaw = keep(_at(ed.add_set_member_variable_node("BaseYawScale"), 2080, -1700))
+    keep_yaw = keep(ed.add_set_member_variable_node("BaseYawScale"))
     _connect(_pin(yaw_now, "ReturnValue", is_input=False), _pin(keep_yaw, "BaseYawScale"))
     _connect(BEL.find_then_pin(now_fov), _pin(keep_yaw, "execute"))
-    pitch_now = keep(_at(_node(ed, FN_GET_PITCH_SCALE), 1300, -1960))
+    pitch_now = keep(_node(ed, FN_GET_PITCH_SCALE))
     _connect(pc_out, _pin(pitch_now, "self"))
-    keep_pitch = keep(_at(ed.add_set_member_variable_node("BasePitchScale"),
-                          2340, -1700))
+    keep_pitch = keep(ed.add_set_member_variable_node("BasePitchScale"))
     _connect(_pin(pitch_now, "ReturnValue", is_input=False),
              _pin(keep_pitch, "BasePitchScale"))
     _connect(BEL.find_then_pin(keep_yaw), _pin(keep_pitch, "execute"))
 
-    where = keep(_at(_node(ed, FN_GET_TRANSFORM), 1040, -1000))
+    where = keep(_node(ed, FN_GET_TRANSFORM))
     _connect(as_char, _pin(where, "self"))
     spawn_at = _pin(where, "ReturnValue", is_input=False)
 
-    prev = _author_camera_after_boom(ed, as_char, BEL.find_then_pin(keep_pitch),
-                                     2600, -1840)
-    prev = _author_listener_at_character(ed, as_char, pc_out, prev, 3120, -1840)
+    prev = _author_camera_after_boom(ed, as_char, BEL.find_then_pin(keep_pitch))
+    prev = _author_listener_at_character(ed, as_char, pc_out, prev)
     for i, var in enumerate(STARTER_CLASS_VARS):
-        cls = keep(_at(ed.add_get_member_variable_node(var), 1300, -1020 + i * 460))
-        spawn = keep(_at(_palette(ed, NODE_SPAWN), 1560, -1200 + i * 460))
+        cls = keep(ed.add_get_member_variable_node(var))
+        spawn = keep(_palette(ed, NODE_SPAWN))
         _connect(_pin(cls, var, is_input=False), _pin(spawn, "Class"))
         _connect(spawn_at, _pin(spawn, "SpawnTransform"))
         _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
         _connect(prev, _pin(spawn, "execute"))
 
-        inv = keep(_at(ed.add_get_member_variable_node("Inventory"),
-                       1840, -1000 + i * 460))
-        add = keep(_at(_node(ed, FN_ARR_ADD), 2100, -1200 + i * 460))
+        inv = keep(ed.add_get_member_variable_node("Inventory"))
+        add = keep(_node(ed, FN_ARR_ADD))
         _connect(_pin(inv, "Inventory", is_input=False), _pin(add, "TargetArray"))
         _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(add, "NewItem"))
         _connect(BEL.find_then_pin(spawn), _pin(add, "execute"))
         # Its slot (slot_tuning.STARTER_SLOTS): the slot sync places it there.
-        slot = keep(_at(ed.add_set_member_variable_node(SLOT_VAR, ITEM_CLASS_PATH),
-                        2360, -1200 + i * 460))
+        slot = keep(ed.add_set_member_variable_node(SLOT_VAR, ITEM_CLASS_PATH))
         _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(slot, "self"))
         _set(slot, SLOT_VAR, STARTER_SLOTS[i])
         _connect(BEL.find_then_pin(add), _pin(slot, "execute"))
         prev = BEL.find_then_pin(slot)
 
-    dirty = keep(_at(ed.add_set_member_variable_node("NeedsRefresh"), 2660, -1200))
+    dirty = keep(ed.add_set_member_variable_node("NeedsRefresh"))
     _set(dirty, "NeedsRefresh", "true")
     _connect(prev, _pin(dirty, "execute"))
 

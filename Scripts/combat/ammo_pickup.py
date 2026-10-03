@@ -4,11 +4,10 @@
 import unreal
 
 from combat.graph import (
-    BEL, BGE, _add_component, _apply_defaults, _assets, _at,
-    _component_object, _connect, _create_blueprint, _declare,
-    _drop_components, _events, _log, _loose_pin, _node, _palette, _pin,
-    _root_handle, _set,
-)
+    BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _connect,
+    _create_blueprint, _declare, _drop_components, _events, _log, _loose_pin, _node,
+    _palette, _pin, _root_handle, _set)
+from uebp.layout import arrange
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_II, FN_ADD_LOCAL_ROT, FN_AND, FN_DESTROY,
     FN_DISTANCE, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_LESS_FF,
@@ -79,47 +78,46 @@ def build_ammo_pickup(rebuild=True):
     _declare(ed, "Credited", BEL.get_basic_type_by_name("bool"))
 
     # --- BeginPlay: tidy yourself away eventually ---------------------------
-    life = _at(_node(ed, FN_LIFESPAN), 320, -500)
+    life = _node(ed, FN_LIFESPAN)
     _set(life, "InLifespan", AMMO_PICKUP_LIFETIME)
     _connect(BEL.find_then_pin(begin), _pin(life, "execute"))
 
     # --- Tick: spin, then check the distance --------------------------------
     # The spin is what makes a 10 cm object findable on a forest floor at night;
     # the emissive brass does the rest.
-    turn = _at(_node(ed, FN_MUL_FF), 320, 300)
+    turn = _node(ed, FN_MUL_FF)
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(turn, "A"))
     _set(turn, "B", AMMO_SPIN_DEG_PER_S)
-    delta = _at(_node(ed, FN_MAKE_ROT), 560, 300)
+    delta = _node(ed, FN_MAKE_ROT)
     _connect(_pin(turn, "ReturnValue", is_input=False), _pin(delta, "Yaw"))
-    spin = _at(_node(ed, FN_ADD_LOCAL_ROT), 800, 0)
+    spin = _node(ed, FN_ADD_LOCAL_ROT)
     _connect(_pin(delta, "ReturnValue", is_input=False), _pin(spin, "DeltaRotation"))
     _set(spin, "bSweep", "false")
     _set(spin, "bTeleport", "true")
     _connect(BEL.find_then_pin(tick), _pin(spin, "execute"))
 
-    pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), 800, 300)
+    pawn = _node(ed, FN_GET_PLAYER_PAWN)
     _set(pawn, "PlayerIndex", 0)
     pawn_out = _pin(pawn, "ReturnValue", is_input=False)
-    there = _at(_node(ed, FN_ACTOR_LOC), 1040, 300)
+    there = _node(ed, FN_ACTOR_LOC)
     _connect(pawn_out, _pin(there, "self"))
-    here = _at(_node(ed, FN_ACTOR_LOC), 1040, 420)
-    gap = _at(_node(ed, FN_DISTANCE), 1280, 300)
+    here = _node(ed, FN_ACTOR_LOC)
+    gap = _node(ed, FN_DISTANCE)
     _connect(_pin(there, "ReturnValue", is_input=False), _pin(gap, "V1"))
     _connect(_pin(here, "ReturnValue", is_input=False), _pin(gap, "V2"))
-    near = _at(_node(ed, FN_LESS_FF), 1520, 300)
+    near = _node(ed, FN_LESS_FF)
     _connect(_pin(gap, "ReturnValue", is_input=False), _pin(near, "A"))
     _set(near, "B", AMMO_PICKUP_RADIUS)
 
-    reached = _at(ed.add_branch_node(), 1760, 0)
+    reached = ed.add_branch_node()
     _connect(_pin(near, "ReturnValue", is_input=False), _pin(reached, "Condition"))
     _connect(BEL.find_then_pin(spin), _pin(reached, "execute"))
 
     # --- who gets the shells ------------------------------------------------
-    comp = _at(_node(ed, FN_GET_COMP), 2000, 300)
+    comp = _node(ed, FN_GET_COMP)
     _connect(pawn_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
-    as_weapon_n = _at(_palette(ed, "Utilities|Casting|CastToBP_WeaponComponent"),
-                      2280, 0)
+    as_weapon_n = _palette(ed, "Utilities|Casting|CastToBP_WeaponComponent")
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_weapon_n, "Object"))
     _connect(BEL.find_then_pin(reached), _pin(as_weapon_n, "execute"))
     as_weapon = _loose_pin(as_weapon_n, "AsBPWeaponComponent", is_input=False)
@@ -129,42 +127,40 @@ def build_ammo_pickup(rebuild=True):
     # now hit four times: UsesAmmo is a pure read off Held, and pulling it while
     # Held is None is an Accessed None. The validity test has to be a gate the
     # second read sits behind, not a term beside it.
-    held_get = _at(ed.add_get_member_variable_node("Held", WEAPON_COMP_CLASS_PATH),
-                   2560, 300)
+    held_get = ed.add_get_member_variable_node("Held", WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(held_get, "self"))
     held = _pin(held_get, "Held", is_input=False)
-    armed = _at(_node(ed, FN_IS_VALID), 2800, 300)
+    armed = _node(ed, FN_IS_VALID)
     _connect(held, _pin(armed, "Object"))
-    has_gun = _at(ed.add_branch_node(), 3040, -700)
+    has_gun = ed.add_branch_node()
     _connect(_pin(armed, "ReturnValue", is_input=False), _pin(has_gun, "Condition"))
     _connect(BEL.find_then_pin(as_weapon_n), _pin(has_gun, "execute"))
 
     # "Takes shells" is UsesAmmo AND NOT InfiniteReserve: the pistol has a
     # magazine now, but shells paid into a reserve that is never spent would
     # simply vanish.
-    held_uses, held_uses_n = _prop(ed, "UsesAmmo", held, 3300, -400)
-    held_endless, held_endless_n = _prop(ed, "InfiniteReserve", held, 3040, -280)
-    held_finite = _at(_node(ed, FN_NOT), 3300, -280)
+    held_uses, held_uses_n = _prop(ed, "UsesAmmo", held)
+    held_endless, held_endless_n = _prop(ed, "InfiniteReserve", held)
+    held_finite = _node(ed, FN_NOT)
     _connect(held_endless, _pin(held_finite, "A"))
-    held_wants = _at(_node(ed, FN_AND), 3420, -340)
+    held_wants = _node(ed, FN_AND)
     _connect(held_uses, _pin(held_wants, "A"))
     _connect(_pin(held_finite, "ReturnValue", is_input=False), _pin(held_wants, "B"))
-    takes_ammo = _at(ed.add_branch_node(), 3560, -700)
+    takes_ammo = ed.add_branch_node()
     _connect(_pin(held_wants, "ReturnValue", is_input=False), _pin(takes_ammo, "Condition"))
     _connect(BEL.find_then_pin(has_gun), _pin(takes_ammo, "execute"))
 
-    held_res, held_res_n = _prop(ed, "Reserve", held, 3820, -400)
-    held_shells = _at(ed.add_get_member_variable_node("Shells"), 3820, -280)
-    held_richer = _at(_node(ed, FN_ADD_II), 4080, -400)
+    held_res, held_res_n = _prop(ed, "Reserve", held)
+    held_shells = ed.add_get_member_variable_node("Shells")
+    held_richer = _node(ed, FN_ADD_II)
     _connect(held_res, _pin(held_richer, "A"))
     _connect(_pin(held_shells, "Shells", is_input=False), _pin(held_richer, "B"))
-    held_store = _at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH),
-                     4340, -700)
+    held_store = ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH)
     _connect(held, _pin(held_store, "self"))
     _connect(_pin(held_richer, "ReturnValue", is_input=False),
              _pin(held_store, "Reserve"))
     _connect(BEL.find_then_pin(takes_ammo), _pin(held_store, "execute"))
-    held_mark = _at(ed.add_set_member_variable_node("Credited"), 4600, -700)
+    held_mark = ed.add_set_member_variable_node("Credited")
     _set(held_mark, "Credited", "true")
     _connect(BEL.find_then_pin(held_store), _pin(held_mark, "execute"))
 
@@ -172,48 +168,47 @@ def build_ammo_pickup(rebuild=True):
     # Reached when nothing is held, or when what is held is the pistol. Walking
     # over shells with the pistol out still has to pay into something, or the
     # drop is lost for the sake of a rule about which gun is out.
-    inv = _at(ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH),
-              2560, 420)
+    inv = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(inv, "self"))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    _at(loop, 2840, 0)
+    loop
     _connect(_pin(inv, "Inventory", is_input=False), _loose_pin(loop, "Array"))
     _connect(BEL.find_else_pin(has_gun), _loose_pin(loop, "Exec"))
     _connect(BEL.find_else_pin(takes_ammo), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
-    uses, uses_n = _prop(ed, "UsesAmmo", item, 3140, 300)
-    endless, endless_n = _prop(ed, "InfiniteReserve", item, 3140, 180)
-    finite = _at(_node(ed, FN_NOT), 3380, 180)
+    uses, uses_n = _prop(ed, "UsesAmmo", item)
+    endless, endless_n = _prop(ed, "InfiniteReserve", item)
+    finite = _node(ed, FN_NOT)
     _connect(endless, _pin(finite, "A"))
-    counts = _at(_node(ed, FN_AND), 3620, 220)
+    counts = _node(ed, FN_AND)
     _connect(uses, _pin(counts, "A"))
     _connect(_pin(finite, "ReturnValue", is_input=False), _pin(counts, "B"))
-    done_get = _at(ed.add_get_member_variable_node("Credited"), 3140, 440)
-    fresh = _at(_node(ed, FN_NOT), 3380, 440)
+    done_get = ed.add_get_member_variable_node("Credited")
+    fresh = _node(ed, FN_NOT)
     _connect(_pin(done_get, "Credited", is_input=False), _pin(fresh, "A"))
-    wants = _at(_node(ed, FN_AND), 3620, 360)
+    wants = _node(ed, FN_AND)
     _connect(_pin(counts, "ReturnValue", is_input=False), _pin(wants, "A"))
     _connect(_pin(fresh, "ReturnValue", is_input=False), _pin(wants, "B"))
 
-    give = _at(ed.add_branch_node(), 3880, 0)
+    give = ed.add_branch_node()
     _connect(_pin(wants, "ReturnValue", is_input=False), _pin(give, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(give, "execute"))
 
-    item_res, item_res_n = _prop(ed, "Reserve", item, 4140, 300)
-    shells = _at(ed.add_get_member_variable_node("Shells"), 4140, 440)
-    richer = _at(_node(ed, FN_ADD_II), 4400, 300)
+    item_res, item_res_n = _prop(ed, "Reserve", item)
+    shells = ed.add_get_member_variable_node("Shells")
+    richer = _node(ed, FN_ADD_II)
     _connect(item_res, _pin(richer, "A"))
     _connect(_pin(shells, "Shells", is_input=False), _pin(richer, "B"))
-    store = _at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH), 4660, 0)
+    store = ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH)
     _connect(item, _pin(store, "self"))
     _connect(_pin(richer, "ReturnValue", is_input=False), _pin(store, "Reserve"))
     _connect(BEL.find_then_pin(give), _pin(store, "execute"))
 
-    mark = _at(ed.add_set_member_variable_node("Credited"), 4920, 0)
+    mark = ed.add_set_member_variable_node("Credited")
     _set(mark, "Credited", "true")
     _connect(BEL.find_then_pin(store), _pin(mark, "execute"))
 
@@ -221,12 +216,12 @@ def build_ammo_pickup(rebuild=True):
     # Gated on Credited rather than destroyed unconditionally at the Completed
     # pin: a player with no shotgun who walks over the shells has not picked
     # anything up, and the drop has to still be there when they find one.
-    took_get = _at(ed.add_get_member_variable_node("Credited"), 5180, 300)
-    took = _at(ed.add_branch_node(), 5440, 0)
+    took_get = ed.add_get_member_variable_node("Credited")
+    took = ed.add_branch_node()
     _connect(_pin(took_get, "Credited", is_input=False), _pin(took, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(took, "execute"))
     _connect(BEL.find_then_pin(held_mark), _pin(took, "execute"))
-    gone = _at(_node(ed, FN_DESTROY), 5700, 0)
+    gone = _node(ed, FN_DESTROY)
     _connect(BEL.find_then_pin(took), _pin(gone, "execute"))
 
     ed.add_comment_to_nodes(
@@ -246,6 +241,7 @@ def build_ammo_pickup(rebuild=True):
          inv, loop, uses_n, endless_n, finite, counts, done_get, fresh, wants, give,
          item_res_n, shells, richer, store, mark, took_get, took, gone])
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_AmmoPickup failed to compile")
     _apply_defaults(bp, {"Shells": AMMO_DROP_SHELLS, "Credited": False})

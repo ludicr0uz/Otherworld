@@ -18,22 +18,21 @@ from combat.game_state import (
     COMBAT_TRACE_OFF_EVENT, COMBAT_TRACE_ON_EVENT, COMBAT_TRACE_PREFIX,
     COMBAT_TRACE_VAR,
 )
-from combat.graph import (
-    BEL, BGE, _apply_defaults, _assets, _at, _connect, _log, _node, _pin, _set,
-)
+from combat.graph import BEL, BGE, _apply_defaults, _assets, _connect, _log, _node, _pin, _set
+from uebp.layout import arrange
 from combat.nodes import FN_PRINT
 from combat.paths import GAME_MODE_BP_PATH
 from combat.tuning import COMBAT_TRACE_DEFAULT
 
 
-def _author_switch(ed, event_name, value, y):
+def _author_switch(ed, event_name, value):
     """<event> -> CombatTrace = value -> print that it changed, screen and log."""
-    event = _at(ed.add_custom_event_node(event_name), 0, y)
-    flip = _at(ed.add_set_member_variable_node(COMBAT_TRACE_VAR), 300, y)
+    event = ed.add_custom_event_node(event_name)
+    flip = ed.add_set_member_variable_node(COMBAT_TRACE_VAR)
     _set(flip, COMBAT_TRACE_VAR, "true" if value else "false")
     _connect(BEL.find_then_pin(event), _pin(flip, "execute"))
 
-    say = _at(_node(ed, FN_PRINT), 600, y)
+    say = _node(ed, FN_PRINT)
     _set(say, "InString", f"{COMBAT_TRACE_PREFIX}{'on' if value else 'off'}")
     _set(say, "bPrintToScreen", "true")
     _set(say, "bPrintToLog", "true")
@@ -59,8 +58,8 @@ def build_combat_trace_switch():
     if nodes:
         ed.remove_nodes(nodes)
 
-    made = (_author_switch(ed, COMBAT_TRACE_ON_EVENT, True, 0)
-            + _author_switch(ed, COMBAT_TRACE_OFF_EVENT, False, 300))
+    made = (_author_switch(ed, COMBAT_TRACE_ON_EVENT, True)
+            + _author_switch(ed, COMBAT_TRACE_OFF_EVENT, False))
     ed.add_comment_to_nodes(
         f"Combat trace switch. In the console: `ke * {COMBAT_TRACE_ON_EVENT}` / "
         f"`ke * {COMBAT_TRACE_OFF_EVENT}`. While on, every landed wanderer swing "
@@ -68,6 +67,7 @@ def build_combat_trace_switch():
         f"location, the target's location.",
         made)
 
+    arrange(ed)
     # _apply_defaults compiles, saves and reads the default back.
     _apply_defaults(bp, {COMBAT_TRACE_VAR: COMBAT_TRACE_DEFAULT})
     _log(f"{GAME_MODE_BP_PATH}: {COMBAT_TRACE_ON_EVENT} / {COMBAT_TRACE_OFF_EVENT} "

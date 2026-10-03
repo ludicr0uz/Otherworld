@@ -1,7 +1,7 @@
 """Reloading and the dry-fire click.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_MIN_II,
     FN_NOT, FN_PLAY_SOUND, FN_SELECT_II, FN_SUB_II, FN_TIME_SECONDS,
@@ -11,7 +11,7 @@ from combat.tuning import RELOAD_KEY, SMG_FIRE_INTERVAL
 from combat.weapon_component.common import _prop
 
 
-def _author_reload(ed, held, exec_in, x0, y0):
+def _author_reload(ed, held, exec_in):
     """R: top the magazine up from the reserve, and stand still for a moment.
 
     How many rounds move is worked out ONCE and stored in ReloadTake before
@@ -37,44 +37,43 @@ def _author_reload(ed, held, exec_in, x0, y0):
         made.append(n)
         return n
 
-    mag, mag_n = _prop(ed, "MagazineSize", held, x0, y0 + 300)
-    have, have_n = _prop(ed, "Loaded", held, x0, y0 + 420)
+    mag, mag_n = _prop(ed, "MagazineSize", held)
+    have, have_n = _prop(ed, "Loaded", held)
     keep(mag_n), keep(have_n)
-    gap = keep(_at(_node(ed, FN_SUB_II), x0 + 260, y0 + 300))
+    gap = keep(_node(ed, FN_SUB_II))
     _connect(mag, _pin(gap, "A"))
     _connect(have, _pin(gap, "B"))
-    spare, spare_n = _prop(ed, "Reserve", held, x0, y0 + 560)
+    spare, spare_n = _prop(ed, "Reserve", held)
     keep(spare_n)
     # Min, so a reserve of one tops a magazine that is four short up by one and
     # not by four -- and so the reserve can never be driven negative.
-    endless, endless_n = _prop(ed, "InfiniteReserve", held, x0, y0 + 680)
+    endless, endless_n = _prop(ed, "InfiniteReserve", held)
     keep(endless_n)
-    source = keep(_at(_node(ed, FN_SELECT_II), x0 + 260, y0 + 560))
+    source = keep(_node(ed, FN_SELECT_II))
     _connect(_pin(gap, "ReturnValue", is_input=False), _pin(source, "A"))
     _connect(spare, _pin(source, "B"))
     _connect(endless, _pin(source, "bPickA"))
-    moving = keep(_at(_node(ed, FN_MIN_II), x0 + 520, y0 + 300))
+    moving = keep(_node(ed, FN_MIN_II))
     _connect(_pin(gap, "ReturnValue", is_input=False), _pin(moving, "A"))
     _connect(_pin(source, "ReturnValue", is_input=False), _pin(moving, "B"))
-    pin_take = keep(_at(ed.add_set_member_variable_node("ReloadTake"), x0 + 780, y0))
+    pin_take = keep(ed.add_set_member_variable_node("ReloadTake"))
     _connect(_pin(moving, "ReturnValue", is_input=False), _pin(pin_take, "ReloadTake"))
     _connect(exec_in, _pin(pin_take, "execute"))
 
-    uses, uses_n = _prop(ed, "UsesAmmo", held, x0 + 780, y0 + 420)
+    uses, uses_n = _prop(ed, "UsesAmmo", held)
     keep(uses_n)
-    take_get = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
-                        x0 + 780, y0 + 540))
-    any_left = keep(_at(_node(ed, FN_GREATER_II), x0 + 1020, y0 + 540))
+    take_get = keep(ed.add_get_member_variable_node("ReloadTake"))
+    any_left = keep(_node(ed, FN_GREATER_II))
     _connect(_pin(take_get, "ReloadTake", is_input=False), _pin(any_left, "A"))
     _set(any_left, "B", 0)
-    worth = keep(_at(_node(ed, FN_AND), x0 + 1260, y0 + 460))
+    worth = keep(_node(ed, FN_AND))
     _connect(uses, _pin(worth, "A"))
     _connect(_pin(any_left, "ReturnValue", is_input=False), _pin(worth, "B"))
 
     # A weapon without ammunition and a full magazine both take the False arm, and both
     # skip the pause -- a reload that cost 1.6 s and moved nothing would be a
     # way to punish the player for pressing a key that did not apply.
-    does = keep(_at(ed.add_branch_node(), x0 + 1520, y0))
+    does = keep(ed.add_branch_node())
     _connect(_pin(worth, "ReturnValue", is_input=False), _pin(does, "Condition"))
     _connect(BEL.find_then_pin(pin_take), _pin(does, "execute"))
 
@@ -86,57 +85,52 @@ def _author_reload(ed, held, exec_in, x0, y0):
     # Placed at the weapon rather than at the player: the gun is in the
     # player's hands, so the two are the same position to within a few
     # centimetres, and reading the weapon's transform needs no owner cast.
-    at = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 1520, y0 + 300))
+    at = keep(_node(ed, FN_ACTOR_LOC))
     _connect(held, _pin(at, "self"))
-    clack_pin, clack_n = _prop(ed, "ReloadSound", held, x0 + 1520, y0 + 180)
+    clack_pin, clack_n = _prop(ed, "ReloadSound", held)
     keep(clack_n)
-    clack = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 1780, y0))
+    clack = keep(_node(ed, FN_PLAY_SOUND))
     _connect(clack_pin, _pin(clack, "Sound"))
     _connect(_pin(at, "ReturnValue", is_input=False), _pin(clack, "Location"))
     _connect(BEL.find_then_pin(does), _pin(clack, "execute"))
 
-    take_a = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
-                      x0 + 1780, y0 + 420))
-    was, was_n = _prop(ed, "Loaded", held, x0 + 1780, y0 + 300)
+    take_a = keep(ed.add_get_member_variable_node("ReloadTake"))
+    was, was_n = _prop(ed, "Loaded", held)
     keep(was_n)
-    filled = keep(_at(_node(ed, FN_ADD_II), x0 + 2020, y0 + 300))
+    filled = keep(_node(ed, FN_ADD_II))
     _connect(was, _pin(filled, "A"))
     _connect(_pin(take_a, "ReloadTake", is_input=False), _pin(filled, "B"))
-    load = keep(_at(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH),
-                    x0 + 2280, y0))
+    load = keep(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH))
     _connect(held, _pin(load, "self"))
     _connect(_pin(filled, "ReturnValue", is_input=False), _pin(load, "Loaded"))
     _connect(BEL.find_then_pin(clack), _pin(load, "execute"))
 
-    take_b = keep(_at(ed.add_get_member_variable_node("ReloadTake"),
-                      x0 + 2280, y0 + 420))
-    kept, kept_n = _prop(ed, "Reserve", held, x0 + 2280, y0 + 300)
+    take_b = keep(ed.add_get_member_variable_node("ReloadTake"))
+    kept, kept_n = _prop(ed, "Reserve", held)
     keep(kept_n)
-    fewer = keep(_at(_node(ed, FN_SUB_II), x0 + 2540, y0 + 300))
+    fewer = keep(_node(ed, FN_SUB_II))
     _connect(kept, _pin(fewer, "A"))
     _connect(_pin(take_b, "ReloadTake", is_input=False), _pin(fewer, "B"))
     # An infinite reserve is written back as it was: one Set Reserve on both
     # kinds of weapon, rather than a branch around it.
-    free, free_n = _prop(ed, "InfiniteReserve", held, x0 + 2280, y0 + 540)
+    free, free_n = _prop(ed, "InfiniteReserve", held)
     keep(free_n)
-    after = keep(_at(_node(ed, FN_SELECT_II), x0 + 2540, y0 + 460))
+    after = keep(_node(ed, FN_SELECT_II))
     _connect(kept, _pin(after, "A"))
     _connect(_pin(fewer, "ReturnValue", is_input=False), _pin(after, "B"))
     _connect(free, _pin(after, "bPickA"))
-    charge = keep(_at(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH),
-                      x0 + 2800, y0))
+    charge = keep(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH))
     _connect(held, _pin(charge, "self"))
     _connect(_pin(after, "ReturnValue", is_input=False), _pin(charge, "Reserve"))
     _connect(BEL.find_then_pin(load), _pin(charge, "execute"))
 
-    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 2800, y0 + 300))
-    takes, takes_n = _prop(ed, "ReloadSeconds", held, x0 + 2800, y0 + 420)
+    now = keep(_node(ed, FN_TIME_SECONDS))
+    takes, takes_n = _prop(ed, "ReloadSeconds", held)
     keep(takes_n)
-    ready = keep(_at(_node(ed, FN_ADD_FF), x0 + 3060, y0 + 300))
+    ready = keep(_node(ed, FN_ADD_FF))
     _connect(_pin(now, "ReturnValue", is_input=False), _pin(ready, "A"))
     _connect(takes, _pin(ready, "B"))
-    pause = keep(_at(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH),
-                     x0 + 3320, y0))
+    pause = keep(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH))
     _connect(held, _pin(pause, "self"))
     _connect(_pin(ready, "ReturnValue", is_input=False), _pin(pause, "NextFireTime"))
     _connect(BEL.find_then_pin(charge), _pin(pause, "execute"))
@@ -155,7 +149,7 @@ def _author_reload(ed, held, exec_in, x0, y0):
     return (BEL.find_then_pin(pause), BEL.find_else_pin(does))
 
 
-def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, tapped, exec_in, x0, y0):
+def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, tapped, exec_in):
     """The trigger was pulled on an empty chamber: click, and nothing else.
 
     Hangs off the False arm of the ready gate, which is the one place in the
@@ -192,22 +186,22 @@ def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, tapped, exec_in, x0, y0
         made.append(n)
         return n
 
-    empty = keep(_at(_node(ed, FN_NOT), x0, y0 + 300))
+    empty = keep(_node(ed, FN_NOT))
     _connect(has_ammo, _pin(empty, "A"))
-    settled = keep(_at(_node(ed, FN_AND), x0 + 260, y0 + 300))
+    settled = keep(_node(ed, FN_AND))
     _connect(_pin(empty, "ReturnValue", is_input=False), _pin(settled, "A"))
     _connect(cooled, _pin(settled, "B"))
-    worth = keep(_at(_node(ed, FN_AND), x0 + 260, y0 + 460))
+    worth = keep(_node(ed, FN_AND))
     _connect(_pin(settled, "ReturnValue", is_input=False), _pin(worth, "A"))
     _connect(tapped, _pin(worth, "B"))
 
-    click = keep(_at(ed.add_branch_node(), x0 + 520, y0))
+    click = keep(ed.add_branch_node())
     _connect(_pin(worth, "ReturnValue", is_input=False), _pin(click, "Condition"))
     _connect(exec_in, _pin(click, "execute"))
 
-    dry_pin, dry_n = _prop(ed, "DryFireSound", held, x0 + 520, y0 + 180)
+    dry_pin, dry_n = _prop(ed, "DryFireSound", held)
     keep(dry_n)
-    play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 780, y0))
+    play = keep(_node(ed, FN_PLAY_SOUND))
     _connect(dry_pin, _pin(play, "Sound"))
     # At the muzzle, like the shot it is standing in for, so the click comes
     # from the same place in the mix as the bang the player expected.

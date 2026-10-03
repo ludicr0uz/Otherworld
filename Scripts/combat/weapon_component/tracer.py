@@ -18,13 +18,13 @@ from combat.game_state import (
     DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS, TRACER_HIT_COLOR, TRACER_MISS_COLOR,
     TRACER_POINT_SIZE, TRACER_THICKNESS,
 )
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
 from combat.nodes import (
     FN_DRAW_LINE, FN_DRAW_POINT, FN_SELECT_COLOR, FN_SELECT_VECTOR,
 )
 
 
-def _author_tracer(ed, trace, brk, x0, y0):
+def _author_tracer(ed, trace, brk):
     """Draw the pellet ``trace`` just made, if debug mode is on.
 
     ``brk`` is the Break of its hit result. Returns ``(nodes, exec tails)``;
@@ -36,22 +36,22 @@ def _author_tracer(ed, trace, brk, x0, y0):
         made.append(n)
         return n
 
-    seen = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR), x0, y0 + 300))
-    showing = keep(_at(ed.add_branch_node(), x0 + 240, y0))
+    seen = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR))
+    showing = keep(ed.add_branch_node())
     _connect(_pin(seen, DEBUG_MODE_VAR, is_input=False), _pin(showing, "Condition"))
     _connect(BEL.find_then_pin(trace), _pin(showing, "execute"))
     connected = _pin(trace, "ReturnValue", is_input=False)
 
-    stop = keep(_at(_node(ed, FN_SELECT_VECTOR), x0 + 340, y0 + 440))
+    stop = keep(_node(ed, FN_SELECT_VECTOR))
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(stop, "A"))
     _connect(_loose_pin(brk, "TraceEnd", is_input=False), _pin(stop, "B"))
     _connect(connected, _pin(stop, "bPickA"))
-    colour = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 340, y0 + 620))
+    colour = keep(_node(ed, FN_SELECT_COLOR))
     _set(colour, "A", TRACER_HIT_COLOR)
     _set(colour, "B", TRACER_MISS_COLOR)
     _connect(connected, _pin(colour, "bPickA"))
 
-    line = keep(_at(_node(ed, FN_DRAW_LINE), x0 + 520, y0 - 320))
+    line = keep(_node(ed, FN_DRAW_LINE))
     _connect(_loose_pin(brk, "TraceStart", is_input=False), _pin(line, "LineStart"))
     _connect(_pin(stop, "ReturnValue", is_input=False), _pin(line, "LineEnd"))
     _connect(_pin(colour, "ReturnValue", is_input=False), _pin(line, "LineColor"))
@@ -59,7 +59,7 @@ def _author_tracer(ed, trace, brk, x0, y0):
     _set(line, "Thickness", TRACER_THICKNESS)
     _connect(BEL.find_then_pin(showing), _pin(line, "execute"))
 
-    point = keep(_at(_node(ed, FN_DRAW_POINT), x0 + 800, y0 - 320))
+    point = keep(_node(ed, FN_DRAW_POINT))
     _connect(_pin(stop, "ReturnValue", is_input=False), _pin(point, "Position"))
     _connect(_pin(colour, "ReturnValue", is_input=False), _pin(point, "PointColor"))
     _set(point, "Size", TRACER_POINT_SIZE)

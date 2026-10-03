@@ -7,10 +7,9 @@ import unreal
 
 from combat.audio import CREATURE_AUDIO_DIR, FOOTSTEP_NAMES
 from combat.graph import (
-    BEL, BGE, _apply_defaults, _assets, _at, _connect, _create_blueprint,
-    _declare, _events, _float_type, _log, _loose_pin, _node, _palette, _pin,
-    _set,
-)
+    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _declare, _events,
+    _float_type, _log, _loose_pin, _node, _palette, _pin, _set)
+from uebp.layout import arrange
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_AND, FN_ARR_GET, FN_ARR_LEN, FN_GET_OWNER,
     FN_GET_VELOCITY, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_MUL_FF,
@@ -48,7 +47,7 @@ FOOTSTEP_MIN_SPEED_CMS = 40.0
 FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
 
 
-def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0, volume_pin=None):
+def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None):
     """Play a random element of the ``var_name`` sound array at ``at_pin``,
     at ``volume_pin`` if one is given (the stance's StepVolume).
 
@@ -67,36 +66,36 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, x0, y0, volume_pin=None)
         made.append(n)
         return n
 
-    table = keep(_at(ed.add_get_member_variable_node(var_name), x0, y0 + 240))
+    table = keep(ed.add_get_member_variable_node(var_name))
     table_out = _pin(table, var_name, is_input=False)
-    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 240, y0 + 240))
+    count = keep(_node(ed, FN_ARR_LEN))
     _connect(table_out, _pin(count, "TargetArray"))
-    stocked = keep(_at(_node(ed, FN_GREATER_II), x0 + 480, y0 + 240))
+    stocked = keep(_node(ed, FN_GREATER_II))
     _connect(_pin(count, "ReturnValue", is_input=False), _pin(stocked, "A"))
     _set(stocked, "B", 0)
 
-    have = keep(_at(ed.add_branch_node(), x0 + 720, y0))
+    have = keep(ed.add_branch_node())
     _connect(_pin(stocked, "ReturnValue", is_input=False), _pin(have, "Condition"))
     _connect(exec_in, _pin(have, "execute"))
 
-    top = keep(_at(_node(ed, FN_SUB_II), x0 + 720, y0 + 240))
+    top = keep(_node(ed, FN_SUB_II))
     _connect(_pin(count, "ReturnValue", is_input=False), _pin(top, "A"))
     _set(top, "B", 1)
-    which = keep(_at(_node(ed, FN_RAND_INT), x0 + 960, y0 + 240))
+    which = keep(_node(ed, FN_RAND_INT))
     _set(which, "Min", 0)
     _connect(_pin(top, "ReturnValue", is_input=False), _pin(which, "Max"))
-    pick = keep(_at(_node(ed, FN_ARR_GET), x0 + 1200, y0 + 240))
+    pick = keep(_node(ed, FN_ARR_GET))
     _connect(table_out, _pin(pick, "TargetArray"))
     _connect(_pin(which, "ReturnValue", is_input=False), _pin(pick, "Index"))
 
-    play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 1440, y0))
+    play = keep(_node(ed, FN_PLAY_SOUND))
     _connect(_pin(pick, "Item", is_input=False), _pin(play, "Sound"))
     _connect(at_pin, _pin(play, "Location"))
     if volume_pin is not None:
         _connect(volume_pin, _pin(play, "VolumeMultiplier"))
     _connect(BEL.find_then_pin(have), _pin(play, "execute"))
 
-    join = keep(_at(ed.add_branch_node(), x0 + 1700, y0))
+    join = keep(ed.add_branch_node())
     _set(join, "Condition", "true")
     _connect(BEL.find_then_pin(play), _pin(join, "execute"))
     _connect(BEL.find_else_pin(have), _pin(join, "execute"))
@@ -139,83 +138,82 @@ def build_footstep_component(rebuild=True):
     _declare(ed, "Sounds", BEL.get_array_type(
         BEL.get_object_reference_type(unreal.SoundBase.static_class())))
 
-    owner = _at(_node(ed, FN_GET_OWNER), 0, 300)
+    owner = _node(ed, FN_GET_OWNER)
     owner_out = _pin(owner, "ReturnValue", is_input=False)
-    as_char = _at(_palette(ed, NODE_CAST_CHARACTER), 260, 0)
+    as_char = _palette(ed, NODE_CAST_CHARACTER)
     _connect(owner_out, _pin(as_char, "Object"))
     _connect(BEL.find_then_pin(tick), _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    movement = _at(ed.add_get_member_variable_node(
-        "CharacterMovement", "/Script/Engine.Character"), 520, 300)
+    movement = ed.add_get_member_variable_node("CharacterMovement", "/Script/Engine.Character")
     _connect(char_out, _pin(movement, "self"))
-    grounded = _at(_node(ed, FN_ON_GROUND), 780, 300)
+    grounded = _node(ed, FN_ON_GROUND)
     _connect(_pin(movement, "CharacterMovement", is_input=False),
              _pin(grounded, "self"))
 
-    walking = _at(ed.add_branch_node(), 1040, 0)
+    walking = ed.add_branch_node()
     _connect(_pin(grounded, "ReturnValue", is_input=False), _pin(walking, "Condition"))
     _connect(BEL.find_then_pin(as_char), _pin(walking, "execute"))
 
     # Airborne: forget the part-stride, so landing does not immediately fire a
     # step that was 90% accumulated before the jump.
-    reset = _at(ed.add_set_member_variable_node("Travelled"), 1300, 400)
+    reset = ed.add_set_member_variable_node("Travelled")
     _set(reset, "Travelled", 0.0)
     _connect(BEL.find_else_pin(walking), _pin(reset, "execute"))
 
-    speed_v = _at(_node(ed, FN_GET_VELOCITY), 1040, 560)
+    speed_v = _node(ed, FN_GET_VELOCITY)
     _connect(owner_out, _pin(speed_v, "self"))
     # Horizontal speed only: falling at terminal velocity is not walking, and
     # VSize would count it.
-    speed = _at(_node(ed, FN_VSIZE_XY), 1300, 560)
+    speed = _node(ed, FN_VSIZE_XY)
     _connect(_pin(speed_v, "ReturnValue", is_input=False), _pin(speed, "A"))
     speed_out = _pin(speed, "ReturnValue", is_input=False)
 
-    step = _at(_node(ed, FN_MUL_FF), 1560, 560)
+    step = _node(ed, FN_MUL_FF)
     _connect(speed_out, _pin(step, "A"))
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "B"))
-    sofar = _at(ed.add_get_member_variable_node("Travelled"), 1560, 700)
-    total = _at(_node(ed, FN_ADD_FF), 1820, 560)
+    sofar = ed.add_get_member_variable_node("Travelled")
+    total = _node(ed, FN_ADD_FF)
     _connect(_pin(sofar, "Travelled", is_input=False), _pin(total, "A"))
     _connect(_pin(step, "ReturnValue", is_input=False), _pin(total, "B"))
-    advance = _at(ed.add_set_member_variable_node("Travelled"), 2080, 0)
+    advance = ed.add_set_member_variable_node("Travelled")
     _connect(_pin(total, "ReturnValue", is_input=False), _pin(advance, "Travelled"))
     _connect(BEL.find_then_pin(walking), _pin(advance, "execute"))
     # Read the STORED total from here on. The add is pure and would be
     # re-evaluated against the new Travelled on a second read -- the same trap
     # the NPC id and the reload arithmetic ran into.
-    have = _at(ed.add_get_member_variable_node("Travelled"), 2080, 300)
+    have = ed.add_get_member_variable_node("Travelled")
     have_out = _pin(have, "Travelled", is_input=False)
 
-    stride = _at(ed.add_get_member_variable_node("StrideCm"), 2080, 420)
+    stride = ed.add_get_member_variable_node("StrideCm")
     stride_out = _pin(stride, "StrideCm", is_input=False)
-    far_enough = _at(_node(ed, FN_GE_FF), 2340, 300)
+    far_enough = _node(ed, FN_GE_FF)
     _connect(have_out, _pin(far_enough, "A"))
     _connect(stride_out, _pin(far_enough, "B"))
-    quick_enough = _at(_node(ed, FN_GREATER_FF), 2340, 560)
+    quick_enough = _node(ed, FN_GREATER_FF)
     _connect(speed_out, _pin(quick_enough, "A"))
     _set(quick_enough, "B", FOOTSTEP_MIN_SPEED_CMS)
-    both = _at(_node(ed, FN_AND), 2600, 420)
+    both = _node(ed, FN_AND)
     _connect(_pin(far_enough, "ReturnValue", is_input=False), _pin(both, "A"))
     _connect(_pin(quick_enough, "ReturnValue", is_input=False), _pin(both, "B"))
 
-    lands = _at(ed.add_branch_node(), 2860, 0)
+    lands = ed.add_branch_node()
     _connect(_pin(both, "ReturnValue", is_input=False), _pin(lands, "Condition"))
     _connect(BEL.find_then_pin(advance), _pin(lands, "execute"))
 
-    left = _at(_node(ed, FN_SUB_FF), 3120, 300)
+    left = _node(ed, FN_SUB_FF)
     _connect(have_out, _pin(left, "A"))
     _connect(stride_out, _pin(left, "B"))
-    charge = _at(ed.add_set_member_variable_node("Travelled"), 3380, 0)
+    charge = ed.add_set_member_variable_node("Travelled")
     _connect(_pin(left, "ReturnValue", is_input=False), _pin(charge, "Travelled"))
     _connect(BEL.find_then_pin(lands), _pin(charge, "execute"))
 
-    at = _at(_node(ed, FN_ACTOR_LOC), 3380, 300)
+    at = _node(ed, FN_ACTOR_LOC)
     _connect(owner_out, _pin(at, "self"))
-    volume = _at(ed.add_get_member_variable_node("StepVolume"), 3380, 440)
+    volume = ed.add_get_member_variable_node("StepVolume")
     _sounded, stepped = _author_random_sound(
         ed, "Sounds", _pin(at, "ReturnValue", is_input=False),
-        BEL.find_then_pin(charge), 3640, 0,
+        BEL.find_then_pin(charge),
         volume_pin=_pin(volume, "StepVolume", is_input=False))
 
     # --- and the wanderers may hear it ---------------------------------------
@@ -226,22 +224,22 @@ def build_footstep_component(rebuild=True):
     # aiming's half-speed creep carries half as far, without this graph
     # knowing about either. StepNoise then scales it for the stance: a crouched
     # or prone step is slower AND quieter.
-    mine = _at(_node(ed, FN_IS_PLAYER_CONTROLLED), 5400, 300)
+    mine = _node(ed, FN_IS_PLAYER_CONTROLLED)
     _connect(char_out, _pin(mine, "self"))
-    players = _at(ed.add_branch_node(), 5400, 0)
+    players = ed.add_branch_node()
     _connect(_pin(mine, "ReturnValue", is_input=False), _pin(players, "Condition"))
     _connect(stepped, _pin(players, "execute"))
-    reach = _at(_node(ed, FN_MUL_FF), 5660, 300)
+    reach = _node(ed, FN_MUL_FF)
     _connect(speed_out, _pin(reach, "A"))
     _set(reach, "B", COMBAT.footstep_noise_range_cm
          / COMBAT.footstep_noise_reference_speed_cms)
-    hushed = _at(_node(ed, FN_MUL_FF), 5660, 440)
+    hushed = _node(ed, FN_MUL_FF)
     _connect(_pin(reach, "ReturnValue", is_input=False), _pin(hushed, "A"))
-    _connect(_pin(_at(ed.add_get_member_variable_node("StepNoise"), 5400, 560),
+    _connect(_pin(ed.add_get_member_variable_node("StepNoise"),
                   "StepNoise", is_input=False), _pin(hushed, "B"))
     _author_make_noise(ed, BEL.find_then_pin(players),
                        _pin(at, "ReturnValue", is_input=False),
-                       _pin(hushed, "ReturnValue", is_input=False), 5920, 0)
+                       _pin(hushed, "ReturnValue", is_input=False))
 
     ed.add_comment_to_nodes(
         f"A footfall every {FOOTSTEP_STRIDE_CM:.0f} cm of ground covered, "
@@ -253,6 +251,7 @@ def build_footstep_component(rebuild=True):
         f"rate does not depend on framerate.",
         ed.list_all_nodes())
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_FootstepComponent failed to compile")
 

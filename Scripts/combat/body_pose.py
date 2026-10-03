@@ -80,9 +80,9 @@ from combat.aim_pitch import (
     MODIFY_BONE_CLASS, NODE_MODIFY_BONE, _feeding_all, _nodes_of,
 )
 from combat.graph import (
-    BEL, BGE, PIN, _assets, _at, _connect, _declare, _float_type, _log, _node,
-    _palette, _pin, _set,
-)
+    BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _log, _node, _palette, _pin,
+    _set)
+from uebp.layout import arrange
 from combat.nodes import FN_CLAMP, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MUL_FF
 
 POSE_CROUCH = "PoseCrouch"
@@ -350,9 +350,9 @@ def _remove_previous(ed, start_out):
     _connect(start_out, nxt)
 
 
-def _modify_bone(ed, step, weight_pins, x, y):
+def _modify_bone(ed, step, weight_pins):
     weight, bone, mode, quat, move = step
-    mb = _at(_palette(ed, NODE_MODIFY_BONE), x, y)
+    mb = _palette(ed, NODE_MODIFY_BONE)
     inner = mb.get_editor_property("node")
     ref = unreal.BoneReference()
     ref.set_editor_property("bone_name", bone)
@@ -370,27 +370,27 @@ def _modify_bone(ed, step, weight_pins, x, y):
 
     _connect(weight_pins[weight], _pin(mb, "Alpha"))
     if quat is not None:
-        rot = _at(_node(ed, FN_MAKE_ROT), x, y + 300)
+        rot = _node(ed, FN_MAKE_ROT)
         pitch, yaw, roll = _rotator(quat)
         _set(rot, "Pitch", round(pitch, 4))
         _set(rot, "Yaw", round(yaw, 4))
         _set(rot, "Roll", round(roll, 4))
         _connect(_pin(rot, "ReturnValue", is_input=False), _pin(mb, "Rotation"))
     if move is not None:
-        vec = _at(_node(ed, FN_MAKE_VECTOR), x, y + 480)
+        vec = _node(ed, FN_MAKE_VECTOR)
         for axis, value in zip("XYZ", move):
             _set(vec, axis, round(value, 3))
         _connect(_pin(vec, "ReturnValue", is_input=False), _pin(mb, "Translation"))
     return mb
 
 
-def move_alpha(ed, x, y):
+def move_alpha(ed):
     """clamp(GroundSpeed / MOVE_FULL_CM_S, 0, 1), as a pin."""
-    speed = _at(ed.add_get_member_variable_node(GROUND_SPEED), x, y)
-    scaled = _at(_node(ed, FN_MUL_FF), x + 250, y)
+    speed = ed.add_get_member_variable_node(GROUND_SPEED)
+    scaled = _node(ed, FN_MUL_FF)
     _connect(_pin(speed, GROUND_SPEED, is_input=False), _pin(scaled, "A"))
     _set(scaled, "B", 1.0 / MOVE_FULL_CM_S)
-    clamp = _at(_node(ed, FN_CLAMP), x + 500, y)
+    clamp = _node(ed, FN_CLAMP)
     _connect(_pin(scaled, "ReturnValue", is_input=False), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", 1.0)
@@ -399,8 +399,8 @@ def move_alpha(ed, x, y):
 
 def _prone_moving(ed, prone_pin):
     """ProneMoving: PoseProne x Move."""
-    move = move_alpha(ed, -1900, 2450)
-    product = _at(_node(ed, FN_MUL_FF), -1100, 2450)
+    move = move_alpha(ed)
+    product = _node(ed, FN_MUL_FF)
     _connect(move, _pin(product, "A"))
     _connect(prone_pin, _pin(product, "B"))
     return _pin(product, "ReturnValue", is_input=False)
@@ -440,15 +440,15 @@ def patch_body_pose(skin):
     # every rerun (_remove_previous finds nodes by what they feed).
     used = {step[0] for step in plan} | ({POSE_PRONE} if skin.stance_clips else set())
     weight_pins, made = {}, []
-    for i, name in enumerate(w for w in POSE_WEIGHTS if w in used):
-        get = _at(ed.add_get_member_variable_node(name), -1100, 1900 + i * 120)
+    for name in (w for w in POSE_WEIGHTS if w in used):
+        get = ed.add_get_member_variable_node(name)
         weight_pins[name] = _pin(get, name, is_input=False)
         made.append(get)
     if skin.stance_clips:
         weight_pins[PRONE_MOVING] = _prone_moving(ed, weight_pins[POSE_PRONE])
     pose = start_out
-    for i, step in enumerate(plan):
-        mb = _modify_bone(ed, step, weight_pins, -800 + i * 300, 1900)
+    for step in plan:
+        mb = _modify_bone(ed, step, weight_pins)
         _connect(pose, _pin(mb, "ComponentPose"))
         pose = _pin(mb, "Pose", is_input=False)
         made.append(mb)
@@ -460,6 +460,7 @@ def patch_body_pose(skin):
         f"clips: the crawl's lift, more by {PRONE_MOVING} while crawling). "
         "See Scripts/combat/body_pose.py.", made)
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{skin.anim_bp} failed to compile after the body poses")
     _assets().save_loaded_asset(bp)

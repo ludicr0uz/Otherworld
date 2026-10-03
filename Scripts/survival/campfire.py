@@ -33,11 +33,11 @@ light at the flames' height lights the ground round it at night.
 import unreal
 
 from combat.graph import (
-    BEL, BGE, _add_component, _apply_defaults, _at, _component_object, _connect,
-    _create_blueprint, _declare, _drop_components, _events, _float_type, _log,
-    _loose_pin, _must_load, _node, _palette, _pin, _root_handle, _set,
-)
+    BEL, BGE, _add_component, _apply_defaults, _component_object, _connect,
+    _create_blueprint, _declare, _drop_components, _events, _float_type, _log, _loose_pin,
+    _must_load, _node, _palette, _pin, _root_handle, _set)
 from uebp.graph import out
+from uebp.layout import arrange
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_DISTANCE, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID,
@@ -90,58 +90,57 @@ def _build_model(bp):
 
 def _author_warmth(ed, tick):
     """Tick: warm the player's survival component while they are near."""
-    def get(name, x, y):
-        return out(_at(ed.add_get_member_variable_node(name), x, y), name)
+    def get(name):
+        return out(ed.add_get_member_variable_node(name), name)
 
-    pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), 300, 300)
+    pawn = _node(ed, FN_GET_PLAYER_PAWN)
     _set(pawn, "PlayerIndex", 0)
-    is_there = _at(_node(ed, FN_IS_VALID), 560, 300)
+    is_there = _node(ed, FN_IS_VALID)
     _connect(out(pawn), _pin(is_there, "Object"))
-    there = _at(ed.add_branch_node(), 820, 0)
+    there = ed.add_branch_node()
     _connect(out(is_there), _pin(there, "Condition"))
     _connect(BEL.find_then_pin(tick), _pin(there, "execute"))
 
-    theirs = _at(_node(ed, FN_ACTOR_LOC), 820, 300)
+    theirs = _node(ed, FN_ACTOR_LOC)
     _connect(out(pawn), _pin(theirs, "self"))
-    mine = _at(_node(ed, FN_ACTOR_LOC), 820, 440)
-    gap = _at(_node(ed, FN_DISTANCE), 1080, 300)
+    mine = _node(ed, FN_ACTOR_LOC)
+    gap = _node(ed, FN_DISTANCE)
     _connect(out(theirs), _pin(gap, "V1"))
     _connect(out(mine), _pin(gap, "V2"))
-    close = _at(_node(ed, FN_LE_FF), 1340, 300)
+    close = _node(ed, FN_LE_FF)
     _connect(out(gap), _pin(close, "A"))
-    _connect(get(WARM_RADIUS_VAR, 1080, 460), _pin(close, "B"))
-    near = _at(ed.add_branch_node(), 1600, 0)
+    _connect(get(WARM_RADIUS_VAR), _pin(close, "B"))
+    near = ed.add_branch_node()
     _connect(out(close), _pin(near, "Condition"))
     _connect(BEL.find_then_pin(there), _pin(near, "execute"))
 
-    comp = _at(_node(ed, FN_GET_COMP), 1600, 300)
+    comp = _node(ed, FN_GET_COMP)
     _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(SURVIVAL_CLASS_PATH)
     if not unreal.load_asset(SURVIVAL_BP_PATH):   # the cast exists only for a loaded class
         raise RuntimeError(f"{SURVIVAL_BP_PATH} is missing -- build it first")
-    cast = _at(_palette(ed, NODE_CAST_SURVIVAL), 1880, 0)
+    cast = _palette(ed, NODE_CAST_SURVIVAL)
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_SurvivalComponent")
     _connect(out(comp), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(near), _pin(cast, "execute"))
     survival = _loose_pin(cast, "AsBPSurvivalComponent", is_input=False)
 
-    def theirs_var(name, x, y):
-        n = _at(ed.add_get_member_variable_node(name, SURVIVAL_CLASS_PATH), x, y)
+    def theirs_var(name):
+        n = ed.add_get_member_variable_node(name, SURVIVAL_CLASS_PATH)
         _connect(survival, _pin(n, "self"))
         return out(n, name)
 
-    step = _at(_node(ed, FN_MUL_FF), 2160, 460)
+    step = _node(ed, FN_MUL_FF)
     _connect(out(tick, "DeltaSeconds"), _pin(step, "A"))
-    _connect(get(WARM_RATE_VAR, 1900, 560), _pin(step, "B"))
-    more = _at(_node(ed, FN_ADD_FF), 2420, 300)
-    _connect(theirs_var(TEMPERATURE_VAR, 2160, 300), _pin(more, "A"))
+    _connect(get(WARM_RATE_VAR), _pin(step, "B"))
+    more = _node(ed, FN_ADD_FF)
+    _connect(theirs_var(TEMPERATURE_VAR), _pin(more, "A"))
     _connect(out(step), _pin(more, "B"))
-    capped = _at(_node(ed, FN_MIN_FF), 2680, 300)
+    capped = _node(ed, FN_MIN_FF)
     _connect(out(more), _pin(capped, "A"))
-    _connect(theirs_var(MAX_TEMPERATURE_VAR, 2420, 460), _pin(capped, "B"))
-    write = _at(ed.add_set_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH),
-                2940, 0)
+    _connect(theirs_var(MAX_TEMPERATURE_VAR), _pin(capped, "B"))
+    write = ed.add_set_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH)
     _connect(survival, _pin(write, "self"))
     _connect(out(capped), _pin(write, TEMPERATURE_VAR))
     _connect(_loose_pin(cast, "then", is_input=False), _pin(write, "execute"))
@@ -160,11 +159,12 @@ def build_campfire(rebuild=True):
     for name in (WARM_RADIUS_VAR, WARM_RATE_VAR):
         _declare(ed, name, _float_type())
 
-    life = _at(_node(ed, FN_LIFESPAN), 320, -900)
+    life = _node(ed, FN_LIFESPAN)
     _set(life, "InLifespan", CAMPFIRE_BURN_S)
     _connect(BEL.find_then_pin(begin), _pin(life, "execute"))
     _author_warmth(ed, tick)
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{CAMPFIRE_BP_PATH} failed to compile")
     _apply_defaults(bp, {

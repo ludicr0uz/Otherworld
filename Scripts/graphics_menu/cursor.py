@@ -28,7 +28,7 @@ there: probes/probe_menu_cursor.py raises the flags a click would.
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _declare, _loose_pin, _palette, _pin, _set
+from combat.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, _set
 from uebp.graph import out
 from combat.nodes import FN_AND, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_WAS_PRESSED
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
@@ -75,45 +75,41 @@ def cursor_defaults():
     return {**{b: False for b in CURSOR_BOOLS}, **{i: NO_ROW for i in CURSOR_INTS}}
 
 
-def _pc(ed, x, y, made):
-    return out(_call(ed, FN_GET_OWNING_PC, x, y, made))
+def _pc(ed, made):
+    return out(_call(ed, FN_GET_OWNING_PC, made))
 
 
-def _clicked(ed, x, y, made):
-    return out(_call(ed, FN_WAS_PRESSED, x, y, made, self=_pc(ed, x - 240, y, made),
-                      Key=CLICK_KEY))
+def _clicked(ed, made):
+    return out(_call(ed, FN_WAS_PRESSED, made, self=_pc(ed, made), Key=CLICK_KEY))
 
 
-def _under(ed, widget, x, y, made):
+def _under(ed, widget, made):
     """``widget``'s painted rectangle holds the cursor."""
-    geo = _call(ed, FN_GEOMETRY, x, y, made, self=widget)
-    return out(_call(ed, FN_UNDER, x + 260, y, made, Geometry=out(geo),
-                      AbsoluteCoordinate=_get(ed, CURSOR_POS_VAR, x, y + 140, made)))
+    geo = _call(ed, FN_GEOMETRY, made, self=widget)
+    return out(_call(ed, FN_UNDER, made, Geometry=out(geo),
+                      AbsoluteCoordinate=_get(ed, CURSOR_POS_VAR, made)))
 
 
-def _write(ed, click, in_execs, x, y, made):
+def _write(ed, click, in_execs, made):
     var, value = click
     if value is ROW:
-        return put(ed, var, _get(ed, CURSOR_ROW_VAR, x - 240, y + 200, made), in_execs,
-                   x, y, made)
-    return _setter(ed, var, value, in_execs, x, y, made)
+        return put(ed, var, _get(ed, CURSOR_ROW_VAR, made), in_execs, made)
+    return _setter(ed, var, value, in_execs, made)
 
 
-def author_cursor_read(ed, in_execs, x0, y0):
+def author_cursor_read(ed, in_execs):
     """Top of DrawHUD (see the module docstring). Returns the exec tail.
 
     CursorMoved is set before CursorPos: a Set pulls its inputs when it runs,
     so the comparison still sees last frame's position."""
     made = []
-    pos = _call(ed, FN_MOUSE_POS, x0, y0, made)
+    pos = _call(ed, FN_MOUSE_POS, made)
     for e in in_execs:
         _connect(e, _pin(pos, "execute"))
-    moved = _call(ed, FN_VEC2_NE, x0 + 300, y0 + 300, made, A=out(pos),
-                  B=_get(ed, CURSOR_POS_VAR, x0 + 60, y0 + 440, made))
-    flow = put(ed, CURSOR_MOVED_VAR, out(moved), [BEL.find_then_pin(pos)], x0 + 560, y0,
-               made)
-    flow = put(ed, CURSOR_POS_VAR, out(pos), [flow], x0 + 820, y0, made)
-    flow = _setter(ed, PAUSE_CLICK_VAR, NO_ROW, [flow], x0 + 1080, y0, made)
+    moved = _call(ed, FN_VEC2_NE, made, A=out(pos), B=_get(ed, CURSOR_POS_VAR, made))
+    flow = put(ed, CURSOR_MOVED_VAR, out(moved), [BEL.find_then_pin(pos)], made)
+    flow = put(ed, CURSOR_POS_VAR, out(pos), [flow], made)
+    flow = _setter(ed, PAUSE_CLICK_VAR, NO_ROW, [flow], made)
     ed.add_comment_to_nodes(
         "The mouse cursor: where it is (desktop space, as cached geometry is) "
         "and whether it moved since last frame. Last frame's M-panel click is "
@@ -121,7 +117,7 @@ def author_cursor_read(ed, in_execs, x0, y0):
     return flow
 
 
-def author_cursor_mode(ed, want, in_execs, x0, y0):
+def author_cursor_mode(ed, want, in_execs):
     """The cursor shown (``want`` True, or a bool pin) or hidden, applied only
     when it differs from what the controller has. Returns the exec tails.
 
@@ -130,29 +126,24 @@ def author_cursor_mode(ed, want, in_execs, x0, y0):
     for the camera -- without it the view stays dead until the next click."""
     made = []
     if want is True:
-        flow = _setter(ed, CURSOR_WANTED_VAR, "true", in_execs, x0, y0, made)
+        flow = _setter(ed, CURSOR_WANTED_VAR, "true", in_execs, made)
     else:
-        flow = put(ed, CURSOR_WANTED_VAR, want, in_execs, x0, y0, made)
-    changed = _call(ed, FN_XOR, x0 + 260, y0 + 300, made,
-                    A=_get(ed, CURSOR_WANTED_VAR, x0, y0 + 300, made),
-                    B=_get(ed, CURSOR_SHOWN_VAR, x0, y0 + 440, made))
-    switch, same = _branch(ed, out(changed), [flow], x0 + 520, y0, made)
-    flow = put(ed, CURSOR_SHOWN_VAR, _get(ed, CURSOR_WANTED_VAR, x0 + 520, y0 + 300, made),
-               [switch], x0 + 780, y0, made)
-    pc = _pc(ed, x0 + 780, y0 + 500, made)
-    show = _at(ed.add_set_member_variable_node(SHOW_CURSOR_PROP, PC_CLASS_PATH),
-               x0 + 1040, y0)
+        flow = put(ed, CURSOR_WANTED_VAR, want, in_execs, made)
+    changed = _call(ed, FN_XOR, made,
+                    A=_get(ed, CURSOR_WANTED_VAR, made),
+                    B=_get(ed, CURSOR_SHOWN_VAR, made))
+    switch, same = _branch(ed, out(changed), [flow], made)
+    flow = put(ed, CURSOR_SHOWN_VAR, _get(ed, CURSOR_WANTED_VAR, made), [switch], made)
+    pc = _pc(ed, made)
+    show = ed.add_set_member_variable_node(SHOW_CURSOR_PROP, PC_CLASS_PATH)
     made.append(show)
     _connect(pc, _pin(show, "self"))
-    _connect(_get(ed, CURSOR_WANTED_VAR, x0 + 780, y0 + 300, made),
-             _pin(show, SHOW_CURSOR_PROP))
+    _connect(_get(ed, CURSOR_WANTED_VAR, made), _pin(show, SHOW_CURSOR_PROP))
     _connect(flow, _pin(show, "execute"))
-    on, off = _branch(ed, _get(ed, CURSOR_WANTED_VAR, x0 + 1040, y0 + 300, made),
-                      [BEL.find_then_pin(show)], x0 + 1300, y0, made)
-    free = _call(ed, FN_MODE_GAME_UI, x0 + 1560, y0, made, PlayerController=pc,
-                 bHideCursorDuringCapture="false")
+    on, off = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), [BEL.find_then_pin(show)], made)
+    free = _call(ed, FN_MODE_GAME_UI, made, PlayerController=pc, bHideCursorDuringCapture="false")
     _connect(on, _pin(free, "execute"))
-    taken = _call(ed, FN_MODE_GAME, x0 + 1560, y0 + 400, made, PlayerController=pc)
+    taken = _call(ed, FN_MODE_GAME, made, PlayerController=pc)
     _connect(off, _pin(taken, "execute"))
     ed.add_comment_to_nodes(
         "The mouse cursor, shown while a menu is up. Only on a change: "
@@ -161,24 +152,22 @@ def author_cursor_mode(ed, want, in_execs, x0, y0):
     return [BEL.find_then_pin(free), BEL.find_then_pin(taken), same]
 
 
-def author_hold_fire(ed, in_execs, x0, y0):
+def author_hold_fire(ed, in_execs):
     """While the cursor shows over a running game (the M panel, the loot
     window): the weapon component's TriggerSpent, every frame. Its Tick keeps
     a spent press spent while the fire key is down, so a click on a row
     neither fires, slashes nor punches. Returns the exec tails."""
     made = []
-    held, free = _branch(ed, _get(ed, CURSOR_WANTED_VAR, x0, y0 + 300, made), in_execs,
-                         x0 + 240, y0, made)
-    pawn = _call(ed, FN_GET_PLAYER_PAWN, x0 + 240, y0 + 440, made, PlayerIndex=0)
-    comp = _call(ed, FN_GET_COMP, x0 + 500, y0 + 440, made, self=out(pawn))
+    held, free = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), in_execs, made)
+    pawn = _call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0)
+    comp = _call(ed, FN_GET_COMP, made, self=out(pawn))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node
-    cast = _at(_palette(ed, NODE_CAST_WEAPON), x0 + 760, y0)
+    cast = _palette(ed, NODE_CAST_WEAPON)
     made.append(cast)
     _connect(out(comp), _pin(cast, "Object"))
     _connect(held, _pin(cast, "execute"))
-    spent = _setter(ed, TRIGGER_SPENT_VAR, "true", [BEL.find_then_pin(cast)], x0 + 1040,
-                    y0, made, WEAPON_COMP_CLASS_PATH,
+    spent = _setter(ed, TRIGGER_SPENT_VAR, "true", [BEL.find_then_pin(cast)], made, WEAPON_COMP_CLASS_PATH,
                     _loose_pin(cast, "AsBPWeaponComponent", is_input=False))
     ed.add_comment_to_nodes(
         "A click on a menu row is not a shot: the cursor showing keeps the "
@@ -186,7 +175,7 @@ def author_hold_fire(ed, in_execs, x0, y0):
     return [spent, free, _pin(cast, "CastFailed", is_input=False)]
 
 
-def author_row_cursor(ed, box, count, in_execs, x0, y0, row_var=None, click=None,
+def author_row_cursor(ed, box, count, in_execs, row_var=None, click=None,
                       limit=None, within=None):
     """Which of ``box``'s first ``count`` rows the cursor is over -> CursorRow.
 
@@ -198,50 +187,41 @@ def author_row_cursor(ed, box, count, in_execs, x0, y0, row_var=None, click=None
     list's window, whose rows keep their geometry when scrolled out of it.
     Returns the exec tails."""
     made = []
-    flow = _setter(ed, CURSOR_ROW_VAR, NO_ROW, in_execs, x0, y0, made)
+    flow = _setter(ed, CURSOR_ROW_VAR, NO_ROW, in_execs, made)
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
     if not loop:
         raise RuntimeError("could not create the ForLoop macro node")
-    made.append(_at(loop, x0 + 260, y0))
+    made.append(loop)
     _set(loop, "FirstIndex", 0)
     _set(loop, "LastIndex", count - 1)
     _connect(flow, _pin(loop, "execute"))
     index = _loose_pin(loop, "Index", is_input=False)
-    child = _call(ed, FN_CHILD_AT, x0 + 560, y0 + 300, made, self=box)
+    child = _call(ed, FN_CHILD_AT, made, self=box)
     _connect(index, _pin(child, "Index"))
-    over = _under(ed, out(child), x0 + 820, y0 + 300, made)
+    over = _under(ed, out(child), made)
     if limit is not None:
-        shown = _call(ed, FN_LESS_II, x0 + 1080, y0 + 500, made, A=index, B=limit)
-        over = out(_call(ed, FN_AND, x0 + 1340, y0 + 300, made, A=over, B=out(shown)))
+        shown = _call(ed, FN_LESS_II, made, A=index, B=limit)
+        over = out(_call(ed, FN_AND, made, A=over, B=out(shown)))
     if within is not None:
-        over = out(_call(ed, FN_AND, x0 + 1340, y0 + 700, made, A=over,
-                          B=_under(ed, within, x0 + 820, y0 + 700, made)))
-    hit, _miss = _branch(ed, over, [_loose_pin(loop, "LoopBody", is_input=False)],
-                         x0 + 1600, y0, made)
-    put(ed, CURSOR_ROW_VAR, index, [hit], x0 + 1860, y0, made)
+        over = out(_call(ed, FN_AND, made, A=over, B=_under(ed, within, made)))
+    hit, _miss = _branch(ed, over, [_loose_pin(loop, "LoopBody", is_input=False)], made)
+    put(ed, CURSOR_ROW_VAR, index, [hit], made)
 
-    x = x0 + 2200
-    on_row = _call(ed, FN_GE_II, x, y0 + 300, made,
-                   A=_get(ed, CURSOR_ROW_VAR, x - 240, y0 + 300, made), B=0)
-    flow, off = _branch(ed, out(on_row), [_loose_pin(loop, "Completed", is_input=False)],
-                        x + 260, y0, made)
+    on_row = _call(ed, FN_GE_II, made, A=_get(ed, CURSOR_ROW_VAR, made), B=0)
+    flow, off = _branch(ed, out(on_row), [_loose_pin(loop, "Completed", is_input=False)], made)
     tails = [off]
     flow = [flow]
     if row_var is not None:
-        stirred = _call(ed, FN_OR, x + 520, y0 + 300, made,
-                        A=_get(ed, CURSOR_MOVED_VAR, x + 280, y0 + 300, made),
-                        B=_clicked(ed, x + 280, y0 + 440, made))
-        move, rest = _branch(ed, out(stirred), flow, x + 780, y0, made)
-        flow = [put(ed, row_var, _get(ed, CURSOR_ROW_VAR, x + 800, y0 + 300, made),
-                    [move], x + 1040, y0, made), rest]
+        stirred = _call(ed, FN_OR, made, A=_get(ed, CURSOR_MOVED_VAR, made), B=_clicked(ed, made))
+        move, rest = _branch(ed, out(stirred), flow, made)
+        flow = [put(ed, row_var, _get(ed, CURSOR_ROW_VAR, made), [move], made), rest]
     if click is not None:
-        took, idle = _branch(ed, _clicked(ed, x + 1300, y0 + 440, made), flow, x + 1560,
-                             y0, made)
-        flow = [_write(ed, click, [took], x + 1820, y0, made), idle]
+        took, idle = _branch(ed, _clicked(ed, made), flow, made)
+        flow = [_write(ed, click, [took], made), idle]
     return flow + tails
 
 
-def author_back_row(ed, back, row_var, back_row, open_var, in_execs, x0, y0):
+def author_back_row(ed, back, row_var, back_row, open_var, in_execs):
     """A menu's BACK row, a WBP_MenuRow outside its list. The cursor over it
     (moved or clicked) puts the caret there: ``row_var`` := ``back_row``. A
     click on it, or Enter with the caret on it, lowers ``open_var``.
@@ -252,53 +232,43 @@ def author_back_row(ed, back, row_var, back_row, open_var, in_execs, x0, y0):
     no tab is open, so the Enter that shuts a tab cannot also take the row
     the panel's caret was left on."""
     made = []
-    over = _under(ed, back, x0, y0 + 500, made)
-    stirred = _call(ed, FN_OR, x0 + 560, y0 + 760, made,
-                    A=_get(ed, CURSOR_MOVED_VAR, x0 + 300, y0 + 760, made),
-                    B=_clicked(ed, x0 + 300, y0 + 900, made))
-    aimed = _call(ed, FN_AND, x0 + 820, y0 + 500, made, A=over, B=out(stirred))
-    move, rest = _branch(ed, out(aimed), in_execs, x0 + 1080, y0, made)
-    flow = [_setter(ed, row_var, back_row, [move], x0 + 1340, y0, made), rest]
+    over = _under(ed, back, made)
+    stirred = _call(ed, FN_OR, made, A=_get(ed, CURSOR_MOVED_VAR, made), B=_clicked(ed, made))
+    aimed = _call(ed, FN_AND, made, A=over, B=out(stirred))
+    move, rest = _branch(ed, out(aimed), in_execs, made)
+    flow = [_setter(ed, row_var, back_row, [move], made), rest]
 
-    x = x0 + 1700
-    on_it = _call(ed, FN_AND, x, y0 + 300, made, A=_clicked(ed, x - 260, y0 + 300, made),
-                  B=over)
-    caret = _call(ed, FN_GE_II, x, y0 + 500, made,
-                  A=_get(ed, row_var, x - 240, y0 + 500, made), B=back_row)
-    entered = _call(ed, FN_AND, x + 260, y0 + 500, made, A=out(caret),
-                    B=out(_call(ed, FN_WAS_PRESSED, x, y0 + 700, made,
-                                 self=_pc(ed, x - 240, y0 + 700, made), Key=BACK_KEY)))
-    leave = _call(ed, FN_OR, x + 520, y0 + 300, made, A=out(on_it), B=out(entered))
-    took, idle = _branch(ed, out(leave), flow, x + 780, y0, made)
-    return [_setter(ed, open_var, "false", [took], x + 1040, y0, made), idle]
+    on_it = _call(ed, FN_AND, made, A=_clicked(ed, made), B=over)
+    caret = _call(ed, FN_GE_II, made, A=_get(ed, row_var, made), B=back_row)
+    entered = _call(ed, FN_AND, made, A=out(caret),
+                    B=out(_call(ed, FN_WAS_PRESSED, made,
+                                 self=_pc(ed, made), Key=BACK_KEY)))
+    leave = _call(ed, FN_OR, made, A=out(on_it), B=out(entered))
+    took, idle = _branch(ed, out(leave), flow, made)
+    return [_setter(ed, open_var, "false", [took], made), idle]
 
 
-def author_button_row(ed, button, row_var, row, click, in_execs, x0, y0):
+def author_button_row(ed, button, row_var, row, click, in_execs):
     """A button that is a WBP_MenuRow outside its menu's list (a tab's SAVE
     DEFAULT). The cursor over it (moved or clicked) puts the caret there:
     ``row_var`` := ``row``. A click on it writes ``click`` (a variable and a
     literal); Enter with the caret on it is the menu's own keys'.
     Returns the exec tails."""
     made = []
-    over = _under(ed, button, x0, y0 + 500, made)
-    stirred = _call(ed, FN_OR, x0 + 560, y0 + 760, made,
-                    A=_get(ed, CURSOR_MOVED_VAR, x0 + 300, y0 + 760, made),
-                    B=_clicked(ed, x0 + 300, y0 + 900, made))
-    aimed = _call(ed, FN_AND, x0 + 820, y0 + 500, made, A=over, B=out(stirred))
-    move, rest = _branch(ed, out(aimed), in_execs, x0 + 1080, y0, made)
-    flow = [_setter(ed, row_var, row, [move], x0 + 1340, y0, made), rest]
-    on_it = _call(ed, FN_AND, x0 + 1700, y0 + 300, made,
-                  A=_clicked(ed, x0 + 1440, y0 + 300, made), B=over)
-    took, idle = _branch(ed, out(on_it), flow, x0 + 1960, y0, made)
-    return [_write(ed, click, [took], x0 + 2220, y0, made), idle]
+    over = _under(ed, button, made)
+    stirred = _call(ed, FN_OR, made, A=_get(ed, CURSOR_MOVED_VAR, made), B=_clicked(ed, made))
+    aimed = _call(ed, FN_AND, made, A=over, B=out(stirred))
+    move, rest = _branch(ed, out(aimed), in_execs, made)
+    flow = [_setter(ed, row_var, row, [move], made), rest]
+    on_it = _call(ed, FN_AND, made, A=_clicked(ed, made), B=over)
+    took, idle = _branch(ed, out(on_it), flow, made)
+    return [_write(ed, click, [took], made), idle]
 
 
-def author_widget_click(ed, widget, click, in_execs, x0, y0):
+def author_widget_click(ed, widget, click, in_execs):
     """A left click with the cursor over ``widget`` writes ``click`` (a
     variable and a literal). Returns the exec tails."""
     made = []
-    on_it = _call(ed, FN_AND, x0 + 560, y0 + 300, made,
-                  A=_clicked(ed, x0 + 300, y0 + 300, made),
-                  B=_under(ed, widget, x0, y0 + 500, made))
-    took, idle = _branch(ed, out(on_it), in_execs, x0 + 820, y0, made)
-    return [_write(ed, click, [took], x0 + 1080, y0, made), idle]
+    on_it = _call(ed, FN_AND, made, A=_clicked(ed, made), B=_under(ed, widget, made))
+    took, idle = _branch(ed, out(on_it), in_execs, made)
+    return [_write(ed, click, [took], made), idle]

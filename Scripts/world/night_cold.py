@@ -23,7 +23,7 @@ pure Get with a null self is an Accessed None on every frame.
 
 import unreal
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
+from combat.graph import BEL, _connect, _loose_pin, _palette, _pin
 from uebp.graph import out
 from combat.nodes import (
     FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_MAX_FF, FN_MUL_FF, FN_SUB_FF,
@@ -35,37 +35,30 @@ from world.day_night_graph import _call, _get, _map
 TEMPERATURE_VAR = "Temperature"
 
 
-def author_night_cold(ed, tick, chain, x0):
+def author_night_cold(ed, tick, chain):
     """Extend the Tick chain with the cold (see the module docstring)."""
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, x0, 400, PlayerIndex=0))
-    there = chain.step(_at(ed.add_branch_node(), x0 + 300, 0))
-    _connect(out(_call(ed, FN_IS_VALID, x0 + 300, 400, Object=pawn)),
-             _pin(there, "Condition"))
+    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, PlayerIndex=0))
+    there = chain.step(ed.add_branch_node())
+    _connect(out(_call(ed, FN_IS_VALID, Object=pawn)), _pin(there, "Condition"))
 
-    comp = _call(ed, FN_GET_COMP, x0 + 600, 400, self=pawn)
+    comp = _call(ed, FN_GET_COMP, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(SURVIVAL_CLASS_PATH)
     if not unreal.load_asset(SURVIVAL_BP_PATH):   # the cast exists only for a loaded class
         raise RuntimeError(f"{SURVIVAL_BP_PATH} is missing -- run build_survival.py first")
-    cast = chain.step(_at(_palette(ed, NODE_CAST_SURVIVAL), x0 + 900, 0))
+    cast = chain.step(_palette(ed, NODE_CAST_SURVIVAL))
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_SurvivalComponent")
     _connect(out(comp), _pin(cast, "Object"))
     survival = _loose_pin(cast, "AsBPSurvivalComponent", is_input=False)
 
-    night = _map(ed, _get(ed, "DayAmount", x0 + 900, 500), 0.0, 1.0, 1.0, 0.0,
-                 x0 + 1100, 500)
-    rate = out(_call(ed, FN_MUL_FF, x0 + 1400, 500,
-                      A=_get(ed, NIGHT_COLD_VAR, x0 + 1100, 750), B=night))
-    step = out(_call(ed, FN_MUL_FF, x0 + 1650, 500, A=rate,
-                      B=out(tick, "DeltaSeconds")))
-    now = _at(ed.add_get_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH),
-              x0 + 1400, 300)
+    night = _map(ed, _get(ed, "DayAmount"), 0.0, 1.0, 1.0, 0.0)
+    rate = out(_call(ed, FN_MUL_FF, A=_get(ed, NIGHT_COLD_VAR), B=night))
+    step = out(_call(ed, FN_MUL_FF, A=rate, B=out(tick, "DeltaSeconds")))
+    now = ed.add_get_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH)
     _connect(survival, _pin(now, "self"))
-    less = out(_call(ed, FN_SUB_FF, x0 + 1900, 400,
-                      A=out(now, TEMPERATURE_VAR), B=step))
-    floor = out(_call(ed, FN_MAX_FF, x0 + 2150, 400, A=less, B=0.0))
-    write = chain.step(_at(ed.add_set_member_variable_node(
-        TEMPERATURE_VAR, SURVIVAL_CLASS_PATH), x0 + 2400, 0))
+    less = out(_call(ed, FN_SUB_FF, A=out(now, TEMPERATURE_VAR), B=step))
+    floor = out(_call(ed, FN_MAX_FF, A=less, B=0.0))
+    write = chain.step(ed.add_set_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH))
     _connect(survival, _pin(write, "self"))
     _connect(floor, _pin(write, TEMPERATURE_VAR))
     ed.add_comment_to_nodes(

@@ -70,60 +70,56 @@ def declare_drawn_vars(ed):
             raise RuntimeError(f"could not declare {name}")
 
 
-def _author_drawn(ed, exec_in, result, stock, x0, y0):
+def _author_drawn(ed, exec_in, result, stock):
     """The Drawn step, off ``exec_in`` (the event, behind its alive gate).
-    ``result(value, x, y)`` makes a StepResult write and returns its exec
+    ``result(value)`` makes a StepResult write and returns its exec
     input; ``stock`` is the creature's built run speed. Returns the nodes
     made, for the comment box."""
     g = _Graph(ed)
-    pawn = out(g.call(FN_GET_PAWN, x0, y0 + 300))
-    here = g.call(FN_ACTOR_LOC, x0 + 240, y0 + 300)
+    pawn = out(g.call(FN_GET_PAWN))
+    here = g.call(FN_ACTOR_LOC)
     _connect(pawn, _pin(here, "self"))
 
-    fires = g.call(FN_ALL_ACTORS, x0 + 480, y0, ActorClass=CAMPFIRE_CLASS_PATH)
+    fires = g.call(FN_ALL_ACTORS, ActorClass=CAMPFIRE_CLASS_PATH)
     _connect(exec_in, _pin(fires, "execute"))
-    nearest = g.call(FN_NEAREST_ACTOR, x0 + 760, y0 + 300)
+    nearest = g.call(FN_NEAREST_ACTOR)
     _connect(out(here), _pin(nearest, "Origin"))
     _connect(out(fires, "OutActors"), _pin(nearest, "ActorsToCheck"))
-    kept = g.put(DRAWN_TO_VAR, BEL.find_then_pin(fires), x0 + 1040, y0,
-                 pin=out(nearest))
+    kept = g.put(DRAWN_TO_VAR, BEL.find_then_pin(fires), pin=out(nearest))
 
-    fire = g.get(DRAWN_TO_VAR, x0 + 1040, y0 + 300)
-    lit = g.call(FN_IS_VALID, x0 + 1280, y0 + 300)
+    fire = g.get(DRAWN_TO_VAR)
+    lit = g.call(FN_IS_VALID)
     _connect(fire, _pin(lit, "Object"))
-    burning = g.branch(out(lit), kept, x0 + 1520, y0)
+    burning = g.branch(out(lit), kept)
 
-    there = g.call(FN_ACTOR_LOC, x0 + 1520, y0 + 440)
+    there = g.call(FN_ACTOR_LOC)
     _connect(fire, _pin(there, "self"))
-    gap = g.call(FN_DISTANCE_2D, x0 + 1760, y0 + 300)
+    gap = g.call(FN_DISTANCE_2D)
     _connect(out(here), _pin(gap, "V1"))
     _connect(out(there), _pin(gap, "V2"))
-    near = g.op(FN_LE_FF, out(gap), NPC_DRAWN_RANGE_CM, x0 + 2000, y0 + 300)
-    reached = g.branch(near, BEL.find_then_pin(burning), x0 + 2240, y0)
+    near = g.op(FN_LE_FF, out(gap), NPC_DRAWN_RANGE_CM)
+    reached = g.branch(near, BEL.find_then_pin(burning))
 
     let_go = g.put(DRAWN_VAR,
-                   [BEL.find_else_pin(burning), BEL.find_else_pin(reached)],
-                   x0 + 2480, y0 + 700, literal="false")
-    _connect(let_go, result(False, x0 + 2760, y0 + 700))
+                   [BEL.find_else_pin(burning), BEL.find_else_pin(reached)], literal="false")
+    _connect(let_go, result(False))
 
-    drawn = g.put(DRAWN_VAR, BEL.find_then_pin(reached), x0 + 2480, y0,
-                  literal="true")
-    far = g.op(FN_GT_FF, out(gap), NPC_DRAWN_ARRIVE_CM, x0 + 2480, y0 + 300)
-    walking = g.branch(far, drawn, x0 + 2760, y0)
+    drawn = g.put(DRAWN_VAR, BEL.find_then_pin(reached), literal="true")
+    far = g.op(FN_GT_FF, out(gap), NPC_DRAWN_ARRIVE_CM)
+    walking = g.branch(far, drawn)
 
-    me = g.call(FN_GET_CONTROLLER, x0 + 2760, y0 + 440)
+    me = g.call(FN_GET_CONTROLLER)
     _connect(pawn, _pin(me, "self"))
-    go = g.call(FN_SIMPLE_MOVE, x0 + 3040, y0)
+    go = g.call(FN_SIMPLE_MOVE)
     _connect(out(me), _pin(go, "Controller"))
     _connect(out(there), _pin(go, "Goal"))
     _connect(BEL.find_then_pin(walking), _pin(go, "execute"))
-    walked, tails, _entry = _author_walk_speed(
-        ed, [BEL.find_then_pin(go)], True, stock, x0 + 3320, y0)
+    walked, tails, _entry = _author_walk_speed(ed, [BEL.find_then_pin(go)], True, stock)
 
-    stand = g.call(FN_STOP_MOVEMENT, x0 + 3040, y0 + 700)
+    stand = g.call(FN_STOP_MOVEMENT)
     _connect(BEL.find_else_pin(walking), _pin(stand, "execute"))
 
-    done = result(True, x0 + 4900, y0)
+    done = result(True)
     for tail in tails + [BEL.find_then_pin(stand)]:
         _connect(tail, done)
     return g.made + walked

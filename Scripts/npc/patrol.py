@@ -3,7 +3,7 @@ the step that sends a wanderer to a new point inside its circle now and then.
 """
 
 from forest_generator.npc_agro import PATROL_ACCEPT_FRACTION, PATROL_ACCEPT_SLACK_CM
-from npc.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from npc.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from npc.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_DISTANCE, FN_DIV_FF, FN_GET_CONTROLLER, FN_GET_PAWN,
     FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_RANDOM_FLOAT, FN_RANDOM_REACHABLE,
@@ -16,7 +16,7 @@ from npc.paths import (
 from npc.tuned import tuned
 
 
-def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0, scale=None):
+def _author_walk_speed(ed, exec_in, stroll, stock, scale=None):
     """MaxWalkSpeed = RunSpeed * TuneRunSpeed / ``stock`` [* TunePatrolSpeed]
     on the possessed Character: the run, or with ``stroll`` the patrol walk,
     or with ``scale`` that fraction of the run (the step between two swings,
@@ -41,44 +41,41 @@ def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0, scale=None):
         made.append(n)
         return n
 
-    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 300))
-    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0 + 240, y0))
+    pawn = keep(_node(ed, FN_GET_PAWN))
+    as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(as_char, "Object"))
     for pin in exec_in:
         _connect(pin, _pin(as_char, "execute"))
-    move = keep(_at(ed.add_get_member_variable_node("CharacterMovement",
-                                                    CHARACTER_CLASS_PATH),
-                    x0 + 480, y0 + 300))
+    move = keep(ed.add_get_member_variable_node("CharacterMovement", CHARACTER_CLASS_PATH))
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(move, "self"))
-    run = keep(_at(ed.add_get_member_variable_node(RUN_SPEED_VAR), x0 + 480, y0 + 440))
-    want, want_out = tuned(ed, "run_speed_cms", x0 + 240, y0 + 580)
+    run = keep(ed.add_get_member_variable_node(RUN_SPEED_VAR))
+    want, want_out = tuned(ed, "run_speed_cms")
     keep(want)
-    ratio = keep(_at(_node(ed, FN_DIV_FF), x0 + 480, y0 + 580))
+    ratio = keep(_node(ed, FN_DIV_FF))
     _connect(want_out, _pin(ratio, "A"))
     _set(ratio, "B", stock)
-    scaled = keep(_at(_node(ed, FN_MUL_FF), x0 + 720, y0 + 440))
+    scaled = keep(_node(ed, FN_MUL_FF))
     _connect(_pin(run, RUN_SPEED_VAR, is_input=False), _pin(scaled, "A"))
     _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(scaled, "B"))
     speed = _pin(scaled, "ReturnValue", is_input=False)
     if stroll:
-        walk, walk_out = tuned(ed, "patrol_speed_scale", x0 + 720, y0 + 580)
+        walk, walk_out = tuned(ed, "patrol_speed_scale")
         keep(walk)
-        slowed = keep(_at(_node(ed, FN_MUL_FF), x0 + 960, y0 + 440))
+        slowed = keep(_node(ed, FN_MUL_FF))
         _connect(speed, _pin(slowed, "A"))
         _connect(walk_out, _pin(slowed, "B"))
         speed = _pin(slowed, "ReturnValue", is_input=False)
     if scale is not None:
-        eased = keep(_at(_node(ed, FN_MUL_FF), x0 + 960, y0 + 440))
+        eased = keep(_node(ed, FN_MUL_FF))
         _connect(speed, _pin(eased, "A"))
         if isinstance(scale, str):
-            share, share_out = tuned(ed, scale, x0 + 720, y0 + 720)
+            share, share_out = tuned(ed, scale)
             keep(share)
             _connect(share_out, _pin(eased, "B"))
         else:
             _set(eased, "B", scale)
         speed = _pin(eased, "ReturnValue", is_input=False)
-    write = keep(_at(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH),
-                     x0 + 1200, y0))
+    write = keep(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
     _connect(_pin(move, "CharacterMovement", is_input=False), _pin(write, "self"))
     _connect(speed, _pin(write, "MaxWalkSpeed"))
     _connect(BEL.find_then_pin(as_char), _pin(write, "execute"))
@@ -86,7 +83,7 @@ def _author_walk_speed(ed, exec_in, stroll, stock, x0, y0, scale=None):
             _pin(as_char, "execute"))
 
 
-def _author_patrol_setup(ed, exec_in, x0, y0):
+def _author_patrol_setup(ed, exec_in):
     """Once per life, on the first heartbeat with a pawn:
 
         PatrolHome = where the pawn is      (the centre of its circle)
@@ -108,47 +105,44 @@ def _author_patrol_setup(ed, exec_in, x0, y0):
         made.append(n)
         return n
 
-    ready = keep(_at(ed.add_get_member_variable_node(PATROL_READY_VAR), x0, y0 + 300))
-    first = keep(_at(ed.add_branch_node(), x0 + 240, y0))
+    ready = keep(ed.add_get_member_variable_node(PATROL_READY_VAR))
+    first = keep(ed.add_branch_node())
     _connect(_pin(ready, PATROL_READY_VAR, is_input=False), _pin(first, "Condition"))
     _connect(exec_in, _pin(first, "execute"))
 
-    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0 + 240, y0 + 440))
-    where = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 480, y0 + 440))
+    pawn = keep(_node(ed, FN_GET_PAWN))
+    where = keep(_node(ed, FN_ACTOR_LOC))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(where, "self"))
-    home = keep(_at(ed.add_set_member_variable_node(PATROL_HOME_VAR), x0 + 480, y0))
+    home = keep(ed.add_set_member_variable_node(PATROL_HOME_VAR))
     _connect(_pin(where, "ReturnValue", is_input=False), _pin(home, PATROL_HOME_VAR))
     _connect(BEL.find_else_pin(first), _pin(home, "execute"))
 
-    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0 + 740, y0))
+    as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(as_char, "Object"))
     _connect(BEL.find_then_pin(home), _pin(as_char, "execute"))
-    move = keep(_at(ed.add_get_member_variable_node("CharacterMovement",
-                                                    CHARACTER_CLASS_PATH),
-                    x0 + 980, y0 + 300))
+    move = keep(ed.add_get_member_variable_node("CharacterMovement", CHARACTER_CLASS_PATH))
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(move, "self"))
-    speed = keep(_at(ed.add_get_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH),
-                     x0 + 1220, y0 + 300))
+    speed = keep(ed.add_get_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
     _connect(_pin(move, "CharacterMovement", is_input=False), _pin(speed, "self"))
-    cache = keep(_at(ed.add_set_member_variable_node(RUN_SPEED_VAR), x0 + 1220, y0))
+    cache = keep(ed.add_set_member_variable_node(RUN_SPEED_VAR))
     _connect(_pin(speed, "MaxWalkSpeed", is_input=False), _pin(cache, RUN_SPEED_VAR))
     _connect(BEL.find_then_pin(as_char), _pin(cache, "execute"))
 
-    mark = keep(_at(ed.add_set_member_variable_node(PATROL_READY_VAR), x0 + 2700, y0))
+    mark = keep(ed.add_set_member_variable_node(PATROL_READY_VAR))
     _set(mark, PATROL_READY_VAR, "true")
     # A pawn that is not a Character still gets a centre and is marked ready,
     # or it would retry the setup on every heartbeat forever.
     for pin in (BEL.find_then_pin(cache), _pin(as_char, "CastFailed", is_input=False)):
         _connect(pin, _pin(mark, "execute"))
 
-    out = keep(_at(ed.add_branch_node(), x0 + 2960, y0))
+    out = keep(ed.add_branch_node())
     _set(out, "Condition", "true")
     _connect(BEL.find_then_pin(mark), _pin(out, "execute"))
     _connect(BEL.find_then_pin(first), _pin(out, "execute"))
     return made, BEL.find_then_pin(out)
 
 
-def _author_patrol_step(ed, exec_in, rest_in, x0, y0):
+def _author_patrol_step(ed, exec_in, rest_in):
     """Every so often, stroll to a random reachable point inside the circle.
 
         [now >= NextPatrolTime?]
@@ -175,64 +169,62 @@ def _author_patrol_step(ed, exec_in, rest_in, x0, y0):
         made.append(n)
         return n
 
-    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0, y0 + 300))
+    now = keep(_node(ed, FN_TIME_SECONDS))
     now_out = _pin(now, "ReturnValue", is_input=False)
-    due_at = keep(_at(ed.add_get_member_variable_node(NEXT_PATROL_VAR), x0, y0 + 440))
-    due = keep(_at(_node(ed, FN_GE_FF), x0 + 240, y0 + 300))
+    due_at = keep(ed.add_get_member_variable_node(NEXT_PATROL_VAR))
+    due = keep(_node(ed, FN_GE_FF))
     _connect(now_out, _pin(due, "A"))
     _connect(_pin(due_at, NEXT_PATROL_VAR, is_input=False), _pin(due, "B"))
-    time_to = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+    time_to = keep(ed.add_branch_node())
     _connect(_pin(due, "ReturnValue", is_input=False), _pin(time_to, "Condition"))
     for pin in exec_in:
         _connect(pin, _pin(time_to, "execute"))
 
-    home = keep(_at(ed.add_get_member_variable_node(PATROL_HOME_VAR), x0 + 480, y0 + 300))
+    home = keep(ed.add_get_member_variable_node(PATROL_HOME_VAR))
     home_out = _pin(home, PATROL_HOME_VAR, is_input=False)
-    pick = keep(_at(_node(ed, FN_RANDOM_REACHABLE), x0 + 720, y0 + 300))
+    pick = keep(_node(ed, FN_RANDOM_REACHABLE))
     _connect(home_out, _pin(pick, "Origin"))
-    radius, radius_out = tuned(ed, "patrol_radius_cm", x0 + 480, y0 + 580)
+    radius, radius_out = tuned(ed, "patrol_radius_cm")
     keep(radius)
     _connect(radius_out, _pin(pick, "Radius"))
-    aim = keep(_at(ed.add_set_member_variable_node(PATROL_TARGET_VAR), x0 + 960, y0))
+    aim = keep(ed.add_set_member_variable_node(PATROL_TARGET_VAR))
     _connect(_pin(pick, "RandomLocation", is_input=False), _pin(aim, PATROL_TARGET_VAR))
     _connect(BEL.find_then_pin(time_to), _pin(aim, "execute"))
 
-    wait = keep(_at(_node(ed, FN_RANDOM_FLOAT), x0 + 960, y0 + 300))
-    for pin, column, dy in (("Min", "patrol_repick_min_s", 440),
-                            ("Max", "patrol_repick_max_s", 580)):
-        bound, bound_out = tuned(ed, column, x0 + 720, y0 + dy)
+    wait = keep(_node(ed, FN_RANDOM_FLOAT))
+    for pin, column in (("Min", "patrol_repick_min_s"), ("Max", "patrol_repick_max_s")):
+        bound, bound_out = tuned(ed, column)
         keep(bound)
         _connect(bound_out, _pin(wait, pin))
-    later = keep(_at(_node(ed, FN_ADD_FF), x0 + 1200, y0 + 300))
+    later = keep(_node(ed, FN_ADD_FF))
     _connect(now_out, _pin(later, "A"))
     _connect(_pin(wait, "ReturnValue", is_input=False), _pin(later, "B"))
-    rearm = keep(_at(ed.add_set_member_variable_node(NEXT_PATROL_VAR), x0 + 1200, y0))
+    rearm = keep(ed.add_set_member_variable_node(NEXT_PATROL_VAR))
     _connect(_pin(later, "ReturnValue", is_input=False), _pin(rearm, NEXT_PATROL_VAR))
     _connect(BEL.find_then_pin(aim), _pin(rearm, "execute"))
 
-    target = keep(_at(ed.add_get_member_variable_node(PATROL_TARGET_VAR),
-                      x0 + 1440, y0 + 300))
+    target = keep(ed.add_get_member_variable_node(PATROL_TARGET_VAR))
     target_out = _pin(target, PATROL_TARGET_VAR, is_input=False)
-    off = keep(_at(_node(ed, FN_DISTANCE), x0 + 1680, y0 + 300))
+    off = keep(_node(ed, FN_DISTANCE))
     _connect(target_out, _pin(off, "V1"))
     _connect(home_out, _pin(off, "V2"))
-    inside = keep(_at(_node(ed, FN_LE_FF), x0 + 1920, y0 + 300))
+    inside = keep(_node(ed, FN_LE_FF))
     _connect(_pin(off, "ReturnValue", is_input=False), _pin(inside, "A"))
-    loose = keep(_at(_node(ed, FN_MUL_FF), x0 + 1440, y0 + 580))
+    loose = keep(_node(ed, FN_MUL_FF))
     _connect(radius_out, _pin(loose, "A"))
     _set(loose, "B", PATROL_ACCEPT_FRACTION)
-    fence = keep(_at(_node(ed, FN_ADD_FF), x0 + 1680, y0 + 580))
+    fence = keep(_node(ed, FN_ADD_FF))
     _connect(_pin(loose, "ReturnValue", is_input=False), _pin(fence, "A"))
     _set(fence, "B", PATROL_ACCEPT_SLACK_CM)
     _connect(_pin(fence, "ReturnValue", is_input=False), _pin(inside, "B"))
-    sane = keep(_at(ed.add_branch_node(), x0 + 1920, y0))
+    sane = keep(ed.add_branch_node())
     _connect(_pin(inside, "ReturnValue", is_input=False), _pin(sane, "Condition"))
     _connect(BEL.find_then_pin(rearm), _pin(sane, "execute"))
 
-    pawn = keep(_at(_node(ed, FN_GET_PAWN), x0 + 1920, y0 + 440))
-    me = keep(_at(_node(ed, FN_GET_CONTROLLER), x0 + 2160, y0 + 440))
+    pawn = keep(_node(ed, FN_GET_PAWN))
+    me = keep(_node(ed, FN_GET_CONTROLLER))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(me, "self"))
-    stroll = keep(_at(_node(ed, FN_SIMPLE_MOVE), x0 + 2400, y0))
+    stroll = keep(_node(ed, FN_SIMPLE_MOVE))
     _connect(_pin(me, "ReturnValue", is_input=False), _pin(stroll, "Controller"))
     _connect(target_out, _pin(stroll, "Goal"))
     _connect(BEL.find_then_pin(sane), _pin(stroll, "execute"))

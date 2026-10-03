@@ -36,10 +36,10 @@ import unreal
 
 from combat.chop_tuning import CHOPS_VAR
 from combat.graph import (
-    BEL, BGE, _add_component, _apply_defaults, _at, _component_object, _connect,
-    _create_blueprint, _drop_components, _events, _find_handle, _log, _must_load,
-    _node, _pin, _rot, _set,
-)
+    BEL, BGE, _add_component, _apply_defaults, _component_object, _connect,
+    _create_blueprint, _drop_components, _events, _find_handle, _log, _must_load, _node,
+    _pin, _rot, _set)
+from uebp.layout import arrange
 from combat.grip import _grip_location, _grip_rotation
 from combat.light_tuning import LIGHTS_VAR
 from combat.nodes import FN_AND, FN_GE_FF, FN_NOT, FN_TIME_SECONDS
@@ -113,35 +113,35 @@ def _build_model(bp):
 
 def _author_burn(ed, tick):
     """Tick: put a spent fire out, then show the stick as Lit says."""
-    def get(name, x, y):
-        return _pin(_at(ed.add_get_member_variable_node(name), x, y), name, is_input=False)
+    def get(name):
+        return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
 
     def out(n):
         return _pin(n, "ReturnValue", is_input=False)
 
-    now = _at(_node(ed, FN_TIME_SECONDS), 300, 320)
-    spent = _at(_node(ed, FN_GE_FF), 560, 320)
+    now = _node(ed, FN_TIME_SECONDS)
+    spent = _node(ed, FN_GE_FF)
     _connect(out(now), _pin(spent, "A"))
-    _connect(get(BURN_OUT_VAR, 300, 460), _pin(spent, "B"))
-    over = _at(_node(ed, FN_AND), 820, 240)
-    _connect(get(LIT_VAR, 560, 200), _pin(over, "A"))
+    _connect(get(BURN_OUT_VAR), _pin(spent, "B"))
+    over = _node(ed, FN_AND)
+    _connect(get(LIT_VAR), _pin(over, "A"))
     _connect(out(spent), _pin(over, "B"))
-    burnt = _at(ed.add_branch_node(), 1080, 0)
+    burnt = ed.add_branch_node()
     _connect(out(over), _pin(burnt, "Condition"))
     _connect(BEL.find_then_pin(tick), _pin(burnt, "execute"))
-    dark = _at(ed.add_set_member_variable_node(LIT_VAR), 1340, -120)
+    dark = ed.add_set_member_variable_node(LIT_VAR)
     _set(dark, LIT_VAR, "false")
     _connect(BEL.find_then_pin(burnt), _pin(dark, "execute"))
 
     # Read after the write above: a pure Get is pulled when its reader runs.
-    lit = get(LIT_VAR, 1340, 320)
-    unlit = _at(_node(ed, FN_NOT), 1600, 440)
+    lit = get(LIT_VAR)
+    unlit = _node(ed, FN_NOT)
     _connect(lit, _pin(unlit, "A"))
     made = [burnt, dark]
     prev = (BEL.find_then_pin(dark), BEL.find_else_pin(burnt))
-    for i, (name, shown) in enumerate(((MODEL, out(unlit)), (FLAME, lit), (GLOW, lit))):
-        show = _at(_node(ed, FN_SET_VISIBILITY), 1860 + i * 300, 0)
-        _connect(get(name, 1600, 160 + i * 100), _pin(show, "self"))
+    for name, shown in ((MODEL, out(unlit)), (FLAME, lit), (GLOW, lit)):
+        show = _node(ed, FN_SET_VISIBILITY)
+        _connect(get(name), _pin(show, "self"))
         _connect(shown, _pin(show, "bNewVisibility"))
         for e in prev:
             _connect(e, _pin(show, "execute"))
@@ -165,9 +165,11 @@ def build_stick(item_bp, rebuild=True):
     tick, _begin = _events(ed, rebuild)
     _build_model(bp)
     # The components are variables of the class only once it has compiled.
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{STICK_BP_PATH} failed to compile")
     _author_burn(ed, tick)
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{STICK_BP_PATH} failed to compile")
     aim = HOLD_TORCH_ANIM_PATH

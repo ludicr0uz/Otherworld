@@ -32,7 +32,7 @@ After sights.py, which writes SightBlend, and before the equip.
 """
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.hit_reaction import STEADY_VAR
 from combat.nodes import (
     FN_AND, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GREATER_FF, FN_IS_SLOT_ACTIVE,
@@ -45,7 +45,7 @@ from combat.paths import HEALTH_CLASS_PATH
 STEADY_BLEND = 0.01
 
 
-def _author_steady(ed, owner_out, exec_ins, x0, y0):
+def _author_steady(ed, owner_out, exec_ins):
     """See the module docstring. Returns the exec pins to carry on from."""
     made = []
 
@@ -56,50 +56,47 @@ def _author_steady(ed, owner_out, exec_ins, x0, y0):
     def out(n, name="ReturnValue"):
         return _pin(n, name, is_input=False)
 
-    blend = keep(_at(ed.add_get_member_variable_node("SightBlend"), x0, y0 + 300))
-    steady = keep(_at(_node(ed, FN_GREATER_FF), x0 + 240, y0 + 300))
+    blend = keep(ed.add_get_member_variable_node("SightBlend"))
+    steady = keep(_node(ed, FN_GREATER_FF))
     _connect(out(blend, "SightBlend"), _pin(steady, "A"))
     _set(steady, "B", STEADY_BLEND)
 
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0, y0 + 160))
+    comp = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
-    cast = keep(_at(_palette(ed, NODE_CAST_HEALTH), x0 + 260, y0))
+    cast = keep(_palette(ed, NODE_CAST_HEALTH))
     _connect(out(comp), _pin(cast, "Object"))
     for e in exec_ins:
         _connect(e, _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
     # Behind the cast, and before the write below: last frame's answer.
-    was = keep(_at(ed.add_get_member_variable_node(STEADY_VAR, HEALTH_CLASS_PATH),
-                   x0 + 520, y0 + 440))
+    was = keep(ed.add_get_member_variable_node(STEADY_VAR, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(was, "self"))
-    fresh = keep(_at(_node(ed, FN_NOT), x0 + 760, y0 + 440))
+    fresh = keep(_node(ed, FN_NOT))
     _connect(out(was, STEADY_VAR), _pin(fresh, "A"))
-    raised = keep(_at(_node(ed, FN_AND), x0 + 1000, y0 + 340))
+    raised = keep(_node(ed, FN_AND))
     _connect(out(steady), _pin(raised, "A"))
     _connect(out(fresh), _pin(raised, "B"))
 
-    mesh = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0 + 520, y0 + 580))
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 760, y0 + 580))
+    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
-    flinching = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 1000, y0 + 580))
+    flinching = keep(_node(ed, FN_IS_SLOT_ACTIVE))
     _connect(out(anim), _pin(flinching, "self"))
     _set(flinching, "SlotNodeName", HIT_SLOT)
-    caught = keep(_at(_node(ed, FN_AND), x0 + 1240, y0 + 400))
+    caught = keep(_node(ed, FN_AND))
     _connect(out(raised), _pin(caught, "A"))
     _connect(out(flinching), _pin(caught, "B"))
 
-    mid = keep(_at(ed.add_branch_node(), x0 + 1480, y0))
+    mid = keep(ed.add_branch_node())
     _connect(out(caught), _pin(mid, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(mid, "execute"))
-    dirty = keep(_at(ed.add_set_member_variable_node("NeedsRefresh"),
-                     x0 + 1740, y0 - 200))
+    dirty = keep(ed.add_set_member_variable_node("NeedsRefresh"))
     _set(dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(mid), _pin(dirty, "execute"))
 
-    mark = keep(_at(ed.add_set_member_variable_node(STEADY_VAR, HEALTH_CLASS_PATH),
-                    x0 + 2040, y0))
+    mark = keep(ed.add_set_member_variable_node(STEADY_VAR, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(mark, "self"))
     _connect(out(steady), _pin(mark, STEADY_VAR))
     for tail in (BEL.find_then_pin(dirty), BEL.find_else_pin(mid)):

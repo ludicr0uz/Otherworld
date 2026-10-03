@@ -4,14 +4,14 @@ cone down the aim line, written into the GameMode's noise record.
 
 import math
 
-from combat.graph import _at, _connect, _node, _pin, _set
+from combat.graph import _connect, _node, _pin, _set
 from combat.noise import _author_make_noise
 from combat.nodes import FN_MUL_FF
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
 
 
-def _author_shot_noise(ed, held, muzzle, direction, exec_in, x0, y0):
+def _author_shot_noise(ed, held, muzzle, direction, exec_in):
     """After the pellets: make this weapon's noise. Returns the exec to carry on.
 
     The reach is read off Held, like every other per-weapon number, so the
@@ -22,14 +22,14 @@ def _author_shot_noise(ed, held, muzzle, direction, exec_in, x0, y0):
     shot fired at a pack reaches it from further away than one fired away
     from it.
     """
-    volume, volume_n = _prop(ed, "ShotVolume", held, x0, y0 + 300)
+    volume, volume_n = _prop(ed, "ShotVolume", held)
 
-    ahead = _at(_node(ed, FN_MUL_FF), x0 + 240, y0 + 300)
+    ahead = _node(ed, FN_MUL_FF)
     _connect(volume, _pin(ahead, "A"))
     _set(ahead, "B", COMBAT.shot_noise_cone_range_scale)
 
     made, then = _author_make_noise(
-        ed, exec_in, muzzle, volume, x0 + 720, y0,
+        ed, exec_in, muzzle, volume,
         direction=direction,
         cone_reach=_pin(ahead, "ReturnValue", is_input=False),
         cone_cos=math.cos(math.radians(COMBAT.shot_noise_cone_half_angle_deg)))

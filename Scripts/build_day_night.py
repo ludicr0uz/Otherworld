@@ -20,6 +20,7 @@ for _name in [m for m in sys.modules
 import unreal                                                     # noqa: E402
 
 from combat.graph import BGE, _create_blueprint                   # noqa: E402
+from uebp.layout import arrange                                   # noqa: E402
 from world.day_night_blueprint import (                           # noqa: E402
     apply_config, build_components, declare_variables,
 )
@@ -42,6 +43,7 @@ def build_blueprint():
     build_components(bp)
     declare_variables(ed)
     author_night_cold(ed, *build_graph(bp, ed))
+    arrange(ed)
     apply_config(bp)          # compiles, saves, reads the defaults back
     return bp
 

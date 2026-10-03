@@ -48,7 +48,7 @@ from npc.agro import _author_agro_steps, _declare_agro_vars
 from npc.chase import _author_chase
 from npc.corpse import _author_alive_gate, _author_corpse_gate
 from npc.drawn import _author_drawn, declare_drawn_vars, draws
-from npc.graph import BEL, _at, _connect, _log, _node, _pin, _set
+from npc.graph import BEL, _connect, _log, _node, _pin, _set
 from npc.melee import _author_melee
 from npc.nodes import FN_GET_PAWN, FN_IS_VALID
 from npc.monster_tuning import monster_specs, stock_run_speed
@@ -73,13 +73,13 @@ class _Steps:
     def __init__(self, ed):
         self.ed = ed
 
-    def event(self, name, x, y, gated=True):
+    def event(self, name, gated=True):
         """A new BT_<name> custom event; returns the exec output its work
         hangs off. That is behind the alive gate (corpse.py), drawn to the
         event's left, unless ``gated`` is False: Pulse, whose own corpse gate
         is what a dead pawn has to reach."""
         full = f"{STEP_EVENT_PREFIX}{name}"
-        node = _at(self.ed.add_custom_event_node(full), x - (2300 if gated else 0), y)
+        node = self.ed.add_custom_event_node(full)
         title = str(BEL.get_node_title(node)).replace(" ", "")
         # A name still held by the skeleton class comes back suffixed, and the
         # task's call by name would then miss it.
@@ -87,56 +87,53 @@ class _Steps:
             raise RuntimeError(f"custom event {full!r} came back as {title!r}")
         if not gated:
             return BEL.find_then_pin(node)
-        return _author_alive_gate(self.ed, BEL.find_then_pin(node), x - 2000, y)
+        return _author_alive_gate(self.ed, BEL.find_then_pin(node))
 
-    def result_node(self, value, x, y):
-        node = _at(self.ed.add_set_member_variable_node(STEP_RESULT_VAR), x, y)
+    def result_node(self, value):
+        node = self.ed.add_set_member_variable_node(STEP_RESULT_VAR)
         _set(node, STEP_RESULT_VAR, "true" if value else "false")
         return node
 
-    def result(self, value, x, y):
+    def result(self, value):
         """A StepResult write; returns its exec input."""
-        return _pin(self.result_node(value, x, y), "execute")
+        return _pin(self.result_node(value), "execute")
 
 
-def _author_pulse(ed, steps, x0, y0):
+def _author_pulse(ed, steps):
     """BT_Pulse: the part of every pass that runs before the tree chooses
     between hunting, noticing and patrolling. Returns the nodes by concern,
     for the comment boxes."""
     # The gate is not defensive padding: the tree starts at possession, but a
     # pawn can be gone (destroyed, unpossessed) while the controller lives.
-    own_pawn = _at(_node(ed, FN_GET_PAWN), x0 - 220, y0 - 320)
-    possessed = _at(_node(ed, FN_IS_VALID), x0 + 40, y0 - 320)
+    own_pawn = _node(ed, FN_GET_PAWN)
+    possessed = _node(ed, FN_IS_VALID)
     _connect(_pin(own_pawn, "ReturnValue", is_input=False),
              _pin(possessed, "Object"))
-    gate = _at(ed.add_branch_node(), x0 + 300, y0 - 200)
+    gate = ed.add_branch_node()
     _connect(_pin(possessed, "ReturnValue", is_input=False),
              _pin(gate, "Condition"))
-    _connect(steps.event(STEP_PULSE, x0, y0 - 200, gated=False),
-             _pin(gate, "execute"))
-    _connect(BEL.find_else_pin(gate), steps.result(False, x0 + 600, y0 - 60))
+    _connect(steps.event(STEP_PULSE, gated=False), _pin(gate, "execute"))
+    _connect(BEL.find_else_pin(gate), steps.result(False))
 
     # First thing with a pawn: is it a corpse? A dead wanderer's tree stops
     # there, so nothing below -- stats, voice, patrol, chase, melee -- can run
     # for it. See npc/corpse.py.
-    _, alive, ended = _author_corpse_gate(ed, BEL.find_then_pin(gate),
-                                          x0 - 200, y0 - 1400)
-    _connect(ended, steps.result(False, x0 + 2200, y0 - 1400))
+    _, alive, ended = _author_corpse_gate(ed, BEL.find_then_pin(gate))
+    _connect(ended, steps.result(False))
     # This creature's health, applied when it changes, and its voice on a timer. Both
     # need the pawn, which is why they sit after the gate.
-    extras, after_extras = _author_stats_and_voice(
-        ed, alive, x0 - 200, y0 + 1400, NPC_VOICE_MIN_S, NPC_VOICE_MAX_S)
-    setup, ready = _author_patrol_setup(ed, after_extras, x0 - 200, y0 + 3000)
-    _connect(ready, steps.result(True, x0 + 2000, y0 + 3000))
+    extras, after_extras = _author_stats_and_voice(ed, alive, NPC_VOICE_MIN_S, NPC_VOICE_MAX_S)
+    setup, ready = _author_patrol_setup(ed, after_extras)
+    _connect(ready, steps.result(True))
     return [own_pawn, possessed, gate], extras, setup
 
 
-def _author_stalk_step(ed, steps, key, x0, y0):
+def _author_stalk_step(ed, steps, key):
     """BT_Stalk, for a creature of NPC_STALK_ROAR: the hunt before the chase."""
     declare_stalk_vars(ed)
     hunt, cover = _author_stalk(
-        ed, steps.event(STEP_STALK, x0 - 300, y0), steps.result,
-        roar_object(NPC_STALK_ROAR[key]), stock_run_speed(key), x0, y0)
+        ed, steps.event(STEP_STALK), steps.result,
+        roar_object(NPC_STALK_ROAR[key]), stock_run_speed(key))
     ed.add_comment_to_nodes(
         f"BT_Stalk, tried before BT_Chase. Hurt by the player it is Enraged, "
         f"for good: the step fails at once and BT_Chase charges. Otherwise: "
@@ -158,13 +155,13 @@ def _author_stalk_step(ed, steps, key, x0, y0):
         f"open.", cover)
 
 
-def _author_ward_step(ed, steps, key, x0, y0):
+def _author_ward_step(ed, steps, key):
     """BT_Ward, for a creature of NPC_WARD_FEARS: held off by the player's
     fire. After the Stalk step's variables are declared: a flight resets them."""
     declare_ward_vars(ed)
-    made = _author_ward(ed, steps.event(STEP_WARD, x0 - 300, y0), steps.result,
+    made = _author_ward(ed, steps.event(STEP_WARD), steps.result,
                         roar_object(NPC_STALK_ROAR.get(key)),
-                        stock_run_speed(key), key in NPC_STALK_ROAR, x0, y0)
+                        stock_run_speed(key), key in NPC_STALK_ROAR)
     ed.add_comment_to_nodes(
         f"BT_Ward, tried before the attack: while the player holds fire out "
         f"(FireWard), within {NPC_WARD_RANGE_CM:.0f} cm and "
@@ -180,11 +177,10 @@ def _author_ward_step(ed, steps, key, x0, y0):
         made)
 
 
-def _author_drawn_step(ed, steps, key, x0, y0):
+def _author_drawn_step(ed, steps, key):
     """BT_Drawn, for a creature of NPC_DRAWN_BY_FIRE: a fire draws it."""
     declare_drawn_vars(ed)
-    made = _author_drawn(ed, steps.event(STEP_DRAWN, x0 - 300, y0), steps.result,
-                         stock_run_speed(key), x0, y0)
+    made = _author_drawn(ed, steps.event(STEP_DRAWN), steps.result, stock_run_speed(key))
     ed.add_comment_to_nodes(
         f"BT_Drawn, tried after the senses and before BT_Stroll: with a "
         f"campfire burning within {NPC_DRAWN_RANGE_CM / 100:.0f} m (the "
@@ -193,7 +189,7 @@ def _author_drawn_step(ed, steps, key, x0, y0):
         f"step fails and it strolls.", made)
 
 
-def _author_steps(ed, key, melee_anim, x0, y0):
+def _author_steps(ed, key, melee_anim):
     """Author every step event into creature ``key``'s controller graph.
     Its numbers are read off the Tune* variables (npc/tuned.py); ``spec``
     here only words the comments.
@@ -210,7 +206,7 @@ def _author_steps(ed, key, melee_anim, x0, y0):
     spec = monster_specs(key)
     steps = _Steps(ed)
 
-    gate, extras, setup = _author_pulse(ed, steps, x0, y0)
+    gate, extras, setup = _author_pulse(ed, steps)
     ed.add_comment_to_nodes(
         "BT_Pulse: the tree's first step on every pass. No pawn: fail. A "
         "corpse: stop the tree. Otherwise this creature's stats and voice, "
@@ -226,19 +222,17 @@ def _author_steps(ed, key, melee_anim, x0, y0):
         extras)
 
     if key in NPC_STALK_ROAR:
-        _author_stalk_step(ed, steps, key, x0 + 3000, y0 - 14000)
+        _author_stalk_step(ed, steps, key)
     warded = wards(key)
     if warded:
-        _author_ward_step(ed, steps, key, x0 + 3000, y0 - 22000)
+        _author_ward_step(ed, steps, key)
     if draws(key):
-        _author_drawn_step(ed, steps, key, x0 + 3000, y0 - 30000)
+        _author_drawn_step(ed, steps, key)
 
-    cx, cy = x0 + 3000, y0 - 3000
     stock = stock_run_speed(key)
-    strafe, to_chase, strafed = _author_strafe(
-        ed, steps.event(STEP_CHASE, cx - 300, cy - 2400), stock, cx, cy - 2400)
+    strafe, to_chase, strafed = _author_strafe(ed, steps.event(STEP_CHASE), stock)
     for tail in strafed:
-        _connect(tail, steps.result(True, cx + 6800, cy - 2400))
+        _connect(tail, steps.result(True))
     ed.add_comment_to_nodes(
         f"BT_Chase, between two swings: for the first {NPC_STRAFE_SHARE:.0%} of the "
         f"cooldown, with the player within {NPC_STRAFE_ENGAGE_CM:.0f} cm, step "
@@ -247,22 +241,20 @@ def _author_steps(ed, key, melee_anim, x0, y0):
         f"round, left or right (one pick per swing), facing them, at "
         f"{NPC_STRAFE_SPEED_SCALE:.0%} of the run. Otherwise face the way it "
         f"runs and chase.", strafe)
-    chase, after_move = _author_chase(ed, to_chase, cx, cy)
-    ran, ran_tails, _entry = _author_walk_speed(ed, after_move, False, stock,
-                                                cx + 1300, cy)
+    chase, after_move = _author_chase(ed, to_chase)
+    ran, ran_tails, _entry = _author_walk_speed(ed, after_move, False, stock)
     chase += ran
     for tail in ran_tails:
-        _connect(tail, steps.result(True, cx + 2700, cy))
+        _connect(tail, steps.result(True))
     ed.add_comment_to_nodes(
         "BT_Chase: a move order at the player, pathfinding when both ends are "
         "on the navmesh -- which is what runs the NPC around trees -- and a "
         "straight-line move order when either end is not. Then the run speed, "
         "from TuneRunSpeed, every pass.", chase)
 
-    sx, sy = x0 + 5000, y0 - 3000
-    rest = steps.result_node(True, sx + 5200, sy + 600)
-    swing_in = steps.event(STEP_SWING, sx - 300, sy)
-    melee = _author_melee(ed, [swing_in], rest, sx, sy, melee_anim=melee_anim,
+    rest = steps.result_node(True)
+    swing_in = steps.event(STEP_SWING)
+    melee = _author_melee(ed, [swing_in], rest, melee_anim=melee_anim,
                           on_hit=on_hit_effects(melee_attack(key)),
                           # A blow that lands ends the hold the fire had it in.
                           clears=(WARD_SINCE_VAR,) if warded else ())
@@ -276,8 +268,7 @@ def _author_steps(ed, key, melee_anim, x0, y0):
             f"({spec['melee_interval_s']:g} s) out. The cooldown is per controller, so "
             f"a pack does not hit in lockstep.", melee)
 
-    agro_nodes, senses = _author_agro_steps(ed, steps.event, steps.result,
-                                            stock_run_speed(key), x0 - 200, y0 + 5000)
+    agro_nodes, senses = _author_agro_steps(ed, steps.event, steps.result, stock_run_speed(key))
     ed.add_comment_to_nodes(
         f"Patrol until noticed: stroll a {spec['patrol_radius_cm'] / 100:.0f} m "
         f"circle about the spawn point at {spec['patrol_speed_scale']:.0%} of run "

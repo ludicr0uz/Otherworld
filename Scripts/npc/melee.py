@@ -18,9 +18,7 @@ from npc.nodes import (
     NODE_CAST_CHARACTER, NODE_CAST_HEALTH,
 )
 from npc.graph import (
-    _asset_sub, _at, BEL, _connect, _log, _loose_pin, _node, _palette, _pin,
-    _resolve, _set,
-)
+    _asset_sub, BEL, _connect, _log, _loose_pin, _node, _palette, _pin, _resolve, _set)
 from npc.block import _author_block_check
 from npc.combat_trace import _author_melee_trace
 from npc.sound import _author_random_sound
@@ -39,7 +37,7 @@ def _melee_montage_object():
     return _resolve(NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK, "melee montage")
 
 
-def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
+def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
                   clears=()):
     """Swing at the player when the chase has closed the distance.
 
@@ -106,40 +104,39 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
         return n
 
     # --- is the player within reach? ----------------------------------------
-    self_pawn = keep(_at(_node(ed, FN_GET_PAWN), x0, y0 + 260))
-    self_loc = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 240, y0 + 260))
+    self_pawn = keep(_node(ed, FN_GET_PAWN))
+    self_loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(_pin(self_pawn, "ReturnValue", is_input=False), _pin(self_loc, "self"))
 
-    player = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 420))
+    player = keep(_node(ed, FN_GET_PLAYER_PAWN))
     _set(player, "PlayerIndex", 0)
     player_out = _pin(player, "ReturnValue", is_input=False)
-    player_loc = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 240, y0 + 420))
+    player_loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(player_out, _pin(player_loc, "self"))
 
-    gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 480, y0 + 340))
+    gap = keep(_node(ed, FN_DISTANCE))
     _connect(_pin(self_loc, "ReturnValue", is_input=False), _pin(gap, "V1"))
     _connect(_pin(player_loc, "ReturnValue", is_input=False), _pin(gap, "V2"))
 
-    in_range = keep(_at(_node(ed, FN_LE_FF), x0 + 720, y0 + 340))
+    in_range = keep(_node(ed, FN_LE_FF))
     _connect(_pin(gap, "ReturnValue", is_input=False), _pin(in_range, "A"))
-    reach, reach_out = tuned(ed, "melee_range_cm", x0 + 480, y0 + 460)
+    reach, reach_out = tuned(ed, "melee_range_cm")
     keep(reach)
     _connect(reach_out, _pin(in_range, "B"))
 
     # --- has this NPC's cooldown expired? ------------------------------------
-    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 480, y0 + 560))
+    now = keep(_node(ed, FN_TIME_SECONDS))
     now_out = _pin(now, "ReturnValue", is_input=False)
-    next_at = keep(_at(ed.add_get_member_variable_node("NextAttackTime"),
-                       x0 + 480, y0 + 680))
-    ready = keep(_at(_node(ed, FN_GE_FF), x0 + 720, y0 + 560))
+    next_at = keep(ed.add_get_member_variable_node("NextAttackTime"))
+    ready = keep(_node(ed, FN_GE_FF))
     _connect(now_out, _pin(ready, "A"))
     _connect(_pin(next_at, "NextAttackTime", is_input=False), _pin(ready, "B"))
 
-    both = keep(_at(_node(ed, FN_AND), x0 + 960, y0 + 400))
+    both = keep(_node(ed, FN_AND))
     _connect(_pin(in_range, "ReturnValue", is_input=False), _pin(both, "A"))
     _connect(_pin(ready, "ReturnValue", is_input=False), _pin(both, "B"))
 
-    swing = keep(_at(ed.add_branch_node(), x0 + 1200, y0))
+    swing = keep(ed.add_branch_node())
     _connect(_pin(both, "ReturnValue", is_input=False), _pin(swing, "Condition"))
     for tail in after_move:
         _connect(tail, _pin(swing, "execute"))
@@ -147,13 +144,12 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
     _connect(BEL.find_else_pin(swing), BEL.find_execute_pin(delay))
 
     # --- arm the next swing --------------------------------------------------
-    when = keep(_at(_node(ed, FN_ADD_FF), x0 + 1440, y0 + 300))
+    when = keep(_node(ed, FN_ADD_FF))
     _connect(now_out, _pin(when, "A"))
-    gap_s, gap_out = tuned(ed, "melee_interval_s", x0 + 1200, y0 + 440)
+    gap_s, gap_out = tuned(ed, "melee_interval_s")
     keep(gap_s)
     _connect(gap_out, _pin(when, "B"))
-    arm = keep(_at(ed.add_set_member_variable_node("NextAttackTime"),
-                   x0 + 1680, y0))
+    arm = keep(ed.add_set_member_variable_node("NextAttackTime"))
     _connect(_pin(when, "ReturnValue", is_input=False), _pin(arm, "NextAttackTime"))
     _connect(BEL.find_then_pin(swing), _pin(arm, "execute"))
 
@@ -161,19 +157,18 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
     # The montage goes through the pawn's own AnimInstance, so it animates
     # whichever body this controller happens to possess rather than assuming
     # BP_ForestWanderer.
-    as_char = keep(_at(_palette(ed, NODE_CAST_CHARACTER), x0 + 1920, y0))
+    as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(_pin(self_pawn, "ReturnValue", is_input=False), _pin(as_char, "Object"))
     _connect(BEL.find_then_pin(arm), _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    mesh = keep(_at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
-                    x0 + 1920, y0 + 300))
+    mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
     _connect(char_out, _pin(mesh, "self"))
 
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 2160, y0 + 300))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(_pin(mesh, "Mesh", is_input=False), _pin(anim, "self"))
 
-    montage = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 2400, y0))
+    montage = keep(_node(ed, FN_PLAY_SLOT))
     _connect(_pin(anim, "ReturnValue", is_input=False), _pin(montage, "self"))
     _set(montage, "Asset", melee_anim or _melee_montage_object())
     _set(montage, "SlotNodeName", MELEE_SLOT)
@@ -182,11 +177,11 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
     _connect(BEL.find_then_pin(as_char), _pin(montage, "execute"))
 
     # --- land the hit --------------------------------------------------------
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 2400, y0 + 300))
+    comp = keep(_node(ed, FN_GET_COMP))
     _connect(player_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
 
-    hit = keep(_at(_palette(ed, NODE_CAST_HEALTH), x0 + 2640, y0))
+    hit = keep(_palette(ed, NODE_CAST_HEALTH))
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(hit, "Object"))
     _connect(BEL.find_then_pin(montage), _pin(hit, "execute"))
     as_health = _loose_pin(hit, "AsBPHealthComponent", is_input=False)
@@ -195,32 +190,28 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
     # The unit vector from the player to the wanderer that swung. The guard
     # reads it to decide whether the swing met the player's front, and it is
     # stored below as LastHitFrom for the flinch.
-    toward = keep(_at(_node(ed, FN_SUB_VV), x0 + 3600, y0 + 300))
+    toward = keep(_node(ed, FN_SUB_VV))
     _connect(_pin(self_loc, "ReturnValue", is_input=False), _pin(toward, "A"))
     _connect(_pin(player_loc, "ReturnValue", is_input=False), _pin(toward, "B"))
-    bearing = keep(_at(_node(ed, FN_NORMAL), x0 + 3840, y0 + 300))
+    bearing = keep(_node(ed, FN_NORMAL))
     _connect(_pin(toward, "ReturnValue", is_input=False), _pin(bearing, "A"))
     bearing_out = _pin(bearing, "ReturnValue", is_input=False)
 
     # --- how much of it lands: the player's guard --------------------------
     # Its nodes stay out of `made`: they have their own comment box.
-    _, guarded = _author_block_check(ed, BEL.find_then_pin(hit), player_out,
-                                     bearing_out, x0 + 2880, y0 - 900)
+    _, guarded = _author_block_check(ed, BEL.find_then_pin(hit), player_out, bearing_out)
 
-    read = keep(_at(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH),
-                    x0 + 2880, y0 + 300))
+    read = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(as_health, _pin(read, "self"))
-    hurt = keep(_at(_node(ed, FN_SUB_FF), x0 + 3120, y0 + 300))
+    hurt = keep(_node(ed, FN_SUB_FF))
     _connect(_pin(read, "Health", is_input=False), _pin(hurt, "A"))
-    dealt = keep(_at(ed.add_get_member_variable_node(HIT_DAMAGE_VAR),
-                     x0 + 2880, y0 + 420))
+    dealt = keep(ed.add_get_member_variable_node(HIT_DAMAGE_VAR))
     _connect(_pin(dealt, HIT_DAMAGE_VAR, is_input=False), _pin(hurt, "B"))
-    floor = keep(_at(_node(ed, FN_CLAMP), x0 + 3360, y0 + 300))
+    floor = keep(_node(ed, FN_CLAMP))
     _connect(_pin(hurt, "ReturnValue", is_input=False), _pin(floor, "Value"))
     _set(floor, "Min", 0.0)
     _set(floor, "Max", INF)
-    write = keep(_at(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH),
-                     x0 + 3600, y0))
+    write = keep(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH))
     _connect(as_health, _pin(write, "self"))
     _connect(_pin(floor, "ReturnValue", is_input=False), _pin(write, "Health"))
     for tail in guarded:
@@ -231,9 +222,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
     # normal to read it off -- so it is stated: the bearing above.  Whichever of
     # the ten lands the blow writes its own bearing, so being surrounded reads
     # as being hit from all sides rather than as one repeated stagger.
-    came_from = keep(_at(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR,
-                                                          HEALTH_CLASS_PATH),
-                         x0 + 3840, y0))
+    came_from = keep(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(came_from, "self"))
     _connect(bearing_out, _pin(came_from, LAST_HIT_FROM_VAR))
 
@@ -241,9 +230,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
     # The HUD's save-and-exit countdown reads it, because being hit calls the
     # exit off. A time rather than a flag: nothing has to clear it, and a drop
     # in Health would also count the starvation drain, which is not a hit.
-    struck = keep(_at(ed.add_set_member_variable_node(LAST_DAMAGE_VAR,
-                                                      HEALTH_CLASS_PATH),
-                      x0 + 4080, y0))
+    struck = keep(ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(struck, "self"))
     _connect(_pin(now, "ReturnValue", is_input=False), _pin(struck, LAST_DAMAGE_VAR))
     _connect(BEL.find_then_pin(came_from), _pin(struck, "execute"))
@@ -257,8 +244,7 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
         _pin(self_pawn, "ReturnValue", is_input=False),
         _pin(self_loc, "ReturnValue", is_input=False), player_out,
         _pin(player_loc, "ReturnValue", is_input=False),
-        _pin(gap, "ReturnValue", is_input=False), as_health,
-        x0 + 3600, y0 + 1400)
+        _pin(gap, "ReturnValue", is_input=False), as_health)
     for tail in trace_tails:
         _connect(tail, _pin(came_from, "execute"))
 
@@ -270,21 +256,19 @@ def _author_melee(ed, after_move, delay, x0, y0, melee_anim=None, on_hit=(),
     # front of them.
     thud, after_thud = _author_random_sound(
         ed, HIT_SOUNDS_VAR, _pin(player_loc, "ReturnValue", is_input=False),
-        BEL.find_then_pin(struck), x0 + 4320, y0)
+        BEL.find_then_pin(struck))
     made.extend(thud)
 
     # --- and the timers it starts over --------------------------------------
-    for i, name in enumerate(clears):
-        cleared = keep(_at(ed.add_set_member_variable_node(name),
-                           x0 + 6200 + 300 * i, y0))
+    for name in clears:
+        cleared = keep(ed.add_set_member_variable_node(name))
         _set(cleared, name, 0.0)
         _connect(after_thud, _pin(cleared, "execute"))
         after_thud = BEL.find_then_pin(cleared)
 
     # --- and what it leaves behind -------------------------------------------
     # Its nodes stay out of `made`: they have their own comment box.
-    _, after_effects = _author_on_hit(ed, after_thud, player_out, on_hit,
-                                      x0 + 5400, y0 + 1400)
+    _, after_effects = _author_on_hit(ed, after_thud, player_out, on_hit)
 
     # Every exit -- hit, missing health component, not a Character -- has to
     # reach the Delay, or the chase loop ends on the first swing and the NPC

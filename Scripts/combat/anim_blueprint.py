@@ -34,9 +34,8 @@ this is the file that splices them into ABP_Unarmed.
 
 import unreal
 
-from combat.graph import (
-    BEL, BGE, PIN, _assets, _at, _connect, _log, _palette, _pin,
-)
+from combat.graph import BEL, BGE, PIN, _assets, _connect, _log, _palette, _pin
+from uebp.layout import arrange
 from combat.paths import ABP_PATH
 
 
@@ -157,9 +156,8 @@ def _ensure_hit_slot(ed, aim_blend):
     if not downstream:
         raise RuntimeError("the aim blend feeds nothing; graph is not what we expect")
 
-    slot = _name_slot(_at(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"),
-                          -280, 900), HIT_SLOT)
-    blend = _at(_palette(ed, "Animation|Blends|Layeredblendperbone"), -20, 900)
+    slot = _name_slot(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"), HIT_SLOT)
+    blend = _palette(ed, "Animation|Blends|Layeredblendperbone")
 
     PIN.break_pin_links(out)
     # One pose output legally drives more than one input, so the aim blend
@@ -207,8 +205,7 @@ def _ensure_full_body_slot(ed):
         # wiring alone, so re-running never stacks a second slot on the chain.
         return _name_slot(upstream, FULL_BODY_SLOT)
 
-    slot = _name_slot(_at(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"),
-                          -140, 620), FULL_BODY_SLOT)
+    slot = _name_slot(_palette(ed, f"Animation|Montage|Slot'{AIM_SLOT}'"), FULL_BODY_SLOT)
     PIN.break_pin_links(_pin(rig, "Source"))
     _connect(_pin(upstream, "Pose", is_input=False), _pin(slot, "Source"))
     _connect(_pin(slot, "Pose", is_input=False), _pin(rig, "Source"))
@@ -292,8 +289,7 @@ def patch_anim_blueprint():
                                "we expect")
         loco = PIN.get_owning_node(feeding[0])
 
-        aim_blend = _at(_palette(ed, "Animation|Blends|Layeredblendperbone"),
-                        -420, 620)
+        aim_blend = _palette(ed, "Animation|Blends|Layeredblendperbone")
         # A pose output legally drives more than one input here, so the
         # locomotion pose reaches both the blend's base and the slot's source
         # without needing a cached-pose pair.
@@ -307,6 +303,7 @@ def patch_anim_blueprint():
     _ensure_hit_slot(ed, aim_blend)
     _ensure_full_body_slot(ed)
 
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("ABP_Unarmed failed to compile after the blend patch")
     _assets().save_loaded_asset(bp)

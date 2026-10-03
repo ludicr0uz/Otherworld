@@ -8,6 +8,7 @@ import unreal
 from combat.graph import (
     BEL, BGE, _assets, _declare, _float_type, _log, _struct_type,
 )
+from uebp.layout import arrange
 from combat.difficulty import DIFFICULTY_VAR
 from combat.paths import GAME_MODE_BP_PATH
 
@@ -170,6 +171,7 @@ def ensure_game_mode_vars():
         _declare(ed, name, _struct_type(unreal.Vector.static_struct()))
     for name in (GUN_ROLL_STREAM_VAR, GUN_PICK_STREAM_VAR):
         _declare(ed, name, _struct_type(unreal.RandomStream.static_struct()))
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)

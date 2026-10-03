@@ -44,7 +44,7 @@ key and the click: no key can be injected into a headless game
 game.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
 from uebp.graph import out
 from combat.nodes import (
     FN_AND, FN_ARR_REMOVE, FN_DETACH, FN_GET_TRANSFORM, FN_IS_KEY_DOWN,
@@ -77,45 +77,42 @@ THROW_ARC_VAR = "ThrowArc"            # the BP_ThrowArc, spawned on first aim
 THROW_ARC_CLASS_VAR = "ThrowArcClass"
 
 
-def _author_throw_key(ed, pc_out, key_pin, x0, y0):
+def _author_throw_key(ed, pc_out, key_pin):
     """(wants, free): the throw key is down (or a probe holds it); and neither
     that nor a throw winding up, which Tick's fire gate takes. Plain reads:
     safe in a condition that is pulled with empty hands."""
-    down = _at(_node(ed, FN_IS_KEY_DOWN), x0, y0)
+    down = _node(ed, FN_IS_KEY_DOWN)
     _connect(pc_out, _pin(down, "self"))
     _connect(key_pin, _pin(down, "Key"))
-    forced = _at(ed.add_get_member_variable_node(THROW_FORCED_VAR), x0, y0 + 140)
-    wants = _at(_node(ed, FN_OR), x0 + 240, y0)
+    forced = ed.add_get_member_variable_node(THROW_FORCED_VAR)
+    wants = _node(ed, FN_OR)
     _connect(out(down), _pin(wants, "A"))
     _connect(out(forced, THROW_FORCED_VAR), _pin(wants, "B"))
-    busy = _at(_node(ed, FN_OR), x0 + 480, y0)
+    busy = _node(ed, FN_OR)
     _connect(out(wants), _pin(busy, "A"))
-    _connect(_winding(ed, x0, y0 + 280), _pin(busy, "B"))
-    free = _at(_node(ed, FN_NOT), x0 + 720, y0)
+    _connect(_winding(ed), _pin(busy, "B"))
+    free = _node(ed, FN_NOT)
     _connect(out(busy), _pin(free, "A"))
     return out(wants), out(free)
 
 
-def _author_throw(ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins,
-                  x0, y0):
+def _author_throw(ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins):
     """The whole throw, in Tick's chain: aim, wind-up, release, flight.
     Returns the exit exec pins."""
     aim_exits, clicked, start, velocity = _author_throw_aim(
-        ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins, x0, y0)
-    let_go, called_off, waiting = _author_throw_windup(
-        ed, held, clicked, aim_exits, x0 + 3160, y0 + 2000)
-    thrown = _author_throw_release(ed, held, start, velocity, let_go,
-                                   x0 + 3160, y0 + 1200)
-    over = _author_wound_down(ed, (thrown, called_off), x0 + 6300, y0 + 1200)
-    return _author_throw_flight(ed, (over, waiting), x0, y0 + 2800)
+        ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins)
+    let_go, called_off, waiting = _author_throw_windup(ed, held, clicked, aim_exits)
+    thrown = _author_throw_release(ed, held, start, velocity, let_go)
+    over = _author_wound_down(ed, (thrown, called_off))
+    return _author_throw_flight(ed, (over, waiting))
 
 
-def _add_dot(ed, dots, location, scale, exec_in, x, y):
+def _add_dot(ed, dots, location, scale, exec_in):
     """One world-space instance on the arc's Dots at location."""
-    xf = _at(_node(ed, FN_MAKE_TRANSFORM), x, y + 200)
+    xf = _node(ed, FN_MAKE_TRANSFORM)
     _connect(location, _pin(xf, "Location"))
-    _connect(_vec(ed, *scale, x - 240, y + 340), _pin(xf, "Scale"))
-    add = _at(_node(ed, "/Script/Engine.InstancedStaticMeshComponent.AddInstance"), x + 280, y)
+    _connect(_vec(ed, *scale), _pin(xf, "Scale"))
+    add = _node(ed, "/Script/Engine.InstancedStaticMeshComponent.AddInstance")
     _connect(dots, _pin(add, "self"))
     _connect(out(xf), _pin(add, "InstanceTransform"))
     _set(add, "bWorldSpace", "true")
@@ -124,29 +121,29 @@ def _add_dot(ed, dots, location, scale, exec_in, x, y):
 
 
 def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
-                      exec_ins, x0, y0):
+                      exec_ins):
     """The key held: draw the arc. Returns (exits, released, start, velocity):
     exits run on to the next block; released is the exec pin of the frame the
     fire key is clicked over a shown arc, for _author_throw_windup."""
-    start, velocity = _author_launch(ed, pc_out, owner_out, held, x0, y0 + 1400)
+    start, velocity = _author_launch(ed, pc_out, owner_out, held)
 
-    thrown = _at(ed.add_get_member_variable_node(THROWN_VAR), x0, y0 + 480)
-    flying = _at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 480)
+    thrown = ed.add_get_member_variable_node(THROWN_VAR)
+    flying = _node(ed, FN_IS_VALID)
     _connect(out(thrown, THROWN_VAR), _pin(flying, "Object"))
     # One throw at a time: none in the air, none winding up.
-    busy = _at(_node(ed, FN_OR), x0 + 360, y0 + 600)
+    busy = _node(ed, FN_OR)
     _connect(out(flying), _pin(busy, "A"))
-    _connect(_winding(ed, x0 - 120, y0 + 700), _pin(busy, "B"))
-    idle = _at(_node(ed, FN_NOT), x0 + 480, y0 + 480)
+    _connect(_winding(ed), _pin(busy, "B"))
+    idle = _node(ed, FN_NOT)
     _connect(out(busy), _pin(idle, "A"))
-    ready = _at(_node(ed, FN_AND), x0 + 480, y0 + 300)
+    ready = _node(ed, FN_AND)
     _connect(armed_out, _pin(ready, "A"))
     _connect(out(idle), _pin(ready, "B"))
-    aimed = _at(_node(ed, FN_AND), x0 + 720, y0 + 200)
+    aimed = _node(ed, FN_AND)
     _connect(wants, _pin(aimed, "A"))
     _connect(out(ready), _pin(aimed, "B"))
 
-    gate = _at(ed.add_branch_node(), x0 + 960, y0)
+    gate = ed.add_branch_node()
     _connect(out(aimed), _pin(gate, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(gate, "execute"))
@@ -154,53 +151,49 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     # --- the click: the throw, if the arc was already showing ----------------
     # ThrowAiming is still last frame's here: a click on the very frame the
     # key goes down throws nothing, as no arc has been seen yet.
-    click_forced = _at(ed.add_get_member_variable_node(THROW_CLICK_FORCED_VAR),
-                       x0 + 480, y0 - 300)
-    clicked = _at(_node(ed, FN_OR), x0 + 720, y0 - 300)
+    click_forced = ed.add_get_member_variable_node(THROW_CLICK_FORCED_VAR)
+    clicked = _node(ed, FN_OR)
     _connect(tap, _pin(clicked, "A"))
     _connect(out(click_forced, THROW_CLICK_FORCED_VAR), _pin(clicked, "B"))
-    shown = _at(ed.add_get_member_variable_node(THROW_AIMING_VAR), x0 + 720, y0 - 160)
-    lets_go = _at(_node(ed, FN_AND), x0 + 960, y0 - 300)
+    shown = ed.add_get_member_variable_node(THROW_AIMING_VAR)
+    lets_go = _node(ed, FN_AND)
     _connect(out(clicked), _pin(lets_go, "A"))
     _connect(out(shown, THROW_AIMING_VAR), _pin(lets_go, "B"))
-    click = _at(ed.add_branch_node(), x0 + 1080, y0 - 100)
+    click = ed.add_branch_node()
     _connect(out(lets_go), _pin(click, "Condition"))
     _connect(BEL.find_then_pin(gate), _pin(click, "execute"))
 
     # --- the arc actor, spawned the first time it is wanted -----------------
-    arc_get = _at(ed.add_get_member_variable_node(THROW_ARC_VAR), x0 + 960, y0 - 400)
+    arc_get = ed.add_get_member_variable_node(THROW_ARC_VAR)
     arc = out(arc_get, THROW_ARC_VAR)
-    have = _at(_node(ed, FN_IS_VALID), x0 + 1200, y0 - 400)
+    have = _node(ed, FN_IS_VALID)
     _connect(arc, _pin(have, "Object"))
-    spawned = _at(ed.add_branch_node(), x0 + 1200, y0)
+    spawned = ed.add_branch_node()
     _connect(out(have), _pin(spawned, "Condition"))
     _connect(BEL.find_else_pin(click), _pin(spawned, "execute"))
-    cls = _at(ed.add_get_member_variable_node(THROW_ARC_CLASS_VAR), x0 + 1200, y0 + 300)
-    where = _at(_node(ed, FN_GET_TRANSFORM), x0 + 1200, y0 + 420)
+    cls = ed.add_get_member_variable_node(THROW_ARC_CLASS_VAR)
+    where = _node(ed, FN_GET_TRANSFORM)
     _connect(owner_out, _pin(where, "self"))
-    spawn = _at(_palette(ed, NODE_SPAWN), x0 + 1460, y0 + 200)
+    spawn = _palette(ed, NODE_SPAWN)
     _connect(out(cls, THROW_ARC_CLASS_VAR), _pin(spawn, "Class"))
     _connect(out(where), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(BEL.find_else_pin(spawned), _pin(spawn, "execute"))
-    keep = _at(ed.add_set_member_variable_node(THROW_ARC_VAR), x0 + 1740, y0 + 200)
+    keep = ed.add_set_member_variable_node(THROW_ARC_VAR)
     _connect(out(spawn), _pin(keep, THROW_ARC_VAR))
     _connect(BEL.find_then_pin(spawn), _pin(keep, "execute"))
 
-    dots_get = _at(ed.add_get_member_variable_node(ARC_COMPONENT, THROW_ARC_CLASS_PATH),
-                   x0 + 1740, y0 - 400)
+    dots_get = ed.add_get_member_variable_node(ARC_COMPONENT, THROW_ARC_CLASS_PATH)
     _connect(arc, _pin(dots_get, "self"))
     dots = out(dots_get, ARC_COMPONENT)
-    clear = _at(_node(ed, "/Script/Engine.InstancedStaticMeshComponent.ClearInstances"),
-                x0 + 2000, y0)
+    clear = _node(ed, "/Script/Engine.InstancedStaticMeshComponent.ClearInstances")
     _connect(dots, _pin(clear, "self"))
     _connect(BEL.find_then_pin(spawned), _pin(clear, "execute"))
     _connect(BEL.find_then_pin(keep), _pin(clear, "execute"))
 
     # --- the arc: the engine's own ballistic prediction, traced -------------
-    predict = _at(_node(ed, "/Script/Engine.GameplayStatics."
-                            "Blueprint_PredictProjectilePath_ByTraceChannel"),
-                  x0 + 2280, y0)
+    predict = _node(ed, "/Script/Engine.GameplayStatics."
+                            "Blueprint_PredictProjectilePath_ByTraceChannel")
     _connect(start, _pin(predict, "StartPos"))
     _connect(velocity, _pin(predict, "LaunchVelocity"))
     _set(predict, "bTracePath", "true")
@@ -214,110 +207,109 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _set(predict, "MaxSimTime", THROW_ARC_SIM_S)
     _set(predict, "OverrideGravityZ", THROW_GRAVITY_Z)
     _connect(BEL.find_then_pin(clear), _pin(predict, "execute"))
-    on = _at(ed.add_set_member_variable_node(THROW_AIMING_VAR), x0 + 2560, y0)
+    on = ed.add_set_member_variable_node(THROW_AIMING_VAR)
     _set(on, THROW_AIMING_VAR, "true")
     _connect(BEL.find_then_pin(predict), _pin(on, "execute"))
     # The arm is cocked for as long as the arc shows (throw_ready.py).
-    posed = _author_throw_ready(ed, held, BEL.find_then_pin(on), x0 + 2560, y0 - 1400)
+    posed = _author_throw_ready(ed, held, BEL.find_then_pin(on))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
-    _at(loop, x0 + 2820, y0)
+    loop
     _connect(out(predict, "OutPathPositions"), _loose_pin(loop, "Array"))
     for pin in posed:
         _connect(pin, _loose_pin(loop, "Exec"))
     d = THROW_DOT_CM / 100.0
     _add_dot(ed, dots, _loose_pin(loop, "ArrayElement", is_input=False), (d, d, d),
-             _loose_pin(loop, "LoopBody", is_input=False), x0 + 3100, y0 - 300)
+             _loose_pin(loop, "LoopBody", is_input=False))
     # The disc where it comes down, if the arc comes down on anything.
-    landed = _at(ed.add_branch_node(), x0 + 3100, y0 + 300)
+    landed = ed.add_branch_node()
     _connect(out(predict), _pin(landed, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(landed, "execute"))
-    hit = _at(_palette(ed, NODE_BREAK_HIT), x0 + 3100, y0 + 500)
+    hit = _palette(ed, NODE_BREAK_HIT)
     _connect(out(predict, "OutHit"), _loose_pin(hit, "Hit"))
     mark = _add_dot(ed, dots, _loose_pin(hit, "Location", is_input=False),
                     tuple(c / 100.0 for c in THROW_MARK_CM),
-                    BEL.find_then_pin(landed), x0 + 3400, y0 + 300)
+                    BEL.find_then_pin(landed))
 
     # --- not aiming: was it, last frame? Then the aim ends here -------------
-    was_get = _at(ed.add_get_member_variable_node(THROW_AIMING_VAR), x0 + 960, y0 + 700)
-    was = _at(ed.add_branch_node(), x0 + 1200, y0 + 800)
+    was_get = ed.add_get_member_variable_node(THROW_AIMING_VAR)
+    was = ed.add_branch_node()
     _connect(out(was_get, THROW_AIMING_VAR), _pin(was, "Condition"))
     _connect(BEL.find_else_pin(gate), _pin(was, "execute"))
-    wipe = _at(_node(ed, "/Script/Engine.InstancedStaticMeshComponent.ClearInstances"),
-               x0 + 1460, y0 + 800)
+    wipe = _node(ed, "/Script/Engine.InstancedStaticMeshComponent.ClearInstances")
     _connect(dots, _pin(wipe, "self"))
     _connect(BEL.find_then_pin(was), _pin(wipe, "execute"))
     _connect(BEL.find_then_pin(click), _pin(wipe, "execute"))
-    off = _at(ed.add_set_member_variable_node(THROW_AIMING_VAR), x0 + 1740, y0 + 800)
+    off = ed.add_set_member_variable_node(THROW_AIMING_VAR)
     _set(off, THROW_AIMING_VAR, "false")
     _connect(BEL.find_then_pin(wipe), _pin(off, "execute"))
     # Which of the two ended it? Still aimed (key down, item in hand) can only
     # be the click: that is the throw. Otherwise the key came up, or the hand
     # emptied under it (eaten, dropped), and nothing is thrown.
-    release = _at(ed.add_branch_node(), x0 + 2000, y0 + 800)
+    release = ed.add_branch_node()
     _connect(out(aimed), _pin(release, "Condition"))
     _connect(BEL.find_then_pin(off), _pin(release, "execute"))
     # The click is spent: still down next frame, it must not fire the
     # automatic that takes the thrown item's place (consume.py's latch).
-    spend = _at(ed.add_set_member_variable_node(TRIGGER_SPENT), x0 + 2260, y0 + 800)
+    spend = ed.add_set_member_variable_node(TRIGGER_SPENT)
     _set(spend, TRIGGER_SPENT, "true")
     _connect(BEL.find_then_pin(release), _pin(spend, "execute"))
 
     # Called off: the cocked arm comes down.
-    lowered = _author_ready_down(ed, BEL.find_else_pin(release), x0 + 2260, y0 + 1000)
+    lowered = _author_ready_down(ed, BEL.find_else_pin(release))
 
     exits = (BEL.find_then_pin(mark), BEL.find_else_pin(landed),
              BEL.find_else_pin(was), lowered)
     return exits, BEL.find_then_pin(spend), start, velocity
 
 
-def _author_throw_release(ed, held, start, velocity, exec_in, x0, y0):
+def _author_throw_release(ed, held, start, velocity, exec_in):
     """Let go: the launch is stored for the flight, the item leaves the hand
     and the inventory the way a drop's does. Returns the exit exec pin.
     Reads Held: run it only where the hand is known to hold something."""
-    now = _at(_node(ed, FN_TIME_SECONDS), x0, y0 + 300)
+    now = _node(ed, FN_TIME_SECONDS)
     prev = exec_in
-    for i, (var, value) in enumerate(((THROW_START_VAR, start),
-                                      (THROW_LAST_VAR, start),
-                                      (THROW_VELOCITY_VAR, velocity),
-                                      (THROW_TIME_VAR, out(now)),
-                                      (THROWN_VAR, held))):
-        n = _at(ed.add_set_member_variable_node(var), x0 + 260 * i, y0)
+    for var, value in ((THROW_START_VAR, start),
+                       (THROW_LAST_VAR, start),
+                       (THROW_VELOCITY_VAR, velocity),
+                       (THROW_TIME_VAR, out(now)),
+                       (THROWN_VAR, held)):
+        n = ed.add_set_member_variable_node(var)
         _connect(value, _pin(n, var))
         _connect(prev, _pin(n, "execute"))
         prev = BEL.find_then_pin(n)
 
-    off = _at(_node(ed, FN_DETACH), x0 + 1300, y0)
+    off = _node(ed, FN_DETACH)
     _connect(held, _pin(off, "self"))
     _detach_rules(off)
     _connect(prev, _pin(off, "execute"))
     # Shown, as a drop does: a scoped gun thrown from the sights was hidden.
-    shown = _at(_node(ed, FN_SET_HIDDEN), x0 + 1560, y0)
+    shown = _node(ed, FN_SET_HIDDEN)
     _connect(held, _pin(shown, "self"))
     _set(shown, "bNewHidden", "false")
     _connect(BEL.find_then_pin(off), _pin(shown, "execute"))
-    put = _at(_node(ed, FN_SET_ACTOR_LOC), x0 + 1820, y0)
+    put = _node(ed, FN_SET_ACTOR_LOC)
     _connect(held, _pin(put, "self"))
     _connect(start, _pin(put, "NewLocation"))
     _connect(BEL.find_then_pin(shown), _pin(put, "execute"))
-    squared = _author_square(ed, held, BEL.find_then_pin(put), x0 + 1820, y0 - 500)
+    squared = _author_square(ed, held, BEL.find_then_pin(put))
 
-    inv = _at(ed.add_get_member_variable_node("Inventory"), x0 + 1820, y0 + 300)
-    idx = _at(ed.add_get_member_variable_node("EquippedIndex"), x0 + 1820, y0 + 420)
-    remove = _at(_node(ed, FN_ARR_REMOVE), x0 + 2080, y0)
+    inv = ed.add_get_member_variable_node("Inventory")
+    idx = ed.add_get_member_variable_node("EquippedIndex")
+    remove = _node(ed, FN_ARR_REMOVE)
     _connect(out(inv, "Inventory"), _pin(remove, "TargetArray"))
     _connect(out(idx, "EquippedIndex"), _pin(remove, "IndexToRemove"))
     for pin in squared:
         _connect(pin, _pin(remove, "execute"))
     # Held set with nothing connected clears it, as in _author_drop.
-    clear = _at(ed.add_set_member_variable_node("Held"), x0 + 2340, y0)
+    clear = ed.add_set_member_variable_node("Held")
     _connect(BEL.find_then_pin(remove), _pin(clear, "execute"))
-    reset = _at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 2600, y0)
+    reset = ed.add_set_member_variable_node("EquippedIndex")
     _set(reset, "EquippedIndex", 0)
     _connect(BEL.find_then_pin(clear), _pin(reset, "execute"))
-    dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), x0 + 2860, y0)
+    dirty = ed.add_set_member_variable_node("NeedsRefresh")
     _set(dirty, "NeedsRefresh", "true")
     _connect(BEL.find_then_pin(reset), _pin(dirty, "execute"))
     return BEL.find_then_pin(dirty)

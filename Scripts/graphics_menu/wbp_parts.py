@@ -12,9 +12,9 @@ row) and the value column (a slider's number, a key's name, ON/OFF).
 import unreal
 
 from combat.graph import (
-    BEL, BGE, _apply_defaults, _at, _connect, _declare, _float_type, _must_load, _node,
-    _palette, _pin,
-)
+    BEL, BGE, _apply_defaults, _connect, _declare, _float_type, _must_load, _node,
+    _palette, _pin)
+from uebp.layout import arrange
 from graphics_menu import umg_author as U
 from graphics_menu.umg_consts import (
     COL_CARET, COL_GHOST, COL_KILL, COL_ROW, ROW_CARET, ROW_CARET_W, ROW_COLOR_VAR, ROW_FONT,
@@ -40,25 +40,26 @@ def _author_pre_construct(bp):
     ed.remove_nodes(ed.list_all_nodes())
     pre = _palette(ed, NODE_PRE_CONSTRUCT)
 
-    def get(var, x, y):
-        return _pin(_at(ed.add_get_member_variable_node(var), x, y), var, is_input=False)
+    def get(var):
+        return _pin(ed.add_get_member_variable_node(var), var, is_input=False)
 
-    as_text = _at(_node(ed, FN_STR_TO_TEXT), 300, 200)
-    _connect(get(ROW_TEXT_VAR, 60, 200), _pin(as_text, "InString"))
-    put = _at(_node(ed, FN_SET_TEXT), 560, 0)
-    _connect(get(ROW_LABEL, 300, 80), _pin(put, "self"))
+    as_text = _node(ed, FN_STR_TO_TEXT)
+    _connect(get(ROW_TEXT_VAR), _pin(as_text, "InString"))
+    put = _node(ed, FN_SET_TEXT)
+    _connect(get(ROW_LABEL), _pin(put, "self"))
     _connect(_pin(as_text, "ReturnValue", is_input=False), _pin(put, "InText"))
     _connect(BEL.find_then_pin(pre), _pin(put, "execute"))
 
-    tint = _at(_node(ed, FN_SET_TEXT_COLOUR), 860, 0)
-    _connect(get(ROW_LABEL, 600, 240), _pin(tint, "self"))
-    _connect(get(ROW_COLOR_VAR, 600, 320), _pin(tint, "InColorAndOpacity"))
+    tint = _node(ed, FN_SET_TEXT_COLOUR)
+    _connect(get(ROW_LABEL), _pin(tint, "self"))
+    _connect(get(ROW_COLOR_VAR), _pin(tint, "InColorAndOpacity"))
     _connect(BEL.find_then_pin(put), _pin(tint, "execute"))
 
-    width = _at(_node(ed, FN_SET_WIDTH), 1160, 0)
-    _connect(get(ROW_LABEL_BOX, 900, 240), _pin(width, "self"))
-    _connect(get(ROW_WIDTH_VAR, 900, 320), _pin(width, "InWidthOverride"))
+    width = _node(ed, FN_SET_WIDTH)
+    _connect(get(ROW_LABEL_BOX), _pin(width, "self"))
+    _connect(get(ROW_WIDTH_VAR), _pin(width, "InWidthOverride"))
     _connect(BEL.find_then_pin(tint), _pin(width, "execute"))
+    arrange(ed)
 
 
 def build_menu_row():
@@ -132,11 +133,12 @@ def build_inventory_slot():
     BEL.set_blueprint_variable_instance_editable(bp, SLOT_GHOST_VAR, True)
     ed.remove_nodes(ed.list_all_nodes())
     pre = _palette(ed, NODE_PRE_CONSTRUCT)
-    put = _at(_node(ed, FN_SET_BRUSH), 560, 0)
-    for var, pin, y in ((SLOT_GHOST, "self", 80), (SLOT_GHOST_VAR, "Texture", 200)):
-        got = _at(ed.add_get_member_variable_node(var), 300, y)
+    put = _node(ed, FN_SET_BRUSH)
+    for var, pin in ((SLOT_GHOST, "self"), (SLOT_GHOST_VAR, "Texture")):
+        got = ed.add_get_member_variable_node(var)
         _connect(_pin(got, var, is_input=False), _pin(put, pin))
     _connect(BEL.find_then_pin(pre), _pin(put, "execute"))
+    arrange(ed)
     return U.compile_and_save(bp)
 
 

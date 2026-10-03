@@ -3,10 +3,10 @@
 The key knows nothing about what it acts on. Each kind of thing that can be
 interacted with is a pair in KINDS:
 
-  candidates(ed, exec_in, x0, y0)       walks the things of its kind and hands
+  candidates(ed, exec_in)               walks the things of its kind and hands
                                         back each one, whether it is offered
                                         at all, and the exec pins of the walk
-  act(ed, target, exec_in, x0, y0)      casts InteractTarget to its kind and
+  act(ed, target, exec_in)              casts InteractTarget to its kind and
                                         does its thing to it
 
 A press runs every kind's walk in turn. A candidate that is offered and lies
@@ -24,7 +24,7 @@ injected into a headless game (probes/probe_pickup.py). It is OR'd with the
 key, the press clears it, and it is false in every real game.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from uebp.graph import out
 from combat.nodes import (
     FN_ABS, FN_ACTOR_LOC, FN_AND, FN_BREAK_VECTOR, FN_DISTANCE, FN_IS_VALID,
@@ -54,10 +54,9 @@ RETIRED_VARS = ("KeyPickup", "PickBest", "PickBestGap", "PickupForced")
 # casts are tried.
 KINDS = ((_author_item_candidates, _author_take_item),
          (_author_fire_candidates, _author_heat_item))
-KIND_PITCH = 2000   # graph units between two kinds' rows of nodes
 
 
-def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
+def _author_offer(ed, owner, candidate, offered, exec_in):
     """One candidate of a walk: keep it if it is in reach and the nearest yet."""
     made = []
 
@@ -65,61 +64,59 @@ def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
         made.append(n)
         return n
 
-    there = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 1900, y0 + 400))
+    there = keep(_node(ed, FN_ACTOR_LOC))
     _connect(candidate, _pin(there, "self"))
-    here = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 1900, y0 + 520))
+    here = keep(_node(ed, FN_ACTOR_LOC))
     _connect(owner, _pin(here, "self"))
-    gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 2160, y0 + 440))
+    gap = keep(_node(ed, FN_DISTANCE))
     _connect(out(there, "ReturnValue"), _pin(gap, "V1"))
     _connect(out(here, "ReturnValue"), _pin(gap, "V2"))
-    near = keep(_at(_node(ed, FN_LESS_FF), x0 + 2400, y0 + 440))
+    near = keep(_node(ed, FN_LESS_FF))
     _connect(out(gap, "ReturnValue"), _pin(near, "A"))
     _set(near, "B", INTERACT_RADIUS)
     # And how far up or down: |dz| < INTERACT_HEIGHT.
-    rise = keep(_at(_node(ed, FN_SUB_VV), x0 + 2160, y0 + 260))
+    rise = keep(_node(ed, FN_SUB_VV))
     _connect(out(there, "ReturnValue"), _pin(rise, "A"))
     _connect(out(here, "ReturnValue"), _pin(rise, "B"))
-    parts = keep(_at(_node(ed, FN_BREAK_VECTOR), x0 + 2400, y0 + 260))
+    parts = keep(_node(ed, FN_BREAK_VECTOR))
     _connect(out(rise, "ReturnValue"), _pin(parts, "InVec"))
-    dz = keep(_at(_node(ed, FN_ABS), x0 + 2640, y0 + 200))
+    dz = keep(_node(ed, FN_ABS))
     _connect(out(parts, "Z"), _pin(dz, "A"))
-    level = keep(_at(_node(ed, FN_LESS_FF), x0 + 2880, y0 + 200))
+    level = keep(_node(ed, FN_LESS_FF))
     _connect(out(dz, "ReturnValue"), _pin(level, "A"))
     _set(level, "B", INTERACT_HEIGHT)
 
     # How far the candidate lies from the point the reticle rests on. Pure, so
     # the Branch and the Set below each compute it, from inputs that do not
     # change in between.
-    aim = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0 + 1900, y0 + 660))
-    aim_gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 2160, y0 + 620))
+    aim = keep(ed.add_get_member_variable_node("AimPoint"))
+    aim_gap = keep(_node(ed, FN_DISTANCE))
     _connect(out(there, "ReturnValue"), _pin(aim_gap, "V1"))
     _connect(out(aim, "AimPoint"), _pin(aim_gap, "V2"))
-    best_gap = keep(_at(ed.add_get_member_variable_node(INTERACT_GAP_VAR),
-                        x0 + 2160, y0 + 780))
-    closer = keep(_at(_node(ed, FN_LESS_FF), x0 + 2400, y0 + 620))
+    best_gap = keep(ed.add_get_member_variable_node(INTERACT_GAP_VAR))
+    closer = keep(_node(ed, FN_LESS_FF))
     _connect(out(aim_gap, "ReturnValue"), _pin(closer, "A"))
     _connect(out(best_gap, INTERACT_GAP_VAR), _pin(closer, "B"))
 
-    and1 = keep(_at(_node(ed, FN_AND), x0 + 2640, y0 + 340))
+    and1 = keep(_node(ed, FN_AND))
     _connect(offered, _pin(and1, "A"))
     _connect(out(near, "ReturnValue"), _pin(and1, "B"))
-    and_h = keep(_at(_node(ed, FN_AND), x0 + 2880, y0 + 300))
+    and_h = keep(_node(ed, FN_AND))
     _connect(out(and1, "ReturnValue"), _pin(and_h, "A"))
     _connect(out(level, "ReturnValue"), _pin(and_h, "B"))
-    and2 = keep(_at(_node(ed, FN_AND), x0 + 3000, y0 + 420))
+    and2 = keep(_node(ed, FN_AND))
     _connect(out(and_h, "ReturnValue"), _pin(and2, "A"))
     _connect(out(closer, "ReturnValue"), _pin(and2, "B"))
 
     # The walk only remembers. Acting inside it is how one press used to pick
     # up every item in reach.
-    better = keep(_at(ed.add_branch_node(), x0 + 3120, y0))
+    better = keep(ed.add_branch_node())
     _connect(out(and2, "ReturnValue"), _pin(better, "Condition"))
     _connect(exec_in, _pin(better, "execute"))
-    remember = keep(_at(ed.add_set_member_variable_node(INTERACT_TARGET_VAR),
-                        x0 + 3380, y0))
+    remember = keep(ed.add_set_member_variable_node(INTERACT_TARGET_VAR))
     _connect(candidate, _pin(remember, INTERACT_TARGET_VAR))
     _connect(BEL.find_then_pin(better), _pin(remember, "execute"))
-    at_gap = keep(_at(ed.add_set_member_variable_node(INTERACT_GAP_VAR), x0 + 3640, y0))
+    at_gap = keep(ed.add_set_member_variable_node(INTERACT_GAP_VAR))
     _connect(out(aim_gap, "ReturnValue"), _pin(at_gap, INTERACT_GAP_VAR))
     _connect(BEL.find_then_pin(remember), _pin(at_gap, "execute"))
 
@@ -131,7 +128,7 @@ def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
         made)
 
 
-def _author_interact(ed, owner, pressed, exec_ins, x0, y0):
+def _author_interact(ed, owner, pressed, exec_ins):
     """E: act on the thing in reach nearest the reticle's point.
 
     Returns (acted, idle): the exec pins a press that did something leaves by,
@@ -143,50 +140,45 @@ def _author_interact(ed, owner, pressed, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    forced = keep(_at(ed.add_get_member_variable_node(INTERACT_FORCED_VAR),
-                      x0 - 560, y0 + 280))
-    wants = keep(_at(_node(ed, FN_OR), x0 - 280, y0 + 160))
+    forced = keep(ed.add_get_member_variable_node(INTERACT_FORCED_VAR))
+    wants = keep(_node(ed, FN_OR))
     _connect(pressed, _pin(wants, "A"))
     _connect(out(forced, INTERACT_FORCED_VAR), _pin(wants, "B"))
-    gate = keep(_at(ed.add_branch_node(), x0, y0))
+    gate = keep(ed.add_branch_node())
     _connect(out(wants, "ReturnValue"), _pin(gate, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(gate, "execute"))
 
-    spent = keep(_at(ed.add_set_member_variable_node(INTERACT_FORCED_VAR), x0 + 260, y0))
+    spent = keep(ed.add_set_member_variable_node(INTERACT_FORCED_VAR))
     _set(spent, INTERACT_FORCED_VAR, "false")
     _connect(BEL.find_then_pin(gate), _pin(spent, "execute"))
     # InteractTarget is set with its input pin left unconnected, which is how
     # a Blueprint object variable is cleared to None.
-    forget = keep(_at(ed.add_set_member_variable_node(INTERACT_TARGET_VAR),
-                      x0 + 520, y0))
+    forget = keep(ed.add_set_member_variable_node(INTERACT_TARGET_VAR))
     _connect(BEL.find_then_pin(spent), _pin(forget, "execute"))
-    far = keep(_at(ed.add_set_member_variable_node(INTERACT_GAP_VAR), x0 + 780, y0))
+    far = keep(ed.add_set_member_variable_node(INTERACT_GAP_VAR))
     _set(far, INTERACT_GAP_VAR, INTERACT_NO_GAP)
     _connect(BEL.find_then_pin(forget), _pin(far, "execute"))
 
     # --- the search: every kind's walk in turn, each offering its candidates --
     flow = BEL.find_then_pin(far)
-    for i, (candidates, _act) in enumerate(KINDS):
-        y = y0 + i * KIND_PITCH
-        candidate, offered, body, flow = candidates(ed, flow, x0, y)
-        _author_offer(ed, owner, candidate, offered, body, x0, y)
+    for candidates, _act in KINDS:
+        candidate, offered, body, flow = candidates(ed, flow)
+        _author_offer(ed, owner, candidate, offered, body)
 
     # --- after the search: the kinds try the one that was kept, in order ------
-    y1 = y0 + (len(KINDS) - 1) * KIND_PITCH + 1000
-    target_get = keep(_at(ed.add_get_member_variable_node(INTERACT_TARGET_VAR),
-                          x0 + 1320, y1 + 260))
+    target_get = keep(ed.add_get_member_variable_node(INTERACT_TARGET_VAR))
     target = out(target_get, INTERACT_TARGET_VAR)
-    any_target = keep(_at(_node(ed, FN_IS_VALID), x0 + 1580, y1 + 260))
+    any_target = keep(_node(ed, FN_IS_VALID))
     _connect(target, _pin(any_target, "Object"))
-    found = keep(_at(ed.add_branch_node(), x0 + 1840, y1))
+    found = keep(ed.add_branch_node())
     _connect(out(any_target, "ReturnValue"), _pin(found, "Condition"))
     _connect(flow, _pin(found, "execute"))
 
     acted, idle = (), (BEL.find_else_pin(gate), BEL.find_else_pin(found))
     flow = BEL.find_then_pin(found)
-    for i, (_candidates, act) in enumerate(KINDS):
-        did, did_not, flow = act(ed, target, flow, x0, y1 + i * KIND_PITCH)
+    for _candidates, act in KINDS:
+        did, did_not, flow = act(ed, target, flow)
         acted += did
         idle += did_not
     idle += (flow,)   # a target no kind's cast took

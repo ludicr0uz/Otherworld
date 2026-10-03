@@ -6,7 +6,7 @@ recoil.py read for the tighter cone and the steadier kick (either way of
 aiming earns them), and what sights.py reads to move the camera onto the gun.
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _pin, _set
 from combat.nodes import (
     CAMERA_CLASS_PATH, FN_AND, FN_CLAMP, FN_DIV_FF, FN_GET_COMP, FN_INTERP_FF,
     FN_IS_KEY_DOWN, FN_LERP, FN_MUL_FF, FN_NOT_B, FN_OR, FN_SELECT_FF,
@@ -20,7 +20,7 @@ from combat.weapon_component.common import _prop
 
 
 def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
-                      exec_ins, keep, x0, y0):
+                      exec_ins, keep):
     """Read the two aim keys into the aim state and the FOV to zoom to.
 
         shoulder  = IsInputKeyDown(KeyAim)
@@ -68,91 +68,88 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
 
     Returns (exits, the NOT Sprinting pin).
     """
-    def held_down(var, y):
-        n = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0, y))
+    def held_down(var):
+        n = keep(_node(ed, FN_IS_KEY_DOWN))
         _connect(pc_out, _pin(n, "self"))
         _connect(key_pins[var], _pin(n, "Key"))
         return _pin(n, "ReturnValue", is_input=False)
 
-    shoulder = held_down("KeyAim", y0 + 300)
+    shoulder = held_down("KeyAim")
     # The same key uses an item that has no sights (use.py): then it is not
     # an aim key this frame.
-    using = keep(_at(ed.add_get_member_variable_node(USING_VAR), x0, y0 - 40))
-    not_using = keep(_at(_node(ed, FN_NOT_B), x0 + 240, y0 - 40))
+    using = keep(ed.add_get_member_variable_node(USING_VAR))
+    not_using = keep(_node(ed, FN_NOT_B))
     _connect(_pin(using, USING_VAR, is_input=False), _pin(not_using, "A"))
-    sights_and = keep(_at(_node(ed, FN_AND), x0 + 480, y0 + 60))
+    sights_and = keep(_node(ed, FN_AND))
     _connect(sights_key, _pin(sights_and, "A"))
     _connect(_pin(not_using, "ReturnValue", is_input=False), _pin(sights_and, "B"))
     sights = _pin(sights_and, "ReturnValue", is_input=False)
-    either = keep(_at(_node(ed, FN_OR), x0 + 240, y0 + 240))
+    either = keep(_node(ed, FN_OR))
     _connect(shoulder, _pin(either, "A"))
     _connect(sights, _pin(either, "B"))
 
     # Sprinting has already been written this frame -- _author_sprint runs
     # before this block -- so this reads the flag rather than the key.
-    running = keep(_at(ed.add_get_member_variable_node("Sprinting"), x0, y0 + 420))
-    still = keep(_at(_node(ed, FN_NOT_B), x0 + 240, y0 + 420))
+    running = keep(ed.add_get_member_variable_node("Sprinting"))
+    still = keep(_node(ed, FN_NOT_B))
     _connect(_pin(running, "Sprinting", is_input=False), _pin(still, "A"))
 
-    can = keep(_at(_node(ed, FN_AND), x0 + 480, y0 + 360))
+    can = keep(_node(ed, FN_AND))
     _connect(_pin(either, "ReturnValue", is_input=False), _pin(can, "A"))
     _connect(_pin(still, "ReturnValue", is_input=False), _pin(can, "B"))
-    wants = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 300))
+    wants = keep(_node(ed, FN_AND))
     _connect(_pin(can, "ReturnValue", is_input=False), _pin(wants, "A"))
     _connect(armed_out, _pin(wants, "B"))
 
-    mark = keep(_at(ed.add_set_member_variable_node("Aiming"), x0 + 980, y0))
+    mark = keep(ed.add_set_member_variable_node("Aiming"))
     _connect(_pin(wants, "ReturnValue", is_input=False), _pin(mark, "Aiming"))
     for e in exec_ins:
         _connect(e, _pin(mark, "execute"))
 
-    base = keep(_at(ed.add_get_member_variable_node("BaseFOV"), x0 + 980, y0 + 420))
+    base = keep(ed.add_get_member_variable_node("BaseFOV"))
     base_out = _pin(base, "BaseFOV", is_input=False)
 
-    aiming = keep(_at(ed.add_get_member_variable_node("Aiming"), x0 + 980, y0 + 300))
-    zoomed = keep(_at(ed.add_branch_node(), x0 + 1240, y0))
+    aiming = keep(ed.add_get_member_variable_node("Aiming"))
+    zoomed = keep(ed.add_branch_node())
     _connect(_pin(aiming, "Aiming", is_input=False), _pin(zoomed, "Condition"))
     _connect(BEL.find_then_pin(mark), _pin(zoomed, "execute"))
 
     # True arm. Held is valid here, so it can be asked about.
-    sighted, sighted_n = _prop(ed, HAS_SIGHTS_VAR, held, x0 + 1240, y0 + 560)
+    sighted, sighted_n = _prop(ed, HAS_SIGHTS_VAR, held)
     keep(sighted_n)
-    down_sights = keep(_at(_node(ed, FN_AND), x0 + 1760, y0 + 500))
+    down_sights = keep(_node(ed, FN_AND))
     _connect(sights, _pin(down_sights, "A"))
     _connect(sighted, _pin(down_sights, "B"))
-    sight_on = keep(_at(ed.add_set_member_variable_node("SightAiming"),
-                        x0 + 1500, y0))
+    sight_on = keep(ed.add_set_member_variable_node("SightAiming"))
     _connect(_pin(down_sights, "ReturnValue", is_input=False),
              _pin(sight_on, "SightAiming"))
     _connect(BEL.find_then_pin(zoomed), _pin(sight_on, "execute"))
 
     # The weapon's zoom down its sights, the shoulder's for everything else.
     # The literal is on B, which is the pin a Kismet node lets hold one.
-    zoom_pin, zoom_n = _prop(ed, "AdsZoom", held, x0 + 1760, y0 + 700)
+    zoom_pin, zoom_n = _prop(ed, "AdsZoom", held)
     keep(zoom_n)
-    pick = keep(_at(_node(ed, FN_SELECT_FF), x0 + 2020, y0 + 560))
+    pick = keep(_node(ed, FN_SELECT_FF))
     _connect(zoom_pin, _pin(pick, "A"))
     _set(pick, "B", COMBAT.shoulder_zoom)
     _connect(_loose_pin(sight_on, "Output_Get", is_input=False),
              _pin(pick, "bPickA"))
-    chosen = keep(_at(ed.add_set_member_variable_node("AimZoom"), x0 + 1760, y0))
+    chosen = keep(ed.add_set_member_variable_node("AimZoom"))
     _connect(_pin(pick, "ReturnValue", is_input=False), _pin(chosen, "AimZoom"))
     _connect(BEL.find_then_pin(sight_on), _pin(chosen, "execute"))
 
-    narrow = keep(_at(_node(ed, FN_DIV_FF), x0 + 2280, y0 + 420))
+    narrow = keep(_node(ed, FN_DIV_FF))
     _connect(base_out, _pin(narrow, "A"))
     _connect(_loose_pin(chosen, "Output_Get", is_input=False), _pin(narrow, "B"))
-    want_in = keep(_at(ed.add_set_member_variable_node("TargetFOV"), x0 + 2020, y0))
+    want_in = keep(ed.add_set_member_variable_node("TargetFOV"))
     _connect(_pin(narrow, "ReturnValue", is_input=False), _pin(want_in, "TargetFOV"))
     _connect(BEL.find_then_pin(chosen), _pin(want_in, "execute"))
 
     # False arm: not aiming at all, so not down the sights either.
-    sight_off = keep(_at(ed.add_set_member_variable_node("SightAiming"),
-                         x0 + 1500, y0 + 220))
+    sight_off = keep(ed.add_set_member_variable_node("SightAiming"))
     _set(sight_off, "SightAiming", "false")
     _connect(BEL.find_else_pin(zoomed), _pin(sight_off, "execute"))
-    want_out = keep(_at(ed.add_set_member_variable_node("TargetFOV"),
-                        x0 + 2020, y0 + 220))
+    want_out = keep(ed.add_set_member_variable_node("TargetFOV"))
     _connect(base_out, _pin(want_out, "TargetFOV"))
     _connect(BEL.find_then_pin(sight_off), _pin(want_out, "execute"))
 
@@ -160,7 +157,7 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
             _pin(still, "ReturnValue", is_input=False))
 
 
-def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep, x0, y0):
+def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     """Move the camera's FOV toward TargetFOV, and slow the mouse with it.
 
         CurrentFOV = FInterpTo(CurrentFOV, TargetFOV, dt, COMBAT.ads_interp_speed)
@@ -174,22 +171,22 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep, x0, y0):
     Returns (the exec pin to carry on from, the CurrentFOV setter).
     """
     # --- move the camera toward it ------------------------------------------
-    have = keep(_at(ed.add_get_member_variable_node("CurrentFOV"), x0 + 2020, y0 + 420))
-    want = keep(_at(ed.add_get_member_variable_node("TargetFOV"), x0 + 2020, y0 + 540))
-    step = keep(_at(_node(ed, FN_INTERP_FF), x0 + 2280, y0 + 420))
+    have = keep(ed.add_get_member_variable_node("CurrentFOV"))
+    want = keep(ed.add_get_member_variable_node("TargetFOV"))
+    step = keep(_node(ed, FN_INTERP_FF))
     _connect(_pin(have, "CurrentFOV", is_input=False), _pin(step, "Current"))
     _connect(_pin(want, "TargetFOV", is_input=False), _pin(step, "Target"))
     _connect(_pin(tick, "DeltaSeconds", is_input=False), _pin(step, "DeltaTime"))
     _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
-    moved = keep(_at(ed.add_set_member_variable_node("CurrentFOV"), x0 + 2540, y0))
+    moved = keep(ed.add_set_member_variable_node("CurrentFOV"))
     _connect(_pin(step, "ReturnValue", is_input=False), _pin(moved, "CurrentFOV"))
     for tail in exec_ins:
         _connect(tail, _pin(moved, "execute"))
 
-    cam = keep(_at(_node(ed, FN_GET_COMP), x0 + 2540, y0 + 420))
+    cam = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(cam, "self"))
     _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
-    apply_fov = keep(_at(_node(ed, FN_SET_FOV), x0 + 2800, y0))
+    apply_fov = keep(_node(ed, FN_SET_FOV))
     _connect(_pin(cam, "ReturnValue", is_input=False), _pin(apply_fov, "self"))
     # Driven from the SET node's own pass-through output, not from a fresh
     # getter: the setter passes the value it wrote straight out, so this cannot
@@ -213,12 +210,11 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep, x0, y0):
     #
     # Both base scales are signed as the engine shipped them, so multiplying
     # by a positive sensitivity cannot flip the pitch axis.
-    base_again = keep(_at(ed.add_get_member_variable_node("BaseFOV"),
-                          x0 + 2800, y0 + 560))
-    ratio = keep(_at(_node(ed, FN_DIV_FF), x0 + 3060, y0 + 480))
+    base_again = keep(ed.add_get_member_variable_node("BaseFOV"))
+    ratio = keep(_node(ed, FN_DIV_FF))
     _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(ratio, "A"))
     _connect(_pin(base_again, "BaseFOV", is_input=False), _pin(ratio, "B"))
-    eased = keep(_at(_node(ed, FN_LERP), x0 + 3320, y0 + 480))
+    eased = keep(_node(ed, FN_LERP))
     _set(eased, "A", 1.0)
     _connect(_pin(ratio, "ReturnValue", is_input=False), _pin(eased, "B"))
     _set(eased, "Alpha", COMBAT.ads_sens_compensation)
@@ -230,49 +226,45 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep, x0, y0):
     #
     # Irons never get past their own zoom, so this is 1 for every weapon but the
     # sniper, and on the sniper it arrives with the zoom.
-    zoom_now = keep(_at(_node(ed, FN_DIV_FF), x0 + 3060, y0 + 760))
+    zoom_now = keep(_node(ed, FN_DIV_FF))
     _connect(_pin(base_again, "BaseFOV", is_input=False), _pin(zoom_now, "A"))
     _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_now, "B"))
-    beyond = keep(_at(_node(ed, FN_SUB_FF), x0 + 3320, y0 + 760))
+    beyond = keep(_node(ed, FN_SUB_FF))
     _connect(_pin(zoom_now, "ReturnValue", is_input=False), _pin(beyond, "A"))
     _set(beyond, "B", COMBAT.ads_zoom_irons)
-    beyond_frac = keep(_at(_node(ed, FN_DIV_FF), x0 + 3580, y0 + 760))
+    beyond_frac = keep(_node(ed, FN_DIV_FF))
     _connect(_pin(beyond, "ReturnValue", is_input=False), _pin(beyond_frac, "A"))
     _set(beyond_frac, "B", COMBAT.ads_zoom_scope - COMBAT.ads_zoom_irons)
-    past = keep(_at(_node(ed, FN_CLAMP), x0 + 3840, y0 + 760))
+    past = keep(_node(ed, FN_CLAMP))
     _connect(_pin(beyond_frac, "ReturnValue", is_input=False), _pin(past, "Value"))
     _set(past, "Min", 0.0)
     _set(past, "Max", 1.0)
     # B is the player's ScopeSensitivity (settings screen, pushed by the HUD),
     # whose CDO default is COMBAT.ads_scope_sens_scale.
-    glass = keep(_at(_node(ed, FN_LERP), x0 + 4100, y0 + 760))
+    glass = keep(_node(ed, FN_LERP))
     _set(glass, "A", 1.0)
-    glass_sens = keep(_at(ed.add_get_member_variable_node("ScopeSensitivity"),
-                          x0 + 3840, y0 + 900))
+    glass_sens = keep(ed.add_get_member_variable_node("ScopeSensitivity"))
     _connect(_pin(glass_sens, "ScopeSensitivity", is_input=False),
              _pin(glass, "B"))
     _connect(_pin(past, "ReturnValue", is_input=False), _pin(glass, "Alpha"))
-    scoped = keep(_at(_node(ed, FN_MUL_FF), x0 + 3580, y0 + 600))
+    scoped = keep(_node(ed, FN_MUL_FF))
     _connect(_pin(eased, "ReturnValue", is_input=False), _pin(scoped, "A"))
     _connect(_pin(glass, "ReturnValue", is_input=False), _pin(scoped, "B"))
 
-    sens = keep(_at(ed.add_get_member_variable_node("MouseSensitivity"),
-                    x0 + 3320, y0 + 620))
-    factor = keep(_at(_node(ed, FN_MUL_FF), x0 + 3580, y0 + 480))
+    sens = keep(ed.add_get_member_variable_node("MouseSensitivity"))
+    factor = keep(_node(ed, FN_MUL_FF))
     _connect(_pin(scoped, "ReturnValue", is_input=False), _pin(factor, "A"))
     _connect(_pin(sens, "MouseSensitivity", is_input=False), _pin(factor, "B"))
     factor_out = _pin(factor, "ReturnValue", is_input=False)
 
     flow = BEL.find_then_pin(apply_fov)
-    for i, (var, setter, arg) in enumerate(
-            (("BaseYawScale", FN_SET_YAW_SCALE, "NewValue"),
-             ("BasePitchScale", FN_SET_PITCH_SCALE, "NewValue"))):
-        base_scale = keep(_at(ed.add_get_member_variable_node(var),
-                              x0 + 3840, y0 + 480 + i * 140))
-        scaled = keep(_at(_node(ed, FN_MUL_FF), x0 + 4100, y0 + 480 + i * 140))
+    for var, setter, arg in (("BaseYawScale", FN_SET_YAW_SCALE, "NewValue"),
+                             ("BasePitchScale", FN_SET_PITCH_SCALE, "NewValue")):
+        base_scale = keep(ed.add_get_member_variable_node(var))
+        scaled = keep(_node(ed, FN_MUL_FF))
         _connect(_pin(base_scale, var, is_input=False), _pin(scaled, "A"))
         _connect(factor_out, _pin(scaled, "B"))
-        put = keep(_at(_node(ed, setter), x0 + 4360, y0 + i * 220))
+        put = keep(_node(ed, setter))
         _connect(pc_out, _pin(put, "self"))
         _connect(_pin(scaled, "ReturnValue", is_input=False),
                  _loose_pin(put, arg))
@@ -282,8 +274,7 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep, x0, y0):
     return flow, moved
 
 
-def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep,
-                         x0, y0):
+def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep):
     """Slow the legs by how far the zoom has travelled; see the block."""
     # --- and slow the legs by the same curve ---------------------------------
     # A SECOND write of MaxWalkSpeed, after the one _author_sprint made earlier
@@ -315,19 +306,18 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep,
     # CurrentFOV/BaseFOV the sensitivity uses would have made the sniper slower
     # on its legs than the pistol, which is a zoom factor leaking into a
     # mechanic that has nothing to do with zoom.
-    steady = keep(_at(_node(ed, FN_AND), x0 + 4620, y0 + 900))
+    steady = keep(_node(ed, FN_AND))
     _connect(still, _pin(steady, "A"))
     _connect(armed_out, _pin(steady, "B"))
-    slow_gate = keep(_at(ed.add_branch_node(), x0 + 4880, y0 + 760))
+    slow_gate = keep(ed.add_branch_node())
     _connect(_pin(steady, "ReturnValue", is_input=False), _pin(slow_gate, "Condition"))
     _connect(flow, _pin(slow_gate, "execute"))
 
-    base_third = keep(_at(ed.add_get_member_variable_node("BaseFOV"),
-                          x0 + 4880, y0 + 1040))
-    zoom_ratio = keep(_at(_node(ed, FN_DIV_FF), x0 + 5140, y0 + 1040))
+    base_third = keep(ed.add_get_member_variable_node("BaseFOV"))
+    zoom_ratio = keep(_node(ed, FN_DIV_FF))
     _connect(_pin(base_third, "BaseFOV", is_input=False), _pin(zoom_ratio, "A"))
     _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_ratio, "B"))
-    so_far = keep(_at(_node(ed, FN_SUB_FF), x0 + 5400, y0 + 1040))
+    so_far = keep(_node(ed, FN_SUB_FF))
     _connect(_pin(zoom_ratio, "ReturnValue", is_input=False), _pin(so_far, "A"))
     _set(so_far, "B", 1.0)
 
@@ -336,32 +326,30 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep,
     # AimZoom rather than Held.AdsZoom because the sniper's shoulder aim stops
     # at 1.5x, and rather than a fresh select because on release AimZoom is
     # left at the zoom being let go of, which is what the ease-out travels.
-    zoom_again = keep(_at(ed.add_get_member_variable_node("AimZoom"),
-                          x0 + 5140, y0 + 1180))
-    span = keep(_at(_node(ed, FN_SUB_FF), x0 + 5400, y0 + 1180))
+    zoom_again = keep(ed.add_get_member_variable_node("AimZoom"))
+    span = keep(_node(ed, FN_SUB_FF))
     _connect(_pin(zoom_again, "AimZoom", is_input=False), _pin(span, "A"))
     _set(span, "B", 1.0)
 
-    frac = keep(_at(_node(ed, FN_DIV_FF), x0 + 5660, y0 + 1040))
+    frac = keep(_node(ed, FN_DIV_FF))
     _connect(_pin(so_far, "ReturnValue", is_input=False), _pin(frac, "A"))
     _connect(_pin(span, "ReturnValue", is_input=False), _pin(frac, "B"))
     # Clamped because the FInterpTo can overshoot its target by a fraction on a
     # long frame, and an unclamped progress of 1.02 is a walk speed below the
     # configured floor -- small, but it would be a number nobody chose.
-    progress = keep(_at(_node(ed, FN_CLAMP), x0 + 5920, y0 + 1040))
+    progress = keep(_node(ed, FN_CLAMP))
     _connect(_pin(frac, "ReturnValue", is_input=False), _pin(progress, "Value"))
     _set(progress, "Min", 0.0)
     _set(progress, "Max", 1.0)
 
-    slowed = keep(_at(_node(ed, FN_LERP), x0 + 6180, y0 + 1040))
+    slowed = keep(_node(ed, FN_LERP))
     _set(slowed, "A", 1.0)
     _set(slowed, "B", COMBAT.ads_move_speed_scale)
     _connect(_pin(progress, "ReturnValue", is_input=False), _pin(slowed, "Alpha"))
     # Off BaseSpeed, not off the speed that is currently set: this runs every
     # frame, so a factor applied to the live value would compound.
-    walked = keep(_at(ed.add_get_member_variable_node("BaseSpeed"),
-                      x0 + 6180, y0 + 1180))
-    speed = keep(_at(_node(ed, FN_MUL_FF), x0 + 6440, y0 + 1040))
+    walked = keep(ed.add_get_member_variable_node("BaseSpeed"))
+    speed = keep(_node(ed, FN_MUL_FF))
     _connect(_pin(walked, "BaseSpeed", is_input=False), _pin(speed, "A"))
     _connect(_pin(slowed, "ReturnValue", is_input=False), _pin(speed, "B"))
 
@@ -370,11 +358,10 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep,
     # own setter. _author_sprint casts to Character instead only because it
     # needs the CastFailed pin as a continuation; here the branch above is
     # already the guard.
-    legs = keep(_at(_node(ed, FN_GET_COMP), x0 + 5140, y0 + 900))
+    legs = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(legs, "self"))
     _pin(legs, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
-    apply_speed = keep(_at(ed.add_set_member_variable_node(
-        "MaxWalkSpeed", MOVEMENT_CLASS_PATH), x0 + 6700, y0 + 760))
+    apply_speed = keep(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
     _connect(_pin(legs, "ReturnValue", is_input=False), _pin(apply_speed, "self"))
     _connect(_pin(speed, "ReturnValue", is_input=False),
              _pin(apply_speed, "MaxWalkSpeed"))
@@ -384,7 +371,7 @@ def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep,
 
 
 def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
-                sights_key, exec_ins, x0, y0):
+                sights_key, exec_ins):
     """Either aim key held: zoom the camera, and slow the mouse and the legs.
 
     The shoulder aim (KeyAim) keeps the camera on its boom and zooms by
@@ -405,10 +392,9 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
         return n
 
     aimed, still = _author_aim_state(ed, pc_out, held, armed_out, key_pins,
-                                     sights_key, exec_ins, keep, x0, y0)
-    flow, moved = _author_zoom(ed, tick, pc_out, owner_out, aimed, keep, x0, y0)
-    exits = _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow,
-                                 keep, x0, y0)
+                                     sights_key, exec_ins, keep)
+    flow, moved = _author_zoom(ed, tick, pc_out, owner_out, aimed, keep)
+    exits = _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep)
 
     ed.add_comment_to_nodes(
         f"{AIM_KEY} aims over the shoulder at {COMBAT.shoulder_zoom:g}x; "

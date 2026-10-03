@@ -13,9 +13,7 @@ from combat.game_state import (
     FELL_LOG_PREFIX, NPC_ID_VAR, SPAWNED_AT_VAR, SPAWN_COUNT_VAR,
     SPAWN_LOG_PREFIX,
 )
-from combat.graph import (
-    BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set,
-)
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.hit_reaction import HIT_REACT_PROBE, LAST_HIT_FROM_VAR
 from combat.nodes import (
     FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ADD_II, FN_AND, FN_BREAK_VECTOR,
@@ -104,8 +102,8 @@ def _author_health_begin_play(ed, begin):
     # of every wanderer that has ever existed this session -- which is what
     # makes a fall-through reportable: read the number off the health bar, find
     # that number in the log, and its spawn location is right there.
-    mine = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -1200, -640)
-    is_wanderer = _at(ed.add_branch_node(), -960, -900)
+    mine = ed.add_get_member_variable_node("DespawnOnDeath")
+    is_wanderer = ed.add_branch_node()
     _connect(_pin(mine, "DespawnOnDeath", is_input=False), _pin(is_wanderer, "Condition"))
     _connect(BEL.find_then_pin(begin), _pin(is_wanderer, "execute"))
 
@@ -122,24 +120,23 @@ def _author_health_begin_play(ed, begin):
     # The template default stays as the fallback for a wanderer that somehow
     # has no owner class, and DespawnOnDeath -- already the "am I a wanderer"
     # test above -- stays the thing that decides whether any of this runs.
-    me = _at(_node(ed, FN_GET_OWNER), -1200, -500)
-    my_class = _at(_node(ed, FN_OBJECT_CLASS), -960, -500)
+    me = _node(ed, FN_GET_OWNER)
+    my_class = _node(ed, FN_OBJECT_CLASS)
     _connect(_pin(me, "ReturnValue", is_input=False), _pin(my_class, "Object"))
-    same_again = _at(ed.add_set_member_variable_node("RespawnClass"), -720, -1100)
+    same_again = ed.add_set_member_variable_node("RespawnClass")
     _connect(_pin(my_class, "ReturnValue", is_input=False),
              _pin(same_again, "RespawnClass"))
     _connect(BEL.find_then_pin(is_wanderer), _pin(same_again, "execute"))
 
-    mode = _at(_node(ed, FN_GET_GAME_MODE), -720, -900)
-    as_mode = _at(_palette(ed, NODE_CAST_GAME_MODE), -480, -900)
+    mode = _node(ed, FN_GET_GAME_MODE)
+    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     _connect(BEL.find_then_pin(same_again), _pin(as_mode, "execute"))
     mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
 
-    seen = _at(ed.add_get_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH),
-               -480, -700)
+    seen = ed.add_get_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(seen, "self"))
-    next_id = _at(_node(ed, FN_ADD_II), -240, -700)
+    next_id = _node(ed, FN_ADD_II)
     _connect(_pin(seen, SPAWN_COUNT_VAR, is_input=False), _pin(next_id, "A"))
     _set(next_id, "B", 1)
     # Take the number FIRST, then write the counter back from the stored value,
@@ -148,44 +145,43 @@ def _author_health_begin_play(ed, begin):
     # wanderer 2: the add is pure, so reading it again after the counter has
     # moved re-evaluates it against the new count. Same trap as the navmesh
     # queries in the respawn path; a stored value is what makes it go away.
-    take = _at(ed.add_set_member_variable_node(NPC_ID_VAR), 0, -900)
+    take = ed.add_set_member_variable_node(NPC_ID_VAR)
     _connect(_pin(next_id, "ReturnValue", is_input=False), _pin(take, NPC_ID_VAR))
     _connect(BEL.find_then_pin(as_mode), _pin(take, "execute"))
 
-    my_id = _at(ed.add_get_member_variable_node(NPC_ID_VAR), 240, -700)
+    my_id = ed.add_get_member_variable_node(NPC_ID_VAR)
     my_id_out = _pin(my_id, NPC_ID_VAR, is_input=False)
 
-    bump = _at(ed.add_set_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH),
-               240, -900)
+    bump = ed.add_set_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(bump, "self"))
     _connect(my_id_out, _pin(bump, SPAWN_COUNT_VAR))
     _connect(BEL.find_then_pin(take), _pin(bump, "execute"))
 
     # "[NPC-SPAWN] #7 at X=... Y=... Z=..."
-    id_str = _at(_node(ed, FN_INT_TO_STR), 480, -700)
+    id_str = _node(ed, FN_INT_TO_STR)
     _connect(my_id_out, _pin(id_str, "InInt"))
-    head = _at(_node(ed, FN_CONCAT), 720, -700)
+    head = _node(ed, FN_CONCAT)
     _set(head, "A", SPAWN_LOG_PREFIX)
     _connect(_pin(id_str, "ReturnValue", is_input=False), _pin(head, "B"))
-    here_owner = _at(_node(ed, FN_GET_OWNER), 240, -520)
-    here = _at(_node(ed, FN_ACTOR_LOC), 480, -520)
+    here_owner = _node(ed, FN_GET_OWNER)
+    here = _node(ed, FN_ACTOR_LOC)
     _connect(_pin(here_owner, "ReturnValue", is_input=False), _pin(here, "self"))
-    record = _at(ed.add_set_member_variable_node(SPAWNED_AT_VAR), 480, -900)
+    record = ed.add_set_member_variable_node(SPAWNED_AT_VAR)
     _connect(_pin(here, "ReturnValue", is_input=False), _pin(record, SPAWNED_AT_VAR))
     _connect(BEL.find_then_pin(bump), _pin(record, "execute"))
     # The log line reads the stored value rather than the actor again, so the
     # line and the variable the safety net quotes can never disagree.
-    spawned_at = _at(ed.add_get_member_variable_node(SPAWNED_AT_VAR), 720, -520)
-    where_str = _at(_node(ed, FN_VEC_TO_STR), 960, -520)
+    spawned_at = ed.add_get_member_variable_node(SPAWNED_AT_VAR)
+    where_str = _node(ed, FN_VEC_TO_STR)
     _connect(_pin(spawned_at, SPAWNED_AT_VAR, is_input=False), _pin(where_str, "InVec"))
-    at_str = _at(_node(ed, FN_CONCAT), 1200, -520)
+    at_str = _node(ed, FN_CONCAT)
     _set(at_str, "A", " at ")
     _connect(_pin(where_str, "ReturnValue", is_input=False), _pin(at_str, "B"))
-    line = _at(_node(ed, FN_CONCAT), 1440, -700)
+    line = _node(ed, FN_CONCAT)
     _connect(_pin(head, "ReturnValue", is_input=False), _pin(line, "A"))
     _connect(_pin(at_str, "ReturnValue", is_input=False), _pin(line, "B"))
 
-    say = _at(_node(ed, FN_PRINT), 1440, -900)
+    say = _node(ed, FN_PRINT)
     _connect(_pin(line, "ReturnValue", is_input=False), _pin(say, "InString"))
     # Log only. On screen it would be five lines at level start and another
     # every time something dies, over the top of the HUD it is meant to explain.
@@ -232,15 +228,15 @@ def _author_world_floor_net(ed, tick):
     # capsule ended up inside geometry" has more causes than the one that was
     # measured. For the player it is not a net at all -- it is the only thing
     # standing between "walked too far" and a fall with no bottom.
-    net_owner = _at(_node(ed, FN_GET_OWNER), -1200, 240)
-    net_loc = _at(_node(ed, FN_ACTOR_LOC), -960, 240)
+    net_owner = _node(ed, FN_GET_OWNER)
+    net_loc = _node(ed, FN_ACTOR_LOC)
     _connect(_pin(net_owner, "ReturnValue", is_input=False), _pin(net_loc, "self"))
-    net_brk = _at(_node(ed, FN_BREAK_VECTOR), -720, 240)
+    net_brk = _node(ed, FN_BREAK_VECTOR)
     _connect(_pin(net_loc, "ReturnValue", is_input=False), _pin(net_brk, "InVec"))
-    under = _at(_node(ed, FN_LESS_FF), -480, 240)
+    under = _node(ed, FN_LESS_FF)
     _connect(_pin(net_brk, "Z", is_input=False), _pin(under, "A"))
     _set(under, "B", WORLD_FLOOR_Z)
-    lost = _at(ed.add_branch_node(), -240, 0)
+    lost = ed.add_branch_node()
     _connect(_pin(under, "ReturnValue", is_input=False), _pin(lost, "Condition"))
     tick_out = BEL.find_then_pin(tick)
 
@@ -255,41 +251,41 @@ def _author_world_floor_net(ed, tick):
         # therefore the random-of-three arm the player's own punches never
         # reach. It needs no extra variable to fire once -- after the hit,
         # Health < MaxHealth is false forever.
-        probe_npc = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -1900, 1000)
-        probe_now = _at(_node(ed, FN_TIME_SECONDS), -1900, 1120)
-        probe_late = _at(_node(ed, FN_GREATER_FF), -1660, 1120)
+        probe_npc = ed.add_get_member_variable_node("DespawnOnDeath")
+        probe_now = _node(ed, FN_TIME_SECONDS)
+        probe_late = _node(ed, FN_GREATER_FF)
         _connect(_pin(probe_now, "ReturnValue", is_input=False), _pin(probe_late, "A"))
         _set(probe_late, "B", 6.0)
-        probe_hp = _at(ed.add_get_member_variable_node("Health"), -1900, 1240)
-        probe_max = _at(ed.add_get_member_variable_node("MaxHealth"), -1900, 1360)
-        probe_full = _at(_node(ed, FN_GE_FF), -1660, 1240)
+        probe_hp = ed.add_get_member_variable_node("Health")
+        probe_max = ed.add_get_member_variable_node("MaxHealth")
+        probe_full = _node(ed, FN_GE_FF)
         _connect(_pin(probe_hp, "Health", is_input=False), _pin(probe_full, "A"))
         _connect(_pin(probe_max, "MaxHealth", is_input=False), _pin(probe_full, "B"))
-        probe_and = _at(_node(ed, FN_AND), -1420, 1120)
+        probe_and = _node(ed, FN_AND)
         _connect(_pin(probe_npc, "DespawnOnDeath", is_input=False), _pin(probe_and, "A"))
         _connect(_pin(probe_late, "ReturnValue", is_input=False), _pin(probe_and, "B"))
-        probe_and2 = _at(_node(ed, FN_AND), -1180, 1120)
+        probe_and2 = _node(ed, FN_AND)
         _connect(_pin(probe_and, "ReturnValue", is_input=False), _pin(probe_and2, "A"))
         _connect(_pin(probe_full, "ReturnValue", is_input=False), _pin(probe_and2, "B"))
-        probe_br = _at(ed.add_branch_node(), -940, 1000)
+        probe_br = ed.add_branch_node()
         _connect(_pin(probe_and2, "ReturnValue", is_input=False), _pin(probe_br, "Condition"))
         _connect(tick_out, _pin(probe_br, "execute"))
 
-        probe_owner = _at(_node(ed, FN_GET_OWNER), -940, 1240)
-        probe_fwd = _at(_node(ed, FN_ACTOR_FORWARD), -700, 1240)
+        probe_owner = _node(ed, FN_GET_OWNER)
+        probe_fwd = _node(ed, FN_ACTOR_FORWARD)
         _connect(_pin(probe_owner, "ReturnValue", is_input=False), _pin(probe_fwd, "self"))
-        probe_dir = _at(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR), -700, 1000)
+        probe_dir = ed.add_set_member_variable_node(LAST_HIT_FROM_VAR)
         _connect(_pin(probe_fwd, "ReturnValue", is_input=False),
                  _pin(probe_dir, LAST_HIT_FROM_VAR))
         _connect(BEL.find_then_pin(probe_br), _pin(probe_dir, "execute"))
-        probe_hurt = _at(_node(ed, FN_SUB_FF), -460, 1240)
+        probe_hurt = _node(ed, FN_SUB_FF)
         _connect(_pin(probe_hp, "Health", is_input=False), _pin(probe_hurt, "A"))
         _set(probe_hurt, "B", 20.0)
-        probe_set = _at(ed.add_set_member_variable_node("Health"), -460, 1000)
+        probe_set = ed.add_set_member_variable_node("Health")
         _connect(_pin(probe_hurt, "ReturnValue", is_input=False), _pin(probe_set, "Health"))
         _connect(BEL.find_then_pin(probe_dir), _pin(probe_set, "execute"))
 
-        probe_join = _at(ed.add_branch_node(), -220, 1000)
+        probe_join = ed.add_branch_node()
         _set(probe_join, "Condition", "true")
         _connect(BEL.find_then_pin(probe_set), _pin(probe_join, "execute"))
         _connect(BEL.find_else_pin(probe_br), _pin(probe_join, "execute"))
@@ -299,8 +295,8 @@ def _author_world_floor_net(ed, tick):
     # ...and only then, is this one worth a log line? A wanderer under the map
     # is a bug worth reporting with its number and its spawn point. A player
     # under the map walked there.
-    net_is_npc = _at(ed.add_get_member_variable_node("DespawnOnDeath"), -240, 240)
-    reportable = _at(ed.add_branch_node(), 0, 0)
+    net_is_npc = ed.add_get_member_variable_node("DespawnOnDeath")
+    reportable = ed.add_branch_node()
     _connect(_pin(net_is_npc, "DespawnOnDeath", is_input=False),
              _pin(reportable, "Condition"))
     _connect(BEL.find_then_pin(lost), _pin(reportable, "execute"))
@@ -308,18 +304,18 @@ def _author_world_floor_net(ed, tick):
     # game within a frame, which would otherwise erase the evidence of the very
     # thing worth diagnosing. Grep [NPC-FELL] for the number, then [NPC-SPAWN]
     # for the same number to see exactly where it was put.
-    net_id = _at(ed.add_get_member_variable_node(NPC_ID_VAR), -240, 400)
-    net_id_str = _at(_node(ed, FN_INT_TO_STR), 0, 400)
+    net_id = ed.add_get_member_variable_node(NPC_ID_VAR)
+    net_id_str = _node(ed, FN_INT_TO_STR)
     _connect(_pin(net_id, NPC_ID_VAR, is_input=False), _pin(net_id_str, "InInt"))
-    net_head = _at(_node(ed, FN_CONCAT), 240, 400)
+    net_head = _node(ed, FN_CONCAT)
     _set(net_head, "A", FELL_LOG_PREFIX)
     _connect(_pin(net_id_str, "ReturnValue", is_input=False), _pin(net_head, "B"))
-    net_where = _at(_node(ed, FN_VEC_TO_STR), 240, 560)
+    net_where = _node(ed, FN_VEC_TO_STR)
     _connect(_pin(net_loc, "ReturnValue", is_input=False), _pin(net_where, "InVec"))
-    net_at = _at(_node(ed, FN_CONCAT), 480, 560)
+    net_at = _node(ed, FN_CONCAT)
     _set(net_at, "A", " fell to ")
     _connect(_pin(net_where, "ReturnValue", is_input=False), _pin(net_at, "B"))
-    net_line = _at(_node(ed, FN_CONCAT), 720, 400)
+    net_line = _node(ed, FN_CONCAT)
     _connect(_pin(net_head, "ReturnValue", is_input=False), _pin(net_line, "A"))
     _connect(_pin(net_at, "ReturnValue", is_input=False), _pin(net_line, "B"))
 
@@ -327,21 +323,21 @@ def _author_world_floor_net(ed, tick):
     # position is always "somewhere under the map", while the spawn position is
     # the thing that has to be explained. Quoting the stored SpawnedAt means the
     # two lines for one wanderer agree by construction.
-    net_origin = _at(ed.add_get_member_variable_node(SPAWNED_AT_VAR), 480, 720)
-    net_origin_str = _at(_node(ed, FN_VEC_TO_STR), 720, 720)
+    net_origin = ed.add_get_member_variable_node(SPAWNED_AT_VAR)
+    net_origin_str = _node(ed, FN_VEC_TO_STR)
     _connect(_pin(net_origin, SPAWNED_AT_VAR, is_input=False),
              _pin(net_origin_str, "InVec"))
-    net_from = _at(_node(ed, FN_CONCAT), 960, 720)
+    net_from = _node(ed, FN_CONCAT)
     _set(net_from, "A", " — spawned at ")
     _connect(_pin(net_origin_str, "ReturnValue", is_input=False), _pin(net_from, "B"))
-    net_full = _at(_node(ed, FN_CONCAT), 1200, 400)
+    net_full = _node(ed, FN_CONCAT)
     _connect(_pin(net_line, "ReturnValue", is_input=False), _pin(net_full, "A"))
     _connect(_pin(net_from, "ReturnValue", is_input=False), _pin(net_full, "B"))
 
     # PrintWarning, not PrintString: Warning is the highest severity Blueprint
     # can emit, so this is as close to an error as the graph can get, and it is
     # what makes the line stand out in the Output Log.
-    net_say = _at(_node(ed, FN_WARN), 1200, 0)
+    net_say = _node(ed, FN_WARN)
     _connect(_pin(net_full, "ReturnValue", is_input=False), _pin(net_say, "InString"))
     _connect(BEL.find_then_pin(reportable), _pin(net_say, "execute"))
 
@@ -349,7 +345,7 @@ def _author_world_floor_net(ed, tick):
     # player straight away. Missing the second connection would be the exact
     # bug this block exists to fix, silently: the player would fall past the
     # threshold, take the unreported branch, and carry on falling.
-    write_off = _at(ed.add_set_member_variable_node("Health"), 1440, 0)
+    write_off = ed.add_set_member_variable_node("Health")
     _set(write_off, "Health", 0.0)
     for tail in (BEL.find_then_pin(net_say), BEL.find_else_pin(reportable)):
         _connect(tail, _pin(write_off, "execute"))

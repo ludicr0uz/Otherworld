@@ -33,6 +33,7 @@ from combat.graph import (
     _pin,
 )
 from uebp.graph import out
+from uebp.layout import arrange
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_stats import CVAR, LEVEL, STAT_COUNT, stats_by, table_values
 from graphics_menu.gfx_tune_consts import (
@@ -85,22 +86,21 @@ def _declare_vars(ed):
         _declare(ed, name, _float_type())
 
 
-def _author_level(ed, in_execs, x0, y0, made):
+def _author_level(ed, in_execs, made):
     """The scalability level, when it moved. Returns the exec tails."""
     (index, _st), = stats_by(LEVEL)
-    moved = _call(ed, FN_NEQ_II, x0, y0 + 300, made,
-                  A=whole(ed, index, x0 - 980, y0 + 300, made),
-                  B=_get(ed, TUNER_LEVEL_APPLIED_VAR, x0 - 240, y0 + 500, made))
-    go, same = _branch(ed, out(moved), in_execs, x0 + 240, y0, made)
-    gus = _call(ed, FN_GET_GUS, x0 + 520, y0, made)
+    moved = _call(ed, FN_NEQ_II, made,
+                  A=whole(ed, index, made),
+                  B=_get(ed, TUNER_LEVEL_APPLIED_VAR, made))
+    go, same = _branch(ed, out(moved), in_execs, made)
+    gus = _call(ed, FN_GET_GUS, made)
     _connect_exec(go, gus)
-    level = _call(ed, FN_SET_OVERALL, x0 + 820, y0, made, self=out(gus),
-                  Value=whole(ed, index, x0 - 200, y0 + 700, made))
+    level = _call(ed, FN_SET_OVERALL, made, self=out(gus), Value=whole(ed, index, made))
     _connect_exec(BEL.find_then_pin(gus), level)
-    apply = _call(ed, FN_APPLY, x0 + 1120, y0, made, self=out(gus))
+    apply = _call(ed, FN_APPLY, made, self=out(gus))
     _connect_exec(BEL.find_then_pin(level), apply)
-    kept = put(ed, TUNER_LEVEL_APPLIED_VAR, whole(ed, index, x0 + 400, y0 + 1000, made),
-               [BEL.find_then_pin(apply)], x0 + 1420, y0, made)
+    kept = put(ed, TUNER_LEVEL_APPLIED_VAR, whole(ed, index, made),
+               [BEL.find_then_pin(apply)], made)
     return [kept, same]
 
 
@@ -109,42 +109,39 @@ def _connect_exec(src, node):
         raise RuntimeError("could not connect an exec pin")
 
 
-def _author_cvars(ed, in_execs, x0, y0, made):
+def _author_cvars(ed, in_execs, made):
     """One console command per cvar stat: a whole number as an int, a
     percentage as the fraction the cvar takes. Returns the last then pin."""
-    flow, x = None, x0
+    flow = None
     for index, st in stats_by(CVAR):
         if st.kind is int and st.scale == 1:
-            words = _call(ed, FN_BUILD_INT, x, y0 + 400, made,
+            words = _call(ed, FN_BUILD_INT, made,
                           Prefix=command_prefix(st.target),
-                          InInt=whole(ed, index, x - 760, y0 + 600, made))
+                          InInt=whole(ed, index, made))
         else:
-            words = _call(ed, FN_BUILD_FLOAT, x, y0 + 400, made,
+            words = _call(ed, FN_BUILD_FLOAT, made,
                           Prefix=command_prefix(st.target),
-                          InDouble=applied(ed, index, x - 760, y0 + 600, made))
+                          InDouble=applied(ed, index, made))
         # WorldContextObject is a hidden pin the compiler fills from self, and
         # a null SpecificPlayer is the first local player.
-        run = _call(ed, FN_CONSOLE, x + 300, y0, made, Command=out(words))
+        run = _call(ed, FN_CONSOLE, made, Command=out(words))
         for e in ([flow] if flow else in_execs):
             _connect_exec(e, run)
         flow = BEL.find_then_pin(run)
-        x += 1100
     return flow
 
 
 def _author_tick(ed, tick):
     made = []
-    go, _idle = _branch(ed, _get(ed, TUNER_DIRTY_VAR, 60, 300, made),
-                        [BEL.find_then_pin(tick)], 300, 0, made)
-    flow = _setter(ed, TUNER_DIRTY_VAR, "false", [go], 560, 0, made)
-    base = _call(ed, FN_MUL_II, 620, 300, made,
-                 A=_get(ed, TUNER_PRESET_VAR, 380, 300, made), B=STAT_COUNT)
-    flow = put(ed, TUNER_BASE_VAR, out(base), [flow], 860, 0, made)
-    tails = _author_level(ed, [flow], 2200, 0, made)
-    flow = _author_cvars(ed, tails, 5000, 0, made)
-    tails = author_foliage(ed, [flow], 5000, 3000, made)
-    tails = author_sky(ed, tails, 5000, 6000, made)
-    author_wind(ed, tails, 5000, 9000, made)
+    go, _idle = _branch(ed, _get(ed, TUNER_DIRTY_VAR, made), [BEL.find_then_pin(tick)], made)
+    flow = _setter(ed, TUNER_DIRTY_VAR, "false", [go], made)
+    base = _call(ed, FN_MUL_II, made, A=_get(ed, TUNER_PRESET_VAR, made), B=STAT_COUNT)
+    flow = put(ed, TUNER_BASE_VAR, out(base), [flow], made)
+    tails = _author_level(ed, [flow], made)
+    flow = _author_cvars(ed, tails, made)
+    tails = author_foliage(ed, [flow], made)
+    tails = author_sky(ed, tails, made)
+    author_wind(ed, tails, made)
     ed.add_comment_to_nodes(
         "A preset's row of the graphics table, applied when the HUD marks it "
         "Dirty: the scalability level, one console command per cvar stat, the "
@@ -158,6 +155,7 @@ def build_graphics_tuner(rebuild=True):
     tick, _begin = _events(ed, rebuild)
     _declare_vars(ed)
     _author_tick(ed, tick)
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsTuner failed to compile")
     _apply_defaults(bp, tuner_defaults())       # recompiles and saves

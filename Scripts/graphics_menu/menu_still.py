@@ -31,17 +31,15 @@ from graphics_menu.loot_kneel import FN_IGNORE_MOVE
 MENU_STILL_VAR = "MenuStill"
 
 
-def author_menu_still(ed, pc_out, in_execs, x0, y0):
+def author_menu_still(ed, pc_out, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
     made = []
-    changed = _call(ed, FN_NEQ_BB, x0 + 240, y0 + 300, made,
-                    A=_get(ed, "MenuOpen", x0, y0 + 300, made),
-                    B=_get(ed, MENU_STILL_VAR, x0, y0 + 440, made))
-    edge, same = _branch(ed, out(changed), in_execs, x0 + 500, y0, made)
-    flow = put(ed, MENU_STILL_VAR, _get(ed, "MenuOpen", x0 + 520, y0 + 300, made),
-               [edge], x0 + 760, y0, made)
-    still = _call(ed, FN_IGNORE_MOVE, x0 + 1020, y0, made, self=pc_out,
-                  bNewMoveInput=_get(ed, "MenuOpen", x0 + 780, y0 + 300, made))
+    changed = _call(ed, FN_NEQ_BB, made,
+                    A=_get(ed, "MenuOpen", made),
+                    B=_get(ed, MENU_STILL_VAR, made))
+    edge, same = _branch(ed, out(changed), in_execs, made)
+    flow = put(ed, MENU_STILL_VAR, _get(ed, "MenuOpen", made), [edge], made)
+    still = _call(ed, FN_IGNORE_MOVE, made, self=pc_out, bNewMoveInput=_get(ed, "MenuOpen", made))
     _connect(flow, _pin(still, "execute"))
     ed.add_comment_to_nodes(
         "The M panel holds the player still: the controller ignores move input "

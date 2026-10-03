@@ -12,10 +12,7 @@ import math
 
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.tuning import COMBAT
-from npc.graph import (
-    _asset_sub, _at, BEL, _connect, _log, _loose_pin, _node, _palette, _pin,
-    _set,
-)
+from npc.graph import _asset_sub, BEL, _connect, _log, _loose_pin, _node, _palette, _pin, _set
 from npc.nodes import (
     FN_AND, FN_CLAMP, FN_DOT_VV, FN_FORWARD, FN_GET_COMP, FN_GE_FF, FN_MUL_FF,
     FN_SUB_FF, NODE_CAST_WEAPON,
@@ -27,7 +24,7 @@ from npc.tuned import tuned
 BLOCK_MIN_DOT = math.cos(math.radians(COMBAT.block_half_angle_deg))
 
 
-def _author_block_check(ed, exec_in, player_out, bearing_out, x0, y0):
+def _author_block_check(ed, exec_in, player_out, bearing_out):
     """[player blocking AND swing from the front?] -> set HitDamage.
 
         exec_in --> cast player's BP_WeaponComponent
@@ -51,9 +48,9 @@ def _author_block_check(ed, exec_in, player_out, bearing_out, x0, y0):
         made.append(n)
         return n
 
-    damage, damage_out = tuned(ed, "melee_damage", x0 + 1200, y0 + 460)
+    damage, damage_out = tuned(ed, "melee_damage")
     keep(damage)
-    full = keep(_at(ed.add_set_member_variable_node(HIT_DAMAGE_VAR), x0 + 1440, y0 + 300))
+    full = keep(ed.add_set_member_variable_node(HIT_DAMAGE_VAR))
     _connect(damage_out, _pin(full, HIT_DAMAGE_VAR))
 
     eas = _asset_sub()
@@ -63,51 +60,48 @@ def _author_block_check(ed, exec_in, player_out, bearing_out, x0, y0):
         _connect(exec_in, _pin(full, "execute"))
         return made, [BEL.find_then_pin(full)]
 
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0, y0 + 240))
+    comp = keep(_node(ed, FN_GET_COMP))
     _connect(player_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
-    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 240, y0))
+    cast = keep(_palette(ed, NODE_CAST_WEAPON))
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
     _connect(exec_in, _pin(cast, "execute"))
     as_wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
-    guard = keep(_at(ed.add_get_member_variable_node("Blocking", WEAPON_COMP_CLASS_PATH),
-                     x0 + 480, y0 + 240))
+    guard = keep(ed.add_get_member_variable_node("Blocking", WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(guard, "self"))
-    facing = keep(_at(_node(ed, FN_FORWARD), x0 + 240, y0 + 400))
+    facing = keep(_node(ed, FN_FORWARD))
     _connect(player_out, _pin(facing, "self"))
-    dot = keep(_at(_node(ed, FN_DOT_VV), x0 + 480, y0 + 400))
+    dot = keep(_node(ed, FN_DOT_VV))
     _connect(_pin(facing, "ReturnValue", is_input=False), _pin(dot, "A"))
     _connect(bearing_out, _pin(dot, "B"))
-    in_front = keep(_at(_node(ed, FN_GE_FF), x0 + 720, y0 + 400))
+    in_front = keep(_node(ed, FN_GE_FF))
     _connect(_pin(dot, "ReturnValue", is_input=False), _pin(in_front, "A"))
     _set(in_front, "B", round(BLOCK_MIN_DOT, 4))
-    both = keep(_at(_node(ed, FN_AND), x0 + 720, y0 + 240))
+    both = keep(_node(ed, FN_AND))
     _connect(_pin(guard, "Blocking", is_input=False), _pin(both, "A"))
     _connect(_pin(in_front, "ReturnValue", is_input=False), _pin(both, "B"))
 
-    blocked = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+    blocked = keep(ed.add_branch_node())
     _connect(_pin(both, "ReturnValue", is_input=False), _pin(blocked, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(blocked, "execute"))
 
-    stamina = keep(_at(ed.add_get_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH),
-                       x0 + 720, y0 - 240))
+    stamina = keep(ed.add_get_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(stamina, "self"))
-    spent = keep(_at(_node(ed, FN_SUB_FF), x0 + 960, y0 - 240))
+    spent = keep(_node(ed, FN_SUB_FF))
     _connect(_pin(stamina, "Stamina", is_input=False), _pin(spent, "A"))
     _set(spent, "B", COMBAT.block_stamina_per_hit)
-    floor = keep(_at(_node(ed, FN_CLAMP), x0 + 1200, y0 - 240))
+    floor = keep(_node(ed, FN_CLAMP))
     _connect(_pin(spent, "ReturnValue", is_input=False), _pin(floor, "Value"))
     _set(floor, "Min", 0.0)
     _set(floor, "Max", INF)
-    pay = keep(_at(ed.add_set_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH),
-                   x0 + 960, y0))
+    pay = keep(ed.add_set_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(pay, "self"))
     _connect(_pin(floor, "ReturnValue", is_input=False), _pin(pay, "Stamina"))
     _connect(BEL.find_then_pin(blocked), _pin(pay, "execute"))
 
-    soft = keep(_at(ed.add_set_member_variable_node(HIT_DAMAGE_VAR), x0 + 1440, y0))
-    less = keep(_at(_node(ed, FN_MUL_FF), x0 + 1440, y0 - 120))
+    soft = keep(ed.add_set_member_variable_node(HIT_DAMAGE_VAR))
+    less = keep(_node(ed, FN_MUL_FF))
     _connect(damage_out, _pin(less, "A"))
     _set(less, "B", COMBAT.block_damage_scale)
     _connect(_pin(less, "ReturnValue", is_input=False), _pin(soft, HIT_DAMAGE_VAR))

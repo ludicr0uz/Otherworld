@@ -17,7 +17,7 @@ creatures of forest_generator/npc_ward.NPC_WARD_FEARS: the wendigo), and this
 only reads it, so a zombie takes a hot blade as it takes a cold one.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from combat.graph import BEL, _connect, _node, _pin, _set
 from uebp.graph import out
 from combat.heat_tuning import (
     BLOW_DAMAGE_VAR, FIRE_FEAR_TAG, HOT_BLOW_SCALE, HOT_VAR,
@@ -29,46 +29,45 @@ FN_ACTOR_HAS_TAG = "/Script/Engine.Actor.ActorHasTag"
 
 
 def author_hot_blow(strike):
-    """The `damage` fragment for ``strike``: ``(ed, body, exec_in, x, y) ->
+    """The `damage` fragment for ``strike``: ``(ed, body, exec_in) ->
     (the damage's pin, the exits)``, ``body`` being the actor the sweep met."""
-    def _author(ed, body, exec_in, x0, y0):
+    def _author(ed, body, exec_in):
         made = []
 
         def keep(n):
             made.append(n)
             return n
 
-        def put(value, x, y):
-            n = keep(_at(ed.add_set_member_variable_node(BLOW_DAMAGE_VAR), x, y))
+        def put(value):
+            n = keep(ed.add_set_member_variable_node(BLOW_DAMAGE_VAR))
             _set(n, BLOW_DAMAGE_VAR, value)
             return n
 
-        plain = put(strike.damage, x0, y0)
+        plain = put(strike.damage)
         _connect(exec_in, _pin(plain, "execute"))
 
-        held_n = keep(_at(ed.add_get_member_variable_node("Held"), x0, y0 + 300))
+        held_n = keep(ed.add_get_member_variable_node("Held"))
         held = out(held_n, "Held")
-        armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 300))
+        armed = keep(_node(ed, FN_IS_VALID))
         _connect(held, _pin(armed, "Object"))
-        gate = keep(_at(ed.add_branch_node(), x0 + 480, y0))
+        gate = keep(ed.add_branch_node())
         _connect(out(armed), _pin(gate, "Condition"))
         _connect(BEL.find_then_pin(plain), _pin(gate, "execute"))
-        hot_pin, hot_n = _prop(ed, HOT_VAR, held, x0 + 480, y0 + 300)
+        hot_pin, hot_n = _prop(ed, HOT_VAR, held)
         keep(hot_n)
-        hot = keep(_at(ed.add_branch_node(), x0 + 740, y0))
+        hot = keep(ed.add_branch_node())
         _connect(hot_pin, _pin(hot, "Condition"))
         _connect(BEL.find_then_pin(gate), _pin(hot, "execute"))
-        fears = keep(_at(_node(ed, FN_ACTOR_HAS_TAG), x0 + 740, y0 + 300))
+        fears = keep(_node(ed, FN_ACTOR_HAS_TAG))
         _connect(body, _pin(fears, "self"))
         _set(fears, "Tag", FIRE_FEAR_TAG)
-        burns = keep(_at(ed.add_branch_node(), x0 + 1000, y0))
+        burns = keep(ed.add_branch_node())
         _connect(out(fears), _pin(burns, "Condition"))
         _connect(BEL.find_then_pin(hot), _pin(burns, "execute"))
-        seared = put(strike.damage * HOT_BLOW_SCALE, x0 + 1260, y0 - 160)
+        seared = put(strike.damage * HOT_BLOW_SCALE)
         _connect(BEL.find_then_pin(burns), _pin(seared, "execute"))
 
-        amount = keep(_at(ed.add_get_member_variable_node(BLOW_DAMAGE_VAR),
-                          x0 + 1520, y0 + 300))
+        amount = keep(ed.add_get_member_variable_node(BLOW_DAMAGE_VAR))
         ed.add_comment_to_nodes(
             f"What the {strike.name}'s blow takes ({BLOW_DAMAGE_VAR}, "
             f"hot_blow.py): {strike.damage:g} HP, or {HOT_BLOW_SCALE:g} times "

@@ -10,7 +10,7 @@ answer the only question a stamina bar is ever asked mid-fight -- "is it
 going down because I am sprinting, or did I stop and it is coming back?"
 """
 
-from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent
 from graphics_menu.umg_consts import (
@@ -27,7 +27,7 @@ FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"
 FN_SET_FILL = "/Script/UMG.ProgressBar.SetFillColorAndOpacity"
 
 
-def _author_stamina(ed, x0, y0, in_execs):
+def _author_stamina(ed, in_execs):
     """StaminaBar = Stamina / MaxStamina, amber while sprinting. Returns the
     exec pins to go on from, the cast-failed one included."""
     made = []
@@ -36,43 +36,42 @@ def _author_stamina(ed, x0, y0, in_execs):
         made.append(n)
         return n
 
-    pawn = keep(_at(_node(ed, FN_GET_PLAYER_PAWN), x0, y0 + 260))
+    pawn = keep(_node(ed, FN_GET_PLAYER_PAWN))
     _set(pawn, "PlayerIndex", 0)
-    comp = keep(_at(_node(ed, FN_GET_COMP), x0 + 240, y0 + 260))
+    comp = keep(_node(ed, FN_GET_COMP))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
 
-    cast = keep(_at(_palette(ed, NODE_CAST_WEAPON), x0 + 500, y0))
+    cast = keep(_palette(ed, NODE_CAST_WEAPON))
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(cast, "Object"))
     for e in in_execs:
         _connect(e, _pin(cast, "execute"))
     as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
-    def var(name, py):
-        n = keep(_at(ed.add_get_member_variable_node(name, WEAPON_COMP_CLASS_PATH),
-                     x0 + 760, py))
+    def var(name):
+        n = keep(ed.add_get_member_variable_node(name, WEAPON_COMP_CLASS_PATH))
         _connect(as_weapon, _pin(n, "self"))
         return _pin(n, name, is_input=False)
 
-    frac = keep(_at(_node(ed, FN_DIV), x0 + 1000, y0 + 320))
-    _connect(var("Stamina", y0 + 260), _pin(frac, "A"))
-    _connect(var("MaxStamina", y0 + 400), _pin(frac, "B"))
-    bar = part(ed, WBP_HUD, STAMINA_BAR, x0 + 1000, y0 + 500)
+    frac = keep(_node(ed, FN_DIV))
+    _connect(var("Stamina"), _pin(frac, "A"))
+    _connect(var("MaxStamina"), _pin(frac, "B"))
+    bar = part(ed, WBP_HUD, STAMINA_BAR)
     filled = set_percent(ed, bar, _pin(frac, "ReturnValue", is_input=False),
-                         [BEL.find_then_pin(cast)], x0 + 1500, y0)
+                         [BEL.find_then_pin(cast)])
 
-    tint = keep(_at(_node(ed, FN_SELECT_COLOR), x0 + 1500, y0 + 560))
+    tint = keep(_node(ed, FN_SELECT_COLOR))
     _set(tint, "A", COL_ST_SPENT)
     _set(tint, "B", COL_ST_FILL)
-    _connect(var("Sprinting", y0 + 540), _pin(tint, "bPickA"))
-    fill = keep(_at(_node(ed, FN_SET_FILL), x0 + 1800, y0))
+    _connect(var("Sprinting"), _pin(tint, "bPickA"))
+    fill = keep(_node(ed, FN_SET_FILL))
     _connect(bar, _pin(fill, "self"))
     _connect(_pin(tint, "ReturnValue", is_input=False), _pin(fill, "InColor"))
     _connect(filled, _pin(fill, "execute"))
 
-    flashed = author_flash(ed, part(ed, WBP_HUD, ST_GROUP, x0 + 1800, y0 + 800),
+    flashed = author_flash(ed, part(ed, WBP_HUD, ST_GROUP),
                            _pin(frac, "ReturnValue", is_input=False),
-                           [BEL.find_then_pin(fill)], x0 + 2100, y0)
+                           [BEL.find_then_pin(fill)])
 
     ed.add_comment_to_nodes(
         "Stamina, beside HP under the inventory grid. The fill goes amber while "

@@ -17,7 +17,7 @@ another anim BP simply fails the cast and keeps the level pose.
 import unreal
 
 from combat.aim_pitch import AIM_PITCH_VAR
-from combat.graph import BEL, _at, _connect, _node, _palette, _pin
+from combat.graph import BEL, _connect, _node, _palette, _pin
 from combat.nodes import (
     FN_ANIM_INSTANCE, FN_BREAK_ROT, FN_GET_CONTROL_ROT, FN_MUL_FF,
     FN_NORMALIZE_AXIS,
@@ -30,7 +30,7 @@ def _anim_class_path(skin):
     return f"{skin.anim_bp}.{name}_C"
 
 
-def _author_sight_pitch(ed, pc_out, exec_ins, x0, y0):
+def _author_sight_pitch(ed, pc_out, exec_ins):
     """Set the anim instance's AimPitch. Returns the exec pins to carry on from."""
     skin = player_skin()
     anim_class = _anim_class_path(skin)
@@ -43,22 +43,21 @@ def _author_sight_pitch(ed, pc_out, exec_ins, x0, y0):
         made.append(n)
         return n
 
-    view = keep(_at(_node(ed, FN_GET_CONTROL_ROT), x0, y0 + 300))
+    view = keep(_node(ed, FN_GET_CONTROL_ROT))
     _connect(pc_out, _pin(view, "self"))
-    parts = keep(_at(_node(ed, FN_BREAK_ROT), x0 + 260, y0 + 300))
+    parts = keep(_node(ed, FN_BREAK_ROT))
     _connect(_pin(view, "ReturnValue", is_input=False), _pin(parts, "InRot"))
-    signed = keep(_at(_node(ed, FN_NORMALIZE_AXIS), x0 + 520, y0 + 300))
+    signed = keep(_node(ed, FN_NORMALIZE_AXIS))
     _connect(_pin(parts, "Pitch", is_input=False), _pin(signed, "Angle"))
-    blend = keep(_at(ed.add_get_member_variable_node("SightBlend"), x0 + 520, y0 + 440))
-    scaled = keep(_at(_node(ed, FN_MUL_FF), x0 + 780, y0 + 300))
+    blend = keep(ed.add_get_member_variable_node("SightBlend"))
+    scaled = keep(_node(ed, FN_MUL_FF))
     _connect(_pin(signed, "ReturnValue", is_input=False), _pin(scaled, "A"))
     _connect(_pin(blend, "SightBlend", is_input=False), _pin(scaled, "B"))
 
-    mesh = keep(_at(ed.add_get_member_variable_node("OwnerMesh"), x0, y0 + 160))
-    anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 260, y0 + 160))
+    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(_pin(mesh, "OwnerMesh", is_input=False), _pin(anim, "self"))
-    cast = keep(_at(_palette(ed, "Utilities|Casting|CastTo"
-                                 + anim_class.rsplit(".", 1)[1][:-2]), x0 + 520, y0))
+    cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(_pin(anim, "ReturnValue", is_input=False), _pin(cast, "Object"))
     for e in exec_ins:
         _connect(e, _pin(cast, "execute"))
@@ -66,8 +65,7 @@ def _author_sight_pitch(ed, pc_out, exec_ins, x0, y0):
                    if str(unreal.BlueprintGraphPinLibrary.get_pin_name(p))
                    .startswith("As"))
 
-    put = keep(_at(ed.add_set_member_variable_node(AIM_PITCH_VAR, anim_class),
-                   x0 + 1040, y0))
+    put = keep(ed.add_set_member_variable_node(AIM_PITCH_VAR, anim_class))
     _connect(as_anim, _pin(put, "self"))
     _connect(_pin(scaled, "ReturnValue", is_input=False), _pin(put, AIM_PITCH_VAR))
     _connect(BEL.find_then_pin(cast), _pin(put, "execute"))

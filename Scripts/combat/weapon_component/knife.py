@@ -23,7 +23,7 @@ can be injected into a headless game). Tuning is COMBAT.knife_* in tuning.py;
 the clip is knife_anim.py's.
 """
 
-from combat.graph import BEL, _at, _connect, _node, _pin
+from combat.graph import BEL, _connect, _node, _pin
 from combat.nodes import FN_GE_FF, FN_TIME_SECONDS
 from combat.tuning import COMBAT
 from combat.weapon_component.chop import _author_chop
@@ -46,24 +46,22 @@ KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,
                COMBAT.knife_radius_cm, COMBAT.knife_chest_cm)
 
 
-def _author_knife_press(ed, held, tap, not_melee, x0, y0):
+def _author_knife_press(ed, held, tap, not_melee):
     """Branch a Melee item off the fire gate; a tap off cooldown queues a
     slash. Returns (the gate's exec input, its exits)."""
-    melee, melee_n = _prop(ed, MELEE_VAR, held, x0, y0 + 160)
-    gate = _at(ed.add_branch_node(), x0 + 240, y0)
+    melee, melee_n = _prop(ed, MELEE_VAR, held)
+    gate = ed.add_branch_node()
     _connect(melee, _pin(gate, "Condition"))
     _connect(BEL.find_else_pin(gate), not_melee)
 
-    now = _at(_node(ed, FN_TIME_SECONDS), x0 + 240, y0 + 300)
-    rested = _at(_node(ed, FN_GE_FF), x0 + 480, y0 + 300)
+    now = _node(ed, FN_TIME_SECONDS)
+    rested = _node(ed, FN_GE_FF)
     _connect(_pin(now, "ReturnValue", is_input=False), _pin(rested, "A"))
-    _connect(_get(ed, NEXT_KNIFE_VAR, x0 + 240, y0 + 420), _pin(rested, "B"))
-    press = _at(ed.add_branch_node(), x0 + 720, y0)
-    _connect(_and(ed, tap, _pin(rested, "ReturnValue", is_input=False),
-                  x0 + 720, y0 + 300), _pin(press, "Condition"))
+    _connect(_get(ed, NEXT_KNIFE_VAR), _pin(rested, "B"))
+    press = ed.add_branch_node()
+    _connect(_and(ed, tap, _pin(rested, "ReturnValue", is_input=False)), _pin(press, "Condition"))
     _connect(BEL.find_then_pin(gate), _pin(press, "execute"))
-    queued = _set_bool(ed, KNIFE_QUEUED_VAR, True, BEL.find_then_pin(press),
-                       x0 + 960, y0)
+    queued = _set_bool(ed, KNIFE_QUEUED_VAR, True, BEL.find_then_pin(press))
     ed.add_comment_to_nodes(
         "A Melee item (the knife) is swung, not fired: a tap off cooldown queues "
         "a slash (KnifeQueued), which the knife's swing stage plays. Anything "
@@ -72,11 +70,10 @@ def _author_knife_press(ed, held, tap, not_melee, x0, y0):
     return _pin(gate, "execute"), (queued, BEL.find_else_pin(press))
 
 
-def _author_knife_swing(ed, exec_ins, x0, y0):
+def _author_knife_swing(ed, exec_ins):
     """The slash's swing and blow (punch.py's stages on KNIFE); returns the
     blow stage's exits. A blow on something with no health goes to chop.py:
     with an item that Chops in hand, a tree gives wood. What it takes off a
     body is hot_blow.py's: more, with a hot blade, off a creature afraid of
     fire."""
-    return _author_swing(ed, KNIFE, exec_ins, x0, y0, scenery=_author_chop,
-                         damage=author_hot_blow(KNIFE))
+    return _author_swing(ed, KNIFE, exec_ins, scenery=_author_chop, damage=author_hot_blow(KNIFE))

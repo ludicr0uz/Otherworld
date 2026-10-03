@@ -10,6 +10,7 @@ from combat.graph import (
     BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _events,
     _float_type, _key, _log, _must_load, _post_physics_tick, _struct_type,
 )
+from uebp.layout import arrange
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import (
     CHARACTER_BP_PATH, FIRE_WARD_VAR, HEALTH_BP_PATH, ITEM_BP_PATH,
@@ -348,6 +349,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     _author_wc_tick(ed, tick)
 
     _post_physics_tick(bp)
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
     _apply_defaults(bp, {

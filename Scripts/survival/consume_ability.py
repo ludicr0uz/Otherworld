@@ -29,9 +29,9 @@ ability cannot).
 import unreal
 
 from combat.graph import (
-    BEL, BGE, _assets, _at, _connect, _create_blueprint, _log, _loose_pin,
-    _must_load, _node, _palette, _pin, _set,
-)
+    BEL, BGE, _assets, _connect, _create_blueprint, _log, _loose_pin, _must_load, _node,
+    _palette, _pin, _set)
+from uebp.layout import arrange
 from combat.nodes import (
     FN_ADD_FF, FN_AVATAR, FN_CLAMP, FN_END_ABILITY, FN_GET_COMP,
     NODE_ABILITY_FROM_EVENT, NODE_BREAK_EVENT_DATA,
@@ -48,57 +48,54 @@ RESTORES = (("Hunger", "HungerRestore"), ("Thirst", "ThirstRestore"))
 
 
 def _author_graph(ed):
-    event = _palette(ed, NODE_ABILITY_FROM_EVENT, 0, 0)
-    data = _at(_palette(ed, NODE_BREAK_EVENT_DATA), 0, 300)
+    event = _palette(ed, NODE_ABILITY_FROM_EVENT)
+    data = _palette(ed, NODE_BREAK_EVENT_DATA)
     _connect(_loose_pin(event, "EventData", is_input=False),
              BEL.list_input_pins(data)[0])
 
-    as_item = _at(_palette(ed, NODE_CAST_CONSUMABLE), 320, 0)
+    as_item = _palette(ed, NODE_CAST_CONSUMABLE)
     _connect(_loose_pin(data, "OptionalObject", is_input=False),
              _pin(as_item, "Object"))
     _connect(BEL.find_then_pin(event), _pin(as_item, "execute"))
     item = _loose_pin(as_item, "AsBPConsumableItem", is_input=False)
 
-    avatar = _at(_node(ed, FN_AVATAR), 320, 300)
+    avatar = _node(ed, FN_AVATAR)
     avatar_out = _pin(avatar, "ReturnValue", is_input=False)
-    comp = _at(_node(ed, FN_GET_COMP), 560, 300)
+    comp = _node(ed, FN_GET_COMP)
     _connect(avatar_out, _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(SURVIVAL_CLASS_PATH)
-    as_survival = _at(_palette(ed, NODE_CAST_SURVIVAL), 800, 0)
+    as_survival = _palette(ed, NODE_CAST_SURVIVAL)
     _connect(_pin(comp, "ReturnValue", is_input=False), _pin(as_survival, "Object"))
     _connect(BEL.find_then_pin(as_item), _pin(as_survival, "execute"))
     survival = _loose_pin(as_survival, "AsBPSurvivalComponent", is_input=False)
 
     flow = BEL.find_then_pin(as_survival)
-    for i, (stat, restore) in enumerate(RESTORES):
-        x = 1100 + i * 800
-        now = _at(ed.add_get_member_variable_node(stat, SURVIVAL_CLASS_PATH), x, 300)
+    for stat, restore in RESTORES:
+        now = ed.add_get_member_variable_node(stat, SURVIVAL_CLASS_PATH)
         _connect(survival, _pin(now, "self"))
-        top = _at(ed.add_get_member_variable_node(f"Max{stat}", SURVIVAL_CLASS_PATH),
-                  x, 420)
+        top = ed.add_get_member_variable_node(f"Max{stat}", SURVIVAL_CLASS_PATH)
         _connect(survival, _pin(top, "self"))
-        gain = _at(ed.add_get_member_variable_node(restore, CONSUMABLE_CLASS_PATH),
-                   x, 540)
+        gain = ed.add_get_member_variable_node(restore, CONSUMABLE_CLASS_PATH)
         _connect(item, _pin(gain, "self"))
-        more = _at(_node(ed, FN_ADD_FF), x + 240, 360)
+        more = _node(ed, FN_ADD_FF)
         _connect(_pin(now, stat, is_input=False), _pin(more, "A"))
         _connect(_pin(gain, restore, is_input=False), _pin(more, "B"))
-        clamp = _at(_node(ed, FN_CLAMP), x + 480, 360)
+        clamp = _node(ed, FN_CLAMP)
         _connect(_pin(more, "ReturnValue", is_input=False), _pin(clamp, "Value"))
         _set(clamp, "Min", 0.0)
         _connect(_pin(top, f"Max{stat}", is_input=False), _pin(clamp, "Max"))
-        write = _at(ed.add_set_member_variable_node(stat, SURVIVAL_CLASS_PATH), x + 480, 0)
+        write = ed.add_set_member_variable_node(stat, SURVIVAL_CLASS_PATH)
         _connect(survival, _pin(write, "self"))
         _connect(_pin(clamp, "ReturnValue", is_input=False), _pin(write, stat))
         _connect(flow, _pin(write, "execute"))
         flow = BEL.find_then_pin(write)
 
-    _heal_nodes, healed = _author_easy_heal(ed, flow, item, avatar_out, 2800, 0)
+    _heal_nodes, healed = _author_easy_heal(ed, flow, item, avatar_out)
 
     # Every path ends the ability, including every failed cast and the heal's
     # not-easy arm: an ability left active would block the next activation of
     # this instance.
-    end = _at(_node(ed, FN_END_ABILITY), 4900, 0)
+    end = _node(ed, FN_END_ABILITY)
     for e in (*healed, _pin(as_item, "CastFailed", is_input=False),
               _pin(as_survival, "CastFailed", is_input=False)):
         _connect(e, _pin(end, "execute"))
@@ -135,6 +132,7 @@ def build_consume_ability(rebuild=True):
         if nodes:
             ed.remove_nodes(nodes)
     _author_graph(ed)
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("GA_ConsumeItem failed to compile")
 
@@ -142,6 +140,7 @@ def build_consume_ability(rebuild=True):
     cdo.set_editor_property("ability_triggers", [_trigger()])
     cdo.set_editor_property("instancing_policy",
                             unreal.GameplayAbilityInstancingPolicy.INSTANCED_PER_ACTOR)
+    arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("GA_ConsumeItem failed to recompile")
     _assets().save_loaded_asset(bp)

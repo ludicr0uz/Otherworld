@@ -4,9 +4,7 @@ that connects does is impact.py.
 """
 
 from combat.game_state import DEBUG_MODE_VAR
-from combat.graph import (
-    BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set,
-)
+from combat.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set
 from combat.nodes import (
     FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_GET_GAME_MODE,
     FN_MUL_VF, FN_NORMAL, FN_PLAY_SOUND, FN_RAND_CONE, FN_SUB_II, FN_SUB_VV,
@@ -23,7 +21,7 @@ from combat.weapon_component.tracer import _author_tracer
 SHOT_DIRECTION_VAR = "ShotDirection"
 
 
-def _author_fire(ed, held, muzzle, exec_in, x0, y0):
+def _author_fire(ed, held, muzzle, exec_in):
     """One trigger pull: the fire sound, then one trace per pellet from the muzzle.
 
     All the aiming was done in _author_resolve_aim; what is left here is the
@@ -49,26 +47,23 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     # Unconditional, on every weapon. Loaded is only ever *read* behind
     # UsesAmmo, so letting a weapon without ammunition count into the negatives costs
     # nothing and saves a branch on the one path that runs eight traces.
-    was = keep(_at(ed.add_get_member_variable_node("Loaded", ITEM_CLASS_PATH),
-                   x0 - 760, y0 + 300))
+    was = keep(ed.add_get_member_variable_node("Loaded", ITEM_CLASS_PATH))
     _connect(held, _pin(was, "self"))
-    spent = keep(_at(_node(ed, FN_SUB_II), x0 - 520, y0 + 300))
+    spent = keep(_node(ed, FN_SUB_II))
     _connect(_pin(was, "Loaded", is_input=False), _pin(spent, "A"))
     _set(spent, "B", 1)
-    burn = keep(_at(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH),
-                    x0 - 280, y0))
+    burn = keep(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH))
     _connect(held, _pin(burn, "self"))
     _connect(_pin(spent, "ReturnValue", is_input=False), _pin(burn, "Loaded"))
     _connect(exec_in, _pin(burn, "execute"))
 
-    now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 - 760, y0 + 440))
-    every, every_n = _prop(ed, "FireInterval", held, x0 - 760, y0 + 560)
+    now = keep(_node(ed, FN_TIME_SECONDS))
+    every, every_n = _prop(ed, "FireInterval", held)
     keep(every_n)
-    again = keep(_at(_node(ed, FN_ADD_FF), x0 - 520, y0 + 440))
+    again = keep(_node(ed, FN_ADD_FF))
     _connect(_pin(now, "ReturnValue", is_input=False), _pin(again, "A"))
     _connect(every, _pin(again, "B"))
-    cool = keep(_at(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH),
-                    x0 - 40, y0))
+    cool = keep(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH))
     _connect(held, _pin(cool, "self"))
     _connect(_pin(again, "ReturnValue", is_input=False), _pin(cool, "NextFireTime"))
     _connect(BEL.find_then_pin(burn), _pin(cool, "execute"))
@@ -78,16 +73,14 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     # pellet: the pellet loop needs a plain bool it can branch on, and a
     # GetGameMode plus a cast eight times over for one flag is eight times the
     # work for the same answer.
-    mode = keep(_at(_node(ed, FN_GET_GAME_MODE), x0 + 200, y0 + 300))
-    as_mode = keep(_at(_palette(ed, NODE_CAST_GAME_MODE), x0 + 200, y0))
+    mode = keep(_node(ed, FN_GET_GAME_MODE))
+    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
     _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
     _connect(BEL.find_then_pin(cool), _pin(as_mode, "execute"))
-    flag = keep(_at(ed.add_get_member_variable_node(DEBUG_MODE_VAR,
-                                                    GAME_MODE_CLASS_PATH),
-                    x0 + 200, y0 + 440))
+    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(flag, "self"))
-    note = keep(_at(ed.add_set_member_variable_node(DEBUG_MODE_VAR), x0 + 460, y0))
+    note = keep(ed.add_set_member_variable_node(DEBUG_MODE_VAR))
     _connect(_pin(flag, DEBUG_MODE_VAR, is_input=False), _pin(note, DEBUG_MODE_VAR))
     _connect(BEL.find_then_pin(as_mode), _pin(note, "execute"))
     # A GameMode of the wrong class cannot say; not drawing is the safe answer,
@@ -95,76 +88,75 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
     after_cost = [BEL.find_then_pin(note),
                   _pin(as_mode, "CastFailed", is_input=False)]
 
-    aim_get = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0, y0 + 560))
-    delta = keep(_at(_node(ed, FN_SUB_VV), x0 + 260, y0 + 560))
+    aim_get = keep(ed.add_get_member_variable_node("AimPoint"))
+    delta = keep(_node(ed, FN_SUB_VV))
     _connect(_pin(aim_get, "AimPoint", is_input=False), _pin(delta, "A"))
     _connect(muzzle, _pin(delta, "B"))
-    direction_n = keep(_at(_node(ed, FN_NORMAL), x0 + 500, y0 + 560))
+    direction_n = keep(_node(ed, FN_NORMAL))
     _connect(_pin(delta, "ReturnValue", is_input=False), _pin(direction_n, "A"))
     direction = _pin(direction_n, "ReturnValue", is_input=False)
 
-    snd_pin, snd_n = _prop(ed, "FireSound", held, x0 + 240, y0 + 140)
+    snd_pin, snd_n = _prop(ed, "FireSound", held)
     keep(snd_n)
-    play = keep(_at(_node(ed, FN_PLAY_SOUND), x0 + 520, y0))
+    play = keep(_node(ed, FN_PLAY_SOUND))
     _connect(snd_pin, _pin(play, "Sound"))
     _connect(muzzle, _pin(play, "Location"))
     for tail in after_cost:
         _connect(tail, _pin(play, "execute"))
 
-    pel_pin, pel_n = _prop(ed, "PelletCount", held, x0 + 760, y0 + 180)
+    pel_pin, pel_n = _prop(ed, "PelletCount", held)
     keep(pel_n)
-    last = keep(_at(_node(ed, FN_SUB_II), x0 + 980, y0 + 180))
+    last = keep(_node(ed, FN_SUB_II))
     _connect(pel_pin, _pin(last, "A"))
     _set(last, "B", 1)
 
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
     if not loop:
         raise RuntimeError("could not create the ForLoop macro node")
-    keep(_at(loop, x0 + 1240, y0))
+    keep(loop)
     _loose_pin(loop, "FirstIndex").set_pin_value("0")
     _connect(_pin(last, "ReturnValue", is_input=False), _loose_pin(loop, "LastIndex"))
     _connect(_author_shot_direction(ed, direction, BEL.find_then_pin(play),
-                                    keep, x0 + 760, y0 - 400),
+                                    keep),
              _loose_pin(loop, "execute"))
 
     # Each pellet: the weapon's own pattern around the shot's direction. Zero
     # on a single-round gun, so its one pellet flies exactly down the draw.
-    pattern, pattern_n = _prop(ed, "PelletSpreadDegrees", held, x0 + 1420, y0 + 840)
+    pattern, pattern_n = _prop(ed, "PelletSpreadDegrees", held)
     keep(pattern_n)
-    rad = keep(_at(_node(ed, FN_DEG2RAD), x0 + 1900, y0 + 940))
+    rad = keep(_node(ed, FN_DEG2RAD))
     _connect(pattern, _pin(rad, "A"))
-    shot_get = keep(_at(ed.add_get_member_variable_node(SHOT_DIRECTION_VAR),
-                        x0 + 1660, y0 + 620))
-    cone = keep(_at(_node(ed, FN_RAND_CONE), x0 + 1900, y0 + 620))
+    shot_get = keep(ed.add_get_member_variable_node(SHOT_DIRECTION_VAR))
+    cone = keep(_node(ed, FN_RAND_CONE))
     _connect(_pin(shot_get, SHOT_DIRECTION_VAR, is_input=False), _pin(cone, "ConeDir"))
     _connect(_pin(rad, "ReturnValue", is_input=False),
              _pin(cone, "ConeHalfAngleInRadians"))
-    rng_pin, rng_n = _prop(ed, "WeaponRange", held, x0 + 1900, y0 + 840)
+    rng_pin, rng_n = _prop(ed, "WeaponRange", held)
     keep(rng_n)
-    reach = keep(_at(_node(ed, FN_MUL_VF), x0 + 2140, y0 + 620))
+    reach = keep(_node(ed, FN_MUL_VF))
     _connect(_pin(cone, "ReturnValue", is_input=False), _pin(reach, "A"))
     _connect(rng_pin, _pin(reach, "B"))
-    end = keep(_at(_node(ed, FN_ADD_VV), x0 + 2380, y0 + 560))
+    end = keep(_node(ed, FN_ADD_VV))
     _connect(muzzle, _pin(end, "A"))
     _connect(_pin(reach, "ReturnValue", is_input=False), _pin(end, "B"))
 
-    trace = keep(_at(_node(ed, FN_TRACE), x0 + 2620, y0))
+    trace = keep(_node(ed, FN_TRACE))
     _connect(muzzle, _pin(trace, "Start"))
     _connect(_pin(end, "ReturnValue", is_input=False), _pin(trace, "End"))
     _trace_defaults(trace)
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(trace, "execute"))
 
-    brk = keep(_at(_palette(ed, NODE_BREAK_HIT), x0 + 2620, y0 + 760))
+    brk = keep(_palette(ed, NODE_BREAK_HIT))
     _connect(_pin(trace, "OutHit", is_input=False), _loose_pin(brk, "Hit"))
 
     # The tracer, in debug mode only (tracer.py). It starts at the barrel, so
     # what you see is the line the pellet took and not a line from the camera
     # -- which is what makes it worth having while tuning the aim solve, and
     # what makes it wrong to leave switched on in the game.
-    drawn, after_tracer = _author_tracer(ed, trace, brk, x0 + 2620, y0)
+    drawn, after_tracer = _author_tracer(ed, trace, brk)
     made.extend(drawn)
 
-    hit = keep(_at(ed.add_branch_node(), x0 + 3760, y0))
+    hit = keep(ed.add_branch_node())
     _connect(_pin(trace, "ReturnValue", is_input=False), _pin(hit, "Condition"))
     # Both arms of the tracer branch carry on: whether a line was drawn has
     # nothing to do with whether the pellet connected.
@@ -179,12 +171,12 @@ def _author_fire(ed, held, muzzle, exec_in, x0, y0):
         "-- when DebugMode is on, which is the only time it is drawn at all.",
         made)
 
-    _author_impact(ed, brk, held, BEL.find_then_pin(hit), x0 + 4040, y0)
+    _author_impact(ed, brk, held, BEL.find_then_pin(hit))
     # The direction goes back too, so the shot's noise cone is the pellets' line.
     return _loose_pin(loop, "Completed", is_input=False), direction
 
 
-def _author_shot_direction(ed, direction, exec_in, keep, x, y):
+def _author_shot_direction(ed, direction, exec_in, keep):
     """ShotDirection = a random direction within AimSpread of `direction`.
 
     Stored, because RandomUnitVectorInCone is pure: read per pellet it would
@@ -193,14 +185,14 @@ def _author_shot_direction(ed, direction, exec_in, keep, x, y):
     itself for a zero cone, so the shot goes exactly where the reticle is.
     Returns the exec pin to carry on from.
     """
-    cloud = keep(_at(ed.add_get_member_variable_node(AIM_SPREAD_VAR), x, y + 300))
-    rad = keep(_at(_node(ed, FN_DEG2RAD), x + 240, y + 300))
+    cloud = keep(ed.add_get_member_variable_node(AIM_SPREAD_VAR))
+    rad = keep(_node(ed, FN_DEG2RAD))
     _connect(_pin(cloud, AIM_SPREAD_VAR, is_input=False), _pin(rad, "A"))
-    draw = keep(_at(_node(ed, FN_RAND_CONE), x + 480, y + 200))
+    draw = keep(_node(ed, FN_RAND_CONE))
     _connect(direction, _pin(draw, "ConeDir"))
     _connect(_pin(rad, "ReturnValue", is_input=False),
              _pin(draw, "ConeHalfAngleInRadians"))
-    hold = keep(_at(ed.add_set_member_variable_node(SHOT_DIRECTION_VAR), x + 740, y))
+    hold = keep(ed.add_set_member_variable_node(SHOT_DIRECTION_VAR))
     _connect(_pin(draw, "ReturnValue", is_input=False), _pin(hold, SHOT_DIRECTION_VAR))
     _connect(exec_in, _pin(hold, "execute"))
     return BEL.find_then_pin(hold)

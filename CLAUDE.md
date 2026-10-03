@@ -267,8 +267,8 @@ editor.
   (`Scripts/asset_pipeline/CLAUDE.md`). One of
   each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).
 - **Item icons:** every item's icon, in the inventory grid and in the loot window, is a
-  picture of its own 3D model, lit and fitted to the slot by `Scripts/build_item_icons.py`
-  and drawn untinted (`Scripts/item_icons/CLAUDE.md`). A new or re-modelled item gets its
+  picture of its own 3D model, lit as a studio shot (its own shadows, gloss), fitted to the
+  slot and given a thin black contour by `Scripts/build_item_icons.py`, and drawn untinted (`Scripts/item_icons/CLAUDE.md`). A new or re-modelled item gets its
   icon from a re-run.
 - **Proprietary notices:** the game is Ellivian Inc.'s (`LICENSE.txt`). The title and settings
   pages carry a copyright and confidentiality notice, and every screen a faint

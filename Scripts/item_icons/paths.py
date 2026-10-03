@@ -6,7 +6,7 @@ import os
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# capture.py writes <PASSES_DIR>/<DisplayName>/{base,normal,mask}.png + view.json
+# capture.py writes <PASSES_DIR>/<DisplayName>/{base,normal,mask}.png, depth.exr + view.json
 PASSES_DIR = os.path.join(PROJECT_DIR, "assets", "generated", "item_icons")
 # compose.py writes T_UI_Icon_<DisplayName>.png beside the rest of the HUD's
 # artwork, and a contact sheet of them all beside the passes.

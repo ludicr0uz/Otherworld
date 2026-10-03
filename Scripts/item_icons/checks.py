@@ -3,7 +3,7 @@ it checks the rest of the HUD's artwork): every item has its own texture,
 imported the way UI art must be, and draws it untinted.
 
 That a texture is a shaded picture of the model, and not an empty frame, is
-compose.py's own check: it refuses to write one that is not.
+light.py's and compose.py's own check: they refuse to write one that is not.
 """
 
 import unreal

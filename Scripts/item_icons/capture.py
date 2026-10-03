@@ -1,14 +1,18 @@
-"""The editor's half: photograph each item's model into three passes.
+"""The editor's half: photograph each item's model into four passes.
 
 An item is spawned far above the level, alone in a SceneCapture2D's show-only
-list, and captured through an orthographic camera three times:
+list, and captured through an orthographic camera four times:
 
     base.png    its base colour (linear), straight out of the G-buffer
     normal.png  its world-space normals, n * 0.5 + 0.5
     mask.png    scene colour, kept for its alpha: 0 on the item, 255 off it
+    depth.exr   scene colour again, into a float target, kept for its alpha:
+                each pixel's distance from the camera, in cm
 
-plus view.json, the camera's axes, which turn those normals into the camera's
-space. compose.py lights the picture from them.
+plus view.json: the camera's axes, which turn those normals into the camera's
+space, and the picture's width in cm, which turns the depth into a shape.
+light.py lights the picture from them: the depth is what lets one part of a
+model shade another.
 
 Why the G-buffer and not a lit capture: the lit one depends on the level's
 sun (the forest boots at a random hour, and the first try came out black),
@@ -32,10 +36,18 @@ from item_icons.portrait import PORTRAIT, PORTRAIT_MESH, PORTRAIT_POSE, PORTRAIT
 SIZE = 1024                      # square, so any view of any model fits
 MARGIN = 1.08                    # of the model's bounding sphere
 FAR_ABOVE = unreal.Vector(0.0, 0.0, 50000.0)   # clear of the level and its fog
+# The camera stands this far off the model's centre, in radii. As close as
+# clears the model: the scene's depth is a half float, whose step grows with
+# the distance (0.125 cm from 128 cm on, a pixel and more of a rifle).
+CAMERA_RADII = 1.5
+CAMERA_CLEAR = 10.0              # cm, on top of that
+RGBA8 = "RTF_RGBA8"
 PASSES = (
-    ("base", "SCS_BASE_COLOR"),
-    ("normal", "SCS_NORMAL"),
-    ("mask", "SCS_SCENE_COLOR_HDR"),
+    ("base.png", "SCS_BASE_COLOR", RGBA8),
+    ("normal.png", "SCS_NORMAL", RGBA8),
+    ("mask.png", "SCS_SCENE_COLOR_HDR", RGBA8),
+    # A float target is exported as an EXR whatever its file is called.
+    ("depth.exr", "SCS_SCENE_COLOR_SCENE_DEPTH", "RTF_RGBA32F"),
 )
 
 
@@ -68,12 +80,12 @@ def _camera_rotation(item):
 
 
 def _shoot(world, actor, rotation, out_dir, label, spawned):
-    """The three passes and view.json of ``actor``, alone, seen along
+    """The four passes and view.json of ``actor``, alone, seen along
     ``rotation``. The camera it spawns is added to ``spawned``."""
     centre, radius = _model_sphere(actor)
     forward = unreal.MathLibrary.get_forward_vector(rotation)
     camera = unreal.EditorLevelLibrary.spawn_actor_from_class(
-        unreal.SceneCapture2D, centre - forward * (radius * 4.0 + 50.0), rotation)
+        unreal.SceneCapture2D, centre - forward * (radius * CAMERA_RADII + CAMERA_CLEAR), rotation)
     spawned.append(camera)
     cc = camera.get_component_by_class(unreal.SceneCaptureComponent2D)
     cc.set_editor_property("projection_type", unreal.CameraProjectionMode.ORTHOGRAPHIC)
@@ -84,27 +96,37 @@ def _shoot(world, actor, rotation, out_dir, label, spawned):
         "primitive_render_mode",
         unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST)
     cc.show_only_actor_components(actor)
-    # Without this the first capture of a model is the default checker
-    # material: its shaders are still compiling and its textures are at
-    # their lowest mip.
+    # Without this the first capture of a model is the default material:
+    # its shaders are still compiling and its textures are at their lowest
+    # mip. The wait only covers what something has asked for, and the first
+    # model of a run has been drawn by nothing yet (the pistol came out one
+    # flat grey), so a capture that is thrown away asks first.
+    unreal.AutomationLibrary.finish_loading_before_screenshot()
+    cc.set_editor_property("texture_target", unreal.RenderingLibrary.create_render_target2d(
+        world, SIZE, SIZE, getattr(unreal.TextureRenderTargetFormat, RGBA8)))
+    cc.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_BASE_COLOR)
+    cc.capture_scene()
     unreal.AutomationLibrary.finish_loading_before_screenshot()
 
     os.makedirs(out_dir, exist_ok=True)
-    for name, source in PASSES:
+    for name, source, fmt in PASSES:
         target = unreal.RenderingLibrary.create_render_target2d(
-            world, SIZE, SIZE, unreal.TextureRenderTargetFormat.RTF_RGBA8)
+            world, SIZE, SIZE, getattr(unreal.TextureRenderTargetFormat, fmt))
         cc.set_editor_property("texture_target", target)
         cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, source))
         cc.capture_scene()
-        unreal.RenderingLibrary.export_render_target(world, target, out_dir, f"{name}.png")
-        if not os.path.isfile(os.path.join(out_dir, f"{name}.png")):
+        if os.path.isfile(os.path.join(out_dir, name)):
+            os.remove(os.path.join(out_dir, name))
+        unreal.RenderingLibrary.export_render_target(world, target, out_dir, name)
+        if not os.path.isfile(os.path.join(out_dir, name)):
             raise RuntimeError(f"{label}: the {name} pass was not written")
-    axes = {k: v.to_tuple() for k, v in (
+    view = {k: v.to_tuple() for k, v in (
         ("right", unreal.MathLibrary.get_right_vector(rotation)),
         ("up", unreal.MathLibrary.get_up_vector(rotation)),
         ("forward", forward))}
+    view["width_cm"] = 2.0 * radius * MARGIN
     with open(os.path.join(out_dir, "view.json"), "w") as fh:
-        json.dump(axes, fh)
+        json.dump(view, fh)
     _log(f"{label:<9} radius {radius:6.1f} cm -> {out_dir}")
 
 

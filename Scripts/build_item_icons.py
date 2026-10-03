@@ -12,15 +12,17 @@ Three steps, and this script runs all of them:
 
     1. capture   Scripts/capture_item_icons.py, inside the editor (uepy.py):
                  each item's model, alone, as base colour + normals + mask
+                 + depth
                  -> assets/generated/item_icons/<DisplayName>/
-    2. compose   item_icons/compose.py, here: lit, levelled, fitted to 128 x 64
+    2. compose   item_icons/light.py and compose.py, here: lit as a studio
+                 shot, levelled, fitted to 128 x 64, contoured in black
                  -> assets/ui/T_UI_Icon_<DisplayName>.png, and a contact sheet
                  of them all at assets/generated/item_icons/sheet.png
     3. import    Scripts/asset_pipeline/import_ui_art.py, inside the editor
                  -> /Game/UI/Art
 
 --no-editor does step 2 alone, on the passes already captured: for tuning the
-light in compose.py, which needs no editor.
+light in item_icons/light.py, which needs no editor.
 
 An item is added in item_icons/items.py. On a fresh clone the items are built
 before their icons can be (the icon is a picture of the built item), so run

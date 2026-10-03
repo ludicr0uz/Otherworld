@@ -11,7 +11,11 @@ the compose here (Pillow + numpy), and the import
             the front, posed; its texture's name and size, the mesh, the clip
   paths     where the passes, the PNGs and the contact sheet go (assets/)
   capture   in the editor: the item alone before an orthographic
-            SceneCapture2D, written as base colour, normals and a mask
-  compose   outside it: light the passes, level, crop, fit to the canvas
+            SceneCapture2D, written as base colour, normals, a mask and depth
+  exr       outside it: reads the depth pass (an EXR, which Pillow cannot)
+  light     outside it: light the passes as a studio shot (cast shadows and
+            occlusion from the depth, key and fill, gloss), then level
+  compose   outside it: crop the lit picture, fit it to the canvas, draw the
+            thin black contour round it; the contact sheet
   checks    check_item_icons, for verify_graphics_menu.py
 """

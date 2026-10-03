@@ -9,16 +9,21 @@ It is the one setting (player_body.PLAYER_BODY) and the builds that follow
 from it, in the order they must run:
 
     1. the setting is written into asset_pipeline/player_body.py
-    2. import_body.py            only if the body has never been imported
-    3. import_quaternius.py      the stance, kneel and throw clips, on that body
-    4. Content/Weapons/Anims is emptied: the weapons build keys those pose
+    2. Content/Weapons/Anims is emptied: the weapons build keys those pose
        clips on the worn skeleton, and one left on another body's has to be
        deleted through the editor first, which takes minutes apiece
-    5. the weapons, survival, menu and clothing builds, in a fresh editor
-       (the weapons build poses every weapon in the worn body's hands)
-    6. build_item_icons.py Character   the I panel's portrait, a picture of
+    3. in ONE fresh editor (each boot is 25 seconds):
+         import_body.py            only if the body has never been imported
+         retarget_player_clips.py  the stance, kneel and throw clips, on that
+                                   body (not import_quaternius.py, which also
+                                   re-imports every pack: six minutes)
+         the weapons, survival, menu and clothing builds (the weapons build
+         poses every weapon in the worn body's hands)
+    4. build_item_icons.py Character   the I panel's portrait, a picture of
        the body the built character now wears
-    7. the verifiers
+    5. the verifiers, in a fresh editor
+
+About five minutes.
 
 Close the editor first: every step runs cold, and a cold build under an open
 editor is overwritten by it (CLAUDE.md, "Never cold-run a builder").
@@ -38,9 +43,10 @@ from asset_pipeline import catalog                      # noqa: E402
 
 SETTING = os.path.join(HERE, "player_body.py")
 UEPY = os.path.join(SCRIPTS, "dev", "uepy.py")
-IMPORT = ("asset_pipeline/import_body.py",)
-CLIPS = ("asset_pipeline/import_quaternius.py",)
-BUILDS = ("build_weapons_and_combat.py", "build_survival.py",
+# One editor: the import (if any), the clips, then the builds.
+BUILDS = ("asset_pipeline/import_body.py",
+          "asset_pipeline/retarget_player_clips.py",
+          "build_weapons_and_combat.py", "build_survival.py",
           "build_graphics_menu.py", "build_clothing.py")
 # Run as it is, not through uepy.py: it drives the editor itself.
 PORTRAIT = ("build_item_icons.py", "Character")
@@ -71,9 +77,8 @@ def steps(check_only=False):
     verify = ("the verifiers", VERIFIERS)
     if check_only:
         return [verify]
-    return [("import any body not imported yet", IMPORT),
-            ("the stance, kneel and throw clips", CLIPS),
-            ("the builds", BUILDS), ("the I panel's portrait", PORTRAIT), verify]
+    return [("the import (if needed), the clips and the builds", BUILDS),
+            ("the I panel's portrait", PORTRAIT), verify]
 
 
 def clear_pose_clips():

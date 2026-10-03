@@ -5,8 +5,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 ## The player's body (`skin.py`)
 
 - **Which body the player wears is one setting:** `asset_pipeline/player_body.py`
-  `PLAYER_BODY`, a catalog id (`adventurer_01` today: `SKM_Adventurer01`, animated by
-  `A_Adventurer01_ABP_Unarmed`, which is `ABP_Unarmed` retargeted by
+  `PLAYER_BODY`, a catalog id (`adventurer_03` today: `SKM_Adventurer03`, animated by
+  `A_Adventurer03_ABP_Unarmed`, which is `ABP_Unarmed` retargeted by
   `asset_pipeline/build_retarget.py`). Every path in `SKIN_ADVENTURER` follows it, and
   `verify/body_setting.py` checks that. To change it:
   `python3 Scripts/asset_pipeline/swap_player_body.py <id>` (`Scripts/asset_pipeline/CLAUDE.md`).

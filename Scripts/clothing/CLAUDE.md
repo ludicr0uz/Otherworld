@@ -76,11 +76,11 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 ## Not done yet
 
 - Nothing is drawn worn, and a worn garment does nothing (no warmth, no carry space).
-- **The base body** is not worn: the player still wears `SKM_Adventurer01` (dressed).
-  The base is `SKM_Adventurer03`, the same man in skin-tight shorts, generated to swap in
-  for the player's body (`asset_pipeline/player_body.py` `CLOTHING_BASE_BODY`;
-  `verify/base_body.py` checks it). Worn as a rehearsal it passed every verifier and probe.
-  Wearing it for good is `python3 Scripts/asset_pipeline/swap_player_body.py adventurer_03`
+- **The base body is worn:** the player is `SKM_Adventurer03`, the man in skin-tight
+  shorts, generated to swap in for the dressed `SKM_Adventurer01`
+  (`asset_pipeline/player_body.py` `PLAYER_BODY` and `CLOTHING_BASE_BODY`;
+  `verify/base_body.py` checks it). Garments are not drawn on it yet. Swapping bodies is
+  `python3 Scripts/asset_pipeline/swap_player_body.py <id>`
   (`Scripts/asset_pipeline/CLAUDE.md`). `SKM_Adventurer02`, the first try in loose boxers,
   is kept only as test data.
 - The saved profile (`graphics_menu/CLAUDE.md`, "Save and exit") stores the bag, not `Worn`:

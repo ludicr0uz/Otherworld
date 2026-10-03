@@ -10,7 +10,7 @@ player body from a description, with no numbers of its own anywhere in the repo.
 # 2. generate (Meshy credits: preview 20, refine 10, remesh 5, rig 5 -- ask the user first)
 python3 Scripts/asset_pipeline/fetch_monsters.py adventurer_03 --through preview   # look at the thumbnail
 python3 Scripts/asset_pipeline/fetch_monsters.py adventurer_03                     # the rest, and the rig check
-# 3. wear it: imports it, retargets, rebuilds, verifies (editor closed; about 12 minutes)
+# 3. wear it: imports it, retargets, rebuilds, verifies (editor closed; about 5 minutes)
 python3 Scripts/asset_pipeline/swap_player_body.py adventurer_03
 ```
 
@@ -79,8 +79,9 @@ bound and never add a number for one character.**
   hold-pose and gait probes, with nothing in the repo tuned for it. It took two previews: the
   first, worded "boxer briefs", came back in loose boxing shorts
   (`assets/cache/meshy/_adventurer_03_attempt1`, preview only). 60 credits in all.
-- The player is left on `adventurer_01`; `adventurer_03` is the clothing base body
-  (`CLOTHING_BASE_BODY`). Wearing it is the one command at the top.
+- **The player wears `adventurer_03`**, which is also the clothing base body
+  (`CLOTHING_BASE_BODY`). Back to the dressed one is
+  `swap_player_body.py adventurer_01`.
 - Three more things turned out to be one body's accident, and are general now: which side of
   a flat open hand is the palm (`palm_twist.hand_frame`: the two hands vote together), a
   handle no easing fully fits (`grip._eased` goes as far as it may), and how the guard's lean

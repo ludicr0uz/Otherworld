@@ -203,7 +203,7 @@ editor.
 
 ## Current state
 
-- **The player:** a Meshy-generated adventurer holding an issued shotgun, pistol, knife, axe, box of matches and stick. The SMG,
+- **The player:** a Meshy-generated adventurer in skin-tight shorts (`SKM_Adventurer03`; which body is one setting, `asset_pipeline/player_body.py`) holding an issued shotgun, pistol, knife, axe, box of matches and stick. The SMG,
   assault rifle and sniper are found as drops. The rifle is the FPS Weapon Bundle's AK 47 and
   the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
   Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). A gun is carried lowered, in the hand of the stock idle and jog, and comes up into its
@@ -263,7 +263,7 @@ editor.
   (`combat/weapon_component/wear_drag.py`), and a portrait of the character, facing
   forward, stands left of the panel (a render of the player's body: `item_icons/portrait.py`). Only the state exists: nothing is drawn worn and wearing changes nothing. The body
   the garments will be drawn on is generated: the adventurer in skin-tight shorts
-  (`SKM_Adventurer03`, Meshy), made to swap in for the player's body and not yet worn
+  (`SKM_Adventurer03`, Meshy), which the player now wears
   (`Scripts/asset_pipeline/CLAUDE.md`). One of
   each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).
 - **Item icons:** every item's icon, in the inventory grid and in the loot window, is a

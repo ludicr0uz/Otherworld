@@ -44,6 +44,8 @@ Editor-side, in pipeline order:
                                 adventurer, gun/survival props, the zombie
     quaternius_paths.py         constants: packs, asset paths, which clips/models play
     quaternius_import.py        unzip; import each GLB/FBX and rename it into its pack
+    retarget_player_clips.py    entry point: the UAL clips onto the player's body
+                                alone, from the packs as imported (the swap's step)
     ual_retarget.py             IK_UAL1/2, RTG_<Character>_from_UAL1/2, batch retarget
     import_ui_art.py            entry point: HUD art PNGs -> textures
     fab_index.py                entry point: index Fab content -> assets/cache/fab/

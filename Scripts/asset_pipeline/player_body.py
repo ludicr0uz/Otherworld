@@ -28,7 +28,7 @@ import os
 from asset_pipeline import catalog
 
 # The catalog id (asset_pipeline/catalog.py) of the body the player wears.
-PLAYER_BODY = "adventurer_01"
+PLAYER_BODY = "adventurer_03"
 
 # The catalog id of the body the garments are drawn on (Scripts/clothing): the
 # player with every clothing slot empty.

@@ -18,6 +18,8 @@ and it never relies on a variable another section left behind.
               I panel asks for (TakeOffSlot), Worn and ClothingSlot's defaults
   bullet_impact  BP_BulletImpact: the chips and dust, the seeded layout, and
               the fire graph spawning it off the health cast's failed arm
+  skins       every generated character's material: an instance of the
+              Meshy master wearing its own maps (not the grey default)
   hit_bodies  the physics bodies fitted to each model, measured ray by ray
               against the mesh; a pellet that strikes no body does nothing
   tracer      debug mode's pellet tracer: drawn off the trace's own hit result
@@ -77,6 +79,9 @@ and it never relies on a variable another section left behind.
               point and sit on the shotgun, the grip unchanged
   interact    the interact key: its idle state, the probe's press, the reach,
               the ranking by AimPoint, a walk that only remembers
+  slots       the inventory's slots: each item's Slot and WeaponKind, the
+              component's slot variables and number keys, the issued items'
+              slots, the sync before the refresh, the keys' requests
   pickup      interact's item kind: the take runs once, after the search, on
               the kept target cast to an item, with room in the bag, and
               detaches it from what it was left in
@@ -101,7 +106,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "pickup", "heat",
+    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "slots", "pickup", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",
 )

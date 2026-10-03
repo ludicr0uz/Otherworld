@@ -564,10 +564,28 @@ def verify(specs):
     return ok
 
 
+def _existing_maps(spec):
+    """The textures an earlier run imported for a character, keyed by role."""
+    name = _monster_name(spec).replace("SKM_", "")
+    out = {}
+    for _img, role, *_rest in MAPS:
+        tex = unreal.EditorAssetLibrary.load_asset(f"{_monster_dir(spec)}/T_{name}_{role}")
+        if tex:
+            out[role] = tex
+    return out
+
+
 def main(only=None):
-    """Every cached character, or just the ids in ``only`` (as import_characters)."""
+    """Every cached character, or just the ids in ``only`` (as import_characters).
+
+    ``only`` limits the texture import, never the instances: the master is
+    deleted and recreated each run, and an instance left out of the re-parent
+    loses its parent and renders the engine's grey default. That is how
+    adding adventurer_02 greyed the player and both monsters.
+    """
     unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
-    specs = [s for s in _specs() if not only or s["id"] in only]
+    every = _specs()
+    specs = [s for s in every if not only or s["id"] in only]
     if not specs:
         _log(f"nothing cached under {CACHE_ROOT} -- run fetch_monsters.py first")
         return
@@ -587,7 +605,12 @@ def main(only=None):
         return
 
     master = build_master(defaults)
+    fresh = {spec["id"] for spec, _ in imported}
+    imported += [(spec, _existing_maps(spec)) for spec in every
+                 if spec["id"] not in fresh]
     for spec, maps in imported:
+        if not maps:
+            continue
         mi = build_instance(spec, master, maps)
         if mi:
             assign_to_mesh(spec, mi)
@@ -596,7 +619,7 @@ def main(only=None):
     # unsaved mesh still claims to be wearing the material about to be deleted.
     unreal.EditorAssetLibrary.save_directory(DEST_ROOT, only_if_is_dirty=False)
     sweep_generic(specs)
-    verify(specs)
+    verify(every)
 
 
 if __name__ == "__main__":

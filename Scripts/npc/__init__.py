@@ -37,6 +37,7 @@ THE CONTROLLER'S STEPS (one fragment per concern)
   corpse       the corpse state: a Dead pawn stops the behaviour tree for good
                (Pulse), and the alive gate every other step starts at
   stats        this creature's health and flinch clips, once; voice on a timer
+               (a wendigo's only once it is Aggro: silent on patrol)
   melee        range + cooldown check, swing, damage, hit direction; then
                the creature's on-hit effects, rolled onto the player by
                survival/on_hit_graph.py (a wendigo's blow: bleeding, 33%)
@@ -92,6 +93,7 @@ CHECKS (Scripts/verify_npc_blueprints.py)
                  stand, and the blow that starts the hold over
   verify_drawn   the fire that draws a zombie: the fire it finds, the range,
                  the walk, the stand, and its place in the tree
+  verify_voice   who growls on patrol: the wendigo's voice waits for Aggro
   verify_on_hit  what a landed swing leaves on the player: the roll, the apply
 
 THE BODY

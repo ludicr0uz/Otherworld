@@ -30,6 +30,7 @@ task reads StepResult straight after calling it.
 
 from forest_generator.npc_drawn import NPC_DRAWN_ARRIVE_CM, NPC_DRAWN_RANGE_CM
 from forest_generator.npc_placement import NPC_VOICE_MAX_S, NPC_VOICE_MIN_S
+from forest_generator.npc_voice import quiet_on_patrol
 from forest_generator.npc_stalk import (
     NPC_STALK_ARC_DEG, NPC_STALK_BEHIND_CM, NPC_STALK_CHARGE_CM,
     NPC_STALK_HIDE_MAX_S, NPC_STALK_HIDE_MIN_S, NPC_STALK_ROAR, NPC_STALK_ROAR_S,
@@ -101,7 +102,7 @@ class _Steps:
         return _pin(self.result_node(value), "execute")
 
 
-def _author_pulse(ed, steps):
+def _author_pulse(ed, steps, key):
     """BT_Pulse: the part of every pass that runs before the tree chooses
     between hunting, noticing and patrolling. Returns the nodes by concern,
     for the comment boxes."""
@@ -122,7 +123,8 @@ def _author_pulse(ed, steps):
     _connect(ended, steps.result(False))
     # This creature's health, applied when it changes, and its voice on a timer. Both
     # need the pawn, which is why they sit after the gate.
-    extras, after_extras = _author_stats_and_voice(ed, alive, NPC_VOICE_MIN_S, NPC_VOICE_MAX_S)
+    extras, after_extras = _author_stats_and_voice(
+        ed, alive, NPC_VOICE_MIN_S, NPC_VOICE_MAX_S, quiet_on_patrol(key))
     setup, ready = _author_patrol_setup(ed, after_extras)
     _connect(ready, steps.result(True))
     return [own_pawn, possessed, gate], extras, setup
@@ -206,7 +208,7 @@ def _author_steps(ed, key, melee_anim):
     spec = monster_specs(key)
     steps = _Steps(ed)
 
-    gate, extras, setup = _author_pulse(ed, steps)
+    gate, extras, setup = _author_pulse(ed, steps, key)
     ed.add_comment_to_nodes(
         "BT_Pulse: the tree's first step on every pass. No pawn: fail. A "
         "corpse: stop the tree. Otherwise this creature's stats and voice, "
@@ -215,7 +217,8 @@ def _author_steps(ed, key, melee_anim):
         f"This creature's own health (TuneHealth, built {spec['health']:.0f}), "
         f"applied on the first pass after possession and whenever it is tuned, "
         f"and its voice every "
-        f"{NPC_VOICE_MIN_S:.0f}-{NPC_VOICE_MAX_S:.0f} s. Health is set from "
+        f"{NPC_VOICE_MIN_S:.0f}-{NPC_VOICE_MAX_S:.0f} s"
+        f"{' once it is Aggro (on patrol it is silent)' if quiet_on_patrol(key) else ''}. Health is set from "
         f"here rather than on the pawn because MaxHealth lives on an INHERITED "
         f"component, and Unreal keeps a child Blueprint's override of one in an "
         f"InheritableComponentHandler that Python cannot reach.",

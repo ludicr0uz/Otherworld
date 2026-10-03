@@ -37,9 +37,10 @@ The generator's code lives in this package. The level-side import code is in
 
 - **`Lvl_Forest_200m`** (`--size 200`):
   - night, 136 trees, ~44k grass clumps, ten NPCs at 75–78 m;
-  - it is the `EditorStartupMap`.
+  - it is the `EditorStartupMap`: the debug map.
 - **`Lvl_Forest_1000m`** (`--size 1000`, tree density 0.5):
   - 1,700 trees, ~1.1 M grass clumps;
+  - it is the `GameDefaultMap`: what a packaged or standalone run boots;
   - the `.umap` is 161 MB;
   - the import takes about a minute. `uepy.py` reports that the editor stopped responding, but
     the job keeps going; read the editor log.
@@ -156,8 +157,3 @@ level from scratch, which drops the forage and the day/night cycle actor.
 - **UE 5.8 renamed the fog property to `fog_inscattering_luminance`.** Use `try_set_first([...])`.
 - **Generated scripts come from `textwrap.dedent(f'''...''')` templates,** so double any literal
   braces.
-
-## Known issue
-
-`GameDefaultMap` in the config is still the old `/Game/Maps/Lvl_Forest`, so a packaged or
-standalone run boots that level.

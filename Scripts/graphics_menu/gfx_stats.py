@@ -128,8 +128,9 @@ PERFORMANCE_STATS = (
     Stat("anti_aliasing", "AA (0, 1 FXAA, 2 TAA, 4 TSR)", 1, 0, 4, int, CVAR,
          "r.AntiAliasingMethod", _same(2)),
     # Wind is world-position offset: off, the cells skip it (and Nanite its
-    # programmable raster); past the distance an instance stands still.
-    Stat("wind", "wind (0 off, 1 on)", 1, 0, 1, int, WIND, "", _same(1)),
+    # programmable raster); past the distance an instance stands still. Only
+    # Custom (once Ultra) pays for it.
+    Stat("wind", "wind (0 off, 1 on)", 1, 0, 1, int, WIND, "", (0, 0, 0, 1)),
     Stat("wind_distance", "wind distance (m)", 10, 10, 500, int, WIND, "",
          (50, 80, 120, 200)),
 )

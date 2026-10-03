@@ -279,7 +279,8 @@ editor.
   the prevailing wind, in gusts that cross the map in patches; the graphics menu's GRAPHICS SETTINGS tab switches it on or off
   per preset, sets how far off it still moves, and its strength and speed
   (`graphics_menu/gfx_tuner_wind.py`).
-- **The maps:** `Lvl_Forest_200m` (the startup map) and `Lvl_Forest_1000m`. Food and water lie
+- **The maps:** `Lvl_Forest_200m` (the editor's startup map, for debugging) and
+  `Lvl_Forest_1000m` (`GameDefaultMap`: what a packaged game boots). Food and water lie
   in both.
 - **Day and night:** a clock turns the sun and the moon across the sky. The day and the night
   are 4 minutes each for now (`Scripts/world/world_config.py`). The night is moonlit, dim and
@@ -292,8 +293,7 @@ editor.
 - **Death:** once the player or a wanderer is dead (or at 0 HP), nothing it could do runs: the
   weapon component's Tick stops at its dead gate, the loot window shuts, and every step of a
   wanderer's tree refuses (`probes/probe_dead_no_actions.py`).
-- **Known gaps:** a low temperature does nothing yet. `GameDefaultMap` still points at the old
-  `Lvl_Forest`. Feel checks that need a play session are listed per package.
+- **Known gaps:** a low temperature does nothing yet. Feel checks that need a play session are listed per package.
 
 ## Gotchas learned the hard way
 

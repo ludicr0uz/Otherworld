@@ -308,7 +308,8 @@ into the HUD. Enter on a number saves nothing in this tab.
   `MPC_Wind`'s `Strength` and `Speed`. The wind row walks every instanced-mesh cell
   (`SetEvaluateWorldPositionOffset`), so off takes the offset's cost away too, not only
   the motion; the strength is also zeroed. The wind distance is each cell's
-  `SetWorldPositionOffsetDisableDistance`: an instance further off stands still. It is
+  `SetWorldPositionOffsetDisableDistance`: an instance further off stands still. Wind is
+  off by default on Low, Medium and High and on only on Custom (once Ultra). The distance is
   plain metres from the camera, and the defaults (50 / 80 / 120 / 200 m) are long
   because a 30 m one left every tree in a rendered shot still. Strength and speed go to
   `MPC_Wind` on every apply. A speed nudge jumps the sway once (time x speed).

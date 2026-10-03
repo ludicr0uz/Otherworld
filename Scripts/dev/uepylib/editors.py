@@ -25,8 +25,16 @@ from uepylib.paths import editor_inbox, log, uproject
 # The binary's basename must end right there: UnrealEditorServices is not one.
 _BINARY = re.compile(r"/(UnrealEditor(?:-Cmd)?)(?=\s|$)")
 
+# A dirty level is saved without its RecastNavMesh: the editor re-creates one
+# on open, and a game that loads a saved one never builds a tile
+# (Scripts/world/level_save.py).
 QUIT_JOB = """
 import unreal
+_world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+if _world and _world.get_outermost().is_dirty():
+    _sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    for _a in [a for a in _sub.get_all_level_actors() if isinstance(a, unreal.RecastNavMesh)]:
+        _sub.destroy_actor(_a)
 saved = unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
 unreal.log_warning(f"[uepy] saved dirty packages: {saved}; quitting")
 unreal.SystemLibrary.quit_editor()

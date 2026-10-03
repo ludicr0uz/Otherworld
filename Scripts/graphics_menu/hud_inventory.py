@@ -1,26 +1,33 @@
-"""DrawHUD: the inventory grid -- WBP_HUD's ten WBP_InventorySlots and the
-equipped weapon's name above them -- filled from the weapon component.
+"""DrawHUD: the inventory's slots -- WBP_HUD's hand slot, four weapon slots
+and ten bag slots (WBP_InventorySlot each) and the held item's name above
+the hand -- filled from the weapon component.
 
 Everything shown comes off the carried item itself (Icon, SlotColor,
 DisplayName, UsesAmmo, Loaded, Reserve, InfiniteReserve), so the HUD keeps no table of weapons
-and no idea which of them has a magazine. Slot i shows Inventory[i]; a slot
-past the end of the inventory is emptied, every frame, so a dropped weapon
-leaves no ghost behind.
+and no idea which of them has a magazine. One loop over the fifteen slot
+codes (combat/slot_tuning.py): code c's widget is the hand's cell, a weapon
+cell or a bag cell (inv_consts.SLOT_BOXES), and it shows the component's
+SlotItems[c], read behind IsValidIndex and then IsValid; an empty slot is
+emptied, every frame, so a dropped weapon leaves no ghost behind. The bag's
+grid shows only with the I panel open.
 
-The equipped slot gets a lit background AND a lit frame over its icon -- a
-lit edge alone was reported as not reading -- and its name, once, above the
-grid rather than in every slot.
+A lit slot gets a lit background AND a lit frame over its icon -- a lit
+edge alone was reported as not reading: the hand's, the bag slot under the
+I panel's caret, and the slot a drag started on.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
-from combat.tuning import INVENTORY_SIZE
+from combat.nodes import FN_AND, FN_IS_VALID, FN_LESS_II, FN_NOT, FN_OR, FN_SUB_II
+from combat.slot_tuning import HAND, SLOT_COUNT, SLOT_ITEMS_VAR
+from graphics_menu.inv_consts import BAG_PANEL, DRAG_FROM_VAR, SEL_TO_CODE, SLOT_BOXES
 from graphics_menu.ui_graph import (
     FN_CHILD_AT, MACRO_FOR_LOOP, member, part, set_shown, set_text, show_if,
 )
 from graphics_menu.umg_consts import (
-    EQUIPPED_NAME, SLOT_ACTIVE, SLOT_AMMO, SLOT_FRAME, SLOT_ICON, SLOTS,
-    WBP_HUD, WBP_INVENTORY_SLOT,
+    EQUIPPED_NAME, SLOT_ACTIVE, SLOT_AMMO, SLOT_FRAME, SLOT_ICON, WBP_HUD,
+    WBP_INVENTORY_SLOT,
 )
+from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_SEL_VAR
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
@@ -35,6 +42,7 @@ FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
 FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 FN_SELECT_STR = "/Script/Engine.KismetMathLibrary.SelectString"
+FN_SELECT_OBJ = "/Script/Engine.KismetMathLibrary.SelectObject"
 # What an InfiniteReserve weapon (the pistol) shows for its reserve.
 INFINITE_RESERVE_TEXT = "\u221e"
 FN_SET_BRUSH = "/Script/UMG.Image.SetBrushFromTexture"
@@ -121,12 +129,67 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, x0, y0):
     return show_if(ed, frame, is_equipped, lit, x0 + 2820, y0)
 
 
-def _author_empty_slot(ed, slot, exec_in, x0, y0):
-    flow = (exec_in,)
+def _author_empty_slot(ed, slot, execs, x0, y0):
+    flow = tuple(execs)
     for i, name in enumerate((SLOT_ICON, SLOT_AMMO, SLOT_ACTIVE, SLOT_FRAME)):
         target = member(ed, slot, WBP_INVENTORY_SLOT, name, x0 + i * 260, y0 + 240)
         flow = (set_shown(ed, target, False, flow, x0 + i * 260, y0),)
     return flow
+
+
+def _slot_widget(ed, code, x0, y0):
+    """Code ``code``'s WBP_InventorySlot (as a UObject): the hand's cell, a
+    weapon cell or a bag cell. GetChildAt past a grid's end is None, never
+    an error, so all three are read and the code picks one."""
+    (hand_box, _h, _n), (weapon_box, first_weapon, _w), (bag_box, first_bag, _b) = SLOT_BOXES
+    kids = []
+    for i, (box, first) in enumerate(((hand_box, 0), (weapon_box, first_weapon),
+                                      (bag_box, first_bag))):
+        at = _at(_node(ed, FN_SUB_II), x0, y0 + i * 300)
+        _connect(code, _pin(at, "A"))
+        _set(at, "B", first)
+        child = _at(_node(ed, FN_CHILD_AT), x0 + 260, y0 + i * 300)
+        _connect(part(ed, WBP_HUD, box, x0, y0 + i * 300 + 140), _pin(child, "self"))
+        _connect(_pin(at, "ReturnValue", is_input=False), _pin(child, "Index"))
+        kids.append(_pin(child, "ReturnValue", is_input=False))
+    in_bag = _at(_node(ed, FN_LESS_II), x0 + 520, y0 + 900)
+    _connect(code, _pin(in_bag, "A"))
+    _set(in_bag, "B", first_bag)
+    near = _at(_node(ed, FN_SELECT_OBJ), x0 + 780, y0 + 300)
+    _connect(kids[1], _pin(near, "A"))
+    _connect(kids[2], _pin(near, "B"))
+    _connect(_pin(in_bag, "ReturnValue", is_input=False), _pin(near, "bSelectA"))
+    is_hand = _at(_node(ed, FN_EQ_II), x0 + 780, y0 + 900)
+    _connect(code, _pin(is_hand, "A"))
+    _set(is_hand, "B", HAND)
+    pick = _at(_node(ed, FN_SELECT_OBJ), x0 + 1040, y0)
+    _connect(kids[0], _pin(pick, "A"))
+    _connect(_pin(near, "ReturnValue", is_input=False), _pin(pick, "B"))
+    _connect(_pin(is_hand, "ReturnValue", is_input=False), _pin(pick, "bSelectA"))
+    return _pin(pick, "ReturnValue", is_input=False), _pin(is_hand, "ReturnValue",
+                                                         is_input=False)
+
+
+def _lit(ed, code, is_hand, x0, y0):
+    """The hand's slot, the bag slot under the open panel's caret, and the
+    slot a drag started on (a pure bool)."""
+    def var(name, y):
+        return _pin(_at(ed.add_get_member_variable_node(name), x0, y), name, is_input=False)
+
+    def node(fn, a, b, y):
+        n = _at(_node(ed, fn), x0 + 260, y)
+        _connect(a, _pin(n, "A"))
+        if isinstance(b, int):
+            _set(n, "B", b)
+        else:
+            _connect(b, _pin(n, "B"))
+        return _pin(n, "ReturnValue", is_input=False)
+
+    sel_code = node(FN_SUB_II, var(WEAR_SEL_VAR, y0), SEL_TO_CODE, y0)
+    caret = node(FN_AND, var(WEAR_OPEN_VAR, y0 + 140),
+                 node(FN_EQ_II, code, sel_code, y0 + 140), y0 + 280)
+    dragged = node(FN_EQ_II, code, var(DRAG_FROM_VAR, y0 + 420), y0 + 420)
+    return node(FN_OR, node(FN_OR, is_hand, caret, y0 + 560), dragged, y0 + 700)
 
 
 def author_inventory(ed, x0, y0, in_execs):
@@ -154,39 +217,56 @@ def author_inventory(ed, x0, y0, in_execs):
     named = _author_equipped_name(ed, inv, equipped, BEL.find_then_pin(cast),
                                   x0 + 1000, y0)
 
-    # Slot i of the grid, i over every slot the component allows.
+    items = _at(ed.add_get_member_variable_node(SLOT_ITEMS_VAR, WEAPON_COMP_CLASS_PATH),
+                x0 + 760, y0 + 540)
+    _connect(as_weapon, _pin(items, "self"))
+    items = _pin(items, SLOT_ITEMS_VAR, is_input=False)
+
+    # The bag's grid only with the I panel open, and never under the menu.
+    open_ = _at(ed.add_get_member_variable_node(WEAR_OPEN_VAR), x0 + 1760, y0 + 700)
+    menu = _at(ed.add_get_member_variable_node("MenuOpen"), x0 + 1760, y0 + 840)
+    no_menu = _at(_node(ed, FN_NOT), x0 + 2000, y0 + 840)
+    _connect(_pin(menu, "MenuOpen", is_input=False), _pin(no_menu, "A"))
+    bag_up = _at(_node(ed, FN_AND), x0 + 2240, y0 + 700)
+    _connect(_pin(open_, WEAR_OPEN_VAR, is_input=False), _pin(bag_up, "A"))
+    _connect(_pin(no_menu, "ReturnValue", is_input=False), _pin(bag_up, "B"))
+    shown = show_if(ed, part(ed, WBP_HUD, BAG_PANEL, x0 + 1760, y0 + 1000),
+                    _pin(bag_up, "ReturnValue", is_input=False), named, x0 + 2000, y0)
+
+    # Slot code c, over every code.
     loop = ed.add_macro_node(MACRO_FOR_LOOP)
     if not loop:
         raise RuntimeError("could not create the ForLoop macro node")
-    _at(loop, x0 + 2300, y0)
+    _at(loop, x0 + 2600, y0)
     _set(loop, "FirstIndex", 0)
-    _set(loop, "LastIndex", INVENTORY_SIZE - 1)
-    for e in named:
+    _set(loop, "LastIndex", SLOT_COUNT - 1)
+    for e in shown:
         _connect(e, _pin(loop, "execute"))
     index = _loose_pin(loop, "Index", is_input=False)
-    child = _at(_node(ed, FN_CHILD_AT), x0 + 2600, y0 + 300)
-    _connect(part(ed, WBP_HUD, SLOTS, x0 + 2300, y0 + 500), _pin(child, "self"))
-    _connect(index, _pin(child, "Index"))
-    as_slot = _at(_palette(ed, NODE_CAST_SLOT), x0 + 2860, y0)
-    _connect(_pin(child, "ReturnValue", is_input=False), _pin(as_slot, "Object"))
+    widget, is_hand = _slot_widget(ed, index, x0 + 2600, y0 + 400)
+    as_slot = _at(_palette(ed, NODE_CAST_SLOT), x0 + 3900, y0)
+    _connect(widget, _pin(as_slot, "Object"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(as_slot, "execute"))
     slot = _loose_pin(as_slot, "AsWBPInventorySlot", is_input=False)
 
-    valid, item = _item(ed, inv, index, x0 + 2860, y0 + 400)
-    carried = _at(ed.add_branch_node(), x0 + 3120, y0)
+    valid, item = _item(ed, items, index, x0 + 3900, y0 + 400)
+    carried = _at(ed.add_branch_node(), x0 + 4160, y0)
     _connect(valid, _pin(carried, "Condition"))
     _connect(BEL.find_then_pin(as_slot), _pin(carried, "execute"))
-    is_equipped = _at(_node(ed, FN_EQ_II), x0 + 3120, y0 + 400)
-    _connect(index, _pin(is_equipped, "A"))
-    _connect(equipped, _pin(is_equipped, "B"))
-    _author_filled_slot(ed, slot, item, _pin(is_equipped, "ReturnValue", is_input=False),
-                        BEL.find_then_pin(carried), x0 + 3400, y0)
-    _author_empty_slot(ed, slot, BEL.find_else_pin(carried), x0 + 3400, y0 + 1400)
-
+    there = _at(_node(ed, FN_IS_VALID), x0 + 4160, y0 + 400)
+    _connect(item, _pin(there, "Object"))
+    filled = _at(ed.add_branch_node(), x0 + 4420, y0)
+    _connect(_pin(there, "ReturnValue", is_input=False), _pin(filled, "Condition"))
+    _connect(BEL.find_then_pin(carried), _pin(filled, "execute"))
+    _author_filled_slot(ed, slot, item, _lit(ed, index, is_hand, x0 + 4420, y0 + 600),
+                        BEL.find_then_pin(filled), x0 + 4700, y0)
+    _author_empty_slot(ed, slot, (BEL.find_else_pin(carried), BEL.find_else_pin(filled)),
+                       x0 + 4700, y0 + 1400)
     ed.add_comment_to_nodes(
-        "The inventory grid: slot i shows Inventory[i] -- its own icon in its "
-        "own SlotColor, rounds-in-gun / rounds-in-reserve if it uses ammunition, "
-        "and a lit background and frame if it is the equipped one. Slots past "
-        "the end are emptied.", [cast, loop, as_slot, carried])
+        "The inventory's slots: code c's widget (the hand, a weapon slot, a bag "
+        "slot) shows SlotItems[c] -- its own icon in its own SlotColor, "
+        "rounds-in-gun / rounds-in-reserve if it uses ammunition, and a lit "
+        "background and frame on the hand, the caret and a drag's start. Empty "
+        "slots are emptied.", [cast, loop, as_slot, carried])
     return (_loose_pin(loop, "Completed", is_input=False),
             _pin(cast, "CastFailed", is_input=False))

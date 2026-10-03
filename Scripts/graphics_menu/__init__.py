@@ -8,8 +8,10 @@ The screens (widget trees, authored through the UMGToolSet plugin)
                   palette -- constants only
   umg_author      building a Widget Blueprint's tree from Python: add, style, slot
   wbp_parts       WBP_MenuRow (caret, label, value) and WBP_InventorySlot
-  wbp_hud         WBP_HUD: survival bars (bottom left), kills, banner, inventory
-                  grid with HP and stamina under it, FPS; an icon by every bar
+  wbp_hud         WBP_HUD: survival bars (bottom left), kills, banner, the hand
+                  slot over the weapon slots with HP and stamina under them,
+                  the Kit (worn panel over the bag, bottom right), FPS; an icon
+                  by every bar
   wbp_screens     WBP_PauseMenu (the menu: the title's, and M's in play),
                   WBP_MainMenu (its settings page), WBP_DeathMenu
 
@@ -23,7 +25,12 @@ The HUD graph that shows and writes them
   hud_flash       a stat bar's group blinking while the bar is low
   stamina_bar     the stamina bar's fill, amber while sprinting
   survival_bars   hunger/thirst/temperature fills and the debuff names
-  hud_inventory   the inventory grid and the equipped weapon's name
+  hud_inventory   the inventory's slots (hand, weapons, bag: SlotItems) and the
+                  held item's name; the bag shown with I
+  inv_consts      the inventory's widgets, the drag's variables, the caret's
+                  run from the worn rows into the bag
+  inv_drag        DrawHUD, the I panel open: the slot under the cursor, a drag
+                  (MoveFrom/MoveTo) and a click (SlotRequest)
   fps             the FPS readout, always on screen
   profile_draw    the save-and-exit countdown banner
   settings_page   the settings page's values and hint; pushing settings onto the weapon
@@ -76,10 +83,12 @@ Input, settings and state
   loot_draw       DrawHUD: the loot prompt, and the window's icon rows and caret
   wbp_loot        WBP_HUD's loot prompt and window (called from wbp_hud)
   wear_consts     the I panel: keys (I, Up/Down, Enter), variables, widget names
-  wear_tick       the I panel's Tick fragment: keys, the take-off asked of the
-                  weapon component (TakeOffSlot), the walk held while open
-  wear_draw       DrawHUD: the I panel's rows (what Worn holds) and caret
-  wbp_wear        WBP_HUD's I panel (called from wbp_hud)
+  wear_tick       the I panel's Tick fragment: keys, the take-off (TakeOffSlot)
+                  or a bag slot to hand (SlotRequest) asked of the weapon
+                  component, the walk held while open
+  wear_draw       DrawHUD: the worn rows (what Worn holds, always shown), and
+                  with the I panel open the caret, the mouse and the drag
+  wbp_wear        WBP_HUD's worn panel (called from wbp_hud, in the Kit)
   legal_consts    the proprietary notices' words and places, WATERMARK_RECIPIENT
   wbp_legal       WBP_MainMenu's LegalNotice and WBP_HUD's Watermark (called
                   from wbp_screens and wbp_hud)

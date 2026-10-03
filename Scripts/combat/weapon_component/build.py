@@ -22,6 +22,11 @@ from combat.breath_tuning import (
     WINDED_VAR,
 )
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_VAR, SWAY_VARS
+from combat.slot_tuning import (
+    HAND_FROM_VAR, HAS_ROOM_VAR, MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR, MOVE_TO_VAR,
+    NO_REQUEST, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
+    STARTER_HAND_FROM,
+)
 from combat.tuning import BIND_VARS, COMBAT
 from combat.weapon_component.accuracy import ACCURACY_OUT_VARS
 from combat.wear_tuning import NOT_CLOTHING, TAKE_OFF_VAR, WEAR_ITEM_VAR, WORN_VAR
@@ -77,6 +82,12 @@ from combat.weapon_component.throw_windup import (
 )
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
+
+
+# The slots' int variables, all NO_REQUEST at rest (HandFrom's default is
+# the issued shotgun's: build_weapon_component overrides it).
+SLOT_INT_VARS = (HAND_FROM_VAR, SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_WANT_VAR,
+                 MOVE_FROM_VAR, MOVE_TO_VAR, MOVE_SRC_VAR, MOVE_DST_VAR)
 
 
 def _kept_class(bp, var):
@@ -196,6 +207,15 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # of it still plays with the keys this file documents.
     for name, _default in BIND_VARS:
         _declare(ed, name, _struct_type(unreal.Key.static_struct()))
+    # The slots (slot_tuning.py): the number keys, SlotItems (the sync's view),
+    # where the hand's item came from, whether a pick-up fits, the requests.
+    for name, _default, _slot in SLOT_KEYS:
+        _declare(ed, name, _struct_type(unreal.Key.static_struct()))
+    _declare(ed, SLOT_ITEMS_VAR,
+             BEL.get_array_type(BEL.get_object_reference_type(item_class)))
+    for name in SLOT_INT_VARS:
+        _declare(ed, name, BEL.get_basic_type_by_name("int"))
+    _declare(ed, HAS_ROOM_VAR, BEL.get_basic_type_by_name("bool"))
     # Mouse sensitivity, and the two controller scales it multiplies. Both
     # bases are cached off the PlayerController at BeginPlay -- BasePitchScale
     # especially, because the engine ships it negative and a literal would
@@ -368,6 +388,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         WINDED_VAR: False,
         BREATH_FORCED_VAR: False,
         **{name: _key(k) for name, k in BIND_VARS},
+        **{name: _key(k) for name, k, _slot in SLOT_KEYS},
+        **{name: NO_REQUEST for name in SLOT_INT_VARS},
+        HAND_FROM_VAR: STARTER_HAND_FROM,
+        HAS_ROOM_VAR: True,
         # Both overwritten on the first frame of BeginPlay. Seeded with the
         # engine's own defaults, signs included, so that a BeginPlay that
         # somehow never ran leaves the look working rather than dead.

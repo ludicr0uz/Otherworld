@@ -5,11 +5,10 @@ aim/fire/inventory/sprint/recoil/ammo fragments in order.
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.weapon_component.accuracy import _author_accuracy
 from combat.nodes import (
-    FN_ADD_II, FN_AND, FN_ARR_LEN, FN_GET_OWNER, FN_GET_PC, FN_GE_FF,
-    FN_GREATER_II, FN_IS_KEY_DOWN, FN_IS_VALID, FN_LESS_II, FN_MOD_II,
-    FN_NOT, FN_OR, FN_TIME_SECONDS, FN_WAS_PRESSED,
+    FN_AND, FN_GET_OWNER, FN_GET_PC, FN_GE_FF, FN_GREATER_II, FN_IS_KEY_DOWN,
+    FN_IS_VALID, FN_NOT, FN_OR, FN_TIME_SECONDS, FN_WAS_PRESSED,
 )
-from combat.tuning import BIND_VARS, SWITCH_KEY
+from combat.tuning import BIND_VARS
 from combat.weapon_component.ads import _author_ads
 from combat.weapon_component.aim import _author_resolve_aim
 from combat.weapon_component.ammo import _author_dry_fire, _author_reload
@@ -39,6 +38,8 @@ from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
 )
 from combat.weapon_component.shot_noise import _author_shot_noise
+from combat.weapon_component.slot_moves import _author_slot_keys, _author_slot_serve
+from combat.weapon_component.slot_sync import _author_slot_sync
 from combat.weapon_component.head_hide import _author_head_hide
 from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
@@ -64,8 +65,8 @@ def _author_wc_tick(ed, tick):
     next guard. That keeps the chain flat and means a block can be inserted or
     removed without re-fanning a Sequence's pins.
 
-    Refresh runs last so a switch, drop or pick-up earlier in the same frame is
-    already applied when it does.
+    Refresh runs last, after the slot sync, so a slot key, drop or pick-up
+    earlier in the same frame is already applied when it does.
     """
     pc = _at(_node(ed, FN_GET_PC), 240, 260)
     _set(pc, "PlayerIndex", 0)
@@ -385,45 +386,16 @@ def _author_wc_tick(ed, tick):
     reload_exits = _author_reload(ed, held, BEL.find_then_pin(reload_gate),
                                   1400, 7200)
 
-    # --- switch --------------------------------------------------------------
-    switch_gate = _at(ed.add_branch_node(), 1040, 1400)
-    inv = _at(ed.add_get_member_variable_node("Inventory"), 240, 1560)
-    count = _at(_node(ed, FN_ARR_LEN), 480, 1560)
-    _connect(_pin(inv, "Inventory", is_input=False), _pin(count, "TargetArray"))
-    count_out = _pin(count, "ReturnValue", is_input=False)
-    any_held = _at(_node(ed, FN_LESS_II), 760, 1680)
-    _set(any_held, "A", 0)
-    _connect(count_out, _pin(any_held, "B"))
-    _connect(both(pressed("KeySwitch", 1560), _pin(any_held, "ReturnValue", is_input=False),
-                  1620), _pin(switch_gate, "Condition"))
-    for exit_pin in reload_exits + (BEL.find_else_pin(reload_gate),):
-        _connect(exit_pin, _pin(switch_gate, "execute"))
-
-    idx = _at(ed.add_get_member_variable_node("EquippedIndex"), 1300, 1600)
-    step = _at(_node(ed, FN_ADD_II), 1540, 1600)
-    _connect(_pin(idx, "EquippedIndex", is_input=False), _pin(step, "A"))
-    _set(step, "B", 1)
-    wrap = _at(_node(ed, FN_MOD_II), 1780, 1600)
-    _connect(_pin(step, "ReturnValue", is_input=False), _pin(wrap, "A"))
-    _connect(count_out, _pin(wrap, "B"))
-    to = _at(ed.add_set_member_variable_node("EquippedIndex"), 2020, 1400)
-    _connect(_pin(wrap, "ReturnValue", is_input=False), _pin(to, "EquippedIndex"))
-    _connect(BEL.find_then_pin(switch_gate), _pin(to, "execute"))
-    switch_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 2280, 1400)
-    _set(switch_dirty, "NeedsRefresh", "true")
-    _connect(BEL.find_then_pin(to), _pin(switch_dirty, "execute"))
-
-    ed.add_comment_to_nodes(
-        f"{SWITCH_KEY} cycles: (index + 1) mod count, so it wraps and works for "
-        "any number of carried weapons. 1/2/3 and M would have been the obvious "
-        "keys but they already belong to the graphics menu.",
-        [inv, count, any_held, idx, step, wrap, to, switch_dirty, switch_gate])
+    # --- the slots' keys (slot_moves.py): 1-9 and Q ask for a slot ---------
+    slot_exits = _author_slot_keys(ed, pc_out, pressed("KeySwitch", 1560),
+                                   reload_exits + (BEL.find_else_pin(reload_gate),),
+                                   1040, 1400)
 
     # --- drop ----------------------------------------------------------------
     drop_gate = _at(ed.add_branch_node(), 1040, 2200)
     _connect(both(pressed("KeyDrop", 2360), armed_out, 2300), _pin(drop_gate, "Condition"))
-    _connect(BEL.find_then_pin(switch_dirty), _pin(drop_gate, "execute"))
-    _connect(BEL.find_else_pin(switch_gate), _pin(drop_gate, "execute"))
+    for exit_pin in slot_exits:
+        _connect(exit_pin, _pin(drop_gate, "execute"))
     after_drop = _author_drop(ed, held, owner_out, BEL.find_then_pin(drop_gate),
                               1400, 2200)
     drop_dirty = _at(ed.add_set_member_variable_node("NeedsRefresh"), 4700, 2200)
@@ -449,6 +421,11 @@ def _author_wc_tick(ed, tick):
 
     # --- take a garment off (wear.py): the I panel's request ---------------
     flight_exits = _author_take_off(ed, flight_exits, 1040, 15800)
+
+    # --- the slots: requests and drags served, then every item placed --------
+    # (slot_moves.py, slot_sync.py): last, so the equip below follows them.
+    flight_exits = _author_slot_serve(ed, flight_exits, 1040, 18800)
+    flight_exits = _author_slot_sync(ed, flight_exits, 1040, 25000)
 
     # --- refresh -------------------------------------------------------------
     dirty_get = _at(ed.add_get_member_variable_node("NeedsRefresh"), 1040, 4760)

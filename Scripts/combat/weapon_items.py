@@ -28,6 +28,9 @@ from combat.graph import (
 )
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
+from combat.slot_tuning import (
+    GUN_KINDS, LONG_GUN, NOT_A_WEAPON, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR,
+)
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN, SWAY_RATE_VAR
 from combat.heat_tuning import COOL_VAR, HEAT_MATERIAL_VAR, HEATS_VAR, HOT_VAR
 from combat.torch_tuning import BURN_OUT_VAR, BURNS_VAR, LIT_VAR, USE_POSE_VAR
@@ -120,6 +123,11 @@ def build_weapon_item():
     # NOT_CLOTHING: the weapon component wears an item whose slot is >= 0
     # (weapon_component/wear.py). Scripts/clothing sets it on each garment.
     _declare(ed, CLOTHING_SLOT_VAR, BEL.get_basic_type_by_name("int"))
+    # Where it is carried (slot_tuning: the hand, a weapon slot, a bag slot,
+    # or UNPLACED), and which weapon slot it belongs in (NOT_A_WEAPON on
+    # everything but the guns and the blades). weapon_component/slot_*.py.
+    _declare(ed, SLOT_VAR, BEL.get_basic_type_by_name("int"))
+    _declare(ed, WEAPON_KIND_VAR, BEL.get_basic_type_by_name("int"))
     _declare(ed, BURN_OUT_VAR, _float_type())
     _declare(ed, COOL_VAR, _float_type())
     # The overlay a hot blade's model wears (heat.py). None on everything
@@ -214,6 +222,8 @@ def build_weapon_item():
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
     _apply_defaults(bp, {CLOTHING_SLOT_VAR: NOT_CLOTHING,
+                         SLOT_VAR: UNPLACED,
+                         WEAPON_KIND_VAR: NOT_A_WEAPON,
                          THROW_PITCH_VAR: THROW_PITCH_UP_DEG,
                          SWAY_RATE_VAR: SWAY_RATE,
                          THROW_SPEED_VAR: THROW_SPEED,
@@ -329,6 +339,7 @@ def build_weapon(spec, item_bp):
         "Automatic": bool(spec["automatic"]),
         "Consumable": False,
         "Melee": False,
+        WEAPON_KIND_VAR: GUN_KINDS.get(spec["display"], LONG_GUN),
         HAS_SIGHTS_VAR: True,
         "MagazineSize": int(spec["magazine"]),
         # Starts loaded. A weapon that had to be reloaded before its first shot

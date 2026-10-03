@@ -112,7 +112,7 @@ HUD_BODY, HUD_FPS = "Body", "Fps"
 HP_BAR, HP_NUM = "HpBar", "HpNum"
 KILLS = "Kills"
 BANNER_COUNT, BANNER_OFF = "BannerCount", "BannerOff"
-SLOTS, EQUIPPED_NAME = "Slots", "EquippedName"
+EQUIPPED_NAME = "EquippedName"   # the held item, over the hand slot (inv_consts)
 STAMINA_BAR = "StaminaBar"
 
 
@@ -182,7 +182,6 @@ FPS_TOP, FPS_FONT = 40.0, 16.0
 KILLS_TOP, KILLS_FONT = 92.0, 22.0
 BANNER_TOP, BANNER_FONT = 150.0, 20.0
 STRIP_BOTTOM = 22.0              # the vitals' and the survival bars' bottom edge
-INVENTORY_COLUMNS = 5
 EQUIPPED_FONT, EQUIPPED_GAP = 17.0, 8.0
 
 # A bar under LOW_FRACTION of its maximum blinks its group: FLASH_HZ times a

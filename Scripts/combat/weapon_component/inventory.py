@@ -17,6 +17,7 @@ from combat.nodes import (
 )
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
+from combat.slot_tuning import SLOT_VAR, STARTER_SLOTS
 from combat.tuning import DROP_FORWARD, DROP_KEY
 from combat.carry_tuning import LOWERED_VAR
 from combat.light_tuning import MATCHES_CLASS_VAR
@@ -174,7 +175,12 @@ def _author_equip(ed, exec_in, x0, y0):
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(_at(loop, x0 + 260, y0))
     _connect(_pin(inv, "Inventory", is_input=False), _loose_pin(loop, "Array"))
-    _connect(exec_in, _loose_pin(loop, "Exec"))
+    # Empty first: with EquippedIndex -1 (nothing in the hand slot) no turn of
+    # the loop sets Held, and the hands are empty rather than still holding
+    # what was put away.
+    empty = keep(_at(ed.add_set_member_variable_node("Held"), x0, y0 - 200))
+    _connect(exec_in, _pin(empty, "execute"))
+    _connect(BEL.find_then_pin(empty), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
     idx = keep(_at(ed.add_get_member_variable_node("EquippedIndex"), x0 + 560, y0 + 320))
@@ -285,7 +291,7 @@ def _author_equip(ed, exec_in, x0, y0):
 
 
 def _author_wc_begin_play(ed, begin):
-    """Cache the character's mesh, spawn the starting loadout, equip slot 0."""
+    """Cache the character's mesh, spawn the starting loadout into its slots."""
     made = []
 
     def keep(n):
@@ -384,18 +390,22 @@ def _author_wc_begin_play(ed, begin):
         _connect(_pin(inv, "Inventory", is_input=False), _pin(add, "TargetArray"))
         _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(add, "NewItem"))
         _connect(BEL.find_then_pin(spawn), _pin(add, "execute"))
-        prev = BEL.find_then_pin(add)
+        # Its slot (slot_tuning.STARTER_SLOTS): the slot sync places it there.
+        slot = keep(_at(ed.add_set_member_variable_node(SLOT_VAR, ITEM_CLASS_PATH),
+                        2360, -1200 + i * 460))
+        _connect(_pin(spawn, "ReturnValue", is_input=False), _pin(slot, "self"))
+        _set(slot, SLOT_VAR, STARTER_SLOTS[i])
+        _connect(BEL.find_then_pin(add), _pin(slot, "execute"))
+        prev = BEL.find_then_pin(slot)
 
-    first = keep(_at(ed.add_set_member_variable_node("EquippedIndex"), 2400, -1200))
-    _set(first, "EquippedIndex", 0)
-    _connect(prev, _pin(first, "execute"))
     dirty = keep(_at(ed.add_set_member_variable_node("NeedsRefresh"), 2660, -1200))
     _set(dirty, "NeedsRefresh", "true")
-    _connect(BEL.find_then_pin(first), _pin(dirty, "execute"))
+    _connect(prev, _pin(dirty, "execute"))
 
     ed.add_comment_to_nodes(
         "The player starts carrying the shotgun, the pistol, the knife, the "
-        "axe, the matches and a stick. "
+        "axe, the matches and a stick, each given its slot: the shotgun in "
+        "hand, the pistol and the knife in theirs, the rest in the bag. "
         "They are spawned here rather "
         "than placed in the level so that a generated map needs no weapon "
         "actors in it -- nothing in Scripts/generated_levels knows weapons "

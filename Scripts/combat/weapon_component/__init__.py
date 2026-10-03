@@ -5,7 +5,7 @@ build.build_weapon_component() is the entry; it declares the variables and
 authors BeginPlay (inventory.py) and Tick (tick.py). Tick calls one
 _author_* fragment per concern, each in its own module:
 
-  common      _prop, trace defaults, muzzle location (shared fragments)
+  common      _prop, trace defaults, muzzle location, _G (shared fragments)
   dead        the dead gate at the head of Tick: an owner who is Dead or at
               0 HP gets none of it; the aim, zoom and camera are let go
   aim         resolve the aim point every frame (camera trace, muzzle trace)
@@ -56,7 +56,12 @@ _author_* fragment per concern, each in its own module:
   impact      a pellet that connected: blood, damage, hit zones, debug readout
   surface_impact  a pellet that hit something with no health: BP_BulletImpact,
               off the health cast's failed arm, at the blood's transform
-  inventory   equip, drop, BeginPlay loadout
+  inventory   equip, drop, BeginPlay loadout (each issued item into its slot)
+  slot_nodes  the slot fragments' shared shapes: loops, SlotItems[c], fits()
+  slot_moves  1-9 and Q ask for a slot (SlotRequest); the request (the hand's
+              item home, the asked one up) and the HUD's drag (MoveFrom/To)
+  slot_sync   last before the refresh: SlotItems rebuilt from each item's
+              Slot, UNPLACED items placed, EquippedIndex, HasRoom, refresh
   interact    the interact key acts on ONE thing in reach: the candidate
               nearest AimPoint, the point the reticle rests on. KINDS lists
               what can be interacted with (today: an item, which is picked

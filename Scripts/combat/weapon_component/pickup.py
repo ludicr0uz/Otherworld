@@ -12,12 +12,9 @@ that goes into the bag unseen does not ride on with the body.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
-from combat.nodes import (
-    FN_ALL_ACTORS, FN_ARR_ADD, FN_ARR_LEN, FN_DETACH, FN_IS_VALID, FN_LESS_II,
-    MACRO_FOR_EACH,
-)
+from combat.nodes import FN_ALL_ACTORS, FN_ARR_ADD, FN_DETACH, MACRO_FOR_EACH
 from combat.paths import ITEM_CLASS_PATH
-from combat.tuning import INVENTORY_SIZE
+from combat.slot_tuning import HAS_ROOM_VAR, SLOT_VAR, UNPLACED
 from combat.weapon_component.common import _prop
 
 ITEM_CAST = "Utilities|Casting|CastToBP_WeaponItem"
@@ -86,14 +83,11 @@ def _author_take_item(ed, target, exec_in, x0, y1):
     _connect(exec_in, _pin(cast, "execute"))
     best = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
 
-    inv = keep(_at(ed.add_get_member_variable_node("Inventory"), x0 + 1840, y1 + 420))
-    count = keep(_at(_node(ed, FN_ARR_LEN), x0 + 2100, y1 + 420))
-    _connect(_out(inv, "Inventory"), _pin(count, "TargetArray"))
-    fits = keep(_at(_node(ed, FN_LESS_II), x0 + 2340, y1 + 420))
-    _connect(_out(count, "ReturnValue"), _pin(fits, "A"))
-    _set(fits, "B", INVENTORY_SIZE)
+    # Room is a free bag slot or empty hands (the slot sync's HasRoom): with
+    # the bag full and something in hand, nothing is picked up.
+    fits = keep(_at(ed.add_get_member_variable_node(HAS_ROOM_VAR), x0 + 2340, y1 + 420))
     room = keep(_at(ed.add_branch_node(), x0 + 2580, y1))
-    _connect(_out(fits, "ReturnValue"), _pin(room, "Condition"))
+    _connect(_out(fits, HAS_ROOM_VAR), _pin(room, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(room, "execute"))
 
     clear = keep(_at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH),
@@ -115,28 +109,21 @@ def _author_take_item(ed, target, exec_in, x0, y1):
     _connect(best, _pin(add, "NewItem"))
     _connect(BEL.find_then_pin(loose), _pin(add, "execute"))
 
-    # A pick-up goes into the bag and whatever is in the hand stays there.
-    # Only empty hands take it up: after dropping or eating the last item,
-    # Held is None and EquippedIndex may be -1, so nothing would be shown.
-    # Array_Add's ReturnValue is the new item's index (an exec node's output,
-    # read once).
-    held = keep(_at(ed.add_get_member_variable_node("Held"), x0 + 3100, y1 + 300))
-    armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 3360, y1 + 300))
-    _connect(_out(held, "Held"), _pin(armed, "Object"))
-    empty = keep(_at(ed.add_branch_node(), x0 + 3360, y1))
-    _connect(_out(armed, "ReturnValue"), _pin(empty, "Condition"))
-    _connect(BEL.find_then_pin(add), _pin(empty, "execute"))
-    at = keep(_at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 3620, y1 + 120))
-    _connect(_out(add, "ReturnValue"), _pin(at, "EquippedIndex"))
-    _connect(BEL.find_else_pin(empty), _pin(at, "execute"))
+    # Where it goes is the slot sync's (slot_sync.py): UNPLACED, it takes
+    # the first free bag slot, or the hand if the bag is full. Whatever is
+    # in hand stays there.
+    place = keep(_at(ed.add_set_member_variable_node(SLOT_VAR, ITEM_CLASS_PATH),
+                     x0 + 3360, y1))
+    _connect(best, _pin(place, "self"))
+    _set(place, SLOT_VAR, UNPLACED)
+    _connect(BEL.find_then_pin(add), _pin(place, "execute"))
 
     ed.add_comment_to_nodes(
         "An interact target that is an item is picked up: taken once, after "
-        f"the search, while fewer than {INVENTORY_SIZE} are carried, and "
-        "detached from whatever it was left in. It goes "
-        "into the inventory without switching to it: the held item stays "
-        "held. Only empty hands (Held is None) take it up.",
+        "the search, while a bag slot or the hand is free (HasRoom), and "
+        "detached from whatever it was left in. It goes in UNPLACED: the slot "
+        "sync puts it in the bag, or in empty hands when the bag is full.",
         made)
-    taken = (BEL.find_then_pin(empty), BEL.find_then_pin(at))
+    taken = (BEL.find_then_pin(place),)
     idle = (BEL.find_else_pin(room),)
     return taken, idle, _pin(cast, "CastFailed", is_input=False)

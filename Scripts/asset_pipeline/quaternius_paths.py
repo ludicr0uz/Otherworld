@@ -3,7 +3,7 @@ and which of their clips and models the game uses.
 
 Constants only (no ``unreal``).  Shared by import_quaternius.py and its
 modules.  combat/skin.py and combat/weapon_models.py spell the paths they use
-out as literals (combat imports nothing from here); import_quaternius.py
+out themselves (combat imports nothing from here); import_quaternius.py
 checks the two agree.
 
 Five downloads, all by Quaternius and all CC0 (public domain; each zip's
@@ -23,6 +23,8 @@ the player is moved by CharacterMovement.
 """
 
 import os
+
+from asset_pipeline.player_body import PLAYER_NAME
 
 # ─── Host side: the zips, kept in the git-ignored cache ─────────────────────
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -87,7 +89,8 @@ def prop_mesh(short, stem):
 # Not under Anims/<Character>, which build_retarget.py wipes and regenerates on
 # every run, and not anywhere under Anims/ at all: the combat verifier reads
 # each folder there as a creature family owing six hit reactions.
-UAL_CHARACTERS = ("Adventurer01",)
+# Who gets them is the player (player_body.PLAYER_BODY, the one setting).
+UAL_CHARACTERS = (PLAYER_NAME,)
 
 
 def ual_retargeter_path(character, short):

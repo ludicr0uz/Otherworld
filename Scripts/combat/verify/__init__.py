@@ -18,6 +18,8 @@ and it never relies on a variable another section left behind.
               I panel asks for (TakeOffSlot), Worn and ClothingSlot's defaults
   bullet_impact  BP_BulletImpact: the chips and dust, the seeded layout, and
               the fire graph spawning it off the health cast's failed arm
+  body_setting  the one setting that names the player's body
+              (asset_pipeline/player_body.py), and everything that follows it
   skins       every generated character's material: an instance of the
               Meshy master wearing its own maps (not the grey default)
   hit_bodies  the physics bodies fitted to each model, measured ray by ray
@@ -106,7 +108,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
-    "player_body", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
+    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "slots", "pickup", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",
 )

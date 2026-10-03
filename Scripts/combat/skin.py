@@ -6,6 +6,7 @@ import dataclasses
 
 import unreal
 
+from asset_pipeline.player_body import PLAYER_NAME
 from combat.graph import BEL, _assets, _component_object, _handles, _log, _rot
 from combat.paths import CHARACTER_BP_PATH
 
@@ -151,7 +152,10 @@ SKIN_QUINN = PlayerSkin(
 # falls back to the mannequin above -- the same bargain build_npc_blueprints.py
 # strikes, and for the same reason: a player who looks wrong is a far better
 # failure than a build that stops.
-ADVENTURER = "Adventurer01"
+#
+# Which generated body it is, is asset_pipeline/player_body.py's PLAYER_BODY,
+# the one setting: every path below follows it.
+ADVENTURER = PLAYER_NAME
 UAL_ANIMS = f"/Game/Sourced/Quaternius/UAL/{ADVENTURER}"
 SKIN_ADVENTURER = PlayerSkin(
     mesh=f"/Game/Sourced/Characters/SKM_{ADVENTURER}/SKM_{ADVENTURER}",

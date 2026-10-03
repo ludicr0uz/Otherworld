@@ -4,9 +4,15 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 ## The player's body (`skin.py`)
 
-- **The player wears `SKM_Adventurer01`** (Meshy `catalog.ADVENTURER`) animated by
+- **Which body the player wears is one setting:** `asset_pipeline/player_body.py`
+  `PLAYER_BODY`, a catalog id (`adventurer_01` today: `SKM_Adventurer01`, animated by
   `A_Adventurer01_ABP_Unarmed`, which is `ABP_Unarmed` retargeted by
-  `asset_pipeline/build_retarget.py`.
+  `asset_pipeline/build_retarget.py`). Every path in `SKIN_ADVENTURER` follows it, and
+  `verify/body_setting.py` checks that. To change it:
+  `python3 Scripts/asset_pipeline/swap_player_body.py <id>` (`Scripts/asset_pipeline/CLAUDE.md`).
+- **Nothing here may be measured on one body.** A generated body swaps in because the poses,
+  grips and hit bodies are solved against whatever is worn; a constant read off the dressed
+  adventurer is what broke the first swap.
 - **`PlayerSkin` is one record:** mesh, anim BP, grip, poses and offsets.
   - `player_skin()` picks the adventurer only if **all** its assets exist (mesh, anim BP, both
     ready poses and the punch clip), and otherwise falls

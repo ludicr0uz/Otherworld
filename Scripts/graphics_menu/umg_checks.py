@@ -116,7 +116,7 @@ def check_trees(check):
     check("...with one bind row per BIND_VARS entry",
           len(S.BIND_LABELS) == len(S.BIND_VARS), f"{len(S.BIND_LABELS)} labels")
     pause_rows = _labels(pause, C.PAUSE_ROWS)
-    check("the menu lists new game first, then settings, debug, save and exit, "
+    check("the menu lists new game first, then controls, debug, save and exit, "
           "the cheat and the tabs, and exit game last",
           pause_rows == list(C.PAUSE_ROW_LABELS)
           and pause_rows[C.PAUSE_START_ROW] == C.START_ROW_LABEL
@@ -335,10 +335,10 @@ def check_hud_graph(check, nodes):
               f"Get {name}" in written)
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}
     check("the menu's rows are the only literals written: debug reads ON or OFF, "
-          "the first row new game or resume, and on the title the rows that need "
-          "a game say so",
+          "the first row new game, continue game or resume, and on the title the "
+          "rows that need a game say so",
           literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
-                      C.IN_GAME_ONLY, ""}, str(sorted(literal)))
+                      C.CONTINUE_ROW_LABEL, C.IN_GAME_ONLY, ""}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons
     # (loot_checks.py checks that one).

@@ -74,7 +74,7 @@ SCOPE_SENS_LABEL = SLIDERS[SCOPE_SENS_ROW].label
 BACK_LABEL = "BACK"
 DIFFICULTY_LABEL = "DIFFICULTY"
 DIFFICULTY_LABELS = combat_difficulty.DIFFICULTY_LABELS
-SETTINGS_TITLE = "SETTINGS"
+SETTINGS_TITLE = "CONTROLS"
 
 # What a bind may be set to. Letters, digits, the mouse and the usual
 # modifiers -- and nothing the menu itself uses, so no keypress can make the

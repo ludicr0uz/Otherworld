@@ -105,8 +105,9 @@ def check_profile(check, bp, nodes):
     check("...and then the current level reopens, onto the main menu",
           len(opens) == 2 and len(after_save) == 1,
           f"{len(opens)} OpenLevel, {len(after_save)} after the save")
+    # The fifth is the title's first row asking whether there is one to continue.
     check("the profile is looked for, and loaded, once a game starts",
-          len(_on_slot(nodes, "UserIndex")) == 4
+          len(_on_slot(nodes, "UserIndex")) == 5
           and any("Load" in _title(n) for n in _on_slot(nodes)),
           str([_title(n) for n in _on_slot(nodes)]))
     wipes = [n for n in _on_slot(nodes) if "Delete" in _title(n)]

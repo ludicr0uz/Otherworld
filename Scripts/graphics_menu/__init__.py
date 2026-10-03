@@ -57,9 +57,10 @@ Input, settings and state
                   picking one sets Quality
   menu_nav        Up/Down caret movement and the accept keys, shared by pages;
                   what a key poll gains from the wheel; Tick's test for a
-                  taken M-panel row (the rows have no hotkeys)
-  menu_main       Tick: the menu's own rows (new game or resume, settings,
-                  exit game) and M; BeginPlay's "tick while paused" for the
+                  taken M-panel row (the rows have no hotkeys); the Escape
+                  poll (BACK in every menu) and "a tuning tab is open"
+  menu_main       Tick: the menu's own rows (new game or resume, controls,
+                  exit game), M, and Escape shutting the menu in play; BeginPlay's "tick while paused" for the
                   title; Tick's split on a game in play
   menu_still      Tick: the controller ignores move input while the M panel
                   is open, so the arrows only work the menu
@@ -193,8 +194,11 @@ verify_graphics_menu.py's checks, beside it because it is over budget
                      overrides
   cursor_checks      the mouse cursor: shown when, the row tests, the clicks
   menu_main_checks   the one menu: the title holds it open and ticks under
-                     its pause, the first row starts or resumes, settings
-                     opens its page in the rows' place, exit game quits
+                     its pause, the first row starts or resumes (and reads
+                     continue game over a saved profile), controls opens
+                     its page in the rows' place, exit game quits
+  escape_checks      Escape is BACK: out of a tab, a capture, the controls
+                     page, and in play out of the menu from its own rows
   pause_checks       the M panel as a menu: rows taken by caret or click (no
                      hotkeys), one menu at a time, BACK, the scrolling list,
                      the player held still

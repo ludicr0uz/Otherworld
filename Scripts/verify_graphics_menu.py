@@ -49,6 +49,7 @@ from graphics_menu import cursor_consts as CC
 from graphics_menu.cursor_checks import check_cursor
 from graphics_menu.pause_checks import check_pause_menu
 from graphics_menu.menu_main_checks import check_main_menu
+from graphics_menu.escape_checks import check_escape
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -162,13 +163,14 @@ def main():
     # The M panel's rows have no keys of their own (no preset, debug, exit,
     # cheat or tab hotkeys): the caret and Enter, or the mouse, take a row.
     expected_keys = set((G.MENU_KEY, UC.RESTART_KEY, UC.PAUSE_ACCEPT_KEY, CC.BACK_KEY,
+                         CC.ESCAPE_KEY,
                          N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT,
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
                          WEAR.WEAR_KEY, WEAR.WEAR_UP, WEAR.WEAR_DOWN, WEAR.WEAR_TAKE_KEY,
                          TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
                          TT.TUNE_MORE, TT.TUNE_SAVE_KEY)
                         + N.START_KEYS + CC.CURSOR_KEYS)
-    check("polls exactly the menu, restart, start, nav, loot, I panel and tuning-tab keys "
+    check("polls exactly the menu, restart, start, nav, back, loot, I panel and tuning-tab keys "
           "and the cursor's click (never the wheel): no row of the M panel has a hotkey",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
@@ -785,9 +787,17 @@ def main():
     # Two of them: the input gate, and the hint line that reports its state.
     check("the settings page branches on whether a capture is armed",
           len(gates) == 2, str(len(gates)))
+    # The armed arm reaches the pool's loop through one Branch: Escape, which
+    # calls the capture off instead (escape_checks.py).
+    def capture_loop(g):
+        called_off = first_after(BEL.find_then_pin(g))
+        if called_off is None or pin_names(called_off) != {"execute", "Condition"}:
+            return None
+        return first_after(BEL.find_else_pin(called_off))
+
     armed_gate = [g for g in gates
-                  if (first_after(BEL.find_then_pin(g)) is not None
-                      and first_after(BEL.find_then_pin(g)).get_class()
+                  if (capture_loop(g) is not None
+                      and capture_loop(g).get_class()
                       .get_name() == "K2Node_MacroInstance")]
     check("the capture poll is the ARMED arm, and nothing else is",
           len(armed_gate) == 1,
@@ -816,9 +826,10 @@ def main():
           bool(by_pins("TargetArray", "Index", "Item")),
           f"{len(by_pins('TargetArray', 'Index', 'Item'))} Array_Set")
     # Armed by Enter on a bind row, cleared the moment a key lands. Without the
-    # clear the next keypress rebinds the same row again, for ever.
-    check("capture mode is armed and then cleared",
-          sum(1 for t in titles if t == "Set Capturing") == 2,
+    # clear the next keypress rebinds the same row again, for ever. The third
+    # is Escape calling it off.
+    check("capture mode is armed, and then cleared or called off",
+          sum(1 for t in titles if t == "Set Capturing") == 3,
           str(sum(1 for t in titles if t == "Set Capturing")))
 
     # --- two pages, and getting between them
@@ -847,6 +858,7 @@ def main():
     check_cursor(check, bp, nodes)
     check_pause_menu(check, bp, nodes)
     check_main_menu(check, nodes)
+    check_escape(check, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

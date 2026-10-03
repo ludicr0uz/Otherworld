@@ -5,10 +5,14 @@ it (the rows with Enter alone, polled in menu_screens.py).
 Also what a key poll gains from the mouse (cursor_consts.py): a click raised
 as CursorAccept; and how Tick learns that a row of the M panel was taken
 (pause_row_taken). The wheel does nothing in a menu.
+
+And Escape, which is BACK wherever a menu has one (escape_pressed), and
+whether a tuning tab stands in the menu's place (any_tab_open).
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
+from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, ESCAPE_KEY, PAUSE_CLICK_VAR
+from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_consts import PAUSE_ROW_ACTIONS
 from uebp.nodes.actor import FN_WAS_PRESSED
 from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MAX_II, FN_MIN_II, FN_OR, FN_SUB_II
@@ -123,3 +127,32 @@ def pause_row_taken(ed, action, made):
     _set(this_row, "B", PAUSE_ROW_ACTIONS.index(action))
     made += [clicked, this_row]
     return out(this_row)
+
+
+def escape_pressed(ed, pc_out, made):
+    """Escape went down this frame: a bool pin. It is BACK in every menu: a
+    tab's and the controls page's are DrawHUD's (cursor.author_back_row,
+    settings_input.py), the menu's own, in play, is Tick's (menu_main.py)."""
+    was = _node(ed, FN_WAS_PRESSED)
+    _connect(pc_out, _pin(was, "self"))
+    _set(was, "Key", ESCAPE_KEY)
+    made.append(was)
+    return out(was)
+
+
+def any_tab_open(ed, made):
+    """A tuning tab is open: a bool pin. At most one is (opening one shuts
+    the others), and it stands in the panel's place."""
+    either = None
+    for tab in TABS:
+        flag = ed.add_get_member_variable_node(tab.open_var)
+        made.append(flag)
+        if either is None:
+            either = out(flag, tab.open_var)
+            continue
+        both = _node(ed, FN_OR)
+        _connect(either, _pin(both, "A"))
+        _connect(out(flag, tab.open_var), _pin(both, "B"))
+        made.append(both)
+        either = out(both)
+    return either

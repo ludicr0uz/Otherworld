@@ -53,6 +53,18 @@ def _gates(n):
     return [g for g in _sources(n, "execute") if "Condition" in _pins(g)]
 
 
+def _logic(gate):
+    """The two-input nodes (AND, OR, a comparison) ``gate``'s Condition is
+    made of, however deep."""
+    seen, todo = [], _sources(gate, "Condition")
+    while todo:
+        c = todo.pop()
+        if c not in seen and _pins(c) == {"A", "B"}:
+            seen.append(c)
+            todo += _sources(c, "A") + _sources(c, "B")
+    return seen
+
+
 def _is_row_test(n, action):
     """PauseClick == ``action``'s row. A literal 0 reads back empty once the
     asset is loaded from disk (row 0's)."""
@@ -131,16 +143,14 @@ def _check_one_menu(check, nodes):
         backs = [n for n in _sets(nodes, t.open_var) if _value(n, t.open_var) == "false"
                  and any(f"Get {t.row_var}" in _feeds(x, "A")
                          and int(_value(x, "B") or 0) == t.back_row
-                         for g in _gates(n) for c in _sources(g, "Condition")
-                         for half in _sources(c, "A") + _sources(c, "B")
-                         for x in [half] + _sources(half, "A") + _sources(half, "B")
-                         if _pins(x) == {"A", "B"})]
+                         for g in _gates(n) for x in _logic(g)
+                         if not _sources(x, "B"))]
         carets = [n for n in _sets(nodes, t.row_var) if not _sources(n, t.row_var)
                   and int(_value(n, t.row_var) or 0) == t.back_row]
         if len(backs) != 1 or len(carets) != 1:
             wrong.append((t.back_widget, len(backs), len(carets)))
     check(f"...{BACK_LABEL} shuts its tab (a click on it, or {CC.BACK_KEY} with the "
-          "caret on it), and the cursor over it takes the caret", not wrong, str(wrong))
+          f"caret on it, or {CC.ESCAPE_KEY}), and the cursor over it takes the caret", not wrong, str(wrong))
     reset = [t.open_var for t in TABS
              if not any(int(_value(n, t.row_var) or 0) == 0 and not _sources(n, t.row_var)
                         and row_serves(nodes, t.action, t.open_var)

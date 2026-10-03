@@ -7,7 +7,7 @@ from graphics_menu.cursor import author_row_cursor
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR
 from graphics_menu.difficulty import emit_difficulty_nudge
 from graphics_menu.menu_nav import (
-    NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav)
+    NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav, escape_pressed)
 from graphics_menu.ui_graph import part
 from graphics_menu.umg_consts import SETTINGS_ROWS_BOX, WBP_MAIN_MENU
 from graphics_menu.settings_rows import (
@@ -71,7 +71,15 @@ def _author_capture(ed, settings_out, in_execs, made):
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
     _connect(out(pool, MV.KeyPool), _loose_pin(loop, "Array"))
-    _connect(then(listening), _loose_pin(loop, "Exec"))
+    # Escape calls the capture off: it is in no pool, so it could bind nothing,
+    # and BACK from "press a key" is the page with nothing armed.
+    called_off = keep(ed.add_branch_node())
+    _connect(escape_pressed(ed, pc_out, made), _pin(called_off, "Condition"))
+    _connect(then(listening), _pin(called_off, "execute"))
+    disarm = keep(ed.add_set_member_variable_node(MV.Capturing))
+    _set(disarm, MV.Capturing, False)
+    _connect(then(called_off), _pin(disarm, "execute"))
+    _connect(else_(called_off), _loose_pin(loop, "Exec"))
     candidate = _loose_pin(loop, "ArrayElement", is_input=False)
 
     hit = keep(_node(ed, FN_WAS_PRESSED))
@@ -145,7 +153,12 @@ def _author_capture(ed, settings_out, in_execs, made):
     made.append(writer)
     flow = (saved, passed)
 
-    go = _emit_accept(ed, pc_out, flow, made)
+    # Escape is BACK from any row; the accept keys are not looked at that frame.
+    escaped = keep(ed.add_branch_node())
+    _connect(escape_pressed(ed, pc_out, made), _pin(escaped, "Condition"))
+    for e in flow:
+        _connect(e, _pin(escaped, "execute"))
+    go = _emit_accept(ed, pc_out, [else_(escaped)], made)
 
     # BACK, or arm a capture. Enter means nothing on a slider row -- the arrows
     # are its control, and arming a capture there would bind a key to a row
@@ -160,6 +173,7 @@ def _author_capture(ed, settings_out, in_execs, made):
     to_title = keep(ed.add_set_member_variable_node(MV.MenuPage))
     _set(to_title, MV.MenuPage, PAGE_TITLE)
     _connect(then(back), _pin(to_title, "execute"))
+    _connect(then(escaped), _pin(to_title, "execute"))
     home = keep(ed.add_set_member_variable_node(MV.MenuRow))
     _set(home, MV.MenuRow, 0)
     _connect(then(to_title), _pin(home, "execute"))

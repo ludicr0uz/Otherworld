@@ -29,15 +29,15 @@ from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_find import put
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.wear_consts import WEAR_OPEN_VAR
-from graphics_menu.menu_nav import _emit_row_nav
+from graphics_menu.menu_nav import _emit_row_nav, any_tab_open
+from graphics_menu.profile_consts import PROFILE_SLOT, PROFILE_USER_INDEX
 from graphics_menu.settings_page import _author_settings_page
 from graphics_menu.settings_rows import PAGE_TITLE
-from graphics_menu.tune_tabs import TABS
 from graphics_menu.ui_graph import (
     mark_rows, member, part, row_at, screen, set_shown, set_text,
 )
 from graphics_menu.umg_consts import (
-    DEATH_HINT_LINE, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF, DEBUG_ON,
+    CONTINUE_ROW_LABEL, DEATH_HINT_LINE, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF, DEBUG_ON,
     GAME_STARTED_VAR, HUD_BODY, IN_GAME_ACTIONS, IN_GAME_ONLY,
     PAUSE_ACCEPT_KEY, PAUSE_DEBUG_ROW, PAUSE_PANEL, PAUSE_ROW_ACTIONS,
     PAUSE_ROW_LABELS, PAUSE_ROW_VAR, PAUSE_ROWS, PAUSE_START_ROW, RESTART_KEY,
@@ -47,7 +47,7 @@ from graphics_menu.umg_consts import (
 from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
 from uebp.nodes.math import FN_EQ_II, FN_OR
 from uebp.nodes.system import (
-    FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SET_PAUSED)
+    FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS, FN_SET_PAUSED)
 from graphics_menu import hud_vars as MV
 
 GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
@@ -153,16 +153,6 @@ def author_alive(ed, in_execs):
     return (set_shown(ed, part(ed, WBP_HUD, HUD_BODY), True, [flow]),)
 
 
-def _any_tab_open(ed, made):
-    """A tuning tab is open: a bool pin. At most one is (opening one shuts
-    the others), and it stands in the panel's place."""
-    flags = [_get(ed, tab.open_var, made) for i, tab in enumerate(TABS)]
-    either = flags[0]
-    for flag in flags[1:]:
-        either = out(_call(ed, FN_OR, made, A=either, B=flag))
-    return either
-
-
 def _author_pause_keys(ed, in_execs, made):
     """Up / Down move the panel's caret; Enter takes the row it is on, as a
     click on the row does: PauseClick, which Tick serves. Returns the tails.
@@ -179,10 +169,29 @@ def _author_pause_keys(ed, in_execs, made):
     return [taken, idle]
 
 
+def _author_first_row(ed, rows, in_execs, made):
+    """The first row's words: resume in play; on the title continue game
+    with a saved profile to load, else new game. Returns the exec tails.
+
+    The save is looked for every frame of the title, not once: a profile is
+    written and deleted while the HUD lives (save and exit, a death), and a
+    file's existence is cheap beside a frame."""
+    row, found, missing = row_at(ed, rows, PAUSE_START_ROW, in_execs)
+    text = member(ed, row, WBP_MENU_ROW, ROW_LABEL)
+    playing, title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [found], made)
+    exists = _call(ed, FN_SAVE_EXISTS, made, SlotName=PROFILE_SLOT,
+                   UserIndex=PROFILE_USER_INDEX)
+    _connect(title, _pin(exists, "execute"))
+    saved, fresh = _branch(ed, out(exists), [then(exists)], made)
+    return [set_text(ed, text, RESUME_ROW_LABEL, [playing]),
+            set_text(ed, text, CONTINUE_ROW_LABEL, [saved]),
+            set_text(ed, text, START_ROW_LABEL, [fresh]), missing]
+
+
 def _author_row_words(ed, rows, in_execs, made):
     """What the rows say that depends on whether a game is in play: the first
-    row is new game on the title and resume in play, and the rows that need
-    a game say so on the title. Returns the exec tails."""
+    row (_author_first_row), and the rows that need a game say so on the
+    title. Returns the exec tails."""
     def by_state(index, widget, playing_says, title_says, execs):
         row, found, missing = row_at(ed, rows, index, execs)
         text = member(ed, row, WBP_MENU_ROW, widget)
@@ -190,7 +199,7 @@ def _author_row_words(ed, rows, in_execs, made):
         return [set_text(ed, text, playing_says, [playing]),
                 set_text(ed, text, title_says, [title]), missing]
 
-    flow = by_state(PAUSE_START_ROW, ROW_LABEL, RESUME_ROW_LABEL, START_ROW_LABEL, in_execs)
+    flow = _author_first_row(ed, rows, in_execs, made)
     for action in IN_GAME_ACTIONS:
         flow = by_state(PAUSE_ROW_ACTIONS.index(action), ROW_VALUE, "", IN_GAME_ONLY, flow)
     return flow
@@ -240,7 +249,7 @@ def author_pause_menu(ed, in_execs):
         ed, settings, True, [set_shown(ed, panel, False, [on_settings])]))
     flow = set_shown(ed, settings, False, [on_menu])
 
-    in_tab, in_panel = _branch(ed, _any_tab_open(ed, made), [flow], made)
+    in_tab, in_panel = _branch(ed, any_tab_open(ed, made), [flow], made)
     tabbed = set_shown(ed, panel, False, [in_tab])
     flow = set_shown(ed, panel, True, [in_panel])
 
@@ -267,6 +276,7 @@ def author_pause_menu(ed, in_execs):
         "settings page or a tuning tab is open in their place. The caret is "
         "on PauseRow: Up/Down or the cursor move it, Enter or a click takes "
         "the row (PauseClick, served by Tick). The first row reads new game "
-        "or resume; debug mode's row says ON or OFF.",
+        "(continue game with a saved profile) or resume; debug mode's row "
+        "says ON or OFF.",
         [get_open, br, caret, dbg, dbg_br])
     return [closed, on, off, missing, tabbed]

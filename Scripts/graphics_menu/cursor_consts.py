@@ -20,6 +20,10 @@ WHEEL_KEYS = ("MouseScrollUp", "MouseScrollDown")
 CURSOR_KEYS = (CLICK_KEY,)
 # What takes a BACK row with the caret on it (a click on the row does too).
 BACK_KEY = "Enter"
+# Escape is BACK from anywhere in a menu: it shuts an open tab or the controls
+# page (and calls an armed capture off), and in play, on the menu's own rows,
+# the menu. Not in KEY_POOL, so it cannot be bound away.
+ESCAPE_KEY = "Escape"
 
 # What the frame's screens ask for, and what the controller was last given:
 # the input mode is switched only when the two differ -- and, on the title,

@@ -227,7 +227,10 @@ DEBUG_ACTION, QUIT_ACTION = "debug", "quit"
 # The first row starts the game from the title; in play it shuts the menu, as
 # M does, and says so (the HUD writes its label every frame).
 START_ROW_LABEL, RESUME_ROW_LABEL = "New Game", "Resume"
-SETTINGS_ROW_LABEL = "Settings"
+# ...and on the title, with a saved profile to load, it says that instead.
+CONTINUE_ROW_LABEL = "Continue Game"
+# The settings page's row: the page is the key binds and the mouse.
+SETTINGS_ROW_LABEL = "Controls"
 DEBUG_ROW_LABEL = "Debug"
 # The last row leaves the game for the desktop, saving nothing.
 QUIT_ROW_LABEL = "Exit Game"

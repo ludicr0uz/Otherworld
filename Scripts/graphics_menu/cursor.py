@@ -32,7 +32,7 @@ import unreal
 from uebp.graph import BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, _set, out, then
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.cursor_consts import (
-    BACK_KEY, CLICK_KEY, CURSOR_BOOLS, CURSOR_INTS, CURSOR_MOVED_VAR, CURSOR_POS_VAR,
+    BACK_KEY, CLICK_KEY, ESCAPE_KEY, CURSOR_BOOLS, CURSOR_INTS, CURSOR_MOVED_VAR, CURSOR_POS_VAR,
     CURSOR_REALS,
     CURSOR_ROW_VAR, CURSOR_SHOWN_VAR, CURSOR_WANTED_VAR, NO_ROW, PAUSE_CLICK_VAR,
     TRIGGER_SPENT_VAR,
@@ -241,7 +241,8 @@ def author_row_cursor(ed, box, count, in_execs, row_var=None, click=None,
 def author_back_row(ed, back, row_var, back_row, open_var, in_execs):
     """A menu's BACK row, a WBP_MenuRow outside its list. The cursor over it
     (moved or clicked) puts the caret there: ``row_var`` := ``back_row``. A
-    click on it, or Enter with the caret on it, lowers ``open_var``.
+    click on it, or Enter with the caret on it, or Escape with the caret
+    anywhere, lowers ``open_var``.
     Returns the exec tails.
 
     DrawHUD's, though the rest of a tab's keys are Tick's: the M panel's own
@@ -261,6 +262,9 @@ def author_back_row(ed, back, row_var, back_row, open_var, in_execs):
                     B=out(_call(ed, FN_WAS_PRESSED, made,
                                  self=_pc(ed, made), Key=BACK_KEY)))
     leave = _call(ed, FN_OR, made, A=out(on_it), B=out(entered))
+    # ...or Escape, wherever the caret is.
+    escaped = _call(ed, FN_WAS_PRESSED, made, self=_pc(ed, made), Key=ESCAPE_KEY)
+    leave = _call(ed, FN_OR, made, A=out(leave), B=out(escaped))
     took, idle = _branch(ed, out(leave), flow, made)
     return [_setter(ed, open_var, "false", [took], made), idle]
 

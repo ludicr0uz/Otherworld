@@ -9,6 +9,7 @@ the settings page, leaving for the desktop, and M.
         settings taken            MenuPage = the settings page, caret on top
         exit game taken           QuitGame
         M, in play                MenuOpen flips
+        Escape, in play           on the menu's own rows: MenuOpen = false
 
 The menu is one menu: the game opens on it, paused, and M brings the same
 one up in play (menu_screens.py draws it and raises PauseClick). Its rows are
@@ -27,12 +28,12 @@ from uebp.graph import _connect, _pin, out, then
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.loot_find import put
-from graphics_menu.menu_nav import pause_row_taken
-from graphics_menu.settings_rows import PAGE_SETTINGS
+from graphics_menu.menu_nav import any_tab_open, escape_pressed, pause_row_taken
+from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
 from graphics_menu.umg_consts import (
     GAME_STARTED_VAR, MENU_KEY, QUIT_ACTION, SETTINGS_ACTION, START_ACTION)
 from uebp.nodes.actor import FN_ACTOR_TICK_PAUSED, FN_COMP_TICK_PAUSED, FN_WAS_PRESSED
-from uebp.nodes.math import FN_NOT
+from uebp.nodes.math import FN_AND, FN_EQ_II, FN_NOT, FN_OR
 from uebp.nodes.system import FN_QUIT, FN_SET_PAUSED
 from graphics_menu import hud_vars as MV
 
@@ -99,7 +100,23 @@ def _author_toggle(ed, pc_out, in_execs, made):
     pressed = _call(ed, FN_WAS_PRESSED, made, self=pc_out, Key=MENU_KEY)
     flip, idle = _branch(ed, out(pressed), [in_play], made)
     flipped = _call(ed, FN_NOT, made, A=_get(ed, MV.MenuOpen, made))
-    return [put(ed, MV.MenuOpen, out(flipped), [flip], made), idle, on_title]
+    return _author_escape(ed, pc_out, [put(ed, MV.MenuOpen, out(flipped), [flip], made), idle],
+                          made) + [on_title]
+
+
+def _author_escape(ed, pc_out, in_execs, made):
+    """Escape in play, on the menu's own rows, shuts the menu: BACK from the
+    top. With the controls page or a tab up it is theirs (DrawHUD lowers the
+    page or the tab later in the same frame, so this must not also take the
+    menu down: hence the test on what is up now)."""
+    pressed, rest = _branch(ed, escape_pressed(ed, pc_out, made), in_execs, made)
+    on_rows = _call(ed, FN_EQ_II, made, A=_get(ed, MV.MenuPage, made), B=PAGE_TITLE)
+    paged = _call(ed, FN_OR, made, A=out(_call(ed, FN_NOT, made, A=out(on_rows))),
+                  B=any_tab_open(ed, made))
+    top = _call(ed, FN_AND, made, A=_get(ed, MV.MenuOpen, made),
+                B=out(_call(ed, FN_NOT, made, A=out(paged))))
+    shut, kept = _branch(ed, out(top), [pressed], made)
+    return [_setter(ed, MV.MenuOpen, "false", [shut], made), kept, rest]
 
 
 def author_main_rows_tick(ed, pc_out, in_execs):
@@ -113,7 +130,8 @@ def author_main_rows_tick(ed, pc_out, in_execs):
         f"The menu's own rows, and {MENU_KEY}. The first row starts the game "
         f"from the title (unpausing last) and shuts the menu in play; settings "
         f"opens its page in the rows' place; exit game quits to the desktop. "
-        f"{MENU_KEY} toggles the menu, in play only. Polled on Tick rather than "
+        f"{MENU_KEY} toggles the menu, in play only, and Escape on its own rows "
+        f"shuts it. Polled on Tick rather than "
         f"bound as an input action: an FInputActionValue binding would need an "
         f"IA asset and an IMC entry, and neither is authorable from Python.",
         made)

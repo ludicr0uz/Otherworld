@@ -10,6 +10,7 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.pause_checks import (
     _feeds, _gates, _is_row_test, _pins, _sets, _sources, _value)
+from graphics_menu.profile_consts import PROFILE_SLOT
 from graphics_menu.settings_rows import PAGE_SETTINGS
 
 TICK_PIN, PAUSE_PIN = "bTickableWhenPaused", "bPaused"
@@ -74,6 +75,18 @@ def _check_rows(check, nodes, stops):
     check("the settings row opens the settings page, its caret on the top row",
           len(pages) == 1 and _value(pages[0], "MenuPage") == str(PAGE_SETTINGS)
           and len(tops) == 1, f"{len(pages)} pages, {len(tops)} carets")
+
+    says = [n for n in nodes if {"self", "InText"} <= _pins(n)
+            and UC.CONTINUE_ROW_LABEL in _value(n, "InText")]
+    asked = [c for n in says for g in _gates(n) for c in _sources(g, "Condition")
+             if "SlotName" in _pins(c) and _value(c, "SlotName") == PROFILE_SLOT
+             and g in _sources(n, "execute")
+             and any(f"Get {UC.GAME_STARTED_VAR}" in _feeds(b, "Condition")
+                     for b in _sources(c, "execute"))]
+    check("on the title the first row reads continue game while the saved "
+          "profile exists (DoesSaveGameExist on its slot, off GameStarted's "
+          "false arm), and new game otherwise",
+          len(says) == 1 and len(asked) == 1, f"{len(says)} says, {len(asked)} asked")
 
     quits = [n for n in nodes if "QuitPreference" in _pins(n)]
     check("the exit game row, and nothing else, quits the game for the owning player",

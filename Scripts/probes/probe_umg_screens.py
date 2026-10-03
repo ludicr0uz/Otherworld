@@ -8,6 +8,8 @@ canvas when called this way; they are not what this probe is about.) State is
 set by writing the HUD's and the game's variables: a probe has no keyboard.
 """
 
+import os
+
 import unreal
 
 from combat.slot_tuning import HAND, SLOT_ITEMS_VAR, WEAPON_SLOTS
@@ -17,6 +19,8 @@ from combat.paths import (
     GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from graphics_menu import umg_consts as C
+from graphics_menu.profile_consts import (
+    PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX)
 from graphics_menu.settings_rows import DIFFICULTY_LABELS, DIFFICULTY_ROW, FIRST_BIND_ROW
 from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 from combat import health_vars as HV
@@ -33,6 +37,11 @@ WRITABLE += [(GAME_MODE_BP_PATH, KILL_COUNT_VAR), (GAME_MODE_BP_PATH, "PlayerDea
 SHOWN = unreal.SlateVisibility.HIT_TEST_INVISIBLE
 HIDDEN = unreal.SlateVisibility.COLLAPSED
 HEALTH, HUNGER, KILLS = 37.0, 40.0, 4
+
+
+def _profile_file():
+    return os.path.join(unreal.Paths.project_saved_dir(), "SaveGames",
+                        f"{PROFILE_SLOT}.sav")
 
 
 def _draw(hud):
@@ -195,7 +204,31 @@ def probe(p):
     carets = _carets(rows, len(C.PAUSE_ROW_LABELS))
     p.check("...with the caret on PauseRow's row",
             carets == [float(i == 1) for i in range(len(C.PAUSE_ROW_LABELS))], str(carets))
-    first = _text(_row(rows, C.PAUSE_START_ROW).get_editor_property(C.ROW_LABEL))
+    # The first row asks the disk whether there is a profile to continue. One
+    # that is the player's own is set aside for the look without it and put
+    # back; with none, a blank one is saved for the look with it and deleted.
+    def first_row():
+        _draw(hud)
+        return _text(_row(rows, C.PAUSE_START_ROW).get_editor_property(C.ROW_LABEL))
+
+    GS = unreal.GameplayStatics
+    mine = os.path.exists(_profile_file())
+    if mine:
+        os.rename(_profile_file(), _profile_file() + ".probe")
+    try:
+        first = first_row()
+        if mine:
+            os.rename(_profile_file() + ".probe", _profile_file())
+        else:
+            GS.save_game_to_slot(
+                GS.create_save_game_object(p.load_class(PROFILE_CLASS_PATH)),
+                PROFILE_SLOT, PROFILE_USER_INDEX)
+        saved = first_row()
+    finally:
+        if mine and os.path.exists(_profile_file() + ".probe"):
+            os.rename(_profile_file() + ".probe", _profile_file())
+        if not mine:
+            GS.delete_game_in_slot(PROFILE_SLOT, PROFILE_USER_INDEX)
     needs = [_text(_row(rows, C.PAUSE_ROW_ACTIONS.index(a)).get_editor_property(C.ROW_VALUE))
              for a in C.IN_GAME_ACTIONS]
     last = str(_row(rows, len(C.PAUSE_ROW_LABELS) - 1).get_editor_property(C.ROW_TEXT_VAR))
@@ -203,6 +236,11 @@ def probe(p):
             "need a game say so",
             first == C.START_ROW_LABEL and last == C.QUIT_ROW_LABEL
             and needs == [C.IN_GAME_ONLY] * len(needs), f"'{first}', '{last}', {needs}")
+    p.check("...and with a saved profile on disk the first row reads continue game",
+            saved == C.CONTINUE_ROW_LABEL, f"'{saved}'")
+    second = str(_row(rows, 1).get_editor_property(C.ROW_TEXT_VAR))
+    p.check("...and its second row, the settings page's, reads controls",
+            second == "Controls" == C.SETTINGS_ROW_LABEL, f"'{second}'")
 
     p.set(hud, "MenuPage", 1)
     p.set(hud, "MenuRow", FIRST_BIND_ROW)

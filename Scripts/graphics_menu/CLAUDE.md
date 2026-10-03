@@ -24,8 +24,10 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 - **M** toggles the menu in play: the only key it has. On the title it cannot be shut.
 - **Up / Down** move the menu's caret and **Enter** takes the row it is on; a click on a
   row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
-- **The rows:** `New Game` (in play it reads `Resume` and shuts the menu), `Settings` (the
-  settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
+- **Escape is BACK**, in every menu that has somewhere to go back to (below: "Escape").
+- **The rows:** `New Game` (on the title with a saved profile it reads `Continue Game`; in
+  play it reads `Resume` and shuts the menu), `Controls` (the settings page, titled
+  **CONTROLS**; the code still calls it the settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
   the wanderers' sight cones; not the FPS readout, which is always on), `Save and Exit`, `Dev All Guns`, `Gun Settings`,
   `Monster Settings`, `World Settings`, `Player Settings`, `Graphics Settings`, `Exit Game` (quits to the desktop,
   saving nothing). The quality presets are not
@@ -58,7 +60,10 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   screen's pause still stops Tick, as it always did.
 - **The first row** (`START_ACTION`) lowers `MenuOpen`; on the title it then sets
   `GameStarted`, stops the paused tick and unpauses, last. DrawHUD writes its label every
-  frame: `new game` or `resume`.
+  frame: `new game` or `resume`, and on the title `continue game` while the saved profile
+  exists (`_author_first_row`: `DoesSaveGameExist` on the profile's slot, asked every frame
+  of the title, because save and exit writes it and a death deletes it under a live HUD).
+  The row does the same either way: a started game loads the profile if there is one.
 - **`settings`** sets `MenuPage` to the settings page and `MenuRow` to 0. The page
   (`WBP_MainMenu.SettingsPanel`, at `PAUSE_POS` like the menu) shows while `MenuPage` says
   so and the menu's `Panel` is collapsed; its BACK row sets `MenuPage` back. In play the
@@ -81,6 +86,31 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   served, new game unpausing, exit game ending the process).
 - **Still needs a play session:** the keys themselves on the title, exit game from a real
   session, and how the title reads with the paused level behind it.
+
+## Escape (`cursor_consts.ESCAPE_KEY`, `menu_nav.escape_pressed`)
+
+Escape goes back one step, from any row:
+
+| what is up | Escape | where |
+|---|---|---|
+| a tuning tab | shuts the tab, back to the menu's rows | DrawHUD (`cursor.author_back_row`, ORed with BACK's click and Enter) |
+| the controls page, a capture armed | calls the capture off, binding nothing | DrawHUD (`settings_input._author_capture`, before the key pool's loop) |
+| the controls page | back to the menu's rows (the same `Set MenuPage` as its BACK row) | DrawHUD (`settings_input`) |
+| the menu's own rows, in play | shuts the menu, as M and `Resume` do | Tick (`menu_main._author_escape`) |
+| the menu's own rows, on the title | nothing: there is nothing under it | |
+
+- **One press, one step.** Escape is "just pressed" for the whole frame, and Tick runs before
+  DrawHUD: Tick's shut tests what is up *now* (`MenuOpen`, `MenuPage` on the rows, no tab's
+  flag), so the press that DrawHUD will spend on a tab or the page does not also take the
+  menu down.
+- **Not rebindable:** it is not in `KEY_POOL`, like the arrows.
+- The loot window and the I panel keep their own keys (Tab, I) and close lines; Escape does
+  nothing to them. The death menu has nothing to go back to.
+- **In the editor's PIE, Escape ends the session** (the editor's own shortcut) before the
+  game sees it. A `-game` run or a packaged build has no such binding.
+- **No probe:** nothing can press a key in a probe's game. `escape_checks.py` checks the
+  graph (each poll, what it gates, and the menu shut's test of what is up).
+- **Still needs a play session:** every row of the table above.
 
 ## The M panel as a menu (`menu_screens.py`, `menu_nav.py`, `menu_still.py`)
 

@@ -10,6 +10,9 @@ catches pin literals that compile but mean something else. After a change to wha
 shows, also run `uepy.py --game --probe Scripts/probes/probe_umg_screens.py` (and
 `probe_hud_low_flash.py` for the bars).
 
+Graphs are authored with `Scripts/uebp` (root `CLAUDE.md`): no coordinates, node paths from
+`uebp.nodes`, the HUD's own variables by their row in `hud_vars.py` (`MV.MenuOpen`).
+
 This package holds the fragments. The entry point itself is still 1.2k lines, over budget, so
 split it before extending it.
 

@@ -57,11 +57,11 @@ sessions tens of millions of tokens.
   modules, and a `main()` that calls the steps in order.
 - **Package:** the code lives in a package with one module per responsibility, named after what
   it owns: one Blueprint, one graph concern, or one constants table (`tuning.py`, `paths.py`,
-  `nodes.py`). Constants modules stay separate from the modules that author graphs.
+  `<blueprint>_vars.py`). Constants modules stay separate from the modules that author graphs.
 - **The map:** the package's `__init__.py` docstring lists every module in one line each. Keep it
   current. Each module's docstring says what it owns and why.
 - **Explicit imports only.** No `import *` and no re-exporting facades.
-- **No import cycles.** Imports flow constants → `graph.py` → builders → entry point.
+- **No import cycles.** Imports flow constants → `uebp` → builders → entry point.
 - **Verifiers mirror builders.** `verify/<area>.py` holds self-contained `check_*` functions.
   Values shared between sections go in `verify/fixtures.py`, and no section reads state that
   another section left behind.
@@ -319,7 +319,25 @@ editor.
 - **An enum pin is a literal and can't be driven by a variable.** If a behaviour varies at
   runtime, it can't live in a pin literal. Use a Branch.
 
-### Authoring Blueprint graphs from Python (`combat/graph.py` has the helpers)
+### Authoring Blueprint graphs from Python (`Scripts/uebp` has the helpers)
+
+- **One authoring library, `Scripts/uebp`,** imported directly by every builder (its
+  `__init__.py` maps it):
+  - `uebp.graph`: `_node`, `_palette`, `_pin`, `_connect`, `_set` (takes a Python bool), and
+    `out(n)`, `out(n, "Pin")`, `then(n)`, `else_(n)` for the plumbing pins.
+  - `uebp.g._G`: the node shapes a long fragment repeats (`g.get`, `g.put`, `g.call`,
+    `g.branch`). Write new fragments in it.
+  - `uebp.nodes.<library>`: every `FN_*`/`NODE_*`/`MACRO_*` path, once. Add a path there,
+    then run `python3 Scripts/dev/uepy.py --summary Scripts/dev/check_node_catalog.py`.
+  - `uebp.vars`: a Blueprint's variables are rows of its `<blueprint>_vars.py` table
+    (`Var(name, type, default)`; a `Var` is its name). Name a variable by its row
+    (`HV.Health`) or its `*_VAR` constant, never by a bare string.
+- **No coordinates.** Nothing positions a node: `uebp.layout.arrange(ed)` lays the graph out
+  before the compile. A new builder calls it once per graph it authors.
+- **Refactoring the authoring code:** `python3 Scripts/dev/graph_fingerprint.py <label>`
+  records every Blueprint with no positions; `graph_fingerprint_diff.py <a> <b>` must be
+  empty when nothing structural was meant to change. `Scripts/dev/codemods/` holds the
+  rewrites that got here (each has a dry run on a scratch copy).
 
 - **Widget Blueprint layouts can be authored from Python,** through the editor-only UMGToolSet
   plugin (enabled in `Otherworld.uproject`) and `call_method`, since its functions have no

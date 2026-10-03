@@ -4,6 +4,11 @@
 `Scripts/verify_weapons_and_combat.py` reads the saved assets back. Both are thin entry points:
 the code is this package (`__init__.py` is the map) and the verifier's sections are `verify/`.
 
+Graphs are authored with `Scripts/uebp` (root `CLAUDE.md`): no coordinates, `out`/`then`
+for pins, node paths from `uebp.nodes`, and a variable by its row (`WV.Held` from
+`weapon_component/vars.py`, `HV.Health` from `health_vars.py`, `IV.Loaded` from
+`item_vars.py`) or its `*_VAR` constant. `_log` is `combat/log.py`.
+
 ## Controls, and where they live
 
 The defaults are all rebindable on the settings screen:

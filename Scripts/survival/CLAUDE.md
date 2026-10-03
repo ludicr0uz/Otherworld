@@ -50,7 +50,7 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 
 - **The table:** `on_hit.ON_HIT` maps an attack's name to the effects a landed hit of it
   rolls, each with its own chance. Today: `"melee.Wendigo"` → bleeding at 33%.
-- **The fragment:** `_author_on_hit(ed, exec_in, target, effects, x0, y0)` goes into whatever
+- **The fragment:** `_author_on_hit(ed, exec_in, target, effects)` goes into whatever
   graph lands the hit and takes the target as an actor pin. Per effect: a random 0..1 under
   `chance + OnHitChanceBonus` → remove every stack the target has → spec, tags → apply. It
   returns the exec tails. The wanderers' swing runs it for every creature (`npc/melee.py`), so

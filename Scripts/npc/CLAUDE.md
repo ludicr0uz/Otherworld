@@ -5,6 +5,9 @@ rebuilds the AI graph and the Behavior Trees every run. The code is this package
 the map: one module per step fragment — stats, melee, chase, patrol, senses, agro, corpse — plus the
 steps, the tree, the step task, the controller and the character).
 
+Graphs are authored with `Scripts/uebp` (root `CLAUDE.md`): no coordinates, node paths from
+`uebp.nodes`; `npc/graph.py` keeps only `_log`, `_Graph` and `_mesh_object`.
+
 - Every movement, melee and spawn-band number lives in `forest_generator/npc_placement.py`.
 - Every sense and patrol number lives in `forest_generator/npc_agro.py`.
 - The step between two swings is `forest_generator/npc_strafe.py`.

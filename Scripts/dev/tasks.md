@@ -215,7 +215,7 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       pick up the item. Drag-and-drop constraints: Only weapons can be dragged into weapon slots.
       Consumables cannot be dragged into weapon slots; hotkeyed backpack slots will be used for
       consumables. Clothing system: Use existing clothing slot system.
-- [ ] There seems to be a bug introduced in recent commits where monster textures were lost.
+- [x] There seems to be a bug introduced in recent commits where monster textures were lost.
       player character and monsters are gray. Fix that, and update the character model to the new
       one that was generated in the recent commit (5c6c53b).
 - [ ] Wind was implement recently but it is in random direction. Wind motion across objects
@@ -225,3 +225,4 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [ ] Players default movement should be a jog rather than a walk. Right now the character walks.
 - [ ] Pressing I should have a hover image of the character facing forward as part of the
       character menu screen.
+- [ ] Update the worn clothing inventory to show clothing icons rather than text. Should be the same icon format as the inventory. Remove text labels for primary / secondary / gun / knife weapon slots. Create translucent icons for the weapon categories (AR / AR / Gun / Knife) if there are no items in those slots. Always show clothing and inventory (should not be hidden until "i" is pressed). If I is pressed, allow mouse drag to move items around, including putting them into inventory slots or hands. 

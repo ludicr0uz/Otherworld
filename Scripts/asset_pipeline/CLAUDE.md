@@ -71,3 +71,12 @@ bound and never add a number for one character.**
   from the cached one, and with the same prompt it would resume the model already paid for.
 - **Never cold-run while an editor is open**, including a warm `$UEPY_SERVE` one: close it
   (`uepy.py --close-editors`) before `swap_player_body.py`.
+
+## Where this stands (2026-10-03)
+
+`adventurer_03` is in the catalog and **not generated**: the first request came back
+`HTTP 402 "API key credit limit reached"` (the account had 900 credits; the limit is the
+key's own, set in Meshy's dashboard, and only the user can raise it). Nothing was spent. When
+the key allows it again, the three commands at the top of this file are all that is left,
+within the 80 credits the user allowed; then set `CLOTHING_BASE_BODY` to it and leave the
+player on `adventurer_01` unless told otherwise.

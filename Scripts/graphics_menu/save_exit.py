@@ -36,24 +36,13 @@ from graphics_menu.profile_consts import (
 )
 from graphics_menu.profile_read import author_read_profile
 from graphics_menu.profile_write import author_write_profile
+from uebp.nodes.actor import FN_DISABLE_MOVEMENT, FN_GET_COMP, FN_SET_MOVEMENT_MODE
+from uebp.nodes.array import FN_ARR_LEN
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LE_FF, FN_NOT)
+from uebp.nodes.system import (
+    FN_DELETE_SAVE, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS, FN_TIME_SECONDS)
 
-FN_LE = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
-FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
-FN_GE = "/Script/Engine.KismetMathLibrary.GreaterEqual_DoubleDouble"
-FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
-FN_GREATER_II = "/Script/Engine.KismetMathLibrary.Greater_IntInt"
-FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
-FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
-FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
-FN_SAVE_EXISTS = "/Script/Engine.GameplayStatics.DoesSaveGameExist"
-FN_DELETE_SAVE = "/Script/Engine.GameplayStatics.DeleteGameInSlot"
-FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
-FN_OPEN_LEVEL = "/Script/Engine.GameplayStatics.OpenLevel"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_DISABLE_MOVEMENT = "/Script/Engine.CharacterMovementComponent.DisableMovement"
-FN_SET_MOVEMENT_MODE = "/Script/Engine.CharacterMovementComponent.SetMovementMode"
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 
 _BOOLS = (EXIT_PENDING_VAR, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR)
@@ -131,7 +120,7 @@ def _branch(ed, cond, in_execs, made):
 def _author_forget_on_death(ed, health, in_execs, made):
     """Returns (alive exec, [tails of the dead arm])."""
     hp = _get(ed, "Health", made, HEALTH_CLASS_PATH, health)
-    dead, alive = _branch(ed, out(_call(ed, FN_LE, made, A=hp, B=0.0)), in_execs, made)
+    dead, alive = _branch(ed, out(_call(ed, FN_LE_FF, made, A=hp, B=0.0)), in_execs, made)
     done, fresh = _branch(ed, _get(ed, PROFILE_FORGOTTEN_VAR, made), [dead], made)
     wipe = _call(ed, FN_DELETE_SAVE, made, SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
     flow = _chain(wipe, [fresh])
@@ -171,7 +160,7 @@ def _author_start(ed, pc_out, now_out, in_execs, made):
     start, stay = _branch(ed, out(go), in_execs, made)
     flow = _setter(ed, EXIT_PENDING_VAR, "true", [start], made)
     flow = _setter(ed, EXIT_STARTED_VAR, now_out, flow, made)
-    deadline = _call(ed, FN_ADD, made, A=now_out, B=EXIT_SECONDS)
+    deadline = _call(ed, FN_ADD_FF, made, A=now_out, B=EXIT_SECONDS)
     flow = _setter(ed, EXIT_AT_VAR, out(deadline), flow, made)
     flow = _setter(ed, "MenuOpen", "false", flow, made)
     return flow + [stay]
@@ -187,7 +176,7 @@ def _author_countdown(ed, parts, now_out, in_execs, made):
     """A running exit: called off by a hit, or saved and left when it is due."""
     running, idle = _branch(ed, _get(ed, EXIT_PENDING_VAR, made), in_execs, made)
     struck = _get(ed, "LastDamageTime", made, HEALTH_CLASS_PATH, parts[HEALTH_CLASS_PATH])
-    since = _call(ed, FN_GREATER, made, A=struck, B=_get(ed, EXIT_STARTED_VAR, made))
+    since = _call(ed, FN_GREATER_FF, made, A=struck, B=_get(ed, EXIT_STARTED_VAR, made))
     hit, unhurt = _branch(ed, out(since), [running], made)
     off = _setter(ed, EXIT_PENDING_VAR, "false", [hit], made)
     off = _setter(ed, EXIT_CALLED_OFF_VAR, now_out, off, made)
@@ -197,7 +186,7 @@ def _author_countdown(ed, parts, now_out, in_execs, made):
     walk, off = _movement_call(ed, moves, FN_SET_MOVEMENT_MODE, off, made)
     _set(walk, "NewMovementMode", "MOVE_Walking")
 
-    ripe = _call(ed, FN_GE, made, A=now_out, B=_get(ed, EXIT_AT_VAR, made))
+    ripe = _call(ed, FN_GE_FF, made, A=now_out, B=_get(ed, EXIT_AT_VAR, made))
     leave, wait = _branch(ed, out(ripe), [unhurt], made)
     # Standing still while the countdown runs; the reopened level brings a
     # fresh pawn, so only the hit arm has to give the movement back.

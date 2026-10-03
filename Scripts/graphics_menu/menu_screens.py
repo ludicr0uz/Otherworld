@@ -44,20 +44,14 @@ from graphics_menu.umg_consts import (
     RESUME_ROW_LABEL, ROW_LABEL, ROW_VALUE, SETTINGS_PANEL, START_ROW_LABEL,
     WBP_DEATH_MENU, WBP_HUD, WBP_MAIN_MENU, WBP_MENU_ROW, WBP_PAUSE_MENU,
 )
+from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
+from uebp.nodes.math import FN_EQ_II, FN_OR
+from uebp.nodes.system import (
+    FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SET_PAUSED)
 
 GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
                         ".BP_ThirdPersonGameMode_C")
 KILL_COUNT_VAR = "NpcKillCount"
-
-FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
-FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
-FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
-FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
-FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
-FN_OPEN_LEVEL = "/Script/Engine.GameplayStatics.OpenLevel"
-FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
-FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
-FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 
 
 def author_title(ed, in_execs):

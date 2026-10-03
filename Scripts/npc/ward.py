@@ -56,14 +56,6 @@ from forest_generator.npc_ward import (
 )
 from npc.graph import _Graph, _log
 from uebp.graph import BEL, _assets, _connect, _loose_pin, _palette, _pin, else_, out, then
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_DEG_COS, FN_DISTANCE_2D, FN_DOT_VV,
-    FN_EQ_FF, FN_FORWARD, FN_GE_FF, FN_GET_COMP, FN_GET_CONTROLLER, FN_GET_PAWN,
-    FN_GET_PLAYER_PAWN, FN_GT_FF, FN_IS_VALID, FN_LE_FF, FN_LT_FF,
-    FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VV, FN_NORMAL_2D, FN_OR, FN_PROJECT_NAV,
-    FN_RANDOM_BOOL, FN_RANDOM_FLOAT, FN_ROTATE_AXIS, FN_SELECT_FLOAT, FN_SIMPLE_MOVE, FN_SUB_FF,
-    FN_SUB_VV, FN_TIME_SECONDS, FN_VELOCITY, FN_VSIZE_XY, NODE_CAST_WEAPON,
-)
 from npc.paths import (
     STALK_CHARGING_VAR, STALK_LEG_UNTIL_VAR, STALK_ROAR_UNTIL_VAR,
     WARD_FLEE_GOAL_VAR, WARD_FLEE_UNTIL_VAR, WARD_LAST_VAR, WARD_SIDE_VAR,
@@ -75,6 +67,16 @@ from npc.tuned import tuned_pin
 from npc.ward_roar import (
     _author_roar_time, _author_roar_wait, _author_roars, declare_ward_roar_vars,
 )
+from uebp.nodes.actor import (
+    FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_GET_COMP, FN_GET_CONTROLLER, FN_GET_PAWN, FN_VELOCITY)
+from uebp.nodes.ai import FN_PROJECT_NAV, FN_SIMPLE_MOVE
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_DEG_COS, FN_DISTANCE_2D, FN_DOT_VV, FN_EQ_FF, FN_GE_FF,
+    FN_GREATER_FF, FN_LESS_FF, FN_LE_FF, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VV, FN_NORMAL_2D,
+    FN_OR, FN_RANDOM_BOOL, FN_RANDOM_FLOAT, FN_ROTATE_AXIS, FN_SELECT_FF, FN_SUB_FF,
+    FN_SUB_VV, FN_VSIZE_XY)
+from uebp.nodes.palette import NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_TIME_SECONDS
 
 def wards(key):
     """Does creature ``key`` get the step? It has to fear fire, and the
@@ -139,12 +141,12 @@ def _author_held(g, exec_in, pins):
              _pin(fire, "self"))
 
     near = g.op(FN_LE_FF, pins["gap"], tuned_pin(g, "ward_range_cm"))
-    facing = g.call(FN_FORWARD)
+    facing = g.call(FN_ACTOR_FORWARD)
     _connect(pins["player"], _pin(facing, "self"))
     dot = g.op(FN_DOT_VV, out(facing), pins["bearing"])
     edge = g.call(FN_DEG_COS)
     _connect(tuned_pin(g, "ward_half_angle_deg"), _pin(edge, "A"))
-    front = g.op(FN_GT_FF, dot, out(edge))
+    front = g.op(FN_GREATER_FF, dot, out(edge))
     lit = g.op(FN_AND, out(fire, FIRE_WARD_VAR), near)
     held = g.branch(g.op(FN_AND, lit, front), then(cast))
     return then(held), [else_(present), out(cast, "CastFailed"), else_(held)]
@@ -165,13 +167,13 @@ def _author_hold(g, exec_in, pins):
     way round and until when, when it first roars, the stamp. Returns the Branch on "held off long
     enough"."""
     idle = g.op(FN_SUB_FF, pins["now"], g.get(WARD_LAST_VAR))
-    lapsed = g.op(FN_GT_FF, idle, NPC_WARD_GRACE_S)
+    lapsed = g.op(FN_GREATER_FF, idle, NPC_WARD_GRACE_S)
     # Exactly 0, which is what a flight leaves: any other time is a hold's.
     unstarted = g.op(FN_EQ_FF, g.get(WARD_SINCE_VAR), 0.0)
     fresh = g.branch(g.op(FN_OR, lapsed, unstarted), exec_in)
     # --- a new hold: one throw for the way round, as the stalk's is -----------
     began = g.put(WARD_SINCE_VAR, then(fresh), pin=pins["now"])
-    coin = g.call(FN_SELECT_FLOAT, A=1.0, B=-1.0)
+    coin = g.call(FN_SELECT_FF, A=1.0, B=-1.0)
     _connect(out(g.call(FN_RANDOM_BOOL)), _pin(coin, "bPickA"))
     picked = g.put(WARD_SIDE_VAR, began, pin=out(coin))
     picked = _author_turn_time(g, picked, pins)
@@ -183,7 +185,7 @@ def _author_hold(g, exec_in, pins):
     pace = g.call(FN_VSIZE_XY)
     _connect(out(moving), _pin(pace, "A"))
     up = g.op(FN_LE_FF, g.get(WARD_TURN_AT_VAR), pins["now"])
-    still = g.op(FN_LT_FF, out(pace), NPC_WARD_STALLED_CMS)
+    still = g.op(FN_LESS_FF, out(pace), NPC_WARD_STALLED_CMS)
     stalled = g.branch(g.op(FN_OR, still, up), else_(fresh))
     other = g.op(FN_MUL_FF, g.get(WARD_SIDE_VAR), -1.0)
     turned = g.put(WARD_SIDE_VAR, then(stalled), pin=other)
@@ -274,7 +276,7 @@ def _author_ward(ed, exec_in, result, roar_anim, stock, restalks):
                 player_loc=out(player_loc), gap=out(gap), bearing=out(bearing),
                 now=out(now))
 
-    running = g.op(FN_LT_FF, pins["now"], g.get(WARD_FLEE_UNTIL_VAR))
+    running = g.op(FN_LESS_FF, pins["now"], g.get(WARD_FLEE_UNTIL_VAR))
     fleeing = g.branch(running, exec_in)
     # It roars before it runs: the flight's first passes stand.
     standing, away = _author_roar_wait(g, then(fleeing), pins)

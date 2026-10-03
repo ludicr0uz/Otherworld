@@ -34,11 +34,10 @@ After sights.py, which writes SightBlend, and before the equip.
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from combat.hit_reaction import STEADY_VAR
-from combat.nodes import (
-    FN_AND, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GREATER_FF, FN_IS_SLOT_ACTIVE,
-    FN_NOT, NODE_CAST_HEALTH,
-)
 from combat.paths import HEALTH_CLASS_PATH
+from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_GET_COMP, FN_IS_SLOT_ACTIVE
+from uebp.nodes.math import FN_AND, FN_GREATER_FF, FN_NOT
+from uebp.nodes.palette import NODE_CAST_HEALTH
 
 # The sights are up, for the flinch, from this much of the camera's travel to
 # the eye point. Below it the view is the boom's to within a hundredth.

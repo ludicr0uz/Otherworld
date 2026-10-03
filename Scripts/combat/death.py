@@ -10,17 +10,19 @@ from combat.game_state import (
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.gun_drop import _author_gun_drop
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_II, FN_ADD_VV, FN_CONCAT, FN_DELAY,
-    FN_DISABLE_MOVEMENT, FN_GET_CONTROLLER, FN_GET_GAME_MODE, FN_GET_OWNER,
-    FN_INT_TO_STR, FN_IS_VALID, FN_LIFESPAN, FN_MAKE_TRANSFORM, FN_PRINT,
-    FN_SET_COLLISION, FN_SET_PAUSED, FN_SET_PROFILE, FN_SIMULATE_ALL,
-    NODE_CAST_CHARACTER, NODE_CAST_GAME_MODE, NODE_CAST_PAWN, NODE_SPAWN,
-)
 from combat.paths import GAME_MODE_CLASS_PATH
 from combat.ragdoll import RAGDOLL_PROFILE
 from combat.tuning import AMMO_DROP_SHELLS, AMMO_PICKUP_LIFT
 from loot.roll import author_loot_roll
+from uebp.nodes.actor import (
+    FN_ACTOR_LOC, FN_DISABLE_MOVEMENT, FN_GET_CONTROLLER, FN_GET_OWNER, FN_LIFESPAN,
+    FN_SET_COLLISION, FN_SET_PROFILE, FN_SIMULATE_ALL)
+from uebp.nodes.math import FN_ADD_II, FN_ADD_VV, FN_MAKE_TRANSFORM
+from uebp.nodes.palette import (
+    NODE_CAST_CHARACTER, NODE_CAST_GAME_MODE, NODE_CAST_PAWN, NODE_SPAWN)
+from uebp.nodes.system import (
+    FN_CONCAT, FN_DELAY, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT,
+    FN_SET_PAUSED)
 
 
 # How long a corpse lies where it fell. Long enough that a firefight leaves a

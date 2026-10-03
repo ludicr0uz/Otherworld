@@ -31,11 +31,6 @@ IsValidIndex: it starts empty and is grown by the first wear into a slot.
 """
 
 from uebp.graph import _connect, _loose_pin, _pin, _set, out, then
-from combat.nodes import (
-    FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_ARR_REMOVE, FN_ARR_SET, FN_ARR_VALID,
-    FN_AND, FN_EQ_II, FN_IS_VALID, FN_LESS_II, FN_MIN_II, FN_OR, FN_SELECT_II,
-    FN_SET_HIDDEN, FN_SUB_II,
-)
 from combat.paths import ITEM_CLASS_PATH
 from combat.slot_tuning import (
     BAG_FIRST, BAG_LAST, HAND, HAS_ROOM_VAR, SLOT_PICK_VAR, SLOT_VAR, UNPLACED,
@@ -45,9 +40,13 @@ from combat.wear_tuning import (
 )
 from uebp.g import _G
 from combat.weapon_component.consume import TRIGGER_SPENT
+from uebp.nodes.actor import FN_SET_HIDDEN
+from uebp.nodes.array import (
+    FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_ARR_REMOVE, FN_ARR_SET, FN_ARR_VALID)
+from uebp.nodes.math import (
+    FN_AND, FN_EQ_II, FN_GE_II, FN_LE_II, FN_MIN_II, FN_OR, FN_SELECT_II, FN_SUB_II)
+from uebp.nodes.system import FN_IS_VALID
 
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-FN_LE_II = "/Script/Engine.KismetMathLibrary.LessEqual_IntInt"
 WEAR_SLOT_VAR = "WearSlot"     # the slot WearItem goes into (declared in build.py)
 
 

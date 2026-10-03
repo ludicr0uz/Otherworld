@@ -3,8 +3,9 @@ weapon property, trace defaults and the muzzle location.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, out
-from combat.nodes import FN_GET_TRANSFORM, FN_TRANSFORM_LOC
 from combat.paths import ITEM_CLASS_PATH
+from uebp.nodes.actor import FN_GET_TRANSFORM
+from uebp.nodes.math import FN_TRANSFORM_LOC
 
 
 # ─── BP_WeaponComponent ──────────────────────────────────────────────────────

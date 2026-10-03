@@ -388,3 +388,29 @@ def arity_errors(project, conventions=None):
                 out.append(f"{module.rel}:{call.lineno}: "
                            f"{target[1]}(): {problem}")
     return sorted(out)
+
+
+def missing_imports(project):
+    """``from <project module> import name`` where the module has no such
+    name: what a codemod that moves definitions must leave none of."""
+    def bound(module):
+        out = set(module.imports) | set(module.aliases)
+        for node in ast.walk(module.tree):
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                out.add(node.name)
+            elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                out.add(node.id)
+        return out
+
+    known, out = {}, []
+    for module in project.modules.values():
+        for node in ast.walk(module.tree):
+            if not isinstance(node, ast.ImportFrom) or node.module not in project.modules:
+                continue
+            if node.module not in known:
+                known[node.module] = bound(project.modules[node.module])
+            for a in node.names:
+                if (a.name not in known[node.module]
+                        and f"{node.module}.{a.name}" not in project.modules):
+                    out.append(f"{module.rel}:{node.lineno}: {node.module} has no {a.name}")
+    return sorted(out)

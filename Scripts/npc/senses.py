@@ -22,14 +22,15 @@ from combat.game_state import (
 from combat.paths import GAME_MODE_CLASS_PATH
 from combat.tuning import COMBAT
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_AND, FN_DISTANCE, FN_DOT_VV, FN_FORWARD, FN_GET_COMP,
-    FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_GE_FF, FN_LE_FF,
-    FN_LINE_OF_SIGHT, FN_MUL_FF, FN_NORMAL, FN_OR, FN_SUB_FF, FN_SUB_VV,
-    FN_TIME_SECONDS, NODE_CAST_GAME_MODE, NODE_CAST_HEALTH, FN_DEG_COS,
-)
 from npc.paths import HEALTH_CLASS_PATH
 from npc.tuned import tuned
+from uebp.nodes.actor import (
+    FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_GET_COMP, FN_GET_PAWN, FN_LINE_OF_SIGHT)
+from uebp.nodes.math import (
+    FN_AND, FN_DEG_COS, FN_DISTANCE, FN_DOT_VV, FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_NORMAL,
+    FN_OR, FN_SUB_FF, FN_SUB_VV)
+from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
+from uebp.nodes.system import FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
 
 
 class _Maker:
@@ -124,7 +125,7 @@ def _author_sight(ed, exec_in):
     _connect(here, _pin(toward, "B"))
     unit = k.fn(FN_NORMAL)
     _connect(k.out(toward), _pin(unit, "A"))
-    facing = k.fn(FN_FORWARD)
+    facing = k.fn(FN_ACTOR_FORWARD)
     _connect(k.out(pawn), _pin(facing, "self"))
     dot = k.fn(FN_DOT_VV)
     _connect(k.out(facing), _pin(dot, "A"))

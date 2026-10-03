@@ -4,16 +4,17 @@ the step that sends a wanderer to a new point inside its circle now and then.
 
 from forest_generator.npc_agro import PATROL_ACCEPT_FRACTION, PATROL_ACCEPT_SLACK_CM
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_DISTANCE, FN_DIV_FF, FN_GET_CONTROLLER, FN_GET_PAWN,
-    FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_RANDOM_FLOAT, FN_RANDOM_REACHABLE,
-    FN_SIMPLE_MOVE, FN_TIME_SECONDS, NODE_CAST_CHARACTER,
-)
 from npc.paths import (
     CHARACTER_CLASS_PATH, MOVEMENT_CLASS_PATH, NEXT_PATROL_VAR,
     PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR, RUN_SPEED_VAR,
 )
 from npc.tuned import tuned
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_CONTROLLER, FN_GET_PAWN
+from uebp.nodes.ai import FN_RANDOM_REACHABLE, FN_SIMPLE_MOVE
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_DISTANCE, FN_DIV_FF, FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_RANDOM_FLOAT)
+from uebp.nodes.palette import NODE_CAST_CHARACTER
+from uebp.nodes.system import FN_TIME_SECONDS
 
 
 def _author_walk_speed(ed, exec_in, stroll, stock, scale=None):

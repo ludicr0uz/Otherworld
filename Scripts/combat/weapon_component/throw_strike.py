@@ -83,12 +83,6 @@ from uebp.graph import (
     BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.hit_zones import HEAD_BONES_VAR, HEAD_MULT_VAR
-from combat.nodes import (
-    FN_ADD_VV, FN_ARR_ADD, FN_ARR_CONTAINS, FN_ATTACH, FN_BREAK_VECTOR, FN_CLAMP,
-    FN_GET_COMP, FN_GREATER_FF, FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF,
-    FN_NORMAL, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV, FN_TIME_SECONDS,
-    FN_TRACE_COMPONENT, INF, NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_SPAWN,
-)
 from combat.paths import HEALTH_CLASS_PATH
 from combat.throw_tuning import (
     LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, STICK_LINE_REACH_CM,
@@ -96,6 +90,17 @@ from combat.throw_tuning import (
 )
 from combat.weapon_component.common import _prop
 from combat.weapon_component.surface_impact import _author_surface_impact
+from uebp.nodes.actor import (
+    FN_ATTACH, FN_CLOSEST_BONE, FN_GET_COMP, FN_INSTANCE_TRANSFORM, FN_SET_LOC_ROT,
+    FN_TRACE_COMPONENT)
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_CONTAINS
+from uebp.nodes.math import (
+    FN_ADD_VV, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_CLAMP, FN_COMPOSE_ROT, FN_GREATER_FF,
+    FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF, FN_NE_NAME, FN_NORMAL,
+    FN_ROTATE_VECTOR, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV, INF)
+from uebp.nodes.palette import (
+    NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_CAST_INSTANCED, NODE_SPAWN)
+from uebp.nodes.system import FN_TIME_SECONDS
 
 THROW_PAST_VAR = "ThrowPast"          # the actors the fall to the ground ignores
 # The bone of the body the blade is set into, a Name on the component: None
@@ -104,16 +109,6 @@ THROW_PAST_VAR = "ThrowPast"          # the actors the fall to the ground ignore
 # of that bone's body the blade struck: where it is set.
 THROW_BONE_VAR = "ThrowBone"
 THROW_SKIN_VAR = "ThrowSkin"
-
-NODE_CAST_INSTANCED = "Utilities|Casting|CastToInstancedStaticMeshComponent"
-FN_INSTANCE_TRANSFORM = "/Script/Engine.InstancedStaticMeshComponent.GetInstanceTransform"
-FN_BREAK_TRANSFORM = "/Script/Engine.KismetMathLibrary.BreakTransform"
-FN_COMPOSE_ROT = "/Script/Engine.KismetMathLibrary.ComposeRotators"
-FN_ROTATE_VECTOR = "/Script/Engine.KismetMathLibrary.GreaterGreater_VectorRotator"
-FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
-FN_SET_LOC_ROT = "/Script/Engine.Actor.K2_SetActorLocationAndRotation"
-FN_CLOSEST_BONE = "/Script/Engine.SkinnedMeshComponent.FindClosestBone_K2"
-FN_NE_NAME = "/Script/Engine.KismetMathLibrary.NotEqual_NameName"
 
 
 def _hit(brk, name):

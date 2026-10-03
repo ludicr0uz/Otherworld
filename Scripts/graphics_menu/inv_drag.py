@@ -27,7 +27,6 @@ is (cursor.py); a -nullrhi probe writes the component's variables instead.
 """
 
 from uebp.graph import BEL, _connect, _declare, _pin, out, then
-from combat.nodes import FN_AND, FN_EQ_II, FN_IS_VALID, FN_LESS_II, FN_SUB_II
 from combat.paths import WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import (
     MOVE_FROM_VAR, MOVE_TO_VAR, PRIMARY, SLOT_ITEMS_VAR, SLOT_REQUEST_VAR,
@@ -43,12 +42,11 @@ from graphics_menu.loot_find import put
 from graphics_menu.ui_graph import part
 from graphics_menu.umg_consts import WBP_HUD
 from graphics_menu.wear_consts import WEAR_SEL_VAR, WEAR_SLOTS_BOX, WEAR_TAKE_VAR
+from uebp.nodes.actor import FN_RELEASED
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_VALID
+from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_SUB_II
+from uebp.nodes.system import FN_IS_VALID
 
-FN_RELEASED = "/Script/Engine.PlayerController.WasInputKeyJustReleased"
-FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
-FN_ARR_VALID = "/Script/Engine.KismetArrayLibrary.Array_IsValidIndex"
 
 _INTS = (DRAG_FROM_VAR, INV_OVER_VAR)
 

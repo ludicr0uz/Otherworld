@@ -2,16 +2,17 @@
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.nodes import (
-    FN_ACTOR_FORWARD, FN_ADD_FF, FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF,
-    FN_IS_KEY_DOWN, FN_LAST_MOVE_INPUT, FN_LE_FF, FN_MUL_FF, FN_NORMAL, FN_NOT,
-    FN_OR, FN_SELECT_FF, MOVEMENT_CLASS_PATH, NODE_CAST_CHARACTER,
-)
+from combat.nodes import MOVEMENT_CLASS_PATH
 from combat.sprint_tuning import (
     SPRINT_AHEAD_VAR, SPRINT_CONE_HALF_ANGLE_DEG, SPRINT_CONE_MIN_DOT,
     SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR,
 )
 from combat.tuning import COMBAT, SPRINT_KEY
+from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_IS_KEY_DOWN, FN_LAST_MOVE_INPUT
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_NORMAL, FN_NOT,
+    FN_OR, FN_SELECT_FF)
+from uebp.nodes.palette import NODE_CAST_CHARACTER
 
 # Set when a held sprint runs Stamina out, cleared by letting the key go.
 SPRINT_SPENT_VAR = "SprintSpent"

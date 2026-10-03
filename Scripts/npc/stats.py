@@ -8,13 +8,13 @@ from npc.paths import (
     APPLIED_HEALTH_VAR, HEALTH_CLASS_PATH, HIT_SOUNDS_VAR, NEXT_VOICE_VAR,
     REACTIONS_VAR, STATS_APPLIED_VAR, VOICES_VAR,
 )
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_GET_COMP, FN_GET_PAWN, FN_GE_FF, FN_NE_FF,
-    FN_RANDOM_FLOAT, FN_TIME_SECONDS, NODE_CAST_HEALTH,
-)
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from npc.sound import _author_random_sound
 from npc.tuned import tuned
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_PAWN
+from uebp.nodes.math import FN_ADD_FF, FN_GE_FF, FN_NEQ_FF, FN_RANDOM_FLOAT
+from uebp.nodes.palette import NODE_CAST_HEALTH
+from uebp.nodes.system import FN_TIME_SECONDS
 
 
 def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
@@ -84,7 +84,7 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
     want, want_out = tuned(ed, "health")
     keep(want)
     done = keep(ed.add_get_member_variable_node(APPLIED_HEALTH_VAR))
-    fresh = keep(_node(ed, FN_NE_FF))
+    fresh = keep(_node(ed, FN_NEQ_FF))
     _connect(want_out, _pin(fresh, "A"))
     _connect(_pin(done, APPLIED_HEALTH_VAR, is_input=False), _pin(fresh, "B"))
     first = keep(ed.add_branch_node())

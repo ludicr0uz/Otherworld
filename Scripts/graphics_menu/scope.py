@@ -10,19 +10,14 @@ only arrives with zoom past that -- which only the sights give it.
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, out, then
 from combat.tuning import COMBAT
 from graphics_menu.canvas import _draw_texture
+from uebp.nodes.actor import FN_DRAW_RECT
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_CLAMP, FN_DIV_FF, FN_GREATER_FF, FN_MAKE_COLOR, FN_MAX_FF,
+    FN_SUB_FF)
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
 
-FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
-FN_DRAW_RECT = "/Script/Engine.HUD.DrawRect"
-FN_FCLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
-FN_FMAX = "/Script/Engine.KismetMathLibrary.FMax"
-FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
-FN_MAKE_COLOR = "/Script/Engine.KismetMathLibrary.MakeColor"
-FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
 
 # --- the sniper's scope -------------------------------------------------------
 # T_UI_Scope is a square: an opaque black field with a circular hole and the
@@ -62,10 +57,10 @@ def _author_scope_gate(ed, as_weapon, scoped_out, keep):
     _connect(as_weapon, _pin(base, "self"))
     now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
-    zoom = keep(_node(ed, FN_DIV))
+    zoom = keep(_node(ed, FN_DIV_FF))
     _connect(out(base, "BaseFOV"), _pin(zoom, "A"))
     _connect(out(now, "CurrentFOV"), _pin(zoom, "B"))
-    past = keep(_node(ed, FN_GREATER))
+    past = keep(_node(ed, FN_GREATER_FF))
     _connect(out(zoom), _pin(past, "A"))
     _set(past, "B", COMBAT.shoulder_zoom + SCOPE_GATE_SLACK)
     both = keep(_node(ed, FN_AND))
@@ -109,14 +104,14 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     # cx - cy is both the square's left edge and the width of each side strip,
     # because the square is the viewport's height wide and centred: the two
     # leftovers are equal by construction.
-    left = keep(_node(ed, FN_SUB))
+    left = keep(_node(ed, FN_SUB_FF))
     _connect(cx, _pin(left, "A"))
     _connect(cy, _pin(left, "B"))
     left_out = out(left)
-    right = keep(_node(ed, FN_ADD))
+    right = keep(_node(ed, FN_ADD_FF))
     _connect(cx, _pin(right, "A"))
     _connect(cy, _pin(right, "B"))
-    bar_w = keep(_node(ed, FN_FMAX))
+    bar_w = keep(_node(ed, FN_MAX_FF))
     _connect(left_out, _pin(bar_w, "A"))
     _set(bar_w, "B", 0.0)
     bar_w_out = out(bar_w)
@@ -125,10 +120,10 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     _connect(as_weapon, _pin(base, "self"))
     now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
-    zoom = keep(_node(ed, FN_DIV))
+    zoom = keep(_node(ed, FN_DIV_FF))
     _connect(out(base, "BaseFOV"), _pin(zoom, "A"))
     _connect(out(now, "CurrentFOV"), _pin(zoom, "B"))
-    travelled = keep(_node(ed, FN_SUB))
+    travelled = keep(_node(ed, FN_SUB_FF))
     _connect(out(zoom), _pin(travelled, "A"))
     _set(travelled, "B", COMBAT.shoulder_zoom)
 
@@ -138,14 +133,14 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     # would otherwise be fully opaque a third of the way in.
     ads = keep(ed.add_get_member_variable_node("AdsZoom", ITEM_CLASS_PATH))
     _connect(held_out, _pin(ads, "self"))
-    span = keep(_node(ed, FN_SUB))
+    span = keep(_node(ed, FN_SUB_FF))
     _connect(out(ads, "AdsZoom"), _pin(span, "A"))
     _set(span, "B", COMBAT.shoulder_zoom)
 
-    frac = keep(_node(ed, FN_DIV))
+    frac = keep(_node(ed, FN_DIV_FF))
     _connect(out(travelled), _pin(frac, "A"))
     _connect(out(span), _pin(frac, "B"))
-    alpha = keep(_node(ed, FN_FCLAMP))
+    alpha = keep(_node(ed, FN_CLAMP))
     _connect(out(frac), _loose_pin(alpha, "Value"))
     _set(alpha, "Min", 0.0)
     _set(alpha, "Max", 1.0)

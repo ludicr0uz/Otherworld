@@ -3,14 +3,13 @@ recovery back toward the aim the player was holding.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_ABS, FN_ADD_FF, FN_BREAK_ROT, FN_GET_CONTROL_ROT, FN_GREATER_FF,
-    FN_INTERP_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT,
-    FN_SET_CONTROL_ROT, FN_SUB_FF,
-)
 from combat.tuning import COMBAT
 from combat.weapon_component.accuracy import RECOIL_SCALE_VAR
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import FN_GET_CONTROL_ROT, FN_SET_CONTROL_ROT
+from uebp.nodes.math import (
+    FN_ABS, FN_ADD_FF, FN_BREAK_ROT, FN_GREATER_FF, FN_INTERP_FF, FN_MAKE_ROT, FN_MUL_FF,
+    FN_RANDOM_FLOAT, FN_SUB_FF)
 
 
 def _author_turn_view(ed, pc_out, pitch_delta, yaw_delta, exec_in):

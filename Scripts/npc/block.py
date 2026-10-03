@@ -15,12 +15,11 @@ from combat.tuning import COMBAT
 from npc.graph import _log
 from uebp.graph import (
     _assets, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then)
-from npc.nodes import (
-    FN_AND, FN_CLAMP, FN_DOT_VV, FN_FORWARD, FN_GET_COMP, FN_GE_FF, FN_MUL_FF,
-    FN_SUB_FF, NODE_CAST_WEAPON,
-)
-from npc.paths import HIT_DAMAGE_VAR, INF
+from npc.paths import HIT_DAMAGE_VAR
 from npc.tuned import tuned
+from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_GET_COMP
+from uebp.nodes.math import FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF, FN_MUL_FF, FN_SUB_FF, INF
+from uebp.nodes.palette import NODE_CAST_WEAPON
 
 # Dot(player forward, unit bearing to the swinger) at the edge of the guard.
 BLOCK_MIN_DOT = math.cos(math.radians(COMBAT.block_half_angle_deg))
@@ -72,7 +71,7 @@ def _author_block_check(ed, exec_in, player_out, bearing_out):
 
     guard = keep(ed.add_get_member_variable_node("Blocking", WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(guard, "self"))
-    facing = keep(_node(ed, FN_FORWARD))
+    facing = keep(_node(ed, FN_ACTOR_FORWARD))
     _connect(player_out, _pin(facing, "self"))
     dot = keep(_node(ed, FN_DOT_VV))
     _connect(out(facing), _pin(dot, "A"))

@@ -5,17 +5,16 @@ that connects does is impact.py.
 
 from combat.game_state import DEBUG_MODE_VAR
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.nodes import (
-    FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_GET_GAME_MODE,
-    FN_MUL_VF, FN_NORMAL, FN_PLAY_SOUND, FN_RAND_CONE, FN_SUB_II, FN_SUB_VV,
-    FN_TIME_SECONDS, FN_TRACE, MACRO_FOR_LOOP, NODE_BREAK_HIT,
-    NODE_CAST_GAME_MODE,
-)
 from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH
 from combat.weapon_component.accuracy import AIM_SPREAD_VAR
 from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.impact import _author_impact
 from combat.weapon_component.tracer import _author_tracer
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_MUL_VF, FN_NORMAL, FN_RAND_CONE, FN_SUB_II,
+    FN_SUB_VV)
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT, NODE_CAST_GAME_MODE
+from uebp.nodes.system import FN_GET_GAME_MODE, FN_PLAY_SOUND, FN_TIME_SECONDS, FN_TRACE
 
 # The shot's direction, drawn once per trigger pull inside AimSpread.
 SHOT_DIRECTION_VAR = "ShotDirection"

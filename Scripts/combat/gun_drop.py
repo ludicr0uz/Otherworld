@@ -12,15 +12,15 @@ from combat.game_state import (
 )
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.nodes import (
-    FN_ADD_VV, FN_AND, FN_ARR_GET, FN_ARR_LEN, FN_GREATER_II, FN_LESS_FF,
-    FN_MAKE_TRANSFORM, FN_SEED_STREAM, FN_SET_STREAM_SEED, FN_STREAM_FLOAT,
-    FN_STREAM_INT, NODE_CAST_ITEM, NODE_SPAWN,
-)
 from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH
 from combat.tuning import (
     GUN_DROP_CHANCE, GUN_DROP_FORWARD, GUN_DROP_SEED, GUN_LOOT_TABLE,
 )
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN
+from uebp.nodes.math import (
+    FN_ADD_VV, FN_AND, FN_GREATER_II, FN_LESS_FF, FN_MAKE_TRANSFORM, FN_SEED_STREAM,
+    FN_SET_STREAM_SEED, FN_STREAM_FLOAT, FN_STREAM_INT)
+from uebp.nodes.palette import NODE_CAST_ITEM, NODE_SPAWN
 
 
 def _mode_var(ed, mode_out, name, setter=False):

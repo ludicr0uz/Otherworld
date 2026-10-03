@@ -13,19 +13,14 @@ was dropped from the character (an item eaten) cannot survive in the save.
 
 from combat.game_state import KILL_COUNT_VAR
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.nodes import MACRO_FOR_EACH
 from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.player_parts import MODE
 from graphics_menu.profile_consts import (
-    ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
-    NODE_CAST_PROFILE, PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX,
-    STAT_FIELDS,
-)
-
-FN_CREATE_SAVE = "/Script/Engine.GameplayStatics.CreateSaveGameObject"
-FN_WRITE_SAVE = "/Script/Engine.GameplayStatics.SaveGameToSlot"
-FN_OBJECT_CLASS = "/Script/Engine.GameplayStatics.GetObjectClass"
-FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
+    ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD, PROFILE_CLASS_PATH,
+    PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS)
+from uebp.nodes.array import FN_ARR_ADD
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_PROFILE
+from uebp.nodes.system import FN_CREATE_SAVE, FN_OBJECT_CLASS, FN_WRITE_SAVE
 
 
 def copy_var(ed, src_out, src_class, src_var, dst_out, dst_class, dst_var, flow, made):

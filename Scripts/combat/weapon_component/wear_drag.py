@@ -18,7 +18,6 @@ verify/wear.py still finds one Branch on Held.ClothingSlot.
 """
 
 from uebp.graph import _set, out, then
-from combat.nodes import FN_ARR_ADD, FN_ARR_SET, FN_IS_VALID, FN_SET_HIDDEN
 from combat.slot_tuning import SLOT_VAR, UNPLACED
 from combat.wear_tuning import (
     CLOTHING_SLOT_VAR, NOT_CLOTHING, WEAR_ITEM_VAR, WEAR_REQUEST_VAR, WORN_VAR,
@@ -26,10 +25,12 @@ from combat.wear_tuning import (
 from combat.paths import ITEM_CLASS_PATH
 from uebp.g import _G
 from combat.weapon_component.slot_nodes import slot_at
-from combat.weapon_component.wear import FN_GE_II, WEAR_SLOT_VAR, _worn_at
+from combat.weapon_component.wear import WEAR_SLOT_VAR, _worn_at
+from uebp.nodes.actor import FN_SET_HIDDEN
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE_ITEM, FN_ARR_SET, FN_ARR_VALID
+from uebp.nodes.math import FN_GE_II
+from uebp.nodes.system import FN_IS_VALID
 
-FN_ARR_REMOVE_ITEM = "/Script/Engine.KismetArrayLibrary.Array_RemoveItem"
-FN_ARR_VALID = "/Script/Engine.KismetArrayLibrary.Array_IsValidIndex"
 SLOT_ITEMS = "SlotItems"
 
 

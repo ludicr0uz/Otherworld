@@ -25,18 +25,19 @@ from combat.log import _log
 from uebp.graph import (
     _component_object, _connect, _handles, _loose_pin, _node, _palette, _pin, _set, else_,
     out, then)
-from combat.nodes import (
-    FN_ABS, FN_AND, FN_CAPSULE_HALF_HEIGHT, FN_CROUCH, FN_EQ_II, FN_GET_COMP,
-    FN_GREATER_FF, FN_IS_CROUCHING, FN_MUL_FF, FN_SELECT_FF, FN_SELECT_II,
-    FN_SUB_FF, FN_UNCROUCH, FN_WAS_PRESSED, MOVEMENT_CLASS_PATH,
-    NODE_CAST_CHARACTER,
-)
+from combat.nodes import MOVEMENT_CLASS_PATH
 from combat.tuning import COMBAT, CROUCH_KEY, PRONE_KEY
+from uebp.nodes.actor import (
+    FN_CAPSULE_HALF_HEIGHT, FN_CROUCH, FN_GET_COMP, FN_IS_CROUCHING, FN_UNCROUCH,
+    FN_WAS_PRESSED)
+from uebp.nodes.math import (
+    FN_ABS, FN_AND, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_SELECT_FF, FN_SELECT_II,
+    FN_SUB_FF)
+from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_FOOTSTEP
 
 STANCE_VAR = "Stance"
 STAND, CROUCH, PRONE = 0, 1, 2
 FOOTSTEP_CLASS_PATH = f"{FOOTSTEP_BP_PATH}.BP_FootstepComponent_C"
-NODE_CAST_FOOTSTEP = "Utilities|Casting|CastToBP_FootstepComponent"
 # A capsule that is within this of the stance's height is the stance's height.
 # The engine writes the height it was asked for, so this is float slack only.
 HEIGHT_SLACK_CM = 0.5

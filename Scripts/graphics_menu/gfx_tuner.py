@@ -42,19 +42,15 @@ from graphics_menu.gfx_tune_consts import (
     TUNER_TREE_DISTANCE_APPLIED_VAR, TUNER_VALUES_VAR, TUNER_WIND_APPLIED_VAR,
     TUNER_WIND_DISTANCE_APPLIED_VAR,
 )
-from graphics_menu.gfx_tuner_foliage import FN_NEQ_II, author_foliage
+from graphics_menu.gfx_tuner_foliage import author_foliage
 from graphics_menu.gfx_tuner_read import applied, whole
 from graphics_menu.gfx_tuner_sky import author_sky
 from graphics_menu.gfx_tuner_wind import author_wind
 from graphics_menu.loot_find import put
+from uebp.nodes.math import FN_MUL_II, FN_NEQ_II
+from uebp.nodes.system import (
+    FN_APPLY, FN_BUILD_FLOAT, FN_BUILD_INT, FN_CONSOLE, FN_GET_GUS, FN_SET_OVERALL)
 
-FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
-FN_GET_GUS = "/Script/Engine.GameUserSettings.GetGameUserSettings"
-FN_SET_OVERALL = "/Script/Engine.GameUserSettings.SetOverallScalabilityLevel"
-FN_APPLY = "/Script/Engine.GameUserSettings.ApplyNonResolutionSettings"
-FN_CONSOLE = "/Script/Engine.KismetSystemLibrary.ExecuteConsoleCommand"
-FN_BUILD_FLOAT = "/Script/Engine.KismetStringLibrary.BuildString_Double"
-FN_BUILD_INT = "/Script/Engine.KismetStringLibrary.BuildString_Int"
 
 INT_VARS = (TUNER_PRESET_VAR, TUNER_BASE_VAR, TUNER_LEVEL_APPLIED_VAR,
             TUNER_GRASS_SHADOWS_APPLIED_VAR, TUNER_GRASS_LAYERS_APPLIED_VAR,

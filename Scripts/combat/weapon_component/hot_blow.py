@@ -21,10 +21,9 @@ from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.heat_tuning import (
     BLOW_DAMAGE_VAR, FIRE_FEAR_TAG, HOT_BLOW_SCALE, HOT_VAR,
 )
-from combat.nodes import FN_IS_VALID
 from combat.weapon_component.common import _prop
-
-FN_ACTOR_HAS_TAG = "/Script/Engine.Actor.ActorHasTag"
+from uebp.nodes.actor import FN_HAS_TAG
+from uebp.nodes.system import FN_IS_VALID
 
 
 def author_hot_blow(strike):
@@ -57,7 +56,7 @@ def author_hot_blow(strike):
         hot = keep(ed.add_branch_node())
         _connect(hot_pin, _pin(hot, "Condition"))
         _connect(then(gate), _pin(hot, "execute"))
-        fears = keep(_node(ed, FN_ACTOR_HAS_TAG))
+        fears = keep(_node(ed, FN_HAS_TAG))
         _connect(body, _pin(fears, "self"))
         _set(fears, "Tag", FIRE_FEAR_TAG)
         burns = keep(ed.add_branch_node())

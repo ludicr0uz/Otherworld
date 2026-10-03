@@ -8,15 +8,8 @@ from forest_generator.npc_placement import (
     NPC_MELEE_BLEND_S, NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK,
 )
 from npc.paths import (
-    HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, INF,
-    LAST_HIT_FROM_VAR, MELEE_SLOT,
-)
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_AND, FN_ANIM_INSTANCE, FN_CLAMP, FN_DISTANCE,
-    FN_GET_COMP, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_GE_FF, FN_LE_FF,
-    FN_NORMAL, FN_PLAY_SLOT, FN_SUB_FF, FN_SUB_VV, FN_TIME_SECONDS,
-    NODE_CAST_CHARACTER, NODE_CAST_HEALTH,
-)
+    HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, LAST_HIT_FROM_VAR,
+    MELEE_SLOT)
 from npc.graph import _log
 from uebp.graph import (
     BEL, _assets, _connect, _loose_pin, _node, _palette, _pin, _resolve, _set, else_, out,
@@ -26,6 +19,13 @@ from npc.combat_trace import _author_melee_trace
 from npc.sound import _author_random_sound
 from npc.tuned import tuned
 from survival.on_hit_graph import _author_on_hit
+from uebp.nodes.actor import (
+    FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_PAWN, FN_PLAY_SLOT)
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_CLAMP, FN_DISTANCE, FN_GE_FF, FN_LE_FF, FN_NORMAL, FN_SUB_FF,
+    FN_SUB_VV, INF)
+from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
 
 
 # An object pin holds the full object path (package + object name), and it

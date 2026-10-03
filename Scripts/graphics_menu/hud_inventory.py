@@ -20,36 +20,27 @@ I panel's caret, and the slot a drag started on.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from combat.nodes import FN_AND, FN_IS_VALID, FN_LESS_II, FN_NOT, FN_OR, FN_SUB_II
 from combat.slot_tuning import HAND, SLOT_COUNT, SLOT_ITEMS_VAR
 from graphics_menu.inv_consts import BAG_PANEL, DRAG_FROM_VAR, SEL_TO_CODE, SLOT_BOXES
-from graphics_menu.ui_graph import (
-    FN_CHILD_AT, MACRO_FOR_LOOP, member, part, set_shown, set_text, show_if,
-)
+from graphics_menu.ui_graph import member, part, set_shown, set_text, show_if
 from graphics_menu.umg_consts import (
     EQUIPPED_NAME, SLOT_ACTIVE, SLOT_AMMO, SLOT_FRAME, SLOT_GHOST, SLOT_GHOST_VAR,
     SLOT_ICON, WBP_HUD, WBP_INVENTORY_SLOT,
 )
 from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_PORTRAIT, WEAR_SEL_VAR
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_VALID
+from uebp.nodes.math import (
+    FN_AND, FN_EQ_II, FN_LESS_II, FN_NOT, FN_OR, FN_SELECT_OBJ, FN_SELECT_STR, FN_SUB_II)
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_SLOT, NODE_CAST_WEAPON
+from uebp.nodes.system import FN_CONCAT, FN_GET_PLAYER_PAWN, FN_INT_TO_STR, FN_IS_VALID
+from uebp.nodes.umg import FN_CHILD_AT, FN_SET_BRUSH, FN_SET_TINT
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
-NODE_CAST_SLOT = "Utilities|Casting|CastToWBP_InventorySlot"
 
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
-FN_ARR_VALID = "/Script/Engine.KismetArrayLibrary.Array_IsValidIndex"
-FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
-FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
-FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
-FN_SELECT_STR = "/Script/Engine.KismetMathLibrary.SelectString"
-FN_SELECT_OBJ = "/Script/Engine.KismetMathLibrary.SelectObject"
 # What an InfiniteReserve weapon (the pistol) shows for its reserve.
 INFINITE_RESERVE_TEXT = "\u221e"
-FN_SET_BRUSH = "/Script/UMG.Image.SetBrushFromTexture"
-FN_SET_TINT = "/Script/UMG.Image.SetColorAndOpacity"
 
 
 def _item(ed, inv, index):

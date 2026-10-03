@@ -31,19 +31,17 @@ the punch and the slash: the legs keep walking.
 
 from combat.anim_blueprint import AIM_SLOT
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_ANIM_INSTANCE, FN_GE_FF, FN_IS_VALID, FN_PLAY_SLOT, FN_TIME_SECONDS,
-)
 from combat.throw_tuning import (
     THROW_ANIM_BLEND_S, THROW_READY_S, THROW_RELEASE_S, THROW_WINDUP_S,
 )
 from combat.weapon_component.punch import _and, _get, _stamp
+from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_PLAY_SLOT
+from uebp.nodes.math import FN_EQ_OO, FN_GE_FF
+from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
 
 THROW_ANIM_VAR = "ThrowAnim"          # the skin's throw clip, or None
 THROW_WINDING_VAR = "ThrowWinding"    # the item being thrown, until it leaves
 THROW_DUE_VAR = "ThrowDueTime"        # world time the hand lets go
-
-FN_SAME_OBJECT = "/Script/Engine.KismetMathLibrary.EqualEqual_ObjectObject"
 
 
 def _winding(ed):
@@ -92,7 +90,7 @@ def _author_throw_windup(ed, held, started, exec_ins):
     for pin in tuple(exec_ins) + (then(play), else_(clip)):
         _connect(pin, _pin(gate, "execute"))
     # Nested, not folded into the gate: it is asked only of a winding throw.
-    same = _node(ed, FN_SAME_OBJECT)
+    same = _node(ed, FN_EQ_OO)
     _connect(_get(ed, THROW_WINDING_VAR), _pin(same, "A"))
     _connect(held, _pin(same, "B"))
     still = ed.add_branch_node()

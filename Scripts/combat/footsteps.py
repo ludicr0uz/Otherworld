@@ -11,15 +11,17 @@ from uebp.graph import (
     BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _declare, _events,
     _float_type, _loose_pin, _node, _palette, _pin, _set, else_, out, then)
 from uebp.layout import arrange
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_AND, FN_ARR_GET, FN_ARR_LEN, FN_GET_OWNER,
-    FN_GET_VELOCITY, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_MUL_FF,
-    FN_IS_PLAYER_CONTROLLED, FN_ON_GROUND, FN_PLAY_SOUND, FN_RAND_INT,
-    FN_SUB_FF, FN_SUB_II, FN_VSIZE_XY, NODE_CAST_CHARACTER,
-)
 from combat.noise import _author_make_noise
 from combat.paths import WEAPON_DIR
 from combat.tuning import COMBAT
+from uebp.nodes.actor import (
+    FN_ACTOR_LOC, FN_GET_OWNER, FN_IS_PLAYER_CONTROLLED, FN_ON_GROUND, FN_VELOCITY)
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_MUL_FF, FN_RAND_INT,
+    FN_SUB_FF, FN_SUB_II, FN_VSIZE_XY)
+from uebp.nodes.palette import NODE_CAST_CHARACTER
+from uebp.nodes.system import FN_PLAY_SOUND
 
 
 # --- footsteps ---------------------------------------------------------------
@@ -161,7 +163,7 @@ def build_footstep_component(rebuild=True):
     _set(reset, "Travelled", 0.0)
     _connect(else_(walking), _pin(reset, "execute"))
 
-    speed_v = _node(ed, FN_GET_VELOCITY)
+    speed_v = _node(ed, FN_VELOCITY)
     _connect(owner_out, _pin(speed_v, "self"))
     # Horizontal speed only: falling at terminal velocity is not walking, and
     # VSize would count it.

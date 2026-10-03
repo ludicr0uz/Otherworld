@@ -18,9 +18,8 @@ from graphics_menu.dev_guns import _call, _class_literal
 from graphics_menu.gfx_stats import CYCLE, stats_by
 from graphics_menu.gfx_tuner_read import applied
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
-
-FN_ACTOR_OF_CLASS = "/Script/Engine.GameplayStatics.GetActorOfClass"
-NODE_CAST_CYCLE = "Utilities|Casting|CastToBP_DayNightCycle"
+from uebp.nodes.palette import NODE_CAST_CYCLE
+from uebp.nodes.system import FN_ACTOR_OF_CLASS
 
 
 def author_sky(ed, in_execs, made):

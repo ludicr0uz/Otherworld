@@ -33,17 +33,16 @@ from uebp.graph import (
     BEL, BGE, _assets, _connect, _create_blueprint, _loose_pin, _must_load, _node, _palette,
     _pin, _set, out, then)
 from uebp.layout import arrange
-from combat.nodes import (
-    FN_ADD_FF, FN_AVATAR, FN_CLAMP, FN_END_ABILITY, FN_GET_COMP,
-    NODE_ABILITY_FROM_EVENT, NODE_BREAK_EVENT_DATA,
-)
 from combat.tuning import CONSUME_EVENT_TAG
 from survival.easy_heal import _author_easy_heal
 from survival.paths import (
-    CONSUMABLE_BP_PATH, CONSUMABLE_CLASS_PATH, CONSUME_ABILITY_PATH,
-    NODE_CAST_CONSUMABLE, NODE_CAST_SURVIVAL, SURVIVAL_BP_PATH,
-    SURVIVAL_CLASS_PATH,
-)
+    CONSUMABLE_BP_PATH, CONSUMABLE_CLASS_PATH, CONSUME_ABILITY_PATH, SURVIVAL_BP_PATH,
+    SURVIVAL_CLASS_PATH)
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.gas import FN_AVATAR, FN_END_ABILITY
+from uebp.nodes.math import FN_ADD_FF, FN_CLAMP
+from uebp.nodes.palette import (
+    NODE_ABILITY_FROM_EVENT, NODE_BREAK_EVENT_DATA, NODE_CAST_CONSUMABLE, NODE_CAST_SURVIVAL)
 
 RESTORES = (("Hunger", "HungerRestore"), ("Thirst", "ThirstRestore"))
 

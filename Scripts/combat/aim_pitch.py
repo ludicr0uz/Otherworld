@@ -47,15 +47,13 @@ from uebp.graph import (
     BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _node, _palette, _pin, _set,
     out)
 from uebp.layout import arrange
-from combat.nodes import FN_MAKE_ROT, FN_MUL_FF
+from uebp.nodes.math import FN_MAKE_ROT, FN_MUL_FF
+from uebp.nodes.palette import NODE_MODIFY_BONE, NODE_TO_COMPONENT, NODE_TO_LOCAL
 
 AIM_PITCH_VAR = "AimPitch"
 # Each of the two bones takes half, and Roll(+a) tips the body's forward down.
 ROLL_PER_DEGREE = -0.5
 
-NODE_MODIFY_BONE = "Animation|SkeletalControls|Transform(Modify)Bone"
-NODE_TO_COMPONENT = "Animation|ConvertSpaces|LocalToComponent"
-NODE_TO_LOCAL = "Animation|ConvertSpaces|ComponentToLocal"
 MODIFY_BONE_CLASS = "AnimGraphNode_ModifyBone"
 # The support hand's IK (support_hand.py), which sits in this chain too.
 IK_CLASS = "AnimGraphNode_TwoBoneIK"

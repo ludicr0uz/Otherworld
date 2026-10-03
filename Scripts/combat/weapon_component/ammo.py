@@ -2,13 +2,13 @@
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_MIN_II,
-    FN_NOT, FN_PLAY_SOUND, FN_SELECT_II, FN_SUB_II, FN_TIME_SECONDS,
-)
 from combat.paths import ITEM_CLASS_PATH
 from combat.tuning import RELOAD_KEY, SMG_FIRE_INTERVAL
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import FN_ACTOR_LOC
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_MIN_II, FN_NOT, FN_SELECT_II, FN_SUB_II)
+from uebp.nodes.system import FN_PLAY_SOUND, FN_TIME_SECONDS
 
 
 def _author_reload(ed, held, exec_in):

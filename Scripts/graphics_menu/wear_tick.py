@@ -26,10 +26,6 @@ edge's memory.
 import unreal
 
 from uebp.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, out, then
-from combat.nodes import (
-    FN_ADD_II, FN_AND, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_LESS_II, FN_MIN_II, FN_NEQ_BB,
-    FN_NOT, FN_SUB_II, FN_WAS_PRESSED,
-)
 from combat.slot_tuning import SLOT_REQUEST_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.wear_tuning import TAKE_OFF_VAR
@@ -38,14 +34,16 @@ from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.loot_find import put
 from graphics_menu.inv_consts import SEL_ROWS, SEL_TO_CODE
-from graphics_menu.loot_kneel import FN_IGNORE_MOVE
 from graphics_menu.wear_consts import (
     WEAR_DOWN, WEAR_KEY, WEAR_OPEN_VAR, WEAR_ROWS, WEAR_SEL_VAR, WEAR_TAKE_KEY,
     WEAR_TAKE_VAR, WEAR_UP,
 )
+from uebp.nodes.actor import FN_GET_COMP, FN_IGNORE_MOVE, FN_WAS_PRESSED
+from uebp.nodes.math import (
+    FN_ADD_II, FN_AND, FN_LESS_II, FN_MAX_II, FN_MIN_II, FN_NEQ_BB, FN_NOT, FN_SUB_II)
+from uebp.nodes.palette import NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN
 
-FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 WEAR_STILL_VAR = "WearStill"
 
 _BOOLS = (WEAR_OPEN_VAR, WEAR_TAKE_VAR, WEAR_STILL_VAR)

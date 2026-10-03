@@ -15,13 +15,14 @@ from combat.game_state import (
 )
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.hit_reaction import HIT_REACT_PROBE, LAST_HIT_FROM_VAR
-from combat.nodes import (
-    FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ADD_II, FN_AND, FN_BREAK_VECTOR,
-    FN_CONCAT, FN_GET_GAME_MODE, FN_GET_OWNER, FN_GE_FF, FN_GREATER_FF,
-    FN_INT_TO_STR, FN_LESS_FF, FN_OBJECT_CLASS, FN_PRINT, FN_SUB_FF,
-    FN_TIME_SECONDS, FN_VEC_TO_STR, FN_WARN, NODE_CAST_GAME_MODE,
-)
 from combat.paths import GAME_MODE_CLASS_PATH
+from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_GET_OWNER
+from uebp.nodes.math import (
+    FN_ADD_II, FN_AND, FN_BREAK_VECTOR, FN_GE_FF, FN_GREATER_FF, FN_LESS_FF, FN_SUB_FF)
+from uebp.nodes.palette import NODE_CAST_GAME_MODE
+from uebp.nodes.system import (
+    FN_CONCAT, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_OBJECT_CLASS, FN_PRINT, FN_TIME_SECONDS,
+    FN_VEC_TO_STR, FN_WARN)
 
 
 # NPC respawn: a replacement wanderer appears in the same 75-100 m band the

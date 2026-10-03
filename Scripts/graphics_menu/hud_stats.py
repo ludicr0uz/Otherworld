@@ -10,22 +10,16 @@ from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, t
 from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent, set_text
 from graphics_menu.umg_consts import HP_BAR, HP_GROUP, HP_NUM, KILLS, WBP_HUD
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.math import FN_DIV_FF, FN_ROUND
+from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
+from uebp.nodes.system import FN_CONCAT, FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN, FN_INT_TO_STR
 
 HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
 GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
                         ".BP_ThirdPersonGameMode_C")
 KILL_COUNT_VAR = "NpcKillCount"
 KILLS_PREFIX = "KILLS  "
-NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
-NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
-
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_GET_GAME_MODE = "/Script/Engine.GameplayStatics.GetGameMode"
-FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
-FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
-FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
-FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
 
 
 def author_hp(ed, in_execs):
@@ -49,7 +43,7 @@ def author_hp(ed, in_execs):
     top = ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH)
     _connect(as_health, _pin(top, "self"))
     health_out = out(health, "Health")
-    frac = _node(ed, FN_DIV)
+    frac = _node(ed, FN_DIV_FF)
     _connect(health_out, _pin(frac, "A"))
     _connect(out(top, "MaxHealth"), _pin(frac, "B"))
     filled = set_percent(ed, part(ed, WBP_HUD, HP_BAR), out(frac), [then(cast)])

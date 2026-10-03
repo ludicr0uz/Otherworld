@@ -6,5 +6,6 @@
              branch), each made and kept for the comment box
   layout.py  arrange(ed): lays a graph out before the compile, so no builder
              carries coordinates
-  nodes.py   the engine paths graph.py itself needs
+  nodes/     the one catalog of node paths (FN_*, NODE_*, MACRO_*), a module
+             per engine library; its own __init__ maps them
 """

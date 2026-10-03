@@ -8,24 +8,17 @@ build_graphics_menu.py, which calls _author_reticle from DrawHUD.
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.seat_tuning import RETICLE_HIDE_SEAT, SEAT_VAR
 from graphics_menu.scope import _author_scope, _author_scope_gate
+from uebp.nodes.actor import FN_DRAW_RECT, FN_GET_COMP
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_BREAK_V2D, FN_FMIN, FN_GREATER_FF, FN_MUL_FF, FN_NOT,
+    FN_SELECT_COLOR, FN_SUB_FF)
+from uebp.nodes.palette import NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN
+from uebp.nodes.umg import FN_VIEWPORT
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
 
-FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
-FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
-FN_BREAK_V2D = "/Script/Engine.KismetMathLibrary.BreakVector2D"
-FN_DRAW_RECT = "/Script/Engine.HUD.DrawRect"
-FN_FMIN = "/Script/Engine.KismetMathLibrary.FMin"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
-FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
-FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"
-FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
-FN_VIEWPORT = "/Script/UMG.WidgetLayoutLibrary.GetViewportSize"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 
 # --- reticle, nailed to the centre of the viewport ----------------------------
 # The aim ray is cast from the camera along its forward vector, which is the
@@ -120,7 +113,7 @@ def _author_reticle(ed, in_execs):
     _connect(out(size), _loose_pin(wh, "InVec"))
 
     def half(axis):
-        n = keep(_node(ed, FN_MUL))
+        n = keep(_node(ed, FN_MUL_FF))
         _connect(_loose_pin(wh, axis, is_input=False), _pin(n, "A"))
         _set(n, "B", 0.5)
         return out(n)
@@ -155,7 +148,7 @@ def _author_reticle(ed, in_execs):
 
     def offset(src, by):
         """centre + by, as a node -- DrawRect wants the corner, we have the middle."""
-        n = keep(_node(ed, FN_ADD))
+        n = keep(_node(ed, FN_ADD_FF))
         _connect(src, _pin(n, "A"))
         _set(n, "B", by)
         return out(n)
@@ -164,7 +157,7 @@ def _author_reticle(ed, in_execs):
     # for the four ticks. The dot stays on the true centre.
     reticle_spread = keep(ed.add_get_member_variable_node("ReticleSpread", WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(reticle_spread, "self"))
-    spread_px = keep(_node(ed, FN_MUL))
+    spread_px = keep(_node(ed, FN_MUL_FF))
     _connect(out(reticle_spread, "ReticleSpread"), _pin(spread_px, "A"))
     _connect(cx, _pin(spread_px, "B"))
     # FMin, not FClamp: ReticleSpread is never negative, and the verifier
@@ -180,8 +173,8 @@ def _author_reticle(ed, in_execs):
         _connect(capped_out, _pin(n, "B"))
         return out(n)
 
-    left_x, right_x = pushed(cx, FN_SUB), pushed(cx, FN_ADD)
-    top_y, bottom_y = pushed(cy, FN_SUB), pushed(cy, FN_ADD)
+    left_x, right_x = pushed(cx, FN_SUB_FF), pushed(cx, FN_ADD_FF)
+    top_y, bottom_y = pushed(cy, FN_SUB_FF), pushed(cy, FN_ADD_FF)
 
     half_t = RETICLE_THICK / 2.0
     half_d = RETICLE_DOT / 2.0
@@ -201,7 +194,7 @@ def _author_reticle(ed, in_execs):
     # reticle. Under `armed`, so the component is valid.
     seat = keep(ed.add_get_member_variable_node(SEAT_VAR, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(seat, "self"))
-    on_sights = keep(_node(ed, FN_GREATER))
+    on_sights = keep(_node(ed, FN_GREATER_FF))
     _connect(out(seat, SEAT_VAR), _pin(on_sights, "A"))
     _set(on_sights, "B", RETICLE_HIDE_SEAT)
     debug = keep(ed.add_get_member_variable_node("DebugOn"))

@@ -4,22 +4,14 @@ uebp.g._G; no fragment of its own.
 """
 
 from uebp.graph import _connect, _loose_pin, _pin, _set, out
-from combat.nodes import (
-    FN_AND, FN_ARR_GET, FN_EQ_II, FN_IS_VALID, FN_LESS_II, FN_NOT, FN_OR,
-    MACRO_FOR_EACH, MACRO_FOR_LOOP,
-)
 from combat.slot_tuning import (
     LONG_GUN, MELEE_SLOT, PRIMARY, SECONDARY, SLOT_COUNT, SLOT_ITEMS_VAR,
     WEAPON_KIND_VAR,
 )
-
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-FN_LE_II = "/Script/Engine.KismetMathLibrary.LessEqual_IntInt"
-FN_NE_II = "/Script/Engine.KismetMathLibrary.NotEqual_IntInt"
-FN_NE_OO = "/Script/Engine.KismetMathLibrary.NotEqual_ObjectObject"
-FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
-FN_ARR_RESIZE = "/Script/Engine.KismetArrayLibrary.Array_Resize"
-FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
+from uebp.nodes.array import FN_ARR_GET
+from uebp.nodes.math import FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_LE_II, FN_NOT, FN_OR
+from uebp.nodes.palette import MACRO_FOR_EACH, MACRO_FOR_LOOP
+from uebp.nodes.system import FN_IS_VALID
 
 
 def op(g, fn, a, b):

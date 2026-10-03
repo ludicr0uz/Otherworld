@@ -22,10 +22,10 @@ the walk back as it starts the game. The death screen needs none of this.
 """
 
 from uebp.graph import _connect, _pin, out, then
-from combat.nodes import FN_NEQ_BB
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_find import put
-from graphics_menu.loot_kneel import FN_IGNORE_MOVE
+from uebp.nodes.actor import FN_IGNORE_MOVE
+from uebp.nodes.math import FN_NEQ_BB
 
 MENU_STILL_VAR = "MenuStill"
 

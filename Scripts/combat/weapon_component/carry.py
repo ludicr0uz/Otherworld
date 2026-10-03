@@ -37,15 +37,15 @@ from combat.carry_tuning import (
     CARRY_GRIP, CARRY_RAISE_HOLD_S, LOWERED_VAR, RAISE_FORCED_VAR,
 )
 from uebp.graph import _connect, _node, _pin, _set, _vec, else_, out, then
-from combat.nodes import (
-    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_II, FN_GET_OWNER, FN_GET_TRANSFORM,
-    FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_OR, FN_SELECT_VECTOR, FN_TIME_SECONDS,
-    FN_TRANSFORM_LOC,
-)
 from combat.seat_tuning import SEAT_HOLD, SEAT_VAR
 from combat.torch_tuning import BURNS_VAR
 from combat.weapon_component.common import _muzzle_location, _prop
 from combat.weapon_component.stance import PRONE, STANCE_VAR
+from uebp.nodes.actor import FN_GET_OWNER, FN_GET_TRANSFORM
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_II, FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_OR,
+    FN_SELECT_VECTOR, FN_TRANSFORM_LOC)
+from uebp.nodes.system import FN_TIME_SECONDS
 
 
 def _author_shot_origin(ed, held):

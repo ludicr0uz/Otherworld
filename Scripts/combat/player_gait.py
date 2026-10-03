@@ -31,8 +31,8 @@ whatever else wears it.
 from combat.log import _log
 from uebp.graph import BEL, BGE, PIN, _assets, _connect, _node, _pin, _set, out
 from uebp.layout import arrange
-from combat.nodes import FN_MUL_FF
 from combat.tuning import COMBAT
+from uebp.nodes.math import FN_MUL_FF
 
 # The Speed the blend space's jog row sits at.
 JOG_ROW_CMS = 600.0

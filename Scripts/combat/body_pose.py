@@ -76,15 +76,14 @@ import unreal
 
 from asset_pipeline.rig_util import _bone_world
 
-from combat.aim_pitch import (
-    MODIFY_BONE_CLASS, NODE_MODIFY_BONE, _feeding_all, _nodes_of,
-)
+from combat.aim_pitch import MODIFY_BONE_CLASS, _feeding_all, _nodes_of
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, PIN, _assets, _connect, _declare, _float_type, _node, _palette, _pin, _set,
     out)
 from uebp.layout import arrange
-from combat.nodes import FN_CLAMP, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MUL_FF
+from uebp.nodes.math import FN_CLAMP, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MUL_FF
+from uebp.nodes.palette import NODE_MODIFY_BONE
 
 POSE_CROUCH = "PoseCrouch"
 POSE_PRONE = "PoseProne"

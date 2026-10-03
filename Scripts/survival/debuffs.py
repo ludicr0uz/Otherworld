@@ -23,10 +23,10 @@ the spec node directly would build two specs and apply the one with one tag.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_ADD_GRANTED_TAG, FN_APPLY_SPEC_TO_SELF, FN_EFFECT_COUNT, FN_GREATER_II,
-    FN_LE_FF, FN_MAKE_CONTEXT, FN_MAKE_SPEC, FN_NEQ_BB, FN_REMOVE_EFFECT,
-)
+from uebp.nodes.gas import (
+    FN_ADD_GRANTED_TAG, FN_APPLY_SPEC_TO_SELF, FN_EFFECT_COUNT, FN_MAKE_CONTEXT,
+    FN_MAKE_SPEC, FN_REMOVE_EFFECT)
+from uebp.nodes.math import FN_GREATER_II, FN_LE_FF, FN_NEQ_BB
 
 
 def _author_debuff_sync(ed, asc, stat, effect_var, tags, exec_in):

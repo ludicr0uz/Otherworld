@@ -33,15 +33,15 @@ component again.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
-from combat.nodes import (
-    CAMERA_CLASS_PATH, FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT,
-    FN_GET_COMP, FN_LE_FF, FN_OR, FN_SET_FOV, FN_SET_HIDDEN,
-    FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT,
-    NODE_CAST_HEALTH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET,
-)
+from combat.nodes import CAMERA_CLASS_PATH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET
 from combat.paths import FIRE_WARD_VAR, HEALTH_CLASS_PATH
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR
 from combat.weapon_component.head_hide import _author_head_shown
+from uebp.nodes.actor import (
+    FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT, FN_GET_COMP, FN_SET_FOV, FN_SET_HIDDEN,
+    FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT)
+from uebp.nodes.math import FN_LE_FF, FN_OR
+from uebp.nodes.palette import NODE_CAST_HEALTH
 
 OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
 

@@ -16,15 +16,13 @@ from graphics_menu.ui_graph import part, set_percent
 from graphics_menu.umg_consts import (
     COL_ST_FILL, COL_ST_SPENT, STAMINA_BAR, ST_GROUP, WBP_HUD,
 )
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.math import FN_DIV_FF, FN_SELECT_COLOR
+from uebp.nodes.palette import NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN
+from uebp.nodes.umg import FN_SET_FILL
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
-
-FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
-FN_SELECT_COLOR = "/Script/Engine.KismetMathLibrary.SelectColor"
-FN_SET_FILL = "/Script/UMG.ProgressBar.SetFillColorAndOpacity"
 
 
 def _author_stamina(ed, in_execs):
@@ -53,7 +51,7 @@ def _author_stamina(ed, in_execs):
         _connect(as_weapon, _pin(n, "self"))
         return out(n, name)
 
-    frac = keep(_node(ed, FN_DIV))
+    frac = keep(_node(ed, FN_DIV_FF))
     _connect(var("Stamina"), _pin(frac, "A"))
     _connect(var("MaxStamina"), _pin(frac, "B"))
     bar = part(ed, WBP_HUD, STAMINA_BAR)

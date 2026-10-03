@@ -23,12 +23,13 @@ is still reported.
 """
 
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_AND, FN_ARR_LEN, FN_ARR_REMOVE, FN_DESTROY, FN_MIN_II, FN_NOT,
-    FN_SEND_GAMEPLAY_EVENT, FN_SUB_II, NODE_MAKE_EVENT_DATA,
-)
 from combat.tuning import CONSUME_EVENT_TAG
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import FN_DESTROY
+from uebp.nodes.array import FN_ARR_LEN, FN_ARR_REMOVE
+from uebp.nodes.gas import FN_SEND_GAMEPLAY_EVENT
+from uebp.nodes.math import FN_AND, FN_MIN_II, FN_NOT, FN_SUB_II
+from uebp.nodes.palette import NODE_MAKE_EVENT_DATA
 
 # The fire press that used an item, still held. Declared in build.py.
 TRIGGER_SPENT = "TriggerSpent"

@@ -20,12 +20,12 @@ behind the Branch on UsePressed, which is false with empty hands (use.py).
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.heat_tuning import HOT_VAR
-from combat.nodes import FN_GET_ASC, FN_IS_VALID, GAS
 from combat.tuning import BLEEDING_TAG
 from combat.use_tuning import USE_PRESSED_VAR
 from combat.weapon_component.common import _prop
+from uebp.nodes.gas import FN_GET_ASC, FN_REMOVE_GRANTING
+from uebp.nodes.system import FN_IS_VALID
 
-FN_REMOVE_GRANTING = f"{GAS}.AbilitySystemComponent.RemoveActiveEffectsWithGrantedTags"
 # The tag container's literal, as the pin stores it.
 CAUTERIZE_TAGS = f'(GameplayTags=((TagName="{BLEEDING_TAG}")))'
 

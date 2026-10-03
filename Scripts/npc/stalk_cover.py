@@ -60,19 +60,20 @@ from forest_generator.npc_stalk import (
 )
 from npc.graph import _Graph
 from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, else_, out, then
-from npc.nodes import (
-    FN_ADD_FF, FN_ADD_II, FN_ADD_VV, FN_ARR_ADD, FN_ARR_CLEAR,
-    FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_DISTANCE_2D, FN_EQ_II,
-    FN_EQ_OO, FN_EQ_SS, FN_FMAX, FN_GE_FF, FN_IN_RANGE, FN_INSTANCE_TRANSFORM,
-    FN_LINE_TRACE, FN_MAKE_VECTOR, FN_MOVEMENT_BASE, FN_MUL_FF, FN_MUL_VV,
-    FN_NORMAL_2D, FN_OBJECT_NAME, FN_PROJECT_NAV, FN_ROTATE_AXIS, FN_SELECT_FLOAT,
-    FN_SPHERE_TRACE, FN_SUB_FF, FN_SUB_VV, NODE_BREAK_HIT, NODE_CAST_INSTANCED,
-)
 from npc.paths import (
     STALK_ARRIVED_VAR, STALK_COVER_VAR, STALK_HIDDEN_VAR, STALK_IGNORE_VAR,
     STALK_LEG_UNTIL_VAR, STALK_LEGS_VAR, STALK_SIDE_VAR,
     STATIC_MESH_COMP_CLASS_PATH,
 )
+from uebp.nodes.actor import FN_INSTANCE_TRANSFORM, FN_MOVEMENT_BASE
+from uebp.nodes.ai import FN_PROJECT_NAV
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_II, FN_ADD_VV, FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR,
+    FN_DISTANCE_2D, FN_EQ_II, FN_EQ_OO, FN_GE_FF, FN_IN_RANGE, FN_MAKE_VECTOR, FN_MAX_FF,
+    FN_MUL_FF, FN_MUL_VV, FN_NORMAL_2D, FN_ROTATE_AXIS, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV)
+from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_INSTANCED
+from uebp.nodes.system import FN_EQ_SS, FN_OBJECT_NAME, FN_SPHERE_TRACE, FN_TRACE
 
 # What the chain of least scales ends on: a mesh that is not cover at any
 # scale (a sapling, or one no row names) needs a scale no tree has.
@@ -128,7 +129,7 @@ def _author_wide(g, exec_in, tree, scale):
     for path, scale_min in cover_trees():
         same = g.call(FN_EQ_SS, B=path.rsplit(".", 1)[-1])
         _connect(out(named), _pin(same, "A"))
-        pick = g.call(FN_SELECT_FLOAT, A=scale_min)
+        pick = g.call(FN_SELECT_FF, A=scale_min)
         _connect(out(same), _pin(pick, "bPickA"))
         if least is None:
             _pin(pick, "B").set_pin_value(str(NO_COVER_SCALE))
@@ -198,7 +199,7 @@ def _author_try(g, exec_in, angle, pins):
 
     # --- ...out of the player's sight ------------------------------------------
     stored = g.get(STALK_COVER_VAR)
-    line = g.call(FN_LINE_TRACE, TraceChannel="TraceTypeQuery1",
+    line = g.call(FN_TRACE, TraceChannel="TraceTypeQuery1",
                   bTraceComplex="false", bIgnoreSelf="true", DrawDebugType="None")
     _connect(stored, _pin(line, "Start"))
     _connect(pins["player_loc"], _pin(line, "End"))
@@ -288,7 +289,7 @@ def _author_cover(ed, exec_in, pins):
     _connect(high, _pin(lifted, "Z"))
     far = g.op(FN_SUB_FF, pins["gap"], NPC_STALK_ADVANCE_MIN_CM)
     deep = g.op(FN_SUB_FF, pins["gap"], NPC_STALK_ADVANCE_MAX_CM)
-    near = g.op(FN_FMAX, deep, NPC_STALK_COVER_MIN_CM)
+    near = g.op(FN_MAX_FF, deep, NPC_STALK_COVER_MIN_CM)
     gain = g.op(FN_SUB_FF, pins["gap"], NPC_STALK_GAIN_MIN_CM)
     shared = dict(
         pins, radial=out(radial), lifted=out(lifted), far=far, near=near, gain=gain,

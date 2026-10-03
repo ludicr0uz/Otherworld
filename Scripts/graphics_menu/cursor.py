@@ -29,7 +29,6 @@ there: probes/probe_menu_cursor.py raises the flags a click would.
 import unreal
 
 from uebp.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, _set, out, then
-from combat.nodes import FN_AND, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_WAS_PRESSED
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.cursor_consts import (
     BACK_KEY, CLICK_KEY, CURSOR_BOOLS, CURSOR_INTS, CURSOR_MOVED_VAR, CURSOR_POS_VAR,
@@ -38,22 +37,15 @@ from graphics_menu.cursor_consts import (
 )
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_find import put
-from graphics_menu.ui_graph import FN_CHILD_AT, MACRO_FOR_LOOP
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PC, FN_WAS_PRESSED
+from uebp.nodes.math import FN_AND, FN_GE_II, FN_LESS_II, FN_OR, FN_VEC2_NE, FN_XOR
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN
+from uebp.nodes.umg import (
+    FN_CHILD_AT, FN_GEOMETRY, FN_MODE_GAME, FN_MODE_GAME_UI, FN_MOUSE_POS, FN_UNDER)
 
-FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
-FN_MOUSE_POS = "/Script/UMG.WidgetLayoutLibrary.GetMousePositionOnPlatform"
-FN_GEOMETRY = "/Script/UMG.Widget.GetCachedGeometry"
-FN_UNDER = "/Script/UMG.SlateBlueprintLibrary.IsUnderLocation"
-FN_MODE_GAME_UI = "/Script/UMG.WidgetBlueprintLibrary.SetInputMode_GameAndUIEx"
-FN_MODE_GAME = "/Script/UMG.WidgetBlueprintLibrary.SetInputMode_GameOnly"
-FN_VEC2_NE = "/Script/Engine.KismetMathLibrary.NotEqualExactly_Vector2DVector2D"
-FN_XOR = "/Script/Engine.KismetMathLibrary.BooleanXOR"
-FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-FN_LESS_II = "/Script/Engine.KismetMathLibrary.Less_IntInt"
 PC_CLASS_PATH = "/Script/Engine.PlayerController"
 SHOW_CURSOR_PROP = "bShowMouseCursor"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 
 # What a click writes: (HUD variable, a literal) or (HUD variable, ROW) for
 # the row that was clicked.

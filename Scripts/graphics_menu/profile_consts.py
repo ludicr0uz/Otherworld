@@ -17,7 +17,6 @@ PROFILE_BP_PATH = "/Game/UI/BP_Profile"
 PROFILE_CLASS_PATH = f"{PROFILE_BP_PATH}.BP_Profile_C"
 PROFILE_SLOT = "OtherworldProfile"
 PROFILE_USER_INDEX = 0
-NODE_CAST_PROFILE = "Utilities|Casting|CastToBP_Profile"
 
 # The stats, as (field on BP_Profile, the component class that owns it, its
 # variable there). All floats. The kill count is an int on the GameMode and

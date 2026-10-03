@@ -31,11 +31,6 @@ from npc.graph import _log
 from uebp.graph import (
     BEL, _assets, _connect, _loose_pin, _name_literal, _node, _palette, _pin, _set, else_,
     out, then)
-from npc.nodes import (
-    FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_CONCAT, FN_DISPLAY_NAME,
-    FN_GET_BLACKBOARD, FN_GET_GAME_MODE, FN_GET_PAWN, FN_GET_PLAYER_PAWN,
-    FN_IS_VALID, FN_WARN, NODE_CAST_GAME_MODE,
-)
 from npc.patrol import _author_patrol_step, _author_walk_speed
 from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, BB_AGGRO_KEY, BB_REASON_KEY, NEXT_PATROL_VAR,
@@ -43,6 +38,11 @@ from npc.paths import (
     SENSE_STEPS, STEP_PRESENT, STEP_STROLL,
 )
 from npc.senses import _author_hearing, _author_hurt, _author_sight, _author_touch
+from uebp.nodes.actor import FN_GET_PAWN
+from uebp.nodes.ai import FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_GET_BLACKBOARD
+from uebp.nodes.palette import NODE_CAST_GAME_MODE
+from uebp.nodes.system import (
+    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_WARN)
 
 
 def _declare(ed, name, pin_type):

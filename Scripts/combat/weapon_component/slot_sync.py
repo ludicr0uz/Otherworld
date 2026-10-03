@@ -22,7 +22,6 @@ window test HasRoom first, and the dev-all-guns cheat gives only guns,
 which find their weapon slots.
 """
 
-from combat.nodes import FN_AND, FN_ARR_SET, FN_EQ_II, FN_LESS_II, FN_OR
 from combat.slot_tuning import (
     BAG_FIRST, BAG_LAST, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, MELEE_SLOT, PRIMARY,
     SLOT_COUNT, SLOT_ITEMS_VAR, SLOT_PICK_VAR, SLOT_VAR, UNPLACED,
@@ -30,11 +29,10 @@ from combat.slot_tuning import (
 from combat.paths import ITEM_CLASS_PATH
 from uebp.g import _G
 from combat.weapon_component.slot_nodes import (
-    FN_ARR_CLEAR, FN_ARR_FIND, FN_ARR_RESIZE, FN_GE_II, FN_NE_OO,
-    fits, for_each, for_loop, not_, op,
-    slot_at, valid,
-)
+    fits, for_each, for_loop, not_, op, slot_at, valid)
 from uebp.graph import out, then
+from uebp.nodes.array import FN_ARR_CLEAR, FN_ARR_FIND, FN_ARR_RESIZE, FN_ARR_SET
+from uebp.nodes.math import FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_NE_OO, FN_OR
 
 
 def _author_claim(g, execs):

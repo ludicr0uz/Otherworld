@@ -31,18 +31,17 @@ boom's rotation; the look is weighted by whether the line has any length.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    CAMERA_CLASS_PATH, FN_ADD_TICK_PREREQ, FN_AND, FN_BOOL_TO_FLOAT,
-    FN_COMP_SET_WORLD_LOC, FN_GET_COMP, FN_GET_TRANSFORM, FN_GREATER_FF,
-    FN_COMP_SET_WORLD_ROT, FN_INTERP_FF, FN_MUL_FF, FN_OR, FN_RLERP, FN_ROT_FROM_X,
-    FN_SET_HIDDEN, FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT,
-    FN_SUB_VV, FN_TRANSFORM_LOC, FN_VLERP, FN_VSIZE,
-    SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET,
-)
+from combat.nodes import CAMERA_CLASS_PATH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET
 from combat.seat_tuning import SEAT_HOLD, SEAT_VAR, SIGHT_SEAT_DEG
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
 from combat.weapon_component.seat import _author_sight_seat, _author_unseat
+from uebp.nodes.actor import (
+    FN_ADD_TICK_PREREQ, FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT, FN_GET_COMP,
+    FN_GET_TRANSFORM, FN_SET_HIDDEN, FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT)
+from uebp.nodes.math import (
+    FN_AND, FN_BOOL_TO_FLOAT, FN_GREATER_FF, FN_INTERP_FF, FN_MUL_FF, FN_OR, FN_RLERP,
+    FN_ROT_FROM_X, FN_SUB_VV, FN_TRANSFORM_LOC, FN_VLERP, FN_VSIZE)
 
 # A scoped weapon is hidden once the camera is this far to its eye point
 # (SightSeat). The

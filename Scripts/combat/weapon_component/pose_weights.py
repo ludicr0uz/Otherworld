@@ -32,15 +32,16 @@ from combat.body_pose import (
     POSE_BLEND_SPEED, POSE_CROUCH, POSE_KNEEL, POSE_PRONE,
 )
 from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_ABS, FN_ADD_FF, FN_AND, FN_ANIM_INSTANCE, FN_BOOL_TO_FLOAT, FN_EQ_II,
-    FN_INTERP_FF, FN_NOT, FN_SUB_FF, FN_TIME_SECONDS,
-)
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_POINT_VAR
 from combat.weapon_component.sight_pitch import _anim_class_path
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
+from uebp.nodes.actor import FN_ANIM_INSTANCE
+from uebp.nodes.math import (
+    FN_ABS, FN_ADD_FF, FN_AND, FN_BOOL_TO_FLOAT, FN_EQ_II, FN_FMOD, FN_INTERP_FF, FN_NOT,
+    FN_SUB_FF)
+from uebp.nodes.system import FN_TIME_SECONDS
 
 HELD_TWO_HANDED = "HeldTwoHanded"
 # Held.SupportPoint, copied beside it: where the held gun's ready pose has the
@@ -48,7 +49,6 @@ HELD_TWO_HANDED = "HeldTwoHanded"
 HELD_SUPPORT_POINT = "HeldSupportPoint"
 # The loot window is open (the HUD writes it, graphics_menu/loot_kneel.py).
 SEARCHING_VAR = "Searching"
-FN_FMOD = "/Script/Engine.KismetMathLibrary.FMod"
 
 
 def _author_held_two_handed(ed, held, armed_out, exec_ins):

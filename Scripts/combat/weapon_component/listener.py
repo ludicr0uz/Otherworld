@@ -15,7 +15,7 @@ restart opens the level again, and the new character's BeginPlay sets it again.
 """
 
 from uebp.graph import _connect, _node, _pin, out, then
-from combat.nodes import FN_SET_LISTENER_ATTENUATION
+from uebp.nodes.actor import FN_SET_LISTENER_ATTENUATION
 
 
 def _author_listener_at_character(ed, as_char, pc_out, exec_in):

@@ -31,35 +31,21 @@ Constants sit on B pins or range pins (a Kismet A pin will not hold a literal).
 
 from combat.log import _log
 from uebp.graph import _connect, _events, _loose_pin, _node, _pin, _set, out, then
-from combat.nodes import (
-    FN_ADD_FF, FN_DESTROY, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT,
-    MACRO_FOR_EACH,
-)
 from world import world_config as cfg
 from world.day_night_blueprint import (
     AMBIENT_SCALE_VAR, FOG_SCALE_VAR, IS_DAY_VAR, MOON_DISC_SCALE_VAR, MOON_SCALE_VAR,
     RANDOM_START_VAR, SKY_MID_VAR, STAR_SCALE_VAR, SUN_DISC_SCALE_VAR, SUN_SCALE_VAR,
 )
 from world.paths import STATIC_SKY_TAG
+from uebp.nodes.actor import (
+    FN_COMP_SET_WORLD_ROT, FN_CREATE_MID, FN_DESTROY, FN_FOG_COLOR, FN_FOG_DENSITY,
+    FN_FORWARD_OF, FN_LIGHT_INTENSITY, FN_MID_SCALAR, FN_MID_VECTOR, FN_SKY_INTENSITY)
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_COLOR_LERP, FN_DEG_SIN, FN_LESS_FF, FN_MAKE_COLOR, FN_MAKE_ROT,
+    FN_MAP_CLAMPED, FN_MUL_FF, FN_NEGATE_V, FN_PERCENT_FF, FN_RANDOM_FLOAT, FN_VEC_TO_COLOR)
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_WITH_TAG
 
-KML = "/Script/Engine.KismetMathLibrary"
-FN_PERCENT_FF = f"{KML}.Percent_FloatFloat"
-FN_MAP_CLAMPED = f"{KML}.MapRangeClamped"
-FN_DEG_SIN = f"{KML}.DegSin"
-FN_NEGATE_V = f"{KML}.NegateVector"
-FN_VEC_TO_COLOR = f"{KML}.Conv_VectorToLinearColor"
-FN_MAKE_COLOR = f"{KML}.MakeColor"
-FN_COLOR_LERP = f"{KML}.LinearColorLerp"
-FN_ACTORS_WITH_TAG = "/Script/Engine.GameplayStatics.GetAllActorsWithTag"
-FN_CREATE_MID = "/Script/Engine.PrimitiveComponent.CreateDynamicMaterialInstance"
-FN_SET_WORLD_ROT = "/Script/Engine.SceneComponent.K2_SetWorldRotation"
-FN_FORWARD_OF = "/Script/Engine.SceneComponent.GetForwardVector"
-FN_LIGHT_INTENSITY = "/Script/Engine.LightComponent.SetIntensity"
-FN_SKY_INTENSITY = "/Script/Engine.SkyLightComponent.SetIntensity"
-FN_FOG_DENSITY = "/Script/Engine.ExponentialHeightFogComponent.SetFogDensity"
-FN_FOG_COLOR = "/Script/Engine.ExponentialHeightFogComponent.SetFogInscatteringColor"
-FN_MID_SCALAR = "/Script/Engine.MaterialInstanceDynamic.SetScalarParameterValue"
-FN_MID_VECTOR = "/Script/Engine.MaterialInstanceDynamic.SetVectorParameterValue"
 PP_CLASS_PATH = "/Script/Engine.PostProcessComponent"
 
 
@@ -120,7 +106,7 @@ def _author_begin_play(ed, begin):
     """Destroy the level's tagged sky rig, make the dome's dynamic material,
     then (RandomStart) pick the starting clock."""
     chain = _Chain(then(begin))
-    found = chain.step(_call(ed, FN_ACTORS_WITH_TAG, Tag=STATIC_SKY_TAG))
+    found = chain.step(_call(ed, FN_WITH_TAG, Tag=STATIC_SKY_TAG))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
@@ -177,7 +163,7 @@ def _author_bodies(ed, chain, angle, sin):
                     Pitch=_mul(ed, sin, pitch_scale),
                     Yaw=out(_call(ed, FN_ADD_FF, A=angle,
                                    B=float(yaw_offset))))
-        chain.step(_call(ed, FN_SET_WORLD_ROT, self=_get(ed, name), NewRotation=out(rot)))
+        chain.step(_call(ed, FN_COMP_SET_WORLD_ROT, self=_get(ed, name), NewRotation=out(rot)))
 
     day = _get(ed, "DayAmount")
     chain.step(_call(ed, FN_LIGHT_INTENSITY,

@@ -28,5 +28,3 @@ CAMPFIRE_CLASS_PATH = f"{CAMPFIRE_BP_PATH}.BP_Campfire_C"
 ASC_COMPONENT = "AbilitySystem"
 SURVIVAL_COMPONENT = "SurvivalComponent"
 
-NODE_CAST_CONSUMABLE = "Utilities|Casting|CastToBP_ConsumableItem"
-NODE_CAST_SURVIVAL = "Utilities|Casting|CastToBP_SurvivalComponent"

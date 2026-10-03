@@ -44,7 +44,6 @@ actor happens only when the tree distance moves.
 """
 
 from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
-from combat.nodes import FN_ADD_FF, FN_LESS_II, FN_MUL_FF, FN_OR, MACRO_FOR_EACH
 from forest_generator.grass_cells import GRASS_TAG, GRASS_TIERS, tier_tag
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
 from graphics_menu.gfx_stats import FULL_VIEW_M, PERCENT
@@ -52,29 +51,19 @@ from graphics_menu.gfx_tune_consts import (
     TUNER_GRASS_DISTANCE_APPLIED_VAR, TUNER_GRASS_LAYERS_APPLIED_VAR,
     TUNER_GRASS_SHADOWS_APPLIED_VAR, TUNER_TREE_DISTANCE_APPLIED_VAR,
 )
-from graphics_menu.gfx_tuner_read import FN_ROUND, column
+from graphics_menu.gfx_tuner_read import column
 from graphics_menu.loot_find import put
+from uebp.nodes.actor import (
+    FN_GET_CULLS, FN_HAS_TAG, FN_ROOT, FN_SET_CULLS, FN_SET_HIDDEN, FN_SET_MAX_DRAW)
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_DIV_FF, FN_GE_II, FN_INT_TO_FLOAT, FN_LESS_II, FN_MUL_FF, FN_NEQ_FF,
+    FN_NEQ_II, FN_OR, FN_ROUND, FN_SUB_II)
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_INSTANCED
+from uebp.nodes.system import FN_ALL_ACTORS, FN_WITH_TAG
 
-KML = "/Script/Engine.KismetMathLibrary"
-FN_NEQ_FF = f"{KML}.NotEqual_DoubleDouble"
-FN_NEQ_II = f"{KML}.NotEqual_IntInt"
-FN_GE_II = f"{KML}.GreaterEqual_IntInt"
-FN_SUB_II = f"{KML}.Subtract_IntInt"
-FN_DIV_FF = f"{KML}.Divide_DoubleDouble"
-FN_INT_TO_FLOAT = f"{KML}.Conv_IntToDouble"
-FN_WITH_TAG = "/Script/Engine.GameplayStatics.GetAllActorsWithTag"
-FN_ALL_OF_CLASS = "/Script/Engine.GameplayStatics.GetAllActorsOfClass"
-FN_HAS_TAG = "/Script/Engine.Actor.ActorHasTag"
-FN_ROOT = "/Script/Engine.Actor.K2_GetRootComponent"
-FN_HIDE = "/Script/Engine.Actor.SetActorHiddenInGame"
 ACTOR_CLASS_PATH = "/Script/Engine.Actor"
-ISM_CLASS_PATH = "/Script/Engine.InstancedStaticMeshComponent"
 PRIMITIVE_CLASS_PATH = "/Script/Engine.PrimitiveComponent"
-FN_GET_CULLS = f"{ISM_CLASS_PATH}.GetCullDistances"
-FN_SET_CULLS = f"{ISM_CLASS_PATH}.SetCullDistances"
-FN_SET_MAX_DRAW = f"{PRIMITIVE_CLASS_PATH}.SetCullDistance"
 MAX_DRAW_VAR = "LDMaxDrawDistance"
-NODE_CAST_ISM = "Utilities|Casting|CastToInstancedStaticMeshComponent"
 
 # What grass shadows switches, one PrimitiveComponent setter each.
 GRASS_SETTERS = (
@@ -105,7 +94,7 @@ def _root_mesh(ed, actor, in_exec, made):
     """The actor's root as an instanced mesh. Returns (component, then); an
     actor with some other root fails the cast and is skipped."""
     root = _call(ed, FN_ROOT, made, self=actor)
-    cast = _palette(ed, NODE_CAST_ISM)
+    cast = _palette(ed, NODE_CAST_INSTANCED)
     made.append(cast)
     _connect(out(root), _pin(cast, "Object"))
     _connect(in_exec, _pin(cast, "execute"))
@@ -191,7 +180,7 @@ def _author_trees(ed, in_execs, made):
                   A=_wanted(ed, "tree_distance", made),
                   B=_get(ed, TUNER_TREE_DISTANCE_APPLIED_VAR, made))
     go, same = _branch(ed, out(moved), in_execs, made)
-    actors = _call(ed, FN_ALL_OF_CLASS, made)
+    actors = _call(ed, FN_ALL_ACTORS, made)
     _class_literal(actors, "ActorClass", ACTOR_CLASS_PATH)
     _connect(go, _pin(actors, "execute"))
     actor, body, done = _for_each(ed, out(actors, "OutActors"), then(actors), made)
@@ -219,7 +208,7 @@ def _author_layers(ed, in_execs, made):
         below = _call(ed, FN_LESS_II, made,
                       A=column(ed, "grass_layers", made, rounded=True),
                       B=tier + 1)
-        hide = _call(ed, FN_HIDE, made, self=cell, bNewHidden=out(below))
+        hide = _call(ed, FN_SET_HIDDEN, made, self=cell, bNewHidden=out(below))
         _connect(body, _pin(hide, "execute"))
     kept = put(ed, TUNER_GRASS_LAYERS_APPLIED_VAR,
                column(ed, "grass_layers", made, rounded=True), [flow], made)

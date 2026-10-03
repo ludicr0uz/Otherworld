@@ -12,21 +12,17 @@ else too.
 
 from uebp.graph import (
     _connect, _loose_pin, _must_load, _node, _palette, _pin, _set, else_, out, then)
-from combat.nodes import FN_GET_ASC, FN_TAG_COUNT
 from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent, set_shown, show_if
 from graphics_menu.umg_consts import (
     DEBUFF_LABELS, SURVIVAL_BARS, WBP_HUD, debuff_text, stat_bar, stat_group,
 )
-from survival.paths import (
-    NODE_CAST_SURVIVAL, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH,
-)
-
-FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
-FN_GREATER_II = "/Script/Engine.KismetMathLibrary.Greater_IntInt"
-FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
+from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.gas import FN_GET_ASC, FN_TAG_COUNT
+from uebp.nodes.math import FN_DIV_FF, FN_GREATER_II
+from uebp.nodes.palette import NODE_CAST_SURVIVAL
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 
 
 def _author_bar(ed, survival, stat, exec_in):
@@ -35,7 +31,7 @@ def _author_bar(ed, survival, stat, exec_in):
     _connect(survival, _pin(now, "self"))
     top = ed.add_get_member_variable_node(f"Max{stat}", SURVIVAL_CLASS_PATH)
     _connect(survival, _pin(top, "self"))
-    frac = _node(ed, FN_DIV)
+    frac = _node(ed, FN_DIV_FF)
     _connect(out(now, stat), _pin(frac, "A"))
     _connect(out(top, f"Max{stat}"), _pin(frac, "B"))
     filled = set_percent(ed, part(ed, WBP_HUD, stat_bar(stat)), out(frac), [exec_in])

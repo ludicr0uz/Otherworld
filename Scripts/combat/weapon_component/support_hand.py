@@ -20,11 +20,11 @@ another anim BP simply fails the cast.
 import unreal
 
 from uebp.graph import BEL, _connect, _node, _palette, _pin, out, then
-from combat.nodes import FN_ANIM_INSTANCE
 from combat.skin import player_skin
 from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.weapon_component.pose_weights import HELD_SUPPORT_POINT
 from combat.weapon_component.sight_pitch import _anim_class_path
+from uebp.nodes.actor import FN_ANIM_INSTANCE
 
 
 def _author_support_hand(ed, exec_ins):

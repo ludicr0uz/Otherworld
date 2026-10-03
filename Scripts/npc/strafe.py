@@ -33,20 +33,20 @@ from forest_generator.npc_strafe import (
     NPC_STRAFE_SPEED_SCALE,
 )
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_CLEAR_FOCUS, FN_DISTANCE,
-    FN_GET_CONTROLLER, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_LE_FF, FN_LT_FF,
-    FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VV, FN_NE_FF, FN_NORMAL_2D,
-    FN_RANDOM_BOOL, FN_RANDOM_FLOAT, FN_ROTATE_AXIS, FN_SELECT_FLOAT,
-    FN_SET_FOCUS, FN_SIMPLE_MOVE, FN_SUB_VV, FN_TIME_SECONDS,
-    NODE_CAST_CHARACTER,
-)
 from npc.paths import (
     CHARACTER_CLASS_PATH, MOVEMENT_CLASS_PATH, STRAFE_DIST_VAR, STRAFE_FOR_VAR,
     STRAFE_YAW_VAR,
 )
 from npc.patrol import _author_walk_speed
 from npc.tuned import tuned
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_CONTROLLER, FN_GET_PAWN
+from uebp.nodes.ai import FN_CLEAR_FOCUS, FN_SET_FOCUS, FN_SIMPLE_MOVE
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_DISTANCE, FN_LESS_FF, FN_LE_FF, FN_MAKE_VECTOR,
+    FN_MUL_FF, FN_MUL_VV, FN_NEQ_FF, FN_NORMAL_2D, FN_RANDOM_BOOL, FN_RANDOM_FLOAT,
+    FN_ROTATE_AXIS, FN_SELECT_FF, FN_SUB_VV)
+from uebp.nodes.palette import NODE_CAST_CHARACTER
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
 
 ORIENT_FLAG = "bOrientRotationToMovement"
 DESIRED_FLAG = "bUseControllerDesiredRotation"
@@ -139,7 +139,7 @@ def _author_strafe(ed, exec_in, stock):
     _connect(out(back_in), _pin(by, "B"))
     next_at = keep(ed.add_get_member_variable_node("NextAttackTime"))
     next_out = out(next_at, "NextAttackTime")
-    early = keep(_node(ed, FN_LT_FF))
+    early = keep(_node(ed, FN_LESS_FF))
     _connect(out(by), _pin(early, "A"))
     _connect(next_out, _pin(early, "B"))
     both = keep(_node(ed, FN_AND))
@@ -155,7 +155,7 @@ def _author_strafe(ed, exec_in, stock):
 
     # --- yes: one pick per swing ---------------------------------------------
     picked_for = keep(ed.add_get_member_variable_node(STRAFE_FOR_VAR))
-    fresh = keep(_node(ed, FN_NE_FF))
+    fresh = keep(_node(ed, FN_NEQ_FF))
     _connect(out(picked_for, STRAFE_FOR_VAR), _pin(fresh, "A"))
     _connect(next_out, _pin(fresh, "B"))
     pick = keep(ed.add_branch_node())
@@ -166,7 +166,7 @@ def _author_strafe(ed, exec_in, stock):
     _set(angle, "Min", NPC_STRAFE_MIN_ANGLE_DEG)
     _set(angle, "Max", NPC_STRAFE_MAX_ANGLE_DEG)
     coin = keep(_node(ed, FN_RANDOM_BOOL))
-    side = keep(_node(ed, FN_SELECT_FLOAT))
+    side = keep(_node(ed, FN_SELECT_FF))
     _set(side, "A", 1.0)
     _set(side, "B", -1.0)
     _connect(out(coin), _pin(side, "bPickA"))

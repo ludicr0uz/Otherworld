@@ -36,18 +36,17 @@ valid. AimPoint is this frame's, resolved at the head of Tick.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, _vec, out
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_BREAK_ROT, FN_BREAK_VECTOR,
-    FN_CLAMP, FN_DEG_ATAN2, FN_DOT_VV, FN_FORWARD, FN_GE_FF, FN_GET_CONTROL_ROT,
-    FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MAX_FF, FN_MUL_FF, FN_MUL_VF,
-    FN_NORMALIZE_AXIS, FN_SELECT_FF, FN_SQRT, FN_SUB_FF, FN_SUB_VV,
-    FN_VEC_TO_ROT, FN_VSIZE_XY,
-)
 from combat.throw_tuning import (
     THROW_AIM_MIN_AHEAD, THROW_GRAVITY_Z, THROW_MAX_PITCH_DEG,
     THROW_PITCH_VAR, THROW_SPEED_VAR, THROW_START_FORWARD, THROW_START_UP,
 )
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_CONTROL_ROT
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_BREAK_ROT, FN_BREAK_VECTOR, FN_CLAMP, FN_DEG_ATAN2,
+    FN_DOT_VV, FN_FORWARD, FN_GE_FF, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MAX_FF, FN_MUL_FF,
+    FN_MUL_VF, FN_NORMALIZE_AXIS, FN_SELECT_FF, FN_SQRT, FN_SUB_FF, FN_SUB_VV, FN_VEC_TO_ROT,
+    FN_VSIZE_XY)
 
 AIM_POINT_VAR = "AimPoint"
 

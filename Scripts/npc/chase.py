@@ -11,11 +11,11 @@ the navmesh and a straight line when either is not. The tree's Chase step
 from forest_generator.npc_placement import (
     NAV_REACHABLE_EXTENT_CM, NPC_ACCEPTANCE_RADIUS_CM,
 )
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_AND_B, FN_GET_PAWN, FN_GET_PLAYER_PAWN, FN_MAKE_VECTOR,
-    FN_MOVE_TO_ACTOR, FN_MOVE_TO_LOCATION, FN_PROJECT_NAV,
-)
 from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_PAWN
+from uebp.nodes.ai import FN_MOVE_TO_ACTOR, FN_MOVE_TO_LOCATION, FN_PROJECT_NAV
+from uebp.nodes.math import FN_AND, FN_MAKE_VECTOR
+from uebp.nodes.system import FN_GET_PLAYER_PAWN
 
 
 def _author_chase(ed, exec_in):
@@ -69,7 +69,7 @@ def _author_chase(ed, exec_in):
     _connect(out(here_loc), _pin(here_on, "Point"))
     _connect(reach_out, _pin(here_on, "QueryExtent"))
 
-    both_on = _node(ed, FN_AND_B)
+    both_on = _node(ed, FN_AND)
     _connect(out(goal_on), _pin(both_on, "A"))
     _connect(out(here_on), _pin(both_on, "B"))
 

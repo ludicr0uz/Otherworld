@@ -6,9 +6,9 @@ import math
 
 from uebp.graph import _connect, _node, _pin, _set, out
 from combat.noise import _author_make_noise
-from combat.nodes import FN_MUL_FF
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
+from uebp.nodes.math import FN_MUL_FF
 
 
 def _author_shot_noise(ed, held, muzzle, direction, exec_in):

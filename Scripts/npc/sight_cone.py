@@ -21,16 +21,15 @@ attached to. Drawn for one frame (Duration 0) and redrawn the next.
 from combat.game_state import DEBUG_MODE_VAR
 from combat.paths import GAME_MODE_CLASS_PATH
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_DRAW_CONE, FN_FORWARD, FN_GET_GAME_MODE, FN_GET_PAWN,
-    FN_IS_VALID, FN_SELECT_COLOR, FN_TIME_SECONDS, NODE_CAST_GAME_MODE,
-    NODE_EVENT_TICK,
-)
 from npc.paths import (
     AGGRO_VAR, CORPSE_VAR, SIGHT_CONE_AGGRO_COLOR, SIGHT_CONE_PATROL_COLOR,
     SIGHT_CONE_SIDES, SIGHT_CONE_STAMP_VAR, SIGHT_CONE_THICKNESS,
 )
 from npc.tuned import tuned
+from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_GET_PAWN
+from uebp.nodes.math import FN_SELECT_COLOR
+from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_TICK
+from uebp.nodes.system import FN_DRAW_CONE, FN_GET_GAME_MODE, FN_IS_VALID, FN_TIME_SECONDS
 
 
 def _author_sight_cone(ed):
@@ -61,7 +60,7 @@ def _author_sight_cone(ed):
     def get(name):
         return out(keep(ed.add_get_member_variable_node(name)), name)
 
-    tick = keep(_palette(ed, NODE_EVENT_TICK))
+    tick = keep(_palette(ed, NODE_TICK))
     # The flag first: with debug mode off, which is how the game is played,
     # a wanderer's Tick costs one cast and one branch.
     mode = keep(_node(ed, FN_GET_GAME_MODE))
@@ -83,7 +82,7 @@ def _author_sight_cone(ed):
 
     here = keep(_node(ed, FN_ACTOR_LOC))
     _connect(out(pawn), _pin(here, "self"))
-    facing = keep(_node(ed, FN_FORWARD))
+    facing = keep(_node(ed, FN_ACTOR_FORWARD))
     _connect(out(pawn), _pin(facing, "self"))
     colour = keep(_node(ed, FN_SELECT_COLOR))
     _set(colour, "A", SIGHT_CONE_AGGRO_COLOR)

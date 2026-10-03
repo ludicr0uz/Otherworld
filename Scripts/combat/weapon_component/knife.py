@@ -24,7 +24,6 @@ the clip is knife_anim.py's.
 """
 
 from uebp.graph import _connect, _node, _pin, else_, out, then
-from combat.nodes import FN_GE_FF, FN_TIME_SECONDS
 from combat.tuning import COMBAT
 from combat.weapon_component.chop import _author_chop
 from combat.weapon_component.common import _prop
@@ -32,6 +31,8 @@ from combat.weapon_component.hot_blow import author_hot_blow
 from combat.weapon_component.punch import (
     Strike, _and, _author_swing, _get, _set_bool,
 )
+from uebp.nodes.math import FN_GE_FF
+from uebp.nodes.system import FN_TIME_SECONDS
 
 KNIFE_ANIM_VAR = "KnifeAnim"
 KNIFE_QUEUED_VAR = "KnifeQueued"

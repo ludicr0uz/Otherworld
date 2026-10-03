@@ -4,7 +4,7 @@ health cast's failed arm.
 """
 
 from uebp.graph import _connect, _palette, _pin, _set, out
-from combat.nodes import NODE_SPAWN
+from uebp.nodes.palette import NODE_SPAWN
 
 IMPACT_CLASS_VAR = "ImpactClass"   # BP_BulletImpact, a default set by build.py
 

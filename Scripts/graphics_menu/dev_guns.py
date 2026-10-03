@@ -20,7 +20,6 @@ the request, which is what lets a probe ask for the guns without a key press
 import unreal
 
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from combat.nodes import FN_OBJECT_CLASS, MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import SLOT_COUNT
 from graphics_menu.dev_consts import (
@@ -28,15 +27,12 @@ from graphics_menu.dev_consts import (
 )
 from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.player_parts import PAWN
+from uebp.nodes.actor import FN_GET_TRANSFORM
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_LEN
+from uebp.nodes.math import FN_AND, FN_CLASS_EQ, FN_LESS_II, FN_NOT
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
+from uebp.nodes.system import FN_OBJECT_CLASS
 
-FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
-FN_LESS_II = "/Script/Engine.KismetMathLibrary.Less_IntInt"
-FN_CLASS_EQ = "/Script/Engine.KismetMathLibrary.EqualEqual_ClassClass"
-FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
-FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
-FN_GET_TRANSFORM = "/Script/Engine.Actor.GetTransform"
 
 _VARS = (DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR)
 

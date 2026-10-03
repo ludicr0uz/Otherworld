@@ -46,11 +46,6 @@ game.
 
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.nodes import (
-    FN_AND, FN_ARR_REMOVE, FN_DETACH, FN_GET_TRANSFORM, FN_IS_KEY_DOWN,
-    FN_IS_VALID, FN_MAKE_TRANSFORM, FN_NOT, FN_OR, FN_SET_ACTOR_LOC,
-    FN_SET_HIDDEN, FN_TIME_SECONDS, MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN,
-)
 from combat.paths import THROW_ARC_CLASS_PATH
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
@@ -69,6 +64,12 @@ from combat.weapon_component.throw_ready import (
 from combat.weapon_component.throw_windup import (
     _author_throw_windup, _author_wound_down, _winding,
 )
+from uebp.nodes.actor import (
+    FN_DETACH, FN_GET_TRANSFORM, FN_IS_KEY_DOWN, FN_SET_ACTOR_LOC, FN_SET_HIDDEN)
+from uebp.nodes.array import FN_ARR_REMOVE
+from uebp.nodes.math import FN_AND, FN_MAKE_TRANSFORM, FN_NOT, FN_OR
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
+from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
 
 THROW_AIMING_VAR = "ThrowAiming"      # the arc was drawn last frame
 THROW_FORCED_VAR = "ThrowKeyForced"   # a probe holding the key

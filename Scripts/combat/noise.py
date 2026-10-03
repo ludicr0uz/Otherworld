@@ -29,12 +29,11 @@ from combat.game_state import (
     NOISE_LOCATION_VAR, NOISE_RANGE_VAR, NOISE_TIME_VAR,
 )
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
-from combat.nodes import (
-    FN_GET_GAME_MODE, FN_GE_FF, FN_MAX_FF, FN_OR, FN_SUB_FF, FN_TIME_SECONDS,
-    NODE_CAST_GAME_MODE,
-)
 from combat.paths import GAME_MODE_CLASS_PATH
 from combat.tuning import COMBAT
+from uebp.nodes.math import FN_GE_FF, FN_MAX_FF, FN_OR, FN_SUB_FF
+from uebp.nodes.palette import NODE_CAST_GAME_MODE
+from uebp.nodes.system import FN_GET_GAME_MODE, FN_TIME_SECONDS
 
 
 def _author_make_noise(ed, exec_in, location, reach,

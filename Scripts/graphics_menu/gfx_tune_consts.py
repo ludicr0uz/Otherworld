@@ -110,7 +110,6 @@ GFX_SAVE_BP_PATH = "/Game/UI/BP_GraphicsSave"
 GFX_SAVE_CLASS_PATH = f"{GFX_SAVE_BP_PATH}.BP_GraphicsSave_C"
 GFX_SAVE_SLOT = "OtherworldGraphics"
 GFX_SAVE_USER_INDEX = 0
-NODE_CAST_GFX_SAVE = "Utilities|Casting|CastToBP_GraphicsSave"
 # The picked preset, and the HUD's whole table as it stood. Only Custom's row
 # of it is read back; a table of any other length is from an older build
 # (another STAT_COUNT) and is left alone, pick and all.

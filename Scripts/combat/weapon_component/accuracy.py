@@ -24,11 +24,9 @@ trigger.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_DEG_TAN, FN_DIV_FF, FN_EQ_II, FN_MUL_FF, FN_SELECT_FF,
-)
 from combat.weapon_component.common import _prop
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
+from uebp.nodes.math import FN_DEG_TAN, FN_DIV_FF, FN_EQ_II, FN_MUL_FF, FN_SELECT_FF
 
 AIM_SPREAD_VAR = "AimSpread"
 RECOIL_SCALE_VAR = "RecoilScale"

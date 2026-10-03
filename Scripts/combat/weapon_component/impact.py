@@ -18,17 +18,17 @@ from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR,
     LIMB_BONES_VAR, LIMB_MULT_VAR,
 )
-from combat.nodes import (
-    FN_ARR_CONTAINS, FN_CLAMP, FN_CONCAT, FN_DIV_FF, FN_DRAW_STRING,
-    FN_FLOAT_TO_STR, FN_GET_COMP, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF,
-    FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_TIME_SECONDS,
-    FN_TRACE_COMPONENT, INF, NODE_CAST_CHARACTER, NODE_CAST_HEALTH,
-    NODE_SPAWN,
-)
 from combat.paths import HEALTH_CLASS_PATH
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
 from combat.weapon_component.surface_impact import _author_surface_impact
+from uebp.nodes.actor import FN_GET_COMP, FN_TRACE_COMPONENT
+from uebp.nodes.array import FN_ARR_CONTAINS
+from uebp.nodes.math import (
+    FN_CLAMP, FN_DIV_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF, FN_ROT_FROM_X,
+    FN_SELECT_FF, FN_SUB_FF, INF)
+from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_SPAWN
+from uebp.nodes.system import FN_CONCAT, FN_DRAW_STRING, FN_FLOAT_TO_STR, FN_TIME_SECONDS
 
 
 def _author_impact(ed, brk, held, exec_in):

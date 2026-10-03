@@ -18,15 +18,13 @@ import unreal
 
 from uebp.graph import (
     BEL, _connect, _declare, _float_type, _node, _pin, _struct_type, out, then)
-from combat.nodes import (
-    FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_LESS_FF, FN_SUB_II, MACRO_FOR_LOOP,
-)
 from loot.consts import (
     LOOT_ARRAYS, LOOT_CHANCES_VAR, LOOT_ICONS_VAR, LOOT_NAMES_VAR, LOOT_TABLE_ICONS_VAR,
     LOOT_TABLE_NAMES_VAR, LOOT_TABLE_TINTS_VAR, LOOT_TABLE_VAR, LOOT_TINTS_VAR, LOOT_VAR,
 )
-
-FN_RANDOM_UNIT = "/Script/Engine.KismetMathLibrary.RandomFloat"
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN
+from uebp.nodes.math import FN_LESS_FF, FN_RANDOM_UNIT, FN_SUB_II
+from uebp.nodes.palette import MACRO_FOR_LOOP
 
 
 def declare_loot_vars(ed):

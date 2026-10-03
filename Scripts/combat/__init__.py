@@ -9,7 +9,8 @@ each module's docstring says what it owns and why it is shaped that way.
 
 DATA (constants and pure tables -- no Blueprint authoring)
   paths             /Game asset paths and generated-class paths
-  nodes             FN_* function paths, NODE_* palette names, macros
+  nodes             engine class paths the graphs name (the node paths, FN_*
+                    and NODE_*, are the shared catalog: uebp/nodes/)
   tuning            keys, inventory size, CombatConfig / COMBAT, ammo, drops
                     (GUN_LOOT_TABLE, GUN_DROP_CHANCE, GUN_DROP_SEED),
                     auto fire, the consume event and health-drain tags,
@@ -110,7 +111,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     SUPPORT_FINGERS), keyed off the rifle pose
 
 SHARED AUTHORING HELPERS
-  graph             node/pin/connect/set, variables, components, events
+  (uebp)            node/pin/connect/set, out/then, variables, components,
+                    events: Scripts/uebp/graph.py, shared by every package
+  log               _log: the [GUN] log line
   noise             _author_make_noise: write the GameMode's noise record
                     (the shot and the player's footsteps call it)
 
@@ -176,8 +179,8 @@ INSTALLING
   install           components onto the player and the wanderer; retire old
 
 Dependency direction: data modules import nothing from this package except
-each other; graph imports only nodes; everything else may import data and
-graph. No module imports the entry point. Keep it acyclic -- a module that
+each other; everything else may import data and uebp. No module imports
+the entry point. Keep it acyclic -- a module that
 needs a name from a sibling that already imports it means the name is in the
 wrong module.
 """

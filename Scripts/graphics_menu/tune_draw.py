@@ -19,21 +19,19 @@ a tab is up (menu_screens.author_pause_menu).
 """
 
 from uebp.graph import _connect, _pin, _set, out, then
-from combat.nodes import FN_ADD_II, FN_AND, FN_ARR_GET, FN_MIN_II, FN_SUB_II
 from graphics_menu.cursor import (
-    FN_GE_II, author_back_row, author_button_row, author_row_cursor, author_widget_click)
+    author_back_row, author_button_row, author_row_cursor, author_widget_click)
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.tune_consts import GUN_TAB, TUNE_DASH
-from graphics_menu.ui_graph import (
-    FN_CHILD_AT, FN_EQ_II, FN_SELECT_FLOAT, FN_SET_OPACITY, MACRO_FOR_LOOP, mark_rows, member,
-    part, row_value, set_shown, show_if)
+from graphics_menu.ui_graph import mark_rows, member, part, row_value, set_shown, show_if
 from graphics_menu.umg_consts import ROW_CARET, WBP_MENU_ROW, WBP_PAUSE_MENU
-
-FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
-FN_TO_TEXT = "/Script/Engine.KismetTextLibrary.Conv_DoubleToText"
-FN_TEXT_TO_STR = "/Script/Engine.KismetTextLibrary.Conv_TextToString"
-FN_SELECT_STR = "/Script/Engine.KismetMathLibrary.SelectString"
-FN_SCROLL_TO = "/Script/UMG.ScrollBox.ScrollWidgetIntoView"
+from uebp.nodes.array import FN_ARR_GET
+from uebp.nodes.math import (
+    FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_MIN_II, FN_MUL_II, FN_SELECT_FF, FN_SELECT_STR,
+    FN_SUB_II)
+from uebp.nodes.palette import MACRO_FOR_LOOP
+from uebp.nodes.system import FN_TEXT_TO_STR, FN_TO_TEXT
+from uebp.nodes.umg import FN_CHILD_AT, FN_SCROLL_TO, FN_SET_OPACITY
 
 
 def _item(ed, array_var, index, made):
@@ -78,7 +76,7 @@ def _author_under_caret(ed, tab, widget, test, row, in_execs, made):
     tab's caret ``test`` ``row``: at or past it for BACK, the last stop, and
     on it for the save row. Returns then."""
     on_it = _call(ed, test, made, A=_get(ed, tab.row_var, made), B=row)
-    lit = _call(ed, FN_SELECT_FLOAT, made, A=1.0, B=0.0, bPickA=out(on_it))
+    lit = _call(ed, FN_SELECT_FF, made, A=1.0, B=0.0, bPickA=out(on_it))
     fade = _call(ed, FN_SET_OPACITY, made,
                  self=member(ed, widget, WBP_MENU_ROW, ROW_CARET),
                  InOpacity=out(lit))

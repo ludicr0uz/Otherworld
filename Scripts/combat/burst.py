@@ -16,13 +16,14 @@ from uebp.graph import (
     _declare, _drop_components, _events, _float_type, _loose_pin, _must_load, _node, _pin,
     _root_handle, _rot, _set, _struct_type, _vec, out, then)
 from uebp.layout import arrange
-from combat.nodes import (
-    FN_ADD_FF, FN_ADD_VV, FN_ARR_ADD, FN_ARR_GET, FN_BREAK_TRANSFORM,
-    FN_BREAK_VECTOR, FN_CLAMP, FN_COMP_REL_XFORM, FN_COMP_SET_REL_LOC,
-    FN_COMP_SET_SCALE, FN_DIV_FF, FN_EXP, FN_GET_COMPONENTS, FN_GET_TRANSFORM,
-    FN_INV_XFORM_DIR, FN_LIFESPAN, FN_MUL_FF, FN_MUL_VF, FN_SUB_FF,
-    MACRO_FOR_EACH,
-)
+from uebp.nodes.actor import (
+    FN_COMP_REL_XFORM, FN_COMP_SET_REL_LOC, FN_COMP_SET_SCALE, FN_GET_COMPONENTS,
+    FN_GET_TRANSFORM, FN_LIFESPAN)
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_GET
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_VV, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_CLAMP, FN_DIV_FF, FN_EXP,
+    FN_INV_XFORM_DIR, FN_MUL_FF, FN_MUL_VF, FN_SUB_FF)
+from uebp.nodes.palette import MACRO_FOR_EACH
 
 
 # The velocity of each piece is baked into its relative *location*, divided by

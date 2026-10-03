@@ -25,7 +25,6 @@ HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 # the legs; it still reads as an attack, so this is not a hard dependency.
 MELEE_SLOT = "DefaultSlot"
 
-INF = 1.0e9
 
 # Where the creature voices and the impact sounds are imported to, by
 # combat.audio.import_sounds().

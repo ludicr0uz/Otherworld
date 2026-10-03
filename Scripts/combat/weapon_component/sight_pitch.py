@@ -18,11 +18,9 @@ import unreal
 
 from combat.aim_pitch import AIM_PITCH_VAR
 from uebp.graph import BEL, _connect, _node, _palette, _pin, out, then
-from combat.nodes import (
-    FN_ANIM_INSTANCE, FN_BREAK_ROT, FN_GET_CONTROL_ROT, FN_MUL_FF,
-    FN_NORMALIZE_AXIS,
-)
 from combat.skin import player_skin
+from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_GET_CONTROL_ROT
+from uebp.nodes.math import FN_BREAK_ROT, FN_MUL_FF, FN_NORMALIZE_AXIS
 
 
 def _anim_class_path(skin):

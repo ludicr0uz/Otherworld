@@ -5,7 +5,9 @@ group. No game logic lives here.
 
 import unreal
 
-from uebp.nodes import FN_LITERAL_NAME, FN_MAKE_VECTOR, NODE_BEGIN_PLAY, NODE_TICK
+from uebp.nodes.math import FN_MAKE_VECTOR
+from uebp.nodes.palette import NODE_BEGIN_PLAY, NODE_TICK
+from uebp.nodes.system import FN_LITERAL_NAME
 
 
 BGE = unreal.BlueprintGraphEditor

@@ -1,0 +1,13 @@
+"""uebp.nodes.array -- KismetArrayLibrary."""
+
+FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
+FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
+FN_ARR_CONTAINS = "/Script/Engine.KismetArrayLibrary.Array_Contains"
+FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
+FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
+FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
+FN_ARR_REMOVE = "/Script/Engine.KismetArrayLibrary.Array_Remove"
+FN_ARR_REMOVE_ITEM = "/Script/Engine.KismetArrayLibrary.Array_RemoveItem"
+FN_ARR_RESIZE = "/Script/Engine.KismetArrayLibrary.Array_Resize"
+FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
+FN_ARR_VALID = "/Script/Engine.KismetArrayLibrary.Array_IsValidIndex"

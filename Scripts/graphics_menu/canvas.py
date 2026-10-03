@@ -7,8 +7,8 @@ has their palette).
 
 from uebp.graph import _node, _set
 from graphics_menu.umg_consts import UI_ART_DIR
+from uebp.nodes.actor import FN_DRAW_TEXTURE
 
-FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"
 
 # ─── Generated artwork ───────────────────────────────────────────────────────
 #

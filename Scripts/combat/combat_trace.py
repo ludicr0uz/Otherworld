@@ -21,9 +21,9 @@ from combat.game_state import (
 from combat.log import _log
 from uebp.graph import BGE, _apply_defaults, _assets, _connect, _node, _pin, _set, then
 from uebp.layout import arrange
-from combat.nodes import FN_PRINT
 from combat.paths import GAME_MODE_BP_PATH
 from combat.tuning import COMBAT_TRACE_DEFAULT
+from uebp.nodes.system import FN_PRINT
 
 
 def _author_switch(ed, event_name, value):

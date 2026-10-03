@@ -34,24 +34,17 @@ from uebp.graph import (
     BEL, BGE, _connect, _create_blueprint, _declare, _float_type, _loose_pin, _must_load,
     _palette, _pin, out, then)
 from uebp.layout import arrange
-from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_EQ_II, FN_MIN_II, MACRO_FOR_LOOP
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.gfx_stats import CUSTOM_PRESET, PRESET_LABELS, STAT_COUNT
 from graphics_menu.gfx_tune_consts import (
     GFX_SAVE_BP_PATH, GFX_SAVE_CLASS_PATH, GFX_SAVE_QUALITY_FIELD, GFX_SAVE_SLOT,
-    GFX_SAVE_TABLE_FIELD, GFX_SAVE_TABLE_LEN, GFX_SAVE_USER_INDEX, GFX_TUNE_VALUES_VAR,
-    NODE_CAST_GFX_SAVE,
-)
+    GFX_SAVE_TABLE_FIELD, GFX_SAVE_TABLE_LEN, GFX_SAVE_USER_INDEX, GFX_TUNE_VALUES_VAR)
 from graphics_menu.loot_find import put
 from graphics_menu.save_exit import _chain
-
-FN_SAVE_EXISTS = "/Script/Engine.GameplayStatics.DoesSaveGameExist"
-FN_LOAD_SAVE = "/Script/Engine.GameplayStatics.LoadGameFromSlot"
-FN_CREATE_SAVE = "/Script/Engine.GameplayStatics.CreateSaveGameObject"
-FN_WRITE_SAVE = "/Script/Engine.GameplayStatics.SaveGameToSlot"
-FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
-FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
-FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_SET
+from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MAX_II, FN_MIN_II
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_GFX_SAVE
+from uebp.nodes.system import FN_CREATE_SAVE, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_WRITE_SAVE
 
 
 def build_graphics_savegame():

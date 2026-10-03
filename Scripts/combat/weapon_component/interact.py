@@ -25,13 +25,13 @@ key, the press clears it, and it is false in every real game.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_ABS, FN_ACTOR_LOC, FN_AND, FN_BREAK_VECTOR, FN_DISTANCE, FN_IS_VALID,
-    FN_LESS_FF, FN_OR, FN_SUB_VV,
-)
 from combat.tuning import INTERACT_KEY, INTERACT_RADIUS
 from combat.weapon_component.heat import _author_fire_candidates, _author_heat_item
 from combat.weapon_component.pickup import _author_item_candidates, _author_take_item
+from uebp.nodes.actor import FN_ACTOR_LOC
+from uebp.nodes.math import (
+    FN_ABS, FN_AND, FN_BREAK_VECTOR, FN_DISTANCE, FN_LESS_FF, FN_OR, FN_SUB_VV)
+from uebp.nodes.system import FN_IS_VALID
 
 INTERACT_TARGET_VAR = "InteractTarget"   # the nearest candidate so far, or None
 INTERACT_GAP_VAR = "InteractGap"         # its distance to AimPoint, cm

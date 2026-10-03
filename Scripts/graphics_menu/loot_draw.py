@@ -18,7 +18,6 @@ click on the LootClose line lowers LootOpen, as Tab does.
 """
 
 from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import FN_ARR_GET, FN_ARR_LEN, FN_IS_VALID, FN_LESS_II, MACRO_FOR_LOOP
 from combat.paths import HEALTH_CLASS_PATH
 from graphics_menu.cursor import author_row_cursor, author_widget_click
 from graphics_menu.loot_consts import (
@@ -28,9 +27,11 @@ from graphics_menu.loot_consts import (
 from graphics_menu.ui_graph import mark_rows, member, part, row_at, set_shown, show_if
 from graphics_menu.umg_consts import ROW_ICON, WBP_HUD, WBP_MENU_ROW
 from loot.consts import LOOT_ICONS_VAR, LOOT_TINTS_VAR
-
-FN_SET_BRUSH = "/Script/UMG.Image.SetBrushFromTexture"
-FN_SET_TINT = "/Script/UMG.Image.SetColorAndOpacity"
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN
+from uebp.nodes.math import FN_LESS_II
+from uebp.nodes.palette import MACRO_FOR_LOOP
+from uebp.nodes.system import FN_IS_VALID
+from uebp.nodes.umg import FN_SET_BRUSH, FN_SET_TINT
 
 
 def _get(ed, var, owner=None, self_out=None):

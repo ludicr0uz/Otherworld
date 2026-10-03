@@ -10,14 +10,9 @@ that a row of the M panel was taken (pause_row_taken).
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
 from graphics_menu.umg_consts import PAUSE_ROW_ACTIONS
+from uebp.nodes.actor import FN_WAS_PRESSED
+from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MAX_II, FN_MIN_II, FN_OR, FN_SUB_II
 
-FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
-FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
-FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
-FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
-FN_MIN_II = "/Script/Engine.KismetMathLibrary.Min"
-FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
-FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
 
 # Enter and Space accept. The left mouse button is not a third key here: a
 # click accepts only over a row, which cursor.py raises as CursorAccept.

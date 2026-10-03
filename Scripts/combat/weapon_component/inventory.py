@@ -5,15 +5,7 @@ interact.py's, and picking an item up pickup.py's.
 from combat.anim_blueprint import AIM_SLOT
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.nodes import (
-    CAMERA_CLASS_PATH, FN_ACTOR_LOC, FN_ADD_VV, FN_AND, FN_ANIM_INSTANCE,
-    FN_ARR_ADD, FN_ARR_REMOVE, FN_ATTACH, FN_DETACH, FN_EQ_II, FN_FORWARD,
-    FN_GET_COMP, FN_GET_OWNER, FN_GET_PC, FN_GET_PITCH_SCALE, FN_GET_TRANSFORM,
-    FN_GET_YAW_SCALE, FN_IS_VALID, FN_MUL_VF, FN_NOT, FN_PLAY_SLOT,
-    FN_SET_ACTOR_LOC, FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT,
-    FN_STOP_SLOT, FN_TRACE, MACRO_FOR_EACH, MOVEMENT_CLASS_PATH,
-    NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN,
-)
+from combat.nodes import CAMERA_CLASS_PATH, MOVEMENT_CLASS_PATH
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
 from combat.slot_tuning import SLOT_VAR, STARTER_SLOTS
@@ -24,6 +16,14 @@ from combat.torch_tuning import STICK_CLASS_VAR
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 from combat.weapon_component.listener import _author_listener_at_character
 from combat.weapon_component.sights import _author_camera_after_boom
+from uebp.nodes.actor import (
+    FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
+    FN_GET_PITCH_SCALE, FN_GET_TRANSFORM, FN_GET_YAW_SCALE, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
+    FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT, FN_STOP_SLOT)
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE
+from uebp.nodes.math import FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN
+from uebp.nodes.system import FN_GET_PC, FN_IS_VALID, FN_TRACE
 
 # What the player is issued, in bag order: the component's class variables
 # BeginPlay spawns from (build.py declares and fills them).

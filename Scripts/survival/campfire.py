@@ -39,19 +39,16 @@ from uebp.graph import (
     _must_load, _node, _palette, _pin, _root_handle, _set, out, then)
 from uebp.layout import arrange
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_DISTANCE, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID,
-    FN_LE_FF, FN_LIFESPAN, FN_MUL_FF,
-)
 from combat.paths import WEAPON_COMP_BP_PATH
-from survival.paths import (
-    CAMPFIRE_BP_PATH, NODE_CAST_SURVIVAL, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH,
-)
+from survival.paths import CAMPFIRE_BP_PATH, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 from survival.tuning import (
     CAMPFIRE_BURN_S, CAMPFIRE_WARM_PER_S, CAMPFIRE_WARM_RADIUS_CM,
 )
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_LIFESPAN
+from uebp.nodes.math import FN_ADD_FF, FN_DISTANCE, FN_FMIN, FN_LE_FF, FN_MUL_FF
+from uebp.nodes.palette import NODE_CAST_SURVIVAL
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 
-FN_MIN_FF = "/Script/Engine.KismetMathLibrary.FMin"
 
 CAMPFIRE_MESH = "/Game/Sourced/Quaternius/Survival/SM_Bonfire_Fire"
 CAMPFIRE_SCALE = 0.4
@@ -137,7 +134,7 @@ def _author_warmth(ed, tick):
     more = _node(ed, FN_ADD_FF)
     _connect(theirs_var(TEMPERATURE_VAR), _pin(more, "A"))
     _connect(out(step), _pin(more, "B"))
-    capped = _node(ed, FN_MIN_FF)
+    capped = _node(ed, FN_FMIN)
     _connect(out(more), _pin(capped, "A"))
     _connect(theirs_var(MAX_TEMPERATURE_VAR), _pin(capped, "B"))
     write = ed.add_set_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH)

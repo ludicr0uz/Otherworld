@@ -36,12 +36,11 @@ from combat.heat_tuning import (
     HEAT_GLOW_RADIUS_CM, HEAT_MATERIAL_VAR, HEAT_S, HOT_AXIS_PARAM, HOT_COLOUR,
     HOT_EMISSIVE, HOT_FADE_PARAM, HOT_START_PARAM, HOT_VAR, MODEL,
 )
-from combat.nodes import FN_AND, FN_GE_FF, FN_TIME_SECONDS
 from combat.paths import MAT_HOT_METAL
 from combat.weapon_items import build_model
-
-FN_SET_OVERLAY = "/Script/Engine.MeshComponent.SetOverlayMaterial"
-FN_SET_VISIBILITY = "/Script/Engine.SceneComponent.SetVisibility"
+from uebp.nodes.actor import FN_SET_OVERLAY, FN_SET_VISIBILITY
+from uebp.nodes.math import FN_AND, FN_GE_FF
+from uebp.nodes.system import FN_TIME_SECONDS
 
 
 def build_hot_material():

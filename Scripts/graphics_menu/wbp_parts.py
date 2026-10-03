@@ -25,13 +25,9 @@ from graphics_menu.umg_consts import (
     SLOT_ICON_TOP, SLOT_ICON_W, SLOT_W, UI_ART_DIR, WBP_INVENTORY_SLOT, WBP_MENU_ROW,
 )
 from item_icons.items import icon_name
-
-NODE_PRE_CONSTRUCT = "AddEvent|UserInterface|EventPreConstruct"
-FN_STR_TO_TEXT = "/Script/Engine.KismetTextLibrary.Conv_StringToText"
-FN_SET_TEXT = "/Script/UMG.TextBlock.SetText"
-FN_SET_TEXT_COLOUR = "/Script/UMG.TextBlock.SetColorAndOpacity"
-FN_SET_WIDTH = "/Script/UMG.SizeBox.SetWidthOverride"
-FN_SET_BRUSH = "/Script/UMG.Image.SetBrushFromTexture"
+from uebp.nodes.palette import NODE_PRE_CONSTRUCT
+from uebp.nodes.system import FN_STR_TO_TEXT
+from uebp.nodes.umg import FN_SET_BRUSH, FN_SET_TEXT, FN_SET_TEXT_COLOUR, FN_SET_WIDTH
 
 
 def _author_pre_construct(bp):

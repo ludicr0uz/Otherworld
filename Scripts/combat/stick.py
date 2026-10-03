@@ -43,7 +43,6 @@ from uebp.graph import (
 from uebp.layout import arrange
 from combat.grip import _grip_location, _grip_rotation
 from combat.light_tuning import LIGHTS_VAR
-from combat.nodes import FN_AND, FN_GE_FF, FN_NOT, FN_TIME_SECONDS
 from combat.paths import (
     CUBE, HOLD_TORCH_ANIM_PATH, MAT_METAL, STICK_BP_PATH, WARD_TORCH_ANIM_PATH,
 )
@@ -55,8 +54,10 @@ from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
+from uebp.nodes.actor import FN_SET_VISIBILITY
+from uebp.nodes.math import FN_AND, FN_GE_FF, FN_NOT
+from uebp.nodes.system import FN_TIME_SECONDS
 
-FN_SET_VISIBILITY = "/Script/Engine.SceneComponent.SetVisibility"
 
 STICK_MESH = "/Game/Sourced/Quaternius/Survival/SM_WoodenTorch"
 STICK_LIT_MESH = "/Game/Sourced/Quaternius/Survival/SM_WoodenTorch_Fire"

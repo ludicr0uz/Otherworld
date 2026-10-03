@@ -8,8 +8,9 @@ That graph reads Blocking and writes Stamina on this component.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, out, then
-from combat.nodes import FN_AND, FN_GREATER_FF, FN_IS_KEY_DOWN, FN_NOT
 from combat.tuning import BLOCK_KEY, COMBAT
+from uebp.nodes.actor import FN_IS_KEY_DOWN
+from uebp.nodes.math import FN_AND, FN_GREATER_FF, FN_NOT
 
 
 def _author_block(ed, pc_out, key_pin, exec_ins):

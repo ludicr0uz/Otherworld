@@ -33,10 +33,6 @@ the view drifted off by the dropped steps (0.13 degrees in one probe run).
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, then
-from combat.nodes import (
-    FN_ABS, FN_ADD_FF, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_OR, FN_SIN,
-    FN_SUB_FF,
-)
 from combat.breath_tuning import BREATH_SCALE_VAR
 from combat.sway_tuning import (
     SWAY_CROUCH_SCALE, SWAY_MIN_STEP_DEG, SWAY_PITCH_DEG, SWAY_PITCH_PERIOD_S, SWAY_PITCH_VAR,
@@ -46,6 +42,8 @@ from combat.sway_tuning import (
 from combat.weapon_component.accuracy import _mul, _select
 from combat.weapon_component.recoil import _author_turn_view
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
+from uebp.nodes.math import (
+    FN_ABS, FN_ADD_FF, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_OR, FN_SIN, FN_SUB_FF)
 
 
 def _author_sight_sway(ed, tick, pc_out, exec_ins):

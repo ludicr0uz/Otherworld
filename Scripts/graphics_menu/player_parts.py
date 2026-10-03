@@ -9,11 +9,11 @@ survival was never built) fails the chain and gets no profile.
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, out, then
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
-from survival.paths import NODE_CAST_SURVIVAL, SURVIVAL_CLASS_PATH
+from survival.paths import SURVIVAL_CLASS_PATH
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.palette import NODE_CAST_SURVIVAL
+from uebp.nodes.system import FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN
 
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_GET_GAME_MODE = "/Script/Engine.GameplayStatics.GetGameMode"
 
 PAWN = "pawn"
 MODE = "mode"

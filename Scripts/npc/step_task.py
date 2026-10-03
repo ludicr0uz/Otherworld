@@ -21,8 +21,10 @@ from uebp.graph import (
     BEL, BGE, _assets, _connect, _create_blueprint, _name_literal, _node, _palette, _pin,
     _set, else_, out, then)
 from uebp.layout import arrange
-from npc.nodes import FN_EQ_NAME, FN_FINISH_EXECUTE, NODE_EVENT_EXECUTE_AI
 from npc.paths import STEP_EVENT_PREFIX, STEP_RESULT_VAR, STEP_VAR
+from uebp.nodes.ai import FN_FINISH_EXECUTE
+from uebp.nodes.math import FN_EQ_NAME
+from uebp.nodes.palette import NODE_EVENT_EXECUTE_AI
 
 PIN = unreal.BlueprintGraphPinLibrary
 

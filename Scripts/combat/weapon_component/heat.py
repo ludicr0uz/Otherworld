@@ -24,14 +24,11 @@ IsValid Branch in both halves: empty hands are offered nothing.
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from combat.heat_tuning import COOL_VAR, HEAT_S, HEATS_VAR, HOT_VAR
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
-from combat.nodes import (
-    FN_ADD_FF, FN_ALL_ACTORS, FN_IS_VALID, FN_OBJECT_CLASS, FN_TIME_SECONDS,
-    MACRO_FOR_EACH,
-)
 from combat.paths import ITEM_CLASS_PATH
 from combat.weapon_component.common import _prop
-
-FN_CLASS_IS_CHILD = "/Script/Engine.KismetMathLibrary.ClassIsChildOf"
+from uebp.nodes.math import FN_ADD_FF, FN_CLASS_IS_CHILD
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_OBJECT_CLASS, FN_TIME_SECONDS
 
 
 def _author_fire_candidates(ed, exec_in):

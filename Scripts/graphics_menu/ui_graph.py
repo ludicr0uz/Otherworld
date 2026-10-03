@@ -18,22 +18,13 @@ from graphics_menu.umg_consts import (
     HIDDEN, ROW_CARET, ROW_VALUE, SCREENS, SHOWN, UI_VAR, WBP_HUD, WBP_MENU_ROW,
     class_path,
 )
-
-NODE_CREATE_WIDGET = "UserInterface|CreateWidget"
-NODE_CAST_ROW = "Utilities|Casting|CastToWBP_MenuRow"
-FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
-FN_ADD_TO_VIEWPORT = "/Script/UMG.UserWidget.AddToViewport"
-FN_SET_VISIBILITY = "/Script/UMG.Widget.SetVisibility"
-FN_SET_OPACITY = "/Script/UMG.Widget.SetRenderOpacity"
-FN_SET_TEXT = "/Script/UMG.TextBlock.SetText"
-FN_SET_PERCENT = "/Script/UMG.ProgressBar.SetPercent"
-FN_CHILD_AT = "/Script/UMG.PanelWidget.GetChildAt"
-FN_STR_TO_TEXT = "/Script/Engine.KismetTextLibrary.Conv_StringToText"
-FN_SELECT_FLOAT = "/Script/Engine.KismetMathLibrary.SelectFloat"
-FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
-FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
-MACRO_FOR_LOOP = ("/Engine/EditorBlueprintResources/StandardMacros"
-                  ".StandardMacros:ForLoop")
+from uebp.nodes.actor import FN_GET_OWNING_PC
+from uebp.nodes.math import FN_EQ_II, FN_OR, FN_SELECT_FF
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_ROW, NODE_CREATE_WIDGET
+from uebp.nodes.system import FN_STR_TO_TEXT
+from uebp.nodes.umg import (
+    FN_ADD_TO_VIEWPORT, FN_CHILD_AT, FN_SET_OPACITY, FN_SET_PERCENT, FN_SET_TEXT,
+    FN_SET_WIDGET_VISIBILITY)
 
 
 def _wire(execs, node):
@@ -104,7 +95,7 @@ def part(ed, asset, name):
 # ─── Writes ──────────────────────────────────────────────────────────────────
 
 def set_shown(ed, target, shown, execs):
-    n = _node(ed, FN_SET_VISIBILITY)
+    n = _node(ed, FN_SET_WIDGET_VISIBILITY)
     _connect(target, _pin(n, "self"))
     _set(n, "InVisibility", SHOWN if shown else HIDDEN)
     return _wire(execs, n)
@@ -202,7 +193,7 @@ def mark_rows(ed, box, count, selected, execs, also=None):
         _connect(picked, _pin(either, "A"))
         _connect(out(hover), _pin(either, "B"))
         picked = out(either)
-    lit = _node(ed, FN_SELECT_FLOAT)
+    lit = _node(ed, FN_SELECT_FF)
     _set(lit, "A", 1.0)
     _set(lit, "B", 0.0)
     _connect(picked, _pin(lit, "bPickA"))

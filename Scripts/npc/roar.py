@@ -11,12 +11,11 @@ it stores, and a Branch on it that succeeds the step without a move order.
 from forest_generator.npc_stalk import NPC_STALK_ROAR_BLEND_S
 from npc.graph import _log, _mesh_object
 from uebp.graph import _assets, _connect, _loose_pin, _palette, _pin, out, then
-from npc.nodes import (
-    FN_ANIM_INSTANCE, FN_PLAY_SLOT, FN_STOP_MOVEMENT, NODE_CAST_CHARACTER,
-)
 from npc.paths import CHARACTER_CLASS_PATH, MELEE_SLOT, VOICES_VAR
 from npc.sound import _author_random_sound
 from npc.strafe import _author_facing
+from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_PLAY_SLOT, FN_STOP_MOVEMENT
+from uebp.nodes.palette import NODE_CAST_CHARACTER
 
 
 def roar_object(roar_anim):

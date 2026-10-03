@@ -13,16 +13,11 @@ from uebp.graph import BEL, _connect, _loose_pin, _node, _pin, _set, else_, out,
 from combat.paths import GAME_MODE_CLASS_PATH
 from graphics_menu.settings_rows import (
     DIFFICULTY_LABELS, DIFFICULTY_ROW, SETTINGS_CLASS_PATH)
+from uebp.nodes.array import FN_ARR_GET
+from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_MOD_II, FN_SELECT_II
+from uebp.nodes.system import FN_IS_VALID
 
 LABELS_VAR = "DifficultyLabels"
-
-FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
-FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
-FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
-FN_MOD_II = "/Script/Engine.KismetMathLibrary.Percent_IntInt"
-FN_SELECT_INT = "/Script/Engine.KismetMathLibrary.SelectInt"
 
 
 def declare_difficulty_vars(ed):
@@ -74,7 +69,7 @@ def emit_difficulty_nudge(ed, settings_out, either_out, right_out, in_execs, mad
     for e in in_execs:
         _connect(e, _pin(cycling, "execute"))
 
-    delta = keep(_node(ed, FN_SELECT_INT))
+    delta = keep(_node(ed, FN_SELECT_II))
     _set(delta, "A", 1)
     _set(delta, "B", count - 1)
     _connect(right_out, _pin(delta, "bPickA"))

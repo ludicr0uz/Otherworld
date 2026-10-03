@@ -26,13 +26,13 @@ kills on the frame it happens, through the ordinary death path.
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.hit_reaction import PREV_HEALTH_VAR
-from combat.nodes import (
-    FN_ADD_FF, FN_ADD_II, FN_AND, FN_GET_ASC, FN_GET_OWNER, FN_GREATER_II,
-    FN_IS_VALID, FN_MUL_FF, FN_NOT, FN_SUB_FF, FN_TAG_COUNT,
-)
 from combat.tuning import HEALTH_DRAINS
-
-FN_INT_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
+from uebp.nodes.actor import FN_GET_OWNER
+from uebp.nodes.gas import FN_GET_ASC, FN_TAG_COUNT
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_INT_TO_FLOAT, FN_MUL_FF, FN_NOT,
+    FN_SUB_FF)
+from uebp.nodes.system import FN_IS_VALID
 
 
 def _author_debuff_drain(ed, tick, exec_ins):

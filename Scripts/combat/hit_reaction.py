@@ -11,14 +11,16 @@ from combat.log import _log
 from uebp.graph import (
     _assets, _component_object, _connect, _handles, _loose_pin, _node, _palette, _pin, _set,
     else_, out, then)
-from combat.nodes import (
-    FN_ABS, FN_ACTOR_FORWARD, FN_ACTOR_RIGHT, FN_ADD_FF, FN_ADD_II,
-    FN_ANIM_INSTANCE, FN_ARR_GET, FN_ARR_LEN, FN_CLAMP_II, FN_CONCAT,
-    FN_DISPLAY_NAME, FN_DOT_VV, FN_GET_OWNER, FN_GE_FF, FN_GREATER_II,
-    FN_INT_TO_STR, FN_LESS_FF, FN_PLAY_SLOT, FN_RAND_INT, FN_SUB_II,
-    FN_TIME_SECONDS, FN_WARN, NODE_CAST_CHARACTER,
-)
 from combat.tuning import COMBAT
+from uebp.nodes.actor import (
+    FN_ACTOR_FORWARD, FN_ACTOR_RIGHT, FN_ANIM_INSTANCE, FN_GET_OWNER, FN_PLAY_SLOT)
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN
+from uebp.nodes.math import (
+    FN_ABS, FN_ADD_FF, FN_ADD_II, FN_CLAMP_II, FN_DOT_VV, FN_GE_FF, FN_GREATER_II,
+    FN_LESS_FF, FN_RAND_INT, FN_SUB_II)
+from uebp.nodes.palette import NODE_CAST_CHARACTER
+from uebp.nodes.system import (
+    FN_CONCAT, FN_DISPLAY_NAME, FN_INT_TO_STR, FN_TIME_SECONDS, FN_WARN)
 
 
 # --- flinching: the hit reaction ---------------------------------------------

@@ -17,17 +17,15 @@ its own body, hence the pawn test.
 import unreal
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ALL_ACTORS, FN_DISTANCE, FN_GET_COMP, FN_GET_PLAYER_PAWN,
-    FN_IS_VALID, FN_LESS_FF, MACRO_FOR_EACH, NODE_CAST_HEALTH,
-)
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_consts import LOOT_BEST_VAR, LOOT_TARGET_VAR
 from loot.consts import LOOT_RADIUS
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_COMP_LOC, FN_GET_COMP
+from uebp.nodes.math import FN_DISTANCE, FN_LESS_FF, FN_NE_OO
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_HEALTH
+from uebp.nodes.system import FN_ALL_ACTORS, FN_GET_PLAYER_PAWN, FN_IS_VALID
 
-FN_NEQ_OO = "/Script/Engine.KismetMathLibrary.NotEqual_ObjectObject"
-FN_COMP_LOC = "/Script/Engine.SceneComponent.K2_GetComponentLocation"
 CHARACTER_CLASS_PATH = "/Script/Engine.Character"
 MESH_CLASS_PATH = "/Script/Engine.SkeletalMeshComponent"
 
@@ -76,7 +74,7 @@ def author_find_body(ed, in_execs, made):
     comp = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
     dead, _alive = _branch(ed, _get(ed, "Dead", made, HEALTH_CLASS_PATH, comp), [then(cast)], made)
-    other, _self = _branch(ed, out(_call(ed, FN_NEQ_OO, made, A=who, B=pawn)), [dead], made)
+    other, _self = _branch(ed, out(_call(ed, FN_NE_OO, made, A=who, B=pawn)), [dead], made)
     mesh = _call(ed, FN_GET_COMP, made, self=who)
     _pin(mesh, "ComponentClass").set_pin_value(MESH_CLASS_PATH)
     shaped, _no_mesh = _branch(ed, out(_call(ed, FN_IS_VALID, made,

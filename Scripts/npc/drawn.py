@@ -36,14 +36,13 @@ from forest_generator.npc_drawn import (
 )
 from npc.graph import _Graph, _log
 from uebp.graph import BEL, _assets, _connect, _pin, else_, out, then
-from npc.nodes import (
-    FN_ACTOR_LOC, FN_ALL_ACTORS, FN_DISTANCE_2D, FN_GET_CONTROLLER, FN_GET_PAWN,
-    FN_GT_FF, FN_IS_VALID, FN_LE_FF, FN_NEAREST_ACTOR, FN_SIMPLE_MOVE,
-    FN_STOP_MOVEMENT,
-)
 from npc.patrol import _author_walk_speed
 from npc.paths import DRAWN_TO_VAR, DRAWN_VAR
 from survival.paths import CAMPFIRE_BP_PATH, CAMPFIRE_CLASS_PATH
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_CONTROLLER, FN_GET_PAWN, FN_STOP_MOVEMENT
+from uebp.nodes.ai import FN_SIMPLE_MOVE
+from uebp.nodes.math import FN_DISTANCE_2D, FN_GREATER_FF, FN_LE_FF
+from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_NEAREST_ACTOR
 
 
 def draws(key):
@@ -105,7 +104,7 @@ def _author_drawn(ed, exec_in, result, stock):
     _connect(let_go, result(False))
 
     drawn = g.put(DRAWN_VAR, then(reached), literal="true")
-    far = g.op(FN_GT_FF, out(gap), NPC_DRAWN_ARRIVE_CM)
+    far = g.op(FN_GREATER_FF, out(gap), NPC_DRAWN_ARRIVE_CM)
     walking = g.branch(far, drawn)
 
     me = g.call(FN_GET_CONTROLLER)

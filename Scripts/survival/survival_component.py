@@ -28,13 +28,13 @@ from uebp.graph import (
     BEL, BGE, _apply_defaults, _connect, _create_blueprint, _declare, _events, _float_type,
     _node, _pin, _set, out, then)
 from uebp.layout import arrange
-from combat.nodes import (
-    FN_AND, FN_CLAMP, FN_GET_ASC, FN_GET_OWNER, FN_GIVE_ABILITY, FN_IS_VALID,
-    FN_IS_VALID_CLASS, FN_MUL_FF, FN_SUB_FF,
-)
 from survival.debuffs import _author_debuff_sync
 from survival.paths import SURVIVAL_BP_PATH
 from survival.tuning import DEBUFFS, SURVIVAL
+from uebp.nodes.actor import FN_GET_OWNER
+from uebp.nodes.gas import FN_GET_ASC, FN_GIVE_ABILITY
+from uebp.nodes.math import FN_AND, FN_CLAMP, FN_MUL_FF, FN_SUB_FF
+from uebp.nodes.system import FN_IS_VALID, FN_IS_VALID_CLASS
 
 STATS = ("Hunger", "Thirst", "Temperature")
 

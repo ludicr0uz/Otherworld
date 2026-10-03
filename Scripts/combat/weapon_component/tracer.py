@@ -19,9 +19,8 @@ from combat.game_state import (
     TRACER_POINT_SIZE, TRACER_THICKNESS,
 )
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_DRAW_LINE, FN_DRAW_POINT, FN_SELECT_COLOR, FN_SELECT_VECTOR,
-)
+from uebp.nodes.math import FN_SELECT_COLOR, FN_SELECT_VECTOR
+from uebp.nodes.system import FN_DRAW_LINE, FN_DRAW_POINT
 
 
 def _author_tracer(ed, trace, brk):

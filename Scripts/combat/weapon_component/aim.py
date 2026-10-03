@@ -7,12 +7,12 @@ are ads.py; where the camera sits while aiming down the sights is sights.py.
 from combat.camera import AIM_TRACE_RANGE, BLOCKED_SLACK
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.nodes import (
-    FN_ADD_VV, FN_CAM_LOC, FN_CAM_ROT, FN_DISTANCE, FN_FORWARD, FN_GET_CAM,
-    FN_GREATER_FF, FN_IS_VALID, FN_MUL_VF, FN_TRACE, NODE_BREAK_HIT,
-)
 from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.common import _trace_defaults
+from uebp.nodes.actor import FN_CAM_LOC, FN_CAM_ROT
+from uebp.nodes.math import FN_ADD_VV, FN_DISTANCE, FN_FORWARD, FN_GREATER_FF, FN_MUL_VF
+from uebp.nodes.palette import NODE_BREAK_HIT
+from uebp.nodes.system import FN_GET_CAM, FN_IS_VALID, FN_TRACE
 
 
 def _author_resolve_aim(ed, held, exec_ins):

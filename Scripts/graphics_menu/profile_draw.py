@@ -14,13 +14,8 @@ from graphics_menu.profile_consts import (
 )
 from graphics_menu.ui_graph import part, set_shown, set_text, show_if
 from graphics_menu.umg_consts import BANNER_COUNT, BANNER_OFF, WBP_HUD
-
-FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
-FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
-FN_LESS = "/Script/Engine.KismetMathLibrary.Less_DoubleDouble"
-FN_CEIL = "/Script/Engine.KismetMathLibrary.FCeil"
-FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
-FN_CONCAT = "/Script/Engine.KismetStringLibrary.Concat_StrStr"
+from uebp.nodes.math import FN_CEIL, FN_LESS_FF, FN_SUB_FF
+from uebp.nodes.system import FN_CONCAT, FN_INT_TO_STR, FN_TIME_SECONDS
 
 
 def author_exit_banner(ed, in_execs):
@@ -43,7 +38,7 @@ def author_exit_banner(ed, in_execs):
     called_off = part(ed, WBP_HUD, BANNER_OFF)
 
     # --- the countdown -----------------------------------------------------
-    remaining = keep(_node(ed, FN_SUB))
+    remaining = keep(_node(ed, FN_SUB_FF))
     _connect(get(EXIT_AT_VAR), _pin(remaining, "A"))
     _connect(now, _pin(remaining, "B"))
     whole = keep(_node(ed, FN_CEIL))
@@ -59,10 +54,10 @@ def author_exit_banner(ed, in_execs):
 
     # --- or, for a moment after a hit, why it stopped -------------------------
     idle = set_shown(ed, count, False, [else_(br)])
-    ago = keep(_node(ed, FN_SUB))
+    ago = keep(_node(ed, FN_SUB_FF))
     _connect(now, _pin(ago, "A"))
     _connect(get(EXIT_CALLED_OFF_VAR), _pin(ago, "B"))
-    recent = keep(_node(ed, FN_LESS))
+    recent = keep(_node(ed, FN_LESS_FF))
     _connect(out(ago), _pin(recent, "A"))
     _set(recent, "B", EXIT_CALLED_OFF_SHOWN_S)
     tails = show_if(ed, called_off, out(recent), [idle])

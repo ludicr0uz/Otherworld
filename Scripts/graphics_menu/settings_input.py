@@ -13,22 +13,13 @@ from graphics_menu.umg_consts import SETTINGS_ROWS_BOX, WBP_MAIN_MENU
 from graphics_menu.settings_rows import (
     BACK_ROW, FIRST_BIND_ROW, PAGE_TITLE, SETTINGS_CLASS_PATH, SETTINGS_SLOT,
     SETTINGS_USER_INDEX, SLIDERS)
-
-FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
-FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
-FN_WRITE_SAVE = "/Script/Engine.GameplayStatics.SaveGameToSlot"
-FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
-FN_SUB_II = "/Script/Engine.KismetMathLibrary.Subtract_IntInt"
-FN_EQ_II = "/Script/Engine.KismetMathLibrary.EqualEqual_IntInt"
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-FN_LESS_II = "/Script/Engine.KismetMathLibrary.Less_IntInt"
-FN_OR = "/Script/Engine.KismetMathLibrary.BooleanOR"
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_ADD = "/Script/Engine.KismetMathLibrary.Add_DoubleDouble"
-FN_FCLAMP = "/Script/Engine.KismetMathLibrary.FClamp"
-FN_SELECT_FLOAT = "/Script/Engine.KismetMathLibrary.SelectFloat"
-MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
-                  ".StandardMacros:ForEachLoop")
+from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
+from uebp.nodes.array import FN_ARR_SET
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_CLAMP, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_OR, FN_SELECT_FF,
+    FN_SUB_II)
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_WRITE_SAVE
 
 
 def _emit_save(ed, settings_out, in_exec):
@@ -206,16 +197,16 @@ def _emit_nudge(ed, slider, row, settings_out, either_out, right_out, in_execs, 
     for e in in_execs:
         _connect(e, _pin(nudging, "execute"))
 
-    delta = keep(_node(ed, FN_SELECT_FLOAT))
+    delta = keep(_node(ed, FN_SELECT_FF))
     _set(delta, "A", slider.step)
     _set(delta, "B", -slider.step)
     _connect(right_out, _loose_pin(delta, "bPickA"))
     now = keep(ed.add_get_member_variable_node(slider.var, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(now, "self"))
-    total = keep(_node(ed, FN_ADD))
+    total = keep(_node(ed, FN_ADD_FF))
     _connect(out(now, slider.var), _pin(total, "A"))
     _connect(out(delta), _pin(total, "B"))
-    held = keep(_node(ed, FN_FCLAMP))
+    held = keep(_node(ed, FN_CLAMP))
     _connect(out(total), _loose_pin(held, "Value"))
     _set(held, "Min", slider.lo)
     _set(held, "Max", slider.hi)

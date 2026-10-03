@@ -7,11 +7,10 @@ from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
-from combat.nodes import (
-    FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NEQ_BB, FN_NOT,
-    FN_PLAY_SLOT, FN_WARN,
-)
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
+from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
+from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT
+from uebp.nodes.system import FN_IS_VALID, FN_WARN
 
 
 def _author_ready_pose_keepalive(ed, held, exec_ins):

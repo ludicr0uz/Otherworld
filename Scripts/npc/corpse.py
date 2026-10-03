@@ -31,14 +31,14 @@ on the frame of the killing blow may not have run yet.
 
 from combat.game_state import NPC_ID_VAR
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from npc.nodes import (
-    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_COMP, FN_GET_PAWN, FN_INT_TO_STR,
-    FN_IS_VALID, FN_LE_FF, FN_OR, FN_PRINT, FN_STOP_LOGIC, FN_STOP_MOVEMENT,
-    NODE_CAST_HEALTH,
-)
 from npc.paths import (
     CORPSE_LOG_PREFIX, CORPSE_VAR, HEALTH_CLASS_PATH, STEP_RESULT_VAR,
 )
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_PAWN, FN_STOP_MOVEMENT
+from uebp.nodes.ai import FN_STOP_LOGIC
+from uebp.nodes.math import FN_LE_FF, FN_OR
+from uebp.nodes.palette import NODE_CAST_HEALTH
+from uebp.nodes.system import FN_CONCAT, FN_DISPLAY_NAME, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT
 
 
 def _dead_pin(ed, health_out, keep):

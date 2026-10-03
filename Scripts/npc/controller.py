@@ -13,7 +13,6 @@ from npc.paths import (
     STEP_SWING, STEP_WARD, VOICES_VAR,
     step_task_path, tree_path,
 )
-from npc.nodes import FN_RUN_BT, NODE_EVENT_POSSESS
 from npc.graph import _log
 from uebp.graph import (
     BEL, BGE, _assets, _connect, _create_blueprint, _node, _palette, _set, then)
@@ -26,6 +25,8 @@ from npc.tree import build_blackboard, fill_tree, fresh_tree
 from npc.monster_tuning import monster_specs
 from npc.tuned import write_tuned_defaults
 from npc.ward import wards
+from uebp.nodes.ai import FN_RUN_BT
+from uebp.nodes.palette import NODE_EVENT_POSSESS
 
 
 def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,

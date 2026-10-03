@@ -39,12 +39,11 @@ With empty hands all three are cleared, so the camera is home (_author_unseat).
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, then
-from combat.nodes import (
-    FN_AND, FN_BOOL_TO_FLOAT, FN_DOT_VV, FN_FORWARD, FN_GREATER_FF,
-    FN_INTERP_FF, FN_NORMAL, FN_NOT, FN_OR,
-)
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_COS
 from combat.tuning import COMBAT
+from uebp.nodes.math import (
+    FN_AND, FN_BOOL_TO_FLOAT, FN_DOT_VV, FN_FORWARD, FN_GREATER_FF, FN_INTERP_FF, FN_NORMAL,
+    FN_NOT, FN_OR)
 
 
 def _author_sight_seat(ed, tick, keep, line_out, has_line_out, boom_rot_out,

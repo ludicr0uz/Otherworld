@@ -27,7 +27,6 @@ from combat.hit_reaction import (
 from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR,
 )
-from combat.nodes import FN_LE_FF
 from combat.paths import HEALTH_BP_PATH, ITEM_BP_PATH
 from combat.replacement import _author_replacement
 from combat.respawn import (
@@ -36,6 +35,7 @@ from combat.respawn import (
 )
 from combat.tuning import COMBAT
 from loot.roll import declare_loot_vars
+from uebp.nodes.math import FN_LE_FF
 
 
 def build_health_component(rebuild=True):

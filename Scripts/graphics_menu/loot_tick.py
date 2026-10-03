@@ -28,10 +28,6 @@ import unreal
 
 from uebp.graph import (
     BEL, _connect, _declare, _float_type, _loose_pin, _must_load, _palette, _pin, out, then)
-from combat.nodes import (
-    FN_ADD_II, FN_AND, FN_ARR_LEN, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_GREATER_II,
-    FN_IS_VALID, FN_MIN_II, FN_NOT, FN_SUB_II, FN_WAS_PRESSED,
-)
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
@@ -46,10 +42,13 @@ from graphics_menu.loot_find import author_find_body, put
 from graphics_menu.loot_kneel import author_kneel
 from graphics_menu.loot_take import author_take
 from loot.consts import LOOT_NAMES_VAR, LOOT_RADIUS
+from uebp.nodes.actor import FN_GET_COMP, FN_WAS_PRESSED
+from uebp.nodes.array import FN_ARR_LEN
+from uebp.nodes.math import (
+    FN_ADD_II, FN_AND, FN_GREATER_II, FN_MAX_II, FN_MIN_II, FN_NOT, FN_SUB_II)
+from uebp.nodes.palette import NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 
-FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 
 _BOOLS = (LOOT_OPEN_VAR, LOOT_TAKE_VAR, LOOT_BAG_FULL_VAR, LOOT_KNEELING_VAR)
 

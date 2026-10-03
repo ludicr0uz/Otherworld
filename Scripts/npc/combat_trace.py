@@ -18,12 +18,12 @@ Log only, never on screen: ten wanderers around the player write a line every
 from combat.game_state import COMBAT_TRACE_PREFIX, COMBAT_TRACE_VAR, NPC_ID_VAR
 from combat.paths import GAME_MODE_CLASS_PATH
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from npc.nodes import (
-    FN_BOOL_TO_STR, FN_CONCAT, FN_DISPLAY_NAME, FN_FLOAT_TO_STR,
-    FN_GET_COMP, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_PRINT, FN_VEC_TO_STR,
-    NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
-)
 from npc.paths import HEALTH_CLASS_PATH, HIT_DAMAGE_VAR
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
+from uebp.nodes.system import (
+    FN_BOOL_TO_STR, FN_CONCAT, FN_DISPLAY_NAME, FN_FLOAT_TO_STR, FN_GET_GAME_MODE,
+    FN_INT_TO_STR, FN_PRINT, FN_VEC_TO_STR)
 
 
 def _author_concat(ed, keep, parts):

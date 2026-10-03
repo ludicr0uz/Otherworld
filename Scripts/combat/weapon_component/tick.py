@@ -4,10 +4,6 @@ aim/fire/inventory/sprint/recoil/ammo fragments in order.
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.weapon_component.accuracy import _author_accuracy
-from combat.nodes import (
-    FN_AND, FN_GET_OWNER, FN_GET_PC, FN_GE_FF, FN_GREATER_II, FN_IS_KEY_DOWN,
-    FN_IS_VALID, FN_NOT, FN_OR, FN_TIME_SECONDS, FN_WAS_PRESSED,
-)
 from combat.tuning import BIND_VARS
 from combat.weapon_component.ads import _author_ads
 from combat.weapon_component.aim import _author_resolve_aim
@@ -52,6 +48,9 @@ from combat.weapon_component.use import _author_use
 from combat.weapon_component.wear import _author_take_off, _author_wear_gate
 from combat.weapon_component.wear_drag import _author_wear_request
 from combat.weapon_component.throw import _author_throw, _author_throw_key
+from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
+from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
+from uebp.nodes.system import FN_GET_PC, FN_IS_VALID, FN_TIME_SECONDS
 
 # A probe's stand-in for the fire key's press: no key can be injected into a
 # headless game (probes/probe_dead_no_actions.py). False in every real game.

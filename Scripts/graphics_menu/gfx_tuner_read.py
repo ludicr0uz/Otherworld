@@ -7,12 +7,11 @@ tells which stat a wire carries. The table is in a person's units
 """
 
 from uebp.graph import _connect, _pin, out
-from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_MUL_FF
 from graphics_menu.dev_guns import _call, _get
 from graphics_menu.gfx_stats import GFX_STATS, index_of
 from graphics_menu.gfx_tune_consts import TUNER_BASE_VAR, TUNER_VALUES_VAR
-
-FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
+from uebp.nodes.array import FN_ARR_GET
+from uebp.nodes.math import FN_ADD_II, FN_MUL_FF, FN_ROUND
 
 
 def stat(ed, index, made):

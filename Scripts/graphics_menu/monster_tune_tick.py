@@ -20,7 +20,6 @@ so a wanderer that respawns or spawns later gets the tuning too.
 import unreal
 
 from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out, then
-from combat.nodes import FN_ARR_GET, MACRO_FOR_EACH
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.monster_tune_consts import (
     MON_CONTROLLERS, MON_CREATURES, MON_STAT_COUNT, MONSTER_TAB,
@@ -28,8 +27,9 @@ from graphics_menu.monster_tune_consts import (
 from graphics_menu.tune_tabs import other_open_vars
 from graphics_menu.tune_tick import author_tab_flow, declare_tab_vars, tab_defaults
 from npc.monster_tuning import MONSTER_STATS, monster_specs
-
-FN_GET_ALL_ACTORS = "/Script/Engine.GameplayStatics.GetAllActorsOfClass"
+from uebp.nodes.array import FN_ARR_GET
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_ALL_ACTORS
 
 
 def declare_monster_tune_vars(ed):
@@ -65,7 +65,7 @@ def _author_creature(ed, c, bp_path, class_path, in_execs, made):
     bp = unreal.load_asset(bp_path)      # for its class pin and cast node
     if not bp:
         raise RuntimeError(f"{bp_path} is missing -- run build_npc_blueprints.py first")
-    find = _call(ed, FN_GET_ALL_ACTORS, made)
+    find = _call(ed, FN_ALL_ACTORS, made)
     _pin(find, "ActorClass").set_pin_value(class_path)
     for e in in_execs:
         _connect(e, _pin(find, "execute"))

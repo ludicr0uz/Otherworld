@@ -7,16 +7,16 @@ aiming earns them), and what sights.py reads to move the camera onto the gun.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    CAMERA_CLASS_PATH, FN_AND, FN_CLAMP, FN_DIV_FF, FN_GET_COMP, FN_INTERP_FF,
-    FN_IS_KEY_DOWN, FN_LERP, FN_MUL_FF, FN_NOT_B, FN_OR, FN_SELECT_FF,
-    FN_SET_FOV, FN_SET_PITCH_SCALE, FN_SET_YAW_SCALE, FN_SUB_FF,
-    MOVEMENT_CLASS_PATH,
-)
+from combat.nodes import CAMERA_CLASS_PATH, MOVEMENT_CLASS_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.tuning import AIM_KEY, COMBAT, SIGHTS_KEY
 from combat.use_tuning import USING_VAR
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import (
+    FN_GET_COMP, FN_IS_KEY_DOWN, FN_SET_FOV, FN_SET_PITCH_SCALE, FN_SET_YAW_SCALE)
+from uebp.nodes.math import (
+    FN_AND, FN_CLAMP, FN_DIV_FF, FN_INTERP_FF, FN_LERP, FN_MUL_FF, FN_NOT, FN_OR,
+    FN_SELECT_FF, FN_SUB_FF)
 
 
 def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
@@ -78,7 +78,7 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     # The same key uses an item that has no sights (use.py): then it is not
     # an aim key this frame.
     using = keep(ed.add_get_member_variable_node(USING_VAR))
-    not_using = keep(_node(ed, FN_NOT_B))
+    not_using = keep(_node(ed, FN_NOT))
     _connect(out(using, USING_VAR), _pin(not_using, "A"))
     sights_and = keep(_node(ed, FN_AND))
     _connect(sights_key, _pin(sights_and, "A"))
@@ -91,7 +91,7 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
     # Sprinting has already been written this frame -- _author_sprint runs
     # before this block -- so this reads the flag rather than the key.
     running = keep(ed.add_get_member_variable_node("Sprinting"))
-    still = keep(_node(ed, FN_NOT_B))
+    still = keep(_node(ed, FN_NOT))
     _connect(out(running, "Sprinting"), _pin(still, "A"))
 
     can = keep(_node(ed, FN_AND))

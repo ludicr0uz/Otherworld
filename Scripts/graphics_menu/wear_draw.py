@@ -19,25 +19,23 @@ exactly as it serves Enter, and a drag wears or takes off).
 import unreal
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, else_, out, then
-from combat.nodes import (
-    FN_ADD_II, FN_AND, FN_ARR_GET, FN_ARR_VALID, FN_EQ_II, FN_GET_COMP, FN_GET_PLAYER_PAWN,
-    FN_IS_VALID, FN_NOT, FN_OR, MACRO_FOR_LOOP,
-)
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.wear_tuning import WORN_VAR
 from graphics_menu.cursor import author_widget_click
-from graphics_menu.hud_inventory import (
-    NODE_CAST_SLOT, _author_empty_slot, _author_filled_slot,
-)
+from graphics_menu.hud_inventory import _author_empty_slot, _author_filled_slot
 from graphics_menu.inv_consts import DRAG_FROM_VAR, WORN_CODE_FIRST
 from graphics_menu.inv_drag import author_inv_drag
-from graphics_menu.ui_graph import FN_CHILD_AT, part, set_shown
+from graphics_menu.ui_graph import part, set_shown
 from graphics_menu.umg_consts import WBP_HUD
 from graphics_menu.wear_consts import (
     WEAR_CLOSE, WEAR_OPEN_VAR, WEAR_PANEL, WEAR_ROWS, WEAR_SEL_VAR, WEAR_SLOTS_BOX,
 )
-
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_VALID
+from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_NOT, FN_OR
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_SLOT, NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.nodes.umg import FN_CHILD_AT
 
 
 def _get(ed, var, owner=None, self_out=None):

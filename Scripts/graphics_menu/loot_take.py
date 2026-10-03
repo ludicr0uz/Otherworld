@@ -12,13 +12,13 @@ the hand. The held item stays held, as with a pick-up.
 """
 
 from uebp.graph import _connect, _loose_pin, _palette, _pin, _set, out, then
-from combat.nodes import (
-    FN_ARR_ADD, FN_ARR_GET, FN_ARR_REMOVE, FN_GET_TRANSFORM, NODE_CAST_ITEM, NODE_SPAWN,
-)
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.dev_guns import _call, _get, _setter
 from graphics_menu.loot_consts import LOOT_SEL_VAR, LOOT_TARGET_VAR
 from loot.consts import BODY_ARRAYS, LOOT_VAR
+from uebp.nodes.actor import FN_GET_TRANSFORM
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_GET, FN_ARR_REMOVE
+from uebp.nodes.palette import NODE_CAST_ITEM, NODE_SPAWN
 
 
 def _body(ed, var, made):

@@ -6,17 +6,17 @@ The band's numbers and why they are what they are live in respawn.py.
 
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_VV, FN_DELAY, FN_FORWARD, FN_GET_PLAYER_PAWN,
-    FN_IS_VALID_CLASS, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MUL_VF,
-    FN_PROJECT_NAV, FN_RANDOM_FLOAT, FN_RANDOM_NAV, FN_TRACE, NODE_BREAK_HIT,
-    NODE_SPAWN,
-)
 from combat.respawn import (
     RESPAWN_ATTEMPTS, RESPAWN_BAND, RESPAWN_DELAY, RESPAWN_DELAY_VAR,
     RESPAWN_LIFT, RESPAWN_PROJECT_EXTENT, RESPAWN_TRACE_DOWN, RESPAWN_TRACE_UP,
 )
 from combat.weapon_component.common import _trace_defaults
+from uebp.nodes.actor import FN_ACTOR_LOC
+from uebp.nodes.ai import FN_PROJECT_NAV, FN_RANDOM_NAV
+from uebp.nodes.math import (
+    FN_ADD_VV, FN_FORWARD, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_RANDOM_FLOAT)
+from uebp.nodes.palette import NODE_BREAK_HIT, NODE_SPAWN
+from uebp.nodes.system import FN_DELAY, FN_GET_PLAYER_PAWN, FN_IS_VALID_CLASS, FN_TRACE
 
 
 def _author_replacement(ed, exec_in):

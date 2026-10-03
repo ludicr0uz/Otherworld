@@ -51,7 +51,6 @@ from npc.drawn import _author_drawn, declare_drawn_vars, draws
 from npc.graph import _log
 from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
 from npc.melee import _author_melee
-from npc.nodes import FN_GET_PAWN, FN_IS_VALID
 from npc.monster_tuning import monster_specs, stock_run_speed
 from npc.patrol import _author_patrol_setup, _author_walk_speed
 from npc.paths import (
@@ -66,6 +65,8 @@ from npc.tuned import declare_tuned_vars
 from npc.ward import _author_ward, declare_ward_vars, wards
 from survival.on_hit import melee_attack, on_hit_effects
 from survival.on_hit_graph import declare_on_hit_vars
+from uebp.nodes.actor import FN_GET_PAWN
+from uebp.nodes.system import FN_IS_VALID
 
 
 class _Steps:

@@ -34,16 +34,13 @@ from combat.light_tuning import (
     CAMPFIRE_AHEAD_CM, CAMPFIRE_CLASS_VAR, CAMPFIRE_FEET_CM, CAMPFIRE_TRACE_DOWN_CM,
     CAMPFIRE_TRACE_UP_CM, LIGHT_WOOD_VAR, LIGHTS_VAR,
 )
-from combat.nodes import (
-    FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ADD_VV, FN_DESTROY, FN_IS_VALID,
-    FN_IS_VALID_CLASS, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_OBJECT_CLASS, FN_SELECT_VECTOR,
-    FN_TRACE, MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN,
-)
 from combat.weapon_component.common import _prop, _trace_defaults
-
-FN_EQ_CLASSES = "/Script/Engine.KismetMathLibrary.EqualEqual_ClassClass"
-FN_ARR_REMOVE_ITEM = "/Script/Engine.KismetArrayLibrary.Array_RemoveItem"
-FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
+from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_DESTROY
+from uebp.nodes.array import FN_ARR_FIND, FN_ARR_REMOVE_ITEM
+from uebp.nodes.math import (
+    FN_ADD_VV, FN_CLASS_EQ, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_SELECT_VECTOR)
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
+from uebp.nodes.system import FN_IS_VALID, FN_IS_VALID_CLASS, FN_OBJECT_CLASS, FN_TRACE
 
 
 def _get(ed, name):
@@ -93,7 +90,7 @@ def _author_campfire(ed, held, owner, exec_in):
     item = _loose_pin(loop, "ArrayElement", is_input=False)
     kind = _node(ed, FN_OBJECT_CLASS)
     _connect(item, _pin(kind, "Object"))
-    is_wood = _node(ed, FN_EQ_CLASSES)
+    is_wood = _node(ed, FN_CLASS_EQ)
     _connect(out(kind), _pin(is_wood, "A"))
     _connect(_get(ed, WOOD_CLASS_VAR), _pin(is_wood, "B"))
     burns = ed.add_branch_node()

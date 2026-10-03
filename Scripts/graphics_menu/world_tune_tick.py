@@ -20,24 +20,20 @@ import unreal
 
 from uebp.graph import (
     BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, out, then)
-from combat.nodes import FN_ADD_FF, FN_ARR_GET
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
 from graphics_menu.loot_find import put
 from graphics_menu.tune_tabs import other_open_vars
-from graphics_menu.tune_tick import FN_ARR_SET, author_tab_flow, declare_tab_vars, tab_defaults
+from graphics_menu.tune_tick import author_tab_flow, declare_tab_vars, tab_defaults
 from graphics_menu.world_tune_consts import (
     WORLD_SUBJECT, WORLD_TAB, WORLD_TUNE_HOUR_SEEN_VAR,
 )
 from world import world_config as cfg
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
 from world.world_tuning import WORLD_STATS
-
-KML = "/Script/Engine.KismetMathLibrary"
-FN_PERCENT_FF = f"{KML}.Percent_FloatFloat"
-FN_MAP_CLAMPED = f"{KML}.MapRangeClamped"
-FN_NEQ_FF = f"{KML}.NotEqual_DoubleDouble"
-FN_ACTOR_OF_CLASS = "/Script/Engine.GameplayStatics.GetActorOfClass"
-NODE_CAST_CYCLE = "Utilities|Casting|CastToBP_DayNightCycle"
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_SET
+from uebp.nodes.math import FN_ADD_FF, FN_MAP_CLAMPED, FN_NEQ_FF, FN_PERCENT_FF
+from uebp.nodes.palette import NODE_CAST_CYCLE
+from uebp.nodes.system import FN_ACTOR_OF_CLASS
 
 
 def declare_world_tune_vars(ed):

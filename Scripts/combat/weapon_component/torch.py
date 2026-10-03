@@ -45,10 +45,6 @@ hands. Numbers and names: torch_tuning.py.
 
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_FF, FN_ALL_ACTORS, FN_AND, FN_DISTANCE, FN_IS_VALID,
-    FN_LE_FF, FN_NOT, FN_OR, FN_TIME_SECONDS, MACRO_FOR_EACH,
-)
 from combat.paths import FIRE_WARD_VAR, ITEM_CLASS_PATH
 from combat.torch_tuning import (
     BURN_OUT_VAR, BURNS_VAR, LIT_VAR, NEAR_FIRE_VAR, STICK_BURN_S,
@@ -56,8 +52,10 @@ from combat.torch_tuning import (
 )
 from combat.use_tuning import USE_PRESSED_VAR, USING_VAR
 from combat.weapon_component.common import _prop
-
-FN_NEQ_OBJECTS = "/Script/Engine.KismetMathLibrary.NotEqual_ObjectObject"
+from uebp.nodes.actor import FN_ACTOR_LOC
+from uebp.nodes.math import FN_ADD_FF, FN_AND, FN_DISTANCE, FN_LE_FF, FN_NE_OO, FN_NOT, FN_OR
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_TIME_SECONDS
 
 
 def _author_torch(ed, held, owner, exec_ins):
@@ -158,7 +156,7 @@ def _author_torch(ed, held, owner, exec_ins):
     item = get(WARD_ITEM_VAR)
     up = keep(_node(ed, FN_IS_VALID))
     _connect(item, _pin(up, "Object"))
-    other = keep(_node(ed, FN_NEQ_OBJECTS))
+    other = keep(_node(ed, FN_NE_OO))
     _connect(item, _pin(other, "A"))
     _connect(held, _pin(other, "B"))
     stale = gate2(FN_OR, negate(ward), out(other))

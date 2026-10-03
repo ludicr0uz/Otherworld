@@ -27,12 +27,13 @@ anywhere else.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import FN_AND, FN_IS_KEY_DOWN, FN_NOT, FN_OR
 from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
 from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
 from combat.weapon_component.cauterize import _author_cauterize
 from combat.weapon_component.common import _prop
 from combat.weapon_component.torch import _author_torch
+from uebp.nodes.actor import FN_IS_KEY_DOWN
+from uebp.nodes.math import FN_AND, FN_NOT, FN_OR
 
 # One fragment per kind of use, run in this order every frame.
 KINDS = (_author_torch, _author_cauterize)

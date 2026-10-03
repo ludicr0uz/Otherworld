@@ -31,14 +31,16 @@ from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.hit_reaction import LAST_HIT_FROM_VAR
-from combat.nodes import (
-    FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_ANIM_INSTANCE,
-    FN_CLAMP, FN_GE_FF, FN_GET_COMP, FN_GET_OWNER, FN_MUL_VF, FN_NOT, FN_PLAY_SLOT, FN_SUB_FF,
-    FN_TIME_SECONDS, INF, NODE_BREAK_HIT, NODE_CAST_HEALTH,
-)
 from combat.paths import HEALTH_CLASS_PATH
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _trace_defaults
+from uebp.nodes.actor import (
+    FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_OWNER,
+    FN_PLAY_SLOT)
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_CLAMP, FN_GE_FF, FN_MUL_VF, FN_NOT, FN_SUB_FF, INF)
+from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
+from uebp.nodes.system import FN_SPHERE_TRACE, FN_TIME_SECONDS
 
 PUNCH_ANIM_VAR = "PunchAnim"
 PUNCH_QUEUED_VAR = "PunchQueued"
@@ -46,8 +48,6 @@ PUNCH_PENDING_VAR = "PunchPending"
 NEXT_PUNCH_VAR = "NextPunchTime"
 PUNCH_DUE_VAR = "PunchDueTime"
 PUNCH_BLEND_S = 0.1
-
-FN_SPHERE_TRACE = "/Script/Engine.KismetSystemLibrary.SphereTraceSingle"
 
 
 @dataclasses.dataclass(frozen=True)

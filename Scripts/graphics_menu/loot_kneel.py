@@ -22,15 +22,15 @@ the mouse-look (cursor.py).
 import unreal
 
 from uebp.graph import _connect, _loose_pin, _palette, _pin, out, then
-from combat.nodes import FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_NEQ_BB
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.weapon_component.pose_weights import SEARCHING_VAR
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_consts import LOOT_KNEELING_VAR, LOOT_OPEN_VAR
 from graphics_menu.loot_find import put
-
-FN_IGNORE_MOVE = "/Script/Engine.Controller.SetIgnoreMoveInput"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
+from uebp.nodes.actor import FN_GET_COMP, FN_IGNORE_MOVE
+from uebp.nodes.math import FN_NEQ_BB
+from uebp.nodes.palette import NODE_CAST_WEAPON
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 
 
 def author_kneel(ed, pc_out, in_execs):

@@ -139,6 +139,18 @@ from graphics_menu.world_tune_tick import (                         # noqa: E402
 from graphics_menu.loot_tick import (                               # noqa: E402
     author_loot_tick, declare_loot_vars, loot_defaults)
 from survival.paths import SURVIVAL_BP_PATH                        # noqa: E402
+from uebp.nodes.actor import (  # noqa: E402
+    FN_ACTOR_LOC, FN_DRAW_TEXT, FN_GET_COMP, FN_GET_OWNING_PC, FN_PROJECT)
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_LEN  # noqa: E402
+from uebp.nodes.math import (  # noqa: E402
+    FN_ADD_VV, FN_AND, FN_BREAK_VECTOR, FN_DIV_FF, FN_GREATER_FF, FN_LE_FF, FN_MAKE_VECTOR,
+    FN_MUL_FF, FN_NEQ_II, FN_NOT, FN_SUB_FF)
+from uebp.nodes.palette import (  # noqa: E402
+    MACRO_FOR_EACH, NODE_BEGIN_PLAY, NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
+    NODE_CAST_SETTINGS, NODE_DRAW_HUD, NODE_TICK)
+from uebp.nodes.system import (  # noqa: E402
+    FN_ALL_ACTORS, FN_COMMAND_LINE, FN_CONTAINS, FN_CREATE_SAVE, FN_DELAY, FN_GET_GAME_MODE,
+    FN_INT_TO_STR, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_SET_PAUSED, FN_TIME_SECONDS)
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -226,47 +238,6 @@ PLAYER_DEAD_VAR = "PlayerDead"
 
 # ─── Function paths for the graph nodes ──────────────────────────────────────
 
-FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
-FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
-FN_MUL = "/Script/Engine.KismetMathLibrary.Multiply_DoubleDouble"
-FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_DIV = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
-FN_INT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_IntToString"
-FN_ALL_ACTORS = "/Script/Engine.GameplayStatics.GetAllActorsOfClass"
-FN_ACTOR_LOC = "/Script/Engine.Actor.K2_GetActorLocation"
-FN_ADD_VV = "/Script/Engine.KismetMathLibrary.Add_VectorVector"
-FN_MAKE_VECTOR = "/Script/Engine.KismetMathLibrary.MakeVector"
-FN_BREAK_VECTOR = "/Script/Engine.KismetMathLibrary.BreakVector"
-FN_PROJECT = "/Script/Engine.HUD.Project"
-FN_GREATER = "/Script/Engine.KismetMathLibrary.Greater_DoubleDouble"
-FN_SUB = "/Script/Engine.KismetMathLibrary.Subtract_DoubleDouble"
-FN_COMMAND_LINE = "/Script/Engine.KismetSystemLibrary.GetCommandLine"
-FN_CONTAINS = "/Script/Engine.KismetStringLibrary.Contains"
-FN_TIME_SECONDS = "/Script/Engine.GameplayStatics.GetTimeSeconds"
-FN_GET_GAME_MODE = "/Script/Engine.GameplayStatics.GetGameMode"
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_LE = "/Script/Engine.KismetMathLibrary.LessEqual_DoubleDouble"
-FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
-FN_DELAY = "/Script/Engine.KismetSystemLibrary.Delay"
-FN_SAVE_EXISTS = "/Script/Engine.GameplayStatics.DoesSaveGameExist"
-FN_LOAD_SAVE = "/Script/Engine.GameplayStatics.LoadGameFromSlot"
-FN_CREATE_SAVE = "/Script/Engine.GameplayStatics.CreateSaveGameObject"
-FN_ARR_LEN = "/Script/Engine.KismetArrayLibrary.Array_Length"
-FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
-FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
-FN_NEQ_II = "/Script/Engine.KismetMathLibrary.NotEqual_IntInt"
-
-# The DrawHUD event is not one of the placeholder nodes a fresh Blueprint ships
-# with (BeginPlay and Tick are), so it has to be created from the palette.
-NODE_DRAW_HUD = "AddEvent|EventReceiveDrawHUD"
-NODE_TICK = "AddEvent|EventTick"
-NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
-NODE_CAST_HEALTH = "Utilities|Casting|CastToBP_HealthComponent"
-NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
-NODE_CAST_SETTINGS = "Utilities|Casting|CastToBP_Settings"
-MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
-                  ".StandardMacros:ForEachLoop")
 
 _log = make_log("UI")
 
@@ -755,7 +726,7 @@ def _author_npc_bars(ed, in_execs):
     # Project returns the depth in Z, and it is negative for anything behind the
     # camera -- without this test those NPCs get their bars mirrored onto the
     # screen as if they were in front.
-    in_front = _node(ed, FN_GREATER)
+    in_front = _node(ed, FN_GREATER_FF)
     _connect(out(parts, "Z"), _pin(in_front, "A"))
     _set(in_front, "B", 0.0)
 
@@ -768,10 +739,10 @@ def _author_npc_bars(ed, in_execs):
     hurt_at = ed.add_get_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(hurt_at, "self"))
     now = _node(ed, FN_TIME_SECONDS)
-    since = _node(ed, FN_SUB)
+    since = _node(ed, FN_SUB_FF)
     _connect(out(now), _pin(since, "A"))
     _connect(out(hurt_at, LAST_DAMAGE_VAR), _pin(since, "B"))
-    recent = _node(ed, FN_LE)
+    recent = _node(ed, FN_LE_FF)
     _connect(out(since), _pin(recent, "A"))
     _set(recent, "B", NPC_BAR_SECONDS)
 
@@ -799,16 +770,16 @@ def _author_npc_bars(ed, in_execs):
     _connect(out(showing), _pin(visible, "Condition"))
     _connect(then(cast), _pin(visible, "execute"))
 
-    left = _node(ed, FN_SUB)
+    left = _node(ed, FN_SUB_FF)
     _connect(out(parts, "X"), _pin(left, "A"))
     _set(left, "B", NPC_BAR[0] / 2.0)          # centre the bar on the head
     left_out = out(left)
     top_out = out(parts, "Y")
 
-    frac = _node(ed, FN_DIV)
+    frac = _node(ed, FN_DIV_FF)
     _connect(out(health, "Health"), _pin(frac, "A"))
     _connect(out(max_health, "MaxHealth"), _pin(frac, "B"))
-    fill_w = _node(ed, FN_MUL)
+    fill_w = _node(ed, FN_MUL_FF)
     _connect(out(frac), _pin(fill_w, "A"))
     _set(fill_w, "B", NPC_BAR[0])
 
@@ -835,10 +806,10 @@ def _author_npc_bars(ed, in_execs):
     nid_str = _node(ed, FN_INT_TO_STR)
     _connect(out(nid, NPC_ID_VAR), _pin(nid_str, "InInt"))
 
-    id_x = _node(ed, FN_SUB)
+    id_x = _node(ed, FN_SUB_FF)
     _connect(left_out, _pin(id_x, "A"))
     _set(id_x, "B", NPC_ID_WIDTH + NPC_ID_GAP)
-    id_y = _node(ed, FN_SUB)
+    id_y = _node(ed, FN_SUB_FF)
     _connect(top_out, _pin(id_y, "A"))
     _set(id_y, "B", NPC_ID_RISE)
 

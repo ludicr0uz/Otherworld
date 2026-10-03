@@ -31,14 +31,9 @@ from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.settings_rows import PAGE_SETTINGS
 from graphics_menu.umg_consts import (
     GAME_STARTED_VAR, MENU_KEY, QUIT_ACTION, SETTINGS_ACTION, START_ACTION)
-
-FN_AND = "/Script/Engine.KismetMathLibrary.BooleanAND"
-FN_NOT = "/Script/Engine.KismetMathLibrary.Not_PreBool"
-FN_WAS_PRESSED = "/Script/Engine.PlayerController.WasInputKeyJustPressed"
-FN_SET_PAUSED = "/Script/Engine.GameplayStatics.SetGamePaused"
-FN_QUIT = "/Script/Engine.KismetSystemLibrary.QuitGame"
-FN_ACTOR_TICK_PAUSED = "/Script/Engine.Actor.SetTickableWhenPaused"
-FN_COMP_TICK_PAUSED = "/Script/Engine.ActorComponent.SetTickableWhenPaused"
+from uebp.nodes.actor import FN_ACTOR_TICK_PAUSED, FN_COMP_TICK_PAUSED, FN_WAS_PRESSED
+from uebp.nodes.math import FN_NOT
+from uebp.nodes.system import FN_QUIT, FN_SET_PAUSED
 
 
 def _then(node, in_execs):

@@ -9,11 +9,6 @@ from uebp.graph import (
     _create_blueprint, _declare, _drop_components, _events, _loose_pin, _node, _palette,
     _pin, _root_handle, _set, else_, out, then)
 from uebp.layout import arrange
-from combat.nodes import (
-    FN_ACTOR_LOC, FN_ADD_II, FN_ADD_LOCAL_ROT, FN_AND, FN_DESTROY,
-    FN_DISTANCE, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_LESS_FF,
-    FN_LIFESPAN, FN_MAKE_ROT, FN_MUL_FF, FN_NOT, MACRO_FOR_EACH,
-)
 from combat.paths import (
     AMMO_BP_PATH, CYLINDER, ITEM_CLASS_PATH, MAT_BRASS,
     WEAPON_COMP_CLASS_PATH,
@@ -23,6 +18,12 @@ from combat.tuning import (
     AMMO_SPIN_DEG_PER_S,
 )
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import (
+    FN_ACTOR_LOC, FN_ADD_LOCAL_ROT, FN_DESTROY, FN_GET_COMP, FN_LIFESPAN)
+from uebp.nodes.math import (
+    FN_ADD_II, FN_AND, FN_DISTANCE, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, FN_NOT)
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 
 
 # ─── BP_AmmoPickup ───────────────────────────────────────────────────────────

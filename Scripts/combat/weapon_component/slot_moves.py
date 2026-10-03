@@ -26,10 +26,6 @@ is served once; the items are read off SlotItems, which the sync wrote at
 the end of last frame.
 """
 
-from combat.nodes import (
-    FN_ADD_II, FN_AND, FN_EQ_II, FN_LESS_II, FN_MOD_II, FN_OR, FN_SELECT_II, FN_SUB_II,
-    FN_WAS_PRESSED,
-)
 from combat.slot_tuning import (
     BAG_LAST, HAND, HAND_FROM_VAR, MELEE_SLOT, MOVE_DST_VAR, MOVE_FROM_VAR, MOVE_SRC_VAR,
     MOVE_TO_VAR, NO_REQUEST, PRIMARY, SLOT_COUNT, SLOT_KEYS, SLOT_PICK_VAR,
@@ -37,11 +33,12 @@ from combat.slot_tuning import (
 )
 from combat.paths import ITEM_CLASS_PATH
 from uebp.g import _G
-from combat.weapon_component.slot_nodes import (
-    FN_GE_II, FN_LE_II, FN_NE_II, fits, for_loop,
-    not_, op, slot_at, valid,
-)
+from combat.weapon_component.slot_nodes import fits, for_loop, not_, op, slot_at, valid
 from uebp.graph import out
+from uebp.nodes.actor import FN_WAS_PRESSED
+from uebp.nodes.math import (
+    FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_LE_II, FN_MOD_II, FN_NEQ_II, FN_OR,
+    FN_SELECT_II, FN_SUB_II)
 
 WEAPON_SLOT_COUNT = MELEE_SLOT - PRIMARY + 1
 
@@ -105,7 +102,7 @@ def _author_slot_move(g, in_execs):
               op(g, FN_AND, op(g, FN_GE_II, dst_i, 0),
                  op(g, FN_LESS_II, dst_i, SLOT_COUNT)),
               op(g, FN_AND, op(g, FN_LESS_II, src_i, SLOT_COUNT),
-                 op(g, FN_NE_II, src_i, dst_i)))
+                 op(g, FN_NEQ_II, src_i, dst_i)))
     ok, bad = g.branch(sane, [flow])
     src = slot_at(g, src_i)
     dst = slot_at(g, dst_i)

@@ -44,11 +44,6 @@ from uebp.graph import (
     BEL, _connect, _declare, _float_type, _loose_pin, _palette, _pin, out, then)
 from combat.gun_tuning import GUN_COLUMNS, MELEE_COLUMNS, TUNE_COLUMNS, TUNE_STATS, columns_of
 from combat.melee_tuning import melee_specs
-from combat.nodes import (
-    FN_ADD_FF, FN_ADD_II, FN_AND, FN_ARR_GET, FN_EQ_II, FN_GET_COMP,
-    FN_GET_PLAYER_PAWN, FN_LESS_II, FN_MIN_II, FN_MOD_II, FN_MUL_FF, FN_NOT, FN_SUB_II,
-    FN_WAS_PRESSED, MACRO_FOR_EACH,
-)
 from combat.paths import (
     ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
@@ -63,18 +58,14 @@ from graphics_menu.tune_consts import (
 )
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
 from graphics_menu.tune_tabs import other_open_vars
-
-FN_MAX_II = "/Script/Engine.KismetMathLibrary.Max"
-FN_MUL_II = "/Script/Engine.KismetMathLibrary.Multiply_IntInt"
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-FN_FMAX = "/Script/Engine.KismetMathLibrary.FMax"
-FN_FMIN = "/Script/Engine.KismetMathLibrary.FMin"
-FN_ROUND = "/Script/Engine.KismetMathLibrary.Round"
-FN_INT_TO_FLOAT = "/Script/Engine.KismetMathLibrary.Conv_IntToDouble"
-FN_ARR_SET = "/Script/Engine.KismetArrayLibrary.Array_Set"
-FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
-FN_EXEC_PYTHON = "/Script/PythonScriptPlugin.PythonScriptLibrary.ExecutePythonCommand"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
+from uebp.nodes.actor import FN_GET_COMP, FN_WAS_PRESSED
+from uebp.nodes.array import FN_ARR_FIND, FN_ARR_GET, FN_ARR_SET
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_ADD_II, FN_AND, FN_EQ_II, FN_FMIN, FN_GE_II, FN_INT_TO_FLOAT, FN_LESS_II,
+    FN_MAX_FF, FN_MAX_II, FN_MIN_II, FN_MOD_II, FN_MUL_FF, FN_MUL_II, FN_NOT, FN_ROUND,
+    FN_SUB_II)
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
+from uebp.nodes.system import FN_EXEC_PYTHON, FN_GET_PLAYER_PAWN
 
 
 def _bools(tab):
@@ -226,7 +217,7 @@ def _author_nudge(ed, in_execs, made, tab, subjects):
     sign = _call(ed, FN_INT_TO_FLOAT, made, InInt=_get(ed, tab.nudge_var, made))
     delta = _call(ed, FN_MUL_FF, made, A=_cell(ed, tab.steps_var, s, made), B=out(sign))
     moved = _call(ed, FN_ADD_FF, made, A=_cell(ed, tab.values_var, idx, made), B=out(delta))
-    kept = _call(ed, FN_FMAX, made, A=out(moved), B=_cell(ed, tab.mins_var, s, made))
+    kept = _call(ed, FN_MAX_FF, made, A=out(moved), B=_cell(ed, tab.mins_var, s, made))
     if tab.maxs_var:
         kept = _call(ed, FN_FMIN, made, A=out(kept), B=_cell(ed, tab.maxs_var, s, made))
     write = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, tab.values_var, made))

@@ -18,22 +18,16 @@ starts wherever the level puts it.
 
 from combat.game_state import KILL_COUNT_VAR
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.nodes import MACRO_FOR_EACH, NODE_SPAWN
 from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.player_parts import MODE, PAWN
 from graphics_menu.profile_consts import (
-    ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD,
-    NODE_CAST_PROFILE, PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX,
-    STAT_FIELDS,
-)
+    ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD, PROFILE_CLASS_PATH,
+    PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS)
 from graphics_menu.profile_write import copy_var
-
-FN_LOAD_SAVE = "/Script/Engine.GameplayStatics.LoadGameFromSlot"
-FN_DESTROY = "/Script/Engine.Actor.K2_DestroyActor"
-FN_ARR_ADD = "/Script/Engine.KismetArrayLibrary.Array_Add"
-FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
-FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
-FN_GET_TRANSFORM = "/Script/Engine.Actor.GetTransform"
+from uebp.nodes.actor import FN_DESTROY, FN_GET_TRANSFORM
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_GET
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_PROFILE, NODE_SPAWN
+from uebp.nodes.system import FN_LOAD_SAVE
 
 
 def _for_each(ed, array_out, exec_in, made):

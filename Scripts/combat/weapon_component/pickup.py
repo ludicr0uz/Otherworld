@@ -12,10 +12,13 @@ that goes into the bag unseen does not ride on with the body.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from combat.nodes import FN_ALL_ACTORS, FN_ARR_ADD, FN_DETACH, MACRO_FOR_EACH
 from combat.paths import ITEM_CLASS_PATH
 from combat.slot_tuning import HAS_ROOM_VAR, SLOT_VAR, UNPLACED
 from combat.weapon_component.common import _prop
+from uebp.nodes.actor import FN_DETACH
+from uebp.nodes.array import FN_ARR_ADD
+from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_ALL_ACTORS
 
 ITEM_CAST = "Utilities|Casting|CastToBP_WeaponItem"
 

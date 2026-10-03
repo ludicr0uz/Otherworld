@@ -30,7 +30,6 @@ neither moved, so the tab always shows the preset that is running.
 from uebp.graph import (
     BEL, _add_component, _connect, _declare, _drop_components, _loose_pin, _must_load, _pin,
     _root_handle, out, then)
-from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_MOD_II, FN_OR, MACRO_FOR_LOOP
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_save import author_keep_graphics
 from graphics_menu.gfx_stats import (
@@ -43,11 +42,10 @@ from graphics_menu.gfx_tune_consts import (
 )
 from graphics_menu.loot_find import put
 from graphics_menu.tune_tabs import other_open_vars
-from graphics_menu.tune_tick import (
-    FN_ARR_SET, FN_GE_II, FN_MUL_II, author_tab_flow, declare_tab_vars, tab_defaults,
-)
-
-FN_NEQ_II = "/Script/Engine.KismetMathLibrary.NotEqual_IntInt"
+from graphics_menu.tune_tick import author_tab_flow, declare_tab_vars, tab_defaults
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_SET
+from uebp.nodes.math import FN_ADD_II, FN_GE_II, FN_MOD_II, FN_MUL_II, FN_NEQ_II, FN_OR
+from uebp.nodes.palette import MACRO_FOR_LOOP
 
 
 def install_tuner(bp):

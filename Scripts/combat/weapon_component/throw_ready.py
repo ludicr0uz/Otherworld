@@ -30,18 +30,17 @@ keep walking, crouched or prone.
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NOT, FN_PLAY_SLOT,
-    FN_SET_REL_LOC, FN_SET_REL_ROT,
-)
 from combat.throw_tuning import (
     THROW_GRIP_LOC_VAR, THROW_GRIP_ROT_VAR, THROW_GRIP_VAR, THROW_READY_BLEND_S,
 )
 from combat.weapon_component.common import AIM_LOOPS, _prop
+from uebp.nodes.actor import (
+    FN_ANIM_INSTANCE, FN_IS_PLAYING_SLOT, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT, FN_SET_REL_LOC,
+    FN_SET_REL_ROT)
+from uebp.nodes.math import FN_AND, FN_NOT
+from uebp.nodes.system import FN_IS_VALID
 
 THROW_READY_ANIM_VAR = "ThrowReadyAnim"   # A_ThrowReady, or None
-
-FN_IS_PLAYING_SLOT = "/Script/Engine.AnimInstance.IsPlayingSlotAnimation"
 
 
 def _author_throw_ready(ed, item, exec_in):

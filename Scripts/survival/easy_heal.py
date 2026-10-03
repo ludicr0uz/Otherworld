@@ -17,14 +17,14 @@ failing means no heal. Every exit is handed back for EndAbility.
 from combat.difficulty import DIFFICULTY_VAR, EASY
 from uebp.graph import (
     BEL, _connect, _loose_pin, _must_load, _node, _palette, _pin, _set, else_, out, then)
-from combat.nodes import (
-    FN_ADD_FF, FN_CLAMP, FN_EQ_II, FN_GET_COMP, FN_GET_GAME_MODE,
-    NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
-)
 from combat.paths import (
     GAME_MODE_BP_PATH, GAME_MODE_CLASS_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH,
 )
 from survival.paths import CONSUMABLE_CLASS_PATH
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.math import FN_ADD_FF, FN_CLAMP, FN_EQ_II
+from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
+from uebp.nodes.system import FN_GET_GAME_MODE
 
 RESTORE_VAR = "HealthRestoreEasy"
 

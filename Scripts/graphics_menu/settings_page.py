@@ -12,18 +12,13 @@ from graphics_menu.settings_rows import (
 from graphics_menu.ui_graph import mark_rows, part, row_value, set_shown
 from graphics_menu.umg_consts import (
     HINT_CAPTURE, HINT_IDLE, SETTINGS_ROWS_BOX, WBP_MAIN_MENU)
+from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.array import FN_ARR_GET
+from uebp.nodes.math import FN_ADD_II
+from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
+from uebp.nodes.system import FN_FLOAT_TO_STR, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_KEY_DISPLAY
 
-FN_ADD_II = "/Script/Engine.KismetMathLibrary.Add_IntInt"
-FN_ARR_GET = "/Script/Engine.KismetArrayLibrary.Array_Get"
-FN_FLOAT_TO_STR = "/Script/Engine.KismetStringLibrary.Conv_DoubleToString"
-FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
-FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
-FN_KEY_DISPLAY = "/Script/Engine.KismetInputLibrary.Key_GetDisplayName"
-NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
-MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
-                  ".StandardMacros:ForEachLoop")
 
 
 def _author_push_settings(ed, in_execs):

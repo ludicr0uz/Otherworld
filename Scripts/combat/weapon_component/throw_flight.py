@@ -29,11 +29,6 @@ Owns the variables the release (throw.py) stores the launch in.
 
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.nodes import (
-    FN_ADD_VV, FN_GREATER_FF, FN_IS_VALID, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF,
-    FN_NORMAL, FN_ROT_FROM_X, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT, FN_SUB_FF,
-    FN_TIME_SECONDS, FN_TRACE, NODE_BREAK_HIT,
-)
 from combat.paths import ITEM_CLASS_PATH
 from combat.throw_tuning import (
     THROW_BOUNCE_BACK, THROW_EDGE_ON_VAR, THROW_GRAVITY_Z, THROW_LAND_LIFT,
@@ -41,6 +36,12 @@ from combat.throw_tuning import (
 )
 from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.throw_strike import THROW_PAST_VAR, _author_throw_strike
+from uebp.nodes.actor import FN_ADD_WORLD_ROT, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT
+from uebp.nodes.math import (
+    FN_ADD_VV, FN_AXIS_ANGLE, FN_CROSS, FN_GREATER_FF, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF,
+    FN_NORMAL, FN_ROT_FROM_X, FN_SUB_FF)
+from uebp.nodes.palette import NODE_BREAK_HIT
+from uebp.nodes.system import FN_DELTA_SECONDS, FN_IS_VALID, FN_TIME_SECONDS, FN_TRACE
 
 THROWN_VAR = "Thrown"                 # the item in the air, or None
 THROW_START_VAR = "ThrowStart"
@@ -48,11 +49,6 @@ THROW_VELOCITY_VAR = "ThrowVelocity"
 THROW_TIME_VAR = "ThrowTime"          # world time at release
 THROW_LAST_VAR = "ThrowLast"          # where the flight was last frame
 FLIGHT_GROUND_CM = 5000.0             # how far down a wall-stopped item looks for ground
-
-FN_CROSS = "/Script/Engine.KismetMathLibrary.Cross_VectorVector"
-FN_AXIS_ANGLE = "/Script/Engine.KismetMathLibrary.RotatorFromAxisAndAngle"
-FN_DELTA_SECONDS = "/Script/Engine.GameplayStatics.GetWorldDeltaSeconds"
-FN_ADD_WORLD_ROT = "/Script/Engine.Actor.K2_AddActorWorldRotation"
 
 
 def _author_square(ed, held, exec_in):

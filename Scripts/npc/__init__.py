@@ -18,13 +18,14 @@ noise record the senses listen to, and the per-gun ShotVolume, are combat's
 
 DATA (constants -- no Blueprint authoring)
   paths        /Game paths, the controller's variable names, mesh offsets
-  nodes        FN_* function paths, NODE_* palette names
   monster_tuning  the tunable stats (MONSTER_STATS), monster_tuning.csv and
                monster_specs(): the CSV over npc_agro/npc_placement/
                npc_stalk/npc_ward's literals, per creature. Pure Python (the game's save uses it)
 
 SHARED AUTHORING HELPERS
-  graph        create/load a Blueprint, pins, connect, _set, _resolve
+  graph        the [NPC] log line, _Graph (the node shapes a long fragment
+               repeats), a creature asset's object path. The rest is uebp:
+               uebp/graph.py (nodes, pins, _set), uebp/nodes/ (FN_*, NODE_*)
   tuned        the controller's Tune* variables: declare, read, CDO defaults.
                Every fragment below reads its numbers off them, which is
                what lets the M panel's MONSTER SETTINGS tab change a live one

@@ -24,11 +24,12 @@ AddGrantedTag reads the previous one's returned handle (survival/debuffs.py).
 
 from combat.log import _log
 from uebp.graph import _assets, _connect, _float_type, _node, _pin, _set, else_, out, then
-from combat.nodes import (
-    FN_ADD_FF, FN_ADD_GRANTED_TAG, FN_APPLY_SPEC_TO_SELF, FN_GET_ASC, FN_IS_VALID,
-    FN_LESS_FF, FN_MAKE_CONTEXT, FN_MAKE_SPEC, FN_RANDOM_FLOAT, FN_REMOVE_EFFECT,
-)
 from survival.on_hit import ON_HIT_BONUS_VAR
+from uebp.nodes.gas import (
+    FN_ADD_GRANTED_TAG, FN_APPLY_SPEC_TO_SELF, FN_GET_ASC, FN_MAKE_CONTEXT, FN_MAKE_SPEC,
+    FN_REMOVE_EFFECT)
+from uebp.nodes.math import FN_ADD_FF, FN_LESS_FF, FN_RANDOM_FLOAT
+from uebp.nodes.system import FN_IS_VALID
 
 
 def declare_on_hit_vars(ed):

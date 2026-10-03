@@ -25,27 +25,19 @@ nothing applied, so a reload converges through the same walk.
 import unreal
 
 from uebp.graph import _connect, _pin, out
-from combat.nodes import FN_MUL_FF
 from forest_generator.wind import MPC_NAME, MPC_PATH
 from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
 from graphics_menu.gfx_stats import WIND_PARAM, stats_by
 from graphics_menu.gfx_tune_consts import (
     TUNER_WIND_APPLIED_VAR, TUNER_WIND_DISTANCE_APPLIED_VAR,
 )
-from graphics_menu.gfx_tuner_foliage import (
-    ACTOR_CLASS_PATH, FN_ALL_OF_CLASS, FN_GE_II, FN_INT_TO_FLOAT, FN_NEQ_II, _for_each,
-    _root_mesh,
-)
+from graphics_menu.gfx_tuner_foliage import ACTOR_CLASS_PATH, _for_each, _root_mesh
 from graphics_menu.gfx_tuner_read import applied, column
 from graphics_menu.loot_find import put
+from uebp.nodes.actor import FN_SET_WPO, FN_SET_WPO_DISTANCE
+from uebp.nodes.math import FN_GE_II, FN_INT_TO_FLOAT, FN_MUL_FF, FN_MUL_II, FN_NEQ_II, FN_OR
+from uebp.nodes.system import FN_ALL_ACTORS, FN_SET_MPC_SCALAR
 
-KML = "/Script/Engine.KismetMathLibrary"
-FN_MUL_II = f"{KML}.Multiply_IntInt"
-FN_OR_BB = f"{KML}.BooleanOR"
-SMC = "/Script/Engine.StaticMeshComponent"
-FN_SET_WPO = f"{SMC}.SetEvaluateWorldPositionOffset"
-FN_SET_WPO_DISTANCE = f"{SMC}.SetWorldPositionOffsetDisableDistance"
-FN_SET_MPC_SCALAR = "/Script/Engine.KismetMaterialLibrary.SetScalarParameterValue"
 MPC_OBJECT_PATH = f"{MPC_PATH}.{MPC_NAME}"
 CM_PER_M = 100
 
@@ -64,10 +56,10 @@ def _author_walk(ed, in_execs, made):
     far = _call(ed, FN_NEQ_II, made,
                 A=column(ed, "wind_distance", made, rounded=True),
                 B=_get(ed, TUNER_WIND_DISTANCE_APPLIED_VAR, made))
-    moved = _call(ed, FN_OR_BB, made, A=out(on), B=out(far))
+    moved = _call(ed, FN_OR, made, A=out(on), B=out(far))
     go, same = _branch(ed, out(moved), in_execs, made)
 
-    actors = _call(ed, FN_ALL_OF_CLASS, made)
+    actors = _call(ed, FN_ALL_ACTORS, made)
     _class_literal(actors, "ActorClass", ACTOR_CLASS_PATH)
     _connect(go, _pin(actors, "execute"))
     actor, body, done = _for_each(ed, out(actors, "OutActors"), out(actors, "then"), made)

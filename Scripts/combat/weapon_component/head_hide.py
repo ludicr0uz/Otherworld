@@ -27,9 +27,10 @@ runs for a dead owner.
 import unreal
 
 from uebp.graph import _assets, _connect, _node, _pin, _set, else_, out, then
-from combat.nodes import FN_GREATER_FF, FN_HIDE_BONE, FN_UNHIDE_BONE
 from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR
 from combat.skin import player_skin
+from uebp.nodes.actor import FN_HIDE_BONE, FN_UNHIDE_BONE
+from uebp.nodes.math import FN_GREATER_FF
 
 # The bone's physics body is left alone: only the picture changes.
 PHYS_BODY_OP = "PBO_None"

@@ -2,11 +2,10 @@
 impact both go through.
 """
 
-from npc.nodes import (
-    FN_ARR_GET, FN_ARR_LEN, FN_GREATER_II, FN_PLAY_SOUND, FN_RAND_INT,
-    FN_SUB_II,
-)
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN
+from uebp.nodes.math import FN_GREATER_II, FN_RAND_INT, FN_SUB_II
+from uebp.nodes.system import FN_PLAY_SOUND
 
 
 # ─── Playing one of several sounds ──────────────────────────────────────────

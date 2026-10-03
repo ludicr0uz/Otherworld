@@ -38,20 +38,15 @@ from combat.chop_tuning import (
 )
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.nodes import (
-    FN_ADD_II, FN_ADD_VV, FN_AND, FN_BREAK_VECTOR, FN_EQ_II, FN_IS_VALID,
-    FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF, FN_NORMAL,
-    FN_RANDOM_FLOAT, FN_ROT_FROM_X, FN_SELECT_FF, FN_SELECT_II, FN_SELECT_VECTOR,
-    FN_SUB_VV, FN_TRACE, NODE_BREAK_HIT, NODE_SPAWN,
-)
 from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.surface_impact import _author_surface_impact
-
-NODE_CAST_INSTANCED = "Utilities|Casting|CastToInstancedStaticMeshComponent"
-FN_EQ_OBJECTS = "/Script/Engine.KismetMathLibrary.EqualEqual_ObjectObject"
-FN_GE_II = "/Script/Engine.KismetMathLibrary.GreaterEqual_IntInt"
-FN_RANDOM_BOOL = "/Script/Engine.KismetMathLibrary.RandomBool"
-FN_ROTATE_ABOUT = "/Script/Engine.KismetMathLibrary.RotateAngleAxis"
+from uebp.nodes.math import (
+    FN_ADD_II, FN_ADD_VV, FN_AND, FN_BREAK_VECTOR, FN_EQ_II, FN_EQ_OO, FN_GE_II, FN_MAKE_ROT,
+    FN_MAKE_TRANSFORM, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF, FN_NORMAL, FN_RANDOM_BOOL,
+    FN_RANDOM_FLOAT, FN_ROTATE_AXIS, FN_ROT_FROM_X, FN_SELECT_FF, FN_SELECT_II,
+    FN_SELECT_VECTOR, FN_SUB_VV)
+from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_INSTANCED, NODE_SPAWN
+from uebp.nodes.system import FN_IS_VALID, FN_TRACE
 
 
 def _get(ed, name):
@@ -100,7 +95,7 @@ def _author_chop(ed, brk, exec_in):
     _cls, chipped = _author_surface_impact(ed, where, then(tree))
 
     # --- the count, on this tree ----------------------------------------------
-    same_comp = _node(ed, FN_EQ_OBJECTS)
+    same_comp = _node(ed, FN_EQ_OO)
     _connect(_get(ed, CHOP_TREE_VAR), _pin(same_comp, "A"))
     _connect(struck, _pin(same_comp, "B"))
     same_item = _node(ed, FN_EQ_II)
@@ -151,7 +146,7 @@ def _author_chop(ed, brk, exec_in):
     angle = _node(ed, FN_MUL_FF)
     _connect(out(turn), _pin(angle, "A"))
     _connect(out(side), _pin(angle, "B"))
-    aside = _node(ed, FN_ROTATE_ABOUT)
+    aside = _node(ed, FN_ROTATE_AXIS)
     _connect(out(towards), _pin(aside, "InVect"))
     _connect(out(angle), _pin(aside, "AngleDeg"))
     _connect(_vec(ed, 0.0, 0.0, 1.0), _pin(aside, "Axis"))

@@ -29,6 +29,7 @@ from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, component_template, graph, load, num_pin, pin_value,
 )
 from combat.verify.fixtures import _is_exec, w, wg
+from combat.verify.glimmer import is_glimmer_node
 from combat.verify.grip_fit import check_handles_in_fist
 from combat.verify.hold_pose import _pose, _sub
 from combat.verify.punch import _feeders, _feeds, _title
@@ -140,7 +141,7 @@ def check_stick_burn():
               and any("ReceiveTick" in str(n.get_name()) or "Tick" in _title(n)
                       for g in gates for n in _ran_by(g)),
               str(sorted(_names(src))))
-    shows = by_pins(sg, "bNewVisibility")
+    shows = [n for n in by_pins(sg, "bNewVisibility") if not is_glimmer_node(n)]
     how = {}
     for n in shows:
         src = _pure_feeds(n)

@@ -142,6 +142,29 @@ menu polls its own copy from `DrawHUD`, which does.
   - `verify/interact.py` counts one reach test, one ranking and one keep **per kind**
     (`len(KINDS)`).
   - Searching a body is Tab, not this key (`Scripts/loot/CLAUDE.md`).
+- **An item on the ground glimmers** (`glimmer.py`, numbers in `glimmer_tuning.py`): the
+  item highlight. `BP_WeaponItem` carries `Glimmer`, a `MaterialBillboardComponent` on
+  `Body`, hidden as built, and its Tick's one step is `Glimmer.SetVisibility(Dropped)`.
+  `Dropped` is written in half a dozen places, so none of them is told: the item shows the
+  sprite by its own flag. `BP_AmmoPickup` is built with its sprite showing.
+  - **A child with a Tick of its own overrides the base's** (the knife and the axe:
+    `heat.build_heated_model`; the stick), so each calls `author_glimmer` at the tail of
+    its own chain. `verify/glimmer.py` finds a child whose wired Tick lacks the step, and
+    `is_glimmer_node` sets the node aside in the heat's and the torch's SetVisibility counts.
+  - **`Glimmer` is inherited, so a child's builder cannot drop it:** it is in
+    `weapon_items.KEEP`. A builder that clears "every other component" must leave it.
+  - **The look is `M_ItemGlimmer`:** unlit, additive, one Custom node drawing a four-rayed
+    star that rests dim and flashes every 2.2 s, each item out of step (the phase is its
+    place in the world), through `EyeAdaptationInverse`, so it reads the same at noon and
+    at midnight. World-position offset lifts the sprite 10 cm and pulls it 12 cm towards
+    the camera, so the ground, the grass and the item's own model do not swallow it.
+    `CameraVectorWS` does not exist in a vertex shader (the material fails to compile and
+    the default one is drawn): the offset normalises camera position minus world position.
+  - **On or off is `MPC_ItemGlimmer.Highlight`,** which the material multiplies by. Combat
+    builds it on; the day/night cycle writes it from the WORLD SETTINGS tab's row
+    (`world/item_highlight.py`). It is a sprite, not an overlay material: the overlay slot
+    is the hot blade's.
+  - `probes/probe_item_glimmer.py` runs it in a game.
 - **Ammunition lives on the weapon** (`MagazineSize`/`Loaded`/`Reserve` on `BP_WeaponItem`).
   Drop a half-empty gun and it is still half-empty when picked up. The pistol is the fallback: an
   8-round magazine over an endless reserve (`InfiniteReserve`), so it reloads every 8 shots but
@@ -663,4 +686,11 @@ These are feel checks a headless run can't do:
 - the bullet impact on the scenery (`bullet_impact.py`): whether 1-3 cm lit chips and dust
   read at all at range and at night (they are not emissive, as blood is not), and whether
   0.6 s is long enough to see where a round landed. It leaves no mark behind;
-- the shotgun's index finger along the receiver, 4 cm above the guard (`docs/aiming.md`).
+- the shotgun's index finger along the receiver, 4 cm above the guard (`docs/aiming.md`);
+- the glimmer (`glimmer_tuning.py`): it was seen only in two 1280x720 pictures (noon and
+  midnight, `OW_GLIMMER_SHOTS=1` on the probe, windowed). Whether a 28 cm star at 8 emissive
+  reads as a glint or as a lamp, by day and at night, and over pale sunlit ground, where
+  light added to near-white shows least; whether the flash
+  every 2.2 s is too busy over a patch of forage; how it sits over a long gun (it stands at
+  the item's origin, not its middle), over a blade lodged in a trunk or a body, and in tall
+  grass; and whether it should fade with distance (it does not).

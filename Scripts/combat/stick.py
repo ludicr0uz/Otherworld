@@ -35,6 +35,7 @@ mesh's origin, in A_HoldTorch (hold_pose.py).
 import unreal
 
 from combat.chop_tuning import CHOPS_VAR
+from combat.glimmer import author_glimmer
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _component_object, _connect,
@@ -115,7 +116,8 @@ def _build_model(bp):
 
 
 def _author_burn(ed, tick):
-    """Tick: put a spent fire out, then show the stick as Lit says."""
+    """Tick: put a spent fire out, then show the stick as Lit says. Returns
+    the chain's tails."""
     def get(name):
         return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
 
@@ -155,6 +157,7 @@ def _author_burn(ed, tick):
         f"it, {STICK_BURN_S:g} s on from the campfire that lit it) and is a "
         "stick again. The bare model shows while it is not Lit; the burning "
         "one and the glow while it is.", made)
+    return prev
 
 
 def build_stick(item_bp, rebuild=True):
@@ -171,7 +174,8 @@ def build_stick(item_bp, rebuild=True):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{STICK_BP_PATH} failed to compile")
-    _author_burn(ed, tick)
+    # This Tick overrides BP_WeaponItem's, so the glimmer is authored again.
+    author_glimmer(ed, _author_burn(ed, tick))
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{STICK_BP_PATH} failed to compile")

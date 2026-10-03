@@ -3,6 +3,7 @@
 
 import unreal
 
+from combat.glimmer import add_glimmer
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _connect,
@@ -77,6 +78,9 @@ def build_ammo_pickup(rebuild=True):
             obj.set_collision_profile_name("NoCollision")
         except Exception as exc:                                  # noqa: BLE001
             _log(f"  note: could not set NoCollision on {name}: {exc}")
+
+    # It is only ever on the ground, so its glimmer is built showing.
+    add_glimmer(bp, root, visible=True)
 
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)

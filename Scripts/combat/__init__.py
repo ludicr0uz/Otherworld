@@ -153,6 +153,9 @@ ASSETS AND PATCHES
   bullet_impact     BP_BulletImpact: the chips and dust layout, what the
                     scenery throws where a bullet hits it
   ammo_pickup       BP_AmmoPickup
+  glimmer_tuning    the glimmer over an item on the ground: names, paths, look
+  glimmer           MPC_ItemGlimmer + M_ItemGlimmer, the Glimmer sprite on an
+                    item, and the Tick step that shows it while Dropped
   throw_arc         BP_ThrowArc + M_ThrowArc: the dotted arc a throw is aimed
                     with (one instanced mesh of emissive spheres)
   footsteps         BP_FootstepComponent (StepVolume/StepNoise, set by the stance)

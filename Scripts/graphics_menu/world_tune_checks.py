@@ -67,10 +67,12 @@ def _check_graph(check, nodes):
     writes = [n for n in nodes if {"TargetArray", "Index", "Item", "bSizeToFit"} <= _pins(n)
               and f"Get {TAB.values_var}" in _feeds(BEL.find_input_pin(n, "TargetArray"))]
     nudged = [n for n in writes
-              if any("Max" in t for t in _feeds(BEL.find_input_pin(n, "Item")))]
+              if any("Max" in t or "Min" in t
+                     for t in _feeds(BEL.find_input_pin(n, "Item")))]
     read_back = [n for n in writes if n not in nudged
                  and str(BEL.find_input_pin(n, "Index").get_pin_value()) == "0"]
-    check("a world nudge writes WorldTuneValues (held at the row's minimum), and "
+    check("a world nudge writes WorldTuneValues (held between the row's minimum and "
+          "maximum), and "
           "the cycle's clock is read back into the hour cell",
           len(writes) == 2 and len(nudged) == 1 and len(read_back) == 1,
           f"{len(writes)} writes, {len(nudged)} nudged, {len(read_back)} read back")
@@ -83,8 +85,8 @@ def _check_graph(check, nodes):
                         for t in _feeds(BEL.find_input_pin(n, "self")))]
         if len(sets) != 1:
             missing.append(f"{var} x{len(sets)}")
-    check("the tab sets the cycle's day and night lengths, its night cold and its "
-          "Clock, once each",
+    check("the tab sets the cycle's day and night lengths, its night cold, its item "
+          "highlight and its Clock, once each",
           not missing, str(missing))
     finds = [n for n in nodes if "ActorClass" in _pins(n)
              and "DayNightCycle" in str(BEL.find_input_pin(n, "ActorClass").get_pin_value())]
@@ -100,8 +102,8 @@ def check_world_tune(check, bp, nodes):
     wrong = [k for k, v in world_tune_defaults().items()
              if not (_same(cdo.get_editor_property(k), v) if isinstance(v, list)
                      else cdo.get_editor_property(k) == v)]
-    check("the world tab starts shut, untouched, with the built day and night lengths "
-          "and night cold",
+    check("the world tab starts shut, untouched, with the built day and night lengths, "
+          "night cold and item highlight (a row held between 0 and 1)",
           not wrong, str(wrong))
     _check_widgets(check)
     _check_graph(check, nodes)

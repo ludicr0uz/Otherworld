@@ -3,7 +3,8 @@ setting (``setting,value``).
 
 The CSV is the tracked copy of the numbers the in-game WORLD SETTINGS tab (the
 M panel's world tuning tab, graphics_menu/world_tune_*.py) saves: the day's and the
-night's lengths, and how fast the night cools the player. world_config lays it over its literals, and
+night's lengths, how fast the night cools the player, and whether an item
+lying on the ground glimmers (1 on, 0 off). world_config lays it over its literals, and
 build_day_night.py bakes the result into BP_DayNightCycle's defaults, so a
 length tuned in a game and saved lands in the Blueprint on the next build
 and git shows what moved.
@@ -24,13 +25,21 @@ SETTING_COLUMN, VALUE_COLUMN = "setting", "value"
 # or None, the tab's label, step, minimum). The hour's minimum is below zero
 # so Left keeps turning the clock back past midnight (the graph wraps it).
 TIME_OF_DAY_ROW = ("", "", "time of day (h)", 0.5, -12.0)
+# An on/off row: the tab's cells are numbers, so it steps between 0 and 1
+# (its maximum is what stops Right at "on").
+ITEM_HIGHLIGHT_ROW = ("item_highlight", "ItemHighlight",
+                      "item highlight (1 on, 0 off)", 1.0, 0.0)
 WORLD_STATS = (
     TIME_OF_DAY_ROW,
     ("day_length_s", "DayLengthSeconds", "day length (s)", 30.0, 30.0),
     ("night_length_s", "NightLengthSeconds", "night length (s)", 30.0, 30.0),
     ("night_temperature_drop_per_s", "NightTemperatureDropPerSecond",
      "night cold (temp/s)", 0.01, 0.0),
+    ITEM_HIGHLIGHT_ROW,
 )
+# Each row's maximum. Only the on/off row has a real one.
+NO_MAX = 1.0e9
+WORLD_MAXS = tuple(1.0 if s is ITEM_HIGHLIGHT_ROW else NO_MAX for s in WORLD_STATS)
 SAVED_STATS = tuple(s for s in WORLD_STATS if s[0])
 SAVED_COLUMNS = tuple(s[0] for s in SAVED_STATS)
 

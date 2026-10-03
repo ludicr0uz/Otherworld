@@ -31,6 +31,7 @@ from combat.verify.common import (
     BEL, by_pins, cdo, check, component_template, graph, load, num_pin, pin_value,
 )
 from combat.verify.fixtures import w, wg
+from combat.verify.glimmer import is_glimmer_node
 from combat.verify.interact import _then
 from combat.verify.punch import _feeders, _feeds, _title
 from combat.weapon_component.interact import INTERACT_TARGET_VAR
@@ -165,7 +166,7 @@ def _check_cooling(name, nodes):
           len(on) == 1 and len(off) == 1 and len(wears) == 2
           and all([_title(f) for f in _feeders(n, "self")] == [f"Get {MODEL}"] for n in wears)
           and arms == {"on": True, "off": False}, f"{len(on)} on, {len(off)} off, {arms}")
-    shows = by_pins(nodes, "bNewVisibility")
+    shows = [n for n in by_pins(nodes, "bNewVisibility") if not is_glimmer_node(n)]
     check(f"...and {HEAT_GLOW} shows while it is {HOT_VAR}",
           len(shows) == 1
           and [_title(f) for f in _feeders(shows[0], "self")] == [f"Get {HEAT_GLOW}"]

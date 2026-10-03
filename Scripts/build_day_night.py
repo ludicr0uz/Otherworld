@@ -25,6 +25,7 @@ from world.day_night_blueprint import (                           # noqa: E402
     apply_config, build_components, declare_variables,
 )
 from world.day_night_graph import build_graph                     # noqa: E402
+from world.item_highlight import author_item_highlight            # noqa: E402
 from world.level_placement import place_day_night                 # noqa: E402
 from world.night_cold import author_night_cold                    # noqa: E402
 from world.paths import DAY_NIGHT_BP_PATH                         # noqa: E402
@@ -42,7 +43,10 @@ def build_blueprint():
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     build_components(bp)
     declare_variables(ed)
-    author_night_cold(ed, *build_graph(bp, ed))
+    tick, chain = build_graph(bp, ed)
+    # Before the cold, whose chain stops at a level with no player.
+    author_item_highlight(ed, chain)
+    author_night_cold(ed, tick, chain)
     arrange(ed)
     apply_config(bp)          # compiles, saves, reads the defaults back
     return bp

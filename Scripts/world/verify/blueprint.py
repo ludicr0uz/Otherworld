@@ -9,8 +9,11 @@ from combat.verify.common import (
 from world import world_config as cfg
 from world.day_night_blueprint import (
     AMBIENT_SCALE_VAR, COMPONENTS, FOG_SCALE_VAR, LOOK_SCALE_VARS, MOON_DISC_SCALE_VAR,
-    MOON_SCALE_VAR, NIGHT_COLD_VAR, RANDOM_START_VAR, STAR_SCALE_VAR,
+    ITEM_HIGHLIGHT_VAR, MOON_SCALE_VAR, NIGHT_COLD_VAR, RANDOM_START_VAR, STAR_SCALE_VAR,
     SUN_DISC_SCALE_VAR, SUN_SCALE_VAR,
+)
+from combat.glimmer_tuning import (
+    HIGHLIGHT_DEFAULT, MPC_ITEM_GLIMMER, MPC_NAME, PARAM_HIGHLIGHT,
 )
 from world.paths import DAY_NIGHT_BP_PATH, SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH, STATIC_SKY_TAG
 
@@ -20,7 +23,8 @@ def _check_defaults(bp):
     for var, want in (("DayLengthSeconds", cfg.DAY_LENGTH_S),
                       ("NightLengthSeconds", cfg.NIGHT_LENGTH_S),
                       ("Clock", cfg.START_CLOCK_S),
-                      (NIGHT_COLD_VAR, cfg.NIGHT_TEMPERATURE_DROP_PER_S)):
+                      (NIGHT_COLD_VAR, cfg.NIGHT_TEMPERATURE_DROP_PER_S),
+                      (ITEM_HIGHLIGHT_VAR, cfg.ITEM_HIGHLIGHT)):
         got = d.get_editor_property(var)
         check(f"BP_DayNightCycle.{var} defaults to world_config ({want})",
               isinstance(got, float) and abs(got - want) < 1e-6, repr(got))
@@ -108,6 +112,32 @@ def _title(n):
 def _feeds(pin):
     return [_title(unreal.BlueprintGraphPinLibrary.get_owning_node(q))
             for q in pin.list_connected_pins()]
+
+
+def _check_item_highlight(bp):
+    """item_highlight.py: Tick writes the glimmer collection's switch."""
+    nodes = graph(bp).list_all_nodes()
+    writes = [n for n in by_pins(nodes, "Collection", "ParameterName", "ParameterValue")
+              if MPC_NAME in pin_value(n, "Collection")]
+    check(f"Tick writes {MPC_NAME}.{PARAM_HIGHLIGHT} once, from {ITEM_HIGHLIGHT_VAR}: "
+          "the WORLD SETTINGS row switches every item's glimmer",
+          len(writes) == 1 and pin_value(writes[0], "ParameterName") == PARAM_HIGHLIGHT
+          and f"Get {ITEM_HIGHLIGHT_VAR}" in _feeds(
+              BEL.find_input_pin(writes[0], "ParameterValue")),
+          str([(pin_value(n, "Collection"), pin_value(n, "ParameterName")) for n in writes]))
+    mpc = unreal.load_asset(MPC_ITEM_GLIMMER)
+    params = {str(p.get_editor_property("parameter_name")):
+              p.get_editor_property("default_value")
+              for p in (mpc.get_editor_property("scalar_parameters") if mpc else [])}
+    check(f"...and {MPC_NAME} has that scalar, on as built (a level without a cycle "
+          "glimmers)", params.get(PARAM_HIGHLIGHT) == HIGHLIGHT_DEFAULT == 1.0, str(params))
+    connected = [n for n in writes
+                 if BEL.find_input_pin(n, "execute").list_connected_pins()]
+    check("...on the Tick's chain, ahead of the night's cold (which stops with no player)",
+          len(connected) == len(writes) == 1
+          and not any("Cast" in t for n in writes
+                      for t in _feeds(BEL.find_input_pin(n, "execute"))),
+          str([_feeds(BEL.find_input_pin(n, "execute")) for n in writes]))
 
 
 def _check_night_cold(bp):
@@ -199,5 +229,6 @@ def run():
     _check_defaults(bp)
     _check_components(bp)
     _check_graph(bp)
+    _check_item_highlight(bp)
     _check_night_cold(bp)
     _check_look(bp)

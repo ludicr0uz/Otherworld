@@ -87,6 +87,10 @@ and it never relies on a variable another section left behind.
   pickup      interact's item kind: the take runs once, after the search, on
               the kept target cast to an item, with room in the bag, and
               detaches it from what it was left in
+  glimmer     the glimmer over an item on the ground: MPC_ItemGlimmer and
+              M_ItemGlimmer, the sprite on the item and the ammo pickup, the
+              Tick step on the base and on each child with its own Tick;
+              is_glimmer_node
   heat        the heated blade: who Heats, M_HotMetal and each item's
               instance, the glow and the cooling on the item's own Tick, the
               interact key's campfire kind, the use key's cauterising, the
@@ -109,6 +113,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "slots", "pickup", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "slots", "pickup", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",
 )

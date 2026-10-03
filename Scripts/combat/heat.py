@@ -36,6 +36,7 @@ from combat.heat_tuning import (
     HEAT_GLOW_RADIUS_CM, HEAT_MATERIAL_VAR, HEAT_S, HOT_AXIS_PARAM, HOT_COLOUR,
     HOT_EMISSIVE, HOT_FADE_PARAM, HOT_START_PARAM, HOT_VAR, MODEL,
 )
+from combat.glimmer import author_glimmer
 from combat.paths import MAT_HOT_METAL
 from combat.weapon_items import build_model
 from uebp.nodes.actor import FN_SET_OVERLAY, FN_SET_VISIBILITY
@@ -138,7 +139,8 @@ def build_hot_instance(path, axis, start, fade):
 
 
 def _author_cooling(ed, tick):
-    """Tick: a blade whose time is up is cold, then show it as Hot says."""
+    """Tick: a blade whose time is up is cold, then show it as Hot says.
+    Returns the chain's tail."""
     def get(name):
         return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
 
@@ -184,6 +186,7 @@ def _author_cooling(ed, tick):
         f"While it is {HOT_VAR} the model wears {HEAT_MATERIAL_VAR} as its "
         f"overlay and {HEAT_GLOW} is lit.",
         [cooled, cold, which, wear, bare, show])
+    return then(show)
 
 
 def build_heated_model(bp, model, glow_at):
@@ -211,7 +214,8 @@ def build_heated_model(bp, model, glow_at):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
-    _author_cooling(ed, tick)
+    # This Tick overrides BP_WeaponItem's, so the glimmer is authored again.
+    author_glimmer(ed, [_author_cooling(ed, tick)])
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")

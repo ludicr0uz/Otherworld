@@ -18,6 +18,10 @@ def run():
           cfg.NIGHT_TEMPERATURE_DROP_PER_S
           == tuned.get("night_temperature_drop_per_s", 0.1) >= 0.0,
           f"{cfg.NIGHT_TEMPERATURE_DROP_PER_S} per s")
+    check("world config: the item highlight is world_tuning.csv's (else on), on or off",
+          cfg.ITEM_HIGHLIGHT == tuned.get("item_highlight", 1.0)
+          and cfg.ITEM_HIGHLIGHT in (0.0, 1.0),
+          f"{cfg.ITEM_HIGHLIGHT}")
     check("world config: the clock starts in the day",
           0.0 <= cfg.START_CLOCK_S < cfg.DAY_LENGTH_S, f"{cfg.START_CLOCK_S} s")
 

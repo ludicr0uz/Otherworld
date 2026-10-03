@@ -5,7 +5,8 @@ table onto the level's day/night cycle.
     its M panel row taken   WorldTuneOpen = NOT WorldTuneOpen; the other tabs shut
     WorldTuneOpen, and the level has a BP_DayNightCycle (GetActorOfClass, cast):
       WorldTuneTouched      DayLengthSeconds, NightLengthSeconds,
-                            NightTemperatureDropPerSecond := the table's
+                            NightTemperatureDropPerSecond, ItemHighlight
+                            := the table's
       Values[0] != HourSeen a nudge moved the hour: Clock := hour_to_clock
       always                Values[0] := HourSeen := clock_to_hour(Clock)
 
@@ -29,7 +30,7 @@ from graphics_menu.world_tune_consts import (
 )
 from world import world_config as cfg
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
-from world.world_tuning import WORLD_STATS
+from world.world_tuning import WORLD_MAXS, WORLD_STATS
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_SET
 from uebp.nodes.math import FN_ADD_FF, FN_MAP_CLAMPED, FN_NEQ_FF, FN_PERCENT_FF
 from uebp.nodes.palette import NODE_CAST_CYCLE
@@ -43,15 +44,16 @@ def declare_world_tune_vars(ed):
 
 
 def world_tune_defaults():
-    """The built lengths and night cold; the hour cell and HourSeen both 0 until the tab
-    first opens and reads the live clock."""
+    """The built lengths, night cold and item highlight; the hour cell and HourSeen
+    both 0 until the tab first opens and reads the live clock."""
     values = [0.0, float(cfg.DAY_LENGTH_S), float(cfg.NIGHT_LENGTH_S),
-              float(cfg.NIGHT_TEMPERATURE_DROP_PER_S)]
+              float(cfg.NIGHT_TEMPERATURE_DROP_PER_S), float(cfg.ITEM_HIGHLIGHT)]
     if len(values) != len(WORLD_STATS):
         raise RuntimeError(f"{len(values)} built values for {len(WORLD_STATS)} WORLD_STATS")
     return {**tab_defaults(WORLD_TAB, [WORLD_SUBJECT], values,
                            [float(s[3]) for s in WORLD_STATS],
                            [float(s[4]) for s in WORLD_STATS]),
+            WORLD_TAB.maxs_var: [float(m) for m in WORLD_MAXS],
             WORLD_TUNE_HOUR_SEEN_VAR: 0.0}
 
 
@@ -147,7 +149,7 @@ def author_world_tune_tick(ed, pc_out, in_execs):
     tails = _author_apply(ed, flow, made)
     ed.add_comment_to_nodes(
         "World tuning (its row in the M panel): Up/Down pick a row, "
-        "Left/Right move the time of day or a length, Enter saves the lengths to "
-        "world_tuning.csv. While open, the table goes onto the day/night cycle "
+        "Left/Right move the time of day, a length or a switch, Enter saves all but "
+        "the hour to world_tuning.csv. While open, the table goes onto the day/night cycle "
         "and the cycle's clock comes back as the hour.", made[:1])
     return tails

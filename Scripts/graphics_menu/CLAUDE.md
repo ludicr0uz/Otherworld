@@ -606,18 +606,23 @@ keys as GUN SETTINGS; **Enter** saves `Scripts/combat/player_tuning.csv`.
 
 **Its M panel row** opens it (`WorldTuneOpen`). One subject row (`world`), then
 `world/world_tuning.WORLD_STATS`: the time of day (hours, step 0.5), the day's length and the
-night's (seconds, step 30), and the night's cold (Temperature points a second, step 0.01,
-`world/night_cold.py`). Same keys as GUN SETTINGS; **Enter** saves all but the hour to
+night's (seconds, step 30), the night's cold (Temperature points a second, step 0.01,
+`world/night_cold.py`), and the item highlight (1 on, 0 off: whether an item on the ground
+glimmers, `world/item_highlight.py`). Same keys as GUN SETTINGS; **Enter** saves all but the hour to
 `Scripts/world/world_tuning.csv` (the hour is never saved: a level starts at a random one).
 
 - **The hour is a 24-hour dial over the cycle's `Clock`:** sunrise 06:00, sunset 18:00, each
   half 12 hours whatever its length (`world_config.clock_to_hour`/`hour_to_clock`, which the
   graph mirrors with two `MapRangeClamped` each way).
 - **Only while the tab is open,** each Tick: `GetActorOfClass(BP_DayNightCycle)`, a cast, then
-  the lengths and the night's cold onto it (once touched), then `Clock := hour_to_clock(WorldTuneValues[0])` **only
+  the lengths, the night's cold and the item highlight onto it (once touched), then `Clock := hour_to_clock(WorldTuneValues[0])` **only
   when that cell differs from `WorldTuneHourSeen`**, then the live clock read back into both.
   Writing the hour every Tick would stop time; the read-back is what makes a nudge step from
   the hour on screen.
+- **An on/off row is a number held between 0 and 1.** The tab's cells are floats, so the item
+  highlight steps by 1 from a minimum of 0 to a maximum of 1: the tab has maximums
+  (`WorldTuneMaxs`, `world_tuning.WORLD_MAXS`; every other row's is `NO_MAX`), as the graphics
+  tab does. A new switch is a row with its maximum at 1.
 - **The CSV feeds** `world_config` (so `build_day_night.py`, the cycle's defaults, then
   `build_graphics_menu.py`, the HUD's table). `verify_day_night` checks the lengths against it.
 - **The verifier's whole-graph scans exclude this tab:** the Binds read-by-index check skips
@@ -625,7 +630,8 @@ night's (seconds, step 30), and the night's cold (Temperature points a second, s
   `Value` pin).
 - **Probe:** `probe_world_tuning.py` (8 checks: the random start, the hour on the dial, a nudge,
   crossing into the other half, a length, the CSV, the panel). It backs up the CSV and puts it
-  back.
+  back. `probe_item_glimmer.py` steps the item highlight's row off and back on, past
+  both ends, and saves it.
 - **Still needs a play session:** how the sky looks when the hour jumps.
 
 ## HUD

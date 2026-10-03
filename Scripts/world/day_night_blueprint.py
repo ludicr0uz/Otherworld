@@ -23,11 +23,13 @@ from world import day_night_vars as DV
 
 COMPONENTS = (DV.Sun, DV.Moon, DV.SkyLight, DV.SkyDome, DV.Fog, "NightGrade", DV.DayGrade)
 
-# Variables. The two lengths, Clock, the night's cold and RandomStart are
-# Instance Editable, so a level can run a different day, or start at a set
+# Variables. The two lengths, Clock, the night's cold, the item highlight and
+# RandomStart are Instance Editable, so a level can run a different day, or start at a set
 # hour, without a rebuild.
 NIGHT_COLD_VAR = "NightTemperatureDropPerSecond"   # night_cold.py reads it
-CONFIG_VARS = (DV.DayLengthSeconds, DV.NightLengthSeconds, DV.Clock, NIGHT_COLD_VAR)
+ITEM_HIGHLIGHT_VAR = "ItemHighlight"               # item_highlight.py reads it
+CONFIG_VARS = (DV.DayLengthSeconds, DV.NightLengthSeconds, DV.Clock, NIGHT_COLD_VAR,
+               ITEM_HIGHLIGHT_VAR)
 RANDOM_START_VAR = "RandomStart"   # BeginPlay picks Clock anywhere in the cycle
 STATE_FLOAT_VARS = (DV.DayAmount,)
 # The look multipliers, all 1 as built: the Tick graph scales the sun's and
@@ -140,6 +142,7 @@ def apply_config(bp):
         DV.NightLengthSeconds: float(cfg.NIGHT_LENGTH_S),
         DV.Clock: float(cfg.START_CLOCK_S),
         NIGHT_COLD_VAR: float(cfg.NIGHT_TEMPERATURE_DROP_PER_S),
+        ITEM_HIGHLIGHT_VAR: float(cfg.ITEM_HIGHLIGHT),
         RANDOM_START_VAR: bool(cfg.RANDOM_START),
         **{name: 1.0 for name in LOOK_SCALE_VARS},
     })

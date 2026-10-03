@@ -87,6 +87,7 @@ from combat.install import (                                      # noqa: E402
     install_on_character, install_on_npc, retire_old_assets,
 )
 from combat.materials import build_materials                      # noqa: E402
+from combat.glimmer import build_glimmer_material                 # noqa: E402
 from combat.heat import build_hot_material                        # noqa: E402
 from combat.throw_arc import build_throw_arc                      # noqa: E402
 from combat.throw_pose import build_throw_ready                   # noqa: E402
@@ -143,6 +144,8 @@ def main():
     # Before the weapons: the shotgun's row names it, and its grip is solved
     # in it.
     build_shotgun_pose(skin)
+    # Before the items: the base one carries the sprite it is drawn on.
+    build_glimmer_material()
     item_bp = build_weapon_item()
     weapons = {}
     for spec in _weapon_specs():

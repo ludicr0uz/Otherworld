@@ -8,10 +8,13 @@ one table.
     Up / Down, Left / Right,    as GUN SETTINGS (tune_tab.py), over one subject,
     Enter                       "world": the time of day (hours, live only),
                                 the day's and the night's lengths, how fast
-                                the night cools the player; Enter saves all
-                                but the hour to world/world_tuning.csv
+                                the night cools the player, whether an item
+                                on the ground glimmers (1 on, 0 off); Enter
+                                saves all but the hour to
+                                world/world_tuning.csv
 
-The rows, their steps and minimums are world/world_tuning.WORLD_STATS.
+The rows, their steps and minimums are world/world_tuning.WORLD_STATS, and
+their maximums its WORLD_MAXS (only the on/off row has a real one).
 """
 
 from graphics_menu.tune_tab import TuneTab, save_command
@@ -28,11 +31,12 @@ WORLD_TUNE_SAVE_VAR = "WorldTuneSaveRequested"
 WORLD_TUNE_SAVED_VAR = "WorldTuneSaved"
 WORLD_TUNE_TOUCHED_VAR = "WorldTuneTouched"
 # WorldTuneValues[s] is WORLD_STATS[s]: the hour, the day's length, the
-# night's, the night's cold.
+# night's, the night's cold, the item highlight.
 WORLD_TUNE_VALUES_VAR = "WorldTuneValues"
 WORLD_TUNE_NAMES_VAR = "WorldTuneNames"
 WORLD_TUNE_STEPS_VAR = "WorldTuneSteps"
 WORLD_TUNE_MINS_VAR = "WorldTuneMins"
+WORLD_TUNE_MAXS_VAR = "WorldTuneMaxs"
 # The hour the HUD last read off the cycle. WorldTuneValues[0] differing
 # from it means a nudge moved the hour: write the cycle's Clock.
 WORLD_TUNE_HOUR_SEEN_VAR = "WorldTuneHourSeen"
@@ -59,4 +63,4 @@ WORLD_TAB = TuneTab(
     hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                "ENTER  save to world_tuning.csv"),
     saved_words="saved to Scripts/world/world_tuning.csv",
-    fraction_digits=2)
+    fraction_digits=2, maxs_var=WORLD_TUNE_MAXS_VAR)

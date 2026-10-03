@@ -7,9 +7,9 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
                        cold, start time, sun/moon paths, sky colours;
                        sun_state() does the Tick's sums in Python,
                        clock_to_hour() the tuning dial's
-  world_tuning         world_tuning.csv: the lengths and the night's cold the
-                       M panel's WORLD SETTINGS tab saves, laid over
-                       world_config's
+  world_tuning         world_tuning.csv: the lengths, the night's cold and the
+                       item highlight the M panel's WORLD SETTINGS tab
+                       saves, laid over world_config's
   paths                /Game paths, class paths, the two actor tags
   day_night_vars       BP_DayNightCycle's variables and components, named once
   sky_material         M_DayNightSky: the whole sky (gradient, glow, discs,
@@ -23,6 +23,8 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
   day_night_graph      its BeginPlay (take over the level's sky) and Tick
   night_cold           the Tick's last step: the player's Temperature falls
                        at night, by NightTemperatureDropPerSecond
+  item_highlight       a Tick step: the cycle's ItemHighlight onto
+                       MPC_ItemGlimmer, the switch of every item's glimmer
   level_placement      tag each level's static sky, place the cycle actor
   verify/              the verifier's sections
 """

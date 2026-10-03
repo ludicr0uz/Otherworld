@@ -20,12 +20,14 @@ import unreal
 
 from combat.audio import SND_DRY_FIRE
 from combat.chop_tuning import CHOPS_VAR
+from combat.glimmer import add_glimmer, author_glimmer
+from combat.glimmer_tuning import GLIMMER
 from combat.light_tuning import LIGHTS_VAR
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _create_blueprint,
-    _declare, _drop_components, _find_handle, _float_type, _handles, _must_load,
-    _root_handle, _struct_type)
+    _declare, _drop_components, _events, _find_handle, _float_type, _handles, _must_load,
+    _root_handle, _struct_type, then)
 from uebp.layout import arrange
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
@@ -51,7 +53,9 @@ from combat import item_vars as IV
 
 
 def build_weapon_item():
-    """The base weapon Actor: no geometry, no graph, just the data a gun has.
+    """The base weapon Actor: no geometry, just the data a gun has, and the
+    one thing every item does for itself: glimmer while it lies on the ground
+    (glimmer.py, the Tick's only step).
 
     Every property the weapon component reads is declared here so that Inventory
     can be a plain array of BP_WeaponItem and the firing code needs exactly one
@@ -63,8 +67,12 @@ def build_weapon_item():
     bp = _create_blueprint(ITEM_BP_PATH, unreal.Actor)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
 
+    # The graph is wiped before the components are rebuilt, for stick.py's
+    # reason: its node names the Glimmer component.
+    tick, _begin = _events(ed, True)
     _drop_components(bp, {"Body"})
-    _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Body")
+    body = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Body")
+    add_glimmer(bp, body)
 
     declare(ed, IV.TABLE)
     for name, kind in (("DisplayName", "string"),
@@ -173,6 +181,10 @@ def build_weapon_item():
     _declare(ed, THROW_GRIP_LOC_VAR, _struct_type(unreal.Vector.static_struct()))
     _declare(ed, THROW_GRIP_ROT_VAR, _struct_type(unreal.Rotator.static_struct()))
 
+    # The components are variables of the class only once it has compiled.
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_WeaponItem failed to compile")
+    author_glimmer(ed, [then(tick)])
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
@@ -226,8 +238,9 @@ def build_parts(bp, parts):
             _log(f"  note: could not set NoCollision on {name}: {exc}")
 
 
-# The components every weapon keeps: its own root and BP_WeaponItem's Body.
-KEEP = {"None", "DefaultSceneRoot", "Body"}
+# The components every weapon keeps: its own root, and BP_WeaponItem's Body
+# and Glimmer.
+KEEP = {"None", "DefaultSceneRoot", "Body", GLIMMER}
 
 
 def build_model(bp, model):

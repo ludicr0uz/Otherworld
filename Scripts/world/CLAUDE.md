@@ -24,10 +24,13 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
 - **The night's cold:** `NIGHT_TEMPERATURE_DROP_PER_S` (0.1, or `world_tuning.csv`'s) is how
   many points of the player's Temperature a second of full night takes. It is the actor's
   `NightTemperatureDropPerSecond`. See "The night is cold" below.
+- **The item highlight:** `ITEM_HIGHLIGHT` (1 on, 0 off; or `world_tuning.csv`'s) is whether
+  an item lying on the ground glimmers. It is the actor's `ItemHighlight`. See "The item
+  highlight" below.
 - **A level starts at a random time of day:** with `RANDOM_START` (the actor's `RandomStart`),
   BeginPlay sets `Clock` to `RandomFloatInRange(0, day + night)`. With it off, `Clock`'s default
   `START_CLOCK_S` (20 s, just after sunrise) is where it starts.
-- The two lengths, `Clock`, the night's cold and `RandomStart` are also Instance Editable on the placed actor, so
+- The two lengths, `Clock`, the night's cold, the item highlight and `RandomStart` are also Instance Editable on the placed actor, so
   one level can differ.
 - **The time of day can be set in a game** from the WORLD SETTINGS tab, on a 24-hour dial
   (`clock_to_hour`: sunrise 06:00, sunset 18:00). See `Scripts/graphics_menu/CLAUDE.md`.
@@ -104,6 +107,19 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
   nothing reads a low Temperature yet. A saved profile carries the bar into the next game.
 - **The probe raises the rate** to 20 a second for its run: a headless game's time moves too
   little for 0.1 to show.
+
+## The item highlight (`item_highlight.py`)
+
+- **The glimmer is combat's, the switch is the world's.** Every item carries a sprite that
+  shows while it lies on the ground, drawn with a material multiplied by
+  `MPC_ItemGlimmer.Highlight` (`combat/glimmer.py`, `Scripts/combat/CLAUDE.md`). The cycle's
+  Tick writes that scalar from `ItemHighlight` every frame, which is what makes the WORLD
+  SETTINGS row live: one float, and no item is told.
+- **The step sits before the night's cold** in the Tick's chain: the cold stops at a level
+  with no player, and nothing after it would run.
+- **`build_weapons_and_combat.py` makes the collection** and runs before this build. A level
+  without a cycle keeps the collection's own default: on.
+- `probes/probe_item_glimmer.py` switches it from the tab in a game.
 
 ## Traps
 

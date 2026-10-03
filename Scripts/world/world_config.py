@@ -36,6 +36,11 @@ NIGHT_LENGTH_S = float(_TUNED.get("night_length_s", 240.0))
 # twilight (world/night_cold.py). Slow: 0.1 takes 24 points off in a 4-minute
 # night. world_tuning.csv overrides it too.
 NIGHT_TEMPERATURE_DROP_PER_S = float(_TUNED.get("night_temperature_drop_per_s", 0.1))
+
+# Whether an item lying on the ground glimmers: 1 on, 0 off (the cycle's
+# ItemHighlight, which its Tick writes to the glimmer's material collection:
+# world/item_highlight.py). world_tuning.csv overrides it too.
+ITEM_HIGHLIGHT = float(_TUNED.get("item_highlight", 1.0))
 # Where a level starts. RANDOM_START (BP_DayNightCycle.RandomStart, Instance
 # Editable) has BeginPlay pick a clock anywhere in the cycle instead; with it
 # off, START_CLOCK_S is a little after sunrise, so the first thing the player

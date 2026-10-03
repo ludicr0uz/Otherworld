@@ -20,9 +20,12 @@ One Two Bone IK on the left arm, last in the chain, after the aim pitch:
     ... -> ModifyBone(upper) -> TwoBoneIK(left hand) -> ComponentToLocal -> Output
 
 Its effector is a point in the RIGHT HAND's bone space, which is the gun's
-space: where the ready pose's left hand is at the clip's start, sampled off
-the clip (support_at). The rifle pose and the pistol pose each have their own
-point, picked by SupportRifle. The elbow keeps its side: the joint target is
+space: where the held gun's own ready pose has the left hand at the clip's
+start, sampled off the clip (support_at). The point is the gun's
+(BP_WeaponItem.SupportPoint, written at build time off its AimPose), and the
+weapon component hands the held one's to SupportPoint here: the shotgun's pose
+seats the hand on its pump, somewhere the rifle pose's is not, and two points
+picked by a flag could not say so. The elbow keeps its side: the joint target is
 the forearm bone itself, as the pose left it. The hand's turn is not touched;
 it is the pose's, in mesh space, as the right hand's is.
 
@@ -42,13 +45,14 @@ import unreal
 
 from combat.aim_pitch import IK_CLASS, _feeding, _nodes_of
 from combat.graph import (
-    BEL, BGE, PIN, _assets, _at, _connect, _declare, _float_type, _log, _node,
-    _palette, _pin, _set,
+    BEL, BGE, PIN, _assets, _at, _connect, _declare, _float_type, _log,
+    _palette, _pin, _struct_type,
 )
-from combat.nodes import FN_MAKE_VECTOR, FN_SELECT_VECTOR
 
 SUPPORT_HAND_VAR = "SupportHand"
-SUPPORT_RIFLE_VAR = "SupportRifle"
+# The point, on the anim BP; and under the same name, each gun's own on
+# BP_WeaponItem.
+SUPPORT_POINT_VAR = "SupportPoint"
 
 NODE_TWO_BONE_IK = "Animation|SkeletalControls|TwoBoneIK"
 BONE_SPACE = unreal.BoneControlSpace.BCS_BONE_SPACE
@@ -146,7 +150,7 @@ def patch_support_hand(skin):
 
     _remove_previous(ed)
     _declare(ed, SUPPORT_HAND_VAR, _float_type())
-    _declare(ed, SUPPORT_RIFLE_VAR, BEL.get_basic_type_by_name("bool"))
+    _declare(ed, SUPPORT_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
 
     pose_in = _pin(to_ls[0], "ComponentPose")
     fed = PIN.list_connected_pins(pose_in)
@@ -161,33 +165,21 @@ def patch_support_hand(skin):
 
     weight = _at(ed.add_get_member_variable_node(SUPPORT_HAND_VAR), 0, 1760)
     _connect(_pin(weight, SUPPORT_HAND_VAR, is_input=False), _pin(ik, "Alpha"))
-    # A vector pin takes no literal: one MakeVector per pose, and a pick.
-    points = {"rifle": support_at(skin, skin.aim_rifle),
-              "pistol": support_at(skin, skin.aim_pistol)}
-    made = [ik, weight]
-    pick = _at(_node(ed, FN_SELECT_VECTOR), 0, 1900)
-    for pin, pose, dy in (("A", "rifle", 0), ("B", "pistol", 200)):
-        vec = _at(_node(ed, FN_MAKE_VECTOR), -300, 1900 + dy)
-        for axis, value in zip("XYZ", points[pose]):
-            _set(vec, axis, value)
-        _connect(_pin(vec, "ReturnValue", is_input=False), _pin(pick, pin))
-        made.append(vec)
-    rifle = _at(ed.add_get_member_variable_node(SUPPORT_RIFLE_VAR), -300, 2300)
-    _connect(_pin(rifle, SUPPORT_RIFLE_VAR, is_input=False), _pin(pick, "bPickA"))
-    _connect(_pin(pick, "ReturnValue", is_input=False), _pin(ik, "EffectorLocation"))
-    made += [pick, rifle]
+    point = _at(ed.add_get_member_variable_node(SUPPORT_POINT_VAR), 0, 1900)
+    _connect(_pin(point, SUPPORT_POINT_VAR, is_input=False),
+             _pin(ik, "EffectorLocation"))
     ed.add_comment_to_nodes(
         f"Down the sights the left hand holds the gun: a Two Bone IK puts "
-        f"{skin.pose_bones['hand_l']} at a point in {skin.pose_bones['hand_r']}'s "
-        "space (the gun is rigid to that hand), where the ready pose has it at "
-        f"its start -- the rifle pose's or the pistol's, by {SUPPORT_RIFLE_VAR}. "
-        f"{SUPPORT_HAND_VAR} (0..1, SightBlend, written by BP_WeaponComponent) "
-        "is its weight. See Scripts/combat/support_hand.py.", made)
+        f"{skin.pose_bones['hand_l']} at {SUPPORT_POINT_VAR}, a point in "
+        f"{skin.pose_bones['hand_r']}'s space (the gun is rigid to that hand): "
+        "where the held gun's ready pose has it at its start. "
+        f"{SUPPORT_HAND_VAR} (0..1, SightBlend) is its weight. BP_WeaponComponent "
+        "writes both. See Scripts/combat/support_hand.py.", [ik, weight, point])
 
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{skin.anim_bp} failed to compile after the support hand")
     _assets().save_loaded_asset(bp)
     _log(f"{bp.get_name()}: {SUPPORT_HAND_VAR} holds {skin.pose_bones['hand_l']} at "
-         f"{points['rifle']} (rifle) / {points['pistol']} (pistol) in "
+         f"{SUPPORT_POINT_VAR}, the held gun's point in "
          f"{skin.pose_bones['hand_r']}'s space")
     return bp

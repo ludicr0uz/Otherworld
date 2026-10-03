@@ -42,8 +42,13 @@ creature is still no new hand-authoring -- just more generated assets.
 
 import json
 import os
+import sys
 
 import unreal
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from asset_pipeline import physics_template, player_body          # noqa: E402
 
 PROJECT_DIR = unreal.Paths.project_dir()
 CACHE_ROOT = os.path.join(PROJECT_DIR, "assets", "cache", "meshy")
@@ -329,6 +334,11 @@ def main(only=None):
         if not fbx:
             _log(f"[IMPORT] {sid}: no rigged FBX in cache, skipping")
             continue
+        gate = spec.get("rig_compat") or {}
+        if gate.get("verdict") == "fail":
+            _log(f"[IMPORT] {sid}: FAILED -- its rig cannot stand in for "
+                 f"{gate.get('reference')} (rig_compat.py {sid}); not imported")
+            continue
         asset_name = _monster_name(spec)
         dest_dir = _monster_dir(spec)
         _log(f"[IMPORT] {sid}: importing {os.path.basename(fbx)} -> {dest_dir}/{asset_name}")
@@ -344,6 +354,11 @@ def main(only=None):
             continue
 
         _ensure_physics(mesh)
+        # A body that must replace another takes that body's physics bodies,
+        # so the same bones can be shot whatever this mesh's own came out as.
+        reference = player_body.reference_of(asset_name.replace("SKM_", ""))
+        if reference:
+            physics_template.adopt(asset_name.replace("SKM_", ""), reference)
         ok = check_mesh(mesh, spec)
         skel = mesh.get_editor_property("skeleton")
         _log(f"[IMPORT]   skeleton = {skel.get_name() if skel else None}")

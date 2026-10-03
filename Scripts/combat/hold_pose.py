@@ -43,7 +43,7 @@ Constant clips (a held pose, as the ADS poses are). The slash
 import unreal
 
 from asset_pipeline.rig_util import mesh_ref_pose, visible_bone_xf
-from combat.body_pose import _between, _conj, _mul, _norm
+from combat.body_pose import CLAVICLE_DIR, _between, _conj, _mul, _norm
 from combat.graph import _assets, _log
 from combat.paths import (
     HOLD_ITEM_ANIM_PATH, HOLD_KNIFE_ANIM_PATH, HOLD_TORCH_ANIM_PATH,
@@ -54,26 +54,34 @@ FPS = 30
 FRAMES = 30
 
 # {role: direction of the bone's line to its child}, body frame. Roles are
-# PlayerSkin.pose_bones'; a role left out keeps the idle's.
+# PlayerSkin.pose_bones'; a role left out keeps the idle's. Each turned arm
+# starts at its clavicle, put straight out to the side as body_pose's guard
+# puts it (CLAVICLE_DIR), so the arm starts where the shoulder is on any rig.
+CLAVICLE_R = (-CLAVICLE_DIR[0], CLAVICLE_DIR[1], CLAVICLE_DIR[2])
 HOLD_ITEM_DIRS = {
+    "clavicle_r": CLAVICLE_R,
     "upperarm_r": (-0.10, 0.20, -0.97),
     "forearm_r": (0.15, 0.92, -0.36),
 }
 HOLD_KNIFE_DIRS = {
+    "clavicle_r": CLAVICLE_R,
+    "clavicle_l": CLAVICLE_DIR,
     "upperarm_r": (-0.20, 0.45, -0.87),
     "forearm_r": (0.10, 0.88, 0.46),
     "upperarm_l": (0.10, 0.50, -0.86),
     "forearm_l": (-0.20, 0.40, 0.89),
 }
 HOLD_TORCH_DIRS = {
+    "clavicle_r": CLAVICLE_R,
     "upperarm_r": (-0.45, 0.35, -0.82),
     "forearm_r": (-0.15, 0.55, 0.82),
 }
 WARD_TORCH_DIRS = {
+    "clavicle_r": CLAVICLE_R,
     "upperarm_r": (-0.10, 0.99, 0.10),
     "forearm_r": (0.05, 0.98, 0.20),
 }
-CHILD = {"upperarm": "forearm", "forearm": "hand"}
+CHILD = {"clavicle": "upperarm", "upperarm": "forearm", "forearm": "hand"}
 
 HOLD_POSES = ((HOLD_ITEM_ANIM_PATH, HOLD_ITEM_DIRS),
               (HOLD_KNIFE_ANIM_PATH, HOLD_KNIFE_DIRS),
@@ -110,6 +118,10 @@ def _copy_of(src_path, dst_path):
         clip = _assets().load_asset(dst_path)
         if clip.get_editor_property("skeleton") == src.get_editor_property("skeleton"):
             return clip
+        # Minutes per clip (the editor walks every reference to it):
+        # asset_pipeline/swap_player_body.py clears these before the build.
+        _log(f"note: {dst_path} is keyed on another body's skeleton: deleting "
+             "it through the editor, which is slow")
         if not eal.delete_asset(dst_path):
             raise RuntimeError(f"{dst_path} is on another skeleton and could not "
                                "be deleted; restart the editor")

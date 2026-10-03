@@ -28,6 +28,7 @@ from combat.graph import (
 )
 from combat.paths import ITEM_BP_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
+from combat.support_hand import SUPPORT_POINT_VAR
 from combat.slot_tuning import (
     GUN_KINDS, LONG_GUN, NOT_A_WEAPON, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR,
 )
@@ -172,6 +173,10 @@ def build_weapon_item():
     # the gun across the body instead of the fists (body_pose.py). False on
     # the base, so the pistol and every consumable guard with the fists.
     _declare(ed, "TwoHanded", BEL.get_basic_type_by_name("bool"))
+    # Where this gun's ready pose has the left hand, in the right hand's bone
+    # space (support_hand.py): down the sights the hand is held there. Zero
+    # on the base; nothing holds a hand on an item that has no sights.
+    _declare(ed, SUPPORT_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
     # How far this weapon zooms when the right button is held. On the item for
     # the same reason SpreadDegrees is -- the component reads it off Held and
     # knows nothing about which weapon it is holding.
@@ -369,6 +374,7 @@ def build_weapon(spec, item_bp):
         "ReloadSound": _must_load(spec["reload_sound"]),
         "AimPose": _must_load(spec["aim"]),
         "TwoHanded": bool(spec["two_handed"]),
+        SUPPORT_POINT_VAR: unreal.Vector(*spec["support_point"]),
     })
     _log(f"built {spec['path']} ("
          + (f"model {', '.join(m[1].rsplit('/', 1)[-1] for m in model)}, " if model

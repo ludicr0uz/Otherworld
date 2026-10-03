@@ -121,9 +121,15 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     trace, so blood is on the skin and not on the capsule 10–25 cm in front of it.
 - **The bodies are fitted to the model** (`hit_bodies.py`, run by the build after
   `tune_ragdolls`). The importer wraps each bone's vertices in a box and the box in a capsule,
-  4–8 cm proud of the skin all round. `fit_hit_bodies()` re-derives each capsule's centre,
-  radius and length from the vertices its bone carries (dominant weight; a bone with no body
-  goes to its nearest parent with one), down the longest of the importer's three axes.
+  4–8 cm proud of the skin all round. `fit_hit_bodies()` re-derives each body from the
+  vertices its bone carries (dominant weight; a bone with no body goes to its nearest parent
+  with one). The geometry is `capsule_fit.py` (pure; tests in `dev/tests/test_capsule_fit.py`):
+  the capsule runs down the vertices' own long axis (not the importer's: a physics asset
+  copied from another body has that body's bone frames in its axes), and a body is cut into
+  two to four capsules where that covers 5% less of the picture than one (`SPLIT_GAIN`): a
+  bare thigh tapering to the knee, a forearm whose body also carries the open hand.
+  - That is what lets a bare body pass: the man in boxers went from 28% overhang (one capsule
+    a bone, on the importer's axes) to 17%. Never loosen the bound for a new body.
   - `SkeletalBodySetups` is protected, but each setup is a subobject named
     `SkeletalBodySetup_<n>`: `find_object(physics_asset, name)` reaches it, and its `agg_geom`
     is writable. Array elements come out as copies: edit one and put the array back.

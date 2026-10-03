@@ -6,7 +6,7 @@ import unreal
 
 from combat.hit_bodies import (
     COVERAGE_MAX_HEAD_OVERHANG, COVERAGE_MAX_OVERHANG, COVERAGE_MAX_UNCOVERED,
-    body_coverage, body_fit_plan, saved_capsule,
+    body_coverage, body_fit_plan, saved_capsules,
 )
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.ragdoll import RAGDOLL_MESH_ROOT
@@ -36,11 +36,14 @@ def check_bodies_fit_the_model():
               f"{len(plan)} bodies")
         off = []
         for b in plan:
-            centre, radius, length = saved_capsule(b["setup"])
-            if not (all(_near(x, y) for x, y in zip(centre, b["center"]))
-                    and _near(radius, b["radius"]) and _near(length, b["length"])):
-                off.append((b["bone"], (centre, radius, length),
-                            (b["center"], b["radius"], b["length"])))
+            saved = saved_capsules(b["setup"])
+            want = [(c["center"], c["radius"], c["length"]) for c in b["capsules"]]
+            same = len(saved) == len(want) and all(
+                all(_near(x, y) for x, y in zip(sc, wc)) and _near(sr, wr)
+                and _near(sl, wl)
+                for (sc, sr, sl), (wc, wr, wl) in zip(saved, want))
+            if not same:
+                off.append((b["bone"], saved, want))
         check("...and the saved capsules are the fitted ones", not off, str(off[:3]))
 
         cover = body_coverage(mesh)

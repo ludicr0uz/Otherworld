@@ -74,6 +74,8 @@ import math
 
 import unreal
 
+from asset_pipeline.rig_util import _bone_world
+
 from combat.aim_pitch import (
     MODIFY_BONE_CLASS, NODE_MODIFY_BONE, _feeding_all, _nodes_of,
 )
@@ -113,11 +115,11 @@ CROUCH_LEAN_DEG = 20.0
 # how far the chest is propped up off the ground.
 PRONE_HIPS_CM = 16.0
 PRONE_CHEST_LIFT_DEG = 30.0
-# With the crawl clip: its hips, measured on the adventurer's retargeted
-# A_Adventurer01_UAL1_Swim_Fwd_Loop (-7..-8 through the stroke), lifted to
-# PRONE_HIPS_CM lying still and this much higher crawling, where the kick
-# drops the knees 28 cm under the hips: they then just clear the ground.
-PRONE_CLIP_HIPS_Z = -7.5
+# With the crawl clip: its hips are lifted from where the clip has them
+# (crawl_hips_z: measured off the worn body's own retargeted clip, -7.5 on the
+# dressed adventurer, -8.0 on the one in boxers) to PRONE_HIPS_CM lying still
+# and this much higher crawling, where the kick drops the knees 28 cm under
+# the hips: they then just clear the ground.
 PRONE_CRAWL_LIFT_CM = 15.0
 # A weight that is not a variable (see WITH THE CLIPS above).
 PRONE_MOVING = "ProneMoving"
@@ -129,6 +131,12 @@ GROUND_SPEED = "GroundSpeed"
 # The fists-up guard, as the LEFT arm's directions in the body frame
 # (+X left, +Y forward, +Z up); the right arm mirrors X. The elbow hangs in
 # front of the ribs and the forearm rises to put the fist before the chin.
+# The clavicle first, straight out to the side: a generated body's shoulders
+# sit where its rigger put them (the adventurer in boxers has them 13 cm
+# behind the spine, its clavicles 39 degrees back), and an arm turned from
+# there falls short of the face. On a rig whose clavicles already point
+# sideways it changes next to nothing.
+CLAVICLE_DIR = (1.0, 0.0, 0.0)
 GUARD_UPPERARM_DIR = (-0.05, 0.45, -0.89)
 GUARD_FOREARM_DIR = (-0.10, 0.40, 0.91)
 # The two-handed guard: the chest turns left by this, then leans back by this.
@@ -234,10 +242,11 @@ def _crouch_legs(ref, bones, thigh, calf):
 
 
 def _guard_arm(ref, bones, side):
-    """The two REPLACE rotations that put one arm in the fists-up guard."""
+    """The three REPLACE rotations that put one arm in the fists-up guard."""
     mirror = 1.0 if side == "l" else -1.0
     out = []
-    for role, child, want in (("upperarm", "forearm", GUARD_UPPERARM_DIR),
+    for role, child, want in (("clavicle", "upperarm", CLAVICLE_DIR),
+                              ("upperarm", "forearm", GUARD_UPPERARM_DIR),
                               ("forearm", "hand", GUARD_FOREARM_DIR)):
         at, rot = ref[bones[f"{role}_{side}"]]
         along = _norm(tuple(c - p for c, p in zip(ref[bones[f"{child}_{side}"]][0], at)))
@@ -262,7 +271,7 @@ def pose_plan(skin, ref):
     steps.append((GUARD_GUN, b["neck"], ADDITIVE, _conj(chest), None))
 
     if skin.stance_clips:
-        return steps + _prone_on_clip(b)
+        return steps + _prone_on_clip(b, crawl_hips_z(skin))
 
     thigh = _swing(DOWN, FORWARD, CROUCH_THIGH_DEG)
     # The shin, carried forward by the thigh, swings back to S behind vertical.
@@ -292,11 +301,23 @@ def pose_plan(skin, ref):
     return steps
 
 
-def _prone_on_clip(b):
+def crawl_hips_z(skin):
+    """Where the crawl clip carries the hips (cm, component space): the middle
+    of what they sweep through the stroke, read off the worn body's own clip."""
+    clip = unreal.EditorAssetLibrary.load_asset(skin.prone_crawl)
+    if clip is None:
+        raise RuntimeError(f"could not load the crawl clip {skin.prone_crawl}")
+    length = clip.get_editor_property("sequence_length")
+    zs = [_bone_world(clip, skin.pose_bones["hips"], length * i / 16.0).z
+          for i in range(17)]
+    return round((min(zs) + max(zs)) / 2.0, 2)
+
+
+def _prone_on_clip(b, hips_z):
     """The prone's corrections on the crawl clip (stance_clips.py): lift the
     hips onto the ground, and higher while crawling."""
     return [(POSE_PRONE, b["hips"], IGNORE, None,
-              (0.0, 0.0, PRONE_HIPS_CM - PRONE_CLIP_HIPS_Z)),
+              (0.0, 0.0, PRONE_HIPS_CM - hips_z)),
              (PRONE_MOVING, b["hips"], IGNORE, None, (0.0, 0.0, PRONE_CRAWL_LIFT_CM))]
 
 

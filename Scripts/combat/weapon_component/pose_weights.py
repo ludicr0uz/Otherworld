@@ -38,17 +38,22 @@ from combat.nodes import (
 )
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
+from combat.support_hand import SUPPORT_POINT_VAR
 from combat.weapon_component.sight_pitch import _anim_class_path
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
 
 HELD_TWO_HANDED = "HeldTwoHanded"
+# Held.SupportPoint, copied beside it: where the held gun's ready pose has the
+# left hand (support_hand.py). Kept with nothing held; nothing reads it then.
+HELD_SUPPORT_POINT = "HeldSupportPoint"
 # The loot window is open (the HUD writes it, graphics_menu/loot_kneel.py).
 SEARCHING_VAR = "Searching"
 FN_FMOD = "/Script/Engine.KismetMathLibrary.FMod"
 
 
 def _author_held_two_handed(ed, held, armed_out, exec_ins, x0, y0):
-    """HeldTwoHanded = IsValid(Held) ? Held.TwoHanded : false."""
+    """HeldTwoHanded = IsValid(Held) ? Held.TwoHanded : false, and with a
+    valid Held, HeldSupportPoint = Held.SupportPoint."""
     gate = _at(ed.add_branch_node(), x0, y0)
     _connect(armed_out, _pin(gate, "Condition"))
     for e in exec_ins:
@@ -62,7 +67,14 @@ def _author_held_two_handed(ed, held, armed_out, exec_ins, x0, y0):
     clear = _at(ed.add_set_member_variable_node(HELD_TWO_HANDED), x0 + 500, y0 + 300)
     _set(clear, HELD_TWO_HANDED, "false")
     _connect(BEL.find_else_pin(gate), _pin(clear, "execute"))
-    return (BEL.find_then_pin(copy), BEL.find_then_pin(clear))
+    point = _at(ed.add_get_member_variable_node(SUPPORT_POINT_VAR, ITEM_CLASS_PATH),
+                x0 + 240, y0 + 420)
+    _connect(held, _pin(point, "self"))
+    keep = _at(ed.add_set_member_variable_node(HELD_SUPPORT_POINT), x0 + 760, y0)
+    _connect(_pin(point, SUPPORT_POINT_VAR, is_input=False),
+             _pin(keep, HELD_SUPPORT_POINT))
+    _connect(BEL.find_then_pin(copy), _pin(keep, "execute"))
+    return (BEL.find_then_pin(keep), BEL.find_then_pin(clear))
 
 
 def _targets(ed, x0, y0):

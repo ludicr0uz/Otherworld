@@ -28,7 +28,7 @@ from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR
 from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
-from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_RIFLE_VAR
+from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.sway_tuning import SWAY_TIME_VAR
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from probes.probe_sight_align import HUD_BP_PATH, _file, _held_name, _hold, _live_hud
@@ -106,13 +106,14 @@ def _run(p):
             if walk:
                 p.check(f"{gun}, walking: the player did walk", walked > 100.0,
                         f"{walked:.0f} cm")
+            held_point = p.get(p.get(wc, "Held"), SUPPORT_POINT_VAR)
             p.check(f"{gun}, {label}, down the sights: the hold is on "
-                    f"({SUPPORT_HAND_VAR} 1, {SUPPORT_RIFLE_VAR} {two_handed}) over "
+                    f"({SUPPORT_HAND_VAR} 1, {SUPPORT_POINT_VAR} the gun's own) over "
                     f"{len(weights)} frames",
                     len(weights) > 10 and min(weights) > 1.0 - FREE
-                    and p.get(anim, SUPPORT_RIFLE_VAR) == two_handed,
-                    f"least {min(weights):.4f}, {SUPPORT_RIFLE_VAR} "
-                    f"{p.get(anim, SUPPORT_RIFLE_VAR)}")
+                    and (p.get(anim, SUPPORT_POINT_VAR) - held_point).length() < 0.01,
+                    f"least {min(weights):.4f}, {SUPPORT_POINT_VAR} "
+                    f"{p.get(anim, SUPPORT_POINT_VAR)} against {held_point}")
             for hand, _bone in hands:
                 moved = _spread(seen[hand])
                 p.check(f"{gun}, {label}: the {hand} hand does not move in the gun's "

@@ -18,6 +18,7 @@ from combat.paths import (
     UI_ART_DIR,
 )
 from combat.skin import player_skin
+from combat.support_hand import support_at
 from item_icons.items import icon_name
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN
 from combat.throw_tuning import THROW_PITCH_COLUMN, THROW_PITCH_UP_DEG
@@ -250,6 +251,9 @@ def _weapon_specs():
         # (body_pose.py) picks fists or the gun across the body on it.
         spec["two_handed"] = spec["aim"] in two_handed_poses(skin)
         spec["grip_loc"] = _grip_location(spec["aim"], spec["grip_rot"], spec["parts"])
+        # Where its own ready pose has the left hand: held there down the
+        # sights (support_hand.py).
+        spec["support_point"] = support_at(skin, spec["aim"])
     return specs
 
 

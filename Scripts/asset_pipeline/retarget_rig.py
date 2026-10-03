@@ -9,6 +9,7 @@ retargeter's finger and mapping checks read CHAINS_MESHY.
 
 import unreal
 
+from asset_pipeline.clavicle_align import align_clavicles
 from asset_pipeline.palm_twist import _apply_palm_twist
 from asset_pipeline.rig_chains import CHAINS_MESHY, meshy_finger_bones
 from asset_pipeline.rig_util import _bone_names, _load, _log, _reuse_or_create
@@ -108,6 +109,9 @@ def build_retargeter(source_rig, target_rig, pkg, palm_angles=None):
     # conventions -- Mixamo and Epic do not.
     ctl.auto_align_all_bones(unreal.RetargetSourceOrTarget.TARGET,
                              unreal.RetargetAutoAlignMethod.CHAIN_TO_CHAIN)
+    # Then the clavicles, which that leaves as they are, and the arms again
+    # from where they now hang (clavicle_align.py).
+    align_clavicles(ctl, source_rig, target_rig, name)
     _log(f"{name}: target retarget pose auto-aligned to the source (chain to chain)")
 
     # Chain alignment fixes DIRECTION and leaves ROLL, which is why the monsters

@@ -58,7 +58,9 @@ menu polls its own copy from `DrawHUD`, which does.
   its own, `A_AimShotgun` (`shotgun_pose.py`): the rifle's, with the right thumb over the
   stock's wrist and the left along the pump, out of its low sight line, and the left hand
   turned under the pump with its fingers closed on the wood (the rifle pose cups a deep
-  handguard: its knuckles stood inside the pump and its fingers out to the right).
+  handguard: its knuckles stood inside the pump and its fingers out to the right), and
+  moved, with the arm, to where its own fingers fit the pump (`pump_seat.py`: the rifle
+  pose's wrist is right only by the accident of one body's hands).
 - **The SMG, the rifle and the sniper are Fab models** (`weapon_models.py`): the FPS Weapon
   Bundle's SMG11 (`SK_SMG11_X`, a MAC-11 with its wire stock folded), AK 47 (`SK_KA47_X`) and
   AS Val (`SK_KA_Val_X`) with its 25x56 scope, under `/Game/FPS_Weapon_Bundle`.
@@ -554,7 +556,7 @@ These are feel checks a headless run can't do:
 - a real trigger pull through the hit zones (a pistol head shot should take a wanderer from 100
   to 61);
 - the fitted hit bodies (`hit_bodies.py`): whether a shot that looks on the zombie ever misses
-  (the bodies are one capsule a bone; `FIT_ROUNDNESS` and `FIT_END_OVERLAP` trade overhang
+  (the bodies are capsules down each bone's own vertices, cut where a limb tapers: `capsule_fit.py`; `FIT_ROUNDNESS` and `FIT_END_OVERLAP` trade overhang
   for gaps), and whether a near miss vanishing at the capsule, with no chips behind, shows;
 - the pistol emptying after 8 shots, clicking, and R refilling it to 8 (no key can be injected
   into a headless game, so only the verifier covers this);

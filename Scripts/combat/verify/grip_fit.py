@@ -14,11 +14,14 @@ the one it fits in).
 
 import unreal
 
-from combat.grip import fist_in_socket, part_placement
+from combat.grip import (
+    box_distance, fist_in_socket, placed_part, wrapping_joints,
+)
 from combat.weapon_specs import _weapon_specs
 from combat.verify.common import cdo, check, load
 
-# The handle's centre may sit this far off the fist's centre.
+# The handle's centre may sit this far off the fist's centre (the build eases
+# it up to grip.SEAT_EASE_MAX_CM off, out of a joint that would stand in it).
 FIST_MISS_CM = 0.5
 # How far a joint may sink into the box. A round fist cannot hug a box's
 # corners; measured at most 0.33 cm on the five weapons.
@@ -28,23 +31,6 @@ JOINT_SINK_CM = 0.5
 JOINT_REACH_CM = 3.5
 # The index's two outer joints, to the trigger guard. Measured 0.5-1.9 cm.
 TRIGGER_REACH_CM = 2.5
-
-
-def _placed(weapon, parts, name):
-    """(Transform into the part's own frame, its half extents) in the socket."""
-    centre, rot, half = part_placement(parts, name)
-    xf = unreal.MathLibrary.compose_transforms(
-        unreal.Transform(location=centre, rotation=rot,
-                         scale=unreal.Vector(1.0, 1.0, 1.0)), weapon)
-    return xf, unreal.MathLibrary.invert_transform(xf), half
-
-
-def _box_distance(into, half, point):
-    """Signed distance from a point to a box: negative inside."""
-    p = unreal.MathLibrary.transform_location(into, point)
-    d = [abs(v) - h for v, h in zip(p.to_tuple(), half.to_tuple())]
-    out = sum(max(x, 0.0) ** 2 for x in d) ** 0.5
-    return out if out > 0.0 else max(d)
 
 
 def grip_fit(bp, aim, parts, part, trigger=None):
@@ -60,13 +46,13 @@ def grip_fit(bp, aim, parts, part, trigger=None):
                               rotation=d.get_editor_property("GripRotation"),
                               scale=unreal.Vector(1.0, 1.0, 1.0))
     fist, fingers = fist_in_socket(aim)
-    handle, into, half = _placed(weapon, parts, part)
-    index, rest = fingers[0], fingers[1:]
-    wrap = [_box_distance(into, half, j) for j in [index[0]] + [j for f in rest for j in f]]
+    handle, into, half = placed_part(weapon, parts, part)
+    index = fingers[0]
+    wrap = [box_distance(into, half, j) for j in wrapping_joints(fingers)]
     on_trigger = None
     if trigger:
-        _xf, into_guard, guard_half = _placed(weapon, parts, trigger)
-        on_trigger = min(_box_distance(into_guard, guard_half, j) for j in index[1:])
+        _xf, into_guard, guard_half = placed_part(weapon, parts, trigger)
+        on_trigger = min(box_distance(into_guard, guard_half, j) for j in index[1:])
     return dict(miss=(handle.translation - fist).length(),
                 sink=-min(wrap), reach=max(wrap), trigger=on_trigger)
 

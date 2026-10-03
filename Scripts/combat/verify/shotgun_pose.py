@@ -14,6 +14,7 @@ from combat.body_pose import _conj, _norm, _turn
 from combat.grip import _grip_rotation, _grip_socket, fist_in_socket, part_placement
 from combat.hold_pose import _shown
 from combat.paths import SHOTGUN_AIM_ANIM_PATH, SHOTGUN_BP_PATH
+from combat import pump_seat
 from combat.shotgun_pose import (
     FINGER_TIP_CM, SHOTGUN_THUMBS, SUPPORT_FINGERS, SUPPORT_PALM, THUMB_TIP_CM,
     thumb_lines, weapon_rotation,
@@ -43,6 +44,12 @@ def _placed_bones(skin):
     return {b.lower() for b in bones}
 
 
+def _carried_bones(skin):
+    """The left arm's two bones, lower case: turned to carry the hand onto
+    the pump, moving as the rifle pose's do."""
+    return {skin.pose_bones[f"{k}_l"].lower() for k in ("upperarm", "forearm")}
+
+
 def _sampled(clip, bone, frame):
     return unreal.AnimationLibrary.get_bone_pose_for_frame(clip, bone, frame, False)
 
@@ -70,22 +77,33 @@ def check_shotgun_clip():
     thumbs = _placed_bones(skin)
     frames = sorted({0, n // 2, n - 1})
     off = []
+    arm = _carried_bones(skin)
     for track in sorted(str(t) for t in theirs.get_bone_track_names()):
-        if track.lower() in thumbs:
+        if track.lower() in thumbs or track.lower() in arm:
             continue
         for f in frames:
             a, b = _sampled(clip, track, f), _sampled(rifle, track, f)
             if (a.rotation.angular_distance(b.rotation) > SAME_RAD
                     or (a.translation - b.translation).length() > SAME_CM):
                 off.append(f"{track}@{f}")
-    check("...and every track but the thumbs', the left hand's and its fingers' is "
-          "the rifle pose's "
+    check("...and every track but the thumbs', the left arm's, hand's and its "
+          "fingers' is the rifle pose's "
           f"(frames {frames})", not off, str(off[:6]))
     moved = [b for b in sorted(thumbs)
              if _sampled(clip, b, 0).rotation.angular_distance(
                  _sampled(clip, b, n - 1).rotation) > SAME_RAD]
     check("...the thumbs, the left hand and its fingers held still through it",
           not moved, str(moved))
+    # The arm is the rifle pose's arm under one fixed turn: the same on
+    # every key, so it breathes as the rifle pose does.
+    drift = []
+    for b in sorted(arm):
+        turns = [_sampled(rifle, b, f).rotation.inversed() * _sampled(clip, b, f).rotation
+                 for f in frames]
+        if any(t.angular_distance(turns[0]) > SAME_RAD for t in turns[1:]):
+            drift.append(b)
+    check("...and the left arm turned by one turn on every key, to carry the "
+          "hand onto the pump", not drift, str(drift))
 
 
 def _in_weapon():
@@ -161,11 +179,8 @@ def check_shotgun_thumbs():
 
 def pump_distance(point):
     """Signed distance from a point in the weapon's frame to the pump's box
-    (SHOTGUN_PUMP): negative inside. Pure."""
-    lo, hi = SHOTGUN_PUMP
-    d = [max(l - p, p - h) for p, l, h in zip(point, lo, hi)]
-    out = sum(max(x, 0.0) ** 2 for x in d) ** 0.5
-    return out if out > 0.0 else max(d)
+    (SHOTGUN_PUMP): negative inside."""
+    return pump_seat.box_distance(SHOTGUN_PUMP, point)
 
 
 def check_support_fingers():

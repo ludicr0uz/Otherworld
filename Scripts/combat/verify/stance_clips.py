@@ -17,7 +17,7 @@ from asset_pipeline.rig_util import _bone_world
 from combat.anim_blueprint import AIM_SLOT, _slot_name
 from combat.body_pose import (
     KNEEL_FROM_S, KNEEL_TIME, KNEEL_TO_S, MOVE_FULL_CM_S, POSE_CROUCH, POSE_KNEEL,
-    POSE_PRONE, PRONE_CLIP_HIPS_Z, PRONE_CRAWL_LIFT_CM, PRONE_HIPS_CM,
+    POSE_PRONE, PRONE_CRAWL_LIFT_CM, PRONE_HIPS_CM, crawl_hips_z,
 )
 from combat.skin import player_skin
 from combat.stance_clips import (
@@ -180,10 +180,12 @@ def check_crawl_on_ground():
     hips = b["hips"]
     lying = ["Head", hips, b["spine"], b["upperarm_l"], b["upperarm_r"],
              b["hand_l"], b["hand_r"], b["calf_l"], b["calf_r"], b["foot_l"], b["foot_r"]]
-    rest_lift = PRONE_HIPS_CM - PRONE_CLIP_HIPS_Z
+    clip_z = crawl_hips_z(skin)
+    rest_lift = PRONE_HIPS_CM - clip_z
     hips_z = [p[hips].z for p in _samples(crawl, [hips])]
-    check(f"the crawl's hips are where body_pose lifts them from ({PRONE_CLIP_HIPS_Z:g} cm)",
-          all(abs(z - PRONE_CLIP_HIPS_Z) < 1.0 for z in hips_z),
+    check(f"the crawl's hips stay within 1 cm of where body_pose lifts them "
+          f"from ({clip_z:g} cm, measured off this body's clip)",
+          all(abs(z - clip_z) < 1.0 for z in hips_z),
           f"{min(hips_z):.1f}..{max(hips_z):.1f}")
 
     length = crawl.get_editor_property("sequence_length")

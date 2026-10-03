@@ -56,6 +56,7 @@ import unreal                                                     # noqa: E402
 
 from asset_pipeline.finger_rig import ensure_fingers              # noqa: E402
 from asset_pipeline.finger_verify import verify_fingers           # noqa: E402
+from asset_pipeline.two_hands import keep_two_hands               # noqa: E402
 from asset_pipeline.mixamo_locomotion import (                    # noqa: E402
     apply_locomotion, mixamo_ready,
 )
@@ -222,6 +223,7 @@ def main(only=None):
                 f"correction (tolerance {PALM_TOLERANCE_DEG}); the creature "
                 "would run with its palms turned")
 
+        keep_two_hands(anim_dir(name), anim_prefix(name))
         # After the copy, before the checks: verify() asserts the graph is clean.
         fix_retargeted_abp(abp_path(name), skeleton)
         totals.append((name, *verify(created, name, skeleton), worst))

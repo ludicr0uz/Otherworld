@@ -142,9 +142,9 @@ ADVENTURER = MonsterSpec(
 # every slot empty. Bare skin is also the easy case for Meshy's rigger: no
 # loose hem or cuff for it to skin to the wrong bone.
 #
-# Not worn yet. The player still wears ADVENTURER (combat/skin.py) until the
-# clothing task moves the player onto this rig; until then it is imported on
-# its own skeleton and left alone.
+# Never worn, and superseded by ADVENTURER_03 below. It is kept as test data:
+# a rig that was NOT compatible as generated (rig_compat.py: clavicles 39
+# degrees off), which the import-time normalising has to carry, and does.
 ADVENTURER_BASE = MonsterSpec(
     id="adventurer_02",
     # Led by what he wears, and with nothing about horror or survival: the
@@ -162,14 +162,50 @@ ADVENTURER_BASE = MonsterSpec(
     ),
     height_meters=QUINN_HEIGHT_M,
     dest="/Game/Sourced/Characters/SKM_Adventurer02",
+    compatible_with="adventurer_01",
     note="The player in boxers, the base the garments go on. The same face "
          "and height as adventurer_01, so moving the player onto it changes "
          "the clothes and nothing else.",
 )
 
+# ── A body that swaps in for the player's ────────────────────────────────────
+#
+# The first body made to REPLACE the player's rather than to stand beside it:
+# the same man in tight boxer briefs, the base the clothing options are drawn
+# over. ``compatible_with`` is what makes it swappable: its rig is checked
+# against adventurer_01's as soon as it is rigged (rig_compat.py), and the
+# import normalises it to that body (player_body.py lists what follows).
+#
+# A new body like it is one more spec here with its own description and the
+# same ``compatible_with``; nothing else in the repo names it until
+# player_body.PLAYER_BODY does.
+#
+# Tight, not loose: a boxer short's hem hangs off the thigh, skins to the
+# wrong bone and would poke through trousers drawn over it. The pose is left
+# to ``pose_mode`` and said once, as adventurer_01's prompt says it:
+# adventurer_02's "arms angled down and away from the body" came back with the
+# arms hung behind the shoulders, 39 degrees off adventurer_01's.
+ADVENTURER_03 = MonsterSpec(
+    id="adventurer_03",
+    prompt=(
+        "Full body 3D character, an adult man wearing nothing but plain dark "
+        "grey tight-fitting boxer briefs underwear, snug on the hips and "
+        "thighs, barefoot with bare toes, bare knees and bare legs, shirtless "
+        "with a bare chest, lean athletic build, weathered rugged face with "
+        "short stubble and cropped dark hair, base mesh for a clothing "
+        "system, standing upright, A-pose, photorealistic skin, PBR textures, "
+        "Unreal Engine 5 style, 4k resolution, symmetrical posture for rigging"
+    ),
+    height_meters=QUINN_HEIGHT_M,
+    dest="/Game/Sourced/Characters/SKM_Adventurer03",
+    compatible_with="adventurer_01",
+    note="The player in tight boxers: a body generated to swap in for "
+         "adventurer_01 by player_body.PLAYER_BODY alone.",
+)
+
 # What fetch_monsters.py iterates. MONSTERS is kept as its own name because
 # npc_placement.py's variants and the spawn logic are about monsters only.
-CHARACTERS = MONSTERS + (ADVENTURER, ADVENTURER_BASE)
+CHARACTERS = MONSTERS + (ADVENTURER, ADVENTURER_BASE, ADVENTURER_03)
 
 
 def by_id(spec_id: str):

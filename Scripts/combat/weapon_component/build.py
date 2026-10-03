@@ -44,7 +44,9 @@ from combat.weapon_component.knife import (
     KNIFE_ANIM_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR,
     NEXT_KNIFE_VAR,
 )
-from combat.weapon_component.pose_weights import HELD_TWO_HANDED, SEARCHING_VAR
+from combat.weapon_component.pose_weights import (
+    HELD_SUPPORT_POINT, HELD_TWO_HANDED, SEARCHING_VAR,
+)
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
     PUNCH_QUEUED_VAR,
@@ -162,6 +164,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # Held.TwoHanded, or false with nothing held: copied behind an IsValid
     # Branch once a frame so the guard pose never reads a null Held.
     _declare(ed, HELD_TWO_HANDED, BEL.get_basic_type_by_name("bool"))
+    # Held.SupportPoint, copied beside it (weapon_component/support_hand.py).
+    _declare(ed, HELD_SUPPORT_POINT, _struct_type(unreal.Vector.static_struct()))
     # A body is being searched: the HUD writes it while its loot window is
     # open, and the pose weights kneel the body from it.
     _declare(ed, SEARCHING_VAR, BEL.get_basic_type_by_name("bool"))

@@ -37,9 +37,15 @@ the barrel, +Y right, +Z up):
 
   - the left hand is turned about its own wrist (SUPPORT_PALM): the line from
     the wrist to the middle knuckle and the line across the knuckles, index
-    to pinky, are swung onto the table's, which lays the palm under the pump.
-    The wrist does not move, so the support hand's point (support_hand.py)
-    is the rifle pose's;
+    to pinky, are swung onto the table's, which lays the palm under the pump;
+  - the hand, so shaped, is then MOVED to where its own fingers close on the
+    pump (pump_seat.py: every joint as near 0.75 cm off the wood as the worst
+    can be), and the left arm's two bones are turned to carry the wrist there
+    (asset_pipeline/two_hands.reach), by the same turn on every key so the
+    arm keeps the rifle pose's breathing. Where the rifle pose's wrist was is
+    a matter of the body's arms and how big its hands are; the pump is where
+    it is. The support hand's point (support_hand.py) is read off this clip,
+    so down the sights the hand is held where it was seated;
   - the three joints of each thumb (PlayerSkin.grip_thumb, support_thumb) and
     of each left finger (support_fingers): each joint's line to the next is
     swung, by the shortest turn, onto its direction in SHOTGUN_THUMBS or
@@ -57,11 +63,16 @@ pose.
 import unreal
 
 from asset_pipeline.rig_util import mesh_ref_pose
+from asset_pipeline.two_hands import reach
+from combat import pump_seat
 from combat.body_pose import _between, _conj, _mul, _norm, _turn
 from combat.graph import _assets, _log
-from combat.grip import _grip_rotation, _grip_socket
+from combat.grip import (
+    _grip_location, _grip_rotation, _grip_socket, part_placement,
+)
 from combat.hold_pose import _below, _copy_of, _q, _shown
 from combat.paths import SHOTGUN_AIM_ANIM_PATH
+from combat.weapon_models import SHOTGUN_PUMP, shotgun_outline
 
 # {PlayerSkin's thumb: the line of each of its joints to the next, palm out,
 # in the weapon's frame}.
@@ -163,10 +174,60 @@ def support_hand_pose(skin, comp, ref, weapon):
     return out, hand
 
 
+def weapon_origin(comp, grip_loc):
+    """Where the weapon's own origin is in the component, against a component
+    pose ``comp``: the grip socket, then GripLocation (the weapon is attached
+    at the socket and moved by it, in the socket's frame)."""
+    _mesh_yaw, socket = _grip_socket()
+    bone = str(socket.get_editor_property("bone_name"))
+    in_bone = _q(socket.get_editor_property("relative_rotation").quaternion())
+    at = socket.get_editor_property("relative_location")
+    loc = tuple(a + g for a, g in zip((at.x, at.y, at.z), _turn(in_bone, grip_loc)))
+    return tuple(c + o for c, o in zip(comp[bone][0], _turn(comp[bone][1], loc)))
+
+
+def finger_points(bones, dirs, placed, weapon, tip_cm):
+    """Where a finger's (or thumb's) joints and tip are once its joints point
+    along ``dirs`` (the weapon's frame): its knuckle where ``placed`` has it,
+    each bone its own length. Component space. Pure."""
+    at = [placed[bones[0]][0]]
+    lengths = [sum((c - p) ** 2 for p, c in zip(placed[a][0], placed[b][0])) ** 0.5
+               for a, b in zip(bones, bones[1:])] + [tip_cm]
+    for want, length in zip(dirs, lengths):
+        line = _turn(weapon, _norm(want))
+        at.append(tuple(p + length * d for p, d in zip(at[-1], line)))
+    return at
+
+
+def pump_move(skin, placed, weapon, origin):
+    """How far to move the shaped left hand so its fingers close on the pump
+    (pump_seat.seat), in the component."""
+    into = _conj(weapon)
+
+    def in_weapon(point):
+        return _turn(into, tuple(p - o for p, o in zip(point, origin)))
+
+    joints = [in_weapon(p) for bones, dirs in zip(skin.support_fingers, SUPPORT_FINGERS)
+              for p in finger_points(bones, dirs, placed, weapon, FINGER_TIP_CM)]
+    thumb = [in_weapon(p) for p in finger_points(
+        skin.support_thumb, SHOTGUN_THUMBS["support_thumb"], placed, weapon,
+        THUMB_TIP_CM)[1:]]
+    centre, _rot, half = part_placement(shotgun_outline(), "Barrel")
+    move = pump_seat.seat(SHOTGUN_PUMP, joints, thumb, centre.z + half.z)
+    was, now = (pump_seat.misfit(SHOTGUN_PUMP, joints, m)
+                for m in ((0.0, 0.0, 0.0), move))
+    _log(f"A_AimShotgun: the left hand moved ({move[0]:.1f}, {move[1]:.1f}, "
+         f"{move[2]:.1f}) cm in the weapon's frame onto the pump: its worst "
+         f"joint {was:.2f} -> {now:.2f} cm from riding "
+         f"{pump_seat.SEAT_OFF_CM:g} cm off the wood")
+    return _turn(weapon, move)
+
+
 def _keyed_locals(skin, comp, ref):
-    """{bone: local Transform} for everything this pose places: the left
-    hand, its fingers and both thumbs. The rifle pose's translations and
-    scales, the new rotations."""
+    """({bone: local Transform} for everything this pose holds still: the left
+    hand, its fingers and both thumbs; {bone: local turn} for the left arm's
+    two bones, to be laid over every key of theirs). The rifle pose's
+    translations and scales, the new rotations."""
     weapon = weapon_rotation(skin, comp)
     placed, hand = support_hand_pose(skin, comp, ref, weapon)
     turned = {hand: placed[hand][1]}
@@ -174,8 +235,28 @@ def _keyed_locals(skin, comp, ref):
         turned.update(thumb_rotations(getattr(skin, thumb), dirs, placed, weapon))
     for bones, dirs in zip(skin.support_fingers, SUPPORT_FINGERS):
         turned.update(thumb_rotations(bones, dirs, placed, weapon))
+
+    # The shaped hand, moved onto the pump; the arm turned to carry it there.
+    grip_rot = _grip_rotation(skin.aim_rifle)
+    grip_loc = _grip_location(skin.aim_rifle, grip_rot, shotgun_outline())
+    origin = weapon_origin(comp, grip_loc)
+    upper_b, fore_b = (skin.pose_bones[f"{k}_l"] for k in ("upperarm", "forearm"))
+    wrist = placed[hand][0]
+    target = tuple(w + m for w, m in zip(wrist, pump_move(skin, placed, weapon, origin)))
+    upper, fore = reach(comp[upper_b][0], comp[fore_b][0], wrist, target)
+    arm = {upper_b: _mul(upper, comp[upper_b][1]),
+           fore_b: _mul(fore, _mul(upper, comp[fore_b][1]))}
+    carried = {}
+    for bone in (upper_b, fore_b):
+        up = arm.get(ref[bone][1], comp[ref[bone][1]][1])
+        was = _q(comp[bone][2].rotation)
+        carried[bone] = _mul(_conj(was), _mul(_conj(up), arm[bone]))
+    turned.update(arm)
+
     out = {}
     for bone, rotation in turned.items():
+        if bone in arm:
+            continue
         parent = ref[bone][1]
         up = turned.get(parent, placed[parent][1])
         local = comp[bone][2]
@@ -183,7 +264,7 @@ def _keyed_locals(skin, comp, ref):
             location=local.translation,
             rotation=unreal.Quat(*_mul(_conj(up), rotation)).rotator(),
             scale=local.scale3d)
-    return out
+    return out, carried
 
 
 def build_shotgun_pose(skin):
@@ -194,13 +275,14 @@ def build_shotgun_pose(skin):
         raise RuntimeError(f"could not load {skin.aim_rifle}")
     mesh = _assets().load_asset(skin.mesh)
     ref = mesh_ref_pose(mesh)
-    thumbs = _keyed_locals(skin, _shown(rifle, mesh, ref), ref)
+    thumbs, carried = _keyed_locals(skin, _shown(rifle, mesh, ref), ref)
     model = rifle.data_model_interface
     frames = model.get_number_of_frames()
     n = model.get_number_of_keys()
     # Track names are FNames and can come back in another case than the bones.
     by_lower = {b.lower(): b for b in ref}
-    tracks = {by_lower[str(t).lower()] for t in model.get_bone_track_names()} | set(thumbs)
+    tracks = ({by_lower[str(t).lower()] for t in model.get_bone_track_names()}
+              | set(thumbs) | set(carried))
 
     clip = _copy_of(skin.aim_rifle, SHOTGUN_AIM_ANIM_PATH)
     ctrl = clip.controller
@@ -215,8 +297,11 @@ def build_shotgun_pose(skin):
         else:
             got = [unreal.AnimationLibrary.get_bone_pose_for_frame(rifle, track, f, False)
                    for f in range(n)]
-            keys = ([t.translation for t in got], [t.rotation for t in got],
-                    [t.scale3d for t in got])
+            rots = [t.rotation for t in got]
+            if track in carried:
+                # The rifle pose's own motion, with the one turn laid over it.
+                rots = [unreal.Quat(*_mul(_q(r), carried[track])) for r in rots]
+            keys = ([t.translation for t in got], rots, [t.scale3d for t in got])
         if not ctrl.add_bone_curve(track, False):
             raise RuntimeError(f"could not add a track for {track}")
         if not ctrl.set_bone_track_keys(track, *keys, False):
@@ -226,5 +311,5 @@ def build_shotgun_pose(skin):
     _log(f"built {SHOTGUN_AIM_ANIM_PATH} ({len(tracks)} tracks off "
          f"{skin.aim_rifle.rsplit('/', 1)[-1]}, {n} keys; both thumbs, the left "
          f"hand and its fingers placed for a straight stock and a pump: "
-         f"{len(thumbs)} bones)")
+         f"{len(thumbs)} bones; the left arm carries the hand onto the pump)")
     return clip

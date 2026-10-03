@@ -10,13 +10,23 @@ Host-side (no ``unreal``):
     skeleton_probe.py           fingerprint a cached GLB's bone hierarchy
     rig_compat.py               can one cached rig replace another: compatible,
                                 normalise or fail (tests: dev/tests/test_rig_compat.py)
+    player_body.py              constants: THE setting naming the player's body,
+                                and the clothing base body
+    swap_player_body.py         entry point: write that setting, import, rebuild, verify
     fab_library.py              Fab manifest (fab_library.json) + CLI; acquisition is manual
 
 Editor-side, in pipeline order:
+    import_body.py              entry point: bring in every cached character not
+                                imported yet (the three steps below, for it alone)
     import_characters.py        entry point: cached FBX -> SKM_/SK_ per character
+    physics_template.py         a body that replaces another takes its physics
+                                bodies; joints reseated on its own bones
     build_creature_materials.py entry point: the creature material and instances
     build_retarget.py           entry point: fingers, IK rigs, retargeters, clips
     finger_rig.py               add and skin 15 finger bones per Meshy hand
+    clavicle_align.py           turn a clavicle far off the source's onto its line
+    two_hands.py                the two-handed ready poses keep the source's hand spacing
+    quat_math.py                quaternion/vector tuples for the passes above
     palm_twist.py               hand frame from skinned geometry; palm roll calibration
     retarget_abp.py             fix the copied ABP_Unarmed for the Meshy skeleton
     retarget_verify.py          retargeted clips stand, stay in place and step

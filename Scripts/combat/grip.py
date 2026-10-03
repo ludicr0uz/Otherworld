@@ -281,17 +281,92 @@ def part_placement(parts, name):
     raise RuntimeError(f"no {name!r} part to hold the weapon by")
 
 
+def placed_part(weapon, parts, name):
+    """(the part's Transform in the socket, the Transform into the part's own
+    frame, its half extents) for a weapon placed in the socket by ``weapon``
+    (GripLocation and GripRotation as a Transform)."""
+    centre, rot, half = part_placement(parts, name)
+    xf = unreal.MathLibrary.compose_transforms(
+        unreal.Transform(location=centre, rotation=rot,
+                         scale=unreal.Vector(1.0, 1.0, 1.0)), weapon)
+    return xf, unreal.MathLibrary.invert_transform(xf), half
+
+
+def box_distance(into, half, point):
+    """Signed distance from a point to a box: negative inside."""
+    p = unreal.MathLibrary.transform_location(into, point)
+    d = [abs(v) - h for v, h in zip(p.to_tuple(), half.to_tuple())]
+    out = sum(max(x, 0.0) ** 2 for x in d) ** 0.5
+    return out if out > 0.0 else max(d)
+
+
+def wrapping_joints(fingers):
+    """The joints that close on a handle: the index's knuckle and all of the
+    other three fingers. The index's outer joints are on the trigger."""
+    index, rest = fingers[0], fingers[1:]
+    return [index[0]] + [j for f in rest for j in f]
+
+
+# A handle is seated at the middle of the fist, and that is where it stays
+# when the hand fits it. A hand smaller than the one a handle was measured
+# against closes tighter, and its joints then stand inside a thick handle (the
+# stick's, 0.62 cm deep on the adventurer in boxers). So where any wrapping
+# joint would sink past the first, the handle is eased off the middle by the
+# least that brings them out to it, and never by more than the second (the
+# verifier allows 0.5 cm of sink and 0.5 cm off the fist's middle); a handle
+# that even that does not fit stays at the middle.
+SEAT_SINK_CM = 0.35
+SEAT_EASE_MAX_CM = 0.4
+_EASE_STEP_CM = 0.05
+_EASE_DIRS = tuple(unreal.Vector(x, y, z).normal()
+                   for x in (-1, 0, 1) for y in (-1, 0, 1) for z in (-1, 0, 1)
+                   if (x, y, z) != (0, 0, 0))
+
+
+def _sink(loc, grip_rot, parts, part, joints):
+    weapon = unreal.Transform(location=loc, rotation=grip_rot,
+                              scale=unreal.Vector(1.0, 1.0, 1.0))
+    _xf, into, half = placed_part(weapon, parts, part)
+    return -min(box_distance(into, half, j) for j in joints)
+
+
+def _eased(loc, grip_rot, parts, part, fingers):
+    """``loc``, or the nearest point to it (within SEAT_EASE_MAX_CM) where no
+    wrapping joint is more than SEAT_SINK_CM inside ``part``; (location, how
+    far it moved)."""
+    joints = wrapping_joints(fingers)
+    if _sink(loc, grip_rot, parts, part, joints) <= SEAT_SINK_CM:
+        return loc, 0.0
+    best = (_sink(loc, grip_rot, parts, part, joints), loc, 0.0)
+    steps = int(round(SEAT_EASE_MAX_CM / _EASE_STEP_CM))
+    for i in range(1, steps + 1):
+        reach = i * _EASE_STEP_CM
+        for d in _EASE_DIRS:
+            at = loc + d * reach
+            sink = _sink(at, grip_rot, parts, part, joints)
+            if sink < best[0] - 1e-6:
+                best = (sink, at, reach)
+        if best[0] <= SEAT_SINK_CM:
+            return best[1], best[2]
+    # A handle no easing fits (a log with no handle, a matchbox): the middle
+    # of the fist is still the best place for it.
+    return loc, 0.0
+
+
 def _grip_location(aim_pose_path, grip_rot, parts, part="Grip"):
     """The GripLocation that puts `part` in the middle of the fist.
 
     The weapon is attached at the socket, then moved by GripLocation and turned
     by GripRotation, both in the socket's frame; so a point p of the weapon
     lands at GripLocation + GripRotation(p). Solved for the handle's centre
-    landing on the fist's.
+    landing on the fist's, then eased out of any finger it stands in
+    (_eased).
     """
-    fist, _fingers = fist_in_socket(aim_pose_path)
+    fist, fingers = fist_in_socket(aim_pose_path)
     centre = part_placement(parts, part)[0]
-    loc = fist - _rotate_vector(grip_rot, centre)
+    loc, eased = _eased(fist - _rotate_vector(grip_rot, centre), grip_rot,
+                        parts, part, fingers)
     _log(f"{aim_pose_path.rsplit('/', 1)[-1]}: {part} seated at the fist, "
-         f"GripLocation ({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})")
+         f"GripLocation ({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})"
+         + (f", eased {eased:.2f} cm out of the fingers" if eased else ""))
     return loc.to_tuple()

@@ -200,11 +200,14 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     gun stood still in the view and the hand moved under it.
   - A Two Bone IK on the left arm, last in the player's anim BP's chain (after the pitch's
     ModifyBones), puts the hand at a point in the **right hand's bone space**: where the
-    ready clip holds it at its start (`support_at`, sampled at build time). The rifle pose
-    and the pistol pose each have a point, picked by `SupportRifle`. The joint target is the
+    ready clip holds it at its start (`support_at`, sampled at build time). The point is
+    each gun's own, `SupportPoint` on `BP_WeaponItem`, read off its `AimPose`: the shotgun's
+    pose seats the hand on the pump (`pump_seat.py`), which is not where the rifle pose has
+    it, so two points picked by a flag would not do. The joint target is the
     forearm bone itself, so the elbow stays on the side the pose has it.
   - The component writes `SupportHand = SightBlend` (the IK's weight) and
-    `SupportRifle = HeldTwoHanded`. **Only down the sights:** at the hip and on the shoulder
+    `SupportPoint = HeldSupportPoint` (its copy of `Held.SupportPoint`, made beside
+    `HeldTwoHanded`). **Only down the sights:** at the hip and on the shoulder
     the upper-body slot also plays things the left hand must be free for (a throw, a
     search), and the camera is not on the gun.
   - The point is the clip's at its start, 0.7 cm from where the walking hand used to

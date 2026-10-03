@@ -1,7 +1,8 @@
 """verify.support_hand -- down the sights the left hand holds the gun: the
 player's anim BP ends its chain in a Two Bone IK on the left hand, aimed at a
-point in the right hand's space, and the weapon component writes its weight
-from SightBlend and its pose from HeldTwoHanded.
+point in the right hand's space; the point is the held gun's own (where its
+ready pose has the hand), and the weapon component writes it and the IK's
+weight from SightBlend.
 """
 
 import unreal
@@ -9,21 +10,17 @@ import unreal
 from combat.aim_pitch import IK_CLASS
 from combat.skin import player_skin
 from combat.support_hand import (
-    SUPPORT_HAND_VAR, SUPPORT_RIFLE_VAR, support_at, target_bone,
+    SUPPORT_HAND_VAR, SUPPORT_POINT_VAR, support_at, target_bone,
 )
-from combat.verify.aim_pitch import _feeds, _pose_source, _title
-from combat.verify.common import BEL, PIN, cdo, check, graph, load, num_pin
+from combat.verify.aim_pitch import _feeds, _title
+from combat.verify.common import BEL, PIN, cdo, check, graph, load
 from combat.verify.fixtures import wg
-from combat.weapon_component.pose_weights import HELD_TWO_HANDED
+from combat.weapon_component.pose_weights import (
+    HELD_SUPPORT_POINT, HELD_TWO_HANDED,
+)
 from combat.weapon_specs import _weapon_specs, two_handed_poses
 
 BONE_SPACE = unreal.BoneControlSpace.BCS_BONE_SPACE
-
-
-def _point(make):
-    """A MakeVector's three literals. One equal to its pin's default (0) is
-    not saved, and reads back as nothing from disk."""
-    return tuple(num_pin(make, axis) or 0.0 for axis in "XYZ")
 
 
 def check_anim_bp_support_hand():
@@ -35,8 +32,9 @@ def check_anim_bp_support_hand():
     weight = cdo(abp).get_editor_property(SUPPORT_HAND_VAR)
     check(f"{abp.get_name()} declares {SUPPORT_HAND_VAR} as a float, resting at 0",
           isinstance(weight, float) and weight == 0.0, repr(weight))
-    rifle = cdo(abp).get_editor_property(SUPPORT_RIFLE_VAR)
-    check(f"...and {SUPPORT_RIFLE_VAR} as a bool", isinstance(rifle, bool), repr(rifle))
+    point = cdo(abp).get_editor_property(SUPPORT_POINT_VAR)
+    check(f"...and {SUPPORT_POINT_VAR} as a vector", isinstance(point, unreal.Vector),
+          repr(point))
 
     iks = [n for n in nodes if n.get_class().get_name() == IK_CLASS]
     check("exactly one Two Bone IK -- a rerun must not stack a second",
@@ -67,18 +65,16 @@ def check_anim_bp_support_hand():
     alpha = {_title(n) for n in _feeds(BEL.find_input_pin(ik, "Alpha"))}
     check(f"its weight is {SUPPORT_HAND_VAR} and nothing else",
           alpha == {f"Get {SUPPORT_HAND_VAR}"}, str(sorted(alpha)))
-    pick = _pose_source(ik, "EffectorLocation")
-    picked = {_title(n) for n in _feeds(BEL.find_input_pin(pick, "bPickA"))} if pick else set()
-    check(f"the point is picked by {SUPPORT_RIFLE_VAR}: the rifle pose's or the "
-          "pistol's", picked == {f"Get {SUPPORT_RIFLE_VAR}"}, str(sorted(picked)))
-    for pin, pose, clip in (("A", "rifle", skin.aim_rifle), ("B", "pistol", skin.aim_pistol)):
-        make = _pose_source(pick, pin) if pick else None
-        got = _point(make) if make else None
-        want = support_at(skin, clip)
-        check(f"...the {pose} pose's: where its clip holds the left hand at its "
-              "start, re-measured",
-              got is not None and max(abs(g - w) for g, w in zip(got, want)) < 0.01,
-              f"{got} against {want}")
+    fed = {_title(n) for n in _feeds(BEL.find_input_pin(ik, "EffectorLocation"))}
+    check(f"the point is {SUPPORT_POINT_VAR} and nothing else: the held gun's own",
+          fed == {f"Get {SUPPORT_POINT_VAR}"}, str(sorted(fed)))
+    for spec in _weapon_specs():
+        got = cdo(load(spec["path"])).get_editor_property(SUPPORT_POINT_VAR)
+        want = support_at(skin, spec["aim"])
+        check(f"...{spec['display']}'s is where its ready pose holds the left hand "
+              "at its start, re-measured",
+              max(abs(g - w) for g, w in zip(got.to_tuple(), want)) < 0.01,
+              f"{got.to_tuple()} against {want}")
     after = PIN.list_connected_pins(BEL.find_output_pin(ik, "Pose"))
     check("it is the last thing done to the pose: it feeds the ComponentToLocal",
           len(after) == 1 and PIN.get_owning_node(after[0]).get_class().get_name()
@@ -90,7 +86,7 @@ def check_component_writes_support_hand():
     for var, source, why in (
             (SUPPORT_HAND_VAR, "SightBlend",
              "the hold eases in with the sights and is off at the hip"),
-            (SUPPORT_RIFLE_VAR, HELD_TWO_HANDED,
+            (SUPPORT_POINT_VAR, HELD_SUPPORT_POINT,
              "the component's own copy, so nothing reads off an empty hand")):
         writes = [n for n in wg if _title(n) == f"Set {var}"]
         check(f"BP_WeaponComponent writes the anim BP's {var} once a frame",
@@ -104,6 +100,13 @@ def check_component_writes_support_hand():
         check("...onto the player's anim instance, cast to the player's anim BP",
               any(n.get_class().get_name() == "K2Node_DynamicCast" for n in target),
               str([_title(n) for n in target]))
+    copies = [n for n in wg if _title(n) == f"Set {HELD_SUPPORT_POINT}"]
+    src = ({_title(x) for x in _feeds(BEL.find_input_pin(copies[0], HELD_SUPPORT_POINT), 3)}
+           if len(copies) == 1 else set())
+    check(f"{HELD_SUPPORT_POINT} is copied off Held.{SUPPORT_POINT_VAR} once a "
+          "frame, behind the IsValid Branch the two-handed flag is copied behind",
+          len(copies) == 1 and f"Get {SUPPORT_POINT_VAR}" in src,
+          f"{len(copies)} write(s), fed by {sorted(src)}")
     odd = [s["display"] for s in _weapon_specs()
            if s["two_handed"] != (s["aim"] in two_handed_poses(skin))]
     check(f"every gun held in the rifle pose (or the shotgun's, which is the "

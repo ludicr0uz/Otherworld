@@ -4,28 +4,20 @@ hit_zones.py says which body is which zone; this says how big each body is.
 The importer's physics asset wraps every bone's vertices in a box and then the
 box in a capsule, so each body stands 4-8 cm proud of the skin: the zombie's
 head was a 26 cm capsule round an 18 cm skull, and a round that passed a hand's
-width from its ear was a head shot. fit_hit_bodies() refits every capsule to
-the vertices its bone carries, and body_coverage() measures the result the way
-a pellet meets it: rays through the bodies against rays through the mesh.
+width from its ear was a head shot. fit_hit_bodies() refits every body to the
+vertices its bone carries (the geometry is capsule_fit.py's), and
+body_coverage() measures the result the way a pellet meets it: rays through
+the bodies against rays through the mesh.
 """
 
 from contextlib import contextmanager
 
 import unreal
 
+from combat.capsule_fit import fit_capsules
 from combat.graph import _log
 from combat.ragdoll import RAGDOLL_MESH_ROOT
 
-# The share of a bone's vertices, from each end of an axis, left outside the
-# fit: a few stray vertices (a tooth, a torn sleeve) must not set the size.
-FIT_TRIM = 0.02
-# A capsule is round and a head or a chest is not, so its radius sits between
-# the body's two half-widths: 0 is the narrower one, 1 the wider.
-FIT_ROUNDNESS = 0.5
-# How far a capsule's rounded end reaches past its vertices, as a share of its
-# radius. Neighbouring bodies meet where the skin's weights change hands, and
-# two hemispheres meeting there leave a notch all round the joint.
-FIT_END_OVERLAP = 0.25
 # body_coverage()'s grid, and how much of what it finds the verifier allows.
 COVERAGE_STEP_CM = 2.0
 # Rays that strike a body but not the model, as a share of those that strike
@@ -96,22 +88,16 @@ def _clouds(dm, comp, bodies):
     return out
 
 
-def _span(values):
-    """(middle, half-extent) of ``values`` with FIT_TRIM dropped off each end."""
-    values = sorted(values)
-    lo = values[int(FIT_TRIM * (len(values) - 1))]
-    hi = values[int((1.0 - FIT_TRIM) * (len(values) - 1))]
-    return (lo + hi) * 0.5, (hi - lo) * 0.5
-
-
 def body_fit_plan(mesh):
-    """[{bone, setup, center, radius, length}]: every capsule refitted.
+    """[{bone, setup, rotation, capsules: [{center, radius, length}]}]: every
+    body refitted.
 
-    Each body keeps the importer's capsule axis -- the long axis of its
-    vertices -- and gets a new centre, radius and length off the same vertices,
-    measured in the mesh's reference pose and written in the bone's own space.
-    A pure function of the mesh and the axes, so a rebuild plans the same
-    numbers and the verifier can compare the saved asset to the plan.
+    Each body's capsules are fitted to the vertices its bone carries
+    (capsule_fit.fit_capsules: down the long axis of those vertices, more than
+    one where the body tapers), measured in the mesh's reference pose
+    and written in the bone's own space. A pure function of the mesh, so a
+    rebuild plans the same numbers and the verifier can compare the saved
+    asset to the plan.
     """
     pa = mesh.get_editor_property("physics_asset")
     if not pa:
@@ -122,59 +108,41 @@ def body_fit_plan(mesh):
     with _posed(mesh) as comp:
         clouds = _clouds(_dynamic_mesh(mesh), comp, bodies)
         for bone in sorted(bodies):
-            geom = bodies[bone].get_editor_property("agg_geom")
-            capsules = geom.get_editor_property("sphyl_elems")
             cloud = clouds[bone]
-            if len(capsules) != 1 or len(cloud) < 8:
+            if len(cloud) < 8:
                 raise RuntimeError(
-                    f"{pa.get_name()}: {bone} has {len(capsules)} capsule(s) and "
-                    f"{len(cloud)} vertices -- not a body this fit knows")
+                    f"{pa.get_name()}: {bone} carries {len(cloud)} vertices -- "
+                    "not a body this fit knows")
             xf = comp.get_socket_transform(
                 bone, unreal.RelativeTransformSpace.RTS_COMPONENT)
-            # The capsule runs down whichever of the importer's three axes the
-            # vertices reach furthest along. The importer's own pick is not
-            # always that one: the zombie's hips lay across the pelvis's depth.
-            rot = capsules[0].get_editor_property("rotation")
-            local_axes = [math.greater_greater_vector_rotator(v, rot)
-                          for v in (unreal.Vector(1, 0, 0), unreal.Vector(0, 1, 0),
-                                    unreal.Vector(0, 0, 1))]
-            reach = [_span([p.dot(math.transform_direction(xf, a).normal())
-                            for p in cloud])[1] for a in local_axes]
-            # The capsule's own axis (Z) keeps a tie, so a refit of a fitted
-            # body plans the same rotation.
-            long_axis = max((2, 1, 0), key=lambda i: reach[i] + (0.5 if i == 2 else 0.0))
-            if long_axis != 2:
-                rot = math.make_rot_from_z(local_axes[long_axis])
-            axes = [math.transform_direction(
-                        xf, math.greater_greater_vector_rotator(v, rot)).normal()
-                    for v in (unreal.Vector(1, 0, 0), unreal.Vector(0, 1, 0),
-                              unreal.Vector(0, 0, 1))]
-            (mu, hu), (mv, hv), (mt, ht) = (
-                _span([p.dot(a) for p in cloud]) for a in axes)
-            narrow, wide = sorted((hu, hv))
-            radius = narrow + (wide - narrow) * FIT_ROUNDNESS
-            # Never rounder than it is long: a capsule's ends are its radius.
-            radius = min(radius, ht / (1.0 - FIT_END_OVERLAP)) if ht > 0 else radius
-            length = max(0.0, 2.0 * (ht - radius * (1.0 - FIT_END_OVERLAP)))
-            centre = axes[0] * mu + axes[1] * mv + axes[2] * mt
-            local = math.inverse_transform_location(xf, centre)
             scale = xf.scale3d.x
-            plan.append({
-                "bone": bone, "setup": bodies[bone], "rotation": rot,
-                "center": (round(local.x, 3), round(local.y, 3), round(local.z, 3)),
-                "radius": round(radius / scale, 3),
-                "length": round(length / scale, 3)})
+            (along, across, _up), capsules = fit_capsules(
+                [(p.x, p.y, p.z) for p in cloud])
+            rot = math.make_rot_from_zx(
+                math.inverse_transform_direction(xf, unreal.Vector(*along)),
+                math.inverse_transform_direction(xf, unreal.Vector(*across)))
+            fitted = []
+            for c in capsules:
+                local = math.inverse_transform_location(xf, unreal.Vector(*c["center"]))
+                fitted.append({
+                    "center": (round(local.x, 3), round(local.y, 3), round(local.z, 3)),
+                    "radius": round(c["radius"] / scale, 3),
+                    "length": round(c["length"] / scale, 3)})
+            plan.append({"bone": bone, "setup": bodies[bone], "rotation": rot,
+                         "capsules": fitted})
     return plan
 
 
-def saved_capsule(setup):
-    """(center, radius, length) of a body's one capsule, as body_fit_plan
+def saved_capsules(setup):
+    """[(center, radius, length)] of a body's capsules, as body_fit_plan
     writes them."""
-    c = setup.get_editor_property("agg_geom").get_editor_property("sphyl_elems")[0]
-    at = c.get_editor_property("center")
-    return ((round(at.x, 3), round(at.y, 3), round(at.z, 3)),
-            round(c.get_editor_property("radius"), 3),
-            round(c.get_editor_property("length"), 3))
+    out = []
+    for c in setup.get_editor_property("agg_geom").get_editor_property("sphyl_elems"):
+        at = c.get_editor_property("center")
+        out.append(((round(at.x, 3), round(at.y, 3), round(at.z, 3)),
+                    round(c.get_editor_property("radius"), 3),
+                    round(c.get_editor_property("length"), 3)))
+    return out
 
 
 def fit_hit_bodies():
@@ -198,21 +166,23 @@ def fit_hit_bodies():
             setup = b["setup"]
             setup.modify()
             geom = setup.get_editor_property("agg_geom")
-            capsules = geom.get_editor_property("sphyl_elems")
-            # Elements come out of the array as copies: edit one, put it back.
-            capsule = capsules[0]
-            capsule.set_editor_properties({
-                "center": unreal.Vector(*b["center"]), "rotation": b["rotation"],
-                "radius": b["radius"], "length": b["length"]})
-            geom.set_editor_property("sphyl_elems", [capsule])
+            capsules = []
+            for c in b["capsules"]:
+                capsule = unreal.KSphylElem()
+                capsule.set_editor_properties({
+                    "center": unreal.Vector(*c["center"]), "rotation": b["rotation"],
+                    "radius": c["radius"], "length": c["length"]})
+                capsules.append(capsule)
+            geom.set_editor_property("sphyl_elems", capsules)
             setup.set_editor_property("agg_geom", geom)
-            want = (b["center"], b["radius"], b["length"])
-            if saved_capsule(setup) != want:
-                raise RuntimeError(f"{pa.get_name()}: {b['bone']}'s capsule did "
-                                   f"not stick: {saved_capsule(setup)} != {want}")
+            want = [(c["center"], c["radius"], c["length"]) for c in b["capsules"]]
+            if saved_capsules(setup) != want:
+                raise RuntimeError(f"{pa.get_name()}: {b['bone']}'s capsules did "
+                                   f"not stick: {saved_capsules(setup)} != {want}")
         eas.save_loaded_asset(pa)
         cover = body_coverage(mesh)
-        _log(f"{pa.get_name()}: {len(plan)} bodies fitted to the model -- "
+        _log(f"{pa.get_name()}: {len(plan)} bodies fitted to the model with "
+             f"{sum(len(b['capsules']) for b in plan)} capsules -- "
              f"overhang {cover['overhang']:.2f}, uncovered {cover['uncovered']:.2f}")
 
 

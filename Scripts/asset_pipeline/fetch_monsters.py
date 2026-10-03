@@ -7,7 +7,10 @@ inside the editor through Scripts/dev/uepy.py.
 
     python3 Scripts/asset_pipeline/fetch_monsters.py            # all specs
     python3 Scripts/asset_pipeline/fetch_monsters.py zombie_01  # just one
+    python3 Scripts/asset_pipeline/fetch_monsters.py adventurer_03 --through preview
+                                # 20 credits, then look before paying the rest
     python3 Scripts/asset_pipeline/fetch_monsters.py --status   # spend nothing
+    python3 Scripts/asset_pipeline/fetch_monsters.py --gate     # re-check cached rigs
 
 A spec that names ``compatible_with`` is checked against that body's rig once
 it is rigged (rig_compat.py): the verdict is kept in task.json, and a rig that
@@ -64,11 +67,24 @@ def _pull(spec, task, label):
             if isinstance(url, str) and url.startswith("http"):
                 ext = url.split("?")[0].rsplit(".", 1)[-1][:4] or "png"
                 meshy.download(url, os.path.join(out, "textures", f"{spec.id}_{kind}.{ext}"))
+    # The picture Meshy took of the stage: what to look at before paying for
+    # the next one (--through).
+    thumb = task.get("thumbnail_url")
+    if isinstance(thumb, str) and thumb.startswith("http"):
+        ext = thumb.split("?")[0].rsplit(".", 1)[-1][:4] or "png"
+        meshy.download(thumb, os.path.join(out, f"{spec.id}_{label}_thumbnail.{ext}"))
     if task.get("result"):
         _download_tree(task["result"], os.path.join(out, "rigged"), spec.id)
 
 
-def run_spec(spec) -> dict:
+STAGES = ("preview", "refine", "remesh", "rig")
+
+
+class _Stop(Exception):
+    """Raised past the last stage ``--through`` asked for."""
+
+
+def run_spec(spec, through="rig") -> dict:
     print(f"\n=== {spec.id} ===", flush=True)
     print(f"  height {spec.height_meters} m | {spec.target_polycount} tris | "
           f"{spec.texture_resolution} textures | {spec.pose_mode}", flush=True)
@@ -100,6 +116,8 @@ def run_spec(spec) -> dict:
             task = meshy.poll(poll_path, task_id, name)
             _finish(spec, state, name, task)
         _pull(spec, task, name)
+        if name == through and name != STAGES[-1]:
+            raise _Stop(name)
         return task
 
     preview_task = stage("preview", lambda: meshy.preview(spec), GEN_PATH, "1/4")
@@ -129,6 +147,8 @@ def run_spec(spec) -> dict:
         remesh_task = meshy.poll(remesh_path["v"], task_id, "remesh")
         _finish(spec, state, "remesh", remesh_task)
         _pull(spec, remesh_task, "remesh")
+    if through == "remesh":
+        raise _Stop("remesh")
 
     rig_task = stage("rig", lambda: meshy.rig(spec, remesh_task["id"]), RIG_PATH, "4/4")
 
@@ -200,17 +220,44 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("ids", nargs="*", help="spec ids; default is all of them")
     ap.add_argument("--status", action="store_true", help="report progress, spend nothing")
+    ap.add_argument("--through", choices=STAGES, default="rig",
+                    help="stop after this stage (preview is 20 of the ~40 "
+                         "credits): look at the result, then run again to go on")
+    ap.add_argument("--gate", action="store_true",
+                    help="run the rig check again on what is cached, spend nothing")
     args = ap.parse_args()
 
     if args.status:
         cmd_status()
         return 0
 
+    if args.gate:
+        # Offline: no request is made, so it costs nothing and needs no key.
+        worst = 0
+        for spec in [catalog.by_id(i) for i in args.ids] or [
+                s for s in catalog.CHARACTERS if s.compatible_with]:
+            state = meshy.load_state(spec)
+            if "rig" not in state["stages"]:
+                print(f"{spec.id}: not rigged yet")
+                continue
+            state["compatible_with"] = spec.compatible_with
+            verdict = _gate(spec, state)
+            meshy.save_state(spec, state)
+            worst = max(worst, 1 if verdict == "fail" else 0)
+        return worst
+
     specs = [catalog.by_id(i) for i in args.ids] if args.ids else list(catalog.CHARACTERS)
     failures = []
     for spec in specs:
         try:
-            run_spec(spec)
+            run_spec(spec, through=args.through)
+        except _Stop as stop:
+            state = meshy.load_state(spec)
+            spent = sum((x.get("consumed_credits") or 0)
+                        for x in state["stages"].values())
+            print(f"  stopped after {stop} -- {spent} credits so far; look at "
+                  f"{os.path.relpath(meshy.cache_dir(spec), meshy.PROJECT_DIR)} "
+                  "and run again to go on", flush=True)
         except meshy.MeshyError as exc:
             print(f"  FAILED {spec.id}: {exc}", flush=True)
             failures.append((spec.id, str(exc)))

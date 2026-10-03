@@ -56,6 +56,11 @@ class MonsterSpec:
     provider: str = "meshy"
     license: str = "meshy-commercial"
     note: str = ""
+    # The spec id of the body this one must be able to replace, or "". The
+    # rigger cannot be told (combat/skin.py), so it is checked afterwards:
+    # fetch_monsters.py runs rig_compat.py against that body's rig and the
+    # import steps normalise to it.
+    compatible_with: str = ""
 
 
 MONSTERS = (

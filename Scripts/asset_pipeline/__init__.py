@@ -8,6 +8,8 @@ Host-side (no ``unreal``):
     fetch_monsters.py           entry point: drive Meshy for every spec, cache the results
     providers/meshy.py          Meshy client: preview -> refine -> remesh -> rig
     skeleton_probe.py           fingerprint a cached GLB's bone hierarchy
+    rig_compat.py               can one cached rig replace another: compatible,
+                                normalise or fail (tests: dev/tests/test_rig_compat.py)
     fab_library.py              Fab manifest (fab_library.json) + CLI; acquisition is manual
 
 Editor-side, in pipeline order:

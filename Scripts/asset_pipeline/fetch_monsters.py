@@ -9,6 +9,10 @@ inside the editor through Scripts/dev/uepy.py.
     python3 Scripts/asset_pipeline/fetch_monsters.py zombie_01  # just one
     python3 Scripts/asset_pipeline/fetch_monsters.py --status   # spend nothing
 
+A spec that names ``compatible_with`` is checked against that body's rig once
+it is rigged (rig_compat.py): the verdict is kept in task.json, and a rig that
+cannot stand in for it fails the run, with its files left in place.
+
 Safe to re-run.  Every completed stage is recorded in the spec's task.json and
 skipped on the next pass, so an interrupted run resumes instead of re-paying.
 """
@@ -19,7 +23,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from asset_pipeline import catalog                      # noqa: E402
+from asset_pipeline import catalog, rig_compat          # noqa: E402
 from asset_pipeline.providers import meshy              # noqa: E402
 
 GEN_PATH = "/openapi/v2/text-to-3d"
@@ -129,11 +133,38 @@ def run_spec(spec) -> dict:
     rig_task = stage("rig", lambda: meshy.rig(spec, remesh_task["id"]), RIG_PATH, "4/4")
 
     state["cache_dir"] = meshy.cache_dir(spec)
+    state["compatible_with"] = spec.compatible_with
+    gate = _gate(spec, state)
     meshy.save_state(spec, state)
     spent = sum((s.get("consumed_credits") or 0) for s in state["stages"].values())
     print(f"  done -- {spent} credits, cached in "
           f"{os.path.relpath(state['cache_dir'], meshy.PROJECT_DIR)}", flush=True)
+    if gate == "fail":
+        # Nothing is deleted: the model is paid for, and its numbers are what
+        # says how the next attempt should differ.
+        raise meshy.MeshyError(
+            f"the rig cannot stand in for {spec.compatible_with} (rig_compat: "
+            f"{'; '.join(state['rig_compat']['problems'] + state['rig_compat']['flags'])})")
     return state
+
+
+def _gate(spec, state):
+    """Check the rig against the body it must replace; the verdict, or None.
+
+    Recorded in task.json under ``rig_compat``, where the importer reads which
+    body to normalise to and whether there is anything to normalise.
+    """
+    state.pop("rig_compat", None)
+    if not spec.compatible_with:
+        return None
+    try:
+        report = rig_compat.check(spec.id, spec.compatible_with)
+    except FileNotFoundError as exc:
+        raise meshy.MeshyError(f"cannot check the rig: {exc}") from None
+    rig_compat.print_report(report)
+    state["rig_compat"] = dict(rig_compat.summary(report),
+                               reference=spec.compatible_with)
+    return report["verdict"]
 
 
 def _download_tree(node, dest, prefix, trail=""):
@@ -159,7 +190,10 @@ def cmd_status():
             for n in ("preview", "refine", "remesh", "rig")
         )
         spent = sum((s.get("consumed_credits") or 0) for s in stages.values())
-        print(f"{spec.id:14s} {marks}   {spent} credits")
+        gate = (state.get("rig_compat") or {}).get("verdict")
+        print(f"{spec.id:14s} {marks}   {spent} credits"
+              + (f"   rig vs {spec.compatible_with}: {gate or 'not checked'}"
+                 if spec.compatible_with else ""))
 
 
 def main():

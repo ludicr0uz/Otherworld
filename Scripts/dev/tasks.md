@@ -177,14 +177,51 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
       This should be generic so that any damage taken results in a "taking hit" animation. This may be implemented already, looking to confirm that this is extended to damage inflicted from thrown weapons. 
 - [x] Implement the thrown trajectory to be aligned vertically with the reticle. For thrown weapons, the weapon should fly where the reticle is aimed. While holding the throw button, character should be in a "getting ready to throw" animation. 
 - [x] Headshots from thrown weapons should also apply a headshot multiplier. Thrown damage should also be tunable for melee weapons in the weapon tuning menu.
-- [ ] Implement an exit game button in the main menu. Consolidate the menu that appears when
+- [x] Implement an exit game button in the main menu. Consolidate the menu that appears when
       pressing 'm' with the main menu into one unified menu. When pressing 'm' during gameplay,
       the same consolidated menu appears. Keep the menu placement the same as the current 'm'
       menu location.
-- [ ] Update player jog speed to 4m/s and sprint speed to 6m/s. Double the sprint duration available at full bar. The current recharge time should stay enough to fully recharge the sprint bar. This should be configurable in the player tuning options.
-- [ ] Implement a clothing system for the main character. Shirt, jacket, hat, glasses, boots, pants, gloves, backpack. Looted clothing items be stored in the current inventory slots until equipped. Using them should equip them. Do not implement drawings/models for the equipped clothing yet. Just implement the state - in inventory, vs equipped in the proper slot. Implement the "i" button to show what's currently equipped - inventory screen. Implement test clothing items to be spawned in front of the character at start on the 200 x 200 map.
-- [ ] Reduce the rate at which the ADS aimer hovers around target. Right now it moves around too fast making it difficult to shoot. Make this rate configurable in weapon tuning. Implement a hold breath button 
-- [ ] Implement wind for trees and grass, configurable in the graphics menu if its enabled or disabled. And settings around it. 
-- [ ] When the knife is held for the throw animation, character should hold it by the blade rather than by the handle. 
-- [ ] Items should not be lootable if they are vertically too far away from the character. It seems right now only the horizontal distnace is checked. 
-- [ ] Generate a new adventurer model with meshy API in boxers as default. This will be a preparation for implementing clothing.
+- [x] Update player jog speed to 4m/s and sprint speed to 6m/s. Double the sprint duration available at full bar. The current recharge time should stay enough to fully recharge the sprint bar. This should be configurable in the player tuning options.
+- [x] Implement a clothing system for the main character. Shirt, jacket, hat, glasses, boots, pants, gloves, backpack. Looted clothing items be stored in the current inventory slots until equipped. Using them should equip them. Do not implement drawings/models for the equipped clothing yet. Just implement the state - in inventory, vs equipped in the proper slot. Implement the "i" button to show what's currently equipped - inventory screen. Implement test clothing items to be spawned in front of the character at start on the 200 x 200 map.
+- [x] Reduce the rate at which the ADS aimer hovers around target. Right now it moves around too fast making it difficult to shoot. Make this rate configurable in weapon tuning. Implement a hold breath button 
+- [x] Implement wind for trees and grass, configurable in the graphics menu if its enabled or disabled. And settings around it. 
+- [x] When the knife is held for the throw animation, character should hold it by the blade rather than by the handle. 
+- [x] Items should not be lootable if they are vertically too far away from the character. It seems right now only the horizontal distnace is checked. 
+- [x] Generate a new adventurer model with meshy API in boxers as default. This will be a preparation for implementing clothing.
+- [ ] Re-work how inventory is organized. There will be item in hands (center slot on the scren)
+      + 4 weapon slots (storage slots) - shown underneat it + 10 backpack slots (backpack visible
+      when I is pressed). Hand slot always visible, and 4 weapon slots always visible underneath
+      it. The selected weapon is in the hand slot. If no weapon is selected, pressing one moves
+      primary weapon to hand slot and the weapon is now active. Pressing 1 again will put the
+      weapon back into the weapon slot and the weapon is inactive. Character then becomes
+      unarmed. Picking up items puts them straight into the backpack slot if available. In hands
+      if no backpack slot is available. Items can be moved from the backpack slot to hands to be
+      used. Buttons 5,6,7,8,9 can be mapped to 5 backpack slots to be able to quickly bring those
+      to hands. Backpack items and clothing items should be visible bottom right of the screen.
+      Clothing slots should be above the backpack slots bottom right. Always visible, do not need
+      to press I to show them. There is now going to be a primary weapon slot, secondary weapon
+      slot, pistol slot, melee weapon slot. When inventory is selected, user can drag items from
+      backpack into either weapon slots or hand slot or vice versa. New button mapping - 1 Will be
+      to select primary weapon. 2 - select secondary weapon, 3 select pistol, 4 select melee.
+      Backpack slots are not visible by default, but are shown when the I button is pressed for
+      inventory. Hand slot & active items: All items (weapons, consumables, tools, torches) can
+      be in the hand slot. When navigating through the backpack, selecting an item brings it to
+      the hand slot. When a weapon is in the hand slot and a quick-slot button (5-9) is pressed
+      for a backpack item, the weapon goes to a slot if one is available (primary or secondary).
+      Weapon slot organization: Primary/secondary slots hold SMGs/Rifles/ARs. Pistol slot holds
+      all pistols. Melee slot holds all melee weapons. Weapon slots can be empty. Quick slots
+      (5-9): The top 5 backpack slots are mapped to buttons 5-9 (slots 1-5). Picking up items:
+      If the backpack is full and you already have a weapon active in the hand slot, you cannot
+      pick up the item. Drag-and-drop constraints: Only weapons can be dragged into weapon slots.
+      Consumables cannot be dragged into weapon slots; hotkeyed backpack slots will be used for
+      consumables. Clothing system: Use existing clothing slot system.
+- [ ] There seems to be a bug introduced in recent commits where monster textures were lost.
+      player character and monsters are gray. Fix that, and update the character model to the new
+      one that was generated in the recent commit (5c6c53b).
+- [ ] Wind was implement recently but it is in random direction. Wind motion across objects
+      should be realistic rather than all items blowing in the same direciton.
+- [ ] Improve the Menu options to appear more professional, rather than "tuning" call it
+      "Settings", I.E Monster Settings, Gun Settings. Capitalize first letters.
+- [ ] Players default movement should be a jog rather than a walk. Right now the character walks.
+- [ ] Pressing I should have a hover image of the character facing forward as part of the
+      character menu screen.

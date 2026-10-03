@@ -10,7 +10,7 @@ from combat.tuning import BIND_VARS, INTERACT_KEY, INTERACT_RADIUS
 from combat.verify.common import BEL, PIN, by_pins, check, num_pin, pin_value
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.interact import (
-    INTERACT_FORCED_VAR, INTERACT_GAP_VAR, INTERACT_NO_GAP, INTERACT_TARGET_VAR,
+    INTERACT_FORCED_VAR, INTERACT_GAP_VAR, INTERACT_HEIGHT, INTERACT_NO_GAP, INTERACT_TARGET_VAR,
     KINDS, RETIRED_VARS,
 )
 
@@ -87,6 +87,16 @@ def check_interact_keeps_one():
     check(f"a candidate of each of the {kinds} kinds lies within "
           f"{INTERACT_RADIUS:.0f} cm of the player",
           len(reach) == kinds, f"{len(reach)} reach test(s)")
+    # The radius is a sphere; the height test keeps a candidate on a ledge or
+    # down a drop out of reach.
+    level = [n for n in by_pins(wg, "A", "B")
+             if num_pin(n, "B") == INTERACT_HEIGHT
+             and any(str(PIN.get_pin_name(p)) == "A"
+                     and not any(str(PIN.get_pin_name(q)) == "V1"
+                                 for q in BEL.list_input_pins(s))
+                     for s in _sources(n, "A") for p in BEL.list_input_pins(s))]
+    check(f"...and within {INTERACT_HEIGHT:.0f} cm of it up or down (|dz|)",
+          len(level) == kinds, f"{len(level)} height test(s)")
 
     gaps = _aim_gaps()
     ranks = [n for n in by_pins(wg, "A", "B")

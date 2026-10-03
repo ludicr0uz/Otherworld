@@ -10,7 +10,8 @@ interacted with is a pair in KINDS:
                                         does its thing to it
 
 A press runs every kind's walk in turn. A candidate that is offered and lies
-within INTERACT_RADIUS of the player is kept in InteractTarget when it is
+within INTERACT_RADIUS of the player, and within INTERACT_HEIGHT of it
+up or down, is kept in InteractTarget when it is
 nearer AimPoint, the point the reticle rests on (aim.py resolves it every
 frame, armed or not), than the one kept so far. Nothing is done inside a walk.
 After the last one the target goes down the kinds' acts in order, and the first
@@ -25,7 +26,8 @@ key, the press clears it, and it is false in every real game.
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
 from combat.nodes import (
-    FN_ACTOR_LOC, FN_AND, FN_DISTANCE, FN_IS_VALID, FN_LESS_FF, FN_OR,
+    FN_ABS, FN_ACTOR_LOC, FN_AND, FN_BREAK_VECTOR, FN_DISTANCE, FN_IS_VALID,
+    FN_LESS_FF, FN_OR, FN_SUB_VV,
 )
 from combat.tuning import INTERACT_KEY, INTERACT_RADIUS
 from combat.weapon_component.heat import _author_fire_candidates, _author_heat_item
@@ -37,6 +39,12 @@ INTERACT_FORCED_VAR = "InteractForced"   # a probe pressing the key
 # What InteractGap starts a search at: farther than any candidate can be from
 # the aim point, which is at most the aim trace's kilometre out.
 INTERACT_NO_GAP = 1.0e9
+# How far above or below the player's middle (the capsule's centre, about 90 cm
+# up when standing) a candidate may lie and still be in reach. The radius alone
+# is a sphere, so an item on a ledge or down a drop 2 m off was still taken.
+# 150 cm reaches the ground under a standing player with room for a slope, and
+# no higher than an arm's length over the head.
+INTERACT_HEIGHT = 150.0
 # What the key and its variables were called while all it did was pick up an
 # item. build.py takes them off a component built before the rename.
 RETIRED_VARS = ("KeyPickup", "PickBest", "PickBestGap", "PickupForced")
@@ -70,6 +78,17 @@ def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
     near = keep(_at(_node(ed, FN_LESS_FF), x0 + 2400, y0 + 440))
     _connect(_out(gap, "ReturnValue"), _pin(near, "A"))
     _set(near, "B", INTERACT_RADIUS)
+    # And how far up or down: |dz| < INTERACT_HEIGHT.
+    rise = keep(_at(_node(ed, FN_SUB_VV), x0 + 2160, y0 + 260))
+    _connect(_out(there, "ReturnValue"), _pin(rise, "A"))
+    _connect(_out(here, "ReturnValue"), _pin(rise, "B"))
+    parts = keep(_at(_node(ed, FN_BREAK_VECTOR), x0 + 2400, y0 + 260))
+    _connect(_out(rise, "ReturnValue"), _pin(parts, "InVec"))
+    dz = keep(_at(_node(ed, FN_ABS), x0 + 2640, y0 + 200))
+    _connect(_out(parts, "Z"), _pin(dz, "A"))
+    level = keep(_at(_node(ed, FN_LESS_FF), x0 + 2880, y0 + 200))
+    _connect(_out(dz, "ReturnValue"), _pin(level, "A"))
+    _set(level, "B", INTERACT_HEIGHT)
 
     # How far the candidate lies from the point the reticle rests on. Pure, so
     # the Branch and the Set below each compute it, from inputs that do not
@@ -87,8 +106,11 @@ def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
     and1 = keep(_at(_node(ed, FN_AND), x0 + 2640, y0 + 340))
     _connect(offered, _pin(and1, "A"))
     _connect(_out(near, "ReturnValue"), _pin(and1, "B"))
-    and2 = keep(_at(_node(ed, FN_AND), x0 + 2880, y0 + 420))
-    _connect(_out(and1, "ReturnValue"), _pin(and2, "A"))
+    and_h = keep(_at(_node(ed, FN_AND), x0 + 2880, y0 + 300))
+    _connect(_out(and1, "ReturnValue"), _pin(and_h, "A"))
+    _connect(_out(level, "ReturnValue"), _pin(and_h, "B"))
+    and2 = keep(_at(_node(ed, FN_AND), x0 + 3000, y0 + 420))
+    _connect(_out(and_h, "ReturnValue"), _pin(and2, "A"))
     _connect(_out(closer, "ReturnValue"), _pin(and2, "B"))
 
     # The walk only remembers. Acting inside it is how one press used to pick
@@ -106,7 +128,7 @@ def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
 
     ed.add_comment_to_nodes(
         f"A candidate the walk offers, within {INTERACT_RADIUS:.0f} cm of the "
-        "player, is kept as InteractTarget when it is nearer AimPoint, the "
+        f"player and {INTERACT_HEIGHT:.0f} cm of it up or down, is kept as InteractTarget when it is nearer AimPoint, the "
         "point the reticle rests on, than the one kept so far. The walk only "
         "remembers it.",
         made)

@@ -92,7 +92,7 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 - **`PauseRow` is the caret.** Up / Down and Enter are polled in DrawHUD (`_author_pause_keys`),
   only while no tab and no settings page is open. Enter, not Space: the panel does not pause, and Space jumps.
 - **One menu on screen.** `WBP_PauseMenu.Panel` (the panel's own artwork and rows) is
-  collapsed while the settings page is up or any tab's open flag is, and the page or the open tab's panel shows instead; the four
+  collapsed while the settings page is up or any tab's open flag is, and the page or the open tab's panel shows instead; the five
   developer tabs sit where the panel does (`TUNE_POS`), the graphics tab in the corner.
 - **BACK is a `WBP_MenuRow` under each tab's list**, the caret's last stop
   (`TuneTab.back_row`: one past the list, or two in the graphics tab, whose SAVE DEFAULT
@@ -634,6 +634,33 @@ keys as GUN SETTINGS; **Enter** saves `Scripts/combat/player_tuning.csv`.
   backs up the CSV and puts it back.
 - **Still needs a play session:** how a 4 m/s jog and a 6 m/s sprint feel against the
   wanderers (a zombie runs at 6), and how the jog clip reads at the slower speed.
+
+## The SOUND SETTINGS tab (`sound_tune_*.py`)
+
+**Its menu row** opens it (`SoundTuneOpen`). One subject row (`volume`), then
+`combat/sound_tuning.SOUND_STATS`: one row per sound (the footsteps, each gun's shot, the dry
+click, the reloads, the melee hit, the growl, the roar), its volume as a multiplier (step
+0.05, from 0 to 2: the tab has maximums, `SoundTuneMaxs`). Same keys as GUN SETTINGS;
+**Enter** saves `Scripts/combat/sound_tuning.csv`.
+
+- **The apply is the game's sound mix** (`sound_tune_tick._author_apply`; what a class and
+  the mix are: `Scripts/combat/docs/audio.md`): `SetBaseSoundMix(A_Mix_Game)`, then one
+  `SetSoundMixClassOverride` per row, its class and the mix as pin literals, its volume
+  the row's cell, no fade.
+- **It runs on the HUD's first Tick, tab or no tab** (`SoundTuneApplied` false), which is
+  what gives a game its volumes at all: no asset holds one. Then only after a nudge:
+  `SoundTuneTouched` is **lowered again** once the mix is told, unlike the gun, monster and
+  player tabs', because the mix is the audio device's and outlives a respawn. Each level's
+  HUD tells it again.
+- **The CSV feeds** `build_graphics_menu.py` alone (the HUD's table). After a save, re-run
+  it.
+- **The verifier's whole-graph scans exclude this tab:** the Binds read-by-index check skips
+  `Get SoundTuneValues`.
+- **Probe:** `probe_sound_tuning.py` (6 checks: the first Tick's apply, each class's volume
+  as the audio device reports it, two nudges reaching the device, the stop at 0, the CSV,
+  the panel). It backs up the CSV and puts it back.
+- **Still needs a play session:** how loud the footsteps are at 0.4 against the guns and
+  the growls, and how the 14-row panel reads.
 
 ## The WORLD SETTINGS tab (`world_tune_*.py`)
 

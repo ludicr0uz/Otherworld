@@ -17,6 +17,7 @@ from graphics_menu.profile_consts import EXIT_ACTION, EXIT_ROW_LABEL
 from graphics_menu.tune_consts import TUNE_ACTION, TUNE_ROW_LABEL
 from graphics_menu.monster_tune_consts import MON_TUNE_ACTION, MON_TUNE_ROW_LABEL
 from graphics_menu.player_tune_consts import PLAYER_TUNE_ACTION, PLAYER_TUNE_ROW_LABEL
+from graphics_menu.sound_tune_consts import SOUND_TUNE_ACTION, SOUND_TUNE_ROW_LABEL
 from graphics_menu.world_tune_consts import WORLD_TUNE_ACTION, WORLD_TUNE_ROW_LABEL
 from graphics_menu.settings_rows import (
     BACK_LABEL, BIND_LABELS, DIFFICULTY_LABEL, SETTINGS_TITLE, SLIDERS)
@@ -233,13 +234,13 @@ QUIT_ROW_LABEL = "Exit Game"
 PAUSE_ROW_LABELS = (START_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_ROW_LABEL,
                     EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL, TUNE_ROW_LABEL,
                     MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL, PLAYER_TUNE_ROW_LABEL,
-                    GFX_TUNE_ROW_LABEL, QUIT_ROW_LABEL)
+                    SOUND_TUNE_ROW_LABEL, GFX_TUNE_ROW_LABEL, QUIT_ROW_LABEL)
 # What each row does, in row order: taking row i raises PauseClick = i, and
 # Tick's fragment for that action serves it (menu_nav.pause_row_taken).
 PAUSE_ROW_ACTIONS = (START_ACTION, SETTINGS_ACTION, DEBUG_ACTION, EXIT_ACTION,
                      DEV_GUNS_ACTION, TUNE_ACTION, MON_TUNE_ACTION,
-                     WORLD_TUNE_ACTION, PLAYER_TUNE_ACTION, GFX_TUNE_ACTION,
-                     QUIT_ACTION)
+                     WORLD_TUNE_ACTION, PLAYER_TUNE_ACTION, SOUND_TUNE_ACTION,
+                     GFX_TUNE_ACTION, QUIT_ACTION)
 PAUSE_START_ROW = PAUSE_ROW_ACTIONS.index(START_ACTION)
 PAUSE_DEBUG_ROW = PAUSE_ROW_ACTIONS.index(DEBUG_ACTION)
 # The rows that need a game in play: on the title they do nothing and say so.

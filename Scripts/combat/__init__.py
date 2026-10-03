@@ -125,6 +125,10 @@ ASSETS AND PATCHES
   materials         flat materials (gunmetal, wood, blood, brass, impact chip
                     and dust)
   audio             sound names, attenuation profiles, import + link
+  sound_tuning      sound_tuning.csv: each sound's volume; what the menu's
+                    SOUND SETTINGS tab saves and the HUD's table is built from
+  sound_mix         a SoundClass per sound on its waves, and A_Mix_Game, the
+                    mix the HUD overrides their volumes in
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
   aim_pitch         the player's anim BP: AimPitch tips the upper body (two
                     spine ModifyBones) so the gun follows the sights' pitch

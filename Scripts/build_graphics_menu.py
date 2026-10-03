@@ -132,6 +132,9 @@ from graphics_menu.monster_tune_tick import (                       # noqa: E402
 from graphics_menu.player_tune_consts import PLAYER_TAB             # noqa: E402
 from graphics_menu.player_tune_tick import (                        # noqa: E402
     author_player_tune_tick, declare_player_tune_vars, player_tune_defaults)
+from graphics_menu.sound_tune_consts import SOUND_TAB               # noqa: E402
+from graphics_menu.sound_tune_tick import (                         # noqa: E402
+    author_sound_tune_tick, declare_sound_tune_vars, sound_tune_defaults)
 from graphics_menu.tune_draw import author_tune_panel               # noqa: E402
 from graphics_menu.tune_tick import (                               # noqa: E402
     author_tune_tick, declare_tune_vars, tune_defaults)
@@ -298,6 +301,7 @@ def _ensure_variables(ed, bp):
     declare_monster_tune_vars(ed)
     declare_world_tune_vars(ed)
     declare_player_tune_vars(ed)
+    declare_sound_tune_vars(ed)
     declare_gfx_tune_vars(ed)
     declare_cursor_vars(ed)
 
@@ -583,6 +587,8 @@ def _author_tick(ed, tick):
     tuned = author_world_tune_tick(ed, pc_out, tuned)
     tuned = author_gfx_tune_tick(ed, pc_out, tuned)
     tuned = author_player_tune_tick(ed, pc_out, tuned)
+    # The sound one also tells the game's sound mix its volumes, first Tick on.
+    tuned = author_sound_tune_tick(ed, pc_out, tuned)
     # Then the menu's own rows (new game or resume, settings, exit game) and M.
     toggled = author_main_rows_tick(ed, pc_out, tuned)
 
@@ -899,7 +905,8 @@ def _author_draw(ed):
     monsters = author_tune_panel(ed, guns, MONSTER_TAB)
     world = author_tune_panel(ed, monsters, WORLD_TAB)
     gfx = author_tune_panel(ed, world, GFX_TAB)
-    author_tune_panel(ed, gfx, PLAYER_TAB)
+    player = author_tune_panel(ed, gfx, PLAYER_TAB)
+    author_tune_panel(ed, player, SOUND_TAB)
 
 
 # ─── Entry points ────────────────────────────────────────────────────────────
@@ -985,7 +992,7 @@ def build_hud_blueprint(rebuild=False):
                          **carry_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),
                          **world_tune_defaults(), **gfx_tune_defaults(),
-                         **player_tune_defaults(),
+                         **player_tune_defaults(), **sound_tune_defaults(),
                          **cursor_defaults()})
     _assets().save_loaded_asset(bp)
     _log(f"built {HUD_BP_PATH}")

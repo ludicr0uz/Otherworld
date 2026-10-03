@@ -1,0 +1,14 @@
+sound,volume
+footsteps,0.4
+shotgun_shot,1
+pistol_shot,1
+smg_shot,1
+rifle_shot,1
+sniper_shot,1
+dry_fire,1
+shotgun_reload,1
+rifle_reload,1
+pistol_reload,1
+melee_hit,1
+zombie_growl,1
+wendigo_roar,1

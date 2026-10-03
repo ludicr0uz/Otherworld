@@ -62,6 +62,7 @@ from combat.anim_blueprint import patch_anim_blueprint            # noqa: E402
 from combat.audio import (                                        # noqa: E402
     apply_attenuation, build_sound_attenuations, import_sounds,
 )
+from combat.sound_mix import build_sound_mix                      # noqa: E402
 from combat.body_pose import patch_body_pose                      # noqa: E402
 from combat.stance_clips import (                                 # noqa: E402
     patch_stance_clips, unpatch_stance_clips,
@@ -116,6 +117,8 @@ def main():
     # past -- and it is a step that refuses to finish with a sound it has no
     # profile for.
     apply_attenuation(build_sound_attenuations())
+    # A sound class per sound, so each has a volume (the SOUND SETTINGS tab).
+    build_sound_mix()
     patch_anim_blueprint()
 
     # First of the Blueprints, and before anything that names its class: both

@@ -9,6 +9,9 @@ tune_tick's keys, nudge and save, tune_draw's panel and wbp_tune's widgets
 all take a TuneTab. Only what the table is applied to differs
 (tune_tick._author_apply: carried guns; monster_tune_tick: live controllers;
 world_tune_tick: the day/night cycle; gfx_tune_tick: BP_GraphicsTuner).
+The PLAYER SETTINGS and SOUND SETTINGS tabs (player_tune_consts.PLAYER_TAB,
+sound_tune_consts.SOUND_TAB) are two more: the player's weapon component,
+and the game's sound mix.
 
     its row in the M panel        open the tab (and shut the others). An open
                                   tab stands in place of the panel's rows

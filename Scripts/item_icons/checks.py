@@ -9,17 +9,18 @@ compose.py's own check: it refuses to write one that is not.
 import unreal
 
 from item_icons.items import ICON_H, ICON_TINT, ICON_W, ITEMS, UI_ART_DIR, icon_name
+from item_icons.portrait import PORTRAIT_H, PORTRAIT_TEXTURE, PORTRAIT_W
 
 
 def _texture(item):
     return unreal.EditorAssetLibrary.load_asset(f"{UI_ART_DIR}/{icon_name(item.display)}")
 
 
-def _texture_fault(tex):
+def _texture_fault(tex, want=(ICON_W, ICON_H)):
     if not tex:
         return "not imported"
     size = (tex.blueprint_get_size_x(), tex.blueprint_get_size_y())
-    if size != (ICON_W, ICON_H):
+    if size != want:
         return f"{size[0]} x {size[1]}"
     if tex.get_editor_property("lod_group") != unreal.TextureGroup.TEXTUREGROUP_UI:
         return "not in the UI texture group"
@@ -48,3 +49,8 @@ def check_item_icons(check):
     wrong = [f"{i.display}: {f}" for i in ITEMS for f in [_item_fault(i)] if f]
     check("every item shows its own icon (T_UI_Icon_<DisplayName>, the render of "
           "its model), untinted: its SlotColor is white", not wrong, "; ".join(wrong))
+    fault = _texture_fault(
+        unreal.EditorAssetLibrary.load_asset(f"{UI_ART_DIR}/{PORTRAIT_TEXTURE}"),
+        (PORTRAIT_W, PORTRAIT_H))
+    check(f"the character's portrait is imported the same way: {PORTRAIT_TEXTURE}, "
+          f"{PORTRAIT_W} x {PORTRAIT_H}", not fault, fault)

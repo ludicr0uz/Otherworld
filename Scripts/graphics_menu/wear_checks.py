@@ -1,5 +1,5 @@
 """verify_graphics_menu.py's checks for the I panel (wear_tick, wear_draw,
-wbp_wear). Here rather than in the verifier, which is over its size budget.
+wbp_wear) and its portrait. Here rather than in the verifier, which is over its size budget.
 The weapon component's side (the wear and the take-off) is
 combat/verify/wear.py's.
 """
@@ -12,6 +12,8 @@ from graphics_menu import umg_consts as UC
 from graphics_menu import wear_consts as WC
 from graphics_menu.umg_checks import _tree
 from graphics_menu.wear_tick import WEAR_STILL_VAR, wear_defaults
+from item_icons.items import UI_ART_DIR
+from item_icons.portrait import PORTRAIT_TEXTURE
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -48,6 +50,26 @@ def _check_widgets(check):
     check("...collapsed until the HUD shows it",
           panel is not None
           and "COLLAPSED" in str(panel.get_editor_property("visibility")).upper())
+
+
+def _check_portrait(check, nodes):
+    widgets = {name: w for name, (w, _var) in _tree(UC.WBP_HUD).items()}
+    outer, image = widgets.get(WC.WEAR_PORTRAIT), widgets.get(WC.WEAR_PORTRAIT_IMAGE)
+    drawn = image.get_editor_property("brush").get_editor_property("resource_object") \
+        if image else None
+    check(f"WBP_HUD has the character's portrait: {PORTRAIT_TEXTURE}, collapsed until "
+          "the HUD shows it",
+          outer is not None and drawn is not None
+          and drawn == unreal.EditorAssetLibrary.load_asset(f"{UI_ART_DIR}/{PORTRAIT_TEXTURE}")
+          and "COLLAPSED" in str(outer.get_editor_property("visibility")).upper(),
+          str(drawn.get_name() if drawn else None))
+    sets = [n for n in nodes if "InVisibility" in _pins(n)
+            and [_title(f) for f in _feeders(n, "self")] == [f"Get {WC.WEAR_PORTRAIT}"]]
+    gates = {_title(g) for n in sets for b in _feeders(n, "execute")
+             for c in _feeders(b, "Condition") for g in _feeders(c, "A")}
+    check(f"...shown and collapsed on one branch, which reads {WC.WEAR_OPEN_VAR}",
+          len(sets) == 2 and len({_value(n, "InVisibility") for n in sets}) == 2
+          and gates == {f"Get {WC.WEAR_OPEN_VAR}"}, f"{len(sets)} sets, gated by {gates}")
 
 
 def _check_keys(check, nodes):
@@ -99,6 +121,7 @@ def _check_draw(check, nodes):
 
 def check_wear(check, bp, nodes):
     _check_widgets(check)
+    _check_portrait(check, nodes)
     _check_keys(check, nodes)
     _check_draw(check, nodes)
     cdo = unreal.get_default_object(BEL.generated_class(bp))

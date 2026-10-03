@@ -11,6 +11,8 @@ panel: the backpack shows under them and the keys and the mouse work it
     Enter, or a click   a worn row: take that garment off, into the bag
     a click on "[I] inventory"  shuts it, as I does
 
+While it is open the character's portrait stands left of it: a picture only.
+
 A fixed key, like Tab: not a gameplay bind. Up/Down/Enter are the menu's
 navigation keys; with the loot window open they are the loot window's, and
 with the menu open the menu's.
@@ -33,6 +35,13 @@ WEAR_PANEL = "WearPanel"
 WEAR_ROWS_BOX = "WearRows"
 WEAR_CLOSE = "WearClose"            # the close button: a line a click lands on
 WEAR_ROWS = len(WEAR_SLOTS)
+# The character's portrait (item_icons/portrait.py renders it): a picture of
+# the player's body from the front, left of the kit, up while the panel is open.
+WEAR_PORTRAIT = "WearPortrait"
+WEAR_PORTRAIT_IMAGE = "WearPortraitImage"
+WEAR_PORTRAIT_SIZE = (150.0, 300.0)     # the texture's own 1:2
+WEAR_PORTRAIT_PAD = 12.0                # the panel's edge round the picture
+WEAR_PORTRAIT_GAP = 12.0                # between it and the kit
 
 WEAR_LABELS = tuple(s.upper() for s in WEAR_SLOTS)
 WEAR_NONE_TEXT = "-"                # a slot with nothing worn in it

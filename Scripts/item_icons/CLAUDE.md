@@ -5,6 +5,7 @@ An item's inventory icon is a picture of its own 3D model. Nothing is drawn by h
 ```bash
 python3 Scripts/build_item_icons.py              # capture, compose, import: every item
 python3 Scripts/build_item_icons.py Axe Wood     # only these
+python3 Scripts/build_item_icons.py Character    # the I panel's portrait alone
 python3 Scripts/build_item_icons.py --no-editor  # compose again from the passes on disk
 ```
 
@@ -37,6 +38,20 @@ itself for the two editor steps. Look at the result in
 - **Icons build after the items, and the items point at their icons.** On a fresh clone:
   build weapons and survival (they log that the icon is missing), run this, build both again.
   The capture logs a note for each item still without its `Icon`.
+
+## The character's portrait (`portrait.py`)
+
+The I panel's picture of the player (`T_UI_Portrait`, 256 x 512) goes through the same three
+steps, named `Character` on the command line: the body the player wears
+(`asset_pipeline/player_body.py`), from the front, in the first frame of its idle clip.
+
+- **A new body needs a re-run** (`build_item_icons.py Character`), as a re-modelled item
+  does. `build_graphics_menu.py` needs the texture: on a fresh clone run this before it.
+- **Its own level, `PORTRAIT_LEVEL_TO`:** brought up to the guns' `LEVEL_TO` a clothed body
+  washes out, and left as captured it is lost on the panel's dark.
+- **Nothing ticks an animation in the capture,** so a clip set on the spawned component
+  leaves the bind pose (arms out). The clip goes into `animation_data` *before* the mesh is
+  set: setting the mesh initialises the animation, which poses the body once.
 
 ## Traps
 
@@ -71,4 +86,6 @@ itself for the two editor steps. Look at the result in
   group, no mips), is the item's own `Icon`, and the item's `SlotColor` is white.
 - `compose.py` refuses to write an icon whose model covers under 2% of its capture or that
   has fewer than 24 shades: an empty or flat picture never reaches the game.
-- By eye: `sheet.png`.
+- The portrait: imported the same way, 256 x 512 (`checks.py`); the widget and its gate are
+  `graphics_menu/wear_checks.py`'s.
+- By eye: `sheet.png`, and `assets/ui/T_UI_Portrait.png`.

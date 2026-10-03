@@ -27,7 +27,7 @@ from graphics_menu.umg_consts import (
     EQUIPPED_NAME, SLOT_ACTIVE, SLOT_AMMO, SLOT_FRAME, SLOT_ICON, WBP_HUD,
     WBP_INVENTORY_SLOT,
 )
-from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_SEL_VAR
+from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_PORTRAIT, WEAR_SEL_VAR
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
@@ -232,6 +232,10 @@ def author_inventory(ed, x0, y0, in_execs):
     _connect(_pin(no_menu, "ReturnValue", is_input=False), _pin(bag_up, "B"))
     shown = show_if(ed, part(ed, WBP_HUD, BAG_PANEL, x0 + 1760, y0 + 1000),
                     _pin(bag_up, "ReturnValue", is_input=False), named, x0 + 2000, y0)
+    # The character's portrait with it.
+    shown = show_if(ed, part(ed, WBP_HUD, WEAR_PORTRAIT, x0 + 1760, y0 - 700),
+                    _pin(bag_up, "ReturnValue", is_input=False), list(shown),
+                    x0 + 2000, y0 - 600)
 
     # Slot code c, over every code.
     loop = ed.add_macro_node(MACRO_FOR_LOOP)

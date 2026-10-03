@@ -35,7 +35,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
    | level generator, navmesh, trees and grass | `generate_forest_level.py` | `Scripts/forest_generator/CLAUDE.md` |
 | day and night: world config, sun, moon, sky | `build_`/`verify_day_night.py` | `Scripts/world/CLAUDE.md` |
 | corpse loot: loot tables, the roll, the loot window | `build_survival.py` (tables), `probe_corpse_loot.py` | `Scripts/loot/CLAUDE.md` |
-| item icons: each item's inventory icon, rendered from its 3D model | `build_item_icons.py` (run outside the editor) | `Scripts/item_icons/CLAUDE.md` |
+| item icons: each item's inventory icon, rendered from its 3D model; the I panel's portrait of the character | `build_item_icons.py` (run outside the editor) | `Scripts/item_icons/CLAUDE.md` |
 | generated bodies: describing one, the rig check, the import that normalises it, swapping the player onto it | `asset_pipeline/fetch_monsters.py`, `rig_compat.py`, `swap_player_body.py` | `Scripts/asset_pipeline/CLAUDE.md` |
 | clothing: the eight garments, wearing and taking off, the I panel, the test garments | `build_`/`verify_clothing.py`, `probe_clothing.py` | `Scripts/clothing/CLAUDE.md` |
 
@@ -257,7 +257,8 @@ editor.
   slot each. A garment picked up goes into the bag; the fire key with it in hand wears it
   (out of the bag, into its slot; one already worn there goes back into the bag). The worn
   garments are listed bottom right, always, over the backpack; with **I** open, Up/Down and
-  Enter (or a click) take one off into the bag. Only the state exists: nothing is drawn worn and wearing changes nothing. The body
+  Enter (or a click) take one off into the bag, and a portrait of the character, facing
+  forward, stands left of the panel (a render of the player's body: `item_icons/portrait.py`). Only the state exists: nothing is drawn worn and wearing changes nothing. The body
   the garments will be drawn on is generated: the adventurer in boxers (`SKM_Adventurer02`,
   Meshy, rigged and animated like the player's), not yet worn. One of
   each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).

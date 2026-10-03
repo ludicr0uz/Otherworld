@@ -20,6 +20,7 @@ from PIL import Image, ImageFilter
 
 from item_icons.items import ICON_H, ICON_W, ITEMS, icon_name
 from item_icons.paths import ICON_DIR, PASSES_DIR, SHEET_PATH
+from item_icons.portrait import PORTRAIT, PORTRAIT_H, PORTRAIT_TEXTURE, PORTRAIT_W
 
 KEY_LIGHT = (-0.45, 0.60, 0.66)   # camera space: right, up, towards the viewer
 AMBIENT = 0.42
@@ -34,6 +35,9 @@ RIM = 0.10                        # on faces turning away from the viewer
 LEVEL_PERCENTILE = 90.0
 LEVEL_TO = 0.62
 LEVEL_MAX_GAIN = 6.0
+# The portrait's: a clothed body brought up to the guns' level washes out,
+# and left as captured is lost on the panel's dark.
+PORTRAIT_LEVEL_TO = 0.40
 FILL = 0.96                       # of the canvas, for an item of length 1
 EDGE_PX = 1.0                     # the pale edge, in icon pixels
 EDGE_COLOUR = (205, 215, 232)
@@ -56,8 +60,9 @@ def _to_srgb(x):
     return np.where(x <= 0.0031308, x * 12.92, 1.055 * np.power(x, 1 / 2.4) - 0.055)
 
 
-def _lit(folder):
-    """The model lit, as straight-alpha float RGBA at the capture's size."""
+def _lit(folder, level_to=LEVEL_TO):
+    """The model lit and levelled, as straight-alpha float RGBA at the
+    capture's size."""
     base = _load(folder, "base")[..., :3]
     world_normal = _load(folder, "normal")[..., :3] * 2.0 - 1.0
     alpha = 1.0 - _load(folder, "mask")[..., 3]
@@ -83,15 +88,15 @@ def _lit(folder):
         raise RuntimeError(f"{folder}: the model covers {on.mean():.1%} of its capture")
     luma = colour @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
     bright = float(np.percentile(luma[on], LEVEL_PERCENTILE))
-    gain = min(LEVEL_MAX_GAIN, max(1.0, LEVEL_TO / max(bright, 1e-4)))
+    gain = min(LEVEL_MAX_GAIN, max(1.0, level_to / max(bright, 1e-4)))
     return np.dstack([_to_srgb(colour * gain), alpha])
 
 
-def _fit(rgba, length):
+def _fit(rgba, length, fit_to=(ICON_W, ICON_H)):
     """Crop to the model, scale to its share of the canvas, centre, edge."""
     img = Image.fromarray((np.clip(rgba, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8), "RGBA")
     img = img.crop(img.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox())
-    w, h = ICON_W * SUPERSAMPLE, ICON_H * SUPERSAMPLE
+    w, h = fit_to[0] * SUPERSAMPLE, fit_to[1] * SUPERSAMPLE
     scale = min(w * FILL * length / img.width, h * FILL / img.height)
     size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
     # Reduced with its colour premultiplied, or the capture's black background
@@ -105,7 +110,7 @@ def _fit(rgba, length):
     edge = Image.new("RGBA", (w, h), EDGE_COLOUR + (0,))
     edge.putalpha(spread.point(lambda a: round(a * EDGE_ALPHA)))
     edge.alpha_composite(canvas)
-    return edge.convert("RGBa").resize((ICON_W, ICON_H), Image.LANCZOS).convert("RGBA")
+    return edge.convert("RGBa").resize(fit_to, Image.LANCZOS).convert("RGBA")
 
 
 def _check(display, icon):
@@ -130,8 +135,8 @@ def _sheet(icons):
 
 
 def compose_all(only=()):
-    """Write T_UI_Icon_<DisplayName>.png for every captured item. Returns the
-    texture names written."""
+    """Write T_UI_Icon_<DisplayName>.png for every captured item, and the
+    portrait. Returns the texture names written."""
     os.makedirs(ICON_DIR, exist_ok=True)
     made, icons = [], []
     for item in ITEMS:
@@ -143,5 +148,13 @@ def compose_all(only=()):
         icon.save(os.path.join(ICON_DIR, f"{icon_name(item.display)}.png"))
         made.append(icon_name(item.display))
         icons.append(icon)
-    _sheet(icons)
+    if icons:
+        _sheet(icons)
+    # The character's portrait: the same light, on its own taller canvas.
+    folder = os.path.join(PASSES_DIR, PORTRAIT)
+    if (not only or PORTRAIT in only) and os.path.isdir(folder):
+        portrait = _fit(_lit(folder, PORTRAIT_LEVEL_TO), 1.0, (PORTRAIT_W, PORTRAIT_H))
+        _check(PORTRAIT, portrait)
+        portrait.save(os.path.join(ICON_DIR, f"{PORTRAIT_TEXTURE}.png"))
+        made.append(PORTRAIT_TEXTURE)
     return made

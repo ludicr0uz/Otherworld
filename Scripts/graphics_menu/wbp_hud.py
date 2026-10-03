@@ -38,7 +38,7 @@ from graphics_menu.inv_consts import (
     INV_LABEL_FONT, KIT, KIT_BOTTOM, KIT_SCALE, WEAPON_BOX, WEAPON_LABEL_TEXTS,
     WEAPON_LABELS,
 )
-from graphics_menu.wbp_wear import author_wear_widgets
+from graphics_menu.wbp_wear import author_wear_portrait, author_wear_widgets
 from graphics_menu.umg_consts import (
     BANNER_COUNT, BANNER_FONT, BANNER_OFF, BANNER_TOP, COL_EXIT_CALLED_OFF, COL_FPS,
     COL_GOLD, COL_HP_FILL, COL_KILL, COL_LABEL, COL_NUMBER, COL_DEBUFF, COL_ST_FILL,
@@ -146,7 +146,8 @@ def _author_strip(bp, body):
 
 def _author_kit(bp, body):
     """Bottom right: what is worn (always), and under it the backpack, its
-    top row's quick keys over it (shown with I)."""
+    top row's quick keys over it (shown with I); left of them, with I, the
+    character's portrait."""
     kit = U.add(bp, unreal.VerticalBox, KIT, body)
     U.at(kit, (1.0, 1.0), (1.0, 1.0), (-CORNER_MARGIN, -KIT_BOTTOM))
     scale = U.scaled(bp, kit, "WearScale", KIT_SCALE)
@@ -157,6 +158,7 @@ def _author_kit(bp, body):
     _labels(bp, bag, BAG_LABELS, BAG_LABEL_TEXTS)
     _grid(bp, bag, BAG_BOX, BAG_SIZE, BAG_COLUMNS, "Bag")
     U.hide(bag)
+    author_wear_portrait(bp, body)
 
 
 def build_hud_widget():

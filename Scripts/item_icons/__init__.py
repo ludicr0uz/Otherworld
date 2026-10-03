@@ -7,6 +7,8 @@ the compose here (Pillow + numpy), and the import
 
   items     the table: each item's DisplayName, Blueprint, camera view and
             share of the slot; the texture's name and size; the white tint
+  portrait  the character's portrait (the I panel's): the player's body from
+            the front, posed; its texture's name and size, the mesh, the clip
   paths     where the passes, the PNGs and the contact sheet go (assets/)
   capture   in the editor: the item alone before an orthographic
             SceneCapture2D, written as base colour, normals and a mask

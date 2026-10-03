@@ -32,7 +32,7 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 - **I** opens the inventory (the I panel): the backpack shows under the worn garments,
-  bottom right (`wear_*.py`, `inv_*.py`, `Scripts/clothing/CLAUDE.md`). **Up/Down** run the
+  bottom right, and the character's portrait left of them (`wear_*.py`, `inv_*.py`, `Scripts/clothing/CLAUDE.md`). **Up/Down** run the
   caret over the worn rows, then the bag's slots; **Enter** takes a garment off, or brings
   a bag slot's item to hand; the mouse drags an item from slot to slot (below). It does not
   pause, holds the walk while open, and hides under the menu; with the loot window open
@@ -447,6 +447,12 @@ loot window, in play only. Traps met here:
   `MoveFrom`) or, on the same slot, for that slot in hand (`SlotRequest`). The component
   decides what fits. Its press and release are read with `InvOver`/`InvDragFrom`, not a
   geometry test of their own: `cursor_checks._on_slot` allows that.
+- **The character's portrait** (`WearPortrait`, `wbp_wear.author_wear_portrait`): a picture
+  of the player's body from the front, a canvas child of `Body` left of the Kit (not in
+  it: `umg_checks` holds the Kit to its two children). `hud_inventory.py` shows it on the
+  bag's own condition (WearOpen and no menu). The picture is a render
+  (`Scripts/item_icons/CLAUDE.md`), so it does not change with what is worn or held.
+  `probe_inventory_window.py` (windowed) saves the screen with it up.
 - **Still needs a play session:** dragging with a real mouse (no probe can aim at a cell),
   how the Kit reads over the watermark and beside the loot window on a 720p screen, and
   the 1-9 keys themselves.

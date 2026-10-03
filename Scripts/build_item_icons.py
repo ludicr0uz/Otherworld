@@ -6,6 +6,7 @@ editor's embedded Python does not have):
 
     python3 Scripts/build_item_icons.py              # every item
     python3 Scripts/build_item_icons.py Axe Wood     # only these
+    python3 Scripts/build_item_icons.py Character    # the I panel's portrait
 
 Three steps, and this script runs all of them:
 
@@ -36,6 +37,7 @@ sys.path.insert(0, HERE)
 from item_icons.compose import compose_all                          # noqa: E402
 from item_icons.items import DISPLAYS                               # noqa: E402
 from item_icons.paths import ICON_DIR, SHEET_PATH                   # noqa: E402
+from item_icons.portrait import PORTRAIT                            # noqa: E402
 
 UEPY = os.path.join(HERE, "dev", "uepy.py")
 
@@ -48,9 +50,10 @@ def _in_editor(script, **env):
 def main(argv):
     editor = "--no-editor" not in argv
     only = tuple(a for a in argv if not a.startswith("--"))
-    unknown = [n for n in only if n not in DISPLAYS]
+    unknown = [n for n in only if n not in DISPLAYS + (PORTRAIT,)]
     if unknown:
-        sys.exit(f"no such item: {', '.join(unknown)} (items: {', '.join(DISPLAYS)})")
+        sys.exit(f"no such item: {', '.join(unknown)} "
+                 f"(items: {', '.join(DISPLAYS)}, and {PORTRAIT})")
 
     if editor:
         _in_editor("capture_item_icons.py", ITEM_ICONS_ONLY=",".join(only))

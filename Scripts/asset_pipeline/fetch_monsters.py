@@ -69,6 +69,13 @@ def run_spec(spec) -> dict:
     print(f"  height {spec.height_meters} m | {spec.target_polycount} tris | "
           f"{spec.texture_resolution} textures | {spec.pose_mode}", flush=True)
     state = meshy.load_state(spec)
+    # A cache paid for under another prompt is another model: resuming it would
+    # skip every stage and record the new prompt over the old model's.
+    if state["stages"] and state.get("prompt", spec.prompt) != spec.prompt:
+        raise meshy.MeshyError(
+            f"the prompt changed since {spec.id} was generated: move "
+            f"{os.path.relpath(meshy.cache_dir(spec), meshy.PROJECT_DIR)} aside "
+            "to generate it again")
     state["prompt"] = spec.prompt
     state["license"] = spec.license
     state["dest"] = spec.dest

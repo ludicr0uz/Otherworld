@@ -308,8 +308,14 @@ def _bind_fingerprint(skel):
     return " ".join(out)
 
 
-def main():
-    specs = _specs()
+def main(only=None):
+    """Import every cached character, or just the ids in ``only``.
+
+    ``only`` is how a new character joins without re-importing the others: a
+    re-import replaces the mesh, and with it the finger bones build_retarget.py
+    added, so the player would lose its fingers until the retarget re-ran.
+    """
+    specs = [s for s in _specs() if not only or s["id"] in only]
     if not specs:
         _log(f"[IMPORT] nothing cached under {CACHE_ROOT} -- run fetch_monsters.py first")
         return
@@ -376,4 +382,5 @@ def main():
             _log("[IMPORT]   (bind poses differ, as expected -- this is exactly "
                  "why the clips cannot be shared)")
 
-main()
+if __name__ == "__main__":
+    main()

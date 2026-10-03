@@ -119,8 +119,10 @@ REMESH_TEX_SUBDIR = "textures_remesh"
 # Meshy names every export's material Material_1 and its texture texture_0.
 # Once the mesh wears a real instance these are unreferenced dead weight --
 # and texture_0 is a 4k base colour in TEXTUREGROUP_World, i.e. precisely the
-# unscalable texture this script exists to replace.
-GENERIC_LEFTOVERS = ("Material_1", "texture_0")
+# unscalable texture this script exists to replace. Meshy's exports since
+# October 2026 (adventurer_02) name them BakedMaterial and its _baseColor.
+GENERIC_LEFTOVERS = ("Material_1", "texture_0",
+                     "BakedMaterial", "BakedMaterial_baseColor")
 
 
 def _log(msg):
@@ -562,9 +564,10 @@ def verify(specs):
     return ok
 
 
-def main():
+def main(only=None):
+    """Every cached character, or just the ids in ``only`` (as import_characters)."""
     unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
-    specs = _specs()
+    specs = [s for s in _specs() if not only or s["id"] in only]
     if not specs:
         _log(f"nothing cached under {CACHE_ROOT} -- run fetch_monsters.py first")
         return
@@ -596,4 +599,5 @@ def main():
     verify(specs)
 
 
-main()
+if __name__ == "__main__":
+    main()

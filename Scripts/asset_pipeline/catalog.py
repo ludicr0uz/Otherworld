@@ -128,9 +128,43 @@ ADVENTURER = MonsterSpec(
          "player is the one character a bad rig cannot be hidden on.",
 )
 
+# ── The player's base body, for clothing ─────────────────────────────────────
+#
+# The same man as ADVENTURER, stripped to a pair of boxers: the body the
+# clothing system dresses (Scripts/clothing/CLAUDE.md). Garments are drawn over
+# it one slot at a time, so the base must carry nothing a slot would add -- no
+# shirt, no gloves, no boots, no hat -- and the boxers are what it wears with
+# every slot empty. Bare skin is also the easy case for Meshy's rigger: no
+# loose hem or cuff for it to skin to the wrong bone.
+#
+# Not worn yet. The player still wears ADVENTURER (combat/skin.py) until the
+# clothing task moves the player onto this rig; until then it is imported on
+# its own skeleton and left alone.
+ADVENTURER_BASE = MonsterSpec(
+    id="adventurer_02",
+    # Led by what he wears, and with nothing about horror or survival: the
+    # first try, worded as a "survival horror protagonist ... wearing only
+    # boxer shorts", came back in camo cargo trousers and combat boots.
+    prompt=(
+        "Full body 3D character, an adult man wearing nothing but plain dark "
+        "grey cotton boxer shorts underwear, barefoot with bare toes, bare "
+        "knees and bare legs, shirtless with a bare chest, lean athletic "
+        "build, weathered rugged face with short stubble and cropped dark "
+        "hair, base mesh for a clothing system, A-pose with the arms angled "
+        "down and away from the body, hands open with fingers apart, "
+        "photorealistic skin, PBR textures, Unreal Engine 5 style, 4k "
+        "resolution, symmetrical posture for rigging"
+    ),
+    height_meters=QUINN_HEIGHT_M,
+    dest="/Game/Sourced/Characters/SKM_Adventurer02",
+    note="The player in boxers, the base the garments go on. The same face "
+         "and height as adventurer_01, so moving the player onto it changes "
+         "the clothes and nothing else.",
+)
+
 # What fetch_monsters.py iterates. MONSTERS is kept as its own name because
 # npc_placement.py's variants and the spawn logic are about monsters only.
-CHARACTERS = MONSTERS + (ADVENTURER,)
+CHARACTERS = MONSTERS + (ADVENTURER, ADVENTURER_BASE)
 
 
 def by_id(spec_id: str):

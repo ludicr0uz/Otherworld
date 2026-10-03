@@ -159,7 +159,9 @@ def retarget_animations(rtg, mesh, out_dir, prefix):
     return created
 
 
-def main():
+def main(only=None):
+    """Every imported character, or just the short names in ``only``
+    (``{"Adventurer02"}``): the others' rigs and clips are left as they are."""
     # Chained straight after import_characters.py in one cold editor, the
     # registry is still scanning the meshes that were just written and
     # create_asset quietly returns None. Wait for it rather than race it.
@@ -174,7 +176,7 @@ def main():
                        CHAINS_MANNEQUIN, RETARGET_ROOT_MANNEQUIN,
                        root_motion_bone=ROOT_MOTION_BONE_MANNEQUIN)
 
-    monsters = _monsters()
+    monsters = [m for m in _monsters() if not only or m[0] in only]
     _log(f"{len(monsters)} monster(s): {', '.join(n for n, _, _ in monsters)}")
     src_clip = _load(f"{MANNEQUIN_ANIM_DIR}/{PALM_CALIBRATION_CLIP}")
     totals = []

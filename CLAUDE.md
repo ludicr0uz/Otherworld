@@ -256,7 +256,9 @@ editor.
   slot each. A garment picked up goes into the bag; the fire key with it in hand wears it
   (out of the bag, into its slot; one already worn there goes back into the bag). **I** opens
   a panel on the left listing what is worn; Up/Down and Enter (or a click) take one off into
-  the bag. Only the state exists: nothing is drawn worn and wearing changes nothing. One of
+  the bag. Only the state exists: nothing is drawn worn and wearing changes nothing. The body
+  the garments will be drawn on is generated: the adventurer in boxers (`SKM_Adventurer02`,
+  Meshy, rigged and animated like the player's), not yet worn. One of
   each lies 3 m in front of the start on `Lvl_Forest_200m` (`Scripts/clothing/CLAUDE.md`).
 - **Item icons:** every item's icon, in the inventory grid and in the loot window, is a
   picture of its own 3D model, lit and fitted to the slot by `Scripts/build_item_icons.py`

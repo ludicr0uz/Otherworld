@@ -20,6 +20,7 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 | putting one on, taking one off | `combat/weapon_component/wear.py` (checks: `combat/verify/wear.py`) |
 | the **I** panel | `graphics_menu/wear_*.py`, `wbp_wear.py` (checks: `graphics_menu/wear_checks.py`) |
 | the icons | `item_icons/items.py` rows, `python3 Scripts/build_item_icons.py Hat ...` |
+| the base body in boxers (`SKM_Adventurer02`), what the garments will be drawn on | `asset_pipeline/catalog.py` `ADVENTURER_BASE`; names in `specs.py` `BASE_BODY_*` (checks: `verify/base_body.py`) |
 
 ## The design
 
@@ -62,6 +63,18 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 ## Not done yet
 
 - Nothing is drawn worn, and a worn garment does nothing (no warmth, no carry space).
+- **The base body** is ready but not worn: the player still wears `SKM_Adventurer01`
+  (dressed, `combat/skin.py`). `SKM_Adventurer02` is the same man in boxers on its own
+  skeleton, with fingers, a retargeter and its own `A_Adventurer02_*` mannequin clips. To
+  move the player onto it, point `combat/skin.py`'s `ADVENTURER` at it, run
+  `import_quaternius.py` with `quaternius_paths.UAL_CHARACTERS` naming it (the stance,
+  kneel and throw clips), and re-measure what was measured on Adventurer01 (grips, hit
+  bodies, head hide, the sight line). To make it again:
+  `python3 Scripts/asset_pipeline/fetch_monsters.py adventurer_02`, then in the editor
+  `import_characters.main(only={"adventurer_02"})`,
+  `build_creature_materials.main(only={"adventurer_02"})` and
+  `build_retarget.main(only={"Adventurer02"})` (`only` leaves the other characters alone:
+  a re-import drops the fingers the retarget added).
 - The saved profile (`graphics_menu/CLAUDE.md`, "Save and exit") stores the bag, not `Worn`:
   what was worn is lost on save and exit.
 - No loot table names a garment yet (`Scripts/loot/tables.py`); a looted one would go into

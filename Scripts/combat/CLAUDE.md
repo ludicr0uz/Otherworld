@@ -98,14 +98,23 @@ menu polls its own copy from `DrawHUD`, which does.
     hand and the bag take anything (`slot_tuning.fits`, mirrored by `slot_nodes.fits`).
   - **The slot sync is the last fragment before the refresh.** It rebuilds `SlotItems`
     (15 entries, the HUD's view) from the items' Slots (a second claim on a code is
-    UNPLACED), puts each UNPLACED item in the first free bag slot, else the empty hand,
-    else a free weapon slot it fits, then writes `EquippedIndex` (the hand's item's index,
+    UNPLACED), puts each UNPLACED item in a free weapon slot it fits (a weapon goes to its
+    own slot before the bag), else the first free bag slot, else the empty hand, then writes `EquippedIndex` (the hand's item's index,
     -1 for empty hands) and `HasRoom` (a bag slot or the hand free). **Nothing else writes
     the hand:** the old writes of `EquippedIndex` (drop, throw, eating, wearing, light) are
     overwritten by it the same frame.
   - **A pick-up, a take-off and the loot window go in UNPLACED**, after testing `HasRoom`:
-    into the bag, or empty hands with the bag full; with the bag full and something in
-    hand nothing is picked up. The held item stays held. After a drop, a throw or eating the
+    a weapon into a free weapon slot of its kind, anything else (and a weapon whose slots
+    are taken) into the bag, or empty hands with the bag full; with the bag full and
+    something in hand nothing is picked up, a weapon with a free slot included (`HasRoom`
+    is not per item). The held item stays held
+    (`probes/probe_pickup_weapon_slot.py`).
+  - **One pick-up goes to the hand: a blade taken back out of what it was thrown into.**
+    The strike flags the item `Lodged` as it sets it into a tree or a body
+    (`throw_strike.py`); the take (`pickup._author_to_hand`) lowers it and, with empty
+    hands (`Held` not valid), writes `Slot = HAND` over the UNPLACED, `HandFrom` the
+    item's `WeaponKind`, so 4 puts it away. With something in hand it is placed like
+    any weapon. A blade that glanced off and fell is not `Lodged`. After a drop, a throw or eating the
     last one the hands stay empty: nothing comes up unasked.
   - **A request is `SlotRequest`** (a number key, Q, Enter on a bag slot in the I panel, a
     click on a slot): a filled slot's item comes to hand, the hand's item going home first

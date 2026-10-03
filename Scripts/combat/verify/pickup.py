@@ -1,15 +1,18 @@
 """verify.pickup -- the pick-up (weapon_component/pickup.py), interact's item
 kind: the target interact kept, cast to an item, is taken into the bag once,
-after the search, while there is room.
+after the search, while there is room; and a blade that was Lodged goes back
+into empty hands.
 
 How the target is chosen is verify/interact.py's. That a pick-up joins the
 inventory without switching to it is verify/weapon_inputs.py's.
 """
 
-from combat.slot_tuning import HAS_ROOM_VAR
+from combat import item_vars as IV
+from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, WEAPON_KIND_VAR
 from combat.verify.common import by_pins, check, pin_value
 from combat.verify.fixtures import wg
-from combat.verify.interact import _exec_from, _reads, _sources, _title
+from combat.verify.interact import _exec_from, _reads, _sources, _then, _title
+from combat.weapon_component import vars as WV
 from combat.weapon_component.interact import INTERACT_TARGET_VAR
 
 
@@ -81,5 +84,48 @@ def check_pickup_takes_once():
           str([pin for _n, pin in entries]))
 
 
+def check_lodged_to_hand():
+    """A blade taken back out of a tree or a body goes to empty hands."""
+    hands = [n for n in wg if _title(n) == f"Set {SLOT_VAR}"
+             and pin_value(n, SLOT_VAR) in (str(HAND), "")
+             and not _sources(n, SLOT_VAR) and _target_as_item(n, "self")]
+    check("the take puts the item in the hand in one place",
+          len(hands) == 1, f"{len(hands)} Set {SLOT_VAR} = HAND on the target")
+    if len(hands) != 1:
+        return
+    bare = _exec_from(hands[0])
+    held = [h for n, _pin in bare for c in _sources(n, "Condition")
+            for v in _sources(c, "A") for h in _sources(v, "Object")]
+    check(f"...only with empty hands ({WV.Held} is not valid)",
+          len(bare) == 1 and bare[0][1] == "then"
+          and [_title(h) for h in held] == [f"Get {WV.Held}"],
+          str([_title(h) for h in held]))
+    if len(bare) != 1:
+        return
+    lowers = _exec_from(bare[0][0])
+    check(f"...the item no longer {IV.Lodged}",
+          len(lowers) == 1 and _title(lowers[0][0]) == f"Set {IV.Lodged}"
+          and pin_value(lowers[0][0], IV.Lodged) in ("false", "")
+          and _target_as_item(lowers[0][0], "self"),
+          ", ".join(_title(n) for n, _pin in lowers))
+    if len(lowers) != 1:
+        return
+    gates = _exec_from(lowers[0][0])
+    asked = [c for n, _pin in gates for c in _sources(n, "Condition")]
+    check(f"...and only an item that was {IV.Lodged} (a thrown blade left in a "
+          "tree or a body), after the take set it UNPLACED",
+          len(gates) == 1 and gates[0][1] == "then" and len(asked) == 1
+          and _title(asked[0]) == f"Get {IV.Lodged}"
+          and [_title(n) for n, _pin in _exec_from(gates[0][0])] == [f"Set {SLOT_VAR}"],
+          f"{len(gates)} gate(s)")
+    froms = [n for n in _then(hands[0])]
+    check(f"...{HAND_FROM_VAR} its {WEAPON_KIND_VAR}: the melee slot's key puts it away",
+          len(froms) == 1 and _title(froms[0]) == f"Set {HAND_FROM_VAR}"
+          and [_title(f) for f in _sources(froms[0], HAND_FROM_VAR)]
+          == [f"Get {WEAPON_KIND_VAR}"],
+          ", ".join(_title(n) for n in froms))
+
+
 def run():
     check_pickup_takes_once()
+    check_lodged_to_hand()

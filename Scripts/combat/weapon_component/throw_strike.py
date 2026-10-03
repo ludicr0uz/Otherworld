@@ -37,7 +37,9 @@ there is no hot blade's double, which is the blow's.
 LODGED, the item is where the flight left it, turned and set by its own
 LodgeTurn and LodgePoint (combat/lodge.py): its X along the segment it
 just flew, after a turn of its own that takes its point or its bit onto X, and
-placed so that LodgePoint is on the bark. The flight then flags it Dropped
+placed so that LodgePoint is on the bark, and flagged Lodged (in a tree or in
+a body: what the pick-up reads to put it back in empty hands). The flight
+then flags it Dropped
 without the fall to the ground, so it hangs in the tree and E takes it back
 like any item lying about. The height is measured from the tree instance's own
 origin, which is the foot of its trunk on the ground, not by a trace, which a
@@ -83,7 +85,7 @@ from uebp.graph import (
     BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.hit_zones import HEAD_BONES_VAR, HEAD_MULT_VAR
-from combat.paths import HEALTH_CLASS_PATH
+from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
 from combat.throw_tuning import (
     LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, STICK_LINE_REACH_CM,
     STICK_TRACE_PAST, THROW_DAMAGE_VAR,
@@ -103,6 +105,7 @@ from uebp.nodes.palette import (
 from uebp.nodes.system import FN_TIME_SECONDS
 from uebp import props as EP
 from combat import health_vars as HV
+from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
 THROW_PAST_VAR = "ThrowPast"          # the actors the fall to the ground ignores
@@ -425,4 +428,11 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     falls = (else_(bites), then(aside),
              _loose_pin(tree, "CastFailed", is_input=False),
              else_(reachable))
-    return falls, (lodged, stuck)
+    # Left in a tree or a body, the item says so: the pick-up puts a Lodged
+    # blade back into empty hands (pickup.py), and lowers it.
+    mark = ed.add_set_member_variable_node(IV.Lodged, ITEM_CLASS_PATH)
+    _connect(thrown, _pin(mark, "self"))
+    _set(mark, IV.Lodged, True)
+    for pin in (lodged, stuck):
+        _connect(pin, _pin(mark, "execute"))
+    return falls, (then(mark),)

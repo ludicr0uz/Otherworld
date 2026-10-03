@@ -7,8 +7,9 @@ refresh, so whatever moved this frame is placed before the equip runs.
         its Slot a free code -> SlotItems[Slot] = item
         otherwise (UNPLACED, or a code another item took) -> Slot = UNPLACED
     for each item still UNPLACED (picked up, looted, taken off):
-        the first free bag slot, or the hand if it is empty, or a free
-        weapon slot it fits -> Slot, SlotItems
+        a free weapon slot it fits (a weapon goes to its own slot before
+        the bag), or the first free bag slot, or the hand if it is empty
+        -> Slot, SlotItems
         (into the hand: HandFrom = UNPLACED, it came from nowhere)
     EquippedIndex = Find(Inventory, SlotItems[HAND])        (-1: empty hands)
     HasRoom = a bag slot free OR the hand empty
@@ -52,13 +53,14 @@ def _author_claim(g, execs):
 
 
 def _author_place(g, execs):
-    """The second pass: each UNPLACED item into the first free bag slot, or
-    the hand. Returns Completed."""
+    """The second pass: each UNPLACED item into a free weapon slot it fits,
+    else the first free bag slot, else the hand. Returns Completed."""
     item, _i, body, done = for_each(g, g.get(WV.Inventory), execs)
     lost = op(g, FN_EQ_II, g.iget(item, SLOT_VAR), UNPLACED)
     yes, _no = g.branch(lost, [body])
     flow = g.put(SLOT_PICK_VAR, str(UNPLACED), [yes])
-    k, kbody, kdone = for_loop(g, BAG_FIRST, BAG_LAST, [flow])
+    armed, unarmed = _author_weapon_slot(g, item, [flow])
+    k, kbody, kdone = for_loop(g, BAG_FIRST, BAG_LAST, [unarmed])
     searching = op(g, FN_LESS_II, g.get(SLOT_PICK_VAR), 0)
     look, _ = g.branch(searching, [kbody])
     _taken, empty = g.branch(valid(g, slot_at(g, k)), [look])
@@ -67,10 +69,9 @@ def _author_place(g, execs):
     found = op(g, FN_GE_II, g.get(SLOT_PICK_VAR), 0)
     bagged, full = g.branch(found, [kdone])
     bare = not_(g, valid(g, slot_at(g, HAND)))
-    in_hand, busy = g.branch(bare, [full])
+    in_hand, _busy = g.branch(bare, [full])
     flow = g.put(SLOT_PICK_VAR, str(HAND), [in_hand])
     flow = g.put(HAND_FROM_VAR, str(UNPLACED), [flow])
-    armed = _author_weapon_slot(g, item, [busy])
     pick = g.get(SLOT_PICK_VAR)
     flow = g.iput(item, SLOT_VAR, pick, [bagged, flow, armed])
     g.call(FN_ARR_SET, [flow], TargetArray=g.get(SLOT_ITEMS_VAR), Index=pick, Item=item)
@@ -78,16 +79,16 @@ def _author_place(g, execs):
 
 
 def _author_weapon_slot(g, item, execs):
-    """With the bag full and the hand taken: SlotPick := a free weapon slot
-    ``item`` fits. Returns the exec pin a find leaves by (none: nothing)."""
+    """Before the bag: SlotPick := the first free weapon slot ``item`` fits
+    (none for an item that is no weapon). Returns (found, none): the exec
+    pins a find and no find leave by."""
     s, body, done = for_loop(g, PRIMARY, MELEE_SLOT, execs)
     searching = op(g, FN_LESS_II, g.get(SLOT_PICK_VAR), 0)
     look, _ = g.branch(searching, [body])
     free = op(g, FN_AND, fits(g, item, s), not_(g, valid(g, slot_at(g, s))))
     yes, _ = g.branch(free, [look])
     g.put(SLOT_PICK_VAR, s, [yes])
-    found, _none = g.branch(op(g, FN_GE_II, g.get(SLOT_PICK_VAR), PRIMARY), [done])
-    return found
+    return g.branch(op(g, FN_GE_II, g.get(SLOT_PICK_VAR), PRIMARY), [done])
 
 
 def _author_after(g, execs):
@@ -115,7 +116,8 @@ def _author_slot_sync(ed, in_execs):
     tails = _author_after(g, [flow])
     ed.add_comment_to_nodes(
         "The slot sync: SlotItems rebuilt from each item's own Slot, the "
-        "UNPLACED ones put in the first free bag slot or the hand, then "
+        "UNPLACED ones put in a free weapon slot they fit, else the first "
+        "free bag slot, else the hand, then "
         "EquippedIndex, HasRoom, and a refresh when the hand's item is not "
         "Held (slot_sync.py).", g.made[:4])
     return tails

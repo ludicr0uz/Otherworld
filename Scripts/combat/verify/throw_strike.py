@@ -446,10 +446,14 @@ def check_lodge():
           {f"Get {LODGE_POINT_VAR}", f"Get {LODGE_TURN_VAR}"} <= at, str(sorted(at)))
     held = [n for n in _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))]
     landed = exits.get("Set Dropped", [])
-    check("lodged, in a tree or in a body, it skips the fall: straight on to "
-          "the landing's Dropped, so it stays there as a pick-up",
-          len(landed) == 2 and all(n in landed for n in puts + held)
-          and len(exits) == 2, str(sorted(exits)))
+    marks = [f for n in landed for f in _feeders(n, "execute")]
+    check("lodged, in a tree or in a body, it is flagged Lodged (the pick-up "
+          "puts such a blade back in empty hands) and skips the fall: straight "
+          "on to the landing's Dropped, so it stays there as a pick-up",
+          len(landed) == 1 and _title(landed[0]) == "Set Lodged"
+          and pin_value(landed[0], "Lodged") == "true" and _of_thrown(landed[0])
+          and len(marks) == 2 and all(n in marks for n in puts + held)
+          and len(exits) == 2, f"{sorted(exits)}, {[_title(n) for n in landed]}")
     falls = [v for k, v in exits.items() if k != "Set Dropped"]
     check("everything else still comes down to the ground: an item that is no "
           "blade, one a body dropped, one that struck no tree, one too high",

@@ -9,15 +9,23 @@ picks the item they are looking at, and a second press takes the next.
 A pick-up is not always lying loose: a thrown blade is left attached to the
 body it struck (throw_strike.py). The take detaches what it takes, so an item
 that goes into the bag unseen does not ride on with the body.
+
+Where a taken item goes is the slot sync's (UNPLACED: a weapon to a free
+weapon slot of its kind, anything else to the bag), but for one case: a blade
+taken back out of what it was thrown into (the item is Lodged), with empty
+hands, goes to the hand (_author_to_hand).
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.paths import ITEM_CLASS_PATH
-from combat.slot_tuning import HAS_ROOM_VAR, SLOT_VAR, UNPLACED
+from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, UNPLACED, WEAPON_KIND_VAR
 from combat.weapon_component.common import _prop
 from uebp.nodes.actor import FN_DETACH
 from uebp.nodes.array import FN_ARR_ADD
+from uebp.g import _G
+from uebp.nodes.math import FN_NOT
 from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.nodes.system import FN_IS_VALID
 from uebp.nodes.system import FN_ALL_ACTORS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
@@ -116,12 +124,35 @@ def _author_take_item(ed, target, exec_in):
     _set(place, SLOT_VAR, UNPLACED)
     _connect(then(add), _pin(place, "execute"))
 
+    taken, hand_nodes = _author_to_hand(ed, best, then(place))
     ed.add_comment_to_nodes(
         "An interact target that is an item is picked up: taken once, after "
         "the search, while a bag slot or the hand is free (HasRoom), and "
         "detached from whatever it was left in. It goes in UNPLACED: the slot "
-        "sync puts it in the bag, or in empty hands when the bag is full.",
-        made)
-    taken = (then(place),)
+        "sync puts a weapon in a free weapon slot of its kind, anything else "
+        "in the bag, or in empty hands when the bag is full. A blade taken "
+        "back out of what it was thrown into (Lodged) with empty hands goes "
+        "to the hand instead.",
+        made + hand_nodes)
     idle = (else_(room),)
     return taken, idle, out(cast, "CastFailed")
+
+
+def _author_to_hand(ed, item, exec_in):
+    """A Lodged item (a blade thrown into a tree or a body) taken with empty
+    hands goes to the hand: Slot = HAND, over the UNPLACED the take wrote.
+    HandFrom is its WeaponKind, so the melee slot's key puts it away as if
+    it had come from there. Lodged is lowered either way.
+
+    Held is last frame's equip: a clash with something that reached the
+    hand this frame is the slot sync's (the later claim goes UNPLACED).
+    Returns (tails, nodes).
+    """
+    g = _G(ed, ITEM_CLASS_PATH)
+    stuck, loose = g.branch(g.iget(item, IV.Lodged), [exec_in])
+    flow = g.iput(item, IV.Lodged, "false", [stuck])
+    bare = out(g.call(FN_NOT, A=out(g.call(FN_IS_VALID, Object=g.get(WV.Held)))))
+    empty, busy = g.branch(bare, [flow])
+    flow = g.iput(item, SLOT_VAR, str(HAND), [empty])
+    flow = g.put(HAND_FROM_VAR, g.iget(item, WEAPON_KIND_VAR), [flow])
+    return (loose, busy, flow), g.made

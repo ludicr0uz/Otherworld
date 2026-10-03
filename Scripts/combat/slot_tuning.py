@@ -10,8 +10,9 @@ its Slot, one code over all fifteen places,
     1 2 3 4      weapons     primary, secondary, pistol, melee
     5 .. 14      backpack    the bag's ten slots; 5..9 are on keys 5..9
     -1           UNPLACED    just picked up, looted or taken off: the next
-                             sync puts it in the first free bag slot, or in
-                             the hand if the bag is full
+                             sync puts it in a free weapon slot it fits,
+                             else the first free bag slot, or in the hand
+                             if the bag is full
 
 so an item that leaves Inventory (eaten, dropped, thrown, worn) leaves its
 slot with it, and nothing else has to be told. A weapon's WeaponKind is the

@@ -31,6 +31,7 @@ from combat.throw_tuning import (
     LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, THROW_DAMAGE_VAR,
     THROW_MELEE_PITCH_UP_DEG, THROW_START_FORWARD, THROW_START_UP,
 )
+from combat.slot_tuning import BAG_FIRST, BAG_LAST, HAND, MELEE_SLOT, SLOT_VAR
 from combat.tuning import INTERACT_RADIUS
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.throw import (
@@ -231,9 +232,15 @@ def _lodge(p, wc, player, item, name, spot, base, eye):
 
     yield from _stand(p, player, near, yaw)
     gap = (player.get_actor_location() - item.get_actor_location()).length()
+    lodged = p.get(item, "Lodged")
     taken = yield from _take(p, wc, item)
-    p.check(f"E at the trunk takes the {name} back into the bag",
+    p.check(f"E at the trunk takes the {name} back",
             taken and gap < INTERACT_RADIUS, f"{gap:.0f} cm away")
+    yield lambda: p.get(wc, "Held") == item
+    p.check("...into the empty hands it was thrown from, no longer Lodged",
+            p.get(wc, "Held") == item and p.get(item, SLOT_VAR) == HAND
+            and p.get(item, "Lodged") is False and lodged is True,
+            f"slot {p.get(item, SLOT_VAR)}, was Lodged {lodged}")
 
 
 def _falls(p, wc, player, item, label, spot, base, pitch, reticle=False):
@@ -304,7 +311,12 @@ def _run(p):
                       "cm up glances off: it falls to the foot of the tree",
                       spot, base, spot[4])
     taken = yield from _take(p, wc, knife)
-    p.check("...where E takes it back", taken)
+    yield 0.2
+    p.check("...where E takes it back: not Lodged, so not to the empty hands (the axe "
+            "is in the melee slot: to the bag)",
+            taken and p.get(axe, SLOT_VAR) == MELEE_SLOT
+            and BAG_FIRST <= p.get(knife, SLOT_VAR) <= BAG_LAST and p.get(wc, "Held") is None,
+            f"slot {p.get(knife, SLOT_VAR)}, the axe in {p.get(axe, SLOT_VAR)}")
     yield from _falls(p, wc, player, guns[0],
                       "a gun thrown at the trunk does not lodge: it falls to the "
                       "foot of the tree", spot, base, GUN_VIEW_DEG, reticle=True)

@@ -63,14 +63,16 @@ _author_* fragment per concern, each in its own module:
   slot_moves  1-9 and Q ask for a slot (SlotRequest); the request (the hand's
               item home, the asked one up) and the HUD's drag (MoveFrom/To)
   slot_sync   last before the refresh: SlotItems rebuilt from each item's
-              Slot, UNPLACED items placed, EquippedIndex, HasRoom, refresh
+              Slot, UNPLACED items placed (a weapon in its weapon slot
+              before the bag), EquippedIndex, HasRoom, refresh
   interact    the interact key acts on ONE thing in reach: the candidate
               nearest AimPoint, the point the reticle rests on. KINDS lists
               what can be interacted with (today: an item, which is picked
               up, and a campfire, which heats the blade in hand)
   pickup      interact's item kind: the Dropped items it offers, and the take
               of the one kept into the bag, detached from what it was left in
-              (a body a thrown blade struck)
+              (a body a thrown blade struck); a Lodged blade taken with empty
+              hands goes to the hand
   heat        interact's campfire kind: the fires it offers while the held
               item Heats (the knife, the axe), and what makes that item Hot
               for HEAT_S (the item's own Tick cools it: combat/heat.py)

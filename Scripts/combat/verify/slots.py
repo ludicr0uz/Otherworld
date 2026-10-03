@@ -9,7 +9,7 @@ about in a game.
 
 from combat.paths import AXE_BP_PATH, ITEM_BP_PATH, KNIFE_BP_PATH
 from combat.slot_tuning import (
-    BAG_FIRST, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, LONG_GUN, MELEE_KIND, MELEE_SLOT,
+    BAG_FIRST, BAG_LAST, HAND, HAND_FROM_VAR, HAS_ROOM_VAR, LONG_GUN, MELEE_KIND, MELEE_SLOT,
     MOVE_FROM_VAR, MOVE_TO_VAR, NO_REQUEST, NOT_A_WEAPON, PISTOL_KIND, PISTOL_SLOT,
     PRIMARY, SECONDARY, SLOT_COUNT, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_REQUEST_VAR, SLOT_VAR,
     STARTER_HAND_FROM, STARTER_SLOTS, UNPLACED, WEAPON_KIND_VAR, fits,
@@ -120,6 +120,30 @@ def check_sync():
           f"{[_title(f) for f in into]}")
 
 
+def _exec_from(node):
+    """(node, pin name) of every exec output wired into ``node``."""
+    return [(PIN.get_owning_node(q), str(PIN.get_pin_name(q)))
+            for q in PIN.list_connected_pins(BEL.find_execute_pin(node))]
+
+
+def check_weapon_slot_first():
+    """An UNPLACED weapon is offered its weapon slots before the bag: the
+    sync's bag search runs only off the miss of a search of the four."""
+    loops = by_pins(wg, "FirstIndex", "LastIndex")
+    span = lambda n: (num_pin(n, "FirstIndex"), num_pin(n, "LastIndex"))
+    after = []
+    for bag in (n for n in loops if span(n) == (float(BAG_FIRST), float(BAG_LAST))):
+        for miss, pin in _exec_from(bag):
+            if pin != "else" or _title(miss) != "Branch":
+                continue
+            after += [w for w, wpin in _exec_from(miss)
+                      if wpin == "Completed" and w in loops
+                      and span(w) == (float(PRIMARY), float(MELEE_SLOT))]
+    check("the sync offers an UNPLACED item a free weapon slot it fits before the bag "
+          "(a looted weapon goes to its own slot): the bag is searched off that "
+          "search's miss", len(after) == 1, f"{len(after)} such search(es)")
+
+
 def check_keys():
     asked = {}
     for n in wg:
@@ -141,4 +165,5 @@ def run():
     check_component_slots()
     check_starter_slots()
     check_sync()
+    check_weapon_slot_first()
     check_keys()

@@ -235,8 +235,11 @@ def _bodies(p, wc, player, knife, axe, gun, body, second, at, yaw):
             not taken and gap > INTERACT_RADIUS and _held_by(knife)[0] == body,
             f"{gap:.0f} cm away")
     taken, gap = yield from _take_from(p, wc, player, knife, body.get_actor_location(), yaw)
-    p.check("E beside the living body takes the knife back into the bag, off the body",
-            taken and gap < INTERACT_RADIUS and _held_by(knife)[0] != body,
+    yield lambda: not taken or p.get(wc, "Held") == knife
+    p.check("E beside the living body takes the knife back, off the body, into the "
+            "empty hands",
+            taken and gap < INTERACT_RADIUS and _held_by(knife)[0] != body
+            and p.get(wc, "Held") == knife and p.get(knife, "Lodged") is False,
             f"{gap:.0f} cm away, now on "
             f"{_held_by(knife)[0].get_name() if _held_by(knife)[0] else None}")
     if not taken:

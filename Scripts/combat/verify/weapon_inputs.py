@@ -241,7 +241,7 @@ def _check_pickup_keeps_held():
     placed = [n for a in adds for n in _linked(a, "then")
               if str(BEL.get_node_title(n)).replace("\n", " ").startswith(f"Set {SLOT_VAR}")
               and pin_value(n, SLOT_VAR) == str(UNPLACED)]
-    check("...it is set UNPLACED: the slot sync finds it a bag slot, or the hand",
+    check("...it is set UNPLACED: the slot sync finds it a weapon slot, a bag slot, or the hand",
           len(placed) == 1, f"{len(placed)} Set {SLOT_VAR} = {UNPLACED} after an add")
 
 

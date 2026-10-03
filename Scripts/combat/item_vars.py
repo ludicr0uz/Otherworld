@@ -60,6 +60,10 @@ Automatic = Var("Automatic")
 Consumable = Var("Consumable")
 DisplayName = Var("DisplayName")
 Dropped = Var("Dropped")
+# A thrown blade left in a tree or a body (throw_strike.py sets it as it sets
+# the item in). The pick-up reads it: taken back with empty hands, it goes to
+# the hand, not to a slot (pickup.py), and stops being Lodged.
+Lodged = Var("Lodged", BOOL)
 InfiniteReserve = Var("InfiniteReserve")
 Loaded = Var("Loaded")
 MagazineSize = Var("MagazineSize")
@@ -76,4 +80,5 @@ TABLE = (
     Damage, SpreadDegrees, WeaponRange, FireInterval, NextFireTime, ReloadSeconds,
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
     FireSound, DryFireSound, ReloadSound, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
+    Lodged,
 )

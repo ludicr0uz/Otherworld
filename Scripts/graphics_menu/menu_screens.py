@@ -22,10 +22,11 @@ so WasInputKeyJustPressed still answers. What a taken row does is Tick's
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from uebp.graph import out
 from graphics_menu.cursor import (
     ROW, author_cursor_mode, author_hold_fire, author_row_cursor, author_widget_click)
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, PAUSE_CLICK_VAR
-from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_find import put
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.wear_consts import WEAR_OPEN_VAR
@@ -179,7 +180,7 @@ def _any_tab_open(ed, x, y, made):
     flags = [_get(ed, tab.open_var, x, y + 140 * i, made) for i, tab in enumerate(TABS)]
     either = flags[0]
     for i, flag in enumerate(flags[1:]):
-        either = _out(_call(ed, FN_OR, x + 260 * (i + 1), y + 140 * i, made,
+        either = out(_call(ed, FN_OR, x + 260 * (i + 1), y + 140 * i, made,
                             A=either, B=flag))
     return either
 
@@ -191,13 +192,13 @@ def _author_pause_keys(ed, in_execs, x0, y0, made):
     DrawHUD rather than Tick, like the settings page's keys, though the menu
     pauses nothing in play: the row is raised in the same place for the key and the
     mouse, and top-of-frame lowers it once Tick has had its one look."""
-    pc_out = _out(_call(ed, FN_GET_OWNING_PC, x0, y0 + 400, made))
+    pc_out = out(_call(ed, FN_GET_OWNING_PC, x0, y0 + 400, made))
     moved, nav_nodes = _emit_row_nav(ed, pc_out, len(PAUSE_ROW_LABELS) - 1, in_execs,
                                      x0 + 240, y0 + 1200, row_var=PAUSE_ROW_VAR)
     made += nav_nodes
     enter = _call(ed, FN_WAS_PRESSED, x0 + 1740, y0 + 400, made, self=pc_out,
                   Key=PAUSE_ACCEPT_KEY)
-    take, idle = _branch(ed, _out(enter), moved, x0 + 2000, y0, made)
+    take, idle = _branch(ed, out(enter), moved, x0 + 2000, y0, made)
     taken = put(ed, PAUSE_CLICK_VAR, _get(ed, PAUSE_ROW_VAR, x0 + 2000, y0 + 400, made),
                 [take], x0 + 2260, y0, made)
     return [taken, idle]
@@ -270,7 +271,7 @@ def author_pause_menu(ed, x0, y0, in_execs):
     settings = part(ed, WBP_MAIN_MENU, SETTINGS_PANEL, x0 + 520, y0 + 2600)
     on_rows = _call(ed, FN_EQ_II, x0 + 780, y0 + 2900, made,
                     A=_get(ed, "MenuPage", x0 + 520, y0 + 2900, made), B=PAGE_TITLE)
-    on_menu, on_settings = _branch(ed, _out(on_rows), [flow], x0 + 1040, y0 + 2000, made)
+    on_menu, on_settings = _branch(ed, out(on_rows), [flow], x0 + 1040, y0 + 2000, made)
     _author_settings_page(ed, x0, y0 + 9000, set_shown(
         ed, settings, True, [set_shown(ed, panel, False, [on_settings],
                                        x0 + 1300, y0 + 2600)], x0 + 1560, y0 + 2600))

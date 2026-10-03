@@ -29,6 +29,7 @@ and the take runs once, off Completed. Tuning is light_tuning.py.
 
 from combat.chop_tuning import WOOD_CLASS_VAR
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
+from uebp.graph import out
 from combat.light_tuning import (
     CAMPFIRE_AHEAD_CM, CAMPFIRE_CLASS_VAR, CAMPFIRE_FEET_CM, CAMPFIRE_TRACE_DOWN_CM,
     CAMPFIRE_TRACE_UP_CM, LIGHT_WOOD_VAR, LIGHTS_VAR,
@@ -43,10 +44,6 @@ from combat.weapon_component.common import _prop, _trace_defaults
 FN_EQ_CLASSES = "/Script/Engine.KismetMathLibrary.EqualEqual_ClassClass"
 FN_ARR_REMOVE_ITEM = "/Script/Engine.KismetArrayLibrary.Array_RemoveItem"
 FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
-
-
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
 
 
 def _get(ed, name, x, y):
@@ -80,7 +77,7 @@ def _author_campfire(ed, held, owner, exec_in, x0, y0):
     is_fire = _at(_node(ed, FN_IS_VALID_CLASS), x0 + 240, y0 + 200)
     _connect(cls, _pin(is_fire, "Class"))
     known = _at(ed.add_branch_node(), x0 + 480, y0)
-    _connect(_out(is_fire), _pin(known, "Condition"))
+    _connect(out(is_fire), _pin(known, "Condition"))
     _connect(exec_in, _pin(known, "execute"))
 
     # --- the wood to burn -----------------------------------------------------
@@ -98,10 +95,10 @@ def _author_campfire(ed, held, owner, exec_in, x0, y0):
     kind = _at(_node(ed, FN_OBJECT_CLASS), x0 + 1300, y0 + 300)
     _connect(item, _pin(kind, "Object"))
     is_wood = _at(_node(ed, FN_EQ_CLASSES), x0 + 1560, y0 + 300)
-    _connect(_out(kind), _pin(is_wood, "A"))
+    _connect(out(kind), _pin(is_wood, "A"))
     _connect(_get(ed, WOOD_CLASS_VAR, x0 + 1300, y0 + 460), _pin(is_wood, "B"))
     burns = _at(ed.add_branch_node(), x0 + 1820, y0 + 160)
-    _connect(_out(is_wood), _pin(burns, "Condition"))
+    _connect(out(is_wood), _pin(burns, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(burns, "execute"))
     pick = _at(ed.add_set_member_variable_node(LIGHT_WOOD_VAR), x0 + 2080, y0 + 160)
     _connect(item, _pin(pick, LIGHT_WOOD_VAR))
@@ -111,7 +108,7 @@ def _author_campfire(ed, held, owner, exec_in, x0, y0):
     is_there = _at(_node(ed, FN_IS_VALID), x0 + 2340, y0 + 460)
     _connect(wood, _pin(is_there, "Object"))
     has_wood = _at(ed.add_branch_node(), x0 + 2600, y0)
-    _connect(_out(is_there), _pin(has_wood, "Condition"))
+    _connect(out(is_there), _pin(has_wood, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(has_wood, "execute"))
 
     # --- spend it -------------------------------------------------------------
@@ -127,7 +124,7 @@ def _author_campfire(ed, held, owner, exec_in, x0, y0):
     _connect(inv, _pin(slot, "TargetArray"))
     _connect(held, _pin(slot, "ItemToFind"))
     stay = _at(ed.add_set_member_variable_node("EquippedIndex"), x0 + 3380, y0)
-    _connect(_out(slot), _pin(stay, "EquippedIndex"))
+    _connect(out(slot), _pin(stay, "EquippedIndex"))
     _connect(BEL.find_then_pin(gone), _pin(stay, "execute"))
 
     # --- the ground in front of the player, and the fire ----------------------
@@ -137,18 +134,18 @@ def _author_campfire(ed, held, owner, exec_in, x0, y0):
     _connect(owner, _pin(ahead, "self"))
     # Multiply_VectorFloat's B is promoted to a vector: drive it with one.
     reach = _at(_node(ed, FN_MUL_VF), x0 + 3640, y0 + 460)
-    _connect(_out(ahead), _pin(reach, "A"))
+    _connect(out(ahead), _pin(reach, "A"))
     r = CAMPFIRE_AHEAD_CM
     _connect(_vec(ed, r, r, r, x0 + 3380, y0 + 620), _pin(reach, "B"))
     spot = _at(_node(ed, FN_ADD_VV), x0 + 3900, y0 + 300)
-    _connect(_out(here), _pin(spot, "A"))
-    _connect(_out(reach), _pin(spot, "B"))
+    _connect(out(here), _pin(spot, "A"))
+    _connect(out(reach), _pin(spot, "B"))
 
     def offset(z, x, y):
         n = _at(_node(ed, FN_ADD_VV), x, y)
-        _connect(_out(spot), _pin(n, "A"))
+        _connect(out(spot), _pin(n, "A"))
         _connect(_vec(ed, 0.0, 0.0, z, x - 260, y + 140), _pin(n, "B"))
-        return _out(n)
+        return out(n)
 
     floor = _at(_node(ed, FN_TRACE), x0 + 4420, y0)
     _connect(offset(CAMPFIRE_TRACE_UP_CM, x0 + 4160, y0 + 300), _pin(floor, "Start"))
@@ -156,17 +153,17 @@ def _author_campfire(ed, held, owner, exec_in, x0, y0):
     _trace_defaults(floor)
     _connect(BEL.find_then_pin(stay), _pin(floor, "execute"))
     ground = _at(_palette(ed, NODE_BREAK_HIT), x0 + 4700, y0 + 300)
-    _connect(_out(floor, "OutHit"), _loose_pin(ground, "Hit"))
+    _connect(out(floor, "OutHit"), _loose_pin(ground, "Hit"))
     # No ground under it (the map's edge): at the height of the player's feet.
     rests = _at(_node(ed, FN_SELECT_VECTOR), x0 + 4960, y0 + 300)
     _connect(_loose_pin(ground, "Location", is_input=False), _pin(rests, "A"))
     _connect(offset(-CAMPFIRE_FEET_CM, x0 + 4700, y0 + 900), _pin(rests, "B"))
-    _connect(_out(floor), _pin(rests, "bPickA"))
+    _connect(out(floor), _pin(rests, "bPickA"))
     at = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 5220, y0 + 300)
-    _connect(_out(rests), _pin(at, "Location"))
+    _connect(out(rests), _pin(at, "Location"))
     fire = _at(_palette(ed, NODE_SPAWN), x0 + 5480, y0)
     _connect(cls, _pin(fire, "Class"))
-    _connect(_out(at), _pin(fire, "SpawnTransform"))
+    _connect(out(at), _pin(fire, "SpawnTransform"))
     _set(fire, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(BEL.find_then_pin(floor), _pin(fire, "execute"))
 

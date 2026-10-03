@@ -14,7 +14,8 @@ cycle fails the cast and keeps its static sky.
 import unreal
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
-from graphics_menu.dev_guns import _call, _class_literal, _out
+from uebp.graph import out
+from graphics_menu.dev_guns import _call, _class_literal
 from graphics_menu.gfx_stats import CYCLE, stats_by
 from graphics_menu.gfx_tuner_read import applied
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
@@ -35,7 +36,7 @@ def author_sky(ed, in_execs, x0, y0, made):
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_DayNightCycle")
     made.append(cast)
-    _connect(_out(find), _pin(cast, "Object"))
+    _connect(out(find), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(find), _pin(cast, "execute"))
     cycle = _loose_pin(cast, "AsBPDayNightCycle", is_input=False)
 

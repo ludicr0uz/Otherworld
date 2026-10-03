@@ -20,6 +20,7 @@ scale it. A row's minimum (PLAYER_STATS) keeps the two divisions off zero.
 import unreal
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
+from uebp.graph import out
 from combat.nodes import FN_ARR_GET, FN_DIV_FF, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_MUL_FF
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.player_tuning import (
@@ -29,7 +30,7 @@ from combat.player_tuning import (
 from combat.sprint_tuning import (
     BASE_SPEED_VAR, SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR, STAMINA_REGEN_VAR,
 )
-from graphics_menu.dev_guns import _branch, _call, _get, _out
+from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.player_tune_consts import PLAYER_SUBJECT, PLAYER_TAB
 from graphics_menu.tune_tabs import other_open_vars
 from graphics_menu.tune_tick import (
@@ -69,7 +70,7 @@ def _author_apply(ed, in_execs, x0, y0, made):
     Returns the exec tails."""
     go, idle = _branch(ed, _get(ed, PLAYER_TAB.touched_var, x0 - 240, y0 + 300, made),
                        in_execs, x0, y0, made)
-    pawn = _out(_call(ed, FN_GET_PLAYER_PAWN, x0, y0 + 440, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, x0, y0 + 440, made, PlayerIndex=0))
     comp = _call(ed, FN_GET_COMP, x0 + 260, y0 + 440, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # the cast exists only for a loaded class
@@ -77,7 +78,7 @@ def _author_apply(ed, in_execs, x0, y0, made):
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_WeaponComponent")
     made.append(cast)
-    _connect(_out(comp), _pin(cast, "Object"))
+    _connect(out(comp), _pin(cast, "Object"))
     _connect(go, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
@@ -86,10 +87,10 @@ def _author_apply(ed, in_execs, x0, y0, made):
         var, kind = APPLIES[col]
         cell = _value(ed, s, x - 300, y0 + 440, made)
         if kind == SPEED:
-            value = _out(_call(ed, FN_MUL_FF, x + 240, y0 + 440, made, A=cell, B=CM_PER_M))
+            value = out(_call(ed, FN_MUL_FF, x + 240, y0 + 440, made, A=cell, B=CM_PER_M))
         else:
             full = _get(ed, "MaxStamina", x - 60, y0 + 620, made, WEAPON_COMP_CLASS_PATH, wc)
-            value = _out(_call(ed, FN_DIV_FF, x + 240, y0 + 440, made, A=full, B=cell))
+            value = out(_call(ed, FN_DIV_FF, x + 240, y0 + 440, made, A=full, B=cell))
         n = _at(ed.add_set_member_variable_node(var, WEAPON_COMP_CLASS_PATH), x + 500, y0)
         made.append(n)
         _connect(wc, _pin(n, "self"))

@@ -37,8 +37,10 @@ from combat.slot_tuning import (
 )
 from combat.weapon_component.common import _G
 from combat.weapon_component.slot_nodes import (
-    FN_GE_II, FN_LE_II, FN_NE_II, fits, for_loop, not_, op, out, slot_at, valid,
+    FN_GE_II, FN_LE_II, FN_NE_II, fits, for_loop,
+    not_, op, slot_at, valid,
 )
+from uebp.graph import out
 
 WEAPON_SLOT_COUNT = MELEE_SLOT - PRIMARY + 1
 

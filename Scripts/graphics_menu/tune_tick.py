@@ -41,6 +41,7 @@ lands on the next shot.
 import unreal
 
 from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, _palette, _pin
+from uebp.graph import out
 from combat.gun_tuning import GUN_COLUMNS, MELEE_COLUMNS, TUNE_COLUMNS, TUNE_STATS, columns_of
 from combat.melee_tuning import melee_specs
 from combat.nodes import (
@@ -53,7 +54,7 @@ from combat.paths import (
 )
 from combat.weapon_specs import _weapon_specs
 from graphics_menu.cursor_consts import WHEEL_LESS, WHEEL_MORE
-from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.menu_nav import or_wheel, pause_row_taken
 from graphics_menu.loot_find import put
 from graphics_menu.tune_consts import (
@@ -131,7 +132,7 @@ def tune_defaults():
 
 
 def _pressed(ed, pc_out, key, x, y, made):
-    return _out(_call(ed, FN_WAS_PRESSED, x, y, made, self=pc_out, Key=key))
+    return out(_call(ed, FN_WAS_PRESSED, x, y, made, self=pc_out, Key=key))
 
 
 def _cell(ed, array_var, index, x, y, made):
@@ -156,7 +157,7 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
                          in_execs, x0 + 240, y0, made)
     opened = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
                    A=_get(ed, tab.open_var, x0, y0 + 580, made))
-    flow = put(ed, tab.open_var, _out(opened), [flip], x0 + 500, y0 - 200, made)
+    flow = put(ed, tab.open_var, out(opened), [flip], x0 + 500, y0 - 200, made)
     flow = _setter(ed, tab.row_var, 0, [flow], x0 + 500, y0 - 400, made)
     for i, other in enumerate(closes):
         flow = _setter(ed, other, "false", [flow], x0 + 760 + 260 * i, y0 - 400, made)
@@ -165,7 +166,7 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
     active = _call(ed, FN_AND, x - 240, y0 + 300, made,
                    A=_get(ed, "MenuOpen", x - 480, y0 + 300, made),
                    B=_get(ed, tab.open_var, x - 480, y0 + 440, made))
-    on, off = _branch(ed, _out(active), [flow, no_t], x, y0, made)
+    on, off = _branch(ed, out(active), [flow, no_t], x, y0, made)
     flow = [on]
     # A scrolling tab's wheel moves the caret (the list follows it); the
     # others' wheel changes the value under it.
@@ -180,12 +181,12 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
         hit, miss = _branch(ed, asked, flow, x, y0, made)
         moved = _call(ed, step, x + 300, y0 + 300, made,
                       A=_get(ed, tab.row_var, x + 60, y0 + 300, made), B=1)
-        held = _call(ed, limit, x + 540, y0 + 300, made, A=_out(moved), B=bound)
-        flow = [put(ed, tab.row_var, _out(held), [hit], x + 780, y0, made), miss]
+        held = _call(ed, limit, x + 540, y0 + 300, made, A=out(moved), B=bound)
+        flow = [put(ed, tab.row_var, out(held), [hit], x + 780, y0, made), miss]
         x += 800
     in_list = _call(ed, FN_LESS_II, x, y0 + 300, made,
                     A=_get(ed, tab.row_var, x - 240, y0 + 300, made), B=tab.row_count)
-    listed, on_back = _branch(ed, _out(in_list), flow, x + 240, y0, made)
+    listed, on_back = _branch(ed, out(in_list), flow, x + 240, y0, made)
     flow = [listed]
     x += 300
     for key, wheel, nudge in ((TUNE_LESS, WHEEL_LESS, -1), (TUNE_MORE, WHEEL_MORE, 1)):
@@ -204,7 +205,7 @@ def _author_keys(ed, pc_out, in_execs, x0, y0, made, tab, closes):
     # only polled there.
     on_save = _call(ed, FN_EQ_II, x, y0 + 900, made,
                     A=_get(ed, tab.row_var, x - 240, y0 + 900, made), B=tab.save_row)
-    there, on_back = _branch(ed, _out(on_save), [on_back], x + 240, y0 + 700, made)
+    there, on_back = _branch(ed, out(on_save), [on_back], x + 240, y0 + 700, made)
     ask, no_ask = _branch(ed, _pressed(ed, pc_out, TUNE_SAVE_KEY, x + 300, y0 + 1140, made),
                           [there], x + 540, y0 + 700, made)
     asked = _setter(ed, tab.save_var, "true", [ask], x + 800, y0 + 700, made)
@@ -219,44 +220,44 @@ def _author_nudge(ed, in_execs, x0, y0, made, tab, subjects):
     pulled when it runs, so lowering first would step by zero."""
     idle = _call(ed, FN_EQ_II, x0, y0 + 300, made,
                  A=_get(ed, tab.nudge_var, x0 - 240, y0 + 300, made), B=0)
-    still, asked = _branch(ed, _out(idle), in_execs, x0 + 240, y0, made)
+    still, asked = _branch(ed, out(idle), in_execs, x0 + 240, y0, made)
     on_subject = _call(ed, FN_EQ_II, x0 + 240, y0 + 440, made,
                        A=_get(ed, tab.row_var, x0, y0 + 440, made), B=0)
-    subject, stat = _branch(ed, _out(on_subject), [asked], x0 + 500, y0, made)
+    subject, stat = _branch(ed, out(on_subject), [asked], x0 + 500, y0, made)
 
     # The subject row: (pick + nudge + subjects) % subjects, round the ends.
     x = x0 + 800
     stepped = _call(ed, FN_ADD_II, x, y0 - 300, made,
                     A=_get(ed, tab.pick_var, x - 240, y0 - 300, made),
                     B=_get(ed, tab.nudge_var, x - 240, y0 - 160, made))
-    lifted = _call(ed, FN_ADD_II, x + 240, y0 - 300, made, A=_out(stepped), B=subjects)
-    wrapped = _call(ed, FN_MOD_II, x + 480, y0 - 300, made, A=_out(lifted), B=subjects)
-    picked = put(ed, tab.pick_var, _out(wrapped), [subject], x + 720, y0 - 500, made)
+    lifted = _call(ed, FN_ADD_II, x + 240, y0 - 300, made, A=out(stepped), B=subjects)
+    wrapped = _call(ed, FN_MOD_II, x + 480, y0 - 300, made, A=out(lifted), B=subjects)
+    picked = put(ed, tab.pick_var, out(wrapped), [subject], x + 720, y0 - 500, made)
 
     # A stat row: cell := FMax(cell + nudge * step, minimum), and with
     # maximums FMin(that, maximum). Not an FClamp: the verifier reads every
     # Clamp in this graph as a settings slider.
-    s = _out(_call(ed, FN_SUB_II, x, y0 + 700, made,
+    s = out(_call(ed, FN_SUB_II, x, y0 + 700, made,
                    A=_get(ed, tab.row_var, x - 240, y0 + 700, made), B=1))
     base = _call(ed, FN_MUL_II, x, y0 + 900, made,
                  A=_get(ed, tab.pick_var, x - 240, y0 + 900, made), B=tab.stat_count)
-    idx = _out(_call(ed, FN_ADD_II, x + 240, y0 + 900, made, A=_out(base), B=s))
+    idx = out(_call(ed, FN_ADD_II, x + 240, y0 + 900, made, A=out(base), B=s))
     sign = _call(ed, FN_INT_TO_FLOAT, x + 240, y0 + 1100, made,
                  InInt=_get(ed, tab.nudge_var, x, y0 + 1100, made))
     delta = _call(ed, FN_MUL_FF, x + 720, y0 + 1000, made,
-                  A=_cell(ed, tab.steps_var, s, x + 480, y0 + 1200, made), B=_out(sign))
+                  A=_cell(ed, tab.steps_var, s, x + 480, y0 + 1200, made), B=out(sign))
     moved = _call(ed, FN_ADD_FF, x + 960, y0 + 800, made,
                   A=_cell(ed, tab.values_var, idx, x + 720, y0 + 800, made),
-                  B=_out(delta))
-    kept = _call(ed, FN_FMAX, x + 1200, y0 + 800, made, A=_out(moved),
+                  B=out(delta))
+    kept = _call(ed, FN_FMAX, x + 1200, y0 + 800, made, A=out(moved),
                  B=_cell(ed, tab.mins_var, s, x + 960, y0 + 1300, made))
     if tab.maxs_var:
-        kept = _call(ed, FN_FMIN, x + 1200, y0 + 1100, made, A=_out(kept),
+        kept = _call(ed, FN_FMIN, x + 1200, y0 + 1100, made, A=out(kept),
                      B=_cell(ed, tab.maxs_var, s, x + 960, y0 + 1500, made))
     write = _call(ed, FN_ARR_SET, x + 1440, y0, made,
                   TargetArray=_get(ed, tab.values_var, x + 1200, y0 + 600, made))
     _connect(idx, _pin(write, "Index"))
-    _connect(_out(kept), _pin(write, "Item"))
+    _connect(out(kept), _pin(write, "Item"))
     stays = []
     if tab.live_var:
         # A stat that is not the subject's own: nothing moves, nothing is touched.
@@ -278,7 +279,7 @@ def _author_save(ed, in_execs, x0, y0, made, tab):
     flow = _setter(ed, tab.save_var, "false", [serve], x0 + 260, y0, made)
     run = _call(ed, FN_EXEC_PYTHON, x0 + 520, y0, made, PythonCommand=tab.save_command)
     _connect(flow, _pin(run, "execute"))
-    done = put(ed, tab.saved_var, _out(run), [BEL.find_then_pin(run)], x0 + 820, y0, made)
+    done = put(ed, tab.saved_var, out(run), [BEL.find_then_pin(run)], x0 + 820, y0, made)
     return [done, idle]
 
 
@@ -288,14 +289,14 @@ def _author_apply(ed, in_execs, x0, y0, made, guns):
     rest being melee weapons. Returns the exec tails."""
     go, idle = _branch(ed, _get(ed, TUNE_TOUCHED_VAR, x0 - 240, y0 + 300, made),
                        in_execs, x0, y0, made)
-    pawn = _out(_call(ed, FN_GET_PLAYER_PAWN, x0, y0 + 440, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, x0, y0 + 440, made, PlayerIndex=0))
     comp = _call(ed, FN_GET_COMP, x0 + 260, y0 + 440, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node
     unreal.load_asset(ITEM_BP_PATH)
     cast = _at(_palette(ed, NODE_CAST_WEAPON), x0 + 520, y0)
     made.append(cast)
-    _connect(_out(comp), _pin(cast, "Object"))
+    _connect(out(comp), _pin(cast, "Object"))
     _connect(go, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
@@ -313,24 +314,24 @@ def _author_apply(ed, in_execs, x0, y0, made, guns):
                  TargetArray=_get(ed, TUNE_WEAPONS_VAR, x - 240, y0 + 300, made))
     _connect(_get(ed, "DisplayName", x - 240, y0 + 440, made, ITEM_CLASS_PATH, item),
              _pin(find, "ItemToFind"))
-    known = _call(ed, FN_GE_II, x + 240, y0 + 300, made, A=_out(find), B=0)
-    tuned, _other = _branch(ed, _out(known), [_loose_pin(loop, "LoopBody", is_input=False)],
+    known = _call(ed, FN_GE_II, x + 240, y0 + 300, made, A=out(find), B=0)
+    tuned, _other = _branch(ed, out(known), [_loose_pin(loop, "LoopBody", is_input=False)],
                             x + 480, y0, made)
-    base = _out(_call(ed, FN_MUL_II, x + 480, y0 + 440, made, A=_out(find), B=STAT_COUNT))
+    base = out(_call(ed, FN_MUL_II, x + 480, y0 + 440, made, A=out(find), B=STAT_COUNT))
     # The guns are listed first: past them it is a melee weapon, which takes
     # only its own columns.
-    melee = _call(ed, FN_GE_II, x + 480, y0 + 640, made, A=_out(find), B=guns)
-    blade, gun = _branch(ed, _out(melee), [tuned], x + 760, y0, made)
+    melee = _call(ed, FN_GE_II, x + 480, y0 + 640, made, A=out(find), B=guns)
+    blade, gun = _branch(ed, out(melee), [tuned], x + 760, y0, made)
     x += 1060
     for flow, columns, y in ((gun, GUN_COLUMNS, y0), (blade, MELEE_COLUMNS, y0 + 1200)):
         at = x
         for s, (col, var, _label, _step, _min, kind) in enumerate(TUNE_STATS):
             if col not in columns:
                 continue
-            idx = _out(_call(ed, FN_ADD_II, at, y + 300, made, A=base, B=s))
+            idx = out(_call(ed, FN_ADD_II, at, y + 300, made, A=base, B=s))
             value = _cell(ed, TUNE_VALUES_VAR, idx, at + 240, y + 440, made)
             if kind is int:
-                value = _out(_call(ed, FN_ROUND, at + 240, y + 600, made, A=value))
+                value = out(_call(ed, FN_ROUND, at + 240, y + 600, made, A=value))
             n = _at(ed.add_set_member_variable_node(var, ITEM_CLASS_PATH), at + 480, y)
             made.append(n)
             _connect(item, _pin(n, "self"))

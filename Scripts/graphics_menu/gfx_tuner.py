@@ -32,7 +32,8 @@ from combat.graph import (
     BEL, BGE, _apply_defaults, _create_blueprint, _declare, _events, _float_type, _log,
     _pin,
 )
-from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from uebp.graph import out
+from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_stats import CVAR, LEVEL, STAT_COUNT, stats_by, table_values
 from graphics_menu.gfx_tune_consts import (
     TUNER_BASE_VAR, TUNER_BP_PATH, TUNER_DIRTY_VAR, TUNER_GRASS_DISTANCE_APPLIED_VAR,
@@ -90,13 +91,13 @@ def _author_level(ed, in_execs, x0, y0, made):
     moved = _call(ed, FN_NEQ_II, x0, y0 + 300, made,
                   A=whole(ed, index, x0 - 980, y0 + 300, made),
                   B=_get(ed, TUNER_LEVEL_APPLIED_VAR, x0 - 240, y0 + 500, made))
-    go, same = _branch(ed, _out(moved), in_execs, x0 + 240, y0, made)
+    go, same = _branch(ed, out(moved), in_execs, x0 + 240, y0, made)
     gus = _call(ed, FN_GET_GUS, x0 + 520, y0, made)
     _connect_exec(go, gus)
-    level = _call(ed, FN_SET_OVERALL, x0 + 820, y0, made, self=_out(gus),
+    level = _call(ed, FN_SET_OVERALL, x0 + 820, y0, made, self=out(gus),
                   Value=whole(ed, index, x0 - 200, y0 + 700, made))
     _connect_exec(BEL.find_then_pin(gus), level)
-    apply = _call(ed, FN_APPLY, x0 + 1120, y0, made, self=_out(gus))
+    apply = _call(ed, FN_APPLY, x0 + 1120, y0, made, self=out(gus))
     _connect_exec(BEL.find_then_pin(level), apply)
     kept = put(ed, TUNER_LEVEL_APPLIED_VAR, whole(ed, index, x0 + 400, y0 + 1000, made),
                [BEL.find_then_pin(apply)], x0 + 1420, y0, made)
@@ -123,7 +124,7 @@ def _author_cvars(ed, in_execs, x0, y0, made):
                           InDouble=applied(ed, index, x - 760, y0 + 600, made))
         # WorldContextObject is a hidden pin the compiler fills from self, and
         # a null SpecificPlayer is the first local player.
-        run = _call(ed, FN_CONSOLE, x + 300, y0, made, Command=_out(words))
+        run = _call(ed, FN_CONSOLE, x + 300, y0, made, Command=out(words))
         for e in ([flow] if flow else in_execs):
             _connect_exec(e, run)
         flow = BEL.find_then_pin(run)
@@ -138,7 +139,7 @@ def _author_tick(ed, tick):
     flow = _setter(ed, TUNER_DIRTY_VAR, "false", [go], 560, 0, made)
     base = _call(ed, FN_MUL_II, 620, 300, made,
                  A=_get(ed, TUNER_PRESET_VAR, 380, 300, made), B=STAT_COUNT)
-    flow = put(ed, TUNER_BASE_VAR, _out(base), [flow], 860, 0, made)
+    flow = put(ed, TUNER_BASE_VAR, out(base), [flow], 860, 0, made)
     tails = _author_level(ed, [flow], 2200, 0, made)
     flow = _author_cvars(ed, tails, 5000, 0, made)
     tails = author_foliage(ed, [flow], 5000, 3000, made)

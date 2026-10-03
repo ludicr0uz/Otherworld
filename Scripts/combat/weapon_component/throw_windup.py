@@ -31,6 +31,7 @@ the punch and the slash: the legs keep walking.
 
 from combat.anim_blueprint import AIM_SLOT
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from uebp.graph import out
 from combat.nodes import (
     FN_ANIM_INSTANCE, FN_GE_FF, FN_IS_VALID, FN_PLAY_SLOT, FN_TIME_SECONDS,
 )
@@ -46,15 +47,11 @@ THROW_DUE_VAR = "ThrowDueTime"        # world time the hand lets go
 FN_SAME_OBJECT = "/Script/Engine.KismetMathLibrary.EqualEqual_ObjectObject"
 
 
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
 def _winding(ed, x, y):
     """A throw is winding up: a plain read, safe in any condition."""
     valid = _at(_node(ed, FN_IS_VALID), x + 240, y)
     _connect(_get(ed, THROW_WINDING_VAR, x, y), _pin(valid, "Object"))
-    return _out(valid)
+    return out(valid)
 
 
 def _author_throw_windup(ed, held, started, exec_ins, x0, y0):
@@ -69,14 +66,14 @@ def _author_throw_windup(ed, held, started, exec_ins, x0, y0):
     has = _at(_node(ed, FN_IS_VALID), x0, y0 + 300)
     _connect(_get(ed, THROW_ANIM_VAR, x0 - 240, y0 + 300), _pin(has, "Object"))
     clip = _at(ed.add_branch_node(), x0 + 260, y0)
-    _connect(_out(has), _pin(clip, "Condition"))
+    _connect(out(has), _pin(clip, "Condition"))
     _connect(BEL.find_then_pin(keep), _pin(clip, "execute"))
     step = _stamp(ed, THROW_DUE_VAR, THROW_WINDUP_S, BEL.find_then_pin(clip),
                   x0 + 520, y0)
     anim = _at(_node(ed, FN_ANIM_INSTANCE), x0 + 1000, y0 + 300)
     _connect(_get(ed, "OwnerMesh", x0 + 760, y0 + 300), _pin(anim, "self"))
     play = _at(_node(ed, FN_PLAY_SLOT), x0 + 1260, y0)
-    _connect(_out(anim), _pin(play, "self"))
+    _connect(out(anim), _pin(play, "self"))
     _connect(_get(ed, THROW_ANIM_VAR, x0 + 1000, y0 + 440), _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
     _set(play, "BlendInTime", THROW_ANIM_BLEND_S)
@@ -90,10 +87,10 @@ def _author_throw_windup(ed, held, started, exec_ins, x0, y0):
     # --- due: the hand lets go ----------------------------------------------
     now = _at(_node(ed, FN_TIME_SECONDS), x0 + 1560, y0 + 460)
     due = _at(_node(ed, FN_GE_FF), x0 + 1800, y0 + 460)
-    _connect(_out(now), _pin(due, "A"))
+    _connect(out(now), _pin(due, "A"))
     _connect(_get(ed, THROW_DUE_VAR, x0 + 1560, y0 + 580), _pin(due, "B"))
     gate = _at(ed.add_branch_node(), x0 + 2280, y0)
-    _connect(_and(ed, _winding(ed, x0 + 1560, y0 + 300), _out(due),
+    _connect(_and(ed, _winding(ed, x0 + 1560, y0 + 300), out(due),
                   x0 + 2040, y0 + 300), _pin(gate, "Condition"))
     for pin in tuple(exec_ins) + (BEL.find_then_pin(play), BEL.find_else_pin(clip)):
         _connect(pin, _pin(gate, "execute"))
@@ -102,7 +99,7 @@ def _author_throw_windup(ed, held, started, exec_ins, x0, y0):
     _connect(_get(ed, THROW_WINDING_VAR, x0 + 2040, y0 + 440), _pin(same, "A"))
     _connect(held, _pin(same, "B"))
     still = _at(ed.add_branch_node(), x0 + 2540, y0)
-    _connect(_out(same), _pin(still, "Condition"))
+    _connect(out(same), _pin(still, "Condition"))
     _connect(BEL.find_then_pin(gate), _pin(still, "execute"))
 
     ed.add_comment_to_nodes(

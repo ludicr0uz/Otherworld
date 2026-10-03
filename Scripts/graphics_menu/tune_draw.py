@@ -19,10 +19,11 @@ a tab is up (menu_screens.author_pause_menu).
 """
 
 from combat.graph import BEL, _at, _connect, _pin, _set
+from uebp.graph import out
 from combat.nodes import FN_ADD_II, FN_AND, FN_ARR_GET, FN_MIN_II, FN_SUB_II
 from graphics_menu.cursor import (
     FN_GE_II, author_back_row, author_button_row, author_row_cursor, author_widget_click)
-from graphics_menu.dev_guns import _branch, _call, _get, _out
+from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.tune_consts import GUN_TAB, TUNE_DASH
 from graphics_menu.ui_graph import (
     FN_CHILD_AT, FN_EQ_II, FN_SELECT_FLOAT, FN_SET_OPACITY, MACRO_FOR_LOOP, mark_rows, member,
@@ -57,18 +58,18 @@ def _author_stats(ed, tab, box, in_execs, x0, y0, made):
     base = _call(ed, FN_MUL_II, x0 + 300, y0 + 500, made,
                  A=_get(ed, tab.pick_var, x0 + 60, y0 + 500, made), B=tab.stat_count)
     s = _call(ed, FN_SUB_II, x0 + 300, y0 + 640, made, A=i, B=1)
-    idx = _call(ed, FN_ADD_II, x0 + 540, y0 + 500, made, A=_out(base), B=_out(s))
+    idx = _call(ed, FN_ADD_II, x0 + 540, y0 + 500, made, A=out(base), B=out(s))
     words = _call(ed, FN_TO_TEXT, x0 + 1020, y0 + 500, made,
-                  Value=_item(ed, tab.values_var, _out(idx), x0 + 780, y0 + 500, made),
+                  Value=_item(ed, tab.values_var, out(idx), x0 + 780, y0 + 500, made),
                   bUseGrouping="false", MaximumFractionalDigits=tab.fraction_digits)
-    value = ("text", _out(words))
+    value = ("text", out(words))
     if tab.live_var:
         # A String here: the number, or the dash of a stat that is not the
         # subject's own. The dash on B, the pin that holds a literal.
-        number = _call(ed, FN_TEXT_TO_STR, x0 + 1020, y0 + 700, made, InText=_out(words))
-        value = _out(_call(ed, FN_SELECT_STR, x0 + 1020, y0 + 860, made, A=_out(number),
+        number = _call(ed, FN_TEXT_TO_STR, x0 + 1020, y0 + 700, made, InText=out(words))
+        value = out(_call(ed, FN_SELECT_STR, x0 + 1020, y0 + 860, made, A=out(number),
                            B=TUNE_DASH,
-                           bPickA=_item(ed, tab.live_var, _out(idx), x0 + 780, y0 + 860,
+                           bPickA=_item(ed, tab.live_var, out(idx), x0 + 780, y0 + 860,
                                         made)))
     row_value(ed, box, i, value, [_pin(loop, "LoopBody", is_input=False)],
               x0 + 1300, y0)
@@ -82,10 +83,10 @@ def _author_under_caret(ed, tab, widget, test, row, in_execs, x0, y0, made):
     on_it = _call(ed, test, x0, y0 + 300, made,
                   A=_get(ed, tab.row_var, x0 - 240, y0 + 300, made), B=row)
     lit = _call(ed, FN_SELECT_FLOAT, x0 + 260, y0 + 300, made, A=1.0, B=0.0,
-                bPickA=_out(on_it))
+                bPickA=out(on_it))
     fade = _call(ed, FN_SET_OPACITY, x0 + 560, y0, made,
                  self=member(ed, widget, WBP_MENU_ROW, ROW_CARET, x0 + 260, y0 + 500),
-                 InOpacity=_out(lit))
+                 InOpacity=out(lit))
     for e in in_execs:
         _connect(e, _pin(fade, "execute"))
     return BEL.find_then_pin(fade)
@@ -97,9 +98,9 @@ def _author_follow(ed, tab, box, in_execs, x0, y0, made):
     Returns then."""
     row = _call(ed, FN_MIN_II, x0, y0 + 300, made,
                 A=_get(ed, tab.row_var, x0 - 240, y0 + 300, made), B=tab.stat_count)
-    child = _call(ed, FN_CHILD_AT, x0 + 260, y0 + 300, made, self=box, Index=_out(row))
+    child = _call(ed, FN_CHILD_AT, x0 + 260, y0 + 300, made, self=box, Index=out(row))
     seek = _call(ed, FN_SCROLL_TO, x0 + 560, y0, made, self=box,
-                 WidgetToFind=_out(child), AnimateScroll="false")
+                 WidgetToFind=out(child), AnimateScroll="false")
     for e in in_execs:
         _connect(e, _pin(seek, "execute"))
     return BEL.find_then_pin(seek)
@@ -114,7 +115,7 @@ def author_tune_panel(ed, x0, y0, in_execs, tab=GUN_TAB):
     up = _call(ed, FN_AND, x0, y0 + 300, made,
                A=_get(ed, "MenuOpen", x0 - 240, y0 + 300, made),
                B=_get(ed, tab.open_var, x0 - 240, y0 + 440, made))
-    shown, shut = _branch(ed, _out(up), in_execs, x0 + 240, y0, made)
+    shown, shut = _branch(ed, out(up), in_execs, x0 + 240, y0, made)
     closed = set_shown(ed, panel, False, [shut], x0 + 500, y0 + 600)
     flow = set_shown(ed, panel, True, [shown], x0 + 500, y0)
 

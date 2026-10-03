@@ -27,6 +27,7 @@ anywhere else.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from uebp.graph import out
 from combat.nodes import FN_AND, FN_IS_KEY_DOWN, FN_NOT, FN_OR
 from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
 from combat.use_tuning import USE_PRESSED_VAR, USE_WAS_VAR, USING_VAR
@@ -37,10 +38,6 @@ from combat.weapon_component.torch import _author_torch
 # One fragment per kind of use, run in this order every frame.
 KINDS = (_author_torch, _author_cauterize)
 KIND_PITCH = 2000   # graph units between two kinds' rows of nodes
-
-
-def _out(node, name="ReturnValue"):
-    return _pin(node, name, is_input=False)
 
 
 def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins,
@@ -55,23 +52,23 @@ def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins,
         return n
 
     def get(name, x, y):
-        return _out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
+        return out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
 
     def gate2(fn, a, b, x, y):
         n = keep(_at(_node(ed, fn), x, y))
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
-        return _out(n)
+        return out(n)
 
     def negate(a, x, y):
         n = keep(_at(_node(ed, FN_NOT), x, y))
         _connect(a, _pin(n, "A"))
-        return _out(n)
+        return out(n)
 
     down = keep(_at(_node(ed, FN_IS_KEY_DOWN), x0, y0 + 200))
     _connect(pc_out, _pin(down, "self"))
     _connect(sights_key, _pin(down, "Key"))
-    key = gate2(FN_OR, _out(down), get(SIGHTS_FORCED_VAR, x0, y0 + 340),
+    key = gate2(FN_OR, out(down), get(SIGHTS_FORCED_VAR, x0, y0 + 340),
                 x0 + 260, y0 + 240)
     free = gate2(FN_AND, key, negate(get("Sprinting", x0, y0 + 460), x0 + 260, y0 + 460),
                  x0 + 520, y0 + 300)

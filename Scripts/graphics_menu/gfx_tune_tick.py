@@ -31,8 +31,9 @@ from combat.graph import (
     BEL, _add_component, _at, _connect, _declare, _drop_components, _loose_pin,
     _must_load, _pin, _root_handle,
 )
+from uebp.graph import out
 from combat.nodes import FN_ADD_II, FN_ARR_GET, FN_MOD_II, FN_OR, MACRO_FOR_LOOP
-from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_save import author_keep_graphics
 from graphics_menu.gfx_stats import (
     GFX_STATS, LOOK_FROM, PRESET_LABELS, STAT_COUNT, table_values,
@@ -79,7 +80,7 @@ def _author_pick(ed, in_execs, x0, y0, made):
     moved = _call(ed, FN_NEQ_II, x0, y0 + 300, made,
                   A=_get(ed, GFX_TAB.pick_var, x0 - 240, y0 + 300, made),
                   B=_get(ed, GFX_TUNE_PICK_SEEN_VAR, x0 - 240, y0 + 440, made))
-    picked, followed = _branch(ed, _out(moved), in_execs, x0 + 240, y0, made)
+    picked, followed = _branch(ed, out(moved), in_execs, x0 + 240, y0, made)
     picked = put(ed, "Quality", _get(ed, GFX_TAB.pick_var, x0 + 260, y0 - 200, made),
                  [picked], x0 + 520, y0 - 300, made)
     followed = put(ed, GFX_TAB.pick_var, _get(ed, "Quality", x0 + 260, y0 + 500, made),
@@ -102,16 +103,16 @@ def _author_spread(ed, in_execs, x0, y0, made):
     _loose_pin(loop, "LastIndex").set_pin_value(str(len(PRESET_LABELS) * STAT_COUNT - 1))
     _connect(go, _pin(loop, "execute"))
     i = _pin(loop, "Index", is_input=False)
-    s = _out(_call(ed, FN_MOD_II, x0 + 560, y0 + 300, made, A=i, B=STAT_COUNT))
+    s = out(_call(ed, FN_MOD_II, x0 + 560, y0 + 300, made, A=i, B=STAT_COUNT))
     look = _call(ed, FN_GE_II, x0 + 800, y0 + 300, made, A=s, B=LOOK_FROM)
-    copy, _skip = _branch(ed, _out(look), [_pin(loop, "LoopBody", is_input=False)],
+    copy, _skip = _branch(ed, out(look), [_pin(loop, "LoopBody", is_input=False)],
                           x0 + 1040, y0, made)
     base = _call(ed, FN_MUL_II, x0 + 800, y0 + 600, made,
                  A=_get(ed, GFX_TAB.pick_var, x0 + 560, y0 + 600, made), B=STAT_COUNT)
-    source = _call(ed, FN_ADD_II, x0 + 1040, y0 + 600, made, A=_out(base), B=s)
+    source = _call(ed, FN_ADD_II, x0 + 1040, y0 + 600, made, A=out(base), B=s)
     cell = _call(ed, FN_ARR_GET, x0 + 1280, y0 + 600, made,
                  TargetArray=_get(ed, GFX_TAB.values_var, x0 + 1040, y0 + 800, made))
-    _connect(_out(source), _pin(cell, "Index"))
+    _connect(out(source), _pin(cell, "Index"))
     write = _call(ed, FN_ARR_SET, x0 + 1560, y0, made,
                   TargetArray=_get(ed, GFX_TAB.values_var, x0 + 1300, y0 + 300, made))
     _connect(i, _pin(write, "Index"))
@@ -127,8 +128,8 @@ def _author_hand_over(ed, in_execs, x0, y0, made):
                 A=_get(ed, "Quality", x0 - 480, y0 + 500, made),
                 B=_get(ed, GFX_APPLIED_VAR, x0 - 480, y0 + 640, made))
     stale = _call(ed, FN_OR, x0, y0 + 300, made,
-                  A=_get(ed, GFX_TAB.touched_var, x0 - 240, y0 + 300, made), B=_out(new))
-    go, idle = _branch(ed, _out(stale), in_execs, x0 + 240, y0, made)
+                  A=_get(ed, GFX_TAB.touched_var, x0 - 240, y0 + 300, made), B=out(new))
+    go, idle = _branch(ed, out(stale), in_execs, x0 + 240, y0, made)
     tuner = _get(ed, TUNER_COMPONENT, x0 + 260, y0 + 500, made)
     flow = [go]
     for i, (var, source) in enumerate(((TUNER_VALUES_VAR, GFX_TAB.values_var),
@@ -148,7 +149,7 @@ def _author_hand_over(ed, in_execs, x0, y0, made):
     again = _call(ed, FN_NEQ_II, x0 + 1480, y0 + 300, made,
                   A=_get(ed, GFX_APPLIED_VAR, x0 + 1240, y0 + 300, made),
                   B=GFX_APPLIED_DEFAULT)
-    keep, first = _branch(ed, _out(again), [flow], x0 + 1720, y0, made)
+    keep, first = _branch(ed, out(again), [flow], x0 + 1720, y0, made)
     kept = author_keep_graphics(ed, [keep], x0 + 2000, y0 - 700, made)
     flow = put(ed, GFX_APPLIED_VAR, _get(ed, "Quality", x0 + 3500, y0 + 300, made),
                [*kept, first], x0 + 3760, y0, made)

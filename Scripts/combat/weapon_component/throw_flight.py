@@ -28,6 +28,7 @@ Owns the variables the release (throw.py) stores the launch in.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec
+from uebp.graph import out
 from combat.nodes import (
     FN_ADD_VV, FN_GREATER_FF, FN_IS_VALID, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF,
     FN_NORMAL, FN_ROT_FROM_X, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT, FN_SUB_FF,
@@ -54,10 +55,6 @@ FN_DELTA_SECONDS = "/Script/Engine.GameplayStatics.GetWorldDeltaSeconds"
 FN_ADD_WORLD_ROT = "/Script/Engine.Actor.K2_AddActorWorldRotation"
 
 
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
 def _author_square(ed, held, exec_in, x0, y0):
     """The release, for an item thrown edge on (a melee weapon): turn it so
     its X runs along the throw and its Y level across it. Returns the exit
@@ -75,10 +72,10 @@ def _author_square(ed, held, exec_in, x0, y0):
     _connect(exec_in, _pin(gate, "execute"))
     vel = _at(ed.add_get_member_variable_node(THROW_VELOCITY_VAR), x0 + 260, y0 + 300)
     along = _at(_node(ed, FN_ROT_FROM_X), x0 + 520, y0 + 300)
-    _connect(_out(vel, THROW_VELOCITY_VAR), _pin(along, "X"))
+    _connect(out(vel, THROW_VELOCITY_VAR), _pin(along, "X"))
     turn = _at(_node(ed, FN_SET_ACTOR_ROT), x0 + 780, y0)
     _connect(held, _pin(turn, "self"))
-    _connect(_out(along), _pin(turn, "NewRotation"))
+    _connect(out(along), _pin(turn, "NewRotation"))
     _connect(BEL.find_then_pin(gate), _pin(turn, "execute"))
     ed.add_comment_to_nodes(
         "A melee weapon leaves the hand squared up to the throw: its blade in "
@@ -98,24 +95,24 @@ def _author_spin(ed, thrown, exec_in, x0, y0):
     """
     vel = _at(ed.add_get_member_variable_node(THROW_VELOCITY_VAR), x0, y0)
     across = _at(_node(ed, FN_CROSS), x0 + 240, y0)
-    _connect(_out(vel, THROW_VELOCITY_VAR), _pin(across, "A"))
+    _connect(out(vel, THROW_VELOCITY_VAR), _pin(across, "A"))
     _connect(_vec(ed, 0.0, 0.0, 1.0, x0, y0 + 140), _pin(across, "B"))
     axis = _at(_node(ed, FN_NORMAL), x0 + 480, y0)
-    _connect(_out(across), _pin(axis, "A"))
+    _connect(out(across), _pin(axis, "A"))
     dt = _at(_node(ed, FN_DELTA_SECONDS), x0 + 240, y0 + 300)
     angle = _at(_node(ed, FN_MUL_FF), x0 + 480, y0 + 300)
-    _connect(_out(dt), _pin(angle, "A"))
+    _connect(out(dt), _pin(angle, "A"))
     rate, _rate_n = _prop(ed, THROW_SPIN_VAR, thrown, x0 + 240, y0 + 440)
     _connect(rate, _pin(angle, "B"))
     back = _at(_node(ed, FN_MUL_FF), x0 + 600, y0 + 300)
-    _connect(_out(angle), _pin(back, "A"))
+    _connect(out(angle), _pin(back, "A"))
     _set(back, "B", -1.0)
     turn = _at(_node(ed, FN_AXIS_ANGLE), x0 + 720, y0)
-    _connect(_out(axis), _pin(turn, "Axis"))
-    _connect(_out(back), _pin(turn, "Angle"))
+    _connect(out(axis), _pin(turn, "Axis"))
+    _connect(out(back), _pin(turn, "Angle"))
     spin = _at(_node(ed, FN_ADD_WORLD_ROT), x0 + 980, y0 - 200)
     _connect(thrown, _pin(spin, "self"))
-    _connect(_out(turn), _pin(spin, "DeltaRotation"))
+    _connect(out(turn), _pin(spin, "DeltaRotation"))
     _connect(exec_in, _pin(spin, "execute"))
     ed.add_comment_to_nodes(
         f"The tumble: the item's {THROW_SPIN_VAR} degrees a second about the "
@@ -128,11 +125,11 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
     curve, and set it down where the segment it just flew hits something.
     Returns the exit exec pins."""
     thrown_get = _at(ed.add_get_member_variable_node(THROWN_VAR), x0, y0 + 200)
-    thrown = _out(thrown_get, THROWN_VAR)
+    thrown = out(thrown_get, THROWN_VAR)
     flying = _at(_node(ed, FN_IS_VALID), x0 + 240, y0 + 200)
     _connect(thrown, _pin(flying, "Object"))
     gate = _at(ed.add_branch_node(), x0 + 480, y0)
-    _connect(_out(flying), _pin(gate, "Condition"))
+    _connect(out(flying), _pin(gate, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(gate, "execute"))
 
@@ -140,43 +137,43 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
     now = _at(_node(ed, FN_TIME_SECONDS), x0, y0 + 500)
     since = _at(ed.add_get_member_variable_node(THROW_TIME_VAR), x0, y0 + 620)
     t = _at(_node(ed, FN_SUB_FF), x0 + 240, y0 + 500)
-    _connect(_out(now), _pin(t, "A"))
-    _connect(_out(since, THROW_TIME_VAR), _pin(t, "B"))
-    t_out = _out(t)
+    _connect(out(now), _pin(t, "A"))
+    _connect(out(since, THROW_TIME_VAR), _pin(t, "B"))
+    t_out = out(t)
     tt = _at(_node(ed, FN_MUL_FF), x0 + 480, y0 + 620)
     _connect(t_out, _pin(tt, "A"))
     _connect(t_out, _pin(tt, "B"))
     fall = _at(_node(ed, FN_MUL_FF), x0 + 720, y0 + 620)
-    _connect(_out(tt), _pin(fall, "A"))
+    _connect(out(tt), _pin(fall, "A"))
     _set(fall, "B", 0.5 * THROW_GRAVITY_Z)
     drop = _at(_node(ed, FN_MAKE_VECTOR), x0 + 960, y0 + 620)
     _set(drop, "X", 0.0)
     _set(drop, "Y", 0.0)
-    _connect(_out(fall), _pin(drop, "Z"))
+    _connect(out(fall), _pin(drop, "Z"))
     ts = _at(_node(ed, FN_MAKE_VECTOR), x0 + 480, y0 + 800)
     for axis in ("X", "Y", "Z"):
         _connect(t_out, _pin(ts, axis))
     vel = _at(ed.add_get_member_variable_node(THROW_VELOCITY_VAR), x0 + 480, y0 + 960)
     vt = _at(_node(ed, FN_MUL_VF), x0 + 720, y0 + 800)
-    _connect(_out(vel, THROW_VELOCITY_VAR), _pin(vt, "A"))
-    _connect(_out(ts), _pin(vt, "B"))
+    _connect(out(vel, THROW_VELOCITY_VAR), _pin(vt, "A"))
+    _connect(out(ts), _pin(vt, "B"))
     origin = _at(ed.add_get_member_variable_node(THROW_START_VAR), x0 + 720, y0 + 960)
     moved = _at(_node(ed, FN_ADD_VV), x0 + 960, y0 + 800)
-    _connect(_out(origin, THROW_START_VAR), _pin(moved, "A"))
-    _connect(_out(vt), _pin(moved, "B"))
+    _connect(out(origin, THROW_START_VAR), _pin(moved, "A"))
+    _connect(out(vt), _pin(moved, "B"))
     pos = _at(_node(ed, FN_ADD_VV), x0 + 1200, y0 + 700)
-    _connect(_out(moved), _pin(pos, "A"))
-    _connect(_out(drop), _pin(pos, "B"))
-    pos_out = _out(pos)
+    _connect(out(moved), _pin(pos, "A"))
+    _connect(out(drop), _pin(pos, "B"))
+    pos_out = out(pos)
 
     last = _at(ed.add_get_member_variable_node(THROW_LAST_VAR), x0 + 1200, y0 + 400)
     seg = _at(_node(ed, FN_TRACE), x0 + 1460, y0)
-    _connect(_out(last, THROW_LAST_VAR), _pin(seg, "Start"))
+    _connect(out(last, THROW_LAST_VAR), _pin(seg, "Start"))
     _connect(pos_out, _pin(seg, "End"))
     _trace_defaults(seg)
     _connect(BEL.find_then_pin(gate), _pin(seg, "execute"))
     struck = _at(ed.add_branch_node(), x0 + 1740, y0)
-    _connect(_out(seg), _pin(struck, "Condition"))
+    _connect(out(seg), _pin(struck, "Condition"))
     _connect(BEL.find_then_pin(seg), _pin(struck, "execute"))
 
     # --- still flying: move on, and give up on a throw into nothing ----------
@@ -192,27 +189,27 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
     _connect(t_out, _pin(late, "A"))
     _set(late, "B", THROW_MAX_FLIGHT_S)
     lost = _at(ed.add_branch_node(), x0 + 2520, y0 + 300)
-    _connect(_out(late), _pin(lost, "Condition"))
+    _connect(out(late), _pin(lost, "Condition"))
     _connect(BEL.find_then_pin(step), _pin(lost, "execute"))
 
     # --- struck: back off what it hit, then down onto the ground -------------
     # A floor gives the same floor back; a wall or a wanderer drops it at
     # their foot rather than leaving it stuck to their side.
     hit = _at(_palette(ed, NODE_BREAK_HIT), x0 + 2000, y0 - 600)
-    _connect(_out(seg, "OutHit"), _loose_pin(hit, "Hit"))
+    _connect(out(seg, "OutHit"), _loose_pin(hit, "Hit"))
     push = _at(_node(ed, FN_MUL_VF), x0 + 2260, y0 - 500)
     _connect(_loose_pin(hit, "ImpactNormal", is_input=False), _pin(push, "A"))
     b = THROW_BOUNCE_BACK
     _connect(_vec(ed, b, b, b, x0 + 2000, y0 - 300), _pin(push, "B"))
     back = _at(_node(ed, FN_ADD_VV), x0 + 2520, y0 - 600)
     _connect(_loose_pin(hit, "Location", is_input=False), _pin(back, "A"))
-    _connect(_out(push), _pin(back, "B"))
+    _connect(out(push), _pin(back, "B"))
     below = _at(_node(ed, FN_ADD_VV), x0 + 2780, y0 - 500)
-    _connect(_out(back), _pin(below, "A"))
+    _connect(out(back), _pin(below, "A"))
     _connect(_vec(ed, 0.0, 0.0, -FLIGHT_GROUND_CM, x0 + 2520, y0 - 380), _pin(below, "B"))
     floor = _at(_node(ed, FN_TRACE), x0 + 3040, y0 - 200)
-    _connect(_out(back), _pin(floor, "Start"))
-    _connect(_out(below), _pin(floor, "End"))
+    _connect(out(back), _pin(floor, "Start"))
+    _connect(out(below), _pin(floor, "End"))
     _trace_defaults(floor)
     # First what a blade does to what it struck (throw_strike.py): one that
     # lodged in a tree or a body stays there, and skips the way down.
@@ -222,22 +219,22 @@ def _author_throw_flight(ed, exec_ins, x0, y0):
         _connect(pin, _pin(floor, "execute"))
     # ...and the way down passes by a body it wounded, which would catch it.
     past = _at(ed.add_get_member_variable_node(THROW_PAST_VAR), x0 + 2780, y0 - 60)
-    _connect(_out(past, THROW_PAST_VAR), _pin(floor, "ActorsToIgnore"))
+    _connect(out(past, THROW_PAST_VAR), _pin(floor, "ActorsToIgnore"))
     grounded = _at(ed.add_branch_node(), x0 + 3300, y0 - 200)
-    _connect(_out(floor), _pin(grounded, "Condition"))
+    _connect(out(floor), _pin(grounded, "Condition"))
     _connect(BEL.find_then_pin(floor), _pin(grounded, "execute"))
     ground = _at(_palette(ed, NODE_BREAK_HIT), x0 + 3300, y0 - 600)
-    _connect(_out(floor, "OutHit"), _loose_pin(ground, "Hit"))
+    _connect(out(floor, "OutHit"), _loose_pin(ground, "Hit"))
     lift = _at(_node(ed, FN_ADD_VV), x0 + 3560, y0 - 500)
     _connect(_loose_pin(ground, "Location", is_input=False), _pin(lift, "A"))
     _connect(_vec(ed, 0.0, 0.0, THROW_LAND_LIFT, x0 + 3300, y0 - 380), _pin(lift, "B"))
     rest = _at(_node(ed, FN_SET_ACTOR_LOC), x0 + 3820, y0 - 300)
     _connect(thrown, _pin(rest, "self"))
-    _connect(_out(lift), _pin(rest, "NewLocation"))
+    _connect(out(lift), _pin(rest, "NewLocation"))
     _connect(BEL.find_then_pin(grounded), _pin(rest, "execute"))
     hang = _at(_node(ed, FN_SET_ACTOR_LOC), x0 + 3820, y0 - 60)
     _connect(thrown, _pin(hang, "self"))
-    _connect(_out(back), _pin(hang, "NewLocation"))
+    _connect(out(back), _pin(hang, "NewLocation"))
     _connect(BEL.find_else_pin(grounded), _pin(hang, "execute"))
 
     # --- landed: an ordinary dropped item, which E picks up ------------------

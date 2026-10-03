@@ -19,6 +19,7 @@ exactly as it serves Enter, and a drag wears or takes off).
 import unreal
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin
+from uebp.graph import out
 from combat.nodes import (
     FN_ADD_II, FN_AND, FN_ARR_GET, FN_ARR_VALID, FN_EQ_II, FN_GET_COMP, FN_GET_PLAYER_PAWN,
     FN_IS_VALID, FN_NOT, FN_OR, MACRO_FOR_LOOP,
@@ -58,10 +59,6 @@ def _call(ed, fn, x, y, **inputs):
     return n
 
 
-def _out(n):
-    return _pin(n, "ReturnValue", is_input=False)
-
-
 def _branch(ed, cond, execs, x, y):
     br = _at(ed.add_branch_node(), x, y)
     _connect(cond, _pin(br, "Condition"))
@@ -85,26 +82,26 @@ def _author_slots(ed, worn, box, in_execs, x0, y0):
         _connect(e, _pin(loop, "execute"))
     i = _pin(loop, "Index", is_input=False)
     cast = _at(_palette(ed, NODE_CAST_SLOT), x0 + 560, y0)
-    _connect(_out(_call(ed, FN_CHILD_AT, x0 + 300, y0 + 240, self=box, Index=i)),
+    _connect(out(_call(ed, FN_CHILD_AT, x0 + 300, y0 + 240, self=box, Index=i)),
              _pin(cast, "Object"))
     _connect(_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     slot = _loose_pin(cast, "AsWBPInventorySlot", is_input=False)
-    there, past = _branch(ed, _out(_call(ed, FN_ARR_VALID, x0 + 600, y0 + 500,
+    there, past = _branch(ed, out(_call(ed, FN_ARR_VALID, x0 + 600, y0 + 500,
                                          TargetArray=worn, IndexToTest=i)),
                           [BEL.find_then_pin(cast)], x0 + 860, y0)
     item = _loose_pin(_call(ed, FN_ARR_GET, x0 + 860, y0 + 500, TargetArray=worn, Index=i),
                       "Item", is_input=False)
-    worn_one, bare = _branch(ed, _out(_call(ed, FN_IS_VALID, x0 + 1120, y0 + 500,
+    worn_one, bare = _branch(ed, out(_call(ed, FN_IS_VALID, x0 + 1120, y0 + 500,
                                             Object=item)), [there], x0 + 1120, y0)
     caret = _call(ed, FN_AND, x0 + 1120, y0 + 900,
                   A=_get(ed, WEAR_OPEN_VAR, x0 + 600, y0 + 900),
-                  B=_out(_call(ed, FN_EQ_II, x0 + 860, y0 + 1040, A=i,
+                  B=out(_call(ed, FN_EQ_II, x0 + 860, y0 + 1040, A=i,
                                B=_get(ed, WEAR_SEL_VAR, x0 + 600, y0 + 1040))))
     code = _call(ed, FN_ADD_II, x0 + 600, y0 + 1200, A=i, B=WORN_CODE_FIRST)
-    dragged = _call(ed, FN_EQ_II, x0 + 860, y0 + 1200, A=_out(code),
+    dragged = _call(ed, FN_EQ_II, x0 + 860, y0 + 1200, A=out(code),
                     B=_get(ed, DRAG_FROM_VAR, x0 + 600, y0 + 1340))
-    lit = _call(ed, FN_OR, x0 + 1120, y0 + 1200, A=_out(caret), B=_out(dragged))
-    _author_filled_slot(ed, slot, item, _out(lit), worn_one, x0 + 1400, y0, ammo=False)
+    lit = _call(ed, FN_OR, x0 + 1120, y0 + 1200, A=out(caret), B=out(dragged))
+    _author_filled_slot(ed, slot, item, out(lit), worn_one, x0 + 1400, y0, ammo=False)
     _author_empty_slot(ed, slot, (bare, past), x0 + 1400, y0 + 1600)
     return _pin(loop, "Completed", is_input=False)
 
@@ -113,16 +110,16 @@ def author_wear_panel(ed, x0, y0, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
     panel = part(ed, WBP_HUD, WEAR_PANEL, x0, y0 + 1000)
     not_menu = _call(ed, FN_NOT, x0, y0 + 440, A=_get(ed, "MenuOpen", x0 - 240, y0 + 440))
-    shown, shut = _branch(ed, _out(not_menu), in_execs, x0 + 480, y0)
+    shown, shut = _branch(ed, out(not_menu), in_execs, x0 + 480, y0)
     closed = set_shown(ed, panel, False, [shut], x0 + 740, y0 + 700)
     flow = set_shown(ed, panel, True, [shown], x0 + 740, y0)
 
-    pawn = _out(_call(ed, FN_GET_PLAYER_PAWN, x0 + 740, y0 + 440))
+    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, x0 + 740, y0 + 440))
     comp = _call(ed, FN_GET_COMP, x0 + 1000, y0 + 440, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node
     cast = _at(_palette(ed, NODE_CAST_WEAPON), x0 + 1000, y0)
-    _connect(_out(comp), _pin(cast, "Object"))
+    _connect(out(comp), _pin(cast, "Object"))
     _connect(flow, _pin(cast, "execute"))
     wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
     worn = _get(ed, WORN_VAR, x0 + 1300, y0 + 300, WEAPON_COMP_CLASS_PATH, wc)

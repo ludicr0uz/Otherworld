@@ -29,9 +29,11 @@ from combat.slot_tuning import (
 )
 from combat.weapon_component.common import _G
 from combat.weapon_component.slot_nodes import (
-    FN_ARR_CLEAR, FN_ARR_FIND, FN_ARR_RESIZE, FN_GE_II, FN_NE_OO, fits, for_each,
-    for_loop, not_, op, out, slot_at, then, valid,
+    FN_ARR_CLEAR, FN_ARR_FIND, FN_ARR_RESIZE, FN_GE_II, FN_NE_OO,
+    fits, for_each, for_loop, not_, op,
+    slot_at, valid,
 )
+from uebp.graph import out, then
 
 
 def _author_claim(g, execs, x0, y0):

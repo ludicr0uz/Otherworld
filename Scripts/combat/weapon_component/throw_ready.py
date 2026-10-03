@@ -30,6 +30,7 @@ keep walking, crouched or prone.
 
 from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from uebp.graph import out
 from combat.nodes import (
     FN_AND, FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_IS_VALID, FN_NOT, FN_PLAY_SLOT,
     FN_SET_REL_LOC, FN_SET_REL_ROT,
@@ -44,10 +45,6 @@ THROW_READY_ANIM_VAR = "ThrowReadyAnim"   # A_ThrowReady, or None
 FN_IS_PLAYING_SLOT = "/Script/Engine.AnimInstance.IsPlayingSlotAnimation"
 
 
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
 def _author_throw_ready(ed, item, exec_in, x0, y0):
     """Hold the ready pose in the slot, and an item thrown by its blade in
     its throw grip; returns the exits. Run it on every frame of the aim, when
@@ -59,18 +56,18 @@ def _author_throw_ready(ed, item, exec_in, x0, y0):
         return n
 
     def get(name, x, y):
-        return _out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
+        return out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
 
     def both(a, b, x, y):
         n = keep(_at(_node(ed, FN_AND), x, y))
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
-        return _out(n)
+        return out(n)
 
     def negate(a, x, y):
         n = keep(_at(_node(ed, FN_NOT), x, y))
         _connect(a, _pin(n, "A"))
-        return _out(n)
+        return out(n)
 
     anim = keep(_at(_node(ed, FN_ANIM_INSTANCE), x0 + 240, y0 + 300))
     _connect(get("OwnerMesh", x0, y0 + 300), _pin(anim, "self"))
@@ -78,20 +75,20 @@ def _author_throw_ready(ed, item, exec_in, x0, y0):
     has = keep(_at(_node(ed, FN_IS_VALID), x0 + 480, y0 + 440))
     _connect(pose, _pin(has, "Object"))
     held = keep(_at(_node(ed, FN_IS_PLAYING_SLOT), x0 + 480, y0 + 580))
-    _connect(_out(anim), _pin(held, "self"))
+    _connect(out(anim), _pin(held, "self"))
     _connect(pose, _pin(held, "Asset"))
     _set(held, "SlotNodeName", AIM_SLOT)
     flinching = keep(_at(_node(ed, FN_IS_SLOT_ACTIVE), x0 + 480, y0 + 760))
-    _connect(_out(anim), _pin(flinching, "self"))
+    _connect(out(anim), _pin(flinching, "self"))
     _set(flinching, "SlotNodeName", HIT_SLOT)
-    free = both(negate(_out(held), x0 + 760, y0 + 580),
-                negate(_out(flinching), x0 + 760, y0 + 760), x0 + 1000, y0 + 640)
+    free = both(negate(out(held), x0 + 760, y0 + 580),
+                negate(out(flinching), x0 + 760, y0 + 760), x0 + 1000, y0 + 640)
     gate = keep(_at(ed.add_branch_node(), x0 + 1480, y0))
-    _connect(both(_out(has), free, x0 + 1240, y0 + 440), _pin(gate, "Condition"))
+    _connect(both(out(has), free, x0 + 1240, y0 + 440), _pin(gate, "Condition"))
     _connect(exec_in, _pin(gate, "execute"))
 
     play = keep(_at(_node(ed, FN_PLAY_SLOT), x0 + 1760, y0))
-    _connect(_out(anim), _pin(play, "self"))
+    _connect(out(anim), _pin(play, "self"))
     _connect(pose, _pin(play, "Asset"))
     _set(play, "SlotNodeName", AIM_SLOT)
     _set(play, "BlendInTime", THROW_READY_BLEND_S)

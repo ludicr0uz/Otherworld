@@ -32,6 +32,7 @@ Constants sit on B pins or range pins (a Kismet A pin will not hold a literal).
 from combat.graph import (
     BEL, _at, _connect, _events, _log, _loose_pin, _node, _pin, _set,
 )
+from uebp.graph import out
 from combat.nodes import (
     FN_ADD_FF, FN_DESTROY, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, FN_RANDOM_FLOAT,
     MACRO_FOR_EACH,
@@ -76,10 +77,6 @@ class _Chain:
         return node
 
 
-def _out(node, name="ReturnValue"):
-    return _pin(node, name, is_input=False)
-
-
 def _call(ed, fn, x, y, **inputs):
     """A call node with each input either wired (a pin) or set (a literal)."""
     n = _at(_node(ed, fn), x, y)
@@ -92,27 +89,27 @@ def _call(ed, fn, x, y, **inputs):
 
 
 def _get(ed, name, x, y):
-    return _out(_at(ed.add_get_member_variable_node(name), x, y), name)
+    return out(_at(ed.add_get_member_variable_node(name), x, y), name)
 
 
 def _mul(ed, a, b, x, y):
-    return _out(_call(ed, FN_MUL_FF, x, y, A=a, B=float(b)))
+    return out(_call(ed, FN_MUL_FF, x, y, A=a, B=float(b)))
 
 
 def _scaled(ed, value, scale_var, x, y):
     """value x one of the look multipliers (a variable, so it sits on B)."""
-    return _out(_call(ed, FN_MUL_FF, x, y, A=value, B=_get(ed, scale_var, x - 200, y + 80)))
+    return out(_call(ed, FN_MUL_FF, x, y, A=value, B=_get(ed, scale_var, x - 200, y + 80)))
 
 
 def _map(ed, value, in_a, in_b, out_a, out_b, x, y):
-    return _out(_call(ed, FN_MAP_CLAMPED, x, y, Value=value,
+    return out(_call(ed, FN_MAP_CLAMPED, x, y, Value=value,
                       InRangeA=float(in_a), InRangeB=float(in_b),
                       OutRangeA=float(out_a), OutRangeB=float(out_b)))
 
 
 def _color(ed, rgba, x, y):
     c = list(rgba) + [1.0] * (4 - len(rgba))
-    return _out(_call(ed, FN_MAKE_COLOR, x, y, R=float(c[0]), G=float(c[1]),
+    return out(_call(ed, FN_MAKE_COLOR, x, y, R=float(c[0]), G=float(c[1]),
                       B=float(c[2]), A=float(c[3])))
 
 
@@ -131,7 +128,7 @@ def _author_begin_play(ed, begin):
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     _connect(chain.then, _loose_pin(loop, "Exec"))
-    _connect(_out(found, "OutActors"), _loose_pin(loop, "Array"))
+    _connect(out(found, "OutActors"), _loose_pin(loop, "Array"))
     kill = _at(_node(ed, FN_DESTROY), 900, -1000)
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(kill, "execute"))
     _connect(_loose_pin(loop, "ArrayElement", is_input=False), _pin(kill, "self"))
@@ -139,29 +136,29 @@ def _author_begin_play(ed, begin):
     chain = _Chain(_loose_pin(loop, "Completed", is_input=False))
     mid = chain.step(_call(ed, FN_CREATE_MID, 900, -800,
                            self=_get(ed, "SkyDome", 650, -700), ElementIndex=0))
-    _set_var(ed, chain, SKY_MID_VAR, _out(mid), 1250, -800)
+    _set_var(ed, chain, SKY_MID_VAR, out(mid), 1250, -800)
 
     pick = chain.step(_at(ed.add_branch_node(), 1550, -800))
     _connect(_get(ed, RANDOM_START_VAR, 1350, -650), _pin(pick, "Condition"))
-    total = _out(_call(ed, FN_ADD_FF, 1600, -550,
+    total = out(_call(ed, FN_ADD_FF, 1600, -550,
                        A=_get(ed, "DayLengthSeconds", 1350, -550),
                        B=_get(ed, "NightLengthSeconds", 1350, -450)))
     anywhere = _call(ed, FN_RANDOM_FLOAT, 1850, -550, Min=0.0, Max=total)
-    _set_var(ed, chain, "Clock", _out(anywhere), 2100, -800)
+    _set_var(ed, chain, "Clock", out(anywhere), 2100, -800)
 
 
 def _author_clock(ed, tick, chain):
     """Advance Clock, set IsDay; return (clock, day_len, sin(angle), sun_elev) pins."""
     day_len = _get(ed, "DayLengthSeconds", 200, 300)
-    total = _out(_call(ed, FN_ADD_FF, 450, 350, A=day_len,
+    total = out(_call(ed, FN_ADD_FF, 450, 350, A=day_len,
                        B=_get(ed, "NightLengthSeconds", 200, 400)))
-    ahead = _out(_call(ed, FN_ADD_FF, 450, 200, A=_get(ed, "Clock", 200, 200),
-                       B=_out(tick, "DeltaSeconds")))
-    wrapped = _out(_call(ed, FN_PERCENT_FF, 700, 200, A=ahead, B=total))
+    ahead = out(_call(ed, FN_ADD_FF, 450, 200, A=_get(ed, "Clock", 200, 200),
+                       B=out(tick, "DeltaSeconds")))
+    wrapped = out(_call(ed, FN_PERCENT_FF, 700, 200, A=ahead, B=total))
     _set_var(ed, chain, "Clock", wrapped, 950, 0)
 
     clock = _get(ed, "Clock", 1200, 300)
-    is_day = _out(_call(ed, FN_LESS_FF, 1450, 200, A=clock, B=day_len))
+    is_day = out(_call(ed, FN_LESS_FF, 1450, 200, A=clock, B=day_len))
     _set_var(ed, chain, IS_DAY_VAR, is_day, 1650, 0)
 
     # angle = map(clock, 0..day -> 0..180) + map(clock, day..total -> 0..180)
@@ -169,8 +166,8 @@ def _author_clock(ed, tick, chain):
                   InRangeB=day_len, OutRangeA=0.0, OutRangeB=180.0)
     second = _call(ed, FN_MAP_CLAMPED, 1450, 650, Value=clock, InRangeA=day_len,
                    InRangeB=total, OutRangeA=0.0, OutRangeB=180.0)
-    angle = _out(_call(ed, FN_ADD_FF, 1700, 500, A=_out(first), B=_out(second)))
-    sin = _out(_call(ed, FN_DEG_SIN, 1900, 500, A=angle))
+    angle = out(_call(ed, FN_ADD_FF, 1700, 500, A=out(first), B=out(second)))
+    sin = out(_call(ed, FN_DEG_SIN, 1900, 500, A=angle))
     sun_elev = _mul(ed, sin, cfg.SUN_MAX_ELEVATION_DEG, 2100, 600)
     day = _map(ed, sun_elev, cfg.NIGHT_BELOW_DEG, cfg.DAY_ABOVE_DEG, 0.0, 1.0, 2300, 600)
     _set_var(ed, chain, "DayAmount", day, 2500, 0)
@@ -185,11 +182,11 @@ def _author_bodies(ed, chain, angle, sin):
             ("Moon", cfg.MOON_MAX_ELEVATION_DEG, cfg.SUNRISE_YAW_DEG - 180.0, 600)):
         rot = _call(ed, FN_MAKE_ROT, x0 + 250, y, Roll=0.0,
                     Pitch=_mul(ed, sin, pitch_scale, x0, y),
-                    Yaw=_out(_call(ed, FN_ADD_FF, x0, y + 120, A=angle,
+                    Yaw=out(_call(ed, FN_ADD_FF, x0, y + 120, A=angle,
                                    B=float(yaw_offset))))
         chain.step(_call(ed, FN_SET_WORLD_ROT, x0 + 500, 0,
                          self=_get(ed, name, x0 + 300, y - 100),
-                         NewRotation=_out(rot)))
+                         NewRotation=out(rot)))
         x0 += 500
 
     day = _get(ed, "DayAmount", x0, 400)
@@ -200,7 +197,7 @@ def _author_bodies(ed, chain, angle, sin):
     moon_elev = _mul(ed, sin, -cfg.MOON_MAX_ELEVATION_DEG, x0 + 400, 600)
     moon_up = _map(ed, moon_elev, 0.0, cfg.MOON_FADE_DEG, 0.0, 1.0, x0 + 600, 600)
     night = _map(ed, day, 0.0, 1.0, 1.0, 0.0, x0 + 600, 800)
-    moon_amount = _out(_call(ed, FN_MUL_FF, x0 + 850, 700, A=moon_up, B=night))
+    moon_amount = out(_call(ed, FN_MUL_FF, x0 + 850, 700, A=moon_up, B=night))
     chain.step(_call(ed, FN_LIGHT_INTENSITY, x0 + 1100, 0,
                      self=_get(ed, "Moon", x0 + 900, 250),
                      NewIntensity=_scaled(
@@ -227,7 +224,7 @@ def _author_air(ed, chain, x0):
     tint = _call(ed, FN_COLOR_LERP, x0 + 1000, 500,
                  A=_color(ed, cfg.FOG_COLOR[0], x0 + 800, 550),
                  B=_color(ed, cfg.FOG_COLOR[1], x0 + 800, 700), Alpha=day)
-    chain.step(_call(ed, FN_FOG_COLOR, x0 + 1200, 0, self=fog, Value=_out(tint)))
+    chain.step(_call(ed, FN_FOG_COLOR, x0 + 1200, 0, self=fog, Value=out(tint)))
 
     weight = chain.step(_at(ed.add_set_member_variable_node("BlendWeight", PP_CLASS_PATH),
                             x0 + 1500, 0))
@@ -254,10 +251,10 @@ def _author_sky(ed, chain, x0, sun_elev):
     x = x0 + 1500
     for body in ("Sun", "Moon"):
         fwd = _call(ed, FN_FORWARD_OF, x - 200, 400, self=_get(ed, body, x - 400, 400))
-        toward = _call(ed, FN_NEGATE_V, x - 50, 450, A=_out(fwd))
-        color = _call(ed, FN_VEC_TO_COLOR, x + 100, 500, InVec=_out(toward))
+        toward = _call(ed, FN_NEGATE_V, x - 50, 450, A=out(fwd))
+        color = _call(ed, FN_VEC_TO_COLOR, x + 100, 500, InVec=out(toward))
         chain.step(_call(ed, FN_MID_VECTOR, x + 300, 0, self=mid,
-                         ParameterName=f"{body}Direction", Value=_out(color)))
+                         ParameterName=f"{body}Direction", Value=out(color)))
         x += 700
 
 

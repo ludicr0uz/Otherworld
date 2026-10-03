@@ -25,6 +25,7 @@ key, the press clears it, and it is false in every real game.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from uebp.graph import out
 from combat.nodes import (
     FN_ABS, FN_ACTOR_LOC, FN_AND, FN_BREAK_VECTOR, FN_DISTANCE, FN_IS_VALID,
     FN_LESS_FF, FN_OR, FN_SUB_VV,
@@ -56,10 +57,6 @@ KINDS = ((_author_item_candidates, _author_take_item),
 KIND_PITCH = 2000   # graph units between two kinds' rows of nodes
 
 
-def _out(node, name):
-    return _pin(node, name, is_input=False)
-
-
 def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
     """One candidate of a walk: keep it if it is in reach and the nearest yet."""
     made = []
@@ -73,21 +70,21 @@ def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
     here = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 1900, y0 + 520))
     _connect(owner, _pin(here, "self"))
     gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 2160, y0 + 440))
-    _connect(_out(there, "ReturnValue"), _pin(gap, "V1"))
-    _connect(_out(here, "ReturnValue"), _pin(gap, "V2"))
+    _connect(out(there, "ReturnValue"), _pin(gap, "V1"))
+    _connect(out(here, "ReturnValue"), _pin(gap, "V2"))
     near = keep(_at(_node(ed, FN_LESS_FF), x0 + 2400, y0 + 440))
-    _connect(_out(gap, "ReturnValue"), _pin(near, "A"))
+    _connect(out(gap, "ReturnValue"), _pin(near, "A"))
     _set(near, "B", INTERACT_RADIUS)
     # And how far up or down: |dz| < INTERACT_HEIGHT.
     rise = keep(_at(_node(ed, FN_SUB_VV), x0 + 2160, y0 + 260))
-    _connect(_out(there, "ReturnValue"), _pin(rise, "A"))
-    _connect(_out(here, "ReturnValue"), _pin(rise, "B"))
+    _connect(out(there, "ReturnValue"), _pin(rise, "A"))
+    _connect(out(here, "ReturnValue"), _pin(rise, "B"))
     parts = keep(_at(_node(ed, FN_BREAK_VECTOR), x0 + 2400, y0 + 260))
-    _connect(_out(rise, "ReturnValue"), _pin(parts, "InVec"))
+    _connect(out(rise, "ReturnValue"), _pin(parts, "InVec"))
     dz = keep(_at(_node(ed, FN_ABS), x0 + 2640, y0 + 200))
-    _connect(_out(parts, "Z"), _pin(dz, "A"))
+    _connect(out(parts, "Z"), _pin(dz, "A"))
     level = keep(_at(_node(ed, FN_LESS_FF), x0 + 2880, y0 + 200))
-    _connect(_out(dz, "ReturnValue"), _pin(level, "A"))
+    _connect(out(dz, "ReturnValue"), _pin(level, "A"))
     _set(level, "B", INTERACT_HEIGHT)
 
     # How far the candidate lies from the point the reticle rests on. Pure, so
@@ -95,35 +92,35 @@ def _author_offer(ed, owner, candidate, offered, exec_in, x0, y0):
     # change in between.
     aim = keep(_at(ed.add_get_member_variable_node("AimPoint"), x0 + 1900, y0 + 660))
     aim_gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 2160, y0 + 620))
-    _connect(_out(there, "ReturnValue"), _pin(aim_gap, "V1"))
-    _connect(_out(aim, "AimPoint"), _pin(aim_gap, "V2"))
+    _connect(out(there, "ReturnValue"), _pin(aim_gap, "V1"))
+    _connect(out(aim, "AimPoint"), _pin(aim_gap, "V2"))
     best_gap = keep(_at(ed.add_get_member_variable_node(INTERACT_GAP_VAR),
                         x0 + 2160, y0 + 780))
     closer = keep(_at(_node(ed, FN_LESS_FF), x0 + 2400, y0 + 620))
-    _connect(_out(aim_gap, "ReturnValue"), _pin(closer, "A"))
-    _connect(_out(best_gap, INTERACT_GAP_VAR), _pin(closer, "B"))
+    _connect(out(aim_gap, "ReturnValue"), _pin(closer, "A"))
+    _connect(out(best_gap, INTERACT_GAP_VAR), _pin(closer, "B"))
 
     and1 = keep(_at(_node(ed, FN_AND), x0 + 2640, y0 + 340))
     _connect(offered, _pin(and1, "A"))
-    _connect(_out(near, "ReturnValue"), _pin(and1, "B"))
+    _connect(out(near, "ReturnValue"), _pin(and1, "B"))
     and_h = keep(_at(_node(ed, FN_AND), x0 + 2880, y0 + 300))
-    _connect(_out(and1, "ReturnValue"), _pin(and_h, "A"))
-    _connect(_out(level, "ReturnValue"), _pin(and_h, "B"))
+    _connect(out(and1, "ReturnValue"), _pin(and_h, "A"))
+    _connect(out(level, "ReturnValue"), _pin(and_h, "B"))
     and2 = keep(_at(_node(ed, FN_AND), x0 + 3000, y0 + 420))
-    _connect(_out(and_h, "ReturnValue"), _pin(and2, "A"))
-    _connect(_out(closer, "ReturnValue"), _pin(and2, "B"))
+    _connect(out(and_h, "ReturnValue"), _pin(and2, "A"))
+    _connect(out(closer, "ReturnValue"), _pin(and2, "B"))
 
     # The walk only remembers. Acting inside it is how one press used to pick
     # up every item in reach.
     better = keep(_at(ed.add_branch_node(), x0 + 3120, y0))
-    _connect(_out(and2, "ReturnValue"), _pin(better, "Condition"))
+    _connect(out(and2, "ReturnValue"), _pin(better, "Condition"))
     _connect(exec_in, _pin(better, "execute"))
     remember = keep(_at(ed.add_set_member_variable_node(INTERACT_TARGET_VAR),
                         x0 + 3380, y0))
     _connect(candidate, _pin(remember, INTERACT_TARGET_VAR))
     _connect(BEL.find_then_pin(better), _pin(remember, "execute"))
     at_gap = keep(_at(ed.add_set_member_variable_node(INTERACT_GAP_VAR), x0 + 3640, y0))
-    _connect(_out(aim_gap, "ReturnValue"), _pin(at_gap, INTERACT_GAP_VAR))
+    _connect(out(aim_gap, "ReturnValue"), _pin(at_gap, INTERACT_GAP_VAR))
     _connect(BEL.find_then_pin(remember), _pin(at_gap, "execute"))
 
     ed.add_comment_to_nodes(
@@ -150,9 +147,9 @@ def _author_interact(ed, owner, pressed, exec_ins, x0, y0):
                       x0 - 560, y0 + 280))
     wants = keep(_at(_node(ed, FN_OR), x0 - 280, y0 + 160))
     _connect(pressed, _pin(wants, "A"))
-    _connect(_out(forced, INTERACT_FORCED_VAR), _pin(wants, "B"))
+    _connect(out(forced, INTERACT_FORCED_VAR), _pin(wants, "B"))
     gate = keep(_at(ed.add_branch_node(), x0, y0))
-    _connect(_out(wants, "ReturnValue"), _pin(gate, "Condition"))
+    _connect(out(wants, "ReturnValue"), _pin(gate, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(gate, "execute"))
 
@@ -179,11 +176,11 @@ def _author_interact(ed, owner, pressed, exec_ins, x0, y0):
     y1 = y0 + (len(KINDS) - 1) * KIND_PITCH + 1000
     target_get = keep(_at(ed.add_get_member_variable_node(INTERACT_TARGET_VAR),
                           x0 + 1320, y1 + 260))
-    target = _out(target_get, INTERACT_TARGET_VAR)
+    target = out(target_get, INTERACT_TARGET_VAR)
     any_target = keep(_at(_node(ed, FN_IS_VALID), x0 + 1580, y1 + 260))
     _connect(target, _pin(any_target, "Object"))
     found = keep(_at(ed.add_branch_node(), x0 + 1840, y1))
-    _connect(_out(any_target, "ReturnValue"), _pin(found, "Condition"))
+    _connect(out(any_target, "ReturnValue"), _pin(found, "Condition"))
     _connect(flow, _pin(found, "execute"))
 
     acted, idle = (), (BEL.find_else_pin(gate), BEL.find_else_pin(found))

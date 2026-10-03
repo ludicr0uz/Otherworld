@@ -26,7 +26,7 @@ sys.path.insert(0, _SCRIPTS)
 # A live editor keeps imported modules between runs, and combat.verify.fixtures
 # holds assets loaded at import: without this a second run would check the
 # first run's objects, and an edit to any combat module would be ignored.
-for _name in [m for m in sys.modules if m.split(".")[0] in ("combat", "loot", "item_icons")]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "combat", "loot", "item_icons")]:
     del sys.modules[_name]
 
 import unreal                                                     # noqa: E402

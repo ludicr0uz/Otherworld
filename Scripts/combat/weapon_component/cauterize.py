@@ -19,6 +19,7 @@ behind the Branch on UsePressed, which is false with empty hands (use.py).
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from uebp.graph import out
 from combat.heat_tuning import HOT_VAR
 from combat.nodes import FN_GET_ASC, FN_IS_VALID, GAS
 from combat.tuning import BLEEDING_TAG
@@ -28,10 +29,6 @@ from combat.weapon_component.common import _prop
 FN_REMOVE_GRANTING = f"{GAS}.AbilitySystemComponent.RemoveActiveEffectsWithGrantedTags"
 # The tag container's literal, as the pin stores it.
 CAUTERIZE_TAGS = f'(GameplayTags=((TagName="{BLEEDING_TAG}")))'
-
-
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
 
 
 def _author_cauterize(ed, held, owner, exec_ins, x0, y0):
@@ -44,7 +41,7 @@ def _author_cauterize(ed, held, owner, exec_ins, x0, y0):
 
     pressed_n = keep(_at(ed.add_get_member_variable_node(USE_PRESSED_VAR), x0, y0 + 200))
     press = keep(_at(ed.add_branch_node(), x0 + 260, y0))
-    _connect(_out(pressed_n, USE_PRESSED_VAR), _pin(press, "Condition"))
+    _connect(out(pressed_n, USE_PRESSED_VAR), _pin(press, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(press, "execute"))
     hot_pin, hot_n = _prop(ed, HOT_VAR, held, x0 + 260, y0 + 200)
@@ -55,11 +52,11 @@ def _author_cauterize(ed, held, owner, exec_ins, x0, y0):
 
     lookup = keep(_at(_node(ed, FN_GET_ASC), x0 + 520, y0 + 300))
     _connect(owner, _pin(lookup, "Actor"))
-    asc = _out(lookup)
+    asc = out(lookup)
     valid = keep(_at(_node(ed, FN_IS_VALID), x0 + 780, y0 + 300))
     _connect(asc, _pin(valid, "Object"))
     able = keep(_at(ed.add_branch_node(), x0 + 1040, y0))
-    _connect(_out(valid), _pin(able, "Condition"))
+    _connect(out(valid), _pin(able, "Condition"))
     _connect(BEL.find_then_pin(hot), _pin(able, "execute"))
     seal = keep(_at(_node(ed, FN_REMOVE_GRANTING), x0 + 1300, y0))
     _connect(asc, _pin(seal, "self"))

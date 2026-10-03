@@ -19,8 +19,9 @@ time passing. Only while open: nothing else moves the table.
 import unreal
 
 from combat.graph import BEL, _at, _connect, _declare, _float_type, _loose_pin, _palette, _pin
+from uebp.graph import out
 from combat.nodes import FN_ADD_FF, FN_ARR_GET
-from graphics_menu.dev_guns import _branch, _call, _class_literal, _get, _out
+from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
 from graphics_menu.loot_find import put
 from graphics_menu.tune_tabs import other_open_vars
 from graphics_menu.tune_tick import FN_ARR_SET, author_tab_flow, declare_tab_vars, tab_defaults
@@ -66,7 +67,7 @@ def _value(ed, s, x, y, made):
 
 def _map(ed, value, in_a, in_b, out_a, out_b, x, y, made):
     """MapRangeClamped; each bound a literal or a pin."""
-    return _out(_call(ed, FN_MAP_CLAMPED, x, y, made, Value=value, InRangeA=in_a,
+    return out(_call(ed, FN_MAP_CLAMPED, x, y, made, Value=value, InRangeA=in_a,
                       InRangeB=in_b, OutRangeA=out_a, OutRangeB=out_b))
 
 
@@ -74,21 +75,21 @@ def _hour_to_clock(ed, hour, day, night, x, y, made):
     """phase = (hour - SUNRISE + 24) % 24; the day half maps 0..12 h onto
     0..day, the night half 12..24 h onto 0..night after it."""
     lifted = _call(ed, FN_ADD_FF, x, y, made, A=hour, B=24.0 - cfg.SUNRISE_HOUR)
-    phase = _out(_call(ed, FN_PERCENT_FF, x + 240, y, made, A=_out(lifted), B=24.0))
+    phase = out(_call(ed, FN_PERCENT_FF, x + 240, y, made, A=out(lifted), B=24.0))
     half = cfg.HALF_HOURS
     a = _map(ed, phase, 0.0, half, 0.0, day, x + 480, y, made)
     b = _map(ed, phase, half, 24.0, 0.0, night, x + 480, y + 300, made)
-    return _out(_call(ed, FN_ADD_FF, x + 720, y, made, A=a, B=b))
+    return out(_call(ed, FN_ADD_FF, x + 720, y, made, A=a, B=b))
 
 
 def _clock_to_hour(ed, clock, day, night, x, y, made):
     """The inverse: 12 h across each half, then round the dial from sunrise."""
-    total = _out(_call(ed, FN_ADD_FF, x, y + 300, made, A=day, B=night))
+    total = out(_call(ed, FN_ADD_FF, x, y + 300, made, A=day, B=night))
     a = _map(ed, clock, 0.0, day, 0.0, cfg.HALF_HOURS, x + 240, y, made)
     b = _map(ed, clock, day, total, 0.0, cfg.HALF_HOURS, x + 240, y + 300, made)
     phase = _call(ed, FN_ADD_FF, x + 480, y, made, A=a, B=b)
-    shifted = _call(ed, FN_ADD_FF, x + 720, y, made, A=_out(phase), B=cfg.SUNRISE_HOUR)
-    return _out(_call(ed, FN_PERCENT_FF, x + 960, y, made, A=_out(shifted), B=24.0))
+    shifted = _call(ed, FN_ADD_FF, x + 720, y, made, A=out(phase), B=cfg.SUNRISE_HOUR)
+    return out(_call(ed, FN_PERCENT_FF, x + 960, y, made, A=out(shifted), B=24.0))
 
 
 def _set_on(ed, cyc, var, value, in_execs, x, y, made):
@@ -115,7 +116,7 @@ def _author_apply(ed, in_execs, x0, y0, made):
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_DayNightCycle")
     made.append(cast)
-    _connect(_out(find), _pin(cast, "Object"))
+    _connect(out(find), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(find), _pin(cast, "execute"))
     cyc = _loose_pin(cast, "AsBPDayNightCycle", is_input=False)
     none = _pin(cast, "CastFailed", is_input=False)
@@ -135,7 +136,7 @@ def _author_apply(ed, in_execs, x0, y0, made):
     night = _get(ed, "NightLengthSeconds", x, y0 + 1040, made, DAY_NIGHT_CLASS_PATH, cyc)
     moved = _call(ed, FN_NEQ_FF, x, y0 + 300, made, A=_value(ed, 0, x - 480, y0 + 300, made),
                   B=_get(ed, WORLD_TUNE_HOUR_SEEN_VAR, x - 240, y0 + 440, made))
-    write, same = _branch(ed, _out(moved), [flow, keep], x + 240, y0, made)
+    write, same = _branch(ed, out(moved), [flow, keep], x + 240, y0, made)
     clock = _hour_to_clock(ed, _value(ed, 0, x + 240, y0 + 600, made), day, night,
                            x + 480, y0 + 600, made)
     flow = _set_on(ed, cyc, "Clock", clock, [write], x + 1400, y0, made)

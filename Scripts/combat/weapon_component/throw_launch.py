@@ -10,7 +10,7 @@ arc is predicted from and the release stores (throw.py).
              beside the reticle and never met it
     pitch    the one whose curve passes through AimPoint at Held.ThrowSpeed,
              so the item goes where the reticle is. With no such pitch (the
-             point is out of the speed's reach, or is the sky), the view's,
+             point is aim_rot of the speed's reach, or is the sky), the view's,
              tipped up Held.ThrowArcDegrees: a lob
 
 THE AIMED PITCH
@@ -21,7 +21,7 @@ v under gravity g passes through it when
     tan(pitch) = (v^2 - sqrt(v^4 - g (g d^2 + 2 h v^2))) / (g d)
 
 the flatter of the two answers. Under the root is negative when the point is
-out of reach (and at the sky, AIM_TRACE_RANGE out): the throw then falls
+aim_rot of reach (and at the sky, AIM_TRACE_RANGE aim_rot): the throw then falls
 back on the tipped view, which is what ThrowArcDegrees is for. The default
 speed reaches about 12 m over level ground, a melee weapon's 33 m. Taken with DegAtan2, so a point straight above or below (d = 0)
 is a throw straight up or down, capped like any other.
@@ -36,6 +36,7 @@ valid. AimPoint is this frame's, resolved at the head of Tick.
 """
 
 from combat.graph import _at, _connect, _node, _pin, _set, _vec
+from uebp.graph import out
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ADD_VV, FN_AND, FN_BREAK_ROT, FN_BREAK_VECTOR,
     FN_CLAMP, FN_DEG_ATAN2, FN_DOT_VV, FN_FORWARD, FN_GE_FF, FN_GET_CONTROL_ROT,
@@ -52,10 +53,6 @@ from combat.weapon_component.common import _prop
 AIM_POINT_VAR = "AimPoint"
 
 
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
 def _math(ed, fn, a, b, x, y):
     """fn(a, b), where b is a pin or a literal (a math node's A holds none)."""
     n = _at(_node(ed, fn), x, y)
@@ -64,7 +61,7 @@ def _math(ed, fn, a, b, x, y):
         _set(n, "B", float(b))
     else:
         _connect(b, _pin(n, "B"))
-    return _out(n)
+    return out(n)
 
 
 def _pick(ed, a, b, pick_a, x, y):
@@ -72,7 +69,7 @@ def _pick(ed, a, b, pick_a, x, y):
     _connect(a, _pin(n, "A"))
     _connect(b, _pin(n, "B"))
     _connect(pick_a, _pin(n, "bPickA"))
-    return _out(n)
+    return out(n)
 
 
 def _author_start(ed, owner_out, yaw, x0, y0):
@@ -81,20 +78,20 @@ def _author_start(ed, owner_out, yaw, x0, y0):
     flat = _at(_node(ed, FN_MAKE_ROT), x0, y0)
     _connect(yaw, _pin(flat, "Yaw"))
     ahead_dir = _at(_node(ed, FN_FORWARD), x0 + 240, y0)
-    _connect(_out(flat), _pin(ahead_dir, "InRot"))
+    _connect(out(flat), _pin(ahead_dir, "InRot"))
     ahead = _at(_node(ed, FN_MUL_VF), x0 + 480, y0)
-    _connect(_out(ahead_dir), _pin(ahead, "A"))
+    _connect(out(ahead_dir), _pin(ahead, "A"))
     f = THROW_START_FORWARD
     _connect(_vec(ed, f, f, f, x0 + 240, y0 + 140), _pin(ahead, "B"))
     here = _at(_node(ed, FN_ACTOR_LOC), x0 + 480, y0 + 260)
     _connect(owner_out, _pin(here, "self"))
     raised = _at(_node(ed, FN_ADD_VV), x0 + 720, y0 + 260)
-    _connect(_out(here), _pin(raised, "A"))
+    _connect(out(here), _pin(raised, "A"))
     _connect(_vec(ed, 0.0, 0.0, THROW_START_UP, x0 + 480, y0 + 400), _pin(raised, "B"))
     start = _at(_node(ed, FN_ADD_VV), x0 + 960, y0)
-    _connect(_out(raised), _pin(start, "A"))
-    _connect(_out(ahead), _pin(start, "B"))
-    return _out(start), _out(ahead_dir)
+    _connect(out(raised), _pin(start, "A"))
+    _connect(out(ahead), _pin(start, "B"))
+    return out(start), out(ahead_dir)
 
 
 def _author_through(ed, to, speed, x0, y0):
@@ -108,9 +105,9 @@ def _author_through(ed, to, speed, x0, y0):
     _connect(to, _pin(parts, "InVec"))
     v2 = _math(ed, FN_MUL_FF, speed, speed, x0, y0 + 300)
     v4 = _math(ed, FN_MUL_FF, v2, v2, x0 + 240, y0 + 300)
-    gd2 = _math(ed, FN_MUL_FF, _math(ed, FN_MUL_FF, _out(d), _out(d), x0 + 240, y0),
+    gd2 = _math(ed, FN_MUL_FF, _math(ed, FN_MUL_FF, out(d), out(d), x0 + 240, y0),
                 g, x0 + 480, y0)
-    hv2 = _math(ed, FN_MUL_FF, _math(ed, FN_MUL_FF, _out(parts, "Z"), v2,
+    hv2 = _math(ed, FN_MUL_FF, _math(ed, FN_MUL_FF, out(parts, "Z"), v2,
                                      x0 + 240, y0 + 140), 2.0, x0 + 480, y0 + 140)
     drop = _math(ed, FN_MUL_FF, _math(ed, FN_ADD_FF, gd2, hv2, x0 + 720, y0),
                  g, x0 + 960, y0)
@@ -119,9 +116,9 @@ def _author_through(ed, to, speed, x0, y0):
     root = _at(_node(ed, FN_SQRT), x0 + 1680, y0 + 300)
     _connect(_math(ed, FN_MAX_FF, under, 0.0, x0 + 1440, y0 + 300), _pin(root, "A"))
     pitch = _at(_node(ed, FN_DEG_ATAN2), x0 + 2160, y0)
-    _connect(_math(ed, FN_SUB_FF, v2, _out(root), x0 + 1920, y0 + 300), _pin(pitch, "Y"))
-    _connect(_math(ed, FN_MUL_FF, _out(d), g, x0 + 1920, y0), _pin(pitch, "X"))
-    return _out(pitch), reaches
+    _connect(_math(ed, FN_SUB_FF, v2, out(root), x0 + 1920, y0 + 300), _pin(pitch, "Y"))
+    _connect(_math(ed, FN_MUL_FF, out(d), g, x0 + 1920, y0), _pin(pitch, "X"))
+    return out(pitch), reaches
 
 
 def _author_launch(ed, pc_out, owner_out, held, x0, y0):
@@ -129,33 +126,33 @@ def _author_launch(ed, pc_out, owner_out, held, x0, y0):
     view = _at(_node(ed, FN_GET_CONTROL_ROT), x0, y0)
     _connect(pc_out, _pin(view, "self"))
     parts = _at(_node(ed, FN_BREAK_ROT), x0 + 240, y0)
-    _connect(_out(view), _pin(parts, "InRot"))
+    _connect(out(view), _pin(parts, "InRot"))
     # The controller's pitch comes back 0..360; 350 is ten degrees down.
     signed = _at(_node(ed, FN_NORMALIZE_AXIS), x0 + 480, y0)
-    _connect(_out(parts, "Pitch"), _pin(signed, "Angle"))
+    _connect(out(parts, "Pitch"), _pin(signed, "Angle"))
     tip, _tip_n = _prop(ed, THROW_PITCH_VAR, held, x0 + 480, y0 + 140)
-    tipped = _math(ed, FN_ADD_FF, _out(signed), tip, x0 + 720, y0)
+    tipped = _math(ed, FN_ADD_FF, out(signed), tip, x0 + 720, y0)
     speed, _speed_n = _prop(ed, THROW_SPEED_VAR, held, x0 + 480, y0 + 280)
 
-    start, ahead_dir = _author_start(ed, owner_out, _out(parts, "Yaw"),
+    start, ahead_dir = _author_start(ed, owner_out, out(parts, "Yaw"),
                                      x0 + 720, y0 + 500)
 
     # --- the point the reticle rests on, as seen from the start ---------------
     aim = _at(ed.add_get_member_variable_node(AIM_POINT_VAR), x0 + 1680, y0 + 760)
     to = _at(_node(ed, FN_SUB_VV), x0 + 1920, y0 + 700)
-    _connect(_out(aim, AIM_POINT_VAR), _pin(to, "A"))
+    _connect(out(aim, AIM_POINT_VAR), _pin(to, "A"))
     _connect(start, _pin(to, "B"))
     ahead_cm = _at(_node(ed, FN_DOT_VV), x0 + 2160, y0 + 560)
-    _connect(_out(to), _pin(ahead_cm, "A"))
+    _connect(out(to), _pin(ahead_cm, "A"))
     _connect(ahead_dir, _pin(ahead_cm, "B"))
-    clear = _math(ed, FN_GE_FF, _out(ahead_cm), THROW_AIM_MIN_AHEAD, x0 + 2400, y0 + 560)
+    clear = _math(ed, FN_GE_FF, out(ahead_cm), THROW_AIM_MIN_AHEAD, x0 + 2400, y0 + 560)
     towards = _at(_node(ed, FN_VEC_TO_ROT), x0 + 2160, y0 + 700)
-    _connect(_out(to), _pin(towards, "InVec"))
+    _connect(out(to), _pin(towards, "InVec"))
     bearing = _at(_node(ed, FN_BREAK_ROT), x0 + 2400, y0 + 700)
-    _connect(_out(towards), _pin(bearing, "InRot"))
-    yaw = _pick(ed, _out(bearing, "Yaw"), _out(parts, "Yaw"), clear, x0 + 2640, y0 + 600)
+    _connect(out(towards), _pin(bearing, "InRot"))
+    yaw = _pick(ed, out(bearing, "Yaw"), out(parts, "Yaw"), clear, x0 + 2640, y0 + 600)
 
-    through, reaches = _author_through(ed, _out(to), speed, x0 + 2160, y0 + 900)
+    through, reaches = _author_through(ed, out(to), speed, x0 + 2160, y0 + 900)
     aimed = _math(ed, FN_AND, clear, reaches, x0 + 4320, y0 + 440)
     pitch = _pick(ed, through, tipped, aimed, x0 + 4800, y0)
     # Capped either way: a throw straight up would land on the thrower.
@@ -164,16 +161,16 @@ def _author_launch(ed, pc_out, owner_out, held, x0, y0):
     _set(capped, "Min", -89.0)
     _set(capped, "Max", THROW_MAX_PITCH_DEG)
 
-    out = _at(_node(ed, FN_MAKE_ROT), x0 + 5280, y0)
-    _connect(_out(capped), _pin(out, "Pitch"))
-    _connect(yaw, _pin(out, "Yaw"))
+    aim_rot = _at(_node(ed, FN_MAKE_ROT), x0 + 5280, y0)
+    _connect(out(capped), _pin(aim_rot, "Pitch"))
+    _connect(yaw, _pin(aim_rot, "Yaw"))
     along = _at(_node(ed, FN_FORWARD), x0 + 5520, y0)
-    _connect(_out(out), _pin(along, "InRot"))
+    _connect(out(aim_rot), _pin(along, "InRot"))
     velocity = _at(_node(ed, FN_MUL_VF), x0 + 5760, y0)
-    _connect(_out(along), _pin(velocity, "A"))
+    _connect(out(along), _pin(velocity, "A"))
     # Vector x float is a wildcard whose B is a vector: the speed, three times.
     speeds = _at(_node(ed, FN_MAKE_VECTOR), x0 + 5520, y0 + 140)
     for axis in ("X", "Y", "Z"):
         _connect(speed, _pin(speeds, axis))
-    _connect(_out(speeds), _pin(velocity, "B"))
-    return start, _out(velocity)
+    _connect(out(speeds), _pin(velocity, "B"))
+    return start, out(velocity)

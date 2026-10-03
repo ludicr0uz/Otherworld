@@ -24,7 +24,8 @@ kept off the title by author_in_play, which splits Tick's chain.
 """
 
 from combat.graph import BEL, _connect, _pin
-from graphics_menu.dev_guns import _branch, _call, _get, _out, _setter
+from uebp.graph import out
+from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.loot_find import put
 from graphics_menu.menu_nav import pause_row_taken
@@ -109,10 +110,10 @@ def _author_toggle(ed, pc_out, in_execs, x0, y0, made):
                                 in_execs, x0 + 240, y0, made)
     pressed = _call(ed, FN_WAS_PRESSED, x0 + 240, y0 + 300, made, self=pc_out,
                     Key=MENU_KEY)
-    flip, idle = _branch(ed, _out(pressed), [in_play], x0 + 500, y0, made)
+    flip, idle = _branch(ed, out(pressed), [in_play], x0 + 500, y0, made)
     flipped = _call(ed, FN_NOT, x0 + 500, y0 + 300, made,
                     A=_get(ed, "MenuOpen", x0 + 260, y0 + 440, made))
-    return [put(ed, "MenuOpen", _out(flipped), [flip], x0 + 760, y0, made), idle,
+    return [put(ed, "MenuOpen", out(flipped), [flip], x0 + 760, y0, made), idle,
             on_title]
 
 

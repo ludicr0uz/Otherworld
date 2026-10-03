@@ -22,8 +22,9 @@ the walk back as it starts the game. The death screen needs none of this.
 """
 
 from combat.graph import BEL, _connect, _pin
+from uebp.graph import out
 from combat.nodes import FN_NEQ_BB
-from graphics_menu.dev_guns import _branch, _call, _get, _out
+from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_find import put
 from graphics_menu.loot_kneel import FN_IGNORE_MOVE
 
@@ -36,7 +37,7 @@ def author_menu_still(ed, pc_out, in_execs, x0, y0):
     changed = _call(ed, FN_NEQ_BB, x0 + 240, y0 + 300, made,
                     A=_get(ed, "MenuOpen", x0, y0 + 300, made),
                     B=_get(ed, MENU_STILL_VAR, x0, y0 + 440, made))
-    edge, same = _branch(ed, _out(changed), in_execs, x0 + 500, y0, made)
+    edge, same = _branch(ed, out(changed), in_execs, x0 + 500, y0, made)
     flow = put(ed, MENU_STILL_VAR, _get(ed, "MenuOpen", x0 + 520, y0 + 300, made),
                [edge], x0 + 760, y0, made)
     still = _call(ed, FN_IGNORE_MOVE, x0 + 1020, y0, made, self=pc_out,

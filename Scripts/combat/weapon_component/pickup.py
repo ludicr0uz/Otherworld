@@ -12,16 +12,13 @@ that goes into the bag unseen does not ride on with the body.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import out
 from combat.nodes import FN_ALL_ACTORS, FN_ARR_ADD, FN_DETACH, MACRO_FOR_EACH
 from combat.paths import ITEM_CLASS_PATH
 from combat.slot_tuning import HAS_ROOM_VAR, SLOT_VAR, UNPLACED
 from combat.weapon_component.common import _prop
 
 ITEM_CAST = "Utilities|Casting|CastToBP_WeaponItem"
-
-
-def _out(node, name):
-    return _pin(node, name, is_input=False)
 
 
 def _author_item_candidates(ed, exec_in, x0, y0):
@@ -39,14 +36,14 @@ def _author_item_candidates(ed, exec_in, x0, y0):
 
     cls = keep(_at(ed.add_get_member_variable_node("ItemClass"), x0 + 780, y0 + 240))
     every = keep(_at(_node(ed, FN_ALL_ACTORS), x0 + 1040, y0))
-    _connect(_out(cls, "ItemClass"), _pin(every, "ActorClass"))
+    _connect(out(cls, "ItemClass"), _pin(every, "ActorClass"))
     _connect(exec_in, _pin(every, "execute"))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(_at(loop, x0 + 1320, y0))
-    _connect(_out(every, "OutActors"), _loose_pin(loop, "Array"))
+    _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
     _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
     element = _loose_pin(loop, "ArrayElement", is_input=False)
 
@@ -87,7 +84,7 @@ def _author_take_item(ed, target, exec_in, x0, y1):
     # the bag full and something in hand, nothing is picked up.
     fits = keep(_at(ed.add_get_member_variable_node(HAS_ROOM_VAR), x0 + 2340, y1 + 420))
     room = keep(_at(ed.add_branch_node(), x0 + 2580, y1))
-    _connect(_out(fits, HAS_ROOM_VAR), _pin(room, "Condition"))
+    _connect(out(fits, HAS_ROOM_VAR), _pin(room, "Condition"))
     _connect(BEL.find_then_pin(cast), _pin(room, "execute"))
 
     clear = keep(_at(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH),
@@ -105,7 +102,7 @@ def _author_take_item(ed, target, exec_in, x0, y1):
 
     inv2 = keep(_at(ed.add_get_member_variable_node("Inventory"), x0 + 2840, y1 + 300))
     add = keep(_at(_node(ed, FN_ARR_ADD), x0 + 3100, y1))
-    _connect(_out(inv2, "Inventory"), _pin(add, "TargetArray"))
+    _connect(out(inv2, "Inventory"), _pin(add, "TargetArray"))
     _connect(best, _pin(add, "NewItem"))
     _connect(BEL.find_then_pin(loose), _pin(add, "execute"))
 

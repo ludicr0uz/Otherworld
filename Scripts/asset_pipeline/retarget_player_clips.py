@@ -21,7 +21,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 for _name in [m for m in sys.modules
-              if m.split(".")[0] in ("asset_pipeline", "combat")]:
+              if m.split(".")[0] in ("uebp", "asset_pipeline", "combat")]:
     del sys.modules[_name]
 
 import unreal                                                     # noqa: E402

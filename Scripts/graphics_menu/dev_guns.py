@@ -20,6 +20,7 @@ the request, which is what lets a probe ask for the guns without a key press
 import unreal
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set
+from uebp.graph import out
 from combat.nodes import FN_OBJECT_CLASS, MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import SLOT_COUNT
@@ -95,10 +96,6 @@ def _call(ed, fn, x, y, made, **inputs):
     return n
 
 
-def _out(n):
-    return _pin(n, "ReturnValue", is_input=False)
-
-
 def _branch(ed, cond, in_execs, x, y, made):
     br = _at(ed.add_branch_node(), x, y)
     _connect(cond, _pin(br, "Condition"))
@@ -121,9 +118,9 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, x0, y0, made):
     _connect(flow, _loose_pin(loop, "Exec"))
     cls = _call(ed, FN_OBJECT_CLASS, x0 + 560, y0 + 300, made,
                 Object=_loose_pin(loop, "ArrayElement", is_input=False))
-    same = _call(ed, FN_CLASS_EQ, x0 + 800, y0 + 300, made, A=_out(cls))
+    same = _call(ed, FN_CLASS_EQ, x0 + 800, y0 + 300, made, A=out(cls))
     _class_literal(same, "B", gun)
-    held, _other = _branch(ed, _out(same),
+    held, _other = _branch(ed, out(same),
                            [_loose_pin(loop, "LoopBody", is_input=False)],
                            x0 + 1040, y0, made)
     _setter(ed, DEV_HAS_GUN_VAR, "true", [held], x0 + 1300, y0, made)
@@ -133,12 +130,12 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, x0, y0, made):
     count = _call(ed, FN_ARR_LEN, x0 + 260, y1 + 300, made,
                   TargetArray=_get(ed, "Inventory", x0, y1 + 300, made,
                                    WEAPON_COMP_CLASS_PATH, wc))
-    room = _call(ed, FN_LESS_II, x0 + 500, y1 + 300, made, A=_out(count),
+    room = _call(ed, FN_LESS_II, x0 + 500, y1 + 300, made, A=out(count),
                  B=SLOT_COUNT)
     new = _call(ed, FN_NOT, x0 + 500, y1 + 440, made,
                 A=_get(ed, DEV_HAS_GUN_VAR, x0 + 260, y1 + 440, made))
-    want = _call(ed, FN_AND, x0 + 740, y1 + 300, made, A=_out(room), B=_out(new))
-    give, skip = _branch(ed, _out(want),
+    want = _call(ed, FN_AND, x0 + 740, y1 + 300, made, A=out(room), B=out(new))
+    give, skip = _branch(ed, out(want),
                          [_loose_pin(loop, "Completed", is_input=False)],
                          x0 + 980, y1, made)
 
@@ -146,7 +143,7 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, x0, y0, made):
     spawn = _at(_palette(ed, NODE_SPAWN), x0 + 1240, y1)
     made.append(spawn)
     _class_literal(spawn, "Class", gun)
-    _connect(_out(where), _pin(spawn, "SpawnTransform"))
+    _connect(out(where), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(give, _pin(spawn, "execute"))
     cast = _at(_palette(ed, NODE_CAST_ITEM), x0 + 1540, y1)

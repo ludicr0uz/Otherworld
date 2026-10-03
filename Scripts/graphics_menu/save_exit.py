@@ -25,6 +25,7 @@ skips the whole fragment.
 """
 
 from combat.graph import BEL, _at, _connect, _node, _pin, _set
+from uebp.graph import out
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.dev_guns import author_dev_guns
@@ -119,10 +120,6 @@ def _call(ed, fn, x, y, made, **inputs):
     return n
 
 
-def _out(n):
-    return _pin(n, "ReturnValue", is_input=False)
-
-
 def _branch(ed, cond, in_execs, x, y, made):
     br = _at(ed.add_branch_node(), x, y)
     _connect(cond, _pin(br, "Condition"))
@@ -135,7 +132,7 @@ def _branch(ed, cond, in_execs, x, y, made):
 def _author_forget_on_death(ed, health, in_execs, x0, y0, made):
     """Returns (alive exec, [tails of the dead arm])."""
     hp = _get(ed, "Health", x0, y0 + 300, made, HEALTH_CLASS_PATH, health)
-    dead, alive = _branch(ed, _out(_call(ed, FN_LE, x0 + 240, y0 + 300, made,
+    dead, alive = _branch(ed, out(_call(ed, FN_LE, x0 + 240, y0 + 300, made,
                                          A=hp, B=0.0)),
                           in_execs, x0 + 480, y0, made)
     done, fresh = _branch(ed, _get(ed, PROFILE_FORGOTTEN_VAR, x0 + 480, y0 + 300, made),
@@ -153,22 +150,22 @@ def _author_load_once(ed, parts, in_execs, x0, y0, made):
     started = _get(ed, "GameStarted", x0, y0 + 300, made)
     unchecked = _call(ed, FN_NOT, x0, y0 + 440, made,
                       A=_get(ed, PROFILE_CHECKED_VAR, x0 - 240, y0 + 440, made))
-    due = _call(ed, FN_AND, x0 + 240, y0 + 300, made, A=started, B=_out(unchecked))
-    look, skip = _branch(ed, _out(due), in_execs, x0 + 480, y0, made)
+    due = _call(ed, FN_AND, x0 + 240, y0 + 300, made, A=started, B=out(unchecked))
+    look, skip = _branch(ed, out(due), in_execs, x0 + 480, y0, made)
 
     # Only once the weapon component has spawned the issued loadout, or the
     # saved items would be added and the issued ones after them.
     inv = _get(ed, "Inventory", x0 + 480, y0 + 300, made, WEAPON_COMP_CLASS_PATH,
                parts[WEAPON_COMP_CLASS_PATH])
     count = _call(ed, FN_ARR_LEN, x0 + 720, y0 + 300, made, TargetArray=inv)
-    armed = _call(ed, FN_GREATER_II, x0 + 960, y0 + 300, made, A=_out(count), B=0)
-    ready, not_yet = _branch(ed, _out(armed), [look], x0 + 1200, y0, made)
+    armed = _call(ed, FN_GREATER_II, x0 + 960, y0 + 300, made, A=out(count), B=0)
+    ready, not_yet = _branch(ed, out(armed), [look], x0 + 1200, y0, made)
     flow = _setter(ed, PROFILE_CHECKED_VAR, "true", [ready], x0 + 1460, y0, made)
 
     exists = _call(ed, FN_SAVE_EXISTS, x0 + 1720, y0 + 300, made,
                    SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
     flow = _chain(exists, flow)
-    have, none = _branch(ed, _out(exists), flow, x0 + 1980, y0, made)
+    have, none = _branch(ed, out(exists), flow, x0 + 1980, y0, made)
     loaded = author_read_profile(ed, have, parts, x0 + 2240, y0, made)
     return loaded + [none, not_yet, skip]
 
@@ -179,12 +176,12 @@ def _author_start(ed, pc_out, now_out, in_execs, x0, y0, made):
     idle = _call(ed, FN_NOT, x0 + 240, y0 + 440, made,
                  A=_get(ed, EXIT_PENDING_VAR, x0, y0 + 580, made))
     asked = pause_row_taken(ed, EXIT_ACTION, x0, y0 + 760, made)
-    go = _call(ed, FN_AND, x0 + 480, y0 + 300, made, A=asked, B=_out(idle))
-    start, stay = _branch(ed, _out(go), in_execs, x0 + 720, y0, made)
+    go = _call(ed, FN_AND, x0 + 480, y0 + 300, made, A=asked, B=out(idle))
+    start, stay = _branch(ed, out(go), in_execs, x0 + 720, y0, made)
     flow = _setter(ed, EXIT_PENDING_VAR, "true", [start], x0 + 980, y0, made)
     flow = _setter(ed, EXIT_STARTED_VAR, now_out, flow, x0 + 1240, y0, made)
     deadline = _call(ed, FN_ADD, x0 + 1240, y0 + 300, made, A=now_out, B=EXIT_SECONDS)
-    flow = _setter(ed, EXIT_AT_VAR, _out(deadline), flow, x0 + 1500, y0, made)
+    flow = _setter(ed, EXIT_AT_VAR, out(deadline), flow, x0 + 1500, y0, made)
     flow = _setter(ed, "MenuOpen", "false", flow, x0 + 1760, y0, made)
     return flow + [stay]
 
@@ -203,19 +200,19 @@ def _author_countdown(ed, parts, now_out, in_execs, x0, y0, made):
                   parts[HEALTH_CLASS_PATH])
     since = _call(ed, FN_GREATER, x0 + 480, y0 + 300, made, A=struck,
                   B=_get(ed, EXIT_STARTED_VAR, x0 + 240, y0 + 440, made))
-    hit, unhurt = _branch(ed, _out(since), [running], x0 + 720, y0, made)
+    hit, unhurt = _branch(ed, out(since), [running], x0 + 720, y0, made)
     off = _setter(ed, EXIT_PENDING_VAR, "false", [hit], x0 + 980, y0 - 300, made)
     off = _setter(ed, EXIT_CALLED_OFF_VAR, now_out, off, x0 + 1240, y0 - 300, made)
     comp = _call(ed, FN_GET_COMP, x0 + 1240, y0 + 600, made, self=parts[PAWN])
     _pin(comp, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
-    moves = _out(comp)
+    moves = out(comp)
     walk, off = _movement_call(ed, moves, FN_SET_MOVEMENT_MODE, off,
                                x0 + 1500, y0 - 600, made)
     _set(walk, "NewMovementMode", "MOVE_Walking")
 
     ripe = _call(ed, FN_GE, x0 + 980, y0 + 300, made, A=now_out,
                  B=_get(ed, EXIT_AT_VAR, x0 + 740, y0 + 440, made))
-    leave, wait = _branch(ed, _out(ripe), [unhurt], x0 + 1240, y0, made)
+    leave, wait = _branch(ed, out(ripe), [unhurt], x0 + 1240, y0, made)
     # Standing still while the countdown runs; the reopened level brings a
     # fresh pawn, so only the hit arm has to give the movement back.
     _, wait = _movement_call(ed, moves, FN_DISABLE_MOVEMENT, [wait],
@@ -227,7 +224,7 @@ def _author_countdown(ed, parts, now_out, in_execs, x0, y0, made):
     # and a reopened level opens on the main menu (GameStarted is false again).
     where = _call(ed, FN_LEVEL_NAME, x0 + 6800, y0, made, bRemovePrefixString="true")
     flow = _chain(where, written)
-    reopen = _call(ed, FN_OPEN_LEVEL, x0 + 7060, y0, made, LevelName=_out(where))
+    reopen = _call(ed, FN_OPEN_LEVEL, x0 + 7060, y0, made, LevelName=out(where))
     _chain(reopen, flow)
     return off + wait + [idle]
 
@@ -236,7 +233,7 @@ def author_save_exit_tick(ed, pc_out, in_execs, x0, y0):
     """The whole fragment (see the module docstring). Returns the tails."""
     made = []
     ok, fails, parts = author_player_parts(ed, in_execs, x0, y0 - 600, made)
-    now_out = _out(_call(ed, FN_TIME_SECONDS, x0, y0 + 900, made))
+    now_out = out(_call(ed, FN_TIME_SECONDS, x0, y0 + 900, made))
     alive, dead_tails = _author_forget_on_death(ed, parts[HEALTH_CLASS_PATH],
                                                 [ok], x0 + 2400, y0, made)
     flow = _author_load_once(ed, parts, [alive], x0 + 4400, y0, made)

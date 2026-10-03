@@ -12,11 +12,12 @@ the hand. The held item stays held, as with a pick-up.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin, _set
+from uebp.graph import out
 from combat.nodes import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_REMOVE, FN_GET_TRANSFORM, NODE_CAST_ITEM, NODE_SPAWN,
 )
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
-from graphics_menu.dev_guns import _call, _get, _out, _setter
+from graphics_menu.dev_guns import _call, _get, _setter
 from graphics_menu.loot_consts import LOOT_SEL_VAR, LOOT_TARGET_VAR
 from loot.consts import BODY_ARRAYS, LOOT_VAR
 
@@ -37,7 +38,7 @@ def author_take(ed, wc, pawn_out, in_execs, x0, y0, made):
     spawn = _at(_palette(ed, NODE_SPAWN), x0 + 520, y0)
     made.append(spawn)
     _connect(_pin(cls, "Item", is_input=False), _pin(spawn, "Class"))
-    _connect(_out(where), _pin(spawn, "SpawnTransform"))
+    _connect(out(where), _pin(spawn, "SpawnTransform"))
     _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
     for e in in_execs:
         _connect(e, _pin(spawn, "execute"))

@@ -82,6 +82,7 @@ from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
 from combat.graph import (
     BEL, _at, _connect, _loose_pin, _node, _palette, _pin, _set, _vec,
 )
+from uebp.graph import out
 from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.hit_zones import HEAD_BONES_VAR, HEAD_MULT_VAR
 from combat.nodes import (
@@ -117,10 +118,6 @@ FN_CLOSEST_BONE = "/Script/Engine.SkinnedMeshComponent.FindClosestBone_K2"
 FN_NE_NAME = "/Script/Engine.KismetMathLibrary.NotEqual_NameName"
 
 
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
 def _hit(brk, name):
     return _loose_pin(brk, name, is_input=False)
 
@@ -128,7 +125,7 @@ def _hit(brk, name):
 def _z(ed, vector, x, y):
     parts = _at(_node(ed, FN_BREAK_VECTOR), x, y)
     _connect(vector, _pin(parts, "InVec"))
-    return _out(parts, "Z")
+    return out(parts, "Z")
 
 
 def _head_worth(ed, as_health, damage, x0, y0):
@@ -139,17 +136,17 @@ def _head_worth(ed, as_health, damage, x0, y0):
     heads, heads_n = _prop(ed, HEAD_BONES_VAR, as_health, x0, y0, HEALTH_CLASS_PATH)
     in_head = _at(_node(ed, FN_ARR_CONTAINS), x0 + 240, y0)
     _connect(heads, _loose_pin(in_head, "TargetArray"))
-    _connect(_out(bone, THROW_BONE_VAR), _loose_pin(in_head, "ItemToFind"))
+    _connect(out(bone, THROW_BONE_VAR), _loose_pin(in_head, "ItemToFind"))
     worth, worth_n = _prop(ed, HEAD_MULT_VAR, as_health, x0 + 240, y0 + 140,
                            HEALTH_CLASS_PATH)
     scale = _at(_node(ed, FN_SELECT_FF), x0 + 480, y0)
     _connect(worth, _pin(scale, "A"))
     _set(scale, "B", 1.0)
-    _connect(_out(in_head), _pin(scale, "bPickA"))
+    _connect(out(in_head), _pin(scale, "bPickA"))
     dealt = _at(_node(ed, FN_MUL_FF), x0 + 720, y0)
     _connect(damage, _pin(dealt, "A"))
-    _connect(_out(scale), _pin(dealt, "B"))
-    return _out(dealt), [bone, heads_n, in_head, worth_n, scale, dealt]
+    _connect(out(scale), _pin(dealt, "B"))
+    return out(dealt), [bone, heads_n, in_head, worth_n, scale, dealt]
 
 
 def _author_wound(ed, as_health, damage, brk, execs, x0, y0):
@@ -160,23 +157,23 @@ def _author_wound(ed, as_health, damage, brk, execs, x0, y0):
                 x0, y0 + 300)
     _connect(as_health, _pin(get_h, "self"))
     sub = _at(_node(ed, FN_SUB_FF), x0 + 240, y0 + 300)
-    _connect(_out(get_h, "Health"), _pin(sub, "A"))
+    _connect(out(get_h, "Health"), _pin(sub, "A"))
     _connect(damage, _pin(sub, "B"))
     clamp = _at(_node(ed, FN_CLAMP), x0 + 480, y0 + 300)
-    _connect(_out(sub), _pin(clamp, "Value"))
+    _connect(out(sub), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", INF)
     set_h = _at(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH),
                 x0 + 740, y0)
     _connect(as_health, _pin(set_h, "self"))
-    _connect(_out(clamp), _pin(set_h, "Health"))
+    _connect(out(clamp), _pin(set_h, "Health"))
     for pin in execs:
         _connect(pin, _pin(set_h, "execute"))
     now = _at(_node(ed, FN_TIME_SECONDS), x0 + 740, y0 + 300)
     stamp = _at(ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH),
                 x0 + 1000, y0)
     _connect(as_health, _pin(stamp, "self"))
-    _connect(_out(now), _pin(stamp, LAST_DAMAGE_VAR))
+    _connect(out(now), _pin(stamp, LAST_DAMAGE_VAR))
     _connect(BEL.find_then_pin(set_h), _pin(stamp, "execute"))
     blame = _at(ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR,
                                                 HEALTH_CLASS_PATH), x0 + 1260, y0)
@@ -201,25 +198,25 @@ def _author_lodge(ed, thrown, brk, on, exec_in, x0, y0):
     _connect(_hit(brk, "TraceEnd"), _pin(flew, "A"))
     _connect(_hit(brk, "TraceStart"), _pin(flew, "B"))
     along = _at(_node(ed, FN_NORMAL), x0 + 240, y0 + 300)
-    _connect(_out(flew), _pin(along, "A"))
+    _connect(out(flew), _pin(along, "A"))
     into = _at(_node(ed, FN_ROT_FROM_X), x0 + 480, y0 + 300)
-    _connect(_out(along), _pin(into, "X"))
+    _connect(out(along), _pin(into, "X"))
     own, _own_n = _prop(ed, LODGE_TURN_VAR, thrown, x0 + 480, y0 + 480)
     # ComposeRotators applies A first: the item's own turn, then the throw's.
     pose = _at(_node(ed, FN_COMPOSE_ROT), x0 + 740, y0 + 380)
     _connect(own, _pin(pose, "A"))
-    _connect(_out(into), _pin(pose, "B"))
+    _connect(out(into), _pin(pose, "B"))
     point, _point_n = _prop(ed, LODGE_POINT_VAR, thrown, x0 + 480, y0 + 660)
     reach = _at(_node(ed, FN_ROTATE_VECTOR), x0 + 1000, y0 + 560)
     _connect(point, _pin(reach, "A"))
-    _connect(_out(pose), _pin(reach, "B"))
+    _connect(out(pose), _pin(reach, "B"))
     at = _at(_node(ed, FN_SUB_VV), x0 + 1260, y0 + 460)
     _connect(on, _pin(at, "A"))
-    _connect(_out(reach), _pin(at, "B"))
+    _connect(out(reach), _pin(at, "B"))
     put = _at(_node(ed, FN_SET_LOC_ROT), x0 + 1520, y0)
     _connect(thrown, _pin(put, "self"))
-    _connect(_out(at), _pin(put, "NewLocation"))
-    _connect(_out(pose), _pin(put, "NewRotation"))
+    _connect(out(at), _pin(put, "NewLocation"))
+    _connect(out(pose), _pin(put, "NewRotation"))
     _connect(exec_in, _pin(put, "execute"))
     return BEL.find_then_pin(put), put
 
@@ -237,7 +234,7 @@ def _body_trace(ed, mesh_out, start, end, exec_in, x0, y0):
     _set(skin, "bPersistentShowTrace", "false")
     _connect(exec_in, _pin(skin, "execute"))
     found = _at(ed.add_branch_node(), x0 + 320, y0)
-    _connect(_out(skin), _pin(found, "Condition"))
+    _connect(out(skin), _pin(found, "Condition"))
     _connect(BEL.find_then_pin(skin), _pin(found, "execute"))
     return skin, found
 
@@ -246,10 +243,10 @@ def _note(ed, skin, exec_in, x0, y0):
     """ThrowBone, ThrowSkin := what the trace ``skin`` struck. Returns the
     exec pin after them, and the two nodes."""
     bone = _at(ed.add_set_member_variable_node(THROW_BONE_VAR), x0, y0)
-    _connect(_out(skin, "BoneName"), _pin(bone, THROW_BONE_VAR))
+    _connect(out(skin, "BoneName"), _pin(bone, THROW_BONE_VAR))
     _connect(exec_in, _pin(bone, "execute"))
     at = _at(ed.add_set_member_variable_node(THROW_SKIN_VAR), x0 + 260, y0)
-    _connect(_out(skin, "HitLocation"), _pin(at, THROW_SKIN_VAR))
+    _connect(out(skin, "HitLocation"), _pin(at, THROW_SKIN_VAR))
     _connect(BEL.find_then_pin(bone), _pin(at, "execute"))
     return BEL.find_then_pin(at), [bone, at]
 
@@ -268,7 +265,7 @@ def _author_skin(ed, brk, exec_in, x0, y0):
     mesh = _at(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"),
                x0, y0 + 300)
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
-    mesh_out = _out(mesh, "Mesh")
+    mesh_out = out(mesh, "Mesh")
 
     # The blade's own line: on from the capsule's hit the way the segment
     # flew, far enough to cross the capsule. What that strikes is what the
@@ -277,15 +274,15 @@ def _author_skin(ed, brk, exec_in, x0, y0):
     _connect(_hit(brk, "TraceEnd"), _pin(flew, "A"))
     _connect(_hit(brk, "TraceStart"), _pin(flew, "B"))
     along = _at(_node(ed, FN_NORMAL), x0 + 520, y0 - 500)
-    _connect(_out(flew), _pin(along, "A"))
+    _connect(out(flew), _pin(along, "A"))
     on = _at(_node(ed, FN_MUL_VF), x0 + 760, y0 - 500)
-    _connect(_out(along), _pin(on, "A"))
+    _connect(out(along), _pin(on, "A"))
     r = STICK_LINE_REACH_CM
     _connect(_vec(ed, r, r, r, x0 + 520, y0 - 340), _pin(on, "B"))
     through = _at(_node(ed, FN_ADD_VV), x0 + 1000, y0 - 500)
     _connect(_hit(brk, "ImpactPoint"), _pin(through, "A"))
-    _connect(_out(on), _pin(through, "B"))
-    line, struck = _body_trace(ed, mesh_out, _hit(brk, "ImpactPoint"), _out(through),
+    _connect(out(on), _pin(through, "B"))
+    line, struck = _body_trace(ed, mesh_out, _hit(brk, "ImpactPoint"), out(through),
                                BEL.find_then_pin(as_char), x0 + 1300, y0)
     on_line, line_nodes = _note(ed, line, BEL.find_then_pin(struck), x0 + 1900, y0)
 
@@ -303,16 +300,16 @@ def _author_skin(ed, brk, exec_in, x0, y0):
         _connect(step, runs)
         step = BEL.find_then_pin(near)
     inward = _at(_node(ed, FN_SUB_VV), x0 + 2180, y0 + 700)
-    _connect(_out(near, "BoneLocation"), _pin(inward, "A"))
+    _connect(out(near, "BoneLocation"), _pin(inward, "A"))
     _connect(_hit(brk, "ImpactPoint"), _pin(inward, "B"))
     far = _at(_node(ed, FN_MUL_VF), x0 + 2420, y0 + 700)
-    _connect(_out(inward), _pin(far, "A"))
+    _connect(out(inward), _pin(far, "A"))
     s = STICK_TRACE_PAST
     _connect(_vec(ed, s, s, s, x0 + 2180, y0 + 860), _pin(far, "B"))
     end = _at(_node(ed, FN_ADD_VV), x0 + 2660, y0 + 700)
     _connect(_hit(brk, "ImpactPoint"), _pin(end, "A"))
-    _connect(_out(far), _pin(end, "B"))
-    skin, found = _body_trace(ed, mesh_out, _hit(brk, "ImpactPoint"), _out(end), step,
+    _connect(out(far), _pin(end, "B"))
+    skin, found = _body_trace(ed, mesh_out, _hit(brk, "ImpactPoint"), out(end), step,
                               x0 + 2920, y0 + 400)
     nearest, near_nodes = _note(ed, skin, BEL.find_then_pin(found), x0 + 3520, y0 + 400)
     return ((on_line, nearest, _loose_pin(as_char, "CastFailed", is_input=False),
@@ -328,17 +325,17 @@ def _author_stick(ed, thrown, brk, mesh_out, exec_in, x0, y0):
     that could not be set leaves by, the nodes)."""
     bone = _at(ed.add_get_member_variable_node(THROW_BONE_VAR), x0 - 240, y0 + 300)
     is_set = _at(_node(ed, FN_NE_NAME), x0, y0 + 300)
-    _connect(_out(bone, THROW_BONE_VAR), _pin(is_set, "A"))   # B is left at None
+    _connect(out(bone, THROW_BONE_VAR), _pin(is_set, "A"))   # B is left at None
     found = _at(ed.add_branch_node(), x0 + 260, y0)
-    _connect(_out(is_set), _pin(found, "Condition"))
+    _connect(out(is_set), _pin(found, "Condition"))
     _connect(exec_in, _pin(found, "execute"))
     at = _at(ed.add_get_member_variable_node(THROW_SKIN_VAR), x0 + 260, y0 + 300)
-    set_in, put = _author_lodge(ed, thrown, brk, _out(at, THROW_SKIN_VAR),
+    set_in, put = _author_lodge(ed, thrown, brk, out(at, THROW_SKIN_VAR),
                                 BEL.find_then_pin(found), x0 + 520, y0)
     hold = _at(_node(ed, FN_ATTACH), x0 + 2340, y0)
     _connect(thrown, _pin(hold, "self"))
     _connect(mesh_out, _pin(hold, "Parent"))
-    _connect(_out(bone, THROW_BONE_VAR), _pin(hold, "SocketName"))
+    _connect(out(bone, THROW_BONE_VAR), _pin(hold, "SocketName"))
     # Where the lodge just put it, and its own size on a scaled model.
     for rule in ("LocationRule", "RotationRule", "ScaleRule"):
         _set(hold, rule, "KeepWorld")
@@ -355,10 +352,10 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
     sharp = _at(_node(ed, FN_GREATER_FF), x0 + 240, y0 + 200)
     _connect(damage, _pin(sharp, "A"))        # B is left at its default, 0
     bites = _at(ed.add_branch_node(), x0 + 480, y0)
-    _connect(_out(sharp), _pin(bites, "Condition"))
+    _connect(out(sharp), _pin(bites, "Condition"))
     past = _at(ed.add_get_member_variable_node(THROW_PAST_VAR), x0 - 260, y0 + 200)
     fresh = _at(_node(ed, FN_ARR_CLEAR), x0, y0)
-    _connect(_out(past, THROW_PAST_VAR), _pin(fresh, "TargetArray"))
+    _connect(out(past, THROW_PAST_VAR), _pin(fresh, "TargetArray"))
     _connect(exec_in, _pin(fresh, "execute"))
     _connect(BEL.find_then_pin(fresh), _pin(bites, "execute"))
 
@@ -367,7 +364,7 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
     _connect(_hit(brk, "HitActor"), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)
     body = _at(_palette(ed, NODE_CAST_HEALTH), x0 + 760, y0)
-    _connect(_out(comp), _pin(body, "Object"))
+    _connect(out(comp), _pin(body, "Object"))
     _connect(BEL.find_then_pin(bites), _pin(body, "execute"))
     as_health = _loose_pin(body, "AsBPHealthComponent", is_input=False)
     # Where it went in comes first: the wound asks whether that is the head.
@@ -382,11 +379,11 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
     _connect(_hit(brk, "ImpactNormal"), _pin(facing, "X"))
     where = _at(_node(ed, FN_MAKE_TRANSFORM), x0 + 2860, y0 + 300)
     _connect(_hit(brk, "ImpactPoint"), _pin(where, "Location"))
-    _connect(_out(facing), _pin(where, "Rotation"))
+    _connect(out(facing), _pin(where, "Rotation"))
     blood_cls = _at(ed.add_get_member_variable_node("BloodClass"), x0 + 2860, y0 + 180)
     blood = _at(_palette(ed, NODE_SPAWN), x0 + 3140, y0)
-    _connect(_out(blood_cls, "BloodClass"), _pin(blood, "Class"))
-    _connect(_out(where), _pin(blood, "SpawnTransform"))
+    _connect(out(blood_cls, "BloodClass"), _pin(blood, "Class"))
+    _connect(out(where), _pin(blood, "SpawnTransform"))
     _set(blood, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(wounded, _pin(blood, "execute"))
     # ...and the blade stays in the body. One it cannot be set into drops
@@ -395,7 +392,7 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
         ed, thrown, brk, mesh_out, BEL.find_then_pin(blood),
         x0 + 3700, y0 - 300)
     aside = _at(_node(ed, FN_ARR_ADD), x0 + 6400, y0)
-    _connect(_out(past, THROW_PAST_VAR), _pin(aside, "TargetArray"))
+    _connect(out(past, THROW_PAST_VAR), _pin(aside, "TargetArray"))
     _connect(_hit(brk, "HitActor"), _pin(aside, "NewItem"))
     _connect(dropped, _pin(aside, "execute"))
 
@@ -416,15 +413,15 @@ def _author_throw_strike(ed, thrown, brk, exec_in, x0, y0):
         _connect(step, runs)
         step = BEL.find_then_pin(stands)
     foot = _at(_node(ed, FN_BREAK_TRANSFORM), x0 + 1600, y1 + 300)
-    _connect(_out(stands, "OutInstanceTransform"), _pin(foot, "InTransform"))
+    _connect(out(stands, "OutInstanceTransform"), _pin(foot, "InTransform"))
     up = _at(_node(ed, FN_SUB_FF), x0 + 2140, y1 + 300)
     _connect(_z(ed, _hit(brk, "ImpactPoint"), x0 + 1880, y1 + 200), _pin(up, "A"))
-    _connect(_z(ed, _out(foot, "Location"), x0 + 1880, y1 + 380), _pin(up, "B"))
+    _connect(_z(ed, out(foot, "Location"), x0 + 1880, y1 + 380), _pin(up, "B"))
     low = _at(_node(ed, FN_LE_FF), x0 + 2380, y1 + 300)
-    _connect(_out(up), _pin(low, "A"))
+    _connect(out(up), _pin(low, "A"))
     _set(low, "B", LODGE_MAX_HEIGHT_CM)
     reachable = _at(ed.add_branch_node(), x0 + 2620, y1)
-    _connect(_out(low), _pin(reachable, "Condition"))
+    _connect(out(low), _pin(reachable, "Condition"))
     _connect(step, _pin(reachable, "execute"))
     _cls, chipped = _author_surface_impact(ed, where, BEL.find_then_pin(reachable),
                                            x0 + 2880, y1)

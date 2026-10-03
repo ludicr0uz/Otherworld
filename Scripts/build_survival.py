@@ -32,7 +32,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # A live editor keeps imported modules between runs: drop both packages so an
 # edit to any of their modules is what actually runs.
-for _name in [m for m in sys.modules if m.split(".")[0] in ("combat", "survival", "loot", "item_icons")]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "combat", "survival", "loot", "item_icons")]:
     del sys.modules[_name]
 
 from combat.graph import BEL, _apply_defaults, _log                 # noqa: E402

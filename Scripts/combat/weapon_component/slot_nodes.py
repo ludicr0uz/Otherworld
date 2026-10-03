@@ -4,6 +4,7 @@ common._G; no fragment of its own.
 """
 
 from combat.graph import BEL, _connect, _loose_pin, _pin, _set
+from uebp.graph import out
 from combat.nodes import (
     FN_AND, FN_ARR_GET, FN_EQ_II, FN_IS_VALID, FN_LESS_II, FN_NOT, FN_OR,
     MACRO_FOR_EACH, MACRO_FOR_LOOP,
@@ -20,14 +21,6 @@ FN_NE_OO = "/Script/Engine.KismetMathLibrary.NotEqual_ObjectObject"
 FN_ARR_CLEAR = "/Script/Engine.KismetArrayLibrary.Array_Clear"
 FN_ARR_RESIZE = "/Script/Engine.KismetArrayLibrary.Array_Resize"
 FN_ARR_FIND = "/Script/Engine.KismetArrayLibrary.Array_Find"
-
-
-def out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
-def then(n):
-    return BEL.find_then_pin(n)
 
 
 def op(g, fn, a, b, x, y):

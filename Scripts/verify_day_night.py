@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 for _name in [m for m in sys.modules
-              if m.split(".")[0] in ("combat", "world", "forest_generator")]:
+              if m.split(".")[0] in ("uebp", "combat", "world", "forest_generator")]:
     del sys.modules[_name]
 
 import unreal                                                     # noqa: E402

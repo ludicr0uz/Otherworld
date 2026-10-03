@@ -52,7 +52,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # A live editor keeps imported modules between runs, so an edit to any npc
 # module would otherwise be ignored by the next build in the same editor.
-for _name in [m for m in sys.modules if m == "npc" or m.startswith("npc.")]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "npc")]:
     del sys.modules[_name]
 
 from forest_generator.npc_placement import NPC_VARIANTS          # noqa: E402

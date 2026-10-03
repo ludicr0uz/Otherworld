@@ -37,6 +37,7 @@ from combat.graph import (
     _create_blueprint, _declare, _drop_components, _events, _float_type, _log,
     _loose_pin, _must_load, _node, _palette, _pin, _root_handle, _set,
 )
+from uebp.graph import out
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_DISTANCE, FN_GET_COMP, FN_GET_PLAYER_PAWN, FN_IS_VALID,
@@ -69,10 +70,6 @@ GLOW_INTENSITY = 3000.0
 GLOW_RADIUS_CM = 900.0
 
 
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
 def _build_model(bp):
     _drop_components(bp, {"Hearth", "Fire", "Glow"})
     root = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Hearth")
@@ -94,59 +91,59 @@ def _build_model(bp):
 def _author_warmth(ed, tick):
     """Tick: warm the player's survival component while they are near."""
     def get(name, x, y):
-        return _out(_at(ed.add_get_member_variable_node(name), x, y), name)
+        return out(_at(ed.add_get_member_variable_node(name), x, y), name)
 
     pawn = _at(_node(ed, FN_GET_PLAYER_PAWN), 300, 300)
     _set(pawn, "PlayerIndex", 0)
     is_there = _at(_node(ed, FN_IS_VALID), 560, 300)
-    _connect(_out(pawn), _pin(is_there, "Object"))
+    _connect(out(pawn), _pin(is_there, "Object"))
     there = _at(ed.add_branch_node(), 820, 0)
-    _connect(_out(is_there), _pin(there, "Condition"))
+    _connect(out(is_there), _pin(there, "Condition"))
     _connect(BEL.find_then_pin(tick), _pin(there, "execute"))
 
     theirs = _at(_node(ed, FN_ACTOR_LOC), 820, 300)
-    _connect(_out(pawn), _pin(theirs, "self"))
+    _connect(out(pawn), _pin(theirs, "self"))
     mine = _at(_node(ed, FN_ACTOR_LOC), 820, 440)
     gap = _at(_node(ed, FN_DISTANCE), 1080, 300)
-    _connect(_out(theirs), _pin(gap, "V1"))
-    _connect(_out(mine), _pin(gap, "V2"))
+    _connect(out(theirs), _pin(gap, "V1"))
+    _connect(out(mine), _pin(gap, "V2"))
     close = _at(_node(ed, FN_LE_FF), 1340, 300)
-    _connect(_out(gap), _pin(close, "A"))
+    _connect(out(gap), _pin(close, "A"))
     _connect(get(WARM_RADIUS_VAR, 1080, 460), _pin(close, "B"))
     near = _at(ed.add_branch_node(), 1600, 0)
-    _connect(_out(close), _pin(near, "Condition"))
+    _connect(out(close), _pin(near, "Condition"))
     _connect(BEL.find_then_pin(there), _pin(near, "execute"))
 
     comp = _at(_node(ed, FN_GET_COMP), 1600, 300)
-    _connect(_out(pawn), _pin(comp, "self"))
+    _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(SURVIVAL_CLASS_PATH)
     if not unreal.load_asset(SURVIVAL_BP_PATH):   # the cast exists only for a loaded class
         raise RuntimeError(f"{SURVIVAL_BP_PATH} is missing -- build it first")
     cast = _at(_palette(ed, NODE_CAST_SURVIVAL), 1880, 0)
     if not BEL.list_input_pins(cast):
         raise RuntimeError("no cast node for BP_SurvivalComponent")
-    _connect(_out(comp), _pin(cast, "Object"))
+    _connect(out(comp), _pin(cast, "Object"))
     _connect(BEL.find_then_pin(near), _pin(cast, "execute"))
     survival = _loose_pin(cast, "AsBPSurvivalComponent", is_input=False)
 
     def theirs_var(name, x, y):
         n = _at(ed.add_get_member_variable_node(name, SURVIVAL_CLASS_PATH), x, y)
         _connect(survival, _pin(n, "self"))
-        return _out(n, name)
+        return out(n, name)
 
     step = _at(_node(ed, FN_MUL_FF), 2160, 460)
-    _connect(_out(tick, "DeltaSeconds"), _pin(step, "A"))
+    _connect(out(tick, "DeltaSeconds"), _pin(step, "A"))
     _connect(get(WARM_RATE_VAR, 1900, 560), _pin(step, "B"))
     more = _at(_node(ed, FN_ADD_FF), 2420, 300)
     _connect(theirs_var(TEMPERATURE_VAR, 2160, 300), _pin(more, "A"))
-    _connect(_out(step), _pin(more, "B"))
+    _connect(out(step), _pin(more, "B"))
     capped = _at(_node(ed, FN_MIN_FF), 2680, 300)
-    _connect(_out(more), _pin(capped, "A"))
+    _connect(out(more), _pin(capped, "A"))
     _connect(theirs_var(MAX_TEMPERATURE_VAR, 2420, 460), _pin(capped, "B"))
     write = _at(ed.add_set_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH),
                 2940, 0)
     _connect(survival, _pin(write, "self"))
-    _connect(_out(capped), _pin(write, TEMPERATURE_VAR))
+    _connect(out(capped), _pin(write, TEMPERATURE_VAR))
     _connect(_loose_pin(cast, "then", is_input=False), _pin(write, "execute"))
     ed.add_comment_to_nodes(
         "A campfire warms: while the player is within WarmRadius, their "

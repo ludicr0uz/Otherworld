@@ -22,6 +22,7 @@ IsValid Branch in both halves: empty hands are offered nothing.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import out
 from combat.heat_tuning import COOL_VAR, HEAT_S, HEATS_VAR, HOT_VAR
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
@@ -32,10 +33,6 @@ from combat.paths import ITEM_CLASS_PATH
 from combat.weapon_component.common import _prop
 
 FN_CLASS_IS_CHILD = "/Script/Engine.KismetMathLibrary.ClassIsChildOf"
-
-
-def _out(node, name="ReturnValue"):
-    return _pin(node, name, is_input=False)
 
 
 def _author_fire_candidates(ed, exec_in, x0, y0):
@@ -54,23 +51,23 @@ def _author_fire_candidates(ed, exec_in, x0, y0):
     cls = keep(_at(ed.add_get_member_variable_node(CAMPFIRE_CLASS_VAR),
                    x0 + 780, y0 + 240))
     every = keep(_at(_node(ed, FN_ALL_ACTORS), x0 + 1040, y0))
-    _connect(_out(cls, CAMPFIRE_CLASS_VAR), _pin(every, "ActorClass"))
+    _connect(out(cls, CAMPFIRE_CLASS_VAR), _pin(every, "ActorClass"))
     _connect(exec_in, _pin(every, "execute"))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(_at(loop, x0 + 1320, y0))
-    _connect(_out(every, "OutActors"), _loose_pin(loop, "Array"))
+    _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
     _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
 
     held = keep(_at(ed.add_get_member_variable_node("Held"), x0 + 1320, y0 + 300))
     armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 1560, y0 + 300))
-    _connect(_out(held, "Held"), _pin(armed, "Object"))
+    _connect(out(held, "Held"), _pin(armed, "Object"))
     gate = keep(_at(ed.add_branch_node(), x0 + 1620, y0))
-    _connect(_out(armed), _pin(gate, "Condition"))
+    _connect(out(armed), _pin(gate, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(gate, "execute"))
-    heats_pin, heats_n = _prop(ed, HEATS_VAR, _out(held, "Held"), x0 + 1900, y0 + 260)
+    heats_pin, heats_n = _prop(ed, HEATS_VAR, out(held, "Held"), x0 + 1900, y0 + 260)
     keep(heats_n)
 
     ed.add_comment_to_nodes(
@@ -99,28 +96,28 @@ def _author_heat_item(ed, target, exec_in, x0, y1):
     fire_cls = keep(_at(ed.add_get_member_variable_node(CAMPFIRE_CLASS_VAR),
                         x0 + 1840, y1 + 420))
     is_fire = keep(_at(_node(ed, FN_CLASS_IS_CHILD), x0 + 2080, y1 + 340))
-    _connect(_out(kind), _pin(is_fire, "TestClass"))
-    _connect(_out(fire_cls, CAMPFIRE_CLASS_VAR), _pin(is_fire, "ParentClass"))
+    _connect(out(kind), _pin(is_fire, "TestClass"))
+    _connect(out(fire_cls, CAMPFIRE_CLASS_VAR), _pin(is_fire, "ParentClass"))
     mine = keep(_at(ed.add_branch_node(), x0 + 2340, y1))
-    _connect(_out(is_fire), _pin(mine, "Condition"))
+    _connect(out(is_fire), _pin(mine, "Condition"))
     _connect(exec_in, _pin(mine, "execute"))
 
     held_n = keep(_at(ed.add_get_member_variable_node("Held"), x0 + 2340, y1 + 300))
-    held = _out(held_n, "Held")
+    held = out(held_n, "Held")
     armed = keep(_at(_node(ed, FN_IS_VALID), x0 + 2580, y1 + 300))
     _connect(held, _pin(armed, "Object"))
     gate = keep(_at(ed.add_branch_node(), x0 + 2840, y1))
-    _connect(_out(armed), _pin(gate, "Condition"))
+    _connect(out(armed), _pin(gate, "Condition"))
     _connect(BEL.find_then_pin(mine), _pin(gate, "execute"))
 
     now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 2840, y1 + 300))
     until = keep(_at(_node(ed, FN_ADD_FF), x0 + 3080, y1 + 300))
-    _connect(_out(now), _pin(until, "A"))
+    _connect(out(now), _pin(until, "A"))
     _set(until, "B", HEAT_S)
     cool = keep(_at(ed.add_set_member_variable_node(COOL_VAR, ITEM_CLASS_PATH),
                     x0 + 3340, y1))
     _connect(held, _pin(cool, "self"))
-    _connect(_out(until), _pin(cool, COOL_VAR))
+    _connect(out(until), _pin(cool, COOL_VAR))
     _connect(BEL.find_then_pin(gate), _pin(cool, "execute"))
     hot = keep(_at(ed.add_set_member_variable_node(HOT_VAR, ITEM_CLASS_PATH),
                    x0 + 3600, y1))

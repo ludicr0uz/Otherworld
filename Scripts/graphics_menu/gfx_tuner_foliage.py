@@ -44,9 +44,10 @@ actor happens only when the tree distance moves.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _palette, _pin
+from uebp.graph import out
 from combat.nodes import FN_ADD_FF, FN_LESS_II, FN_MUL_FF, FN_OR, MACRO_FOR_EACH
 from forest_generator.grass_cells import GRASS_TAG, GRASS_TIERS, tier_tag
-from graphics_menu.dev_guns import _branch, _call, _class_literal, _get, _out
+from graphics_menu.dev_guns import _branch, _call, _class_literal, _get
 from graphics_menu.gfx_stats import FULL_VIEW_M, PERCENT
 from graphics_menu.gfx_tune_consts import (
     TUNER_GRASS_DISTANCE_APPLIED_VAR, TUNER_GRASS_LAYERS_APPLIED_VAR,
@@ -107,7 +108,7 @@ def _root_mesh(ed, actor, in_exec, x, y, made):
     root = _call(ed, FN_ROOT, x, y + 260, made, self=actor)
     cast = _at(_palette(ed, NODE_CAST_ISM), x + 260, y)
     made.append(cast)
-    _connect(_out(root), _pin(cast, "Object"))
+    _connect(out(root), _pin(cast, "Object"))
     _connect(in_exec, _pin(cast, "execute"))
     return (_loose_pin(cast, "AsInstancedStaticMeshComponent", is_input=False),
             BEL.find_then_pin(cast))
@@ -122,18 +123,18 @@ def _author_scale(ed, comp, ratio, in_exec, x, y, made):
         # Not Multiply_IntFloat: it is promoted to a wildcard that takes its
         # type from the int, and the ratio is truncated on the way in.
         scaled = _call(ed, FN_MUL_FF, x + 260, y + 300 + i * 160, made, B=ratio,
-                       A=_out(_call(ed, FN_INT_TO_FLOAT, x + 20, y + 300 + i * 160, made,
+                       A=out(_call(ed, FN_INT_TO_FLOAT, x + 20, y + 300 + i * 160, made,
                                     InInt=was)))
-        ends[name] = (was, _out(_call(ed, FN_ROUND, x + 500, y + 300 + i * 160, made,
-                                      A=_out(scaled))))
+        ends[name] = (was, out(_call(ed, FN_ROUND, x + 500, y + 300 + i * 160, made,
+                                      A=out(scaled))))
     grew = _call(ed, FN_SUB_II, x + 740, y + 700, made, A=ends["End"][1], B=ends["End"][0])
     reach = _call(ed, FN_ADD_FF, x + 1220, y + 700, made,
                   A=_get(ed, MAX_DRAW_VAR, x + 980, y + 860, made, PRIMITIVE_CLASS_PATH,
                          comp),
-                  B=_out(_call(ed, FN_INT_TO_FLOAT, x + 980, y + 700, made,
-                               InInt=_out(grew))))
+                  B=out(_call(ed, FN_INT_TO_FLOAT, x + 980, y + 700, made,
+                               InInt=out(grew))))
     far = _call(ed, FN_SET_MAX_DRAW, x + 1480, y, made, self=comp,
-                NewCullDistance=_out(reach))
+                NewCullDistance=out(reach))
     _connect(in_exec, _pin(far, "execute"))
     fade = _call(ed, FN_SET_CULLS, x + 1780, y, made, self=comp,
                  StartCullDistance=ends["Start"][1], EndCullDistance=ends["End"][1])
@@ -146,12 +147,12 @@ def _wanted(ed, column_name, x, y, made):
     reach = _call(ed, FN_MUL_FF, x, y + 300, made,
                   A=column(ed, "view_distance", x - 520, y + 300, made),
                   B=round(FULL_VIEW_M[column_name] * PERCENT, 6))
-    return _out(_call(ed, FN_DIV_FF, x + 260, y, made,
-                      A=column(ed, column_name, x - 520, y, made), B=_out(reach)))
+    return out(_call(ed, FN_DIV_FF, x + 260, y, made,
+                      A=column(ed, column_name, x - 520, y, made), B=out(reach)))
 
 
 def _ratio(ed, column_name, applied_var, x, y, made):
-    return _out(_call(ed, FN_DIV_FF, x + 760, y, made,
+    return out(_call(ed, FN_DIV_FF, x + 760, y, made,
                       A=_wanted(ed, column_name, x, y, made),
                       B=_get(ed, applied_var, x + 500, y + 200, made)))
 
@@ -164,15 +165,15 @@ def _author_grass(ed, in_execs, x0, y0, made):
     lit = _call(ed, FN_NEQ_II, x0, y0 + 700, made,
                 A=column(ed, "grass_shadows", x0 - 980, y0 + 700, made, rounded=True),
                 B=_get(ed, TUNER_GRASS_SHADOWS_APPLIED_VAR, x0 - 240, y0 + 900, made))
-    moved = _call(ed, FN_OR, x0 + 240, y0 + 300, made, A=_out(far), B=_out(lit))
-    go, same = _branch(ed, _out(moved), in_execs, x0 + 480, y0, made)
+    moved = _call(ed, FN_OR, x0 + 240, y0 + 300, made, A=out(far), B=out(lit))
+    go, same = _branch(ed, out(moved), in_execs, x0 + 480, y0, made)
 
     cells = _call(ed, FN_WITH_TAG, x0 + 760, y0, made, Tag=GRASS_TAG)
     _connect(go, _pin(cells, "execute"))
     cell, body, done = _for_each(ed, _pin(cells, "OutActors", is_input=False),
                                  BEL.find_then_pin(cells), x0 + 1060, y0, made)
     comp, flow = _root_mesh(ed, cell, body, x0 + 1360, y0, made)
-    on = _out(_call(ed, FN_GE_II, x0 + 1900, y0 + 500, made,
+    on = out(_call(ed, FN_GE_II, x0 + 1900, y0 + 500, made,
                     A=column(ed, "grass_shadows", x0 + 940, y0 + 700, made, rounded=True),
                     B=1))
     for i, (fn, arg) in enumerate(GRASS_SETTERS):
@@ -199,14 +200,14 @@ def _author_trees(ed, in_execs, x0, y0, made):
     moved = _call(ed, FN_NEQ_FF, x0, y0 + 300, made,
                   A=_wanted(ed, "tree_distance", x0 - 760, y0 - 400, made),
                   B=_get(ed, TUNER_TREE_DISTANCE_APPLIED_VAR, x0 - 240, y0 + 500, made))
-    go, same = _branch(ed, _out(moved), in_execs, x0 + 240, y0, made)
+    go, same = _branch(ed, out(moved), in_execs, x0 + 240, y0, made)
     actors = _call(ed, FN_ALL_OF_CLASS, x0 + 520, y0, made)
     _class_literal(actors, "ActorClass", ACTOR_CLASS_PATH)
     _connect(go, _pin(actors, "execute"))
     actor, body, done = _for_each(ed, _pin(actors, "OutActors", is_input=False),
                                   BEL.find_then_pin(actors), x0 + 820, y0, made)
     grass = _call(ed, FN_HAS_TAG, x0 + 1120, y0 + 300, made, self=actor, Tag=GRASS_TAG)
-    _skip, other = _branch(ed, _out(grass), [body], x0 + 1400, y0, made)
+    _skip, other = _branch(ed, out(grass), [body], x0 + 1400, y0, made)
     comp, flow = _root_mesh(ed, actor, other, x0 + 1700, y0, made)
     _author_scale(ed, comp,
                   _ratio(ed, "tree_distance", TUNER_TREE_DISTANCE_APPLIED_VAR,
@@ -223,7 +224,7 @@ def _author_layers(ed, in_execs, x0, y0, made):
     moved = _call(ed, FN_NEQ_II, x0, y0 + 300, made,
                   A=column(ed, "grass_layers", x0 - 980, y0 + 300, made, rounded=True),
                   B=_get(ed, TUNER_GRASS_LAYERS_APPLIED_VAR, x0 - 240, y0 + 500, made))
-    flow, same = _branch(ed, _out(moved), in_execs, x0 + 240, y0, made)
+    flow, same = _branch(ed, out(moved), in_execs, x0 + 240, y0, made)
     for row, tier in enumerate(SWITCHED_TIERS):
         x = x0 + 520 + row * 1900
         cells = _call(ed, FN_WITH_TAG, x, y0, made, Tag=tier_tag(tier))
@@ -233,7 +234,7 @@ def _author_layers(ed, in_execs, x0, y0, made):
         below = _call(ed, FN_LESS_II, x + 1300, y0 + 400, made,
                       A=column(ed, "grass_layers", x + 300, y0 + 500, made, rounded=True),
                       B=tier + 1)
-        hide = _call(ed, FN_HIDE, x + 1560, y0, made, self=cell, bNewHidden=_out(below))
+        hide = _call(ed, FN_HIDE, x + 1560, y0, made, self=cell, bNewHidden=out(below))
         _connect(body, _pin(hide, "execute"))
     kept = put(ed, TUNER_GRASS_LAYERS_APPLIED_VAR,
                column(ed, "grass_layers", x0 + 700, y0 - 500, made, rounded=True), [flow],

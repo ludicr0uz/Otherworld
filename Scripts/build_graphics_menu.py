@@ -54,6 +54,10 @@ import sys
 import unreal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# The authoring helpers every builder shares.
+from uebp.graph import (                                           # noqa: E402
+    BEL, BGE, PIN, _assets, _at, _connect, _create_blueprint, _key, _loose_pin, _node,
+    _palette, _pin, _set, make_log)
 # BP_Settings' asset path. The settings screen's own contract with the combat
 # package (BIND_VARS, the sensitivity limits) lives in graphics_menu/settings_rows.py.
 from combat import paths as combat_paths                           # noqa: E402
@@ -263,119 +267,8 @@ NODE_CAST_SETTINGS = "Utilities|Casting|CastToBP_Settings"
 MACRO_FOR_EACH = ("/Engine/EditorBlueprintResources/StandardMacros"
                   ".StandardMacros:ForEachLoop")
 
-BGE = unreal.BlueprintGraphEditor
-BEL = unreal.BlueprintEditorLibrary
-PIN = unreal.BlueprintGraphPinLibrary
-
-
-def _log(msg):
-    unreal.log_warning(f"[UI] {msg}")
-
-
-def _asset_sub():
-    return unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
-
-
-# ─── Small graph helpers ─────────────────────────────────────────────────────
-# Deliberately duplicated from build_npc_blueprints.py rather than shared: each
-# builder in Scripts/ is standalone and runnable on its own, and three tiny
-# wrappers are a cheaper price than a coupling between them.
-
-def _create_blueprint(path, parent_class):
-    """Load the Blueprint at ``path``, creating it if absent (never recreating:
-    an existing asset is referenced by the game mode's HUDClass)."""
-    eas = _asset_sub()
-    if eas.does_asset_exist(path):
-        existing = eas.load_asset(path)
-        if existing:
-            return existing
-    package_path, asset_name = path.rsplit("/", 1)
-    factory = unreal.BlueprintFactory()
-    factory.set_editor_property("parent_class", parent_class)
-    bp = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-        asset_name, package_path, unreal.Blueprint, factory)
-    if not bp:
-        raise RuntimeError(f"Could not create Blueprint {path}")
-    return bp
-
-
-def _node(ed, function_path):
-    """add_call_function_node, but loud when the function path does not resolve.
-
-    An unresolvable path yields a pinless node rather than None, which surfaces
-    much later as a baffling "pin 'self' not found on ''".
-    """
-    n = ed.add_call_function_node(function_path)
-    if not n or not BEL.list_all_pins(n):
-        raise RuntimeError(f"{function_path} is not a Blueprint-callable function")
-    return n
-
-
-def _palette(ed, name, x=0.0, y=0.0):
-    n = ed.create_node_from_name(name, unreal.Vector2D(float(x), float(y)), [])
-    if not n:
-        raise RuntimeError(f"palette node {name!r} could not be created")
-    return n
-
-
-def _loose_pin(node, wanted, is_input=True):
-    """Find a pin ignoring spaces and case.
-
-    Cast nodes name their output after the class with spaces inserted
-    ("AsBP Health Component"), which is not worth depending on exactly.
-    """
-    key = wanted.replace(" ", "").lower()
-    for p in (BEL.list_input_pins(node) if is_input else BEL.list_output_pins(node)):
-        if str(PIN.get_pin_name(p)).replace(" ", "").lower() == key:
-            return p
-    raise RuntimeError(f"no pin like {wanted!r} on node")
-
-
-def _pin(node, name, is_input=True):
-    p = (BEL.find_input_pin(node, name) if is_input
-         else BEL.find_output_pin(node, name))
-    if not p or not p.is_valid():
-        raise RuntimeError(
-            f"pin {name!r} ({'in' if is_input else 'out'}) not found on "
-            f"{BEL.get_node_title(node)}")
-    return p
-
-
-def _connect(a, b):
-    if not a.try_create_connection(b):
-        raise RuntimeError("could not connect pins")
-
-
-def _set(node, name, value):
-    """Set a pin's literal, and prove it landed.
-
-    set_pin_value's return is useless as a signal -- False means both "rejected"
-    and "already equal to the default" -- so the pin is read back instead. A pin
-    that quietly stayed empty compiles as zero and looks perfect in the graph,
-    which is exactly how a scale factor can go missing without a single warning.
-    """
-    pin = _pin(node, name)
-    pin.set_pin_value(str(value))
-    got = str(PIN.get_pin_value(pin))
-    if not _literal_matches(got, value):
-        raise RuntimeError(f"pin {name!r} would not take {value!r} — it reads "
-                           f"back as {got!r} (struct pins reject every format; "
-                           "build the constant as a node instead)")
-
-
-def _literal_matches(got, want):
-    want = str(want)
-    if got == want:
-        return True
-    try:
-        # An empty numeric pin *is* zero: the compiler reads a blank literal as
-        # 0, so setting zero and reading back "" is a genuine match.
-        return abs(float(got or 0.0) - float(want)) < 1e-6
-    except ValueError:
-        pass
-    # Enum literals read back namespaced, bools lower-cased.
-    return got.lower() == want.lower() or got.endswith(f"::{want}")
-
+_log = make_log("UI")
+_asset_sub = _assets
 
 
 # Source sizes, so DrawTexture can be handed a UV rectangle in texels.
@@ -389,23 +282,6 @@ def _literal_matches(got, want):
 # giving them more pixels. A weapon silhouette at 88 px wide has about 40 px of
 # usable length once the margins are off it, and no silhouette survives that.
 # Since shrunk with the slot, by 30%, to 78 x 35 at the player's request.
-
-
-def _at(node, x, y):
-    BEL.set_node_pos(node, unreal.IntPoint(int(x), int(y)))
-    return node
-
-
-def _key(name):
-    """An FKey value for a CDO default.
-
-    unreal.Key takes no constructor argument and exposes no fields, so the only
-    way in is the key_name property -- which at least fails loudly on a
-    misspelling, where import_text() returns True for anything.
-    """
-    k = unreal.Key()
-    k.set_editor_property("key_name", name)
-    return k
 
 
 # ─── Member variables ────────────────────────────────────────────────────────

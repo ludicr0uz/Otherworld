@@ -44,6 +44,7 @@ hands. Numbers and names: torch_tuning.py.
 """
 
 from combat.graph import BEL, _at, _connect, _loose_pin, _node, _pin, _set
+from uebp.graph import out
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.nodes import (
     FN_ACTOR_LOC, FN_ADD_FF, FN_ALL_ACTORS, FN_AND, FN_DISTANCE, FN_IS_VALID,
@@ -60,10 +61,6 @@ from combat.weapon_component.common import _prop
 FN_NEQ_OBJECTS = "/Script/Engine.KismetMathLibrary.NotEqual_ObjectObject"
 
 
-def _out(n, name="ReturnValue"):
-    return _pin(n, name, is_input=False)
-
-
 def _author_torch(ed, held, owner, exec_ins, x0, y0):
     """See the module docstring. Returns the exits."""
     made = []
@@ -73,7 +70,7 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
         return n
 
     def get(name, x, y):
-        return _out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
+        return out(keep(_at(ed.add_get_member_variable_node(name), x, y)), name)
 
     def put(name, value, x, y):
         n = keep(_at(ed.add_set_member_variable_node(name), x, y))
@@ -90,12 +87,12 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
         n = keep(_at(_node(ed, fn), x, y))
         _connect(a, _pin(n, "A"))
         _connect(b, _pin(n, "B"))
-        return _out(n)
+        return out(n)
 
     def negate(a, x, y):
         n = keep(_at(_node(ed, FN_NOT), x, y))
         _connect(a, _pin(n, "A"))
-        return _out(n)
+        return out(n)
 
     def branch(cond, exec_in, x, y):
         n = keep(_at(ed.add_branch_node(), x, y))
@@ -128,19 +125,19 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(_at(loop, x0 + 2100, y0 + 200))
-    _connect(_out(every, "OutActors"), _loose_pin(loop, "Array"))
+    _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
     _connect(BEL.find_then_pin(every), _loose_pin(loop, "Exec"))
     there = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 2400, y0 + 440))
     _connect(_loose_pin(loop, "ArrayElement", is_input=False), _pin(there, "self"))
     here = keep(_at(_node(ed, FN_ACTOR_LOC), x0 + 2400, y0 + 560))
     _connect(owner, _pin(here, "self"))
     gap = keep(_at(_node(ed, FN_DISTANCE), x0 + 2660, y0 + 480))
-    _connect(_out(there), _pin(gap, "V1"))
-    _connect(_out(here), _pin(gap, "V2"))
+    _connect(out(there), _pin(gap, "V1"))
+    _connect(out(here), _pin(gap, "V2"))
     close = keep(_at(_node(ed, FN_LE_FF), x0 + 2920, y0 + 480))
-    _connect(_out(gap), _pin(close, "A"))
+    _connect(out(gap), _pin(close, "A"))
     _set(close, "B", STICK_LIGHT_RADIUS_CM)
-    near = branch(_out(close), (_loose_pin(loop, "LoopBody", is_input=False),),
+    near = branch(out(close), (_loose_pin(loop, "LoopBody", is_input=False),),
                   x0 + 3180, y0 + 320)
     found = put(NEAR_FIRE_VAR, "true", x0 + 3440, y0 + 320)
     _connect(BEL.find_then_pin(near), _pin(found, "execute"))
@@ -149,12 +146,12 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
                      (_loose_pin(loop, "Completed", is_input=False),), x0 + 3440, y0 + 60)
     now = keep(_at(_node(ed, FN_TIME_SECONDS), x0 + 3440, y0 - 200))
     until = keep(_at(_node(ed, FN_ADD_FF), x0 + 3700, y0 - 200))
-    _connect(_out(now), _pin(until, "A"))
+    _connect(out(now), _pin(until, "A"))
     _set(until, "B", STICK_BURN_S)
     burn = keep(_at(ed.add_set_member_variable_node(BURN_OUT_VAR, ITEM_CLASS_PATH),
                     x0 + 3960, y0 + 60))
     _connect(held, _pin(burn, "self"))
-    _connect(_out(until), _pin(burn, BURN_OUT_VAR))
+    _connect(out(until), _pin(burn, BURN_OUT_VAR))
     _connect(BEL.find_then_pin(at_fire), _pin(burn, "execute"))
     light = keep(_at(ed.add_set_member_variable_node(LIT_VAR, ITEM_CLASS_PATH),
                      x0 + 4220, y0 + 60))
@@ -174,9 +171,9 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
     other = keep(_at(_node(ed, FN_NEQ_OBJECTS), x0 + 4740, y0 + 560))
     _connect(item, _pin(other, "A"))
     _connect(held, _pin(other, "B"))
-    stale = gate2(FN_OR, negate(ward, x0 + 4740, y0 + 300), _out(other),
+    stale = gate2(FN_OR, negate(ward, x0 + 4740, y0 + 300), out(other),
                   x0 + 5000, y0 + 440)
-    lower = branch(gate2(FN_AND, _out(up), stale, x0 + 5260, y0 + 420), settled,
+    lower = branch(gate2(FN_AND, out(up), stale, x0 + 5260, y0 + 420), settled,
                    x0 + 5520, y0)
     back = keep(_at(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH),
                     x0 + 5780, y0 - 200))
@@ -190,7 +187,7 @@ def _author_torch(ed, held, owner, exec_ins, x0, y0):
     _connect(BEL.find_then_pin(clear), _pin(down, "execute"))
 
     # Pure, and read after the lowering above: it sees WardItem cleared.
-    raise_ = branch(gate2(FN_AND, ward, negate(_out(up), x0 + 6300, y0 + 420),
+    raise_ = branch(gate2(FN_AND, ward, negate(out(up), x0 + 6300, y0 + 420),
                           x0 + 6560, y0 + 320),
                     (BEL.find_then_pin(down), BEL.find_else_pin(lower)), x0 + 6820, y0)
     whose = put(WARD_ITEM_VAR, None, x0 + 7080, y0 - 200)

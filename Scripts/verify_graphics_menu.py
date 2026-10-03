@@ -23,7 +23,8 @@ from graphics_menu import settings_rows as S
 from graphics_menu import stamina_bar as ST
 from graphics_menu import survival_bars as SB
 from graphics_menu import scope as SC
-from graphics_menu.reticle_checks import check_reticle_sights, sights_gate
+from graphics_menu.reticle_checks import (
+    check_headshot_mark, check_reticle_sights, check_reticle_white, sights_gate)
 from graphics_menu import profile_consts as PC
 from graphics_menu.profile_checks import check_profile
 from graphics_menu.dev_guns_checks import check_dev_guns
@@ -292,8 +293,8 @@ def main():
           len(projects) == 1, str(len(projects)))
     aim_reads = {str(BEL.get_node_title(n)) for n in nodes
                  if str(BEL.get_node_title(n)).startswith("Get Aim")}
-    check("the reticle reads AimValid and AimBlocked, and not AimPoint",
-          aim_reads == {"Get AimValid", "Get AimBlocked"}, str(sorted(aim_reads)))
+    check("the reticle reads AimValid alone: not AimPoint, and not AimBlocked",
+          aim_reads == {"Get AimValid"}, str(sorted(aim_reads)))
     viewports = [n for n in nodes
                  if str(BEL.get_node_title(n)).replace("\n", " ") == "GetViewportSize"]
     # One: the reticle's centre, which the scope shares. Everything else on
@@ -314,9 +315,8 @@ def main():
           len(spread_reads) == 1 and len(capped) == 1,
           f"{len(spread_reads)} reads, {len(capped)} caps "
           f"{sorted({str(BEL.get_node_title(n)) for n in caps})}")
-    check("a blocked shot colours the reticle differently",
-          any(str(BEL.get_node_title(n)) == "SelectColor" for n in nodes)
-          and "Get AimBlocked" in aim_reads)
+    check_reticle_white(check, nodes)
+    check_headshot_mark(check, nodes)
 
     # --- the sniper's scope
     # It must be the SNIPER's ADS and not everyone's, it must replace the
@@ -520,9 +520,10 @@ def main():
     check("the stamina bar reads Stamina, MaxStamina and Sprinting",
           stamina_reads == {"Get Stamina", "Get MaxStamina", "Get Sprinting"},
           str(sorted(stamina_reads)))
-    # Two SelectColors now: the reticle's blocked state and the stamina fill.
+    # One SelectColor: the stamina fill. The reticle's went with its red
+    # (reticle_checks.py: it is always white).
     check("the stamina fill changes colour while the key is held",
-          sum(1 for t in titles if t == "SelectColor") == 2,
+          sum(1 for t in titles if t == "SelectColor") == 1,
           str(sum(1 for t in titles if t == "SelectColor")))
 
     # --- the NPC bars are hidden unless something just got hurt

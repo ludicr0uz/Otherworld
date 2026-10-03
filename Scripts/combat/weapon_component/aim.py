@@ -35,8 +35,8 @@ def _author_resolve_aim(ed, held, exec_ins):
          which is the standard stand-in for "the sky".
       2. Trace from the muzzle to that aim point. If something stops that second
          line well short, *that* is where the shot lands -- the wall in front of
-         the barrel -- and AimBlocked says so, which is what turns the reticle
-         red.
+         the barrel -- and AimBlocked says so. (It turned the reticle red;
+         the reticle is always white now and nothing reads it.)
 
     Step 2 is not a separate safety check bolted on: it is the same line the
     pellets themselves fly down, so the reticle cannot promise a hit the shot

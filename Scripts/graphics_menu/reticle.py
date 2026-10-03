@@ -1,5 +1,5 @@
-"""The HUD's reticle: a crosshair nailed to the centre of the viewport, red
-when the muzzle is blocked, handing over to the sniper's scope (scope.py)
+"""The HUD's reticle: a crosshair nailed to the centre of the viewport, always
+white, with the headshot mark's X round it (hit_marker.py), handing over to the sniper's scope (scope.py)
 down the sights, and to a gun's own iron sights there too: with the camera on
 the sights it is drawn only in debug mode. Split out of
 build_graphics_menu.py, which calls _author_reticle from DrawHUD.
@@ -7,11 +7,12 @@ build_graphics_menu.py, which calls _author_reticle from DrawHUD.
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.seat_tuning import RETICLE_HIDE_SEAT, SEAT_VAR
+from graphics_menu.hit_marker import _author_headshot_mark
 from graphics_menu.scope import _author_scope, _author_scope_gate
 from uebp.nodes.actor import FN_DRAW_RECT, FN_GET_COMP
 from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_BREAK_V2D, FN_FMIN, FN_GREATER_FF, FN_MUL_FF, FN_NOT,
-    FN_SELECT_COLOR, FN_SUB_FF)
+    FN_SUB_FF)
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from uebp.nodes.umg import FN_VIEWPORT
@@ -28,8 +29,9 @@ ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
 # centre of the screen, so the centre is where the shot goes. Drawing it at the
 # projected impact point instead was tried and reverted: that point is a world
 # position on whatever surface the ray lands on, so the crosshair slid around
-# under its own parallax and could not be aimed with. Only the colour still
-# reflects the world -- red when the muzzle's line is blocked.
+# under its own parallax and could not be aimed with. Nothing of it reflects
+# the world: it turned red when the muzzle's line was blocked, which read as
+# "an enemy" as often as "a tree", and it is one white now, always.
 RETICLE_GAP = 7.0          # pixels of clear space around the centre dot
 # ...plus the held gun's accuracy cloud, in pixels: the weapon component's
 # ReticleSpread (tan of the cloud over tan of half the field of view) times
@@ -41,7 +43,6 @@ RETICLE_ARM = 11.0         # length of each of the four ticks
 RETICLE_THICK = 2.0
 RETICLE_DOT = 3.0
 COL_RETICLE = "(R=0.960000,G=0.960000,B=0.970000,A=0.900000)"
-COL_RETICLE_BLOCKED = "(R=0.950000,G=0.250000,B=0.200000,A=0.950000)"
 
 
 def _author_reticle(ed, in_execs):
@@ -60,9 +61,11 @@ def _author_reticle(ed, in_execs):
     vector is the centre of the screen. AimPoint is still where the shot lands;
     the reticle just no longer tries to follow it around.
 
-    What is kept from the impact point is the one thing worth showing: the
-    crosshair turns red when the muzzle's line is blocked short of what the
-    camera can see, so a barrel against a tree reads as such without moving.
+    Its colour is fixed too: COL_RETICLE, always. It used to turn red when
+    the muzzle's line was blocked short of what the camera could see
+    (AimBlocked); the HUD no longer reads that. What a shot did is said by a
+    shape instead: a headshot draws an X round the centre for a moment
+    (_author_headshot_mark), on every arm below that has the component.
 
     The gap is not fixed: the four ticks stand off by the held gun's accuracy
     cloud on screen (ReticleSpread x half the width, see RETICLE_SPREAD_MAX),
@@ -100,8 +103,6 @@ def _author_reticle(ed, in_execs):
 
     valid = keep(ed.add_get_member_variable_node(WV.AimValid, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(valid, "self"))
-    blocked = keep(ed.add_get_member_variable_node(WV.AimBlocked, WEAPON_COMP_CLASS_PATH))
-    _connect(as_weapon, _pin(blocked, "self"))
 
     # Empty hands draw nothing: a reticle with no weapon behind it points at a
     # shot that cannot be taken.
@@ -142,12 +143,6 @@ def _author_reticle(ed, in_execs):
     scoped_tail = _author_scope(ed, then(glass),
                                 as_weapon, held_out, cx, cy,
                                 _loose_pin(wh, "Y", is_input=False))
-
-    colour = keep(_node(ed, FN_SELECT_COLOR))
-    _set(colour, "A", COL_RETICLE_BLOCKED)
-    _set(colour, "B", COL_RETICLE)
-    _connect(out(blocked, WV.AimBlocked), _pin(colour, "bPickA"))
-    colour_out = out(colour)
 
     def offset(src, by):
         """centre + by, as a node -- DrawRect wants the corner, we have the middle."""
@@ -215,7 +210,7 @@ def _author_reticle(ed, in_execs):
         r = keep(_node(ed, FN_DRAW_RECT))
         _set(r, "ScreenW", w)
         _set(r, "ScreenH", h)
-        _connect(colour_out, _pin(r, "RectColor"))
+        _set(r, "RectColor", COL_RETICLE)
         _connect(offset(fx, dx), _pin(r, "ScreenX"))
         _connect(offset(fy, dy), _pin(r, "ScreenY"))
         _connect(flow, _pin(r, "execute"))
@@ -224,8 +219,7 @@ def _author_reticle(ed, in_execs):
     ed.add_comment_to_nodes(
         "Reticle, nailed to the centre of the viewport. The aim ray is cast "
         "along the camera's forward vector, and that *is* the centre of the "
-        "screen, so this is where the shot goes -- it turns red when the muzzle "
-        "cannot reach what the camera is looking at. The ticks stand off by the "
+        "screen, so this is where the shot goes. Always white. The ticks stand off by the "
         "held gun's accuracy cloud (ReticleSpread x half the width), so the "
         "gap is where the shot can land: wide at the hip, closed down the "
         "sights. With the camera on the gun's sights (SightSeat past "
@@ -233,4 +227,8 @@ def _author_reticle(ed, in_execs):
         "sight is the middle of the view there.",
         made)
 
-    return (flow, then(hidden), scoped_tail, else_(armed), out(cast, "CastFailed"))
+    # Last, on every arm that has the component (empty hands too: a thrown
+    # knife leaves them empty): the headshot's X.
+    marked = _author_headshot_mark(
+        ed, [flow, then(hidden), scoped_tail, else_(armed)], as_weapon, cx, cy)
+    return (*marked, out(cast, "CastFailed"))

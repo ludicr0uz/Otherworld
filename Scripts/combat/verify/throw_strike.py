@@ -37,6 +37,7 @@ from combat.verify.common import (
 )
 from combat.verify.fixtures import _is_exec, wg
 from combat.verify.throw import _item_cdo, _title, is_throw_trace
+from combat.headshot_tuning import HEADSHOT_TIME_VAR
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 from combat.weapon_component.throw_flight import THROWN_VAR
 from combat.weapon_component.throw_strike import (
@@ -282,10 +283,14 @@ def check_wound():
                   for s in stamps[DAMAGED_BY_PLAYER_VAR]),
           str({k: len(v) for k, v in stamps.items()}))
     blood = _mine(_spawns("BloodClass"))
-    check("...and it bleeds: one blood spawn, after the wound",
+    # Between the two, the headshot stamp (verify/headshot.py).
+    told = _feeders(blood[0], "execute") if len(blood) == 1 else []
+    check("...and it bleeds: one blood spawn, after the wound and its "
+          f"{HEADSHOT_TIME_VAR} stamp",
           len(blood) == 1 and len(stamps[LAST_HIT_FROM_VAR]) == 1
-          and _feeders(blood[0], "execute") == stamps[LAST_HIT_FROM_VAR],
-          str(len(blood)))
+          and [_title(n) for n in told] == [f"Set {HEADSHOT_TIME_VAR}"]
+          and _feeders(told[0], "execute") == stamps[LAST_HIT_FROM_VAR],
+          f"{len(blood)} spawns, after {[_title(n) for n in told]}")
     adds = [n for n in by_pins(wg, "TargetArray", "NewItem")
             if [_title(f) for f in _feeders(n, "TargetArray")] == [f"Get {THROW_PAST_VAR}"]]
     floors = [n for n in by_pins(wg, "Start", "End", "TraceChannel", "ActorsToIgnore")

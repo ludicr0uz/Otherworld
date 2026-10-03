@@ -109,11 +109,14 @@ and it never relies on a variable another section left behind.
               multiplier) and its blood, the body it stays in (the attach
               to the bone), the tree it lodges in and how high, the pose it
               is left in, the fall it skips; is_strike_node
+  headshot    the headshot stamp: HeadshotTime's default, and its two writes
+              (a pellet's wound, a thrown blade's), each the game's time for
+              a bone of the head and nothing otherwise
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "interact", "slots", "pickup", "glimmer", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "pickup", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",
 )

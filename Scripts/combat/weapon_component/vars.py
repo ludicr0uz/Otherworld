@@ -5,6 +5,7 @@ TABLE; a row with no type is a component, or a variable declared elsewhere.
 
 from uebp.vars import BOOL, FLOAT, INT, VECTOR, Var, array, cls, obj
 from combat.paths import ITEM_CLASS_PATH
+from combat.headshot_tuning import HEADSHOT_NEVER, HEADSHOT_TIME_VAR
 from combat.tuning import COMBAT
 
 Inventory = Var("Inventory", array(obj(ITEM_CLASS_PATH)))
@@ -13,10 +14,15 @@ EquippedIndex = Var("EquippedIndex", INT, 0)
 NeedsRefresh = Var("NeedsRefresh", BOOL, True)
 OwnerMesh = Var("OwnerMesh", obj("/Script/Engine.SkeletalMeshComponent"))
 # Where this frame's shot lands, and whether there is anything to draw a
-# reticle on. The HUD reads all three; nothing else writes them.
+# reticle on. Nothing else writes them. The HUD reads AimValid alone: the
+# reticle is always white, so AimBlocked (the muzzle's line stopped short of
+# what the camera sees) colours nothing any more.
 AimPoint = Var("AimPoint", VECTOR)
 AimValid = Var("AimValid", BOOL)
 AimBlocked = Var("AimBlocked", BOOL)
+# When a round or a thrown blade last struck a head (headshot.py): the HUD
+# draws an X round the reticle for a moment after it.
+HeadshotTime = Var(HEADSHOT_TIME_VAR, FLOAT, HEADSHOT_NEVER)
 Stamina = Var("Stamina", FLOAT, COMBAT.max_stamina)
 MaxStamina = Var("MaxStamina", FLOAT, COMBAT.max_stamina)
 Sprinting = Var("Sprinting", BOOL, False)
@@ -81,5 +87,5 @@ TABLE = (
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
     SightAiming, AimZoom, SightBlend, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
-    BloodClass,
+    BloodClass, HeadshotTime,
 )

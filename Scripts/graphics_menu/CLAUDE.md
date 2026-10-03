@@ -775,6 +775,12 @@ glimmers, `world/item_highlight.py`). Same keys as GUN SETTINGS; **Enter** saves
   reticle is drawn only in debug mode: the gun's own sights are on the centre there
   (`reticle_checks.py`; a headless run draws nothing, so the look is
   `probe_sight_raise.py --windowed` with `OW_RAISE_SHOTS=1`).
+  The reticle is **always white**: one literal colour, nothing picked off the aim (it used to
+  turn red on the weapon component's `AimBlocked`). A headshot is said by a shape instead:
+  `hit_marker.py` draws an X (four `AHUD::DrawLine` strokes on the diagonals, the reticle's
+  white) for `HEADSHOT_MARK_SECONDS` after the weapon component's `HeadshotTime`. It hangs off
+  every arm of the reticle that has the component (crosshair, crosshair left out down the
+  sights, scope, empty hands after a thrown knife), so it is drawn whatever is on the centre.
 - **When the player is dead:** only the death menu. `DrawHUD` branches on `GameMode.PlayerDead`
   first.
 

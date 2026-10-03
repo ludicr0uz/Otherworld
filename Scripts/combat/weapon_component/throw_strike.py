@@ -91,6 +91,7 @@ from combat.throw_tuning import (
     STICK_TRACE_PAST, THROW_DAMAGE_VAR,
 )
 from combat.weapon_component.common import _prop
+from combat.weapon_component.headshot import _author_headshot
 from combat.weapon_component.surface_impact import _author_surface_impact
 from uebp.nodes.actor import (
     FN_ATTACH, FN_CLOSEST_BONE, FN_GET_COMP, FN_INSTANCE_TRANSFORM, FN_SET_LOC_ROT,
@@ -130,7 +131,7 @@ def _z(ed, vector):
 def _head_worth(ed, as_health, damage):
     """``damage`` on this body where ThrowBone says the blade went in: times
     its HeadMultiplier in one of its HeadBones, as it is anywhere else. A pure
-    float pin, and the nodes."""
+    float pin, whether it was the head (a pure bool), and the nodes."""
     bone = ed.add_get_member_variable_node(THROW_BONE_VAR)
     heads, heads_n = _prop(ed, HEAD_BONES_VAR, as_health, HEALTH_CLASS_PATH)
     in_head = _node(ed, FN_ARR_CONTAINS)
@@ -144,7 +145,7 @@ def _head_worth(ed, as_health, damage):
     dealt = _node(ed, FN_MUL_FF)
     _connect(damage, _pin(dealt, "A"))
     _connect(out(scale), _pin(dealt, "B"))
-    return out(dealt), [bone, heads_n, in_head, worth_n, scale, dealt]
+    return out(dealt), out(in_head), [bone, heads_n, in_head, worth_n, scale, dealt]
 
 
 def _author_wound(ed, as_health, damage, brk, execs):
@@ -357,8 +358,10 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     as_health = _loose_pin(body, "AsBPHealthComponent", is_input=False)
     # Where it went in comes first: the wound asks whether that is the head.
     known, mesh_out, skin_nodes = _author_skin(ed, brk, then(body))
-    dealt, worth_nodes = _head_worth(ed, as_health, damage)
+    dealt, in_head, worth_nodes = _head_worth(ed, as_health, damage)
     wounded, wound_nodes = _author_wound(ed, as_health, dealt, brk, known)
+    # A blade in the head says so to the HUD, as a pellet does (headshot.py).
+    wounded, head_nodes = _author_headshot(ed, in_head, [wounded])
     # The one transform serves the blood and the chips, as a pellet's does:
     # the hit, +X turned out along the surface normal.
     facing = _node(ed, FN_ROT_FROM_X)
@@ -424,7 +427,7 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
         f"and the item lodges in it: {LODGE_POINT_VAR} on the bark, turned by "
         f"{LODGE_TURN_VAR} along the way it flew, left there to be picked up.",
         [fresh, damage_n, bites, body, blood, aside, tree, reachable, chipped, put]
-        + wound_nodes + skin_nodes + worth_nodes + stick_nodes)
+        + wound_nodes + skin_nodes + worth_nodes + head_nodes + stick_nodes)
     falls = (else_(bites), then(aside),
              _loose_pin(tree, "CastFailed", is_input=False),
              else_(reachable))

@@ -47,9 +47,12 @@ The HUD graph that shows and writes them
 
 Still drawn on the HUD canvas (placed per frame)
   canvas          generated art for the canvas draws, _draw_texture
-  reticle         the crosshair: centred, red when blocked, gap = the gun's cloud;
+  reticle         the crosshair: centred, always white, gap = the gun's cloud;
                   left out down a gun's sights, except in debug mode
-  reticle_checks  the verifier's checks for that (the sights gate)
+  hit_marker      the headshot's X round the reticle, for a moment after the
+                  weapon component's HeadshotTime
+  reticle_checks  the verifier's checks for those (the sights gate, the one
+                  white, the X)
   scope           the sniper's glass, and when it replaces the crosshair
 
 Input, settings and state

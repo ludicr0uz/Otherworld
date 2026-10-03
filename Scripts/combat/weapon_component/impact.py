@@ -21,6 +21,7 @@ from combat.hit_zones import (
 from combat.paths import HEALTH_CLASS_PATH
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
+from combat.weapon_component.headshot import _author_headshot
 from combat.weapon_component.surface_impact import _author_surface_impact
 from uebp.nodes.actor import FN_GET_COMP, FN_TRACE_COMPONENT
 from uebp.nodes.array import FN_ARR_CONTAINS
@@ -104,7 +105,7 @@ def _author_impact(ed, brk, held, exec_in):
     get_h = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(get_h, "self"))
     dmg_pin, dmg_n = _prop(ed, IV.Damage, held)
-    worth, worth_nodes = _zone_multiplier(ed, as_health)
+    worth, in_head, worth_nodes = _zone_multiplier(ed, as_health)
     scaled = _node(ed, FN_MUL_FF)
     _connect(dmg_pin, _pin(scaled, "A"))
     _connect(worth, _pin(scaled, "B"))
@@ -153,7 +154,10 @@ def _author_impact(ed, brk, held, exec_in):
              _pin(from_where, LAST_HIT_FROM_VAR))
     _connect(then(blame), _pin(from_where, "execute"))
 
-    shown = _author_damage_readout(ed, brk, out(scaled), worth, then(from_where))
+    # A pellet in the head says so to the HUD: the X round the reticle.
+    headed, head_nodes = _author_headshot(ed, in_head, [then(from_where)])
+
+    shown = _author_damage_readout(ed, brk, out(scaled), worth, headed)
 
     ed.add_comment_to_nodes(
         "Clamped at zero so an overkill shot cannot drive Health negative -- "
@@ -172,9 +176,10 @@ def _author_impact(ed, brk, held, exec_in):
         f"physics-asset bodies alone, and the bone it strikes picks the "
         f"multiplier off the TARGET's health component -- head "
         f"{COMBAT.head_multiplier}x, arms and legs {COMBAT.limb_multiplier}x, anything else "
-        f"1x. A pellet that clipped the capsule but strikes no body passed "
+        f"1x; one in the head stamps HeadshotTime, the HUD's X round the "
+        f"reticle. A pellet that clipped the capsule but strikes no body passed "
         f"the model by: no blood, no damage.",
-        zone_nodes + worth_nodes + [dmg_n, scaled])
+        zone_nodes + worth_nodes + head_nodes + [dmg_n, scaled])
     ed.add_comment_to_nodes(
         "Debug mode only: the damage this pellet actually did, and the zone "
         "multiplier behind it, drawn where it landed for as long as the tracer.",
@@ -298,7 +303,8 @@ def _author_hit_zone(ed, brk, exec_in):
 
 
 def _zone_multiplier(ed, as_health):
-    """What HitBone is worth on this target: a pure float, 1.0 unless zoned.
+    """What HitBone is worth on this target: a pure float, 1.0 unless zoned,
+    and whether it is a bone of the head (a pure bool).
 
     Head is tested last so it wins, though the two tables never overlap -- a
     bone cannot be under both the head and a thigh.
@@ -336,4 +342,4 @@ def _zone_multiplier(ed, as_health):
     _connect(worth(HEAD_MULT_VAR), _pin(pick, "A"))
     _connect(out(limb_or_body), _pin(pick, "B"))
     _connect(is_head, _pin(pick, "bPickA"))
-    return out(pick), made
+    return out(pick), is_head, made

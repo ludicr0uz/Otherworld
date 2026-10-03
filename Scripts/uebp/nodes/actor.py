@@ -64,6 +64,7 @@ FN_STOP_MOVEMENT = "/Script/Engine.Controller.StopMovement"
 FN_FOG_COLOR = "/Script/Engine.ExponentialHeightFogComponent.SetFogInscatteringColor"
 FN_FOG_DENSITY = "/Script/Engine.ExponentialHeightFogComponent.SetFogDensity"
 
+FN_DRAW_HUD_LINE = "/Script/Engine.HUD.DrawLine"
 FN_DRAW_RECT = "/Script/Engine.HUD.DrawRect"
 FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
 FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"

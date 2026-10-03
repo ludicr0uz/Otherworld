@@ -10,8 +10,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
   Each shot draws **one** direction inside the accuracy cloud around `Normal(AimPoint - muzzle)`
   into `ShotDirection`; pellets fly the gun's `PelletSpreadDegrees` pattern around it. Hitscan.
-- **The reticle is nailed to the viewport centre**, and turns red when `AimBlocked`. Drawing it at
-  the projected `AimPoint` was tried and reverted: it slid under parallax.
+- **The reticle is nailed to the viewport centre.** Drawing it at the projected `AimPoint` was
+  tried and reverted: it slid under parallax. It is always white (it turned red when
+  `AimBlocked`; the HUD no longer reads that). A headshot draws an X round it for 0.35 s:
+  a pellet or a thrown blade in one of the target's `HeadBones` stamps the weapon component's
+  `HeadshotTime` (`weapon_component/headshot.py`, `headshot_tuning.py`,
+  `probes/probe_headshot.py`).
   - **Down a gun's sights it is drawn only in debug mode.** The front sight's tip is the
     middle of the view there (below), so the crosshair only covered it. The HUD leaves it out
     past `SightSeat` 0.9 (`RETICLE_HIDE_SEAT`) unless `DebugOn`; the hip and the shoulder aim

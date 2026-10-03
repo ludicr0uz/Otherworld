@@ -41,6 +41,7 @@ from probes.probe_throw_stick import (
 )
 from probes.probe_throw_strike import AXE, KNIFE, _dir, _stand, _throw
 from combat import health_vars as HV
+from combat.headshot_tuning import HEADSHOT_TIME_VAR
 from combat.weapon_component import vars as WV
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
@@ -152,12 +153,17 @@ def _run(p):
         return
 
     for name, item, damage in blades:
+        marked = p.get(wc, HEADSHOT_TIME_VAR)
         lost, bone, counted = yield from _strike(p, wc, player, item, body, health,
                                                  at, yaw, head=True)
         p.check(f"a {name} thrown at the head is left in a bone of the head",
                 bone in heads and counted == bone, f"in {bone}, counted on {counted}")
         p.check(f"...and takes its {damage:g} HP times the head's {worth:g}",
                 abs(lost - damage * worth) < 1e-3, f"lost {lost:g}")
+        p.check(f"...and stamps {HEADSHOT_TIME_VAR}: the HUD's X round the reticle",
+                p.get(wc, HEADSHOT_TIME_VAR) > marked,
+                f"{marked:g} -> {p.get(wc, HEADSHOT_TIME_VAR):g}")
+        marked = p.get(wc, HEADSHOT_TIME_VAR)
         taken, gap = yield from _take_from(p, wc, player, item,
                                            body.get_actor_location(), yaw)
         p.check(f"...and E takes the {name} back out of it", taken, f"{gap:.0f} cm away")
@@ -171,6 +177,9 @@ def _run(p):
                 f"in {bone}, counted on {counted}")
         p.check(f"...and takes its {damage:g} HP whole", abs(lost - damage) < 1e-3,
                 f"lost {lost:g}")
+        p.check(f"...and leaves {HEADSHOT_TIME_VAR} alone: no X",
+                p.get(wc, HEADSHOT_TIME_VAR) == marked,
+                f"{marked:g} -> {p.get(wc, HEADSHOT_TIME_VAR):g}")
         taken, gap = yield from _take_from(p, wc, player, item,
                                            body.get_actor_location(), yaw)
         if not taken:

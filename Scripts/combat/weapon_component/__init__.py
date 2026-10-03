@@ -56,6 +56,8 @@ _author_* fragment per concern, each in its own module:
   tracer      debug mode: the line each pellet flew, off the trace's own hit
               result (red to an impact, blue out to the range), and a point
   impact      a pellet that connected: blood, damage, hit zones, debug readout
+  headshot    the headshot stamp: HeadshotTime, when a round or a thrown
+              blade last struck a head (the HUD's X round the reticle)
   surface_impact  a pellet that hit something with no health: BP_BulletImpact,
               off the health cast's failed arm, at the blood's transform
   inventory   equip, drop, BeginPlay loadout (each issued item into its slot)
@@ -182,7 +184,8 @@ BP_WeaponComponent event graph:
     camera -> LineTrace -> AimPoint      what the crosshair is resting on
     muzzle -> LineTrace -> AimPoint      can the gun actually reach it?
                                          if not, AimPoint moves to the wall and
-                                         AimBlocked goes true (red reticle)
+                                         AimBlocked goes true (the reticle stays
+                                         white: the HUD no longer reads it)
 
   Fire: muzzle world location  -> Start
         AimPoint - muzzle      -> direction

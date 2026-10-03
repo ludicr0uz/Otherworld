@@ -29,6 +29,7 @@ from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 from survival.consumable_specs import MATERIALS, consumable_specs
 from survival.paths import CONSUMABLE_BP_PATH
+from combat import item_vars as IV
 
 
 def build_consumable_materials():
@@ -46,7 +47,7 @@ def build_consumable_item():
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ConsumableItem failed to compile")
-    _apply_defaults(bp, {"Consumable": True, "HungerRestore": 0.0,
+    _apply_defaults(bp, {IV.Consumable: True, "HungerRestore": 0.0,
                          "ThirstRestore": 0.0, "HealthRestoreEasy": 0.0})
     _log(f"built {CONSUMABLE_BP_PATH}")
     return bp
@@ -67,8 +68,8 @@ def build_consumable(spec, base_bp):
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
-        "DisplayName": spec["display"],
-        "Consumable": True,
+        IV.DisplayName: spec["display"],
+        IV.Consumable: True,
         "HungerRestore": float(spec["hunger"]),
         "ThirstRestore": float(spec["thirst"]),
         "HealthRestoreEasy": float(spec["health_easy"]),
@@ -77,29 +78,29 @@ def build_consumable(spec, base_bp):
         # per-instance override (Python refuses to write a Blueprint variable
         # on an instance unless it is Instance Editable), and picking one up
         # clears it like any weapon.
-        "Dropped": True,
-        "UsesAmmo": False,
-        "Automatic": False,
-        "Damage": 0.0,
-        "PelletCount": 0,
-        "MagazineSize": 0,
-        "Loaded": 0,
-        "Reserve": 0,
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, spec["parts"],
+        IV.Dropped: True,
+        IV.UsesAmmo: False,
+        IV.Automatic: False,
+        IV.Damage: 0.0,
+        IV.PelletCount: 0,
+        IV.MagazineSize: 0,
+        IV.Loaded: 0,
+        IV.Reserve: 0,
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
+        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, spec["parts"],
                                                        spec["grip_part"])),
-        "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.GripRotation: grip_rot,
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0: the ADS speed and scope fade divide by (AdsZoom - 1), and
         # right-click still aims with food in hand. The irons zoom is the
         # harmless value every unscoped weapon already uses.
-        "AdsZoom": float(COMBAT.ads_zoom_irons),
-        "Scoped": False,
-        "RecoilPitch": 0.0,
-        "ShotVolume": 0.0,
-        "Icon": _weapon_icon(spec["display"]),
-        "AimPose": _must_load(aim),
+        IV.AdsZoom: float(COMBAT.ads_zoom_irons),
+        IV.Scoped: False,
+        IV.RecoilPitch: 0.0,
+        IV.ShotVolume: 0.0,
+        IV.Icon: _weapon_icon(spec["display"]),
+        IV.AimPose: _must_load(aim),
     })
     _log(f"built {spec['path']} ({spec['display']}: +{spec['hunger']:.0f} hunger, "
          f"+{spec['thirst']:.0f} thirst, +{spec['health_easy']:.0f} health on easy)")

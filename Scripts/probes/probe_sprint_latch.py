@@ -10,8 +10,9 @@ Sprinting stays down every frame, and the stamina refills.
 
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, SPRINT_SPENT_VAR), (WEAPON_COMP_BP_PATH, "Stamina")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, SPRINT_SPENT_VAR), (WEAPON_COMP_BP_PATH, WV.Stamina)]
 
 FRAMES = 20
 

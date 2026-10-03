@@ -34,6 +34,7 @@ from graphics_menu.umg_consts import (
 from uebp.nodes.actor import FN_ACTOR_TICK_PAUSED, FN_COMP_TICK_PAUSED, FN_WAS_PRESSED
 from uebp.nodes.math import FN_NOT
 from uebp.nodes.system import FN_QUIT, FN_SET_PAUSED
+from graphics_menu import hud_vars as MV
 
 
 def _then(node, in_execs):
@@ -67,7 +68,7 @@ def author_in_play(ed, in_execs):
 def _author_start(ed, in_execs, made):
     """The first row: resume in play, new game on the title."""
     take, rest = _branch(ed, pause_row_taken(ed, START_ACTION, made), in_execs, made)
-    flow = _setter(ed, "MenuOpen", "false", [take], made)
+    flow = _setter(ed, MV.MenuOpen, "false", [take], made)
     resumed, fresh = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [flow], made)
     flow = _setter(ed, GAME_STARTED_VAR, "true", [fresh], made)
     still = _call(ed, FN_ACTOR_TICK_PAUSED, made, bTickableWhenPaused="false")
@@ -80,8 +81,8 @@ def _author_start(ed, in_execs, made):
 def _author_settings(ed, in_execs, made):
     """The settings row: its page in the rows' place, caret at its top."""
     take, rest = _branch(ed, pause_row_taken(ed, SETTINGS_ACTION, made), in_execs, made)
-    flow = _setter(ed, "MenuPage", PAGE_SETTINGS, [take], made)
-    return [_setter(ed, "MenuRow", 0, [flow], made), rest]
+    flow = _setter(ed, MV.MenuPage, PAGE_SETTINGS, [take], made)
+    return [_setter(ed, MV.MenuRow, 0, [flow], made), rest]
 
 
 def _author_quit(ed, pc_out, in_execs, made):
@@ -97,8 +98,8 @@ def _author_toggle(ed, pc_out, in_execs, made):
     in_play, on_title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), in_execs, made)
     pressed = _call(ed, FN_WAS_PRESSED, made, self=pc_out, Key=MENU_KEY)
     flip, idle = _branch(ed, out(pressed), [in_play], made)
-    flipped = _call(ed, FN_NOT, made, A=_get(ed, "MenuOpen", made))
-    return [put(ed, "MenuOpen", out(flipped), [flip], made), idle, on_title]
+    flipped = _call(ed, FN_NOT, made, A=_get(ed, MV.MenuOpen, made))
+    return [put(ed, MV.MenuOpen, out(flipped), [flip], made), idle, on_title]
 
 
 def author_main_rows_tick(ed, pc_out, in_execs):

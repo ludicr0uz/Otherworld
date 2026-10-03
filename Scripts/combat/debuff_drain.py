@@ -33,6 +33,7 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_INT_TO_FLOAT, FN_MUL_FF, FN_NOT,
     FN_SUB_FF)
 from uebp.nodes.system import FN_IS_VALID
+from combat import health_vars as HV
 
 
 def _author_debuff_drain(ed, tick, exec_ins):
@@ -53,9 +54,9 @@ def _author_debuff_drain(ed, tick, exec_ins):
     # off the ability system, so it waits behind this gate.
     has = keep(_node(ed, FN_IS_VALID))
     _connect(asc, _pin(has, "Object"))
-    dead = keep(ed.add_get_member_variable_node("Dead"))
+    dead = keep(ed.add_get_member_variable_node(HV.Dead))
     alive = keep(_node(ed, FN_NOT))
-    _connect(out(dead, "Dead"), _pin(alive, "A"))
+    _connect(out(dead, HV.Dead), _pin(alive, "A"))
     both = keep(_node(ed, FN_AND))
     _connect(out(has), _pin(both, "A"))
     _connect(out(alive), _pin(both, "B"))

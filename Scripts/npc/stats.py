@@ -15,6 +15,7 @@ from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_PAWN
 from uebp.nodes.math import FN_ADD_FF, FN_GE_FF, FN_NEQ_FF, FN_RANDOM_FLOAT
 from uebp.nodes.palette import NODE_CAST_HEALTH
 from uebp.nodes.system import FN_TIME_SECONDS
+from combat import health_vars as HV
 
 
 def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
@@ -100,14 +101,14 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
     _connect(then(first), _pin(as_health, "execute"))
     health_out = _loose_pin(as_health, "AsBPHealthComponent", is_input=False)
 
-    set_max = keep(ed.add_set_member_variable_node("MaxHealth", HEALTH_CLASS_PATH))
+    set_max = keep(ed.add_set_member_variable_node(HV.MaxHealth, HEALTH_CLASS_PATH))
     _connect(health_out, _pin(set_max, "self"))
-    _connect(want_out, _pin(set_max, "MaxHealth"))
+    _connect(want_out, _pin(set_max, HV.MaxHealth))
     _connect(then(as_health), _pin(set_max, "execute"))
 
-    set_now = keep(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH))
+    set_now = keep(ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
     _connect(health_out, _pin(set_now, "self"))
-    _connect(want_out, _pin(set_now, "Health"))
+    _connect(want_out, _pin(set_now, HV.Health))
     _connect(then(set_max), _pin(set_now, "execute"))
 
     # ...and this creature's own hit reactions, onto the same component, in the

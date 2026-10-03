@@ -42,6 +42,7 @@ from uebp.nodes.math import (
     FN_NORMAL, FN_ROT_FROM_X, FN_SUB_FF)
 from uebp.nodes.palette import NODE_BREAK_HIT
 from uebp.nodes.system import FN_DELTA_SECONDS, FN_IS_VALID, FN_TIME_SECONDS, FN_TRACE
+from combat import item_vars as IV
 
 THROWN_VAR = "Thrown"                 # the item in the air, or None
 THROW_START_VAR = "ThrowStart"
@@ -232,9 +233,9 @@ def _author_throw_flight(ed, exec_ins):
     _connect(else_(grounded), _pin(hang, "execute"))
 
     # --- landed: an ordinary dropped item, which E picks up ------------------
-    flag = ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH)
+    flag = ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH)
     _connect(thrown, _pin(flag, "self"))
-    _set(flag, "Dropped", "true")
+    _set(flag, IV.Dropped, "true")
     for pin in (then(rest), then(hang), then(lost)) + lodged:
         _connect(pin, _pin(flag, "execute"))
     done = ed.add_set_member_variable_node(THROWN_VAR)

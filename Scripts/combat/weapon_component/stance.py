@@ -34,6 +34,9 @@ from uebp.nodes.math import (
     FN_ABS, FN_AND, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_SELECT_FF, FN_SELECT_II,
     FN_SUB_FF)
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_FOOTSTEP
+from combat.sprint_tuning import BASE_SPEED_VAR
+from uebp import props as EP
+from combat.weapon_component import vars as WV
 
 STANCE_VAR = "Stance"
 STAND, CROUCH, PRONE = 0, 1, 2
@@ -122,7 +125,7 @@ def _author_stance_toggle(ed, pc_out, key_pins, exec_in):
     stood = _node(ed, FN_SELECT_II)
     _set(stood, "A", STAND)
     _connect(out(after_p), _pin(stood, "B"))
-    _connect(out(ed.add_get_member_variable_node("Sprinting"), "Sprinting"), _pin(stood, "bPickA"))
+    _connect(out(ed.add_get_member_variable_node(WV.Sprinting), WV.Sprinting), _pin(stood, "bPickA"))
 
     mark = ed.add_set_member_variable_node(STANCE_VAR)
     _connect(out(stood), _pin(mark, STANCE_VAR))
@@ -154,9 +157,9 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     stance = ed.add_get_member_variable_node(STANCE_VAR)
     stance_out = out(stance, STANCE_VAR)
 
-    movement = ed.add_get_member_variable_node("CharacterMovement", "/Script/Engine.Character")
+    movement = ed.add_get_member_variable_node(EP.CHARACTER_MOVEMENT, "/Script/Engine.Character")
     _connect(char_out, _pin(movement, "self"))
-    movement_out = out(movement, "CharacterMovement")
+    movement_out = out(movement, EP.CHARACTER_MOVEMENT)
 
     # --- how fast a low stance moves -----------------------------------------
     # The movement component reads MaxWalkSpeedCrouched instead of
@@ -164,11 +167,11 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     # latter simply do not apply down here.
     scale = _by_stance(ed, stance_out, COMBAT.crouch_speed_scale, COMBAT.prone_speed_scale)
     speed = _node(ed, FN_MUL_FF)
-    _connect(out(ed.add_get_member_variable_node("BaseSpeed"), "BaseSpeed"), _pin(speed, "A"))
+    _connect(out(ed.add_get_member_variable_node(BASE_SPEED_VAR), BASE_SPEED_VAR), _pin(speed, "A"))
     _connect(scale, _pin(speed, "B"))
-    pace = ed.add_set_member_variable_node("MaxWalkSpeedCrouched", MOVEMENT_CLASS_PATH)
+    pace = ed.add_set_member_variable_node(EP.MAX_WALK_SPEED_CROUCHED, MOVEMENT_CLASS_PATH)
     _connect(movement_out, _pin(pace, "self"))
-    _connect(out(speed), _pin(pace, "MaxWalkSpeedCrouched"))
+    _connect(out(speed), _pin(pace, EP.MAX_WALK_SPEED_CROUCHED))
     _connect(then(mark), _pin(pace, "execute"))
 
     # --- stand, or crouch to the stance's height -----------------------------
@@ -191,10 +194,10 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     _connect(out(is_prone), _pin(height, "bPickA"))
     height_out = out(height)
 
-    capsule = ed.add_get_member_variable_node("CapsuleComponent", "/Script/Engine.Character")
+    capsule = ed.add_get_member_variable_node(EP.CAPSULE_COMPONENT, "/Script/Engine.Character")
     _connect(char_out, _pin(capsule, "self"))
     now_h = _node(ed, FN_CAPSULE_HALF_HEIGHT)
-    _connect(out(capsule, "CapsuleComponent"), _pin(now_h, "self"))
+    _connect(out(capsule, EP.CAPSULE_COMPONENT), _pin(now_h, "self"))
     off = _node(ed, FN_SUB_FF)
     _connect(out(now_h), _pin(off, "A"))
     _connect(height_out, _pin(off, "B"))
@@ -213,9 +216,9 @@ def _author_stance(ed, pc_out, owner_out, key_pins, exec_ins):
     _connect(out(resize), _pin(restart, "Condition"))
     _connect(else_(up), _pin(restart, "execute"))
     _connect(then(restart), _pin(rise, "execute"))
-    size = ed.add_set_member_variable_node("CrouchedHalfHeight", MOVEMENT_CLASS_PATH)
+    size = ed.add_set_member_variable_node(EP.CROUCHED_HALF_HEIGHT, MOVEMENT_CLASS_PATH)
     _connect(movement_out, _pin(size, "self"))
-    _connect(height_out, _pin(size, "CrouchedHalfHeight"))
+    _connect(height_out, _pin(size, EP.CROUCHED_HALF_HEIGHT))
     _connect(else_(restart), _pin(size, "execute"))
     duck = _node(ed, FN_CROUCH)
     _connect(char_out, _pin(duck, "self"))

@@ -11,8 +11,9 @@ import math
 
 from world import world_config as cfg
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH, STATIC_SKY_TAG
+from world import day_night_vars as DV
 
-WRITABLE = [(DAY_NIGHT_BP_PATH, "Clock")]
+WRITABLE = [(DAY_NIGHT_BP_PATH, DV.Clock)]
 
 SETTLE = 0.1
 

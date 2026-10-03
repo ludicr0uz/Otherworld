@@ -21,6 +21,7 @@ from graphics_menu.profile_consts import (
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_PROFILE
 from uebp.nodes.system import FN_CREATE_SAVE, FN_OBJECT_CLASS, FN_WRITE_SAVE
+from combat.weapon_component import vars as WV
 
 
 def copy_var(ed, src_out, src_class, src_var, dst_out, dst_class, dst_var, flow, made):
@@ -59,13 +60,13 @@ def author_write_profile(ed, in_exec, parts, made):
                      field, flow, made)
 
     # --- the inventory, one entry per slot in every array -------------------
-    inv = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
+    inv = ed.add_get_member_variable_node(WV.Inventory, WEAPON_COMP_CLASS_PATH)
     _connect(parts[WEAPON_COMP_CLASS_PATH], _pin(inv, "self"))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     loop
-    _connect(out(inv, "Inventory"), _loose_pin(loop, "Array"))
+    _connect(out(inv, WV.Inventory), _loose_pin(loop, "Array"))
     _connect(flow, _loose_pin(loop, "Exec"))
     made += [inv, loop]
     item = _loose_pin(loop, "ArrayElement", is_input=False)

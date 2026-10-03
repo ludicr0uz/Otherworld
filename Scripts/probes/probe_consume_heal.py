@@ -14,8 +14,10 @@ from combat.paths import GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from combat.tuning import CONSUME_EVENT_TAG
 from survival.paths import MUSHROOM_CLASS_PATH, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 from survival.tuning import MUSHROOM_HEALTH_EASY
+from combat import health_vars as HV
+from survival import component_vars as UV
 
-WRITABLE = [(HEALTH_BP_PATH, "Health"), (SURVIVAL_BP_PATH, "Hunger"),
+WRITABLE = [(HEALTH_BP_PATH, HV.Health), (SURVIVAL_BP_PATH, UV.Hunger),
             (GAME_MODE_BP_PATH, DIFFICULTY_VAR)]
 
 START_HEALTH = 50.0

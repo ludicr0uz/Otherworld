@@ -29,6 +29,7 @@ from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
+from combat import item_vars as IV
 
 MATCHES_MESH = "/Game/Sourced/Quaternius/Survival/SM_Matchbox"
 MATCHES_DISPLAY = "Matches"
@@ -62,35 +63,35 @@ def build_matches(item_bp):
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
-        "DisplayName": MATCHES_DISPLAY,
+        IV.DisplayName: MATCHES_DISPLAY,
         LIGHTS_VAR: True,
-        "Melee": False,
-        "Consumable": False,
+        IV.Melee: False,
+        IV.Consumable: False,
         CHOPS_VAR: False,
-        "Dropped": False,
+        IV.Dropped: False,
         # Nothing to fire: the Lights branch takes the fire key before the
         # guns' gate is reached.
-        "UsesAmmo": False,
-        "Automatic": False,
-        "Damage": 0.0,
-        "PelletCount": 0,
-        "MagazineSize": 0,
-        "Loaded": 0,
-        "Reserve": 0,
-        "InfiniteReserve": False,
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, matches_outline())),
-        "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.UsesAmmo: False,
+        IV.Automatic: False,
+        IV.Damage: 0.0,
+        IV.PelletCount: 0,
+        IV.MagazineSize: 0,
+        IV.Loaded: 0,
+        IV.Reserve: 0,
+        IV.InfiniteReserve: False,
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
+        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, matches_outline())),
+        IV.GripRotation: grip_rot,
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.
-        "AdsZoom": float(COMBAT.ads_zoom_irons),
-        "Scoped": False,
-        "RecoilPitch": 0.0,
-        "ShotVolume": 0.0,
-        "TwoHanded": False,
-        "Icon": _weapon_icon(MATCHES_DISPLAY),
-        "AimPose": _must_load(aim),
+        IV.AdsZoom: float(COMBAT.ads_zoom_irons),
+        IV.Scoped: False,
+        IV.RecoilPitch: 0.0,
+        IV.ShotVolume: 0.0,
+        IV.TwoHanded: False,
+        IV.Icon: _weapon_icon(MATCHES_DISPLAY),
+        IV.AimPose: _must_load(aim),
     })
     _log(f"built {MATCHES_BP_PATH} ({MATCHES_MESH.rsplit('/', 1)[-1]} at {MATCHES_SCALE}, "
          f"a {BOX_CM[2]:.0f} cm box of matches)")

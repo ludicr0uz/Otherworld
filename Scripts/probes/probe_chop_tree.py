@@ -26,9 +26,10 @@ from combat.weapon_component.knife import KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from probes.probe_knife import _file, _held_name
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
-            ("EquippedIndex", "NeedsRefresh", KNIFE_QUEUED_VAR, INTERACT_FORCED_VAR,
+            (WV.EquippedIndex, WV.NeedsRefresh, KNIFE_QUEUED_VAR, INTERACT_FORCED_VAR,
              FIRE_FORCED_VAR)]
 
 AXE, KNIFE, WOOD = "BP_Axe_C", "BP_Knife_C", "BP_Wood_C"

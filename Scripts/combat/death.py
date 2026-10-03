@@ -23,6 +23,8 @@ from uebp.nodes.palette import (
 from uebp.nodes.system import (
     FN_CONCAT, FN_DELAY, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT,
     FN_SET_PAUSED)
+from uebp import props as EP
+from combat import health_vars as HV
 
 
 # How long a corpse lies where it fell. Long enough that a firefight leaves a
@@ -93,9 +95,9 @@ def _author_kill_count(ed, exec_in):
     # the zero vector -- which spawns the pickup at zero size, invisible.
     _connect(_vec(ed, 1.0, 1.0, 1.0), _pin(where, "Scale"))
 
-    ammo_cls = ed.add_get_member_variable_node("AmmoClass")
+    ammo_cls = ed.add_get_member_variable_node(HV.AmmoClass)
     drop = _palette(ed, NODE_SPAWN)
-    _connect(out(ammo_cls, "AmmoClass"), _pin(drop, "Class"))
+    _connect(out(ammo_cls, HV.AmmoClass), _pin(drop, "Class"))
     _connect(out(where), _pin(drop, "SpawnTransform"))
     _set(drop, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(then(write), _pin(drop, "execute"))
@@ -150,22 +152,22 @@ def _author_death_collapse(ed, exec_ins):
         _connect(tail, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    movement = ed.add_get_member_variable_node("CharacterMovement", "/Script/Engine.Character")
+    movement = ed.add_get_member_variable_node(EP.CHARACTER_MOVEMENT, "/Script/Engine.Character")
     _connect(char_out, _pin(movement, "self"))
     stop = _node(ed, FN_DISABLE_MOVEMENT)
-    _connect(out(movement, "CharacterMovement"), _pin(stop, "self"))
+    _connect(out(movement, EP.CHARACTER_MOVEMENT), _pin(stop, "self"))
     _connect(then(as_char), _pin(stop, "execute"))
 
-    capsule = ed.add_get_member_variable_node("CapsuleComponent", "/Script/Engine.Character")
+    capsule = ed.add_get_member_variable_node(EP.CAPSULE_COMPONENT, "/Script/Engine.Character")
     _connect(char_out, _pin(capsule, "self"))
     intangible = _node(ed, FN_SET_COLLISION)
-    _connect(out(capsule, "CapsuleComponent"), _pin(intangible, "self"))
+    _connect(out(capsule, EP.CAPSULE_COMPONENT), _pin(intangible, "self"))
     _set(intangible, "NewType", "NoCollision")
     _connect(then(stop), _pin(intangible, "execute"))
 
-    mesh = ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character")
+    mesh = ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character")
     _connect(char_out, _pin(mesh, "self"))
-    mesh_out = out(mesh, "Mesh")
+    mesh_out = out(mesh, EP.MESH)
 
     loosen = _node(ed, FN_SET_PROFILE)
     _connect(mesh_out, _pin(loosen, "self"))

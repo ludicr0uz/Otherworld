@@ -70,6 +70,7 @@ from uebp.nodes.array import FN_ARR_REMOVE
 from uebp.nodes.math import FN_AND, FN_MAKE_TRANSFORM, FN_NOT, FN_OR
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
+from combat.weapon_component import vars as WV
 
 THROW_AIMING_VAR = "ThrowAiming"      # the arc was drawn last frame
 THROW_FORCED_VAR = "ThrowKeyForced"   # a probe holding the key
@@ -296,20 +297,20 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     _connect(then(shown), _pin(put, "execute"))
     squared = _author_square(ed, held, then(put))
 
-    inv = ed.add_get_member_variable_node("Inventory")
-    idx = ed.add_get_member_variable_node("EquippedIndex")
+    inv = ed.add_get_member_variable_node(WV.Inventory)
+    idx = ed.add_get_member_variable_node(WV.EquippedIndex)
     remove = _node(ed, FN_ARR_REMOVE)
-    _connect(out(inv, "Inventory"), _pin(remove, "TargetArray"))
-    _connect(out(idx, "EquippedIndex"), _pin(remove, "IndexToRemove"))
+    _connect(out(inv, WV.Inventory), _pin(remove, "TargetArray"))
+    _connect(out(idx, WV.EquippedIndex), _pin(remove, "IndexToRemove"))
     for pin in squared:
         _connect(pin, _pin(remove, "execute"))
     # Held set with nothing connected clears it, as in _author_drop.
-    clear = ed.add_set_member_variable_node("Held")
+    clear = ed.add_set_member_variable_node(WV.Held)
     _connect(then(remove), _pin(clear, "execute"))
-    reset = ed.add_set_member_variable_node("EquippedIndex")
-    _set(reset, "EquippedIndex", 0)
+    reset = ed.add_set_member_variable_node(WV.EquippedIndex)
+    _set(reset, WV.EquippedIndex, 0)
     _connect(then(clear), _pin(reset, "execute"))
-    dirty = ed.add_set_member_variable_node("NeedsRefresh")
-    _set(dirty, "NeedsRefresh", "true")
+    dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
+    _set(dirty, WV.NeedsRefresh, "true")
     _connect(then(reset), _pin(dirty, "execute"))
     return then(dirty)

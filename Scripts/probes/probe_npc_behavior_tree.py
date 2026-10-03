@@ -16,8 +16,9 @@ from npc.paths import (
     AGGRO_REASON_VAR, AGGRO_VAR, BB_AGGRO_KEY, BB_REASON_KEY, CORPSE_VAR,
     NEXT_PATROL_VAR, PATROL_READY_VAR, STATS_APPLIED_VAR,
 )
+from combat import health_vars as HV
 
-WRITABLE = [(HEALTH_BP_PATH, "Dead")]
+WRITABLE = [(HEALTH_BP_PATH, HV.Dead)]
 
 SETTLE = 1.5          # game seconds: a few passes of the tree
 BESIDE_CM = 100.0     # well inside every creature's touch range

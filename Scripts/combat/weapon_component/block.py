@@ -11,6 +11,7 @@ from uebp.graph import _connect, _node, _pin, _set, out, then
 from combat.tuning import BLOCK_KEY, COMBAT
 from uebp.nodes.actor import FN_IS_KEY_DOWN
 from uebp.nodes.math import FN_AND, FN_GREATER_FF, FN_NOT
+from combat.weapon_component import vars as WV
 
 
 def _author_block(ed, pc_out, key_pin, exec_ins):
@@ -35,14 +36,14 @@ def _author_block(ed, pc_out, key_pin, exec_ins):
     _connect(pc_out, _pin(down, "self"))
     _connect(key_pin, _pin(down, "Key"))
 
-    stamina = keep(ed.add_get_member_variable_node("Stamina"))
+    stamina = keep(ed.add_get_member_variable_node(WV.Stamina))
     left = keep(_node(ed, FN_GREATER_FF))
-    _connect(out(stamina, "Stamina"), _pin(left, "A"))
+    _connect(out(stamina, WV.Stamina), _pin(left, "A"))
     _set(left, "B", 0.0)
 
-    running = keep(ed.add_get_member_variable_node("Sprinting"))
+    running = keep(ed.add_get_member_variable_node(WV.Sprinting))
     still = keep(_node(ed, FN_NOT))
-    _connect(out(running, "Sprinting"), _pin(still, "A"))
+    _connect(out(running, WV.Sprinting), _pin(still, "A"))
 
     able = keep(_node(ed, FN_AND))
     _connect(out(left), _pin(able, "A"))
@@ -51,8 +52,8 @@ def _author_block(ed, pc_out, key_pin, exec_ins):
     _connect(out(down), _pin(guard, "A"))
     _connect(out(able), _pin(guard, "B"))
 
-    mark = keep(ed.add_set_member_variable_node("Blocking"))
-    _connect(out(guard), _pin(mark, "Blocking"))
+    mark = keep(ed.add_set_member_variable_node(WV.Blocking))
+    _connect(out(guard), _pin(mark, WV.Blocking))
     for e in exec_ins:
         _connect(e, _pin(mark, "execute"))
 

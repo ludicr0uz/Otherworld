@@ -9,6 +9,10 @@ each module's docstring says what it owns and why it is shaped that way.
 
 DATA (constants and pure tables -- no Blueprint authoring)
   paths             /Game asset paths and generated-class paths
+  health_vars, item_vars, settings_vars, burst_vars, ammo_vars, footstep_vars
+                    one Blueprint's member variables each, named once: name,
+                    pin type, default (uebp/vars.py). The weapon component's
+                    is weapon_component/vars.py
   nodes             engine class paths the graphs name (the node paths, FN_*
                     and NODE_*, are the shared catalog: uebp/nodes/)
   tuning            keys, inventory size, CombatConfig / COMBAT, ammo, drops

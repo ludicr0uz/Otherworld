@@ -28,9 +28,10 @@ from forest_generator.npc_placement import NAV_REACHABLE_EXTENT_CM
 from npc.paths import NPC_DIR
 from survival.on_hit import ON_HIT_BONUS_VAR
 from survival.paths import BLEEDING_GE_CLASS_PATH
+from combat import health_vars as HV
 
 WENDIGO_AI = f"{NPC_DIR}/BP_ForestWandererAI_Wendigo"
-WRITABLE = [(HEALTH_BP_PATH, "Health"), (WENDIGO_AI, ON_HIT_BONUS_VAR)]
+WRITABLE = [(HEALTH_BP_PATH, HV.Health), (WENDIGO_AI, ON_HIT_BONUS_VAR)]
 
 START_CM = 150.0      # inside its reach
 FULL = 100.0

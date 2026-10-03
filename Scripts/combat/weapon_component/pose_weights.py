@@ -42,6 +42,8 @@ from uebp.nodes.math import (
     FN_ABS, FN_ADD_FF, FN_AND, FN_BOOL_TO_FLOAT, FN_EQ_II, FN_FMOD, FN_INTERP_FF, FN_NOT,
     FN_SUB_FF)
 from uebp.nodes.system import FN_TIME_SECONDS
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 HELD_TWO_HANDED = "HeldTwoHanded"
 # Held.SupportPoint, copied beside it: where the held gun's ready pose has the
@@ -58,10 +60,10 @@ def _author_held_two_handed(ed, held, armed_out, exec_ins):
     _connect(armed_out, _pin(gate, "Condition"))
     for e in exec_ins:
         _connect(e, _pin(gate, "execute"))
-    flag = ed.add_get_member_variable_node("TwoHanded", ITEM_CLASS_PATH)
+    flag = ed.add_get_member_variable_node(IV.TwoHanded, ITEM_CLASS_PATH)
     _connect(held, _pin(flag, "self"))
     copy = ed.add_set_member_variable_node(HELD_TWO_HANDED)
-    _connect(out(flag, "TwoHanded"), _pin(copy, HELD_TWO_HANDED))
+    _connect(out(flag, IV.TwoHanded), _pin(copy, HELD_TWO_HANDED))
     _connect(then(gate), _pin(copy, "execute"))
     clear = ed.add_set_member_variable_node(HELD_TWO_HANDED)
     _set(clear, HELD_TWO_HANDED, "false")
@@ -85,7 +87,7 @@ def _targets(ed):
         _set(eq, "B", value)
         out[weight] = _pin(eq, "ReturnValue", is_input=False)
 
-    blocking = ed.add_get_member_variable_node("Blocking")
+    blocking = ed.add_get_member_variable_node(WV.Blocking)
     two = ed.add_get_member_variable_node(HELD_TWO_HANDED)
     two_out = _pin(two, HELD_TWO_HANDED, is_input=False)
     one = _node(ed, FN_NOT)
@@ -93,7 +95,7 @@ def _targets(ed):
     for weight, hands in ((GUARD_GUN, two_out),
                           (GUARD_ARMS, _pin(one, "ReturnValue", is_input=False))):
         both = _node(ed, FN_AND)
-        _connect(_pin(blocking, "Blocking", is_input=False), _pin(both, "A"))
+        _connect(_pin(blocking, WV.Blocking, is_input=False), _pin(both, "A"))
         _connect(hands, _pin(both, "B"))
         out[weight] = _pin(both, "ReturnValue", is_input=False)
 
@@ -135,9 +137,9 @@ def _author_pose_weights(ed, tick, held, armed_out, exec_ins):
 
     copied = _author_held_two_handed(ed, held, armed_out, exec_ins)
 
-    mesh = ed.add_get_member_variable_node("OwnerMesh")
+    mesh = ed.add_get_member_variable_node(WV.OwnerMesh)
     anim = _node(ed, FN_ANIM_INSTANCE)
-    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
+    _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     cast = _palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2])
     _connect(out(anim), _pin(cast, "Object"))
     for e in copied:

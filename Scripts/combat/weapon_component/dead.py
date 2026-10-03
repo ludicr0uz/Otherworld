@@ -42,6 +42,8 @@ from uebp.nodes.actor import (
     FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT)
 from uebp.nodes.math import FN_LE_FF, FN_OR
 from uebp.nodes.palette import NODE_CAST_HEALTH
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
 OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
 
@@ -72,15 +74,15 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
     # Behind the cast, so neither read is ever pulled off a null component.
-    marked = keep(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH))
+    marked = keep(ed.add_get_member_variable_node(HV.Dead, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(marked, "self"))
-    hp = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
+    hp = keep(ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(hp, "self"))
     spent = keep(_node(ed, FN_LE_FF))
-    _connect(out(hp, "Health"), _pin(spent, "A"))
+    _connect(out(hp, HV.Health), _pin(spent, "A"))
     _set(spent, "B", 0.0)
     dead = keep(_node(ed, FN_OR))
-    _connect(out(marked, "Dead"), _pin(dead, "A"))
+    _connect(out(marked, HV.Dead), _pin(dead, "A"))
     _connect(out(spent), _pin(dead, "B"))
     gate = keep(ed.add_branch_node())
     _connect(out(dead), _pin(gate, "Condition"))
@@ -109,13 +111,13 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     cam = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(cam, "self"))
     _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
-    base = keep(ed.add_get_member_variable_node("BaseFOV"))
-    fov = keep(ed.add_set_member_variable_node("CurrentFOV"))
-    _connect(out(base, "BaseFOV"), _pin(fov, "CurrentFOV"))
+    base = keep(ed.add_get_member_variable_node(WV.BaseFOV))
+    fov = keep(ed.add_set_member_variable_node(WV.CurrentFOV))
+    _connect(out(base, WV.BaseFOV), _pin(fov, WV.CurrentFOV))
     _connect(flow, _pin(fov, "execute"))
     unzoom = keep(_node(ed, FN_SET_FOV))
     _connect(out(cam), _pin(unzoom, "self"))
-    _connect(out(base, "BaseFOV"), _pin(unzoom, "InFieldOfView"))
+    _connect(out(base, WV.BaseFOV), _pin(unzoom, "InFieldOfView"))
     _connect(then(fov), _pin(unzoom, "execute"))
     seat = keep(ed.add_set_member_variable_node(SEAT_VAR))
     _set(seat, SEAT_VAR, 0.0)
@@ -123,8 +125,8 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     look = keep(ed.add_set_member_variable_node(LOOK_VAR))
     _set(look, LOOK_VAR, 0.0)
     _connect(then(seat), _pin(look, "execute"))
-    blend = keep(ed.add_set_member_variable_node("SightBlend"))
-    _set(blend, "SightBlend", 0.0)
+    blend = keep(ed.add_set_member_variable_node(WV.SightBlend))
+    _set(blend, WV.SightBlend, 0.0)
     _connect(then(look), _pin(blend, "execute"))
     arm = keep(_node(ed, FN_GET_COMP))
     _connect(owner_out, _pin(arm, "self"))
@@ -146,9 +148,9 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
 
     # ...and what the scope hid shows again: the body, and the gun if there
     # is one (a nested Branch, so Held is never read null).
-    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    body = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     shown = keep(_node(ed, FN_SET_OWNER_NO_SEE))
-    _connect(out(body, "OwnerMesh"), _pin(shown, "self"))
+    _connect(out(body, WV.OwnerMesh), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", "false")
     _connect(then(level), _pin(shown, "execute"))
     # ...and the head the sights hid (head_hide.py).

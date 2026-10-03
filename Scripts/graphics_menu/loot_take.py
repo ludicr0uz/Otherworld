@@ -19,6 +19,8 @@ from loot.consts import BODY_ARRAYS, LOOT_VAR
 from uebp.nodes.actor import FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_GET, FN_ARR_REMOVE
 from uebp.nodes.palette import NODE_CAST_ITEM, NODE_SPAWN
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _body(ed, var, made):
@@ -45,13 +47,13 @@ def author_take(ed, wc, pawn_out, in_execs, made):
     _connect(then(spawn), _pin(cast, "execute"))
     item = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
 
-    flow = _setter(ed, "Dropped", "false", [then(cast)], made, ITEM_CLASS_PATH, item)
+    flow = _setter(ed, IV.Dropped, "false", [then(cast)], made, ITEM_CLASS_PATH, item)
     add = _call(ed, FN_ARR_ADD, made,
-                TargetArray=_get(ed, "Inventory", made,
+                TargetArray=_get(ed, WV.Inventory, made,
                                  WEAPON_COMP_CLASS_PATH, wc))
     _connect(item, _loose_pin(add, "NewItem"))
     _connect(flow, _pin(add, "execute"))
-    flow = _setter(ed, "NeedsRefresh", "true", [then(add)], made, WEAPON_COMP_CLASS_PATH, wc)
+    flow = _setter(ed, WV.NeedsRefresh, "true", [then(add)], made, WEAPON_COMP_CLASS_PATH, wc)
     for var in BODY_ARRAYS:
         gone = _call(ed, FN_ARR_REMOVE, made,
                      TargetArray=_body(ed, var, made),

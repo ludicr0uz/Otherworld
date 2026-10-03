@@ -21,6 +21,7 @@ from uebp.nodes.math import FN_DIV_FF, FN_SELECT_COLOR
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from uebp.nodes.umg import FN_SET_FILL
+from combat.weapon_component import vars as WV
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 
@@ -52,15 +53,15 @@ def _author_stamina(ed, in_execs):
         return out(n, name)
 
     frac = keep(_node(ed, FN_DIV_FF))
-    _connect(var("Stamina"), _pin(frac, "A"))
-    _connect(var("MaxStamina"), _pin(frac, "B"))
+    _connect(var(WV.Stamina), _pin(frac, "A"))
+    _connect(var(WV.MaxStamina), _pin(frac, "B"))
     bar = part(ed, WBP_HUD, STAMINA_BAR)
     filled = set_percent(ed, bar, out(frac), [then(cast)])
 
     tint = keep(_node(ed, FN_SELECT_COLOR))
     _set(tint, "A", COL_ST_SPENT)
     _set(tint, "B", COL_ST_FILL)
-    _connect(var("Sprinting"), _pin(tint, "bPickA"))
+    _connect(var(WV.Sprinting), _pin(tint, "bPickA"))
     fill = keep(_node(ed, FN_SET_FILL))
     _connect(bar, _pin(fill, "self"))
     _connect(out(tint), _pin(fill, "InColor"))

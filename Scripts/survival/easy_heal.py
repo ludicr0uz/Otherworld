@@ -25,6 +25,7 @@ from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.math import FN_ADD_FF, FN_CLAMP, FN_EQ_II
 from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_GET_GAME_MODE
+from combat import health_vars as HV
 
 RESTORE_VAR = "HealthRestoreEasy"
 
@@ -68,22 +69,22 @@ def _author_easy_heal(ed, in_exec, item, avatar):
     _connect(then(on_easy), _pin(as_health, "execute"))
     health = _loose_pin(as_health, "AsBPHealthComponent", is_input=False)
 
-    now = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
+    now = keep(ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
     _connect(health, _pin(now, "self"))
-    top = keep(ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH))
+    top = keep(ed.add_get_member_variable_node(HV.MaxHealth, HEALTH_CLASS_PATH))
     _connect(health, _pin(top, "self"))
     gain = keep(ed.add_get_member_variable_node(RESTORE_VAR, CONSUMABLE_CLASS_PATH))
     _connect(item, _pin(gain, "self"))
     more = keep(_node(ed, FN_ADD_FF))
-    _connect(out(now, "Health"), _pin(more, "A"))
+    _connect(out(now, HV.Health), _pin(more, "A"))
     _connect(out(gain, RESTORE_VAR), _pin(more, "B"))
     clamp = keep(_node(ed, FN_CLAMP))
     _connect(out(more), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
-    _connect(out(top, "MaxHealth"), _pin(clamp, "Max"))
-    write = keep(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH))
+    _connect(out(top, HV.MaxHealth), _pin(clamp, "Max"))
+    write = keep(ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
     _connect(health, _pin(write, "self"))
-    _connect(out(clamp), _pin(write, "Health"))
+    _connect(out(clamp), _pin(write, HV.Health))
     _connect(then(as_health), _pin(write, "execute"))
 
     ed.add_comment_to_nodes(

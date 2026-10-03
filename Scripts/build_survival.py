@@ -44,6 +44,7 @@ from survival.consume_ability import build_consume_ability         # noqa: E402
 from survival.effects import build_debuff_effects, build_timed_effects  # noqa: E402
 from survival.install import install_survival                      # noqa: E402
 from survival.survival_component import build_survival_component   # noqa: E402
+from survival import component_vars as UV  # noqa: E402
 
 
 def main():
@@ -57,7 +58,7 @@ def main():
     # the same way combat writes BP_HealthComponent.AmmoClass.
     _apply_defaults(survival_bp, {
         **{var: BEL.generated_class(bp) for var, bp in effects.items()},
-        "ConsumeAbility": BEL.generated_class(ability_bp),
+        UV.ConsumeAbility: BEL.generated_class(ability_bp),
     })
     # The corpse loot tables name the items, so they are filled once the last
     # item exists -- and before the install recompiles the characters.

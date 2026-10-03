@@ -30,6 +30,8 @@ from uebp.nodes.array import FN_ARR_LEN, FN_ARR_REMOVE
 from uebp.nodes.gas import FN_SEND_GAMEPLAY_EVENT
 from uebp.nodes.math import FN_AND, FN_MIN_II, FN_NOT, FN_SUB_II
 from uebp.nodes.palette import NODE_MAKE_EVENT_DATA
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 # The fire press that used an item, still held. Declared in build.py.
 TRIGGER_SPENT = "TriggerSpent"
@@ -71,7 +73,7 @@ def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, wear_gate):
     `not_edible` (the ready gate). Returns the exits: [eaten, worn], and not
     tapped.
     """
-    edible, edible_n = _prop(ed, "Consumable", held)
+    edible, edible_n = _prop(ed, IV.Consumable, held)
     use_gate = ed.add_branch_node()
     _connect(edible, _pin(use_gate, "Condition"))
     _connect(exec_in, _pin(use_gate, "execute"))
@@ -117,10 +119,10 @@ def _author_consume(ed, held, owner, exec_in):
     _connect(BEL.list_output_pins(payload)[0], _pin(send, "Payload"))
     _connect(exec_in, _pin(send, "execute"))
 
-    inv = keep(ed.add_get_member_variable_node("Inventory"))
-    inv_out = out(inv, "Inventory")
-    idx = keep(ed.add_get_member_variable_node("EquippedIndex"))
-    idx_out = out(idx, "EquippedIndex")
+    inv = keep(ed.add_get_member_variable_node(WV.Inventory))
+    inv_out = out(inv, WV.Inventory)
+    idx = keep(ed.add_get_member_variable_node(WV.EquippedIndex))
+    idx_out = out(idx, WV.EquippedIndex)
     remove = keep(_node(ed, FN_ARR_REMOVE))
     _connect(inv_out, _pin(remove, "TargetArray"))
     _connect(idx_out, _pin(remove, "IndexToRemove"))
@@ -132,7 +134,7 @@ def _author_consume(ed, held, owner, exec_in):
 
     # Held is set with its input pin left unconnected: that clears it to None,
     # the same way dropping does.
-    clear = keep(ed.add_set_member_variable_node("Held"))
+    clear = keep(ed.add_set_member_variable_node(WV.Held))
     _connect(then(gone), _pin(clear, "execute"))
 
     # Min(EquippedIndex, Length - 1). Length is pure, so it is read here --
@@ -145,12 +147,12 @@ def _author_consume(ed, held, owner, exec_in):
     clamp = keep(_node(ed, FN_MIN_II))
     _connect(idx_out, _pin(clamp, "A"))
     _connect(out(last), _pin(clamp, "B"))
-    stay = keep(ed.add_set_member_variable_node("EquippedIndex"))
-    _connect(out(clamp), _pin(stay, "EquippedIndex"))
+    stay = keep(ed.add_set_member_variable_node(WV.EquippedIndex))
+    _connect(out(clamp), _pin(stay, WV.EquippedIndex))
     _connect(then(clear), _pin(stay, "execute"))
 
-    dirty = keep(ed.add_set_member_variable_node("NeedsRefresh"))
-    _set(dirty, "NeedsRefresh", "true")
+    dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
+    _set(dirty, WV.NeedsRefresh, "true")
     _connect(then(stay), _pin(dirty, "execute"))
 
     # The press is spent; _author_trigger_latch re-arms it on release.

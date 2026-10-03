@@ -42,6 +42,11 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LE_FF, FN_NOT)
 from uebp.nodes.system import (
     FN_DELETE_SAVE, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS, FN_TIME_SECONDS)
+from graphics_menu.umg_consts import GAME_STARTED_VAR
+from combat import health_vars as HV
+from combat.game_state import LAST_DAMAGE_VAR
+from graphics_menu import hud_vars as MV
+from combat.weapon_component import vars as WV
 
 MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
 
@@ -119,7 +124,7 @@ def _branch(ed, cond, in_execs, made):
 
 def _author_forget_on_death(ed, health, in_execs, made):
     """Returns (alive exec, [tails of the dead arm])."""
-    hp = _get(ed, "Health", made, HEALTH_CLASS_PATH, health)
+    hp = _get(ed, HV.Health, made, HEALTH_CLASS_PATH, health)
     dead, alive = _branch(ed, out(_call(ed, FN_LE_FF, made, A=hp, B=0.0)), in_execs, made)
     done, fresh = _branch(ed, _get(ed, PROFILE_FORGOTTEN_VAR, made), [dead], made)
     wipe = _call(ed, FN_DELETE_SAVE, made, SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
@@ -131,14 +136,14 @@ def _author_forget_on_death(ed, health, in_execs, made):
 
 def _author_load_once(ed, parts, in_execs, made):
     """Returns the exec pins that continue, loaded or not."""
-    started = _get(ed, "GameStarted", made)
+    started = _get(ed, GAME_STARTED_VAR, made)
     unchecked = _call(ed, FN_NOT, made, A=_get(ed, PROFILE_CHECKED_VAR, made))
     due = _call(ed, FN_AND, made, A=started, B=out(unchecked))
     look, skip = _branch(ed, out(due), in_execs, made)
 
     # Only once the weapon component has spawned the issued loadout, or the
     # saved items would be added and the issued ones after them.
-    inv = _get(ed, "Inventory", made, WEAPON_COMP_CLASS_PATH, parts[WEAPON_COMP_CLASS_PATH])
+    inv = _get(ed, WV.Inventory, made, WEAPON_COMP_CLASS_PATH, parts[WEAPON_COMP_CLASS_PATH])
     count = _call(ed, FN_ARR_LEN, made, TargetArray=inv)
     armed = _call(ed, FN_GREATER_II, made, A=out(count), B=0)
     ready, not_yet = _branch(ed, out(armed), [look], made)
@@ -162,7 +167,7 @@ def _author_start(ed, pc_out, now_out, in_execs, made):
     flow = _setter(ed, EXIT_STARTED_VAR, now_out, flow, made)
     deadline = _call(ed, FN_ADD_FF, made, A=now_out, B=EXIT_SECONDS)
     flow = _setter(ed, EXIT_AT_VAR, out(deadline), flow, made)
-    flow = _setter(ed, "MenuOpen", "false", flow, made)
+    flow = _setter(ed, MV.MenuOpen, "false", flow, made)
     return flow + [stay]
 
 
@@ -175,7 +180,7 @@ def _movement_call(ed, moves, fn, in_execs, made):
 def _author_countdown(ed, parts, now_out, in_execs, made):
     """A running exit: called off by a hit, or saved and left when it is due."""
     running, idle = _branch(ed, _get(ed, EXIT_PENDING_VAR, made), in_execs, made)
-    struck = _get(ed, "LastDamageTime", made, HEALTH_CLASS_PATH, parts[HEALTH_CLASS_PATH])
+    struck = _get(ed, LAST_DAMAGE_VAR, made, HEALTH_CLASS_PATH, parts[HEALTH_CLASS_PATH])
     since = _call(ed, FN_GREATER_FF, made, A=struck, B=_get(ed, EXIT_STARTED_VAR, made))
     hit, unhurt = _branch(ed, out(since), [running], made)
     off = _setter(ed, EXIT_PENDING_VAR, "false", [hit], made)

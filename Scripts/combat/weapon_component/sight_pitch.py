@@ -21,6 +21,7 @@ from uebp.graph import BEL, _connect, _node, _palette, _pin, out, then
 from combat.skin import player_skin
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_GET_CONTROL_ROT
 from uebp.nodes.math import FN_BREAK_ROT, FN_MUL_FF, FN_NORMALIZE_AXIS
+from combat.weapon_component import vars as WV
 
 
 def _anim_class_path(skin):
@@ -47,14 +48,14 @@ def _author_sight_pitch(ed, pc_out, exec_ins):
     _connect(out(view), _pin(parts, "InRot"))
     signed = keep(_node(ed, FN_NORMALIZE_AXIS))
     _connect(out(parts, "Pitch"), _pin(signed, "Angle"))
-    blend = keep(ed.add_get_member_variable_node("SightBlend"))
+    blend = keep(ed.add_get_member_variable_node(WV.SightBlend))
     scaled = keep(_node(ed, FN_MUL_FF))
     _connect(out(signed), _pin(scaled, "A"))
-    _connect(out(blend, "SightBlend"), _pin(scaled, "B"))
+    _connect(out(blend, WV.SightBlend), _pin(scaled, "B"))
 
-    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
+    _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(out(anim), _pin(cast, "Object"))
     for e in exec_ins:

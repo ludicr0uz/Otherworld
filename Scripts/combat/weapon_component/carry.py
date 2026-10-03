@@ -46,6 +46,8 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_VV, FN_AND, FN_EQ_II, FN_GREATER_FF, FN_LESS_FF, FN_NOT, FN_OR,
     FN_SELECT_VECTOR, FN_TRANSFORM_LOC)
 from uebp.nodes.system import FN_TIME_SECONDS
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _author_shot_origin(ed, held):
@@ -56,7 +58,7 @@ def _author_shot_origin(ed, held):
     owner = _node(ed, FN_GET_OWNER)
     body = _node(ed, FN_GET_TRANSFORM)
     _connect(out(owner), _pin(body, "self"))
-    off_pin, _off = _prop(ed, "MuzzleOffset", held)
+    off_pin, _off = _prop(ed, IV.MuzzleOffset, held)
     grip = _vec(ed, *CARRY_GRIP)
     ahead = _node(ed, FN_ADD_VV)
     _connect(off_pin, _pin(ahead, "A"))
@@ -101,8 +103,8 @@ def _author_carry(ed, held, armed_out, exec_ins):
         _connect(e, _pin(gate, "execute"))
 
     # --- is it a gun? ---------------------------------------------------------
-    melee, melee_n = _prop(ed, "Melee", held)
-    food, food_n = _prop(ed, "Consumable", held)
+    melee, melee_n = _prop(ed, IV.Melee, held)
+    food, food_n = _prop(ed, IV.Consumable, held)
     burns, burns_n = _prop(ed, BURNS_VAR, held)
     keep(melee_n)
     keep(food_n)
@@ -111,14 +113,14 @@ def _author_carry(ed, held, armed_out, exec_ins):
     gun = negate(held_up)
 
     # --- is anything holding it up? -------------------------------------------
-    hands = gate2(FN_OR, get("Aiming"), get("Blocking"))
+    hands = gate2(FN_OR, get(WV.Aiming), get(WV.Blocking))
     hands = gate2(FN_OR, hands, get(RAISE_FORCED_VAR))
     # ...or the camera, still on the gun's sights (seat.py). Literal on B.
     on_gun = keep(_node(ed, FN_GREATER_FF))
     _connect(get(SEAT_VAR), _pin(on_gun, "A"))
     _set(on_gun, "B", SEAT_HOLD)
     hands = gate2(FN_OR, hands, out(on_gun))
-    ready, ready_n = _prop(ed, "NextFireTime", held)
+    ready, ready_n = _prop(ed, IV.NextFireTime, held)
     keep(ready_n)
     until = keep(_node(ed, FN_ADD_FF))
     _connect(ready, _pin(until, "A"))
@@ -134,16 +136,16 @@ def _author_carry(ed, held, armed_out, exec_ins):
     _set(lying, "B", PRONE)
     upright = negate(out(lying))
     gun_down = gate2(FN_AND, gun_down, upright)
-    down = gate2(FN_OR, get("Sprinting"), gun_down)
+    down = gate2(FN_OR, get(WV.Sprinting), gun_down)
 
     mark = keep(ed.add_set_member_variable_node(LOWERED_VAR))
     _connect(down, _pin(mark, LOWERED_VAR))
     _connect(then(gate), _pin(mark, "execute"))
 
     # --- empty hands: the pose follows the sprint alone -----------------------
-    running = keep(ed.add_get_member_variable_node("Sprinting"))
+    running = keep(ed.add_get_member_variable_node(WV.Sprinting))
     plain = keep(ed.add_set_member_variable_node(LOWERED_VAR))
-    _connect(out(running, "Sprinting"), _pin(plain, LOWERED_VAR))
+    _connect(out(running, WV.Sprinting), _pin(plain, LOWERED_VAR))
     _connect(else_(gate), _pin(plain, "execute"))
 
     ed.add_comment_to_nodes(

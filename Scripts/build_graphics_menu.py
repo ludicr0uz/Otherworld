@@ -56,8 +56,8 @@ import unreal
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # The authoring helpers every builder shares.
 from uebp.graph import (
-    BEL, BGE, PIN, _assets, _connect, _create_blueprint, _key, _loose_pin, _node, _palette,
-    _pin, _set, else_, make_log, out, then)
+    BEL, BGE, PIN, _assets, _connect, _create_blueprint, _declare, _key, _loose_pin, _node,
+    _palette, _pin, _set, else_, make_log, out, then)
 # BP_Settings' asset path. The settings screen's own contract with the combat
 # package (BIND_VARS, the sensitivity limits) lives in graphics_menu/settings_rows.py.
 from combat import paths as combat_paths                           # noqa: E402
@@ -76,8 +76,9 @@ from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
 from graphics_menu.canvas import _draw_texture                      # noqa: E402
 # The settings screen: constants, the push, the save.
 from graphics_menu.settings_rows import (                          # noqa: E402
-    BIND_VARS, KEY_POOL, PAGE_TITLE,
-    SETTINGS_CLASS_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
+    BIND_VARS, KEY_POOL, SETTINGS_CLASS_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
+# Read off this module by verify_graphics_menu.py.
+from graphics_menu.settings_rows import PAGE_TITLE                 # noqa: E402,F401
 from graphics_menu.settings_input import _emit_save                # noqa: E402
 from graphics_menu.settings_page import _author_push_settings      # noqa: E402
 # The UMG screens: their layouts, their creation at BeginPlay, and the
@@ -151,6 +152,10 @@ from uebp.nodes.palette import (  # noqa: E402
 from uebp.nodes.system import (  # noqa: E402
     FN_ALL_ACTORS, FN_COMMAND_LINE, FN_CONTAINS, FN_CREATE_SAVE, FN_DELAY, FN_GET_GAME_MODE,
     FN_INT_TO_STR, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_SET_PAUSED, FN_TIME_SECONDS)
+from combat import health_vars as HV  # noqa: E402
+from graphics_menu import hud_vars as MV                          # noqa: E402
+from uebp.vars import declare, defaults                           # noqa: E402
+from combat import settings_vars as SV  # noqa: E402
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -266,49 +271,17 @@ def _ensure_variables(ed, bp):
     DEFAULT_PRESET used to be.  Only ever called after a wipe or on a fresh
     asset, so nothing is referencing them at this point.
     """
-    for name, kind, default in (("MenuOpen", "bool", "false"),
-                                # The M panel's caret, and whether the
-                                # controller was told to ignore move input
-                                # for the open panel (menu_still.py).
-                                (PAUSE_ROW_VAR, "int", "0"),
-                                (MENU_STILL_VAR, "bool", "false"),
-                                # This frame's copy of the GameMode's
-                                # DebugMode.  Taken once at the top of DrawHUD.
-                                ("DebugOn", "bool", "false"),
-                                # False until the player picks NEW GAME.
-                                # BeginPlay pauses the world alongside it.
-                                (GAME_STARTED_VAR, "bool", "false"),
-                                ("Quality", "int", str(DEFAULT_PRESET)),
-                                # Which page of the menu panel is on screen,
-                                # and which line of it the caret is on.
-                                ("MenuPage", "int", str(PAGE_TITLE)),
-                                ("MenuRow", "int", "0"),
-                                # Armed by Enter on a bind row; the next key
-                                # the player presses becomes that bind.
-                                ("Capturing", "bool", "false")):
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind),
-                                      default):
-            raise RuntimeError(f"could not declare member variable {name}")
-
-    # The loaded save. Typed as BP_Settings rather than as SaveGame so the page
-    # can read MouseSensitivity and Binds off it without a cast per read; the
-    # one cast is at BeginPlay, where LoadGameFromSlot hands back a USaveGame.
-    settings_class = _assets().load_asset(combat_paths.SETTINGS_BP_PATH)
-    if not settings_class:
+    # BP_Settings is the type of the HUD's Settings variable.
+    if not _assets().load_asset(combat_paths.SETTINGS_BP_PATH):
         raise RuntimeError(f"{combat_paths.SETTINGS_BP_PATH} must be built first "
                            "(build_weapons_and_combat.py)")
-    for name, pin_type in (
-            ("Settings", BEL.get_object_reference_type(
-                BEL.generated_class(settings_class))),
-            # What a bind may be captured as -- walked by a ForEachLoop while
-            # Capturing. A variable rather than a literal chain because the
-            # graph tests every entry with the same three nodes.
-            ("KeyPool", BEL.get_array_type(
-                BEL.get_struct_type(unreal.Key.static_struct())))):
-        ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, pin_type):
-            raise RuntimeError(f"could not declare member variable {name}")
+    declare(ed, MV.TABLE)
+    # The M panel's caret, and whether the controller was told to ignore move
+    # input for the open panel (menu_still.py); GameStarted is false until the
+    # player picks NEW GAME, and BeginPlay pauses the world alongside it.
+    _declare(ed, PAUSE_ROW_VAR, BEL.get_basic_type_by_name("int"))
+    for name in (MENU_STILL_VAR, GAME_STARTED_VAR):
+        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     # The canvas HUD's bind labels: the settings rows carry their own now.
     ed.remove_member_variable("BindLabels")
     declare_ui_vars(ed)
@@ -415,9 +388,8 @@ def _author_load_settings(ed, in_exec):
     as_saved = keep(_palette(ed, NODE_CAST_SETTINGS))
     _connect(out(loaded), _pin(as_saved, "Object"))
     _connect(after_load, _pin(as_saved, "execute"))
-    took = keep(ed.add_set_member_variable_node("Settings"))
-    _connect(_loose_pin(as_saved, "AsBPSettings", is_input=False),
-             _pin(took, "Settings"))
+    took = keep(ed.add_set_member_variable_node(MV.Settings))
+    _connect(_loose_pin(as_saved, "AsBPSettings", is_input=False), _pin(took, MV.Settings))
     _connect(then(as_saved), _pin(took, "execute"))
 
     # A save that will not cast is a save from a different class, which is the
@@ -431,16 +403,15 @@ def _author_load_settings(ed, in_exec):
     as_new = keep(_palette(ed, NODE_CAST_SETTINGS))
     _connect(out(fresh), _pin(as_new, "Object"))
     _connect(then(fresh), _pin(as_new, "execute"))
-    made_it = keep(ed.add_set_member_variable_node("Settings"))
-    _connect(_loose_pin(as_new, "AsBPSettings", is_input=False),
-             _pin(made_it, "Settings"))
+    made_it = keep(ed.add_set_member_variable_node(MV.Settings))
+    _connect(_loose_pin(as_new, "AsBPSettings", is_input=False), _pin(made_it, MV.Settings))
     _connect(then(as_new), _pin(made_it, "execute"))
 
-    got = keep(ed.add_get_member_variable_node("Settings"))
-    settings_out = out(got, "Settings")
-    binds = keep(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH))
+    got = keep(ed.add_get_member_variable_node(MV.Settings))
+    settings_out = out(got, MV.Settings)
+    binds = keep(ed.add_get_member_variable_node(SV.Binds, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(binds, "self"))
-    binds_out = out(binds, "Binds")
+    binds_out = out(binds, SV.Binds)
 
     count = keep(_node(ed, FN_ARR_LEN))
     _connect(binds_out, _loose_pin(count, "TargetArray"))
@@ -491,9 +462,9 @@ def _author_restore_debug(ed, in_execs):
     _connect(out(gm), _pin(as_gm, "Object"))
     for e in in_execs:
         _connect(e, _pin(as_gm, "execute"))
-    settings = ed.add_get_member_variable_node("Settings")
+    settings = ed.add_get_member_variable_node(MV.Settings)
     saved = ed.add_get_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH)
-    _connect(out(settings, "Settings"), _pin(saved, "self"))
+    _connect(out(settings, MV.Settings), _pin(saved, "self"))
     put = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
     _connect(_loose_pin(as_gm, "AsBPThirdPersonGameMode", is_input=False),
              _pin(put, "self"))
@@ -614,9 +585,9 @@ def _author_tick(ed, tick):
     toggled = author_main_rows_tick(ed, pc_out, tuned)
 
     # --- the menu's debug row, gated on the menu being open -----------------
-    gate_get = ed.add_get_member_variable_node("MenuOpen")
+    gate_get = ed.add_get_member_variable_node(MV.MenuOpen)
     gate = ed.add_branch_node()
-    _connect(out(gate_get, "MenuOpen"), _pin(gate, "Condition"))
+    _connect(out(gate_get, MV.MenuOpen), _pin(gate, "Condition"))
     for tail in toggled:
         _connect(tail, _pin(gate, "execute"))
 
@@ -646,8 +617,8 @@ def _author_tick(ed, tick):
     _connect(then(as_gm), _pin(set_dbg, "execute"))
 
     # ...and into the save, written on the spot like every other setting.
-    settings = ed.add_get_member_variable_node("Settings")
-    settings_out = out(settings, "Settings")
+    settings = ed.add_get_member_variable_node(MV.Settings)
+    settings_out = out(settings, MV.Settings)
     keep_dbg = ed.add_set_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH)
     _connect(settings_out, _pin(keep_dbg, "self"))
     _connect(out(flip), _pin(keep_dbg, DEBUG_MODE_VAR))
@@ -707,9 +678,9 @@ def _author_npc_bars(ed, in_execs):
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    health = ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH)
+    health = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(health, "self"))
-    max_health = ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH)
+    max_health = ed.add_get_member_variable_node(HV.MaxHealth, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(max_health, "self"))
 
     where = _node(ed, FN_ACTOR_LOC)
@@ -749,10 +720,10 @@ def _author_npc_bars(ed, in_execs):
     # ...and still alive. A killed wanderer now lies where it fell for a minute
     # (see CORPSE_SECONDS), and it was shot a moment ago by definition, so
     # without this every corpse wears an empty bar for its first five seconds.
-    gone = ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH)
+    gone = ed.add_get_member_variable_node(HV.Dead, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(gone, "self"))
     alive = _node(ed, FN_NOT)
-    _connect(out(gone, "Dead"), _pin(alive, "A"))
+    _connect(out(gone, HV.Dead), _pin(alive, "A"))
 
     # Safe to fold into one AND: every half is arithmetic on values already
     # read, so pulling them costs two comparisons and has no side effect. (The
@@ -777,8 +748,8 @@ def _author_npc_bars(ed, in_execs):
     top_out = out(parts, "Y")
 
     frac = _node(ed, FN_DIV_FF)
-    _connect(out(health, "Health"), _pin(frac, "A"))
-    _connect(out(max_health, "MaxHealth"), _pin(frac, "B"))
+    _connect(out(health, HV.Health), _pin(frac, "A"))
+    _connect(out(max_health, HV.MaxHealth), _pin(frac, "B"))
     fill_w = _node(ed, FN_MUL_FF)
     _connect(out(frac), _pin(fill_w, "A"))
     _set(fill_w, "B", NPC_BAR[0])
@@ -817,9 +788,9 @@ def _author_npc_bars(ed, in_execs):
     # is matched to a body on screen, which is a thing a developer does and not
     # a thing the game is. DebugOn is this frame's copy of the GameMode's flag,
     # taken once in _author_draw.
-    numbered = ed.add_get_member_variable_node("DebugOn")
+    numbered = ed.add_get_member_variable_node(MV.DebugOn)
     labelled = ed.add_branch_node()
-    _connect(out(numbered, "DebugOn"), _pin(labelled, "Condition"))
+    _connect(out(numbered, MV.DebugOn), _pin(labelled, "Condition"))
     _connect(then(fill), _pin(labelled, "execute"))
 
     number = _node(ed, FN_DRAW_TEXT)
@@ -863,11 +834,11 @@ def _author_draw(ed):
     # costs one node.
     on_get = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(on_get, "self"))
-    copy_dbg = ed.add_set_member_variable_node("DebugOn")
-    _connect(out(on_get, DEBUG_MODE_VAR), _pin(copy_dbg, "DebugOn"))
+    copy_dbg = ed.add_set_member_variable_node(MV.DebugOn)
+    _connect(out(on_get, DEBUG_MODE_VAR), _pin(copy_dbg, MV.DebugOn))
     _connect(then(as_mode), _pin(copy_dbg, "execute"))
-    no_dbg = ed.add_set_member_variable_node("DebugOn")
-    _set(no_dbg, "DebugOn", "false")
+    no_dbg = ed.add_set_member_variable_node(MV.DebugOn)
+    _set(no_dbg, MV.DebugOn, "false")
     _connect(out(as_mode, "CastFailed"), _pin(no_dbg, "execute"))
 
     # The player's settings, onto the weapon component. Before the menu and
@@ -1003,12 +974,10 @@ def build_hud_blueprint(rebuild=False):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_GraphicsMenuHUD failed to compile")
-    _apply_defaults(bp, {"MenuOpen": False, "DebugOn": False,
+    _apply_defaults(bp, {**defaults(MV.TABLE),
                          PAUSE_ROW_VAR: 0, MENU_STILL_VAR: False,
-                         "Quality": DEFAULT_PRESET,
-                         "MenuPage": PAGE_TITLE, "MenuRow": 0,
-                         "Capturing": False,
-                         "KeyPool": [_key(k) for k in KEY_POOL],
+                         MV.Quality: DEFAULT_PRESET,
+                         MV.KeyPool: [_key(k) for k in KEY_POOL],
                          **difficulty_defaults(), **profile_defaults(),
                          **dev_guns_defaults(), **loot_defaults(), **wear_defaults(), **inv_defaults(),
                          **tune_defaults(), **monster_tune_defaults(),

@@ -21,6 +21,8 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import NODE_CAST_CHARACTER
 from uebp.nodes.system import (
     FN_CONCAT, FN_DISPLAY_NAME, FN_INT_TO_STR, FN_TIME_SECONDS, FN_WARN)
+from uebp import props as EP
+from combat import health_vars as HV
 
 
 # --- flinching: the hit reaction ---------------------------------------------
@@ -207,10 +209,10 @@ def _author_hit_reaction(ed, exec_in, skips=()):
         return n
 
     # --- did Health go down this frame? --------------------------------------
-    now_h = keep(ed.add_get_member_variable_node("Health"))
+    now_h = keep(ed.add_get_member_variable_node(HV.Health))
     was_h = keep(ed.add_get_member_variable_node(PREV_HEALTH_VAR))
     dropped = keep(_node(ed, FN_LESS_FF))
-    _connect(out(now_h, "Health"), _pin(dropped, "A"))
+    _connect(out(now_h, HV.Health), _pin(dropped, "A"))
     _connect(out(was_h, PREV_HEALTH_VAR), _pin(dropped, "B"))
     took = keep(ed.add_branch_node())
     _connect(out(dropped), _pin(took, "Condition"))
@@ -335,7 +337,7 @@ def _author_hit_reaction(ed, exec_in, skips=()):
     for tail in arms:
         _connect(tail, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
-    mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
+    mesh = keep(ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character"))
     _connect(char_out, _pin(mesh, "self"))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(out(mesh, "Mesh"), _pin(anim, "self"))
@@ -384,7 +386,7 @@ def _author_hit_reaction(ed, exec_in, skips=()):
     # would make the NEXT hit compare against a health from before this one and
     # fire the moment the cooldown lapses, with nothing new having happened.
     remember = keep(ed.add_set_member_variable_node(PREV_HEALTH_VAR))
-    _connect(out(now_h, "Health"), _pin(remember, PREV_HEALTH_VAR))
+    _connect(out(now_h, HV.Health), _pin(remember, PREV_HEALTH_VAR))
     for tail in (after_play,
                  out(as_char, "CastFailed"),
                  else_(have),

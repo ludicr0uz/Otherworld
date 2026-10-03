@@ -35,11 +35,12 @@ from combat.weapon_component.throw import (
 from combat.weapon_component.throw_flight import THROWN_VAR
 from combat.weapon_component.throw_ready import THROW_READY_ANIM_VAR
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR, THROW_WINDING_VAR
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
             (WEAPON_COMP_BP_PATH, THROW_CLICK_FORCED_VAR),
-            (WEAPON_COMP_BP_PATH, "EquippedIndex"),
-            (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
+            (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
             (ITEM_BP_PATH, THROW_PITCH_VAR)]
 
 LANDS_WITHIN_CM = 80.0     # the disc to where it rests: back-off + lift + a sub-step

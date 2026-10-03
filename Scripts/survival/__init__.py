@@ -22,6 +22,7 @@ THE STANDARD PIECES (Gameplay Ability System, plugin GameplayAbilities)
 
 DATA (no Blueprint authoring)
   paths             /Game/Survival asset and class paths, component names
+  component_vars    BP_SurvivalComponent's member variables, named once
   tuning            SurvivalConfig / SURVIVAL, restores (and the EASY heal),
                     debuff tags, forage
   consumable_specs  the mushroom and the canteen: parts, grip part, colours, restores

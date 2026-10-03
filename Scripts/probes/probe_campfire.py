@@ -46,11 +46,13 @@ from survival.tuning import (
 )
 from world.day_night_blueprint import NIGHT_COLD_VAR
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
+from survival import component_vars as UV
+from combat.weapon_component import vars as WV
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
-             ("EquippedIndex", "NeedsRefresh", "Inventory", KNIFE_QUEUED_VAR,
+             (WV.EquippedIndex, WV.NeedsRefresh, WV.Inventory, KNIFE_QUEUED_VAR,
               INTERACT_FORCED_VAR, FIRE_FORCED_VAR)]
-            + [(SURVIVAL_BP_PATH, "Temperature"), (CAMPFIRE_BP_PATH, WARM_RATE_VAR),
+            + [(SURVIVAL_BP_PATH, UV.Temperature), (CAMPFIRE_BP_PATH, WARM_RATE_VAR),
                (DAY_NIGHT_BP_PATH, NIGHT_COLD_VAR)])
 
 MATCHES = "BP_Matches_C"

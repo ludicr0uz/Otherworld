@@ -35,11 +35,12 @@ from graphics_menu.profile_consts import PROFILE_FORGOTTEN_VAR, PROFILE_SLOT
 from npc.paths import (
     AGGRO_VAR, AI_BP_PATH, STEP_CHASE, STEP_EVENT_PREFIX, STEP_RESULT_VAR, STEP_SWING,
 )
+from combat import health_vars as HV
 
 COOLDOWN_VAR = "NextAttackTime"
 _AI_BPS = [AI_BP_PATH] + [v.ai_blueprint for v in NPC_VARIANTS]
 
-WRITABLE = ([(HEALTH_BP_PATH, "Health"), (HEALTH_BP_PATH, "Dead"),
+WRITABLE = ([(HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, HV.Dead),
              (WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR),
              (WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
              (WEAPON_COMP_BP_PATH, THROW_CLICK_FORCED_VAR)]

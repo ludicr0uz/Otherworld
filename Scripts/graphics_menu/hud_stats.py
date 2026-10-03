@@ -14,6 +14,7 @@ from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.math import FN_DIV_FF, FN_ROUND
 from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_CONCAT, FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN, FN_INT_TO_STR
+from combat import health_vars as HV
 
 HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
 GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
@@ -38,14 +39,14 @@ def author_hp(ed, in_execs):
         _connect(e, _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    health = ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH)
+    health = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(health, "self"))
-    top = ed.add_get_member_variable_node("MaxHealth", HEALTH_CLASS_PATH)
+    top = ed.add_get_member_variable_node(HV.MaxHealth, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(top, "self"))
-    health_out = out(health, "Health")
+    health_out = out(health, HV.Health)
     frac = _node(ed, FN_DIV_FF)
     _connect(health_out, _pin(frac, "A"))
-    _connect(out(top, "MaxHealth"), _pin(frac, "B"))
+    _connect(out(top, HV.MaxHealth), _pin(frac, "B"))
     filled = set_percent(ed, part(ed, WBP_HUD, HP_BAR), out(frac), [then(cast)])
 
     # Rounded for display only: the bar reads the unrounded value, so chip

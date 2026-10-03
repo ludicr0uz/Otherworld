@@ -39,19 +39,21 @@ from uebp.nodes.ai import FN_STOP_LOGIC
 from uebp.nodes.math import FN_LE_FF, FN_OR
 from uebp.nodes.palette import NODE_CAST_HEALTH
 from uebp.nodes.system import FN_CONCAT, FN_DISPLAY_NAME, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT
+from uebp import props as EP
+from combat import health_vars as HV
 
 
 def _dead_pin(ed, health_out, keep):
     """Dead OR Health <= 0, off a health component already cast."""
-    dead = keep(ed.add_get_member_variable_node("Dead", HEALTH_CLASS_PATH))
+    dead = keep(ed.add_get_member_variable_node(HV.Dead, HEALTH_CLASS_PATH))
     _connect(health_out, _pin(dead, "self"))
-    hp = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
+    hp = keep(ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
     _connect(health_out, _pin(hp, "self"))
     spent = keep(_node(ed, FN_LE_FF))
-    _connect(out(hp, "Health"), _pin(spent, "A"))
+    _connect(out(hp, HV.Health), _pin(spent, "A"))
     _set(spent, "B", 0.0)
     either = keep(_node(ed, FN_OR))
-    _connect(out(dead, "Dead"), _pin(either, "A"))
+    _connect(out(dead, HV.Dead), _pin(either, "A"))
     _connect(out(spent), _pin(either, "B"))
     return out(either)
 
@@ -173,7 +175,7 @@ def _author_corpse_gate(ed, exec_in):
     _connect(then(halt), _pin(say, "execute"))
     # The tree ends here. StopLogic called from inside a running task is
     # queued by the BehaviorTreeComponent and applied once the task returns.
-    brain = keep(ed.add_get_member_variable_node("BrainComponent"))
+    brain = keep(ed.add_get_member_variable_node(EP.BRAIN_COMPONENT))
     stop = keep(_node(ed, FN_STOP_LOGIC))
     _connect(out(brain, "BrainComponent"), _pin(stop, "self"))
     _set(stop, "Reason", "corpse")

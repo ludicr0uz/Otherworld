@@ -38,6 +38,7 @@ from combat.paths import HEALTH_CLASS_PATH
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_GET_COMP, FN_IS_SLOT_ACTIVE
 from uebp.nodes.math import FN_AND, FN_GREATER_FF, FN_NOT
 from uebp.nodes.palette import NODE_CAST_HEALTH
+from combat.weapon_component import vars as WV
 
 # The sights are up, for the flinch, from this much of the camera's travel to
 # the eye point. Below it the view is the boom's to within a hundredth.
@@ -55,9 +56,9 @@ def _author_steady(ed, owner_out, exec_ins):
     def out(n, name="ReturnValue"):
         return _pin(n, name, is_input=False)
 
-    blend = keep(ed.add_get_member_variable_node("SightBlend"))
+    blend = keep(ed.add_get_member_variable_node(WV.SightBlend))
     steady = keep(_node(ed, FN_GREATER_FF))
-    _connect(out(blend, "SightBlend"), _pin(steady, "A"))
+    _connect(out(blend, WV.SightBlend), _pin(steady, "A"))
     _set(steady, "B", STEADY_BLEND)
 
     comp = keep(_node(ed, FN_GET_COMP))
@@ -78,9 +79,9 @@ def _author_steady(ed, owner_out, exec_ins):
     _connect(out(steady), _pin(raised, "A"))
     _connect(out(fresh), _pin(raised, "B"))
 
-    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
+    _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     flinching = keep(_node(ed, FN_IS_SLOT_ACTIVE))
     _connect(out(anim), _pin(flinching, "self"))
     _set(flinching, "SlotNodeName", HIT_SLOT)
@@ -91,8 +92,8 @@ def _author_steady(ed, owner_out, exec_ins):
     mid = keep(ed.add_branch_node())
     _connect(out(caught), _pin(mid, "Condition"))
     _connect(then(cast), _pin(mid, "execute"))
-    dirty = keep(ed.add_set_member_variable_node("NeedsRefresh"))
-    _set(dirty, "NeedsRefresh", "true")
+    dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
+    _set(dirty, WV.NeedsRefresh, "true")
     _connect(then(mid), _pin(dirty, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(STEADY_VAR, HEALTH_CLASS_PATH))

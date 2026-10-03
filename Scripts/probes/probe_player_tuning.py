@@ -34,12 +34,14 @@ from combat.sprint_tuning import (
 from graphics_menu import player_tune_consts as PC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
 from graphics_menu.umg_consts import ROW_VALUE
+from graphics_menu import hud_vars as MV
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 TAB = PC.PLAYER_TAB
 WRITABLE = [(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var,
-                                       TAB.save_var, "MenuOpen")]
-WRITABLE += [(WEAPON_COMP_BP_PATH, "Stamina")]
+                                       TAB.save_var, MV.MenuOpen)]
+WRITABLE += [(WEAPON_COMP_BP_PATH, WV.Stamina)]
 COLUMNS = [s[0] for s in PLAYER_STATS]
 STEPS = {s[0]: s[2] for s in PLAYER_STATS}
 

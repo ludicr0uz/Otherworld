@@ -46,6 +46,8 @@ from combat.tuning import COMBAT
 from combat.wear_tuning import CLOTHING_SLOT_VAR, NOT_CLOTHING
 from combat.weapon_specs import ACCURACY_VARS, _weapon_icon
 from item_icons.items import ICON_TINT
+from uebp.vars import declare
+from combat import item_vars as IV
 
 
 def build_weapon_item():
@@ -64,14 +66,7 @@ def build_weapon_item():
     _drop_components(bp, {"Body"})
     _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Body")
 
-    for name in ("Damage", "SpreadDegrees", "WeaponRange",
-                 # When this weapon may next be fired, as a world time in
-                 # seconds. One number does both jobs the shotgun needs: the
-                 # interval between shots, and the pause a reload costs. A
-                 # "reloading" bool plus a timer would need an interrupt rule
-                 # and could disagree with itself; a deadline cannot.
-                 "FireInterval", "NextFireTime", "ReloadSeconds"):
-        _declare(ed, name, _float_type())
+    declare(ed, IV.TABLE)
     for name, kind in (("DisplayName", "string"),
                        ("PelletCount", "int"),
                        ("Dropped", "bool"),
@@ -136,57 +131,14 @@ def build_weapon_item():
     # that does not heat.
     _declare(ed, HEAT_MATERIAL_VAR, BEL.get_object_reference_type(
         unreal.MaterialInterface.static_class()))
-    _declare(ed, "MuzzleOffset", _struct_type(unreal.Vector.static_struct()))
-    # Where the eye goes when this weapon is aimed down its sights, in the
-    # weapon's own space: on the sight line, behind the rear sight (on the
-    # scope's axis for the sniper). The camera is moved there from the
-    # shoulder boom; see weapon_component/sights.py. A variable for the same
-    # reason MuzzleOffset is -- the component reads it off Held.
-    _declare(ed, "SightOffset", _struct_type(unreal.Vector.static_struct()))
-    # ...and what the eye looks at from there: the front sight's tip (the
-    # scope's objective). The camera is turned onto it, so the view runs down
-    # the sight line itself and the tip is the middle of the screen.
-    _declare(ed, "SightAim", _struct_type(unreal.Vector.static_struct()))
-    _declare(ed, "GripLocation", _struct_type(unreal.Vector.static_struct()))
-    _declare(ed, "GripRotation", _struct_type(unreal.Rotator.static_struct()))
-    _declare(ed, "SlotColor", _struct_type(unreal.LinearColor.static_struct()))
-    # The weapon's own silhouette for the inventory strip, drawn by
-    # build_graphics_menu.py. On the item rather than in a table in the HUD for
-    # the same reason SlotColor and DisplayName are: adding a weapon stays a
-    # row in _weapon_specs() and the HUD never learns any weapon's name.
-    _declare(ed, "Icon",
-             BEL.get_object_reference_type(unreal.Texture2D.static_class()))
-    # Three sounds, not one, and all three live on the weapon for the same
-    # reason FireSound does: the graphs read them off Held, so a new weapon is
-    # a row in _weapon_specs() and nothing else. The dry-fire and reload
-    # assets happen to be shared by every weapon today -- that is a fact about
-    # the defaults, not about the shape of the data.
-    for name in ("FireSound", "DryFireSound", "ReloadSound"):
-        _declare(ed, name,
-                 BEL.get_object_reference_type(unreal.SoundBase.static_class()))
-    _declare(ed, "AimPose",
-             BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
     # The pose a lit stick is raised in while the use key holds it out
     # (weapon_component/torch.py). None on everything else.
     _declare(ed, USE_POSE_VAR,
              BEL.get_object_reference_type(unreal.AnimSequence.static_class()))
-    # Held in both hands (the rifle ready pose). The guard reads it to raise
-    # the gun across the body instead of the fists (body_pose.py). False on
-    # the base, so the pistol and every consumable guard with the fists.
-    _declare(ed, "TwoHanded", BEL.get_basic_type_by_name("bool"))
     # Where this gun's ready pose has the left hand, in the right hand's bone
     # space (support_hand.py): down the sights the hand is held there. Zero
     # on the base; nothing holds a hand on an item that has no sights.
     _declare(ed, SUPPORT_POINT_VAR, _struct_type(unreal.Vector.static_struct()))
-    # How far this weapon zooms when the right button is held. On the item for
-    # the same reason SpreadDegrees is -- the component reads it off Held and
-    # knows nothing about which weapon it is holding.
-    _declare(ed, "AdsZoom", _float_type())
-    # Whether aiming this weapon puts a scope over the screen. A flag rather
-    # than "AdsZoom >= COMBAT.ads_zoom_scope": the zoom is how far the camera moves
-    # and the scope is what the sight looks like, and a future weapon is free
-    # to be a 4x with irons or a 2x with glass without either answer moving.
-    _declare(ed, "Scoped", BEL.get_basic_type_by_name("bool"))
     # Accuracy: the cloud a shot is drawn in and the kick it puts on the view,
     # with their stance and aim factors. One variable per GUN_ACCURACY column
     # (weapon_specs.py says what each means), on the item for the same reason
@@ -195,10 +147,6 @@ def build_weapon_item():
     for _col, name in ACCURACY_VARS:
         if name != "SpreadDegrees":
             _declare(ed, name, _float_type())
-    # How far this weapon's shot is heard by the wanderers, in cm (see
-    # SHOT_VOLUME_CM in tuning.py). On the item so the shot's noise is read off
-    # Held like every other per-weapon number.
-    _declare(ed, "ShotVolume", _float_type())
     # How fast the sights wander down them (sway_tuning.py): the component
     # copies Held's each frame. The default is on the base, so an item with
     # no sights has one too, though it never sways.
@@ -337,45 +285,45 @@ def build_weapon(spec, item_bp):
                            f"the shoulder aim")
 
     _apply_defaults(bp, {
-        "DisplayName": spec["display"],
-        "Damage": float(spec["damage"]),
-        "PelletCount": int(spec["pellets"]),
-        "WeaponRange": float(spec["range"]),
-        "Dropped": False,
-        "UsesAmmo": bool(spec["uses_ammo"]),
-        "Automatic": bool(spec["automatic"]),
-        "Consumable": False,
-        "Melee": False,
+        IV.DisplayName: spec["display"],
+        IV.Damage: float(spec["damage"]),
+        IV.PelletCount: int(spec["pellets"]),
+        IV.WeaponRange: float(spec["range"]),
+        IV.Dropped: False,
+        IV.UsesAmmo: bool(spec["uses_ammo"]),
+        IV.Automatic: bool(spec["automatic"]),
+        IV.Consumable: False,
+        IV.Melee: False,
         WEAPON_KIND_VAR: GUN_KINDS.get(spec["display"], LONG_GUN),
         HAS_SIGHTS_VAR: True,
-        "MagazineSize": int(spec["magazine"]),
+        IV.MagazineSize: int(spec["magazine"]),
         # Starts loaded. A weapon that had to be reloaded before its first shot
         # would be a puzzle, not a mechanic.
-        "Loaded": int(spec["magazine"]),
-        "Reserve": int(spec["reserve"]),
-        "InfiniteReserve": bool(spec.get("infinite_reserve", False)),
-        "FireInterval": float(spec["interval"]),
-        "ReloadSeconds": float(spec["reload_s"]),
+        IV.Loaded: int(spec["magazine"]),
+        IV.Reserve: int(spec["reserve"]),
+        IV.InfiniteReserve: bool(spec.get("infinite_reserve", False)),
+        IV.FireInterval: float(spec["interval"]),
+        IV.ReloadSeconds: float(spec["reload_s"]),
         # World time 0 is "now" at level start, so the first shot is free.
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(*spec["muzzle"]),
-        "SightOffset": unreal.Vector(*spec["sight"]),
-        "SightAim": unreal.Vector(*spec["sight_front"]),
-        "GripLocation": unreal.Vector(*spec["grip_loc"]),
-        "GripRotation": spec["grip_rot"],
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
-        "AdsZoom": float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),
-        "Scoped": bool(spec.get("scoped", False)),
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(*spec["muzzle"]),
+        IV.SightOffset: unreal.Vector(*spec["sight"]),
+        IV.SightAim: unreal.Vector(*spec["sight_front"]),
+        IV.GripLocation: unreal.Vector(*spec["grip_loc"]),
+        IV.GripRotation: spec["grip_rot"],
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.AdsZoom: float(spec.get("ads_zoom", COMBAT.ads_zoom_irons)),
+        IV.Scoped: bool(spec.get("scoped", False)),
         **{name: float(spec[col]) for col, name in ACCURACY_VARS},
-        "ShotVolume": float(spec["shot_volume"]),
+        IV.ShotVolume: float(spec["shot_volume"]),
         THROW_PITCH_VAR: float(spec[THROW_PITCH_COLUMN]),
         SWAY_RATE_VAR: float(spec[SWAY_RATE_COLUMN]),
-        "Icon": _weapon_icon(spec["display"]),
-        "FireSound": _must_load(spec["sound"]),
-        "DryFireSound": _must_load(SND_DRY_FIRE),
-        "ReloadSound": _must_load(spec["reload_sound"]),
-        "AimPose": _must_load(spec["aim"]),
-        "TwoHanded": bool(spec["two_handed"]),
+        IV.Icon: _weapon_icon(spec["display"]),
+        IV.FireSound: _must_load(spec["sound"]),
+        IV.DryFireSound: _must_load(SND_DRY_FIRE),
+        IV.ReloadSound: _must_load(spec["reload_sound"]),
+        IV.AimPose: _must_load(spec["aim"]),
+        IV.TwoHanded: bool(spec["two_handed"]),
         SUPPORT_POINT_VAR: unreal.Vector(*spec["support_point"]),
     })
     _log(f"built {spec['path']} ("

@@ -34,10 +34,11 @@ from probes.probe_monster_tuning import (
 from probes.probe_wendigo_stalk import (
     START_CM, _about, _on_navmesh, _stand_in_sight, _walk_speed,
 )
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.pick_var,
-                                       TAB.nudge_var, TAB.save_var, "MenuOpen")]
+                                       TAB.nudge_var, TAB.save_var, MV.MenuOpen)]
 MINS = {s[0]: s[4] for s in MONSTER_STATS}
 BEAT_S = 0.7            # the tree's 0.5 s beat, and a sample or two
 WAIT_S = 12.0

@@ -25,9 +25,11 @@ from combat.weapon_component.knife import (
     KNIFE_ANIM_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR, NEXT_KNIFE_VAR,
 )
 from graphics_menu.profile_consts import PROFILE_SLOT
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, "EquippedIndex"), (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
-            (WEAPON_COMP_BP_PATH, KNIFE_QUEUED_VAR), (HEALTH_BP_PATH, "Health")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex), (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
+            (WEAPON_COMP_BP_PATH, KNIFE_QUEUED_VAR), (HEALTH_BP_PATH, HV.Health)]
 
 IN_FRONT_CM = 100.0   # capsule centre to capsule centre: inside the reach
 KNIFE = "BP_Knife_C"

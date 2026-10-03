@@ -48,6 +48,7 @@ from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_GREATER_II, FN_MAX_II, FN_MIN_II, FN_NOT, FN_SUB_II)
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from graphics_menu import hud_vars as MV
 
 
 _BOOLS = (LOOT_OPEN_VAR, LOOT_TAKE_VAR, LOOT_BAG_FULL_VAR, LOOT_KNEELING_VAR)
@@ -86,7 +87,7 @@ def _move(ed, step, limit, bound, in_execs, made):
 def _author_keys(ed, pc_out, in_execs, made):
     """Tab, and with the window open Up/Down/Enter. Returns the exec tails."""
     free, busy = _branch(ed, out(_call(ed, FN_NOT, made,
-                                        A=_get(ed, "MenuOpen", made))),
+                                        A=_get(ed, MV.MenuOpen, made))),
                          in_execs, made)
     tab, no_tab = _branch(ed, _pressed(ed, pc_out, LOOT_KEY, made), [free], made)
     flip = _call(ed, FN_NOT, made, A=_get(ed, LOOT_OPEN_VAR, made))

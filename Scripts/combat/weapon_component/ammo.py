@@ -9,6 +9,8 @@ from uebp.nodes.actor import FN_ACTOR_LOC
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_MIN_II, FN_NOT, FN_SELECT_II, FN_SUB_II)
 from uebp.nodes.system import FN_PLAY_SOUND, FN_TIME_SECONDS
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _author_reload(ed, held, exec_in):
@@ -37,17 +39,17 @@ def _author_reload(ed, held, exec_in):
         made.append(n)
         return n
 
-    mag, mag_n = _prop(ed, "MagazineSize", held)
-    have, have_n = _prop(ed, "Loaded", held)
+    mag, mag_n = _prop(ed, IV.MagazineSize, held)
+    have, have_n = _prop(ed, IV.Loaded, held)
     keep(mag_n), keep(have_n)
     gap = keep(_node(ed, FN_SUB_II))
     _connect(mag, _pin(gap, "A"))
     _connect(have, _pin(gap, "B"))
-    spare, spare_n = _prop(ed, "Reserve", held)
+    spare, spare_n = _prop(ed, IV.Reserve, held)
     keep(spare_n)
     # Min, so a reserve of one tops a magazine that is four short up by one and
     # not by four -- and so the reserve can never be driven negative.
-    endless, endless_n = _prop(ed, "InfiniteReserve", held)
+    endless, endless_n = _prop(ed, IV.InfiniteReserve, held)
     keep(endless_n)
     source = keep(_node(ed, FN_SELECT_II))
     _connect(out(gap), _pin(source, "A"))
@@ -56,15 +58,15 @@ def _author_reload(ed, held, exec_in):
     moving = keep(_node(ed, FN_MIN_II))
     _connect(out(gap), _pin(moving, "A"))
     _connect(out(source), _pin(moving, "B"))
-    pin_take = keep(ed.add_set_member_variable_node("ReloadTake"))
-    _connect(out(moving), _pin(pin_take, "ReloadTake"))
+    pin_take = keep(ed.add_set_member_variable_node(WV.ReloadTake))
+    _connect(out(moving), _pin(pin_take, WV.ReloadTake))
     _connect(exec_in, _pin(pin_take, "execute"))
 
-    uses, uses_n = _prop(ed, "UsesAmmo", held)
+    uses, uses_n = _prop(ed, IV.UsesAmmo, held)
     keep(uses_n)
-    take_get = keep(ed.add_get_member_variable_node("ReloadTake"))
+    take_get = keep(ed.add_get_member_variable_node(WV.ReloadTake))
     any_left = keep(_node(ed, FN_GREATER_II))
-    _connect(out(take_get, "ReloadTake"), _pin(any_left, "A"))
+    _connect(out(take_get, WV.ReloadTake), _pin(any_left, "A"))
     _set(any_left, "B", 0)
     worth = keep(_node(ed, FN_AND))
     _connect(uses, _pin(worth, "A"))
@@ -87,52 +89,52 @@ def _author_reload(ed, held, exec_in):
     # centimetres, and reading the weapon's transform needs no owner cast.
     at = keep(_node(ed, FN_ACTOR_LOC))
     _connect(held, _pin(at, "self"))
-    clack_pin, clack_n = _prop(ed, "ReloadSound", held)
+    clack_pin, clack_n = _prop(ed, IV.ReloadSound, held)
     keep(clack_n)
     clack = keep(_node(ed, FN_PLAY_SOUND))
     _connect(clack_pin, _pin(clack, "Sound"))
     _connect(out(at), _pin(clack, "Location"))
     _connect(then(does), _pin(clack, "execute"))
 
-    take_a = keep(ed.add_get_member_variable_node("ReloadTake"))
-    was, was_n = _prop(ed, "Loaded", held)
+    take_a = keep(ed.add_get_member_variable_node(WV.ReloadTake))
+    was, was_n = _prop(ed, IV.Loaded, held)
     keep(was_n)
     filled = keep(_node(ed, FN_ADD_II))
     _connect(was, _pin(filled, "A"))
-    _connect(out(take_a, "ReloadTake"), _pin(filled, "B"))
-    load = keep(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH))
+    _connect(out(take_a, WV.ReloadTake), _pin(filled, "B"))
+    load = keep(ed.add_set_member_variable_node(IV.Loaded, ITEM_CLASS_PATH))
     _connect(held, _pin(load, "self"))
-    _connect(out(filled), _pin(load, "Loaded"))
+    _connect(out(filled), _pin(load, IV.Loaded))
     _connect(then(clack), _pin(load, "execute"))
 
-    take_b = keep(ed.add_get_member_variable_node("ReloadTake"))
-    kept, kept_n = _prop(ed, "Reserve", held)
+    take_b = keep(ed.add_get_member_variable_node(WV.ReloadTake))
+    kept, kept_n = _prop(ed, IV.Reserve, held)
     keep(kept_n)
     fewer = keep(_node(ed, FN_SUB_II))
     _connect(kept, _pin(fewer, "A"))
-    _connect(out(take_b, "ReloadTake"), _pin(fewer, "B"))
+    _connect(out(take_b, WV.ReloadTake), _pin(fewer, "B"))
     # An infinite reserve is written back as it was: one Set Reserve on both
     # kinds of weapon, rather than a branch around it.
-    free, free_n = _prop(ed, "InfiniteReserve", held)
+    free, free_n = _prop(ed, IV.InfiniteReserve, held)
     keep(free_n)
     after = keep(_node(ed, FN_SELECT_II))
     _connect(kept, _pin(after, "A"))
     _connect(out(fewer), _pin(after, "B"))
     _connect(free, _pin(after, "bPickA"))
-    charge = keep(ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH))
+    charge = keep(ed.add_set_member_variable_node(IV.Reserve, ITEM_CLASS_PATH))
     _connect(held, _pin(charge, "self"))
-    _connect(out(after), _pin(charge, "Reserve"))
+    _connect(out(after), _pin(charge, IV.Reserve))
     _connect(then(load), _pin(charge, "execute"))
 
     now = keep(_node(ed, FN_TIME_SECONDS))
-    takes, takes_n = _prop(ed, "ReloadSeconds", held)
+    takes, takes_n = _prop(ed, IV.ReloadSeconds, held)
     keep(takes_n)
     ready = keep(_node(ed, FN_ADD_FF))
     _connect(out(now), _pin(ready, "A"))
     _connect(takes, _pin(ready, "B"))
-    pause = keep(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH))
+    pause = keep(ed.add_set_member_variable_node(IV.NextFireTime, ITEM_CLASS_PATH))
     _connect(held, _pin(pause, "self"))
-    _connect(out(ready), _pin(pause, "NextFireTime"))
+    _connect(out(ready), _pin(pause, IV.NextFireTime))
     _connect(then(charge), _pin(pause, "execute"))
 
     ed.add_comment_to_nodes(
@@ -199,7 +201,7 @@ def _author_dry_fire(ed, held, muzzle, has_ammo, cooled, tapped, exec_in):
     _connect(out(worth), _pin(click, "Condition"))
     _connect(exec_in, _pin(click, "execute"))
 
-    dry_pin, dry_n = _prop(ed, "DryFireSound", held)
+    dry_pin, dry_n = _prop(ed, IV.DryFireSound, held)
     keep(dry_n)
     play = keep(_node(ed, FN_PLAY_SOUND))
     _connect(dry_pin, _pin(play, "Sound"))

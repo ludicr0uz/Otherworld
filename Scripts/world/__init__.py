@@ -11,6 +11,7 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
                        M panel's WORLD SETTINGS tab saves, laid over
                        world_config's
   paths                /Game paths, class paths, the two actor tags
+  day_night_vars       BP_DayNightCycle's variables and components, named once
   sky_material         M_DayNightSky: the whole sky (gradient, glow, discs,
                        stars) in one Custom node the SkyLight captures
   star_catalogue       star_catalogue.csv: the real stars (the Yale Bright

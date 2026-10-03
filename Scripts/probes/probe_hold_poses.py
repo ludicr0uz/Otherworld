@@ -28,10 +28,12 @@ from combat.paths import (
 from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
 from graphics_menu.profile_consts import PROFILE_SLOT
 from survival.paths import MUSHROOM_CLASS_PATH
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, "EquippedIndex"), (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
-            (WEAPON_COMP_BP_PATH, "Inventory"), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR),
-            (ITEM_BP_PATH, "Dropped")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex), (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
+            (WEAPON_COMP_BP_PATH, WV.Inventory), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR),
+            (ITEM_BP_PATH, IV.Dropped)]
 
 SETTLE_S = 0.3
 APART_CM = 8.0      # how far apart the hand heights must be to count

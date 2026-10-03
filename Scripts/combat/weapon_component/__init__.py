@@ -5,7 +5,9 @@ build.build_weapon_component() is the entry; it declares the variables and
 authors BeginPlay (inventory.py) and Tick (tick.py). Tick calls one
 _author_* fragment per concern, each in its own module:
 
-  common      _prop, trace defaults, muzzle location, _G (shared fragments)
+  common      _prop, trace defaults, muzzle location (shared fragments)
+  vars        BP_WeaponComponent's member variables that had no constant, named
+              once: name, pin type, default (uebp/vars.py)
   dead        the dead gate at the head of Tick: an owner who is Dead or at
               0 HP gets none of it; the aim, zoom and camera are let go
   aim         resolve the aim point every frame (camera trace, muzzle trace)

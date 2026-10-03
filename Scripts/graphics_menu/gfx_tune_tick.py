@@ -46,6 +46,7 @@ from graphics_menu.tune_tick import author_tab_flow, declare_tab_vars, tab_defau
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_SET
 from uebp.nodes.math import FN_ADD_II, FN_GE_II, FN_MOD_II, FN_MUL_II, FN_NEQ_II, FN_OR
 from uebp.nodes.palette import MACRO_FOR_LOOP
+from graphics_menu import hud_vars as MV
 
 
 def install_tuner(bp):
@@ -77,8 +78,8 @@ def _author_pick(ed, in_execs, made):
                   A=_get(ed, GFX_TAB.pick_var, made),
                   B=_get(ed, GFX_TUNE_PICK_SEEN_VAR, made))
     picked, followed = _branch(ed, out(moved), in_execs, made)
-    picked = put(ed, "Quality", _get(ed, GFX_TAB.pick_var, made), [picked], made)
-    followed = put(ed, GFX_TAB.pick_var, _get(ed, "Quality", made), [followed], made)
+    picked = put(ed, MV.Quality, _get(ed, GFX_TAB.pick_var, made), [picked], made)
+    followed = put(ed, GFX_TAB.pick_var, _get(ed, MV.Quality, made), [followed], made)
     return put(ed, GFX_TUNE_PICK_SEEN_VAR,
                _get(ed, GFX_TAB.pick_var, made), [picked, followed], made)
 
@@ -112,7 +113,7 @@ def _author_spread(ed, in_execs, made):
 def _author_hand_over(ed, in_execs, made):
     """Touched or a new Quality: the table and the preset onto the tuner.
     Returns the exec tails."""
-    new = _call(ed, FN_NEQ_II, made, A=_get(ed, "Quality", made), B=_get(ed, GFX_APPLIED_VAR, made))
+    new = _call(ed, FN_NEQ_II, made, A=_get(ed, MV.Quality, made), B=_get(ed, GFX_APPLIED_VAR, made))
     stale = _call(ed, FN_OR, made, A=_get(ed, GFX_TAB.touched_var, made), B=out(new))
     go, idle = _branch(ed, out(stale), in_execs, made)
     tuner = _get(ed, TUNER_COMPONENT, made)
@@ -131,7 +132,7 @@ def _author_hand_over(ed, in_execs, made):
     again = _call(ed, FN_NEQ_II, made, A=_get(ed, GFX_APPLIED_VAR, made), B=GFX_APPLIED_DEFAULT)
     keep, first = _branch(ed, out(again), [flow], made)
     kept = author_keep_graphics(ed, [keep], made)
-    flow = put(ed, GFX_APPLIED_VAR, _get(ed, "Quality", made), [*kept, first], made)
+    flow = put(ed, GFX_APPLIED_VAR, _get(ed, MV.Quality, made), [*kept, first], made)
     done = _setter(ed, GFX_TAB.touched_var, "false", [flow], made)
     return [done, idle]
 

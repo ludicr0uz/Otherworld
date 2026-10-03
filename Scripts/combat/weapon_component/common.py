@@ -6,6 +6,7 @@ from uebp.graph import _connect, _node, _pin, _set, out
 from combat.paths import ITEM_CLASS_PATH
 from uebp.nodes.actor import FN_GET_TRANSFORM
 from uebp.nodes.math import FN_TRANSFORM_LOC
+from combat import item_vars as IV
 
 
 # ─── BP_WeaponComponent ──────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ def _muzzle_location(ed, held):
     """
     xform = _node(ed, FN_GET_TRANSFORM)
     _connect(held, _pin(xform, "self"))
-    off_pin, _off = _prop(ed, "MuzzleOffset", held)
+    off_pin, _off = _prop(ed, IV.MuzzleOffset, held)
     at = _node(ed, FN_TRANSFORM_LOC)
     _connect(out(xform), _pin(at, "T"))
     _connect(off_pin, _pin(at, "Location"))

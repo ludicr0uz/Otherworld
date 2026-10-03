@@ -400,6 +400,8 @@ def missing_imports(project):
                 out.add(node.name)
             elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
                 out.add(node.id)
+            elif isinstance(node, ast.Import):
+                out |= {(a.asname or a.name).split(".")[0] for a in node.names}
         return out
 
     known, out = {}, []
@@ -413,4 +415,17 @@ def missing_imports(project):
                 if (a.name not in known[node.module]
                         and f"{node.module}.{a.name}" not in project.modules):
                     out.append(f"{module.rel}:{node.lineno}: {node.module} has no {a.name}")
-    return sorted(out)
+        # ...and ``alias.name`` where alias is a project module (``import x as G``,
+        # ``from pkg import mod as M``): a verifier reads a builder's names that way.
+        as_module = dict(module.aliases)
+        as_module.update({local: f"{source}.{name}" for local, (source, name)
+                          in module.imports.items() if f"{source}.{name}" in project.modules})
+        for node in ast.walk(module.tree):
+            if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+                    and as_module.get(node.value.id) in project.modules):
+                target = as_module[node.value.id]
+                if target not in known:
+                    known[target] = bound(project.modules[target])
+                if node.attr not in known[target] and f"{target}.{node.attr}" not in project.modules:
+                    out.append(f"{module.rel}:{node.lineno}: {target} has no {node.attr}")
+    return sorted(set(out))

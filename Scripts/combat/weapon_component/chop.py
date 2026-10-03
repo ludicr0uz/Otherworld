@@ -47,6 +47,7 @@ from uebp.nodes.math import (
     FN_SELECT_VECTOR, FN_SUB_VV)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_INSTANCED, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
+from combat.weapon_component import vars as WV
 
 
 def _get(ed, name):
@@ -68,7 +69,7 @@ def _author_chop(ed, brk, exec_in):
     """The blow struck something with no health: if an item that Chops is in
     hand and it is a tree, chip it, count it, and leave wood on the count.
     ``brk`` is the sweep's broken hit. Returns the stage's exits."""
-    held = _get(ed, "Held")
+    held = _get(ed, WV.Held)
     valid = _node(ed, FN_IS_VALID)
     _connect(held, _pin(valid, "Object"))
     armed = ed.add_branch_node()

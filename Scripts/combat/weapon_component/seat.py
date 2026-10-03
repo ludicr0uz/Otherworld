@@ -44,6 +44,7 @@ from combat.tuning import COMBAT
 from uebp.nodes.math import (
     FN_AND, FN_BOOL_TO_FLOAT, FN_DOT_VV, FN_FORWARD, FN_GREATER_FF, FN_INTERP_FF, FN_NORMAL,
     FN_NOT, FN_OR)
+from combat.weapon_component import vars as WV
 
 
 def _author_sight_seat(ed, tick, keep, line_out, has_line_out, boom_rot_out,
@@ -73,9 +74,9 @@ def _author_sight_seat(ed, tick, keep, line_out, has_line_out, boom_rot_out,
 
     was = keep(ed.add_get_member_variable_node(SEATED_VAR))
     stay = gate2(FN_OR, out(was, SEATED_VAR), up)
-    wanted = keep(ed.add_get_member_variable_node("SightAiming"))
+    wanted = keep(ed.add_get_member_variable_node(WV.SightAiming))
     seated = keep(ed.add_set_member_variable_node(SEATED_VAR))
-    _connect(gate2(FN_AND, out(wanted, "SightAiming"), stay), _pin(seated, SEATED_VAR))
+    _connect(gate2(FN_AND, out(wanted, WV.SightAiming), stay), _pin(seated, SEATED_VAR))
     _connect(exec_in, _pin(seated, "execute"))
 
     def eased(var, toward, after):
@@ -94,7 +95,7 @@ def _author_sight_seat(ed, tick, keep, line_out, has_line_out, boom_rot_out,
         return put
 
     # The travel starts on the key; the turn waits for the latch.
-    seat = eased(SEAT_VAR, out(wanted, "SightAiming"), then(seated))
+    seat = eased(SEAT_VAR, out(wanted, WV.SightAiming), then(seated))
     look = eased(LOOK_VAR, _loose_pin(seated, "Output_Get", is_input=False), then(seat))
     return (then(look),
             _loose_pin(seat, "Output_Get", is_input=False),

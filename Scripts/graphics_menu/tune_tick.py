@@ -66,6 +66,9 @@ from uebp.nodes.math import (
     FN_SUB_II)
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
 from uebp.nodes.system import FN_EXEC_PYTHON, FN_GET_PLAYER_PAWN
+from combat import item_vars as IV
+from graphics_menu import hud_vars as MV
+from combat.weapon_component import vars as WV
 
 
 def _bools(tab):
@@ -151,7 +154,7 @@ def _author_keys(ed, pc_out, in_execs, made, tab, closes):
     for other in closes:
         flow = _setter(ed, other, "false", [flow], made)
 
-    active = _call(ed, FN_AND, made, A=_get(ed, "MenuOpen", made), B=_get(ed, tab.open_var, made))
+    active = _call(ed, FN_AND, made, A=_get(ed, MV.MenuOpen, made), B=_get(ed, tab.open_var, made))
     on, off = _branch(ed, out(active), [flow, no_t], made)
     flow = [on]
     # A scrolling tab's wheel moves the caret (the list follows it); the
@@ -265,12 +268,12 @@ def _author_apply(ed, in_execs, made, guns):
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     made.append(loop)
-    _connect(_get(ed, "Inventory", made, WEAPON_COMP_CLASS_PATH, wc), _loose_pin(loop, "Array"))
+    _connect(_get(ed, WV.Inventory, made, WEAPON_COMP_CLASS_PATH, wc), _loose_pin(loop, "Array"))
     _connect(then(cast), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
     find = _call(ed, FN_ARR_FIND, made, TargetArray=_get(ed, TUNE_WEAPONS_VAR, made))
-    _connect(_get(ed, "DisplayName", made, ITEM_CLASS_PATH, item), _pin(find, "ItemToFind"))
+    _connect(_get(ed, IV.DisplayName, made, ITEM_CLASS_PATH, item), _pin(find, "ItemToFind"))
     known = _call(ed, FN_GE_II, made, A=out(find), B=0)
     tuned, _other = _branch(ed, out(known), [_loose_pin(loop, "LoopBody", is_input=False)], made)
     base = out(_call(ed, FN_MUL_II, made, A=out(find), B=STAT_COUNT))

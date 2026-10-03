@@ -11,6 +11,8 @@ from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
 from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT
 from uebp.nodes.system import FN_IS_VALID, FN_WARN
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _author_ready_pose_keepalive(ed, held, exec_ins):
@@ -56,9 +58,9 @@ def _author_ready_pose_keepalive(ed, held, exec_ins):
         made.append(n)
         return n
 
-    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
+    _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     anim_out = out(anim)
 
     armed = keep(_node(ed, FN_IS_VALID))
@@ -94,7 +96,7 @@ def _author_ready_pose_keepalive(ed, held, exec_ins):
     for tail in exec_ins:
         _connect(tail, _pin(gate, "execute"))
 
-    pose_pin, pose_n = _prop(ed, "AimPose", held)
+    pose_pin, pose_n = _prop(ed, IV.AimPose, held)
     keep(pose_n)
     replay = keep(_node(ed, FN_PLAY_SLOT))
     _connect(anim_out, _pin(replay, "self"))
@@ -156,8 +158,8 @@ def _author_lowered_pose_edge(ed, exec_ins):
     remember = ed.add_set_member_variable_node(POSE_LOWERED_VAR)
     _connect(now_sprint_out, _pin(remember, POSE_LOWERED_VAR))
     _connect(then(pose_gate), _pin(remember, "execute"))
-    pose_dirty = ed.add_set_member_variable_node("NeedsRefresh")
-    _set(pose_dirty, "NeedsRefresh", "true")
+    pose_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
+    _set(pose_dirty, WV.NeedsRefresh, "true")
     _connect(then(remember), _pin(pose_dirty, "execute"))
 
     ed.add_comment_to_nodes(

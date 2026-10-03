@@ -87,6 +87,9 @@ from combat.weapon_component.throw_windup import (
 )
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
+from uebp.vars import declare, defaults
+from combat.sprint_tuning import BASE_SPEED_VAR
+from combat.weapon_component import vars as WV
 
 
 # The slots' int variables, all NO_REQUEST at rest (HandFrom's default is
@@ -123,31 +126,16 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     tick, begin = _events(ed, rebuild)
 
     item_class = BEL.generated_class(item_bp)
-    _declare(ed, "Inventory",
-             BEL.get_array_type(BEL.get_object_reference_type(item_class)))
-    _declare(ed, "Held", BEL.get_object_reference_type(item_class))
-    _declare(ed, "EquippedIndex", BEL.get_basic_type_by_name("int"))
-    _declare(ed, "NeedsRefresh", BEL.get_basic_type_by_name("bool"))
-    _declare(ed, "OwnerMesh", BEL.get_object_reference_type(
-        unreal.SkeletalMeshComponent.static_class()))
-    # Where this frame's shot lands, and whether there is anything to draw a
-    # reticle on. The HUD reads all three; nothing else writes them.
-    _declare(ed, "AimPoint", _struct_type(unreal.Vector.static_struct()))
-    _declare(ed, "AimValid", BEL.get_basic_type_by_name("bool"))
-    _declare(ed, "AimBlocked", BEL.get_basic_type_by_name("bool"))
+    declare(ed, WV.TABLE)
     # Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's
     # HP bar; BaseSpeed is cached off the character at BeginPlay, never a
     # literal. Sprinting is what the fire gate refuses on. The sprint's speed
     # and the stamina's two rates are variables so the PLAYER SETTINGS tab can
     # write them.
-    for name in ("Stamina", "MaxStamina", "BaseSpeed", *SPRINT_RATE_VARS):
+    for name in ("BaseSpeed", *SPRINT_RATE_VARS):
         _declare(ed, name, _float_type())
-    _declare(ed, "Sprinting", BEL.get_basic_type_by_name("bool"))
     _declare(ed, SPRINT_SPENT_VAR, BEL.get_basic_type_by_name("bool"))
     _declare(ed, SPRINT_AHEAD_VAR, BEL.get_basic_type_by_name("bool"))
-    # The guard (block.py). Read by the fire gate, and by every wanderer's
-    # swing, which also writes Stamina here when the guard takes the hit.
-    _declare(ed, "Blocking", BEL.get_basic_type_by_name("bool"))
     # Fire held out in front of the player: a lit stick, raised by the use
     # key (torch.py writes it every frame). Read only by the wanderers afraid
     # of fire (npc/ward.py).
@@ -172,22 +160,6 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # A body is being searched: the HUD writes it while its loot window is
     # open, and the pose weights kneel the body from it.
     _declare(ed, SEARCHING_VAR, BEL.get_basic_type_by_name("bool"))
-    # Aiming down the sights. BaseFOV is cached off the camera at BeginPlay for
-    # the same reason BaseSpeed is cached off the movement component; CurrentFOV
-    # is stored because FInterpTo's input is its own previous output, and
-    # TargetFOV because the two arms of the zoom branch must write one value
-    # that one interpolation then reads.
-    for name in ("BaseFOV", "CurrentFOV", "TargetFOV"):
-        _declare(ed, name, _float_type())
-    # Aiming is either aim key (the cone and the recoil read it); SightAiming
-    # is the down-the-sights key alone (the camera and the scope read it).
-    # AimZoom is the zoom being aimed at, stored so the walk slowdown's
-    # ease-out divides by the zoom being let go of; SightBlend is how far the
-    # camera has travelled from the boom to the sight (weapon_component/sights).
-    _declare(ed, "Aiming", BEL.get_basic_type_by_name("bool"))
-    _declare(ed, "SightAiming", BEL.get_basic_type_by_name("bool"))
-    _declare(ed, "AimZoom", _float_type())
-    _declare(ed, "SightBlend", _float_type())
     # The camera's own share of the sights (seat.py): the latch that says the
     # gun is up, how far the camera has gone onto it and turned onto its sight
     # line, and the probes' stand-in for the sights key.
@@ -223,26 +195,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     for name in SLOT_INT_VARS:
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
     _declare(ed, HAS_ROOM_VAR, BEL.get_basic_type_by_name("bool"))
-    # Mouse sensitivity, and the two controller scales it multiplies. Both
-    # bases are cached off the PlayerController at BeginPlay -- BasePitchScale
-    # especially, because the engine ships it negative and a literal would
-    # invert the look. See the ADS block for what the zoom does to them.
-    # ScopeSensitivity is the scope's extra multiplier on top of the zoom's
-    # own slowdown -- the settings screen's second row, pushed like the first.
-    for name in ("MouseSensitivity", "ScopeSensitivity", "BaseYawScale",
-                 "BasePitchScale"):
-        _declare(ed, name, _float_type())
     # What the ready pose should reflect (carry.py writes it) and what it
     # currently does. The pair is what makes the pose edge-triggered; see
     # ready_pose.py.
     for name in (LOWERED_VAR, POSE_LOWERED_VAR, RAISE_FORCED_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    # Recoil. RecoilDebt/RecoilYawDebt are what has been kicked and not yet
-    # given back, recovered toward zero every frame; RecoilYawKick holds the
-    # one draw of the sideways component for the frame it is fired on, because
-    # RandomFloatInRange is pure and a second read would be a second number.
-    for name in ("RecoilDebt", "RecoilYawDebt", "RecoilYawKick"):
-        _declare(ed, name, _float_type())
     # Accuracy (accuracy.py): the cloud, the kick's scale and the reticle's
     # size, written once a frame. ShotDirection is the one draw of a shot's
     # direction inside the cloud, stored because the cone is pure and every
@@ -250,9 +207,6 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     for name in ACCURACY_OUT_VARS:
         _declare(ed, name, _float_type())
     _declare(ed, SHOT_DIRECTION_VAR, _struct_type(unreal.Vector.static_struct()))
-    # How many rounds this reload moves, computed once and read back three
-    # times. See _author_reload for why it cannot just be recomputed.
-    _declare(ed, "ReloadTake", BEL.get_basic_type_by_name("int"))
     # The fire press that ate an item, until it is released; see consume.py.
     _declare(ed, TRIGGER_SPENT, BEL.get_basic_type_by_name("bool"))
     # The clothing worn, one entry per wear_tuning.WEAR_SLOTS slot (grown by
@@ -273,11 +227,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # Typed as "class of BP_WeaponItem", not "class of Actor": SpawnActor's
     # return pin takes its type from its Class pin, and an Actor-typed return
     # cannot be added to an array of BP_WeaponItem.
-    for name in (*STARTER_CLASS_VARS, "ItemClass"):
+    for name in STARTER_CLASS_VARS:
         _declare(ed, name, BEL.get_class_reference_type(item_class))
     # CampfireClass is what a strike of the matches spawns (light.py). It is
     # declared here and left None: build_survival.py fills it in.
-    for name in ("BloodClass", IMPACT_CLASS_VAR, CAMPFIRE_CLASS_VAR):
+    for name in (IMPACT_CLASS_VAR, CAMPFIRE_CLASS_VAR):
         _declare(ed, name,
                  BEL.get_class_reference_type(unreal.Actor.static_class()))
     # The empty-handed punch (punch.py): its clip on the worn rig, the press
@@ -352,21 +306,15 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
-    _apply_defaults(bp, {
-        "EquippedIndex": 0,
-        "NeedsRefresh": True,
-        "Stamina": COMBAT.max_stamina,
-        "MaxStamina": COMBAT.max_stamina,
+    _apply_defaults(bp, {**defaults(WV.TABLE),
         # Overwritten on the first frame of BeginPlay with the character's
         # own walk speed, which is this same number (player_pace.py).
-        "BaseSpeed": COMBAT.jog_speed_cms,
+        BASE_SPEED_VAR: COMBAT.jog_speed_cms,
         SPRINT_SPEED_VAR: COMBAT.sprint_speed_cms,
         STAMINA_DRAIN_VAR: COMBAT.stamina_drain_per_s,
         STAMINA_REGEN_VAR: COMBAT.stamina_regen_per_s,
-        "Sprinting": False,
         SPRINT_SPENT_VAR: False,
         SPRINT_AHEAD_VAR: False,
-        "Blocking": False,
         FIRE_WARD_VAR: False,
         USING_VAR: False,
         USE_PRESSED_VAR: False,
@@ -375,15 +323,6 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         STANCE_VAR: STAND,
         HELD_TWO_HANDED: False,
         SEARCHING_VAR: False,
-        # 1.0 is "exactly what the controller already does", because the two
-        # base scales this multiplies are the controller's own. A player who
-        # never opens the settings screen therefore gets the stock feel.
-        "MouseSensitivity": COMBAT.mouse_sensitivity_default,
-        "ScopeSensitivity": COMBAT.ads_scope_sens_scale,
-        "SightAiming": False,
-        # A divisor (AimZoom - 1) from the first frame, so never 1.0.
-        "AimZoom": COMBAT.shoulder_zoom,
-        "SightBlend": 0.0,
         SEATED_VAR: False,
         SEAT_VAR: 0.0,
         LOOK_VAR: 0.0,
@@ -400,17 +339,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         **{name: NO_REQUEST for name in SLOT_INT_VARS},
         HAND_FROM_VAR: STARTER_HAND_FROM,
         HAS_ROOM_VAR: True,
-        # Both overwritten on the first frame of BeginPlay. Seeded with the
-        # engine's own defaults, signs included, so that a BeginPlay that
-        # somehow never ran leaves the look working rather than dead.
-        "BaseYawScale": 2.5,
-        "BasePitchScale": -2.5,
         # The two match, so the first frame sees no edge and does not
         # re-equip for nothing.
         LOWERED_VAR: False,
         POSE_LOWERED_VAR: False,
         RAISE_FORCED_VAR: False,
-        "ReloadTake": 0,
         TRIGGER_SPENT: False,
         TAKE_OFF_VAR: NOT_CLOTHING,
         TAKE_OFF_TO_VAR: NOT_CLOTHING,
@@ -418,19 +351,16 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         WEAR_SLOT_VAR: NOT_CLOTHING,
         OWNER_DEAD_VAR: False,
         FIRE_FORCED_VAR: False,
-        "RecoilDebt": 0.0,
-        "RecoilYawDebt": 0.0,
-        "RecoilYawKick": 0.0,
         **{name: 0.0 for name in ACCURACY_OUT_VARS},
         DEBUG_MODE_VAR: False,
-        "ShotgunClass": BEL.generated_class(shotgun_bp),
-        "PistolClass": BEL.generated_class(pistol_bp),
-        "KnifeClass": BEL.generated_class(knife_bp),
-        "AxeClass": BEL.generated_class(axe_bp),
+        WV.ShotgunClass: BEL.generated_class(shotgun_bp),
+        WV.PistolClass: BEL.generated_class(pistol_bp),
+        WV.KnifeClass: BEL.generated_class(knife_bp),
+        WV.AxeClass: BEL.generated_class(axe_bp),
         MATCHES_CLASS_VAR: BEL.generated_class(matches_bp),
         STICK_CLASS_VAR: BEL.generated_class(stick_bp),
-        "ItemClass": item_class,
-        "BloodClass": BEL.generated_class(blood_bp),
+        WV.ItemClass: item_class,
+        WV.BloodClass: BEL.generated_class(blood_bp),
         IMPACT_CLASS_VAR: BEL.generated_class(impact_bp),
         WOOD_CLASS_VAR: BEL.generated_class(wood_bp),
         CAMPFIRE_CLASS_VAR: campfire_class,

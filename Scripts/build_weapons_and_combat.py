@@ -100,6 +100,7 @@ from combat.tuning import GUN_DROP_CHANCE, GUN_LOOT_TABLE         # noqa: E402
 from combat.weapon_component.build import build_weapon_component  # noqa: E402
 from combat.weapon_items import build_weapon, build_weapon_item   # noqa: E402
 from combat.weapon_specs import DROP_TICKETS, _weapon_specs       # noqa: E402
+from combat import health_vars as HV  # noqa: E402
 
 
 # ─── Entry point ─────────────────────────────────────────────────────────────
@@ -181,10 +182,10 @@ def main():
     # link between the two is a default written here rather than a parameter.
     ammo_bp = build_ammo_pickup()
     _apply_defaults(health_bp, {
-        "AmmoClass": BEL.generated_class(ammo_bp),
+        HV.AmmoClass: BEL.generated_class(ammo_bp),
         # The loot table, one entry per ticket (GUN_LOOT_TABLE's weights), so
         # the graph's uniform pick roll over it is the weighted draw.
-        "DropClasses": [BEL.generated_class(weapons[name])
+        HV.DropClasses: [BEL.generated_class(weapons[name])
                         for name in DROP_TICKETS],
     })
     _log(f"{HEALTH_BP_PATH}.AmmoClass -> {AMMO_BP_PATH}")

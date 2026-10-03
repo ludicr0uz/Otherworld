@@ -35,6 +35,9 @@ from uebp.nodes.actor import FN_GET_OWNER
 from uebp.nodes.gas import FN_GET_ASC, FN_GIVE_ABILITY
 from uebp.nodes.math import FN_AND, FN_CLAMP, FN_MUL_FF, FN_SUB_FF
 from uebp.nodes.system import FN_IS_VALID, FN_IS_VALID_CLASS
+from uebp.vars import declare, defaults
+from survival.paths import ASC_COMPONENT
+from survival import component_vars as UV
 
 STATS = ("Hunger", "Thirst", "Temperature")
 
@@ -43,12 +46,12 @@ def _author_begin_play(ed, begin):
     owner = _node(ed, FN_GET_OWNER)
     lookup = _node(ed, FN_GET_ASC)
     _connect(out(owner), _pin(lookup, "Actor"))
-    keep_asc = ed.add_set_member_variable_node("AbilitySystem")
-    _connect(out(lookup), _pin(keep_asc, "AbilitySystem"))
+    keep_asc = ed.add_set_member_variable_node(ASC_COMPONENT)
+    _connect(out(lookup), _pin(keep_asc, ASC_COMPONENT))
     _connect(then(begin), _pin(keep_asc, "execute"))
 
-    asc = out(ed.add_get_member_variable_node("AbilitySystem"), "AbilitySystem")
-    ability = out(ed.add_get_member_variable_node("ConsumeAbility"), "ConsumeAbility")
+    asc = out(ed.add_get_member_variable_node(ASC_COMPONENT), ASC_COMPONENT)
+    ability = out(ed.add_get_member_variable_node(UV.ConsumeAbility), UV.ConsumeAbility)
     has_asc = _node(ed, FN_IS_VALID)
     _connect(asc, _pin(has_asc, "Object"))
     has_ability = _node(ed, FN_IS_VALID_CLASS)
@@ -97,14 +100,14 @@ def _author_decay(ed, tick, stat, rate_var, max_var, exec_in):
 
 def _author_tick(ed, tick):
     flow = then(tick)
-    flow = _author_decay(ed, tick, "Hunger", "HungerDecay", "MaxHunger", flow)
-    flow = _author_decay(ed, tick, "Thirst", "ThirstDecay", "MaxThirst", flow)
+    flow = _author_decay(ed, tick, UV.Hunger, "HungerDecay", "MaxHunger", flow)
+    flow = _author_decay(ed, tick, UV.Thirst, "ThirstDecay", "MaxThirst", flow)
 
     # Nested, not folded into each sync's condition: every sync reads off
     # AbilitySystem, and a pure Get with a null self in a Branch condition is
     # an Accessed None on every frame (CLAUDE.md, the fire-gate gotcha).
-    asc_get = ed.add_get_member_variable_node("AbilitySystem")
-    asc = out(asc_get, "AbilitySystem")
+    asc_get = ed.add_get_member_variable_node(ASC_COMPONENT)
+    asc = out(asc_get, ASC_COMPONENT)
     valid = _node(ed, FN_IS_VALID)
     _connect(asc, _pin(valid, "Object"))
     gate = ed.add_branch_node()
@@ -134,15 +137,12 @@ def build_survival_component(rebuild=True):
     for stat in STATS:
         _declare(ed, stat, _float_type())
         _declare(ed, f"Max{stat}", _float_type())
-    for name in ("HungerDecay", "ThirstDecay"):
-        _declare(ed, name, _float_type())
+    declare(ed, UV.TABLE)
     _declare(ed, "AbilitySystem", BEL.get_object_reference_type(
         unreal.AbilitySystemComponent.static_class()))
     for _stat, effect_var, _tags in DEBUFFS:
         _declare(ed, effect_var, BEL.get_class_reference_type(
             unreal.GameplayEffect.static_class()))
-    _declare(ed, "ConsumeAbility", BEL.get_class_reference_type(
-        unreal.GameplayAbility.static_class()))
 
     _author_begin_play(ed, begin)
     _author_tick(ed, tick)
@@ -150,15 +150,13 @@ def build_survival_component(rebuild=True):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_SurvivalComponent failed to compile")
-    _apply_defaults(bp, {
-        "Hunger": SURVIVAL.max_hunger,
-        "MaxHunger": SURVIVAL.max_hunger,
-        "Thirst": SURVIVAL.max_thirst,
-        "MaxThirst": SURVIVAL.max_thirst,
-        "Temperature": SURVIVAL.start_temperature,
-        "MaxTemperature": SURVIVAL.max_temperature,
-        "HungerDecay": SURVIVAL.hunger_decay_per_s,
-        "ThirstDecay": SURVIVAL.thirst_decay_per_s,
+    _apply_defaults(bp, {**defaults(UV.TABLE),
+        UV.Hunger: SURVIVAL.max_hunger,
+        UV.MaxHunger: SURVIVAL.max_hunger,
+        UV.Thirst: SURVIVAL.max_thirst,
+        UV.MaxThirst: SURVIVAL.max_thirst,
+        UV.Temperature: SURVIVAL.start_temperature,
+        UV.MaxTemperature: SURVIVAL.max_temperature,
     })
     _log(f"built {SURVIVAL_BP_PATH}")
     return bp

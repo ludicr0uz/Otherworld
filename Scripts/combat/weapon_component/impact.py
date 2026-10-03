@@ -29,6 +29,10 @@ from uebp.nodes.math import (
     FN_SELECT_FF, FN_SUB_FF, INF)
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_SPAWN
 from uebp.nodes.system import FN_CONCAT, FN_DRAW_STRING, FN_FLOAT_TO_STR, FN_TIME_SECONDS
+from uebp import props as EP
+from combat import health_vars as HV
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _author_impact(ed, brk, held, exec_in):
@@ -58,7 +62,7 @@ def _author_impact(ed, brk, held, exec_in):
     _connect(exec_in, _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    blood_cls = ed.add_get_member_variable_node("BloodClass")
+    blood_cls = ed.add_get_member_variable_node(WV.BloodClass)
     where = _node(ed, FN_MAKE_TRANSFORM)
     _connect(out(landed, HIT_POINT_VAR), _pin(where, "Location"))
     # How big the spray is, as a clamped ratio of the round's damage to a
@@ -67,7 +71,7 @@ def _author_impact(ed, brk, held, exec_in):
     # actor scales launch distance and droplet size together, which is the
     # single number that separates a 9 mm from a slug at contact range. A
     # shotgun pays eight of these at once, which is why one pellet is under 1x.
-    spray_dmg_pin, spray_dmg = _prop(ed, "Damage", held)
+    spray_dmg_pin, spray_dmg = _prop(ed, IV.Damage, held)
     ratio = _node(ed, FN_DIV_FF)
     _connect(spray_dmg_pin, _pin(ratio, "A"))
     _set(ratio, "B", BLOOD_REFERENCE_DAMAGE)
@@ -86,7 +90,7 @@ def _author_impact(ed, brk, held, exec_in):
     _connect(_loose_pin(brk, "ImpactNormal", is_input=False), _pin(facing, "X"))
     _connect(out(facing), _pin(where, "Rotation"))
     splash = _palette(ed, NODE_SPAWN)
-    _connect(out(blood_cls, "BloodClass"), _pin(splash, "Class"))
+    _connect(out(blood_cls, WV.BloodClass), _pin(splash, "Class"))
     _connect(out(where), _pin(splash, "SpawnTransform"))
     _set(splash, "CollisionHandlingOverride", "AlwaysSpawn")
     chipped = _author_surface_impact(ed, where, out(cast, "CastFailed"))
@@ -97,23 +101,23 @@ def _author_impact(ed, brk, held, exec_in):
     for tail in zoned:
         _connect(tail, _pin(splash, "execute"))
 
-    get_h = ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH)
+    get_h = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(get_h, "self"))
-    dmg_pin, dmg_n = _prop(ed, "Damage", held)
+    dmg_pin, dmg_n = _prop(ed, IV.Damage, held)
     worth, worth_nodes = _zone_multiplier(ed, as_health)
     scaled = _node(ed, FN_MUL_FF)
     _connect(dmg_pin, _pin(scaled, "A"))
     _connect(worth, _pin(scaled, "B"))
     sub = _node(ed, FN_SUB_FF)
-    _connect(out(get_h, "Health"), _pin(sub, "A"))
+    _connect(out(get_h, HV.Health), _pin(sub, "A"))
     _connect(out(scaled), _pin(sub, "B"))
     clamp = _node(ed, FN_CLAMP)
     _connect(out(sub), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", INF)
-    set_h = ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH)
+    set_h = ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(set_h, "self"))
-    _connect(out(clamp), _pin(set_h, "Health"))
+    _connect(out(clamp), _pin(set_h, HV.Health))
     _connect(then(splash), _pin(set_h, "execute"))
 
     # Stamp the hit. Two things read this and nothing else writes it:
@@ -264,7 +268,7 @@ def _author_hit_zone(ed, brk, exec_in):
     as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(as_char, "Object"))
     _connect(then(clear), _pin(as_char, "execute"))
-    mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
+    mesh = keep(ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character"))
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
 
     probe = keep(_node(ed, FN_TRACE_COMPONENT))

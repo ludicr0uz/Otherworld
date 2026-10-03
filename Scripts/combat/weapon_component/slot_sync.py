@@ -33,6 +33,7 @@ from combat.weapon_component.slot_nodes import (
 from uebp.graph import out, then
 from uebp.nodes.array import FN_ARR_CLEAR, FN_ARR_FIND, FN_ARR_RESIZE, FN_ARR_SET
 from uebp.nodes.math import FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_NE_OO, FN_OR
+from combat.weapon_component import vars as WV
 
 
 def _author_claim(g, execs):
@@ -40,7 +41,7 @@ def _author_claim(g, execs):
     items = g.get(SLOT_ITEMS_VAR)
     clear = g.call(FN_ARR_CLEAR, execs, TargetArray=items)
     size = g.call(FN_ARR_RESIZE, [then(clear)], TargetArray=items, Size=SLOT_COUNT)
-    item, _i, body, done = for_each(g, g.get("Inventory"), [then(size)])
+    item, _i, body, done = for_each(g, g.get(WV.Inventory), [then(size)])
     slot = g.iget(item, SLOT_VAR)
     placed = op(g, FN_AND, op(g, FN_GE_II, slot, 0), op(g, FN_LESS_II, slot, SLOT_COUNT))
     yes, no = g.branch(placed, [body])
@@ -53,7 +54,7 @@ def _author_claim(g, execs):
 def _author_place(g, execs):
     """The second pass: each UNPLACED item into the first free bag slot, or
     the hand. Returns Completed."""
-    item, _i, body, done = for_each(g, g.get("Inventory"), execs)
+    item, _i, body, done = for_each(g, g.get(WV.Inventory), execs)
     lost = op(g, FN_EQ_II, g.iget(item, SLOT_VAR), UNPLACED)
     yes, _no = g.branch(lost, [body])
     flow = g.put(SLOT_PICK_VAR, str(UNPLACED), [yes])
@@ -93,17 +94,17 @@ def _author_after(g, execs):
     """EquippedIndex, HasRoom and the refresh off the rebuilt SlotItems.
     Returns the exec tails."""
     hand = slot_at(g, HAND)
-    find = g.call(FN_ARR_FIND, TargetArray=g.get("Inventory"), ItemToFind=hand)
-    flow = g.put("EquippedIndex", out(find), execs)
+    find = g.call(FN_ARR_FIND, TargetArray=g.get(WV.Inventory), ItemToFind=hand)
+    flow = g.put(WV.EquippedIndex, out(find), execs)
     flow = g.put(SLOT_PICK_VAR, str(UNPLACED), [flow])
     k, body, done = for_loop(g, BAG_FIRST, BAG_LAST, [flow])
     empty, _ = g.branch(not_(g, valid(g, slot_at(g, k))), [body])
     g.put(SLOT_PICK_VAR, k, [empty])
     room = op(g, FN_OR, op(g, FN_GE_II, g.get(SLOT_PICK_VAR), 0), not_(g, valid(g, hand)))
     flow = g.put(HAS_ROOM_VAR, room, [done])
-    changed = op(g, FN_NE_OO, slot_at(g, HAND), g.get("Held"))
+    changed = op(g, FN_NE_OO, slot_at(g, HAND), g.get(WV.Held))
     moved, same = g.branch(changed, [flow])
-    return [g.put("NeedsRefresh", "true", [moved]), same]
+    return [g.put(WV.NeedsRefresh, "true", [moved]), same]
 
 
 def _author_slot_sync(ed, in_execs):

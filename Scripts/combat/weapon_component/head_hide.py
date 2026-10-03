@@ -31,6 +31,7 @@ from combat.seat_tuning import HEAD_HIDE_SEAT, SEAT_VAR
 from combat.skin import player_skin
 from uebp.nodes.actor import FN_HIDE_BONE, FN_UNHIDE_BONE
 from uebp.nodes.math import FN_GREATER_FF
+from combat.weapon_component import vars as WV
 
 # The bone's physics body is left alone: only the picture changes.
 PHYS_BODY_OP = "PBO_None"
@@ -57,9 +58,9 @@ def head_bone():
 
 def _author_head_shown(ed, keep, exec_in):
     """OwnerMesh.UnHideBoneByName(head). Returns the exec pin to carry on from."""
-    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    body = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     show = keep(_node(ed, FN_UNHIDE_BONE))
-    _connect(out(body, "OwnerMesh"), _pin(show, "self"))
+    _connect(out(body, WV.OwnerMesh), _pin(show, "self"))
     _set(show, "BoneName", head_bone())
     _connect(exec_in, _pin(show, "execute"))
     return then(show)
@@ -82,9 +83,9 @@ def _author_head_hide(ed, exec_ins):
     for e in exec_ins:
         _connect(e, _pin(on_sights, "execute"))
 
-    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    body = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     hide = keep(_node(ed, FN_HIDE_BONE))
-    _connect(out(body, "OwnerMesh"), _pin(hide, "self"))
+    _connect(out(body, WV.OwnerMesh), _pin(hide, "self"))
     _set(hide, "BoneName", head_bone())
     _set(hide, "PhysBodyOption", PHYS_BODY_OP)
     _connect(then(on_sights), _pin(hide, "execute"))

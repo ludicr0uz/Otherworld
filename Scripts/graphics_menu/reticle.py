@@ -15,6 +15,9 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from uebp.nodes.umg import FN_VIEWPORT
+from combat import item_vars as IV
+from graphics_menu import hud_vars as MV
+from combat.weapon_component import vars as WV
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
@@ -95,15 +98,15 @@ def _author_reticle(ed, in_execs):
         _connect(e, _pin(cast, "execute"))
     as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
-    valid = keep(ed.add_get_member_variable_node("AimValid", WEAPON_COMP_CLASS_PATH))
+    valid = keep(ed.add_get_member_variable_node(WV.AimValid, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(valid, "self"))
-    blocked = keep(ed.add_get_member_variable_node("AimBlocked", WEAPON_COMP_CLASS_PATH))
+    blocked = keep(ed.add_get_member_variable_node(WV.AimBlocked, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(blocked, "self"))
 
     # Empty hands draw nothing: a reticle with no weapon behind it points at a
     # shot that cannot be taken.
     armed = keep(ed.add_branch_node())
-    _connect(out(valid, "AimValid"), _pin(armed, "Condition"))
+    _connect(out(valid, WV.AimValid), _pin(armed, "Condition"))
     _connect(then(cast), _pin(armed, "execute"))
 
     # Centre from the viewport, not from a constant: DrawRect works in canvas
@@ -125,14 +128,14 @@ def _author_reticle(ed, in_execs):
     # branch below are downstream of it, and because AimValid is exactly the
     # weapon component's answer to "is Held valid" -- it is set false on the
     # empty-handed path, so under `armed` this Get cannot be an Accessed None.
-    held = keep(ed.add_get_member_variable_node("Held", WEAPON_COMP_CLASS_PATH))
+    held = keep(ed.add_get_member_variable_node(WV.Held, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(held, "self"))
-    held_out = out(held, "Held")
-    scoped = keep(ed.add_get_member_variable_node("Scoped", ITEM_CLASS_PATH))
+    held_out = out(held, WV.Held)
+    scoped = keep(ed.add_get_member_variable_node(IV.Scoped, ITEM_CLASS_PATH))
     _connect(held_out, _pin(scoped, "self"))
     glass = keep(ed.add_branch_node())
     _connect(_author_scope_gate(ed, as_weapon,
-                                out(scoped, "Scoped"), keep),
+                                out(scoped, IV.Scoped), keep),
              _pin(glass, "Condition"))
     _connect(then(armed), _pin(glass, "execute"))
 
@@ -143,7 +146,7 @@ def _author_reticle(ed, in_execs):
     colour = keep(_node(ed, FN_SELECT_COLOR))
     _set(colour, "A", COL_RETICLE_BLOCKED)
     _set(colour, "B", COL_RETICLE)
-    _connect(out(blocked, "AimBlocked"), _pin(colour, "bPickA"))
+    _connect(out(blocked, WV.AimBlocked), _pin(colour, "bPickA"))
     colour_out = out(colour)
 
     def offset(src, by):
@@ -155,10 +158,10 @@ def _author_reticle(ed, in_execs):
 
     # The cloud's radius on screen, and the centre pushed out by it each way
     # for the four ticks. The dot stays on the true centre.
-    reticle_spread = keep(ed.add_get_member_variable_node("ReticleSpread", WEAPON_COMP_CLASS_PATH))
+    reticle_spread = keep(ed.add_get_member_variable_node(WV.ReticleSpread, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(reticle_spread, "self"))
     spread_px = keep(_node(ed, FN_MUL_FF))
-    _connect(out(reticle_spread, "ReticleSpread"), _pin(spread_px, "A"))
+    _connect(out(reticle_spread, WV.ReticleSpread), _pin(spread_px, "A"))
     _connect(cx, _pin(spread_px, "B"))
     # FMin, not FClamp: ReticleSpread is never negative, and the verifier
     # reads every FClamp on this HUD as a settings slider.
@@ -197,9 +200,9 @@ def _author_reticle(ed, in_execs):
     on_sights = keep(_node(ed, FN_GREATER_FF))
     _connect(out(seat, SEAT_VAR), _pin(on_sights, "A"))
     _set(on_sights, "B", RETICLE_HIDE_SEAT)
-    debug = keep(ed.add_get_member_variable_node("DebugOn"))
+    debug = keep(ed.add_get_member_variable_node(MV.DebugOn))
     plain = keep(_node(ed, FN_NOT))
-    _connect(out(debug, "DebugOn"), _pin(plain, "A"))
+    _connect(out(debug, MV.DebugOn), _pin(plain, "A"))
     irons = keep(_node(ed, FN_AND))
     _connect(out(on_sights), _pin(irons, "A"))
     _connect(out(plain), _pin(irons, "B"))

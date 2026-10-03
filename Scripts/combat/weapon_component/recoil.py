@@ -10,6 +10,8 @@ from uebp.nodes.actor import FN_GET_CONTROL_ROT, FN_SET_CONTROL_ROT
 from uebp.nodes.math import (
     FN_ABS, FN_ADD_FF, FN_BREAK_ROT, FN_GREATER_FF, FN_INTERP_FF, FN_MAKE_ROT, FN_MUL_FF,
     FN_RANDOM_FLOAT, FN_SUB_FF)
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _author_turn_view(ed, pc_out, pitch_delta, yaw_delta, exec_in):
@@ -96,7 +98,7 @@ def _author_recoil_kick(ed, held, pc_out, exec_in):
         made.append(n)
         return n
 
-    per_shot, per_shot_n = _prop(ed, "RecoilPitch", held)
+    per_shot, per_shot_n = _prop(ed, IV.RecoilPitch, held)
     keep(per_shot_n)
     # How much of it this frame's stance and aim let through: RecoilScale,
     # written by accuracy.py from the gun's own factors.
@@ -107,7 +109,7 @@ def _author_recoil_kick(ed, held, pc_out, exec_in):
     _connect(scale_out, _pin(up, "B"))
     up_out = out(up)
 
-    swing, swing_n = _prop(ed, "RecoilYaw", held)
+    swing, swing_n = _prop(ed, IV.RecoilYaw, held)
     keep(swing_n)
     span = keep(_node(ed, FN_MUL_FF))
     _connect(swing, _pin(span, "A"))
@@ -119,26 +121,26 @@ def _author_recoil_kick(ed, held, pc_out, exec_in):
     draw = keep(_node(ed, FN_RANDOM_FLOAT))
     _connect(out(mirrored), _pin(draw, "Min"))
     _connect(span_out, _pin(draw, "Max"))
-    hold = keep(ed.add_set_member_variable_node("RecoilYawKick"))
-    _connect(out(draw), _pin(hold, "RecoilYawKick"))
+    hold = keep(ed.add_set_member_variable_node(WV.RecoilYawKick))
+    _connect(out(draw), _pin(hold, WV.RecoilYawKick))
     _connect(exec_in, _pin(hold, "execute"))
 
-    owed = keep(ed.add_get_member_variable_node("RecoilDebt"))
+    owed = keep(ed.add_get_member_variable_node(WV.RecoilDebt))
     charge = keep(_node(ed, FN_ADD_FF))
-    _connect(out(owed, "RecoilDebt"), _pin(charge, "A"))
+    _connect(out(owed, WV.RecoilDebt), _pin(charge, "A"))
     _connect(up_out, _pin(charge, "B"))
-    bill = keep(ed.add_set_member_variable_node("RecoilDebt"))
-    _connect(out(charge), _pin(bill, "RecoilDebt"))
+    bill = keep(ed.add_set_member_variable_node(WV.RecoilDebt))
+    _connect(out(charge), _pin(bill, WV.RecoilDebt))
     _connect(then(hold), _pin(bill, "execute"))
 
-    drawn = keep(ed.add_get_member_variable_node("RecoilYawKick"))
-    drawn_out = out(drawn, "RecoilYawKick")
-    owed_yaw = keep(ed.add_get_member_variable_node("RecoilYawDebt"))
+    drawn = keep(ed.add_get_member_variable_node(WV.RecoilYawKick))
+    drawn_out = out(drawn, WV.RecoilYawKick)
+    owed_yaw = keep(ed.add_get_member_variable_node(WV.RecoilYawDebt))
     charge_yaw = keep(_node(ed, FN_ADD_FF))
-    _connect(out(owed_yaw, "RecoilYawDebt"), _pin(charge_yaw, "A"))
+    _connect(out(owed_yaw, WV.RecoilYawDebt), _pin(charge_yaw, "A"))
     _connect(drawn_out, _pin(charge_yaw, "B"))
-    bill_yaw = keep(ed.add_set_member_variable_node("RecoilYawDebt"))
-    _connect(out(charge_yaw), _pin(bill_yaw, "RecoilYawDebt"))
+    bill_yaw = keep(ed.add_set_member_variable_node(WV.RecoilYawDebt))
+    _connect(out(charge_yaw), _pin(bill_yaw, WV.RecoilYawDebt))
     _connect(then(bill), _pin(bill_yaw, "execute"))
 
     turned, turn_nodes = _author_turn_view(ed, pc_out, up_out, drawn_out, then(bill_yaw))
@@ -186,10 +188,10 @@ def _author_recoil_recovery(ed, tick, pc_out, exec_in):
         made.append(n)
         return n
 
-    owed = keep(ed.add_get_member_variable_node("RecoilDebt"))
-    owed_out = out(owed, "RecoilDebt")
-    owed_yaw = keep(ed.add_get_member_variable_node("RecoilYawDebt"))
-    owed_yaw_out = out(owed_yaw, "RecoilYawDebt")
+    owed = keep(ed.add_get_member_variable_node(WV.RecoilDebt))
+    owed_out = out(owed, WV.RecoilDebt)
+    owed_yaw = keep(ed.add_get_member_variable_node(WV.RecoilYawDebt))
+    owed_yaw_out = out(owed_yaw, WV.RecoilYawDebt)
 
     size = keep(_node(ed, FN_ABS))
     _connect(owed_out, _pin(size, "A"))

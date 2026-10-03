@@ -50,11 +50,13 @@ from probes.probe_throw_strike import (
     AXE, ISM, KNIFE, ON_GROUND_CM, SHOTS, _alive, _dir, _picture, _reticle_on,
     _stand, _take, _throw,
 )
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
              (THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR, INTERACT_FORCED_VAR,
-              "EquippedIndex", "NeedsRefresh")]
-            + [(HEALTH_BP_PATH, "Health"), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR)])
+              WV.EquippedIndex, WV.NeedsRefresh)]
+            + [(HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR)])
 
 BODY_AT_CM = 300.0        # the body, in front of the player
 BODY_HP = 200.0           # room for a blade

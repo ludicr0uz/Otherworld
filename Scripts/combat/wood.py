@@ -39,6 +39,7 @@ from combat.tuning import COMBAT
 from combat.weapon_items import build_model
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
+from combat import item_vars as IV
 
 WOOD_MESH = "/Game/Sourced/Quaternius/Survival/SM_WoodLog"
 WOOD_DISPLAY = "Wood"
@@ -87,35 +88,35 @@ def build_wood(item_bp):
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
-        "DisplayName": WOOD_DISPLAY,
-        "Melee": False,
-        "Consumable": False,
+        IV.DisplayName: WOOD_DISPLAY,
+        IV.Melee: False,
+        IV.Consumable: False,
         CHOPS_VAR: False,
         # True, as on food: a piece of wood starts life on the ground, which
         # is what E looks for; picking it up clears it.
-        "Dropped": True,
+        IV.Dropped: True,
         # Nothing to fire: the fire key runs the guns' path over no pellets.
-        "UsesAmmo": False,
-        "Automatic": False,
-        "Damage": 0.0,
-        "PelletCount": 0,
-        "MagazineSize": 0,
-        "Loaded": 0,
-        "Reserve": 0,
-        "InfiniteReserve": False,
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, wood_outline())),
-        "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.UsesAmmo: False,
+        IV.Automatic: False,
+        IV.Damage: 0.0,
+        IV.PelletCount: 0,
+        IV.MagazineSize: 0,
+        IV.Loaded: 0,
+        IV.Reserve: 0,
+        IV.InfiniteReserve: False,
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
+        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, wood_outline())),
+        IV.GripRotation: grip_rot,
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.
-        "AdsZoom": float(COMBAT.ads_zoom_irons),
-        "Scoped": False,
-        "RecoilPitch": 0.0,
-        "ShotVolume": 0.0,
-        "TwoHanded": False,
-        "Icon": _weapon_icon(WOOD_DISPLAY),
-        "AimPose": _must_load(aim),
+        IV.AdsZoom: float(COMBAT.ads_zoom_irons),
+        IV.Scoped: False,
+        IV.RecoilPitch: 0.0,
+        IV.ShotVolume: 0.0,
+        IV.TwoHanded: False,
+        IV.Icon: _weapon_icon(WOOD_DISPLAY),
+        IV.AimPose: _must_load(aim),
     })
     _log(f"built {WOOD_BP_PATH} ({WOOD_MESH.rsplit('/', 1)[-1]} at {WOOD_SCALE}, "
          f"a {LOG_LENGTH_CM:.0f} cm log)")

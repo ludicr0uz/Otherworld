@@ -24,6 +24,7 @@ from combat.heat_tuning import (
 from combat.weapon_component.common import _prop
 from uebp.nodes.actor import FN_HAS_TAG
 from uebp.nodes.system import FN_IS_VALID
+from combat.weapon_component import vars as WV
 
 
 def author_hot_blow(strike):
@@ -44,8 +45,8 @@ def author_hot_blow(strike):
         plain = put(strike.damage)
         _connect(exec_in, _pin(plain, "execute"))
 
-        held_n = keep(ed.add_get_member_variable_node("Held"))
-        held = out(held_n, "Held")
+        held_n = keep(ed.add_get_member_variable_node(WV.Held))
+        held = out(held_n, WV.Held)
         armed = keep(_node(ed, FN_IS_VALID))
         _connect(held, _pin(armed, "Object"))
         gate = keep(ed.add_branch_node())

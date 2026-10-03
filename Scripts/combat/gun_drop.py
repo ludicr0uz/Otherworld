@@ -21,6 +21,8 @@ from uebp.nodes.math import (
     FN_ADD_VV, FN_AND, FN_GREATER_II, FN_LESS_FF, FN_MAKE_TRANSFORM, FN_SEED_STREAM,
     FN_SET_STREAM_SEED, FN_STREAM_FLOAT, FN_STREAM_INT)
 from uebp.nodes.palette import NODE_CAST_ITEM, NODE_SPAWN
+from combat import health_vars as HV
+from combat import item_vars as IV
 
 
 def _mode_var(ed, mode_out, name, setter=False):
@@ -109,8 +111,8 @@ def _author_gun_drop(ed, mode_out, at, exec_in):
     _connect(out(roll), _pin(lucky, "A"))
     _set(lucky, "B", GUN_DROP_CHANCE)
 
-    table = keep(ed.add_get_member_variable_node("DropClasses"))
-    table_out = out(table, "DropClasses")
+    table = keep(ed.add_get_member_variable_node(HV.DropClasses))
+    table_out = out(table, HV.DropClasses)
     how_many = keep(_node(ed, FN_ARR_LEN))
     _connect(table_out, _pin(how_many, "TargetArray"))
     stocked = keep(_node(ed, FN_GREATER_II))
@@ -156,10 +158,10 @@ def _author_gun_drop(ed, mode_out, at, exec_in):
     as_item = keep(_palette(ed, NODE_CAST_ITEM))
     _connect(out(spawn), _pin(as_item, "Object"))
     _connect(then(spawn), _pin(as_item, "execute"))
-    loose = keep(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH))
+    loose = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
     _connect(_loose_pin(as_item, "AsBPWeaponItem", is_input=False),
              _pin(loose, "self"))
-    _set(loose, "Dropped", "true")
+    _set(loose, IV.Dropped, "true")
     _connect(then(as_item), _pin(loose, "execute"))
 
     total = sum(w for _, w in GUN_LOOT_TABLE)

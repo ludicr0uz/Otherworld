@@ -24,10 +24,14 @@ from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE
 from uebp.nodes.math import FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN
 from uebp.nodes.system import FN_GET_PC, FN_IS_VALID, FN_TRACE
+from combat.sprint_tuning import BASE_SPEED_VAR
+from uebp import props as EP
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 # What the player is issued, in bag order: the component's class variables
 # BeginPlay spawns from (build.py declares and fills them).
-STARTER_CLASS_VARS = ("ShotgunClass", "PistolClass", "KnifeClass", "AxeClass",
+STARTER_CLASS_VARS = (WV.ShotgunClass, WV.PistolClass, WV.KnifeClass, WV.AxeClass,
                       MATCHES_CLASS_VAR, STICK_CLASS_VAR)
 
 
@@ -46,9 +50,9 @@ def _author_drop(ed, held, owner, exec_in):
         made.append(n)
         return n
 
-    flag = keep(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH))
+    flag = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
     _connect(held, _pin(flag, "self"))
-    _set(flag, "Dropped", "true")
+    _set(flag, IV.Dropped, "true")
     _connect(exec_in, _pin(flag, "execute"))
 
     off = keep(_node(ed, FN_DETACH))
@@ -116,20 +120,20 @@ def _author_drop(ed, held, owner, exec_in):
     _connect(else_(landed), _pin(in_air, "execute"))
 
     # Both placements rejoin here; an exec input takes more than one link.
-    inv = keep(ed.add_get_member_variable_node("Inventory"))
-    idx = keep(ed.add_get_member_variable_node("EquippedIndex"))
+    inv = keep(ed.add_get_member_variable_node(WV.Inventory))
+    idx = keep(ed.add_get_member_variable_node(WV.EquippedIndex))
     remove = keep(_node(ed, FN_ARR_REMOVE))
-    _connect(out(inv, "Inventory"), _pin(remove, "TargetArray"))
-    _connect(out(idx, "EquippedIndex"), _pin(remove, "IndexToRemove"))
+    _connect(out(inv, WV.Inventory), _pin(remove, "TargetArray"))
+    _connect(out(idx, WV.EquippedIndex), _pin(remove, "IndexToRemove"))
     _connect(then(on_ground), _pin(remove, "execute"))
     _connect(then(in_air), _pin(remove, "execute"))
 
     # Held is set with its input pin left unconnected, which is how a Blueprint
     # object variable is cleared to None.
-    clear = keep(ed.add_set_member_variable_node("Held"))
+    clear = keep(ed.add_set_member_variable_node(WV.Held))
     _connect(then(remove), _pin(clear, "execute"))
-    reset = keep(ed.add_set_member_variable_node("EquippedIndex"))
-    _set(reset, "EquippedIndex", 0)
+    reset = keep(ed.add_set_member_variable_node(WV.EquippedIndex))
+    _set(reset, WV.EquippedIndex, 0)
     _connect(then(clear), _pin(reset, "execute"))
 
     ed.add_comment_to_nodes(
@@ -167,24 +171,24 @@ def _author_equip(ed, exec_in):
         made.append(n)
         return n
 
-    inv = keep(ed.add_get_member_variable_node("Inventory"))
+    inv = keep(ed.add_get_member_variable_node(WV.Inventory))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
-    _connect(out(inv, "Inventory"), _loose_pin(loop, "Array"))
+    _connect(out(inv, WV.Inventory), _loose_pin(loop, "Array"))
     # Empty first: with EquippedIndex -1 (nothing in the hand slot) no turn of
     # the loop sets Held, and the hands are empty rather than still holding
     # what was put away.
-    empty = keep(ed.add_set_member_variable_node("Held"))
+    empty = keep(ed.add_set_member_variable_node(WV.Held))
     _connect(exec_in, _pin(empty, "execute"))
     _connect(then(empty), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
-    idx = keep(ed.add_get_member_variable_node("EquippedIndex"))
+    idx = keep(ed.add_get_member_variable_node(WV.EquippedIndex))
     same = keep(_node(ed, FN_EQ_II))
     _connect(_loose_pin(loop, "ArrayIndex", is_input=False), _pin(same, "A"))
-    _connect(out(idx, "EquippedIndex"), _pin(same, "B"))
+    _connect(out(idx, WV.EquippedIndex), _pin(same, "B"))
 
     chosen = keep(ed.add_branch_node())
     _connect(out(same), _pin(chosen, "Condition"))
@@ -200,10 +204,10 @@ def _author_equip(ed, exec_in):
     _set(hide, "bNewHidden", "true")
     _connect(else_(chosen), _pin(hide, "execute"))
 
-    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     attach = keep(_node(ed, FN_ATTACH))
     _connect(item, _pin(attach, "self"))
-    _connect(out(mesh, "OwnerMesh"), _pin(attach, "Parent"))
+    _connect(out(mesh, WV.OwnerMesh), _pin(attach, "Parent"))
     _set(attach, "SocketName", player_skin().grip)
     # Snap first, then apply the weapon's own grip offset explicitly. Snapping
     # gives a known starting transform; KeepRelative would carry over whatever
@@ -212,7 +216,7 @@ def _author_equip(ed, exec_in):
         _set(attach, rule, "SnapToTarget")
     _connect(then(show), _pin(attach, "execute"))
 
-    gl_pin, gl_n = _prop(ed, "GripLocation", item)
+    gl_pin, gl_n = _prop(ed, IV.GripLocation, item)
     keep(gl_n)
     put = keep(_node(ed, FN_SET_REL_LOC))
     _connect(item, _pin(put, "self"))
@@ -222,20 +226,20 @@ def _author_equip(ed, exec_in):
     # The resting orientation only. From the next frame on, Tick points the
     # held weapon at the aim point; this just stops it being visibly wrong for
     # the one frame in between.
-    gr_pin, gr_n = _prop(ed, "GripRotation", item)
+    gr_pin, gr_n = _prop(ed, IV.GripRotation, item)
     keep(gr_n)
     turn = keep(_node(ed, FN_SET_REL_ROT))
     _connect(item, _pin(turn, "self"))
     _connect(gr_pin, _pin(turn, "NewRelativeRotation"))
     _connect(then(put), _pin(turn, "execute"))
 
-    hold = keep(ed.add_set_member_variable_node("Held"))
-    _connect(item, _pin(hold, "Held"))
+    hold = keep(ed.add_set_member_variable_node(WV.Held))
+    _connect(item, _pin(hold, WV.Held))
     _connect(then(turn), _pin(hold, "execute"))
 
     # --- once the loop is done, drive the ready pose -------------------------
-    held_get = keep(ed.add_get_member_variable_node("Held"))
-    held = out(held_get, "Held")
+    held_get = keep(ed.add_get_member_variable_node(WV.Held))
+    held = out(held_get, WV.Held)
     armed = keep(_node(ed, FN_IS_VALID))
     _connect(held, _pin(armed, "Object"))
     # Safe to fold into one condition, unlike the fire gate's ammunition tests:
@@ -252,12 +256,12 @@ def _author_equip(ed, exec_in):
     _connect(out(shown), _pin(posing, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(posing, "execute"))
 
-    mesh2 = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    mesh2 = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(out(mesh2, "OwnerMesh"), _pin(anim, "self"))
+    _connect(out(mesh2, WV.OwnerMesh), _pin(anim, "self"))
     anim_out = out(anim)
 
-    pose_pin, pose_n = _prop(ed, "AimPose", held)
+    pose_pin, pose_n = _prop(ed, IV.AimPose, held)
     keep(pose_n)
     play = keep(_node(ed, FN_PLAY_SLOT))
     _connect(anim_out, _pin(play, "self"))
@@ -301,10 +305,10 @@ def _author_wc_begin_play(ed, begin):
     _connect(then(begin), _pin(cast, "execute"))
     as_char = _loose_pin(cast, "AsBPThirdPersonCharacter", is_input=False)
 
-    mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
+    mesh = keep(ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character"))
     _connect(as_char, _pin(mesh, "self"))
-    remember = keep(ed.add_set_member_variable_node("OwnerMesh"))
-    _connect(out(mesh, "Mesh"), _pin(remember, "OwnerMesh"))
+    remember = keep(ed.add_set_member_variable_node(WV.OwnerMesh))
+    _connect(out(mesh, "Mesh"), _pin(remember, WV.OwnerMesh))
     _connect(then(cast), _pin(remember, "execute"))
 
     # Whatever the character's own walking speed is, before sprint ever touches
@@ -313,11 +317,11 @@ def _author_wc_begin_play(ed, begin):
     # symptom -- "the player walks at the wrong speed, but only after
     # sprinting once" -- would point at the sprint code instead of at the copy.
     movement = keep(ed.add_get_member_variable_node(
-        "CharacterMovement", "/Script/Engine.Character"))
+        EP.CHARACTER_MOVEMENT, "/Script/Engine.Character"))
     _connect(as_char, _pin(movement, "self"))
-    walk = keep(ed.add_get_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
+    walk = keep(ed.add_get_member_variable_node(EP.MAX_WALK_SPEED, MOVEMENT_CLASS_PATH))
     _connect(out(movement, "CharacterMovement"), _pin(walk, "self"))
-    cache = keep(ed.add_set_member_variable_node("BaseSpeed"))
+    cache = keep(ed.add_set_member_variable_node(BASE_SPEED_VAR))
     _connect(out(walk, "MaxWalkSpeed"), _pin(cache, "BaseSpeed"))
     _connect(then(remember), _pin(cache, "execute"))
 
@@ -328,16 +332,16 @@ def _author_wc_begin_play(ed, begin):
     cam = keep(_node(ed, FN_GET_COMP))
     _connect(as_char, _pin(cam, "self"))
     _pin(cam, "ComponentClass").set_pin_value(CAMERA_CLASS_PATH)
-    fov = keep(ed.add_get_member_variable_node("FieldOfView", CAMERA_CLASS_PATH))
+    fov = keep(ed.add_get_member_variable_node(EP.FIELD_OF_VIEW, CAMERA_CLASS_PATH))
     _connect(out(cam), _pin(fov, "self"))
     fov_out = out(fov, "FieldOfView")
-    base_fov = keep(ed.add_set_member_variable_node("BaseFOV"))
-    _connect(fov_out, _pin(base_fov, "BaseFOV"))
+    base_fov = keep(ed.add_set_member_variable_node(WV.BaseFOV))
+    _connect(fov_out, _pin(base_fov, WV.BaseFOV))
     _connect(then(cache), _pin(base_fov, "execute"))
     # Start the interpolation where the camera already is, or the first frame
     # lerps from zero and the view snaps open.
-    now_fov = keep(ed.add_set_member_variable_node("CurrentFOV"))
-    _connect(fov_out, _pin(now_fov, "CurrentFOV"))
+    now_fov = keep(ed.add_set_member_variable_node(WV.CurrentFOV))
+    _connect(fov_out, _pin(now_fov, WV.CurrentFOV))
     _connect(then(base_fov), _pin(now_fov, "execute"))
 
     # And whatever the controller's own look scales already are, for the third
@@ -352,13 +356,13 @@ def _author_wc_begin_play(ed, begin):
     pc_out = out(pc)
     yaw_now = keep(_node(ed, FN_GET_YAW_SCALE))
     _connect(pc_out, _pin(yaw_now, "self"))
-    keep_yaw = keep(ed.add_set_member_variable_node("BaseYawScale"))
-    _connect(out(yaw_now), _pin(keep_yaw, "BaseYawScale"))
+    keep_yaw = keep(ed.add_set_member_variable_node(WV.BaseYawScale))
+    _connect(out(yaw_now), _pin(keep_yaw, WV.BaseYawScale))
     _connect(then(now_fov), _pin(keep_yaw, "execute"))
     pitch_now = keep(_node(ed, FN_GET_PITCH_SCALE))
     _connect(pc_out, _pin(pitch_now, "self"))
-    keep_pitch = keep(ed.add_set_member_variable_node("BasePitchScale"))
-    _connect(out(pitch_now), _pin(keep_pitch, "BasePitchScale"))
+    keep_pitch = keep(ed.add_set_member_variable_node(WV.BasePitchScale))
+    _connect(out(pitch_now), _pin(keep_pitch, WV.BasePitchScale))
     _connect(then(keep_yaw), _pin(keep_pitch, "execute"))
 
     where = keep(_node(ed, FN_GET_TRANSFORM))
@@ -375,9 +379,9 @@ def _author_wc_begin_play(ed, begin):
         _set(spawn, "CollisionHandlingOverride", "AlwaysSpawn")
         _connect(prev, _pin(spawn, "execute"))
 
-        inv = keep(ed.add_get_member_variable_node("Inventory"))
+        inv = keep(ed.add_get_member_variable_node(WV.Inventory))
         add = keep(_node(ed, FN_ARR_ADD))
-        _connect(out(inv, "Inventory"), _pin(add, "TargetArray"))
+        _connect(out(inv, WV.Inventory), _pin(add, "TargetArray"))
         _connect(out(spawn), _pin(add, "NewItem"))
         _connect(then(spawn), _pin(add, "execute"))
         # Its slot (slot_tuning.STARTER_SLOTS): the slot sync places it there.
@@ -387,8 +391,8 @@ def _author_wc_begin_play(ed, begin):
         _connect(then(add), _pin(slot, "execute"))
         prev = then(slot)
 
-    dirty = keep(ed.add_set_member_variable_node("NeedsRefresh"))
-    _set(dirty, "NeedsRefresh", "true")
+    dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
+    _set(dirty, WV.NeedsRefresh, "true")
     _connect(prev, _pin(dirty, "execute"))
 
     ed.add_comment_to_nodes(

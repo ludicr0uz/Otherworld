@@ -49,6 +49,7 @@ from combat.tuning import COMBAT
 from combat.weapon_models import FAB_WEAPONS
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
+from combat import item_vars as IV
 
 KNIFE_MESH = f"{FAB_WEAPONS}/M9_Knife/SK_M9_Knife_X"
 KNIFE_DISPLAY = "Knife"
@@ -139,8 +140,8 @@ def build_knife(item_bp):
     lodge = knife_lodge()
     throw_grip = knife_throw_grip(grip_rot)
     _apply_defaults(bp, {
-        "DisplayName": KNIFE_DISPLAY,
-        "Melee": True,
+        IV.DisplayName: KNIFE_DISPLAY,
+        IV.Melee: True,
         WEAPON_KIND_VAR: MELEE_KIND,
         # Thrown hard and flat, spinning forward, edge first.
         **MELEE_THROW,
@@ -158,34 +159,34 @@ def build_knife(item_bp):
         COOL_VAR: 0.0,
         HEAT_MATERIAL_VAR: build_hot_instance(MAT_HOT_KNIFE, HOT_AXIS, HOT_START,
                                               HOT_FADE),
-        "Consumable": False,
-        "Dropped": False,
-        "UsesAmmo": False,
-        "Automatic": False,
+        IV.Consumable: False,
+        IV.Dropped: False,
+        IV.UsesAmmo: False,
+        IV.Automatic: False,
         # What the slash does, for the record; the blow itself uses
         # COMBAT.knife_damage, since it lands after the press and the knife
         # may no longer be in hand by then.
-        "Damage": float(COMBAT.knife_damage),
-        "PelletCount": 0,
-        "WeaponRange": float(COMBAT.knife_reach_cm),
-        "MagazineSize": 0,
-        "Loaded": 0,
-        "Reserve": 0,
-        "InfiniteReserve": False,
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, knife_outline())),
-        "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.Damage: float(COMBAT.knife_damage),
+        IV.PelletCount: 0,
+        IV.WeaponRange: float(COMBAT.knife_reach_cm),
+        IV.MagazineSize: 0,
+        IV.Loaded: 0,
+        IV.Reserve: 0,
+        IV.InfiniteReserve: False,
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
+        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, knife_outline())),
+        IV.GripRotation: grip_rot,
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0: the ADS speed and the scope fade divide by (AdsZoom - 1),
         # and right-click still aims with a knife in hand (as with food).
-        "AdsZoom": float(COMBAT.ads_zoom_irons),
-        "Scoped": False,
-        "RecoilPitch": 0.0,
-        "ShotVolume": 0.0,
-        "TwoHanded": False,
-        "Icon": _weapon_icon(KNIFE_DISPLAY),
-        "AimPose": _must_load(aim),
+        IV.AdsZoom: float(COMBAT.ads_zoom_irons),
+        IV.Scoped: False,
+        IV.RecoilPitch: 0.0,
+        IV.ShotVolume: 0.0,
+        IV.TwoHanded: False,
+        IV.Icon: _weapon_icon(KNIFE_DISPLAY),
+        IV.AimPose: _must_load(aim),
     })
     _log(f"built {KNIFE_BP_PATH} ({KNIFE_MESH.rsplit('/', 1)[-1]}, "
          f"{COMBAT.knife_damage:.0f} per slash every {COMBAT.knife_interval_s:.2f} s)")

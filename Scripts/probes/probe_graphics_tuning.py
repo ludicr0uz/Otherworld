@@ -54,12 +54,14 @@ from graphics_menu import gfx_tune_consts as GC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
 from graphics_menu.umg_consts import ROW_VALUE
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
+from world import day_night_vars as DV
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 TAB = GC.GFX_TAB
 WRITABLE = ([(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var,
-                                        TAB.save_var, "MenuOpen")]
-            + [(DAY_NIGHT_BP_PATH, "Clock")])
+                                        TAB.save_var, MV.MenuOpen)]
+            + [(DAY_NIGHT_BP_PATH, DV.Clock)])
 ROW = {s.column: i + 1 for i, s in enumerate(GS.GFX_STATS)}
 STAT = {s.column: s for s in GS.GFX_STATS}
 SL = unreal.SystemLibrary

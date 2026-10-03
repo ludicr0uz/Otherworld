@@ -32,10 +32,11 @@ from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.sway_tuning import SWAY_TIME_VAR
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from probes.probe_sight_align import HUD_BP_PATH, _file, _held_name, _hold, _live_hud
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)] + [
     (WEAPON_COMP_BP_PATH, v) for v in
-    ("EquippedIndex", "NeedsRefresh", "Stance", "SightBlend", SEAT_VAR, LOOK_VAR,
+    (WV.EquippedIndex, WV.NeedsRefresh, WV.Stance, WV.SightBlend, SEAT_VAR, LOOK_VAR,
      SWAY_TIME_VAR, RAISE_FORCED_VAR)]
 ML = unreal.MathLibrary
 GUNS = (("BP_AssaultRifle_C", "rifle", True), ("BP_Pistol_C", "pistol", False))

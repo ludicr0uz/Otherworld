@@ -36,6 +36,8 @@ from combat.respawn import (
 from combat.tuning import COMBAT
 from loot.roll import declare_loot_vars
 from uebp.nodes.math import FN_LE_FF
+from uebp.vars import declare, defaults
+from combat import health_vars as HV
 
 
 def build_health_component(rebuild=True):
@@ -84,31 +86,11 @@ def build_health_component(rebuild=True):
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
 
-    for name in ("Health", "MaxHealth", LAST_DAMAGE_VAR):
-        _declare(ed, name, _float_type())
-    for name in ("Dead", "DespawnOnDeath", DAMAGED_BY_PLAYER_VAR):
-        _declare(ed, name, BEL.get_basic_type_by_name("bool"))
-    _declare(ed, "RespawnClass",
-             BEL.get_class_reference_type(unreal.Actor.static_class()))
-    # What a killed wanderer leaves on the ground. Typed as a class rather than
-    # hard-coded in the graph so this component still compiles when
-    # BP_AmmoPickup does not exist yet -- which is the case every time this
-    # builder runs from scratch, because the pickup casts to BP_WeaponComponent
-    # and so has to be built after it. main() fills the default in afterwards.
-    _declare(ed, "AmmoClass",
-             BEL.get_class_reference_type(unreal.Actor.static_class()))
-    # The weapons a kill can leave behind, class-of-Actor for the same reason
-    # AmmoClass is, and filled by main() once every weapon blueprint exists.
-    # Empty is a legal state and means "no weapon ever drops" -- the graph
-    # checks the length before it draws an index.
-    _declare(ed, "DropClasses", BEL.get_array_type(
-        BEL.get_class_reference_type(unreal.Actor.static_class())))
+    declare(ed, HV.TABLE)
+    _declare(ed, LAST_DAMAGE_VAR, _float_type())
+    _declare(ed, DAMAGED_BY_PLAYER_VAR, BEL.get_basic_type_by_name("bool"))
     # Corpse loot: the table loot/install.py fills, and what this body carries.
     declare_loot_vars(ed)
-    # Where the replacement will appear. Written three times on the way to the
-    # spawn -- the request, then whichever navmesh point it resolved to -- so
-    # that the random draw and the nav query are each evaluated exactly once.
-    _declare(ed, "RespawnPoint", _struct_type(unreal.Vector.static_struct()))
     # How long after a death its replacement appears.
     _declare(ed, RESPAWN_DELAY_VAR, _float_type())
     # The number this wanderer was given at spawn. The HUD draws it beside the
@@ -151,9 +133,9 @@ def build_health_component(rebuild=True):
     lost, write_off = _author_world_floor_net(ed, tick)
 
     # --- Tick: has it died this frame? ---------------------------------------
-    health = ed.add_get_member_variable_node("Health")
+    health = ed.add_get_member_variable_node(HV.Health)
     dying = _node(ed, FN_LE_FF)
-    _connect(out(health, "Health"), _pin(dying, "A"))
+    _connect(out(health, HV.Health), _pin(dying, "A"))
     _set(dying, "B", 0.0)
 
     at_zero = ed.add_branch_node()
@@ -175,18 +157,18 @@ def build_health_component(rebuild=True):
 
     # Branch on Dead and use its *False* pin -- one node cheaper than a NOT, and
     # it is what stops the death path running again every frame after the first.
-    dead_get = ed.add_get_member_variable_node("Dead")
+    dead_get = ed.add_get_member_variable_node(HV.Dead)
     already = ed.add_branch_node()
-    _connect(out(dead_get, "Dead"), _pin(already, "Condition"))
+    _connect(out(dead_get, HV.Dead), _pin(already, "Condition"))
     _connect(then(at_zero), _pin(already, "execute"))
 
-    mark = ed.add_set_member_variable_node("Dead")
-    _set(mark, "Dead", "true")
+    mark = ed.add_set_member_variable_node(HV.Dead)
+    _set(mark, HV.Dead, "true")
     _connect(else_(already), _pin(mark, "execute"))
 
-    despawn_get = ed.add_get_member_variable_node("DespawnOnDeath")
+    despawn_get = ed.add_get_member_variable_node(HV.DespawnOnDeath)
     should = ed.add_branch_node()
-    _connect(out(despawn_get, "DespawnOnDeath"), _pin(should, "Condition"))
+    _connect(out(despawn_get, HV.DespawnOnDeath), _pin(should, "Condition"))
     _connect(then(mark), _pin(should, "execute"))
 
     # --- count it, leave a corpse, and later a replacement -------------------------
@@ -203,9 +185,9 @@ def build_health_component(rebuild=True):
     # ...and only the player gets a menu out of it. A second read of
     # DespawnOnDeath rather than routing the two arms separately, so there is
     # exactly one place that says what dying looks like.
-    mine_again = ed.add_get_member_variable_node("DespawnOnDeath")
+    mine_again = ed.add_get_member_variable_node(HV.DespawnOnDeath)
     is_player = ed.add_branch_node()
-    _connect(out(mine_again, "DespawnOnDeath"), _pin(is_player, "Condition"))
+    _connect(out(mine_again, HV.DespawnOnDeath), _pin(is_player, "Condition"))
     for tail in (fell, no_body):
         _connect(tail, _pin(is_player, "execute"))
     _author_player_death(ed, (else_(is_player),))
@@ -225,11 +207,7 @@ def build_health_component(rebuild=True):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_HealthComponent failed to compile")
-    _apply_defaults(bp, {
-        "Health": COMBAT.start_health,
-        "MaxHealth": COMBAT.start_health,
-        "Dead": False,
-        "DespawnOnDeath": False,
+    _apply_defaults(bp, {**defaults(HV.TABLE),
         RESPAWN_DELAY_VAR: RESPAWN_DELAY,
         # Far enough in the past that nothing counts as recently hurt at level
         # start -- a zero here would float every wanderer's bar for the first

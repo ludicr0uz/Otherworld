@@ -32,10 +32,12 @@ from combat.paths import ITEM_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PA
 from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
-            ("EquippedIndex", "NeedsRefresh", RAISE_FORCED_VAR, FIRE_FORCED_VAR)] + [
-    (ITEM_BP_PATH, "NextFireTime")]
+            (WV.EquippedIndex, WV.NeedsRefresh, RAISE_FORCED_VAR, FIRE_FORCED_VAR)] + [
+    (ITEM_BP_PATH, IV.NextFireTime)]
 
 SETTLE_S = 0.4          # the ready pose's blend, and a little
 JOG_S = 0.6

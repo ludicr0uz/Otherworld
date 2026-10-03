@@ -45,11 +45,12 @@ from combat.tuning import COMBAT
 from combat import weapon_models as M
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR)] + [
     (WEAPON_COMP_BP_PATH, v) for v in
-    ("EquippedIndex", "NeedsRefresh", "Stance", "SightBlend", SEAT_VAR, LOOK_VAR,
+    (WV.EquippedIndex, WV.NeedsRefresh, WV.Stance, WV.SightBlend, SEAT_VAR, LOOK_VAR,
      SWAY_TIME_VAR, RAISE_FORCED_VAR)]
 ML = unreal.MathLibrary
 # weapon_specs needs the editor (it solves the grips), so the sight lines are

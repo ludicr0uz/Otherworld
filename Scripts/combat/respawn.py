@@ -23,6 +23,7 @@ from uebp.nodes.palette import NODE_CAST_GAME_MODE
 from uebp.nodes.system import (
     FN_CONCAT, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_OBJECT_CLASS, FN_PRINT, FN_TIME_SECONDS,
     FN_VEC_TO_STR, FN_WARN)
+from combat import health_vars as HV
 
 
 # NPC respawn: a replacement wanderer appears in the same 75-100 m band the
@@ -103,9 +104,9 @@ def _author_health_begin_play(ed, begin):
     # of every wanderer that has ever existed this session -- which is what
     # makes a fall-through reportable: read the number off the health bar, find
     # that number in the log, and its spawn location is right there.
-    mine = ed.add_get_member_variable_node("DespawnOnDeath")
+    mine = ed.add_get_member_variable_node(HV.DespawnOnDeath)
     is_wanderer = ed.add_branch_node()
-    _connect(out(mine, "DespawnOnDeath"), _pin(is_wanderer, "Condition"))
+    _connect(out(mine, HV.DespawnOnDeath), _pin(is_wanderer, "Condition"))
     _connect(then(begin), _pin(is_wanderer, "execute"))
 
     # --- what this one respawns as: itself -----------------------------------
@@ -124,8 +125,8 @@ def _author_health_begin_play(ed, begin):
     me = _node(ed, FN_GET_OWNER)
     my_class = _node(ed, FN_OBJECT_CLASS)
     _connect(out(me), _pin(my_class, "Object"))
-    same_again = ed.add_set_member_variable_node("RespawnClass")
-    _connect(out(my_class), _pin(same_again, "RespawnClass"))
+    same_again = ed.add_set_member_variable_node(HV.RespawnClass)
+    _connect(out(my_class), _pin(same_again, HV.RespawnClass))
     _connect(then(is_wanderer), _pin(same_again, "execute"))
 
     mode = _node(ed, FN_GET_GAME_MODE)
@@ -251,18 +252,18 @@ def _author_world_floor_net(ed, tick):
         # therefore the random-of-three arm the player's own punches never
         # reach. It needs no extra variable to fire once -- after the hit,
         # Health < MaxHealth is false forever.
-        probe_npc = ed.add_get_member_variable_node("DespawnOnDeath")
+        probe_npc = ed.add_get_member_variable_node(HV.DespawnOnDeath)
         probe_now = _node(ed, FN_TIME_SECONDS)
         probe_late = _node(ed, FN_GREATER_FF)
         _connect(out(probe_now), _pin(probe_late, "A"))
         _set(probe_late, "B", 6.0)
-        probe_hp = ed.add_get_member_variable_node("Health")
-        probe_max = ed.add_get_member_variable_node("MaxHealth")
+        probe_hp = ed.add_get_member_variable_node(HV.Health)
+        probe_max = ed.add_get_member_variable_node(HV.MaxHealth)
         probe_full = _node(ed, FN_GE_FF)
-        _connect(out(probe_hp, "Health"), _pin(probe_full, "A"))
-        _connect(out(probe_max, "MaxHealth"), _pin(probe_full, "B"))
+        _connect(out(probe_hp, HV.Health), _pin(probe_full, "A"))
+        _connect(out(probe_max, HV.MaxHealth), _pin(probe_full, "B"))
         probe_and = _node(ed, FN_AND)
-        _connect(out(probe_npc, "DespawnOnDeath"), _pin(probe_and, "A"))
+        _connect(out(probe_npc, HV.DespawnOnDeath), _pin(probe_and, "A"))
         _connect(out(probe_late), _pin(probe_and, "B"))
         probe_and2 = _node(ed, FN_AND)
         _connect(out(probe_and), _pin(probe_and2, "A"))
@@ -278,10 +279,10 @@ def _author_world_floor_net(ed, tick):
         _connect(out(probe_fwd), _pin(probe_dir, LAST_HIT_FROM_VAR))
         _connect(then(probe_br), _pin(probe_dir, "execute"))
         probe_hurt = _node(ed, FN_SUB_FF)
-        _connect(out(probe_hp, "Health"), _pin(probe_hurt, "A"))
+        _connect(out(probe_hp, HV.Health), _pin(probe_hurt, "A"))
         _set(probe_hurt, "B", 20.0)
-        probe_set = ed.add_set_member_variable_node("Health")
-        _connect(out(probe_hurt), _pin(probe_set, "Health"))
+        probe_set = ed.add_set_member_variable_node(HV.Health)
+        _connect(out(probe_hurt), _pin(probe_set, HV.Health))
         _connect(then(probe_dir), _pin(probe_set, "execute"))
 
         probe_join = ed.add_branch_node()
@@ -294,9 +295,9 @@ def _author_world_floor_net(ed, tick):
     # ...and only then, is this one worth a log line? A wanderer under the map
     # is a bug worth reporting with its number and its spawn point. A player
     # under the map walked there.
-    net_is_npc = ed.add_get_member_variable_node("DespawnOnDeath")
+    net_is_npc = ed.add_get_member_variable_node(HV.DespawnOnDeath)
     reportable = ed.add_branch_node()
-    _connect(out(net_is_npc, "DespawnOnDeath"), _pin(reportable, "Condition"))
+    _connect(out(net_is_npc, HV.DespawnOnDeath), _pin(reportable, "Condition"))
     _connect(then(lost), _pin(reportable, "execute"))
     # Say which one, by its number, before removing it: the net recovers the
     # game within a frame, which would otherwise erase the evidence of the very
@@ -342,8 +343,8 @@ def _author_world_floor_net(ed, tick):
     # player straight away. Missing the second connection would be the exact
     # bug this block exists to fix, silently: the player would fall past the
     # threshold, take the unreported branch, and carry on falling.
-    write_off = ed.add_set_member_variable_node("Health")
-    _set(write_off, "Health", 0.0)
+    write_off = ed.add_set_member_variable_node(HV.Health)
+    _set(write_off, HV.Health, 0.0)
     for tail in (then(net_say), else_(reportable)):
         _connect(tail, _pin(write_off, "execute"))
 

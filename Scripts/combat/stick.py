@@ -57,6 +57,7 @@ from item_icons.items import ICON_TINT
 from uebp.nodes.actor import FN_SET_VISIBILITY
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_NOT
 from uebp.nodes.system import FN_TIME_SECONDS
+from combat import item_vars as IV
 
 
 STICK_MESH = "/Game/Sourced/Quaternius/Survival/SM_WoodenTorch"
@@ -177,38 +178,38 @@ def build_stick(item_bp, rebuild=True):
     aim = HOLD_TORCH_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
-        "DisplayName": STICK_DISPLAY,
+        IV.DisplayName: STICK_DISPLAY,
         BURNS_VAR: True,
         LIT_VAR: False,
         BURN_OUT_VAR: 0.0,
         LIGHTS_VAR: False,
-        "Melee": False,
-        "Consumable": False,
+        IV.Melee: False,
+        IV.Consumable: False,
         CHOPS_VAR: False,
         HAS_SIGHTS_VAR: False,
-        "Dropped": False,
+        IV.Dropped: False,
         # Nothing to fire: the guns' path runs over no pellets and no sound.
-        "UsesAmmo": False,
-        "Automatic": False,
-        "Damage": 0.0,
-        "PelletCount": 0,
-        "MagazineSize": 0,
-        "Loaded": 0,
-        "Reserve": 0,
-        "InfiniteReserve": False,
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, stick_outline())),
-        "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.UsesAmmo: False,
+        IV.Automatic: False,
+        IV.Damage: 0.0,
+        IV.PelletCount: 0,
+        IV.MagazineSize: 0,
+        IV.Loaded: 0,
+        IV.Reserve: 0,
+        IV.InfiniteReserve: False,
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
+        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, stick_outline())),
+        IV.GripRotation: grip_rot,
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.
-        "AdsZoom": float(COMBAT.ads_zoom_irons),
-        "Scoped": False,
-        "RecoilPitch": 0.0,
-        "ShotVolume": 0.0,
-        "TwoHanded": False,
-        "Icon": _weapon_icon(STICK_DISPLAY),
-        "AimPose": _must_load(aim),
+        IV.AdsZoom: float(COMBAT.ads_zoom_irons),
+        IV.Scoped: False,
+        IV.RecoilPitch: 0.0,
+        IV.ShotVolume: 0.0,
+        IV.TwoHanded: False,
+        IV.Icon: _weapon_icon(STICK_DISPLAY),
+        IV.AimPose: _must_load(aim),
         USE_POSE_VAR: _must_load(WARD_TORCH_ANIM_PATH),
     })
     _log(f"built {STICK_BP_PATH} ({STICK_MESH.rsplit('/', 1)[-1]} at {STICK_SCALE}, "

@@ -46,6 +46,7 @@ from uebp.nodes.array import (
 from uebp.nodes.math import (
     FN_AND, FN_EQ_II, FN_GE_II, FN_LE_II, FN_MIN_II, FN_OR, FN_SELECT_II, FN_SUB_II)
 from uebp.nodes.system import FN_IS_VALID
+from combat.weapon_component import vars as WV
 
 WEAR_SLOT_VAR = "WearSlot"     # the slot WearItem goes into (declared in build.py)
 
@@ -79,9 +80,9 @@ def _author_wear(ed, held, exec_in):
     slot_n = g.keep(ed.add_get_member_variable_node(CLOTHING_SLOT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(slot_n, "self"))
     flow = g.put(WEAR_SLOT_VAR, out(slot_n, CLOTHING_SLOT_VAR), [flow])
-    inv = g.get("Inventory")
+    inv = g.get(WV.Inventory)
     flow = then(g.call(FN_ARR_REMOVE, [flow], TargetArray=inv,
-                                    IndexToRemove=g.get("EquippedIndex")))
+                                    IndexToRemove=g.get(WV.EquippedIndex)))
 
     # The slot already holds one: it goes back into the bag, which the
     # removal above has just made room in.
@@ -89,7 +90,7 @@ def _author_wear(ed, held, exec_in):
     valid, old = _worn_at(g, slot)
     there, empty = g.branch(valid, [flow])
     worn, bare = g.branch(out(g.call(FN_IS_VALID, Object=old)), [there])
-    back = g.call(FN_ARR_ADD, [worn], TargetArray=g.get("Inventory"), NewItem=old)
+    back = g.call(FN_ARR_ADD, [worn], TargetArray=g.get(WV.Inventory), NewItem=old)
 
     item = g.get(WEAR_ITEM_VAR)
     put_on = g.call(FN_ARR_SET,
@@ -102,14 +103,14 @@ def _author_wear(ed, held, exec_in):
     # Out of every slot: taken off, it comes back UNPLACED and the slot sync
     # finds it a bag slot, rather than claiming the hand it left.
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(hide)])
-    flow = g.put("Held", None, [flow])
+    flow = g.put(WV.Held, None, [flow])
 
     # Min(EquippedIndex, Length - 1), as eating leaves it (consume.py).
-    count = g.call(FN_ARR_LEN, TargetArray=g.get("Inventory"))
+    count = g.call(FN_ARR_LEN, TargetArray=g.get(WV.Inventory))
     last = g.call(FN_SUB_II, A=out(count), B=1)
-    clamp = g.call(FN_MIN_II, A=g.get("EquippedIndex"), B=out(last))
-    flow = g.put("EquippedIndex", out(clamp), [flow])
-    flow = g.put("NeedsRefresh", "true", [flow])
+    clamp = g.call(FN_MIN_II, A=g.get(WV.EquippedIndex), B=out(last))
+    flow = g.put(WV.EquippedIndex, out(clamp), [flow])
+    flow = g.put(WV.NeedsRefresh, "true", [flow])
     flow = g.put(TRIGGER_SPENT, "true", [flow])
     ed.add_comment_to_nodes(
         "A garment is worn, not fired: out of Inventory and into Worn[its "
@@ -135,7 +136,7 @@ def _author_take_off(ed, in_execs):
     room = g.get(HAS_ROOM_VAR)
     worn, bare = g.branch(out(g.call(FN_IS_VALID, Object=item)), [there])
     fits, full = g.branch(room, [worn])
-    back = g.call(FN_ARR_ADD, [fits], TargetArray=g.get("Inventory"), NewItem=item)
+    back = g.call(FN_ARR_ADD, [fits], TargetArray=g.get(WV.Inventory), NewItem=item)
     # The hand or a bag slot only: a garment fits no weapon slot.
     to = g.get(SLOT_PICK_VAR)
     in_bag = g.call(FN_AND,
@@ -146,7 +147,7 @@ def _author_take_off(ed, in_execs):
     placed = g.iput(item, SLOT_VAR, out(code), [then(back)])
     # Item left unconnected: Worn[slot] = None.
     off = g.call(FN_ARR_SET, [placed], TargetArray=g.get(WORN_VAR), Index=g.get(WEAR_SLOT_VAR))
-    flow = g.put("NeedsRefresh", "true", [then(off)])
+    flow = g.put(WV.NeedsRefresh, "true", [then(off)])
     ed.add_comment_to_nodes(
         f"{TAKE_OFF_VAR}: the I panel asks for a garment to come off. While the "
         "bag has room, Worn[slot] goes back into Inventory and the slot is "

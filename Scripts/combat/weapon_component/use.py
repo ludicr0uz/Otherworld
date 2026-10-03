@@ -34,6 +34,7 @@ from combat.weapon_component.common import _prop
 from combat.weapon_component.torch import _author_torch
 from uebp.nodes.actor import FN_IS_KEY_DOWN
 from uebp.nodes.math import FN_AND, FN_NOT, FN_OR
+from combat.weapon_component import vars as WV
 
 # One fragment per kind of use, run in this order every frame.
 KINDS = (_author_torch, _author_cauterize)
@@ -67,7 +68,7 @@ def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins):
     _connect(pc_out, _pin(down, "self"))
     _connect(sights_key, _pin(down, "Key"))
     key = gate2(FN_OR, out(down), get(SIGHTS_FORCED_VAR))
-    free = gate2(FN_AND, key, negate(get("Sprinting")))
+    free = gate2(FN_AND, key, negate(get(WV.Sprinting)))
 
     gate = keep(ed.add_branch_node())
     _connect(armed_out, _pin(gate, "Condition"))

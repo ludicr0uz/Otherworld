@@ -25,9 +25,11 @@ from combat.weapon_component.knife import (
     KNIFE_ANIM_VAR, KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR,
 )
 from probes.probe_knife import _file, _held_name, _place, _wanderer
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, "EquippedIndex"), (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
-            (WEAPON_COMP_BP_PATH, KNIFE_QUEUED_VAR), (HEALTH_BP_PATH, "Health")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex), (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
+            (WEAPON_COMP_BP_PATH, KNIFE_QUEUED_VAR), (HEALTH_BP_PATH, HV.Health)]
 
 AXE = "BP_Axe_C"
 # How far the middle of the drawn axe may be from the hand's socket (cm): the middle of

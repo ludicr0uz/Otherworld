@@ -28,13 +28,17 @@ from graphics_menu.profile_consts import (
     PROFILE_BP_PATH, PROFILE_CHECKED_VAR, PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX,
 )
 from survival.paths import MUSHROOM_CLASS_PATH, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
+from combat import health_vars as HV
+from combat.game_state import LAST_DAMAGE_VAR
+from survival import component_vars as UV
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, EXIT_PENDING_VAR), (HUD_BP_PATH, EXIT_AT_VAR),
             (HUD_BP_PATH, EXIT_STARTED_VAR),
-            (HEALTH_BP_PATH, "Health"), (HEALTH_BP_PATH, "LastDamageTime"),
-            (SURVIVAL_BP_PATH, "Hunger"), (GAME_MODE_BP_PATH, KILL_COUNT_VAR),
-            (WEAPON_COMP_BP_PATH, "EquippedIndex")]
+            (HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, LAST_DAMAGE_VAR),
+            (SURVIVAL_BP_PATH, UV.Hunger), (GAME_MODE_BP_PATH, KILL_COUNT_VAR),
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex)]
 # ...and every field of the crafted profile the load is tested with.
 PROFILE_FIELDS = ("Health", "Stamina", "Hunger", "Thirst", "Temperature", "Kills",
                   "EquippedIndex", "ItemClasses", "ItemLoaded", "ItemReserve", "ItemSlot")

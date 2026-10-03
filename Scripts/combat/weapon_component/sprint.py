@@ -13,6 +13,9 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_NORMAL, FN_NOT,
     FN_OR, FN_SELECT_FF)
 from uebp.nodes.palette import NODE_CAST_CHARACTER
+from combat.sprint_tuning import BASE_SPEED_VAR
+from uebp import props as EP
+from combat.weapon_component import vars as WV
 
 # Set when a held sprint runs Stamina out, cleared by letting the key go.
 SPRINT_SPENT_VAR = "SprintSpent"
@@ -104,7 +107,7 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
     movement = keep(ed.add_get_member_variable_node(
-        "CharacterMovement", "/Script/Engine.Character"))
+        EP.CHARACTER_MOVEMENT, "/Script/Engine.Character"))
     _connect(char_out, _pin(movement, "self"))
     movement_out = _pin(movement, "CharacterMovement", is_input=False)
 
@@ -112,8 +115,8 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     _connect(pc_out, _pin(down, "self"))
     _connect(key_pin, _pin(down, "Key"))
 
-    stamina = keep(ed.add_get_member_variable_node("Stamina"))
-    stamina_out = _pin(stamina, "Stamina", is_input=False)
+    stamina = keep(ed.add_get_member_variable_node(WV.Stamina))
+    stamina_out = _pin(stamina, WV.Stamina, is_input=False)
     out = keep(_node(ed, FN_LE_FF))
     _connect(stamina_out, _pin(out, "A"))
     _set(out, "B", 0.0)
@@ -140,21 +143,21 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     forwards = keep(_node(ed, FN_AND))
     _connect(_pin(running, "ReturnValue", is_input=False), _pin(forwards, "A"))
     _connect(_loose_pin(ahead, "Output_Get", is_input=False), _pin(forwards, "B"))
-    mark = keep(ed.add_set_member_variable_node("Sprinting"))
-    _connect(_pin(forwards, "ReturnValue", is_input=False), _pin(mark, "Sprinting"))
+    mark = keep(ed.add_set_member_variable_node(WV.Sprinting))
+    _connect(_pin(forwards, "ReturnValue", is_input=False), _pin(mark, WV.Sprinting))
     _connect(then(latch), _pin(mark, "execute"))
     # Read the stored flag from here on, for the same reason the NPC id is read
     # back from its variable: the AND is pure and would be re-evaluated per read.
-    is_running = keep(ed.add_get_member_variable_node("Sprinting"))
-    running_out = _pin(is_running, "Sprinting", is_input=False)
+    is_running = keep(ed.add_get_member_variable_node(WV.Sprinting))
+    running_out = _pin(is_running, WV.Sprinting, is_input=False)
 
-    base = keep(ed.add_get_member_variable_node("BaseSpeed"))
+    base = keep(ed.add_get_member_variable_node(BASE_SPEED_VAR))
     pick_speed = keep(_node(ed, FN_SELECT_FF))
     fast = keep(ed.add_get_member_variable_node(SPRINT_SPEED_VAR))
     _connect(_pin(fast, SPRINT_SPEED_VAR, is_input=False), _pin(pick_speed, "A"))
     _connect(_pin(base, "BaseSpeed", is_input=False), _pin(pick_speed, "B"))
     _connect(running_out, _pin(pick_speed, "bPickA"))
-    apply_speed = keep(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
+    apply_speed = keep(ed.add_set_member_variable_node(EP.MAX_WALK_SPEED, MOVEMENT_CLASS_PATH))
     _connect(movement_out, _pin(apply_speed, "self"))
     _connect(_pin(pick_speed, "ReturnValue", is_input=False),
              _pin(apply_speed, "MaxWalkSpeed"))
@@ -180,8 +183,8 @@ def _author_sprint(ed, tick, pc_out, owner_out, key_pin, exec_ins):
     _connect(_pin(moved, "ReturnValue", is_input=False), _pin(held_in, "Value"))
     _set(held_in, "Min", 0.0)
     _set(held_in, "Max", COMBAT.max_stamina)
-    spend = keep(ed.add_set_member_variable_node("Stamina"))
-    _connect(_pin(held_in, "ReturnValue", is_input=False), _pin(spend, "Stamina"))
+    spend = keep(ed.add_set_member_variable_node(WV.Stamina))
+    _connect(_pin(held_in, "ReturnValue", is_input=False), _pin(spend, WV.Stamina))
     _connect(then(apply_speed), _pin(spend, "execute"))
 
     ed.add_comment_to_nodes(

@@ -39,6 +39,7 @@ from uebp.nodes.actor import (
     FN_SET_REL_ROT)
 from uebp.nodes.math import FN_AND, FN_NOT
 from uebp.nodes.system import FN_IS_VALID
+from combat.weapon_component import vars as WV
 
 THROW_READY_ANIM_VAR = "ThrowReadyAnim"   # A_ThrowReady, or None
 
@@ -68,7 +69,7 @@ def _author_throw_ready(ed, item, exec_in):
         return out(n)
 
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(get("OwnerMesh"), _pin(anim, "self"))
+    _connect(get(WV.OwnerMesh), _pin(anim, "self"))
     pose = get(THROW_READY_ANIM_VAR)
     has = keep(_node(ed, FN_IS_VALID))
     _connect(pose, _pin(has, "Object"))
@@ -127,7 +128,7 @@ def _author_throw_ready(ed, item, exec_in):
 def _author_ready_down(ed, exec_in):
     """The aim was called off: re-equip, which puts the held item's own pose
     back in the slot (or stops it, under a lowered gun). Returns the exit."""
-    dirty = ed.add_set_member_variable_node("NeedsRefresh")
-    _set(dirty, "NeedsRefresh", "true")
+    dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
+    _set(dirty, WV.NeedsRefresh, "true")
     _connect(exec_in, _pin(dirty, "execute"))
     return then(dirty)

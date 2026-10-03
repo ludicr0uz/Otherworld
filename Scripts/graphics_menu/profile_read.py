@@ -28,6 +28,8 @@ from uebp.nodes.actor import FN_DESTROY, FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_GET
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_PROFILE, NODE_SPAWN
 from uebp.nodes.system import FN_LOAD_SAVE
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _for_each(ed, array_out, exec_in, made):
@@ -60,9 +62,9 @@ def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, made):
     item = out(spawn)
 
     # Carried, not lying in the world: a consumable defaults to Dropped.
-    held = ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH)
+    held = ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH)
     _connect(item, _pin(held, "self"))
-    _set(held, "Dropped", "false")
+    _set(held, IV.Dropped, "false")
     _connect(then(spawn), _pin(held, "execute"))
     made.append(held)
     flow = then(held)
@@ -80,10 +82,10 @@ def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, made):
         made += [arr, at, put]
         flow = then(put)
 
-    inv = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
+    inv = ed.add_get_member_variable_node(WV.Inventory, WEAPON_COMP_CLASS_PATH)
     _connect(wc, _pin(inv, "self"))
     add = _node(ed, FN_ARR_ADD)
-    _connect(out(inv, "Inventory"), _loose_pin(add, "TargetArray"))
+    _connect(out(inv, WV.Inventory), _loose_pin(add, "TargetArray"))
     _connect(item, _loose_pin(add, "NewItem"))
     _connect(flow, _pin(add, "execute"))
     made += [inv, add]
@@ -112,10 +114,10 @@ def author_read_profile(ed, in_exec, parts, made):
                      dst_var, flow, made)
 
     # --- out with the issued loadout ----------------------------------------
-    old = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
+    old = ed.add_get_member_variable_node(WV.Inventory, WEAPON_COMP_CLASS_PATH)
     _connect(wc, _pin(old, "self"))
     made.append(old)
-    old_out = out(old, "Inventory")
+    old_out = out(old, WV.Inventory)
     drop_all = _for_each(ed, old_out, flow, made)
     gone = _node(ed, FN_DESTROY)
     _connect(_loose_pin(drop_all, "ArrayElement", is_input=False), _pin(gone, "self"))
@@ -129,9 +131,9 @@ def author_read_profile(ed, in_exec, parts, made):
     done = _author_respawn_items(ed, prof, wc, parts[PAWN], then(wipe), made)
     flow = copy_var(ed, prof, PROFILE_CLASS_PATH, EQUIPPED_FIELD, wc,
                  WEAPON_COMP_CLASS_PATH, "EquippedIndex", done, made)
-    dirty = ed.add_set_member_variable_node("NeedsRefresh", WEAPON_COMP_CLASS_PATH)
+    dirty = ed.add_set_member_variable_node(WV.NeedsRefresh, WEAPON_COMP_CLASS_PATH)
     _connect(wc, _pin(dirty, "self"))
-    _set(dirty, "NeedsRefresh", "true")
+    _set(dirty, WV.NeedsRefresh, "true")
     _connect(flow, _pin(dirty, "execute"))
     made.append(dirty)
     ed.add_comment_to_nodes(

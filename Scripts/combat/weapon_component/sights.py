@@ -42,6 +42,8 @@ from uebp.nodes.actor import (
 from uebp.nodes.math import (
     FN_AND, FN_BOOL_TO_FLOAT, FN_GREATER_FF, FN_INTERP_FF, FN_MUL_FF, FN_OR, FN_RLERP,
     FN_ROT_FROM_X, FN_SUB_VV, FN_TRANSFORM_LOC, FN_VLERP, FN_VSIZE)
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 # A scoped weapon is hidden once the camera is this far to its eye point
 # (SightSeat). The
@@ -67,7 +69,7 @@ def _author_sight_line(ed, keep, held, xform, eye_out):
 
     Returns (the line, whether it is one: longer than SIGHT_LINE_MIN_CM).
     """
-    aim_pin, aim_n = _prop(ed, "SightAim", held)
+    aim_pin, aim_n = _prop(ed, IV.SightAim, held)
     keep(aim_n)
     front = keep(_node(ed, FN_TRANSFORM_LOC))
     _connect(out(xform), _pin(front, "T"))
@@ -186,24 +188,24 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     # The body holds the aim until the camera has left the gun (last frame's
     # SightSeat): letting go, a view still easing home would otherwise follow
     # the gun as the upper body's pitch came off it.
-    wanted = keep(ed.add_get_member_variable_node("SightAiming"))
+    wanted = keep(ed.add_get_member_variable_node(WV.SightAiming))
     seat_was = keep(ed.add_get_member_variable_node(SEAT_VAR))
     on_gun = keep(_node(ed, FN_GREATER_FF))
     _connect(out(seat_was, SEAT_VAR), _pin(on_gun, "A"))
     _set(on_gun, "B", SEAT_HOLD)
     either = keep(_node(ed, FN_OR))
-    _connect(out(wanted, "SightAiming"), _pin(either, "A"))
+    _connect(out(wanted, WV.SightAiming), _pin(either, "A"))
     _connect(out(on_gun), _pin(either, "B"))
     as_float = keep(_node(ed, FN_BOOL_TO_FLOAT))
     _connect(out(either), _pin(as_float, "InBool"))
-    have = keep(ed.add_get_member_variable_node("SightBlend"))
+    have = keep(ed.add_get_member_variable_node(WV.SightBlend))
     step = keep(_node(ed, FN_INTERP_FF))
-    _connect(out(have, "SightBlend"), _pin(step, "Current"))
+    _connect(out(have, WV.SightBlend), _pin(step, "Current"))
     _connect(out(as_float), _pin(step, "Target"))
     _connect(out(tick, "DeltaSeconds"), _pin(step, "DeltaTime"))
     _set(step, "InterpSpeed", COMBAT.ads_interp_speed)
-    blend = keep(ed.add_set_member_variable_node("SightBlend"))
-    _connect(out(step), _pin(blend, "SightBlend"))
+    blend = keep(ed.add_set_member_variable_node(WV.SightBlend))
+    _connect(out(step), _pin(blend, WV.SightBlend))
     for e in exec_ins:
         _connect(e, _pin(blend, "execute"))
 
@@ -229,7 +231,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     # True arm: Held is valid, so its transform and SightOffset can be read.
     xform = keep(_node(ed, FN_GET_TRANSFORM))
     _connect(held, _pin(xform, "self"))
-    off_pin, off_n = _prop(ed, "SightOffset", held)
+    off_pin, off_n = _prop(ed, IV.SightOffset, held)
     keep(off_n)
     eye = keep(_node(ed, FN_TRANSFORM_LOC))
     _connect(out(xform), _pin(eye, "T"))
@@ -255,7 +257,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     # ...and a scoped weapon gets out of its own scope's way. Written every
     # frame on Held, which is the one weapon the equip sequence shows, so the
     # frame the sights come down (or Held changes) it is visible again.
-    scoped, scoped_n = _prop(ed, "Scoped", held)
+    scoped, scoped_n = _prop(ed, IV.Scoped, held)
     keep(scoped_n)
     far_in = keep(_node(ed, FN_GREATER_FF))
     _connect(seat_out, _pin(far_in, "A"))
@@ -267,9 +269,9 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     _connect(held, _pin(tuck, "self"))
     _connect(out(behind_glass), _pin(tuck, "bNewHidden"))
     _connect(then(to_line), _pin(tuck, "execute"))
-    body = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    body = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     bare = keep(_node(ed, FN_SET_OWNER_NO_SEE))
-    _connect(out(body, "OwnerMesh"), _pin(bare, "self"))
+    _connect(out(body, WV.OwnerMesh), _pin(bare, "self"))
     _connect(out(behind_glass), _pin(bare, "bNewOwnerNoSee"))
     _connect(then(tuck), _pin(bare, "execute"))
 
@@ -284,9 +286,9 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     _connect(then(home), _pin(level, "execute"))
     # ...and the body shows again: a sniper dropped while scoped leaves no
     # scope to hide behind.
-    body_home = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    body_home = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     shown = keep(_node(ed, FN_SET_OWNER_NO_SEE))
-    _connect(out(body_home, "OwnerMesh"), _pin(shown, "self"))
+    _connect(out(body_home, WV.OwnerMesh), _pin(shown, "self"))
     _set(shown, "bNewOwnerNoSee", "false")
     _connect(then(level), _pin(shown, "execute"))
 

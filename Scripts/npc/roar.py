@@ -16,6 +16,7 @@ from npc.sound import _author_random_sound
 from npc.strafe import _author_facing
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_PLAY_SLOT, FN_STOP_MOVEMENT
 from uebp.nodes.palette import NODE_CAST_CHARACTER
+from uebp import props as EP
 
 
 def roar_object(roar_anim):
@@ -46,7 +47,7 @@ def _author_bellow(g, exec_in, pins, roar_anim):
     _connect(step, _pin(as_char, "execute"))
     voiced = [out(as_char, "CastFailed")]
     if roar_anim:
-        mesh = g.keep(g.ed.add_get_member_variable_node("Mesh", CHARACTER_CLASS_PATH))
+        mesh = g.keep(g.ed.add_get_member_variable_node(EP.MESH, CHARACTER_CLASS_PATH))
         _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
         anim = g.call(FN_ANIM_INSTANCE)
         _connect(out(mesh, "Mesh"), _pin(anim, "self"))

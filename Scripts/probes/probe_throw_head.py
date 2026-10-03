@@ -40,11 +40,13 @@ from probes.probe_throw_stick import (
     BODY_AT_CM, BODY_VIEW_DEG, _held_by, _open, _take_from, _zombies,
 )
 from probes.probe_throw_strike import AXE, KNIFE, _dir, _stand, _throw
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
              (THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR, INTERACT_FORCED_VAR,
-              "EquippedIndex", "NeedsRefresh")]
-            + [(HEALTH_BP_PATH, "Health"), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR)])
+              WV.EquippedIndex, WV.NeedsRefresh)]
+            + [(HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR)])
 
 BODY_HP = 400.0           # room for every blade, and the head's worth
 ON_HEAD_CM = 40.0         # the reticle's point (on the capsule), from the head's middle

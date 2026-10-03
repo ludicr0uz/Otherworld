@@ -46,6 +46,7 @@ from npc.paths import (
     WARD_TURN_AT_VAR,
 )
 from probes.probe_knife import _file
+from combat.weapon_component import vars as WV
 
 # The tuned numbers (the MONSTER SETTINGS tab's rows): monster_tuning.csv's, as built.
 _SPEC = monster_specs("Wendigo")
@@ -59,7 +60,7 @@ WARD_TURN_MIN_S = _SPEC["ward_turn_min_s"]
 
 WENDIGO_AI = f"{NPC_DIR}/BP_ForestWandererAI_Wendigo"
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
-             ("EquippedIndex", "NeedsRefresh", SIGHTS_FORCED_VAR)]
+             (WV.EquippedIndex, WV.NeedsRefresh, SIGHTS_FORCED_VAR)]
             + [(ITEM_BP_PATH, LIT_VAR), (ITEM_BP_PATH, BURN_OUT_VAR),
                (WENDIGO_AI, WARD_SINCE_VAR), (WENDIGO_AI, WARD_TURN_AT_VAR)])
 

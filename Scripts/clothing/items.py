@@ -23,6 +23,7 @@ from combat.weapon_items import build_parts
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 from clothing.specs import GARMENTS
+from combat import item_vars as IV
 
 # A faint glow, as the forage has: a dark thing on dark ground at night is
 # never found (survival/consumable_specs.py).
@@ -46,31 +47,31 @@ def build_garment(garment, item_bp):
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
-        "DisplayName": garment.display,
+        IV.DisplayName: garment.display,
         CLOTHING_SLOT_VAR: garment.slot_index,
-        "Consumable": True,
-        "Dropped": True,
-        "Melee": False,
-        "UsesAmmo": False,
-        "Automatic": False,
-        "Damage": 0.0,
-        "PelletCount": 0,
-        "MagazineSize": 0,
-        "Loaded": 0,
-        "Reserve": 0,
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, parts,
+        IV.Consumable: True,
+        IV.Dropped: True,
+        IV.Melee: False,
+        IV.UsesAmmo: False,
+        IV.Automatic: False,
+        IV.Damage: 0.0,
+        IV.PelletCount: 0,
+        IV.MagazineSize: 0,
+        IV.Loaded: 0,
+        IV.Reserve: 0,
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
+        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, parts,
                                                        parts[0][0])),
-        "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.GripRotation: grip_rot,
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the consumables' reason: the aim divides by AdsZoom - 1.
-        "AdsZoom": float(COMBAT.ads_zoom_irons),
-        "Scoped": False,
-        "RecoilPitch": 0.0,
-        "ShotVolume": 0.0,
-        "Icon": _weapon_icon(garment.display),
-        "AimPose": _must_load(aim),
+        IV.AdsZoom: float(COMBAT.ads_zoom_irons),
+        IV.Scoped: False,
+        IV.RecoilPitch: 0.0,
+        IV.ShotVolume: 0.0,
+        IV.Icon: _weapon_icon(garment.display),
+        IV.AimPose: _must_load(aim),
     })
     _log(f"built {garment.path} ({garment.display}, worn as the {garment.slot})")
     return bp

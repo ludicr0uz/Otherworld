@@ -17,6 +17,7 @@ from uebp.nodes.math import (
     FN_ADD_VV, FN_FORWARD, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_RANDOM_FLOAT)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_SPAWN
 from uebp.nodes.system import FN_DELAY, FN_GET_PLAYER_PAWN, FN_IS_VALID_CLASS, FN_TRACE
+from combat import health_vars as HV
 
 
 def _author_replacement(ed, exec_in):
@@ -29,9 +30,9 @@ def _author_replacement(ed, exec_in):
     one of ten is recoverable and visible; dropping a replacement through the
     floor is neither.
     """
-    cls_get = ed.add_get_member_variable_node("RespawnClass")
+    cls_get = ed.add_get_member_variable_node(HV.RespawnClass)
     can_respawn = _node(ed, FN_IS_VALID_CLASS)
-    _connect(out(cls_get, "RespawnClass"), _pin(can_respawn, "Class"))
+    _connect(out(cls_get, HV.RespawnClass), _pin(can_respawn, "Class"))
     respawns = ed.add_branch_node()
     _connect(out(can_respawn), _pin(respawns, "Condition"))
     _connect(exec_in, _pin(respawns, "execute"))
@@ -110,13 +111,13 @@ def _author_replacement(ed, exec_in):
         _connect(hero_out, _pin(request, "A"))
         _connect(out(offset), _pin(request, "B"))
 
-        ask = ed.add_set_member_variable_node("RespawnPoint")
-        _connect(out(request), _pin(ask, "RespawnPoint"))
+        ask = ed.add_set_member_variable_node(HV.RespawnPoint)
+        _connect(out(request), _pin(ask, HV.RespawnPoint))
         _connect(flow, _pin(ask, "execute"))
-        asked = ed.add_get_member_variable_node("RespawnPoint")
+        asked = ed.add_get_member_variable_node(HV.RespawnPoint)
 
         proj = _node(ed, FN_PROJECT_NAV)
-        _connect(out(asked, "RespawnPoint"), _pin(proj, "Point"))
+        _connect(out(asked, HV.RespawnPoint), _pin(proj, "Point"))
         # QueryExtent is a struct pin, and struct pins reject set_pin_value
         # outright -- an empty one compiles as the ZERO vector, i.e. a search box
         # with no volume, which finds nothing and fails every projection.
@@ -126,8 +127,8 @@ def _author_replacement(ed, exec_in):
         _connect(out(proj), _pin(landed, "Condition"))
         _connect(then(ask), _pin(landed, "execute"))
 
-        use_proj = ed.add_set_member_variable_node("RespawnPoint")
-        _connect(out(proj, "ProjectedLocation"), _pin(use_proj, "RespawnPoint"))
+        use_proj = ed.add_set_member_variable_node(HV.RespawnPoint)
+        _connect(out(proj, "ProjectedLocation"), _pin(use_proj, HV.RespawnPoint))
         _connect(then(landed), _pin(use_proj, "execute"))
 
         ready.append(then(use_proj))
@@ -153,8 +154,8 @@ def _author_replacement(ed, exec_in):
     _connect(out(anywhere), _pin(salvaged, "Condition"))
     _connect(then(anywhere), _pin(salvaged, "execute"))
 
-    use_any = ed.add_set_member_variable_node("RespawnPoint")
-    _connect(out(anywhere, "RandomLocation"), _pin(use_any, "RespawnPoint"))
+    use_any = ed.add_set_member_variable_node(HV.RespawnPoint)
+    _connect(out(anywhere, "RandomLocation"), _pin(use_any, HV.RespawnPoint))
     _connect(then(salvaged), _pin(use_any, "execute"))
     ready.append(then(use_any))
 
@@ -162,8 +163,8 @@ def _author_replacement(ed, exec_in):
     # navmesh is a voxelised approximation of the terrain and its Z can be most
     # of a capsule too low -- so keep the XY, throw the Z away, and trace onto
     # the collision geometry the character will actually stand on.
-    seat = ed.add_get_member_variable_node("RespawnPoint")
-    seat_out = out(seat, "RespawnPoint")
+    seat = ed.add_get_member_variable_node(HV.RespawnPoint)
+    seat_out = out(seat, HV.RespawnPoint)
     above = _node(ed, FN_ADD_VV)
     _connect(seat_out, _pin(above, "A"))
     _connect(_vec(ed, 0.0, 0.0, RESPAWN_TRACE_UP), _pin(above, "B"))
@@ -192,8 +193,8 @@ def _author_replacement(ed, exec_in):
     ground = _node(ed, FN_ADD_VV)
     _connect(_loose_pin(brk, "Location", is_input=False), _pin(ground, "A"))
     _connect(lift, _pin(ground, "B"))
-    stand = ed.add_set_member_variable_node("RespawnPoint")
-    _connect(out(ground), _pin(stand, "RespawnPoint"))
+    stand = ed.add_set_member_variable_node(HV.RespawnPoint)
+    _connect(out(ground), _pin(stand, HV.RespawnPoint))
     _connect(then(found), _pin(stand, "execute"))
 
     # Nothing under the point at all (it hangs over a hole in the world). Keep
@@ -202,20 +203,20 @@ def _author_replacement(ed, exec_in):
     airborne = _node(ed, FN_ADD_VV)
     _connect(seat_out, _pin(airborne, "A"))
     _connect(lift, _pin(airborne, "B"))
-    hover = ed.add_set_member_variable_node("RespawnPoint")
-    _connect(out(airborne), _pin(hover, "RespawnPoint"))
+    hover = ed.add_set_member_variable_node(HV.RespawnPoint)
+    _connect(out(airborne), _pin(hover, HV.RespawnPoint))
     _connect(else_(found), _pin(hover, "execute"))
 
     made += [seat, above, below, drop, found, brk, ground, stand, airborne, hover]
 
     # 4. spawn, on ground the character can actually stand on.
-    chosen = ed.add_get_member_variable_node("RespawnPoint")
+    chosen = ed.add_get_member_variable_node(HV.RespawnPoint)
     xform = _node(ed, FN_MAKE_TRANSFORM)
-    _connect(out(chosen, "RespawnPoint"), _pin(xform, "Location"))
+    _connect(out(chosen, HV.RespawnPoint), _pin(xform, "Location"))
     _connect(_vec(ed, 1.0, 1.0, 1.0), _pin(xform, "Scale"))
 
     spawn = _palette(ed, NODE_SPAWN)
-    _connect(out(cls_get, "RespawnClass"), _pin(spawn, "Class"))
+    _connect(out(cls_get, HV.RespawnClass), _pin(spawn, "Class"))
     _connect(out(xform), _pin(spawn, "SpawnTransform"))
     # AlwaysSpawn: the nav point is inset from obstacles by the agent radius but
     # may still clip a trunk's collision, and a respawn that silently returns

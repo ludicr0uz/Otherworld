@@ -32,6 +32,8 @@ from uebp.nodes.array import FN_ARR_ADD, FN_ARR_LEN
 from uebp.nodes.math import FN_AND, FN_CLASS_EQ, FN_LESS_II, FN_NOT
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_ITEM, NODE_SPAWN
 from uebp.nodes.system import FN_OBJECT_CLASS
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 _VARS = (DEV_GUNS_REQUEST_VAR, DEV_HAS_GUN_VAR)
@@ -104,7 +106,7 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, made):
     """One gun class: skipped if carried or the bag is full, else spawned and
     carried. Returns the exec tails."""
     flow = _setter(ed, DEV_HAS_GUN_VAR, "false", in_execs, made)
-    inv = _get(ed, "Inventory", made, WEAPON_COMP_CLASS_PATH, wc)
+    inv = _get(ed, WV.Inventory, made, WEAPON_COMP_CLASS_PATH, wc)
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
@@ -119,7 +121,7 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, made):
 
     # After the scan: a gun not carried, while there is room for it.
     count = _call(ed, FN_ARR_LEN, made,
-                  TargetArray=_get(ed, "Inventory", made,
+                  TargetArray=_get(ed, WV.Inventory, made,
                                    WEAPON_COMP_CLASS_PATH, wc))
     room = _call(ed, FN_LESS_II, made, A=out(count), B=SLOT_COUNT)
     new = _call(ed, FN_NOT, made, A=_get(ed, DEV_HAS_GUN_VAR, made))
@@ -140,9 +142,9 @@ def _author_give_one(ed, gun, wc, pawn_out, in_execs, made):
     item = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
 
     # Carried, not lying in the world.
-    flow = _setter(ed, "Dropped", "false", [then(cast)], made, ITEM_CLASS_PATH, item)
+    flow = _setter(ed, IV.Dropped, "false", [then(cast)], made, ITEM_CLASS_PATH, item)
     add = _call(ed, FN_ARR_ADD, made,
-                TargetArray=_get(ed, "Inventory", made,
+                TargetArray=_get(ed, WV.Inventory, made,
                                  WEAPON_COMP_CLASS_PATH, wc))
     _connect(item, _loose_pin(add, "NewItem"))
     _connect(flow, _pin(add, "execute"))
@@ -161,7 +163,7 @@ def author_dev_guns(ed, pc_out, parts, in_execs, made):
     wc = parts[WEAPON_COMP_CLASS_PATH]
     for gun in DEV_GUN_CLASS_PATHS:
         flow = _author_give_one(ed, gun, wc, parts[PAWN], flow, made)
-    dirty = _setter(ed, "NeedsRefresh", "true", flow, made, WEAPON_COMP_CLASS_PATH, wc)
+    dirty = _setter(ed, WV.NeedsRefresh, "true", flow, made, WEAPON_COMP_CLASS_PATH, wc)
     ed.add_comment_to_nodes(
         f"dev-all-guns (its row in the M panel): one of every gun not "
         f"already carried, while fewer than {SLOT_COUNT} items are. "

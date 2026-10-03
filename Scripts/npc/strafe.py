@@ -47,6 +47,8 @@ from uebp.nodes.math import (
     FN_ROTATE_AXIS, FN_SELECT_FF, FN_SUB_VV)
 from uebp.nodes.palette import NODE_CAST_CHARACTER
 from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
+from uebp import props as EP
+from npc import controller_vars as NV
 
 ORIENT_FLAG = "bOrientRotationToMovement"
 DESIRED_FLAG = "bUseControllerDesiredRotation"
@@ -76,12 +78,12 @@ def _author_facing(ed, exec_in, focus):
     _connect(out(pawn), _pin(as_char, "Object"))
     for pin in exec_in:
         _connect(pin, _pin(as_char, "execute"))
-    move = ed.add_get_member_variable_node("CharacterMovement", CHARACTER_CLASS_PATH)
+    move = ed.add_get_member_variable_node(EP.CHARACTER_MOVEMENT, CHARACTER_CLASS_PATH)
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(move, "self"))
     made, last = [pawn, as_char, move], then(as_char)
     for flag, on in ((ORIENT_FLAG, focus is None), (DESIRED_FLAG, focus is not None)):
         write = ed.add_set_member_variable_node(flag, MOVEMENT_CLASS_PATH)
-        _connect(out(move, "CharacterMovement"), _pin(write, "self"))
+        _connect(out(move, EP.CHARACTER_MOVEMENT), _pin(write, "self"))
         _set(write, flag, "true" if on else "false")
         _connect(last, _pin(write, "execute"))
         made.append(write)
@@ -137,8 +139,8 @@ def _author_strafe(ed, exec_in, stock):
     by = keep(_node(ed, FN_ADD_FF))
     _connect(out(now), _pin(by, "A"))
     _connect(out(back_in), _pin(by, "B"))
-    next_at = keep(ed.add_get_member_variable_node("NextAttackTime"))
-    next_out = out(next_at, "NextAttackTime")
+    next_at = keep(ed.add_get_member_variable_node(NV.NextAttackTime))
+    next_out = out(next_at, NV.NextAttackTime)
     early = keep(_node(ed, FN_LESS_FF))
     _connect(out(by), _pin(early, "A"))
     _connect(next_out, _pin(early, "B"))

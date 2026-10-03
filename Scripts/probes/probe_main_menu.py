@@ -26,9 +26,10 @@ from graphics_menu import cursor_consts as CC
 from graphics_menu import umg_consts as C
 from graphics_menu.profile_consts import EXIT_ACTION, EXIT_PENDING_VAR
 from graphics_menu.tune_consts import GUN_TAB
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, v) for v in ("MenuOpen", C.GAME_STARTED_VAR, CC.PAUSE_CLICK_VAR,
+WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, CC.PAUSE_CLICK_VAR,
                                        GUN_TAB.open_var)]
 
 

@@ -17,10 +17,11 @@ from graphics_menu import umg_consts as C
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.settings_rows import BACK_ROW, PAGE_SETTINGS, PAGE_TITLE
 from graphics_menu.tune_consts import GUN_TAB
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (
-    "MenuOpen", C.GAME_STARTED_VAR, "MenuPage", "MenuRow", LOOT_OPEN_VAR,
+    MV.MenuOpen, C.GAME_STARTED_VAR, MV.MenuPage, MV.MenuRow, LOOT_OPEN_VAR,
     CC.CURSOR_ACCEPT_VAR, CC.PAUSE_CLICK_VAR, GUN_TAB.open_var, GUN_TAB.row_var)]
 WRITABLE += [(GAME_MODE_BP_PATH, "PlayerDead"),
              (WEAPON_COMP_BP_PATH, CC.TRIGGER_SPENT_VAR)]

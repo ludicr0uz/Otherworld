@@ -9,6 +9,7 @@ from combat.noise import _author_make_noise
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _prop
 from uebp.nodes.math import FN_MUL_FF
+from combat import item_vars as IV
 
 
 def _author_shot_noise(ed, held, muzzle, direction, exec_in):
@@ -22,7 +23,7 @@ def _author_shot_noise(ed, held, muzzle, direction, exec_in):
     shot fired at a pack reaches it from further away than one fired away
     from it.
     """
-    volume, volume_n = _prop(ed, "ShotVolume", held)
+    volume, volume_n = _prop(ed, IV.ShotVolume, held)
 
     ahead = _node(ed, FN_MUL_FF)
     _connect(volume, _pin(ahead, "A"))

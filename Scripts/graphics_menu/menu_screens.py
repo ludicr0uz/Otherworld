@@ -48,6 +48,7 @@ from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
 from uebp.nodes.math import FN_EQ_II, FN_OR
 from uebp.nodes.system import (
     FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SET_PAUSED)
+from graphics_menu import hud_vars as MV
 
 GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
                         ".BP_ThirdPersonGameMode_C")
@@ -66,7 +67,7 @@ def author_title(ed, in_execs):
     started, title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), in_execs, made)
     flow = set_shown(ed, part(ed, WBP_HUD, HUD_BODY), False, [title])
     flow = set_shown(ed, screen(ed, WBP_DEATH_MENU), False, [flow])
-    flow = _setter(ed, "MenuOpen", "true", [flow], made)
+    flow = _setter(ed, MV.MenuOpen, "true", [flow], made)
     ed.add_comment_to_nodes(
         f"The title: while {GAME_STARTED_VAR} is false, which BeginPlay leaves "
         f"it with while it pauses the world, the menu is held open over a "
@@ -208,10 +209,10 @@ def author_pause_menu(ed, in_execs):
     and its BACK row brings these back. A row is taken with Enter or a click,
     which raises PauseClick for Tick; the rows have no keys of their own."""
     made = []
-    get_open = ed.add_get_member_variable_node("MenuOpen")
+    get_open = ed.add_get_member_variable_node(MV.MenuOpen)
     looting = ed.add_get_member_variable_node(LOOT_OPEN_VAR)
     wanted = _node(ed, FN_OR)
-    _connect(out(ed.add_get_member_variable_node("MenuOpen"), "MenuOpen"), _pin(wanted, "A"))
+    _connect(out(ed.add_get_member_variable_node(MV.MenuOpen), MV.MenuOpen), _pin(wanted, "A"))
     _connect(out(looting, LOOT_OPEN_VAR), _pin(wanted, "B"))
     # ...or the I panel (wear_draw.py).
     wearing = ed.add_get_member_variable_node(WEAR_OPEN_VAR)
@@ -221,7 +222,7 @@ def author_pause_menu(ed, in_execs):
     wanted = wanted_any
     in_execs = author_hold_fire(ed, author_cursor_mode(ed, out(wanted), in_execs))
     br = ed.add_branch_node()
-    _connect(out(get_open, "MenuOpen"), _pin(br, "Condition"))
+    _connect(out(get_open, MV.MenuOpen), _pin(br, "Condition"))
     for e in in_execs:
         _connect(e, _pin(br, "execute"))
     # WBP_MainMenu goes up and down with the menu: its legal notice is on
@@ -233,7 +234,7 @@ def author_pause_menu(ed, in_execs):
     flow = set_shown(ed, screen(ed, WBP_MAIN_MENU), True, [flow])
     panel = part(ed, WBP_PAUSE_MENU, PAUSE_PANEL)
     settings = part(ed, WBP_MAIN_MENU, SETTINGS_PANEL)
-    on_rows = _call(ed, FN_EQ_II, made, A=_get(ed, "MenuPage", made), B=PAGE_TITLE)
+    on_rows = _call(ed, FN_EQ_II, made, A=_get(ed, MV.MenuPage, made), B=PAGE_TITLE)
     on_menu, on_settings = _branch(ed, out(on_rows), [flow], made)
     _author_settings_page(ed, set_shown(
         ed, settings, True, [set_shown(ed, panel, False, [on_settings])]))
@@ -255,9 +256,9 @@ def author_pause_menu(ed, in_execs):
     # reads "true", which is a variable's value and not a setting.
     debug_row, found, missing = row_at(ed, rows, PAUSE_DEBUG_ROW, worded)
     value = member(ed, debug_row, WBP_MENU_ROW, ROW_VALUE)
-    dbg = ed.add_get_member_variable_node("DebugOn")
+    dbg = ed.add_get_member_variable_node(MV.DebugOn)
     dbg_br = ed.add_branch_node()
-    _connect(out(dbg, "DebugOn"), _pin(dbg_br, "Condition"))
+    _connect(out(dbg, MV.DebugOn), _pin(dbg_br, "Condition"))
     _connect(found, _pin(dbg_br, "execute"))
     on = set_text(ed, value, DEBUG_ON, [then(dbg_br)])
     off = set_text(ed, value, DEBUG_OFF, [else_(dbg_br)])

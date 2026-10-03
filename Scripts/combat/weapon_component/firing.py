@@ -15,6 +15,8 @@ from uebp.nodes.math import (
     FN_SUB_VV)
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT, NODE_CAST_GAME_MODE
 from uebp.nodes.system import FN_GET_GAME_MODE, FN_PLAY_SOUND, FN_TIME_SECONDS, FN_TRACE
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 # The shot's direction, drawn once per trigger pull inside AimSpread.
 SHOT_DIRECTION_VAR = "ShotDirection"
@@ -46,25 +48,25 @@ def _author_fire(ed, held, muzzle, exec_in):
     # Unconditional, on every weapon. Loaded is only ever *read* behind
     # UsesAmmo, so letting a weapon without ammunition count into the negatives costs
     # nothing and saves a branch on the one path that runs eight traces.
-    was = keep(ed.add_get_member_variable_node("Loaded", ITEM_CLASS_PATH))
+    was = keep(ed.add_get_member_variable_node(IV.Loaded, ITEM_CLASS_PATH))
     _connect(held, _pin(was, "self"))
     spent = keep(_node(ed, FN_SUB_II))
-    _connect(out(was, "Loaded"), _pin(spent, "A"))
+    _connect(out(was, IV.Loaded), _pin(spent, "A"))
     _set(spent, "B", 1)
-    burn = keep(ed.add_set_member_variable_node("Loaded", ITEM_CLASS_PATH))
+    burn = keep(ed.add_set_member_variable_node(IV.Loaded, ITEM_CLASS_PATH))
     _connect(held, _pin(burn, "self"))
-    _connect(out(spent), _pin(burn, "Loaded"))
+    _connect(out(spent), _pin(burn, IV.Loaded))
     _connect(exec_in, _pin(burn, "execute"))
 
     now = keep(_node(ed, FN_TIME_SECONDS))
-    every, every_n = _prop(ed, "FireInterval", held)
+    every, every_n = _prop(ed, IV.FireInterval, held)
     keep(every_n)
     again = keep(_node(ed, FN_ADD_FF))
     _connect(out(now), _pin(again, "A"))
     _connect(every, _pin(again, "B"))
-    cool = keep(ed.add_set_member_variable_node("NextFireTime", ITEM_CLASS_PATH))
+    cool = keep(ed.add_set_member_variable_node(IV.NextFireTime, ITEM_CLASS_PATH))
     _connect(held, _pin(cool, "self"))
-    _connect(out(again), _pin(cool, "NextFireTime"))
+    _connect(out(again), _pin(cool, IV.NextFireTime))
     _connect(then(burn), _pin(cool, "execute"))
 
     # --- is anyone watching the tracers? -------------------------------------
@@ -86,15 +88,15 @@ def _author_fire(ed, held, muzzle, exec_in):
     # and the component's own default is already false.
     after_cost = [then(note), out(as_mode, "CastFailed")]
 
-    aim_get = keep(ed.add_get_member_variable_node("AimPoint"))
+    aim_get = keep(ed.add_get_member_variable_node(WV.AimPoint))
     delta = keep(_node(ed, FN_SUB_VV))
-    _connect(out(aim_get, "AimPoint"), _pin(delta, "A"))
+    _connect(out(aim_get, WV.AimPoint), _pin(delta, "A"))
     _connect(muzzle, _pin(delta, "B"))
     direction_n = keep(_node(ed, FN_NORMAL))
     _connect(out(delta), _pin(direction_n, "A"))
     direction = out(direction_n)
 
-    snd_pin, snd_n = _prop(ed, "FireSound", held)
+    snd_pin, snd_n = _prop(ed, IV.FireSound, held)
     keep(snd_n)
     play = keep(_node(ed, FN_PLAY_SOUND))
     _connect(snd_pin, _pin(play, "Sound"))
@@ -102,7 +104,7 @@ def _author_fire(ed, held, muzzle, exec_in):
     for tail in after_cost:
         _connect(tail, _pin(play, "execute"))
 
-    pel_pin, pel_n = _prop(ed, "PelletCount", held)
+    pel_pin, pel_n = _prop(ed, IV.PelletCount, held)
     keep(pel_n)
     last = keep(_node(ed, FN_SUB_II))
     _connect(pel_pin, _pin(last, "A"))
@@ -118,7 +120,7 @@ def _author_fire(ed, held, muzzle, exec_in):
 
     # Each pellet: the weapon's own pattern around the shot's direction. Zero
     # on a single-round gun, so its one pellet flies exactly down the draw.
-    pattern, pattern_n = _prop(ed, "PelletSpreadDegrees", held)
+    pattern, pattern_n = _prop(ed, IV.PelletSpreadDegrees, held)
     keep(pattern_n)
     rad = keep(_node(ed, FN_DEG2RAD))
     _connect(pattern, _pin(rad, "A"))
@@ -126,7 +128,7 @@ def _author_fire(ed, held, muzzle, exec_in):
     cone = keep(_node(ed, FN_RAND_CONE))
     _connect(out(shot_get, SHOT_DIRECTION_VAR), _pin(cone, "ConeDir"))
     _connect(out(rad), _pin(cone, "ConeHalfAngleInRadians"))
-    rng_pin, rng_n = _prop(ed, "WeaponRange", held)
+    rng_pin, rng_n = _prop(ed, IV.WeaponRange, held)
     keep(rng_n)
     reach = keep(_node(ed, FN_MUL_VF))
     _connect(out(cone), _pin(reach, "A"))

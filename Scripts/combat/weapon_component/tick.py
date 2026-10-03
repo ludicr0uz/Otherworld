@@ -51,6 +51,8 @@ from combat.weapon_component.throw import _author_throw, _author_throw_key
 from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
 from uebp.nodes.system import FN_GET_PC, FN_IS_VALID, FN_TIME_SECONDS
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 # A probe's stand-in for the fire key's press: no key can be injected into a
 # headless game (probes/probe_dead_no_actions.py). False in every real game.
@@ -75,8 +77,8 @@ def _author_wc_tick(ed, tick):
     owner = _node(ed, FN_GET_OWNER)
     owner_out = out(owner)
 
-    held_get = ed.add_get_member_variable_node("Held")
-    held = out(held_get, "Held")
+    held_get = ed.add_get_member_variable_node(WV.Held)
+    held = out(held_get, WV.Held)
     armed = _node(ed, FN_IS_VALID)
     _connect(held, _pin(armed, "Object"))
     armed_out = out(armed)
@@ -221,12 +223,12 @@ def _author_wc_tick(ed, tick):
     # reads that actually decide are the same two pins the weapon is asked
     # about below.
     steady = _node(ed, FN_NOT)
-    _connect(out(ed.add_get_member_variable_node("Sprinting"), "Sprinting"), _pin(steady, "A"))
+    _connect(out(ed.add_get_member_variable_node(WV.Sprinting), WV.Sprinting), _pin(steady, "A"))
 
     # Guarding is not shooting: a separate NOT, so the Sprinting read the
     # verifier walks keeps its own NOT.
     guarded = _node(ed, FN_NOT)
-    _connect(out(ed.add_get_member_variable_node("Blocking"), "Blocking"), _pin(guarded, "A"))
+    _connect(out(ed.add_get_member_variable_node(WV.Blocking), WV.Blocking), _pin(guarded, "A"))
 
     tapped = _node(ed, FN_OR)
     _connect(pressed("KeyFire"), _pin(tapped, "A"))
@@ -262,11 +264,11 @@ def _author_wc_tick(ed, tick):
     # including the frames where nothing is equipped at all. A pure Get with a
     # null self is an "Accessed None" per frame forever. Behind the gate, Held
     # has already been checked valid.
-    loaded, loaded_n = _prop(ed, "Loaded", held)
+    loaded, loaded_n = _prop(ed, IV.Loaded, held)
     rounds = _node(ed, FN_GREATER_II)
     _connect(loaded, _pin(rounds, "A"))
     _set(rounds, "B", 0)
-    limited, limited_n = _prop(ed, "UsesAmmo", held)
+    limited, limited_n = _prop(ed, IV.UsesAmmo, held)
     unlimited = _node(ed, FN_NOT)
     _connect(limited, _pin(unlimited, "A"))
     # OR, so an item without ammunition never consults a magazine it does not have.
@@ -274,7 +276,7 @@ def _author_wc_tick(ed, tick):
     _connect(out(unlimited), _pin(has_ammo, "A"))
     _connect(out(rounds), _pin(has_ammo, "B"))
 
-    when, when_n = _prop(ed, "NextFireTime", held)
+    when, when_n = _prop(ed, IV.NextFireTime, held)
     right_now = _node(ed, FN_TIME_SECONDS)
     cooled = _node(ed, FN_GE_FF)
     _connect(out(right_now), _pin(cooled, "A"))
@@ -284,7 +286,7 @@ def _author_wc_tick(ed, tick):
     # weapon can be asked. An automatic accepts either; everything else
     # accepts only the tap, which is what makes one click one shot on the
     # shotgun even though the button is still down on the following frame.
-    auto_pin, auto_n = _prop(ed, "Automatic", held)
+    auto_pin, auto_n = _prop(ed, IV.Automatic, held)
     spraying = _node(ed, FN_AND)
     _connect(holding_out, _pin(spraying, "A"))
     _connect(auto_pin, _pin(spraying, "B"))
@@ -374,16 +376,16 @@ def _author_wc_tick(ed, tick):
     for exit_pin in slot_exits:
         _connect(exit_pin, _pin(drop_gate, "execute"))
     after_drop = _author_drop(ed, held, owner_out, then(drop_gate))
-    drop_dirty = ed.add_set_member_variable_node("NeedsRefresh")
-    _set(drop_dirty, "NeedsRefresh", "true")
+    drop_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
+    _set(drop_dirty, WV.NeedsRefresh, "true")
     _connect(after_drop, _pin(drop_dirty, "execute"))
 
     # --- interact (interact.py): an item in reach is picked up ---------------
     picked, not_picked = _author_interact(
         ed, owner_out, pressed("KeyInteract"),
         (then(drop_dirty), else_(drop_gate)))
-    pick_dirty = ed.add_set_member_variable_node("NeedsRefresh")
-    _set(pick_dirty, "NeedsRefresh", "true")
+    pick_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
+    _set(pick_dirty, WV.NeedsRefresh, "true")
     for exit_pin in picked:
         _connect(exit_pin, _pin(pick_dirty, "execute"))
 
@@ -405,12 +407,12 @@ def _author_wc_tick(ed, tick):
     flight_exits = _author_slot_sync(ed, flight_exits)
 
     # --- refresh -------------------------------------------------------------
-    dirty_get = ed.add_get_member_variable_node("NeedsRefresh")
+    dirty_get = ed.add_get_member_variable_node(WV.NeedsRefresh)
     refresh_gate = ed.add_branch_node()
-    _connect(out(dirty_get, "NeedsRefresh"), _pin(refresh_gate, "Condition"))
+    _connect(out(dirty_get, WV.NeedsRefresh), _pin(refresh_gate, "Condition"))
     for exit_pin in flight_exits:
         _connect(exit_pin, _pin(refresh_gate, "execute"))
-    settle = ed.add_set_member_variable_node("NeedsRefresh")
-    _set(settle, "NeedsRefresh", "false")
+    settle = ed.add_set_member_variable_node(WV.NeedsRefresh)
+    _set(settle, WV.NeedsRefresh, "false")
     _connect(then(refresh_gate), _pin(settle, "execute"))
     _author_equip(ed, then(settle))

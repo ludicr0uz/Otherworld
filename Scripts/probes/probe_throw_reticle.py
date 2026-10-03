@@ -22,11 +22,12 @@ from combat.weapon_component.throw import (
     THROW_AIMING_VAR, THROW_ARC_VAR, THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR,
 )
 from combat.weapon_component.throw_flight import THROWN_VAR, THROW_VELOCITY_VAR
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
             (WEAPON_COMP_BP_PATH, THROW_CLICK_FORCED_VAR),
-            (WEAPON_COMP_BP_PATH, "EquippedIndex"),
-            (WEAPON_COMP_BP_PATH, "NeedsRefresh")]
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
+            (WEAPON_COMP_BP_PATH, WV.NeedsRefresh)]
 
 NEAR_PITCH = -14.0         # the reticle on the ground some metres ahead
 FAR_PITCH = -6.0           # ...and a good way further

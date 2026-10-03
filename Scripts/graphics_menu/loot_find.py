@@ -25,6 +25,7 @@ from uebp.nodes.actor import FN_ACTOR_LOC, FN_COMP_LOC, FN_GET_COMP
 from uebp.nodes.math import FN_DISTANCE, FN_LESS_FF, FN_NE_OO
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_ALL_ACTORS, FN_GET_PLAYER_PAWN, FN_IS_VALID
+from combat import health_vars as HV
 
 CHARACTER_CLASS_PATH = "/Script/Engine.Character"
 MESH_CLASS_PATH = "/Script/Engine.SkeletalMeshComponent"
@@ -73,7 +74,7 @@ def author_find_body(ed, in_execs, made):
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     comp = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    dead, _alive = _branch(ed, _get(ed, "Dead", made, HEALTH_CLASS_PATH, comp), [then(cast)], made)
+    dead, _alive = _branch(ed, _get(ed, HV.Dead, made, HEALTH_CLASS_PATH, comp), [then(cast)], made)
     other, _self = _branch(ed, out(_call(ed, FN_NE_OO, made, A=who, B=pawn)), [dead], made)
     mesh = _call(ed, FN_GET_COMP, made, self=who)
     _pin(mesh, "ComponentClass").set_pin_value(MESH_CLASS_PATH)

@@ -16,6 +16,7 @@ from graphics_menu.settings_rows import (
 from uebp.nodes.array import FN_ARR_GET
 from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_MOD_II, FN_SELECT_II
 from uebp.nodes.system import FN_IS_VALID
+from graphics_menu import hud_vars as MV
 
 LABELS_VAR = "DifficultyLabels"
 
@@ -59,7 +60,7 @@ def emit_difficulty_nudge(ed, settings_out, either_out, right_out, in_execs, mad
 
     count = len(DIFFICULTY_LABELS)
     here = keep(_node(ed, FN_EQ_II))
-    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(here, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node(MV.MenuRow)), MV.MenuRow), _pin(here, "A"))
     _set(here, "B", DIFFICULTY_ROW)
     adjusting = keep(_node(ed, FN_AND))
     _connect(either_out, _pin(adjusting, "A"))
@@ -96,8 +97,8 @@ def author_push_difficulty(ed, in_exec, mode_out):
     corrected on its first frame without a second code path. Guarded on
     IsValid(Settings), which BeginPlay fills. Returns the exec tails.
     """
-    got = ed.add_get_member_variable_node("Settings")
-    settings_out = out(got, "Settings")
+    got = ed.add_get_member_variable_node(MV.Settings)
+    settings_out = out(got, MV.Settings)
     ok = _node(ed, FN_IS_VALID)
     _connect(settings_out, _pin(ok, "Object"))
     have = ed.add_branch_node()

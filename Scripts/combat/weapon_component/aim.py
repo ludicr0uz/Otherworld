@@ -13,6 +13,7 @@ from uebp.nodes.actor import FN_CAM_LOC, FN_CAM_ROT
 from uebp.nodes.math import FN_ADD_VV, FN_DISTANCE, FN_FORWARD, FN_GREATER_FF, FN_MUL_VF
 from uebp.nodes.palette import NODE_BREAK_HIT
 from uebp.nodes.system import FN_GET_CAM, FN_IS_VALID, FN_TRACE
+from combat.weapon_component import vars as WV
 
 
 def _author_resolve_aim(ed, held, exec_ins):
@@ -90,11 +91,11 @@ def _author_resolve_aim(ed, held, exec_ins):
     _connect(out(look), _pin(saw, "Condition"))
     _connect(then(look), _pin(saw, "execute"))
 
-    on_surface = keep(ed.add_set_member_variable_node("AimPoint"))
-    _connect(_loose_pin(look_brk, "Location", is_input=False), _pin(on_surface, "AimPoint"))
+    on_surface = keep(ed.add_set_member_variable_node(WV.AimPoint))
+    _connect(_loose_pin(look_brk, "Location", is_input=False), _pin(on_surface, WV.AimPoint))
     _connect(then(saw), _pin(on_surface, "execute"))
-    at_sky = keep(ed.add_set_member_variable_node("AimPoint"))
-    _connect(sky_out, _pin(at_sky, "AimPoint"))
+    at_sky = keep(ed.add_set_member_variable_node(WV.AimPoint))
+    _connect(sky_out, _pin(at_sky, WV.AimPoint))
     _connect(else_(saw), _pin(at_sky, "execute"))
 
     armed = keep(_node(ed, FN_IS_VALID))
@@ -106,12 +107,12 @@ def _author_resolve_aim(ed, held, exec_ins):
 
     # Empty-handed: there is nothing to draw a reticle for, and no muzzle to
     # trace from -- reading one off a null weapon is how Accessed None happens.
-    unarmed = keep(ed.add_set_member_variable_node("AimValid"))
-    _set(unarmed, "AimValid", "false")
+    unarmed = keep(ed.add_set_member_variable_node(WV.AimValid))
+    _set(unarmed, WV.AimValid, "false")
     _connect(else_(holding), _pin(unarmed, "execute"))
 
-    aim_get = keep(ed.add_get_member_variable_node("AimPoint"))
-    aim_out = out(aim_get, "AimPoint")
+    aim_get = keep(ed.add_get_member_variable_node(WV.AimPoint))
+    aim_out = out(aim_get, WV.AimPoint)
 
     # The muzzle, or while the gun is lowered where it is about to be (carry.py).
     muzzle = _author_shot_origin(ed, held)
@@ -135,21 +136,21 @@ def _author_resolve_aim(ed, held, exec_ins):
     _connect(out(short_by), _pin(far_short, "A"))
     _set(far_short, "B", BLOCKED_SLACK)
 
-    mark = keep(ed.add_set_member_variable_node("AimBlocked"))
-    _connect(out(far_short), _pin(mark, "AimBlocked"))
+    mark = keep(ed.add_set_member_variable_node(WV.AimBlocked))
+    _connect(out(far_short), _pin(mark, WV.AimBlocked))
     _connect(then(stopped), _pin(mark, "execute"))
     # The aim point moves to where the barrel's own line actually ends, so the
     # reticle sits on the near wall rather than on the enemy behind it.
-    reality = keep(ed.add_set_member_variable_node("AimPoint"))
-    _connect(_loose_pin(clear_brk, "Location", is_input=False), _pin(reality, "AimPoint"))
+    reality = keep(ed.add_set_member_variable_node(WV.AimPoint))
+    _connect(_loose_pin(clear_brk, "Location", is_input=False), _pin(reality, WV.AimPoint))
     _connect(then(mark), _pin(reality, "execute"))
 
-    open_shot = keep(ed.add_set_member_variable_node("AimBlocked"))
-    _set(open_shot, "AimBlocked", "false")
+    open_shot = keep(ed.add_set_member_variable_node(WV.AimBlocked))
+    _set(open_shot, WV.AimBlocked, "false")
     _connect(else_(stopped), _pin(open_shot, "execute"))
 
-    ready = keep(ed.add_set_member_variable_node("AimValid"))
-    _set(ready, "AimValid", "true")
+    ready = keep(ed.add_set_member_variable_node(WV.AimValid))
+    _set(ready, WV.AimValid, "true")
     _connect(then(reality), _pin(ready, "execute"))
     _connect(then(open_shot), _pin(ready, "execute"))
 

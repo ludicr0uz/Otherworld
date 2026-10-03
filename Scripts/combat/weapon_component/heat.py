@@ -29,6 +29,7 @@ from combat.weapon_component.common import _prop
 from uebp.nodes.math import FN_ADD_FF, FN_CLASS_IS_CHILD
 from uebp.nodes.palette import MACRO_FOR_EACH
 from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_OBJECT_CLASS, FN_TIME_SECONDS
+from combat.weapon_component import vars as WV
 
 
 def _author_fire_candidates(ed, exec_in):
@@ -56,13 +57,13 @@ def _author_fire_candidates(ed, exec_in):
     _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
     _connect(then(every), _loose_pin(loop, "Exec"))
 
-    held = keep(ed.add_get_member_variable_node("Held"))
+    held = keep(ed.add_get_member_variable_node(WV.Held))
     armed = keep(_node(ed, FN_IS_VALID))
-    _connect(out(held, "Held"), _pin(armed, "Object"))
+    _connect(out(held, WV.Held), _pin(armed, "Object"))
     gate = keep(ed.add_branch_node())
     _connect(out(armed), _pin(gate, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(gate, "execute"))
-    heats_pin, heats_n = _prop(ed, HEATS_VAR, out(held, "Held"))
+    heats_pin, heats_n = _prop(ed, HEATS_VAR, out(held, WV.Held))
     keep(heats_n)
 
     ed.add_comment_to_nodes(
@@ -96,8 +97,8 @@ def _author_heat_item(ed, target, exec_in):
     _connect(out(is_fire), _pin(mine, "Condition"))
     _connect(exec_in, _pin(mine, "execute"))
 
-    held_n = keep(ed.add_get_member_variable_node("Held"))
-    held = out(held_n, "Held")
+    held_n = keep(ed.add_get_member_variable_node(WV.Held))
+    held = out(held_n, WV.Held)
     armed = keep(_node(ed, FN_IS_VALID))
     _connect(held, _pin(armed, "Object"))
     gate = keep(ed.add_branch_node())

@@ -31,6 +31,7 @@ from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.math import FN_MAX_FF, FN_MUL_FF, FN_SUB_FF
 from uebp.nodes.palette import NODE_CAST_SURVIVAL
 from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from world import day_night_vars as DV
 
 TEMPERATURE_VAR = "Temperature"
 
@@ -51,7 +52,7 @@ def author_night_cold(ed, tick, chain):
     _connect(out(comp), _pin(cast, "Object"))
     survival = _loose_pin(cast, "AsBPSurvivalComponent", is_input=False)
 
-    night = _map(ed, _get(ed, "DayAmount"), 0.0, 1.0, 1.0, 0.0)
+    night = _map(ed, _get(ed, DV.DayAmount), 0.0, 1.0, 1.0, 0.0)
     rate = out(_call(ed, FN_MUL_FF, A=_get(ed, NIGHT_COLD_VAR), B=night))
     step = out(_call(ed, FN_MUL_FF, A=rate, B=out(tick, "DeltaSeconds")))
     now = ed.add_get_member_variable_node(TEMPERATURE_VAR, SURVIVAL_CLASS_PATH)

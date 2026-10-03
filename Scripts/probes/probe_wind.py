@@ -25,10 +25,11 @@ from forest_generator.wind import MPC_PATH, PARAM_SPEED, PARAM_STRENGTH
 from graphics_menu import gfx_stats as GS
 from graphics_menu import gfx_tune_consts as GC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 TAB = GC.GFX_TAB
-WRITABLE = [(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var, "MenuOpen")]
+WRITABLE = [(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var, MV.MenuOpen)]
 ROW = {s.column: i + 1 for i, s in enumerate(GS.GFX_STATS)}
 ISM = unreal.InstancedStaticMeshComponent
 

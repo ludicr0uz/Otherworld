@@ -45,6 +45,8 @@ from uebp.nodes.math import (
     FN_MAP_CLAMPED, FN_MUL_FF, FN_NEGATE_V, FN_PERCENT_FF, FN_RANDOM_FLOAT, FN_VEC_TO_COLOR)
 from uebp.nodes.palette import MACRO_FOR_EACH
 from uebp.nodes.system import FN_WITH_TAG
+from world import day_night_vars as DV
+from uebp import props as EP
 
 PP_CLASS_PATH = "/Script/Engine.PostProcessComponent"
 
@@ -117,27 +119,27 @@ def _author_begin_play(ed, begin):
     _connect(_loose_pin(loop, "ArrayElement", is_input=False), _pin(kill, "self"))
 
     chain = _Chain(_loose_pin(loop, "Completed", is_input=False))
-    mid = chain.step(_call(ed, FN_CREATE_MID, self=_get(ed, "SkyDome"), ElementIndex=0))
+    mid = chain.step(_call(ed, FN_CREATE_MID, self=_get(ed, DV.SkyDome), ElementIndex=0))
     _set_var(ed, chain, SKY_MID_VAR, out(mid))
 
     pick = chain.step(ed.add_branch_node())
     _connect(_get(ed, RANDOM_START_VAR), _pin(pick, "Condition"))
     total = out(_call(ed, FN_ADD_FF,
-                       A=_get(ed, "DayLengthSeconds"),
-                       B=_get(ed, "NightLengthSeconds")))
+                       A=_get(ed, DV.DayLengthSeconds),
+                       B=_get(ed, DV.NightLengthSeconds)))
     anywhere = _call(ed, FN_RANDOM_FLOAT, Min=0.0, Max=total)
-    _set_var(ed, chain, "Clock", out(anywhere))
+    _set_var(ed, chain, DV.Clock, out(anywhere))
 
 
 def _author_clock(ed, tick, chain):
     """Advance Clock, set IsDay; return (clock, day_len, sin(angle), sun_elev) pins."""
-    day_len = _get(ed, "DayLengthSeconds")
-    total = out(_call(ed, FN_ADD_FF, A=day_len, B=_get(ed, "NightLengthSeconds")))
-    ahead = out(_call(ed, FN_ADD_FF, A=_get(ed, "Clock"), B=out(tick, "DeltaSeconds")))
+    day_len = _get(ed, DV.DayLengthSeconds)
+    total = out(_call(ed, FN_ADD_FF, A=day_len, B=_get(ed, DV.NightLengthSeconds)))
+    ahead = out(_call(ed, FN_ADD_FF, A=_get(ed, DV.Clock), B=out(tick, "DeltaSeconds")))
     wrapped = out(_call(ed, FN_PERCENT_FF, A=ahead, B=total))
-    _set_var(ed, chain, "Clock", wrapped)
+    _set_var(ed, chain, DV.Clock, wrapped)
 
-    clock = _get(ed, "Clock")
+    clock = _get(ed, DV.Clock)
     is_day = out(_call(ed, FN_LESS_FF, A=clock, B=day_len))
     _set_var(ed, chain, IS_DAY_VAR, is_day)
 
@@ -150,24 +152,24 @@ def _author_clock(ed, tick, chain):
     sin = out(_call(ed, FN_DEG_SIN, A=angle))
     sun_elev = _mul(ed, sin, cfg.SUN_MAX_ELEVATION_DEG)
     day = _map(ed, sun_elev, cfg.NIGHT_BELOW_DEG, cfg.DAY_ABOVE_DEG, 0.0, 1.0)
-    _set_var(ed, chain, "DayAmount", day)
+    _set_var(ed, chain, DV.DayAmount, day)
     return angle, sin, sun_elev
 
 
 def _author_bodies(ed, chain, angle, sin):
     """Point the sun and the moon, and light each by how far up it is."""
     for name, pitch_scale, yaw_offset in (
-                                          ("Sun", -cfg.SUN_MAX_ELEVATION_DEG, cfg.SUNRISE_YAW_DEG),
-                                          ("Moon", cfg.MOON_MAX_ELEVATION_DEG, cfg.SUNRISE_YAW_DEG - 180.0)):
+                                          (DV.Sun, -cfg.SUN_MAX_ELEVATION_DEG, cfg.SUNRISE_YAW_DEG),
+                                          (DV.Moon, cfg.MOON_MAX_ELEVATION_DEG, cfg.SUNRISE_YAW_DEG - 180.0)):
         rot = _call(ed, FN_MAKE_ROT, Roll=0.0,
                     Pitch=_mul(ed, sin, pitch_scale),
                     Yaw=out(_call(ed, FN_ADD_FF, A=angle,
                                    B=float(yaw_offset))))
         chain.step(_call(ed, FN_COMP_SET_WORLD_ROT, self=_get(ed, name), NewRotation=out(rot)))
 
-    day = _get(ed, "DayAmount")
+    day = _get(ed, DV.DayAmount)
     chain.step(_call(ed, FN_LIGHT_INTENSITY,
-                     self=_get(ed, "Sun"),
+                     self=_get(ed, DV.Sun),
                      NewIntensity=_scaled(ed, _mul(ed, day, cfg.SUN_LUX),
                                           SUN_SCALE_VAR)))
     moon_elev = _mul(ed, sin, -cfg.MOON_MAX_ELEVATION_DEG)
@@ -175,7 +177,7 @@ def _author_bodies(ed, chain, angle, sin):
     night = _map(ed, day, 0.0, 1.0, 1.0, 0.0)
     moon_amount = out(_call(ed, FN_MUL_FF, A=moon_up, B=night))
     chain.step(_call(ed, FN_LIGHT_INTENSITY,
-                     self=_get(ed, "Moon"),
+                     self=_get(ed, DV.Moon),
                      NewIntensity=_scaled(
                          ed, _mul(ed, moon_amount, cfg.MOON_LUX),
                          MOON_SCALE_VAR)))
@@ -183,15 +185,15 @@ def _author_bodies(ed, chain, angle, sin):
 
 def _author_air(ed, chain):
     """Ambient, fog and exposure: each goes night value -> day value by DayAmount."""
-    day = _get(ed, "DayAmount")
+    day = _get(ed, DV.DayAmount)
     night_sky, day_sky = cfg.SKY_LIGHT_INTENSITY
     chain.step(_call(ed, FN_SKY_INTENSITY,
-                     self=_get(ed, "SkyLight"),
+                     self=_get(ed, DV.SkyLight),
                      NewIntensity=_scaled(
                          ed, _map(ed, day, 0, 1, night_sky, day_sky),
                          AMBIENT_SCALE_VAR)))
     night_fog, day_fog = cfg.FOG_DENSITY
-    fog = _get(ed, "Fog")
+    fog = _get(ed, DV.Fog)
     chain.step(_call(ed, FN_FOG_DENSITY, self=fog,
                      Value=_scaled(
                          ed, _map(ed, day, 0, 1, night_fog, day_fog),
@@ -201,8 +203,8 @@ def _author_air(ed, chain):
                  B=_color(ed, cfg.FOG_COLOR[1]), Alpha=day)
     chain.step(_call(ed, FN_FOG_COLOR, self=fog, Value=out(tint)))
 
-    weight = chain.step(ed.add_set_member_variable_node("BlendWeight", PP_CLASS_PATH))
-    _connect(_get(ed, "DayGrade"), _pin(weight, "self"))
+    weight = chain.step(ed.add_set_member_variable_node(EP.BLEND_WEIGHT, PP_CLASS_PATH))
+    _connect(_get(ed, DV.DayGrade), _pin(weight, "self"))
     _connect(day, _pin(weight, "BlendWeight"))
 
 
@@ -210,7 +212,7 @@ def _author_sky(ed, chain, sun_elev):
     """Feed the dome: how much day, how many stars, where the sun and moon are."""
     mid = _get(ed, SKY_MID_VAR)
     chain.step(_call(ed, FN_MID_SCALAR, self=mid, ParameterName="DayAmount",
-                     Value=_get(ed, "DayAmount")))
+                     Value=_get(ed, DV.DayAmount)))
     stars = _map(ed, sun_elev, 0.0, cfg.STARS_FULL_BELOW_DEG, 0.0, 1.0)
     chain.step(_call(ed, FN_MID_SCALAR, self=mid,
                      ParameterName="StarBrightness",
@@ -219,7 +221,7 @@ def _author_sky(ed, chain, sun_elev):
     for param, var in (("SunDiscBrightness", SUN_DISC_SCALE_VAR),
                        ("MoonDiscBrightness", MOON_DISC_SCALE_VAR)):
         chain.step(_call(ed, FN_MID_SCALAR, self=mid, ParameterName=param, Value=_get(ed, var)))
-    for body in ("Sun", "Moon"):
+    for body in (DV.Sun, DV.Moon):
         fwd = _call(ed, FN_FORWARD_OF, self=_get(ed, body))
         toward = _call(ed, FN_NEGATE_V, A=out(fwd))
         color = _call(ed, FN_VEC_TO_COLOR, InVec=out(toward))

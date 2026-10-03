@@ -18,6 +18,8 @@ noise record the senses listen to, and the per-gun ShotVolume, are combat's
 
 DATA (constants -- no Blueprint authoring)
   paths        /Game paths, the controller's variable names, mesh offsets
+  controller_vars  the controller's variables that had no constant, as a
+               table (uebp/vars.py)
   monster_tuning  the tunable stats (MONSTER_STATS), monster_tuning.csv and
                monster_specs(): the CSV over npc_agro/npc_placement/
                npc_stalk/npc_ward's literals, per creature. Pure Python (the game's save uses it)

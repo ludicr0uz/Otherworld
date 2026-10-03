@@ -6,8 +6,8 @@ import unreal
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _connect,
-    _create_blueprint, _declare, _drop_components, _events, _loose_pin, _node, _palette,
-    _pin, _root_handle, _set, else_, out, then)
+    _create_blueprint, _drop_components, _events, _loose_pin, _node, _palette, _pin,
+    _root_handle, _set, else_, out, then)
 from uebp.layout import arrange
 from combat.paths import (
     AMMO_BP_PATH, CYLINDER, ITEM_CLASS_PATH, MAT_BRASS,
@@ -24,6 +24,10 @@ from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_DISTANCE, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, FN_NOT)
 from uebp.nodes.palette import MACRO_FOR_EACH
 from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.vars import declare
+from combat import ammo_vars as AV
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 # ─── BP_AmmoPickup ───────────────────────────────────────────────────────────
@@ -76,8 +80,7 @@ def build_ammo_pickup(rebuild=True):
 
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
-    _declare(ed, "Shells", BEL.get_basic_type_by_name("int"))
-    _declare(ed, "Credited", BEL.get_basic_type_by_name("bool"))
+    declare(ed, AV.TABLE)
 
     # --- BeginPlay: tidy yourself away eventually ---------------------------
     life = _node(ed, FN_LIFESPAN)
@@ -129,9 +132,9 @@ def build_ammo_pickup(rebuild=True):
     # now hit four times: UsesAmmo is a pure read off Held, and pulling it while
     # Held is None is an Accessed None. The validity test has to be a gate the
     # second read sits behind, not a term beside it.
-    held_get = ed.add_get_member_variable_node("Held", WEAPON_COMP_CLASS_PATH)
+    held_get = ed.add_get_member_variable_node(WV.Held, WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(held_get, "self"))
-    held = out(held_get, "Held")
+    held = out(held_get, WV.Held)
     armed = _node(ed, FN_IS_VALID)
     _connect(held, _pin(armed, "Object"))
     has_gun = ed.add_branch_node()
@@ -141,8 +144,8 @@ def build_ammo_pickup(rebuild=True):
     # "Takes shells" is UsesAmmo AND NOT InfiniteReserve: the pistol has a
     # magazine now, but shells paid into a reserve that is never spent would
     # simply vanish.
-    held_uses, held_uses_n = _prop(ed, "UsesAmmo", held)
-    held_endless, held_endless_n = _prop(ed, "InfiniteReserve", held)
+    held_uses, held_uses_n = _prop(ed, IV.UsesAmmo, held)
+    held_endless, held_endless_n = _prop(ed, IV.InfiniteReserve, held)
     held_finite = _node(ed, FN_NOT)
     _connect(held_endless, _pin(held_finite, "A"))
     held_wants = _node(ed, FN_AND)
@@ -152,45 +155,45 @@ def build_ammo_pickup(rebuild=True):
     _connect(out(held_wants), _pin(takes_ammo, "Condition"))
     _connect(then(has_gun), _pin(takes_ammo, "execute"))
 
-    held_res, held_res_n = _prop(ed, "Reserve", held)
-    held_shells = ed.add_get_member_variable_node("Shells")
+    held_res, held_res_n = _prop(ed, IV.Reserve, held)
+    held_shells = ed.add_get_member_variable_node(AV.Shells)
     held_richer = _node(ed, FN_ADD_II)
     _connect(held_res, _pin(held_richer, "A"))
-    _connect(out(held_shells, "Shells"), _pin(held_richer, "B"))
-    held_store = ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH)
+    _connect(out(held_shells, AV.Shells), _pin(held_richer, "B"))
+    held_store = ed.add_set_member_variable_node(IV.Reserve, ITEM_CLASS_PATH)
     _connect(held, _pin(held_store, "self"))
-    _connect(out(held_richer), _pin(held_store, "Reserve"))
+    _connect(out(held_richer), _pin(held_store, IV.Reserve))
     _connect(then(takes_ammo), _pin(held_store, "execute"))
-    held_mark = ed.add_set_member_variable_node("Credited")
-    _set(held_mark, "Credited", "true")
+    held_mark = ed.add_set_member_variable_node(AV.Credited)
+    _set(held_mark, AV.Credited, "true")
     _connect(then(held_store), _pin(held_mark, "execute"))
 
     # --- fallback: the first carried weapon that takes ammunition ------------
     # Reached when nothing is held, or when what is held is the pistol. Walking
     # over shells with the pistol out still has to pay into something, or the
     # drop is lost for the sake of a rule about which gun is out.
-    inv = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
+    inv = ed.add_get_member_variable_node(WV.Inventory, WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(inv, "self"))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     loop
-    _connect(out(inv, "Inventory"), _loose_pin(loop, "Array"))
+    _connect(out(inv, WV.Inventory), _loose_pin(loop, "Array"))
     _connect(else_(has_gun), _loose_pin(loop, "Exec"))
     _connect(else_(takes_ammo), _loose_pin(loop, "Exec"))
     item = _loose_pin(loop, "ArrayElement", is_input=False)
 
-    uses, uses_n = _prop(ed, "UsesAmmo", item)
-    endless, endless_n = _prop(ed, "InfiniteReserve", item)
+    uses, uses_n = _prop(ed, IV.UsesAmmo, item)
+    endless, endless_n = _prop(ed, IV.InfiniteReserve, item)
     finite = _node(ed, FN_NOT)
     _connect(endless, _pin(finite, "A"))
     counts = _node(ed, FN_AND)
     _connect(uses, _pin(counts, "A"))
     _connect(out(finite), _pin(counts, "B"))
-    done_get = ed.add_get_member_variable_node("Credited")
+    done_get = ed.add_get_member_variable_node(AV.Credited)
     fresh = _node(ed, FN_NOT)
-    _connect(out(done_get, "Credited"), _pin(fresh, "A"))
+    _connect(out(done_get, AV.Credited), _pin(fresh, "A"))
     wants = _node(ed, FN_AND)
     _connect(out(counts), _pin(wants, "A"))
     _connect(out(fresh), _pin(wants, "B"))
@@ -199,27 +202,27 @@ def build_ammo_pickup(rebuild=True):
     _connect(out(wants), _pin(give, "Condition"))
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(give, "execute"))
 
-    item_res, item_res_n = _prop(ed, "Reserve", item)
-    shells = ed.add_get_member_variable_node("Shells")
+    item_res, item_res_n = _prop(ed, IV.Reserve, item)
+    shells = ed.add_get_member_variable_node(AV.Shells)
     richer = _node(ed, FN_ADD_II)
     _connect(item_res, _pin(richer, "A"))
-    _connect(out(shells, "Shells"), _pin(richer, "B"))
-    store = ed.add_set_member_variable_node("Reserve", ITEM_CLASS_PATH)
+    _connect(out(shells, AV.Shells), _pin(richer, "B"))
+    store = ed.add_set_member_variable_node(IV.Reserve, ITEM_CLASS_PATH)
     _connect(item, _pin(store, "self"))
-    _connect(out(richer), _pin(store, "Reserve"))
+    _connect(out(richer), _pin(store, IV.Reserve))
     _connect(then(give), _pin(store, "execute"))
 
-    mark = ed.add_set_member_variable_node("Credited")
-    _set(mark, "Credited", "true")
+    mark = ed.add_set_member_variable_node(AV.Credited)
+    _set(mark, AV.Credited, "true")
     _connect(then(store), _pin(mark, "execute"))
 
     # --- and only then vanish -----------------------------------------------
     # Gated on Credited rather than destroyed unconditionally at the Completed
     # pin: a player with no shotgun who walks over the shells has not picked
     # anything up, and the drop has to still be there when they find one.
-    took_get = ed.add_get_member_variable_node("Credited")
+    took_get = ed.add_get_member_variable_node(AV.Credited)
     took = ed.add_branch_node()
-    _connect(out(took_get, "Credited"), _pin(took, "Condition"))
+    _connect(out(took_get, AV.Credited), _pin(took, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(took, "execute"))
     _connect(then(held_mark), _pin(took, "execute"))
     gone = _node(ed, FN_DESTROY)
@@ -245,7 +248,7 @@ def build_ammo_pickup(rebuild=True):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_AmmoPickup failed to compile")
-    _apply_defaults(bp, {"Shells": AMMO_DROP_SHELLS, "Credited": False})
+    _apply_defaults(bp, {AV.Shells: AMMO_DROP_SHELLS, AV.Credited: False})
     _log(f"built {AMMO_BP_PATH} ({AMMO_DROP_SHELLS} shells, "
          f"{AMMO_PICKUP_RADIUS:.0f} cm, {AMMO_PICKUP_LIFETIME:.0f}s)")
     return bp

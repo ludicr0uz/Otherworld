@@ -37,11 +37,12 @@ from combat.throw_tuning import (
 from graphics_menu import tune_consts as TC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
 from graphics_menu.umg_consts import ROW_CARET, ROW_VALUE
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (TC.TUNE_OPEN_VAR, TC.TUNE_ROW_VAR,
                                        TC.TUNE_WEAPON_VAR, TC.TUNE_NUDGE_VAR,
-                                       TC.TUNE_SAVE_VAR, "MenuOpen")]
+                                       TC.TUNE_SAVE_VAR, MV.MenuOpen)]
 COLS = [s[0] for s in TUNE_STATS]
 N = len(TUNE_STATS)
 

@@ -20,6 +20,8 @@ from uebp.nodes.math import (
     FN_SUB_II)
 from uebp.nodes.palette import MACRO_FOR_EACH
 from uebp.nodes.system import FN_WRITE_SAVE
+from graphics_menu import hud_vars as MV
+from combat import settings_vars as SV
 
 
 def _emit_save(ed, settings_out, in_exec):
@@ -56,19 +58,19 @@ def _author_capture(ed, settings_out, in_execs, made):
     pc = keep(_node(ed, FN_GET_OWNING_PC))
     pc_out = out(pc)
 
-    armed = keep(ed.add_get_member_variable_node("Capturing"))
+    armed = keep(ed.add_get_member_variable_node(MV.Capturing))
     listening = keep(ed.add_branch_node())
-    _connect(out(armed, "Capturing"), _pin(listening, "Condition"))
+    _connect(out(armed, MV.Capturing), _pin(listening, "Condition"))
     for e in in_execs:
         _connect(e, _pin(listening, "execute"))
 
     # --- armed: the next key in KEY_POOL that goes down becomes the bind ------
-    pool = keep(ed.add_get_member_variable_node("KeyPool"))
+    pool = keep(ed.add_get_member_variable_node(MV.KeyPool))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
-    _connect(out(pool, "KeyPool"), _loose_pin(loop, "Array"))
+    _connect(out(pool, MV.KeyPool), _loose_pin(loop, "Array"))
     _connect(then(listening), _loose_pin(loop, "Exec"))
     candidate = _loose_pin(loop, "ArrayElement", is_input=False)
 
@@ -81,19 +83,19 @@ def _author_capture(ed, settings_out, in_execs, made):
 
     # Binds[MenuRow - FIRST_BIND_ROW]: the sliders sit above the binds, so the
     # subtraction is the whole of that mapping.
-    row = keep(ed.add_get_member_variable_node("MenuRow"))
+    row = keep(ed.add_get_member_variable_node(MV.MenuRow))
     slot = keep(_node(ed, FN_SUB_II))
-    _connect(out(row, "MenuRow"), _pin(slot, "A"))
+    _connect(out(row, MV.MenuRow), _pin(slot, "A"))
     _set(slot, "B", FIRST_BIND_ROW)
-    binds = keep(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH))
+    binds = keep(ed.add_get_member_variable_node(SV.Binds, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(binds, "self"))
     write = keep(_node(ed, FN_ARR_SET))
-    _connect(out(binds, "Binds"), _loose_pin(write, "TargetArray"))
+    _connect(out(binds, SV.Binds), _loose_pin(write, "TargetArray"))
     _connect(out(slot), _pin(write, "Index"))
     _connect(candidate, _loose_pin(write, "Item"))
     _connect(then(took), _pin(write, "execute"))
-    done = keep(ed.add_set_member_variable_node("Capturing"))
-    _set(done, "Capturing", "false")
+    done = keep(ed.add_set_member_variable_node(MV.Capturing))
+    _set(done, MV.Capturing, "false")
     _connect(then(write), _pin(done, "execute"))
     _, writer = _emit_save(ed, settings_out, then(done))
     made.append(writer)
@@ -119,7 +121,7 @@ def _author_capture(ed, settings_out, in_execs, made):
     left_out = or_wheel(ed, pc_out, out(left), WHEEL_LESS, made)
     right_out = or_wheel(ed, pc_out, out(right), WHEEL_MORE, made)
     valued = keep(_node(ed, FN_LESS_II))
-    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(valued, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node(MV.MenuRow)), MV.MenuRow), _pin(valued, "A"))
     _set(valued, "B", FIRST_BIND_ROW)
     stepped = keep(_node(ed, FN_AND))
     _connect(out(keep(ed.add_get_member_variable_node(CURSOR_ACCEPT_VAR)), CURSOR_ACCEPT_VAR),
@@ -150,27 +152,27 @@ def _author_capture(ed, settings_out, in_execs, made):
     # are its control, and arming a capture there would bind a key to a row
     # that has none -- so only rows from FIRST_BIND_ROW down arm one.
     leaving = keep(_node(ed, FN_EQ_II))
-    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(leaving, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node(MV.MenuRow)), MV.MenuRow), _pin(leaving, "A"))
     _set(leaving, "B", BACK_ROW)
     back = keep(ed.add_branch_node())
     _connect(out(leaving), _pin(back, "Condition"))
     _connect(then(go), _pin(back, "execute"))
 
-    to_title = keep(ed.add_set_member_variable_node("MenuPage"))
-    _set(to_title, "MenuPage", PAGE_TITLE)
+    to_title = keep(ed.add_set_member_variable_node(MV.MenuPage))
+    _set(to_title, MV.MenuPage, PAGE_TITLE)
     _connect(then(back), _pin(to_title, "execute"))
-    home = keep(ed.add_set_member_variable_node("MenuRow"))
-    _set(home, "MenuRow", 0)
+    home = keep(ed.add_set_member_variable_node(MV.MenuRow))
+    _set(home, MV.MenuRow, 0)
     _connect(then(to_title), _pin(home, "execute"))
 
     bindable = keep(_node(ed, FN_GE_II))
-    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(bindable, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node(MV.MenuRow)), MV.MenuRow), _pin(bindable, "A"))
     _set(bindable, "B", FIRST_BIND_ROW)
     arming = keep(ed.add_branch_node())
     _connect(out(bindable), _pin(arming, "Condition"))
     _connect(else_(back), _pin(arming, "execute"))
-    arm = keep(ed.add_set_member_variable_node("Capturing"))
-    _set(arm, "Capturing", "true")
+    arm = keep(ed.add_set_member_variable_node(MV.Capturing))
+    _set(arm, MV.Capturing, "true")
     _connect(then(arming), _pin(arm, "execute"))
 
 
@@ -187,7 +189,7 @@ def _emit_nudge(ed, slider, row, settings_out, either_out, right_out, in_execs, 
         return n
 
     here = keep(_node(ed, FN_EQ_II))
-    _connect(out(keep(ed.add_get_member_variable_node("MenuRow")), "MenuRow"), _pin(here, "A"))
+    _connect(out(keep(ed.add_get_member_variable_node(MV.MenuRow)), MV.MenuRow), _pin(here, "A"))
     _set(here, "B", row)
     adjusting = keep(_node(ed, FN_AND))
     _connect(either_out, _pin(adjusting, "A"))

@@ -52,12 +52,13 @@ from combat.seat_tuning import (
 from combat import weapon_models as M
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
             (GAME_MODE_BP_PATH, DEBUG_MODE_VAR)] + [
     (WEAPON_COMP_BP_PATH, v) for v in
-    ("EquippedIndex", "NeedsRefresh", SIGHTS_FORCED_VAR)]
+    (WV.EquippedIndex, WV.NeedsRefresh, SIGHTS_FORCED_VAR)]
 ML = unreal.MathLibrary
 GS = unreal.GameplayStatics
 # (class, label, the view's pitch when the key goes down)

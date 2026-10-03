@@ -40,10 +40,11 @@ from combat.weapon_component.throw_flight import THROWN_VAR
 from probes.probe_chop_tree import CLEAR_CM, _flat, _items, _trace, _trees
 from probes.probe_hot_blade import _of, _wanderers
 from probes.probe_knife import _file
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, v) for v in
             (THROW_FORCED_VAR, THROW_CLICK_FORCED_VAR, INTERACT_FORCED_VAR,
-             "EquippedIndex", "NeedsRefresh")]
+             WV.EquippedIndex, WV.NeedsRefresh)]
 
 KNIFE, AXE = "BP_Knife_C", "BP_Axe_C"
 THROW_FROM_CM = 400.0     # the player's middle, from the bark

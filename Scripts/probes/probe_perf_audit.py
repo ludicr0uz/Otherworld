@@ -26,9 +26,11 @@ from graphics_menu import gfx_tune_consts as GC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
 from world.world_config import hour_to_clock
+from world import day_night_vars as DV
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, "Quality"), (DAY_NIGHT_BP_PATH, "Clock")]
+WRITABLE = [(HUD_BP_PATH, MV.Quality), (DAY_NIGHT_BP_PATH, DV.Clock)]
 SL = unreal.SystemLibrary
 HISM = unreal.HierarchicalInstancedStaticMeshComponent
 OUT_DIR = os.path.join(unreal.Paths.convert_relative_path_to_full(

@@ -33,13 +33,14 @@ from combat.weapon_component.punch import (
 )
 from uebp.nodes.math import FN_GE_FF
 from uebp.nodes.system import FN_TIME_SECONDS
+from combat import item_vars as IV
 
 KNIFE_ANIM_VAR = "KnifeAnim"
 KNIFE_QUEUED_VAR = "KnifeQueued"
 KNIFE_PENDING_VAR = "KnifePending"
 NEXT_KNIFE_VAR = "NextKnifeTime"
 KNIFE_DUE_VAR = "KnifeDueTime"
-MELEE_VAR = "Melee"
+MELEE_VAR = IV.Melee
 
 KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,
                NEXT_KNIFE_VAR, KNIFE_DUE_VAR, COMBAT.knife_interval_s,

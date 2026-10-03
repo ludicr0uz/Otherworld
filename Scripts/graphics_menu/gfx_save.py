@@ -45,6 +45,7 @@ from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_SET
 from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MAX_II, FN_MIN_II
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_GFX_SAVE
 from uebp.nodes.system import FN_CREATE_SAVE, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_WRITE_SAVE
+from graphics_menu import hud_vars as MV
 
 
 def build_graphics_savegame():
@@ -112,7 +113,7 @@ def author_load_graphics(ed, in_execs):
                 A=_field(ed, save, GFX_SAVE_QUALITY_FIELD, made),
                 B=len(PRESET_LABELS) - 1)
     held = _call(ed, FN_MAX_II, made, A=out(top), B=0)
-    picked = put(ed, "Quality", out(held), [out(loop, "Completed")], made)
+    picked = put(ed, MV.Quality, out(held), [out(loop, "Completed")], made)
     ed.add_comment_to_nodes(
         f"The player's graphics, from slot {GFX_SAVE_SLOT!r}: the preset they picked "
         f"and their Custom row, over the built defaults. Low, Medium and High stay "

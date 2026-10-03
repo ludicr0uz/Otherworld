@@ -37,6 +37,7 @@ from uebp.nodes.array import FN_ARR_GET
 from uebp.nodes.math import FN_DIV_FF, FN_MUL_FF
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN
+from combat.weapon_component import vars as WV
 
 # What each row writes on the component, and how: a speed is metres to
 # centimetres, a time is the stamina rate that crosses the bar in it.
@@ -88,7 +89,7 @@ def _author_apply(ed, in_execs, made):
         if kind == SPEED:
             value = out(_call(ed, FN_MUL_FF, made, A=cell, B=CM_PER_M))
         else:
-            full = _get(ed, "MaxStamina", made, WEAPON_COMP_CLASS_PATH, wc)
+            full = _get(ed, WV.MaxStamina, made, WEAPON_COMP_CLASS_PATH, wc)
             value = out(_call(ed, FN_DIV_FF, made, A=full, B=cell))
         n = ed.add_set_member_variable_node(var, WEAPON_COMP_CLASS_PATH)
         made.append(n)

@@ -41,6 +41,8 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_VV, FN_AND, FN_CLAMP, FN_GE_FF, FN_MUL_VF, FN_NOT, FN_SUB_FF, INF)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_SPHERE_TRACE, FN_TIME_SECONDS
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
 PUNCH_ANIM_VAR = "PunchAnim"
 PUNCH_QUEUED_VAR = "PunchQueued"
@@ -144,7 +146,7 @@ def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
     step = _stamp(ed, strike.due_var, strike.impact_s, step)
     step = _set_bool(ed, strike.pending_var, True, step)
 
-    mesh = _get(ed, "OwnerMesh")
+    mesh = _get(ed, WV.OwnerMesh)
     anim = _node(ed, FN_ANIM_INSTANCE)
     _connect(mesh, _pin(anim, "self"))
     play = _node(ed, FN_PLAY_SLOT)
@@ -228,10 +230,10 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     _connect(then(hit), _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    get_h = ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH)
+    get_h = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(get_h, "self"))
     sub = _node(ed, FN_SUB_FF)
-    _connect(out(get_h, "Health"), _pin(sub, "A"))
+    _connect(out(get_h, HV.Health), _pin(sub, "A"))
     met = (then(cast),)
     if damage:
         amount, met = damage(ed, _loose_pin(brk, "HitActor", is_input=False), met[0])
@@ -242,9 +244,9 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     _connect(out(sub), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", INF)
-    set_h = ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH)
+    set_h = ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(set_h, "self"))
-    _connect(out(clamp), _pin(set_h, "Health"))
+    _connect(out(clamp), _pin(set_h, HV.Health))
     for pin in met:
         _connect(pin, _pin(set_h, "execute"))
 

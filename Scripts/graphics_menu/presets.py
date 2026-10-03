@@ -13,6 +13,7 @@ from collections import namedtuple
 
 from uebp.graph import _connect, _pin, _set
 from graphics_menu.gfx_stats import PRESET_LABELS, default_preset
+from graphics_menu import hud_vars as MV
 
 # One preset, in the order the GRAPHICS SETTINGS tab's preset row steps through.
 Preset = namedtuple("Preset", "label")
@@ -31,7 +32,7 @@ def emit_apply(ed, index, in_exec):
     from its pick (gfx_tune_tick.py).
     Returns the nodes it made, for the caller to wrap in a comment.
     """
-    set_q = ed.add_set_member_variable_node("Quality")
-    _set(set_q, "Quality", index)
+    set_q = ed.add_set_member_variable_node(MV.Quality)
+    _set(set_q, MV.Quality, index)
     _connect(in_exec, _pin(set_q, "execute"))
     return [set_q]

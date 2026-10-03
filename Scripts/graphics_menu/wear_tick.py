@@ -43,6 +43,7 @@ from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_LESS_II, FN_MAX_II, FN_MIN_II, FN_NEQ_BB, FN_NOT, FN_SUB_II)
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN
+from graphics_menu import hud_vars as MV
 
 WEAR_STILL_VAR = "WearStill"
 
@@ -67,7 +68,7 @@ def _pressed(ed, pc_out, key, made):
 def _author_keys(ed, pc_out, in_execs, made):
     """I, and with the panel open Up/Down/Enter. Returns the exec tails."""
     free, busy = _branch(ed, out(_call(ed, FN_NOT, made,
-                                        A=_get(ed, "MenuOpen", made))),
+                                        A=_get(ed, MV.MenuOpen, made))),
                          in_execs, made)
     key, no_key = _branch(ed, _pressed(ed, pc_out, WEAR_KEY, made), [free], made)
     flip = _call(ed, FN_NOT, made, A=_get(ed, WEAR_OPEN_VAR, made))

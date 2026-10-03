@@ -19,9 +19,11 @@ from combat.tuning import COMBAT
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_PENDING_VAR, PUNCH_QUEUED_VAR,
 )
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, "Held"), (WEAPON_COMP_BP_PATH, PUNCH_QUEUED_VAR),
-            (HEALTH_BP_PATH, "Health")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.Held), (WEAPON_COMP_BP_PATH, PUNCH_QUEUED_VAR),
+            (HEALTH_BP_PATH, HV.Health)]
 
 IN_FRONT_CM = 90.0    # capsule centre to capsule centre: well inside the reach
 

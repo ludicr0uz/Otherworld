@@ -26,6 +26,9 @@ from uebp.nodes.math import (
     FN_SUB_VV, INF)
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
+from uebp import props as EP
+from combat import health_vars as HV
+from npc import controller_vars as NV
 
 
 # An object pin holds the full object path (package + object name), and it
@@ -129,10 +132,10 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     # --- has this NPC's cooldown expired? ------------------------------------
     now = keep(_node(ed, FN_TIME_SECONDS))
     now_out = out(now)
-    next_at = keep(ed.add_get_member_variable_node("NextAttackTime"))
+    next_at = keep(ed.add_get_member_variable_node(NV.NextAttackTime))
     ready = keep(_node(ed, FN_GE_FF))
     _connect(now_out, _pin(ready, "A"))
-    _connect(out(next_at, "NextAttackTime"), _pin(ready, "B"))
+    _connect(out(next_at, NV.NextAttackTime), _pin(ready, "B"))
 
     both = keep(_node(ed, FN_AND))
     _connect(out(in_range), _pin(both, "A"))
@@ -151,8 +154,8 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     gap_s, gap_out = tuned(ed, "melee_interval_s")
     keep(gap_s)
     _connect(gap_out, _pin(when, "B"))
-    arm = keep(ed.add_set_member_variable_node("NextAttackTime"))
-    _connect(out(when), _pin(arm, "NextAttackTime"))
+    arm = keep(ed.add_set_member_variable_node(NV.NextAttackTime))
+    _connect(out(when), _pin(arm, NV.NextAttackTime))
     _connect(then(swing), _pin(arm, "execute"))
 
     # --- play the swing ------------------------------------------------------
@@ -164,7 +167,7 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     _connect(then(arm), _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    mesh = keep(ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character"))
+    mesh = keep(ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character"))
     _connect(char_out, _pin(mesh, "self"))
 
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
@@ -203,19 +206,19 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     # Its nodes stay out of `made`: they have their own comment box.
     _, guarded = _author_block_check(ed, then(hit), player_out, bearing_out)
 
-    read = keep(ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH))
+    read = keep(ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(read, "self"))
     hurt = keep(_node(ed, FN_SUB_FF))
-    _connect(out(read, "Health"), _pin(hurt, "A"))
+    _connect(out(read, HV.Health), _pin(hurt, "A"))
     dealt = keep(ed.add_get_member_variable_node(HIT_DAMAGE_VAR))
     _connect(out(dealt, HIT_DAMAGE_VAR), _pin(hurt, "B"))
     floor = keep(_node(ed, FN_CLAMP))
     _connect(out(hurt), _pin(floor, "Value"))
     _set(floor, "Min", 0.0)
     _set(floor, "Max", INF)
-    write = keep(ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH))
+    write = keep(ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
     _connect(as_health, _pin(write, "self"))
-    _connect(out(floor), _pin(write, "Health"))
+    _connect(out(floor), _pin(write, HV.Health))
     for tail in guarded:
         _connect(tail, _pin(write, "execute"))
 

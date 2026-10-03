@@ -26,6 +26,7 @@ from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_find import put
 from uebp.nodes.actor import FN_IGNORE_MOVE
 from uebp.nodes.math import FN_NEQ_BB
+from graphics_menu import hud_vars as MV
 
 MENU_STILL_VAR = "MenuStill"
 
@@ -34,11 +35,11 @@ def author_menu_still(ed, pc_out, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
     made = []
     changed = _call(ed, FN_NEQ_BB, made,
-                    A=_get(ed, "MenuOpen", made),
+                    A=_get(ed, MV.MenuOpen, made),
                     B=_get(ed, MENU_STILL_VAR, made))
     edge, same = _branch(ed, out(changed), in_execs, made)
-    flow = put(ed, MENU_STILL_VAR, _get(ed, "MenuOpen", made), [edge], made)
-    still = _call(ed, FN_IGNORE_MOVE, made, self=pc_out, bNewMoveInput=_get(ed, "MenuOpen", made))
+    flow = put(ed, MENU_STILL_VAR, _get(ed, MV.MenuOpen, made), [edge], made)
+    still = _call(ed, FN_IGNORE_MOVE, made, self=pc_out, bNewMoveInput=_get(ed, MV.MenuOpen, made))
     _connect(flow, _pin(still, "execute"))
     ed.add_comment_to_nodes(
         "The M panel holds the player still: the controller ignores move input "

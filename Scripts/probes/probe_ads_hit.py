@@ -34,9 +34,11 @@ from combat.seat_tuning import LOOK_VAR, SEAT_VAR
 from combat.tuning import COMBAT
 from combat.weapon_component.common import AIM_BLEND
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(HEALTH_BP_PATH, "Health"),
-            (WEAPON_COMP_BP_PATH, "SightBlend"),
+WRITABLE = [(HEALTH_BP_PATH, HV.Health),
+            (WEAPON_COMP_BP_PATH, WV.SightBlend),
             (WEAPON_COMP_BP_PATH, SEAT_VAR),
             (WEAPON_COMP_BP_PATH, LOOK_VAR),
             (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]

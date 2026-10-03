@@ -4,6 +4,8 @@ preset. build_graphics_menu.py is the entry point and still owns BeginPlay,
 Tick, the DrawHUD skeleton and the wanderers' canvas bars.
 
 The screens (widget trees, authored through the UMGToolSet plugin)
+  hud_vars        BP_GraphicsMenuHUD's own member variables, named once: name,
+                  pin type, default (uebp/vars.py)
   umg_consts      screen paths, the widget names the HUD writes, labels, layout,
                   palette -- constants only
   umg_author      building a Widget Blueprint's tree from Python: add, style, slot

@@ -38,6 +38,7 @@ from combat.weapon_component.punch import _and, _get, _stamp
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_PLAY_SLOT
 from uebp.nodes.math import FN_EQ_OO, FN_GE_FF
 from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
+from combat.weapon_component import vars as WV
 
 THROW_ANIM_VAR = "ThrowAnim"          # the skin's throw clip, or None
 THROW_WINDING_VAR = "ThrowWinding"    # the item being thrown, until it leaves
@@ -67,7 +68,7 @@ def _author_throw_windup(ed, held, started, exec_ins):
     _connect(then(keep), _pin(clip, "execute"))
     step = _stamp(ed, THROW_DUE_VAR, THROW_WINDUP_S, then(clip))
     anim = _node(ed, FN_ANIM_INSTANCE)
-    _connect(_get(ed, "OwnerMesh"), _pin(anim, "self"))
+    _connect(_get(ed, WV.OwnerMesh), _pin(anim, "self"))
     play = _node(ed, FN_PLAY_SLOT)
     _connect(out(anim), _pin(play, "self"))
     _connect(_get(ed, THROW_ANIM_VAR), _pin(play, "Asset"))

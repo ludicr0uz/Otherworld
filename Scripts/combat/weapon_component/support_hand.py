@@ -25,6 +25,7 @@ from combat.support_hand import SUPPORT_HAND_VAR, SUPPORT_POINT_VAR
 from combat.weapon_component.pose_weights import HELD_SUPPORT_POINT
 from combat.weapon_component.sight_pitch import _anim_class_path
 from uebp.nodes.actor import FN_ANIM_INSTANCE
+from combat.weapon_component import vars as WV
 
 
 def _author_support_hand(ed, exec_ins):
@@ -40,9 +41,9 @@ def _author_support_hand(ed, exec_ins):
         made.append(n)
         return n
 
-    mesh = keep(ed.add_get_member_variable_node("OwnerMesh"))
+    mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
-    _connect(out(mesh, "OwnerMesh"), _pin(anim, "self"))
+    _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     cast = keep(_palette(ed, "Utilities|Casting|CastTo" + anim_class.rsplit(".", 1)[1][:-2]))
     _connect(out(anim), _pin(cast, "Object"))
     for e in exec_ins:

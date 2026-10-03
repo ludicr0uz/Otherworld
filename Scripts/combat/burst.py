@@ -13,8 +13,8 @@ import unreal
 from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _add_component, _assets, _component_object, _connect, _create_blueprint,
-    _declare, _drop_components, _events, _float_type, _loose_pin, _must_load, _node, _pin,
-    _root_handle, _rot, _set, _struct_type, _vec, out, then)
+    _drop_components, _events, _loose_pin, _must_load, _node, _pin, _root_handle, _rot, _set,
+    _vec, out, then)
 from uebp.layout import arrange
 from uebp.nodes.actor import (
     FN_COMP_REL_XFORM, FN_COMP_SET_REL_LOC, FN_COMP_SET_SCALE, FN_GET_COMPONENTS,
@@ -24,6 +24,8 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_VV, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_CLAMP, FN_DIV_FF, FN_EXP,
     FN_INV_XFORM_DIR, FN_MUL_FF, FN_MUL_VF, FN_SUB_FF)
 from uebp.nodes.palette import MACRO_FOR_EACH
+from uebp.vars import declare
+from combat import burst_vars as BV
 
 
 # The velocity of each piece is baked into its relative *location*, divided by
@@ -135,19 +137,7 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
 
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, begin = _events(ed, rebuild)
-    _declare(ed, "Age", _float_type())
-    _declare(ed, "Blobs", BEL.get_array_type(
-        BEL.get_object_reference_type(unreal.StaticMeshComponent.static_class())))
-    # Launch velocity and untouched size, one entry per component, filled in the
-    # same loop that fills Blobs -- so the three arrays are in step by
-    # construction and not by an assumption about component ordering.
-    _declare(ed, "Velocity", BEL.get_array_type(
-        _struct_type(unreal.Vector.static_struct())))
-    _declare(ed, "Size", BEL.get_array_type(_float_type()))
-    # Gravity, rotated into the actor's own frame once. The actor is spawned
-    # facing the hit normal and never turns, so this cannot go stale, and doing
-    # it here keeps a transform inverse out of the per-frame path.
-    _declare(ed, "Fall", _struct_type(unreal.Vector.static_struct()))
+    declare(ed, BV.TABLE)
 
     # --- BeginPlay: read each droplet's velocity back off the component ------
     # Pure, not impure: UHT promotes a const BlueprintCallable to BlueprintPure,
@@ -170,12 +160,12 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     _connect(out(rel), _pin(parts, "InTransform"))
 
     keep_blob = _node(ed, FN_ARR_ADD)
-    _connect(out(ed.add_get_member_variable_node("Blobs"), "Blobs"), _pin(keep_blob, "TargetArray"))
+    _connect(out(ed.add_get_member_variable_node(BV.Blobs), BV.Blobs), _pin(keep_blob, "TargetArray"))
     _connect(blob, _pin(keep_blob, "NewItem"))
     _connect(_loose_pin(gather, "LoopBody", is_input=False), _pin(keep_blob, "execute"))
 
     keep_vel = _node(ed, FN_ARR_ADD)
-    _connect(out(ed.add_get_member_variable_node("Velocity"), "Velocity"),
+    _connect(out(ed.add_get_member_variable_node(BV.Velocity), BV.Velocity),
              _pin(keep_vel, "TargetArray"))
     _connect(_loose_pin(parts, "Location", is_input=False), _pin(keep_vel, "NewItem"))
     _connect(then(keep_blob), _pin(keep_vel, "execute"))
@@ -184,7 +174,7 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     axes = _node(ed, FN_BREAK_VECTOR)
     _connect(_loose_pin(parts, "Scale", is_input=False), _pin(axes, "InVec"))
     keep_size = _node(ed, FN_ARR_ADD)
-    _connect(out(ed.add_get_member_variable_node("Size"), "Size"), _pin(keep_size, "TargetArray"))
+    _connect(out(ed.add_get_member_variable_node(BV.Size), BV.Size), _pin(keep_size, "TargetArray"))
     _connect(out(axes, "X"), _pin(keep_size, "NewItem"))
     _connect(then(keep_vel), _pin(keep_size, "execute"))
 
@@ -192,8 +182,8 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     local_g = _node(ed, FN_INV_XFORM_DIR)
     _connect(out(here), _pin(local_g, "T"))
     _connect(_vec(ed, 0.0, 0.0, -gravity), _pin(local_g, "Direction"))
-    pin_fall = ed.add_set_member_variable_node("Fall")
-    _connect(out(local_g), _pin(pin_fall, "Fall"))
+    pin_fall = ed.add_set_member_variable_node(BV.Fall)
+    _connect(out(local_g), _pin(pin_fall, BV.Fall))
     _connect(_loose_pin(gather, "Completed", is_input=False), _pin(pin_fall, "execute"))
 
     life = _node(ed, FN_LIFESPAN)
@@ -201,19 +191,19 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     _connect(then(pin_fall), _pin(life, "execute"))
 
     # --- Tick: two scalars for the whole burst, then one pass over it --------
-    age_get = ed.add_get_member_variable_node("Age")
+    age_get = ed.add_get_member_variable_node(BV.Age)
     add = _node(ed, FN_ADD_FF)
-    _connect(out(age_get, "Age"), _pin(add, "A"))
+    _connect(out(age_get, BV.Age), _pin(add, "A"))
     _connect(out(tick, "DeltaSeconds"), _pin(add, "B"))
-    age_set = ed.add_set_member_variable_node("Age")
-    _connect(out(add), _pin(age_set, "Age"))
+    age_set = ed.add_set_member_variable_node(BV.Age)
+    _connect(out(add), _pin(age_set, BV.Age))
     _connect(then(tick), _pin(age_set, "execute"))
     # Read the *stored* age from here on. The add is pure, so every re-read of
     # its output would recompute it -- harmless while the inputs hold still, but
     # the stored value is the one the next frame accumulates from, and the two
     # should not be allowed to drift apart.
-    age = ed.add_get_member_variable_node("Age")
-    age_out = out(age, "Age")
+    age = ed.add_get_member_variable_node(BV.Age)
+    age_out = out(age, BV.Age)
 
     # A = (1 - e^(-k t)) / k, written as (e^(-k t) - 1) / -k. Algebraically the
     # same; the difference is that every constant then lands on a B pin, and
@@ -263,27 +253,27 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     _set(fade, "Max", 1.0)
     fade_out = out(fade)
 
-    blobs_get = ed.add_get_member_variable_node("Blobs")
+    blobs_get = ed.add_get_member_variable_node(BV.Blobs)
     fly = ed.add_macro_node(MACRO_FOR_EACH)
     if not fly:
         raise RuntimeError("could not create the ForEachLoop macro node")
     fly
-    _connect(out(blobs_get, "Blobs"), _loose_pin(fly, "Array"))
+    _connect(out(blobs_get, BV.Blobs), _loose_pin(fly, "Array"))
     _connect(then(age_set), _loose_pin(fly, "Exec"))
     each = _loose_pin(fly, "ArrayElement", is_input=False)
     index = _loose_pin(fly, "ArrayIndex", is_input=False)
 
-    vel_arr = ed.add_get_member_variable_node("Velocity")
+    vel_arr = ed.add_get_member_variable_node(BV.Velocity)
     vel = _node(ed, FN_ARR_GET)
-    _connect(out(vel_arr, "Velocity"), _pin(vel, "TargetArray"))
+    _connect(out(vel_arr, BV.Velocity), _pin(vel, "TargetArray"))
     _connect(index, _pin(vel, "Index"))
     thrown = _node(ed, FN_MUL_VF)
     _connect(out(vel, "Item"), _pin(thrown, "A"))
     _connect(a_cm_out, _pin(thrown, "B"))
 
-    fall_get = ed.add_get_member_variable_node("Fall")
+    fall_get = ed.add_get_member_variable_node(BV.Fall)
     dropped = _node(ed, FN_MUL_VF)
-    _connect(out(fall_get, "Fall"), _pin(dropped, "A"))
+    _connect(out(fall_get, BV.Fall), _pin(dropped, "A"))
     _connect(b_out, _pin(dropped, "B"))
 
     offset = _node(ed, FN_ADD_VV)
@@ -299,9 +289,9 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     _set(put, "bTeleport", "true")
     _connect(_loose_pin(fly, "LoopBody", is_input=False), _pin(put, "execute"))
 
-    size_arr = ed.add_get_member_variable_node("Size")
+    size_arr = ed.add_get_member_variable_node(BV.Size)
     born = _node(ed, FN_ARR_GET)
-    _connect(out(size_arr, "Size"), _pin(born, "TargetArray"))
+    _connect(out(size_arr, BV.Size), _pin(born, "TargetArray"))
     _connect(index, _pin(born, "Index"))
     now_size = _node(ed, FN_MUL_FF)
     _connect(out(born, "Item"), _pin(now_size, "A"))

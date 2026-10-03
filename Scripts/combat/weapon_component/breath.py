@@ -42,6 +42,7 @@ from combat.weapon_component.common import _prop
 from uebp.nodes.actor import FN_IS_KEY_DOWN
 from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_CLAMP, FN_INTERP_FF, FN_LESS_FF, FN_LE_FF, FN_NOT, FN_OR)
+from combat.weapon_component import vars as WV
 
 
 def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins):
@@ -91,7 +92,7 @@ def _author_hold_breath(ed, tick, pc_out, held, armed_out, key_pin, exec_ins):
     down = call(FN_IS_KEY_DOWN, self=pc_out, Key=key_pin)
     key = call(FN_OR, A=out(down), B=get(BREATH_FORCED_VAR))
     calm = call(FN_NOT, A=get(WINDED_VAR))
-    sighted = call(FN_AND, A=get("SightAiming"), B=out(calm))
+    sighted = call(FN_AND, A=get(WV.SightAiming), B=out(calm))
     holding = call(FN_AND, A=out(key), B=out(sighted))
     flow = store(BREATH_HELD_VAR, out(holding), flow)
 

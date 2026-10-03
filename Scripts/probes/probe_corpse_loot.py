@@ -45,9 +45,11 @@ from loot.consts import (
     LOOT_CHANCES_VAR, LOOT_ICONS_VAR, LOOT_NAMES_VAR, LOOT_TABLE_VAR, LOOT_TINTS_VAR,
     LOOT_VAR,
 )
+from combat import health_vars as HV
+from combat.game_state import DAMAGED_BY_PLAYER_VAR
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HEALTH_BP_PATH, "Health"), (HEALTH_BP_PATH, "DamagedByPlayer"),
+WRITABLE = [(HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR),
             (HEALTH_BP_PATH, LOOT_CHANCES_VAR),
             (HUD_BP_PATH, LOOT_OPEN_VAR), (HUD_BP_PATH, LOOT_TAKE_VAR)]
 CANTEEN = "BP_WaterCanteen_C"

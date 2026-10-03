@@ -48,6 +48,7 @@ from combat.throw_tuning import (
 from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
+from combat import item_vars as IV
 
 # asset_pipeline/import_quaternius.py imports every Survival Pack FBX here.
 AXE_MESH = "/Game/Sourced/Quaternius/Survival/SM_Axe"
@@ -118,8 +119,8 @@ def build_axe(item_bp):
     grip_rot = _grip_rotation(aim)
     lodge = axe_lodge()
     _apply_defaults(bp, {
-        "DisplayName": AXE_DISPLAY,
-        "Melee": True,
+        IV.DisplayName: AXE_DISPLAY,
+        IV.Melee: True,
         WEAPON_KIND_VAR: MELEE_KIND,
         # Thrown hard and flat, spinning forward, edge first.
         **MELEE_THROW,
@@ -134,32 +135,32 @@ def build_axe(item_bp):
         COOL_VAR: 0.0,
         HEAT_MATERIAL_VAR: build_hot_instance(
             MAT_HOT_AXE, HOT_AXIS, HOT_START_CM / AXE_SCALE, HOT_FADE_CM / AXE_SCALE),
-        "Consumable": False,
-        "Dropped": False,
-        "UsesAmmo": False,
-        "Automatic": False,
+        IV.Consumable: False,
+        IV.Dropped: False,
+        IV.UsesAmmo: False,
+        IV.Automatic: False,
         # For the record, as on the knife: the blow is the knife's Strike and
         # uses COMBAT.knife_*, whichever Melee item is in hand.
-        "Damage": float(COMBAT.knife_damage),
-        "PelletCount": 0,
-        "WeaponRange": float(COMBAT.knife_reach_cm),
-        "MagazineSize": 0,
-        "Loaded": 0,
-        "Reserve": 0,
-        "InfiniteReserve": False,
-        "NextFireTime": 0.0,
-        "MuzzleOffset": unreal.Vector(0.0, 0.0, 0.0),
-        "GripLocation": unreal.Vector(*_grip_location(aim, grip_rot, axe_outline())),
-        "GripRotation": grip_rot,
-        "SlotColor": unreal.LinearColor(*ICON_TINT, 1.0),
+        IV.Damage: float(COMBAT.knife_damage),
+        IV.PelletCount: 0,
+        IV.WeaponRange: float(COMBAT.knife_reach_cm),
+        IV.MagazineSize: 0,
+        IV.Loaded: 0,
+        IV.Reserve: 0,
+        IV.InfiniteReserve: False,
+        IV.NextFireTime: 0.0,
+        IV.MuzzleOffset: unreal.Vector(0.0, 0.0, 0.0),
+        IV.GripLocation: unreal.Vector(*_grip_location(aim, grip_rot, axe_outline())),
+        IV.GripRotation: grip_rot,
+        IV.SlotColor: unreal.LinearColor(*ICON_TINT, 1.0),
         # Not 1.0, for the knife's reason: right-click still aims.
-        "AdsZoom": float(COMBAT.ads_zoom_irons),
-        "Scoped": False,
-        "RecoilPitch": 0.0,
-        "ShotVolume": 0.0,
-        "TwoHanded": False,
-        "Icon": _weapon_icon(AXE_DISPLAY),
-        "AimPose": _must_load(aim),
+        IV.AdsZoom: float(COMBAT.ads_zoom_irons),
+        IV.Scoped: False,
+        IV.RecoilPitch: 0.0,
+        IV.ShotVolume: 0.0,
+        IV.TwoHanded: False,
+        IV.Icon: _weapon_icon(AXE_DISPLAY),
+        IV.AimPose: _must_load(aim),
     })
     _log(f"built {AXE_BP_PATH} ({AXE_MESH.rsplit('/', 1)[-1]} at {AXE_SCALE}, "
          f"swung as the knife is)")

@@ -13,8 +13,10 @@ import time
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from graphics_menu import umg_consts as C
 from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
+from combat import health_vars as HV
+from survival import component_vars as UV
 
-WRITABLE = [(HEALTH_BP_PATH, "Health"), (SURVIVAL_BP_PATH, "Hunger")]
+WRITABLE = [(HEALTH_BP_PATH, HV.Health), (SURVIVAL_BP_PATH, UV.Hunger)]
 
 
 def _sample(hud, ui, groups, seconds, seen):

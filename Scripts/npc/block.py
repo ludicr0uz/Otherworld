@@ -20,6 +20,7 @@ from npc.tuned import tuned
 from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_GET_COMP
 from uebp.nodes.math import FN_AND, FN_CLAMP, FN_DOT_VV, FN_GE_FF, FN_MUL_FF, FN_SUB_FF, INF
 from uebp.nodes.palette import NODE_CAST_WEAPON
+from combat.weapon_component import vars as WV
 
 # Dot(player forward, unit bearing to the swinger) at the edge of the guard.
 BLOCK_MIN_DOT = math.cos(math.radians(COMBAT.block_half_angle_deg))
@@ -69,7 +70,7 @@ def _author_block_check(ed, exec_in, player_out, bearing_out):
     _connect(exec_in, _pin(cast, "execute"))
     as_wc = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
 
-    guard = keep(ed.add_get_member_variable_node("Blocking", WEAPON_COMP_CLASS_PATH))
+    guard = keep(ed.add_get_member_variable_node(WV.Blocking, WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(guard, "self"))
     facing = keep(_node(ed, FN_ACTOR_FORWARD))
     _connect(player_out, _pin(facing, "self"))
@@ -80,25 +81,25 @@ def _author_block_check(ed, exec_in, player_out, bearing_out):
     _connect(out(dot), _pin(in_front, "A"))
     _set(in_front, "B", round(BLOCK_MIN_DOT, 4))
     both = keep(_node(ed, FN_AND))
-    _connect(out(guard, "Blocking"), _pin(both, "A"))
+    _connect(out(guard, WV.Blocking), _pin(both, "A"))
     _connect(out(in_front), _pin(both, "B"))
 
     blocked = keep(ed.add_branch_node())
     _connect(out(both), _pin(blocked, "Condition"))
     _connect(then(cast), _pin(blocked, "execute"))
 
-    stamina = keep(ed.add_get_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH))
+    stamina = keep(ed.add_get_member_variable_node(WV.Stamina, WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(stamina, "self"))
     spent = keep(_node(ed, FN_SUB_FF))
-    _connect(out(stamina, "Stamina"), _pin(spent, "A"))
+    _connect(out(stamina, WV.Stamina), _pin(spent, "A"))
     _set(spent, "B", COMBAT.block_stamina_per_hit)
     floor = keep(_node(ed, FN_CLAMP))
     _connect(out(spent), _pin(floor, "Value"))
     _set(floor, "Min", 0.0)
     _set(floor, "Max", INF)
-    pay = keep(ed.add_set_member_variable_node("Stamina", WEAPON_COMP_CLASS_PATH))
+    pay = keep(ed.add_set_member_variable_node(WV.Stamina, WEAPON_COMP_CLASS_PATH))
     _connect(as_wc, _pin(pay, "self"))
-    _connect(out(floor), _pin(pay, "Stamina"))
+    _connect(out(floor), _pin(pay, WV.Stamina))
     _connect(then(blocked), _pin(pay, "execute"))
 
     soft = keep(ed.add_set_member_variable_node(HIT_DAMAGE_VAR))

@@ -19,13 +19,16 @@ from combat.paths import (
 from graphics_menu import umg_consts as C
 from graphics_menu.settings_rows import DIFFICULTY_LABELS, DIFFICULTY_ROW, FIRST_BIND_ROW
 from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
+from combat import health_vars as HV
+from graphics_menu import hud_vars as MV
+from survival import component_vars as UV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, v) for v in ("MenuOpen", C.GAME_STARTED_VAR, "MenuPage",
-                                       "MenuRow", C.PAUSE_ROW_VAR)]
+WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, MV.MenuPage,
+                                       MV.MenuRow, C.PAUSE_ROW_VAR)]
 WRITABLE += [(GAME_MODE_BP_PATH, KILL_COUNT_VAR), (GAME_MODE_BP_PATH, "PlayerDead"),
              (GAME_MODE_BP_PATH, DEBUG_MODE_VAR),
-             (HEALTH_BP_PATH, "Health"), (SURVIVAL_BP_PATH, "Hunger")]
+             (HEALTH_BP_PATH, HV.Health), (SURVIVAL_BP_PATH, UV.Hunger)]
 
 SHOWN = unreal.SlateVisibility.HIT_TEST_INVISIBLE
 HIDDEN = unreal.SlateVisibility.COLLAPSED

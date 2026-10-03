@@ -44,6 +44,7 @@ from combat.weapon_component.recoil import _author_turn_view
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
 from uebp.nodes.math import (
     FN_ABS, FN_ADD_FF, FN_EQ_II, FN_GREATER_FF, FN_MUL_FF, FN_OR, FN_SIN, FN_SUB_FF)
+from combat.weapon_component import vars as WV
 
 
 def _author_sight_sway(ed, tick, pc_out, exec_ins):
@@ -80,8 +81,8 @@ def _author_sight_sway(ed, tick, pc_out, exec_ins):
         is_low[value] = out(eq)
     crouched = _select(ed, keep, SWAY_CROUCH_SCALE, 1.0, is_low[CROUCH])
     steadied = _select(ed, keep, SWAY_PRONE_SCALE, crouched, is_low[PRONE])
-    blend = keep(ed.add_get_member_variable_node("SightBlend"))
-    sighted = _mul(ed, keep, out(blend, "SightBlend"), steadied)
+    blend = keep(ed.add_get_member_variable_node(WV.SightBlend))
+    sighted = _mul(ed, keep, out(blend, WV.SightBlend), steadied)
     breath = keep(ed.add_get_member_variable_node(BREATH_SCALE_VAR))
     amount = _mul(ed, keep, sighted, out(breath, BREATH_SCALE_VAR))
 

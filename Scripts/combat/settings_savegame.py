@@ -5,12 +5,13 @@ both read, so rebinds, sensitivity and debug mode survive a restart.
 import unreal
 
 from combat.log import _log
-from uebp.graph import (
-    BEL, BGE, _apply_defaults, _create_blueprint, _declare, _float_type, _key, _struct_type)
+from combat.tuning import BIND_VARS
+from uebp.graph import BEL, BGE, _apply_defaults, _create_blueprint, _declare, _key
 from uebp.layout import arrange
 from combat.difficulty import DEFAULT_DIFFICULTY, DIFFICULTY_VAR
 from combat.paths import SETTINGS_BP_PATH, SETTINGS_SLOT
-from combat.tuning import BIND_VARS, COMBAT
+from uebp.vars import declare, defaults
+from combat import settings_vars as SV
 
 
 def build_settings_savegame(rebuild=True):
@@ -28,30 +29,15 @@ def build_settings_savegame(rebuild=True):
     """
     bp = _create_blueprint(SETTINGS_BP_PATH, unreal.SaveGame)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    _declare(ed, "MouseSensitivity", _float_type())
-    # The sniper scope's own multiplier, on top of the zoom's slowdown. A save
-    # written before this field existed loads it as the default below.
-    _declare(ed, "ScopeSensitivity", _float_type())
-    # Indexed, not a struct per bind and not seven separate variables: the
-    # settings screen walks the rows with one ForEachLoop and one Array_Set, and
-    # BIND_VARS is what says which index means which action.
-    _declare(ed, "Binds", BEL.get_array_type(_struct_type(unreal.Key.static_struct())))
-    # Whether the developer overlays (tracers, wanderer numbers)
-    # are on. ON by default, and a save written before this field existed loads
-    # it as the default too. The HUD copies it onto the GameMode's DebugMode at
-    # BeginPlay and writes it back whenever D flips it.
-    _declare(ed, "DebugMode", BEL.get_basic_type_by_name("bool"))
+    declare(ed, SV.TABLE)
     # The difficulty, an index into combat.difficulty.DIFFICULTY_LABELS. A save
     # written before this field existed loads it as the default (EASY).
     _declare(ed, DIFFICULTY_VAR, BEL.get_basic_type_by_name("int"))
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_Settings failed to compile")
-    _apply_defaults(bp, {
-        "MouseSensitivity": COMBAT.mouse_sensitivity_default,
-        "ScopeSensitivity": COMBAT.ads_scope_sens_scale,
-        "Binds": [_key(k) for _name, k in BIND_VARS],
-        "DebugMode": True,
+    _apply_defaults(bp, {**defaults(SV.TABLE),
+        SV.Binds: [_key(k) for _name, k in BIND_VARS],
         DIFFICULTY_VAR: DEFAULT_DIFFICULTY,
     })
     _log(f"built {SETTINGS_BP_PATH} (slot {SETTINGS_SLOT!r})")

@@ -17,8 +17,9 @@ from survival.paths import SURVIVAL_CLASS_PATH
 from world import world_config as cfg
 from world.day_night_blueprint import NIGHT_COLD_VAR
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
+from world import day_night_vars as DV
 
-WRITABLE = [(DAY_NIGHT_BP_PATH, "Clock"), (DAY_NIGHT_BP_PATH, NIGHT_COLD_VAR)]
+WRITABLE = [(DAY_NIGHT_BP_PATH, DV.Clock), (DAY_NIGHT_BP_PATH, NIGHT_COLD_VAR)]
 
 RATE = 20.0
 SETTLE = 0.1

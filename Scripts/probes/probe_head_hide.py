@@ -35,13 +35,15 @@ from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.sights import SIGHT_LINE_MIN_CM
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
-            (WEAPON_COMP_BP_PATH, "EquippedIndex"),
-            (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
+            (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
             (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR),
-            (HEALTH_BP_PATH, "Health")]
+            (HEALTH_BP_PATH, HV.Health)]
 SEATED = 0.99           # the camera is on the sights
 HOME = 0.01             # ...and back on the boom
 # A head still drawn is never nearer the camera than this (cm): it goes before

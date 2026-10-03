@@ -36,6 +36,7 @@ from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_NOT, FN_OR
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_SLOT, NODE_CAST_WEAPON
 from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 from uebp.nodes.umg import FN_CHILD_AT
+from graphics_menu import hud_vars as MV
 
 
 def _get(ed, var, owner=None, self_out=None):
@@ -102,7 +103,7 @@ def _author_slots(ed, worn, box, in_execs):
 def author_wear_panel(ed, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
     panel = part(ed, WBP_HUD, WEAR_PANEL)
-    not_menu = _call(ed, FN_NOT, A=_get(ed, "MenuOpen"))
+    not_menu = _call(ed, FN_NOT, A=_get(ed, MV.MenuOpen))
     shown, shut = _branch(ed, out(not_menu), in_execs)
     closed = set_shown(ed, panel, False, [shut])
     flow = set_shown(ed, panel, True, [shown])

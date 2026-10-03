@@ -30,6 +30,7 @@ from uebp.nodes.actor import FN_SET_HIDDEN
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE_ITEM, FN_ARR_SET, FN_ARR_VALID
 from uebp.nodes.math import FN_GE_II
 from uebp.nodes.system import FN_IS_VALID
+from combat.weapon_component import vars as WV
 
 SLOT_ITEMS = "SlotItems"
 
@@ -50,13 +51,13 @@ def _author_wear_request(ed, in_execs):
     flow = g.put(WEAR_SLOT_VAR, g.iget(item, CLOTHING_SLOT_VAR), [there])
     slot = g.get(WEAR_SLOT_VAR)
     garment, other = g.branch(out(g.call(FN_GE_II, A=slot, B=0)), [flow])
-    taken = g.call(FN_ARR_REMOVE_ITEM, [garment], TargetArray=g.get("Inventory"), Item=item)
+    taken = g.call(FN_ARR_REMOVE_ITEM, [garment], TargetArray=g.get(WV.Inventory), Item=item)
 
     # The slot already holds one: it comes off into the slot this one leaves.
     valid, old = _worn_at(g, slot)
     full, empty = g.branch(valid, [then(taken)])
     worn, bare = g.branch(out(g.call(FN_IS_VALID, Object=old)), [full])
-    back = g.call(FN_ARR_ADD, [worn], TargetArray=g.get("Inventory"), NewItem=old)
+    back = g.call(FN_ARR_ADD, [worn], TargetArray=g.get(WV.Inventory), NewItem=old)
     swapped = g.iput(old, SLOT_VAR, g.iget(item, SLOT_VAR), [then(back)])
 
     put_on = g.call(FN_ARR_SET, [swapped, bare, empty],
@@ -65,7 +66,7 @@ def _author_wear_request(ed, in_execs):
     hide = g.call(FN_SET_HIDDEN, [then(put_on)], self=item)
     _set(hide, "bNewHidden", "true")
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(hide)])
-    flow = g.put("NeedsRefresh", "true", [flow])
+    flow = g.put(WV.NeedsRefresh, "true", [flow])
     ed.add_comment_to_nodes(
         f"{WEAR_REQUEST_VAR}: the I panel's drag of a slot's item onto the worn grid. "
         "A garment leaves Inventory for Worn[its ClothingSlot], hidden; one already "

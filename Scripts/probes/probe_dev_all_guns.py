@@ -19,9 +19,10 @@ from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.slot_tuning import SLOT_COUNT
 from graphics_menu.dev_consts import DEV_GUN_CLASS_PATHS, DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR), (WEAPON_COMP_BP_PATH, "Inventory")]
+WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR), (WEAPON_COMP_BP_PATH, WV.Inventory)]
 SETTLE = 0.3     # game seconds for the weapon component's re-equip
 GUNS = [c.rsplit(".", 1)[1] for c in DEV_GUN_CLASS_PATHS]
 

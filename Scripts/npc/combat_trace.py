@@ -24,6 +24,7 @@ from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
 from uebp.nodes.system import (
     FN_BOOL_TO_STR, FN_CONCAT, FN_DISPLAY_NAME, FN_FLOAT_TO_STR, FN_GET_GAME_MODE,
     FN_INT_TO_STR, FN_PRINT, FN_VEC_TO_STR)
+from combat import health_vars as HV
 
 
 def _author_concat(ed, keep, parts):
@@ -94,14 +95,14 @@ def _author_melee_trace(ed, exec_in, self_pawn_out, self_loc_out, player_out,
         return out(g, name)
 
     npc_id = to_str(FN_INT_TO_STR, "InInt", field(mine_out, NPC_ID_VAR))
-    npc_hp = to_str(FN_FLOAT_TO_STR, "InDouble", field(mine_out, "Health"))
-    npc_dead = to_str(FN_BOOL_TO_STR, "InBool", field(mine_out, "Dead"))
+    npc_hp = to_str(FN_FLOAT_TO_STR, "InDouble", field(mine_out, HV.Health))
+    npc_dead = to_str(FN_BOOL_TO_STR, "InBool", field(mine_out, HV.Dead))
     npc_name = to_str(FN_DISPLAY_NAME, "Object", self_pawn_out)
     npc_at = to_str(FN_VEC_TO_STR, "InVec", self_loc_out)
     target_name = to_str(FN_DISPLAY_NAME, "Object", player_out)
     target_at = to_str(FN_VEC_TO_STR, "InVec", player_loc_out)
     dist = to_str(FN_FLOAT_TO_STR, "InDouble", gap_out)
-    target_hp = to_str(FN_FLOAT_TO_STR, "InDouble", field(target_health_out, "Health"))
+    target_hp = to_str(FN_FLOAT_TO_STR, "InDouble", field(target_health_out, HV.Health))
 
     # What this swing dealt, after the player's guard (npc/block.py).
     dealt = to_str(FN_FLOAT_TO_STR, "InDouble",

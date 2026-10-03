@@ -32,6 +32,7 @@ from uebp.nodes.actor import FN_ACTOR_LOC
 from uebp.nodes.math import (
     FN_ABS, FN_AND, FN_BREAK_VECTOR, FN_DISTANCE, FN_LESS_FF, FN_OR, FN_SUB_VV)
 from uebp.nodes.system import FN_IS_VALID
+from combat.weapon_component import vars as WV
 
 INTERACT_TARGET_VAR = "InteractTarget"   # the nearest candidate so far, or None
 INTERACT_GAP_VAR = "InteractGap"         # its distance to AimPoint, cm
@@ -88,10 +89,10 @@ def _author_offer(ed, owner, candidate, offered, exec_in):
     # How far the candidate lies from the point the reticle rests on. Pure, so
     # the Branch and the Set below each compute it, from inputs that do not
     # change in between.
-    aim = keep(ed.add_get_member_variable_node("AimPoint"))
+    aim = keep(ed.add_get_member_variable_node(WV.AimPoint))
     aim_gap = keep(_node(ed, FN_DISTANCE))
     _connect(out(there, "ReturnValue"), _pin(aim_gap, "V1"))
-    _connect(out(aim, "AimPoint"), _pin(aim_gap, "V2"))
+    _connect(out(aim, WV.AimPoint), _pin(aim_gap, "V2"))
     best_gap = keep(ed.add_get_member_variable_node(INTERACT_GAP_VAR))
     closer = keep(_node(ed, FN_LESS_FF))
     _connect(out(aim_gap, "ReturnValue"), _pin(closer, "A"))

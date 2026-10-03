@@ -41,6 +41,7 @@ from uebp.nodes.math import (
     FN_ADD_VV, FN_CLASS_EQ, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_SELECT_VECTOR)
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_IS_VALID_CLASS, FN_OBJECT_CLASS, FN_TRACE
+from combat.weapon_component import vars as WV
 
 
 def _get(ed, name):
@@ -80,7 +81,7 @@ def _author_campfire(ed, held, owner, exec_in):
     # Set with its input unconnected: None, so last strike's wood is forgotten.
     forget = ed.add_set_member_variable_node(LIGHT_WOOD_VAR)
     _connect(then(known), _pin(forget, "execute"))
-    inv = _get(ed, "Inventory")
+    inv = _get(ed, WV.Inventory)
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
@@ -119,8 +120,8 @@ def _author_campfire(ed, held, owner, exec_in):
     slot = _node(ed, FN_ARR_FIND)
     _connect(inv, _pin(slot, "TargetArray"))
     _connect(held, _pin(slot, "ItemToFind"))
-    stay = ed.add_set_member_variable_node("EquippedIndex")
-    _connect(out(slot), _pin(stay, "EquippedIndex"))
+    stay = ed.add_set_member_variable_node(WV.EquippedIndex)
+    _connect(out(slot), _pin(stay, WV.EquippedIndex))
     _connect(then(gone), _pin(stay, "execute"))
 
     # --- the ground in front of the player, and the fire ----------------------

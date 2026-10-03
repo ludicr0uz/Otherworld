@@ -10,10 +10,11 @@ import unreal
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.throw_tuning import THROW_GRIP_LOC_VAR, THROW_GRIP_VAR
 from combat.weapon_component.throw import THROW_AIMING_VAR, THROW_FORCED_VAR
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
-            (WEAPON_COMP_BP_PATH, "EquippedIndex"),
-            (WEAPON_COMP_BP_PATH, "NeedsRefresh")]
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
+            (WEAPON_COMP_BP_PATH, WV.NeedsRefresh)]
 
 NEAR_CM = 0.1
 

@@ -24,9 +24,10 @@ from combat.seat_tuning import (
 )
 from combat.use_tuning import USING_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, v)
-            for v in ("EquippedIndex", "NeedsRefresh", SIGHTS_FORCED_VAR)]
+            for v in (WV.EquippedIndex, WV.NeedsRefresh, SIGHTS_FORCED_VAR)]
 
 ITEMS = (("BP_Knife_C", "the knife"), ("BP_Axe_C", "the axe"),
          ("BP_Matches_C", "the matches"), ("BP_Stick_C", "the stick"))

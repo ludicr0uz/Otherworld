@@ -20,8 +20,9 @@ import unreal
 from combat.game_state import SPAWN_COUNT_VAR
 from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from combat.respawn import RESPAWN_BAND, RESPAWN_DELAY, RESPAWN_DELAY_VAR
+from combat import health_vars as HV
 
-WRITABLE = [(HEALTH_BP_PATH, "Health"), (HEALTH_BP_PATH, RESPAWN_DELAY_VAR)]
+WRITABLE = [(HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, RESPAWN_DELAY_VAR)]
 
 PROBE_DELAY_S = 1.0
 EARLY_FRACTION = 0.6     # how far into the wait "still none" is checked

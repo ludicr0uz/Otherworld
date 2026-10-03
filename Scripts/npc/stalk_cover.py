@@ -74,6 +74,7 @@ from uebp.nodes.math import (
     FN_MUL_FF, FN_MUL_VV, FN_NORMAL_2D, FN_ROTATE_AXIS, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_INSTANCED
 from uebp.nodes.system import FN_EQ_SS, FN_OBJECT_NAME, FN_SPHERE_TRACE, FN_TRACE
+from uebp import props as EP
 
 # What the chain of least scales ends on: a mesh that is not cover at any
 # scale (a sapling, or one no row names) needs a scale no tree has.
@@ -120,7 +121,7 @@ def _author_wide(g, exec_in, tree, scale):
     """Is this tree's trunk wide enough to hide behind? ``tree`` is the pin
     of the instanced component the sweep struck and ``scale`` that of the
     instance's scale (a vector). Returns the Branch."""
-    mesh = g.keep(g.ed.add_get_member_variable_node("StaticMesh", STATIC_MESH_COMP_CLASS_PATH))
+    mesh = g.keep(g.ed.add_get_member_variable_node(EP.STATIC_MESH, STATIC_MESH_COMP_CLASS_PATH))
     _connect(tree, _pin(mesh, "self"))
     # By name: an object pin of an Equal node takes no asset literal.
     named = g.call(FN_OBJECT_NAME)

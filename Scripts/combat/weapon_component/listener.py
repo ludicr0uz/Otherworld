@@ -16,6 +16,7 @@ restart opens the level again, and the new character's BeginPlay sets it again.
 
 from uebp.graph import _connect, _node, _pin, out, then
 from uebp.nodes.actor import FN_SET_LISTENER_ATTENUATION
+from uebp import props as EP
 
 
 def _author_listener_at_character(ed, as_char, pc_out, exec_in):
@@ -24,11 +25,11 @@ def _author_listener_at_character(ed, as_char, pc_out, exec_in):
     The offset pin stays empty, which compiles as zero: the listener is the
     capsule's centre. Returns the then pin.
     """
-    capsule = ed.add_get_member_variable_node("CapsuleComponent", "/Script/Engine.Character")
+    capsule = ed.add_get_member_variable_node(EP.CAPSULE_COMPONENT, "/Script/Engine.Character")
     _connect(as_char, _pin(capsule, "self"))
     listen = _node(ed, FN_SET_LISTENER_ATTENUATION)
     _connect(pc_out, _pin(listen, "self"))
-    _connect(out(capsule, "CapsuleComponent"), _pin(listen, "AttachToComponent"))
+    _connect(out(capsule, EP.CAPSULE_COMPONENT), _pin(listen, "AttachToComponent"))
     _connect(exec_in, _pin(listen, "execute"))
     ed.add_comment_to_nodes(
         "Sounds fade with the distance from the character, not from the "

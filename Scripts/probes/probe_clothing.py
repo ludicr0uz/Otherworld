@@ -45,10 +45,11 @@ from graphics_menu.wear_consts import (
     WEAR_OPEN_VAR, WEAR_PANEL, WEAR_SEL_VAR, WEAR_SLOTS_BOX, WEAR_TAKE_VAR,
 )
 from probes.probe_clothing_drag import drag_checks
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
-             ("EquippedIndex", "NeedsRefresh", INTERACT_FORCED_VAR, FIRE_FORCED_VAR,
+             (WV.EquippedIndex, WV.NeedsRefresh, INTERACT_FORCED_VAR, FIRE_FORCED_VAR,
               WORN_VAR, TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR)]
             + [(HUD_BP_PATH, v) for v in (WEAR_OPEN_VAR, WEAR_SEL_VAR, WEAR_TAKE_VAR)])
 

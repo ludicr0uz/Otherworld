@@ -15,6 +15,7 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_DISTANCE, FN_DIV_FF, FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_RANDOM_FLOAT)
 from uebp.nodes.palette import NODE_CAST_CHARACTER
 from uebp.nodes.system import FN_TIME_SECONDS
+from uebp import props as EP
 
 
 def _author_walk_speed(ed, exec_in, stroll, stock, scale=None):
@@ -47,7 +48,7 @@ def _author_walk_speed(ed, exec_in, stroll, stock, scale=None):
     _connect(out(pawn), _pin(as_char, "Object"))
     for pin in exec_in:
         _connect(pin, _pin(as_char, "execute"))
-    move = keep(ed.add_get_member_variable_node("CharacterMovement", CHARACTER_CLASS_PATH))
+    move = keep(ed.add_get_member_variable_node(EP.CHARACTER_MOVEMENT, CHARACTER_CLASS_PATH))
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(move, "self"))
     run = keep(ed.add_get_member_variable_node(RUN_SPEED_VAR))
     want, want_out = tuned(ed, "run_speed_cms")
@@ -76,7 +77,7 @@ def _author_walk_speed(ed, exec_in, stroll, stock, scale=None):
         else:
             _set(eased, "B", scale)
         speed = out(eased)
-    write = keep(ed.add_set_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
+    write = keep(ed.add_set_member_variable_node(EP.MAX_WALK_SPEED, MOVEMENT_CLASS_PATH))
     _connect(out(move, "CharacterMovement"), _pin(write, "self"))
     _connect(speed, _pin(write, "MaxWalkSpeed"))
     _connect(then(as_char), _pin(write, "execute"))
@@ -120,9 +121,9 @@ def _author_patrol_setup(ed, exec_in):
     as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(_pin(pawn, "ReturnValue", is_input=False), _pin(as_char, "Object"))
     _connect(then(home), _pin(as_char, "execute"))
-    move = keep(ed.add_get_member_variable_node("CharacterMovement", CHARACTER_CLASS_PATH))
+    move = keep(ed.add_get_member_variable_node(EP.CHARACTER_MOVEMENT, CHARACTER_CLASS_PATH))
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(move, "self"))
-    speed = keep(ed.add_get_member_variable_node("MaxWalkSpeed", MOVEMENT_CLASS_PATH))
+    speed = keep(ed.add_get_member_variable_node(EP.MAX_WALK_SPEED, MOVEMENT_CLASS_PATH))
     _connect(_pin(move, "CharacterMovement", is_input=False), _pin(speed, "self"))
     cache = keep(ed.add_set_member_variable_node(RUN_SPEED_VAR))
     _connect(_pin(speed, "MaxWalkSpeed", is_input=False), _pin(cache, RUN_SPEED_VAR))

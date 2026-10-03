@@ -101,6 +101,9 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import (
     NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_CAST_INSTANCED, NODE_SPAWN)
 from uebp.nodes.system import FN_TIME_SECONDS
+from uebp import props as EP
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
 THROW_PAST_VAR = "ThrowPast"          # the actors the fall to the ground ignores
 # The bone of the body the blade is set into, a Name on the component: None
@@ -145,18 +148,18 @@ def _author_wound(ed, as_health, damage, brk, execs):
     """Take ``damage`` off the body and leave the three stamps a pellet does
     (impact.py): the health bar, the kill's credit, which way the flinch
     goes. Returns the exec pin after them, and the nodes."""
-    get_h = ed.add_get_member_variable_node("Health", HEALTH_CLASS_PATH)
+    get_h = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(get_h, "self"))
     sub = _node(ed, FN_SUB_FF)
-    _connect(out(get_h, "Health"), _pin(sub, "A"))
+    _connect(out(get_h, HV.Health), _pin(sub, "A"))
     _connect(damage, _pin(sub, "B"))
     clamp = _node(ed, FN_CLAMP)
     _connect(out(sub), _pin(clamp, "Value"))
     _set(clamp, "Min", 0.0)
     _set(clamp, "Max", INF)
-    set_h = ed.add_set_member_variable_node("Health", HEALTH_CLASS_PATH)
+    set_h = ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(set_h, "self"))
-    _connect(out(clamp), _pin(set_h, "Health"))
+    _connect(out(clamp), _pin(set_h, HV.Health))
     for pin in execs:
         _connect(pin, _pin(set_h, "execute"))
     now = _node(ed, FN_TIME_SECONDS)
@@ -248,9 +251,9 @@ def _author_skin(ed, brk, exec_in):
     as_char = _palette(ed, NODE_CAST_CHARACTER)
     _connect(_hit(brk, "HitActor"), _pin(as_char, "Object"))
     _connect(then(none), _pin(as_char, "execute"))
-    mesh = ed.add_get_member_variable_node("Mesh", "/Script/Engine.Character")
+    mesh = ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character")
     _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
-    mesh_out = out(mesh, "Mesh")
+    mesh_out = out(mesh, EP.MESH)
 
     # The blade's own line: on from the capsule's hit the way the segment
     # flew, far enough to cross the capsule. What that strikes is what the
@@ -360,9 +363,9 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     where = _node(ed, FN_MAKE_TRANSFORM)
     _connect(_hit(brk, "ImpactPoint"), _pin(where, "Location"))
     _connect(out(facing), _pin(where, "Rotation"))
-    blood_cls = ed.add_get_member_variable_node("BloodClass")
+    blood_cls = ed.add_get_member_variable_node(WV.BloodClass)
     blood = _palette(ed, NODE_SPAWN)
-    _connect(out(blood_cls, "BloodClass"), _pin(blood, "Class"))
+    _connect(out(blood_cls, WV.BloodClass), _pin(blood, "Class"))
     _connect(out(where), _pin(blood, "SpawnTransform"))
     _set(blood, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(wounded, _pin(blood, "execute"))

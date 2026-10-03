@@ -32,6 +32,7 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import MACRO_FOR_LOOP
 from uebp.nodes.system import FN_TEXT_TO_STR, FN_TO_TEXT
 from uebp.nodes.umg import FN_CHILD_AT, FN_SCROLL_TO, FN_SET_OPACITY
+from graphics_menu import hud_vars as MV
 
 
 def _item(ed, array_var, index, made):
@@ -103,7 +104,7 @@ def author_tune_panel(ed, in_execs, tab=GUN_TAB):
     panel = part(ed, WBP_PAUSE_MENU, tab.panel)
     # MenuOpen too: a tab left open under a shut panel is not on screen, and
     # its rows keep the geometry they last had.
-    up = _call(ed, FN_AND, made, A=_get(ed, "MenuOpen", made), B=_get(ed, tab.open_var, made))
+    up = _call(ed, FN_AND, made, A=_get(ed, MV.MenuOpen, made), B=_get(ed, tab.open_var, made))
     shown, shut = _branch(ed, out(up), in_execs, made)
     closed = set_shown(ed, panel, False, [shut])
     flow = set_shown(ed, panel, True, [shown])

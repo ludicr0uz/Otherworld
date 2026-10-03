@@ -17,6 +17,8 @@ from uebp.nodes.array import FN_ARR_GET
 from uebp.nodes.math import FN_ADD_II
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
 from uebp.nodes.system import FN_FLOAT_TO_STR, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_KEY_DISPLAY
+from graphics_menu import hud_vars as MV
+from combat import settings_vars as SV
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 
@@ -42,8 +44,8 @@ def _author_push_settings(ed, in_execs):
         made.append(n)
         return n
 
-    got = keep(ed.add_get_member_variable_node("Settings"))
-    settings_out = out(got, "Settings")
+    got = keep(ed.add_get_member_variable_node(MV.Settings))
+    settings_out = out(got, MV.Settings)
     ok = keep(_node(ed, FN_IS_VALID))
     _connect(settings_out, _pin(ok, "Object"))
     have = keep(ed.add_branch_node())
@@ -71,9 +73,9 @@ def _author_push_settings(ed, in_execs):
         _connect(flow, _pin(push, "execute"))
         flow = then(push)
 
-    binds = keep(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH))
+    binds = keep(ed.add_get_member_variable_node(SV.Binds, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(binds, "self"))
-    binds_out = out(binds, "Binds")
+    binds_out = out(binds, SV.Binds)
     for i, (var, _default) in enumerate(BIND_VARS):
         item = keep(_node(ed, FN_ARR_GET))
         _connect(binds_out, _loose_pin(item, "TargetArray"))
@@ -112,12 +114,12 @@ def _author_settings_page(ed, in_exec):
         made.append(n)
         return n
 
-    settings = keep(ed.add_get_member_variable_node("Settings"))
-    settings_out = out(settings, "Settings")
+    settings = keep(ed.add_get_member_variable_node(MV.Settings))
+    settings_out = out(settings, MV.Settings)
     rows = part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX)
 
-    row = keep(ed.add_get_member_variable_node("MenuRow"))
-    flow = (mark_rows(ed, rows, SETTINGS_ROWS, out(row, "MenuRow"), [in_exec]),)
+    row = keep(ed.add_get_member_variable_node(MV.MenuRow))
+    flow = (mark_rows(ed, rows, SETTINGS_ROWS, out(row, MV.MenuRow), [in_exec]),)
 
     # --- the slider rows: the value each is set to --------------------------
     for i, slider in enumerate(SLIDERS):
@@ -131,13 +133,13 @@ def _author_settings_page(ed, in_exec):
     flow = row_value(ed, rows, DIFFICULTY_ROW, author_difficulty_name(ed, settings_out, made), flow)
 
     # --- the binds, one loop ------------------------------------------------
-    binds = keep(ed.add_get_member_variable_node("Binds", SETTINGS_CLASS_PATH))
+    binds = keep(ed.add_get_member_variable_node(SV.Binds, SETTINGS_CLASS_PATH))
     _connect(settings_out, _pin(binds, "self"))
     loop = ed.add_macro_node(MACRO_FOR_EACH)
     if not loop:
         raise RuntimeError("could not create the ForEachLoop macro node")
     keep(loop)
-    _connect(out(binds, "Binds"), _loose_pin(loop, "Array"))
+    _connect(out(binds, SV.Binds), _loose_pin(loop, "Array"))
     for e in flow:
         _connect(e, _loose_pin(loop, "Exec"))
     index = _loose_pin(loop, "ArrayIndex", is_input=False)
@@ -154,9 +156,9 @@ def _author_settings_page(ed, in_exec):
 
     # The hint says something different while a capture is armed, or the
     # screen looks frozen: two lines in the designer, one shown.
-    arming = keep(ed.add_get_member_variable_node("Capturing"))
+    arming = keep(ed.add_get_member_variable_node(MV.Capturing))
     hinting = keep(ed.add_branch_node())
-    _connect(out(arming, "Capturing"), _pin(hinting, "Condition"))
+    _connect(out(arming, MV.Capturing), _pin(hinting, "Condition"))
     _connect(_loose_pin(loop, "Completed", is_input=False), _pin(hinting, "execute"))
     idle = part(ed, WBP_MAIN_MENU, HINT_IDLE)
     armed = part(ed, WBP_MAIN_MENU, HINT_CAPTURE)

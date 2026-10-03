@@ -8,8 +8,8 @@ import unreal
 from combat.audio import CREATURE_AUDIO_DIR, FOOTSTEP_NAMES
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _declare, _events,
-    _float_type, _loose_pin, _node, _palette, _pin, _set, else_, out, then)
+    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _events, _loose_pin,
+    _node, _palette, _pin, _set, else_, out, then)
 from uebp.layout import arrange
 from combat.noise import _author_make_noise
 from combat.paths import WEAPON_DIR
@@ -22,6 +22,9 @@ from uebp.nodes.math import (
     FN_SUB_FF, FN_SUB_II, FN_VSIZE_XY)
 from uebp.nodes.palette import NODE_CAST_CHARACTER
 from uebp.nodes.system import FN_PLAY_SOUND
+from uebp.vars import declare, defaults
+from uebp import props as EP
+from combat import footstep_vars as FV
 
 
 # --- footsteps ---------------------------------------------------------------
@@ -130,16 +133,7 @@ def build_footstep_component(rebuild=True):
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     tick, _begin = _events(ed, rebuild)
 
-    _declare(ed, "Travelled", _float_type())
-    _declare(ed, "StrideCm", _float_type())
-    # How loud a step is and how far it carries, as multipliers. 1.0 on every
-    # wanderer; the player's weapon component writes them from its stance
-    # every frame (weapon_component/stance.py), so this graph never learns
-    # what crouching is.
-    _declare(ed, "StepVolume", _float_type())
-    _declare(ed, "StepNoise", _float_type())
-    _declare(ed, "Sounds", BEL.get_array_type(
-        BEL.get_object_reference_type(unreal.SoundBase.static_class())))
+    declare(ed, FV.TABLE)
 
     owner = _node(ed, FN_GET_OWNER)
     owner_out = out(owner)
@@ -148,10 +142,10 @@ def build_footstep_component(rebuild=True):
     _connect(then(tick), _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
-    movement = ed.add_get_member_variable_node("CharacterMovement", "/Script/Engine.Character")
+    movement = ed.add_get_member_variable_node(EP.CHARACTER_MOVEMENT, "/Script/Engine.Character")
     _connect(char_out, _pin(movement, "self"))
     grounded = _node(ed, FN_ON_GROUND)
-    _connect(out(movement, "CharacterMovement"), _pin(grounded, "self"))
+    _connect(out(movement, EP.CHARACTER_MOVEMENT), _pin(grounded, "self"))
 
     walking = ed.add_branch_node()
     _connect(out(grounded), _pin(walking, "Condition"))
@@ -159,8 +153,8 @@ def build_footstep_component(rebuild=True):
 
     # Airborne: forget the part-stride, so landing does not immediately fire a
     # step that was 90% accumulated before the jump.
-    reset = ed.add_set_member_variable_node("Travelled")
-    _set(reset, "Travelled", 0.0)
+    reset = ed.add_set_member_variable_node(FV.Travelled)
+    _set(reset, FV.Travelled, 0.0)
     _connect(else_(walking), _pin(reset, "execute"))
 
     speed_v = _node(ed, FN_VELOCITY)
@@ -174,21 +168,21 @@ def build_footstep_component(rebuild=True):
     step = _node(ed, FN_MUL_FF)
     _connect(speed_out, _pin(step, "A"))
     _connect(out(tick, "DeltaSeconds"), _pin(step, "B"))
-    sofar = ed.add_get_member_variable_node("Travelled")
+    sofar = ed.add_get_member_variable_node(FV.Travelled)
     total = _node(ed, FN_ADD_FF)
-    _connect(out(sofar, "Travelled"), _pin(total, "A"))
+    _connect(out(sofar, FV.Travelled), _pin(total, "A"))
     _connect(out(step), _pin(total, "B"))
-    advance = ed.add_set_member_variable_node("Travelled")
-    _connect(out(total), _pin(advance, "Travelled"))
+    advance = ed.add_set_member_variable_node(FV.Travelled)
+    _connect(out(total), _pin(advance, FV.Travelled))
     _connect(then(walking), _pin(advance, "execute"))
     # Read the STORED total from here on. The add is pure and would be
     # re-evaluated against the new Travelled on a second read -- the same trap
     # the NPC id and the reload arithmetic ran into.
-    have = ed.add_get_member_variable_node("Travelled")
-    have_out = out(have, "Travelled")
+    have = ed.add_get_member_variable_node(FV.Travelled)
+    have_out = out(have, FV.Travelled)
 
-    stride = ed.add_get_member_variable_node("StrideCm")
-    stride_out = out(stride, "StrideCm")
+    stride = ed.add_get_member_variable_node(FV.StrideCm)
+    stride_out = out(stride, FV.StrideCm)
     far_enough = _node(ed, FN_GE_FF)
     _connect(have_out, _pin(far_enough, "A"))
     _connect(stride_out, _pin(far_enough, "B"))
@@ -206,17 +200,17 @@ def build_footstep_component(rebuild=True):
     left = _node(ed, FN_SUB_FF)
     _connect(have_out, _pin(left, "A"))
     _connect(stride_out, _pin(left, "B"))
-    charge = ed.add_set_member_variable_node("Travelled")
-    _connect(out(left), _pin(charge, "Travelled"))
+    charge = ed.add_set_member_variable_node(FV.Travelled)
+    _connect(out(left), _pin(charge, FV.Travelled))
     _connect(then(lands), _pin(charge, "execute"))
 
     at = _node(ed, FN_ACTOR_LOC)
     _connect(owner_out, _pin(at, "self"))
-    volume = ed.add_get_member_variable_node("StepVolume")
+    volume = ed.add_get_member_variable_node(FV.StepVolume)
     _sounded, stepped = _author_random_sound(
-        ed, "Sounds", out(at),
+        ed, FV.Sounds, out(at),
         then(charge),
-        volume_pin=out(volume, "StepVolume"))
+        volume_pin=out(volume, FV.StepVolume))
 
     # --- and the wanderers may hear it ---------------------------------------
     # Only the player's steps: the wanderers wear this same component, and a
@@ -237,7 +231,7 @@ def build_footstep_component(rebuild=True):
          / COMBAT.footstep_noise_reference_speed_cms)
     hushed = _node(ed, FN_MUL_FF)
     _connect(out(reach), _pin(hushed, "A"))
-    _connect(out(ed.add_get_member_variable_node("StepNoise"), "StepNoise"), _pin(hushed, "B"))
+    _connect(out(ed.add_get_member_variable_node(FV.StepNoise), FV.StepNoise), _pin(hushed, "B"))
     _author_make_noise(ed, then(players), out(at), out(hushed))
 
     ed.add_comment_to_nodes(
@@ -257,11 +251,7 @@ def build_footstep_component(rebuild=True):
     eas = _assets()
     found = [eas.load_asset(f"{CREATURE_AUDIO_DIR}/{n}") for n in FOOTSTEP_NAMES
              if eas.does_asset_exist(f"{CREATURE_AUDIO_DIR}/{n}")]
-    _apply_defaults(bp, {"StrideCm": FOOTSTEP_STRIDE_CM,
-                         "Travelled": 0.0,
-                         "StepVolume": 1.0,
-                         "StepNoise": 1.0,
-                         "Sounds": found})
+    _apply_defaults(bp, {**defaults(FV.TABLE), FV.StrideCm: FOOTSTEP_STRIDE_CM, FV.Sounds: found})
     _log(f"built {FOOTSTEP_BP_PATH} "
          f"({len(found)} steps, one every {FOOTSTEP_STRIDE_CM:.0f} cm)")
     return bp

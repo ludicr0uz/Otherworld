@@ -19,6 +19,8 @@ from uebp.nodes.actor import FN_DETACH
 from uebp.nodes.array import FN_ARR_ADD
 from uebp.nodes.palette import MACRO_FOR_EACH
 from uebp.nodes.system import FN_ALL_ACTORS
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 ITEM_CAST = "Utilities|Casting|CastToBP_WeaponItem"
 
@@ -36,9 +38,9 @@ def _author_item_candidates(ed, exec_in):
         made.append(n)
         return n
 
-    cls = keep(ed.add_get_member_variable_node("ItemClass"))
+    cls = keep(ed.add_get_member_variable_node(WV.ItemClass))
     every = keep(_node(ed, FN_ALL_ACTORS))
-    _connect(out(cls, "ItemClass"), _pin(every, "ActorClass"))
+    _connect(out(cls, WV.ItemClass), _pin(every, "ActorClass"))
     _connect(exec_in, _pin(every, "execute"))
 
     loop = ed.add_macro_node(MACRO_FOR_EACH)
@@ -54,7 +56,7 @@ def _author_item_candidates(ed, exec_in):
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(cast, "execute"))
     item = _loose_pin(cast, "AsBPWeaponItem", is_input=False)
 
-    dropped_pin, dropped_n = _prop(ed, "Dropped", item)
+    dropped_pin, dropped_n = _prop(ed, IV.Dropped, item)
     keep(dropped_n)
 
     ed.add_comment_to_nodes(
@@ -88,9 +90,9 @@ def _author_take_item(ed, target, exec_in):
     _connect(out(fits, HAS_ROOM_VAR), _pin(room, "Condition"))
     _connect(then(cast), _pin(room, "execute"))
 
-    clear = keep(ed.add_set_member_variable_node("Dropped", ITEM_CLASS_PATH))
+    clear = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
     _connect(best, _pin(clear, "self"))
-    _set(clear, "Dropped", "false")
+    _set(clear, IV.Dropped, "false")
     _connect(then(room), _pin(clear, "execute"))
     # Off whatever it was left attached to (a blade thrown into a body),
     # staying where it is: the equip puts it in the hand, or hides it.
@@ -100,9 +102,9 @@ def _author_take_item(ed, target, exec_in):
         _set(loose, rule, "KeepWorld")
     _connect(then(clear), _pin(loose, "execute"))
 
-    inv2 = keep(ed.add_get_member_variable_node("Inventory"))
+    inv2 = keep(ed.add_get_member_variable_node(WV.Inventory))
     add = keep(_node(ed, FN_ARR_ADD))
-    _connect(out(inv2, "Inventory"), _pin(add, "TargetArray"))
+    _connect(out(inv2, WV.Inventory), _pin(add, "TargetArray"))
     _connect(best, _pin(add, "NewItem"))
     _connect(then(loose), _pin(add, "execute"))
 

@@ -27,8 +27,9 @@ from combat.paths import (
 )
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from probes.probe_bullet_impact import _all, _file, _fire, _look, _until, _wanderer
+from combat import health_vars as HV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR), (HEALTH_BP_PATH, "Health")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR), (HEALTH_BP_PATH, HV.Health)]
 
 IN_FRONT_CM = 150.0      # past the muzzle, inside every pellet's pattern
 SWEEP_CM = 40            # either side of the head, a line per centimetre

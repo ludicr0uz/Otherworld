@@ -30,11 +30,12 @@ from world import world_config as cfg
 from world.day_night_blueprint import NIGHT_COLD_VAR, RANDOM_START_VAR
 from world.paths import DAY_NIGHT_CLASS_PATH
 from world.world_tuning import CSV_PATH, WORLD_STATS, read_table
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 TAB = WC.WORLD_TAB
 WRITABLE = [(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var,
-                                       TAB.save_var, "MenuOpen")]
+                                       TAB.save_var, MV.MenuOpen)]
 HOUR_STEP = WORLD_STATS[0][3]
 DAY_STEP = WORLD_STATS[1][3]
 COLD_STEP = WORLD_STATS[3][3]

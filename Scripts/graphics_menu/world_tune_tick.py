@@ -34,6 +34,7 @@ from uebp.nodes.array import FN_ARR_GET, FN_ARR_SET
 from uebp.nodes.math import FN_ADD_FF, FN_MAP_CLAMPED, FN_NEQ_FF, FN_PERCENT_FF
 from uebp.nodes.palette import NODE_CAST_CYCLE
 from uebp.nodes.system import FN_ACTOR_OF_CLASS
+from world import day_night_vars as DV
 
 
 def declare_world_tune_vars(ed):
@@ -121,15 +122,15 @@ def _author_apply(ed, in_execs, made):
         if var:
             flow = _set_on(ed, cyc, var, _value(ed, s, made), [flow], made)
 
-    day = _get(ed, "DayLengthSeconds", made, DAY_NIGHT_CLASS_PATH, cyc)
-    night = _get(ed, "NightLengthSeconds", made, DAY_NIGHT_CLASS_PATH, cyc)
+    day = _get(ed, DV.DayLengthSeconds, made, DAY_NIGHT_CLASS_PATH, cyc)
+    night = _get(ed, DV.NightLengthSeconds, made, DAY_NIGHT_CLASS_PATH, cyc)
     moved = _call(ed, FN_NEQ_FF, made, A=_value(ed, 0, made),
                   B=_get(ed, WORLD_TUNE_HOUR_SEEN_VAR, made))
     write, same = _branch(ed, out(moved), [flow, keep], made)
     clock = _hour_to_clock(ed, _value(ed, 0, made), day, night, made)
-    flow = _set_on(ed, cyc, "Clock", clock, [write], made)
+    flow = _set_on(ed, cyc, DV.Clock, clock, [write], made)
 
-    now = _get(ed, "Clock", made, DAY_NIGHT_CLASS_PATH, cyc)
+    now = _get(ed, DV.Clock, made, DAY_NIGHT_CLASS_PATH, cyc)
     hour = _clock_to_hour(ed, now, day, night, made)
     store = _call(ed, FN_ARR_SET, made, TargetArray=_get(ed, WORLD_TAB.values_var, made), Index=0)
     _connect(hour, _pin(store, "Item"))

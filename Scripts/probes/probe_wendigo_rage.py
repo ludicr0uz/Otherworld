@@ -28,6 +28,7 @@ from npc.paths import (
 from probes.probe_wendigo_stalk import (
     START_CM, _about, _on_navmesh, _stand_in_sight, _walk_speed, _wendigos,
 )
+from combat.game_state import DAMAGED_BY_PLAYER_VAR
 
 # The tuned numbers (the MONSTER SETTINGS tab's rows): monster_tuning.csv's, as built.
 _SPEC = monster_specs("Wendigo")
@@ -36,7 +37,7 @@ STALK_TURN_MAX_S = _SPEC["stalk_turn_max_s"]
 STALK_TURN_MIN_S = _SPEC["stalk_turn_min_s"]
 
 WENDIGO_AI = f"{NPC_DIR}/BP_ForestWandererAI_Wendigo"
-WRITABLE = [(WENDIGO_AI, STALK_TURN_AT_VAR), (HEALTH_BP_PATH, "DamagedByPlayer")]
+WRITABLE = [(WENDIGO_AI, STALK_TURN_AT_VAR), (HEALTH_BP_PATH, DAMAGED_BY_PLAYER_VAR)]
 
 SAMPLE_S = 0.1
 BEAT_S = 0.7          # the tree's 0.5 s beat, and a sample or two

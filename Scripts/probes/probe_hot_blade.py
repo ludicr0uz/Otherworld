@@ -52,11 +52,13 @@ from probes.probe_campfire import MATCHES, _bag, _cut_wood, _fires, _strike
 from probes.probe_chop_tree import _equip
 from probes.probe_knife import _file, _held_name
 from survival.paths import BLEEDING_GE_CLASS_PATH
+from combat import health_vars as HV
+from combat.weapon_component import vars as WV
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
-             ("EquippedIndex", "NeedsRefresh", "Inventory", KNIFE_QUEUED_VAR,
+             (WV.EquippedIndex, WV.NeedsRefresh, WV.Inventory, KNIFE_QUEUED_VAR,
               INTERACT_FORCED_VAR, FIRE_FORCED_VAR, SIGHTS_FORCED_VAR)]
-            + [(ITEM_BP_PATH, COOL_VAR), (HEALTH_BP_PATH, "Health")])
+            + [(ITEM_BP_PATH, COOL_VAR), (HEALTH_BP_PATH, HV.Health)])
 
 KNIFE, AXE, STICK = "BP_Knife_C", "BP_Axe_C", "BP_Stick_C"
 FAR_CM = 2.0 * INTERACT_RADIUS

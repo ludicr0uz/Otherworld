@@ -17,6 +17,8 @@ from npc.graph import _log
 from uebp.graph import (
     BEL, BGE, _assets, _connect, _create_blueprint, _node, _palette, _set, then)
 from uebp.layout import arrange
+from uebp.vars import declare
+from npc import controller_vars as NV
 from npc.drawn import draws
 from npc.sight_cone import _author_sight_cone
 from npc.step_task import build_step_task, clear_step_task
@@ -93,13 +95,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     BEL.compile_blueprint(bp)
     bt = fresh_tree(tree_path(path))
 
-    # Each NPC's swing timer. Zero is the right default -- it means "may attack
-    # immediately" -- which is just as well, since add_member_variable's own
-    # default-value argument silently does not apply (see CLAUDE.md).
-    ed.remove_member_variable("NextAttackTime")
-    if not ed.add_member_variable("NextAttackTime",
-                                  BEL.get_basic_type_by_name("real")):
-        raise RuntimeError("could not declare NextAttackTime")
+    declare(ed, NV.TABLE)
     # What the swing being landed deals, after the player's guard (npc/block.py).
     ed.remove_member_variable(HIT_DAMAGE_VAR)
     if not ed.add_member_variable(HIT_DAMAGE_VAR,

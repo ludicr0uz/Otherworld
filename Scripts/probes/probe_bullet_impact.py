@@ -25,8 +25,9 @@ from combat.paths import (
 )
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from graphics_menu.profile_consts import PROFILE_SLOT
+from combat import health_vars as HV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR), (HEALTH_BP_PATH, "Health")]
+WRITABLE = [(WEAPON_COMP_BP_PATH, FIRE_FORCED_VAR), (HEALTH_BP_PATH, HV.Health)]
 
 LOOK_DOWN_DEG = -55.0   # the reticle on the ground a few metres ahead
 IN_FRONT_CM = 150.0     # past the muzzle, inside every pellet's pattern

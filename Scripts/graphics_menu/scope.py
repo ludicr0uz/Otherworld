@@ -14,6 +14,8 @@ from uebp.nodes.actor import FN_DRAW_RECT
 from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_CLAMP, FN_DIV_FF, FN_GREATER_FF, FN_MAKE_COLOR, FN_MAX_FF,
     FN_SUB_FF)
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
@@ -53,13 +55,13 @@ def _author_scope_gate(ed, as_weapon, scoped_out, keep):
 
     Returns the condition pin.
     """
-    base = keep(ed.add_get_member_variable_node("BaseFOV", WEAPON_COMP_CLASS_PATH))
+    base = keep(ed.add_get_member_variable_node(WV.BaseFOV, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(base, "self"))
-    now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
+    now = keep(ed.add_get_member_variable_node(WV.CurrentFOV, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
     zoom = keep(_node(ed, FN_DIV_FF))
-    _connect(out(base, "BaseFOV"), _pin(zoom, "A"))
-    _connect(out(now, "CurrentFOV"), _pin(zoom, "B"))
+    _connect(out(base, WV.BaseFOV), _pin(zoom, "A"))
+    _connect(out(now, WV.CurrentFOV), _pin(zoom, "B"))
     past = keep(_node(ed, FN_GREATER_FF))
     _connect(out(zoom), _pin(past, "A"))
     _set(past, "B", COMBAT.shoulder_zoom + SCOPE_GATE_SLACK)
@@ -116,13 +118,13 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     _set(bar_w, "B", 0.0)
     bar_w_out = out(bar_w)
 
-    base = keep(ed.add_get_member_variable_node("BaseFOV", WEAPON_COMP_CLASS_PATH))
+    base = keep(ed.add_get_member_variable_node(WV.BaseFOV, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(base, "self"))
-    now = keep(ed.add_get_member_variable_node("CurrentFOV", WEAPON_COMP_CLASS_PATH))
+    now = keep(ed.add_get_member_variable_node(WV.CurrentFOV, WEAPON_COMP_CLASS_PATH))
     _connect(as_weapon, _pin(now, "self"))
     zoom = keep(_node(ed, FN_DIV_FF))
-    _connect(out(base, "BaseFOV"), _pin(zoom, "A"))
-    _connect(out(now, "CurrentFOV"), _pin(zoom, "B"))
+    _connect(out(base, WV.BaseFOV), _pin(zoom, "A"))
+    _connect(out(now, WV.CurrentFOV), _pin(zoom, "B"))
     travelled = keep(_node(ed, FN_SUB_FF))
     _connect(out(zoom), _pin(travelled, "A"))
     _set(travelled, "B", COMBAT.shoulder_zoom)
@@ -131,10 +133,10 @@ def _author_scope(ed, in_exec, as_weapon, held_out, cx, cy, height):
     # figure: the scope and the zoom factor are separate facts about a
     # weapon, and a 6x scope
     # would otherwise be fully opaque a third of the way in.
-    ads = keep(ed.add_get_member_variable_node("AdsZoom", ITEM_CLASS_PATH))
+    ads = keep(ed.add_get_member_variable_node(IV.AdsZoom, ITEM_CLASS_PATH))
     _connect(held_out, _pin(ads, "self"))
     span = keep(_node(ed, FN_SUB_FF))
-    _connect(out(ads, "AdsZoom"), _pin(span, "A"))
+    _connect(out(ads, IV.AdsZoom), _pin(span, "A"))
     _set(span, "B", COMBAT.shoulder_zoom)
 
     frac = keep(_node(ed, FN_DIV_FF))

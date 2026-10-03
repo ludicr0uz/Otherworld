@@ -27,10 +27,12 @@ from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.weapon_component.common import _prop
 from combat.weapon_component.stance import CROUCH, PRONE, STANCE_VAR
 from uebp.nodes.math import FN_DEG_TAN, FN_DIV_FF, FN_EQ_II, FN_MUL_FF, FN_SELECT_FF
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 AIM_SPREAD_VAR = "AimSpread"
 RECOIL_SCALE_VAR = "RecoilScale"
-RETICLE_SPREAD_VAR = "ReticleSpread"
+RETICLE_SPREAD_VAR = WV.ReticleSpread
 ACCURACY_OUT_VARS = (AIM_SPREAD_VAR, RECOIL_SCALE_VAR, RETICLE_SPREAD_VAR)
 
 
@@ -73,10 +75,10 @@ def _factors(ed, keep, held, kind, sights):
     crouched = _select(ed, keep, held_scale("Crouch"), 1.0, is_low[CROUCH])
     stance_f = _select(ed, keep, held_scale("Prone"), crouched, is_low[PRONE])
 
-    aiming = keep(ed.add_get_member_variable_node("Aiming"))
-    sighting = keep(ed.add_get_member_variable_node("SightAiming"))
-    shoulder = _select(ed, keep, held_scale("Shoulder"), 1.0, out(aiming, "Aiming"))
-    aim_f = _select(ed, keep, sights, shoulder, out(sighting, "SightAiming"))
+    aiming = keep(ed.add_get_member_variable_node(WV.Aiming))
+    sighting = keep(ed.add_get_member_variable_node(WV.SightAiming))
+    shoulder = _select(ed, keep, held_scale("Shoulder"), 1.0, out(aiming, WV.Aiming))
+    aim_f = _select(ed, keep, sights, shoulder, out(sighting, WV.SightAiming))
     return _mul(ed, keep, stance_f, aim_f)
 
 
@@ -94,10 +96,10 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
     for e in exec_ins:
         _connect(e, _pin(gate, "execute"))
 
-    hip, hip_n = _prop(ed, "SpreadDegrees", held)
+    hip, hip_n = _prop(ed, IV.SpreadDegrees, held)
     keep(hip_n)
     spread = _mul(ed, keep, hip, _factors(ed, keep, held, "Spread", 0.0))
-    sights_kick, sights_n = _prop(ed, "RecoilSightsScale", held)
+    sights_kick, sights_n = _prop(ed, IV.RecoilSightsScale, held)
     keep(sights_n)
     kick = _factors(ed, keep, held, "Recoil", sights_kick)
 
@@ -113,9 +115,9 @@ def _author_accuracy(ed, held, armed_out, exec_ins):
     cloud = keep(ed.add_get_member_variable_node(AIM_SPREAD_VAR))
     cloud_tan = keep(_node(ed, FN_DEG_TAN))
     _connect(out(cloud, AIM_SPREAD_VAR), _pin(cloud_tan, "A"))
-    fov = keep(ed.add_get_member_variable_node("CurrentFOV"))
+    fov = keep(ed.add_get_member_variable_node(WV.CurrentFOV))
     half_fov = keep(_node(ed, FN_MUL_FF))
-    _connect(out(fov, "CurrentFOV"), _pin(half_fov, "A"))
+    _connect(out(fov, WV.CurrentFOV), _pin(half_fov, "A"))
     _set(half_fov, "B", 0.5)
     fov_tan = keep(_node(ed, FN_DEG_TAN))
     _connect(out(half_fov), _pin(fov_tan, "A"))

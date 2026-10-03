@@ -19,16 +19,17 @@ from uebp.graph import (
     _float_type, _must_load, _root_handle)
 from world import world_config as cfg
 from world.paths import SKY_MATERIAL_PATH, SKY_SPHERE_MESH_PATH
+from world import day_night_vars as DV
 
-COMPONENTS = ("Sun", "Moon", "SkyLight", "SkyDome", "Fog", "NightGrade", "DayGrade")
+COMPONENTS = (DV.Sun, DV.Moon, DV.SkyLight, DV.SkyDome, DV.Fog, "NightGrade", DV.DayGrade)
 
 # Variables. The two lengths, Clock, the night's cold and RandomStart are
 # Instance Editable, so a level can run a different day, or start at a set
 # hour, without a rebuild.
 NIGHT_COLD_VAR = "NightTemperatureDropPerSecond"   # night_cold.py reads it
-CONFIG_VARS = ("DayLengthSeconds", "NightLengthSeconds", "Clock", NIGHT_COLD_VAR)
+CONFIG_VARS = (DV.DayLengthSeconds, DV.NightLengthSeconds, DV.Clock, NIGHT_COLD_VAR)
 RANDOM_START_VAR = "RandomStart"   # BeginPlay picks Clock anywhere in the cycle
-STATE_FLOAT_VARS = ("DayAmount",)
+STATE_FLOAT_VARS = (DV.DayAmount,)
 # The look multipliers, all 1 as built: the Tick graph scales the sun's and
 # the moon's light, the stars, the sky light, the fog's density and the two
 # discs by them. The M panel's GRAPHICS SETTINGS tab writes them
@@ -80,24 +81,24 @@ def build_components(bp):
     _drop_components(bp, set(COMPONENTS))
     root = _root_handle(bp)
     made = {}
-    for name, cls in (("Sun", unreal.DirectionalLightComponent),
-                      ("Moon", unreal.DirectionalLightComponent),
-                      ("SkyLight", unreal.SkyLightComponent),
-                      ("SkyDome", unreal.StaticMeshComponent),
-                      ("Fog", unreal.ExponentialHeightFogComponent),
+    for name, cls in ((DV.Sun, unreal.DirectionalLightComponent),
+                      (DV.Moon, unreal.DirectionalLightComponent),
+                      (DV.SkyLight, unreal.SkyLightComponent),
+                      (DV.SkyDome, unreal.StaticMeshComponent),
+                      (DV.Fog, unreal.ExponentialHeightFogComponent),
                       ("NightGrade", unreal.PostProcessComponent),
-                      ("DayGrade", unreal.PostProcessComponent)):
+                      (DV.DayGrade, unreal.PostProcessComponent)):
         made[name] = _component_object(_add_component(bp, root, cls, name))
 
-    _light(made["Sun"], cfg.SUN_LUX, cfg.SUN_COLOR, 0)
-    _light(made["Moon"], 0.0, cfg.MOON_COLOR, 1)
+    _light(made[DV.Sun], cfg.SUN_LUX, cfg.SUN_COLOR, 0)
+    _light(made[DV.Moon], 0.0, cfg.MOON_COLOR, 1)
 
-    sky = made["SkyLight"]
+    sky = made[DV.SkyLight]
     sky.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
     sky.set_editor_property("real_time_capture", True)
     sky.set_editor_property("intensity", float(cfg.SKY_LIGHT_INTENSITY[1]))
 
-    dome = made["SkyDome"]
+    dome = made[DV.SkyDome]
     dome.set_editor_property("static_mesh", _must_load(SKY_SPHERE_MESH_PATH))
     dome.set_editor_property("override_materials", [_must_load(SKY_MATERIAL_PATH)])
     dome.set_editor_property("relative_scale3d", unreal.Vector(
@@ -105,7 +106,7 @@ def build_components(bp):
     dome.set_editor_property("cast_shadow", False)
     dome.set_collision_profile_name("NoCollision")
 
-    fog = made["Fog"]
+    fog = made[DV.Fog]
     fog.set_editor_property("enable_volumetric_fog", True)
     fog.set_editor_property("fog_density", float(cfg.FOG_DENSITY[1]))
     fog.set_editor_property("fog_inscattering_luminance", _linear(cfg.FOG_COLOR[1]))
@@ -113,7 +114,7 @@ def build_components(bp):
                             float(cfg.FOG_VOLUMETRIC_EXTINCTION))
 
     _grade(made["NightGrade"], cfg.NIGHT_GRADE_PRIORITY, 1.0, cfg.EXPOSURE[0])
-    _grade(made["DayGrade"], cfg.DAY_GRADE_PRIORITY, 1.0, cfg.EXPOSURE[1])
+    _grade(made[DV.DayGrade], cfg.DAY_GRADE_PRIORITY, 1.0, cfg.EXPOSURE[1])
     return made
 
 
@@ -135,9 +136,9 @@ def apply_config(bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{bp.get_name()} failed to compile")
     _apply_defaults(bp, {
-        "DayLengthSeconds": float(cfg.DAY_LENGTH_S),
-        "NightLengthSeconds": float(cfg.NIGHT_LENGTH_S),
-        "Clock": float(cfg.START_CLOCK_S),
+        DV.DayLengthSeconds: float(cfg.DAY_LENGTH_S),
+        DV.NightLengthSeconds: float(cfg.NIGHT_LENGTH_S),
+        DV.Clock: float(cfg.START_CLOCK_S),
         NIGHT_COLD_VAR: float(cfg.NIGHT_TEMPERATURE_DROP_PER_S),
         RANDOM_START_VAR: bool(cfg.RANDOM_START),
         **{name: 1.0 for name in LOOK_SCALE_VARS},

@@ -18,10 +18,11 @@ from graphics_menu import cursor_consts as CC
 from graphics_menu import umg_consts as C
 from graphics_menu.gfx_tune_consts import GFX_TAB
 from graphics_menu.settings_rows import BACK_ROW, PAGE_SETTINGS, PAGE_TITLE
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, v) for v in ("MenuOpen", C.GAME_STARTED_VAR, "MenuPage",
-                                       "MenuRow", C.PAUSE_ROW_VAR, GFX_TAB.open_var,
+WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, MV.MenuPage,
+                                       MV.MenuRow, C.PAUSE_ROW_VAR, GFX_TAB.open_var,
                                        GFX_TAB.row_var)]
 STEP_PX = 6          # under the thinnest row at any window this is run in
 STEP_S = 0.04

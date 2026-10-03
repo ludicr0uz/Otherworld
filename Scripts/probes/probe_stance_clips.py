@@ -17,8 +17,9 @@ import unreal
 from combat.carry_tuning import RAISE_FORCED_VAR
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.skin import SKIN_ADVENTURER
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, "Stance"), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.Stance), (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR)]
 
 SETTLE_S = 0.6
 

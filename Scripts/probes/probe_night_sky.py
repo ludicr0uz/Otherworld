@@ -16,8 +16,9 @@ from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH, STARS_TEXTURE_P
 from world.sky_material import STARS_PARAM
 from world.star_catalogue import load_stars
 from world.star_map import elevation_deg, star_direction
+from world import day_night_vars as DV
 
-WRITABLE = [(DAY_NIGHT_BP_PATH, "Clock")]
+WRITABLE = [(DAY_NIGHT_BP_PATH, DV.Clock)]
 
 SHOTS = bool(os.environ.get("OW_SKY_SHOTS"))
 MIDNIGHT_S = cfg.DAY_LENGTH_S + cfg.NIGHT_LENGTH_S / 2

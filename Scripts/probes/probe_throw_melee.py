@@ -29,11 +29,12 @@ from combat.weapon_component.throw import (
     THROW_AIMING_VAR, THROW_ARC_VAR, THROW_CLICK_FORCED_VAR, THROW_FORCED_VAR,
 )
 from combat.weapon_component.throw_flight import THROWN_VAR, THROW_VELOCITY_VAR
+from combat.weapon_component import vars as WV
 
 WRITABLE = [(WEAPON_COMP_BP_PATH, THROW_FORCED_VAR),
             (WEAPON_COMP_BP_PATH, THROW_CLICK_FORCED_VAR),
-            (WEAPON_COMP_BP_PATH, "EquippedIndex"),
-            (WEAPON_COMP_BP_PATH, "NeedsRefresh")]
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
+            (WEAPON_COMP_BP_PATH, WV.NeedsRefresh)]
 
 LANDS_WITHIN_CM = 80.0     # the disc to where it rests, as in probe_throw.py
 OPEN_CM = 3000.0           # the reticle's point is out of the gun's reach past this

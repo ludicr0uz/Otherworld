@@ -35,6 +35,9 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_SLOT, NODE_CAST_WEAPON
 from uebp.nodes.system import FN_CONCAT, FN_GET_PLAYER_PAWN, FN_INT_TO_STR, FN_IS_VALID
 from uebp.nodes.umg import FN_CHILD_AT, FN_SET_BRUSH, FN_SET_TINT
+from combat import item_vars as IV
+from graphics_menu import hud_vars as MV
+from combat.weapon_component import vars as WV
 
 WEAPON_COMP_CLASS_PATH = "/Game/Weapons/BP_WeaponComponent.BP_WeaponComponent_C"
 ITEM_CLASS_PATH = "/Game/Weapons/BP_WeaponItem.BP_WeaponItem_C"
@@ -67,7 +70,7 @@ def _author_equipped_name(ed, inv, equipped, exec_in):
     _connect(valid, _pin(br, "Condition"))
     _connect(exec_in, _pin(br, "execute"))
     name = part(ed, WBP_HUD, EQUIPPED_NAME)
-    said = set_text(ed, name, _get(ed, item, "DisplayName"), [then(br)])
+    said = set_text(ed, name, _get(ed, item, IV.DisplayName), [then(br)])
     return (set_shown(ed, name, True, [said]), set_shown(ed, name, False, [else_(br)]))
 
 
@@ -82,11 +85,11 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, ammo=True):
     no_ghost = set_shown(ed, w(SLOT_GHOST), False, [exec_in])
     brush = _node(ed, FN_SET_BRUSH)
     _connect(icon, _pin(brush, "self"))
-    _connect(_get(ed, item, "Icon"), _pin(brush, "Texture"))
+    _connect(_get(ed, item, IV.Icon), _pin(brush, "Texture"))
     _connect(no_ghost, _pin(brush, "execute"))
     tint = _node(ed, FN_SET_TINT)
     _connect(icon, _pin(tint, "self"))
-    _connect(_get(ed, item, "SlotColor"), _pin(tint, "InColorAndOpacity"))
+    _connect(_get(ed, item, IV.SlotColor), _pin(tint, "InColorAndOpacity"))
     _connect(then(brush), _pin(tint, "execute"))
     flow = set_shown(ed, icon, True, [then(tint)])
     active, frame = w(SLOT_ACTIVE), w(SLOT_FRAME)
@@ -99,13 +102,13 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, ammo=True):
     # uses ammunition. The pistol reloads every eight shots over an endless
     # reserve, so it reads "5 / ∞": the magazine is the part to manage.
     loaded = _node(ed, FN_INT_TO_STR)
-    _connect(_get(ed, item, "Loaded"), _pin(loaded, "InInt"))
+    _connect(_get(ed, item, IV.Loaded), _pin(loaded, "InInt"))
     reserve = _node(ed, FN_INT_TO_STR)
-    _connect(_get(ed, item, "Reserve"), _pin(reserve, "InInt"))
+    _connect(_get(ed, item, IV.Reserve), _pin(reserve, "InInt"))
     spare = _node(ed, FN_SELECT_STR)
     _set(spare, "A", INFINITE_RESERVE_TEXT)
     _connect(out(reserve), _pin(spare, "B"))
-    _connect(_get(ed, item, "InfiniteReserve"), _pin(spare, "bPickA"))
+    _connect(_get(ed, item, IV.InfiniteReserve), _pin(spare, "bPickA"))
     sep = _node(ed, FN_CONCAT)
     _set(sep, "A", " / ")
     _connect(out(spare), _pin(sep, "B"))
@@ -115,7 +118,7 @@ def _author_filled_slot(ed, slot, item, is_equipped, exec_in, ammo=True):
 
     ammo = w(SLOT_AMMO)
     counted = ed.add_branch_node()
-    _connect(_get(ed, item, "UsesAmmo"), _pin(counted, "Condition"))
+    _connect(_get(ed, item, IV.UsesAmmo), _pin(counted, "Condition"))
     _connect(flow, _pin(counted, "execute"))
     wrote = set_text(ed, ammo, out(count), [then(counted)])
     tails = (set_shown(ed, ammo, True, [wrote]), set_shown(ed, ammo, False, [else_(counted)]))
@@ -201,12 +204,12 @@ def author_inventory(ed, in_execs):
     for e in in_execs:
         _connect(e, _pin(cast, "execute"))
     as_weapon = _loose_pin(cast, "AsBPWeaponComponent", is_input=False)
-    inv = ed.add_get_member_variable_node("Inventory", WEAPON_COMP_CLASS_PATH)
+    inv = ed.add_get_member_variable_node(WV.Inventory, WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(inv, "self"))
-    inv = out(inv, "Inventory")
-    equipped = ed.add_get_member_variable_node("EquippedIndex", WEAPON_COMP_CLASS_PATH)
+    inv = out(inv, WV.Inventory)
+    equipped = ed.add_get_member_variable_node(WV.EquippedIndex, WEAPON_COMP_CLASS_PATH)
     _connect(as_weapon, _pin(equipped, "self"))
-    equipped = out(equipped, "EquippedIndex")
+    equipped = out(equipped, WV.EquippedIndex)
 
     named = _author_equipped_name(ed, inv, equipped, then(cast))
 
@@ -216,9 +219,9 @@ def author_inventory(ed, in_execs):
 
     # The bag's grid always, but never under the menu.
     open_ = ed.add_get_member_variable_node(WEAR_OPEN_VAR)
-    menu = ed.add_get_member_variable_node("MenuOpen")
+    menu = ed.add_get_member_variable_node(MV.MenuOpen)
     no_menu = _node(ed, FN_NOT)
-    _connect(out(menu, "MenuOpen"), _pin(no_menu, "A"))
+    _connect(out(menu, MV.MenuOpen), _pin(no_menu, "A"))
     bag_up = _node(ed, FN_AND)
     _connect(out(open_, WEAR_OPEN_VAR), _pin(bag_up, "A"))
     _connect(out(no_menu), _pin(bag_up, "B"))

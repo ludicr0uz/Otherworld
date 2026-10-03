@@ -39,11 +39,12 @@ from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
 from combat.weapon_models import SHOTGUN_WRIST, shotgun_outline
 from graphics_menu.dev_consts import DEV_GUNS_REQUEST_VAR
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR, PROFILE_SLOT
+from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
-            (WEAPON_COMP_BP_PATH, "EquippedIndex"),
-            (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
+            (WEAPON_COMP_BP_PATH, WV.EquippedIndex),
+            (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
             (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR)]
 SHOTS = bool(os.environ.get("OW_SIGHT_SHOTS"))
 SEATED = 0.99           # the camera is on the sights

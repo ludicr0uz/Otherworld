@@ -27,9 +27,10 @@ from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import SEAT_VAR, SIGHTS_FORCED_VAR
 from combat.skin import SKIN_ADVENTURER, SKIN_QUINN
 from combat.weapon_models import SHOTGUN_PUMP
+from combat.weapon_component import vars as WV
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, "EquippedIndex"),
-            (WEAPON_COMP_BP_PATH, "NeedsRefresh"),
+WRITABLE = [(WEAPON_COMP_BP_PATH, WV.EquippedIndex),
+            (WEAPON_COMP_BP_PATH, WV.NeedsRefresh),
             (WEAPON_COMP_BP_PATH, RAISE_FORCED_VAR),
             (WEAPON_COMP_BP_PATH, SIGHTS_FORCED_VAR)]
 SHOTS = bool(os.environ.get("OW_GRIP_SHOTS"))

@@ -14,9 +14,10 @@ import unreal
 from graphics_menu import legal_consts as L
 from graphics_menu import umg_consts as C
 from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, v) for v in (C.GAME_STARTED_VAR, "MenuPage", "MenuOpen")]
+WRITABLE = [(HUD_BP_PATH, v) for v in (C.GAME_STARTED_VAR, MV.MenuPage, MV.MenuOpen)]
 SHOWN = unreal.SlateVisibility.HIT_TEST_INVISIBLE
 
 

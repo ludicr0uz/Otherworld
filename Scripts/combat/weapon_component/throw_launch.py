@@ -47,8 +47,9 @@ from uebp.nodes.math import (
     FN_DOT_VV, FN_FORWARD, FN_GE_FF, FN_MAKE_ROT, FN_MAKE_VECTOR, FN_MAX_FF, FN_MUL_FF,
     FN_MUL_VF, FN_NORMALIZE_AXIS, FN_SELECT_FF, FN_SQRT, FN_SUB_FF, FN_SUB_VV, FN_VEC_TO_ROT,
     FN_VSIZE_XY)
+from combat.weapon_component import vars as WV
 
-AIM_POINT_VAR = "AimPoint"
+AIM_POINT_VAR = WV.AimPoint
 
 
 def _math(ed, fn, a, b):

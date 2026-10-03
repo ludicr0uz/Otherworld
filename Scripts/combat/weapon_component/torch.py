@@ -56,6 +56,8 @@ from uebp.nodes.actor import FN_ACTOR_LOC
 from uebp.nodes.math import FN_ADD_FF, FN_AND, FN_DISTANCE, FN_LE_FF, FN_NE_OO, FN_NOT, FN_OR
 from uebp.nodes.palette import MACRO_FOR_EACH
 from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_TIME_SECONDS
+from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 
 def _author_torch(ed, held, owner, exec_ins):
@@ -161,14 +163,14 @@ def _author_torch(ed, held, owner, exec_ins):
     _connect(held, _pin(other, "B"))
     stale = gate2(FN_OR, negate(ward), out(other))
     lower = branch(gate2(FN_AND, out(up), stale), settled)
-    back = keep(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH))
+    back = keep(ed.add_set_member_variable_node(IV.AimPose, ITEM_CLASS_PATH))
     _connect(item, _pin(back, "self"))
-    _connect(get(WARD_CARRY_VAR), _pin(back, "AimPose"))
+    _connect(get(WARD_CARRY_VAR), _pin(back, IV.AimPose))
     _connect(then(lower), _pin(back, "execute"))
     # Set with its input unconnected: None.
     clear = put(WARD_ITEM_VAR, None)
     _connect(then(back), _pin(clear, "execute"))
-    down = put("NeedsRefresh", "true")
+    down = put(WV.NeedsRefresh, "true")
     _connect(then(clear), _pin(down, "execute"))
 
     # Pure, and read after the lowering above: it sees WardItem cleared.
@@ -177,13 +179,13 @@ def _author_torch(ed, held, owner, exec_ins):
     _connect(held, _pin(whose, WARD_ITEM_VAR))
     _connect(then(raise_), _pin(whose, "execute"))
     carry = put(WARD_CARRY_VAR, None)
-    _connect(held_prop("AimPose"), _pin(carry, WARD_CARRY_VAR))
+    _connect(held_prop(IV.AimPose), _pin(carry, WARD_CARRY_VAR))
     _connect(then(whose), _pin(carry, "execute"))
-    swap = keep(ed.add_set_member_variable_node("AimPose", ITEM_CLASS_PATH))
+    swap = keep(ed.add_set_member_variable_node(IV.AimPose, ITEM_CLASS_PATH))
     _connect(held, _pin(swap, "self"))
-    _connect(held_prop(USE_POSE_VAR), _pin(swap, "AimPose"))
+    _connect(held_prop(USE_POSE_VAR), _pin(swap, IV.AimPose))
     _connect(then(carry), _pin(swap, "execute"))
-    rise = put("NeedsRefresh", "true")
+    rise = put(WV.NeedsRefresh, "true")
     _connect(then(swap), _pin(rise, "execute"))
 
     ed.add_comment_to_nodes(

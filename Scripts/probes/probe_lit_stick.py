@@ -47,9 +47,10 @@ from combat.weapon_component.tick import FIRE_FORCED_VAR
 from probes.probe_campfire import ISSUED, MATCHES, _bag, _cut_wood, _fires, _strike
 from probes.probe_chop_tree import _equip
 from probes.probe_knife import _file, _held_name
+from combat.weapon_component import vars as WV
 
 WRITABLE = ([(WEAPON_COMP_BP_PATH, v) for v in
-             ("EquippedIndex", "NeedsRefresh", "Inventory", KNIFE_QUEUED_VAR,
+             (WV.EquippedIndex, WV.NeedsRefresh, WV.Inventory, KNIFE_QUEUED_VAR,
               INTERACT_FORCED_VAR, FIRE_FORCED_VAR, SIGHTS_FORCED_VAR)]
             + [(ITEM_BP_PATH, BURN_OUT_VAR)])
 

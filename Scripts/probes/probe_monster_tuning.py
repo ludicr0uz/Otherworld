@@ -27,11 +27,12 @@ from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
 from graphics_menu.umg_consts import ROW_CARET, ROW_VALUE
 from npc.monster_tuning import CSV_PATH, MONSTER_STATS, read_table, stock_run_speed
 from npc.paths import AGGRO_VAR, APPLIED_HEALTH_VAR, RUN_SPEED_VAR
+from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 TAB = MC.MONSTER_TAB
 WRITABLE = [(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.pick_var,
-                                       TAB.nudge_var, TAB.save_var, "MenuOpen")]
+                                       TAB.nudge_var, TAB.save_var, MV.MenuOpen)]
 COLS = [s[0] for s in MONSTER_STATS]
 STEP = {s[0]: s[3] for s in MONSTER_STATS}
 VAR = {s[0]: s[1] for s in MONSTER_STATS}

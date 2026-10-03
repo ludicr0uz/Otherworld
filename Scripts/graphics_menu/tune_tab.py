@@ -13,7 +13,7 @@ world_tune_tick: the day/night cycle; gfx_tune_tick: BP_GraphicsTuner).
     its row in the M panel        open the tab (and shut the others). An open
                                   tab stands in place of the panel's rows
     Up / Down                     pick a row: the subject, then one per stat,
-                                  then BACK (in a scrolling tab the wheel too)
+                                  then BACK
     Left / Right                  the subject row: the previous / next one;
                                   a stat: one step down / up, never under
                                   its minimum (nor, where the tab has
@@ -72,8 +72,8 @@ class TuneTab:
     label_w: float = 0.0      # the rows' label column; 0 = TUNE_ROW_LABEL_W
     panel_w: float = 0.0      # 0 = TUNE_PANEL_W
     title_font: float = 0.0   # 0 = TUNE_TITLE_FONT
-    # The list shows this many rows at a time behind a scroll bar, and the
-    # wheel moves the caret instead of a value; 0 = every row, no scrolling.
+    # The list shows this many rows at a time behind a scroll bar, which the
+    # mouse drags (tune_scroll.py); 0 = every row, no scrolling.
     visible_rows: int = 0
     corner: bool = False      # bottom right of the screen; else where the M panel is
     # A WBP_MenuRow between the list and BACK that saves, and its words;

@@ -10,7 +10,8 @@ from the tab's variables. For the guns:
                    caret on TuneRow -- on BACK when it is past the list, or
                    on the save row of a tab that has one --
                    and "saved to ..." while TuneSaved. A scrolling tab's
-                   list is scrolled to the caret's row
+                   list is scrolled to the caret's row, or
+                   by the mouse dragging its bar (tune_scroll.py)
 
 Reads, with one exception: BACK. Its Enter and its click lower TuneOpen here
 (cursor.author_back_row says why it is not Tick's); everything else
@@ -23,6 +24,7 @@ from graphics_menu.cursor import (
     author_back_row, author_button_row, author_row_cursor, author_widget_click)
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.tune_consts import GUN_TAB, TUNE_DASH
+from graphics_menu.tune_scroll import author_scroll_drag
 from graphics_menu.ui_graph import mark_rows, member, part, row_value, set_shown, show_if
 from graphics_menu.umg_consts import ROW_CARET, WBP_MENU_ROW, WBP_PAUSE_MENU
 from uebp.nodes.array import FN_ARR_GET
@@ -127,6 +129,9 @@ def author_tune_panel(ed, in_execs, tab=GUN_TAB):
             (tab.save_var, "true"), hovered)
     back = part(ed, WBP_PAUSE_MENU, tab.back_widget)
     hovered = author_back_row(ed, back, tab.row_var, tab.back_row, tab.open_var, hovered)
+    if tab.visible_rows:
+        # Before the caret is lit and followed: a dragged list brings it along.
+        hovered = author_scroll_drag(ed, tab, box, hovered)
     name = _item(ed, tab.names_var, _get(ed, tab.pick_var, made), made)
     flow, failed = row_value(ed, box, 0, name, hovered)
     flow = _author_stats(ed, tab, box, [flow, failed], made)

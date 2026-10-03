@@ -12,8 +12,8 @@ read one table.
 The stats, their steps and minimums are npc/monster_tuning.MONSTER_STATS;
 each is a Tune* variable on every creature's AI controller (npc/tuned.py).
 With the wendigo's hunt and what fire does to it there are more rows than
-the panel is tall, so the list scrolls: MON_VISIBLE_ROWS at a time, and the
-wheel moves the caret (tune_tab.TuneTab.visible_rows).
+the panel is tall, so the list scrolls: MON_VISIBLE_ROWS at a time, following
+the caret or the dragged bar (tune_tab.TuneTab.visible_rows).
 """
 
 from forest_generator.npc_placement import NPC_VARIANTS

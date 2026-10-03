@@ -6,12 +6,13 @@ the table written onto every carried gun.
         Up / Down                     TuneRow -/+ 1, kept in 0..STAT_COUNT + 1
                                       (the last is BACK, under the list)
       and unless the caret is on BACK:
-        Left / Right, or the wheel    TuneNudge = -1 / +1
+        Left / Right                  TuneNudge = -1 / +1
         Enter                         TuneSaveRequested = true (a tab with a
                                       save row: only with the caret on it)
     (the mouse: tune_draw raises the same flags from a click; BACK, by Enter
-     or a click, is tune_draw's too, because it must not also save. A
-     scrolling tab's wheel is Up / Down instead: the list follows the caret)
+     or a click, is tune_draw's too, because it must not also save. The
+     wheel is no key of a tab's; a scrolling tab's bar is dragged:
+     tune_scroll.py)
     TuneNudge != 0 -> lower it, then
         TuneRow 0                     TuneWeapon steps round the guns
         else                          TuneValues[gun, stat] +/- its step, never
@@ -48,9 +49,8 @@ from combat.paths import (
     ITEM_BP_PATH, ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.weapon_specs import _weapon_specs
-from graphics_menu.cursor_consts import WHEEL_LESS, WHEEL_MORE
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
-from graphics_menu.menu_nav import or_wheel, pause_row_taken
+from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.loot_find import put
 from graphics_menu.tune_consts import (
     GUN_TAB, STAT_COUNT, TUNE_LIVE_VAR, TUNE_TOUCHED_VAR,
@@ -157,15 +157,10 @@ def _author_keys(ed, pc_out, in_execs, made, tab, closes):
     active = _call(ed, FN_AND, made, A=_get(ed, MV.MenuOpen, made), B=_get(ed, tab.open_var, made))
     on, off = _branch(ed, out(active), [flow, no_t], made)
     flow = [on]
-    # A scrolling tab's wheel moves the caret (the list follows it); the
-    # others' wheel changes the value under it.
-    scrolls = tab.visible_rows > 0
-    for key, wheel, step, limit, bound in (
-            (TUNE_UP, WHEEL_MORE, FN_SUB_II, FN_MAX_II, 0),
-            (TUNE_DOWN, WHEEL_LESS, FN_ADD_II, FN_MIN_II, tab.back_row)):
+    for key, step, limit, bound in (
+            (TUNE_UP, FN_SUB_II, FN_MAX_II, 0),
+            (TUNE_DOWN, FN_ADD_II, FN_MIN_II, tab.back_row)):
         asked = _pressed(ed, pc_out, key, made)
-        if scrolls:
-            asked = or_wheel(ed, pc_out, asked, wheel, made)
         hit, miss = _branch(ed, asked, flow, made)
         moved = _call(ed, step, made, A=_get(ed, tab.row_var, made), B=1)
         held = _call(ed, limit, made, A=out(moved), B=bound)
@@ -173,10 +168,8 @@ def _author_keys(ed, pc_out, in_execs, made, tab, closes):
     in_list = _call(ed, FN_LESS_II, made, A=_get(ed, tab.row_var, made), B=tab.row_count)
     listed, on_back = _branch(ed, out(in_list), flow, made)
     flow = [listed]
-    for key, wheel, nudge in ((TUNE_LESS, WHEEL_LESS, -1), (TUNE_MORE, WHEEL_MORE, 1)):
+    for key, nudge in ((TUNE_LESS, -1), (TUNE_MORE, 1)):
         turned = _pressed(ed, pc_out, key, made)
-        if not scrolls:
-            turned = or_wheel(ed, pc_out, turned, wheel, made)
         hit, miss = _branch(ed, turned, flow, made)
         flow = [_setter(ed, tab.nudge_var, nudge, [hit], made), miss]
     if not tab.save_widget:

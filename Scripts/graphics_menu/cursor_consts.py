@@ -5,18 +5,19 @@
                         loot window)
     over a row          the caret goes to it, once the mouse moves or clicks
     left click          the row's Enter (on the M panel: the row is taken)
-    wheel up / down     Right / Left: a slider, the difficulty, a tuning stat
-                        (in a scrolling tab: Up / Down, the list follows)
+    wheel               nothing: no menu reads it
+    a scrolling list's  the left button held on it drags the list
+    bar                 (tune_scroll.py)
 
 Constants only. The graph is cursor.py; menu_nav.py holds what the key polls
-gain (the wheel), and Tick's test for a taken M-panel row.
+gain (a click), and Tick's test for a taken M-panel row.
 """
 
 CLICK_KEY = "LeftMouseButton"
-# The wheel stands in for Right (up) and Left (down). Not a second button: the
-# right one is the shoulder aim, and it would zoom behind the M panel.
-WHEEL_MORE, WHEEL_LESS = "MouseScrollUp", "MouseScrollDown"
-CURSOR_KEYS = (CLICK_KEY, WHEEL_MORE, WHEEL_LESS)
+# The wheel's two keys, which no menu polls: it turned values and moved carets
+# by accident. Named for the verifier, which checks nothing reads them.
+WHEEL_KEYS = ("MouseScrollUp", "MouseScrollDown")
+CURSOR_KEYS = (CLICK_KEY,)
 # What takes a BACK row with the caret on it (a click on the row does too).
 BACK_KEY = "Enter"
 
@@ -45,5 +46,14 @@ PAUSE_CLICK_VAR = "PauseClick"
 # held up while the cursor shows in a running game so a click fires nothing.
 TRIGGER_SPENT_VAR = "TriggerSpent"
 
-CURSOR_BOOLS = (CURSOR_WANTED_VAR, CURSOR_SHOWN_VAR, CURSOR_MOVED_VAR, CURSOR_ACCEPT_VAR)
+# A scrolling list's bar is being dragged (the left button went down on it and
+# is still down), and how far down the list's window the cursor is, 0..1.
+# The drag only writes these and tune_scroll.py scrolls from them, so a probe
+# drags without a mouse: SCROLL_GRAB_VAR up for one frame.
+SCROLL_GRAB_VAR = "ScrollGrab"
+SCROLL_AT_VAR = "ScrollAt"
+
+CURSOR_BOOLS = (CURSOR_WANTED_VAR, CURSOR_SHOWN_VAR, CURSOR_MOVED_VAR, CURSOR_ACCEPT_VAR,
+                SCROLL_GRAB_VAR)
 CURSOR_INTS = (CURSOR_ROW_VAR, PAUSE_CLICK_VAR)
+CURSOR_REALS = (SCROLL_AT_VAR,)

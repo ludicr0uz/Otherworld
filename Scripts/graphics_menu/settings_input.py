@@ -4,10 +4,10 @@ BACK, and the save written after every change.
 
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
 from graphics_menu.cursor import author_row_cursor
-from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, WHEEL_LESS, WHEEL_MORE
+from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR
 from graphics_menu.difficulty import emit_difficulty_nudge
 from graphics_menu.menu_nav import (
-    NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav, or_wheel)
+    NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav)
 from graphics_menu.ui_graph import part
 from graphics_menu.umg_consts import SETTINGS_ROWS_BOX, WBP_MAIN_MENU
 from graphics_menu.settings_rows import (
@@ -116,10 +116,9 @@ def _author_capture(ed, settings_out, in_execs, made):
     right = keep(_node(ed, FN_WAS_PRESSED))
     _connect(pc_out, _pin(right, "self"))
     _set(right, "Key", NAV_RIGHT)
-    # The wheel is Left/Right too, and a click on a row with no bind (a
-    # slider, the difficulty) is Right: one step up, or the next difficulty.
-    left_out = or_wheel(ed, pc_out, out(left), WHEEL_LESS, made)
-    right_out = or_wheel(ed, pc_out, out(right), WHEEL_MORE, made)
+    # A click on a row with no bind (a slider, the difficulty) is Right: one
+    # step up, or the next difficulty. The wheel is not a key here.
+    left_out, right_out = out(left), out(right)
     valued = keep(_node(ed, FN_LESS_II))
     _connect(out(keep(ed.add_get_member_variable_node(MV.MenuRow)), MV.MenuRow), _pin(valued, "A"))
     _set(valued, "B", FIRST_BIND_ROW)

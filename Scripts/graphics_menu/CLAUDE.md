@@ -111,7 +111,17 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   `ScrollBox` inside a `SizeBox` `visible_rows x TUNE_ROW_H` high, bar always shown.
   - Nothing is hit-testable, so the bar is a picture and the HUD scrolls: every DrawHUD,
     `ScrollWidgetIntoView(child at the caret's row)`, unanimated.
-  - The wheel is Up / Down there (the caret moves, the list follows), not Left / Right.
+  - **The bar is dragged** (`tune_scroll.py`): a left press inside the box that lands on no
+    row is on the bar (the ScrollBox draws it beside its rows), and raises `ScrollGrab`.
+    While it is up and the button down, `ScrollAt` is how far down the box the cursor is
+    (0..1); the list's offset is that as a whole number of rows (`SetScrollOffset`, the
+    thumb's centre under the cursor) and the caret is kept inside the window, because the
+    follow above would pull the list back to a caret left outside it. Vertical only: once
+    held, the cursor's X is not read.
+  - The scroll is served from `ScrollGrab`/`ScrollAt`, also on the frame the button comes
+    up, which is what lets `probe_menu_scroll.py` drag without a mouse.
+  - Its sum is plain arithmetic and Min / Max: `verify_graphics_menu.py` counts every
+    FClamp and MapRangeClamped of the HUD as a slider's or the clock's.
   - **A row scrolled out of the window keeps its geometry**, and lies over the hint and BACK
     below: the row test is ANDed with "the cursor is over the box" (`author_row_cursor`'s
     `within`).
@@ -119,9 +129,12 @@ it pauses nothing. The code and the notes below still call it "the M panel".
     (`get_desired_size()` works in a windowed `-game`; cached geometry still reads zeros).
 - **Probes:** `probe_menu_cursor.py` (a taken row served once, the tab in the panel's place,
   BACK's caret, the walk taken and given back) and the windowed `probe_menu_cursor_window.py`
-  (the graphics tab's five rows under the cursor and no more, the list scrolled to its end).
-- **Still needs a play session:** Enter and the arrows themselves, the click on BACK, the
-  wheel in the scrolling list, and how the corner panel reads.
+  (the graphics tab's five rows under the cursor and no more, the list scrolled to its end);
+  `probe_menu_scroll.py` (the bar dragged to the bottom, the middle and the top in both
+  scrolling tabs, the caret brought along, the list staying put once let go).
+- **Still needs a play session:** Enter and the arrows themselves, the click on BACK,
+  dragging the bar with a real mouse (no probe can press a button), and how the corner
+  panel reads.
 
 ## The mouse cursor (`cursor.py`, `cursor_consts.py`)
 
@@ -129,14 +142,17 @@ The cursor shows while a menu is up: the menu (on the title and in play, with it
 page and tuning tabs), the death menu, the loot window and the I panel. Otherwise it is hidden and the
 mouse is the camera's.
 
-| menu | cursor over a row | left click | wheel |
-|---|---|---|---|
-| settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up | Left / Right |
-| M panel | the caret goes there | takes the row (as Enter does) | |
-| tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel | Left / Right (the graphics tab: Up / Down, its list scrolls) |
-| loot window | the caret goes there | take; on the `[TAB] close` line: shut | |
-| I panel | the caret goes there (a worn slot) | on a worn slot: take that garment off; on the `[I] inventory` line: shut; on a slot: bring it to hand; a press on one slot and a release on another: move it there (a worn garment off into it, a carried one onto the worn grid worn) | |
-| death menu | | on the hint line: restart | |
+| menu | cursor over a row | left click |
+|---|---|---|
+| settings | the caret goes there | a bind row: arms the capture; BACK: back; a slider or the difficulty: one step up |
+| M panel | the caret goes there | takes the row (as Enter does) |
+| tuning tab | the caret goes there | one step up; on the hint line: save (the graphics tab: on its SAVE DEFAULT row); on BACK: back to the panel; held on a scrolling list's bar: drags the list |
+| loot window | the caret goes there | take; on the `[TAB] close` line: shut |
+| I panel | the caret goes there (a worn slot) | on a worn slot: take that garment off; on the `[I] inventory` line: shut; on a slot: bring it to hand; a press on one slot and a release on another: move it there (a worn garment off into it, a carried one onto the worn grid worn) |
+| death menu | | on the hint line: restart |
+
+**The wheel does nothing in any menu**: no key poll reads it (it turned a value or moved a
+caret whenever the mouse was nudged), and the verifier checks nothing polls its keys.
 
 - **The HUD is still the controller.** No widget is hit-testable. A row is under the cursor
   when `IsUnderLocation(row.GetCachedGeometry, CursorPos)`, tested in a ForLoop over the stack
@@ -153,9 +169,6 @@ mouse is the camera's.
   `resume` (it lowers `MenuOpen`, as M does), and every tuning tab has BACK. The loot window's `LootClose` line lowers
   `LootOpen` (`loot_draw.py`), and Tick stands the player up off that edge as after Tab. The
   settings page has its BACK row. The title's menu and the death screen have nothing to shut.
-- **The wheel is two more keys** OR'd into the Left/Right polls (`menu_nav.or_wheel`; in a
-  scrolling tab, the Up/Down polls), not the right button: that is the shoulder aim, and the
-  M panel does not pause.
 - **Shown is Game-and-UI, hidden is Game-only** (`author_cursor_mode`), switched only when
   `CursorWanted != CursorShown`. Without the Game-only call the camera stays dead after a
   menu closes until the next click.
@@ -169,7 +182,7 @@ mouse is the camera's.
   `uepy.py --game --windowed --probe Scripts/probes/probe_menu_cursor_window.py` (a real
   window: every row of the M panel, in play and on the title, and of the settings page found under the cursor). The
   windowed one moves the machine's pointer for a few seconds.
-- **Still needs a play session:** the click and the wheel themselves, the loot window's
+- **Still needs a play session:** the click itself, the loot window's
   close line under a real cursor (no probe can aim at it), the cursor's look, and
   how losing the mouse-look while the M panel or the loot window is open feels.
 
@@ -539,8 +552,8 @@ gives up and how long it runs). Same keys as GUN SETTINGS; **Enter** saves
 `Scripts/npc/monster_tuning.csv`.
 
 - **The list scrolls:** 14 rows at a time behind a scroll bar (`MON_VISIBLE_ROWS`,
-  `TuneTab.visible_rows`, as GRAPHICS SETTINGS's), so here the wheel moves the caret, not the
-  value under it.
+  `TuneTab.visible_rows`, as GRAPHICS SETTINGS's): the list follows the caret, and the mouse drags
+  its bar.
 - **The `hunt:` and `fire:` rows are on every creature,** since the tab is one table of
   creatures x stats, but only a creature that hunts (`NPC_STALK_ROAR`) or fears fire
   (`NPC_WARD_FEARS`) has graphs that read them: on the zombie they change nothing.

@@ -167,7 +167,7 @@ def main():
                          TT.TUNE_MORE, TT.TUNE_SAVE_KEY)
                         + N.START_KEYS + CC.CURSOR_KEYS)
     check("polls exactly the menu, restart, start, nav, loot, I panel and tuning-tab keys "
-          "and the cursor's click and wheel: no row of the M panel has a hotkey",
+          "and the cursor's click (never the wheel): no row of the M panel has a hotkey",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
     # Exactly one Key pin in this graph is driven rather than literal: the

@@ -8,10 +8,10 @@ import unreal
 
 from graphics_menu import cursor_consts as CC
 from graphics_menu import loot_consts as LC
-from graphics_menu import tune_tab as TT
 from graphics_menu import umg_consts as UC
 from graphics_menu.cursor import cursor_defaults
 from graphics_menu.inv_consts import DRAG_FROM_VAR, INV_OVER_VAR, SLOT_BOXES
+from graphics_menu.tune_scroll import hidden_rows, rows_per_window, thumb_half
 from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_checks import _tree
 from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_SEL_VAR
@@ -27,6 +27,8 @@ ROW_LISTS = 4 + len(TABS) + len(SLOT_BOXES)
 # BACK row.
 CLICK_LINES = 3 + 2 * len(TABS)
 # A scrolling tab's rows count only inside its list's window: one more test.
+# Its bar's drag reads the list's box twice more: the press on it, and how far
+# down it the cursor is (tune_scroll.py).
 WINDOWS = sum(1 for t in TABS if t.visible_rows)
 
 
@@ -117,8 +119,8 @@ def _check_rows(check, nodes):
              or not _feeders(n, "Geometry")]
     check(f"a row is under the cursor by its geometry: {ROW_LISTS} row lists, "
           f"{CLICK_LINES} hint (or save row) and BACK lines and {WINDOWS} scrolling list's "
-          "window, none hit-testable",
-          len(tests) == ROW_LISTS + CLICK_LINES + WINDOWS and not wrong,
+          "window (and its bar: the press, and where the drag is), none hit-testable",
+          len(tests) == ROW_LISTS + CLICK_LINES + 3 * WINDOWS and not wrong,
           f"{len(tests)} tests, {len(wrong)} not off CursorPos")
 
     rows = _sets(nodes, CC.CURSOR_ROW_VAR)
@@ -219,6 +221,40 @@ def _on_slot(user):
     return False
 
 
+def _users(n):
+    return [PIN.get_owning_node(q)
+            for q in BEL.find_output_pin(n, "ReturnValue").list_connected_pins()]
+
+
+def _check_scroll_drag(check, nodes):
+    """Each scrolling tab's bar: a press in the list's box off its rows grabs
+    it, and while grabbed the list's offset and the caret come from ScrollAt."""
+    wrong = []
+    for t in TABS:
+        moves = [n for n in nodes if "NewScrollOffset" in _pins(n)
+                 and f"Get {t.rows_box}" in _feeders(n, "self")]
+        if not t.visible_rows:
+            if moves:
+                wrong.append(f"{t.rows_box}: scrolled, though it is no scrolling list")
+            continue
+        # ScrollAt less half the thumb, times the rows a window's height is.
+        pasts = [n for n in nodes if _pins(n) == {"A", "B"}
+                 and _feeders(n, "A") == [f"Get {CC.SCROLL_AT_VAR}"]
+                 and abs(float(_value(n, "B") or 0) - thumb_half(t)) < 1e-6]
+        scaled = [u for n in pasts for u in _users(n) if _pins(u) == {"A", "B"}
+                  and abs(float(_value(u, "B") or 0) - rows_per_window(t)) < 1e-6]
+        if len(moves) != 1 or not scaled:
+            wrong.append(f"{t.rows_box}: {len(moves)} offset writes, {len(scaled)} sums of "
+                         f"{CC.SCROLL_AT_VAR} onto its {hidden_rows(t)} hidden rows")
+    grabs = sorted(_value(n, CC.SCROLL_GRAB_VAR) for n in _sets(nodes, CC.SCROLL_GRAB_VAR))
+    ats = _sets(nodes, CC.SCROLL_AT_VAR)
+    check(f"a scrolling list's bar is dragged ({WINDOWS} tabs): {CC.SCROLL_GRAB_VAR} is "
+          f"raised and lowered once per tab, {CC.SCROLL_AT_VAR} written once, and the "
+          "list's offset is that mapped onto the rows its window hides",
+          not wrong and WINDOWS > 0 and grabs == ["false"] * WINDOWS + ["true"] * WINDOWS
+          and len(ats) == WINDOWS, f"{wrong}, grabs {grabs}, {len(ats)} writes")
+
+
 def _check_clicks(check, nodes):
     polls = [n for n in nodes if {"Key", "self"} <= _pins(n)]
     by_key = {k: [n for n in polls if _value(n, "Key") == k] for k in CC.CURSOR_KEYS}
@@ -235,28 +271,9 @@ def _check_clicks(check, nodes):
     check("the left button is only ever read with the cursor over a row or a line "
           "(or, in the I panel, a slot: InvOver, or a drag begun on one)",
           bool(by_key[CC.CLICK_KEY]) and not loose, str(loose))
-    # Left/Right gain the wheel on the settings page and in each tuning tab;
-    # in a scrolling tab it is Up/Down's instead, and the list follows.
-    check("the wheel is Left/Right: the settings page and the tabs",
-          len(by_key[CC.WHEEL_MORE]) == 1 + len(TABS)
-          and len(by_key[CC.WHEEL_LESS]) == 1 + len(TABS),
-          f"{len(by_key[CC.WHEEL_MORE])} up, {len(by_key[CC.WHEEL_LESS])} down")
-    # Each wheel poll is OR'd with a key poll: which key says what it moves.
-    paired = {}
-    for wheel in (CC.WHEEL_MORE, CC.WHEEL_LESS):
-        for n in by_key[wheel]:
-            for q in BEL.find_output_pin(n, "ReturnValue").list_connected_pins():
-                either = PIN.get_owning_node(q)
-                for a in BEL.find_input_pin(either, "A").list_connected_pins():
-                    key = _value(PIN.get_owning_node(a), "Key")
-                    paired[(wheel, key)] = paired.get((wheel, key), 0) + 1
-    check(f"...except in a scrolling tab ({WINDOWS}), where it is Up/Down: the "
-          "caret moves and the list follows it",
-          paired == {(CC.WHEEL_MORE, TT.TUNE_MORE): 1 + len(TABS) - WINDOWS,
-                     (CC.WHEEL_LESS, TT.TUNE_LESS): 1 + len(TABS) - WINDOWS,
-                     (CC.WHEEL_MORE, TT.TUNE_UP): WINDOWS,
-                     (CC.WHEEL_LESS, TT.TUNE_DOWN): WINDOWS} and WINDOWS > 0,
-          str(paired))
+    wheel = [_title(n) for n in polls if _value(n, "Key") in CC.WHEEL_KEYS]
+    check("no menu reads the mouse wheel: nothing polls its keys", not wheel, str(wheel))
+    _check_scroll_drag(check, nodes)
 
     accepts = [_value(n, CC.CURSOR_ACCEPT_VAR) for n in _sets(nodes, CC.CURSOR_ACCEPT_VAR)]
     check("a click on a settings row, or on the death menu's hint, "
@@ -313,12 +330,12 @@ CC_SHOW = "bShowMouseCursor"
 
 def check_cursor(check, bp, nodes):
     names = {str(n) for n in BEL.list_member_variable_names(bp, False)}
-    wanted = set(CC.CURSOR_BOOLS + CC.CURSOR_INTS + (CC.CURSOR_POS_VAR,))
+    wanted = set(CC.CURSOR_BOOLS + CC.CURSOR_INTS + CC.CURSOR_REALS + (CC.CURSOR_POS_VAR,))
     check("the HUD has the cursor's variables", wanted <= names, str(sorted(wanted - names)))
     cdo = unreal.get_default_object(BEL.generated_class(bp))
     wrong = {k: cdo.get_editor_property(k) for k, v in cursor_defaults().items()
              if cdo.get_editor_property(k) != v}
-    check("the cursor starts hidden, over nothing, with nothing clicked", not wrong,
+    check("the cursor starts hidden, over nothing, with nothing clicked or dragged", not wrong,
           str(wrong))
     _check_widgets(check)
     _check_show(check, nodes)

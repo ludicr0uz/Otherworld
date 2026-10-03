@@ -7,7 +7,7 @@ player still.
 A -nullrhi run lays out no widget and has no mouse, so nothing is ever under
 the cursor here: the probe raises what a click would (CursorAccept,
 PauseClick) and calls the HUD's ReceiveDrawHUD itself, as probe_umg_screens
-does. Which row the cursor is over, and the click and the wheel themselves,
+does. Which row the cursor is over, and the click itself,
 need a window and a hand (graphics_menu/CLAUDE.md).
 """
 

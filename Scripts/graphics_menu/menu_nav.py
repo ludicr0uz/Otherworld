@@ -3,8 +3,8 @@ accept key takes the row. The menu's own rows and its settings page both use
 it (the rows with Enter alone, polled in menu_screens.py).
 
 Also what a key poll gains from the mouse (cursor_consts.py): a click raised
-as CursorAccept, the wheel as Left/Right (or_wheel); and how Tick learns
-that a row of the M panel was taken (pause_row_taken).
+as CursorAccept; and how Tick learns that a row of the M panel was taken
+(pause_row_taken). The wheel does nothing in a menu.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
@@ -110,18 +110,6 @@ def _emit_accept(ed, pc_out, in_exec, made):
     _set(served, CURSOR_ACCEPT_VAR, False)
     _connect(then(go), _pin(served, "execute"))
     return served
-
-
-def or_wheel(ed, pc_out, pressed, wheel_key, made):
-    """``pressed`` (a bool pin) OR the wheel turned ``wheel_key``'s way."""
-    wheel = _node(ed, FN_WAS_PRESSED)
-    _connect(pc_out, _pin(wheel, "self"))
-    _set(wheel, "Key", wheel_key)
-    either = _node(ed, FN_OR)
-    _connect(pressed, _pin(either, "A"))
-    _connect(out(wheel), _pin(either, "B"))
-    made += [wheel, either]
-    return out(either)
 
 
 def pause_row_taken(ed, action, made):

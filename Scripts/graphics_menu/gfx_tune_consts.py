@@ -19,8 +19,8 @@ Medium and High start every session as the CSV has them.
 
 The tab is the one the player keeps open while looking at the picture, so it
 is small and out of the way: bottom right, a small title, and a list that
-shows GFX_VISIBLE_ROWS rows at a time behind a scroll bar (the wheel moves
-the caret, and the list follows it). The rows, their steps and limits are
+shows GFX_VISIBLE_ROWS rows at a time behind a scroll bar (the list follows
+the caret, and the bar is dragged: tune_scroll.py). The rows, their steps and limits are
 gfx_stats.GFX_STATS.
 """
 

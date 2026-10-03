@@ -8,7 +8,7 @@ engine draws the HUD itself, and the probe sweeps the real cursor down each
 menu with SetMouseLocation and reads CursorRow and the caret back.
 
 It moves the machine's mouse pointer for a few seconds. It cannot press a
-button or turn the wheel. Python reads a widget's cached geometry back as
+button. Python reads a widget's cached geometry back as
 zeros, so the sweep finds the rows instead of aiming at them.
 """
 

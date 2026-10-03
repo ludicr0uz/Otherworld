@@ -206,7 +206,7 @@ SETTINGS_ROW_LABELS = (tuple(sl.label for sl in SLIDERS) + (DIFFICULTY_LABEL,)
 SETTINGS_TITLE_TEXT = SETTINGS_TITLE
 SETTINGS_PANEL_W = 620.0
 SET_TITLE_FONT, SET_HINT_FONT = 22.0, 12.0
-HINT_IDLE_TEXT = "arrows or wheel adjust  ·  ENTER or click rebinds"
+HINT_IDLE_TEXT = "arrows adjust  ·  ENTER or click rebinds"
 HINT_CAPTURE_TEXT = "press any key to bind it"
 
 # ─── WBP_PauseMenu: the menu ──────────────────────────────────────────────────

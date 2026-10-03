@@ -9,9 +9,12 @@ FN_SET_FILL = "/Script/UMG.ProgressBar.SetFillColorAndOpacity"
 FN_SET_PERCENT = "/Script/UMG.ProgressBar.SetPercent"
 
 FN_SCROLL_TO = "/Script/UMG.ScrollBox.ScrollWidgetIntoView"
+FN_SET_SCROLL_OFFSET = "/Script/UMG.ScrollBox.SetScrollOffset"
 
 FN_SET_WIDTH = "/Script/UMG.SizeBox.SetWidthOverride"
 
+FN_ABS_TO_LOCAL = "/Script/UMG.SlateBlueprintLibrary.AbsoluteToLocal"
+FN_LOCAL_SIZE = "/Script/UMG.SlateBlueprintLibrary.GetLocalSize"
 FN_UNDER = "/Script/UMG.SlateBlueprintLibrary.IsUnderLocation"
 
 FN_SET_TEXT = "/Script/UMG.TextBlock.SetText"

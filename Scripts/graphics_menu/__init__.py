@@ -109,6 +109,8 @@ Input, settings and state
   tune_tick       Tick: any tab's keys, nudge and save (author_tab_flow), and
                   the gun table onto every carried gun, and the knife's and
                   the axe's throw rows onto them (run after loot_tick's)
+  tune_scroll     DrawHUD: a scrolling tab's bar dragged by the mouse (the
+                  list scrolled a whole row at a time, the caret kept in it)
   tune_draw       DrawHUD: a tab's panel, the subject and its values, the
                   caret, BACK, a scrolling list kept on the caret's row
   tune_save       run in the game by the save: the live table into

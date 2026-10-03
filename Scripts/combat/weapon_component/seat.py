@@ -106,7 +106,7 @@ def _author_unseat(ed, keep, exec_in):
     """Clear the latch, the seat and the look at once; returns the exec pin
     after."""
     seated = keep(ed.add_set_member_variable_node(SEATED_VAR))
-    _set(seated, SEATED_VAR, "false")
+    _set(seated, SEATED_VAR, False)
     _connect(exec_in, _pin(seated, "execute"))
     seat = keep(ed.add_set_member_variable_node(SEAT_VAR))
     _set(seat, SEAT_VAR, 0.0)

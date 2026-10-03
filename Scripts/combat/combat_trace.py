@@ -35,8 +35,8 @@ def _author_switch(ed, event_name, value):
 
     say = _node(ed, FN_PRINT)
     _set(say, "InString", f"{COMBAT_TRACE_PREFIX}{'on' if value else 'off'}")
-    _set(say, "bPrintToScreen", "true")
-    _set(say, "bPrintToLog", "true")
+    _set(say, "bPrintToScreen", True)
+    _set(say, "bPrintToLog", True)
     _set(say, "Duration", 3.0)
     _connect(then(flip), _pin(say, "execute"))
     return [event, flip, say]

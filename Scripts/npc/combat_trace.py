@@ -117,8 +117,8 @@ def _author_melee_trace(ed, exec_in, self_pawn_out, self_loc_out, player_out,
 
     say = keep(_node(ed, FN_PRINT))
     _connect(line, _pin(say, "InString"))
-    _set(say, "bPrintToScreen", "false")
-    _set(say, "bPrintToLog", "true")
+    _set(say, "bPrintToScreen", False)
+    _set(say, "bPrintToLog", True)
     _set(say, "Duration", 0.0)
     _connect(then(mine), _pin(say, "execute"))
 

@@ -128,7 +128,7 @@ def _author_make_noise(ed, exec_in, location, reach,
     # One exec out whether or not the record was replaced, and whether or not
     # the GameMode was the one this project builds.
     out = keep(ed.add_branch_node())
-    _set(out, "Condition", "true")
+    _set(out, "Condition", True)
     for pin in (tail, else_(lands), _pin(as_mode, "CastFailed", is_input=False)):
         _connect(pin, _pin(out, "execute"))
     return made, then(out)

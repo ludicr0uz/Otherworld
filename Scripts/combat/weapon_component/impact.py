@@ -138,7 +138,7 @@ def _author_impact(ed, brk, held, exec_in):
 
     blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(blame, "self"))
-    _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
+    _set(blame, DAMAGED_BY_PLAYER_VAR, True)
     _connect(then(stamp), _pin(blame, "execute"))
 
     # ...and which way it came from, for the flinch. The IMPACT NORMAL, not the
@@ -277,9 +277,9 @@ def _author_hit_zone(ed, brk, exec_in):
     _connect(_loose_pin(brk, "TraceEnd", is_input=False), _pin(probe, "TraceEnd"))
     # Simple collision is the physics asset's capsules and spheres, which is
     # the point: complex would be the render mesh, which has no bone to report.
-    _set(probe, "bTraceComplex", "false")
-    _set(probe, "bShowTrace", "false")
-    _set(probe, "bPersistentShowTrace", "false")
+    _set(probe, "bTraceComplex", False)
+    _set(probe, "bShowTrace", False)
+    _set(probe, "bPersistentShowTrace", False)
     _connect(then(as_char), _pin(probe, "execute"))
 
     struck = keep(ed.add_branch_node())

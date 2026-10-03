@@ -58,7 +58,7 @@ class _Graph:
         """A Branch on ``condition`` (None: always true), run by ``exec_in``."""
         node = self.keep(self.ed.add_branch_node())
         if condition is None:       # a join: several exec wires into one
-            _set(node, "Condition", "true")
+            _set(node, "Condition", True)
         else:
             _connect(condition, _pin(node, "Condition"))
         for source in (exec_in if isinstance(exec_in, list) else [exec_in]):

@@ -81,7 +81,7 @@ def _author_use(ed, pc_out, owner_out, held, armed_out, sights_key, exec_ins):
     _connect(gate2(FN_AND, free, negate(sighted)), _pin(mark, USING_VAR))
     _connect(then(gate), _pin(mark, "execute"))
     idle = keep(ed.add_set_member_variable_node(USING_VAR))
-    _set(idle, USING_VAR, "false")
+    _set(idle, USING_VAR, False)
     _connect(else_(gate), _pin(idle, "execute"))
 
     # The press: read against last frame's Using before that is overwritten.

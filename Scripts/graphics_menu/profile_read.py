@@ -64,7 +64,7 @@ def _author_respawn_items(ed, prof, wc, pawn_out, exec_in, made):
     # Carried, not lying in the world: a consumable defaults to Dropped.
     held = ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH)
     _connect(item, _pin(held, "self"))
-    _set(held, IV.Dropped, "false")
+    _set(held, IV.Dropped, False)
     _connect(then(spawn), _pin(held, "execute"))
     made.append(held)
     flow = then(held)
@@ -133,7 +133,7 @@ def author_read_profile(ed, in_exec, parts, made):
                  WEAPON_COMP_CLASS_PATH, "EquippedIndex", done, made)
     dirty = ed.add_set_member_variable_node(WV.NeedsRefresh, WEAPON_COMP_CLASS_PATH)
     _connect(wc, _pin(dirty, "self"))
-    _set(dirty, WV.NeedsRefresh, "true")
+    _set(dirty, WV.NeedsRefresh, True)
     _connect(flow, _pin(dirty, "execute"))
     made.append(dirty)
     ed.add_comment_to_nodes(

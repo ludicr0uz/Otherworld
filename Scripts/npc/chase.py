@@ -30,12 +30,12 @@ def _author_chase(ed, exec_in):
 
     # Pathfinding is what makes it run around the trees rather than into them.
     _set(move_to, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
-    _set(move_to, "bUsePathfinding", "true")
-    _set(move_to, "bStopOnOverlap", "true")
+    _set(move_to, "bUsePathfinding", True)
+    _set(move_to, "bStopOnOverlap", True)
     # Partial paths keep the NPC advancing as far as the navmesh allows instead
     # of refusing to move at all; the tree then re-paths on its next pass, so a
     # temporary dead end does not end the chase.
-    _set(move_to, "bAllowPartialPath", "true")
+    _set(move_to, "bAllowPartialPath", True)
 
     # --- can this chase be pathfound at all? ---------------------------------
     # See NAV_REACHABLE_EXTENT_CM. Both ends are tested, and both have to be
@@ -92,10 +92,10 @@ def _author_chase(ed, exec_in):
     direct = _node(ed, FN_MOVE_TO_LOCATION)
     _connect(goal_out, _pin(direct, "Dest"))
     _set(direct, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
-    _set(direct, "bUsePathfinding", "false")
-    _set(direct, "bProjectDestinationToNavigation", "false")
-    _set(direct, "bStopOnOverlap", "true")
-    _set(direct, "bCanStrafe", "false")
+    _set(direct, "bUsePathfinding", False)
+    _set(direct, "bProjectDestinationToNavigation", False)
+    _set(direct, "bStopOnOverlap", True)
+    _set(direct, "bCanStrafe", False)
     _connect(else_(pathable), BEL.find_execute_pin(direct))
 
     nodes = [move_to, get_pawn, reach, goal_loc, goal_on, here_pawn, here_loc,

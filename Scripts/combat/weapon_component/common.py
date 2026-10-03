@@ -36,11 +36,11 @@ def _trace_defaults(node):
     separate DrawDebugLine behind a Branch instead (see _author_fire).
     """
     _set(node, "TraceChannel", "TraceTypeQuery1")   # Visibility
-    _set(node, "bTraceComplex", "false")
+    _set(node, "bTraceComplex", False)
     # Ignores the pawn this component hangs off. The weapon actor is separate
     # and *not* ignored, but every one of its parts is NoCollision, so a pellet
     # cannot hit the gun it came out of.
-    _set(node, "bIgnoreSelf", "true")
+    _set(node, "bIgnoreSelf", True)
     _set(node, "DrawDebugType", "None")
 
 

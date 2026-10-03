@@ -49,7 +49,7 @@ def _author_debuff_sync(ed, asc, stat, effect_var, tags, exec_in):
     count = keep(_node(ed, FN_EFFECT_COUNT))
     _connect(asc, _pin(count, "self"))
     _connect(effect_out, _pin(count, "SourceGameplayEffect"))
-    _set(count, "bEnforceOnGoingCheck", "true")
+    _set(count, "bEnforceOnGoingCheck", True)
     active = keep(_node(ed, FN_GREATER_II))
     _connect(out(count), _pin(active, "A"))
     _set(active, "B", 0)

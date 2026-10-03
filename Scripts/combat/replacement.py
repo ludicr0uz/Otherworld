@@ -179,7 +179,7 @@ def _author_replacement(ed, exec_in):
     # The terrain is imported with complex collision, and its simple collision
     # is a box around the whole 200 m mesh -- tracing against that would seat
     # every respawn on an invisible lid.
-    _set(drop, "bTraceComplex", "true")
+    _set(drop, "bTraceComplex", True)
     for tail in ready:
         _connect(tail, _pin(drop, "execute"))
 

@@ -60,7 +60,7 @@ def _author_seed_streams(ed, mode_out, exec_in, keep):
         _connect(step, _pin(seed, "execute"))
         step = then(seed)
     done = keep(_mode_var(ed, mode_out, GUN_STREAMS_SEEDED_VAR, setter=True))
-    _set(done, GUN_STREAMS_SEEDED_VAR, "true")
+    _set(done, GUN_STREAMS_SEEDED_VAR, True)
     _connect(step, _pin(done, "execute"))
     return then(first), then(done)
 
@@ -161,7 +161,7 @@ def _author_gun_drop(ed, mode_out, at, exec_in):
     loose = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
     _connect(_loose_pin(as_item, "AsBPWeaponItem", is_input=False),
              _pin(loose, "self"))
-    _set(loose, IV.Dropped, "true")
+    _set(loose, IV.Dropped, True)
     _connect(then(as_item), _pin(loose, "execute"))
 
     total = sum(w for _, w in GUN_LOOT_TABLE)

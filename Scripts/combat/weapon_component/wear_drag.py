@@ -62,9 +62,9 @@ def _author_wear_request(ed, in_execs):
 
     put_on = g.call(FN_ARR_SET, [swapped, bare, empty],
                     TargetArray=g.get(WORN_VAR), Index=slot, Item=item)
-    _set(put_on, "bSizeToFit", "true")
+    _set(put_on, "bSizeToFit", True)
     hide = g.call(FN_SET_HIDDEN, [then(put_on)], self=item)
-    _set(hide, "bNewHidden", "true")
+    _set(hide, "bNewHidden", True)
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(hide)])
     flow = g.put(WV.NeedsRefresh, "true", [flow])
     ed.add_comment_to_nodes(

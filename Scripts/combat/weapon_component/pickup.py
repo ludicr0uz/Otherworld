@@ -92,7 +92,7 @@ def _author_take_item(ed, target, exec_in):
 
     clear = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
     _connect(best, _pin(clear, "self"))
-    _set(clear, IV.Dropped, "false")
+    _set(clear, IV.Dropped, False)
     _connect(then(room), _pin(clear, "execute"))
     # Off whatever it was left attached to (a blade thrown into a body),
     # staying where it is: the equip puts it in the hand, or hides it.

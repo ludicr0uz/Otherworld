@@ -66,7 +66,7 @@ def _author_held_two_handed(ed, held, armed_out, exec_ins):
     _connect(out(flag, IV.TwoHanded), _pin(copy, HELD_TWO_HANDED))
     _connect(then(gate), _pin(copy, "execute"))
     clear = ed.add_set_member_variable_node(HELD_TWO_HANDED)
-    _set(clear, HELD_TWO_HANDED, "false")
+    _set(clear, HELD_TWO_HANDED, False)
     _connect(else_(gate), _pin(clear, "execute"))
     point = ed.add_get_member_variable_node(SUPPORT_POINT_VAR, ITEM_CLASS_PATH)
     _connect(held, _pin(point, "self"))

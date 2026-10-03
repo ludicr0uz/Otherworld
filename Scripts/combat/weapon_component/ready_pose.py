@@ -121,7 +121,7 @@ def _author_ready_pose_keepalive(ed, held, exec_ins):
         after_replay = then(say)
 
     join = keep(ed.add_branch_node())
-    _set(join, "Condition", "true")
+    _set(join, "Condition", True)
     _connect(after_replay, _pin(join, "execute"))
     _connect(else_(gate), _pin(join, "execute"))
 
@@ -159,7 +159,7 @@ def _author_lowered_pose_edge(ed, exec_ins):
     _connect(now_sprint_out, _pin(remember, POSE_LOWERED_VAR))
     _connect(then(pose_gate), _pin(remember, "execute"))
     pose_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
-    _set(pose_dirty, WV.NeedsRefresh, "true")
+    _set(pose_dirty, WV.NeedsRefresh, True)
     _connect(then(remember), _pin(pose_dirty, "execute"))
 
     ed.add_comment_to_nodes(

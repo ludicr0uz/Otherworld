@@ -64,7 +64,7 @@ def _author_random_sound(ed, var_name, at_pin, exec_in):
     # there was a sound to play. Without it the empty-array path dangles and
     # the chase loop ends the first time a wanderer tries to speak.
     join = keep(ed.add_branch_node())
-    _set(join, "Condition", "true")
+    _set(join, "Condition", True)
     _connect(then(play), _pin(join, "execute"))
     _connect(else_(have), _pin(join, "execute"))
     return made, then(join)

@@ -91,18 +91,18 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     # Alive, or nothing to die with: one setter both arms run into, so the
     # rest of the Tick still hangs off a single exec pin.
     alive = keep(ed.add_set_member_variable_node(OWNER_DEAD_VAR))
-    _set(alive, OWNER_DEAD_VAR, "false")
+    _set(alive, OWNER_DEAD_VAR, False)
     _connect(else_(gate), _pin(alive, "execute"))
     _connect(_pin(cast, "CastFailed", is_input=False), _pin(alive, "execute"))
 
     # Dead. Nothing below reaches the rest of the Tick.
     gone = keep(ed.add_set_member_variable_node(OWNER_DEAD_VAR))
-    _set(gone, OWNER_DEAD_VAR, "true")
+    _set(gone, OWNER_DEAD_VAR, True)
     _connect(then(gate), _pin(gone, "execute"))
     flow = then(gone)
     for name in LET_GO_VARS:
         drop = keep(ed.add_set_member_variable_node(name))
-        _set(drop, name, "false")
+        _set(drop, name, False)
         _connect(flow, _pin(drop, "execute"))
         flow = then(drop)
 
@@ -151,7 +151,7 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     body = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     shown = keep(_node(ed, FN_SET_OWNER_NO_SEE))
     _connect(out(body, WV.OwnerMesh), _pin(shown, "self"))
-    _set(shown, "bNewOwnerNoSee", "false")
+    _set(shown, "bNewOwnerNoSee", False)
     _connect(then(level), _pin(shown, "execute"))
     # ...and the head the sights hid (head_hide.py).
     headed = _author_head_shown(ed, keep, then(shown))
@@ -160,7 +160,7 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     _connect(headed, _pin(armed, "execute"))
     untuck = keep(_node(ed, FN_SET_HIDDEN))
     _connect(held, _pin(untuck, "self"))
-    _set(untuck, "bNewHidden", "false")
+    _set(untuck, "bNewHidden", False)
     _connect(then(armed), _pin(untuck, "execute"))
 
     ed.add_comment_to_nodes(

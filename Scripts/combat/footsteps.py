@@ -102,7 +102,7 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None):
     _connect(then(have), _pin(play, "execute"))
 
     join = keep(ed.add_branch_node())
-    _set(join, "Condition", "true")
+    _set(join, "Condition", True)
     _connect(then(play), _pin(join, "execute"))
     _connect(else_(have), _pin(join, "execute"))
     return made, then(join)

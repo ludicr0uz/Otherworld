@@ -77,7 +77,7 @@ def _author_alive_gate(ed, exec_in):
 
     def result():
         node = keep(ed.add_set_member_variable_node(STEP_RESULT_VAR))
-        _set(node, STEP_RESULT_VAR, "false")
+        _set(node, STEP_RESULT_VAR, False)
         return node
 
     pawn = keep(_node(ed, FN_GET_PAWN))
@@ -142,7 +142,7 @@ def _author_corpse_gate(ed, exec_in):
     _connect(then(health), _pin(is_dead, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(CORPSE_VAR))
-    _set(mark, CORPSE_VAR, "true")
+    _set(mark, CORPSE_VAR, True)
     _connect(then(is_dead), _pin(mark, "execute"))
     halt = keep(_node(ed, FN_STOP_MOVEMENT))
     _connect(then(mark), _pin(halt, "execute"))
@@ -169,8 +169,8 @@ def _author_corpse_gate(ed, exec_in):
     _set(line, "B", " is a corpse: heartbeat stopped, it no longer chases or swings")
     say = keep(_node(ed, FN_PRINT))
     _connect(out(line), _pin(say, "InString"))
-    _set(say, "bPrintToScreen", "false")
-    _set(say, "bPrintToLog", "true")
+    _set(say, "bPrintToScreen", False)
+    _set(say, "bPrintToLog", True)
     _set(say, "Duration", 0.0)
     _connect(then(halt), _pin(say, "execute"))
     # The tree ends here. StopLogic called from inside a running task is

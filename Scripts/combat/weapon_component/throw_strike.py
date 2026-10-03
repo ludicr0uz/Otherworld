@@ -169,7 +169,7 @@ def _author_wound(ed, as_health, damage, brk, execs):
     _connect(then(set_h), _pin(stamp, "execute"))
     blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(blame, "self"))
-    _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
+    _set(blame, DAMAGED_BY_PLAYER_VAR, True)
     _connect(then(stamp), _pin(blame, "execute"))
     from_where = ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(from_where, "self"))
@@ -218,9 +218,9 @@ def _body_trace(ed, mesh_out, start, end, exec_in):
     _connect(start, _pin(skin, "TraceStart"))
     _connect(end, _pin(skin, "TraceEnd"))
     # Simple collision: the physics asset's bodies, each of which names its bone.
-    _set(skin, "bTraceComplex", "false")
-    _set(skin, "bShowTrace", "false")
-    _set(skin, "bPersistentShowTrace", "false")
+    _set(skin, "bTraceComplex", False)
+    _set(skin, "bShowTrace", False)
+    _set(skin, "bPersistentShowTrace", False)
     _connect(exec_in, _pin(skin, "execute"))
     found = ed.add_branch_node()
     _connect(out(skin), _pin(found, "Condition"))
@@ -280,7 +280,7 @@ def _author_skin(ed, brk, exec_in):
     near = _node(ed, FN_CLOSEST_BONE)
     _connect(mesh_out, _pin(near, "self"))
     _connect(_hit(brk, "ImpactPoint"), _pin(near, "TestLocation"))
-    _set(near, "bRequirePhysicsAsset", "true")
+    _set(near, "bRequirePhysicsAsset", True)
     # Const, so pure here; were it ever given an exec pin, it goes in the chain.
     runs = BEL.find_input_pin(near, "execute")
     if runs and runs.is_valid():
@@ -386,7 +386,7 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     _connect(_loose_pin(tree, "AsInstancedStaticMeshComponent", is_input=False),
              _pin(stands, "self"))
     _connect(_hit(brk, "HitItem"), _pin(stands, "InstanceIndex"))
-    _set(stands, "bWorldSpace", "true")
+    _set(stands, "bWorldSpace", True)
     # Const, so pure here; were it ever given an exec pin, it goes in the chain.
     runs = BEL.find_input_pin(stands, "execute")
     if runs and runs.is_valid():

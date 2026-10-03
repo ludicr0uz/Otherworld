@@ -156,7 +156,7 @@ def _author_cooling(ed, tick):
     _connect(out(over), _pin(cooled, "Condition"))
     _connect(then(tick), _pin(cooled, "execute"))
     cold = ed.add_set_member_variable_node(HOT_VAR)
-    _set(cold, HOT_VAR, "false")
+    _set(cold, HOT_VAR, False)
     _connect(then(cooled), _pin(cold, "execute"))
 
     # Read after the write above: a pure Get is pulled when its reader runs.

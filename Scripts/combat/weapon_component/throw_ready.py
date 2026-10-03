@@ -129,6 +129,6 @@ def _author_ready_down(ed, exec_in):
     """The aim was called off: re-equip, which puts the held item's own pose
     back in the slot (or stops it, under a lowered gun). Returns the exit."""
     dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
-    _set(dirty, WV.NeedsRefresh, "true")
+    _set(dirty, WV.NeedsRefresh, True)
     _connect(exec_in, _pin(dirty, "execute"))
     return then(dirty)

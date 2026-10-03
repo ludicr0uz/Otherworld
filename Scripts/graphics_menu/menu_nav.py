@@ -107,7 +107,7 @@ def _emit_accept(ed, pc_out, in_exec, made):
     for e in in_exec:
         _connect(e, _pin(go, "execute"))
     served = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
-    _set(served, CURSOR_ACCEPT_VAR, "false")
+    _set(served, CURSOR_ACCEPT_VAR, False)
     _connect(then(go), _pin(served, "execute"))
     return served
 

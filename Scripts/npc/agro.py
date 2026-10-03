@@ -91,7 +91,7 @@ def _author_enter_agro(ed, reasons, chase_in):
         return n
 
     flip = keep(ed.add_set_member_variable_node(AGGRO_VAR))
-    _set(flip, AGGRO_VAR, "true")
+    _set(flip, AGGRO_VAR, True)
     for sense, exec_pin in reasons:
         why = keep(ed.add_set_member_variable_node(AGGRO_REASON_VAR))
         _set(why, AGGRO_REASON_VAR, sense)
@@ -153,7 +153,7 @@ def _author_tell_blackboard(ed, done_in):
     flag = keep(_node(ed, FN_BB_SET_BOOL))
     _connect(board_out, _pin(flag, "self"))
     _connect(_name_literal(ed, BB_AGGRO_KEY), _pin(flag, "KeyName"))
-    _set(flag, "BoolValue", "true")
+    _set(flag, "BoolValue", True)
     reason = keep(ed.add_get_member_variable_node(AGGRO_REASON_VAR))
     why = keep(_node(ed, FN_BB_SET_STRING))
     _connect(board_out, _pin(why, "self"))

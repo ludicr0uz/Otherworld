@@ -535,12 +535,12 @@ def _author_begin_play(ed, begin_play):
     _connect(out(started, GAME_STARTED_VAR), _pin(still_on_menu, "Condition"))
     _connect(then(settle), _pin(still_on_menu, "execute"))
     hold = _node(ed, FN_SET_PAUSED)
-    _set(hold, "bPaused", "true")
+    _set(hold, "bPaused", True)
     _connect(else_(still_on_menu), _pin(hold, "execute"))
 
     # Straight into the game, for a run with nobody to press Enter.
     skip = ed.add_set_member_variable_node(GAME_STARTED_VAR)
-    _set(skip, GAME_STARTED_VAR, "true")
+    _set(skip, GAME_STARTED_VAR, True)
     _connect(else_(shown), _pin(skip, "execute"))
 
     ed.add_comment_to_nodes(
@@ -838,7 +838,7 @@ def _author_draw(ed):
     _connect(out(on_get, DEBUG_MODE_VAR), _pin(copy_dbg, MV.DebugOn))
     _connect(then(as_mode), _pin(copy_dbg, "execute"))
     no_dbg = ed.add_set_member_variable_node(MV.DebugOn)
-    _set(no_dbg, MV.DebugOn, "false")
+    _set(no_dbg, MV.DebugOn, False)
     _connect(out(as_mode, "CastFailed"), _pin(no_dbg, "execute"))
 
     # The player's settings, onto the weapon component. Before the menu and

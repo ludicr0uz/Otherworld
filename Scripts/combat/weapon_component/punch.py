@@ -259,7 +259,7 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     _connect(then(set_h), _pin(stamp, "execute"))
     blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(blame, "self"))
-    _set(blame, DAMAGED_BY_PLAYER_VAR, "true")
+    _set(blame, DAMAGED_BY_PLAYER_VAR, True)
     _connect(then(stamp), _pin(blame, "execute"))
     from_where = ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(from_where, "self"))

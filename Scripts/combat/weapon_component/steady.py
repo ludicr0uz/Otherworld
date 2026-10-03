@@ -93,7 +93,7 @@ def _author_steady(ed, owner_out, exec_ins):
     _connect(out(caught), _pin(mid, "Condition"))
     _connect(then(cast), _pin(mid, "execute"))
     dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
-    _set(dirty, WV.NeedsRefresh, "true")
+    _set(dirty, WV.NeedsRefresh, True)
     _connect(then(mid), _pin(dirty, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(STEADY_VAR, HEALTH_CLASS_PATH))

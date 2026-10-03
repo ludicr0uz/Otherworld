@@ -148,7 +148,7 @@ def _author_torch(ed, held, owner, exec_ins):
     _connect(then(at_fire), _pin(burn, "execute"))
     light = keep(ed.add_set_member_variable_node(LIT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(light, "self"))
-    _set(light, LIT_VAR, "true")
+    _set(light, LIT_VAR, True)
     _connect(then(burn), _pin(light, "execute"))
 
     settled = (then(out_), then(idle), else_(wants), else_(at_fire), then(light))

@@ -52,7 +52,7 @@ def _author_drop(ed, held, owner, exec_in):
 
     flag = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
     _connect(held, _pin(flag, "self"))
-    _set(flag, IV.Dropped, "true")
+    _set(flag, IV.Dropped, True)
     _connect(exec_in, _pin(flag, "execute"))
 
     off = keep(_node(ed, FN_DETACH))
@@ -63,7 +63,7 @@ def _author_drop(ed, held, owner, exec_in):
     # by the sight camera (sights.py), and nothing else would ever show it.
     shown = keep(_node(ed, FN_SET_HIDDEN))
     _connect(held, _pin(shown, "self"))
-    _set(shown, "bNewHidden", "false")
+    _set(shown, "bNewHidden", False)
     _connect(then(off), _pin(shown, "execute"))
 
     loc = keep(_node(ed, FN_ACTOR_LOC))
@@ -94,8 +94,8 @@ def _author_drop(ed, held, owner, exec_in):
     _connect(out(start), _pin(ground, "Start"))
     _connect(out(down), _pin(ground, "End"))
     _set(ground, "TraceChannel", "TraceTypeQuery1")
-    _set(ground, "bTraceComplex", "false")
-    _set(ground, "bIgnoreSelf", "true")
+    _set(ground, "bTraceComplex", False)
+    _set(ground, "bIgnoreSelf", True)
     _set(ground, "DrawDebugType", "None")
     _connect(then(shown), _pin(ground, "execute"))
 
@@ -196,12 +196,12 @@ def _author_equip(ed, exec_in):
 
     show = keep(_node(ed, FN_SET_HIDDEN))
     _connect(item, _pin(show, "self"))
-    _set(show, "bNewHidden", "false")
+    _set(show, "bNewHidden", False)
     _connect(then(chosen), _pin(show, "execute"))
 
     hide = keep(_node(ed, FN_SET_HIDDEN))
     _connect(item, _pin(hide, "self"))
-    _set(hide, "bNewHidden", "true")
+    _set(hide, "bNewHidden", True)
     _connect(else_(chosen), _pin(hide, "execute"))
 
     mesh = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
@@ -392,7 +392,7 @@ def _author_wc_begin_play(ed, begin):
         prev = then(slot)
 
     dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
-    _set(dirty, WV.NeedsRefresh, "true")
+    _set(dirty, WV.NeedsRefresh, True)
     _connect(prev, _pin(dirty, "execute"))
 
     ed.add_comment_to_nodes(

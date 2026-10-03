@@ -130,14 +130,14 @@ def _author_patrol_setup(ed, exec_in):
     _connect(then(as_char), _pin(cache, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(PATROL_READY_VAR))
-    _set(mark, PATROL_READY_VAR, "true")
+    _set(mark, PATROL_READY_VAR, True)
     # A pawn that is not a Character still gets a centre and is marked ready,
     # or it would retry the setup on every heartbeat forever.
     for pin in (then(cache), _pin(as_char, "CastFailed", is_input=False)):
         _connect(pin, _pin(mark, "execute"))
 
     out = keep(ed.add_branch_node())
-    _set(out, "Condition", "true")
+    _set(out, "Condition", True)
     _connect(then(mark), _pin(out, "execute"))
     _connect(then(first), _pin(out, "execute"))
     return made, then(out)

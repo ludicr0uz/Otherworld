@@ -115,7 +115,7 @@ def _author_heat_item(ed, target, exec_in):
     _connect(then(gate), _pin(cool, "execute"))
     hot = keep(ed.add_set_member_variable_node(HOT_VAR, ITEM_CLASS_PATH))
     _connect(held, _pin(hot, "self"))
-    _set(hot, HOT_VAR, "true")
+    _set(hot, HOT_VAR, True)
     _connect(then(cool), _pin(hot, "execute"))
 
     ed.add_comment_to_nodes(

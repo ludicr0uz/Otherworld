@@ -163,7 +163,7 @@ def build_health_component(rebuild=True):
     _connect(then(at_zero), _pin(already, "execute"))
 
     mark = ed.add_set_member_variable_node(HV.Dead)
-    _set(mark, HV.Dead, "true")
+    _set(mark, HV.Dead, True)
     _connect(else_(already), _pin(mark, "execute"))
 
     despawn_get = ed.add_get_member_variable_node(HV.DespawnOnDeath)

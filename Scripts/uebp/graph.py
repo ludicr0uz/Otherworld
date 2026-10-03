@@ -84,8 +84,16 @@ def _connect(a, b):
         raise RuntimeError("could not connect pins")
 
 
+def _literal(value):
+    """A Python value as a pin literal: a bool is ``true``/``false``."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 def _set(node, name, value):
-    """Set a pin's literal, and prove it landed.
+    """Set a pin's literal, and prove it landed. ``value`` is a bool, a
+    number, or the literal's own text.
 
     set_pin_value's return is not a usable signal: it is False when the set
     genuinely failed *and* when the value already equalled the pin's default.
@@ -94,7 +102,7 @@ def _set(node, name, value):
     the graph looked perfect the whole time.
     """
     pin = _pin(node, name)
-    pin.set_pin_value(str(value))
+    pin.set_pin_value(_literal(value))
     got = str(PIN.get_pin_value(pin))
     if not _literal_matches(got, value):
         raise RuntimeError(f"pin {name!r} would not take {value!r} — it reads "
@@ -103,7 +111,7 @@ def _set(node, name, value):
 
 
 def _literal_matches(got, want):
-    want = str(want)
+    want = _literal(want)
     if got == want:
         return True
     try:

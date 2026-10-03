@@ -285,8 +285,8 @@ def build_burst(path, pieces, *, lifetime, fade_tail, drag, gravity, note,
     _connect(out(offset), _pin(put, "NewLocation"))
     # No sweep: the droplets have no collision and the spray is meant to pass
     # through the surface it came off, not to be stopped by it.
-    _set(put, "bSweep", "false")
-    _set(put, "bTeleport", "true")
+    _set(put, "bSweep", False)
+    _set(put, "bTeleport", True)
     _connect(_loose_pin(fly, "LoopBody", is_input=False), _pin(put, "execute"))
 
     size_arr = ed.add_get_member_variable_node(BV.Size)

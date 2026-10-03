@@ -235,7 +235,7 @@ def _author_throw_flight(ed, exec_ins):
     # --- landed: an ordinary dropped item, which E picks up ------------------
     flag = ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH)
     _connect(thrown, _pin(flag, "self"))
-    _set(flag, IV.Dropped, "true")
+    _set(flag, IV.Dropped, True)
     for pin in (then(rest), then(hang), then(lost)) + lodged:
         _connect(pin, _pin(flag, "execute"))
     done = ed.add_set_member_variable_node(THROWN_VAR)

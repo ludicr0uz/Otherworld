@@ -176,7 +176,7 @@ def _author_death_collapse(ed, exec_ins):
 
     limp = _node(ed, FN_SIMULATE_ALL)
     _connect(mesh_out, _pin(limp, "self"))
-    _set(limp, "bNewSimulate", "true")
+    _set(limp, "bNewSimulate", True)
     _connect(then(loosen), _pin(limp, "execute"))
 
     ed.add_comment_to_nodes(
@@ -294,7 +294,7 @@ def _author_player_death(ed, exec_ins):
     tell = ed.add_set_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH)
     _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
              _pin(tell, "self"))
-    _set(tell, PLAYER_DEAD_VAR, "true")
+    _set(tell, PLAYER_DEAD_VAR, True)
     _connect(then(as_mode), _pin(tell, "execute"))
 
     # Say so in the log, with the score. A paused game and a game where the
@@ -312,8 +312,8 @@ def _author_player_death(ed, exec_ins):
     say_dead = _node(ed, FN_PRINT)
     _connect(out(dead_line), _pin(say_dead, "InString"))
     # Log only: the menu is what says it on screen, and it says it better.
-    _set(say_dead, "bPrintToScreen", "false")
-    _set(say_dead, "bPrintToLog", "true")
+    _set(say_dead, "bPrintToScreen", False)
+    _set(say_dead, "bPrintToLog", True)
     _set(say_dead, "Duration", 0.0)
     _connect(then(tell), _pin(say_dead, "execute"))
 
@@ -321,7 +321,7 @@ def _author_player_death(ed, exec_ins):
     # and with the game paused nothing moves behind it. The HUD polls its
     # restart key from the PlayerController, which ticks through a pause.
     freeze = _node(ed, FN_SET_PAUSED)
-    _set(freeze, "bPaused", "true")
+    _set(freeze, "bPaused", True)
     for tail in (then(say_dead), out(as_mode, "CastFailed")):
         _connect(tail, _pin(freeze, "execute"))
 

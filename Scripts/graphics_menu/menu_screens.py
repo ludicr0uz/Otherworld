@@ -124,15 +124,15 @@ def author_death_menu(ed, in_execs, mode_out):
     for e in clicked:
         _connect(e, _pin(again, "execute"))
     served = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
-    _set(served, CURSOR_ACCEPT_VAR, "false")
+    _set(served, CURSOR_ACCEPT_VAR, False)
     _connect(then(again), _pin(served, "execute"))
     unpause = keep(_node(ed, FN_SET_PAUSED))
-    _set(unpause, "bPaused", "false")
+    _set(unpause, "bPaused", False)
     _connect(then(served), _pin(unpause, "execute"))
     # The current map by name, so the menu restarts whatever level is loaded.
     # bRemovePrefixString strips PIE's UEDPIE_0_.
     where = keep(_node(ed, FN_LEVEL_NAME))
-    _set(where, "bRemovePrefixString", "true")
+    _set(where, "bRemovePrefixString", True)
     _connect(then(unpause), _pin(where, "execute"))
     reopen = keep(_node(ed, FN_OPEN_LEVEL))
     _connect(out(where), _pin(reopen, "LevelName"))

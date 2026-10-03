@@ -133,7 +133,7 @@ def _author_burn(ed, tick):
     _connect(out(over), _pin(burnt, "Condition"))
     _connect(then(tick), _pin(burnt, "execute"))
     dark = ed.add_set_member_variable_node(LIT_VAR)
-    _set(dark, LIT_VAR, "false")
+    _set(dark, LIT_VAR, False)
     _connect(then(burnt), _pin(dark, "execute"))
 
     # Read after the write above: a pure Get is pulled when its reader runs.

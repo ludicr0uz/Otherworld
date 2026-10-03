@@ -117,7 +117,7 @@ def _add_dot(ed, dots, location, scale, exec_in):
     add = _node(ed, "/Script/Engine.InstancedStaticMeshComponent.AddInstance")
     _connect(dots, _pin(add, "self"))
     _connect(out(xf), _pin(add, "InstanceTransform"))
-    _set(add, "bWorldSpace", "true")
+    _set(add, "bWorldSpace", True)
     _connect(exec_in, _pin(add, "execute"))
     return add
 
@@ -198,19 +198,19 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
                             "Blueprint_PredictProjectilePath_ByTraceChannel")
     _connect(start, _pin(predict, "StartPos"))
     _connect(velocity, _pin(predict, "LaunchVelocity"))
-    _set(predict, "bTracePath", "true")
+    _set(predict, "bTracePath", True)
     _set(predict, "ProjectileRadius", 0.0)
     # Visibility, the channel the flight traces on, so both stop at the same
     # things (a wanderer's capsule blocks it: hit_zones.make_shootable).
     _set(predict, "TraceChannel", "ECC_Visibility")
-    _set(predict, "bTraceComplex", "false")
+    _set(predict, "bTraceComplex", False)
     _set(predict, "DrawDebugType", "None")
     _set(predict, "SimFrequency", THROW_ARC_HZ)
     _set(predict, "MaxSimTime", THROW_ARC_SIM_S)
     _set(predict, "OverrideGravityZ", THROW_GRAVITY_Z)
     _connect(then(clear), _pin(predict, "execute"))
     on = ed.add_set_member_variable_node(THROW_AIMING_VAR)
-    _set(on, THROW_AIMING_VAR, "true")
+    _set(on, THROW_AIMING_VAR, True)
     _connect(then(predict), _pin(on, "execute"))
     # The arm is cocked for as long as the arc shows (throw_ready.py).
     posed = _author_throw_ready(ed, held, then(on))
@@ -245,7 +245,7 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     _connect(then(was), _pin(wipe, "execute"))
     _connect(then(click), _pin(wipe, "execute"))
     off = ed.add_set_member_variable_node(THROW_AIMING_VAR)
-    _set(off, THROW_AIMING_VAR, "false")
+    _set(off, THROW_AIMING_VAR, False)
     _connect(then(wipe), _pin(off, "execute"))
     # Which of the two ended it? Still aimed (key down, item in hand) can only
     # be the click: that is the throw. Otherwise the key came up, or the hand
@@ -256,7 +256,7 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     # The click is spent: still down next frame, it must not fire the
     # automatic that takes the thrown item's place (consume.py's latch).
     spend = ed.add_set_member_variable_node(TRIGGER_SPENT)
-    _set(spend, TRIGGER_SPENT, "true")
+    _set(spend, TRIGGER_SPENT, True)
     _connect(then(release), _pin(spend, "execute"))
 
     # Called off: the cocked arm comes down.
@@ -289,7 +289,7 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     # Shown, as a drop does: a scoped gun thrown from the sights was hidden.
     shown = _node(ed, FN_SET_HIDDEN)
     _connect(held, _pin(shown, "self"))
-    _set(shown, "bNewHidden", "false")
+    _set(shown, "bNewHidden", False)
     _connect(then(off), _pin(shown, "execute"))
     put = _node(ed, FN_SET_ACTOR_LOC)
     _connect(held, _pin(put, "self"))
@@ -311,6 +311,6 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     _set(reset, WV.EquippedIndex, 0)
     _connect(then(clear), _pin(reset, "execute"))
     dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
-    _set(dirty, WV.NeedsRefresh, "true")
+    _set(dirty, WV.NeedsRefresh, True)
     _connect(then(reset), _pin(dirty, "execute"))
     return then(dirty)

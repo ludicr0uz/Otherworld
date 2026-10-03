@@ -377,7 +377,7 @@ def _author_wc_tick(ed, tick):
         _connect(exit_pin, _pin(drop_gate, "execute"))
     after_drop = _author_drop(ed, held, owner_out, then(drop_gate))
     drop_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
-    _set(drop_dirty, WV.NeedsRefresh, "true")
+    _set(drop_dirty, WV.NeedsRefresh, True)
     _connect(after_drop, _pin(drop_dirty, "execute"))
 
     # --- interact (interact.py): an item in reach is picked up ---------------
@@ -385,7 +385,7 @@ def _author_wc_tick(ed, tick):
         ed, owner_out, pressed("KeyInteract"),
         (then(drop_dirty), else_(drop_gate)))
     pick_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
-    _set(pick_dirty, WV.NeedsRefresh, "true")
+    _set(pick_dirty, WV.NeedsRefresh, True)
     for exit_pin in picked:
         _connect(exit_pin, _pin(pick_dirty, "execute"))
 
@@ -413,6 +413,6 @@ def _author_wc_tick(ed, tick):
     for exit_pin in flight_exits:
         _connect(exit_pin, _pin(refresh_gate, "execute"))
     settle = ed.add_set_member_variable_node(WV.NeedsRefresh)
-    _set(settle, WV.NeedsRefresh, "false")
+    _set(settle, WV.NeedsRefresh, False)
     _connect(then(refresh_gate), _pin(settle, "execute"))
     _author_equip(ed, then(settle))

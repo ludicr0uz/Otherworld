@@ -123,7 +123,7 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
     _connect(then(set_now), _pin(set_reacts, "execute"))
 
     mark = keep(ed.add_set_member_variable_node(STATS_APPLIED_VAR))
-    _set(mark, STATS_APPLIED_VAR, "true")
+    _set(mark, STATS_APPLIED_VAR, True)
     _connect(then(set_reacts), _pin(mark, "execute"))
     took = keep(ed.add_set_member_variable_node(APPLIED_HEALTH_VAR))
     _connect(want_out, _pin(took, APPLIED_HEALTH_VAR))
@@ -158,7 +158,7 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max):
 
     # One exec out, whether or not it spoke this pass.
     out = keep(ed.add_branch_node())
-    _set(out, "Condition", "true")
+    _set(out, "Condition", True)
     _connect(then(rearm), _pin(out, "execute"))
     _connect(else_(speak), _pin(out, "execute"))
     return made, then(out)

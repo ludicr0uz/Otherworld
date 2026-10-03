@@ -108,7 +108,7 @@ def _author_resolve_aim(ed, held, exec_ins):
     # Empty-handed: there is nothing to draw a reticle for, and no muzzle to
     # trace from -- reading one off a null weapon is how Accessed None happens.
     unarmed = keep(ed.add_set_member_variable_node(WV.AimValid))
-    _set(unarmed, WV.AimValid, "false")
+    _set(unarmed, WV.AimValid, False)
     _connect(else_(holding), _pin(unarmed, "execute"))
 
     aim_get = keep(ed.add_get_member_variable_node(WV.AimPoint))
@@ -146,11 +146,11 @@ def _author_resolve_aim(ed, held, exec_ins):
     _connect(then(mark), _pin(reality, "execute"))
 
     open_shot = keep(ed.add_set_member_variable_node(WV.AimBlocked))
-    _set(open_shot, WV.AimBlocked, "false")
+    _set(open_shot, WV.AimBlocked, False)
     _connect(else_(stopped), _pin(open_shot, "execute"))
 
     ready = keep(ed.add_set_member_variable_node(WV.AimValid))
-    _set(ready, WV.AimValid, "true")
+    _set(ready, WV.AimValid, True)
     _connect(then(reality), _pin(ready, "execute"))
     _connect(then(open_shot), _pin(ready, "execute"))
 

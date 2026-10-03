@@ -97,8 +97,8 @@ def build_ammo_pickup(rebuild=True):
     _connect(out(turn), _pin(delta, "Yaw"))
     spin = _node(ed, FN_ADD_LOCAL_ROT)
     _connect(out(delta), _pin(spin, "DeltaRotation"))
-    _set(spin, "bSweep", "false")
-    _set(spin, "bTeleport", "true")
+    _set(spin, "bSweep", False)
+    _set(spin, "bTeleport", True)
     _connect(then(tick), _pin(spin, "execute"))
 
     pawn = _node(ed, FN_GET_PLAYER_PAWN)
@@ -165,7 +165,7 @@ def build_ammo_pickup(rebuild=True):
     _connect(out(held_richer), _pin(held_store, IV.Reserve))
     _connect(then(takes_ammo), _pin(held_store, "execute"))
     held_mark = ed.add_set_member_variable_node(AV.Credited)
-    _set(held_mark, AV.Credited, "true")
+    _set(held_mark, AV.Credited, True)
     _connect(then(held_store), _pin(held_mark, "execute"))
 
     # --- fallback: the first carried weapon that takes ammunition ------------
@@ -213,7 +213,7 @@ def build_ammo_pickup(rebuild=True):
     _connect(then(give), _pin(store, "execute"))
 
     mark = ed.add_set_member_variable_node(AV.Credited)
-    _set(mark, AV.Credited, "true")
+    _set(mark, AV.Credited, True)
     _connect(then(store), _pin(mark, "execute"))
 
     # --- and only then vanish -----------------------------------------------

@@ -103,7 +103,7 @@ def _author_sight_look(ed, keep, line_out, has_line_out, boom_rot, look_out):
     _connect(boom_rot, _pin(turn, "A"))
     _connect(out(look), _pin(turn, "B"))
     _connect(out(alpha), _pin(turn, "Alpha"))
-    _set(turn, "bShortestPath", "true")
+    _set(turn, "bShortestPath", True)
     return out(turn)
 
 
@@ -289,7 +289,7 @@ def _author_sight_camera(ed, tick, owner_out, held, armed_out, exec_ins):
     body_home = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     shown = keep(_node(ed, FN_SET_OWNER_NO_SEE))
     _connect(out(body_home, WV.OwnerMesh), _pin(shown, "self"))
-    _set(shown, "bNewOwnerNoSee", "false")
+    _set(shown, "bNewOwnerNoSee", False)
     _connect(then(level), _pin(shown, "execute"))
 
     ed.add_comment_to_nodes(

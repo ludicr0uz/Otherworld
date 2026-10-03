@@ -152,12 +152,12 @@ def _author_consume(ed, held, owner, exec_in):
     _connect(then(clear), _pin(stay, "execute"))
 
     dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
-    _set(dirty, WV.NeedsRefresh, "true")
+    _set(dirty, WV.NeedsRefresh, True)
     _connect(then(stay), _pin(dirty, "execute"))
 
     # The press is spent; _author_trigger_latch re-arms it on release.
     spend = keep(ed.add_set_member_variable_node(TRIGGER_SPENT))
-    _set(spend, TRIGGER_SPENT, "true")
+    _set(spend, TRIGGER_SPENT, True)
     _connect(then(dirty), _pin(spend, "execute"))
 
     ed.add_comment_to_nodes(

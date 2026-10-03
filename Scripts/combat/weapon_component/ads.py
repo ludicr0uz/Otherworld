@@ -150,7 +150,7 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
 
     # False arm: not aiming at all, so not down the sights either.
     sight_off = keep(ed.add_set_member_variable_node(WV.SightAiming))
-    _set(sight_off, WV.SightAiming, "false")
+    _set(sight_off, WV.SightAiming, False)
     _connect(else_(zoomed), _pin(sight_off, "execute"))
     want_out = keep(ed.add_set_member_variable_node(WV.TargetFOV))
     _connect(base_out, _pin(want_out, WV.TargetFOV))

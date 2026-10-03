@@ -186,8 +186,8 @@ def _author_health_begin_play(ed, begin):
     _connect(out(line), _pin(say, "InString"))
     # Log only. On screen it would be five lines at level start and another
     # every time something dies, over the top of the HUD it is meant to explain.
-    _set(say, "bPrintToScreen", "false")
-    _set(say, "bPrintToLog", "true")
+    _set(say, "bPrintToScreen", False)
+    _set(say, "bPrintToLog", True)
     _set(say, "Duration", 0.0)
     _connect(then(record), _pin(say, "execute"))
 
@@ -286,7 +286,7 @@ def _author_world_floor_net(ed, tick):
         _connect(then(probe_dir), _pin(probe_set, "execute"))
 
         probe_join = ed.add_branch_node()
-        _set(probe_join, "Condition", "true")
+        _set(probe_join, "Condition", True)
         _connect(then(probe_set), _pin(probe_join, "execute"))
         _connect(else_(probe_br), _pin(probe_join, "execute"))
         tick_out = then(probe_join)

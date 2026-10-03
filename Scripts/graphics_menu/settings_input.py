@@ -95,7 +95,7 @@ def _author_capture(ed, settings_out, in_execs, made):
     _connect(candidate, _loose_pin(write, "Item"))
     _connect(then(took), _pin(write, "execute"))
     done = keep(ed.add_set_member_variable_node(MV.Capturing))
-    _set(done, MV.Capturing, "false")
+    _set(done, MV.Capturing, False)
     _connect(then(write), _pin(done, "execute"))
     _, writer = _emit_save(ed, settings_out, then(done))
     made.append(writer)
@@ -172,7 +172,7 @@ def _author_capture(ed, settings_out, in_execs, made):
     _connect(out(bindable), _pin(arming, "Condition"))
     _connect(else_(back), _pin(arming, "execute"))
     arm = keep(ed.add_set_member_variable_node(MV.Capturing))
-    _set(arm, MV.Capturing, "true")
+    _set(arm, MV.Capturing, True)
     _connect(then(arming), _pin(arm, "execute"))
 
 

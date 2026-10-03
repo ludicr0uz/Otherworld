@@ -97,9 +97,9 @@ def _author_wear(ed, held, exec_in):
                     [then(back), bare, empty],
                     TargetArray=g.get(WORN_VAR),
                     Index=g.get(WEAR_SLOT_VAR), Item=item)
-    _set(put_on, "bSizeToFit", "true")
+    _set(put_on, "bSizeToFit", True)
     hide = g.call(FN_SET_HIDDEN, [then(put_on)], self=item)
-    _set(hide, "bNewHidden", "true")
+    _set(hide, "bNewHidden", True)
     # Out of every slot: taken off, it comes back UNPLACED and the slot sync
     # finds it a bag slot, rather than claiming the hand it left.
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(hide)])

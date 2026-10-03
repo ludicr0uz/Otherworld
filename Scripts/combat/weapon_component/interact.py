@@ -150,7 +150,7 @@ def _author_interact(ed, owner, pressed, exec_ins):
         _connect(e, _pin(gate, "execute"))
 
     spent = keep(ed.add_set_member_variable_node(INTERACT_FORCED_VAR))
-    _set(spent, INTERACT_FORCED_VAR, "false")
+    _set(spent, INTERACT_FORCED_VAR, False)
     _connect(then(gate), _pin(spent, "execute"))
     # InteractTarget is set with its input pin left unconnected, which is how
     # a Blueprint object variable is cleared to None.

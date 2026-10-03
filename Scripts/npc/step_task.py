@@ -88,7 +88,7 @@ def build_step_task(ai_bp, path, steps):
     _connect(ctrl, _pin(result, "self"))
     _connect(out(result, STEP_RESULT_VAR), _pin(done, "bSuccess"))
     failed = _node(ed, FN_FINISH_EXECUTE)
-    _set(failed, "bSuccess", "false")
+    _set(failed, "bSuccess", False)
     _connect(out(cast, "CastFailed"), _pin(failed, "execute"))
 
     step = ed.add_get_member_variable_node(STEP_VAR)

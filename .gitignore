@@ -61,3 +61,6 @@ Content/Python/__pycache__/
 # Generator sidecars: megabytes apiece, and fully determined by the seed.
 Scripts/generated_levels/*/grass_*.json
 Scripts/generated_levels/*/*.obj
+
+# Diagnostic dumps written by one-off inspection scripts.
+Scripts/*_out.txt

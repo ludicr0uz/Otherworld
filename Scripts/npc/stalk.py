@@ -14,13 +14,14 @@ charge. The numbers are forest_generator/npc_stalk.py's.
               stop, face the player, play the roar clip and a voice    succeed
        -> [now < StalkRoarUntil?]  still roaring                       succeed
        -> [player further than TuneStalkFled from StalkOrigin?]  they
-              have run off: StalkCharging = true       fail: Chase runs
+              have run off: StalkCharging = true, one
+              of its voices                            fail: Chase runs
        -> [player further off than the catch-up range?]
               StalkLegUntil = 0 (no leg: a pick, once it is inside)
               face the way it runs -> SimpleMoveToLocation(the player's
               spot) -> the leg speed                                   succeed
        -> [player within the charge range?]
-              StalkCharging = true                     fail: Chase runs
+              StalkCharging = true, one of its voices  fail: Chase runs
               (so do a leg it is standing still on, and a pick with nowhere
               to go: it charges rather than stand)
        -> [now < StalkLegUntil?]  a leg is under way
@@ -297,7 +298,12 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
     cover, picked, lost = _author_cover(ed, _author_turn(g, [else_(on_leg), onward], pins), pins)
     # The player gone, close enough, standing still on a leg, or nowhere to
     # go: all one charge.
-    _connect(g.put(STALK_CHARGING_VAR, charge + [lost], literal="true"), result(False))
+    step = g.put(STALK_CHARGING_VAR, charge + [lost], literal="true")
+    # It roars as it breaks into the charge: the voice alone, no clip and no
+    # stand, so the pass still fails and Chase gives its order at once.
+    sound, step = _author_random_sound(g.ed, VOICES_VAR, pins["self_loc"], step)
+    g.made.extend(sound)
+    _connect(step, result(False))
     ahead, step = _author_facing(ed, picked, None)
     me = g.call(FN_GET_CONTROLLER)
     _connect(pins["self_pawn"], _pin(me, "self"))

@@ -143,6 +143,10 @@ Wanderer (selector)
   - It is one more step, `BT_Stalk`, ahead of Chase in a selector of the two. Only the
     creatures in `NPC_STALK_ROAR` get the event, its variables and the tree node; a new
     stalker is a row there (its roar clip) and an entry in `mixamo_paths.ROAR_CREATURES`.
+  - **It roars again as it charges, with its voice alone.** The one `StalkCharging` write
+    (close enough, the player run off, stalled, nowhere to go) plays one of its `Voices`
+    and fails the step on that same pass: no clip and no stand, so Chase orders the run
+    at once. An enraged one has its own voice (below) and never gets here.
   - **The step succeeds while it hunts and fails for good to charge.** A pass that succeeds
     has given its own move order, so Chase is not reached; once `StalkCharging` is set the
     step fails first thing, every pass, and the chase (and its strafe) is all that runs.

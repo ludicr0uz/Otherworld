@@ -236,7 +236,19 @@ def check_charge(tag, own, event):
           and len([g for g in gates
                    if _limit(g, "Distance2D (Vector)", "stalk_charge_cm")
                    and flags[0] in _after(BEL.find_then_pin(g))]) == 1
-          and _result(_after(BEL.find_then_pin(flags[0])), False))
+          and _result(_titled(_exec_reach(flags[0]), f"Set {STEP_RESULT_VAR}"), False))
+    after = _exec_reach(flags[0]) if len(flags) == 1 else []
+    voices = [v for v in _with(after, "Sound", "Location")
+              if f"Get {VOICES_VAR}" in _titles(_sources(v, "Sound"))]
+    ends = _titled(after, f"Set {STEP_RESULT_VAR}")
+    # Nothing between the flag and the result but the voice and its Branches:
+    # no clip, no stop, no time to stand for.
+    check(f"{tag}: ...roaring as it breaks into the charge: one of its voices, "
+          f"the once, with no clip and no stand, so Chase runs on that pass",
+          len(voices) == 1 and len(ends) == 1
+          and all(_title(n) == "Branch" for n in after
+                  if n not in flags + voices + ends),
+          f"{sorted(_title(n) for n in after)}")
     still = [g for g in gates if _title(g) == "Branch"
              and "GetVelocity" in _titles(_sources(g, "Condition"))
              and [_num(t, "B") for t in _feeders(g, "Condition")

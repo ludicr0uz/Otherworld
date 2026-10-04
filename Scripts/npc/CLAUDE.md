@@ -401,6 +401,11 @@ Wanderer (selector)
   (zombie 15 m, wendigo 30 m) at 30% of its own run speed, re-picking a point every
   `patrol_repick_*`.
 - **Aggro is a one-way switch:** once `Aggro` is set it is never cleared, and the NPC runs.
+  - It ends with the controller. A killed wanderer's replacement is a new pawn with a new
+    controller and Blackboard, and the death menu's restart reopens the level, so neither
+    comes back hunting: `probes/probe_respawn_calm.py` holds both. What does bring a fresh
+    one straight in is a sense: the respawn band (75–100 m) is inside the all-round reach of
+    the rifle (90 m), the shotgun (85) and the sniper (150), so the next shot wakes it.
 - **The senses** (per creature, from `npc_agro.py`):
 
   | sense | trigger |

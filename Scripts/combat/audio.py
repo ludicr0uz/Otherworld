@@ -14,7 +14,7 @@ from npc.monster_tuning import monster_specs
 
 
 # The mechanical sounds. All of these, and the five gunshots, are now cut from
-# CC0 recordings of real firearms by Scripts/fetch_weapon_sounds.py -- see that
+# CC0 recordings of real firearms by Scripts/Sound/fetch_weapon_sounds.py -- see that
 # file for the sources and for why every one of them is public domain rather
 # than merely free.
 #
@@ -57,7 +57,7 @@ RETIRED_SOUNDS = (f"{AUDIO_DIR}/A_Reload",)
 # gunshots are -- it is the only importer that exists -- but nothing about them
 # is a weapon.
 #
-# The .wav files come from Scripts/make_creature_sounds.py, which synthesises
+# The .wav files come from Scripts/Sound/make_creature_sounds.py, which synthesises
 # rather than cutting from recordings; that file's docstring says why that is
 # the right call for these and the wrong one for gunfire.
 CREATURE_AUDIO_DIR = "/Game/Audio"
@@ -298,10 +298,10 @@ def import_sounds():
     """Import the WAVs as SoundWave assets.
 
     Two folders and two sources. The gunshots are cut from CC0 recordings by
-    Scripts/fetch_weapon_sounds.py, which is run by hand rather than from
+    Scripts/Sound/fetch_weapon_sounds.py, which is run by hand rather than from
     main() -- it reaches the network and unpacks 194 MB, which is not something
     an asset build should do on every invocation. The foley and the monster
-    voices are synthesised by Scripts/make_creature_sounds.py, which is cheap
+    voices are synthesised by Scripts/Sound/make_creature_sounds.py, which is cheap
     and offline. Both write into assets/generated/sounds; the cut and
     synthesised files are committed, the downloads are not.
 
@@ -310,9 +310,9 @@ def import_sounds():
     """
     eas = _assets()
     made = []
-    groups = ((AUDIO_DIR, SOUND_NAMES, "Scripts/fetch_weapon_sounds.py"),
+    groups = ((AUDIO_DIR, SOUND_NAMES, "Scripts/Sound/fetch_weapon_sounds.py"),
               (CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES,
-               "Scripts/make_creature_sounds.py"))
+               "Scripts/Sound/make_creature_sounds.py"))
     for folder, names, how in groups:
       for name in names:
         dest = f"{folder}/{name}"

@@ -2,7 +2,7 @@
 
 Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
-## Audio (`audio.py`, `Scripts/fetch_weapon_sounds.py`)
+## Audio (`audio.py`, `Scripts/Sound/fetch_weapon_sounds.py`)
 
 - **The nine weapon sounds are cut from CC0 recordings.**
   - The five gunshots all come from *The Free Firearm Sound Library*, so they share room and

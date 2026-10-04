@@ -828,7 +828,7 @@ inside, where `Held` is valid, because a Branch's condition is pulled every fram
 `ReloadSound` all live on `BP_WeaponItem` and are read off `Held`. `ReloadSound` is genuinely
 per-weapon — a pump, a magazine change, a slower hand-fed reload — while `DryFireSound` is
 shared, which is a fact about the defaults and not about the shape of the data. All nine assets
-are cuts from CC0 recordings of real firearms, produced by `Scripts/fetch_weapon_sounds.py`
+are cuts from CC0 recordings of real firearms, produced by `Scripts/Sound/fetch_weapon_sounds.py`
 (mono, because `PlaySoundAtLocation` can only spatialise one channel; level baked in per weapon,
 so twelve overlapping SMG rounds do not clip). The click hangs off the **False arm of the ready
 gate** and is gated on `empty AND cooled AND tapped` — the cooldown is the other reason the gate
@@ -925,7 +925,7 @@ every frame and `APlayerController` ticks through a pause.
   second number is the one that matters — counting actors proves a spawn happened, while the
   flag proves the cast behind it succeeded and the pick-up interface was written.
 - **Nine** audio assets under `/Game/Weapons/Audio`, all cut from **CC0 recordings of real
-  firearms** by `Scripts/fetch_weapon_sounds.py` (pure Python plus `curl`, `bsdtar` and
+  firearms** by `Scripts/Sound/fetch_weapon_sounds.py` (pure Python plus `curl`, `bsdtar` and
   `afconvert`; imports no `unreal`): five gunshots from five firearms in one library, three
   reloads (pump / magazine / hand-fed) and one lock click. The synthesiser it replaced,
   `make_weapon_sounds.py`, is gone. `Scripts/downloaded_sounds/` caches ~200 MB of source

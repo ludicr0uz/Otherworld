@@ -17,7 +17,7 @@ def _author_random_sound(ed, var_name, at_pin, exec_in):
     RandomIntegerInRange(0, -1) against an empty array feeds Array_Get an index
     into nothing, which is an access-none at runtime rather than silence.  That
     matters here because the arrays are filled from /Game/Audio, which a
-    checkout that has never run Scripts/make_creature_sounds.py does not have
+    checkout that has never run Scripts/Sound/make_creature_sounds.py does not have
     -- an unvoiced monster is a fine outcome, a spammed error log is not.
 
     One sound is drawn per call rather than cycling, and there are three of

@@ -311,13 +311,13 @@ CACHE = (
     AssetSource(
         dest="assets/cache/sounds",
         kind="cache",
-        builders=("Scripts/fetch_weapon_sounds.py",),
+        builders=("Scripts/Sound/fetch_weapon_sounds.py",),
         note="~300 MB of CC0 firearm recordings from opengameart.org, including "
              "a 185 MB .7z. fetch_weapon_sounds.py both downloads them and cuts "
              "the nine A_* wavs into assets/generated/sounds, which "
              "build_weapons_and_combat.py imports. Never committed: GitHub "
              "rejects files over 100 MB, and the fetcher reproduces them "
-             "exactly. Scripts/make_creature_sounds.py synthesises the other "
+             "exactly. Scripts/Sound/make_creature_sounds.py synthesises the other "
              "sounds -- footsteps, melee impacts and the "
              "monster voices, which have no recording to be overwritten by, "
              "and writes only A_Footstep_*, A_MeleeHit_*, A_ZombieGrowl_* and "
@@ -392,13 +392,13 @@ STOCK_CHECKSUM_FILE = "Scripts/forest_generator/stock_checksums.json"
 # The order a fresh clone runs things in.
 RESTORE_ORDER = (
     "Scripts/sync_assets.py --restore-stock",
-    "Scripts/fetch_weapon_sounds.py",
+    "Scripts/Sound/fetch_weapon_sounds.py",
     # The foley and the monster voices. A separate script from the fetcher
     # because it is synthesised rather than cut from recordings -- see its
     # docstring for why that split is the right one and not laziness. Both
     # write into assets/generated/sounds and build_weapons_and_combat.py
     # imports the lot.
-    "python3 Scripts/make_creature_sounds.py",
+    "python3 Scripts/Sound/make_creature_sounds.py",
     # The HUD's artwork comes before the menu, which draws the panels, slots
     # and bars. Two steps, not one: the generator needs Pillow and the editor's
     # embedded Python does not have it, so it runs outside.

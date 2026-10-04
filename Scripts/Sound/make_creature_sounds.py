@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """make_creature_sounds.py -- synthesise the foley and the monster voices.
 
-    python3 Scripts/make_creature_sounds.py
+    python3 Scripts/Sound/make_creature_sounds.py
 
 Writes 44.1 kHz 16-bit mono WAVs into assets/generated/sounds/, alongside the
 gunshots -- which is where combat.audio.import_sounds() looks.
 
 ── Why these are synthesised when the gunshots are not ─────────────────────
 
-Scripts/fetch_weapon_sounds.py cut the five gunshots from CC0 recordings of
+Scripts/Sound/fetch_weapon_sounds.py cut the five gunshots from CC0 recordings of
 real firearms, and its own docstring explains why a synthesiser could not do
 that job: what makes a gunshot recognisable is the report slapping back off
 whatever is around you, and a three-oscillator model has no way to invent a
@@ -54,7 +54,8 @@ import struct
 import wave
 
 RATE = 44100
-OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+# This file is Scripts/Sound/make_creature_sounds.py: the project is three up.
+OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                        "assets", "generated", "sounds")
 
 

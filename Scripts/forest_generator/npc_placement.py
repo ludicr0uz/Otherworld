@@ -105,7 +105,7 @@ NPC_BASE_HEALTH = 100.0
 
 # ── Voices ───────────────────────────────────────────────────────────────────
 #
-# Synthesised by Scripts/make_creature_sounds.py and imported to /Game/Audio by
+# Synthesised by Scripts/Sound/make_creature_sounds.py and imported to /Game/Audio by
 # combat.audio.import_sounds().  Several takes per creature and the
 # controller draws one at random, because a pack of ten on a 4-9 s timer
 # retriggering ONE buffer reads as a machine rather than as a forest.

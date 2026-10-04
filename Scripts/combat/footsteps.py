@@ -60,7 +60,7 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None):
     Returns ``(nodes, then_pin)``. Guarded on the array's own length, because
     RandomIntegerInRange(0, -1) into Array_Get is an access-none rather than
     silence -- and an empty array is the normal state of a checkout that has
-    not run Scripts/make_creature_sounds.py yet.
+    not run Scripts/Sound/make_creature_sounds.py yet.
 
     The same shape exists in build_npc_blueprints.py. Two copies rather than a
     shared module because the two files each carry their own _pin/_connect/_set

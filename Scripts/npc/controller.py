@@ -124,7 +124,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
     # The sound arrays are defaults on the class, not pin literals -- an array
     # cannot be written into a pin. Missing files are dropped rather than
     # raising: /Game/Audio is built from assets/generated/sounds, which a
-    # checkout that has not run Scripts/make_creature_sounds.py does not have,
+    # checkout that has not run Scripts/Sound/make_creature_sounds.py does not have,
     # and the graph already guards an empty array.
     eas = _assets()
     cdo = unreal.get_default_object(BEL.generated_class(bp))
@@ -133,7 +133,7 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
         cdo.set_editor_property(var, found)
         if len(found) != len(wanted):
             _log(f"note: {path} {var}: {len(found)} of {len(wanted)} sounds "
-                 f"exist -- run Scripts/make_creature_sounds.py, then "
+                 f"exist -- run Scripts/Sound/make_creature_sounds.py, then "
                  f"build_weapons_and_combat.py, to import the rest")
 
     # The flinches, same mechanism, but ALL SIX OR NONE: the reaction graph

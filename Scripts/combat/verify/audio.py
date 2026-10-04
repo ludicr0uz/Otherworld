@@ -24,7 +24,7 @@ from npc.monster_tuning import monster_specs
 
 def check_sound_assets():
     # Nine assets cut from CC0 recordings of real firearms by
-    # Scripts/fetch_weapon_sounds.py, which replaced a synthesiser. The checks are
+    # Scripts/Sound/fetch_weapon_sounds.py, which replaced a synthesiser. The checks are
     # on the WAVs on disk rather than on the SoundWave assets, because the two
     # properties worth asserting are properties of the audio and not of the import.
 

@@ -1,0 +1,120 @@
+"""Run the manifest: cut every row and write the candidates and their sources.
+
+Output goes to `assets/generated/sound_candidates/`, which nothing imports.
+`combat.audio.import_sounds()` reads `assets/generated/sounds/`, so a candidate
+is in the game only once someone has listened to it and moved it there.
+"""
+
+import glob
+import os
+import shutil
+
+from sound_candidates import dsp
+from sound_candidates.manifest import LICENCES, PREVIEWS, ROWS
+
+_PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))
+CACHE_DIR = os.path.join(_PROJECT_DIR, "assets", "cache", "sounds")
+OUT_DIR = os.path.join(_PROJECT_DIR, "assets", "generated", "sound_candidates")
+
+
+def _find(pattern):
+    found = sorted(glob.glob(os.path.join(CACHE_DIR, pattern), recursive=True))
+    if not found:
+        raise FileNotFoundError(f"no source for {pattern!r} under {CACHE_DIR}")
+    return found
+
+
+def _rel(path):
+    return os.path.relpath(path, CACHE_DIR)
+
+
+def _takes(op, source, opts, channels):
+    """`[(samples, source_path)]` for one row, cut but not yet levelled."""
+    if op == "design":
+        layers, used = [], []
+        for pattern, semitones, gain in opts["layers"]:
+            path = _find(pattern)[0]
+            used.append(path)
+            layers.append((dsp.repitch(dsp.trim(dsp.decode(path, channels)), semitones), gain))
+        return [(dsp.fade(dsp.mix(layers)), " + ".join(_rel(p) for p in used))]
+
+    paths = _find(source)
+    if op == "each":
+        paths = paths[:opts.get("limit")]
+        return [(dsp.fade(dsp.trim(dsp.decode(p, channels))), _rel(p)) for p in paths]
+    if op == "split":
+        samples = dsp.decode(paths[0], channels)
+        cuts = dsp.split_events(samples, gap_ms=opts.get("gap_ms", 180.0))
+        return [(dsp.fade(c), _rel(paths[0])) for c in cuts[:opts.get("limit")]]
+    if op == "shot":
+        cut = dsp.cut_shot(dsp.decode(paths[0], channels), opts["seconds"])
+        shots = dsp.count_transients(cut)
+        if shots != 1:
+            raise ValueError(f"{_rel(paths[0])}: {shots} shots in the cut, wanted 1")
+        return [(cut, _rel(paths[0]))]
+    if op == "loop":
+        return [(dsp.decode(paths[0], channels), _rel(paths[0]))]
+    if op == "mkloop":
+        samples = dsp.trim(dsp.decode(paths[0], channels), tail_ms=0.0)
+        return [(dsp.loopify(samples, opts.get("seconds")), _rel(paths[0]))]
+    raise ValueError(f"unknown op {op!r}")
+
+
+def build_rows():
+    """Cut every row. Returns `[(out_name, seconds, channels, source)]`."""
+    written = []
+    for op, out, source, opts in ROWS:
+        channels = 2 if opts.get("stereo") else 1
+        takes = _takes(op, source, opts, channels)
+        numbered = len(takes) > 1 or op in ("each", "split")
+        for i, (samples, src) in enumerate(takes, 1):
+            name = f"{out}_{i:02d}" if numbered else out
+            samples = dsp.normalise(samples, opts["peak"])
+            dsp.write(os.path.join(OUT_DIR, name + ".wav"), samples)
+            written.append((name, len(samples) / dsp.RATE, channels, src))
+    return written
+
+
+def build_previews():
+    written = []
+    for out, seconds, layers in PREVIEWS:
+        parts = []
+        for loop, gain in layers:
+            samples = dsp.decode(os.path.join(OUT_DIR, loop + ".wav"), 2)
+            parts.append((dsp.tile(samples, seconds), gain))
+        mixed = dsp.normalise(dsp.fade(dsp.mix(parts), 500.0, 2000.0), 0.6)
+        dsp.write(os.path.join(OUT_DIR, out + ".wav"), mixed)
+        written.append((out, seconds, 2, " + ".join(l for l, _ in layers)))
+    return written
+
+
+def write_sources(written):
+    lines = [
+        "# Sound candidates: sources",
+        "",
+        "Produced by `Scripts/Sound/prepare_sound_candidates.py`. Do not edit by hand:",
+        "re-run the script. Nothing here is in the game: these are for listening.",
+        "",
+        "## Licences",
+        "",
+        "| pack | licence | from |",
+        "|---|---|---|",
+    ]
+    for folder in sorted(LICENCES):
+        name, licence, url = LICENCES[folder]
+        lines.append(f"| {name} (`{folder}/`) | {licence} | <{url}> |")
+    lines += ["", "## Files", "", "| candidate | s | ch | cut from |", "|---|---|---|---|"]
+    for name, seconds, channels, src in written:
+        lines.append(f"| `{name}` | {seconds:.2f} | {channels} | `{src}` |")
+    with open(os.path.join(OUT_DIR, "SOURCES.md"), "w") as out:
+        out.write("\n".join(lines) + "\n")
+
+
+def build():
+    if os.path.isdir(OUT_DIR):
+        shutil.rmtree(OUT_DIR)   # a dropped row must not leave its file behind
+    written = build_rows()
+    written += build_previews()
+    write_sources(written)
+    return written

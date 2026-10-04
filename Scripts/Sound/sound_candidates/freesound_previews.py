@@ -50,6 +50,19 @@ NEEDS = (
     ("creature_growl", "creature growl", 12, 5),
     ("ui_click", "menu click", 2, 5),
     ("ui_confirm", "menu confirm select", 3, 4),
+    # The third round: what two rounds of packs still left open. The electronic
+    # menu sounds and the cinematic drones were all turned down, so these ask
+    # for the opposite: paper, leather and wood for the menu, wind and low
+    # tone for the bed.
+    ("ui_soft_click", "soft click", 1, 6),
+    ("ui_page", "page turn", 3, 5),
+    ("ui_pouch", "leather pouch open", 4, 4),
+    ("tension_dark_ambient", "dark ambient drone", 240, 6),
+    ("tension_eerie_wind", "eerie wind", 240, 5),
+    ("tension_low_rumble", "low rumble ambience", 240, 4),
+    ("player_pain", "male pain grunt", 4, 6),
+    ("zombie_hurt", "monster hurt", 5, 5),
+    ("drinking_glug", "glug water bottle", 12, 5),
 )
 
 _RESULT = re.compile(

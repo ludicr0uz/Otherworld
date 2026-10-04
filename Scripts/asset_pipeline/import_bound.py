@@ -169,13 +169,50 @@ def check(mesh, strays, skeleton, spec, short):
     return ok
 
 
-def adopt_physics(mesh, dest_dir, short):
-    """Give the body a copy of the mannequin's physics asset.
+def reseat_joints(mesh, physics):
+    """Put every joint of ``physics`` on its child bone as THIS MESH has it;
+    returns the furthest one moved, in cm.
 
-    The same skeleton, so the same bodies on the same bones, placed by this
-    body's own joints: what every mesh on SK_Mannequin does.  A copy and not
-    the asset itself, because the build refits capsules to the worn body
-    (combat/capsule_fit.py) and must not refit Quinn's.
+    A constraint keeps where its joint is in the parent bone's space, and in
+    the mannequin's asset that is the mannequin's limb lengths.  Left there on
+    a body with shorter limbs, the joints pull every bone out to Manny's
+    length the moment the body goes limp: in the game the corpse jumped 70 cm
+    and poured onto the ground, its calves 5.5 cm longer than in life
+    (probes/probe_bound_body.py).  physics_template.reseat_joints does this
+    for the per-body skeletons off the SKELETON's reference pose; a bound
+    body shares its skeleton with Manny, so the pose read here is the mesh's.
+    """
+    from asset_pipeline.physics_template import _templates
+    from asset_pipeline.rig_util import mesh_ref_pose
+    ref = mesh_ref_pose(mesh)
+    worst = 0.0
+    physics.modify()
+    for t in _templates(physics):
+        di = t.get_editor_property("DefaultInstance")
+        child = str(di.get_editor_property("constraint_bone1"))
+        parent = str(di.get_editor_property("constraint_bone2"))
+        if child not in ref or parent not in ref:
+            raise RuntimeError(f"{physics.get_name()}: a joint between {child} "
+                               f"and {parent}, which the mesh lacks")
+        seat = ref[parent][0].inverse_transform_location(ref[child][0].translation)
+        t.modify()
+        worst = max(worst, (di.get_editor_property("pos2") - seat).length())
+        di.set_editor_property("pos1", unreal.Vector(0.0, 0.0, 0.0))
+        di.set_editor_property("pos2", seat)
+        t.set_editor_property("DefaultInstance", di)
+        got = t.get_editor_property("DefaultInstance").get_editor_property("pos2")
+        if (got - seat).length() > 0.01:
+            raise RuntimeError(f"{physics.get_name()}: {child}'s joint did not move")
+    return worst
+
+
+def adopt_physics(mesh, dest_dir, short):
+    """Give the body a copy of the mannequin's physics asset, its joints
+    reseated on this body's bones.
+
+    The same skeleton, so the same bodies on the same bones: what every mesh
+    on SK_Mannequin does.  A copy and not the asset itself, because the joints
+    are moved here and must not move under Quinn.
     """
     path = f"{dest_dir}/{paths.bound_asset_name(short)}_PhysicsAsset"
     if EAL.does_asset_exist(path):
@@ -184,8 +221,11 @@ def adopt_physics(mesh, dest_dir, short):
     if not physics:
         _log(f"[BOUND]   FAIL could not copy {MANNEQUIN_PHYSICS_ASSET}")
         return False
+    moved = reseat_joints(mesh, physics)
     mesh.set_editor_property("physics_asset", physics)
-    _log(f"[BOUND]   physics: a copy of {MANNEQUIN_PHYSICS_ASSET.rsplit('/', 1)[1]}")
+    EAL.save_loaded_asset(physics)
+    _log(f"[BOUND]   physics: a copy of {MANNEQUIN_PHYSICS_ASSET.rsplit('/', 1)[1]}, "
+         f"{len(physics.get_constraints(False))} joints reseated by up to {moved:.1f} cm")
     return True
 
 

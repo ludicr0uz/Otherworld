@@ -181,6 +181,16 @@ def _local_rotations(skin, dirs, idle, pistol):
         if bone in fingers:
             out[bone] = fist[bone][2]
             continue
+        if bone not in turned:
+            # A bone that is not turned goes where its parent takes it: its
+            # local pose is the idle's. (Keyed from its idle COMPONENT
+            # rotation instead, a child of a turned bone stayed pointing where
+            # the idle had it -- nothing on a rig whose idle has no track for
+            # such a bone, and on the mannequin's, whose idle keys every bone,
+            # the twist bones and the left hand were left hanging down a
+            # forearm that had swung up: a wrung arm and a knotted hand.)
+            out[bone] = comp[bone][2]
+            continue
         here = turned.get(bone, comp[bone][1])
         up = turned.get(parent, comp[parent][1]) if parent else (0.0, 0.0, 0.0, 1.0)
         local = comp[bone][2]

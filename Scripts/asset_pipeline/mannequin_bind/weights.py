@@ -15,8 +15,8 @@ part worth keeping.  What changes:
                          changes nothing; with the mannequin's post-process
                          rig it is what keeps a turned forearm from wringing
     hands                fingers.py
-    clavicles, trimmed   see CLAVICLE below: the fault this pipeline was
-                         written after
+    clavicles and upper  see CLAVICLE and UPPER ARM below: trimmed off the
+    arms, trimmed        ribs, the fault this pipeline was written after
 
 Then each vertex keeps its four largest shares.
 """
@@ -58,6 +58,35 @@ CLAVICLE_FULL_TO_CM = 2.0        # this far under the shoulder joint: untouched
 CLAVICLE_NONE_BY_CM = 10.0       # this far under: none left
 CLAVICLE_MIDLINE_CM = 4.0        # this far past the midline: none left
 REFERENCE_STATURE_CM = 180.0
+
+
+# ── UPPER ARM ────────────────────────────────────────────────────────────────
+# The same fault one bone further out.  Meshy's upper arm holds skin well onto
+# the ribs: with the clavicle trimmed and the arms lifted as MM_Fall_Loop lifts
+# them (clavicle 20 degrees, upper arm 100), the chest under the armpits still
+# measured 1.33 times its resting width -- in the game, a torso a third too
+# wide and pulled long whenever the arms went up.
+#
+# An upper arm moves the arm and the cap of the shoulder.  So its weight (the
+# bone's and its twist bones') is faded with distance from the bone's own
+# line, measured in arm radii -- the radius being this body's, read off the
+# vertices the arm holds outright along its middle.  Skin within ARM_FULL_TO
+# radii is the arm's; by ARM_NONE_BY it is the trunk's, and what is taken off
+# goes to the trunk bones the vertex already has.  A vertex with no trunk
+# weight is left alone: it is arm, however thick.
+#
+# Where the fade sits, on adventurer_03, by the chest's width under the
+# armpits with the arms lifted that way, against its width at rest:
+#
+#     no trim        1.33
+#     1.3  to 2.1    1.14
+#     1.15 to 1.8    1.09
+#     1.0  to 1.6    1.03
+#
+# A chest does widen a little under lifted arms, and the tightest line takes
+# the armpit's own skin off the arm, which is a crease waiting to be seen.
+ARM_FULL_TO = 1.15
+ARM_NONE_BY = 1.8
 
 
 def hat(nodes, u):
@@ -137,6 +166,60 @@ def _trim_clavicles(new, v, skeleton, spine, stature):
         _add(new, hat(spine.nodes, spine.at(v)), have * (1.0 - keep))
 
 
+def _to_segment(p, a, b):
+    ab = sub(b, a)
+    t = max(0.0, min(1.0, dot(sub(p, a), ab) / max(dot(ab, ab), 1e-12)))
+    return length(sub(p, add(a, scale(ab, t)))), t
+
+
+def arm_radii(weighted, verts, skeleton):
+    """{suffix: (upper arm bones, shoulder, elbow, radius)}: the radius is the
+    median distance from the bone's line of the vertices the arm holds
+    outright, along the middle of the arm."""
+    out = {}
+    for s, _side in SIDES:
+        bones = [f"upperarm_{s}"] + [b for b in skeleton.children(f"upperarm_{s}")
+                                     if "_twist_" in b]
+        a, b = skeleton.pos(f"upperarm_{s}"), skeleton.pos(f"lowerarm_{s}")
+        around = []
+        for v, w in zip(verts, weighted):
+            if sum(w.get(x, 0.0) for x in bones) < 0.9:
+                continue
+            d, t = _to_segment(v, a, b)
+            if 0.35 < t < 0.85:
+                around.append(d)
+        if len(around) < 16:
+            raise ValueError(f"upperarm_{s}: only {len(around)} vertices to "
+                             "read the arm's thickness from")
+        around.sort()
+        out[s] = (bones, a, b, around[len(around) // 2])
+    return out
+
+
+def _trim_arms(new, v, arms):
+    trunk = {b: w for b, w in new.items()
+             if b == "pelvis" or b.startswith(("spine_", "clavicle_", "neck_"))}
+    if not trunk:
+        return
+    for bones, a, b, radius in arms.values():
+        have = {x: new[x] for x in bones if x in new}
+        if not have:
+            continue
+        d, _t = _to_segment(v, a, b)
+        keep = 1.0 - smoothstep(ARM_FULL_TO * radius, ARM_NONE_BY * radius, d)
+        if keep >= 1.0:
+            continue
+        freed = sum(have.values()) * (1.0 - keep)
+        for x, w in have.items():
+            if w * keep > 0.0:
+                new[x] = w * keep
+            else:
+                del new[x]
+        total = sum(trunk.values())
+        for x, w in trunk.items():
+            new[x] += freed * w / total
+
+
 def prune(w, limit=MAX_INFLUENCES):
     """The ``limit`` largest shares, made to sum to one."""
     top = sorted(w.items(), key=lambda kv: -kv[1])[:limit]
@@ -180,5 +263,8 @@ def remap(body_weights, verts, skeleton, stature, digits, limit=MAX_INFLUENCES):
             else:
                 raise ValueError(f"no rule for Meshy bone {bone}")
         _trim_clavicles(new, v, skeleton, spine, stature)
-        out.append(prune(new, limit))
-    return out
+        out.append(new)
+    arms = arm_radii(out, verts, skeleton)
+    for v, new in zip(verts, out):
+        _trim_arms(new, v, arms)
+    return [prune(new, limit) for new in out]

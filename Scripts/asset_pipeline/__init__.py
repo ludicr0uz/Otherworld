@@ -14,6 +14,10 @@ Host-side (no ``unreal``):
                                 and the clothing base body
     swap_player_body.py         entry point: write that setting, import, rebuild, verify
     fab_library.py              Fab manifest (fab_library.json) + CLI; acquisition is manual
+    bind_to_mannequin.py        entry point: bind cached bodies to the mannequin's
+                                skeleton -> assets/cache/meshy/<id>/bound/
+    mannequin_bind/             the bind itself (its __init__.py is its module
+                                map; tests: dev/tests/test_mannequin_bind.py)
 
 Editor-side, in pipeline order:
     import_body.py              entry point: bring in every cached character not
@@ -47,6 +51,10 @@ Editor-side, in pipeline order:
     retarget_player_clips.py    entry point: the UAL clips onto the player's body
                                 alone, from the packs as imported (the swap's step)
     ual_retarget.py             IK_UAL1/2, RTG_<Character>_from_UAL1/2, batch retarget
+    import_bound.py             entry point: bound GLBs -> /Game/Sourced/Bound on
+                                SK_Mannequin, and the checks only an editor can make
+    bound_look.py               entry point (tooling): photograph the bound body,
+                                the per-body one and Quinn in the same clip poses
     import_ui_art.py            entry point: HUD art PNGs -> textures
     fab_index.py                entry point: index Fab content -> assets/cache/fab/
     fab_inventory.py            describe a folder's assets from registry tags

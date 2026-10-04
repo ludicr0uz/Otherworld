@@ -6,7 +6,8 @@ import dataclasses
 
 import unreal
 
-from asset_pipeline.player_body import PLAYER_NAME
+from asset_pipeline.mannequin_bind.paths import bound_asset_dir, bound_asset_name
+from asset_pipeline.player_body import PLAYER_NAME, PLAYER_RIG
 from combat.log import _log
 from uebp.graph import BEL, _assets, _component_object, _handles, _rot
 from combat.paths import CHARACTER_BP_PATH
@@ -21,6 +22,16 @@ from combat.paths import CHARACTER_BP_PATH
 # player's body means changing all four together or not at all.
 #
 # ── Why the adventurer is on its own skeleton, and not on SK_Mannequin ──
+#
+# (2026-10-03: no longer the whole story.  The three obstacles below are all
+# about doing it IN THE EDITOR or AT THE RIGGER.  asset_pipeline/mannequin_bind
+# does it before the import instead, host-side, on the cached GLB: the body is
+# posed like the mannequin, its weights re-addressed to the mannequin's bones,
+# and the file written on the mannequin's skeleton, so the importer has 89
+# same-named bones to merge and nothing to transfer.  SKIN_BOUND below wears
+# the result when player_body.PLAYER_RIG says "mannequin".  What follows is
+# why the per-body skeleton was the answer until then, and it still describes
+# SKIN_ADVENTURER.)
 #
 # The obvious integration -- generate a new mesh and bind it to the skeleton
 # everything here already depends on -- is not reachable from this toolchain,
@@ -195,6 +206,19 @@ SKIN_ADVENTURER = PlayerSkin(
 )
 
 
+# The same generated body bound to the mannequin's skeleton
+# (asset_pipeline/bind_to_mannequin.py, import_bound.py).  Everything but the
+# mesh is Quinn's, because on this skeleton everything but the mesh IS the
+# mannequin's: its anim blueprint, its ready poses, its grip socket, its bone
+# names.  No stance or throw clips yet: the Quaternius library is retargeted
+# per body today (ual_retarget.py) and has not been retargeted onto the
+# mannequin, so this skin crouches procedurally and throws without a clip,
+# as the mannequin does.
+SKIN_BOUND = dataclasses.replace(
+    SKIN_QUINN,
+    mesh=f"{bound_asset_dir(PLAYER_NAME)}/{bound_asset_name(PLAYER_NAME)}")
+
+
 def player_skin():
     """The adventurer if the pipeline has produced all of it, else the mannequin.
 
@@ -203,6 +227,12 @@ def player_skin():
     anim BP compiles, runs, and stands in the reference pose forever.
     """
     eas = _assets()
+    if PLAYER_RIG == "mannequin":
+        if eas.does_asset_exist(SKIN_BOUND.mesh):
+            return SKIN_BOUND
+        _log(f"note: PLAYER_RIG is \"mannequin\" and {SKIN_BOUND.mesh} is not "
+             "imported — wearing the body on its own skeleton. Run "
+             "asset_pipeline/bind_to_mannequin.py, then import_bound.py.")
     want = (SKIN_ADVENTURER.mesh, SKIN_ADVENTURER.anim_bp,
             SKIN_ADVENTURER.aim_rifle, SKIN_ADVENTURER.aim_pistol,
             SKIN_ADVENTURER.idle, SKIN_ADVENTURER.punch)

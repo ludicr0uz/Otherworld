@@ -253,6 +253,20 @@ GENERATED = (
              "in that order.",
     ),
     AssetSource(
+        dest="Content/Sourced/Bound",
+        kind="generated",
+        builders=("Scripts/asset_pipeline/bind_to_mannequin.py",
+                  "Scripts/asset_pipeline/import_bound.py"),
+        note="The same Meshy bodies bound to SK_Mannequin instead of to a "
+             "skeleton of their own: SKM_<Name>/SKM_<Name>, no skeleton, IK "
+             "rig, retargeter or clips beside it, because the mannequin's "
+             "serve it as they are. bind_to_mannequin.py is host-side (it "
+             "writes assets/cache/meshy/<id>/bound/); import_bound.py brings "
+             "that in. Not worn until player_body.PLAYER_RIG says "
+             "\"mannequin\"; asset_pipeline/mannequin_bind/__init__.py says "
+             "why this is where the per-body flow above is headed.",
+    ),
+    AssetSource(
         dest="Content/Sourced/Mixamo",
         kind="generated",
         builders=("Scripts/asset_pipeline/import_mixamo.py",),

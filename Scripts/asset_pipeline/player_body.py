@@ -30,6 +30,18 @@ from asset_pipeline import catalog
 # The catalog id (asset_pipeline/catalog.py) of the body the player wears.
 PLAYER_BODY = "adventurer_03"
 
+# How that body is rigged.  One line, like the one above:
+#
+#   "own"        its own Meshy skeleton, every clip retargeted onto it
+#                (import_characters.py, build_retarget.py).  What is built and
+#                verified today.
+#   "mannequin"  bound to SK_Mannequin (bind_to_mannequin.py, import_bound.py):
+#                the mannequin's anim blueprint and clips play on it as they
+#                are.  Where the project is going; see mannequin_bind/.  Until
+#                import_bound.py has put the body in Content/, combat/skin.py
+#                says so and wears the "own" body.
+PLAYER_RIG = "own"
+
 # The catalog id of the body the garments are drawn on (Scripts/clothing): the
 # player with every clothing slot empty.
 CLOTHING_BASE_BODY = "adventurer_03"

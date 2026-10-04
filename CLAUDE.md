@@ -173,6 +173,9 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
 - **Log prefixes:** builders log with `[GEN]`, verifiers with `[VERIFY]`.
 - **Editor log:** `~/Library/Logs/Unreal Engine/OtherworldEditor/Otherworld.log`, not
   `Saved/Logs`. The previous session is rolled to `Otherworld-backup-<ts>.log`.
+- **The published build's log** (it is sandboxed): `~/Library/Containers/com.YourCompany.Otherworld/Data/Library/Logs/Otherworld/Otherworld.log`,
+  earlier runs beside it; its saved settings are under that container's
+  `Library/Application Support/Epic/Otherworld/Saved/Config/Mac/`.
 
 **The transport is the inbox** (`Content/Python/uepy_inbox.py`). It is a request/result
 directory under `Saved/uepy/` that the editor polls, and it captures both `print()` and

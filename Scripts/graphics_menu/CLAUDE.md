@@ -211,6 +211,27 @@ caret whenever the mouse was nudged), and the verifier checks nothing polls its 
   a drag needs.
   - **Do not call `SetFocusToGameViewport` there:** every frame, it left `CursorRow` empty at
     the end of the frame (`probe_menu_cursor_window.py` found no row on the title).
+- **The mouse at launch (open, not fixed).** In the published build the user finds the
+  mouse "not within the game window" from launch until they switch to another app and back.
+  The title's every-frame mode (above) did not cure it. What is known, 4 Oct 2026:
+  - **Read the build's own log** (path in the root `CLAUDE.md`). `LogViewport` and
+    `LogAppleController` are Verbose (`DefaultEngine.ini` `[Core.Log]`) for this: after a
+    run that shows the fault, look for `Releasing Mouse Capture; …` (a mouse-up that gave
+    the capture away), `Scene viewport resized to …, mode …` and
+    `HighPrecisionMouseMode Enabled/Disabled`, before and after the switch of apps.
+  - **The logs so far** show the modes changing as authored: Game-and-UI on the title, then
+    Game-only once the game starts, with the Mac's mouse handlers bound again at that
+    moment, and again after each switch of apps. Nothing in them says what is missing.
+  - **The build runs windowed-fullscreen with 640x360 saved as its resolution**
+    (`GameUserSettings.ini`: `FullscreenMode=1`, `ResolutionSizeX=640`), usually on a desk
+    with two screens. Whether the window Slate hit-tests is the size of the screen has not
+    been checked; the new `Scene viewport resized` line will say.
+  - **Which screen it is on is not known:** the title (hover and click) or play (the look,
+    the cursor leaving the window). The engine's code gives the same capture, lock and
+    focus from `SetInputMode_GameOnly` as from the activation a switch of apps causes
+    (`FSceneViewport::AcquireFocusAndCapture`), so reading it did not find the difference.
+  - **It cannot be reproduced by a session with the screen locked:** no app becomes the
+    active one, Slate then skips every capture, and nothing can move or press the mouse.
 - **A click on a row is not a shot.** While the cursor shows in a running game, DrawHUD sets
   the weapon component's `TriggerSpent` every frame (`author_hold_fire`); its Tick keeps a
   spent press spent while the fire key is down (`combat/docs/firing_gate.md`).

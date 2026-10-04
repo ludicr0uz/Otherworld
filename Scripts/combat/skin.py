@@ -210,13 +210,35 @@ SKIN_ADVENTURER = PlayerSkin(
 # (asset_pipeline/bind_to_mannequin.py, import_bound.py).  Everything but the
 # mesh is Quinn's, because on this skeleton everything but the mesh IS the
 # mannequin's: its anim blueprint, its ready poses, its grip socket, its bone
-# names.  No stance or throw clips yet: the Quaternius library is retargeted
-# per body today (ual_retarget.py) and has not been retargeted onto the
-# mannequin, so this skin crouches procedurally and throws without a clip,
-# as the mannequin does.
+# names.  The stance and throw clips are the Quaternius library retargeted
+# once onto the mannequin (asset_pipeline/retarget_ual_to_mannequin.py), which
+# serve every bound body; without them this skin crouches procedurally and
+# throws without a clip, as the mannequin does.
+BOUND_UAL_ANIMS = "/Game/Sourced/Quaternius/UAL/Mannequin"
 SKIN_BOUND = dataclasses.replace(
     SKIN_QUINN,
-    mesh=f"{bound_asset_dir(PLAYER_NAME)}/{bound_asset_name(PLAYER_NAME)}")
+    mesh=f"{bound_asset_dir(PLAYER_NAME)}/{bound_asset_name(PLAYER_NAME)}",
+    crouch_idle=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Crouch_Idle_Loop",
+    crouch_walk=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Crouch_Fwd_Loop",
+    prone_crawl=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Swim_Fwd_Loop",
+    search_kneel=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL1_Fixing_Kneeling",
+    throw=f"{BOUND_UAL_ANIMS}/A_Mannequin_UAL2_OverhandThrow")
+
+
+def _without_missing_clips(skin, eas, who, builder):
+    """``skin`` less the optional clips that are not built: the throw, and
+    the four stance clips (all of them or none)."""
+    if not eas.does_asset_exist(skin.throw):
+        _log(f"note: no Quaternius throw clip yet — {who} throws without one. "
+             f"Run asset_pipeline/{builder}.")
+        skin = dataclasses.replace(skin, throw=None)
+    stances = (skin.crouch_idle, skin.crouch_walk, skin.prone_crawl, skin.search_kneel)
+    if all(eas.does_asset_exist(p) for p in stances):
+        return skin
+    _log(f"note: no Quaternius stance clips yet — {who} crouches and lies down "
+         f"procedurally. Run asset_pipeline/{builder}.")
+    return dataclasses.replace(skin, crouch_idle=None, crouch_walk=None,
+                               prone_crawl=None, search_kneel=None)
 
 
 def player_skin():
@@ -229,7 +251,8 @@ def player_skin():
     eas = _assets()
     if PLAYER_RIG == "mannequin":
         if eas.does_asset_exist(SKIN_BOUND.mesh):
-            return SKIN_BOUND
+            return _without_missing_clips(SKIN_BOUND, eas, "the bound body",
+                                          "retarget_ual_to_mannequin.py")
         _log(f"note: PLAYER_RIG is \"mannequin\" and {SKIN_BOUND.mesh} is not "
              "imported — wearing the body on its own skeleton. Run "
              "asset_pipeline/bind_to_mannequin.py, then import_bound.py.")
@@ -238,21 +261,8 @@ def player_skin():
             SKIN_ADVENTURER.idle, SKIN_ADVENTURER.punch)
     missing = [p for p in want if not eas.does_asset_exist(p)]
     if not missing:
-        skin = SKIN_ADVENTURER
-        # Optional, unlike the rest: without it the item just leaves the hand.
-        if not eas.does_asset_exist(skin.throw):
-            _log("note: no Quaternius throw clip yet — the adventurer throws "
-                 "without one. Run asset_pipeline/import_quaternius.py.")
-            skin = dataclasses.replace(skin, throw=None)
-        stances = (SKIN_ADVENTURER.crouch_idle, SKIN_ADVENTURER.crouch_walk,
-                   SKIN_ADVENTURER.prone_crawl, SKIN_ADVENTURER.search_kneel)
-        if all(eas.does_asset_exist(p) for p in stances):
-            return skin
-        # Optional, unlike the rest: without them the stances are procedural.
-        _log("note: no Quaternius stance clips yet — the adventurer crouches "
-             "and lies down procedurally. Run asset_pipeline/import_quaternius.py.")
-        return dataclasses.replace(skin, crouch_idle=None, crouch_walk=None,
-                                   prone_crawl=None, search_kneel=None)
+        return _without_missing_clips(SKIN_ADVENTURER, eas, "the adventurer",
+                                      "import_quaternius.py")
     if len(missing) < len(want):
         _log(f"note: the adventurer skin is incomplete ({len(missing)} of "
              f"{len(want)} assets missing, first {missing[0]}) — wearing the "

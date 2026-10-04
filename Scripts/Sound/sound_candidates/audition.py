@@ -35,7 +35,11 @@ RATINGS = (
     ("neutral", "Neutral", "\u25cb", "3"),
     ("bad", "Bad", "\u2212", "2"),
     ("verybad", "Very bad", "\u2212\u2212", "1"),
+    # Not a point on the scale: the sound is good and the category is wrong.
+    # It carries a note saying what it would be good for.
+    ("reuse", "Good, other use", "\u21aa", "6"),
 )
+NOTED = "reuse"   # the rating that shows the note box
 
 # Beds are judged looping; everything else is a one-shot.
 LOOPED = ("ambience", "fire")
@@ -86,11 +90,13 @@ def _add(groups, category, path):
 _STYLE = """
 :root { --bg:#f6f5f1; --panel:#fff; --ink:#1d1d1b; --dim:#6b6a65; --line:#dedcd4;
         --accent:#2f6f4f; --accent-ink:#fff; color-scheme: light;
-        --great:#1f8a4c; --ok:#6aa84f; --neutral:#8a8983; --bad:#d9822b; --verybad:#c0392b; }
+        --great:#1f8a4c; --ok:#6aa84f; --neutral:#8a8983; --bad:#d9822b; --verybad:#c0392b;
+        --reuse:#3b6fd4; }
 @media (prefers-color-scheme: dark) {
   :root { --bg:#161715; --panel:#1f211e; --ink:#e9e7e0; --dim:#9a988f; --line:#33352f;
           --accent:#6fbf93; --accent-ink:#10140f; color-scheme: dark;
-          --great:#4fc47f; --ok:#9bcf7c; --neutral:#a3a199; --bad:#f0a04b; --verybad:#ef6a5b; }
+          --great:#4fc47f; --ok:#9bcf7c; --neutral:#a3a199; --bad:#f0a04b; --verybad:#ef6a5b;
+          --reuse:#7da6f5; }
 }
 * { box-sizing: border-box; }
 body { margin:0; background:var(--bg); color:var(--ink);
@@ -138,6 +144,11 @@ section h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em;
 .rate button[data-r=neutral], .take[data-rating=neutral] { --c:var(--neutral); }
 .rate button[data-r=bad], .take[data-rating=bad] { --c:var(--bad); }
 .rate button[data-r=verybad], .take[data-rating=verybad] { --c:var(--verybad); }
+.rate button[data-r=reuse], .take[data-rating=reuse] { --c:var(--reuse); }
+.rate button[data-r=reuse] { border-left:1px solid var(--line); }
+.take .note { display:none; font:inherit; font-size:12px; width:150px; padding:4px 7px; border:0;
+       border-left:1px solid var(--line); background:transparent; color:var(--ink); }
+.take[data-rating=reuse] .note { display:block; }
 .take[data-rating] { border-color:var(--c); box-shadow:inset 3px 0 0 var(--c); }
 .rate button.on { opacity:1; background:var(--c); color:#fff; font-weight:700; }
 #picks { margin-top:28px; }
@@ -205,6 +216,10 @@ try {   // the stars this page had before it had ratings
     if (!(id in ratings)) ratings[id] = 'great';
   }
 } catch (e) {}
+// What a "good, other use" take would be good for, by take id.
+const NOTES_KEY = 'otherworld-sound-notes';
+let notes = {};
+try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch (e) {}
 const takes = [...document.querySelectorAll('.take')];
 const ratedBox = document.getElementById('rated');
 
@@ -225,18 +240,33 @@ function report() {
   for (const {key, label} of RATINGS) {
     const ids = takes.map(t => t.dataset.id).filter(id => ratings[id] === key);
     rated += ids.length;
-    if (ids.length) lines.push(label + ' (' + ids.length + ')', ...ids.map(id => '  ' + id), '');
+    const line = id => '  ' + id + (key === NOTED && notes[id] ? '  -- ' + notes[id] : '');
+    if (ids.length) lines.push(label + ' (' + ids.length + ')', ...ids.map(line), '');
   }
   ratedBox.value = lines.join('\\n').trimEnd();
   document.getElementById('ratedcount').textContent = rated + ' of ' + takes.length;
-  try { localStorage.setItem(KEY, JSON.stringify(ratings)); } catch (e) {}
+  try {
+    localStorage.setItem(KEY, JSON.stringify(ratings));
+    localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  } catch (e) {}
   applyFilter();
 }
 takes.forEach(take => {
   paint(take);
   take.querySelector('.play').addEventListener('click', () => play(take));
   take.querySelectorAll('.rate button').forEach(b =>
-    b.addEventListener('click', () => { focus(take); rate(take, b.dataset.r); }));
+    b.addEventListener('click', () => {
+      focus(take);
+      rate(take, b.dataset.r);
+      if (b.dataset.r === NOTED && ratings[take.dataset.id] === NOTED) note.focus();
+    }));
+  const note = take.querySelector('.note');
+  note.value = notes[take.dataset.id] || '';
+  note.addEventListener('input', () => {
+    const text = note.value.trim();
+    if (text) notes[take.dataset.id] = text; else delete notes[take.dataset.id];
+    report();
+  });
 });
 document.getElementById('clear').addEventListener('click', () => {
   const box = document.getElementById('confirm');
@@ -244,7 +274,8 @@ document.getElementById('clear').addEventListener('click', () => {
 });
 document.getElementById('clear-yes').addEventListener('click', () => {
   ratings = {};
-  takes.forEach(paint);
+  notes = {};
+  takes.forEach(t => { paint(t); t.querySelector('.note').value = ''; });
   document.getElementById('confirm').hidden = true;
   report();
 });
@@ -295,7 +326,9 @@ def _take_html(take, looped):
         f' data-loop="{1 if looped else 0}">'
         f'<button class="play" title="{e(take["name"])}">&#9654; {e(_take_label(take))}'
         f'<small>{take["seconds"]:.1f}s{stereo}</small></button>'
-        f'<span class="rate">{_RATE_BUTTONS}</span></span>')
+        f'<span class="rate">{_RATE_BUTTONS}</span>'
+        f'<input class="note" type="text" placeholder="good for\u2026" '
+        f'title="What this sound would be good for"></span>')
 
 
 _RATE_BUTTONS = "".join(
@@ -347,7 +380,7 @@ def render(groups):
   </div>
   <nav>{"".join(nav)}<a href="#picks">ratings</a></nav>
   <div class="hint">Rate the last take played with <kbd>5</kbd> great, <kbd>4</kbd> ok,
-    <kbd>3</kbd> neutral, <kbd>2</kbd> bad, <kbd>1</kbd> very bad, <kbd>0</kbd> clear.
+    <kbd>3</kbd> neutral, <kbd>2</kbd> bad, <kbd>1</kbd> very bad, <kbd>6</kbd> good but for another use (with a note), <kbd>0</kbd> clear.
     <kbd>Space</kbd> stops.</div>
 </header>
 <main>
@@ -360,6 +393,7 @@ def render(groups):
 </section>
 </main>
 <script>const RATINGS = {ratings_js};
+const NOTED = {json.dumps(NOTED)};
 {_SCRIPT}</script>
 </body></html>
 """

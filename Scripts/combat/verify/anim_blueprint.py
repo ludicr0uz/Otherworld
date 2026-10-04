@@ -5,6 +5,7 @@ from combat.anim_blueprint import (
     AIM_SLOT, FULL_BODY_SLOT, HIT_SLOT, UPPER_BODY_ROOT,
 )
 from combat.paths import ABP_PATH
+from combat.skin import player_skin
 from combat.verify.common import BEL, PIN, check, graph, load
 
 
@@ -51,7 +52,14 @@ def check_anim_graph_patch():
     check("the aim slot and the hit slot feed two DIFFERENT blends",
           aim_blend is not None and hit_blend is not None and aim_blend != hit_blend)
 
-    for label, blend, want_base in (("aim", aim_blend, "AnimGraphNode_StateMachine"),
+    # The locomotion state machine -- or, when the body worn on this anim
+    # blueprint has stance clips (one bound to the mannequin's skeleton:
+    # combat/skin.SKIN_BOUND), the blend stance_clips.py puts over it.
+    skin = player_skin()
+    over_locomotion = ("AnimGraphNode_TwoWayBlend"
+                       if skin.anim_bp == ABP_PATH and skin.stance_clips
+                       else "AnimGraphNode_StateMachine")
+    for label, blend, want_base in (("aim", aim_blend, over_locomotion),
                                     ("hit", hit_blend, "AnimGraphNode_LayeredBoneBlend")):
         if blend is None:
             continue

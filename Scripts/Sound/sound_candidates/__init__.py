@@ -6,6 +6,13 @@ ffmpeg and numpy. Reads `assets/cache/sounds/`, writes
 
   manifest.py   the table: which candidate is cut from which file, how, and
                 each pack's licence
+  manifest_archive.py   the second table: the Sonniss 2016-2019 files and the
+                Freesound previews
+  sonniss_archive.py    which files of the 2016-2019 Sonniss bundles are
+                wanted, and the fetch (`Scripts/Sound/fetch_sonniss_archive.py`)
+  remote_zip.py         one member of a zip on a web server, by HTTP range
+  freesound_previews.py CC0 Freesound previews for what the packs lack
+                (`Scripts/Sound/fetch_freesound_previews.py`)
   dsp.py        decode, trim, split, loop, repitch, write: the signal code
   build.py      runs the table and writes the files and SOURCES.md
   audition.py   the HTML page that plays every candidate and every sound the

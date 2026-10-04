@@ -49,6 +49,7 @@ from asset_pipeline.mannequin_bind import paths                    # noqa: E402
 EAL = unreal.EditorAssetLibrary
 _log = unreal.log_warning
 MANNEQUIN_MESH_ASSET = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
+MANNEQUIN_PHYSICS_ASSET = "/Game/Characters/Mannequins/Rigs/PA_Mannequin"
 PER_BODY_ROOT = "/Game/Sourced/Characters"
 ROTATION_TOLERANCE = 1e-3          # 1 - |dot| of two unit quaternions
 HEIGHT_TOLERANCE = 0.05
@@ -89,7 +90,10 @@ def import_onto(glb, dest_dir, skeleton, with_materials):
     meshes = pipeline.get_editor_property("mesh_pipeline")
     meshes.set_editor_property("import_skeletal_meshes", True)
     meshes.set_editor_property("import_static_meshes", False)
-    meshes.set_editor_property("create_physics_asset", True)
+    # Its physics asset is the mannequin's, copied (adopt_physics below): the
+    # importer's own guess put no body on the head, and a body with no head
+    # body cannot be shot in it (combat/hit_zones.py refused the build).
+    meshes.set_editor_property("create_physics_asset", False)
     pipeline.get_editor_property("animation_pipeline").set_editor_property(
         "import_animations", False)
 
@@ -165,6 +169,26 @@ def check(mesh, strays, skeleton, spec, short):
     return ok
 
 
+def adopt_physics(mesh, dest_dir, short):
+    """Give the body a copy of the mannequin's physics asset.
+
+    The same skeleton, so the same bodies on the same bones, placed by this
+    body's own joints: what every mesh on SK_Mannequin does.  A copy and not
+    the asset itself, because the build refits capsules to the worn body
+    (combat/capsule_fit.py) and must not refit Quinn's.
+    """
+    path = f"{dest_dir}/{paths.bound_asset_name(short)}_PhysicsAsset"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    physics = EAL.duplicate_asset(MANNEQUIN_PHYSICS_ASSET, path)
+    if not physics:
+        _log(f"[BOUND]   FAIL could not copy {MANNEQUIN_PHYSICS_ASSET}")
+        return False
+    mesh.set_editor_property("physics_asset", physics)
+    _log(f"[BOUND]   physics: a copy of {MANNEQUIN_PHYSICS_ASSET.rsplit('/', 1)[1]}")
+    return True
+
+
 def creature_material(short):
     """The creature material built for this body's per-body import, or None."""
     path = f"{PER_BODY_ROOT}/SKM_{short}/MI_{short}"
@@ -213,7 +237,8 @@ def main(only=None):
             _log("[BOUND]   FAIL no SkeletalMesh produced")
             results[spec["id"]] = False
             continue
-        results[spec["id"]] = check(mesh, strays, skeleton, spec, short)
+        results[spec["id"]] = (check(mesh, strays, skeleton, spec, short)
+                               and adopt_physics(mesh, dest, short))
         wear_material(mesh, short)
         EAL.save_directory(dest, only_if_is_dirty=False)
     _log("[BOUND] ================ summary ================")

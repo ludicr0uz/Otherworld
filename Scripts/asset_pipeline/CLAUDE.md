@@ -103,43 +103,52 @@ reference skeleton straight out of `SKM_Manny_Simple.uasset`, and writes
 `assets/cache/meshy/<id>/bound/<id>_mannequin.glb` with a `bind_report.json`. `--check`
 checks without writing; `--all` does every cached body (the wendigo is refused: not a man).
 
-**Where it stands (2026-10-03).** Bound, imported and looked at; not worn in the game.
+**Where it stands (2026-10-03).** Worn: `player_body.PLAYER_RIG = "mannequin"`, and the
+player is `/Game/Sourced/Bound/SKM_Adventurer03` on the stock `ABP_Unarmed`.
 
-- Host half: tested (`python3 -m unittest discover -s Scripts/dev/tests -p
-  'test_mannequin_bind.py'`); the four humanoids bind, and the Khronos glTF validator
-  passes their files with no errors or warnings.
-- Editor half: `import_bound.py` runs clean on all four. Each lands on `SK_Mannequin`
-  itself (no new skeleton, and `SK_Mannequin.uasset` is not rewritten), every bone's
-  reference rotation is the mannequin's, heights are 180.5-181.0 cm.
-- In a clip (`bound_look.py` photographs the bound body, the per-body one and Quinn side by
-  side into `Saved/Renders/bound_look/`): limbs keep the body's own lengths, feet stay on
-  the ground (ankle 13.4-14.2 cm in `MM_Idle` against 13.8 at rest), the pose is Quinn's,
-  the fingers close, and the lats no longer flare in `MM_Jump`.
-- `combat/skin.player_skin()` with `PLAYER_RIG = "mannequin"` resolves to the bound mesh on
-  `ABP_Unarmed`, with the `HandGrip_R` socket. **Nothing has been built or verified with
-  it worn**: the weapons build, the grip solve, the hold poses and the probes have only
-  ever run on the per-body skeleton.
+```bash
+python3 Scripts/asset_pipeline/bind_to_mannequin.py adventurer_03
+rm Content/Weapons/Anims/*.uasset          # keyed on the skeleton worn before
+python3 Scripts/dev/uepy.py --cold --summary Scripts/asset_pipeline/import_bound.py \
+    Scripts/asset_pipeline/retarget_ual_to_mannequin.py Scripts/build_weapons_and_combat.py \
+    Scripts/build_survival.py Scripts/build_graphics_menu.py Scripts/build_clothing.py
+```
 
-Two things the first editor runs found, both fixed: the importer names a mesh after its
-FILE (so the GLB is `SKM_<Name>.glb`), and a pelvis left on Meshy's high Hips joint floats
-the body 11 cm in every clip (`mannequin_bind/fit.py`, THE PELVIS IS NOT MESHY'S HIPS).
+Back to the per-body skeleton: `PLAYER_RIG = "own"` and `swap_player_body.py adventurer_03`.
 
-Run from a worktree, both scripts take `--project <main checkout>` on `uepy.py`: the code
-and the bound files are the worktree's, the editor and Content/ the main checkout's.
+- Host half: tested (`dev/tests/test_mannequin_bind.py`); the Khronos glTF validator
+  passes the bound files with no errors or warnings.
+- Import: on `SK_Mannequin` itself, every reference rotation the mannequin's, the
+  mannequin's physics asset copied beside the mesh (the importer's own had no head body).
+- Clips: `retarget_ual_to_mannequin.py` puts the Quaternius library on the mannequin once
+  (`/Game/Sourced/Quaternius/UAL/Mannequin`); `SKIN_BOUND` takes its crouch, crawl, kneel
+  and throw from there. `bound_look.py` photographs the bound body, the per-body one and
+  Quinn in the same poses into `Saved/Renders/bound_look/`.
+- Builds pass; survival, menu, clothing and NPC verifiers pass; a 25 s headless game runs
+  with no Blueprint errors. **`verify_weapons_and_combat.py` is 1788/1794.** The six:
+  - four on the shotgun's hands (thumb over the stock's wrist, a finger 1.8 cm in the
+    pump, one 2.9 cm off it against 2.5 allowed, the fist 1 cm from the stock): the pose
+    is solved for the body and lands 1-2 cm off on this one;
+  - the throw's ready pose 5 cm from the clip's own frame;
+  - `calf_l`/`calf_r` of `A_AimShotgun` not the rifle pose's. Not understood yet.
 
-What is known not to be done:
+Things the first runs found, all fixed: the importer names a mesh after its FILE; a pelvis
+left on Meshy's high Hips joint floats the body in every clip (`mannequin_bind/fit.py`);
+the mannequin's own clips key corrective bones its simple mesh does not have
+(`combat/hold_pose.py`, `shotgun_pose.py` leave those tracks out).
 
-- **Stance and throw clips.** `SKIN_BOUND` has none: the Quaternius library is retargeted
-  per body (`ual_retarget.py`) and needs one retarget onto the mannequin instead. Same for
-  the zombie's Mixamo set if a monster is ever bound.
-- **`adventurer_02` and `zombie_01` have fingers the bind cannot find** (they do not
-  separate into four and a thumb). They are weighted by the mannequin's layout and not
-  curled; the report says so.
-- **Physics asset and capsules** are the importer's, not the reference body's
-  (`physics_template.py`, `combat/capsule_fit.py` are written for the per-body flow).
-- **The per-body passes are not deleted.** `clavicle_align.py`, `palm_twist.py`,
-  `two_hands.py`, `finger_rig.py` and the retargeted clip sets go when the bound flow has
-  been worn and verified, not before.
+Not done:
+
+- **The probes** (`Scripts/probes`) pick the worn skin out of `(SKIN_ADVENTURER,
+  SKIN_QUINN)` and have not been run on the bound body.
+- **`adventurer_02` and `zombie_01` have fingers the bind cannot find**; they are weighted
+  by the mannequin's layout and not curled, and the report says so.
+- **Capsules** are the mannequin's, not refitted to this body's limbs.
+- **Monsters** are still per-body (their Mixamo set would need one retarget onto the
+  mannequin, as the Quaternius one got).
+- **The per-body passes are not deleted**: `clavicle_align.py`, `palm_twist.py`,
+  `two_hands.py`, `finger_rig.py` and the retargeted clip sets go when this flow has been
+  played, not before.
 
 One finding to carry back to the per-body flow: on all four cached bodies the palm side
 `palm_twist.hand_frame` picks (the cloud's skew) is the BACK of the hand by the thumb's

@@ -168,8 +168,12 @@ def _local_rotations(skin, dirs, idle, pistol):
     fingers = {b for b in ref if _below(ref, b, hand)}
     # Track names are FNames and can come back in another case than the bones.
     by_lower = {b.lower(): b for b in ref}
+    # ...and a track for a bone this mesh does not have (a corrective bone of
+    # the mannequin's full skeleton, on a body bound to its simple mesh's 89)
+    # is left out.
     keyed = ({by_lower[str(n).lower()]
-              for n in idle.data_model_interface.get_bone_track_names()}
+              for n in idle.data_model_interface.get_bone_track_names()
+              if str(n).lower() in by_lower}
              | set(turned) | fingers)
     out = {}
     for bone in keyed:

@@ -76,13 +76,19 @@ def _search(query):
     return results
 
 
-def fetch(log=print):
-    """Save the previews not already held. Returns the index it wrote."""
+def fetch(only=(), log=print):
+    """Save the previews not already held, for the needs named in `only` or
+    for all of them. Returns the index it wrote."""
+    unknown = set(only) - {need for need, _q, _s, _n in NEEDS}
+    if unknown:
+        raise ValueError(f"no such need: {sorted(unknown)}")
     index = {}
     if os.path.exists(INDEX_PATH):
         with open(INDEX_PATH) as held:
             index = json.load(held)
     for need, query, longest, wanted in NEEDS:
+        if only and need not in only:
+            continue
         have = [k for k, v in index.items() if v["need"] == need]
         if len(have) >= wanted:
             continue

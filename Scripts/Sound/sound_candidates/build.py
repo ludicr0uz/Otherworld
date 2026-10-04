@@ -10,7 +10,11 @@ import os
 import shutil
 
 from sound_candidates import dsp
-from sound_candidates.manifest import LICENCES, PREVIEWS, ROWS
+from sound_candidates import manifest, manifest_archive
+from sound_candidates.manifest import PREVIEWS
+
+ROWS = manifest.ROWS + manifest_archive.ROWS
+LICENCES = {**manifest.LICENCES, **manifest_archive.LICENCES}
 
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
@@ -18,8 +22,10 @@ CACHE_DIR = os.path.join(_PROJECT_DIR, "assets", "cache", "sounds")
 OUT_DIR = os.path.join(_PROJECT_DIR, "assets", "generated", "sound_candidates")
 
 
-def _find(pattern):
+def _find(pattern, optional=False):
     found = sorted(glob.glob(os.path.join(CACHE_DIR, pattern), recursive=True))
+    if not found and optional:
+        return []
     if not found:
         raise FileNotFoundError(f"no source for {pattern!r} under {CACHE_DIR}")
     return found
@@ -39,7 +45,9 @@ def _takes(op, source, opts, channels):
             layers.append((dsp.repitch(dsp.trim(dsp.decode(path, channels)), semitones), gain))
         return [(dsp.fade(dsp.mix(layers)), " + ".join(_rel(p) for p in used))]
 
-    paths = _find(source)
+    paths = _find(source, opts.get("optional", False))
+    if not paths:
+        return []
     if op == "each":
         paths = paths[:opts.get("limit")]
         return [(dsp.fade(dsp.trim(dsp.decode(p, channels))), _rel(p)) for p in paths]
@@ -69,7 +77,10 @@ def build_rows():
         takes = _takes(op, source, opts, channels)
         numbered = len(takes) > 1 or op in ("each", "split")
         for i, (samples, src) in enumerate(takes, 1):
-            name = f"{out}_{i:02d}" if numbered else out
+            if opts.get("named"):
+                name = f"{out}/{os.path.splitext(os.path.basename(src))[0]}"
+            else:
+                name = f"{out}_{i:02d}" if numbered else out
             samples = dsp.normalise(samples, opts["peak"])
             dsp.write(os.path.join(OUT_DIR, name + ".wav"), samples)
             written.append((name, len(samples) / dsp.RATE, channels, src))

@@ -295,7 +295,10 @@ def check_flinching():
               len(_clips) in (0, len(HIT_REACTION_CLIPS)), str(len(_clips)))
         if _clips:
             check(f"...in HIT_REACTION_CLIPS order",
-                  [c.get_name().rsplit("_MM_", 1)[-1] for c in _clips]
+                  # A_Zombie01_MM_HitReact_... on a body with a skeleton of
+                  # its own, MM_HitReact_... (Epic's originals) on one bound
+                  # to the mannequin's.
+                  [c.get_name().split("MM_", 1)[-1] for c in _clips]
                   == [c.split("MM_", 1)[1] for c in HIT_REACTION_CLIPS],
                   str([c.get_name() for c in _clips]))
             _mesh = _mesh_asset(_bp)

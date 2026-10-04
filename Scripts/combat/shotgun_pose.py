@@ -281,8 +281,13 @@ def build_shotgun_pose(skin):
     frames = model.get_number_of_frames()
     n = model.get_number_of_keys()
     # Track names are FNames and can come back in another case than the bones.
+    # A track for a bone this mesh does not have is left out: the mannequin's
+    # own clips key its 161-bone skeleton's corrective bones, and a body bound
+    # to the 89 its simple mesh carries (asset_pipeline/mannequin_bind) has
+    # nothing for them to move.
     by_lower = {b.lower(): b for b in ref}
-    tracks = ({by_lower[str(t).lower()] for t in model.get_bone_track_names()}
+    tracks = ({by_lower[str(t).lower()] for t in model.get_bone_track_names()
+               if str(t).lower() in by_lower}
               | set(thumbs) | set(carried))
 
     clip = _copy_of(skin.aim_rifle, SHOTGUN_AIM_ANIM_PATH)

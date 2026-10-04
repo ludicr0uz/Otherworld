@@ -40,7 +40,7 @@ PLAYER_BODY = "adventurer_03"
 #                are.  Where the project is going; see mannequin_bind/.  Until
 #                import_bound.py has put the body in Content/, combat/skin.py
 #                says so and wears the "own" body.
-PLAYER_RIG = "own"
+PLAYER_RIG = "mannequin"
 
 # The catalog id of the body the garments are drawn on (Scripts/clothing): the
 # player with every clothing slot empty.

@@ -53,6 +53,8 @@ Editor-side, in pipeline order:
     ual_retarget.py             IK_UAL1/2, RTG_<Character>_from_UAL1/2, batch retarget
     import_bound.py             entry point: bound GLBs -> /Game/Sourced/Bound on
                                 SK_Mannequin, and the checks only an editor can make
+    retarget_ual_to_mannequin.py  entry point: the Quaternius clips onto SK_Mannequin,
+                                once, for every bound body
     bound_look.py               entry point (tooling): photograph the bound body,
                                 the per-body one and Quinn in the same clip poses
     import_ui_art.py            entry point: HUD art PNGs -> textures

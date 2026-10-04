@@ -10,7 +10,7 @@ import unreal
 
 from asset_pipeline import catalog, player_body, quaternius_paths
 from combat.hit_bodies import _bodies
-from combat.skin import SKIN_ADVENTURER, player_skin
+from combat.skin import SKIN_ADVENTURER, SKIN_BOUND, player_skin
 from combat.verify.common import _mesh_asset, check, load
 from combat.verify.fixtures import char
 
@@ -39,11 +39,20 @@ def check_one_setting():
         # A checkout that has never run the asset pipeline: the mannequin.
         return
     worn = _mesh_asset(char) if char else None
+    # Which mesh that is depends on how the body is rigged
+    # (player_body.PLAYER_RIG): on its own skeleton, or bound to the
+    # mannequin's -- the same body either way, and not Quinn.
+    bound = (player_body.PLAYER_RIG == "mannequin"
+             and unreal.EditorAssetLibrary.does_asset_exist(SKIN_BOUND.mesh))
+    want = SKIN_BOUND.mesh if bound else _mesh_path(name)
     check(f"the player wears {name}, not the mannequin fallback: all of its "
           "assets are built",
-          player_skin().mesh == SKIN_ADVENTURER.mesh and worn is not None
-          and worn.get_path_name().split(".")[0] == _mesh_path(name),
+          player_skin().mesh == want and worn is not None
+          and worn.get_path_name().split(".")[0] == want,
           f"skin {player_skin().mesh}, worn {worn.get_path_name() if worn else None}")
+    if bound:
+        # What follows is about the per-body skeleton's physics asset.
+        return
 
     reference = player_body.reference_of(name)
     if not reference:

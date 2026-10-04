@@ -78,8 +78,11 @@ def check_shotgun_clip():
     frames = sorted({0, n // 2, n - 1})
     off = []
     arm = _carried_bones(skin)
+    # A track for a bone the worn mesh does not have is not kept
+    # (shotgun_pose.build_shotgun_pose): nothing on this body moves with it.
+    has = {b.lower() for b in mesh_ref_pose(worn)}
     for track in sorted(str(t) for t in theirs.get_bone_track_names()):
-        if track.lower() in thumbs or track.lower() in arm:
+        if track.lower() in thumbs or track.lower() in arm or track.lower() not in has:
             continue
         for f in frames:
             a, b = _sampled(clip, track, f), _sampled(rifle, track, f)

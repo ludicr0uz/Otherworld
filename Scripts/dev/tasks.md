@@ -226,3 +226,31 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [x] Pressing I should have a hover image of the character facing forward as part of the
       character menu screen.
 - [x] Update the worn clothing inventory to show clothing icons rather than text. Should be the same icon format as the inventory. Remove text labels for primary / secondary / gun / knife weapon slots. Create translucent icons for the weapon categories (AR / AR / Gun / Knife) if there are no items in those slots. Always show clothing and inventory (should not be hidden until "i" is pressed). If I is pressed, allow mouse drag to move items around, including putting them into inventory slots or hands. 
+- [x] Add item highlighting when items are on the ground (configurable in the world menu as
+      on/off). Implement a glimmer if there is an item on the floor.
+- [x] Improve the item icon generation processor to make the items look more realistic, and add
+      a thin black contour around the item models.
+- [x] If the player runs too far away from his original location, the wendigo should go
+      directly into the "charge at the player" state.
+- [x] Disable the scroll wheel in menus. Allow vertical drag for the vertical scrollbar.
+- [x] Remove the Food / H2O / Temperature labels (we already have icons). Update the food icon
+      to a chicken leg rather than a mushroom.
+- [x] When I (inventory) is selected, dragging an item should hold the item attached to the
+      mouse cursor as it is moved to the destination. Dropping it outside of the inventory area
+      should result in dropping the item on the floor. While the mouse is moving in the
+      drag-item state, it should not rotate the screen.
+- [x] Instead of "NPCs killed", update the label to "Monster Kills".
+- [x] Wendigos should not make sound when they are patrolling.
+- [x] When looting a weapon, if there is an open weapon slot for it, it should prioritize going
+      there before the inventory. When retrieving a melee weapon from a stuck state (e.g. an NPC
+      or a tree), if the hands are empty, the weapon should go into the hand slot.
+- [x] Reduce footsteps volume. Add a sounds menu where the volume for each sound is tunable.
+- [x] In the published build, when the game launches, the menu is not clickable until
+      alt-tabbing out and back into the game, or first pressing a keyboard button. Fix this so
+      the menu is clickable immediately on launch.
+- [x] In the menus, the Escape button should navigate backwards (equivalent to Back). Rename
+      "Settings" in the main menu to "Controls". If there is a saved state, the main menu should
+      say "Continue Game" rather than "New Game".
+- [x] The reticle turns red sometimes. Always keep the reticle white. If there is a headshot,
+      show an X around the reticle.
+- [x] The Q button should navigate through inventory items, not through guns.

@@ -24,6 +24,7 @@ from graphics_menu.wear_consts import (
     WEAR_GHOSTS, WEAR_PANEL, WEAR_PORTRAIT, WEAR_PORTRAIT_GAP, WEAR_PORTRAIT_IMAGE,
     WEAR_PORTRAIT_PAD, WEAR_PORTRAIT_SIZE, WEAR_ROWS, WEAR_SLOTS_BOX,
 )
+from item_icons.items import icon_name
 from item_icons.portrait import PORTRAIT_TEXTURE
 
 
@@ -35,7 +36,7 @@ def author_wear_widgets(bp, parent):
                    variable=True)
     U.pad(close, bottom=WEAR_CLOSE_GAP, h="Right")
     grid = slot_grid(bp, panel, WEAR_SLOTS_BOX, WEAR_ROWS, WEAR_COLUMNS, "Worn",
-                     ghosts=WEAR_GHOSTS)
+                     ghosts=[icon_name(d) for d in WEAR_GHOSTS])
     U.pad(grid, h="Right")
     U.hide(panel)
     return panel

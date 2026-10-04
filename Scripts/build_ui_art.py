@@ -33,6 +33,7 @@ edges come from -- PIL's polygon fill is hard-edged.
 
 import os
 
+from ui_art.slot_ghosts import write_slot_ghosts
 from ui_art.stat_icons import write_stat_icons
 from ui_art.vertical_bars import write_vertical_bars
 
@@ -373,6 +374,7 @@ def main():
     made.append("T_UI_Scope")
 
     made += write_stat_icons(OUT_DIR)
+    made += write_slot_ghosts(OUT_DIR)
     made += write_vertical_bars(OUT_DIR)
 
     print(f"wrote {len(made)} PNGs to {OUT_DIR}")

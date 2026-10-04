@@ -50,6 +50,7 @@ from graphics_menu.umg_consts import (
     VITALS, VITALS_GAP, VITALS_OVER, WBP_HUD,
     debuff_text, stat_bar, stat_group, stat_icon,
 )
+from ui_art.slot_ghosts import ghost_name
 from ui_art.stat_icons import stat_icon_name
 
 DEBUFF_OF = {stat: label for _tag, label, stat in DEBUFF_LABELS}
@@ -125,7 +126,7 @@ def _author_strip(bp, body):
     hand = slot_grid(bp, strip, HAND_BOX, 1, 1, "Hand")
     U.pad(hand, bottom=HAND_GAP, h="Center")
     weapons = slot_grid(bp, strip, WEAPON_BOX, len(WEAPON_GHOSTS), len(WEAPON_GHOSTS),
-                        "Weapon", ghosts=WEAPON_GHOSTS)
+                        "Weapon", ghosts=[ghost_name(k) for k in WEAPON_GHOSTS])
     U.pad(weapons, h="Center")
     _author_vitals(bp, strip)
 

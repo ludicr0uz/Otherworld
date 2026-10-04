@@ -526,10 +526,12 @@ loot window, in play only. Traps met here:
   read, the slots'). The caret is the lit slot, not a `>`.
 - **An empty slot's silhouette is the slot's own:** `WBP_InventorySlot.GhostTexture`,
   Instance Editable, set per cell in `WBP_HUD` (`wbp_parts.slot_grid(ghosts=…)`) and put
-  into the `Ghost` image by the slot's PreConstruct, as a menu row's label is. It is an
-  item's icon drawn at `COL_GHOST`'s alpha: a rifle, a rifle, a pistol and a knife in the
-  weapon slots (`inv_consts.WEAPON_GHOSTS`), each garment in its worn slot
-  (`wear_consts.WEAR_GHOSTS`); the hand and the bag have none. The HUD shows it in an
+  into the `Ghost` image by the slot's PreConstruct, as a menu row's label is. It is drawn
+  at `COL_GHOST`'s alpha. The weapon slots' are drawn glyphs of the kind, not any item's
+  icon: a rifle, a rifle, a pistol and a knife (`inv_consts.WEAPON_GHOSTS`,
+  `T_UI_Ghost_<Kind>`, drawn by `ui_art/slot_ghosts.py` as the stat icons are; after a
+  change run `build_ui_art.py`, `import_ui_art.py`, then the menu build). A worn slot's
+  is its garment's icon (`wear_consts.WEAR_GHOSTS`); the hand and the bag have none. The HUD shows it in an
   empty slot only where the texture is valid, and collapses it in a filled one. The
   weapon slots have no captions any more.
 - **The caret runs on into the bag:** `WearSel` 0-7 are the worn slots, 8-17 the bag's

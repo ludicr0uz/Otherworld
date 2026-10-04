@@ -13,7 +13,7 @@ import unreal
 from graphics_menu import inv_consts as IC
 from graphics_menu import settings_rows as S
 from graphics_menu.wear_consts import WEAR_SEL_VAR
-from item_icons.items import icon_name
+from ui_art.slot_ghosts import ghost_name
 from graphics_menu import umg_consts as C
 from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
 from graphics_menu.umg_author import toolset
@@ -176,10 +176,10 @@ def check_trees(check):
           and pad == C.SLOT_GAP / 2.0, f"{order}, gap {pad}")
     ghosts = [g.get_name() if g else None for g in
               (k.get_editor_property(C.SLOT_GHOST_VAR) for k in cells(IC.WEAPON_BOX)[1])]
-    want_ghosts = [icon_name(d) for d in IC.WEAPON_GHOSTS]
+    want_ghosts = [ghost_name(k) for k in IC.WEAPON_GHOSTS]
     ghost = slot.get(C.SLOT_GHOST, (None, False))[0]
     alpha = ghost.get_editor_property("color_and_opacity").a if ghost else None
-    check(f"an empty weapon slot shows its kind's silhouette, translucent: {want_ghosts}; "
+    check(f"an empty weapon slot shows its kind's drawn silhouette (no item's icon), translucent: {want_ghosts}; "
           "the hand's and the bag's slots have none",
           ghosts == want_ghosts and alpha is not None and 0.05 < alpha < 0.5
           and not any(k.get_editor_property(C.SLOT_GHOST_VAR)

@@ -24,7 +24,6 @@ from graphics_menu.umg_consts import (
     SLOT_FRAME, SLOT_GAP, SLOT_GHOST, SLOT_GHOST_VAR, SLOT_H, SLOT_ICON, SLOT_ICON_H,
     SLOT_ICON_TOP, SLOT_ICON_W, SLOT_W, UI_ART_DIR, WBP_INVENTORY_SLOT, WBP_MENU_ROW,
 )
-from item_icons.items import icon_name
 from uebp.nodes.palette import NODE_PRE_CONSTRUCT
 from uebp.nodes.system import FN_STR_TO_TEXT
 from uebp.nodes.umg import FN_SET_BRUSH, FN_SET_TEXT, FN_SET_TEXT_COLOUR, FN_SET_WIDTH
@@ -140,7 +139,8 @@ def build_inventory_slot():
 
 def slot_grid(bp, parent, name, cells, columns, prefix, ghosts=None):
     """A UniformGridPanel of ``cells`` WBP_InventorySlots, a gap apart.
-    ``ghosts``: per cell, the item whose icon is its empty silhouette."""
+    ``ghosts``: per cell, the texture (its name in UI_ART_DIR) that is its
+    empty silhouette."""
     grid = U.add(bp, unreal.UniformGridPanel, name, parent, variable=True)
     half = SLOT_GAP / 2.0
     grid.set_editor_property("slot_padding", unreal.Margin(half, half, half, half))
@@ -149,6 +149,6 @@ def slot_grid(bp, parent, name, cells, columns, prefix, ghosts=None):
         cell = U.add(bp, slot_class, f"{prefix}{i}", grid)
         if ghosts:
             cell.set_editor_property(
-                SLOT_GHOST_VAR, _must_load(f"{UI_ART_DIR}/{icon_name(ghosts[i])}"))
+                SLOT_GHOST_VAR, _must_load(f"{UI_ART_DIR}/{ghosts[i]}"))
         U.cell(cell, i // columns, i % columns)
     return grid

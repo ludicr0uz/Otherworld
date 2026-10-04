@@ -41,9 +41,9 @@ SLOT_BOXES = ((HAND_BOX, HAND, 1), (WEAPON_BOX, PRIMARY, len(WEAPON_SLOT_NAMES))
 WORN_CODE_FIRST = SLOT_COUNT
 DRAG_BOXES = SLOT_BOXES + ((WEAR_SLOTS_BOX, WORN_CODE_FIRST, WEAR_ROWS),)
 
-# An empty weapon slot's silhouette: the item (item_icons/items.py's
-# DisplayName) whose icon stands in it, translucent. Primary and secondary
-# a rifle, then a pistol and a knife.
+# An empty weapon slot's silhouette: the kind of weapon (ui_art/slot_ghosts.py's
+# drawn glyph, not an item's icon) that stands in it, translucent. Primary and
+# secondary a rifle, then a pistol and a knife.
 WEAPON_GHOSTS = ("Rifle", "Rifle", "Pistol", "Knife")
 BAG_LABEL_TEXTS = tuple(str(k) for k in range(5, 10))     # over the bag's top row
 INV_LABEL_FONT = 10.0

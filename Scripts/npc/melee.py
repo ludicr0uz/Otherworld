@@ -8,7 +8,7 @@ from forest_generator.npc_placement import (
     NPC_MELEE_BLEND_S, NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK,
 )
 from npc.paths import (
-    HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, LAST_HIT_FROM_VAR,
+    ATTACK_VOICES_VAR, HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, LAST_HIT_FROM_VAR,
     MELEE_SLOT)
 from npc.graph import _log
 from uebp.graph import (
@@ -162,9 +162,13 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     # The montage goes through the pawn's own AnimInstance, so it animates
     # whichever body this controller happens to possess rather than assuming
     # BP_ForestWanderer.
+    # ...and is heard: one of its AttackVoices as the swing starts, whether
+    # or not it lands. Empty on a creature with none: silence.
+    snarl, snarled = _author_random_sound(ed, ATTACK_VOICES_VAR, out(self_loc), then(arm))
+    made.extend(snarl)
     as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(out(self_pawn), _pin(as_char, "Object"))
-    _connect(then(arm), _pin(as_char, "execute"))
+    _connect(snarled, _pin(as_char, "execute"))
     char_out = _loose_pin(as_char, "AsCharacter", is_input=False)
 
     mesh = keep(ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character"))

@@ -33,12 +33,13 @@ from uebp.graph import (
     out, then)
 from npc.patrol import _author_patrol_step, _author_walk_speed
 from npc.paths import (
-    AGGRO_REASON_VAR, AGGRO_VAR, BB_AGGRO_KEY, BB_REASON_KEY, NEXT_PATROL_VAR,
+    AGGRO_REASON_VAR, AGGRO_VAR, AGGRO_VOICES_VAR, BB_AGGRO_KEY, BB_REASON_KEY, NEXT_PATROL_VAR,
     PATROL_HOME_VAR, PATROL_READY_VAR, PATROL_TARGET_VAR, RUN_SPEED_VAR,
     SENSE_STEPS, STEP_PRESENT, STEP_STROLL,
 )
+from Sound.play import _author_random_sound
 from npc.senses import _author_hearing, _author_hurt, _author_sight, _author_touch
-from uebp.nodes.actor import FN_GET_PAWN
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_PAWN
 from uebp.nodes.ai import FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_GET_BLACKBOARD
 from uebp.nodes.palette import NODE_CAST_GAME_MODE
 from uebp.nodes.system import (
@@ -98,13 +99,20 @@ def _author_enter_agro(ed, reasons, chase_in):
         _connect(exec_pin, _pin(why, "execute"))
         _connect(then(why), _pin(flip, "execute"))
 
-    after = [then(flip)]
+    # Heard to notice: one of its AggroVoices, the once (the senses are not
+    # asked again while Aggro stands). Empty on a creature with none -- the
+    # wendigo, whose roar is a step of its own -- and then this is silence.
+    pawn = keep(_node(ed, FN_GET_PAWN))
+    here = keep(_node(ed, FN_ACTOR_LOC))
+    _connect(out(pawn), _pin(here, "self"))
+    cried, after_cry = _author_random_sound(ed, AGGRO_VOICES_VAR, out(here), then(flip))
+    made.extend(cried)
+    after = [after_cry]
 
     reason = keep(ed.add_get_member_variable_node(AGGRO_REASON_VAR))
     head = keep(_node(ed, FN_CONCAT))
     _set(head, "A", AGRO_LOG_PREFIX)
     _connect(out(reason, AGGRO_REASON_VAR), _pin(head, "B"))
-    pawn = keep(_node(ed, FN_GET_PAWN))
     name = keep(_node(ed, FN_DISPLAY_NAME))
     _connect(out(pawn), _pin(name, "Object"))
     who = keep(_node(ed, FN_CONCAT))

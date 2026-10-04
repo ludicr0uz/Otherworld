@@ -5,6 +5,8 @@ import unreal
 
 from combat.camera import CAMERA_ARM, CAMERA_SHOULDER
 from combat.footsteps import FOOTSTEP_BP_PATH, FOOTSTEP_STRIDE_CM
+from Sound.sound_monsters import MONSTER_FOOTSTEPS
+from Sound.sound_world import FOOTSTEPS
 from combat.game_state import TRACE_DEBUG_SECONDS
 from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR, hit_zones,
@@ -203,6 +205,15 @@ def check_footsteps():
     check("both the player and the wanderers wear it",
           "FootstepComponent" in components(char)
           and (npc is None or "FootstepComponent" in components(npc)))
+    # One component, and whose feet they are is which takes its copy holds:
+    # the class's own on the player, the monsters' on BP_ForestWanderer's.
+    for who, bp, sound in (("the player", char, FOOTSTEPS), ("a wanderer", npc, MONSTER_FOOTSTEPS)):
+        if bp is None or "FootstepComponent" not in components(bp):
+            continue
+        got = [s.get_name() for s in
+               component_template(bp, "FootstepComponent").get_editor_property("Sounds") if s]
+        check(f"{who}'s footsteps are the {len(sound.names)} takes of '{sound.key}'",
+              got == list(sound.names), str(got))
 
 
 def run():

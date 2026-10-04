@@ -10,9 +10,12 @@ from Sound.bind import takes_of
 from Sound.catalog import (
     ATTENUATIONS, BINDINGS, CREATURE_SOUND_NAMES, SOUND_ATTENUATION, SOUND_NAMES)
 from Sound.sound_def import (
-    ATT_DB_AT_MAX, ATT_FOLEY, ATT_GUNFIRE, AUDIBLE_LIMIT_CM, CREATURE_AUDIO_DIR)
-from Sound.sound_monsters import ATT_ROAR, ROAR_CREATURE, ROAR_REACH_X_AGGRO, WENDIGO_ROAR
+    ATT_DB_AT_MAX, ATT_FOOTSTEP, ATT_GUNFIRE, ATT_VOICE, AUDIBLE_LIMIT_CM, CREATURE_AUDIO_DIR)
+from Sound.sound_monsters import (
+    ATT_ROAR, MONSTER_FOOTSTEPS, ROAR_CREATURE, ROAR_REACH_X_AGGRO, WENDIGO_ROAR,
+    ZOMBIE_AGGRO, ZOMBIE_ATTACK, ZOMBIE_GROWL)
 from Sound.sound_weapons import RETIRED_SOUNDS
+from Sound.sound_world import FOOTSTEPS
 from Sound.waves import SOUND_SRC_DIR
 from combat.paths import AUDIO_DIR, HEALTH_BP_PATH, WEAPON_COMP_BP_PATH
 from combat.tuning import AUTO_DISPLAYS
@@ -104,7 +107,7 @@ def check_distance_and_direction():
 
     _ATT_OK = {p.name: p for p in ATTENUATIONS}
     check("there is a small named set of attenuation profiles, not one per sound",
-          1 <= len(ATTENUATIONS) <= 4, str(sorted(_ATT_OK)))
+          1 <= len(ATTENUATIONS) <= 6, str(sorted(_ATT_OK)))
 
     for profile in ATTENUATIONS:
         att = load(profile.path)
@@ -164,8 +167,8 @@ def check_distance_and_direction():
           abs(ATT_GUNFIRE.audible_cm - AUDIBLE_LIMIT_CM) < 1e-3,
           f"{ATT_GUNFIRE.audible_cm / 100.0:.0f} m")
     check("a footstep carries far less than a gunshot",
-          ATT_FOLEY.audible_cm * 4 < ATT_GUNFIRE.audible_cm,
-          f"{ATT_FOLEY.audible_cm / 100.0:.0f} m vs "
+          ATT_FOOTSTEP.audible_cm * 4 < ATT_GUNFIRE.audible_cm,
+          f"{ATT_FOOTSTEP.audible_cm / 100.0:.0f} m vs "
           f"{ATT_GUNFIRE.audible_cm / 100.0:.0f} m")
 
     # A roar is the wendigo going aggro, so it must reach a player at the very
@@ -177,15 +180,36 @@ def check_distance_and_direction():
     # the aggro range it is still at a fair part of full volume. (The natural
     # curve had it near -34 dB.)
     _at_aggro = 1.0 - max(0.0, _aggro - ATT_ROAR.radius_cm) / ATT_ROAR.falloff_cm
-    check("the roar is the one linear profile, and at the edge of the aggro range "
-          "it is still over a third of full volume",
-          [p.name for p in ATTENUATIONS if p.linear] == [ATT_ROAR.name] and _at_aggro > 1 / 3,
+    check("the linear profiles are the roar's, a footstep's and a creature's voice's, "
+          "and at the edge of the aggro range the roar is still over a third of full volume",
+          {p.name for p in ATTENUATIONS if p.linear}
+          == {ATT_ROAR.name, ATT_FOOTSTEP.name, ATT_VOICE.name} and _at_aggro > 1 / 3,
           f"{_at_aggro:.2f} of full volume at {_aggro / 100.0:g} m")
     check(f"a wendigo's roar carries {ROAR_REACH_X_AGGRO:g}x its aggro range "
           f"({_aggro / 100.0:g} m)",
           abs(ATT_ROAR.audible_cm - _want) < 1e-3 and ATT_ROAR.audible_cm >= _aggro
           and all(SOUND_ATTENUATION[n] is ATT_ROAR for n in WENDIGO_ROAR.names),
           f"{ATT_ROAR.audible_cm / 100.0:g} m")
+
+    # The zombie is heard from further than it sees, as the wendigo is: its
+    # growls on the voice's line, and the one it gives going aggro on the
+    # roar's. A footstep, anyone's, is on a line too: heard close by.
+    _sees = monster_specs("Zombie")["vision_range_cm"]
+    _at_sight = 1.0 - max(0.0, _sees - ATT_VOICE.radius_cm) / ATT_VOICE.falloff_cm
+    check("a zombie's growls carry past its sight, and at the edge of it are still "
+          "over half of full volume; its aggro growl carries as the roar does",
+          ATT_VOICE.audible_cm > _sees and _at_sight > 0.5
+          and all(SOUND_ATTENUATION[n] is ATT_VOICE
+                  for n in ZOMBIE_GROWL.names + ZOMBIE_ATTACK.names)
+          and all(SOUND_ATTENUATION[n] is ATT_ROAR for n in ZOMBIE_AGGRO.names),
+          f"{_at_sight:.2f} of full volume at {_sees / 100.0:g} m")
+    _at_8m = 1.0 - (800.0 - ATT_FOOTSTEP.radius_cm) / ATT_FOOTSTEP.falloff_cm
+    check("a wanderer's footsteps are takes of their own, and 8 m off are still "
+          "over half of full volume",
+          _at_8m > 0.5 and all(SOUND_ATTENUATION[n] is ATT_FOOTSTEP
+                               for n in MONSTER_FOOTSTEPS.names)
+          and not set(MONSTER_FOOTSTEPS.names) & set(FOOTSTEPS.names),
+          f"{_at_8m:.2f} at 8 m")
 
     # THE SWEEP THAT MAKES "NOTHING WAS MISSED" TRUE. It walks the two audio
     # folders on disk rather than SOUND_NAMES + CREATURE_SOUND_NAMES, so a

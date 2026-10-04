@@ -5,8 +5,8 @@ health changes), and the voice on a timer -- both hung off the controller's hear
 import unreal
 
 from npc.paths import (
-    AGGRO_VAR, APPLIED_HEALTH_VAR, HEALTH_CLASS_PATH, HIT_SOUNDS_VAR, NEXT_VOICE_VAR,
-    REACTIONS_VAR, STATS_APPLIED_VAR, VOICES_VAR,
+    AGGRO_VAR, APPLIED_HEALTH_VAR, HEALTH_CLASS_PATH, NEXT_VOICE_VAR,
+    REACTIONS_VAR, SOUND_ARRAY_VARS, STATS_APPLIED_VAR, VOICES_VAR,
 )
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
 from Sound.play import _author_random_sound
@@ -18,7 +18,8 @@ from uebp.nodes.system import FN_TIME_SECONDS
 from combat import health_vars as HV
 
 
-def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=False):
+def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=False,
+                            quiet_on_hunt=False):
     """Apply this creature's health when it changes, then growl on a timer.
 
     Both hang off the chase loop's existing heartbeat rather than getting a
@@ -41,7 +42,9 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=
                                        yes --> [time to make a noise?] ...
 
     so it never comes due while it patrols, and its first growl of a hunt is
-    voice_min after it notices the player rather than on top of its roar.
+    voice_min after it notices the player rather than on top of its roar. One
+    that is ``quiet_on_hunt`` (the zombie) has the same Branch the other way
+    round: the timer is read on patrol and pushed back while it is Aggro.
 
     AppliedHealth starts at 0, so the first pass after possession applies it;
     after that only the MONSTER SETTINGS tab changing TuneHealth does, and a
@@ -75,7 +78,7 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=
             raise RuntimeError(f"could not declare {name}")
     sound_array = BEL.get_array_type(
         BEL.get_object_reference_type(unreal.SoundBase.static_class()))
-    for name in (VOICES_VAR, HIT_SOUNDS_VAR):
+    for name in SOUND_ARRAY_VARS:
         ed.remove_member_variable(name)
         if not ed.add_member_variable(name, sound_array):
             raise RuntimeError(f"could not declare {name}")
@@ -151,9 +154,12 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=
     # current, or the component was not there to apply them to.
     tails = (then(took), else_(first), _pin(as_health, "CastFailed", is_input=False))
     hushed = None
-    if quiet_on_patrol:
-        # Silent until it hunts: patrolling, the timer is pushed back instead
-        # of read. Aggro is this controller's own, so one Branch is enough.
+    if quiet_on_patrol and quiet_on_hunt:
+        raise RuntimeError("a creature quiet on patrol and on the hunt has no voice")
+    if quiet_on_patrol or quiet_on_hunt:
+        # Silent until it hunts (or once it does): on the quiet side the timer
+        # is pushed back instead of read. Aggro is this controller's own, so
+        # one Branch is enough.
         aggro = keep(ed.add_get_member_variable_node(AGGRO_VAR))
         hunting = keep(ed.add_branch_node())
         _connect(_pin(aggro, AGGRO_VAR, is_input=False), _pin(hunting, "Condition"))
@@ -164,8 +170,8 @@ def _author_stats_and_voice(ed, exec_ins, voice_min, voice_max, quiet_on_patrol=
         _set(later, "B", voice_min)
         hushed = keep(ed.add_set_member_variable_node(NEXT_VOICE_VAR))
         _connect(_pin(later, "ReturnValue", is_input=False), _pin(hushed, NEXT_VOICE_VAR))
-        _connect(else_(hunting), _pin(hushed, "execute"))
-        tails = (then(hunting),)
+        _connect((else_ if quiet_on_patrol else then)(hunting), _pin(hushed, "execute"))
+        tails = ((then if quiet_on_patrol else else_)(hunting),)
     for tail in tails:
         _connect(tail, _pin(speak, "execute"))
 

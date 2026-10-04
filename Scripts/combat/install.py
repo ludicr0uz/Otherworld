@@ -5,6 +5,8 @@ superseded assets.
 
 import unreal
 
+from Sound.bind import write_components
+from Sound.sound_monsters import BINDINGS as MONSTER_SOUNDS
 from Sound.sound_weapons import RETIRED_SOUNDS
 from combat.camera import aim_camera, face_the_camera
 from combat.log import _log
@@ -88,6 +90,9 @@ def install_on_npc(health_bp, footstep_bp):
     # the trees is most of what the approach sounds like.
     _add_component(bp, _root_handle(bp),
                    BEL.generated_class(footstep_bp), "FootstepComponent")
+    # ...with takes of its own (Sound/sound_monsters.py), on this Blueprint's
+    # copy of the component: the class's own are the player's.
+    write_components(bp, MONSTER_SOUNDS)
     comp = _component_object(handle)
     comp.set_editor_property("DespawnOnDeath", True)
     comp.set_editor_property("RespawnClass", unreal.load_class(None, NPC_CLASS_PATH))

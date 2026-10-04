@@ -27,7 +27,8 @@ from npc.tree import build_blackboard, fill_tree, fresh_tree
 from npc.monster_tuning import monster_specs
 from npc.tuned import write_tuned_defaults
 from npc.ward import wards
-from Sound.sound_monsters import HIT_SOUNDS
+from Sound.bind import defaults_for
+from Sound.sound_monsters import BINDINGS as MONSTER_SOUNDS, HIT_SOUNDS
 from uebp.nodes.ai import FN_RUN_BT
 from uebp.nodes.palette import NODE_EVENT_POSSESS
 
@@ -136,6 +137,11 @@ def build_ai_controller_blueprint(rebuild=True, path=None, melee_anim=None,
             _log(f"note: {path} {var}: {len(found)} of {len(wanted)} sounds "
                  f"exist -- run Scripts/Sound/make_creature_sounds.py, then "
                  f"build_weapons_and_combat.py, to import the rest")
+
+    # Whatever else Sound/sound_monsters.py binds to this controller (its
+    # AggroVoices, its AttackVoices): build_sound.py writes the same again.
+    for var, found in defaults_for(path, MONSTER_SOUNDS).items():
+        cdo.set_editor_property(var, found)
 
     # The flinches, same mechanism, but ALL SIX OR NONE: the reaction graph
     # indexes this array by position (three Fronts, then Back, Left, Right), so

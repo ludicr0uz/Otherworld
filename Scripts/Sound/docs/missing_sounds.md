@@ -16,7 +16,7 @@ Nothing rated ok or better exists for these. Each needs a new source.
 | A tension bed for ordinary play, and for a wendigo's hunt | 11 Sonniss drones and 15 Freesound ones: all bad, but three kept for ghosts and a boss, and one rated ok | Quiet, mostly wind and low tone. The Sonniss 2020 and 2021-23 bundles have horror ambience libraries not yet looked at (they are only on Sonniss's own server: download by hand) |
 | Eating forage (a mushroom) | Only an apple and crackers were liked, each for an item the game does not have | A soft, wet bite: Freesound has three eating previews not yet rated |
 | The forest's night one-shots: an owl, a branch snapping, a tree creaking | One owl was rated bad. Four more owls, six owl screeches, five branch snaps and one tree creak are cut and **not yet rated** | Rate those first. The four tree creaks that were liked are for a creaky house, not the forest |
-| A wanderer's footsteps as its own sound | None sought | The wanderers share the player's footsteps today |
+| A wanderer's footsteps as its own sound | None sought: the six bare-ground takes (`dirt_walk`, rated ok for the player) play for now, chosen so they differ from the player's leaves, not by ear for a monster | Heavier, dragging steps for the zombie; a fast, heavy run for the wendigo (they share one set today) |
 | The wind | `wind_grass_norway`, rated great on the page and not a good match in the game: silent by default | A steadier wind through trees. Four wind beds are cut and not yet rated |
 
 ## 2. Thin: one or two takes

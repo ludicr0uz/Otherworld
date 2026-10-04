@@ -27,6 +27,18 @@ def defaults_for(blueprint, bindings):
             if b.blueprint == blueprint and not b.component}
 
 
+def write_components(bp, bindings):
+    """Each component binding of ``bp`` onto its component template."""
+    path = bp.get_path_name().rsplit(".", 1)[0]
+    for b in bindings:
+        if b.blueprint != path or not b.component:
+            continue
+        handle = _find_handle(bp, b.component)
+        if handle is None:
+            raise RuntimeError(f"{path} has no component {b.component}")
+        _component_object(handle).set_editor_property(b.variable, value_of(b))
+
+
 def takes_of(blueprint, bindings):
     """{variable: the take names} of the Blueprint's array bindings."""
     return {b.variable: b.sound.names for b in bindings
@@ -45,13 +57,7 @@ def apply_bindings(bindings):
             continue
         bp = _must_load(path)
         rows = [b for b in bindings if b.blueprint == path]
-        for b in rows:
-            if not b.component:
-                continue
-            handle = _find_handle(bp, b.component)
-            if handle is None:
-                raise RuntimeError(f"{path} has no component {b.component}")
-            _component_object(handle).set_editor_property(b.variable, value_of(b))
+        write_components(bp, rows)
         _apply_defaults(bp, defaults_for(path, rows))
         written.append(path)
         _log(f"{path.rsplit('/', 1)[-1]}: " + ", ".join(

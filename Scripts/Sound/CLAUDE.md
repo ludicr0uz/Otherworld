@@ -93,6 +93,36 @@
   - `MatchSounds` where a campfire is laid.
   The thrown blade's two are between steps the verifier pins (the blood, then the lodge):
   `verify/throw_strike._past_sound` looks back past a played sound.
+- **The monsters' voices** (`sound_monsters.py`), four arrays on each creature's AI
+  controller; empty is silence:
+  - `Voices` on the Pulse's 4-9 s timer. The zombie's are its patrol growls and play only
+    on patrol; the wendigo's is its roar and plays only once it hunts
+    (`forest_generator/npc_voice.py`: `NPC_QUIET_ON_HUNT`, `NPC_QUIET_ON_PATROL`);
+  - `AggroVoices` the once, behind the one write of `Aggro` (`npc/agro.py`). The zombie's
+    growl 10; the wendigo has none (its roar is a step of its own);
+  - `AttackVoices` as a swing starts, landed or not (`npc/melee.py`). The zombie's growls
+    1, 2 and 4; the wendigo has none;
+  - `HitSounds` where a swing lands.
+  The zombie's three sets are one selection row (`zombie_growl`, `A_ZombieGrowl_01` and
+  on) dealt out by take number in `sound_monsters.py` (`ZOMBIE_ATTACK_TAKES`,
+  `ZOMBIE_AGGRO_TAKES`; the rest are the patrol's). Moving a take between them is that
+  edit and `build_sound.py`. Each set is a row of the SOUND SETTINGS tab.
+  **After the takes in `Voices` change in number, the level verifiers' expected count is
+  stale** (`generated_levels/*/verify_*.py` bake `voices_of()`): regenerate the levels, or
+  patch `EXPECTED_VARIANTS`' `voices` to `voices_of(key)` as the split did.
+- **Footsteps are one component and a set of takes per wearer.** `BP_FootstepComponent`
+  (`combat/footsteps.py`) knows a stride and an array, `Sounds`; whose feet they are is
+  which takes its copy holds. The class's own are the player's (`sound_world.FOOTSTEPS`);
+  a Blueprint that wears the component gets others with a `Binding(..., component=
+  "FootstepComponent")` on itself, as `BP_ForestWanderer` has
+  (`sound_monsters.MONSTER_FOOTSTEPS`: heavier takes, a volume row of their own). The
+  creature Blueprints inherit that copy (`probes/probe_monster_sounds.py` reads it off a
+  spawned zombie and wendigo). A new kind of walker (another NPC, another player's body)
+  is a `Sound` row and such a binding; `combat/install.py` writes the bindings when it
+  adds the component, and `build_sound.py` again. Per-creature takes (a zombie's against
+  a wendigo's) can't be bound this way: Python can't reach a child Blueprint's override
+  of an inherited component, so they would have to be copied on at possession, as the
+  flinch clips are.
 - **The player's voice** (`sound_world.py`, on `BP_HealthComponent`): a grunt when
   `LastDamageTime` moves (a blow: a drain does not stamp it, and would grunt every frame),
   on the player (`DespawnOnDeath` false) while alive; a cry as `Dead` is set. The wanderers
@@ -100,9 +130,10 @@
 - **Where each sound fires:**
   - The dry click fires on the ready gate's False arm when `empty AND cooled AND tapped`.
   - The reload clack fires only on the reload's True arm.
-- **Attenuation:** four `USoundAttenuation` assets in `/Game/Audio`, all `NATURAL_SOUND` and
-  spherical (the axe's chop and a melee hit carry as a creature's voice does; the player's
-  voice, a swing, a match and the campfire as foley):
+- **Attenuation:** six `USoundAttenuation` assets in `/Game/Audio`, all spherical, and
+  `NATURAL_SOUND` but for the three that have to be heard at a distance, which are straight
+  lines (the axe's chop and a melee hit are `A_Att_Creature`; the player's voice, a swing, a
+  match and the campfire are foley):
   - `A_Att_Gunfire`: 2 m → 100 m, with a low-pass;
   - `A_Att_Creature`: 1.5 → 40 m;
   - `A_Att_WendigoRoar`: the one **linear** profile. Full volume to 10 m (`ROAR_FULL_CM`),
@@ -112,6 +143,12 @@
     recording. The range is read from `npc/monster_tuning.csv` when the sound build runs:
     after saving a new aggro range from the MONSTER SETTINGS tab, re-run
     `build_sound.py` (the verifier fails until then). Capped at the 100 m ceiling;
+  - `A_Att_CreatureVoice`: **linear**, full to 5 m, silent at 50 m. The zombie's patrol and
+    attack growls: it sees 20 m, and there they are two thirds of full volume (on
+    `A_Att_Creature` they were near -29 dB). Its aggro growl is on the roar's curve;
+  - `A_Att_Footstep`: **linear**, full to 2 m, silent at 20 m. Every footstep, the player's
+    and the wanderers' (the player's own are at the listener, so only others' are shaped
+    by it). On the foley curve a wanderer running up was not heard coming;
   - `A_Att_Foley`: 1 → 15 m.
 - **A sound with no attenuation plays at full volume from anywhere.** `apply_attenuation()` sets
   it **on the asset**, sweeps both audio folders, and raises on a wave with no profile.
@@ -133,9 +170,10 @@
 - **Each sound has one volume, in `sound_tuning.csv`** (`sound,volume`; 1 = as recorded, 0 =
   silent, at most 2). A "sound" is a row of `catalog.SOUND_STATS`: the footsteps (six
   takes, one row, 0.4: they drowned the forest at 1), each gun's shot, the dry click, the
-  three reloads, the melee hit and swing, the axe's chop, the zombie's growl, the wendigo's
+  three reloads, the melee hit and swing, the axe's chop, the zombie's growl (its patrol's), the wendigo's
   roar, the player's hit and death, the match, the campfire, a blade's hit, a thrown blade in a
-  body, a throw, and the three beds (the wind's at 0: silent until a better one is found).
+  body, a throw, the three beds (the wind's at 0: silent until a better one is found), and, at
+  the end, the zombie's attack and aggro growls and the monsters' footsteps.
 - **A row is a `SoundClass`** (`/Game/Audio/A_Class_<Sound>`), set on each of its waves by
   `mix.build_sound_mix()`, as the attenuation is: on the asset, so no play site carries
   a volume. `/Game/Audio/A_Mix_Game` is an empty `SoundMix`.

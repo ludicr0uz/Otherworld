@@ -101,9 +101,19 @@ ATT_GUNFIRE = AttenuationProfile("A_Att_Gunfire", 200.0, 9800.0,
 # trees, short enough that ten of them spread over the map are not all audible
 # at once.
 ATT_CREATURE = AttenuationProfile("A_Att_Creature", 150.0, 3850.0)
-# 15 m. Footsteps, the dry click and the reload clack: small mechanical noises
+# 15 m. The dry click and the reload clack: small mechanical noises
 # that in the real world do not reach the next clearing.
 ATT_FOLEY = AttenuationProfile("A_Att_Foley", 100.0, 1400.0)
+# 20 m, on a straight line: a footfall, anyone's (the player's, a wanderer's,
+# another player's one day). Linear for the reason the roar is (see
+# sound_monsters.py): on the natural curve a wanderer running up was near
+# -30 dB at 8 m, and was not heard coming. Full within 2 m, about half at 11 m.
+# The player's own steps are at the listener, so the curve never touches them.
+ATT_FOOTSTEP = AttenuationProfile("A_Att_Footstep", 200.0, 1800.0, linear=True)
+# 50 m, on a straight line: a creature's voice that is meant to be heard from
+# further than it can see (the zombie's growls: it sees 20 m, and there this
+# is still two thirds of full volume; on A_Att_Creature it was near -29 dB).
+ATT_VOICE = AttenuationProfile("A_Att_CreatureVoice", 500.0, 4500.0, linear=True)
 
 
 def takes(key):

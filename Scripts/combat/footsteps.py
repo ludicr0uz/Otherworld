@@ -29,7 +29,10 @@ from combat import footstep_vars as FV
 
 # --- footsteps ---------------------------------------------------------------
 # One component, on the player and on every wanderer, because a footfall is a
-# fact about having legs and not about which side you are on.
+# fact about having legs and not about which side you are on. Whose feet they
+# are is which takes a wearer's copy of it holds in Sounds: the class's own
+# are the player's, and a Blueprint that wears it binds others on itself
+# (Sound/sound_monsters.py: BP_ForestWanderer's; Sound/CLAUDE.md).
 #
 # Driven by DISTANCE TRAVELLED, not by a timer. That is the whole design: a
 # timer has to be told how fast its owner is moving and gets it wrong the

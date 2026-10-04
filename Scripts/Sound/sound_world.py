@@ -5,9 +5,13 @@ heard from.
 SOUNDS is the area's rows of the sound table and BINDINGS where each is played
 from:
 
-    BP_FootstepComponent.Sounds        a footfall, the player's and every
-                                       wanderer's (combat/footsteps.py owns
-                                       the stride; it plays through Sound/play.py)
+    BP_FootstepComponent.Sounds        a footfall: the component's own takes,
+                                       the player's (combat/footsteps.py owns
+                                       the stride; it plays through
+                                       Sound/play.py). Whoever else wears the
+                                       component has a binding of its own on
+                                       its Blueprint's copy of it: the
+                                       wanderers' is Sound/sound_monsters.py
     BP_HealthComponent.HurtSounds      the player's grunt   (the voice, below)
     BP_HealthComponent.DeathSounds     the player's cry
     BP_DayNightCycle BedDay/BedNight/BedWind   the beds     (the ambience, below)
@@ -24,7 +28,7 @@ from combat.game_state import LAST_DAMAGE_VAR, NEVER_DAMAGED
 from combat.paths import FOOTSTEP_BP_PATH, HEALTH_BP_PATH
 from Sound.bind import defaults_for
 from Sound.play import _author_random_sound
-from Sound.sound_def import ATT_FOLEY, BED_DIR, Binding, Sound, takes
+from Sound.sound_def import ATT_FOLEY, ATT_FOOTSTEP, BED_DIR, Binding, Sound, takes
 from uebp import props as EP
 from uebp.graph import (
     _add_component, _component_object, _connect, _drop_components, _must_load, _node, _pin,
@@ -38,7 +42,7 @@ from world.day_night_graph import _get as _dn_get
 from world.paths import DAY_NIGHT_BP_PATH
 
 # The footsteps were as loud as recorded and drowned the forest: under half.
-FOOTSTEPS = Sound("footsteps", "footsteps", takes("footsteps"), ATT_FOLEY, volume=0.4)
+FOOTSTEPS = Sound("footsteps", "footsteps", takes("footsteps"), ATT_FOOTSTEP, volume=0.4)
 PLAYER_HIT = Sound("player_hit", "player hit", takes("player_hit"), ATT_FOLEY)
 PLAYER_DEATH = Sound("player_death", "player death", takes("player_death"), ATT_FOLEY)
 

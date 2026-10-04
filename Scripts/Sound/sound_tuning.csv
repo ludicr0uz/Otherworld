@@ -25,3 +25,6 @@ throw_sharp,1
 ambience_day,0.25
 ambience_night,0.25
 ambience_wind,0
+zombie_attack_growl,1
+zombie_aggro_growl,1
+monster_footsteps,1

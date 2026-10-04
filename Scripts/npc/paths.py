@@ -29,7 +29,12 @@ MELEE_SLOT = "DefaultSlot"
 
 # The controller's sound arrays: which takes fill them is Sound/sound_monsters.py.
 VOICES_VAR = "Voices"
+# The once, as it notices the player (npc/agro.py), and as a swing starts
+# (npc/melee.py). Empty on a creature with no such takes: silence.
+AGGRO_VOICES_VAR = "AggroVoices"
+ATTACK_VOICES_VAR = "AttackVoices"
 HIT_SOUNDS_VAR = "HitSounds"
+SOUND_ARRAY_VARS = (VOICES_VAR, AGGRO_VOICES_VAR, ATTACK_VOICES_VAR, HIT_SOUNDS_VAR)
 STATS_APPLIED_VAR = "StatsApplied"
 # The TuneHealth last written onto the pawn (npc/stats.py): a change re-applies it.
 APPLIED_HEALTH_VAR = "AppliedHealth"

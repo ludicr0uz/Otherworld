@@ -303,6 +303,18 @@ Wanderer (selector)
     its forward run, feet sliding, as the strafe does; 50° a pass at 4 m is quick, so a
     player has to keep turning; the roars at the fire are the hunt's clip, upper body on
     standing legs; and its fear shows only in them and the flight (no clip of its own).
+- **A zombie is heard three ways** (`Sound/sound_monsters.py` says which takes; `Sound/CLAUDE.md`):
+  its patrol growls on the Pulse's timer, only while it is not `Aggro` (`NPC_QUIET_ON_HUNT`:
+  the mirror of the wendigo's Branch below, the timer kept 4 s off while it hunts); one of
+  its `AggroVoices` right behind `_author_enter_agro`'s one write of `Aggro` (so once per
+  hunt, whichever sense noticed); one of its `AttackVoices` in the Swing step, between
+  arming the cooldown and the clip. The wendigo has the same nodes and empty arrays.
+  `verify_voice.py` reads the graph; `probes/probe_monster_sounds.py` the live arrays and
+  the hushed timer.
+  - **Feel check (needs a play session):** whether growl 10 at the roar's reach tells the
+    player a zombie has noticed them; the snarl on every swing (one each 1.5 s) is not too
+    much; a chasing zombie, silent between swings but for its feet, reads right; the
+    monsters' footsteps at volume 1 against the player's 0.3.
 - **A wendigo on patrol makes no sound** (`stats.py`, the list in `forest_generator/npc_voice.py`):
   - Every wanderer growls on the Pulse's 4–9 s timer (`NextVoiceTime`). A creature of
     `NPC_QUIET_ON_PATROL` reaches that timer only through a Branch on its own `Aggro`; while
@@ -312,7 +324,7 @@ Wanderer (selector)
     in their own steps, all behind `Aggro`.
   - A sound can't be heard in a headless game: `probe_wendigo_quiet.py` watches the timer
     (never under ~4 s off on patrol; run down and re-armed once it hunts; a zombie's runs
-    down on patrol).
+    down on patrol, and `probe_monster_sounds.py` watches it held off once it hunts).
 - **A fire draws the zombies** (`drawn.py`, numbers in `forest_generator/npc_drawn.py`):
   - It is one more step, `BT_Drawn`, in a selector with the Stroll and ahead of it. Only the
     creatures in `NPC_DRAWN_BY_FIRE` get the event, its two variables and the tree node.

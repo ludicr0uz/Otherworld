@@ -8,7 +8,7 @@ new AREA is a module listed in AREAS.
 
 from Sound import sound_items, sound_monsters, sound_weapons, sound_world
 from Sound.sound_def import (
-    ATT_CREATURE, ATT_FOLEY, ATT_GUNFIRE, BED_DIR, CREATURE_AUDIO_DIR, WEAPON_AUDIO_DIR)
+    ATT_CREATURE, ATT_FOLEY, ATT_FOOTSTEP, ATT_GUNFIRE, ATT_VOICE, BED_DIR, CREATURE_AUDIO_DIR, WEAPON_AUDIO_DIR)
 from Sound.sound_monsters import ATT_ROAR
 
 AREAS = (sound_weapons, sound_monsters, sound_items, sound_world)
@@ -18,7 +18,7 @@ BY_KEY = {s.key: s for s in SOUNDS}
 if len(BY_KEY) != len(SOUNDS):
     raise RuntimeError("two rows of the sound table share a key")
 
-ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY)
+ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY, ATT_FOOTSTEP, ATT_VOICE)
 
 # Which sound gets which, and the only table that says so. Every sound in the
 # game is a WORLD sound -- something in the level made it, at a place -- so
@@ -30,7 +30,7 @@ ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY)
 # listener, where the gunfire curve is still 1.0 anyway.
 #
 # The player's own FOOTSTEPS are the judgement call. They share the component
-# and therefore the profile with the wanderers', which means they attenuate
+# and the profile (ATT_FOOTSTEP) with the wanderers', which means they attenuate
 # too; at the third-person camera's ~3 m that costs a little volume the player
 # did not ask to lose. Kept spatialised regardless, because the alternative is
 # a second non-attenuated footstep path whose only purpose is to be wrong about
@@ -65,6 +65,7 @@ TAB_ORDER = (
     "zombie_growl", "wendigo_roar", "melee_swing", "axe_chop", "player_hit",
     "player_death", "match", "campfire", "blade_hit", "blade_lodge", "throw",
     "throw_sharp", "ambience_day", "ambience_night", "ambience_wind",
+    "zombie_attack_growl", "zombie_aggro_growl", "monster_footsteps",
 )
 if sorted(TAB_ORDER) != sorted(BY_KEY):
     raise RuntimeError(f"TAB_ORDER and the areas' sounds differ: "

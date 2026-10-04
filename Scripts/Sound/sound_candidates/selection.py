@@ -108,6 +108,10 @@ FOOTSTEPS = (
     Use("footsteps_dirt", "footsteps", "footsteps on bare ground",
         _n("footsteps/dirt_walk", 1, 2, 3, 4, 5, 6), READY,
         note="the game does not tell one surface from another"),
+    Use("footsteps_monster", "footsteps", "a wanderer's footsteps", _n("footsteps/dirt_walk", 1, 2, 3, 4, 5, 6),
+        GAME, "A_MonsterFootstep",
+        note="the bare-ground takes: heavier than the player's own leaves, so a wanderer "
+             "running up is told from one's own feet. Not picked by ear for this use yet"),
     Use("land", "footsteps", "landing from a jump", ("footsteps/dirt_land_02",), READY),
     Use("grass_rustle", "footsteps", "moving through tall grass", _n("footsteps/grass_rustle", 1, 2, 3, 4, 5, 6),
         READY, note="for crouching and crawling"),

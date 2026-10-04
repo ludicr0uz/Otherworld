@@ -15,9 +15,10 @@ carried does not, and the WORLD SETTINGS tab's row switches every glimmer.
 
 world_tuning.csv is set aside first and put back.
 
-Run with --windowed and OW_GLIMMER_SHOTS=1 to save two pictures of the items
-nearest the start, at noon and at midnight, to Saved/Screenshots/MacEditor:
-the only way to see the glimmer without playing.
+Run with --windowed and OW_GLIMMER_SHOTS=1 to save pictures of the items
+nearest the start, four across one flash's period at noon and four at
+midnight, to Saved/Screenshots/MacEditor: the only way to see the glimmer
+without playing.
 """
 
 import os
@@ -25,7 +26,7 @@ import shutil
 
 import unreal
 
-from combat.glimmer_tuning import MPC_ITEM_GLIMMER, PARAM_HIGHLIGHT
+from combat.glimmer_tuning import GLIMMER_PERIOD_S, MPC_ITEM_GLIMMER, PARAM_HIGHLIGHT
 from combat.paths import ITEM_BP_PATH, ITEM_CLASS_PATH
 from graphics_menu import world_tune_consts as WC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR
@@ -43,6 +44,7 @@ WRITABLE = ([(HUD_BP_PATH, v) for v in (TAB.open_var, TAB.row_var, TAB.nudge_var
 HIGHLIGHT_TAB_ROW = 1 + WORLD_STATS.index(ITEM_HIGHLIGHT_ROW)
 SETTLE = 0.15          # game seconds: a Tick of the item, or of the cycle
 SHOTS = bool(os.environ.get("OW_GLIMMER_SHOTS"))
+SHOT_BURST = 4
 
 
 def _live_hud(p):
@@ -87,9 +89,11 @@ def _shots(p, cycle, ground):
     for what, clock in (("noon", day / 2.0), ("midnight", day + night / 2.0)):
         p.set(cycle, "Clock", clock)
         yield 2.0       # the exposure settles
-        unreal.SystemLibrary.execute_console_command(p.world(), "shot")
-        p.note(f"shot: the glimmer at {what}, {near.get_name()}")
-        yield 0.5
+        # A glint is gone most of the time: a burst across one period.
+        for _ in range(SHOT_BURST):
+            unreal.SystemLibrary.execute_console_command(p.world(), "shot")
+            yield GLIMMER_PERIOD_S / SHOT_BURST
+        p.note(f"{SHOT_BURST} shots: the glimmer at {what}, {near.get_name()}")
 
 
 def probe(p):

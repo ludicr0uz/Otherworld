@@ -5,10 +5,12 @@ the sprite component an item carries, and the Tick fragment that shows it.
                                 switch, written by the day/night cycle from
                                 the WORLD SETTINGS tab's row
                                 (world/item_highlight.py)
-    M_ItemGlimmer               unlit, additive: a four-rayed star that rests
-                                dim and flashes every GLIMMER_PERIOD_S, each
-                                item out of step with the next (the phase is
-                                its position), times Highlight
+    M_ItemGlimmer               unlit, additive: a four-rayed star that
+                                appears and is gone every GLIMMER_PERIOD_S,
+                                each item out of step with the next (the phase
+                                is its position), only near the camera
+                                (GLIMMER_NEAR_CM..GLIMMER_FAR_CM), times
+                                Highlight
     Glimmer                     a MaterialBillboardComponent on BP_WeaponItem's
                                 Body, hidden as built
     author_glimmer              Tick: Glimmer.SetVisibility(Dropped)
@@ -31,8 +33,9 @@ import unreal
 
 from combat import item_vars as IV
 from combat.glimmer_tuning import (
-    GLIMMER, GLIMMER_COLOUR, GLIMMER_EMISSIVE, GLIMMER_HALF_SIZE_CM, GLIMMER_LIFT_CM,
-    GLIMMER_PERIOD_S, GLIMMER_PULL_CM, GLIMMER_RAY_THIN, GLIMMER_REST,
+    GLIMMER, GLIMMER_COLOUR, GLIMMER_EMISSIVE, GLIMMER_FAR_CM, GLIMMER_HALF_SIZE_CM,
+    GLIMMER_LIFT_CM, GLIMMER_NEAR_CM, GLIMMER_PERIOD_S, GLIMMER_PULL_CM,
+    GLIMMER_RAY_THIN, GLIMMER_REST,
     GLIMMER_SHARPNESS, HIGHLIGHT_DEFAULT, MAT_ITEM_GLIMMER, MPC_ITEM_GLIMMER,
     MPC_NAME, PARAM_HIGHLIGHT,
 )
@@ -45,8 +48,8 @@ from uebp.nodes.actor import FN_SET_VISIBILITY
 MEL = unreal.MaterialEditingLibrary
 
 # UV 0..1 across the sprite, T seconds, P the sprite's place in the world,
-# On the collection's Highlight.
-GLIMMER_INPUTS = ("UV", "T", "P", "On")
+# On the collection's Highlight, C the camera's place in the world.
+GLIMMER_INPUTS = ("UV", "T", "P", "On", "C")
 GLIMMER_HLSL = f"""
 float2 c = abs(UV - 0.5) * 2.0;
 float core = pow(saturate(1.0 - length(c)), 2.0);
@@ -56,10 +59,11 @@ float star = saturate(core + rayX + rayY);
 float phase = dot(P, float3(0.0131, 0.0173, 0.0091));
 float beat = sin(T * {6.283185 / GLIMMER_PERIOD_S:.5f} + phase) * 0.5 + 0.5;
 float flash = lerp({GLIMMER_REST:.4f}, 1.0, pow(beat, {GLIMMER_SHARPNESS:.4f}));
+float near = 1.0 - smoothstep({GLIMMER_NEAR_CM:.1f}, {GLIMMER_FAR_CM:.1f}, length(C - P));
 return float3({GLIMMER_COLOUR[0]:.4f}, {GLIMMER_COLOUR[1]:.4f}, {GLIMMER_COLOUR[2]:.4f})
-    * (star * flash * saturate(On) * {GLIMMER_EMISSIVE:.4f});
+    * (star * flash * near * saturate(On) * {GLIMMER_EMISSIVE:.4f});
 """
-# The Custom node and its four inputs, the exposure's inverse, and the three
+# The Custom node and its inputs (the camera's place is the offset's), the exposure's inverse, and the three
 # of the offset (the way to the camera, the pull, the lift) with their sums.
 EXPRESSION_COUNT = 14
 
@@ -158,6 +162,8 @@ def build_glimmer_material():
     away = make(unreal.MaterialExpressionSubtract, -1150, 520)
     join(camera, away, "A")
     join(here, away, "B")
+    # ...and how far off the item is: the glimmer shows only from near.
+    join(camera, custom, "C")
     eye = make(unreal.MaterialExpressionNormalize, -900, 520)
     join(away, eye, "VectorInput")
     pull = make(unreal.MaterialExpressionConstant, -900, 640)

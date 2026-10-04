@@ -168,8 +168,10 @@ menu polls its own copy from `DrawHUD`, which does.
   - **`Glimmer` is inherited, so a child's builder cannot drop it:** it is in
     `weapon_items.KEEP`. A builder that clears "every other component" must leave it.
   - **The look is `M_ItemGlimmer`:** unlit, additive, one Custom node drawing a four-rayed
-    star that rests dim and flashes every 2.2 s, each item out of step (the phase is its
-    place in the world), through `EyeAdaptationInverse`, so it reads the same at noon and
+    star that appears and is gone every 3 s (it rests at nothing), each item out of step
+    (the phase is its place in the world), only near: whole within 5.5 m of the camera
+    and nothing past 8.5 m (about 3 m and 6 m ahead of the character; a material cannot
+    know the pawn, and the camera stands 2.6 m behind it), through `EyeAdaptationInverse`, so it reads the same at noon and
     at midnight. World-position offset lifts the sprite 10 cm and pulls it 12 cm towards
     the camera, so the ground, the grass and the item's own model do not swallow it.
     `CameraVectorWS` does not exist in a vertex shader (the material fails to compile and
@@ -701,10 +703,10 @@ These are feel checks a headless run can't do:
   read at all at range and at night (they are not emissive, as blood is not), and whether
   0.6 s is long enough to see where a round landed. It leaves no mark behind;
 - the shotgun's index finger along the receiver, 4 cm above the guard (`docs/aiming.md`);
-- the glimmer (`glimmer_tuning.py`): it was seen only in two 1280x720 pictures (noon and
-  midnight, `OW_GLIMMER_SHOTS=1` on the probe, windowed). Whether a 28 cm star at 8 emissive
-  reads as a glint or as a lamp, by day and at night, and over pale sunlit ground, where
-  light added to near-white shows least; whether the flash
-  every 2.2 s is too busy over a patch of forage; how it sits over a long gun (it stands at
+- the glimmer (`glimmer_tuning.py`): it was seen only in 1280x720 pictures (four across a
+  flash at noon and at midnight, `OW_GLIMMER_SHOTS=1` on the probe, windowed). The 28 cm
+  star at 8 emissive that rested at 0.3 was too bright; whether the 18 cm one at 3 that
+  rests at nothing is now too faint by day over pale sunlit ground, where light added to
+  near-white shows least; whether 5.5-8.5 m from the camera is the right "near"; how it sits over a long gun (it stands at
   the item's origin, not its middle), over a blade lodged in a trunk or a body, and in tall
-  grass; and whether it should fade with distance (it does not).
+  grass.

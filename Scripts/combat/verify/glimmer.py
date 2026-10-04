@@ -12,7 +12,8 @@ import unreal
 from combat import item_vars as IV
 from combat.glimmer import EXPRESSION_COUNT
 from combat.glimmer_tuning import (
-    GLIMMER, GLIMMER_HALF_SIZE_CM, HIGHLIGHT_DEFAULT, MAT_ITEM_GLIMMER,
+    GLIMMER, GLIMMER_EMISSIVE, GLIMMER_FAR_CM, GLIMMER_HALF_SIZE_CM, GLIMMER_NEAR_CM,
+    GLIMMER_REST, HIGHLIGHT_DEFAULT, MAT_ITEM_GLIMMER,
     MPC_ITEM_GLIMMER, MPC_NAME, PARAM_HIGHLIGHT,
 )
 from combat.paths import AMMO_BP_PATH, ITEM_BP_PATH, ITEM_CLASS_PATH
@@ -49,6 +50,12 @@ def check_collection_and_material():
     check(f"{MPC_NAME} holds one scalar, {PARAM_HIGHLIGHT}, on as built",
           params == {PARAM_HIGHLIGHT: HIGHLIGHT_DEFAULT} and HIGHLIGHT_DEFAULT == 1.0,
           str(params))
+    check("the glimmer is slight: gone between flashes, and only near the camera "
+          "(whole at a few metres, nothing past ten)",
+          GLIMMER_REST == 0.0 and GLIMMER_EMISSIVE <= 4.0
+          and 200.0 <= GLIMMER_NEAR_CM < GLIMMER_FAR_CM <= 1000.0,
+          f"rest {GLIMMER_REST}, emissive {GLIMMER_EMISSIVE}, "
+          f"{GLIMMER_NEAR_CM:g}..{GLIMMER_FAR_CM:g} cm")
     mat = load(MAT_ITEM_GLIMMER)
     check("M_ItemGlimmer is unlit and additive: light added over the scene, "
           "nothing where it is dark",

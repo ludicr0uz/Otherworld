@@ -34,7 +34,8 @@ from combat.respawn import (
     _author_world_floor_net,
 )
 from combat.tuning import COMBAT
-from Sound.sound_world import _author_death_voice, _author_hurt_voice, voice_defaults
+from Sound.sound_world import (
+    _author_death_voice, _author_heartbeat, _author_hurt_voice, voice_defaults)
 from loot.roll import declare_loot_vars
 from uebp.nodes.math import FN_LE_FF
 from uebp.vars import declare, defaults
@@ -148,7 +149,8 @@ def build_health_component(rebuild=True):
     drained = _author_debuff_drain(ed, tick, (then(write_off), else_(lost)))
     # A blow is grunted at on the way (voice.py): before the death branch, so
     # it is heard on a frame the player lives through and on no other.
-    for e in _author_hurt_voice(ed, drained):
+    # ...and, badly hurt, the player's heart is heard.
+    for e in _author_heartbeat(ed, _author_hurt_voice(ed, drained)):
         _connect(e, _pin(at_zero, "execute"))
 
     # --- Tick: took a hit and lived --------------------------------------

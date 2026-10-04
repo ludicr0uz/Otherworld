@@ -24,6 +24,8 @@ from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 from clothing.specs import GARMENTS
 from combat import item_vars as IV
+from Sound.bind import defaults_for
+from Sound.sound_items import BINDINGS as ITEM_SOUNDS
 
 # A faint glow, as the forage has: a dark thing on dark ground at night is
 # never found (survival/consumable_specs.py).
@@ -47,6 +49,7 @@ def build_garment(garment, item_bp):
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
+        **defaults_for(garment.path, ITEM_SOUNDS),
         IV.DisplayName: garment.display,
         CLOTHING_SLOT_VAR: garment.slot_index,
         IV.Consumable: True,

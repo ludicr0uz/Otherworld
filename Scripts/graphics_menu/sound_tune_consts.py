@@ -8,7 +8,7 @@ one table.
     Up / Down, Left / Right,    as GUN SETTINGS (tune_tab.py), over one subject,
     Enter                       "volume": one row per sound of the game, its
                                 volume as a multiplier (0 silent, 1 as
-                                recorded, at most 2); Enter saves them to
+                                recorded, at most 4); Enter saves them to
                                 Sound/sound_tuning.csv
 
 The rows are Sound/catalog.SOUND_STATS.

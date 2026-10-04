@@ -140,9 +140,10 @@ def check_footsteps_by_stance():
           all(isinstance(f.get_editor_property(v), float)
               and f.get_editor_property(v) == 1.0 for v in ("StepVolume", "StepNoise")))
     plays = [n for n in fg if "PlaySoundAtLocation" in _flat(n)]
-    check("the step plays at StepVolume",
-          len(plays) == 1 and "Get StepVolume" in {
-              _title(n) for n in _feeds(BEL.find_input_pin(plays[0], "VolumeMultiplier"))},
+    check("the step, and the rustle of one inside a bush, play at StepVolume",
+          len(plays) == 2 and all("Get StepVolume" in {
+              _title(n) for n in _feeds(BEL.find_input_pin(p, "VolumeMultiplier"))}
+              for p in plays),
           f"{len(plays)} PlaySoundAtLocation")
     ranges = [n for n in fg if _title(n) == f"Set {NOISE_RANGE_VAR}"]
     check("the step's noise reach is scaled by StepNoise",

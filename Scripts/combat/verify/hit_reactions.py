@@ -26,6 +26,7 @@ from combat.verify.common import (
 )
 from asset_pipeline.retarget_paths import HIT_SOURCES as RETARGET_HIT_SOURCES
 from forest_generator.npc_placement import NPC_HIT_REACTION_CLIPS
+from Sound.sound_world import LOW_HEALTH_FRACTION
 
 
 # ─── Flinching: took a hit and lived ─────────────────────────────────────────
@@ -275,10 +276,16 @@ def check_flinching():
           not _probe_nodes, str(_probe_nodes))
     # The scripted hit the probe used to deal itself, too: nothing in the shipped
     # health graph may subtract from Health except the world floor's write of zero.
+    # MaxHealth has one reader left, which subtracts nothing: the heartbeat's
+    # threshold (Sound/sound_world.py), a product compared with Health.
+    _max_reads = [PIN.get_owning_node(q) for n in hg
+                  if str(BEL.get_node_title(n)).replace("\n", " ").startswith("Get MaxHealth")
+                  for p in BEL.list_output_pins(n) for q in PIN.list_connected_pins(p)]
     check("...and the probe's scripted self-hit is gone with it",
-          not [n for n in hg
-               if str(BEL.get_node_title(n)).replace("\n", " ").startswith("Get MaxHealth")],
-          "MaxHealth is read by nothing in the health graph but the probe")
+          all(num_pin(n, "B") == LOW_HEALTH_FRACTION for n in _max_reads)
+          and len(_max_reads) <= 1,
+          "MaxHealth is read by nothing in the health graph but the heartbeat's "
+          f"threshold: {len(_max_reads)} reader(s)")
 
     # Every character carries its OWN six, because an AnimSequence belongs to one
     # skeleton and a shared default could only be right for one body.

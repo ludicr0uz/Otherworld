@@ -15,6 +15,10 @@ and it never relies on a variable another section left behind.
   player_body  blood  hit_reactions  ragdoll  aiming  settings_and_tuning
   firing  consume  drops  noise  combat_trace
   sound_mix   each sound's SoundClass on its waves, and the game's sound mix
+  sound_states  the sounds of a state or an item: the heartbeat at low
+              health, the breath of a spent sprint, a footfall's rustle in a
+              bush, a thrown axe's kill by the head, an item's own takes
+              handled and used up
   wear        clothing: the wear behind the Consumable tap, the take-off the
               I panel asks for (TakeOffSlot), Worn and ClothingSlot's defaults
   bullet_impact  BP_BulletImpact: the chips and dust, the seeded layout, and
@@ -115,7 +119,7 @@ and it never relies on a variable another section left behind.
 """
 
 SECTIONS = (
-    "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "health", "weapon_inputs", "install",
+    "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "pickup", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",

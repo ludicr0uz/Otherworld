@@ -138,13 +138,26 @@ def _past_sound(nodes):
     """Exec feeders, looked back past one played sound. A sound is three
     nodes (Sound/play.py): a Branch on "are there takes", the
     play, and a Branch both of those run into. Where ``nodes`` is that last
-    Branch, what feeds the first one is what the sound came after."""
-    if len(nodes) == 1 and _title(nodes[0]) == "Branch":
-        back = _feeders(nodes[0], "execute")
+    Branch, what feeds the first one is what the sound came after. Two
+    such Branches are two sounds one Branch picks between (a blade into a
+    body: the stab, or the axe's kill by the head): what feeds the picking
+    Branch (verify/sound_states.py checks what it picks on)."""
+    def before(node):
+        if _title(node) != "Branch":
+            return None
+        back = _feeders(node, "execute")
         plays = [n for n in back if has_in_pin(n, "Sound")]
         gates = [n for n in back if n not in plays]
         if len(plays) == 1 and len(gates) == 1 and _feeders(plays[0], "execute") == gates:
             return _feeders(gates[0], "execute")
+        return None
+
+    backs = [before(n) for n in nodes]
+    if len(nodes) == 1 and backs[0] is not None:
+        return backs[0]
+    if (len(nodes) == 2 and None not in backs and backs[0] == backs[1]
+            and len(backs[0]) == 1 and _title(backs[0][0]) == "Branch"):
+        return _feeders(backs[0][0], "execute")
     return nodes
 
 

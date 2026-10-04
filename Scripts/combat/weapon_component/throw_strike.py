@@ -80,6 +80,7 @@ Owns ThrowPast, which build.py declares and the flight's ground trace reads,
 and ThrowBone and ThrowSkin, which build.py declares too.
 """
 
+from combat.chop_tuning import CHOPS_VAR
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
 from uebp.graph import (
     BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
@@ -99,9 +100,9 @@ from uebp.nodes.actor import (
     FN_TRACE_COMPONENT)
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_CONTAINS
 from uebp.nodes.math import (
-    FN_ADD_VV, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_CLAMP, FN_COMPOSE_ROT, FN_GREATER_FF,
+    FN_ADD_VV, FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_CLAMP, FN_COMPOSE_ROT, FN_GREATER_FF,
     FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF, FN_NE_NAME, FN_NORMAL,
-    FN_ROTATE_VECTOR, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV, INF)
+    FN_NOT, FN_ROTATE_VECTOR, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV, INF)
 from uebp.nodes.palette import (
     NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_CAST_INSTANCED, NODE_SPAWN)
 from uebp.nodes.system import FN_TIME_SECONDS
@@ -309,7 +310,7 @@ def _author_skin(ed, brk, exec_in):
             [none, as_char, line, struck, skin, found] + line_nodes + near_nodes)
 
 
-def _author_stick(ed, thrown, brk, mesh_out, exec_in):
+def _author_stick(ed, thrown, brk, mesh_out, exec_ins):
     """Leave the item in the body it wounded, if _author_skin found where
     (ThrowBone is a bone): set into the model at ThrowSkin, and attached to
     that bone. Returns (the exec pin a stuck item leaves by, the one an item
@@ -319,7 +320,8 @@ def _author_stick(ed, thrown, brk, mesh_out, exec_in):
     _connect(out(bone, THROW_BONE_VAR), _pin(is_set, "A"))   # B is left at None
     found = ed.add_branch_node()
     _connect(out(is_set), _pin(found, "Condition"))
-    _connect(exec_in, _pin(found, "execute"))
+    for pin in exec_ins:
+        _connect(pin, _pin(found, "execute"))
     at = ed.add_get_member_variable_node(THROW_SKIN_VAR)
     set_in, put = _author_lodge(ed, thrown, brk, out(at, THROW_SKIN_VAR), then(found))
     hold = _node(ed, FN_ATTACH)
@@ -378,9 +380,35 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     _connect(wounded, _pin(blood, "execute"))
     # ...and the blade stays in the body. One it cannot be set into drops
     # it, and that fall to the ground passes the body by.
-    # ...and is heard going in, at the wound.
-    sunk = _author_sound(ed, WV.LodgeSounds, _hit(brk, "ImpactPoint"), then(blood))
+    # ...and is heard going in, at the wound: the stab, or, where an axe (an
+    # item that Chops) has just killed by the head, the kill's own sound in
+    # its place. Health is read here, after the wound; Dead is the body's
+    # own Tick's to set, so a body already Dead is a corpse and no kill.
+    chops, chops_n = _prop(ed, CHOPS_VAR, thrown)
+    health_now = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
+    _connect(as_health, _pin(health_now, "self"))
+    killed = _node(ed, FN_LE_FF)
+    _connect(out(health_now, HV.Health), _pin(killed, "A"))    # B is left at 0
+    by_axe = _node(ed, FN_AND)
+    _connect(chops, _pin(by_axe, "A"))
+    _connect(in_head, _pin(by_axe, "B"))
+    dead, dead_n = _prop(ed, HV.Dead, as_health, HEALTH_CLASS_PATH)
+    lived = _node(ed, FN_NOT)
+    _connect(dead, _pin(lived, "A"))
+    fresh_kill = _node(ed, FN_AND)
+    _connect(out(killed), _pin(fresh_kill, "A"))
+    _connect(out(lived), _pin(fresh_kill, "B"))
+    head_kill = _node(ed, FN_AND)
+    _connect(out(by_axe), _pin(head_kill, "A"))
+    _connect(out(fresh_kill), _pin(head_kill, "B"))
+    finisher = ed.add_branch_node()
+    _connect(out(head_kill), _pin(finisher, "Condition"))
+    _connect(then(blood), _pin(finisher, "execute"))
+    sunk = (_author_sound(ed, WV.HeadKillSounds, _hit(brk, "ImpactPoint"), then(finisher)),
+            _author_sound(ed, WV.LodgeSounds, _hit(brk, "ImpactPoint"), else_(finisher)))
     stuck, dropped, stick_nodes = _author_stick(ed, thrown, brk, mesh_out, sunk)
+    stick_nodes = stick_nodes + [chops_n, health_now, killed, by_axe, dead_n, lived, fresh_kill,
+                                 head_kill, finisher]
     aside = _node(ed, FN_ARR_ADD)
     _connect(out(past, THROW_PAST_VAR), _pin(aside, "TargetArray"))
     _connect(_hit(brk, "HitActor"), _pin(aside, "NewItem"))

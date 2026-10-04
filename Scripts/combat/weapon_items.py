@@ -18,6 +18,8 @@ per weapon in every graph that touches a weapon.
 
 import unreal
 
+from Sound.bind import defaults_for
+from Sound.sound_items import BINDINGS as ITEM_SOUNDS
 from Sound.sound_weapons import DRY_FIRE
 from combat.chop_tuning import CHOPS_VAR
 from combat.glimmer import add_glimmer, author_glimmer
@@ -188,7 +190,8 @@ def build_weapon_item():
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")
-    _apply_defaults(bp, {CLOTHING_SLOT_VAR: NOT_CLOTHING,
+    _apply_defaults(bp, {**defaults_for(ITEM_BP_PATH, ITEM_SOUNDS),
+                         CLOTHING_SLOT_VAR: NOT_CLOTHING,
                          SLOT_VAR: UNPLACED,
                          WEAPON_KIND_VAR: NOT_A_WEAPON,
                          THROW_PITCH_VAR: THROW_PITCH_UP_DEG,
@@ -332,6 +335,7 @@ def build_weapon(spec, item_bp):
         THROW_PITCH_VAR: float(spec[THROW_PITCH_COLUMN]),
         SWAY_RATE_VAR: float(spec[SWAY_RATE_COLUMN]),
         IV.Icon: _weapon_icon(spec["display"]),
+        **defaults_for(spec["path"], ITEM_SOUNDS),
         IV.FireSound: _must_load(spec["sound"]),
         IV.DryFireSound: _must_load(DRY_FIRE.paths[0]),
         IV.ReloadSound: _must_load(spec["reload_sound"]),

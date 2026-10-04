@@ -80,7 +80,9 @@ _author_* fragment per concern, each in its own module:
               for HEAT_S (the item's own Tick cools it: combat/heat.py)
   ammo        reload and dry fire
   (sounds)    Sound/sound_weapons.py and sound_items.py: the component's own
-              sounds; Sound/sound_world.py: the listener at the character
+              sounds, and an item's as a slot move handles it (HandledItem)
+              or it is used up; Sound/sound_world.py: the listener at the
+              character, the breath of a spent sprint
   punch       empty hands: the fire key throws a punch (MM_Attack_01 into the
               upper-body slot); the blow is a short sphere sweep a moment later.
               The swing and the blow are written once, for a Strike

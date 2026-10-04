@@ -49,6 +49,8 @@ from combat.tuning import COMBAT
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 from combat import item_vars as IV
+from Sound.bind import defaults_for
+from Sound.sound_items import BINDINGS as ITEM_SOUNDS
 
 # asset_pipeline/import_quaternius.py imports every Survival Pack FBX here.
 AXE_MESH = "/Game/Sourced/Quaternius/Survival/SM_Axe"
@@ -119,6 +121,7 @@ def build_axe(item_bp):
     grip_rot = _grip_rotation(aim)
     lodge = axe_lodge()
     _apply_defaults(bp, {
+        **defaults_for(AXE_BP_PATH, ITEM_SOUNDS),
         IV.DisplayName: AXE_DISPLAY,
         IV.Melee: True,
         WEAPON_KIND_VAR: MELEE_KIND,

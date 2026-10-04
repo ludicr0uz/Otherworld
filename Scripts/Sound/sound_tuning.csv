@@ -3,7 +3,7 @@ footsteps,0.3
 shotgun_shot,2
 pistol_shot,1
 smg_shot,1
-rifle_shot,1.75
+rifle_shot,3
 sniper_shot,1
 dry_fire,1
 shotgun_reload,1
@@ -28,3 +28,12 @@ ambience_wind,0
 zombie_attack_growl,1
 zombie_aggro_growl,1
 monster_footsteps,1
+grass_rustle,1
+player_breath,1
+heartbeat,0.6
+eating,1
+axe_head_kill,1
+handle_item,1
+handle_gun,1
+handle_blade,1
+handle_cloth,1

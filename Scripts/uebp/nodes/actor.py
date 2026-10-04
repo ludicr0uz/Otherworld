@@ -74,6 +74,7 @@ FN_PROJECT = "/Script/Engine.HUD.Project"
 FN_GET_CULLS = "/Script/Engine.InstancedStaticMeshComponent.GetCullDistances"
 # Pure (it is const): read the bool, branch, then read the transform.
 FN_INSTANCE_TRANSFORM = "/Script/Engine.InstancedStaticMeshComponent.GetInstanceTransform"
+FN_INSTANCES_IN_SPHERE = "/Script/Engine.InstancedStaticMeshComponent.GetInstancesOverlappingSphere"
 FN_SET_CULLS = "/Script/Engine.InstancedStaticMeshComponent.SetCullDistances"
 
 FN_LIGHT_INTENSITY = "/Script/Engine.LightComponent.SetIntensity"

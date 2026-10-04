@@ -32,8 +32,11 @@ RespawnPoint = Var("RespawnPoint", VECTOR)
 HurtSounds = Var("HurtSounds", array(obj("/Script/Engine.SoundBase")))
 DeathSounds = Var("DeathSounds", array(obj("/Script/Engine.SoundBase")))
 HeardDamageTime = Var("HeardDamageTime", FLOAT)
+# The low-health heartbeat, and when it may next be played (Sound/sound_world.py).
+HeartbeatSounds = Var("HeartbeatSounds", array(obj("/Script/Engine.SoundBase")))
+HeartbeatNextTime = Var("HeartbeatNextTime", FLOAT, 0.0)
 
 TABLE = (
     Health, MaxHealth, Dead, DespawnOnDeath, RespawnClass, AmmoClass, DropClasses,
-    RespawnPoint, HurtSounds, DeathSounds, HeardDamageTime,
+    RespawnPoint, HurtSounds, DeathSounds, HeardDamageTime, HeartbeatSounds, HeartbeatNextTime,
 )

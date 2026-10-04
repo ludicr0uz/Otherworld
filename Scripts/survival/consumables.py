@@ -29,6 +29,8 @@ from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 from survival.consumable_specs import MATERIALS, consumable_specs
 from survival.paths import CONSUMABLE_BP_PATH
+from Sound.bind import defaults_for
+from Sound.sound_items import BINDINGS as ITEM_SOUNDS
 from combat import item_vars as IV
 
 
@@ -68,6 +70,7 @@ def build_consumable(spec, base_bp):
     aim = HOLD_ITEM_ANIM_PATH
     grip_rot = _grip_rotation(aim)
     _apply_defaults(bp, {
+        **defaults_for(spec["path"], ITEM_SOUNDS),
         IV.DisplayName: spec["display"],
         IV.Consumable: True,
         "HungerRestore": float(spec["hunger"]),

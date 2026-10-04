@@ -50,6 +50,8 @@ from combat.weapon_models import FAB_WEAPONS
 from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 from combat import item_vars as IV
+from Sound.bind import defaults_for
+from Sound.sound_items import BINDINGS as ITEM_SOUNDS
 
 KNIFE_MESH = f"{FAB_WEAPONS}/M9_Knife/SK_M9_Knife_X"
 KNIFE_DISPLAY = "Knife"
@@ -140,6 +142,7 @@ def build_knife(item_bp):
     lodge = knife_lodge()
     throw_grip = knife_throw_grip(grip_rot)
     _apply_defaults(bp, {
+        **defaults_for(KNIFE_BP_PATH, ITEM_SOUNDS),
         IV.DisplayName: KNIFE_DISPLAY,
         IV.Melee: True,
         WEAPON_KIND_VAR: MELEE_KIND,

@@ -66,6 +66,8 @@ TAB_ORDER = (
     "player_death", "match", "campfire", "blade_hit", "blade_lodge", "throw",
     "throw_sharp", "ambience_day", "ambience_night", "ambience_wind",
     "zombie_attack_growl", "zombie_aggro_growl", "monster_footsteps",
+    "grass_rustle", "player_breath", "heartbeat", "eating", "axe_head_kill",
+    "handle_item", "handle_gun", "handle_blade", "handle_cloth",
 )
 if sorted(TAB_ORDER) != sorted(BY_KEY):
     raise RuntimeError(f"TAB_ORDER and the areas' sounds differ: "

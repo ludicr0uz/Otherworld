@@ -90,6 +90,13 @@ ThrowSharpSounds = Var("ThrowSharpSounds", array(obj("/Script/Engine.SoundBase")
 PunchHitSounds = Var("PunchHitSounds", array(obj("/Script/Engine.SoundBase")))
 BladeHitSounds = Var("BladeHitSounds", array(obj("/Script/Engine.SoundBase")))
 LodgeSounds = Var("LodgeSounds", array(obj("/Script/Engine.SoundBase")))
+# Sound/sound_weapons.py, sound_world.py and sound_items.py: a thrown axe's
+# kill by the head; the breath of a spent sprint and when it may next be
+# heard; the item a slot move handled this frame, whose HandleSounds play.
+HeadKillSounds = Var("HeadKillSounds", array(obj("/Script/Engine.SoundBase")))
+BreathSounds = Var("BreathSounds", array(obj("/Script/Engine.SoundBase")))
+BreathNextTime = Var("BreathNextTime", FLOAT, 0.0)
+HandledItem = Var("HandledItem", obj(ITEM_CLASS_PATH))
 
 TABLE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
@@ -97,5 +104,6 @@ TABLE = (
     SightAiming, AimZoom, SightBlend, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
     BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
-    PunchHitSounds, BladeHitSounds, LodgeSounds,
+    PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,
+    HandledItem,
 )

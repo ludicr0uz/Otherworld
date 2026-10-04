@@ -732,7 +732,7 @@ dry click, the reloads, the melee hit and swing, the chop, the growl, the roar, 
 hit and death, the match, the campfire, a blade's hit, a thrown blade in a body, a throw and
 the three beds, the wind's at 0), behind a scroll bar
 (`SOUND_VISIBLE_ROWS`, 14 at a time, as MONSTER SETTINGS), its volume as a multiplier (step
-0.05, from 0 to 2: the tab has maximums, `SoundTuneMaxs`). Same keys as GUN SETTINGS;
+0.05, from 0 to 4, the engine's own ceiling for a source: the tab has maximums, `SoundTuneMaxs`). Same keys as GUN SETTINGS;
 **Enter** saves `Scripts/Sound/sound_tuning.csv` (then `build_sound.py` bakes it into the HUD).
 
 - **The apply is the game's sound mix** (`sound_tune_tick._author_apply`; what a class and

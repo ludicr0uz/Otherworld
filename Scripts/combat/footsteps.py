@@ -24,6 +24,7 @@ from uebp import props as EP
 from Sound.bind import defaults_for
 from Sound.play import _author_random_sound
 from Sound.sound_world import BINDINGS as WORLD_SOUNDS
+from Sound.sound_world import _author_find_bushes, _author_rustle, rustle_defaults
 from combat import footstep_vars as FV
 
 
@@ -78,9 +79,11 @@ def build_footstep_component(rebuild=True):
     """
     bp = _create_blueprint(FOOTSTEP_BP_PATH, unreal.ActorComponent)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
-    tick, _begin = _events(ed, rebuild)
+    tick, begin = _events(ed, rebuild)
 
     declare(ed, FV.TABLE)
+    # BeginPlay: which of the level's components are bushes (the rustle).
+    _author_find_bushes(ed, then(begin))
 
     owner = _node(ed, FN_GET_OWNER)
     owner_out = out(owner)
@@ -171,7 +174,9 @@ def build_footstep_component(rebuild=True):
     _connect(char_out, _pin(mine, "self"))
     players = ed.add_branch_node()
     _connect(out(mine), _pin(players, "Condition"))
-    _connect(stepped, _pin(players, "execute"))
+    # A footfall inside a bush rustles too, whoever's it is (Sound/sound_world.py).
+    for e in _author_rustle(ed, out(at), out(volume, FV.StepVolume), stepped):
+        _connect(e, _pin(players, "execute"))
     reach = _node(ed, FN_MUL_FF)
     _connect(speed_out, _pin(reach, "A"))
     _set(reach, "B", COMBAT.footstep_noise_range_cm
@@ -195,7 +200,7 @@ def build_footstep_component(rebuild=True):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_FootstepComponent failed to compile")
 
-    sounds = defaults_for(FOOTSTEP_BP_PATH, WORLD_SOUNDS)
+    sounds = {**defaults_for(FOOTSTEP_BP_PATH, WORLD_SOUNDS), **rustle_defaults()}
     found = sounds[FV.Sounds]
     _apply_defaults(bp, {**defaults(FV.TABLE), FV.StrideCm: FOOTSTEP_STRIDE_CM, **sounds})
     _log(f"built {FOOTSTEP_BP_PATH} "

@@ -3,7 +3,7 @@ the name, the pin type and the default (uebp/vars.py). The builder declares
 TABLE; a row with no type is a component, or a variable declared elsewhere.
 """
 
-from uebp.vars import BOOL, FLOAT, VECTOR, Var, obj, struct
+from uebp.vars import BOOL, FLOAT, VECTOR, Var, array, obj, struct
 
 Damage = Var("Damage", FLOAT)
 SpreadDegrees = Var("SpreadDegrees", FLOAT)
@@ -38,6 +38,11 @@ Icon = Var("Icon", obj("/Script/Engine.Texture2D"))
 FireSound = Var("FireSound", obj("/Script/Engine.SoundBase"))
 DryFireSound = Var("DryFireSound", obj("/Script/Engine.SoundBase"))
 ReloadSound = Var("ReloadSound", obj("/Script/Engine.SoundBase"))
+# Two more, arrays of takes, on every item (Sound/sound_items.py binds them
+# by the item's type): what it sounds like handled -- moved between slots,
+# brought to hand, put away -- and used up (food eaten). Empty is silence.
+HandleSounds = Var("HandleSounds", array(obj("/Script/Engine.SoundBase")))
+UseSounds = Var("UseSounds", array(obj("/Script/Engine.SoundBase")))
 AimPose = Var("AimPose", obj("/Script/Engine.AnimSequence"))
 # Held in both hands (the rifle ready pose). The guard reads it to raise
 # the gun across the body instead of the fists (body_pose.py). False on
@@ -79,6 +84,6 @@ UsesAmmo = Var("UsesAmmo")
 TABLE = (
     Damage, SpreadDegrees, WeaponRange, FireInterval, NextFireTime, ReloadSeconds,
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
-    FireSound, DryFireSound, ReloadSound, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
+    FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
     Lodged,
 )

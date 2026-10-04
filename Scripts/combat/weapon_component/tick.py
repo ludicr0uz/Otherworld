@@ -40,6 +40,7 @@ from combat.weapon_component.head_hide import _author_head_hide
 from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
 from combat.weapon_component.sprint import _author_sprint
+from Sound.sound_world import _author_breath
 from combat.weapon_component.support_hand import _author_support_hand
 from combat.weapon_component.sway import _author_sight_sway
 from combat.weapon_component.stance import _author_stance
@@ -125,6 +126,8 @@ def _author_wc_tick(ed, tick):
     # Before the trigger, because the trigger reads Sprinting: polled in the
     # other order, a shot would be allowed on the frame the sprint started.
     sprint_exits = _author_sprint(ed, tick, pc_out, owner_out, key_pins["KeySprint"], aim_exits)
+    # The run key held with no stamina left is heard (Sound/sound_world.py).
+    sprint_exits = _author_breath(ed, owner_out, sprint_exits)
 
     # --- block ---------------------------------------------------------------
     # After sprint (it reads Sprinting), before the trigger (which refuses

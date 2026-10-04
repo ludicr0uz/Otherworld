@@ -5,7 +5,7 @@ verify_graphics_menu (graphics_menu/sound_tune_checks.py).
 
 from Sound.catalog import BED_NAMES, SOUND_ATTENUATION, SOUND_STATS
 from Sound.mix import SOUND_CLASS_PROP, SOUND_MIX_PATH, class_path, wave_path
-from Sound.tuning import FOOTSTEPS, table
+from Sound.tuning import FOOTSTEPS, VOLUME_MAX, table
 from combat.verify.common import check, load
 from combat.verify.fixtures import _eas
 
@@ -40,9 +40,10 @@ def check_sound_mix():
           mix is not None and len(mix.get_editor_property("sound_class_effects")) == 0,
           str(mix))
     volumes = table()
-    check("the sound tuning table holds every volume between 0 and 2, the "
-          "footsteps' under 1",
-          all(0.0 <= v <= 2.0 for v in volumes.values()) and volumes[FOOTSTEPS] < 1.0,
+    check(f"the sound tuning table holds every volume between 0 and {VOLUME_MAX:g} (the "
+          "engine's own ceiling for a source), the footsteps' under 1",
+          all(0.0 <= v <= VOLUME_MAX for v in volumes.values()) and VOLUME_MAX == 4.0
+          and volumes[FOOTSTEPS] < 1.0,
           str(volumes))
 
 

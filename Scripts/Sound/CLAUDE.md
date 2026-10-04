@@ -89,8 +89,28 @@
     the fist's, and the knife's and the axe's);
   - `ChopSounds` at the axe's cut in a tree, and where a thrown blade lodges in one;
   - `ThrowSharpSounds` as a thrown Melee item (the knife, the axe) leaves the hand and
-    `ThrowSounds` as anything else does; `LodgeSounds` where a thrown blade goes into a body;
-  - `MatchSounds` where a campfire is laid.
+    `ThrowSounds` as anything else does; `LodgeSounds` where a thrown blade goes into a body,
+    or `HeadKillSounds` in its place where a thrown axe (an item that `Chops`) kills by the
+    head: the body is not yet `Dead`, and has no `Health` left after the wound
+    (`throw_strike.py`);
+  - `MatchSounds` where a campfire is laid;
+  - `BreathSounds` while the run key is held with no stamina left (below).
+  **A blade's blow and a thrown blade going in are the one stab take, for now**
+  (`stab_dagger_05`): the gore takes were too gory for every blow. The one gory take
+  left is the axe's kill by the head (`gore_weapon_02`, 1.9 s).
+- **An item's own sounds** (`sound_items.py`), two arrays on `BP_WeaponItem`, so on every
+  item, read off the item by the graph that plays them:
+  - `HandleSounds`: the item handled. `slot_moves.py` names the item in `HandledItem`
+    where a slot's key brings it to hand or puts it away (1-9, Q, a click in the I panel)
+    and where the I panel's drag moves it; the serve ends with one play
+    (`sound_items.author_handled`). **By the item's type** (`ITEM_HANDLING`): a gun's
+    (leather, a belt), a blade's (drawn), a garment's (cloth), and the base item's for
+    everything with no row (a child Blueprint inherits the default it does not override).
+    Wearing a garment, a pick-up and a drop are not moves of a slot and are silent.
+  - `UseSounds`: the item used up, played by `consume.py` before the item is spent
+    (`ITEM_USE`: the mushroom's eating; the canteen has none).
+  A new kind of item sounds like the base item until it has a row; the row and
+  `build_sound.py` are the whole change.
   The thrown blade's two are between steps the verifier pins (the blood, then the lodge):
   `verify/throw_strike._past_sound` looks back past a played sound.
 - **The monsters' voices** (`sound_monsters.py`), four arrays on each creature's AI
@@ -127,6 +147,23 @@
   `LastDamageTime` moves (a blow: a drain does not stamp it, and would grunt every frame),
   on the player (`DespawnOnDeath` false) while alive; a cry as `Dead` is set. The wanderers
   have no hurt or death takes yet.
+- **The heart and the breath** (`sound_world.py`) are a take played again as it ends, for
+  as long as a state holds: a time it is next due, pushed on by the take's length at each
+  play (`_author_again`). One-shots, so a take that has started plays out.
+  - The heart: the player alive under `LOW_HEALTH_FRACTION` (0.3) of `MaxHealth`. The
+    take is the first 6.5 s of a 56 s recording that speeds up: four steady beats, played
+    again every `HEARTBEAT_S` (6.56 s, on the beat). Mono, at the player, at 0.6.
+  - The breath: `SprintSpent`, which is the run key held with `Stamina` run out
+    (`sprint.py`'s latch), every `BREATH_S`. No key can be injected into a headless
+    game, so only the verifier covers it (`verify/sound_states.py`).
+- **A footfall inside a bush rustles** (`sound_world.py`, on `BP_FootstepComponent`, so the
+  player's and every wanderer's). A bush has no collision, so nothing overlaps it: at
+  BeginPlay the component collects the level's bush components (`Bushes`: of the actors
+  tagged as grass cells, the instanced components whose mesh is one of `BushMeshes`), and
+  each footfall asks them for an instance whose bounds come within 30 cm of the walker
+  (`GetInstancesOverlappingSphere`). The level is not changed for it. The walk is per
+  footfall, over 8 components on the 200 m map and about 200 on the 1 km one.
+  `probes/probe_state_sounds.py` walks the player through a bush.
 - **Where each sound fires:**
   - The dry click fires on the ready gate's False arm when `empty AND cooled AND tapped`.
   - The reload clack fires only on the reload's True arm.
@@ -168,12 +205,17 @@
 ## Volumes (`tuning.py`, `mix.py`)
 
 - **Each sound has one volume, in `sound_tuning.csv`** (`sound,volume`; 1 = as recorded, 0 =
-  silent, at most 2). A "sound" is a row of `catalog.SOUND_STATS`: the footsteps (six
+  silent, at most 4: `tuning.VOLUME_MAX`. That is the engine's own ceiling, `MAX_VOLUME` in
+  `AudioDefines.h`, which a source's final volume is clamped to; it was 2, and the AKM's
+  shot was still too quiet there: its cut is one sharp crack, a quarter of the shotgun's
+  energy at the same peak. It starts at 3). A "sound" is a row of `catalog.SOUND_STATS`: the footsteps (six
   takes, one row, 0.4: they drowned the forest at 1), each gun's shot, the dry click, the
   three reloads, the melee hit and swing, the axe's chop, the zombie's growl (its patrol's), the wendigo's
   roar, the player's hit and death, the match, the campfire, a blade's hit, a thrown blade in a
   body, a throw, the three beds (the wind's at 0: silent until a better one is found), and, at
-  the end, the zombie's attack and aggro growls and the monsters' footsteps.
+  the end, the zombie's attack and aggro growls and the monsters' footsteps, then the bush rustle, the
+  player's breath and heartbeat (0.6), eating, the axe's kill by the head and the four
+  kinds of item handling.
 - **A row is a `SoundClass`** (`/Game/Audio/A_Class_<Sound>`), set on each of its waves by
   `mix.build_sound_mix()`, as the attenuation is: on the asset, so no play site carries
   a volume. `/Game/Audio/A_Mix_Game` is an empty `SoundMix`.

@@ -12,12 +12,17 @@ from:
                                        component has a binding of its own on
                                        its Blueprint's copy of it: the
                                        wanderers' is Sound/sound_monsters.py
+    BP_FootstepComponent.RustleSounds  a footfall inside a bush, anyone's
+                                       (the rustle, below)
     BP_HealthComponent.HurtSounds      the player's grunt   (the voice, below)
     BP_HealthComponent.DeathSounds     the player's cry
+    BP_HealthComponent.HeartbeatSounds the player's heart at low health
+    BP_WeaponComponent.BreathSounds    the player out of breath: the run key
+                                       held with no stamina left
     BP_DayNightCycle BedDay/BedNight/BedWind   the beds     (the ambience, below)
 
-and the three pieces of sound logic that are the world's: the voice, the
-ambience, and the listener.
+and the pieces of sound logic that are the world's: the voice (the grunt, the
+cry, the heartbeat, the breath), the rustle, the ambience, and the listener.
 """
 
 import unreal
@@ -25,17 +30,27 @@ import unreal
 from combat import footstep_vars as FV
 from combat import health_vars as HV
 from combat.game_state import LAST_DAMAGE_VAR, NEVER_DAMAGED
-from combat.paths import FOOTSTEP_BP_PATH, HEALTH_BP_PATH
+from combat.paths import FOOTSTEP_BP_PATH, HEALTH_BP_PATH, WEAPON_COMP_BP_PATH
+from combat.weapon_component import vars as WV
+from combat.weapon_component.slot_nodes import for_each, not_, op
+from combat.weapon_component.sprint import SPRINT_SPENT_VAR
+from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
+from forest_generator.grass_cells import GRASS_TAG
 from Sound.bind import defaults_for
 from Sound.play import _author_random_sound
 from Sound.sound_def import ATT_FOLEY, ATT_FOOTSTEP, BED_DIR, Binding, Sound, takes
 from uebp import props as EP
+from uebp.g import _G
 from uebp.graph import (
-    _add_component, _component_object, _connect, _drop_components, _must_load, _node, _pin,
-    _root_handle, _set, else_, out, then)
-from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_OWNER, FN_SET_LISTENER_ATTENUATION
-from uebp.nodes.math import FN_GREATER_FF
-from uebp.nodes.system import FN_SET_VOLUME
+    BEL, _add_component, _assets, _component_object, _connect, _drop_components, _loose_pin,
+    _must_load, _node, _palette, _pin, _root_handle, _set, else_, out, then)
+from uebp.nodes.actor import (
+    FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER, FN_INSTANCES_IN_SPHERE, FN_SET_LISTENER_ATTENUATION)
+from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CONTAINS, FN_ARR_LEN
+from uebp.nodes.math import (
+    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LESS_FF, FN_MUL_FF)
+from uebp.nodes.palette import NODE_CAST_INSTANCED
+from uebp.nodes.system import FN_SET_VOLUME, FN_TIME_SECONDS, FN_WITH_TAG
 from world import day_night_vars as DV
 from world.day_night_graph import _call, _map
 from world.day_night_graph import _get as _dn_get
@@ -45,6 +60,12 @@ from world.paths import DAY_NIGHT_BP_PATH
 FOOTSTEPS = Sound("footsteps", "footsteps", takes("footsteps"), ATT_FOOTSTEP, volume=0.4)
 PLAYER_HIT = Sound("player_hit", "player hit", takes("player_hit"), ATT_FOLEY)
 PLAYER_DEATH = Sound("player_death", "player death", takes("player_death"), ATT_FOLEY)
+# A footfall inside a bush: leaves brushed past, heard as far as a footstep is.
+GRASS_RUSTLE = Sound("grass_rustle", "bush rustle", takes("grass_rustle"), ATT_FOOTSTEP)
+PLAYER_BREATH = Sound("player_breath", "player out of breath", takes("player_breath"), ATT_FOLEY)
+# Under the rest: the recording is loud, and it plays for as long as the
+# player is hurt.
+HEARTBEAT = Sound("heartbeat", "heartbeat", takes("heartbeat"), ATT_FOLEY, volume=0.6)
 
 # ── The beds ─────────────────────────────────────────────────────────────────
 #
@@ -66,7 +87,8 @@ def _bed(key, label, volume):
 AMBIENCE_DAY = _bed("ambience_day", "day birds", 0.7)
 AMBIENCE_NIGHT = _bed("ambience_night", "night", 0.7)
 AMBIENCE_WIND = _bed("ambience_wind", "wind", 0.0)
-SOUNDS = (FOOTSTEPS, PLAYER_HIT, PLAYER_DEATH, AMBIENCE_DAY, AMBIENCE_NIGHT, AMBIENCE_WIND)
+SOUNDS = (FOOTSTEPS, PLAYER_HIT, PLAYER_DEATH, AMBIENCE_DAY, AMBIENCE_NIGHT, AMBIENCE_WIND,
+          GRASS_RUSTLE, PLAYER_BREATH, HEARTBEAT)
 
 BED_DAY, BED_NIGHT, BED_WIND = (s.names[0] for s in (AMBIENCE_DAY, AMBIENCE_NIGHT, AMBIENCE_WIND))
 BED_DAY_COMP, BED_NIGHT_COMP, BED_WIND_COMP = "BedDay", "BedNight", "BedWind"
@@ -76,6 +98,9 @@ BINDINGS = (
     Binding(FOOTSTEP_BP_PATH, FV.Sounds, FOOTSTEPS),
     Binding(HEALTH_BP_PATH, HV.HurtSounds, PLAYER_HIT),
     Binding(HEALTH_BP_PATH, HV.DeathSounds, PLAYER_DEATH),
+    Binding(FOOTSTEP_BP_PATH, FV.RustleSounds, GRASS_RUSTLE),
+    Binding(HEALTH_BP_PATH, HV.HeartbeatSounds, HEARTBEAT),
+    Binding(WEAPON_COMP_BP_PATH, WV.BreathSounds, PLAYER_BREATH),
     Binding(DAY_NIGHT_BP_PATH, "sound", AMBIENCE_DAY, single=True, component=BED_DAY_COMP),
     Binding(DAY_NIGHT_BP_PATH, "sound", AMBIENCE_NIGHT, single=True, component=BED_NIGHT_COMP),
     Binding(DAY_NIGHT_BP_PATH, "sound", AMBIENCE_WIND, single=True, component=BED_WIND_COMP),
@@ -166,6 +191,155 @@ def _author_death_voice(ed, exec_in):
         "The player's death: one of DeathSounds, the once (Dead was just set).",
         [wanderer])
     return (cried, then(wanderer))
+
+
+# ─── The heart and the breath ────────────────────────────────────────────────
+#
+# Two sounds that go on for as long as a state does, each a take played again
+# as it ends: a time it may next be heard, pushed on by the take's length each
+# time it is played. A one-shot, not a component, so a take that has started
+# plays out (the heart beats on for up to HEARTBEAT_S after a heal).
+#
+#     the heart   BP_HealthComponent's Tick: the player's (not DespawnOnDeath),
+#                 alive, under LOW_HEALTH_FRACTION of MaxHealth
+#     the breath  BP_WeaponComponent's Tick, after the sprint: SprintSpent,
+#                 which is the run key held with Stamina run out (sprint.py)
+
+# Under this much of MaxHealth the heart is heard.
+LOW_HEALTH_FRACTION = 0.3
+# The heartbeat's cut is four beats, one every 1.64 s (selection.py): played
+# again on the beat. The breath is the take's length and a moment.
+HEARTBEAT_S = 6.56
+BREATH_S = 4.3
+
+
+def _num(g, fn, a, b):
+    """A two-input pure node with a float literal on B; its ReturnValue."""
+    n = g.call(fn, A=a)
+    _set(n, "B", b)
+    return out(n)
+
+
+def _author_again(g, due_var, period, sounds_var, at_pin, wanted, exec_ins):
+    """Where ``wanted`` (a bool pin) holds and ``due_var`` has come: play one
+    of ``sounds_var`` at ``at_pin`` and put ``due_var`` ``period`` on. Returns
+    the exits."""
+    due = op(g, FN_GE_FF, out(g.call(FN_TIME_SECONDS)), g.get(due_var))
+    play, rest = g.branch(op(g, FN_AND, wanted, due), exec_ins)
+    waits = g.put(due_var, _num(g, FN_ADD_FF, out(g.call(FN_TIME_SECONDS)), period), [play])
+    made, heard = _author_random_sound(g.ed, sounds_var, at_pin, waits)
+    g.made.extend(made)
+    return (heard, rest)
+
+
+def _author_heartbeat(ed, exec_ins):
+    """The player's heart, heard while they are badly hurt. Returns the exits."""
+    g = _G(ed)
+    low = op(g, FN_LESS_FF, g.get(HV.Health), _num(g, FN_MUL_FF, g.get(HV.MaxHealth),
+                                                   LOW_HEALTH_FRACTION))
+    alive = _num(g, FN_GREATER_FF, g.get(HV.Health), 0.0)
+    hurt = op(g, FN_AND, op(g, FN_AND, not_(g, g.get(HV.DespawnOnDeath)), alive), low)
+    exits = _author_again(g, HV.HeartbeatNextTime, HEARTBEAT_S, HV.HeartbeatSounds,
+                          _at_owner(ed), hurt, exec_ins)
+    ed.add_comment_to_nodes(
+        f"The player's heart: alive and under {LOW_HEALTH_FRACTION:g} of MaxHealth, one of "
+        f"HeartbeatSounds where they stand, again every {HEARTBEAT_S:g} s (its four beats).",
+        g.made)
+    return exits
+
+
+def _author_breath(ed, owner_out, exec_ins):
+    """The player out of breath: the run key held with no stamina left
+    (SprintSpent). On the weapon component, after the sprint. Returns the exits."""
+    g = _G(ed)
+    here = g.call(FN_ACTOR_LOC, self=owner_out)
+    exits = _author_again(g, WV.BreathNextTime, BREATH_S, WV.BreathSounds, out(here),
+                          g.get(SPRINT_SPENT_VAR), exec_ins)
+    ed.add_comment_to_nodes(
+        f"Out of breath: while {SPRINT_SPENT_VAR} (the run key held, Stamina run out), one "
+        f"of BreathSounds at the player, again every {BREATH_S:g} s.", g.made)
+    return exits
+
+
+# ─── A footfall in a bush ────────────────────────────────────────────────────
+#
+# Whoever wears the footstep component, the player or a wanderer, rustles as
+# they walk through a bush. A bush has no collision (it is walked through), so
+# nothing overlaps it: the footfall asks the bushes themselves.
+#
+#     [BeginPlay] every actor tagged as a grass cell -> its instanced mesh
+#                 component -> Bushes, if its mesh is one of BushMeshes
+#     [a footfall] InBush = some component of Bushes has an instance whose
+#                 bounds reach within RUSTLE_REACH_CM of the walker
+#                 -> one of RustleSounds there, at StepVolume
+#
+# The bush cells carry the grass cells' tag and no other, so the mesh tells
+# them apart (the level needs no regenerating for this). The walk over Bushes
+# is per footfall, not per frame: 2 components on the 200 m map, 200 on the
+# 1 km one.
+
+RUSTLE_REACH_CM = 30.0
+ISM_CLASS = "/Script/Engine.InstancedStaticMeshComponent"
+
+
+def rustle_defaults():
+    """{BushMeshes: the bush meshes, loaded}; one never built is left out."""
+    eas = _assets()
+    return {FV.BushMeshes: [eas.load_asset(s.mesh_path) for s in DEFAULT_BUSH_SPECS
+                            if eas.does_asset_exist(s.mesh_path)]}
+
+
+def _author_find_bushes(ed, exec_in):
+    """BeginPlay: Bushes = the level's bush components. Returns the exec pin after."""
+    g = _G(ed)
+    cells = g.call(FN_WITH_TAG, [exec_in], Tag=GRASS_TAG)
+    cell, _index, body, done = for_each(g, out(cells, "OutActors"), [then(cells)])
+    comp = g.call(FN_GET_COMP, self=cell)
+    _pin(comp, "ComponentClass").set_pin_value(ISM_CLASS)
+    instanced = g.keep(_palette(ed, NODE_CAST_INSTANCED))
+    _connect(out(comp), _pin(instanced, "Object"))
+    _connect(body, _pin(instanced, "execute"))
+    as_ism = _loose_pin(instanced, "AsInstancedStaticMeshComponent", is_input=False)
+    mesh = g.iget(as_ism, EP.STATIC_MESH, "/Script/Engine.StaticMeshComponent")
+    known = g.call(FN_ARR_CONTAINS, TargetArray=g.get(FV.BushMeshes), ItemToFind=mesh)
+    bush, _other = g.branch(out(known), [then(instanced)])
+    g.call(FN_ARR_ADD, [bush], TargetArray=g.get(FV.Bushes), NewItem=as_ism)
+    ed.add_comment_to_nodes(
+        f"The level's bushes: of the cells tagged {GRASS_TAG}, the instanced "
+        "components whose mesh is one of BushMeshes. A footfall asks them "
+        "whether it is inside one.", g.made)
+    return done
+
+
+def _author_rustle(ed, at_pin, volume_pin, exec_in):
+    """A footfall at ``at_pin``: inside a bush, one of RustleSounds there, at
+    ``volume_pin``. Returns the exits."""
+    g = _G(ed)
+    out_of = g.keep(ed.add_set_member_variable_node(FV.InBush))
+    _set(out_of, FV.InBush, False)
+    _connect(exec_in, _pin(out_of, "execute"))
+    bush, _index, body, done = for_each(g, g.get(FV.Bushes), [then(out_of)])
+    near = g.call(FN_INSTANCES_IN_SPHERE, self=bush, Center=at_pin)
+    _set(near, "Radius", RUSTLE_REACH_CM)
+    _set(near, "bSphereInWorldSpace", True)
+    # Const, so pure here; were it ever given an exec pin, it goes in the chain.
+    runs = BEL.find_input_pin(near, "execute")
+    if runs and runs.is_valid():
+        _connect(body, runs)
+        body = then(near)
+    count = g.call(FN_ARR_LEN, TargetArray=out(near))
+    inside, _clear = g.branch(op(g, FN_GREATER_II, out(count), 0), [body])
+    mark = g.keep(ed.add_set_member_variable_node(FV.InBush))
+    _set(mark, FV.InBush, True)
+    _connect(inside, _pin(mark, "execute"))
+    brushed, open_ground = g.branch(g.get(FV.InBush), [done])
+    made, heard = _author_random_sound(ed, FV.RustleSounds, at_pin, brushed, volume_pin=volume_pin)
+    ed.add_comment_to_nodes(
+        f"A footfall inside a bush rustles: some component of Bushes has an instance "
+        f"within {RUSTLE_REACH_CM:g} cm of the walker (a bush has no collision, so its "
+        "instances' bounds are asked), and one of RustleSounds plays there, at StepVolume.",
+        g.made + made)
+    return (heard, open_ground)
 
 
 # ─── The forest's own sound ──────────────────────────────────────────────────

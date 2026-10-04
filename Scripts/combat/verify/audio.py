@@ -317,8 +317,9 @@ def check_sound_tables():
     # The player's voice hangs off the blow's stamp, not off Health going down:
     # a drain lowers Health every frame and would grunt every frame.
     grunts = [n for n in by_pins(hg, "Sound", "Location")]
-    check("the health component plays two sounds: the player's grunt and their cry",
-          len(grunts) == 2, f"{len(grunts)} PlaySoundAtLocation node(s)")
+    check("the health component plays three sounds: the player's grunt, their cry "
+          "and, badly hurt, their heart (verify/sound_states.py)",
+          len(grunts) == 3, f"{len(grunts)} PlaySoundAtLocation node(s)")
     heard = [n for n in hg if "Set HeardDamageTime" in str(BEL.get_node_title(n)).replace("\n", " ")]
     check("...and the grunt is on LastDamageTime moving: HeardDamageTime is written "
           "in one place", len(heard) == 1, f"{len(heard)} write(s)")

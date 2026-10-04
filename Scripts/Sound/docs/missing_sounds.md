@@ -14,7 +14,7 @@ Nothing rated ok or better exists for these. Each needs a new source.
 |---|---|---|
 | The menu opening, closing, scrolling, a toggle | Kenney's interface sounds, Sonniss's dark and mechanical sets: all rated bad or very bad. Electronic sounds do not suit the game | Soft, physical sounds: paper, leather, wood. Two page turns were rated ok (below), nothing better |
 | A tension bed for ordinary play, and for a wendigo's hunt | 11 Sonniss drones and 15 Freesound ones: all bad, but three kept for ghosts and a boss, and one rated ok | Quiet, mostly wind and low tone. The Sonniss 2020 and 2021-23 bundles have horror ambience libraries not yet looked at (they are only on Sonniss's own server: download by hand) |
-| Eating forage (a mushroom) | Only an apple and crackers were liked, each for an item the game does not have | A soft, wet bite: Freesound has three eating previews not yet rated |
+| Eating forage (a mushroom) | Only an apple and crackers were liked, each for an item the game does not have. The crackers (Freesound 718593, JoMungus) play for the mushroom for now | A soft, wet bite: Freesound has three eating previews not yet rated |
 | The forest's night one-shots: an owl, a branch snapping, a tree creaking | One owl was rated bad. Four more owls, six owl screeches, five branch snaps and one tree creak are cut and **not yet rated** | Rate those first. The four tree creaks that were liked are for a creaky house, not the forest |
 | A wanderer's footsteps as its own sound | None sought: the six bare-ground takes (`dirt_walk`, rated ok for the player) play for now, chosen so they differ from the player's leaves, not by ear for a monster | Heavier, dragging steps for the zombie; a fast, heavy run for the wendigo (they share one set today) |
 | The wind | `wind_grass_norway`, rated great on the page and not a good match in the game: silent by default | A steadier wind through trees. Four wind beds are cut and not yet rated |
@@ -50,11 +50,12 @@ ship: download the original from its page (a free account) into
 | The wendigo hurt | 784771, pdfpxf520, "Hit02" | <https://freesound.org/people/pdfpxf520/sounds/784771/> |
 | Drinking | 674543, laboratoriosonoridades2022 | <https://freesound.org/people/laboratoriosonoridades2022/sounds/674543/> |
 | A match | 398448, brachern, "Match Ignite" | <https://freesound.org/people/brachern/sounds/398448/> |
+| Eating (**played in the game**, for the mushroom) | 718593, JoMungus | <https://freesound.org/people/JoMungus/sounds/718593/> |
 | A menu click | 477640, Joao_Janz | <https://freesound.org/people/Joao_Janz/sounds/477640/> |
 | The menu opening and closing | 437121, mosaichorse; 667180, MBPL | <https://freesound.org/people/mosaichorse/sounds/437121/>, <https://freesound.org/people/MBPL/sounds/667180/> |
 | A bed under a hunt | 560618, szegvari, "Dark Ghost House" | <https://freesound.org/people/szegvari/sounds/560618/> |
 
-None of the sounds the game plays today is a preview.
+One sound the game plays today is a preview: eating (718593). The rest are not.
 
 ## 4. Chosen, and not played yet
 
@@ -65,11 +66,10 @@ plays them. What each needs:
 |---|---|---|
 | The zombie's bite and swing, hurt and death; the wendigo's growl, hurt and death | The wanderers' controller (`npc/`), and the health component, whose voice is the player's only (`combat/voice.py` gates on `DespawnOnDeath`) | Per-creature takes have to reach the pawn's health component at possession, as its flinch clips do |
 | A bullet into wood, a body, the ground | `BP_BulletImpact` and `BP_BloodSplash` (`combat/bullet_impact.py`, `blood.py`) | The impact does not know its surface: wood and ground are one burst |
-| An item picked up and set down; a garment worn; a weapon brought to hand | `weapon_component/pickup.py`, `wear.py`, `slot_sync.py` | Nothing |
-| The player's effort on a swing and a throw; out of breath; a grunt on landing | `punch.py`, `throw_windup.py`, `sprint.py` | Nothing |
-| Low health: a heartbeat | The health component, or the HUD | The take is 56 s and speeds up: it has to be trimmed to a steady loop and turned down (the note on it says so) |
-| Drinking; eating | `weapon_component/consume.py` | Drinking is a preview; eating has no take |
-| Running, grass and bare-ground footsteps, landing, grass rustle | `combat/footsteps.py` | The component has one sound for every speed and surface, and does not know what is underfoot |
+| An item picked up and set down; a garment worn or taken off | `weapon_component/pickup.py`, `wear.py`, `drop_request.py` | Nothing: set the item in `HandledItem` there, as `slot_moves.py` does (an item moved between slots or brought to hand is played, by its type) |
+| The player's effort on a swing and a throw; a grunt on landing | `punch.py`, `throw_windup.py` | Nothing |
+| Drinking | `weapon_component/consume.py`: a row of `sound_items.ITEM_USE` | It is a preview, rated ok |
+| Running, grass and bare-ground footsteps, landing | `combat/footsteps.py` | The component has one sound for every speed and surface, and does not know what is underfoot |
 | The menu's sounds | The HUD (`graphics_menu/`) | The HUD polls keys in `DrawHUD`; every row change, take and back needs a play node, and they would be the game's first 2D sounds played from a graph |
 | The title screen's boom; a scare when a wendigo sees you | The HUD's first Tick; `npc/roar.py` | Nothing |
 | A bed under a hunt | `Sound/sound_world.py`, a fourth bed, raised while a wendigo hunts | Something has to tell the cycle that one is hunting |
@@ -100,6 +100,15 @@ After the first listen in the game (4 October 2026):
   (the throw, into a body, into a tree, which is the axe's chop).
 - **A knife or an axe hitting a zombie had no sound:** a blow landing on a body is heard
   now, the fist's and the blade's each with takes of its own.
+- **The blade's takes were too gory:** a blade's blow and a thrown blade going into a body
+  are the one stab take (`stab_dagger_05`) for now, and need slicing takes of their own.
+  The gore is kept for a thrown axe's kill by the head (`gore_weapon_02`).
+- **The AKM was too quiet at the tab's maximum of 2:** the maximum is 4 now (the engine's
+  ceiling), and the rifle's shot starts at 3. If it is still thin, the cut needs a fuller
+  recording, not more volume.
+- **Wired on 4 October:** the rustle of a bush walked through, the breath of a spent
+  sprint, the heartbeat at low health (cut to four beats, at 0.6), eating, and an item's
+  own sound as it is moved or brought to hand.
 
 Still to listen to: the rifle's and the pistol's reloads (put together from parts), the
 footsteps at 0.4, the day's and the night's beds at 0.7, the player's grunt, the zombie's

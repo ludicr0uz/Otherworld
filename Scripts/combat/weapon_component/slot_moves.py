@@ -24,6 +24,10 @@ them and the equip follows.
         the item fits MoveTo and whatever is there fits MoveFrom -> swapped;
         an empty MoveTo just takes it. Only a weapon fits a weapon slot.
 
+Each of the three that moves an item names it in HandledItem, and the serve
+ends by playing that item's HandleSounds (Sound/sound_items.author_handled):
+a gun, a blade, a garment and anything else each sound like themselves.
+
 Each request is copied and lowered before anything reads it, so a request
 is served once; the items are read off SlotItems, which the sync wrote at
 the end of last frame.
@@ -35,6 +39,8 @@ from combat.slot_tuning import (
     SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_VAR, SLOT_WANT_VAR,
 )
 from combat.paths import ITEM_CLASS_PATH
+from combat.weapon_component import vars as WV
+from Sound.sound_items import author_handled
 from uebp.g import _G
 from combat.weapon_component.slot_nodes import fits, for_loop, not_, op, slot_at, valid
 from uebp.graph import out
@@ -79,12 +85,14 @@ def _author_slot_request(g, in_execs):
     stowed = g.iput(hand, SLOT_VAR, g.get(SLOT_PICK_VAR), [homed])
     took = g.iput(target, SLOT_VAR, str(HAND), [stowed, bare])
     took = g.put(HAND_FROM_VAR, want, [took])
+    took = g.put(WV.HandledItem, target, [took])
 
     # An empty slot: the hand's item goes back if that is where it came from.
     holding2, bare2 = g.branch(valid(g, hand), [empty])
     came = op(g, FN_AND, op(g, FN_EQ_II, g.get(HAND_FROM_VAR), want), fits(g, hand, want))
     back, stay = g.branch(came, [holding2])
     put_back = g.iput(hand, SLOT_VAR, want, [back])
+    put_back = g.put(WV.HandledItem, hand, [put_back])
     return [took, no_home, put_back, stay, bare2, idle]
 
 
@@ -113,6 +121,7 @@ def _author_slot_move(g, in_execs):
     swaps, stuck = g.branch(fits(g, dst, src_i), [taken])
     swapped = g.iput(dst, SLOT_VAR, src_i, [swaps])
     moved = g.iput(src, SLOT_VAR, dst_i, [swapped, open_])
+    moved = g.put(WV.HandledItem, src, [moved])
     # Into the hand, it came from MoveFrom; out of it, the swapped-in one
     # came from MoveTo.
     up, not_up = g.branch(op(g, FN_EQ_II, dst_i, HAND), [moved])
@@ -164,6 +173,8 @@ def _author_slot_serve(ed, in_execs):
     g = _G(ed, ITEM_CLASS_PATH)
     tails = _author_slot_request(g, in_execs)
     tails = _author_slot_move(g, tails)
+    # Whatever either moved is heard, by its type (Sound/sound_items.py).
+    tails = author_handled(g, tails)
     ed.add_comment_to_nodes(
         "SlotRequest brings a slot's item to hand (the hand's going home first, "
         "or back where it came from); MoveFrom/MoveTo is the HUD's drag, a swap "

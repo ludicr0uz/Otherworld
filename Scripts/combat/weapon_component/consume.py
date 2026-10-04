@@ -25,7 +25,9 @@ is still reported.
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from combat.tuning import CONSUME_EVENT_TAG
 from combat.weapon_component.common import _prop
-from uebp.nodes.actor import FN_DESTROY
+from combat.paths import ITEM_CLASS_PATH
+from Sound.play import _author_random_sound
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_DESTROY
 from uebp.nodes.array import FN_ARR_LEN, FN_ARR_REMOVE
 from uebp.nodes.gas import FN_SEND_GAMEPLAY_EVENT
 from uebp.nodes.math import FN_AND, FN_MIN_II, FN_NOT, FN_SUB_II
@@ -113,11 +115,21 @@ def _author_consume(ed, held, owner, exec_in):
     _connect(owner, _loose_pin(payload, "Instigator"))
     _connect(owner, _loose_pin(payload, "Target"))
 
+    # Heard first, while the item is still there to be asked for its takes:
+    # one of its UseSounds (food's eating; an item with none is silent).
+    takes = keep(ed.add_get_member_variable_node(IV.UseSounds, ITEM_CLASS_PATH))
+    _connect(held, _pin(takes, "self"))
+    here = keep(_node(ed, FN_ACTOR_LOC))
+    _connect(owner, _pin(here, "self"))
+    sounded, heard = _author_random_sound(ed, IV.UseSounds, out(here), exec_in,
+                                          source=out(takes, IV.UseSounds))
+    made.extend(sounded)
+
     send = keep(_node(ed, FN_SEND_GAMEPLAY_EVENT))
     _connect(owner, _pin(send, "Actor"))
     _set(send, "EventTag", f'(TagName="{CONSUME_EVENT_TAG}")')
     _connect(BEL.list_output_pins(payload)[0], _pin(send, "Payload"))
-    _connect(exec_in, _pin(send, "execute"))
+    _connect(heard, _pin(send, "execute"))
 
     inv = keep(ed.add_get_member_variable_node(WV.Inventory))
     inv_out = out(inv, WV.Inventory)
@@ -161,7 +173,7 @@ def _author_consume(ed, held, owner, exec_in):
     _connect(then(dirty), _pin(spend, "execute"))
 
     ed.add_comment_to_nodes(
-        f"A Consumable is used, not fired: send {CONSUME_EVENT_TAG} to the owner "
+        f"A Consumable is used, not fired: one of its UseSounds is heard, then send {CONSUME_EVENT_TAG} to the owner "
         "with the item as OptionalObject (GA_ConsumeItem answers it), THEN take "
         "it out of Inventory and destroy it -- the ability reads the item's "
         "restore values synchronously inside the send. The press is then "

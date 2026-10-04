@@ -8,17 +8,21 @@ to run. Design rules and traps: Scripts/Sound/CLAUDE.md.
 
 THE AREAS (one module each: its SOUNDS, its BINDINGS, and its sound logic)
   sound_weapons   each gun's shot and reload, the dry click; a swing, a fist's
-                  and a blade's blow, a thrown blade (GUN_SOUNDS: which gun
-                  plays which)
+                  and a blade's blow, a thrown blade, a thrown axe's kill by
+                  the head (GUN_SOUNDS: which gun plays which)
   sound_monsters  the zombie's growls (patrol, aggro, attack: which take is
                   which), the wendigo's roar and its own attenuation curve,
                   a wanderer's blow and its footsteps (VOICES, AGGRO_VOICES,
                   ATTACK_VOICES: which creature has which voice)
   sound_items     a throw, the axe on a trunk, a match, the campfire's crackle
-                  (its AudioComponent: add_crackle)
-  sound_world     the player's footsteps; the player's voice (the health component's grunt
-                  and cry); the forest's beds on BP_DayNightCycle and their
-                  fade by DayAmount; the listener at the character
+                  (its AudioComponent: add_crackle); an item handled, by its
+                  type, and used up (ITEM_HANDLING, ITEM_USE: which item
+                  sounds like what; author_handled)
+  sound_world     the player's footsteps, and anyone's rustle through a bush;
+                  the player's voice (the health component's grunt and cry,
+                  the heartbeat at low health, the breath of a spent sprint);
+                  the forest's beds on BP_DayNightCycle and their fade by
+                  DayAmount; the listener at the character
 
 SHARED
   sound_def       Sound (a row of the table) and Binding (a Blueprint variable
@@ -40,11 +44,12 @@ SHARED
   build           the build's three steps: build_sound_assets(),
                   apply_sound_bindings(), apply_sound_volumes()
 
-Checks: combat/verify/audio.py and sound_mix.py (verify_weapons_and_combat),
+Checks: combat/verify/audio.py and sound_mix.py and sound_states.py
+(verify_weapons_and_combat),
 world/verify/ambience.py (verify_day_night), npc/verify_voice.py
 (verify_npc_blueprints), graphics_menu/sound_tune_checks.py
 (verify_graphics_menu); probes/probe_sound_tuning.py, probe_ambience.py,
-probe_monster_sounds.py.
+probe_monster_sounds, probe_state_sounds.py.
 
 SOURCING (outside the editor; sound_candidates/__init__.py maps it)
   sound_candidates/         the candidates, the audition page, THE CHOICE

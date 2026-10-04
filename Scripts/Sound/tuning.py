@@ -3,7 +3,8 @@ sound (``sound,volume``).
 
 The CSV is the tracked copy of the numbers the in-game SOUND SETTINGS tab (the
 menu's sound tuning row, graphics_menu/sound_tune_*.py) saves: how loud each
-sound of the game is, as a multiplier (1 = as recorded, 0 = silent).
+sound of the game is, as a multiplier (1 = as recorded, 0 = silent, at most
+VOLUME_MAX).
 
 A "sound" is what the player hears as one thing: the footsteps are six
 takes and one row. The rows are the areas' (catalog.SOUND_STATS: CSV sound,
@@ -22,7 +23,9 @@ from Sound.catalog import SOUND_STATS
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sound_tuning.csv")
 SOUND_COLUMN, VOLUME_COLUMN = "sound", "volume"
 
-VOLUME_STEP, VOLUME_MIN, VOLUME_MAX = 0.05, 0.0, 2.0
+# 4 is the engine's own ceiling: a source's final volume is clamped to its
+# MAX_VOLUME (AudioDefines.h), so a row past it would change nothing.
+VOLUME_STEP, VOLUME_MIN, VOLUME_MAX = 0.05, 0.0, 4.0
 FOOTSTEPS = "footsteps"
 SAVED_COLUMNS = tuple(s[0] for s in SOUND_STATS)
 

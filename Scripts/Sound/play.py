@@ -11,9 +11,11 @@ from uebp.nodes.system import FN_PLAY_SOUND
 
 # ─── Playing one of several sounds ──────────────────────────────────────────
 
-def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None):
+def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None, source=None):
     """Play a random element of the ``var_name`` sound array at ``at_pin``,
-    at ``volume_pin`` if one is given (the stance's StepVolume).
+    at ``volume_pin`` if one is given (the stance's StepVolume). ``source``
+    is the array's pin where it is not this graph's own variable (an item's
+    takes, read off the item).
 
     Returns ``(nodes, then_pin)``.  The array is guarded on its own length:
     RandomIntegerInRange(0, -1) against an empty array feeds Array_Get an index
@@ -33,8 +35,11 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None):
         made.append(n)
         return n
 
-    table = keep(ed.add_get_member_variable_node(var_name))
-    table_out = out(table, var_name)
+    if source is None:
+        table = keep(ed.add_get_member_variable_node(var_name))
+        table_out = out(table, var_name)
+    else:
+        table_out = source
 
     count = keep(_node(ed, FN_ARR_LEN))
     _connect(table_out, _pin(count, "TargetArray"))

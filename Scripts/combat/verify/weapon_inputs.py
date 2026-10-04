@@ -214,10 +214,13 @@ def check_keys_are_variables():
     #   4  a throw: leaving the hand (a blade's, and a blunt thing's), sinking
     #      into a body, lodging in a tree
     #   1  the match
-    check("the component plays thirteen sounds: the guns' three, a swing and a "
+    #   4  the axe's kill by the head, the breath of a spent sprint, an item
+    #      handled and an item used up (verify/sound_states.py)
+    check("the component plays seventeen sounds: the guns' three, a swing and a "
           "landed blow for the fist and for the blade, the chop, a throw's "
-          "four and the match",
-          len(by_pins(wg, "Sound", "Location")) == 13,
+          "four, the match, a thrown axe's kill by the head, the breath, an "
+          "item handled and an item used up",
+          len(by_pins(wg, "Sound", "Location")) == 17,
           f"{len(by_pins(wg, 'Sound', 'Location'))} PlaySoundAtLocation node(s)")
     check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,
           f"{len(by_pins(wg, 'Class', 'SpawnTransform'))} spawn nodes "

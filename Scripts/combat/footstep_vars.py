@@ -3,7 +3,7 @@ the name, the pin type and the default (uebp/vars.py). The builder declares
 TABLE; a row with no type is a component, or a variable declared elsewhere.
 """
 
-from uebp.vars import FLOAT, Var, array, obj
+from uebp.vars import BOOL, FLOAT, Var, array, obj
 
 Travelled = Var("Travelled", FLOAT, 0.0)
 StrideCm = Var("StrideCm", FLOAT)
@@ -14,5 +14,12 @@ StrideCm = Var("StrideCm", FLOAT)
 StepVolume = Var("StepVolume", FLOAT, 1.0)
 StepNoise = Var("StepNoise", FLOAT, 1.0)
 Sounds = Var("Sounds", array(obj("/Script/Engine.SoundBase")))
+# A footfall inside a bush rustles (Sound/sound_world.py): the takes, the
+# meshes that are bushes, the level's bush components (found at BeginPlay)
+# and whether this footfall is in one.
+RustleSounds = Var("RustleSounds", array(obj("/Script/Engine.SoundBase")))
+BushMeshes = Var("BushMeshes", array(obj("/Script/Engine.StaticMesh")))
+Bushes = Var("Bushes", array(obj("/Script/Engine.InstancedStaticMeshComponent")))
+InBush = Var("InBush", BOOL, False)
 
-TABLE = (Travelled, StrideCm, StepVolume, StepNoise, Sounds)
+TABLE = (Travelled, StrideCm, StepVolume, StepNoise, Sounds, RustleSounds, BushMeshes, Bushes, InBush)

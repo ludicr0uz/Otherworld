@@ -114,7 +114,7 @@ FOOTSTEPS = (
              "running up is told from one's own feet. Not picked by ear for this use yet"),
     Use("land", "footsteps", "landing from a jump", ("footsteps/dirt_land_02",), READY),
     Use("grass_rustle", "footsteps", "moving through tall grass", _n("footsteps/grass_rustle", 1, 2, 3, 4, 5, 6),
-        READY, note="for crouching and crawling"),
+        GAME, "A_GrassRustle", note="a footfall inside a bush, the player's or a wanderer's"),
 )
 
 AMBIENCE = (
@@ -169,11 +169,18 @@ PLAYER = (
     Use("player_death", "player", "the player dying", ("player/pain_shout_01",), GAME, "A_PlayerDeath"),
     Use("player_effort", "player", "the player's effort: a swing, a throw",
         _n("player/effort", 1, 2, 3, 4, 5, 6) + _n("player/attack", 1, 2, 6), READY),
-    Use("player_breath", "player", "out of breath",
-        ("player/breath_fast_01", "player/breath_fast_03", "player/gasp_04", "player/gasp_05"), READY),
+    Use("player_breath", "player", "out of breath: the run key held with no stamina left",
+        ("player/breath_fast_01",), GAME, "A_PlayerBreath"),
+    Use("player_breath_spare", "player", "out of breath, the other takes",
+        ("player/breath_fast_03", "player/gasp_04", "player/gasp_05"), READY),
     Use("player_land", "player", "the player's grunt on landing", _n("player/land", 1, 2, 4), READY),
-    Use("heartbeat", "player", "low health", ("player/heartbeat_panic_01",), READY,
-        note="needs to be turned down and trimmed", stereo=True),
+    # The take is 56 s and speeds up. Its first 6.5 s are steady, a beat every
+    # 1.64 s: four beats, played again as they end (sound_world.HEARTBEAT_S).
+    # Mono: it is played at the player, and a stereo wave cannot be placed.
+    Use("heartbeat", "player", "low health", ("player/heartbeat_panic_01",), GAME, "A_Heartbeat",
+        note="cut to its first four beats; turned down by its volume row", seconds=6.5),
+    Use("eating", "player", "eating food", (f"{FS}/eating/718593_JoMungus",), GAME, "A_Eating",
+        note="a preview"),
     Use("drinking", "player", "drinking water", (f"{FS}/drinking/674543_laboratoriosonoridades2022",),
         READY, note="rated ok, and a preview"),
 )
@@ -184,9 +191,14 @@ MELEE = (
     Use("melee_swing", "melee", "a swing through the air", _n("melee/swing", 1, 4, 2, 3, 5, 6, 7, 8), GAME,
         "A_MeleeSwing"),
     Use("blade_hit", "melee", "a knife or an axe landing on a body",
-        ("melee/stab_dagger_05", "melee/gore_weapon_02", "melee/blood_splat_01"), GAME, "A_BladeHit"),
-    Use("blade_lodge", "melee", "a thrown knife or axe sticking in a body", ("melee/gore_02",), GAME,
-        "A_BladeLodge", note="in a tree, it is the axe's chop"),
+        ("melee/stab_dagger_05",), GAME, "A_BladeHit",
+        note="the stab alone, for now: the gore takes were too gory for every blow"),
+    Use("blade_lodge", "melee", "a thrown knife or axe sticking in a body", ("melee/stab_dagger_05",), GAME,
+        "A_BladeLodge", note="the stab too, for now; in a tree, it is the axe's chop"),
+    Use("axe_head_kill", "melee", "a thrown axe killing with a blow to the head", ("melee/gore_weapon_02",),
+        GAME, "A_AxeHeadKill", note="the 1.9 s take"),
+    Use("blade_gore_spare", "melee", "the gory takes a blade's blow had", ("melee/blood_splat_01", "melee/gore_02"),
+        READY, note="too gory for an ordinary blow"),
     # Told apart by ear in the game: these five are a blunt thing thrown, and
     # the knife's swing is a sharp one.
     Use("throw", "melee", "a blunt item thrown, as it leaves the hand",
@@ -208,14 +220,20 @@ IMPACTS = (
 )
 
 INVENTORY = (
-    Use("pickup", "inventory", "an item picked up", ("inventory/grab_pickup_01", "inventory/backpack_pickup_01"),
-        READY),
+    # Handling: what an item sounds like as it is moved between slots or
+    # brought to hand, by its type (sound_items.ITEM_HANDLING).
+    Use("handle_item", "inventory", "an item handled: moved in the inventory, brought to hand",
+        ("inventory/grab_pickup_01", "inventory/backpack_pickup_01"), GAME, "A_HandleItem",
+        note="also the takes for an item picked up, which nothing plays yet"),
     Use("drop", "inventory", "an item set down", ("inventory/drop_01", "inventory/backpack_drop_01"), READY),
-    Use("wear", "inventory", "a garment put on or taken off",
-        ("inventory/coat_pickup_01",) + _n("inventory/cloth", 2, 1, 3, 4), READY),
-    Use("weapon_draw", "inventory", "a weapon brought to hand",
-        ("inventory/knife_draw_01", "inventory/knife_draw_03", "inventory/leather_01", "inventory/leather_02")
-        + _n("inventory/belt", 1, 2), READY),
+    Use("handle_cloth", "inventory", "a garment handled, put on or taken off",
+        _n("inventory/cloth", 2, 1, 3, 4), GAME, "A_HandleCloth"),
+    Use("wear_spare", "inventory", "a coat picked up", ("inventory/coat_pickup_01",), READY,
+        note="13 s: too long to play on a move"),
+    Use("handle_gun", "inventory", "a gun handled or brought to hand",
+        ("inventory/leather_01", "inventory/leather_02") + _n("inventory/belt", 1, 2), GAME, "A_HandleGun"),
+    Use("handle_blade", "inventory", "a knife or an axe handled or drawn",
+        ("inventory/knife_draw_01", "inventory/knife_draw_03"), GAME, "A_HandleBlade"),
 )
 
 UI = (
@@ -254,7 +272,7 @@ LATER = (
     Use("blood_steps", "for later", "walking on blood", ("melee/splatter_01",), FUTURE),
     Use("food_items", "for later", "an apple, crackers, a sip",
         ("player/eating_apple_01", "player/eating_crunch_01", f"{FS}/eating/699846_8bitmyketison",
-         f"{FS}/eating/718593_JoMungus", "player/drinking_sip_01"), FUTURE),
+         "player/drinking_sip_01"), FUTURE),
     Use("creaky_house", "for later", "a creaky house",
         (f"{FS}/tree_creak/797992_Comradar", f"{FS}/tree_creak/797993_Comradar",
          f"{FS}/tree_creak/797994_Comradar", f"{FS}/tree_creak/94359_Ryding"), FUTURE),

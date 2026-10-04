@@ -167,8 +167,8 @@
 - **Where each sound fires:**
   - The dry click fires on the ready gate's False arm when `empty AND cooled AND tapped`.
   - The reload clack fires only on the reload's True arm.
-- **Attenuation:** six `USoundAttenuation` assets in `/Game/Audio`, all spherical, and
-  `NATURAL_SOUND` but for the three that have to be heard at a distance, which are straight
+- **Attenuation:** seven `USoundAttenuation` assets in `/Game/Audio`, all spherical, and
+  `NATURAL_SOUND` but for the four whose reach is set in metres, which are straight
   lines (the axe's chop and a melee hit are `A_Att_Creature`; the player's voice, a swing, a
   match and the campfire are foley):
   - `A_Att_Gunfire`: 2 m → 100 m, with a low-pass;
@@ -180,9 +180,13 @@
     recording. The range is read from `npc/monster_tuning.csv` when the sound build runs:
     after saving a new aggro range from the MONSTER SETTINGS tab, re-run
     `build_sound.py` (the verifier fails until then). Capped at the 100 m ceiling;
-  - `A_Att_CreatureVoice`: **linear**, full to 5 m, silent at 50 m. The zombie's patrol and
+  - `A_Att_CreatureVoice`: **linear**, full to 5 m, silent at 50 m. The zombie's
     attack growls: it sees 20 m, and there they are two thirds of full volume (on
     `A_Att_Creature` they were near -29 dB). Its aggro growl is on the roar's curve;
+  - `A_Att_PatrolVoice`: **linear**, full to 5 m, silent at **`PATROL_VOICE_HEARD_CM`**
+    (`sound_monsters.py`, 25 m): the config for how far off a patrol's sounds are heard.
+    The zombie's patrol growls (on the 50 m line they started too far away). To change
+    it: the number, then `build_sound.py`;
   - `A_Att_Footstep`: **linear**, full to 2 m, silent at 20 m. Every footstep, the player's
     and the wanderers' (the player's own are at the listener, so only others' are shaped
     by it). On the foley curve a wanderer running up was not heard coming;

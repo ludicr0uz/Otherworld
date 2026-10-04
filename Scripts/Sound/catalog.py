@@ -9,7 +9,7 @@ new AREA is a module listed in AREAS.
 from Sound import sound_items, sound_monsters, sound_weapons, sound_world
 from Sound.sound_def import (
     ATT_CREATURE, ATT_FOLEY, ATT_FOOTSTEP, ATT_GUNFIRE, ATT_VOICE, BED_DIR, CREATURE_AUDIO_DIR, WEAPON_AUDIO_DIR)
-from Sound.sound_monsters import ATT_ROAR
+from Sound.sound_monsters import ATT_PATROL_VOICE, ATT_ROAR
 
 AREAS = (sound_weapons, sound_monsters, sound_items, sound_world)
 SOUNDS = tuple(s for area in AREAS for s in area.SOUNDS)
@@ -18,7 +18,8 @@ BY_KEY = {s.key: s for s in SOUNDS}
 if len(BY_KEY) != len(SOUNDS):
     raise RuntimeError("two rows of the sound table share a key")
 
-ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY, ATT_FOOTSTEP, ATT_VOICE)
+ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY, ATT_FOOTSTEP, ATT_VOICE,
+                ATT_PATROL_VOICE)
 
 # Which sound gets which, and the only table that says so. Every sound in the
 # game is a WORLD sound -- something in the level made it, at a place -- so

@@ -76,7 +76,7 @@ class AttenuationProfile:
     tens of metres that the effect exists at all.
 
     ``linear`` swaps the natural curve for a straight line from full volume to
-    silence. Only the roar: see ATT_ROAR.
+    silence. The roar first (see ATT_ROAR), then the footsteps and the voices.
     """
 
     name: str

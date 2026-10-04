@@ -1,6 +1,7 @@
 """The monsters' sounds: the zombie's growls (on patrol, as it goes aggro, as
 it swings), the wendigo's roar, the thud of a wanderer's blow on the player,
-the wanderers' footsteps, and the roar's own attenuation curve.
+the wanderers' footsteps, the roar's own attenuation curve, and how far off
+a patrol's growls are heard (PATROL_VOICE_HEARD_CM).
 
 SOUNDS is the area's rows of the sound table and BINDINGS where each is played
 from. Every creature's AI controller holds four arrays of takes, one drawn per
@@ -58,6 +59,22 @@ ROAR_FULL_CM = 1000.0
 ATT_ROAR = AttenuationProfile("A_Att_WendigoRoar", ROAR_FULL_CM,
                               roar_reach_cm() - ROAR_FULL_CM, linear=True)
 
+# HOW FAR OFF A PATROL'S SOUNDS ARE HEARD: the config for it. A creature's
+# patrol-level voice (the zombie's growls on the timer) is silent from this far
+# and further, and rises on a straight line to full volume at PATROL_VOICE_FULL_CM.
+# On the voice's own 50 m line a patrolling pack was heard from well before it
+# could matter; this is a little past the zombie's sight (20 m), where a growl
+# is a quarter of full volume. To change it: this number, then build_sound.py.
+PATROL_VOICE_HEARD_CM = 2500.0
+PATROL_VOICE_FULL_CM = ATT_VOICE.radius_cm
+if not PATROL_VOICE_FULL_CM < PATROL_VOICE_HEARD_CM <= AUDIBLE_LIMIT_CM:
+    raise RuntimeError(
+        f"PATROL_VOICE_HEARD_CM is {PATROL_VOICE_HEARD_CM:g}: it has to be over "
+        f"{PATROL_VOICE_FULL_CM:g} (full volume) and at most {AUDIBLE_LIMIT_CM:g}")
+ATT_PATROL_VOICE = AttenuationProfile(
+    "A_Att_PatrolVoice", PATROL_VOICE_FULL_CM,
+    PATROL_VOICE_HEARD_CM - PATROL_VOICE_FULL_CM, linear=True)
+
 # Several takes per creature and the controller draws one at random, because a
 # pack of ten on a 4-9 s timer playing the same buffer is audibly one sound.
 #
@@ -74,12 +91,13 @@ def _growls(numbers):
     return tuple(_GROWLS[n - 1] for n in numbers)
 
 
-# The growls carry further than the zombie sees (ATT_VOICE: 50 m), and the one
-# it gives as it goes aggro as far as the wendigo's roar does, on the roar's
-# own curve: a zombie that had noticed the player was not heard to.
+# The patrol's growls are heard from PATROL_VOICE_HEARD_CM (above). A swing's
+# carry further than the zombie sees (ATT_VOICE: 50 m), and the one it gives
+# as it goes aggro as far as the wendigo's roar does, on the roar's own curve:
+# a zombie that had noticed the player was not heard to.
 ZOMBIE_GROWL = Sound("zombie_growl", "zombie growl", _growls(
     n for n in range(1, len(_GROWLS) + 1)
-    if n not in ZOMBIE_ATTACK_TAKES + ZOMBIE_AGGRO_TAKES), ATT_VOICE)
+    if n not in ZOMBIE_ATTACK_TAKES + ZOMBIE_AGGRO_TAKES), ATT_PATROL_VOICE)
 ZOMBIE_ATTACK = Sound("zombie_attack_growl", "zombie attack", _growls(ZOMBIE_ATTACK_TAKES),
                       ATT_VOICE)
 ZOMBIE_AGGRO = Sound("zombie_aggro_growl", "zombie aggro", _growls(ZOMBIE_AGGRO_TAKES),

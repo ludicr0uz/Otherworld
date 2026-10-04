@@ -626,11 +626,12 @@ These are feel checks a headless run can't do:
   hides much of the view below and beside the target; the shotgun's support-hand fingers
   stand just right of the bead (its thumb no longer stands left of it); the adventurer's
   hair shows at the top of the AK's view;
-- the hands down the pistol's sights, now that the near plane no longer cuts them open
-  (`NEAR_CLIP_CM`, 2 cm): both thumbs stand whole beside the slide, left of the rear
-  sight, 4-10 cm from the eye, where the skin's texture is a blur; whether they take too
-  much of the view; and anything the nearer plane shows that 10 cm hid (the player's own
-  body with the boom pulled in against a wall);
+- the hands down the pistol's sights, now that the eye is 25 cm behind the grip
+  (`PISTOL_SIGHT`) and both hands stand partly in the view: whether they take too much or
+  too little of it; the left hand, whose fingers are seen spread below the grip rather than
+  wrapped over the right hand's (the support hand's pose, hidden at 14 cm); and anything
+  the 2 cm near plane (`NEAR_CLIP_CM`) shows that 10 cm hid (the player's own body with
+  the boom pulled in against a wall);
 - the shotgun's thumbs (`shotgun_pose.SHOTGUN_THUMBS`): how the right thumb reads over the
   stock's wrist from behind and at the hip (its base joint is inside the wood, as the rifle
   pose's was), whether the left one closes on the pump or hovers (its base is 5 cm off the

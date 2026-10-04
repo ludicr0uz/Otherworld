@@ -41,6 +41,9 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     the camera is placed against last frame's boom and shimmers while strafing.
   - How far back the eye sits was tuned in PIE. At 14 cm behind the receiver, its back face
     filled a third of the screen. At 34 cm, the camera was inside the head.
+  - **The pistol's eye is 25 cm behind the grip** (`PISTOL_SIGHT`), so both hands stand
+    partly in the view, round the gun. At 14 cm the slide's back and two blurred thumbs were
+    all of the lower view; at 30 cm the hands took too much of it.
 - **One motion from the key; only the turn waits for the gun** (`weapon_component/seat.py`,
   numbers in `seat_tuning.py`). A gun is carried lowered, and the sights key raises it over
   the ready pose's 0.25 s blend, from 70–95° off the view. The sights are three blends, all at
@@ -127,22 +130,20 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     line, so a gun added later is covered unnamed, then kills the player down them.
 - **The camera's near plane is 2 cm, so the hands are not cut open** (`NEAR_CLIP_CM` in
   `seat_tuning.py`; `Config/DefaultEngine.ini`, `[/Script/Engine.Engine] NearClipPlane`):
-  - **Why:** the eye is on the gun, and the pistol's is 14 cm behind the grip. Both thumbs
-    lie beside the slide 6-10 cm from the eye, in the view. The engine's default plane is
-    10 cm: it went through them, and the player saw into the hand and out the other side.
-    The shotgun's right thumb (6 cm) was cut the same way.
+  - **Why:** the eye is on the gun, and the shotgun's right thumb is 6 cm from it, in the
+    view. The engine's default plane is 10 cm: it went through the thumb, and the player saw
+    into the hand and out the other side. (The pistol's thumbs were cut the same way while
+    its eye was 14 cm behind the grip; at 25 cm its nearest skin is 9.5 cm off.)
   - **It is the engine's plane, for every view,** read at startup. A camera component has no
     near plane of its own (`FMinimalViewInfo.PerspectiveNearClipPlane` is not set by it), and
     `r.SetNearClipPlane` is the same global. Depth is reversed-Z, so nothing far is lost.
-  - **Not the eye moved back:** the sight picture was tuned where it is, and the thumbs
-    would still be in the view, only smaller.
   - At 2 cm the piece of the plane in view is 2.3 x 1.3 cm; the nearest skin in view is
-    3.7 cm from the eye (the pistol's right thumb).
+    6 cm from the eye (the shotgun's right thumb).
   - `verify/near_clip.py` reads the ini line; `verify/sights.py` holds each gun's parts
     clear of the same plane. `probes/probe_sight_near_clip.py` reads the plane off the
     game's projection matrix (an ini key in the wrong section is ignored silently) and, for
     every gun with a sight line, standing, crouched and prone, finds no hand or forearm
-    crossing the plane's piece in view; at 10 cm it finds the pistol's thumbs. With
+    crossing the plane's piece in view; at 10 cm it finds the shotgun's thumb. With
     `--windowed` and `OW_SIGHT_SHOTS=1` it saves each gun's sight picture.
 - **Down the sights the aim sways** (`sway_tuning.py`, `weapon_component/sway.py`):
   - Two slow sines, 0.3° sideways and 0.2° up and down, times `SightBlend` and the stance

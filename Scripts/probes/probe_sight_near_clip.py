@@ -1,9 +1,10 @@
 """Down the sights the camera's near plane cuts no hand open.
 
-The eye is on the gun, and the pistol's is a hand's length behind the grip:
-both thumbs lie beside the slide 6-10 cm from the eye, inside the view. At the
-engine's default near plane (10 cm) the plane went through them, and the
-player saw into the hand and out the other side. Config/DefaultEngine.ini now
+The eye is on the gun, and the shotgun's is a hand's length behind the grip:
+its right thumb lies 6 cm from the eye, inside the view (the pistol's thumbs
+did too, until its eye moved back to 25 cm). At the engine's default near
+plane (10 cm) the plane went through them, and the player saw into the hand
+and out the other side. Config/DefaultEngine.ini now
 sets it to seat_tuning.NEAR_CLIP_CM.
 
   - The game's near plane is NEAR_CLIP_CM: read off the camera's own
@@ -14,8 +15,8 @@ sets it to seat_tuning.NEAR_CLIP_CM.
     either hand or forearm crosses the piece of the near plane that is in
     view. A hand is its skeleton, each bone a run of spheres from its parent
     (SKIN_CM, the forearm FOREARM_CM).
-  - The positive case: the same test at the engine's default plane finds the
-    pistol's hands cut, so the test can fail.
+  - The positive case: the same test at the engine's default plane finds a
+    gun's hand cut (the shotgun's), so the test can fail.
 
 Nothing here renders. Run with --windowed and OW_SIGHT_SHOTS=1 to save each
 gun's sight picture to Saved/Screenshots/MacEditor and look at the hands.
@@ -194,12 +195,9 @@ def _run(p):
         p.set(wc, SIGHTS_FORCED_VAR, False)
         yield lambda: p.get(wc, SEAT_VAR) < HOME
 
-    was = default_cuts.get("Pistol", [])
+    was = {gun: cut for gun, cut in default_cuts.items() if cut}
     p.check(f"the test can fail: at the engine's default plane ({NEAR_CLIP_DEFAULT_CM:g} cm) "
-            "the pistol's hands are cut, both thumbs among them",
-            any("Right" in b or b.endswith("_r") for b in was)
-            and any("Left" in b or b.endswith("_l") for b in was)
-            and any("thumb" in b.lower() for b in was), str(was))
+            "a gun's hand is cut", bool(was), str(default_cuts))
     depth, bone, where = closest
     p.check("no skin in view comes within a centimetre of the plane, on any gun",
             depth > NEAR_CLIP_CM + 1.0, f"{bone}, {depth:.1f} cm from the eye ({where})")

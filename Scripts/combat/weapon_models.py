@@ -276,11 +276,12 @@ PISTOL_MUZZLE = (16.4, 0.0, 6.35)
 
 # The sight line: the top of the rear notch (two blades 8.125 high at x -1.2,
 # 4.4 mm apart) and the tip of the front post (8.29 at x 13.9, 4.4 mm wide),
-# the post's tip level with the blades. The eye is a near plane behind the
-# slide's back.
+# the post's tip level with the blades. The eye is 21 cm behind the slide's
+# back: far enough that both hands stand partly in the view, round the gun
+# (at 10 cm the slide's back alone filled a quarter of it).
 PISTOL_SIGHT_REAR = (-1.2, 0.0, 8.125)
 PISTOL_SIGHT_FRONT = (13.9, 0.0, 8.29)
-PISTOL_SIGHT = _eye_behind(PISTOL_SIGHT_REAR, PISTOL_SIGHT_FRONT, -14.0)
+PISTOL_SIGHT = _eye_behind(PISTOL_SIGHT_REAR, PISTOL_SIGHT_FRONT, -25.0)
 
 
 def pistol_outline():

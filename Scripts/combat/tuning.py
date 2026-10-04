@@ -135,7 +135,7 @@ class CombatConfig:
     # Where on the body a shot landed. The capsule decides *whether* a pellet
     # hit a character; the physics asset's bodies decide where (see hit_zones).
     # Anything the zones do not name -- neck, clavicles, torso -- is worth 1.0.
-    head_multiplier: float = 1.5
+    head_multiplier: float = 1.75
     limb_multiplier: float = 0.75
 
     # --- sprint and stamina --------------------------------------------------

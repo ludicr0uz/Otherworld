@@ -366,7 +366,7 @@ menu polls its own copy from `DrawHUD`, which does.
     thrown blade counts the kill and enrages a wendigo), and `BloodClass` is spawned at the
     wound. No hot blade's double.
   - **A blade in the head does more** (`_head_worth`): the damage is times the struck
-    body's own `HeadMultiplier` (1.5, the pellet's: `hit_zones.py`) where the bone the
+    body's own `HeadMultiplier` (1.75, the pellet's: `hit_zones.py`) where the bone the
     blade went in at is one of its `HeadBones`. Only the head: a limb takes it whole.
     That bone is the one the blade is then left in, so a blade seen in the head was a
     head shot. So where it went in (`_author_skin`, below) is found **before** the wound,

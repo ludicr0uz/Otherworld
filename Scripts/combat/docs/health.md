@@ -116,7 +116,7 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - **A trace that strikes no body is a miss:** no blood, no damage. The capsule is 68 cm across
     and a head 18, so counting it as a body hit (as it was) made every near miss a hit.
     The pellet stops there all the same: it does not carry on to the scenery behind.
-  - Head is ×1.5 and limbs ×0.75 (`COMBAT.head_multiplier`/`limb_multiplier`); any other body ×1.
+  - Head is ×1.75 and limbs ×0.75 (`COMBAT.head_multiplier`/`limb_multiplier`); any other body ×1.
   - `HitPoint` is where the burst goes: the pellet's own hit, moved onto the body by the body
     trace, so blood is on the skin and not on the capsule 10–25 cm in front of it.
 - **The bodies are fitted to the model** (`hit_bodies.py`, run by the build after

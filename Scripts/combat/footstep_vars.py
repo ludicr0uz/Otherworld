@@ -14,12 +14,17 @@ StrideCm = Var("StrideCm", FLOAT)
 StepVolume = Var("StepVolume", FLOAT, 1.0)
 StepNoise = Var("StepNoise", FLOAT, 1.0)
 Sounds = Var("Sounds", array(obj("/Script/Engine.SoundBase")))
-# A footfall inside a bush rustles (Sound/sound_world.py): the takes, the
+# Going through a bush rustles (Sound/sound_world.py): the ground covered
+# since the bushes were last asked and how much of it between two askings,
+# the takes, the
 # meshes that are bushes, the level's bush components (found at BeginPlay)
 # and whether this footfall is in one.
 RustleSounds = Var("RustleSounds", array(obj("/Script/Engine.SoundBase")))
 BushMeshes = Var("BushMeshes", array(obj("/Script/Engine.StaticMesh")))
 Bushes = Var("Bushes", array(obj("/Script/Engine.InstancedStaticMeshComponent")))
 InBush = Var("InBush", BOOL, False)
+RustleTravelled = Var("RustleTravelled", FLOAT, 0.0)
+RustleStrideCm = Var("RustleStrideCm", FLOAT)
 
-TABLE = (Travelled, StrideCm, StepVolume, StepNoise, Sounds, RustleSounds, BushMeshes, Bushes, InBush)
+TABLE = (Travelled, StrideCm, StepVolume, StepNoise, Sounds, RustleSounds, BushMeshes, Bushes, InBush,
+         RustleTravelled, RustleStrideCm)

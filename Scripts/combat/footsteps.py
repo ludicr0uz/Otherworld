@@ -62,6 +62,7 @@ def build_footstep_component(rebuild=True):
         [Tick] -> cast owner to Character -> [movement on the ground?]
                     no  -> Travelled = 0          (a jump restarts the stride)
                     yes -> Travelled += speed * dt
+                        -> the rustle of a bush gone through (sound_world.py)
                         -> [Travelled >= stride AND moving?]
                              yes -> Travelled -= stride
                                  -> play one of Sounds at the owner,
@@ -143,9 +144,16 @@ def build_footstep_component(rebuild=True):
     _connect(out(far_enough), _pin(both, "A"))
     _connect(out(quick_enough), _pin(both, "B"))
 
+    at = _node(ed, FN_ACTOR_LOC)
+    _connect(owner_out, _pin(at, "self"))
+    volume = ed.add_get_member_variable_node(FV.StepVolume)
+
     lands = ed.add_branch_node()
     _connect(out(both), _pin(lands, "Condition"))
-    _connect(then(advance), _pin(lands, "execute"))
+    # Going through a bush rustles, whoever it is, on a measure of its own
+    # (Sound/sound_world.py), and then the footfall.
+    for e in _author_rustle(ed, out(at), out(volume, FV.StepVolume), out(step), then(advance)):
+        _connect(e, _pin(lands, "execute"))
 
     left = _node(ed, FN_SUB_FF)
     _connect(have_out, _pin(left, "A"))
@@ -154,9 +162,6 @@ def build_footstep_component(rebuild=True):
     _connect(out(left), _pin(charge, FV.Travelled))
     _connect(then(lands), _pin(charge, "execute"))
 
-    at = _node(ed, FN_ACTOR_LOC)
-    _connect(owner_out, _pin(at, "self"))
-    volume = ed.add_get_member_variable_node(FV.StepVolume)
     _sounded, stepped = _author_random_sound(
         ed, FV.Sounds, out(at),
         then(charge),
@@ -174,9 +179,7 @@ def build_footstep_component(rebuild=True):
     _connect(char_out, _pin(mine, "self"))
     players = ed.add_branch_node()
     _connect(out(mine), _pin(players, "Condition"))
-    # A footfall inside a bush rustles too, whoever's it is (Sound/sound_world.py).
-    for e in _author_rustle(ed, out(at), out(volume, FV.StepVolume), stepped):
-        _connect(e, _pin(players, "execute"))
+    _connect(stepped, _pin(players, "execute"))
     reach = _node(ed, FN_MUL_FF)
     _connect(speed_out, _pin(reach, "A"))
     _set(reach, "B", COMBAT.footstep_noise_range_cm

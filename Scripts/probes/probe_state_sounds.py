@@ -4,9 +4,11 @@ A sound can't be heard in a headless game; this reads what would play it:
 
   - the player's and a wanderer's footstep component found the level's bushes
     at BeginPlay, and hold the rustle's takes;
-  - walked in the open a footfall is not InBush, and walked from inside a bush
-    it is (the stride is shortened to a centimetre, so a short walk is many
-    footfalls);
+  - walked in the open the player is not InBush, and walked from inside a bush
+    they are (the rustle's stride is shortened to a centimetre, so a short walk
+    asks the bushes many times);
+  - a zombie set down in a bush is InBush as it walks out of it: the rustle is
+    anyone's;
   - at full health the heartbeat never comes due; badly hurt, it is played and
     next due HEARTBEAT_S on, and not before;
   - with the run key up the breath never comes due (no key can be injected, so
@@ -26,7 +28,7 @@ from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
 from probes.probe_wendigo_quiet import _zombies
 from Sound.sound_world import GRASS_RUSTLE, HEARTBEAT_S, LOW_HEALTH_FRACTION
 
-WRITABLE = [(FOOTSTEP_BP_PATH, FV.StrideCm), (HEALTH_BP_PATH, HV.Health)]
+WRITABLE = [(FOOTSTEP_BP_PATH, FV.RustleStrideCm), (HEALTH_BP_PATH, HV.Health)]
 
 # Short walks from spots known to be on the ground, on a centimetre's stride:
 # a 10 m walk up to a bush from a point set down beside it went 3 cm in 2000
@@ -94,11 +96,11 @@ def probe(p):
     points = _bush_points(feet, p)
     home = player.get_actor_location()
     bush = min(points, key=lambda b: (b - home).length())
-    p.set(feet, FV.StrideCm, STRIDE_CM)
+    p.set(feet, FV.RustleStrideCm, STRIDE_CM)
     seen = []
     yield from _walk(p, player, feet, seen)
     gone = (player.get_actor_location() - home).length()
-    p.check("walked in the open, no footfall is InBush",
+    p.check("walked in the open, the player is never InBush",
             gone > 2 * STRIDE_CM and not any(seen),
             f"{sum(seen)} of {len(seen)} frames, {gone:.1f} cm walked, the nearest bush "
             f"{(bush - home).length():.0f} cm off")
@@ -107,7 +109,21 @@ def probe(p):
     seen = []
     yield from _walk(p, player, feet, seen)
     gone = (player.get_actor_location() - at).length()
-    p.check("walked from inside a bush, a footfall is InBush",
+    p.check("walked from inside a bush, the player is InBush",
+            any(seen), f"{sum(seen)} of {len(seen)} frames, {gone:.1f} cm walked")
+
+    # --- a zombie in a bush: the rustle is anyone's ------------------------------
+    # Set down in the bush with the player in sight, it walks out of it by itself.
+    zombie = _zombies(p)[0].get_controlled_pawn()
+    p.set(theirs, FV.RustleStrideCm, STRIDE_CM)
+    player.set_actor_location(bush + unreal.Vector(600.0, 0.0, STAND_CM), False, True)
+    zombie.set_actor_location(bush + unreal.Vector(0.0, 0.0, STAND_CM), False, True)
+    at, seen, end = zombie.get_actor_location(), [], time.time() + WALL_S
+    while time.time() < end and (zombie.get_actor_location() - at).length() < WALK_CM:
+        yield 0.0
+        seen.append(p.get(theirs, FV.InBush))
+    gone = (zombie.get_actor_location() - at).length()
+    p.check("a zombie walking out of a bush is InBush: it rustles as the player does",
             any(seen), f"{sum(seen)} of {len(seen)} frames, {gone:.1f} cm walked")
 
     # --- the heartbeat -----------------------------------------------------------

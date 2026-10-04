@@ -140,7 +140,7 @@ def check_footsteps_by_stance():
           all(isinstance(f.get_editor_property(v), float)
               and f.get_editor_property(v) == 1.0 for v in ("StepVolume", "StepNoise")))
     plays = [n for n in fg if "PlaySoundAtLocation" in _flat(n)]
-    check("the step, and the rustle of one inside a bush, play at StepVolume",
+    check("the step, and the rustle of a bush gone through, play at StepVolume",
           len(plays) == 2 and all("Get StepVolume" in {
               _title(n) for n in _feeds(BEL.find_input_pin(p, "VolumeMultiplier"))}
               for p in plays),

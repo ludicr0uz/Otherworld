@@ -12,7 +12,7 @@ from:
                                        component has a binding of its own on
                                        its Blueprint's copy of it: the
                                        wanderers' is Sound/sound_monsters.py
-    BP_FootstepComponent.RustleSounds  a footfall inside a bush, anyone's
+    BP_FootstepComponent.RustleSounds  a bush gone through, by anyone
                                        (the rustle, below)
     BP_HealthComponent.HurtSounds      the player's grunt   (the voice, below)
     BP_HealthComponent.DeathSounds     the player's cry
@@ -38,7 +38,8 @@ from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
 from forest_generator.grass_cells import GRASS_TAG
 from Sound.bind import defaults_for
 from Sound.play import _author_random_sound
-from Sound.sound_def import ATT_FOLEY, ATT_FOOTSTEP, BED_DIR, Binding, Sound, takes
+from Sound.sound_def import (
+    ATT_FOLEY, ATT_FOOTSTEP, AUDIBLE_LIMIT_CM, AttenuationProfile, BED_DIR, Binding, Sound, takes)
 from uebp import props as EP
 from uebp.g import _G
 from uebp.graph import (
@@ -48,7 +49,8 @@ from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER, FN_INSTANCES_IN_SPHERE, FN_SET_LISTENER_ATTENUATION)
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CONTAINS, FN_ARR_LEN
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LESS_FF, FN_MUL_FF)
+    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LESS_FF, FN_MUL_FF,
+    FN_SUB_FF)
 from uebp.nodes.palette import NODE_CAST_INSTANCED
 from uebp.nodes.system import FN_SET_VOLUME, FN_TIME_SECONDS, FN_WITH_TAG
 from world import day_night_vars as DV
@@ -60,8 +62,22 @@ from world.paths import DAY_NIGHT_BP_PATH
 FOOTSTEPS = Sound("footsteps", "footsteps", takes("footsteps"), ATT_FOOTSTEP, volume=0.4)
 PLAYER_HIT = Sound("player_hit", "player hit", takes("player_hit"), ATT_FOLEY)
 PLAYER_DEATH = Sound("player_death", "player death", takes("player_death"), ATT_FOLEY)
-# A footfall inside a bush: leaves brushed past, heard as far as a footstep is.
-GRASS_RUSTLE = Sound("grass_rustle", "bush rustle", takes("grass_rustle"), ATT_FOOTSTEP)
+# HOW FAR OFF A BUSH IS HEARD TO RUSTLE: the config for it. Anyone going through
+# a bush, the player or a wanderer, is silent from this far and further, and
+# rises on a straight line to full volume at RUSTLE_FULL_CM. On the footstep's
+# own 20 m line a zombie in a bush 10 m off was at half volume under its own
+# heavier step, and was not heard. To change it: this number, then
+# build_sound.py.
+RUSTLE_HEARD_CM = 3000.0
+RUSTLE_FULL_CM = 500.0
+if not RUSTLE_FULL_CM < RUSTLE_HEARD_CM <= AUDIBLE_LIMIT_CM:
+    raise RuntimeError(
+        f"RUSTLE_HEARD_CM is {RUSTLE_HEARD_CM:g}: it has to be over "
+        f"{RUSTLE_FULL_CM:g} (full volume) and at most {AUDIBLE_LIMIT_CM:g}")
+ATT_RUSTLE = AttenuationProfile(
+    "A_Att_Rustle", RUSTLE_FULL_CM, RUSTLE_HEARD_CM - RUSTLE_FULL_CM, linear=True)
+# A bush gone through: leaves brushed past, heard from further than a footstep.
+GRASS_RUSTLE = Sound("grass_rustle", "bush rustle", takes("grass_rustle"), ATT_RUSTLE)
 PLAYER_BREATH = Sound("player_breath", "player out of breath", takes("player_breath"), ATT_FOLEY)
 # Under the rest: the recording is loud, and it plays for as long as the
 # player is hurt.
@@ -261,31 +277,41 @@ def _author_breath(ed, owner_out, exec_ins):
     return exits
 
 
-# ─── A footfall in a bush ────────────────────────────────────────────────────
+# ─── Going through a bush ────────────────────────────────────────────────────
 #
 # Whoever wears the footstep component, the player or a wanderer, rustles as
-# they walk through a bush. A bush has no collision (it is walked through), so
-# nothing overlaps it: the footfall asks the bushes themselves.
+# they go through a bush. A bush has no collision (it is walked through), so
+# nothing overlaps it: the walker asks the bushes themselves.
 #
 #     [BeginPlay] every actor tagged as a grass cell -> its instanced mesh
 #                 component -> Bushes, if its mesh is one of BushMeshes
-#     [a footfall] InBush = some component of Bushes has an instance whose
+#     [every RustleStrideCm of ground covered: RUSTLE_STRIDE_CM]
+#                 InBush = some component of Bushes has an instance whose
 #                 bounds reach within RUSTLE_REACH_CM of the walker
 #                 -> one of RustleSounds there, at StepVolume
 #
+# The rustle has a measure of its own (RustleTravelled), half a footfall's
+# stride. Asked only at a footfall, a bush crossed was one rustle, played in
+# the same instant as the step: a wanderer's heavier step covered it, and a
+# zombie was not heard to go through a bush at all. On its own measure a bush
+# crossed is two or three, most of them between two steps.
+#
 # The bush cells carry the grass cells' tag and no other, so the mesh tells
 # them apart (the level needs no regenerating for this). The walk over Bushes
-# is per footfall, not per frame: 2 components on the 200 m map, 200 on the
-# 1 km one.
+# is per RUSTLE_STRIDE_CM, not per frame: 2 components on the 200 m map, 200
+# on the 1 km one.
 
+RUSTLE_STRIDE_CM = 80.0
 RUSTLE_REACH_CM = 30.0
 ISM_CLASS = "/Script/Engine.InstancedStaticMeshComponent"
 
 
 def rustle_defaults():
-    """{BushMeshes: the bush meshes, loaded}; one never built is left out."""
+    """{BushMeshes: the bush meshes, loaded (one never built is left out),
+    RustleStrideCm: the rustle's measure}."""
     eas = _assets()
-    return {FV.BushMeshes: [eas.load_asset(s.mesh_path) for s in DEFAULT_BUSH_SPECS
+    return {FV.RustleStrideCm: RUSTLE_STRIDE_CM,
+            FV.BushMeshes: [eas.load_asset(s.mesh_path) for s in DEFAULT_BUSH_SPECS
                             if eas.does_asset_exist(s.mesh_path)]}
 
 
@@ -311,13 +337,21 @@ def _author_find_bushes(ed, exec_in):
     return done
 
 
-def _author_rustle(ed, at_pin, volume_pin, exec_in):
-    """A footfall at ``at_pin``: inside a bush, one of RustleSounds there, at
+def _author_rustle(ed, at_pin, volume_pin, moved_pin, exec_in):
+    """``moved_pin`` of ground covered this frame by a walker at ``at_pin``:
+    every RustleStrideCm of it, inside a bush, one of RustleSounds there, at
     ``volume_pin``. Returns the exits."""
     g = _G(ed)
+    # Stored, then read: the sum is pure and would be taken again off the new
+    # RustleTravelled on a second read.
+    gone = g.put(FV.RustleTravelled, op(g, FN_ADD_FF, g.get(FV.RustleTravelled), moved_pin),
+                 [exec_in])
+    far = op(g, FN_GE_FF, g.get(FV.RustleTravelled), g.get(FV.RustleStrideCm))
+    due, not_yet = g.branch(far, [gone])
+    left = g.call(FN_SUB_FF, A=g.get(FV.RustleTravelled), B=g.get(FV.RustleStrideCm))
     out_of = g.keep(ed.add_set_member_variable_node(FV.InBush))
     _set(out_of, FV.InBush, False)
-    _connect(exec_in, _pin(out_of, "execute"))
+    _connect(g.put(FV.RustleTravelled, out(left), [due]), _pin(out_of, "execute"))
     bush, _index, body, done = for_each(g, g.get(FV.Bushes), [then(out_of)])
     near = g.call(FN_INSTANCES_IN_SPHERE, self=bush, Center=at_pin)
     _set(near, "Radius", RUSTLE_REACH_CM)
@@ -335,11 +369,12 @@ def _author_rustle(ed, at_pin, volume_pin, exec_in):
     brushed, open_ground = g.branch(g.get(FV.InBush), [done])
     made, heard = _author_random_sound(ed, FV.RustleSounds, at_pin, brushed, volume_pin=volume_pin)
     ed.add_comment_to_nodes(
-        f"A footfall inside a bush rustles: some component of Bushes has an instance "
-        f"within {RUSTLE_REACH_CM:g} cm of the walker (a bush has no collision, so its "
-        "instances' bounds are asked), and one of RustleSounds plays there, at StepVolume.",
+        f"Going through a bush rustles: every {RUSTLE_STRIDE_CM:g} cm of ground covered, "
+        f"some component of Bushes has an instance within {RUSTLE_REACH_CM:g} cm of the "
+        "walker (a bush has no collision, so its instances' bounds are asked), and one of "
+        "RustleSounds plays there, at StepVolume.",
         g.made + made)
-    return (heard, open_ground)
+    return (heard, open_ground, not_yet)
 
 
 # ─── The forest's own sound ──────────────────────────────────────────────────

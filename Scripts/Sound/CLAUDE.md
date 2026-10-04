@@ -156,18 +156,26 @@
   - The breath: `SprintSpent`, which is the run key held with `Stamina` run out
     (`sprint.py`'s latch), every `BREATH_S`. No key can be injected into a headless
     game, so only the verifier covers it (`verify/sound_states.py`).
-- **A footfall inside a bush rustles** (`sound_world.py`, on `BP_FootstepComponent`, so the
+- **Going through a bush rustles** (`sound_world.py`, on `BP_FootstepComponent`, so the
   player's and every wanderer's). A bush has no collision, so nothing overlaps it: at
   BeginPlay the component collects the level's bush components (`Bushes`: of the actors
   tagged as grass cells, the instanced components whose mesh is one of `BushMeshes`), and
-  each footfall asks them for an instance whose bounds come within 30 cm of the walker
-  (`GetInstancesOverlappingSphere`). The level is not changed for it. The walk is per
-  footfall, over 8 components on the 200 m map and about 200 on the 1 km one.
-  `probes/probe_state_sounds.py` walks the player through a bush.
+  every `RustleStrideCm` of ground covered (`RUSTLE_STRIDE_CM`, 80 cm: half a footfall's
+  stride, measured by `RustleTravelled`) it asks them for an instance whose bounds come
+  within 30 cm of the walker (`GetInstancesOverlappingSphere`). The level is not changed
+  for it. The walk is over 8 components on the 200 m map and about 200 on the 1 km one.
+  - **Why a measure of its own:** asked only at a footfall, a bush crossed was one rustle,
+    in the same instant as the step and at a footstep's range; a zombie's heavier step
+    covered it and it was not heard to go through a bush. Now a bush crossed is two or
+    three rustles, and they carry on `A_Att_Rustle` (below).
+  - `probes/probe_state_sounds.py` walks the player, and a zombie, out of a bush.
+  - **Feel check (needs a play session):** whether a zombie in a bush 10-20 m off is heard,
+    and whether the player's own rustle (the same takes, twice as often) is too much; the
+    SOUND SETTINGS tab's bush rustle row is its volume.
 - **Where each sound fires:**
   - The dry click fires on the ready gate's False arm when `empty AND cooled AND tapped`.
   - The reload clack fires only on the reload's True arm.
-- **Attenuation:** seven `USoundAttenuation` assets in `/Game/Audio`, all spherical, and
+- **Attenuation:** eight `USoundAttenuation` assets in `/Game/Audio`, all spherical, and
   `NATURAL_SOUND` but for the four whose reach is set in metres, which are straight
   lines (the axe's chop and a melee hit are `A_Att_Creature`; the player's voice, a swing, a
   match and the campfire are foley):
@@ -190,6 +198,9 @@
   - `A_Att_Footstep`: **linear**, full to 2 m, silent at 20 m. Every footstep, the player's
     and the wanderers' (the player's own are at the listener, so only others' are shaped
     by it). On the foley curve a wanderer running up was not heard coming;
+  - `A_Att_Rustle`: **linear**, full to 5 m, silent at **`RUSTLE_HEARD_CM`**
+    (`sound_world.py`, 30 m): the config for how far off a bush is heard to rustle,
+    whoever goes through it. To change it: the number, then `build_sound.py`;
   - `A_Att_Foley`: 1 → 15 m.
 - **A sound with no attenuation plays at full volume from anywhere.** `apply_attenuation()` sets
   it **on the asset**, sweeps both audio folders, and raises on a wave with no profile.

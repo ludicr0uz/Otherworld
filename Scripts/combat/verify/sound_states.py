@@ -18,7 +18,7 @@ from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
 from forest_generator.grass_cells import GRASS_TAG
 from Sound.sound_items import HANDLE_ITEM, ITEM_HANDLING, ITEM_USE
 from Sound.sound_world import (
-    BREATH_S, GRASS_RUSTLE, HEARTBEAT_S, LOW_HEALTH_FRACTION, RUSTLE_REACH_CM)
+    BREATH_S, GRASS_RUSTLE, HEARTBEAT_S, LOW_HEALTH_FRACTION, RUSTLE_REACH_CM, RUSTLE_STRIDE_CM)
 from survival.paths import CANTEEN_BP_PATH, MUSHROOM_BP_PATH
 
 
@@ -85,9 +85,23 @@ def check_rustle():
               t for g in _feeders(adds[0], "execute") for t in _reads(g)},
           f"{len(finds)} find(s), {len(adds)} add(s)")
     asks = by_pins(fg, "Center", "Radius")
-    check(f"a footfall asks each for an instance within {RUSTLE_REACH_CM:g} cm of the walker",
+    check(f"a walker asks each for an instance within {RUSTLE_REACH_CM:g} cm of them",
           len(asks) == 1 and num_pin(asks[0], "Radius") == RUSTLE_REACH_CM,
           f"{len(asks)} overlap node(s)")
+    # The rustle's own measure: a bush crossed is more than the one footfall's.
+    stride = f.get_editor_property(FV.RustleStrideCm)
+    check(f"...every {RUSTLE_STRIDE_CM:g} cm of ground covered (RustleStrideCm), "
+          "under a footfall's stride",
+          isinstance(stride, float) and stride == RUSTLE_STRIDE_CM
+          and stride < f.get_editor_property(FV.StrideCm), str(stride))
+    spent = [n for n in fg if _title(n) == f"Set {FV.RustleTravelled}"]
+    gates = [n for n in fg if _title(n) == "Branch" and {
+        f"Get {FV.RustleTravelled}", f"Get {FV.RustleStrideCm}"} <= _reads(n)]
+    check("...measured by RustleTravelled: added to each frame on the ground, and the "
+          "stride taken off it behind the one Branch that compares the two",
+          len(spent) == 2 and len(gates) == 1
+          and sum(gates[0] in _feeders(n, "execute") for n in spent) == 1,
+          f"{len(spent)} write(s), {len(gates)} gate(s)")
     rustles = _plays_of(fg, FV.RustleSounds)
     marks = [n for n in fg if _title(n) == f"Set {FV.InBush}"]
     check("...and, inside one, plays one of RustleSounds: InBush is lowered before the "

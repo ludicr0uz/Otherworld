@@ -16,7 +16,7 @@ from Sound.sound_monsters import (
     ROAR_REACH_X_AGGRO, WENDIGO_ROAR,
     ZOMBIE_AGGRO, ZOMBIE_ATTACK, ZOMBIE_GROWL)
 from Sound.sound_weapons import RETIRED_SOUNDS
-from Sound.sound_world import FOOTSTEPS
+from Sound.sound_world import ATT_RUSTLE, FOOTSTEPS, GRASS_RUSTLE, RUSTLE_HEARD_CM
 from Sound.waves import SOUND_SRC_DIR
 from combat.paths import AUDIO_DIR, HEALTH_BP_PATH, WEAPON_COMP_BP_PATH
 from combat.tuning import AUTO_DISPLAYS
@@ -108,7 +108,7 @@ def check_distance_and_direction():
 
     _ATT_OK = {p.name: p for p in ATTENUATIONS}
     check("there is a small named set of attenuation profiles, not one per sound",
-          1 <= len(ATTENUATIONS) <= 7, str(sorted(_ATT_OK)))
+          1 <= len(ATTENUATIONS) <= 8, str(sorted(_ATT_OK)))
 
     for profile in ATTENUATIONS:
         att = load(profile.path)
@@ -181,11 +181,11 @@ def check_distance_and_direction():
     # the aggro range it is still at a fair part of full volume. (The natural
     # curve had it near -34 dB.)
     _at_aggro = 1.0 - max(0.0, _aggro - ATT_ROAR.radius_cm) / ATT_ROAR.falloff_cm
-    check("the linear profiles are the roar's, a footstep's and a creature's two voices', "
+    check("the linear profiles are the roar's, a footstep's, a bush's and a creature's two voices', "
           "and at the edge of the aggro range the roar is still over a third of full volume",
           {p.name for p in ATTENUATIONS if p.linear}
           == {ATT_ROAR.name, ATT_FOOTSTEP.name, ATT_VOICE.name,
-              ATT_PATROL_VOICE.name} and _at_aggro > 1 / 3,
+              ATT_PATROL_VOICE.name, ATT_RUSTLE.name} and _at_aggro > 1 / 3,
           f"{_at_aggro:.2f} of full volume at {_aggro / 100.0:g} m")
     check(f"a wendigo's roar carries {ROAR_REACH_X_AGGRO:g}x its aggro range "
           f"({_aggro / 100.0:g} m)",
@@ -220,6 +220,17 @@ def check_distance_and_direction():
                                for n in MONSTER_FOOTSTEPS.names)
           and not set(MONSTER_FOOTSTEPS.names) & set(FOOTSTEPS.names),
           f"{_at_8m:.2f} at 8 m")
+    # A bush gone through is heard from further than the step that is in it,
+    # whoever goes through it: at 10 m a footstep is under half, and this over.
+    _rustle_10m = 1.0 - (1000.0 - ATT_RUSTLE.radius_cm) / ATT_RUSTLE.falloff_cm
+    check(f"a bush's rustle is heard from {RUSTLE_HEARD_CM / 100.0:g} m (RUSTLE_HEARD_CM), "
+          "further than a footstep, on a profile of its own, and 10 m off is still "
+          "over three quarters of full volume",
+          abs(ATT_RUSTLE.audible_cm - RUSTLE_HEARD_CM) < 1e-3
+          and ATT_RUSTLE.audible_cm > ATT_FOOTSTEP.audible_cm and _rustle_10m > 0.75
+          and GRASS_RUSTLE.names
+          and all(SOUND_ATTENUATION[n] is ATT_RUSTLE for n in GRASS_RUSTLE.names),
+          f"{_rustle_10m:.2f} at 10 m, {len(GRASS_RUSTLE.names)} take(s)")
 
     # THE SWEEP THAT MAKES "NOTHING WAS MISSED" TRUE. It walks the two audio
     # folders on disk rather than SOUND_NAMES + CREATURE_SOUND_NAMES, so a

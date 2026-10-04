@@ -45,6 +45,23 @@ WANTED = {
         r"Various Gun Foley & Handling/",
         r"12 Gauge Shotgun/(Shell Load|Shotgun_Quick Pump)",
     ),
+    # Gunshots, for the five guns: Pole Position's are each recorded close
+    # and from tens of metres off, which is the pair distant gunfire wants.
+    "gunshots": (
+        r"Pole Position Production - (SPAS-12|Saiga-12|USAS-12) 12g solid slug/",
+        r"Pole Position Production - (Sig P229|Glock 18c|Beretta 93R) ?(9mm)?/",
+        r"Pole Position Production - (Ingram M10|Mini Uzi|Uzi) 9mm/",
+        r"Pole Position Production - (AKM 7.62x39mm|Remington 700 7.62x51mm)/",
+        r"Pole Position Production - De Lisle Carbine",
+        r"Pole Position Production - Smith & Wesson M29",
+        r"Pole Position Production -  Heckler & Koch (MP5 9mm|VP70 9mm|G36C|HK416)",
+        r"Pole Position Production - Heckler & Koch G36C 5.56mm/",
+        r"TS Sound - 12 Gauge Shotgun/Shotgun_Fire",
+        r"London Warehouse Firearms Library/.*(Colt_M1911|Remington_870|H&K_416)",
+        r"Gamemaster Audio -  Gun Sound Pack/gun_(revolver|rifle_sniper|submachine)",
+        r"Outdoor Gun Acoustics Library/(AK47|MP5)",
+        r"Silenced Gun Sounds/gun_silenced_sniper",
+    ),
     "tension": (
         r"Cinematic Tension Sound Effects/", r"Drone Collection/Drone_(Dungeon|Evolving|Horror)",
         r"SoundMorph - TENSION/Tension - (low|warbley)", r"Subtext Drone Library Vol. 1/Drone, Dark",

@@ -148,7 +148,15 @@ def check_knife_loadout():
 def check_knife_press():
     melee = [n for n in wg if _title(n) == "Branch"
              and any(MELEE_VAR in out_pins(f) for f in _feeders(n, "Condition"))]
-    check("one Branch asks Held.Melee", len(melee) == 1, str(len(melee)))
+    # Two ask: the fire gate, and the throw, which picks a blade's sound or a
+    # blunt thing's as the item is put at its start (throw.py). The gate is
+    # the one that does not come after that move.
+    thrown = [n for n in melee
+              if any("NewLocation" in in_pins(f) for f in _feeders(n, "execute"))]
+    melee = [n for n in melee if n not in thrown]
+    check("one Branch asks Held.Melee at the fire gate, and one where a throw "
+          "picks its sound", len(melee) == 1 and len(thrown) == 1,
+          f"{len(melee)} + {len(thrown)}")
     if len(melee) != 1:
         return
     gate = melee[0]

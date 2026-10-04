@@ -80,7 +80,8 @@ GFX_TAB = TuneTab(
     hint_text="LEFT / RIGHT or click  change   ·   Custom is remembered",
     saved_words="default saved to Scripts/graphics_menu/graphics_tuning.csv",
     fraction_digits=2, maxs_var=GFX_TUNE_MAXS_VAR, label_w=280.0, panel_w=440.0,
-    title_font=GFX_TITLE_FONT, visible_rows=GFX_VISIBLE_ROWS, corner=True)
+    title_font=GFX_TITLE_FONT, visible_rows=GFX_VISIBLE_ROWS, corner=True,
+    kept=False)   # its own save, of the Custom row alone: gfx_save.py
 
 assert len(PRESET_LABELS) == 4
 

@@ -52,10 +52,15 @@ SOUND_STATS = (
     ("player_death", "player death", asset_names("player_death"), 1.0),
     ("match", "match", asset_names("match"), 1.0),
     ("campfire", "campfire", asset_names("campfire"), 1.0),
+    ("blade_hit", "blade hit", asset_names("blade_hit"), 1.0),
+    ("blade_lodge", "thrown blade in a body", asset_names("blade_lodge"), 1.0),
+    ("throw", "throw", asset_names("throw"), 1.0),
+    ("throw_sharp", "blade throw", asset_names("throw_sharp"), 1.0),
     # The beds (combat/audio.py, BED_NAMES): under everything else.
     ("ambience_day", "day birds", asset_names("ambience_day"), 0.7),
     ("ambience_night", "night", asset_names("ambience_night"), 0.7),
-    ("ambience_wind", "wind", asset_names("ambience_wind"), 0.5),
+    # Silent until a better wind is found: the bed plays, at nothing.
+    ("ambience_wind", "wind", asset_names("ambience_wind"), 0.0),
 )
 SAVED_COLUMNS = tuple(s[0] for s in SOUND_STATS)
 

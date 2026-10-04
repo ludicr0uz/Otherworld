@@ -41,7 +41,11 @@ RATINGS = (
     # It carries a note saying what it would be good for.
     ("reuse", "Good, other use", "\u21aa", "6"),
 )
-NOTED = "reuse"   # the rating that shows the note box
+# The ratings that show the note box: a take that was liked can say why, or
+# what for. NOTE_FIRST is the one whose click puts the cursor in the box,
+# because its note is the point of it; on the others the box is only there.
+NOTED = ("great", "ok", "reuse")
+NOTE_FIRST = "reuse"
 
 # Beds are judged looping; everything else is a one-shot.
 LOOPED = ("ambience", "fire")
@@ -150,6 +154,7 @@ section h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em;
 .rate button[data-r=reuse] { border-left:1px solid var(--line); }
 .take .note { display:none; font:inherit; font-size:12px; width:150px; padding:4px 7px; border:0;
        border-left:1px solid var(--line); background:transparent; color:var(--ink); }
+.take[data-rating=great] .note, .take[data-rating=ok] .note,
 .take[data-rating=reuse] .note { display:block; }
 .take[data-rating] { border-color:var(--c); box-shadow:inset 3px 0 0 var(--c); }
 .rate button.on { opacity:1; background:var(--c); color:#fff; font-weight:700; }
@@ -231,7 +236,8 @@ try {   // the stars this page had before it had ratings
     if (!(id in ratings)) ratings[id] = 'great';
   }
 } catch (e) {}
-// What a "good, other use" take would be good for, by take id.
+// A liked take's note, by take id: why, or what for. Kept when the rating
+// changes, so a note is not lost to a slip of the finger.
 const NOTES_KEY = 'otherworld-sound-notes';
 let notes = {};
 try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch (e) {}
@@ -255,7 +261,7 @@ function report() {
   for (const {key, label} of RATINGS) {
     const ids = takes.map(t => t.dataset.id).filter(id => ratings[id] === key);
     rated += ids.length;
-    const line = id => '  ' + id + (key === NOTED && notes[id] ? '  -- ' + notes[id] : '');
+    const line = id => '  ' + id + (NOTED.includes(key) && notes[id] ? '  -- ' + notes[id] : '');
     if (ids.length) lines.push(label + ' (' + ids.length + ')', ...ids.map(line), '');
   }
   ratedBox.value = lines.join('\\n').trimEnd();
@@ -273,7 +279,7 @@ takes.forEach(take => {
     b.addEventListener('click', () => {
       focus(take);
       rate(take, b.dataset.r);
-      if (b.dataset.r === NOTED && ratings[take.dataset.id] === NOTED) note.focus();
+      if (b.dataset.r === NOTE_FIRST && ratings[take.dataset.id] === NOTE_FIRST) note.focus();
     }));
   const note = take.querySelector('.note');
   note.value = notes[take.dataset.id] || '';
@@ -342,8 +348,8 @@ def _take_html(take, looped):
         f'<button class="play" title="{e(take["name"])}">&#9654; {e(_take_label(take))}'
         f'<small>{take["seconds"]:.1f}s{stereo}</small></button>'
         f'<span class="rate">{_RATE_BUTTONS}</span>'
-        f'<input class="note" type="text" placeholder="good for\u2026" '
-        f'title="What this sound would be good for"></span>')
+        f'<input class="note" type="text" placeholder="note\u2026" '
+        f'title="A note on this take: why it is good, or what for"></span>')
 
 
 _RATE_BUTTONS = "".join(
@@ -398,7 +404,7 @@ def render(groups):
   </div>
   <nav data-in="all">{"".join(nav)}<a href="#picks">ratings</a></nav>
   <div class="hint" data-in="all">Rate the last take played with <kbd>5</kbd> great, <kbd>4</kbd> ok,
-    <kbd>3</kbd> neutral, <kbd>2</kbd> bad, <kbd>1</kbd> very bad, <kbd>6</kbd> good but for another use (with a note), <kbd>0</kbd> clear.
+    <kbd>3</kbd> neutral, <kbd>2</kbd> bad, <kbd>1</kbd> very bad, <kbd>6</kbd> good but for another use. A take rated great, ok or other-use has a note box, <kbd>0</kbd> clear.
     <kbd>Space</kbd> stops.</div>
 </header>
 <main data-in="selected">{selected_html}</main>
@@ -413,6 +419,7 @@ def render(groups):
 </main>
 <script>const RATINGS = {ratings_js};
 const NOTED = {json.dumps(NOTED)};
+const NOTE_FIRST = {json.dumps(NOTE_FIRST)};
 {_SCRIPT}</script>
 </body></html>
 """

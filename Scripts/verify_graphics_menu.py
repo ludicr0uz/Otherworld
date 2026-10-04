@@ -31,20 +31,16 @@ from graphics_menu.dev_guns_checks import check_dev_guns
 from graphics_menu import loot_consts as LC
 from graphics_menu import wear_consts as WEAR
 from graphics_menu import tune_tab as TT
-from graphics_menu import monster_tune_consts as MC
 from graphics_menu.loot_checks import check_loot
 from graphics_menu.wear_checks import check_wear
 from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
-from graphics_menu import player_tune_consts as PTC
 from graphics_menu.player_tune_checks import check_player_tune
-from graphics_menu import sound_tune_consts as STC
 from graphics_menu.sound_tune_checks import check_sound_tune
-from graphics_menu import world_tune_consts as WC
 from graphics_menu.world_tune_checks import check_world_tune
 from graphics_menu.gfx_checks import check_gfx_tune
-from graphics_menu.gfx_save_checks import check_gfx_save
-from graphics_menu.gfx_tune_consts import GFX_SAVE_SLOT
+from graphics_menu.tune_keep_checks import check_kept
+from graphics_menu.tune_keep_consts import KEPT_SLOTS, KEPT_TABS
 from graphics_menu.gfx_tuner_checks import check_gfx_tuner
 from graphics_menu import cursor_consts as CC
 from graphics_menu.cursor_checks import check_cursor
@@ -664,9 +660,9 @@ def main():
           len(set(pool)) == len(pool))
 
     # --- the save itself
-    # The profile's slot is check_profile's business, the graphics save's
-    # check_gfx_save's.
-    other_slots = (PC.PROFILE_SLOT, GFX_SAVE_SLOT)
+    # The profile's slot is check_profile's business, the tabs' saves'
+    # check_kept's.
+    other_slots = (PC.PROFILE_SLOT, *KEPT_SLOTS)
     slots = [n for n in by_pins("SlotName")
              if BEL.find_input_pin(n, "SlotName").get_pin_value() not in other_slots]
     check("the settings are read and written through a named save slot",
@@ -725,13 +721,11 @@ def main():
               str(sum(1 for t in titles if t == f"Set {slider.var}")))
     # Literal indices only: the settings page's own Array_Get and Array_Set
     # take theirs from the loop and from MenuRow, and those are not the push.
-    # Nor are the monster, world, player and sound tuning tabs' cells (literal,
-    # off MonTuneValues, WorldTuneValues, PlayerTuneValues and SoundTuneValues).
+    # Nor are the kept tuning tabs' cells (literal, off each one's table and
+    # the built copy of it: MonTuneValues, WorldTuneValuesBuilt and the rest).
     reads = [n for n in by_pins("TargetArray", "Index")
              if not BEL.find_input_pin(n, "Index").list_connected_pins()
-             and not {f"Get {MC.MON_TUNE_VALUES_VAR}", f"Get {WC.WORLD_TUNE_VALUES_VAR}",
-                      f"Get {PTC.PLAYER_TUNE_VALUES_VAR}",
-                      f"Get {STC.SOUND_TUNE_VALUES_VAR}"} & {
+             and not {f"Get {v}" for t in KEPT_TABS for v in (t.values_var, t.built_var)} & {
                  str(BEL.get_node_title(PIN.get_owning_node(q)))
                  for q in BEL.find_input_pin(n, "TargetArray").list_connected_pins()}]
     check("...read out of Binds by index, one per action",
@@ -854,7 +848,7 @@ def main():
     check_player_tune(check, bp, nodes)
     check_sound_tune(check, bp, nodes)
     check_gfx_tune(check, bp, nodes)
-    check_gfx_save(check, nodes)
+    check_kept(check, bp, nodes)
     check_gfx_tuner(check)
     check_cursor(check, bp, nodes)
     check_pause_menu(check, bp, nodes)

@@ -28,6 +28,10 @@ A tab with a save_widget (GRAPHICS SETTINGS's SAVE DEFAULT) has a row for the
 save instead, between the list and BACK: Enter saves only with the caret on
 it, as does a click on it, and Enter on a number does nothing.
 
+Every tab's table but GRAPHICS SETTINGS' is kept between sessions in a save
+slot of its own (kept, keep_slot, built_var: tune_keep.py), which is what a
+build without the Python plugin has in place of the CSV.
+
 Constants only.
 """
 
@@ -83,11 +87,29 @@ class TuneTab:
     # "" = Enter anywhere in the list saves (and a click on the hint).
     save_widget: str = ""
     save_label: str = ""
+    # The table persists between sessions through tune_keep.py: loaded over
+    # the built one at BeginPlay, saved on every nudge. False = the tab has a
+    # save of its own (GRAPHICS SETTINGS: gfx_save.py).
+    kept: bool = True
+    # Cells of values_var that are the session's alone and never read back
+    # from a save (WORLD SETTINGS' hour: the live clock).
+    unkept_cells: tuple = ()
 
     @property
     def row_count(self):
         """The rows of the list: the subject, then one per stat."""
         return 1 + self.stat_count
+
+    @property
+    def keep_slot(self):
+        """The save slot a kept tab's table lives in."""
+        return f"OtherworldTune_{self.action}"
+
+    @property
+    def built_var(self):
+        """The HUD's copy of the built table, which a nudge never moves: what
+        a save was made over (tune_keep.py)."""
+        return f"{self.values_var}Built"
 
     @property
     def save_row(self):

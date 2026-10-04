@@ -152,6 +152,13 @@ Input, settings and state
   sound_tune_save      run in the game by the save: the volumes into
                   combat/sound_tuning.csv
 
+What the tabs keep between sessions
+  tune_keep_consts     BP_TuneSave's path and fields, the kept tabs and
+                  their slots
+  tune_keep            BP_TuneSave; BeginPlay's load of every kept tab's slot
+                  over its built table, and the save a nudge makes
+                  (also runs gfx_save's load and build)
+
 Graphics: what a preset is, the tab that tunes it, the component that applies it
   gfx_stats            the graphics table: each stat's label, unit (percent,
                   metres), step, limits, per-preset defaults and how it is
@@ -210,6 +217,8 @@ verify_graphics_menu.py's checks, beside it because it is over budget
   gfx_checks         the graphics tuning tab: table, units, CSV, panel (corner,
                      title), the M panel's title, the hand-over to the tuner
   gfx_tuner_checks   BP_GraphicsTuner: each stat reaching what it names
+  tune_keep_checks   BP_TuneSave, each kept tab's load and save in the HUD
+                     graph, then gfx_save_checks
   gfx_save_checks    BP_GraphicsSave, its load and save in the HUD graph, the
                      CSV's default preset, the graphics tab's SAVE DEFAULT row
 """

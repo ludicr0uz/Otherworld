@@ -4,6 +4,10 @@ dev-team itself is the thin CLI (argument parsing and the per-task loop):
 
   tasks       the task file: parsing items and their effort:/model: hints, ticking,
               and the queue when the file is read again after each task
+  work        one task from start to finish: session, gate, write-up; pausing it
+              and resuming it
+  pause       the typed ``pause``: listening for it, the WIP branch, the session
+              backup, the record ``dev-team resume`` reads
   session     one headless ``claude -p`` session: prompt, command, env, live output
   triage      one Haiku call before the run marks the small, obvious tasks low effort
   fast        fast mode for a task while the five-hour session limit is under half used

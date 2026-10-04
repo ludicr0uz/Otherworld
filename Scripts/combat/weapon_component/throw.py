@@ -57,6 +57,9 @@ from combat.weapon_component.throw_flight import (
     THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
     THROW_VELOCITY_VAR, _author_square, _author_throw_flight,
 )
+from combat import item_vars as IV
+from combat.weapon_component.common import _prop
+from combat.weapon_component.sounds import _author_sound
 from combat.weapon_component.throw_launch import _author_launch
 from combat.weapon_component.throw_ready import (
     _author_ready_down, _author_throw_ready,
@@ -295,7 +298,19 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     _connect(held, _pin(put, "self"))
     _connect(start, _pin(put, "NewLocation"))
     _connect(then(shown), _pin(put, "execute"))
-    squared = _author_square(ed, held, then(put))
+    # The air it goes through, heard from where it left the hand: a blade
+    # cuts it, anything else pushes it aside.
+    melee, _melee_n = _prop(ed, IV.Melee, held)
+    blade = ed.add_branch_node()
+    _connect(melee, _pin(blade, "Condition"))
+    _connect(then(put), _pin(blade, "execute"))
+    sharp = _author_sound(ed, WV.ThrowSharpSounds, start, then(blade))
+    blunt = _author_sound(ed, WV.ThrowSounds, start, else_(blade))
+    joined = ed.add_branch_node()
+    _set(joined, "Condition", True)
+    for pin in (sharp, blunt):
+        _connect(pin, _pin(joined, "execute"))
+    squared = _author_square(ed, held, then(joined))
 
     inv = ed.add_get_member_variable_node(WV.Inventory)
     idx = ed.add_get_member_variable_node(WV.EquippedIndex)

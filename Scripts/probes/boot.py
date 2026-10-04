@@ -30,7 +30,9 @@ import traceback
 import unreal
 
 from combat.slot_tuning import SLOT_REQUEST_VAR
+from graphics_menu.tune_keep_consts import TUNE_SAVE_SLOTS
 
+from probes import kept_slots
 from probes.context import Probe
 from probes.runner import DEFAULT_TIMEOUT, Ledger, ProbeRun, Queue
 
@@ -117,8 +119,24 @@ def _write_results(results, setup_errors):
         os.replace(tmp, path)
 
 
+def _save_dir():
+    return os.path.join(unreal.Paths.project_saved_dir(), "SaveGames")
+
+
+def _hermetic(fn, probe):
+    """The probe, and then nothing of its nudges left in the tabs' slots."""
+    try:
+        result = fn(probe)
+        if hasattr(result, "send"):      # a plain function ran already
+            yield from result
+    finally:
+        kept_slots.clear(_save_dir(), TUNE_SAVE_SLOTS)
+
+
 def _finish(setup_errors):
     queue = _state["queue"]
+    # Before the results: uepy.py kills the game as soon as they appear.
+    kept_slots.put_back(_save_dir(), TUNE_SAVE_SLOTS)
     _write_results(queue.results() if queue else [], setup_errors)
     _state["phase"] = "done"
     if _state["handle"] is not None:
@@ -156,11 +174,14 @@ def start():
     timeout = float(os.environ.get("UEPY_PROBE_TIMEOUT") or DEFAULT_TIMEOUT)
     game_time = _game_time(map_path)
 
+    # The developer's own tuning (graphics_menu/tune_keep.py) is not the
+    # build's: every probe starts from the built tables.
+    kept_slots.set_aside(_save_dir(), TUNE_SAVE_SLOTS)
     loaded = load_probes(paths)
     runs = []
     for ledger, fn, _writable in loaded:
         probe = Probe(ledger, map_path, game_time)
-        factory = (lambda fn=fn, probe=probe: fn(probe)) if fn else (lambda: None)
+        factory = (lambda fn=fn, probe=probe: _hermetic(fn, probe)) if fn else (lambda: None)
         runs.append(ProbeRun(ledger, factory, game_time, time.time, timeout))
     _state["queue"] = Queue(runs)
     _state["since"] = time.time()

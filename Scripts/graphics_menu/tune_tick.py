@@ -18,7 +18,9 @@ the table written onto every carried gun.
         else                          TuneValues[gun, stat] +/- its step, never
                                       under its minimum (nor over its maximum,
                                       for a tab that has them); TuneTouched,
-                                      NOT TuneSaved. In a tab with a live
+                                      NOT TuneSaved, and the table into the
+                                      tab's save slot (tune_keep.py; not the
+                                      graphics tab's). In a tab with a live
                                       mask, only a cell that is the subject's
                                       own (TuneLive): the others stay
     TuneSaveRequested -> lower it; TuneSaved = ExecutePythonCommand(the save)
@@ -56,6 +58,7 @@ from graphics_menu.tune_consts import (
     GUN_TAB, STAT_COUNT, TUNE_LIVE_VAR, TUNE_TOUCHED_VAR,
     TUNE_VALUES_VAR, TUNE_WEAPONS_VAR,
 )
+from graphics_menu.tune_keep import author_keep_tab
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
 from graphics_menu.tune_tabs import other_open_vars
 from uebp.nodes.actor import FN_GET_COMP, FN_WAS_PRESSED
@@ -88,16 +91,20 @@ def declare_tab_vars(ed, tab):
     for name in filter(None, (tab.values_var, tab.steps_var, tab.mins_var,
                               tab.maxs_var)):
         _declare(ed, name, BEL.get_array_type(_float_type()))
+    if tab.kept:
+        _declare(ed, tab.built_var, BEL.get_array_type(_float_type()))
     if tab.live_var:
         _declare(ed, tab.live_var, BEL.get_array_type(BEL.get_basic_type_by_name("bool")))
     _declare(ed, tab.names_var, BEL.get_array_type(BEL.get_basic_type_by_name("string")))
 
 
 def tab_defaults(tab, names, values, steps, mins):
-    """Shut, untouched, on the first subject, with the built table."""
+    """Shut, untouched, on the first subject, with the built table (and, for
+    a kept tab, a second copy of it that no nudge moves)."""
     return {**{b: False for b in _bools(tab)}, **{i: 0 for i in _ints(tab)},
             tab.values_var: values, tab.names_var: names,
-            tab.steps_var: steps, tab.mins_var: mins}
+            tab.steps_var: steps, tab.mins_var: mins,
+            **({tab.built_var: list(values)} if tab.kept else {})}
 
 
 def declare_tune_vars(ed):
@@ -226,8 +233,10 @@ def _author_nudge(ed, in_execs, made, tab, subjects):
         stays = [dead]
     _connect(stat, _pin(write, "execute"))
     flow = _setter(ed, tab.touched_var, "true", [then(write)], made)
-    flow = _setter(ed, tab.saved_var, "false", [flow], made)
-    lowered = _setter(ed, tab.nudge_var, 0, [flow, picked, *stays], made)
+    flow = [_setter(ed, tab.saved_var, "false", [flow], made)]
+    if tab.kept:
+        flow = author_keep_tab(ed, tab, flow, made)
+    lowered = _setter(ed, tab.nudge_var, 0, [*flow, picked, *stays], made)
     return [lowered, still]
 
 

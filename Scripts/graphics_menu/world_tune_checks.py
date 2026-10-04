@@ -37,6 +37,15 @@ def _feeds(pin):
     return [_title(PIN.get_owning_node(q)) for q in pin.list_connected_pins()]
 
 
+def _from_built(n):
+    """Is this write's Item a cell of the built copy of the table?"""
+    for q in BEL.find_input_pin(n, "Item").list_connected_pins():
+        array = BEL.find_input_pin(PIN.get_owning_node(q), "TargetArray")
+        if array and f"Get {TAB.built_var}" in _feeds(array):
+            return True
+    return False
+
+
 def _check_widgets(check):
     widgets = {name: w for name, (w, _var) in _tree(UC.WBP_PAUSE_MENU).items()}
     box = widgets.get(TAB.rows_box)
@@ -64,8 +73,11 @@ def _check_graph(check, nodes):
           and f"Set {TAB.saved_var}" in _feeds(BEL.find_output_pin(runs[0], "ReturnValue")),
           str(len(runs)))
 
+    # Not the load's: a saved table's hour cell takes the built one back
+    # (tune_keep.py; tune_keep_checks counts that write).
     writes = [n for n in nodes if {"TargetArray", "Index", "Item", "bSizeToFit"} <= _pins(n)
-              and f"Get {TAB.values_var}" in _feeds(BEL.find_input_pin(n, "TargetArray"))]
+              and f"Get {TAB.values_var}" in _feeds(BEL.find_input_pin(n, "TargetArray"))
+              and not _from_built(n)]
     nudged = [n for n in writes
               if any("Max" in t or "Min" in t
                      for t in _feeds(BEL.find_input_pin(n, "Item")))]

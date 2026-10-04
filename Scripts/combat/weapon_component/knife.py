@@ -34,6 +34,7 @@ from combat.weapon_component.punch import (
 from uebp.nodes.math import FN_GE_FF
 from uebp.nodes.system import FN_TIME_SECONDS
 from combat import item_vars as IV
+from combat.weapon_component import vars as WV
 
 KNIFE_ANIM_VAR = "KnifeAnim"
 KNIFE_QUEUED_VAR = "KnifeQueued"
@@ -45,7 +46,7 @@ MELEE_VAR = IV.Melee
 KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,
                NEXT_KNIFE_VAR, KNIFE_DUE_VAR, COMBAT.knife_interval_s,
                COMBAT.knife_impact_s, COMBAT.knife_damage, COMBAT.knife_reach_cm,
-               COMBAT.knife_radius_cm, COMBAT.knife_chest_cm)
+               COMBAT.knife_radius_cm, COMBAT.knife_chest_cm, WV.BladeHitSounds)
 
 
 def _author_knife_press(ed, held, tap, not_melee):

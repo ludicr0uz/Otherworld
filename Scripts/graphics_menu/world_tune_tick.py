@@ -3,7 +3,8 @@
 table onto the level's day/night cycle.
 
     its M panel row taken   WorldTuneOpen = NOT WorldTuneOpen; the other tabs shut
-    WorldTuneOpen, and the level has a BP_DayNightCycle (GetActorOfClass, cast):
+    WorldTuneOpen OR WorldTuneTouched, and the level has a BP_DayNightCycle
+    (GetActorOfClass, cast):
       WorldTuneTouched      DayLengthSeconds, NightLengthSeconds,
                             NightTemperatureDropPerSecond, ItemHighlight
                             := the table's
@@ -14,7 +15,9 @@ The hour row shows the cycle's live clock on a 24-hour dial (sunrise 06:00,
 sunset 18:00, whatever the lengths: world_config.clock_to_hour does the same
 sums). It is read back every Tick the tab is open, so a nudge steps from the
 hour on screen, and the difference from HourSeen is what tells a nudge from
-time passing. Only while open: nothing else moves the table.
+time passing. While open, or once touched: a nudge touches it, and so does a
+table loaded from the player's save (tune_keep.py), which has to reach the
+cycle with the tab shut. Nothing else moves the table.
 """
 
 import unreal
@@ -32,7 +35,7 @@ from world import world_config as cfg
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
 from world.world_tuning import WORLD_MAXS, WORLD_STATS
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_SET
-from uebp.nodes.math import FN_ADD_FF, FN_MAP_CLAMPED, FN_NEQ_FF, FN_PERCENT_FF
+from uebp.nodes.math import FN_ADD_FF, FN_MAP_CLAMPED, FN_NEQ_FF, FN_OR, FN_PERCENT_FF
 from uebp.nodes.palette import NODE_CAST_CYCLE
 from uebp.nodes.system import FN_ACTOR_OF_CLASS
 from world import day_night_vars as DV
@@ -103,7 +106,9 @@ def _set_on(ed, cyc, var, value, in_execs, made):
 def _author_apply(ed, in_execs, made):
     """The table onto the cycle, and its clock back (module docstring).
     Returns the exec tails."""
-    on, shut = _branch(ed, _get(ed, WORLD_TAB.open_var, made), in_execs, made)
+    live = _call(ed, FN_OR, made, A=_get(ed, WORLD_TAB.open_var, made),
+                 B=_get(ed, WORLD_TAB.touched_var, made))
+    on, shut = _branch(ed, out(live), in_execs, made)
     find = _call(ed, FN_ACTOR_OF_CLASS, made)
     _class_literal(find, "ActorClass", DAY_NIGHT_CLASS_PATH)
     _connect(on, _pin(find, "execute"))

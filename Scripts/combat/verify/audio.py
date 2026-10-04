@@ -77,13 +77,15 @@ def check_sound_assets():
         check(f"{name}: a held trigger stacks at most 12 copies of the shot",
               overlap <= 12.0, f"{seconds:.2f}s sample / {sp['interval']:.2f}s "
                                f"interval = {overlap:.1f} overlapping")
-        # ...and the ones that do stack are mixed down for it, or the burst clips.
+        # The automatics' shots are the game's own from 26 September, kept as
+        # they were because they were the ones liked: at full scale. A cut
+        # mixed down to 0.8 for stacking would be a different sound, so the
+        # check is only that the sample itself does not clip.
         with _wave.open(src, "rb") as fh:
             raw = fh.readframes(fh.getnframes())
         peak = max(abs(int.from_bytes(raw[i:i + 2], "little", signed=True))
                    for i in range(0, len(raw), 2)) / 32767.0
-        check(f"{name}: its sample is mixed below full scale, so a burst does not "
-              f"clip", peak < 0.80, f"peak {peak:.2f}")
+        check(f"{name}: its sample is at most full scale", peak <= 1.0, f"peak {peak:.2f}")
 
 
 # ─── Distance and direction ──────────────────────────────────────────────────
@@ -122,9 +124,14 @@ def check_distance_and_direction():
               st.get_editor_property("spatialization_algorithm")
               == unreal.SoundSpatializationAlgorithm.SPATIALIZATION_DEFAULT,
               str(st.get_editor_property("spatialization_algorithm")))
-        check(f"{profile.name}: a natural (dB) falloff curve, not a mixing one",
-              st.get_editor_property("distance_algorithm")
-              == unreal.AttenuationDistanceModel.NATURAL_SOUND,
+        # Every profile but the roar's: that one has to arrive from far off,
+        # and the natural curve is half way to silence, in dB, at half the way.
+        _curve = (unreal.AttenuationDistanceModel.LINEAR if profile.linear
+                  else unreal.AttenuationDistanceModel.NATURAL_SOUND)
+        check(f"{profile.name}: " + ("a straight line from full volume to silence, so it "
+                                     "is heard far off" if profile.linear else
+                                     "a natural (dB) falloff curve, not a mixing one"),
+              st.get_editor_property("distance_algorithm") == _curve,
               str(st.get_editor_property("distance_algorithm")))
         check(f"{profile.name}: a sphere, so it fades the same in every direction",
               st.get_editor_property("attenuation_shape")
@@ -166,6 +173,14 @@ def check_distance_and_direction():
     # not from the profile, so a range saved without a rebuild fails.
     _aggro = monster_specs(ROAR_CREATURE)["vision_range_cm"]
     _want = min(ROAR_REACH_X_AGGRO * _aggro, AUDIBLE_LIMIT_CM)
+    # ...and to be worth hearing there: on its straight line, at the edge of
+    # the aggro range it is still at a fair part of full volume. (The natural
+    # curve had it near -34 dB.)
+    _at_aggro = 1.0 - max(0.0, _aggro - ATT_ROAR.radius_cm) / ATT_ROAR.falloff_cm
+    check("the roar is the one linear profile, and at the edge of the aggro range "
+          "it is still over a third of full volume",
+          [p.name for p in ATTENUATIONS if p.linear] == [ATT_ROAR.name] and _at_aggro > 1 / 3,
+          f"{_at_aggro:.2f} of full volume at {_aggro / 100.0:g} m")
     check(f"a wendigo's roar carries {ROAR_REACH_X_AGGRO:g}x its aggro range "
           f"({_aggro / 100.0:g} m)",
           abs(ATT_ROAR.audible_cm - _want) < 1e-3 and ATT_ROAR.audible_cm >= _aggro

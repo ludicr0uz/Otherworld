@@ -76,6 +76,11 @@ PLAYER_DEATH_NAMES = asset_names("player_death")
 MELEE_SWING_NAMES = asset_names("melee_swing")
 AXE_CHOP_NAMES = asset_names("axe_chop")
 MATCH_NAMES = asset_names("match")
+# A blade on a body, in the hand and thrown, and anything leaving the hand.
+BLADE_HIT_NAMES = asset_names("blade_hit")
+BLADE_LODGE_NAMES = asset_names("blade_lodge")
+THROW_NAMES = asset_names("throw")
+THROW_SHARP_NAMES = asset_names("throw_sharp")
 CAMPFIRE_NAMES = asset_names("campfire")
 LOOPING_NAMES = CAMPFIRE_NAMES
 
@@ -94,7 +99,9 @@ BED_DAY, BED_NIGHT, BED_WIND = (asset_names(key)[0] for key in
 BED_NAMES = (BED_DAY, BED_NIGHT, BED_WIND)
 CREATURE_SOUND_NAMES = (FOOTSTEP_NAMES + MELEE_HIT_NAMES + CREATURE_VOICE_NAMES
                         + PLAYER_HIT_NAMES + PLAYER_DEATH_NAMES + MELEE_SWING_NAMES
-                        + AXE_CHOP_NAMES + MATCH_NAMES + CAMPFIRE_NAMES)
+                        + AXE_CHOP_NAMES + MATCH_NAMES + CAMPFIRE_NAMES
+                        + BLADE_HIT_NAMES + BLADE_LODGE_NAMES + THROW_NAMES
+                        + THROW_SHARP_NAMES)
 
 # ── How far each of them carries ─────────────────────────────────────────────
 #
@@ -147,12 +154,16 @@ class AttenuationProfile:
     gunshots use it: high frequencies are the first thing air eats, which is
     why distant gunfire is a thump rather than a crack, and it is only over
     tens of metres that the effect exists at all.
+
+    ``linear`` swaps the natural curve for a straight line from full volume to
+    silence. Only the roar: see ATT_ROAR.
     """
 
     name: str
     radius_cm: float
     falloff_cm: float
     air_absorption: bool = False
+    linear: bool = False
 
     @property
     def path(self):
@@ -188,8 +199,20 @@ def roar_reach_cm():
                AUDIBLE_LIMIT_CM)
 
 
-ATT_ROAR = AttenuationProfile("A_Att_WendigoRoar", ATT_CREATURE.radius_cm,
-                              roar_reach_cm() - ATT_CREATURE.radius_cm)
+# THE ROAR IS HEARD FAR OFF, so it has a curve of its own. On the natural (dB)
+# curve every other sound uses, a wendigo that saw the player from 35 m roared
+# at about -34 dB: the loudest thing in the forest, and barely there. The
+# curve is steep by design -- it reaches -60 dB at the edge, and is half way
+# there in dB at half the distance -- which suits a noise heard close and is
+# wrong for one whose whole purpose is to arrive from far away.
+#
+# So the roar is at full volume out to ROAR_FULL_CM and falls in a straight
+# line from there to silence at its reach: at 35 m that is about half, -6 dB.
+# Close up it is no louder than the recording (a multiplier never passes 1),
+# so a wendigo that turns on the player at arm's length does not deafen them.
+ROAR_FULL_CM = 1000.0
+ATT_ROAR = AttenuationProfile("A_Att_WendigoRoar", ROAR_FULL_CM,
+                              roar_reach_cm() - ROAR_FULL_CM, linear=True)
 ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY)
 
 # Which sound gets which, and the only table that says so. Every sound in the
@@ -214,8 +237,10 @@ ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY)
 SOUND_ATTENUATION = dict(
     [(n, ATT_GUNFIRE) for n in GUNSHOT_NAMES]
     + [(n, ATT_FOLEY) for n in HANDLING_NAMES + FOOTSTEP_NAMES + PLAYER_HIT_NAMES
-       + PLAYER_DEATH_NAMES + MELEE_SWING_NAMES + MATCH_NAMES + CAMPFIRE_NAMES]
-    + [(n, ATT_CREATURE) for n in MELEE_HIT_NAMES + CREATURE_VOICE_NAMES + AXE_CHOP_NAMES]
+       + PLAYER_DEATH_NAMES + MELEE_SWING_NAMES + MATCH_NAMES + CAMPFIRE_NAMES + THROW_NAMES
+       + THROW_SHARP_NAMES]
+    + [(n, ATT_CREATURE) for n in MELEE_HIT_NAMES + CREATURE_VOICE_NAMES + AXE_CHOP_NAMES
+       + BLADE_HIT_NAMES + BLADE_LODGE_NAMES]
     + [(n, ATT_ROAR) for n in WENDIGO_ROAR_NAMES])
 
 # <project>/assets/generated/sounds -- this file is Scripts/combat/audio.py.
@@ -257,8 +282,10 @@ def build_sound_attenuations():
         at = asset.get_editor_property("attenuation")
         at.set_editor_property("attenuate", True)
         at.set_editor_property("spatialize", True)
-        at.set_editor_property("distance_algorithm",
-                               unreal.AttenuationDistanceModel.NATURAL_SOUND)
+        at.set_editor_property(
+            "distance_algorithm",
+            unreal.AttenuationDistanceModel.LINEAR if profile.linear
+            else unreal.AttenuationDistanceModel.NATURAL_SOUND)
         at.set_editor_property("attenuation_shape",
                                unreal.AttenuationShape.SPHERE)
         # Only X is read for a sphere; Y and Z are the box and capsule extents.
@@ -353,6 +380,15 @@ def import_sounds():
     how = "Scripts/Sound/install_selected_sounds.py"
     groups = ((AUDIO_DIR, SOUND_NAMES), (CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES),
               (BED_DIR, BED_NAMES))
+    # A take dropped from the selection leaves its wave behind, under a name
+    # nothing knows: the attenuation sweep would stop the build on it. Gone
+    # first, so a row can lose a take as easily as it gains one.
+    for folder, names in groups:
+        for ref in eas.list_assets(folder, recursive=False):
+            name = ref.rsplit("/", 1)[-1].split(".")[0]
+            if name not in names and isinstance(eas.load_asset(ref), unreal.SoundWave):
+                eas.delete_asset(f"{folder}/{name}")
+                _log(f"removed {folder}/{name}: no longer a sound of the game")
     for folder, names in groups:
       for name in names:
         dest = f"{folder}/{name}"

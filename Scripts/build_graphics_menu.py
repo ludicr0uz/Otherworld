@@ -68,8 +68,8 @@ from graphics_menu.gfx_tune_consts import GFX_TAB, TUNER_COMPONENT   # noqa: E40
 from graphics_menu.gfx_tune_tick import (                           # noqa: E402
     author_gfx_tune_tick, declare_gfx_tune_vars, gfx_tune_defaults, install_tuner)
 from graphics_menu.gfx_tuner import build_graphics_tuner            # noqa: E402
-from graphics_menu.gfx_save import (                                # noqa: E402
-    author_load_graphics, build_graphics_savegame)
+from graphics_menu.tune_keep import (                               # noqa: E402
+    author_load_kept, build_keep_savegames)
 # The FPS readout, on screen whatever debug mode says; see graphics_menu/fps.py.
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
 # The generated art the canvas layers (the wanderers' bars) still draw with.
@@ -505,8 +505,8 @@ def _author_begin_play(ed, begin_play):
     # preset.
     loaded_tails = _author_load_settings(ed, then(made[-1]))
     loaded_tails = _author_restore_debug(ed, loaded_tails)
-    # The player's own preset and Custom row, over the default set above.
-    loaded_tails = author_load_graphics(ed, loaded_tails)
+    # The player's own preset, Custom row and tuning tables, over the defaults.
+    loaded_tails = author_load_kept(ed, loaded_tails)
 
     # --- open paused, on the menu -------------------------------------------
     # Pausing is what makes the menu a menu. Without it the level is live
@@ -924,7 +924,7 @@ def build_hud_blueprint(rebuild=False):
     # loads create_node_from_name returns None and the error reads like a typo
     # in the node name rather than a missing asset.
     build_profile_savegame()
-    build_graphics_savegame()
+    build_keep_savegames()
     # The tuner component before the HUD that carries it and sets its variables.
     build_graphics_tuner()
     # The screens first: the HUD's variables are typed to their classes, and

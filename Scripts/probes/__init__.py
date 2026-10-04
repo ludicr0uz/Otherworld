@@ -18,5 +18,6 @@ this run only -- nothing on disk changes and no builder has to be re-run.
   runner      the pure driver: advances probe generators on a clock, records checks
   context     Probe, the object a probe is handed: checks plus the game helpers
   boot        in-game entry (init_unreal.py calls it when UEPY_PROBES is set)
+  kept_slots  the tuning tabs' save slots, set aside for a run and put back
   probe_*     the probes themselves, one behaviour each
 """

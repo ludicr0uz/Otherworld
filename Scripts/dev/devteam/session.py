@@ -1,11 +1,14 @@
 """One headless ``claude -p`` session: its prompt, command line, environment,
 and the live one-line-per-step view of what it is doing."""
 
+import contextlib
 import json
 import os
 import re
 import signal
 import subprocess
+
+from devteam.pause import interrupt
 
 FAIL_MARK = "FAILED:"
 FAB_MARK = "FAB-REQUIRED:"
@@ -136,6 +139,25 @@ def build_fix_prompt(problems, table, commit):
                       fail=FAIL_MARK)
 
 
+RESUMED = """\
+dev-team paused this session at the user's request and has now resumed it. \
+While it was paused: the command that was running, if any, was killed part \
+way; the warm editor was stopped; and your uncommitted work was parked in a \
+commit and has been put back as it was, uncommitted{where}. The project may \
+have been built from other code meanwhile, so assets under Content/ are not \
+to be trusted: re-run the builders for what you changed before you believe a \
+verifier or a probe. Then carry on with the task from where you stopped{commit}, \
+and end with the same kind of report; if you cannot complete it, make its \
+first line "{fail} <reason>"."""
+
+
+def build_resumed_prompt(branch, commit):
+    return RESUMED.format(
+        where=f", on the branch {branch}" if branch else "",
+        commit=" and commit on this branch as you would have" if commit else "",
+        fail=FAIL_MARK)
+
+
 def build_cmd(prompt, permission_mode, name=None, model=None, effort=None,
               budget=None, resume=None, fast=False):
     # --strict-mcp-config with no --mcp-config: no MCP servers at all. The
@@ -212,51 +234,65 @@ def fast_note(event):
     return ""
 
 
-def run_session(cmd, root, log_path, env, on_limits=None):
+def run_session(cmd, root, log_path, env, on_limits=None, pauser=None):
     """Run one session, narrating it. Returns (ok, report, result event).
-    ``on_limits`` is handed each rate_limit_info the session streams."""
+    ``on_limits`` is handed each rate_limit_info the session streams. A
+    ``pauser`` (devteam/pause.py) listens for the pause word meanwhile and
+    interrupts the session on it; a session that ends without a result event
+    returns its id alone, which is what resuming it needs."""
     narrator = Narrator(root)
-    result = {}
+    seen = {"result": {}, "session_id": None}
     # A text block is printed only once a tool call follows it: the last one
     # is the final report, which is printed in full after the session.
     pending = []
+
+    def handle(line):
+        try:
+            event = json.loads(line)
+        except ValueError:
+            print(f"    {line.rstrip()}")
+            return
+        if event.get("type") == "system" and event.get("subtype") == "init":
+            seen["session_id"] = event.get("session_id")
+            note_fast = fast_note(event)
+            print(f"    session {event.get('session_id')}"
+                  + (f"  ({note_fast})" if note_fast else ""))
+        elif event.get("type") == "rate_limit_event":
+            if on_limits:
+                on_limits(event.get("rate_limit_info"))
+        elif event.get("type") == "assistant" and not event.get("parent_tool_use_id"):
+            for block in event.get("message", {}).get("content", []):
+                if block.get("type") == "text" and block.get("text", "").strip():
+                    pending.append(block["text"])
+                elif block.get("type") == "tool_use":
+                    for text in pending:
+                        print(f"    » {note(text)}")
+                    pending.clear()
+                    print(f"    · {narrator.describe(block)}")
+        elif event.get("type") == "result":
+            seen["result"] = event
+
     with open(log_path, "a") as log:
         proc = subprocess.Popen(cmd, cwd=root, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, env=env,
                                 stdin=subprocess.DEVNULL, start_new_session=True)
+        watching = pauser.watching if pauser else (lambda on_pause: contextlib.nullcontext())
         try:
-            for line in proc.stdout:
-                log.write(line)
-                log.flush()
-                try:
-                    event = json.loads(line)
-                except ValueError:
-                    print(f"    {line.rstrip()}")
-                    continue
-                if event.get("type") == "system" and event.get("subtype") == "init":
-                    note_fast = fast_note(event)
-                    print(f"    session {event.get('session_id')}"
-                          + (f"  ({note_fast})" if note_fast else ""))
-                elif event.get("type") == "rate_limit_event":
-                    if on_limits:
-                        on_limits(event.get("rate_limit_info"))
-                elif event.get("type") == "assistant" and not event.get("parent_tool_use_id"):
-                    for block in event.get("message", {}).get("content", []):
-                        if block.get("type") == "text" and block.get("text", "").strip():
-                            pending.append(block["text"])
-                        elif block.get("type") == "tool_use":
-                            for text in pending:
-                                print(f"    » {note(text)}")
-                            pending.clear()
-                            print(f"    · {narrator.describe(block)}")
-                elif event.get("type") == "result":
-                    result = event
-            proc.wait()
+            with watching(lambda: interrupt(proc)):
+                for line in proc.stdout:
+                    log.write(line)
+                    log.flush()
+                    handle(line)
+                proc.wait()
+                proc.stdout.close()
         except KeyboardInterrupt:
             os.killpg(proc.pid, signal.SIGTERM)
             proc.wait()
             raise
+    result, session_id = seen["result"], seen["session_id"]
     report = (result.get("result") or "").strip()
     ok = (proc.returncode == 0 and result and not result.get("is_error")
           and not report.startswith((FAIL_MARK, FAB_MARK)))
+    if not result and session_id:
+        result = {"session_id": session_id, "interrupted": True}
     return bool(ok), report, result

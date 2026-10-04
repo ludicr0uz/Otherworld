@@ -254,3 +254,16 @@ Run: `Scripts/dev/dev-team` (this file is its default queue)
 - [x] The reticle turns red sometimes. Always keep the reticle white. If there is a headshot,
       show an X around the reticle.
 - [x] The Q button should navigate through inventory items, not through guns.
+- [x] The item shine is too bright. Make it appear subtly, and only when the character is near
+      the items: a slight glimmer that appears and disappears.
+- [x] The wendigo should roar when transitioning from the hunting state to the charging state.
+      Just the sound, no animation, to avoid a delay in attacking.
+- [x] Pistol ADS is too close to the pistol. It should partially show the hands with the pistol.
+- [ ] The mouse bug at game start is not resolved. It seems that when the game starts, the mouse
+      is not within the game window. After alt-tabbing out and alt-tabbing back in, the mouse
+      issue gets resolved. Fix it so the mouse works in the game window from launch.
+- [ ] The transparent weapon slot icons on the items UI use actual weapon images, which is not
+      intended. Update them to be drawn icons of those weapon types rather than based on the
+      actual weapon appearance, i.e. similar to how the food / water / temperature icons are
+      generated.
+- [ ] Update the headshot multiplier to be 1.75 across the board.

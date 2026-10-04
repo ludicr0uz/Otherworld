@@ -63,4 +63,5 @@ WORLD_TAB = TuneTab(
     hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                "ENTER  save to world_tuning.csv"),
     saved_words="saved to Scripts/world/world_tuning.csv",
-    fraction_digits=2, maxs_var=WORLD_TUNE_MAXS_VAR)
+    fraction_digits=2, maxs_var=WORLD_TUNE_MAXS_VAR,
+    unkept_cells=(0,))   # the hour: the live clock, no session's to keep

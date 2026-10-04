@@ -8,6 +8,7 @@ ffmpeg and numpy. Reads `assets/cache/sounds/`, writes
                 each pack's licence
   manifest_archive.py   the second table: the Sonniss 2016-2019 files and the
                 Freesound previews
+  manifest_guns.py      the third table: gunshots for the five guns, near and far
   sonniss_archive.py    which files of the 2016-2019 Sonniss bundles are
                 wanted, and the fetch (`Scripts/Sound/fetch_sonniss_archive.py`)
   remote_zip.py         one member of a zip on a web server, by HTTP range
@@ -15,6 +16,8 @@ ffmpeg and numpy. Reads `assets/cache/sounds/`, writes
                 (`Scripts/Sound/fetch_freesound_previews.py`)
   dsp.py        decode, trim, split, loop, repitch, write: the signal code
   build.py      runs the table and writes the files and SOURCES.md
+  ratings.py    the page's ratings and notes, read out of Chrome's storage
+                into assets/generated (`Scripts/Sound/read_sound_ratings.py`)
   selection.py  THE CHOICE: which takes were picked for which use, and which
                 of them the game plays; the builders read the names from it
   install.py    writes the chosen takes to assets/generated/sounds, as the

@@ -68,6 +68,8 @@ class Strike:
     reach_cm: float
     radius_cm: float
     chest_cm: float
+    # The takes of the blow landing on a body (weapon_component/sounds.py).
+    hit_sounds_var: str = WV.PunchHitSounds
 
 
 PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
@@ -273,6 +275,9 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     _connect(_loose_pin(brk, "ImpactNormal", is_input=False),
              _pin(from_where, LAST_HIT_FROM_VAR))
     _connect(then(blame), _pin(from_where, "execute"))
+    # What it sounds like going in, from where it went in.
+    landed = _author_sound(ed, strike.hit_sounds_var,
+                           _loose_pin(brk, "ImpactPoint", is_input=False), then(from_where))
 
     ed.add_comment_to_nodes(
         f"The {strike.name}'s blow, {strike.impact_s} s into the swing: a "
@@ -283,4 +288,4 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
 
     failed = _loose_pin(cast, "CastFailed", is_input=False)
     missed = scenery(ed, brk, failed) if scenery else (failed,)
-    return (then(from_where), else_(gate), else_(hit)) + tuple(missed)
+    return (landed, else_(gate), else_(hit)) + tuple(missed)

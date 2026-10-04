@@ -15,6 +15,8 @@ A row is `(op, out, source, options)`:
   mkloop  a recording that does not loop: its head cross-faded into its tail.
   design  layers of other sounds, each repitched and summed. These are
           guesses made without listening and are named `designed_*`.
+  legacy  a sound of the first set, cut as fetch_weapon_sounds.py cut it
+          (its window, its level, its fade): `original_*`.
 
 `stereo` rows stay stereo: beds, drones and stingers, which play flat. All
 the rest are mono, because a stereo wave cannot be placed in the world.
@@ -34,6 +36,28 @@ SON = "sonniss"
 FOLEY = 0.50
 HIT = 0.85
 VOX = 0.80
+
+# The first set's gunshots and its shotgun reload, as they were: after a
+# listen in the game, these were the ones kept for the gun in the player's
+# hands. The numbers are fetch_weapon_sounds.py's SHOTS and HANDLING rows.
+ORIGINALS = (
+    ("legacy", "weapons/original_shotgun", f"{GUNS}/Mossberg/N_26P.wav", dict(seconds=1.30, peak=0.95, lead_ms=12.0)),
+    ("legacy", "weapons/original_pistol", f"{GUNS}/1911/A_42P.wav", dict(seconds=0.95, peak=0.85, lead_ms=12.0)),
+    ("legacy", "weapons/original_smg", f"{GUNS}/Carl Gustav M45/G_20P.wav", dict(seconds=0.60, peak=0.55, lead_ms=8.0)),
+    ("legacy", "weapons/original_rifle", f"{GUNS}/AK-47/C_31P.wav", dict(seconds=0.90, peak=0.68, lead_ms=8.0)),
+    ("legacy", "weapons/original_sniper", f"{GUNS}/Mosin Nagant/M_26P.wav", dict(seconds=1.60, peak=0.95, lead_ms=12.0)),
+    ("legacy", "weapons/original_reload_shotgun", "shotguncock.wav", dict(peak=0.90)),
+)
+
+# What the game's five shots were on 26 September, before the recordings:
+# exported from a backup of Content of that evening (assets/cache/sounds/
+# backup_sep26, which no script can fetch again). Here to be told apart by
+# ear from `original_*`: the importer of the time skipped an asset that
+# existed, so which of the two the game was playing afterwards is not known.
+BACKUP = tuple(
+    ("loop", f"weapons/backup_sep26_{gun}", f"backup_sep26/A_{name}Fire.wav", dict(optional=True))
+    for gun, name in (("shotgun", "Shotgun"), ("pistol", "Pistol"), ("smg", "SMG"),
+                      ("rifle", "Rifle"), ("sniper", "Sniper")))
 
 WEAPONS = (
     # Near takes for the gun in the player's hands, mid takes for the same
@@ -178,7 +202,7 @@ STINGERS = (
     ("each", "stingers/creature_swell", f"{SON}/*Halloween Game*/UIAlert*.wav", dict(peak=0.7, stereo=True)),
 )
 
-ROWS = (WEAPONS + FOOTSTEPS + AMBIENCE + FIRE + PLAYER + MELEE + IMPACTS
+ROWS = (ORIGINALS + BACKUP + WEAPONS + FOOTSTEPS + AMBIENCE + FIRE + PLAYER + MELEE + IMPACTS
         + CREATURES + INVENTORY + UI + STINGERS)
 
 # Previews of a layered bed, for listening only: the loops are 30 s each, and

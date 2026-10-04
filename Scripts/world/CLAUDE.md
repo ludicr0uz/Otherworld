@@ -76,7 +76,9 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
   (`combat/audio.py`, `BED_NAMES`; which recordings is `Scripts/Sound`'s selection). Not
   spatialised: where the actor stands does not matter.
 - **Tick fades the day's into the night's by `DayAmount`:** `BedDay`'s volume is
-  `DayAmount`, `BedNight`'s `1 - DayAmount`; the wind plays on. A bed at zero goes on
+  `DayAmount`, `BedNight`'s `1 - DayAmount`; the wind plays on, **at volume 0 by default**
+  (its SOUND SETTINGS row: the recording is not a good match, and is kept only so the
+  bed is there to be replaced). A bed at zero goes on
   playing (the wave's virtualization mode), so it keeps its place.
 - **How loud** is each bed's row on the SOUND SETTINGS tab (`day birds`, `night`, `wind`),
   which the component's volume multiplies.

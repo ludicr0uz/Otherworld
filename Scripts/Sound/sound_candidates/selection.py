@@ -50,19 +50,29 @@ def _n(stem, *numbers):
     return tuple(f"{stem}_{i:02d}" for i in numbers)
 
 
+# The gun in the player's hands. The shots picked on the audition page from
+# real guns recorded close (manifest_guns.py): "great shotgun sound, use this
+# one", "great pistol sound", "good for uzi", the AKM "worth trying". No
+# sniper among them was liked (the Remington clips), so the sniper keeps the
+# shot the game had from 26 September, as the rest did until these.
 WEAPONS = (
-    Use("shotgun_shot", "weapons", "shotgun shot", ("weapons/shotgun_near",), GAME, "A_ShotgunFire"),
-    Use("pistol_shot", "weapons", "pistol shot", ("weapons/pistol_near",), GAME, "A_PistolFire"),
-    Use("smg_shot", "weapons", "SMG shot", ("weapons/smg_near",), GAME, "A_SMGFire"),
-    Use("rifle_shot", "weapons", "rifle shot", ("weapons/rifle_near",), GAME, "A_RifleFire"),
-    # The verifier holds a weapon sound to 2.5 s.
-    Use("sniper_shot", "weapons", "sniper shot", ("weapons/sniper_near",), GAME, "A_SniperFire",
-        seconds=2.5),
+    Use("shotgun_shot", "weapons", "shotgun shot", ("gunshots/shotgun/ts_slug_near_01",), GAME,
+        "A_ShotgunFire"),
+    Use("pistol_shot", "weapons", "pistol shot", ("gunshots/pistol/glock18_near_02",), GAME,
+        "A_PistolFire"),
+    Use("smg_shot", "weapons", "SMG shot", ("gunshots/smg/mini_uzi_near_02",), GAME, "A_SMGFire"),
+    Use("rifle_shot", "weapons", "rifle shot", ("gunshots/rifle/akm_near_02",), GAME, "A_RifleFire"),
+    Use("sniper_shot", "weapons", "sniper shot", ("weapons/backup_sep26_sniper",), GAME, "A_SniperFire"),
+    Use("shots_spare", "weapons", "other shots that were liked",
+        ("gunshots/pistol/glock18_near_01", "gunshots/pistol/beretta93r_near_02",
+         "gunshots/smg/mini_uzi_near_01", "gunshots/rifle/akm_near_01",
+         "gunshots/shotgun/usas12_near_02", "weapons/backup_sep26_shotgun",
+         "weapons/backup_sep26_smg", "weapons/backup_sep26_rifle"), READY,
+        note="the second take of each gun picked, and the 26 September shots they replaced"),
     Use("dry_fire", "weapons", "dry fire", ("weapons/dry_fire_metal_latch_01",), GAME, "A_DryFire"),
-    Use("shotgun_reload", "weapons", "shotgun reload: three shells, then the action", (), GAME,
-        "A_ReloadShotgun", peak=0.9, recipe=(
-            ("weapons/shotgun_shell_load_01", 0.00), ("weapons/shotgun_shell_load_02", 0.30),
-            ("weapons/shotgun_shell_load_03", 0.60), ("weapons/handling_shotgun_cock_01", 0.95))),
+    # The first set's too: the pump cocked, one take.
+    Use("shotgun_reload", "weapons", "shotgun reload: the pump", ("weapons/original_reload_shotgun",),
+        GAME, "A_ReloadShotgun"),
     Use("rifle_reload", "weapons", "rifle and SMG reload: magazine out, magazine in, bolt", (), GAME,
         "A_ReloadRifle", peak=0.9, recipe=(
             ("weapons/handling_rifle_mag_01", 0.00), ("weapons/handling_rifle_mag_03", 0.65),
@@ -71,11 +81,17 @@ WEAPONS = (
         "A_ReloadPistol", peak=0.9, recipe=(
             ("weapons/handling_rifle_mag_05", 0.00), ("weapons/handling_rifle_mag_06", 0.40),
             ("weapons/handling_smg_cock_dry_01", 0.85))),
-    Use("shots_far", "weapons", "each gun heard from far off",
-        ("weapons/shotgun_far", "weapons/pistol_far", "weapons/smg_far", "weapons/rifle_far",
-         "weapons/sniper_far"), FUTURE,
-        note="only the player fires, and the muzzle is 1.5 m from the listener: "
-             "for the day something else shoots"),
+    Use("shots_distant", "weapons", "each gun heard from beyond 100 m: a nearer take and a farther",
+        ("weapons/shotgun_near", "weapons/shotgun_far", "weapons/pistol_near", "weapons/pistol_far",
+         "weapons/smg_near", "weapons/smg_far", "weapons/rifle_near", "weapons/rifle_far",
+         "weapons/sniper_near", "weapons/sniper_far", "weapons/shotgun_alt_near",
+         "weapons/original_shotgun", "weapons/original_pistol", "weapons/original_smg",
+         "weapons/original_rifle", "weapons/original_sniper", "gunshots/smg/mini_uzi_far_01"), READY,
+        note="within 100 m, and in the player's own hands, a gun is its shot above. Nothing "
+             "fires from farther yet: only the player shoots, and no sound carries past 100 m"),
+    Use("shotgun_reload_spare", "weapons", "a shotgun reload from real handling: three shells, the action",
+        _n("weapons/shotgun_shell_load", 1, 2, 3) + ("weapons/handling_shotgun_cock_01",), READY,
+        note="put together and tried in the game, and turned down for the first set's pump"),
     Use("handling_spare", "weapons", "gun handling, the takes no reload uses",
         _n("weapons/handling_rifle_mag", 2, 4, 7, 8) + _n("weapons/handling_shotgun_cock", 3, 4, 5, 6)
         + _n("weapons/handling_smg_cock_dry", 2, 3, 4, 5, 6, 7, 8) + ("weapons/shotgun_pump_01",),
@@ -101,7 +117,9 @@ AMBIENCE = (
     Use("ambience_day", "ambience", "the day bed: birds",
         ("ambience/day_birds",), GAME, "A_Amb_DayBirds", stereo=True),
     Use("ambience_wind", "ambience", "the wind, day and night",
-        ("ambience/wind_grass_norway",), GAME, "A_Amb_Wind", stereo=True),
+        ("ambience/wind_grass_norway",), GAME, "A_Amb_Wind", stereo=True,
+        note="not a good match: in the game and silent by default (volume 0 on the "
+             "SOUND SETTINGS tab) until a better wind is found"),
     Use("ambience_night", "ambience", "the night bed: crickets and owls",
         ("ambience/night_crickets_owls",), GAME, "A_Amb_Night", stereo=True),
     Use("ambience_night_spare", "ambience", "other nights",
@@ -161,10 +179,16 @@ MELEE = (
         GAME, "A_MeleeHit"),
     Use("melee_swing", "melee", "a swing through the air", _n("melee/swing", 1, 4, 2, 3, 5, 6, 7, 8), GAME,
         "A_MeleeSwing"),
-    Use("blade_hit", "melee", "a blade into a body",
-        ("melee/stab_dagger_05", "melee/gore_weapon_02", "melee/blood_splat_01", "melee/knife_swing_01"),
-        READY),
-    Use("blade_lodge", "melee", "a thrown knife or axe sticking in a body", ("melee/gore_02",), READY),
+    Use("blade_hit", "melee", "a knife or an axe landing on a body",
+        ("melee/stab_dagger_05", "melee/gore_weapon_02", "melee/blood_splat_01"), GAME, "A_BladeHit"),
+    Use("blade_lodge", "melee", "a thrown knife or axe sticking in a body", ("melee/gore_02",), GAME,
+        "A_BladeLodge", note="in a tree, it is the axe's chop"),
+    # Told apart by ear in the game: these five are a blunt thing thrown, and
+    # the knife's swing is a sharp one.
+    Use("throw", "melee", "a blunt item thrown, as it leaves the hand",
+        _n("melee/swing", 9, 10, 11, 12, 13), GAME, "A_Throw"),
+    Use("throw_sharp", "melee", "a knife or an axe thrown, as it leaves the hand",
+        ("melee/knife_swing_01",), GAME, "A_ThrowSharp"),
     Use("swing_thud", "melee", "a heavy swing and its thud", _n("melee/swing_thud", 6, 1, 5), READY),
 )
 
@@ -209,6 +233,7 @@ STINGERS = (
 )
 
 LATER = (
+    Use("revolver", "for later", "a revolver", ("gunshots/pistol/designed_revolver_near_01",), FUTURE),
     Use("dog_monster", "for later", "a growling, dog-like monster",
         _n("creatures/wendigo/monster_growl", 1, 2, 3, 4, 5) + ("creatures/wendigo/roar_growl_01",
                                                                f"{FS}/wolf_howl/420449_Mrthenoronha"), FUTURE),

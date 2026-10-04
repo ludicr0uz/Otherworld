@@ -143,6 +143,34 @@ def cut_shot(samples, seconds, lead_ms=10.0, onset=0.10, tail_fraction=0.30):
     return fade(cut, FADE_IN_MS, seconds * 1000.0 * tail_fraction)
 
 
+def single_shots(samples, seconds, count, level=0.5, gap_ms=60.0, lead_ms=8.0,
+                 tail_fraction=0.30):
+    """The cleanest ``count`` single shots of a recording that holds several.
+
+    A file of gunfire is shots at any spacing: singles seconds apart, or a
+    burst a tenth of a second apart, where each shot's tail is the next one's
+    start. Every transient that reaches ``level`` of the file's peak is a
+    shot; the ones kept are those with the most room after them before the
+    next, because that room is the shot's own tail. Each is cut from just
+    before its transient to ``seconds`` on or to the next shot, whichever
+    comes first, and faded as cut_shot fades.
+    """
+    env = envelope(samples)
+    block = _frames(ENV_BLOCK_MS)
+    loud = np.nonzero(env >= env.max() * level)[0]
+    onsets = [int(i) for n, i in enumerate(loud)
+              if n == 0 or i - loud[n - 1] > _blocks(gap_ms)]
+    ends = onsets[1:] + [len(env)]
+    room = sorted(((end - on, on, end) for on, end in zip(onsets, ends)), reverse=True)
+    cuts = []
+    for _gap, on, end in sorted(room[:count], key=lambda r: r[1]):
+        start = max(0, on * block - _frames(lead_ms))
+        stop = min(start + int(RATE * seconds), end * block - _frames(lead_ms), len(samples))
+        cut = samples[start:stop]
+        cuts.append(fade(cut, FADE_IN_MS, len(cut) / RATE * 1000.0 * tail_fraction))
+    return cuts
+
+
 def loopify(samples, seconds=None, cross_s=2.0):
     """A seamless loop out of a recording that is not one: its head is
     cross-faded (equal power) into its tail, so the end runs into the start."""

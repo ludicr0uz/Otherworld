@@ -92,6 +92,7 @@ from combat.throw_tuning import (
 )
 from combat.weapon_component.common import _prop
 from combat.weapon_component.headshot import _author_headshot
+from combat.weapon_component.sounds import _author_sound
 from combat.weapon_component.surface_impact import _author_surface_impact
 from uebp.nodes.actor import (
     FN_ATTACH, FN_CLOSEST_BONE, FN_GET_COMP, FN_INSTANCE_TRANSFORM, FN_SET_LOC_ROT,
@@ -377,7 +378,9 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     _connect(wounded, _pin(blood, "execute"))
     # ...and the blade stays in the body. One it cannot be set into drops
     # it, and that fall to the ground passes the body by.
-    stuck, dropped, stick_nodes = _author_stick(ed, thrown, brk, mesh_out, then(blood))
+    # ...and is heard going in, at the wound.
+    sunk = _author_sound(ed, WV.LodgeSounds, _hit(brk, "ImpactPoint"), then(blood))
+    stuck, dropped, stick_nodes = _author_stick(ed, thrown, brk, mesh_out, sunk)
     aside = _node(ed, FN_ARR_ADD)
     _connect(out(past, THROW_PAST_VAR), _pin(aside, "TargetArray"))
     _connect(_hit(brk, "HitActor"), _pin(aside, "NewItem"))
@@ -410,7 +413,9 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     _connect(out(low), _pin(reachable, "Condition"))
     _connect(step, _pin(reachable, "execute"))
     _cls, chipped = _author_surface_impact(ed, where, then(reachable))
-    lodged, put = _author_lodge(ed, thrown, brk, _hit(brk, "ImpactPoint"), then(chipped))
+    # The blade in the wood is the axe in the wood: the chop's own takes.
+    thunk = _author_sound(ed, WV.ChopSounds, _hit(brk, "ImpactPoint"), then(chipped))
+    lodged, put = _author_lodge(ed, thrown, brk, _hit(brk, "ImpactPoint"), thunk)
 
     ed.add_comment_to_nodes(
         f"What the flight struck, for an item with a {THROW_DAMAGE_VAR} (a "

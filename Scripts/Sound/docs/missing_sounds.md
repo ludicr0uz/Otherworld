@@ -17,6 +17,7 @@ Nothing rated ok or better exists for these. Each needs a new source.
 | Eating forage (a mushroom) | Only an apple and crackers were liked, each for an item the game does not have | A soft, wet bite: Freesound has three eating previews not yet rated |
 | The forest's night one-shots: an owl, a branch snapping, a tree creaking | One owl was rated bad. Four more owls, six owl screeches, five branch snaps and one tree creak are cut and **not yet rated** | Rate those first. The four tree creaks that were liked are for a creaky house, not the forest |
 | A wanderer's footsteps as its own sound | None sought | The wanderers share the player's footsteps today |
+| The wind | `wind_grass_norway`, rated great on the page and not a good match in the game: silent by default | A steadier wind through trees. Four wind beds are cut and not yet rated |
 
 ## 2. Thin: one or two takes
 
@@ -63,7 +64,6 @@ plays them. What each needs:
 | sound | where it would be played | what is in the way |
 |---|---|---|
 | The zombie's bite and swing, hurt and death; the wendigo's growl, hurt and death | The wanderers' controller (`npc/`), and the health component, whose voice is the player's only (`combat/voice.py` gates on `DespawnOnDeath`) | Per-creature takes have to reach the pawn's health component at possession, as its flinch clips do |
-| A blade into a body; a thrown blade sticking | `weapon_component/punch.py`'s blow, on a Melee item; `throw_strike.py` | Nothing: a play node each |
 | A bullet into wood, a body, the ground | `BP_BulletImpact` and `BP_BloodSplash` (`combat/bullet_impact.py`, `blood.py`) | The impact does not know its surface: wood and ground are one burst |
 | An item picked up and set down; a garment worn; a weapon brought to hand | `weapon_component/pickup.py`, `wear.py`, `slot_sync.py` | Nothing |
 | The player's effort on a swing and a throw; out of breath; a grunt on landing | `punch.py`, `throw_windup.py`, `sprint.py` | Nothing |
@@ -73,22 +73,37 @@ plays them. What each needs:
 | The menu's sounds | The HUD (`graphics_menu/`) | The HUD polls keys in `DrawHUD`; every row change, take and back needs a play node, and they would be the game's first 2D sounds played from a graph |
 | The title screen's boom; a scare when a wendigo sees you | The HUD's first Tick; `npc/roar.py` | Nothing |
 | A bed under a hunt | `world/ambience.py`, a fourth bed, raised while a wendigo hunts | Something has to tell the cycle that one is hunting |
-| Each gun from far off | Nowhere yet | Only the player fires, 1.5 m from the listener. For the day something else shoots |
+| Each gun from beyond 100 m: a nearer and a farther take | The fire graph, on the distance to the listener | Only the player fires, 1.5 m from the listener, and nothing carries past 100 m |
+| A thrown item landing on the ground | `throw_flight.py`, where it is set down | No take chosen for it |
 
-## 5. To listen to in the game
+## 5. Heard in the game, and changed
 
-Built and verified, and nobody has heard them yet:
+After the first listen in the game (4 October 2026):
 
-- **The three reloads** are put together from separate takes (shells and the action; a
-  magazine out, a magazine in, a bolt), laid out by each take's length. Which take is the
-  magazine going in and which is it coming out was a guess.
-- **The beds' levels** against everything else: day birds 0.7, night 0.7, wind 0.5 (the
-  SOUND SETTINGS tab), and whether dusk's cross-fade reads.
-- **The footsteps at 0.4**: that number was set for the synthesised steps.
-- **The gunshots' tails**: the shotgun's is 2.2 s where it was 1.3 s.
-- **The player's grunt**, on every blow a wanderer lands.
-- **The zombie's growl**: eleven takes from three libraries, which may not sound like one
-  creature.
+- **The gunshots changed three times.** The Free Firearm Sound Library's close takes were
+  not liked in the hand. What the game had before turned out to be the synthesised shots of
+  26 September (the recordings cut that day were never imported), and those were put back.
+  Then real guns recorded close were found in the Sonniss 2016 bundle and picked by ear: a
+  12-gauge slug, a Glock 18, a Mini Uzi, an AKM. **The sniper has no good shot:** it keeps
+  the 26 September one; the Remington 700 clips and the designed ones were rated bad.
+- **Gunfire from beyond 100 m** has takes waiting (the library's, noted "may be good for
+  distance above 100m", and a far Mini Uzi) and nothing to play them: only the player
+  fires, and nothing carries past 100 m. Two far cuts hold several shots and are not
+  usable as they are (the AKM's, the Saiga's).
+- **The throw is two sounds now:** a blade's, and a blunt thing's, as noted in the game.
+- **The wind is silent by default** (its SOUND SETTINGS row is 0): the recording was not a
+  good match. A wind is still missing.
+- **The wendigo's roar was too quiet when it went aggro from far off.** It has a curve of
+  its own now: full to 10 m, then a straight line to silence at 61 m, so about half volume
+  at the 35 m it can see from.
+- **A thrown knife or axe had no sound,** leaving the hand or landing: it has three now
+  (the throw, into a body, into a tree, which is the axe's chop).
+- **A knife or an axe hitting a zombie had no sound:** a blow landing on a body is heard
+  now, the fist's and the blade's each with takes of its own.
+
+Still to listen to: the rifle's and the pistol's reloads (put together from parts), the
+footsteps at 0.4, the day's and the night's beds at 0.7, the player's grunt, the zombie's
+eleven growls from three libraries, and everything in the list just above.
 
 ## 6. Kept for later
 

@@ -134,6 +134,20 @@ def _floor():
             for q in PIN.list_connected_pins(p) if _title(PIN.get_owning_node(q)) == k]
 
 
+def _past_sound(nodes):
+    """Exec feeders, looked back past one played sound. A sound is three
+    nodes (weapon_component/sounds.py): a Branch on "are there takes", the
+    play, and a Branch both of those run into. Where ``nodes`` is that last
+    Branch, what feeds the first one is what the sound came after."""
+    if len(nodes) == 1 and _title(nodes[0]) == "Branch":
+        back = _feeders(nodes[0], "execute")
+        plays = [n for n in back if has_in_pin(n, "Sound")]
+        gates = [n for n in back if n not in plays]
+        if len(plays) == 1 and len(gates) == 1 and _feeders(plays[0], "execute") == gates:
+            return _feeders(gates[0], "execute")
+    return nodes
+
+
 def _mine(nodes):
     return [n for n in nodes if is_strike_node(n)]
 
@@ -387,12 +401,13 @@ def check_stick(blood):
           f"{len(bones)} nearest-bone node(s)")
     in_body, _in_tree = _puts()
     found = _stuck_gates()
-    check("a blade that wounded a body stays in it: after the blood, where "
+    check("a blade that wounded a body stays in it: after the blood and the "
+          "sound of it going in, where "
           f"{THROW_BONE_VAR} is a bone, the item in the air is set on the skin "
           f"({THROW_SKIN_VAR}) once, as it is into a trunk",
           len(in_body) == 1 and len(found) == 1 and _of_thrown(in_body[0])
           and _feeders(in_body[0], "execute") == found
-          and _feeders(found[0], "execute") == blood
+          and _past_sound(_feeders(found[0], "execute")) == blood
           and _feeders(in_body[0], "NewLocation") != _feeders(in_body[0], "NewRotation"),
           f"{len(in_body)} move(s), {len(found)} Branch(es)")
     holds = _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))
@@ -430,9 +445,10 @@ def check_lodge():
     check("it chips the bark once, on the reachable arm",
           len(chips) == 1 and _feeders(chips[0], "execute") == highs, str(len(chips)))
     in_body, puts = _puts()
-    check("...and is set into the trunk once: the item in the air, placed and "
-          "turned in one move",
-          len(puts) == 1 and _of_thrown(puts[0]) and _feeders(puts[0], "execute") == chips
+    check("...and, after the chop's sound, is set into the trunk once: the item "
+          "in the air, placed and turned in one move",
+          len(puts) == 1 and _of_thrown(puts[0])
+          and _past_sound(_feeders(puts[0], "execute")) == chips
           and any(has_in_pin(f, "Hit") for f in _feeders(puts[0], "NewLocation")
                   for f in [f] + _feeders(f, "A")),
           str(len(puts)))

@@ -8,12 +8,14 @@ is in the game only once someone has listened to it and moved it there.
 import glob
 import os
 import shutil
+import tempfile
+import wave
 
 from sound_candidates import dsp
-from sound_candidates import manifest, manifest_archive
+from sound_candidates import manifest, manifest_archive, manifest_guns
 from sound_candidates.manifest import PREVIEWS
 
-ROWS = manifest.ROWS + manifest_archive.ROWS
+ROWS = manifest.ROWS + manifest_archive.ROWS + manifest_guns.ROWS
 LICENCES = {**manifest.LICENCES, **manifest_archive.LICENCES}
 
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -33,6 +35,27 @@ def _find(pattern, optional=False):
 
 def _rel(path):
     return os.path.relpath(path, CACHE_DIR)
+
+
+def _legacy(path, opts):
+    """A sound of the first set, cut exactly as it was: by
+    fetch_weapon_sounds.py's own functions, at its own rate, then brought to
+    this one. The first gunshots were liked better than the second ones, and
+    "the same take, cut the same way" is the only honest way to have them back."""
+    import fetch_weapon_sounds as first
+    cut = first._cut(first._to_mono(path), opts.get("seconds", 0.0), opts["peak"],
+                     opts.get("lead_ms", 0.0), seek_onset="seconds" in opts)
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        name = tmp.name
+    try:
+        with wave.open(name, "wb") as out:
+            out.setnchannels(1)
+            out.setsampwidth(2)
+            out.setframerate(first.RATE)
+            out.writeframes(b"".join(int(s).to_bytes(2, "little", signed=True) for s in cut))
+        return dsp.decode(name, 1)
+    finally:
+        os.remove(name)
 
 
 def _takes(op, source, opts, channels):
@@ -61,8 +84,14 @@ def _takes(op, source, opts, channels):
         if shots != 1:
             raise ValueError(f"{_rel(paths[0])}: {shots} shots in the cut, wanted 1")
         return [(cut, _rel(paths[0]))]
+    if op == "shots":
+        cuts = dsp.single_shots(dsp.decode(paths[0], channels), opts["seconds"],
+                                opts.get("limit", 2))
+        return [(c, _rel(paths[0])) for c in cuts]
     if op == "loop":
         return [(dsp.decode(paths[0], channels), _rel(paths[0]))]
+    if op == "legacy":
+        return [(_legacy(paths[0], opts), _rel(paths[0]))]
     if op == "mkloop":
         samples = dsp.trim(dsp.decode(paths[0], channels), tail_ms=0.0)
         return [(dsp.loopify(samples, opts.get("seconds")), _rel(paths[0]))]
@@ -75,13 +104,14 @@ def build_rows():
     for op, out, source, opts in ROWS:
         channels = 2 if opts.get("stereo") else 1
         takes = _takes(op, source, opts, channels)
-        numbered = len(takes) > 1 or op in ("each", "split")
+        numbered = len(takes) > 1 or op in ("each", "split", "shots")
         for i, (samples, src) in enumerate(takes, 1):
             if opts.get("named"):
                 name = f"{out}/{os.path.splitext(os.path.basename(src))[0]}"
             else:
                 name = f"{out}_{i:02d}" if numbered else out
-            samples = dsp.normalise(samples, opts["peak"])
+            if opts.get("peak"):   # none: the file's own level, untouched
+                samples = dsp.normalise(samples, opts["peak"])
             dsp.write(os.path.join(OUT_DIR, name + ".wav"), samples)
             written.append((name, len(samples) / dsp.RATE, channels, src))
     return written

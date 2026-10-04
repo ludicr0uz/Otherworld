@@ -580,6 +580,30 @@ loot window, in play only. Traps met here:
 - **The cursor's wish is an OR tree** (MenuOpen, LootOpen, WearOpen); `cursor_checks`
   walks it.
 
+## What the tuning tabs keep (`tune_keep.py`, `tune_keep_consts.py`)
+
+Every tab's table but GRAPHICS SETTINGS' persists between sessions, from one place. A tab
+only names itself: `TuneTab.kept` (default true), and from it `keep_slot` and `built_var`.
+
+- **The CSV is the default, the save is what was moved since.** The build bakes the CSV into
+  the HUD's table (`<Values>`) and into a second copy no nudge moves (`<Values>Built`).
+- **A nudge saves** (`author_keep_tab`, in `tune_tick._author_nudge`): `/Game/UI/BP_TuneSave`
+  (a `USaveGame`: `KeptTable`, `KeptBuilt`) into the tab's slot, `OtherworldTune_<action>`.
+  No Python, so it works in a packaged build, where Enter's CSV save cannot run.
+- **BeginPlay loads** (`author_load_kept`, after the graphics save): only a save whose
+  `KeptBuilt` is this build's built table. So a CSV that changed since (by Enter and a
+  build, or by hand and a build) wins, and a save never hides it.
+- **A loaded table raises the tab's Touched flag**, because the assets hold the CSV's
+  numbers: the tab's apply is what puts the save's on the guns, creatures, player and
+  cycle. WORLD SETTINGS applies while open *or touched* for this.
+- **`TuneTab.unkept_cells`** are never read back (the world tab's hour: the live clock).
+- **A new tab is kept by default.** Give it an apply that runs on Touched, nothing else.
+- **Probes never see the developer's saves:** `probes/boot.py` sets the slots aside for the
+  run, clears them after each probe and puts them back (`probes/kept_slots.py`).
+- **To drop a save:** delete `Saved/SaveGames/OtherworldTune_*.sav`. There is no reset row.
+- **Checks:** `tune_keep_checks.check_kept` (which also runs `gfx_save_checks`).
+- **Still needs a play session:** a nudge, quit, relaunch, and the number is still there.
+
 ## The GUN SETTINGS tab (`tune_*.py`, `wbp_tune.py`)
 
 A developer tab in the M panel's place: **its row** (`Gun Settings`) opens it (`TuneOpen`). Up/Down pick
@@ -699,9 +723,10 @@ keys as GUN SETTINGS; **Enter** saves `Scripts/combat/player_tuning.csv`.
 ## The SOUND SETTINGS tab (`sound_tune_*.py`)
 
 **Its menu row** opens it (`SoundTuneOpen`). One subject row (`volume`), then
-`combat/sound_tuning.SOUND_STATS`: one row per sound (22: the footsteps, each gun's shot, the
+`combat/sound_tuning.SOUND_STATS`: one row per sound (25: the footsteps, each gun's shot, the
 dry click, the reloads, the melee hit and swing, the chop, the growl, the roar, the player's
-hit and death, the match, the campfire and the three beds), behind a scroll bar
+hit and death, the match, the campfire, a blade's hit, a thrown blade in a body, a throw and
+the three beds, the wind's at 0), behind a scroll bar
 (`SOUND_VISIBLE_ROWS`, 14 at a time, as MONSTER SETTINGS), its volume as a multiplier (step
 0.05, from 0 to 2: the tab has maximums, `SoundTuneMaxs`). Same keys as GUN SETTINGS;
 **Enter** saves `Scripts/combat/sound_tuning.csv`.
@@ -715,8 +740,8 @@ hit and death, the match, the campfire and the three beds), behind a scroll bar
   `SoundTuneTouched` is **lowered again** once the mix is told, unlike the gun, monster and
   player tabs', because the mix is the audio device's and outlives a respawn. Each level's
   HUD tells it again.
-- **The CSV feeds** `build_graphics_menu.py` alone (the HUD's table). After a save, re-run
-  it.
+- **The CSV feeds** `build_graphics_menu.py` alone (the HUD's table). A nudge is in the next
+  game without it (the tab's save slot, `tune_keep.py`); a hand-edited CSV needs the build.
 - **The verifier's whole-graph scans exclude this tab:** the Binds read-by-index check skips
   `Get SoundTuneValues`.
 - **Probe:** `probe_sound_tuning.py` (6 checks: the first Tick's apply, each class's volume

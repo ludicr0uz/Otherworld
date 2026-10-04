@@ -85,11 +85,17 @@ Stance = Var("Stance")
 SwingSounds = Var("SwingSounds", array(obj("/Script/Engine.SoundBase")))
 ChopSounds = Var("ChopSounds", array(obj("/Script/Engine.SoundBase")))
 MatchSounds = Var("MatchSounds", array(obj("/Script/Engine.SoundBase")))
+ThrowSounds = Var("ThrowSounds", array(obj("/Script/Engine.SoundBase")))
+ThrowSharpSounds = Var("ThrowSharpSounds", array(obj("/Script/Engine.SoundBase")))
+PunchHitSounds = Var("PunchHitSounds", array(obj("/Script/Engine.SoundBase")))
+BladeHitSounds = Var("BladeHitSounds", array(obj("/Script/Engine.SoundBase")))
+LodgeSounds = Var("LodgeSounds", array(obj("/Script/Engine.SoundBase")))
 
 TABLE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
     SightAiming, AimZoom, SightBlend, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
-    BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds,
+    BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
+    PunchHitSounds, BladeHitSounds, LodgeSounds,
 )

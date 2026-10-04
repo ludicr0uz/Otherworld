@@ -267,34 +267,36 @@ class CombatConfig:
     mouse_sensitivity_min: float = 0.20
     mouse_sensitivity_max: float = 3.00
     mouse_sensitivity_step: float = 0.05
-    # How much of the zoom aiming gives back in slower mouse movement.
+    # The mouse is the SAME with no aim, on the shoulder and down the irons.
+    # It used to slow with the zoom (0.75x at the 1.5x both of those zoom by),
+    # and aiming is also what walks the character, so the mouse read as slower
+    # walking than standing or running. Only the sniper's scope slows it now.
     #
-    # Driven off CurrentFOV / BaseFOV, not off a flag, which buys three things
-    # for one node: the slowdown is per weapon without anything per weapon
-    # being written (a 4x scope slows the mouse more than 1.5x irons because
-    # its FOV is narrower), it EASES IN along the same FInterpTo curve the zoom
-    # does rather than snapping the instant the button goes down, and letting
-    # go restores it by the same curve with no second code path.
-    #
-    # 1.0 would be full compensation: the crosshair would then cross the same
-    # number of PIXELS per centimetre of mouse at any zoom, which at 4x reads
-    # as the mouse having gone dead. 0.0 would be none at all, which at 4x
-    # throws the crosshair off the far side of the scope. 0.75 is the usual
-    # compromise, and works out at 0.75x sensitivity down the irons and 0.44x
-    # down the scope.
+    # How much of the SCOPE's zoom is given back in slower mouse movement
+    # (scope_sens_base below): 1.0 would be full compensation -- the crosshair
+    # would cross the same number of PIXELS per centimetre of mouse as
+    # unzoomed, which at 4x reads as the mouse having gone dead. 0.0 would be
+    # none at all, which at 4x throws the crosshair off the far side of the
+    # scope. 0.75 is the usual compromise, and works out at 0.44x.
     ads_sens_compensation: float = 0.75
-    # ...and on top of that, the sniper's scope halves it again. 0.44x read as
-    # still too twitchy at 4x, where a few pixels of mouse cross a whole head.
+    # ...and on top of that, the scope halves it again. 0.44x read as still
+    # too twitchy at 4x, where a few pixels of mouse cross a whole head.
     # Keyed off zoom BEYOND the irons -- progress from ads_zoom_irons to
-    # ads_zoom_scope -- not off Held.Scoped, so it eases in on the same
-    # FInterpTo curve, needs no Held read on the frames nothing is equipped, and
-    # leaves irons exactly at 0.75x. Works out at 0.22x down the scope.
+    # ads_zoom_scope -- not off Held.Scoped, so it eases in on the zoom's
+    # FInterpTo curve, needs no Held read on the frames nothing is equipped,
+    # and leaves the shoulder and the irons at exactly 1x. Works out at 0.22x
+    # down the scope.
     #
     # This is only the DEFAULT: the player sets it on the settings screen
     # ("SCOPE SENSITIVITY"), it is saved in BP_Settings.ScopeSensitivity and
     # pushed onto BP_WeaponComponent every frame like MouseSensitivity. 1.0
     # there means "no extra slowdown", i.e. the 0.44x the zoom alone gives.
     ads_scope_sens_scale: float = 0.50
+
+    def scope_sens_base(self):
+        """The look scale the scope's zoom alone gives: Lerp(1, 1/zoom, compensation)."""
+        return 1.0 + self.ads_sens_compensation * (1.0 / self.ads_zoom_scope - 1.0)
+
     scope_sensitivity_min: float = 0.10
     scope_sensitivity_max: float = 1.50
     scope_sensitivity_step: float = 0.05

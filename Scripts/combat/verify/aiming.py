@@ -283,13 +283,13 @@ def check_aiming_mobility():
           "zoom's curve, not the zoom's magnitude",
           all(abs(v - 0.75) < 1e-9 for v in halfway.values()),
           str(sorted(halfway.items())))
-    # And the contrast that justifies normalising at all: the raw ratio the mouse
-    # uses would be a different speed per weapon and never exactly the number asked
-    # for -- right for sensitivity, wrong for legs.
+    # And the contrast that justifies normalising at all: the raw zoom ratio
+    # would be a different speed per weapon and never exactly the number asked
+    # for.
     raw = {k: 1.0 + (1.0 - COMBAT.ads_move_speed_scale) * (1.0 / z - 1.0)
            for k, z in zooms.items()}
-    check("...which the raw CurrentFOV/BaseFOV ratio the sensitivity uses would "
-          "NOT have been: that is why this one is normalised and that one is not",
+    check("...which the raw CurrentFOV/BaseFOV ratio would NOT have been: that "
+          "is why this one is normalised",
           len({round(v, 6) for v in raw.values()}) > 1
           and all(abs(v - COMBAT.ads_move_speed_scale) > 1e-6
                   for v in raw.values()),

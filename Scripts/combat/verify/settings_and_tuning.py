@@ -11,7 +11,27 @@ from combat.paths import (
     GAME_MODE_BP_PATH, SETTINGS_BP_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
 from combat.tuning import BIND_VARS, COMBAT, CombatConfig
 from combat.verify.fixtures import w, wc_cdo, wg
-from combat.verify.common import BEL, builder_modules, cdo, check, load, titled
+from combat.verify.common import BEL, PIN, builder_modules, cdo, check, load, titled
+
+
+def _upstream_titles(nodes, title):
+    """How many nodes titled `title` feed data, at any depth, into `nodes`."""
+    seen, todo, hits = set(), list(nodes), 0
+    while todo:
+        node = todo.pop()
+        for pin in BEL.list_input_pins(node):
+            if str(PIN.get_pin_name(pin)) == "execute":
+                continue
+            for link in PIN.list_connected_pins(pin):
+                up = PIN.get_owning_node(link)
+                if up.get_name() in seen or any(
+                        str(PIN.get_pin_name(q)) == "execute"
+                        for q in BEL.list_input_pins(up)):
+                    continue        # an exec node's output is a stored value
+                seen.add(up.get_name())
+                hits += str(BEL.get_node_title(up)).replace("\n", " ") == title
+                todo.append(up)
+    return hits
 
 
 # ─── BP_Settings: what survives a restart ────────────────────────────────────
@@ -105,20 +125,33 @@ def check_settings_savegame():
                 == want.replace(" ", "")]
         check(f"...from a {label} base READ off the controller, not a literal",
               bool(hits), want)
-    check("the slowdown is driven off the zoom, not off the Aiming flag -- so it "
-          "eases in and is stronger on the scope",
-          bool(titled(wg, "Lerp")) and 0.0 < COMBAT.ads_sens_compensation <= 1.0,
-          f"Lerp(1, CurrentFOV/BaseFOV, {COMBAT.ads_sens_compensation})")
+    check("the scope's slowdown is driven off the zoom, not off a flag -- so it "
+          "eases in, and only past the irons",
+          len(titled(wg, "Lerp")) >= 1 and 0.0 < COMBAT.ads_sens_compensation <= 1.0,
+          f"Lerp(1, {COMBAT.scope_sens_base():g} x ScopeSensitivity, past the irons)")
     # The numbers the player actually feels, spelled out so a change to either
-    # constant has to be argued for rather than noticed later.
-    for name, zoom, want in (("irons", COMBAT.ads_zoom_irons, 0.75),
+    # constant has to be argued for rather than noticed later. The shoulder
+    # and the irons are 1x: the mouse is the same standing, walking (which is
+    # aiming) and running.
+    for name, zoom, want in (("shoulder", COMBAT.shoulder_zoom, 1.0),
+                             ("irons", COMBAT.ads_zoom_irons, 1.0),
                              ("scope", COMBAT.ads_zoom_scope, 0.21875)):
-        got = 1.0 + COMBAT.ads_sens_compensation * (1.0 / zoom - 1.0)
         past = min(max((zoom - COMBAT.ads_zoom_irons)
                        / (COMBAT.ads_zoom_scope - COMBAT.ads_zoom_irons), 0.0), 1.0)
-        got *= 1.0 + past * (COMBAT.ads_scope_sens_scale - 1.0)
-        check(f"...which works out at {want:.2f}x sensitivity down the {name}",
+        got = 1.0 + past * (COMBAT.scope_sens_base() * COMBAT.ads_scope_sens_scale - 1.0)
+        check(f"...which works out at {want:.2f}x sensitivity "
+              f"{'on the' if name == 'shoulder' else 'down the'} {name}",
               abs(got - want) < 5e-3, f"{got:.4f}")
+    # The graph itself: nothing but the scope's Lerp, the sensitivity and the
+    # cached base may reach a look scale. A CurrentFOV/BaseFOV ratio feeding it
+    # is the old slowdown, which slowed the mouse on every aim.
+    for label, want in (("yaw", "SetDeprecatedInputYawScale"),
+                        ("pitch", "SetDeprecatedInputPitchScale")):
+        puts = [n for n in wg
+                if str(BEL.get_node_title(n)).replace("\n", " ").replace(" ", "") == want]
+        lerps = _upstream_titles(puts, "Lerp") if puts else -1
+        check(f"...and the {label} scale has one Lerp behind it (the scope's): the "
+              f"shoulder and the irons do not slow the mouse", lerps == 1, str(lerps))
     check("the scope's extra slowdown is the component's ScopeSensitivity, "
           "read rather than a literal, so the settings screen can move it",
           bool(titled(wg, "Get ScopeSensitivity")),

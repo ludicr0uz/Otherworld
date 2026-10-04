@@ -200,34 +200,25 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
              _pin(apply_fov, "InFieldOfView"))
     _connect(then(moved), _pin(apply_fov, "execute"))
 
-    # --- and slow the mouse by the same curve --------------------------------
-    # Not "if aiming, use the slow number": the factor is read straight off how
-    # far the zoom has actually travelled this frame, so it eases in and out
-    # along the FInterpTo above, is automatically stronger on the 4x scope than
-    # on the 1.5x shoulder or irons, and has no second code path for letting the button go.
+    # --- the mouse: the same at every aim but the scope's ---------------------
+    # The shoulder aim and the irons leave the look scales alone. They used to
+    # slow the mouse with the zoom (0.75x at 1.5x), and since aiming is also
+    # what walks the character, the mouse read as slower walking than standing
+    # or running. Only zoom PAST the irons slows it, so only the sniper's scope:
     #
-    #     eased = Lerp(1, CurrentFOV / BaseFOV, COMBAT.ads_sens_compensation)
-    #     yaw   scale = BaseYawScale   * MouseSensitivity * eased
-    #     pitch scale = BasePitchScale * MouseSensitivity * eased
+    #     past  = FClamp((BaseFOV / CurrentFOV - irons) / (scope - irons), 0, 1)
+    #     glass = Lerp(1, scope_base * ScopeSensitivity, past)
+    #     yaw   scale = BaseYawScale   * MouseSensitivity * glass
+    #     pitch scale = BasePitchScale * MouseSensitivity * glass
+    #
+    # scope_base (COMBAT.scope_sens_base()) is the share of the scope's zoom
+    # given back in slower mouse movement. Read off how far the zoom has
+    # travelled this frame, so it eases in and out along the FInterpTo above
+    # and has no second code path for letting the button go.
     #
     # Both base scales are signed as the engine shipped them, so multiplying
     # by a positive sensitivity cannot flip the pitch axis.
     base_again = keep(ed.add_get_member_variable_node(WV.BaseFOV))
-    ratio = keep(_node(ed, FN_DIV_FF))
-    _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(ratio, "A"))
-    _connect(out(base_again, WV.BaseFOV), _pin(ratio, "B"))
-    eased = keep(_node(ed, FN_LERP))
-    _set(eased, "A", 1.0)
-    _connect(out(ratio), _pin(eased, "B"))
-    _set(eased, "Alpha", COMBAT.ads_sens_compensation)
-
-    # The scope's extra slowdown, on zoom past the irons:
-    #
-    #     past  = FClamp((BaseFOV / CurrentFOV - irons) / (scope - irons), 0, 1)
-    #     scoped = eased * Lerp(1, ScopeSensitivity, past)
-    #
-    # Irons never get past their own zoom, so this is 1 for every weapon but the
-    # sniper, and on the sniper it arrives with the zoom.
     zoom_now = keep(_node(ed, FN_DIV_FF))
     _connect(out(base_again, WV.BaseFOV), _pin(zoom_now, "A"))
     _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_now, "B"))
@@ -241,16 +232,16 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     _connect(out(beyond_frac), _pin(past, "Value"))
     _set(past, "Min", 0.0)
     _set(past, "Max", 1.0)
-    # B is the player's ScopeSensitivity (settings screen, pushed by the HUD),
+    # ScopeSensitivity is the player's (settings screen, pushed by the HUD),
     # whose CDO default is COMBAT.ads_scope_sens_scale.
-    glass = keep(_node(ed, FN_LERP))
-    _set(glass, "A", 1.0)
     glass_sens = keep(ed.add_get_member_variable_node(WV.ScopeSensitivity))
-    _connect(out(glass_sens, WV.ScopeSensitivity), _pin(glass, "B"))
-    _connect(out(past), _pin(glass, "Alpha"))
-    scoped = keep(_node(ed, FN_MUL_FF))
-    _connect(out(eased), _pin(scoped, "A"))
-    _connect(out(glass), _pin(scoped, "B"))
+    through = keep(_node(ed, FN_MUL_FF))
+    _connect(out(glass_sens, WV.ScopeSensitivity), _pin(through, "A"))
+    _set(through, "B", COMBAT.scope_sens_base())
+    scoped = keep(_node(ed, FN_LERP))
+    _set(scoped, "A", 1.0)
+    _connect(out(through), _pin(scoped, "B"))
+    _connect(out(past), _pin(scoped, "Alpha"))
 
     sens = keep(ed.add_get_member_variable_node(WV.MouseSensitivity))
     factor = keep(_node(ed, FN_MUL_FF))
@@ -406,13 +397,11 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
         f"getter off a null Held. Aiming is either key; SightAiming only the "
         f"second, and never with food in hand. The shot's cloud narrows with "
         f"either (accuracy.py). The mouse "
-        f"slows with the zoom rather than with the button: "
-        f"Lerp(1, CurrentFOV/BaseFOV, {COMBAT.ads_sens_compensation:g}) scaling both "
-        f"of the controller's cached look scales, so a 4x scope is slower than "
-        f"1.5x irons for free and the slowdown eases in on the same curve; "
-        f"zoom past the irons scales it by a further ScopeSensitivity "
-        f"(settings screen, default {COMBAT.ads_scope_sens_scale:g}x), so only "
-        f"the scope gets it. "
+        f"is the same on the shoulder and down the irons as with no aim at "
+        f"all; only zoom past the irons slows it, by "
+        f"{COMBAT.scope_sens_base():g} x ScopeSensitivity "
+        f"(settings screen, default {COMBAT.ads_scope_sens_scale:g}x), eased "
+        f"in with the zoom, so only the scope gets it. "
         f"The legs slow too, to {COMBAT.ads_move_speed_scale:g}x BaseSpeed at full "
         f"zoom, normalised by AimZoom -- a second MaxWalkSpeed "
         f"write after the sprint block's, which is what makes releasing the "

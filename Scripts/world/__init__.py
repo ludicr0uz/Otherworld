@@ -21,6 +21,8 @@ Entry point: Scripts/build_day_night.py. Checks: Scripts/verify_day_night.py
   star_texture         T_NightSkyStars: the catalogue drawn as a texture
   day_night_blueprint  BP_DayNightCycle's components, variables, defaults
   day_night_graph      its BeginPlay (take over the level's sky) and Tick
+  ambience             the forest's sound: three looping beds on the cycle,
+                       the day's and the night's faded by DayAmount
   night_cold           the Tick's last step: the player's Temperature falls
                        at night, by NightTemperatureDropPerSecond
   item_highlight       a Tick step: the cycle's ItemHighlight onto

@@ -15,7 +15,9 @@ from combat.audio import (
 from combat.paths import AUDIO_DIR
 from combat.tuning import AUTO_DISPLAYS
 from combat.weapon_specs import _weapon_specs
-from combat.verify.fixtures import _eas, wg
+from combat.verify.fixtures import _eas, h, hg, w, wg
+from combat import voice
+from combat.weapon_component import sounds as component_sounds
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, load
 from npc.monster_tuning import monster_specs
 
@@ -23,9 +25,9 @@ from npc.monster_tuning import monster_specs
 # ─── The sounds themselves ───────────────────────────────────────────────────
 
 def check_sound_assets():
-    # Nine assets cut from CC0 recordings of real firearms by
-    # Scripts/Sound/fetch_weapon_sounds.py, which replaced a synthesiser. The checks are
-    # on the WAVs on disk rather than on the SoundWave assets, because the two
+    # Nine assets cut from recordings of real firearms, the takes chosen by
+    # ear (Scripts/Sound/install_selected_sounds.py). The checks are on the
+    # WAVs on disk rather than on the SoundWave assets, because the two
     # properties worth asserting are properties of the audio and not of the import.
 
 
@@ -54,7 +56,9 @@ def check_sound_assets():
         # and full volume with no sense of where the muzzle was.
         check(f"{name} is mono, so PlaySoundAtLocation can place it",
               channels == 1, f"{channels} channels")
-        check(f"{name} is 44.1 kHz", rate == 44100, str(rate))
+        # The project's own rate (DefaultEngine.ini, AudioSampleRate), so the
+        # engine does not resample it on every play.
+        check(f"{name} is 48 kHz", rate == 48000, str(rate))
         seconds = frames / float(rate)
         check(f"{name} is between 0.2 s and 2.5 s long", 0.2 <= seconds <= 2.5,
               f"{seconds:.2f}s")
@@ -259,6 +263,28 @@ def check_sound_call_sites():
           len(_placed) >= 5, f"{len(_placed)} across {_graphs} graphs")
 
 
+# ─── The takes each graph draws from ─────────────────────────────────────────
+
+def check_sound_tables():
+    # A play node that draws from an empty array is silence and not an error
+    # (the draw is guarded on the length), so a table left unfilled would pass
+    # every other check here and be heard by nobody.
+    for owner, d, tables in (("BP_WeaponComponent", w, component_sounds.SOUND_TAKES),
+                             ("BP_HealthComponent", h, voice.SOUND_TAKES)):
+        for var, names in tables.items():
+            got = [s.get_name() for s in d.get_editor_property(var) if s]
+            check(f"{owner}.{var} holds its {len(names)} take(s)",
+                  got == list(names), str(got))
+    # The player's voice hangs off the blow's stamp, not off Health going down:
+    # a drain lowers Health every frame and would grunt every frame.
+    grunts = [n for n in by_pins(hg, "Sound", "Location")]
+    check("the health component plays two sounds: the player's grunt and their cry",
+          len(grunts) == 2, f"{len(grunts)} PlaySoundAtLocation node(s)")
+    heard = [n for n in hg if "Set HeardDamageTime" in str(BEL.get_node_title(n)).replace("\n", " ")]
+    check("...and the grunt is on LastDamageTime moving: HeardDamageTime is written "
+          "in one place", len(heard) == 1, f"{len(heard)} write(s)")
+
+
 # ─── Heard from the character, not the camera ────────────────────────────────
 
 def check_listener_at_character():
@@ -297,4 +323,5 @@ def run():
     check_sound_assets()
     check_distance_and_direction()
     check_sound_call_sites()
+    check_sound_tables()
     check_listener_at_character()

@@ -126,7 +126,10 @@ SHARED AUTHORING HELPERS
 ASSETS AND PATCHES
   materials         flat materials (gunmetal, wood, blood, brass, impact chip
                     and dust)
-  audio             sound names, attenuation profiles, import + link
+  audio             sound names (from Scripts/Sound's selection), attenuation
+                    profiles, the beds, import + link
+  voice             the player's grunt at a blow and cry at death, on the
+                    health component's Tick
   sound_tuning      sound_tuning.csv: each sound's volume; what the menu's
                     SOUND SETTINGS tab saves and the HUD's table is built from
   sound_mix         a SoundClass per sound on its waves, and A_Mix_Game, the

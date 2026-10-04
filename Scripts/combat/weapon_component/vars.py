@@ -81,11 +81,15 @@ PistolClass = Var("PistolClass")
 ReticleSpread = Var("ReticleSpread")
 ShotgunClass = Var("ShotgunClass")
 Stance = Var("Stance")
+# The component's own sounds, a few takes each (weapon_component/sounds.py).
+SwingSounds = Var("SwingSounds", array(obj("/Script/Engine.SoundBase")))
+ChopSounds = Var("ChopSounds", array(obj("/Script/Engine.SoundBase")))
+MatchSounds = Var("MatchSounds", array(obj("/Script/Engine.SoundBase")))
 
 TABLE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
     Stamina, MaxStamina, Sprinting, Blocking, BaseFOV, CurrentFOV, TargetFOV, Aiming,
     SightAiming, AimZoom, SightBlend, MouseSensitivity, ScopeSensitivity, BaseYawScale,
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
-    BloodClass, HeadshotTime,
+    BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds,
 )

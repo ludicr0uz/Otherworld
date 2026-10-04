@@ -8,7 +8,8 @@ SECTIONS order, on combat.verify.common's check() ledger.
   stars       the star catalogue, the sky's frame, the stars' size beside the
               moon, T_NightSkyStars
   blueprint   BP_DayNightCycle: defaults, components, the graph's key nodes
+  ambience    the three beds on the cycle, and the Tick's fade between two
   levels      what build_day_night.py put in each generated level
 """
 
-SECTIONS = ("config", "sky", "stars", "blueprint", "levels")
+SECTIONS = ("config", "sky", "stars", "blueprint", "ambience", "levels")

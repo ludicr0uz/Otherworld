@@ -2,6 +2,9 @@
 Constants only -- no Blueprint authoring, no graph helpers.
 """
 
+from Sound.sound_candidates.selection import asset_names
+
+
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -34,7 +37,7 @@ STATS_APPLIED_VAR = "StatsApplied"
 # The TuneHealth last written onto the pawn (npc/stats.py): a change re-applies it.
 APPLIED_HEALTH_VAR = "AppliedHealth"
 NEXT_VOICE_VAR = "NextVoiceTime"
-HIT_SOUNDS = tuple(f"/Game/Audio/A_MeleeHit_{i:02d}" for i in (1, 2, 3))
+HIT_SOUNDS = tuple(f"/Game/Audio/{n}" for n in asset_names("melee_hit"))
 
 # This creature's six flinches, carried on the CONTROLLER and copied onto the
 # pawn's health component at possession -- the same route, and for the same

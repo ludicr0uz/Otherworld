@@ -153,10 +153,12 @@ def check_weapon_drop():
           len(picks) == 1, f"{len(picks)} pick(s)")
     check("...and nothing else in the health graph draws from a stream",
           len(draws) == 2, f"{len(draws)} stream draws")
+    # Unseeded draws that decide nothing: which flinch clip, and which take of
+    # the player's grunt and of their death cry (voice.py).
     check("no unseeded RandomIntegerInRange is left in the death path -- the "
-          "only one is the flinch clip pick",
+          "only ones pick a flinch clip and a take of the player's voice",
           len([n for n in by_pins(hg, "Min", "Max")
-               if "RandomInteger" in str(BEL.get_node_title(n))]) <= 1)
+               if "RandomInteger" in str(BEL.get_node_title(n))]) <= 3)
     # Pure draws advance their stream: a second reader would be a second roll.
     for label, nodes in (("drop", rolls), ("pick", picks)):
         if nodes:

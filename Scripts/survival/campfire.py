@@ -51,6 +51,7 @@ from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 
 
 CAMPFIRE_MESH = "/Game/Sourced/Quaternius/Survival/SM_Bonfire_Fire"
+CAMPFIRE_SOUND = "/Game/Audio/A_Campfire"
 CAMPFIRE_SCALE = 0.4
 # The mesh's middle on the ground and its lowest point, in its own units.
 MESH_CENTRE_XY = (8.06, -1.27)
@@ -68,7 +69,7 @@ GLOW_RADIUS_CM = 900.0
 
 
 def _build_model(bp):
-    _drop_components(bp, {"Hearth", "Fire", "Glow"})
+    _drop_components(bp, {"Hearth", "Fire", "Glow", "Crackle"})
     root = _add_component(bp, _root_handle(bp), unreal.SceneComponent, "Hearth")
     fire = _component_object(_add_component(bp, root, unreal.StaticMeshComponent, "Fire"))
     fire.set_editor_property("static_mesh", _must_load(CAMPFIRE_MESH))
@@ -83,6 +84,13 @@ def _build_model(bp):
     glow.set_editor_property("light_color", unreal.Color(r=GLOW_COLOUR[0], g=GLOW_COLOUR[1], b=GLOW_COLOUR[2], a=255))
     glow.set_editor_property("attenuation_radius", GLOW_RADIUS_CM)
     glow.set_editor_property("cast_shadows", False)
+    # The fire's own sound: a looping wave on a component of the fire, so it
+    # starts with the fire and ends with it. How far it carries and how loud
+    # it is are the wave's (combat/audio.py, the SOUND SETTINGS tab).
+    crackle = _component_object(_add_component(bp, root, unreal.AudioComponent, "Crackle"))
+    crackle.set_editor_property("sound", _must_load(CAMPFIRE_SOUND))
+    crackle.set_editor_property("relative_location", unreal.Vector(0.0, 0.0, GLOW_HEIGHT_CM))
+    crackle.set_editor_property("auto_activate", True)
 
 
 def _author_warmth(ed, tick):

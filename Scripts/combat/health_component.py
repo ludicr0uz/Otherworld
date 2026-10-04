@@ -34,6 +34,7 @@ from combat.respawn import (
     _author_world_floor_net,
 )
 from combat.tuning import COMBAT
+from combat.voice import _author_death_voice, _author_hurt_voice, voice_defaults
 from loot.roll import declare_loot_vars
 from uebp.nodes.math import FN_LE_FF
 from uebp.vars import declare, defaults
@@ -145,7 +146,9 @@ def build_health_component(rebuild=True):
     # write and the drain's -- and a wanderer written off this frame, or a
     # starving player drained past zero, dies this frame.
     drained = _author_debuff_drain(ed, tick, (then(write_off), else_(lost)))
-    for e in drained:
+    # A blow is grunted at on the way (voice.py): before the death branch, so
+    # it is heard on a frame the player lives through and on no other.
+    for e in _author_hurt_voice(ed, drained):
         _connect(e, _pin(at_zero, "execute"))
 
     # --- Tick: took a hit and lived --------------------------------------
@@ -169,7 +172,8 @@ def build_health_component(rebuild=True):
     despawn_get = ed.add_get_member_variable_node(HV.DespawnOnDeath)
     should = ed.add_branch_node()
     _connect(out(despawn_get, HV.DespawnOnDeath), _pin(should, "Condition"))
-    _connect(then(mark), _pin(should, "execute"))
+    for e in _author_death_voice(ed, then(mark)):
+        _connect(e, _pin(should, "execute"))
 
     # --- count it, leave a corpse, and later a replacement -------------------------
     counted = _author_kill_count(ed, then(should))
@@ -207,7 +211,7 @@ def build_health_component(rebuild=True):
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_HealthComponent failed to compile")
-    _apply_defaults(bp, {**defaults(HV.TABLE),
+    _apply_defaults(bp, {**defaults(HV.TABLE), **voice_defaults(),
         RESPAWN_DELAY_VAR: RESPAWN_DELAY,
         # Far enough in the past that nothing counts as recently hurt at level
         # start -- a zero here would float every wanderer's bar for the first

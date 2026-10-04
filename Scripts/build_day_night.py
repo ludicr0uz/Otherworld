@@ -21,6 +21,7 @@ import unreal                                                     # noqa: E402
 
 from uebp.graph import BGE, _create_blueprint                     # noqa: E402
 from uebp.layout import arrange                                   # noqa: E402
+from world.ambience import author_ambience, build_beds            # noqa: E402
 from world.day_night_blueprint import (                           # noqa: E402
     apply_config, build_components, declare_variables,
 )
@@ -42,8 +43,10 @@ def build_blueprint():
     bp = _create_blueprint(DAY_NIGHT_BP_PATH, unreal.Actor)
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     build_components(bp)
+    build_beds(bp)
     declare_variables(ed)
     tick, chain = build_graph(bp, ed)
+    author_ambience(ed, chain)
     # Before the cold, whose chain stops at a level with no player.
     author_item_highlight(ed, chain)
     author_night_cold(ed, tick, chain)

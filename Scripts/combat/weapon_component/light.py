@@ -42,6 +42,7 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_IS_VALID_CLASS, FN_OBJECT_CLASS, FN_TRACE
 from combat.weapon_component import vars as WV
+from combat.weapon_component.sounds import _author_sound
 
 
 def _get(ed, name):
@@ -163,6 +164,8 @@ def _author_campfire(ed, held, owner, exec_in):
     _connect(out(at), _pin(fire, "SpawnTransform"))
     _set(fire, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(then(floor), _pin(fire, "execute"))
+    # The match itself, heard where the fire is laid.
+    struck = _author_sound(ed, WV.MatchSounds, out(rests), then(fire))
 
     ed.add_comment_to_nodes(
         "A strike of the matches. With a campfire class to spawn and a piece "
@@ -172,4 +175,4 @@ def _author_campfire(ed, held, owner, exec_in):
         "front of the player, on the ground a trace finds there. The matches "
         "are not spent; with no wood, nothing happens.",
         [known, forget, loop, burns, pick, has_wood, remove, gone, stay, floor, fire])
-    return (then(fire), else_(known), else_(has_wood))
+    return (struck, else_(known), else_(has_wood))

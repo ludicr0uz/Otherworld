@@ -15,6 +15,13 @@ ffmpeg and numpy. Reads `assets/cache/sounds/`, writes
                 (`Scripts/Sound/fetch_freesound_previews.py`)
   dsp.py        decode, trim, split, loop, repitch, write: the signal code
   build.py      runs the table and writes the files and SOURCES.md
+  selection.py  THE CHOICE: which takes were picked for which use, and which
+                of them the game plays; the builders read the names from it
+  install.py    writes the chosen takes to assets/generated/sounds, as the
+                sounds the game imports (`Scripts/Sound/install_selected_sounds.py`)
+  free_packs.py the small CC0 packs fetched whole, and what is fetched by
+                hand (`Scripts/Sound/fetch_free_packs.py`)
   audition.py   the HTML page that plays every candidate and every sound the
-                game has now (`Scripts/Sound/build_sound_audition.py`)
+                game has now, with a rating a take (`Scripts/Sound/build_sound_audition.py`)
+  audition_selected.py  the page's second tab: the selection, use by use
 """

@@ -3,7 +3,7 @@ the name, the pin type and the default (uebp/vars.py). The builder declares
 TABLE; a row with no type is a component, or a variable declared elsewhere.
 """
 
-from uebp.vars import BOOL, FLOAT, VECTOR, Var, array, cls
+from uebp.vars import BOOL, FLOAT, VECTOR, Var, array, cls, obj
 from combat.tuning import COMBAT
 
 Health = Var("Health", FLOAT, COMBAT.start_health)
@@ -26,8 +26,14 @@ DropClasses = Var("DropClasses", array(cls("/Script/Engine.Actor")))
 # spawn -- the request, then whichever navmesh point it resolved to -- so
 # that the random draw and the nav query are each evaluated exactly once.
 RespawnPoint = Var("RespawnPoint", VECTOR)
+# The player's voice (voice.py): the takes of a grunt and of a death cry, and
+# the last blow already grunted at. The time has no default here: it is
+# NEVER_DAMAGED, as LastDamageTime's is, and the builder gives both.
+HurtSounds = Var("HurtSounds", array(obj("/Script/Engine.SoundBase")))
+DeathSounds = Var("DeathSounds", array(obj("/Script/Engine.SoundBase")))
+HeardDamageTime = Var("HeardDamageTime", FLOAT)
 
 TABLE = (
     Health, MaxHealth, Dead, DespawnOnDeath, RespawnClass, AmmoClass, DropClasses,
-    RespawnPoint,
+    RespawnPoint, HurtSounds, DeathSounds, HeardDamageTime,
 )

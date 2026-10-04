@@ -2,26 +2,52 @@
 
 Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
-## Audio (`audio.py`, `Scripts/Sound/fetch_weapon_sounds.py`)
+## Audio (`audio.py`, `Scripts/Sound/`)
 
-- **The nine weapon sounds are cut from CC0 recordings.**
-  - The five gunshots all come from *The Free Firearm Sound Library*, so they share room and
-    distance. The handling sounds come from two OpenGameArt packs.
-  - The license is **CC0 only**, because there is no credits screen.
-  - The fetcher downloads and caches into `assets/cache/sounds` using curl, bsdtar (for 7z),
-    afconvert and `wave`, and cuts into `assets/generated/sounds`.
-- **Rules baked into the samples:**
-  - mono 44.1 kHz 16-bit, because a stereo sound can't be spatialised;
+- **Every sound is a recording, chosen by ear.** The takes were cut from downloaded packs
+  into candidates, rated on an audition page, and the chosen ones are listed in
+  `Scripts/Sound/sound_candidates/selection.py`: one row per use, its takes, and whether the
+  game plays it. `Scripts/Sound/install_selected_sounds.py` writes each `in game` row to
+  `assets/generated/sounds/<asset>.wav` (and `SELECTED.md` beside them: what each was cut
+  from). `audio.py` reads the same table for the names and how many takes there are, so a
+  take added to a row is a take in the game after an install and a weapons build.
+  - **Licences:** CC0 (the Free Firearm Sound Library, Nox Sound, Kenney, OpenGameArt) or the
+    Sonniss GDC bundle licence, which asks for no credit either. There is no credits screen,
+    so nothing that needs one is used. `assets/generated/sound_candidates/SOURCES.md` has
+    each take's source.
+  - **What is still missing, and what is chosen and not yet played:**
+    `Scripts/Sound/docs/missing_sounds.md`.
+- **`import_sounds()` re-imports a wave whose WAV is newer than its asset,** so a take chosen
+  again reaches the game. One that is unchanged is skipped.
+- **Rules of the samples:**
+  - mono, 48 kHz (the project's rate), 16-bit: a stereo sound can't be spatialised;
   - automatics cut quieter (peak < 0.80), with `length ÷ FireInterval ≤ 12` asserted;
-  - shots truncated and faded, handling sounds not;
-  - `_count_shots()` raises unless a gunshot cut has exactly one onset. One "single shot" take
-    was a four-round burst.
-- **`ReloadSound` is per weapon:** pump, magazine or hand-fed. `DryFireSound` is shared.
+  - a weapon sound is 0.2 to 2.5 s; shots are truncated and faded.
+- **A reload is put together from parts** (`selection.py`'s `recipe`): shells and the action,
+  or a magazine out, a magazine in and a bolt, each at its own start. They were laid out by
+  each part's length, not by ear: listen to them. `ReloadSound` is per weapon; `DryFireSound`
+  is shared.
+- **The beds are the one kind of sound that is not placed** (`audio.BED_NAMES`, in
+  `/Game/Audio/Beds`): the day's birds, the night and the wind. Stereo, looping, no
+  attenuation, playing on at volume zero. `BP_DayNightCycle` plays them and fades the day's
+  into the night's by `DayAmount` (`Scripts/world/CLAUDE.md`). They are in a folder below
+  the one the attenuation sweep reads, so "every wave in the two audio folders is placed"
+  still holds.
+- **The campfire's sound is a component of the fire** (`survival/campfire.py`, `Crackle`):
+  a looping, placed wave that starts and ends with the actor.
+- **The component's own sounds** (`weapon_component/sounds.py`): `SwingSounds` as a punch
+  or a slash starts, `ChopSounds` at the axe's cut in a tree, `MatchSounds` where a campfire
+  is laid. Arrays of takes on `BP_WeaponComponent`, one drawn per play; empty is silence.
+- **The player's voice** (`voice.py`, on `BP_HealthComponent`): a grunt when
+  `LastDamageTime` moves (a blow: a drain does not stamp it, and would grunt every frame),
+  on the player (`DespawnOnDeath` false) while alive; a cry as `Dead` is set. The wanderers
+  have no hurt or death takes yet.
 - **Where each sound fires:**
   - The dry click fires on the ready gate's False arm when `empty AND cooled AND tapped`.
   - The reload clack fires only on the reload's True arm.
 - **Attenuation:** four `USoundAttenuation` assets in `/Game/Audio`, all `NATURAL_SOUND` and
-  spherical:
+  spherical (the axe's chop and a melee hit carry as a creature's voice does; the player's
+  voice, a swing, a match and the campfire as foley):
   - `A_Att_Gunfire`: 2 m → 100 m, with a low-pass;
   - `A_Att_Creature`: 1.5 → 40 m;
   - `A_Att_WendigoRoar`: 1.5 m → 1.75 × the wendigo's aggro range (`ROAR_REACH_X_AGGRO`;
@@ -48,9 +74,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 ## Volumes (`sound_tuning.py`, `sound_mix.py`)
 
 - **Each sound has one volume, in `sound_tuning.csv`** (`sound,volume`; 1 = as recorded, 0 =
-  silent, at most 2). A "sound" is a row of `sound_tuning.SOUND_STATS`: the footsteps (four
+  silent, at most 2). A "sound" is a row of `sound_tuning.SOUND_STATS`: the footsteps (six
   takes, one row, 0.4: they drowned the forest at 1), each gun's shot, the dry click, the
-  three reloads, the melee hit, the zombie's growl, the wendigo's roar.
+  three reloads, the melee hit and swing, the axe's chop, the zombie's growl, the wendigo's
+  roar, the player's hit and death, the match, the campfire, and the three beds.
 - **A row is a `SoundClass`** (`/Game/Audio/A_Class_<Sound>`), set on each of its waves by
   `sound_mix.build_sound_mix()`, as the attenuation is: on the asset, so no play site carries
   a volume. `/Game/Audio/A_Mix_Game` is an empty `SoundMix`.

@@ -16,6 +16,8 @@ import os
 import urllib.parse
 import wave
 
+from sound_candidates import audition_selected
+
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
 GENERATED_DIR = os.path.join(_PROJECT_DIR, "assets", "generated")
@@ -201,11 +203,24 @@ document.addEventListener('keydown', e => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === 'Space') { e.preventDefault(); stop(); return; }
-  if (!focused) return;
+  if (!focused || !focused.classList.contains('take')) return;   // a pick is not rated
   if (e.key === '0') { rate(focused, null); return; }
   const hit = RATINGS.find(r => r.digit === e.key);
   if (hit) rate(focused, hit.key);
 });
+
+// The two tabs: every sound, and the selection.
+const VIEW_KEY = 'otherworld-sound-view';
+function show(view) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+  document.querySelectorAll('[data-in]').forEach(el => { el.hidden = el.dataset.in !== view; });
+  try { localStorage.setItem(VIEW_KEY, view); } catch (e) {}
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => show(b.dataset.view)));
+let view = 'all';
+try { view = localStorage.getItem(VIEW_KEY) || 'all'; } catch (e) {}
+show(view === 'selected' ? 'selected' : 'all');
+document.querySelectorAll('button.pick').forEach(p => p.addEventListener('click', () => play(p)));
 
 // Ratings live in this browser only; the textarea is how they leave it.
 const KEY = 'otherworld-sound-ratings';
@@ -344,6 +359,7 @@ def _take_label(take):
 def render(groups):
     e = html.escape
     total = sum(len(takes) for _c, sounds in groups for _s, takes in sounds)
+    selected_html, selected_count = audition_selected.render()
     nav, body = [], []
     for category, sounds in groups:
         count = sum(len(takes) for _s, takes in sounds)
@@ -367,9 +383,11 @@ def render(groups):
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Otherworld sound audition</title>
-<style>{_STYLE}</style></head><body>
+<style>{_STYLE}{audition_selected.STYLE}</style></head><body>
 <header>
-  <h1>Otherworld sound audition &middot; {total} sounds</h1>
+  <h1>Otherworld sound audition
+    <span class="tabs"><button data-view="all">All sounds &middot; {total}</button><button
+      data-view="selected">Selected &middot; {selected_count}</button></span></h1>
   <div class="bar">
     <input type="search" id="filter" placeholder="Filter by name or category">
     <label>Volume <input type="range" id="volume" min="0" max="1" step="0.05" value="0.8"></label>
@@ -378,12 +396,13 @@ def render(groups):
     <label><input type="checkbox" id="loop" checked> Loop ambience and fire</label>
     <span id="now"></span>
   </div>
-  <nav>{"".join(nav)}<a href="#picks">ratings</a></nav>
-  <div class="hint">Rate the last take played with <kbd>5</kbd> great, <kbd>4</kbd> ok,
+  <nav data-in="all">{"".join(nav)}<a href="#picks">ratings</a></nav>
+  <div class="hint" data-in="all">Rate the last take played with <kbd>5</kbd> great, <kbd>4</kbd> ok,
     <kbd>3</kbd> neutral, <kbd>2</kbd> bad, <kbd>1</kbd> very bad, <kbd>6</kbd> good but for another use (with a note), <kbd>0</kbd> clear.
     <kbd>Space</kbd> stops.</div>
 </header>
-<main>
+<main data-in="selected">{selected_html}</main>
+<main data-in="all">
 {"".join(body)}
 <section id="picks">
   <h2>Ratings &middot; <span id="ratedcount">0</span> rated</h2>

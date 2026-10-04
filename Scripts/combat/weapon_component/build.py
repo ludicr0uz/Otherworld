@@ -90,6 +90,7 @@ from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
 from uebp.vars import declare, defaults
 from combat.sprint_tuning import BASE_SPEED_VAR
+from combat.weapon_component.sounds import sound_defaults
 from combat.weapon_component import vars as WV
 
 
@@ -310,7 +311,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
-    _apply_defaults(bp, {**defaults(WV.TABLE),
+    _apply_defaults(bp, {**defaults(WV.TABLE), **sound_defaults(),
         # Overwritten on the first frame of BeginPlay with the character's
         # own walk speed, which is this same number (player_pace.py).
         BASE_SPEED_VAR: COMBAT.jog_speed_cms,

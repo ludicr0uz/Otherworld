@@ -84,7 +84,10 @@ DOWNLOADS = (
 # The 7-Zip archive holds 104 takes across 22 firearms, several takes per file
 # with seconds of silence between them. Only these five are unpacked.
 ARCHIVE_ROOT = "Prepared SFX Library"
-ARCHIVE_WANTED = ("1911", "Mossberg", "Carl Gustav M45", "AK-47", "Mosin Nagant")
+# The Nova and the Model 12 are the pump-action shotguns the candidate cutter
+# reads (sound_candidates/manifest.py); the Mossberg here is a bolt action.
+ARCHIVE_WANTED = ("1911", "Mossberg", "Carl Gustav M45", "AK-47", "Mosin Nagant", "Nova",
+                  "Model 12")
 
 # ─── What each output is cut from ────────────────────────────────────────────
 #

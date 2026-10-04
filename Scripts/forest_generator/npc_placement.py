@@ -19,6 +19,8 @@ import math
 import random
 from dataclasses import dataclass
 
+from Sound.sound_candidates.selection import asset_names
+
 from .terrain import get_exact_mesh_z
 
 
@@ -114,8 +116,8 @@ NPC_BASE_HEALTH = 100.0
 # any that are missing, so a checkout that has not run the sound script still
 # gets silent monsters rather than a failed build.
 CREATURE_AUDIO_DIR = "/Game/Audio"
-ZOMBIE_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/A_ZombieGrowl_{i:02d}" for i in (1, 2, 3))
-WENDIGO_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/A_WendigoRoar_{i:02d}" for i in (1, 2, 3))
+ZOMBIE_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/{n}" for n in asset_names("zombie_growl"))
+WENDIGO_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/{n}" for n in asset_names("wendigo_roar"))
 
 # How often a wanderer makes a noise, drawn uniformly per utterance. Tuned
 # against the PACK and not against one monster: ten of them on a 4-9 s timer is

@@ -19,7 +19,7 @@ per wave.
 
 import unreal
 
-from combat.audio import CREATURE_AUDIO_DIR, SOUND_ATTENUATION
+from combat.audio import BED_DIR, BED_NAMES, CREATURE_AUDIO_DIR, SOUND_ATTENUATION
 from combat.log import _log
 from combat.paths import AUDIO_DIR
 from combat.sound_tuning import SOUND_STATS, class_name
@@ -36,8 +36,8 @@ def class_path(sound):
 
 
 def wave_path(name):
-    """A wave's asset, in whichever of the two audio folders holds it."""
-    for folder in (AUDIO_DIR, CREATURE_AUDIO_DIR):
+    """A wave's asset, in whichever of the audio folders holds it."""
+    for folder in (AUDIO_DIR, CREATURE_AUDIO_DIR, BED_DIR):
         if _assets().does_asset_exist(f"{folder}/{name}"):
             return f"{folder}/{name}"
     raise RuntimeError(f"no SoundWave named {name} in {AUDIO_DIR} or {CREATURE_AUDIO_DIR}")
@@ -59,7 +59,7 @@ def build_sound_mix():
     Raises on a wave with no row, or in two: it would play at no one's volume."""
     eas = _assets()
     rows = [name for s in SOUND_STATS for name in s[2]]
-    stray = sorted(set(SOUND_ATTENUATION) ^ set(rows))
+    stray = sorted((set(SOUND_ATTENUATION) | set(BED_NAMES)) ^ set(rows))
     if stray or len(rows) != len(set(rows)):
         raise RuntimeError(f"sound_tuning.SOUND_STATS and the game's waves differ: "
                            f"{stray or 'a wave is in two rows'}")

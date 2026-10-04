@@ -11,12 +11,15 @@ from combat.log import _log
 from uebp.graph import _assets
 from combat.paths import AUDIO_DIR
 from npc.monster_tuning import monster_specs
+# Which takes were chosen for each sound, and so how many of each there are
+# (Scripts/Sound/sound_candidates/selection.py; pure Python).
+from Sound.sound_candidates.selection import asset_names
 
 
-# The mechanical sounds. All of these, and the five gunshots, are now cut from
-# CC0 recordings of real firearms by Scripts/Sound/fetch_weapon_sounds.py -- see that
-# file for the sources and for why every one of them is public domain rather
-# than merely free.
+# The mechanical sounds. All of these, and the five gunshots, are cut from
+# recordings of real firearms. Which take each one is was chosen by ear on the
+# audition page, and Scripts/Sound/install_selected_sounds.py writes the WAVs
+# (assets/generated/sounds/SELECTED.md says what each was cut from).
 #
 # The click stays SHARED by all five weapons: a hammer falling on an empty
 # chamber genuinely is the same noise in every receiver, and five copies would
@@ -57,16 +60,41 @@ RETIRED_SOUNDS = (f"{AUDIO_DIR}/A_Reload",)
 # gunshots are -- it is the only importer that exists -- but nothing about them
 # is a weapon.
 #
-# The .wav files come from Scripts/Sound/make_creature_sounds.py, which synthesises
-# rather than cutting from recordings; that file's docstring says why that is
-# the right call for these and the wrong one for gunfire.
+# The .wav files are recordings now, as the gunshots are: the selection names
+# the takes and how many there are of each, so a take added there is a take
+# here. (Scripts/Sound/make_creature_sounds.py synthesised the first set.)
 CREATURE_AUDIO_DIR = "/Game/Audio"
-FOOTSTEP_NAMES = tuple(f"A_Footstep_{i:02d}" for i in (1, 2, 3, 4))
-MELEE_HIT_NAMES = tuple(f"A_MeleeHit_{i:02d}" for i in (1, 2, 3))
-WENDIGO_ROAR_NAMES = tuple(f"A_WendigoRoar_{i:02d}" for i in (1, 2, 3))
-CREATURE_VOICE_NAMES = (tuple(f"A_ZombieGrowl_{i:02d}" for i in (1, 2, 3))
-                        + WENDIGO_ROAR_NAMES)
-CREATURE_SOUND_NAMES = FOOTSTEP_NAMES + MELEE_HIT_NAMES + CREATURE_VOICE_NAMES
+FOOTSTEP_NAMES = asset_names("footsteps")
+MELEE_HIT_NAMES = asset_names("melee_hit")
+WENDIGO_ROAR_NAMES = asset_names("wendigo_roar")
+ZOMBIE_GROWL_NAMES = asset_names("zombie_growl")
+CREATURE_VOICE_NAMES = ZOMBIE_GROWL_NAMES + WENDIGO_ROAR_NAMES
+# What the first set had no sound for at all. The player's own voice, a swing
+# through the air, the axe on a trunk, a match, and a campfire, which loops.
+PLAYER_HIT_NAMES = asset_names("player_hit")
+PLAYER_DEATH_NAMES = asset_names("player_death")
+MELEE_SWING_NAMES = asset_names("melee_swing")
+AXE_CHOP_NAMES = asset_names("axe_chop")
+MATCH_NAMES = asset_names("match")
+CAMPFIRE_NAMES = asset_names("campfire")
+LOOPING_NAMES = CAMPFIRE_NAMES
+
+# ── The beds ─────────────────────────────────────────────────────────────────
+#
+# The one kind of sound that is NOT something in the level making a noise at a
+# place: the forest itself, by day and by night, and the wind. A bed is
+# stereo, loops, and has no attenuation profile on purpose -- it is all round
+# the player wherever they stand. They live in a folder of their own, below
+# the one apply_attenuation() sweeps, so that sweep still means what it says:
+# every wave in the two audio folders is placed, and a flat one there is a
+# mistake. BP_DayNightCycle plays them (world/ambience.py).
+BED_DIR = f"{CREATURE_AUDIO_DIR}/Beds"
+BED_DAY, BED_NIGHT, BED_WIND = (asset_names(key)[0] for key in
+                                ("ambience_day", "ambience_night", "ambience_wind"))
+BED_NAMES = (BED_DAY, BED_NIGHT, BED_WIND)
+CREATURE_SOUND_NAMES = (FOOTSTEP_NAMES + MELEE_HIT_NAMES + CREATURE_VOICE_NAMES
+                        + PLAYER_HIT_NAMES + PLAYER_DEATH_NAMES + MELEE_SWING_NAMES
+                        + AXE_CHOP_NAMES + MATCH_NAMES + CAMPFIRE_NAMES)
 
 # ── How far each of them carries ─────────────────────────────────────────────
 #
@@ -180,10 +208,14 @@ ATTENUATIONS = (ATT_GUNFIRE, ATT_CREATURE, ATT_ROAR, ATT_FOLEY)
 # a second non-attenuated footstep path whose only purpose is to be wrong about
 # where the player's feet are, and because a step that pans as you turn is the
 # cheapest cue in the game that the audio is placed at all.
+# The axe on a trunk carries as a creature's voice does: it is the loudest
+# thing a player does without a gun, and the wanderers' hearing of it is the
+# chop's own noise event, not this.
 SOUND_ATTENUATION = dict(
     [(n, ATT_GUNFIRE) for n in GUNSHOT_NAMES]
-    + [(n, ATT_FOLEY) for n in HANDLING_NAMES + FOOTSTEP_NAMES]
-    + [(n, ATT_CREATURE) for n in MELEE_HIT_NAMES + CREATURE_VOICE_NAMES]
+    + [(n, ATT_FOLEY) for n in HANDLING_NAMES + FOOTSTEP_NAMES + PLAYER_HIT_NAMES
+       + PLAYER_DEATH_NAMES + MELEE_SWING_NAMES + MATCH_NAMES + CAMPFIRE_NAMES]
+    + [(n, ATT_CREATURE) for n in MELEE_HIT_NAMES + CREATURE_VOICE_NAMES + AXE_CHOP_NAMES]
     + [(n, ATT_ROAR) for n in WENDIGO_ROAR_NAMES])
 
 # <project>/assets/generated/sounds -- this file is Scripts/combat/audio.py.
@@ -294,34 +326,42 @@ def apply_attenuation(attenuations):
     return applied
 
 
-def import_sounds():
-    """Import the WAVs as SoundWave assets.
+def _wav_is_newer(src, dest):
+    """True if the WAV was written after the SoundWave it was imported as.
+    A take chosen again is a new WAV under an old name, and an import that
+    skipped every asset that exists would never hear of it."""
+    package = unreal.Paths.convert_relative_path_to_full(
+        unreal.Paths.project_content_dir()) + dest[len("/Game/"):] + ".uasset"
+    return not os.path.isfile(package) or os.path.getmtime(src) > os.path.getmtime(package)
 
-    Two folders and two sources. The gunshots are cut from CC0 recordings by
-    Scripts/Sound/fetch_weapon_sounds.py, which is run by hand rather than from
-    main() -- it reaches the network and unpacks 194 MB, which is not something
-    an asset build should do on every invocation. The foley and the monster
-    voices are synthesised by Scripts/Sound/make_creature_sounds.py, which is cheap
-    and offline. Both write into assets/generated/sounds; the cut and
-    synthesised files are committed, the downloads are not.
+
+def import_sounds():
+    """Import the WAVs as SoundWave assets, each one whose WAV is new or newer
+    than its asset.
+
+    Two folders, one source: assets/generated/sounds, written by
+    Scripts/Sound/install_selected_sounds.py from the takes chosen on the
+    audition page. It is run by hand rather than from main(): what it cuts
+    from is gigabytes of downloaded packs, which an asset build should not
+    need on every invocation.
 
     Nothing in /Engine/Content is a usable gunshot -- or footstep, or growl --
     which is why this project supplies its own at all.
     """
     eas = _assets()
     made = []
-    groups = ((AUDIO_DIR, SOUND_NAMES, "Scripts/Sound/fetch_weapon_sounds.py"),
-              (CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES,
-               "Scripts/Sound/make_creature_sounds.py"))
-    for folder, names, how in groups:
+    how = "Scripts/Sound/install_selected_sounds.py"
+    groups = ((AUDIO_DIR, SOUND_NAMES), (CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES),
+              (BED_DIR, BED_NAMES))
+    for folder, names in groups:
       for name in names:
         dest = f"{folder}/{name}"
-        if eas.does_asset_exist(dest):
-            made.append(dest)
-            continue
         src = os.path.join(SOUND_SRC_DIR, f"{name}.wav")
         if not os.path.isfile(src):
             raise RuntimeError(f"missing {src} -- run {how}")
+        if eas.does_asset_exist(dest) and not _wav_is_newer(src, dest):
+            made.append(dest)
+            continue
         task = unreal.AssetImportTask()
         task.set_editor_property("filename", src)
         task.set_editor_property("destination_path", folder)
@@ -334,4 +374,19 @@ def import_sounds():
             raise RuntimeError(f"import produced no asset at {dest}")
         made.append(dest)
         _log(f"imported {dest}")
+    # A fire does not end. Set every run, not only on import: it is a
+    # property of the asset, and an import leaves it off.
+    for name in LOOPING_NAMES:
+        wave = eas.load_asset(f"{CREATURE_AUDIO_DIR}/{name}")
+        wave.set_editor_property("looping", True)
+        eas.save_loaded_asset(wave)
+    # A bed loops, and goes on playing at volume zero: the day's birds fade
+    # out at dusk and back in at dawn, and a wave the mixer dropped at zero
+    # would start again from its first second each time.
+    for name in BED_NAMES:
+        wave = eas.load_asset(f"{BED_DIR}/{name}")
+        wave.set_editor_property("looping", True)
+        wave.set_editor_property("virtualization_mode",
+                                 unreal.VirtualizationMode.PLAY_WHEN_SILENT)
+        eas.save_loaded_asset(wave)
     return made

@@ -127,7 +127,7 @@ CREATURES = (
     ("each", "creatures/wendigo/trex", f"{SON}/*Dinosaurs Vol. 1/*T Rex*.wav", dict(peak=0.9)),
     ("split", "creatures/wendigo/herbivore_roar", f"{SON}/*Dinosaurs Vol. 2/*Large Herbivore Roar*.wav", dict(peak=0.9, gap_ms=400.0)),
     ("each", "creatures/wendigo/deep_roar", f"{OGA}/cc0-deep-monster-roar/monster_roar.wav", dict(peak=0.9)),
-    ("split", "creatures/wendigo/troll_roar", f"{OGA}/big-scary-troll-sounds/troll-roars.ogg", dict(peak=0.9)),
+    ("split", "creatures/wendigo/troll_roar", f"{OGA}/big-scary-troll-sounds/troll-roars_0.ogg", dict(peak=0.9)),
     ("each", "creatures/wendigo/death_whistle", f"{SON}/*Death Whistle*/*Distortion*.wav", dict(peak=0.9)),
     ("each", "creatures/wendigo/death_whistle_dry", f"{SON}/*Death Whistle*/*DryPitch*.wav", dict(peak=0.9)),
     # A scream over a body: the whistle is the wendigo's shriek, the growl

@@ -43,6 +43,7 @@ from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_SPHERE_TRACE, FN_TIME_SECONDS
 from combat import health_vars as HV
 from combat.weapon_component import vars as WV
+from combat.weapon_component.sounds import _author_sound
 
 PUNCH_ANIM_VAR = "PunchAnim"
 PUNCH_QUEUED_VAR = "PunchQueued"
@@ -158,14 +159,20 @@ def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
     _set(play, "InPlayRate", 1.0)
     _set(play, "LoopCount", 1)
     _connect(step, _pin(play, "execute"))
+    # ...and the air it moves, heard at the player.
+    owner = _node(ed, FN_GET_OWNER)
+    here = _node(ed, FN_ACTOR_LOC)
+    _connect(out(owner), _pin(here, "self"))
+    swung = _author_sound(ed, WV.SwingSounds, out(here), then(play))
 
     ed.add_comment_to_nodes(
         f"The {strike.name}'s swing: stamp the cooldown and when the blow lands, "
-        f"then play the clip into {AIM_SLOT}, upper body only.",
+        f"then play the clip into {AIM_SLOT}, upper body only, and one of the "
+        f"swing's sounds.",
         [swing, play])
 
     # --- blow ----------------------------------------------------------------
-    return _author_blow(ed, strike, (then(play), else_(swing)), scenery, damage)
+    return _author_blow(ed, strike, (swung, else_(swing)), scenery, damage)
 
 
 def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):

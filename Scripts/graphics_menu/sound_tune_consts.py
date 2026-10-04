@@ -39,6 +39,9 @@ SOUND_TUNE_MAXS_VAR = "SoundTuneMaxs"
 SOUND_TUNE_APPLIED_VAR = "SoundTuneApplied"
 
 SOUND_SUBJECT = "volume"
+# One row a sound, and there are more sounds than the panel is tall: the list
+# scrolls, as MONSTER SETTINGS' does.
+SOUND_VISIBLE_ROWS = 14
 SOUND_STAT_COUNT = len(SOUND_STATS)
 
 SOUND_TUNE_SAVE_COMMAND = save_command("graphics_menu.sound_tune_save")
@@ -59,4 +62,4 @@ SOUND_TAB = TuneTab(
     hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                "ENTER  save to sound_tuning.csv"),
     saved_words="saved to Scripts/combat/sound_tuning.csv",
-    fraction_digits=2, maxs_var=SOUND_TUNE_MAXS_VAR)
+    fraction_digits=2, maxs_var=SOUND_TUNE_MAXS_VAR, visible_rows=SOUND_VISIBLE_ROWS)

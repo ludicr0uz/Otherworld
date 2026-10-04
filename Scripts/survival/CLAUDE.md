@@ -104,6 +104,9 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
 - **It draws the zombies:** one on patrol within 200 m walks to a burning fire
   (`Scripts/npc/CLAUDE.md`, `npc/drawn.py`; the NPC build names `BP_Campfire`, so it runs
   after this one).
+- **It crackles:** `Crackle`, an AudioComponent playing `/Game/Audio/A_Campfire`, a looping
+  placed wave (how far and how loud are the wave's: `Scripts/combat/docs/audio.md`). On a
+  component so that it ends with the fire. The weapons build imports the wave: run it first.
 - `probes/probe_campfire.py` cuts wood, strikes, and measures the warmth in and out of the
   radius. It raises the fire's rate for the run and zeroes the night's cold.
 

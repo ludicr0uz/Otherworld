@@ -678,8 +678,10 @@ keys as GUN SETTINGS; **Enter** saves `Scripts/combat/player_tuning.csv`.
 ## The SOUND SETTINGS tab (`sound_tune_*.py`)
 
 **Its menu row** opens it (`SoundTuneOpen`). One subject row (`volume`), then
-`combat/sound_tuning.SOUND_STATS`: one row per sound (the footsteps, each gun's shot, the dry
-click, the reloads, the melee hit, the growl, the roar), its volume as a multiplier (step
+`combat/sound_tuning.SOUND_STATS`: one row per sound (22: the footsteps, each gun's shot, the
+dry click, the reloads, the melee hit and swing, the chop, the growl, the roar, the player's
+hit and death, the match, the campfire and the three beds), behind a scroll bar
+(`SOUND_VISIBLE_ROWS`, 14 at a time, as MONSTER SETTINGS), its volume as a multiplier (step
 0.05, from 0 to 2: the tab has maximums, `SoundTuneMaxs`). Same keys as GUN SETTINGS;
 **Enter** saves `Scripts/combat/sound_tuning.csv`.
 

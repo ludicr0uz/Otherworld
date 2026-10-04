@@ -3,7 +3,7 @@ sound mix (combat/sound_mix.py). The volumes themselves are the HUD's table:
 verify_graphics_menu (graphics_menu/sound_tune_checks.py).
 """
 
-from combat.audio import SOUND_ATTENUATION
+from combat.audio import BED_NAMES, SOUND_ATTENUATION
 from combat.sound_mix import SOUND_CLASS_PROP, SOUND_MIX_PATH, class_path, wave_path
 from combat.sound_tuning import FOOTSTEPS, SOUND_STATS, table
 from combat.verify.common import check, load
@@ -13,7 +13,8 @@ from combat.verify.fixtures import _eas
 def check_sound_classes():
     rows = [name for s in SOUND_STATS for name in s[2]]
     check("every sound of the game is in exactly one row of the sound tuning table",
-          sorted(rows) == sorted(SOUND_ATTENUATION), str(sorted(set(rows) ^ set(SOUND_ATTENUATION))))
+          sorted(rows) == sorted(tuple(SOUND_ATTENUATION) + BED_NAMES),
+          str(sorted(set(rows) ^ (set(SOUND_ATTENUATION) | set(BED_NAMES)))))
     wrong = []
     for sound, _label, waves, _default in SOUND_STATS:
         path = class_path(sound)

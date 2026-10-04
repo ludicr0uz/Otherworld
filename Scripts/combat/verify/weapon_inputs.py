@@ -205,8 +205,11 @@ def check_keys_are_variables():
         check(f"{var} exists on the weapon component for the HUD to read",
               isinstance(value, kind), type(value).__name__)
 
-    check("the component plays three sounds: the shot, the click and the reload",
-          len(by_pins(wg, "Sound", "Location")) == 3,
+    # The guns' three, and the component's own (weapon_component/sounds.py):
+    # a swing for the punch and one for the blade, the axe on a tree, a match.
+    check("the component plays seven sounds: the shot, the click, the reload, "
+          "the fist's swing and the blade's, the chop and the match",
+          len(by_pins(wg, "Sound", "Location")) == 7,
           f"{len(by_pins(wg, 'Sound', 'Location'))} PlaySoundAtLocation node(s)")
     check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,
           f"{len(by_pins(wg, 'Class', 'SpawnTransform'))} spawn nodes "

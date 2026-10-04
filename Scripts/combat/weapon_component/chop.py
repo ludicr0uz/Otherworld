@@ -48,6 +48,7 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_INSTANCED, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
 from combat.weapon_component import vars as WV
+from combat.weapon_component.sounds import _author_sound
 
 
 def _get(ed, name):
@@ -94,6 +95,8 @@ def _author_chop(ed, brk, exec_in):
     _connect(cut, _pin(where, "Location"))
     _connect(out(face), _pin(where, "Rotation"))
     _cls, chipped = _author_surface_impact(ed, where, then(tree))
+    # ...and the sound of the axe in the wood, from the cut.
+    heard = _author_sound(ed, WV.ChopSounds, cut, then(chipped))
 
     # --- the count, on this tree ----------------------------------------------
     same_comp = _node(ed, FN_EQ_OO)
@@ -113,7 +116,7 @@ def _author_chop(ed, brk, exec_in):
     _set(count, "B", 1)
     _connect(out(same), _pin(count, "bPickA"))
     # The count first: it is the one write that reads ChopTree and ChopItem.
-    step = _store(ed, CHOP_COUNT_VAR, then(chipped), pin=out(count))
+    step = _store(ed, CHOP_COUNT_VAR, heard, pin=out(count))
     step = _store(ed, CHOP_TREE_VAR, step, pin=struck)
     step = _store(ed, CHOP_ITEM_VAR, step, pin=which)
 

@@ -69,6 +69,22 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
 - **`import_<Level>.py` rebuilds a level from scratch.** Re-run `build_day_night.py` after it,
   as with `place_forage.py`.
 
+## The forest's sound (`ambience.py`)
+
+- **Three looping beds on the cycle actor:** `BedDay` (birds), `BedNight` (crickets and owls)
+  and `BedWind`, each an AudioComponent playing a stereo wave of `/Game/Audio/Beds`
+  (`combat/audio.py`, `BED_NAMES`; which recordings is `Scripts/Sound`'s selection). Not
+  spatialised: where the actor stands does not matter.
+- **Tick fades the day's into the night's by `DayAmount`:** `BedDay`'s volume is
+  `DayAmount`, `BedNight`'s `1 - DayAmount`; the wind plays on. A bed at zero goes on
+  playing (the wave's virtualization mode), so it keeps its place.
+- **How loud** is each bed's row on the SOUND SETTINGS tab (`day birds`, `night`, `wind`),
+  which the component's volume multiplies.
+- **Checks:** `world/verify/ambience.py`; `probe_ambience.py` jumps the clock to noon and to
+  midnight and reads the two volumes.
+- **Run the weapons build first:** it imports the waves. It needs a play session: the
+  levels against the guns, and whether dusk's cross-fade is too long.
+
 ## The stars are the real ones (`star_catalogue.py`, `star_map.py`, `star_texture.py`)
 
 - **The layout is the real sky.** `star_catalogue.csv` is the Yale Bright Star Catalogue

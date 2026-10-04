@@ -1,11 +1,11 @@
 """verify.sound_mix -- each sound's SoundClass on its waves, and the game's
-sound mix (combat/sound_mix.py). The volumes themselves are the HUD's table:
+sound mix (Sound/mix.py). The volumes themselves are the HUD's table:
 verify_graphics_menu (graphics_menu/sound_tune_checks.py).
 """
 
-from combat.audio import BED_NAMES, SOUND_ATTENUATION
-from combat.sound_mix import SOUND_CLASS_PROP, SOUND_MIX_PATH, class_path, wave_path
-from combat.sound_tuning import FOOTSTEPS, SOUND_STATS, table
+from Sound.catalog import BED_NAMES, SOUND_ATTENUATION, SOUND_STATS
+from Sound.mix import SOUND_CLASS_PROP, SOUND_MIX_PATH, class_path, wave_path
+from Sound.tuning import FOOTSTEPS, table
 from combat.verify.common import check, load
 from combat.verify.fixtures import _eas
 

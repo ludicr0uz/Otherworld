@@ -25,6 +25,7 @@ from combat.tuning import BLEEDING_TAG
 from survival.tuning import DEHYDRATED_TAG, STARVING_TAG
 
 UI_DIR = "/Game/UI"
+HUD_BP_PATH = f"{UI_DIR}/BP_GraphicsMenuHUD"
 UI_ART_DIR = f"{UI_DIR}/Art"
 UI_FONT = "/Engine/EngineFonts/Roboto"
 

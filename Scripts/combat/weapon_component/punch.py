@@ -43,7 +43,7 @@ from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_SPHERE_TRACE, FN_TIME_SECONDS
 from combat import health_vars as HV
 from combat.weapon_component import vars as WV
-from combat.weapon_component.sounds import _author_sound
+from Sound.play import _author_sound
 
 PUNCH_ANIM_VAR = "PunchAnim"
 PUNCH_QUEUED_VAR = "PunchQueued"
@@ -68,7 +68,7 @@ class Strike:
     reach_cm: float
     radius_cm: float
     chest_cm: float
-    # The takes of the blow landing on a body (weapon_component/sounds.py).
+    # The takes of the blow landing on a body (Sound/sound_weapons.py).
     hit_sounds_var: str = WV.PunchHitSounds
 
 

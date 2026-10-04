@@ -16,7 +16,7 @@ from uebp.graph import (
     then)
 from npc.block import _author_block_check
 from npc.combat_trace import _author_melee_trace
-from npc.sound import _author_random_sound
+from Sound.play import _author_random_sound
 from npc.tuned import tuned
 from survival.on_hit_graph import _author_on_hit
 from uebp.nodes.actor import (

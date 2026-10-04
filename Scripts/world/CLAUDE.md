@@ -69,11 +69,11 @@ to `Saved/Screenshots/MacEditor`: the only way to see the stars without playing.
 - **`import_<Level>.py` rebuilds a level from scratch.** Re-run `build_day_night.py` after it,
   as with `place_forage.py`.
 
-## The forest's sound (`ambience.py`)
+## The forest's sound (`Sound/sound_world.py`)
 
 - **Three looping beds on the cycle actor:** `BedDay` (birds), `BedNight` (crickets and owls)
   and `BedWind`, each an AudioComponent playing a stereo wave of `/Game/Audio/Beds`
-  (`combat/audio.py`, `BED_NAMES`; which recordings is `Scripts/Sound`'s selection). Not
+  (`Sound/sound_world.py`, `BEDS`; which recordings is `Scripts/Sound`'s selection). Not
   spatialised: where the actor stands does not matter.
 - **Tick fades the day's into the night's by `DayAmount`:** `BedDay`'s volume is
   `DayAmount`, `BedNight`'s `1 - DayAmount`; the wind plays on, **at volume 0 by default**

@@ -5,7 +5,7 @@ This is the step between listening and building. `selection.py` says which
 takes were chosen; this cuts them to what the game is given (mono unless the
 row is a bed, 16-bit, the project's sample rate) and puts a reload together
 from its parts. The weapons build then imports what it finds
-(`combat.audio.import_sounds`), replacing a SoundWave whose WAV is newer.
+(`Sound.waves.import_sounds`), replacing a SoundWave whose WAV is newer.
 
 It takes over from `fetch_weapon_sounds.py` and `make_creature_sounds.py` for
 every name in the selection: run after either of them, it has the last word.

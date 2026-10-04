@@ -1,10 +1,10 @@
-"""The forest's sound: the three beds on BP_DayNightCycle (world/ambience.py)."""
+"""The forest's sound: the three beds on BP_DayNightCycle (Sound/sound_world.py)."""
 
 import unreal
 
-from combat.audio import BED_DIR
 from combat.verify.common import by_pins, check, component_template, graph, load
-from world.ambience import BEDS, BED_DAY_COMP, BED_NIGHT_COMP
+from Sound.sound_def import BED_DIR
+from Sound.sound_world import BEDS, BED_DAY_COMP, BED_NIGHT_COMP
 from world.paths import DAY_NIGHT_BP_PATH
 
 

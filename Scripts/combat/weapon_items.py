@@ -18,7 +18,7 @@ per weapon in every graph that touches a weapon.
 
 import unreal
 
-from combat.audio import SND_DRY_FIRE
+from Sound.sound_weapons import DRY_FIRE
 from combat.chop_tuning import CHOPS_VAR
 from combat.glimmer import add_glimmer, author_glimmer
 from combat.glimmer_tuning import GLIMMER
@@ -333,7 +333,7 @@ def build_weapon(spec, item_bp):
         SWAY_RATE_VAR: float(spec[SWAY_RATE_COLUMN]),
         IV.Icon: _weapon_icon(spec["display"]),
         IV.FireSound: _must_load(spec["sound"]),
-        IV.DryFireSound: _must_load(SND_DRY_FIRE),
+        IV.DryFireSound: _must_load(DRY_FIRE.paths[0]),
         IV.ReloadSound: _must_load(spec["reload_sound"]),
         IV.AimPose: _must_load(spec["aim"]),
         IV.TwoHanded: bool(spec["two_handed"]),

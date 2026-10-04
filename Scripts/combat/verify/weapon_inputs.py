@@ -205,7 +205,7 @@ def check_keys_are_variables():
         check(f"{var} exists on the weapon component for the HUD to read",
               isinstance(value, kind), type(value).__name__)
 
-    # The guns' three, and the component's own (weapon_component/sounds.py):
+    # The guns' three, and the component's own (Sound/sound_weapons.py, sound_items.py):
     # a swing for the punch and one for the blade, the axe on a tree, a match.
     #   3  the shot, the click, the reload
     #   2  a swing: the fist's and the blade's

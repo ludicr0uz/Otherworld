@@ -8,7 +8,7 @@ import unreal
 from forest_generator.npc_placement import NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
 from npc.paths import (
-    AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS, HIT_SOUNDS_VAR, REACTIONS_VAR,
+    AI_BP_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, REACTIONS_VAR,
     STEP_CHASE, STEP_DRAWN, STEP_PRESENT, STEP_PULSE, STEP_STALK, STEP_STROLL,
     STEP_SWING, STEP_WARD, VOICES_VAR,
     step_task_path, tree_path,
@@ -27,6 +27,7 @@ from npc.tree import build_blackboard, fill_tree, fresh_tree
 from npc.monster_tuning import monster_specs
 from npc.tuned import write_tuned_defaults
 from npc.ward import wards
+from Sound.sound_monsters import HIT_SOUNDS
 from uebp.nodes.ai import FN_RUN_BT
 from uebp.nodes.palette import NODE_EVENT_POSSESS
 

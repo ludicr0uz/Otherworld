@@ -2,14 +2,14 @@
 ExecutePythonCommand (sound_tune_consts.SOUND_TUNE_SAVE_COMMAND) on Enter.
 
 It reads the live HUD's working table (SoundTuneValues) and writes each
-sound's volume to combat/sound_tuning.csv, which the next
-build_graphics_menu.py bakes into the HUD's table: the volumes a game
-starts with.
+sound's volume to Sound/sound_tuning.csv, which the next build_sound.py
+bakes into the HUD's table: the volumes a game starts with.
 """
 
 import unreal
 
-from combat.sound_tuning import CSV_PATH, SOUND_STATS, write_table
+from Sound.catalog import SOUND_STATS
+from Sound.tuning import CSV_PATH, write_table
 from graphics_menu.sound_tune_consts import SOUND_TUNE_VALUES_VAR
 from graphics_menu.tune_save import _live_hud
 
@@ -21,5 +21,5 @@ def save(path=CSV_PATH):
                            f"{len(SOUND_STATS)}")
     write_table({st[0]: v for st, v in zip(SOUND_STATS, values)}, path)
     unreal.log_warning(f"[TUNE] saved the sounds' volumes to {path}; "
-                       "build_graphics_menu.py bakes them into the HUD")
+                       "build_sound.py bakes them into the HUD")
     return path

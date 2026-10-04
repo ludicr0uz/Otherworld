@@ -84,7 +84,7 @@ from graphics_menu.settings_page import _author_push_settings      # noqa: E402
 # The UMG screens: their layouts, their creation at BeginPlay, and the
 # DrawHUD fragments that write into them.
 from graphics_menu.umg_consts import (                              # noqa: E402
-    DEBUG_ACTION, GAME_STARTED_VAR, PAUSE_ROW_VAR)
+    DEBUG_ACTION, GAME_STARTED_VAR, HUD_BP_PATH, PAUSE_ROW_VAR)
 from graphics_menu.wbp_hud import build_hud_widget                  # noqa: E402
 from graphics_menu.wbp_parts import (                              # noqa: E402
     build_inventory_slot, build_menu_row)
@@ -164,7 +164,6 @@ from combat import settings_vars as SV  # noqa: E402
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 UI_DIR = "/Game/UI"
-HUD_BP_PATH = f"{UI_DIR}/BP_GraphicsMenuHUD"
 
 GAME_MODE_PATH = "/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
 

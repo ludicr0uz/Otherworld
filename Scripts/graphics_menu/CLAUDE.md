@@ -727,16 +727,16 @@ keys as GUN SETTINGS; **Enter** saves `Scripts/combat/player_tuning.csv`.
 ## The SOUND SETTINGS tab (`sound_tune_*.py`)
 
 **Its menu row** opens it (`SoundTuneOpen`). One subject row (`volume`), then
-`combat/sound_tuning.SOUND_STATS`: one row per sound (25: the footsteps, each gun's shot, the
+`Sound/catalog.SOUND_STATS`: one row per sound (25: the footsteps, each gun's shot, the
 dry click, the reloads, the melee hit and swing, the chop, the growl, the roar, the player's
 hit and death, the match, the campfire, a blade's hit, a thrown blade in a body, a throw and
 the three beds, the wind's at 0), behind a scroll bar
 (`SOUND_VISIBLE_ROWS`, 14 at a time, as MONSTER SETTINGS), its volume as a multiplier (step
 0.05, from 0 to 2: the tab has maximums, `SoundTuneMaxs`). Same keys as GUN SETTINGS;
-**Enter** saves `Scripts/combat/sound_tuning.csv`.
+**Enter** saves `Scripts/Sound/sound_tuning.csv` (then `build_sound.py` bakes it into the HUD).
 
 - **The apply is the game's sound mix** (`sound_tune_tick._author_apply`; what a class and
-  the mix are: `Scripts/combat/docs/audio.md`): `SetBaseSoundMix(A_Mix_Game)`, then one
+  the mix are: `Scripts/Sound/CLAUDE.md`): `SetBaseSoundMix(A_Mix_Game)`, then one
   `SetSoundMixClassOverride` per row, its class and the mix as pin literals, its volume
   the row's cell, no fade.
 - **It runs on the HUD's first Tick, tab or no tab** (`SoundTuneApplied` false), which is

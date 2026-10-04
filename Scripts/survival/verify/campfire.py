@@ -10,8 +10,8 @@ from combat.paths import WEAPON_COMP_BP_PATH
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, component_template, graph, load, num_pin,
 )
+from Sound.sound_items import CAMPFIRE, CRACKLE_COMP
 from survival.campfire import (
-    CAMPFIRE_SOUND,
     CAMPFIRE_MESH, CAMPFIRE_SCALE, MAX_TEMPERATURE_VAR, TEMPERATURE_VAR, WARM_RADIUS_VAR,
     WARM_RATE_VAR,
 )
@@ -83,12 +83,12 @@ def check_model(bp):
           and not glow.get_editor_property("cast_shadows"), str(glow))
     # The fire's sound is a component of the fire, so it ends with it: a
     # looping wave played at a location instead would crackle on over the ash.
-    crackle = component_template(bp, "Crackle")
+    crackle = component_template(bp, CRACKLE_COMP)
     sound = crackle.get_editor_property("sound") if crackle else None
     check("...and its own sound: a looping, placed wave on an audio component "
           "that starts with the fire",
           isinstance(crackle, unreal.AudioComponent) and sound is not None
-          and sound.get_path_name().split(".")[0] == CAMPFIRE_SOUND
+          and sound.get_path_name().split(".")[0] == CAMPFIRE.paths[0]
           and sound.get_editor_property("looping")
           and sound.get_editor_property("attenuation_settings") is not None
           and crackle.get_editor_property("auto_activate"), str(sound))

@@ -58,6 +58,7 @@ THROW_READY_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_ThrowReady"
 SHOTGUN_AIM_ANIM_PATH = f"{WEAPON_DIR}/Anims/A_AimShotgun"
 HEALTH_BP_PATH = f"{WEAPON_DIR}/BP_HealthComponent"
 WEAPON_COMP_BP_PATH = f"{WEAPON_DIR}/BP_WeaponComponent"
+FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
 BLOOD_BP_PATH = f"{WEAPON_DIR}/BP_BloodSplash"
 # The burst where a bullet hits anything that does not bleed (bullet_impact.py).
 BULLET_IMPACT_BP_PATH = f"{WEAPON_DIR}/BP_BulletImpact"

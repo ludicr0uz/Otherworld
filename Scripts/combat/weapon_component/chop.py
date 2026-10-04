@@ -48,7 +48,7 @@ from uebp.nodes.math import (
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_INSTANCED, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
 from combat.weapon_component import vars as WV
-from combat.weapon_component.sounds import _author_sound
+from Sound.play import _author_sound
 
 
 def _get(ed, name):

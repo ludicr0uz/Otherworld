@@ -1,29 +1,29 @@
 """BP_FootstepComponent: distance-driven footfalls for the player and every
-wanderer, the random-sound picker it plays through, and the noise the
-player's steps make for the wanderers to hear.
+wanderer, played through the random-sound picker (Sound/play.py; which takes
+is Sound/sound_world.py), and the noise the player's steps make for the
+wanderers to hear.
 """
 
 import unreal
 
-from combat.audio import CREATURE_AUDIO_DIR, FOOTSTEP_NAMES
 from combat.log import _log
 from uebp.graph import (
-    BEL, BGE, _apply_defaults, _assets, _connect, _create_blueprint, _events, _loose_pin,
+    BEL, BGE, _apply_defaults, _connect, _create_blueprint, _events, _loose_pin,
     _node, _palette, _pin, _set, else_, out, then)
 from uebp.layout import arrange
 from combat.noise import _author_make_noise
-from combat.paths import WEAPON_DIR
+from combat.paths import FOOTSTEP_BP_PATH
 from combat.tuning import COMBAT
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_GET_OWNER, FN_IS_PLAYER_CONTROLLED, FN_ON_GROUND, FN_VELOCITY)
-from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_MUL_FF, FN_RAND_INT,
-    FN_SUB_FF, FN_SUB_II, FN_VSIZE_XY)
+    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_MUL_FF, FN_SUB_FF, FN_VSIZE_XY)
 from uebp.nodes.palette import NODE_CAST_CHARACTER
-from uebp.nodes.system import FN_PLAY_SOUND
 from uebp.vars import declare, defaults
 from uebp import props as EP
+from Sound.bind import defaults_for
+from Sound.play import _author_random_sound
+from Sound.sound_world import BINDINGS as WORLD_SOUNDS
 from combat import footstep_vars as FV
 
 
@@ -50,62 +50,6 @@ from combat import footstep_vars as FV
 FOOTSTEP_STRIDE_CM = 160.0
 # Below this the owner is shuffling against a wall, not walking.
 FOOTSTEP_MIN_SPEED_CMS = 40.0
-FOOTSTEP_BP_PATH = f"{WEAPON_DIR}/BP_FootstepComponent"
-
-
-def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None):
-    """Play a random element of the ``var_name`` sound array at ``at_pin``,
-    at ``volume_pin`` if one is given (the stance's StepVolume).
-
-    Returns ``(nodes, then_pin)``. Guarded on the array's own length, because
-    RandomIntegerInRange(0, -1) into Array_Get is an access-none rather than
-    silence -- and an empty array is the normal state of a checkout that has
-    not run Scripts/Sound/make_creature_sounds.py yet.
-
-    The same shape exists in build_npc_blueprints.py. Two copies rather than a
-    shared module because the two files each carry their own _pin/_connect/_set
-    authoring helpers, and hoisting one function would mean hoisting those.
-    """
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    table = keep(ed.add_get_member_variable_node(var_name))
-    table_out = out(table, var_name)
-    count = keep(_node(ed, FN_ARR_LEN))
-    _connect(table_out, _pin(count, "TargetArray"))
-    stocked = keep(_node(ed, FN_GREATER_II))
-    _connect(out(count), _pin(stocked, "A"))
-    _set(stocked, "B", 0)
-
-    have = keep(ed.add_branch_node())
-    _connect(out(stocked), _pin(have, "Condition"))
-    _connect(exec_in, _pin(have, "execute"))
-
-    top = keep(_node(ed, FN_SUB_II))
-    _connect(out(count), _pin(top, "A"))
-    _set(top, "B", 1)
-    which = keep(_node(ed, FN_RAND_INT))
-    _set(which, "Min", 0)
-    _connect(out(top), _pin(which, "Max"))
-    pick = keep(_node(ed, FN_ARR_GET))
-    _connect(table_out, _pin(pick, "TargetArray"))
-    _connect(out(which), _pin(pick, "Index"))
-
-    play = keep(_node(ed, FN_PLAY_SOUND))
-    _connect(out(pick, "Item"), _pin(play, "Sound"))
-    _connect(at_pin, _pin(play, "Location"))
-    if volume_pin is not None:
-        _connect(volume_pin, _pin(play, "VolumeMultiplier"))
-    _connect(then(have), _pin(play, "execute"))
-
-    join = keep(ed.add_branch_node())
-    _set(join, "Condition", True)
-    _connect(then(play), _pin(join, "execute"))
-    _connect(else_(have), _pin(join, "execute"))
-    return made, then(join)
 
 
 def build_footstep_component(rebuild=True):
@@ -248,10 +192,9 @@ def build_footstep_component(rebuild=True):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_FootstepComponent failed to compile")
 
-    eas = _assets()
-    found = [eas.load_asset(f"{CREATURE_AUDIO_DIR}/{n}") for n in FOOTSTEP_NAMES
-             if eas.does_asset_exist(f"{CREATURE_AUDIO_DIR}/{n}")]
-    _apply_defaults(bp, {**defaults(FV.TABLE), FV.StrideCm: FOOTSTEP_STRIDE_CM, FV.Sounds: found})
+    sounds = defaults_for(FOOTSTEP_BP_PATH, WORLD_SOUNDS)
+    found = sounds[FV.Sounds]
+    _apply_defaults(bp, {**defaults(FV.TABLE), FV.StrideCm: FOOTSTEP_STRIDE_CM, **sounds})
     _log(f"built {FOOTSTEP_BP_PATH} "
          f"({len(found)} steps, one every {FOOTSTEP_STRIDE_CM:.0f} cm)")
     return bp

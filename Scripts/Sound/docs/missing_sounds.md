@@ -72,7 +72,7 @@ plays them. What each needs:
 | Running, grass and bare-ground footsteps, landing, grass rustle | `combat/footsteps.py` | The component has one sound for every speed and surface, and does not know what is underfoot |
 | The menu's sounds | The HUD (`graphics_menu/`) | The HUD polls keys in `DrawHUD`; every row change, take and back needs a play node, and they would be the game's first 2D sounds played from a graph |
 | The title screen's boom; a scare when a wendigo sees you | The HUD's first Tick; `npc/roar.py` | Nothing |
-| A bed under a hunt | `world/ambience.py`, a fourth bed, raised while a wendigo hunts | Something has to tell the cycle that one is hunting |
+| A bed under a hunt | `Sound/sound_world.py`, a fourth bed, raised while a wendigo hunts | Something has to tell the cycle that one is hunting |
 | Each gun from beyond 100 m: a nearer and a farther take | The fire graph, on the distance to the listener | Only the player fires, 1.5 m from the listener, and nothing carries past 100 m |
 | A thrown item landing on the ground | `throw_flight.py`, where it is set down | No take chosen for it |
 

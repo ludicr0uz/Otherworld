@@ -34,7 +34,7 @@ from combat.respawn import (
     _author_world_floor_net,
 )
 from combat.tuning import COMBAT
-from combat.voice import _author_death_voice, _author_hurt_voice, voice_defaults
+from Sound.sound_world import _author_death_voice, _author_hurt_voice, voice_defaults
 from loot.roll import declare_loot_vars
 from uebp.nodes.math import FN_LE_FF
 from uebp.vars import declare, defaults

@@ -1,7 +1,7 @@
 """Run the manifest: cut every row and write the candidates and their sources.
 
 Output goes to `assets/generated/sound_candidates/`, which nothing imports.
-`combat.audio.import_sounds()` reads `assets/generated/sounds/`, so a candidate
+`Sound.waves.import_sounds()` reads `assets/generated/sounds/`, so a candidate
 is in the game only once someone has listened to it and moved it there.
 """
 

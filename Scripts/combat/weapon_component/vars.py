@@ -81,7 +81,7 @@ PistolClass = Var("PistolClass")
 ReticleSpread = Var("ReticleSpread")
 ShotgunClass = Var("ShotgunClass")
 Stance = Var("Stance")
-# The component's own sounds, a few takes each (weapon_component/sounds.py).
+# The component's own sounds, a few takes each (Sound/sound_weapons.py, sound_items.py).
 SwingSounds = Var("SwingSounds", array(obj("/Script/Engine.SoundBase")))
 ChopSounds = Var("ChopSounds", array(obj("/Script/Engine.SoundBase")))
 MatchSounds = Var("MatchSounds", array(obj("/Script/Engine.SoundBase")))

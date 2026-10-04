@@ -6,18 +6,16 @@ muzzle and sight come from weapon_models.py.
 
 import unreal
 
-from combat.audio import (
-    SND_RELOAD_PISTOL, SND_RELOAD_RIFLE, SND_RELOAD_SHOTGUN,
-)
 from combat.log import _log
 from combat.gun_tuning import read_table
 from combat.grip import _grip_location, _grip_rotation
 from combat.paths import (
-    AUDIO_DIR, PISTOL_BP_PATH,
+    PISTOL_BP_PATH,
     RIFLE_BP_PATH, SHOTGUN_AIM_ANIM_PATH, SHOTGUN_BP_PATH, SMG_BP_PATH, SNIPER_BP_PATH,
     UI_ART_DIR,
 )
 from combat.skin import player_skin
+from Sound.sound_weapons import fire_sound, reload_sound
 from combat.support_hand import support_at
 from item_icons.items import icon_name
 from combat.sway_tuning import SWAY_RATE, SWAY_RATE_COLUMN
@@ -187,7 +185,7 @@ def _weapon_specs():
         dict(path=SHOTGUN_BP_PATH, parts=shotgun_outline(), model=SHOTGUN_MODEL, muzzle=SHOTGUN_MUZZLE, sight=SHOTGUN_SIGHT,
              sight_rear=SHOTGUN_SIGHT_REAR, sight_front=SHOTGUN_SIGHT_FRONT,
              display="Shotgun", automatic=False, damage=18.0, pellets=8, range=4000.0,
-             sound=f"{AUDIO_DIR}/A_ShotgunFire", reload_sound=SND_RELOAD_SHOTGUN, aim=AIM_SHOTGUN,
+             sound=fire_sound(SHOTGUN_BP_PATH), reload_sound=reload_sound(SHOTGUN_BP_PATH), aim=AIM_SHOTGUN,
              grip_rot=_grip_rotation(AIM_SHOTGUN), trigger_reach=SHOTGUN_TRIGGER_REACH_CM,
              uses_ammo=True, magazine=SHOTGUN_MAGAZINE, reserve=SHOTGUN_RESERVE,
              interval=SHOTGUN_FIRE_INTERVAL, reload_s=SHOTGUN_RELOAD_SECONDS,
@@ -195,7 +193,7 @@ def _weapon_specs():
         dict(path=PISTOL_BP_PATH, parts=pistol_outline(), model=PISTOL_MODEL, muzzle=PISTOL_MUZZLE, sight=PISTOL_SIGHT,
              sight_rear=PISTOL_SIGHT_REAR, sight_front=PISTOL_SIGHT_FRONT,
              display="Pistol", automatic=False, damage=26.0, pellets=1, range=6000.0,
-             sound=f"{AUDIO_DIR}/A_PistolFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_PISTOL,
+             sound=fire_sound(PISTOL_BP_PATH), reload_sound=reload_sound(PISTOL_BP_PATH), aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
              uses_ammo=True, magazine=PISTOL_MAGAZINE, reserve=0, infinite_reserve=True,
              interval=PISTOL_FIRE_INTERVAL, reload_s=PISTOL_RELOAD_SECONDS,
@@ -207,7 +205,7 @@ def _weapon_specs():
         dict(path=SMG_BP_PATH, parts=smg_outline(), model=SMG_MODEL, muzzle=SMG_MUZZLE, sight=SMG_SIGHT,
              sight_rear=SMG_SIGHT_REAR, sight_front=SMG_SIGHT_FRONT,
              display="SMG", automatic=True, damage=12.0, pellets=1, range=4500.0,
-             sound=f"{AUDIO_DIR}/A_SMGFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_PISTOL,
+             sound=fire_sound(SMG_BP_PATH), reload_sound=reload_sound(SMG_BP_PATH), aim=AIM_PISTOL,
              grip_rot=_grip_rotation(AIM_PISTOL),
              uses_ammo=True, magazine=SMG_MAGAZINE, reserve=SMG_RESERVE,
              interval=SMG_FIRE_INTERVAL, reload_s=SMG_RELOAD_SECONDS,
@@ -217,7 +215,7 @@ def _weapon_specs():
         dict(path=RIFLE_BP_PATH, parts=rifle_outline(), model=RIFLE_MODEL, muzzle=RIFLE_MUZZLE, sight=RIFLE_SIGHT,
              sight_rear=RIFLE_SIGHT_REAR, sight_front=RIFLE_SIGHT_FRONT,
              display="Rifle", automatic=True, damage=24.0, pellets=1, range=9000.0,
-             sound=f"{AUDIO_DIR}/A_RifleFire", reload_sound=SND_RELOAD_RIFLE, aim=AIM_RIFLE,
+             sound=fire_sound(RIFLE_BP_PATH), reload_sound=reload_sound(RIFLE_BP_PATH), aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
              uses_ammo=True, magazine=RIFLE_MAGAZINE, reserve=RIFLE_RESERVE,
              interval=RIFLE_FIRE_INTERVAL, reload_s=RIFLE_RELOAD_SECONDS,
@@ -230,7 +228,7 @@ def _weapon_specs():
         dict(path=SNIPER_BP_PATH, parts=sniper_outline(), model=SNIPER_MODEL, muzzle=SNIPER_MUZZLE, sight=SNIPER_SIGHT,
              sight_rear=SNIPER_SIGHT_REAR, sight_front=SNIPER_SIGHT_FRONT,
              display="Sniper", automatic=False, damage=120.0, pellets=1, range=20000.0,
-             sound=f"{AUDIO_DIR}/A_SniperFire", reload_sound=SND_RELOAD_PISTOL, aim=AIM_RIFLE,
+             sound=fire_sound(SNIPER_BP_PATH), reload_sound=reload_sound(SNIPER_BP_PATH), aim=AIM_RIFLE,
              grip_rot=_grip_rotation(AIM_RIFLE),
              ads_zoom=COMBAT.ads_zoom_scope, scoped=True,
              uses_ammo=True, magazine=SNIPER_MAGAZINE, reserve=SNIPER_RESERVE,

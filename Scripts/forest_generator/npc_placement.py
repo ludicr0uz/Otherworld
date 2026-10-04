@@ -19,7 +19,6 @@ import math
 import random
 from dataclasses import dataclass
 
-from Sound.sound_candidates.selection import asset_names
 
 from .terrain import get_exact_mesh_z
 
@@ -107,17 +106,8 @@ NPC_BASE_HEALTH = 100.0
 
 # ── Voices ───────────────────────────────────────────────────────────────────
 #
-# Synthesised by Scripts/Sound/make_creature_sounds.py and imported to /Game/Audio by
-# combat.audio.import_sounds().  Several takes per creature and the
-# controller draws one at random, because a pack of ten on a 4-9 s timer
-# retriggering ONE buffer reads as a machine rather than as a forest.
-#
-# These are asset *package* paths; the builder resolves them and silently drops
-# any that are missing, so a checkout that has not run the sound script still
-# gets silent monsters rather than a failed build.
-CREATURE_AUDIO_DIR = "/Game/Audio"
-ZOMBIE_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/{n}" for n in asset_names("zombie_growl"))
-WENDIGO_VOICES = tuple(f"{CREATURE_AUDIO_DIR}/{n}" for n in asset_names("wendigo_roar"))
+# Which takes each creature growls or roars with is Sound/sound_monsters.py
+# (VOICES); when is here.
 
 # How often a wanderer makes a noise, drawn uniformly per utterance. Tuned
 # against the PACK and not against one monster: ten of them on a 4-9 s timer is
@@ -195,7 +185,6 @@ class NpcVariant:
     ai_blueprint: str
     health: float
     speed_scale: float
-    voices: tuple
     # This creature's six hit reactions, in NPC_HIT_REACTION_CLIPS order. Its
     # AI controller copies them onto the pawn's health component at possession,
     # for the same reason it writes the health: an inherited component's
@@ -207,7 +196,7 @@ class NpcVariant:
     melee_fallback: str = ""
 
 
-def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0, voices=(),
+def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0,
               melee=None):
     """The asset layout every creature follows, from one name.
 
@@ -226,7 +215,6 @@ def _creature(key, folder, health=NPC_BASE_HEALTH, speed_scale=1.0, voices=(),
         ai_blueprint=f"/Game/Forest/NPC/BP_ForestWandererAI_{key}",
         health=health,
         speed_scale=speed_scale,
-        voices=voices,
         reactions=tuple(f"{anims}/A_{folder}_{clip}"
                         for clip in NPC_HIT_REACTION_CLIPS),
     )
@@ -236,13 +224,12 @@ NPC_VARIANTS = (
     # The zombie swings the Mixamo pack's two-handed lunge
     # (asset_pipeline/import_mixamo.py, which checks this literal against
     # mixamo_paths.MELEE).
-    _creature("Zombie", "Zombie01", voices=ZOMBIE_VOICES,
+    _creature("Zombie", "Zombie01",
               melee="/Game/Sourced/Mixamo/Zombie01/"
                     "A_Zombie01_Mx_Scary_ZombieAttack"),
     _creature("Wendigo", "Wendigo01",
               health=NPC_BASE_HEALTH * WENDIGO_HEALTH_MULTIPLIER,
-              speed_scale=WENDIGO_SPEED_MULTIPLIER,
-              voices=WENDIGO_VOICES),
+              speed_scale=WENDIGO_SPEED_MULTIPLIER),
 )
 
 

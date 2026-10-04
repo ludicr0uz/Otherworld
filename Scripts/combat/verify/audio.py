@@ -6,18 +6,18 @@ import wave as _wave
 
 import unreal
 
-from combat.audio import (
-    ATTENUATIONS, ATT_DB_AT_MAX, ATT_FOLEY, ATT_GUNFIRE, ATT_ROAR, AUDIBLE_LIMIT_CM,
-    CREATURE_AUDIO_DIR, CREATURE_SOUND_NAMES, RETIRED_SOUNDS, ROAR_CREATURE,
-    ROAR_REACH_X_AGGRO, SOUND_ATTENUATION, SOUND_NAMES, SOUND_SRC_DIR,
-    WENDIGO_ROAR_NAMES,
-)
-from combat.paths import AUDIO_DIR
+from Sound.bind import takes_of
+from Sound.catalog import (
+    ATTENUATIONS, BINDINGS, CREATURE_SOUND_NAMES, SOUND_ATTENUATION, SOUND_NAMES)
+from Sound.sound_def import (
+    ATT_DB_AT_MAX, ATT_FOLEY, ATT_GUNFIRE, AUDIBLE_LIMIT_CM, CREATURE_AUDIO_DIR)
+from Sound.sound_monsters import ATT_ROAR, ROAR_CREATURE, ROAR_REACH_X_AGGRO, WENDIGO_ROAR
+from Sound.sound_weapons import RETIRED_SOUNDS
+from Sound.waves import SOUND_SRC_DIR
+from combat.paths import AUDIO_DIR, HEALTH_BP_PATH, WEAPON_COMP_BP_PATH
 from combat.tuning import AUTO_DISPLAYS
 from combat.weapon_specs import _weapon_specs
 from combat.verify.fixtures import _eas, h, hg, w, wg
-from combat import voice
-from combat.weapon_component import sounds as component_sounds
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, load
 from npc.monster_tuning import monster_specs
 
@@ -184,7 +184,7 @@ def check_distance_and_direction():
     check(f"a wendigo's roar carries {ROAR_REACH_X_AGGRO:g}x its aggro range "
           f"({_aggro / 100.0:g} m)",
           abs(ATT_ROAR.audible_cm - _want) < 1e-3 and ATT_ROAR.audible_cm >= _aggro
-          and all(SOUND_ATTENUATION[n] is ATT_ROAR for n in WENDIGO_ROAR_NAMES),
+          and all(SOUND_ATTENUATION[n] is ATT_ROAR for n in WENDIGO_ROAR.names),
           f"{ATT_ROAR.audible_cm / 100.0:g} m")
 
     # THE SWEEP THAT MAKES "NOTHING WAS MISSED" TRUE. It walks the two audio
@@ -284,8 +284,8 @@ def check_sound_tables():
     # A play node that draws from an empty array is silence and not an error
     # (the draw is guarded on the length), so a table left unfilled would pass
     # every other check here and be heard by nobody.
-    for owner, d, tables in (("BP_WeaponComponent", w, component_sounds.SOUND_TAKES),
-                             ("BP_HealthComponent", h, voice.SOUND_TAKES)):
+    for owner, d, tables in (("BP_WeaponComponent", w, takes_of(WEAPON_COMP_BP_PATH, BINDINGS)),
+                             ("BP_HealthComponent", h, takes_of(HEALTH_BP_PATH, BINDINGS))):
         for var, names in tables.items():
             got = [s.get_name() for s in d.get_editor_property(var) if s]
             check(f"{owner}.{var} holds its {len(names)} take(s)",

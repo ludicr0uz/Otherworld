@@ -21,7 +21,7 @@ import unreal                                                     # noqa: E402
 
 from uebp.graph import BGE, _create_blueprint                     # noqa: E402
 from uebp.layout import arrange                                   # noqa: E402
-from world.ambience import author_ambience, build_beds            # noqa: E402
+from Sound.sound_world import author_ambience, build_beds            # noqa: E402
 from world.day_night_blueprint import (                           # noqa: E402
     apply_config, build_components, declare_variables,
 )

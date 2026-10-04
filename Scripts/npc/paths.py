@@ -2,8 +2,6 @@
 Constants only -- no Blueprint authoring, no graph helpers.
 """
 
-from Sound.sound_candidates.selection import asset_names
-
 
 
 # ─── Configuration ───────────────────────────────────────────────────────────
@@ -29,15 +27,13 @@ HEALTH_CLASS_PATH = f"{HEALTH_BP_PATH}.BP_HealthComponent_C"
 MELEE_SLOT = "DefaultSlot"
 
 
-# Where the creature voices and the impact sounds are imported to, by
-# combat.audio.import_sounds().
+# The controller's sound arrays: which takes fill them is Sound/sound_monsters.py.
 VOICES_VAR = "Voices"
 HIT_SOUNDS_VAR = "HitSounds"
 STATS_APPLIED_VAR = "StatsApplied"
 # The TuneHealth last written onto the pawn (npc/stats.py): a change re-applies it.
 APPLIED_HEALTH_VAR = "AppliedHealth"
 NEXT_VOICE_VAR = "NextVoiceTime"
-HIT_SOUNDS = tuple(f"/Game/Audio/{n}" for n in asset_names("melee_hit"))
 
 # This creature's six flinches, carried on the CONTROLLER and copied onto the
 # pawn's health component at possession -- the same route, and for the same

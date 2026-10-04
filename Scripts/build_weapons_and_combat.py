@@ -53,16 +53,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # A live editor keeps imported modules between runs: drop the combat package so
 # an edit to any of its modules is what actually runs.
-for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "combat", "loot", "item_icons")]:
+for _name in [m for m in sys.modules if m.split(".")[0] in ("uebp", "combat", "loot", "item_icons", "Sound")]:
     del sys.modules[_name]
 
 from combat.aim_pitch import patch_aim_pitch                      # noqa: E402
 from combat.ammo_pickup import build_ammo_pickup                  # noqa: E402
 from combat.anim_blueprint import patch_anim_blueprint            # noqa: E402
-from combat.audio import (                                        # noqa: E402
-    apply_attenuation, build_sound_attenuations, import_sounds,
-)
-from combat.sound_mix import build_sound_mix                      # noqa: E402
+from Sound.build import build_sound_assets                        # noqa: E402
 from combat.body_pose import patch_body_pose                      # noqa: E402
 from combat.stance_clips import (                                 # noqa: E402
     patch_stance_clips, unpatch_stance_clips,
@@ -111,14 +108,9 @@ def main():
     build_materials()
     # Before the knife and the axe, whose glow is an instance of it.
     build_hot_material()
-    import_sounds()
-    # Both halves have to exist before either can name the other, so the link
-    # is a third step rather than something import_sounds() does on the way
-    # past -- and it is a step that refuses to finish with a sound it has no
-    # profile for.
-    apply_attenuation(build_sound_attenuations())
-    # A sound class per sound, so each has a volume (the SOUND SETTINGS tab).
-    build_sound_mix()
+    # The sound assets, which the Blueprints below hold: Scripts/build_sound.py's
+    # first step, run here too so a fresh checkout builds in the old order.
+    build_sound_assets()
     patch_anim_blueprint()
 
     # First of the Blueprints, and before anything that names its class: both

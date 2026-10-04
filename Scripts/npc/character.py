@@ -15,6 +15,7 @@ from npc.paths import (
 from npc.graph import _log, _mesh_object
 from uebp.graph import BEL, _assets, _create_blueprint, _resolve, _try_set
 from npc.controller import build_ai_controller_blueprint
+from Sound.sound_monsters import voices_of
 
 
 # ─── The character ──────────────────────────────────────────────────────────
@@ -228,7 +229,7 @@ def build_variant_blueprint(base_bp, variant):
                                             NPC_MELEE_MONTAGE_FALLBACK)
                                 if p != variant.melee)),
                             f"{variant.key} melee clip"),
-        voices=variant.voices, reactions=variant.reactions, key=variant.key)
+        voices=voices_of(variant.key), reactions=variant.reactions, key=variant.key)
     cdo.set_editor_property("ai_controller_class", BEL.generated_class(ai_bp))
 
     if not BEL.compile_blueprint(bp):

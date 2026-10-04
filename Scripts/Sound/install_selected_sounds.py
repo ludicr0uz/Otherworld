@@ -4,7 +4,7 @@ assets/generated/sounds/, as the sounds the game plays.
 
     python3 Scripts/Sound/install_selected_sounds.py
 
-Then run the weapons build, which imports them. What is chosen is the table
+Then run Scripts/build_sound.py (in the editor: uepy.py), which imports them. What is chosen is the table
 in Scripts/Sound/sound_candidates/selection.py.
 """
 

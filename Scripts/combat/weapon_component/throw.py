@@ -59,7 +59,7 @@ from combat.weapon_component.throw_flight import (
 )
 from combat import item_vars as IV
 from combat.weapon_component.common import _prop
-from combat.weapon_component.sounds import _author_sound
+from Sound.play import _author_sound
 from combat.weapon_component.throw_launch import _author_launch
 from combat.weapon_component.throw_ready import (
     _author_ready_down, _author_throw_ready,

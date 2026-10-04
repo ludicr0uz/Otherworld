@@ -78,11 +78,9 @@ _author_* fragment per concern, each in its own module:
   heat        interact's campfire kind: the fires it offers while the held
               item Heats (the knife, the axe), and what makes that item Hot
               for HEAT_S (the item's own Tick cools it: combat/heat.py)
-  listener    BeginPlay: sounds fade with the distance from the character,
-              not the camera (the controller's attenuation listener override)
   ammo        reload and dry fire
-  sounds      the component's own sounds: SwingSounds, ChopSounds, MatchSounds,
-              their takes, and the fragment that plays one of them
+  (sounds)    Sound/sound_weapons.py and sound_items.py: the component's own
+              sounds; Sound/sound_world.py: the listener at the character
   punch       empty hands: the fire key throws a punch (MM_Attack_01 into the
               upper-body slot); the blow is a short sphere sweep a moment later.
               The swing and the blow are written once, for a Strike

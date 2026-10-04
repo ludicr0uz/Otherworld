@@ -9,12 +9,12 @@ one table.
     Enter                       "volume": one row per sound of the game, its
                                 volume as a multiplier (0 silent, 1 as
                                 recorded, at most 2); Enter saves them to
-                                combat/sound_tuning.csv
+                                Sound/sound_tuning.csv
 
-The rows are combat/sound_tuning.SOUND_STATS.
+The rows are Sound/catalog.SOUND_STATS.
 """
 
-from combat.sound_tuning import SOUND_STATS
+from Sound.catalog import SOUND_STATS
 from graphics_menu.tune_tab import TuneTab, save_command
 
 SOUND_TUNE_ACTION = "sound_tuning"   # the menu row that opens the tab
@@ -61,5 +61,5 @@ SOUND_TAB = TuneTab(
     row_labels=(SOUND_SUBJECT,) + tuple(s[1] for s in SOUND_STATS),
     hint_text=("UP / DOWN  pick   ·   LEFT / RIGHT  change   ·   "
                "ENTER  save to sound_tuning.csv"),
-    saved_words="saved to Scripts/combat/sound_tuning.csv",
+    saved_words="saved to Scripts/Sound/sound_tuning.csv",
     fraction_digits=2, maxs_var=SOUND_TUNE_MAXS_VAR, visible_rows=SOUND_VISIBLE_ROWS)

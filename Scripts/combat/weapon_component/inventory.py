@@ -14,8 +14,8 @@ from combat.carry_tuning import LOWERED_VAR
 from combat.light_tuning import MATCHES_CLASS_VAR
 from combat.torch_tuning import STICK_CLASS_VAR
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
-from combat.weapon_component.listener import _author_listener_at_character
 from combat.weapon_component.sights import _author_camera_after_boom
+from Sound.sound_world import _author_listener_at_character
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
     FN_GET_PITCH_SCALE, FN_GET_TRANSFORM, FN_GET_YAW_SCALE, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,

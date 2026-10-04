@@ -5,7 +5,7 @@ superseded assets.
 
 import unreal
 
-from combat.audio import RETIRED_SOUNDS
+from Sound.sound_weapons import RETIRED_SOUNDS
 from combat.camera import aim_camera, face_the_camera
 from combat.log import _log
 from uebp.graph import (

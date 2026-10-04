@@ -9,7 +9,7 @@ the game's sound mix.
                             SoundClass, Volume = SoundTuneValues[s], no fade)
       SoundTuneApplied = true, SoundTuneTouched = false
 
-Every sound's waves are in a class of their own (combat/sound_mix.py), so a
+Every sound's waves are in a class of their own (Sound/mix.py), so a
 class's volume in the mix is that sound's, wherever it is played from. The
 assets hold no volume: the HUD's table (sound_tuning.csv, baked at build
 time) is the one place it is, and the HUD's first Tick tells the mix. The
@@ -19,10 +19,9 @@ respawn, unlike what the other tabs write.
 """
 
 from uebp.graph import BEL, _connect, _declare, _must_load, _pin, out, then
-from combat.sound_mix import SOUND_MIX_PATH, class_path
-from combat.sound_tuning import (
-    SOUND_STATS, VOLUME_MAX, VOLUME_MIN, VOLUME_STEP, table,
-)
+from Sound.catalog import SOUND_STATS
+from Sound.mix import SOUND_MIX_PATH, class_path
+from Sound.tuning import VOLUME_MAX, VOLUME_MIN, VOLUME_STEP, table
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.sound_tune_consts import (
     SOUND_SUBJECT, SOUND_TAB, SOUND_TUNE_APPLIED_VAR,

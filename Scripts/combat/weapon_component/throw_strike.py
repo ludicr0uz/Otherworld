@@ -92,7 +92,7 @@ from combat.throw_tuning import (
 )
 from combat.weapon_component.common import _prop
 from combat.weapon_component.headshot import _author_headshot
-from combat.weapon_component.sounds import _author_sound
+from Sound.play import _author_sound
 from combat.weapon_component.surface_impact import _author_surface_impact
 from uebp.nodes.actor import (
     FN_ATTACH, FN_CLOSEST_BONE, FN_GET_COMP, FN_INSTANCE_TRANSFORM, FN_SET_LOC_ROT,

@@ -12,7 +12,7 @@ the Tick wrote: each bed component's volume multiplier.
 """
 
 from world import world_config as cfg
-from world.ambience import BEDS, BED_DAY_COMP, BED_NIGHT_COMP, BED_WIND_COMP
+from Sound.sound_world import BEDS, BED_DAY_COMP, BED_NIGHT_COMP, BED_WIND_COMP
 from world.paths import DAY_NIGHT_BP_PATH, DAY_NIGHT_CLASS_PATH
 from world import day_night_vars as DV
 

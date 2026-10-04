@@ -126,14 +126,8 @@ SHARED AUTHORING HELPERS
 ASSETS AND PATCHES
   materials         flat materials (gunmetal, wood, blood, brass, impact chip
                     and dust)
-  audio             sound names (from Scripts/Sound's selection), attenuation
-                    profiles, the beds, import + link
-  voice             the player's grunt at a blow and cry at death, on the
-                    health component's Tick
-  sound_tuning      sound_tuning.csv: each sound's volume; what the menu's
-                    SOUND SETTINGS tab saves and the HUD's table is built from
-  sound_mix         a SoundClass per sound on its waves, and A_Mix_Game, the
-                    mix the HUD overrides their volumes in
+  (sound)           the Sound package: Scripts/Sound/__init__.py. The weapons
+                    build runs its asset step (Sound.build.build_sound_assets)
   anim_blueprint    ABP_Unarmed: layered blends and the three slots
   aim_pitch         the player's anim BP: AimPitch tips the upper body (two
                     spine ModifyBones) so the gun follows the sights' pitch

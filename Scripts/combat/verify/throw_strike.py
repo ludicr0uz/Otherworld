@@ -136,7 +136,7 @@ def _floor():
 
 def _past_sound(nodes):
     """Exec feeders, looked back past one played sound. A sound is three
-    nodes (weapon_component/sounds.py): a Branch on "are there takes", the
+    nodes (Sound/play.py): a Branch on "are there takes", the
     play, and a Branch both of those run into. Where ``nodes`` is that last
     Branch, what feeds the first one is what the sound came after."""
     if len(nodes) == 1 and _title(nodes[0]) == "Branch":

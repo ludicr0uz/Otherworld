@@ -9,7 +9,7 @@ from npc.paths import (
     REACTIONS_VAR, STATS_APPLIED_VAR, VOICES_VAR,
 )
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
-from npc.sound import _author_random_sound
+from Sound.play import _author_random_sound
 from npc.tuned import tuned
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_PAWN
 from uebp.nodes.math import FN_ADD_FF, FN_GE_FF, FN_NEQ_FF, FN_RANDOM_FLOAT

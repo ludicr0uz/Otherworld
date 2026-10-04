@@ -52,6 +52,7 @@ from forest_generator.bush_placement import (
     BUSH_CLUSTERS_PER_HA,
 )
 from forest_generator.grass_cells import tier_spec
+from Sound.sound_monsters import voices_of
 from forest_generator.npc_placement import (
     NPC_VARIANTS,
     gait_scale_for_index,
@@ -1066,7 +1067,7 @@ def _write_unreal_verify_script(
         {"key": v.key, "blueprint": v.blueprint, "mesh": v.mesh,
          "anim_bp": v.anim_bp, "melee": v.melee,
          "ai_blueprint": v.ai_blueprint, "health": v.health,
-         "speed_scale": v.speed_scale, "voices": list(v.voices)}
+         "speed_scale": v.speed_scale, "voices": list(voices_of(v.key))}
         for v in NPC_VARIANTS])
     # What each placed wanderer should end up with, computed here rather than
     # re-derived in the verify script: the composition of the per-instance gait

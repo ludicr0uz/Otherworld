@@ -26,9 +26,8 @@ import shutil
 
 import unreal
 
-from combat.sound_tuning import (
-    CSV_PATH, FOOTSTEPS, SOUND_STATS, VOLUME_STEP, class_name, read_table, table,
-)
+from Sound.catalog import SOUND_STATS
+from Sound.tuning import CSV_PATH, FOOTSTEPS, VOLUME_STEP, class_name, read_table, table
 from graphics_menu import hud_vars as MV
 from graphics_menu import sound_tune_consts as SC
 from graphics_menu.profile_consts import PROFILE_CHECKED_VAR

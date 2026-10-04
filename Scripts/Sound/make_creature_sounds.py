@@ -4,7 +4,7 @@
     python3 Scripts/Sound/make_creature_sounds.py
 
 Writes 44.1 kHz 16-bit mono WAVs into assets/generated/sounds/, alongside the
-gunshots -- which is where combat.audio.import_sounds() looks.
+gunshots -- which is where Sound.waves.import_sounds() looks.
 
 ── Why these are synthesised when the gunshots are not ─────────────────────
 

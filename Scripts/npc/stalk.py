@@ -78,7 +78,7 @@ from npc.paths import (
 from npc.patrol import _author_walk_speed
 from npc.roar import _author_bellow
 from npc.senses import _author_hurt
-from npc.sound import _author_random_sound
+from Sound.play import _author_random_sound
 from npc.stalk_cover import _author_cover, declare_cover_vars
 from npc.strafe import _author_facing
 from npc.tuned import tuned_pin

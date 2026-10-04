@@ -7,8 +7,9 @@ sound classes on the waves are verify_weapons_and_combat's
 
 import unreal
 
-from combat.sound_mix import SOUND_MIX_PATH, class_path
-from combat.sound_tuning import FOOTSTEPS, SOUND_STATS, VOLUME_MAX, VOLUME_MIN
+from Sound.catalog import SOUND_STATS
+from Sound.mix import SOUND_MIX_PATH, class_path
+from Sound.tuning import FOOTSTEPS, VOLUME_MAX, VOLUME_MIN
 from graphics_menu import sound_tune_consts as SC
 from graphics_menu import umg_consts as UC
 from graphics_menu.sound_tune_tick import CLASS_PIN, MIX_PIN, sound_tune_defaults

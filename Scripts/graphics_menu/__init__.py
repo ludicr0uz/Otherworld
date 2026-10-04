@@ -150,7 +150,7 @@ Input, settings and state
                   its SoundClass in the game's sound mix (first Tick, and
                   after a nudge)
   sound_tune_save      run in the game by the save: the volumes into
-                  combat/sound_tuning.csv
+                  Sound/sound_tuning.csv
 
 What the tabs keep between sessions
   tune_keep_consts     BP_TuneSave's path and fields, the kept tabs and

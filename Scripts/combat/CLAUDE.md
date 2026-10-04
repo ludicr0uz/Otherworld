@@ -547,7 +547,7 @@ touches the fire graph doesn't pay for the notes on blood.
 | `docs/stance.md` | sprint, blocking (the guard's quarter damage and stamina cost), crouch and prone (`weapon_component/stance.py`), the procedural body poses (`body_pose.py`, `weapon_component/pose_weights.py`) |
 | `docs/health.md` | health, respawn and the pack's numbering (`health_component.py`, `respawn.py`), dying (the ragdoll collapse), hit boxes and hit reactions (`hit_zones.py`, `hit_bodies.py`, `hit_reaction.py`), blood and bullet impacts on the scenery (`burst.py`, `blood.py`, `bullet_impact.py`) |
 | `docs/skin.md` | the player's body: the Meshy mesh and its retarget (`skin.py`) |
-| `docs/audio.md` | gun and creature sounds (`audio.py`, `Scripts/Sound/fetch_weapon_sounds.py`), each sound's volume (`sound_tuning.py`, `sound_mix.py`) |
+| `Scripts/Sound/CLAUDE.md` | every sound: the areas' tables, the bindings, attenuation, volumes, `build_sound.py` (it was `docs/audio.md`) |
 | `docs/firing_gate.md` | what may fire and when, eating through the fire button (`weapon_component/consume.py`), debug mode |
 | `docs/anim_blueprint.md` | authoring Animation Blueprints from Python: AnimGraphs, pose pins, anim node settings |
 

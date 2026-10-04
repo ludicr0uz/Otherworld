@@ -121,7 +121,28 @@ def _check_graph(check, nodes):
             missing.append(var)
     check(f"every tuned stat is written onto the carried gun ({len(TUNE_STATS)} Sets, "
           "ints rounded)", not missing, str(missing))
+    _check_apply_goes_on(check, nodes)
     _check_melee(check, nodes)
+
+
+def _check_apply_goes_on(check, nodes):
+    """The apply's loop over the carried items must hand Tick on. With its
+    Completed loose, a touched table (a nudge, or a kept save loaded at
+    BeginPlay) ended Tick there, and the menu's rows after it went dead: no
+    new game from the title."""
+    first = f"Set {TUNE_STATS[0][1]}"
+    loops = [n for n in nodes
+             if any(str(PIN.get_pin_name(q)) == "LoopBody" for q in BEL.list_output_pins(n))
+             and any(_title(PIN.get_owning_node(q)) == first
+                     for o in BEL.list_output_pins(n)
+                     if str(PIN.get_pin_name(o)).replace(" ", "") == "ArrayElement"
+                     for q in o.list_connected_pins())]
+    done = [o for n in loops for o in BEL.list_output_pins(n)
+            if str(PIN.get_pin_name(o)) == "Completed" and o.list_connected_pins()]
+    check("the apply's loop over the carried items hands Tick on when it completes, "
+          "so a touched table never cuts off the fragments after it (the menu's rows)",
+          len(loops) == 1 and len(done) == 1,
+          f"{len(loops)} loop(s), {len(done)} with Completed wired")
 
 
 def _from_live(pin):

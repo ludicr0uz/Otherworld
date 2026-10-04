@@ -602,6 +602,11 @@ only names itself: `TuneTab.kept` (default true), and from it `keep_slot` and `b
   cycle. WORLD SETTINGS applies while open *or touched* for this.
 - **`TuneTab.unkept_cells`** are never read back (the world tab's hour: the live clock).
 - **A new tab is kept by default.** Give it an apply that runs on Touched, nothing else.
+- **An apply returns every exec tail, a loop's `Completed` too.** The tabs' fragments are
+  chained on Tick and the menu's own rows come last. The gun apply once left its loop's
+  `Completed` loose: with a kept gun save loaded, Tick ended there every frame, and the
+  title's rows went dead (no new game) until the save was deleted. `tune_checks` and
+  `probe_main_menu.py` (the first row with the gun table touched) guard it.
 - **Probes never see the developer's saves:** `probes/boot.py` sets the slots aside for the
   run, clears them after each probe and puts them back (`probes/kept_slots.py`).
 - **To drop a save:** delete `Saved/SaveGames/OtherworldTune_*.sav`. There is no reset row.

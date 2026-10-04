@@ -253,7 +253,9 @@ def _author_save(ed, in_execs, made, tab):
 def _author_apply(ed, in_execs, made, guns):
     """TuneTouched: the table onto every carried weapon it lists, each stat
     that is the weapon's own. ``guns``: how many of TuneWeapons are guns, the
-    rest being melee weapons. Returns the exec tails."""
+    rest being melee weapons. Returns the exec tails: the loop's Completed
+    among them, or a touched table ends Tick here, and the fragments after it
+    (the menu's own rows: new game) are never reached."""
     go, idle = _branch(ed, _get(ed, TUNE_TOUCHED_VAR, made), in_execs, made)
     pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
@@ -297,7 +299,7 @@ def _author_apply(ed, in_execs, made, guns):
             _connect(value, _pin(n, var))
             _connect(flow, _pin(n, "execute"))
             flow = then(n)
-    return [idle, out(cast, "CastFailed")]
+    return [_loose_pin(loop, "Completed", is_input=False), idle, out(cast, "CastFailed")]
 
 
 def author_tab_flow(ed, pc_out, in_execs, made, tab, subjects, closes):

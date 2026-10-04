@@ -11,7 +11,10 @@ would.
   paused, ticking               the debug row flips debug mode; a tab opens;
                                 save and exit does nothing (it needs a game)
   the first row                 GameStarted, the menu shut, the world
-                                unpaused, and the HUD's paused tick given up
+                                unpaused, and the HUD's paused tick given up;
+                                with the gun table touched (a kept save loaded
+                                at BeginPlay), which once ended Tick before
+                                the menu's rows
   in play                       the same row shuts the menu and nothing else
 
 Waits are on the wall clock or on a condition: game time stands still here.
@@ -30,7 +33,7 @@ from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, CC.PAUSE_CLICK_VAR,
-                                       GUN_TAB.open_var)]
+                                       GUN_TAB.open_var, GUN_TAB.touched_var)]
 
 
 def _row(action):
@@ -93,11 +96,15 @@ def probe(p):
             unreal.GameplayStatics.is_game_paused(world))
 
     # --- the first row starts the game ------------------------------------------
+    # The gun table touched, as a kept GUN SETTINGS save leaves it from BeginPlay.
+    p.set(hud, GUN_TAB.touched_var, True)
+    yield _after(0.3)
     p.set(hud, CC.PAUSE_CLICK_VAR, _row(C.START_ACTION))
-    yield lambda: p.get(hud, C.GAME_STARTED_VAR)
+    started = _after(5.0)
+    yield lambda: p.get(hud, C.GAME_STARTED_VAR) or started()
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    p.check("the first row on the title starts the game: the menu shut and the "
-            "world unpaused",
+    p.check("the first row on the title starts the game, the gun table touched "
+            "(a kept save): the menu shut and the world unpaused",
             p.get(hud, "MenuOpen") is False
             and not unreal.GameplayStatics.is_game_paused(world),
             f"open {p.get(hud, 'MenuOpen')}, "

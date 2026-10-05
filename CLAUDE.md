@@ -503,3 +503,10 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
 - **An unknown `.ini` key, or a wrong section name, is silently ignored.** If a flag seems to do
   nothing, find the owning class and its `config=` file in the engine source.
 - **The GameplayAbilities plugin and the gameplay tags are read only at editor startup.**
+- **A full-screen game on a Mac with a notch loses its bottom edge** unless the app's
+  `Info.plist` has `NSPrefersDisplaySafeAreaCompatibilityMode` true. The engine sizes the
+  viewport to the whole screen (1800x1169 here), while macOS gives a full-screen window only
+  the area under the notch (1800x1130): the bottom 39 px, the HUD's bars, fall off the screen.
+  With the key macOS scales the whole window in under the notch. It is in
+  `Build/Mac/Resources/Info.Template.plist` (tracked; the packaging copies its keys into the
+  app), guarded by `Scripts/dev/tests/test_mac_plist.py`, and takes a re-package to reach a build.

@@ -7,7 +7,8 @@ rules a graph follows, how to prove one, and what the spike (task M4, 2026-10-06
 broken. Its code is what the builders share to keep one graph right in both modes
 (`__init__.py` maps it): `pause.py`, the session (`session_consts.py`,
 `game_instance.py`), where state lives (`state*.py`), who is nearby (`players*.py`) and
-whose keys a graph reads (`input_checks.py`).
+whose keys a graph reads (`input_checks.py`) and the audit of every random draw
+(`random_consts.py`, `random_checks.py`).
 
 ## The authority pattern
 
@@ -262,6 +263,66 @@ says who struck it. `combat/damage.py` is the whole of it.
   naming client 2's controller is client 2's; client 2's own `TakeHit` calls change
   nothing; at 20 HP the heart is heard on client 1 alone; at 0 `Dead` reaches both.
   `--game` runs its single-player arm.
+
+## Random rolls (M17, done)
+
+Chance that changes the game is rolled once, by the machine that owns the state, and the
+result replicates; rolled on each machine, two players would see two worlds. A roll that
+only varies how something looks or sounds is each machine's own.
+
+- **Every draw a graph makes is audited** in `net/random_consts.py` (`AUDIT`): one row per
+  builder that names a `Random*` node, **state** or **cosmetic**, what is drawn, which
+  machine draws it. The menu verifier fails on a builder that draws and has no row, on a
+  row whose builder no longer draws, and on a Random node in a Blueprint the audited
+  builders do not author (`net/random_checks.py`). **A new draw gets its row in the same
+  commit.**
+- **A state roll runs behind authority,** by one of three means: on an arm already behind
+  the switch (the kill's, in `BP_HealthComponent`'s Tick), in a graph only the server has
+  (a wanderer's AIController; the GameMode's streams), or behind its own question (the
+  on-hit fragment asks `HasAuthority` of its target, so it is right in whatever graph
+  lands a hit). Then store the draw (a pure node draws again at every read) and let the
+  stored result travel: a replicated variable, or an actor the server spawns.
+- **Never roll a state value on a client "to predict it".** Two draws do not agree. The
+  owning client may predict a cosmetic (recoil's drift); the server's answer is the state.
+- **A table a roll reads is the server's copy's.** `LootChances`, the on-hit bonus and the
+  gun-drop table are not replicated and need not be: no client reads them.
+
+| builder | kind | what is drawn | where, and how the others learn it (a **task**: still per machine until then) |
+|---|---|---|---|
+| `loot/roll.py` | state | what a killed wanderer carries: each loot-table entry against its chance | the kill's arm of BP_HealthComponent, behind the Tick's authority switch; the body's Loot arrays replicate |
+| `combat/gun_drop.py` | state | whether a kill leaves a gun, and which: two streams on the GameMode | the same arm, and the streams are the GameMode's, which a client does not have; the gun is an actor the server spawns (**M23**) |
+| `combat/replacement.py` | state | where a killed wanderer's replacement appears (bearing, distance, the navmesh's point) | the same arm; the wanderer is spawned by the server and replicates |
+| `combat/player_respawn.py` | state | which PlayerStart a respawn is given | behind death's IsStandalone Branch and the authority switch; the new pawn replicates |
+| `survival/on_hit_graph.py` | state | whether a blow leaves its on-hit effect (a wendigo's: bleeding, 33%) | behind HasAuthority of the target, in the fragment itself; the effect is the target's ability system's (**M26**) |
+| `npc/patrol.py` | state | a patrol's next point and how long the wanderer waits there | the wanderer's AIController, which exists on the server alone; its movement replicates |
+| `npc/stalk.py` | state | the wendigo's hunt: which way round, when it turns, the wait behind a tree | the AIController, as the patrol |
+| `npc/strafe.py` | state | between two swings: the sidestep's angle, side and distance | the AIController, as the patrol |
+| `npc/ward.py` | state | held off by fire: which way it circles and when it turns | the AIController, as the patrol |
+| `npc/ward_roar.py` | state | held off by fire: when the first roar comes (it stands for it) | the AIController, as the patrol |
+| `combat/weapon_component/firing.py` | state | where in the gun's cloud a round or a pellet goes | the weapon component of whoever fires; the server's once the shot is its to run (**M19**) |
+| `combat/weapon_component/chop.py` | state | where the wood lands beside the trunk, and how it lies | the weapon component of whoever chops; the server's once the chop is a server action (**M25**) |
+| `world/day_night_graph.py` | state | the time of day a level starts at | every machine's own BP_DayNightCycle at BeginPlay; one clock, the server's, replicated (**M30**) |
+| `Sound/play.py` | cosmetic | which take of a sound plays (every sound with more than one) | wherever the sound plays |
+| `combat/hit_reaction.py` | cosmetic | which of the three front flinches a blow from the front plays | every machine's copy of the health component, off its own Tick |
+| `combat/weapon_component/recoil.py` | cosmetic | the kick's sideways drift, on the view of the player who fired | the owning client: it turns its own controller, as the mouse does |
+| `npc/stats.py` | cosmetic | the gap before a wanderer's next growl | the AIController (the server's); every client hears the growl once sounds are multicast (**M21**) |
+
+- **Still drawn by the machine that acts,** each until its action is the server's: a
+  shot's place in the cloud (M19), where chopped wood lands (M25), the hour a level starts
+  at (M30: every machine's sky is its own today). A client of a server changes nothing
+  with the first two yet (`TakeHit` does nothing there; its wood is its own copy's).
+- **A dropped gun is rolled by the server and spawned there;** it reaches a client when
+  items lying in the world replicate (M23). A landed bleed is the target's ability
+  system's on the server; the owner's HUD reads it when the attributes replicate (M26).
+- **Not runtime rolls:** the level generator's `random` (seeded, at build time: every
+  machine loads the same level) and the materials' wind (a function of world position
+  and time).
+- **The check:** `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_loot_roll.py`: the server kills all ten wanderers in a
+  player's name; one body is loaded to carry a canteen on the server and never on either
+  client's copy, one the other way round, the rest roll the table's 50%. Both clients
+  read on every body exactly what the server rolled (matched by `NpcId`), one canteen at
+  most. `--game` runs its single-player arm; `probe_bleeding.py` is the on-hit roll's.
 
 ## Who is nearby (M9, done)
 

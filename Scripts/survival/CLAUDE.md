@@ -64,6 +64,8 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
   not saved with the profile. One thing stops it early: the use key with a hot knife or axe
   in hand (heated at a campfire) removes it, by the tag
   (`combat/weapon_component/cauterize.py`, `probes/probe_hot_blade.py`).
+- **The roll is the server's:** the fragment asks `HasAuthority` of its target before any
+  roll (`Scripts/net/CLAUDE.md`, "Random rolls"), so a graph a client also runs can use it.
 - **Build order:** the controllers name `GE_Bleeding` on a pin, so `build_npc_blueprints.py`
   runs after `build_survival.py`. Without the asset the swing is built without the roll, and
   the builder says so.

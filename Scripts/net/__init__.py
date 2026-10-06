@@ -29,4 +29,7 @@ replication authoring).
     input_checks.py  the verifiers' check that keys are the local player's: a
                 HUD polls its owning controller, the weapon component LocalPC
                 (combat/weapon_component/local.py), no node asks by player index
+    random_consts.py  the audit of every random draw a graph makes: state (the
+                server's, rolled once) or cosmetic (each machine's own)
+    random_checks.py  the verifiers' check that no builder draws outside it
 """

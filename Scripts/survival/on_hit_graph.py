@@ -3,6 +3,8 @@ the target each of the attack's effects (survival/on_hit.py) with its chance.
 
     exec_in --> [target has an ability system?]
                   no  -----------------------------------------------> out
+                  yes --> [is the target this machine's to change?]
+                  no  -----------------------------------------------> out
                   yes --> per effect, each on its own roll:
                           [RandomFloat(0, 1) < chance + OnHitChanceBonus?]
                             no  --> the next effect
@@ -18,6 +20,11 @@ Removed before it is applied, so a second wound restarts the effect's time
 rather than stacking a second copy: the health component drains per stack of
 the tag, and two copies would bleed twice as fast.
 
+The roll is state, so it is the server's (net/CLAUDE.md, "Random rolls"): the
+fragment asks HasAuthority of the target itself, whatever graph it is in, and
+a client's copy of a hit rolls nothing. Asked behind the ability system's
+Branch, where the target is known to be there.
+
 The roll is a pure node read once, by its Branch. The spec is pure too: each
 AddGrantedTag reads the previous one's returned handle (survival/debuffs.py).
 """
@@ -25,6 +32,7 @@ AddGrantedTag reads the previous one's returned handle (survival/debuffs.py).
 from combat.log import _log
 from uebp.graph import _assets, _connect, _float_type, _node, _pin, _set, else_, out, then
 from survival.on_hit import ON_HIT_BONUS_VAR
+from uebp.nodes.actor import FN_HAS_AUTHORITY
 from uebp.nodes.gas import (
     FN_ADD_GRANTED_TAG, FN_APPLY_SPEC_TO_SELF, FN_GET_ASC, FN_MAKE_CONTEXT, FN_MAKE_SPEC,
     FN_REMOVE_EFFECT)
@@ -72,7 +80,13 @@ def _author_on_hit(ed, exec_in, target, effects):
     _connect(out(valid), _pin(gate, "Condition"))
     _connect(exec_in, _pin(gate, "execute"))
 
-    flows = [then(gate)]
+    owns = keep(_node(ed, FN_HAS_AUTHORITY))
+    _connect(target, _pin(owns, "self"))
+    server = keep(ed.add_branch_node())
+    _connect(out(owns), _pin(server, "Condition"))
+    _connect(then(gate), _pin(server, "execute"))
+
+    flows = [then(server)]
     for effect in ready:
         roll = keep(_node(ed, FN_RANDOM_FLOAT))
         _set(roll, "Min", 0.0)
@@ -121,6 +135,8 @@ def _author_on_hit(ed, exec_in, target, effects):
         "On hit: " + "; ".join(
             f"{e.chance:.0%} of the time the target gets {e.name} "
             f"({', '.join(e.tags)}), any it already has replaced" for e in ready)
-        + f". {ON_HIT_BONUS_VAR} (0 as built) is added to each chance.",
+        + f". {ON_HIT_BONUS_VAR} (0 as built) is added to each chance. Rolled "
+        "only where the target is this machine's to change (the server, single "
+        "player): a client's copy of the hit rolls nothing.",
         made)
-    return made, flows + [else_(gate)]
+    return made, flows + [else_(gate), else_(server)]

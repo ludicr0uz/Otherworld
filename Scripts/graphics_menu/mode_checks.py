@@ -21,6 +21,7 @@ from net import session_consts as S
 from net.session_checks import check_session
 from net.input_checks import check_local_input
 from net.owner_checks import check_no_player_zero_pawn
+from net.random_checks import check_random_audit
 from net.state_checks import check_no_client_game_mode
 
 BEL = unreal.BlueprintEditorLibrary
@@ -348,6 +349,7 @@ def check_modes(check, bp, nodes):
     check_session(check)
     check_no_client_game_mode(check)
     check_no_player_zero_pawn(check)
+    check_random_audit(check)
     check_local_input(check)
     _check_trees(check)
     _check_first_rows(check, nodes)

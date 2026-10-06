@@ -30,6 +30,11 @@ has (`Scripts/net/CLAUDE.md`, "Death"). In single player a player's body carries
 
 ## The roll (`roll.py`, spliced in `combat/death.py`)
 
+- **The roll is the server's** (`Scripts/net/CLAUDE.md`, "Random rolls"): it hangs off the
+  kill's arm, behind the Tick's authority switch, and the body's arrays replicate, so every
+  client reads one roll. `LootChances` is read by the server's copy alone.
+  `probe_net_loot_roll.py` proves it with two clients.
+
 - After the gun drop, on the **`DamagedByPlayer` arm** only, like the shells: the world-floor
   net kills the same way and must not pay out.
 - `RandomFloat < LootChances[i]` → `Loot += LootTable[i]`, and the same for `LootNames`,

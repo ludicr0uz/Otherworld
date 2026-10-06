@@ -376,7 +376,10 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
 19. Death: a ragdoll on every client, gear onto a lootable corpse, respawn at a chosen
     point. (Done, M16: `Scripts/net/CLAUDE.md`, "Death". The point is a random
     PlayerStart; the levels have one.)
-20. Server-only random rolls for loot, gun drops and on-hit effects.
+20. Server-only random rolls for loot, gun drops and on-hit effects. (Done, M17:
+    `Scripts/net/CLAUDE.md`, "Random rolls": every draw is audited as state or
+    cosmetic in `net/random_consts.py`; spread, the wood's spot and the start hour
+    move with M19, M25 and M30.)
 
 **Phase 5 — Weapons and inventory** (the largest phase; `weapon_component` alone is about
 55 modules)

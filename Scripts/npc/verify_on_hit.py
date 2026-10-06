@@ -99,6 +99,16 @@ def check_on_hit(path, key):
               len(rolls) == 1 and len(_drivers(mine[0])) == 1, f"{len(rolls)} branches")
         if len(rolls) != 1:
             continue
+        gates = _drivers(rolls[0])
+        asked = [f for g in gates if "Condition" in _ins(g)
+                 for f in _feeders(g, "Condition")]
+        # The first effect's roll hangs off the gate; a later one off the first.
+        if e is effects[0]:
+            check(f"{tag}: the rolls are the server's: they run only off a Branch "
+                  f"on HasAuthority of the target, and a client rolls nothing",
+                  len(gates) == 1 and len(asked) == 1
+                  and "".join(_title(asked[0]).split()) == "HasAuthority",
+                  f"{[_title(f) for f in asked]}")
         under = _feeders(rolls[0], "Condition")
         draws = [d for u in under for d in _feeders(u, "A")]
         odds = [d for u in under for d in _feeders(u, "B")]

@@ -96,6 +96,12 @@ from combat.weapon_component.record import replicate_record
 from combat.weapon_component.view import author_view_events
 from combat.weapon_component.shot import author_shot_events, replicate_shot
 from combat.shot_vars import TABLE as SHOT_TABLE
+from combat.strike_vars import TABLE as STRIKE_TABLE
+from combat.weapon_component.holds import author_set_holds, replicate_holds
+from combat.weapon_component.knife import KNIFE
+from combat.weapon_component.pickup import author_take_event
+from combat.weapon_component.punch import PUNCH, author_strike_event
+from combat.weapon_component.throw import author_throw_event
 from combat.weapon_component.loot_take import author_loot_take
 from combat.weapon_component.save_exit import author_ask_save_exit
 from combat.weapon_component.ads import AIM_FORCED_VAR
@@ -155,6 +161,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # a client's predicted rounds.
     declare(ed, SHOT_TABLE)
     replicate_shot(bp)
+    # Melee, the guard, the throw and the take as server requests
+    # (combat/strike_vars.py): what the owning machine reports and the server keeps.
+    declare(ed, STRIKE_TABLE)
     # Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's
     # HP bar; BaseSpeed is cached off the character at BeginPlay, never a
     # literal. Sprinting is what the fire gate refuses on. The sprint's speed
@@ -336,6 +345,16 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     author_asks(ed)
     author_view_events(ed)
     author_shot_events(ed)
+    # M20's requests: the two swings, the guard and the use key, the throw
+    # and the take. Blocking travels to the other players, and Thrown to the
+    # owner, whose arc waits for it: flagged here, after every declare.
+    replicate_holds(bp)
+    net.replicate(bp, THROWN_VAR, unreal.LifetimeCondition.COND_OWNER_ONLY)
+    author_strike_event(ed, PUNCH)
+    author_strike_event(ed, KNIFE)
+    author_set_holds(ed)
+    author_throw_event(ed)
+    author_take_event(ed)
     _author_wc_begin_play(ed, begin)
     _author_wc_tick(ed, tick)
     author_loot_take(ed)

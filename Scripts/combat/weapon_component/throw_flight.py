@@ -24,6 +24,11 @@ flies in, so that same tumble is a throwing axe's forward spin, the blade
 going over the handle edge first, and not whatever wobble the hand's pose at
 the release would have made of it.
 
+The flight is the server's (task M20): it runs in the Tick's upkeep behind
+HasAuthority, on the item the release made a replicated actor
+(item_world.py), so every client sees it fly by the engine's replicated
+movement, and what it strikes is judged once.
+
 Owns the variables the release (throw.py) stores the launch in.
 """
 
@@ -36,9 +41,10 @@ from combat.throw_tuning import (
 )
 from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.throw_strike import THROW_PAST_VAR, _author_throw_strike
-from uebp.nodes.actor import FN_ADD_WORLD_ROT, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT
+from uebp.nodes.actor import (
+    FN_ADD_WORLD_ROT, FN_GET_OWNER, FN_HAS_AUTHORITY, FN_SET_ACTOR_LOC, FN_SET_ACTOR_ROT)
 from uebp.nodes.math import (
-    FN_ADD_VV, FN_AXIS_ANGLE, FN_CROSS, FN_GREATER_FF, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF,
+    FN_ADD_VV, FN_AND, FN_AXIS_ANGLE, FN_CROSS, FN_GREATER_FF, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF,
     FN_NORMAL, FN_ROT_FROM_X, FN_SUB_FF)
 from uebp.nodes.palette import NODE_BREAK_HIT
 from uebp.nodes.system import FN_DELTA_SECONDS, FN_IS_VALID, FN_TIME_SECONDS, FN_TRACE
@@ -125,8 +131,16 @@ def _author_throw_flight(ed, exec_ins):
     thrown = out(thrown_get, THROWN_VAR)
     flying = _node(ed, FN_IS_VALID)
     _connect(thrown, _pin(flying, "Object"))
+    # ...on the machine that owns it: Thrown replicates to the owning client,
+    # whose arc reads it, and that copy flies nothing.
+    owner = _node(ed, FN_GET_OWNER)
+    owns = _node(ed, FN_HAS_AUTHORITY)
+    _connect(out(owner), _pin(owns, "self"))
+    mine = _node(ed, FN_AND)
+    _connect(out(flying), _pin(mine, "A"))
+    _connect(out(owns), _pin(mine, "B"))
     gate = ed.add_branch_node()
-    _connect(out(flying), _pin(gate, "Condition"))
+    _connect(out(mine), _pin(gate, "Condition"))
     for pin in exec_ins:
         _connect(pin, _pin(gate, "execute"))
 

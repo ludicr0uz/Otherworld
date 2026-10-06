@@ -24,6 +24,7 @@ from Sound.sound_weapons import DRY_FIRE
 from combat.chop_tuning import CHOPS_VAR
 from combat.glimmer import add_glimmer, author_glimmer
 from combat.glimmer_tuning import GLIMMER
+from combat.item_world import replicate_item
 from combat.light_tuning import LIGHTS_VAR
 from combat.log import _log
 from uebp.graph import (
@@ -183,6 +184,9 @@ def build_weapon_item():
     _declare(ed, THROW_GRIP_LOC_VAR, _struct_type(unreal.Vector.static_struct()))
     _declare(ed, THROW_GRIP_ROT_VAR, _struct_type(unreal.Rotator.static_struct()))
 
+    # What an item loose in the world shows every client (item_world.py):
+    # after the declares, which drop the flags.
+    replicate_item(bp)
     # The components are variables of the class only once it has compiled.
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponItem failed to compile")

@@ -99,10 +99,11 @@ _author_* fragment per concern, each in its own module:
               nearest AimPoint, the point the reticle rests on. KINDS lists
               what can be interacted with (today: an item, which is picked
               up, and a campfire, which heats the blade in hand)
-  pickup      interact's item kind: the Dropped items it offers, and the take
-              of the one kept into the bag, detached from what it was left in
-              (a body a thrown blade struck); a Lodged blade taken with empty
-              hands goes to the hand
+  pickup      interact's item kind: the Dropped items it offers, and the ask
+              for the one kept, Server_Take(Item), whose body is the take into
+              the bag, detached from what it was left in (a body a thrown
+              blade struck); a Lodged blade taken with empty hands goes to the
+              hand
   heat        interact's campfire kind: the fires it offers while the held
               item Heats (the knife, the axe), and what makes that item Hot
               for HEAT_S (the item's own Tick cools it: combat/heat.py)
@@ -113,10 +114,16 @@ _author_* fragment per concern, each in its own module:
               character, the breath of a spent sprint
   punch       empty hands: the fire key throws a punch (MM_Attack_01 into the
               upper-body slot); the blow is a short sphere sweep a moment later.
-              The swing and the blow are written once, for a Strike
+              The swing and the blow are written once, for a Strike. The swing
+              is a server request (Server_Punch / Server_Slash: the queue asks,
+              the event stamps and plays, a client predicts the clip); the
+              blow runs in the upkeep, pending only where the event ran
   knife       a Melee item held: the fire key slashes (behind the fire gate,
               beside the Consumable branch); punch.py's swing and blow on the
               KNIFE Strike, playing A_KnifeSlash
+  holds       the guard and the use key as the server knows them:
+              Server_SetHolds on a change, and the server's copy's own
+              Blocking (its stamina) and FireWard (its stick), in the mirror
   hot_blow    what the knife stage's blow takes (BlowDamage): the strike's
               damage, doubled with a Hot item in hand off a body tagged
               FearsFire (the wendigo)
@@ -127,8 +134,9 @@ _author_* fragment per concern, each in its own module:
               piece of wood from Inventory into CampfireClass on the ground
               in front of the player (behind the fire gate, after Melee)
   throw       the throw key held: the predicted arc on BP_ThrowArc; clicked:
-              the wind-up, then the release: the item leaves hand and
-              inventory
+              the wind-up, then the ask, Server_Throw(Start, Velocity), whose
+              body is the release: with authority the item leaves hand and
+              inventory and becomes a replicated actor (combat/item_world.py)
   throw_launch  where a throw leaves from and how fast, as pure pins: at
               AimPoint, pitched so its curve passes through the point the
               reticle rests on; out of the item's reach, tipped over the view
@@ -140,7 +148,8 @@ _author_* fragment per concern, each in its own module:
               (ThrowWinding, ThrowDueTime)
   throw_flight  the item in the air flies the arc's curve, tumbling end over
               end, and lands as a Dropped item; a melee weapon leaves the hand
-              squared up to the throw, so it spins forward, edge first
+              squared up to the throw, so it spins forward, edge first. In the
+              upkeep, with authority: clients see it by replicated movement
   throw_strike  what the flight struck, for an item with a ThrowDamage (the
               knife, the axe): a body is wounded (more in the head) and
               bleeds, and keeps the item, set on the model and attached to

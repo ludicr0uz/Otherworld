@@ -72,6 +72,11 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   `Blocking = KeyBlock down AND Stamina > 0 AND NOT Sprinting`, stored once a frame after the
   sprint block. It never reads `Held`, so empty hands block too. The fire gate refuses while
   it is set.
+- **That is the owning machine's `Blocking`.** On a server the wanderer reads the
+  server's copy of the character, which writes its own (`weapon_component/holds.py`,
+  M20): the guard the client reports (`Server_SetHolds`) AND the movement component's
+  own stamina AND not sprinting. It replicates to the other players, whose copies pose
+  the guard. `BlockForced` is a probe's stand-in for the key.
 - **The hit is resolved by the wanderer that swings** (`npc/block.py`), because the melee
   writes `Health` straight onto the player's component and the swing is the only place its
   damage and bearing exist together. The controller casts the player's `BP_WeaponComponent`:

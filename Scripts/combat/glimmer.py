@@ -32,6 +32,7 @@ the camera still shows over an item lying in grass.
 import unreal
 
 from combat import item_vars as IV
+from combat.item_world import author_world_view
 from combat.glimmer_tuning import (
     GLIMMER, GLIMMER_COLOUR, GLIMMER_EMISSIVE, GLIMMER_FAR_CM, GLIMMER_HALF_SIZE_CM,
     GLIMMER_LIFT_CM, GLIMMER_NEAR_CM, GLIMMER_PERIOD_S, GLIMMER_PULL_CM,
@@ -212,6 +213,9 @@ def author_glimmer(ed, exec_ins):
     def get(name):
         return _pin(ed.add_get_member_variable_node(name), name, is_input=False)
 
+    # First what a client's copy of a replicated item shows at all
+    # (item_world.py): here because every child's Tick calls this.
+    exec_ins = author_world_view(ed, exec_ins)
     show = _node(ed, FN_SET_VISIBILITY)
     _connect(get(GLIMMER), _pin(show, "self"))
     _connect(get(IV.Dropped), _pin(show, "bNewVisibility"))

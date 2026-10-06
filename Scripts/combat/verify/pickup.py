@@ -1,7 +1,8 @@
 """verify.pickup -- the pick-up (weapon_component/pickup.py), interact's item
-kind: the target interact kept, cast to an item, is taken into the bag once,
-after the search, while there is room; and a blade that was Lodged goes back
-into empty hands.
+kind: the target interact kept, cast to an item, is asked for once, after the
+search, while there is room; the take is Server_Take's (task M20), which
+asks again on the machine that owns the inventory; and a blade that was
+Lodged goes back into empty hands.
 
 How the target is chosen is verify/interact.py's. That a pick-up joins the
 inventory without switching to it is verify/weapon_inputs.py's.
@@ -9,9 +10,12 @@ inventory without switching to it is verify/weapon_inputs.py's.
 
 from combat import item_vars as IV
 from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, WEAPON_KIND_VAR
-from combat.verify.common import by_pins, check, in_pins, pin_value
-from combat.verify.fixtures import wg
+from combat.strike_vars import ITEM_PARAM, SERVER_TAKE, TAKE_REACH_CM
+from combat.verify.common import BEL, by_pins, check, graph, in_pins, num_pin, pin_value
+from combat.verify.fixtures import wc, wg
 from combat.verify.interact import _exec_from, _reads, _sources, _then, _title
+from combat.verify.punch import _feeds
+from combat.verify.shot import _calls_of
 from combat.weapon_component import vars as WV
 from combat.weapon_component.interact import INTERACT_TARGET_VAR
 
@@ -22,44 +26,75 @@ def _target_as_item(node, pin):
     return len(casts) == 1 and _reads(casts[0], "Object", INTERACT_TARGET_VAR)
 
 
+def _event_item(node, pin):
+    """Is ``pin`` fed by Server_Take's own Item, the item the client asked for?"""
+    event = graph(wc).find_event_node(SERVER_TAKE)
+    return event is not None and _sources(node, pin) == [event]
+
+
 def check_pickup_takes_once():
     adds = by_pins(wg, "TargetArray", "NewItem")
-    takes = [a for a in adds if _target_as_item(a, "NewItem")]
+    takes = [a for a in adds if _event_item(a, "NewItem")]
     # (The loot take adds the item it has just spawned: verify/asks.py.)
     looped = [a for a in adds if a not in takes
               and any("Cast" in _title(s) and not any(
                   "SpawnTransform" in in_pins(o) for o in _sources(s, "Object"))
                   for s in _sources(a, "NewItem"))]
-    check(f"the take adds {INTERACT_TARGET_VAR}, cast to an item, to the "
+    check(f"the take, in {SERVER_TAKE}, adds the item the client asked for to the "
           "inventory, and nothing adds a loop's own element",
           len(takes) == 1 and not looped,
           f"{len(takes)} take(s), {len(looped)} add(s) inside a loop")
     if len(takes) != 1:
         return
 
-    # Backwards from the add: Detach <- Set Dropped <- Branch(room)
-    # <- Cast(target) <- Branch(found) <- the loop's Completed.
+    # Backwards from the add: Detach <- Set InWorld <- Set Dropped <- Branch(free).
     looses = [n for n, _pin in _exec_from(takes[0])]
     check("the taken item is detached from whatever it was left in (a body a "
           "thrown blade struck), staying where it is",
           len(looses) == 1 and "detachfromactor" in _title(looses[0]).replace(" ", "").lower()
-          and _target_as_item(looses[0], "self")
+          and _event_item(looses[0], "self")
           and all(pin_value(looses[0], r) == "KeepWorld"
                   for r in ("LocationRule", "RotationRule", "ScaleRule")),
           ", ".join(_title(n) for n in looses))
     if len(looses) != 1:
         return
-    flags = [n for n, _pin in _exec_from(looses[0])]
+    worlds = [n for n, _pin in _exec_from(looses[0])]
+    check(f"the taken item is out of the world ({IV.InWorld} lowered: each client's "
+          "copy of it goes)",
+          len(worlds) == 1 and _title(worlds[0]) == f"Set {IV.InWorld}"
+          and pin_value(worlds[0], IV.InWorld) in ("false", "")
+          and _event_item(worlds[0], "self"), ", ".join(_title(n) for n in worlds))
+    if len(worlds) != 1:
+        return
+    flags = [n for n, _pin in _exec_from(worlds[0])]
     check("the taken item stops being Dropped",
           len(flags) == 1 and _title(flags[0]) == "Set Dropped"
-          and pin_value(flags[0], "Dropped") == "false"
-          and _target_as_item(flags[0], "self"),
+          and pin_value(flags[0], "Dropped") in ("false", "")
+          and _event_item(flags[0], "self"),
           ", ".join(_title(n) for n in flags))
     if len(flags) != 1:
         return
     rooms = _exec_from(flags[0])
+    behind = (_feeds(BEL.find_input_pin(rooms[0][0], "Condition"))
+              if len(rooms) == 1 else [])
+    names = {_title(n) for n in behind}
+    reach = [n for n in behind if num_pin(n, "B") == TAKE_REACH_CM
+             and any("Distance" in _title(f) for f in _sources(n, "A"))]
+    check(f"...only an item still Dropped, within {TAKE_REACH_CM:g} cm of this "
+          f"machine's copy of the taker, while there is room ({HAS_ROOM_VAR}): two "
+          "players reaching for one item, the first ask takes it",
+          len(rooms) == 1 and rooms[0][1] == "then" and len(reach) == 1
+          and {"Get Dropped", f"Get {HAS_ROOM_VAR}"} <= names, str(sorted(names)))
+
+    # --- the ask, where the keys are ---------------------------------------------
+    asks = [n for n in _calls_of(SERVER_TAKE) if _target_as_item(n, ITEM_PARAM)]
+    check(f"the Tick asks for the take in one place: {INTERACT_TARGET_VAR}, cast to "
+          "an item", len(asks) == 1, f"{len(asks)} ask(s)")
+    if len(asks) != 1:
+        return
+    rooms = _exec_from(asks[0])
     fits = [c for n, _pin in rooms for c in _sources(n, "Condition")]
-    check(f"...only while there is room ({HAS_ROOM_VAR}: a bag slot or the hand free)",
+    check(f"...only while this copy has room ({HAS_ROOM_VAR}: a bag slot or the hand free)",
           len(rooms) == 1 and rooms[0][1] == "then" and len(fits) == 1
           and _title(fits[0]) == f"Get {HAS_ROOM_VAR}",
           f"{len(rooms)} gate(s)")
@@ -82,7 +117,7 @@ def check_pickup_takes_once():
     if len(founds) != 1:
         return
     entries = _exec_from(founds[0][0])
-    check("the take runs once per press: off the loop's Completed, not its body",
+    check("the ask runs once per press: off the loop's Completed, not its body",
           [pin for _n, pin in entries] == ["Completed"],
           str([pin for _n, pin in entries]))
 
@@ -91,7 +126,7 @@ def check_lodged_to_hand():
     """A blade taken back out of a tree or a body goes to empty hands."""
     hands = [n for n in wg if _title(n) == f"Set {SLOT_VAR}"
              and pin_value(n, SLOT_VAR) in (str(HAND), "")
-             and not _sources(n, SLOT_VAR) and _target_as_item(n, "self")]
+             and not _sources(n, SLOT_VAR) and _event_item(n, "self")]
     check("the take puts the item in the hand in one place",
           len(hands) == 1, f"{len(hands)} Set {SLOT_VAR} = HAND on the target")
     if len(hands) != 1:
@@ -109,7 +144,7 @@ def check_lodged_to_hand():
     check(f"...the item no longer {IV.Lodged}",
           len(lowers) == 1 and _title(lowers[0][0]) == f"Set {IV.Lodged}"
           and pin_value(lowers[0][0], IV.Lodged) in ("false", "")
-          and _target_as_item(lowers[0][0], "self"),
+          and _event_item(lowers[0][0], "self"),
           ", ".join(_title(n) for n, _pin in lowers))
     if len(lowers) != 1:
         return

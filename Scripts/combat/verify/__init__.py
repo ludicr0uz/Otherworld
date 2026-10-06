@@ -106,6 +106,10 @@ and it never relies on a variable another section left behind.
   shot        the shot and the reload as server requests (M19): the Server
               events, the pellets traced only in Server_Fire, the owning
               client's prediction off authority, the counters and the view
+  strike      melee, the guard, the fire held out, the throw and the take as
+              server requests (M20): the five Server events, what each asks
+              first, a blow pending and an item let go only in its event, the
+              client's predicted swing, what an item in the world replicates
   slots       the inventory's slots: each item's Slot and WeaponKind, the
               component's slot variables and number keys, the issued items'
               slots, the sync before the refresh, the keys' requests
@@ -141,6 +145,6 @@ and it never relies on a variable another section left behind.
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "record", "shot", "pickup", "glimmer", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "record", "shot", "strike", "pickup", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
 )

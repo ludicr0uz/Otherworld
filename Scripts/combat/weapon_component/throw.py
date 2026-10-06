@@ -7,7 +7,13 @@ gate takes _author_throw_key's NOT, so the click neither fires, eats nor
 slashes. The click that threw is spent (TriggerSpent) until it comes up, so
 it cannot fire the automatic equipped in the thrown item's place.
 
-_author_throw, called from Tick, runs four fragments one after another:
+The throw is a server request (task M20, combat/strike_vars.py): the arc, the
+cocked arm and the wind-up are the owning machine's, and on the frame the
+hand lets go it asks Server_Throw(Start, Velocity). The event is the release,
+and the flight runs in the Tick's upkeep, with authority. In single player
+the event is a plain call.
+
+_author_throw, called from Tick's local arm, runs three fragments:
 
   _author_throw_aim      while the key is held with something in hand and
                          nothing already in the air: predict the arc and draw
@@ -18,9 +24,17 @@ _author_throw, called from Tick, runs four fragments one after another:
   _author_throw_windup   on the frame of that click: play the throw's clip;
                          a moment later, when its hand lets go, run the
                          release (throw_windup.py)
-  _author_throw_release  on that frame: store the launch, detach the item
-                         and take it out of the inventory, exactly as a drop
-                         does
+  _author_throw_ask      on that frame: the launch, the throw's sound, and
+                         Server_Throw
+
+Server_Throw (author_throw_event) is then, with authority:
+
+  _author_throw_release  store the launch, detach the item and take it out
+                         of the inventory, exactly as a drop does, and make
+                         it an actor every client is sent (item_world.py)
+
+and the upkeep, on the machine with authority:
+
   _author_throw_flight   every frame something is in the air: move it along
                          the same curve, tumbling, and when a trace between
                          two frames hits, set it down on the ground as a
@@ -47,15 +61,25 @@ game.
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.paths import THROW_ARC_CLASS_PATH
+from combat.item_world import author_into_world
+from combat.strike_vars import (
+    SERVER_THROW, START_PARAM, THROW_PARAMS, THROW_SPEED_SLACK, THROW_START_REACH_CM,
+    VELOCITY_PARAM)
 from combat.throw_arc import ARC_COMPONENT
 from combat.throw_tuning import (
     THROW_ARC_HZ, THROW_ARC_SIM_S, THROW_DOT_CM, THROW_GRAVITY_Z, THROW_MARK_CM,
+    THROW_SPEED_VAR,
 )
+from combat.paths import ITEM_CLASS_PATH
+from combat.weapon_component.shot import _author_alive
+from combat.weapon_component.slot_nodes import not_, op, valid
+from uebp import net
+from uebp.g import _G
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.inventory import _detach_rules
 from combat.weapon_component.throw_flight import (
     THROWN_VAR, THROW_LAST_VAR, THROW_START_VAR, THROW_TIME_VAR,
-    THROW_VELOCITY_VAR, _author_square, _author_throw_flight,
+    THROW_VELOCITY_VAR, _author_square,
 )
 from combat import item_vars as IV
 from combat.weapon_component.common import _prop
@@ -68,9 +92,12 @@ from combat.weapon_component.throw_windup import (
     _author_throw_windup, _author_wound_down, _winding,
 )
 from uebp.nodes.actor import (
-    FN_DETACH, FN_GET_TRANSFORM, FN_IS_KEY_DOWN, FN_SET_ACTOR_LOC, FN_SET_HIDDEN)
+    FN_ACTOR_LOC, FN_DETACH, FN_GET_OWNER, FN_GET_TRANSFORM, FN_IS_KEY_DOWN,
+    FN_SET_ACTOR_LOC, FN_SET_HIDDEN)
 from uebp.nodes.array import FN_ARR_REMOVE
-from uebp.nodes.math import FN_AND, FN_MAKE_TRANSFORM, FN_NOT, FN_OR
+from uebp.nodes.math import (
+    FN_AND, FN_CLAMP_VSIZE, FN_DISTANCE, FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_NOT,
+    FN_OR)
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
 from combat.weapon_component import vars as WV
@@ -102,14 +129,14 @@ def _author_throw_key(ed, pc_out, key_pin):
 
 
 def _author_throw(ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins):
-    """The whole throw, in Tick's chain: aim, wind-up, release, flight.
-    Returns the exit exec pins."""
+    """The throw where the keys are, in Tick's chain: aim, wind-up, and the
+    ask on the frame the hand lets go. Returns the exit exec pins."""
     aim_exits, clicked, start, velocity = _author_throw_aim(
         ed, pc_out, owner_out, held, armed_out, wants, tap, exec_ins)
     let_go, called_off, waiting = _author_throw_windup(ed, held, clicked, aim_exits)
-    thrown = _author_throw_release(ed, held, start, velocity, let_go)
-    over = _author_wound_down(ed, (thrown, called_off))
-    return _author_throw_flight(ed, (over, waiting))
+    asked = _author_throw_ask(ed, held, start, velocity, let_go)
+    over = _author_wound_down(ed, (asked, called_off))
+    return (over, waiting)
 
 
 def _add_dot(ed, dots, location, scale, exec_in):
@@ -269,10 +296,68 @@ def _author_throw_aim(ed, pc_out, owner_out, held, armed_out, wants, tap,
     return exits, then(spend), start, velocity
 
 
+def _author_throw_ask(ed, held, start, velocity, exec_in):
+    """The hand lets go, on the machine with the keys: the launch is stored
+    (it is a pure chain off the view), the air the item goes through is heard,
+    and the throw is asked of the server. Returns the exit exec pin. Reads
+    Held: run it only where the hand is known to hold something."""
+    g = _G(ed)
+    flow = g.put(THROW_START_VAR, start, [exec_in])
+    flow = g.put(THROW_VELOCITY_VAR, velocity, [flow])
+    # Heard from where it left the hand, by whoever threw it, at once: a
+    # blade cuts the air, anything else pushes it aside.
+    melee, _melee_n = _prop(ed, IV.Melee, held)
+    sharp_in, blunt_in = g.branch(melee, [flow])
+    sharp = _author_sound(ed, WV.ThrowSharpSounds, g.get(THROW_START_VAR), sharp_in)
+    blunt = _author_sound(ed, WV.ThrowSounds, g.get(THROW_START_VAR), blunt_in)
+    ask = g.keep(_node(ed, SERVER_THROW))
+    _connect(g.get(THROW_START_VAR), _pin(ask, START_PARAM))
+    _connect(g.get(THROW_VELOCITY_VAR), _pin(ask, VELOCITY_PARAM))
+    for pin in (sharp, blunt):
+        _connect(pin, _pin(ask, "execute"))
+    ed.add_comment_to_nodes(
+        f"The throw is asked of the server ({SERVER_THROW}, throw.py), with where "
+        "it leaves from and how fast, read on this frame. Its sound is this "
+        "machine's, now. With authority (single player) the event is the throw.",
+        g.made)
+    return then(ask)
+
+
+def author_throw_event(ed):
+    """Server_Throw(Start, Velocity): the release, on the machine that owns
+    the item. Refused unless there is an item in a living hand, nothing of
+    this player's already in the air, and Start within THROW_START_REACH_CM of
+    this machine's copy of the thrower; the speed is capped at the item's own
+    ThrowSpeed. Before the Tick, which calls it by name."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    event = g.keep(net.server_event(ed, SERVER_THROW, THROW_PARAMS))
+    start = out(event, START_PARAM)
+    held = g.get(WV.Held)
+    armed, _empty = g.branch(valid(g, held), [then(event)])
+    alive = _author_alive(g, [armed])
+    idle = not_(g, valid(g, g.get(THROWN_VAR)))
+    here = g.call(FN_ACTOR_LOC, self=out(g.call(FN_GET_OWNER)))
+    near = op(g, FN_LE_FF, out(g.call(FN_DISTANCE, V1=start, V2=out(here))),
+              str(THROW_START_REACH_CM))
+    go, _refused = g.branch(op(g, FN_AND, idle, near), alive)
+    top = op(g, FN_MUL_FF, g.iget(held, THROW_SPEED_VAR), str(THROW_SPEED_SLACK))
+    capped = g.call(FN_CLAMP_VSIZE, A=out(event, VELOCITY_PARAM), Max=top)
+    ed.add_comment_to_nodes(
+        f"{SERVER_THROW} (throw.py): the owning client's throw, on the frame its "
+        "hand lets go. Refused unless there is an item in a living hand, nothing "
+        f"of this player's in the air and the start within {THROW_START_REACH_CM:g} "
+        "cm of this machine's copy of them; the speed is capped at the item's "
+        "own. Then the release: the item leaves the hand and the inventory, "
+        "replicates to everyone, and the Tick flies it.", g.made)
+    _author_throw_release(ed, held, start, out(capped), go)
+
+
 def _author_throw_release(ed, held, start, velocity, exec_in):
-    """Let go: the launch is stored for the flight, the item leaves the hand
-    and the inventory the way a drop's does. Returns the exit exec pin.
-    Reads Held: run it only where the hand is known to hold something."""
+    """Let go, with authority: the launch is stored for the flight, the item
+    leaves the hand and the inventory the way a drop's does, and from here on
+    it is an actor every client sees (InWorld, replicated). Returns the exit
+    exec pin. Reads Held: run it only where the hand is known to hold
+    something."""
     now = _node(ed, FN_TIME_SECONDS)
     prev = exec_in
     for var, value in ((THROW_START_VAR, start),
@@ -298,27 +383,16 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     _connect(held, _pin(put, "self"))
     _connect(start, _pin(put, "NewLocation"))
     _connect(then(shown), _pin(put, "execute"))
-    # The air it goes through, heard from where it left the hand: a blade
-    # cuts it, anything else pushes it aside.
-    melee, _melee_n = _prop(ed, IV.Melee, held)
-    blade = ed.add_branch_node()
-    _connect(melee, _pin(blade, "Condition"))
-    _connect(then(put), _pin(blade, "execute"))
-    sharp = _author_sound(ed, WV.ThrowSharpSounds, start, then(blade))
-    blunt = _author_sound(ed, WV.ThrowSounds, start, else_(blade))
-    joined = ed.add_branch_node()
-    _set(joined, "Condition", True)
-    for pin in (sharp, blunt):
-        _connect(pin, _pin(joined, "execute"))
-    squared = _author_square(ed, held, then(joined))
+    squared = _author_square(ed, held, then(put))
+    # The server's item is now the world's: every client is sent it.
+    loosed = author_into_world(ed, held, squared)
 
     inv = ed.add_get_member_variable_node(WV.Inventory)
     idx = ed.add_get_member_variable_node(WV.EquippedIndex)
     remove = _node(ed, FN_ARR_REMOVE)
     _connect(out(inv, WV.Inventory), _pin(remove, "TargetArray"))
     _connect(out(idx, WV.EquippedIndex), _pin(remove, "IndexToRemove"))
-    for pin in squared:
-        _connect(pin, _pin(remove, "execute"))
+    _connect(loosed, _pin(remove, "execute"))
     # Held set with nothing connected clears it, as in _author_drop.
     clear = ed.add_set_member_variable_node(WV.Held)
     _connect(then(remove), _pin(clear, "execute"))

@@ -171,8 +171,8 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   - **To add something to interact with,** write its pair in a module of its own and add it to
     `KINDS`. Don't poll the key anywhere else.
   - **One kind is an item** (`weapon_component/pickup.py`): it offers the `Dropped`
-    items and takes the target into the bag. A take inside the walk is how one press used to
-    empty a pile.
+    items and asks the server for the target (`Server_Take`, whose body takes it into the
+    bag: M20, below). A take inside the walk is how one press used to empty a pile.
   - **The other is a campfire** (`weapon_component/heat.py`), offered only while the held
     item `Heats`. It has no cast: a kind's `act` may test the target any way it likes (here
     `ClassIsChildOf` against `CampfireClass`) as long as it hands on the exec pin a target
@@ -182,7 +182,8 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   - Searching a body is Tab, not this key (`Scripts/loot/CLAUDE.md`).
 - **An item on the ground glimmers** (`glimmer.py`, numbers in `glimmer_tuning.py`): the
   item highlight. `BP_WeaponItem` carries `Glimmer`, a `MaterialBillboardComponent` on
-  `Body`, hidden as built, and its Tick's one step is `Glimmer.SetVisibility(Dropped)`.
+  `Body`, hidden as built, and its Tick's step is `Glimmer.SetVisibility(Dropped)` (after
+  what a client's copy of a replicated item shows at all: `item_world.py`).
   `Dropped` is written in half a dozen places, so none of them is told: the item shows the
   sprite by its own flag. `BP_AmmoPickup` is built with its sprite showing.
   - **A child with a Tick of its own overrides the base's** (the knife and the axe:
@@ -241,8 +242,8 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     and packets do not arrive evenly, so an honest burst would lose rounds without it,
     and with the `FMax` the rate over any stretch is still the gun's own.
   - **The server does not ask about sprint or the guard:** both are the local gate's
-    (the guard is the owning client's until M20; a sprint's end and the shot behind it
-    travel separately).
+    (a sprint's end and the shot behind it travel separately; the server has its own
+    `Blocking` since M20, and a swing's event does ask it).
   - **Plain Server events, not GAS abilities.** `GA_ConsumeItem` is triggered by a
     gameplay event whose payload is the item actor, on an ability system that does not
     replicate until M26. A shot does not fit that: the event would be raised on the
@@ -261,6 +262,48 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     local arm, so on a client they go through the Server events. A probe that calls
     `Server_Fire` itself does so on the server (or in single player).
     `probes/probe_net_fire.py` is the two-client proof; `verify/shot.py` the wiring.
+- **Melee, the guard, the throw and the take are server requests too** (M20;
+  `strike_vars.py`; `Scripts/net/CLAUDE.md`, "Melee, the guard, the throw and the take").
+  Five reliable Server events on the component, each a plain call in single player:
+  - **`Server_Punch` / `Server_Slash`** (`weapon_component/punch.py`,
+    `author_strike_event`): a queued swing asks for its strike's event, which refuses
+    unless the hand is the strike's (empty, or a `Melee` item), the owner alive and not
+    `Blocking` and the cooldown over (`STRIKE_GRACE_S`), then stamps the cooldown and
+    the blow's time, raises `Pending` and plays the clip. **The blow stage is in the
+    Tick's upkeep** (`_author_punch_blow`, `_author_knife_blow`), on every copy, and
+    finds a strike pending only where the event ran: the sweep, `TakeHit`, the chop
+    and the hot blade's double are the server's. A client of a server stamps its own
+    cooldown and plays the clip and the swing's sound at once (its prediction).
+    - **A swing written straight into `KnifeQueued` inside the cooldown is refused**
+      (the press gate always waited; the event now does too), and so is a punch with
+      something in hand. A probe waits for `NextKnifeTime` and empties the hands with
+      a slot ask.
+  - **`Server_SetHolds(Guard, Use)`** (`weapon_component/holds.py`): the owning machine
+    reports its `Blocking` and `Using` on the frame either changes. The server's copy
+    of a client's character writes its own `Blocking` (asked AND the movement's own
+    stamina AND not sprinting) and `FireWard` (asked AND `Held.Lit`, behind
+    `IsValid(Held)`) in the Tick's remote arm. `Blocking` replicates to everyone but
+    the owner. `BlockForced` is the probe's block key.
+  - **`Server_Throw(Start, Velocity)`** (`weapon_component/throw.py`): the arc, the
+    cocked arm and the wind-up are the owning machine's; on the frame the hand lets go
+    it stores the launch, plays the throw's sound and asks. The event is the release
+    (`_author_throw_release`), refused unless an item is in a living hand, nothing of
+    this player's is in the air and `Start` is within `THROW_START_REACH_CM` of the
+    server's copy; the speed is capped at the item's `ThrowSpeed`. The flight is in the
+    upkeep, behind HasAuthority.
+  - **`Server_Take(Item)`** (`weapon_component/pickup.py`): E's item kind asks (while
+    its own copy has room); the event is the take, refused unless the item is still
+    `Dropped`, within `TAKE_REACH_CM` of the server's copy of the taker, and a slot is
+    free.
+  - **An item that leaves a hand for the world replicates** (`item_world.py`): the
+    release sets `InWorld` and calls `SetReplicateMovement(true)` and
+    `SetReplicates(true)` on the server's actor; `Dropped`, `Lodged` and `InWorld` are
+    replicated variables of `BP_WeaponItem`. Replication is never switched off (the
+    generic driver would leave each client's copy standing): the take lowers
+    `InWorld`, and a client's copy hides itself while it is false. That step is the
+    first of `glimmer.author_glimmer`, so every child's Tick has it.
+  - `verify/strike.py` and `verify/pickup.py` are the wiring;
+    `probes/probe_net_throw.py` and `probe_net_melee.py` the two-client proof.
 - **The knife is a melee item, not a gun** (`knife.py`): a `BP_WeaponItem` child flagged `Melee`,
   drawn by the pack's `SK_M9_Knife_X` (blade up, tipped 30° forward, the pistol's grip), and
   not a row of `_weapon_specs()`, whose every column and check is about a gun. Its slash clip
@@ -348,8 +391,8 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   (spawned on first aim; `throw_arc.py`), with a disc where it lands. A click of the fire key
   over the arc plays the skin's throw clip (`throw_windup.py`: Quaternius UAL2's
   `OverhandThrow`, upper body only) and, where the clip's hand lets go (`THROW_RELEASE_S`,
-  0.35 s into it), stores the launch, detaches the item and takes it out of the inventory as a
-  drop does; letting V up instead calls it off.
+  0.35 s into it), stores the launch and asks `Server_Throw`, whose body detaches the item and
+  takes it out of the inventory as a drop does (M20, above); letting V up instead calls it off.
   - **A throw goes where the reticle is** (`weapon_component/throw_launch.py`, the launch
     as pure pins). Its yaw is the bearing from the launch point to `AimPoint`, and its
     pitch the one whose curve passes through `AimPoint` at the item's `ThrowSpeed`, the
@@ -531,8 +574,10 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   with a `Lit` item in hand, false otherwise, so the key let go, a sprint, a burn-out, a
   drop, a throw or a switch all lower it with no code of their own; the dead gate lets it
   go too. A wendigo reads it (`Scripts/npc/CLAUDE.md`, "Fire holds the wendigo off").
-  **Nothing else may write it**: a probe that set it by hand is overwritten on the next
-  frame (`probes/probe_wendigo_ward.py` holds out a real stick).
+  **Nothing else may write it** where the keys are: a probe that set it by hand is
+  overwritten on the next frame (`probes/probe_wendigo_ward.py` holds out a real stick).
+  The server's copy of a client's character writes its own, from the use key the
+  client reports and its own stick (`weapon_component/holds.py`).
   - **Held out, the stick's `AimPose` is swapped for its `UsePose`** (`A_WardTorch`) and
     the hand re-equips, so the equip and the keep-alive play it with no branch of their
     own. `WardItem` is the stick that is up and `WardCarryPose` what to put back; the

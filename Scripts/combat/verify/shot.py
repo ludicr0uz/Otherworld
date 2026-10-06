@@ -107,7 +107,11 @@ def check_server_fires():
           f"missing {sorted(want - asked)}")
     graces = [n for n in by_pins(wg, "A", "B") if abs((num_pin(n, "B") or 0.0) - FIRE_GRACE_S)
               < 1e-9 and any("GetTimeSeconds" in _title(f).replace(" ", "")
-                             for f in _feeders(n, "A"))]
+                             for f in _feeders(n, "A"))
+              # ...the shot's: a swing's Server event has a grace too (verify/strike.py).
+              and any(_title(f) == "Get NextFireTime"
+                      for q in PIN.list_connected_pins(BEL.find_output_pin(n, "ReturnValue"))
+                      for f in _feeders(PIN.get_owning_node(q), "B"))]
     check(f"...the cooldown with {FIRE_GRACE_S:g} s of grace for uneven packets",
           len(graces) == 1, str(len(graces)))
     stamps = [n for n in wg if _title(n) == "Set NextFireTime" and fire in _upstream(n)]

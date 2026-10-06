@@ -26,15 +26,16 @@ from combat.weapon_component.light import _author_light_press
 from combat.weapon_component.look import _author_local_carry, _author_look_mirror
 from combat.weapon_component.local import (
     _author_local_gate, _author_local_only, local_pc)
+from combat.weapon_component.holds import _author_holds_mirror, _author_holds_report
 from combat.weapon_component.knife import (
-    _author_knife_press, _author_knife_swing,
+    _author_knife_blow, _author_knife_press, _author_knife_swing,
 )
 from combat.weapon_component.inventory import (
     _author_drop, _author_equip,
 )
 from combat.weapon_component.interact import _author_interact
 from combat.weapon_component.pose_weights import _author_pose_weights
-from combat.weapon_component.punch import _author_punch
+from combat.weapon_component.punch import _author_punch, _author_punch_blow
 from combat.weapon_component.ready_pose import (
     _author_lowered_pose_edge, _author_ready_pose_keepalive,
 )
@@ -62,6 +63,7 @@ from combat.weapon_component.wear_drag import _author_wear_request
 from combat.weapon_component.drop_request import _author_drop_request
 from combat.weapon_component.save_exit import _author_save_exit
 from combat.weapon_component.throw import _author_throw, _author_throw_key
+from combat.weapon_component.throw_flight import _author_throw_flight
 from combat.shot_vars import ReloadForced
 from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
@@ -193,8 +195,10 @@ def _author_wc_tick(ed, tick):
 
     # --- from here on every machine's copy runs: the pose follows state -------
     # A copy that is not its player's own writes that state first, from what
-    # was replicated (look.py).
-    ads_exits = tuple(ads_exits) + tuple(_author_look_mirror(ed, tick, owner_out, remote))
+    # was replicated
+    # (look.py), and the server its guard and its fire held out (holds.py).
+    ads_exits = tuple(ads_exits) + tuple(_author_holds_mirror(
+        ed, owner_out, _author_look_mirror(ed, tick, owner_out, remote)))
 
     # --- and the body takes the stance and the guard -------------------------
     # After both are written (Stance, Blocking), which set its weights.
@@ -232,8 +236,10 @@ def _author_wc_tick(ed, tick):
 
     # --- the trigger and the action keys: the local player's (local.py) -------
     local, remote = _author_local_only(ed, pose_exits)
+    # The guard and the use key are told to the server as they change (holds.py).
     flight_exits = _author_actions(
-        ed, pc_out, owner_out, held, armed_out, key_pins, muzzle, pressed, both, (local,))
+        ed, pc_out, owner_out, held, armed_out, key_pins, muzzle, pressed, both,
+        _author_holds_report(ed, (local,)))
     _author_upkeep(ed, tuple(flight_exits) + (remote,))
 
 
@@ -395,8 +401,7 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
     # DrawHUD is; it is renderer-driven, which is why the menu can poll a key at
     # all.)
     # --- the knife's slash, once queued (knife.py) ----------------------------
-    # Every frame, whatever is held: the swing and the blow run on after the
-    # press, and the blow lands even if the knife was put away in between.
+    # Every frame, whatever is held: queued, the swing is asked of the server.
     slash_exits = _author_knife_swing(
         ed, (after_fire, *used, untapped) + slash_pressed + struck + dry_exits
         + punch_exits)
@@ -453,11 +458,19 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
 
 
 def _author_upkeep(ed, flight_exits):
-    """What follows from state on every copy: the slots served (the server)
-    or pictured (a client), placed and recorded, then the equip, if anything
-    asked for one."""
+    """What follows from state on every copy: a blow that is due and a thrown
+    item's flight (the server's), the slots served (the server) or pictured
+    (a client), placed and recorded, then the equip, if anything asked for
+    one."""
     # --- save and exit's countdown (save_exit.py) ----------------------------
     flight_exits = _author_save_exit(ed, flight_exits)
+
+    # --- the blows that are due, and what is in the air (punch.py, knife.py,
+    # throw_flight.py): pending only where a Server event made them so, and
+    # the blow lands even if the knife was put away since the swing.
+    flight_exits = _author_punch_blow(ed, flight_exits)
+    flight_exits = _author_knife_blow(ed, flight_exits)
+    flight_exits = _author_throw_flight(ed, flight_exits)
 
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.

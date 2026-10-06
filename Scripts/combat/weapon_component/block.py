@@ -4,13 +4,18 @@ blocking this frame.
 Only the stance lives here. What a block DOES to a swing -- the reduced damage
 and the stamina it costs -- is resolved by the wanderer that swings
 (npc/block.py), because the swing's damage and its bearing exist nowhere else.
-That graph reads Blocking and writes Stamina on this component.
+That graph reads Blocking on this component and spends the movement's stamina.
+
+This is the owning machine's Blocking, off its own key. The server's copy of
+a client's character decides its own from what the client reports (holds.py),
+and that is the one a wanderer's swing reads.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, out, then
 from combat.tuning import BLOCK_KEY, COMBAT
 from uebp.nodes.actor import FN_IS_KEY_DOWN
-from uebp.nodes.math import FN_AND, FN_GREATER_FF, FN_NOT
+from uebp.nodes.math import FN_AND, FN_GREATER_FF, FN_NOT, FN_OR
+from combat.strike_vars import BlockForced
 from combat.weapon_component import vars as WV
 
 
@@ -35,6 +40,13 @@ def _author_block(ed, pc_out, key_pin, exec_ins):
     down = keep(_node(ed, FN_IS_KEY_DOWN))
     _connect(pc_out, _pin(down, "self"))
     _connect(key_pin, _pin(down, "Key"))
+
+    # ...or a probe holding it: no key can be injected into a headless game.
+    forced = keep(ed.add_get_member_variable_node(BlockForced))
+    held_down = keep(_node(ed, FN_OR))
+    _connect(out(down), _pin(held_down, "A"))
+    _connect(out(forced, BlockForced), _pin(held_down, "B"))
+    down = held_down
 
     stamina = keep(ed.add_get_member_variable_node(WV.Stamina))
     left = keep(_node(ed, FN_GREATER_FF))

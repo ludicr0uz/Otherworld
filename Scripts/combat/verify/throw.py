@@ -309,10 +309,14 @@ def check_windup():
           len(kept) == 1 and len(winds) == 2
           and _title(PIN.get_owning_node(_source(kept[0], THROW_WINDING_VAR)))
           == "Get Held", f"{len(kept)} of {len(winds)} sets")
-    sets = [n for n in wg if _title(n) == f"Set {THROWN_VAR}" and _source(n, THROWN_VAR)]
+    # The ask (throw.py): where the launch the arc was drawn from is stored, on
+    # the frame the hand lets go, before Server_Throw is called with it.
+    preds = _predicts()
+    sets = [n for n in wg if _title(n) == f"Set {THROW_START_VAR}" and preds
+            and _same_pin(_source(n, THROW_START_VAR), _source(preds[0], "StartPos"))]
     if len(sets) != 1:
         return
-    # Walk the release's exec chain back to the Branch it hangs off.
+    # Walk the ask's exec chain back to the Branch it hangs off.
     node, gate = sets[0], None
     for _ in range(8):
         prev = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
@@ -325,7 +329,7 @@ def check_windup():
             break
     before = ([PIN.get_owning_node(q) for q in PIN.list_connected_pins(
         BEL.find_input_pin(gate, "execute"))] if gate else [])
-    check("the release waits for the wind-up to come due, and runs only if the "
+    check("the throw is asked for when the wind-up comes due, and only if the "
           "hand still holds that item",
           gate is not None
           and {f"Get {THROW_WINDING_VAR}", "Get Held"} <= _upstream(gate, "Condition")
@@ -348,17 +352,31 @@ def check_release():
     # Set with a value: the landing's Set Thrown clears it with nothing wired.
     sets = {v: [n for n in wg if _title(n) == f"Set {v}" and _source(n, v)]
             for v in (THROWN_VAR, THROW_START_VAR, THROW_VELOCITY_VAR)}
-    check("the release stores the item, its start and its velocity once each",
-          all(len(s) == 1 for s in sets.values()),
-          str({k: len(v) for k, v in sets.items()}))
-    if len(preds) != 1 or not all(len(s) == 1 for s in sets.values()):
+    # Each of the launch's two is stored twice: by the ask, where the keys
+    # are, off the launch the arc was drawn from; and by the release, in
+    # Server_Throw, off what the client sent.
+    check("the release stores the item once, and the ask and the release each the "
+          "start and the velocity",
+          [len(sets[v]) for v in (THROWN_VAR, THROW_START_VAR, THROW_VELOCITY_VAR)]
+          == [1, 2, 2], str({k: len(v) for k, v in sets.items()}))
+    if len(preds) != 1 or len(sets[THROWN_VAR]) != 1:
         return
     p = preds[0]
-    check("...the very launch the arc was drawn from, start and velocity alike",
-          _same_pin(_source(sets[THROW_START_VAR][0], THROW_START_VAR),
-                    _source(p, "StartPos"))
-          and _same_pin(_source(sets[THROW_VELOCITY_VAR][0], THROW_VELOCITY_VAR),
-                        _source(p, "LaunchVelocity")))
+    asked = {v: [n for n in sets[v] if _same_pin(_source(n, v), _source(p, pin))]
+             for v, pin in ((THROW_START_VAR, "StartPos"),
+                            (THROW_VELOCITY_VAR, "LaunchVelocity"))}
+    check("...the ask's are the very launch the arc was drawn from, start and "
+          "velocity alike", all(len(s) == 1 for s in asked.values()),
+          str({k: len(v) for k, v in asked.items()}))
+    sent = {v: [n for n in sets[v] if n not in asked[v]]
+            for v in (THROW_START_VAR, THROW_VELOCITY_VAR)}
+    caps = [PIN.get_owning_node(_source(n, THROW_VELOCITY_VAR))
+            for n in sent[THROW_VELOCITY_VAR]]
+    check(f"...the release's are what the client sent, the velocity capped at the "
+          f"item's own {THROW_SPEED_VAR}",
+          len(caps) == 1 and "ClampVectorSize" in _title(caps[0]).replace(" ", "")
+          and f"Get {THROW_SPEED_VAR}" in _upstream(caps[0], "Max"),
+          str([_title(c) for c in caps]))
     thrown = _source(sets[THROWN_VAR][0], THROWN_VAR)
     check("...and what flies is what was held",
           thrown is not None and _title(PIN.get_owning_node(thrown)) == "Get Held")

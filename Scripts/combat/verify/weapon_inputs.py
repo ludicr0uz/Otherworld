@@ -214,7 +214,8 @@ def check_keys_are_variables():
     # The guns' three, and the component's own (Sound/sound_weapons.py, sound_items.py):
     # a swing for the punch and one for the blade, the axe on a tree, a match.
     #   3  the shot, the click, the reload
-    #   2  a swing: the fist's and the blade's
+    #   4  a swing: the fist's and the blade's, each where the server swings
+    #      (its Server event) and where the owning client predicts it
     #   2  a blow landing on a body: the fist's and the blade's
     #   1  the axe's chop in a tree
     #   4  a throw: leaving the hand (a blade's, and a blunt thing's), sinking
@@ -224,11 +225,12 @@ def check_keys_are_variables():
     #      handled (where the server serves the move, and where a client's
     #      picture follows it: view.py) and an item used up
     #      (verify/sound_states.py)
-    check("the component plays eighteen sounds: the guns' three, a swing and a "
-          "landed blow for the fist and for the blade, the chop, a throw's "
+    check("the component plays twenty sounds: the guns' three, a swing (the server's, "
+          "and the owning client's prediction) and "
+          "a landed blow for the fist and for the blade, the chop, a throw's "
           "four, the match, a thrown axe's kill by the head, the breath, an "
           "item handled (the server's serve, a client's picture) and an item used up",
-          len(by_pins(wg, "Sound", "Location")) == 18,
+          len(by_pins(wg, "Sound", "Location")) == 20,
           f"{len(by_pins(wg, 'Sound', 'Location'))} PlaySoundAtLocation node(s)")
     check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,
           f"{len(by_pins(wg, 'Class', 'SpawnTransform'))} spawn nodes "

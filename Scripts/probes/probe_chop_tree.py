@@ -22,7 +22,8 @@ from combat.chop_tuning import (
     CHOP_COUNT_VAR, CHOPS_PER_WOOD, CHOPS_VAR, WOOD_OUT_CM,
 )
 from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.weapon_component.knife import KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR
+from combat.weapon_component.knife import (
+    KNIFE_PENDING_VAR, KNIFE_QUEUED_VAR, NEXT_KNIFE_VAR)
 from combat.weapon_component.interact import INTERACT_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR
 from probes.probe_knife import _file, _held_name
@@ -102,6 +103,10 @@ def _stand(p, player, base):
 
 
 def _swing(p, wc):
+    # Off cooldown first, as the key's press gate waits: the swing is a
+    # server request, and a slash inside the knife's interval is refused.
+    yield lambda: (unreal.GameplayStatics.get_time_seconds(p.world())
+                   >= p.get(wc, NEXT_KNIFE_VAR))
     p.set(wc, KNIFE_QUEUED_VAR, True)
     yield lambda: not p.get(wc, KNIFE_QUEUED_VAR)
     yield lambda: not p.get(wc, KNIFE_PENDING_VAR)

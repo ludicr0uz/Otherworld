@@ -142,11 +142,27 @@ def check_item_glimmer():
     _check_sprite("BP_WeaponItem", item, visible=False)
     nodes = graph(item).list_all_nodes()
     steps = _glimmer_steps(nodes)
+    # Between the Tick and the step: what a client's copy of a replicated item
+    # shows at all (item_world.py), a Branch on HasAuthority and its false arm.
+    before = _feeders(steps[0], "execute") if len(steps) == 1 else []
+    gate = [f for f in before if _title(f) == "Branch"]
     check(f"BP_WeaponItem's Tick shows {GLIMMER} while the item is {IV.Dropped}, in one "
           "place: nothing that drops or takes an item is told",
-          len(steps) == 1 and len(_wired_ticks(nodes)) == 1
-          and [_title(f) for f in _feeders(steps[0], "execute")] == ["Event Tick"],
+          len(steps) == 1 and len(_wired_ticks(nodes)) == 1 and len(gate) == 1
+          and [_title(f) for f in _feeders(gate[0], "execute")] == ["Event Tick"],
           f"{len(steps)} step(s), {len(_wired_ticks(nodes))} Tick(s)")
+    hides = [f for f in before if "bNewHidden" in {
+        str(PIN.get_pin_name(p)) for p in BEL.list_input_pins(f)}]
+    check(f"...after a client's copy of a replicated item is hidden while it is not "
+          f"{IV.InWorld}: off the false arm of a Branch on HasAuthority",
+          len(hides) == 1 and len(gate) == 1
+          and any("HasAuthority" in _title(c).replace(" ", "")
+                  for c in _feeders(gate[0], "Condition"))
+          and [str(PIN.get_pin_name(q)) for q in PIN.list_connected_pins(
+              BEL.find_input_pin(hides[0], "execute"))] == ["else"]
+          and any(_title(v) == f"Get {IV.InWorld}" for n in _feeders(hides[0], "bNewHidden")
+                  for v in _feeders(n, "A")),
+          f"{len(hides)} hide(s)")
 
     children = _item_children()
     own, forgot = [], []

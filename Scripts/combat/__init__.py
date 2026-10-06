@@ -98,6 +98,12 @@ DATA (constants and pure tables -- no Blueprint authoring)
   shot_vars         the shot and the reload as server requests (M19): the events'
                     names, AsksSent / AsksServed (which reconcile a client's
                     predicted rounds), the server's grace on the cooldown
+  strike_vars       melee, the guard, the use key, the throw and the take as
+                    server requests (M20): the five events' names, what the
+                    owning machine reports and the server keeps, the limits
+  item_world        an item loose in the world is a replicated actor (M20):
+                    InWorld, the release's SetReplicates, a client's copy
+                    hidden while the item is carried
   wear_tuning       clothing: the eight slots (WEAR_SLOTS), ClothingSlot on the
                     item, Worn / TakeOffSlot / WearItem on the component
   ask_consts        what a screen asks of the weapon component: the Ask

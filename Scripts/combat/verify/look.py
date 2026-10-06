@@ -42,7 +42,7 @@ def check_replication():
     others = [str(v) for v in TABLE if v not in REPLICATED
               and net.variable_replication(wc, v)[0] != net.NONE]
     extra = [v for v in (WV.Held, WV.Inventory, WV.Aiming, WV.SightAiming, WV.SightBlend,
-                         STANCE_VAR, LOWERED_VAR, WV.Stamina, WV.Sprinting, WV.Blocking)
+                         STANCE_VAR, LOWERED_VAR, WV.Stamina, WV.Sprinting)
              if net.variable_replication(wc, v)[0] != net.NONE]
     check("nothing else of the look is replicated: the working copies and what was "
           "last sent are each machine's own", not others and not extra, str(others + extra))

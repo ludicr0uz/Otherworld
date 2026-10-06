@@ -18,13 +18,14 @@ from combat.paths import (
     HOLD_KNIFE_ANIM_PATH, ITEM_BP_PATH, KNIFE_ANIM_PATH, KNIFE_BP_PATH,
 )
 from combat.skin import player_skin
+from combat.strike_vars import SERVER_SLASH
 from combat.tuning import COMBAT
 from combat.verify.common import (
     take_hits,
-    BEL, PIN, by_pins, cdo, check, component_template, in_pins, load, num_pin,
+    BEL, PIN, by_pins, cdo, check, component_template, graph, in_pins, load, num_pin,
     out_pins, pin_value,
 )
-from combat.verify.fixtures import w, wg
+from combat.verify.fixtures import w, wc, wg
 from combat.verify.punch import (
     _feeders, _feeds, _title, is_punch_gate, is_punch_play, is_punch_sweep,
     is_punch_write,
@@ -149,15 +150,20 @@ def check_knife_loadout():
 def check_knife_press():
     melee = [n for n in wg if _title(n) == "Branch"
              and any(MELEE_VAR in out_pins(f) for f in _feeders(n, "Condition"))]
-    # Two ask: the fire gate, and the throw, which picks a blade's sound or a
-    # blunt thing's as the item is put at its start (throw.py). The gate is
-    # the one that does not come after that move.
+    # Three ask: the fire gate; the throw's ask, which picks a blade's sound or
+    # a blunt thing's once the launch is stored (throw.py); and the slash's
+    # Server event, which swings only a Melee item (punch.py). The gate is
+    # the one that is neither.
     thrown = [n for n in melee
-              if any("NewLocation" in in_pins(f) for f in _feeders(n, "execute"))]
-    melee = [n for n in melee if n not in thrown]
-    check("one Branch asks Held.Melee at the fire gate, and one where a throw "
-          "picks its sound", len(melee) == 1 and len(thrown) == 1,
-          f"{len(melee)} + {len(thrown)}")
+              if any(_title(f).startswith("Set Throw") for f in _feeders(n, "execute"))]
+    slash = graph(wc).find_event_node(SERVER_SLASH)
+    served = [n for n in melee if n not in thrown and slash is not None
+              and slash in [e for f in _feeders(n, "execute") for e in _feeders(f, "execute")]]
+    melee = [n for n in melee if n not in thrown and n not in served]
+    check("one Branch asks Held.Melee at the fire gate, one where a throw "
+          "picks its sound, and one in the slash's Server event",
+          len(melee) == 1 and len(thrown) == 1 and len(served) == 1,
+          f"{len(melee)} + {len(thrown)} + {len(served)}")
     if len(melee) != 1:
         return
     gate = melee[0]
@@ -189,24 +195,33 @@ def check_knife_press():
 
 def check_knife_swing():
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if is_knife_play(n)]
-    check("one knife clip play", len(plays) == 1, str(len(plays)))
-    if len(plays) != 1:
+    check("two knife clip plays: the swing in its Server event, and the owning "
+          "client's prediction of it", len(plays) == 2, str(len(plays)))
+    if len(plays) != 2:
         return
-    p = plays[0]
     check(f"...into {AIM_SLOT}, the upper-body slot, once",
-          pin_value(p, "SlotNodeName") == AIM_SLOT
-          and int(float(pin_value(p, "LoopCount"))) == 1)
-    chain, node = [], p
-    for _ in range(6):
-        prev = _feeders(node, "execute")
-        if len(prev) != 1:
-            break
-        node = prev[0]
-        chain.append(_title(node))
-    check("...after the queue is cleared and the cooldown, the blow's time and "
-          "KnifePending are stamped",
-          {f"Set {v}" for v in (KNIFE_QUEUED_VAR, NEXT_KNIFE_VAR, KNIFE_DUE_VAR,
-                                KNIFE_PENDING_VAR)} <= set(chain), str(chain))
+          all(pin_value(p, "SlotNodeName") == AIM_SLOT
+              and int(float(pin_value(p, "LoopCount"))) == 1 for p in plays))
+
+    def chain(node):
+        """The Sets before a play, walked back along the exec chain."""
+        seen = []
+        for _ in range(6):
+            prev = _feeders(node, "execute")
+            if len(prev) != 1:
+                break
+            node = prev[0]
+            seen.append(_title(node))
+        return set(seen)
+
+    served = [p for p in plays if f"Set {KNIFE_PENDING_VAR}" in chain(p)]
+    mine = [p for p in plays if p not in served]
+    stamps = {f"Set {v}" for v in (NEXT_KNIFE_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR)}
+    check("...the server's after the cooldown, the blow's time and "
+          "KnifePending are stamped; the client's after its own cooldown alone",
+          len(served) == 1 and stamps <= chain(served[0]) and len(mine) == 1
+          and chain(mine[0]) & stamps == {f"Set {NEXT_KNIFE_VAR}"},
+          str([sorted(chain(p)) for p in plays]))
     delays = {num_pin(n, "B") for n in by_pins(wg, "A", "B")}
     check("...the cooldown and the blow's delay are COMBAT.knife_*",
           {COMBAT.knife_interval_s, COMBAT.knife_impact_s} <= delays)

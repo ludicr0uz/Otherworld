@@ -48,9 +48,14 @@ def check_block_key():
 
 
 def check_blocking_stance():
-    sets = [n for n in wg if "Blocking" in in_pins(n) and _title(n) == "Set Blocking"]
-    check("Blocking is written once a frame, in one place", len(sets) == 1,
-          str(len(sets)))
+    every = [n for n in wg if "Blocking" in in_pins(n) and _title(n) == "Set Blocking"]
+    # Two writes: the owning machine's, off its key, and the server's for a
+    # client's character, off what that client asked (holds.py: verify/strike.py).
+    sets = [n for n in every
+            if "Get KeyBlock" in {_title(x) for x in _feeds(BEL.find_input_pin(n, "Blocking"))}]
+    check("Blocking is written once a frame off the key, in one place (and once by "
+          "the server, for a client's character)", len(sets) == 1 and len(every) == 2,
+          f"{len(sets)} of {len(every)}")
     if len(sets) != 1:
         return
     src = {_title(n) for n in _feeds(BEL.find_input_pin(sets[0], "Blocking"))}
@@ -75,9 +80,12 @@ def check_fire_refused_while_blocking():
     reads = [n for n in wg if _title(n) == "Get Blocking"]
     negated = [PIN.get_owning_node(q) for n in reads
                for q in BEL.find_output_pin(n, "Blocking").list_connected_pins()
-               if _title(PIN.get_owning_node(q)).upper().startswith("NOT")]
-    check("the trigger reads Blocking through a NOT", len(negated) == 1,
-          str([_title(n) for n in reads]))
+               if _title(PIN.get_owning_node(q)).upper().startswith("NOT")
+               # (Not the report's NotEqual against what was last sent: holds.py.)
+               and "EQUAL" not in _title(PIN.get_owning_node(q)).upper()]
+    # Three: the trigger's, and the two swings' Server events (verify/strike.py).
+    check("the trigger reads Blocking through a NOT, as the two swings' Server "
+          "events do", len(negated) == 3, f"{len(negated)} of {len(reads)} read(s)")
     # The fire gate is the one Branch whose condition reads the fire key AND
     # Sprinting; it must read the guard's NOT too.
     # (The punch's press gate reads both too; verify/punch.py checks it.)
@@ -85,8 +93,8 @@ def check_fire_refused_while_blocking():
              and {"Get KeyFire", "Get Sprinting"}
              <= {_title(x) for x in _feeds(BEL.find_input_pin(n, "Condition"))}]
     check("...and the fire gate refuses while the guard is up",
-          len(gates) == 1 and bool(negated)
-          and negated[0] in _feeds(BEL.find_input_pin(gates[0], "Condition")),
+          len(gates) == 1 and any(
+              n in _feeds(BEL.find_input_pin(gates[0], "Condition")) for n in negated),
           str(len(gates)))
 
 

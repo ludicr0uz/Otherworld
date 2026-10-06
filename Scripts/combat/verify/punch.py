@@ -124,26 +124,33 @@ def check_punch_press():
 
 def check_punch_swing():
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if is_punch_play(n)]
-    check("one punch clip play", len(plays) == 1, str(len(plays)))
-    if len(plays) != 1:
+    check("two punch clip plays: the swing in its Server event, and the owning "
+          "client's prediction of it", len(plays) == 2, str(len(plays)))
+    if len(plays) != 2:
         return
-    p = plays[0]
     check(f"...into {AIM_SLOT}, the upper-body slot, once",
-          pin_value(p, "SlotNodeName") == AIM_SLOT
-          and int(float(pin_value(p, "LoopCount"))) == 1,
-          f"{pin_value(p, 'SlotNodeName')} x{pin_value(p, 'LoopCount')}")
-    # The Sets before it, walked back along the exec chain.
-    chain, node = [], p
-    for _ in range(6):
-        prev = _feeders(node, "execute")
-        if len(prev) != 1:
-            break
-        node = prev[0]
-        chain.append(_title(node))
-    check("...after the queue is cleared and the cooldown, the blow's time and "
-          "PunchPending are stamped",
-          {f"Set {v}" for v in (PUNCH_QUEUED_VAR, NEXT_PUNCH_VAR, PUNCH_DUE_VAR,
-                                PUNCH_PENDING_VAR)} <= set(chain), str(chain))
+          all(pin_value(p, "SlotNodeName") == AIM_SLOT
+              and int(float(pin_value(p, "LoopCount"))) == 1 for p in plays))
+
+    def chain(node):
+        """The Sets before a play, walked back along the exec chain."""
+        seen = []
+        for _ in range(6):
+            prev = _feeders(node, "execute")
+            if len(prev) != 1:
+                break
+            node = prev[0]
+            seen.append(_title(node))
+        return set(seen)
+
+    served = [p for p in plays if f"Set {PUNCH_PENDING_VAR}" in chain(p)]
+    mine = [p for p in plays if p not in served]
+    stamps = {f"Set {v}" for v in (NEXT_PUNCH_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR)}
+    check("...the server's after the cooldown, the blow's time and "
+          "PunchPending are stamped; the client's after its own cooldown alone",
+          len(served) == 1 and stamps <= chain(served[0]) and len(mine) == 1
+          and chain(mine[0]) & stamps == {f"Set {NEXT_PUNCH_VAR}"},
+          str([sorted(chain(p)) for p in plays]))
     delays = {num_pin(n, "B") for n in by_pins(wg, "A", "B")}
     check("...the cooldown and the blow's delay are COMBAT.punch_*",
           {COMBAT.punch_interval_s, COMBAT.punch_impact_s} <= delays)

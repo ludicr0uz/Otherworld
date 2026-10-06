@@ -69,6 +69,10 @@ Dropped = Var("Dropped")
 # the item in). The pick-up reads it: taken back with empty hands, it goes to
 # the hand, not to a slot (pickup.py), and stops being Lodged.
 Lodged = Var("Lodged", BOOL)
+# Loose in the world, in the air or lying: set by the server as the item
+# leaves a hand for it and lowered by the take (item_world.py). Replicated: a
+# client's copy of the item is shown only while it is.
+InWorld = Var("InWorld", BOOL, False)
 InfiniteReserve = Var("InfiniteReserve")
 Loaded = Var("Loaded")
 MagazineSize = Var("MagazineSize")
@@ -85,5 +89,5 @@ TABLE = (
     Damage, SpreadDegrees, WeaponRange, FireInterval, NextFireTime, ReloadSeconds,
     MuzzleOffset, SightOffset, SightAim, GripLocation, GripRotation, SlotColor, Icon,
     FireSound, DryFireSound, ReloadSound, HandleSounds, UseSounds, AimPose, TwoHanded, AdsZoom, Scoped, ShotVolume,
-    Lodged,
+    Lodged, InWorld,
 )

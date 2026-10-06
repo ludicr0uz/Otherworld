@@ -5,10 +5,19 @@ reads Held and none waits on a Delay (a component Tick cannot hold one):
 
   press   tap AND NOT IsValid(Held) AND NOT Sprinting AND NOT Blocking
           AND NOT TriggerSpent AND now >= NextPunchTime   --> PunchQueued
-  swing   PunchQueued --> NextPunchTime, PunchDueTime, PunchPending,
-          MM_Attack_01 (PunchAnim) into the upper-body slot
+  swing   PunchQueued --> Server_Punch, which (empty hands, alive, not
+          guarding, off cooldown) stamps NextPunchTime and PunchDueTime, sets
+          PunchPending and plays MM_Attack_01 (PunchAnim) into the upper-body
+          slot
   blow    PunchPending AND now >= PunchDueTime --> a sphere in front of the
           chest; a body with BP_HealthComponent loses COMBAT.punch_damage
+
+The swing is a server request (task M20, combat/strike_vars.py), as the shot
+is: the press and the queue are where the keys are, the Server event is the
+swing, and the blow runs in the Tick's upkeep, on every copy, where only the
+server's ever finds a strike pending. A client of a server plays the clip and
+the swing's sound and stamps its own cooldown at once, its prediction; it
+sweeps nothing. In single player the event is a plain call.
 
 The press only queues, so a probe can throw a punch by writing PunchQueued
 (no key can be injected into a headless game). The blow lands a moment into
@@ -30,8 +39,15 @@ from combat.anim_blueprint import AIM_SLOT
 from combat.damage import hit as take_hit, owner_instigator
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.paths import HEALTH_CLASS_PATH
+from combat import item_vars as IV
+from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
+from combat.strike_vars import SERVER_PUNCH, STRIKE_GRACE_S
 from combat.tuning import COMBAT
+from combat.weapon_component.record import authority
+from combat.weapon_component.shot import _author_alive
+from combat.weapon_component.slot_nodes import not_, op, valid
+from uebp import net
+from uebp.g import _G
 from combat.weapon_component.common import _trace_defaults
 from uebp.nodes.actor import (
     FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_OWNER,
@@ -68,6 +84,10 @@ class Strike:
     chest_cm: float
     # The takes of the blow landing on a body (Sound/sound_weapons.py).
     hit_sounds_var: str = WV.PunchHitSounds
+    # The Server event that is this swing, and whether it wants a Melee item
+    # in hand (the knife's) or empty hands (the punch's).
+    event: str = SERVER_PUNCH
+    armed: bool = False
 
 
 PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
@@ -133,20 +153,14 @@ def _author_punch(ed, tap, armed_out, steady, guarded, unspent, exec_ins):
     return _author_swing(ed, PUNCH, (queued, else_(press)))
 
 
-def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
-    """Queued: clear the queue, stamp the cooldown and when the blow lands,
-    and play the strike's clip; then the blow stage. ``exec_ins`` all run into
-    the swing's Branch; returns the exits of the blow stage. ``scenery`` and
-    ``damage`` are the blow's (see _author_blow)."""
-    swing = ed.add_branch_node()
-    _connect(_get(ed, strike.queued_var), _pin(swing, "Condition"))
-    for pin in exec_ins:
-        _connect(pin, _pin(swing, "execute"))
-    step = _set_bool(ed, strike.queued_var, False, then(swing))
-    step = _stamp(ed, strike.next_var, strike.interval_s, step)
-    step = _stamp(ed, strike.due_var, strike.impact_s, step)
-    step = _set_bool(ed, strike.pending_var, True, step)
+def _author_punch_blow(ed, exec_ins):
+    """The punch's blow stage, in the upkeep. Returns its exits."""
+    return _author_blow(ed, PUNCH, exec_ins)
 
+
+def _author_clip(ed, strike, exec_in):
+    """The strike's clip into the upper-body slot, and the air it moves,
+    heard at the player. Returns (the exec pin after them, the play node)."""
     mesh = _get(ed, WV.OwnerMesh)
     anim = _node(ed, FN_ANIM_INSTANCE)
     _connect(mesh, _pin(anim, "self"))
@@ -158,26 +172,75 @@ def _author_swing(ed, strike, exec_ins, scenery=None, damage=None):
     _set(play, "BlendOutTime", PUNCH_BLEND_S)
     _set(play, "InPlayRate", 1.0)
     _set(play, "LoopCount", 1)
-    _connect(step, _pin(play, "execute"))
-    # ...and the air it moves, heard at the player.
+    _connect(exec_in, _pin(play, "execute"))
     owner = _node(ed, FN_GET_OWNER)
     here = _node(ed, FN_ACTOR_LOC)
     _connect(out(owner), _pin(here, "self"))
-    swung = _author_sound(ed, WV.SwingSounds, out(here), then(play))
+    return _author_sound(ed, WV.SwingSounds, out(here), then(play)), play
 
+
+def _author_swing(ed, strike, exec_ins):
+    """Queued, on the machine with the keys: clear the queue and ask the
+    server for the swing (the strike's Server event). A client of a server
+    first stamps its own cooldown and plays the clip and its sound, its
+    prediction. ``exec_ins`` all run into the swing's Branch; returns the
+    exits."""
+    g = _G(ed)
+    queued, idle = g.branch(g.get(strike.queued_var), exec_ins)
+    flow = g.put(strike.queued_var, "false", [queued])
+    owns, predicts = g.branch(authority(g), [flow])
+    step = _stamp(ed, strike.next_var, strike.interval_s, predicts)
+    swung, play = _author_clip(ed, strike, step)
+    ask = g.keep(_node(ed, strike.event))
+    for e in (owns, swung):
+        _connect(e, _pin(ask, "execute"))
     ed.add_comment_to_nodes(
-        f"The {strike.name}'s swing: stamp the cooldown and when the blow lands, "
-        f"then play the clip into {AIM_SLOT}, upper body only, and one of the "
-        f"swing's sounds.",
-        [swing, play])
+        f"The {strike.name}'s swing is asked of the server ({strike.event}, "
+        "punch.py). A client of a server stamps its own cooldown and plays the "
+        "clip and the swing's sound at once, its prediction; with authority "
+        "(single player) the event is the swing.", g.made + [play])
+    return (then(ask), idle)
 
-    # --- blow ----------------------------------------------------------------
-    return _author_blow(ed, strike, (swung, else_(swing)), scenery, damage)
+
+def author_strike_event(ed, strike):
+    """The strike's Server event: the swing, on the machine that owns it.
+    Refused unless the hand is the strike's (a Melee item, or empty), the
+    owner alive and not guarding, and the cooldown over (within
+    STRIKE_GRACE_S); then the cooldown, when the blow lands, the pending
+    blow, and the clip. Before the Tick, which calls it by name."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    event = g.keep(net.server_event(ed, strike.event))
+    held = g.get(WV.Held)
+    armed, bare = g.branch(valid(g, held), [then(event)])
+    hand = [bare]
+    if strike.armed:
+        # Behind IsValid, as every read of Held is.
+        melee, _other = g.branch(g.iget(held, IV.Melee), [armed])
+        hand = [melee]
+    alive = _author_alive(g, hand)
+    soon = op(g, FN_ADD_FF, out(g.call(FN_TIME_SECONDS)), str(STRIKE_GRACE_S))
+    cooled = op(g, FN_GE_FF, soon, g.get(strike.next_var))
+    free = op(g, FN_AND, cooled, not_(g, g.get(WV.Blocking)))
+    swing, _refused = g.branch(free, alive)
+    step = _stamp(ed, strike.next_var, strike.interval_s, swing)
+    step = _stamp(ed, strike.due_var, strike.impact_s, step)
+    step = _set_bool(ed, strike.pending_var, True, step)
+    _swung, play = _author_clip(ed, strike, step)
+    ed.add_comment_to_nodes(
+        f"{strike.event} (punch.py): the owning client's {strike.name}. Refused "
+        f"unless the hand is {'a Melee item' if strike.armed else 'empty'}, the "
+        "owner alive and not guarding and the cooldown over (within "
+        f"{STRIKE_GRACE_S:g} s). Then the cooldown, when the blow lands "
+        f"({strike.impact_s} s on), and the clip into {AIM_SLOT}, upper body "
+        "only, with one of the swing's sounds. The blow is the Tick's.",
+        g.made + [play])
 
 
 def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     """Pending and due: sweep a sphere forward from the chest, and take the
-    strike's damage off the first body with a health component.
+    strike's damage off the first body with a health component. Pending is
+    set by the strike's Server event alone, so only the machine with
+    authority ever sweeps.
 
     ``damage(ed, body, exec_in)``, if given, authors what this blow
     takes off the body it met, between the cast and the write, and returns

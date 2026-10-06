@@ -14,6 +14,7 @@ from combat.paths import (
     STICK_BP_PATH, WARD_TORCH_ANIM_PATH, WEAPON_DIR,
 )
 from combat.seat_tuning import HAS_SIGHTS_VAR, SIGHTS_FORCED_VAR
+from combat.strike_vars import AskUse
 from combat.skin import player_skin
 from combat.stick import (
     FLAME, GLOW, MODEL, STICK_DISPLAY, STICK_LIT_MESH, STICK_MESH, STICK_SCALE,
@@ -243,8 +244,22 @@ def check_use_key():
     check("...and the key is polled once, for both", len(polls) == 1, str(len(polls)))
 
 
+def _served_ward(node):
+    """A write of FireWard behind the Branch on AskUse: the server's."""
+    cur = [node]
+    for _ in range(2):
+        cur = [PIN.get_owning_node(q) for c in cur
+               for q in PIN.list_connected_pins(BEL.find_input_pin(c, "execute"))]
+        if any(_title(f) == f"Get {AskUse}" for c in cur if _title(c) == "Branch"
+               for f in _feeders(c, "Condition")):
+            return True
+    return False
+
+
 def check_fire_ward():
-    sets = _sets(wg, FIRE_WARD_VAR)
+    # The keys' writes: the server's for a client's character (holds.py) are
+    # verify/strike.py's.
+    sets = [n for n in _sets(wg, FIRE_WARD_VAR) if not _served_ward(n)]
     up = [n for n in sets if pin_value(n, FIRE_WARD_VAR) == "true"]
     down = [n for n in sets if _false(n, FIRE_WARD_VAR)]
     check(f"{FIRE_WARD_VAR} is raised in one place and lowered on every other arm",

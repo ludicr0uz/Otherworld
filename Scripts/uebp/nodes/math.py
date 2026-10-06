@@ -32,6 +32,7 @@ FN_DEG_SIN = "/Script/Engine.KismetMathLibrary.DegSin"
 # fraction of the half-width the field of view spans.
 FN_DEG_TAN = "/Script/Engine.KismetMathLibrary.DegTan"
 FN_DISTANCE = "/Script/Engine.KismetMathLibrary.Vector_Distance"
+FN_CLAMP_VSIZE = "/Script/Engine.KismetMathLibrary.ClampVectorSize"
 FN_DISTANCE_2D = "/Script/Engine.KismetMathLibrary.Vector_Distance2D"
 FN_DIV_FF = "/Script/Engine.KismetMathLibrary.Divide_DoubleDouble"
 # The hit-direction pick. Dot_VectorVector against the owner's own forward and

@@ -3,8 +3,10 @@
     press   inside the fire gate (Held valid, not sprinting, not blocking, not
             a spent press): Held.Melee --> tap AND now >= NextKnifeTime
             --> KnifeQueued. Not Melee goes on to the ready gate (the guns).
-    swing   KnifeQueued --> NextKnifeTime, KnifeDueTime, KnifePending,
-            A_KnifeSlash (KnifeAnim) into the upper-body slot
+    swing   KnifeQueued --> Server_Slash, which (a Melee item in a living
+            hand, not guarding, off cooldown) stamps NextKnifeTime and
+            KnifeDueTime, sets KnifePending and plays A_KnifeSlash
+            (KnifeAnim) into the upper-body slot
     blow    KnifePending AND now >= KnifeDueTime --> a sphere in front of the
             chest; a body with BP_HealthComponent loses COMBAT.knife_damage,
             or twice that off a creature afraid of fire while the blade in
@@ -24,12 +26,13 @@ the clip is knife_anim.py's.
 """
 
 from uebp.graph import _connect, _node, _pin, else_, out, then
+from combat.strike_vars import SERVER_SLASH
 from combat.tuning import COMBAT
 from combat.weapon_component.chop import _author_chop
 from combat.weapon_component.common import _prop
 from combat.weapon_component.hot_blow import author_hot_blow
 from combat.weapon_component.punch import (
-    Strike, _and, _author_swing, _get, _set_bool,
+    Strike, _and, _author_blow, _author_swing, _get, _set_bool,
 )
 from uebp.nodes.math import FN_GE_FF
 from uebp.nodes.system import FN_TIME_SECONDS
@@ -46,7 +49,8 @@ MELEE_VAR = IV.Melee
 KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,
                NEXT_KNIFE_VAR, KNIFE_DUE_VAR, COMBAT.knife_interval_s,
                COMBAT.knife_impact_s, COMBAT.knife_damage, COMBAT.knife_reach_cm,
-               COMBAT.knife_radius_cm, COMBAT.knife_chest_cm, WV.BladeHitSounds)
+               COMBAT.knife_radius_cm, COMBAT.knife_chest_cm, WV.BladeHitSounds,
+               SERVER_SLASH, True)
 
 
 def _author_knife_press(ed, held, tap, not_melee):
@@ -74,9 +78,15 @@ def _author_knife_press(ed, held, tap, not_melee):
 
 
 def _author_knife_swing(ed, exec_ins):
-    """The slash's swing and blow (punch.py's stages on KNIFE); returns the
-    blow stage's exits. A blow on something with no health goes to chop.py:
-    with an item that Chops in hand, a tree gives wood. What it takes off a
-    body is hot_blow.py's: more, with a hot blade, off a creature afraid of
-    fire."""
-    return _author_swing(ed, KNIFE, exec_ins, scenery=_author_chop, damage=author_hot_blow(KNIFE))
+    """The slash's swing (punch.py's, on KNIFE): queued, it is asked of the
+    server (Server_Slash). Returns its exits."""
+    return _author_swing(ed, KNIFE, exec_ins)
+
+
+def _author_knife_blow(ed, exec_ins):
+    """The slash's blow (punch.py's stage on KNIFE), in the upkeep; returns
+    its exits. A blow on something with no health goes to chop.py: with an
+    item that Chops in hand, a tree gives wood. What it takes off a body is
+    hot_blow.py's: more, with a hot blade, off a creature afraid of fire."""
+    return _author_blow(ed, KNIFE, exec_ins, scenery=_author_chop,
+                        damage=author_hot_blow(KNIFE))

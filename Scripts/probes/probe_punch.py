@@ -15,6 +15,7 @@ from combat.anim_blueprint import AIM_SLOT
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
+from combat.slot_tuning import HAND_FROM_VAR
 from combat.tuning import COMBAT
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_PENDING_VAR, PUNCH_QUEUED_VAR,
@@ -53,7 +54,13 @@ def probe(p):
     p.check("the punch clip is set on the live component",
             p.get(wc, PUNCH_ANIM_VAR) is not None, str(p.get(wc, PUNCH_ANIM_VAR)))
 
-    p.set(wc, "Held", None)
+    # Empty hands, the way the player empties them: the hand's item back to
+    # its slot. (Held written to None is put back by the next equip, and a
+    # punch asked of the server with a gun in hand is refused.)
+    held = p.get(wc, "Held")
+    if held is not None:
+        p.ask_slot(wc, p.get(wc, HAND_FROM_VAR))
+        yield lambda: p.get(wc, "Held") is None
     p.set(health, "Health", 100.0)
     _place(npc, player)
     yield 0.05

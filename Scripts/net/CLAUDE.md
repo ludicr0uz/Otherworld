@@ -199,8 +199,10 @@ first by **the mirror** (`combat/weapon_component/look.py`), from the few facts 
 - **`HandPose` is what the equip plays,** not `Held.AimPose`: where the keys are the equip
   takes it off `Held`; on a remote copy `Held` is not read for the pose. The item in a
   remote copy's hand is the server's since M18 (`HandClass`, "The inventory", below).
-- **Not mirrored** (not asked for, and each is a later task's): the guard and the kneel
-  (M20, M17), the support hand's point (the copy's own `Held`'s), montages (M21).
+- **The guard is mirrored since M20** (`Blocking`, replicated to everyone but the owner:
+  "Melee, the guard, the throw and the take", below).
+- **Not mirrored** (not asked for, and each is a later task's): the kneel, the support
+  hand's point (the copy's own `Held`'s), montages (M21).
 - **`verify/fixtures.py` keeps the mirror's nodes out of `wg`** (`wg_mirror`), as it does the
   dead arm's: the older "written once" counts are about the machine with the keys.
   `verify/look.py` reads the mirror.
@@ -235,9 +237,9 @@ says who struck it. `combat/damage.py` is the whole of it.
     (none for a fist), the thrown blade, the wanderer.
   - **`TakeHit` is not an RPC.** It runs behind Switch Has Authority: called on a client's
     copy it does nothing, and no client can send it. A client's blow reaches the server
-    when its action does (the shot: done, M19, `Server_Fire`; melee and a throw: M20),
-    and the server's copy of that action calls `TakeHit`. Until then a client of a
-    server hurts nothing with a blade, a fist or a throw.
+    when its action does (the shot: M19, `Server_Fire`; a swing and a throw: M20,
+    `Server_Punch`, `Server_Slash`, `Server_Throw`), and the server's copy of that
+    action calls `TakeHit`.
   - It floors `Health` at 0, stamps `LastDamageTime`, keeps `LastHitFrom`,
     `LastInstigator` and `LastCause`, and sets `DamagedByPlayer` where the instigator is a
     PlayerController (so a wanderer's blow blames no player, as before).
@@ -305,9 +307,10 @@ of them, plain data (`combat/record_vars.py`):
   actors are the server's or a picture.
 - **The picture is remade only when a record arrives.** What a client changes itself
   stays until the server next says otherwise, and it is
-  why an action that is not yet the server's (a pick-up, a drop, a throw, a meal, a
-  garment: M21, M23, M24) still shows on its own client, and is undone by the next
-  record. Make the action a server request; do not write the record from a client.
+  why an action that is not yet the server's (a drop, a meal, a garment: M23, M24,
+  M26) still shows on its own client, and is undone by the next record. Make the
+  action a server request; do not write the record from a client. (The throw and
+  the take of an item are: M20, below.)
 - **The slots' asks are Server events** (`AskSlot`, `AskMove`, `AskNext`, reliable): the
   HUD's clicks and drags, and the 1-9 and Q keys, which call them from the Tick's local
   arm (`slot_moves.py`). The request is raised on the server's copy and served there
@@ -321,7 +324,10 @@ of them, plain data (`combat/record_vars.py`):
   call itself with authority, and on a client a write of `SlotForced` or
   `MoveForcedFrom`/`MoveForcedTo`, which the component's Tick turns into the ask where
   the keys are read. The shot's and the reload's doors are `FireForced` and
-  `ReloadForced` (M19); the next Server event needs one of the same kind.
+  `ReloadForced` (M19); a swing's `KnifeQueued` and `PunchQueued`, the guard's
+  `BlockForced`, the use key's `SightsForced`, the throw's `ThrowKeyForced` and
+  `ThrowClickForced` and the take's `InteractForced` (M20); the next Server event
+  needs one of the same kind.
 - **Not yet in the record:** worn garments (M24), a heated blade and a burning stick
   (the item's own state, M25), an item lying in the world (M23). The dev-all-guns cheat
   still spawns on the machine it is pressed on.
@@ -386,13 +392,96 @@ R  ------------------------------------>  Server_Reload: AsksServed + 1, ReloadN
   behind IsDedicatedServer. M22's history of hit boxes reads the same bones.
 - **Not here:** lag compensation (M22: the server traces against where the target is
   now, so at 120 ms a strafing target is missed where the shooter saw a hit); the fight
-  as others see it (M21); melee, the throw and the guard (M20). The server takes the
-  shot whether or not it has the player sprinting or guarding.
+  as others see it (M21). The server takes the shot whether or not it has the player
+  sprinting or guarding. Melee, the throw and the guard are the next section.
 - `combat/verify/shot.py` checks the flags and the wiring. Proof: `uepy.py --net
   --clients 2 --probe-timeout 240 --probe Scripts/probes/probe_net_fire.py` (client 1
   kills a wanderer down the sights and reloads; the server's rounds are client 1's, its
   count of asks client 1's, the kill client 1's, and three `Server_Fire` in one frame
   spend one round); also with `--lag 120`; `--game` runs its single-player arm.
+
+## Melee, the guard, the throw and the take (M20, done)
+
+Every other way of hurting something follows the shot: the keys are read where they
+are, a reliable Server event on the weapon component is the action, and the server
+judges it from its own copy. `combat/strike_vars.py` has the picture.
+
+| the client asks | the server checks, on its own copy | then |
+|---|---|---|
+| `Server_Punch`, `Server_Slash` (a swing was queued) | empty hands / a `Melee` item in hand, alive, not `Blocking`, the cooldown (0.1 s of grace) | stamps the cooldown and when the blow lands, plays the clip; its Tick sweeps and calls `TakeHit` |
+| `Server_SetHolds(Guard, Use)` (either key changed) | nothing: it keeps `AskGuard`, `AskUse` | each Tick: `Blocking` = asked AND its own stamina AND not sprinting; `FireWard` = asked AND its own item in hand is `Lit` |
+| `Server_Throw(Start, Velocity)` (the hand lets go) | an item in a living hand, nothing of this player's in the air, `Start` within 3 m of its copy, the speed capped at the item's `ThrowSpeed` | the item leaves the inventory, becomes a replicated actor and flies; the strike is judged once |
+| `Server_Take(Item)` (E on an item) | the item exists and is `Dropped`, the taker alive and within reach of it, a slot free | into the taker's inventory; the record tells the client |
+
+- **A blow is pending only where its Server event ran** (`weapon_component/punch.py`): the
+  swing's two stages are now the event (the stamps, `Pending`, the clip) and the blow,
+  which moved to the Tick's upkeep and runs on every copy. Only the server's ever finds
+  a strike pending, so only it sweeps. The chop (the blow on a tree) and the hot
+  blade's double hang off that same blow, so they are the server's too: **the double
+  is read off the server's item**, and a client that only says its blade is hot gets
+  nothing. (Heating one on a server is M25: until then the server's item is cold.)
+- **The owning client predicts the swing it can see:** its own cooldown, the clip and
+  the swing's sound, off the false arm of a Branch on HasAuthority. Not the blow.
+- **The guard and the use key are reported, not trusted** (`weapon_component/holds.py`):
+  the owning machine still writes its own `Blocking` and `FireWard` off its keys, for
+  its own pose and fire gate, and tells the server on the frame either key changes.
+  The server's copy writes both itself (`_author_holds_mirror`, in the Tick's remote
+  arm, behind HasAuthority) from what it was told and from **its own** stamina and
+  **its own** stick, and those are what a wanderer's swing (`npc/block.py`) and a
+  wendigo (`npc/ward.py`) read. `Blocking` replicates to everyone but the owner, so
+  another player's copy poses the guard; `FireWard` goes nowhere (the stick held out
+  is seen as `LookPose`). The server's stick is lit by M25; until then a client's
+  ward holds no wendigo off.
+- **A thrown item is a replicated actor** (`combat/item_world.py`). What is carried is
+  the server's unreplicated item actors and each client's picture of the record
+  (above); the release (`Server_Throw`) sets `InWorld` on the server's actor and calls
+  `SetReplicateMovement(true)` and `SetReplicates(true)`, and from then on every
+  client is sent it: where it is each frame of the flight, the bone it is attached
+  to in a body, and its `Dropped`, `Lodged` and `InWorld`. The flight
+  (`throw_flight.py`) runs in the upkeep behind HasAuthority; `Thrown` replicates to
+  the owner alone, whose arc waits on it.
+  - **Replication is never switched off again.** The project replicates through the
+    engine's generic driver (the log's `replication model Generic`, not Iris), where
+    `SetReplicates(false)` only stops the updates: each client's copy would stand
+    where it last was for good. So the take lowers `InWorld` instead, and a client's
+    copy of an item hides itself while that is false (the item's own Tick, off the
+    false arm of HasAuthority, first in `glimmer.author_glimmer` so every child's
+    Tick has it). The engine closes the channel of a hidden actor with no collision
+    by itself, so the copy of an item in a bag is gone a few seconds on.
+  - **Thrown items only.** An item dropped with G, placed in the level or left by a
+    kill is still each machine's own (M23): what its drop must do is call
+    `item_world.author_into_world`, and the take already serves it.
+- **The take is a Server event with an actor in it** (`weapon_component/pickup.py`), so
+  it works for an item the server can be told of: a replicated one. An item that is
+  only the client's own arrives as None and is refused. Two players reaching for one
+  item: the first ask finds it `Dropped`, the second does not.
+- **In single player** every one of these is a plain call on the one machine: nothing
+  is predicted, the mirror never runs, and `SetReplicates(true)` on an item sends it
+  to no one.
+- **A probe that queues a swing must wait out the cooldown first** (the press gate
+  did; the Server event now refuses one inside it), and must empty the hands the way
+  a player does (a slot ask) before a punch: `Held` written to None is put back by
+  the next equip, and the server refuses a punch with a gun in hand.
+- **A probe's `set_editor_property` on a live actor re-runs its construction script**
+  unless it is `p.set` (no edit notification): written with the default on a
+  wanderer, the server's body got fresh components and each client's copy of it lost
+  its health component.
+- **Not here:** the swing, the throw and the hit as other players see and hear them
+  (M21); lag compensation of a sweep or a throw; the pick-up of an item that is not
+  replicated, the drop, and two clients on one item on one frame as a probe (M23);
+  lighting the stick and heating the blade on the server (M25).
+- `combat/verify/strike.py` and `verify/pickup.py` check the flags and the wiring.
+  Proof: `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_throw.py` (client 1 throws its axe into a trunk, all three
+  machines have it lodged in the same place, client 2 takes it out with E and client 1
+  sees it gone; a throw from 10 m off, a take of an item in another player's bag and
+  a throw at ten times the speed are refused or capped) and `probe_net_melee.py`
+  (client 1's slash and punch land by the server's sweep, the hot blade's double
+  follows the server's knife, three `Server_Slash` in a frame land one blow, the
+  guard reaches the server and client 2, and `FireWard` rises only with the server's
+  stick burning); both clean with `--lag 120`. Single player's are the existing
+  `--game` probes (`probe_knife`, `probe_punch`, `probe_hot_blade`, `probe_throw*`,
+  `probe_pickup`, `probe_wendigo_ward`).
 
 ## Random rolls (M17, done)
 

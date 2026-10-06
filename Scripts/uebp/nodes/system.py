@@ -56,6 +56,11 @@ FN_DRAW_CONE = "/Script/Engine.KismetSystemLibrary.DrawDebugConeInDegrees"
 FN_DRAW_LINE = "/Script/Engine.KismetSystemLibrary.DrawDebugLine"
 FN_DRAW_POINT = "/Script/Engine.KismetSystemLibrary.DrawDebugPoint"
 FN_DRAW_STRING = "/Script/Engine.KismetSystemLibrary.DrawDebugString"
+# The mode questions (uebp/CLAUDE.md): single player is standalone, and a
+# dedicated server has no local player, screen or sound.
+FN_IS_DEDICATED_SERVER = "/Script/Engine.KismetSystemLibrary.IsDedicatedServer"
+FN_IS_SERVER = "/Script/Engine.KismetSystemLibrary.IsServer"
+FN_IS_STANDALONE = "/Script/Engine.KismetSystemLibrary.IsStandalone"
 FN_IS_VALID = "/Script/Engine.KismetSystemLibrary.IsValid"
 # A class reference is a different pin category from an object reference, so
 # IsValid refuses to connect to one; IsValidClass is the class-pin twin.

@@ -1,6 +1,13 @@
 """uebp.nodes.palette -- palette nodes (events, casts, break/make) and the
-standard macros.
+standard macros, and the
+actor and component macros (the authority switch).
 """
+
+# Switch Has Authority: exec outs "Authority" and "Remote". An actor graph takes
+# the first, a component graph the second (it asks its owner).
+MACRO_SWITCH_AUTHORITY = "/Engine/EditorBlueprintResources/ActorMacros.ActorMacros:Switch Has Authority"
+MACRO_SWITCH_AUTHORITY_COMP = (
+    "/Engine/EditorBlueprintResources/ActorComponentMacros.ActorComponentMacros:Switch Has Authority")
 
 MACRO_FOR_EACH = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForEachLoop"
 MACRO_FOR_LOOP = "/Engine/EditorBlueprintResources/StandardMacros.StandardMacros:ForLoop"

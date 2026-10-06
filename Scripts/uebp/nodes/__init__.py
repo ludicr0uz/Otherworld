@@ -12,5 +12,6 @@ Scripts/dev/check_node_catalog.py.
   umg.py      UMG widgets and their libraries
   actor.py    member functions of engine classes: actors, components,
               controllers, the HUD, anim instances
-  palette.py  palette nodes (events, casts, break/make) and the standard macros
+  palette.py  palette nodes (events, casts, break/make) and the standard, actor
+              and component macros
 """

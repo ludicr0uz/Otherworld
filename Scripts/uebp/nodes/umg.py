@@ -20,6 +20,7 @@ FN_UNDER = "/Script/UMG.SlateBlueprintLibrary.IsUnderLocation"
 FN_SET_TEXT = "/Script/UMG.TextBlock.SetText"
 FN_SET_TEXT_COLOUR = "/Script/UMG.TextBlock.SetColorAndOpacity"
 
+FN_GET_OWNING_PLAYER_PAWN = "/Script/UMG.UserWidget.GetOwningPlayerPawn"
 FN_ADD_TO_VIEWPORT = "/Script/UMG.UserWidget.AddToViewport"
 
 FN_GEOMETRY = "/Script/UMG.Widget.GetCachedGeometry"

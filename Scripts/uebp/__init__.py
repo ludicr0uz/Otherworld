@@ -8,6 +8,9 @@
              carries coordinates
   vars.py    Var (a member variable: its name, pin type and default), the
              type specs, declare(ed, TABLE) and defaults(TABLE)
+  net.py     networked Blueprints: Server / Client / Multicast custom events,
+             Replicated and RepNotify variables, actors and components that
+             replicate (through Source/OtherworldEditor; CLAUDE.md is the guide)
   props.py   engine properties and components read through a variable node
   nodes/     the one catalog of node paths (FN_*, NODE_*, MACRO_*), a module
              per engine library; its own __init__ maps them

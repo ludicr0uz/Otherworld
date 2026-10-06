@@ -7,6 +7,6 @@ public class OtherworldEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.Latest;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 		Type = TargetType.Editor;
-		ExtraModuleNames.Add("Otherworld");
+		ExtraModuleNames.AddRange(new string[] { "Otherworld", "OtherworldEditor" });
 	}
 }

@@ -11,6 +11,8 @@ FN_ADD_WORLD_ROT = "/Script/Engine.Actor.K2_AddActorWorldRotation"
 FN_ATTACH = "/Script/Engine.Actor.K2_AttachToComponent"
 FN_DESTROY = "/Script/Engine.Actor.K2_DestroyActor"
 FN_DETACH = "/Script/Engine.Actor.K2_DetachFromActor"
+# True on the machine that owns the actor's state: the server, and single player.
+FN_HAS_AUTHORITY = "/Script/Engine.Actor.HasAuthority"
 FN_GET_COMP = "/Script/Engine.Actor.GetComponentByClass"
 FN_GET_COMPONENTS = "/Script/Engine.Actor.K2_GetComponentsByClass"
 FN_GET_TRANSFORM = "/Script/Engine.Actor.GetTransform"
@@ -53,6 +55,7 @@ FN_SET_MOVEMENT_MODE = "/Script/Engine.CharacterMovementComponent.SetMovementMod
 # Recoil moves the view through the CONTROLLER's rotation, not through
 # AddPitchInput: see COMBAT's recoil block for why routing it through
 # RotationInput would make the kick scale with the sensitivity slider.
+FN_IS_LOCAL_CONTROLLER = "/Script/Engine.Controller.IsLocalController"
 FN_GET_CONTROL_ROT = "/Script/Engine.Controller.GetControlRotation"
 FN_GET_PAWN = "/Script/Engine.Controller.K2_GetPawn"
 FN_IGNORE_LOOK = "/Script/Engine.Controller.SetIgnoreLookInput"
@@ -68,6 +71,7 @@ FN_DRAW_HUD_LINE = "/Script/Engine.HUD.DrawLine"
 FN_DRAW_RECT = "/Script/Engine.HUD.DrawRect"
 FN_DRAW_TEXT = "/Script/Engine.HUD.DrawText"
 FN_DRAW_TEXTURE = "/Script/Engine.HUD.DrawTexture"
+FN_GET_OWNING_PAWN = "/Script/Engine.HUD.GetOwningPawn"
 FN_GET_OWNING_PC = "/Script/Engine.HUD.GetOwningPlayerController"
 FN_PROJECT = "/Script/Engine.HUD.Project"
 
@@ -94,6 +98,8 @@ FN_IS_CROUCHING = "/Script/Engine.NavMovementComponent.IsCrouching"
 FN_ON_GROUND = "/Script/Engine.NavMovementComponent.IsMovingOnGround"
 
 FN_GET_CONTROLLER = "/Script/Engine.Pawn.GetController"
+# True on the machine whose player drives this pawn: its input, camera and HUD.
+FN_IS_LOCALLY_CONTROLLED = "/Script/Engine.Pawn.IsLocallyControlled"
 FN_IS_PLAYER_CONTROLLED = "/Script/Engine.Pawn.IsPlayerControlled"
 # The way the player steered this frame, as the movement component consumed it:
 # the intent, not the velocity, which lags it and outlives it.

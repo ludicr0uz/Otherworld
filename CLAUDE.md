@@ -1,8 +1,9 @@
 # Otherworld — Claude quick reference
 
 An Unreal Engine **5.8** project on macOS, driven entirely by **Unreal Python** automation.
-The game is authored by those scripts; the one C++ module, `Source/`, is empty so far and must
-be compiled before the editor opens (`Source/CLAUDE.md`). `systemDesign.md` holds the detailed
+The game is authored by those scripts; the C++ in `Source/` holds no gameplay so far (an empty
+runtime module, and an editor module of helpers for the scripts) and must be compiled before
+the editor opens (`Source/CLAUDE.md`). `systemDesign.md` holds the detailed
 architecture.
 
 ## Hard rules
@@ -42,7 +43,8 @@ architecture.
 | clothing: the eight garments, wearing and taking off, the I panel, the test garments | `build_`/`verify_clothing.py`, `probe_clothing.py` | `Scripts/clothing/CLAUDE.md` |
 | sound: every sound of the game, which Blueprint variable plays which takes, how far each carries, how loud each is, the beds, the player's voice, the listener | `build_sound.py` (the one build after a change to any of them) | `Scripts/Sound/CLAUDE.md` |
 | sourcing sounds: the fetchers and the synthesiser, cutting candidates from the downloaded packs, the page that plays and rates them (all run outside the editor) | `Scripts/Sound/*.py` | `Scripts/Sound/sound_candidates/__init__.py` |
-| the C++ module: the `Otherworld` runtime module (no gameplay yet) and the Editor, Game, Client and Server targets; the compile command, its time and the Xcode it needs | `Source/Otherworld/Otherworld.Build.cs`, `Source/*.Target.cs` | `Source/CLAUDE.md` |
+| the C++ modules: the `Otherworld` runtime module (no gameplay yet), the editor-only `OtherworldEditor` (what the builders need and Python cannot reach) and the Editor, Game, Client and Server targets; the compile command, its time and the Xcode it needs | `Source/Otherworld/Otherworld.Build.cs`, `Source/OtherworldEditor/`, `Source/*.Target.cs` | `Source/CLAUDE.md` |
+| networked Blueprints: Server / Client / Multicast custom events, Replicated and RepNotify variables, actors and components that replicate, the nodes that ask which machine this is | `uebp/net.py`, `dev/check_net_authoring.py` | `Scripts/uebp/CLAUDE.md` |
 | multiplayer server: the strategy and task list (`serversupportsysdesign.md`), the GCP build VM and the engine source build | `Scripts/server/gcp/vm_create.sh`, `engine_clone.sh`, `engine_build.sh`, `vm.sh` | `Scripts/server/gcp/CLAUDE.md` |
 
 ## Code layout: small modules, one owner each
@@ -341,6 +343,8 @@ editor.
     `g.branch`). Write new fragments in it.
   - `uebp.nodes.<library>`: every `FN_*`/`NODE_*`/`MACRO_*` path, once. Add a path there,
     then run `python3 Scripts/dev/uepy.py --summary Scripts/dev/check_node_catalog.py`.
+  - `uebp.net`: RPC custom events, replicated variables and what replicates
+    (`Scripts/uebp/CLAUDE.md`).
   - `uebp.vars`: a Blueprint's variables are rows of its `<blueprint>_vars.py` table
     (`Var(name, type, default)`; a `Var` is its name). Name a variable by its row
     (`HV.Health`) or its `*_VAR` constant, never by a bare string.

@@ -22,7 +22,8 @@ Enabled plugins: `ModelingToolsEditorMode` (editor-only), `GameplayStateTree`,
 `PythonScriptPlugin`, `EditorScriptingUtilities`, `ProceduralMeshComponent`,
 `PCG`, `PCGGeometryScriptInterop`.
 
-No C++ source module exists — the project is Blueprint + Python only. It started from the
+One C++ module exists, `Source/Otherworld`, empty so far (`Source/CLAUDE.md`); the game
+itself is Blueprint + Python. It started from the
 Third Person template (`Content/ThirdPerson`, `Content/Characters/Mannequins`,
 `Content/Input`, `Content/LevelPrototyping`), and "largely untouched" turns out to be
 measurable: of those 171 files, **168 are byte-identical to the UE 5.8.3 install** and three

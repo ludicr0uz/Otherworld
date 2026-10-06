@@ -1,7 +1,9 @@
 # Otherworld — Claude quick reference
 
 An Unreal Engine **5.8** project on macOS, driven entirely by **Unreal Python** automation.
-There is no C++ module. `systemDesign.md` holds the detailed architecture.
+The game is authored by those scripts; the one C++ module, `Source/`, is empty so far and must
+be compiled before the editor opens (`Source/CLAUDE.md`). `systemDesign.md` holds the detailed
+architecture.
 
 ## Hard rules
 
@@ -40,6 +42,7 @@ There is no C++ module. `systemDesign.md` holds the detailed architecture.
 | clothing: the eight garments, wearing and taking off, the I panel, the test garments | `build_`/`verify_clothing.py`, `probe_clothing.py` | `Scripts/clothing/CLAUDE.md` |
 | sound: every sound of the game, which Blueprint variable plays which takes, how far each carries, how loud each is, the beds, the player's voice, the listener | `build_sound.py` (the one build after a change to any of them) | `Scripts/Sound/CLAUDE.md` |
 | sourcing sounds: the fetchers and the synthesiser, cutting candidates from the downloaded packs, the page that plays and rates them (all run outside the editor) | `Scripts/Sound/*.py` | `Scripts/Sound/sound_candidates/__init__.py` |
+| the C++ module: the `Otherworld` runtime module (no gameplay yet) and the Editor, Game, Client and Server targets; the compile command, its time and the Xcode it needs | `Source/Otherworld/Otherworld.Build.cs`, `Source/*.Target.cs` | `Source/CLAUDE.md` |
 | multiplayer server: the strategy and task list (`serversupportsysdesign.md`), the GCP build VM and the engine source build | `Scripts/server/gcp/vm_create.sh`, `engine_clone.sh`, `engine_build.sh`, `vm.sh` | `Scripts/server/gcp/CLAUDE.md` |
 
 ## Code layout: small modules, one owner each

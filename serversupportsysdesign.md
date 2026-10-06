@@ -161,9 +161,10 @@ owning client: read input  --Server RPC-->  server: validate, change state
 
 ### 4.3 What needs C++
 
-The project has no C++ module today. It needs one: a dedicated server target requires a
-real `Source/` folder. The packaging step's generated files in `Intermediate/Source`
-(`Otherworld.Build.cs`, the four `.Target.cs`) are the starting point (*verified*).
+The project has one C++ module, `Source/Otherworld`, empty so far (task M1; `Source/CLAUDE.md`
+has the compile command). A dedicated server target requires a real `Source/` folder; it was
+made from the packaging step's generated files in `Intermediate/Source`
+(`Otherworld.Build.cs`, the four `.Target.cs`).
 
 | piece | why C++ |
 |---|---|

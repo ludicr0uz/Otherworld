@@ -24,6 +24,7 @@ from combat.weapon_component.consume import (
 from combat.weapon_component.dead import _author_dead_gate
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.light import _author_light_press
+from combat.weapon_component.look import _author_local_carry, _author_look_mirror
 from combat.weapon_component.local import (
     _author_local_gate, _author_local_only, local_pc)
 from combat.weapon_component.knife import (
@@ -188,7 +189,9 @@ def _author_wc_tick(ed, tick):
     ads_exits = _author_sight_pitch(ed, pc_out, ads_exits)
 
     # --- from here on every machine's copy runs: the pose follows state -------
-    ads_exits = tuple(ads_exits) + (remote,)
+    # A copy that is not its player's own writes that state first, from what
+    # was replicated (look.py).
+    ads_exits = tuple(ads_exits) + tuple(_author_look_mirror(ed, tick, owner_out, remote))
 
     # --- and the body takes the stance and the guard -------------------------
     # After both are written (Stance, Blocking), which set its weights.
@@ -205,7 +208,9 @@ def _author_wc_tick(ed, tick):
 
     # --- the gun is lowered or raised (carry.py) ------------------------------
     # After Sprinting, Aiming and Blocking are written, which it reads.
-    ads_exits = _author_carry(ed, held, armed_out, ads_exits)
+    # Where the keys are; and there the look is reported (look.py).
+    ads_exits = _author_local_carry(
+        ed, ads_exits, lambda execs: _author_carry(ed, held, armed_out, execs))
 
     # --- and the pose follows it (ready_pose.py) ------------------------------
     pose_exits = _author_lowered_pose_edge(ed, ads_exits)
@@ -220,7 +225,7 @@ def _author_wc_tick(ed, tick):
     # away. See _author_ready_pose_keepalive: a hit reaction stops the ready
     # pose as a side effect of the montage group, and without this the player
     # fights the rest of the session with the gun in the locomotion pose.
-    pose_exits = _author_ready_pose_keepalive(ed, held, pose_exits)
+    pose_exits = _author_ready_pose_keepalive(ed, pose_exits)
 
     # --- the trigger and the action keys: the local player's (local.py) -------
     local, remote = _author_local_only(ed, pose_exits)

@@ -13,7 +13,9 @@ from combat.paths import (
 )
 from combat.tuning import HEALTH_DRAINS
 from combat.verify.common import BEL, PIN, by_pins, cdo, graph, load, num_pin, pin_value
+from combat.aim_pitch import AIM_PITCH_VAR
 from combat.weapon_component.dead import OWNER_DEAD_VAR
+from combat.weapon_component.stance import STANCE_VAR
 
 _eas = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
 
@@ -47,14 +49,8 @@ def exec_reach(pins):
     return list(seen.values())
 
 
-def _dead_arm(nodes):
-    """The dead gate's True arm (weapon_component/dead.py): what it runs, and
-    the pure nodes that feed nothing else."""
-    marks = [n for n in nodes
-             if str(BEL.get_node_title(n)) == f"Set {OWNER_DEAD_VAR}"
-             and pin_value(n, OWNER_DEAD_VAR) == "true"]
-    arm = {n.get_path_name(): n for m in marks
-           for n in [m] + exec_reach(BEL.list_output_pins(m))}
+def _with_private_feeds(arm):
+    """``arm`` ({path: node}) and the pure nodes that feed nothing else."""
     grew = True
     while grew:
         grew = False
@@ -73,14 +69,60 @@ def _dead_arm(nodes):
     return arm
 
 
+def _dead_arm(nodes):
+    """The dead gate's True arm (weapon_component/dead.py): what it runs, and
+    the pure nodes that feed nothing else."""
+    marks = [n for n in nodes
+             if str(BEL.get_node_title(n)) == f"Set {OWNER_DEAD_VAR}"
+             and pin_value(n, OWNER_DEAD_VAR) == "true"]
+    arm = {n.get_path_name(): n for m in marks
+           for n in [m] + exec_reach(BEL.list_output_pins(m))}
+    return _with_private_feeds(arm)
+
+
+def _fed_by(node, pin, squashed_title):
+    found = BEL.find_input_pin(node, pin)
+    return bool(found) and any(
+        str(BEL.get_node_title(PIN.get_owning_node(q))).replace(" ", "").lower()
+        == squashed_title for q in PIN.list_connected_pins(found))
+
+
+def _mirror_arm(nodes):
+    """The look's mirror (weapon_component/look.py): the chain a copy that is
+    not its player's own runs before the pose, from the Stance it takes off
+    the movement component to the AimPitch it takes off the pawn's view, and
+    the pure nodes that feed nothing else. A failed cast leaves the chain."""
+    marks = [n for n in nodes if str(BEL.get_node_title(n)) == f"Set {STANCE_VAR}"
+             and _fed_by(n, STANCE_VAR, "getstance")]
+    arm, todo = {}, list(marks)
+    while todo:
+        n = todo.pop()
+        if n.get_path_name() in arm:
+            continue
+        arm[n.get_path_name()] = n
+        if str(BEL.get_node_title(n)) == f"Set {AIM_PITCH_VAR}":
+            continue
+        todo += [PIN.get_owning_node(q) for p in BEL.list_output_pins(n)
+                 if _is_exec(p) and str(PIN.get_pin_name(p)) in ("then", "else")
+                 for q in PIN.list_connected_pins(p)]
+    return _with_private_feeds(arm)
+
+
 # The weapon component's Tick is two states (weapon_component/dead.py): the
 # living Tick, which is what every section but verify/dead.py reads as ``wg``,
 # and the dead arm, which lets go of what the living one holds. Kept apart so
 # "written once" stays a statement about the living Tick.
+# The living Tick has an arm of its own kept apart the same way: the look's
+# mirror (weapon_component/look.py), which on a copy of another machine's
+# player writes what the keys write on that player's own. "Written once" is a
+# statement about the machine with the keys; verify/look.py reads the mirror.
 _wg_all = graph(wc).list_all_nodes()
 _arm = _dead_arm(_wg_all)
 wg_dead = list(_arm.values())
-wg = [n for n in _wg_all if n.get_path_name() not in _arm]
+_mirror = _mirror_arm(_wg_all)
+wg_mirror = list(_mirror.values())
+wg = [n for n in _wg_all if n.get_path_name() not in _arm
+      and n.get_path_name() not in _mirror]
 titles = [str(BEL.get_node_title(n)).replace("\n", " ") for n in wg]
 
 gm = load(GAME_MODE_BP_PATH)

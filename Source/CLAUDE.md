@@ -14,7 +14,7 @@ Everything else stays in the Python builders.
 | `Otherworld/Otherworld.Build.cs` | the module's dependencies (`Core`, `CoreUObject`, `Engine`) |
 | `Otherworld/Otherworld.cpp` | `IMPLEMENT_PRIMARY_GAME_MODULE`, nothing else |
 | `Otherworld/Public/OtherworldCharacterMovement.h`, `Private/….cpp` | `UOtherworldCharacterMovement`: sprint, prone and the aim-walk as saved-move flags (`FLAG_Custom_0..2`), the speed of each state (`GetMaxSpeed`), the sprint's rules (the stamina latch, the forward cone) and the stamina, all stepped in `UpdateCharacterStateBeforeMovement` with the move's own delta time, so the owning client predicts them and the server makes the same ones. See "Predicted movement" below |
-| `Otherworld/Public/OtherworldCharacter.h`, `Private/….cpp` | `AOtherworldCharacter`: a Character whose movement component is that class, and nothing else. `BP_ThirdPersonCharacter` is reparented onto it by `Scripts/combat/player_move.py` |
+| `Otherworld/Public/OtherworldCharacter.h`, `Private/….cpp` | `AOtherworldCharacter`: a Character whose movement component is that class, and `bProne`, the one fact a simulated copy needs beside the engine's replicated crouch to stand as the server has it (M13, below). `BP_ThirdPersonCharacter` is reparented onto it by `Scripts/combat/player_move.py` |
 | `Otherworld/Public/OtherworldMovementLibrary.h`, `Private/….cpp` | `UOtherworldMovementLibrary` (Python: `unreal.OtherworldMovementLibrary`): what the graphs and the probes say to the component and read off it, each a static taking the character's actor (`Scripts/uebp/nodes/move.py`) |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
 | `OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h`, `Private/….cpp` | `UOtherworldBlueprintNetLibrary` (Python: `unreal.OtherworldBlueprintNetLibrary`): a custom event's net flags and parameters, a variable's replication and OnRep graph, and the same read back off a compiled class. Wrapped by `Scripts/uebp/net.py`; checked by `Scripts/dev/check_net_authoring.py` |
@@ -66,8 +66,16 @@ are listed under `Modules` in `Otherworld.uproject` (`OtherworldEditor` as type 
 - **Every correction a client takes is one `MOVE-CORRECTION` log line** and a count
   (`CorrectionCount`). `uepy.py --net --lag 120` shows the count per process;
   `Scripts/probes/probe_net_move_states.py` is the check that the states take none.
-- **Not done here:** another player's copy of a character (a simulated proxy) gets the
-  engine's replicated crouch but not prone's height, nor sprint or aim: M13.
+- **Another player's copy of the character** (a simulated proxy) runs no moves, so it gets
+  its stance by replication (M13): the engine's `bIsCrouched`, and
+  `AOtherworldCharacter::bProne` (`COND_SimulatedOnly`), which the server writes in
+  `UpdateCharacterStateBeforeMovement`. Both notifies call `ApplySimulatedStance`, which
+  sizes the capsule to the stance the two flags make and is safe to run twice (they
+  arrive in either order): the engine's own `OnRep_IsCrouched` crouches again whatever
+  the capsule is, and a second crouch to the height it already has resets the mesh to its
+  standing offset. `GetStance(actor)` answers 0/1/2 on any machine. The aim and the pose
+  on that copy are the weapon component's (`Scripts/net/CLAUDE.md`, "Other players'
+  characters").
 
 ## Traps
 

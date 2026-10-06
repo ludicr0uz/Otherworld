@@ -36,6 +36,13 @@ public:
 
 	// --- the state, for the graphs that show or gate on it.
 
+	/**
+	 * 0 stand, 1 crouch, 2 prone: the stance the character is in, on any
+	 * machine. On another player's copy it is what the server replicated.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
+	static int32 GetStance(const AActor* Character);
+
 	UFUNCTION(BlueprintPure, Category = "Otherworld|Movement")
 	static float GetStamina(const AActor* Character);
 

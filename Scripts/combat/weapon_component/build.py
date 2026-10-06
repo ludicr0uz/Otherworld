@@ -10,6 +10,7 @@ from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _apply_defaults, _assets, _create_blueprint, _declare, _events, _float_type,
     _key, _must_load, _post_physics_tick, _struct_type)
+from uebp import net
 from uebp.layout import arrange
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.paths import (
@@ -88,6 +89,8 @@ from combat.weapon_component.throw_windup import (
 )
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.asks import author_asks
+from combat.weapon_component.look import author_set_look, replicate_look
+from combat.weapon_component.look_vars import TABLE as LOOK_TABLE
 from combat.weapon_component.loot_take import author_loot_take
 from combat.weapon_component.save_exit import author_ask_save_exit
 from combat.weapon_component.ads import AIM_FORCED_VAR
@@ -137,6 +140,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
 
     item_class = BEL.generated_class(item_bp)
     declare(ed, WV.TABLE)
+    # The look (look.py): declared, then replicated, on every build.
+    declare(ed, LOOK_TABLE)
+    replicate_look(bp)
     # Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's
     # HP bar; BaseSpeed is cached off the character at BeginPlay, never a
     # literal. Sprinting is what the fire gate refuses on. The sprint's speed
@@ -311,6 +317,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     _declare(ed, THROW_ARC_VAR, BEL.get_object_reference_type(arc_class))
     _declare(ed, THROW_ARC_CLASS_VAR, BEL.get_class_reference_type(arc_class))
 
+    # First: the Tick calls it by name, and a call finds only an event that exists.
+    author_set_look(ed)
     _author_wc_begin_play(ed, begin)
     _author_wc_tick(ed, tick)
     # What a screen asks of the component: one event each (combat/ask_consts.py).
@@ -322,7 +330,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
-    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
+    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
         # Overwritten on the first frame of BeginPlay with the character's
         # own walk speed, which is this same number (player_pace.py).
         BASE_SPEED_VAR: COMBAT.jog_speed_cms,
@@ -408,5 +416,11 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
            if player_skin().throw else {}),
         THROW_ARC_CLASS_VAR: arc_class,
     })
+    # The component replicates (its look, to the other players): a class
+    # default, so after the compile and with one more (uebp/CLAUDE.md).
+    net.replicate_component(bp)
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_WeaponComponent failed to compile")
+    _assets().save_loaded_asset(bp)
     _log(f"built {WEAPON_COMP_BP_PATH}")
     return bp

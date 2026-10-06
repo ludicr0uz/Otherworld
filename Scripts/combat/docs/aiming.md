@@ -283,6 +283,11 @@ in game `probes/probe_carry.py`.
 - **The pose follows `Lowered` on its edge** (`ready_pose.py`): `Lowered != PoseLowered` sets
   `NeedsRefresh`, and the equip plays or stops the slot. The keepalive after a flinch asks
   `Lowered` too.
+- **The carry runs where the keys are.** On another machine's copy of the player `Lowered`
+  is the mirror's, off the replicated `LookLowered`, and the pose the equip and the
+  keep-alive play is `HandPose`: `Held.AimPose` locally, the replicated `LookPose` on a
+  remote copy (`weapon_component/look.py`; `Scripts/net/CLAUDE.md`, "Other players'
+  characters").
 - **The shot is not delayed.** It leaves on the frame of the click, before the gun is up. So
   while `Lowered`, the wall check and the pellets start not at the muzzle (at the knee,
   pointing at the ground) but where the muzzle is about to be: `CARRY_GRIP` in the body's

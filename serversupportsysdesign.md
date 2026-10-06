@@ -366,7 +366,7 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
 15. Subclass CharacterMovement with predicted sprint, prone and aim-walk. Stamina moves to
     the server.
 16. Replicate stance, aim pitch and the held item's pose so other players animate
-    correctly.
+    correctly. (Done, M13: `Scripts/net/CLAUDE.md`, "Other players' characters".)
 
 **Phase 4 — Health, damage, death**
 

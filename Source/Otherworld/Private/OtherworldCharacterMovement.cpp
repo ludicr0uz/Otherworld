@@ -2,6 +2,7 @@
 
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
+#include "OtherworldCharacter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogOtherworldMove, Log, All);
 
@@ -259,6 +260,16 @@ void UOtherworldCharacterMovement::UpdateCharacterStateBeforeMovement(float Delt
 
 	const float AimTarget = (bWantsAimWalk && !bSprinting) ? 1.f : 0.f;
 	AimWalkAlpha = FMath::FInterpTo(AimWalkAlpha, AimTarget, DeltaSeconds, AimWalkInterpSpeed);
+
+	// What the other players' copies stand by (AOtherworldCharacter::bProne):
+	// the engine sends them the crouch, and this says how low it is.
+	if (CharacterOwner->HasAuthority())
+	{
+		if (AOtherworldCharacter* Body = Cast<AOtherworldCharacter>(CharacterOwner))
+		{
+			Body->bProne = bWantsProne && IsCrouching();
+		}
+	}
 }
 
 void UOtherworldCharacterMovement::UpdateFromCompressedFlags(uint8 Flags)

@@ -57,6 +57,9 @@ FN_SET_MOVEMENT_MODE = "/Script/Engine.CharacterMovementComponent.SetMovementMod
 # RotationInput would make the kick scale with the sensitivity slider.
 FN_IS_LOCAL_CONTROLLER = "/Script/Engine.Controller.IsLocalController"
 FN_GET_CONTROL_ROT = "/Script/Engine.Controller.GetControlRotation"
+# A pawn's view on any machine: its controller's where there is one, the
+# replicated RemoteViewPitch on another player's copy.
+FN_GET_BASE_AIM_ROT = "/Script/Engine.Pawn.GetBaseAimRotation"
 FN_GET_PAWN = "/Script/Engine.Controller.K2_GetPawn"
 FN_IGNORE_LOOK = "/Script/Engine.Controller.SetIgnoreLookInput"
 FN_IGNORE_MOVE = "/Script/Engine.Controller.SetIgnoreMoveInput"

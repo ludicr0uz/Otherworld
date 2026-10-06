@@ -52,6 +52,17 @@ void UOtherworldMovementLibrary::SetStance(AActor* Character, int32 Stance)
 	}
 }
 
+int32 UOtherworldMovementLibrary::GetStance(const AActor* Character)
+{
+	const UOtherworldCharacterMovement* Movement = MovementOf(Character);
+	if (!Movement || !Movement->IsCrouching())
+	{
+		return 0;
+	}
+	// On a simulated copy bWantsProne is the character's replicated bProne.
+	return Movement->bWantsProne ? 2 : 1;
+}
+
 void UOtherworldMovementLibrary::SetAimWalk(AActor* Character, bool bAiming)
 {
 	if (UOtherworldCharacterMovement* Movement = MovementOf(Character))

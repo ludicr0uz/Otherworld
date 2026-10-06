@@ -99,7 +99,9 @@ and every other client. Only the first has that player's keys.
   |---|---|
   | the dead gate | every copy |
   | the view, the aim trace, sprint, block, stance, use, the sights, sway | the local player's |
-  | the pose (weights, support hand, accuracy, carry, ready pose, steady) | every copy |
+  | the mirror: the pose's state off what was replicated (`look.py`) | every copy but the local player's |
+  | the pose (weights, support hand, accuracy, ready pose, steady) | every copy |
+  | the carry (`Lowered`), and the look reported to the server | the local player's |
   | the trigger and the action keys (`_author_actions`: fire, reload, slots' keys, drop, interact, throw, the HUD's requests) | the local player's |
   | the slots served and placed, the equip (`_author_upkeep`) | every copy |
 
@@ -125,8 +127,8 @@ and every other client. Only the first has that player's keys.
   `probe_net_local_input.py` is the proof: client 1 forces fire on both characters, its
   own spends a round and the other's does not, on either client or the server, which has
   no HUD and no widgets; `--game` runs its standalone arm.
-- **Not done here:** the non-local copies of a character still run from their own
-  unreplicated state (stance and aim as others see them, what is held): M13, M18, M19.
+- **The non-local copies of a character** pose from the mirror ("Other players'
+  characters", below); what is held and fired there is still each copy's own: M18, M19.
   The walk speed, the sprint and the stance of the character itself are M12's, below.
 
 ## Movement states are predicted (M12, done)
@@ -158,8 +160,51 @@ and every other client. Only the first has that player's keys.
   `MOVE-CORRECTION` line in the client's log, counted in the run's report.
 - **A probe drives it with** `SprintForced`, `AimForced` and `Stance` on the acting
   client's own weapon component, and `add_movement_input` each frame.
-- **Not done here:** how another player's character looks in a state (prone's height
-  and the poses on a simulated proxy) is M13.
+- **How another player's character looks in a state** is the next section.
+
+## Other players' characters (M13, done)
+
+A player reads other players by their animation. The pose part of the weapon component's
+Tick runs on every copy from the component's own state; on a copy that is not its player's
+own (the server's of a client's character, every other client's) that state is written
+first by **the mirror** (`combat/weapon_component/look.py`), from the few facts that travel:
+
+| fact | travels as | the copy writes |
+|---|---|---|
+| stance | the movement's own flags: the engine's replicated crouch and `AOtherworldCharacter::bProne` (C++, to simulated copies only), read with `GetStance(owner)` | `Stance`; the capsule is sized in C++ (`Source/CLAUDE.md`) |
+| aim pitch | the engine's `Pawn.RemoteViewPitch`, read with `GetBaseAimRotation` | the anim BP's `AimPitch`, times `SightBlend` as locally |
+| aim mode | `LookAim`: 0 hip, 1 shoulder, 2 sights | `Aiming`, `SightAiming`, and `SightBlend` eased to it |
+| raised to fire, or not | `LookLowered` | `Lowered` (the carry runs only where the keys are) |
+| the hand's pose class | `LookPose`: the ready pose itself, the held item's `AimPose`, none with empty hands | `HandPose`, which the equip and the keep-alive play |
+
+- **Three replicated variables and nothing more,** `COND_SKIP_OWNER`, on a component that
+  now replicates (`net.replicate_component`, in the build and on the character). The owning
+  machine reports them with `Server_SetLook`, reliable, only on the frame one changes: it
+  alone knows them until the server owns the hand (M18) and the shot (M19), which then
+  write them and the event goes. They are cosmetic: no rule may read them.
+- **`HandPose` is what the equip plays,** not `Held.AimPose`: where the keys are the equip
+  takes it off `Held`; on a remote copy `Held` is that copy's own item and is not read
+  for the pose. So a remote copy shows the right pose with **its own copy's item in the
+  hand** (a knife's stance holding the shotgun) until the item in hand replicates: M18.
+- **Not mirrored** (not asked for, and each is a later task's): the guard and the kneel
+  (M20, M17), the support hand's point (the copy's own `Held`'s), montages (M21).
+- **`verify/fixtures.py` keeps the mirror's nodes out of `wg`** (`wg_mirror`), as it does the
+  dead arm's: the older "written once" counts are about the machine with the keys.
+  `verify/look.py` reads the mirror.
+- **The check:** `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_look.py`: client 1 crouches, lies down, aims at the shoulder and
+  down the sights with the view up and down, and holds a pistol, a knife, the matches, the
+  stick and the rifle's ready pose; client 2 and the server compare their copy of that
+  character with what client 1 posted, step by step (the stance and capsule, the mode,
+  lowered, the pose and that it plays, the body's pitch, the feet on the ground). With
+  `--windowed` and `OW_LOOK_SHOTS=1` client 2 saves a picture of each step. `--game` runs
+  its single-player arm.
+- **Two players start exactly two capsule radii apart** (the engine nudges the second off
+  the one PlayerStart until they just touch). There the server will not let a crouched
+  character stand, or go from crouch to prone: its stand-up test counts the touching
+  capsule as in the way, while the owning client, whose copy of the other is a hair
+  smaller (a proxy's capsule is), stands. They disagree until one walks off. A probe that
+  changes stance walks clear first; the fix is player starts (M16).
 
 ## Who is nearby (M9, done)
 
@@ -385,9 +430,9 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server would correct a sprinting client. **Fixed (M12): "Movement states are predicted", above** | the write measured; the fix measured (`probe_net_move_states.py`, 137 ms) | M12 done |
 | input | **Fixed (M10): "Input", above.** The weapon component polled keys in its Tick on every copy of every character, the server's included, and on `GetPlayerController(0)`, so a client's press drove every character it could see | read; the fix measured (`probe_net_local_input.py`, headless and `--windowed`) | M10 done |
 | stamina, hunger, thirst, temperature | Per-process component and GAS state: no builder replicates a variable or a component yet (`net.replicate` has no caller outside `dev/check_net_authoring.py`). **Stamina is the server's since M12** (the movement component; the owning client predicts it and is corrected to it) | read; stamina measured | M12 done, M26 |
-| animation of the other player | Only what CharacterMovement replicates reaches a simulated proxy (velocity, falling): stance, aim, the held item's pose and montages do not | read | M13, M21 |
+| animation of the other player | Only what CharacterMovement replicates reached a simulated proxy (velocity, falling). **Fixed (M13): "Other players' characters", above**: stance, aim pitch, aim mode, the gun raised or lowered and the hand's pose. Montages do not yet | read | M21 |
 | sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only | read | M21 |
-| player starts | The level has one PlayerStart: the two spawned 70 cm apart, the engine nudging the second | measured | M16 |
+| player starts | The level has one PlayerStart: the two spawned 70 cm apart, the engine nudging the second. At that spacing the server refuses a crouched character's stand-up ("Other players' characters") | measured | M16 |
 | pause and the title menu | Without `-nomenu` a client opened on the title menu. **The pause is fixed (M5):** it is standalone's alone (`net/pause.py`, above), and a client's menu is an overlay. **The title is fixed (M6):** a connected client has none, and the harness no longer gives a client `-nomenu` | read; the fixes measured (`probe_net_menu_overlay.py`, `probe_net_join.py`, `probe_net_title.py`) | M5, M6 done |
 | the profile and the tuning slots | A client loaded the local `OtherworldProfile` as in single player: **fixed (M6)**, the profile's fragment runs in standalone only. It still loads the tuning tabs' save slots (the harness sets them aside for a run: `probes/kept_slots.py`) | read; the profile measured (`probe_net_title.py`) | M32, M35 |
 

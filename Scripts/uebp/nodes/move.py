@@ -11,6 +11,8 @@ FN_SET_STANCE = MOVE_LIBRARY + ".SetStance"
 FN_SET_AIM_WALK = MOVE_LIBRARY + ".SetAimWalk"
 
 # The state the movement made of them.
+# 0 stand, 1 crouch, 2 prone, on any machine (a simulated copy included).
+FN_GET_STANCE = MOVE_LIBRARY + ".GetStance"
 FN_GET_STAMINA = MOVE_LIBRARY + ".GetStamina"
 FN_IS_SPRINTING = MOVE_LIBRARY + ".IsSprinting"
 FN_IS_SPRINT_SPENT = MOVE_LIBRARY + ".IsSprintSpent"

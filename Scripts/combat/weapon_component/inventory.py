@@ -3,6 +3,8 @@ interact.py's, and picking an item up pickup.py's.
 """
 
 from combat.anim_blueprint import AIM_SLOT
+from combat.weapon_component.look import _author_hand_pose
+from combat.weapon_component.look_vars import HandPose
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.nodes import CAMERA_CLASS_PATH, MOVEMENT_CLASS_PATH
@@ -246,10 +248,14 @@ def _author_equip(ed, exec_in):
     _connect(then(turn), _pin(hold, "execute"))
 
     # --- once the loop is done, drive the ready pose -------------------------
-    held_get = keep(ed.add_get_member_variable_node(WV.Held))
-    held = out(held_get, WV.Held)
+    # The pose is HandPose (look.py): Held's AimPose where this machine's
+    # player holds it, taken here; on a copy of another machine's player it is
+    # the pose that player's machine reported, and Held is not read for it.
+    taken = _author_hand_pose(ed, _loose_pin(loop, "Completed", is_input=False))
+    pose_get = keep(ed.add_get_member_variable_node(HandPose))
+    pose_pin = out(pose_get, HandPose)
     armed = keep(_node(ed, FN_IS_VALID))
-    _connect(held, _pin(armed, "Object"))
+    _connect(pose_pin, _pin(armed, "Object"))
     # Safe to fold into one condition, unlike the fire gate's ammunition tests:
     # IsValid takes a null object as an answer rather than as an error, and
     # Lowered is this component's own bool (carry.py: sprinting, or a gun
@@ -262,15 +268,14 @@ def _author_equip(ed, exec_in):
     _connect(out(still), _pin(shown, "B"))
     posing = keep(ed.add_branch_node())
     _connect(out(shown), _pin(posing, "Condition"))
-    _connect(_loose_pin(loop, "Completed", is_input=False), _pin(posing, "execute"))
+    for e in taken:
+        _connect(e, _pin(posing, "execute"))
 
     mesh2 = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(out(mesh2, WV.OwnerMesh), _pin(anim, "self"))
     anim_out = out(anim)
 
-    pose_pin, pose_n = _prop(ed, IV.AimPose, held)
-    keep(pose_n)
     play = keep(_node(ed, FN_PLAY_SLOT))
     _connect(anim_out, _pin(play, "self"))
     _connect(pose_pin, _pin(play, "Asset"))
@@ -288,7 +293,7 @@ def _author_equip(ed, exec_in):
     _connect(else_(posing), _pin(stop, "execute"))
 
     ed.add_comment_to_nodes(
-        f"The ready pose is the weapon's own AimPose played into {AIM_SLOT}, "
+        f"The ready pose is the weapon's own AimPose (HandPose) played into {AIM_SLOT}, "
         f"looping {AIM_LOOPS} times because PlaySlotAnimationAsDynamicMontage "
         "has no infinite option. It reads as a pose rather than a full-body "
         "animation only because patch_anim_blueprint() put a spine_01 layered "

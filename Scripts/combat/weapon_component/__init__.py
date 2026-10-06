@@ -44,6 +44,15 @@ _author_* fragment per concern, each in its own module:
   sway        down the sights: the view drifts on two slow sines (the control
               rotation is turned by the change), at SwayRate, steadied by the
               stance and BreathScale
+  look        what another machine's copy of the character poses by (M13):
+              LookAim / LookLowered / LookPose, replicated to everyone but
+              the owner; Server_SetLook and the owning machine's report on a
+              change; the mirror a remote copy runs before the pose (Stance,
+              Aiming, SightAiming, SightBlend, Lowered, HandPose, AimPitch);
+              HandPose taken off Held in the equip; the carry kept to the
+              machine with the keys
+  look_vars   the look's names: those variables, HandPose, what was last
+              sent, the event and its parameters
   steady      down the sights: write the owner's health component's Steady
               (SightBlend > 0.01), which refuses the flinch, so a hit leaves
               the view on the target; re-equip over a flinch already playing

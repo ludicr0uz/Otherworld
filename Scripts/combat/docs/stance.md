@@ -112,6 +112,10 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   writes them onto the player's component every frame: 1/1 standing, 0.5/0.5 crouched, 0.3/0.35
   prone. The wanderers keep 1.0. A crouched step carries 12 m × 0.45 × 0.5 = 2.7 m; a crawl
   under a metre.
+- **On another machine's copy of the player** nothing toggles `Stance`: the mirror writes it
+  each frame from `GetStance(owner)`, the movement component's answer, and the capsule
+  there is sized in C++ from the replicated crouch and `bProne`
+  (`weapon_component/look.py`; `Scripts/net/CLAUDE.md`, "Other players' characters").
 - **The footstep ground test is `NavMovementComponent.IsMovingOnGround`.** It used to be
   `Character.CanJump`, which is false while crouched, so every low step would have been silent.
   (`CharacterMovementComponent.IsMovingOnGround` isn't callable; the one a class up is.)

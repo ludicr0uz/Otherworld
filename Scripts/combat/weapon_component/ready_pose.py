@@ -7,15 +7,15 @@ from combat.anim_blueprint import AIM_SLOT, HIT_SLOT
 from combat.carry_tuning import LOWERED_VAR, POSE_LOWERED_VAR
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
-from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
+from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
+from combat.weapon_component.look_vars import HandPose
 from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
 from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT
 from uebp.nodes.system import FN_IS_VALID, FN_WARN
-from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
 
-def _author_ready_pose_keepalive(ed, held, exec_ins):
+def _author_ready_pose_keepalive(ed, exec_ins):
     """Put the ready pose back after a hit reaction has taken it away.
 
     THIS IS NOT BELT AND BRACES, it is the price of the second slot.
@@ -38,19 +38,22 @@ def _author_ready_pose_keepalive(ed, held, exec_ins):
     sights for the length of the stagger, and this puts them back on the first
     frame after it, with the montage's own blend.
 
-        Held is valid AND not Lowered   (carry.py: sprinting, or a gun at rest)
+        HandPose is valid AND not Lowered   (carry.py: sprinting, or a gun at rest)
           AND DefaultSlot is quiet      (nothing is holding the pose)
           AND HitSlot is quiet          (we are not mid-flinch)
-            -> play AimPose into DefaultSlot again
+            -> play HandPose into DefaultSlot again
+
+    HandPose (look.py) is the held item's AimPose as the equip last took it:
+    the component's own variable, the same on a copy that only mirrors
+    another machine's player, where Held is not that player's item.
 
     The HitSlot term is the one that stops it oscillating: without it, the
     frame the flinch starts DefaultSlot goes quiet, this restarts the ready
     pose, and the restart stops the flinch -- in the same group, for the same
     reason -- and the reaction is a single frame of twitch.
 
-    Nothing inside the condition reads a property off Held: only IsValid does,
-    and the AimPose getter sits behind the gate on the play node's own pin, so
-    a player with empty hands does not cost an Accessed None per frame.
+    Nothing inside the condition reads a property off Held, so a player with
+    empty hands does not cost an Accessed None per frame.
     """
     made = []
 
@@ -63,8 +66,10 @@ def _author_ready_pose_keepalive(ed, held, exec_ins):
     _connect(out(mesh, WV.OwnerMesh), _pin(anim, "self"))
     anim_out = out(anim)
 
+    pose_get = keep(ed.add_get_member_variable_node(HandPose))
+    pose_pin = out(pose_get, HandPose)
     armed = keep(_node(ed, FN_IS_VALID))
-    _connect(held, _pin(armed, "Object"))
+    _connect(pose_pin, _pin(armed, "Object"))
     running = keep(ed.add_get_member_variable_node(LOWERED_VAR))
     still = keep(_node(ed, FN_NOT))
     _connect(out(running, LOWERED_VAR), _pin(still, "A"))
@@ -96,8 +101,6 @@ def _author_ready_pose_keepalive(ed, held, exec_ins):
     for tail in exec_ins:
         _connect(tail, _pin(gate, "execute"))
 
-    pose_pin, pose_n = _prop(ed, IV.AimPose, held)
-    keep(pose_n)
     replay = keep(_node(ed, FN_PLAY_SLOT))
     _connect(anim_out, _pin(replay, "self"))
     _connect(pose_pin, _pin(replay, "Asset"))

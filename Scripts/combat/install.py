@@ -10,6 +10,7 @@ from Sound.sound_monsters import BINDINGS as MONSTER_SOUNDS
 from Sound.sound_weapons import RETIRED_SOUNDS
 from combat.camera import aim_camera, face_the_camera
 from combat.log import _log
+from uebp import net
 from uebp.graph import (
     BEL, _add_component, _assets, _component_object, _drop_components, _handles,
     _root_handle)
@@ -67,6 +68,11 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     allow_crouch(bp)
     set_jog_speed(bp)
     set_move_numbers(bp)
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
+    # The weapon component replicates (the look: weapon_component/look.py),
+    # on this character too: a template's default, written after a compile.
+    net.replicate_component(bp, "WeaponComponent")
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)

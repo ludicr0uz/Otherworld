@@ -10,6 +10,7 @@ from combat.paths import KNIFE_BP_PATH
 from combat.seat_tuning import SEAT_HOLD, SEAT_VAR
 from combat.weapon_component.stance import PRONE, STANCE_VAR
 from combat.weapon_specs import _weapon_specs
+from combat.weapon_component.look_vars import HandPose
 from combat.verify.fixtures import titles, w, wg
 from combat.verify.knife import is_melee_play
 from combat.torch_tuning import BURNS_VAR
@@ -108,9 +109,10 @@ def check_pose_follows_carry():
           {LOWERED_VAR, POSE_LOWERED_VAR} <= _reads(edge), str(sorted(_reads(edge))))
 
     # Every place that starts the ready pose (the equip and the keepalive) asks
-    # Lowered first; the punch and the slash are their own montages.
+    # Lowered first, and plays HandPose, the held item's AimPose as this copy
+    # has it (verify/look.py); the punch and the slash are their own montages.
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if not is_melee_play(n)
-             and "AimPose" in _reads(_feeds(BEL.find_input_pin(n, "Asset"), 3))]
+             and HandPose in _reads(_feeds(BEL.find_input_pin(n, "Asset"), 3))]
     check("the ready pose is started in two places: the equip and the keepalive",
           len(plays) == 2, f"{len(plays)} plays")
     for i, n in enumerate(plays):

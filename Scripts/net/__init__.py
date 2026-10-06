@@ -26,4 +26,7 @@ replication authoring).
                 or a wanderer calls it with instead of GetPlayerPawn(0)
     owner_checks.py  the verifiers' check that no graph reads player 0's pawn:
                 no GetPlayerPawn in any Blueprint, none named by any builder
+    input_checks.py  the verifiers' check that keys are the local player's: a
+                HUD polls its owning controller, the weapon component LocalPC
+                (combat/weapon_component/local.py), no node asks by player index
 """

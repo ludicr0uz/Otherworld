@@ -1,5 +1,11 @@
 """The weapon component's Tick: polls every key and calls into the
 aim/fire/inventory/sprint/recoil/ammo fragments in order.
+
+The keys are the local player's alone (local.py). Of the Tick's four parts
+the view and the stance keys (``_author_wc_tick``'s first half) and the
+trigger and the action keys (``_author_actions``) run only where the owner is
+locally controlled; the pose (the second half) and the slots and the equip
+(``_author_upkeep``) run on every machine's copy.
 """
 
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
@@ -18,6 +24,8 @@ from combat.weapon_component.consume import (
 from combat.weapon_component.dead import _author_dead_gate
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.light import _author_light_press
+from combat.weapon_component.local import (
+    _author_local_gate, _author_local_only, local_pc)
 from combat.weapon_component.knife import (
     _author_knife_press, _author_knife_swing,
 )
@@ -52,7 +60,7 @@ from combat.weapon_component.drop_request import _author_drop_request
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
-from uebp.nodes.system import FN_GET_PC, FN_IS_VALID, FN_TIME_SECONDS
+from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
@@ -72,9 +80,8 @@ def _author_wc_tick(ed, tick):
     Refresh runs last, after the slot sync, so a slot key, drop or pick-up
     earlier in the same frame is already applied when it does.
     """
-    pc = _node(ed, FN_GET_PC)
-    _set(pc, "PlayerIndex", 0)
-    pc_out = out(pc)
+    # This machine's controller of the owner: read only behind the local gate.
+    pc_out = local_pc(ed)
 
     owner = _node(ed, FN_GET_OWNER)
     owner_out = out(owner)
@@ -111,6 +118,11 @@ def _author_wc_tick(ed, tick):
     # none of this Tick (dead.py).
     alive = _author_dead_gate(ed, owner_out, held, armed_out, then(tick))
 
+    # --- whose keys? (local.py) ----------------------------------------------
+    # Everything down to the body's pose is the local player's: the view, the
+    # keys held. On any other machine's copy the Tick goes straight there.
+    alive, remote = _author_local_gate(ed, owner_out, alive)
+
     # --- aim -----------------------------------------------------------------
     # First, and unconditionally: the reticle has to be right on the frames
     # where nothing is fired, which is nearly all of them. It also leaves
@@ -120,7 +132,7 @@ def _author_wc_tick(ed, tick):
     # taken after this frame's give-back rather than one frame behind it.
     recoil_exits = _author_recoil_recovery(ed, tick, pc_out, alive)
 
-    aim_exits, muzzle = _author_resolve_aim(ed, held, recoil_exits)
+    aim_exits, muzzle = _author_resolve_aim(ed, held, pc_out, recoil_exits)
 
     # --- sprint --------------------------------------------------------------
     # Before the trigger, because the trigger reads Sprinting: polled in the
@@ -174,6 +186,9 @@ def _author_wc_tick(ed, tick):
     # After SightBlend is written, which scales it.
     ads_exits = _author_sight_pitch(ed, pc_out, ads_exits)
 
+    # --- from here on every machine's copy runs: the pose follows state -------
+    ads_exits = tuple(ads_exits) + (remote,)
+
     # --- and the body takes the stance and the guard -------------------------
     # After both are written (Stance, Blocking), which set its weights.
     ads_exits = _author_pose_weights(ed, tick, held, armed_out, ads_exits)
@@ -206,6 +221,18 @@ def _author_wc_tick(ed, tick):
     # fights the rest of the session with the gun in the locomotion pose.
     pose_exits = _author_ready_pose_keepalive(ed, held, pose_exits)
 
+    # --- the trigger and the action keys: the local player's (local.py) -------
+    local, remote = _author_local_only(ed, pose_exits)
+    flight_exits = _author_actions(
+        ed, pc_out, owner_out, held, armed_out, key_pins, muzzle, pressed, both, (local,))
+    _author_upkeep(ed, tuple(flight_exits) + (remote,))
+
+
+def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
+                    pressed, both, pose_exits):
+    """The trigger and every action key: fire, eat, slash, strike, punch,
+    reload, the slot keys, drop, interact, throw, and the HUD's requests.
+    Local input only. Returns the execs the upkeep carries on from."""
     # --- fire ----------------------------------------------------------------
     # Three conditions, and "not sprinting" is the new one: the weapon is being
     # used to run with, not to aim with. Note this AND is safe to fold together
@@ -407,6 +434,12 @@ def _author_wc_tick(ed, tick):
     # --- and an item dragged out of the inventory (drop_request.py) ---------
     flight_exits = _author_drop_request(ed, flight_exits)
 
+    return flight_exits
+
+
+def _author_upkeep(ed, flight_exits):
+    """What follows from state on every copy: the slots served and placed,
+    then the equip, if anything asked for one."""
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.
     flight_exits = _author_slot_serve(ed, flight_exits)

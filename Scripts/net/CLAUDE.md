@@ -6,7 +6,8 @@ authority, 4.2 where state lives, 4.8 the two modes); the authoring helpers are
 rules a graph follows, how to prove one, and what the spike (task M4, 2026-10-06) found
 broken. Its code is what the builders share to keep one graph right in both modes
 (`__init__.py` maps it): `pause.py`, the session (`session_consts.py`,
-`game_instance.py`) and where state lives (`state*.py`); M9's shared helpers ("nearest living player") land here.
+`game_instance.py`), where state lives (`state*.py`), who is nearby (`players*.py`) and
+whose keys a graph reads (`input_checks.py`).
 
 ## The authority pattern
 
@@ -36,14 +37,93 @@ owning client: read input  --Server RPC-->  server: validate, change state
   - **Done for what a player owns (M8).** Every HUD fragment reads `FN_GET_OWNING_PAWN`
     (the HUD's own pawn); the components already asked `GetOwner`, and no animation graph
     or widget read a pawn by index. `owner_checks.check_no_player_zero_pawn` (the menu
-    verifier) fails on a `GetPlayerPawn` in any HUD, widget, component or animation
-    Blueprint, and on `FN_GET_PLAYER_PAWN` named in `graphics_menu`,
-    `combat/weapon_component`, `clothing` or `loot`. A widget that needs its pawn uses
-    `FN_GET_OWNING_PLAYER_PAWN`. `probe_net_hud_own_pawn.py` is the two-client check.
-  - **Still player 0:** the world actors and the health component's replacement spawn
-    (M9, the one name in `owner_checks.NOT_THE_PLAYERS`), the wanderers (M27), and the
-    weapon component's `GetPlayerController(0)` and camera manager, which are its input
-    and view (M10: polled only on the locally controlled pawn).
+    verifier) fails on a `GetPlayerPawn` in any Blueprint of the game. A widget that
+    needs its pawn uses `FN_GET_OWNING_PLAYER_PAWN`. `probe_net_hud_own_pawn.py` is the
+    two-client check.
+  - **Done for everything else (M9): "Who is nearby", below.** `GetPlayerPawn` is gone
+    from the node catalog, and the same check fails on any builder that names it.
+  - **Done for the controller and the camera (M10): "Input", below.**
+  - **Still player 0:** a kill's credit (`state_graph.first_player_state`, M14).
+
+## Input (M10, done)
+
+A component ticks on every machine that has its character: the player's own, the server
+and every other client. Only the first has that player's keys.
+
+- **A HUD polls its owning controller** (`FN_GET_OWNING_PC`). The engine makes a HUD only
+  for a local player and none on a dedicated server, so a HUD's polls and its widgets need
+  no gate.
+- **A component polls `LocalPC`, behind the local gate**
+  (`combat/weapon_component/local.py`). At the head of the Tick, after the dead gate:
+  the owner is a Pawn, its controller is a PlayerController and `IsLocalController`.
+  True writes `LocalPC` (that controller) and `LocalInput`; anything else clears both.
+  `local_pc(ed)` is the pin every poll's self is; `_author_local_only` asks
+  `LocalInput` again further down a chain.
+- **What runs where in the weapon component's Tick** (`tick.py`):
+
+  | part | runs on |
+  |---|---|
+  | the dead gate | every copy |
+  | the view, the aim trace, sprint, block, stance, use, the sights, sway | the local player's |
+  | the pose (weights, support hand, accuracy, carry, ready pose, steady) | every copy |
+  | the trigger and the action keys (`_author_actions`: fire, reload, slots' keys, drop, interact, throw, the HUD's requests) | the local player's |
+  | the slots served and placed, the equip (`_author_upkeep`) | every copy |
+
+  A later task that moves an action to the server splits it there: the poll stays on
+  the local arm and calls a Server event; what the event does goes with the parts that
+  run on every copy, behind the authority switch.
+- **Never ask for a controller or a camera by index.** `GetPlayerController(0)` is the
+  local player on a client whichever character the graph is on (one press of fire used to
+  fire every character that client could see), and the first joiner on a server.
+  `FN_GET_PC` and `FN_GET_CAM` are gone from the node catalog; the camera is `LocalPC`'s
+  `PlayerCameraManager` (`combat/weapon_component/aim.py`).
+- **A controller is not there at BeginPlay** unless the pawn was possessed before the
+  world began: a client's arrives by replication, a respawned pawn's after the spawn. What
+  needs one (the look scales' cache, the audio listener) runs once on the first local
+  frame (`local._author_local_once`, `LocalReady`).
+- **A controller that is not a PlayerController is not local input.** The engine calls an
+  AI controller "local" on the server.
+- **A probe's forced key** (`FireForced` and the rest) is read on the local arm, so it
+  presses nothing on another player's character: write it on the acting client's own.
+- `input_checks.check_local_input` (the menu verifier) fails on a by-index node in any
+  Blueprint, on a key poll that is not a HUD's on its owning controller or the weapon
+  component's on `LocalPC`, and on a weapon component with no `IsLocalController`.
+  `probe_net_local_input.py` is the proof: client 1 forces fire on both characters, its
+  own spends a round and the other's does not, on either client or the server, which has
+  no HUD and no widgets; `--game` runs its standalone arm.
+- **Not done here:** the non-local copies of a character still run from their own
+  unreplicated state (walk speed, stance, what is held): M12, M13, M18, M19.
+
+## Who is nearby (M9, done)
+
+A world actor, a wanderer's controller or any graph that is not a player's own asks
+`BPL_Players`, a Blueprint function library (`/Game/Weapons`, built by `players.py` in
+the weapons build), through `players.py`'s fragments. Never author a `GetPlayerPawn`.
+
+| the question | the fragment | what it is |
+|---|---|---|
+| every living player | `living_players(ed, in_execs)` | an exec call: the array is made once. `each_living_player` wraps it in a ForEach |
+| the living player nearest a point | `nearest_living_player(ed, point)`, read with `player_pin(node)` | a pure node: asked again at every read, as `GetPlayerPawn` was |
+
+- **Living** is: the PlayerState is in the GameState's `PlayerArray`, its pawn exists, and
+  it does not say `PlayerDead`. All three replicate, so a client's answer is the server's
+  for the pawns it has.
+- **Nearest is None while no one lives.** Put the read behind a Branch of its own
+  (`combat/ammo_pickup.py`, `combat/replacement.py`). The wanderers' steps sit behind the
+  tree's player-present step (`npc/agro.py`), which asks whether `LivingPlayers` is empty.
+- **Who uses which:** what happens to everyone is the loop (the night's cold, a
+  campfire's warmth); what one player gets or one wanderer does is the nearest (the
+  ammunition box, a dead wanderer's replacement, every wanderer step).
+- **The wanderers' choice is the nearest, re-asked at every read.** It can change between
+  two reads of one step if two players are the same distance away, and a wanderer keeps
+  no target. Choosing one and keeping them, and the cost of the pure node per read once
+  there are 32 players (each read walks the PlayerArray), are M27's.
+- **Rebuilding a function library:** keep the function graph and wipe its nodes
+  (`players._function`). Removing the graph and adding it again names the new one
+  `<name>_0`, because the compiled class still holds the old function.
+- **Python can call it:** `unreal.get_default_object(cls).call_method("NearestLivingPlayer",
+  (point, world))`: the hidden world context is the last argument.
+  `probe_net_living_players.py` is the check, in single player and with two clients.
 
 ## Where state lives (M7, done)
 
@@ -229,14 +309,14 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 |---|---|---|---|
 | HUD | **Fixed (M7).** `ReceiveDrawHUD` cast the GameMode, which a client does not have: `Accessed None ... AsBP_Third_Person_Game_Mode` on every rendered client (16 lines a client in a 48 s run). The only runtime error of the spike, and invisible with `-nullrhi` | measured (`--windowed`); the fix measured (`probe_net_player_state.py --windowed`: 0) | M7 done |
 | GameMode readers | **Fixed (M7): "Where state lives", above.** 12 builder modules called `FN_GET_GAME_MODE` and 11 cast to it (combat 4, npc 4, graphics_menu, survival, the menu build); each reads None on a client. Only the HUD's logged, because only it ran | read | M7 done |
-| player 0 | **The HUD's 15 are fixed (M8):** it reads its owning pawn (measured: `probe_net_hud_own_pawn.py`, headless and `--windowed`). Before: 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
+| player 0 | **Fixed (M8, M9).** The HUD reads its owning pawn (measured: `probe_net_hud_own_pawn.py`, headless and `--windowed`); the world actors and the wanderers ask the living players ("Who is nearby"; measured: `probe_net_living_players.py`, the cold falls on both players and the nearest to the second player is the second). Before: 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
 | health | Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured | M14 |
 | firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | M19, M21 |
 | the loadout and held items | Every process spawns its own copy of each character's six items (not replicated, each with local authority), so the three worlds start alike and part at the first change | measured | M18 |
 | items on the ground | The 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
 | day and night | Each process rolls its own start time: in one run it was day on the server and client 2 and night on client 1 | measured | M30 |
-| walk speed, sprint, stance | The weapon component writes `MaxWalkSpeed` every tick in every process from its own unreplicated state (a client's write of 1200 was 400 again at once, and it moved at 400). Sprint, crouch and prone are keys read on the client, so the server will keep the jog speed and correct the client | the write measured; the rubber-band read | M10, M12 |
-| input | The weapon component polls keys in its Tick on every copy of every character, the server's included; nothing asks whether the pawn is locally controlled | read | M10 |
+| walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server will correct a sprinting client | the write measured; the rubber-band read | M12 |
+| input | **Fixed (M10): "Input", above.** The weapon component polled keys in its Tick on every copy of every character, the server's included, and on `GetPlayerController(0)`, so a client's press drove every character it could see | read; the fix measured (`probe_net_local_input.py`, headless and `--windowed`) | M10 done |
 | stamina, hunger, thirst, temperature | Per-process component and GAS state: no builder replicates a variable or a component yet (`net.replicate` has no caller outside `dev/check_net_authoring.py`) | read | M12, M26 |
 | animation of the other player | Only what CharacterMovement replicates reaches a simulated proxy (velocity, falling): stance, aim, the held item's pose and montages do not | read | M13, M21 |
 | sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only | read | M21 |

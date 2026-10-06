@@ -41,6 +41,13 @@ every frame. Sprint and every other key live on the component, not on the charac
 `BP_ThirdPersonCharacter`'s graph is the Enhanced Input template, which the API cannot
 partially rebuild.
 
+**The keys are read only where the owner is locally controlled**
+(`weapon_component/local.py`; `Scripts/net/CLAUDE.md`, "Input"). The component ticks on the
+server and on other players' clients too; there the Tick skips the view, the keys and the
+actions and runs only the pose, the slots and the equip. Every poll's self is `LocalPC`
+(`local.local_pc`), never a controller by index, and a new key is polled in a fragment on
+the local arm (`tick._author_wc_tick`'s first half or `_author_actions`).
+
 R is shared safely between reload and restart: Tick does not run while paused, and the death
 menu polls its own copy from `DrawHUD`, which does.
 

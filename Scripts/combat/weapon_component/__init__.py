@@ -10,6 +10,11 @@ _author_* fragment per concern, each in its own module:
               once: name, pin type, default (uebp/vars.py)
   dead        the dead gate at the head of Tick: an owner who is Dead or at
               0 HP gets none of it; the aim, zoom and camera are let go
+  local       the local gate, after the dead gate: LocalPC (this machine's
+              controller of the owner, every poll's self) and LocalInput; the
+              keys and the view run only where the owner is locally controlled
+              (net/CLAUDE.md, "Input"); the first local frame caches the look
+              scales and pins the listener
   aim         resolve the aim point every frame (camera trace, muzzle trace)
   use         the use key: the sights key on an item with no sights -> Using /
               UsePressed (and the one poll of that key, which ads aims a gun

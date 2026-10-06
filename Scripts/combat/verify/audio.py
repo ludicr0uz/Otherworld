@@ -351,13 +351,13 @@ def check_sound_tables():
 def check_listener_at_character():
     # The engine measures distance from the camera. The camera moves 2.6 m
     # between the shoulder and the sights, and the footsteps got louder down the
-    # sights. BeginPlay pins the controller's ATTENUATION listener to the
-    # capsule. Panning stays on the camera, so SetAudioListenerOverride (which
+    # sights. The first locally controlled frame (weapon_component/local.py)
+    # pins the controller's ATTENUATION listener to the capsule. Panning stays on the camera, so SetAudioListenerOverride (which
     # moves both) is the wrong call.
     _set = [n for n in by_pins(wg, "AttachToComponent")
             if "Attenuation" in str(BEL.get_node_title(n))]
     _whole = [n for n in by_pins(wg, "AttachToComponent", "Rotation")]
-    check("BeginPlay sets the attenuation listener once, and never moves the "
+    check("the graph sets the attenuation listener once, and never moves the "
           "whole listener off the camera", len(_set) == 1 and not _whole,
           f"{len(_set)} attenuation, {len(_whole)} whole-listener")
     if len(_set) != 1:
@@ -375,8 +375,10 @@ def check_listener_at_character():
               for t in _src("AttachToComponent"))
           and not _src("AttenuationLocationOVerride"),
           f"{_src('AttachToComponent')}")
+    # LocalPC: this machine's controller of the owner (weapon_component/local.py),
+    # never player 0's, which on a client is the local player for every character.
     check("...of the player's controller",
-          any("PlayerController" in t.replace(" ", "") for t in _src("self")),
+          [t.replace(" ", "") for t in _src("self")] == ["GetLocalPC"],
           f"{_src('self')}")
 
 

@@ -97,6 +97,11 @@ HeadKillSounds = Var("HeadKillSounds", array(obj("/Script/Engine.SoundBase")))
 BreathSounds = Var("BreathSounds", array(obj("/Script/Engine.SoundBase")))
 BreathNextTime = Var("BreathNextTime", FLOAT, 0.0)
 HandledItem = Var("HandledItem", obj(ITEM_CLASS_PATH))
+# local.py: this machine's controller of the owner, or none; whether this Tick
+# may read keys; and whether the first local frame's caches are taken.
+LocalPC = Var("LocalPC", obj("/Script/Engine.PlayerController"))
+LocalInput = Var("LocalInput", BOOL, False)
+LocalReady = Var("LocalReady", BOOL, False)
 
 TABLE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
@@ -105,5 +110,5 @@ TABLE = (
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
     BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
     PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,
-    HandledItem,
+    HandledItem, LocalPC, LocalInput, LocalReady,
 )

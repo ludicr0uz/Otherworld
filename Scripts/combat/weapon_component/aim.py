@@ -9,14 +9,16 @@ from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.common import _trace_defaults
+from combat.weapon_component.local import PC_CLASS_PATH
 from uebp.nodes.actor import FN_CAM_LOC, FN_CAM_ROT
 from uebp.nodes.math import FN_ADD_VV, FN_DISTANCE, FN_FORWARD, FN_GREATER_FF, FN_MUL_VF
 from uebp.nodes.palette import NODE_BREAK_HIT
-from uebp.nodes.system import FN_GET_CAM, FN_IS_VALID, FN_TRACE
+from uebp.nodes.system import FN_IS_VALID, FN_TRACE
+from uebp import props as EP
 from combat.weapon_component import vars as WV
 
 
-def _author_resolve_aim(ed, held, exec_ins):
+def _author_resolve_aim(ed, held, pc_out, exec_ins):
     """Work out where this frame's shot lands. The hybrid of the two obvious wrongs.
 
     Aiming purely from the muzzle is honest and unplayable: the barrel sits below
@@ -52,9 +54,10 @@ def _author_resolve_aim(ed, held, exec_ins):
         made.append(n)
         return n
 
-    cam = keep(_node(ed, FN_GET_CAM))
-    _set(cam, "PlayerIndex", 0)
-    cam_out = out(cam)
+    # The local player's camera (local.py): this runs behind the local gate.
+    cam = keep(ed.add_get_member_variable_node(EP.PLAYER_CAMERA_MANAGER, PC_CLASS_PATH))
+    _connect(pc_out, _pin(cam, "self"))
+    cam_out = out(cam, EP.PLAYER_CAMERA_MANAGER)
     cam_loc = keep(_node(ed, FN_CAM_LOC))
     _connect(cam_out, _pin(cam_loc, "self"))
     cam_loc_out = out(cam_loc)

@@ -15,15 +15,14 @@ from combat.light_tuning import MATCHES_CLASS_VAR
 from combat.torch_tuning import STICK_CLASS_VAR
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS, _prop
 from combat.weapon_component.sights import _author_camera_after_boom
-from Sound.sound_world import _author_listener_at_character
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
-    FN_GET_PITCH_SCALE, FN_GET_TRANSFORM, FN_GET_YAW_SCALE, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
+    FN_GET_TRANSFORM, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
     FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT, FN_STOP_SLOT)
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE
 from uebp.nodes.math import FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN
-from uebp.nodes.system import FN_GET_PC, FN_IS_VALID, FN_TRACE
+from uebp.nodes.system import FN_IS_VALID, FN_TRACE
 from combat.sprint_tuning import BASE_SPEED_VAR
 from uebp import props as EP
 from combat import item_vars as IV
@@ -353,33 +352,14 @@ def _author_wc_begin_play(ed, begin):
     _connect(fov_out, _pin(now_fov, WV.CurrentFOV))
     _connect(then(base_fov), _pin(now_fov, "execute"))
 
-    # And whatever the controller's own look scales already are, for the third
-    # time in this function and for the third identical reason. The pitch one
-    # is the reason this is a cache and not a constant: the engine ships it
-    # NEGATIVE (-2.5), so any literal written here would have a one-in-two
-    # chance of inverting the player's vertical look, and the symptom -- "the
-    # mouse is upside down, but only after aiming once" -- would send whoever
-    # chased it into the ADS code rather than into this line.
-    pc = keep(_node(ed, FN_GET_PC))
-    _set(pc, "PlayerIndex", 0)
-    pc_out = out(pc)
-    yaw_now = keep(_node(ed, FN_GET_YAW_SCALE))
-    _connect(pc_out, _pin(yaw_now, "self"))
-    keep_yaw = keep(ed.add_set_member_variable_node(WV.BaseYawScale))
-    _connect(out(yaw_now), _pin(keep_yaw, WV.BaseYawScale))
-    _connect(then(now_fov), _pin(keep_yaw, "execute"))
-    pitch_now = keep(_node(ed, FN_GET_PITCH_SCALE))
-    _connect(pc_out, _pin(pitch_now, "self"))
-    keep_pitch = keep(ed.add_set_member_variable_node(WV.BasePitchScale))
-    _connect(out(pitch_now), _pin(keep_pitch, WV.BasePitchScale))
-    _connect(then(keep_yaw), _pin(keep_pitch, "execute"))
-
+    # The controller's own look scales, and the listener it hears from, are
+    # taken on the first frame the character is locally controlled (local.py):
+    # a pawn may have no controller yet here.
     where = keep(_node(ed, FN_GET_TRANSFORM))
     _connect(as_char, _pin(where, "self"))
     spawn_at = out(where)
 
-    prev = _author_camera_after_boom(ed, as_char, then(keep_pitch))
-    prev = _author_listener_at_character(ed, as_char, pc_out, prev)
+    prev = _author_camera_after_boom(ed, as_char, then(now_fov))
     for i, var in enumerate(STARTER_CLASS_VARS):
         cls = keep(ed.add_get_member_variable_node(var))
         spawn = keep(_palette(ed, NODE_SPAWN))

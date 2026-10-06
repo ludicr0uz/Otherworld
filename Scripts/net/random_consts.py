@@ -60,11 +60,12 @@ AUDIT = (
     Roll("npc/ward_roar.py", STATE,
          "held off by fire: when the first roar comes (it stands for it)",
          "the AIController, as the patrol", ""),
-    # --- state, still drawn by the machine that acts ------------------------
     Roll("combat/weapon_component/firing.py", STATE,
          "where in the gun's cloud a round or a pellet goes",
-         "the weapon component of whoever fires; the server's once the shot "
-         "is its to run", "M19"),
+         "inside Server_Fire, which only the server runs (single player: a "
+         "plain call); the owning client draws nothing, and what the pellets "
+         "did replicates as health", ""),
+    # --- state, still drawn by the machine that acts ------------------------
     Roll("combat/weapon_component/chop.py", STATE,
          "where the wood lands beside the trunk, and how it lies",
          "the weapon component of whoever chops; the server's once the chop "

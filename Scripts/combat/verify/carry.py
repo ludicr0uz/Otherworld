@@ -127,11 +127,24 @@ def check_shot_origin():
     # muzzle is about to be, not at the knee (carry._author_shot_origin).
     picks = [n for n in by_pins(wg, "A", "B", "bPickA")
              if LOWERED_VAR in _reads(_feeds(BEL.find_input_pin(n, "bPickA"), 2))]
-    check(f"one SelectVector picks the shot's start on {LOWERED_VAR}", len(picks) == 1,
+    # Two, the same sub-graph twice: the aim resolve's, on the machine with the
+    # keys, and Server_Fire's own (shot.py), since the shot leaves the server's
+    # muzzle. Each is checked below.
+    check(f"a SelectVector picks the shot's start on {LOWERED_VAR}: the aim resolve's, "
+          "and the server's own for the shot it traces", len(picks) == 2,
           f"{len(picks)} found")
-    if len(picks) != 1:
-        return
-    pick = picks[0]
+    for pick in picks:
+        _check_origin_pick(pick)
+    starts = [len([n for n in by_pins(wg, "Start", "End", "TraceChannel")
+                   if BEL.find_output_pin(pick, "ReturnValue")
+                   in PIN.list_connected_pins(BEL.find_input_pin(n, "Start"))])
+              for pick in picks]
+    check("...and the wall check starts at the one and the pellets at the other: the "
+          "same sub-graph on the machine that runs each, so the reticle and the shot "
+          "agree", starts == [1, 1], f"{starts} traces")
+
+
+def _check_origin_pick(pick):
     real = _feeds(BEL.find_input_pin(pick, "B"))
     raised = _feeds(BEL.find_input_pin(pick, "A"))
     check("...not lowered, it is the muzzle: Held's transform x MuzzleOffset",
@@ -144,11 +157,6 @@ def check_shot_origin():
           "MuzzleOffset" in _reads(raised) and got == CARRY_GRIP
           and any("GetOwner" in str(BEL.get_node_title(n)).replace(" ", "")
                   for n in raised), f"grip {got}")
-    starts = [n for n in by_pins(wg, "Start", "End", "TraceChannel")
-              if BEL.find_output_pin(pick, "ReturnValue")
-              in PIN.list_connected_pins(BEL.find_input_pin(n, "Start"))]
-    check("...and both the wall check and the pellets start there, so the reticle "
-          "and the shot cannot disagree", len(starts) == 2, f"{len(starts)} traces")
 
 
 def check_what_is_carried_lowered():

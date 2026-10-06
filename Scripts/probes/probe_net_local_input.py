@@ -73,8 +73,10 @@ def probe_server(p):
     yield _await(lambda: p.posted("client 1", "fired"))
     yield 0.5
     after = [_loaded(p, c) for c in comps]
-    p.check("client 1's press fired nothing on the server (the shot's own "
-            "replication is a later task)", before == after, f"{before} -> {after}")
+    spent = sorted(b - a for b, a in zip(before, after))
+    p.check("client 1's press fired one character on the server, its own (the "
+            "shot is a server request: M19), and not the other player's",
+            spent == [0] * (len(spent) - 1) + [1], f"{before} -> {after}")
 
 
 def probe_client(p):

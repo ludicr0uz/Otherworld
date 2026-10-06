@@ -13,19 +13,21 @@ from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.impact import _author_impact
 from combat.weapon_component.tracer import _author_tracer
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_MUL_VF, FN_NORMAL, FN_RAND_CONE, FN_SUB_II,
+    FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_MAX_FF, FN_MUL_VF, FN_NORMAL, FN_RAND_CONE, FN_SUB_II,
     FN_SUB_VV)
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT
-from uebp.nodes.system import FN_PLAY_SOUND, FN_TIME_SECONDS, FN_TRACE
+from uebp.nodes.system import FN_TIME_SECONDS, FN_TRACE
 from combat import item_vars as IV
-from combat.weapon_component import vars as WV
 
 # The shot's direction, drawn once per trigger pull inside AimSpread.
 SHOT_DIRECTION_VAR = "ShotDirection"
 
 
-def _author_fire(ed, held, muzzle, exec_in):
-    """One trigger pull: the fire sound, then one trace per pellet from the muzzle.
+def _author_fire(ed, held, muzzle, aim, exec_in):
+    """One shot, on the machine that owns it (the body of Server_Fire,
+    shot.py): the round and the cooldown, then one trace per pellet from the
+    muzzle. ``aim`` is where the shooter's reticle rested, the event's
+    parameter; the sound is the shooter's own machine's (shot.py).
 
     All the aiming was done in _author_resolve_aim; what is left here is the
     spread, in two layers. The shot draws ONE direction inside the accuracy
@@ -63,8 +65,15 @@ def _author_fire(ed, held, muzzle, exec_in):
     now = keep(_node(ed, FN_TIME_SECONDS))
     every, every_n = _prop(ed, IV.FireInterval, held)
     keep(every_n)
+    # From the later of now and the old deadline: the server lets a shot in a
+    # little early (shot_vars.FIRE_GRACE_S), and that must not raise the rate.
+    due, due_n = _prop(ed, IV.NextFireTime, held)
+    keep(due_n)
+    start = keep(_node(ed, FN_MAX_FF))
+    _connect(out(now), _pin(start, "A"))
+    _connect(due, _pin(start, "B"))
     again = keep(_node(ed, FN_ADD_FF))
-    _connect(out(now), _pin(again, "A"))
+    _connect(out(start), _pin(again, "A"))
     _connect(every, _pin(again, "B"))
     cool = keep(ed.add_set_member_variable_node(IV.NextFireTime, ITEM_CLASS_PATH))
     _connect(held, _pin(cool, "self"))
@@ -88,21 +97,12 @@ def _author_fire(ed, held, muzzle, exec_in):
     # and the component's own default is already false.
     after_cost = [then(note), *state.fails]
 
-    aim_get = keep(ed.add_get_member_variable_node(WV.AimPoint))
     delta = keep(_node(ed, FN_SUB_VV))
-    _connect(out(aim_get, WV.AimPoint), _pin(delta, "A"))
+    _connect(aim, _pin(delta, "A"))
     _connect(muzzle, _pin(delta, "B"))
     direction_n = keep(_node(ed, FN_NORMAL))
     _connect(out(delta), _pin(direction_n, "A"))
     direction = out(direction_n)
-
-    snd_pin, snd_n = _prop(ed, IV.FireSound, held)
-    keep(snd_n)
-    play = keep(_node(ed, FN_PLAY_SOUND))
-    _connect(snd_pin, _pin(play, "Sound"))
-    _connect(muzzle, _pin(play, "Location"))
-    for tail in after_cost:
-        _connect(tail, _pin(play, "execute"))
 
     pel_pin, pel_n = _prop(ed, IV.PelletCount, held)
     keep(pel_n)
@@ -116,7 +116,7 @@ def _author_fire(ed, held, muzzle, exec_in):
     keep(loop)
     _loose_pin(loop, "FirstIndex").set_pin_value("0")
     _connect(out(last), _loose_pin(loop, "LastIndex"))
-    _connect(_author_shot_direction(ed, direction, then(play), keep), _loose_pin(loop, "execute"))
+    _connect(_author_shot_direction(ed, direction, after_cost, keep), _loose_pin(loop, "execute"))
 
     # Each pellet: the weapon's own pattern around the shot's direction. Zero
     # on a single-round gun, so its one pellet flies exactly down the draw.
@@ -161,8 +161,9 @@ def _author_fire(ed, held, muzzle, exec_in):
         _connect(tail, _pin(hit, "execute"))
 
     ed.add_comment_to_nodes(
-        "Fire: one round and one cooldown stamp first, then origin at the "
-        "muzzle, direction muzzle -> AimPoint drawn once inside AimSpread, "
+        "Fire, on the machine that owns the shot: one round and one cooldown stamp "
+        "first, then origin at the muzzle, direction muzzle -> the shooter's "
+        "AimPoint drawn once inside AimSpread, "
         "then each pellet inside the weapon's own pattern. "
         "The tracer leaves the barrel and ends where the pellet stopped "
         "-- when DebugMode is on, which is the only time it is drawn at all.",
@@ -173,7 +174,7 @@ def _author_fire(ed, held, muzzle, exec_in):
     return _loose_pin(loop, "Completed", is_input=False), direction
 
 
-def _author_shot_direction(ed, direction, exec_in, keep):
+def _author_shot_direction(ed, direction, exec_ins, keep):
     """ShotDirection = a random direction within AimSpread of `direction`.
 
     Stored, because RandomUnitVectorInCone is pure: read per pellet it would
@@ -190,5 +191,6 @@ def _author_shot_direction(ed, direction, exec_in, keep):
     _connect(out(rad), _pin(draw, "ConeHalfAngleInRadians"))
     hold = keep(ed.add_set_member_variable_node(SHOT_DIRECTION_VAR))
     _connect(out(draw), _pin(hold, SHOT_DIRECTION_VAR))
-    _connect(exec_in, _pin(hold, "execute"))
+    for e in exec_ins:
+        _connect(e, _pin(hold, "execute"))
     return then(hold)

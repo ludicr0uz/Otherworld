@@ -9,6 +9,12 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   outer: (tapped OR holding) AND IsValid(Held) AND NOT Sprinting AND NOT Blocking
   inner: (Loaded > 0 AND cooled) AND (tapped OR (holding AND Held.Automatic))
   ```
+  - **The gate is the local player's; the shot is the server's** (M19,
+    `weapon_component/shot.py`). Past the inner gate the Tick kicks the view, plays the
+    shot's sound and calls `Server_Fire(AimPoint)`, which asks again for itself (a valid
+    `Held`, a living owner, a gun, a round, the cooldown with 0.1 s of grace) before it
+    spends and traces. A client of a server also spends its own copy's round and stamps
+    its own cooldown, so its next frame's gate is right before any answer comes.
   - Anything read off `Held` must stay inside the outer gate, per the nested-Branch gotcha in the
     root CLAUDE.md. The verifier pins that exactly one Branch reads `Automatic`, together with
     `Loaded` and `NextFireTime`.
@@ -62,7 +68,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     35 HP and the ready pose come back. `verify/knife.py`'s `is_melee_*` set both attacks' nodes
     aside in the older counts.
 - **Reload stores `Min(MagazineSize − Loaded, Reserve)` into `ReloadTake` once.** Recomputing it
-  after `Loaded` rises means free ammo.
+  after `Loaded` rises means free ammo. The reload is the `ReloadNow` event: R calls
+  `Server_Reload`, which runs it, and a client of a server runs it on its own copy first.
 - **Debug mode:**
   - `DebugMode` lives on the GameMode, because a component can't reach the HUD. It is on by
     default and persisted as `BP_Settings.DebugMode`. The HUD copies it at BeginPlay, and D writes

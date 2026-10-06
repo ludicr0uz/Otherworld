@@ -13,14 +13,15 @@ from combat.tuning import (
     SHOTGUN_RESERVE,
 )
 from combat.weapon_specs import _weapon_specs
-from combat.verify.fixtures import titles, w, wg
+from combat.shot_vars import AIM_PARAM, SERVER_FIRE
+from combat.verify.fixtures import titles, w, wc, wg
 from combat.verify.chop import is_chop_node
 from combat.verify.light import is_light_trace
 from combat.verify.knife import is_melee_play, is_melee_sweep
 from combat.verify.throw import is_throw_play, is_throw_trace, launch_nodes
 from combat.verify.throw_aim import is_ready_node
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, in_pins, load, out_pins, pin_value, titled,
+    BEL, PIN, by_pins, cdo, check, graph, in_pins, load, out_pins, pin_value, titled,
 )
 
 
@@ -170,15 +171,20 @@ def check_keys_are_variables():
                   for axis in "XYZ")
               for n in titled(wg, "MakeVector")),
           f"{DROP_FORWARD:.0f} cm ahead")
-    # One subtraction off AimPoint: the pellet direction. (The throw's launch
-    # takes its own, from its start: verify/throw_aim.py.)
+    # One subtraction off the shooter's AimPoint: the pellet direction, taken
+    # from Server_Fire's own parameter (shot.py), since the shot is traced by
+    # the machine that owns it. (The throw's launch takes its own, from the
+    # variable: verify/throw_aim.py.)
     throw_launch = launch_nodes()
+    fire_event = graph(wc).find_event_node(SERVER_FIRE)
     deltas = [n for n in titled(wg, "vector - vector")
               if n not in throw_launch
-              and any(str(BEL.get_node_title(PIN.get_owning_node(q))) == "Get AimPoint"
-                     for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A")))]
-    check("the pellet direction is muzzle -> AimPoint, not camera forward",
-          len(deltas) == 1, f"{len(deltas)} vector subtractions driven by AimPoint")
+              and any(PIN.get_owning_node(q) == fire_event
+                      and str(PIN.get_pin_name(q)) == AIM_PARAM
+                      for q in PIN.list_connected_pins(BEL.find_input_pin(n, "A")))]
+    check("the pellet direction is muzzle -> the AimPoint the shooter sent, not camera "
+          "forward", len(deltas) == 1,
+          f"{len(deltas)} vector subtractions driven by {SERVER_FIRE}'s {AIM_PARAM}")
 
     # A held weapon is rigidly attached and never rotated on its own. Driving its
     # rotation from the aim was tried and reverted: the gun swivelled out of the
@@ -401,14 +407,17 @@ def check_ammunition():
 def check_ammunition_graph():
     loaded_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                                  for n in wg) if t == "Set Loaded"]
-    # The third is a client's picture of the server's record (view.py).
-    check("firing spends a round and reloading puts rounds back (and a client's "
-          "picture takes the record's)",
-          len(loaded_writes) == 3, f"{len(loaded_writes)} writes to Loaded")
+    # The server's shot, the owning client's predicted round (shot.py), the
+    # reload, and a client's picture of the server's record (view.py).
+    check("firing spends a round, on the server and as the owning client's "
+          "prediction, and reloading puts rounds back (and a client's picture takes "
+          "the record's)",
+          len(loaded_writes) == 4, f"{len(loaded_writes)} writes to Loaded")
     next_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                                for n in wg) if t == "Set NextFireTime"]
-    check("both the interval and the reload push the same NextFireTime deadline",
-          len(next_writes) == 2, f"{len(next_writes)} writes to NextFireTime")
+    check("the interval (the server's, and the owning client's predicted one) and the "
+          "reload push the same NextFireTime deadline",
+          len(next_writes) == 3, f"{len(next_writes)} writes to NextFireTime")
     check("the deadline is compared against the clock, not a frame count",
           bool(titled(wg, "GetTimeSeconds")),
           f"{len(titled(wg, 'GetTimeSeconds'))} GetTimeSeconds")
@@ -439,8 +448,9 @@ def check_ammunition_graph():
     # The gate is nested, not folded: every one of these reads a property off Held,
     # and the outer condition is pulled on frames where nothing is equipped.
     ammo_reads = [n for n in wg if "UsesAmmo" in out_pins(n)]
-    check("the fire gate and the reload both ask the weapon whether it uses ammo",
-          len(ammo_reads) == 2, f"{len(ammo_reads)} UsesAmmo reads")
+    check("the fire gate, the server's own test of the shot and the reload each ask "
+          "the weapon whether it uses ammo",
+          len(ammo_reads) == 3, f"{len(ammo_reads)} UsesAmmo reads")
     check("an unlimited weapon short-circuits the magazine test (an OR, not an AND)",
           bool(titled(wg, "OR Boolean")),
           str(sorted({t for t in (str(BEL.get_node_title(n)).replace("\n", " ")

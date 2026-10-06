@@ -13,7 +13,7 @@ from combat.weapon_component.accuracy import _author_accuracy
 from combat.tuning import BIND_VARS
 from combat.weapon_component.ads import _author_ads
 from combat.weapon_component.aim import _author_resolve_aim
-from combat.weapon_component.ammo import _author_dry_fire, _author_reload
+from combat.weapon_component.ammo import _author_dry_fire
 from combat.weapon_component.block import _author_block
 from combat.weapon_component.breath import _author_hold_breath
 from combat.weapon_component.carry import _author_carry
@@ -22,7 +22,6 @@ from combat.weapon_component.consume import (
     _author_trigger_latch, _author_use_gate,
 )
 from combat.weapon_component.dead import _author_dead_gate
-from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.light import _author_light_press
 from combat.weapon_component.look import _author_local_carry, _author_look_mirror
 from combat.weapon_component.local import (
@@ -42,7 +41,6 @@ from combat.weapon_component.ready_pose import (
 from combat.weapon_component.recoil import (
     _author_recoil_kick, _author_recoil_recovery,
 )
-from combat.weapon_component.shot_noise import _author_shot_noise
 from combat.weapon_component.slot_moves import _author_slot_keys, _author_slot_serve
 from combat.weapon_component.slot_sync import _author_slot_sync
 from combat.weapon_component.record import _author_record, authority
@@ -57,12 +55,14 @@ from combat.weapon_component.support_hand import _author_support_hand
 from combat.weapon_component.sway import _author_sight_sway
 from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.steady import _author_steady
+from combat.weapon_component.shot import _author_reload_ask, _author_shot_ask
 from combat.weapon_component.use import _author_use
 from combat.weapon_component.wear import _author_take_off, _author_wear_gate
 from combat.weapon_component.wear_drag import _author_wear_request
 from combat.weapon_component.drop_request import _author_drop_request
 from combat.weapon_component.save_exit import _author_save_exit
 from combat.weapon_component.throw import _author_throw, _author_throw_key
+from combat.shot_vars import ReloadForced
 from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
 from uebp.nodes.system import FN_IS_VALID, FN_TIME_SECONDS
@@ -367,10 +367,11 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
     # in the right order. It cannot bend the shot that caused it: the pellets
     # fly down the AimPoint resolved at the top of this frame.
     kicked = _author_recoil_kick(ed, held, pc_out, then(ready_gate))
-    fired, flew = _author_fire(ed, held, muzzle, kicked)
-    # ...and the wanderers hear it. After the pellets, so a shot is heard
-    # whether or not it hit anything.
-    after_fire = _author_shot_noise(ed, held, muzzle, flew, fired)
+    # The shot itself is the server's (shot.py): this machine asks, with where
+    # the reticle rests, and a client of a server predicts the round and the
+    # cooldown. The pellets, the damage and the noise the wanderers hear are
+    # in the Server event, which in single player is a plain call.
+    after_fire = _author_shot_ask(ed, held, muzzle, kicked)
 
     # --- the click, when the gate said no ------------------------------------
     dry_exits = _author_dry_fire(
@@ -400,11 +401,16 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
         ed, (after_fire, *used, untapped) + slash_pressed + struck + dry_exits
         + punch_exits)
 
+    # R, or a probe's stand-in for it. The reload is the server's too (shot.py).
+    reload_key = _node(ed, FN_OR)
+    _connect(pressed("KeyReload"), _pin(reload_key, "A"))
+    _connect(out(ed.add_get_member_variable_node(ReloadForced), ReloadForced),
+             _pin(reload_key, "B"))
     reload_gate = ed.add_branch_node()
-    _connect(both(pressed("KeyReload"), armed_out), _pin(reload_gate, "Condition"))
+    _connect(both(out(reload_key), armed_out), _pin(reload_gate, "Condition"))
     for exit_pin in slash_exits:
         _connect(exit_pin, _pin(reload_gate, "execute"))
-    reload_exits = _author_reload(ed, held, then(reload_gate))
+    reload_exits = (_author_reload_ask(ed, then(reload_gate)),)
 
     # --- the slots' keys (slot_moves.py): 1-9 and Q ask for a slot ---------
     slot_exits = _author_slot_keys(ed, pc_out, pressed("KeySwitch"),

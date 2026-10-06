@@ -212,6 +212,55 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   it; the HUD shows `5 / ∞`.
 - **There is no reloading state.** `NextFireTime` is one world-time deadline. Both the fire
   interval and the reload push it out.
+- **The shot and the reload are server requests** (M19; `shot_vars.py`,
+  `weapon_component/shot.py`; `Scripts/net/CLAUDE.md`, "The shot and the reload"). The
+  trigger's gate and R are still polled where the keys are, but what they do is two reliable
+  Server events on the component:
+  - **`Server_Fire(AimPoint)`** is the shot: it refuses unless `Held` is valid, the owner
+    alive, the item a gun (not `Melee`, `Consumable` or `Lights`), a round in it and its
+    cooldown over, then runs `firing._author_fire` (the round, the cooldown, the one draw in
+    the cloud, the pellets, the damage) and the shot's noise. The pellets leave **the
+    server's own muzzle** (`carry._author_shot_origin`, a second copy of the sub-graph)
+    towards the `AimPoint` the client sent, in **the server's own `AimSpread`**.
+  - **`Server_Reload`** calls `ReloadNow`, a plain event holding `ammo._author_reload`.
+  - **The owning client predicts** (`shot._author_shot_ask`, `_author_reload_ask`, off the
+    false arm of a Branch on HasAuthority): the kick, the shot's sound, a round off its
+    own copy's `Loaded`, its own `NextFireTime`, and `ReloadNow` on its own copy. It
+    traces nothing and draws nothing in the cloud: a hit is the server's word, and
+    reaches it as health. There is no muzzle flash in the game to predict.
+  - **`AsksSent` / `AsksServed` keep the predicted rounds.** A client counts each ask it
+    sends; the server counts each it answers, fired or refused, and that count
+    replicates to the owner. While it is behind, a record that arrives is older than the
+    client's own shots, so `view.py` leaves the rounds alone and takes them once the two
+    agree. A refused shot's round comes back the same way.
+  - **In single player nothing is predicted:** the one machine has authority, the events
+    are plain calls, and a press is one shot as before. Never write the cost on the local
+    arm with authority: it would be spent twice.
+  - **The cooldown has `FIRE_GRACE_S` (0.1 s) of grace on the server** and is stamped
+    from the later of now and the old deadline (`FMax`): a client fires on its own clock
+    and packets do not arrive evenly, so an honest burst would lose rounds without it,
+    and with the `FMax` the rate over any stretch is still the gun's own.
+  - **The server does not ask about sprint or the guard:** both are the local gate's
+    (the guard is the owning client's until M20; a sprint's end and the shot behind it
+    travel separately).
+  - **Plain Server events, not GAS abilities.** `GA_ConsumeItem` is triggered by a
+    gameplay event whose payload is the item actor, on an ability system that does not
+    replicate until M26. A shot does not fit that: the event would be raised on the
+    client's own ability system and go nowhere; its payload would be an item actor that
+    on a client is a local picture, which the server cannot resolve; the aim point needs
+    target data, which a Blueprint ability cannot send without C++; and an automatic gun
+    asks eleven times a second from a gate that is already a Tick poll. A Server event
+    with a vector is the whole of it. Worth another look once the ability system is the
+    server's (M26): the cooldown could then be a GameplayEffect.
+  - **A dedicated server poses its bodies** (`server_pose.py`): `BP_HealthComponent`'s
+    BeginPlay, behind IsDedicatedServer, sets the owner's mesh to
+    `AlwaysTickPoseAndRefreshBones`. Nothing is rendered there, and an unrendered mesh
+    keeps its reference pose: the hit bodies and the muzzle would be where no client
+    sees them.
+  - **Probes:** `FireForced` and `ReloadForced` are the keys' stand-ins, read on the
+    local arm, so on a client they go through the Server events. A probe that calls
+    `Server_Fire` itself does so on the server (or in single player).
+    `probes/probe_net_fire.py` is the two-client proof; `verify/shot.py` the wiring.
 - **The knife is a melee item, not a gun** (`knife.py`): a `BP_WeaponItem` child flagged `Melee`,
   drawn by the pack's `SK_M9_Knife_X` (blade up, tipped 30° forward, the pistol's grip), and
   not a row of `_weapon_specs()`, whose every column and check is about a gun. Its slash clip

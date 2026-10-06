@@ -42,24 +42,30 @@ def authority(g):
     return out(g.call(FN_HAS_AUTHORITY, self=out(g.call(FN_GET_OWNER))))
 
 
+def rep_dirty(bp, var, condition):
+    """``var`` is a RepNotify whose arrival raises ViewDirty (shot.py's
+    AsksServed is one too)."""
+    ed = net.rep_notify(bp, var, condition)
+    stale = [n for n in ed.list_all_nodes()
+             if not isinstance(n, unreal.K2Node_FunctionEntry)]
+    if stale:
+        ed.remove_nodes(stale)
+    g = _G(ed)
+    g.put(ViewDirty, "true", [ed.find_graph_entry_pin()])
+    ed.add_comment_to_nodes(
+        "The record changed: the Tick makes this machine's item actors its picture "
+        "again (view.py). Blueprint runs this where the server sets the variable "
+        "too, and the server never reads ViewDirty.", g.made)
+    arrange(ed)
+
+
 def replicate_record(bp):
     """Mark what travels and author each OnRep (ViewDirty := true). After
     every declare, which drops the flags, and before the compile."""
     for var in REPLICATED:
         condition = (unreal.LifetimeCondition.COND_SKIP_OWNER if var == HandClass
                      else unreal.LifetimeCondition.COND_OWNER_ONLY)
-        ed = net.rep_notify(bp, var, condition)
-        stale = [n for n in ed.list_all_nodes()
-                 if not isinstance(n, unreal.K2Node_FunctionEntry)]
-        if stale:
-            ed.remove_nodes(stale)
-        g = _G(ed)
-        g.put(ViewDirty, "true", [ed.find_graph_entry_pin()])
-        ed.add_comment_to_nodes(
-            "The record changed: the Tick makes this machine's item actors its picture "
-            "again (view.py). Blueprint runs this where the server sets the variable "
-            "too, and the server never reads ViewDirty.", g.made)
-        arrange(ed)
+        rep_dirty(bp, var, condition)
 
 
 def _author_clear(g, execs):

@@ -290,7 +290,22 @@ def check_dying():
         _flinch_cast = _walk if _walk in casts else None
     check("the flinch finds its body through its own CastToCharacter",
           _flinch_cast is not None)
-    collapse_casts = [n for n in casts if n is not _flinch_cast]
+    # A third is the dedicated server's (server_pose.py): BeginPlay's, which
+    # sets the owner's mesh to refresh its bones always.
+    pose_casts = [n for n in casts if any(
+        "VisibilityBasedAnimTickOption" in str(BEL.get_node_title(PIN.get_owning_node(q)))
+        .replace(" ", "") for q in PIN.list_connected_pins(BEL.find_output_pin(n, "then")))]
+    check("a dedicated server poses the body it judges shots against: BeginPlay sets "
+          "the owner's mesh to refresh its bones always, behind IsDedicatedServer",
+          len(pose_casts) == 1 and any(
+              "IsDedicatedServer" in str(BEL.get_node_title(PIN.get_owning_node(q)))
+              .replace(" ", "")
+              for c in pose_casts
+              for b in PIN.list_connected_pins(BEL.find_input_pin(c, "execute"))
+              for q in PIN.list_connected_pins(
+                  BEL.find_input_pin(PIN.get_owning_node(b), "Condition") or b)),
+          f"{len(pose_casts)} cast(s) feeding the tick option")
+    collapse_casts = [n for n in casts if n is not _flinch_cast and n not in pose_casts]
     check("the player and the wanderers collapse through the same nodes",
           len(collapse_casts) == 1, f"{len(collapse_casts)} collapse CastToCharacter(s) "
           f"of {len(casts)} in the graph")

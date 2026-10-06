@@ -5,6 +5,7 @@ BP_HealthComponent fragments built on them -- BeginPlay's spawn numbering
 and log line, and Tick's world-floor safety net.
 """
 
+from combat.server_pose import author_server_pose
 from forest_generator.npc_placement import (
     NPC_CAPSULE_HALF_HEIGHT_CM, NPC_RESPAWN_DELAY_S, NPC_RESPAWN_NAV_SNAP_CM,
     NPC_SPAWN_MAX_DISTANCE_CM, NPC_SPAWN_MIN_DISTANCE_CM,
@@ -95,8 +96,9 @@ RESPAWN_ATTEMPTS = 2
 
 
 def _author_health_begin_play(ed, begin):
-    """BP_HealthComponent's BeginPlay: a wanderer respawns as its own class,
-    takes the next number from the GameMode and logs where it appeared."""
+    """BP_HealthComponent's BeginPlay: a dedicated server poses the body
+    (server_pose.py); a wanderer respawns as its own class, takes the next
+    number from the GameMode and logs where it appeared."""
     # --- BeginPlay: take the next number and say where this one appeared -----
     # Numbered in spawn order, wanderers only (the player carries the same
     # component and must not consume a number). Both the initially placed five
@@ -107,7 +109,8 @@ def _author_health_begin_play(ed, begin):
     mine = ed.add_get_member_variable_node(HV.DespawnOnDeath)
     is_wanderer = ed.add_branch_node()
     _connect(out(mine, HV.DespawnOnDeath), _pin(is_wanderer, "Condition"))
-    _connect(then(begin), _pin(is_wanderer, "execute"))
+    for e in author_server_pose(ed, [then(begin)]):
+        _connect(e, _pin(is_wanderer, "execute"))
 
     # --- what this one respawns as: itself -----------------------------------
     # RespawnClass used to be a default written onto BP_ForestWanderer's own

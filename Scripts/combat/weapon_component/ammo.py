@@ -13,8 +13,11 @@ from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
 
-def _author_reload(ed, held, exec_in):
+def _author_reload(ed, held, exec_ins):
     """R: top the magazine up from the reserve, and stand still for a moment.
+
+    The body of the ReloadNow event (shot.py): the server runs it for
+    Server_Reload, and the owning client for itself, as its prediction.
 
     How many rounds move is worked out ONCE and stored in ReloadTake before
     anything is written. The arithmetic is pure, so a second read of
@@ -60,7 +63,8 @@ def _author_reload(ed, held, exec_in):
     _connect(out(source), _pin(moving, "B"))
     pin_take = keep(ed.add_set_member_variable_node(WV.ReloadTake))
     _connect(out(moving), _pin(pin_take, WV.ReloadTake))
-    _connect(exec_in, _pin(pin_take, "execute"))
+    for e in exec_ins:
+        _connect(e, _pin(pin_take, "execute"))
 
     uses, uses_n = _prop(ed, IV.UsesAmmo, held)
     keep(uses_n)

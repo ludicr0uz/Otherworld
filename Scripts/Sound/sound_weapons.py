@@ -4,7 +4,7 @@ hand and going in.
 
 SOUNDS is the area's rows of the sound table and BINDINGS where each is played
 from. A gun's are three variables of its own item Blueprint (the graphs read
-them off Held, so a new weapon is a row: weapon_component/firing.py, ammo.py);
+them off Held, so a new weapon is a row: weapon_component/shot.py, ammo.py);
 the rest are arrays of takes on BP_WeaponComponent, one drawn per play
 (Sound/play.py):
 

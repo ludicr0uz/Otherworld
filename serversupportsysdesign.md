@@ -391,6 +391,14 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
     from it, and the slots' asks are Server events. `Scripts/net/CLAUDE.md`, "The
     inventory". Worn garments are M24.)
 22. Fire, reload, melee, throw and block as server requests, preferably GAS abilities.
+    (Fire and reload done, M19: two reliable Server events on the weapon component,
+    `Server_Fire(AimPoint)` and `Server_Reload`, not abilities: the ability system
+    does not replicate until M26 and a Blueprint ability cannot carry the aim point.
+    The server traces from its own muzzle inside its own cloud; the owning client
+    predicts the round, the cooldown and the kick, and two counters keep the
+    server's record from handing rounds back. A dedicated server now refreshes
+    every body's bones. `Scripts/net/CLAUDE.md`, "The shot and the reload".
+    Melee, throw and block are M20.)
 23. Server-side shot traces with lag compensation (C++).
 24. Multicast cosmetics: shot sounds, impacts, blood, tracers, montages.
 25. Pick-up, drop, loot, wear, chop, light, heat and cauterise as server actions.

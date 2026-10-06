@@ -95,6 +95,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   record_vars       the inventory's record (M18): the four plain arrays the server
                     writes and the owning client is sent, HandClass for everyone
                     else, the view's events, a probe's forced asks
+  shot_vars         the shot and the reload as server requests (M19): the events'
+                    names, AsksSent / AsksServed (which reconcile a client's
+                    predicted rounds), the server's grace on the cooldown
   wear_tuning       clothing: the eight slots (WEAR_SLOTS), ClothingSlot on the
                     item, Worn / TakeOffSlot / WearItem on the component
   ask_consts        what a screen asks of the weapon component: the Ask
@@ -178,6 +181,8 @@ BP_HealthComponent (health_component wires the fragments together)
   health_component  variables, defaults, the Tick's death branch
   damage            health is the server's: the TakeHit event every blow calls
                     (hit, owner_instigator), what replicates, OnRep_Health
+  server_pose       a dedicated server refreshes the bones of every body with
+                    health: its hit bodies and muzzles are where clients see them
   respawn           spawn numbering, world-floor net, respawn band and delay
   replacement       the dead wanderer's replacement: the wait, the point, the spawn
   death             kill count, shells, ragdoll collapse, corpse, player death

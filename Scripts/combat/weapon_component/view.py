@@ -29,9 +29,12 @@ own: nothing below the view knows whether its actors are the server's or a
 picture.
 
 The picture is remade only when a record arrives, so what a client changes
-itself (a round spent by its own shot, until the shot is the server's) stays
-until the server next says otherwise. That is what a predicted action needs,
-and all an action that is not yet the server's can have.
+itself stays until the server next says otherwise: all an action that is not
+yet the server's can have. A predicted one needs more. The owning client
+spends its own shot's round and reloads its own copy at once (shot.py), and a
+record that left the server before it answered those would hand the rounds
+back for a moment: so a row's rounds are taken only while AsksServed has
+caught up with AsksSent (shot_vars.py).
 """
 
 from uebp.g import _G
@@ -42,13 +45,14 @@ from combat.paths import ITEM_CLASS_PATH
 from combat.record_vars import (
     AMMO_UNKNOWN, HandClass, InvClass, InvLoaded, InvReserve, InvSlot, RECORD, ROW_PARAMS,
     TRIM_PARAMS, VIEW_ROW, VIEW_TRIM, ViewDirty, ViewItem)
+from combat.shot_vars import AsksSent, AsksServed
 from combat.slot_tuning import HAND, SLOT_VAR
 from combat.weapon_component import vars as WV
 from combat.weapon_component.slot_nodes import for_each, not_, op, valid
 from Sound.sound_items import author_handled
 from uebp.nodes.actor import FN_DESTROY, FN_GET_OWNER, FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_RESIZE, FN_ARR_SET, FN_ARR_VALID
-from uebp.nodes.math import FN_AND, FN_EQ_CC, FN_EQ_II, FN_GE_II, FN_GREATER_II, FN_NEQ_II, FN_OR
+from uebp.nodes.math import FN_AND, FN_EQ_CC, FN_EQ_II, FN_GE_II, FN_GREATER_II, FN_NEQ_II, FN_OR, FN_SELECT_II
 from uebp.nodes.palette import NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID_CLASS, FN_OBJECT_CLASS
 
@@ -155,8 +159,16 @@ def _author_view(ed, in_execs):
         whole = same if whole is None else op(g, FN_AND, whole, same)
     sound, torn = g.branch(whole, [own])
     cls, i, body, done = for_each(g, g.get(InvClass), [sound])
+    # The rounds are taken only once the server has answered every shot and
+    # reload this client asked for (shot_vars.py): until then the record is
+    # older than the client's own count, and taking it would hand back rounds
+    # already fired. AsksServed's own arrival raises ViewDirty, so the answer
+    # to the last ask is always taken.
+    settled = op(g, FN_GE_II, g.get(AsksServed), g.get(AsksSent))
+    loaded = out(g.call(FN_SELECT_II, A=_at(g, InvLoaded, i), B=AMMO_UNKNOWN,
+                        bPickA=settled))
     _call(g, VIEW_ROW, [body], Index=i, Class=cls, Slot=_at(g, InvSlot, i),
-          Loaded=_at(g, InvLoaded, i), Reserve=_at(g, InvReserve, i))
+          Loaded=loaded, Reserve=_at(g, InvReserve, i))
     trimmed = _call(g, VIEW_TRIM, [done], Count=rows)
 
     armed, bare = g.branch(out(g.call(FN_IS_VALID_CLASS, Class=g.get(HandClass))), [other])

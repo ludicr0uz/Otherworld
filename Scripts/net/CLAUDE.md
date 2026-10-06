@@ -65,6 +65,9 @@ and which decides whether it happens. The names are `combat/ask_consts.py`.
 | `AskLootTake(Body, Index)` | the loot window's Enter or click | the take itself, with its refusals (`weapon_component/loot_take.py`) | M23 |
 | `AskSaveExit()` | the menu's save-and-exit row | starts the countdown the component runs (`weapon_component/save_exit.py`) | M35 |
 
+The trigger and R are keys, not a screen's asks, and have Server events of their own:
+`Server_Fire` and `Server_Reload` ("The shot and the reload", below).
+
 - **The slots' three are reliable Server events** (`ask_consts.SERVER_ASKS`; "The
   inventory", below); the rest are plain calls yet. `combat/verify/asks.py` asserts which
   is which on the compiled class; the task that makes one a Server event adds it to
@@ -134,7 +137,8 @@ and every other client. Only the first has that player's keys.
   no HUD and no widgets; `--game` runs its standalone arm.
 - **The non-local copies of a character** pose from the mirror ("Other players'
   characters", below) and hold the item the server says is in hand ("The inventory",
-  below); what is fired there is still each copy's own: M19.
+  below); nothing is fired there but by the server, when the owner asks ("The shot and
+  the reload", below).
   The walk speed, the sprint and the stance of the character itself are M12's, below.
 
 ## Movement states are predicted (M12, done)
@@ -185,9 +189,13 @@ first by **the mirror** (`combat/weapon_component/look.py`), from the few facts 
 
 - **Three replicated variables and nothing more,** `COND_SKIP_OWNER`, on a component that
   now replicates (`net.replicate_component`, in the build and on the character). The owning
-  machine reports them with `Server_SetLook`, reliable, only on the frame one changes: it
-  alone knows them until the server owns the shot (M19), which then writes them and the
-  event goes (the hand is the server's since M18, but when it is raised is the aim's). They are cosmetic: no rule may read them.
+  machine reports them with `Server_SetLook`, reliable, only on the frame one changes:
+  the aim keys are that machine's (the hand is the server's since M18, but when it is
+  raised is the aim's). **One rule now reads them:** the server draws a shot inside its
+  own copy's `AimSpread`, which follows the mirrored aim mode and stance ("The shot and
+  the reload", below), so a client that reports the sights it is not using gets their
+  cloud. What the sights cost, the slower walk, is the movement component's
+  (`SetAimWalk`); tying the cloud to that is still to do.
 - **`HandPose` is what the equip plays,** not `Held.AimPose`: where the keys are the equip
   takes it off `Held`; on a remote copy `Held` is not read for the pose. The item in a
   remote copy's hand is the server's since M18 (`HandClass`, "The inventory", below).
@@ -227,8 +235,9 @@ says who struck it. `combat/damage.py` is the whole of it.
     (none for a fist), the thrown blade, the wanderer.
   - **`TakeHit` is not an RPC.** It runs behind Switch Has Authority: called on a client's
     copy it does nothing, and no client can send it. A client's blow reaches the server
-    when its action does (the shot: M19; melee: M20; a throw: M21), and the server's copy
-    of that action calls `TakeHit`. Until then a client of a server hurts nothing.
+    when its action does (the shot: done, M19, `Server_Fire`; melee and a throw: M20),
+    and the server's copy of that action calls `TakeHit`. Until then a client of a
+    server hurts nothing with a blade, a fist or a throw.
   - It floors `Health` at 0, stamps `LastDamageTime`, keeps `LastHitFrom`,
     `LastInstigator` and `LastCause`, and sets `DamagedByPlayer` where the instigator is a
     PlayerController (so a wanderer's blow blames no player, as before).
@@ -295,8 +304,7 @@ of them, plain data (`combat/record_vars.py`):
   sync and the equip run after it on every copy, so nothing below knows whether its
   actors are the server's or a picture.
 - **The picture is remade only when a record arrives.** What a client changes itself
-  stays until the server next says otherwise: that is what a predicted action needs (a
-  round spent by the client's own shot, which M19's server will spend too), and it is
+  stays until the server next says otherwise, and it is
   why an action that is not yet the server's (a pick-up, a drop, a throw, a meal, a
   garment: M21, M23, M24) still shows on its own client, and is undone by the next
   record. Make the action a server request; do not write the record from a client.
@@ -312,7 +320,8 @@ of them, plain data (`combat/record_vars.py`):
   slot)`, `p.ask_move(wc, src, dst)` or `p.hold(wc, index)` (`probes/context.py`): the
   call itself with authority, and on a client a write of `SlotForced` or
   `MoveForcedFrom`/`MoveForcedTo`, which the component's Tick turns into the ask where
-  the keys are read. The next task's Server event needs a door of the same kind.
+  the keys are read. The shot's and the reload's doors are `FireForced` and
+  `ReloadForced` (M19); the next Server event needs one of the same kind.
 - **Not yet in the record:** worn garments (M24), a heated blade and a burning stick
   (the item's own state, M25), an item lying in the world (M23). The dev-all-guns cheat
   still spawns on the machine it is pressed on.
@@ -321,6 +330,69 @@ of them, plain data (`combat/record_vars.py`):
   another bag slot, brings the pistol to hand and asks for a move no rule allows; the
   server's copy and its record agree after each, the refused one moved nothing, and
   client 2 sees the pistol in client 1's hand); `--game` runs its standalone arm.
+
+## The shot and the reload (M19, done)
+
+Shooting has to feel immediate to the shooter while the server stays the judge of ammo,
+timing and hits. `combat/shot_vars.py` has the picture; the graphs are
+`combat/weapon_component/shot.py`.
+
+```
+owning client                             server
+the trigger's gate passes  ------------>  Server_Fire(AimPoint), reliable
+  the kick, the shot's sound                AsksServed + 1
+  a round off its own Loaded,               a valid Held, a living owner, a gun,
+  its own NextFireTime, AsksSent + 1        a round, the cooldown?  no: nothing
+                                            a round, NextFireTime, the draw in ITS
+                                            cloud, the pellets from ITS muzzle to
+                                            AimPoint, TakeHit, the noise
+R  ------------------------------------>  Server_Reload: AsksServed + 1, ReloadNow
+  ReloadNow on its own copy, AsksSent + 1
+```
+
+- **The client sends one thing: where its reticle rests.** The server traces from its own
+  copy's muzzle (`carry._author_shot_origin`) and draws the shot inside its own copy's
+  `AimSpread`, so a client cannot shoot from where it is not, nor choose its place in
+  the cloud. The hold-breath sway and the sights need nothing of their own: both move
+  the client's view, and the view is what `AimPoint` is taken from; down the sights the
+  server's cloud is closed because its copy mirrors the aim mode. The aim mode is still
+  the client's word ("Other players' characters", above).
+- **What the owning client predicts** is what it can know: the kick (it turns its own
+  controller), the shot's sound, the round and the cooldown on its own copy, the reload
+  on its own copy. Not the hit: it traces nothing and rolls nothing ("Random rolls").
+  Blood, chips, the tracer and the headshot's X are drawn by the machine that ran the
+  shot, so a client of a server sees none of them yet (M21).
+- **`AsksSent` and `AsksServed` reconcile the rounds.** The client counts the asks it
+  sends; the server counts the asks it answers, fired or refused, replicated to the
+  owner as a RepNotify that raises `ViewDirty`. While the server's count is behind, the
+  record in hand is older than the client's own shots: the view places items but leaves
+  their rounds alone (`view.py`), and takes them on the frame the counts agree. Without
+  this a burst's counter climbs back a round every time a record lands. A refused
+  shot's round is handed back by the same rule.
+- **Both events are reliable:** a lost ask would leave the two counts apart for good.
+  An automatic gun sends one every `FireInterval`: eleven a second from the SMG.
+- **The server's cooldown has grace** (`FIRE_GRACE_S`, 0.1 s; stamped from the later of
+  now and the old deadline): two honest shots can arrive closer together than they were
+  fired.
+- **A request can arrive after the blow that killed its sender,** so the events ask the
+  health themselves; the Tick's dead gate only stops keys.
+- **In single player** the local arm has authority: nothing is predicted, the counts
+  read 0 sent and one served per ask, and a Server event is a plain call. One shot, as
+  before.
+- **A dedicated server poses the bodies it judges** (`combat/server_pose.py`): an
+  unrendered skeletal mesh ticks its animation but never refreshes its bones, so on a
+  server every hit body and every muzzle stood in the reference pose. Every body with a
+  health component is set to `AlwaysTickPoseAndRefreshBones` there, at BeginPlay,
+  behind IsDedicatedServer. M22's history of hit boxes reads the same bones.
+- **Not here:** lag compensation (M22: the server traces against where the target is
+  now, so at 120 ms a strafing target is missed where the shooter saw a hit); the fight
+  as others see it (M21); melee, the throw and the guard (M20). The server takes the
+  shot whether or not it has the player sprinting or guarding.
+- `combat/verify/shot.py` checks the flags and the wiring. Proof: `uepy.py --net
+  --clients 2 --probe-timeout 240 --probe Scripts/probes/probe_net_fire.py` (client 1
+  kills a wanderer down the sights and reloads; the server's rounds are client 1's, its
+  count of asks client 1's, the kill client 1's, and three `Server_Fire` in one frame
+  spend one round); also with `--lag 120`; `--game` runs its single-player arm.
 
 ## Random rolls (M17, done)
 
@@ -357,7 +429,7 @@ only varies how something looks or sounds is each machine's own.
 | `npc/strafe.py` | state | between two swings: the sidestep's angle, side and distance | the AIController, as the patrol |
 | `npc/ward.py` | state | held off by fire: which way it circles and when it turns | the AIController, as the patrol |
 | `npc/ward_roar.py` | state | held off by fire: when the first roar comes (it stands for it) | the AIController, as the patrol |
-| `combat/weapon_component/firing.py` | state | where in the gun's cloud a round or a pellet goes | the weapon component of whoever fires; the server's once the shot is its to run (**M19**) |
+| `combat/weapon_component/firing.py` | state | where in the gun's cloud a round or a pellet goes | inside `Server_Fire`, which only the server runs (single player: a plain call); the owning client draws nothing, and what the pellets did replicates as health |
 | `combat/weapon_component/chop.py` | state | where the wood lands beside the trunk, and how it lies | the weapon component of whoever chops; the server's once the chop is a server action (**M25**) |
 | `world/day_night_graph.py` | state | the time of day a level starts at | every machine's own BP_DayNightCycle at BeginPlay; one clock, the server's, replicated (**M30**) |
 | `Sound/play.py` | cosmetic | which take of a sound plays (every sound with more than one) | wherever the sound plays |
@@ -365,10 +437,10 @@ only varies how something looks or sounds is each machine's own.
 | `combat/weapon_component/recoil.py` | cosmetic | the kick's sideways drift, on the view of the player who fired | the owning client: it turns its own controller, as the mouse does |
 | `npc/stats.py` | cosmetic | the gap before a wanderer's next growl | the AIController (the server's); every client hears the growl once sounds are multicast (**M21**) |
 
-- **Still drawn by the machine that acts,** each until its action is the server's: a
-  shot's place in the cloud (M19), where chopped wood lands (M25), the hour a level starts
-  at (M30: every machine's sky is its own today). A client of a server changes nothing
-  with the first two yet (`TakeHit` does nothing there; its wood is its own copy's).
+- **Still drawn by the machine that acts,** each until its action is the server's: where
+  chopped wood lands (M25), the hour a level starts at (M30: every machine's sky is its
+  own today). A client of a server changes nothing with the first yet (its wood is its
+  own copy's).
 - **A dropped gun is rolled by the server and spawned there;** it reaches a client when
   items lying in the world replicate (M23). A landed bleed is the target's ability
   system's on the server; the owner's HUD reads it when the attributes replicate (M26).
@@ -643,7 +715,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | GameMode readers | **Fixed (M7): "Where state lives", above.** 12 builder modules called `FN_GET_GAME_MODE` and 11 cast to it (combat 4, npc 4, graphics_menu, survival, the menu build); each reads None on a client. Only the HUD's logged, because only it ran | read | M7 done |
 | player 0 | **Fixed (M8, M9).** The HUD reads its owning pawn (measured: `probe_net_hud_own_pawn.py`, headless and `--windowed`); the world actors and the wanderers ask the living players ("Who is nearby"; measured: `probe_net_living_players.py`, the cold falls on both players and the nearest to the second player is the second). Before: 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
 | health | **Fixed (M14): "Health and damage", above.** Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured; the fix measured (`probe_net_health.py`) | M14 done |
-| firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | M19, M21 |
+| firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | done for the shot, its round and its damage (M19: the server's); what others see and hear of it is M21 |
 | the loadout and held items | **Fixed (M18): "The inventory", above.** Every process spawned its own copy of each character's six items (not replicated, each with local authority), so the three worlds started alike and parted at the first change | measured; the fix measured (`probe_net_inventory.py`) | M18 done |
 | items on the ground | The 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
 | day and night | Each process rolls its own start time: in one run it was day on the server and client 2 and night on client 1 | measured | M30 |

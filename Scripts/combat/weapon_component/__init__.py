@@ -68,7 +68,11 @@ _author_* fragment per concern, each in its own module:
               and PoseKneel from Searching (the HUD's loot window), with KneelTime
   accuracy    once a frame: AimSpread (the shot's cloud), RecoilScale and
               ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
-  firing      the round and cooldown, the shot's one draw inside AimSpread
+  shot        the shot and the reload as server requests (combat/shot_vars.py):
+              Server_Fire and Server_Reload with their refusals, ReloadNow, and
+              the local arm's asks, which are the owning client's prediction
+  firing      the shot on the machine that owns it (Server_Fire's body): the
+              round and cooldown, the one draw inside AimSpread
               (ShotDirection), the pellet traces around it
   tracer      debug mode: the line each pellet flew, off the trace's own hit
               result (red to an impact, blue out to the range), and a point
@@ -86,7 +90,8 @@ _author_* fragment per concern, each in its own module:
               written off the item actors after the sync, emptied by the shed,
               marked to replicate with its OnReps
   view        a client's half: its item actors made from the record when one
-              arrives (ViewRow, ViewTrim); another player's from HandClass
+              arrives (ViewRow, ViewTrim); another player's from HandClass;
+              the rounds only once every ask is answered (shot_vars.py)
   slot_sync   last before the refresh: SlotItems rebuilt from each item's
               Slot, UNPLACED items placed (a weapon in its weapon slot
               before the bag), EquippedIndex, HasRoom, refresh
@@ -101,7 +106,7 @@ _author_* fragment per concern, each in its own module:
   heat        interact's campfire kind: the fires it offers while the held
               item Heats (the knife, the axe), and what makes that item Hot
               for HEAT_S (the item's own Tick cools it: combat/heat.py)
-  ammo        reload and dry fire
+  ammo        the reload (ReloadNow's body) and dry fire
   (sounds)    Sound/sound_weapons.py and sound_items.py: the component's own
               sounds, and an item's as a slot move handles it (HandledItem)
               or it is used up; Sound/sound_world.py: the listener at the

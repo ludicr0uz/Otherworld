@@ -15,6 +15,7 @@ uepy_inbox.py, then the engine's multicast remote execution), which turns those
     Scripts/dev/uepy.py --game --seconds 25          # headless -game run
     Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
     Scripts/dev/uepy.py --in-game probe.py           # into a running -game
+    Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py
     Scripts/dev/uepy.py --cold Scripts/verify_level.py   # force a fresh editor
     Scripts/dev/uepy.py --close-editors              # save, quit, or kill them
 
@@ -46,7 +47,7 @@ import re
 import sys
 import time
 
-from uepylib import cold, editors, game, inbox, remote, server, warm
+from uepylib import cold, editors, game, inbox, net, net_plan, remote, server, warm
 from uepylib.paths import (
     editor_inbox, engine_dir, game_inbox, log, saved_uepy, serve_inbox, set_project,
 )
@@ -140,16 +141,27 @@ def parse_args():
                     help="save and quit (or kill) this project's editors, then exit")
     ap.add_argument("--game", action="store_true",
                     help="headless -game run instead of a script")
+    ap.add_argument("--net", action="store_true",
+                    help="a dedicated server and --clients N on this machine, "
+                         "instead of a script")
+    ap.add_argument("--clients", type=int, default=1, metavar="N",
+                    help="with --net: how many clients join (default 1)")
+    ap.add_argument("--port", type=int, default=net_plan.DEFAULT_PORT,
+                    help=f"with --net: the server's port (default {net_plan.DEFAULT_PORT})")
     ap.add_argument("--probe", action="append", default=[], metavar="FILE",
-                    help="with --game: run this probe (Scripts/probes); repeatable")
+                    help="with --game or --net: run this probe (Scripts/probes); "
+                         "repeatable")
     ap.add_argument("--probe-timeout", type=float,
                     help="wall seconds allowed per probe (default 60)")
     ap.add_argument("--windowed", action="store_true",
-                    help="with --game: render into a window instead of -nullrhi")
-    ap.add_argument("--map", default=game.DEFAULT_MAP, help="level for --game")
+                    help="with --game or --net: render (each client) into a "
+                         "window instead of -nullrhi")
+    ap.add_argument("--map", default=game.DEFAULT_MAP, help="level for --game and --net")
     ap.add_argument("--seconds", type=int,
                     help=f"--game duration (default {game.GAME_SECONDS}; with "
-                         f"--probe, a ceiling of {game.PROBE_SECONDS})")
+                         f"--probe, a ceiling of {game.PROBE_SECONDS}); with --net, "
+                         f"the play after the last join (default {net.NET_SECONDS}; "
+                         f"with --probe, a ceiling of {net.PROBE_SECONDS})")
     ap.add_argument("--grep", action="append", default=[],
                     help="extra regex to count in a --game log")
     out = ap.add_mutually_exclusive_group()
@@ -177,11 +189,21 @@ def main():
     if args.close_editors:
         _closed, left = editors.close_editors()
         return 1 if left else 0
-    if args.game:
+    if args.net and args.game:
+        ap.error("--net and --game are two different runs: pass one")
+    if args.net or args.game:
         probes = [os.path.abspath(p) for p in args.probe]
         for p in probes:
             if not os.path.isfile(p):
                 sys.exit(f"[uepy] no such probe: {p}")
+    if args.net:
+        problem = net_plan.check_args(args.clients, args.port, args.seconds)
+        if problem:
+            ap.error(problem)
+        ok = net.run_net(engine, args.map, args.clients, args.port, args.seconds, probes,
+                         args.probe_timeout, args.windowed, args.allow_pie)
+        return 0 if ok else 1
+    if args.game:
         seconds = args.seconds or (game.PROBE_SECONDS if probes else game.GAME_SECONDS)
         extra = [(f"/{p}/", p) for p in args.grep]
         ok = game.run_game(engine, args.map, seconds, extra, probes, args.probe_timeout,
@@ -191,7 +213,7 @@ def main():
     targets = [("file", os.path.abspath(s)) for s in args.scripts]
     targets += [("code", c) for c in args.code]
     if not targets:
-        ap.error("nothing to run -- pass a script, -c, --game or --list")
+        ap.error("nothing to run -- pass a script, -c, --game, --net or --list")
     for kind, value in targets:
         if kind == "file" and not os.path.isfile(value):
             sys.exit(f"[uepy] no such script: {value}")

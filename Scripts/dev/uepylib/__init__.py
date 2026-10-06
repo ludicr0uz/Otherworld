@@ -11,8 +11,12 @@ uepy.py is the thin CLI; everything it does lives here:
   server      a warm headless editor of the caller's own ($UEPY_SERVE), booted once
   warm        running targets in that editor; a crash or hang is retried in a fresh one
   game        headless -game runs, with or without probes (Scripts/probes)
+  net         a network run (--net): a dedicated server and N clients, started and killed
+  net_plan    that run's processes: names, command lines, environments, argument checks
+  net_report  that run's one report: joins and errors per process, every process's probes
   editors     finding and closing the project's running editors
 
-The modules that do not start processes (summary, targets, and the parsing
-halves of game, cold and editors) are unit-tested in Scripts/dev/tests.
+The modules that do not start processes (summary, targets, net_plan,
+net_report, and the parsing halves of game, cold and editors) are unit-tested
+in Scripts/dev/tests.
 """

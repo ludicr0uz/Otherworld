@@ -153,6 +153,7 @@ python3 Scripts/dev/uepy.py --list                 # which editors are listening
 python3 Scripts/dev/uepy.py --game --seconds 25    # headless -game run + error summary
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py   # see below
 python3 Scripts/dev/uepy.py --game --windowed --probe <probe>   # rendered, in a 1280x720 window
+python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py   # a server and 2 clients, see below
 python3 Scripts/dev/uepy.py --cold <script>        # force a fresh editor
 python3 Scripts/dev/uepy.py --summary <scripts>    # one line per script + its failures
 python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's editors
@@ -174,8 +175,21 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
   script again by itself (`uepylib/warm.py`), saying so in one line; don't kill or restart it by
   hand. A script it still reports as failed took two editors down in a row.
 - **`--game`** counts `Blueprint Runtime Error`, `Accessed None`, `NPC-SPAWN` and `NPC-FELL`.
-- **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`. Never
-  rebuild Blueprints under a running game.
+- **`--net --clients N [--windowed] [--probe <probe>] [--seconds S]`** is the multiplayer
+  check (`uepylib/net.py`): one dedicated server (the editor binary, `-server`) on `--map`
+  (default `Lvl_Forest_200m`) and N clients that join it on `127.0.0.1` (`--port`, default
+  17777), all started at once, about 40 s for a server and two clients.
+  - **The report:** one row per process (its joins, Blueprint runtime errors, `Accessed None`
+    and network failures), then each probe's checks, process by process. Any error, a client
+    that did not join, a process that died or a failed check fails the run.
+  - **The files:** one log per process (`server.log`, `client1.log`, ...) in
+    `Saved/uepy/net/<stamp>/`, the last ten runs kept.
+  - **Clients are `-nullrhi`** unless `--windowed`. With no probe everyone plays for
+    `--seconds` (default 20) after the last join; with one the run ends when the last process
+    has finished its probes.
+  - **Memory:** each process is 3-5 GB. Close the editor first, and run one at a time.
+- **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`
+  (`--net` too). Never rebuild Blueprints under a running game.
 - **Log prefixes:** builders log with `[GEN]`, verifiers with `[VERIFY]`.
 - **Editor log:** `~/Library/Logs/Unreal Engine/OtherworldEditor/Otherworld.log`, not
   `Saved/Logs`. The previous session is rolled to `Otherworld-backup-<ts>.log`.
@@ -460,6 +474,21 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
   `WRITABLE = [(bp_path, var)]`. `probes/boot.py` makes it Instance Editable and recompiles, in
   memory for that run only, before the level loads. Nothing on disk changes and no builder
   re-run is needed.
+- **A network probe** (`uepy.py --net`) is the same file run in every process, the server and
+  each client. `Scripts/probes/probe_net_join.py` is the model; `probes/net.py` has the rules.
+  - **Where it runs:** `RUNS_ON = ("server", "client")`, or `"client 1"` for that client alone.
+    Absent, it runs everywhere, single player too. A file may define `probe_server(p)` and
+    `probe_client(p)` instead of one `probe(p)`.
+  - **Where it is:** `p.where` (`"server"`, `"client 2"`, `"standalone"`), `p.is_server`,
+    `p.client` (1..N), `p.clients`. `p.players()` is every player's controller: all of them on
+    the server, its own on a client.
+  - **When it starts:** on the server once every client's player has joined, on a client once
+    it has its pawn.
+  - **From one process to another:** `p.post("shot")` on one side,
+    `yield lambda: p.posted("server", "shot")` on the other. The processes share nothing else.
+  - **A dedicated server has no Slate,** so nothing registered with
+    `register_slate_post_tick_callback` ever runs there. Use `unreal.register_ticker_callback`
+    (the callback returns True to keep ticking), as `probes/boot.py` does.
 - **Keep probes:** they are checked in, so the next change to the same behaviour re-runs them.
 - **Poking a running game by hand:** start `uepy.py --game --seconds 120` and send scripts with
   `uepy.py --in-game <script>`. A game has its own inbox, `Saved/uepy/game`, so it never takes a

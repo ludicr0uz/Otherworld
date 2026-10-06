@@ -19,6 +19,13 @@ recompiled class, with no reinstancing of live actors and no rebuild on disk.
 
 When the last probe finishes the results file appears; uepy.py is polling for
 it and kills the game at once rather than sitting out the timer.
+
+A network run (``uepy.py --net``, probes/net.py) starts this in every process,
+probes or none. The server opens the level and posts that it listens; a client
+waits in Entry for that, then opens the server's address. The probes start on
+the server once every client's player has joined, and on a client once it has
+its pawn. A dedicated server has no Slate, so there the tick is the core
+ticker's.
 """
 
 import json
@@ -34,13 +41,15 @@ from graphics_menu.tune_keep_consts import TUNE_SAVE_SLOTS
 
 from probes import kept_slots
 from probes.context import Probe
+from probes.net import LISTENING, SERVER, STANDALONE, Where, pick_probe
 from probes.runner import DEFAULT_TIMEOUT, Ledger, ProbeRun, Queue
 
 READY_GAME_SECONDS = 0.5    # let BeginPlay and the first ticks settle
 READY_TIMEOUT = 120.0       # wall seconds for the level to load and spawn
+NET_READY_TIMEOUT = 240.0   # ... and, in a network run, for everyone to boot and join
 
 _state = {"handle": None, "queue": None, "phase": "prepare", "since": 0.0,
-          "writable": [], "keep": []}
+          "writable": [], "keep": [], "where": Where()}
 
 
 def _log(text):
@@ -59,16 +68,23 @@ def _game_time(map_path):
     return now
 
 
-def load_probes(paths):
-    """Each file's probe function and WRITABLE list, or a ledger error."""
+def load_probes(paths, where):
+    """Each file's probe function and WRITABLE list, or a ledger error. A
+    file whose RUNS_ON leaves this process out is not loaded here; in a
+    single-player run that is an error, since it then runs nowhere."""
     loaded = []
     for path in paths:
         name = os.path.splitext(os.path.basename(path))[0]
         ledger = Ledger(name)
         try:
             ns = runpy.run_path(path, run_name=f"probe_{name}")
-            fn = ns.get("probe")
-            if not callable(fn):
+            if not where.matches(ns.get("RUNS_ON")):
+                if where.networked:
+                    continue
+                raise RuntimeError(f"{name} has RUNS_ON = {ns.get('RUNS_ON')!r}: it is "
+                                   f"a network probe, run it with uepy.py --net")
+            fn = pick_probe(ns, where)
+            if fn is None:
                 raise AttributeError(f"{path} defines no probe(p)")
             loaded.append((ledger, fn, list(ns.get("WRITABLE") or ())))
         except Exception:
@@ -105,7 +121,8 @@ def make_writable(pairs):
 
 def _write_results(results, setup_errors):
     path = os.environ.get("UEPY_PROBE_RESULTS")
-    payload = {"probes": results, "setup_errors": setup_errors}
+    payload = {"probes": results, "setup_errors": setup_errors,
+               "where": _state["where"].name}
     for probe in results:
         for c in probe["checks"]:
             _log(f"{'PASS' if c['ok'] else 'FAIL'}  {probe['name']}: {c['label']}"
@@ -135,8 +152,10 @@ def _hermetic(fn, probe):
 
 def _finish(setup_errors):
     queue = _state["queue"]
-    # Before the results: uepy.py kills the game as soon as they appear.
-    kept_slots.put_back(_save_dir(), TUNE_SAVE_SLOTS)
+    # Before the results: uepy.py kills the game as soon as they appear. In a
+    # network run the others may still be playing: uepy.py puts them back.
+    if not _state["where"].networked:
+        kept_slots.put_back(_save_dir(), TUNE_SAVE_SLOTS)
     _write_results(queue.results() if queue else [], setup_errors)
     _state["phase"] = "done"
     if _state["handle"] is not None:
@@ -144,22 +163,45 @@ def _finish(setup_errors):
         _state["handle"] = None
 
 
+def _ready(world, where):
+    """Is the level up, with whoever this process waits for in it?"""
+    if not world or unreal.GameplayStatics.get_time_seconds(world) < READY_GAME_SECONDS:
+        return False
+    if where.role == SERVER:
+        if not where.posted(SERVER, LISTENING):
+            _log(f"server is listening on {world.get_name()}")
+            where.post(LISTENING)
+        return unreal.GameplayStatics.get_num_player_controllers(world) >= where.clients
+    return bool(unreal.GameplayStatics.get_player_pawn(world, 0))
+
+
+def _awaited(where):
+    return (f"{where.clients} joined player(s)" if where.role == SERVER
+            else "a player pawn")
+
+
 def _tick(_delta):
-    """Slate post-tick: wait for the level, then drive the queue. Never raises."""
+    """Once a frame: wait for the level, then drive the queue. Never raises."""
     map_path = os.environ.get("UEPY_PROBE_MAP", "")
+    where = _state["where"]
+    limit = NET_READY_TIMEOUT if where.networked else READY_TIMEOUT
     try:
         if _state["phase"] == "prepare":
             _prepare(map_path)
             return
+        if _state["phase"] == "await server":
+            if where.posted(SERVER, LISTENING):
+                _open(where.address)
+            elif time.time() - _state["since"] > limit:
+                _finish([f"the server never listened within {limit:.0f} s"])
+            return
         if _state["phase"] == "load":
-            world = _world(map_path)
-            pawn = world and unreal.GameplayStatics.get_player_pawn(world, 0)
-            if pawn and unreal.GameplayStatics.get_time_seconds(world) >= READY_GAME_SECONDS:
+            if _ready(_world(map_path), where):
                 _log(f"{map_path} is up; running {len(_state['queue'].runs)} probe(s)")
                 _state["phase"] = "run"
-            elif time.time() - _state["since"] > READY_TIMEOUT:
-                _finish([f"{map_path} never came up with a player pawn "
-                         f"within {READY_TIMEOUT:.0f} s"])
+            elif time.time() - _state["since"] > limit:
+                _finish([f"{map_path} never came up with {_awaited(where)} "
+                         f"within {limit:.0f} s"])
             return
         if _state["phase"] == "run" and _state["queue"].advance():
             _finish([])
@@ -171,16 +213,20 @@ def start():
     """Called once by init_unreal.py in the -game process."""
     paths = [p for p in os.environ.get("UEPY_PROBES", "").split(os.pathsep) if p]
     map_path = os.environ.get("UEPY_PROBE_MAP", "")
+    where = _state["where"] = Where.from_env(os.environ)
     timeout = float(os.environ.get("UEPY_PROBE_TIMEOUT") or DEFAULT_TIMEOUT)
     game_time = _game_time(map_path)
 
     # The developer's own tuning (graphics_menu/tune_keep.py) is not the
     # build's: every probe starts from the built tables.
-    kept_slots.set_aside(_save_dir(), TUNE_SAVE_SLOTS)
-    loaded = load_probes(paths)
+    # In a network run the processes share the save folder: the server, which
+    # is up before any client is in the level, sets them aside for all.
+    if where.role in (STANDALONE, SERVER):
+        kept_slots.set_aside(_save_dir(), TUNE_SAVE_SLOTS)
+    loaded = load_probes(paths, where)
     runs = []
     for ledger, fn, _writable in loaded:
-        probe = Probe(ledger, map_path, game_time)
+        probe = Probe(ledger, map_path, game_time, where)
         factory = (lambda fn=fn, probe=probe: _hermetic(fn, probe)) if fn else (lambda: None)
         runs.append(ProbeRun(ledger, factory, game_time, time.time, timeout))
     _state["queue"] = Queue(runs)
@@ -191,7 +237,16 @@ def start():
     # in hand (context.hold): the request is what is written.
     writable |= {(bp, SLOT_REQUEST_VAR) for bp, var in writable if var == "EquippedIndex"}
     _state["writable"] = sorted(writable)
-    _state["handle"] = unreal.register_slate_post_tick_callback(_tick)
+    if where.networked:
+        unreal.register_ticker_callback(_ticker)
+    else:
+        _state["handle"] = unreal.register_slate_post_tick_callback(_tick)
+
+
+def _ticker(delta):
+    """The core ticker's callback: true keeps it ticking."""
+    _tick(delta)
+    return _state["phase"] != "done"
 
 
 def _prepare(map_path):
@@ -204,9 +259,18 @@ def _prepare(map_path):
     if setup_errors:
         _finish(setup_errors)
         return
+    if _state["where"].role == "client":
+        _state["phase"] = "await server"
+        _state["since"] = time.time()
+        return
+    _open(map_path)
+
+
+def _open(url):
+    """Leave Entry for the level, or for the server that runs it."""
     # The Entry world is the only one loaded; any world works as the context.
     entry = unreal.find_object(None, "/Engine/Maps/Entry.Entry")
-    _log(f"opening {map_path}")
-    unreal.GameplayStatics.open_level(entry, map_path, True, "")
+    _log(f"opening {url}")
+    unreal.GameplayStatics.open_level(entry, url, True, "")
     _state["phase"] = "load"
     _state["since"] = time.time()

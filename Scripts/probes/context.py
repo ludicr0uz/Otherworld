@@ -15,16 +15,54 @@ them -- each of these cost a session a turn or three to find:
   default, re-runs the owner's construction script (``set`` below says why
   it must not).
 
+In a network run (``uepy.py --net``) every process runs the probe: ``where``
+and its neighbours say which one this is, and ``post``/``posted`` carry a
+step from one process to another (net.py).
+
 ``unreal`` is imported lazily so the ledger half stays importable off-engine.
 """
+
+from probes.net import Where
 
 
 class Probe(object):
 
-    def __init__(self, ledger, map_path, game_time):
+    def __init__(self, ledger, map_path, game_time, where=None):
         self._ledger = ledger
         self.map_path = map_path
         self.time = game_time
+        self.net = where or Where()
+
+    # ─── which process this is ──────────────────────────────────────────────
+
+    @property
+    def where(self):
+        """"server", "client 1", ..., or "standalone" in a --game run."""
+        return self.net.name
+
+    @property
+    def is_server(self):
+        return self.net.role == "server"
+
+    @property
+    def is_client(self):
+        return self.net.role == "client"
+
+    @property
+    def client(self):
+        """This client's number, 1..N; 0 on the server and standalone."""
+        return self.net.index
+
+    @property
+    def clients(self):
+        """How many clients the run started; 0 standalone."""
+        return self.net.clients
+
+    def post(self, key, value=True):
+        self.net.post(key, value)
+
+    def posted(self, where, key):
+        return self.net.posted(where, key)
 
     # ─── results ────────────────────────────────────────────────────────────
 
@@ -48,6 +86,14 @@ class Probe(object):
     def controller(self, index=0):
         import unreal
         return unreal.GameplayStatics.get_player_controller(self.world(), index)
+
+    def players(self):
+        """Every player's controller. On the server that is one per client;
+        a client (or a single-player game) has only its own."""
+        import unreal
+        world = self.world()
+        return [unreal.GameplayStatics.get_player_controller(world, i)
+                for i in range(unreal.GameplayStatics.get_num_player_controllers(world))]
 
     def hud(self):
         pc = self.controller()

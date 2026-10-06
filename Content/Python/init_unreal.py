@@ -34,7 +34,8 @@ if __name__ == "__main__":
     # A probe run (Scripts/dev/uepy.py --game --probe) names its probes in the
     # environment; Scripts/probes/boot.py prepares the classes, opens the level
     # and drives them. Absent in every other editor or game, so a no-op there.
-    if os.environ.get("UEPY_PROBES"):
+    # A network run (uepy.py --net) names each process, probes or none.
+    if os.environ.get("UEPY_PROBES") or os.environ.get("UEPY_NET_WHERE"):
         try:
             sys.path.insert(0, os.path.join(unreal.Paths.convert_relative_path_to_full(
                 unreal.Paths.project_dir()), "Scripts"))

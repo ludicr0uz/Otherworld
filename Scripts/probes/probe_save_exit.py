@@ -19,8 +19,9 @@ import unreal
 
 from combat.slot_tuning import BAG_FIRST, HAND
 from combat.game_state import KILL_COUNT_VAR
+from net.state_consts import PLAYER_STATE_BP_PATH
 from combat.paths import (
-    GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, PISTOL_BP_PATH,
+    HEALTH_BP_PATH, HEALTH_CLASS_PATH, PISTOL_BP_PATH,
     SHOTGUN_BP_PATH, SMG_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from graphics_menu.profile_consts import (
@@ -37,7 +38,7 @@ HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, EXIT_PENDING_VAR), (HUD_BP_PATH, EXIT_AT_VAR),
             (HUD_BP_PATH, EXIT_STARTED_VAR),
             (HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, LAST_DAMAGE_VAR),
-            (SURVIVAL_BP_PATH, UV.Hunger), (GAME_MODE_BP_PATH, KILL_COUNT_VAR),
+            (SURVIVAL_BP_PATH, UV.Hunger), (PLAYER_STATE_BP_PATH, KILL_COUNT_VAR),
             (WEAPON_COMP_BP_PATH, WV.EquippedIndex)]
 # ...and every field of the crafted profile the load is tested with.
 PROFILE_FIELDS = ("Health", "Stamina", "Hunger", "Thirst", "Temperature", "Kills",
@@ -125,7 +126,7 @@ def _run(p):
     # --- running out saves and leaves ---------------------------------------
     p.set(health, "Health", HEALTH)
     p.set(survival, "Hunger", HUNGER)
-    p.set(p.game_mode(), KILL_COUNT_VAR, KILLS)
+    p.set(p.player_state(), KILL_COUNT_VAR, KILLS)
     p.set(wc, "EquippedIndex", EQUIPPED)      # the pistol to hand (context.hold)
     yield lambda: p.get(wc, "EquippedIndex") == EQUIPPED
     carried = _inventory(p, wc)
@@ -154,9 +155,9 @@ def _run(p):
     wc = p.component(pawn, WEAPON_COMP_CLASS_PATH)
     p.check("the level reopened and the new game loaded the profile's stats",
             abs(p.get(health, "Health") - HEALTH) < 1e-3
-            and p.get(p.game_mode(), KILL_COUNT_VAR) == KILLS,
+            and p.get(p.player_state(), KILL_COUNT_VAR) == KILLS,
             f"health {p.get(health, 'Health')}, "
-            f"kills {p.get(p.game_mode(), KILL_COUNT_VAR)}")
+            f"kills {p.get(p.player_state(), KILL_COUNT_VAR)}")
     p.check("...its inventory, in place of the issued loadout",
             _inventory(p, wc) == carried and p.get(wc, "EquippedIndex") == EQUIPPED,
             f"{_inventory(p, wc)} vs {carried}, equipped {p.get(wc, 'EquippedIndex')}")

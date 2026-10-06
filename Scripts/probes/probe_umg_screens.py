@@ -15,8 +15,9 @@ import unreal
 from combat.slot_tuning import HAND, SLOT_ITEMS_VAR, WEAPON_SLOTS
 from graphics_menu.inv_consts import BAG_PANEL, SLOT_BOXES
 from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR
+from net.state_consts import GAME_STATE_BP_PATH, PLAYER_STATE_BP_PATH
 from combat.paths import (
-    GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH,
+    HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
@@ -32,8 +33,8 @@ from survival import component_vars as UV
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, MV.MenuPage,
                                        MV.MenuRow, C.PAUSE_ROW_VAR)]
-WRITABLE += [(GAME_MODE_BP_PATH, KILL_COUNT_VAR), (GAME_MODE_BP_PATH, "PlayerDead"),
-             (GAME_MODE_BP_PATH, DEBUG_MODE_VAR),
+WRITABLE += [(PLAYER_STATE_BP_PATH, KILL_COUNT_VAR), (PLAYER_STATE_BP_PATH, "PlayerDead"),
+             (GAME_STATE_BP_PATH, DEBUG_MODE_VAR),
              (HEALTH_BP_PATH, HV.Health), (SURVIVAL_BP_PATH, UV.Hunger)]
 
 SHOWN = unreal.SlateVisibility.HIT_TEST_INVISIBLE
@@ -74,7 +75,8 @@ def _visible(ui):
 def probe(p):
     yield lambda: p.hud() is not None and p.get(p.hud(), "UiHud") is not None
     yield 0.3
-    hud, pawn, mode = p.hud(), p.pawn(), p.game_mode()
+    hud, pawn, mode = p.hud(), p.pawn(), p.player_state()
+    world_state = p.game_state()
     ui = _screens(p, hud)
     p.check("BeginPlay created all four screens and put them on the viewport",
             all(w is not None and w.is_in_viewport() for w in ui.values()),
@@ -175,12 +177,12 @@ def probe(p):
 
     # --- the FPS readout: on screen whatever debug mode says --------------------------
     fps = ui["UiHud"].get_editor_property(C.HUD_FPS)
-    was, seen = p.get(mode, DEBUG_MODE_VAR), {}
+    was, seen = p.get(world_state, DEBUG_MODE_VAR), {}
     for debug in (False, True):
-        p.set(mode, DEBUG_MODE_VAR, debug)
+        p.set(world_state, DEBUG_MODE_VAR, debug)
         _draw(hud)
         seen[debug] = (p.get(hud, "DebugOn"), fps.get_visibility(), _text(fps))
-    p.set(mode, DEBUG_MODE_VAR, was)
+    p.set(world_state, DEBUG_MODE_VAR, was)
     _draw(hud)
     p.check("the FPS readout is on screen with debug mode off, and with it on",
             all(on == debug and vis not in (HIDDEN, unreal.SlateVisibility.HIDDEN)

@@ -11,7 +11,8 @@ does. Which row the cursor is over, and the click itself,
 need a window and a hand (graphics_menu/CLAUDE.md).
 """
 
-from combat.paths import GAME_MODE_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from net.state_consts import PLAYER_STATE_BP_PATH
+from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu import cursor_consts as CC
 from graphics_menu import umg_consts as C
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
@@ -24,7 +25,7 @@ HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (
     MV.MenuOpen, C.GAME_STARTED_VAR, MV.MenuPage, MV.MenuRow, LOOT_OPEN_VAR,
     CC.CURSOR_ACCEPT_VAR, CC.PAUSE_CLICK_VAR, CC.PAGE_CLICK_VAR, GUN_TAB.open_var, GUN_TAB.row_var)]
-WRITABLE += [(GAME_MODE_BP_PATH, "PlayerDead"),
+WRITABLE += [(PLAYER_STATE_BP_PATH, "PlayerDead"),
              (WEAPON_COMP_BP_PATH, CC.TRIGGER_SPENT_VAR)]
 
 
@@ -44,7 +45,7 @@ def _cursor(p, hud):
 def probe(p):
     yield lambda: p.hud() is not None and p.get(p.hud(), "UiHud") is not None
     yield 0.3
-    hud, mode = p.hud(), p.game_mode()
+    hud, mode = p.hud(), p.player_state()
     wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
 
     # --- playing: no cursor; the M panel: a cursor, and no shot from a click ----
@@ -78,17 +79,17 @@ def probe(p):
     # --- a row taken (a click, or Enter on the caret's row) is served by Tick ---
     # The debug row: taken twice, so the saved setting ends as it began.
     debug_row = C.PAUSE_ROW_ACTIONS.index(C.DEBUG_ACTION)
-    before = p.get(mode, "DebugMode")
+    before = p.get(p.game_state(), "DebugMode")
     p.set(hud, CC.PAUSE_CLICK_VAR, debug_row)
-    yield lambda: p.get(mode, "DebugMode") != before
+    yield lambda: p.get(p.game_state(), "DebugMode") != before
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    flipped = p.get(mode, "DebugMode")
+    flipped = p.get(p.game_state(), "DebugMode")
     p.set(hud, CC.PAUSE_CLICK_VAR, debug_row)
-    yield lambda: p.get(mode, "DebugMode") == before
+    yield lambda: p.get(p.game_state(), "DebugMode") == before
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
     p.check("taking the debug row toggles debug mode, and again toggles it back",
-            flipped != before and p.get(mode, "DebugMode") == before,
-            f"{before} -> {flipped} -> {p.get(mode, 'DebugMode')}")
+            flipped != before and p.get(p.game_state(), "DebugMode") == before,
+            f"{before} -> {flipped} -> {p.get(p.game_state(), 'DebugMode')}")
 
     ui = p.get(hud, "UiPause")
     own, tab = (ui.get_editor_property(n) for n in (C.PAUSE_PANEL, GUN_TAB.panel))

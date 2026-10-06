@@ -150,10 +150,10 @@ owning client: read input  --Server RPC-->  server: validate, change state
 
 | state | today | becomes |
 |---|---|---|
-| kill count, per player | GameMode | PlayerState |
-| `PlayerDead` | GameMode | PlayerState |
+| kill count, per player | GameMode | PlayerState (done, M7: `BP_OtherworldPlayerState`) |
+| `PlayerDead` | GameMode | PlayerState (done, M7) |
 | team | none | PlayerState (team id), GameState (roster) |
-| debug flags, the day's clock | GameMode, `BP_DayNightCycle` | GameState / a replicated actor |
+| debug flags, the difficulty, the day's clock | GameMode, `BP_DayNightCycle` | GameState / a replicated actor (debug mode and the difficulty done, M7: `BP_OtherworldGameState`; the clock is M30) |
 | the noise record | GameMode | stays on the server (only AI reads it), as a list |
 | gun-drop random streams, spawn counter | GameMode | stay on the GameMode: server only is right |
 | health, inventory, slots, ammo, worn garments | components, unreplicated | the same components, server-owned and replicated |

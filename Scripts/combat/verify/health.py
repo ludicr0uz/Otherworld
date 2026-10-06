@@ -19,8 +19,10 @@ from combat.verify.fixtures import (
     _montages, drain_writes, exec_reach, gm, h, health_bp, hg, wg,
 )
 from net.pause_checks import check_standalone_pause
+from net.state_checks import check_state
+from net.state_consts import PLAYER_STATE_BP_PATH
 from combat.verify.common import (
-    BEL, PIN, by_pins, check, graph, in_pins, num_pin, out_pins, pin_value,
+    BEL, PIN, by_pins, check, graph, in_pins, load, num_pin, out_pins, pin_value,
     titled,
 )
 
@@ -193,10 +195,14 @@ def check_damage_stamp():
 # ─── The kill counter ────────────────────────────────────────────────────────
 
 def check_kill_counter():
-    gm_vars = {str(v) for v in BEL.list_member_variable_names(gm, False)}
-    check("the GameMode carries the kill counter", KILL_COUNT_VAR in gm_vars,
-          str(sorted(gm_vars)))
-    check("the GameMode carries the player-death flag", PLAYER_DEAD_VAR in gm_vars)
+    # Where state lives (net/state_checks.py): both are one player's, on
+    # their PlayerState, where their own machine's HUD can read them.
+    check_state(check)
+    ps_vars = {str(v) for v in BEL.list_member_variable_names(
+        load(PLAYER_STATE_BP_PATH), False)}
+    check("the PlayerState carries the kill counter", KILL_COUNT_VAR in ps_vars,
+          str(sorted(ps_vars)))
+    check("the PlayerState carries the player-death flag", PLAYER_DEAD_VAR in ps_vars)
     check("a death adds one to the kill counter",
           bool(titled(hg, f"SET {KILL_COUNT_VAR}"))
           or bool(titled(hg, f"Set {KILL_COUNT_VAR}")))

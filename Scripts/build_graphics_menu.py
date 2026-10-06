@@ -71,6 +71,9 @@ from graphics_menu.gfx_tuner import build_graphics_tuner            # noqa: E402
 from graphics_menu.tune_keep import (                               # noqa: E402
     author_load_kept, build_keep_savegames)
 # The FPS readout, on screen whatever debug mode says; see graphics_menu/fps.py.
+from net.state_consts import GAME_STATE_CLASS_PATH, PLAYER_STATE_CLASS_PATH  # noqa: E402
+from net.state_graph import (                                      # noqa: E402
+    CONTROLLER_CLASS_PATH, game_state, owned_game_state, player_state_of)
 from net.pause import author_pause                                 # noqa: E402
 from net.game_instance import build_game_instance                  # noqa: E402
 from net.session_consts import GAME_INSTANCE_BP_PATH               # noqa: E402
@@ -159,10 +162,10 @@ from uebp.nodes.math import (  # noqa: E402
     FN_ADD_VV, FN_AND, FN_BREAK_VECTOR, FN_DIV_FF, FN_GREATER_FF, FN_LE_FF, FN_MAKE_VECTOR,
     FN_MUL_FF, FN_NEQ_II, FN_NOT, FN_SUB_FF)
 from uebp.nodes.palette import (  # noqa: E402
-    MACRO_FOR_EACH, NODE_BEGIN_PLAY, NODE_CAST_GAME_MODE, NODE_CAST_HEALTH,
+    MACRO_FOR_EACH, NODE_BEGIN_PLAY, NODE_CAST_HEALTH,
     NODE_CAST_SETTINGS, NODE_DRAW_HUD, NODE_TICK)
 from uebp.nodes.system import (  # noqa: E402
-    FN_ALL_ACTORS, FN_COMMAND_LINE, FN_CONTAINS, FN_CREATE_SAVE, FN_DELAY, FN_GET_GAME_MODE,
+    FN_ALL_ACTORS, FN_COMMAND_LINE, FN_CONTAINS, FN_CREATE_SAVE, FN_DELAY,
     FN_INT_TO_STR, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_TIME_SECONDS)
 from combat import health_vars as HV  # noqa: E402
 from graphics_menu import hud_vars as MV                          # noqa: E402
@@ -466,30 +469,27 @@ def _author_load_settings(ed, in_exec):
 
 
 def _author_restore_debug(ed, in_execs):
-    """BeginPlay: GameMode.DebugMode = Settings.DebugMode.
+    """BeginPlay: GameState.DebugMode = Settings.DebugMode.
 
-    The save is the record and the GameMode is where the game reads it, so the
-    one copy happens as soon as Settings is known to be valid. A GameMode that
-    is not BP_ThirdPersonGameMode has nowhere to put it, and goes on without.
+    The save is the record and the GameState is where the game reads it, so
+    the one copy happens as soon as Settings is known to be valid. Only where
+    this machine owns the GameState (net/state_graph.py): a client of a
+    server takes the server's, and goes on without.
     """
-    gm = _node(ed, FN_GET_GAME_MODE)
-    as_gm = _palette(ed, NODE_CAST_GAME_MODE)
-    _connect(out(gm), _pin(as_gm, "Object"))
-    for e in in_execs:
-        _connect(e, _pin(as_gm, "execute"))
+    state = owned_game_state(ed, in_execs)
     settings = ed.add_get_member_variable_node(MV.Settings)
     saved = ed.add_get_member_variable_node(DEBUG_MODE_VAR, SETTINGS_CLASS_PATH)
     _connect(out(settings, MV.Settings), _pin(saved, "self"))
-    put = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
-    _connect(_loose_pin(as_gm, "AsBPThirdPersonGameMode", is_input=False),
-             _pin(put, "self"))
+    put = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH)
+    _connect(state.pin, _pin(put, "self"))
     _connect(out(saved, DEBUG_MODE_VAR), _pin(put, DEBUG_MODE_VAR))
-    _connect(then(as_gm), _pin(put, "execute"))
+    _connect(state.then, _pin(put, "execute"))
     ed.add_comment_to_nodes(
         "Debug mode as the player last left it (BP_Settings.DebugMode, on for "
-        "a first run), onto the GameMode where the HUD and the weapon read it.",
-        [gm, as_gm, settings, saved, put])
-    return (then(put), out(as_gm, "CastFailed"))
+        "a first run), onto the GameState where the HUD and the weapon read "
+        "it, on the machine that owns it.",
+        [*state.nodes, settings, saved, put])
+    return (then(put), *state.fails)
 
 
 # ─── Event BeginPlay: the startup default ────────────────────────────────────
@@ -618,29 +618,28 @@ def _author_tick(ed, tick):
         _connect(tail, _pin(gate, "execute"))
 
     # --- the debug row toggles debug mode -----------------------------------
-    # Written to the GameMode rather than to this HUD: the pellet tracers are
-    # drawn by BP_WeaponComponent, which can reach a GameMode and cannot reach
-    # a HUD variable.  The row has no key: Enter on it or a click raises
+    # Written to the GameState rather than to this HUD: the pellet tracers are
+    # drawn by BP_WeaponComponent, which can reach a GameState and cannot reach
+    # a HUD variable. Only where this machine owns it: on a client of a server
+    # the row changes nothing, the save included (serversupportsysdesign.md
+    # 4.8, the dev settings' row).  The row has no key: Enter on it or a click raises
     # PauseClick, like every other row of the panel.
     br_d = ed.add_branch_node()
     d_taken = []
     _connect(pause_row_taken(ed, DEBUG_ACTION, d_taken), _pin(br_d, "Condition"))
     _connect(then(gate), _pin(br_d, "execute"))
 
-    gm = _node(ed, FN_GET_GAME_MODE)
-    as_gm = _palette(ed, NODE_CAST_GAME_MODE)
-    _connect(out(gm), _pin(as_gm, "Object"))
-    _connect(then(br_d), _pin(as_gm, "execute"))
-    gm_out = _loose_pin(as_gm, "AsBPThirdPersonGameMode", is_input=False)
+    dbg_state = owned_game_state(ed, [then(br_d)])
+    gm_out = dbg_state.pin
 
-    was_on = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
+    was_on = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH)
     _connect(gm_out, _pin(was_on, "self"))
     flip = _node(ed, FN_NOT)
     _connect(out(was_on, DEBUG_MODE_VAR), _pin(flip, "A"))
-    set_dbg = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
+    set_dbg = ed.add_set_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH)
     _connect(gm_out, _pin(set_dbg, "self"))
     _connect(out(flip), _pin(set_dbg, DEBUG_MODE_VAR))
-    _connect(then(as_gm), _pin(set_dbg, "execute"))
+    _connect(dbg_state.then, _pin(set_dbg, "execute"))
 
     # ...and into the save, written on the spot like every other setting.
     settings = ed.add_get_member_variable_node(MV.Settings)
@@ -652,11 +651,11 @@ def _author_tick(ed, tick):
     _, writer = _emit_save(ed, settings_out, then(keep_dbg))
 
     ed.add_comment_to_nodes(
-        "The panel's debug row -> debug mode, held on the GameMode so the weapon "
+        "The panel's debug row -> debug mode, held on the GameState so the weapon "
         "component can read it too, and saved to BP_Settings so it survives a "
         "restart.  It turns on the pellet tracers and the "
         "wanderers' numbers.",
-        d_taken + [br_d, gm, as_gm, was_on, flip, set_dbg, settings, keep_dbg,
+        d_taken + [br_d, *dbg_state.nodes, was_on, flip, set_dbg, settings, keep_dbg,
          writer])
 
 
@@ -844,36 +843,33 @@ def _author_npc_bars(ed, in_execs):
 def _author_draw(ed):
     draw = _palette(ed, NODE_DRAW_HUD)
 
-    # Dead or alive, before anything is drawn. The death menu replaces the HUD
-    # rather than covering it, so this branch is the first thing in the frame.
-    mode = _node(ed, FN_GET_GAME_MODE)
-    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
-    _connect(out(mode), _pin(as_mode, "Object"))
-    _connect(then(draw), _pin(as_mode, "execute"))
-    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
+    # The world's shared state first (net/state_graph.py). A client of a
+    # server has none for its first frames: the cast-failed arm goes on.
+    state = game_state(ed, [then(draw)])
 
     # This frame's copy of DebugMode, taken here and nowhere else.  Every
-    # consumer below reads the HUD's own DebugOn instead of the GameMode's
+    # consumer below reads the HUD's own DebugOn instead of the GameState's
     # variable, for one reason: the cast-failed path reaches the same drawing
     # code, and a Get with an invalid self is an "Accessed None" per wanderer
     # per frame.  Copying it once gives that path a real answer -- false -- and
     # costs one node.
-    on_get = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH)
-    _connect(mode_out, _pin(on_get, "self"))
+    on_get = ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH)
+    _connect(state.pin, _pin(on_get, "self"))
     copy_dbg = ed.add_set_member_variable_node(MV.DebugOn)
     _connect(out(on_get, DEBUG_MODE_VAR), _pin(copy_dbg, MV.DebugOn))
-    _connect(then(as_mode), _pin(copy_dbg, "execute"))
+    _connect(state.then, _pin(copy_dbg, "execute"))
     no_dbg = ed.add_set_member_variable_node(MV.DebugOn)
     _set(no_dbg, MV.DebugOn, False)
-    _connect(out(as_mode, "CastFailed"), _pin(no_dbg, "execute"))
+    for e in state.fails:
+        _connect(e, _pin(no_dbg, "execute"))
 
     # The player's settings, onto the weapon component. Before the menu and
     # before the dead/alive test, because it is the one thing on this event
     # that has to happen on every frame in every state -- a sensitivity changed
     # on the settings screen has to be in effect the moment the world unpauses.
-    # The difficulty onto the GameMode first, where there is one to write.
-    to_mode = author_push_difficulty(ed, then(copy_dbg), mode_out)
-    pushed = _author_push_settings(ed, (*to_mode, then(no_dbg)))
+    # The difficulty onto the GameState first, where this machine owns it.
+    to_state = author_push_difficulty(ed, then(copy_dbg), state.pin)
+    pushed = _author_push_settings(ed, (*to_state, then(no_dbg)))
 
     # The FPS readout, in every state -- title, game, death -- and whether
     # debug mode is on or off. Drawn first, so every panel after it can sit on top.
@@ -884,18 +880,24 @@ def _author_draw(ed):
     # on to the menu.
     title, playing = author_title(ed, [author_cursor_read(ed, fps_out)])
 
+    # Dead or alive: this player's own state, the owning controller's
+    # PlayerState. The death menu replaces the HUD rather than covering it,
+    # and reads the score through the same cast, so it runs only down the
+    # arm where the cast held.
+    owner = _node(ed, FN_GET_OWNING_PC)
+    mine = player_state_of(ed, out(owner), CONTROLLER_CLASS_PATH, [playing])
     alive = ed.add_branch_node()
-    dead_get = ed.add_get_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH)
-    _connect(mode_out, _pin(dead_get, "self"))
+    dead_get = ed.add_get_member_variable_node(PLAYER_DEAD_VAR, PLAYER_STATE_CLASS_PATH)
+    _connect(mine.pin, _pin(dead_get, "self"))
     _connect(out(dead_get, PLAYER_DEAD_VAR), _pin(alive, "Condition"))
-    _connect(playing, _pin(alive, "execute"))
+    _connect(mine.then, _pin(alive, "execute"))
 
-    author_death_menu(ed, (then(alive),), mode_out)
+    author_death_menu(ed, (then(alive),), mine.pin)
 
-    # A GameMode that is not BP_ThirdPersonGameMode cannot say whether the
-    # player is dead, so it is treated as alive and the HUD shows as normal --
-    # a missing death menu is recoverable, a missing HUD is not.
-    living = author_alive(ed, (else_(alive),))
+    # With no PlayerState yet (a client's first frames) nobody can say whether
+    # the player is dead, so they are treated as alive and the HUD shows as
+    # normal -- a missing death menu is recoverable, a missing HUD is not.
+    living = author_alive(ed, (else_(alive), *mine.fails))
 
     # The stat bars and the kill counter, into WBP_HUD.
     after_hp = author_hp(ed, living)

@@ -223,7 +223,7 @@ def check_controller(path, key):
     check(f"{tag}: going aggro is logged as '{AGRO_LOG_PREFIX.strip()} <sense>'",
           len(warns) == 1 and len(heads) == 1)
     gates = [d for w in warns for d in _drivers(w)]
-    check(f"{tag}: ...only while the GameMode's {DEBUG_MODE_VAR} is on",
+    check(f"{tag}: ...only while the GameState's {DEBUG_MODE_VAR} is on",
           len(gates) == 1 and _title(gates[0]) == "Branch"
           and {_title(f) for f in _feeders(gates[0], "Condition")}
           == {f"Get {DEBUG_MODE_VAR}"}

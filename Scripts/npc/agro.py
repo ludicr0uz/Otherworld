@@ -25,11 +25,13 @@ M panel's MONSTER SETTINGS tab writes them on a live wanderer.
 import unreal
 
 from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
-from combat.paths import GAME_MODE_BP_PATH, GAME_MODE_CLASS_PATH
+from combat.paths import GAME_MODE_BP_PATH
+from net.state_consts import GAME_STATE_CLASS_PATH
+from net.state_graph import game_state
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
 from npc.graph import _log
 from uebp.graph import (
-    BEL, _assets, _connect, _loose_pin, _name_literal, _node, _palette, _pin, _set, else_,
+    BEL, _assets, _connect, _name_literal, _node, _pin, _set, else_,
     out, then)
 from npc.patrol import _author_patrol_step, _author_walk_speed
 from npc.paths import (
@@ -41,9 +43,8 @@ from Sound.play import _author_random_sound
 from npc.senses import _author_hearing, _author_hurt, _author_sight, _author_touch
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_PAWN
 from uebp.nodes.ai import FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_GET_BLACKBOARD
-from uebp.nodes.palette import NODE_CAST_GAME_MODE
 from uebp.nodes.system import (
-    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_WARN)
+    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_WARN)
 
 
 def _declare(ed, name, pin_type):
@@ -122,23 +123,20 @@ def _author_enter_agro(ed, reasons, chase_in):
     _connect(out(head), _pin(line, "A"))
     _connect(out(who), _pin(line, "B"))
     # A developer line: PrintWarning puts it on screen as well as in the log,
-    # so it is written only while the GameMode's DebugMode is on. One line per
+    # so it is written only while the GameState's DebugMode is on. One line per
     # wanderer per life.
-    mode = keep(_node(ed, FN_GET_GAME_MODE))
-    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(out(mode), _pin(as_mode, "Object"))
-    for pin in after:
-        _connect(pin, _pin(as_mode, "execute"))
-    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
-    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
-             _pin(flag, "self"))
+    state = game_state(ed, list(after))
+    for n in state.nodes:
+        keep(n)
+    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH))
+    _connect(state.pin, _pin(flag, "self"))
     debugging = keep(ed.add_branch_node())
     _connect(out(flag, DEBUG_MODE_VAR), _pin(debugging, "Condition"))
-    _connect(then(as_mode), _pin(debugging, "execute"))
+    _connect(state.then, _pin(debugging, "execute"))
     say = keep(_node(ed, FN_WARN))
     _connect(out(line), _pin(say, "InString"))
     _connect(then(debugging), _pin(say, "execute"))
-    for tail in (then(say), else_(debugging), out(as_mode, "CastFailed")):
+    for tail in (then(say), else_(debugging), *state.fails):
         _connect(tail, chase_in)
     return made
 

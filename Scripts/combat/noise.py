@@ -28,12 +28,12 @@ from combat.game_state import (
     NOISE_CONE_COS_VAR, NOISE_CONE_RANGE_VAR, NOISE_DIRECTION_VAR,
     NOISE_LOCATION_VAR, NOISE_RANGE_VAR, NOISE_TIME_VAR,
 )
-from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
+from uebp.graph import _connect, _node, _pin, _set, else_, then
 from combat.paths import GAME_MODE_CLASS_PATH
+from net.state_graph import server_game_mode
 from combat.tuning import COMBAT
 from uebp.nodes.math import FN_GE_FF, FN_MAX_FF, FN_OR, FN_SUB_FF
-from uebp.nodes.palette import NODE_CAST_GAME_MODE
-from uebp.nodes.system import FN_GET_GAME_MODE, FN_TIME_SECONDS
+from uebp.nodes.system import FN_TIME_SECONDS
 
 
 def _author_make_noise(ed, exec_in, location, reach,
@@ -41,11 +41,14 @@ def _author_make_noise(ed, exec_in, location, reach,
     """Write a noise into the GameMode's record, if it is allowed to replace
     the one already there. Returns ``(nodes, then_pin)``.
 
-        exec_in -> GetGameMode -> cast
+        exec_in -> Switch Has Authority -> GetGameMode -> cast
                 -> [record stale  OR  this noise at least as loud?]
                      yes -> NoiseTime = now, NoiseLocation, NoiseRange,
                             NoiseDirection, NoiseConeRange, NoiseConeCos
-                -> then (every path, the failed cast included)
+                -> then (every path, the failed cast and a client included)
+
+    The record is the server's (only the wanderers' AI reads it, and that
+    runs there): a client has no GameMode and writes nothing.
 
     ``location``, ``reach`` and the optional ``direction``/``cone_reach`` are
     data pins; ``cone_cos`` is a literal. An all-round noise leaves
@@ -58,11 +61,10 @@ def _author_make_noise(ed, exec_in, location, reach,
         made.append(n)
         return n
 
-    mode = keep(_node(ed, FN_GET_GAME_MODE))
-    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(_pin(mode, "ReturnValue", is_input=False), _pin(as_mode, "Object"))
-    _connect(exec_in, _pin(as_mode, "execute"))
-    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
+    server = server_game_mode(ed, [exec_in])
+    made.extend(server.nodes)
+    as_mode = server.nodes[-1]
+    mode_out = server.pin
 
     def read(name):
         n = keep(ed.add_get_member_variable_node(name, GAME_MODE_CLASS_PATH))
@@ -129,6 +131,6 @@ def _author_make_noise(ed, exec_in, location, reach,
     # the GameMode was the one this project builds.
     out = keep(ed.add_branch_node())
     _set(out, "Condition", True)
-    for pin in (tail, else_(lands), _pin(as_mode, "CastFailed", is_input=False)):
+    for pin in (tail, else_(lands), *server.fails):
         _connect(pin, _pin(out, "execute"))
     return made, then(out)

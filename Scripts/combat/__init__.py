@@ -60,7 +60,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     (THROW_*_DAMAGE, LODGE_*), when the clip's hand lets go
                     and where in the clip the ready pose is taken
   difficulty        EASY / MEDIUM / SURVIVOR: labels, default, the variable
-  game_state        GameMode + health-component variable names, debug mode,
+  game_state        world-scoped + health-component variable names (which live
+                    on the GameMode, which moved: net/state_consts.py), debug mode,
                     the noise record, ensure_game_mode_vars()
   gun_tuning        gun_tuning.csv: the tunable stats (TUNE_STATS: column,
                     variable, label, step, minimum), which are whose

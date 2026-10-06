@@ -46,10 +46,9 @@ from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
 from uebp.nodes.math import FN_EQ_II, FN_OR
 from uebp.nodes.system import FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL
 from net.pause import author_unpause
+from net.state_consts import PLAYER_STATE_CLASS_PATH
 from graphics_menu import hud_vars as MV
 
-GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
-                        ".BP_ThirdPersonGameMode_C")
 KILL_COUNT_VAR = "NpcKillCount"
 
 
@@ -74,7 +73,7 @@ def author_title(ed, in_execs):
     return flow, started
 
 
-def author_death_menu(ed, in_execs, mode_out):
+def author_death_menu(ed, in_execs, state_out):
     """What is on screen once the player is dead and the game is paused:
     WBP_DeathMenu instead of the HUD, not over it -- a reticle and an
     inventory over a death screen read as a game still being played.
@@ -95,8 +94,8 @@ def author_death_menu(ed, in_execs, mode_out):
 
     # The same counter the corner shows, read again so the final score is the
     # live number rather than a copy taken when the player fell.
-    kills = keep(ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH))
-    _connect(mode_out, _pin(kills, "self"))
+    kills = keep(ed.add_get_member_variable_node(KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH))
+    _connect(state_out, _pin(kills, "self"))
     kills_str = keep(_node(ed, FN_INT_TO_STR))
     _connect(out(kills, KILL_COUNT_VAR), _pin(kills_str, "InInt"))
     score_text = keep(_node(ed, FN_CONCAT))

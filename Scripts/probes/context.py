@@ -100,8 +100,20 @@ class Probe(object):
         return pc.get_hud() if pc else None
 
     def game_mode(self):
+        """The GameMode: the server's (and single player's). None on a client."""
         import unreal
         return unreal.GameplayStatics.get_game_mode(self.world())
+
+    def game_state(self):
+        """The world's shared state (net/state_consts.py), on any machine."""
+        import unreal
+        return unreal.GameplayStatics.get_game_state(self.world())
+
+    def player_state(self, index=0):
+        """A local player's own state: the kills, "is dead". On a server use
+        ``controller.player_state`` of each of ``players()``."""
+        pc = self.controller(index)
+        return pc.player_state if pc else None
 
     def load_class(self, class_path):
         """A Blueprint class by its ``/Game/.../BP_X.BP_X_C`` path. Raises if missing."""

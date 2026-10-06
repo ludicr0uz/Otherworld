@@ -19,8 +19,9 @@ attached to. Drawn for one frame (Duration 0) and redrawn the next.
 """
 
 from combat.game_state import DEBUG_MODE_VAR
-from combat.paths import GAME_MODE_CLASS_PATH
-from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
+from net.state_consts import GAME_STATE_CLASS_PATH
+from net.state_graph import game_state
+from uebp.graph import BEL, _connect, _node, _palette, _pin, _set, else_, then
 from npc.paths import (
     AGGRO_VAR, CORPSE_VAR, SIGHT_CONE_AGGRO_COLOR, SIGHT_CONE_PATROL_COLOR,
     SIGHT_CONE_SIDES, SIGHT_CONE_STAMP_VAR, SIGHT_CONE_THICKNESS,
@@ -28,8 +29,8 @@ from npc.paths import (
 from npc.tuned import tuned
 from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_GET_PAWN
 from uebp.nodes.math import FN_SELECT_COLOR
-from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_TICK
-from uebp.nodes.system import FN_DRAW_CONE, FN_GET_GAME_MODE, FN_IS_VALID, FN_TIME_SECONDS
+from uebp.nodes.palette import NODE_TICK
+from uebp.nodes.system import FN_DRAW_CONE, FN_IS_VALID, FN_TIME_SECONDS
 
 
 def _author_sight_cone(ed):
@@ -63,14 +64,12 @@ def _author_sight_cone(ed):
     tick = keep(_palette(ed, NODE_TICK))
     # The flag first: with debug mode off, which is how the game is played,
     # a wanderer's Tick costs one cast and one branch.
-    mode = keep(_node(ed, FN_GET_GAME_MODE))
-    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(out(mode), _pin(as_mode, "Object"))
-    _connect(then(tick), _pin(as_mode, "execute"))
-    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
-    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
-             _pin(flag, "self"))
-    debugging = branch(out(flag, DEBUG_MODE_VAR), then(as_mode))
+    state = game_state(ed, [then(tick)])
+    for n in state.nodes:
+        keep(n)
+    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH))
+    _connect(state.pin, _pin(flag, "self"))
+    debugging = branch(out(flag, DEBUG_MODE_VAR), state.then)
 
     # Nested, not ANDed: a Branch pulls its whole condition, and the cone's
     # inputs read the pawn (see the root CLAUDE.md, "Evaluation order").

@@ -13,8 +13,9 @@ was dropped from the character (an item eaten) cannot survive in the save.
 
 from combat.game_state import KILL_COUNT_VAR
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
-from graphics_menu.player_parts import MODE
+from net.state_consts import PLAYER_STATE_CLASS_PATH
+from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
+from graphics_menu.player_parts import STATE
 from graphics_menu.profile_consts import (
     ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD, PROFILE_CLASS_PATH,
     PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS)
@@ -52,7 +53,7 @@ def author_write_profile(ed, in_exec, parts, made):
     flow = then(cast)
 
     copies = [(parts[owner], owner, var, field) for field, owner, var in STAT_FIELDS]
-    copies += [(parts[MODE], GAME_MODE_CLASS_PATH, KILL_COUNT_VAR, KILLS_FIELD),
+    copies += [(parts[STATE], PLAYER_STATE_CLASS_PATH, KILL_COUNT_VAR, KILLS_FIELD),
                (parts[WEAPON_COMP_CLASS_PATH], WEAPON_COMP_CLASS_PATH,
                 "EquippedIndex", EQUIPPED_FIELD)]
     for src_out, src_class, src_var, field in copies:

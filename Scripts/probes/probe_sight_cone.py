@@ -15,11 +15,11 @@ straight after its DrawDebugCone (npc/sight_cone.py).
 import unreal
 
 from combat.game_state import DEBUG_MODE_VAR
-from combat.paths import GAME_MODE_BP_PATH
+from net.state_consts import GAME_STATE_BP_PATH
 from npc.monster_tuning import TUNED_VAR
 from npc.paths import SIGHT_CONE_STAMP_VAR
 
-WRITABLE = [(GAME_MODE_BP_PATH, DEBUG_MODE_VAR)]
+WRITABLE = [(GAME_STATE_BP_PATH, DEBUG_MODE_VAR)]
 FRESH_S = 0.1          # a stamp this recent was written in the last few frames
 
 
@@ -36,7 +36,7 @@ def _stamps(p):
 def probe(p):
     yield lambda: len(_controllers(p)) > 0
     yield 0.5
-    mode, world = p.game_mode(), p.world()
+    mode, world = p.game_state(), p.world()
 
     p.set(mode, DEBUG_MODE_VAR, False)
     yield 0.3

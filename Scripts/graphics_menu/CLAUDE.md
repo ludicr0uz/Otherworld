@@ -489,9 +489,9 @@ into the HUD. Enter on a number saves nothing in this tab.
 - **The settings page:**
   - mouse sensitivity (Left/Right, clamped to a minimum above zero);
   - DIFFICULTY: EASY / MEDIUM / SURVIVOR (Left/Right cycle it; default EASY). Saved as the int
-    `BP_Settings.Difficulty` and copied onto the GameMode's `Difficulty` every `DrawHUD`
-    (`difficulty.py`). Only EASY does anything yet (the mushroom heal). `-nullrhi` runs no
-    `DrawHUD`, so a headless game keeps the GameMode's own default, EASY;
+    `BP_Settings.Difficulty` and copied onto the GameState's `Difficulty` every `DrawHUD`
+    (`difficulty.py`), where this machine owns the GameState: a client plays at the server's. Only EASY does anything yet (the mushroom heal). `-nullrhi` runs no
+    `DrawHUD`, so a headless game keeps the GameState's own default, EASY;
   - the keybinds, one row per `BIND_VARS` entry (Enter arms a capture; the next key from `KEY_POOL` becomes the bind;
     navigation keys are not in the pool);
   - BACK.
@@ -899,8 +899,9 @@ glimmers, `world/item_highlight.py`). Same keys as GUN SETTINGS; **Enter** saves
   white) for `HEADSHOT_MARK_SECONDS` after the weapon component's `HeadshotTime`. It hangs off
   every arm of the reticle that has the component (crosshair, crosshair left out down the
   sights, scope, empty hands after a thrown knife), so it is drawn whatever is on the centre.
-- **When the player is dead:** only the death menu. `DrawHUD` branches on `GameMode.PlayerDead`
-  first.
+- **When the player is dead:** only the death menu. `DrawHUD` branches on `PlayerDead` of the owning
+  controller's PlayerState (`net/state_graph.py`); with no PlayerState yet (a client's first
+  frames) the player counts as alive.
 
 **Rules:**
 
@@ -909,7 +910,8 @@ glimmers, `world/item_highlight.py`). Same keys as GUN SETTINGS; **Enter** saves
   keeps no list of weapons.
 - **A wanderer's bar shows only for 5 s after it is hurt** (`LastDamageTime`, default −1000). It
   is gated on `NOT Dead`.
-- **`NpcKillCount` lives on the GameMode** and only counts kills with `DamagedByPlayer` set.
+- **`NpcKillCount` lives on the player's PlayerState** (replicated: a client's HUD reads its
+  own; `probe_net_player_state.py`) and only counts kills with `DamagedByPlayer` set.
 - **The FPS readout counts real time over a 0.5 s window.** Never drive a HUD element with a
   `stat` command: `stat fps` is a toggle, and in PIE its state outlives the session. The verifier
   rejects it.

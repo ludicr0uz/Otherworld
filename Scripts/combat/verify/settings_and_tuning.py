@@ -8,7 +8,8 @@ import unreal
 
 from combat.difficulty import DEFAULT_DIFFICULTY, DIFFICULTY_LABELS, DIFFICULTY_VAR, EASY
 from combat.paths import (
-    GAME_MODE_BP_PATH, SETTINGS_BP_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
+    SETTINGS_BP_PATH, SETTINGS_SLOT, SETTINGS_USER_INDEX)
+from net.state_consts import GAME_STATE_BP_PATH
 from combat.tuning import BIND_VARS, COMBAT, CombatConfig
 from combat.verify.fixtures import w, wc_cdo, wg
 from combat.verify.common import BEL, PIN, builder_modules, cdo, check, load, titled
@@ -207,7 +208,7 @@ def check_combat_config():
 
 
 def check_difficulty():
-    # Saved in BP_Settings, copied onto the GameMode by the HUD each frame;
+    # Saved in BP_Settings, copied onto the GameState by the HUD each frame;
     # both default to EASY so a first run, an old save and a HUD-less pawn all
     # play on easy.
     check("the difficulties are EASY, MEDIUM, SURVIVOR in that order",
@@ -215,7 +216,7 @@ def check_difficulty():
     check("the default difficulty is EASY",
           DEFAULT_DIFFICULTY == EASY == DIFFICULTY_LABELS.index("EASY"))
     for owner, path in (("BP_Settings", SETTINGS_BP_PATH),
-                        ("the GameMode", GAME_MODE_BP_PATH)):
+                        ("the GameState", GAME_STATE_BP_PATH)):
         bp = load(path)
         got = cdo(bp).get_editor_property(DIFFICULTY_VAR) if bp else None
         check(f"{owner} carries {DIFFICULTY_VAR}, an int defaulting to EASY",

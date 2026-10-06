@@ -70,6 +70,7 @@ from combat.bullet_impact import build_bullet_impact              # noqa: E402
 from combat.combat_trace import build_combat_trace_switch         # noqa: E402
 from combat.footsteps import build_footstep_component             # noqa: E402
 from combat.game_state import ensure_game_mode_vars               # noqa: E402
+from net.state import build_state                                 # noqa: E402
 from combat.log import _log                                       # noqa: E402
 from uebp.graph import BEL, _apply_defaults                       # noqa: E402
 from combat.health_component import build_health_component        # noqa: E402
@@ -165,6 +166,9 @@ def main():
     impact_bp = build_bullet_impact()
     # Before the health component: its BeginPlay casts to the GameMode, and a
     # cast node only appears in the palette for a class that is already loaded.
+    # The PlayerState and the GameState (what a client reads) first, for the
+    # same reason, and named on the GameMode.
+    build_state()
     ensure_game_mode_vars()
     build_combat_trace_switch()
     health_bp = build_health_component()

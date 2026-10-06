@@ -2,23 +2,24 @@
 
 Health is read off BP_HealthComponent rather than off the character class, so
 the HUD does not care which pawn is possessed -- anything carrying the
-component shows. The kill count lives on the GameMode: it has to outlast the
-wanderers that earn it and the player's own components.
+component shows. The kill count is the player's own, on their PlayerState
+(net/state_consts.py): it outlasts the wanderers that earn it and the
+player's own components, and a client of a server can read it.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
 from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent, set_text
 from graphics_menu.umg_consts import HP_BAR, HP_GROUP, HP_NUM, KILLS, WBP_HUD
-from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PC
 from uebp.nodes.math import FN_DIV_FF, FN_ROUND
-from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
-from uebp.nodes.system import FN_CONCAT, FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN, FN_INT_TO_STR
+from uebp.nodes.palette import NODE_CAST_HEALTH
+from uebp.nodes.system import FN_CONCAT, FN_GET_PLAYER_PAWN, FN_INT_TO_STR
+from net.state_consts import PLAYER_STATE_CLASS_PATH
+from net.state_graph import CONTROLLER_CLASS_PATH, player_state_of
 from combat import health_vars as HV
 
 HEALTH_CLASS_PATH = "/Game/Weapons/BP_HealthComponent.BP_HealthComponent_C"
-GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
-                        ".BP_ThirdPersonGameMode_C")
 KILL_COUNT_VAR = "NpcKillCount"
 KILLS_PREFIX = "KILLS  "
 
@@ -61,20 +62,17 @@ def author_hp(ed, in_execs):
 
 
 def author_kills(ed, in_execs):
-    """Kills = "KILLS  " + GameMode.NpcKillCount. Only read here; the combat
-    death path is the one writer, and only for a wanderer the player killed."""
-    mode = _node(ed, FN_GET_GAME_MODE)
-    cast = _palette(ed, NODE_CAST_GAME_MODE)
-    _connect(out(mode), _pin(cast, "Object"))
-    for e in in_execs:
-        _connect(e, _pin(cast, "execute"))
-    kills = ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH)
-    _connect(_loose_pin(cast, "AsBPThirdPersonGameMode", is_input=False),
-             _pin(kills, "self"))
+    """Kills = "KILLS  " + this player's NpcKillCount, off the owning
+    controller's PlayerState. Only read here; the combat death path is the
+    one writer, on the server, and only for a wanderer a player killed."""
+    owner = _node(ed, FN_GET_OWNING_PC)
+    mine = player_state_of(ed, out(owner), CONTROLLER_CLASS_PATH, in_execs)
+    kills = ed.add_get_member_variable_node(KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH)
+    _connect(mine.pin, _pin(kills, "self"))
     as_text = _node(ed, FN_INT_TO_STR)
     _connect(out(kills, KILL_COUNT_VAR), _pin(as_text, "InInt"))
     line = _node(ed, FN_CONCAT)
     _set(line, "A", KILLS_PREFIX)
     _connect(out(as_text), _pin(line, "B"))
-    shown = set_text(ed, part(ed, WBP_HUD, KILLS), out(line), [then(cast)])
-    return (shown, out(cast, "CastFailed"))
+    shown = set_text(ed, part(ed, WBP_HUD, KILLS), out(line), [mine.then])
+    return (shown, *mine.fails)

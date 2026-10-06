@@ -18,8 +18,9 @@ starts wherever the level puts it.
 
 from combat.game_state import KILL_COUNT_VAR
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
-from graphics_menu.player_parts import MODE, PAWN
+from net.state_consts import PLAYER_STATE_CLASS_PATH
+from combat.paths import ITEM_CLASS_PATH, WEAPON_COMP_CLASS_PATH
+from graphics_menu.player_parts import STATE, PAWN
 from graphics_menu.profile_consts import (
     ITEM_FIELDS, EQUIPPED_FIELD, ITEM_CLASSES_FIELD, KILLS_FIELD, PROFILE_CLASS_PATH,
     PROFILE_SLOT, PROFILE_USER_INDEX, STAT_FIELDS)
@@ -108,7 +109,7 @@ def author_read_profile(ed, in_exec, parts, made):
     wc = parts[WEAPON_COMP_CLASS_PATH]
 
     copies = [(parts[owner], owner, var, field) for field, owner, var in STAT_FIELDS]
-    copies += [(parts[MODE], GAME_MODE_CLASS_PATH, KILL_COUNT_VAR, KILLS_FIELD)]
+    copies += [(parts[STATE], PLAYER_STATE_CLASS_PATH, KILL_COUNT_VAR, KILLS_FIELD)]
     for dst_out, dst_class, dst_var, field in copies:
         flow = copy_var(ed, prof, PROFILE_CLASS_PATH, field, dst_out, dst_class,
                      dst_var, flow, made)

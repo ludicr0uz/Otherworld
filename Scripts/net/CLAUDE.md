@@ -5,8 +5,8 @@ authority, 4.2 where state lives, 4.8 the two modes); the authoring helpers are
 `Scripts/uebp/CLAUDE.md`; the harness is the root `CLAUDE.md`'s `--net`. This file is the
 rules a graph follows, how to prove one, and what the spike (task M4, 2026-10-06) found
 broken. Its code is what the builders share to keep one graph right in both modes
-(`__init__.py` maps it): `pause.py`, and the session (`session_consts.py`,
-`game_instance.py`); M9's shared helpers ("nearest living player") land here.
+(`__init__.py` maps it): `pause.py`, the session (`session_consts.py`,
+`game_instance.py`) and where state lives (`state*.py`); M9's shared helpers ("nearest living player") land here.
 
 ## The authority pattern
 
@@ -28,10 +28,48 @@ owning client: read input  --Server RPC-->  server: validate, change state
 - **Cosmetics** (a sound, an effect, a montage) are a Multicast called by the server, or a
   RepNotify. Unreliable unless losing it matters.
 - **A client has no GameMode.** `GetGameMode` is None there. What a client reads lives on
-  the GameState, a PlayerState, or a replicated actor or component.
+  the GameState, a PlayerState, or a replicated actor or component ("Where state lives",
+  below).
 - **Player 0 means nothing on a server.** There, index 0 is whoever joined first (client 2
   in one spike run, client 1 in the next). A component asks its owner, a widget its owning
   player, an NPC chooses among the players.
+
+## Where state lives (M7, done)
+
+`serversupportsysdesign.md` 4.2 is the table; `state_consts.py` the two Blueprints, both built
+by the weapons build and named on the GameMode (`state.py`):
+
+| home | holds | who writes | who reads |
+|---|---|---|---|
+| `BP_OtherworldPlayerState` (one per player, replicated to all) | `NpcKillCount`, `PlayerDead` | the server: the death graph (`combat/death.py`) | that player's HUD, through its owning controller |
+| `BP_OtherworldGameState` (one, replicated) | `DebugMode`, `Difficulty` | the machine that owns it: the HUD's writes are behind `HasAuthority` of the GameState | every machine: the HUD, the weapon component, the consume ability, the wanderers' AI |
+| the GameMode (the server alone) | the spawn counter, the noise record, the gun-drop streams, the combat trace's switch | the server | the server |
+
+- **Reach them with `state_graph.py`,** never a hand-made cast: `game_state`,
+  `owned_game_state` (for a write), `player_state_of` (a controller's or a pawn's),
+  `owner_player_state` (a component's), and `server_game_mode`, which is Switch Has Authority
+  and then the cast. Each returns the pin, the exec for "it is there" and the execs for "it is
+  not": read the object only down the first. A client has neither state for its first frames.
+- **No graph a client can run reads the GameMode.** `state_checks.check_no_client_game_mode`
+  (in the menu verifier) scans every Blueprint: a `GetGameMode` is allowed in a class only the
+  server has (the GameMode, an AI controller, a behaviour tree's node) or directly off the
+  Authority arm of the switch, which is what `server_game_mode` authors.
+- **A new per-player fact** is a row of `PLAYER_TABLE`, a shared one of `GAME_TABLE`; both
+  are declared and replicated from the table. The team id (4.2) goes on the PlayerState.
+- **A client's write to either does nothing useful** (its copy is the server's to change).
+  A client that must change state asks with a Server event on something it owns. The debug
+  row and the difficulty therefore do nothing as a client of a server: the dev settings' row
+  of the mode table, until a later task lets the server allow them.
+- **Kills are credited to player 0's PlayerState** (`state_graph.first_player_state`): no
+  blow says yet who struck it. Right in single player; M14's instigator replaces it.
+- **The wanderer's number (`NpcId`) is taken on the server only,** so a client's debug
+  overlay draws 0 beside each health bar until the health component replicates (M14).
+- **A probe** reads them with `p.game_state()` and `p.player_state()`; on a server, each of
+  `p.players()` has its `.player_state`, and `player_id` is the one name a server and a
+  client share for a player (`probe_net_player_state.py`).
+- Proof: `probe_net_player_state.py` (each client's HUD shows its own count, the shared
+  debug flag, and the death menu on the one dead client; clean with `--windowed`) and, for
+  single player, `probe_kill_credit.py`.
 
 ## Three questions, never "is this multiplayer"
 
@@ -178,8 +216,8 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 
 | system | what happens on a server with two clients | how known | task |
 |---|---|---|---|
-| HUD | `ReceiveDrawHUD` casts the GameMode, which a client does not have: `Accessed None ... AsBP_Third_Person_Game_Mode` on every rendered client (16 lines a client in a 48 s run). The only runtime error of the spike, and invisible with `-nullrhi` | measured (`--windowed`) | M7 |
-| GameMode readers | 12 builder modules call `FN_GET_GAME_MODE` and 11 cast to it (combat 4, npc 4, graphics_menu, survival, the menu build); each reads None on a client. Only the HUD's logged, because only it ran | read | M7 |
+| HUD | **Fixed (M7).** `ReceiveDrawHUD` cast the GameMode, which a client does not have: `Accessed None ... AsBP_Third_Person_Game_Mode` on every rendered client (16 lines a client in a 48 s run). The only runtime error of the spike, and invisible with `-nullrhi` | measured (`--windowed`); the fix measured (`probe_net_player_state.py --windowed`: 0) | M7 done |
+| GameMode readers | **Fixed (M7): "Where state lives", above.** 12 builder modules called `FN_GET_GAME_MODE` and 11 cast to it (combat 4, npc 4, graphics_menu, survival, the menu build); each reads None on a client. Only the HUD's logged, because only it ran | read | M7 done |
 | player 0 | 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
 | health | Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured | M14 |
 | firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | M19, M21 |

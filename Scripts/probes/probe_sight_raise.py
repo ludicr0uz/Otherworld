@@ -45,7 +45,8 @@ import unreal
 
 from combat.carry_tuning import LOWERED_VAR
 from combat.game_state import DEBUG_MODE_VAR
-from combat.paths import GAME_MODE_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from net.state_consts import GAME_STATE_BP_PATH
+from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from combat.seat_tuning import (
     LOOK_VAR, SEAT_HOLD, SEAT_VAR, SEATED_VAR, SIGHT_SEAT_DEG, SIGHTS_FORCED_VAR,
 )
@@ -56,7 +57,7 @@ from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, DEV_GUNS_REQUEST_VAR),
-            (GAME_MODE_BP_PATH, DEBUG_MODE_VAR)] + [
+            (GAME_STATE_BP_PATH, DEBUG_MODE_VAR)] + [
     (WEAPON_COMP_BP_PATH, v) for v in
     (WV.EquippedIndex, WV.NeedsRefresh, SIGHTS_FORCED_VAR)]
 ML = unreal.MathLibrary
@@ -104,7 +105,7 @@ def _angle(a, b):
 
 def _shot(p, debug, what):
     """Save the view with its HUD, debug mode as given."""
-    p.set(p.game_mode(), DEBUG_MODE_VAR, debug)
+    p.set(p.game_state(), DEBUG_MODE_VAR, debug)
     yield 0.3
     unreal.SystemLibrary.execute_console_command(p.world(), "shot showui")
     p.note(f"shot showui: {what}")

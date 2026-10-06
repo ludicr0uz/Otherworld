@@ -10,7 +10,8 @@ from combat.game_state import (
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.gun_drop import _author_gun_drop
-from combat.paths import GAME_MODE_CLASS_PATH
+from net.state_consts import PLAYER_STATE_CLASS_PATH
+from net.state_graph import first_player_state, owner_player_state, server_game_mode
 from combat.ragdoll import RAGDOLL_PROFILE
 from combat.tuning import AMMO_DROP_SHELLS, AMMO_PICKUP_LIFT
 from loot.roll import author_loot_roll
@@ -19,9 +20,9 @@ from uebp.nodes.actor import (
     FN_SET_COLLISION, FN_SET_PROFILE, FN_SIMULATE_ALL)
 from uebp.nodes.math import FN_ADD_II, FN_ADD_VV, FN_MAKE_TRANSFORM
 from uebp.nodes.palette import (
-    NODE_CAST_CHARACTER, NODE_CAST_GAME_MODE, NODE_CAST_PAWN, NODE_SPAWN)
+    MACRO_SWITCH_AUTHORITY_COMP, NODE_CAST_CHARACTER, NODE_CAST_PAWN, NODE_SPAWN)
 from uebp.nodes.system import (
-    FN_CONCAT, FN_DELAY, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT)
+    FN_CONCAT, FN_DELAY, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT)
 from net.pause import author_pause
 from uebp import props as EP
 from combat import health_vars as HV
@@ -43,7 +44,12 @@ DEATH_PAUSE_SECONDS = 2.2
 
 
 def _author_kill_count(ed, exec_in):
-    """Count this death on the GameMode, if a pellet is what caused it.
+    """Count this death for the player, if a pellet is what caused it.
+
+    On the server only (state_graph.server_game_mode): the count is state,
+    and the gun drop that follows draws from the GameMode's streams. The kill
+    goes on a PlayerState, where its player's HUD can read it on any machine:
+    player 0's, until a blow names who struck it (task M14).
 
     Spliced between "this one despawns" and the respawn, so it sees exactly the
     deaths that are a wanderer's. The guard is the point: the safety net writes
@@ -59,21 +65,19 @@ def _author_kill_count(ed, exec_in):
     _connect(out(earned, DAMAGED_BY_PLAYER_VAR), _pin(shot, "Condition"))
     _connect(exec_in, _pin(shot, "execute"))
 
-    mode = _node(ed, FN_GET_GAME_MODE)
-    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
-    _connect(out(mode), _pin(as_mode, "Object"))
-    _connect(then(shot), _pin(as_mode, "execute"))
-    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
+    server = server_game_mode(ed, [then(shot)])
+    mode_out = server.pin
+    killer = first_player_state(ed, [server.then])
 
-    tally = ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH)
-    _connect(mode_out, _pin(tally, "self"))
+    tally = ed.add_get_member_variable_node(KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH)
+    _connect(killer.pin, _pin(tally, "self"))
     one_more = _node(ed, FN_ADD_II)
     _connect(out(tally, KILL_COUNT_VAR), _pin(one_more, "A"))
     _set(one_more, "B", 1)
-    write = ed.add_set_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH)
-    _connect(mode_out, _pin(write, "self"))
+    write = ed.add_set_member_variable_node(KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH)
+    _connect(killer.pin, _pin(write, "self"))
     _connect(out(one_more), _pin(write, KILL_COUNT_VAR))
-    _connect(then(as_mode), _pin(write, "execute"))
+    _connect(killer.then, _pin(write, "execute"))
 
     # --- and the shells it drops --------------------------------------------
     # On the same arm as the count, and for the same reason: a wanderer the
@@ -100,21 +104,23 @@ def _author_kill_count(ed, exec_in):
     _connect(out(ammo_cls, HV.AmmoClass), _pin(drop, "Class"))
     _connect(out(where), _pin(drop, "SpawnTransform"))
     _set(drop, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(then(write), _pin(drop, "execute"))
+    # A kill with no player to credit still leaves its shells.
+    for e in (then(write), *killer.fails):
+        _connect(e, _pin(drop, "execute"))
 
     ed.add_comment_to_nodes(
-        f"One kill, counted on the GameMode where it outlives the wanderer that "
-        f"earned it, and {AMMO_DROP_SHELLS} shells left where it fell. "
+        f"One kill, counted on the player's PlayerState where it outlives the "
+        f"wanderer that earned it and every machine can read it, and {AMMO_DROP_SHELLS} shells left where it fell. "
         "DamagedByPlayer is the guard on both: the safety net kills anything "
         "that falls under the world through this same path, and nobody shot it.",
-        [earned, shot, mode, as_mode, tally, one_more, write, corpse, fell_at,
+        [earned, shot, *server.nodes, *killer.nodes, tally, one_more, write, corpse, fell_at,
          lifted, where, ammo_cls, drop])
 
     gun_exits = _author_gun_drop(ed, mode_out, out(lifted), then(drop))
     # Then what the body carries, for the loot window (loot/roll.py). After the
     # gun drop, on the same counted-kill arm.
     looted = author_loot_roll(ed, gun_exits)
-    return (looted, out(as_mode, "CastFailed"), else_(shot))
+    return (looted, *server.fails, else_(shot))
 
 
 def _author_death_collapse(ed, exec_ins):
@@ -277,33 +283,30 @@ def _author_player_death(ed, exec_ins):
     always did -- pausing stops physics as well as everything else, so pausing
     early freezes the body mid-topple.
 
-    PlayerDead is set on the GameMode rather than here because the HUD is what
-    draws the menu and the HUD has no route to this component -- it would have
-    to find the player's pawn, find this component and cast to it, every frame,
-    to read one bool that the GameMode already exists to hold.
+    PlayerDead is set on the player's PlayerState (the owning pawn's) rather
+    than here because the HUD is what draws the menu, on that player's own
+    machine: the PlayerState replicates to it, and outlives the pawn. Set on
+    the server only (the authority switch); a client's copy arrives.
     """
     wait = _node(ed, FN_DELAY)
     _set(wait, "Duration", DEATH_PAUSE_SECONDS)
     for tail in exec_ins:
         _connect(tail, _pin(wait, "execute"))
 
-    mode = _node(ed, FN_GET_GAME_MODE)
-    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
-    _connect(out(mode), _pin(as_mode, "Object"))
-    _connect(then(wait), _pin(as_mode, "execute"))
-    tell = ed.add_set_member_variable_node(PLAYER_DEAD_VAR, GAME_MODE_CLASS_PATH)
-    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
-             _pin(tell, "self"))
+    server = ed.add_macro_node(MACRO_SWITCH_AUTHORITY_COMP)
+    _connect(then(wait), _pin(server, "execute"))
+    mine = owner_player_state(ed, [out(server, "Authority")])
+    tell = ed.add_set_member_variable_node(PLAYER_DEAD_VAR, PLAYER_STATE_CLASS_PATH)
+    _connect(mine.pin, _pin(tell, "self"))
     _set(tell, PLAYER_DEAD_VAR, True)
-    _connect(then(as_mode), _pin(tell, "execute"))
+    _connect(mine.then, _pin(tell, "execute"))
 
     # Say so in the log, with the score. A paused game and a game where the
     # death path silently did nothing look exactly the same from outside, and
     # the menu that would tell them apart is drawn on a canvas that a headless
     # run has nobody looking at.
-    score = ed.add_get_member_variable_node(KILL_COUNT_VAR, GAME_MODE_CLASS_PATH)
-    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
-             _pin(score, "self"))
+    score = ed.add_get_member_variable_node(KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH)
+    _connect(mine.pin, _pin(score, "self"))
     score_str = _node(ed, FN_INT_TO_STR)
     _connect(out(score, KILL_COUNT_VAR), _pin(score_str, "InInt"))
     dead_line = _node(ed, FN_CONCAT)
@@ -323,13 +326,13 @@ def _author_player_death(ed, exec_ins):
     # In standalone only: a server's world does not stop for one player's
     # death (net/pause.py).
     frozen = []
-    author_pause(ed, (then(say_dead), out(as_mode, "CastFailed")), frozen)
+    author_pause(ed, (then(say_dead), *mine.fails, out(server, "Remote")), frozen)
 
     ed.add_comment_to_nodes(
         f"The player's death, from a body that is already on the floor: wait "
-        f"{DEATH_PAUSE_SECONDS}s for the ragdoll to settle, tell the GameMode "
+        f"{DEATH_PAUSE_SECONDS}s for the ragdoll to settle, tell the player's PlayerState "
         f"and pause. The pause stops physics too, so the body stays exactly as "
         f"it fell until the level reopens -- which is the fix for the player "
         f"standing back up. BP_GraphicsMenuHUD draws the menu off "
         f"{PLAYER_DEAD_VAR} and restarts the level from it.",
-        [wait, mode, as_mode, tell, score, score_str, dead_line, say_dead] + frozen)
+        [wait, server, *mine.nodes, tell, score, score_str, dead_line, say_dead] + frozen)

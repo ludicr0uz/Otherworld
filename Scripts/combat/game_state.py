@@ -1,6 +1,13 @@
-"""The GameMode's shared variables (spawn/kill counters, PlayerDead, debug
-mode) and the per-health-component variable names every graph agrees on,
-plus ensure_game_mode_vars() which declares them.
+"""The names of the world-scoped variables every graph agrees on, and of the
+health component's; plus ensure_game_mode_vars(), which declares the ones
+that live on the GameMode.
+
+Where each lives (serversupportsysdesign.md 4.2; net/state_consts.py):
+    the GameMode     what only the server reads: the spawn counter, the noise
+                     record, the gun-drop streams, the combat trace's switch
+    the PlayerState  what is one player's: NpcKillCount, PlayerDead
+    the GameState    what every machine reads: DebugMode, Difficulty
+A client has no GameMode, so nothing it reads may be declared here.
 """
 
 import unreal
@@ -13,7 +20,7 @@ from combat.paths import GAME_MODE_BP_PATH
 
 
 # --- debug mode --------------------------------------------------------------
-# One flag on the GameMode, toggled from the graphics menu, that turns the
+# One flag on the GameState (replicated), toggled from the graphics menu, that turns the
 # developer overlays on and off: the pellet tracers drawn from the muzzle, the
 # wanderer's number beside its health bar and its sight cone
 # (npc/sight_cone.py). Off by default -- they are all instrumentation, and
@@ -59,10 +66,11 @@ TRACER_MISS_COLOR = "(R=0.300000,G=0.800000,B=1.000000,A=1.000000)"
 # every wanderer.
 SPAWN_COUNT_VAR = "NpcSpawnCount"
 NPC_ID_VAR = "NpcId"
-# Two more numbers on the same GameMode, for the same reason: they have to
-# outlive every wanderer and every one of the player's own components.
-# NpcKillCount is what the HUD counts in the corner and what the death menu
-# quotes; PlayerDead is the one flag the menu is drawn from.
+# Two facts about one player, on their PlayerState (net/state_consts.py):
+# they outlive every wanderer and every one of the player's own components,
+# and replicate to the client whose HUD shows them. NpcKillCount is what the
+# HUD counts in the corner and what the death menu quotes; PlayerDead is the
+# one flag the menu is drawn from.
 KILL_COUNT_VAR = "NpcKillCount"
 PLAYER_DEAD_VAR = "PlayerDead"
 # The gun drop's two random streams (combat/gun_drop.py) and whether they have
@@ -116,24 +124,20 @@ NOISE_VECTOR_VARS = (NOISE_LOCATION_VAR, NOISE_DIRECTION_VAR)
 DAMAGE_TEXT_COLOR = "(R=1.000000,G=0.850000,B=0.100000,A=1.000000)"
 
 
-# ─── BP_HealthComponent ──────────────────────────────────────────────────────
+# What the GameMode held before a client had to read it, now on the
+# PlayerState and the GameState (net/state_consts.py).
+MOVED_VARS = (KILL_COUNT_VAR, PLAYER_DEAD_VAR, DEBUG_MODE_VAR, DIFFICULTY_VAR)
+
 
 def ensure_game_mode_vars():
-    """Put the world-scoped counters and the death flag on the GameMode.
+    """Put the server's world-scoped bookkeeping on the GameMode.
 
     Variables only -- no graph. The GameMode is chosen because Blueprints have
     no statics and each of these has to be one value per session, shared by
-    every wanderer's health component and read by the HUD:
+    every wanderer's health component, and read by the server alone:
 
         NpcSpawnCount  the next number to hand a wanderer, so the log and the
                        floating bars agree on who is who;
-        NpcKillCount   what the corner of the HUD shows and what the death menu
-                       quotes as the final score;
-        PlayerDead     the one flag the death menu is drawn from;
-        DebugMode      whether the developer overlays are on. Here rather than
-                       on the HUD that toggles it because the *weapon
-                       component* is the other thing that reads it, and a HUD
-                       variable is not reachable from a component.
         CombatTrace    whether wanderers log each landed swing (see
                        COMBAT_TRACE_VAR). Its default is written by
                        combat_trace.build_combat_trace_switch().
@@ -141,12 +145,11 @@ def ensure_game_mode_vars():
                        written by whatever made it, heard by every wanderer.
         GunDrop*       the gun drop's roll and pick streams and their
                        seeded-this-session flag (see GUN_ROLL_STREAM_VAR).
-        Difficulty     the settings screen's difficulty, copied here by the
-                       HUD every DrawHUD so gameplay (GA_ConsumeItem) reads it
-                       without loading the save. Its int default, 0, is EASY.
 
-    All three outlive every actor that touches them -- the player's own health
-    component is destroyed with the player, so the score cannot live there.
+    What a client reads is not here (MOVED_VARS): the kills and the death
+    flag are the PlayerState's, debug mode and the difficulty the GameState's
+    (net/state.py builds both). They are removed from a GameMode built
+    before that.
 
     Declared here rather than in build_graphics_menu.py (which owns the other
     edit to this asset, HUDClass) because they are part of the NPC and player
@@ -159,10 +162,10 @@ def ensure_game_mode_vars():
     ed = BGE.get_graph_editor_by_name(bp, "EventGraph")
     if not ed:
         raise RuntimeError(f"{GAME_MODE_BP_PATH} has no EventGraph")
-    for name in (SPAWN_COUNT_VAR, KILL_COUNT_VAR, DIFFICULTY_VAR):
-        _declare(ed, name, BEL.get_basic_type_by_name("int"))
-    for name in (PLAYER_DEAD_VAR, DEBUG_MODE_VAR, COMBAT_TRACE_VAR,
-                 GUN_STREAMS_SEEDED_VAR):
+    for name in MOVED_VARS:
+        ed.remove_member_variable(name)
+    _declare(ed, SPAWN_COUNT_VAR, BEL.get_basic_type_by_name("int"))
+    for name in (COMBAT_TRACE_VAR, GUN_STREAMS_SEEDED_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     for name in NOISE_FLOAT_VARS:
         _declare(ed, name, _float_type())
@@ -174,7 +177,6 @@ def ensure_game_mode_vars():
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonGameMode failed to compile")
     eas.save_loaded_asset(bp)
-    _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {KILL_COUNT_VAR}, "
-         f"{PLAYER_DEAD_VAR}, {DEBUG_MODE_VAR}, {COMBAT_TRACE_VAR}, "
-         f"{DIFFICULTY_VAR}, the noise record and the gun-drop streams ready")
+    _log(f"{GAME_MODE_BP_PATH}: {SPAWN_COUNT_VAR}, {COMBAT_TRACE_VAR}, "
+         f"the noise record and the gun-drop streams ready")
     return bp

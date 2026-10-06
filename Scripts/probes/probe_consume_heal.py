@@ -10,7 +10,8 @@ cannot overwrite it.
 """
 
 from combat.difficulty import DIFFICULTY_VAR, EASY, MEDIUM
-from combat.paths import GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH
+from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
+from net.state_consts import GAME_STATE_BP_PATH
 from combat.tuning import CONSUME_EVENT_TAG
 from survival.paths import MUSHROOM_CLASS_PATH, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 from survival.tuning import MUSHROOM_HEALTH_EASY
@@ -18,7 +19,7 @@ from combat import health_vars as HV
 from survival import component_vars as UV
 
 WRITABLE = [(HEALTH_BP_PATH, HV.Health), (SURVIVAL_BP_PATH, UV.Hunger),
-            (GAME_MODE_BP_PATH, DIFFICULTY_VAR)]
+            (GAME_STATE_BP_PATH, DIFFICULTY_VAR)]
 
 START_HEALTH = 50.0
 START_HUNGER = 50.0     # well under the cap, so a refill always shows
@@ -29,7 +30,7 @@ def _eat(p, difficulty):
     pawn = p.pawn()
     health = p.component(pawn, HEALTH_CLASS_PATH)
     survival = p.component(pawn, SURVIVAL_CLASS_PATH)
-    p.set(p.game_mode(), DIFFICULTY_VAR, difficulty)
+    p.set(p.game_state(), DIFFICULTY_VAR, difficulty)
     p.set(health, "Health", START_HEALTH)
     p.set(survival, "Hunger", START_HUNGER)
     hunger_before = p.get(survival, "Hunger")

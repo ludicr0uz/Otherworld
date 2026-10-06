@@ -730,17 +730,19 @@ The level generator above knows nothing about any of this; it is built by
 every generated level picks up through `BP_ThirdPersonGameMode`. CLAUDE.md carries the
 reasoning; this is the shape.
 
-**Four values on the GameMode, because Blueprints have no statics** and each has to outlive
-every actor that touches it — including the player's own components, which die with them:
+**Four world-scoped values, because Blueprints have no statics** and each has to outlive
+every actor that touches it — including the player's own components, which die with them.
+Each lives where every machine that needs it can read it (`serversupportsysdesign.md` 4.2,
+`Scripts/net/CLAUDE.md` "Where state lives"): a client of a server has no GameMode.
 
-| variable | written by | read by |
-|---|---|---|
-| `NpcSpawnCount` | each wanderer's `BeginPlay` | the next wanderer, for its number |
-| `NpcKillCount` | the death path, *only* when `DamagedByPlayer` | the HUD corner and the death menu |
-| `PlayerDead` | the player's death path | the HUD, to draw the menu instead of the HUD |
-| `DebugMode` | the HUD's BeginPlay (from `BP_Settings.DebugMode`, default on) and **D** in the graphics menu (which also saves it) | the weapon component (tracers) and the HUD (FPS readout, NPC numbers) |
+| variable | on | written by | read by |
+|---|---|---|---|
+| `NpcSpawnCount` | the GameMode (server only) | each wanderer's `BeginPlay`, behind the authority switch | the next wanderer, for its number |
+| `NpcKillCount` | `BP_OtherworldPlayerState`, replicated | the death path on the server, *only* when `DamagedByPlayer` | that player's HUD corner and death menu |
+| `PlayerDead` | `BP_OtherworldPlayerState`, replicated | the player's death path, on the server | that player's HUD, to draw the menu instead of the HUD |
+| `DebugMode` | `BP_OtherworldGameState`, replicated | the HUD's BeginPlay (from `BP_Settings.DebugMode`, default on) and the menu's debug row (which also saves it), where the machine owns the GameState | the weapon component (tracers), the HUD (FPS readout, NPC numbers), the wanderers' AI (cones, the aggro line) |
 
-`DebugMode` is on the GameMode rather than on the HUD that toggles it for the same reason as
+`DebugMode` is on the GameState rather than on the HUD that toggles it for the same reason as
 the rest: `BP_WeaponComponent` is the other reader, and a component cannot reach a HUD
 variable. Both readers take one cheap copy — the weapon component once per shot, the HUD once
 per `DrawHUD` — rather than casting per pellet or per wanderer. The HUD's copy (`DebugOn`) also
@@ -775,7 +777,7 @@ Health <= 0, not already Dead
           DisableMovement   <-- also reached by the world-floor net below
           -> MM_Death_Front_01 into FullBodySlot
           -> Delay 2.2 s                       (the animation is ~1.9 s)
-          -> GameMode.PlayerDead = true
+          -> (server) the owner's PlayerState.PlayerDead = true
           -> "[PLAYER-DEAD] killed with N"
           -> SetGamePaused(true)
 ```
@@ -816,7 +818,7 @@ every frame, including the frames where nothing is equipped.
    '-- ((NOT UsesAmmo OR Loaded > 0) AND now >= NextFireTime)
        AND (tapped OR (holding AND Held.Automatic))
           -> Loaded -= 1;  NextFireTime = now + FireInterval
-          -> cache GameMode.DebugMode;  sound;  one trace per pellet
+          -> cache GameState.DebugMode;  sound;  one trace per pellet
 ```
 
 **Automatic fire is the `Automatic` term in that inner condition and nothing else.** The outer

@@ -11,4 +11,13 @@ replication authoring).
     game_instance.py  builds that GameInstance: the engine's NetworkError and
                 TravelError events write the reason the title shows
     session_checks.py  the verifiers' checks for it
+    state_consts.py  where state lives: BP_OtherworldPlayerState (one player's:
+                kills, is dead) and BP_OtherworldGameState (the world's: debug
+                mode, difficulty), their paths and variables
+    state.py    builds the two, every variable Replicated, and names them on
+                the GameMode
+    state_graph.py  how a graph reaches them: the casts every reader shares,
+                and server_game_mode, the GameMode behind the authority switch
+    state_checks.py  the verifiers' checks: the assets, and that no graph a
+                client can run reads the GameMode
 """

@@ -13,15 +13,15 @@ from combat.game_state import (
     FELL_LOG_PREFIX, NPC_ID_VAR, SPAWNED_AT_VAR, SPAWN_COUNT_VAR,
     SPAWN_LOG_PREFIX,
 )
-from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.hit_reaction import HIT_REACT_PROBE, LAST_HIT_FROM_VAR
 from combat.paths import GAME_MODE_CLASS_PATH
+from net.state_graph import server_game_mode
 from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_GET_OWNER
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_BREAK_VECTOR, FN_GE_FF, FN_GREATER_FF, FN_LESS_FF, FN_SUB_FF)
-from uebp.nodes.palette import NODE_CAST_GAME_MODE
 from uebp.nodes.system import (
-    FN_CONCAT, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_OBJECT_CLASS, FN_PRINT, FN_TIME_SECONDS,
+    FN_CONCAT, FN_INT_TO_STR, FN_OBJECT_CLASS, FN_PRINT, FN_TIME_SECONDS,
     FN_VEC_TO_STR, FN_WARN)
 from combat import health_vars as HV
 
@@ -129,11 +129,11 @@ def _author_health_begin_play(ed, begin):
     _connect(out(my_class), _pin(same_again, HV.RespawnClass))
     _connect(then(is_wanderer), _pin(same_again, "execute"))
 
-    mode = _node(ed, FN_GET_GAME_MODE)
-    as_mode = _palette(ed, NODE_CAST_GAME_MODE)
-    _connect(out(mode), _pin(as_mode, "Object"))
-    _connect(then(same_again), _pin(as_mode, "execute"))
-    mode_out = _loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False)
+    # The counter is the server's bookkeeping, on the GameMode a client does
+    # not have: a client's copy of a wanderer takes no number.
+    server = server_game_mode(ed, [then(same_again)])
+    mode, as_mode = server.nodes[1:]
+    mode_out = server.pin
 
     seen = ed.add_get_member_variable_node(SPAWN_COUNT_VAR, GAME_MODE_CLASS_PATH)
     _connect(mode_out, _pin(seen, "self"))
@@ -197,7 +197,7 @@ def _author_health_begin_play(ed, begin):
         "same number beside its health bar, so anything seen on screen can be "
         "looked up in the log. The player's copy of this component skips it -- "
         "DespawnOnDeath is what tells the two apart.",
-        [mine, is_wanderer, mode, as_mode, seen, next_id, take, my_id, bump,
+        [mine, is_wanderer, *server.nodes, seen, next_id, take, my_id, bump,
          record, spawned_at, id_str, head, here_owner, here, where_str, at_str,
          line, say])
 

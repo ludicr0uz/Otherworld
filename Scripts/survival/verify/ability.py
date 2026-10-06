@@ -41,14 +41,14 @@ def run():
 
 
 def check_easy_heal(nodes):
-    """The heal happens on EASY only, from the GameMode's Difficulty."""
+    """The heal happens on EASY only, from the GameState's Difficulty."""
     easy = [n for n in by_pins(nodes, "A", "B")
             if any("Get " + DIFFICULTY_VAR == str(BEL.get_node_title(
                        unreal.BlueprintGraphPinLibrary.get_owning_node(q)))
                    for q in BEL.find_input_pin(n, "A").list_connected_pins())]
     # A literal 0 reads back as "" once the asset is reloaded from disk (an
     # int pin at its default is not stored); an empty int pin compiles as 0.
-    check(f"the heal is gated on the GameMode's {DIFFICULTY_VAR} == EASY",
+    check(f"the heal is gated on the GameState's {DIFFICULTY_VAR} == EASY",
           len(easy) == 1
           and int(BEL.find_input_pin(easy[0], "B").get_pin_value() or 0) == EASY,
           str([BEL.find_input_pin(n, "B").get_pin_value() for n in easy]))

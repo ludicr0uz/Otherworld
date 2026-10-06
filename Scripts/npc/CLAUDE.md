@@ -438,7 +438,7 @@ Wanderer (selector)
     90, shotgun 85, SMG 50, pistol 35), plus a 1.6× cone within 30° of the shot's line.
   - **Footsteps (player only):** 12 m at a run, 18 m sprinting, 6 m while aiming.
 - **Every transition logs `[NPC-AGRO] <sense> -- <actor>`, in debug mode only.** The line is a
-  `PrintWarning`, which also puts it on screen, so it is gated on the GameMode's `DebugMode`.
+  `PrintWarning`, which also puts it on screen, so it is gated on the GameState's `DebugMode`.
 - **Debug mode also draws each live wanderer's sight (aggro) cone** (`sight_cone.py`): from the
   pawn, along its forward vector, `TuneSightRange` long and `TuneSightHalfAngle` either side —
   the sight sense's own inputs, so the MONSTER SETTINGS tab moves the cone and the sense together.

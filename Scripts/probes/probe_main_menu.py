@@ -54,7 +54,7 @@ def _after(seconds):
 def probe(p):
     yield lambda: p.hud() is not None and p.get(p.hud(), "UiHud") is not None
     yield 0.3
-    hud, mode, world = p.hud(), p.game_mode(), p.world()
+    hud, mode, world = p.hud(), p.game_state(), p.world()
     was_debug = p.get(mode, DEBUG_MODE_VAR)
 
     # --- the title, as BeginPlay leaves it, but for the paused tick -----------

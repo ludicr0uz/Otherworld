@@ -1,5 +1,5 @@
 """verify_graphics_menu.py's checks for the DIFFICULTY row and its push onto
-the GameMode (graphics_menu/difficulty.py). Here rather than in the verifier,
+the GameState (graphics_menu/difficulty.py). Here rather than in the verifier,
 which is over its size budget.
 """
 
@@ -68,7 +68,7 @@ def check_difficulty(check, bp, nodes):
     sets = [x for x in nodes
             if str(BEL.get_node_title(x)) == f"Set {DIFFICULTY_VAR}"]
     targets = sorted(src for x in sets for src in _sources(x, "self"))
-    check(f"{DIFFICULTY_VAR} is stored by the nudge and pushed onto the GameMode",
+    check(f"{DIFFICULTY_VAR} is stored by the nudge and pushed onto the GameState",
           len(sets) == 2 and any("Settings" in t for t in targets)
-          and any("ThirdPersonGameMode" in t for t in targets),
+          and any("OtherworldGameState" in t for t in targets),
           str(targets))

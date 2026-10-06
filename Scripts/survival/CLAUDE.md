@@ -38,7 +38,7 @@ Both are read at editor **startup**, so changing either needs a restart.
    The ability runs synchronously and reads the item first.
 3. `GA_ConsumeItem` adds the restore value, clamped. On the **EASY** difficulty it also adds the
    item's `HealthRestoreEasy` to Health (`easy_heal.py`; a mushroom heals 10). It reads the
-   GameMode's `Difficulty` (`combat/difficulty.py`), which the HUD copies from the settings save.
+   GameState's `Difficulty` (`combat/difficulty.py`, `net/state_consts.py`), which the HUD copies from the settings save.
 4. On the next Tick, the survival component sees that the bar and the effect disagree, and
    removes the effect.
 

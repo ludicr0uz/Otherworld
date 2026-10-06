@@ -501,7 +501,7 @@ def main():
     # --- the kill counter, the stamina bar and the death menu
     titles = [str(BEL.get_node_title(n)).replace("\n", " ") for n in nodes]
 
-    check("the HUD reads the kill count off the GameMode",
+    check("the HUD reads the kill count off the player's PlayerState",
           any(t == f"Get {HS.KILL_COUNT_VAR}" for t in titles),
           str(sorted({t for t in titles if "Kill" in t})))
     # Twice: once for the corner and once for the death menu's final score. The
@@ -608,18 +608,18 @@ def main():
           str(sum(1 for t in titles if t == "Get InfiniteReserve")))
 
     # --- debug mode
-    # The flag lives on the GameMode, because BP_WeaponComponent draws the
+    # The flag lives on the GameState, because BP_WeaponComponent draws the
     # tracers and a component cannot reach a HUD variable.
-    check("the debug row toggles debug mode on the GameMode, not on the HUD",
+    check("the debug row toggles debug mode on the GameState, not on the HUD",
           any(t == f"Set {G.DEBUG_MODE_VAR}" for t in titles),
           str(sorted({t for t in titles if G.DEBUG_MODE_VAR in t})))
-    # Three reads: the toggle reads the GameMode's to flip it, DrawHUD reads
+    # Three reads: the toggle reads the GameState's to flip it, DrawHUD reads
     # it to copy it, and BeginPlay reads the saved one off BP_Settings.
     check("...by flipping what is already there, so it is a toggle",
           sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}") == 3,
           str(sum(1 for t in titles if t == f"Get {G.DEBUG_MODE_VAR}")))
-    # Three writes: BeginPlay restores the saved value onto the GameMode, and
-    # the toggle writes both the GameMode and the save.
+    # Three writes: BeginPlay restores the saved value onto the GameState, and
+    # the toggle writes both the GameState and the save.
     check("debug mode is restored from the save and written back to it",
           sum(1 for t in titles if t == f"Set {G.DEBUG_MODE_VAR}") == 3,
           str(sum(1 for t in titles if t == f"Set {G.DEBUG_MODE_VAR}")))

@@ -5,7 +5,9 @@ that connects does is impact.py.
 
 from combat.game_state import DEBUG_MODE_VAR
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
-from combat.paths import GAME_MODE_CLASS_PATH, ITEM_CLASS_PATH
+from combat.paths import ITEM_CLASS_PATH
+from net.state_consts import GAME_STATE_CLASS_PATH
+from net.state_graph import game_state
 from combat.weapon_component.accuracy import AIM_SPREAD_VAR
 from combat.weapon_component.common import _prop, _trace_defaults
 from combat.weapon_component.impact import _author_impact
@@ -13,8 +15,8 @@ from combat.weapon_component.tracer import _author_tracer
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_MUL_VF, FN_NORMAL, FN_RAND_CONE, FN_SUB_II,
     FN_SUB_VV)
-from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT, NODE_CAST_GAME_MODE
-from uebp.nodes.system import FN_GET_GAME_MODE, FN_PLAY_SOUND, FN_TIME_SECONDS, FN_TRACE
+from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT
+from uebp.nodes.system import FN_PLAY_SOUND, FN_TIME_SECONDS, FN_TRACE
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
@@ -72,21 +74,19 @@ def _author_fire(ed, held, muzzle, exec_in):
     # --- is anyone watching the tracers? -------------------------------------
     # Read once per shot and cached on this component, rather than read per
     # pellet: the pellet loop needs a plain bool it can branch on, and a
-    # GetGameMode plus a cast eight times over for one flag is eight times the
-    # work for the same answer.
-    mode = keep(_node(ed, FN_GET_GAME_MODE))
-    as_mode = keep(_palette(ed, NODE_CAST_GAME_MODE))
-    _connect(out(mode), _pin(as_mode, "Object"))
-    _connect(then(cool), _pin(as_mode, "execute"))
-    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_MODE_CLASS_PATH))
-    _connect(_loose_pin(as_mode, "AsBPThirdPersonGameMode", is_input=False),
-             _pin(flag, "self"))
+    # GetGameState plus a cast eight times over for one flag is eight times the
+    # work for the same answer. Off the GameState, which every machine has.
+    state = game_state(ed, [then(cool)])
+    for n in state.nodes:
+        keep(n)
+    flag = keep(ed.add_get_member_variable_node(DEBUG_MODE_VAR, GAME_STATE_CLASS_PATH))
+    _connect(state.pin, _pin(flag, "self"))
     note = keep(ed.add_set_member_variable_node(DEBUG_MODE_VAR))
     _connect(out(flag, DEBUG_MODE_VAR), _pin(note, DEBUG_MODE_VAR))
-    _connect(then(as_mode), _pin(note, "execute"))
-    # A GameMode of the wrong class cannot say; not drawing is the safe answer,
+    _connect(state.then, _pin(note, "execute"))
+    # A GameState of the wrong class cannot say; not drawing is the safe answer,
     # and the component's own default is already false.
-    after_cost = [then(note), out(as_mode, "CastFailed")]
+    after_cost = [then(note), *state.fails]
 
     aim_get = keep(ed.add_get_member_variable_node(WV.AimPoint))
     delta = keep(_node(ed, FN_SUB_VV))

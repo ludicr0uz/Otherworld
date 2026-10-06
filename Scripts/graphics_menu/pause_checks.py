@@ -73,6 +73,18 @@ def _is_row_test(n, action):
             and int(_value(n, "B") or 0) == UC.PAUSE_ROW_ACTIONS.index(action))
 
 
+def row_gates(n, action):
+    """``n`` runs off the Branch ``action``'s row being taken is: its
+    Condition is the PauseClick test itself, or an AND / OR with it."""
+    for gate in _gates(n):
+        for c in _sources(gate, "Condition"):
+            if _is_row_test(c, action) or any(
+                    _is_row_test(x, action)
+                    for x in _sources(c, "A") + _sources(c, "B")):
+                return True
+    return False
+
+
 def row_serves(nodes, action, var):
     """``action``'s row being taken is the Branch that sets ``var``: its
     Condition is the PauseClick test itself, or an AND / OR with it."""

@@ -9,13 +9,14 @@
                          slots after them
                 Enter    WearTakeOffRequested = true
         WearTakeOffRequested AND WearOpen -> lower it;
-            WearSel a worn row -> the weapon component's TakeOffSlot = WearSel
-            WearSel a bag slot -> its SlotRequest = that slot (to hand)
+            WearSel a worn row -> the weapon component's AskTakeOff(WearSel,
+                                  into the bag)
+            WearSel a bag slot -> its AskSlot(that slot) (to hand)
     then, on every path: WearOpen != WearStill -> WearStill = WearOpen,
         controller.SetIgnoreMoveInput(WearOpen)
 
-The HUD only asks: the weapon component takes the garment off on its own
-Tick (combat/weapon_component/wear.py), where the bag's room is known. Tick,
+The HUD only asks (ask.py): the weapon component takes the garment off on its
+own Tick (combat/weapon_component/wear.py), where the bag's room is known. Tick,
 not DrawHUD, so a -nullrhi probe can open the panel and take off without a
 keyboard (probes/probe_clothing.py). The walk is held as the menu holds it
 (menu_still.py): the stock mapping walks on the arrows too. SetIgnoreMoveInput
@@ -26,10 +27,11 @@ edge's memory.
 import unreal
 
 from uebp.graph import BEL, _connect, _declare, _loose_pin, _palette, _pin, out, then
-from combat.slot_tuning import SLOT_REQUEST_VAR
+from combat.ask_consts import ASK_SLOT, ASK_TAKE_OFF
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.wear_tuning import TAKE_OFF_VAR
+from combat.wear_tuning import NOT_CLOTHING
 from combat.weapon_component.dead import OWNER_DEAD_VAR
+from graphics_menu.ask import ask
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.loot_find import put
@@ -133,21 +135,15 @@ def author_wear_tick(ed, pc_out, in_execs):
     # asks for that slot's item in hand.
     worn_row = _call(ed, FN_LESS_II, made, A=_get(ed, WEAR_SEL_VAR, made), B=WEAR_ROWS)
     row, bag = _branch(ed, out(worn_row), [flow], made)
-    asked = ed.add_set_member_variable_node(TAKE_OFF_VAR, WEAPON_COMP_CLASS_PATH)
-    made.append(asked)
-    _connect(wc, _pin(asked, "self"))
-    _connect(_get(ed, WEAR_SEL_VAR, made), _pin(asked, TAKE_OFF_VAR))
-    _connect(row, _pin(asked, "execute"))
+    # Into the bag: no slot named (a drag names one, inv_drag.py).
+    asked = ask(ed, wc, ASK_TAKE_OFF, [row], made,
+                Slot=_get(ed, WEAR_SEL_VAR, made), To=NOT_CLOTHING)
     code = _call(ed, FN_SUB_II, made, A=_get(ed, WEAR_SEL_VAR, made), B=SEL_TO_CODE)
-    brought = ed.add_set_member_variable_node(SLOT_REQUEST_VAR, WEAPON_COMP_CLASS_PATH)
-    made.append(brought)
-    _connect(wc, _pin(brought, "self"))
-    _connect(out(code), _pin(brought, SLOT_REQUEST_VAR))
-    _connect(bag, _pin(brought, "execute"))
-    tails = [then(asked), then(brought), idle, shut, out(cast, "CastFailed")]
+    brought = ask(ed, wc, ASK_SLOT, [bag], made, Slot=out(code))
+    tails = [asked, brought, idle, shut, out(cast, "CastFailed")]
     tails = _author_still(ed, pc_out, tails, made)
     ed.add_comment_to_nodes(
         f"The I panel: [{WEAR_KEY}] opens what the player wears, Up/Down pick a "
         "slot, Enter asks the weapon component to take that garment off "
-        "(TakeOffSlot). While it is open the walk is held.", made[:1])
+        "(AskTakeOff). While it is open the walk is held.", made[:1])
     return tails

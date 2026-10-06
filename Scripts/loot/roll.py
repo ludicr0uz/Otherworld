@@ -10,7 +10,7 @@ that fills a body's Loot when a wanderer is killed.
 Spliced after the gun drop on the DamagedByPlayer arm (combat/death.py), so
 only a counted kill fills a body: the world-floor net kills the same way, and
 a wanderer the terrain swallowed was not killed. The items stay classes until
-the player takes one (graphics_menu/loot_take.py spawns it), so a body holds
+the player takes one (combat/weapon_component/loot_take.py spawns it), so a body holds
 no hidden actors and nothing is left over when its lifespan ends.
 """
 

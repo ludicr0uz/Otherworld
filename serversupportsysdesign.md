@@ -52,7 +52,7 @@ builders, verifiers excluded (*verified*).
 | the game pauses | 7 | title menu, death, save and exit | removed: a shared world can't pause |
 | random rolls run wherever the graph runs | 110 in 36 files | loot, gun drops, spread, patrol, the day's start hour | rolled on the server only |
 | the profile is a local save file | `graphics_menu/profile_*.py`, `save_exit.py` | written by the HUD on the player's machine | written by the server, keyed to an account |
-| gameplay logic lives in the HUD | loot take, inventory drags, save and exit, the cheat | `graphics_menu` | moved out: a dedicated server has no HUD |
+| gameplay logic lives in the HUD | loot take, inventory drags, save and exit, the cheat | `graphics_menu` | moved out: a dedicated server has no HUD (done, M11, but for the cheat and the profile's own file: each is an `Ask…` event on the weapon component that the HUD calls, `combat/ask_consts.py`; `Scripts/net/CLAUDE.md`, "A screen asks") |
 
 **Designs that break at 32–64 players:**
 

@@ -21,6 +21,9 @@ and it never relies on a variable another section left behind.
               handled and used up
   wear        clothing: the wear behind the Consumable tap, the take-off the
               I panel asks for (TakeOffSlot), Worn and ClothingSlot's defaults
+  asks        what a screen asks of the weapon component: an event per action
+              (none an RPC yet), the loot take's refusals and what it moves,
+              save and exit's countdown, freeze and call-off
   bullet_impact  BP_BulletImpact: the chips and dust, the seeded layout, and
               the fire graph spawning it off the health cast's failed arm
   body_setting  the one setting that names the player's body
@@ -122,5 +125,5 @@ SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "pickup", "glimmer", "heat",
-    "settings_and_tuning", "firing", "tracer", "consume", "wear", "drops", "loot", "noise", "combat_trace",
+    "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "noise", "combat_trace",
 )

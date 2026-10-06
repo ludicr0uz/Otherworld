@@ -32,7 +32,7 @@ The code is this package (`__init__.py` is the map) plus the HUD's `graphics_men
 - **A body holds classes, not actors.** The item is spawned only when taken, so nothing hidden
   is left over when the corpse's 60 s lifespan ends. The loot goes with the corpse.
 
-## The window (`graphics_menu/loot_tick.py`, `loot_find.py`, `loot_take.py`, `loot_draw.py`)
+## The window (`graphics_menu/loot_tick.py`, `loot_find.py`, `loot_draw.py`; the take is `combat/weapon_component/loot_take.py`)
 
 - **Every HUD Tick** finds `LootTarget`: the nearest dead Character other than the player,
   within `LOOT_RADIUS` (250 cm) of the player, **measured to the mesh**: the capsule stays
@@ -46,8 +46,12 @@ The code is this package (`__init__.py` is the map) plus the HUD's `graphics_men
   E stays the pick-up: a dropped gun lies beside the body, and E on it must not also empty it.
   The keys only raise `LootOpen` / `LootTakeRequested`; Tick serves them, which is what lets
   a probe drive the window.
-- **Taking** spawns the class at the pawn, `Dropped = false`, `Inventory += it`,
+- **Taking is the weapon component's**, not the window's: the HUD lowers
+  `LootTakeRequested` and calls `AskLootTake(LootTarget, LootSel)`. The event refuses a
+  dead owner, no body, a full bag (`HasRoom`) and a row the body does not have; otherwise it
+  spawns the class at the pawn, `Dropped = false`, `Inventory += it`,
   `NeedsRefresh` (as the dev-all-guns cheat does), then removes the row from every body array.
+  The window's `LootBagFull` is only what it shows.
   Only while the bag has room (`LootBagFull`, which the window shows as BAG FULL) and the body
   has something (`Loot[LootSel]` of an empty array is never read).
 - **Out of reach, or the body gone,** loses the target, which shuts the window. An emptied

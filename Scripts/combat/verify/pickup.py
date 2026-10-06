@@ -9,7 +9,7 @@ inventory without switching to it is verify/weapon_inputs.py's.
 
 from combat import item_vars as IV
 from combat.slot_tuning import HAND, HAND_FROM_VAR, HAS_ROOM_VAR, SLOT_VAR, WEAPON_KIND_VAR
-from combat.verify.common import by_pins, check, pin_value
+from combat.verify.common import by_pins, check, in_pins, pin_value
 from combat.verify.fixtures import wg
 from combat.verify.interact import _exec_from, _reads, _sources, _then, _title
 from combat.weapon_component import vars as WV
@@ -25,8 +25,11 @@ def _target_as_item(node, pin):
 def check_pickup_takes_once():
     adds = by_pins(wg, "TargetArray", "NewItem")
     takes = [a for a in adds if _target_as_item(a, "NewItem")]
+    # (The loot take adds the item it has just spawned: verify/asks.py.)
     looped = [a for a in adds if a not in takes
-              and any("Cast" in _title(s) for s in _sources(a, "NewItem"))]
+              and any("Cast" in _title(s) and not any(
+                  "SpawnTransform" in in_pins(o) for o in _sources(s, "Object"))
+                  for s in _sources(a, "NewItem"))]
     check(f"the take adds {INTERACT_TARGET_VAR}, cast to an item, to the "
           "inventory, and nothing adds a loop's own element",
           len(takes) == 1 and not looped,

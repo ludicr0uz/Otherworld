@@ -33,6 +33,7 @@ from graphics_menu import wear_consts as WEAR
 from graphics_menu import tune_tab as TT
 from graphics_menu.loot_checks import check_loot
 from graphics_menu.wear_checks import check_wear
+from graphics_menu.ask_checks import check_asks
 from graphics_menu.tune_checks import check_tune
 from graphics_menu.monster_tune_checks import check_monster_tune
 from graphics_menu.player_tune_checks import check_player_tune
@@ -852,6 +853,7 @@ def main():
     check_reticle_sights(check, bp, nodes)
     check_loot(check, bp, nodes)
     check_wear(check, bp, nodes)
+    check_asks(check, nodes)
     check_tune(check, bp, nodes)
     check_monster_tune(check, bp, nodes)
     check_world_tune(check, bp, nodes)

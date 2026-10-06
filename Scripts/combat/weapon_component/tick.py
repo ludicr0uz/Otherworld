@@ -57,6 +57,7 @@ from combat.weapon_component.use import _author_use
 from combat.weapon_component.wear import _author_take_off, _author_wear_gate
 from combat.weapon_component.wear_drag import _author_wear_request
 from combat.weapon_component.drop_request import _author_drop_request
+from combat.weapon_component.save_exit import _author_save_exit
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 from uebp.nodes.actor import FN_GET_OWNER, FN_IS_KEY_DOWN, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_GREATER_II, FN_NOT, FN_OR
@@ -440,6 +441,9 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
 def _author_upkeep(ed, flight_exits):
     """What follows from state on every copy: the slots served and placed,
     then the equip, if anything asked for one."""
+    # --- save and exit's countdown (save_exit.py) ----------------------------
+    flight_exits = _author_save_exit(ed, flight_exits)
+
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.
     flight_exits = _author_slot_serve(ed, flight_exits)

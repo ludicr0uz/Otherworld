@@ -6,15 +6,17 @@ combat/verify/wear.py's.
 
 import unreal
 
-from combat.slot_tuning import DROP_REQUEST_VAR
-from combat.wear_tuning import TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR, WORN_VAR
+from combat import ask_consts as AC
+from combat.wear_tuning import NOT_CLOTHING, WORN_VAR
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from graphics_menu import umg_consts as UC
+from graphics_menu.ask_checks import asks, fed
 from graphics_menu import wear_consts as WC
 from graphics_menu.umg_checks import _tree
 from graphics_menu.wear_tick import WEAR_STILL_VAR, wear_defaults
 from graphics_menu.inv_carry import carry_defaults
-from graphics_menu.inv_consts import DRAG_FROM_VAR, DRAG_ICON, LOOK_HELD_VAR, NO_SLOT
+from graphics_menu.inv_consts import (
+    DRAG_FROM_VAR, DRAG_ICON, INV_OVER_VAR, LOOK_HELD_VAR, NO_SLOT)
 from item_icons.items import UI_ART_DIR, icon_name
 from item_icons.portrait import PORTRAIT_TEXTURE
 
@@ -97,25 +99,23 @@ def _check_keys(check, nodes):
     check(f"a dead player wears nothing new: {OWNER_DEAD_VAR} shuts the panel",
           len(dying) == 1 and [_value(n, WC.WEAR_OPEN_VAR) for n in shuts] == ["false"],
           str([_title(n) for n in shuts]))
-    asks = [n for n in nodes if _title(n) == f"Set {TAKE_OFF_VAR}"]
-    by_sel = [n for n in asks if [_title(f) for f in _feeders(n, TAKE_OFF_VAR)]
-              == [f"Get {WC.WEAR_SEL_VAR}"]]
-    check(f"a take-off is asked of the weapon component: its {TAKE_OFF_VAR} := "
-          f"{WC.WEAR_SEL_VAR} once (Enter, a click), and once by a drag off a worn slot",
-          len(asks) == 2 and len(by_sel) == 1
-          and all(any("Cast" in _title(f) for f in _feeders(n, "self")) for n in asks),
-          str([[_title(f) for f in _feeders(n, TAKE_OFF_VAR)] for n in asks]))
-    drops = [n for n in nodes if _title(n) == f"Set {TAKE_OFF_TO_VAR}"]
-    wears = [n for n in nodes if _title(n) == f"Set {WEAR_REQUEST_VAR}"]
-    check(f"...the drag names the slot it dropped the garment on ({TAKE_OFF_TO_VAR} := "
-          f"InvOver, before {TAKE_OFF_VAR}), and a slot's item dropped on the worn grid "
-          f"is asked worn ({WEAR_REQUEST_VAR} := {DRAG_FROM_VAR})",
-          len(drops) == 1 and len(wears) == 1
-          and [_title(PIN.get_owning_node(q)) for q in
-               BEL.find_then_pin(drops[0]).list_connected_pins()] == [f"Set {TAKE_OFF_VAR}"]
-          and [_title(f) for f in _feeders(wears[0], WEAR_REQUEST_VAR)]
-          == [f"Get {DRAG_FROM_VAR}"],
-          f"{len(drops)} drops, {len(wears)} wears")
+    offs = asks(nodes, AC.ASK_TAKE_OFF)
+    by_sel = [n for n in offs if fed(n, "Slot") == [f"Get {WC.WEAR_SEL_VAR}"]]
+    check(f"a take-off is asked of the weapon component: {AC.ASK_TAKE_OFF}("
+          f"{WC.WEAR_SEL_VAR}, into the bag) once (Enter, a click), and once by a drag "
+          "off a worn slot",
+          len(offs) == 2 and len(by_sel) == 1
+          and _value(by_sel[0], "To") == str(NOT_CLOTHING),
+          str([fed(n, "Slot") for n in offs]))
+    drags = [n for n in offs if n not in by_sel]
+    wears = asks(nodes, AC.ASK_WEAR)
+    check("...the drag names the slot it dropped the garment on (To := InvOver), "
+          f"and a slot's item dropped on the worn grid is asked worn ({AC.ASK_WEAR}("
+          f"{DRAG_FROM_VAR}))",
+          len(drags) == 1 and len(wears) == 1
+          and fed(drags[0], "To") == [f"Get {INV_OVER_VAR}"]
+          and fed(wears[0], "From") == [f"Get {DRAG_FROM_VAR}"],
+          f"{len(drags)} drags, {len(wears)} wears")
     takes = sorted(_value(n, WC.WEAR_TAKE_VAR) for n in nodes
                    if _title(n) == f"Set {WC.WEAR_TAKE_VAR}")
     check("Enter or a click on a worn slot raises the take-off, and Tick lowers it (and "
@@ -161,13 +161,11 @@ def _check_carry(check, bp, nodes):
     check("...moved onto the cursor every frame a drag is on (its translation the "
           "cursor's place in the HUD's own space)",
           len(moves) == 1 and place == ["Get CursorPos"], f"{len(moves)} moves, {place}")
-    asks = [n for n in nodes if _title(n) == f"Set {DROP_REQUEST_VAR}"]
+    drops = asks(nodes, AC.ASK_DROP)
     check(f"a drag released outside the inventory asks the weapon component to set "
-          f"the item down: its {DROP_REQUEST_VAR} := {DRAG_FROM_VAR}, once",
-          len(asks) == 1
-          and [_title(f) for f in _feeders(asks[0], DROP_REQUEST_VAR)]
-          == [f"Get {DRAG_FROM_VAR}"]
-          and any("Cast" in _title(f) for f in _feeders(asks[0], "self")), str(len(asks)))
+          f"the item down: {AC.ASK_DROP}({DRAG_FROM_VAR}), once",
+          len(drops) == 1 and fed(drops[0], "From") == [f"Get {DRAG_FROM_VAR}"],
+          str(len(drops)))
     ends = [_value(n, DRAG_FROM_VAR) for n in nodes if _title(n) == f"Set {DRAG_FROM_VAR}"
             and not _feeders(n, DRAG_FROM_VAR)]
     check("a drag ends on the release, and when the panel is not open",

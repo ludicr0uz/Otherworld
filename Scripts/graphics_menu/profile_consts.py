@@ -2,7 +2,8 @@
 
 The profile is what a character carries between sessions: its stats and what
 is in its inventory, never where it stood. BP_Profile (a USaveGame, slot
-PROFILE_SLOT) is written when the save-and-exit countdown runs out, read the
+PROFILE_SLOT) is written when the save-and-exit countdown (the weapon
+component's: combat/weapon_component/save_exit.py) runs out, read the
 first time a started game's HUD finds the player's loadout, and deleted the
 moment the player dies -- a death costs the character.
 
@@ -39,21 +40,16 @@ ITEM_FIELDS = (("ItemLoaded", "Loaded"), ("ItemReserve", "Reserve"), ("ItemSlot"
 # The M panel's "save and exit" row starts it (Enter or a click on the row;
 # EXIT_ACTION is what PauseClick is matched against).
 EXIT_ACTION = "save_exit"
-EXIT_SECONDS = 15.0
 EXIT_ROW_LABEL = "Save and Exit"
 
-# The HUD's variables. ExitStartedAt is compared with the player's
-# BP_HealthComponent.LastDamageTime, which a wanderer's swing stamps
-# (npc/melee.py): a hit after the start calls the exit off.
-EXIT_PENDING_VAR = "ExitPending"
-EXIT_AT_VAR = "ExitAt"
-EXIT_STARTED_VAR = "ExitStartedAt"
-EXIT_CALLED_OFF_VAR = "ExitCalledOffAt"
+# The countdown is the weapon component's (combat/ask_consts.py has its
+# variables and its length). The HUD's own: set once the countdown is over
+# and the profile written, so it is written once.
+EXIT_LEAVING_VAR = "ExitLeaving"
 # Set once the profile has been looked for (and applied, if there was one).
 PROFILE_CHECKED_VAR = "ProfileChecked"
 # Set once a dead player's profile has been deleted, so it is deleted once.
 PROFILE_FORGOTTEN_VAR = "ProfileForgotten"
-NEVER = -1000.0
 
 # --- the banner --------------------------------------------------------------
 EXIT_BANNER_PREFIX = "SAVING AND EXITING IN  "

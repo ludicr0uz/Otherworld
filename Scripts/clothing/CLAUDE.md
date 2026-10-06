@@ -40,7 +40,8 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 - **`Worn` starts empty and the first wear into a slot grows it** (`Array_Set`, size to fit).
   Every read of it is behind `IsValidIndex`, then `IsValid`.
 - **Taking one off is the I panel's**: Up/Down and Enter (or a click) raise the HUD's
-  `WearTakeOffRequested`; its Tick sets the weapon component's `TakeOffSlot`, and the
+  `WearTakeOffRequested`; its Tick calls the weapon component's `AskTakeOff`
+  (`Scripts/net/CLAUDE.md`, "A screen asks"), which raises `TakeOffSlot`, and the
   component's own Tick serves it (into the bag while there is room, `HasRoom`: a bag slot
   or the hand free; the slot emptied).
   The HUD never touches the bag.

@@ -92,6 +92,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     number keys, the issued items' slots, fits()
   wear_tuning       clothing: the eight slots (WEAR_SLOTS), ClothingSlot on the
                     item, Worn / TakeOffSlot / WearItem on the component
+  ask_consts        what a screen asks of the weapon component: the Ask
+                    events' names and parameters, and save and exit's
+                    countdown (its variables, EXIT_SECONDS)
   torch_tuning      the stick that burns: Burns / Lit / BurnOutTime / UsePose on
                     the item, how long it burns and how near a campfire lights
                     it (STICK_*), the component's StickClass/NearFire/WardItem/

@@ -2,8 +2,9 @@
 
 A counted kill (DamagedByPlayer) rolls every entry of the body's loot table
 once; what hits goes into the body's Loot. Any body can be searched: the HUD's
-loot window shows what it carries as icons and takes an item into the bag,
-the player kneeling meanwhile (graphics_menu/loot_*.py). The gun drop, which
+loot window shows what it carries as icons and asks the weapon component to
+take an item into the bag (combat/weapon_component/loot_take.py), the player
+kneeling meanwhile (graphics_menu/loot_*.py). The gun drop, which
 lands on the ground instead, is combat/gun_drop.py. Rules: loot/CLAUDE.md.
 
   consts   the health component's loot variable names (table and body arrays:

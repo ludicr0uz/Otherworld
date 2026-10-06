@@ -3,7 +3,8 @@ calls it off and frees it, running out saves the profile and
 reopens the level, the reopened game loads it, a saved inventory unlike the
 issued one replaces it, and dying deletes it.
 
-The countdown is started by writing the HUD's variables rather than pressing
+The countdown is started by writing the weapon component's variables (it is
+the character's: combat/weapon_component/save_exit.py) rather than pressing
 X (a probe has no keyboard), with ExitAt a fraction of a second away rather
 than 15 s -- -nullrhi game time crawls. The key and the 15 s are the
 verifier's to check. A hit is a write of LastDamageTime, which is what a
@@ -24,8 +25,9 @@ from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, PISTOL_BP_PATH,
     SHOTGUN_BP_PATH, SMG_BP_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
+from combat.ask_consts import (
+    EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_PENDING_VAR, EXIT_STARTED_VAR)
 from graphics_menu.profile_consts import (
-    EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_PENDING_VAR, EXIT_STARTED_VAR,
     PROFILE_BP_PATH, PROFILE_CHECKED_VAR, PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX,
 )
 from survival.paths import MUSHROOM_CLASS_PATH, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
@@ -35,8 +37,8 @@ from survival import component_vars as UV
 from combat.weapon_component import vars as WV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, EXIT_PENDING_VAR), (HUD_BP_PATH, EXIT_AT_VAR),
-            (HUD_BP_PATH, EXIT_STARTED_VAR),
+WRITABLE = [(WEAPON_COMP_BP_PATH, EXIT_PENDING_VAR), (WEAPON_COMP_BP_PATH, EXIT_AT_VAR),
+            (WEAPON_COMP_BP_PATH, EXIT_STARTED_VAR),
             (HEALTH_BP_PATH, HV.Health), (HEALTH_BP_PATH, LAST_DAMAGE_VAR),
             (SURVIVAL_BP_PATH, UV.Hunger), (PLAYER_STATE_BP_PATH, KILL_COUNT_VAR),
             (WEAPON_COMP_BP_PATH, WV.EquippedIndex)]
@@ -77,11 +79,11 @@ def _live_hud(p, not_this=None):
     return hud if p.get(hud, PROFILE_CHECKED_VAR) else None
 
 
-def _start_exit(p, hud, seconds):
+def _start_exit(p, wc, seconds):
     now = p.time()
-    p.set(hud, EXIT_STARTED_VAR, now)
-    p.set(hud, EXIT_AT_VAR, now + seconds)
-    p.set(hud, EXIT_PENDING_VAR, True)
+    p.set(wc, EXIT_STARTED_VAR, now)
+    p.set(wc, EXIT_AT_VAR, now + seconds)
+    p.set(wc, EXIT_PENDING_VAR, True)
 
 
 def probe(p):
@@ -107,7 +109,7 @@ def _run(p):
 
     # --- the character stands still, and a hit calls the exit off -----------
     moves = pawn.get_editor_property("character_movement")
-    _start_exit(p, hud, 100.0)
+    _start_exit(p, wc, 100.0)
     yield 0.1
     p.check("the character can't move while the exit counts down",
             moves.movement_mode == unreal.MovementMode.MOVE_NONE,
@@ -118,9 +120,9 @@ def _run(p):
             moves.movement_mode == unreal.MovementMode.MOVE_WALKING,
             str(moves.movement_mode))
     p.check("a hit during the countdown calls the exit off",
-            not p.get(hud, EXIT_PENDING_VAR) and p.get(hud, EXIT_CALLED_OFF_VAR) > 0.0,
-            f"pending {p.get(hud, EXIT_PENDING_VAR)}, "
-            f"called off at {p.get(hud, EXIT_CALLED_OFF_VAR):.2f}")
+            not p.get(wc, EXIT_PENDING_VAR) and p.get(wc, EXIT_CALLED_OFF_VAR) > 0.0,
+            f"pending {p.get(wc, EXIT_PENDING_VAR)}, "
+            f"called off at {p.get(wc, EXIT_CALLED_OFF_VAR):.2f}")
     p.check("...and nothing is saved", not _saved())
 
     # --- running out saves and leaves ---------------------------------------
@@ -130,7 +132,7 @@ def _run(p):
     p.set(wc, "EquippedIndex", EQUIPPED)      # the pistol to hand (context.hold)
     yield lambda: p.get(wc, "EquippedIndex") == EQUIPPED
     carried = _inventory(p, wc)
-    _start_exit(p, hud, 0.3)
+    _start_exit(p, wc, 0.3)
     yield _saved
     save = GS.load_game_from_slot(PROFILE_SLOT, PROFILE_USER_INDEX)
     p.check("the countdown running out saves the profile", save is not None)

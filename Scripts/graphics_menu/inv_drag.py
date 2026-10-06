@@ -7,20 +7,20 @@
     left button pressed over a filled slot -> InvDragFrom := InvOver
     left button released with a drag on:
         over the slot it started on (a click): a weapon or bag slot ->
-            the weapon component's SlotRequest := it (bring it to hand);
+            the weapon component's AskSlot(it) (bring it to hand);
             a worn slot -> WearTakeOffRequested (Tick takes it off)
         over another slot:
-            slot to slot -> MoveTo := InvOver, MoveFrom := InvDragFrom
+            slot to slot -> AskMove(InvDragFrom, InvOver)
                 (the component swaps them where both fit; only a weapon
                 fits a weapon slot)
-            worn to slot -> TakeOffTo := InvOver, TakeOffSlot := the worn
-                slot (taken off into it: the hand or a bag slot)
-            slot to worn -> WearRequest := InvDragFrom (worn if a garment,
+            worn to slot -> AskTakeOff(the worn slot, InvOver) (taken off
+                into it: the hand or a bag slot)
+            slot to worn -> AskWear(InvDragFrom) (worn if a garment,
                 into its own slot whichever cell it was dropped on)
             worn to worn -> nothing
         over no slot:
             outside the inventory (none of INV_AREAS under the cursor) ->
-                DropRequest := InvDragFrom (set down on the ground: a slot's
+                AskDrop(InvDragFrom) (set down on the ground: a slot's
                 item, or a worn garment, whose code the component reads as
                 SLOT_COUNT + its worn slot)
             between two slots -> nothing
@@ -29,18 +29,19 @@
 While the drag is on, inv_carry.py draws the item's icon on the cursor and
 holds the view still.
 
-The HUD only asks, as the I panel's take-off does: the weapon component
-serves the request on its own Tick (combat/weapon_component/slot_moves.py),
-where what fits where is known. DrawHUD because only it knows where a cell
-is (cursor.py); a -nullrhi probe writes the component's variables instead.
+The HUD only asks, as the I panel's take-off does, by calling the weapon
+component's events (ask.py, combat/weapon_component/asks.py): the component
+serves the request on its own Tick (slot_moves.py), where what fits where is
+known. DrawHUD because only it knows where a cell is (cursor.py); a -nullrhi
+probe writes the component's request variables instead.
 """
 
-from uebp.graph import BEL, _connect, _declare, _pin, out, then
+from uebp.graph import BEL, _declare, out
+from combat.ask_consts import ASK_DROP, ASK_MOVE, ASK_SLOT, ASK_TAKE_OFF, ASK_WEAR
 from combat.paths import WEAPON_COMP_CLASS_PATH
-from combat.slot_tuning import (
-    DROP_REQUEST_VAR, MOVE_FROM_VAR, MOVE_TO_VAR, PRIMARY, SLOT_ITEMS_VAR, SLOT_REQUEST_VAR,
-)
-from combat.wear_tuning import TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_REQUEST_VAR, WORN_VAR
+from combat.slot_tuning import PRIMARY, SLOT_ITEMS_VAR
+from combat.wear_tuning import WORN_VAR
+from graphics_menu.ask import ask
 from graphics_menu.cursor import _clicked, _pc, _under, author_row_cursor
 from graphics_menu.cursor_consts import CLICK_KEY, CURSOR_ROW_VAR
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
@@ -68,17 +69,6 @@ def declare_inv_vars(ed):
 
 def inv_defaults():
     return {name: NO_SLOT for name in _INTS}
-
-
-def _put_on(ed, wc, var, value, in_execs, made):
-    """The weapon component's ``var`` := a pin."""
-    n = ed.add_set_member_variable_node(var, WEAPON_COMP_CLASS_PATH)
-    made.append(n)
-    _connect(wc, _pin(n, "self"))
-    _connect(value, _pin(n, var))
-    for e in in_execs:
-        _connect(e, _pin(n, "execute"))
-    return then(n)
 
 
 def _author_over(ed, in_execs, made):
@@ -148,18 +138,16 @@ def _author_release(ed, wc, in_execs, made):
     off_ask, on_inv = worn_cell(over, [same])
     took = _setter(ed, WEAR_TAKE_VAR, "true", [off_ask], made)
     pick, hand = _branch(ed, out(_call(ed, FN_GE_II, made, A=over, B=PRIMARY)), [on_inv], made)
-    asked = _put_on(ed, wc, SLOT_REQUEST_VAR, over, [pick], made)
+    asked = ask(ed, wc, ASK_SLOT, [pick], made, Slot=over)
     # A drop on another cell. A worn garment onto a slot: taken off into it.
     from_worn, from_inv = worn_cell(start, [moved])
     stays, lands = worn_cell(over, [from_worn])
-    flow = _put_on(ed, wc, TAKE_OFF_TO_VAR, over, [lands], made)
     slot = out(_call(ed, FN_SUB_II, made, A=start, B=WORN_CODE_FIRST))
-    taken = _put_on(ed, wc, TAKE_OFF_VAR, slot, [flow], made)
-    # A slot's item onto the worn grid: worn. Onto a slot: the move, MoveTo first.
+    taken = ask(ed, wc, ASK_TAKE_OFF, [lands], made, Slot=slot, To=over)
+    # A slot's item onto the worn grid: worn. Onto a slot: the move.
     wear, move = worn_cell(over, [from_inv])
-    wearing = _put_on(ed, wc, WEAR_REQUEST_VAR, start, [wear], made)
-    flow = _put_on(ed, wc, MOVE_TO_VAR, over, [move], made)
-    flow = _put_on(ed, wc, MOVE_FROM_VAR, start, [flow], made)
+    wearing = ask(ed, wc, ASK_WEAR, [wear], made, From=start)
+    flow = ask(ed, wc, ASK_MOVE, [move], made, From=start, To=over)
     # Over no slot: outside the inventory it is set down on the ground. The
     # HUD's code for a worn cell is the component's (SLOT_COUNT + the slot).
     inside = _under(ed, part(ed, WBP_HUD, INV_AREAS[0]), made)
@@ -167,7 +155,7 @@ def _author_release(ed, wc, in_execs, made):
         inside = out(_call(ed, FN_OR, made, A=inside,
                            B=_under(ed, part(ed, WBP_HUD, area), made)))
     kept, away = _branch(ed, inside, [off], made)
-    dropped = _put_on(ed, wc, DROP_REQUEST_VAR, start, [away], made)
+    dropped = ask(ed, wc, ASK_DROP, [away], made, From=start)
     done = _setter(ed, DRAG_FROM_VAR, NO_SLOT,
                    [took, asked, hand, taken, stays, wearing, flow, kept, dropped], made)
     return [done, still]
@@ -183,9 +171,9 @@ def author_inv_drag(ed, wc, in_execs):
     ed.add_comment_to_nodes(
         "The mouse on the inventory's slots with the I panel open: a press on a "
         "filled slot starts a drag; the release on the same slot asks for it "
-        "in hand (SlotRequest) or, worn, off (WearTakeOffRequested); on another "
-        "asks for the move (MoveFrom/MoveTo), the take-off into it (TakeOffTo, "
-        "TakeOffSlot) or the wear (WearRequest); outside the inventory, for the "
-        "item set down on the ground (DropRequest). The weapon component decides "
+        "in hand (AskSlot) or, worn, off (WearTakeOffRequested); on another "
+        "asks for the move (AskMove), the take-off into it (AskTakeOff) or the "
+        "wear (AskWear); outside the inventory, for the "
+        "item set down on the ground (AskDrop). The weapon component decides "
         "what fits (inv_drag.py).", made[:4])
     return flow

@@ -2,22 +2,22 @@
 
 One fragment, run every Tick after the grass sync, in this order:
 
-  1. Dead (Health <= 0)?  Delete the profile slot, once, and call off any
-     exit. Tick, not DrawHUD: the player's death pauses the game only after
-     its 2.2 s settle, so Tick sees Health reach zero, and a -nullrhi run --
-     which never draws -- can be probed.
+  1. Dead (Health <= 0)?  Delete the profile slot, once. (The weapon
+     component's dead gate calls off any exit.) Tick, not DrawHUD: the
+     player's death pauses the game only after its 2.2 s settle, so Tick sees
+     Health reach zero, and a -nullrhi run -- which never draws -- can be
+     probed.
   2. A started game whose profile has not been looked for, with the loadout
      spawned?  ProfileChecked = true; if the slot exists, profile_read.py.
-  3. The panel's save-and-exit row taken, no exit running?  ExitPending, ExitStartedAt
-     = now, ExitAt = now + EXIT_SECONDS, and the panel closes.
-  4. An exit running?  If the player was hit since it started
-     (BP_HealthComponent.LastDamageTime, stamped by the wanderers' swing) it
-     is called off and the pawn walks again; once ExitAt has passed,
-     profile_write.py and the current level is reopened -- which opens on the
-     main menu. Until then the pawn's CharacterMovement is disabled, every
-     Tick, so the character stands still for the whole countdown. Every Tick
-     rather than once at the X: the countdown can be started by writing its
-     variables (the probe does), and the freeze follows ExitPending either way.
+  3. The panel's save-and-exit row taken, no exit running?  The weapon
+     component is asked (AskSaveExit, ask.py), and the panel closes.
+  4. The component's ExitDue, not yet left?  ExitLeaving, profile_write.py,
+     and the current level is reopened -- which opens on the main menu.
+
+The countdown itself is the character's, not the screen's: the weapon
+component runs it (combat/weapon_component/save_exit.py: the 15 s, standing
+still, a hit calling it off) and says ExitDue when it is over. This fragment
+asks, and leaves; the banner (profile_draw.py) reads the component's clock.
   5. The dev-all-guns cheat (its row in the panel; dev_guns.py).
 
 Everything reads off the player_parts cast chain; a pawn without the parts
@@ -25,47 +25,43 @@ skips the whole fragment.
 """
 
 from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
+from combat.ask_consts import ASK_SAVE_EXIT, EXIT_DUE_VAR, EXIT_PENDING_VAR, EXIT_SECONDS
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
+from graphics_menu.ask import ask
 from graphics_menu.menu_nav import pause_row_taken
 from graphics_menu.dev_guns import author_dev_guns
-from graphics_menu.player_parts import PAWN, author_player_parts
+from graphics_menu.player_parts import author_player_parts
 from graphics_menu.profile_consts import (
-    EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_ACTION, EXIT_PENDING_VAR, EXIT_SECONDS,
-    EXIT_STARTED_VAR, NEVER, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR,
+    EXIT_ACTION, EXIT_LEAVING_VAR, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR,
     PROFILE_SLOT, PROFILE_USER_INDEX,
 )
 from graphics_menu.profile_read import author_read_profile
 from graphics_menu.profile_write import author_write_profile
-from uebp.nodes.actor import FN_DISABLE_MOVEMENT, FN_GET_COMP, FN_SET_MOVEMENT_MODE
 from uebp.nodes.array import FN_ARR_LEN
-from uebp.nodes.math import (
-    FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LE_FF, FN_NOT)
-from uebp.nodes.system import (
-    FN_DELETE_SAVE, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS, FN_TIME_SECONDS)
+from uebp.nodes.math import FN_AND, FN_GREATER_II, FN_LE_FF, FN_NOT
+from uebp.nodes.system import FN_DELETE_SAVE, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS
 from graphics_menu.umg_consts import GAME_STARTED_VAR
 from combat import health_vars as HV
-from combat.game_state import LAST_DAMAGE_VAR
 from graphics_menu import hud_vars as MV
 from combat.weapon_component import vars as WV
 
-MOVEMENT_CLASS_PATH = "/Script/Engine.CharacterMovementComponent"
-
-_BOOLS = (EXIT_PENDING_VAR, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR)
-_REALS = (EXIT_AT_VAR, EXIT_STARTED_VAR, EXIT_CALLED_OFF_VAR)
+_BOOLS = (EXIT_LEAVING_VAR, PROFILE_CHECKED_VAR, PROFILE_FORGOTTEN_VAR)
+# The countdown's, which the HUD held before the weapon component did.
+RETIRED_VARS = ("ExitPending", "ExitAt", "ExitStartedAt", "ExitCalledOffAt")
 
 
 def declare_profile_vars(ed):
-    """The HUD's countdown and profile flags. Defaults: profile_defaults()."""
-    for name in _BOOLS + _REALS:
-        kind = "bool" if name in _BOOLS else "real"
+    """The HUD's profile flags. Defaults: profile_defaults()."""
+    for name in RETIRED_VARS:
         ed.remove_member_variable(name)
-        if not ed.add_member_variable(name, BEL.get_basic_type_by_name(kind)):
+    for name in _BOOLS:
+        ed.remove_member_variable(name)
+        if not ed.add_member_variable(name, BEL.get_basic_type_by_name("bool")):
             raise RuntimeError(f"could not declare member variable {name}")
 
 
 def profile_defaults():
-    return {**{n: False for n in _BOOLS}, EXIT_AT_VAR: 0.0,
-            EXIT_STARTED_VAR: NEVER, EXIT_CALLED_OFF_VAR: NEVER}
+    return {n: False for n in _BOOLS}
 
 
 def _chain(node, in_execs):
@@ -130,7 +126,6 @@ def _author_forget_on_death(ed, health, in_execs, made):
     wipe = _call(ed, FN_DELETE_SAVE, made, SlotName=PROFILE_SLOT, UserIndex=PROFILE_USER_INDEX)
     flow = _chain(wipe, [fresh])
     flow = _setter(ed, PROFILE_FORGOTTEN_VAR, "true", flow, made)
-    flow = _setter(ed, EXIT_PENDING_VAR, "false", flow, made)
     return alive, flow + [done]
 
 
@@ -156,47 +151,26 @@ def _author_load_once(ed, parts, in_execs, made):
     return loaded + [none, not_yet, skip]
 
 
-def _author_start(ed, pc_out, now_out, in_execs, made):
-    """The M panel's save-and-exit row, with no exit running, starts the
-    countdown."""
-    idle = _call(ed, FN_NOT, made, A=_get(ed, EXIT_PENDING_VAR, made))
+def _author_start(ed, wc, in_execs, made):
+    """The M panel's save-and-exit row, with no exit running, asks the weapon
+    component for the countdown, and the panel closes."""
+    idle = _call(ed, FN_NOT, made, A=_get(ed, EXIT_PENDING_VAR, made, WEAPON_COMP_CLASS_PATH, wc))
     asked = pause_row_taken(ed, EXIT_ACTION, made)
     go = _call(ed, FN_AND, made, A=asked, B=out(idle))
     start, stay = _branch(ed, out(go), in_execs, made)
-    flow = _setter(ed, EXIT_PENDING_VAR, "true", [start], made)
-    flow = _setter(ed, EXIT_STARTED_VAR, now_out, flow, made)
-    deadline = _call(ed, FN_ADD_FF, made, A=now_out, B=EXIT_SECONDS)
-    flow = _setter(ed, EXIT_AT_VAR, out(deadline), flow, made)
+    flow = [ask(ed, wc, ASK_SAVE_EXIT, [start], made)]
     flow = _setter(ed, MV.MenuOpen, "false", flow, made)
     return flow + [stay]
 
 
-def _movement_call(ed, moves, fn, in_execs, made):
-    """``fn`` on the pawn's CharacterMovement; returns (node, what follows)."""
-    call = _call(ed, fn, made, self=moves)
-    return call, _chain(call, in_execs)
-
-
-def _author_countdown(ed, parts, now_out, in_execs, made):
-    """A running exit: called off by a hit, or saved and left when it is due."""
-    running, idle = _branch(ed, _get(ed, EXIT_PENDING_VAR, made), in_execs, made)
-    struck = _get(ed, LAST_DAMAGE_VAR, made, HEALTH_CLASS_PATH, parts[HEALTH_CLASS_PATH])
-    since = _call(ed, FN_GREATER_FF, made, A=struck, B=_get(ed, EXIT_STARTED_VAR, made))
-    hit, unhurt = _branch(ed, out(since), [running], made)
-    off = _setter(ed, EXIT_PENDING_VAR, "false", [hit], made)
-    off = _setter(ed, EXIT_CALLED_OFF_VAR, now_out, off, made)
-    comp = _call(ed, FN_GET_COMP, made, self=parts[PAWN])
-    _pin(comp, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
-    moves = out(comp)
-    walk, off = _movement_call(ed, moves, FN_SET_MOVEMENT_MODE, off, made)
-    _set(walk, "NewMovementMode", "MOVE_Walking")
-
-    ripe = _call(ed, FN_GE_FF, made, A=now_out, B=_get(ed, EXIT_AT_VAR, made))
-    leave, wait = _branch(ed, out(ripe), [unhurt], made)
-    # Standing still while the countdown runs; the reopened level brings a
-    # fresh pawn, so only the hit arm has to give the movement back.
-    _, wait = _movement_call(ed, moves, FN_DISABLE_MOVEMENT, [wait], made)
-    flow = _setter(ed, EXIT_PENDING_VAR, "false", [leave], made)
+def _author_leave(ed, parts, in_execs, made):
+    """The countdown over (the component's ExitDue): the profile is written
+    and the level reopened, once."""
+    due = _get(ed, EXIT_DUE_VAR, made, WEAPON_COMP_CLASS_PATH, parts[WEAPON_COMP_CLASS_PATH])
+    fresh = _call(ed, FN_NOT, made, A=_get(ed, EXIT_LEAVING_VAR, made))
+    leave, stay = _branch(ed, out(_call(ed, FN_AND, made, A=due, B=out(fresh))),
+                          in_execs, made)
+    flow = _setter(ed, EXIT_LEAVING_VAR, "true", [leave], made)
     written = author_write_profile(ed, flow[0], parts, made)
 
     # The current map by name, so the exit reopens whatever level is loaded,
@@ -205,18 +179,17 @@ def _author_countdown(ed, parts, now_out, in_execs, made):
     flow = _chain(where, written)
     reopen = _call(ed, FN_OPEN_LEVEL, made, LevelName=out(where))
     _chain(reopen, flow)
-    return off + wait + [idle]
+    return [stay]
 
 
 def author_save_exit_tick(ed, pc_out, in_execs):
     """The whole fragment (see the module docstring). Returns the tails."""
     made = []
     ok, fails, parts = author_player_parts(ed, in_execs, made)
-    now_out = out(_call(ed, FN_TIME_SECONDS, made))
     alive, dead_tails = _author_forget_on_death(ed, parts[HEALTH_CLASS_PATH], [ok], made)
     flow = _author_load_once(ed, parts, [alive], made)
-    flow = _author_start(ed, pc_out, now_out, flow, made)
-    flow = _author_countdown(ed, parts, now_out, flow, made)
+    flow = _author_start(ed, parts[WEAPON_COMP_CLASS_PATH], flow, made)
+    flow = _author_leave(ed, parts, flow, made)
     flow = author_dev_guns(ed, pc_out, parts, flow, made)
     ed.add_comment_to_nodes(
         f"Save and exit (its row in the M panel, {EXIT_SECONDS:.0f} s, called off "

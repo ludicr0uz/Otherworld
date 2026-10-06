@@ -5,7 +5,9 @@ over its size budget.
 
 import unreal
 
+from combat import ask_consts as AC
 from combat.slot_tuning import HAS_ROOM_VAR
+from graphics_menu.ask_checks import asks, fed
 from graphics_menu import loot_consts as LC
 from graphics_menu import umg_consts as UC
 from graphics_menu.loot_tick import loot_defaults
@@ -13,7 +15,7 @@ from graphics_menu.umg_checks import _tree
 from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.pose_weights import SEARCHING_VAR
 from loot.consts import (
-    BODY_ARRAYS, LOOT_ICONS_VAR, LOOT_RADIUS, LOOT_TINTS_VAR, LOOT_VAR,
+    LOOT_ICONS_VAR, LOOT_RADIUS, LOOT_TINTS_VAR, LOOT_VAR,
 )
 
 BEL = unreal.BlueprintEditorLibrary
@@ -177,12 +179,12 @@ def check_loot(check, bp, nodes):
           == [(f"Set {LC.LOOT_OPEN_VAR}", "false")]
           and [_title(n) for n in goes_on] == [f"Set {LC.LOOT_BAG_FULL_VAR}"],
           f"{[_title(n) for n in shuts + goes_on]}")
-    asks = [n for n in nodes if _title(n) == f"Set {LC.LOOT_TAKE_VAR}"]
+    raised = [n for n in nodes if _title(n) == f"Set {LC.LOOT_TAKE_VAR}"]
     check("Enter or a click on a row raises the take and Tick lowers it (and a "
           "lost body clears it)",
-          sorted(_value(n, LC.LOOT_TAKE_VAR) for n in asks)
+          sorted(_value(n, LC.LOOT_TAKE_VAR) for n in raised)
           == ["false", "false", "true", "true"],
-          str([_value(n, LC.LOOT_TAKE_VAR) for n in asks]))
+          str([_value(n, LC.LOOT_TAKE_VAR) for n in raised]))
 
     fulls = [n for n in nodes if _title(n) == f"Set {LC.LOOT_BAG_FULL_VAR}"]
     tests = [t for n in fulls for t in _feeders(n, LC.LOOT_BAG_FULL_VAR)]
@@ -192,32 +194,19 @@ def check_loot(check, bp, nodes):
           and [_title(f) for f in _feeders(tests[0], "A")] == [f"Get {HAS_ROOM_VAR}"],
           str([[_title(f) for f in _feeders(t, "A")] for t in tests]))
 
+    takes = asks(nodes, AC.ASK_LOOT_TAKE)
+    lowers = [f for n in takes for f in _feeders(n, "execute")]
+    check(f"a take is asked of the weapon component ({AC.ASK_LOOT_TAKE}: the body, "
+          "the caret's row), once the request is lowered; whether it is taken is "
+          "the component's to say",
+          len(takes) == 1 and fed(takes[0], "Body") == [f"Get {LC.LOOT_TARGET_VAR}"]
+          and fed(takes[0], "Index") == [f"Get {LC.LOOT_SEL_VAR}"]
+          and [(_title(f), _value(f, LC.LOOT_TAKE_VAR)) for f in lowers]
+          == [(f"Set {LC.LOOT_TAKE_VAR}", "false")], str(len(takes)))
     spawns = [n for n in nodes if {"Class", "SpawnTransform"} <= _pins(n)
               and any(_title(g) == f"Get {LOOT_VAR}"
                       for f in _feeders(n, "Class") for g in _feeders(f, "TargetArray"))]
-    check("a take spawns the item class read out of the body's Loot",
-          len(spawns) == 1, str(len(spawns)))
-    casts = [c for s in spawns for c in _into(s)]
-    dropped = [x for x in nodes if _title(x) == "Set Dropped"
-               and any(f in casts for f in _feeders(x, "self"))]
-    check("...carried, not lying in the world (Dropped false)",
-          len(dropped) == 1 and _value(dropped[0], "Dropped") == "false", str(len(dropped)))
-    removes = [n for n in nodes if "IndexToRemove" in _pins(n)]
-    emptied = sorted(_title(g) for n in removes for g in _feeders(n, "TargetArray"))
-    check("...and taken out of every one of the body's arrays at LootSel",
-          emptied == sorted(f"Get {v}" for v in BODY_ARRAYS)
-          and all(_title(f) == f"Get {LC.LOOT_SEL_VAR}"
-                  for n in removes for f in _feeders(n, "IndexToRemove")),
-          str(emptied))
-    gates = [n for n in nodes if "Condition" in _pins(n)
-             and any(_title(g) == f"Get {LC.LOOT_BAG_FULL_VAR}"
-                     for f in _feeders(n, "Condition") for g in _feeders(f, "A"))]
-    check("...only while the bag has room", len(gates) == 1, str(len(gates)))
-    some = [n for s in spawns for n in _feeders(s, "execute") if "Condition" in _pins(n)
-               and any({"A", "B"} <= _pins(c) and _value(c, "B") in ("0", "")
-                       for c in _feeders(n, "Condition"))]
-    check("...and the body has something to take (an empty body is searched too)",
-          len(some) == 1, str(len(some)))
+    check("...the HUD spawns nothing out of a body itself", not spawns, str(len(spawns)))
     _check_icons(check, nodes)
     _check_kneel(check, nodes)
 

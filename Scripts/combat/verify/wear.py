@@ -122,7 +122,8 @@ def check_take_off():
                              f"Set {TAKE_OFF_TO_VAR}", "Branch", "Branch", "Branch", "Add",
                              f"Set {SLOT_VAR}", "Set Array Elem", "Set NeedsRefresh"]),
           str(titles))
-    lowered = [n for n in wg if _title(n) == f"Set {TAKE_OFF_VAR}"]
+    # (The Ask event's Set is fed by its parameter: verify/asks.py.)
+    lowered = [n for n in wg if _title(n) == f"Set {TAKE_OFF_VAR}" and not _feeders(n, TAKE_OFF_VAR)]
     check(f"...and {TAKE_OFF_VAR} is lowered to {NOT_CLOTHING}, by that one Set",
           len(lowered) == 1 and pin_value(lowered[0], TAKE_OFF_VAR) == str(NOT_CLOTHING),
           str([pin_value(n, TAKE_OFF_VAR) for n in lowered]))
@@ -143,7 +144,8 @@ def check_wear_request():
                              f"Set {WEAR_SLOT_VAR}", "Branch", "Remove", "Add",
                              f"Set {SLOT_VAR}", "Set Array Elem", "Hidden",
                              f"Set {SLOT_VAR}", "Set NeedsRefresh"]), str(titles))
-    lowered = [n for n in wg if _title(n) == f"Set {WEAR_REQUEST_VAR}"]
+    # (The Ask event's Set is fed by its parameter: verify/asks.py.)
+    lowered = [n for n in wg if _title(n) == f"Set {WEAR_REQUEST_VAR}" and not _feeders(n, WEAR_REQUEST_VAR)]
     check(f"...and {WEAR_REQUEST_VAR} is lowered to {NOT_CLOTHING}, by that one Set",
           len(lowered) == 1 and pin_value(lowered[0], WEAR_REQUEST_VAR) == str(NOT_CLOTHING),
           str([pin_value(n, WEAR_REQUEST_VAR) for n in lowered]))
@@ -165,7 +167,8 @@ def check_drop_request():
                              "Branch", "Remove", "Branch", "Set Dropped", "Detach",
                              "Hidden", "Line Trace", "Branch", "Set Actor Location",
                              f"Set {SLOT_VAR}", "Set NeedsRefresh"]), str(titles))
-    lowered = [n for n in wg if _title(n) == f"Set {DROP_REQUEST_VAR}"]
+    # (The Ask event's Set is fed by its parameter: verify/asks.py.)
+    lowered = [n for n in wg if _title(n) == f"Set {DROP_REQUEST_VAR}" and not _feeders(n, DROP_REQUEST_VAR)]
     check(f"...and {DROP_REQUEST_VAR} is lowered to {NO_REQUEST}, by that one Set",
           len(lowered) == 1 and pin_value(lowered[0], DROP_REQUEST_VAR) == str(NO_REQUEST),
           str([pin_value(n, DROP_REQUEST_VAR) for n in lowered]))

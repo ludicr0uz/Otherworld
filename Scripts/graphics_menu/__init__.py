@@ -37,14 +37,15 @@ The HUD graph that shows and writes them
                   worn ones too), the weapon slots' silhouettes, the caret's
                   run from the worn slots into the bag
   inv_drag        DrawHUD, the I panel open: the slot under the cursor, a drag
-                  (MoveFrom/MoveTo; a worn garment off, TakeOffTo; a carried
-                  one on, WearRequest; out of the inventory onto the ground,
-                  DropRequest) and a click (SlotRequest, the take-off)
+                  (AskMove; a worn garment off, AskTakeOff; a carried one on,
+                  AskWear; out of the inventory onto the ground, AskDrop) and
+                  a click (AskSlot, the take-off)
   inv_carry       DrawHUD: the dragged item's icon carried on the cursor, the
                   look input held while a drag is on, a drag called off when
                   the panel shuts
   fps             the FPS readout, always on screen
-  profile_draw    the save-and-exit countdown banner
+  profile_draw    the save-and-exit countdown banner (the weapon component's
+                  clock)
   settings_page   the settings page's values and hint; pushing settings onto the weapon
 
 Still drawn on the HUD canvas (placed per frame)
@@ -58,6 +59,11 @@ Still drawn on the HUD canvas (placed per frame)
   scope           the sniper's glass, and when it replaces the crosshair
 
 Input, settings and state
+  ask             how a HUD graph changes the game: a call of one of the
+                  weapon component's Ask events (combat/ask_consts.py); the
+                  HUD writes none of its requests itself
+  ask_checks      the verifier's checks for that: every ask made, and no
+                  request, countdown, body or movement written from the HUD
   presets         the quality presets' names and the CSV's default one;
                   picking one sets Quality
   menu_nav        Up/Down caret movement and the accept keys, shared by pages;
@@ -99,22 +105,24 @@ Input, settings and state
   profile_read    BP_Profile back onto the player: stats, and the saved items
                   spawned in place of the issued loadout
   save_exit       the HUD Tick fragment: delete the profile on death, load it once
-                  a game starts, X starts the 15 s exit, a hit calls it off
+                  a game starts, the row asks the weapon component for the
+                  15 s exit (AskSaveExit), and once that is due the profile
+                  is written and the level reopened
   dev_consts      the dev-all-guns cheat: its row, flags, the guns
   dev_guns        the cheat's Tick fragment: its M panel row gives one of every
                   gun not carried (run from save_exit, after the countdown)
   loot_consts     the loot window: keys (Tab, Up/Down, Enter), variables, widget names
   loot_find       Tick: the nearest dead body in reach, loot or none -> LootTarget
-  loot_take       Tick: the selected item out of the body and into the bag
   loot_kneel      Tick: the open window is the weapon component's Searching (the
                   kneel), and the controller ignores move input meanwhile
-  loot_tick       the loot window's Tick fragment: find, keys, serve a take,
-                  kneel (run after save_exit's)
+  loot_tick       the loot window's Tick fragment: find, keys, ask the weapon
+                  component for a take (AskLootTake), kneel (run after
+                  save_exit's)
   loot_draw       DrawHUD: the loot prompt, and the window's icon rows and caret
   wbp_loot        WBP_HUD's loot prompt and window (called from wbp_hud)
   wear_consts     the I panel: keys (I, Up/Down, Enter), variables, widget names
-  wear_tick       the I panel's Tick fragment: keys, the take-off (TakeOffSlot)
-                  or a bag slot to hand (SlotRequest) asked of the weapon
+  wear_tick       the I panel's Tick fragment: keys, the take-off (AskTakeOff)
+                  or a bag slot to hand (AskSlot) asked of the weapon
                   component, the walk held while open
   wear_draw       DrawHUD: the worn slots (Worn's icons, or each slot's
                   silhouette; always shown), and with the I panel open the

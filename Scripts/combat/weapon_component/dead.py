@@ -33,6 +33,7 @@ component again.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, then
+from combat.ask_consts import EXIT_PENDING_VAR
 from combat.nodes import CAMERA_CLASS_PATH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SOCKET
 from combat.paths import FIRE_WARD_VAR, HEALTH_CLASS_PATH
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR
@@ -48,9 +49,10 @@ from combat.weapon_component import vars as WV
 OWNER_DEAD_VAR = "OwnerDead"   # this Tick found its owner dead and did nothing
 
 # What a dead owner is no longer doing. Others read these: the wanderers'
-# swing reads Blocking, the HUD's reticle the aim, a wendigo FireWard.
+# swing reads Blocking, the HUD's reticle the aim, a wendigo FireWard, the
+# HUD's banner the save-and-exit countdown (save_exit.py): a death calls it off.
 LET_GO_VARS = ("Aiming", "SightAiming", SEATED_VAR, "Sprinting", "Blocking",
-               FIRE_WARD_VAR)
+               FIRE_WARD_VAR, EXIT_PENDING_VAR)
 
 
 def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):

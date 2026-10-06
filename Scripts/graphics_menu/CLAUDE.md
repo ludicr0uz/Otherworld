@@ -510,9 +510,15 @@ into the HUD. Enter on a number saves nothing in this tab.
 `save_exit.py` (the Tick fragment; `__init__.py` maps the rest) runs every Tick, after the grass
 sync:
 
-- **The panel's `save and exit` row** closes it and starts a 15 s countdown (`EXIT_SECONDS`), drawn top
-  centre (`profile_draw.py`). When it runs out, the player's stats and inventory go into a fresh
-  `/Game/UI/BP_Profile` (a `USaveGame`, slot `OtherworldProfile`) and the current level reopens,
+- **The countdown is the character's, not the HUD's.** The weapon component holds
+  `ExitPending`, `ExitAt`, `ExitStartedAt`, `ExitCalledOffAt` and `ExitDue` and runs the
+  15 s, the freeze and the call-off on its own Tick (`combat/weapon_component/save_exit.py`;
+  `Scripts/net/CLAUDE.md`, "A screen asks"). The HUD asks for it (`AskSaveExit`), draws its
+  clock, and leaves when it is due.
+- **The panel's `save and exit` row** closes it and asks for the 15 s countdown (`EXIT_SECONDS`,
+  `combat/ask_consts.py`), drawn top centre (`profile_draw.py`). When the component says
+  `ExitDue`, the HUD (once: `ExitLeaving`) puts the player's stats and inventory into a fresh
+  `/Game/UI/BP_Profile` (a `USaveGame`, slot `OtherworldProfile`) and reopens the current level,
   which opens on the main menu.
 - **Stored:** Health, Stamina, Hunger, Thirst, Temperature, the kill count, the equipped slot,
   and each carried item's class, `Loaded`, `Reserve` and `Slot` (`ITEM_FIELDS`: where it
@@ -520,12 +526,13 @@ sync:
   item in hand and the rest in the bag). **Never the location**; the verifier
   asserts BP_Profile has no other field.
 - **The character can't move during the countdown.** Every Tick it waits, the pawn's
-  `CharacterMovement` gets `DisableMovement` (keyed off `ExitPending`, not the X press, so the
+  `CharacterMovement` gets `DisableMovement` (keyed off `ExitPending`, not the ask, so the
   probe's variable writes freeze it too). Looking around still works.
 - **A hit calls it off**, and `SetMovementMode(Walking)` frees the pawn. A wanderer's swing stamps
   the player's `BP_HealthComponent.LastDamageTime` (`npc/melee.py`), and the countdown stops when
   that passes `ExitStartedAt`. The starvation
-  drain lowers Health without stamping it, so it is not a hit.
+  drain lowers Health without stamping it, so it is not a hit. A death calls it off too
+  (the dead gate lowers `ExitPending`).
 - **Loading:** the first Tick of a started game (after NEW GAME, or at once with `-nomenu`) on
   which the weapon component's Inventory is non-empty sets `ProfileChecked` and, if the slot
   exists, applies it: stats back, the issued loadout destroyed, the saved items spawned with
@@ -573,8 +580,8 @@ What the player wears; the design is `Scripts/clothing/CLAUDE.md`. Run from Tick
 loot window, in play only. Traps met here:
 
 - **The HUD only asks.** Enter or a click raises `WearTakeOffRequested`; Tick lowers it and
-  writes `WearSel` into the weapon component's `TakeOffSlot`, which serves it on its own
-  Tick. A probe opens the panel and takes off by writing the HUD's three variables.
+  calls the weapon component's `AskTakeOff(WearSel, into the bag)` (`ask.py`), which raises
+  `TakeOffSlot`; the component serves it on its own Tick. A probe opens the panel and takes off by writing the HUD's three variables.
 - **Its own dead gate and its own walk edge** (`WearStill`): `loot_checks` and
   `pause_checks` pick out the loot's and the menu's from theirs.
 - **It adds two `GetComponentByClass`** (the take-off's and the rows'): the HUD has 20.

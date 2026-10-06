@@ -13,8 +13,10 @@ take, kneel.
             [Tab]          LootOpen = NOT LootOpen, LootSel = 0
             open: Up/Down  LootSel -/+ 1, clamped
                   Enter    LootTakeRequested = true
-        LootTakeRequested AND LootOpen -> lower it; room in the bag, and
-            something on the body -> take (loot_take)
+        LootTakeRequested AND LootOpen -> lower it, and ask the weapon
+            component for it: AskLootTake(LootTarget, LootSel). Whether it
+            is taken (room in the bag, something on the body) is the
+            component's to say (combat/weapon_component/loot_take.py)
     then, on every path: the kneel follows LootOpen (loot_kneel)
 
 Tick, not DrawHUD: a -nullrhi probe never draws. The keys only raise flags,
@@ -28,11 +30,13 @@ import unreal
 
 from uebp.graph import (
     BEL, _connect, _declare, _float_type, _loose_pin, _must_load, _palette, _pin, out, then)
+from combat.ask_consts import ASK_LOOT_TAKE
 from combat.paths import (
     HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH,
 )
 from combat.slot_tuning import HAS_ROOM_VAR
 from combat.weapon_component.dead import OWNER_DEAD_VAR
+from graphics_menu.ask import ask
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_consts import (
     LOOT_BAG_FULL_VAR, LOOT_BEST_VAR, LOOT_DOWN, LOOT_KEY, LOOT_KNEELING_VAR,
@@ -40,12 +44,11 @@ from graphics_menu.loot_consts import (
 )
 from graphics_menu.loot_find import author_find_body, put
 from graphics_menu.loot_kneel import author_kneel
-from graphics_menu.loot_take import author_take
 from loot.consts import LOOT_NAMES_VAR, LOOT_RADIUS
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_WAS_PRESSED
 from uebp.nodes.array import FN_ARR_LEN
 from uebp.nodes.math import (
-    FN_ADD_II, FN_AND, FN_GREATER_II, FN_MAX_II, FN_MIN_II, FN_NOT, FN_SUB_II)
+    FN_ADD_II, FN_AND, FN_MAX_II, FN_MIN_II, FN_NOT, FN_SUB_II)
 from uebp.nodes.palette import NODE_CAST_WEAPON
 from uebp.nodes.system import FN_IS_VALID
 from graphics_menu import hud_vars as MV
@@ -146,17 +149,12 @@ def author_loot_tick(ed, pc_out, in_execs):
                    B=_get(ed, LOOT_OPEN_VAR, made))
     serve, idle = _branch(ed, out(wanted), keyed, made)
     flow = _setter(ed, LOOT_TAKE_VAR, "false", [serve], made)
-    room, no_room = _branch(ed, out(_call(ed, FN_NOT, made,
-                                           A=_get(ed, LOOT_BAG_FULL_VAR, made))),
-                            [flow], made)
-    # A body may carry nothing: Loot[LootSel] of an empty array is not read.
-    some, bare = _branch(ed, out(_call(ed, FN_GREATER_II, made,
-                                        A=_count(ed, made), B=0)),
-                         [room], made)
-    taken = author_take(ed, wc, pawn, [some], made)
+    taken = ask(ed, wc, ASK_LOOT_TAKE, [flow], made,
+                Body=_get(ed, LOOT_TARGET_VAR, made), Index=_get(ed, LOOT_SEL_VAR, made))
     ed.add_comment_to_nodes(
         f"Loot: the nearest dead body within the reach is LootTarget; "
-        f"[{LOOT_KEY}] kneels and opens its window, Up/Down pick, Enter takes into "
-        f"the bag (while it has room). Out of reach, the window shuts.", made[:1])
-    tails = taken + [idle, no_room, bare, shut, out(cast, "CastFailed")]
+        f"[{LOOT_KEY}] kneels and opens its window, Up/Down pick, Enter asks the "
+        f"weapon component for the item (AskLootTake). Out of reach, the window "
+        f"shuts.", made[:1])
+    tails = [taken, idle, shut, out(cast, "CastFailed")]
     return author_kneel(ed, pc_out, tails)

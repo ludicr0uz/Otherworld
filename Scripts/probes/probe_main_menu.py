@@ -31,7 +31,9 @@ from combat.game_state import DEBUG_MODE_VAR
 from graphics_menu import cursor_consts as CC
 from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
-from graphics_menu.profile_consts import EXIT_ACTION, EXIT_PENDING_VAR
+from combat.ask_consts import EXIT_PENDING_VAR
+from combat.paths import WEAPON_COMP_CLASS_PATH
+from graphics_menu.profile_consts import EXIT_ACTION
 from graphics_menu.settings_rows import PAGE_TITLE
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu import hud_vars as MV
@@ -92,12 +94,13 @@ def probe(p):
     p.check("...and a tuning tab opens there", p.get(hud, GUN_TAB.open_var) is True)
     p.set(hud, GUN_TAB.open_var, False)
 
+    wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
     p.set(hud, CC.PAUSE_CLICK_VAR, _row(EXIT_ACTION))
     yield _after(0.5)
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
     p.check("...but save and exit does nothing: it needs a game in play",
-            p.get(hud, EXIT_PENDING_VAR) is False and p.get(hud, "MenuOpen") is True,
-            f"pending {p.get(hud, EXIT_PENDING_VAR)}, open {p.get(hud, 'MenuOpen')}")
+            p.get(wc, EXIT_PENDING_VAR) is False and p.get(hud, "MenuOpen") is True,
+            f"pending {p.get(wc, EXIT_PENDING_VAR)}, open {p.get(hud, 'MenuOpen')}")
     p.check("...and the world is still paused under the menu",
             unreal.GameplayStatics.is_game_paused(world))
 

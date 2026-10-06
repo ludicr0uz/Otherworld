@@ -87,6 +87,9 @@ from combat.weapon_component.throw_windup import (
     THROW_ANIM_VAR, THROW_DUE_VAR, THROW_WINDING_VAR,
 )
 from combat.weapon_component.dead import OWNER_DEAD_VAR
+from combat.weapon_component.asks import author_asks
+from combat.weapon_component.loot_take import author_loot_take
+from combat.weapon_component.save_exit import author_ask_save_exit
 from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
 from uebp.vars import declare, defaults
 from combat.sprint_tuning import BASE_SPEED_VAR
@@ -309,6 +312,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
 
     _author_wc_begin_play(ed, begin)
     _author_wc_tick(ed, tick)
+    # What a screen asks of the component: one event each (combat/ask_consts.py).
+    author_asks(ed)
+    author_loot_take(ed)
+    author_ask_save_exit(ed)
 
     _post_physics_tick(bp)
     arrange(ed)

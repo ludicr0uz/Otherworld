@@ -6,7 +6,9 @@ in the verifier, which is over its size budget.
 import unreal
 
 from graphics_menu import profile_consts as PC
-from graphics_menu.pause_checks import row_serves
+from combat import ask_consts as AC
+from graphics_menu.ask_checks import asks, fed, feeders
+from graphics_menu.pause_checks import row_gates
 from graphics_menu.save_exit import profile_defaults
 
 BEL = unreal.BlueprintEditorLibrary
@@ -69,35 +71,27 @@ def check_profile(check, bp, nodes):
              if cdo.get_editor_property(k) != v}
     check("the countdown starts idle and the profile unlooked-for", not wrong, str(wrong))
 
-    check("the M panel's save-and-exit row starts the exit (the row has no key: "
-          "only an open panel's row can be taken)",
-          row_serves(nodes, PC.EXIT_ACTION, PC.EXIT_PENDING_VAR)
+    starts = asks(nodes, AC.ASK_SAVE_EXIT)
+    check("the M panel's save-and-exit row asks the weapon component for the exit "
+          f"({AC.ASK_SAVE_EXIT}; the row has no key: only an open panel's row can be "
+          "taken), with none running",
+          len(starts) == 1 and row_gates(starts[0], PC.EXIT_ACTION)
+          and any(f"Get {AC.EXIT_PENDING_VAR}" in fed(c, "A")
+                  for g in feeders(starts[0], "execute") for x in feeders(g, "Condition")
+                  for c in feeders(x, "A") + feeders(x, "B"))
           and not [n for n in nodes if {"Key", "self"} <= _pins(n)
-                   and _value(n, "Key") == "X"])
-
-    def _b(n):
-        try:
-            return float(_value(n, "B") or "nan")
-        except ValueError:
-            return float("nan")
-    # A float's literal reads back with a point; the tuning tab's int index
-    # arithmetic (tune_tick.py) adds whole numbers up to 18, 15 among them.
-    deadlines = [n for n in nodes if _pins(n) == {"A", "B"}
-                 and "." in _value(n, "B")
-                 and abs(_b(n) - PC.EXIT_SECONDS) < 1e-6]
-    check(f"...and it runs for {PC.EXIT_SECONDS:.0f} s", len(deadlines) == 1,
-          str(len(deadlines)))
-
-    hits = [n for n in nodes if _pins(n) == {"A", "B"}
-            and {_title(f) for f in _feeders(n, "A")} == {"Get LastDamageTime"}]
-    check("a hit after the start calls it off (LastDamageTime > ExitStartedAt)",
-          len(hits) == 1
-          and {_title(f) for f in _feeders(hits[0], "B")}
-          == {f"Get {PC.EXIT_STARTED_VAR}"},
-          str(len(hits)))
+                   and _value(n, "Key") == "X"], str(len(starts)))
+    leaves = [n for n in nodes if _title(n) == f"Set {PC.EXIT_LEAVING_VAR}"]
+    due = {t for n in leaves for g in _feeders(n, "execute") for c in _feeders(g, "Condition")
+           for t in fed(c, "A") + [x for f in _feeders(c, "B") for x in fed(f, "A")]}
+    check(f"the HUD leaves once the component says the countdown is over "
+          f"({AC.EXIT_DUE_VAR}), and only once ({PC.EXIT_LEAVING_VAR})",
+          len(leaves) == 1 and _value(leaves[0], PC.EXIT_LEAVING_VAR) == "true"
+          and due == {f"Get {AC.EXIT_DUE_VAR}", f"Get {PC.EXIT_LEAVING_VAR}"},
+          f"{len(leaves)} Set, on {sorted(due)}")
 
     saves = _on_slot(nodes, "SaveGameObject")
-    check(f"the profile is saved once, to slot {PC.PROFILE_SLOT!r}", len(saves) == 1,
+    check(f"...the profile is saved once, to slot {PC.PROFILE_SLOT!r}", len(saves) == 1,
           str(len(saves)))
     opens = [n for n in nodes if "LevelName" in _pins(n) and "execute" in _pins(n)]
     after_save = [n for n in opens for d in _feeders(n, "execute")
@@ -124,23 +118,3 @@ def check_profile(check, bp, nodes):
           len(refresh) == 1 and _value(refresh[0], "NeedsRefresh") == "true"
           and len(dropped) == 1 and _value(dropped[0], "Dropped") == "false",
           f"{len(refresh)} NeedsRefresh, {len(dropped)} Dropped")
-    _check_freeze(check, nodes)
-
-
-def _check_freeze(check, nodes):
-    """The character stands still while the countdown runs; a hit frees it."""
-    stops = [n for n in nodes if "DisableMovement" in _title(n).replace(" ", "")]
-    waits = [b for n in stops for b in _feeders(n, "execute")
-             if f"Get {PC.EXIT_AT_VAR}" in {_title(g) for c in _feeders(b, "Condition")
-                                            for g in _feeders(c, "B")}]
-    check("the character can't move while the exit counts down "
-          "(DisableMovement every Tick it waits)",
-          len(stops) == 1 and len(waits) == 1,
-          f"{len(stops)} DisableMovement, {len(waits)} on the countdown's wait")
-    walks = [n for n in nodes if "NewMovementMode" in _pins(n)]
-    check("...and walks again when a hit calls the exit off",
-          len(walks) == 1 and "Walking" in _value(walks[0], "NewMovementMode")
-          and any(_title(f) == f"Set {PC.EXIT_CALLED_OFF_VAR}"
-                  for f in _feeders(walks[0], "execute")),
-          str([(_value(n, "NewMovementMode"), [_title(f) for f in _feeders(n, "execute")])
-               for n in walks]))

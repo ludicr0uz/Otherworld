@@ -128,6 +128,10 @@ player does there instead is the death task's, not built yet.
     item's `WeaponKind`, so 4 puts it away. With something in hand it is placed like
     any weapon. A blade that glanced off and fell is not `Lodged`. After a drop, a throw or eating the
     last one the hands stay empty: nothing comes up unasked.
+  - **A screen never writes a request itself:** the HUD calls the component's `Ask…`
+    events (`combat/ask_consts.py`, `weapon_component/asks.py`), which raise them. The loot
+    take (`loot_take.py`) and save and exit's countdown (`save_exit.py`) are events of the
+    component too (`Scripts/net/CLAUDE.md`, "A screen asks").
   - **A request is `SlotRequest`** (a number key, Q, Enter on a bag slot in the I panel, a
     click on a slot): a filled slot's item comes to hand, the hand's item going home first
     (the first slot from the primary on that it fits and that is free, the asked slot

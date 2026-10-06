@@ -45,6 +45,40 @@ owning client: read input  --Server RPC-->  server: validate, change state
   - **Done for the controller and the camera (M10): "Input", below.**
   - **Still player 0:** a kill's credit (`state_graph.first_player_state`, M14).
 
+## A screen asks, the character acts (M11, done)
+
+A server has no HUD, so nothing a player does may live in a widget graph. Each thing done
+through a screen is **one custom event on `BP_WeaponComponent`**, which the HUD calls with
+what was picked (`graphics_menu/ask.py`, `ask(ed, wc, ASK_MOVE, execs, made, From=…, To=…)`)
+and which decides whether it happens. The names are `combat/ask_consts.py`.
+
+| event | asked by | what it does | becomes a Server event in |
+|---|---|---|---|
+| `AskSlot(Slot)` | a click on a slot, Enter on a bag slot | raises `SlotRequest` | M18 |
+| `AskMove(From, To)` | a drag from slot to slot | raises `MoveTo`, `MoveFrom` | M18 |
+| `AskDrop(From)` | a drag out of the inventory | raises `DropRequest` | M23 |
+| `AskTakeOff(Slot, To)` | Enter or a click on a worn slot, a drag off one | raises `TakeOffTo`, `TakeOffSlot` | M24 |
+| `AskWear(From)` | a drag onto the worn grid | raises `WearRequest` | M24 |
+| `AskLootTake(Body, Index)` | the loot window's Enter or click | the take itself, with its refusals (`weapon_component/loot_take.py`) | M23 |
+| `AskSaveExit()` | the menu's save-and-exit row | starts the countdown the component runs (`weapon_component/save_exit.py`) | M35 |
+
+- **None is an RPC yet.** `combat/verify/asks.py` asserts each is compiled and
+  `NOT_REPLICATED`; the task that makes one a Server event changes that line with it.
+- **The first five only raise the request** the component's Tick already serves, so the
+  serve is still where a move is validated. Three of the serves (take-off, wear, drop) sit
+  in the Tick's local-only half (`tick.py`, `_author_actions`): M24 and M23 move them to
+  where the server runs them.
+- **The HUD writes none of those variables** and takes nothing out of a body:
+  `graphics_menu/ask_checks.py` fails on a `Set` of any of them in the HUD's graph, and on
+  a movement call there.
+- **A new action through a screen gets an event the same way.** Refuse in the event, not
+  in the widget: what the widget greys out is display, and a client's widget is not trusted.
+- **Still in the HUD:** the saved profile's write, read and delete and the level reopened
+  after it (the single-player save is the client's own file: 4.8; M35 gives the server
+  its own), the dev-all-guns cheat (4.7), and the tuning tabs' writes onto live objects
+  (dev tools, 4.7). `Searching` (the kneel) is still written by the loot window.
+- **Probe:** `probe_asks.py` calls each event in a game and takes the save-and-exit row.
+
 ## Input (M10, done)
 
 A component ticks on every machine that has its character: the player's own, the server

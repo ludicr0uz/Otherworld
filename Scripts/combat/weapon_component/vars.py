@@ -5,6 +5,8 @@ TABLE; a row with no type is a component, or a variable declared elsewhere.
 
 from uebp.vars import BOOL, FLOAT, INT, VECTOR, Var, array, cls, obj
 from combat.paths import ITEM_CLASS_PATH
+from combat.ask_consts import (
+    EXIT_AT_VAR, EXIT_CALLED_OFF_VAR, EXIT_DUE_VAR, EXIT_PENDING_VAR, EXIT_STARTED_VAR, NEVER)
 from combat.headshot_tuning import HEADSHOT_NEVER, HEADSHOT_TIME_VAR
 from combat.tuning import COMBAT
 
@@ -102,6 +104,13 @@ HandledItem = Var("HandledItem", obj(ITEM_CLASS_PATH))
 LocalPC = Var("LocalPC", obj("/Script/Engine.PlayerController"))
 LocalInput = Var("LocalInput", BOOL, False)
 LocalReady = Var("LocalReady", BOOL, False)
+# Save and exit's countdown (save_exit.py): the HUD's banner reads it, and
+# leaves once ExitDue.
+ExitPending = Var(EXIT_PENDING_VAR, BOOL, False)
+ExitAt = Var(EXIT_AT_VAR, FLOAT, 0.0)
+ExitStartedAt = Var(EXIT_STARTED_VAR, FLOAT, NEVER)
+ExitCalledOffAt = Var(EXIT_CALLED_OFF_VAR, FLOAT, NEVER)
+ExitDue = Var(EXIT_DUE_VAR, BOOL, False)
 
 TABLE = (
     Inventory, Held, EquippedIndex, NeedsRefresh, OwnerMesh, AimPoint, AimValid, AimBlocked,
@@ -110,5 +119,6 @@ TABLE = (
     BasePitchScale, RecoilDebt, RecoilYawDebt, RecoilYawKick, ReloadTake, ItemClass,
     BloodClass, HeadshotTime, SwingSounds, ChopSounds, MatchSounds, ThrowSounds, ThrowSharpSounds,
     PunchHitSounds, BladeHitSounds, LodgeSounds, HeadKillSounds, BreathSounds, BreathNextTime,
-    HandledItem, LocalPC, LocalInput, LocalReady,
+    HandledItem, LocalPC, LocalInput, LocalReady, ExitPending, ExitAt, ExitStartedAt,
+    ExitCalledOffAt, ExitDue,
 )

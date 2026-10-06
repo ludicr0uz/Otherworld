@@ -30,6 +30,7 @@ from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR,
 )
 from combat.paths import HEALTH_BP_PATH, ITEM_BP_PATH
+from combat.player_kill import author_player_kill
 from combat.player_respawn import author_player_respawn
 from combat.replacement import _author_replacement
 from combat.respawn import (
@@ -222,7 +223,9 @@ def build_health_component(rebuild=True):
     _connect(out(mine_again, HV.DespawnOnDeath), _pin(is_player, "Condition"))
     for tail in (fell, no_body):
         _connect(tail, _pin(is_player, "execute"))
-    shared = _author_player_death(ed, (else_(is_player),))
+    # A player's death is first credited to the player who struck the last
+    # blow, if one did (player_kill.py): the wanderer's count's twin.
+    shared = _author_player_death(ed, author_player_kill(ed, else_(is_player)))
     # ...which in standalone ends there, paused. On a server the player is
     # given a new body (the mode table's death row).
     author_player_respawn(ed, [shared])

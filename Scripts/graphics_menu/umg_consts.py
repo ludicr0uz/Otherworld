@@ -272,6 +272,9 @@ DEBUG_ON, DEBUG_OFF = "ON", "OFF"
 
 # ─── WBP_DeathMenu ────────────────────────────────────────────────────────────
 DEATH_SCORE, DEATH_HINT_LINE = "Score", "DeathHint"
+# The other players this player killed, under the wanderers' count (M15).
+DEATH_PLAYER_SCORE = "PlayerScore"
+DEATH_PLAYER_SCORE_PREFIX = "Player Kills:  "
 RESTART_KEY = "R"
 DEATH_TITLE = "YOU DIED"
 DEATH_SCORE_PREFIX = "Monster Kills:  "

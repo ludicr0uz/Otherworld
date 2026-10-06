@@ -19,7 +19,7 @@ from graphics_menu.wbp_tune import author_tune_widgets
 from graphics_menu.umg_consts import (
     COL_CARET, COL_DEATH_HINT, COL_DEATH_TEXT, COL_DEATH_TITLE, COL_HINT,
     COL_MAIN_HINT, COL_ROW, COL_TITLE, DEATH_HINT, DEATH_HINT_LINE,
-    DEATH_HINT_FONT, DEATH_PANEL_SIZE, DEATH_SCORE, DEATH_SCORE_FONT, DEATH_TITLE,
+    DEATH_HINT_FONT, DEATH_PANEL_SIZE, DEATH_PLAYER_SCORE, DEATH_SCORE, DEATH_SCORE_FONT, DEATH_TITLE,
     DEATH_TITLE_FONT, HINT_CAPTURE, HINT_CAPTURE_TEXT, HINT_IDLE, HINT_IDLE_TEXT,
     PAUSE_HINT, PAUSE_HINT_FONT, PAUSE_MODE, PAUSE_MODE_FONT, PAUSE_PANEL, PAUSE_POS,
     PAUSE_ROW_LABEL_W,
@@ -109,7 +109,9 @@ def build_death_menu():
     U.at(outer, *CENTRE)
     _line(bp, stack, "DeathTitle", DEATH_TITLE, DEATH_TITLE_FONT, COL_DEATH_TITLE,
           bold=True, top=18.0, bottom=18.0)
-    _line(bp, stack, DEATH_SCORE, "", DEATH_SCORE_FONT, COL_DEATH_TEXT, bottom=28.0,
+    _line(bp, stack, DEATH_SCORE, "", DEATH_SCORE_FONT, COL_DEATH_TEXT, bottom=6.0,
+          variable=True)
+    _line(bp, stack, DEATH_PLAYER_SCORE, "", DEATH_SCORE_FONT, COL_DEATH_TEXT, bottom=28.0,
           variable=True)
     _line(bp, stack, DEATH_HINT_LINE, DEATH_HINT, DEATH_HINT_FONT, COL_DEATH_HINT,
           variable=True)

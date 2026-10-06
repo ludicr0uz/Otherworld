@@ -16,6 +16,7 @@ from combat.verify.common import (
     BEL, HEALTH_SETS, PIN, check, graph, in_pins, take_hits, titled)
 from combat.verify.fixtures import _wg_all, char, drain_writes, health_bp, hg, npc
 from combat.verify.sights import _feeds, _title
+from net.state_consts import PLAYER_KILL_COUNT_VAR
 from uebp import net
 from uebp.graph import BGE
 
@@ -235,6 +236,37 @@ def check_kill_credit():
           bool(valid), str(len(valid)))
 
 
+def check_player_kill_credit():
+    """A player killed by a player (player_kill.py): the count of its own."""
+    tallies = _sets(hg, PLAYER_KILL_COUNT_VAR)
+    check(f"a player's death is credited once, on a PlayerState's {PLAYER_KILL_COUNT_VAR}, "
+          "by the server alone",
+          len(tallies) == 1 and _behind_authority(tallies[0]), f"{len(tallies)} write(s)")
+    if not tallies:
+        return
+    above = _upstream(tallies[0])
+    titles = [_title(n) for n in above]
+    whose = [n for n in above if "PlayerController" in _title(n).replace(" ", "")
+             and any(_title(f) == f"Get {HV.LastInstigator}"
+                     for f in _feeds(BEL.find_input_pin(n, "Object")))]
+    check(f"...to the last blow's instigator ({HV.LastInstigator}) where it is a player's "
+          "controller: a wanderer's blow and the world-floor net are nobody's kill",
+          len(whose) == 1, str(len(whose)))
+    own = [n for n in above if _title(n) == "Branch" and any(
+        "Not Equal" in _title(f) or "!=" in _title(f)
+        for f in _feeds(BEL.find_input_pin(n, "Condition")))]
+    check("...and not to the body's own controller", len(own) == 1 and
+          _arm_into(tallies[0]) != ["else"], str(len(own)))
+    # The fragment's head is its own authority switch, straight off the False
+    # arm of the Branch that tells a player's body from a wanderer's.
+    heads = [n for n in _switches(above) if _arm_into(n) == ["else"] and any(
+        _title(f) == f"Get {HV.DespawnOnDeath}"
+        for b in _ran_by(n) for f in _feeds(BEL.find_input_pin(b, "Condition")))]
+    check("...on the player's arm of the death path alone (DespawnOnDeath false): a "
+          "wanderer's death is no player kill", len(heads) == 1
+          and all(heads[0] in _upstream(t) for t in tallies), str(len(heads)))
+
+
 def check_blows():
     calls = take_hits(_wg_all)
     check("the weapon component's blows each call the target's TakeHit: the pellet, the "
@@ -257,4 +289,5 @@ def run():
     check_on_rep()
     check_tick_authority()
     check_kill_credit()
+    check_player_kill_credit()
     check_blows()

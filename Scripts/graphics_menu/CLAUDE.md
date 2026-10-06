@@ -909,6 +909,8 @@ glimmers, `world/item_highlight.py`). Same keys as GUN SETTINGS; **Enter** saves
 - **When the player is dead:** only the death menu. `DrawHUD` branches on `PlayerDead` of the owning
   controller's PlayerState (`net/state_graph.py`); with no PlayerState yet (a client's first
   frames) the player counts as alive.
+  It shows two scores off that PlayerState, each on a line of its own: `Monster Kills`
+  (`NpcKillCount`) and `Player Kills` (`PlayerKillCount`, M15: `combat/player_kill.py`).
 
 **Rules:**
 

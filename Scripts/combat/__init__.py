@@ -192,6 +192,9 @@ BP_HealthComponent (health_component wires the fragments together)
   respawn           spawn numbering, world-floor net, respawn band and delay
   replacement       the dead wanderer's replacement: the wait, the point, the spawn
   death             kill count, shells, ragdoll collapse, corpse, player death
+  player_kill       a player killed by another player: the credit, PlayerKillCount
+                    on the killer's PlayerState (the damage itself is damage.py's,
+                    the same for a player as for a wanderer)
   player_respawn    a dead player on a server: the wait, a new pawn at a random
                     PlayerStart, the body left as a corpse
   gun_drop          the gun drop: seeded roll + pick streams, loot-table draw

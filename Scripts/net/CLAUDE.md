@@ -266,8 +266,29 @@ says who struck it. `combat/damage.py` is the whole of it.
   consume ability, M26), a wanderer's maximum at possession (`npc/stats.py`), a loaded
   profile (standalone). A Blueprint `Set` of a RepNotify calls `OnRep_Health` on that
   machine too, where its Remote arm does nothing.
-- **A drain's death is nobody's kill yet:** bleeding out after a player's blow is not
-  credited (the drain names no one). PvP credit is M15's.
+- **A wanderer's death by a drain is nobody's kill yet:** bleeding out after a player's
+  blow is not credited (the drain names no one).
+- **Players hurt players (M15, done), and nothing was added to make them.** A pellet, a
+  swing and a thrown blade take health off whatever carries a `BP_HealthComponent`, through
+  `TakeHit`, with the target's own hit-box tables; a player's character carries one as a
+  wanderer's does. Never give a blow a "is this a wanderer" test: friendly fire is on until
+  teams exist (M33), and the team check will go in `TakeHit`, the one place every blow
+  passes.
+  - **The kill's credit is the one PvP thing** (`combat/player_kill.py`): on the player's
+    arm of the death path, on the server, `LastInstigator` where it is a PlayerController
+    and not the body's own has `PlayerKillCount` raised on its PlayerState: a row of
+    `PLAYER_TABLE` apart from the wanderers' `NpcKillCount`, replicated to everyone. The
+    death menu shows both (`Monster Kills`, `Player Kills`), in both modes; in single
+    player the second stays 0.
+  - `LastInstigator` is the last blow's, however long ago: a player who starves or bleeds
+    out after another player's blow is that player's kill, until a wanderer's blow names
+    someone else.
+  - **The check:** `uepy.py --net --clients 2 --probe-timeout 240 --probe
+    Scripts/probes/probe_net_pvp.py` (also with `--lag 120`): client 1's slash (35), thrown
+    knife (50) and pistol rounds (the body's zone, then the head's 1.75) come off client 2,
+    the server and both clients agreeing on the health after each; the last round kills,
+    and all three read one player kill for client 1, none for client 2 and no monster
+    kill. The corrections it counts on client 2 are the server holding it in place.
 - **A probe** takes health with `health.call_method("TakeHit", (amount, vector, controller,
   actor))` on the server (or in single player); a probe's own write of `Health` on a
   client is that client's copy alone, until the server next sends one.

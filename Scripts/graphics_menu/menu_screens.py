@@ -39,7 +39,8 @@ from graphics_menu.ui_graph import (
     mark_rows, member, part, row_at, screen, set_shown, set_text,
 )
 from graphics_menu.umg_consts import (
-    DEATH_HINT_LINE, DEATH_HINT_SERVER, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF,
+    DEATH_HINT_LINE, DEATH_HINT_SERVER, DEATH_PLAYER_SCORE, DEATH_PLAYER_SCORE_PREFIX,
+    DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF,
     DEBUG_ON, GAME_STARTED_VAR,
     HUD_BODY, IN_GAME_ACTIONS, IN_GAME_ONLY, PAUSE_ACCEPT_KEY, PAUSE_DEBUG_ROW, PAUSE_PANEL,
     PAUSE_ROW_ACTIONS, PAUSE_ROW_LABELS, PAUSE_ROW_VAR, PAUSE_ROWS, RESTART_KEY, ROW_VALUE,
@@ -50,7 +51,7 @@ from uebp.nodes.math import FN_EQ_II, FN_OR
 from uebp.nodes.system import (
     FN_CONCAT, FN_INT_TO_STR, FN_IS_STANDALONE, FN_LEVEL_NAME, FN_OPEN_LEVEL)
 from net.pause import author_unpause
-from net.state_consts import PLAYER_STATE_CLASS_PATH
+from net.state_consts import PLAYER_KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH
 from graphics_menu import hud_vars as MV
 
 KILL_COUNT_VAR = "NpcKillCount"
@@ -113,6 +114,16 @@ def author_death_menu(ed, in_execs, state_out):
     _set(score_text, "A", DEATH_SCORE_PREFIX)
     _connect(out(kills_str), _pin(score_text, "B"))
     flow = set_text(ed, part(ed, WBP_DEATH_MENU, DEATH_SCORE), out(score_text), [flow])
+    # ...and the other players' characters, a count of its own beside it
+    # (combat/player_kill.py). In single player it stays 0: nobody else is there.
+    pvp = keep(ed.add_get_member_variable_node(PLAYER_KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH))
+    _connect(state_out, _pin(pvp, "self"))
+    pvp_str = keep(_node(ed, FN_INT_TO_STR))
+    _connect(out(pvp, PLAYER_KILL_COUNT_VAR), _pin(pvp_str, "InInt"))
+    pvp_text = keep(_node(ed, FN_CONCAT))
+    _set(pvp_text, "A", DEATH_PLAYER_SCORE_PREFIX)
+    _connect(out(pvp_str), _pin(pvp_text, "B"))
+    flow = set_text(ed, part(ed, WBP_DEATH_MENU, DEATH_PLAYER_SCORE), out(pvp_text), [flow])
 
     # --- whose death is this? -------------------------------------------------
     alone = keep(_node(ed, FN_IS_STANDALONE))

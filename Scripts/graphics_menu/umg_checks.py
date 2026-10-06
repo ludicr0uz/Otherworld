@@ -34,7 +34,7 @@ WRITTEN = {
     C.WBP_MAIN_MENU: (C.SETTINGS_PANEL, C.SETTINGS_ROWS_BOX, C.HINT_IDLE,
                       C.HINT_CAPTURE),
     C.WBP_PAUSE_MENU: (C.PAUSE_ROWS,),
-    C.WBP_DEATH_MENU: (C.DEATH_SCORE, C.DEATH_HINT_LINE),
+    C.WBP_DEATH_MENU: (C.DEATH_SCORE, C.DEATH_PLAYER_SCORE, C.DEATH_HINT_LINE),
     C.WBP_MENU_ROW: (C.ROW_CARET, C.ROW_LABEL_BOX, C.ROW_LABEL, C.ROW_VALUE,
                      C.ROW_ICON),
     C.WBP_INVENTORY_SLOT: (C.SLOT_ACTIVE, C.SLOT_GHOST, C.SLOT_ICON, C.SLOT_AMMO,
@@ -338,8 +338,8 @@ def check_hud_graph(check, nodes):
           f"{len(blank)} empty")
     written = sorted(t for n in texts for t in _source_titles(n, "self")
                      if t.startswith("Get ") and _sources(n, "InText"))
-    for name in (C.HP_NUM, C.KILLS, C.DEATH_SCORE, C.HUD_FPS, C.EQUIPPED_NAME,
-                 C.SLOT_AMMO, C.BANNER_COUNT):
+    for name in (C.HP_NUM, C.KILLS, C.DEATH_SCORE, C.DEATH_PLAYER_SCORE, C.HUD_FPS,
+                 C.EQUIPPED_NAME, C.SLOT_AMMO, C.BANNER_COUNT):
         check(f"{name} is written from the game, not a literal",
               f"Get {name}" in written)
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}

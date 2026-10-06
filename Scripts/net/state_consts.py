@@ -3,7 +3,8 @@ that hold what a client reads, and their variables. Constants only; state.py
 builds them, state_graph.py is how a graph reaches them.
 
     BP_OtherworldPlayerState  one per player, replicated to everyone: what is
-                              that player's alone (the kills, "is dead")
+                              that player's alone (the kills, of wanderers
+                              and of other players, "is dead")
     BP_OtherworldGameState    one per world, replicated: what every machine
                               reads the same (debug mode, the difficulty)
 
@@ -32,7 +33,12 @@ GAME_STATE_CLASS_PATH = f"{GAME_STATE_BP_PATH}.BP_OtherworldGameState_C"
 Kills = Var(KILL_COUNT_VAR, INT, 0)
 # This player's character is dead: what their HUD draws the death menu from.
 Dead = Var(PLAYER_DEAD_VAR, BOOL, False)
-PLAYER_TABLE = (Kills, Dead)
+# The other players' characters this player killed (combat/player_kill.py):
+# a count of its own beside the wanderers', since a fight between players is
+# scored apart from the forest's.
+PLAYER_KILL_COUNT_VAR = "PlayerKillCount"
+PlayerKills = Var(PLAYER_KILL_COUNT_VAR, INT, 0)
+PLAYER_TABLE = (Kills, Dead, PlayerKills)
 
 # --- BP_OtherworldGameState --------------------------------------------------
 # The developer overlays (tracers, sight cones, wanderer numbers) are on.

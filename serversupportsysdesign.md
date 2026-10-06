@@ -372,7 +372,8 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
 
 17. `BP_HealthComponent` is server-owned and replicated, with an instigator on every damage
     event.
-18. Player-versus-player damage and kill credit.
+18. Player-versus-player damage and kill credit. (Done, M15: `Scripts/net/CLAUDE.md`,
+    "Health and damage": no second damage path, a `PlayerKillCount` beside the monsters'.)
 19. Death: a ragdoll on every client, gear onto a lootable corpse, respawn at a chosen
     point. (Done, M16: `Scripts/net/CLAUDE.md`, "Death". The point is a random
     PlayerStart; the levels have one.)

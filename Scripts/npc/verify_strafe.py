@@ -10,6 +10,7 @@ in the game is Scripts/probes/probe_npc_strafe.py.
 
 import unreal
 
+from net.players_consts import NEAREST_TITLE
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM, NPC_VARIANTS
 from forest_generator.npc_strafe import (
     NPC_STRAFE_ENGAGE_CM, NPC_STRAFE_MAX_ANGLE_DEG, NPC_STRAFE_MAX_DISTANCE_CM,
@@ -87,7 +88,7 @@ def check_strafe(path):
     goal = _titles(_sources(step, "Goal"))
     check(f"{tag}: ...to a point off the player, round from where it stands by "
           f"the stored angle and out by the stored distance",
-          {"GetPlayerPawn", "Rotate Vector Around Axis", "Normalize 2D (Vector)",
+          {NEAREST_TITLE, "Rotate Vector Around Axis", "Normalize 2D (Vector)",
            f"Get {STRAFE_YAW_VAR}", f"Get {STRAFE_DIST_VAR}"} <= goal
           and "RandomFloatInRange" not in goal, f"{sorted(goal)}")
     check(f"{tag}: ...reached only from BT_{STEP_CHASE}",
@@ -170,7 +171,7 @@ def check_strafe(path):
     check(f"{tag}: it steps facing the player: focus on them, and the body "
           f"turns with the controller rather than the movement",
           len(focuses) == 1 and _titles(_feeders(focuses[0], "NewFocus"))
-          == {"GetPlayerPawn"} and step in _exec_reach(focuses[0])
+          == {NEAREST_TITLE} and step in _exec_reach(focuses[0])
           and len(orients) == 2 and len(desireds) == 2 and before(step, True))
     check(f"{tag}: ...and chases facing the way it runs, the focus dropped",
           len(clears) == 1 and len(chases) == 1

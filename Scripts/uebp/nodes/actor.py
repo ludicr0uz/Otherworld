@@ -101,6 +101,7 @@ FN_GET_CONTROLLER = "/Script/Engine.Pawn.GetController"
 # True on the machine whose player drives this pawn: its input, camera and HUD.
 FN_IS_LOCALLY_CONTROLLED = "/Script/Engine.Pawn.IsLocallyControlled"
 FN_IS_PLAYER_CONTROLLED = "/Script/Engine.Pawn.IsPlayerControlled"
+FN_PLAYER_STATE_PAWN = "/Script/Engine.PlayerState.GetPawn"
 # The way the player steered this frame, as the movement component consumed it:
 # the intent, not the velocity, which lags it and outlives it.
 FN_LAST_MOVE_INPUT = "/Script/Engine.Pawn.GetLastMovementInputVector"

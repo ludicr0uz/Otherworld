@@ -5,6 +5,7 @@ import unreal
 
 from combat.glimmer import add_glimmer
 from combat.log import _log
+from net.players import nearest_living_player, player_pin
 from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _assets, _component_object, _connect,
     _create_blueprint, _drop_components, _events, _loose_pin, _node, _palette, _pin,
@@ -24,7 +25,7 @@ from uebp.nodes.actor import (
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_DISTANCE, FN_LESS_FF, FN_MAKE_ROT, FN_MUL_FF, FN_NOT)
 from uebp.nodes.palette import MACRO_FOR_EACH
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.nodes.system import FN_IS_VALID
 from uebp.vars import declare
 from combat import ammo_vars as AV
 from combat import item_vars as IV
@@ -105,12 +106,18 @@ def build_ammo_pickup(rebuild=True):
     _set(spin, "bTeleport", True)
     _connect(then(tick), _pin(spin, "execute"))
 
-    pawn = _node(ed, FN_GET_PLAYER_PAWN)
-    _set(pawn, "PlayerIndex", 0)
-    pawn_out = out(pawn)
+    # Whose shells: the living player nearest the box (net/players.py). None
+    # while no one lives, so the reads off the pawn sit behind a Branch.
+    here = _node(ed, FN_ACTOR_LOC)
+    pawn = nearest_living_player(ed, out(here))
+    pawn_out = player_pin(pawn)
+    anyone = _node(ed, FN_IS_VALID)
+    _connect(pawn_out, _pin(anyone, "Object"))
+    someone = ed.add_branch_node()
+    _connect(out(anyone), _pin(someone, "Condition"))
+    _connect(then(spin), _pin(someone, "execute"))
     there = _node(ed, FN_ACTOR_LOC)
     _connect(pawn_out, _pin(there, "self"))
-    here = _node(ed, FN_ACTOR_LOC)
     gap = _node(ed, FN_DISTANCE)
     _connect(out(there), _pin(gap, "V1"))
     _connect(out(here), _pin(gap, "V2"))
@@ -120,7 +127,7 @@ def build_ammo_pickup(rebuild=True):
 
     reached = ed.add_branch_node()
     _connect(out(near), _pin(reached, "Condition"))
-    _connect(then(spin), _pin(reached, "execute"))
+    _connect(then(someone), _pin(reached, "execute"))
 
     # --- who gets the shells ------------------------------------------------
     comp = _node(ed, FN_GET_COMP)

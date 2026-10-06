@@ -1,7 +1,7 @@
-"""BP_DayNightCycle's last Tick step: the night is cold. The player's
-Temperature (BP_SurvivalComponent) falls while the sun is down.
+"""BP_DayNightCycle's last Tick step: the night is cold. Every living
+player's Temperature (BP_SurvivalComponent) falls while the sun is down.
 
-    [Tick ...] --> pawn = GetPlayerPawn(0); valid?
+    [Tick ...] --> for each living player's pawn (net/players.py)
                --> its SurvivalComponent (GetComponentByClass, cast)
                --> Temperature = max(Temperature
                        - NightTemperatureDropPerSecond * (1 - DayAmount) * dt, 0)
@@ -17,12 +17,12 @@ the cold is the world's and build_survival.py runs before build_day_night.py
 (the cast node exists only for a loaded class). A level without a cycle, or a
 pawn without the component, simply has no cold.
 
-The pawn is checked in a Branch of its own before anything reads off it: a
-pure Get with a null self is an Accessed None on every frame.
+The loop's body is the end of the Tick chain: nothing is authored after it.
 """
 
 import unreal
 
+from net.players import each_living_player
 from uebp.graph import BEL, _connect, _loose_pin, _palette, _pin, out
 from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 from world.day_night_blueprint import NIGHT_COLD_VAR
@@ -30,7 +30,6 @@ from world.day_night_graph import _call, _get, _map
 from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.math import FN_MAX_FF, FN_MUL_FF, FN_SUB_FF
 from uebp.nodes.palette import NODE_CAST_SURVIVAL
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
 from world import day_night_vars as DV
 
 TEMPERATURE_VAR = "Temperature"
@@ -38,9 +37,8 @@ TEMPERATURE_VAR = "Temperature"
 
 def author_night_cold(ed, tick, chain):
     """Extend the Tick chain with the cold (see the module docstring)."""
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, PlayerIndex=0))
-    there = chain.step(ed.add_branch_node())
-    _connect(out(_call(ed, FN_IS_VALID, Object=pawn)), _pin(there, "Condition"))
+    pawn, each, _done, everyone = each_living_player(ed, [chain.then])
+    chain.then = each
 
     comp = _call(ed, FN_GET_COMP, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(SURVIVAL_CLASS_PATH)
@@ -63,6 +61,6 @@ def author_night_cold(ed, tick, chain):
     _connect(survival, _pin(write, "self"))
     _connect(floor, _pin(write, TEMPERATURE_VAR))
     ed.add_comment_to_nodes(
-        "The night is cold: the player's Temperature falls by "
+        "The night is cold: every living player's Temperature falls by "
         "NightTemperatureDropPerSecond x (1 - DayAmount), down to 0.",
-        [there, cast, write])
+        everyone + [cast, write])

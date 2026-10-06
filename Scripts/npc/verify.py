@@ -23,6 +23,7 @@ afraid of fire, and npc/verify_ward.py.
 
 import unreal
 
+from net.players_consts import NEAREST_TITLE
 from combat.tuning import COMBAT
 from forest_generator.npc_agro import (
     AGRO_LOG_PREFIX, NPC_AGRO, PATROL_ACCEPT_FRACTION, PATROL_ACCEPT_SLACK_CM,
@@ -310,7 +311,7 @@ def check_controller(path, key):
     los = _titled(nodes, "LineOfSightTo")
     check(f"{tag}: ...and not through a tree (line of sight to the player)",
           len(los) == 1 and {_title(f) for f in _feeders(los[0], "Other")}
-          == {"GetPlayerPawn"})
+          == {NEAREST_TITLE})
     check(f"{tag}: feels the player within TuneTouchRange "
           f"({spec['touch_range_cm']:.0f} cm)",
           sum(_fed(n, "B", "touch_range_cm") for n in reach) == 1, f"{fed}")

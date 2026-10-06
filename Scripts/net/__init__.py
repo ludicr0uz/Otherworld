@@ -20,6 +20,10 @@ replication authoring).
                 and server_game_mode, the GameMode behind the authority switch
     state_checks.py  the verifiers' checks: the assets, and that no graph a
                 client can run reads the GameMode
-    owner_checks.py  the verifiers' check that nothing a player owns (a HUD, a
-                widget, a component, an animation graph) reads player 0's pawn
+    players_consts.py  who is nearby: BPL_Players' path, its two functions
+                (LivingPlayers, NearestLivingPlayer) and their pins
+    players.py  builds that function library, and the fragments a world actor
+                or a wanderer calls it with instead of GetPlayerPawn(0)
+    owner_checks.py  the verifiers' check that no graph reads player 0's pawn:
+                no GetPlayerPawn in any Blueprint, none named by any builder
 """

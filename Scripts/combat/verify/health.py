@@ -15,6 +15,7 @@ from combat.respawn import (
     RESPAWN_ATTEMPTS, RESPAWN_BAND, RESPAWN_DELAY, RESPAWN_DELAY_VAR,
     RESPAWN_LIFT, WORLD_FLOOR_Z,
 )
+from net.players_consts import POINT_PIN
 from combat.verify.fixtures import (
     _montages, drain_writes, exec_reach, gm, h, health_bp, hg, wg,
 )
@@ -78,10 +79,11 @@ def check_health_death_respawn():
           f"{sorted(ranges)} vs {want_band}")
     check("the bearing is random over a full circle", ("0.0", "360.0") in ranges,
           str(sorted(ranges)))
-    check("the respawn is measured from the player, not a stored spawn point",
+    check("the respawn is measured from the living player nearest the body "
+          "(net/players.py), not player 0 or a stored spawn point",
           "SpawnOrigin" not in {str(v) for v in BEL.list_member_variable_names(
               health_bp, False)}
-          and bool(by_pins(hg, "PlayerIndex")))
+          and bool(by_pins(hg, POINT_PIN)) and not by_pins(hg, "PlayerIndex"))
     check_respawn_delay()
     tick = graph(health_bp).find_event_node("ReceiveTick")
     check("health ticks (otherwise nothing notices 0 HP)",

@@ -6,6 +6,7 @@ from combat.verify.common import (
     BEL, by_pins, cdo, check, component_template, components, graph, load, num_pin,
     pin_value,
 )
+from net.players_consts import LIVING_TITLE, PLAYERS_PIN
 from world import world_config as cfg
 from world.day_night_blueprint import (
     AMBIENT_SCALE_VAR, COMPONENTS, FOG_SCALE_VAR, LOOK_SCALE_VARS, MOON_DISC_SCALE_VAR,
@@ -164,13 +165,13 @@ def _check_night_cold(bp):
                if "Get DayAmount" in _feeds(BEL.find_input_pin(m, "Value"))]
     check(f"...by {NIGHT_COLD_VAR} x (1 - DayAmount): the night's, not the day's",
           len(scaled) == 1 and flipped == [(1.0, 0.0)], f"{len(scaled)} {flipped}")
-    pawns = by_pins(nodes, "PlayerIndex")
-    check("...of the player's pawn, checked valid in a Branch of its own",
-          len(pawns) == 1 and any(
-              "Branch" in t for v in by_pins(nodes, "Object")
-              if "GetPlayerPawn" in _feeds(BEL.find_input_pin(v, "Object"))
-              for t in _feeds(BEL.find_output_pin(v, "ReturnValue"))),
-          str(len(pawns)))
+    everyone = [n for n in nodes if _title(n) == LIVING_TITLE]
+    check("...of every living player's pawn: the write is in the body of a "
+          "loop over them (net/players.py)",
+          len(everyone) == 1 and not by_pins(nodes, "PlayerIndex")
+          and any("For Each Loop" in t
+                  for t in _feeds(BEL.find_output_pin(everyone[0], PLAYERS_PIN))),
+          str(len(everyone)))
 
 
 def _check_look(bp):

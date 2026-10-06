@@ -17,6 +17,7 @@ probes/probe_wendigo_ward.py's.
 
 import unreal
 
+from net.players_consts import NEAREST_TITLE
 from combat.heat_tuning import FIRE_FEAR_TAG
 from combat.paths import FIRE_WARD_VAR
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM, NPC_VARIANTS
@@ -135,7 +136,7 @@ def check_held(tag, own):
           len(front) == 1 and _titles(_feeders(front[0], "A")) == {"Dot Product"}
           and len(edges) == 1 and _title(edges[0]) == "Cos (Degrees)"
           and _fed(edges[0], "A", "ward_half_angle_deg")
-          and {"GetActorForwardVector", "Normalize 2D (Vector)", "GetPlayerPawn"} <= fed,
+          and {"GetActorForwardVector", "Normalize 2D (Vector)", NEAREST_TITLE} <= fed,
           f"{_titles(edges)}")
     casts = [d for d in _drivers(gate) if "WeaponComponent" in _title(d)]
     valid = [d for c in casts for d in _drivers(c) if _title(d) == "Branch"]
@@ -240,7 +241,7 @@ def check_circle(tag, own, spent):
     looks = _titled(ring, "SetFocus")
     check(f"{tag}: still held, it faces the player and moves",
           len(moves) == 1 and len(looks) == 1 and moves[0] in _exec_reach(looks[0])
-          and _titles(_feeders(looks[0], "NewFocus")) == {"GetPlayerPawn"}
+          and _titles(_feeders(looks[0], "NewFocus")) == {NEAREST_TITLE}
           and not _titled(ring, "ClearFocus"))
     if len(moves) != 1:
         return

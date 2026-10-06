@@ -17,6 +17,7 @@ is probes/probe_wendigo_stalk.py's.
 
 import unreal
 
+from net.players_consts import NEAREST_TITLE
 from forest_generator.npc_placement import NPC_MELEE_RANGE_CM, NPC_VARIANTS
 from forest_generator.npc_stalk import (
     NPC_STALK_ARC_DEG, NPC_STALK_ARRIVE_CM, NPC_STALK_CATCH_UP_CM,
@@ -116,7 +117,7 @@ def check_roar(tag, own, key):
     check(f"{tag}: ...standing, and facing the player",
           len(stops) == 1 and len(stamps) == 1 and stops[0] in _exec_reach(stamps[0])
           and len(looks) == 1 and looks[0] in _exec_reach(stops[0])
-          and _titles(_feeders(looks[0], "NewFocus")) == {"GetPlayerPawn"})
+          and _titles(_feeders(looks[0], "NewFocus")) == {NEAREST_TITLE})
     waits = [b for b in _titled(own, "Branch")
              if {"float < float", "GetTimeSeconds", f"Get {STALK_ROAR_UNTIL_VAR}"}
              == _titles(_sources(b, "Condition"))]
@@ -277,7 +278,7 @@ def _fled_gates(own):
             if any(_title(t) == "float > float" and _fed(t, "B", "stalk_fled_cm")
                    and any(_title(d) == "Distance2D (Vector)"
                            and _titles(_feeders(d, "V1")) == {"Get Actor Location"}
-                           and "GetPlayerPawn" in _titles(_sources(d, "V1"))
+                           and NEAREST_TITLE in _titles(_sources(d, "V1"))
                            and _titles(_feeders(d, "V2")) == {f"Get {STALK_ORIGIN_VAR}"}
                            for d in _feeders(t, "A"))
                    for t in _feeders(b, "Condition"))]
@@ -291,7 +292,7 @@ def check_fled(tag, own):
           f"and nothing else writes it",
           len(stamps) == 1 and len(roars) == 1 and stamps[0] in _exec_reach(roars[0])
           and _titles(_feeders(stamps[0], STALK_ORIGIN_VAR)) == {"Get Actor Location"}
-          and "GetPlayerPawn" in _titles(_sources(stamps[0], STALK_ORIGIN_VAR)))
+          and NEAREST_TITLE in _titles(_sources(stamps[0], STALK_ORIGIN_VAR)))
     gates = _fled_gates(own)
     waits = [b for b in _titled(own, "Branch")
              if {"float < float", "GetTimeSeconds", f"Get {STALK_ROAR_UNTIL_VAR}"}
@@ -337,7 +338,7 @@ def check_catch_up(tag, own):
     check(f"{tag}: ...it runs straight at them, facing the way it runs",
           len(runs) == 1 and _title(runs[0]) == "SimpleMoveToLocation"
           and _titles(_feeders(runs[0], "Goal")) == {"Get Actor Location"}
-          and "GetPlayerPawn" in _titles(_sources(runs[0], "Goal"))
+          and NEAREST_TITLE in _titles(_sources(runs[0], "Goal"))
           and len(_titled(far, "ClearFocus")) == 1
           and runs[0] in _exec_reach(_titled(far, "ClearFocus")[0]))
     speeds = _titled(far, "Set MaxWalkSpeed")

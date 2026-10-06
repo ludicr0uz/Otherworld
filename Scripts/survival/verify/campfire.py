@@ -10,6 +10,7 @@ from combat.paths import WEAPON_COMP_BP_PATH
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, component_template, graph, load, num_pin,
 )
+from net.players_consts import LIVING_TITLE
 from Sound.sound_items import CAMPFIRE, CRACKLE_COMP
 from survival.campfire import (
     CAMPFIRE_MESH, CAMPFIRE_SCALE, MAX_TEMPERATURE_VAR, TEMPERATURE_VAR, WARM_RADIUS_VAR,
@@ -26,6 +27,9 @@ CAMPFIRE_WIDTH_CM = (60.0, 120.0)
 
 def _title(n):
     return str(BEL.get_node_title(n)).replace("\n", " ")
+
+
+LIVING = LIVING_TITLE.lower()
 
 
 def _squash(n):
@@ -120,27 +124,29 @@ def check_warmth(bp):
            f"get{MAX_TEMPERATURE_VAR.lower()}", "min(float)"} <= value
           and any("tick" in v for v in value), str(sorted(value)))
     casts = _feeders(write, "execute")
-    check("...on the player's survival component (a cast: a pawn without one is "
-          "not warmed)",
+    check("...on a living player's survival component (a cast: a pawn without "
+          "one is not warmed)",
           len(casts) == 1 and "survivalcomponent" in _squash(casts[0])
-          and "getplayerpawn" in _feeds(casts[0], "Object"),
+          and {"foreachloop", LIVING} <= _feeds(casts[0], "Object"),
           str([_title(c) for c in casts]))
     nears = _feeders(casts[0], "execute") if len(casts) == 1 else []
     near = _feeds(nears[0], "Condition") if len(nears) == 1 else set()
-    check("...only while the player is within WarmRadius of the fire",
+    check("...only while that player is within WarmRadius of the fire",
           len(nears) == 1 and _title(nears[0]) == "Branch"
           and PIN.get_owning_node(PIN.list_connected_pins(
               BEL.find_then_pin(nears[0]))[0]) == casts[0]
-          and {f"get{WARM_RADIUS_VAR.lower()}", "getplayerpawn"} <= near
+          and {f"get{WARM_RADIUS_VAR.lower()}", "foreachloop"} <= near
           and any("distance" in v for v in near), str(sorted(near)))
-    theres = _feeders(nears[0], "execute") if len(nears) == 1 else []
-    there = _feeds(theres[0], "Condition") if len(theres) == 1 else set()
-    check("...and the pawn is asked for behind its own Branch on IsValid, nested, "
-          "not folded (a null pawn is an Accessed None a frame)",
-          len(theres) == 1 and _title(theres[0]) == "Branch"
-          and {"isvalid", "getplayerpawn"} <= there and not any("distance" in v for v in there)
-          and any("tick" in _squash(f) for f in _feeders(theres[0], "execute")),
-          str(sorted(there)))
+    loops = _feeders(nears[0], "execute") if len(nears) == 1 else []
+    asks = _feeders(loops[0], "Exec") if len(loops) == 1 else []
+    check("...and that is every living player in turn, never player 0: the "
+          "Branch is the body of a loop over LivingPlayers, asked once a Tick "
+          "(net/players.py)",
+          len(loops) == 1 and _squash(loops[0]) == "foreachloop"
+          and len(asks) == 1 and _squash(asks[0]) == LIVING
+          and any("tick" in _squash(f) for f in _feeders(asks[0], "execute"))
+          and not by_pins(nodes, "PlayerIndex"),
+          str([_title(n) for n in loops + asks]))
 
 
 def run():

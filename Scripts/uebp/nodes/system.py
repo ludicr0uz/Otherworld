@@ -19,7 +19,6 @@ FN_GET_GAME_STATE = "/Script/Engine.GameplayStatics.GetGameState"
 # By index into the GameState's PlayerArray.
 FN_GET_PLAYER_STATE = "/Script/Engine.GameplayStatics.GetPlayerState"
 FN_GET_PC = "/Script/Engine.GameplayStatics.GetPlayerController"
-FN_GET_PLAYER_PAWN = "/Script/Engine.GameplayStatics.GetPlayerPawn"
 FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
 FN_GET_GAME_INSTANCE = "/Script/Engine.GameplayStatics.GetGameInstance"
 FN_LOAD_SAVE = "/Script/Engine.GameplayStatics.LoadGameFromSlot"

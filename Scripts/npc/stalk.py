@@ -69,6 +69,7 @@ from forest_generator.npc_stalk import (
     NPC_STALK_STALLED_CMS,
 )
 from npc.graph import _Graph
+from net.players import nearest_living_player, player_pin
 from uebp.graph import BEL, _connect, _pin, else_, out, then
 from npc.paths import (
     ENRAGED_VAR, STALK_ARRIVED_VAR,
@@ -87,7 +88,7 @@ from uebp.nodes.ai import FN_SIMPLE_MOVE
 from uebp.nodes.math import (
     FN_ADD_FF, FN_DISTANCE_2D, FN_GREATER_FF, FN_LESS_FF, FN_LE_FF, FN_MUL_FF,
     FN_RANDOM_BOOL, FN_RANDOM_FLOAT, FN_SELECT_FF, FN_VSIZE_XY)
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
+from uebp.nodes.system import FN_TIME_SECONDS
 
 
 def declare_stalk_vars(ed):
@@ -256,14 +257,14 @@ def _author_stalk(ed, exec_in, result, roar_anim, stock):
     self_pawn = g.call(FN_GET_PAWN)
     self_loc = g.call(FN_ACTOR_LOC)
     _connect(out(self_pawn), _pin(self_loc, "self"))
-    player = g.call(FN_GET_PLAYER_PAWN, PlayerIndex=0)
+    player = g.keep(nearest_living_player(ed, out(self_loc)))
     player_loc = g.call(FN_ACTOR_LOC)
-    _connect(out(player), _pin(player_loc, "self"))
+    _connect(player_pin(player), _pin(player_loc, "self"))
     gap = g.call(FN_DISTANCE_2D)
     _connect(out(self_loc), _pin(gap, "V1"))
     _connect(out(player_loc), _pin(gap, "V2"))
     now = g.call(FN_TIME_SECONDS)
-    pins = dict(self_pawn=out(self_pawn), self_loc=out(self_loc), player=out(player),
+    pins = dict(self_pawn=out(self_pawn), self_loc=out(self_loc), player=player_pin(player),
                 player_loc=out(player_loc), gap=out(gap), now=out(now))
 
     # --- hurt by the player: no hunt, now or ever -----------------------------

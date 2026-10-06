@@ -27,6 +27,7 @@ import unreal
 from combat.game_state import DEBUG_MODE_VAR, NOISE_TIME_VAR
 from combat.paths import GAME_MODE_BP_PATH
 from net.state_consts import GAME_STATE_CLASS_PATH
+from net.players import living_players
 from net.state_graph import game_state
 from forest_generator.npc_agro import AGRO_LOG_PREFIX
 from npc.graph import _log
@@ -42,9 +43,11 @@ from npc.paths import (
 from Sound.play import _author_random_sound
 from npc.senses import _author_hearing, _author_hurt, _author_sight, _author_touch
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_PAWN
+from uebp.nodes.array import FN_ARR_LEN
+from uebp.nodes.math import FN_GREATER_II
 from uebp.nodes.ai import FN_BB_SET_BOOL, FN_BB_SET_STRING, FN_GET_BLACKBOARD
 from uebp.nodes.system import (
-    FN_CONCAT, FN_DISPLAY_NAME, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_WARN)
+    FN_CONCAT, FN_DISPLAY_NAME, FN_WARN)
 
 
 def _declare(ed, name, pin_type):
@@ -171,18 +174,22 @@ def _author_tell_blackboard(ed, done_in):
 
 
 def _author_player_present(ed, exec_in, yes_in, no_in):
-    """No player pawn (before possession, between a death and a restart): no
-    sense can say anything, so the tree goes on to the patrol."""
-    player = _node(ed, FN_GET_PLAYER_PAWN)
-    _set(player, "PlayerIndex", 0)
-    there = _node(ed, FN_IS_VALID)
-    _connect(out(player), _pin(there, "Object"))
+    """No living player (before possession, between a death and a restart,
+    everyone dead): no sense can say anything, so the tree goes on to the
+    patrol. Every step after this one reads the nearest of them
+    (net/players.py), who is there while this says so."""
+    living, players = living_players(ed, [exec_in])
+    count = _node(ed, FN_ARR_LEN)
+    _connect(players, _pin(count, "TargetArray"))
+    there = _node(ed, FN_GREATER_II)
+    _connect(out(count), _pin(there, "A"))
+    _set(there, "B", 0)
     present = ed.add_branch_node()
     _connect(out(there), _pin(present, "Condition"))
-    _connect(exec_in, _pin(present, "execute"))
+    _connect(then(living), _pin(present, "execute"))
     _connect(then(present), yes_in)
     _connect(else_(present), no_in)
-    return [player, there, present]
+    return [living, count, there, present]
 
 
 def _author_agro_steps(ed, step, result, stock):

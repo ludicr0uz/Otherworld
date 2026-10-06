@@ -21,6 +21,7 @@ from combat.game_state import (
 )
 from combat.paths import GAME_MODE_CLASS_PATH
 from combat.tuning import COMBAT
+from net.players import nearest_living_player, player_pin
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
 from npc.paths import HEALTH_CLASS_PATH
 from npc.tuned import tuned
@@ -30,7 +31,7 @@ from uebp.nodes.math import (
     FN_AND, FN_DEG_COS, FN_DISTANCE, FN_DOT_VV, FN_GE_FF, FN_LE_FF, FN_MUL_FF, FN_NORMAL,
     FN_OR, FN_SUB_FF, FN_SUB_VV)
 from uebp.nodes.palette import NODE_CAST_GAME_MODE, NODE_CAST_HEALTH
-from uebp.nodes.system import FN_GET_GAME_MODE, FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
+from uebp.nodes.system import FN_GET_GAME_MODE, FN_TIME_SECONDS
 
 
 class _Maker:
@@ -61,11 +62,10 @@ def _locations(k):
     pawn = k.fn(FN_GET_PAWN)
     here = k.fn(FN_ACTOR_LOC)
     _connect(k.out(pawn), _pin(here, "self"))
-    player = k.fn(FN_GET_PLAYER_PAWN)
-    _set(player, "PlayerIndex", 0)
+    player = k(nearest_living_player(k.ed, k.out(here)))
     there = k.fn(FN_ACTOR_LOC)
-    _connect(k.out(player), _pin(there, "self"))
-    return pawn, k.out(here), k.out(player), k.out(there)
+    _connect(player_pin(player), _pin(there, "self"))
+    return pawn, k.out(here), player_pin(player), k.out(there)
 
 
 def _branch(k, condition, exec_in):

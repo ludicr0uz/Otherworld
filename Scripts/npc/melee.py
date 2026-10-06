@@ -11,6 +11,7 @@ from npc.paths import (
     ATTACK_VOICES_VAR, HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, LAST_HIT_FROM_VAR,
     MELEE_SLOT)
 from npc.graph import _log
+from net.players import nearest_living_player, player_pin
 from uebp.graph import (
     BEL, _assets, _connect, _loose_pin, _node, _palette, _pin, _resolve, _set, else_, out,
     then)
@@ -25,7 +26,7 @@ from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_CLAMP, FN_DISTANCE, FN_GE_FF, FN_LE_FF, FN_NORMAL, FN_SUB_FF,
     FN_SUB_VV, INF)
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_TIME_SECONDS
+from uebp.nodes.system import FN_TIME_SECONDS
 from uebp import props as EP
 from combat import health_vars as HV
 from npc import controller_vars as NV
@@ -113,9 +114,8 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     self_loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(out(self_pawn), _pin(self_loc, "self"))
 
-    player = keep(_node(ed, FN_GET_PLAYER_PAWN))
-    _set(player, "PlayerIndex", 0)
-    player_out = out(player)
+    player = keep(nearest_living_player(ed, out(self_loc)))
+    player_out = player_pin(player)
     player_loc = keep(_node(ed, FN_ACTOR_LOC))
     _connect(player_out, _pin(player_loc, "self"))
 

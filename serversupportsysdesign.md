@@ -48,7 +48,7 @@ builders, verifiers excluded (*verified*).
 |---|---|---|---|
 | raw key polling on Tick drives gameplay | 50 in 20 files | `combat/weapon_component`, `graphics_menu` | polled only on the locally controlled pawn; each action is a request to the server |
 | world state on the GameMode, which exists only on the server | 46 in 13 files | kill count, `PlayerDead`, `DebugMode`, the noise record, the gun-drop streams | GameState (shared) and PlayerState (per player) |
-| `GetPlayerPawn(0)` is "the player" | 53 in 27 files | 7 NPC modules, 15 HUD modules, the ammo pickup, night cold | AI picks among all players; the HUD uses its owning pawn (done, M8: `net/owner_checks.py` holds it); world actors use overlaps |
+| `GetPlayerPawn(0)` is "the player" | 53 in 27 files | 7 NPC modules, 15 HUD modules, the ammo pickup, night cold | AI picks among all players; the HUD uses its owning pawn (done, M8: `net/owner_checks.py` holds it); world actors and, for now, the wanderers ask the living players: all of them or the nearest (done, M9: `net/players.py`; a wanderer choosing and keeping a target is M27) |
 | the game pauses | 7 | title menu, death, save and exit | removed: a shared world can't pause |
 | random rolls run wherever the graph runs | 110 in 36 files | loot, gun drops, spread, patrol, the day's start hour | rolled on the server only |
 | the profile is a local save file | `graphics_menu/profile_*.py`, `save_exit.py` | written by the HUD on the player's machine | written by the server, keyed to an account |

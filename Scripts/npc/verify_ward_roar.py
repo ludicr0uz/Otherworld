@@ -14,6 +14,7 @@ is probes/probe_wendigo_ward_roar.py's.
 
 import unreal
 
+from net.players_consts import NEAREST_TITLE
 from forest_generator.npc_placement import NPC_VARIANTS
 from forest_generator.npc_stalk import NPC_STALK_ROAR
 from forest_generator.npc_ward import (
@@ -124,7 +125,7 @@ def check_bellow(tag, until, key):
     check(f"{tag}: a roar stops it and faces the player, with no move order, "
           f"and the pass succeeds",
           len(stops) == 1 and len(looks) == 1 and looks[0] in _exec_reach(stops[0])
-          and _titles(_feeders(looks[0], "NewFocus")) == {"GetPlayerPawn"}
+          and _titles(_feeders(looks[0], "NewFocus")) == {NEAREST_TITLE}
           and not _titled(roar, "SimpleMoveToLocation")
           and _ends(BEL.find_then_pin(until)) == {True})
     clip = NPC_STALK_ROAR.get(key)

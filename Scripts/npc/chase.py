@@ -15,18 +15,20 @@ from uebp.graph import BEL, _connect, _node, _pin, _set, else_, out, then
 from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_PAWN
 from uebp.nodes.ai import FN_MOVE_TO_ACTOR, FN_MOVE_TO_LOCATION, FN_PROJECT_NAV
 from uebp.nodes.math import FN_AND, FN_MAKE_VECTOR
-from uebp.nodes.system import FN_GET_PLAYER_PAWN
+from net.players import nearest_living_player, player_pin
 
 
 def _author_chase(ed, exec_in):
     """Returns ``(nodes, after_move)``: the nodes made, for the comment box,
     and the exec pins after either move order."""
     move_to = _node(ed, FN_MOVE_TO_ACTOR)
-    get_pawn = _node(ed, FN_GET_PLAYER_PAWN)
+    here_pawn = _node(ed, FN_GET_PAWN)
+    here_loc = _node(ed, FN_ACTOR_LOC)
+    _connect(out(here_pawn), _pin(here_loc, "self"))
+    get_pawn = nearest_living_player(ed, out(here_loc))
 
-    # Goal = the player pawn
-    _set(get_pawn, "PlayerIndex", 0)
-    _connect(out(get_pawn), _pin(move_to, "Goal"))
+    # Goal = the player pawn: the living one nearest this wanderer
+    _connect(player_pin(get_pawn), _pin(move_to, "Goal"))
 
     # Pathfinding is what makes it run around the trees rather than into them.
     _set(move_to, "AcceptanceRadius", NPC_ACCEPTANCE_RADIUS_CM)
@@ -56,15 +58,12 @@ def _author_chase(ed, exec_in):
     reach_out = out(reach)
 
     goal_loc = _node(ed, FN_ACTOR_LOC)
-    _connect(out(get_pawn), _pin(goal_loc, "self"))
+    _connect(player_pin(get_pawn), _pin(goal_loc, "self"))
     goal_out = out(goal_loc)
     goal_on = _node(ed, FN_PROJECT_NAV)
     _connect(goal_out, _pin(goal_on, "Point"))
     _connect(reach_out, _pin(goal_on, "QueryExtent"))
 
-    here_pawn = _node(ed, FN_GET_PAWN)
-    here_loc = _node(ed, FN_ACTOR_LOC)
-    _connect(out(here_pawn), _pin(here_loc, "self"))
     here_on = _node(ed, FN_PROJECT_NAV)
     _connect(out(here_loc), _pin(here_on, "Point"))
     _connect(reach_out, _pin(here_on, "QueryExtent"))

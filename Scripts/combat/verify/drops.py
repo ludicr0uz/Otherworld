@@ -13,6 +13,7 @@ from combat.tuning import (
     GUN_DROP_CHANCE, GUN_DROP_SEED, GUN_LOOT_TABLE,
 )
 from combat.weapon_specs import DROP_TICKETS, _weapon_specs
+from net.players_consts import POINT_PIN
 from combat.verify.fixtures import ag, health_bp, hg
 from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, components, graph, in_pins, load, num_pin,
@@ -36,8 +37,10 @@ def check_ammo_pickup():
           str(sorted({n for n in components(ammo_bp) if n.startswith("Shell")})))
     # Measured HERE, on at most a handful of actors, rather than by sweeping the
     # level from the weapon component's Tick every frame whether any exist or not.
-    check("the pickup measures its own distance to the player",
-          bool(by_pins(ag, "V1", "V2")) and bool(by_pins(ag, "PlayerIndex")),
+    check("the pickup measures its own distance to the living player nearest "
+          "it (net/players.py), not player 0",
+          bool(by_pins(ag, "V1", "V2")) and bool(by_pins(ag, POINT_PIN))
+          and not by_pins(ag, "PlayerIndex"),
           f"{len(by_pins(ag, 'V1', 'V2'))} distance node(s)")
     check(f"...and is taken by walking within {AMMO_PICKUP_RADIUS:.0f} cm of it",
           any(pin_value(n, "B") == str(AMMO_PICKUP_RADIUS)

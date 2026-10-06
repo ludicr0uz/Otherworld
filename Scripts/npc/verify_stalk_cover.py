@@ -9,6 +9,7 @@ the navmesh; or in the open when no sweep found one. And, of the numbers,
 that every species planted has its trunk's width on record.
 """
 
+from net.players_consts import NEAREST_TITLE
 from forest_generator.npc_stalk import (
     NPC_STALK_ADVANCE_MAX_CM, NPC_STALK_ADVANCE_MIN_CM, NPC_STALK_ARC_DEG,
     NPC_STALK_BEHIND_CM, NPC_STALK_COVER_MIN_CM, NPC_STALK_GAIN_MIN_CM,
@@ -125,7 +126,7 @@ def check_cover(tag, own):
           f"at the player",
           bool(sweeps) and all(
               _close(_num(s, "Radius"), NPC_STALK_SWEEP_RADIUS_CM)
-              and {"GetPlayerPawn", "Rotate Vector Around Axis",
+              and {NEAREST_TITLE, "Rotate Vector Around Axis",
                    "Normalize 2D (Vector)"} <= _titles(_sources(s, pin))
               for s in sweeps for pin in ("Start", "End")))
     clears = [n for n in own if _ins(n) == {"execute", "TargetArray"}]
@@ -181,7 +182,7 @@ def check_cover(tag, own):
           and all(any(_title(m) == "MakeVector"
                       and _close(_num(m, "X"), NPC_STALK_BEHIND_CM)
                       for m in _sources(raw, STALK_COVER_VAR))
-                  and {"GetPlayerPawn", "Normalize 2D (Vector)"}
+                  and {NEAREST_TITLE, "Normalize 2D (Vector)"}
                   <= _titles(_sources(raw, STALK_COVER_VAR)) for raw in raws))
     check_wide(tag, own, sweeps, raws)
     lines = [n for n in _with(own, "Start", "End", "ActorsToIgnore")
@@ -195,7 +196,7 @@ def check_cover(tag, own):
           f"nothing, nor another tree's leaves",
           len(lines) == len(raws) == len(on_nav) > 0 and all(
               _titles(_feeders(ln, "Start")) == {f"Get {STALK_COVER_VAR}"}
-              and "GetPlayerPawn" in _titles(_sources(ln, "End"))
+              and NEAREST_TITLE in _titles(_sources(ln, "End"))
               and _titles(_feeders(ln, "ActorsToIgnore")) == {f"Get {STALK_IGNORE_VAR}"}
               and len(_drivers(ln)) == 1 and _drivers(ln)[0] in raws
               for ln in lines)

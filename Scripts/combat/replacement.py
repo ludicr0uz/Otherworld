@@ -4,6 +4,7 @@ around the player, seats it on the ground and spawns the same creature there.
 The band's numbers and why they are what they are live in respawn.py.
 """
 
+from net.players import nearest_living_player, player_pin
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.respawn import (
@@ -11,12 +12,12 @@ from combat.respawn import (
     RESPAWN_LIFT, RESPAWN_PROJECT_EXTENT, RESPAWN_TRACE_DOWN, RESPAWN_TRACE_UP,
 )
 from combat.weapon_component.common import _trace_defaults
-from uebp.nodes.actor import FN_ACTOR_LOC
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_OWNER
 from uebp.nodes.ai import FN_PROJECT_NAV, FN_RANDOM_NAV
 from uebp.nodes.math import (
     FN_ADD_VV, FN_FORWARD, FN_MAKE_ROT, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_RANDOM_FLOAT)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_SPAWN
-from uebp.nodes.system import FN_DELAY, FN_GET_PLAYER_PAWN, FN_IS_VALID_CLASS, FN_TRACE
+from uebp.nodes.system import FN_DELAY, FN_IS_VALID, FN_IS_VALID_CLASS, FN_TRACE
 from combat import health_vars as HV
 
 
@@ -73,17 +74,27 @@ def _author_replacement(ed, exec_in):
     # navigable island on a 200 m map -- spawned the replacement at the raw
     # request point, at the player's own Z. On any ground higher than the player
     # that is *inside* the terrain, and the capsule falls through the world.
-    hero = _node(ed, FN_GET_PLAYER_PAWN)
-    _set(hero, "PlayerIndex", 0)
+    # Which player: the living one nearest the body (net/players.py), who in
+    # single player is the player. With no one alive there is no band to
+    # spawn in, and the wanderer is not replaced.
+    body = _node(ed, FN_GET_OWNER)
+    body_loc = _node(ed, FN_ACTOR_LOC)
+    _connect(out(body), _pin(body_loc, "self"))
+    hero = nearest_living_player(ed, out(body_loc))
+    anyone = _node(ed, FN_IS_VALID)
+    _connect(player_pin(hero), _pin(anyone, "Object"))
+    someone = ed.add_branch_node()
+    _connect(out(anyone), _pin(someone, "Condition"))
+    _connect(then(wait), _pin(someone, "execute"))
     hero_loc = _node(ed, FN_ACTOR_LOC)
-    _connect(out(hero), _pin(hero_loc, "self"))
+    _connect(player_pin(hero), _pin(hero_loc, "self"))
     hero_out = out(hero_loc)
 
     # Everything below runs after the wait, so the player's location (a pure
     # read) is where they stand when the replacement appears, not where they
     # stood at the kill.
-    made = [hero, hero_loc, pause, wait]
-    flow = then(wait)
+    made = [body, body_loc, hero, anyone, someone, hero_loc, pause, wait]
+    flow = then(someone)
     ready = []          # exec pins that have a good point and may spawn
 
     for attempt in range(RESPAWN_ATTEMPTS):

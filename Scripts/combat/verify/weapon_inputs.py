@@ -286,8 +286,10 @@ def check_sprint_and_stamina():
           str([str(BEL.get_node_title(n)) for n in sprint_polls]))
     walk_titles = {t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                                for n in wg) if "MaxWalkSpeed" in t}
-    check("sprinting drives the character's own walk speed",
-          any(t.startswith("SET") or t.startswith("Set") for t in walk_titles),
+    # The speed is the movement component's now (verify/movement.py): a write
+    # from this graph would exist on one machine only.
+    check("sprinting writes no walk speed from the graph",
+          not any(t.startswith("SET") or t.startswith("Set") for t in walk_titles),
           str(sorted(walk_titles)))
     # Cached, never written down: a literal walk speed here would fight any later
     # change to the character's movement defaults, and only after the first sprint.
@@ -307,17 +309,14 @@ def check_sprint_and_stamina():
                if not is_chop_node(n) and n not in throw_launch and not any(k in str(BEL.get_node_title(PIN.get_owning_node(q)))
                           for k in ("Contains", "Equal", "Get BreathHeld", "Get Winded")
                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, "bPickA")))]
-    # Seven now: sprint picks the speed and the sign of the drain, the sights
-    # key picks the zoom (the weapon's, or the shoulder's), and accuracy.py
-    # picks the shoulder's and the sights' factor for the cloud and the kick.
-    check("SelectFloat picks the speed, the drain, the aimed zoom, and the "
-          "shoulder and sights factors of the cloud and the kick",
-          len(selects) == 7,
+    # Five: the sights key picks the zoom (the weapon's, or the shoulder's),
+    # and accuracy.py picks the shoulder's and the sights' factor for the
+    # cloud and the kick. (The sprint's two, the speed and the sign of the
+    # drain, went into the movement component with the sprint.)
+    check("SelectFloat picks the aimed zoom, and the shoulder and sights "
+          "factors of the cloud and the kick",
+          len(selects) == 5,
           f"{len(selects)} SelectFloat node(s)")
-    check("stamina is clamped, so it cannot run past its own bar",
-          any(pin_value(n, "Max") == str(COMBAT.max_stamina)
-              for n in by_pins(wg, "Value", "Min", "Max")),
-          f"expected a clamp at {COMBAT.max_stamina}")
     # The requirement the flag exists for: you cannot shoot while running.
     sprint_reads = [n for n in wg if "Sprinting" in out_pins(n)]
     check("the trigger reads Sprinting", bool(sprint_reads),

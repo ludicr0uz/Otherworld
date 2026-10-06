@@ -4,9 +4,9 @@ four on the live player and saves player_tuning.csv.
 
 The keys are raised by writing the HUD's PlayerTuneRow / PlayerTuneNudge /
 PlayerTuneSaveRequested (a probe has no keyboard); the keys themselves are
-the verifier's. No key can be injected either, so the sprint itself never
-runs here: its speed and drain are read off the component, and
-verify/sprint.py checks that the graph reads them.
+the verifier's. The sprint itself is the movement component's
+(combat/player_move.py), which the weapon component hands these numbers
+each frame; probe_sprint_latch.py runs one.
 
   - the player's walk speed is the built jog, and the component holds the
     built sprint speed and stamina rates;
@@ -95,10 +95,12 @@ def _run(p):
 
     # The refill, timed on the game's own clock (a headless frame is a fixed
     # small step, so wall time says nothing).
-    p.set(wc, "Stamina", 0.0)
+    unreal.OtherworldMovementLibrary.set_stamina(p.pawn(), 0.0)
+    yield 0.0           # the weapon component's copy of it
+    before = float(p.get(wc, "Stamina"))
     t0 = unreal.GameplayStatics.get_time_seconds(p.world())
     yield 0.5
-    gained = float(p.get(wc, "Stamina"))
+    gained = float(p.get(wc, "Stamina")) - before
     took = unreal.GameplayStatics.get_time_seconds(p.world()) - t0
     rate = gained / took if took > 0 else 0.0
     p.check(f"an emptied bar refills at the rate that fills it in "
@@ -121,8 +123,12 @@ def _run(p):
 
     yield from _nudge(p, hud, SPRINT_SPEED, -1)
     want[SPRINT_SPEED] -= STEPS[SPRINT_SPEED]
-    p.check("a sprint speed nudge lands on SprintSpeed",
-            abs(p.get(wc, SPRINT_SPEED_VAR) - cms(want[SPRINT_SPEED])) < 0.5,
+    moves = unreal.OtherworldMovementLibrary.get_otherworld_movement(p.pawn())
+    p.check("a sprint speed nudge lands on SprintSpeed, and on the movement "
+            "component that sprints",
+            abs(p.get(wc, SPRINT_SPEED_VAR) - cms(want[SPRINT_SPEED])) < 0.5
+            and abs(moves.get_editor_property("sprint_speed")
+                    - cms(want[SPRINT_SPEED])) < 0.5,
             f"{p.get(wc, SPRINT_SPEED_VAR):.1f}, want {cms(want[SPRINT_SPEED]):.1f}")
 
     yield from _nudge(p, hud, SPRINT_DURATION, 1)

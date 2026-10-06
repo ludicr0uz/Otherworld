@@ -27,6 +27,7 @@ from graphics_menu.profile_consts import (
 from graphics_menu.profile_write import copy_var
 from uebp.nodes.actor import FN_DESTROY, FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_GET
+from uebp.nodes.move import FN_SET_STAMINA
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_PROFILE, NODE_SPAWN
 from uebp.nodes.system import FN_LOAD_SAVE
 from combat import item_vars as IV
@@ -113,6 +114,16 @@ def author_read_profile(ed, in_exec, parts, made):
     for dst_out, dst_class, dst_var, field in copies:
         flow = copy_var(ed, prof, PROFILE_CLASS_PATH, field, dst_out, dst_class,
                      dst_var, flow, made)
+    # The stamina is the movement component's (combat/player_move.py); the
+    # weapon component's is a copy of it, so the saved one goes there too.
+    saved = ed.add_get_member_variable_node(WV.Stamina, WEAPON_COMP_CLASS_PATH)
+    _connect(wc, _pin(saved, "self"))
+    hand = _node(ed, FN_SET_STAMINA)
+    _connect(parts[PAWN], _pin(hand, "Character"))
+    _connect(out(saved, WV.Stamina), _pin(hand, "NewStamina"))
+    _connect(flow, _pin(hand, "execute"))
+    made += [saved, hand]
+    flow = then(hand)
 
     # --- out with the issued loadout ----------------------------------------
     old = ed.add_get_member_variable_node(WV.Inventory, WEAPON_COMP_CLASS_PATH)

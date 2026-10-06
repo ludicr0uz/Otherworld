@@ -4,6 +4,18 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 ## Sprint
 
+- **The sprint is the movement component's, in C++** (`UOtherworldCharacterMovement`,
+  `Source/CLAUDE.md` "Predicted movement"; `combat/player_move.py` reparents the player
+  onto the class that has it and writes its numbers). The weapon component's graph
+  (`weapon_component/sprint.py`) hands it the key (`SetSprintHeld`) and the tab's numbers
+  (`SetPace`), and copies its answers into `Sprinting`, `SprintSpent`, `SprintAhead` and
+  `Stamina`, which every other graph reads as before. The copies are the owning machine's:
+  on the server, and for another player's character, ask the movement component
+  (`uebp.nodes.move`). Stamina is changed only on the server (`SetStamina`,
+  `SpendStamina`), and reaches the client as a correction.
+- **No graph writes `MaxWalkSpeed`.** The jog is the character's `MaxWalkSpeed`; the
+  component's `GetMaxSpeed` answers the sprint's speed, the aim's or a low stance's from
+  the state. A write from a graph exists on one machine and is corrected by the server.
 - The jog is 400 cm/s, the sprint 600 while stamina lasts: 8 s from full, refilling in 8.33 s.
 - **The jog plays the jog clip** (`player_gait.py`). The body's blend space has its walk
   clips at 300 cm/s and its jog clips at 600, so at the 400 cm/s jog the player moved in a
@@ -25,6 +37,8 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   `player_pace.set_jog_speed` sets), `SprintSpeed`, `StaminaDrainPerSecond`,
   `StaminaRegenPerSecond` (`sprint_tuning.SPRINT_RATE_VARS`).
   `probes/probe_player_tuning.py` reads them on the live player and times the refill.
+  The graph hands the four to the movement component each frame (`SetPace`), which takes
+  them only with authority: as a client of a server the pace is the server's.
 - **Footstep noise is per gait, as before:** its reference speed followed the jog down to 400,
   so a jog still carries 12 m and a sprint 18 m.
 - The fire gate refuses while sprinting.
@@ -36,16 +50,16 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
     regen a sliver, start, drain it). Everything gated on `NOT Sprinting` flips with it: with an
     aim key held the zoom and the sight camera twitched, and the ready pose re-equipped every
     frame.
-  - `probes/probe_sprint_latch.py` shows the key-up half in game (the latch clears, stamina
-    refills). No key can be pressed in a headless game, so the setting half is graph-checked.
+  - `probes/probe_sprint_latch.py` shows both halves in game: with the key held
+    (`SprintForced`, a probe's hand on it) the player sprints, the bar runs out, the latch
+    sets and the sprint stays off, bar refilling, until the key is let go. The rule is C++
+    now, so no graph check sees it.
 - **Forwards only** (`sprint_tuning.py`, `SprintAhead`): `Sprinting` also needs the player to be
   steering within 60° of the way the character faces (the camera's yaw), so forward and the
   forward diagonals sprint; sideways, backwards and standing still do not, and cost no stamina.
-  - It reads the movement **input** (`GetLastMovementInputVector`), not the velocity, which lags
-    a turn. It gates `Sprinting` only, never the latch: turning back with the key held resumes.
+  - It reads the movement **input** (the move's acceleration, which is what a move carries
+    to the server), not the velocity, which lags a turn, against the view's yaw. It gates `Sprinting` only, never the latch: turning back with the key held resumes.
   - `probes/probe_sprint_forward.py` steers the pawn at angles and reads `SprintAhead`.
-- Authored **without a Branch**. `SelectFloat` picks the speed and the stamina rate, and one
-  write applies each.
 - **Sprinting drops the ready pose** by stopping the slot, so `ABP_Unarmed`'s run comes through.
   Sprinting is one way into `Lowered` (the carry, `docs/aiming.md`), which is what the pose
   follows. It is edge-triggered: `Lowered != PoseLowered` sets `NeedsRefresh`. Level-triggering
@@ -78,20 +92,21 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 - **`Stance` is one int** (0 stand, 1 crouch, 2 prone), toggled by tapping C or Z, and set to
   standing while `Sprinting`. It is picked with `SelectInt`s, no Branch, and written once a frame
-  after the sprint block.
+  after the sprint block, then handed to the movement component (`SetStance`): the crouch
+  travels with each move as the engine's own flag and prone as one of ours, so the owning
+  client predicts the capsule and the speed and the server makes the same ones.
 - **Both low stances are UE's own crouch.** `allow_crouch()` turns on
   `NavAgentProps.bCanCrouch` (the template ships it off) and walking off ledges while crouched.
   The movement component shrinks the capsule (half-height 60 crouched, 40 prone, from 90) and
   keeps the feet where they were. The camera boom hangs off the capsule, so the view drops with it.
   - **The engine sizes the capsule only when a crouch starts.** Changing between crouch and prone
-    therefore uncrouches for a frame when the crouched capsule is at the other height, then
-    crouches again. Probed in PIE: 90 → 60 → (90) → 40 → (90) → 60 → 90.
+    the component therefore uncrouches and crouches again at the other height, within the one
+    movement step (it used to take a frame standing: 90 → 60 → (90) → 40).
   - **The prone height can't be below the capsule radius (35).** The engine clamps a crouch to
     the radius, so the height would never match and the stance would re-crouch every frame. The
     verifier asserts it.
-  - **Speed:** crouched, the engine reads `MaxWalkSpeedCrouched` instead of `MaxWalkSpeed`. The
-    stance writes it as `BaseSpeed ×` 0.45 or 0.2, so sprint's and aiming's writes don't apply
-    while low.
+  - **Speed:** crouched, the component moves at the jog × 0.45, prone × 0.2
+    (`CrouchSpeedScale`, `ProneSpeedScale`), whatever the sprint key or the aim say.
 - **Footsteps:** `BP_FootstepComponent` has `StepVolume` (the `PlaySoundAtLocation` volume) and
   `StepNoise` (multiplies the noise reach, which is already proportional to speed). The stance
   writes them onto the player's component every frame: 1/1 standing, 0.5/0.5 crouched, 0.3/0.35

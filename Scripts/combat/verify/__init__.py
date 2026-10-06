@@ -64,7 +64,10 @@ and it never relies on a variable another section left behind.
               what the dead arm lets go of (fixtures keeps that arm out of wg)
   block       the guard: its key, the Blocking stance, the fire gate refusing
               (and FireWard, fire held out, which only starts false)
-  sprint      the sprint's latch: spent at zero Stamina until the key is let go
+  movement    the player's C++ movement component: the reparented character,
+              its numbers, and the aim-walk flag the graph hands it
+  sprint      the sprint's two ends in the graph: the key handed to the
+              movement component, its answers copied back; the rates
   stance      crouch/prone: keys, the character may crouch, the Stance toggle,
               the crouch it drives, the footsteps' volume and reach per stance
   accuracy    the per-gun cloud and recoil factors: the table, the weapons'
@@ -123,7 +126,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
-    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
+    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "pickup", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "noise", "combat_trace",
 )

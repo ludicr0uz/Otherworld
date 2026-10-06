@@ -56,7 +56,7 @@ from combat.weapon_component.punch import (
     PUNCH_QUEUED_VAR,
 )
 from combat.sprint_tuning import (
-    SPRINT_AHEAD_VAR, SPRINT_RATE_VARS, SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR,
+    SPRINT_AHEAD_VAR, SPRINT_FORCED_VAR, SPRINT_RATE_VARS, SPRINT_SPEED_VAR, STAMINA_DRAIN_VAR,
     STAMINA_REGEN_VAR,
 )
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
@@ -90,6 +90,7 @@ from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.asks import author_asks
 from combat.weapon_component.loot_take import author_loot_take
 from combat.weapon_component.save_exit import author_ask_save_exit
+from combat.weapon_component.ads import AIM_FORCED_VAR
 from combat.weapon_component.tick import FIRE_FORCED_VAR, _author_wc_tick
 from uebp.vars import declare, defaults
 from combat.sprint_tuning import BASE_SPEED_VAR
@@ -228,7 +229,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     for name in (TAKE_OFF_VAR, TAKE_OFF_TO_VAR, WEAR_REQUEST_VAR, WEAR_SLOT_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("int"))
     # The dead gate's answer (dead.py), and a probe's stand-in for the fire key.
-    for name in (OWNER_DEAD_VAR, FIRE_FORCED_VAR):
+    for name in (OWNER_DEAD_VAR, FIRE_FORCED_VAR, SPRINT_FORCED_VAR, AIM_FORCED_VAR):
         _declare(ed, name, BEL.get_basic_type_by_name("bool"))
     # The GameMode's DebugMode, cached at the moment of firing so the pellet
     # loop can branch on a plain bool instead of casting eight times.
@@ -366,6 +367,8 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
         WEAR_SLOT_VAR: NOT_CLOTHING,
         OWNER_DEAD_VAR: False,
         FIRE_FORCED_VAR: False,
+        SPRINT_FORCED_VAR: False,
+        AIM_FORCED_VAR: False,
         **{name: 0.0 for name in ACCURACY_OUT_VARS},
         DEBUG_MODE_VAR: False,
         WV.ShotgunClass: BEL.generated_class(shotgun_bp),

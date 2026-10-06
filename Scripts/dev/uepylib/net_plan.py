@@ -19,6 +19,8 @@ DEFAULT_PORT = 17777
 # Each client is a whole editor binary: 1.9 GB -nullrhi, 5.8 GB rendered
 # (measured: serversupportsysdesign.md 5).
 MAX_CLIENTS = 8
+# The most --lag may ask for: past a second the engine's own timeouts start to matter.
+MAX_LAG_MS = 1000
 SERVER, CLIENT = "server", "client"
 # Windowed clients step down the screen, so each one's title bar shows.
 WINDOW_STEP = 60
@@ -36,7 +38,7 @@ class Process(object):
         self.inbox = os.path.join(run_dir, f"inbox-{slug}")
 
 
-def check_args(clients, port, seconds=None):
+def check_args(clients, port, seconds=None, lag_ms=0):
     """The reason ``--net``'s arguments cannot run, or None."""
     if clients < 1:
         return "--net needs at least one client (--clients N)"
@@ -47,6 +49,8 @@ def check_args(clients, port, seconds=None):
         return f"--port {port}: expected 1024-65535"
     if seconds is not None and seconds < 1:
         return f"--seconds {seconds}: expected a positive number"
+    if not 0 <= lag_ms <= MAX_LAG_MS:
+        return f"--lag {lag_ms}: expected 0-{MAX_LAG_MS} milliseconds"
     return None
 
 
@@ -56,8 +60,12 @@ def processes(run_dir, clients):
         Process(CLIENT, i, run_dir) for i in range(1, clients + 1)]
 
 
-def command(editor, project, process, port, windowed=False, level=""):
+def command(editor, project, process, port, windowed=False, level="", lag_ms=0):
     """The process's command line.
+
+    ``lag_ms`` delays every packet a client sends (the engine's packet
+    simulation, as the console's ``Net PktLag=``), so its ping is at least
+    that: what a movement prediction check needs.
 
     No client is given -nomenu: one that joins a server has no title by the
     game's own rule (graphics_menu/mode_tick.py), which every run thereby
@@ -70,6 +78,8 @@ def command(editor, project, process, port, windowed=False, level=""):
         if windowed:
             offset = WINDOW_STEP * (process.index - 1)
             how += [f"-WinX={offset}", f"-WinY={offset}"]
+        if lag_ms:
+            how += [f"-PktLag={lag_ms}"]
     met = title_args(level, title=process.role == CLIENT)
     return [editor, project, ENTRY_URL, *how, "-unattended", *met,
             "-forcelogflush", f"-abslog={process.log}"]

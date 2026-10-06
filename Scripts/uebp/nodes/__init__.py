@@ -12,6 +12,9 @@ Scripts/dev/check_node_catalog.py.
   umg.py      UMG widgets and their libraries
   actor.py    member functions of engine classes: actors, components,
               controllers, the HUD, anim instances
+  move.py     the game's own movement library (C++, Source/Otherworld): the
+              sprint key, the stance and the aim handed to the player's
+              movement component, its state read back, the server's writes
   palette.py  palette nodes (events, casts, break/make) and the standard, actor
               and component macros
 """

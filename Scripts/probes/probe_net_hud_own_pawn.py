@@ -9,8 +9,11 @@ player's. It writes health, hunger and stamina onto both, a share of its own
 on its own (no two clients alike) and another on the other's, and its bars
 must show its own.
 
-Nothing here replicates yet (health is M14, stamina and hunger M12), so each
-client writes its own copies and the server takes no part. What the check
+Health and hunger do not replicate yet (M14, M26), so each client writes
+its own copies of those. Stamina is the server's (M12: the movement
+component, combat/player_move.py; the weapon component's Stamina on the
+owning client is a copy of it), so the server writes each player's, and
+holds it there, and it reaches that client's bar as a correction. What the check
 cannot show on a client is the old fault itself: a client has one controller,
 so its player 0 is its own player. The rule is held by the verifier
 (net/owner_checks.py); this is the positive case, on a real client's screen.
@@ -28,7 +31,7 @@ from graphics_menu import umg_consts as C
 from survival import component_vars as UV
 from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 
-RUNS_ON = ("client",)
+RUNS_ON = ("server", "client")
 
 WRITABLE = [(HEALTH_BP_PATH, HV.Health), (SURVIVAL_BP_PATH, UV.Hunger),
             (WEAPON_COMP_BP_PATH, WV.Stamina)]
@@ -36,8 +39,10 @@ WRITABLE = [(HEALTH_BP_PATH, HV.Health), (SURVIVAL_BP_PATH, UV.Hunger),
 WAIT = 30.0             # wall seconds any one step may take
 OTHERS = 0.95           # the share written onto the other player's character
 NEAR = 0.01
-# Stamina refills between the write and the draw (combat/weapon_component/sprint.py).
+# The client predicts a refill the server (which holds the bar still for this
+# run) corrects, so its bar stands a little over the server's.
 STAMINA_NEAR = 0.2
+MOVE = unreal.OtherworldMovementLibrary
 
 
 def share_of(client):
@@ -74,6 +79,34 @@ def _write(p, pawn, share):
     return round(p.get(health, HV.Health))
 
 
+def _player_id(pawn):
+    state = pawn.get_editor_property("player_state") if pawn else None
+    # The id the server gave the player, replicated: the same on both machines.
+    return state.get_editor_property("player_id") if state else None
+
+
+def probe_server(p):
+    """Give each player the stamina its client expects, and hold it there."""
+    yield from _await(lambda: len(p.players()) >= p.clients
+                      and all(c.get_controlled_pawn() for c in p.players()))
+    pawns = [c.get_controlled_pawn() for c in p.players()]
+    names = [f"client {i}" for i in range(1, p.clients + 1)]
+    yield from _await(lambda: all(p.posted(n, "player id") is not None for n in names))
+    whose = {p.posted(n, "player id"): i for i, n in enumerate(names, 1)}
+    written = []
+    for pawn in pawns:
+        client, move = whose.get(_player_id(pawn)), MOVE.get_otherworld_movement(pawn)
+        if client is None or move is None:
+            continue
+        p.set(move, "stamina_regen_per_second", 0.0)
+        MOVE.set_stamina(pawn, share_of(client) * move.get_editor_property("max_stamina"))
+        written.append(client)
+    p.check("the server wrote each player's stamina: it is the server's to write",
+            sorted(written) == list(range(1, p.clients + 1)), f"{written} of {whose}")
+    p.post("stamina")
+    yield from _await(lambda: all(p.posted(n, "bars") is not None for n in names))
+
+
 def probe_client(p):
     yield from _await(lambda: p.hud() is not None and p.get(p.hud(), "UiHud") is not None
                       and p.pawn() is not None)
@@ -81,6 +114,8 @@ def probe_client(p):
     if not hud or not mine:
         p.check(f"{p.where} has a HUD and a pawn", False, f"{hud}, {mine}")
         return
+    yield from _await(lambda: _player_id(mine) is not None)
+    p.post("player id", _player_id(mine))
     yield from _await(lambda: p.get(hud, C.GAME_STARTED_VAR)
                       and len(_characters(p, mine)) >= p.clients - 1)
     others = _characters(p, mine)
@@ -94,6 +129,11 @@ def probe_client(p):
     for other in others:
         _write(p, other, OTHERS)
     hp = _write(p, mine, want)
+    # Its own stamina is the server's write, arriving as a correction.
+    move = MOVE.get_otherworld_movement(mine)
+    full = move.get_editor_property("max_stamina")
+    yield from _await(lambda: p.posted("server", "stamina")
+                      and move.get_editor_property("stamina") < (want + STAMINA_NEAR) * full)
     yield from _drawn(hud)
     ui = p.get(hud, "UiHud")
     bar = ui.get_editor_property(C.HP_BAR).get_editor_property("percent")

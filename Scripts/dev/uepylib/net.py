@@ -104,7 +104,7 @@ def _wait(running, seconds, has_probes, meter):
 
 
 def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout=None,
-            windowed=False, allow_pie=False, title=False):
+            windowed=False, allow_pie=False, title=False, lag_ms=0):
     """Run the server and the clients, print the report. True when clean."""
     beat = pie_editor()
     if beat and not allow_pie:
@@ -121,6 +121,8 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
     what = f"{len(probes)} probe(s)" if probes else f"{seconds}s of play"
     if title:
         what += ", the clients starting alone on the title"
+    if lag_ms:
+        what += f", each client's packets {lag_ms} ms late"
     log(f"--net: a server and {clients} client(s) on {level}, port {port}, {what} "
         f"-> {folder}")
     started = time.time()
@@ -131,7 +133,7 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
         for process in plan:
             os.makedirs(process.inbox, exist_ok=True)
             running.append((process, subprocess.Popen(
-                net_plan.command(editor, project, process, port, windowed, level),
+                net_plan.command(editor, project, process, port, windowed, level, lag_ms),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 env=net_plan.environment(os.environ, process, folder, clients, port,
                                          level, list(probes), probe_timeout, title))))

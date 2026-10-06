@@ -439,9 +439,8 @@ def check_player_guard(tag, nodes, spec):
     pay = [d for n in soft for d in _drivers(n)]
     check(f"{tag}: a blocked swing costs the player "
           f"{COMBAT.block_stamina_per_hit:.0f} stamina first",
-          len(pay) == 1 and _title(pay[0]) == "Set Stamina"
-          and any(_close(_num(f, "B"), COMBAT.block_stamina_per_hit)
-                  for c in _feeders(pay[0], "Stamina") for f in _feeders(c, "Value")),
+          len(pay) == 1 and _title(pay[0]).replace(" ", "") == "SpendStamina"
+          and _close(_num(pay[0], "Amount"), COMBAT.block_stamina_per_hit),
           f"{[_title(d) for d in pay]}")
     gate = [d for p in pay for d in _drivers(p) if _title(d) == "Branch"]
     cond = [f for g in gate for f in _feeders(g, "Condition")]

@@ -16,6 +16,7 @@ from uebp.graph import (
 from combat.hit_reaction import install_hit_reactions
 from combat.hit_zones import install_hit_zones, make_shootable
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH, NPC_CLASS_PATH
+from combat.player_move import reparent_player, set_move_numbers
 from combat.player_pace import set_jog_speed
 from combat.weapon_component.stance import allow_crouch
 
@@ -45,6 +46,8 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     bp = eas.load_asset(CHARACTER_BP_PATH)
     if not bp:
         raise RuntimeError(f"could not load {CHARACTER_BP_PATH}")
+    # First: it recompiles the Blueprint, and component handles do not outlive that.
+    reparent_player(bp)
     _uninstall_old_shotgun(bp)
     _drop_components(bp, {"HealthComponent", "WeaponComponent", "FootstepComponent"})
     handles = {}
@@ -63,6 +66,7 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     face_the_camera(bp)
     allow_crouch(bp)
     set_jog_speed(bp)
+    set_move_numbers(bp)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)

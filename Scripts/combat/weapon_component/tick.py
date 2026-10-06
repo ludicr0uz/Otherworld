@@ -138,7 +138,7 @@ def _author_wc_tick(ed, tick):
     # --- sprint --------------------------------------------------------------
     # Before the trigger, because the trigger reads Sprinting: polled in the
     # other order, a shot would be allowed on the frame the sprint started.
-    sprint_exits = _author_sprint(ed, tick, pc_out, owner_out, key_pins["KeySprint"], aim_exits)
+    sprint_exits = _author_sprint(ed, pc_out, owner_out, key_pins["KeySprint"], aim_exits)
     # The run key held with no stamina left is heard (Sound/sound_world.py).
     sprint_exits = _author_breath(ed, owner_out, sprint_exits)
 

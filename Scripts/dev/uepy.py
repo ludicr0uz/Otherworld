@@ -148,6 +148,9 @@ def parse_args():
                     help="with --net: how many clients join (default 1)")
     ap.add_argument("--port", type=int, default=net_plan.DEFAULT_PORT,
                     help=f"with --net: the server's port (default {net_plan.DEFAULT_PORT})")
+    ap.add_argument("--lag", type=int, default=0, metavar="MS",
+                    help="with --net: delay every packet a client sends by MS "
+                         "(the engine's Net PktLag), to check prediction")
     ap.add_argument("--probe", action="append", default=[], metavar="FILE",
                     help="with --game or --net: run this probe (Scripts/probes); "
                          "repeatable")
@@ -201,11 +204,12 @@ def main():
             if not os.path.isfile(p):
                 sys.exit(f"[uepy] no such probe: {p}")
     if args.net:
-        problem = net_plan.check_args(args.clients, args.port, args.seconds)
+        problem = net_plan.check_args(args.clients, args.port, args.seconds, args.lag)
         if problem:
             ap.error(problem)
         ok = net.run_net(engine, args.map, args.clients, args.port, args.seconds, probes,
-                         args.probe_timeout, args.windowed, args.allow_pie, args.title)
+                         args.probe_timeout, args.windowed, args.allow_pie, args.title,
+                         args.lag)
         return 0 if ok else 1
     if args.game:
         seconds = args.seconds or (game.PROBE_SECONDS if probes else game.GAME_SECONDS)

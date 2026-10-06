@@ -102,33 +102,21 @@ def check_stance_toggle():
 
 
 def check_crouch_applied():
-    crouch = [n for n in wg if _flat(n) == "Crouch"]
-    rise = [n for n in wg if _flat(n) == "UnCrouch"]
-    check("one Crouch and one UnCrouch, both on the exec chain",
-          len(crouch) == 1 and len(rise) == 1 and _runs(crouch[0]) and _runs(rise[0]),
-          f"{len(crouch)} Crouch, {len(rise)} UnCrouch")
-    heights = _sets(wg, "CrouchedHalfHeight")
-    src = _feeds(BEL.find_input_pin(heights[0], "CrouchedHalfHeight")) if heights else set()
-    lits = {num_pin(n, p) for n in src for p in ("A", "B")}
-    check("the crouch height is picked per stance, prone's and crouch's",
-          len(heights) == 1 and {COMBAT.prone_half_height_cm,
-                                 COMBAT.crouch_half_height_cm} <= lits
-          and f"Get {STANCE_VAR}" in {_title(n) for n in src},
-          str(sorted(x for x in lits if x is not None)))
-    speed = _sets(wg, "MaxWalkSpeedCrouched")
-    src = _feeds(BEL.find_input_pin(speed[0], "MaxWalkSpeedCrouched")) if speed else set()
-    lits = {num_pin(n, p) for n in src for p in ("A", "B")}
-    # Scale BaseSpeed, never the live speed, or the scales would compound.
-    check("the low stances' speed is BaseSpeed times the stance's scale",
-          len(speed) == 1 and "Get BaseSpeed" in {_title(n) for n in src}
-          and {COMBAT.prone_speed_scale, COMBAT.crouch_speed_scale} <= lits
-          and not any("MaxWalkSpeed" in _title(n) for n in src),
-          str(sorted(x for x in lits if x is not None)))
-    resize = [n for n in titled(wg, "Branch")
-              if any(_flat(f) == "IsCrouching" for f in
-                     _feeds(BEL.find_input_pin(n, "Condition")))]
-    check("changing between crouch and prone re-crouches when the capsule is "
-          "at the other height", len(resize) == 1, f"{len(resize)} such Branch(es)")
+    # How low and how fast are the movement component's (verify/movement.py),
+    # so the owning client and the server make the same capsule.
+    # The call, not the variable's write, which has the same title.
+    tells = [n for n in wg if _flat(n) == "SetStance" and "Character" in in_pins(n)]
+    src = ({PIN.get_owning_node(q) for q in PIN.list_connected_pins(
+        BEL.find_input_pin(tells[0], "Stance"))} if tells else set())
+    check("the stance is handed to the movement component, once a frame, on "
+          "the exec chain",
+          len(tells) == 1 and _runs(tells[0])
+          and {_title(n) for n in src} == {f"Get {STANCE_VAR}"},
+          f"{len(tells)} SetStance, fed by {sorted(_title(n) for n in src)}")
+    own = [n for n in wg if _flat(n) in ("Crouch", "UnCrouch")
+           or _title(n) in ("Set CrouchedHalfHeight", "Set MaxWalkSpeedCrouched")]
+    check("...and no graph crouches the character or sizes its crouch itself",
+          not own, str([_title(n) for n in own]))
 
 
 def check_footsteps_by_stance():

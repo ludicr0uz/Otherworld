@@ -103,15 +103,11 @@ def check_mouse_sensitivity():
 # ─── What aiming costs in mobility ───────────────────────────────────────────
 
 def check_aiming_mobility():
-    # Full ADS is half speed, and it is a second MaxWalkSpeed write layered on top
-    # of the sprint block's unconditional one. Four ways that goes wrong while the
-    # graph still looks right: the factor is applied to the LIVE walk speed rather
-    # than to BaseSpeed, which compounds to a standstill in about a second; nothing
-    # ever restores the speed, because the author added an "undo" path that turns
-    # out to be dead; the slowdown is driven off the Aiming flag, so it snaps on a
-    # frame before the camera moves; and it is driven off the raw CurrentFOV/BaseFOV
-    # ratio the sensitivity uses, which would make the sniper slower on its legs
-    # than the pistol and never reach exactly half on anything.
+    # Full ADS is half speed. The slowdown is the movement component's (C++,
+    # combat/player_move.py): the graph tells it the player is aiming, as a
+    # flag each move carries, and it eases the walk towards the scale at the
+    # zoom's own speed. verify/movement.py checks the flag and the numbers;
+    # probes/probe_net_move_states.py the walk itself, on both machines.
 
     check(f"aiming costs {(1 - COMBAT.ads_move_speed_scale) * 100:.0f}% of the "
           f"walking speed, which is the ask",
@@ -137,95 +133,13 @@ def check_aiming_mobility():
         return seen
 
     speed_writes = [n for n in wg if "MaxWalkSpeed" in in_pins(n)]
-    check("MaxWalkSpeed is written exactly twice: the sprint block's "
-          "unconditional write, and the ADS slowdown layered on top of it",
-          len(speed_writes) == 2, str(len(speed_writes)))
-    # The sprint write reaches the movement component through a cast to Character
-    # (it wants the CastFailed pin as a continuation); the ADS one takes the
-    # GetComponentByClass shortcut, which is what tells the two apart from here.
-    by_class = [n for n in speed_writes
-                if any("getcomponentbyclass" in
-                       str(BEL.get_node_title(PIN.get_owning_node(q)))
-                       .replace(" ", "").lower()
-                       for q in PIN.list_connected_pins(
-                           BEL.find_input_pin(n, "self")))]
-    check("...the second of them off GetComponentByClass, which reshapes its "
-          "return pin to the chosen class and so needs no cast",
-          len(by_class) == 1, str(len(by_class)))
-
-    if by_class:
-        ads_speed = by_class[0]
-        up = feeds(BEL.find_input_pin(ads_speed, "MaxWalkSpeed"))
-        up_titles = {str(BEL.get_node_title(n)).replace("\n", " ") for n in up}
-        check("THE COMPOUNDING TRAP: the slowed speed is computed from BaseSpeed, "
-              "never from the MaxWalkSpeed that is already set -- this write runs "
-              "every frame, so a factor on the live value would walk the player to "
-              "a standstill in about a second",
-              any("BaseSpeed" in out_pins(n) for n in up)
-              and not any("MaxWalkSpeed" in out_pins(n) for n in up),
-              str(sorted(up_titles)))
-        check("...and BaseSpeed is still written exactly once, at BeginPlay, off "
-              "the character's own default",
-              len([n for n in wg if "BaseSpeed" in in_pins(n)]) == 1,
-              str(len([n for n in wg if "BaseSpeed" in in_pins(n)])))
-        check("the slowdown is driven off how far the zoom has actually travelled, "
-              "not off the Aiming flag -- the flag would snap it on a frame before "
-              "the camera moved",
-              "Set CurrentFOV" in up_titles
-              and not any("Aiming" in out_pins(n) for n in up),
-              str(sorted(t for t in up_titles if "FOV" in t or "Aiming" in t)))
-        check("...normalised by AimZoom, the zoom being aimed at, so full zoom "
-              "is the same half speed on a 4x scope, 1.5x irons and the "
-              "shoulder -- and not by Held.AdsZoom, which would leave the "
-              "sniper's 1.5x shoulder aim at a sixth of the slowdown",
-              any("AimZoom" in out_pins(n) for n in up)
-              and not any("AdsZoom" in out_pins(n) for n in up),
-              str(sorted(up_titles)))
-        # An FInterpTo can overshoot its target on a long frame, and an unclamped
-        # progress past 1 is a walk speed below the number anybody chose.
-        # `num_pin(n, "Min") or X` would be the wrong test and quietly the wrong
-        # answer: a Min that really is 0.0 is falsy, so the fallback wins and the
-        # clamp that exists reads as missing.
-        def holds(node, name, want):
-            got = num_pin(node, name)
-            return got is not None and abs(got - want) < 1e-9
-
-        clamps = [n for n in up if {"Value", "Min", "Max"} <= in_pins(n)]
-        check("...clamped to 0..1, because the interpolation can overshoot",
-              any(holds(n, "Min", 0.0) and holds(n, "Max", 1.0) for n in clamps),
-              str(len(clamps)))
-        lerps = [n for n in up
-                 if holds(n, "B", COMBAT.ads_move_speed_scale)
-                 and holds(n, "A", 1.0)]
-        check(f"...and eased Lerp(1, {COMBAT.ads_move_speed_scale:g}, progress), "
-              f"so it arrives with the zoom rather than with the key",
-              len(lerps) == 1, str(len(lerps)))
-
-        # THE REASON THE GATE IS THERE. Sprint writes MaxWalkSpeed unconditionally
-        # every frame, earlier in the same Tick, which is what makes releasing the
-        # aim key need no code at all -- and also what would make the two writes
-        # fight over the frames the player is sprinting, if this one were not shut
-        # off on exactly the condition the zoom is.
-        driving = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
-            BEL.find_input_pin(ads_speed, "execute"))]
-        gates = [n for n in driving if n.get_class().get_name() == "K2Node_IfThenElse"]
-        check("the ADS write sits behind a Branch, so the frames it does not run "
-              "are the frames sprint's unconditional write stands -- that is the "
-              "whole of \"letting go restores the speed\"",
-              len(gates) == 1, str([n.get_class().get_name() for n in driving]))
-        if gates:
-            cond = feeds(BEL.find_input_pin(gates[0], "Condition"))
-            cond_titles = {str(BEL.get_node_title(n)).replace("\n", " ")
-                           for n in cond}
-            check("...gated on NOT Sprinting, the same pin the zoom is, so the two "
-                  "MaxWalkSpeed writes can never disagree about a frame",
-                  any("Sprinting" in out_pins(n) for n in cond)
-                  and any("NOT" in t.upper() for t in cond_titles),
-                  str(sorted(cond_titles)))
-            check("...and on a valid Held, the same as Aiming is, so empty hands "
-                  "always walk at sprint's speed",
-                  any("isvalid" in t.replace(" ", "").lower() for t in cond_titles),
-                  str(sorted(cond_titles)))
+    check("no graph writes MaxWalkSpeed: a speed written here exists on one "
+          "machine, and the server would pull the client back",
+          not speed_writes, str(len(speed_writes)))
+    check("...and BaseSpeed is still written exactly once, at BeginPlay, off "
+          "the character's own default",
+          len([n for n in wg if "BaseSpeed" in in_pins(n)]) == 1,
+          str(len([n for n in wg if "BaseSpeed" in in_pins(n)])))
 
     # The headless -game run takes no input, so the gate above never opens by
     # itself and the positive case has to be forced with a temporary probe. This is
@@ -254,46 +168,6 @@ def check_aiming_mobility():
           str([str(BEL.get_node_title(n)) for n in wg
                if "printstring" in
                str(BEL.get_node_title(n)).replace(" ", "").lower()]))
-
-    # The numbers the player actually feels, spelled out so that a change to either
-    # the scale or a weapon's zoom has to be argued for rather than noticed later.
-    # At full zoom CurrentFOV is BaseFOV/AimZoom, so progress is exactly 1 whatever
-    # the zoom -- which is the point of dividing by (AimZoom - 1).
-    def _eased(zoom, travelled):
-        """The walk-speed factor once the camera is `travelled` of the way in."""
-        now = 1.0 / (1.0 + travelled * (zoom - 1.0))        # CurrentFOV / BaseFOV
-        progress = min(max((1.0 / now - 1.0) / (zoom - 1.0), 0.0), 1.0)
-        return 1.0 + (COMBAT.ads_move_speed_scale - 1.0) * progress
-
-    # Every zoom the player can be at: each weapon down its sights, and the
-    # shoulder aim, which is the same on all of them.
-    zooms = {**{f"{sp['display']} sights": sp.get("ads_zoom", COMBAT.ads_zoom_irons)
-                for sp in _weapon_specs()},
-             "shoulder": COMBAT.shoulder_zoom}
-    full_ads = {k: _eased(z, 1.0) for k, z in zooms.items()}
-    check(f"every weapon, down its sights or off the shoulder, lands on exactly "
-          f"{COMBAT.ads_move_speed_scale:g}x speed at full zoom",
-          all(abs(v - COMBAT.ads_move_speed_scale) < 1e-9
-              for v in full_ads.values()),
-          str(sorted(full_ads.items())))
-    check("...and on full speed with the button up, so nothing is left behind",
-          all(abs(_eased(z, 0.0) - 1.0) < 1e-9 for z in zooms.values()))
-    halfway = {k: _eased(z, 0.5) for k, z in zooms.items()}
-    check("...half way in it is 0.75x on every weapon too: the easing follows the "
-          "zoom's curve, not the zoom's magnitude",
-          all(abs(v - 0.75) < 1e-9 for v in halfway.values()),
-          str(sorted(halfway.items())))
-    # And the contrast that justifies normalising at all: the raw zoom ratio
-    # would be a different speed per weapon and never exactly the number asked
-    # for.
-    raw = {k: 1.0 + (1.0 - COMBAT.ads_move_speed_scale) * (1.0 / z - 1.0)
-           for k, z in zooms.items()}
-    check("...which the raw CurrentFOV/BaseFOV ratio would NOT have been: that "
-          "is why this one is normalised",
-          len({round(v, 6) for v in raw.values()}) > 1
-          and all(abs(v - COMBAT.ads_move_speed_scale) > 1e-6
-                  for v in raw.values()),
-          str(sorted(raw.items())))
 
 
 # ─── Sprinting drops the ready pose ──────────────────────────────────────────

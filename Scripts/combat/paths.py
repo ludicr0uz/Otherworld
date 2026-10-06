@@ -82,6 +82,10 @@ NPC_BP_PATH = "/Game/Forest/NPC/BP_ForestWanderer"
 ABP_PATH = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"
 
 CHARACTER_CLASS_PATH = f"{CHARACTER_BP_PATH}.BP_ThirdPersonCharacter_C"
+# Its native parent and that parent's movement component (C++, Source/Otherworld;
+# player_move.py reparents the Blueprint).
+MOVE_CHARACTER_CLASS_PATH = "/Script/Otherworld.OtherworldCharacter"
+MOVE_COMPONENT_CLASS_PATH = "/Script/Otherworld.OtherworldCharacterMovement"
 GAME_MODE_CLASS_PATH = f"{GAME_MODE_BP_PATH}.BP_ThirdPersonGameMode_C"
 NPC_CLASS_PATH = f"{NPC_BP_PATH}.BP_ForestWanderer_C"
 ITEM_CLASS_PATH = f"{ITEM_BP_PATH}.BP_WeaponItem_C"

@@ -1,9 +1,9 @@
 # Otherworld — Claude quick reference
 
 An Unreal Engine **5.8** project on macOS, driven entirely by **Unreal Python** automation.
-The game is authored by those scripts; the C++ in `Source/` holds no gameplay so far (an empty
-runtime module, and an editor module of helpers for the scripts) and must be compiled before
-the editor opens (`Source/CLAUDE.md`). `systemDesign.md` holds the detailed
+The game is authored by those scripts; the C++ in `Source/` is small (a runtime module with
+the player's predicted movement states, and an editor module of helpers for the scripts) and
+must be compiled before the editor opens (`Source/CLAUDE.md`). `systemDesign.md` holds the detailed
 architecture.
 
 ## Hard rules
@@ -43,7 +43,8 @@ architecture.
 | clothing: the eight garments, wearing and taking off, the I panel, the test garments | `build_`/`verify_clothing.py`, `probe_clothing.py` | `Scripts/clothing/CLAUDE.md` |
 | sound: every sound of the game, which Blueprint variable plays which takes, how far each carries, how loud each is, the beds, the player's voice, the listener | `build_sound.py` (the one build after a change to any of them) | `Scripts/Sound/CLAUDE.md` |
 | sourcing sounds: the fetchers and the synthesiser, cutting candidates from the downloaded packs, the page that plays and rates them (all run outside the editor) | `Scripts/Sound/*.py` | `Scripts/Sound/sound_candidates/__init__.py` |
-| the C++ modules: the `Otherworld` runtime module (no gameplay yet), the editor-only `OtherworldEditor` (what the builders need and Python cannot reach) and the Editor, Game, Client and Server targets; the compile command, its time and the Xcode it needs | `Source/Otherworld/Otherworld.Build.cs`, `Source/OtherworldEditor/`, `Source/*.Target.cs` | `Source/CLAUDE.md` |
+| predicted movement: sprint, prone and the aim-walk, their speeds and the stamina, decided by the player's C++ movement component on the owning client and the server alike; what a graph may hand it and read off it, the reparented player character, the correction count | `combat/player_move.py`, `uebp/nodes/move.py`, `probes/probe_net_move_states.py` | `Source/CLAUDE.md` ("Predicted movement"), `Scripts/combat/docs/stance.md` |
+| the C++ modules: the `Otherworld` runtime module (the player's movement component), the editor-only `OtherworldEditor` (what the builders need and Python cannot reach) and the Editor, Game, Client and Server targets; the compile command, its time and the Xcode it needs | `Source/Otherworld/Otherworld.Build.cs`, `Source/OtherworldEditor/`, `Source/*.Target.cs` | `Source/CLAUDE.md` |
 | the two modes on the title: the Single Player and Multiplayer pages, the server address, joining and leaving a server, the reason a join failed, the session kept on the GameInstance | `graphics_menu/mode_tick.py`, `net/game_instance.py`, `probes/probe_net_title.py` | `Scripts/graphics_menu/CLAUDE.md` ("The two modes"), `Scripts/net/CLAUDE.md` |
 | multiplayer conventions: the authority pattern, what a screen may do (it asks: one `Ask…` event on the weapon component per action, `combat/ask_consts.py`, called through `graphics_menu/ask.py`; a HUD graph writes no request and takes nothing itself), where state lives (per player on `BP_OtherworldPlayerState`, shared on `BP_OtherworldGameState`, server-only on the GameMode, which a client never reads: `net/state_graph.py`), who is nearby (a world actor or a wanderer asks the living players, all of them or the nearest: `net/players.py`, never `GetPlayerPawn(0)`), whose keys a graph reads (the local player's: a HUD's owning controller, the weapon component's `LocalPC` behind its local gate, `combat/weapon_component/local.py`; never `GetPlayerController(0)`), the three mode questions, what may differ between single player and a server (the pause, authored only by `net/pause.py`), writing a `--net` probe, and what the spike found broken on a client, system by system | `probes/probe_net_see_each_other.py`, `probe_net_menu_overlay.py`, `probe_net_living_players.py`, `probe_net_local_input.py`, `probe_asks.py` | `Scripts/net/CLAUDE.md` |
 | networked Blueprints: Server / Client / Multicast custom events, Replicated and RepNotify variables, actors and components that replicate, the nodes that ask which machine this is | `uebp/net.py`, `dev/check_net_authoring.py` | `Scripts/uebp/CLAUDE.md` |
@@ -156,6 +157,7 @@ python3 Scripts/dev/uepy.py --game --seconds 25    # headless -game run + error 
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py   # see below
 python3 Scripts/dev/uepy.py --game --windowed --probe <probe>   # rendered, in a 1280x720 window
 python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py   # a server and 2 clients, see below
+python3 Scripts/dev/uepy.py --net --clients 1 --lag 120 --probe Scripts/probes/probe_net_move_states.py   # with 120 ms of lag
 python3 Scripts/dev/uepy.py --game --title --probe Scripts/probes/probe_title_single.py   # the real title menu, see below
 python3 Scripts/dev/uepy.py --cold <script>        # force a fresh editor
 python3 Scripts/dev/uepy.py --summary <scripts>    # one line per script + its failures
@@ -190,6 +192,11 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
   - **The report:** one row per process (its joins, Blueprint runtime errors, `Accessed None`
     and network failures), then each probe's checks, process by process. Any error, a client
     that did not join, a process that died or a failed check fails the run.
+  - **`--lag MS`** delays every packet a client sends (the engine's `Net PktLag`), and the
+    row's last column counts the movement corrections that process logged
+    (`MOVE-CORRECTION`: the server pulling a client back, rubber-banding when the client
+    predicted wrong). The count fails nothing by itself; a probe says how many a run may
+    have (`probe_net_move_states.py`: none through a sprint, prone or an aim).
   - **The files:** one log per process (`server.log`, `client1.log`, ...) in
     `Saved/uepy/net/<stamp>/`, the last ten runs kept.
   - **Clients are `-nullrhi`** unless `--windowed`. With no probe everyone plays for
@@ -244,7 +251,7 @@ editor.
   the sniper its AS Val with a scope and the SMG its SMG11 (Fab models); the shotgun and pistol are Quaternius's
   Shotgun_3 and Pistol_1 (CC0, `asset_pipeline/import_quaternius.py`). A gun is carried lowered, in the hand of the stock idle and jog, and comes up into its
   ready pose for an aim, a shot, a reload or the guard (`combat/weapon_component/carry.py`).
-  The player's default movement is a jog, at 4 m/s, played by the jog clip (`combat/player_gait.py`), and they can sprint at 6 (a full stamina bar lasts 8 s and refills in a little over 8: `combat/player_tuning.csv`; forwards only: within 60° of the way they face, `combat/sprint_tuning.py`), aim over the shoulder or, with a gun, down
+  The player's default movement is a jog, at 4 m/s, played by the jog clip (`combat/player_gait.py`), and they can sprint at 6 (the sprint, prone, the aim's slower walk and the stamina are the C++ movement component's, predicted by the owning client and decided by the server: `combat/player_move.py`, `Source/CLAUDE.md`) (a full stamina bar lasts 8 s and refills in a little over 8: `combat/player_tuning.csv`; forwards only: within 60° of the way they face, `combat/sprint_tuning.py`), aim over the shoulder or, with a gun, down
   the sights (the sniper's is its scope; the knife, the axe and the other items have none, so with one of them in hand the sights key is the use key and does not aim: `combat/weapon_component/use.py`), reload and eat, block (F; a swing from the front does a
   quarter damage and costs stamina), punch with empty hands (left click, `MM_Attack_01`), slash with the knife in hand (left click,
   `A_KnifeSlash`, a clip keyed from Python; the knife is the FPS Weapon Bundle's M9; the axe, Quaternius's Survival Pack one, swings the same slash for now, and every third blow of it on a tree leaves a piece of wood beside the trunk, a pick-up for the bag: `combat/weapon_component/chop.py`), light a campfire (left click with the matches in hand and wood in the bag: the wood is spent and a fire stands in front of the player for 3 minutes, warming them within 4 m: `combat/weapon_component/light.py`, `survival/campfire.py`), light the stick at a campfire (the use key with it in hand, within 3 m of a fire: it burns for 2 minutes, carried up like a torch and lighting the ground round it, then is a stick again) and hold the burning stick out in front (the use key held: `combat/stick.py`, `combat/weapon_component/torch.py`), heat the knife or the axe at a campfire (E on the fire with it in hand: its metal glows red for 20 s, and while it does the use key cauterises a bleed and its blow does double damage to a wendigo: `combat/heat.py`, `combat/weapon_component/heat.py`, `cauterize.py`, `hot_blow.py`), crouch (C) and go prone (Z), both quieter and slower and played by Quaternius Universal Animation Library

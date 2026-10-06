@@ -5,7 +5,9 @@ JSON, whether it died), and it returns the lines to print and the verdict.
 
 A run is clean when every client joined and stayed, no process logged a
 Blueprint runtime error, an "Accessed None" or a network failure, and every
-probe passed in every process it ran in -- and ran in at least one.
+probe passed in every process it ran in -- and ran in at least one. Each
+row also counts the movement corrections the process logged, which fail
+nothing here.
 """
 
 import os
@@ -21,6 +23,12 @@ NET_PATTERNS = (
     ("accessed None", r"Accessed None"),
     ("net failures", r"Network Failure|Travel Failure|LogNet: Error"),
 )
+# Counted and shown, never a failure by itself: a correction is the server
+# pulling a client back onto its own answer (rubber-banding when the client
+# predicted wrong), one log line each from the game's movement component
+# (Source/Otherworld). A probe says how many a run may have
+# (probes/probe_net_move_states.py).
+CORRECTION = r"MOVE-CORRECTION"
 NOTABLE = re.compile("|".join(p for _l, p in NET_PATTERNS))
 MAX_LINE = 200
 
@@ -48,6 +56,10 @@ class ProcessReport(object):
         return [(label, len(re.findall(pattern, self.text)))
                 for label, pattern in NET_PATTERNS]
 
+    @property
+    def corrections(self):
+        return len(re.findall(CORRECTION, self.text))
+
     def notable(self):
         hits = [l.strip() for l in self.text.splitlines() if NOTABLE.search(l)]
         shown = [h[:MAX_LINE] for h in hits[:MAX_NOTABLE]]
@@ -59,13 +71,15 @@ class ProcessReport(object):
 def summary(reports, clients):
     """(lines, ok): one row a process -- joins, error counts, how it ended."""
     labels = [label for label, _p in NET_PATTERNS]
-    lines = ["  " + "".join(f"{h:<15}" for h in ["process", "joins"] + labels).rstrip()]
+    heads = ["process", "joins"] + labels + ["corrections"]
+    lines = ["  " + "".join(f"{h:<15}" for h in heads).rstrip()]
     ok = True
     for r in reports:
         want = r.expected_joins(clients)
         counts = r.counts()
         died = "" if r.exit_code is None else f"died (exit {r.exit_code})"
-        cells = [r.name, f"{r.joins}/{want}"] + [str(n) for _l, n in counts] + [died]
+        cells = ([r.name, f"{r.joins}/{want}"] + [str(n) for _l, n in counts]
+                 + [str(r.corrections), died])
         lines.append("  " + "".join(f"{c:<15}" for c in cells).rstrip())
         if r.joins != want or died or any(n for _l, n in counts) or not r.text:
             ok = False

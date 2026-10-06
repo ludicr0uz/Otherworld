@@ -126,7 +126,40 @@ and every other client. Only the first has that player's keys.
   own spends a round and the other's does not, on either client or the server, which has
   no HUD and no widgets; `--game` runs its standalone arm.
 - **Not done here:** the non-local copies of a character still run from their own
-  unreplicated state (walk speed, stance, what is held): M12, M13, M18, M19.
+  unreplicated state (stance and aim as others see them, what is held): M13, M18, M19.
+  The walk speed, the sprint and the stance of the character itself are M12's, below.
+
+## Movement states are predicted (M12, done)
+
+- **Sprint, prone and the aim-walk are the movement component's**, a C++ subclass
+  (`Source/CLAUDE.md`, "Predicted movement"; `combat/player_move.py` reparents the
+  player onto it). Each is a flag on every move the owning client sends, and both
+  machines work the speed, the capsule and the stamina out of the flags in the same
+  step, so the client moves at once and the server agrees.
+- **A graph hands it wants and reads its state** (`uebp.nodes.move`), behind the local
+  gate: `SetSprintHeld`, `SetStance`, `SetAimWalk`. It never writes `MaxWalkSpeed`, a
+  crouched height or the stamina (`combat/verify/aiming.py`, `stance.py`,
+  `weapon_inputs.py` fail on one).
+- **Stamina is the server's.** It drains and refills with the moves, so the client
+  predicts it; a change the server alone makes (`SpendStamina`: a blocked blow;
+  `SetStamina`: a loaded profile) reaches the client as a correction, because each move
+  reports the client's stamina and the server corrects one more than 2 points off.
+  The weapon component's `Stamina`, `Sprinting`, `SprintSpent` and `SprintAhead` are
+  copies, written on the owning machine only: on the server ask the movement component.
+- **The speed numbers are the character asset's**, the same on every machine. The
+  PLAYER SETTINGS tab's (`SetPace`) are taken only with authority: single player, and
+  the 4.8 table's "dev settings tabs" row for a client.
+- **The check:** `uepy.py --net --clients 1 --lag 120 --probe
+  Scripts/probes/probe_net_move_states.py`. At a 137 ms ping the client reached each
+  state's speed within 0.1-0.25 s and took no correction through the jog, a sprint
+  started and stopped, prone, standing, the aim and its release, while the server held
+  the same character at 600, 80 and 200 cm/s. Its control: told to sprint at 900 on its
+  own word, the client took 20 corrections in 1.5 s. Each correction is a
+  `MOVE-CORRECTION` line in the client's log, counted in the run's report.
+- **A probe drives it with** `SprintForced`, `AimForced` and `Stance` on the acting
+  client's own weapon component, and `add_movement_input` each frame.
+- **Not done here:** how another player's character looks in a state (prone's height
+  and the poses on a simulated proxy) is M13.
 
 ## Who is nearby (M9, done)
 
@@ -349,9 +382,9 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | the loadout and held items | Every process spawns its own copy of each character's six items (not replicated, each with local authority), so the three worlds start alike and part at the first change | measured | M18 |
 | items on the ground | The 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
 | day and night | Each process rolls its own start time: in one run it was day on the server and client 2 and night on client 1 | measured | M30 |
-| walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server will correct a sprinting client | the write measured; the rubber-band read | M12 |
+| walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server would correct a sprinting client. **Fixed (M12): "Movement states are predicted", above** | the write measured; the fix measured (`probe_net_move_states.py`, 137 ms) | M12 done |
 | input | **Fixed (M10): "Input", above.** The weapon component polled keys in its Tick on every copy of every character, the server's included, and on `GetPlayerController(0)`, so a client's press drove every character it could see | read; the fix measured (`probe_net_local_input.py`, headless and `--windowed`) | M10 done |
-| stamina, hunger, thirst, temperature | Per-process component and GAS state: no builder replicates a variable or a component yet (`net.replicate` has no caller outside `dev/check_net_authoring.py`) | read | M12, M26 |
+| stamina, hunger, thirst, temperature | Per-process component and GAS state: no builder replicates a variable or a component yet (`net.replicate` has no caller outside `dev/check_net_authoring.py`). **Stamina is the server's since M12** (the movement component; the owning client predicts it and is corrected to it) | read; stamina measured | M12 done, M26 |
 | animation of the other player | Only what CharacterMovement replicates reaches a simulated proxy (velocity, falling): stance, aim, the held item's pose and montages do not | read | M13, M21 |
 | sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only | read | M21 |
 | player starts | The level has one PlayerStart: the two spawned 70 cm apart, the engine nudging the second | measured | M16 |

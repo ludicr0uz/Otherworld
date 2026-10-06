@@ -44,6 +44,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     full bar sprints and an empty one refills (s); what the
                     menu's PLAYER SETTINGS tab saves and COMBAT is built from
   player_pace       the jog: the character's own MaxWalkSpeed, set at install
+  player_move       the player's native parent and its C++ movement component (the
+                    reparent), and the numbers sprint, prone and the aim-walk move by
   player_gait       the jog plays the jog clip: GroundSpeed scaled in the
                     body's anim Blueprint so the jog's speed is the blend
                     space's jog row

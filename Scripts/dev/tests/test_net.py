@@ -99,6 +99,16 @@ class PlanTest(unittest.TestCase):
         self.assertIn("-windowed", windowed)
         self.assertIn(f"-WinX={net_plan.WINDOW_STEP}", windowed)
 
+    def test_lag_delays_the_clients_packets_only(self):
+        self.assertIn("-PktLag=120",
+                      net_plan.command("ed", "p", self.plan[1], 17777, lag_ms=120))
+        self.assertFalse([a for a in net_plan.command("ed", "p", self.plan[0], 17777,
+                                                      lag_ms=120) if "PktLag" in a])
+        self.assertFalse([a for a in net_plan.command("ed", "p", self.plan[1], 17777)
+                          if "PktLag" in a])
+        self.assertIsNone(net_plan.check_args(2, 17777, None, 120))
+        self.assertIn("--lag", net_plan.check_args(2, 17777, None, -5))
+
     def test_no_client_is_told_to_skip_the_menu(self):
         # A joined client has no title by the game's own rule; the server has no HUD.
         self.assertIn("-nomenu", net_plan.command("ed", "p", self.plan[0], 17777, level="/L"))
@@ -205,9 +215,10 @@ class ReportTest(unittest.TestCase):
         lines, ok = net_report.report(self.clean(), 2, ["p"])
         self.assertTrue(ok)
         self.assertEqual(lines[0].split(),
-                         ["process", "joins", "bp", "errors", "accessed", "None", "net", "failures"])
-        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0"])
-        self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0"])
+                         ["process", "joins", "bp", "errors", "accessed", "None", "net", "failures",
+                          "corrections"])
+        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0", "0"])
+        self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0", "0"])
         self.assertIn("[probe] ok    p @ server  1/1 checks passed", lines)
         self.assertIn("[probe] ok    p @ client 2  1/1 checks passed", lines)
 
@@ -226,9 +237,19 @@ class ReportTest(unittest.TestCase):
                             "LogNet: Warning: Network Failure: GameNetDriver[ConnectionLost]\n")
         lines, ok = net_report.summary(reports, 2)
         self.assertFalse(ok)
-        self.assertEqual(lines[2].split(), ["client", "1", "1/1", "1", "1", "1"])
-        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0"])
+        self.assertEqual(lines[2].split(), ["client", "1", "1/1", "1", "1", "1", "0"])
+        self.assertEqual(lines[1].split(), ["server", "2/2", "0", "0", "0", "0"])
         self.assertEqual(sum(1 for l in lines if l.startswith("  | client 1: ")), 2)
+
+    def test_corrections_are_counted_and_fail_nothing(self):
+        # A probe says how many a run may have; the report only counts them.
+        reports = self.clean()
+        reports[2].text += ("LogOtherworldMove: MOVE-CORRECTION 1 BP_C_0: 14.2 cm off\n"
+                            "LogOtherworldMove: MOVE-CORRECTION 2 BP_C_0: 3.0 cm off\n")
+        lines, ok = net_report.summary(reports, 2)
+        self.assertTrue(ok)
+        self.assertEqual(lines[0].split()[-1], "corrections")
+        self.assertEqual(lines[3].split(), ["client", "2", "1/1", "0", "0", "0", "2"])
 
     def test_a_process_that_died_fails_it(self):
         reports = self.clean()

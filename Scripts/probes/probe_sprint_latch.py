@@ -1,39 +1,56 @@
-"""A spent sprint's latch lets go with the key, and never holds stamina down.
+"""The sprint's latch, in the running game: a sprint that runs Stamina out
+stays off until the key is let go (the movement component's rule, C++:
+Source/Otherworld, combat/player_move.py).
 
-No key can be injected into a headless game, so the sprint key is up for the
-whole run and the latch cannot be seen to set here: verify/sprint.py checks
-that wiring (key AND (spent OR Stamina <= 0)). What the game can show is the
-other half, the one that would strand the player if it were wrong: with the
-key up a latch left set clears on the next tick, zero stamina does not set it,
-Sprinting stays down every frame, and the stamina refills.
+    key up      zero stamina alone does not latch, Sprinting stays down and
+                the bar refills.
+    key held    (SprintForced, a probe's hand on it, steering forward) the
+                player sprints at the sprint's speed, the bar runs out, the
+                latch sets and Sprinting stays down every frame after, bar
+                refilling, for as long as the key is held: no flicker.
+    key let go  the latch clears.
 """
 
-from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
-from combat.weapon_component.sprint import SPRINT_SPENT_VAR
-from combat.weapon_component import vars as WV
+import math
 
-WRITABLE = [(WEAPON_COMP_BP_PATH, SPRINT_SPENT_VAR), (WEAPON_COMP_BP_PATH, WV.Stamina)]
+import unreal
+
+from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
+from combat.sprint_tuning import SPRINT_FORCED_VAR
+from combat.tuning import COMBAT
+from combat.weapon_component.sprint import SPRINT_SPENT_VAR
+
+WRITABLE = [(WEAPON_COMP_BP_PATH, SPRINT_FORCED_VAR)]
+MOVE = unreal.OtherworldMovementLibrary
+# What the held sprint starts with: a third of a second's worth.
+SHORT_BAR = COMBAT.stamina_drain_per_s / 3.0
+HELD_S = 1.2
 
 FRAMES = 20
 
 
+def _forward(pawn):
+    yaw = math.radians(pawn.get_actor_rotation().yaw)
+    pawn.add_movement_input(unreal.Vector(math.cos(yaw), math.sin(yaw), 0.0), 1.0, False)
+
+
+def _speed(pawn):
+    v = pawn.get_velocity()
+    return math.hypot(v.x, v.y)
+
+
 def probe(p):
     yield 0.2
-    wc = p.component(p.pawn(), WEAPON_COMP_CLASS_PATH)
+    pawn = p.pawn()
+    wc = p.component(pawn, WEAPON_COMP_CLASS_PATH)
     p.check("the player has a weapon component", wc is not None)
     if wc is None:
         return
     p.check("the latch starts clear and the player is not sprinting",
             not p.get(wc, SPRINT_SPENT_VAR) and not p.get(wc, "Sprinting"))
 
-    p.set(wc, "Stamina", 0.0)
-    p.set(wc, SPRINT_SPENT_VAR, True)
-    yield lambda: not p.get(wc, SPRINT_SPENT_VAR)
-    p.check("a set latch clears once the sprint key is up",
-            not p.get(wc, SPRINT_SPENT_VAR))
-
     # Frame by frame from empty: the old flicker was one frame on, one off.
-    p.set(wc, "Stamina", 0.0)
+    MOVE.set_stamina(pawn, 0.0)
     seen = []
     for _ in range(FRAMES):
         yield 0.0
@@ -47,3 +64,34 @@ def probe(p):
     p.check("...while the stamina refills",
             levels[-1] > 0.0 and all(b >= a for a, b in zip(levels, levels[1:])),
             f"{levels[0]:.3f} -> {levels[-1]:.3f} over {FRAMES} yields")
+
+    # The key held through the bar's end.
+    MOVE.set_stamina(pawn, SHORT_BAR)
+    p.set(wc, SPRINT_FORCED_VAR, True)
+    now = lambda: unreal.GameplayStatics.get_time_seconds(p.world())
+    t0, held = now(), []
+    while now() - t0 < HELD_S:
+        _forward(pawn)
+        yield 0.0
+        held.append((bool(p.get(wc, "Sprinting")), bool(p.get(wc, SPRINT_SPENT_VAR)),
+                     float(p.get(wc, "Stamina")), _speed(pawn)))
+    ran = [h for h in held if h[0]]
+    first_spent = next((i for i, h in enumerate(held) if h[1]), None)
+    p.check("the key held, steering forward, the player sprints: faster than the jog",
+            bool(ran) and max(h[3] for h in ran) > COMBAT.jog_speed_cms + 20.0,
+            f"{len(ran)} sprinting frames of {len(held)}, top speed "
+            f"{max((h[3] for h in held), default=0):.0f} cm/s")
+    p.check("...until the bar runs out, which latches the sprint spent",
+            first_spent is not None and min(h[2] for h in held) < 0.5,
+            f"spent from frame {first_spent}, lowest bar {min(h[2] for h in held):.2f}")
+    after = held[first_spent:] if first_spent is not None else []
+    p.check("...and it stays off every frame the key is still held: no flicker",
+            len(after) > 3 and all(spent and not running for running, spent, _, _ in after),
+            f"{len(after)} frames, {sum(1 for h in after if h[0])} of them sprinting")
+    p.check("...while the bar refills under the held key",
+            len(after) > 3 and after[-1][2] > after[1][2],
+            f"{after[1][2]:.2f} -> {after[-1][2]:.2f}" if len(after) > 3 else "")
+
+    p.set(wc, SPRINT_FORCED_VAR, False)
+    yield lambda: not p.get(wc, SPRINT_SPENT_VAR)
+    p.check("letting the key go clears the latch", not p.get(wc, SPRINT_SPENT_VAR))

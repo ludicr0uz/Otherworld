@@ -27,7 +27,8 @@ _author_* fragment per concern, each in its own module:
               the bleed off the player, by the tag its spec grants
   ads         the two aim keys (shoulder, sights) -> Aiming/SightAiming/AimZoom
               (the sights key aims only while it is not Using); the zoom, the
-              walk slowdown it drives and the scope's look slowdown
+              scope's look slowdown, and the aim-walk flag handed to the
+              movement component
   seat        down the sights: SightSeat (how far the camera has gone onto
               the gun, from the key: one motion), SightSeated (the gun is up)
               and SightLook (how far the camera has turned onto its line,
@@ -145,11 +146,14 @@ _author_* fragment per concern, each in its own module:
               the upkeep, on every copy
   recoil      view turn, kick, recovery
   shot_noise  the shot's noise for the wanderers (ShotVolume + a cone)
-  sprint      sprint and stamina, and the latch that ends a spent sprint
+  sprint      the sprint key handed to the movement component (C++, which
+              sprints, latches and spends the stamina), and its answers
+              copied into Sprinting, SprintSpent, SprintAhead and Stamina
   block       the guard: Blocking = block key AND stamina AND not sprinting
               (what a block does to a swing is npc/block.py)
-  stance      crouch/prone toggles -> Stance; UE's crouch at two heights, the
-              crouched speed, and the footsteps' StepVolume/StepNoise
+  stance      crouch/prone toggles -> Stance, handed to the movement
+              component (UE's crouch at two heights, and its speed), and
+              the footsteps' StepVolume/StepNoise
   carry       Lowered, once a frame: sprinting, or a gun that no aim key,
               guard, shot or reload is holding up (the ready pose is off)
   ready_pose  restart the ready pose after it is interrupted; re-equip on the

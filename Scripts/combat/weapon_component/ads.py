@@ -7,7 +7,7 @@ aiming earns them), and what sights.py reads to move the camera onto the gun.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
-from combat.nodes import CAMERA_CLASS_PATH, MOVEMENT_CLASS_PATH
+from combat.nodes import CAMERA_CLASS_PATH
 from combat.seat_tuning import HAS_SIGHTS_VAR
 from combat.tuning import AIM_KEY, COMBAT, SIGHTS_KEY
 from combat.use_tuning import USING_VAR
@@ -17,10 +17,13 @@ from uebp.nodes.actor import (
 from uebp.nodes.math import (
     FN_AND, FN_CLAMP, FN_DIV_FF, FN_INTERP_FF, FN_LERP, FN_MUL_FF, FN_NOT, FN_OR,
     FN_SELECT_FF, FN_SUB_FF)
-from combat.sprint_tuning import BASE_SPEED_VAR
-from uebp import props as EP
+from uebp.nodes.move import FN_SET_AIM_WALK
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
+
+# A probe's hand on the shoulder-aim key (ORed with it): no key can be pressed
+# in a headless game.
+AIM_FORCED_VAR = "AimForced"
 
 
 def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
@@ -78,7 +81,11 @@ def _author_aim_state(ed, pc_out, held, armed_out, key_pins, sights_key,
         _connect(key_pins[var], _pin(n, "Key"))
         return out(n)
 
-    shoulder = held_down("KeyAim")
+    forced = keep(ed.add_get_member_variable_node(AIM_FORCED_VAR))
+    shoulder_or = keep(_node(ed, FN_OR))
+    _connect(held_down("KeyAim"), _pin(shoulder_or, "A"))
+    _connect(out(forced, AIM_FORCED_VAR), _pin(shoulder_or, "B"))
+    shoulder = out(shoulder_or)
     # The same key uses an item that has no sights (use.py): then it is not
     # an aim key this frame.
     using = keep(ed.add_get_member_variable_node(USING_VAR))
@@ -265,99 +272,27 @@ def _author_zoom(ed, tick, pc_out, owner_out, exec_ins, keep):
     return flow, moved
 
 
-def _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep):
-    """Slow the legs by how far the zoom has travelled; see the block."""
-    # --- and slow the legs by the same curve ---------------------------------
-    # A SECOND write of MaxWalkSpeed, after the one _author_sprint made earlier
-    # in this same Tick, and that ordering is the whole design. Sprint writes
-    # the speed unconditionally every frame -- Sprinting ? sprint_speed :
-    # BaseSpeed -- so this write does not need an "undo" path at all: the frame
-    # this branch stops running, sprint's write has already put the player back
-    # at BaseSpeed. Moving the decision into _author_sprint instead was the
-    # alternative, and it is worse: the aim state is resolved after the sprint
-    # block (it reads Sprinting), and sprint's CastFailed pin is a live
-    # continuation that would then need the same arithmetic on it.
-    #
-    # Gated on "not sprinting", the same pin the zoom is gated on, so the two
-    # MaxWalkSpeed writes can never disagree about a frame: while Sprinting is
-    # set this block does nothing and sprint's 900 stands, and letting go of
-    # Shift hands the frame straight back here. Gated on armed as well, the
-    # same as Aiming is, so empty hands always walk at sprint's speed.
-    #
-    #     progress = FClamp((BaseFOV / CurrentFOV - 1) / (AimZoom - 1), 0, 1)
-    #     MaxWalkSpeed = BaseSpeed * Lerp(1, COMBAT.ads_move_speed_scale, progress)
-    #
-    # progress is how far the camera has actually travelled toward the zoom
-    # being aimed at, 0 at rest and 1 at full zoom. So the slowdown eases in
-    # and out on the FInterpTo above instead of snapping on a key, it has no
-    # second code path for release, and because it is NORMALISED by AimZoom --
-    # the shoulder's zoom, or the weapon's own AdsZoom down the sights -- it
-    # lands on exactly ads_move_speed_scale at full zoom for every weapon and
-    # both ways of aiming. The un-normalised
-    # CurrentFOV/BaseFOV the sensitivity uses would have made the sniper slower
-    # on its legs than the pistol, which is a zoom factor leaking into a
-    # mechanic that has nothing to do with zoom.
-    steady = keep(_node(ed, FN_AND))
-    _connect(still, _pin(steady, "A"))
-    _connect(armed_out, _pin(steady, "B"))
-    slow_gate = keep(ed.add_branch_node())
-    _connect(out(steady), _pin(slow_gate, "Condition"))
-    _connect(flow, _pin(slow_gate, "execute"))
+def _author_aim_slowdown(ed, owner_out, flow, keep):
+    """Slow the legs while aiming: tell the movement component.
 
-    base_third = keep(ed.add_get_member_variable_node(WV.BaseFOV))
-    zoom_ratio = keep(_node(ed, FN_DIV_FF))
-    _connect(out(base_third, WV.BaseFOV), _pin(zoom_ratio, "A"))
-    _connect(_loose_pin(moved, "Output_Get", is_input=False), _pin(zoom_ratio, "B"))
-    so_far = keep(_node(ed, FN_SUB_FF))
-    _connect(out(zoom_ratio), _pin(so_far, "A"))
-    _set(so_far, "B", 1.0)
+        SetAimWalk(owner, Aiming)
 
-    # The denominator is the zoom being aimed at, not the config's: 4x down
-    # the scope has four times as far to travel as 1.5x off the shoulder.
-    # AimZoom rather than Held.AdsZoom because the sniper's shoulder aim stops
-    # at 1.5x, and rather than a fresh select because on release AimZoom is
-    # left at the zoom being let go of, which is what the ease-out travels.
-    zoom_again = keep(ed.add_get_member_variable_node(WV.AimZoom))
-    span = keep(_node(ed, FN_SUB_FF))
-    _connect(out(zoom_again, WV.AimZoom), _pin(span, "A"))
-    _set(span, "B", 1.0)
-
-    frac = keep(_node(ed, FN_DIV_FF))
-    _connect(out(so_far), _pin(frac, "A"))
-    _connect(out(span), _pin(frac, "B"))
-    # Clamped because the FInterpTo can overshoot its target by a fraction on a
-    # long frame, and an unclamped progress of 1.02 is a walk speed below the
-    # configured floor -- small, but it would be a number nobody chose.
-    progress = keep(_node(ed, FN_CLAMP))
-    _connect(out(frac), _pin(progress, "Value"))
-    _set(progress, "Min", 0.0)
-    _set(progress, "Max", 1.0)
-
-    slowed = keep(_node(ed, FN_LERP))
-    _set(slowed, "A", 1.0)
-    _set(slowed, "B", COMBAT.ads_move_speed_scale)
-    _connect(out(progress), _pin(slowed, "Alpha"))
-    # Off BaseSpeed, not off the speed that is currently set: this runs every
-    # frame, so a factor applied to the live value would compound.
-    walked = keep(ed.add_get_member_variable_node(BASE_SPEED_VAR))
-    speed = keep(_node(ed, FN_MUL_FF))
-    _connect(out(walked, "BaseSpeed"), _pin(speed, "A"))
-    _connect(out(slowed), _pin(speed, "B"))
-
-    # No cast: GetComponentByClass reshapes its return pin to the class chosen
-    # on ComponentClass, so this wires straight into the movement component's
-    # own setter. _author_sprint casts to Character instead only because it
-    # needs the CastFailed pin as a continuation; here the branch above is
-    # already the guard.
-    legs = keep(_node(ed, FN_GET_COMP))
-    _connect(owner_out, _pin(legs, "self"))
-    _pin(legs, "ComponentClass").set_pin_value(MOVEMENT_CLASS_PATH)
-    apply_speed = keep(ed.add_set_member_variable_node(EP.MAX_WALK_SPEED, MOVEMENT_CLASS_PATH))
-    _connect(out(legs), _pin(apply_speed, "self"))
-    _connect(out(speed), _pin(apply_speed, "MaxWalkSpeed"))
-    _connect(then(slow_gate), _pin(apply_speed, "execute"))
-
-    return (then(apply_speed), else_(slow_gate))
+    The walk at a full aim is COMBAT.ads_move_speed_scale of the jog, for
+    every weapon and both ways of aiming, and it eases in and out with the
+    zoom: the movement component runs its own FInterpTo towards the flag, at
+    the zoom's speed (ads_interp_speed, which player_move.py writes onto
+    it). That ease used to be read off the camera's FOV here and written
+    into MaxWalkSpeed, which only this machine saw; as a flag on each move
+    the owning client predicts the slower walk and the server makes the same
+    one. Aiming is already false while sprinting and with empty hands, so
+    the flag needs no gate of its own.
+    """
+    aiming = keep(ed.add_get_member_variable_node(WV.Aiming))
+    tell = keep(_node(ed, FN_SET_AIM_WALK))
+    _connect(owner_out, _pin(tell, "Character"))
+    _connect(out(aiming, WV.Aiming), _pin(tell, "bAiming"))
+    _connect(flow, _pin(tell, "execute"))
+    return (then(tell),)
 
 
 def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
@@ -384,7 +319,7 @@ def _author_ads(ed, tick, pc_out, owner_out, held, armed_out, key_pins,
     aimed, still = _author_aim_state(ed, pc_out, held, armed_out, key_pins,
                                      sights_key, exec_ins, keep)
     flow, moved = _author_zoom(ed, tick, pc_out, owner_out, aimed, keep)
-    exits = _author_aim_slowdown(ed, owner_out, armed_out, still, moved, flow, keep)
+    exits = _author_aim_slowdown(ed, owner_out, flow, keep)
 
     ed.add_comment_to_nodes(
         f"{AIM_KEY} aims over the shoulder at {COMBAT.shoulder_zoom:g}x; "

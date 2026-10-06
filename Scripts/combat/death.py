@@ -21,8 +21,8 @@ from uebp.nodes.math import FN_ADD_II, FN_ADD_VV, FN_MAKE_TRANSFORM
 from uebp.nodes.palette import (
     NODE_CAST_CHARACTER, NODE_CAST_GAME_MODE, NODE_CAST_PAWN, NODE_SPAWN)
 from uebp.nodes.system import (
-    FN_CONCAT, FN_DELAY, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT,
-    FN_SET_PAUSED)
+    FN_CONCAT, FN_DELAY, FN_GET_GAME_MODE, FN_INT_TO_STR, FN_IS_VALID, FN_PRINT)
+from net.pause import author_pause
 from uebp import props as EP
 from combat import health_vars as HV
 
@@ -320,10 +320,10 @@ def _author_player_death(ed, exec_ins):
     # Pause last, and on every arm: with the flag set the HUD draws the menu,
     # and with the game paused nothing moves behind it. The HUD polls its
     # restart key from the PlayerController, which ticks through a pause.
-    freeze = _node(ed, FN_SET_PAUSED)
-    _set(freeze, "bPaused", True)
-    for tail in (then(say_dead), out(as_mode, "CastFailed")):
-        _connect(tail, _pin(freeze, "execute"))
+    # In standalone only: a server's world does not stop for one player's
+    # death (net/pause.py).
+    frozen = []
+    author_pause(ed, (then(say_dead), out(as_mode, "CastFailed")), frozen)
 
     ed.add_comment_to_nodes(
         f"The player's death, from a body that is already on the floor: wait "
@@ -332,4 +332,4 @@ def _author_player_death(ed, exec_ins):
         f"it fell until the level reopens -- which is the fix for the player "
         f"standing back up. BP_GraphicsMenuHUD draws the menu off "
         f"{PLAYER_DEAD_VAR} and restarts the level from it.",
-        [wait, mode, as_mode, tell, score, score_str, dead_line, say_dead, freeze])
+        [wait, mode, as_mode, tell, score, score_str, dead_line, say_dead] + frozen)

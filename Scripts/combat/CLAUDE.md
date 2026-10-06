@@ -44,6 +44,11 @@ partially rebuild.
 R is shared safely between reload and restart: Tick does not run while paused, and the death
 menu polls its own copy from `DrawHUD`, which does.
 
+Death's pause is single player's (`death.py`, authored by `net.pause.author_pause`): a Branch
+on IsStandalone stands in front of it, so on a server the world runs on past a dead player
+(`verify/health.py`; `probes/probe_death_pause.py` is the standalone arm). What a dead
+player does there instead is the death task's, not built yet.
+
 ## The shape of it
 
 - **Weapons are Actors, not components.** You can't leave a component behind in the world, so:

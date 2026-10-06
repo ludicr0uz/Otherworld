@@ -47,7 +47,8 @@ from graphics_menu.umg_consts import (
 from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
 from uebp.nodes.math import FN_EQ_II, FN_OR
 from uebp.nodes.system import (
-    FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS, FN_SET_PAUSED)
+    FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS)
+from net.pause import author_unpause
 from graphics_menu import hud_vars as MV
 
 GAME_MODE_CLASS_PATH = ("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode"
@@ -126,14 +127,12 @@ def author_death_menu(ed, in_execs, mode_out):
     served = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
     _set(served, CURSOR_ACCEPT_VAR, False)
     _connect(then(again), _pin(served, "execute"))
-    unpause = keep(_node(ed, FN_SET_PAUSED))
-    _set(unpause, "bPaused", False)
-    _connect(then(served), _pin(unpause, "execute"))
+    unpaused = author_unpause(ed, [then(served)], made)
     # The current map by name, so the menu restarts whatever level is loaded.
     # bRemovePrefixString strips PIE's UEDPIE_0_.
     where = keep(_node(ed, FN_LEVEL_NAME))
     _set(where, "bRemovePrefixString", True)
-    _connect(then(unpause), _pin(where, "execute"))
+    _connect(unpaused, _pin(where, "execute"))
     reopen = keep(_node(ed, FN_OPEN_LEVEL))
     _connect(out(where), _pin(reopen, "LevelName"))
     _connect(then(where), _pin(reopen, "execute"))

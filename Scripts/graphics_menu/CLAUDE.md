@@ -75,6 +75,14 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   `in game only` (`IN_GAME_ACTIONS`). The tuning tabs and debug work on the title.
 - **M is polled only in play** (a Branch on `GameStarted`, then the key): the title's menu
   has nothing under it to go back to.
+- **The pause is single player's.** BeginPlay's pause is `net.pause.author_pause`: a Branch
+  on IsStandalone in front of the one `SetGamePaused(true)`, so as a client of a server the
+  title is an overlay over a running world. Nothing else differs there: the HUD ticks
+  either way, `menu_still.py` holds the walk and `author_hold_fire` the fire press while
+  the menu is open (neither ever depended on the pause), and the two unpauses
+  (`author_unpause`: the first row's, the restart's) are plain calls, a no-op where nothing
+  paused. `menu_main_checks` checks the Branch; `probe_net_menu_overlay.py` (`uepy.py --net`)
+  is the client's half, with `--windowed` for the fire press, which DrawHUD holds.
 - **Probes:** `probe_main_menu.py` pauses the game itself and shows both halves: with the
   HUD not ticking a taken row is not served, ticking it is; save and exit does nothing
   there; the first row starts the game, and in play only shuts the menu.

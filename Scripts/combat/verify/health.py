@@ -18,6 +18,7 @@ from combat.respawn import (
 from combat.verify.fixtures import (
     _montages, drain_writes, exec_reach, gm, h, health_bp, hg, wg,
 )
+from net.pause_checks import check_standalone_pause
 from combat.verify.common import (
     BEL, PIN, by_pins, check, graph, in_pins, num_pin, out_pins, pin_value,
     titled,
@@ -330,6 +331,7 @@ def check_corpse():
         check("...paused, not unpaused",
               pin_value(pauses[0], "bPaused") in ("true", "True"),
               pin_value(pauses[0], "bPaused"))
+    check_standalone_pause(check, hg, "death")
     # The pause stops physics too, so this is also how long the ragdoll gets to
     # settle; pausing early freezes the player mid-topple.
     check("the pause waits for the body to land",

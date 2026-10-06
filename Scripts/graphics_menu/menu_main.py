@@ -34,7 +34,8 @@ from graphics_menu.umg_consts import (
     GAME_STARTED_VAR, MENU_KEY, QUIT_ACTION, SETTINGS_ACTION, START_ACTION)
 from uebp.nodes.actor import FN_ACTOR_TICK_PAUSED, FN_COMP_TICK_PAUSED, FN_WAS_PRESSED
 from uebp.nodes.math import FN_AND, FN_EQ_II, FN_NOT, FN_OR
-from uebp.nodes.system import FN_QUIT, FN_SET_PAUSED
+from uebp.nodes.system import FN_QUIT
+from net.pause import author_unpause
 from graphics_menu import hud_vars as MV
 
 
@@ -75,8 +76,7 @@ def _author_start(ed, in_execs, made):
     still = _call(ed, FN_ACTOR_TICK_PAUSED, made, bTickableWhenPaused="false")
     # Unpause LAST. GameStarted is already up, so the very next frame draws
     # the HUD rather than the title, and the world never runs behind a menu.
-    resume = _call(ed, FN_SET_PAUSED, made, bPaused="false")
-    return [_then(resume, [_then(still, [flow])]), resumed, rest]
+    return [author_unpause(ed, [_then(still, [flow])], made), resumed, rest]
 
 
 def _author_settings(ed, in_execs, made):

@@ -12,6 +12,7 @@ from graphics_menu.pause_checks import (
     _feeds, _gates, _is_row_test, _pins, _sets, _sources, _value)
 from graphics_menu.profile_consts import PROFILE_SLOT
 from graphics_menu.settings_rows import PAGE_SETTINGS
+from net.pause_checks import check_standalone_pause
 
 TICK_PIN, PAUSE_PIN = "bTickableWhenPaused", "bPaused"
 
@@ -45,6 +46,7 @@ def _check_title(check, nodes):
     check("BeginPlay makes the HUD and its tuner tick while paused, before the "
           "title's pause: the menu's rows are served on Tick",
           selves == sorted(["[]", str([f"Get {TUNER_COMPONENT}"])]), str(selves))
+    check_standalone_pause(check, nodes, "the title")
     return [n for n in ticks if _flag(n, TICK_PIN) == "false"]
 
 

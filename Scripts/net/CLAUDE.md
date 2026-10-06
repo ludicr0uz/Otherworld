@@ -4,7 +4,9 @@ Read this before any multiplayer task. The strategy is `serversupportsysdesign.m
 authority, 4.2 where state lives, 4.8 the two modes); the authoring helpers are
 `Scripts/uebp/CLAUDE.md`; the harness is the root `CLAUDE.md`'s `--net`. This file is the
 rules a graph follows, how to prove one, and what the spike (task M4, 2026-10-06) found
-broken. It holds no code yet: M9's shared helpers ("nearest living player") land here.
+broken. Its code is what the builders share to keep one graph right in both modes
+(`__init__.py` maps it): `pause.py` so far; M9's shared helpers ("nearest living player")
+land here.
 
 ## The authority pattern
 
@@ -56,6 +58,24 @@ difference is added there, with its reason, in the same commit, and copied here)
 | death | as today: the profile is deleted, back to the title | gear onto a corpse, respawn |
 | dev settings tabs and cheats | available | read-only unless the server allows them |
 | wanderer population | the level's fixed count | a budget that follows the players |
+
+**Pause** (M5, done). Every `SetGamePaused` in the game is authored by `net/pause.py`, and
+no builder names `FN_SET_PAUSED` itself:
+
+- `author_pause` (the title's at BeginPlay, death's) is `SetGamePaused(true)` off the true
+  arm of a Branch on IsStandalone; elsewhere the flow goes on unpaused.
+  `net/pause_checks.check_standalone_pause` is the verifiers' check of it.
+- `author_unpause` (the menu's first row, the death menu's restart) has no Branch: where
+  nothing paused it does nothing, and in standalone nothing may stand between it and its row.
+- A menu never relied on the pause to hold the character: `graphics_menu/menu_still.py`
+  takes the walk on Tick and `cursor.author_hold_fire` the fire press on DrawHUD, in either
+  mode. The M menu, the I panel and the loot window never paused, so they needed nothing.
+- Proof: `probe_net_menu_overlay.py` (client 1 opens M and then the title; the server's
+  clock runs on and its copy of the character stands still), and for single player
+  `probe_death_pause.py` and `probe_main_menu.py`.
+- Still to come, and not the pause's: a dead client's restart key reopens the level locally
+  (death by mode, the table's third row), and a client still reaches the title only with
+  the harness's `-nomenu` taken off (M6).
 
 Every task is tested in both modes: the verifier sweep and the `--game` probes are the
 single-player check and stay green; a `--net` probe is the multiplayer one.
@@ -136,7 +156,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | animation of the other player | Only what CharacterMovement replicates reaches a simulated proxy (velocity, falling): stance, aim, the held item's pose and montages do not | read | M13, M21 |
 | sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only | read | M21 |
 | player starts | The level has one PlayerStart: the two spawned 70 cm apart, the engine nudging the second | measured | M16 |
-| pause and the title menu | The harness starts every process with `-nomenu`; without it a client opens on the title menu, which pauses, and a client cannot pause the server. `FN_SET_PAUSED` is called from the menu build, `menu_main`, `menu_screens` and `death` | read | M5, M6 |
+| pause and the title menu | The harness starts every process with `-nomenu`; without it a client opens on the title menu. **The pause is fixed (M5):** it is standalone's alone (`net/pause.py`, above), and a client's menu is an overlay. The title's flow on a client is M6's | read; the fix measured (`probe_net_menu_overlay.py`) | M5 done, M6 |
 | the profile and the tuning slots | A client loads the local `OtherworldProfile` and the tuning tabs' save slots as in single player (the harness sets the slots aside for a run: `probes/kept_slots.py`) | read | M32, M35 |
 
 **Corrections to the later tasks' wording** (the task queue is the source; where the spike

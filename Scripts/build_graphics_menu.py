@@ -71,6 +71,7 @@ from graphics_menu.gfx_tuner import build_graphics_tuner            # noqa: E402
 from graphics_menu.tune_keep import (                               # noqa: E402
     author_load_kept, build_keep_savegames)
 # The FPS readout, on screen whatever debug mode says; see graphics_menu/fps.py.
+from net.pause import author_pause                                 # noqa: E402
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
 # The generated art the canvas layers (the wanderers' bars) still draw with.
 from graphics_menu.canvas import _draw_texture                      # noqa: E402
@@ -155,7 +156,7 @@ from uebp.nodes.palette import (  # noqa: E402
     NODE_CAST_SETTINGS, NODE_DRAW_HUD, NODE_TICK)
 from uebp.nodes.system import (  # noqa: E402
     FN_ALL_ACTORS, FN_COMMAND_LINE, FN_CONTAINS, FN_CREATE_SAVE, FN_DELAY, FN_GET_GAME_MODE,
-    FN_INT_TO_STR, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_SET_PAUSED, FN_TIME_SECONDS)
+    FN_INT_TO_STR, FN_LOAD_SAVE, FN_SAVE_EXISTS, FN_TIME_SECONDS)
 from combat import health_vars as HV  # noqa: E402
 from graphics_menu import hud_vars as MV                          # noqa: E402
 from uebp.vars import declare, defaults                           # noqa: E402
@@ -539,9 +540,9 @@ def _author_begin_play(ed, begin_play):
     still_on_menu = ed.add_branch_node()
     _connect(out(started, GAME_STARTED_VAR), _pin(still_on_menu, "Condition"))
     _connect(then(settle), _pin(still_on_menu, "execute"))
-    hold = _node(ed, FN_SET_PAUSED)
-    _set(hold, "bPaused", True)
-    _connect(else_(still_on_menu), _pin(hold, "execute"))
+    # In standalone only: as a client the title is an overlay (net/pause.py).
+    held = []
+    author_pause(ed, [else_(still_on_menu)], held)
 
     # Straight into the game, for a run with nobody to press Enter.
     skip = ed.add_set_member_variable_node(GAME_STARTED_VAR)
@@ -559,7 +560,7 @@ def _author_begin_play(ed, begin_play):
         f"reference-posed mesh. {SKIP_MENU_SWITCH} on the command line skips "
         f"the menu, which is how the headless runs still test a game.",
         [cmdline, skipping, wants_menu, shown, settle, started, still_on_menu,
-         hold, skip])
+         skip] + held)
 
 
 # ─── Event Tick: input ───────────────────────────────────────────────────────

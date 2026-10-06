@@ -18,7 +18,9 @@ from combat.game_state import DEBUG_MODE_VAR, KILL_COUNT_VAR
 from combat.paths import (
     GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH,
 )
+from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
+from net.session_consts import SERVER_ADDRESS_VAR
 from graphics_menu.profile_consts import (
     PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX)
 from graphics_menu.settings_rows import DIFFICULTY_LABELS, DIFFICULTY_ROW, FIRST_BIND_ROW
@@ -204,12 +206,30 @@ def probe(p):
     carets = _carets(rows, len(C.PAUSE_ROW_LABELS))
     p.check("...with the caret on PauseRow's row",
             carets == [float(i == 1) for i in range(len(C.PAUSE_ROW_LABELS))], str(carets))
-    # The first row asks the disk whether there is a profile to continue. One
+    first, second = (_text(_row(rows, i).get_editor_property(C.ROW_LABEL)) for i in (0, 1))
+    p.check("...its first two rows the modes: single player, multiplayer",
+            [first, second] == [C.SINGLE_ROW_LABEL, C.MULTI_ROW_LABEL], f"'{first}', '{second}'")
+
+    # --- the Single Player page, in the rows' place ----------------------------
+    p.set(hud, "MenuPage", MC.PAGE_SINGLE)
+    p.set(hud, "MenuRow", MC.SINGLE_START_ROW)
+    _draw(hud)
+    single = pause.get_editor_property(MC.SINGLE.panel)
+    multi = pause.get_editor_property(MC.MULTI.panel)
+    p.check("the Single Player page stands in the menu's place, the caret on its row",
+            single.get_visibility() == SHOWN and panel.get_visibility() == HIDDEN
+            and multi.get_visibility() == HIDDEN and settings.get_visibility() == HIDDEN
+            and _carets(pause.get_editor_property(MC.SINGLE.rows_box), 1) == [1.0]
+            and pause.get_editor_property(MC.SINGLE.back).get_editor_property(
+                C.ROW_CARET).get_render_opacity() == 0.0)
+    page_rows = pause.get_editor_property(MC.SINGLE.rows_box)
+
+    # Its row asks the disk whether there is a profile to continue. One
     # that is the player's own is set aside for the look without it and put
     # back; with none, a blank one is saved for the look with it and deleted.
     def first_row():
         _draw(hud)
-        return _text(_row(rows, C.PAUSE_START_ROW).get_editor_property(C.ROW_LABEL))
+        return _text(_row(page_rows, MC.SINGLE_START_ROW).get_editor_property(C.ROW_LABEL))
 
     GS = unreal.GameplayStatics
     mine = os.path.exists(_profile_file())
@@ -232,15 +252,44 @@ def probe(p):
     needs = [_text(_row(rows, C.PAUSE_ROW_ACTIONS.index(a)).get_editor_property(C.ROW_VALUE))
              for a in C.IN_GAME_ACTIONS]
     last = str(_row(rows, len(C.PAUSE_ROW_LABELS) - 1).get_editor_property(C.ROW_TEXT_VAR))
-    p.check("...its first row reads new game, its last exit game, and the rows that "
-            "need a game say so",
-            first == C.START_ROW_LABEL and last == C.QUIT_ROW_LABEL
-            and needs == [C.IN_GAME_ONLY] * len(needs), f"'{first}', '{last}', {needs}")
-    p.check("...and with a saved profile on disk the first row reads continue game",
+    p.check("...its row reads new game",
+            first == C.START_ROW_LABEL, f"'{first}'")
+    p.check("...and with a saved profile on disk continue game",
             saved == C.CONTINUE_ROW_LABEL, f"'{saved}'")
-    second = str(_row(rows, 1).get_editor_property(C.ROW_TEXT_VAR))
-    p.check("...and its second row, the settings page's, reads controls",
-            second == "Controls" == C.SETTINGS_ROW_LABEL, f"'{second}'")
+
+    # --- the Multiplayer page ------------------------------------------------------
+    p.set(hud, "MenuPage", MC.PAGE_MULTI)
+    p.set(hud, "MenuRow", MC.MULTI.back_row)
+    _draw(hud)
+    typed = str(p.get(p.get(hud, MV.Settings), SERVER_ADDRESS_VAR))
+    shown = _text(_row(pause.get_editor_property(MC.MULTI.rows_box),
+                       MC.MULTI_ADDRESS_ROW).get_editor_property(C.ROW_VALUE))
+    p.check("the Multiplayer page stands in the menu's place, its address row "
+            "showing the saved address, its BACK row lit with the caret on it",
+            multi.get_visibility() == SHOWN and single.get_visibility() == HIDDEN
+            and panel.get_visibility() == HIDDEN and shown == typed != ""
+            and pause.get_editor_property(MC.MULTI.back).get_editor_property(
+                C.ROW_CARET).get_render_opacity() == 1.0
+            and _carets(pause.get_editor_property(MC.MULTI.rows_box), 2) == [0.0, 0.0],
+            f"'{shown}' of '{typed}'")
+    p.set(hud, "MenuRow", MC.MULTI_ADDRESS_ROW)
+    _draw(hud)
+    shown = _text(_row(pause.get_editor_property(MC.MULTI.rows_box),
+                       MC.MULTI_ADDRESS_ROW).get_editor_property(C.ROW_VALUE))
+    status = _text(pause.get_editor_property(MC.MULTI_STATUS))
+    p.check("...with the caret on the address row a typing mark follows it, and "
+            "the status line is empty: no join, no reason",
+            shown == typed + MC.ADDRESS_CARET and status == "", f"'{shown}', '{status}'")
+    p.set(hud, "MenuPage", 0)
+    _draw(hud)
+    p.check("back on the menu's rows both pages are down",
+            panel.get_visibility() == SHOWN and single.get_visibility() == HIDDEN
+            and multi.get_visibility() == HIDDEN)
+    p.check("...its last row exit game, its third the settings page's (controls), "
+            "and the rows that need a game say so",
+            last == C.QUIT_ROW_LABEL and needs == [C.IN_GAME_ONLY] * len(needs)
+            and str(_row(rows, 2).get_editor_property(C.ROW_TEXT_VAR))
+            == "Controls" == C.SETTINGS_ROW_LABEL, f"'{last}', {needs}")
 
     p.set(hud, "MenuPage", 1)
     p.set(hud, "MenuRow", FIRST_BIND_ROW)

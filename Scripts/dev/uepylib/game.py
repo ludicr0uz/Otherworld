@@ -80,10 +80,13 @@ def probe_report(payload):
     return lines, ok
 
 
-def game_env(base, level, probes, results_path, probe_timeout):
+def game_env(base, level, probes, results_path, probe_timeout, title=False):
     """The environment for the -game process."""
     env = dict(base)
     env["UEPY_INBOX_DIR"] = game_inbox()
+    env.pop("UEPY_TITLE", None)
+    if title:
+        env["UEPY_TITLE"] = "1"     # Scripts/probes/boot.py: the title pauses the level
     if probes:
         env["UEPY_PROBES"] = os.pathsep.join(probes)
         env["UEPY_PROBE_MAP"] = level
@@ -112,8 +115,24 @@ def render_args(windowed):
     return list(WINDOW_ARGS) if windowed else ["-nullrhi"]
 
 
+def title_args(level, title=False):
+    """How the process meets the title menu, and which level its title is.
+
+    -nomenu: the HUD opens on a paused title menu (build_graphics_menu.py,
+    SKIP_MENU_SWITCH). A run has nobody to press Enter, so without it the log
+    would be a title screen sitting still. ``title`` (``--title``) leaves it
+    out, for a probe that works the title itself.
+
+    A join that fails, or a server left, returns the process to the engine's
+    GameDefaultMap, which is the 1 km level: the run's own level is named
+    instead, so "back to the title" is back to the level under test.
+    """
+    args = [f"-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap={level}"]
+    return args if title else ["-nomenu"] + args
+
+
 def run_game(engine, level, seconds, extra_patterns=(), probes=(), probe_timeout=None,
-             windowed=False):
+             windowed=False, title=False):
     """Boot the level in -game and summarise the log. Returns True when clean.
 
     The process is killed at the end, which the engine records as a crash via
@@ -127,14 +146,11 @@ def run_game(engine, level, seconds, extra_patterns=(), probes=(), probe_timeout
     log(f"-game {what}, up to {seconds}s -> {logfile}")
     started = time.time()
     proc = subprocess.Popen(
-        # -nomenu: the HUD opens on a paused main menu (build_graphics_menu.py,
-        # SKIP_MENU_SWITCH). A headless run has nobody to press Enter, so
-        # without this the log would be a title screen sitting still.
         [editor_cmd(engine), uproject(), ENTRY_URL if probes else level, "-game",
-         *render_args(windowed), "-unattended", "-nomenu", "-forcelogflush",
+         *render_args(windowed), "-unattended", *title_args(level, title), "-forcelogflush",
          f"-abslog={logfile}"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        env=game_env(os.environ, level, probes, results_path, probe_timeout))
+        env=game_env(os.environ, level, probes, results_path, probe_timeout, title))
     # Kill on a timer in-process rather than shelling out to `timeout`, which
     # is not in the macOS base system.
     deadline = started + seconds

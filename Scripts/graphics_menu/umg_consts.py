@@ -224,24 +224,30 @@ PAUSE_ACCEPT_KEY = "Enter"       # not Space: the menu does not pause, and Space
 PAUSE_ROW_VAR = "PauseRow"
 PAUSE_TITLE = GAME_TITLE
 START_ACTION, SETTINGS_ACTION = "start", "settings"
+# The second row: on the title, the Multiplayer page (mode_consts.py).
+MULTI_ACTION = "multiplayer"
 DEBUG_ACTION, QUIT_ACTION = "debug", "quit"
-# The first row starts the game from the title; in play it shuts the menu, as
-# M does, and says so (the HUD writes its label every frame).
-START_ROW_LABEL, RESUME_ROW_LABEL = "New Game", "Resume"
-# ...and on the title, with a saved profile to load, it says that instead.
+# The title offers the two modes, its first two rows, each opening a page of
+# its own in the rows' place (mode_consts.py). In play the first row shuts the
+# menu, as M does, and says so (the HUD writes its label every frame).
+SINGLE_ROW_LABEL, RESUME_ROW_LABEL = "Single Player", "Resume"
+MULTI_ROW_LABEL = "Multiplayer"
+# The Single Player page's one row starts the game...
+START_ROW_LABEL = "New Game"
+# ...and with a saved profile to load, it says that instead.
 CONTINUE_ROW_LABEL = "Continue Game"
 # The settings page's row: the page is the key binds and the mouse.
 SETTINGS_ROW_LABEL = "Controls"
 DEBUG_ROW_LABEL = "Debug"
 # The last row leaves the game for the desktop, saving nothing.
 QUIT_ROW_LABEL = "Exit Game"
-PAUSE_ROW_LABELS = (START_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_ROW_LABEL,
+PAUSE_ROW_LABELS = (SINGLE_ROW_LABEL, MULTI_ROW_LABEL, SETTINGS_ROW_LABEL, DEBUG_ROW_LABEL,
                     EXIT_ROW_LABEL, DEV_GUNS_ROW_LABEL, TUNE_ROW_LABEL,
                     MON_TUNE_ROW_LABEL, WORLD_TUNE_ROW_LABEL, PLAYER_TUNE_ROW_LABEL,
                     SOUND_TUNE_ROW_LABEL, GFX_TUNE_ROW_LABEL, QUIT_ROW_LABEL)
 # What each row does, in row order: taking row i raises PauseClick = i, and
 # Tick's fragment for that action serves it (menu_nav.pause_row_taken).
-PAUSE_ROW_ACTIONS = (START_ACTION, SETTINGS_ACTION, DEBUG_ACTION, EXIT_ACTION,
+PAUSE_ROW_ACTIONS = (START_ACTION, MULTI_ACTION, SETTINGS_ACTION, DEBUG_ACTION, EXIT_ACTION,
                      DEV_GUNS_ACTION, TUNE_ACTION, MON_TUNE_ACTION,
                      WORLD_TUNE_ACTION, PLAYER_TUNE_ACTION, SOUND_TUNE_ACTION,
                      GFX_TUNE_ACTION, QUIT_ACTION)
@@ -250,6 +256,13 @@ PAUSE_DEBUG_ROW = PAUSE_ROW_ACTIONS.index(DEBUG_ACTION)
 # The rows that need a game in play: on the title they do nothing and say so.
 IN_GAME_ACTIONS = (EXIT_ACTION, DEV_GUNS_ACTION)
 IN_GAME_ONLY = "in game only"
+# ...and the one that needs the title: a game in play is already in a mode.
+TITLE_ACTIONS = (MULTI_ACTION,)
+TITLE_ONLY = "from the title"
+# Which mode the game in play is, under the menu's title; empty on the title.
+PAUSE_MODE = "PauseMode"
+MODE_SINGLE_TEXT, MODE_MULTI_TEXT = "SINGLE PLAYER", "MULTIPLAYER"
+PAUSE_MODE_FONT = 13.0
 PAUSE_HINT = "UP / DOWN  ·  ENTER or click selects"
 PAUSE_POS, PAUSE_W = (60.0, 130.0), 600.0
 PAUSE_TITLE_FONT, PAUSE_HINT_FONT = 22.0, 15.0

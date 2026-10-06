@@ -47,6 +47,8 @@ from graphics_menu.cursor_checks import check_cursor
 from graphics_menu.pause_checks import check_pause_menu
 from graphics_menu.menu_main_checks import check_main_menu
 from graphics_menu.escape_checks import check_escape
+from graphics_menu import mode_consts as MC
+from graphics_menu.mode_checks import check_modes
 from graphics_menu import hud_stats as HS
 from graphics_menu import umg_consts as UC
 from graphics_menu.hud_bar_checks import check_bar_flash, check_bar_layout
@@ -165,17 +167,20 @@ def main():
                          LC.LOOT_KEY, LC.LOOT_UP, LC.LOOT_DOWN, LC.LOOT_TAKE_KEY,
                          WEAR.WEAR_KEY, WEAR.WEAR_UP, WEAR.WEAR_DOWN, WEAR.WEAR_TAKE_KEY,
                          TT.TUNE_UP, TT.TUNE_DOWN, TT.TUNE_LESS,
-                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY)
+                         TT.TUNE_MORE, TT.TUNE_SAVE_KEY, MC.ADDRESS_ERASE_KEY)
                         + N.START_KEYS + CC.CURSOR_KEYS)
-    check("polls exactly the menu, restart, start, nav, back, loot, I panel and tuning-tab keys "
+    check("polls exactly the menu, restart, start, nav, back, loot, I panel and tuning-tab keys, "
+          "the address row's Backspace "
           "and the cursor's click (never the wheel): no row of the M panel has a hotkey",
           keys == expected_keys,
           f"{sorted(keys)} vs {sorted(expected_keys)}")
-    # Exactly one Key pin in this graph is driven rather than literal: the
+    # Exactly two Key pins in this graph are driven rather than literal: the
     # capture poll, which asks the PlayerController about each entry of KeyPool
-    # in turn. That is the only place a key is a value rather than a constant.
-    check("one key poll is driven -- the rebind capture, over KeyPool",
-          len(driven_keys) == 1, str(len(driven_keys)))
+    # in turn, and the Multiplayer page's address row, which asks about each
+    # of AddressKeys (mode_checks.py). Nowhere else is a key a value.
+    check("two key polls are driven -- the rebind capture, over KeyPool, and the "
+          "address row's typing, over AddressKeys",
+          len(driven_keys) == 2, str(len(driven_keys)))
     # The navigation keys must not be bindable, or a keypress can lock the
     # settings screen shut with no way back but deleting the save.
     nav = {N.NAV_UP, N.NAV_DOWN, N.NAV_LEFT, N.NAV_RIGHT} | set(N.START_KEYS)
@@ -673,10 +678,11 @@ def main():
     writes = [n for n in by_pins("SaveGameObject", "SlotName")
               if BEL.find_input_pin(n, "SlotName").get_pin_value() not in other_slots]
     # BeginPlay's repair of a save from an older build, a rebind, one nudge per
-    # slider, the difficulty's nudge, and the debug toggle. Written at the moment of the change and not
+    # slider, the difficulty's nudge, the debug toggle, and the server address
+    # as a join is asked for. Written at the moment of the change and not
     # on leaving the page, because a game quit from the settings screen still
     # has to remember what was set -- which is the whole of "across future game runs".
-    want_writes = 4 + len(S.SLIDERS)
+    want_writes = 5 + len(S.SLIDERS)
     check("every change is written to disk on the spot",
           len(writes) == want_writes, f"{len(writes)}, want {want_writes}")
     check("...and there is a load and a create, so a first run is not an error",
@@ -828,8 +834,12 @@ def main():
           str(sum(1 for t in titles if t == "Set Capturing")))
 
     # --- two pages, and getting between them
-    check("the menu has its own rows and a settings page, one Set each way",
-          sum(1 for t in titles if t == "Set MenuPage") == 2
+    # ...and the title's two mode pages (mode_checks.py): each opened by its
+    # row and left by its BACK, new game back onto the rows, and BeginPlay
+    # onto the Multiplayer page when a session ended.
+    check("the menu has its own rows, a settings page and the two mode pages: "
+          "eight Sets between them",
+          sum(1 for t in titles if t == "Set MenuPage") == 8
           and any(t == "Get MenuPage" for t in titles),
           str(sorted({t for t in titles if "MenuPage" in t})))
     check("...and the caret is reset on every move between them",
@@ -854,6 +864,7 @@ def main():
     check_pause_menu(check, bp, nodes)
     check_main_menu(check, nodes)
     check_escape(check, nodes)
+    check_modes(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen
     gm = eas.load_asset(G.GAME_MODE_PATH)

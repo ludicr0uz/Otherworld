@@ -5,8 +5,8 @@ authority, 4.2 where state lives, 4.8 the two modes); the authoring helpers are
 `Scripts/uebp/CLAUDE.md`; the harness is the root `CLAUDE.md`'s `--net`. This file is the
 rules a graph follows, how to prove one, and what the spike (task M4, 2026-10-06) found
 broken. Its code is what the builders share to keep one graph right in both modes
-(`__init__.py` maps it): `pause.py` so far; M9's shared helpers ("nearest living player")
-land here.
+(`__init__.py` maps it): `pause.py`, and the session (`session_consts.py`,
+`game_instance.py`); M9's shared helpers ("nearest living player") land here.
 
 ## The authority pattern
 
@@ -58,6 +58,7 @@ difference is added there, with its reason, in the same commit, and copied here)
 | death | as today: the profile is deleted, back to the title | gear onto a corpse, respawn |
 | dev settings tabs and cheats | available | read-only unless the server allows them |
 | wanderer population | the level's fixed count | a budget that follows the players |
+| the title menu | the game opens on it, paused: Single Player and Multiplayer are chosen there | none: a connected client is in its game, however it joined (the title or an address on the command line). Leaving, a failed join or a dropped connection returns the process to standalone, and so to the title |
 
 **Pause** (M5, done). Every `SetGamePaused` in the game is authored by `net/pause.py`, and
 no builder names `FN_SET_PAUSED` itself:
@@ -74,8 +75,38 @@ no builder names `FN_SET_PAUSED` itself:
   clock runs on and its copy of the character stands still), and for single player
   `probe_death_pause.py` and `probe_main_menu.py`.
 - Still to come, and not the pause's: a dead client's restart key reopens the level locally
-  (death by mode, the table's third row), and a client still reaches the title only with
-  the harness's `-nomenu` taken off (M6).
+  (death by mode, the table's third row).
+
+**The title and the session** (M6, done). The modes are the title's first two rows, each a
+page (`graphics_menu/mode_*.py`, its `CLAUDE.md` "The two modes"):
+
+- **The session lives on the GameInstance** (`BP_OtherworldGameInstance`,
+  `net/game_instance.py`, named in `DefaultEngine.ini`): `JoinAddress`, `Connecting`,
+  `NetReason`. It is the one object that outlives a travel; later tasks' per-process session
+  state (the player's identity, M32) goes there too.
+- **Join** is `OpenLevel(address)`. The title stands, paused, until the server's level
+  replaces it. **Leave** is the engine's `disconnect`. Either way, and when a join fails or
+  the server drops the client, the engine loads `GameDefaultMap` again, standalone: a new
+  HUD, whose BeginPlay opens the title on the Multiplayer page if the session ended
+  without the player leaving it.
+- **A client has no title** (the table's last row): BeginPlay's Branch on IsStandalone sets
+  `GameStarted` on its false arm. `uepy.py --net` gives no client `-nomenu`, so every net
+  run proves it (`probe_net_join.py` checks it).
+- **The character's save is behind IsStandalone in play** (`mode_tick.author_mode_in_play`):
+  the profile's load, save and wipe on death, and the dev-all-guns cheat chained after
+  them, do not run on a client. What a client's death does is still the death task's.
+- **Traps:**
+  - **IsStandalone is already false while a join is pending**, on the title's own world
+    (the engine derives the net mode from the pending game). Nothing on the title may ask
+    it to mean "I am on a server"; the title's graph asks `GameStarted`.
+  - **A dead address fails after 20 s** (the engine's connection timeout) as
+    `ConnectionTimeout`, not `PendingConnectionFailure`.
+  - **A failure reloads `GameDefaultMap`**, the 1 km level, whatever level the process was
+    on. `uepy.py` names the run's level as the default map on every `--game` and `--net`
+    command line, so a probe returns to the level it knows.
+- **Proof:** `probe_net_title.py` (`--net --title --windowed --clients 1`: join through the
+  page, Leave Server, then a single-player game, one process), `probe_join_dead_address.py`
+  and `probe_title_single.py` (`--game --title`).
 
 Every task is tested in both modes: the verifier sweep and the `--game` probes are the
 single-player check and stay green; a `--net` probe is the multiplayer one.
@@ -118,6 +149,11 @@ in which one process acts and the others watch.
   and `jump()`: both go through CharacterMovement as a key would. To drive a Blueprint
   input, write the probe's forced variable with `WRITABLE`, as single-player probes do; it
   is written in that one process only.
+- **A probe that works the title** runs with `--title`: no `-nomenu`, and a net run's
+  clients start alone on the level (the probe joins through the menu). `probes/title.py`
+  has the steps. The world and the HUD are new after every travel: ask `p` again, never
+  keep one. A join to a dead address logs `Network Failure`, which fails a `--net` run's
+  report: that probe is a `--game --title` one.
 - **Memory:** the report prints each process's. Two `-nullrhi` clients and a server are
   5.7 GB; with `--windowed` 13.5 GB, which swaps here. Close the editor, run one at a time.
 
@@ -156,8 +192,8 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | animation of the other player | Only what CharacterMovement replicates reaches a simulated proxy (velocity, falling): stance, aim, the held item's pose and montages do not | read | M13, M21 |
 | sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only | read | M21 |
 | player starts | The level has one PlayerStart: the two spawned 70 cm apart, the engine nudging the second | measured | M16 |
-| pause and the title menu | The harness starts every process with `-nomenu`; without it a client opens on the title menu. **The pause is fixed (M5):** it is standalone's alone (`net/pause.py`, above), and a client's menu is an overlay. The title's flow on a client is M6's | read; the fix measured (`probe_net_menu_overlay.py`) | M5 done, M6 |
-| the profile and the tuning slots | A client loads the local `OtherworldProfile` and the tuning tabs' save slots as in single player (the harness sets the slots aside for a run: `probes/kept_slots.py`) | read | M32, M35 |
+| pause and the title menu | Without `-nomenu` a client opened on the title menu. **The pause is fixed (M5):** it is standalone's alone (`net/pause.py`, above), and a client's menu is an overlay. **The title is fixed (M6):** a connected client has none, and the harness no longer gives a client `-nomenu` | read; the fixes measured (`probe_net_menu_overlay.py`, `probe_net_join.py`, `probe_net_title.py`) | M5, M6 done |
+| the profile and the tuning slots | A client loaded the local `OtherworldProfile` as in single player: **fixed (M6)**, the profile's fragment runs in standalone only. It still loads the tuning tabs' save slots (the harness sets them aside for a run: `probes/kept_slots.py`) | read; the profile measured (`probe_net_title.py`) | M32, M35 |
 
 **Corrections to the later tasks' wording** (the task queue is the source; where the spike
 contradicts it, this is what holds):

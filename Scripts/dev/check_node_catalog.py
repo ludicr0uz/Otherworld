@@ -6,7 +6,7 @@ A function path that does not resolve yields a pinless node, and a palette
 name that does not exist yields nothing: either way the failure surfaces much
 later, in whichever builder first uses it. This makes each node in a scratch
 Blueprint under /Game/Tmp (one per kind of graph a builder authors: an actor,
-a HUD, a controller, a widget, a BT task, an ability, an anim graph), asserts
+a HUD, a game instance, a controller, a widget, a BT task, an ability, an anim graph), asserts
 it has pins exactly as uebp.graph._node does, and deletes the scratch assets.
 A path passes if it resolves in any of them. Exits non-zero on a miss.
 """
@@ -34,6 +34,7 @@ EXCLUDED = ("/Game/Fab", "/Game/Sourced", "/Game/FPS_Weapon_Bundle", "/Game/Char
 CONTEXTS = (
     ("Actor", "/Script/Engine.Actor", "EventGraph"),
     ("HUD", "/Script/Engine.HUD", "EventGraph"),
+    ("GameInstance", "/Script/Engine.GameInstance", "EventGraph"),
     ("AIController", "/Script/AIModule.AIController", "EventGraph"),
     ("Widget", "/Script/UMG.UserWidget", "EventGraph"),
     ("BTTask", "/Script/AIModule.BTTask_BlueprintBase", "EventGraph"),

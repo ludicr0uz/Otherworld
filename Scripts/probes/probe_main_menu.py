@@ -10,11 +10,14 @@ would.
   paused, the HUD not ticking   a taken row is not served: the flag matters
   paused, ticking               the debug row flips debug mode; a tab opens;
                                 save and exit does nothing (it needs a game)
-  the first row                 GameStarted, the menu shut, the world
-                                unpaused, and the HUD's paused tick given up;
-                                with the gun table touched (a kept save loaded
-                                at BeginPlay), which once ended Tick before
-                                the menu's rows
+  the first row                 the Single Player page in the rows' place;
+                                nothing starts yet
+  the second row                the Multiplayer page
+  the Single Player page's row  GameStarted, the menu shut and back on its
+                                rows, the world unpaused, and the HUD's paused
+                                tick given up; with the gun table touched (a
+                                kept save loaded at BeginPlay), which once
+                                ended Tick before the menu's rows
   in play                       the same row shuts the menu and nothing else
 
 Waits are on the wall clock or on a condition: game time stands still here.
@@ -26,14 +29,17 @@ import unreal
 
 from combat.game_state import DEBUG_MODE_VAR
 from graphics_menu import cursor_consts as CC
+from graphics_menu import mode_consts as MC
 from graphics_menu import umg_consts as C
 from graphics_menu.profile_consts import EXIT_ACTION, EXIT_PENDING_VAR
+from graphics_menu.settings_rows import PAGE_TITLE
 from graphics_menu.tune_consts import GUN_TAB
 from graphics_menu import hud_vars as MV
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
 WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, CC.PAUSE_CLICK_VAR,
-                                       GUN_TAB.open_var, GUN_TAB.touched_var)]
+                                       GUN_TAB.open_var, GUN_TAB.touched_var,
+                                       MV.MenuPage, CC.PAGE_CLICK_VAR)]
 
 
 def _row(action):
@@ -95,19 +101,39 @@ def probe(p):
     p.check("...and the world is still paused under the menu",
             unreal.GameplayStatics.is_game_paused(world))
 
-    # --- the first row starts the game ------------------------------------------
+    # --- the two modes: each row opens its page, in the rows' place -------------
+    for action, page in ((C.MULTI_ACTION, MC.MULTI), (C.START_ACTION, MC.SINGLE)):
+        p.set(hud, CC.PAUSE_CLICK_VAR, _row(action))
+        paged = _after(5.0)
+        yield lambda: p.get(hud, MV.MenuPage) == page.page or paged()
+        p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+        p.check(f"the {page.title.lower()} row on the title opens its page, and "
+                f"starts nothing: still the title, still paused",
+                p.get(hud, MV.MenuPage) == page.page and p.get(hud, MV.MenuRow) == 0
+                and p.get(hud, C.GAME_STARTED_VAR) is False
+                and unreal.GameplayStatics.is_game_paused(world),
+                f"page {p.get(hud, MV.MenuPage)}, row {p.get(hud, MV.MenuRow)}, "
+                f"started {p.get(hud, C.GAME_STARTED_VAR)}")
+        if page is MC.MULTI:
+            # BACK (DrawHUD's, which a -nullrhi run does not draw).
+            p.set(hud, MV.MenuPage, PAGE_TITLE)
+            yield _after(0.2)
+
+    # --- the Single Player page's row starts the game ----------------------------
     # The gun table touched, as a kept GUN SETTINGS save leaves it from BeginPlay.
     p.set(hud, GUN_TAB.touched_var, True)
     yield _after(0.3)
-    p.set(hud, CC.PAUSE_CLICK_VAR, _row(C.START_ACTION))
+    p.set(hud, CC.PAGE_CLICK_VAR, MC.SINGLE_START_ROW)
     started = _after(5.0)
     yield lambda: p.get(hud, C.GAME_STARTED_VAR) or started()
-    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
-    p.check("the first row on the title starts the game, the gun table touched "
-            "(a kept save): the menu shut and the world unpaused",
-            p.get(hud, "MenuOpen") is False
+    p.set(hud, CC.PAGE_CLICK_VAR, CC.NO_ROW)
+    p.check("the Single Player page's row starts the game, the gun table touched "
+            "(a kept save): the menu shut, back on its rows, and the world unpaused",
+            p.get(hud, C.GAME_STARTED_VAR) is True and p.get(hud, "MenuOpen") is False
+            and p.get(hud, MV.MenuPage) == PAGE_TITLE
             and not unreal.GameplayStatics.is_game_paused(world),
-            f"open {p.get(hud, 'MenuOpen')}, "
+            f"started {p.get(hud, C.GAME_STARTED_VAR)}, open {p.get(hud, 'MenuOpen')}, "
+            f"page {p.get(hud, MV.MenuPage)}, "
             f"paused {unreal.GameplayStatics.is_game_paused(world)}")
     p.check("...and the HUD gives its paused tick up, so the death screen's pause "
             "still stops it", hud.get_tickable_when_paused() is False)
@@ -120,4 +146,13 @@ def probe(p):
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
     p.check("in play the first row shuts the menu, and the game goes on",
             p.get(hud, "MenuOpen") is False and p.get(hud, C.GAME_STARTED_VAR) is True
+            and p.get(hud, MV.MenuPage) == PAGE_TITLE
             and not unreal.GameplayStatics.is_game_paused(world))
+    # ...and the second does nothing there: a game in play is already in a mode.
+    p.set(hud, "MenuOpen", True)
+    p.set(hud, CC.PAUSE_CLICK_VAR, _row(C.MULTI_ACTION))
+    yield 0.3
+    p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.check("in play the multiplayer row opens nothing: its page is the title's",
+            p.get(hud, MV.MenuPage) == PAGE_TITLE, f"page {p.get(hud, MV.MenuPage)}")
+    p.set(hud, "MenuOpen", False)

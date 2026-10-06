@@ -26,5 +26,8 @@ Scripts/net/CLAUDE.md has the conventions and the traps.
   boot        in-game entry (init_unreal.py calls it when UEPY_PROBES is set)
   kept_slots  the tuning tabs' save slots, set aside for a run and put back
   net         a network run: which process this is (Where), RUNS_ON, the shared board
+  title       working the real title menu (uepy.py --title): its rows and mode
+              pages taken, the session read, what the menu shows; shared by
+              probe_title_single, probe_join_dead_address and probe_net_title
   probe_*     the probes themselves, one behaviour each
 """

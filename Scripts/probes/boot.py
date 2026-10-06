@@ -26,6 +26,11 @@ waits in Entry for that, then opens the server's address. The probes start on
 the server once every client's player has joined, and on a client once it has
 its pawn. A dedicated server has no Slate, so there the tick is the core
 ticker's.
+
+``--title`` leaves the title menu up (UEPY_TITLE): the level counts as up
+once the title has paused it, and a network run's client opens the level
+alone, its probe joining the server through the menu. The probes outlive the
+travel: they are driven from the engine's tick, not from the level.
 """
 
 import json
@@ -45,6 +50,9 @@ from probes.net import LISTENING, SERVER, STANDALONE, Where, pick_probe
 from probes.runner import DEFAULT_TIMEOUT, Ledger, ProbeRun, Queue
 
 READY_GAME_SECONDS = 0.5    # let BeginPlay and the first ticks settle
+# uepy.py --title: the game keeps its title menu (no -nomenu), and a network
+# run's clients start alone on the level instead of joining.
+TITLE = bool(os.environ.get("UEPY_TITLE"))
 READY_TIMEOUT = 120.0       # wall seconds for the level to load and spawn
 NET_READY_TIMEOUT = 240.0   # ... and, in a network run, for everyone to boot and join
 
@@ -165,7 +173,12 @@ def _finish(setup_errors):
 
 def _ready(world, where):
     """Is the level up, with whoever this process waits for in it?"""
-    if not world or unreal.GameplayStatics.get_time_seconds(world) < READY_GAME_SECONDS:
+    if not world:
+        return False
+    # A run on the real title (uepy.py --title) is paused a quarter second
+    # in, and game time stops there: the pause is the title being up.
+    titled = TITLE and unreal.GameplayStatics.is_game_paused(world)
+    if unreal.GameplayStatics.get_time_seconds(world) < READY_GAME_SECONDS and not titled:
         return False
     if where.role == SERVER:
         if not where.posted(SERVER, LISTENING):
@@ -191,7 +204,8 @@ def _tick(_delta):
             return
         if _state["phase"] == "await server":
             if where.posted(SERVER, LISTENING):
-                _open(where.address)
+                # On the title the client starts alone, and its probe joins.
+                _open(map_path if TITLE else where.address)
             elif time.time() - _state["since"] > limit:
                 _finish([f"the server never listened within {limit:.0f} s"])
             return

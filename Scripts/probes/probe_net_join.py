@@ -3,12 +3,17 @@
     python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py
 
 On the server: one joined player per client, each possessing a pawn of its
-own. On each client: it is a client of that server, and its one local
-controller possesses a pawn. A pawn can arrive a moment after its controller,
+own. On each client: it is a client of that server, its one local
+controller possesses a pawn, and it has no title menu: it joined with the
+server's address, and nothing on its command line skips the menu (the
+harness gives a client no -nomenu), so that is the game's own rule
+(graphics_menu/mode_tick.py). A pawn can arrive a moment after its controller,
 so each side waits for it before it reports.
 """
 
 import unreal
+
+from graphics_menu.umg_consts import GAME_STARTED_VAR
 
 RUNS_ON = ("server", "client")
 
@@ -57,3 +62,11 @@ def probe_client(p):
             and controller.is_local_player_controller(), "local player controller")
     p.check(f"{p.where} sees one local player", len(p.players()) == 1,
             f"{len(p.players())} controller(s) on this client")
+    yield from _await(p, lambda: p.hud() and p.get(p.hud(), GAME_STARTED_VAR))
+    line = unreal.SystemLibrary.get_command_line()
+    p.check(f"{p.where} skipped the title: in play, unpaused, with no -nomenu "
+            f"on its command line",
+            bool(p.hud()) and p.get(p.hud(), GAME_STARTED_VAR) is True
+            and not unreal.GameplayStatics.is_game_paused(p.world())
+            and "-nomenu" not in line,
+            f"-nomenu given: {'-nomenu' in line}")

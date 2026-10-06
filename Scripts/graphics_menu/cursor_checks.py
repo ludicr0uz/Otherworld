@@ -12,6 +12,8 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.cursor import cursor_defaults
 from graphics_menu.inv_consts import DRAG_FROM_VAR, INV_AREAS, INV_OVER_VAR, SLOT_BOXES
 from graphics_menu.tune_scroll import hidden_rows, rows_per_window, thumb_half
+from graphics_menu.profile_consts import EXIT_ACTION
+from graphics_menu.mode_consts import PAGES
 from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_checks import _tree
 from graphics_menu.wear_consts import WEAR_OPEN_VAR, WEAR_SEL_VAR
@@ -20,12 +22,13 @@ BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
 # The row stacks the cursor is tested against: the menu (the title's too), its
 # settings page, the loot window, the I panel, the tuning tabs, and the
-# inventory's three grids of slots (inv_drag.py).
-ROW_LISTS = 4 + len(TABS) + len(SLOT_BOXES)
+# inventory's three grids of slots (inv_drag.py), and the title's two mode
+# pages (mode_draw.py).
+ROW_LISTS = 4 + len(TABS) + len(SLOT_BOXES) + len(PAGES)
 # ...and the single lines a click lands on: the death menu's hint, the loot
 # window's and the I panel's close buttons, each tab's hint and each tab's
-# BACK row.
-CLICK_LINES = 3 + 2 * len(TABS)
+# BACK row, and each mode page's BACK row.
+CLICK_LINES = 3 + 2 * len(TABS) + len(PAGES)
 # A scrolling tab's rows count only inside its list's window: one more test.
 # Its bar's drag reads the list's box twice more: the press on it, and how far
 # down it the cursor is (tune_scroll.py).
@@ -156,19 +159,23 @@ def _check_rows(check, nodes):
 
     carets = sorted(_title(n)[4:] for n in nodes if _title(n).startswith("Set ")
                     and f"Get {CC.CURSOR_ROW_VAR}" in _feeders(n, _title(n)[4:]))
-    want = sorted(["MenuRow", LC.LOOT_SEL_VAR, WEAR_SEL_VAR, UC.PAUSE_ROW_VAR,
-                   CC.PAUSE_CLICK_VAR] + [t.row_var for t in TABS])
+    clicks = [CC.PAUSE_CLICK_VAR] + [CC.PAGE_CLICK_VAR] * len(PAGES)
+    want = sorted(["MenuRow"] * (1 + len(PAGES))
+                  + [LC.LOOT_SEL_VAR, WEAR_SEL_VAR, UC.PAUSE_ROW_VAR]
+                  + clicks + [t.row_var for t in TABS])
     check("the row under the cursor takes the caret (the menu, its settings "
-          "page, loot, the I panel, the tabs), and on the menu a click takes that row",
+          "page and mode pages, loot, the I panel, the tabs), and on the menu "
+          "and a mode page a click takes that row",
           carets == want, str(carets))
     stirred = [n for n in nodes if _pins(n) == {"A", "B"}
                and f"Get {CC.CURSOR_MOVED_VAR}" in _feeders(n, "A")]
-    # One per list (PauseClick is a click, not a caret), one per BACK row and
-    # one per save row (the graphics tab's SAVE DEFAULT).
-    buttons = len(TABS) + sum(1 for t in TABS if t.save_widget)
+    # One per list (PauseClick and PageClick are clicks, not carets), one per
+    # BACK row (the tabs', the mode pages') and one per save row (the graphics
+    # tab's SAVE DEFAULT).
+    buttons = len(TABS) + len(PAGES) + sum(1 for t in TABS if t.save_widget)
     check("...only once the mouse moves or clicks, so a resting cursor does "
           "not hold the caret against Up/Down",
-          len(stirred) == len(want) - 1 + buttons, str(len(stirred)))
+          len(stirred) == len(want) - len(clicks) + buttons, str(len(stirred)))
 
 
 def _gates(n):
@@ -189,7 +196,9 @@ def _row_served(nodes, action, var, value):
             for c in BEL.find_input_pin(gate, "Condition").list_connected_pins():
                 eq = PIN.get_owning_node(c)
                 # A literal 0 reads back empty once loaded from disk (row 0's).
-                if (_pins(eq) == {"A", "B"} and int(_value(eq, "B") or 0) == row
+                # (A bool pin's reads "false": an AND or an OR is no row test.)
+                if (_pins(eq) == {"A", "B"} and (_value(eq, "B") or "0").isdigit()
+                        and int(_value(eq, "B") or 0) == row
                         and f"Get {CC.PAUSE_CLICK_VAR}" in _feeders(eq, "A")):
                     return True
     return False
@@ -323,12 +332,12 @@ def _check_clicks(check, nodes):
     check("the M panel's taken row is lowered every frame, and each row's "
           "action answers to its own row",
           len(lowered) == 1 and _value(lowered[0], CC.PAUSE_CLICK_VAR) == str(CC.NO_ROW)
-          and served == list(range(len(UC.PAUSE_ROW_ACTIONS))), f"{len(lowered)}, {served}")
-    check("the menu's first row is its close button in play (resume): taking it "
-          "lowers MenuOpen",
-          UC.PAUSE_ROW_ACTIONS[0] == UC.START_ACTION
-          and _row_served(nodes, UC.START_ACTION, "MenuOpen", "false"),
-          f"{UC.PAUSE_ROW_LABELS[0]!r}, action {UC.PAUSE_ROW_ACTIONS[0]}")
+          # (the exit row twice: save and exit, and a client's leave server)
+          and served == sorted(list(range(len(UC.PAUSE_ROW_ACTIONS)))
+                               + [UC.PAUSE_ROW_ACTIONS.index(EXIT_ACTION)]),
+          f"{len(lowered)}, {served}")
+    # The first row as the menu's close button in play (resume) is
+    # mode_checks.py's: on the title the same row opens the Single Player page.
     check(f"[{UC.MENU_KEY}] flips MenuOpen, and is polled only in play: the title's "
           "menu cannot be shut",
           _key_toggles(nodes, UC.MENU_KEY, "MenuOpen", UC.GAME_STARTED_VAR))

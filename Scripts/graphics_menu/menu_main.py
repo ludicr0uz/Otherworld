@@ -3,9 +3,12 @@ the settings page, leaving for the desktop, and M.
 
     BeginPlay, on the title   the HUD and its tuner tick while paused
     every Tick (the title's too):
-        new game / resume taken   MenuOpen = false; on the title also
-                                  GameStarted = true, the HUD stops ticking
-                                  while paused, and the world unpauses
+        single player / resume    in play: MenuOpen = false. On the title:
+        taken                     MenuPage = the Single Player page
+        new game / continue game  that page's row: MenuOpen = false, MenuPage
+        taken                     back on the rows, GameStarted = true, the
+                                  HUD stops ticking while paused, and the
+                                  world unpauses
         settings taken            MenuPage = the settings page, caret on top
         exit game taken           QuitGame
         M, in play                MenuOpen flips
@@ -29,6 +32,8 @@ from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.loot_find import put
 from graphics_menu.menu_nav import any_tab_open, escape_pressed, pause_row_taken
+from graphics_menu.mode_consts import PAGE_SINGLE, SINGLE, SINGLE_START_ROW
+from graphics_menu.mode_tick import page_row_taken
 from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
 from graphics_menu.umg_consts import (
     GAME_STARTED_VAR, MENU_KEY, QUIT_ACTION, SETTINGS_ACTION, START_ACTION)
@@ -68,15 +73,27 @@ def author_in_play(ed, in_execs):
 
 
 def _author_start(ed, in_execs, made):
-    """The first row: resume in play, new game on the title."""
+    """The first row: resume in play; on the title, the Single Player page,
+    in the rows' place."""
     take, rest = _branch(ed, pause_row_taken(ed, START_ACTION, made), in_execs, made)
+    resumed, title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [take], made)
+    flow = _setter(ed, MV.MenuPage, PAGE_SINGLE, [title], made)
+    return [_setter(ed, MV.MenuOpen, "false", [resumed], made),
+            _setter(ed, MV.MenuRow, 0, [flow], made), rest]
+
+
+def _author_new_game(ed, in_execs, made):
+    """The Single Player page's row, new game or continue game: the game
+    starts, in this process, alone."""
+    take, rest = _branch(ed, page_row_taken(ed, SINGLE, SINGLE_START_ROW, made), in_execs, made)
     flow = _setter(ed, MV.MenuOpen, "false", [take], made)
-    resumed, fresh = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [flow], made)
-    flow = _setter(ed, GAME_STARTED_VAR, "true", [fresh], made)
+    # Back on the rows, for the next time the menu comes up: M's, in play.
+    flow = _setter(ed, MV.MenuPage, PAGE_TITLE, [flow], made)
+    flow = _setter(ed, GAME_STARTED_VAR, "true", [flow], made)
     still = _call(ed, FN_ACTOR_TICK_PAUSED, made, bTickableWhenPaused="false")
     # Unpause LAST. GameStarted is already up, so the very next frame draws
     # the HUD rather than the title, and the world never runs behind a menu.
-    return [author_unpause(ed, [_then(still, [flow])], made), resumed, rest]
+    return [author_unpause(ed, [_then(still, [flow])], made), rest]
 
 
 def _author_settings(ed, in_execs, made):
@@ -123,12 +140,14 @@ def author_main_rows_tick(ed, pc_out, in_execs):
     """The fragment (see the module docstring). Returns the exec tails."""
     made = []
     flow = _author_start(ed, in_execs, made)
+    flow = _author_new_game(ed, flow, made)
     flow = _author_settings(ed, flow, made)
     flow = _author_quit(ed, pc_out, flow, made)
     flow = _author_toggle(ed, pc_out, flow, made)
     ed.add_comment_to_nodes(
-        f"The menu's own rows, and {MENU_KEY}. The first row starts the game "
-        f"from the title (unpausing last) and shuts the menu in play; settings "
+        f"The menu's own rows, and {MENU_KEY}. The first row opens the Single "
+        f"Player page on the title, whose row starts the game (unpausing "
+        f"last), and shuts the menu in play; settings "
         f"opens its page in the rows' place; exit game quits to the desktop. "
         f"{MENU_KEY} toggles the menu, in play only, and Escape on its own rows "
         f"shuts it. Polled on Tick rather than "

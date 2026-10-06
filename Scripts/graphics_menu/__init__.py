@@ -17,6 +17,8 @@ The screens (widget trees, authored through the UMGToolSet plugin)
                   by every bar
   wbp_screens     WBP_PauseMenu (the menu: the title's, and M's in play),
                   WBP_MainMenu (its settings page), WBP_DeathMenu
+  wbp_modes       WBP_PauseMenu's two mode pages, Single Player and
+                  Multiplayer (called from wbp_screens)
 
 The HUD graph that shows and writes them
   ui_graph        creating the screens at BeginPlay; SetText/SetVisibility/rows helpers
@@ -62,9 +64,23 @@ Input, settings and state
                   what a key poll gains from the wheel; Tick's test for a
                   taken M-panel row (the rows have no hotkeys); the Escape
                   poll (BACK in every menu) and "a tuning tab is open"
-  menu_main       Tick: the menu's own rows (new game or resume, controls,
-                  exit game), M, and Escape shutting the menu in play; BeginPlay's "tick while paused" for the
-                  title; Tick's split on a game in play
+  menu_main       Tick: the menu's own rows (single player or resume, the
+                  Single Player page's new game, controls, exit game), M, and
+                  Escape shutting the menu in play; BeginPlay's "tick while
+                  paused" for the title; Tick's split on a game in play
+  mode_consts     the title's two mode pages (Single Player, Multiplayer):
+                  their MenuPage numbers, rows, widgets, words, and the keys
+                  the address row types
+  mode_session    the HUD's reach to the session (the GameInstance,
+                  net/session_consts.py) and to the saved server address
+  mode_draw       DrawHUD: the mode pages in the rows' place (caret, BACK,
+                  the address typed and shown, the status line), and what
+                  the menu's rows say about the mode
+  mode_tick       BeginPlay: only a standalone process has a title, and one
+                  whose session ended opens on the Multiplayer page. Tick:
+                  the Multiplayer row, Join Server, a join given up; in play
+                  as a client, Leave Server in save and exit's place
+  mode_checks     the verifier's checks for those five, and the session's
   menu_still      Tick: the controller ignores move input while the M panel
                   is open, so the arrows only work the menu
   cursor_consts   the mouse cursor in the menus: its buttons, variables, rules

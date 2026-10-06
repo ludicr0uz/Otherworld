@@ -51,8 +51,13 @@ def check_difficulty(check, bp, nodes):
              and _value(x, "A") == "1" and _value(x, "B") == str(n - 1)]
     check("Left and Right step the difficulty one name either way",
           len(steps) == 1, str(len(steps)))
+    # Not a caret's wrap (menu_nav._emit_row_nav): a page of as many stops
+    # (the Multiplayer page's two rows and BACK) wraps MenuRow round the same number.
     wraps = [x for x in nodes if _pins(x) == {"A", "B"} and _value(x, "B") == str(n)
-             and "%" in str(BEL.get_node_title(x))]
+             and "%" in str(BEL.get_node_title(x))
+             and not any(PIN.get_owning_node(q) == x for y in nodes
+                         if str(BEL.get_node_title(y)).replace("\n", " ") == "Set MenuRow"
+                         for q in BEL.find_input_pin(y, "MenuRow").list_connected_pins())]
     check(f"...wrapping round all {n}", len(wraps) == 1,
           str([str(BEL.get_node_title(x)) for x in wraps]))
     rows = [x for x in nodes if _pins(x) == {"A", "B"}

@@ -25,10 +25,13 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 - **Up / Down** move the menu's caret and **Enter** takes the row it is on; a click on a
   row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
 - **Escape is BACK**, in every menu that has somewhere to go back to (below: "Escape").
-- **The rows:** `New Game` (on the title with a saved profile it reads `Continue Game`; in
-  play it reads `Resume` and shuts the menu), `Controls` (the settings page, titled
+- **The rows:** `Single Player` (on the title it opens the Single Player page, whose one
+  row is `New Game`, or `Continue Game` with a saved profile; in play it reads `Resume` and
+  shuts the menu), `Multiplayer` (on the title it opens the Multiplayer page: the server's
+  address and `Join Server`; in play it does nothing and says `from the title`), `Controls` (the settings page, titled
   **CONTROLS**; the code still calls it the settings page), `Debug` (wanderer numbers, pellet tracers and impact damage,
-  the wanderers' sight cones; not the FPS readout, which is always on), `Save and Exit`, `Dev All Guns`, `Gun Settings`,
+  the wanderers' sight cones; not the FPS readout, which is always on), `Save and Exit`
+  (as a client of a server it reads `Leave Server`), `Dev All Guns`, `Gun Settings`,
   `Monster Settings`, `World Settings`, `Player Settings`, `Graphics Settings`, `Exit Game` (quits to the desktop,
   saving nothing). The quality presets are not
   rows: Low / Medium / High / Custom is the graphics tab's first row.
@@ -58,11 +61,12 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   HUD (and on its tuner component, so a preset picked on the title is applied there) on
   its way to the pause. The first row takes it back before it unpauses, so the death
   screen's pause still stops Tick, as it always did.
-- **The first row** (`START_ACTION`) lowers `MenuOpen`; on the title it then sets
-  `GameStarted`, stops the paused tick and unpauses, last. DrawHUD writes its label every
-  frame: `new game` or `resume`, and on the title `continue game` while the saved profile
-  exists (`_author_first_row`: `DoesSaveGameExist` on the profile's slot, asked every frame
-  of the title, because save and exit writes it and a death deletes it under a live HUD).
+- **The first row** (`START_ACTION`) lowers `MenuOpen` in play (`resume`); on the title it
+  opens the Single Player page (below: "The two modes"), whose row sets `GameStarted`,
+  stops the paused tick and unpauses, last (`menu_main._author_new_game`). DrawHUD writes
+  that row's label every frame: `new game`, or `continue game` while the saved profile
+  exists (`mode_draw._author_single`: `DoesSaveGameExist` on the profile's slot, asked
+  every frame, because save and exit writes it and a death deletes it under a live HUD).
   The row does the same either way: a started game loads the profile if there is one.
 - **`settings`** sets `MenuPage` to the settings page and `MenuRow` to 0. The page
   (`WBP_MainMenu.SettingsPanel`, at `PAUSE_POS` like the menu) shows while `MenuPage` says
@@ -87,13 +91,61 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   HUD not ticking a taken row is not served, ticking it is; save and exit does nothing
   there; the first row starts the game, and in play only shuts the menu.
   `probe_umg_screens.py` reads what the title shows.
-- **A probe's game never sees the real title:** `uepy.py --game` passes `-nomenu`, and
-  `probes/boot.py` waits 0.5 s of game time before the first probe, which the title's
-  pause (0.25 s in) never reaches. The real BeginPlay path was checked once by hand
-  (a windowed run without `-nomenu` and with that wait at 0: paused, the menu up, a row
-  served, new game unpausing, exit game ending the process).
+- **A probe's game sees the real title only when asked:** `uepy.py --game` passes
+  `-nomenu`; `--title` leaves it off, and `probes/boot.py` then takes the title's pause
+  (0.25 s in) for the level being up. `probe_title_single.py` is the real BeginPlay path:
+  paused, the menu up, Single Player and New Game served, the game unpausing and playing.
 - **Still needs a play session:** the keys themselves on the title, exit game from a real
   session, and how the title reads with the paused level behind it.
+
+## The two modes (`mode_consts.py`, `mode_draw.py`, `mode_tick.py`, `wbp_modes.py`)
+
+The title's first two rows are the modes, each a page in the rows' place. The strategy is
+`serversupportsysdesign.md` 4.8; the session's side is `Scripts/net/CLAUDE.md`.
+
+- **A page is a value of `MenuPage`**, like the settings page (`PAGE_SINGLE`, `PAGE_MULTI`):
+  a panel of `WBP_PauseMenu` at `PAUSE_POS`, `MenuRow` its caret, BACK its top row and its
+  last number. `mode_consts.Page` describes one; a third page is a row of `PAGES` and its
+  fragment.
+- **A page's row is taken through `PageClick`**, as the menu's own are through
+  `PauseClick`: DrawHUD raises it (Enter on the caret's row, or a click), Tick serves
+  `mode_tick.page_row_taken(page, row)`, DrawHUD lowers it at the top of the next frame. A
+  probe takes a row by writing it (`probes/title.py`).
+- **BACK and Escape** are `cursor.author_back_row` with `closed=PAGE_TITLE`: one gate.
+- **Single Player** holds today's entry exactly: its row is the old first row's start.
+- **Multiplayer:**
+  - **The address is `BP_Settings.ServerAddress`** (default `127.0.0.1:7777`): the local
+    settings, never the profile. It is saved when a join is asked for.
+  - **It is typed on its row**: while the caret is there, DrawHUD walks `AddressKeys` (a
+    ForEachLoop, as the rebind capture walks `KeyPool`) and appends `AddressChars[i]` for
+    each key that went down; Backspace takes one off. Letters, digits, `.`, `-`, and `:` on
+    the semicolon's key. No widget is focusable here, so there is no text box.
+  - **Join Server** notes the session on the GameInstance (`JoinAddress`, `Connecting`,
+    no `NetReason`) and calls `OpenLevel(address)`. The title stands, its status line
+    reading `connecting to <address> ...`, until the server's level replaces it.
+  - **Leaving the page while it connects** gives the join up (the engine's `cancel`).
+  - **The status line otherwise shows `NetReason`**: why the last join failed or the last
+    session dropped (`net/game_instance.py` writes it from the engine's two failure
+    events). A failure reloads the title's level; that HUD's BeginPlay finds the session
+    ended and opens on this page, the caret on Join Server.
+- **A client has no title.** BeginPlay asks IsStandalone before anything of the title: off
+  its false arm `GameStarted` is set, as `-nomenu` sets it. So a client is never paused or
+  blocked by a title, whether it joined from this page or with an address on the command
+  line.
+- **In play the menu says the mode** (`PauseMode`, under the title: `SINGLE PLAYER` or
+  `MULTIPLAYER`), and as a client its exit row reads `Leave Server`: the session is cleared
+  and the engine's `disconnect` returns the process to the title. **The profile's whole
+  fragment (`save_exit.py`: the load, save and exit, the wipe on death, and the cheat
+  chained after it) runs in standalone only** (`mode_tick.author_mode_in_play`), so a
+  server's character never reads the single-player profile and leaving never writes it.
+- **IsStandalone is false on the title while a join is pending.** The exit row's label
+  flips to `Leave Server` under the open page (unseen); nothing else on the title asks it.
+- **Probes:** `probe_title_single.py` and `probe_join_dead_address.py`
+  (`uepy.py --game --title`: the real title, no `-nomenu`), `probe_net_title.py`
+  (`--net --title --windowed --clients 1`), and `probe_main_menu.py` and
+  `probe_umg_screens.py` for the pages under a title held up by hand.
+- **Still needs a play session:** typing an address with real keys (no probe can press
+  one), the click on each page's rows and BACK, and how the pages read.
 
 ## Escape (`cursor_consts.ESCAPE_KEY`, `menu_nav.escape_pressed`)
 
@@ -104,6 +156,7 @@ Escape goes back one step, from any row:
 | a tuning tab | shuts the tab, back to the menu's rows | DrawHUD (`cursor.author_back_row`, ORed with BACK's click and Enter) |
 | the controls page, a capture armed | calls the capture off, binding nothing | DrawHUD (`settings_input._author_capture`, before the key pool's loop) |
 | the controls page | back to the menu's rows (the same `Set MenuPage` as its BACK row) | DrawHUD (`settings_input`) |
+| a mode page (Single Player, Multiplayer) | back to the menu's rows; a join under way is given up | DrawHUD (`cursor.author_back_row`), then Tick (`mode_tick._author_give_up`) |
 | the menu's own rows, in play | shuts the menu, as M and `Resume` do | Tick (`menu_main._author_escape`) |
 | the menu's own rows, on the title | nothing: there is nothing under it | |
 

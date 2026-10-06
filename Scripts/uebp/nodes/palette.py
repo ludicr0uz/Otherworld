@@ -19,6 +19,10 @@ NODE_BEGIN_PLAY = "AddEvent|EventBeginPlay"
 NODE_DRAW_HUD = "AddEvent|EventReceiveDrawHUD"
 NODE_EVENT_EXECUTE_AI = "AddEvent|AI|EventReceiveExecuteAI"
 NODE_EVENT_POSSESS = "AddEvent|EventOnPossess"
+# A GameInstance's: a connection failed or dropped (FailureType, bIsServer),
+# and a travel failed (FailureType). net/game_instance.py.
+NODE_EVENT_NETWORK_ERROR = "AddEvent|EventNetworkError"
+NODE_EVENT_TRAVEL_ERROR = "AddEvent|EventTravelError"
 NODE_PRE_CONSTRUCT = "AddEvent|UserInterface|EventPreConstruct"
 # Debug mode's sight cone (npc/sight_cone.py): a Tick of the controller's own,
 # because the tree's steps run on its beat and a cone has to follow the head.
@@ -40,6 +44,7 @@ NODE_CAST_CHAR = "Utilities|Casting|CastToBP_ThirdPersonCharacter"
 NODE_CAST_CHARACTER = "Utilities|Casting|CastToCharacter"
 NODE_CAST_CONSUMABLE = "Utilities|Casting|CastToBP_ConsumableItem"
 NODE_CAST_CYCLE = "Utilities|Casting|CastToBP_DayNightCycle"
+NODE_CAST_GAME_INSTANCE = "Utilities|Casting|CastToBP_OtherworldGameInstance"
 NODE_CAST_FOOTSTEP = "Utilities|Casting|CastToBP_FootstepComponent"
 NODE_CAST_GAME_MODE = "Utilities|Casting|CastToBP_ThirdPersonGameMode"
 NODE_CAST_GFX_SAVE = "Utilities|Casting|CastToBP_GraphicsSave"
@@ -55,3 +60,8 @@ NODE_CAST_SURVIVAL = "Utilities|Casting|CastToBP_SurvivalComponent"
 NODE_CAST_TUNE_SAVE = "Utilities|Casting|CastToBP_TuneSave"
 NODE_CAST_WEAPON = "Utilities|Casting|CastToBP_WeaponComponent"
 NODE_MAKE_EVENT_DATA = "Utilities|Struct|MakeGameplayEventData"
+
+# One exec out per enumerator, named after it, and none for "anything else".
+NODE_SWITCH_NET_FAILURE = "Utilities|FlowControl|Switch|SwitchonENetworkFailure"
+# Any enum pin in, its display name out.
+NODE_ENUM_TO_STRING = "Utilities|String|EnumtoString"

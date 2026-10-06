@@ -72,6 +72,8 @@ from graphics_menu.tune_keep import (                               # noqa: E402
     author_load_kept, build_keep_savegames)
 # The FPS readout, on screen whatever debug mode says; see graphics_menu/fps.py.
 from net.pause import author_pause                                 # noqa: E402
+from net.game_instance import build_game_instance                  # noqa: E402
+from net.session_consts import GAME_INSTANCE_BP_PATH               # noqa: E402
 from graphics_menu.fps import author_fps, declare_fps_vars          # noqa: E402
 # The generated art the canvas layers (the wanderers' bars) still draw with.
 from graphics_menu.canvas import _draw_texture                      # noqa: E402
@@ -125,6 +127,11 @@ from graphics_menu.cursor import (                                  # noqa: E402
 from graphics_menu.menu_nav import pause_row_taken                  # noqa: E402
 from graphics_menu.menu_main import (                               # noqa: E402
     author_in_play, author_main_rows_tick, author_title_ticks)
+from graphics_menu.mode_consts import (                             # noqa: E402
+    ADDRESS_KEYS, AddressChars, AddressKeys)
+from graphics_menu import mode_consts                               # noqa: E402
+from graphics_menu.mode_tick import (                               # noqa: E402
+    author_mode_begin, author_mode_in_play, author_mode_rows_tick)
 from graphics_menu.menu_still import (                              # noqa: E402
     MENU_STILL_VAR, author_menu_still)
 from graphics_menu.monster_tune_consts import MONSTER_TAB           # noqa: E402
@@ -280,6 +287,8 @@ def _ensure_variables(ed, bp):
         raise RuntimeError(f"{combat_paths.SETTINGS_BP_PATH} must be built first "
                            "(build_weapons_and_combat.py)")
     declare(ed, MV.TABLE)
+    # What the Multiplayer page's address row types (mode_consts.py).
+    declare(ed, mode_consts.TABLE)
     # The M panel's caret, and whether the controller was told to ignore move
     # input for the open panel (menu_still.py); GameStarted is false until the
     # player picks NEW GAME, and BeginPlay pauses the world alongside it.
@@ -525,7 +534,10 @@ def _author_begin_play(ed, begin_play):
     _connect(out(skipping), _pin(wants_menu, "A"))
     shown = ed.add_branch_node()
     _connect(out(wants_menu), _pin(shown, "Condition"))
-    for tail in loaded_tails:
+    # Only a standalone process has a title: a client of a server is already
+    # in its game (mode_tick.py), and goes the way -nomenu does.
+    on_title, as_client = author_mode_begin(ed, loaded_tails)
+    for tail in on_title:
         _connect(tail, _pin(cmdline, "execute"))
     _connect(then(cmdline), _pin(shown, "execute"))
 
@@ -548,6 +560,8 @@ def _author_begin_play(ed, begin_play):
     skip = ed.add_set_member_variable_node(GAME_STARTED_VAR)
     _set(skip, GAME_STARTED_VAR, True)
     _connect(else_(shown), _pin(skip, "execute"))
+    for tail in as_client:
+        _connect(tail, _pin(skip, "execute"))
 
     ed.add_comment_to_nodes(
         f"Open on the menu, paused {MENU_SETTLE_S}s in. {GAME_STARTED_VAR} "
@@ -576,13 +590,17 @@ def _author_tick(ed, tick):
     # its keys, a take. The title's Tick skips them (menu_main.py).
     stilled = author_menu_still(ed, pc_out, [then(tick)])
     in_play, on_title = author_in_play(ed, stilled)
-    saved = author_save_exit_tick(ed, pc_out, [in_play])
-    looted = author_loot_tick(ed, pc_out, saved)
+    # Single player's alone: as a client the exit row leaves the server and
+    # the profile is neither read nor written (mode_tick.py).
+    single, as_client = author_mode_in_play(ed, pc_out, [in_play])
+    saved = author_save_exit_tick(ed, pc_out, [single])
+    looted = author_loot_tick(ed, pc_out, [*saved, *as_client])
     # The I panel (wear_tick.py): what the player wears, and a take-off.
     looted = author_wear_tick(ed, pc_out, looted)
-    # Then the menu's tuning tabs (tune_tick.py and its four siblings).
+    # The title's Multiplayer row and page (mode_tick.py), then the menu's
+    # tuning tabs (tune_tick.py and its four siblings).
     # The graphics one also hands the picked preset to the tuner component.
-    tuned = author_tune_tick(ed, pc_out, [*looted, on_title])
+    tuned = author_tune_tick(ed, pc_out, author_mode_rows_tick(ed, pc_out, looted, [on_title]))
     tuned = author_monster_tune_tick(ed, pc_out, tuned)
     tuned = author_world_tune_tick(ed, pc_out, tuned)
     tuned = author_gfx_tune_tick(ed, pc_out, tuned)
@@ -924,6 +942,8 @@ def build_hud_blueprint(rebuild=False):
     # loads create_node_from_name returns None and the error reads like a typo
     # in the node name rather than a missing asset.
     build_profile_savegame()
+    # The session, which the HUD casts the GameInstance to.
+    build_game_instance()
     build_keep_savegames()
     # The tuner component before the HUD that carries it and sets its variables.
     build_graphics_tuner()
@@ -938,7 +958,7 @@ def build_hud_blueprint(rebuild=False):
     for path in ("/Game/Weapons/BP_HealthComponent",
                  "/Game/Weapons/BP_WeaponComponent",
                  "/Game/Weapons/BP_WeaponItem",
-                 SURVIVAL_BP_PATH, PROFILE_BP_PATH,
+                 SURVIVAL_BP_PATH, PROFILE_BP_PATH, GAME_INSTANCE_BP_PATH,
                  GAME_MODE_PATH):
         if not _assets().load_asset(path):
             raise RuntimeError(f"could not load {path} for its cast node")
@@ -987,6 +1007,8 @@ def build_hud_blueprint(rebuild=False):
                          PAUSE_ROW_VAR: 0, MENU_STILL_VAR: False,
                          MV.Quality: DEFAULT_PRESET,
                          MV.KeyPool: [_key(k) for k in KEY_POOL],
+                         AddressKeys: [_key(k) for k, _c in ADDRESS_KEYS],
+                         AddressChars: [c for _k, c in ADDRESS_KEYS],
                          **difficulty_defaults(), **profile_defaults(),
                          **dev_guns_defaults(), **loot_defaults(), **wear_defaults(), **inv_defaults(),
                          **carry_defaults(),

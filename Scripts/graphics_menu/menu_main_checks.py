@@ -1,8 +1,8 @@
 """verify_graphics_menu.py's checks for the one menu (menu_main.py, and
 menu_screens.author_title): the title is the menu held open over a paused
-world, with the HUD ticking under it; its first row starts the game or
-resumes it, its settings row opens the settings page in the rows' place, and
-its last row quits. The graph only: the rows served under a real pause are
+world, with the HUD ticking under it; its settings row opens the settings
+page in the rows' place, and its last row quits. Its first two rows, the
+modes, are mode_checks.py's. The graph only: the rows served under a real pause are
 probes/probe_main_menu.py's.
 """
 
@@ -10,7 +10,6 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.gfx_tune_consts import TUNER_COMPONENT
 from graphics_menu.pause_checks import (
     _feeds, _gates, _is_row_test, _pins, _sets, _sources, _value)
-from graphics_menu.profile_consts import PROFILE_SLOT
 from graphics_menu.settings_rows import PAGE_SETTINGS
 from net.pause_checks import check_standalone_pause
 
@@ -47,48 +46,17 @@ def _check_title(check, nodes):
           "title's pause: the menu's rows are served on Tick",
           selves == sorted(["[]", str([f"Get {TUNER_COMPONENT}"])]), str(selves))
     check_standalone_pause(check, nodes, "the title")
-    return [n for n in ticks if _flag(n, TICK_PIN) == "false"]
 
 
-def _check_rows(check, nodes, stops):
-    resumes = [n for n in _sets(nodes, "MenuOpen")
-               if _value(n, "MenuOpen") == "false" and _taken(n, UC.START_ACTION)]
-    # Off the row's Set MenuOpen: a Branch on GameStarted, whose else arm sets
-    # it, stops the paused tick and unpauses, in that order.
-    starts = [n for n in _sets(nodes, UC.GAME_STARTED_VAR)
-              if _value(n, UC.GAME_STARTED_VAR) == "true"
-              and any(f"Get {UC.GAME_STARTED_VAR}" in _feeds(g, "Condition")
-                      and resumes and resumes[0] in _sources(g, "execute")
-                      for g in _gates(n))]
-    unpauses = [n for n in nodes if PAUSE_PIN in _pins(n)
-                and _flag(n, PAUSE_PIN) == "false"
-                and any(s in stops for s in _sources(n, "execute"))]
-    in_order = (len(starts) == len(stops) == len(unpauses) == 1
-                and starts[0] in _sources(stops[0], "execute"))
-    check("the first row shuts the menu, and on the title starts the game: "
-          "GameStarted, the HUD no longer ticking while paused, then the unpause, last",
-          len(resumes) == 1 and in_order,
-          f"{len(resumes)} resume, {len(starts)} start, {len(stops)} stop, "
-          f"{len(unpauses)} unpause")
-
+def _check_rows(check, nodes):
+    # The first row, and the Single Player page's that starts the game, are
+    # mode_checks.py's.
     pages = [n for n in _sets(nodes, "MenuPage") if _taken(n, UC.SETTINGS_ACTION)]
     tops = [m for n in pages for m in _sets(nodes, "MenuRow")
             if n in _sources(m, "execute") and int(_value(m, "MenuRow") or 0) == 0]
     check("the settings row opens the settings page, its caret on the top row",
           len(pages) == 1 and _value(pages[0], "MenuPage") == str(PAGE_SETTINGS)
           and len(tops) == 1, f"{len(pages)} pages, {len(tops)} carets")
-
-    says = [n for n in nodes if {"self", "InText"} <= _pins(n)
-            and UC.CONTINUE_ROW_LABEL in _value(n, "InText")]
-    asked = [c for n in says for g in _gates(n) for c in _sources(g, "Condition")
-             if "SlotName" in _pins(c) and _value(c, "SlotName") == PROFILE_SLOT
-             and g in _sources(n, "execute")
-             and any(f"Get {UC.GAME_STARTED_VAR}" in _feeds(b, "Condition")
-                     for b in _sources(c, "execute"))]
-    check("on the title the first row reads continue game while the saved "
-          "profile exists (DoesSaveGameExist on its slot, off GameStarted's "
-          "false arm), and new game otherwise",
-          len(says) == 1 and len(asked) == 1, f"{len(says)} says, {len(asked)} asked")
 
     quits = [n for n in nodes if "QuitPreference" in _pins(n)]
     check("the exit game row, and nothing else, quits the game for the owning player",
@@ -110,12 +78,13 @@ def _check_page(check, nodes):
         return sorted(found)
     page, panel = shows(UC.SETTINGS_PANEL), shows(UC.PAUSE_PANEL)
     check("the settings page stands in the menu's place: shown, with the rows "
-          "collapsed, while MenuPage is off the rows, and collapsed on them",
-          page == [(UC.HIDDEN, True), (UC.SHOWN, True)]
+          "collapsed, while MenuPage names it, and collapsed on the rows and "
+          "on a mode page",
+          page == [(UC.HIDDEN, True), (UC.HIDDEN, True), (UC.SHOWN, True)]
           and (UC.HIDDEN, True) in panel, f"page {page}, panel {panel}")
 
 
 def check_main_menu(check, nodes):
-    stops = _check_title(check, nodes)
-    _check_rows(check, nodes, stops)
+    _check_title(check, nodes)
+    _check_rows(check, nodes)
     _check_page(check, nodes)

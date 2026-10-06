@@ -78,6 +78,13 @@ class GameEnvTest(unittest.TestCase):
         game.game_env(base, "/Game/Maps/L", ["/a.py"], "/tmp/r.json", None)
         self.assertEqual(base, {})
 
+    def test_title_leaves_the_menu_up_and_names_the_runs_level(self):
+        ini = "-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap=/Game/Maps/L"
+        self.assertEqual(game.title_args("/Game/Maps/L"), ["-nomenu", ini])
+        self.assertEqual(game.title_args("/Game/Maps/L", title=True), [ini])
+        self.assertNotIn("UEPY_TITLE", game.game_env({"UEPY_TITLE": "1"}, "/L", [], "/r", None))
+        self.assertEqual(game.game_env({}, "/L", [], "/r", None, title=True)["UEPY_TITLE"], "1")
+
 
 class RenderArgsTest(unittest.TestCase):
 

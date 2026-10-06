@@ -11,7 +11,7 @@ once the server listens, opens its address (game.py says why Entry first).
 
 import os
 
-from uepylib.game import ENTRY_URL, render_args
+from uepylib.game import ENTRY_URL, render_args, title_args
 
 HOST = "127.0.0.1"
 # Not the engine's 7777: a run never meets a server someone left up.
@@ -56,8 +56,13 @@ def processes(run_dir, clients):
         Process(CLIENT, i, run_dir) for i in range(1, clients + 1)]
 
 
-def command(editor, project, process, port, windowed=False):
-    """The process's command line."""
+def command(editor, project, process, port, windowed=False, level=""):
+    """The process's command line.
+
+    No client is given -nomenu: one that joins a server has no title by the
+    game's own rule (graphics_menu/mode_tick.py), which every run thereby
+    proves; and one started alone (``--title``, environment()) is meant to
+    stand on it. The server has no HUD either way."""
     if process.role == SERVER:
         how = ["-server", f"-port={port}"]
     else:
@@ -65,12 +70,13 @@ def command(editor, project, process, port, windowed=False):
         if windowed:
             offset = WINDOW_STEP * (process.index - 1)
             how += [f"-WinX={offset}", f"-WinY={offset}"]
-    # -nomenu: nobody is there to press Enter on the title menu (game.py).
-    return [editor, project, ENTRY_URL, *how, "-unattended", "-nomenu",
+    met = title_args(level, title=process.role == CLIENT)
+    return [editor, project, ENTRY_URL, *how, "-unattended", *met,
             "-forcelogflush", f"-abslog={process.log}"]
 
 
-def environment(base, process, run_dir, clients, port, level, probes, probe_timeout=None):
+def environment(base, process, run_dir, clients, port, level, probes, probe_timeout=None,
+                title=False):
     """The process's environment: who it is, and the probes it is to run."""
     env = dict(base)
     # A process started from inside a serving editor's shell is not that editor.
@@ -86,4 +92,7 @@ def environment(base, process, run_dir, clients, port, level, probes, probe_time
     env["UEPY_PROBE_RESULTS"] = process.results
     if probe_timeout:
         env["UEPY_PROBE_TIMEOUT"] = str(probe_timeout)
+    env.pop("UEPY_TITLE", None)
+    if title:
+        env["UEPY_TITLE"] = "1"
     return env

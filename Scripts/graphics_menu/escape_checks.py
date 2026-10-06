@@ -10,6 +10,7 @@ from graphics_menu import cursor_consts as CC
 from graphics_menu import hud_vars as MV
 from graphics_menu.pause_checks import _gates, _pins, _sets, _sources, _title, _value
 from graphics_menu.settings_rows import PAGE_TITLE
+from graphics_menu.mode_consts import PAGES
 from graphics_menu.tune_tabs import TABS
 
 BEL = unreal.BlueprintEditorLibrary
@@ -50,9 +51,9 @@ def _lowered(nodes, var):
 
 def check_escape(check, nodes):
     polls = [n for n in nodes if _is_escape(n)]
-    check(f"{CC.ESCAPE_KEY} is polled once per tab, twice on the controls page "
-          "(the capture, the page) and once for the menu in play",
-          len(polls) == len(TABS) + 3, f"{len(polls)} polls")
+    check(f"{CC.ESCAPE_KEY} is polled once per tab and per mode page, twice on "
+          "the controls page (the capture, the page) and once for the menu in play",
+          len(polls) == len(TABS) + len(PAGES) + 3, f"{len(polls)} polls")
 
     deaf = [t.open_var for t in TABS
             if not any(_on_escape(g) for n in _lowered(nodes, t.open_var)
@@ -63,9 +64,12 @@ def check_escape(check, nodes):
     pages = [n for n in _sets(nodes, MV.MenuPage) if not _sources(n, MV.MenuPage)
              and int(_value(n, MV.MenuPage) or 0) == PAGE_TITLE
              and any(_on_escape(g) for g in _gates(n))]
+    # A mode page's BACK row and Escape share one gate (cursor.author_back_row,
+    # mode_checks.py); the controls page's Set has its BACK's gate and Escape's.
     check(f"{CC.ESCAPE_KEY} on the controls page goes back to the menu's rows, "
-          "through the same Set MenuPage as its BACK row",
-          len(pages) == 1 and len(_gates(pages[0])) == 2,
+          "through the same Set MenuPage as its BACK row, and on a mode page "
+          "through that page's",
+          sorted(len(_gates(n)) for n in pages) == [1] * len(PAGES) + [2],
           f"{len(pages)} pages, {[len(_gates(n)) for n in pages]} gates")
 
     disarms = [n for n in _lowered(nodes, MV.Capturing)

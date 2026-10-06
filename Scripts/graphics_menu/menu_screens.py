@@ -7,8 +7,8 @@
   author_alive       neither: the HUD's Body shown, the death menu hidden
   author_pause_menu  MenuOpen: the menu (WBP_PauseMenu), the same one on the
                      title and in play. Its rows (Up/Down/Enter, the caret,
-                     the first row's words, debug ON/OFF) unless the settings
-                     page or a tuning tab is open in their place
+                     the rows' words, debug ON/OFF) unless the settings
+                     page, a mode page or a tuning tab is open in their place
 
 Each also says whether the mouse cursor shows, and what a click on it does
 (cursor.py): always on the title and death screens; alive, with the menu or
@@ -30,24 +30,21 @@ from graphics_menu.loot_find import put
 from graphics_menu.loot_consts import LOOT_OPEN_VAR
 from graphics_menu.wear_consts import WEAR_OPEN_VAR
 from graphics_menu.menu_nav import _emit_row_nav, any_tab_open
-from graphics_menu.profile_consts import PROFILE_SLOT, PROFILE_USER_INDEX
 from graphics_menu.settings_page import _author_settings_page
-from graphics_menu.settings_rows import PAGE_TITLE
+from graphics_menu.settings_rows import PAGE_SETTINGS, PAGE_TITLE
+from graphics_menu.mode_draw import author_mode_hidden, author_mode_pages, author_mode_words
 from graphics_menu.ui_graph import (
     mark_rows, member, part, row_at, screen, set_shown, set_text,
 )
 from graphics_menu.umg_consts import (
-    CONTINUE_ROW_LABEL, DEATH_HINT_LINE, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF, DEBUG_ON,
-    GAME_STARTED_VAR, HUD_BODY, IN_GAME_ACTIONS, IN_GAME_ONLY,
-    PAUSE_ACCEPT_KEY, PAUSE_DEBUG_ROW, PAUSE_PANEL, PAUSE_ROW_ACTIONS,
-    PAUSE_ROW_LABELS, PAUSE_ROW_VAR, PAUSE_ROWS, PAUSE_START_ROW, RESTART_KEY,
-    RESUME_ROW_LABEL, ROW_LABEL, ROW_VALUE, SETTINGS_PANEL, START_ROW_LABEL,
-    WBP_DEATH_MENU, WBP_HUD, WBP_MAIN_MENU, WBP_MENU_ROW, WBP_PAUSE_MENU,
+    DEATH_HINT_LINE, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF, DEBUG_ON, GAME_STARTED_VAR,
+    HUD_BODY, IN_GAME_ACTIONS, IN_GAME_ONLY, PAUSE_ACCEPT_KEY, PAUSE_DEBUG_ROW, PAUSE_PANEL,
+    PAUSE_ROW_ACTIONS, PAUSE_ROW_LABELS, PAUSE_ROW_VAR, PAUSE_ROWS, RESTART_KEY, ROW_VALUE,
+    SETTINGS_PANEL, WBP_DEATH_MENU, WBP_HUD, WBP_MAIN_MENU, WBP_MENU_ROW, WBP_PAUSE_MENU,
 )
 from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
 from uebp.nodes.math import FN_EQ_II, FN_OR
-from uebp.nodes.system import (
-    FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL, FN_SAVE_EXISTS)
+from uebp.nodes.system import FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL
 from net.pause import author_unpause
 from graphics_menu import hud_vars as MV
 
@@ -168,29 +165,10 @@ def _author_pause_keys(ed, in_execs, made):
     return [taken, idle]
 
 
-def _author_first_row(ed, rows, in_execs, made):
-    """The first row's words: resume in play; on the title continue game
-    with a saved profile to load, else new game. Returns the exec tails.
-
-    The save is looked for every frame of the title, not once: a profile is
-    written and deleted while the HUD lives (save and exit, a death), and a
-    file's existence is cheap beside a frame."""
-    row, found, missing = row_at(ed, rows, PAUSE_START_ROW, in_execs)
-    text = member(ed, row, WBP_MENU_ROW, ROW_LABEL)
-    playing, title = _branch(ed, _get(ed, GAME_STARTED_VAR, made), [found], made)
-    exists = _call(ed, FN_SAVE_EXISTS, made, SlotName=PROFILE_SLOT,
-                   UserIndex=PROFILE_USER_INDEX)
-    _connect(title, _pin(exists, "execute"))
-    saved, fresh = _branch(ed, out(exists), [then(exists)], made)
-    return [set_text(ed, text, RESUME_ROW_LABEL, [playing]),
-            set_text(ed, text, CONTINUE_ROW_LABEL, [saved]),
-            set_text(ed, text, START_ROW_LABEL, [fresh]), missing]
-
-
 def _author_row_words(ed, rows, in_execs, made):
-    """What the rows say that depends on whether a game is in play: the first
-    row (_author_first_row), and the rows that need a game say so on the
-    title. Returns the exec tails."""
+    """What the rows say that depends on whether a game is in play and in
+    which mode (mode_draw.author_mode_words), and the rows that need a game
+    say so on the title. Returns the exec tails."""
     def by_state(index, widget, playing_says, title_says, execs):
         row, found, missing = row_at(ed, rows, index, execs)
         text = member(ed, row, WBP_MENU_ROW, widget)
@@ -198,7 +176,7 @@ def _author_row_words(ed, rows, in_execs, made):
         return [set_text(ed, text, playing_says, [playing]),
                 set_text(ed, text, title_says, [title]), missing]
 
-    flow = _author_first_row(ed, rows, in_execs, made)
+    flow = author_mode_words(ed, rows, in_execs, made)
     for action in IN_GAME_ACTIONS:
         flow = by_state(PAUSE_ROW_ACTIONS.index(action), ROW_VALUE, "", IN_GAME_ONLY, flow)
     return flow
@@ -213,7 +191,8 @@ def author_pause_menu(ed, in_execs):
     the menu or the loot window, and while it does a click is not a shot.
 
     One menu on screen: the settings page (WBP_MainMenu's, while MenuPage
-    says so) or an open tuning tab (tune_draw.py) stands in the rows' place,
+    says so), a title mode page (mode_draw.py, likewise) or an open tuning
+    tab (tune_draw.py) stands in the rows' place,
     and its BACK row brings these back. A row is taken with Enter or a click,
     which raises PauseClick for Tick; the rows have no keys of their own."""
     made = []
@@ -243,10 +222,14 @@ def author_pause_menu(ed, in_execs):
     panel = part(ed, WBP_PAUSE_MENU, PAUSE_PANEL)
     settings = part(ed, WBP_MAIN_MENU, SETTINGS_PANEL)
     on_rows = _call(ed, FN_EQ_II, made, A=_get(ed, MV.MenuPage, made), B=PAGE_TITLE)
-    on_menu, on_settings = _branch(ed, out(on_rows), [flow], made)
-    _author_settings_page(ed, set_shown(
-        ed, settings, True, [set_shown(ed, panel, False, [on_settings])]))
-    flow = set_shown(ed, settings, False, [on_menu])
+    on_menu, paged = _branch(ed, out(on_rows), [flow], made)
+    paged = set_shown(ed, panel, False, [paged])
+    on_page = _call(ed, FN_EQ_II, made, A=_get(ed, MV.MenuPage, made), B=PAGE_SETTINGS)
+    on_settings, on_mode = _branch(ed, out(on_page), [paged], made)
+    _author_settings_page(ed, set_shown(ed, settings, True, [on_settings]))
+    # ...or one of the title's mode pages (mode_draw.py).
+    author_mode_pages(ed, [set_shown(ed, settings, False, [on_mode])])
+    flow = author_mode_hidden(ed, [set_shown(ed, settings, False, [on_menu])])
 
     in_tab, in_panel = _branch(ed, any_tab_open(ed, made), [flow], made)
     tabbed = set_shown(ed, panel, False, [in_tab])
@@ -274,8 +257,8 @@ def author_pause_menu(ed, in_execs):
         "The menu: the title's, and M's in play. Its rows show unless the "
         "settings page or a tuning tab is open in their place. The caret is "
         "on PauseRow: Up/Down or the cursor move it, Enter or a click takes "
-        "the row (PauseClick, served by Tick). The first row reads new game "
-        "(continue game with a saved profile) or resume; debug mode's row "
+        "the row (PauseClick, served by Tick). The first row reads single "
+        "player or resume; debug mode's row "
         "says ON or OFF.",
         [get_open, br, caret, dbg, dbg_br])
     return [closed, on, off, missing, tabbed]

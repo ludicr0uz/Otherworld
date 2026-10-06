@@ -99,6 +99,26 @@ class PlanTest(unittest.TestCase):
         self.assertIn("-windowed", windowed)
         self.assertIn(f"-WinX={net_plan.WINDOW_STEP}", windowed)
 
+    def test_no_client_is_told_to_skip_the_menu(self):
+        # A joined client has no title by the game's own rule; the server has no HUD.
+        self.assertIn("-nomenu", net_plan.command("ed", "p", self.plan[0], 17777, level="/L"))
+        for process in self.plan[1:]:
+            self.assertNotIn("-nomenu",
+                             net_plan.command("ed", "p", process, 17777, level="/L"))
+
+    def test_a_left_server_returns_to_the_runs_level(self):
+        for process in self.plan:
+            self.assertIn(
+                "-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap=/L",
+                net_plan.command("ed", "p", process, 17777, level="/L"))
+
+    def test_title_starts_the_clients_alone(self):
+        env = net_plan.environment({"UEPY_TITLE": "1"}, self.plan[1], "/run", 2, 17777,
+                                   "/L", [])
+        self.assertNotIn("UEPY_TITLE", env)
+        env = net_plan.environment({}, self.plan[1], "/run", 2, 17777, "/L", [], title=True)
+        self.assertEqual(env["UEPY_TITLE"], "1")
+
     def test_the_server_is_never_windowed(self):
         self.assertNotIn("-windowed",
                          net_plan.command("ed", "p", self.plan[0], 17777, windowed=True))

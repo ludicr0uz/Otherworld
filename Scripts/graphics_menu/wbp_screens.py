@@ -14,13 +14,15 @@ import unreal
 from uebp.graph import BEL, _must_load
 from graphics_menu import umg_author as U
 from graphics_menu.wbp_legal import author_legal_notice
+from graphics_menu.wbp_modes import author_mode_pages
 from graphics_menu.wbp_tune import author_tune_widgets
 from graphics_menu.umg_consts import (
     COL_CARET, COL_DEATH_HINT, COL_DEATH_TEXT, COL_DEATH_TITLE, COL_HINT,
     COL_MAIN_HINT, COL_ROW, COL_TITLE, DEATH_HINT, DEATH_HINT_LINE,
     DEATH_HINT_FONT, DEATH_PANEL_SIZE, DEATH_SCORE, DEATH_SCORE_FONT, DEATH_TITLE,
     DEATH_TITLE_FONT, HINT_CAPTURE, HINT_CAPTURE_TEXT, HINT_IDLE, HINT_IDLE_TEXT,
-    PAUSE_HINT, PAUSE_HINT_FONT, PAUSE_PANEL, PAUSE_POS, PAUSE_ROW_LABEL_W,
+    PAUSE_HINT, PAUSE_HINT_FONT, PAUSE_MODE, PAUSE_MODE_FONT, PAUSE_PANEL, PAUSE_POS,
+    PAUSE_ROW_LABEL_W,
     PAUSE_ROW_LABELS,
     PAUSE_ROW_SCALE, PAUSE_ROWS, PAUSE_TITLE, PAUSE_TITLE_FONT, PAUSE_W, ROW_COLOR_VAR,
     ROW_GAP, ROW_LABEL_W, ROW_TEXT_VAR, ROW_WIDTH_VAR, SET_HINT_FONT, SET_TITLE_FONT,
@@ -86,13 +88,17 @@ def build_pause_menu():
                            variable=True)
     U.at(outer, (0.0, 0.0), (0.0, 0.0), PAUSE_POS)
     _line(bp, stack, "PauseTitle", PAUSE_TITLE, PAUSE_TITLE_FONT, COL_TITLE, bold=True,
-          bottom=18.0, centred=False)
+          bottom=2.0, centred=False)
+    # Which mode the game in play is; the HUD writes it, empty on the title.
+    _line(bp, stack, PAUSE_MODE, "", PAUSE_MODE_FONT, COL_HINT, bottom=12.0,
+          variable=True, centred=False)
     rows = _rows(bp, stack, PAUSE_ROWS, PAUSE_ROW_LABELS, PAUSE_ROW_LABEL_W, COL_ROW,
                  PAUSE_ROW_SCALE)
     U.pad(rows.get_parent(), h="Left")
     _line(bp, stack, "PauseHint", PAUSE_HINT, PAUSE_HINT_FONT, COL_HINT, top=6.0,
           centred=False)
     author_tune_widgets(bp, root)
+    author_mode_pages(bp, root)
     return U.compile_and_save(bp)
 
 

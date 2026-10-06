@@ -34,7 +34,8 @@ from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu.cursor_consts import (
     BACK_KEY, CLICK_KEY, ESCAPE_KEY, CURSOR_BOOLS, CURSOR_INTS, CURSOR_MOVED_VAR, CURSOR_POS_VAR,
     CURSOR_REALS,
-    CURSOR_ROW_VAR, CURSOR_SHOWN_VAR, CURSOR_WANTED_VAR, NO_ROW, PAUSE_CLICK_VAR,
+    CURSOR_ROW_VAR, CURSOR_SHOWN_VAR, CURSOR_WANTED_VAR, NO_ROW, PAGE_CLICK_VAR,
+    PAUSE_CLICK_VAR,
     TRIGGER_SPENT_VAR,
 )
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
@@ -108,10 +109,11 @@ def author_cursor_read(ed, in_execs):
     flow = put(ed, CURSOR_MOVED_VAR, out(moved), [then(pos)], made)
     flow = put(ed, CURSOR_POS_VAR, out(pos), [flow], made)
     flow = _setter(ed, PAUSE_CLICK_VAR, NO_ROW, [flow], made)
+    flow = _setter(ed, PAGE_CLICK_VAR, NO_ROW, [flow], made)
     ed.add_comment_to_nodes(
         "The mouse cursor: where it is (desktop space, as cached geometry is) "
-        "and whether it moved since last frame. Last frame's M-panel click is "
-        "lowered; Tick has served it.", made)
+        "and whether it moved since last frame. Last frame's M-panel click, "
+        "and a title page's, are lowered; Tick has served them.", made)
     return flow
 
 
@@ -238,11 +240,12 @@ def author_row_cursor(ed, box, count, in_execs, row_var=None, click=None,
     return flow + tails
 
 
-def author_back_row(ed, back, row_var, back_row, open_var, in_execs):
+def author_back_row(ed, back, row_var, back_row, open_var, in_execs, closed="false"):
     """A menu's BACK row, a WBP_MenuRow outside its list. The cursor over it
     (moved or clicked) puts the caret there: ``row_var`` := ``back_row``. A
     click on it, or Enter with the caret on it, or Escape with the caret
-    anywhere, lowers ``open_var``.
+    anywhere, lowers ``open_var``: to false, or to ``closed`` where what is
+    open is a number (MenuPage, back to the menu's rows).
     Returns the exec tails.
 
     DrawHUD's, though the rest of a tab's keys are Tick's: the M panel's own
@@ -266,7 +269,7 @@ def author_back_row(ed, back, row_var, back_row, open_var, in_execs):
     escaped = _call(ed, FN_WAS_PRESSED, made, self=_pc(ed, made), Key=ESCAPE_KEY)
     leave = _call(ed, FN_OR, made, A=out(leave), B=out(escaped))
     took, idle = _branch(ed, out(leave), flow, made)
-    return [_setter(ed, open_var, "false", [took], made), idle]
+    return [_setter(ed, open_var, closed, [took], made), idle]
 
 
 def author_button_row(ed, button, row_var, row, click, in_execs):

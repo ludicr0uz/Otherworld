@@ -15,7 +15,8 @@ from graphics_menu import settings_rows as S
 from graphics_menu.wear_consts import WEAR_SEL_VAR
 from ui_art.slot_ghosts import ghost_name
 from graphics_menu import umg_consts as C
-from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT
+from graphics_menu.mode_consts import LEAVE_ROW_LABEL
+from graphics_menu.profile_consts import EXIT_CALLED_OFF_TEXT, EXIT_ROW_LABEL
 from graphics_menu.umg_author import toolset
 
 BEL = unreal.BlueprintEditorLibrary
@@ -116,11 +117,13 @@ def check_trees(check):
     check("...with one bind row per BIND_VARS entry",
           len(S.BIND_LABELS) == len(S.BIND_VARS), f"{len(S.BIND_LABELS)} labels")
     pause_rows = _labels(pause, C.PAUSE_ROWS)
-    check("the menu lists new game first, then controls, debug, save and exit, "
+    check("the menu lists single player first and multiplayer second, then "
+          "controls, debug, save and exit, "
           "the cheat and the tabs, and exit game last",
           pause_rows == list(C.PAUSE_ROW_LABELS)
-          and pause_rows[C.PAUSE_START_ROW] == C.START_ROW_LABEL
-          and pause_rows[1] == C.SETTINGS_ROW_LABEL
+          and pause_rows[C.PAUSE_START_ROW] == C.SINGLE_ROW_LABEL
+          and pause_rows[1] == C.MULTI_ROW_LABEL
+          and pause_rows[2] == C.SETTINGS_ROW_LABEL
           and pause_rows[C.PAUSE_DEBUG_ROW] == C.DEBUG_ROW_LABEL
           and pause_rows[-1] == C.QUIT_ROW_LABEL, str(pause_rows))
 
@@ -309,15 +312,19 @@ def check_hud_graph(check, nodes):
                     at_or_past = ">=" in _title(eq) or "GreaterEqual" in _title(eq).replace(" ", "")
                     (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
     # The I panel has no rows: its caret is a lit slot (wear_checks.py).
-    check("the settings page, the menu, loot window and the six tuning tabs "
+    # MenuRow is the settings page's caret and each mode page's (mode_draw.py).
+    check("the settings page, the two mode pages, the menu, loot window and the six tuning tabs "
           "light the selected row's caret (the menu's is its own PauseRow)",
           sorted(selected) == sorted(
-              ["Get GfxTuneRow", "Get LootSel", "Get MenuRow", "Get MonTuneRow",
+              ["Get GfxTuneRow", "Get LootSel", "Get MenuRow", "Get MenuRow", "Get MenuRow",
+               "Get MonTuneRow",
                f"Get {C.PAUSE_ROW_VAR}", "Get PlayerTuneRow", "Get SoundTuneRow",
                "Get TuneRow", "Get WorldTuneRow"]),
           str(sorted(selected)))
-    check("...and each tab's BACK row lights its caret while the tab's caret is on it",
-          sorted(backs) == ["Get GfxTuneRow", "Get MonTuneRow", "Get PlayerTuneRow",
+    check("...and each tab's BACK row, and each mode page's, lights its caret "
+          "while the caret is on it",
+          sorted(backs) == ["Get GfxTuneRow", "Get MenuRow", "Get MenuRow",
+                            "Get MonTuneRow", "Get PlayerTuneRow",
                             "Get SoundTuneRow", "Get TuneRow", "Get WorldTuneRow"], str(sorted(backs)))
     check("...and the graphics tab's SAVE DEFAULT row lights its own while the caret "
           "is on it", saves == ["Get GfxTuneRow"], str(saves))
@@ -325,8 +332,10 @@ def check_hud_graph(check, nodes):
     texts = [n for n in nodes if {"self", "InText"} <= _pins(n)]
     blank = [n for n in texts if not text_literal(n) and not _sources(n, "InText")]
     check("every SetText has a literal or a wire, but the one per in-game-only row "
-          "that clears its value once a game is in play",
-          len(blank) == len(C.IN_GAME_ACTIONS), f"{len(blank)} empty")
+          "that clears its value once a game is in play, the one per title-only "
+          "row that clears it on the title, and the mode line's there",
+          len(blank) == len(C.IN_GAME_ACTIONS) + len(C.TITLE_ACTIONS) + 1,
+          f"{len(blank)} empty")
     written = sorted(t for n in texts for t in _source_titles(n, "self")
                      if t.startswith("Get ") and _sources(n, "InText"))
     for name in (C.HP_NUM, C.KILLS, C.DEATH_SCORE, C.HUD_FPS, C.EQUIPPED_NAME,
@@ -335,10 +344,14 @@ def check_hud_graph(check, nodes):
               f"Get {name}" in written)
     literal = {text_literal(n) for n in texts if not _sources(n, "InText")}
     check("the menu's rows are the only literals written: debug reads ON or OFF, "
-          "the first row new game, continue game or resume, and on the title the "
-          "rows that need a game say so",
+          "the first row single player or resume, the Single Player page's new "
+          "game or continue game, the exit row save and exit or leave server, "
+          "the mode under the title, and the rows that need a game, or the "
+          "title, say so",
           literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
-                      C.CONTINUE_ROW_LABEL, C.IN_GAME_ONLY, ""}, str(sorted(literal)))
+                      C.CONTINUE_ROW_LABEL, C.IN_GAME_ONLY, C.SINGLE_ROW_LABEL, C.TITLE_ONLY,
+                      EXIT_ROW_LABEL, LEAVE_ROW_LABEL, C.MODE_SINGLE_TEXT,
+                      C.MODE_MULTI_TEXT, ""}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons
     # (loot_checks.py checks that one).

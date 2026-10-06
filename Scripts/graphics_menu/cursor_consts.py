@@ -47,6 +47,9 @@ CURSOR_ACCEPT_VAR = "CursorAccept"
 # on it), NO_ROW otherwise. Tick serves it on the next frame as that row's
 # action; DrawHUD lowers it at the top of every frame.
 PAUSE_CLICK_VAR = "PauseClick"
+# The same for a row of a title page (Single Player, Multiplayer:
+# mode_consts.py): the row's number in its page, which MenuPage names.
+PAGE_CLICK_VAR = "PageClick"
 
 # The weapon component's spent-press latch (combat/weapon_component/consume.py),
 # held up while the cursor shows in a running game so a click fires nothing.
@@ -61,5 +64,5 @@ SCROLL_AT_VAR = "ScrollAt"
 
 CURSOR_BOOLS = (CURSOR_WANTED_VAR, CURSOR_SHOWN_VAR, CURSOR_MOVED_VAR, CURSOR_ACCEPT_VAR,
                 SCROLL_GRAB_VAR)
-CURSOR_INTS = (CURSOR_ROW_VAR, PAUSE_CLICK_VAR)
+CURSOR_INTS = (CURSOR_ROW_VAR, PAUSE_CLICK_VAR, PAGE_CLICK_VAR)
 CURSOR_REALS = (SCROLL_AT_VAR,)

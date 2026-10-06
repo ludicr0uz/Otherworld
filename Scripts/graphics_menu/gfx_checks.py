@@ -14,6 +14,9 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.gfx_tune_tick import gfx_tune_defaults
 from graphics_menu.presets import DEFAULT_PRESET, PRESETS
 from graphics_menu.umg_checks import _tree
+from net.session_consts import CANCEL_COMMAND, LEAVE_COMMAND
+
+SESSION_COMMANDS = (LEAVE_COMMAND, CANCEL_COMMAND)
 
 BEL = unreal.BlueprintEditorLibrary
 PIN = unreal.BlueprintGraphPinLibrary
@@ -143,11 +146,16 @@ def _check_presets(check, nodes):
                if _feeds(n, TAB.pick_var) == ["Get Quality"]]
     check("...otherwise the pick follows Quality, so the tab shows the running preset",
           len(follows) == 1, str(len(follows)))
+    # The session's two (mode_checks.py) are not settings: leaving a server,
+    # and giving a join up.
     engine = [n for n in nodes
-              if {"Command", "bCheckForCommandLineOverrides"} & _pins(n)
+              if ({"Command", "bCheckForCommandLineOverrides"} & _pins(n)
+                  and not (BEL.find_input_pin(n, "Command") is not None and str(
+                      BEL.find_input_pin(n, "Command").get_pin_value()) in SESSION_COMMANDS))
               or ("Tag" in _pins(n) and "ComponentClass" not in _pins(n))
               or "ScalabilityLevel" in _title(n).replace(" ", "")]
-    check("the HUD graph issues no console command, scalability call or tag walk "
+    check("the HUD graph issues no console command (but the session's leave "
+          "and cancel), scalability call or tag walk "
           "of its own: BP_GraphicsTuner applies a preset",
           not engine, str([_title(n) for n in engine]))
 

@@ -102,8 +102,9 @@ def check_profile(check, bp, nodes):
     opens = [n for n in nodes if "LevelName" in _pins(n) and "execute" in _pins(n)]
     after_save = [n for n in opens for d in _feeders(n, "execute")
                   if saves and saves[0] in _feeders(d, "execute")]
+    # The other two: the death menu's restart, and Join Server's (mode_tick.py).
     check("...and then the current level reopens, onto the main menu",
-          len(opens) == 2 and len(after_save) == 1,
+          len(opens) == 3 and len(after_save) == 1,
           f"{len(opens)} OpenLevel, {len(after_save)} after the save")
     # The fifth is the title's first row asking whether there is one to continue.
     check("the profile is looked for, and loaded, once a game starts",

@@ -33,13 +33,15 @@ import unreal
 
 from combat.paths import WEAPON_COMP_BP_PATH, WEAPON_COMP_CLASS_PATH
 from graphics_menu import cursor_consts as CC
+from graphics_menu.mode_consts import SINGLE, SINGLE_START_ROW
 from graphics_menu import hud_vars as MV
 from graphics_menu import umg_consts as C
 
 RUNS_ON = ("server", "client")
 
 HUD_BP_PATH = "/Game/UI/BP_GraphicsMenuHUD"
-WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, CC.PAUSE_CLICK_VAR)]
+WRITABLE = [(HUD_BP_PATH, v) for v in (MV.MenuOpen, C.GAME_STARTED_VAR, CC.PAUSE_CLICK_VAR,
+                                       MV.MenuPage, CC.PAGE_CLICK_VAR)]
 WRITABLE += [(WEAPON_COMP_BP_PATH, CC.TRIGGER_SPENT_VAR)]
 
 WAIT = 30.0             # wall seconds any one step may take
@@ -156,17 +158,22 @@ def _client_one(p, me, hud, pc):
             str(p.posted("server", "ran")))
 
     # --- the title: the same menu held open, and its first row --------------
+    # A connected client has no title (mode_tick.py): this holds one up by
+    # hand, as M5 did, to show the menu's own graph pauses nothing there.
     p.set(hud, C.GAME_STARTED_VAR, False)
     yield from _await(lambda: False, 0.3)
     p.check("the title on a client pauses nothing either",
             not _paused(p) and pc.is_move_input_ignored(), f"paused: {_paused(p)}")
     p.set(hud, CC.PAUSE_CLICK_VAR, C.PAUSE_START_ROW)
-    yield from _await(lambda: p.get(hud, C.GAME_STARTED_VAR), 5.0)
+    yield from _await(lambda: p.get(hud, MV.MenuPage) == SINGLE.page, 5.0)
     p.set(hud, CC.PAUSE_CLICK_VAR, CC.NO_ROW)
+    p.set(hud, CC.PAGE_CLICK_VAR, SINGLE_START_ROW)
+    yield from _await(lambda: p.get(hud, C.GAME_STARTED_VAR), 5.0)
+    p.set(hud, CC.PAGE_CLICK_VAR, CC.NO_ROW)
     yield from _await(lambda: not pc.is_move_input_ignored(), 5.0)
     t2 = _now(p)
     yield from _await(lambda: False, 0.5)
-    p.check("its first row starts the game: the menu shut, the walk given back",
+    p.check("its first row, then the page's, start the game: the menu shut, the walk given back",
             p.get(hud, C.GAME_STARTED_VAR) and not p.get(hud, MV.MenuOpen)
             and not pc.is_move_input_ignored())
     p.check("...into a world that never stopped", not _paused(p) and _now(p) > t2,

@@ -41,11 +41,11 @@ from graphics_menu.cursor_consts import (
 from graphics_menu.dev_guns import _branch, _call, _get, _setter
 from graphics_menu.loot_find import put
 from graphics_menu.umg_consts import GAME_STARTED_VAR
-from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PC, FN_IS_KEY_DOWN, FN_WAS_PRESSED
+from uebp.nodes.actor import (
+    FN_GET_COMP, FN_GET_OWNING_PAWN, FN_GET_OWNING_PC, FN_IS_KEY_DOWN, FN_WAS_PRESSED)
 from uebp.nodes.math import (
     FN_AND, FN_GE_II, FN_LESS_II, FN_NOT, FN_OR, FN_VEC2_NE, FN_XOR)
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from uebp.nodes.umg import (
     FN_CHILD_AT, FN_GEOMETRY, FN_MODE_GAME, FN_MODE_GAME_UI, FN_MOUSE_POS, FN_UNDER)
 
@@ -178,7 +178,7 @@ def author_hold_fire(ed, in_execs):
     neither fires, slashes nor punches. Returns the exec tails."""
     made = []
     held, free = _branch(ed, _get(ed, CURSOR_WANTED_VAR, made), in_execs, made)
-    pawn = _call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0)
+    pawn = _call(ed, FN_GET_OWNING_PAWN, made)
     comp = _call(ed, FN_GET_COMP, made, self=out(pawn))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node

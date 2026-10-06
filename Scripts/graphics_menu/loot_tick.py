@@ -42,12 +42,12 @@ from graphics_menu.loot_find import author_find_body, put
 from graphics_menu.loot_kneel import author_kneel
 from graphics_menu.loot_take import author_take
 from loot.consts import LOOT_NAMES_VAR, LOOT_RADIUS
-from uebp.nodes.actor import FN_GET_COMP, FN_WAS_PRESSED
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_WAS_PRESSED
 from uebp.nodes.array import FN_ARR_LEN
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_GREATER_II, FN_MAX_II, FN_MIN_II, FN_NOT, FN_SUB_II)
 from uebp.nodes.palette import NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.nodes.system import FN_IS_VALID
 from graphics_menu import hud_vars as MV
 
 
@@ -114,7 +114,7 @@ def author_loot_tick(ed, pc_out, in_execs):
                                          Object=_get(ed, LOOT_TARGET_VAR, made))),
                           flow, made)
 
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node

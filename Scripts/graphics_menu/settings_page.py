@@ -12,11 +12,11 @@ from graphics_menu.settings_rows import (
 from graphics_menu.ui_graph import mark_rows, part, row_value, set_shown
 from graphics_menu.umg_consts import (
     HINT_CAPTURE, HINT_IDLE, SETTINGS_ROWS_BOX, WBP_MAIN_MENU)
-from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.array import FN_ARR_GET
 from uebp.nodes.math import FN_ADD_II
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
-from uebp.nodes.system import FN_FLOAT_TO_STR, FN_GET_PLAYER_PAWN, FN_IS_VALID, FN_KEY_DISPLAY
+from uebp.nodes.system import FN_FLOAT_TO_STR, FN_IS_VALID, FN_KEY_DISPLAY
 from graphics_menu import hud_vars as MV
 from combat import settings_vars as SV
 
@@ -53,8 +53,7 @@ def _author_push_settings(ed, in_execs):
     for e in in_execs:
         _connect(e, _pin(have, "execute"))
 
-    pawn = keep(_node(ed, FN_GET_PLAYER_PAWN))
-    _set(pawn, "PlayerIndex", 0)
+    pawn = keep(_node(ed, FN_GET_OWNING_PAWN))
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)

@@ -142,7 +142,7 @@ def check_loot(check, bp, nodes):
     dead = [n for n in nodes if _title(n) == "Get Dead"
             and any("Cast" in _title(f) for f in _feeders(n, "self"))]
     others = [n for n in nodes if _title(n) == "Not Equal (Object)"
-              and any("PlayerPawn" in _title(f) for f in _feeders(n, "B"))
+              and any("OwningPawn" in "".join(_title(f).split()) for f in _feeders(n, "B"))
               and any("For Each" in _title(f) for f in _feeders(n, "A"))]
     check("...that is Dead and is not the player's own", bool(dead) and len(others) == 1,
           f"{len(dead)} Dead, {len(others)} pawn tests")

@@ -20,4 +20,6 @@ replication authoring).
                 and server_game_mode, the GameMode behind the authority switch
     state_checks.py  the verifiers' checks: the assets, and that no graph a
                 client can run reads the GameMode
+    owner_checks.py  the verifiers' check that nothing a player owns (a HUD, a
+                widget, a component, an animation graph) reads player 0's pawn
 """

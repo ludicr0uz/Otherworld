@@ -61,14 +61,14 @@ from graphics_menu.tune_consts import (
 from graphics_menu.tune_keep import author_keep_tab
 from graphics_menu.tune_tab import TUNE_DOWN, TUNE_LESS, TUNE_MORE, TUNE_SAVE_KEY, TUNE_UP
 from graphics_menu.tune_tabs import other_open_vars
-from uebp.nodes.actor import FN_GET_COMP, FN_WAS_PRESSED
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_WAS_PRESSED
 from uebp.nodes.array import FN_ARR_FIND, FN_ARR_GET, FN_ARR_SET
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_EQ_II, FN_FMIN, FN_GE_II, FN_INT_TO_FLOAT, FN_LESS_II,
     FN_MAX_FF, FN_MAX_II, FN_MIN_II, FN_MOD_II, FN_MUL_FF, FN_MUL_II, FN_NOT, FN_ROUND,
     FN_SUB_II)
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
-from uebp.nodes.system import FN_EXEC_PYTHON, FN_GET_PLAYER_PAWN
+from uebp.nodes.system import FN_EXEC_PYTHON
 from combat import item_vars as IV
 from graphics_menu import hud_vars as MV
 from combat.weapon_component import vars as WV
@@ -257,7 +257,7 @@ def _author_apply(ed, in_execs, made, guns):
     among them, or a touched table ends Tick here, and the fragments after it
     (the menu's own rows: new game) are never reached."""
     go, idle = _branch(ed, _get(ed, TUNE_TOUCHED_VAR, made), in_execs, made)
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node

@@ -31,11 +31,11 @@ from graphics_menu.umg_consts import WBP_HUD
 from graphics_menu.wear_consts import (
     WEAR_CLOSE, WEAR_OPEN_VAR, WEAR_PANEL, WEAR_ROWS, WEAR_SEL_VAR, WEAR_SLOTS_BOX,
 )
-from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_VALID
 from uebp.nodes.math import FN_ADD_II, FN_AND, FN_EQ_II, FN_NOT, FN_OR
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_CAST_SLOT, NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.nodes.system import FN_IS_VALID
 from uebp.nodes.umg import FN_CHILD_AT
 from graphics_menu import hud_vars as MV
 
@@ -109,7 +109,7 @@ def author_wear_panel(ed, in_execs):
     closed = set_shown(ed, panel, False, [shut])
     flow = set_shown(ed, panel, True, [shown])
 
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN))
+    pawn = out(_call(ed, FN_GET_OWNING_PAWN))
     comp = _call(ed, FN_GET_COMP, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node

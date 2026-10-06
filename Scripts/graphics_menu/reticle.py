@@ -9,12 +9,11 @@ from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_,
 from combat.seat_tuning import RETICLE_HIDE_SEAT, SEAT_VAR
 from graphics_menu.hit_marker import _author_headshot_mark
 from graphics_menu.scope import _author_scope, _author_scope_gate
-from uebp.nodes.actor import FN_DRAW_RECT, FN_GET_COMP
+from uebp.nodes.actor import FN_DRAW_RECT, FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_BREAK_V2D, FN_FMIN, FN_GREATER_FF, FN_MUL_FF, FN_NOT,
     FN_SUB_FF)
 from uebp.nodes.palette import NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from uebp.nodes.umg import FN_VIEWPORT
 from combat import item_vars as IV
 from graphics_menu import hud_vars as MV
@@ -89,8 +88,7 @@ def _author_reticle(ed, in_execs):
         made.append(n)
         return n
 
-    pawn = keep(_node(ed, FN_GET_PLAYER_PAWN))
-    _set(pawn, "PlayerIndex", 0)
+    pawn = keep(_node(ed, FN_GET_OWNING_PAWN))
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)

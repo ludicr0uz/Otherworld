@@ -19,6 +19,7 @@ from graphics_menu.settings_rows import BACK_LABEL, PAGE_TITLE, SETTINGS_SLOT
 from graphics_menu.umg_checks import _labels, _tree
 from net import session_consts as S
 from net.session_checks import check_session
+from net.owner_checks import check_no_player_zero_pawn
 from net.state_checks import check_no_client_game_mode
 
 BEL = unreal.BlueprintEditorLibrary
@@ -345,6 +346,7 @@ def _check_in_play(check, nodes):
 def check_modes(check, bp, nodes):
     check_session(check)
     check_no_client_game_mode(check)
+    check_no_player_zero_pawn(check)
     _check_trees(check)
     _check_first_rows(check, nodes)
     _check_single(check, nodes)

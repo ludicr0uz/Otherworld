@@ -11,9 +11,8 @@ survival was never built) fails the chain and gets no profile.
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, out, then
 from combat.paths import HEALTH_CLASS_PATH, WEAPON_COMP_CLASS_PATH
 from survival.paths import SURVIVAL_CLASS_PATH
-from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PC
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_GET_OWNING_PC
 from uebp.nodes.palette import NODE_CAST_SURVIVAL
-from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from net.state_graph import CONTROLLER_CLASS_PATH, player_state_of
 
 
@@ -36,7 +35,7 @@ def author_player_parts(ed, in_execs, made):
     Returns (the exec when every cast held, [every CastFailed pin], parts), where
     parts maps each component class path, PAWN and STATE to its typed pin.
     """
-    pawn = _node(ed, FN_GET_PLAYER_PAWN)
+    pawn = _node(ed, FN_GET_OWNING_PAWN)
     made.append(pawn)
     pawn_out = out(pawn)
     parts = {PAWN: pawn_out}

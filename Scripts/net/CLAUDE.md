@@ -33,6 +33,17 @@ owning client: read input  --Server RPC-->  server: validate, change state
 - **Player 0 means nothing on a server.** There, index 0 is whoever joined first (client 2
   in one spike run, client 1 in the next). A component asks its owner, a widget its owning
   player, an NPC chooses among the players.
+  - **Done for what a player owns (M8).** Every HUD fragment reads `FN_GET_OWNING_PAWN`
+    (the HUD's own pawn); the components already asked `GetOwner`, and no animation graph
+    or widget read a pawn by index. `owner_checks.check_no_player_zero_pawn` (the menu
+    verifier) fails on a `GetPlayerPawn` in any HUD, widget, component or animation
+    Blueprint, and on `FN_GET_PLAYER_PAWN` named in `graphics_menu`,
+    `combat/weapon_component`, `clothing` or `loot`. A widget that needs its pawn uses
+    `FN_GET_OWNING_PLAYER_PAWN`. `probe_net_hud_own_pawn.py` is the two-client check.
+  - **Still player 0:** the world actors and the health component's replacement spawn
+    (M9, the one name in `owner_checks.NOT_THE_PLAYERS`), the wanderers (M27), and the
+    weapon component's `GetPlayerController(0)` and camera manager, which are its input
+    and view (M10: polled only on the locally controlled pawn).
 
 ## Where state lives (M7, done)
 
@@ -218,7 +229,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 |---|---|---|---|
 | HUD | **Fixed (M7).** `ReceiveDrawHUD` cast the GameMode, which a client does not have: `Accessed None ... AsBP_Third_Person_Game_Mode` on every rendered client (16 lines a client in a 48 s run). The only runtime error of the spike, and invisible with `-nullrhi` | measured (`--windowed`); the fix measured (`probe_net_player_state.py --windowed`: 0) | M7 done |
 | GameMode readers | **Fixed (M7): "Where state lives", above.** 12 builder modules called `FN_GET_GAME_MODE` and 11 cast to it (combat 4, npc 4, graphics_menu, survival, the menu build); each reads None on a client. Only the HUD's logged, because only it ran | read | M7 done |
-| player 0 | 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
+| player 0 | **The HUD's 15 are fixed (M8):** it reads its owning pawn (measured: `probe_net_hud_own_pawn.py`, headless and `--windowed`). Before: 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
 | health | Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured | M14 |
 | firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | M19, M21 |
 | the loadout and held items | Every process spawns its own copy of each character's six items (not replicated, each with local authority), so the three worlds start alike and part at the first change | measured | M18 |

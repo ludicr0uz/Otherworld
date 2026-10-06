@@ -16,10 +16,9 @@ from graphics_menu.ui_graph import part, set_percent
 from graphics_menu.umg_consts import (
     COL_ST_FILL, COL_ST_SPENT, STAMINA_BAR, ST_GROUP, WBP_HUD,
 )
-from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.math import FN_DIV_FF, FN_SELECT_COLOR
 from uebp.nodes.palette import NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from uebp.nodes.umg import FN_SET_FILL
 from combat.weapon_component import vars as WV
 
@@ -35,8 +34,7 @@ def _author_stamina(ed, in_execs):
         made.append(n)
         return n
 
-    pawn = keep(_node(ed, FN_GET_PLAYER_PAWN))
-    _set(pawn, "PlayerIndex", 0)
+    pawn = keep(_node(ed, FN_GET_OWNING_PAWN))
     comp = keep(_node(ed, FN_GET_COMP))
     _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)

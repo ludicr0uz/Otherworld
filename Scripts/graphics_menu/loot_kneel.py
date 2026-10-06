@@ -27,10 +27,10 @@ from combat.weapon_component.pose_weights import SEARCHING_VAR
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_consts import LOOT_KNEELING_VAR, LOOT_OPEN_VAR
 from graphics_menu.loot_find import put
-from uebp.nodes.actor import FN_GET_COMP, FN_IGNORE_MOVE
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_IGNORE_MOVE
 from uebp.nodes.math import FN_NEQ_BB
 from uebp.nodes.palette import NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.nodes.system import FN_IS_VALID
 
 
 def author_kneel(ed, pc_out, in_execs):
@@ -46,7 +46,7 @@ def author_kneel(ed, pc_out, in_execs):
     still = _call(ed, FN_IGNORE_MOVE, made, self=pc_out, bNewMoveInput=is_open())
     _connect(flow, _pin(still, "execute"))
 
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
     here, no_pawn = _branch(ed, out(_call(ed, FN_IS_VALID, made,
                                            Object=pawn)),
                             [then(still), same], made)

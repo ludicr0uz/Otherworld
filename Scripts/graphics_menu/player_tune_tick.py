@@ -32,11 +32,10 @@ from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.player_tune_consts import PLAYER_SUBJECT, PLAYER_TAB
 from graphics_menu.tune_tabs import other_open_vars
 from graphics_menu.tune_tick import author_tab_flow, declare_tab_vars, tab_defaults
-from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.array import FN_ARR_GET
 from uebp.nodes.math import FN_DIV_FF, FN_MUL_FF
 from uebp.nodes.palette import NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from combat.weapon_component import vars as WV
 
 # What each row writes on the component, and how: a speed is metres to
@@ -70,7 +69,7 @@ def _author_apply(ed, in_execs, made):
     """The table onto the player's weapon component (module docstring).
     Returns the exec tails."""
     go, idle = _branch(ed, _get(ed, PLAYER_TAB.touched_var, made), in_execs, made)
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # the cast exists only for a loaded class

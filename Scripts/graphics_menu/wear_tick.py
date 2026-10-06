@@ -38,11 +38,10 @@ from graphics_menu.wear_consts import (
     WEAR_DOWN, WEAR_KEY, WEAR_OPEN_VAR, WEAR_ROWS, WEAR_SEL_VAR, WEAR_TAKE_KEY,
     WEAR_TAKE_VAR, WEAR_UP,
 )
-from uebp.nodes.actor import FN_GET_COMP, FN_IGNORE_MOVE, FN_WAS_PRESSED
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_IGNORE_MOVE, FN_WAS_PRESSED
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_LESS_II, FN_MAX_II, FN_MIN_II, FN_NEQ_BB, FN_NOT, FN_SUB_II)
 from uebp.nodes.palette import NODE_CAST_WEAPON
-from uebp.nodes.system import FN_GET_PLAYER_PAWN
 from graphics_menu import hud_vars as MV
 
 WEAR_STILL_VAR = "WearStill"
@@ -107,7 +106,7 @@ def _author_still(ed, pc_out, in_execs, made):
 def author_wear_tick(ed, pc_out, in_execs):
     """The whole fragment (see the module docstring). Returns the tails."""
     made = []
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
     comp = _call(ed, FN_GET_COMP, made, self=pawn)
     _pin(comp, "ComponentClass").set_pin_value(WEAPON_COMP_CLASS_PATH)
     unreal.load_asset(WEAPON_COMP_BP_PATH)   # for its cast node

@@ -21,10 +21,10 @@ from combat.paths import HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from graphics_menu.dev_guns import _branch, _call, _get
 from graphics_menu.loot_consts import LOOT_BEST_VAR, LOOT_TARGET_VAR
 from loot.consts import LOOT_RADIUS
-from uebp.nodes.actor import FN_ACTOR_LOC, FN_COMP_LOC, FN_GET_COMP
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_COMP_LOC, FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.math import FN_DISTANCE, FN_LESS_FF, FN_NE_OO
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_HEALTH
-from uebp.nodes.system import FN_ALL_ACTORS, FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID
 from combat import health_vars as HV
 
 CHARACTER_CLASS_PATH = "/Script/Engine.Character"
@@ -52,7 +52,7 @@ def author_find_body(ed, in_execs, made):
     _set(best, LOOT_BEST_VAR, LOOT_RADIUS)
     _connect(flow, _pin(best, "execute"))
 
-    pawn = out(_call(ed, FN_GET_PLAYER_PAWN, made, PlayerIndex=0))
+    pawn = out(_call(ed, FN_GET_OWNING_PAWN, made))
     here, no_pawn = _branch(ed, out(_call(ed, FN_IS_VALID, made, Object=pawn)), [then(best)], made)
     everyone = _node(ed, FN_ALL_ACTORS)
     made.append(everyone)

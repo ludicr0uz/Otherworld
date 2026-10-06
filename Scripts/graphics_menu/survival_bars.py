@@ -18,11 +18,11 @@ from graphics_menu.umg_consts import (
     DEBUFF_LABELS, SURVIVAL_BARS, WBP_HUD, debuff_text, stat_bar, stat_group,
 )
 from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
-from uebp.nodes.actor import FN_GET_COMP
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.gas import FN_GET_ASC, FN_TAG_COUNT
 from uebp.nodes.math import FN_DIV_FF, FN_GREATER_II
 from uebp.nodes.palette import NODE_CAST_SURVIVAL
-from uebp.nodes.system import FN_GET_PLAYER_PAWN, FN_IS_VALID
+from uebp.nodes.system import FN_IS_VALID
 
 
 def _author_bar(ed, survival, stat, exec_in):
@@ -76,8 +76,7 @@ def author_survival_bars(ed, in_execs):
     # class only exists once build_survival.py has run -- which has to be
     # before this builder.
     _must_load(SURVIVAL_BP_PATH)
-    pawn = _node(ed, FN_GET_PLAYER_PAWN)
-    _set(pawn, "PlayerIndex", 0)
+    pawn = _node(ed, FN_GET_OWNING_PAWN)
     pawn_out = out(pawn)
     comp = _node(ed, FN_GET_COMP)
     _connect(pawn_out, _pin(comp, "self"))

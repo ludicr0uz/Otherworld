@@ -11,10 +11,10 @@ from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, t
 from graphics_menu.hud_flash import author_flash
 from graphics_menu.ui_graph import part, set_percent, set_text
 from graphics_menu.umg_consts import HP_BAR, HP_GROUP, HP_NUM, KILLS, WBP_HUD
-from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PC
+from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_GET_OWNING_PC
 from uebp.nodes.math import FN_DIV_FF, FN_ROUND
 from uebp.nodes.palette import NODE_CAST_HEALTH
-from uebp.nodes.system import FN_CONCAT, FN_GET_PLAYER_PAWN, FN_INT_TO_STR
+from uebp.nodes.system import FN_CONCAT, FN_INT_TO_STR
 from net.state_consts import PLAYER_STATE_CLASS_PATH
 from net.state_graph import CONTROLLER_CLASS_PATH, player_state_of
 from combat import health_vars as HV
@@ -29,8 +29,7 @@ def author_hp(ed, in_execs):
     blinks under a quarter (hud_flash.py). Returns the exec pins
     to go on from -- the cast-failed one too, so a pawn with no health
     component still reaches the rest of the HUD."""
-    pawn = _node(ed, FN_GET_PLAYER_PAWN)
-    _set(pawn, "PlayerIndex", 0)
+    pawn = _node(ed, FN_GET_OWNING_PAWN)
     comp = _node(ed, FN_GET_COMP)
     _connect(out(pawn), _pin(comp, "self"))
     _pin(comp, "ComponentClass").set_pin_value(HEALTH_CLASS_PATH)

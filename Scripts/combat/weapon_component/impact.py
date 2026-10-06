@@ -8,12 +8,11 @@ pellets and calls in here on a hit.
 from combat.blood import (
     BLOOD_REFERENCE_DAMAGE, BLOOD_SCALE_MAX, BLOOD_SCALE_MIN,
 )
+from combat.damage import hit, owner_instigator
 from combat.game_state import (
-    DAMAGED_BY_PLAYER_VAR, DAMAGE_TEXT_COLOR, DEBUG_MODE_VAR, LAST_DAMAGE_VAR,
-    TRACE_DEBUG_SECONDS,
+    DAMAGE_TEXT_COLOR, DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS,
 )
 from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, _vec, out, then
-from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR,
     LIMB_BONES_VAR, LIMB_MULT_VAR,
@@ -27,11 +26,10 @@ from uebp.nodes.actor import FN_GET_COMP, FN_TRACE_COMPONENT
 from uebp.nodes.array import FN_ARR_CONTAINS
 from uebp.nodes.math import (
     FN_CLAMP, FN_DIV_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF, FN_ROT_FROM_X,
-    FN_SELECT_FF, FN_SUB_FF, INF)
+    FN_SELECT_FF)
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_SPAWN
-from uebp.nodes.system import FN_CONCAT, FN_DRAW_STRING, FN_FLOAT_TO_STR, FN_TIME_SECONDS
+from uebp.nodes.system import FN_CONCAT, FN_DRAW_STRING, FN_FLOAT_TO_STR
 from uebp import props as EP
-from combat import health_vars as HV
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
 
@@ -102,70 +100,39 @@ def _author_impact(ed, brk, held, exec_in):
     for tail in zoned:
         _connect(tail, _pin(splash, "execute"))
 
-    get_h = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(get_h, "self"))
     dmg_pin, dmg_n = _prop(ed, IV.Damage, held)
     worth, in_head, worth_nodes = _zone_multiplier(ed, as_health)
     scaled = _node(ed, FN_MUL_FF)
     _connect(dmg_pin, _pin(scaled, "A"))
     _connect(worth, _pin(scaled, "B"))
-    sub = _node(ed, FN_SUB_FF)
-    _connect(out(get_h, HV.Health), _pin(sub, "A"))
-    _connect(out(scaled), _pin(sub, "B"))
-    clamp = _node(ed, FN_CLAMP)
-    _connect(out(sub), _pin(clamp, "Value"))
-    _set(clamp, "Min", 0.0)
-    _set(clamp, "Max", INF)
-    set_h = ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(set_h, "self"))
-    _connect(out(clamp), _pin(set_h, HV.Health))
-    _connect(then(splash), _pin(set_h, "execute"))
-
-    # Stamp the hit. Two things read this and nothing else writes it:
+    # The hit itself is the target's to take (damage.py): its TakeHit floors
+    # Health at zero and stamps the blow, on the server alone. On every pellet
+    # rather than only on the killing one: a wanderer that takes a hit and
+    # lives has to show its bar as well.
     #
-    #   LastDamageTime  the HUD floats a wanderer's health bar for a few seconds
-    #                   after it, and hides it the rest of the time;
-    #   DamagedByPlayer what separates a kill from a wanderer that fell through
-    #                   the world -- the safety net writes Health to 0 too, and
-    #                   the kill counter must not count that.
-    #
-    # Written on every pellet rather than only on the killing one: a wanderer
-    # that takes a hit and lives has to show its bar as well.
-    now = _node(ed, FN_TIME_SECONDS)
-    stamp = ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(stamp, "self"))
-    _connect(out(now), _pin(stamp, LAST_DAMAGE_VAR))
-    _connect(then(set_h), _pin(stamp, "execute"))
-
-    blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(blame, "self"))
-    _set(blame, DAMAGED_BY_PLAYER_VAR, True)
-    _connect(then(stamp), _pin(blame, "execute"))
-
-    # ...and which way it came from, for the flinch. The IMPACT NORMAL, not the
+    # Which way it came from, for the flinch, is the IMPACT NORMAL, not the
     # shot's own direction reversed: it is already in the hit result, it already
     # points back out of the surface toward the muzzle, and it is the one that
     # is right for a pellet that grazed a shoulder at an angle. A target shot in
     # the back therefore plays the Back reaction with nothing having measured an
-    # angle. See _author_hit_reaction for what reads it.
-    from_where = ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(from_where, "self"))
-    _connect(_loose_pin(brk, "ImpactNormal", is_input=False),
-             _pin(from_where, LAST_HIT_FROM_VAR))
-    _connect(then(blame), _pin(from_where, "execute"))
+    # angle. See _author_hit_reaction for what reads it. Who struck it is this
+    # character's controller, and with what the gun in hand.
+    who, who_n = owner_instigator(ed)
+    took, take = hit(ed, as_health, out(scaled), _loose_pin(brk, "ImpactNormal", is_input=False),
+                     who, held, [then(splash)])
 
     # A pellet in the head says so to the HUD: the X round the reticle.
-    headed, head_nodes = _author_headshot(ed, in_head, [then(from_where)])
+    headed, head_nodes = _author_headshot(ed, in_head, [took])
 
     shown = _author_damage_readout(ed, brk, out(scaled), worth, headed)
 
     ed.add_comment_to_nodes(
-        "Clamped at zero so an overkill shot cannot drive Health negative -- "
-        "the HUD bar divides by MaxHealth and the death check is Health <= 0, "
-        "and both want a floor.",
+        "A pellet on a body: blood out of the wound, and the target's TakeHit with the "
+        "round's damage times its zone, the impact normal, this character's controller "
+        "and the gun. The target floors its Health at zero and stamps the blow, on the "
+        "server.",
         [mark, landed, comp, cast, blood_cls, where, facing, splash, spray_dmg, ratio, spray,
-         spray_v, get_h, sub, clamp, set_h, now, stamp, blame,
-         from_where])
+         spray_v, *who_n, take])
     ed.add_comment_to_nodes(
         "No health component: the pellet hit the scenery, which chips and "
         "dusts where a body would bleed. The blood's own transform -- impact "

@@ -15,8 +15,6 @@ FN_DELETE_SAVE = "/Script/Engine.GameplayStatics.DeleteGameInSlot"
 FN_DELTA_SECONDS = "/Script/Engine.GameplayStatics.GetWorldDeltaSeconds"
 FN_GET_GAME_MODE = "/Script/Engine.GameplayStatics.GetGameMode"
 FN_GET_GAME_STATE = "/Script/Engine.GameplayStatics.GetGameState"
-# By index into the GameState's PlayerArray.
-FN_GET_PLAYER_STATE = "/Script/Engine.GameplayStatics.GetPlayerState"
 FN_LEVEL_NAME = "/Script/Engine.GameplayStatics.GetCurrentLevelName"
 FN_GET_GAME_INSTANCE = "/Script/Engine.GameplayStatics.GetGameInstance"
 FN_LOAD_SAVE = "/Script/Engine.GameplayStatics.LoadGameFromSlot"

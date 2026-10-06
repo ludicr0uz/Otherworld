@@ -20,6 +20,7 @@ from combat.paths import (
 from combat.skin import player_skin
 from combat.tuning import COMBAT
 from combat.verify.common import (
+    take_hits,
     BEL, PIN, by_pins, cdo, check, component_template, in_pins, load, num_pin,
     out_pins, pin_value,
 )
@@ -224,10 +225,8 @@ def check_knife_blow():
           {f"Get {KNIFE_PENDING_VAR}", f"Get {KNIFE_DUE_VAR}"} <= names, str(sorted(names)))
     # What it takes is a variable, written before the health is: the strike's
     # damage, or more with a hot blade (verify/heat.py checks the more).
-    subs = [n for n in by_pins(wg, "A", "B")
-            if [_title(f) for f in _feeders(n, "B")] == [f"Get {BLOW_DAMAGE_VAR}"]]
-    writes = [n for n in wg if _title(n) == "Set Health"
-              and any(sub in _feeds(BEL.find_input_pin(n, "Health")) for sub in subs)]
+    writes = [n for n in take_hits(wg)
+              if [_title(f) for f in _feeders(n, "Amount")] == [f"Get {BLOW_DAMAGE_VAR}"]]
     plain = [n for n in wg if _title(n) == f"Set {BLOW_DAMAGE_VAR}"
              and num_pin(n, BLOW_DAMAGE_VAR) == COMBAT.knife_damage]
     check(f"...and the body it meets loses {BLOW_DAMAGE_VAR}, which every blow "
@@ -235,10 +234,10 @@ def check_knife_blow():
           len(writes) == 1 and len(plain) == 1
           and any("Cast" in _title(f) or "HealthComponent" in _title(f)
                   for f in _feeders(plain[0], "execute")),
-          f"{len(subs)} subtract(s), {len(writes)} write(s), {len(plain)} start(s)")
-    from_where = [n for n in wg if _title(n) == "Set LastHitFrom"
-                  and any(is_knife_sweep(t) for b in _feeders(n, "LastHitFrom")
-                          for t in _feeders(b, "Hit"))]
+          f"{len(writes)} TakeHit call(s), {len(plain)} start(s)")
+    from_where = [n for n in writes
+                  if any(is_knife_sweep(t) for b in _feeders(n, "From")
+                         for t in _feeders(b, "Hit"))]
     check("...stamped like a pellet, down to which way the flinch goes",
           len(from_where) == 1, str(len(from_where)))
 

@@ -15,7 +15,7 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None, source=
     """Play a random element of the ``var_name`` sound array at ``at_pin``,
     at ``volume_pin`` if one is given (the stance's StepVolume). ``source``
     is the array's pin where it is not this graph's own variable (an item's
-    takes, read off the item).
+    takes, read off the item). ``exec_in`` is one exec pin, or several.
 
     Returns ``(nodes, then_pin)``.  The array is guarded on its own length:
     RandomIntegerInRange(0, -1) against an empty array feeds Array_Get an index
@@ -49,7 +49,8 @@ def _author_random_sound(ed, var_name, at_pin, exec_in, volume_pin=None, source=
 
     have = keep(ed.add_branch_node())
     _connect(out(stocked), _pin(have, "Condition"))
-    _connect(exec_in, _pin(have, "execute"))
+    for pin in (exec_in if isinstance(exec_in, (list, tuple)) else (exec_in,)):
+        _connect(pin, _pin(have, "execute"))
 
     # RandomIntegerInRange is inclusive at both ends, so the top is length - 1.
     top = keep(_node(ed, FN_SUB_II))

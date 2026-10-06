@@ -15,6 +15,7 @@ from combat.tuning import COMBAT
 from combat.verify.fixtures import char, npc, wg
 from combat.verify.throw_strike import is_strike_node
 from combat.verify.common import (
+    take_hits,
     BEL, PIN, _mesh_asset, check, in_pins, load, num_pin, pin_value, titled,
     zone_tables,
 )
@@ -138,10 +139,10 @@ def check_player_body():
               for q in PIN.list_connected_pins(BEL.find_input_pin(n, "TargetArray"))}
     check("the struck bone is looked up in both of the TARGET's tables",
           {f"Get {HEAD_BONES_VAR}", f"Get {LIMB_BONES_VAR}"} <= tables, str(tables))
-    # The damage subtraction's B must be Damage x multiplier, not raw Damage.
+    # What the pellet's TakeHit is told must be Damage x multiplier, not raw Damage.
     scaled = False
-    for n in titled(wt, "float - float"):
-        for q in PIN.list_connected_pins(BEL.find_input_pin(n, "B")):
+    for n in take_hits(wt):
+        for q in PIN.list_connected_pins(BEL.find_input_pin(n, "Amount")):
             mul = PIN.get_owning_node(q)
             if "*" not in str(BEL.get_node_title(mul)):
                 continue

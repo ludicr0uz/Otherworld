@@ -43,7 +43,8 @@ owning client: read input  --Server RPC-->  server: validate, change state
   - **Done for everything else (M9): "Who is nearby", below.** `GetPlayerPawn` is gone
     from the node catalog, and the same check fails on any builder that names it.
   - **Done for the controller and the camera (M10): "Input", below.**
-  - **Still player 0:** a kill's credit (`state_graph.first_player_state`, M14).
+  - **Done for a kill's credit (M14):** it is the blow's instigator's ("Health and
+    damage", below). `state_graph.first_player_state` and `FN_GET_PLAYER_STATE` are gone.
 
 ## A screen asks, the character acts (M11, done)
 
@@ -206,6 +207,61 @@ first by **the mirror** (`combat/weapon_component/look.py`), from the few facts 
   smaller (a proxy's capsule is), stands. They disagree until one walks off. A probe that
   changes stance walks clear first; the fix is player starts (M16).
 
+## Health and damage (M14, done)
+
+Health is the value a cheater most wants, so only the server changes it, and every blow
+says who struck it. `combat/damage.py` is the whole of it.
+
+- **A blow calls the target's `TakeHit(Amount, From, InstigatedBy, Cause)`,** a custom
+  event on `BP_HealthComponent`, with `damage.hit(ed, as_health, amount, came_from,
+  instigator, cause, execs)`. No graph writes another body's `Health`, `LastDamageTime`,
+  `LastHitFrom` or `DamagedByPlayer` (`combat/verify/damage.py` fails on one in the weapon
+  component, `npc/verify.py` in a wanderer's controller).
+  - **The instigator is a controller:** `damage.owner_instigator(ed)` from a component's
+    graph (its owner's `GetInstigatorController`; a pawn is its own instigator), the
+    wanderer's own from its swing. **The cause is an actor:** the gun, the item in hand
+    (none for a fist), the thrown blade, the wanderer.
+  - **`TakeHit` is not an RPC.** It runs behind Switch Has Authority: called on a client's
+    copy it does nothing, and no client can send it. A client's blow reaches the server
+    when its action does (the shot: M19; melee: M20; a throw: M21), and the server's copy
+    of that action calls `TakeHit`. Until then a client of a server hurts nothing.
+  - It floors `Health` at 0, stamps `LastDamageTime`, keeps `LastHitFrom`,
+    `LastInstigator` and `LastCause`, and sets `DamagedByPlayer` where the instigator is a
+    PlayerController (so a wanderer's blow blames no player, as before).
+- **What travels,** to everyone: `Health` (RepNotify), `MaxHealth`, `Dead`, `HitCount`,
+  `LastHitFrom`, `NpcId`. The component replicates (its own default, and on the character
+  and the wanderer). `LastInstigator` and `LastCause` stay on the server.
+- **A client's copy ticks as the server's does** and reads what arrived: the HUD's bar and
+  the heartbeat off `Health`, the flinch off its drop, the collapse off `Health` at 0.
+  `OnRep_Health` (a client only: its Remote arm) makes that right:
+  - `HitCount` moved with it: a blow. `LastDamageTime` is stamped with **this machine's
+    clock** (it is never replicated: each machine's game time is its own), which the bar
+    over a wanderer and the grunt read; `PrevHealth` is left behind, so the Tick flinches.
+  - It did not: a drain, a heal, a wanderer's maximum. `PrevHealth` follows `Health`, as
+    the drain keeps it on the server, and nothing flinches.
+- **The server's alone, in the Tick:** the world-floor net and the debuff drain (behind
+  one switch at its head), `Dead`, the kill and its drops, the replacement.
+- **`Dead` is the server's word; `DeathPlayed` is each machine's latch** for "this copy has
+  run the death path" (the cry, the collapse). They are two variables because `Dead` can
+  arrive before a client's Tick has seen `Health` at 0, and the path would then never run.
+- **The heartbeat is the local player's** (`IsLocallyControlled`): another player's
+  character has a health component on this machine too.
+- **Still written directly, each on the server:** a heal (`survival/easy_heal.py`: the
+  consume ability, M26), a wanderer's maximum at possession (`npc/stats.py`), a loaded
+  profile (standalone). A Blueprint `Set` of a RepNotify calls `OnRep_Health` on that
+  machine too, where its Remote arm does nothing.
+- **A drain's death is nobody's kill yet:** bleeding out after a player's blow is not
+  credited (the drain names no one). PvP credit is M15's.
+- **A probe** takes health with `health.call_method("TakeHit", (amount, vector, controller,
+  actor))` on the server (or in single player); a probe's own write of `Health` on a
+  client is that client's copy alone, until the server next sends one.
+- **The check:** `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_health.py`: a zombie stood beside client 1 hits them, and the
+  server, client 1 (its bar) and client 2 (its copy; its own bar unmoved) agree; a kill
+  naming client 2's controller is client 2's; client 2's own `TakeHit` calls change
+  nothing; at 20 HP the heart is heard on client 1 alone; at 0 `Dead` reaches both.
+  `--game` runs its single-player arm.
+
 ## Who is nearby (M9, done)
 
 A world actor, a wanderer's controller or any graph that is not a player's own asks
@@ -263,10 +319,11 @@ by the weapons build and named on the GameMode (`state.py`):
   A client that must change state asks with a Server event on something it owns. The debug
   row and the difficulty therefore do nothing as a client of a server: the dev settings' row
   of the mode table, until a later task lets the server allow them.
-- **Kills are credited to player 0's PlayerState** (`state_graph.first_player_state`): no
-  blow says yet who struck it. Right in single player; M14's instigator replaces it.
-- **The wanderer's number (`NpcId`) is taken on the server only,** so a client's debug
-  overlay draws 0 beside each health bar until the health component replicates (M14).
+- **A kill is credited to the PlayerState of the controller that struck the last blow**
+  (the health component's `LastInstigator`, M14: "Health and damage", below). A death
+  nobody struck (the world-floor net) is nobody's.
+- **The wanderer's number (`NpcId`) is taken on the server only** and replicates with the
+  health component (M14), so a client's debug overlay draws the server's number.
 - **A probe** reads them with `p.game_state()` and `p.player_state()`; on a server, each of
   `p.players()` has its `.player_state`, and `player_id` is the one name a server and a
   client share for a player (`probe_net_player_state.py`).
@@ -422,7 +479,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | HUD | **Fixed (M7).** `ReceiveDrawHUD` cast the GameMode, which a client does not have: `Accessed None ... AsBP_Third_Person_Game_Mode` on every rendered client (16 lines a client in a 48 s run). The only runtime error of the spike, and invisible with `-nullrhi` | measured (`--windowed`); the fix measured (`probe_net_player_state.py --windowed`: 0) | M7 done |
 | GameMode readers | **Fixed (M7): "Where state lives", above.** 12 builder modules called `FN_GET_GAME_MODE` and 11 cast to it (combat 4, npc 4, graphics_menu, survival, the menu build); each reads None on a client. Only the HUD's logged, because only it ran | read | M7 done |
 | player 0 | **Fixed (M8, M9).** The HUD reads its owning pawn (measured: `probe_net_hud_own_pawn.py`, headless and `--windowed`); the world actors and the wanderers ask the living players ("Who is nearby"; measured: `probe_net_living_players.py`, the cold falls on both players and the nearest to the second player is the second). Before: 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
-| health | Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured | M14 |
+| health | **Fixed (M14): "Health and damage", above.** Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured; the fix measured (`probe_net_health.py`) | M14 done |
 | firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | M19, M21 |
 | the loadout and held items | Every process spawns its own copy of each character's six items (not replicated, each with local authority), so the three worlds start alike and part at the first change | measured | M18 |
 | items on the ground | The 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
@@ -447,8 +504,9 @@ contradicts it, this is what holds):
 - **M13, M27:** wanderers already replicate their movement to clients with the AI on the
   server only. What is missing for them is what the animation graph and the sounds read,
   and the choice of target.
-- **M14:** "damage ... always carries an instigator" starts from no damage event at all:
-  the weapon writes `Health` on the component. The engine's `ApplyDamage` reaches nothing.
+- **M14 (done):** "damage ... always carries an instigator" started from no damage event at
+  all: the weapon wrote `Health` on the component. The event is the component's own
+  `TakeHit` ("Health and damage"); the engine's `ApplyDamage` still reaches nothing.
 - **M16:** "a random player start" needs player starts: the level generator places one.
 - **M18:** the starting loadout is spawned by every process today; the server alone must
   spawn it, as replicated actors, or the client's local copies must go.

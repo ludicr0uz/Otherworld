@@ -10,7 +10,6 @@ failed cast is an "Accessed None".
     owned_game_state    the same, where this machine may write it
     player_state_of     a controller's or a pawn's player state
     owner_player_state  a component's: its owning pawn's
-    first_player_state  player 0's (see the note on it)
     server_game_mode    the GameMode, behind the authority switch: the one
                         way a graph that can run on a client reaches it
                         (state_checks.check_no_client_game_mode)
@@ -18,12 +17,12 @@ failed cast is an "Accessed None".
 
 from collections import namedtuple
 
-from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, else_, out, then
 from uebp.nodes.actor import FN_GET_OWNER, FN_HAS_AUTHORITY
 from uebp.nodes.palette import (
     MACRO_SWITCH_AUTHORITY, MACRO_SWITCH_AUTHORITY_COMP, NODE_CAST_GAME_MODE,
     NODE_CAST_GAME_STATE, NODE_CAST_PAWN, NODE_CAST_PLAYER_STATE)
-from uebp.nodes.system import FN_GET_GAME_MODE, FN_GET_GAME_STATE, FN_GET_PLAYER_STATE
+from uebp.nodes.system import FN_GET_GAME_MODE, FN_GET_GAME_STATE
 
 Got = namedtuple("Got", "pin then fails nodes")
 
@@ -81,17 +80,6 @@ def owner_player_state(ed, in_execs):
     got = player_state_of(ed, pawn, PAWN_CLASS_PATH, [then(as_pawn)])
     return Got(got.pin, got.then, [out(as_pawn, "CastFailed")] + got.fails,
                [owner, as_pawn] + got.nodes)
-
-
-def first_player_state(ed, in_execs):
-    """Player 0's, by the GameState's list. Right in single player; on a
-    server it is whoever joined first, so nothing may keep it once the thing
-    it stands in for exists (a kill's is the instigator, task M14)."""
-    get = _node(ed, FN_GET_PLAYER_STATE)
-    _set(get, "PlayerStateIndex", 0)
-    cast, pin = _cast(ed, NODE_CAST_PLAYER_STATE, "AsBPOtherworldPlayerState",
-                      out(get), in_execs)
-    return Got(pin, then(cast), [out(cast, "CastFailed")], [get, cast])
 
 
 def server_game_mode(ed, in_execs, component=True):

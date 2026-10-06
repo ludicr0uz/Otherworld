@@ -54,5 +54,7 @@ def check_easy_heal(nodes):
           str([BEL.find_input_pin(n, "B").get_pin_value() for n in easy]))
     titles = {str(BEL.get_node_title(n)) for n in nodes}
     check("...and adds the item's HealthRestoreEasy to Health",
-          {"Get HealthRestoreEasy", "Set Health", "Get MaxHealth"} <= titles,
+          {"Get HealthRestoreEasy", "Get MaxHealth"} <= titles
+          # Health is a RepNotify (combat/damage.py), and its Set is titled so.
+          and titles & {"Set with Notify Health", "Set Health"},
           str(sorted(t for t in titles if "Health" in t)))

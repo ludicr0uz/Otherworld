@@ -66,6 +66,11 @@ def _ins(n):
     return {str(PIN.get_pin_name(p)) for p in BEL.list_input_pins(n)}
 
 
+def _take_hits(nodes):
+    """The calls of BP_HealthComponent's TakeHit (combat/damage.py): a blow."""
+    return [n for n in nodes if {"Amount", "From", "InstigatedBy", "Cause"} <= _ins(n)]
+
+
 def _lit(n, pin):
     return str(PIN.get_pin_value(BEL.find_input_pin(n, pin)))
 
@@ -422,16 +427,14 @@ def check_player_guard(tag, nodes, spec):
           f"{COMBAT.block_damage_scale:g}x it on the player's guard",
           len(sets) == 2 and len(full) == 1 and len(soft) == 1
           and 0.0 < COMBAT.block_damage_scale < 1.0, f"{len(sets)} sets")
-    hurts = [n for n in _titled(nodes, "float - float")
-             if {_title(f) for f in _feeders(n, "A")} == {"Get Health"}]
-    check(f"{tag}: the Health write subtracts {HIT_DAMAGE_VAR}, not a literal",
+    # The swing does not write the player's Health: it calls their health
+    # component's TakeHit (combat/damage.py), which the server alone runs.
+    hurts = _take_hits(nodes)
+    check(f"{tag}: the player's TakeHit is told {HIT_DAMAGE_VAR}, not a literal",
           len(hurts) == 1
-          and {_title(f) for f in _feeders(hurts[0], "B")} == {f"Get {HIT_DAMAGE_VAR}"},
-          f"{[_lit(n, 'B') for n in hurts]}")
-    # The player's Health write, told from this creature's own (stats.py) by
-    # what runs it.
-    writes = [n for n in _titled(nodes, "Set Health")
-              if f"Set {HIT_DAMAGE_VAR}" in {_title(d) for d in _drivers(n)}]
+          and {_title(f) for f in _feeders(hurts[0], "Amount")} == {f"Get {HIT_DAMAGE_VAR}"},
+          f"{[_lit(n, 'Amount') for n in hurts]}")
+    writes = hurts
     check(f"{tag}: ...and runs only after {HIT_DAMAGE_VAR} is set, on both arms",
           len(writes) == 1 and sorted(_title(d) for d in _drivers(writes[0]))
           == [f"Set {HIT_DAMAGE_VAR}"] * 2,
@@ -457,13 +460,17 @@ def check_player_guard(tag, nodes, spec):
           len(full) == 1 and len(into_full) == 2 and "Branch" in into_full,
           f"{into_full}")
     # The HUD's save-and-exit is called off by a hit, and reads it off this.
-    stamps = _titled(nodes, "Set LastDamageTime")
-    check(f"{tag}: a landed swing stamps the player's LastDamageTime with the "
-          f"game time, after its bearing",
-          len(stamps) == 1
-          and any("Time" in _title(f) for f in _feeders(stamps[0], "LastDamageTime"))
-          and [_title(d) for d in _drivers(stamps[0])] == ["Set LastHitFrom"],
-          f"{[[_title(d) for d in _drivers(n)] for n in stamps]}")
+    # TakeHit stamps LastDamageTime there, and is told the rest.
+    told = {pin: [_title(f).replace(" ", "") for h in hurts for f in _feeders(h, pin)]
+            for pin in ("From", "InstigatedBy", "Cause")}
+    check(f"{tag}: a landed swing says which way it came (its bearing), who struck it "
+          f"(this wanderer's controller) and with what (the wanderer); the graph itself "
+          f"writes no Health, LastDamageTime or LastHitFrom on the player",
+          told["From"] == ["Normalize"] and told["InstigatedBy"] == ["GetInstigatorController"]
+          and told["Cause"] == ["GetControlledPawn"]
+          and not [n for t in ("Set LastDamageTime", "Set LastHitFrom")
+                   for n in _titled(nodes, t)],
+          f"{told}")
 
 
 def run():

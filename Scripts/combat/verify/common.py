@@ -53,6 +53,17 @@ def by_pins(nodes, *required):
     return [n for n in nodes if want <= in_pins(n)]
 
 
+def take_hits(nodes):
+    """The calls of BP_HealthComponent's TakeHit (combat/damage.py): the one
+    way a blow takes health. The event itself has these as outputs."""
+    return by_pins(nodes, "Amount", "From", "InstigatedBy", "Cause")
+
+
+# A write of Health, as its node is titled now that Health is a RepNotify
+# (and as it was before).
+HEALTH_SETS = ("Set with Notify Health", "Set Health", "SET Health")
+
+
 def pin_value(node, name):
     return str(PIN.get_pin_value(BEL.find_input_pin(node, name)))
 

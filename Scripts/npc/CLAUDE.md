@@ -108,11 +108,13 @@ Wanderer (selector)
     `A_Zombie01_Mx_Scary_ZombieAttack` (`asset_pipeline/import_mixamo.py`). Its own
     `MM_Attack_01` is the fallback when that clip is missing, and the never-spawned parent
     controller always holds it. `probes/probe_zombie_mixamo.py` proves the swing plays it.
-  - Damage is dealt by writing `Health` on the player's component, because
-    `ApplyDamage`/`AnyDamage` would need a graph on the Enhanced Input template character.
+  - Damage is dealt by calling `TakeHit` on the player's health component
+    (`combat/damage.py`: only the server runs it), told the swing's bearing, this
+    wanderer's controller and the wanderer. Not the engine's `ApplyDamage`/`AnyDamage`,
+    which would need a graph on the Enhanced Input template character.
   - If `BP_HealthComponent` is missing, the NPC only chases.
-  - A landed swing also stamps the player's `LastDamageTime` with the game time, after
-    `LastHitFrom`. The HUD's save-and-exit countdown is called off by it.
+  - `TakeHit` stamps the player's `LastDamageTime` with the game time and keeps the
+    bearing as `LastHitFrom`. The save-and-exit countdown is called off by the first.
   - **The player's guard** (`block.py`) sets the per-controller `HitDamage` before the Health
     write: a quarter of `TuneMeleeDamage` and 20 of the player's stamina when the player is
     `Blocking` and faces the swing (within 60°), otherwise `TuneMeleeDamage` (10). See `Scripts/combat/docs/stance.md`, "Blocking".

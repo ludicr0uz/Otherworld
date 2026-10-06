@@ -3,7 +3,7 @@ the name, the pin type and the default (uebp/vars.py). The builder declares
 TABLE; a row with no type is a component, or a variable declared elsewhere.
 """
 
-from uebp.vars import BOOL, FLOAT, VECTOR, Var, array, cls, obj
+from uebp.vars import BOOL, FLOAT, INT, VECTOR, Var, array, cls, obj
 from combat.tuning import COMBAT
 
 Health = Var("Health", FLOAT, COMBAT.start_health)
@@ -35,8 +35,22 @@ HeardDamageTime = Var("HeardDamageTime", FLOAT)
 # The low-health heartbeat, and when it may next be played (Sound/sound_world.py).
 HeartbeatSounds = Var("HeartbeatSounds", array(obj("/Script/Engine.SoundBase")))
 HeartbeatNextTime = Var("HeartbeatNextTime", FLOAT, 0.0)
+# Damage (damage.py). Who struck the last blow, and with what: the controller
+# a kill is credited to, and the weapon, the thrown blade or the wanderer.
+# The server's alone: a client has no controller but its own.
+LastInstigator = Var("LastInstigator", obj("/Script/Engine.Controller"))
+LastCause = Var("LastCause", obj("/Script/Engine.Actor"))
+# How many blows have taken health off this body. Replicated beside Health,
+# and what tells a client a blow from a drain; SeenHits is the count a client
+# has already answered.
+HitCount = Var("HitCount", INT, 0)
+SeenHits = Var("SeenHits", INT, 0)
+# This machine has run the death path. Its own, never replicated: Dead is the
+# server's word and can arrive before this copy's Tick has seen Health at 0.
+DeathPlayed = Var("DeathPlayed", BOOL, False)
 
 TABLE = (
     Health, MaxHealth, Dead, DespawnOnDeath, RespawnClass, AmmoClass, DropClasses,
     RespawnPoint, HurtSounds, DeathSounds, HeardDamageTime, HeartbeatSounds, HeartbeatNextTime,
+    LastInstigator, LastCause, HitCount, SeenHits, DeathPlayed,
 )

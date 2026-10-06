@@ -81,10 +81,9 @@ and ThrowBone and ThrowSkin, which build.py declares too.
 """
 
 from combat.chop_tuning import CHOPS_VAR
-from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
+from combat.damage import hit as take_hit, owner_instigator
 from uebp.graph import (
     BEL, _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.hit_zones import HEAD_BONES_VAR, HEAD_MULT_VAR
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
 from combat.throw_tuning import (
@@ -100,12 +99,11 @@ from uebp.nodes.actor import (
     FN_TRACE_COMPONENT)
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_CONTAINS
 from uebp.nodes.math import (
-    FN_ADD_VV, FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_CLAMP, FN_COMPOSE_ROT, FN_GREATER_FF,
+    FN_ADD_VV, FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_COMPOSE_ROT, FN_GREATER_FF,
     FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF, FN_NE_NAME, FN_NORMAL,
-    FN_NOT, FN_ROTATE_VECTOR, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV, INF)
+    FN_NOT, FN_ROTATE_VECTOR, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV)
 from uebp.nodes.palette import (
     NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_CAST_INSTANCED, NODE_SPAWN)
-from uebp.nodes.system import FN_TIME_SECONDS
 from uebp import props as EP
 from combat import health_vars as HV
 from combat import item_vars as IV
@@ -150,38 +148,14 @@ def _head_worth(ed, as_health, damage):
     return out(dealt), out(in_head), [bone, heads_n, in_head, worth_n, scale, dealt]
 
 
-def _author_wound(ed, as_health, damage, brk, execs):
-    """Take ``damage`` off the body and leave the three stamps a pellet does
-    (impact.py): the health bar, the kill's credit, which way the flinch
-    goes. Returns the exec pin after them, and the nodes."""
-    get_h = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(get_h, "self"))
-    sub = _node(ed, FN_SUB_FF)
-    _connect(out(get_h, HV.Health), _pin(sub, "A"))
-    _connect(damage, _pin(sub, "B"))
-    clamp = _node(ed, FN_CLAMP)
-    _connect(out(sub), _pin(clamp, "Value"))
-    _set(clamp, "Min", 0.0)
-    _set(clamp, "Max", INF)
-    set_h = ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(set_h, "self"))
-    _connect(out(clamp), _pin(set_h, HV.Health))
-    for pin in execs:
-        _connect(pin, _pin(set_h, "execute"))
-    now = _node(ed, FN_TIME_SECONDS)
-    stamp = ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(stamp, "self"))
-    _connect(out(now), _pin(stamp, LAST_DAMAGE_VAR))
-    _connect(then(set_h), _pin(stamp, "execute"))
-    blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(blame, "self"))
-    _set(blame, DAMAGED_BY_PLAYER_VAR, True)
-    _connect(then(stamp), _pin(blame, "execute"))
-    from_where = ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(from_where, "self"))
-    _connect(_hit(brk, "ImpactNormal"), _pin(from_where, LAST_HIT_FROM_VAR))
-    _connect(then(blame), _pin(from_where, "execute"))
-    return then(from_where), [set_h, stamp, blame, from_where]
+def _author_wound(ed, as_health, damage, thrown, brk, execs):
+    """Take ``damage`` off the body: its TakeHit (damage.py), stamped as a
+    pellet's is (impact.py), the thrower's controller struck it and ``thrown``
+    is what with. Returns the exec pin after it, and the nodes."""
+    who, who_n = owner_instigator(ed)
+    took, take = take_hit(ed, as_health, damage, _hit(brk, "ImpactNormal"), who, thrown,
+                          execs)
+    return took, [*who_n, take]
 
 
 def _author_lodge(ed, thrown, brk, on, exec_in):
@@ -362,7 +336,7 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     # Where it went in comes first: the wound asks whether that is the head.
     known, mesh_out, skin_nodes = _author_skin(ed, brk, then(body))
     dealt, in_head, worth_nodes = _head_worth(ed, as_health, damage)
-    wounded, wound_nodes = _author_wound(ed, as_health, dealt, brk, known)
+    wounded, wound_nodes = _author_wound(ed, as_health, dealt, thrown, brk, known)
     # A blade in the head says so to the HUD, as a pellet does (headshot.py).
     wounded, head_nodes = _author_headshot(ed, in_head, [wounded])
     # The one transform serves the blood and the chips, as a pellet's does:

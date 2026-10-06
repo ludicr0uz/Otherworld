@@ -71,8 +71,10 @@ def install_on_character(health_bp, weapon_bp, footstep_bp):
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     # The weapon component replicates (the look: weapon_component/look.py),
-    # on this character too: a template's default, written after a compile.
+    # and the health component (damage.py), on this character too: a
+    # template's default, written after a compile.
     net.replicate_component(bp, "WeaponComponent")
+    net.replicate_component(bp, "HealthComponent")
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ThirdPersonCharacter failed to compile")
     eas.save_loaded_asset(bp)
@@ -125,6 +127,11 @@ def install_on_npc(health_bp, footstep_bp):
     # possession by its own AI controller -- the same route its health takes.
     install_hit_reactions(bp, handle)
 
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_ForestWanderer failed to compile")
+    # Its health replicates as the player's does (damage.py): a template's
+    # default, written after a compile.
+    net.replicate_component(bp, "HealthComponent")
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_ForestWanderer failed to compile")
     eas.save_loaded_asset(bp)

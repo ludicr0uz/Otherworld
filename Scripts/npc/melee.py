@@ -3,12 +3,12 @@ its direction, the impact sound, and what the hit can leave on the player
 (the on-hit effects: survival/on_hit.py).
 """
 
-from combat.game_state import LAST_DAMAGE_VAR
+from combat.damage import hit as take_hit
 from forest_generator.npc_placement import (
     NPC_MELEE_BLEND_S, NPC_MELEE_MONTAGE, NPC_MELEE_MONTAGE_FALLBACK,
 )
 from npc.paths import (
-    ATTACK_VOICES_VAR, HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR, LAST_HIT_FROM_VAR,
+    ATTACK_VOICES_VAR, HEALTH_BP_PATH, HEALTH_CLASS_PATH, HIT_DAMAGE_VAR, HIT_SOUNDS_VAR,
     MELEE_SLOT)
 from npc.graph import _log
 from net.players import nearest_living_player, player_pin
@@ -21,14 +21,13 @@ from Sound.play import _author_random_sound
 from npc.tuned import tuned
 from survival.on_hit_graph import _author_on_hit
 from uebp.nodes.actor import (
-    FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_PAWN, FN_PLAY_SLOT)
+    FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_INSTIGATOR_CONTROLLER, FN_GET_PAWN,
+    FN_PLAY_SLOT)
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_AND, FN_CLAMP, FN_DISTANCE, FN_GE_FF, FN_LE_FF, FN_NORMAL, FN_SUB_FF,
-    FN_SUB_VV, INF)
+    FN_ADD_FF, FN_AND, FN_DISTANCE, FN_GE_FF, FN_LE_FF, FN_NORMAL, FN_SUB_VV)
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_TIME_SECONDS
 from uebp import props as EP
-from combat import health_vars as HV
 from npc import controller_vars as NV
 
 
@@ -210,52 +209,38 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     # Its nodes stay out of `made`: they have their own comment box.
     _, guarded = _author_block_check(ed, then(hit), player_out, bearing_out)
 
-    read = keep(ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
-    _connect(as_health, _pin(read, "self"))
-    hurt = keep(_node(ed, FN_SUB_FF))
-    _connect(out(read, HV.Health), _pin(hurt, "A"))
+    # The player takes it: their health component's TakeHit (combat/damage.py),
+    # which only the server runs, as only the server runs this controller.
+    #
+    # Which way it came from: the player's flinch is picked by direction, and a
+    # punch has no impact normal to read it off -- so it is stated: the bearing
+    # above.  Whichever of the ten lands the blow states its own bearing, so
+    # being surrounded reads as being hit from all sides rather than as one
+    # repeated stagger.
+    #
+    # When: TakeHit stamps the moment the player was last hit. The save-and-exit
+    # countdown reads it, because being hit calls the exit off. A time rather
+    # than a flag: nothing has to clear it, and a drop in Health would also
+    # count the starvation drain, which is not a hit.
+    #
+    # Who and with what: this wanderer's controller, and the wanderer.
     dealt = keep(ed.add_get_member_variable_node(HIT_DAMAGE_VAR))
-    _connect(out(dealt, HIT_DAMAGE_VAR), _pin(hurt, "B"))
-    floor = keep(_node(ed, FN_CLAMP))
-    _connect(out(hurt), _pin(floor, "Value"))
-    _set(floor, "Min", 0.0)
-    _set(floor, "Max", INF)
-    write = keep(ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH))
-    _connect(as_health, _pin(write, "self"))
-    _connect(out(floor), _pin(write, HV.Health))
-    for tail in guarded:
-        _connect(tail, _pin(write, "execute"))
-
-    # --- and which way it came from ------------------------------------------
-    # The player's flinch is picked by direction, and a punch has no impact
-    # normal to read it off -- so it is stated: the bearing above.  Whichever of
-    # the ten lands the blow writes its own bearing, so being surrounded reads
-    # as being hit from all sides rather than as one repeated stagger.
-    came_from = keep(ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH))
-    _connect(as_health, _pin(came_from, "self"))
-    _connect(bearing_out, _pin(came_from, LAST_HIT_FROM_VAR))
-
-    # --- and when: the moment the player was last hit ------------------------
-    # The HUD's save-and-exit countdown reads it, because being hit calls the
-    # exit off. A time rather than a flag: nothing has to clear it, and a drop
-    # in Health would also count the starvation drain, which is not a hit.
-    struck = keep(ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH))
-    _connect(as_health, _pin(struck, "self"))
-    _connect(out(now), _pin(struck, LAST_DAMAGE_VAR))
-    _connect(then(came_from), _pin(struck, "execute"))
+    who = keep(_node(ed, FN_GET_INSTIGATOR_CONTROLLER))
+    _connect(out(self_pawn), _pin(who, "self"))
+    struck_out, struck = take_hit(ed, as_health, out(dealt, HIT_DAMAGE_VAR), bearing_out,
+                                  out(who), out(self_pawn), guarded)
+    keep(struck)
 
     # --- and, when the combat trace is on, say who did it -------------------
-    # Between the hit and its bearing, so the line quotes the health just
-    # written. Every exit of the trace, logged or not, carries on to the bearing.
+    # After the hit, so the line quotes the health just written. Every exit of
+    # the trace, logged or not, carries on to the thud.
     # The trace's nodes stay out of `made`: they have their own comment box.
     _, trace_tails = _author_melee_trace(
-        ed, then(write),
+        ed, struck_out,
         out(self_pawn),
         out(self_loc), player_out,
         out(player_loc),
         out(gap), as_health)
-    for tail in trace_tails:
-        _connect(tail, _pin(came_from, "execute"))
 
     # --- and make a noise landing it ----------------------------------------
     # At the PLAYER's location rather than the wanderer's: the sound is the
@@ -263,7 +248,8 @@ def _author_melee(ed, after_move, delay, melee_anim=None, on_hit=(),
     # around one player the difference is audible -- from the attacker it
     # smears around the listener, from the target it is one solid thump in
     # front of them.
-    thud, after_thud = _author_random_sound(ed, HIT_SOUNDS_VAR, out(player_loc), then(struck))
+    thud, after_thud = _author_random_sound(ed, HIT_SOUNDS_VAR, out(player_loc),
+                                            list(trace_tails))
     made.extend(thud)
 
     # --- and the timers it starts over --------------------------------------

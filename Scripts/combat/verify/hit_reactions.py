@@ -21,6 +21,7 @@ from combat.verify.fixtures import (
 from combat.verify.knife import is_melee_write
 from combat.verify.throw_strike import is_strike_node
 from combat.verify.common import (
+    take_hits,
     BEL, PIN, _mesh_asset, by_pins, check, component_template, has_in_pin,
     load, num_pin, pin_value, titled,
 )
@@ -243,16 +244,15 @@ def check_flinching():
     # way.
     # (The punch's and the knife's blows write it too; verify/punch.py and
     # verify/knife.py check those; a thrown blade's is verify/throw_strike.py's.)
-    _from_writes = [n for n in wg if has_in_pin(n, LAST_HIT_FROM_VAR)
-                    and not is_melee_write(n, LAST_HIT_FROM_VAR)
-                    and not is_strike_node(n)]
-    check(f"the pellet loop records {LAST_HIT_FROM_VAR} where it lands",
+    # A blow tells the target's TakeHit (combat/damage.py), which writes it.
+    _from_writes = [n for n in take_hits(wg)
+                    if not is_melee_write(n, "From") and not is_strike_node(n)]
+    check(f"the pellet loop tells the target which way it came ({LAST_HIT_FROM_VAR}) "
+          "where it lands",
           len(_from_writes) == 1, str(len(_from_writes)))
     if _from_writes:
-        _src = [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
-            BEL.find_input_pin(_from_writes[0], LAST_HIT_FROM_VAR))]
         _src_pin = PIN.list_connected_pins(
-            BEL.find_input_pin(_from_writes[0], LAST_HIT_FROM_VAR))
+            BEL.find_input_pin(_from_writes[0], "From"))
         check("...off the hit's own impact normal, which already points back up the "
               "shot",
               [str(PIN.get_pin_name(q)).replace(" ", "") for q in _src_pin]

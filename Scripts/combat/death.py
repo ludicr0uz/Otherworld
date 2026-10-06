@@ -11,7 +11,8 @@ from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat.gun_drop import _author_gun_drop
 from net.state_consts import PLAYER_STATE_CLASS_PATH
-from net.state_graph import first_player_state, owner_player_state, server_game_mode
+from net.state_graph import (
+    CONTROLLER_CLASS_PATH, owner_player_state, player_state_of, server_game_mode)
 from combat.ragdoll import RAGDOLL_PROFILE
 from combat.tuning import AMMO_DROP_SHELLS, AMMO_PICKUP_LIFT
 from loot.roll import author_loot_roll
@@ -49,7 +50,8 @@ def _author_kill_count(ed, exec_in):
     On the server only (state_graph.server_game_mode): the count is state,
     and the gun drop that follows draws from the GameMode's streams. The kill
     goes on a PlayerState, where its player's HUD can read it on any machine:
-    player 0's, until a blow names who struck it (task M14).
+    the one whose controller struck the last blow (LastInstigator, which
+    TakeHit records: damage.py).
 
     Spliced between "this one despawns" and the respawn, so it sees exactly the
     deaths that are a wanderer's. The guard is the point: the safety net writes
@@ -67,7 +69,18 @@ def _author_kill_count(ed, exec_in):
 
     server = server_game_mode(ed, [then(shot)])
     mode_out = server.pin
-    killer = first_player_state(ed, [server.then])
+    # Whose kill: the controller that struck the last blow (damage.py's
+    # LastInstigator). None where nothing named one, and then nobody's.
+    by = ed.add_get_member_variable_node(HV.LastInstigator)
+    named = _node(ed, FN_IS_VALID)
+    _connect(out(by, HV.LastInstigator), _pin(named, "Object"))
+    known = ed.add_branch_node()
+    _connect(out(named), _pin(known, "Condition"))
+    _connect(server.then, _pin(known, "execute"))
+    credited = player_state_of(ed, out(by, HV.LastInstigator), CONTROLLER_CLASS_PATH,
+                               [then(known)])
+    killer = credited._replace(fails=[*credited.fails, else_(known)],
+                               nodes=[by, named, known, *credited.nodes])
 
     tally = ed.add_get_member_variable_node(KILL_COUNT_VAR, PLAYER_STATE_CLASS_PATH)
     _connect(killer.pin, _pin(tally, "self"))

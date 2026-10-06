@@ -27,10 +27,9 @@ Strike of its own, behind a press gate of its own.
 import dataclasses
 
 from combat.anim_blueprint import AIM_SLOT
-from combat.game_state import DAMAGED_BY_PLAYER_VAR, LAST_DAMAGE_VAR
+from combat.damage import hit as take_hit, owner_instigator
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
-from combat.hit_reaction import LAST_HIT_FROM_VAR
 from combat.paths import HEALTH_CLASS_PATH
 from combat.tuning import COMBAT
 from combat.weapon_component.common import _trace_defaults
@@ -38,10 +37,9 @@ from uebp.nodes.actor import (
     FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_GET_COMP, FN_GET_OWNER,
     FN_PLAY_SLOT)
 from uebp.nodes.math import (
-    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_CLAMP, FN_GE_FF, FN_MUL_VF, FN_NOT, FN_SUB_FF, INF)
+    FN_ADD_FF, FN_ADD_VV, FN_AND, FN_GE_FF, FN_MUL_VF, FN_NOT)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_SPHERE_TRACE, FN_TIME_SECONDS
-from combat import health_vars as HV
 from combat.weapon_component import vars as WV
 from Sound.play import _author_sound
 
@@ -239,52 +237,28 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     _connect(then(hit), _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    get_h = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(get_h, "self"))
-    sub = _node(ed, FN_SUB_FF)
-    _connect(out(get_h, HV.Health), _pin(sub, "A"))
     met = (then(cast),)
+    amount = strike.damage
     if damage:
         amount, met = damage(ed, _loose_pin(brk, "HitActor", is_input=False), met[0])
-        _connect(amount, _pin(sub, "B"))
-    else:
-        _set(sub, "B", strike.damage)
-    clamp = _node(ed, FN_CLAMP)
-    _connect(out(sub), _pin(clamp, "Value"))
-    _set(clamp, "Min", 0.0)
-    _set(clamp, "Max", INF)
-    set_h = ed.add_set_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(set_h, "self"))
-    _connect(out(clamp), _pin(set_h, HV.Health))
-    for pin in met:
-        _connect(pin, _pin(set_h, "execute"))
-
-    # The same three stamps a pellet leaves (impact.py): the health bar, the
-    # kill's credit, and which way the flinch goes.
-    now2 = _node(ed, FN_TIME_SECONDS)
-    stamp = ed.add_set_member_variable_node(LAST_DAMAGE_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(stamp, "self"))
-    _connect(out(now2), _pin(stamp, LAST_DAMAGE_VAR))
-    _connect(then(set_h), _pin(stamp, "execute"))
-    blame = ed.add_set_member_variable_node(DAMAGED_BY_PLAYER_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(blame, "self"))
-    _set(blame, DAMAGED_BY_PLAYER_VAR, True)
-    _connect(then(stamp), _pin(blame, "execute"))
-    from_where = ed.add_set_member_variable_node(LAST_HIT_FROM_VAR, HEALTH_CLASS_PATH)
-    _connect(as_health, _pin(from_where, "self"))
-    _connect(_loose_pin(brk, "ImpactNormal", is_input=False),
-             _pin(from_where, LAST_HIT_FROM_VAR))
-    _connect(then(blame), _pin(from_where, "execute"))
+    # The target takes it (damage.py), stamped as a pellet's is (impact.py):
+    # the health bar, the kill's credit, and which way the flinch goes. With
+    # what: the item in hand, which is nothing for a fist.
+    who, _who_n = owner_instigator(ed)
+    with_what = ed.add_get_member_variable_node(WV.Held)
+    took, take = take_hit(ed, as_health, amount,
+                          _loose_pin(brk, "ImpactNormal", is_input=False),
+                          who, out(with_what, WV.Held), met)
     # What it sounds like going in, from where it went in.
     landed = _author_sound(ed, strike.hit_sounds_var,
-                           _loose_pin(brk, "ImpactPoint", is_input=False), then(from_where))
+                           _loose_pin(brk, "ImpactPoint", is_input=False), took)
 
     ed.add_comment_to_nodes(
         f"The {strike.name}'s blow, {strike.impact_s} s into the swing: a "
         f"{strike.radius_cm:.0f} cm sphere swept {strike.reach_cm:.0f} cm "
         f"forward from the chest. The first thing with a health component "
         f"loses {strike.damage:.0f} HP, stamped like a pellet hit.",
-        [gate, trace, hit, cast, set_h, stamp, blame, from_where])
+        [gate, trace, hit, cast, take])
 
     failed = _loose_pin(cast, "CastFailed", is_input=False)
     missed = scenery(ed, brk, failed) if scenery else (failed,)

@@ -39,7 +39,7 @@ from npc.paths import (
 )
 from npc.verify import (
     BEL, PIN, _close, _drivers, _exec_reach, _fed, _feeders, _ins, _lit, _num,
-    _sources, _title, _titled, check, step_nodes,
+    _sources, _take_hits, _title, _titled, check, step_nodes,
 )
 
 
@@ -360,6 +360,7 @@ def check_ward(path, key):
           f"MoveTo, no damage, two SimpleMoveToLocation",
           not any({"Dest"} <= _ins(n)
                   or _title(n) in ("Move To Actor", "MoveToActor", "Set Health")
+                  or n in _take_hits(own)
                   for n in own)
           and len(_titled(own, "SimpleMoveToLocation")) == 2)
     gate = check_held(tag, own)

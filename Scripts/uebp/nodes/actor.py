@@ -101,6 +101,9 @@ FN_IS_CROUCHING = "/Script/Engine.NavMovementComponent.IsCrouching"
 FN_ON_GROUND = "/Script/Engine.NavMovementComponent.IsMovingOnGround"
 
 FN_GET_CONTROLLER = "/Script/Engine.Pawn.GetController"
+# Any actor's: its Instigator's controller. A pawn is its own instigator, so
+# this is a pawn's controller with no cast.
+FN_GET_INSTIGATOR_CONTROLLER = "/Script/Engine.Actor.GetInstigatorController"
 # True on the machine whose player drives this pawn: its input, camera and HUD.
 FN_IS_LOCALLY_CONTROLLED = "/Script/Engine.Pawn.IsLocallyControlled"
 FN_IS_PLAYER_CONTROLLED = "/Script/Engine.Pawn.IsPlayerControlled"

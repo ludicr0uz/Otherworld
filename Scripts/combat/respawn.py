@@ -202,8 +202,9 @@ def _author_health_begin_play(ed, begin):
          line, say])
 
 
-def _author_world_floor_net(ed, tick):
-    """BP_HealthComponent's Tick, first thing: below WORLD_FLOOR_Z is dead.
+def _author_world_floor_net(ed, exec_in):
+    """BP_HealthComponent's Tick, first thing where this machine has authority
+    (``exec_in``: Health is the server's to write off): below WORLD_FLOOR_Z is dead.
 
     Returns (lost, write_off): the net's branch, whose False arm is the normal
     frame, and the Health = 0 write both of its True arms end in. The caller
@@ -239,7 +240,7 @@ def _author_world_floor_net(ed, tick):
     _set(under, "B", WORLD_FLOOR_Z)
     lost = ed.add_branch_node()
     _connect(out(under), _pin(lost, "Condition"))
-    tick_out = then(tick)
+    tick_out = exec_in
 
     if HIT_REACT_PROBE:
         # TEMPORARY, and removed by re-running with HIT_REACT_PROBE False.

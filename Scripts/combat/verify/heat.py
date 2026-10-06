@@ -28,6 +28,7 @@ from combat.tuning import BLEEDING_TAG, COMBAT
 from combat.use_tuning import USE_PRESSED_VAR
 from combat.verify.chop import _pure_feeds, _ran_by
 from combat.verify.common import (
+    take_hits,
     BEL, by_pins, cdo, check, component_template, graph, load, num_pin, pin_value,
 )
 from combat.verify.fixtures import w, wg
@@ -268,10 +269,10 @@ def check_hot_blow():
           [f"Get {HOT_VAR}"] in reads
           and any(len(r) == 1 and "isvalid" in r[0].replace(" ", "").lower() for r in reads),
           str(reads))
-    writes = [n for n in wg if _title(n) == "Set Health"
-              and any(_title(f) == f"Get {BLOW_DAMAGE_VAR}"
-                      for f in _feeds(BEL.find_input_pin(n, "Health")))]
-    check("...and the health is written after it, on every way out of the test",
+    writes = [n for n in take_hits(wg)
+              if any(_title(f) == f"Get {BLOW_DAMAGE_VAR}"
+                     for f in _feeds(BEL.find_input_pin(n, "Amount")))]
+    check("...and the health is taken (TakeHit) after it, on every way out of the test",
           len(writes) == 1 and seared[0] in _ran_by(writes[0])
           and len(_ran_by(writes[0])) == 4, f"{len(writes)} write(s)")
 

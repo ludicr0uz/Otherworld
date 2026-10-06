@@ -22,7 +22,7 @@ from npc.paths import (
     STEP_VAR, step_task_path, tree_path,
 )
 from npc.verify import (
-    BEL, _close, _drivers, _fed, _feeders, _ins, _lit, _num, _sources, _title,
+    BEL, _close, _drivers, _fed, _feeders, _ins, _lit, _num, _sources, _take_hits, _title,
     _titled, check, step_nodes,
 )
 from npc.verify_tree import _gates_on_aggro, _load, _walk
@@ -129,6 +129,7 @@ def check_walk(tag, own, on):
           and len(_titled(own, "SimpleMoveToLocation")) == 1
           and not any({"Dest"} <= _ins(n)
                       or _title(n) in ("Move To Actor", "MoveToActor", "Set Health")
+                  or n in _take_hits(own)
                       for n in own),
           f"{sorted(goal)}")
     paces = _titled(own, "Set MaxWalkSpeed")

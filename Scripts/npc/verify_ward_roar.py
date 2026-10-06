@@ -26,7 +26,7 @@ from npc.paths import (
 )
 from npc.verify import (
     BEL, PIN, _close, _drivers, _exec_reach, _fed, _feeders, _ins, _lit, _num,
-    _sources, _title, _titled, check, step_nodes,
+    _sources, _take_hits, _title, _titled, check, step_nodes,
 )
 from npc.verify_ward import _after, _ends, _tests, _titles, _zero
 
@@ -147,7 +147,7 @@ def check_blow(tag, everything, fears):
     swing = step_nodes(everything, STEP_SWING)
     clears = [s for s in everything if _title(s) == f"Set {WARD_SINCE_VAR}"
               and not _feeders(s, WARD_SINCE_VAR)]
-    landed = [n for n in _titled(swing, "Set Health")]
+    landed = _take_hits(swing)
     if not fears:
         check(f"{tag}: does not fear fire: its blow clears no hold",
               not _titled(swing, f"Set {WARD_SINCE_VAR}"))

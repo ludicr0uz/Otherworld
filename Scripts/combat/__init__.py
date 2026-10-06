@@ -173,6 +173,8 @@ ASSETS AND PATCHES
 
 BP_HealthComponent (health_component wires the fragments together)
   health_component  variables, defaults, the Tick's death branch
+  damage            health is the server's: the TakeHit event every blow calls
+                    (hit, owner_instigator), what replicates, OnRep_Health
   respawn           spawn numbering, world-floor net, respawn band and delay
   replacement       the dead wanderer's replacement: the wait, the point, the spawn
   death             kill count, shells, ragdoll collapse, corpse, player death

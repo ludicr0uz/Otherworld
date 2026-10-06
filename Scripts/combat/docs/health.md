@@ -4,6 +4,19 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
 
 ## Health, respawn and the pack's numbering (`health_component.py`, `respawn.py`, `replacement.py`)
 
+- **Health is the server's (`damage.py`; `Scripts/net/CLAUDE.md`, "Health and damage").**
+  - A blow (a pellet, a fist, a blade, a thrown blade, a wanderer's swing) calls the target's
+    `TakeHit(Amount, From, InstigatedBy, Cause)` with `damage.hit(...)`; it writes nothing on
+    the target itself. `TakeHit` runs only with authority, floors `Health` at 0 and stamps
+    the blow: `LastDamageTime`, `LastHitFrom`, `LastInstigator` (the controller a kill is
+    credited to), `LastCause`, and `DamagedByPlayer` where a player struck it.
+  - `Health` (RepNotify), `MaxHealth`, `Dead`, `HitCount`, `LastHitFrom` and `NpcId`
+    replicate; a client's `OnRep_Health` tells a blow from a drain by `HitCount`.
+  - The Tick's world-floor net, drain, `Dead`, kill and replacement are the server's; the
+    grunt, the flinch and the collapse run on every copy, the heartbeat on the local
+    player's. `DeathPlayed` is each machine's "the death path has run" latch.
+  - `verify/damage.py`; `probes/probe_net_health.py` (two clients, and `--game`).
+
 - **A replacement comes `RESPAWN_DELAY` (10 s, `npc_placement.NPC_RESPAWN_DELAY_S`) after the death.**
   - The death path runs to its end first (count, corpse, collapse); the wanderer's arm then waits
     on a `Delay` and spawns (`replacement._author_replacement`). The player's location is read

@@ -46,12 +46,13 @@ from uebp.graph import (
     BEL, _add_component, _assets, _component_object, _connect, _drop_components, _loose_pin,
     _must_load, _node, _palette, _pin, _root_handle, _set, else_, out, then)
 from uebp.nodes.actor import (
-    FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER, FN_INSTANCES_IN_SPHERE, FN_SET_LISTENER_ATTENUATION)
+    FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER, FN_INSTANCES_IN_SPHERE, FN_IS_LOCALLY_CONTROLLED,
+    FN_SET_LISTENER_ATTENUATION)
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CONTAINS, FN_ARR_LEN
 from uebp.nodes.math import (
     FN_ADD_FF, FN_AND, FN_GE_FF, FN_GREATER_FF, FN_GREATER_II, FN_LESS_FF, FN_MUL_FF,
     FN_SUB_FF)
-from uebp.nodes.palette import NODE_CAST_INSTANCED
+from uebp.nodes.palette import NODE_CAST_INSTANCED, NODE_CAST_PAWN
 from uebp.nodes.system import FN_SET_VOLUME, FN_TIME_SECONDS, FN_WITH_TAG
 from world import day_night_vars as DV
 from world.day_night_graph import _call, _map
@@ -197,14 +198,15 @@ def _author_hurt_voice(ed, exec_ins):
     return (grunted, else_(struck), then(wanderer), else_(alive))
 
 
-def _author_death_voice(ed, exec_in):
+def _author_death_voice(ed, exec_ins):
     """Just dead: the player cries out. Returns the stage's exits."""
     wanderer = ed.add_branch_node()
     _connect(_get(ed, HV.DespawnOnDeath), _pin(wanderer, "Condition"))
-    _connect(exec_in, _pin(wanderer, "execute"))
+    for pin in exec_ins:
+        _connect(pin, _pin(wanderer, "execute"))
     _made, cried = _author_random_sound(ed, HV.DeathSounds, _at_owner(ed), else_(wanderer))
     ed.add_comment_to_nodes(
-        "The player's death: one of DeathSounds, the once (Dead was just set).",
+        "The player's death: one of DeathSounds, the once (DeathPlayed was just set).",
         [wanderer])
     return (cried, then(wanderer))
 
@@ -255,13 +257,21 @@ def _author_heartbeat(ed, exec_ins):
                                                    LOW_HEALTH_FRACTION))
     alive = _num(g, FN_GREATER_FF, g.get(HV.Health), 0.0)
     hurt = op(g, FN_AND, op(g, FN_AND, not_(g, g.get(HV.DespawnOnDeath)), alive), low)
+    # A heart is heard by the one whose it is: this copy's player is this
+    # machine's (another player's character has a health component here too).
+    pawn = g.keep(_palette(ed, NODE_CAST_PAWN))
+    _connect(out(g.call(FN_GET_OWNER)), _pin(pawn, "Object"))
+    for pin in exec_ins:
+        _connect(pin, _pin(pawn, "execute"))
+    mine = g.call(FN_IS_LOCALLY_CONTROLLED, self=_loose_pin(pawn, "AsPawn", is_input=False))
     exits = _author_again(g, HV.HeartbeatNextTime, HEARTBEAT_S, HV.HeartbeatSounds,
-                          _at_owner(ed), hurt, exec_ins)
+                          _at_owner(ed), op(g, FN_AND, hurt, out(mine)), [then(pawn)])
     ed.add_comment_to_nodes(
-        f"The player's heart: alive and under {LOW_HEALTH_FRACTION:g} of MaxHealth, one of "
-        f"HeartbeatSounds where they stand, again every {HEARTBEAT_S:g} s (its four beats).",
+        f"The player's heart: this machine's own player, alive and under "
+        f"{LOW_HEALTH_FRACTION:g} of MaxHealth, one of HeartbeatSounds where they stand, "
+        f"again every {HEARTBEAT_S:g} s (its four beats).",
         g.made)
-    return exits
+    return (*exits, out(pawn, "CastFailed"))
 
 
 def _author_breath(ed, owner_out, exec_ins):

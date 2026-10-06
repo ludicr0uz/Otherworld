@@ -46,6 +46,9 @@ and it never relies on a variable another section left behind.
               by the sway's change before storing it
   breath      the sway's per-gun rate (SwayRate, copied off Held behind
               IsValid) and the held breath: numbers, bind, variables, graph
+  damage      health is the server's: TakeHit and what it writes, what
+              replicates, OnRep_Health, the Tick's server-only parts and its
+              death latch, the kill's credit, no blow writing health itself
   look        what another machine's copy poses by: the three replicated
               variables and no more, Server_SetLook, the component
               replicating, the report on a change, the mirror, HandPose
@@ -129,7 +132,7 @@ and it never relies on a variable another section left behind.
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
-    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
+    "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "pickup", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "noise", "combat_trace",
 )

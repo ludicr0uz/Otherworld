@@ -11,6 +11,7 @@ from combat.anim_blueprint import AIM_SLOT
 from combat.skin import player_skin
 from combat.tuning import COMBAT
 from combat.verify.common import (
+    take_hits,
     BEL, PIN, by_pins, check, in_pins, load, num_pin, pin_value,
 )
 from combat.verify.fixtures import w, wg
@@ -165,24 +166,20 @@ def check_punch_blow():
              if gate else set())
     check("...swept only when PunchPending and PunchDueTime has come",
           {f"Get {PUNCH_PENDING_VAR}", f"Get {PUNCH_DUE_VAR}"} <= names, str(sorted(names)))
-    subs = [n for n in wg if num_pin(n, "B") == COMBAT.punch_damage
-            and "A" in in_pins(n)]
-    writes = [n for n in wg if _title(n) == "Set Health"
-              and any(sub in _feeds(BEL.find_input_pin(n, "Health")) for sub in subs)]
-    check(f"...and the body it meets loses {COMBAT.punch_damage:.0f} HP",
-          len(writes) == 1, f"{len(subs)} subtract(s), {len(writes)} write(s)")
+    writes = [n for n in take_hits(wg) if num_pin(n, "Amount") == COMBAT.punch_damage
+              and not _feeders(n, "Amount")]
+    check(f"...and the body it meets is told to take {COMBAT.punch_damage:.0f} HP "
+          "(its TakeHit: combat/damage.py)",
+          len(writes) == 1, f"{len(writes)} call(s)")
     if writes:
-        tail, node = [], writes[0]
-        for _ in range(3):
-            nxt = [PIN.get_owning_node(q) for q in
-                   PIN.list_connected_pins(BEL.find_then_pin(node))]
-            if len(nxt) != 1:
-                break
-            node = nxt[0]
-            tail.append(_title(node))
-        check("...stamped like a pellet: the health bar, the kill's credit, the flinch",
-              tail == ["Set LastDamageTime", "Set DamagedByPlayer", "Set LastHitFrom"],
-              str(tail))
+        told = {pin: [_title(f).replace(" ", "") for f in _feeders(writes[0], pin)]
+                for pin in ("From", "InstigatedBy", "Cause")}
+        check("...stamped like a pellet: which way it came (the sweep's impact normal), "
+              "who struck it (this character's controller) and with what (the item in "
+              "hand, nothing for a fist)",
+              is_punch_write(writes[0], "From")
+              and told["InstigatedBy"] == ["GetInstigatorController"]
+              and told["Cause"] == ["GetHeld"], str(told))
 
 
 def run():

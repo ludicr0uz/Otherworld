@@ -7,11 +7,16 @@ The single-player half of "where state lives" (net/state_consts.py): the
 death graph (combat/death.py) writes NpcKillCount onto a PlayerState, behind
 the authority switch, and nothing on the GameMode. probe_net_player_state.py
 is the half with a server.
+
+Whose PlayerState is the blow's instigator's (combat/damage.py), so the kill
+here is a blow: the wanderer's TakeHit, naming the player's controller. The
+death nobody caused is still Health written to 0, as the world-floor net does.
 """
 
 import unreal
 
 from combat import health_vars as HV
+from combat.damage import TAKE_HIT
 from combat.game_state import DAMAGED_BY_PLAYER_VAR, KILL_COUNT_VAR
 from combat.paths import GAME_MODE_BP_PATH, HEALTH_BP_PATH, HEALTH_CLASS_PATH
 from graphics_menu import umg_consts as C
@@ -31,8 +36,12 @@ def _wanderers(p):
 
 def _kill(p, npc, by_player):
     health = p.component(npc, HEALTH_CLASS_PATH)
-    p.set(health, DAMAGED_BY_PLAYER_VAR, by_player)
-    p.set(health, HV.Health, 0.0)
+    if by_player:
+        health.call_method(TAKE_HIT, (float(p.get(health, HV.Health)), unreal.Vector(1, 0, 0),
+                                      p.controller(), p.pawn()))
+    else:
+        p.set(health, DAMAGED_BY_PLAYER_VAR, False)
+        p.set(health, HV.Health, 0.0)
     yield lambda: p.get(health, "Dead")
     yield 0.3
 

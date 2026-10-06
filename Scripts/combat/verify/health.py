@@ -23,6 +23,7 @@ from net.pause_checks import check_standalone_pause
 from net.state_checks import check_state
 from net.state_consts import PLAYER_STATE_BP_PATH
 from combat.verify.common import (
+    HEALTH_SETS,
     BEL, PIN, by_pins, check, graph, in_pins, load, num_pin, out_pins, pin_value,
     titled,
 )
@@ -183,13 +184,15 @@ def check_damage_stamp():
     check("LastDamageTime is a float, not an int",
           isinstance(h.get_editor_property(LAST_DAMAGE_VAR), float),
           type(h.get_editor_property(LAST_DAMAGE_VAR)).__name__)
-    check("a pellet stamps the time it landed",
-          bool(titled(wg, f"SET {LAST_DAMAGE_VAR}"))
-          or bool(titled(wg, f"Set {LAST_DAMAGE_VAR}")),
+    # Both are TakeHit's now, in the component's own graph, on the server
+    # (verify/damage.py reads the event); the weapon's graph writes neither.
+    check("a blow stamps the time it landed",
+          len(titled(hg, f"Set {LAST_DAMAGE_VAR}")) == 1
+          and not titled(wg, f"Set {LAST_DAMAGE_VAR}"),
           "the HUD floats a wanderer's bar off this")
-    check("a pellet also records who did it",
-          bool(titled(wg, f"SET {DAMAGED_BY_PLAYER_VAR}"))
-          or bool(titled(wg, f"Set {DAMAGED_BY_PLAYER_VAR}")))
+    check("a blow also records who did it",
+          len(titled(hg, f"Set {DAMAGED_BY_PLAYER_VAR}")) == 1
+          and not titled(wg, f"Set {DAMAGED_BY_PLAYER_VAR}"))
     check("nothing is born blamed on the player",
           h.get_editor_property(DAMAGED_BY_PLAYER_VAR) is False)
 
@@ -350,15 +353,16 @@ def check_corpse():
           bool(titled(hg, f"SET {PLAYER_DEAD_VAR}"))
           or bool(titled(hg, f"Set {PLAYER_DEAD_VAR}")))
 
-    # Two writers: the safety net's, and the debuff drain's (combat/debuff_drain.py).
+    # Three writers: the safety net's, the debuff drain's (combat/debuff_drain.py)
+    # and TakeHit's (combat/damage.py).
     # Anything else writing Health inside the component's own graph is a probe
     # that was left behind -- which is exactly how the 60 s corpse timer was
     # measured, on a compressed value, with a clock forcing the death.
-    writes = [n for n in hg if str(BEL.get_node_title(n)) in ("SET Health", "Set Health")]
+    writes = [n for n in hg if str(BEL.get_node_title(n)).replace("\n", " ") in HEALTH_SETS]
     drains = [n for n in writes if n in drain_writes]
-    check("only the world-floor net and the debuff drain write Health from "
+    check("only the world-floor net, the debuff drain and TakeHit write Health from "
           "inside the component",
-          len(writes) == 2 and len(drains) == 1,
+          len(writes) == 3 and len(drains) == 1,
           f"{len(writes)} Set Health node(s), {len(drains)} of them the drain's")
 
 
@@ -394,7 +398,7 @@ def check_world_edge():
     # wanderer and the player.
     # A LITERAL zero: a wired pin (the debuff drain's) also reads back as 0.
     zeroes = [n for n in hg
-              if str(BEL.get_node_title(n)).replace("\n", " ") == "Set Health"
+              if str(BEL.get_node_title(n)).replace("\n", " ") in HEALTH_SETS
               and num_pin(n, "Health") == 0.0
               and not BEL.find_input_pin(n, "Health").list_connected_pins()]
     check("exactly one node writes the fall off as death", len(zeroes) == 1,

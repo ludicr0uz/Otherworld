@@ -33,6 +33,7 @@ from combat.throw_tuning import (
 )
 from combat.tuning import COMBAT, INTERACT_RADIUS
 from combat.verify.common import (
+    take_hits,
     BEL, PIN, by_pins, check, has_in_pin, in_pins, num_pin, pin_value,
 )
 from combat.verify.fixtures import _is_exec, wg
@@ -246,15 +247,15 @@ def check_strike_gate():
 
 
 def check_wound():
-    writes = _mine([n for n in wg if _title(n) == "Set Health"])
-    check("a blade that strikes a body takes its health once",
+    writes = _mine(take_hits(wg))
+    check("a blade that strikes a body takes its health once (the body's TakeHit: "
+          "combat/damage.py)",
           len(writes) == 1, str(len(writes)))
     if len(writes) != 1:
         return
     fed = {_title(n) for n in _pure_feeds(writes[0])}
-    check(f"...by the thrown item's {THROW_DAMAGE_VAR}, clamped at zero",
-          {f"Get {THROW_DAMAGE_VAR}", "Get Health"} <= fed
-          and any("Clamp" in t for t in fed), str(sorted(fed)))
+    check(f"...by the thrown item's {THROW_DAMAGE_VAR} (the body floors it at zero)",
+          f"Get {THROW_DAMAGE_VAR}" in fed, str(sorted(fed)))
     picks = [n for n in _pure_feeds(writes[0]) if {"A", "B", "bPickA"} <= in_pins(n)]
     tests = [f for n in picks for f in _feeders(n, "bPickA")]
     check(f"...times the struck body's own {HEAD_MULT_VAR} where the bone the "
@@ -301,22 +302,26 @@ def check_wound():
           and any(_feeders(f, "Condition") == nearest for f in ways
                   if _title(f) == "Branch"),
           str(before))
-    stamps = {v: _mine([n for n in wg if _title(n) == f"Set {v}"])
-              for v in (LAST_DAMAGE_VAR, DAMAGED_BY_PLAYER_VAR, LAST_HIT_FROM_VAR)}
-    check("...stamped as a pellet's hit is: the health bar, the kill's credit "
-          "(and the wendigo's rage), the flinch's direction",
-          all(len(s) == 1 for s in stamps.values())
-          and all(pin_value(s, DAMAGED_BY_PLAYER_VAR) == "true"
-                  for s in stamps[DAMAGED_BY_PLAYER_VAR]),
-          str({k: len(v) for k, v in stamps.items()}))
+    told = {pin: [_title(f).replace(" ", "") for f in _feeders(writes[0], pin)]
+            for pin in ("InstigatedBy", "Cause")}
+    normal = [str(PIN.get_pin_name(q)).replace(" ", "") for q in
+              PIN.list_connected_pins(BEL.find_input_pin(writes[0], "From"))]
+    check("...stamped as a pellet's hit is: who struck it (the thrower's controller: "
+          "the kill's credit, and the wendigo's rage), which way it came (the flinch) "
+          "and with what (the thrown item)",
+          told["InstigatedBy"] == ["GetInstigatorController"] and normal == ["ImpactNormal"]
+          and len(told["Cause"]) == 1
+          and not [n for v in (LAST_DAMAGE_VAR, DAMAGED_BY_PLAYER_VAR, LAST_HIT_FROM_VAR)
+                   for n in wg if _title(n) == f"Set {v}"],
+          f"{told}, From off {normal}")
     blood = _mine(_spawns("BloodClass"))
     # Between the two, the headshot stamp (verify/headshot.py).
     told = _feeders(blood[0], "execute") if len(blood) == 1 else []
     check("...and it bleeds: one blood spawn, after the wound and its "
           f"{HEADSHOT_TIME_VAR} stamp",
-          len(blood) == 1 and len(stamps[LAST_HIT_FROM_VAR]) == 1
+          len(blood) == 1
           and [_title(n) for n in told] == [f"Set {HEADSHOT_TIME_VAR}"]
-          and _feeders(told[0], "execute") == stamps[LAST_HIT_FROM_VAR],
+          and _feeders(told[0], "execute") == writes,
           f"{len(blood)} spawns, after {[_title(n) for n in told]}")
     adds = [n for n in by_pins(wg, "TargetArray", "NewItem")
             if [_title(f) for f in _feeders(n, "TargetArray")] == [f"Get {THROW_PAST_VAR}"]]

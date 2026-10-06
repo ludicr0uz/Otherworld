@@ -54,7 +54,9 @@ menu polls its own copy from `DrawHUD`, which does.
 Death's pause is single player's (`death.py`, authored by `net.pause.author_pause`): a Branch
 on IsStandalone stands in front of it, so on a server the world runs on past a dead player
 (`verify/health.py`; `probes/probe_death_pause.py` is the standalone arm). What a dead
-player does there instead is the death task's, not built yet.
+player gets there instead: their gear onto the body (`weapon_component/shed.py`) and a new
+body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
+`Scripts/net/CLAUDE.md`, "Death".
 
 ## The shape of it
 

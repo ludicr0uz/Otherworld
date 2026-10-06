@@ -3,7 +3,9 @@ key is polled. A dead owner's Tick does nothing.
 
     Tick --> owner's BP_HealthComponent --> [Dead OR Health <= 0?]
                no, or no component --> OwnerDead = false --> the rest of Tick
-               yes --> OwnerDead = true, and what the Tick was holding is let
+               yes --> on a server, the first time: what the owner carried
+                       goes onto the body (shed.py);
+                       OwnerDead = true, and what the Tick was holding is let
                        go: the aim, the sprint and the guard; the zoom and
                        the camera go home; a scoped gun, the body and the
                        head the sights hid show
@@ -38,6 +40,7 @@ from combat.nodes import CAMERA_CLASS_PATH, SPRING_ARM_CLASS_PATH, SPRING_ARM_SO
 from combat.paths import FIRE_WARD_VAR, HEALTH_CLASS_PATH
 from combat.seat_tuning import LOOK_VAR, SEAT_VAR, SEATED_VAR
 from combat.weapon_component.head_hide import _author_head_shown
+from combat.weapon_component.shed import author_shed_gear
 from uebp.nodes.actor import (
     FN_COMP_SET_WORLD_LOC, FN_COMP_SET_WORLD_ROT, FN_GET_COMP, FN_SET_FOV, FN_SET_HIDDEN,
     FN_SET_OWNER_NO_SEE, FN_SOCKET_LOC, FN_SOCKET_ROT)
@@ -97,10 +100,15 @@ def _author_dead_gate(ed, owner_out, held, armed_out, exec_in):
     _connect(else_(gate), _pin(alive, "execute"))
     _connect(_pin(cast, "CastFailed", is_input=False), _pin(alive, "execute"))
 
-    # Dead. Nothing below reaches the rest of the Tick.
+    # Dead. Nothing below reaches the rest of the Tick. First, and once: on a
+    # server the body takes what the owner carried (shed.py).
+    was_dead = keep(ed.add_get_member_variable_node(OWNER_DEAD_VAR))
+    shed = author_shed_gear(ed, owner_out, as_health, out(was_dead, OWNER_DEAD_VAR),
+                            then(gate))
     gone = keep(ed.add_set_member_variable_node(OWNER_DEAD_VAR))
     _set(gone, OWNER_DEAD_VAR, True)
-    _connect(then(gate), _pin(gone, "execute"))
+    for e in shed:
+        _connect(e, _pin(gone, "execute"))
     flow = then(gone)
     for name in LET_GO_VARS:
         drop = keep(ed.add_set_member_variable_node(name))

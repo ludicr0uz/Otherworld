@@ -5,6 +5,11 @@ kneeling over it. **Every body can be searched**, whether it carries anything or
 player finds out by looking.
 The code is this package (`__init__.py` is the map) plus the HUD's `graphics_menu/loot_*.py`.
 
+**A dead player's body is searched the same way, on a server:** it carries everything the
+player held and wore, put there by `combat/weapon_component/shed.py` (no roll: one row per
+item), and the body's arrays replicate, so every client's window shows what the server
+has (`Scripts/net/CLAUDE.md`, "Death"). In single player a player's body carries nothing.
+
 ## The data
 
 - **A loot table is a row list in `tables.py`:** `LootEntry(item_bp, chance)`. Each entry is

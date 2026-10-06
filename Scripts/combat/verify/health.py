@@ -308,7 +308,12 @@ def check_corpse():
                 for q in PIN.list_connected_pins(BEL.find_input_pin(node, "self"))]
 
     lifespans = titled(hg, "SetLifeSpan")
-    bodies = [n for n in lifespans if _fed_by(n) == ["GetOwner"]]
+    # A wanderer's. A dead player's body gets one too, on a server, straight
+    # off its respawn (player_respawn.py, verify/player_death.py).
+    respawns = by_pins(hg, "NewPlayer")
+    bodies = [n for n in lifespans if _fed_by(n) == ["GetOwner"]
+              and not any(PIN.get_owning_node(q) in respawns
+                          for q in PIN.list_connected_pins(BEL.find_execute_pin(n)))]
     brains = [n for n in lifespans if _fed_by(n) == ["GetController"]]
     check("a killed wanderer leaves a corpse instead of vanishing",
           len(bodies) == 1, str([_fed_by(n) for n in lifespans]))

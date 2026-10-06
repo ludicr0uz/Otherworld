@@ -338,7 +338,7 @@ editor.
   the profile, and death deletes it (`Scripts/graphics_menu/CLAUDE.md`).
 - **Death:** once the player or a wanderer is dead (or at 0 HP), nothing it could do runs: the
   weapon component's Tick stops at its dead gate, the loot window shuts, and every step of a
-  wanderer's tree refuses (`probes/probe_dead_no_actions.py`).
+  wanderer's tree refuses (`probes/probe_dead_no_actions.py`). What a player's death is depends on the mode. In single player it is the end of that game: the world pauses on the death menu, the profile is deleted, and the restart reopens the level. As a client of a server the player stays in the session: everything carried and worn goes onto the body, which anyone can search with the loot window (`combat/weapon_component/shed.py`), the death menu says a respawn is coming, and 10 s later the server gives the player a new character at a random PlayerStart with the starting inventory, the body lying 60 s more (`combat/player_respawn.py`, `probes/probe_net_death.py`).
 - **Known gaps:** a low temperature does nothing yet. Feel checks that need a play session are listed per package.
 
 ## Gotchas learned the hard way

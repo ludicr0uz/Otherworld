@@ -923,6 +923,9 @@ glimmers, `world/item_highlight.py`). Same keys as GUN SETTINGS; **Enter** saves
   `stat` command: `stat fps` is a toggle, and in PIE its state outlives the session. The verifier
   rejects it.
 - **The death menu and the restart key are handled in `DrawHUD`,** because Tick is paused.
+  The restart is standalone's: as a client of a server the hint reads `DEATH_HINT_SERVER`
+  and neither the key nor a click does anything, until the server's respawn lowers
+  `PlayerDead` and the HUD's body is back (`death_checks.py`, `probes/probe_net_death.py`).
 - **A cast-failed path still reaches the rest of the HUD with a real value** (e.g. `DebugOn`
   false). Never read off an invalid object there.
 

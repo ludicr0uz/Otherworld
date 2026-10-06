@@ -276,6 +276,8 @@ RESTART_KEY = "R"
 DEATH_TITLE = "YOU DIED"
 DEATH_SCORE_PREFIX = "Monster Kills:  "
 DEATH_HINT = f"[{RESTART_KEY}] or click   try again"
+# As a client of a server: nothing to press, the server gives a new body.
+DEATH_HINT_SERVER = "you will respawn in a moment"
 DEATH_PANEL_SIZE = (560.0, 300.0)
 DEATH_TITLE_FONT, DEATH_SCORE_FONT, DEATH_HINT_FONT = 34.0, 22.0, 16.0
 

@@ -3,7 +3,9 @@
   author_title       GameStarted false: the menu stands alone, open, over a
                      hidden HUD and a paused world
   author_death_menu  PlayerDead: WBP_DeathMenu instead of the HUD, the score,
-                     and [R] restarting the level
+                     and, in standalone, [R] restarting the level; as a client
+                     of a server the hint says a respawn is coming and no key
+                     or click does anything
   author_alive       neither: the HUD's Body shown, the death menu hidden
   author_pause_menu  MenuOpen: the menu (WBP_PauseMenu), the same one on the
                      title and in play. Its rows (Up/Down/Enter, the caret,
@@ -37,14 +39,16 @@ from graphics_menu.ui_graph import (
     mark_rows, member, part, row_at, screen, set_shown, set_text,
 )
 from graphics_menu.umg_consts import (
-    DEATH_HINT_LINE, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF, DEBUG_ON, GAME_STARTED_VAR,
+    DEATH_HINT_LINE, DEATH_HINT_SERVER, DEATH_SCORE, DEATH_SCORE_PREFIX, DEBUG_OFF,
+    DEBUG_ON, GAME_STARTED_VAR,
     HUD_BODY, IN_GAME_ACTIONS, IN_GAME_ONLY, PAUSE_ACCEPT_KEY, PAUSE_DEBUG_ROW, PAUSE_PANEL,
     PAUSE_ROW_ACTIONS, PAUSE_ROW_LABELS, PAUSE_ROW_VAR, PAUSE_ROWS, RESTART_KEY, ROW_VALUE,
     SETTINGS_PANEL, WBP_DEATH_MENU, WBP_HUD, WBP_MAIN_MENU, WBP_MENU_ROW, WBP_PAUSE_MENU,
 )
 from uebp.nodes.actor import FN_GET_OWNING_PC, FN_WAS_PRESSED
 from uebp.nodes.math import FN_EQ_II, FN_OR
-from uebp.nodes.system import FN_CONCAT, FN_INT_TO_STR, FN_LEVEL_NAME, FN_OPEN_LEVEL
+from uebp.nodes.system import (
+    FN_CONCAT, FN_INT_TO_STR, FN_IS_STANDALONE, FN_LEVEL_NAME, FN_OPEN_LEVEL)
 from net.pause import author_unpause
 from net.state_consts import PLAYER_STATE_CLASS_PATH
 from graphics_menu import hud_vars as MV
@@ -80,6 +84,13 @@ def author_death_menu(ed, in_execs, state_out):
 
     Restarting is SetGamePaused(false) *then* OpenLevel: a level opened while
     the world is paused comes up paused, with nothing left able to unpause it.
+
+    Restarting is standalone's: there death ends that game (the mode table's
+    death row, serversupportsysdesign.md 4.8). As a client of a server the
+    same screen is up for the seconds until the server gives the player a
+    new body (combat/player_respawn.py): the hint line says so, the restart
+    key is not polled, and a click on the line is lowered unserved, so
+    nothing is left raised for the HUD the respawned player comes back to.
     """
     made = []
 
@@ -102,6 +113,18 @@ def author_death_menu(ed, in_execs, state_out):
     _set(score_text, "A", DEATH_SCORE_PREFIX)
     _connect(out(kills_str), _pin(score_text, "B"))
     flow = set_text(ed, part(ed, WBP_DEATH_MENU, DEATH_SCORE), out(score_text), [flow])
+
+    # --- whose death is this? -------------------------------------------------
+    alone = keep(_node(ed, FN_IS_STANDALONE))
+    ends = keep(ed.add_branch_node())
+    _connect(out(alone), _pin(ends, "Condition"))
+    _connect(flow, _pin(ends, "execute"))
+    line = part(ed, WBP_DEATH_MENU, DEATH_HINT_LINE)
+    waits = set_text(ed, line, DEATH_HINT_SERVER, [else_(ends)])
+    unasked = keep(ed.add_set_member_variable_node(CURSOR_ACCEPT_VAR))
+    _set(unasked, CURSOR_ACCEPT_VAR, False)
+    _connect(waits, _pin(unasked, "execute"))
+    flow = then(ends)
 
     # --- the restart itself --------------------------------------------------
     pc = keep(_node(ed, FN_GET_OWNING_PC))
@@ -138,7 +161,9 @@ def author_death_menu(ed, in_execs, state_out):
         f"set and the game is paused. [{RESTART_KEY}] or a click on the hint "
         f"line unpauses and reopens the "
         f"current level, which resets the kill count with it -- the counter "
-        f"lives on the GameMode, and OpenLevel builds a new one.",
+        f"lives on the GameMode, and OpenLevel builds a new one. In standalone only: "
+        f"as a client of a server the hint says a respawn is coming, and nothing "
+        f"restarts.",
         made)
 
 

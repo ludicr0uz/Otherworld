@@ -59,6 +59,19 @@ Part of `Scripts/combat/CLAUDE.md`, which indexes it.
   - Turn off the capsule, not the mesh, because it is the capsule that blocks and is traced.
   - Set the profile **before** simulating.
   - `SetSimulatePhysics` would simulate only the root body.
+- **A player's death is two deaths, by mode** (`Scripts/net/CLAUDE.md`, "Death"; the mode
+  table's death row). Both fork at a Branch on IsStandalone, and standalone's arm is what
+  it always was: the pause after `DEATH_PAUSE_SECONDS`, the death menu's restart.
+  - **On a server the gear is shed** (`weapon_component/shed.py`): the dead gate's first
+    act, on the frame the owner is first found dead (`OwnerDead` read before the gate
+    sets it). The server records `Inventory` and `Worn` on the body's `Loot` arrays; every
+    copy destroys its own actors, clears `Inventory`, `Worn` and `SlotItems` (sized to
+    `SLOT_COUNT` again: the HUD reads every slot), and empties the hand.
+  - **...and the player respawns** (`player_respawn.py`): `PlayerRespawnWait` (the rest of
+    `PLAYER_RESPAWN_SECONDS` after the settle; a variable, so a probe can shorten it)
+    after `PlayerDead` is set, on the server. The Delay is the dead body's own component's,
+    so the body's `CORPSE_SECONDS` of lifespan is given only after the respawn.
+  - `verify/player_death.py`; `probes/probe_net_death.py` (two clients, and `--game`).
 - **There is no death animation, and none is possible.** Meshy rigs ship only walk and run, and
   the `MM_Death_*` clips are staggers that end standing.
 - **The ragdoll joints are tuned** (`ragdoll.tune_ragdolls()`), for every mesh under

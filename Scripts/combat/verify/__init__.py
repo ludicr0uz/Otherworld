@@ -34,6 +34,8 @@ and it never relies on a variable another section left behind.
               against the mesh; a pellet that strikes no body does nothing
   tracer      debug mode's pellet tracer: drawn off the trace's own hit result
   loot        the corpse loot roll on a counted kill (loot/roll.py)
+  player_death  a player's death on a server: the gear shed onto the body, the
+              respawn at a random PlayerStart, neither in standalone
   sights      the two aim keys, each weapon's eye point and sight line, the
               sight camera: where it goes and the line it is turned onto
   near_clip   the camera's near plane: Config/DefaultEngine.ini sets it to
@@ -134,5 +136,5 @@ SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
     "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "pickup", "glimmer", "heat",
-    "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "noise", "combat_trace",
+    "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
 )

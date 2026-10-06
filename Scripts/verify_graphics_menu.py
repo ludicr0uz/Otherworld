@@ -48,6 +48,7 @@ from graphics_menu.cursor_checks import check_cursor
 from graphics_menu.pause_checks import check_pause_menu
 from graphics_menu.menu_main_checks import check_main_menu
 from graphics_menu.escape_checks import check_escape
+from graphics_menu.death_checks import check_death_menu
 from graphics_menu import mode_consts as MC
 from graphics_menu.mode_checks import check_modes
 from graphics_menu import hud_stats as HS
@@ -866,6 +867,7 @@ def main():
     check_pause_menu(check, bp, nodes)
     check_main_menu(check, nodes)
     check_escape(check, nodes)
+    check_death_menu(check, nodes)
     check_modes(check, bp, nodes)
 
     # --- the wiring that actually puts it on screen

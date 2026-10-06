@@ -96,9 +96,13 @@ def check_starter_slots():
 
 
 def check_sync():
+    # The sync's, and the one a dead player's shed gear empties the slots
+    # with, once (weapon_component/shed.py, verify/player_death.py).
     resizes = [n for n in by_pins(wg, "TargetArray", "Size")]
-    check(f"the sync sizes {SLOT_ITEMS_VAR} to {SLOT_COUNT} every Tick",
-          len(resizes) == 1 and num_pin(resizes[0], "Size") == float(SLOT_COUNT),
+    check(f"the sync sizes {SLOT_ITEMS_VAR} to {SLOT_COUNT} every Tick (and the shed "
+          f"gear of a dead player, to the same)",
+          len(resizes) == 2
+          and all(num_pin(n, "Size") == float(SLOT_COUNT) for n in resizes),
           str([pin_value(n, "Size") for n in resizes]))
     finds = [n for n in by_pins(wg, "TargetArray", "ItemToFind")
              if any(_title(a) == f"Get {SLOT_ITEMS_VAR}"

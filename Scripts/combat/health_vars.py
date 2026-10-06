@@ -48,9 +48,17 @@ SeenHits = Var("SeenHits", INT, 0)
 # This machine has run the death path. Its own, never replicated: Dead is the
 # server's word and can arrive before this copy's Tick has seen Health at 0.
 DeathPlayed = Var("DeathPlayed", BOOL, False)
+# A dead player's respawn on a server (player_respawn.py): how long after the
+# death's settle the new body comes. A variable, so a probe can shorten it;
+# its default is the builder's (death.PLAYER_RESPAWN_WAIT).
+PlayerRespawnWait = Var("PlayerRespawnWait", FLOAT)
+# ...and whose it is: the body's controller, kept before it lets go of the
+# body (GetController is pure, and answers None from then on).
+RespawnFor = Var("RespawnFor", obj("/Script/Engine.Controller"))
 
 TABLE = (
     Health, MaxHealth, Dead, DespawnOnDeath, RespawnClass, AmmoClass, DropClasses,
     RespawnPoint, HurtSounds, DeathSounds, HeardDamageTime, HeartbeatSounds, HeartbeatNextTime,
-    LastInstigator, LastCause, HitCount, SeenHits, DeathPlayed,
+    LastInstigator, LastCause, HitCount, SeenHits, DeathPlayed, PlayerRespawnWait,
+    RespawnFor,
 )

@@ -229,7 +229,8 @@ says who struck it. `combat/damage.py` is the whole of it.
     `LastInstigator` and `LastCause`, and sets `DamagedByPlayer` where the instigator is a
     PlayerController (so a wanderer's blow blames no player, as before).
 - **What travels,** to everyone: `Health` (RepNotify), `MaxHealth`, `Dead`, `HitCount`,
-  `LastHitFrom`, `NpcId`. The component replicates (its own default, and on the character
+  `LastHitFrom`, `NpcId`, and what the body carries (`Loot` and its names, icons and
+  tints: M16, "Death" below). The component replicates (its own default, and on the character
   and the wanderer). `LastInstigator` and `LastCause` stay on the server.
 - **A client's copy ticks as the server's does** and reads what arrived: the HUD's bar and
   the heartbeat off `Health`, the flinch off its drop, the collapse off `Health` at 0.
@@ -372,8 +373,51 @@ no builder names `FN_SET_PAUSED` itself:
 - Proof: `probe_net_menu_overlay.py` (client 1 opens M and then the title; the server's
   clock runs on and its copy of the character stands still), and for single player
   `probe_death_pause.py` and `probe_main_menu.py`.
-- Still to come, and not the pause's: a dead client's restart key reopens the level locally
-  (death by mode, the table's third row).
+
+**Death** (M16, done). One death path, forked where the table says: the health component's
+(`combat/death.py`) runs on every machine as before, and standalone's ends where it always
+did (the pause, the death menu's restart, the profile deleted). Outside standalone:
+
+- **Dying is the same collapse on every copy** (the ragdoll, off `Health` at 0: M14), and
+  the weapon component's dead gate stops every action on every copy, the dying player's
+  own first.
+- **The gear goes onto the body** (`combat/weapon_component/shed.py`), the dead gate's first
+  act, once: behind a Branch on IsStandalone, the server appends each item of `Inventory`
+  and `Worn` (its class, `DisplayName`, `Icon`, `SlotColor`) to the body's `Loot` arrays,
+  and every copy destroys its own item actors and empties its slots. A body holds
+  classes, as a wanderer's does, so a looted gun is a fresh one (its rounds are M18's,
+  when the inventory is plain data).
+- **The body's `Loot` arrays replicate** (`BODY_ARRAYS`, on `BP_HealthComponent`), so any
+  client's loot window shows a player's body, or a wanderer's, as the server has it. The
+  window is the wanderers', unchanged: a dead Character that is not the HUD's own pawn.
+- **The take is still the taker's own copy's** (`AskLootTake` is not an RPC until M23): a
+  client that takes a row gets the item in its own bag and removes the row from its own
+  copy of the body, and the server's body keeps it.
+- **The respawn** (`combat/player_respawn.py`) hangs off the false arm of death's pause
+  Branch, on the server: `PLAYER_RESPAWN_SECONDS` (10) after the death the controller
+  lets go of the body (`UnPossess`) and the GameMode gives it a new pawn
+  (`RestartPlayerAtPlayerStart`) at a random one of the level's PlayerStarts. The new
+  pawn's BeginPlay issues the starting inventory on every machine, `PlayerDead` is
+  lowered, and the body lies `CORPSE_SECONDS` more. The character survives; nothing is
+  saved or deleted.
+  - **Keep the controller in a variable** (`RespawnFor`): `GetController` is pure and
+    answers None once the controller has let go, and `RestartPlayerAtPlayerStart(None)`
+    does nothing, silently.
+  - **Not `RestartPlayer`:** `AGameModeBase` sends a controller back to its `StartSpot`.
+  - **The levels have one PlayerStart today,** so "random" picks it; more starts are the
+    level generator's to place.
+- **The death menu** (`graphics_menu/menu_screens.py`) is up on the dead client from
+  `PlayerDead` until the respawn lowers it: behind IsStandalone the restart key is not
+  polled, the hint reads `DEATH_HINT_SERVER`, and a click on it is lowered unserved.
+- **The HUD follows the pawn:** every fragment asks `GetOwningPawn` each frame, so the
+  respawned player's HUD is the new character's with nothing re-bound.
+- Proof: `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_death.py` (the server kills client 1 with a garment worn: the
+  ragdoll and the empty slots on all three machines, the loot on the server and on client
+  2, client 2's loot window on the body and a take, client 1's death screen, and 10 s
+  later the new character, its inventory and its HUD; clean with `--lag 120`); `--game`
+  runs its standalone arm (nothing shed, no loot, the pause, the restart hint, no new
+  body). `combat/verify/player_death.py` and `graphics_menu/death_checks.py` are the graphs.
 
 **The title and the session** (M6, done). The modes are the title's first two rows, each a
 page (`graphics_menu/mode_*.py`, its `CLAUDE.md` "The two modes"):
@@ -392,7 +436,7 @@ page (`graphics_menu/mode_*.py`, its `CLAUDE.md` "The two modes"):
   run proves it (`probe_net_join.py` checks it).
 - **The character's save is behind IsStandalone in play** (`mode_tick.author_mode_in_play`):
   the profile's load, save and wipe on death, and the dev-all-guns cheat chained after
-  them, do not run on a client. What a client's death does is still the death task's.
+  them, do not run on a client. What a client's death does is "Death", above.
 - **Traps:**
   - **IsStandalone is already false while a join is pending**, on the title's own world
     (the engine derives the net mode from the pending game). Nothing on the title may ask

@@ -42,6 +42,11 @@ CONTROLLER_RETIRE_SECONDS = 0.1
 # gets to settle: pausing early freezes the player mid-topple, which reads as a
 # hang rather than as a death.
 DEATH_PAUSE_SECONDS = 2.2
+# On a server a dead player is given a new body this long after the death
+# (player_respawn.py). The wait starts where the settle above ends, so the
+# component's PlayerRespawnWait holds the rest.
+PLAYER_RESPAWN_SECONDS = 10.0
+PLAYER_RESPAWN_WAIT = PLAYER_RESPAWN_SECONDS - DEATH_PAUSE_SECONDS
 
 
 def _author_kill_count(ed, exec_in):
@@ -300,6 +305,10 @@ def _author_player_death(ed, exec_ins):
     than here because the HUD is what draws the menu, on that player's own
     machine: the PlayerState replicates to it, and outlives the pawn. Set on
     the server only (the authority switch); a client's copy arrives.
+
+    Returns the exec pin the path leaves by where the world did not pause:
+    outside standalone, on a server and on a client alike. What a death is
+    there hangs off it (player_respawn.py).
     """
     wait = _node(ed, FN_DELAY)
     _set(wait, "Duration", DEATH_PAUSE_SECONDS)
@@ -339,7 +348,8 @@ def _author_player_death(ed, exec_ins):
     # In standalone only: a server's world does not stop for one player's
     # death (net/pause.py).
     frozen = []
-    author_pause(ed, (then(say_dead), *mine.fails, out(server, "Remote")), frozen)
+    _call, (_paused, shared) = author_pause(
+        ed, (then(say_dead), *mine.fails, out(server, "Remote")), frozen)
 
     ed.add_comment_to_nodes(
         f"The player's death, from a body that is already on the floor: wait "
@@ -347,5 +357,7 @@ def _author_player_death(ed, exec_ins):
         f"and pause. The pause stops physics too, so the body stays exactly as "
         f"it fell until the level reopens -- which is the fix for the player "
         f"standing back up. BP_GraphicsMenuHUD draws the menu off "
-        f"{PLAYER_DEAD_VAR} and restarts the level from it.",
+        f"{PLAYER_DEAD_VAR} and restarts the level from it. Standalone's alone: on a "
+        f"server nothing pauses and the player respawns (player_respawn.py).",
         [wait, server, *mine.nodes, tell, score, score_str, dead_line, say_dead] + frozen)
+    return shared

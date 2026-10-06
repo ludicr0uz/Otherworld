@@ -347,11 +347,11 @@ def check_hud_graph(check, nodes):
           "the first row single player or resume, the Single Player page's new "
           "game or continue game, the exit row save and exit or leave server, "
           "the mode under the title, and the rows that need a game, or the "
-          "title, say so",
+          "title, say so; and the death menu's hint as a client of a server",
           literal == {C.DEBUG_ON, C.DEBUG_OFF, C.START_ROW_LABEL, C.RESUME_ROW_LABEL,
                       C.CONTINUE_ROW_LABEL, C.IN_GAME_ONLY, C.SINGLE_ROW_LABEL, C.TITLE_ONLY,
                       EXIT_ROW_LABEL, LEAVE_ROW_LABEL, C.MODE_SINGLE_TEXT,
-                      C.MODE_MULTI_TEXT, ""}, str(sorted(literal)))
+                      C.MODE_MULTI_TEXT, C.DEATH_HINT_SERVER, ""}, str(sorted(literal)))
 
     # The loot window's rows set a brush too, out of the body's LootIcons
     # (loot_checks.py checks that one).

@@ -374,7 +374,8 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
     event.
 18. Player-versus-player damage and kill credit.
 19. Death: a ragdoll on every client, gear onto a lootable corpse, respawn at a chosen
-    point.
+    point. (Done, M16: `Scripts/net/CLAUDE.md`, "Death". The point is a random
+    PlayerStart; the levels have one.)
 20. Server-only random rolls for loot, gun drops and on-hit effects.
 
 **Phase 5 — Weapons and inventory** (the largest phase; `weapon_component` alone is about

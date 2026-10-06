@@ -178,6 +178,8 @@ BP_HealthComponent (health_component wires the fragments together)
   respawn           spawn numbering, world-floor net, respawn band and delay
   replacement       the dead wanderer's replacement: the wait, the point, the spawn
   death             kill count, shells, ragdoll collapse, corpse, player death
+  player_respawn    a dead player on a server: the wait, a new pawn at a random
+                    PlayerStart, the body left as a corpse
   gun_drop          the gun drop: seeded roll + pick streams, loot-table draw
   debuff_drain      HP lost per stack of each drained GAS tag (tuning.HEALTH_DRAINS)
   hit_reaction      flinch clips and direction pick; the Steady gate (a body

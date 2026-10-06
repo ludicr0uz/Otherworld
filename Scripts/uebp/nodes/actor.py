@@ -101,6 +101,12 @@ FN_IS_CROUCHING = "/Script/Engine.NavMovementComponent.IsCrouching"
 FN_ON_GROUND = "/Script/Engine.NavMovementComponent.IsMovingOnGround"
 
 FN_GET_CONTROLLER = "/Script/Engine.Pawn.GetController"
+# A dead player's respawn (combat/player_respawn.py): the controller lets go
+# of the body, and the GameMode gives it a new pawn at a start. The GameMode
+# spawns none for a controller that still has a pawn.
+FN_UNPOSSESS = "/Script/Engine.Controller.UnPossess"
+FN_RESTART_AT_START = "/Script/Engine.GameModeBase.RestartPlayerAtPlayerStart"
+FN_RESTART_PLAYER = "/Script/Engine.GameModeBase.RestartPlayer"
 # Any actor's: its Instigator's controller. A pawn is its own instigator, so
 # this is a pawn's controller with no cast.
 FN_GET_INSTIGATOR_CONTROLLER = "/Script/Engine.Actor.GetInstigatorController"

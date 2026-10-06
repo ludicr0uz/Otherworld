@@ -71,7 +71,13 @@ def check_dead_gate():
           and "<=" in _title(zero[0]),
           f"{sorted(_title(n) for n in fed)}")
 
-    dead = _next([BEL.find_then_pin(gate)])
+    # The True arm's first node is the shed's latch (weapon_component/shed.py,
+    # verify/player_death.py): a Branch on OwnerDead as it was, whose True arm
+    # goes straight on to the setter.
+    latch = _next([BEL.find_then_pin(gate)])
+    dead = (_next([BEL.find_then_pin(latch[0])])
+            if len(latch) == 1 and f"Get {OWNER_DEAD_VAR}" in
+            [_title(f) for f in _sources(latch[0], "Condition")] else [])
     live = _next([BEL.find_else_pin(gate)])
     spared = _next([p for p in _execs(cast) if "Failed" in str(PIN.get_pin_name(p))])
     check(f"the True arm marks {OWNER_DEAD_VAR}; the False arm, and an owner with "

@@ -9,7 +9,7 @@ import unreal
 from combat.damage import _author_take_hit, replicate_health
 from combat.debuff_drain import _author_debuff_drain
 from combat.death import (
-    CORPSE_SECONDS, _author_corpse, _author_death_collapse,
+    CORPSE_SECONDS, PLAYER_RESPAWN_WAIT, _author_corpse, _author_death_collapse,
     _author_kill_count, _author_player_death,
 )
 from combat.game_state import (
@@ -30,6 +30,7 @@ from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, LIMB_MULT_VAR,
 )
 from combat.paths import HEALTH_BP_PATH, ITEM_BP_PATH
+from combat.player_respawn import author_player_respawn
 from combat.replacement import _author_replacement
 from combat.respawn import (
     RESPAWN_DELAY, RESPAWN_DELAY_VAR, _author_health_begin_play,
@@ -38,6 +39,7 @@ from combat.respawn import (
 from combat.tuning import COMBAT
 from Sound.sound_world import (
     _author_death_voice, _author_heartbeat, _author_hurt_voice, voice_defaults)
+from loot.consts import BODY_ARRAYS
 from loot.roll import declare_loot_vars
 from uebp.nodes.math import FN_LE_FF
 from uebp.nodes.palette import MACRO_SWITCH_AUTHORITY_COMP
@@ -220,7 +222,10 @@ def build_health_component(rebuild=True):
     _connect(out(mine_again, HV.DespawnOnDeath), _pin(is_player, "Condition"))
     for tail in (fell, no_body):
         _connect(tail, _pin(is_player, "execute"))
-    _author_player_death(ed, (else_(is_player),))
+    shared = _author_player_death(ed, (else_(is_player),))
+    # ...which in standalone ends there, paused. On a server the player is
+    # given a new body (the mode table's death row).
+    author_player_respawn(ed, [shared])
     # ...and only a wanderer a replacement, once it is down, and only from
     # the server: a client's copy of the body spawns nothing.
     spawns = ed.add_macro_node(MACRO_SWITCH_AUTHORITY_COMP)
@@ -239,12 +244,17 @@ def build_health_component(rebuild=True):
 
     # After every declare above: a re-declared variable loses its replication.
     replicate_health(bp)
+    # What a body carries is the server's, and every machine's loot window
+    # shows it: a wanderer's roll, a dead player's gear.
+    for var in BODY_ARRAYS:
+        net.replicate(bp, var)
     _post_physics_tick(bp)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_HealthComponent failed to compile")
     _apply_defaults(bp, {**defaults(HV.TABLE), **voice_defaults(),
         RESPAWN_DELAY_VAR: RESPAWN_DELAY,
+        HV.PlayerRespawnWait: PLAYER_RESPAWN_WAIT,
         # Far enough in the past that nothing counts as recently hurt at level
         # start -- a zero here would float every wanderer's bar for the first
         # five seconds of the game.

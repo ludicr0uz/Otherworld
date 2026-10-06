@@ -231,6 +231,8 @@ verify_graphics_menu.py's checks, beside it because it is over budget
                      its pause, the first row starts or resumes (and reads
                      continue game over a saved profile), controls opens
                      its page in the rows' place, exit game quits
+  death_checks       the death menu by mode: the restart is standalone's; a
+                     client of a server is told a respawn is coming
   escape_checks      Escape is BACK: out of a tab, a capture, the controls
                      page, and in play out of the menu from its own rows
   pause_checks       the M panel as a menu: rows taken by caret or click (no

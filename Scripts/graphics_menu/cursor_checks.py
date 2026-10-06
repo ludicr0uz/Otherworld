@@ -321,8 +321,9 @@ def _check_clicks(check, nodes):
 
     accepts = [_value(n, CC.CURSOR_ACCEPT_VAR) for n in _sets(nodes, CC.CURSOR_ACCEPT_VAR)]
     check("a click on a settings row, or on the death menu's hint, "
-          "raises CursorAccept, and each accept lowers it as it serves it",
-          sorted(accepts) == ["false"] * 2 + ["true"] * 2, str(accepts))
+          "raises CursorAccept, and each accept lowers it as it serves it; "
+          "the death menu of a client of a server lowers it unserved",
+          sorted(accepts) == ["false"] * 3 + ["true"] * 2, str(accepts))
 
     lowered = [n for n in _sets(nodes, CC.PAUSE_CLICK_VAR)
                if not _feeders(n, CC.PAUSE_CLICK_VAR)]

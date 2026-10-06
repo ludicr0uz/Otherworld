@@ -10,6 +10,8 @@ _author_* fragment per concern, each in its own module:
               once: name, pin type, default (uebp/vars.py)
   dead        the dead gate at the head of Tick: an owner who is Dead or at
               0 HP gets none of it; the aim, zoom and camera are let go
+  shed        the dead gate's first act on a server: what the owner carried
+              and wore goes onto the body as loot, and the actors are destroyed
   local       the local gate, after the dead gate: LocalPC (this machine's
               controller of the owner, every poll's self) and LocalInput; the
               keys and the view run only where the owner is locally controlled

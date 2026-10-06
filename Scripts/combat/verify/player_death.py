@@ -6,6 +6,7 @@ both out of standalone's way, whose death is the end of the game.
 from combat import health_vars as HV
 from combat.death import PLAYER_RESPAWN_SECONDS, PLAYER_RESPAWN_WAIT
 from combat.paths import HEALTH_BP_PATH, WEAPON_COMP_BP_PATH
+from combat.record_vars import RECORD
 from combat.player_respawn import PLAYER_START_CLASS_PATH
 from combat.slot_tuning import SLOT_ITEMS_VAR
 from combat.verify.common import BEL, PIN, by_pins, cdo, check, graph, load, pin_value
@@ -92,8 +93,10 @@ def check_gear_shed():
     emptied = sorted(_title(f) for n in by_pins(nodes, "TargetArray")
                      if "Clear" in _title(n) and alone and alone[0] in _upstream(n)
                      for f in _feeders(n, "TargetArray"))
-    check("...and every copy empties what it held: Inventory, Worn and SlotItems cleared",
-          emptied == sorted(f"Get {v}" for v in (WV.Inventory, WORN_VAR, SLOT_ITEMS_VAR)),
+    check("...and every copy empties what it held: Inventory, Worn and SlotItems cleared "
+          "(and the server the inventory's record)",
+          emptied == sorted(f"Get {v}" for v in (WV.Inventory, WORN_VAR, SLOT_ITEMS_VAR,
+                                                 *RECORD)),
           str(emptied))
 
 

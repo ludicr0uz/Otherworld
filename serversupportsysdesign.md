@@ -385,7 +385,11 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
 55 modules)
 
 21. Replicate `BP_WeaponItem`, the inventory, slots, ammo and worn garments, server-owned
-    and serialisable.
+    and serialisable. (The inventory, slots and ammo done, M18: the server's item actors
+    are written down as a record of plain arrays, class, slot and rounds per item, which
+    replicates to the owner and is what a save holds; a client's item actors are made
+    from it, and the slots' asks are Server events. `Scripts/net/CLAUDE.md`, "The
+    inventory". Worn garments are M24.)
 22. Fire, reload, melee, throw and block as server requests, preferably GAS abilities.
 23. Server-side shot traces with lag compensation (C++).
 24. Multicast cosmetics: shot sounds, impacts, blood, tracers, montages.

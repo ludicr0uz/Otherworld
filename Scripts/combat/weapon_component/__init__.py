@@ -79,8 +79,14 @@ _author_* fragment per concern, each in its own module:
               off the health cast's failed arm, at the blood's transform
   inventory   equip, drop, BeginPlay loadout (each issued item into its slot)
   slot_nodes  the slot fragments' shared shapes: loops, SlotItems[c], fits()
-  slot_moves  1-9 ask for a slot (SlotRequest), Q for the bag's next item; the request (the hand's
+  slot_moves  1-9 ask for a slot (AskSlot), Q for the bag's next item (AskNext):
+              Server events; the serve, with authority: the request (the hand's
               item home, the asked one up) and the HUD's drag (MoveFrom/To)
+  record      the server's half of the inventory's record (record_vars.py):
+              written off the item actors after the sync, emptied by the shed,
+              marked to replicate with its OnReps
+  view        a client's half: its item actors made from the record when one
+              arrives (ViewRow, ViewTrim); another player's from HandClass
   slot_sync   last before the refresh: SlotItems rebuilt from each item's
               Slot, UNPLACED items placed (a weapon in its weapon slot
               before the bag), EquippedIndex, HasRoom, refresh
@@ -148,8 +154,9 @@ _author_* fragment per concern, each in its own module:
               inventory): a slot's item or a worn garment is set down on the
               ground ahead, as the drop key sets the held one down
   asks        what a screen asks, one custom event each (combat/ask_consts.py):
-              AskSlot, AskMove, AskTakeOff, AskWear, AskDrop raise the request
-              the Tick serves, in place of the HUD writing it
+              AskSlot, AskMove, AskNext, AskTakeOff, AskWear, AskDrop raise the
+              request the Tick serves, in place of the HUD writing it; the
+              slots' three are Server events
   loot_take   AskLootTake(Body, Index): the loot window's take, with its
               refusals (dead, no body, no room, no such row)
   save_exit   AskSaveExit and the countdown it starts (ExitPending, ExitAt,
@@ -175,8 +182,9 @@ BP_WeaponComponent event graph:
 
   [BeginPlay] --> cache Character + Mesh
               --> attenuation listener on the capsule
-              --> spawn BP_Shotgun, BP_Pistol, BP_Knife, BP_Axe, BP_Matches and
-                  BP_Stick into Inventory
+              --> with authority: spawn BP_Shotgun, BP_Pistol, BP_Knife, BP_Axe,
+                  BP_Matches and BP_Stick into Inventory (a client's are made
+                  from the server's record: view.py)
               --> Equip(0)
 
   [Tick] --> Branch owner Dead or at 0 HP                    --> nothing below runs

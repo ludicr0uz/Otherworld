@@ -23,7 +23,8 @@ from uebp.nodes.actor import (
     FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT, FN_STOP_SLOT)
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE
 from uebp.nodes.math import FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT
-from uebp.nodes.palette import MACRO_FOR_EACH, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN
+from uebp.nodes.palette import (
+    MACRO_FOR_EACH, MACRO_SWITCH_AUTHORITY_COMP, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN)
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
 from combat.sprint_tuning import BASE_SPEED_VAR
 from uebp import props as EP
@@ -364,7 +365,12 @@ def _author_wc_begin_play(ed, begin):
     _connect(as_char, _pin(where, "self"))
     spawn_at = out(where)
 
+    # The loadout is the server's to issue (and single player's): a client's
+    # items are made from the record it is sent (view.py).
     prev = _author_camera_after_boom(ed, as_char, then(now_fov))
+    owns = keep(ed.add_macro_node(MACRO_SWITCH_AUTHORITY_COMP))
+    _connect(prev, _pin(owns, "execute"))
+    prev = out(owns, "Authority")
     for i, var in enumerate(STARTER_CLASS_VARS):
         cls = keep(ed.add_get_member_variable_node(var))
         spawn = keep(_palette(ed, NODE_SPAWN))
@@ -388,9 +394,11 @@ def _author_wc_begin_play(ed, begin):
     dirty = keep(ed.add_set_member_variable_node(WV.NeedsRefresh))
     _set(dirty, WV.NeedsRefresh, True)
     _connect(prev, _pin(dirty, "execute"))
+    _connect(out(owns, "Remote"), _pin(dirty, "execute"))
 
     ed.add_comment_to_nodes(
-        "The player starts carrying the shotgun, the pistol, the knife, the "
+        "With authority (the server, and single player; a client's are a picture of "
+        "the server's record, view.py): the player starts carrying the shotgun, the pistol, the knife, the "
         "axe, the matches and a stick, each given its slot: the shotgun in "
         "hand, the pistol and the knife in theirs, the rest in the bag. "
         "They are spawned here rather "

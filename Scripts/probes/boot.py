@@ -41,7 +41,7 @@ import traceback
 
 import unreal
 
-from combat.slot_tuning import SLOT_REQUEST_VAR
+from combat.record_vars import SlotForced
 from graphics_menu.tune_keep_consts import TUNE_SAVE_SLOTS
 
 from probes import kept_slots
@@ -248,8 +248,9 @@ def start():
 
     writable = {pair for _l, _f, w in loaded for pair in map(tuple, w)}
     # A write of the weapon component's EquippedIndex is a request for an item
-    # in hand (context.hold): the request is what is written.
-    writable |= {(bp, SLOT_REQUEST_VAR) for bp, var in writable if var == "EquippedIndex"}
+    # in hand (context.hold): what is written is the ask's forced slot, which
+    # the owning machine's Tick sends to the server (slot_moves.py).
+    writable |= {(bp, str(SlotForced)) for bp, var in writable if var == "EquippedIndex"}
     _state["writable"] = sorted(writable)
     if where.networked:
         unreal.register_ticker_callback(_ticker)

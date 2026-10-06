@@ -47,7 +47,8 @@ def fed(n, pin):
 
 def check_asks(check, nodes):
     counts = {name: len(asks(nodes, name)) for name in AC.ALL_ASKS}
-    want = {AC.ASK_SLOT: 2, AC.ASK_MOVE: 1, AC.ASK_TAKE_OFF: 2, AC.ASK_WEAR: 1,
+    # AskNext is the Q key's, on the component: no screen asks it.
+    want = {AC.ASK_SLOT: 2, AC.ASK_MOVE: 1, AC.ASK_NEXT: 0, AC.ASK_TAKE_OFF: 2, AC.ASK_WEAR: 1,
             AC.ASK_DROP: 1, AC.ASK_LOOT_TAKE: 1, AC.ASK_SAVE_EXIT: 1}
     check("the HUD asks the weapon component for each thing the player does through "
           "a screen: a slot to hand and a take-off (the keys, and the mouse), a move, "

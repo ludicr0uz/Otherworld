@@ -153,10 +153,13 @@ def check_item_sounds():
     handled = _plays_of(wg, IV.HandleSounds)
     writes = [n for n in wg if _title(n) == f"Set {WV.HandledItem}"]
     named = [n for n in writes if _feeders(n, WV.HandledItem)]
-    check("a slot move names its item in HandledItem (to hand, put back, moved) and one "
-          "play draws from that item's HandleSounds, after which it is let go",
-          len(handled) == 1 and len(named) == 3 and len(writes) == 4
-          and f"Get {WV.HandledItem}" in _reads(handled[0]),
+    # Twice over: where the server serves a move (slot_moves.py), and where a
+    # client's picture follows the record (view.py: one more write names it).
+    check("a slot move names its item in HandledItem (to hand, put back, moved; on a "
+          "client, the item whose slot the record changed) and a play draws from that "
+          "item's HandleSounds, after which it is let go",
+          len(handled) == 2 and len(named) == 4 and len(writes) == 6
+          and all(f"Get {WV.HandledItem}" in _reads(h) for h in handled),
           f"{len(handled)} play(s), {len(named)} of {len(writes)} write(s) name an item")
     eaten = _plays_of(wg, IV.UseSounds)
     check("a consumable used up plays one of its own UseSounds, before it is spent",

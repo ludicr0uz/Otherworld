@@ -47,16 +47,19 @@ def check_asks():
           f"({', '.join(AC.ALL_ASKS)})", not missing, str(missing))
     if missing:
         return
-    # M18, M23, M24 and M35 make them Server events; until then a plain call.
+    # The slots' are Server events (M18); M23, M24 and M35 make the rest so.
     kinds = {n: net.compiled_rpc(wc, n) for n in AC.ALL_ASKS}
-    check("...each compiled as a function of the class, and none an RPC yet",
-          all(k == (net.LOCAL, False) for k in kinds.values()), str(kinds))
+    check(f"...each compiled as a function of the class: the slots' "
+          f"({', '.join(AC.SERVER_ASKS)}) reliable Server events, the rest plain calls yet",
+          all(k == ((net.SERVER, True) if n in AC.SERVER_ASKS else (net.LOCAL, False))
+              for n, k in kinds.items()), str(kinds))
     for name, params in AC.INT_ASKS:
         event = _event(name)
         sets = _after(event)
         got = [(_title(s), [str(PIN.get_pin_name(q)) for q in PIN.list_connected_pins(
             BEL.find_input_pin(s, var))]) for s, (var, _) in zip(sets, WRITES[name])]
-        want = [(f"Set {var}", [param]) for var, param in WRITES[name]]
+        want = [(f"Set {var}", [param] if param in params else [])
+                for var, param in WRITES[name]]
         check(f"{name}({', '.join(params)}) raises the request the Tick serves, and "
               f"nothing else ({', '.join(v for v, _ in WRITES[name])}, in that order)",
               len(sets) == len(want) and got == want, str(got))

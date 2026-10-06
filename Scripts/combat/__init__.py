@@ -92,6 +92,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   slot_tuning       the inventory's slots: the codes (the hand, primary,
                     secondary, pistol, melee, the bag's ten), WeaponKind, the
                     number keys, the issued items' slots, fits()
+  record_vars       the inventory's record (M18): the four plain arrays the server
+                    writes and the owning client is sent, HandClass for everyone
+                    else, the view's events, a probe's forced asks
   wear_tuning       clothing: the eight slots (WEAR_SLOTS), ClothingSlot on the
                     item, Worn / TakeOffSlot / WearItem on the component
   ask_consts        what a screen asks of the weapon component: the Ask

@@ -2,10 +2,16 @@
 the codes). Each only changes items' Slots; slot_sync.py, after them, places
 them and the equip follows.
 
-    keys (with the switch block's place in Tick):
-        1 2 3 4         SlotRequest = primary / secondary / pistol / melee
-        5 6 7 8 9       SlotRequest = the bag's first five slots
-        Q               NextRequest, served at once: SlotRequest = the next
+    keys (with the switch block's place in Tick, on the local player's
+    machine): each calls a Server event (asks.py), which raises the request
+    on the server's copy
+        1 2 3 4         AskSlot(primary / secondary / pistol / melee)
+        5 6 7 8 9       AskSlot(the bag's first five slots)
+        Q               AskNext()
+        (a probe: SlotForced asks as a number key does, MoveForcedFrom/To
+        as the HUD's drag does: record_vars.FORCED)
+    the serve (the upkeep, with authority: the server, and single player):
+    NextRequest first: SlotRequest = the next
                         filled bag slot after the one the hand's item came
                         from, round the bag (the first filled one when the
                         hand's item is not the bag's); the weapon slots are
@@ -31,6 +37,9 @@ a gun, a blade, a garment and anything else each sound like themselves.
 Each request is copied and lowered before anything reads it, so a request
 is served once; the items are read off SlotItems, which the sync wrote at
 the end of last frame.
+
+A client serves nothing: its items' Slots are the record's (view.py), which
+the server writes after its own serve (record.py).
 """
 
 from combat.slot_tuning import (
@@ -38,12 +47,14 @@ from combat.slot_tuning import (
     MOVE_SRC_VAR, MOVE_TO_VAR, NEXT_REQUEST_VAR, NO_REQUEST, PRIMARY, SLOT_COUNT, SLOT_KEYS,
     SLOT_PICK_VAR, SLOT_REQUEST_VAR, SLOT_VAR, SLOT_WANT_VAR,
 )
+from combat.ask_consts import ASK_MOVE, ASK_NEXT, ASK_SLOT, FROM_PARAM, SLOT_PARAM, TO_PARAM
+from combat.record_vars import NO_ASK, MoveForcedFrom, MoveForcedTo, SlotForced
 from combat.paths import ITEM_CLASS_PATH
 from combat.weapon_component import vars as WV
 from Sound.sound_items import author_handled
 from uebp.g import _G
 from combat.weapon_component.slot_nodes import fits, for_loop, not_, op, slot_at, valid
-from uebp.graph import out
+from uebp.graph import _node, _pin, _set, _connect, out, then
 from uebp.nodes.actor import FN_WAS_PRESSED
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_EQ_II, FN_GE_II, FN_LESS_II, FN_LE_II, FN_MOD_II, FN_NEQ_II, FN_OR,
@@ -131,21 +142,54 @@ def _author_slot_move(g, in_execs):
     return [t1, t2, other, stuck, refused, nothing, bad, idle]
 
 
+def _ask(g, name, execs, **params):
+    """A call of one of the component's own ask events, each parameter an
+    int literal or a pin. Returns its then."""
+    n = g.keep(_node(g.ed, name))
+    for param, value in params.items():
+        if isinstance(value, int):
+            _set(n, param, value)
+        else:
+            _connect(value, _pin(n, param))
+    for e in execs:
+        _connect(e, _pin(n, "execute"))
+    return then(n)
+
+
 def _author_slot_keys(ed, pc_out, switch_pressed, in_execs):
-    """1-9 raise SlotRequest and Q the next filled bag slot's (see the module docstring). Returns the
-    exec tails."""
+    """1-9 ask for their slot and Q for the bag's next item (see the module
+    docstring): Server events, so the press is the server's to serve. Returns
+    the exec tails."""
     g = _G(ed, ITEM_CLASS_PATH)
     flow = list(in_execs)
     for var, _key, slot in SLOT_KEYS:
         pressed = out(g.call(FN_WAS_PRESSED, self=pc_out, Key=g.get(var)))
         hit, miss = g.branch(pressed, flow)
-        flow = [g.put(SLOT_REQUEST_VAR, str(slot), [hit]), miss]
+        flow = [_ask(g, ASK_SLOT, [hit], **{SLOT_PARAM: slot}), miss]
 
     hit, miss = g.branch(switch_pressed, flow)
-    flow = [g.put(NEXT_REQUEST_VAR, "1", [hit]), miss]
+    flow = [_ask(g, ASK_NEXT, [hit]), miss]
 
-    # The next filled bag slot after the one the hand's item came from, round.
-    serve, idle = g.branch(op(g, FN_GE_II, g.get(NEXT_REQUEST_VAR), 0), flow)
+    # A probe's hand on the same asks (record_vars.FORCED), lowered as taken.
+    forced, none = g.branch(op(g, FN_GE_II, g.get(SlotForced), 0), flow)
+    asked = _ask(g, ASK_SLOT, [forced], **{SLOT_PARAM: g.get(SlotForced)})
+    flow = [g.put(SlotForced, str(NO_ASK), [asked]), none]
+    forced, none = g.branch(op(g, FN_GE_II, g.get(MoveForcedFrom), 0), flow)
+    asked = _ask(g, ASK_MOVE, [forced], **{FROM_PARAM: g.get(MoveForcedFrom),
+                                           TO_PARAM: g.get(MoveForcedTo)})
+    flow = [g.put(MoveForcedFrom, str(NO_ASK), [asked]), none]
+    ed.add_comment_to_nodes(
+        "1-4 ask for a weapon slot's item, 5-9 for the bag's first five, Q for the "
+        "next filled bag slot's (slot_moves.py). Each is a Server event (asks.py): "
+        "the server raises the request and serves it.",
+        g.made[:3])
+    return flow
+
+
+def _author_next_request(g, in_execs):
+    """Serve NextRequest: SlotRequest := the next filled bag slot after the
+    one the hand's item came from, round. Returns the exec tails."""
+    serve, idle = g.branch(op(g, FN_GE_II, g.get(NEXT_REQUEST_VAR), 0), in_execs)
     flow = g.put(NEXT_REQUEST_VAR, str(NO_REQUEST), [serve])
     flow = g.put(SLOT_PICK_VAR, str(NO_REQUEST), [flow])
     came = g.get(HAND_FROM_VAR)
@@ -160,23 +204,21 @@ def _author_slot_keys(ed, pc_out, switch_pressed, in_execs):
     g.put(SLOT_PICK_VAR, c, [there])
     found, none = g.branch(op(g, FN_GE_II, g.get(SLOT_PICK_VAR), BAG_FIRST), [done])
     asked = g.put(SLOT_REQUEST_VAR, g.get(SLOT_PICK_VAR), [found])
-    ed.add_comment_to_nodes(
-        "1-4 bring a weapon slot's item to hand, 5-9 the bag's first five, Q the "
-        "next filled bag slot's (NextRequest; slot_moves.py). Each only raises "
-        "SlotRequest.",
-        g.made[:3])
     return [asked, none, idle]
 
 
 def _author_slot_serve(ed, in_execs):
-    """The request, then the move. Returns the exec tails."""
+    """Q's request, the slot request, then the move: the server's (and
+    single player's). Returns the exec tails."""
     g = _G(ed, ITEM_CLASS_PATH)
-    tails = _author_slot_request(g, in_execs)
+    tails = _author_next_request(g, in_execs)
+    tails = _author_slot_request(g, tails)
     tails = _author_slot_move(g, tails)
     # Whatever either moved is heard, by its type (Sound/sound_items.py).
     tails = author_handled(g, tails)
     ed.add_comment_to_nodes(
-        "SlotRequest brings a slot's item to hand (the hand's going home first, "
+        "Served with authority only. NextRequest (Q) picks the bag's next filled "
+        "slot; SlotRequest brings a slot's item to hand (the hand's going home first, "
         "or back where it came from); MoveFrom/MoveTo is the HUD's drag, a swap "
         "where both fit (slot_moves.py).", g.made[:3])
     return tails

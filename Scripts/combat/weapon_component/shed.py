@@ -21,12 +21,13 @@ On a server the body becomes the corpse the loot window searches
 (graphics_menu/loot_*.py), as a wanderer's does: a body holds classes, not
 actors (loot/roll.py), so each item is recorded and then destroyed. The
 record is the server's alone and replicates with the health component; the
-destroy runs on every copy, because until the inventory replicates (M18) each
-machine holds actors of its own for the same character, and nothing else
-would ever remove a client's.
+destroy runs on every copy: each machine holds item actors of its own for
+the character (a client's are a picture of the server's record, view.py), and
+the dead gate stops the Tick that would remove a client's.
 
-A class remembers no rounds: a looted gun is a fresh one. That goes when the
-inventory is plain data (M18).
+A class remembers no rounds: a looted gun is a fresh one, until a body's loot
+is rows of the inventory's record (combat/record_vars.py; the loot task, M23).
+The server empties that record here too (record.py).
 
 OwnerDead is read before the gate sets it, which makes this the frame the
 owner was first found dead: no latch of its own.
@@ -39,6 +40,7 @@ from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
 from combat.slot_tuning import SLOT_COUNT, SLOT_ITEMS_VAR
 from combat.wear_tuning import WORN_VAR
 from combat.weapon_component import vars as WV
+from combat.weapon_component.record import author_empty_record
 from loot.consts import LOOT_ICONS_VAR, LOOT_NAMES_VAR, LOOT_TINTS_VAR, LOOT_VAR
 from uebp.nodes.actor import FN_DESTROY, FN_HAS_AUTHORITY
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_RESIZE
@@ -94,9 +96,12 @@ def author_shed_gear(ed, owner_out, as_health, was_dead, exec_in):
                        Size=SLOT_COUNT))
     flow = g.put(WV.Held, None, [flow])
     flow = g.put(WV.EquippedIndex, str(EMPTY_HANDS), [flow])
+    # The record with them (record.py): the dead gate stops the upkeep that
+    # writes it.
+    emptied = author_empty_record(g, [flow])
     ed.add_comment_to_nodes(
         "A player found dead, on a server (never in standalone): what they carried and "
         "wore goes onto the body, as classes with their name, icon and tint (the "
         "server's record, which the loot window reads), and every copy destroys its own "
         "actors and empties its slots (shed.py).", g.made)
-    return [already, alone, flow]
+    return [already, alone, *emptied]

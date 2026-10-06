@@ -134,6 +134,11 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     events (`combat/ask_consts.py`, `weapon_component/asks.py`), which raise them. The loot
     take (`loot_take.py`) and save and exit's countdown (`save_exit.py`) are events of the
     component too (`Scripts/net/CLAUDE.md`, "A screen asks").
+  - **The slots are the server's** (M18; `Scripts/net/CLAUDE.md`, "The inventory"): the
+    keys and the HUD call the Server events `AskSlot`, `AskMove` and `AskNext`, the serve
+    below runs with authority only, and the server writes what is carried as a record
+    (`record_vars.py`, `weapon_component/record.py`) from which a client's item actors are
+    made (`view.py`). Single player is the same graphs, with authority.
   - **A request is `SlotRequest`** (a number key, Q, Enter on a bag slot in the I panel, a
     click on a slot): a filled slot's item comes to hand, the hand's item going home first
     (the first slot from the primary on that it fits and that is free, the asked slot
@@ -151,8 +156,9 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   - **The number keys are fixed** (`SLOT_KEYS`, variables on the component, as every key):
     not in `BIND_VARS`, so the settings page does not rebind them.
   - **Probes equip by writing `EquippedIndex`**: `probes/context.py` turns that write into
-    a `SlotRequest` for the item's slot (`Probe.hold`), and `boot.py` makes `SlotRequest`
-    writable for any probe that lists `EquippedIndex`.
+    an `AskSlot` for the item's slot (`Probe.hold`; on a client, a write of `SlotForced`,
+    which the Tick asks with), and `boot.py` makes `SlotForced` writable for any probe
+    that lists `EquippedIndex`.
 - **E is Interact, and picking up is one kind of it** (`weapon_component/interact.py`). The key
   (`KeyInteract`, `INTERACT_KEY`) knows nothing about items. Each kind of thing is a
   `(candidates, act)` pair in `interact.KINDS`: `candidates` walks its things and offers some,

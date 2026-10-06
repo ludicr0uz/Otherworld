@@ -56,18 +56,21 @@ and which decides whether it happens. The names are `combat/ask_consts.py`.
 
 | event | asked by | what it does | becomes a Server event in |
 |---|---|---|---|
-| `AskSlot(Slot)` | a click on a slot, Enter on a bag slot | raises `SlotRequest` | M18 |
-| `AskMove(From, To)` | a drag from slot to slot | raises `MoveTo`, `MoveFrom` | M18 |
+| `AskSlot(Slot)` | a click on a slot, Enter on a bag slot, the 1-9 keys | raises `SlotRequest` | **done, M18** |
+| `AskMove(From, To)` | a drag from slot to slot | raises `MoveTo`, `MoveFrom` | **done, M18** |
+| `AskNext()` | the Q key (no screen) | raises `NextRequest` | **done, M18** |
 | `AskDrop(From)` | a drag out of the inventory | raises `DropRequest` | M23 |
 | `AskTakeOff(Slot, To)` | Enter or a click on a worn slot, a drag off one | raises `TakeOffTo`, `TakeOffSlot` | M24 |
 | `AskWear(From)` | a drag onto the worn grid | raises `WearRequest` | M24 |
 | `AskLootTake(Body, Index)` | the loot window's Enter or click | the take itself, with its refusals (`weapon_component/loot_take.py`) | M23 |
 | `AskSaveExit()` | the menu's save-and-exit row | starts the countdown the component runs (`weapon_component/save_exit.py`) | M35 |
 
-- **None is an RPC yet.** `combat/verify/asks.py` asserts each is compiled and
-  `NOT_REPLICATED`; the task that makes one a Server event changes that line with it.
-- **The first five only raise the request** the component's Tick already serves, so the
-  serve is still where a move is validated. Three of the serves (take-off, wear, drop) sit
+- **The slots' three are reliable Server events** (`ask_consts.SERVER_ASKS`; "The
+  inventory", below); the rest are plain calls yet. `combat/verify/asks.py` asserts which
+  is which on the compiled class; the task that makes one a Server event adds it to
+  `SERVER_ASKS`.
+- **The int asks only raise the request** the component's Tick already serves, so the
+  serve is still where a move is validated (the slots': on the server alone). Three of the serves (take-off, wear, drop) sit
   in the Tick's local-only half (`tick.py`, `_author_actions`): M24 and M23 move them to
   where the server runs them.
 - **The HUD writes none of those variables** and takes nothing out of a body:
@@ -130,7 +133,8 @@ and every other client. Only the first has that player's keys.
   own spends a round and the other's does not, on either client or the server, which has
   no HUD and no widgets; `--game` runs its standalone arm.
 - **The non-local copies of a character** pose from the mirror ("Other players'
-  characters", below); what is held and fired there is still each copy's own: M18, M19.
+  characters", below) and hold the item the server says is in hand ("The inventory",
+  below); what is fired there is still each copy's own: M19.
   The walk speed, the sprint and the stance of the character itself are M12's, below.
 
 ## Movement states are predicted (M12, done)
@@ -182,12 +186,11 @@ first by **the mirror** (`combat/weapon_component/look.py`), from the few facts 
 - **Three replicated variables and nothing more,** `COND_SKIP_OWNER`, on a component that
   now replicates (`net.replicate_component`, in the build and on the character). The owning
   machine reports them with `Server_SetLook`, reliable, only on the frame one changes: it
-  alone knows them until the server owns the hand (M18) and the shot (M19), which then
-  write them and the event goes. They are cosmetic: no rule may read them.
+  alone knows them until the server owns the shot (M19), which then writes them and the
+  event goes (the hand is the server's since M18, but when it is raised is the aim's). They are cosmetic: no rule may read them.
 - **`HandPose` is what the equip plays,** not `Held.AimPose`: where the keys are the equip
-  takes it off `Held`; on a remote copy `Held` is that copy's own item and is not read
-  for the pose. So a remote copy shows the right pose with **its own copy's item in the
-  hand** (a knife's stance holding the shotgun) until the item in hand replicates: M18.
+  takes it off `Held`; on a remote copy `Held` is not read for the pose. The item in a
+  remote copy's hand is the server's since M18 (`HandClass`, "The inventory", below).
 - **Not mirrored** (not asked for, and each is a later task's): the guard and the kneel
   (M20, M17), the support hand's point (the copy's own `Held`'s), montages (M21).
 - **`verify/fixtures.py` keeps the mirror's nodes out of `wg`** (`wg_mirror`), as it does the
@@ -263,6 +266,61 @@ says who struck it. `combat/damage.py` is the whole of it.
   naming client 2's controller is client 2's; client 2's own `TakeHit` calls change
   nothing; at 20 HP the heart is heard on client 1 alone; at 0 `Dead` reaches both.
   `--game` runs its single-player arm.
+
+## The inventory (M18, done)
+
+What a player carries is the server's. The server keeps the item actors every graph already
+works on (`Inventory`, each item's `Slot`, `Loaded`, `Reserve`); what travels is a **record**
+of them, plain data (`combat/record_vars.py`):
+
+| variable | holds | replicates to |
+|---|---|---|
+| `InvClass[i]`, `InvSlot[i]`, `InvLoaded[i]`, `InvReserve[i]` | a row per carried item, in `Inventory`'s order: its class, its slot code, its rounds | the owning client (`COND_OWNER_ONLY`) |
+| `HandClass` | the class in hand, or none | everyone else (`COND_SKIP_OWNER`) |
+
+- **It can be saved as it stands:** classes and ints, nothing that points into a running
+  world. A load is one `SpawnActor` per row. The character's save and a body's loot
+  (M23) should hold rows of it, not a second form.
+- **The server writes it every Tick,** after the slot sync, behind HasAuthority
+  (`weapon_component/record.py`): no graph that changes what is carried has to remember
+  to. Replication compares before it sends, so an unchanged record costs no traffic. The
+  dead gate stops that Tick, so the shed empties the record itself.
+- **A client holds no inventory of its own.** BeginPlay issues the loadout with authority
+  only. A client's item actors are a **picture** of the record, local and unreplicated
+  (`weapon_component/view.py`): each replicated variable is a RepNotify that raises
+  `ViewDirty`, and the next Tick's upkeep, without authority, calls `ViewRow` per row
+  (the actor at that index kept if it is of the row's class, else destroyed and one
+  spawned; then its slot and rounds) and `ViewTrim`. Its own player's from the rows;
+  another player's character from `HandClass` alone, one actor, in the hand. The slot
+  sync and the equip run after it on every copy, so nothing below knows whether its
+  actors are the server's or a picture.
+- **The picture is remade only when a record arrives.** What a client changes itself
+  stays until the server next says otherwise: that is what a predicted action needs (a
+  round spent by the client's own shot, which M19's server will spend too), and it is
+  why an action that is not yet the server's (a pick-up, a drop, a throw, a meal, a
+  garment: M21, M23, M24) still shows on its own client, and is undone by the next
+  record. Make the action a server request; do not write the record from a client.
+- **The slots' asks are Server events** (`AskSlot`, `AskMove`, `AskNext`, reliable): the
+  HUD's clicks and drags, and the 1-9 and Q keys, which call them from the Tick's local
+  arm (`slot_moves.py`). The request is raised on the server's copy and served there
+  (the serve is behind HasAuthority), where a slot out of range, an empty one or an
+  item that does not fit is refused. Bringing an item to hand and putting it away are
+  both `AskSlot`. In single player they are plain calls: nothing changed.
+- **Python cannot send a Blueprint Server event.** `call_method` on a client runs the
+  event there (the engine routes only native functions from `ProcessEvent`; a Blueprint
+  one is routed by the VM, when a graph calls it). So a probe asks with `p.ask_slot(wc,
+  slot)`, `p.ask_move(wc, src, dst)` or `p.hold(wc, index)` (`probes/context.py`): the
+  call itself with authority, and on a client a write of `SlotForced` or
+  `MoveForcedFrom`/`MoveForcedTo`, which the component's Tick turns into the ask where
+  the keys are read. The next task's Server event needs a door of the same kind.
+- **Not yet in the record:** worn garments (M24), a heated blade and a burning stick
+  (the item's own state, M25), an item lying in the world (M23). The dev-all-guns cheat
+  still spawns on the machine it is pressed on.
+- `combat/verify/record.py` checks the flags and the wiring. Proof: `uepy.py --net
+  --clients 2 --probe Scripts/probes/probe_net_inventory.py` (client 1 moves the axe to
+  another bag slot, brings the pistol to hand and asks for a move no rule allows; the
+  server's copy and its record agree after each, the refused one moved nothing, and
+  client 2 sees the pistol in client 1's hand); `--game` runs its standalone arm.
 
 ## Random rolls (M17, done)
 
@@ -586,7 +644,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | player 0 | **Fixed (M8, M9).** The HUD reads its owning pawn (measured: `probe_net_hud_own_pawn.py`, headless and `--windowed`); the world actors and the wanderers ask the living players ("Who is nearby"; measured: `probe_net_living_players.py`, the cold falls on both players and the nearest to the second player is the second). Before: 26 builder modules call `FN_GET_PLAYER_PAWN` (graphics_menu 15, npc 7, combat 2, survival 1, world 1). On the server that is the first joiner, so every wanderer hunts one player, and the night cold, campfire warmth and ammo pick-up serve only them | read; the join order measured | M8, M9, M27 |
 | health | **Fixed (M14): "Health and damage", above.** Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured; the fix measured (`probe_net_health.py`) | M14 done |
 | firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | M19, M21 |
-| the loadout and held items | Every process spawns its own copy of each character's six items (not replicated, each with local authority), so the three worlds start alike and part at the first change | measured | M18 |
+| the loadout and held items | **Fixed (M18): "The inventory", above.** Every process spawned its own copy of each character's six items (not replicated, each with local authority), so the three worlds started alike and parted at the first change | measured; the fix measured (`probe_net_inventory.py`) | M18 done |
 | items on the ground | The 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
 | day and night | Each process rolls its own start time: in one run it was day on the server and client 2 and night on client 1 | measured | M30 |
 | walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server would correct a sprinting client. **Fixed (M12): "Movement states are predicted", above** | the write measured; the fix measured (`probe_net_move_states.py`, 137 ms) | M12 done |
@@ -613,8 +671,9 @@ contradicts it, this is what holds):
   all: the weapon wrote `Health` on the component. The event is the component's own
   `TakeHit` ("Health and damage"); the engine's `ApplyDamage` still reaches nothing.
 - **M16:** "a random player start" needs player starts: the level generator places one.
-- **M18:** the starting loadout is spawned by every process today; the server alone must
-  spawn it, as replicated actors, or the client's local copies must go.
+- **M18 (done):** the starting loadout was spawned by every process; the server alone
+  issues it now, and a client's item actors are local pictures of the server's record,
+  not replicated actors ("The inventory").
 - **Any probe:** "client 1" is not the server's player 0, and no actor name is shared
   between processes (above).
 

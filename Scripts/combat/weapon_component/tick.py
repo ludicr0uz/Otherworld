@@ -45,6 +45,9 @@ from combat.weapon_component.recoil import (
 from combat.weapon_component.shot_noise import _author_shot_noise
 from combat.weapon_component.slot_moves import _author_slot_keys, _author_slot_serve
 from combat.weapon_component.slot_sync import _author_slot_sync
+from combat.weapon_component.record import _author_record, authority
+from combat.weapon_component.view import _author_view
+from uebp.g import _G
 from combat.weapon_component.head_hide import _author_head_hide
 from combat.weapon_component.sight_pitch import _author_sight_pitch
 from combat.weapon_component.sights import _author_sight_camera
@@ -444,15 +447,25 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
 
 
 def _author_upkeep(ed, flight_exits):
-    """What follows from state on every copy: the slots served and placed,
-    then the equip, if anything asked for one."""
+    """What follows from state on every copy: the slots served (the server)
+    or pictured (a client), placed and recorded, then the equip, if anything
+    asked for one."""
     # --- save and exit's countdown (save_exit.py) ----------------------------
     flight_exits = _author_save_exit(ed, flight_exits)
 
     # --- the slots: requests and drags served, then every item placed --------
     # (slot_moves.py, slot_sync.py): last, so the equip below follows them.
-    flight_exits = _author_slot_serve(ed, flight_exits)
+    # The server serves them; a client's items are a picture of the server's
+    # record (view.py), which the server writes once the sync has placed them
+    # (record.py).
+    owns = ed.add_branch_node()
+    _connect(authority(_G(ed)), _pin(owns, "Condition"))
+    for exit_pin in flight_exits:
+        _connect(exit_pin, _pin(owns, "execute"))
+    flight_exits = (_author_slot_serve(ed, [then(owns)])
+                    + _author_view(ed, [else_(owns)]))
     flight_exits = _author_slot_sync(ed, flight_exits)
+    flight_exits = _author_record(ed, flight_exits)
 
     # --- refresh -------------------------------------------------------------
     dirty_get = ed.add_get_member_variable_node(WV.NeedsRefresh)

@@ -214,13 +214,15 @@ def check_keys_are_variables():
     #   4  a throw: leaving the hand (a blade's, and a blunt thing's), sinking
     #      into a body, lodging in a tree
     #   1  the match
-    #   4  the axe's kill by the head, the breath of a spent sprint, an item
-    #      handled and an item used up (verify/sound_states.py)
-    check("the component plays seventeen sounds: the guns' three, a swing and a "
+    #   5  the axe's kill by the head, the breath of a spent sprint, an item
+    #      handled (where the server serves the move, and where a client's
+    #      picture follows it: view.py) and an item used up
+    #      (verify/sound_states.py)
+    check("the component plays eighteen sounds: the guns' three, a swing and a "
           "landed blow for the fist and for the blade, the chop, a throw's "
           "four, the match, a thrown axe's kill by the head, the breath, an "
-          "item handled and an item used up",
-          len(by_pins(wg, "Sound", "Location")) == 17,
+          "item handled (the server's serve, a client's picture) and an item used up",
+          len(by_pins(wg, "Sound", "Location")) == 18,
           f"{len(by_pins(wg, 'Sound', 'Location'))} PlaySoundAtLocation node(s)")
     check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,
           f"{len(by_pins(wg, 'Class', 'SpawnTransform'))} spawn nodes "
@@ -399,8 +401,10 @@ def check_ammunition():
 def check_ammunition_graph():
     loaded_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                                  for n in wg) if t == "Set Loaded"]
-    check("firing spends a round and reloading puts rounds back",
-          len(loaded_writes) == 2, f"{len(loaded_writes)} writes to Loaded")
+    # The third is a client's picture of the server's record (view.py).
+    check("firing spends a round and reloading puts rounds back (and a client's "
+          "picture takes the record's)",
+          len(loaded_writes) == 3, f"{len(loaded_writes)} writes to Loaded")
     next_writes = [t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
                                for n in wg) if t == "Set NextFireTime"]
     check("both the interval and the reload push the same NextFireTime deadline",
@@ -409,9 +413,10 @@ def check_ammunition_graph():
           bool(titled(wg, "GetTimeSeconds")),
           f"{len(titled(wg, 'GetTimeSeconds'))} GetTimeSeconds")
     # The reserve is only ever *spent* here; it is topped up by BP_AmmoPickup.
-    check("the weapon component spends the reserve and never grants it",
+    check("the weapon component spends the reserve and never grants it (its other "
+          "write is a client's picture of the record)",
           len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")
-                           for n in wg) if t == "Set Reserve"]) == 1)
+                           for n in wg) if t == "Set Reserve"]) == 2)
     # The pure-node trap, in the one place where getting it wrong is free ammo.
     check("the reload works out how many rounds move ONCE and stores it",
           len([t for t in (str(BEL.get_node_title(n)).replace("\n", " ")

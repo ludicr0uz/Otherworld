@@ -91,6 +91,9 @@ from combat.weapon_component.dead import OWNER_DEAD_VAR
 from combat.weapon_component.asks import author_asks
 from combat.weapon_component.look import author_set_look, replicate_look
 from combat.weapon_component.look_vars import TABLE as LOOK_TABLE
+from combat.record_vars import TABLE as RECORD_TABLE
+from combat.weapon_component.record import replicate_record
+from combat.weapon_component.view import author_view_events
 from combat.weapon_component.loot_take import author_loot_take
 from combat.weapon_component.save_exit import author_ask_save_exit
 from combat.weapon_component.ads import AIM_FORCED_VAR
@@ -143,6 +146,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # The look (look.py): declared, then replicated, on every build.
     declare(ed, LOOK_TABLE)
     replicate_look(bp)
+    # The inventory's record (record.py): the same, with its OnReps.
+    declare(ed, RECORD_TABLE)
+    replicate_record(bp)
     # Sprint. The HUD reads Stamina/MaxStamina for the bar under the player's
     # HP bar; BaseSpeed is cached off the character at BeginPlay, never a
     # literal. Sprinting is what the fire gate refuses on. The sprint's speed
@@ -319,10 +325,12 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
 
     # First: the Tick calls it by name, and a call finds only an event that exists.
     author_set_look(ed)
+    # What a screen asks of the component: one event each (combat/ask_consts.py).
+    # The slots' keys call theirs, and the upkeep the view's two (view.py).
+    author_asks(ed)
+    author_view_events(ed)
     _author_wc_begin_play(ed, begin)
     _author_wc_tick(ed, tick)
-    # What a screen asks of the component: one event each (combat/ask_consts.py).
-    author_asks(ed)
     author_loot_take(ed)
     author_ask_save_exit(ed)
 
@@ -330,7 +338,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
-    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
+    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults(RECORD_TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
         # Overwritten on the first frame of BeginPlay with the character's
         # own walk speed, which is this same number (player_pace.py).
         BASE_SPEED_VAR: COMBAT.jog_speed_cms,

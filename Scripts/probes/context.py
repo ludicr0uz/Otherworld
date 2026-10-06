@@ -162,19 +162,46 @@ class Probe(object):
 
     def hold(self, wc, index):
         """Bring Inventory[index] to hand, as a number key or a click on its
-        slot does: its slot goes into the component's SlotRequest, and the
-        next Tick it is held (the hand's item goes home first). Already in
-        hand, or past the end of the bag: nothing. boot.py makes SlotRequest
-        writable for any probe that writes EquippedIndex."""
+        slot does: the component is asked for its slot (AskSlot), and
+        the next Tick it is held (the hand's item goes home first); on a
+        client, once the server has served it and its record is back. Already
+        in hand, or past the end of the bag: nothing."""
         import unreal
-        from combat.slot_tuning import HAND, SLOT_REQUEST_VAR, SLOT_VAR
+        from combat.slot_tuning import HAND, SLOT_VAR
         bag = list(wc.get_editor_property("Inventory"))
         if not 0 <= index < len(bag):
             return
         slot = bag[index].get_editor_property(SLOT_VAR)
         if slot > HAND:
-            wc.set_editor_property(SLOT_REQUEST_VAR, slot,
+            self.ask_slot(wc, slot)
+
+    def ask_slot(self, wc, slot):
+        """AskSlot(slot) of a weapon component, from whichever machine this
+        is. With authority (the server, single player) the event is called;
+        a client cannot send a Blueprint Server event from Python, so it
+        writes SlotForced and the component's own Tick asks (the probe lists
+        SlotForced, or EquippedIndex, in WRITABLE)."""
+        import unreal
+        from combat.ask_consts import ASK_SLOT
+        from combat.record_vars import SlotForced
+        if wc.get_owner().has_authority():
+            wc.call_method(ASK_SLOT, (slot,))
+        else:
+            wc.set_editor_property(str(SlotForced), slot,
                                    unreal.PropertyAccessChangeNotifyMode.NEVER)
+
+    def ask_move(self, wc, src, dst):
+        """AskMove(src, dst), the same way (MoveForcedFrom and MoveForcedTo
+        in WRITABLE)."""
+        import unreal
+        from combat.ask_consts import ASK_MOVE
+        from combat.record_vars import MoveForcedFrom, MoveForcedTo
+        if wc.get_owner().has_authority():
+            wc.call_method(ASK_MOVE, (src, dst))
+            return
+        never = unreal.PropertyAccessChangeNotifyMode.NEVER
+        wc.set_editor_property(str(MoveForcedTo), dst, never)
+        wc.set_editor_property(str(MoveForcedFrom), src, never)
 
     def tag(self, name):
         import unreal

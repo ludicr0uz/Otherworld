@@ -1,7 +1,7 @@
 """verify.slots -- the inventory's slots (slot_tuning.py,
 weapon_component/slot_sync.py, slot_moves.py): each item's Slot and
 WeaponKind, the component's slot variables and number keys, the issued
-items' slots, the sync before the refresh, and the keys' requests.
+items' slots, the sync before the refresh, and the keys' asks.
 
 Checked on the defaults and the wiring; probes/probe_slots.py moves items
 about in a game.
@@ -14,8 +14,11 @@ from combat.slot_tuning import (
     PRIMARY, SECONDARY, SLOT_COUNT, SLOT_ITEMS_VAR, SLOT_KEYS, SLOT_REQUEST_VAR, SLOT_VAR,
     STARTER_HAND_FROM, STARTER_SLOTS, UNPLACED, WEAPON_KIND_VAR, fits,
 )
-from combat.verify.common import BEL, PIN, by_pins, cdo, check, load, num_pin, pin_value
-from combat.verify.fixtures import wc_cdo, wg
+from combat.ask_consts import ASK_MOVE, ASK_NEXT, ASK_SLOT, FROM_PARAM, SLOT_PARAM, TO_PARAM
+from combat.record_vars import FORCED, NO_ASK, MoveForcedFrom, MoveForcedTo, SlotForced
+from combat.verify.common import (
+    BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, pin_value)
+from combat.verify.fixtures import _is_exec, wc_cdo, wg
 from combat.weapon_component.inventory import STARTER_CLASS_VARS
 from combat.weapon_specs import _weapon_specs
 
@@ -98,7 +101,8 @@ def check_starter_slots():
 def check_sync():
     # The sync's, and the one a dead player's shed gear empties the slots
     # with, once (weapon_component/shed.py, verify/player_death.py).
-    resizes = [n for n in by_pins(wg, "TargetArray", "Size")]
+    resizes = [n for n in by_pins(wg, "TargetArray", "Size")
+               if any(_title(f) == f"Get {SLOT_ITEMS_VAR}" for f in _feeders(n, "TargetArray"))]
     check(f"the sync sizes {SLOT_ITEMS_VAR} to {SLOT_COUNT} every Tick (and the shed "
           f"gear of a dead player, to the same)",
           len(resizes) == 2
@@ -115,13 +119,32 @@ def check_sync():
     check(f"{HAS_ROOM_VAR} is written once, by the sync", len(rooms) == 1, str(len(rooms)))
     gate = [n for n in wg if _title(n) == "Branch"
             and any(_title(f) == "Get NeedsRefresh" for f in _feeders(n, "Condition"))]
-    into = [f for g in gate for f in _exec_feeders(g)]
-    refresh = [f for f in into if _title(f) == "Set NeedsRefresh" and any(
+    # Through the record (weapon_component/record.py), which the server writes
+    # between the two.
+    raised = [n for n in wg if _title(n) == "Set NeedsRefresh" and any(
         any("Not Equal" in _title(c) or "!=" in _title(c) for c in _feeders(b, "Condition"))
-        for b in _exec_feeders(f))]
-    check("the sync runs into the refresh, raising it when the hand slot's item is not Held",
+        for b in _exec_feeders(n))]
+    refresh = [n for n in raised if gate and gate[0] in _reach(n)]
+    check("the sync runs into the refresh (by way of the record), raising it when the "
+          "hand slot's item is not Held",
           len(gate) == 1 and len(refresh) == 1, f"{len(gate)} gate(s), "
-          f"{[_title(f) for f in into]}")
+          f"{len(raised)} raise(s), {len(refresh)} reaching it")
+
+
+def _reach(node, limit=400):
+    """Every node an exec output of ``node`` reaches."""
+    seen, todo = [], [node]
+    while todo and len(seen) < limit:
+        cur = todo.pop()
+        for p in BEL.list_output_pins(cur):
+            if not _is_exec(p):
+                continue
+            for q in PIN.list_connected_pins(p):
+                n = PIN.get_owning_node(q)
+                if n not in seen:
+                    seen.append(n)
+                    todo.append(n)
+    return seen
 
 
 def _exec_from(node):
@@ -148,19 +171,40 @@ def check_weapon_slot_first():
           "search's miss", len(after) == 1, f"{len(after)} such search(es)")
 
 
+def _calls(name):
+    return [n for n in wg if _title(n).replace(" ", "") == name and "self" in in_pins(n)]
+
+
 def check_keys():
     asked = {}
-    for n in wg:
-        if _title(n) != f"Set {SLOT_REQUEST_VAR}" or not pin_value(n, SLOT_REQUEST_VAR):
+    for n in _calls(ASK_SLOT):
+        if _feeders(n, SLOT_PARAM):
             continue
         for b in _exec_feeders(n):
             for poll in _feeders(b, "Condition"):
                 for k in _feeders(poll, "Key"):
                     asked[_title(k).replace("Get ", "")] = int(float(
-                        pin_value(n, SLOT_REQUEST_VAR)))
+                        pin_value(n, SLOT_PARAM) or 0))
     want = {v: s for v, _k, s in SLOT_KEYS}
-    check("each number key asks for its slot: 1-4 the weapon slots, 5-9 the bag's first five",
-          asked == want, str(asked))
+    check(f"each number key asks for its slot ({ASK_SLOT}, a Server event): 1-4 the "
+          "weapon slots, 5-9 the bag's first five", asked == want, str(asked))
+    nexts = [k for n in _calls(ASK_NEXT) for b in _exec_feeders(n)
+             for poll in _feeders(b, "Condition") for k in _feeders(poll, "Key")]
+    check(f"Q asks for the bag's next item ({ASK_NEXT}), and no key writes a request "
+          "itself: the server's copy is asked",
+          [_title(k) for k in nexts] == ["Get KeySwitch"]
+          and not [n for n in wg if _title(n) == f"Set {SLOT_REQUEST_VAR}"
+                   and pin_value(n, SLOT_REQUEST_VAR) not in ("", str(NO_REQUEST))
+                   and not _feeders(n, SLOT_REQUEST_VAR)],
+          str([_title(k) for k in nexts]))
+    forced = {ASK_SLOT: [_title(f) for n in _calls(ASK_SLOT) for f in _feeders(n, SLOT_PARAM)],
+              ASK_MOVE: [_title(f) for n in _calls(ASK_MOVE)
+                         for pin in (FROM_PARAM, TO_PARAM) for f in _feeders(n, pin)]}
+    check("a probe's forced slot and move ask as the keys and the HUD do "
+          f"({', '.join(map(str, FORCED))})",
+          forced == {ASK_SLOT: [f"Get {SlotForced}"],
+                     ASK_MOVE: [f"Get {MoveForcedFrom}", f"Get {MoveForcedTo}"]}
+          and all(wc_cdo.get_editor_property(str(v)) == NO_ASK for v in FORCED), str(forced))
     spans = [(num_pin(w, "FirstIndex"), num_pin(w, "LastIndex"))
              for w in by_pins(wg, "FirstIndex", "LastIndex")]
     spans = [s for s in spans if s == (1.0, float(BAG_SIZE))]

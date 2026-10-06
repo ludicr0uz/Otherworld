@@ -44,6 +44,7 @@ architecture.
 | sound: every sound of the game, which Blueprint variable plays which takes, how far each carries, how loud each is, the beds, the player's voice, the listener | `build_sound.py` (the one build after a change to any of them) | `Scripts/Sound/CLAUDE.md` |
 | sourcing sounds: the fetchers and the synthesiser, cutting candidates from the downloaded packs, the page that plays and rates them (all run outside the editor) | `Scripts/Sound/*.py` | `Scripts/Sound/sound_candidates/__init__.py` |
 | the C++ modules: the `Otherworld` runtime module (no gameplay yet), the editor-only `OtherworldEditor` (what the builders need and Python cannot reach) and the Editor, Game, Client and Server targets; the compile command, its time and the Xcode it needs | `Source/Otherworld/Otherworld.Build.cs`, `Source/OtherworldEditor/`, `Source/*.Target.cs` | `Source/CLAUDE.md` |
+| multiplayer conventions: the authority pattern, the three mode questions, what may differ between single player and a server, writing a `--net` probe, and what the spike found broken on a client, system by system | `probes/probe_net_see_each_other.py` | `Scripts/net/CLAUDE.md` |
 | networked Blueprints: Server / Client / Multicast custom events, Replicated and RepNotify variables, actors and components that replicate, the nodes that ask which machine this is | `uebp/net.py`, `dev/check_net_authoring.py` | `Scripts/uebp/CLAUDE.md` |
 | multiplayer server: the strategy and task list (`serversupportsysdesign.md`), the GCP build VM and the engine source build | `Scripts/server/gcp/vm_create.sh`, `engine_clone.sh`, `engine_build.sh`, `vm.sh` | `Scripts/server/gcp/CLAUDE.md` |
 
@@ -187,7 +188,10 @@ python3 Scripts/dev/uepy.py --close-editors        # save + quit this project's 
   - **Clients are `-nullrhi`** unless `--windowed`. With no probe everyone plays for
     `--seconds` (default 20) after the last join; with one the run ends when the last process
     has finished its probes.
-  - **Memory:** each process is 3-5 GB. Close the editor first, and run one at a time.
+  - **Memory:** the report has a line per process with what it used (`uepylib/net_memory.py`).
+    Measured on the 200 m map: a server or a `-nullrhi` client is 1.9 GB, a `--windowed`
+    client 5.8 GB, so two rendered clients and a server (13.5 GB) swap on this machine.
+    Close the editor first, and run one at a time.
 - **PIE:** `uepy.py` refuses to run while PIE is running, unless given `--allow-pie`
   (`--net` too). Never rebuild Blueprints under a running game.
 - **Log prefixes:** builders log with `[GEN]`, verifiers with `[VERIFY]`.

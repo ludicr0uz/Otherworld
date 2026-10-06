@@ -234,24 +234,43 @@ two clients. That is enough for replication, PvP damage, teams and saves.
 was at 7.5 of 8 GB with two editor processes running, so it is at its limit before any
 server exists.
 
-**What fits in 16 GB** (*estimates*; the Phase 0 spike measures them):
+**What the processes use** (*measured* 2026-10-06 by the spike, task M4: `uepy.py --net
+--clients 2`, every process the installed editor binary, the editor closed. The figure is
+the footprint macOS charges the process, Activity Monitor's "Memory": resident, compressed
+and swapped together. Each run prints these lines again, so re-read them rather than trust
+this table once the game has grown):
+
+| process | map | memory |
+|---|---|---|
+| dedicated server (`-server`) | 200 m | 1.9 GB |
+| dedicated server | 1 km | 2.5 GB |
+| client, `-nullrhi` | 200 m | 1.9 GB |
+| client, `-nullrhi` | 1 km | 2.2 GB |
+| client, rendered (`--windowed`, 1280x720) | 200 m | 5.8 GB |
+
+Steady from the join on: 90 s of play added nothing to any of them.
+
+**What fits in 16 GB** (sums of the rows above; *measured* where marked, the others added up
+from them or still an *estimate*):
 
 | setup | memory | on 16 GB |
 |---|---|---|
-| editor alone, 1 km map open | 6–10 GB | fine |
-| headless server from the editor binary | 3–5 GB | fine |
-| each test client from the editor binary | 3–5 GB | one or two |
-| editor + server + 2 clients | 15–25 GB | swaps heavily |
-| server + 2 clients, editor closed, 200 m map | 9–15 GB | workable |
-| 8 or more bot clients | 25 GB and up | no |
+| server + 2 `-nullrhi` clients, 200 m map | 5.7 GB (*measured*) | fine: the default check |
+| server + 2 `-nullrhi` clients, 1 km map | 6.9 GB (*measured*) | fine |
+| server + 2 rendered clients, 200 m map | 13.5 GB (*measured*) | runs, and swaps: the machine compressed all three (their resident size fell to 0.1-0.3 GB by the end of a 48 s run) |
+| server + 1 rendered and 1 `-nullrhi` client, 200 m map | 9.6 GB (added up) | workable: use it when one view is enough |
+| the editor as well as any of these | 6–10 GB more (*estimate*) | no: close it first |
+| 8 `-nullrhi` clients and a server, 200 m map | about 17 GB (added up) | no |
 
 **Rules for a multiplayer test on this machine:**
 
 1. Close the editor first. The probe harness already closes editors before a task.
 2. Use `Lvl_Forest_200m` for everything but scale work.
-3. Use the packaged Mac client (`Binaries/Mac/Otherworld.app`) for test clients where the
-   editor binary isn't needed: a cooked client is much lighter.
-4. Run a client `-nullrhi` when the check doesn't need rendering.
+3. Run a client `-nullrhi` when the check doesn't need rendering: it is a third of a
+   rendered one (1.9 GB against 5.8), and `uepy.py --net` does so unless given `--windowed`.
+4. A rendered run has two clients at most, and nothing else open. A packaged Mac client
+   (`Binaries/Mac/Otherworld.app`) should be lighter than a rendered editor binary; that is
+   an *estimate*, not measured, and the harness does not start one.
 5. Don't run dev-team sessions at the same time.
 
 **What does not happen on this machine:**

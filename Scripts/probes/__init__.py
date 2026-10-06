@@ -17,7 +17,9 @@ this run only -- nothing on disk changes and no builder has to be re-run.
 
 A network run (``uepy.py --net --clients 2 --probe ...``) runs the same file in
 a dedicated server and in each client; net.py says how a probe names where it
-runs and reads where it is, and probe_net_join.py is the model.
+runs and reads where it is, and probe_net_join.py is the model
+(probe_net_see_each_other.py for one where a client waits on another);
+Scripts/net/CLAUDE.md has the conventions and the traps.
 
   runner      the pure driver: advances probe generators on a clock, records checks
   context     Probe, the object a probe is handed: checks plus the game helpers

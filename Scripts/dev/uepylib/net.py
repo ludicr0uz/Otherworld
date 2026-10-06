@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import time
 
-from uepylib import editors, inbox, net_plan, net_report
+from uepylib import editors, inbox, net_memory, net_plan, net_report
 from uepylib.paths import editor_cmd, log, saved_uepy, serve_inbox, uproject
 
 # With no probe: how long everyone plays after the last client has joined.
@@ -81,12 +81,17 @@ def _read_json(path):
         return None
 
 
-def _wait(running, seconds, has_probes):
+def _wait(running, seconds, has_probes, meter):
     """Until every process has written its results (then, with no probe, the
-    play time on top), one of them has died, or the ceiling."""
+    play time on top), one of them has died, or the ceiling. ``meter`` reads
+    every process's memory on the way."""
     deadline = time.time() + (seconds if has_probes else JOIN_SECONDS)
     joined_at = None
+    next_read = 0.0
     while time.time() < deadline:
+        if time.time() >= next_read:
+            meter.read(running)
+            next_read = time.time() + net_memory.EVERY
         if any(proc.poll() is not None for _p, proc in running):
             return
         if joined_at is None and all(os.path.exists(p.results) for p, _proc in running):
@@ -119,6 +124,7 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
     started = time.time()
     editor, project = editor_cmd(engine), uproject()
     running = []
+    meter = net_memory.Meter()
     try:
         for process in plan:
             os.makedirs(process.inbox, exist_ok=True)
@@ -127,8 +133,9 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 env=net_plan.environment(os.environ, process, folder, clients, port,
                                          level, list(probes), probe_timeout))))
-        _wait(running, seconds, bool(probes))
+        _wait(running, seconds, bool(probes), meter)
     finally:
+        meter.read(running)
         exits = {}
         for process, proc in reversed(running):      # the clients, then the server
             exits[process.name] = proc.poll()
@@ -139,7 +146,8 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
     reports = [net_report.ProcessReport(p.name, _read(p.log), _read_json(p.results),
                                         exits.get(p.name), p.log) for p in plan]
     names = [os.path.splitext(os.path.basename(p))[0] for p in probes]
-    lines, ok = net_report.report(reports, clients, names)
+    lines, ok = net_report.report(reports, clients, names,
+                                  net_memory.lines(meter.usage, [p.name for p in plan]))
     for line in lines:
         print(line, flush=True)
     log(f"{time.time() - started:.0f}s; one log per process in {folder}")

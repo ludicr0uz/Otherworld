@@ -16,7 +16,8 @@ from uepylib.game import ENTRY_URL, render_args
 HOST = "127.0.0.1"
 # Not the engine's 7777: a run never meets a server someone left up.
 DEFAULT_PORT = 17777
-# Each client is a whole editor binary, 3-5 GB of it (serversupportsysdesign.md 5).
+# Each client is a whole editor binary: 1.9 GB -nullrhi, 5.8 GB rendered
+# (measured: serversupportsysdesign.md 5).
 MAX_CLIENTS = 8
 SERVER, CLIENT = "server", "client"
 # Windowed clients step down the screen, so each one's title bar shows.

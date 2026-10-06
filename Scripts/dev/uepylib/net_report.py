@@ -101,9 +101,11 @@ def probes(reports, probe_names):
     return lines, ok
 
 
-def report(reports, clients, probe_names=()):
-    """(lines, ok) for the whole run."""
+def report(reports, clients, probe_names=(), memory=()):
+    """(lines, ok) for the whole run. ``memory`` is net_memory's lines: what
+    each process used, which fails nothing."""
     lines, ok = summary(reports, clients)
+    lines.extend(memory)
     if probe_names:
         part, good = probes(reports, probe_names)
         lines.extend(part)

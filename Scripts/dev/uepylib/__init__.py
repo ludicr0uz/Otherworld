@@ -14,9 +14,10 @@ uepy.py is the thin CLI; everything it does lives here:
   net         a network run (--net): a dedicated server and N clients, started and killed
   net_plan    that run's processes: names, command lines, environments, argument checks
   net_report  that run's one report: joins and errors per process, every process's probes
+  net_memory  that run's memory: each process's peak footprint and resident size, sampled
   editors     finding and closing the project's running editors
 
 The modules that do not start processes (summary, targets, net_plan,
-net_report, and the parsing halves of game, cold and editors) are unit-tested
+net_report, and the parsing halves of net_memory, game, cold and editors) are unit-tested
 in Scripts/dev/tests.
 """

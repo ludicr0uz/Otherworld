@@ -1166,3 +1166,86 @@ contradicts it, this is what holds):
 | dedicated server | 1.9 GB | 2.5 GB |
 | client, `-nullrhi` | 1.9 GB | 2.2 GB |
 | client, `--windowed` | 5.8 GB | not measured |
+
+## Measured at scale (A1, 2026-10-07)
+
+The load harness is `uepy.py --net --bots N`: the dedicated server (the editor binary with
+`-server`) spawns N more `BP_ThirdPersonCharacter` bodies as soon as its level is up, each
+possessed by the engine's plain AIController and driven by `Scripts/probes/bots.py` from the
+engine's ticker: on a timer of 1.5–3 s each walks to a random reachable point within 15 m,
+crouches or stands (30%), and fires at the nearest other living body within 60 m through the
+same `Server_Fire(AimPoint)` and `Server_Reload` a client asks with, so the weapon component's
+Tick, the record, the hit history and the health path run for it as for a player. The aim is a
+point within 1.5 m of the target, so most shots miss, as a player's do; a dry gun's reserve is
+refilled; a dead bot gets a new body 10 s later and the old one lies 60 s, as a player's does
+(`combat/player_respawn.py`). `--bots 0` is the plain `--net`. `--trace` adds
+`-trace=net,cpu` to the server, writing `server.utrace` into the run's folder.
+`Scripts/probes/probe_net_load.py` is the measurement: once every bot has been spawned and
+every client joined, 5 s of play, then a 90 s window (`UEPY_LOAD_SECONDS` changes it) read
+through `UOtherworldLoadLibrary` (`Source/Otherworld/Public/OtherworldLoadLibrary.h`:
+UNetConnection's counters are not properties, so Python cannot read them without it). Every
+figure is a check's detail, and each process writes `load-<process>.json` beside its log.
+
+**The runs:** `Lvl_Forest_200m`, 2 real `-nullrhi` clients, 90 s window each, this Mac
+(M-series, 10 cores, 16 GB), the editor closed first. The server's tick rate is the engine's
+default `NetServerMaxTickRate` of 30 Hz, so a frame is 33 ms unless the world tick overruns it;
+the world tick (UWorld::Tick, which holds the net driver's dispatch and replication) is the work.
+
+| N bots | server frame ms mean / p99 / max (Hz) | server world tick ms mean / p99 | bytes out per client (packets/s) | bytes in per client | actor channels per client | lag ms (server / client) | characters, hit history samples | bot deaths / shots in 90 s | client frame ms mean / p99 (Hz) | memory: server, each client (footprint) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 4 (the shakedown: 1 client, a 20 s window) | 39.7 / 248.7 / 384 (25.2) | 11.6 / 221.0 | 5.9 KB/s (25) | 4.1 KB/s (70) | 61 | 29 / 24 | 18, 558 (31 each) | – | 1.5 / 2.1 (656) | 2.0, 2.0 GB |
+| 8 | 36.0 / 55.6 / 403 (27.8) | 11.4 / 46.7 | 7.5 KB/s (27.8) | 5.3 KB/s (73) | 77 | 22 / 32 | 33, 990 (30 each) | 2 / 243 | 3.8 / 6.2 (265) | 2.0, 2.0 GB |
+| 16 | 36.4 / 78.8 / 403 (27.5) | 18.1 / 64.1 | 9.7 KB/s (27.5) | 4.7 KB/s (67) | 104 | 36 / 47 | 60, 1800 (30 each) | 15 / 473 | 5.8 / 10.4 (174) | 2.0, 2.0 GB |
+| 32 (traced) | 36.0 / 62.1 / 368 (27.8) | 27.0 / 53.5 | 13.8 KB/s (27.8) | 2.5 KB/s (44) | 119 | 42 / 58 | 75, 2250 (30 each) | 34 / 933 | 9.7 / 15.0 (103) | 2.0, 2.0 GB |
+| 62 | 45.8 / 110.4 / 374 (21.8) | 42.8 / 104.5 | 22.6 KB/s (29.9) | 1.5 KB/s (30) | 180 | 61 / 92 | 136, 2549 (19 each) | 79 / 1766 | 16.5 / 25.2 (60.5) | 2.1, 2.1 GB |
+
+- **N = 62 fits:** the three processes peak at 6.2 GB together (the server grows 0.1 GB for 62
+  bodies), so memory is not the limit on this Mac; the server's game thread is. At 62 the
+  world tick is 43 ms mean and the server runs at 22 Hz, below its 30 Hz; at 32 it is 27 ms,
+  80% of the 33 ms budget. The frame's max of 350–400 ms in every run is a hitch the trace
+  names: one call of the wendigo's stalk step (`BTT_ForestWandererAI_Wendigo_Step` →
+  `BT_Stalk`, `npc/stalk.py`, `stalk_cover.py`) took 250 ms, and another 72 ms, inside the
+  longest frame; five frames of 350 ms or more fell in the traced 20 s. The wendigo's hunt is
+  the one thing on the server that stalls a frame.
+- **"characters" counts bodies:** bots, players, the 10 wanderers and every corpse lying its
+  60 s, each with a mesh that ticks and a row in the hit history. At 62 bots the history holds
+  19 samples per character instead of 30 because the server makes 22 frames a second, not 30.
+- **The client's bytes in fall as N rises** (5.3 → 1.5 KB/s): the clients' players are shot
+  dead within a minute and a dead client sends only its acks until it respawns. The server's
+  bytes out per client (7.5 → 22.6 KB/s, 180 actor channels at 62) are the replication cost
+  the next tasks measure against. In bytes per second per client at 62: 22.6 KB/s × 64 clients
+  would be 1.4 MB/s out of a 64-player server, before any relevancy or dormancy.
+- **The bot driver's own cost** is on the server's frame: 0.12 ms a frame at 8 bots, 0.48 at
+  32, 1.30 at 62 (mean; p99 5.6 ms at 62), Python in the core ticker. Read it off the world
+  tick when a change is judged.
+- **The clients spin:** a `-nullrhi` client runs unthrottled (656 Hz alone, 60 Hz at 62 bots),
+  so two of them hold two of the ten cores while the server is measured. Unchanged here: the
+  existing `--net` probes wait in game time, which a fixed step per frame ties to the frame rate.
+
+**The three largest costs** (Unreal Insights, `-trace=net,cpu`, the N = 32 server, 20 s of its
+window: 478 frames, 20.0 s of game thread of which 5.0 s (25%) is the tick-rate sleep in
+`UpdateTimeAndHandleMaxTickRate`; exported with `UnrealInsights -OpenTraceFile=... -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents events.csv -threads=GameThread -startTime=60 -endTime=80 -columns=ThreadId,TimerId,StartTime,EndTime,Depth" -AutoQuit`, one command per invocation, and summed per timer, inclusive and exclusive; the trace is kept at `Saved/traces/net_load_32bots_2026-10-07.utrace`):
+
+1. **Every character's skeletal mesh and animation Blueprint tick on the dedicated server:
+   30% of the game thread** (`USkinnedMeshComponent_TickComponent` 5.96 s inclusive, 3.44 s
+   exclusive, 47 080 ticks; `SKM_Adventurer03` 5.78 s; `ABP_Unarmed_C` 2.20 s inclusive, 1.90 s
+   exclusive, 52 744 ticks). The server poses 75 bodies a frame, corpses included, with nothing
+   to draw; the hit history needs the bones of the living, not of the dead, and not every frame.
+2. **The wanderers' behaviour trees: 18%** (`BehaviorTreeComponent` 3.60 s; the zombie's
+   `BTT_ForestWandererAI_Zombie_Step` 2.87 s, 14.3% exclusive, 0.65 ms a call;
+   `BT_Chase` 1.89 s, `BT_Swing` 1.08 s; the wendigo's step 0.72 s, of which single calls of
+   `BT_Stalk` take 70–250 ms: the hitches above). Ten wanderers, a cost that does not grow
+   with N and is a seventh of the budget before a player joins.
+3. **The weapon component's Tick on every body: 4.5%** (`WeaponComponent` 0.90 s, 66 037
+   ticks, 138 a frame; `ExecuteUbergraph_BP_WeaponComponent` 0.89 s), with the character
+   movement at 2.6% (`UCharacterMovementComponent_TickComponent` 0.52 s), the net driver's
+   replication to two clients at 2.5% (`NetBroadcastTickTime` 0.49 s, 1.0 ms a frame) and
+   the hit history's recording at 1.0% (`OnWorldPostActorTick` 0.20 s, 0.4 ms a frame for
+   75 characters) behind it. The health component is 1.4%, the ability systems 0.5%.
+
+**What the load found broken, fixed in no task yet:** on the server every `Accessed None`
+(142–235 a run) is a wanderer's `NearestLivingPlayer` read with no living player, the ten or so
+seconds both real players lie dead at once (`BP_ForestWandererAI_Zombie` 110–187,
+`BP_ForestWandererAI_Wendigo` 32–48 a run); on a client, 16 `GetOwningPawn` reads by
+`BP_GraphicsMenuHUD` at each death, the frames between the pawn's death and the respawn. Neither
+happens with one living player, which is why no earlier probe met them.

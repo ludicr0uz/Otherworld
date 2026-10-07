@@ -44,7 +44,7 @@ import unreal
 from combat.record_vars import SlotForced
 from graphics_menu.tune_keep_consts import TUNE_SAVE_SLOTS
 
-from probes import kept_slots
+from probes import bots, kept_slots
 from probes.context import Probe
 from probes.net import LISTENING, SERVER, STANDALONE, Where, pick_probe
 from probes.runner import DEFAULT_TIMEOUT, Ledger, ProbeRun, Queue
@@ -77,9 +77,10 @@ def _game_time(map_path):
 
 
 def load_probes(paths, where):
-    """Each file's probe function and WRITABLE list, or a ledger error. A
-    file whose RUNS_ON leaves this process out is not loaded here; in a
-    single-player run that is an error, since it then runs nowhere."""
+    """Each file's probe function, WRITABLE list and TIMEOUT (wall seconds,
+    None for the run's default), or a ledger error. A file whose RUNS_ON
+    leaves this process out is not loaded here; in a single-player run that
+    is an error, since it then runs nowhere."""
     loaded = []
     for path in paths:
         name = os.path.splitext(os.path.basename(path))[0]
@@ -94,10 +95,10 @@ def load_probes(paths, where):
             fn = pick_probe(ns, where)
             if fn is None:
                 raise AttributeError(f"{path} defines no probe(p)")
-            loaded.append((ledger, fn, list(ns.get("WRITABLE") or ())))
+            loaded.append((ledger, fn, list(ns.get("WRITABLE") or ()), ns.get("TIMEOUT")))
         except Exception:
             ledger.error = traceback.format_exc(limit=4).strip()
-            loaded.append((ledger, None, []))
+            loaded.append((ledger, None, [], None))
     return loaded
 
 
@@ -184,6 +185,9 @@ def _ready(world, where):
         if not where.posted(SERVER, LISTENING):
             _log(f"server is listening on {world.get_name()}")
             where.post(LISTENING)
+            # The load test's bots (uepy.py --net --bots N): spawned as soon
+            # as the level is up, whether or not a client has joined yet.
+            bots.start(world)
         return unreal.GameplayStatics.get_num_player_controllers(world) >= where.clients
     return bool(unreal.GameplayStatics.get_player_pawn(world, 0))
 
@@ -239,14 +243,17 @@ def start():
         kept_slots.set_aside(_save_dir(), TUNE_SAVE_SLOTS)
     loaded = load_probes(paths, where)
     runs = []
-    for ledger, fn, _writable in loaded:
+    for ledger, fn, _writable, own_timeout in loaded:
         probe = Probe(ledger, map_path, game_time, where)
         factory = (lambda fn=fn, probe=probe: _hermetic(fn, probe)) if fn else (lambda: None)
-        runs.append(ProbeRun(ledger, factory, game_time, time.time, timeout))
+        runs.append(ProbeRun(ledger, factory, game_time, time.time,
+                             float(own_timeout or timeout)))
     _state["queue"] = Queue(runs)
     _state["since"] = time.time()
 
-    writable = {pair for _l, _f, w in loaded for pair in map(tuple, w)}
+    writable = {pair for _l, _f, w, _t in loaded for pair in map(tuple, w)}
+    if where.role == SERVER and bots.count():
+        writable |= set(map(tuple, bots.WRITABLE))
     # A write of the weapon component's EquippedIndex is a request for an item
     # in hand (context.hold): what is written is the ask's forced slot, which
     # the owning machine's Tick sends to the server (slot_moves.py).

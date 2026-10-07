@@ -16,6 +16,7 @@ uepy_inbox.py, then the engine's multicast remote execution), which turns those
     Scripts/dev/uepy.py --game --probe Scripts/probes/probe_consume_heal.py
     Scripts/dev/uepy.py --in-game probe.py           # into a running -game
     Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_join.py
+    Scripts/dev/uepy.py --net --clients 2 --bots 32 --trace --probe Scripts/probes/probe_net_load.py
     Scripts/dev/uepy.py --cold Scripts/verify_level.py   # force a fresh editor
     Scripts/dev/uepy.py --close-editors              # save, quit, or kill them
 
@@ -148,6 +149,13 @@ def parse_args():
                     help="with --net: how many clients join (default 1)")
     ap.add_argument("--port", type=int, default=net_plan.DEFAULT_PORT,
                     help=f"with --net: the server's port (default {net_plan.DEFAULT_PORT})")
+    ap.add_argument("--bots", type=int, default=0, metavar="N",
+                    help="with --net: the server spawns N more characters driven by "
+                         "simple AI (Scripts/probes/bots.py), the load test's players "
+                         f"(0-{net_plan.MAX_BOTS}, default 0)")
+    ap.add_argument("--trace", action="store_true",
+                    help=f"with --net: the server writes an Unreal Insights trace "
+                         f"(-trace={net_plan.TRACE_CHANNELS}) into the run's folder")
     ap.add_argument("--lag", type=int, default=0, metavar="MS",
                     help="with --net: delay every packet a client sends by MS "
                          "(the engine's Net PktLag), to check prediction")
@@ -204,12 +212,13 @@ def main():
             if not os.path.isfile(p):
                 sys.exit(f"[uepy] no such probe: {p}")
     if args.net:
-        problem = net_plan.check_args(args.clients, args.port, args.seconds, args.lag)
+        problem = net_plan.check_args(args.clients, args.port, args.seconds, args.lag,
+                                      args.bots)
         if problem:
             ap.error(problem)
         ok = net.run_net(engine, args.map, args.clients, args.port, args.seconds, probes,
                          args.probe_timeout, args.windowed, args.allow_pie, args.title,
-                         args.lag)
+                         args.lag, args.bots, args.trace)
         return 0 if ok else 1
     if args.game:
         seconds = args.seconds or (game.PROBE_SECONDS if probes else game.GAME_SECONDS)

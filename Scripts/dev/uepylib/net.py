@@ -104,7 +104,7 @@ def _wait(running, seconds, has_probes, meter):
 
 
 def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout=None,
-            windowed=False, allow_pie=False, title=False, lag_ms=0):
+            windowed=False, allow_pie=False, title=False, lag_ms=0, bots=0, trace=False):
     """Run the server and the clients, print the report. True when clean."""
     beat = pie_editor()
     if beat and not allow_pie:
@@ -123,6 +123,10 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
         what += ", the clients starting alone on the title"
     if lag_ms:
         what += f", each client's packets {lag_ms} ms late"
+    if bots:
+        what += f", {bots} bot(s) on the server"
+    if trace:
+        what += ", the server traced"
     log(f"--net: a server and {clients} client(s) on {level}, port {port}, {what} "
         f"-> {folder}")
     started = time.time()
@@ -133,10 +137,11 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
         for process in plan:
             os.makedirs(process.inbox, exist_ok=True)
             running.append((process, subprocess.Popen(
-                net_plan.command(editor, project, process, port, windowed, level, lag_ms),
+                net_plan.command(editor, project, process, port, windowed, level, lag_ms,
+                                 trace),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 env=net_plan.environment(os.environ, process, folder, clients, port,
-                                         level, list(probes), probe_timeout, title))))
+                                         level, list(probes), probe_timeout, title, bots))))
         _wait(running, seconds, bool(probes), meter)
     finally:
         meter.read(running)
@@ -155,4 +160,8 @@ def run_net(engine, level, clients, port, seconds=None, probes=(), probe_timeout
     for line in lines:
         print(line, flush=True)
     log(f"{time.time() - started:.0f}s; one log per process in {folder}")
+    if trace:
+        path = plan[0].trace
+        log(f"the server's trace: {path}" if os.path.exists(path)
+            else f"no trace was written at {path}")
     return ok

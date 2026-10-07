@@ -53,6 +53,14 @@ class ArgsTest(unittest.TestCase):
         self.assertIn("--port", net_plan.check_args(1, 80))
         self.assertIn("--seconds", net_plan.check_args(1, 17777, 0))
 
+    def test_bots_and_trace(self):
+        args = self.parse("--net", "--clients", "2", "--bots", "32", "--trace")
+        self.assertEqual((args.bots, args.trace), (32, True))
+        self.assertEqual((self.parse("--net").bots, self.parse("--net").trace), (0, False))
+        self.assertIsNone(net_plan.check_args(2, 17777, None, 0, net_plan.MAX_BOTS))
+        self.assertIn("--bots", net_plan.check_args(2, 17777, None, 0, net_plan.MAX_BOTS + 1))
+        self.assertIn("--bots", net_plan.check_args(2, 17777, None, 0, -1))
+
     def test_net_and_game_together_are_refused(self):
         with mock.patch.object(sys, "argv", ["uepy.py", "--net", "--game"]), \
                 contextlib.redirect_stderr(io.StringIO()) as err, \
@@ -108,6 +116,22 @@ class PlanTest(unittest.TestCase):
                           if "PktLag" in a])
         self.assertIsNone(net_plan.check_args(2, 17777, None, 120))
         self.assertIn("--lag", net_plan.check_args(2, 17777, None, -5))
+
+    def test_trace_is_the_servers_alone(self):
+        cmd = net_plan.command("ed", "p", self.plan[0], 17777, trace=True)
+        self.assertIn(f"-trace={net_plan.TRACE_CHANNELS}", cmd)
+        self.assertIn("-tracefile=/run/server.utrace", cmd)
+        self.assertFalse([a for a in net_plan.command("ed", "p", self.plan[1], 17777, trace=True)
+                          if "trace" in a])
+        self.assertFalse([a for a in net_plan.command("ed", "p", self.plan[0], 17777)
+                          if "trace" in a])
+
+    def test_every_process_is_told_the_bots(self):
+        for process in self.plan:
+            env = net_plan.environment({}, process, "/run", 2, 17777, "/L", [], bots=16)
+            self.assertEqual(env["UEPY_NET_BOTS"], "16")
+        env = net_plan.environment({}, self.plan[0], "/run", 2, 17777, "/L", [])
+        self.assertEqual(env["UEPY_NET_BOTS"], "0")
 
     def test_no_client_is_told_to_skip_the_menu(self):
         # A joined client has no title by the game's own rule; the server has no HUD.

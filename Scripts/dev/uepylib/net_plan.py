@@ -7,6 +7,11 @@ reads the environment back inside each process.
 Every process is the editor binary, booted into the empty Entry map, where
 Scripts/probes/boot.py takes over: the server opens the level and a client,
 once the server listens, opens its address (game.py says why Entry first).
+
+``--bots N`` (UEPY_NET_BOTS) has the server spawn N more characters driven by
+Scripts/probes/bots.py, the load test's stand-ins for players; ``--trace``
+has it write an Unreal Insights trace of its net and cpu channels into the
+run's folder (server.utrace).
 """
 
 import os
@@ -21,6 +26,12 @@ DEFAULT_PORT = 17777
 MAX_CLIENTS = 8
 # The most --lag may ask for: past a second the engine's own timeouts start to matter.
 MAX_LAG_MS = 1000
+# The most --bots may ask for: the 64 players of the target (serversupportsysdesign.md
+# 1) less the two real clients a load run joins.
+MAX_BOTS = 62
+# What --trace records on the server: the Insights channels of the net driver
+# and of the game thread's timers.
+TRACE_CHANNELS = "net,cpu"
 SERVER, CLIENT = "server", "client"
 # Windowed clients step down the screen, so each one's title bar shows.
 WINDOW_STEP = 60
@@ -36,9 +47,10 @@ class Process(object):
         self.log = os.path.join(run_dir, f"{slug}.log")
         self.results = os.path.join(run_dir, f"{slug}.json")
         self.inbox = os.path.join(run_dir, f"inbox-{slug}")
+        self.trace = os.path.join(run_dir, f"{slug}.utrace")
 
 
-def check_args(clients, port, seconds=None, lag_ms=0):
+def check_args(clients, port, seconds=None, lag_ms=0, bots=0):
     """The reason ``--net``'s arguments cannot run, or None."""
     if clients < 1:
         return "--net needs at least one client (--clients N)"
@@ -51,6 +63,8 @@ def check_args(clients, port, seconds=None, lag_ms=0):
         return f"--seconds {seconds}: expected a positive number"
     if not 0 <= lag_ms <= MAX_LAG_MS:
         return f"--lag {lag_ms}: expected 0-{MAX_LAG_MS} milliseconds"
+    if not 0 <= bots <= MAX_BOTS:
+        return f"--bots {bots}: expected 0-{MAX_BOTS} (64 players less the two real clients)"
     return None
 
 
@@ -60,7 +74,8 @@ def processes(run_dir, clients):
         Process(CLIENT, i, run_dir) for i in range(1, clients + 1)]
 
 
-def command(editor, project, process, port, windowed=False, level="", lag_ms=0):
+def command(editor, project, process, port, windowed=False, level="", lag_ms=0,
+            trace=False):
     """The process's command line.
 
     ``lag_ms`` delays every packet a client sends (the engine's packet
@@ -73,6 +88,8 @@ def command(editor, project, process, port, windowed=False, level="", lag_ms=0):
     stand on it. The server has no HUD either way."""
     if process.role == SERVER:
         how = ["-server", f"-port={port}"]
+        if trace:
+            how += [f"-trace={TRACE_CHANNELS}", f"-tracefile={process.trace}"]
     else:
         how = ["-game", *render_args(windowed)]
         if windowed:
@@ -86,8 +103,9 @@ def command(editor, project, process, port, windowed=False, level="", lag_ms=0):
 
 
 def environment(base, process, run_dir, clients, port, level, probes, probe_timeout=None,
-                title=False):
-    """The process's environment: who it is, and the probes it is to run."""
+                title=False, bots=0):
+    """The process's environment: who it is, the probes it is to run, and how
+    many bots the run has (the server spawns them: probes/bots.py)."""
     env = dict(base)
     # A process started from inside a serving editor's shell is not that editor.
     for inherited in ("UEPY_SERVE", "UEPY_SERVING"):
@@ -97,6 +115,7 @@ def environment(base, process, run_dir, clients, port, level, probes, probe_time
     env["UEPY_NET_CLIENTS"] = str(clients)
     env["UEPY_NET_DIR"] = run_dir
     env["UEPY_NET_ADDRESS"] = f"{HOST}:{port}"
+    env["UEPY_NET_BOTS"] = str(bots)
     env["UEPY_PROBES"] = os.pathsep.join(probes)
     env["UEPY_PROBE_MAP"] = level
     env["UEPY_PROBE_RESULTS"] = process.results

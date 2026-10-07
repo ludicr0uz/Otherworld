@@ -9,7 +9,7 @@ from combat.verify.common import BEL, PIN, check, graph, in_pins, pin_value
 from combat.verify.fixtures import _is_exec, wc, wc_cdo, wg, wg_dead
 from combat.weapon_component.asks import WRITES
 from combat.weapon_component.dead import OWNER_DEAD_VAR
-from loot.consts import BODY_ARRAYS, LOOT_VAR
+from loot.consts import BODY_ARRAYS, LOOT_TAKE_REACH_CM, LOOT_VAR
 
 
 def _title(n):
@@ -47,10 +47,12 @@ def check_asks():
           f"({', '.join(AC.ALL_ASKS)})", not missing, str(missing))
     if missing:
         return
-    # The slots' are Server events (M18); M23, M24 and M35 make the rest so.
+    # The slots' (M18), the drop and the loot take (M23) are Server events;
+    # M24 and M35 make the rest so.
     kinds = {n: net.compiled_rpc(wc, n) for n in AC.ALL_ASKS}
-    check(f"...each compiled as a function of the class: the slots' "
-          f"({', '.join(AC.SERVER_ASKS)}) reliable Server events, the rest plain calls yet",
+    check(f"...each compiled as a function of the class: the slots', the drop and "
+          f"the loot take ({', '.join(AC.SERVER_ASKS)}) reliable Server events, the "
+          "rest plain calls yet",
           all(k == ((net.SERVER, True) if n in AC.SERVER_ASKS else (net.LOCAL, False))
               for n, k in kinds.items()), str(kinds))
     for name, params in AC.INT_ASKS:
@@ -75,9 +77,22 @@ def check_ask_loot_take():
              for g in [c, *_feeders(c, "A"), *_feeders(c, "Object"), *_feeders(c, "TargetArray")]}
     check(f"{AC.ASK_LOOT_TAKE} takes only for a living owner, from a valid body, with "
           f"room ({HAS_ROOM_VAR}) and something at that row of its {LOOT_VAR}",
-          len(gates) == 4 and {f"Get {OWNER_DEAD_VAR}", f"Get {HAS_ROOM_VAR}",
+          len(gates) == 6 and {f"Get {OWNER_DEAD_VAR}", f"Get {HAS_ROOM_VAR}",
                                f"Get {LOOT_VAR}"} <= reads,
           f"{len(gates)} gates reading {sorted(reads)}")
+    reach = [pin_value(c, "B") for b in gates for c in _feeders(b, "Condition")
+             if any({"V1", "V2"} <= in_pins(d) for d in _feeders(c, "A"))]
+    check(f"...only a body within {LOOT_TAKE_REACH_CM:g} cm of the taker on the machine "
+          "that serves it: a client is not taken at its word",
+          len(reach) == 1 and abs(float(reach[0] or 0) - LOOT_TAKE_REACH_CM) < 1e-6,
+          str(reach))
+    same = [c for b in gates for c in _feeders(b, "Condition")
+            if event in _feeders(c, "B")
+            and any(_title(g) == f"Get {LOOT_VAR}"
+                    for a in _feeders(c, "A") for g in _feeders(a, "TargetArray"))]
+    check(f"...and only the item asked for ({AC.WANT_PARAM}): a row another player "
+          "took first is gone, and what moved up into it is not taken instead",
+          len(same) == 1, str(len(same)))
     spawns = [n for n in run if {"Class", "SpawnTransform"} <= in_pins(n)
               and any(_title(g) == f"Get {LOOT_VAR}"
                       for f in _feeders(n, "Class") for g in _feeders(f, "TargetArray"))]

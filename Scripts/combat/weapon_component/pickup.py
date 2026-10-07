@@ -9,9 +9,10 @@ picks the item they are looking at, and a second press takes the next.
 The take itself is a server request (task M20, combat/strike_vars.py):
 Server_Take(Item), which checks the item is still Dropped and in reach of the
 server's copy of the taker. The item has to be one the server can be told
-of: a thrown one is a replicated actor (item_world.py). An item that is each
-machine's own (dropped with G, left by a kill: M23) arrives as nothing on a
-server and is refused. In single player the event is a plain call.
+of, and every item in the world is: thrown, set down, placed in the level
+or left by a kill, it is a replicated actor (item_world.py; task M23). A
+client's own picture of what it carries arrives as nothing on a server and
+is refused. In single player the event is a plain call.
 
 A pick-up is not always lying loose: a thrown blade is left attached to the
 body it struck (throw_strike.py). The take detaches what it takes, so an item

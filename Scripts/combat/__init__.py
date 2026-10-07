@@ -107,9 +107,10 @@ DATA (constants and pure tables -- no Blueprint authoring)
   fx_vars           the fight as everyone sees and hears it (M21): each cosmetic's
                     Fx_/Multicast_ pair by name, its parameters and its gate, the
                     five the owning client predicts, FxPlayed (a probe's count)
-  item_world        an item loose in the world is a replicated actor (M20):
-                    InWorld, the release's SetReplicates, a client's copy
-                    hidden while the item is carried
+  item_world        an item loose in the world is a replicated actor (M20,
+                    M23): InWorld, the release's SetReplicates, an item
+                    lying Dropped replicating from its own Tick on the
+                    server, a client's copy hidden while the item is carried
   wear_tuning       clothing: the eight slots (WEAR_SLOTS), ClothingSlot on the
                     item, Worn / TakeOffSlot / WearItem on the component
   ask_consts        what a screen asks of the weapon component: the Ask

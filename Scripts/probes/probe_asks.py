@@ -95,7 +95,7 @@ def _run(p):
 
     # --- a take from nobody --------------------------------------------------
     count = len(p.get(wc, "Inventory"))
-    wc.call_method(AC.ASK_LOOT_TAKE, (None, 0))
+    wc.call_method(AC.ASK_LOOT_TAKE, (None, 0, None))
     yield SETTLE
     p.check(f"{AC.ASK_LOOT_TAKE} with no body takes nothing",
             len(p.get(wc, "Inventory")) == count)

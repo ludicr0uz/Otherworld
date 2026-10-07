@@ -312,6 +312,14 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     generic driver would leave each client's copy standing): the take lowers
     `InWorld`, and a client's copy hides itself while it is false. That step is the
     first of `glimmer.author_glimmer`, so every child's Tick has it.
+  - **Every other item in the world replicates by itself** (M23): the same step, on its
+    authority arm, makes an item that lies `Dropped` and is not yet `InWorld` a
+    replicated actor, on the server. So an item set down, placed in the level, left by a
+    kill or cut from a tree is the server's on every machine, and no graph that makes
+    one says so. The drop is the server's too: the drop key and a drag out of the
+    inventory call `AskDrop` (a Server event), and `DropRequest` is served behind
+    HasAuthority (`weapon_component/drop_request.py`). `verify/world_items.py`;
+    `probes/probe_net_take.py` is the two-client proof.
   - `verify/strike.py` and `verify/pickup.py` are the wiring;
     `probes/probe_net_throw.py` and `probe_net_melee.py` the two-client proof.
 - **Everyone sees and hears the fight** (M21; `fx_vars.py`, `weapon_component/fx.py`;

@@ -190,6 +190,18 @@ class Probe(object):
             wc.set_editor_property(str(SlotForced), slot,
                                    unreal.PropertyAccessChangeNotifyMode.NEVER)
 
+    def ask_drop(self, wc, slot):
+        """AskDrop(slot), the same way (DropForced in WRITABLE): the slot's
+        item set down on the ground, by the server."""
+        import unreal
+        from combat.ask_consts import ASK_DROP
+        from combat.record_vars import DropForced
+        if wc.get_owner().has_authority():
+            wc.call_method(ASK_DROP, (slot,))
+        else:
+            wc.set_editor_property(str(DropForced), slot,
+                                   unreal.PropertyAccessChangeNotifyMode.NEVER)
+
     def ask_move(self, wc, src, dst):
         """AskMove(src, dst), the same way (MoveForcedFrom and MoveForcedTo
         in WRITABLE)."""

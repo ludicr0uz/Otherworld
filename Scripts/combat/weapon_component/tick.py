@@ -30,9 +30,7 @@ from combat.weapon_component.holds import _author_holds_mirror, _author_holds_re
 from combat.weapon_component.knife import (
     _author_knife_blow, _author_knife_press, _author_knife_swing,
 )
-from combat.weapon_component.inventory import (
-    _author_drop, _author_equip,
-)
+from combat.weapon_component.inventory import _author_equip
 from combat.weapon_component.interact import _author_interact
 from combat.weapon_component.pose_weights import _author_pose_weights
 from combat.weapon_component.punch import _author_punch, _author_punch_blow
@@ -60,7 +58,7 @@ from combat.weapon_component.shot import _author_reload_ask, _author_shot_ask
 from combat.weapon_component.use import _author_use
 from combat.weapon_component.wear import _author_take_off, _author_wear_gate
 from combat.weapon_component.wear_drag import _author_wear_request
-from combat.weapon_component.drop_request import _author_drop_request
+from combat.weapon_component.drop_request import _author_drop_keys, _author_drop_request
 from combat.weapon_component.save_exit import _author_save_exit
 from combat.weapon_component.throw import _author_throw, _author_throw_key
 from combat.weapon_component.throw_flight import _author_throw_flight
@@ -422,19 +420,13 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
                                    reload_exits + (else_(reload_gate),))
 
     # --- drop ----------------------------------------------------------------
-    drop_gate = ed.add_branch_node()
-    _connect(both(pressed("KeyDrop"), armed_out), _pin(drop_gate, "Condition"))
-    for exit_pin in slot_exits:
-        _connect(exit_pin, _pin(drop_gate, "execute"))
-    after_drop = _author_drop(ed, held, owner_out, then(drop_gate))
-    drop_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
-    _set(drop_dirty, WV.NeedsRefresh, True)
-    _connect(after_drop, _pin(drop_dirty, "execute"))
+    # The key asks; the server sets the item down (drop_request.py).
+    drop_exits = _author_drop_keys(ed, both(pressed("KeyDrop"), armed_out), slot_exits)
 
     # --- interact (interact.py): an item in reach is picked up ---------------
     picked, not_picked = _author_interact(
         ed, owner_out, pressed("KeyInteract"),
-        (then(drop_dirty), else_(drop_gate)))
+        tuple(drop_exits))
     pick_dirty = ed.add_set_member_variable_node(WV.NeedsRefresh)
     _set(pick_dirty, WV.NeedsRefresh, True)
     for exit_pin in picked:
@@ -451,8 +443,6 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
     flight_exits = _author_take_off(ed, flight_exits)
     # --- and a slot's garment dragged onto the worn grid (wear_drag.py) -----
     flight_exits = _author_wear_request(ed, flight_exits)
-    # --- and an item dragged out of the inventory (drop_request.py) ---------
-    flight_exits = _author_drop_request(ed, flight_exits)
 
     return flight_exits
 
@@ -481,7 +471,9 @@ def _author_upkeep(ed, flight_exits):
     _connect(authority(_G(ed)), _pin(owns, "Condition"))
     for exit_pin in flight_exits:
         _connect(exit_pin, _pin(owns, "execute"))
-    flight_exits = (_author_slot_serve(ed, [then(owns)])
+    # An item set down goes first (drop_request.py): the hand it left is
+    # empty by the time the slots are placed.
+    flight_exits = (_author_slot_serve(ed, _author_drop_request(ed, [then(owns)]))
                     + _author_view(ed, [else_(owns)]))
     flight_exits = _author_slot_sync(ed, flight_exits)
     flight_exits = _author_record(ed, flight_exits)

@@ -151,7 +151,8 @@ def check_loot(check, bp, nodes):
     # The scan used to skip a body with an empty Loot; the one Loot read left
     # is the take's (below).
     stocked = [n for n in nodes if _title(n) == f"Get {LOOT_VAR}"
-               and not any("Class" in _pins(s) or "IndexToRemove" in _pins(r)
+               and not any("Class" in _pins(s) or AC.WANT_PARAM in _pins(s)
+                           or "IndexToRemove" in _pins(r)
                            for r in _into(n, LOOT_VAR) for s in _into(r, "Item") + [r])]
     check("...whether it carries anything or not (the scan reads no Loot)",
           not stocked, str(len(stocked)))
@@ -195,14 +196,24 @@ def check_loot(check, bp, nodes):
           str([[_title(f) for f in _feeders(t, "A")] for t in tests]))
 
     takes = asks(nodes, AC.ASK_LOOT_TAKE)
-    lowers = [f for n in takes for f in _feeders(n, "execute")]
+    rows = [f for n in takes for f in _feeders(n, "execute")]
+    lowers = [f for r in rows for f in _feeders(r, "execute")]
     check(f"a take is asked of the weapon component ({AC.ASK_LOOT_TAKE}: the body, "
-          "the caret's row), once the request is lowered; whether it is taken is "
-          "the component's to say",
+          "the caret's row), once the request is lowered and if the body has that "
+          "row; whether it is taken is the component's to say",
           len(takes) == 1 and fed(takes[0], "Body") == [f"Get {LC.LOOT_TARGET_VAR}"]
           and fed(takes[0], "Index") == [f"Get {LC.LOOT_SEL_VAR}"]
+          and [sorted(_pins(c) - {"self"}) for r in rows for c in _feeders(r, "Condition")]
+          == [["IndexToTest", "TargetArray"]]
           and [(_title(f), _value(f, LC.LOOT_TAKE_VAR)) for f in lowers]
           == [(f"Set {LC.LOOT_TAKE_VAR}", "false")], str(len(takes)))
+    wants = [g for n in takes for g in _feeders(n, AC.WANT_PARAM)]
+    check(f"...with what the window shows there ({AC.WANT_PARAM}: the body's "
+          f"{LOOT_VAR} at the caret), so the server takes that item or nothing",
+          len(wants) == 1
+          and [_title(f) for f in _feeders(wants[0], "TargetArray")] == [f"Get {LOOT_VAR}"]
+          and [_title(f) for f in _feeders(wants[0], "Index")] == [f"Get {LC.LOOT_SEL_VAR}"],
+          str(len(wants)))
     spawns = [n for n in nodes if {"Class", "SpawnTransform"} <= _pins(n)
               and any(_title(g) == f"Get {LOOT_VAR}"
                       for f in _feeders(n, "Class") for g in _feeders(f, "TargetArray"))]

@@ -142,10 +142,13 @@ def check_item_glimmer():
     _check_sprite("BP_WeaponItem", item, visible=False)
     nodes = graph(item).list_all_nodes()
     steps = _glimmer_steps(nodes)
-    # Between the Tick and the step: what a client's copy of a replicated item
-    # shows at all (item_world.py), a Branch on HasAuthority and its false arm.
+    # Between the Tick and the step (item_world.py): a Branch on HasAuthority,
+    # whose true arm is the server's item entering the world (a Branch of its
+    # own: verify/world_items.py) and whose false arm is what a client's copy
+    # of a replicated item shows at all.
     before = _feeders(steps[0], "execute") if len(steps) == 1 else []
-    gate = [f for f in before if _title(f) == "Branch"]
+    enters = [f for f in before if _title(f) == "Branch"]
+    gate = [g for e in enters for g in _feeders(e, "execute") if _title(g) == "Branch"]
     check(f"BP_WeaponItem's Tick shows {GLIMMER} while the item is {IV.Dropped}, in one "
           "place: nothing that drops or takes an item is told",
           len(steps) == 1 and len(_wired_ticks(nodes)) == 1 and len(gate) == 1

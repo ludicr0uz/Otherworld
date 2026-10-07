@@ -36,3 +36,7 @@ BODY_ARRAYS = tuple(body for _table, body in LOOT_ARRAYS)
 # How close the player must stand to a body to search it: the E interact's
 # reach (combat.tuning.INTERACT_RADIUS), measured to the ragdoll, not the capsule.
 LOOT_RADIUS = 250.0
+# How far from the body's actor the server lets a take be asked from. Wider
+# than the window's reach: the window measures to the ragdoll, which lies
+# where each machine's own physics left it, a step or two from the actor.
+LOOT_TAKE_REACH_CM = LOOT_RADIUS + 300.0

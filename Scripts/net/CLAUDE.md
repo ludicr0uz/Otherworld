@@ -59,23 +59,23 @@ and which decides whether it happens. The names are `combat/ask_consts.py`.
 | `AskSlot(Slot)` | a click on a slot, Enter on a bag slot, the 1-9 keys | raises `SlotRequest` | **done, M18** |
 | `AskMove(From, To)` | a drag from slot to slot | raises `MoveTo`, `MoveFrom` | **done, M18** |
 | `AskNext()` | the Q key (no screen) | raises `NextRequest` | **done, M18** |
-| `AskDrop(From)` | a drag out of the inventory | raises `DropRequest` | M23 |
+| `AskDrop(From)` | a drag out of the inventory, the drop key (no screen) | raises `DropRequest` | **done, M23** |
 | `AskTakeOff(Slot, To)` | Enter or a click on a worn slot, a drag off one | raises `TakeOffTo`, `TakeOffSlot` | M24 |
 | `AskWear(From)` | a drag onto the worn grid | raises `WearRequest` | M24 |
-| `AskLootTake(Body, Index)` | the loot window's Enter or click | the take itself, with its refusals (`weapon_component/loot_take.py`) | M23 |
+| `AskLootTake(Body, Index, Want)` | the loot window's Enter or click | the take itself, with its refusals (`weapon_component/loot_take.py`) | **done, M23** |
 | `AskSaveExit()` | the menu's save-and-exit row | starts the countdown the component runs (`weapon_component/save_exit.py`) | M35 |
 
 The trigger and R are keys, not a screen's asks, and have Server events of their own:
 `Server_Fire` and `Server_Reload` ("The shot and the reload", below).
 
-- **The slots' three are reliable Server events** (`ask_consts.SERVER_ASKS`; "The
-  inventory", below); the rest are plain calls yet. `combat/verify/asks.py` asserts which
-  is which on the compiled class; the task that makes one a Server event adds it to
-  `SERVER_ASKS`.
+- **The slots' three, the drop and the loot take are reliable Server events**
+  (`ask_consts.SERVER_ASKS`; "The inventory" and "Picking up, dropping and looting",
+  below); the rest are plain calls yet. `combat/verify/asks.py` asserts which is which on
+  the compiled class; the task that makes one a Server event adds it to `SERVER_ASKS`.
 - **The int asks only raise the request** the component's Tick already serves, so the
-  serve is still where a move is validated (the slots': on the server alone). Three of the serves (take-off, wear, drop) sit
-  in the Tick's local-only half (`tick.py`, `_author_actions`): M24 and M23 move them to
-  where the server runs them.
+  serve is still where a move is validated (the slots' and the drop's: on the server
+  alone). Two of the serves (take-off, wear) sit in the Tick's local-only half
+  (`tick.py`, `_author_actions`): M24 moves them to where the server runs them.
 - **The HUD writes none of those variables** and takes nothing out of a body:
   `graphics_menu/ask_checks.py` fails on a `Set` of any of them in the HUD's graph, and on
   a movement call there.
@@ -312,7 +312,8 @@ of them, plain data (`combat/record_vars.py`):
 
 - **It can be saved as it stands:** classes and ints, nothing that points into a running
   world. A load is one `SpawnActor` per row. The character's save and a body's loot
-  (M23) should hold rows of it, not a second form.
+  should hold rows of it, not a second form (a body still holds classes: a looted gun is
+  a fresh one).
 - **The server writes it every Tick,** after the slot sync, behind HasAuthority
   (`weapon_component/record.py`): no graph that changes what is carried has to remember
   to. Replication compares before it sends, so an unchanged record costs no traffic. The
@@ -328,7 +329,7 @@ of them, plain data (`combat/record_vars.py`):
   actors are the server's or a picture.
 - **The picture is remade only when a record arrives.** What a client changes itself
   stays until the server next says otherwise, and it is
-  why an action that is not yet the server's (a drop, a meal, a garment: M23, M24,
+  why an action that is not yet the server's (a meal, a garment: M24,
   M26) still shows on its own client, and is undone by the next record. Make the
   action a server request; do not write the record from a client. (The throw and
   the take of an item are: M20, below.)
@@ -350,7 +351,7 @@ of them, plain data (`combat/record_vars.py`):
   `ThrowClickForced` and the take's `InteractForced` (M20); the next Server event
   needs one of the same kind.
 - **Not yet in the record:** worn garments (M24), a heated blade and a burning stick
-  (the item's own state, M25), an item lying in the world (M23). The dev-all-guns cheat
+  (the item's own state, M25). The dev-all-guns cheat
   still spawns on the machine it is pressed on.
 - `combat/verify/record.py` checks the flags and the wiring. Proof: `uepy.py --net
   --clients 2 --probe Scripts/probes/probe_net_inventory.py` (client 1 moves the axe to
@@ -519,9 +520,8 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
     false arm of HasAuthority, first in `glimmer.author_glimmer` so every child's
     Tick has it). The engine closes the channel of a hidden actor with no collision
     by itself, so the copy of an item in a bag is gone a few seconds on.
-  - **Thrown items only.** An item dropped with G, placed in the level or left by a
-    kill is still each machine's own (M23): what its drop must do is call
-    `item_world.author_into_world`, and the take already serves it.
+  - **Every other way into the world is the item's own Tick** (M23, "Picking up,
+    dropping and looting", below): the release is the one place that says so itself.
 - **The take is a Server event with an actor in it** (`weapon_component/pickup.py`), so
   it works for an item the server can be told of: a replicated one. An item that is
   only the client's own arrives as None and is refused. Two players reaching for one
@@ -537,9 +537,7 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
   unless it is `p.set` (no edit notification): written with the default on a
   wanderer, the server's body got fresh components and each client's copy of it lost
   its health component.
-- **Not here:** lag compensation of a sweep or a throw; the pick-up of an item that is
-  not replicated, the drop, and two clients on one item on one frame as a probe (M23);
-  lighting the stick and heating the blade on the server (M25). The swing, the throw and
+- **Not here:** lag compensation of a sweep or a throw; lighting the stick and heating the blade on the server (M25). The swing, the throw and
   the hit as other players see and hear them are the next section.
 - `combat/verify/strike.py` and `verify/pickup.py` check the flags and the wiring.
   Proof: `uepy.py --net --clients 2 --probe-timeout 240 --probe
@@ -553,6 +551,60 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
   stick burning); both clean with `--lag 120`. Single player's are the existing
   `--game` probes (`probe_knife`, `probe_punch`, `probe_hot_blade`, `probe_throw*`,
   `probe_pickup`, `probe_wendigo_ward`).
+
+## Picking up, dropping and looting (M23, done)
+
+Two players reaching for one item is settled by the server, and nothing is duplicated:
+every item in the world is one actor, the server's, and every way of taking one or
+setting one down is a reliable Server event on the weapon component.
+
+| the client asks | the server checks, on its own copy | then |
+|---|---|---|
+| `Server_Take(Item)` (E: of the items in reach, the one nearest the reticle, within `INTERACT_HEIGHT` up or down: chosen on the client, `interact.py`) | M20's: the item exists and is `Dropped`, the taker alive and within reach, a slot free | into the taker's inventory, out of the world |
+| `AskDrop(From)` (the drop key: the hand's slot; a drag out of the inventory: the slot dragged) | the slot holds an item | `DropRequest`, served with authority: the server's actor is set down ahead of its copy of the player, `Dropped` |
+| `AskLootTake(Body, Index, Want)` (the loot window's Enter or click) | the taker alive, the body within `LOOT_TAKE_REACH_CM`, a slot free, the row there and still holding the class `Want` | the item is spawned into the taker's inventory and the row leaves the body's arrays |
+
+- **An item lying in the world replicates by itself** (`combat/item_world.py`,
+  `_author_enter_world`): in the item's own Tick, on its authority arm and only where
+  `IsServer`, an item that is `Dropped` and not yet `InWorld` is made `InWorld` and a
+  replicated actor. That covers the drop, an item placed in the level, a gun left by a
+  kill, wood cut from a tree and whatever spawns one later: **a graph that makes an
+  item lie in the world says nothing about replication.** Only the throw's release
+  still calls `author_into_world` itself (it is in the air, not `Dropped`).
+- **A placed item is loaded by every machine, and is still one actor.** A level actor has
+  the same name on the server and a client, so when the server's starts replicating the
+  engine joins the client's own copy to it instead of spawning a second: measured, the
+  client's hat has no authority a moment after the join and follows the server's
+  `Dropped` and `InWorld`. `IsServer`, not HasAuthority alone, gates the step, because
+  until then a client has authority over its own copy.
+- **Whoever asks first gets it.** A second `Server_Take` finds the item no longer
+  `Dropped`. A second `AskLootTake` finds the row gone, or the next row moved up into
+  it, which is why the ask carries what the window showed (`Want`): the server takes
+  that item or nothing.
+- **The loser's UI corrects itself because it predicted nothing.** A client's bag is a
+  picture of the server's record, its copy of the item hides when `InWorld` falls, and
+  the loot window draws the body's replicated arrays: nothing was shown as taken before
+  the server said so.
+- **The drop key is an ask now** (`weapon_component/drop_request.py`,
+  `_author_drop_keys`): G with something in hand calls `AskDrop(HAND)`, and the one
+  serve sets down the hand's item as it does a dragged one. A client sets nothing down
+  itself. A probe's door is `DropForced` (`p.ask_drop(wc, slot)`).
+- **In single player** each is a plain call, served the same frame, and
+  `SetReplicates(true)` sends the item to no one.
+- **Not here:** a worn garment dragged out is dropped only where it is worn, and on a
+  server nothing is worn yet (M24). A client that joins after a placed item was taken
+  still shows its own copy of it, and asks for it in vain (M31). A body's loot is still
+  classes, so a looted gun is a fresh one. Eating a mushroom (M26) and the campfire and
+  the wood's chop (M25) are their own tasks.
+- `combat/verify/world_items.py`, `verify/asks.py` and `graphics_menu/loot_checks.py`
+  are the wiring. Proof: `uepy.py --net --clients 2 --probe-timeout 300 --probe
+  Scripts/probes/probe_net_take.py` (both clients take one row of a body at once and one
+  gets it; a take from 80 m off and a take of an item the row does not hold are refused;
+  both press E on the level's hat at once and one gets it; the winner drops it and both
+  see the server's actor; and the server runs both players' `Server_Take`, and both
+  `AskLootTake`, in one frame: the first has it, the second nothing); clean with
+  `--lag 120`. Single player's are `probe_pickup`, `probe_pickup_weapon_slot`,
+  `probe_pickup_height`, `probe_asks`, `probe_inventory_drag` and `probe_corpse_loot`.
 
 ## Everyone sees and hears the fight (M21, done)
 
@@ -658,7 +710,7 @@ only varies how something looks or sounds is each machine's own.
 | builder | kind | what is drawn | where, and how the others learn it (a **task**: still per machine until then) |
 |---|---|---|---|
 | `loot/roll.py` | state | what a killed wanderer carries: each loot-table entry against its chance | the kill's arm of BP_HealthComponent, behind the Tick's authority switch; the body's Loot arrays replicate |
-| `combat/gun_drop.py` | state | whether a kill leaves a gun, and which: two streams on the GameMode | the same arm, and the streams are the GameMode's, which a client does not have; the gun is an actor the server spawns (**M23**) |
+| `combat/gun_drop.py` | state | whether a kill leaves a gun, and which: two streams on the GameMode | the same arm, and the streams are the GameMode's, which a client does not have; the gun is an actor the server spawns, and it replicates as any item lying in the world does (M23) |
 | `combat/replacement.py` | state | where a killed wanderer's replacement appears (bearing, distance, the navmesh's point) | the same arm; the wanderer is spawned by the server and replicates |
 | `combat/player_respawn.py` | state | which PlayerStart a respawn is given | behind death's IsStandalone Branch and the authority switch; the new pawn replicates |
 | `survival/on_hit_graph.py` | state | whether a blow leaves its on-hit effect (a wendigo's: bleeding, 33%) | behind HasAuthority of the target, in the fragment itself; the effect is the target's ability system's (**M26**) |
@@ -679,8 +731,8 @@ only varies how something looks or sounds is each machine's own.
   chopped wood lands (M25), the hour a level starts at (M30: every machine's sky is its
   own today). A client of a server changes nothing with the first yet (its wood is its
   own copy's).
-- **A dropped gun is rolled by the server and spawned there;** it reaches a client when
-  items lying in the world replicate (M23). A landed bleed is the target's ability
+- **A dropped gun is rolled by the server and spawned there;** it reaches a client as
+  every item lying in the world does (M23: its own Tick replicates it). A landed bleed is the target's ability
   system's on the server; the owner's HUD reads it when the attributes replicate (M26).
 - **Not runtime rolls:** the level generator's `random` (seeded, at build time: every
   machine loads the same level) and the materials' wind (a function of world position
@@ -819,9 +871,9 @@ did (the pause, the death menu's restart, the profile deleted). Outside standalo
 - **The body's `Loot` arrays replicate** (`BODY_ARRAYS`, on `BP_HealthComponent`), so any
   client's loot window shows a player's body, or a wanderer's, as the server has it. The
   window is the wanderers', unchanged: a dead Character that is not the HUD's own pawn.
-- **The take is still the taker's own copy's** (`AskLootTake` is not an RPC until M23): a
-  client that takes a row gets the item in its own bag and removes the row from its own
-  copy of the body, and the server's body keeps it.
+- **The take is the server's** (`AskLootTake` is a Server event: M23, "Picking up,
+  dropping and looting"): the row leaves the server's body, so every client's window
+  loses it, and the item reaches the taker's bag by the record.
 - **The respawn** (`combat/player_respawn.py`) hangs off the false arm of death's pause
   Branch, on the server: `PLAYER_RESPAWN_SECONDS` (10) after the death the controller
   lets go of the body (`UnPossess`) and the GameMode gives it a new pawn
@@ -955,7 +1007,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | health | **Fixed (M14): "Health and damage", above.** Health written on the server (100 to 40) stayed 100 on both clients: nothing replicates it. Damage is the weapon writing `Health` directly, not `ApplyDamage` (which does nothing in this game) | measured; the fix measured (`probe_net_health.py`) | M14 done |
 | firing and ammo | A shot fired on client 1 spent a round there (5 to 4); the server and client 2 still had 5 and saw no shot. The trace and the damage ran on the client alone | measured | done for the shot, its round and its damage (M19: the server's); what others see and hear of it is M21 |
 | the loadout and held items | **Fixed (M18): "The inventory", above.** Every process spawned its own copy of each character's six items (not replicated, each with local authority), so the three worlds started alike and parted at the first change | measured; the fix measured (`probe_net_inventory.py`) | M18 done |
-| items on the ground | The 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
+| items on the ground | **Fixed (M23)** for players who are there: an item lying `Dropped` replicates from its own Tick on the server, a client's copy of a placed one becomes the server's, and the take and the drop are the server's (measured: `probe_net_take.py`). A client that joins after one was taken still has its own copy of it (M31). Before: the 24 mushrooms and the test garments are level actors whose classes do not replicate (`BP_Mushroom`, `BP_Hat`: read off the class defaults): each process has its own, and a pick-up on a client removes it nowhere else | measured (the counts, the defaults), read (the pick-up) | M23, M31 |
 | day and night | Each process rolls its own start time: in one run it was day on the server and client 2 and night on client 1 | measured | M30 |
 | walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server would correct a sprinting client. **Fixed (M12): "Movement states are predicted", above** | the write measured; the fix measured (`probe_net_move_states.py`, 137 ms) | M12 done |
 | input | **Fixed (M10): "Input", above.** The weapon component polled keys in its Tick on every copy of every character, the server's included, and on `GetPlayerController(0)`, so a client's press drove every character it could see | read; the fix measured (`probe_net_local_input.py`, headless and `--windowed`) | M10 done |

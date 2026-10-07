@@ -56,9 +56,14 @@ has (`Scripts/net/CLAUDE.md`, "Death"). In single player a player's body carries
   E stays the pick-up: a dropped gun lies beside the body, and E on it must not also empty it.
   The keys only raise `LootOpen` / `LootTakeRequested`; Tick serves them, which is what lets
   a probe drive the window.
-- **Taking is the weapon component's**, not the window's: the HUD lowers
-  `LootTakeRequested` and calls `AskLootTake(LootTarget, LootSel)`. The event refuses a
-  dead owner, no body, a full bag (`HasRoom`) and a row the body does not have; otherwise it
+- **Taking is the weapon component's**, not the window's, and the server's (M23): the HUD
+  lowers `LootTakeRequested` and, if the body has that row, calls
+  `AskLootTake(LootTarget, LootSel, the class shown there)`, a reliable Server event. It
+  refuses a dead owner, no body, a body further than `LOOT_TAKE_REACH_CM` from the taker
+  on the machine that serves it, a full bag (`HasRoom`), a row the body does not have and
+  a row that no longer holds the class asked for (another player took it first, and the
+  next row moved up: the loser takes nothing, and its window shows the row gone, since
+  the body's arrays replicate; `probes/probe_net_take.py`); otherwise it
   spawns the class at the pawn, `Dropped = false`, `Inventory += it`,
   `NeedsRefresh` (as the dev-all-guns cheat does), then removes the row from every body array.
   The window's `LootBagFull` is only what it shows.

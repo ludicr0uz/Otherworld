@@ -15,12 +15,12 @@ through. The request that gates the serve is written last (MoveFrom,
 TakeOffSlot), after the one it is read with. A probe may still write the
 request variables themselves, on the machine that serves them.
 
-The slots' three (ask_consts.SERVER_ASKS: AskSlot, AskMove, AskNext) are
-reliable Server events (M18): the owning client's HUD and its number keys
-call them, the request is raised on the server's copy, and the server's Tick
-serves it (slot_moves.py), where a slot out of range, an empty one or an
-item that does not fit is refused. In single player a Server event is a
-plain call, so nothing there changed.
+The slots' three and the drop (ask_consts.SERVER_ASKS: AskSlot, AskMove,
+AskNext, M18; AskDrop, M23) are reliable Server events: the owning client's
+HUD and its keys call them, the request is raised on the server's copy, and
+the server's Tick serves it (slot_moves.py, drop_request.py), where a slot
+out of range, an empty one or an item that does not fit is refused. In
+single player a Server event is a plain call, so nothing there changed.
 """
 
 from uebp.graph import _connect, _pin, _set, out, then

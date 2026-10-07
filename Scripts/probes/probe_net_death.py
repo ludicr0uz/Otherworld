@@ -15,7 +15,8 @@ client 1, step by step, and the three machines compare:
     "loot"       the server's record of what the body carries: every item the
                  player held, and the garment. Client 2 reads the same list
     "moved"      client 2 stood beside the body: its loot window finds it and
-                 shows it, and a take puts an item in client 2's bag
+                 shows it, and a take puts an item in client 2's bag and
+                 takes it off the server's body
     "respawned"  PLAYER_RESPAWN_SECONDS after the death client 1 has a new,
                  living character at a PlayerStart with the starting
                  inventory, on every machine; the body still lies there
@@ -222,9 +223,13 @@ def probe_server(p):
             and _carried(p, fresh) == issued, f"{p.get(hp, HV.Health)} HP, {_carried(p, fresh)}")
     p.check("...and client 1's PlayerState no longer says dead",
             not p.get(victim.player_state, PLAYER_DEAD_VAR))
-    p.check(f"the body keeps its loot and has {CORPSE_SECONDS:.0f} s left to lie there",
-            _loot(p, body) == wanted and 0.0 < body.get_life_span() <= CORPSE_SECONDS,
-            f"{_loot(p, body)}, {body.get_life_span():.1f} s")
+    yield from _await(lambda: len(_loot(p, body)) < len(wanted), 15.0)
+    left = _loot(p, body)
+    p.check("the body keeps its loot, less the one item client 2 took out of it (the "
+            f"take is the server's: M23), and has {CORPSE_SECONDS:.0f} s left to lie there",
+            len(left) == len(wanted) - 1 and all(left.count(c) <= wanted.count(c) for c in left)
+            and 0.0 < body.get_life_span() <= CORPSE_SECONDS,
+            f"{left}, {body.get_life_span():.1f} s")
     p.post("respawned")
     yield from _await(lambda: all(p.posted(n, "done") is not None for n in (VICTIM, LOOTER)))
     p.check("both clients finished",
@@ -348,9 +353,10 @@ def _looter(p):
         p.check("...and opens on it", panel.get_visibility() == SHOWN
                 and p.get(hud, LOOT_OPEN_VAR), f"{panel.get_visibility()}")
         p.set(hud, LOOT_TAKE_VAR, True)
-        yield from _await(lambda: len(_carried(p, me)) == len(held) + 1, 10.0)
-        p.check("...a take puts one of its items in client 2's bag (its own copy's: "
-                "the take is not the server's until M23)",
+        yield from _await(lambda: len(_carried(p, me)) == len(held) + 1
+                          and len(_loot(p, body)) == rows - 1, 10.0)
+        p.check("...a take puts one of its items in client 2's bag, by the server's "
+                "record, and the row is gone from the body",
                 len(_carried(p, me)) == len(held) + 1 and len(_loot(p, body)) == rows - 1,
                 f"{_carried(p, me)}")
         p.set(hud, LOOT_OPEN_VAR, False)

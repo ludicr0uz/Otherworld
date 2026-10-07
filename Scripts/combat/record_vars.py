@@ -53,7 +53,10 @@ NO_ASK = -1
 SlotForced = Var("SlotForced", INT, NO_ASK)
 MoveForcedFrom = Var("MoveForcedFrom", INT, NO_ASK)
 MoveForcedTo = Var("MoveForcedTo", INT, NO_ASK)
-FORCED = (SlotForced, MoveForcedFrom, MoveForcedTo)
+# ...and the slot a drag out of the inventory, or the drop key, would set
+# down (drop_request.py).
+DropForced = Var("DropForced", INT, NO_ASK)
+FORCED = (SlotForced, MoveForcedFrom, MoveForcedTo, DropForced)
 TABLE = REPLICATED + (ViewDirty, ViewItem) + FORCED
 
 # The view's two events (view.py). A row with Loaded below 0 leaves the

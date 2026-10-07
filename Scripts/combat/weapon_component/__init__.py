@@ -88,7 +88,8 @@ _author_* fragment per concern, each in its own module:
               blade last struck a head (the HUD's X round the reticle)
   surface_impact  a pellet that hit something with no health: BP_BulletImpact,
               off the health cast's failed arm, at the blood's transform
-  inventory   equip, drop, BeginPlay loadout (each issued item into its slot)
+  inventory   equip, the set-down (drop_request's), BeginPlay loadout (each
+              issued item into its slot)
   slot_nodes  the slot fragments' shared shapes: loops, SlotItems[c], fits()
   slot_moves  1-9 ask for a slot (AskSlot), Q for the bag's next item (AskNext):
               Server events; the serve, with authority: the request (the hand's
@@ -171,15 +172,17 @@ _author_* fragment per concern, each in its own module:
               or into the hand or bag slot a drag dropped it on (TakeOffTo)
   wear_drag   WearRequest (the I panel's drag onto the worn grid): a slot's
               garment is worn from wherever it is carried
-  drop_request  DropRequest (the I panel's drag released outside the
-              inventory): a slot's item or a worn garment is set down on the
-              ground ahead, as the drop key sets the held one down
+  drop_request  the drop: the drop key and a probe's DropForced ask (AskDrop,
+              a Server event), and DropRequest served with authority (the
+              key's, or the I panel's drag released outside the inventory):
+              a slot's item or a worn garment is set down on the ground ahead
   asks        what a screen asks, one custom event each (combat/ask_consts.py):
               AskSlot, AskMove, AskNext, AskTakeOff, AskWear, AskDrop raise the
               request the Tick serves, in place of the HUD writing it; the
-              slots' three are Server events
-  loot_take   AskLootTake(Body, Index): the loot window's take, with its
-              refusals (dead, no body, no room, no such row)
+              slots' three and the drop are Server events
+  loot_take   AskLootTake(Body, Index, Want): the loot window's take, a
+              Server event, with its refusals (dead, no body, out of reach,
+              no room, no such row, not the item asked for)
   save_exit   AskSaveExit and the countdown it starts (ExitPending, ExitAt,
               ExitDue): the owner stands still, a hit calls it off; first in
               the upkeep, on every copy

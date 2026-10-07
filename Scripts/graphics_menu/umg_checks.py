@@ -366,5 +366,6 @@ def check_hud_graph(check, nodes):
     guards = [n for n in nodes if {"TargetArray", "IndexToTest"} <= _pins(n)]
     check("an inventory slot reads its item only behind IsValidIndex, and so "
           "do the equipped name, the I panel's worn slots, its drag's start (on "
-          "a slot, on a worn slot) and the icon the drag carries (the same two)",
-          len(guards) == 7, str(len(guards)))
+          "a slot, on a worn slot), the icon the drag carries (the same two) and "
+          "the loot window's take of the caret's row",
+          len(guards) == 8, str(len(guards)))

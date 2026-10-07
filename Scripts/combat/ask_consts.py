@@ -4,8 +4,9 @@ A widget graph changes no game state. Each thing the player does through one
 is a custom event on BP_WeaponComponent (combat/weapon_component/asks.py,
 loot_take.py, save_exit.py), which the HUD calls with what was picked and
 nothing else; the component decides whether it happens. One event per action,
-so a multiplayer task that makes one a server request (M18 did the slots':
-SERVER_ASKS; M23, M24, M35) has one node to turn into a Server event. Constants only.
+so a multiplayer task that makes one a server request (M18 did the slots',
+M23 the drop and the loot window's take: SERVER_ASKS; M24, M35) has one node
+to turn into a Server event. Constants only.
 """
 
 # (event, its int parameters). The slot codes are combat/slot_tuning.py's; a
@@ -26,15 +27,18 @@ INT_ASKS = (
     (ASK_DROP, (FROM_PARAM,)),
 )
 
-# The ones that are Server events (M18): the owning client asks, and the
-# server's Tick serves the request, where what fits where is decided. The
-# rest are plain calls until their tasks (M23, M24, M35).
-SERVER_ASKS = (ASK_SLOT, ASK_MOVE, ASK_NEXT)
-
-# The loot window's take: the body searched (its BP_HealthComponent) and
-# which of the things it carries.
+# The loot window's take: the body searched (its BP_HealthComponent), which
+# of the things it carries, and what the window showed there (its class). The
+# server takes the row only if it still holds that: a row another player took
+# first has gone, and the next one has moved up into its place.
 ASK_LOOT_TAKE = "AskLootTake"
-BODY_PARAM, INDEX_PARAM = "Body", "Index"
+BODY_PARAM, INDEX_PARAM, WANT_PARAM = "Body", "Index", "Want"
+
+# The ones that are Server events (the slots' M18, the drop and the loot take
+# M23): the owning client asks, and the server serves the request, where what
+# fits where and who gets what is decided. The rest are plain calls until
+# their tasks (M24, M35).
+SERVER_ASKS = (ASK_SLOT, ASK_MOVE, ASK_NEXT, ASK_DROP, ASK_LOOT_TAKE)
 
 # Save and exit: the M panel's row starts the countdown.
 ASK_SAVE_EXIT = "AskSaveExit"

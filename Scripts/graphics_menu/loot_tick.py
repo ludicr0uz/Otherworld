@@ -14,9 +14,13 @@ take, kneel.
             open: Up/Down  LootSel -/+ 1, clamped
                   Enter    LootTakeRequested = true
         LootTakeRequested AND LootOpen -> lower it, and ask the weapon
-            component for it: AskLootTake(LootTarget, LootSel). Whether it
-            is taken (room in the bag, something on the body) is the
-            component's to say (combat/weapon_component/loot_take.py)
+            component for it, if the body has that row:
+            AskLootTake(LootTarget, LootSel, the class shown there). Whether
+            it is taken (room in the bag, the row still that item's) is the
+            component's to say, on the server
+            (combat/weapon_component/loot_take.py). The window shows the
+            body's arrays, which replicate: a row another player took first
+            is gone from it, with nothing taken here
     then, on every path: the kneel follows LootOpen (loot_kneel)
 
 Tick, not DrawHUD: a -nullrhi probe never draws. The keys only raise flags,
@@ -44,9 +48,9 @@ from graphics_menu.loot_consts import (
 )
 from graphics_menu.loot_find import author_find_body, put
 from graphics_menu.loot_kneel import author_kneel
-from loot.consts import LOOT_NAMES_VAR, LOOT_RADIUS
+from loot.consts import LOOT_NAMES_VAR, LOOT_RADIUS, LOOT_VAR
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_WAS_PRESSED
-from uebp.nodes.array import FN_ARR_LEN
+from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_VALID
 from uebp.nodes.math import (
     FN_ADD_II, FN_AND, FN_MAX_II, FN_MIN_II, FN_NOT, FN_SUB_II)
 from uebp.nodes.palette import NODE_CAST_WEAPON
@@ -149,12 +153,20 @@ def author_loot_tick(ed, pc_out, in_execs):
                    B=_get(ed, LOOT_OPEN_VAR, made))
     serve, idle = _branch(ed, out(wanted), keyed, made)
     flow = _setter(ed, LOOT_TAKE_VAR, "false", [serve], made)
-    taken = ask(ed, wc, ASK_LOOT_TAKE, [flow], made,
-                Body=_get(ed, LOOT_TARGET_VAR, made), Index=_get(ed, LOOT_SEL_VAR, made))
+    # What the caret is on, so the server takes that or nothing. A body that
+    # carries nothing has no row to read.
+    loot = _get(ed, LOOT_VAR, made, HEALTH_CLASS_PATH, _get(ed, LOOT_TARGET_VAR, made))
+    row, no_row = _branch(ed, out(_call(ed, FN_ARR_VALID, made, TargetArray=loot,
+                                        IndexToTest=_get(ed, LOOT_SEL_VAR, made))),
+                          [flow], made)
+    shown = _call(ed, FN_ARR_GET, made, TargetArray=loot, Index=_get(ed, LOOT_SEL_VAR, made))
+    taken = ask(ed, wc, ASK_LOOT_TAKE, [row], made,
+                Body=_get(ed, LOOT_TARGET_VAR, made), Index=_get(ed, LOOT_SEL_VAR, made),
+                Want=out(shown, "Item"))
     ed.add_comment_to_nodes(
         f"Loot: the nearest dead body within the reach is LootTarget; "
         f"[{LOOT_KEY}] kneels and opens its window, Up/Down pick, Enter asks the "
         f"weapon component for the item (AskLootTake). Out of reach, the window "
         f"shuts.", made[:1])
-    tails = [taken, idle, shut, out(cast, "CastFailed")]
+    tails = [taken, no_row, idle, shut, out(cast, "CastFailed")]
     return author_kneel(ed, pc_out, tails)

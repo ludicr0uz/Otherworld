@@ -419,7 +419,7 @@ def _author_throw_release(ed, held, start, velocity, exec_in):
     _connect(out(inv, WV.Inventory), _pin(remove, "TargetArray"))
     _connect(out(idx, WV.EquippedIndex), _pin(remove, "IndexToRemove"))
     _connect(loosed, _pin(remove, "execute"))
-    # Held set with nothing connected clears it, as in _author_drop.
+    # Held set with nothing connected clears it.
     clear = ed.add_set_member_variable_node(WV.Held)
     _connect(then(remove), _pin(clear, "execute"))
     reset = ed.add_set_member_variable_node(WV.EquippedIndex)

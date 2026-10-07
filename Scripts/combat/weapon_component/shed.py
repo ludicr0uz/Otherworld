@@ -26,7 +26,8 @@ the character (a client's are a picture of the server's record, view.py), and
 the dead gate stops the Tick that would remove a client's.
 
 A class remembers no rounds: a looted gun is a fresh one, until a body's loot
-is rows of the inventory's record (combat/record_vars.py; the loot task, M23).
+is rows of the inventory's record (combat/record_vars.py; not yet: the take,
+loot_take.py, is the server's since M23, and still of a class).
 The server empties that record here too (record.py).
 
 OwnerDead is read before the gate sets it, which makes this the frame the

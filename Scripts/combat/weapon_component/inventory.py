@@ -11,7 +11,7 @@ from combat.nodes import CAMERA_CLASS_PATH, MOVEMENT_CLASS_PATH
 from combat.paths import ITEM_CLASS_PATH
 from combat.skin import player_skin
 from combat.slot_tuning import SLOT_VAR, STARTER_SLOTS
-from combat.tuning import DROP_FORWARD, DROP_KEY
+from combat.tuning import DROP_FORWARD
 from combat.carry_tuning import LOWERED_VAR
 from combat.light_tuning import MATCHES_CLASS_VAR
 from combat.torch_tuning import STICK_CLASS_VAR
@@ -22,7 +22,7 @@ from uebp.nodes.actor import (
     FN_GET_TRANSFORM, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
     FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT, FN_STOP_SLOT)
 from combat.weapon_component.throw_windup import THROW_ANIM_VAR
-from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE
+from uebp.nodes.array import FN_ARR_ADD
 from uebp.nodes.math import FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT
 from uebp.nodes.palette import (
     MACRO_FOR_EACH, MACRO_SWITCH_AUTHORITY_COMP, NODE_BREAK_HIT, NODE_CAST_CHAR, NODE_SPAWN)
@@ -48,7 +48,8 @@ def _detach_rules(node):
 def _author_set_down(ed, item, owner, exec_in, keep):
     """``item`` becomes a pick-up on the ground in front of ``owner``: Dropped,
     detached, shown, and set on the terrain under a point DROP_FORWARD ahead.
-    The G drop's and a drag out of the inventory's (drop_request.py). Returns
+    The drop key's and a drag out of the inventory's, both served by
+    drop_request.py, on the server. Returns
     the two exec tails (landed, and left in the air over no ground)."""
     flag = keep(ed.add_set_member_variable_node(IV.Dropped, ITEM_CLASS_PATH))
     _connect(item, _pin(flag, "self"))
@@ -119,42 +120,6 @@ def _author_set_down(ed, item, owner, exec_in, keep):
     _connect(out(start), _pin(in_air, "NewLocation"))
     _connect(else_(landed), _pin(in_air, "execute"))
     return then(on_ground), then(in_air)
-
-
-def _author_drop(ed, held, owner, exec_in):
-    """Detach the held weapon, drop it on the ground in front of the player."""
-    made = []
-
-    def keep(n):
-        made.append(n)
-        return n
-
-    on_ground, in_air = _author_set_down(ed, held, owner, exec_in, keep)
-
-    # Both placements rejoin here; an exec input takes more than one link.
-    inv = keep(ed.add_get_member_variable_node(WV.Inventory))
-    idx = keep(ed.add_get_member_variable_node(WV.EquippedIndex))
-    remove = keep(_node(ed, FN_ARR_REMOVE))
-    _connect(out(inv, WV.Inventory), _pin(remove, "TargetArray"))
-    _connect(out(idx, WV.EquippedIndex), _pin(remove, "IndexToRemove"))
-    _connect(on_ground, _pin(remove, "execute"))
-    _connect(in_air, _pin(remove, "execute"))
-
-    # Held is set with its input pin left unconnected, which is how a Blueprint
-    # object variable is cleared to None.
-    clear = keep(ed.add_set_member_variable_node(WV.Held))
-    _connect(then(remove), _pin(clear, "execute"))
-    reset = keep(ed.add_set_member_variable_node(WV.EquippedIndex))
-    _set(reset, WV.EquippedIndex, 0)
-    _connect(then(clear), _pin(reset, "execute"))
-
-    ed.add_comment_to_nodes(
-        f"{DROP_KEY} drops the equipped weapon {DROP_FORWARD:.0f} cm ahead, "
-        "traced down onto the terrain, and takes it out of Inventory. It stays "
-        "in the world as an ordinary actor with Dropped set, which is the only "
-        "thing pick-up looks for.",
-        made)
-    return then(reset)
 
 
 def _author_equip(ed, exec_in):

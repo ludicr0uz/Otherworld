@@ -95,7 +95,8 @@ def check_keys_are_variables():
     # The punch's, the knife's and the throw's clips, and the throw's ready
     # pose, are their own sections' (verify/punch.py, knife.py, throw.py,
     # throw_aim.py).
-    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName")
+    # A play has a rate; IsPlayingSlotAnimation has an Asset and a slot too.
+    plays = [n for n in by_pins(wg, "Asset", "SlotNodeName", "InPlayRate")
              if not is_melee_play(n) and not is_throw_play(n)
              and not is_ready_node(n)]
     # TWO, and the second one is not a duplicate. A montage started in HitSlot stops
@@ -214,8 +215,9 @@ def check_keys_are_variables():
     # The guns' three, and the component's own (Sound/sound_weapons.py, sound_items.py):
     # a swing for the punch and one for the blade, the axe on a tree, a match.
     #   3  the shot, the click, the reload
-    #   4  a swing: the fist's and the blade's, each where the server swings
-    #      (its Server event) and where the owning client predicts it
+    #   2  a swing: the fist's and the blade's, each once, in its Fx_ event
+    #      (the Server event's Multicast and the owning client's prediction
+    #      both call it: verify/fx.py)
     #   2  a blow landing on a body: the fist's and the blade's
     #   1  the axe's chop in a tree
     #   4  a throw: leaving the hand (a blade's, and a blunt thing's), sinking
@@ -225,12 +227,11 @@ def check_keys_are_variables():
     #      handled (where the server serves the move, and where a client's
     #      picture follows it: view.py) and an item used up
     #      (verify/sound_states.py)
-    check("the component plays twenty sounds: the guns' three, a swing (the server's, "
-          "and the owning client's prediction) and "
+    check("the component plays eighteen sounds: the guns' three, a swing and "
           "a landed blow for the fist and for the blade, the chop, a throw's "
           "four, the match, a thrown axe's kill by the head, the breath, an "
           "item handled (the server's serve, a client's picture) and an item used up",
-          len(by_pins(wg, "Sound", "Location")) == 20,
+          len(by_pins(wg, "Sound", "Location")) == 18,
           f"{len(by_pins(wg, 'Sound', 'Location'))} PlaySoundAtLocation node(s)")
     check("impacts spawn blood", len(by_pins(wg, "Class", "SpawnTransform")) >= 3,
           f"{len(by_pins(wg, 'Class', 'SpawnTransform'))} spawn nodes "

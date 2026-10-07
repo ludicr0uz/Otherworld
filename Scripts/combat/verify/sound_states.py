@@ -12,6 +12,8 @@ from combat.paths import FOOTSTEP_BP_PATH, MATCHES_BP_PATH, STICK_BP_PATH, WOOD_
 from combat.verify.common import BEL, by_pins, cdo, check, graph, load, num_pin, pin_value
 from combat.verify.fixtures import _eas, hg, wg
 from combat.verify.throw_strike import _feeders, _pure_feeds
+from combat.verify import fx as fxv
+from combat import fx_vars as FX
 from combat.weapon_component import vars as WV
 from combat.weapon_component.sprint import SPRINT_SPENT_VAR
 from forest_generator.bush_placement import DEFAULT_BUSH_SPECS
@@ -119,14 +121,18 @@ def check_head_kill():
     # Each play is behind its "are there takes" Branch; the picking Branch is behind that.
     picks = [g for p in (kills[0], stabs[0]) for gate in _feeders(p, "execute")
              for g in _feeders(gate, "execute")]
-    check("...picked by one Branch", len(picks) == 2 and picks[0] == picks[1]
-          and _title(picks[0]) == "Branch", str([_title(p) for p in picks]))
+    check("...picked by one Branch, inside Fx_Stab, on the event's HeadKill",
+          len(picks) == 2 and picks[0] == picks[1] and _title(picks[0]) == "Branch"
+          and _feeders(picks[0], "Condition") == [fxv.event(FX.fx_event(FX.STAB))],
+          str([_title(p) for p in picks]))
     if not picks:
         return
-    asked = _reads(picks[0])
+    # What the server tells it: the pure chain feeding the Multicast's HeadKill.
+    told = fxv.calls(FX.STAB)
+    asked = set().union(*[_reads(c) for c in told]) if told else set()
     check("...the kill's where an item that Chops (the axe) struck the head and took a "
-          "body not yet Dead to no Health",
-          {f"Get {CHOPS_VAR}", f"Get {HV.Dead}", f"Get {HV.Health}"} <= asked
+          "body not yet Dead to no Health: what the server's tell of Multicast_Stab reads",
+          len(told) == 1 and {f"Get {CHOPS_VAR}", f"Get {HV.Dead}", f"Get {HV.Health}"} <= asked
           and any("Contains" in t.replace(" ", "") for t in asked), str(sorted(asked)))
 
 

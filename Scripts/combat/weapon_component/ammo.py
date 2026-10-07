@@ -5,7 +5,6 @@ from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.paths import ITEM_CLASS_PATH
 from combat.tuning import RELOAD_KEY, SMG_FIRE_INTERVAL
 from combat.weapon_component.common import _prop
-from uebp.nodes.actor import FN_ACTOR_LOC
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_GREATER_II, FN_MIN_II, FN_NOT, FN_SELECT_II, FN_SUB_II)
 from uebp.nodes.system import FN_PLAY_SOUND, FN_TIME_SECONDS
@@ -83,23 +82,11 @@ def _author_reload(ed, held, exec_ins):
     _connect(out(worth), _pin(does, "Condition"))
     _connect(then(pin_take), _pin(does, "execute"))
 
-    # The clack, on the True arm only. On the False arm nothing moves, so a
-    # sound there would be the game telling the player it had done something it
-    # had not -- which is worse than silence, because the pause that normally
+    # The clack is the caller's, off the True arm this returns (shot.py's
+    # ReloadNow announces Fx_Reload): on the False arm nothing moves, and a
+    # sound there would be the game telling the player it had done something
+    # it had not -- worse than silence, because the pause that normally
     # follows a reload would not happen either.
-    #
-    # Placed at the weapon rather than at the player: the gun is in the
-    # player's hands, so the two are the same position to within a few
-    # centimetres, and reading the weapon's transform needs no owner cast.
-    at = keep(_node(ed, FN_ACTOR_LOC))
-    _connect(held, _pin(at, "self"))
-    clack_pin, clack_n = _prop(ed, IV.ReloadSound, held)
-    keep(clack_n)
-    clack = keep(_node(ed, FN_PLAY_SOUND))
-    _connect(clack_pin, _pin(clack, "Sound"))
-    _connect(out(at), _pin(clack, "Location"))
-    _connect(then(does), _pin(clack, "execute"))
-
     take_a = keep(ed.add_get_member_variable_node(WV.ReloadTake))
     was, was_n = _prop(ed, IV.Loaded, held)
     keep(was_n)
@@ -109,7 +96,7 @@ def _author_reload(ed, held, exec_ins):
     load = keep(ed.add_set_member_variable_node(IV.Loaded, ITEM_CLASS_PATH))
     _connect(held, _pin(load, "self"))
     _connect(out(filled), _pin(load, IV.Loaded))
-    _connect(then(clack), _pin(load, "execute"))
+    _connect(then(does), _pin(load, "execute"))
 
     take_b = keep(ed.add_get_member_variable_node(WV.ReloadTake))
     kept, kept_n = _prop(ed, IV.Reserve, held)
@@ -149,7 +136,7 @@ def _author_reload(ed, held, exec_ins):
         "field the interval between shots uses, so there is only ever one rule "
         "saying when the weapon may fire. An InfiniteReserve weapon (the "
         "pistol) fills the whole gap and is never charged. "
-        "The clack plays on the True arm only, "
+        "The clack is the caller's, off the True arm alone, "
         "because a reload that moved nothing has nothing to announce.",
         made)
     return (then(pause), else_(does))

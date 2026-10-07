@@ -387,8 +387,9 @@ R  ------------------------------------>  Server_Reload: AsksServed + 1, ReloadN
 - **What the owning client predicts** is what it can know: the kick (it turns its own
   controller), the shot's sound, the round and the cooldown on its own copy, the reload
   on its own copy. Not the hit: it traces nothing and rolls nothing ("Random rolls").
-  Blood, chips, the tracer and the headshot's X are drawn by the machine that ran the
-  shot, so a client of a server sees none of them yet (M21).
+  Blood, chips and the shot's sound reach everyone through the cosmetic pairs, and the
+  headshot's X through `HeadshotTime`'s RepNotify ("Everyone sees and hears the fight",
+  below); the tracer is debug mode's, drawn where the shot ran.
 - **`AsksSent` and `AsksServed` reconcile the rounds.** The client counts the asks it
   sends; the server counts the asks it answers, fired or refused, replicated to the
   owner as a RepNotify that raises `ViewDirty`. While the server's count is behind, the
@@ -412,9 +413,9 @@ R  ------------------------------------>  Server_Reload: AsksServed + 1, ReloadN
   health component is set to `AlwaysTickPoseAndRefreshBones` there, at BeginPlay,
   behind IsDedicatedServer. M22's history of hit boxes reads the same bones.
 - **Not here:** lag compensation (M22: the server traces against where the target is
-  now, so at 120 ms a strafing target is missed where the shooter saw a hit); the fight
-  as others see it (M21). The server takes the shot whether or not it has the player
-  sprinting or guarding. Melee, the throw and the guard are the next section.
+  now, so at 120 ms a strafing target is missed where the shooter saw a hit). The server
+  takes the shot whether or not it has the player sprinting or guarding. Melee, the throw
+  and the guard are the next section; what everyone sees and hears is the one after.
 - `combat/verify/shot.py` checks the flags and the wiring. Proof: `uepy.py --net
   --clients 2 --probe-timeout 240 --probe Scripts/probes/probe_net_fire.py` (client 1
   kills a wanderer down the sights and reloads; the server's rounds are client 1's, its
@@ -487,10 +488,10 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
   unless it is `p.set` (no edit notification): written with the default on a
   wanderer, the server's body got fresh components and each client's copy of it lost
   its health component.
-- **Not here:** the swing, the throw and the hit as other players see and hear them
-  (M21); lag compensation of a sweep or a throw; the pick-up of an item that is not
-  replicated, the drop, and two clients on one item on one frame as a probe (M23);
-  lighting the stick and heating the blade on the server (M25).
+- **Not here:** lag compensation of a sweep or a throw; the pick-up of an item that is
+  not replicated, the drop, and two clients on one item on one frame as a probe (M23);
+  lighting the stick and heating the blade on the server (M25). The swing, the throw and
+  the hit as other players see and hear them are the next section.
 - `combat/verify/strike.py` and `verify/pickup.py` check the flags and the wiring.
   Proof: `uepy.py --net --clients 2 --probe-timeout 240 --probe
   Scripts/probes/probe_net_throw.py` (client 1 throws its axe into a trunk, all three
@@ -503,6 +504,84 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
   stick burning); both clean with `--lag 120`. Single player's are the existing
   `--game` probes (`probe_knife`, `probe_punch`, `probe_hot_blade`, `probe_throw*`,
   `probe_pickup`, `probe_wendigo_ward`).
+
+## Everyone sees and hears the fight (M21, done)
+
+A fight must look and sound the same to everyone near it, and losing a sound must never
+change the outcome, so cosmetics travel apart from state: the server changes the state
+in its event, then tells everyone, unreliably. `combat/fx_vars.py` has the picture; the
+machinery is `combat/weapon_component/fx.py`, and each cosmetic's nodes stay with the
+module that owns the action.
+
+```
+owning client                      server                        every machine
+the ask, predicting ---------->    Server_Fire / _Punch /        Multicast_<Name>(params)
+  Fx_Shot, Fx_Reload, Fx_Punch,      _Slash / _Throw, ReloadNow    gate? -> FxPlayed + 1
+  Fx_Slash, Fx_Throw (off the        state, then fx.tell(...)      -> Fx_<Name>(params):
+  authority Branch's false arm)      Multicast_<Name>                 the sound, the clip,
+                                   the sweep's blow, a pellet,       the spawn, once
+                                   the flight's strike: tell too
+```
+
+- **Every cosmetic is a pair of events on `BP_WeaponComponent`:** `Fx_<Name>` holds the
+  one copy of its nodes; `Multicast_<Name>` (unreliable) is the server's word of it,
+  whose gate asks whether this copy owes it, counts it in `FxPlayed` and calls
+  `Fx_<Name>`. Twelve pairs: `Shot`, `Reload`, `Punch`, `Slash`, `Throw(Start, Sharp)`,
+  `ThrowClip`, `PelletHit(Location, Normal, Scale, Blood)`, `PunchHit(Location)`,
+  `BladeHit(Location)`, `Chop(Location, Normal)`, `Stab(Location, Normal, HeadKill)`,
+  `Lodge(Location, Normal)`.
+- **Three gates** (`fx_vars.UNPREDICTED`, `OTHERS`, `SCREEN`):
+  - *unpredicted*, `HasAuthority OR NOT LocalInput`: the owning client already played it
+    as its prediction (`fx.predict`, off the authority Branch's false arm, where the ask
+    is), everyone else owes it. The shot's and the reload's sound, the two swings' clip
+    and sound, the throw's sound.
+  - *others*, `NOT LocalInput`: the owner played it in both modes before the server knew
+    (the throw's clip is the wind-up's, at the click). `ThrowClip`.
+  - *screen*, `NOT IsDedicatedServer`: nobody predicted it (a blow lands by the server's
+    sweep, a pellet by its trace), so every machine with a screen plays it, the striker's
+    included, and the server never. The six point bursts.
+  - `LocalInput` is the local gate's answer, written on every copy each Tick ("Input"):
+    true on the owning client and in single player, false on the server and on another
+    player's copy.
+- **Single player plays each once:** the one machine has authority, every Multicast is a
+  plain call, *unpredicted* passes (authority), *screen* passes, *others* does not (the
+  wind-up played the clip). Nothing is predicted and nothing plays twice.
+- **The owner's copy counts none of what it predicted:** `FxPlayed` is each copy's own
+  count of cosmetics played at the server's word, a probe's readout and nothing else
+  (`probe_net_fx.py`: client 1 counts only its pellets' chips).
+- **What is not a pair:** hit reactions, the grunt, the heartbeat and the collapse follow
+  `Health`'s RepNotify on every copy ("Health and damage"); footsteps are each copy's own
+  footstep component, driven by the replicated movement (the probe watches its copy
+  stride); the headshot's X is `HeadshotTime`, a RepNotify to the owner whose OnRep
+  rewrites it with this machine's clock (`headshot.replicate_headshot`); the dying is M16's.
+  There is no muzzle flash in the game, and the tracer is debug mode's, drawn where the
+  shot ran (the server's).
+- **The noise the wanderers hear is the server's own event's** (`shot_noise.py`, inside
+  `Server_Fire`), never a Multicast's: a lost cosmetic loses nothing a wanderer heard.
+- **A new sound or effect of a shot, a blow or a throw goes in a pair,** authored by the
+  owning module with `fx.pair(ed, name, params, body, gate)` before the event or the Tick
+  fragment that tells it (`build.py` authors every pair first: a call finds only an event
+  that exists), and never at the site that decides it, which runs on the server and has
+  no speaker. The point bursts' transform is `fx.point_transform` (the event's Location,
+  +X on its Normal, a Scale on every axis).
+- **A montage just started reads as a quiet slot:** `IsSlotActive` is false until it has
+  blended in, so the ready pose's keep-alive would replace the throw's clip on its first
+  frame on another player's copy (whose slot holds the hold pose, not the ready pose). The
+  keep-alive and the equip's stop ask `IsPlayingSlotAnimation(ThrowAnim)` instead, so the
+  clip plays on through the hand letting go, on every copy (`inventory.py`,
+  `ready_pose.py`).
+- **Not here:** the cocked arm while the throw key is held, and the wind-up before the
+  release, are the thrower's alone (the others see the clip from the release on); the
+  wanderers' own sounds (their growls, roars and blows run on the server: M27); a
+  rendered check that the sounds are heard (the probe counts what each copy played).
+- `combat/verify/fx.py` checks the pairs, the gates, the predictions and the RepNotify.
+  Proof: `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_fx.py` (client 1 walks, fires at the ground, reloads, slashes
+  and throws the knife; the server and client 2 count each at the server's word, client 2
+  sees the chips as actors and the knife's and the throw's clips playing on its copy of
+  the character, and client 1 counts only its chips), also with `--lag 120`;
+  `OW_FX_SHOTS=1 ... --windowed` saves client 2's view of each step to
+  `Saved/Screenshots/MacEditor`; `--game` runs its single-player arm.
 
 ## Random rolls (M17, done)
 
@@ -832,8 +911,8 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server would correct a sprinting client. **Fixed (M12): "Movement states are predicted", above** | the write measured; the fix measured (`probe_net_move_states.py`, 137 ms) | M12 done |
 | input | **Fixed (M10): "Input", above.** The weapon component polled keys in its Tick on every copy of every character, the server's included, and on `GetPlayerController(0)`, so a client's press drove every character it could see | read; the fix measured (`probe_net_local_input.py`, headless and `--windowed`) | M10 done |
 | stamina, hunger, thirst, temperature | Per-process component and GAS state: no builder replicates a variable or a component yet (`net.replicate` has no caller outside `dev/check_net_authoring.py`). **Stamina is the server's since M12** (the movement component; the owning client predicts it and is corrected to it) | read; stamina measured | M12 done, M26 |
-| animation of the other player | Only what CharacterMovement replicates reached a simulated proxy (velocity, falling). **Fixed (M13): "Other players' characters", above**: stance, aim pitch, aim mode, the gun raised or lowered and the hand's pose. Montages do not yet | read | M21 |
-| sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only | read | M21 |
+| animation of the other player | Only what CharacterMovement replicates reached a simulated proxy (velocity, falling). **Fixed (M13): "Other players' characters", above**: stance, aim pitch, aim mode, the gun raised or lowered and the hand's pose. **The swing's and the throw's clips: fixed (M21), "Everyone sees and hears the fight"** | read; M21's measured (`probe_net_fx.py`) | M13, M21 done |
+| sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only. **Fixed (M21):** each cosmetic is an `Fx_`/`Multicast_` pair told by the server, the owner predicting its own; footsteps were already each copy's own component | read; the fix measured (`probe_net_fx.py`) | M21 done |
 | player starts | The level has one PlayerStart: the two spawned 70 cm apart, the engine nudging the second. At that spacing the server refuses a crouched character's stand-up ("Other players' characters") | measured | M16 |
 | pause and the title menu | Without `-nomenu` a client opened on the title menu. **The pause is fixed (M5):** it is standalone's alone (`net/pause.py`, above), and a client's menu is an overlay. **The title is fixed (M6):** a connected client has none, and the harness no longer gives a client `-nomenu` | read; the fixes measured (`probe_net_menu_overlay.py`, `probe_net_join.py`, `probe_net_title.py`) | M5, M6 done |
 | the profile and the tuning slots | A client loaded the local `OtherworldProfile` as in single player: **fixed (M6)**, the profile's fragment runs in standalone only. It still loads the tuning tabs' save slots (the harness sets them aside for a run: `probes/kept_slots.py`) | read; the profile measured (`probe_net_title.py`) | M32, M35 |

@@ -9,7 +9,8 @@ from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.hit_reaction import HIT_REACT_PROBE, POSE_BACK_PROBE_PREFIX
 from combat.weapon_component.common import AIM_BLEND, AIM_LOOPS
 from combat.weapon_component.look_vars import HandPose
-from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
+from combat.weapon_component.throw_windup import THROW_ANIM_VAR
+from uebp.nodes.actor import FN_ANIM_INSTANCE, FN_IS_PLAYING_SLOT, FN_IS_SLOT_ACTIVE, FN_PLAY_SLOT
 from uebp.nodes.math import FN_AND, FN_NEQ_BB, FN_NOT
 from uebp.nodes.system import FN_IS_VALID, FN_WARN
 from combat.weapon_component import vars as WV
@@ -41,6 +42,7 @@ def _author_ready_pose_keepalive(ed, exec_ins):
         HandPose is valid AND not Lowered   (carry.py: sprinting, or a gun at rest)
           AND DefaultSlot is quiet      (nothing is holding the pose)
           AND HitSlot is quiet          (we are not mid-flinch)
+          AND the throw's clip is not playing   (its first frame reads quiet)
             -> play HandPose into DefaultSlot again
 
     HandPose (look.py) is the held item's AimPose as the equip last took it:
@@ -83,6 +85,17 @@ def _author_ready_pose_keepalive(ed, exec_ins):
     flinching = keep(_node(ed, FN_IS_SLOT_ACTIVE))
     _connect(anim_out, _pin(flinching, "self"))
     _set(flinching, "SlotNodeName", HIT_SLOT)
+    # A montage just started reads as a quiet slot until it has blended in:
+    # the throw's clip, played into DefaultSlot over a held pose on another
+    # player's copy (Fx_ThrowClip), would be replaced by the pose on its first
+    # frame. The montage instance exists at once, so ask for it by its clip.
+    throwing = keep(_node(ed, FN_IS_PLAYING_SLOT))
+    _connect(anim_out, _pin(throwing, "self"))
+    throw_anim = keep(ed.add_get_member_variable_node(THROW_ANIM_VAR))
+    _connect(out(throw_anim, THROW_ANIM_VAR), _pin(throwing, "Asset"))
+    _set(throwing, "SlotNodeName", AIM_SLOT)
+    not_throwing = keep(_node(ed, FN_NOT))
+    _connect(out(throwing), _pin(not_throwing, "A"))
     settled = keep(_node(ed, FN_NOT))
     _connect(out(flinching), _pin(settled, "A"))
 
@@ -92,9 +105,12 @@ def _author_ready_pose_keepalive(ed, exec_ins):
     quiet = keep(_node(ed, FN_AND))
     _connect(out(no_pose), _pin(quiet, "A"))
     _connect(out(settled), _pin(quiet, "B"))
+    undisturbed = keep(_node(ed, FN_AND))
+    _connect(out(quiet), _pin(undisturbed, "A"))
+    _connect(out(not_throwing), _pin(undisturbed, "B"))
     needed = keep(_node(ed, FN_AND))
     _connect(out(ready), _pin(needed, "A"))
-    _connect(out(quiet), _pin(needed, "B"))
+    _connect(out(undisturbed), _pin(needed, "B"))
 
     gate = keep(ed.add_branch_node())
     _connect(out(needed), _pin(gate, "Condition"))

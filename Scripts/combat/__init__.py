@@ -101,6 +101,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   strike_vars       melee, the guard, the use key, the throw and the take as
                     server requests (M20): the five events' names, what the
                     owning machine reports and the server keeps, the limits
+  fx_vars           the fight as everyone sees and hears it (M21): each cosmetic's
+                    Fx_/Multicast_ pair by name, its parameters and its gate, the
+                    five the owning client predicts, FxPlayed (a probe's count)
   item_world        an item loose in the world is a replicated actor (M20):
                     InWorld, the release's SetReplicates, a client's copy
                     hidden while the item is carried

@@ -32,6 +32,8 @@ from combat.throw_tuning import (
     LODGE_TURN_VAR, STICK_LINE_REACH_CM, STICK_TRACE_PAST, THROW_DAMAGE_VAR,
 )
 from combat.tuning import COMBAT, INTERACT_RADIUS
+from combat.verify import fx as fxv
+from combat import fx_vars as FX
 from combat.verify.common import (
     take_hits,
     BEL, PIN, by_pins, check, has_in_pin, in_pins, num_pin, pin_value,
@@ -114,6 +116,9 @@ def _stage():
 @functools.lru_cache(maxsize=1)
 def _strike_names():
     ran, _exits = _stage()
+    # The blood and the sounds into a body, the chips and the sound into a
+    # trunk, are Fx_Stab's and Fx_Lodge's, told by their Multicasts (verify/fx.py).
+    ran = list(ran) + list(fxv.nodes_of(FX.STAB)) + list(fxv.nodes_of(FX.LODGE))
     names = {n.get_path_name() for n in ran}
     for n in ran:
         names |= {f.get_path_name() for f in _pure_feeds(n)}
@@ -133,33 +138,6 @@ def _floor():
     return [PIN.get_owning_node(q) for k, v in exits.items() if k != "Set Dropped"
             for n in v for p in BEL.list_output_pins(n) if _is_exec(p)
             for q in PIN.list_connected_pins(p) if _title(PIN.get_owning_node(q)) == k]
-
-
-def _past_sound(nodes):
-    """Exec feeders, looked back past one played sound. A sound is three
-    nodes (Sound/play.py): a Branch on "are there takes", the
-    play, and a Branch both of those run into. Where ``nodes`` is that last
-    Branch, what feeds the first one is what the sound came after. Two
-    such Branches are two sounds one Branch picks between (a blade into a
-    body: the stab, or the axe's kill by the head): what feeds the picking
-    Branch (verify/sound_states.py checks what it picks on)."""
-    def before(node):
-        if _title(node) != "Branch":
-            return None
-        back = _feeders(node, "execute")
-        plays = [n for n in back if has_in_pin(n, "Sound")]
-        gates = [n for n in back if n not in plays]
-        if len(plays) == 1 and len(gates) == 1 and _feeders(plays[0], "execute") == gates:
-            return _feeders(gates[0], "execute")
-        return None
-
-    backs = [before(n) for n in nodes]
-    if len(nodes) == 1 and backs[0] is not None:
-        return backs[0]
-    if (len(nodes) == 2 and None not in backs and backs[0] == backs[1]
-            and len(backs[0]) == 1 and _title(backs[0][0]) == "Branch"):
-        return _feeders(backs[0][0], "execute")
-    return nodes
 
 
 def _mine(nodes):
@@ -315,14 +293,17 @@ def check_wound():
                    for n in wg if _title(n) == f"Set {v}"],
           f"{told}, From off {normal}")
     blood = _mine(_spawns("BloodClass"))
-    # Between the two, the headshot stamp (verify/headshot.py).
-    told = _feeders(blood[0], "execute") if len(blood) == 1 else []
-    check("...and it bleeds: one blood spawn, after the wound and its "
+    # Between the two, the headshot stamp (verify/headshot.py); the blood is
+    # Fx_Stab's, told after it.
+    tells = fxv.calls(FX.STAB)
+    told = _feeders(tells[0], "execute") if len(tells) == 1 else []
+    check("...and it bleeds: one blood spawn (Fx_Stab), told after the wound and its "
           f"{HEADSHOT_TIME_VAR} stamp",
-          len(blood) == 1
-          and [_title(n) for n in told] == [f"Set {HEADSHOT_TIME_VAR}"]
+          len(blood) == 1 and fxv.in_fx(FX.STAB, blood) == blood and len(tells) == 1
+          and [_title(n).split(" ")[0] + " " + HEADSHOT_TIME_VAR for n in told]
+          == [f"Set {HEADSHOT_TIME_VAR}"]
           and _feeders(told[0], "execute") == writes,
-          f"{len(blood)} spawns, after {[_title(n) for n in told]}")
+          f"{len(blood)} spawns, {len(tells)} tell(s) after {[_title(n) for n in told]}")
     adds = [n for n in by_pins(wg, "TargetArray", "NewItem")
             if [_title(f) for f in _feeders(n, "TargetArray")] == [f"Get {THROW_PAST_VAR}"]]
     floors = [n for n in by_pins(wg, "Start", "End", "TraceChannel", "ActorsToIgnore")
@@ -425,7 +406,7 @@ def check_stick(blood):
           f"({THROW_SKIN_VAR}) once, as it is into a trunk",
           len(in_body) == 1 and len(found) == 1 and _of_thrown(in_body[0])
           and _feeders(in_body[0], "execute") == found
-          and _past_sound(_feeders(found[0], "execute")) == blood
+          and _feeders(found[0], "execute") == fxv.calls(FX.STAB)
           and _feeders(in_body[0], "NewLocation") != _feeders(in_body[0], "NewRotation"),
           f"{len(in_body)} move(s), {len(found)} Branch(es)")
     holds = _mine(by_pins(wg, "Parent", "SocketName", "LocationRule"))
@@ -460,13 +441,15 @@ def check_lodge():
                   for f in _pure_feeds(highs[0])),
           str(len(highs)))
     chips = _mine(_spawns(IMPACT_CLASS_VAR))
-    check("it chips the bark once, on the reachable arm",
-          len(chips) == 1 and _feeders(chips[0], "execute") == highs, str(len(chips)))
+    tells = fxv.calls(FX.LODGE)
+    check("it chips the bark once (Fx_Lodge), told on the reachable arm",
+          len(chips) == 1 and fxv.in_fx(FX.LODGE, chips) == chips and len(tells) == 1
+          and _feeders(tells[0], "execute") == highs, f"{len(chips)} spawn(s), {len(tells)} tell(s)")
     in_body, puts = _puts()
-    check("...and, after the chop's sound, is set into the trunk once: the item "
-          "in the air, placed and turned in one move",
+    check("...and, after the tell of the chips and the chop's sound, is set into the "
+          "trunk once: the item in the air, placed and turned in one move",
           len(puts) == 1 and _of_thrown(puts[0])
-          and _past_sound(_feeders(puts[0], "execute")) == chips
+          and _feeders(puts[0], "execute") == tells
           and any(has_in_pin(f, "Hit") for f in _feeders(puts[0], "NewLocation")
                   for f in [f] + _feeders(f, "A")),
           str(len(puts)))

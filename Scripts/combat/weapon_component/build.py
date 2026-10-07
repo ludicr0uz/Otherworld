@@ -95,12 +95,18 @@ from combat.record_vars import TABLE as RECORD_TABLE
 from combat.weapon_component.record import replicate_record
 from combat.weapon_component.view import author_view_events
 from combat.weapon_component.shot import author_shot_events, replicate_shot
+from combat.weapon_component.headshot import replicate_headshot
+from combat.weapon_component.chop import author_chop_fx
+from combat.weapon_component.impact import author_pellet_fx
+from combat.weapon_component.throw import author_throw_fx
+from combat.weapon_component.throw_strike import author_throw_strike_fx
+from combat import fx_vars as FX
 from combat.shot_vars import TABLE as SHOT_TABLE
 from combat.strike_vars import TABLE as STRIKE_TABLE
 from combat.weapon_component.holds import author_set_holds, replicate_holds
 from combat.weapon_component.knife import KNIFE
 from combat.weapon_component.pickup import author_take_event
-from combat.weapon_component.punch import PUNCH, author_strike_event
+from combat.weapon_component.punch import PUNCH, author_strike_event, author_strike_fx
 from combat.weapon_component.throw import author_throw_event
 from combat.weapon_component.loot_take import author_loot_take
 from combat.weapon_component.save_exit import author_ask_save_exit
@@ -151,6 +157,10 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
 
     item_class = BEL.generated_class(item_bp)
     declare(ed, WV.TABLE)
+    # The headshot's stamp travels to the owner (headshot.py).
+    replicate_headshot(bp)
+    # The fight as everyone sees and hears it (fx.py): the counter a probe reads.
+    declare(ed, FX.TABLE)
     # The look (look.py): declared, then replicated, on every build.
     declare(ed, LOOK_TABLE)
     replicate_look(bp)
@@ -344,6 +354,14 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # The slots' keys call theirs, and the upkeep the view's two (view.py).
     author_asks(ed)
     author_view_events(ed)
+    # The cosmetics (fx.py, combat/fx_vars.py): each pair before the event
+    # or the Tick fragment that tells or predicts it.
+    author_pellet_fx(ed)
+    author_strike_fx(ed, PUNCH)
+    author_strike_fx(ed, KNIFE)
+    author_throw_fx(ed)
+    author_throw_strike_fx(ed)
+    author_chop_fx(ed)
     author_shot_events(ed)
     # M20's requests: the two swings, the guard and the use key, the throw
     # and the take. Blocking travels to the other players, and Thrown to the
@@ -364,7 +382,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_WeaponComponent failed to compile")
-    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults(RECORD_TABLE), **defaults(SHOT_TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
+    _apply_defaults(bp, {**defaults(WV.TABLE), **defaults(LOOK_TABLE), **defaults(RECORD_TABLE), **defaults(SHOT_TABLE), **defaults(FX.TABLE), **defaults_for(WEAPON_COMP_BP_PATH, WEAPON_SOUNDS + ITEM_SOUNDS + WORLD_SOUNDS),
         # Overwritten on the first frame of BeginPlay with the character's
         # own walk speed, which is this same number (player_pace.py).
         BASE_SPEED_VAR: COMBAT.jog_speed_cms,

@@ -19,6 +19,12 @@ server's ever finds a strike pending. A client of a server plays the clip and
 the swing's sound and stamps its own cooldown at once, its prediction; it
 sweeps nothing. In single player the event is a plain call.
 
+What everyone sees and hears of it is fx.py's (task M21): the clip and the
+swing's sound are Fx_<strike.fx>, which the Server event tells everyone
+through its Multicast and the owning client plays as its prediction; the
+blow landing is Multicast_<strike.hit_fx>, told from the server's sweep to
+every machine with a screen, the striker's included.
+
 The press only queues, so a probe can throw a punch by writing PunchQueued
 (no key can be injected into a headless game). The blow lands a moment into
 the clip rather than on the press: a hit before the fist moves reads as a
@@ -41,8 +47,10 @@ from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
 from combat import item_vars as IV
 from combat.paths import HEALTH_CLASS_PATH, ITEM_CLASS_PATH
+from combat.fx_vars import LOCATION_PARAM, PUNCH as PUNCH_FX, PUNCH_HIT, SOUND_AT_PARAMS
 from combat.strike_vars import SERVER_PUNCH, STRIKE_GRACE_S
 from combat.tuning import COMBAT
+from combat.weapon_component import fx
 from combat.weapon_component.record import authority
 from combat.weapon_component.shot import _author_alive
 from combat.weapon_component.slot_nodes import not_, op, valid
@@ -88,6 +96,10 @@ class Strike:
     # in hand (the knife's) or empty hands (the punch's).
     event: str = SERVER_PUNCH
     armed: bool = False
+    # The cosmetics (combat/fx_vars.py): the clip with the swing's sound, and
+    # the blow landing.
+    fx: str = PUNCH_FX
+    hit_fx: str = PUNCH_HIT
 
 
 PUNCH = Strike("punch", PUNCH_ANIM_VAR, PUNCH_QUEUED_VAR, PUNCH_PENDING_VAR,
@@ -182,24 +194,33 @@ def _author_clip(ed, strike, exec_in):
 def _author_swing(ed, strike, exec_ins):
     """Queued, on the machine with the keys: clear the queue and ask the
     server for the swing (the strike's Server event). A client of a server
-    first stamps its own cooldown and plays the clip and its sound, its
-    prediction. ``exec_ins`` all run into the swing's Branch; returns the
+    first stamps its own cooldown and plays the clip and its sound (Fx_, its
+    prediction). ``exec_ins`` all run into the swing's Branch; returns the
     exits."""
     g = _G(ed)
     queued, idle = g.branch(g.get(strike.queued_var), exec_ins)
     flow = g.put(strike.queued_var, "false", [queued])
     owns, predicts = g.branch(authority(g), [flow])
     step = _stamp(ed, strike.next_var, strike.interval_s, predicts)
-    swung, play = _author_clip(ed, strike, step)
+    swung = fx.predict(g, strike.fx, [step])
     ask = g.keep(_node(ed, strike.event))
     for e in (owns, swung):
         _connect(e, _pin(ask, "execute"))
     ed.add_comment_to_nodes(
         f"The {strike.name}'s swing is asked of the server ({strike.event}, "
         "punch.py). A client of a server stamps its own cooldown and plays the "
-        "clip and the swing's sound at once, its prediction; with authority "
-        "(single player) the event is the swing.", g.made + [play])
+        f"clip and the swing's sound at once (Fx_{strike.fx}), its prediction; "
+        "with authority (single player) the event is the swing.", g.made)
     return (then(ask), idle)
+
+
+def author_strike_fx(ed, strike):
+    """The strike's two cosmetics (fx.py): its clip with the swing's sound,
+    and its blow landing, heard where it landed. Before its Server event."""
+    fx.pair(ed, strike.fx, (), lambda g, e, _ev: _author_clip(ed, strike, e), fx.UNPREDICTED)
+    fx.pair(ed, strike.hit_fx, SOUND_AT_PARAMS,
+            lambda g, e, ev: _author_sound(ed, strike.hit_sounds_var, out(ev, LOCATION_PARAM), e),
+            fx.SCREEN)
 
 
 def author_strike_event(ed, strike):
@@ -225,15 +246,16 @@ def author_strike_event(ed, strike):
     step = _stamp(ed, strike.next_var, strike.interval_s, swing)
     step = _stamp(ed, strike.due_var, strike.impact_s, step)
     step = _set_bool(ed, strike.pending_var, True, step)
-    _swung, play = _author_clip(ed, strike, step)
+    fx.tell(g, strike.fx, [step])
     ed.add_comment_to_nodes(
         f"{strike.event} (punch.py): the owning client's {strike.name}. Refused "
         f"unless the hand is {'a Melee item' if strike.armed else 'empty'}, the "
         "owner alive and not guarding and the cooldown over (within "
         f"{STRIKE_GRACE_S:g} s). Then the cooldown, when the blow lands "
         f"({strike.impact_s} s on), and the clip into {AIM_SLOT}, upper body "
-        "only, with one of the swing's sounds. The blow is the Tick's.",
-        g.made + [play])
+        "only, with one of the swing's sounds, told to everyone "
+        f"(Multicast_{strike.fx}). The blow is the Tick's.",
+        g.made)
 
 
 def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
@@ -312,9 +334,10 @@ def _author_blow(ed, strike, exec_ins, scenery=None, damage=None):
     took, take = take_hit(ed, as_health, amount,
                           _loose_pin(brk, "ImpactNormal", is_input=False),
                           who, out(with_what, WV.Held), met)
-    # What it sounds like going in, from where it went in.
-    landed = _author_sound(ed, strike.hit_sounds_var,
-                           _loose_pin(brk, "ImpactPoint", is_input=False), took)
+    # What it sounds like going in, from where it went in: told to every
+    # machine with a screen, the striker's included (nobody predicted it).
+    landed = fx.tell(_G(ed), strike.hit_fx, [took],
+                     Location=_loose_pin(brk, "ImpactPoint", is_input=False))
 
     ed.add_comment_to_nodes(
         f"The {strike.name}'s blow, {strike.impact_s} s into the swing: a "

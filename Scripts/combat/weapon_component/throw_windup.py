@@ -30,6 +30,7 @@ the punch and the slash: the legs keep walking.
 """
 
 from combat.anim_blueprint import AIM_SLOT
+from combat.fx_vars import THROW_CLIP, fx_event
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
 from combat.throw_tuning import (
     THROW_ANIM_BLEND_S, THROW_READY_S, THROW_RELEASE_S, THROW_WINDUP_S,
@@ -52,6 +53,31 @@ def _winding(ed):
     return out(valid)
 
 
+def _author_throw_clip(ed, exec_in):
+    """The skin's throw clip into the upper-body slot, on from the ready
+    pose's moment (throw_ready.py held the arm there), behind IsValid of it.
+    Returns (played, no clip): the exec pins after. Fx_ThrowClip's body too
+    (throw.py): the other players' copies play it at the server's word."""
+    has = _node(ed, FN_IS_VALID)
+    _connect(_get(ed, THROW_ANIM_VAR), _pin(has, "Object"))
+    clip = ed.add_branch_node()
+    _connect(out(has), _pin(clip, "Condition"))
+    _connect(exec_in, _pin(clip, "execute"))
+    anim = _node(ed, FN_ANIM_INSTANCE)
+    _connect(_get(ed, WV.OwnerMesh), _pin(anim, "self"))
+    play = _node(ed, FN_PLAY_SLOT)
+    _connect(out(anim), _pin(play, "self"))
+    _connect(_get(ed, THROW_ANIM_VAR), _pin(play, "Asset"))
+    _set(play, "SlotNodeName", AIM_SLOT)
+    _set(play, "BlendInTime", THROW_ANIM_BLEND_S)
+    _set(play, "BlendOutTime", THROW_ANIM_BLEND_S)
+    _set(play, "InPlayRate", 1.0)
+    _set(play, "LoopCount", 1)
+    _set(play, "InTimeToStartMontageAt", THROW_READY_S)
+    _connect(then(clip), _pin(play, "execute"))
+    return then(play), else_(clip)
+
+
 def _author_throw_windup(ed, held, started, exec_ins):
     """(let_go, called_off, waiting): ``started`` is the exec of the click
     that throws, and ``exec_ins`` every other way into the due gate. let_go
@@ -67,18 +93,9 @@ def _author_throw_windup(ed, held, started, exec_ins):
     _connect(out(has), _pin(clip, "Condition"))
     _connect(then(keep), _pin(clip, "execute"))
     step = _stamp(ed, THROW_DUE_VAR, THROW_WINDUP_S, then(clip))
-    anim = _node(ed, FN_ANIM_INSTANCE)
-    _connect(_get(ed, WV.OwnerMesh), _pin(anim, "self"))
-    play = _node(ed, FN_PLAY_SLOT)
-    _connect(out(anim), _pin(play, "self"))
-    _connect(_get(ed, THROW_ANIM_VAR), _pin(play, "Asset"))
-    _set(play, "SlotNodeName", AIM_SLOT)
-    _set(play, "BlendInTime", THROW_ANIM_BLEND_S)
-    _set(play, "BlendOutTime", THROW_ANIM_BLEND_S)
-    _set(play, "InPlayRate", 1.0)
-    _set(play, "LoopCount", 1)
-    # On from the ready pose's moment (throw_ready.py held the arm there).
-    _set(play, "InTimeToStartMontageAt", THROW_READY_S)
+    # The clip itself is Fx_ThrowClip (throw.py), played here at once: the
+    # owner's own, in both modes, before the server knows of the throw.
+    play = _node(ed, fx_event(THROW_CLIP))
     _connect(step, _pin(play, "execute"))
 
     # --- due: the hand lets go ----------------------------------------------

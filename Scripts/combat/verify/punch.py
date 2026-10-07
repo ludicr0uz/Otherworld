@@ -14,6 +14,8 @@ from combat.verify.common import (
     take_hits,
     BEL, PIN, by_pins, check, in_pins, load, num_pin, pin_value,
 )
+from combat.verify import fx as fxv
+from combat import fx_vars as FX
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.punch import (
     NEXT_PUNCH_VAR, PUNCH_ANIM_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR,
@@ -124,13 +126,16 @@ def check_punch_press():
 
 def check_punch_swing():
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if is_punch_play(n)]
-    check("two punch clip plays: the swing in its Server event, and the owning "
-          "client's prediction of it", len(plays) == 2, str(len(plays)))
-    if len(plays) != 2:
+    check("one punch clip play, in its Fx_ event: the Server event's Multicast and "
+          "the owning client's prediction both call it (verify/fx.py)",
+          len(plays) == 1 and fxv.in_fx(FX.PUNCH, plays) == plays, str(len(plays)))
+    if len(plays) != 1:
         return
     check(f"...into {AIM_SLOT}, the upper-body slot, once",
           all(pin_value(p, "SlotNodeName") == AIM_SLOT
               and int(float(pin_value(p, "LoopCount"))) == 1 for p in plays))
+    # The two callers: the server's tell, and the client's prediction.
+    plays = fxv.calls(FX.PUNCH) + fxv.predicts(FX.PUNCH)
 
     def chain(node):
         """The Sets before a play, walked back along the exec chain."""
@@ -145,6 +150,9 @@ def check_punch_swing():
 
     served = [p for p in plays if f"Set {PUNCH_PENDING_VAR}" in chain(p)]
     mine = [p for p in plays if p not in served]
+    check("...the Server event tells it (Multicast) and the Tick predicts it (Fx_): one "
+          "call each", len(plays) == 2 and len(fxv.calls(FX.PUNCH)) == 1
+          and len(fxv.predicts(FX.PUNCH)) == 1, str(len(plays)))
     stamps = {f"Set {v}" for v in (NEXT_PUNCH_VAR, PUNCH_DUE_VAR, PUNCH_PENDING_VAR)}
     check("...the server's after the cooldown, the blow's time and "
           "PunchPending are stamped; the client's after its own cooldown alone",

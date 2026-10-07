@@ -26,8 +26,11 @@ def check_headshot_stamp():
           f"{HEADSHOT_NEVER:g} until a head is struck: game time starts at 0, "
           f"and a 0 would read as a headshot at the start of a level",
           isinstance(value, float) and value == HEADSHOT_NEVER, repr(value))
-    writes = [n for n in wg if _title(n) == f"Set {HEADSHOT_TIME_VAR}"]
-    check("two things write it: a pellet's wound and a thrown blade's",
+    # A RepNotify's Set reads "Set with Notify": match the head and the tail.
+    writes = [n for n in wg if _title(n).startswith("Set")
+              and _title(n).endswith(f" {HEADSHOT_TIME_VAR}")]
+    check("two things write it: a pellet's wound and a thrown blade's (its arrival on "
+          "the owning client is a third, in the OnRep: verify/fx.py)",
           len(writes) == 2, str(len(writes)))
     bones = set()
     for n in writes:

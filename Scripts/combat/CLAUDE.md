@@ -304,6 +304,39 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     first of `glimmer.author_glimmer`, so every child's Tick has it.
   - `verify/strike.py` and `verify/pickup.py` are the wiring;
     `probes/probe_net_throw.py` and `probe_net_melee.py` the two-client proof.
+- **Everyone sees and hears the fight** (M21; `fx_vars.py`, `weapon_component/fx.py`;
+  `Scripts/net/CLAUDE.md`, "Everyone sees and hears the fight"). Every cosmetic of a
+  player's fight is a **pair of events** on the component: `Fx_<Name>` holds the one copy
+  of its nodes (the sound, the clip, the spawn), and `Multicast_<Name>`, an unreliable
+  Multicast the server calls where the state changed, asks its gate, counts `FxPlayed` and
+  calls `Fx_<Name>`. The owning client predicts the five it can (`Fx_Shot`, `Fx_Reload`,
+  `Fx_Punch`, `Fx_Slash`, `Fx_Throw`: called off the authority Branch's false arm, where
+  the asks are); the point bursts (`PelletHit`, `PunchHit`, `BladeHit`, `Chop`, `Stab`,
+  `Lodge`) nobody predicts, so every screen plays them at the server's word, the striker's
+  included; `ThrowClip` is the wind-up's own on the thrower and told to the others.
+  - **Three gates, one per kind:** `UNPREDICTED` (HasAuthority OR NOT `LocalInput`: the
+    owner already played it), `OTHERS` (NOT `LocalInput`), `SCREEN` (NOT IsDedicatedServer).
+    Single player has authority, so each Multicast is a plain call that plays once.
+  - **Where a cosmetic's nodes live:** inside the pair, authored by the module that owns
+    the action (`fx.pair(ed, name, params, body, gate)`), **before** the event or the Tick
+    fragment that `fx.tell`s or `fx.predict`s it (a call finds only an event that exists:
+    `build.py` authors every pair first). A new sound or effect of a shot, a blow or a throw
+    goes in a pair; never a `PlaySoundAtLocation` or a spawn at the site that decides it,
+    which is the server's and has no speaker.
+  - **`HeadshotTime` is a RepNotify to the owner** (`headshot.replicate_headshot`): the
+    wound is the server's, and the OnRep's Remote arm rewrites the stamp with this
+    machine's clock, which the HUD's X compares against.
+  - **A montage just started reads as a quiet slot.** `IsSlotActive` is false until the
+    montage has blended in, so the ready pose's keep-alive would replace the throw's clip
+    on its first frame on another player's copy (the owner's starts from the ready pose,
+    which keeps the slot active). Both the keep-alive and the equip's stop ask
+    `IsPlayingSlotAnimation(ThrowAnim)`, which sees the montage instance at once; the
+    clip plays on through the hand letting go, in both modes.
+  - **Hit reactions, the grunt, the heartbeat and the collapse are not pairs:** they follow
+    `Health`'s RepNotify on every copy (M14, "Health and damage"), and footsteps are each
+    copy's own footstep component, driven by the replicated movement.
+  - `verify/fx.py` is the wiring (and `nodes_of` / `in_fx` / `calls` / `predicts` for the
+    sections whose nodes moved into a pair); `probes/probe_net_fx.py` the two-client proof.
 - **The knife is a melee item, not a gun** (`knife.py`): a `BP_WeaponItem` child flagged `Melee`,
   drawn by the pack's `SK_M9_Knife_X` (blade up, tipped 30° forward, the pistol's grip), and
   not a row of `_weapon_specs()`, whose every column and check is about a gun. Its slash clip

@@ -38,17 +38,18 @@ from combat.chop_tuning import (
 )
 from uebp.graph import (
     _connect, _loose_pin, _node, _palette, _pin, _set, _vec, else_, out, then)
+from combat.fx_vars import CHOP, LOCATION_PARAM, NORMAL_PARAM
+from combat.weapon_component import fx
 from combat.weapon_component.common import _prop, _trace_defaults
-from combat.weapon_component.surface_impact import _author_surface_impact
+from uebp.g import _G
 from uebp.nodes.math import (
     FN_ADD_II, FN_ADD_VV, FN_AND, FN_BREAK_VECTOR, FN_EQ_II, FN_EQ_OO, FN_GE_II, FN_MAKE_ROT,
     FN_MAKE_TRANSFORM, FN_MAKE_VECTOR, FN_MUL_FF, FN_MUL_VF, FN_NORMAL, FN_RANDOM_BOOL,
-    FN_RANDOM_FLOAT, FN_ROTATE_AXIS, FN_ROT_FROM_X, FN_SELECT_FF, FN_SELECT_II,
+    FN_RANDOM_FLOAT, FN_ROTATE_AXIS, FN_SELECT_FF, FN_SELECT_II,
     FN_SELECT_VECTOR, FN_SUB_VV)
 from uebp.nodes.palette import NODE_BREAK_HIT, NODE_CAST_INSTANCED, NODE_SPAWN
 from uebp.nodes.system import FN_IS_VALID, FN_TRACE
 from combat.weapon_component import vars as WV
-from Sound.play import _author_sound
 
 
 def _get(ed, name):
@@ -64,6 +65,12 @@ def _store(ed, var, exec_in, pin=None, literal=None):
         _set(s, var, literal)
     _connect(exec_in, _pin(s, "execute"))
     return then(s)
+
+
+def author_chop_fx(ed):
+    """The chop's cosmetic pair (fx.py): chips and the axe in the wood, told
+    to every screen. Before the Tick, whose blow tells it."""
+    fx.pair_chop(ed, CHOP)
 
 
 def _author_chop(ed, brk, exec_in):
@@ -88,15 +95,11 @@ def _author_chop(ed, brk, exec_in):
     _connect(struck, _pin(tree, "Object"))
     _connect(then(bites), _pin(tree, "execute"))
 
-    # --- chips off the cut, as a bullet throws them ----------------------------
-    face = _node(ed, FN_ROT_FROM_X)
-    _connect(_loose_pin(brk, "ImpactNormal", is_input=False), _pin(face, "X"))
-    where = _node(ed, FN_MAKE_TRANSFORM)
-    _connect(cut, _pin(where, "Location"))
-    _connect(out(face), _pin(where, "Rotation"))
-    _cls, chipped = _author_surface_impact(ed, where, then(tree))
-    # ...and the sound of the axe in the wood, from the cut.
-    heard = _author_sound(ed, WV.ChopSounds, cut, then(chipped))
+    # --- chips off the cut, as a bullet throws them, and the sound of the axe
+    # in the wood, from the cut: told to every screen (Multicast_Chop, fx.py).
+    heard = fx.tell(_G(ed), CHOP, [then(tree)],
+                    **{LOCATION_PARAM: cut,
+                       NORMAL_PARAM: _loose_pin(brk, "ImpactNormal", is_input=False)})
 
     # --- the count, on this tree ----------------------------------------------
     same_comp = _node(ed, FN_EQ_OO)
@@ -207,7 +210,7 @@ def _author_chop(ed, brk, exec_in):
         f"leaves a piece of wood {WOOD_OUT_CM:.0f} cm from the cut, to one side "
         "of the player, set down on the ground. The wood is Dropped by default: "
         "E picks it up.",
-        [armed, chops_n, bites, tree, chipped, felled, floor, wood])
+        [armed, chops_n, bites, tree, felled, floor, wood])
     return (then(wood), else_(armed),
             else_(bites), _loose_pin(tree, "CastFailed", is_input=False),
             else_(felled))

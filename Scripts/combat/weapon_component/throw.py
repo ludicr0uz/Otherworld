@@ -71,6 +71,7 @@ from combat.throw_tuning import (
     THROW_SPEED_VAR,
 )
 from combat.paths import ITEM_CLASS_PATH
+from combat.weapon_component.record import authority
 from combat.weapon_component.shot import _author_alive
 from combat.weapon_component.slot_nodes import not_, op, valid
 from uebp import net
@@ -82,14 +83,16 @@ from combat.weapon_component.throw_flight import (
     THROW_VELOCITY_VAR, _author_square,
 )
 from combat import item_vars as IV
-from combat.weapon_component.common import _prop
+from combat.fx_vars import SHARP_PARAM, THROW, THROW_CLIP, THROW_FX_PARAMS
+from combat.fx_vars import START_PARAM as FX_START_PARAM
+from combat.weapon_component import fx
 from Sound.play import _author_sound
 from combat.weapon_component.throw_launch import _author_launch
 from combat.weapon_component.throw_ready import (
     _author_ready_down, _author_throw_ready,
 )
 from combat.weapon_component.throw_windup import (
-    _author_throw_windup, _author_wound_down, _winding,
+    _author_throw_clip, _author_throw_windup, _author_wound_down, _winding,
 )
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_DETACH, FN_GET_OWNER, FN_GET_TRANSFORM, FN_IS_KEY_DOWN,
@@ -301,26 +304,45 @@ def _author_throw_ask(ed, held, start, velocity, exec_in):
     (it is a pure chain off the view), the air the item goes through is heard,
     and the throw is asked of the server. Returns the exit exec pin. Reads
     Held: run it only where the hand is known to hold something."""
-    g = _G(ed)
+    g = _G(ed, ITEM_CLASS_PATH)
     flow = g.put(THROW_START_VAR, start, [exec_in])
     flow = g.put(THROW_VELOCITY_VAR, velocity, [flow])
-    # Heard from where it left the hand, by whoever threw it, at once: a
-    # blade cuts the air, anything else pushes it aside.
-    melee, _melee_n = _prop(ed, IV.Melee, held)
-    sharp_in, blunt_in = g.branch(melee, [flow])
-    sharp = _author_sound(ed, WV.ThrowSharpSounds, g.get(THROW_START_VAR), sharp_in)
-    blunt = _author_sound(ed, WV.ThrowSounds, g.get(THROW_START_VAR), blunt_in)
+    # Heard from where it left the hand, by whoever threw it, at once (a
+    # blade cuts the air, anything else pushes it aside): a client of a
+    # server's prediction; with authority the event tells everyone.
+    owns, predicts = g.branch(authority(g), [flow])
+    heard = fx.predict(g, THROW, [predicts], **{FX_START_PARAM: g.get(THROW_START_VAR),
+                                              SHARP_PARAM: g.iget(held, IV.Melee)})
     ask = g.keep(_node(ed, SERVER_THROW))
     _connect(g.get(THROW_START_VAR), _pin(ask, START_PARAM))
     _connect(g.get(THROW_VELOCITY_VAR), _pin(ask, VELOCITY_PARAM))
-    for pin in (sharp, blunt):
+    for pin in (owns, heard):
         _connect(pin, _pin(ask, "execute"))
     ed.add_comment_to_nodes(
         f"The throw is asked of the server ({SERVER_THROW}, throw.py), with where "
-        "it leaves from and how fast, read on this frame. Its sound is this "
-        "machine's, now. With authority (single player) the event is the throw.",
+        "it leaves from and how fast, read on this frame. A client of a server "
+        "plays its sound at once, its prediction. With authority (single player) "
+        "the event is the throw.",
         g.made)
     return then(ask)
+
+
+def _author_throw_sound(g, exec_in, event):
+    """The body of Fx_Throw: the air the item goes through, from where it
+    left the hand (Start): a blade (Sharp) cuts it, anything else pushes it
+    aside."""
+    sharp_in, blunt_in = g.branch(out(event, SHARP_PARAM), [exec_in])
+    _author_sound(g.ed, WV.ThrowSharpSounds, out(event, FX_START_PARAM), sharp_in)
+    _author_sound(g.ed, WV.ThrowSounds, out(event, FX_START_PARAM), blunt_in)
+
+
+def author_throw_fx(ed):
+    """The throw's cosmetic pairs (fx.py): its sound, which the thrower
+    predicts, and its clip, which the thrower's wind-up plays in both modes
+    (throw_windup.py), so only the others owe it. Before the Tick and the
+    throw's event."""
+    fx.pair(ed, THROW, THROW_FX_PARAMS, _author_throw_sound, fx.UNPREDICTED)
+    fx.pair(ed, THROW_CLIP, (), lambda g, e, _ev: _author_throw_clip(ed, e), fx.OTHERS)
 
 
 def author_throw_event(ed):
@@ -347,9 +369,13 @@ def author_throw_event(ed):
         "hand lets go. Refused unless there is an item in a living hand, nothing "
         f"of this player's in the air and the start within {THROW_START_REACH_CM:g} "
         "cm of this machine's copy of them; the speed is capped at the item's "
-        "own. Then the release: the item leaves the hand and the inventory, "
-        "replicates to everyone, and the Tick flies it.", g.made)
-    _author_throw_release(ed, held, start, out(capped), go)
+        "own. Everyone is told of the throw (its sound at Start, and the clip "
+        "on the other players' copies). Then the release: the item leaves the "
+        "hand and the inventory, replicates to everyone, and the Tick flies it.",
+        g.made)
+    told = fx.tell(g, THROW, [go], **{FX_START_PARAM: start, SHARP_PARAM: g.iget(held, IV.Melee)})
+    told = fx.tell(g, THROW_CLIP, [told])
+    _author_throw_release(ed, held, start, out(capped), told)
 
 
 def _author_throw_release(ed, held, start, velocity, exec_in):

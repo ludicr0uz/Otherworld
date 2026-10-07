@@ -11,11 +11,17 @@ arm's asks, which are also the owning client's prediction.
     Server_Reload           counted served, then ReloadNow
     ReloadNow               Held valid and the owner alive: ammo.py's reload
 
-    _author_shot_ask        the trigger's gate passed, where the keys are: the
-                            shot's sound; without authority a round off
-                            Loaded, the cooldown and AsksSent; Server_Fire
+    _author_shot_ask        the trigger's gate passed, where the keys are:
+                            without authority the shot's sound (Fx_Shot), a
+                            round off Loaded, the cooldown and AsksSent;
+                            Server_Fire
     _author_reload_ask      R: without authority ReloadNow and AsksSent;
                             Server_Reload
+
+What everyone else sees and hears of it is fx.py's (task M21,
+combat/fx_vars.py): Server_Fire tells Multicast_Shot before it traces, and
+ReloadNow announces Multicast_Reload after a reload that moved rounds; each
+plays Held's sound on every copy that did not predict it.
 
 In single player the one machine has authority, so the asks predict nothing
 and the Server events are plain calls: one shot, one reload, as before.
@@ -37,13 +43,15 @@ from combat.shot_vars import (
     AIM_PARAM, FIRE_GRACE_S, FIRE_PARAMS, RELOAD_NOW, SERVER_FIRE, SERVER_RELOAD,
     AsksSent, AsksServed)
 from combat.weapon_component import vars as WV
+from combat.fx_vars import RELOAD, SHOT
+from combat.weapon_component import fx
 from combat.weapon_component.ammo import _author_reload
 from combat.weapon_component.carry import _author_shot_origin
 from combat.weapon_component.firing import _author_fire
 from combat.weapon_component.record import authority, rep_dirty
 from combat.weapon_component.shot_noise import _author_shot_noise
 from combat.weapon_component.slot_nodes import not_, op, valid
-from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNER
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_GET_OWNER
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_GE_FF, FN_GREATER_II, FN_LE_FF, FN_OR, FN_SUB_II)
 from uebp.nodes.palette import NODE_CAST_HEALTH
@@ -102,9 +110,11 @@ def _author_server_fire(ed):
         "refused unless there is a gun in a living hand with a round in it and its "
         f"cooldown over (within {FIRE_GRACE_S:g} s: packets do not arrive evenly). The "
         "shot is traced from this machine's muzzle to the client's AimPoint.", g.made)
+    # Heard by everyone who did not predict it, before the pellets fly.
+    told = fx.tell(g, SHOT, [fire])
     # The server's own muzzle: where the gun is here, not where a client says.
     muzzle = _author_shot_origin(ed, held)
-    fired, flew = _author_fire(ed, held, muzzle, out(event, AIM_PARAM), fire)
+    fired, flew = _author_fire(ed, held, muzzle, out(event, AIM_PARAM), told)
     _author_shot_noise(ed, held, muzzle, flew, fired)
 
 
@@ -117,8 +127,22 @@ def _author_reload_now(ed):
     ed.add_comment_to_nodes(
         f"{RELOAD_NOW} (shot.py): the reload, with a valid Held and a living owner. "
         f"The server's from {SERVER_RELOAD}; the owning client calls it too, as its "
-        "prediction.", g.made)
-    _author_reload(ed, held, alive)
+        "prediction. A reload that moved rounds is heard: told to everyone with "
+        "authority, played here without.", g.made)
+    moved, _nothing = _author_reload(ed, held, alive)
+    fx.announce(g, RELOAD, [moved])
+
+
+def _author_heard_on_gun(ed, sound_var):
+    """The body of Fx_Shot and Fx_Reload: Held's ``sound_var`` played where
+    the gun is, behind IsValid(Held). A few centimetres from the muzzle, and
+    no second copy of the muzzle sub-graph."""
+    def body(g, exec_in, _event):
+        held = g.get(WV.Held)
+        armed, _empty = g.branch(valid(g, held), [exec_in])
+        g.call(FN_PLAY_SOUND, [armed], Sound=g.iget(held, sound_var),
+               Location=out(g.call(FN_ACTOR_LOC, self=held)))
+    return body
 
 
 def _author_server_reload(ed):
@@ -133,7 +157,11 @@ def _author_server_reload(ed):
 
 
 def author_shot_events(ed):
-    """The three events. Before the Tick, which calls them by name."""
+    """The three events, and the shot's and the reload's cosmetics. Before
+    the Tick, which calls them by name."""
+    for name, sound in ((SHOT, IV.FireSound), (RELOAD, IV.ReloadSound)):
+        fx.pair(ed, name, (), _author_heard_on_gun(ed, sound), fx.UNPREDICTED,
+                item_class=ITEM_CLASS_PATH)
     _author_server_fire(ed)
     _author_reload_now(ed)
     _author_server_reload(ed)
@@ -143,11 +171,11 @@ def _author_shot_ask(ed, held, muzzle, exec_in):
     """The trigger's gate passed, on the machine with the keys. Returns the
     exec pin after the ask."""
     g = _G(ed, ITEM_CLASS_PATH)
-    # Heard by whoever fired, at once: the server has no speaker to wait for.
-    play = g.call(FN_PLAY_SOUND, [exec_in], Sound=g.iget(held, IV.FireSound),
-                  Location=muzzle)
-    owns, predicts = g.branch(authority(g), [then(play)])
-    flow = g.iput(held, IV.Loaded, op(g, FN_SUB_II, g.iget(held, IV.Loaded), 1), [predicts])
+    owns, predicts = g.branch(authority(g), [exec_in])
+    # Heard by whoever fired, at once: its prediction (with authority the
+    # event tells everyone, this machine included).
+    heard = fx.predict(g, SHOT, [predicts])
+    flow = g.iput(held, IV.Loaded, op(g, FN_SUB_II, g.iget(held, IV.Loaded), 1), [heard])
     again = op(g, FN_ADD_FF, out(g.call(FN_TIME_SECONDS)), g.iget(held, IV.FireInterval))
     flow = g.iput(held, IV.NextFireTime, again, [flow])
     flow = _count(g, AsksSent, [flow])
@@ -157,10 +185,10 @@ def _author_shot_ask(ed, held, muzzle, exec_in):
         _connect(e, _pin(ask, "execute"))
     ed.add_comment_to_nodes(
         f"The shot is asked of the server ({SERVER_FIRE}, shot.py), with where the "
-        "reticle rests. Its sound is this machine's, now. A client of a server also "
-        "spends the round and stamps the cooldown on its own copy, its prediction, "
-        "and counts the ask: the view takes the server's rounds again once every "
-        "ask is answered. With authority (single player) the event is the shot.",
+        "reticle rests. A client of a server plays its sound at once, spends the "
+        "round and stamps the cooldown on its own copy, its prediction, and counts "
+        "the ask: the view takes the server's rounds again once every ask is "
+        "answered. With authority (single player) the event is the shot.",
         g.made)
     return then(ask)
 

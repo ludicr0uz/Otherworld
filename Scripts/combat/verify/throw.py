@@ -25,7 +25,7 @@ from combat.throw_tuning import (
 )
 from combat.tuning import BIND_VARS, THROW_KEY
 from combat.verify.common import (
-    BEL, PIN, by_pins, check, component_template, load, num_pin, pin_value,
+    BEL, PIN, by_pins, check, component_template, has_in_pin, load, num_pin, pin_value,
 )
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.consume import TRIGGER_SPENT
@@ -86,9 +86,12 @@ def is_throw_trace(node):
 
 
 def is_throw_play(node):
-    """The play of the throw's clip: its Asset is ThrowAnim."""
-    return any(_title(n) == f"Get {THROW_ANIM_VAR}"
-               for n in _feeds([BEL.find_input_pin(node, "Asset")]))
+    """The play of the throw's clip: a play (it has a rate), whose Asset is
+    ThrowAnim. The equip's and the keep-alive's IsPlayingSlotAnimation read
+    ThrowAnim through an Asset pin too, and are not plays."""
+    return has_in_pin(node, "InPlayRate") and any(
+        _title(n) == f"Get {THROW_ANIM_VAR}"
+        for n in _feeds([BEL.find_input_pin(node, "Asset")]))
 
 
 def launch_nodes():

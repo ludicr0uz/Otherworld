@@ -25,8 +25,12 @@
 - **The sound logic that is an area's own lives in its module:** the player's voice, the
   beds and their fade, and the listener in `sound_world.py`; the campfire's component in
   `sound_items.py`; the roar's curve in `sound_monsters.py`. The shared picker is `play.py`.
-  When a sound plays is still its feature's graph (a shot in `weapon_component/shot.py`, on the machine of the player who fired,
-  a growl's timer in `npc/stats.py`), which calls the picker with the variable.
+  When a sound plays is still its feature's graph (a shot in `weapon_component/shot.py`,
+  a growl's timer in `npc/stats.py`), which calls the picker with the variable. A player's
+  sounds of the fight are played inside an `Fx_<Name>` event on the weapon component, which
+  its `Multicast_<Name>` carries to every machine (`combat/fx_vars.py`, `Scripts/net/CLAUDE.md`
+  "Everyone sees and hears the fight"): a new sound of a shot, a blow or a throw goes in the
+  pair, not at the site that decides it.
 - **`Sound` is also the folder of the sourcing tools**, which run outside the editor and put
   `Scripts/Sound` itself on the path (`from sound_candidates import ...`). The package's
   `__init__.py` holds only a docstring, so they are unaffected.

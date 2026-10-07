@@ -12,26 +12,43 @@ from combat.damage import hit, owner_instigator
 from combat.game_state import (
     DAMAGE_TEXT_COLOR, DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS,
 )
-from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, _vec, out, then
+from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, out, then
 from combat.hit_zones import (
     HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR,
     LIMB_BONES_VAR, LIMB_MULT_VAR,
 )
 from combat.paths import HEALTH_CLASS_PATH
 from combat.tuning import COMBAT
+from combat.fx_vars import (
+    BLOOD_PARAM, LOCATION_PARAM, NORMAL_PARAM, PELLET_HIT, PELLET_HIT_PARAMS, SCALE_PARAM)
+from combat.weapon_component import fx
 from combat.weapon_component.common import _prop
 from combat.weapon_component.headshot import _author_headshot
 from combat.weapon_component.surface_impact import _author_surface_impact
+from uebp.g import _G
 from uebp.nodes.actor import FN_GET_COMP, FN_TRACE_COMPONENT
 from uebp.nodes.array import FN_ARR_CONTAINS
-from uebp.nodes.math import (
-    FN_CLAMP, FN_DIV_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF, FN_ROT_FROM_X,
-    FN_SELECT_FF)
-from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_SPAWN
+from uebp.nodes.math import FN_CLAMP, FN_DIV_FF, FN_MUL_FF, FN_SELECT_FF
+from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_CONCAT, FN_DRAW_STRING, FN_FLOAT_TO_STR
 from uebp import props as EP
 from combat import item_vars as IV
-from combat.weapon_component import vars as WV
+
+
+def _author_pellet_hit(g, exec_in, event):
+    """The body of Fx_PelletHit: at the event's point and normal, sized by
+    its Scale, the blood (Blood) or the surface's chips. The one transform
+    serves both bursts."""
+    where = fx.point_transform(g, event, out(event, SCALE_PARAM))
+    bleeds, chips = g.branch(out(event, BLOOD_PARAM), [exec_in])
+    fx.spawn_blood(g, where, [bleeds])
+    for n in _author_surface_impact(g.ed, where, chips):
+        g.keep(n)
+
+
+def author_pellet_fx(ed):
+    """The pellet's cosmetic pair (fx.py). Before Server_Fire, which tells it."""
+    fx.pair(ed, PELLET_HIT, PELLET_HIT_PARAMS, _author_pellet_hit, fx.SCREEN)
 
 
 def _author_impact(ed, brk, held, exec_in):
@@ -39,11 +56,15 @@ def _author_impact(ed, brk, held, exec_in):
 
     Both are behind the health cast, so trees and terrain produce no blood
     -- only things carrying BP_HealthComponent bleed. What the cast refuses
-    gets the bullet impact instead (_author_surface_impact). Both are also
+    gets the bullet impact instead. Both are also
     behind the hit zone (_author_hit_zone): a pellet stopped by a character's
     capsule that strikes none of its bodies passed the model by, and does
     nothing. The damage is the weapon's, scaled by where on the body it
     landed, using the target's own hit-box tables.
+
+    The blood and the chips are told to every machine with a screen
+    (Multicast_PelletHit, fx.py): this graph runs on the server, which has
+    none, and the shooter predicted no hit.
     """
     # Where the burst goes: the trace's hit, until the hit zone moves it onto
     # the body. Written before the cast so the scenery's chips read it too.
@@ -61,9 +82,6 @@ def _author_impact(ed, brk, held, exec_in):
     _connect(exec_in, _pin(cast, "execute"))
     as_health = _loose_pin(cast, "AsBPHealthComponent", is_input=False)
 
-    blood_cls = ed.add_get_member_variable_node(WV.BloodClass)
-    where = _node(ed, FN_MAKE_TRANSFORM)
-    _connect(out(landed, HIT_POINT_VAR), _pin(where, "Location"))
     # How big the spray is, as a clamped ratio of the round's damage to a
     # reference one. Spawn *scale* rather than a parameter on the splash,
     # because the droplet solver works in the actor's own space: scaling the
@@ -78,27 +96,21 @@ def _author_impact(ed, brk, held, exec_in):
     _connect(out(ratio), _pin(spray, "Value"))
     _set(spray, "Min", BLOOD_SCALE_MIN)
     _set(spray, "Max", BLOOD_SCALE_MAX)
-    spray_v = _node(ed, FN_MUL_VF)
-    _connect(_vec(ed, 1.0, 1.0, 1.0), _pin(spray_v, "A"))
-    _connect(out(spray), _pin(spray_v, "B"))
-    _connect(out(spray_v), _pin(where, "Scale"))
-    # Point the splash's +X down the surface normal: BP_BloodSplash throws its
-    # cone along its own forward, so this is what makes the spray come *out of*
-    # the wound instead of along an arbitrary world axis.
-    facing = _node(ed, FN_ROT_FROM_X)
-    _connect(_loose_pin(brk, "ImpactNormal", is_input=False), _pin(facing, "X"))
-    _connect(out(facing), _pin(where, "Rotation"))
-    splash = _palette(ed, NODE_SPAWN)
-    _connect(out(blood_cls, WV.BloodClass), _pin(splash, "Class"))
-    _connect(out(where), _pin(splash, "SpawnTransform"))
-    _set(splash, "CollisionHandlingOverride", "AlwaysSpawn")
-    chipped = _author_surface_impact(ed, where, out(cast, "CastFailed"))
+    # The splash's +X goes down the surface normal (BP_BloodSplash throws its
+    # cone along its own forward, so the spray comes *out of* the wound), and
+    # so do the chips: Fx_PelletHit makes the one transform from these.
+    normal = _loose_pin(brk, "ImpactNormal", is_input=False)
+    g = _G(ed)
+    fx.tell(g, PELLET_HIT, [out(cast, "CastFailed")],
+                      **{LOCATION_PARAM: out(landed, HIT_POINT_VAR), NORMAL_PARAM: normal,
+                         SCALE_PARAM: out(spray), BLOOD_PARAM: False})
 
     # The zone runs BEFORE the blood it is drawn to the right of: only a
     # pellet that struck a body (or a thing with health and no body) bleeds.
     zoned, zone_nodes = _author_hit_zone(ed, brk, then(cast))
-    for tail in zoned:
-        _connect(tail, _pin(splash, "execute"))
+    bled = fx.tell(g, PELLET_HIT, zoned,
+                   **{LOCATION_PARAM: out(landed, HIT_POINT_VAR), NORMAL_PARAM: normal,
+                      SCALE_PARAM: out(spray), BLOOD_PARAM: True})
 
     dmg_pin, dmg_n = _prop(ed, IV.Damage, held)
     worth, in_head, worth_nodes = _zone_multiplier(ed, as_health)
@@ -118,8 +130,7 @@ def _author_impact(ed, brk, held, exec_in):
     # angle. See _author_hit_reaction for what reads it. Who struck it is this
     # character's controller, and with what the gun in hand.
     who, who_n = owner_instigator(ed)
-    took, take = hit(ed, as_health, out(scaled), _loose_pin(brk, "ImpactNormal", is_input=False),
-                     who, held, [then(splash)])
+    took, take = hit(ed, as_health, out(scaled), normal, who, held, [bled])
 
     # A pellet in the head says so to the HUD: the X round the reticle.
     headed, head_nodes = _author_headshot(ed, in_head, [took])
@@ -127,17 +138,14 @@ def _author_impact(ed, brk, held, exec_in):
     shown = _author_damage_readout(ed, brk, out(scaled), worth, headed)
 
     ed.add_comment_to_nodes(
-        "A pellet on a body: blood out of the wound, and the target's TakeHit with the "
+        "A pellet on a body: blood out of the wound (told to every screen: "
+        "Multicast_PelletHit, Blood), and the target's TakeHit with the "
         "round's damage times its zone, the impact normal, this character's controller "
         "and the gun. The target floors its Health at zero and stamps the blow, on the "
-        "server.",
-        [mark, landed, comp, cast, blood_cls, where, facing, splash, spray_dmg, ratio, spray,
-         spray_v, *who_n, take])
-    ed.add_comment_to_nodes(
-        "No health component: the pellet hit the scenery, which chips and "
-        "dusts where a body would bleed. The blood's own transform -- impact "
-        "point, surface normal, scale off the round's damage.",
-        chipped)
+        "server. No health component: the pellet hit the scenery, which chips and "
+        "dusts where a body would bleed (the same event, Blood false), at the impact "
+        "point, along the surface normal, sized by the round's damage.",
+        [mark, landed, comp, cast, spray_dmg, ratio, spray, *who_n, take] + g.made)
     ed.add_comment_to_nodes(
         f"Hit boxes: the pellet's own line is traced again against the target's "
         f"physics-asset bodies alone, and the bone it strikes picks the "

@@ -70,13 +70,20 @@ _author_* fragment per concern, each in its own module:
               ReticleSpread from Held's GUN_ACCURACY factors, stance and aim
   shot        the shot and the reload as server requests (combat/shot_vars.py):
               Server_Fire and Server_Reload with their refusals, ReloadNow, and
-              the local arm's asks, which are the owning client's prediction
+              the local arm's asks, which are the owning client's prediction;
+              Fx_Shot and Fx_Reload, Held's sound at the gun
+  fx          the fight as everyone sees and hears it (combat/fx_vars.py): the
+              Fx_<Name>/Multicast_<Name> pair every cosmetic is, its three
+              gates, tell / predict / announce, the point bursts' transform
+              and the chop's body (chips and the axe in the wood)
   firing      the shot on the machine that owns it (Server_Fire's body): the
               round and cooldown, the one draw inside AimSpread
               (ShotDirection), the pellet traces around it
   tracer      debug mode: the line each pellet flew, off the trace's own hit
               result (red to an impact, blue out to the range), and a point
-  impact      a pellet that connected: blood, damage, hit zones, debug readout
+  impact      a pellet that connected: damage, hit zones, debug readout, and
+              Fx_PelletHit (blood on a body, chips on the scenery), told to
+              every screen
   headshot    the headshot stamp: HeadshotTime, when a round or a thrown
               blade last struck a head (the HUD's X round the reticle)
   surface_impact  a pellet that hit something with no health: BP_BulletImpact,

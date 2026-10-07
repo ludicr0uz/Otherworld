@@ -25,6 +25,8 @@ from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, component_template, graph, in_pins, load, num_pin,
     out_pins, pin_value,
 )
+from combat.verify import fx as fxv
+from combat import fx_vars as FX
 from combat.verify.fixtures import w, wc, wg
 from combat.verify.punch import (
     _feeders, _feeds, _title, is_punch_gate, is_punch_play, is_punch_sweep,
@@ -154,15 +156,18 @@ def check_knife_press():
     # a blunt thing's once the launch is stored (throw.py); and the slash's
     # Server event, which swings only a Melee item (punch.py). The gate is
     # the one that is neither.
-    thrown = [n for n in melee
-              if any(_title(f).startswith("Set Throw") for f in _feeders(n, "execute"))]
+    # The throw's sound picks a blade's or a blunt thing's on Fx_Throw's Sharp,
+    # which the ask (the prediction) and the Server event (the tell) read off
+    # Held.Melee (throw.py, verify/fx.py).
+    thrown = [n for n in fxv.calls(FX.THROW) + fxv.predicts(FX.THROW)
+              if any(MELEE_VAR in out_pins(f) for f in _feeders(n, FX.SHARP_PARAM))]
     slash = graph(wc).find_event_node(SERVER_SLASH)
-    served = [n for n in melee if n not in thrown and slash is not None
+    served = [n for n in melee if slash is not None
               and slash in [e for f in _feeders(n, "execute") for e in _feeders(f, "execute")]]
-    melee = [n for n in melee if n not in thrown and n not in served]
-    check("one Branch asks Held.Melee at the fire gate, one where a throw "
-          "picks its sound, and one in the slash's Server event",
-          len(melee) == 1 and len(thrown) == 1 and len(served) == 1,
+    melee = [n for n in melee if n not in served]
+    check("one Branch asks Held.Melee at the fire gate and one in the slash's Server "
+          "event; the throw's tell and its prediction read it for the sound's Sharp",
+          len(melee) == 1 and len(thrown) == 2 and len(served) == 1,
           f"{len(melee)} + {len(thrown)} + {len(served)}")
     if len(melee) != 1:
         return
@@ -195,13 +200,16 @@ def check_knife_press():
 
 def check_knife_swing():
     plays = [n for n in by_pins(wg, "Asset", "SlotNodeName") if is_knife_play(n)]
-    check("two knife clip plays: the swing in its Server event, and the owning "
-          "client's prediction of it", len(plays) == 2, str(len(plays)))
-    if len(plays) != 2:
+    check("one knife clip play, in its Fx_ event: the Server event's Multicast and "
+          "the owning client's prediction both call it (verify/fx.py)",
+          len(plays) == 1 and fxv.in_fx(FX.SLASH, plays) == plays, str(len(plays)))
+    if len(plays) != 1:
         return
     check(f"...into {AIM_SLOT}, the upper-body slot, once",
           all(pin_value(p, "SlotNodeName") == AIM_SLOT
               and int(float(pin_value(p, "LoopCount"))) == 1 for p in plays))
+    # The two callers: the server's tell, and the client's prediction.
+    plays = fxv.calls(FX.SLASH) + fxv.predicts(FX.SLASH)
 
     def chain(node):
         """The Sets before a play, walked back along the exec chain."""
@@ -216,6 +224,9 @@ def check_knife_swing():
 
     served = [p for p in plays if f"Set {KNIFE_PENDING_VAR}" in chain(p)]
     mine = [p for p in plays if p not in served]
+    check("...the Server event tells it (Multicast) and the Tick predicts it (Fx_): one "
+          "call each", len(plays) == 2 and len(fxv.calls(FX.SLASH)) == 1
+          and len(fxv.predicts(FX.SLASH)) == 1, str(len(plays)))
     stamps = {f"Set {v}" for v in (NEXT_KNIFE_VAR, KNIFE_DUE_VAR, KNIFE_PENDING_VAR)}
     check("...the server's after the cooldown, the blow's time and "
           "KnifePending are stamped; the client's after its own cooldown alone",

@@ -26,6 +26,7 @@ the clip is knife_anim.py's.
 """
 
 from uebp.graph import _connect, _node, _pin, else_, out, then
+from combat.fx_vars import BLADE_HIT, SLASH
 from combat.strike_vars import SERVER_SLASH
 from combat.tuning import COMBAT
 from combat.weapon_component.chop import _author_chop
@@ -50,7 +51,7 @@ KNIFE = Strike("knife", KNIFE_ANIM_VAR, KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR,
                NEXT_KNIFE_VAR, KNIFE_DUE_VAR, COMBAT.knife_interval_s,
                COMBAT.knife_impact_s, COMBAT.knife_damage, COMBAT.knife_reach_cm,
                COMBAT.knife_radius_cm, COMBAT.knife_chest_cm, WV.BladeHitSounds,
-               SERVER_SLASH, True)
+               SERVER_SLASH, True, SLASH, BLADE_HIT)
 
 
 def _author_knife_press(ed, held, tap, not_melee):

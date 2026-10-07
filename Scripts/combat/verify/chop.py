@@ -29,6 +29,8 @@ from combat.verify.grip_fit import FIST_MISS_CM, JOINT_REACH_CM, grip_fit
 from combat.verify.knife import is_knife_sweep
 from combat.verify.punch import _feeders, _title, is_punch_sweep
 from combat.verify.throw_strike import is_strike_node
+from combat.verify import fx as fxv
+from combat import fx_vars as FX
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 from combat.weapon_specs import _weapon_specs
 from combat.wood import (
@@ -97,7 +99,8 @@ def _branches_on(title):
 def _chop_nodes():
     casts = _casts()
     roots = list(casts)
-    roots += [n for n in _spawns(IMPACT_CLASS_VAR) if set(_ran_by(n)) & set(casts)]
+    # The chips and the sound are Fx_Chop's, told by Multicast_Chop (verify/fx.py).
+    roots += list(fxv.nodes_of(FX.CHOP))
     for var in (CHOP_COUNT_VAR, CHOP_TREE_VAR, CHOP_ITEM_VAR, WOOD_SPOT_VAR):
         roots += _sets(var)
     roots += _spawns(WOOD_CLASS_VAR) + _floor_traces()
@@ -229,12 +232,14 @@ def check_chop_gate():
           "not chopped",
           len(armed) == 1 and any("health" in _squash(c) for c in _ran_by(armed[0])),
           str([_title(c) for g in armed for c in _ran_by(g)]))
-    chips = [n for n in _spawns(IMPACT_CLASS_VAR) if cast in _ran_by(n)]
-    check("a blow on a tree throws chips: BP_BulletImpact, at the cut",
-          len(chips) == 1 and any(
-              is_knife_sweep(s) for m in _feeders(chips[0], "SpawnTransform")
-              for b in _feeders(m, "Location") for s in _feeders(b, "Hit")),
-          str(len(chips)))
+    chips = fxv.in_fx(FX.CHOP, _spawns(IMPACT_CLASS_VAR))
+    told = [n for n in fxv.calls(FX.CHOP) if cast in _ran_by(n)]
+    check("a blow on a tree throws chips: BP_BulletImpact, at the cut, told to every "
+          "screen off the tree cast (Multicast_Chop)",
+          len(chips) == 1 and len(told) == 1 and any(
+              is_knife_sweep(s) for b in _feeders(told[0], FX.LOCATION_PARAM)
+              for s in _feeders(b, "Hit")),
+          f"{len(chips)} spawn(s), {len(told)} tell(s)")
 
 
 def check_chop_count():

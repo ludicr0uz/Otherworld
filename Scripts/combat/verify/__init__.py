@@ -140,11 +140,15 @@ and it never relies on a variable another section left behind.
   headshot    the headshot stamp: HeadshotTime's default, and its two writes
               (a pellet's wound, a thrown blade's), each the game's time for
               a bone of the head and nothing otherwise
+  fx          the fight as everyone sees and hears it (M21): each cosmetic's
+              Fx_/Multicast_ pair, its gate, the counter, the client's
+              predictions, the headshot stamp's RepNotify; nodes_of, in_fx,
+              calls, predicts for the sections whose nodes moved into a pair
 """
 
 SECTIONS = (
     "anim_blueprint", "weapons", "grip_fit", "audio", "sound_mix", "sound_states", "health", "weapon_inputs", "install",
     "player_body", "body_setting", "blood", "bullet_impact", "hit_reactions", "damage", "ragdoll", "skins", "hit_bodies", "dead", "aiming", "carry", "look", "sights", "near_clip", "head_hide", "sway", "breath", "steady", "aim_pitch", "support_hand", "body_pose", "stance_clips", "block", "movement", "sprint", "stance", "accuracy", "punch", "knife", "axe", "chop", "light", "torch",
-    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "interact", "slots", "record", "shot", "strike", "pickup", "glimmer", "heat",
+    "hold_pose", "shotgun_pose", "throw", "throw_aim", "throw_melee", "throw_strike", "headshot", "fx", "interact", "slots", "record", "shot", "strike", "pickup", "glimmer", "heat",
     "settings_and_tuning", "firing", "tracer", "consume", "wear", "asks", "drops", "loot", "player_death", "noise", "combat_trace",
 )

@@ -20,7 +20,8 @@ from combat.weapon_component.sights import _author_camera_after_boom
 from uebp.nodes.actor import (
     FN_ACTOR_LOC, FN_ANIM_INSTANCE, FN_ATTACH, FN_DETACH, FN_GET_COMP, FN_GET_OWNER,
     FN_GET_TRANSFORM, FN_PLAY_SLOT, FN_SET_ACTOR_LOC,
-    FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT, FN_STOP_SLOT)
+    FN_IS_PLAYING_SLOT, FN_SET_HIDDEN, FN_SET_REL_LOC, FN_SET_REL_ROT, FN_STOP_SLOT)
+from combat.weapon_component.throw_windup import THROW_ANIM_VAR
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_REMOVE
 from uebp.nodes.math import FN_ADD_VV, FN_AND, FN_EQ_II, FN_FORWARD, FN_MUL_VF, FN_NOT
 from uebp.nodes.palette import (
@@ -267,15 +268,29 @@ def _author_equip(ed, exec_in):
     shown = keep(_node(ed, FN_AND))
     _connect(out(armed), _pin(shown, "A"))
     _connect(out(still), _pin(shown, "B"))
-    posing = keep(ed.add_branch_node())
-    _connect(out(shown), _pin(posing, "Condition"))
-    for e in taken:
-        _connect(e, _pin(posing, "execute"))
-
     mesh2 = keep(ed.add_get_member_variable_node(WV.OwnerMesh))
     anim = keep(_node(ed, FN_ANIM_INSTANCE))
     _connect(out(mesh2, WV.OwnerMesh), _pin(anim, "self"))
     anim_out = out(anim)
+
+    # ...but not while the throw's clip is in the slot: the hand empties at
+    # the release, THROW_RELEASE_S into it, and on another player's copy the
+    # look's refresh lands then too (look.py). The clip plays on through the
+    # follow-through, here and on every copy (Fx_ThrowClip), the slot falls
+    # silent by itself, and the keep-alive (ready_pose.py) puts a pose back.
+    throwing = keep(_node(ed, FN_IS_PLAYING_SLOT))
+    _connect(anim_out, _pin(throwing, "self"))
+    throw_anim = keep(ed.add_get_member_variable_node(THROW_ANIM_VAR))
+    _connect(out(throw_anim, THROW_ANIM_VAR), _pin(throwing, "Asset"))
+    _set(throwing, "SlotNodeName", AIM_SLOT)
+    mid_throw = keep(ed.add_branch_node())
+    _connect(out(throwing), _pin(mid_throw, "Condition"))
+    for e in taken:
+        _connect(e, _pin(mid_throw, "execute"))
+
+    posing = keep(ed.add_branch_node())
+    _connect(out(shown), _pin(posing, "Condition"))
+    _connect(else_(mid_throw), _pin(posing, "execute"))
 
     play = keep(_node(ed, FN_PLAY_SLOT))
     _connect(anim_out, _pin(play, "self"))
@@ -301,7 +316,8 @@ def _author_equip(ed, exec_in):
         "blend around that slot in ABP_Unarmed -- without it the legs would "
         "freeze mid-stride. Empty hands stop the slot and locomotion returns, "
         "and so does Lowered: sprinting, or a gun that no aim key, guard or "
-        "shot is holding up (carry.py).",
+        "shot is holding up (carry.py); not while the throw's clip is in the "
+        "slot, which plays through the hand letting go.",
         made)
 
 

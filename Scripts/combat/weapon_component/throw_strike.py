@@ -90,20 +90,22 @@ from combat.throw_tuning import (
     LODGE_MAX_HEIGHT_CM, LODGE_POINT_VAR, LODGE_TURN_VAR, STICK_LINE_REACH_CM,
     STICK_TRACE_PAST, THROW_DAMAGE_VAR,
 )
+from combat.fx_vars import (
+    HEAD_KILL_PARAM, LOCATION_PARAM, LODGE, NORMAL_PARAM, STAB, STAB_PARAMS)
+from combat.weapon_component import fx
 from combat.weapon_component.common import _prop
 from combat.weapon_component.headshot import _author_headshot
 from Sound.play import _author_sound
-from combat.weapon_component.surface_impact import _author_surface_impact
+from uebp.g import _G
 from uebp.nodes.actor import (
     FN_ATTACH, FN_CLOSEST_BONE, FN_GET_COMP, FN_INSTANCE_TRANSFORM, FN_SET_LOC_ROT,
     FN_TRACE_COMPONENT)
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR, FN_ARR_CONTAINS
 from uebp.nodes.math import (
     FN_ADD_VV, FN_AND, FN_BREAK_TRANSFORM, FN_BREAK_VECTOR, FN_COMPOSE_ROT, FN_GREATER_FF,
-    FN_LE_FF, FN_MAKE_TRANSFORM, FN_MUL_FF, FN_MUL_VF, FN_NE_NAME, FN_NORMAL,
+    FN_LE_FF, FN_MUL_FF, FN_MUL_VF, FN_NE_NAME, FN_NORMAL,
     FN_NOT, FN_ROTATE_VECTOR, FN_ROT_FROM_X, FN_SELECT_FF, FN_SUB_FF, FN_SUB_VV)
-from uebp.nodes.palette import (
-    NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_CAST_INSTANCED, NODE_SPAWN)
+from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH, NODE_CAST_INSTANCED
 from uebp import props as EP
 from combat import health_vars as HV
 from combat import item_vars as IV
@@ -309,6 +311,24 @@ def _author_stick(ed, thrown, brk, mesh_out, exec_ins):
     return then(hold), else_(found), [found, put, hold]
 
 
+def _author_stab(g, exec_in, event):
+    """The body of Fx_Stab: blood out of the wound, and the blade heard
+    going in: the stab, or, where an axe has just killed by the head
+    (HeadKill), the kill's own sound in its place."""
+    blood = fx.spawn_blood(g, fx.point_transform(g, event), [exec_in])
+    kill, stab = g.branch(out(event, HEAD_KILL_PARAM), [then(blood)])
+    at = out(event, LOCATION_PARAM)
+    _author_sound(g.ed, WV.HeadKillSounds, at, kill)
+    _author_sound(g.ed, WV.LodgeSounds, at, stab)
+
+
+def author_throw_strike_fx(ed):
+    """The thrown blade's cosmetic pairs (fx.py): into a body, and into a
+    trunk. Before the Tick, whose flight tells them."""
+    fx.pair(ed, STAB, STAB_PARAMS, _author_stab, fx.SCREEN)
+    fx.pair_chop(ed, LODGE)
+
+
 def _author_throw_strike(ed, thrown, brk, exec_in):
     """The flight's segment struck something (``brk`` is that hit, broken):
     a blade wounds a body and stays in it, and lodges in a tree. Returns
@@ -339,25 +359,13 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     wounded, wound_nodes = _author_wound(ed, as_health, dealt, thrown, brk, known)
     # A blade in the head says so to the HUD, as a pellet does (headshot.py).
     wounded, head_nodes = _author_headshot(ed, in_head, [wounded])
-    # The one transform serves the blood and the chips, as a pellet's does:
-    # the hit, +X turned out along the surface normal.
-    facing = _node(ed, FN_ROT_FROM_X)
-    _connect(_hit(brk, "ImpactNormal"), _pin(facing, "X"))
-    where = _node(ed, FN_MAKE_TRANSFORM)
-    _connect(_hit(brk, "ImpactPoint"), _pin(where, "Location"))
-    _connect(out(facing), _pin(where, "Rotation"))
-    blood_cls = ed.add_get_member_variable_node(WV.BloodClass)
-    blood = _palette(ed, NODE_SPAWN)
-    _connect(out(blood_cls, WV.BloodClass), _pin(blood, "Class"))
-    _connect(out(where), _pin(blood, "SpawnTransform"))
-    _set(blood, "CollisionHandlingOverride", "AlwaysSpawn")
-    _connect(wounded, _pin(blood, "execute"))
-    # ...and the blade stays in the body. One it cannot be set into drops
-    # it, and that fall to the ground passes the body by.
-    # ...and is heard going in, at the wound: the stab, or, where an axe (an
+    # Then the blood out of the wound and the blade heard going in, told to
+    # every screen (Multicast_Stab, fx.py): the stab, or, where an axe (an
     # item that Chops) has just killed by the head, the kill's own sound in
     # its place. Health is read here, after the wound; Dead is the body's
     # own Tick's to set, so a body already Dead is a corpse and no kill.
+    # ...and the blade stays in the body. One it cannot be set into drops
+    # it, and that fall to the ground passes the body by.
     chops, chops_n = _prop(ed, CHOPS_VAR, thrown)
     health_now = ed.add_get_member_variable_node(HV.Health, HEALTH_CLASS_PATH)
     _connect(as_health, _pin(health_now, "self"))
@@ -375,14 +383,14 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     head_kill = _node(ed, FN_AND)
     _connect(out(by_axe), _pin(head_kill, "A"))
     _connect(out(fresh_kill), _pin(head_kill, "B"))
-    finisher = ed.add_branch_node()
-    _connect(out(head_kill), _pin(finisher, "Condition"))
-    _connect(then(blood), _pin(finisher, "execute"))
-    sunk = (_author_sound(ed, WV.HeadKillSounds, _hit(brk, "ImpactPoint"), then(finisher)),
-            _author_sound(ed, WV.LodgeSounds, _hit(brk, "ImpactPoint"), else_(finisher)))
+    g = _G(ed)
+    sunk = (fx.tell(g, STAB, [wounded],
+                    **{LOCATION_PARAM: _hit(brk, "ImpactPoint"),
+                       NORMAL_PARAM: _hit(brk, "ImpactNormal"),
+                       HEAD_KILL_PARAM: out(head_kill)}),)
     stuck, dropped, stick_nodes = _author_stick(ed, thrown, brk, mesh_out, sunk)
     stick_nodes = stick_nodes + [chops_n, health_now, killed, by_axe, dead_n, lived, fresh_kill,
-                                 head_kill, finisher]
+                                 head_kill] + g.made
     aside = _node(ed, FN_ARR_ADD)
     _connect(out(past, THROW_PAST_VAR), _pin(aside, "TargetArray"))
     _connect(_hit(brk, "HitActor"), _pin(aside, "NewItem"))
@@ -414,9 +422,11 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
     reachable = ed.add_branch_node()
     _connect(out(low), _pin(reachable, "Condition"))
     _connect(step, _pin(reachable, "execute"))
-    _cls, chipped = _author_surface_impact(ed, where, then(reachable))
-    # The blade in the wood is the axe in the wood: the chop's own takes.
-    thunk = _author_sound(ed, WV.ChopSounds, _hit(brk, "ImpactPoint"), then(chipped))
+    # The chips and the blade in the wood, which is the axe in the wood (the
+    # chop's own takes): told to every screen (Multicast_Lodge, fx.py).
+    thunk = fx.tell(g, LODGE, [then(reachable)],
+                    **{LOCATION_PARAM: _hit(brk, "ImpactPoint"),
+                       NORMAL_PARAM: _hit(brk, "ImpactNormal")})
     lodged, put = _author_lodge(ed, thrown, brk, _hit(brk, "ImpactPoint"), thunk)
 
     ed.add_comment_to_nodes(
@@ -433,7 +443,7 @@ def _author_throw_strike(ed, thrown, brk, exec_in):
         f"mesh) struck within {LODGE_MAX_HEIGHT_CM:.0f} cm of its foot chips, "
         f"and the item lodges in it: {LODGE_POINT_VAR} on the bark, turned by "
         f"{LODGE_TURN_VAR} along the way it flew, left there to be picked up.",
-        [fresh, damage_n, bites, body, blood, aside, tree, reachable, chipped, put]
+        [fresh, damage_n, bites, body, aside, tree, reachable, put]
         + wound_nodes + skin_nodes + worth_nodes + head_nodes + stick_nodes)
     falls = (else_(bites), then(aside),
              _loose_pin(tree, "CastFailed", is_input=False),

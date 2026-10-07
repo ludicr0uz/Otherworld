@@ -21,8 +21,8 @@ from combat.verify.common import (
     BEL, PIN, by_pins, check, component_template, components, graph, load,
     num_pin, titled,
 )
-from combat.verify.chop import is_chop_node
-from combat.verify.throw_strike import is_strike_node
+from combat.verify import fx as fxv
+from combat import fx_vars as FX
 from combat.verify.fixtures import w, wg
 from combat.weapon_component.surface_impact import IMPACT_CLASS_VAR
 
@@ -196,29 +196,43 @@ def check_impact_spawn():
     check(f"{IMPACT_CLASS_VAR} points at BP_BulletImpact_C",
           got is not None and got.get_name() == "BP_BulletImpact_C",
           got.get_name() if got else "None")
-    # The axe's chips off a tree are the chop's (verify/chop.py).
-    # ...and a thrown blade's, off a tree or out of a body, the throw's
-    # (verify/throw_strike.py).
-    chips = [n for n in _spawn_of(IMPACT_CLASS_VAR)
-             if not is_chop_node(n) and not is_strike_node(n)]
-    blood = [n for n in _spawn_of("BloodClass") if not is_strike_node(n)]
-    check("the fire graph spawns the impact once, and the blood once",
+    # The axe's chips off a tree are the chop's (verify/chop.py), a thrown
+    # blade's the throw's (verify/throw_strike.py): the pellet's bursts are
+    # Fx_PelletHit's, told to every screen by Multicast_PelletHit (verify/fx.py).
+    chips = fxv.in_fx(FX.PELLET_HIT, _spawn_of(IMPACT_CLASS_VAR))
+    blood = fxv.in_fx(FX.PELLET_HIT, _spawn_of("BloodClass"))
+    check("Fx_PelletHit spawns the impact once, and the blood once",
           len(chips) == 1 and len(blood) == 1,
           f"{len(chips)} impact spawn(s), {len(blood)} blood spawn(s)")
     if len(chips) != 1 or len(blood) != 1:
         return
-    chip_exec, blood_exec = _fed_by(chips[0], "execute"), _fed_by(blood[0], "execute")
-    check("the impact runs off the health cast's failed arm: what has no health",
-          [pin for _n, pin in chip_exec] == ["CastFailed"],
-          str([pin for _n, pin in chip_exec]))
+    picks = _fed_by(chips[0], "execute") + _fed_by(blood[0], "execute")
+    check("...one on each arm of a Branch on the event's Blood",
+          [pin for _n, pin in picks] == ["else", "then"]
+          and len({n.get_path_name() for n, _pin in picks}) == 1
+          and all(_fed_by(n, "Condition") and _fed_by(n, "Condition")[0][0]
+                  == fxv.event(FX.fx_event(FX.PELLET_HIT)) for n, _pin in picks),
+          str([pin for _n, pin in picks]))
+    told = fxv.calls(FX.PELLET_HIT)
+    no_blood = [c for c in told if str(PIN.get_pin_value(
+        BEL.find_input_pin(c, FX.BLOOD_PARAM))).lower() in ("false", "")]
+    bleeds = [c for c in told if c not in no_blood]
+    chip_exec = _fed_by(no_blood[0], "execute") if len(no_blood) == 1 else []
+    check("the server tells it twice: the chips (Blood false) off the health cast's "
+          "failed arm, what has no health",
+          len(told) == 2 and len(no_blood) == 1 and len(bleeds) == 1
+          and [pin for _n, pin in chip_exec] == ["CastFailed"],
+          f"{len(told)} tell(s), {len(no_blood)} without blood off "
+          f"{[pin for _n, pin in chip_exec]}")
     # The blood sits behind the hit zone now (verify/hit_bodies.py), which the
     # cast's other arm starts: the zone's first node is the HitBone reset.
     cast = chip_exec[0][0] if len(chip_exec) == 1 else None
     zone = ([str(BEL.get_node_title(PIN.get_owning_node(q)))
              for q in PIN.list_connected_pins(BEL.find_then_pin(cast))]
             if cast else [])
-    check("...and the blood off the same cast's other arm, behind the hit zone, "
-          "so a pellet never spawns both",
+    blood_exec = _fed_by(bleeds[0], "execute") if len(bleeds) == 1 else []
+    check("...and the blood (Blood true) off the same cast's other arm, behind the hit "
+          "zone, so a pellet never spawns both",
           cast is not None and zone == [f"Set {HIT_BONE_VAR}"] and blood_exec
           and all(n.get_path_name() != cast.get_path_name() for n, _pin in blood_exec),
           f"the cast's then -> {zone}; blood off {[pin for _n, pin in blood_exec]}")

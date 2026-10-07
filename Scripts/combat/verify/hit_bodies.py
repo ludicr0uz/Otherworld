@@ -115,14 +115,12 @@ def check_body_miss_is_a_miss():
     onto = [n for n in marks if hit and n in _then(hit[0])]
     if not check_one("...the body's straight after the bone", onto):
         return
-    spawns = _then(onto[0])
-    reads = {t for n in spawns if "SpawnTransform" in in_pins(n)
-             for m in [PIN.get_owning_node(q) for q in PIN.list_connected_pins(
-                 BEL.find_input_pin(n, "SpawnTransform"))]
-             for t in _fed_by(m, "Location")}
-    check("...and the blood is spawned after it, where HitPoint says",
-          len(spawns) == 1 and reads == {f"Get {HIT_POINT_VAR}"},
-          f"{[_title(n) for n in spawns]} at {reads}")
+    told = _then(onto[0])
+    reads = {t for n in told for t in _fed_by(n, "Location")}
+    check("...and the blood is told after it (Multicast_PelletHit), where HitPoint says",
+          len(told) == 1 and _title(told[0]).replace(" ", "").replace("_", "") == "MulticastPelletHit"
+          and reads == {f"Get {HIT_POINT_VAR}"},
+          f"{[_title(n) for n in told]} at {reads}")
 
 
 def check_one(label, nodes):

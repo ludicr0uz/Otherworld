@@ -56,7 +56,8 @@ from combat.weapon_component.stance import _author_stance
 from combat.weapon_component.steady import _author_steady
 from combat.weapon_component.shot import _author_reload_ask, _author_shot_ask
 from combat.weapon_component.use import _author_use
-from combat.weapon_component.wear import _author_take_off, _author_wear_gate
+from combat.weapon_component.wear import (
+    _author_take_off, _author_wear_asks, _author_wear_gate)
 from combat.weapon_component.wear_drag import _author_wear_request
 from combat.weapon_component.drop_request import _author_drop_keys, _author_drop_request
 from combat.weapon_component.save_exit import _author_save_exit
@@ -439,10 +440,8 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
         ed, pc_out, owner_out, held, armed_out, throw_wants, tap,
         (then(pick_dirty),) + not_picked)
 
-    # --- take a garment off (wear.py): the I panel's request ---------------
-    flight_exits = _author_take_off(ed, flight_exits)
-    # --- and a slot's garment dragged onto the worn grid (wear_drag.py) -----
-    flight_exits = _author_wear_request(ed, flight_exits)
+    # --- a probe's hand on the I panel's take-off and wear asks (wear.py) ---
+    flight_exits = _author_wear_asks(ed, flight_exits)
 
     return flight_exits
 
@@ -473,7 +472,10 @@ def _author_upkeep(ed, flight_exits):
         _connect(exit_pin, _pin(owns, "execute"))
     # An item set down goes first (drop_request.py): the hand it left is
     # empty by the time the slots are placed.
-    flight_exits = (_author_slot_serve(ed, _author_drop_request(ed, [then(owns)]))
+    # Before both, the garments (wear.py, wear_drag.py): one taken off, then a
+    # slot's garment dragged onto the worn grid.
+    worn_exits = _author_wear_request(ed, _author_take_off(ed, [then(owns)]))
+    flight_exits = (_author_slot_serve(ed, _author_drop_request(ed, worn_exits))
                     + _author_view(ed, [else_(owns)]))
     flight_exits = _author_slot_sync(ed, flight_exits)
     flight_exits = _author_record(ed, flight_exits)

@@ -8,6 +8,7 @@ nothing is drawn on the player when a garment is worn, and wearing one changes n
 python3 Scripts/dev/uepy.py Scripts/build_clothing.py      # after build_weapons_and_combat.py
 python3 Scripts/dev/uepy.py Scripts/verify_clothing.py
 python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
+python3 Scripts/dev/uepy.py --net --clients 2 --probe Scripts/probes/probe_net_clothing.py
 ```
 
 ## Where each piece lives
@@ -17,7 +18,8 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
 | the garments (`/Game/Clothing/BP_<Garment>`), their stand-in models and materials | this package (`specs.py`, `items.py`) |
 | the test garments on `Lvl_Forest_200m` | this package (`placement.py`) |
 | the slots, `ClothingSlot` on the item, `Worn`/`TakeOffSlot` on the weapon component | `combat/wear_tuning.py` |
-| putting one on, taking one off | `combat/weapon_component/wear.py` (checks: `combat/verify/wear.py`) |
+| putting one on, taking one off (the server's: `Scripts/net/CLAUDE.md`, "Clothing") | `combat/weapon_component/wear.py`, `wear_drag.py` (checks: `combat/verify/wear.py`) |
+| what is worn, as the owning client is told it and pictures it | `WornClass` in `combat/record_vars.py`, `weapon_component/record.py`, `view_worn.py` |
 | the **I** panel, and the character's portrait in it | `graphics_menu/wear_*.py`, `wbp_wear.py` (checks: `graphics_menu/wear_checks.py`); the picture: `item_icons/portrait.py` |
 | the icons | `item_icons/items.py` rows, `python3 Scripts/build_item_icons.py Hat ...` |
 | the base body in boxers, what the garments will be drawn on | `asset_pipeline/player_body.py` `CLOTHING_BASE_BODY` (a `catalog.py` spec); names in `specs.py` `BASE_BODY_*` (checks: `verify/base_body.py`) |
@@ -33,6 +35,10 @@ python3 Scripts/dev/uepy.py --game --probe Scripts/probes/probe_clothing.py
   and its `ClothingSlot` (the slot's index; `NOT_CLOTHING`, -1, on every other item) makes that
   use a wear rather than the GAS eat event (`wear._author_wear_gate`, handed to
   `consume._author_use_gate` by `tick.py`, so consume never imports wear).
+- **It is the server's** (task M24). The fire key asks `Server_Wear`, the I panel
+  `AskWear` and `AskTakeOff`, all reliable Server events; the server's Tick serves them
+  with authority and writes what is worn down as `WornClass`, which replicates to the
+  owning client, whose `Worn` is made from it. In single player each is a plain call.
 - **A worn garment is the same actor:** out of `Inventory`, into `Worn[slot]`, hidden, its
   inventory `Slot` UNPLACED (`combat/slot_tuning.py`), so taken off it finds a bag slot. Wearing
   one into a filled slot puts the old one back in the bag (there is room: the new one just

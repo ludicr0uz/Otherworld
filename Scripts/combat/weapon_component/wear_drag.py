@@ -1,6 +1,7 @@
 """Clothing by the mouse: a slot's garment dragged onto the worn grid.
 
-    every Tick, after the take-off: WearRequest a slot code (the I panel's
+    every Tick, with authority (task M24: AskWear is a Server event), after
+    the take-off: WearRequest a slot code (the I panel's
     drag asks, graphics_menu/inv_drag.py):
         WearItem = SlotItems[code], WearRequest = NOT_CLOTHING
         WearItem valid: WearSlot = its ClothingSlot; a slot (a garment) ->
@@ -68,7 +69,7 @@ def _author_wear_request(ed, in_execs):
     flow = g.iput(item, SLOT_VAR, str(UNPLACED), [then(hide)])
     flow = g.put(WV.NeedsRefresh, "true", [flow])
     ed.add_comment_to_nodes(
-        f"{WEAR_REQUEST_VAR}: the I panel's drag of a slot's item onto the worn grid. "
+        f"{WEAR_REQUEST_VAR}, served with authority: the I panel's drag of a slot's item onto the worn grid. "
         "A garment leaves Inventory for Worn[its ClothingSlot], hidden; one already "
         "worn there takes the slot it left (wear_drag.py).", g.made)
     return [flow, idle, nothing, other]

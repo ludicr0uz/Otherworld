@@ -26,6 +26,8 @@ WEAR_ITEM_VAR = "WearItem"            # the garment being put on, held still
                                       # while Held is cleared
 TAKE_OFF_TO_VAR = "TakeOffTo"          # with TakeOffSlot: the hand or the bag slot
                                       # a drag dropped it on, or UNPLACED (-1)
+SERVER_WEAR = "Server_Wear"            # the fire key's wear, asked of the server
+                                      # (weapon_component/wear.py)
 WEAR_REQUEST_VAR = "WearRequest"      # on the component: a slot code whose item
                                       # is to be worn (a drag onto the worn
                                       # grid), or NOT_CLOTHING

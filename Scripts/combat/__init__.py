@@ -112,7 +112,8 @@ DATA (constants and pure tables -- no Blueprint authoring)
                     lying Dropped replicating from its own Tick on the
                     server, a client's copy hidden while the item is carried
   wear_tuning       clothing: the eight slots (WEAR_SLOTS), ClothingSlot on the
-                    item, Worn / TakeOffSlot / WearItem on the component
+                    item, Worn / TakeOffSlot / WearItem on the component,
+                    Server_Wear
   ask_consts        what a screen asks of the weapon component: the Ask
                     events' names and parameters, and save and exit's
                     countdown (its variables, EXIT_SECONDS)

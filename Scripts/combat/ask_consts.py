@@ -5,8 +5,8 @@ is a custom event on BP_WeaponComponent (combat/weapon_component/asks.py,
 loot_take.py, save_exit.py), which the HUD calls with what was picked and
 nothing else; the component decides whether it happens. One event per action,
 so a multiplayer task that makes one a server request (M18 did the slots',
-M23 the drop and the loot window's take: SERVER_ASKS; M24, M35) has one node
-to turn into a Server event. Constants only.
+M23 the drop and the loot window's take, M24 the garments': SERVER_ASKS; M35)
+has one node to turn into a Server event. Constants only.
 """
 
 # (event, its int parameters). The slot codes are combat/slot_tuning.py's; a
@@ -35,10 +35,11 @@ ASK_LOOT_TAKE = "AskLootTake"
 BODY_PARAM, INDEX_PARAM, WANT_PARAM = "Body", "Index", "Want"
 
 # The ones that are Server events (the slots' M18, the drop and the loot take
-# M23): the owning client asks, and the server serves the request, where what
-# fits where and who gets what is decided. The rest are plain calls until
-# their tasks (M24, M35).
-SERVER_ASKS = (ASK_SLOT, ASK_MOVE, ASK_NEXT, ASK_DROP, ASK_LOOT_TAKE)
+# M23, the take-off and the dragged wear M24): the owning client asks, and the
+# server serves the request, where what fits where and who gets what is
+# decided. The rest are plain calls until their task (M35).
+SERVER_ASKS = (ASK_SLOT, ASK_MOVE, ASK_NEXT, ASK_DROP, ASK_LOOT_TAKE, ASK_TAKE_OFF,
+               ASK_WEAR)
 
 # Save and exit: the M panel's row starts the countdown.
 ASK_SAVE_EXIT = "AskSaveExit"

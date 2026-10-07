@@ -9,7 +9,7 @@ moves an item on a client of a server and reads the server's copy.
 
 from uebp import net
 from combat.record_vars import (
-    HandClass, RECORD, REPLICATED, VIEW_ROW, VIEW_TRIM, ViewDirty)
+    HandClass, RECORD, REPLICATED, VIEW_ROW, VIEW_TRIM, VIEW_WORN, ViewDirty, WornClass)
 from combat.slot_tuning import SLOT_WANT_VAR
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins
 from combat.verify.fixtures import _is_exec, wc, wc_cdo, wg
@@ -62,8 +62,8 @@ def check_replication():
     declared = {str(v): net.variable_replication(wc, str(v)) for v in REPLICATED}
     want = {str(v): (net.REP_NOTIFY, f"OnRep_{v}",
                      SKIP_OWNER if v == HandClass else OWNER_ONLY) for v in REPLICATED}
-    check("the record's four arrays replicate to the owning client alone, and the class "
-          "in hand to everyone else; each is a RepNotify",
+    check("the record's four arrays and the worn slots' classes replicate to the owning "
+          "client alone, and the class in hand to everyone else; each is a RepNotify",
           {k: (a, b, c.upper()) for k, (a, b, c) in declared.items()} == want, str(declared))
     compiled = {str(v): net.compiled_replication(wc, str(v)) for v in REPLICATED}
     check("...and compiled so", all(k == (net.REP_NOTIFY, f"OnRep_{v}")
@@ -77,7 +77,8 @@ def check_replication():
           all(t == [f"Set {ViewDirty}"] for t in lone.values()), str(lone))
     check(f"{ViewDirty} starts true (a first record may arrive before BeginPlay), and "
           "the record empty", wc_cdo.get_editor_property(str(ViewDirty)) is True
-          and all(len(wc_cdo.get_editor_property(str(v))) == 0 for v in RECORD))
+          and all(len(wc_cdo.get_editor_property(str(v))) == 0
+                  for v in RECORD + (WornClass,)))
     check("the weapon component replicates", net.replicates(wc))
 
 
@@ -97,6 +98,14 @@ def check_server_owns():
     check("the record's rows are written with authority: an Add per column, each off "
           "the true arm of a Branch on HasAuthority",
           len(adds) == len(RECORD) and arms == ["then"], f"{len(adds)} add(s), {arms}")
+    worn = [n for n in by_pins(wg, "TargetArray", "NewItem")
+            if any(_title(f) == f"Get {WornClass}" for f in _feeders(n, "TargetArray"))]
+    arms = sorted({_arm(n, g) for n in worn for g in gates} - {""})
+    check(f"{WornClass} is written with authority, a row per slot of Worn: the "
+          "garment's class, or none for an empty slot",
+          len(worn) == 2 and arms == ["then"]
+          and sorted(len(_feeders(n, "NewItem")) for n in worn) == [0, 1],
+          f"{len(worn)} add(s), {arms}")
     hands = [n for n in wg if _title(n).endswith(f"Set with Notify {HandClass}")
              or _title(n) == f"Set {HandClass}"]
     check(f"{HandClass} is written by the server alone",
@@ -135,7 +144,31 @@ def check_view():
           "the rows past its end)", len(ended) == 2, str(len(ended)))
 
 
+def check_view_worn():
+    event = graph(wc).find_event_node(VIEW_WORN)
+    check(f"{VIEW_WORN} exists, a plain event of this machine",
+          bool(event) and net.compiled_rpc(wc, VIEW_WORN) == (net.LOCAL, False))
+    if not event:
+        return
+    gates = _authority_branches()
+    calls = [n for n in wg if _title(n).replace(" ", "") == VIEW_WORN and "self" in in_pins(n)]
+    dirty = [n for n in wg if _title(n) == "Branch"
+             and any(_title(c) == f"Get {ViewDirty}" for c in _feeders(n, "Condition"))]
+    check(f"a client's worn slots are remade off {WornClass} only without authority, "
+          f"when a record arrived ({ViewDirty})",
+          len(calls) == 1 and len(dirty) == 1 and dirty[0] in _upstream(calls[0])
+          and any(_arm(dirty[0], g) == "else" for g in gates)
+          and any(_title(f) == f"Get {WornClass}" for up in _upstream(calls[0])
+                  for f in _feeders(up, "Array")), f"{len(calls)} call(s)")
+    made = [n for n in by_pins(wg, "Class", "SpawnTransform") if event in _feeders(n, "Class")]
+    after = [_title(n) for m in made for n in wg if m in _upstream(n)]
+    check(f"...a garment spawned in {VIEW_WORN}, of the row's class, hidden and not "
+          "Dropped", len(made) == 1 and any("Hidden" in t for t in after)
+          and any(t.endswith("Dropped") for t in after), str(after))
+
+
 def run():
+    check_view_worn()
     check_replication()
     check_server_owns()
     check_view()

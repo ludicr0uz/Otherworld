@@ -1,7 +1,8 @@
 """verify.wear -- putting a garment on and taking one off.
 
-Mirrors weapon_component/wear.py: the wear behind the Consumable tap, and the
-take-off the I panel asks for (TakeOffSlot); wear_drag.py's WearRequest; and
+Mirrors weapon_component/wear.py: the wear behind the Consumable tap (asked of
+the server, Server_Wear: task M24), and the take-off the I panel asks for
+(TakeOffSlot); wear_drag.py's WearRequest, both served with authority; and
 drop_request.py's DropRequest (an item dragged out of the inventory). Checked on the wiring and the
 defaults; probes/probe_clothing.py runs both in a game.
 """
@@ -10,11 +11,15 @@ from combat.paths import ITEM_BP_PATH
 from combat.slot_tuning import (
     DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, NO_REQUEST, SLOT_VAR,
 )
-from combat.verify.common import BEL, PIN, cdo, check, in_pins, load, pin_value
-from combat.verify.fixtures import wc_cdo, wg
+from uebp import net
+from combat.ask_consts import ASK_TAKE_OFF, ASK_WEAR
+from combat.record_vars import NO_ASK, TakeOffForced, TakeOffForcedTo, WearForced
+from combat.verify.common import BEL, PIN, cdo, check, graph, in_pins, load, pin_value
+from combat.verify.fixtures import wc, wc_cdo, wg
+from combat.verify.record import _arm, _authority_branches, _upstream
 from combat.wear_tuning import (
     CLOTHING_SLOT_VAR, NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR,
-    WEAR_REQUEST_VAR, WORN_VAR,
+    SERVER_WEAR, WEAR_REQUEST_VAR, WORN_VAR,
 )
 from combat.weapon_component.consume import TRIGGER_SPENT
 from combat.weapon_component.wear import WEAR_SLOT_VAR
@@ -87,25 +92,42 @@ def check_wear():
         "Consumable" in str(PIN.get_pin_name(p)) for f in _feeders(b, "execute")
         for up in _feeders(f, "execute") for g in _feeders(up, "Condition")
         for p in BEL.list_output_pins(g))]
-    check(f"one Branch on Held.{CLOTHING_SLOT_VAR} >= 0, behind the Consumable tap",
-          len(_gated_on(CLOTHING_SLOT_VAR)) == 1 and len(gates) == 1,
-          f"{len(_gated_on(CLOTHING_SLOT_VAR))} gates, {len(gates)} behind the tap")
+    every = _gated_on(CLOTHING_SLOT_VAR)
+    check(f"two Branches on Held.{CLOTHING_SLOT_VAR} >= 0: the key's, behind the "
+          f"Consumable tap, and {SERVER_WEAR}'s own refusal",
+          len(every) == 2 and len(gates) == 1,
+          f"{len(every)} gates, {len(gates)} behind the tap")
     if not gates:
         return
-    titles = [_title(n) for n in _chain(
+    titles = [_title(n).replace(" ", "") for n in _chain(
         PIN.get_owning_node(PIN.list_connected_pins(BEL.find_then_pin(gates[0]))[0]))]
+    check(f"...the key's true arm asks the server ({SERVER_WEAR}) and spends the press, "
+          "and wears nothing itself",
+          [t.replace("_", "") for t in titles[:2]]
+          == [SERVER_WEAR.replace("_", ""), f"Set{TRIGGER_SPENT}"], str(titles[:3]))
+    event = graph(wc).find_event_node(SERVER_WEAR)
+    check(f"{SERVER_WEAR} is a reliable Server event",
+          bool(event) and net.compiled_rpc(wc, SERVER_WEAR) == (net.SERVER, True),
+          str(net.compiled_rpc(wc, SERVER_WEAR)) if event else "no event")
+    served = [b for b in every if b not in gates and event and event in _upstream(b)]
+    if not served:
+        check(f"...whose own Branch on Held.{CLOTHING_SLOT_VAR} gates the wear", False)
+        return
+    titles = [_title(n) for n in _chain(
+        PIN.get_owning_node(PIN.list_connected_pins(BEL.find_then_pin(served[0]))[0]))]
     check("...whose true arm wears it: stored, out of the bag, the old one back in, "
-          "into Worn, hidden, out of the hand, re-equipped and the press spent",
+          "into Worn, hidden, out of the hand and re-equipped",
           _in_order(titles, [f"Set {WEAR_ITEM_VAR}", f"Set {WEAR_SLOT_VAR}", "Remove",
                              "Add", "Set Array Elem", "Hidden", "Set Held",
-                             "Set EquippedIndex", "Set NeedsRefresh",
-                             f"Set {TRIGGER_SPENT}"]), str(titles))
+                             "Set EquippedIndex", "Set NeedsRefresh"]), str(titles))
     sets = [n for n in wg if "bSizeToFit" in in_pins(n)
             and any(_title(f) == f"Get {WORN_VAR}" for f in _feeders(n, "TargetArray"))]
-    check(f"{WORN_VAR} is written four times (the wear, the dragged wear, the take-off, "
-          "the drag out of the inventory), the wears' grown to fit",
-          len(sets) == 4 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
-          == ["false", "false", "true", "true"], str([pin_value(n, "bSizeToFit") for n in sets]))
+    check(f"{WORN_VAR} is written six times (the wear, the dragged wear, the take-off, "
+          "the drag out of the inventory, and a client's picture of a worn slot and of "
+          "an empty one), the wears' and the picture's grown to fit",
+          len(sets) == 6 and sorted(pin_value(n, "bSizeToFit") or "false" for n in sets)
+          == ["false", "false", "true", "true", "true", "true"],
+          str([pin_value(n, "bSizeToFit") for n in sets]))
 
 
 def check_take_off():
@@ -179,8 +201,30 @@ def check_drop_request():
           == [0, 1, 1], str(len(stored)))
 
 
+def check_server_wears():
+    """Task M24: wearing and taking off are the server's."""
+    gates = _authority_branches()
+    for var in (TAKE_OFF_VAR, WEAR_REQUEST_VAR):
+        serves = _gated_on(var)
+        check(f"{var} is served with authority only (the server, and single player)",
+              len(serves) == 1 and any(_arm(serves[0], g) == "then" for g in gates),
+              str(len(serves)))
+    doors = {str(v): wc_cdo.get_editor_property(str(v))
+             for v in (TakeOffForced, TakeOffForcedTo, WearForced)}
+    check(f"a probe's doors on {ASK_TAKE_OFF} and {ASK_WEAR} start shut ({NO_ASK})",
+          all(v == NO_ASK for v in doors.values()), str(doors))
+    for var, ask in ((TakeOffForced, ASK_TAKE_OFF), (WearForced, ASK_WEAR)):
+        calls = [n for n in wg if _title(n).replace(" ", "") == ask and any(
+            _title(f) == f"Get {var}" for p in in_pins(n) for f in _feeders(n, p))]
+        lowered = [n for n in wg if _title(n) == f"Set {var}"
+                   and any(c in _upstream(n) for c in calls)]
+        check(f"{var} calls {ask} once and is lowered after it",
+              len(calls) == 1 and len(lowered) == 1, f"{len(calls)} call(s), {len(lowered)} Set(s)")
+
+
 def run():
     check_wear_state()
+    check_server_wears()
     check_wear()
     check_take_off()
     check_wear_request()

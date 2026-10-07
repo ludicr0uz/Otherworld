@@ -26,8 +26,8 @@ The item is taken from wherever it is carried or worn, the hand included
 (the drop key's): out of Inventory it is out of its slot, the slot sync
 finds the hand empty and the refresh empties Held, as for a garment dragged
 onto the worn grid (wear_drag.py). The item is stored before anything is
-removed: SlotItems and Worn are read once. A worn garment is the server's
-only once wearing is (M24): until then a client's has nothing there to drop.
+removed: SlotItems and Worn are read once. Worn is the server's (wear.py), so
+a client's worn garment dragged out is set down by the server like any item.
 """
 
 from uebp.graph import out, then

@@ -1,15 +1,23 @@
 """Clothing on the weapon component: putting a garment on, and taking one off.
 
     the fire key tapped with a garment in hand (consume.py's use gate, where
-    Held.ClothingSlot is a slot):
+    Held.ClothingSlot is a slot), on the local player's machine:
+        Server_Wear(), TriggerSpent
+    Server_Wear, a reliable Server event (task M24; in single player a plain
+    call, run there and then). Refused unless this machine's Held is a
+    garment:
         WearItem = Held, WearSlot = Held.ClothingSlot
         Inventory.RemoveIndex(EquippedIndex)
         what Worn[WearSlot] holds (if anything) -> Inventory      (a swap)
         Worn[WearSlot] = WearItem (grown to fit), WearItem hidden and UNPLACED
-        Held = None, EquippedIndex clamped, NeedsRefresh, TriggerSpent
+        Held = None, EquippedIndex clamped, NeedsRefresh
 
-    every Tick, before the refresh: TakeOffSlot a slot (the I panel asks,
-    graphics_menu/wear_tick.py):
+    where the keys are (_author_wear_asks): a probe's TakeOffForced and
+    WearForced call AskTakeOff and AskWear, as the I panel does (Server events
+    too: asks.py).
+
+    every Tick, with authority, before the slots are served: TakeOffSlot a
+    slot (the I panel asks, graphics_menu/wear_tick.py):
         TakeOffSlot = NOT_CLOTHING
         SlotPick = TakeOffTo, TakeOffTo = UNPLACED
         Worn[slot] valid and HasRoom (a bag slot or the hand free) ->
@@ -25,21 +33,30 @@ equip loop never shows it, and hidden here once, since it leaves the bag from
 the hand. Taking it off puts that actor back in the bag, still hidden and not
 Dropped, as a pick-up with something else in hand would be.
 
+All of it is the server's: Worn is its item actors, written down each Tick as
+WornClass (record.py), which the owning client's Worn is a picture of
+(view_worn.py). A client wears and takes off nothing itself.
+
 WearItem and WearSlot are stored before anything moves: Held is cleared below,
 and ClothingSlot is a pure read off it. Worn is read only behind
 IsValidIndex: it starts empty and is grown by the first wear into a slot.
 """
 
+from uebp import net
 from uebp.graph import _connect, _loose_pin, _pin, _set, out, then
+from combat.ask_consts import ASK_TAKE_OFF, ASK_WEAR, FROM_PARAM, SLOT_PARAM, TO_PARAM
 from combat.paths import ITEM_CLASS_PATH
+from combat.record_vars import NO_ASK, TakeOffForced, TakeOffForcedTo, WearForced
 from combat.slot_tuning import (
     BAG_FIRST, BAG_LAST, HAND, HAS_ROOM_VAR, SLOT_PICK_VAR, SLOT_VAR, UNPLACED,
 )
 from combat.wear_tuning import (
-    CLOTHING_SLOT_VAR, NOT_CLOTHING, TAKE_OFF_TO_VAR, TAKE_OFF_VAR, WEAR_ITEM_VAR, WORN_VAR,
+    CLOTHING_SLOT_VAR, NOT_CLOTHING, SERVER_WEAR, TAKE_OFF_TO_VAR, TAKE_OFF_VAR,
+    WEAR_ITEM_VAR, WORN_VAR,
 )
 from uebp.g import _G
 from combat.weapon_component.consume import TRIGGER_SPENT
+from combat.weapon_component.slot_moves import _ask
 from uebp.nodes.actor import FN_SET_HIDDEN
 from uebp.nodes.array import (
     FN_ARR_ADD, FN_ARR_GET, FN_ARR_LEN, FN_ARR_REMOVE, FN_ARR_SET, FN_ARR_VALID)
@@ -60,17 +77,58 @@ def _worn_at(g, slot):
     return out(valid), _loose_pin(item, "Item", is_input=False)
 
 
+def _is_garment(g, held):
+    """Pure: Held.ClothingSlot >= 0."""
+    slot_n = g.keep(g.ed.add_get_member_variable_node(CLOTHING_SLOT_VAR, ITEM_CLASS_PATH))
+    _connect(held, _pin(slot_n, "self"))
+    return out(g.call(FN_GE_II, A=out(slot_n, CLOTHING_SLOT_VAR), B=0))
+
+
 def _author_wear_gate(ed, held, exec_in):
-    """Branch on Held.ClothingSlot >= 0: a garment is worn (the wear at wx, wy).
+    """Branch on Held.ClothingSlot >= 0: a garment is worn, by the server
+    (Server_Wear), and the press is spent here, where the key is.
     Returns (the wear's exit, the exec pin for what is not a garment)."""
     g = _G(ed, ITEM_CLASS_PATH)
-    slot_n = g.keep(ed.add_get_member_variable_node(CLOTHING_SLOT_VAR, ITEM_CLASS_PATH))
-    _connect(held, _pin(slot_n, "self"))
-    garment = g.call(FN_GE_II, A=out(slot_n, CLOTHING_SLOT_VAR), B=0)
-    worn, other = g.branch(out(garment), [exec_in])
+    worn, other = g.branch(_is_garment(g, held), [exec_in])
+    asked = _ask(g, SERVER_WEAR, [worn])
+    flow = g.put(TRIGGER_SPENT, "true", [asked])
     ed.add_comment_to_nodes(
-        "Consumable with a ClothingSlot: a garment, worn rather than eaten.", g.made)
-    return _author_wear(ed, held, worn), other
+        "Consumable with a ClothingSlot: a garment, worn rather than eaten. The "
+        f"wear is the server's ({SERVER_WEAR}); the press is spent, as eating "
+        "spends it (wear.py).", g.made)
+    return flow, other
+
+
+def author_wear_event(ed):
+    """Server_Wear(): the fire key's wear, on the machine that owns the
+    inventory. Refused unless its own Held is there and a garment. Before
+    the Tick, which calls it by name."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    event = g.keep(net.server_event(ed, SERVER_WEAR, []))
+    held = g.get(WV.Held)
+    there, _empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [then(event)])
+    garment, _other = g.branch(_is_garment(g, held), [there])
+    ed.add_comment_to_nodes(
+        f"{SERVER_WEAR} (wear.py): the owning client's fire key with a garment in "
+        "hand. Refused unless this machine's Held is one.", g.made)
+    _author_wear(ed, held, garment)
+
+
+def _author_wear_asks(ed, in_execs):
+    """A probe's hand on the I panel's two asks (record_vars.FORCED), where
+    the keys are, lowered as taken. Returns the exec tails."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    forced, none = g.branch(out(g.call(FN_GE_II, A=g.get(TakeOffForced), B=0)), in_execs)
+    asked = _ask(g, ASK_TAKE_OFF, [forced], **{SLOT_PARAM: g.get(TakeOffForced),
+                                               TO_PARAM: g.get(TakeOffForcedTo)})
+    flow = [g.put(TakeOffForced, str(NO_ASK), [asked]), none]
+    forced, none = g.branch(out(g.call(FN_GE_II, A=g.get(WearForced), B=0)), flow)
+    asked = _ask(g, ASK_WEAR, [forced], **{FROM_PARAM: g.get(WearForced)})
+    flow = [g.put(WearForced, str(NO_ASK), [asked]), none]
+    ed.add_comment_to_nodes(
+        f"TakeOffForced and WearForced: a probe's hand on {ASK_TAKE_OFF} and "
+        f"{ASK_WEAR}, the I panel's asks, Server events both (wear.py).", g.made)
+    return flow
 
 
 def _author_wear(ed, held, exec_in):
@@ -111,11 +169,10 @@ def _author_wear(ed, held, exec_in):
     clamp = g.call(FN_MIN_II, A=g.get(WV.EquippedIndex), B=out(last))
     flow = g.put(WV.EquippedIndex, out(clamp), [flow])
     flow = g.put(WV.NeedsRefresh, "true", [flow])
-    flow = g.put(TRIGGER_SPENT, "true", [flow])
     ed.add_comment_to_nodes(
         "A garment is worn, not fired: out of Inventory and into Worn[its "
         "ClothingSlot], hidden; one already worn there goes back into the "
-        "bag. The press is spent, as eating spends it (wear.py).", g.made)
+        "bag (wear.py).", g.made)
     return flow
 
 
@@ -149,7 +206,7 @@ def _author_take_off(ed, in_execs):
     off = g.call(FN_ARR_SET, [placed], TargetArray=g.get(WORN_VAR), Index=g.get(WEAR_SLOT_VAR))
     flow = g.put(WV.NeedsRefresh, "true", [then(off)])
     ed.add_comment_to_nodes(
-        f"{TAKE_OFF_VAR}: the I panel asks for a garment to come off. While the "
+        f"{TAKE_OFF_VAR}, served with authority: the I panel asks for a garment to come off. While the "
         "bag has room, Worn[slot] goes back into Inventory and the slot is "
         "emptied (wear.py).", g.made)
     return [flow, idle, nothing, bare, full]

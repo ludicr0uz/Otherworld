@@ -60,22 +60,21 @@ and which decides whether it happens. The names are `combat/ask_consts.py`.
 | `AskMove(From, To)` | a drag from slot to slot | raises `MoveTo`, `MoveFrom` | **done, M18** |
 | `AskNext()` | the Q key (no screen) | raises `NextRequest` | **done, M18** |
 | `AskDrop(From)` | a drag out of the inventory, the drop key (no screen) | raises `DropRequest` | **done, M23** |
-| `AskTakeOff(Slot, To)` | Enter or a click on a worn slot, a drag off one | raises `TakeOffTo`, `TakeOffSlot` | M24 |
-| `AskWear(From)` | a drag onto the worn grid | raises `WearRequest` | M24 |
+| `AskTakeOff(Slot, To)` | Enter or a click on a worn slot, a drag off one | raises `TakeOffTo`, `TakeOffSlot` | **done, M24** |
+| `AskWear(From)` | a drag onto the worn grid | raises `WearRequest` | **done, M24** |
 | `AskLootTake(Body, Index, Want)` | the loot window's Enter or click | the take itself, with its refusals (`weapon_component/loot_take.py`) | **done, M23** |
 | `AskSaveExit()` | the menu's save-and-exit row | starts the countdown the component runs (`weapon_component/save_exit.py`) | M35 |
 
 The trigger and R are keys, not a screen's asks, and have Server events of their own:
 `Server_Fire` and `Server_Reload` ("The shot and the reload", below).
 
-- **The slots' three, the drop and the loot take are reliable Server events**
-  (`ask_consts.SERVER_ASKS`; "The inventory" and "Picking up, dropping and looting",
-  below); the rest are plain calls yet. `combat/verify/asks.py` asserts which is which on
-  the compiled class; the task that makes one a Server event adds it to `SERVER_ASKS`.
+- **All but save and exit are reliable Server events** (`ask_consts.SERVER_ASKS`; "The
+  inventory", "Picking up, dropping and looting" and "Clothing", below).
+  `combat/verify/asks.py` asserts which is which on the compiled class; the task that
+  makes one a Server event adds it to `SERVER_ASKS`.
 - **The int asks only raise the request** the component's Tick already serves, so the
-  serve is still where a move is validated (the slots' and the drop's: on the server
-  alone). Two of the serves (take-off, wear) sit in the Tick's local-only half
-  (`tick.py`, `_author_actions`): M24 moves them to where the server runs them.
+  serve is still where a move is validated, and every serve is in the upkeep's
+  authority arm (`tick.py`, `_author_upkeep`): the server's alone.
 - **The HUD writes none of those variables** and takes nothing out of a body:
   `graphics_menu/ask_checks.py` fails on a `Set` of any of them in the HUD's graph, and on
   a movement call there.
@@ -329,8 +328,8 @@ of them, plain data (`combat/record_vars.py`):
   actors are the server's or a picture.
 - **The picture is remade only when a record arrives.** What a client changes itself
   stays until the server next says otherwise, and it is
-  why an action that is not yet the server's (a meal, a garment: M24,
-  M26) still shows on its own client, and is undone by the next record. Make the
+  why an action that is not yet the server's (a meal: M26) still shows on its
+  own client, and is undone by the next record. Make the
   action a server request; do not write the record from a client. (The throw and
   the take of an item are: M20, below.)
 - **The slots' asks are Server events** (`AskSlot`, `AskMove`, `AskNext`, reliable): the
@@ -350,7 +349,7 @@ of them, plain data (`combat/record_vars.py`):
   `BlockForced`, the use key's `SightsForced`, the throw's `ThrowKeyForced` and
   `ThrowClickForced` and the take's `InteractForced` (M20); the next Server event
   needs one of the same kind.
-- **Not yet in the record:** worn garments (M24), a heated blade and a burning stick
+- **Not yet in the record:** a heated blade and a burning stick
   (the item's own state, M25). The dev-all-guns cheat
   still spawns on the machine it is pressed on.
 - `combat/verify/record.py` checks the flags and the wiring. Proof: `uepy.py --net
@@ -591,8 +590,7 @@ setting one down is a reliable Server event on the weapon component.
   itself. A probe's door is `DropForced` (`p.ask_drop(wc, slot)`).
 - **In single player** each is a plain call, served the same frame, and
   `SetReplicates(true)` sends the item to no one.
-- **Not here:** a worn garment dragged out is dropped only where it is worn, and on a
-  server nothing is worn yet (M24). A client that joins after a placed item was taken
+- **Not here:** a client that joins after a placed item was taken
   still shows its own copy of it, and asks for it in vain (M31). A body's loot is still
   classes, so a looted gun is a fresh one. Eating a mushroom (M26) and the campfire and
   the wood's chop (M25) are their own tasks.
@@ -605,6 +603,55 @@ setting one down is a reliable Server event on the weapon component.
   `AskLootTake`, in one frame: the first has it, the second nothing); clean with
   `--lag 120`. Single player's are `probe_pickup`, `probe_pickup_weapon_slot`,
   `probe_pickup_height`, `probe_asks`, `probe_inventory_drag` and `probe_corpse_loot`.
+
+## Clothing (M24, done)
+
+Wearing and taking off are the server's, on the inventory's pattern: the server keeps the
+item actors (`Worn[slot]`, the very garment that was picked up), a record of them travels,
+and the owning client's `Worn` is a picture of the record.
+
+| the client asks | the server checks, on its own copy | then |
+|---|---|---|
+| `Server_Wear()` (the fire key with a garment in hand: `weapon_component/wear.py`) | its own `Held` is there and is a garment | out of `Inventory`, into `Worn[its ClothingSlot]`; one worn there goes back into the bag |
+| `AskWear(From)` (a drag onto the worn grid) | the slot holds an item, and it is a garment | the same, from wherever it is carried; one worn there takes the slot it left |
+| `AskTakeOff(Slot, To)` (Enter or a click on a worn slot, a drag off one) | a garment is worn there, and there is room | into `Inventory`, on `To` if that is the hand or a bag slot, else the bag's first free one |
+| `AskDrop(SLOT_COUNT + slot)` (a worn garment dragged out of the inventory: M23's ask) | a garment is worn there | set down on the ground, `Dropped`: a replicated actor from its next Tick |
+
+- **The record is one more array, `WornClass`** (`combat/record_vars.py`): a row per slot
+  of `Worn`, the garment's class or none, written by the server every Tick beside the
+  inventory's rows (`record.py`, `_author_worn_record`) and emptied by the shed. Plain
+  data, as the rows are: the character's save writes it as it stands.
+- **It replicates to the owning client alone** (`COND_OWNER_ONLY`), as the task asked:
+  nothing is drawn worn yet, so nobody else has anything to draw. **The task that draws
+  a garment on the body changes the condition** (everyone must see it, as `HandClass`
+  is seen) and draws from `WornClass` in its RepNotify; nothing else has to change.
+- **A client's `Worn` is a picture of it** (`weapon_component/view_worn.py`, `ViewWorn`):
+  in the view's dirty arm, a local actor per worn slot, hidden and not `Dropped`, so the
+  I panel, which reads `Worn`'s actors, draws a client's worn slots as it draws single
+  player's. A client wears and takes off nothing itself and predicts nothing: a refused
+  ask changes nothing it showed.
+- **The three serves moved** from the Tick's local half to the upkeep's authority arm,
+  ahead of the drop's and the slots' (the order they always ran in). In single player
+  `Server_Wear` is a plain call run where the wear's graph used to be, so nothing there
+  changed; the press is spent (`TriggerSpent`) where the key is read.
+- **A client's picture of a carried garment is not a pick-up:** `ViewRow` clears
+  `Dropped` on the actor it spawns, as the server's take does on its own. A garment's
+  class, like food's, is `Dropped` by default, which is what the pick-up scan and the
+  glimmer read.
+- **A probe's doors** are `FireForced` (the key), `WearForced` and
+  `TakeOffForced`/`TakeOffForcedTo` (`p.ask_wear(wc, slot)`, `p.ask_take_off(wc, slot,
+  to)`: `probes/context.py`), and `DropForced` for the drop.
+- `combat/verify/wear.py` (`check_server_wears`) and `verify/record.py` are the wiring.
+  Proof: `uepy.py --net --clients 2 --probe Scripts/probes/probe_net_clothing.py`
+  (client 1 wears the hat by the key and the jacket by a drag, is refused an axe and an
+  empty slot, takes the jacket off and drags the hat out onto the ground; after each the
+  server's `Worn`, its `WornClass` and client 1's own `Worn` agree, and client 2 is told
+  none of it); clean with `--lag 120`; `--game` runs its standalone arm. Single player's
+  are `probe_clothing` (with `probe_clothing_drag`), `probe_inventory_drag` and
+  `probe_asks`.
+- **Not here:** a garment worn on a server shows on nobody's body (nothing is drawn
+  worn), and the single-player profile still saves the bag and not `Worn`
+  (`Scripts/clothing/CLAUDE.md`).
 
 ## Everyone sees and hears the fight (M21, done)
 

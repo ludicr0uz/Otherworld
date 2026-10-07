@@ -94,6 +94,8 @@ from combat.weapon_component.look_vars import TABLE as LOOK_TABLE
 from combat.record_vars import TABLE as RECORD_TABLE
 from combat.weapon_component.record import replicate_record
 from combat.weapon_component.view import author_view_events
+from combat.weapon_component.view_worn import author_view_worn_event
+from combat.weapon_component.wear import author_wear_event
 from combat.weapon_component.shot import author_shot_events, replicate_shot
 from combat.weapon_component.headshot import replicate_headshot
 from combat.weapon_component.chop import author_chop_fx
@@ -353,7 +355,9 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # What a screen asks of the component: one event each (combat/ask_consts.py).
     # The slots' keys call theirs, and the upkeep the view's two (view.py).
     author_asks(ed)
+    author_wear_event(ed)
     author_view_events(ed)
+    author_view_worn_event(ed)
     # The cosmetics (fx.py, combat/fx_vars.py): each pair before the event
     # or the Tick fragment that tells or predicts it.
     author_pellet_fx(ed)

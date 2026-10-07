@@ -4,6 +4,7 @@ marked to replicate.
 
     upkeep, after the slot sync, with authority (so in single player too):
         InvClass, InvSlot, InvLoaded, InvReserve := a row per item of Inventory
+        WornClass := a row per slot of Worn: the garment's class, or none
         HandClass := the class of SlotItems[HAND], written when it changes
 
 Written every Tick rather than at each change: thirty-odd graphs change what
@@ -23,7 +24,8 @@ from uebp.graph import _connect, _pin, out, then
 from uebp.layout import arrange
 from combat import item_vars as IV
 from combat.paths import ITEM_CLASS_PATH
-from combat.record_vars import HandClass, RECORD, REPLICATED, ViewDirty
+from combat.record_vars import HandClass, RECORD, REPLICATED, ViewDirty, WornClass
+from combat.wear_tuning import WORN_VAR
 from combat.slot_tuning import HAND, SLOT_VAR
 from combat.weapon_component import vars as WV
 from combat.weapon_component.slot_nodes import for_each, slot_at, valid
@@ -68,6 +70,18 @@ def replicate_record(bp):
         rep_dirty(bp, var, condition)
 
 
+def _author_worn_record(g, execs):
+    """WornClass := a row per slot of Worn (task M24). Returns Completed."""
+    flow = then(g.call(FN_ARR_CLEAR, execs, TargetArray=g.get(WornClass)))
+    item, _i, body, done = for_each(g, g.get(WORN_VAR), [flow])
+    worn, bare = g.branch(valid(g, item), [body])
+    g.call(FN_ARR_ADD, [worn], TargetArray=g.get(WornClass),
+           NewItem=out(g.call(FN_OBJECT_CLASS, Object=item)))
+    # NewItem left unconnected: no class, an empty slot.
+    g.call(FN_ARR_ADD, [bare], TargetArray=g.get(WornClass))
+    return done
+
+
 def _author_clear(g, execs):
     flow = list(execs)
     for var in RECORD:
@@ -80,6 +94,7 @@ def author_empty_record(g, execs):
     exec tails."""
     server, client = g.branch(authority(g), execs)
     flow = _author_clear(g, [server])
+    flow = then(g.call(FN_ARR_CLEAR, [flow], TargetArray=g.get(WornClass)))
     return [g.put(HandClass, None, [flow]), client]
 
 
@@ -95,12 +110,13 @@ def _author_record(ed, in_execs):
                  else out(g.call(FN_OBJECT_CLASS, Object=item)))
         row = then(g.call(FN_ARR_ADD, [row], TargetArray=g.get(var), NewItem=value))
     # None for empty hands: GetObjectClass answers a null object with no class.
+    done = _author_worn_record(g, [done])
     in_hand = out(g.call(FN_OBJECT_CLASS, Object=slot_at(g, HAND)))
     changed, same = g.branch(out(g.call(FN_NE_CC, A=in_hand, B=g.get(HandClass))), [done])
     told = g.put(HandClass, in_hand, [changed])
     ed.add_comment_to_nodes(
         "The inventory's record (record.py), the server's: a row per carried item "
-        "(class, slot, rounds loaded, rounds in reserve), replicated to the owning "
-        "client, and the class in hand, replicated to everyone else. Plain data: the "
+        "(class, slot, rounds loaded, rounds in reserve) and a class per worn slot, "
+        "replicated to the owning client, and the class in hand, replicated to everyone else. Plain data: the "
         "save writes it as it stands.", g.made[:4])
     return [told, same, client]

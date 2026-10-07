@@ -166,20 +166,25 @@ _author_* fragment per concern, each in its own module:
               either way
   consume     the fire key on a Consumable: send the GAS use event, spend it,
               and spend the press so it cannot fire what is equipped next
-  wear        clothing: the fire key on a garment (a Consumable with a
-              ClothingSlot) wears it, into Worn[slot], swapping out what was
-              there; TakeOffSlot (the I panel's ask) takes one off into the bag,
-              or into the hand or bag slot a drag dropped it on (TakeOffTo)
-  wear_drag   WearRequest (the I panel's drag onto the worn grid): a slot's
-              garment is worn from wherever it is carried
+  wear        clothing, the server's: the fire key on a garment (a Consumable
+              with a ClothingSlot) asks Server_Wear, which wears it, into
+              Worn[slot], swapping out what was there; TakeOffSlot (the I
+              panel's ask), served with authority, takes one off into the bag,
+              or into the hand or bag slot a drag dropped it on (TakeOffTo);
+              a probe's TakeOffForced and WearForced
+  wear_drag   WearRequest (the I panel's drag onto the worn grid), served
+              with authority: a slot's garment is worn from wherever it is
+              carried
+  view_worn   a client's worn garments: Worn made a picture of the record's
+              WornClass (ViewWorn), called by view
   drop_request  the drop: the drop key and a probe's DropForced ask (AskDrop,
               a Server event), and DropRequest served with authority (the
               key's, or the I panel's drag released outside the inventory):
               a slot's item or a worn garment is set down on the ground ahead
   asks        what a screen asks, one custom event each (combat/ask_consts.py):
               AskSlot, AskMove, AskNext, AskTakeOff, AskWear, AskDrop raise the
-              request the Tick serves, in place of the HUD writing it; the
-              slots' three and the drop are Server events
+              request the Tick serves, in place of the HUD writing it; all
+              six are Server events
   loot_take   AskLootTake(Body, Index, Want): the loot window's take, a
               Server event, with its refusals (dead, no body, out of reach,
               no room, no such row, not the item asked for)

@@ -13,7 +13,7 @@ from combat.record_vars import DropForced
 from combat.slot_tuning import DROP_REQUEST_VAR, HAND
 from combat.verify.common import BEL, PIN, check, graph, in_pins, load, pin_value
 from combat.verify.fixtures import wg
-from combat.verify.record import _authority_branches, _feeders, _title, _upstream
+from combat.verify.record import _arm, _authority_branches, _feeders, _title, _upstream
 from combat.verify.shot import _calls_of, _gate_arm
 from combat.verify.wear import _gated_on
 
@@ -44,9 +44,11 @@ def check_drop_is_asked():
           len(calls) == 2 and len(keyed) == 1 and [f"Get {DropForced}"] in fed,
           f"{len(calls)} call(s), fed {fed}")
     serves = _gated_on(DROP_REQUEST_VAR)
-    arms = [_gate_arm(n, _authority_branches()) for n in serves]
+    # After the garments' two serves (M24), on the same arm: whichever
+    # authority Branch reaches it does so by its true arm.
+    arms = sorted({_arm(n, g) for n in serves for g in _authority_branches()} - {""})
     check(f"{DROP_REQUEST_VAR} is served with authority alone: the item set down is "
-          "the server's", arms == ["then"], str(arms))
+          "the server's", len(serves) == 1 and arms == ["then"], str(arms))
     lying = [n for n in wg if _title(n) == f"Set {IV.Dropped}"
              and pin_value(n, IV.Dropped) == "true"]
     local = [n for n in lying if not any(b in _upstream(n) for b in _authority_branches())]

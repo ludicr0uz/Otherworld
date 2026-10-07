@@ -18,6 +18,14 @@ the four arrays as they stand and a load is ``SpawnActor`` per row (the
 character's save task reuses them). They replicate to the owning client
 alone. Everyone else is told one thing, the class in the hand (HandClass).
 
+What is worn is a fifth array, a row per worn slot (wear_tuning.WEAR_SLOTS'
+index; as long as the server's Worn, which the first wear into a slot grows):
+
+    WornClass[slot]  the class of the garment worn there, or none
+
+It goes to the owning client too (task M24). Nothing is drawn worn yet: the
+task that draws a garment on the body sends this to everyone, as HandClass is.
+
 A client holds no inventory of its own: its item actors are made from the
 record (view.py), on the frame after one of these arrives (each is a
 RepNotify that raises ViewDirty).
@@ -34,9 +42,11 @@ InvSlot = Var("InvSlot", array(INT))
 InvLoaded = Var("InvLoaded", array(INT))
 InvReserve = Var("InvReserve", array(INT))
 RECORD = (InvClass, InvSlot, InvLoaded, InvReserve)
+# Replicated to the owner too: a row per worn slot, the garment's class or none.
+WornClass = Var("WornClass", array(ITEM_CLASS))
 # Replicated to everyone but the owner: what the hand holds, or none.
 HandClass = Var("HandClass", ITEM_CLASS)
-REPLICATED = RECORD + (HandClass,)
+REPLICATED = RECORD + (WornClass, HandClass)
 
 # A client's: a record arrived and the item actors are not yet its picture
 # (true from the start: the first record may arrive before BeginPlay), and
@@ -56,7 +66,14 @@ MoveForcedTo = Var("MoveForcedTo", INT, NO_ASK)
 # ...and the slot a drag out of the inventory, or the drop key, would set
 # down (drop_request.py).
 DropForced = Var("DropForced", INT, NO_ASK)
-FORCED = (SlotForced, MoveForcedFrom, MoveForcedTo, DropForced)
+# ...the worn slot the I panel would take off, and where to (TakeOffForcedTo:
+# a slot code, or UNPLACED for the bag), and the slot whose garment a drag
+# onto the worn grid would wear (wear.py).
+TakeOffForced = Var("TakeOffForced", INT, NO_ASK)
+TakeOffForcedTo = Var("TakeOffForcedTo", INT, NO_ASK)
+WearForced = Var("WearForced", INT, NO_ASK)
+FORCED = (SlotForced, MoveForcedFrom, MoveForcedTo, DropForced, TakeOffForced,
+          TakeOffForcedTo, WearForced)
 TABLE = REPLICATED + (ViewDirty, ViewItem) + FORCED
 
 # The view's two events (view.py). A row with Loaded below 0 leaves the
@@ -68,3 +85,7 @@ ROW_PARAMS = (("Index", INT), ("Class", ITEM_CLASS), ("Slot", INT), ("Loaded", I
               ("Reserve", INT))
 TRIM_PARAMS = (("Count", INT),)
 AMMO_UNKNOWN = -1
+# ...and the worn garments' one (view_worn.py): Worn[Slot] made an actor of
+# Class, or emptied.
+VIEW_WORN = "ViewWorn"
+WORN_PARAMS = (("Slot", INT), ("Class", ITEM_CLASS))

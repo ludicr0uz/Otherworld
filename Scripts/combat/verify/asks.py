@@ -47,11 +47,11 @@ def check_asks():
           f"({', '.join(AC.ALL_ASKS)})", not missing, str(missing))
     if missing:
         return
-    # The slots' (M18), the drop and the loot take (M23) are Server events;
-    # M24 and M35 make the rest so.
+    # The slots' (M18), the drop and the loot take (M23) and the garments'
+    # two (M24) are Server events; M35 makes the last so.
     kinds = {n: net.compiled_rpc(wc, n) for n in AC.ALL_ASKS}
-    check(f"...each compiled as a function of the class: the slots', the drop and "
-          f"the loot take ({', '.join(AC.SERVER_ASKS)}) reliable Server events, the "
+    check(f"...each compiled as a function of the class: the slots', the drop, "
+          f"the loot take and the garments' ({', '.join(AC.SERVER_ASKS)}) reliable Server events, the "
           "rest plain calls yet",
           all(k == ((net.SERVER, True) if n in AC.SERVER_ASKS else (net.LOCAL, False))
               for n, k in kinds.items()), str(kinds))

@@ -202,6 +202,32 @@ class Probe(object):
             wc.set_editor_property(str(DropForced), slot,
                                    unreal.PropertyAccessChangeNotifyMode.NEVER)
 
+    def ask_take_off(self, wc, slot, to=-1):
+        """AskTakeOff(slot, to), the same way (TakeOffForced and
+        TakeOffForcedTo in WRITABLE): the garment worn in ``slot`` into the
+        bag, or onto the slot code ``to``."""
+        import unreal
+        from combat.ask_consts import ASK_TAKE_OFF
+        from combat.record_vars import TakeOffForced, TakeOffForcedTo
+        if wc.get_owner().has_authority():
+            wc.call_method(ASK_TAKE_OFF, (slot, to))
+            return
+        never = unreal.PropertyAccessChangeNotifyMode.NEVER
+        wc.set_editor_property(str(TakeOffForcedTo), to, never)
+        wc.set_editor_property(str(TakeOffForced), slot, never)
+
+    def ask_wear(self, wc, slot):
+        """AskWear(slot), the same way (WearForced in WRITABLE): the garment
+        in the slot code ``slot`` onto the worn slot it belongs in."""
+        import unreal
+        from combat.ask_consts import ASK_WEAR
+        from combat.record_vars import WearForced
+        if wc.get_owner().has_authority():
+            wc.call_method(ASK_WEAR, (slot,))
+        else:
+            wc.set_editor_property(str(WearForced), slot,
+                                   unreal.PropertyAccessChangeNotifyMode.NEVER)
+
     def ask_move(self, wc, src, dst):
         """AskMove(src, dst), the same way (MoveForcedFrom and MoveForcedTo
         in WRITABLE)."""

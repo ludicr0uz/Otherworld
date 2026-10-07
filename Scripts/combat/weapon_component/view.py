@@ -17,6 +17,8 @@ record arrives. Never run with authority.
                       place (a local actor, never replicated), NeedsRefresh
         its Slot, and its Loaded and Reserve unless Loaded < 0
         a kept one whose Slot changed is HandledItem: it is heard
+    what is worn, before the rows: view_worn.py (WornClass --> Worn)
+
     ViewTrim(Count)
         every actor of Inventory from Count on destroyed, Inventory cut to
         Count
@@ -49,6 +51,7 @@ from combat.shot_vars import AsksSent, AsksServed
 from combat.slot_tuning import HAND, SLOT_VAR
 from combat.weapon_component import vars as WV
 from combat.weapon_component.slot_nodes import for_each, not_, op, valid
+from combat.weapon_component.view_worn import author_view_worn
 from Sound.sound_items import author_handled
 from uebp.nodes.actor import FN_DESTROY, FN_GET_OWNER, FN_GET_TRANSFORM
 from uebp.nodes.array import FN_ARR_GET, FN_ARR_LEN, FN_ARR_RESIZE, FN_ARR_SET, FN_ARR_VALID
@@ -110,6 +113,9 @@ def _author_view_row(ed):
                  Item=out(spawn))
     _set(put, "bSizeToFit", True)
     made = g.put(ViewItem, out(spawn), [then(put)])
+    # Carried, so not a pick-up: a garment's class, like food's, is Dropped
+    # until something takes it.
+    made = g.iput(out(spawn), IV.Dropped, "false", [made])
     made = g.put(WV.NeedsRefresh, "true", [made])
 
     item = g.get(ViewItem)
@@ -150,6 +156,8 @@ def _author_view(ed, in_execs):
     g = _G(ed, ITEM_CLASS_PATH)
     dirty, clean = g.branch(g.get(ViewDirty), in_execs)
     flow = g.put(ViewDirty, "false", [dirty])
+    # What is worn first (view_worn.py): the owner's alone, as the rows are.
+    flow = author_view_worn(g, [flow])
     rows = _length(g, InvClass)
     own, other = g.branch(op(g, FN_GREATER_II, rows, 0), [flow])
     # Four arrays of one length: the server writes them in one frame.

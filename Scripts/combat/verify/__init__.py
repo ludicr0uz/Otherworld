@@ -19,8 +19,9 @@ and it never relies on a variable another section left behind.
               health, the breath of a spent sprint, a footfall's rustle in a
               bush, a thrown axe's kill by the head, an item's own takes
               handled and used up
-  wear        clothing: the wear behind the Consumable tap, the take-off the
-              I panel asks for (TakeOffSlot), Worn and ClothingSlot's defaults
+  wear        clothing: the wear behind the Consumable tap (Server_Wear), the
+              take-off the I panel asks for (TakeOffSlot), served with
+              authority, Worn and ClothingSlot's defaults
   asks        what a screen asks of the weapon component: an event per action
               (none an RPC yet), the loot take's refusals and what it moves,
               save and exit's countdown, freeze and call-off

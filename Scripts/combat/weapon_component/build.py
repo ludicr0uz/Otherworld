@@ -95,6 +95,7 @@ from combat.record_vars import TABLE as RECORD_TABLE
 from combat.weapon_component.record import replicate_record
 from combat.weapon_component.view import author_view_events
 from combat.weapon_component.view_worn import author_view_worn_event
+from combat.weapon_component.consume import author_consume_event
 from combat.weapon_component.wear import author_wear_event
 from combat.weapon_component.shot import author_shot_events, replicate_shot
 from combat.weapon_component.headshot import replicate_headshot
@@ -357,6 +358,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     # The slots' keys call theirs, and the upkeep the view's two (view.py).
     author_asks(ed)
     author_wear_event(ed)
+    author_consume_event(ed)
     author_view_events(ed)
     author_view_worn_event(ed)
     # The cosmetics (fx.py, combat/fx_vars.py): each pair before the event

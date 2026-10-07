@@ -19,6 +19,9 @@ THE STANDARD PIECES (Gameplay Ability System, plugin GameplayAbilities)
   The one non-GAS piece is the stats themselves: an AttributeSet can only be
   declared in C++, so Hunger/Thirst/Temperature are Blueprint variables on
   BP_SurvivalComponent. Tags live in Config/DefaultGameplayTags.ini.
+  All of it is the server's (task M26; CLAUDE.md, "On a server"): the stats
+  replicate to their owner, the ability system its effects, and eating is a
+  Server event.
 
 DATA (no Blueprint authoring)
   paths             /Game/Survival asset and class paths, component names
@@ -37,17 +40,19 @@ BUILDERS
                     fragment for any graph that lands a hit (npc/melee.py)
   consumables       materials, BP_ConsumableItem, BP_Mushroom, BP_WaterCanteen
   debuffs           _author_debuff_sync: apply/remove a debuff GE at zero
-  survival_component  BP_SurvivalComponent: decay, grant the ability, debuffs
-  consume_ability   GA_ConsumeItem
+  survival_component  BP_SurvivalComponent: decay, grant the ability, debuffs,
+                    with authority; the three stats replicate to their owner
+  consume_ability   GA_ConsumeItem (server only)
   easy_heal         GA_ConsumeItem's heal: HealthRestoreEasy onto Health, EASY only
   campfire          BP_Campfire: what the matches light; its Tick warms a player
                     within its radius. Also writes it onto the weapon
                     component's CampfireClass
   install           the ability system + survival component onto the characters
+                    (replicated, on the player)
   forage_level      putting the forage into a level, in the editor
 
 Elsewhere, because they belong to what they extend: the use event is sent by
-combat/weapon_component/consume.py, the matches and their strike are
+combat/weapon_component/consume.py (Server_Consume), the matches and their strike are
 combat/matches.py and combat/weapon_component/light.py, the HP drain is combat/debuff_drain.py,
 and the bars are graphics_menu/survival_bars.py.
 

@@ -1,7 +1,8 @@
 """BP_DayNightCycle's last Tick step: the night is cold. Every living
 player's Temperature (BP_SurvivalComponent) falls while the sun is down.
 
-    [Tick ...] --> for each living player's pawn (net/players.py)
+    [Tick ...] --> with authority (the cold is the server's: M26)
+               --> for each living player's pawn (net/players.py)
                --> its SurvivalComponent (GetComponentByClass, cast)
                --> Temperature = max(Temperature
                        - NightTemperatureDropPerSecond * (1 - DayAmount) * dt, 0)
@@ -29,7 +30,7 @@ from world.day_night_blueprint import NIGHT_COLD_VAR
 from world.day_night_graph import _call, _get, _map
 from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.math import FN_MAX_FF, FN_MUL_FF, FN_SUB_FF
-from uebp.nodes.palette import NODE_CAST_SURVIVAL
+from uebp.nodes.palette import MACRO_SWITCH_AUTHORITY, NODE_CAST_SURVIVAL
 from world import day_night_vars as DV
 
 TEMPERATURE_VAR = "Temperature"
@@ -37,7 +38,11 @@ TEMPERATURE_VAR = "Temperature"
 
 def author_night_cold(ed, tick, chain):
     """Extend the Tick chain with the cold (see the module docstring)."""
-    pawn, each, _done, everyone = each_living_player(ed, [chain.then])
+    # The cold is the server's: Temperature replicates to its owner (M26), and
+    # a client's cycle lowering its own copy would fight what it is sent.
+    owns = ed.add_macro_node(MACRO_SWITCH_AUTHORITY)
+    _connect(chain.then, _pin(owns, "execute"))
+    pawn, each, _done, everyone = each_living_player(ed, [out(owns, "Authority")])
     chain.then = each
 
     comp = _call(ed, FN_GET_COMP, self=pawn)
@@ -63,4 +68,4 @@ def author_night_cold(ed, tick, chain):
     ed.add_comment_to_nodes(
         "The night is cold: every living player's Temperature falls by "
         "NightTemperatureDropPerSecond x (1 - DayAmount), down to 0.",
-        everyone + [cast, write])
+        everyone + [owns, cast, write])

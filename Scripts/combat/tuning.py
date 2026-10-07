@@ -28,6 +28,10 @@ INVENTORY_SIZE = BAG_SIZE
 # business, triggered by this tag (Scripts/survival/consume_ability.py). The
 # tag itself is declared in Config/DefaultGameplayTags.ini.
 CONSUME_EVENT_TAG = "Event.Item.Consume"
+# The fire key's use of a Consumable, asked of the server (task M26): the
+# Server event on the weapon component that sends the tag above and spends the
+# item (weapon_component/consume.py).
+SERVER_CONSUME = "Server_Consume"
 
 # A debuff that drains health grants this tag, once per debuff, and
 # BP_HealthComponent takes DEBUFF_DRAIN_HP_PER_S per stack of it every second

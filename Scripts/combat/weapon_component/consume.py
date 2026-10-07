@@ -1,6 +1,14 @@
 """Using a consumable: the fire key, pressed while the held item is flagged
 Consumable, eats or drinks it instead of firing it.
 
+The use is the server's (task M26): the key's arm, on the local player's
+machine, plays the item's sound, asks Server_Consume and spends the press;
+Server_Consume, a reliable Server event (in single player a plain call, run
+there and then), is refused unless its own Held is a Consumable that is not a
+garment, and does the rest. The server owns the inventory and the ability
+system, so a client eats nothing itself: its bag follows the record, its bars
+the survival component's replicated stats.
+
 The weapon component does not know what eating is. It announces the use as a
 Gameplay Ability System event -- CONSUME_EVENT_TAG, with the item as the
 payload's OptionalObject -- and then spends the item: out of Inventory and out
@@ -15,7 +23,7 @@ SendGameplayEventToActor activates the triggered ability synchronously, and the
 ability reads HungerRestore/ThirstRestore off the payload. Destroyed first, it
 would read them off an actor that is already pending kill.
 
-The press that eats an item is spent: TRIGGER_SPENT is set with the item gone,
+The press that eats an item is spent: TRIGGER_SPENT is set as the use is asked,
 and the fire gate stays shut until the key comes up. Without it, the item that
 slides into the emptied slot is equipped the same frame and the press still
 held down fires it -- an automatic on the next frame, anything on a press that
@@ -23,14 +31,18 @@ is still reported.
 """
 
 from uebp.graph import BEL, _connect, _loose_pin, _node, _palette, _pin, _set, else_, out, then
-from combat.tuning import CONSUME_EVENT_TAG
+from uebp import net
+from uebp.g import _G
+from combat.tuning import CONSUME_EVENT_TAG, SERVER_CONSUME
+from combat.wear_tuning import CLOTHING_SLOT_VAR
 from combat.weapon_component.common import _prop
 from combat.paths import ITEM_CLASS_PATH
 from Sound.play import _author_random_sound
-from uebp.nodes.actor import FN_ACTOR_LOC, FN_DESTROY
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_DESTROY, FN_GET_OWNER
 from uebp.nodes.array import FN_ARR_LEN, FN_ARR_REMOVE
 from uebp.nodes.gas import FN_SEND_GAMEPLAY_EVENT
-from uebp.nodes.math import FN_AND, FN_MIN_II, FN_NOT, FN_SUB_II
+from uebp.nodes.math import FN_AND, FN_GE_II, FN_MIN_II, FN_NOT, FN_SUB_II
+from uebp.nodes.system import FN_IS_VALID
 from uebp.nodes.palette import NODE_MAKE_EVENT_DATA
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
@@ -97,26 +109,17 @@ def _author_use_gate(ed, held, owner, tap, exec_in, not_edible, wear_gate):
 
 
 def _author_consume(ed, held, owner, exec_in):
-    """Send the use event, then remove and destroy the held item.
-
-    Returns the exec pin to carry on from. The equipped index stays where it
-    was, clamped to the shorter inventory, so eating one of a stack of
-    mushrooms leaves the next one in hand -- and an emptied inventory clamps to
-    -1, which the equip loop matches against nothing, leaving the hands empty.
-    """
+    """Where the key is: one of the item's UseSounds, then ask the server to
+    use it (Server_Consume), and the press is spent. Returns the exit."""
     made = []
 
     def keep(n):
         made.append(n)
         return n
 
-    payload = keep(_palette(ed, NODE_MAKE_EVENT_DATA))
-    _connect(held, _loose_pin(payload, "OptionalObject"))
-    _connect(owner, _loose_pin(payload, "Instigator"))
-    _connect(owner, _loose_pin(payload, "Target"))
-
-    # Heard first, while the item is still there to be asked for its takes:
-    # one of its UseSounds (food's eating; an item with none is silent).
+    # Heard by the player who eats, off their own copy of the item, while it
+    # is still there to be asked for its takes (food's eating; an item with
+    # none is silent).
     takes = keep(ed.add_get_member_variable_node(IV.UseSounds, ITEM_CLASS_PATH))
     _connect(held, _pin(takes, "self"))
     here = keep(_node(ed, FN_ACTOR_LOC))
@@ -125,11 +128,53 @@ def _author_consume(ed, held, owner, exec_in):
                                           source=out(takes, IV.UseSounds))
     made.extend(sounded)
 
+    ask = keep(_node(ed, SERVER_CONSUME))
+    _connect(heard, _pin(ask, "execute"))
+
+    # The press is spent; _author_trigger_latch re-arms it on release.
+    spend = keep(ed.add_set_member_variable_node(TRIGGER_SPENT))
+    _set(spend, TRIGGER_SPENT, True)
+    _connect(then(ask), _pin(spend, "execute"))
+
+    ed.add_comment_to_nodes(
+        "A Consumable is used, not fired: one of its UseSounds is heard here, "
+        f"the use is asked of the server ({SERVER_CONSUME}), and the press is "
+        "spent, so it cannot fire whatever is equipped next.",
+        made)
+    return then(spend)
+
+
+def author_consume_event(ed):
+    """Server_Consume(): the use, on the machine that owns the inventory and
+    the ability system. Refused unless its own Held is there, Consumable and
+    not a garment. Before the Tick, which calls it by name.
+
+    Sends the use event, then removes and destroys the held item. The
+    equipped index stays where it was, clamped to the shorter inventory, so
+    eating one of a stack of mushrooms leaves the next one in hand -- and an
+    emptied inventory clamps to -1, which the equip loop matches against
+    nothing, leaving the hands empty.
+    """
+    g = _G(ed, ITEM_CLASS_PATH)
+    keep = g.keep
+    event = keep(net.server_event(ed, SERVER_CONSUME, []))
+    held = g.get(WV.Held)
+    there, _empty = g.branch(out(g.call(FN_IS_VALID, Object=held)), [then(event)])
+    edible, _not = g.branch(g.iget(held, IV.Consumable), [there])
+    garment = g.call(FN_GE_II, A=g.iget(held, CLOTHING_SLOT_VAR), B=0)
+    _worn, food = g.branch(out(garment), [edible])
+    owner = out(g.call(FN_GET_OWNER))
+
+    payload = keep(_palette(ed, NODE_MAKE_EVENT_DATA))
+    _connect(held, _loose_pin(payload, "OptionalObject"))
+    _connect(owner, _loose_pin(payload, "Instigator"))
+    _connect(owner, _loose_pin(payload, "Target"))
+
     send = keep(_node(ed, FN_SEND_GAMEPLAY_EVENT))
     _connect(owner, _pin(send, "Actor"))
     _set(send, "EventTag", f'(TagName="{CONSUME_EVENT_TAG}")')
     _connect(BEL.list_output_pins(payload)[0], _pin(send, "Payload"))
-    _connect(heard, _pin(send, "execute"))
+    _connect(food, _pin(send, "execute"))
 
     inv = keep(ed.add_get_member_variable_node(WV.Inventory))
     inv_out = out(inv, WV.Inventory)
@@ -167,16 +212,10 @@ def _author_consume(ed, held, owner, exec_in):
     _set(dirty, WV.NeedsRefresh, True)
     _connect(then(stay), _pin(dirty, "execute"))
 
-    # The press is spent; _author_trigger_latch re-arms it on release.
-    spend = keep(ed.add_set_member_variable_node(TRIGGER_SPENT))
-    _set(spend, TRIGGER_SPENT, True)
-    _connect(then(dirty), _pin(spend, "execute"))
-
     ed.add_comment_to_nodes(
-        f"A Consumable is used, not fired: one of its UseSounds is heard, then send {CONSUME_EVENT_TAG} to the owner "
+        f"{SERVER_CONSUME} (consume.py): the owning client's fire key on a "
+        f"Consumable. Refused unless this machine's Held is one. Send {CONSUME_EVENT_TAG} to the owner "
         "with the item as OptionalObject (GA_ConsumeItem answers it), THEN take "
         "it out of Inventory and destroy it -- the ability reads the item's "
-        "restore values synchronously inside the send. The press is then "
-        "spent, so it cannot fire whatever is equipped next.",
-        made)
-    return then(spend)
+        "restore values synchronously inside the send.",
+        g.made)

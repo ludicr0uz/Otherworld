@@ -414,6 +414,9 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
     stick and a hot blade are two more columns of the inventory's record.)
 26. Survival: a replicated ability system; hunger, thirst, cold and bleeding applied on the
     server.
+    (Done, M26: `Scripts/net/CLAUDE.md`, "Survival". The ability system and the survival
+    component stay on the character, not the PlayerState: `Scripts/survival/CLAUDE.md`,
+    "On a server", has why. Eating is `Server_Consume`.)
 
 **Phase 6 — Wanderers and world**
 

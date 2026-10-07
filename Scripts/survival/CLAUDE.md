@@ -23,19 +23,22 @@ Both are read at editor **startup**, so changing either needs a restart.
 
 | piece | what it is |
 |---|---|
-| `AbilitySystem` component | A stock ASC on the player **and** the wanderer. It initialises itself, and `GetAbilitySystemComponent(Actor)` finds it without the C++ interface. |
+| `AbilitySystem` component | A stock ASC on the player **and** the wanderer. It initialises itself, and `GetAbilitySystemComponent(Actor)` finds it without the C++ interface. It replicates (the stock default), so a client is sent the effects the server applies. |
 | `GE_Starving`, `GE_Dehydrated` | **Infinite** GameplayEffects. |
 | `GE_Bleeding` | A GameplayEffect with a **duration** (180 s): the ability system takes it off. A hit puts it on (below). |
 | `Debuff.Starving` / `.Dehydrated` / `.Bleeding` / `.HealthDrain` | The HUD names a debuff from the first three tags. `combat/debuff_drain.py` drains by the rows of `combat.tuning.HEALTH_DRAINS`: 0.5 HP/s per stack of `HealthDrain` (so starving and dehydrated together drain twice as fast) and 50/180 HP/s per stack of `Bleeding`; the rates add up. |
-| `GA_ConsumeItem` | Triggered by the gameplay event `Event.Item.Consume`. The payload's `OptionalObject` is the item. Instanced per actor. |
+| `GA_ConsumeItem` | Triggered by the gameplay event `Event.Item.Consume`. The payload's `OptionalObject` is the item. Instanced per actor, and run on the server only. |
 | `BP_Campfire` | Not GAS: a replicated Actor the matches light (`campfire.py`). Its Tick warms a player near it, on the server. |
-| `BP_SurvivalComponent` | Hunger/Thirst/Temperature as Blueprint floats, because an AttributeSet needs C++. Also their decay, the ability grant at BeginPlay, and the debuff sync. |
+| `BP_SurvivalComponent` | Hunger/Thirst/Temperature as Blueprint floats, because an AttributeSet needs C++; replicated to the owning client alone. Also their decay, the ability grant at BeginPlay, and the debuff sync, all three with authority only. |
 
 ## The flow
 
-1. The player presses fire while holding a `Consumable`.
-2. `combat/weapon_component/consume.py` sends the event, **then** removes and destroys the item.
-   The ability runs synchronously and reads the item first.
+1. The player presses fire while holding a `Consumable`. Their machine plays the item's
+   sound, asks `Server_Consume` (a reliable Server event on the weapon component; a plain
+   call in single player) and spends the press.
+2. `Server_Consume` (`combat/weapon_component/consume.py`), refused unless the server's own
+   `Held` is a Consumable that is not a garment, sends the event, **then** removes and
+   destroys the item. The ability runs synchronously and reads the item first.
 3. `GA_ConsumeItem` adds the restore value, clamped. On the **EASY** difficulty it also adds the
    item's `HealthRestoreEasy` to Health (`easy_heal.py`; a mushroom heals 10). It reads the
    GameState's `Difficulty` (`combat/difficulty.py`, `net/state_consts.py`), which the HUD copies from the settings save.
@@ -45,6 +48,63 @@ Both are read at editor **startup**, so changing either needs a restart.
 The debuff sync is the only place that decides a debuff is on, and it asks the ASC
 (`GetGameplayEffectCount`). combat never names a survival asset, only the two tags in
 `combat/tuning.py`.
+
+## On a server (M26)
+
+Survival values drive health and death, so the server owns all of them. A client's copy
+writes nothing; in single player the one machine has authority and nothing differs.
+
+| what | whose | how a client learns of it |
+|---|---|---|
+| `Hunger`, `Thirst`, `Temperature` | the server's `BP_SurvivalComponent`; the decay, the night's cold (`world/night_cold.py`) and a campfire's warmth all write behind an authority switch | the component replicates and the three replicate `COND_OWNER_ONLY`: a player's bars are their own, and nobody else's copy of that character is told them |
+| the debuffs, the bleed | effects on the server's ability system: the debuff sync, the on-hit fragment and the cauterise are all behind authority | the ability system component replicates its active effects, with the tags granted on their specs, so the HUD's `GetGameplayTagCount` on its own pawn answers as it does in single player. The stock replication mode (Full) is meant to send them to every client the character is relevant to (not measured); nothing reads them off another player yet |
+| eating and drinking | `Server_Consume`, then `GA_ConsumeItem` with `NetExecutionPolicy` ServerOnly | the bag is the inventory's record, the bars the stats above; nothing is predicted, so a meal shows a round trip late |
+| stamina | the C++ movement component's since M12 (`Source/CLAUDE.md`) | predicted by the owner |
+| health | the health component's since M14; the EASY heal is the server's because the ability is | `Health` replicates |
+
+**Where it lives: on the character, not the PlayerState.** Both the ability system and the
+survival component are components of `BP_ThirdPersonCharacter`. Why:
+
+- **M16's respawn hands the player a new character,** and wants it fresh: full bars, no
+  bleed, no starving. On the pawn that is what a new pawn is, with no reset code; on the
+  PlayerState every effect and stat would have to be cleared by hand at each respawn, and
+  a missed one (a bleed carried across a death) drains the new body.
+- **The body left behind keeps its own state** for the 60 s it lies there, and the health
+  component beside it drains by *its owner's* ability system (`combat/debuff_drain.py`).
+  Health, the drain and the debuffs staying on one actor is what keeps that a one-line read.
+- **A wanderer has no PlayerState** and carries the same ability system for the same
+  drain and the same on-hit fragment. One place for both kinds of character.
+- **Nothing in Blueprint finds an ability system on a PlayerState from a pawn:**
+  `GetAbilitySystemComponent(Actor)` searches the actor's own components unless the
+  actor implements `IAbilitySystemInterface`, which is C++, and the avatar/owner split
+  (`InitAbilityActorInfo` at every possession) is C++ too.
+- **The save does not need it there.** What persists is the numbers, and a save reads
+  them off the living character as the single-player profile does
+  (`graphics_menu/player_parts.py`); a server-side save (phase 7) can do the same on the
+  server's copy and write them back onto the character it spawns at login.
+
+What this costs: a logout or a respawn loses anything not written down first. That is the
+intended rule for a respawn; for a logout it is the save's job.
+
+- **Traps:**
+  - `GA_ConsumeItem`'s default policy, LocalPredicted, refuses to activate on a server for a
+    player who is not local to it (the engine's "Can't activate LocalOnly or LocalPredicted
+    ability", read in its source, not reproduced here): the item would be spent and
+    nothing restored.
+  - A stock `AbilitySystemComponent` replicates by default, the wanderer's too.
+    `ReplicationMode` is not a `UPROPERTY`, so Mixed or Minimal cannot be set from Python
+    or a class default; it would take a `SetReplicationMode` call in C++.
+  - A probe's write of a stat goes on the server. A client's own write stays until the
+    server's value next changes, which hunger's and thirst's do every frame and
+    `Temperature`'s only at night or by a fire.
+- **Checks:** `verify/server.py`; `uepy.py --net --clients 2 --probe
+  Scripts/probes/probe_net_survival.py` (client 1 eats and its own hunger rises by 25,
+  client 2's does not, and client 2's copy of client 1's character is told none of its
+  bars; client 1 is sent the temperature and the dehydrated tag the server gave it), clean
+  with `--lag 120`, and its single-player arm with `--game`.
+- **Not done here:** the HUD drawing itself was not looked at in a rendered net run (the
+  probe reads the same variables and the same tag count the HUD reads); the eating sound
+  is heard by the eater alone.
 
 ## On-hit effects and bleeding (`on_hit.py`, `on_hit_graph.py`)
 

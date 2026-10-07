@@ -2,15 +2,22 @@
 they fall, and the debuffs at zero.
 
     [BeginPlay] --> AbilitySystem = GetAbilitySystemComponent(Owner)
-                --> if valid: GiveAbility(ConsumeAbility)       eating works
+                --> with authority, if valid: GiveAbility(ConsumeAbility)
 
-    [Tick] --> Hunger = clamp(Hunger - HungerDecay * dt, 0, MaxHunger)
+    [Tick] --> with authority:
+           --> Hunger = clamp(Hunger - HungerDecay * dt, 0, MaxHunger)
            --> Thirst = clamp(Thirst - ThirstDecay * dt, 0, MaxThirst)
            --> if AbilitySystem valid: one debuff sync per DEBUFFS row
 
+It is the server's (task M26; CLAUDE.md, "On a server"): the component
+replicates, Hunger, Thirst and Temperature replicate to the owning client
+alone (REPLICATED), and everything that writes them or the ability system runs
+behind the authority switch. A client's copy decays nothing, grants nothing
+and applies no debuff: its HUD draws what it is sent. In single player the one
+machine has authority and nothing differs.
+
 The stats are Blueprint variables, not GAS attributes: an AttributeSet can only
-be declared in C++, and this project has no C++ module on purpose (see
-CLAUDE.md). Everything around them is GAS -- the debuffs are GameplayEffects,
+be declared in C++, and the project's C++ is kept small (Source/CLAUDE.md). Everything around them is GAS -- the debuffs are GameplayEffects,
 eating is a GameplayAbility -- and the component is the seam: the ability
 writes Hunger/Thirst here, and the debuff sync reads them.
 
@@ -27,12 +34,14 @@ from combat.log import _log
 from uebp.graph import (
     BEL, BGE, _apply_defaults, _connect, _create_blueprint, _declare, _events, _float_type,
     _node, _pin, _set, out, then)
+from uebp import net
 from uebp.layout import arrange
 from survival.debuffs import _author_debuff_sync
 from survival.paths import SURVIVAL_BP_PATH
 from survival.tuning import DEBUFFS, SURVIVAL
 from uebp.nodes.actor import FN_GET_OWNER
 from uebp.nodes.gas import FN_GET_ASC, FN_GIVE_ABILITY
+from uebp.nodes.palette import MACRO_SWITCH_AUTHORITY_COMP
 from uebp.nodes.math import FN_AND, FN_CLAMP, FN_MUL_FF, FN_SUB_FF
 from uebp.nodes.system import FN_IS_VALID, FN_IS_VALID_CLASS
 from uebp.vars import declare, defaults
@@ -40,6 +49,9 @@ from survival.paths import ASC_COMPONENT
 from survival import component_vars as UV
 
 STATS = ("Hunger", "Thirst", "Temperature")
+# What the owning client is sent, and no one else: a player's bars are their
+# own. The maxima and the rates are class defaults, the same on every machine.
+REPLICATED = STATS
 
 
 def _author_begin_play(ed, begin):
@@ -49,6 +61,10 @@ def _author_begin_play(ed, begin):
     keep_asc = ed.add_set_member_variable_node(ASC_COMPONENT)
     _connect(out(lookup), _pin(keep_asc, ASC_COMPONENT))
     _connect(then(begin), _pin(keep_asc, "execute"))
+    # The grant is the server's: an ability given on a client is one the
+    # server never heard of.
+    owns = ed.add_macro_node(MACRO_SWITCH_AUTHORITY_COMP)
+    _connect(then(keep_asc), _pin(owns, "execute"))
 
     asc = out(ed.add_get_member_variable_node(ASC_COMPONENT), ASC_COMPONENT)
     ability = out(ed.add_get_member_variable_node(UV.ConsumeAbility), UV.ConsumeAbility)
@@ -61,7 +77,7 @@ def _author_begin_play(ed, begin):
     _connect(out(has_ability), _pin(both, "B"))
     can = ed.add_branch_node()
     _connect(out(both), _pin(can, "Condition"))
-    _connect(then(keep_asc), _pin(can, "execute"))
+    _connect(out(owns, "Authority"), _pin(can, "execute"))
 
     give = _node(ed, FN_GIVE_ABILITY)
     _connect(asc, _pin(give, "self"))
@@ -74,7 +90,7 @@ def _author_begin_play(ed, begin):
         "Find the owner's AbilitySystemComponent (installed next to this "
         "component) and grant it GA_ConsumeItem, the ability that answers the "
         "weapon component's consume event.",
-        [owner, lookup, keep_asc, has_asc, has_ability, both, can, give])
+        [owner, lookup, keep_asc, owns, has_asc, has_ability, both, can, give])
 
 
 def _author_decay(ed, tick, stat, rate_var, max_var, exec_in):
@@ -99,7 +115,11 @@ def _author_decay(ed, tick, stat, rate_var, max_var, exec_in):
 
 
 def _author_tick(ed, tick):
-    flow = then(tick)
+    # The stats are the server's: a client's copy is written by replication
+    # alone, or its decay would fight what it is sent.
+    owns = ed.add_macro_node(MACRO_SWITCH_AUTHORITY_COMP)
+    _connect(then(tick), _pin(owns, "execute"))
+    flow = out(owns, "Authority")
     flow = _author_decay(ed, tick, UV.Hunger, "HungerDecay", "MaxHunger", flow)
     flow = _author_decay(ed, tick, UV.Thirst, "ThirstDecay", "MaxThirst", flow)
 
@@ -120,7 +140,7 @@ def _author_tick(ed, tick):
     ed.add_comment_to_nodes(
         "Hunger and thirst fall every frame; at zero the matching debuff "
         "GameplayEffect goes on, and comes off when something is eaten.",
-        [asc_get, valid, gate])
+        [owns, asc_get, valid, gate])
 
 
 def build_survival_component(rebuild=True):
@@ -144,12 +164,20 @@ def build_survival_component(rebuild=True):
         _declare(ed, effect_var, BEL.get_class_reference_type(
             unreal.GameplayEffect.static_class()))
 
+    # After every declare: re-declaring a variable drops its replication.
+    for stat in REPLICATED:
+        net.replicate(bp, stat, unreal.LifetimeCondition.COND_OWNER_ONLY)
+
     _author_begin_play(ed, begin)
     _author_tick(ed, tick)
 
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("BP_SurvivalComponent failed to compile")
+    # A class default: written after a compile, and it needs another.
+    net.replicate_component(bp)
+    if not BEL.compile_blueprint(bp):
+        raise RuntimeError("BP_SurvivalComponent failed to recompile")
     _apply_defaults(bp, {**defaults(UV.TABLE),
         UV.Hunger: SURVIVAL.max_hunger,
         UV.MaxHunger: SURVIVAL.max_hunger,

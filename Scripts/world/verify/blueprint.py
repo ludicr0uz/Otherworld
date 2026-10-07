@@ -166,6 +166,15 @@ def _check_night_cold(bp):
     check(f"...by {NIGHT_COLD_VAR} x (1 - DayAmount): the night's, not the day's",
           len(scaled) == 1 and flipped == [(1.0, 0.0)], f"{len(scaled)} {flipped}")
     everyone = [n for n in nodes if _title(n) == LIVING_TITLE]
+    owns = [unreal.BlueprintGraphPinLibrary.get_owning_node(q)
+            for n in everyone
+            for q in BEL.find_input_pin(n, "execute").list_connected_pins()]
+    check("...with authority only (M26: Temperature is the server's, replicated to "
+          "its owner)",
+          len(owns) == 1 and "Switch Has Authority" in _title(owns[0])
+          and str(unreal.BlueprintGraphPinLibrary.get_pin_name(
+              BEL.find_input_pin(everyone[0], "execute").list_connected_pins()[0]))
+          == "Authority", str([_title(n) for n in owns]))
     check("...of every living player's pawn: the write is in the body of a "
           "loop over them (net/players.py)",
           len(everyone) == 1 and not by_pins(nodes, "PlayerIndex")

@@ -167,8 +167,9 @@ _author_* fragment per concern, each in its own module:
               the bone it struck (a trace on along the blade's line); a
               tree within reach keeps it, lodged point or bit first; a pick-up
               either way
-  consume     the fire key on a Consumable: send the GAS use event, spend it,
-              and spend the press so it cannot fire what is equipped next
+  consume     the fire key on a Consumable: ask Server_Consume and spend the
+              press, so it cannot fire what is equipped next; the server sends
+              the GAS use event and spends the item
   wear        clothing, the server's: the fire key on a garment (a Consumable
               with a ClothingSlot) asks Server_Wear, which wears it, into
               Worn[slot], swapping out what was there; TakeOffSlot (the I

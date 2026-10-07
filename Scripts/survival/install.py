@@ -7,6 +7,9 @@ AbilitySystemComponent, and BP_HealthComponent drains any owner whose ASC has
 the drain tag. Only the player gets hungry, so only the player gets the
 survival component that applies them.
 
+Where it lives is the character, not the PlayerState: CLAUDE.md, "On a
+server", has the reasons.
+
 This drops and re-adds only its own two component names, so it neither fights
 nor depends on combat.install -- either builder can be re-run alone.
 """
@@ -14,13 +17,22 @@ nor depends on combat.install -- either builder can be re-run alone.
 import unreal
 
 from combat.log import _log
+from uebp import net
 from uebp.graph import BEL, _add_component, _assets, _drop_components, _root_handle
 from combat.paths import CHARACTER_BP_PATH, NPC_BP_PATH
 from forest_generator.npc_placement import NPC_VARIANTS
 from survival.paths import ASC_COMPONENT, SURVIVAL_COMPONENT
 
 
-def _install(path, parts, required=True):
+# The player's two replicate (task M26): the ability system, so that the
+# effects the server applies, and the debuff tags they grant, reach the owner's
+# HUD, and the survival component, for its stats. A stock ability system
+# component replicates by default (the wanderer's too, which nothing on a
+# client reads); it is written here so that the build fails if that changes.
+PLAYER_REPLICATED = (ASC_COMPONENT, SURVIVAL_COMPONENT)
+
+
+def _install(path, parts, required=True, replicated=()):
     eas = _assets()
     bp = eas.load_asset(path)
     if not bp:
@@ -36,6 +48,12 @@ def _install(path, parts, required=True):
         _add_component(bp, _root_handle(bp), cls, name)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError(f"{path} failed to compile")
+    if replicated:
+        # A component template's default: after a compile, and it needs another.
+        for name in replicated:
+            net.replicate_component(bp, name)
+        if not BEL.compile_blueprint(bp):
+            raise RuntimeError(f"{path} failed to recompile")
     eas.save_loaded_asset(bp)
     _log(f"{path.rsplit('/', 1)[1]}: {', '.join(n for n, _c in parts)} installed")
 
@@ -43,7 +61,8 @@ def _install(path, parts, required=True):
 def install_survival(survival_bp):
     asc = unreal.AbilitySystemComponent.static_class()
     _install(CHARACTER_BP_PATH, ((ASC_COMPONENT, asc),
-                                 (SURVIVAL_COMPONENT, BEL.generated_class(survival_bp))))
+                                 (SURVIVAL_COMPONENT, BEL.generated_class(survival_bp))),
+             replicated=PLAYER_REPLICATED)
     _install(NPC_BP_PATH, ((ASC_COMPONENT, asc),), required=False)
     _resave_variants()
 

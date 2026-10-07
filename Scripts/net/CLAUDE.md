@@ -262,7 +262,7 @@ says who struck it. `combat/damage.py` is the whole of it.
 - **The heartbeat is the local player's** (`IsLocallyControlled`): another player's
   character has a health component on this machine too.
 - **Still written directly, each on the server:** a heal (`survival/easy_heal.py`: the
-  consume ability, M26), a wanderer's maximum at possession (`npc/stats.py`), a loaded
+  consume ability, which runs on the server only: "Survival", below), a wanderer's maximum at possession (`npc/stats.py`), a loaded
   profile (standalone). A Blueprint `Set` of a RepNotify calls `OnRep_Health` on that
   machine too, where its Remote arm does nothing.
 - **A wanderer's death by a drain is nobody's kill yet:** bleeding out after a player's
@@ -328,8 +328,8 @@ of them, plain data (`combat/record_vars.py`):
   actors are the server's or a picture.
 - **The picture is remade only when a record arrives.** What a client changes itself
   stays until the server next says otherwise, and it is
-  why an action that is not yet the server's (a meal: M26) still shows on its
-  own client, and is undone by the next record. Make the
+  why an action that is not the server's would still show on its
+  own client, and be undone by the next record. Make the
   action a server request; do not write the record from a client. (The throw and
   the take of an item are: M20, below.)
 - **The slots' asks are Server events** (`AskSlot`, `AskMove`, `AskNext`, reliable): the
@@ -592,7 +592,7 @@ setting one down is a reliable Server event on the weapon component.
   `SetReplicates(true)` sends the item to no one.
 - **Not here:** a client that joins after a placed item was taken
   still shows its own copy of it, and asks for it in vain (M31). A body's loot is still
-  classes, so a looted gun is a fresh one. Eating a mushroom is M26; the campfire and the wood's chop are "Fire and heat",
+  classes, so a looted gun is a fresh one. Eating a mushroom is "Survival"; the campfire and the wood's chop are "Fire and heat",
   below.
 - `combat/verify/world_items.py`, `verify/asks.py` and `graphics_menu/loot_checks.py`
   are the wiring. Proof: `uepy.py --net --clients 2 --probe-timeout 300 --probe
@@ -668,8 +668,7 @@ What changes the world happens once, on the server, and everyone sees it.
 - **The campfire is a replicated actor** (`survival/campfire.py`: `net.replicate_actor`,
   after the compile). Only the server spawns one, so every client is sent it; its model,
   glow and crackle are components and need nothing more. Its life span and its warmth
-  are behind HasAuthority: `Temperature` is the server's (it does not replicate until
-  M26, so a client's own HUD bar does not show the fire yet), and the server's destroy
+  are behind HasAuthority: `Temperature` is the server's (replicated to its owner: "Survival", below), and the server's destroy
   takes every copy.
 - **`Lit` and `Hot` are the item's own, and so are their clocks.** The burn-out and
   the cooling (`combat/stick.py`, `combat/heat.py`) run behind `IsServer`, not
@@ -695,8 +694,7 @@ What changes the world happens once, on the server, and everyone sees it.
 - **The probes' doors** are the keys' stand-ins that already existed: `FireForced` (the
   strike), `SightsForced` (the use key: kindle, cauterise) and `InteractForced` (heat).
 - **In single player** each is a plain call, and `IsServer` is true: nothing changed.
-- **Not here:** `Temperature`, the bleed and the other debuffs on a client's HUD (M26);
-  a client that joins after a fire was lit is sent it like any replicated actor, but
+- **Not here:** a client that joins after a fire was lit is sent it like any replicated actor, but
   what a late joiner is told of the items is M31.
 - `combat/verify/fire.py` checks the events and how `Lit` and `Hot` travel;
   `verify/light.py`, `torch.py` and `heat.py` what each event asks first;
@@ -708,6 +706,27 @@ What changes the world happens once, on the server, and everyone sees it.
   ground, and the server's `Temperature` of client 2 rises beside the fire); clean with
   `--lag 120`. Single player's are `probe_campfire`, `probe_chop_tree`,
   `probe_lit_stick` and `probe_hot_blade`.
+
+## Survival: hunger, thirst, temperature, the debuffs, eating (M26, done)
+
+The server owns every survival value; `Scripts/survival/CLAUDE.md`, "On a server", has
+the table and the reasons the ability system lives on the character.
+
+- **The stats** (`Hunger`, `Thirst`, `Temperature` on `BP_SurvivalComponent`) are written
+  only behind an authority switch (the decay, `world/night_cold.py`, the campfire) and
+  replicate `COND_OWNER_ONLY`. A HUD reads its own pawn's component, as before.
+- **The debuffs and the bleed** are effects on the character's ability system, applied
+  and removed with authority; the component replicates them and the tags on their specs,
+  so `GetGameplayTagCount` answers on the owner's machine.
+- **Eating** is `Server_Consume()` on the weapon component (`weapon_component/consume.py`):
+  the key's arm plays the sound, asks and spends the press; the server, refused unless
+  its own `Held` is a Consumable and not a garment, sends `GA_ConsumeItem` its event
+  (ServerOnly) and spends the item. Nothing is predicted.
+- **On the character, not the PlayerState:** a respawn's new character is fresh by
+  construction, the body keeps its state for the drain beside it, and a wanderer has no
+  PlayerState.
+- Proof: `uepy.py --net --clients 2 --probe Scripts/probes/probe_net_survival.py`, clean
+  with `--lag 120`; `survival/verify/server.py`, `combat/verify/consume.py`.
 
 ## Everyone sees and hears the fight (M21, done)
 
@@ -816,7 +835,7 @@ only varies how something looks or sounds is each machine's own.
 | `combat/gun_drop.py` | state | whether a kill leaves a gun, and which: two streams on the GameMode | the same arm, and the streams are the GameMode's, which a client does not have; the gun is an actor the server spawns, and it replicates as any item lying in the world does (M23) |
 | `combat/replacement.py` | state | where a killed wanderer's replacement appears (bearing, distance, the navmesh's point) | the same arm; the wanderer is spawned by the server and replicates |
 | `combat/player_respawn.py` | state | which PlayerStart a respawn is given | behind death's IsStandalone Branch and the authority switch; the new pawn replicates |
-| `survival/on_hit_graph.py` | state | whether a blow leaves its on-hit effect (a wendigo's: bleeding, 33%) | behind HasAuthority of the target, in the fragment itself; the effect is the target's ability system's (**M26**) |
+| `survival/on_hit_graph.py` | state | whether a blow leaves its on-hit effect (a wendigo's: bleeding, 33%) | behind HasAuthority of the target, in the fragment itself; the effect is the target's ability system's, which replicates ("Survival") |
 | `npc/patrol.py` | state | a patrol's next point and how long the wanderer waits there | the wanderer's AIController, which exists on the server alone; its movement replicates |
 | `npc/stalk.py` | state | the wendigo's hunt: which way round, when it turns, the wait behind a tree | the AIController, as the patrol |
 | `npc/strafe.py` | state | between two swings: the sidestep's angle, side and distance | the AIController, as the patrol |
@@ -834,7 +853,7 @@ only varies how something looks or sounds is each machine's own.
   a level starts at (M30: every machine's sky is its own today).
 - **A dropped gun is rolled by the server and spawned there;** it reaches a client as
   every item lying in the world does (M23: its own Tick replicates it). A landed bleed is the target's ability
-  system's on the server; the owner's HUD reads it when the attributes replicate (M26).
+  system's on the server, which replicates its effects: the owner's HUD reads the tag ("Survival").
 - **Not runtime rolls:** the level generator's `random` (seeded, at build time: every
   machine loads the same level) and the materials' wind (a function of world position
   and time).
@@ -1112,7 +1131,7 @@ Every process's log was free of Blueprint errors with `-nullrhi` clients.
 | day and night | Each process rolls its own start time: in one run it was day on the server and client 2 and night on client 1 | measured | M30 |
 | walk speed, sprint, stance | The weapon component wrote `MaxWalkSpeed` every tick in every process from its own unreplicated state. **Since M10 only the local player's copy writes it** (the sprint and the aim are behind the local gate), so the server's copy keeps the speed the character was built with. Sprint, crouch and prone are keys read on the client, so the server would correct a sprinting client. **Fixed (M12): "Movement states are predicted", above** | the write measured; the fix measured (`probe_net_move_states.py`, 137 ms) | M12 done |
 | input | **Fixed (M10): "Input", above.** The weapon component polled keys in its Tick on every copy of every character, the server's included, and on `GetPlayerController(0)`, so a client's press drove every character it could see | read; the fix measured (`probe_net_local_input.py`, headless and `--windowed`) | M10 done |
-| stamina, hunger, thirst, temperature | Per-process component and GAS state: no builder replicates a variable or a component yet (`net.replicate` has no caller outside `dev/check_net_authoring.py`). **Stamina is the server's since M12** (the movement component; the owning client predicts it and is corrected to it) | read; stamina measured | M12 done, M26 |
+| stamina, hunger, thirst, temperature | Per-process component and GAS state: no builder replicates a variable or a component yet (`net.replicate` has no caller outside `dev/check_net_authoring.py`). **Stamina is the server's since M12** (the movement component; the owning client predicts it and is corrected to it). **Hunger, thirst, temperature and the debuffs are the server's since M26: "Survival", above** (measured: `probe_net_survival.py`) | read; stamina and the bars measured | M12, M26 done |
 | animation of the other player | Only what CharacterMovement replicates reached a simulated proxy (velocity, falling). **Fixed (M13): "Other players' characters", above**: stance, aim pitch, aim mode, the gun raised or lowered and the hand's pose. **The swing's and the throw's clips: fixed (M21), "Everyone sees and hears the fight"** | read; M21's measured (`probe_net_fx.py`) | M13, M21 done |
 | sounds and effects | Played where the graph that caused them ran, so a shot, a blow or a footstep is heard by its own client only. **Fixed (M21):** each cosmetic is an `Fx_`/`Multicast_` pair told by the server, the owner predicting its own; footsteps were already each copy's own component | read; the fix measured (`probe_net_fx.py`) | M21 done |
 | player starts | The level has one PlayerStart: the two spawned 70 cm apart, the engine nudging the second. At that spacing the server refuses a crouched character's stand-up ("Other players' characters") | measured | M16 |

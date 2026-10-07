@@ -15,7 +15,10 @@ so the two suites read the same way.
   loot          the corpse loot table written onto BP_HealthComponent
   campfire      BP_Campfire: the model, the burn time, the warmth; and
                 BP_WeaponComponent.CampfireClass pointing at it
+  server        M26: the stats replicate to their owner, the components
+                replicate on the player, every write is behind authority,
+                and GA_ConsumeItem is server only
 """
 
 SECTIONS = ("tags", "items", "debuffs", "bleeding", "ability", "hooks", "install", "forage", "loot",
-            "campfire")
+            "campfire", "server")

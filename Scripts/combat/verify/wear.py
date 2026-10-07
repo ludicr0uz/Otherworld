@@ -8,6 +8,7 @@ defaults; probes/probe_clothing.py runs both in a game.
 """
 
 from combat.paths import ITEM_BP_PATH
+from combat.tuning import SERVER_CONSUME
 from combat.slot_tuning import (
     DROP_ITEM_VAR, DROP_REQUEST_VAR, DROP_WANT_VAR, NO_REQUEST, SLOT_VAR,
 )
@@ -93,9 +94,10 @@ def check_wear():
         for up in _feeders(f, "execute") for g in _feeders(up, "Condition")
         for p in BEL.list_output_pins(g))]
     every = _gated_on(CLOTHING_SLOT_VAR)
-    check(f"two Branches on Held.{CLOTHING_SLOT_VAR} >= 0: the key's, behind the "
-          f"Consumable tap, and {SERVER_WEAR}'s own refusal",
-          len(every) == 2 and len(gates) == 1,
+    check(f"three Branches on Held.{CLOTHING_SLOT_VAR} >= 0: the key's, behind the "
+          f"Consumable tap, {SERVER_WEAR}'s own refusal, and {SERVER_CONSUME}'s (a "
+          "garment is not eaten)",
+          len(every) == 3 and len(gates) == 1,
           f"{len(every)} gates, {len(gates)} behind the tap")
     if not gates:
         return
@@ -110,6 +112,9 @@ def check_wear():
           bool(event) and net.compiled_rpc(wc, SERVER_WEAR) == (net.SERVER, True),
           str(net.compiled_rpc(wc, SERVER_WEAR)) if event else "no event")
     served = [b for b in every if b not in gates and event and event in _upstream(b)]
+    eaten = graph(wc).find_event_node(SERVER_CONSUME)
+    check(f"...{SERVER_CONSUME}'s is its own",
+          len([b for b in every if eaten and eaten in _upstream(b)]) == 1)
     if not served:
         check(f"...whose own Branch on Held.{CLOTHING_SLOT_VAR} gates the wear", False)
         return

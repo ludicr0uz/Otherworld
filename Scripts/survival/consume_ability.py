@@ -21,6 +21,9 @@ survival component's own debuff sync sees "at zero" and "GE_Starving active"
 disagree on its next Tick and removes the effect, so there is one place that
 decides when a debuff is on, not two.
 
+Server only (NET_POLICY): it runs where the stats and the health are owned.
+In single player that is the one machine.
+
 Instanced per actor: the ability is stateless, so one instance per owner is
 the cheapest policy that still lets a Blueprint graph run (a non-instanced
 ability cannot).
@@ -43,6 +46,12 @@ from uebp.nodes.gas import FN_AVATAR, FN_END_ABILITY
 from uebp.nodes.math import FN_ADD_FF, FN_CLAMP
 from uebp.nodes.palette import (
     NODE_ABILITY_FROM_EVENT, NODE_BREAK_EVENT_DATA, NODE_CAST_CONSUMABLE, NODE_CAST_SURVIVAL)
+
+# Server only (task M26): the server sends the use event (the weapon
+# component's Server_Consume) and the ability writes the server's stats. The
+# default, LocalPredicted, refuses to run on a server for a player who is not
+# local to it, which is every player of a dedicated one.
+NET_POLICY = unreal.GameplayAbilityNetExecutionPolicy.SERVER_ONLY
 
 RESTORES = (("Hunger", "HungerRestore"), ("Thirst", "ThirstRestore"))
 
@@ -139,6 +148,7 @@ def build_consume_ability(rebuild=True):
     cdo.set_editor_property("ability_triggers", [_trigger()])
     cdo.set_editor_property("instancing_policy",
                             unreal.GameplayAbilityInstancingPolicy.INSTANCED_PER_ACTOR)
+    cdo.set_editor_property("net_execution_policy", NET_POLICY)
     arrange(ed)
     if not BEL.compile_blueprint(bp):
         raise RuntimeError("GA_ConsumeItem failed to recompile")
@@ -154,5 +164,8 @@ def build_consume_ability(rebuild=True):
     policy = fresh.get_editor_property("instancing_policy")
     if policy != unreal.GameplayAbilityInstancingPolicy.INSTANCED_PER_ACTOR:
         raise RuntimeError(f"GA_ConsumeItem instancing did not stick: {policy}")
+    net_policy = fresh.get_editor_property("net_execution_policy")
+    if net_policy != NET_POLICY:
+        raise RuntimeError(f"GA_ConsumeItem net policy did not stick: {net_policy}")
     _log(f"built {CONSUME_ABILITY_PATH} (triggered by {CONSUME_EVENT_TAG})")
     return bp

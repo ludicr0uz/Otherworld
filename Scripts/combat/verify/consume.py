@@ -6,9 +6,11 @@ that press from firing it. Checked on the wiring, since a headless run has no
 mouse to hold down.
 """
 
+from uebp import net
+from combat.tuning import SERVER_CONSUME
 from combat.weapon_component.consume import TRIGGER_SPENT
-from combat.verify.fixtures import wc_cdo, wg
-from combat.verify.common import BEL, PIN, by_pins, check, in_pins, out_pins, pin_value
+from combat.verify.fixtures import wc, wc_cdo, wg
+from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins, out_pins, pin_value
 
 
 def _title(n):
@@ -29,6 +31,19 @@ def _exec_after(node, limit=40):
         cur = nxt[0] if nxt else None
         if cur is not None:
             seen.append(cur)
+    return seen
+
+
+def _reached(node, limit=400):
+    """Every node an exec link leads to from node, down every arm."""
+    seen, todo = [], [node]
+    while todo and len(seen) < limit:
+        for p in BEL.list_output_pins(todo.pop()):
+            for q in PIN.list_connected_pins(p):
+                nxt = PIN.get_owning_node(q)
+                if str(PIN.get_pin_name(q)) == "execute" and nxt not in seen:
+                    seen.append(nxt)
+                    todo.append(nxt)
     return seen
 
 
@@ -62,13 +77,27 @@ def check_eating_spends_the_press():
           len(sets) == 4 and len(spends) == 3 and len(rearms) == 1,
           f"{len(sets)} sets, {len(spends)} spend, {len(rearms)} re-arm")
 
+    # The use is the server's (M26): the key's arm asks and spends the press,
+    # and Server_Consume sends the event, then destroys the item.
+    asks = [n for n in wg if _title(n).replace(" ", "").replace("_", "") == SERVER_CONSUME.replace("_", "")
+            and "execute" in in_pins(n)]
+    after_ask = _exec_after(asks[0], 2) if len(asks) == 1 else []
+    check(f"...the key's arm asks the server ({SERVER_CONSUME}) and spends the press "
+          "next, and eats nothing itself",
+          bool(after_ask) and after_ask[0] in spends, str([_title(n) for n in after_ask]))
+    event = graph(wc).find_event_node(SERVER_CONSUME)
+    check(f"{SERVER_CONSUME} is a reliable Server event",
+          bool(event) and net.compiled_rpc(wc, SERVER_CONSUME) == (net.SERVER, True),
+          str(net.compiled_rpc(wc, SERVER_CONSUME)) if event else "no event")
     sends = by_pins(wg, "Actor", "EventTag", "Payload")
-    after_send = _exec_after(sends[0]) if len(sends) == 1 else []
-    spends = [n for n in spends if n in after_send]
-    check("...spent on the use event's own exec chain, after the item is gone",
-          bool(spends) and spends[0] in after_send
-          and any(_title(n) == "Destroy Actor" for n in after_send[:after_send.index(spends[0])]),
-          str([_title(n) for n in after_send]))
+    served = _reached(event) if event else []
+    chain = [_title(n) for n in _exec_after(event)] if event else []
+    after_send = [_title(n) for n in _exec_after(sends[0])] if len(sends) == 1 else []
+    check("...which refuses a Held that is not there, not Consumable or a garment "
+          "(three Branches), then sends the use event once, and only then destroys the item",
+          chain[:3] == ["Branch"] * 3 and len(sends) == 1 and "Destroy Actor" in after_send
+          and sends[0] in served,
+          f"{chain[:5]} / {after_send}")
 
     if rearms:
         ands = _feeders(rearms[0], TRIGGER_SPENT)
@@ -82,7 +111,8 @@ def check_eating_spends_the_press():
     # test. Its condition must refuse a spent press -- which also shuts the
     # ready gate, the shot and the dry click behind it.
     branches = [n for n in wg if n.get_class().get_name() == "K2Node_IfThenElse"]
-    outer = [b for b in branches
+    # Server_Consume tests Consumable too, behind its own IsValid: not a fire gate.
+    outer = [b for b in branches if b not in served
              if any("Consumable" in out_pins(f)
                     for nxt in _exec_after(b, 1)
                     if nxt.get_class().get_name() == "K2Node_IfThenElse"

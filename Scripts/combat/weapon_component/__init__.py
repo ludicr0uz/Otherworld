@@ -138,6 +138,9 @@ _author_* fragment per concern, each in its own module:
   chop        the knife stage's blow on something with no health: with an item
               that Chops in hand (the axe) and a tree under it, chips, a count
               on that tree, and every third blow a BP_Wood beside the trunk
+  fire        M25's four Server events, authored in one call: Server_Light
+              (light), Server_Kindle (torch), Server_Heat (heat) and
+              Server_Cauterize (cauterize), and the match's cosmetic pair
   light       an item that Lights held (the matches): the fire key burns one
               piece of wood from Inventory into CampfireClass on the ground
               in front of the player (behind the fire gate, after Melee)

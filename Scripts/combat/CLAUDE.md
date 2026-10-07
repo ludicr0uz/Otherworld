@@ -396,6 +396,11 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
   `Lights`, carried in `A_HoldItem`. A tap of the fire key with it in hand takes one `BP_Wood`
   out of `Inventory`, destroys it, and spawns `CampfireClass` 130 cm in front of the player,
   on the ground a trace finds. The matches are never spent; with no wood nothing happens.
+  - **The strike is the server's** (`Server_Light`, M25): the key's arm only asks. So are
+    lighting the stick (`Server_Kindle`), heating a blade (`Server_Heat`) and cauterising
+    (`Server_Cauterize`); `combat/fire_vars.py` has the picture and `Scripts/net/CLAUDE.md`,
+    "Fire and heat", the rules (a burning stick or a hot blade reaches a client by the
+    record; the burn-out and the cooling run behind `IsServer`).
   - **The campfire is survival's** (`survival/campfire.py`): combat only holds a class
     variable. `build_survival.py` writes `CampfireClass`; the weapons build re-declares it
     and puts the old value back (`build._kept_class`), so a weapons-only rebuild keeps the

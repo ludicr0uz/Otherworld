@@ -11,6 +11,7 @@ from combat.verify.common import (
     BEL, PIN, by_pins, cdo, check, component_template, graph, load, num_pin,
 )
 from net.players_consts import LIVING_TITLE
+from uebp import net
 from Sound.sound_items import CAMPFIRE, CRACKLE_COMP
 from survival.campfire import (
     CAMPFIRE_MESH, CAMPFIRE_SCALE, MAX_TEMPERATURE_VAR, TEMPERATURE_VAR, WARM_RADIUS_VAR,
@@ -98,6 +99,22 @@ def check_model(bp):
           and crackle.get_editor_property("auto_activate"), str(sound))
 
 
+def _owned(node, event):
+    """``node`` runs off the true arm of a Branch on HasAuthority that the
+    ``event`` runs: the server's copy alone (and single player's)."""
+    gates = _feeders(node, "execute")
+    return (len(gates) == 1 and _title(gates[0]) == "Branch"
+            and node in [PIN.get_owning_node(q) for q in
+                         PIN.list_connected_pins(BEL.find_then_pin(gates[0]))]
+            and any("hasauthority" in _squash(f) for f in _feeders(gates[0], "Condition"))
+            and any(event in _squash(f) for f in _feeders(gates[0], "execute")))
+
+
+def check_replicates(bp):
+    check("it replicates: the fire the server lit is sent to every client (M25)",
+          net.replicates(bp), str(net.replicates(bp)))
+
+
 def check_warmth(bp):
     d = cdo(bp)
     radius, rate = d.get_editor_property(WARM_RADIUS_VAR), d.get_editor_property(WARM_RATE_VAR)
@@ -109,9 +126,10 @@ def check_warmth(bp):
           f"{rate} within {radius}")
     nodes = graph(bp).list_all_nodes()
     lives = by_pins(nodes, "InLifespan")
-    check(f"one piece of wood burns {CAMPFIRE_BURN_S:.0f} s: BeginPlay sets the life span",
+    check(f"one piece of wood burns {CAMPFIRE_BURN_S:.0f} s: BeginPlay sets the life "
+          "span, with authority (the server's clock; its destroy reaches every copy)",
           len(lives) == 1 and num_pin(lives[0], "InLifespan") == CAMPFIRE_BURN_S
-          and any("beginplay" in _squash(f) for f in _feeders(lives[0], "execute")),
+          and _owned(lives[0], "beginplay"),
           str([num_pin(n, "InLifespan") for n in lives]))
     writes = [n for n in nodes if _title(n) == f"Set {TEMPERATURE_VAR}"]
     check("Tick writes the Temperature in one place", len(writes) == 1, str(len(writes)))
@@ -141,10 +159,10 @@ def check_warmth(bp):
     asks = _feeders(loops[0], "Exec") if len(loops) == 1 else []
     check("...and that is every living player in turn, never player 0: the "
           "Branch is the body of a loop over LivingPlayers, asked once a Tick "
-          "(net/players.py)",
+          "(net/players.py), with authority: Temperature is the server's",
           len(loops) == 1 and _squash(loops[0]) == "foreachloop"
           and len(asks) == 1 and _squash(asks[0]) == LIVING
-          and any("tick" in _squash(f) for f in _feeders(asks[0], "execute"))
+          and _owned(asks[0], "tick")
           and not by_pins(nodes, "PlayerIndex"),
           str([_title(n) for n in loops + asks]))
 
@@ -156,6 +174,7 @@ def run():
     if bp is None:
         return
     check_model(bp)
+    check_replicates(bp)
     check_warmth(bp)
     got = cdo(load(WEAPON_COMP_BP_PATH)).get_editor_property(CAMPFIRE_CLASS_VAR)
     check(f"BP_WeaponComponent.{CAMPFIRE_CLASS_VAR} points at BP_Campfire_C, so a "

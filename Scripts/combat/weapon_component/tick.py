@@ -351,7 +351,7 @@ def _author_actions(ed, pc_out, owner_out, held, armed_out, key_pins, muzzle,
 
     # --- or is it something to eat (consume.py), to swing (knife.py), or to
     # strike (light.py)? ---------------------------------------------------------
-    light_in, struck = _author_light_press(ed, held, owner_out, tap, _pin(ready_gate, "execute"))
+    light_in, struck = _author_light_press(ed, held, tap, _pin(ready_gate, "execute"))
     knife_in, slash_pressed = _author_knife_press(ed, held, tap, light_in)
     used, untapped = _author_use_gate(
         ed, held, owner_out, tap, then(fire_gate),

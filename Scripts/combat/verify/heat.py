@@ -34,7 +34,11 @@ from combat.verify.common import (
 from combat.verify.fixtures import w, wg
 from combat.verify.glimmer import is_glimmer_node
 from combat.verify.interact import _then
+from combat.fire_vars import (
+    FIRE_PARAM, HEAT_REACH_CM, SERVER_CAUTERIZE, SERVER_HEAT)
 from combat.verify.punch import _feeders, _feeds, _title
+from combat.verify.record import _upstream
+from combat.verify.shot import _asked_above, _calls_of, _event
 from combat.weapon_component.interact import INTERACT_TARGET_VAR
 from combat.weapon_specs import _weapon_specs
 from survival.paths import SURVIVAL_DIR
@@ -146,8 +150,10 @@ def _check_cooling(name, nodes):
     if len(colds) == 1:
         gates = _ran_by(colds[0])
         src = _pure_feeds(gates[0]) if len(gates) == 1 else []
-        check(f"...on its Tick, once it is {HOT_VAR} and the clock has reached {COOL_VAR}",
+        check(f"...on its Tick, once it is {HOT_VAR} and the clock has reached "
+              f"{COOL_VAR}, on the server's copy alone (IsServer: a client's is told)",
               {f"Get {HOT_VAR}", f"Get {COOL_VAR}"} <= _names(src)
+              and any("isserver" in _squash(n) for n in src)
               and any("gettimeseconds" in _squash(n) for n in src)
               and any("ReceiveTick" in str(n.get_name()) or "Tick" in _title(n)
                       for g in gates for n in _ran_by(g)),
@@ -177,8 +183,10 @@ def _check_cooling(name, nodes):
 
 def check_heat_at_fire():
     # The Branch that keeps a candidate, asking Heats of the held item...
+    # (Server_Heat's own Branch on Heats keeps nothing: it is checked below.)
     offers = [n for n in wg if _title(n) == "Branch"
-              and f"Get {HEATS_VAR}" in _names(_pure_feeds(n))]
+              and f"Get {HEATS_VAR}" in _names(_pure_feeds(n))
+              and _event(SERVER_HEAT) not in _upstream(n)]
     # ...run by a Branch on IsValid(Held), itself the body of a loop...
     held_first = [g for o in offers for g in _ran_by(o) if _title(g) == "Branch"
                   and any("isvalid" in _squash(f) for f in _feeders(g, "Condition"))]
@@ -194,12 +202,14 @@ def check_heat_at_fire():
           f"{len(walks)} walk(s), {len(offers)} offer(s), "
           f"{len(held_first)} IsValid gate(s), {len(keeps)} keep(s)")
 
-    hots = [n for n in _sets(wg, HOT_VAR) if pin_value(n, HOT_VAR) == "true"]
+    # A client's picture is told its row's Hot (view.py): that Set is fed.
+    writes = [n for n in _sets(wg, HOT_VAR) if not _feeders(n, HOT_VAR)]
+    hots = [n for n in writes if pin_value(n, HOT_VAR) == "true"]
     cools = _sets(wg, COOL_VAR)
     check(f"one place makes the held item {HOT_VAR}, and the component never "
           "cools it (the item does)",
-          len(hots) == 1 and len(_sets(wg, HOT_VAR)) == 1 and len(cools) == 1,
-          f"{len(hots)} heat(s), {len(_sets(wg, HOT_VAR))} write(s), {len(cools)} {COOL_VAR}")
+          len(hots) == 1 and len(writes) == 1 and len(cools) == 1,
+          f"{len(hots)} heat(s), {len(writes)} write(s), {len(cools)} {COOL_VAR}")
     if len(hots) != 1 or len(cools) != 1:
         return
     src = _pure_feeds(cools[0])
@@ -208,15 +218,29 @@ def check_heat_at_fire():
           and any(num_pin(n, "B") == HEAT_S for n in src)
           and any("gettimeseconds" in _squash(n) for n in src),
           str(sorted(_names(src))))
-    gates = _gates(cools[0], limit=3)
-    is_fire = [g for g in gates if any("classischildof" in _squash(f) for f in _feeders(g, "Condition"))]
-    armed = [g for g in gates if any("isvalid" in _squash(f) for f in _feeders(g, "Condition"))]
-    fire_src = _names(_pure_feeds(is_fire[0])) if len(is_fire) == 1 else set()
-    check(f"...only when the kept target's class is a {CAMPFIRE_CLASS_VAR} and "
-          "Held is valid",
-          len(is_fire) == 1 and len(armed) == 1
-          and {f"Get {CAMPFIRE_CLASS_VAR}", f"Get {INTERACT_TARGET_VAR}"} <= fire_src,
-          f"{len(is_fire)} class test(s), {len(armed)} IsValid gate(s), {sorted(fire_src)}")
+    event = _event(SERVER_HEAT)
+    gates = [g for g in _upstream(cools[0]) if _title(g) == "Branch"]
+    is_fire = [g for g in gates if "classischildof" in {_squash(n) for n in _pure_feeds(g)}]
+    fire_src = _pure_feeds(is_fire[0]) if len(is_fire) == 1 else []
+    asked = _asked_above(cools[0])
+    check(f"...in {SERVER_HEAT}(Fire): only when Fire is there, a {CAMPFIRE_CLASS_VAR} "
+          f"within {HEAT_REACH_CM:g} cm of this machine's copy of the owner, the owner "
+          f"alive and this machine's Held there and one that {HEATS_VAR}",
+          bool(event) and event in _upstream(cools[0]) and len(is_fire) == 1
+          and f"Get {CAMPFIRE_CLASS_VAR}" in _names(fire_src)
+          and any(num_pin(n, "B") == HEAT_REACH_CM for n in fire_src)
+          and any("getowner" in _squash(n) for n in fire_src)
+          and {"Dead", "Health", "Held", HEATS_VAR} <= asked,
+          f"{len(is_fire)} class test(s), {sorted(_names(fire_src))}, {sorted(asked)}")
+    calls = _calls_of(SERVER_HEAT)
+    above = _gates(calls[0], limit=2) if len(calls) == 1 else []
+    reads = {t for g in above for t in _names(_pure_feeds(g))}
+    check(f"...asked for with the kept target when its class is a {CAMPFIRE_CLASS_VAR} "
+          "and Held is valid: the key's arm heats nothing itself",
+          len(calls) == 1
+          and [_title(f) for f in _feeders(calls[0], FIRE_PARAM)] == [f"Get {INTERACT_TARGET_VAR}"]
+          and {f"Get {CAMPFIRE_CLASS_VAR}", f"Get {INTERACT_TARGET_VAR}", "Get Held"} <= reads,
+          f"{len(calls)} call(s), {sorted(reads)}")
 
 
 def check_cauterize():
@@ -229,15 +253,20 @@ def check_cauterize():
     check(f"...the ones granting {BLEEDING_TAG}: the bleed",
           f'TagName="{BLEEDING_TAG}"' in pin_value(seals[0], "Tags"),
           pin_value(seals[0], "Tags"))
-    # press, hot blade, ability system: the three Branches it sits behind.
-    reads = {t for g in _gates(seals[0], limit=3) for t in _names(_pure_feeds(g))}
-    check(f"...on a press of the use key ({USE_PRESSED_VAR}) with a {HOT_VAR} "
-          "item in hand, off an ability system known valid",
-          {f"Get {USE_PRESSED_VAR}", f"Get {HOT_VAR}"} <= reads
-          and any("isvalid" in t.replace(" ", "").lower() for t in reads)
+    event = _event(SERVER_CAUTERIZE)
+    asked = _asked_above(seals[0])
+    check(f"...in {SERVER_CAUTERIZE}: the owner alive, this machine's Held there and "
+          f"{HOT_VAR}, off an ability system known valid",
+          bool(event) and event in _upstream(seals[0])
+          and {"Dead", "Health", "Held", HOT_VAR} <= asked
           and any("getabilitysystemcomponent" in _squash(f)
-                  for f in _feeders(seals[0], "self")),
-          str(sorted(reads)))
+                  for f in _feeders(seals[0], "self")), str(sorted(asked)))
+    calls = _calls_of(SERVER_CAUTERIZE)
+    reads = ({t for g in _gates(calls[0], limit=2) for t in _names(_pure_feeds(g))}
+             if len(calls) == 1 else set())
+    check(f"...asked for by a press of the use key ({USE_PRESSED_VAR}) with a {HOT_VAR} "
+          "item in hand: the key's arm seals nothing itself",
+          {f"Get {USE_PRESSED_VAR}", f"Get {HOT_VAR}"} <= reads, str(sorted(reads)))
 
 
 def check_hot_blow():

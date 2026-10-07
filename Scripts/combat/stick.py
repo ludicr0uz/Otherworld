@@ -57,7 +57,7 @@ from combat.weapon_specs import _weapon_icon
 from item_icons.items import ICON_TINT
 from uebp.nodes.actor import FN_SET_VISIBILITY
 from uebp.nodes.math import FN_AND, FN_GE_FF, FN_NOT
-from uebp.nodes.system import FN_TIME_SECONDS
+from uebp.nodes.system import FN_IS_SERVER, FN_TIME_SECONDS
 from combat import item_vars as IV
 
 
@@ -128,9 +128,14 @@ def _author_burn(ed, tick):
     spent = _node(ed, FN_GE_FF)
     _connect(out(now), _pin(spent, "A"))
     _connect(get(BURN_OUT_VAR), _pin(spent, "B"))
+    due = _node(ed, FN_AND)
+    _connect(get(LIT_VAR), _pin(due, "A"))
+    _connect(out(spent), _pin(due, "B"))
+    # The server's clock alone (and single player's): a client's copy, the
+    # world's or its picture of a carried one, is told (combat/fire_vars.py).
     over = _node(ed, FN_AND)
-    _connect(get(LIT_VAR), _pin(over, "A"))
-    _connect(out(spent), _pin(over, "B"))
+    _connect(out(due), _pin(over, "A"))
+    _connect(out(_node(ed, FN_IS_SERVER)), _pin(over, "B"))
     burnt = ed.add_branch_node()
     _connect(out(over), _pin(burnt, "Condition"))
     _connect(then(tick), _pin(burnt, "execute"))

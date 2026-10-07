@@ -92,7 +92,7 @@ DATA (constants and pure tables -- no Blueprint authoring)
   slot_tuning       the inventory's slots: the codes (the hand, primary,
                     secondary, pistol, melee, the bag's ten), WeaponKind, the
                     number keys, the issued items' slots, fits()
-  record_vars       the inventory's record (M18): the four plain arrays the server
+  record_vars       the inventory's record (M18): the plain arrays the server
                     writes and the owning client is sent, HandClass for everyone
                     else, the view's events, a probe's forced asks
   shot_vars         the shot and the reload as server requests (M19): the events'
@@ -101,6 +101,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   lag_tuning        lag compensation for shots (M22): the cap on the rewind and
                     the allowance over the round trip; the C++ history and trace
                     are Source/Otherworld
+  fire_vars         fire and heat as server requests (M25): the four Server
+                    events (the matches, the stick, the heat, the bleed), what
+                    the server checks, and how Lit and Hot reach a client
   strike_vars       melee, the guard, the use key, the throw and the take as
                     server requests (M20): the five events' names, what the
                     owning machine reports and the server keeps, the limits

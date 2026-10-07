@@ -28,7 +28,7 @@ Both are read at editor **startup**, so changing either needs a restart.
 | `GE_Bleeding` | A GameplayEffect with a **duration** (180 s): the ability system takes it off. A hit puts it on (below). |
 | `Debuff.Starving` / `.Dehydrated` / `.Bleeding` / `.HealthDrain` | The HUD names a debuff from the first three tags. `combat/debuff_drain.py` drains by the rows of `combat.tuning.HEALTH_DRAINS`: 0.5 HP/s per stack of `HealthDrain` (so starving and dehydrated together drain twice as fast) and 50/180 HP/s per stack of `Bleeding`; the rates add up. |
 | `GA_ConsumeItem` | Triggered by the gameplay event `Event.Item.Consume`. The payload's `OptionalObject` is the item. Instanced per actor. |
-| `BP_Campfire` | Not GAS: an Actor the matches light (`campfire.py`). Its Tick warms a player near it. |
+| `BP_Campfire` | Not GAS: a replicated Actor the matches light (`campfire.py`). Its Tick warms a player near it, on the server. |
 | `BP_SurvivalComponent` | Hunger/Thirst/Temperature as Blueprint floats, because an AttributeSet needs C++. Also their decay, the ability grant at BeginPlay, and the debuff sync. |
 
 ## The flow
@@ -96,7 +96,10 @@ The debuff sync is the only place that decides a debuff is on, and it asks the A
   pawn, valid, within `WarmRadius`, then `Temperature = min(Temperature + WarmPerSecond × dt,
   MaxTemperature)` on its survival component. The night's cold writes the same variable
   (`world/night_cold.py`), so the two add up: by a fire the night nets +0.9 a second.
-- **It burns out:** BeginPlay sets a life span of `CAMPFIRE_BURN_S`; the actor is destroyed.
+- **It is the server's** (M25, `Scripts/net/CLAUDE.md`, "Fire and heat"): the class
+  replicates and only the server spawns one (`Server_Light`), so every client is sent it.
+  The warmth and the life span are behind HasAuthority; a client's copy only shows.
+- **It burns out:** BeginPlay, with authority, sets a life span of `CAMPFIRE_BURN_S`; the actor is destroyed.
   It is not saved with the profile and blocks nothing (the player walks through it).
 - **The model** is Quaternius's `SM_Bonfire_Fire` at 0.4 (87 cm across) with a point light
   that casts no shadows.

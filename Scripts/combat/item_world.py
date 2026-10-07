@@ -9,7 +9,8 @@ gets there:
     into the world    InWorld = true, SetReplicateMovement(true),
                       SetReplicates(true): every client is sent the actor,
                       where it is, what it is attached to (a blade left in
-                      a body rides its bone), and its Dropped and Lodged
+                      a body rides its bone), its Dropped and Lodged, and
+                      whether it burns or is hot (Lit, Hot)
       the throw's release (author_into_world, in the component's graph)
       lying there Dropped: the item's own Tick, on the server
         (author_world_view), which is every other way in: set down with the
@@ -40,7 +41,9 @@ vain for it; what a late joiner is told of the world is M31.
 """
 
 from combat import item_vars as IV
+from combat.heat_tuning import HOT_VAR
 from combat.paths import ITEM_CLASS_PATH
+from combat.torch_tuning import LIT_VAR
 from uebp import net
 from uebp.g import _G
 from uebp.graph import _connect, _node, _pin, _set, else_, out, then
@@ -49,7 +52,9 @@ from uebp.nodes.actor import (
 from uebp.nodes.math import FN_AND, FN_NOT
 from uebp.nodes.system import FN_IS_SERVER
 
-REPLICATED = (IV.Dropped, IV.Lodged, IV.InWorld)
+# Lit and Hot: a burning stick or a hot blade lying there is seen so by
+# everyone (task M25, combat/fire_vars.py).
+REPLICATED = (IV.Dropped, IV.Lodged, IV.InWorld, LIT_VAR, HOT_VAR)
 
 
 def replicate_item(bp):

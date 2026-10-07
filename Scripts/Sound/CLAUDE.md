@@ -97,7 +97,7 @@
     or `HeadKillSounds` in its place where a thrown axe (an item that `Chops`) kills by the
     head: the body is not yet `Dead`, and has no `Health` left after the wound
     (`throw_strike.py`);
-  - `MatchSounds` where a campfire is laid;
+  - `MatchSounds` where a campfire is laid (told to every screen: `Fx_Match`, `combat/weapon_component/light.py`);
   - `BreathSounds` while the run key is held with no stamina left (below).
   **A blade's blow and a thrown blade going in are the one stab take, for now**
   (`stab_dagger_05`): the gore takes were too gory for every blow. The one gory take

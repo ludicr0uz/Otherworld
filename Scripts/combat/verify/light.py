@@ -32,7 +32,10 @@ from combat.verify.fixtures import w, wg
 from combat.verify.grip_fit import (
     FIST_MISS_CM, JOINT_REACH_CM, JOINT_SINK_CM, grip_fit,
 )
+from combat.fire_vars import SERVER_LIGHT
 from combat.verify.punch import _feeders, _feeds, _title
+from combat.verify.record import _upstream
+from combat.verify.shot import _asked_above, _calls_of, _event
 from combat.weapon_component.inventory import STARTER_CLASS_VARS
 from combat.weapon_component.knife import MELEE_VAR
 from combat.weapon_specs import _weapon_specs
@@ -132,9 +135,18 @@ def check_matches_loadout():
           str(sorted(spawned)))
 
 
+def _served(gate):
+    """Is this Branch on Lights the Server event's own refusal?"""
+    event = _event(SERVER_LIGHT)
+    return bool(event) and event in _upstream(gate)
+
+
 def check_light_gate():
-    gates = _branches_on(f"Get {LIGHTS_VAR}")
-    check(f"one Branch asks Held.{LIGHTS_VAR}", len(gates) == 1, str(len(gates)))
+    every = _branches_on(f"Get {LIGHTS_VAR}")
+    gates = [g for g in every if not _served(g)]
+    check(f"two Branches ask Held.{LIGHTS_VAR}: the key's, and {SERVER_LIGHT}'s own "
+          "refusal", len(every) == 2 and len(gates) == 1,
+          f"{len(every)} gates, {len(gates)} the key's")
     if len(gates) != 1:
         return None
     gate = gates[0]
@@ -156,15 +168,35 @@ def check_light_gate():
           "Get KeyFire" in names
           and not any("IsInputKeyDown" in t.replace(" ", "") for t in names),
           str(sorted(names)))
-    return press[0] if len(press) == 1 else None
+    if len(press) != 1:
+        return None
+    asked = [PIN.get_owning_node(q) for q in
+             PIN.list_connected_pins(BEL.find_then_pin(press[0]))]
+    check(f"...by asking the server ({SERVER_LIGHT}): the key's arm spends no wood "
+          "and spawns nothing itself",
+          asked == _calls_of(SERVER_LIGHT) and len(asked) == 1,
+          str([_title(n) for n in asked]))
+    served = [g for g in every if _served(g)]
+    return served[0] if len(served) == 1 else None
 
 
 def check_light_strike(press):
+    """``press``: Server_Light's own Branch on Held.Lights, which the strike
+    hangs off."""
     fires = _fires()
     check("a campfire is spawned in one place", len(fires) == 1, str(len(fires)))
     if len(fires) != 1 or press is None:
         return
     fire = fires[0]
+    check(f"...in {SERVER_LIGHT}, behind its own questions: the owner alive, and this "
+          f"machine's Held there and {LIGHTS_VAR}",
+          _event(SERVER_LIGHT) in _upstream(fire)
+          and {"Dead", "Health", "Held", LIGHTS_VAR} <= _asked_above(fire),
+          str(sorted(_asked_above(fire))))
+    told = [n for n in wg if fire in _ran_by(n)]
+    check("...and the match is told to every screen (Multicast_Match), not played "
+          "where the server decided", [_title(n).replace(" ", "").replace("_", "") for n in told]
+          == ["MulticastMatch"], str([_title(n) for n in told]))
     known = [PIN.get_owning_node(q) for q in
              PIN.list_connected_pins(BEL.find_then_pin(press))]
     check(f"the strike is refused before anything is spent while {CAMPFIRE_CLASS_VAR} "

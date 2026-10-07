@@ -33,7 +33,10 @@ from combat.verify.fixtures import _is_exec, w, wg
 from combat.verify.glimmer import is_glimmer_node
 from combat.verify.grip_fit import check_handles_in_fist
 from combat.verify.hold_pose import _pose, _sub
+from combat.fire_vars import SERVER_KINDLE
 from combat.verify.punch import _feeders, _feeds, _title
+from combat.verify.record import _upstream
+from combat.verify.shot import _asked_above, _calls_of, _event
 from combat.weapon_component.inventory import STARTER_CLASS_VARS
 from combat.weapon_specs import _weapon_specs
 from survival.paths import SURVIVAL_DIR
@@ -136,8 +139,10 @@ def check_stick_burn():
     if len(outs) == 1:
         gates = _ran_by(outs[0])
         src = _pure_feeds(gates[0]) if len(gates) == 1 else []
-        check(f"...on its Tick, once it is {LIT_VAR} and the clock has reached {BURN_OUT_VAR}",
+        check(f"...on its Tick, once it is {LIT_VAR} and the clock has reached "
+              f"{BURN_OUT_VAR}, on the server's copy alone (IsServer: a client's is told)",
               {f"Get {LIT_VAR}", f"Get {BURN_OUT_VAR}"} <= _names(src)
+              and any("IsServer" in _title(n).replace(" ", "") for n in src)
               and any("GetTimeSeconds" in _title(n).replace(" ", "") for n in src)
               and any("ReceiveTick" in str(n.get_name()) or "Tick" in _title(n)
                       for g in gates for n in _ran_by(g)),
@@ -279,7 +284,8 @@ def check_fire_ward():
 
 
 def check_light_at_fire():
-    lights = _sets(wg, LIT_VAR)
+    # A client's picture is told its row's Lit (view.py): that Set is fed.
+    lights = [n for n in _sets(wg, LIT_VAR) if not _feeders(n, LIT_VAR)]
     check("the stick is lit in one place", len(lights) == 1
           and pin_value(lights[0], LIT_VAR) == "true", str(len(lights)))
     if len(lights) != 1:
@@ -317,13 +323,19 @@ def check_light_at_fire():
           and any(num_pin(n, "B") == STICK_LIGHT_RADIUS_CM for n in src)
           and any("GetOwner" in _title(n).replace(" ", "") for n in src),
           f"{len(walks)} walk(s), {sorted(_names(src))}")
-    press = _ran_by(forget[0])
+    event = _event(SERVER_KINDLE)
+    asked = _asked_above(lights[0])
+    check(f"...in {SERVER_KINDLE}, behind its own questions: the owner alive, this "
+          f"machine's Held there, one that {BURNS_VAR} and is not {LIT_VAR} yet",
+          bool(event) and event in _upstream(lights[0])
+          and {"Dead", "Health", "Held", BURNS_VAR, LIT_VAR} <= asked, str(sorted(asked)))
+    calls = _calls_of(SERVER_KINDLE)
+    press = _ran_by(calls[0]) if len(calls) == 1 else []
     names = (_names(_feeds(BEL.find_input_pin(press[0], "Condition")))
              if len(press) == 1 else set())
-    check(f"...started by a press ({USE_PRESSED_VAR}) with an item that {BURNS_VAR} in "
-          "hand, not burning yet",
-          names == {f"Get {USE_PRESSED_VAR}", f"Get {BURNS_VAR}", "Get Held", "AND"}
-          or {f"Get {USE_PRESSED_VAR}", f"Get {BURNS_VAR}"} <= names, str(sorted(names)))
+    check(f"...asked for by a press ({USE_PRESSED_VAR}) with an item that {BURNS_VAR} in "
+          "hand, not burning yet: the key's arm lights nothing itself",
+          {f"Get {USE_PRESSED_VAR}", f"Get {BURNS_VAR}"} <= names, str(sorted(names)))
 
 
 def check_raised_pose():

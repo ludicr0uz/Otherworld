@@ -23,7 +23,7 @@ from combat.torch_tuning import LIT_VAR
 from combat.verify.common import BEL, PIN, by_pins, check, load, num_pin, pin_value
 from combat.verify.fixtures import wc, wc_cdo, wg
 from combat.verify.record import _authority_branches, _feeders, _title, _upstream
-from combat.verify.shot import _calls_of, _event, _gate_arm, _reads_behind
+from combat.verify.shot import _asked_above, _calls_of, _event, _gate_arm, _reads_behind
 from combat.verify.torch import _served_ward
 from combat.weapon_component import vars as WV
 from combat.weapon_component.knife import (
@@ -39,12 +39,6 @@ SWINGS = {
     SERVER_SLASH: (KNIFE_QUEUED_VAR, KNIFE_PENDING_VAR, NEXT_KNIFE_VAR,
                    {"Held", "Melee", "Dead", "Health", "Blocking", NEXT_KNIFE_VAR}),
 }
-
-
-def _asked_above(node):
-    """Every variable a Branch above ``node`` reads in its condition."""
-    return {v for n in _upstream(node) if _title(n) == "Branch"
-            for c in _feeders(n, "Condition") for v in _reads_behind(c)}
 
 
 def _sets(var, value=None):
@@ -196,8 +190,9 @@ def check_throw():
 def check_item_world():
     item = load(ITEM_BP_PATH)
     got = {str(v): net.variable_replication(item, str(v))[0] for v in ITEM_REPLICATED}
-    check("an item's Dropped, Lodged and InWorld replicate to everyone: a client "
-          "picks up, glimmers and hides by the server's word",
+    check("an item's Dropped, Lodged and InWorld, and its Lit and Hot, replicate to "
+          "everyone: a client picks up, glimmers, hides, burns and glows by the "
+          "server's word",
           all(k == net.REPLICATED for k in got.values())
           and all(net.compiled_replication(item, str(v))[0] == net.REPLICATED
                   for v in ITEM_REPLICATED), str(got))

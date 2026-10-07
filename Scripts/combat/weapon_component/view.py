@@ -45,8 +45,11 @@ from uebp.net import custom_event
 from combat import item_vars as IV
 from combat.paths import ITEM_CLASS_PATH
 from combat.record_vars import (
-    AMMO_UNKNOWN, HandClass, InvClass, InvLoaded, InvReserve, InvSlot, RECORD, ROW_PARAMS,
-    TRIM_PARAMS, VIEW_ROW, VIEW_TRIM, ViewDirty, ViewItem)
+    AMMO_UNKNOWN, HandClass, HandHot, HandLit, InvClass, InvHot, InvLit, InvLoaded,
+    InvReserve, InvSlot, RECORD, ROW_PARAMS, TRIM_PARAMS, VIEW_ROW, VIEW_TRIM, ViewDirty,
+    ViewItem)
+from combat.heat_tuning import HOT_VAR
+from combat.torch_tuning import LIT_VAR
 from combat.shot_vars import AsksSent, AsksServed
 from combat.slot_tuning import HAND, SLOT_VAR
 from combat.weapon_component import vars as WV
@@ -120,13 +123,18 @@ def _author_view_row(ed):
 
     item = g.get(ViewItem)
     flow = g.iput(item, SLOT_VAR, out(event, "Slot"), [heard, quiet, made])
+    # Burning or hot is the server's word (combat/fire_vars.py): this copy's
+    # own Tick shows it, and puts nothing out.
+    flow = g.iput(item, LIT_VAR, out(event, "Lit"), [flow])
+    flow = g.iput(item, HOT_VAR, out(event, "Hot"), [flow])
     known, _unknown = g.branch(op(g, FN_GE_II, out(event, "Loaded"), 0), [flow])
     flow = g.iput(item, IV.Loaded, out(event, "Loaded"), [known])
     g.iput(item, IV.Reserve, out(event, "Reserve"), [flow])
     ed.add_comment_to_nodes(
         f"{VIEW_ROW} (view.py), a client's: the actor at Inventory[Index] is made to be "
         "the record's row. One of the right class is kept; anything else is destroyed "
-        "and a local actor of the class spawned there. Then its slot and its rounds.",
+        "and a local actor of the class spawned there. Then its slot, whether it "
+        "burns or is hot, and its rounds.",
         g.made)
 
 
@@ -160,7 +168,7 @@ def _author_view(ed, in_execs):
     flow = author_view_worn(g, [flow])
     rows = _length(g, InvClass)
     own, other = g.branch(op(g, FN_GREATER_II, rows, 0), [flow])
-    # Four arrays of one length: the server writes them in one frame.
+    # Arrays of one length: the server writes them in one frame.
     whole = None
     for var in RECORD[1:]:
         same = op(g, FN_EQ_II, _length(g, var), rows)
@@ -176,17 +184,19 @@ def _author_view(ed, in_execs):
     loaded = out(g.call(FN_SELECT_II, A=_at(g, InvLoaded, i), B=AMMO_UNKNOWN,
                         bPickA=settled))
     _call(g, VIEW_ROW, [body], Index=i, Class=cls, Slot=_at(g, InvSlot, i),
-          Loaded=loaded, Reserve=_at(g, InvReserve, i))
+          Loaded=loaded, Reserve=_at(g, InvReserve, i), Lit=_at(g, InvLit, i),
+          Hot=_at(g, InvHot, i))
     trimmed = _call(g, VIEW_TRIM, [done], Count=rows)
 
     armed, bare = g.branch(out(g.call(FN_IS_VALID_CLASS, Class=g.get(HandClass))), [other])
     one = _call(g, VIEW_ROW, [armed], Index=0, Class=g.get(HandClass), Slot=HAND,
-                Loaded=AMMO_UNKNOWN, Reserve=AMMO_UNKNOWN)
+                Loaded=AMMO_UNKNOWN, Reserve=AMMO_UNKNOWN, Lit=g.get(HandLit),
+                Hot=g.get(HandHot))
     one = _call(g, VIEW_TRIM, [one], Count=1)
     none = _call(g, VIEW_TRIM, [bare], Count=0)
     tails = author_handled(g, [trimmed, one, none])
     ed.add_comment_to_nodes(
         "A client's inventory is a picture of the server's record (view.py): remade "
         "when one arrives (ViewDirty). Its own player's from the rows; another "
-        "player's is the one item in their hand (HandClass).", g.made[:4])
+        "player's is the one item in their hand (HandClass, HandLit, HandHot).", g.made[:4])
     return tails + [clean, torn]

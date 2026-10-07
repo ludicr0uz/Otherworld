@@ -2,12 +2,14 @@
 
     Using --> Held.Lit --> FireWard = true          the fire is held out
               not Lit  --> FireWard = false
-                           UsePressed AND Held.Burns
-                             --> NearFire = any CampfireClass actor within
-                                 STICK_LIGHT_RADIUS_CM of the player
-                             --> NearFire: Held.BurnOutTime = now + burn,
-                                           Held.Lit = true
+                           UsePressed AND Held.Burns --> Server_Kindle()
     not Using --> FireWard = false
+
+    Server_Kindle, a reliable Server event (task M25, combat/fire_vars.py; in
+    single player a plain call). Alive, this machine's Held Burns, not Lit:
+        NearFire = any CampfireClass actor within STICK_LIGHT_RADIUS_CM of
+                   this machine's copy of the player
+        NearFire: Held.BurnOutTime = now + burn, Held.Lit = true
 
     WardItem valid AND (NOT FireWard OR WardItem != Held)
         --> WardItem.AimPose = WardCarryPose; WardItem = None; re-equip
@@ -43,7 +45,8 @@ read behind the Branch on Using or UsePressed, which are false with empty
 hands. Numbers and names: torch_tuning.py.
 """
 
-from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
+from uebp.graph import _connect, _node, _pin, _set, else_, out, then
+from combat.fire_vars import SERVER_KINDLE
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.paths import FIRE_WARD_VAR, ITEM_CLASS_PATH
 from combat.torch_tuning import (
@@ -52,9 +55,12 @@ from combat.torch_tuning import (
 )
 from combat.use_tuning import USE_PRESSED_VAR, USING_VAR
 from combat.weapon_component.common import _prop
-from uebp.nodes.actor import FN_ACTOR_LOC
+from combat.weapon_component.shot import _author_alive
+from combat.weapon_component.slot_nodes import for_each, not_, op, valid
+from uebp import net
+from uebp.g import _G
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_OWNER
 from uebp.nodes.math import FN_ADD_FF, FN_AND, FN_DISTANCE, FN_LE_FF, FN_NE_OO, FN_NOT, FN_OR
-from uebp.nodes.palette import MACRO_FOR_EACH
 from uebp.nodes.system import FN_ALL_ACTORS, FN_IS_VALID, FN_TIME_SECONDS
 from combat import item_vars as IV
 from combat.weapon_component import vars as WV
@@ -110,48 +116,12 @@ def _author_torch(ed, held, owner, exec_ins):
     unlit = put(FIRE_WARD_VAR, "false")
     _connect(else_(lit), _pin(unlit, "execute"))
 
-    # --- not burning: a press at a campfire lights it ---------------------------
+    # --- not burning: a press asks the server to light it at a campfire -------
     wants = branch(gate2(FN_AND, get(USE_PRESSED_VAR), held_prop(BURNS_VAR)), (then(unlit),))
-    forget = put(NEAR_FIRE_VAR, "false")
-    _connect(then(wants), _pin(forget, "execute"))
-    every = keep(_node(ed, FN_ALL_ACTORS))
-    _connect(get(CAMPFIRE_CLASS_VAR), _pin(every, "ActorClass"))
-    _connect(then(forget), _pin(every, "execute"))
-    loop = ed.add_macro_node(MACRO_FOR_EACH)
-    if not loop:
-        raise RuntimeError("could not create the ForEachLoop macro node")
-    keep(loop)
-    _connect(out(every, "OutActors"), _loose_pin(loop, "Array"))
-    _connect(then(every), _loose_pin(loop, "Exec"))
-    there = keep(_node(ed, FN_ACTOR_LOC))
-    _connect(_loose_pin(loop, "ArrayElement", is_input=False), _pin(there, "self"))
-    here = keep(_node(ed, FN_ACTOR_LOC))
-    _connect(owner, _pin(here, "self"))
-    gap = keep(_node(ed, FN_DISTANCE))
-    _connect(out(there), _pin(gap, "V1"))
-    _connect(out(here), _pin(gap, "V2"))
-    close = keep(_node(ed, FN_LE_FF))
-    _connect(out(gap), _pin(close, "A"))
-    _set(close, "B", STICK_LIGHT_RADIUS_CM)
-    near = branch(out(close), (_loose_pin(loop, "LoopBody", is_input=False),))
-    found = put(NEAR_FIRE_VAR, "true")
-    _connect(then(near), _pin(found, "execute"))
+    ask = keep(_node(ed, SERVER_KINDLE))
+    _connect(then(wants), _pin(ask, "execute"))
 
-    at_fire = branch(get(NEAR_FIRE_VAR), (_loose_pin(loop, "Completed", is_input=False),))
-    now = keep(_node(ed, FN_TIME_SECONDS))
-    until = keep(_node(ed, FN_ADD_FF))
-    _connect(out(now), _pin(until, "A"))
-    _set(until, "B", STICK_BURN_S)
-    burn = keep(ed.add_set_member_variable_node(BURN_OUT_VAR, ITEM_CLASS_PATH))
-    _connect(held, _pin(burn, "self"))
-    _connect(out(until), _pin(burn, BURN_OUT_VAR))
-    _connect(then(at_fire), _pin(burn, "execute"))
-    light = keep(ed.add_set_member_variable_node(LIT_VAR, ITEM_CLASS_PATH))
-    _connect(held, _pin(light, "self"))
-    _set(light, LIT_VAR, True)
-    _connect(then(burn), _pin(light, "execute"))
-
-    settled = (then(out_), then(idle), else_(wants), else_(at_fire), then(light))
+    settled = (then(out_), then(idle), else_(wants), then(ask))
 
     # --- the pose follows: lower the stick that is up, then raise ----------------
     ward = get(FIRE_WARD_VAR)
@@ -191,10 +161,47 @@ def _author_torch(ed, held, owner, exec_ins):
     ed.add_comment_to_nodes(
         "The use key on a stick (torch.py). A burning one is held out while "
         f"the key is held: {FIRE_WARD_VAR}, written on every arm so it is never "
-        "left up. One that is not burning is lit by a press within "
-        f"{STICK_LIGHT_RADIUS_CM:g} cm of a campfire, for {STICK_BURN_S:g} s. "
+        "left up. A press with one that is not burning asks the server to "
+        f"light it ({SERVER_KINDLE}). "
         f"Held out, the stick's AimPose is its {USE_POSE_VAR} "
         f"({WARD_ITEM_VAR} is the stick, {WARD_CARRY_VAR} what to put back), "
         "and each change re-equips, which blends the arm up or down.",
         made)
     return (then(rise), else_(raise_))
+
+
+def author_kindle_event(ed):
+    """Server_Kindle(): the press that lights a stick, on the machine that
+    owns it. Refused unless the owner is alive, its own Held Burns and is not
+    Lit, and a campfire stands within STICK_LIGHT_RADIUS_CM of this machine's
+    copy of the owner. Before the Tick, which calls it by name."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    event = g.keep(net.server_event(ed, SERVER_KINDLE))
+    alive = _author_alive(g, [then(event)])
+    held = g.get(WV.Held)
+    armed, _bare = g.branch(valid(g, held), alive)
+    unlit = op(g, FN_AND, g.iget(held, BURNS_VAR), not_(g, g.iget(held, LIT_VAR)))
+    wants, _no = g.branch(unlit, [armed])
+
+    forget = g.put(NEAR_FIRE_VAR, "false", [wants])
+    every = g.call(FN_ALL_ACTORS, [forget], ActorClass=g.get(CAMPFIRE_CLASS_VAR))
+    fire, _i, body, done = for_each(g, out(every, "OutActors"), [then(every)])
+    here = g.call(FN_ACTOR_LOC, self=out(g.call(FN_GET_OWNER)))
+    gap = g.call(FN_DISTANCE, V1=out(g.call(FN_ACTOR_LOC, self=fire)), V2=out(here))
+    close = g.call(FN_LE_FF, A=out(gap))
+    _set(close, "B", STICK_LIGHT_RADIUS_CM)
+    near, _far = g.branch(out(close), [body])
+    g.put(NEAR_FIRE_VAR, "true", [near])
+
+    at_fire, _none = g.branch(g.get(NEAR_FIRE_VAR), [done])
+    until = g.call(FN_ADD_FF, A=out(g.call(FN_TIME_SECONDS)))
+    _set(until, "B", STICK_BURN_S)
+    burn = g.iput(held, BURN_OUT_VAR, out(until), [at_fire])
+    g.iput(held, LIT_VAR, "true", [burn])
+    ed.add_comment_to_nodes(
+        f"{SERVER_KINDLE} (torch.py): the owning client's use key on a stick. "
+        "Refused unless the owner is alive, this machine's Held Burns and is "
+        f"not burning, and a campfire stands within {STICK_LIGHT_RADIUS_CM:g} cm "
+        f"of this machine's copy of the owner; then it is Lit for {STICK_BURN_S:g} s, "
+        "on the item's own clock (stick.py). The owner's copy is told by the "
+        "record, everyone else by HandLit (record.py).", g.made)

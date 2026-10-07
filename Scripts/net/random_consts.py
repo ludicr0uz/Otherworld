@@ -65,11 +65,11 @@ AUDIT = (
          "inside Server_Fire, which only the server runs (single player: a "
          "plain call); the owning client draws nothing, and what the pellets "
          "did replicates as health", ""),
-    # --- state, still drawn by the machine that acts ------------------------
     Roll("combat/weapon_component/chop.py", STATE,
          "where the wood lands beside the trunk, and how it lies",
-         "the weapon component of whoever chops; the server's once the chop "
-         "is a server action", "M25"),
+         "the weapon component of whoever chops, on the server alone: the "
+         "chop hangs off the server's blow, and the wood it leaves replicates", ""),
+    # --- state, still drawn by the machine that acts ------------------------
     Roll("world/day_night_graph.py", STATE,
          "the time of day a level starts at",
          "every machine's own BP_DayNightCycle at BeginPlay; one clock, the "

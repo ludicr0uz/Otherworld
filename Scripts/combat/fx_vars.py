@@ -51,6 +51,7 @@ BLADE_HIT = "BladeHit"        # one of BladeHitSounds at Location
 CHOP = "Chop"                 # chips and one of ChopSounds: the axe in a tree
 STAB = "Stab"                 # blood and the stab, or the axe's kill by the head (HeadKill)
 LODGE = "Lodge"               # chips and the chop's sound: a thrown blade in a trunk
+MATCH = "Match"               # one of MatchSounds where a campfire is laid (Location)
 
 LOCATION_PARAM, NORMAL_PARAM, SCALE_PARAM = "Location", "Normal", "Scale"
 BLOOD_PARAM, HEAD_KILL_PARAM = "Blood", "HeadKill"
@@ -75,6 +76,7 @@ COSMETICS = {
     CHOP: (POINT_PARAMS, SCREEN),
     STAB: (STAB_PARAMS, SCREEN),
     LODGE: (POINT_PARAMS, SCREEN),
+    MATCH: (SOUND_AT_PARAMS, SCREEN),
 }
 # The ones the owning client predicts: Fx_<Name> is called off the authority
 # Branch's false arm as well as by its Multicast.

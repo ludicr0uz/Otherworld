@@ -3,9 +3,12 @@ what it is): written off the item actors each Tick, emptied at death, and
 marked to replicate.
 
     upkeep, after the slot sync, with authority (so in single player too):
-        InvClass, InvSlot, InvLoaded, InvReserve := a row per item of Inventory
+        InvClass, InvSlot, InvLoaded, InvReserve, InvLit, InvHot := a row
+            per item of Inventory
         WornClass := a row per slot of Worn: the garment's class, or none
         HandClass := the class of SlotItems[HAND], written when it changes
+        HandLit, HandHot := that item's Lit and Hot (false for empty hands),
+            written when either changes
 
 Written every Tick rather than at each change: thirty-odd graphs change what
 is carried (a shot, a reload, a pick-up, a throw, a meal) and the record is
@@ -24,18 +27,21 @@ from uebp.graph import _connect, _pin, out, then
 from uebp.layout import arrange
 from combat import item_vars as IV
 from combat.paths import ITEM_CLASS_PATH
-from combat.record_vars import HandClass, RECORD, REPLICATED, ViewDirty, WornClass
+from combat.heat_tuning import HOT_VAR
+from combat.record_vars import (
+    HAND as HAND_VARS, HandClass, HandHot, HandLit, RECORD, REPLICATED, ViewDirty, WornClass)
+from combat.torch_tuning import LIT_VAR
 from combat.wear_tuning import WORN_VAR
 from combat.slot_tuning import HAND, SLOT_VAR
 from combat.weapon_component import vars as WV
 from combat.weapon_component.slot_nodes import for_each, slot_at, valid
 from uebp.nodes.actor import FN_GET_OWNER, FN_HAS_AUTHORITY
 from uebp.nodes.array import FN_ARR_ADD, FN_ARR_CLEAR
-from uebp.nodes.math import FN_NE_CC
+from uebp.nodes.math import FN_NE_CC, FN_NEQ_BB, FN_OR
 from uebp.nodes.system import FN_OBJECT_CLASS
 
 # What each column of a row is read from: the item's class, then its variables.
-COLUMNS = (None, SLOT_VAR, IV.Loaded, IV.Reserve)
+COLUMNS = (None, SLOT_VAR, IV.Loaded, IV.Reserve, LIT_VAR, HOT_VAR)
 
 
 def authority(g):
@@ -65,7 +71,7 @@ def replicate_record(bp):
     """Mark what travels and author each OnRep (ViewDirty := true). After
     every declare, which drops the flags, and before the compile."""
     for var in REPLICATED:
-        condition = (unreal.LifetimeCondition.COND_SKIP_OWNER if var == HandClass
+        condition = (unreal.LifetimeCondition.COND_SKIP_OWNER if var in HAND_VARS
                      else unreal.LifetimeCondition.COND_OWNER_ONLY)
         rep_dirty(bp, var, condition)
 
@@ -95,7 +101,26 @@ def author_empty_record(g, execs):
     server, client = g.branch(authority(g), execs)
     flow = _author_clear(g, [server])
     flow = then(g.call(FN_ARR_CLEAR, [flow], TargetArray=g.get(WornClass)))
-    return [g.put(HandClass, None, [flow]), client]
+    flow = g.put(HandClass, None, [flow])
+    flow = g.put(HandLit, "false", [flow])
+    return [g.put(HandHot, "false", [flow]), client]
+
+
+def _author_hand_fire(g, execs):
+    """HandLit, HandHot := the Lit and Hot of the item in hand (task M25),
+    written when either changes. The item's flags are read behind IsValid.
+    Returns the exec tails."""
+    item = slot_at(g, HAND)
+    armed, bare = g.branch(valid(g, item), execs)
+    lit, hot = g.iget(item, LIT_VAR), g.iget(item, HOT_VAR)
+    differs = out(g.call(FN_OR, A=out(g.call(FN_NEQ_BB, A=lit, B=g.get(HandLit))),
+                         B=out(g.call(FN_NEQ_BB, A=hot, B=g.get(HandHot)))))
+    changed, same = g.branch(differs, [armed])
+    told = g.put(HandHot, hot, [g.put(HandLit, lit, [changed])])
+    # Empty hands: neither.
+    stale, clear = g.branch(out(g.call(FN_OR, A=g.get(HandLit), B=g.get(HandHot))), [bare])
+    none = g.put(HandHot, "false", [g.put(HandLit, "false", [stale])])
+    return [told, same, none, clear]
 
 
 def _author_record(ed, in_execs):
@@ -114,9 +139,11 @@ def _author_record(ed, in_execs):
     in_hand = out(g.call(FN_OBJECT_CLASS, Object=slot_at(g, HAND)))
     changed, same = g.branch(out(g.call(FN_NE_CC, A=in_hand, B=g.get(HandClass))), [done])
     told = g.put(HandClass, in_hand, [changed])
+    tails = _author_hand_fire(g, [told, same])
     ed.add_comment_to_nodes(
         "The inventory's record (record.py), the server's: a row per carried item "
-        "(class, slot, rounds loaded, rounds in reserve) and a class per worn slot, "
-        "replicated to the owning client, and the class in hand, replicated to everyone else. Plain data: the "
+        "(class, slot, rounds loaded, rounds in reserve, burning, hot) and a class per worn slot, "
+        "replicated to the owning client, and the class in hand and whether it burns or glows, "
+        "replicated to everyone else. Plain data: the "
         "save writes it as it stands.", g.made[:4])
-    return [told, same, client]
+    return tails + [client]

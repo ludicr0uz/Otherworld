@@ -99,6 +99,7 @@ from combat.weapon_component.wear import author_wear_event
 from combat.weapon_component.shot import author_shot_events, replicate_shot
 from combat.weapon_component.headshot import replicate_headshot
 from combat.weapon_component.chop import author_chop_fx
+from combat.weapon_component.fire import author_fire_events
 from combat.weapon_component.impact import author_pellet_fx
 from combat.weapon_component.throw import author_throw_fx
 from combat.weapon_component.throw_strike import author_throw_strike_fx
@@ -377,6 +378,7 @@ def build_weapon_component(item_bp, shotgun_bp, pistol_bp, knife_bp, axe_bp,
     author_set_holds(ed)
     author_throw_event(ed)
     author_take_event(ed)
+    author_fire_events(ed)   # M25: the matches, the stick, the heat, the bleed
     _author_wc_begin_play(ed, begin)
     _author_wc_tick(ed, tick)
     author_loot_take(ed)

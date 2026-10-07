@@ -12,11 +12,15 @@ in Inventory's order:
                     bag slot)
     InvLoaded[i]    the rounds in it
     InvReserve[i]   the rounds held for it
+    InvLit[i]       it is burning (a stick lit at a fire: task M25)
+    InvHot[i]       it is hot (a blade heated at one)
 
-Classes and ints, nothing that points into a running world: the save writes
-the four arrays as they stand and a load is ``SpawnActor`` per row (the
+Classes, ints and flags, nothing that points into a running world (how long
+a fire or a heat has left is the server's item's own clock, and is not
+written down): the save writes the arrays as they stand and a load is ``SpawnActor`` per row (the
 character's save task reuses them). They replicate to the owning client
-alone. Everyone else is told one thing, the class in the hand (HandClass).
+alone. Everyone else is told what the hand holds: its class (HandClass) and
+whether it burns or glows (HandLit, HandHot).
 
 What is worn is a fifth array, a row per worn slot (wear_tuning.WEAR_SLOTS'
 index; as long as the server's Worn, which the first wear into a slot grows):
@@ -41,12 +45,17 @@ InvClass = Var("InvClass", array(ITEM_CLASS))
 InvSlot = Var("InvSlot", array(INT))
 InvLoaded = Var("InvLoaded", array(INT))
 InvReserve = Var("InvReserve", array(INT))
-RECORD = (InvClass, InvSlot, InvLoaded, InvReserve)
+InvLit = Var("InvLit", array(BOOL))
+InvHot = Var("InvHot", array(BOOL))
+RECORD = (InvClass, InvSlot, InvLoaded, InvReserve, InvLit, InvHot)
 # Replicated to the owner too: a row per worn slot, the garment's class or none.
 WornClass = Var("WornClass", array(ITEM_CLASS))
 # Replicated to everyone but the owner: what the hand holds, or none.
 HandClass = Var("HandClass", ITEM_CLASS)
-REPLICATED = RECORD + (WornClass, HandClass)
+HandLit = Var("HandLit", BOOL, False)
+HandHot = Var("HandHot", BOOL, False)
+HAND = (HandClass, HandLit, HandHot)
+REPLICATED = RECORD + (WornClass,) + HAND
 
 # A client's: a record arrived and the item actors are not yet its picture
 # (true from the start: the first record may arrive before BeginPlay), and
@@ -82,7 +91,7 @@ TABLE = REPLICATED + (ViewDirty, ViewItem) + FORCED
 VIEW_ROW = "ViewRow"
 VIEW_TRIM = "ViewTrim"
 ROW_PARAMS = (("Index", INT), ("Class", ITEM_CLASS), ("Slot", INT), ("Loaded", INT),
-              ("Reserve", INT))
+              ("Reserve", INT), ("Lit", BOOL), ("Hot", BOOL))
 TRIM_PARAMS = (("Count", INT),)
 AMMO_UNKNOWN = -1
 # ...and the worn garments' one (view_worn.py): Worn[Slot] made an actor of

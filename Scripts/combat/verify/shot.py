@@ -145,6 +145,12 @@ def _reads_behind(node, depth=4):
     return names
 
 
+def _asked_above(node):
+    """Every variable a Branch above ``node`` reads in its condition."""
+    return {v for n in _upstream(node) if _title(n) == "Branch"
+            for c in _feeders(n, "Condition") for v in _reads_behind(c)}
+
+
 def check_client_predicts():
     gates = _authority_branches()
     asks = {name: _calls_of(name) for name in SERVER_EVENTS}

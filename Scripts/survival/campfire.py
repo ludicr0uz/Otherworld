@@ -1,8 +1,9 @@
 """BP_Campfire: the fire a strike of the matches lights, and what warms the
 player.
 
-    [BeginPlay] --> SetLifeSpan(CAMPFIRE_BURN_S)      one piece of wood burns out
-    [Tick] --> pawn = GetPlayerPawn(0); valid?
+    [BeginPlay] --> HasAuthority --> SetLifeSpan(CAMPFIRE_BURN_S)
+                                                      one piece of wood burns out
+    [Tick] --> HasAuthority --> for each living player (net/players.py)
            --> within WarmRadius of this fire?
            --> its SurvivalComponent (GetComponentByClass, cast)
            --> Temperature = min(Temperature + WarmPerSecond * dt, MaxTemperature)
@@ -12,6 +13,14 @@ there are a few fires and one player, and a fire that has burned out costs
 nothing. It writes the survival component the way the night's cold does
 (world/night_cold.py), so the two simply add up: beside a fire the night's 0.1
 a second is outrun by CAMPFIRE_WARM_PER_S.
+
+IT IS THE SERVER'S (task M25). The class replicates, and the server spawns it
+(Server_Light, combat/weapon_component/light.py), so every client is sent the
+fire: its model, its glow and its crackle are components and need nothing
+more. Only the copy with authority burns down and warms (in single player,
+the one copy): Temperature is the server's, and a client's copy that timed
+its own life would go out by its own clock. The server's destroy takes every
+copy with it.
 
 combat/weapon_component/light.py spawns it, knowing only a class variable,
 CampfireClass. install_campfire() writes this class onto BP_WeaponComponent's
@@ -37,6 +46,7 @@ from uebp.graph import (
     BEL, BGE, _add_component, _apply_defaults, _component_object, _connect,
     _create_blueprint, _declare, _drop_components, _events, _float_type, _loose_pin,
     _must_load, _node, _palette, _pin, _root_handle, _set, out, then)
+from uebp import net
 from uebp.layout import arrange
 from combat.light_tuning import CAMPFIRE_CLASS_VAR
 from combat.paths import WEAPON_COMP_BP_PATH
@@ -45,7 +55,7 @@ from survival.paths import CAMPFIRE_BP_PATH, SURVIVAL_BP_PATH, SURVIVAL_CLASS_PA
 from survival.tuning import (
     CAMPFIRE_BURN_S, CAMPFIRE_WARM_PER_S, CAMPFIRE_WARM_RADIUS_CM,
 )
-from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_LIFESPAN
+from uebp.nodes.actor import FN_ACTOR_LOC, FN_GET_COMP, FN_HAS_AUTHORITY, FN_LIFESPAN
 from uebp.nodes.math import FN_ADD_FF, FN_DISTANCE, FN_FMIN, FN_LE_FF, FN_MUL_FF
 from uebp.nodes.palette import NODE_CAST_SURVIVAL
 from net.players import each_living_player
@@ -94,7 +104,11 @@ def _author_warmth(ed, tick):
     def get(name):
         return out(ed.add_get_member_variable_node(name), name)
 
-    pawn, each, _done, everyone = each_living_player(ed, [then(tick)])
+    # Temperature is the server's: a client's copy of the fire warms no one.
+    owns = ed.add_branch_node()
+    _connect(out(_node(ed, FN_HAS_AUTHORITY)), _pin(owns, "Condition"))
+    _connect(then(tick), _pin(owns, "execute"))
+    pawn, each, _done, everyone = each_living_player(ed, [then(owns)])
 
     theirs = _node(ed, FN_ACTOR_LOC)
     _connect(pawn, _pin(theirs, "self"))
@@ -140,9 +154,10 @@ def _author_warmth(ed, tick):
     _connect(out(capped), _pin(write, TEMPERATURE_VAR))
     _connect(_loose_pin(cast, "then", is_input=False), _pin(write, "execute"))
     ed.add_comment_to_nodes(
-        "A campfire warms: while a living player is within WarmRadius, their "
+        "A campfire warms, on the machine with authority: while a living player "
+        "is within WarmRadius, their "
         "Temperature rises by WarmPerSecond, up to MaxTemperature.",
-        everyone + [near, cast, write])
+        everyone + [owns, near, cast, write])
 
 
 def build_campfire(rebuild=True):
@@ -154,9 +169,13 @@ def build_campfire(rebuild=True):
     for name in (WARM_RADIUS_VAR, WARM_RATE_VAR):
         _declare(ed, name, _float_type())
 
+    # The server's clock burns it down; its destroy reaches every copy.
+    owns = ed.add_branch_node()
+    _connect(out(_node(ed, FN_HAS_AUTHORITY)), _pin(owns, "Condition"))
+    _connect(then(begin), _pin(owns, "execute"))
     life = _node(ed, FN_LIFESPAN)
     _set(life, "InLifespan", CAMPFIRE_BURN_S)
-    _connect(then(begin), _pin(life, "execute"))
+    _connect(then(owns), _pin(life, "execute"))
     _author_warmth(ed, tick)
 
     arrange(ed)
@@ -166,6 +185,9 @@ def build_campfire(rebuild=True):
         WARM_RADIUS_VAR: CAMPFIRE_WARM_RADIUS_CM,
         WARM_RATE_VAR: CAMPFIRE_WARM_PER_S,
     })
+    # Every client is sent the fire the server lit (class default: after the
+    # compile).
+    net.replicate_actor(bp)
     _log(f"built {CAMPFIRE_BP_PATH} (+{CAMPFIRE_WARM_PER_S:g} temperature/s within "
          f"{CAMPFIRE_WARM_RADIUS_CM:.0f} cm, burning {CAMPFIRE_BURN_S:.0f} s)")
     return bp

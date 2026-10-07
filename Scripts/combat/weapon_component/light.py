@@ -5,12 +5,22 @@ ground in front of the player.
 It sits inside the fire gate, on the Melee branch's False arm, because Lights
 is read off Held; anything that does not Light goes on to the guns' ready gate.
 
-    Held.Lights --> tap --> IsValidClass(CampfireClass)
+    Held.Lights --> tap --> Server_Light()
+
+    Server_Light, a reliable Server event (task M25, combat/fire_vars.py; in
+    single player a plain call, run there and then). Refused unless the owner
+    is alive and this machine's Held Lights:
+      IsValidClass(CampfireClass)
       --> LightWood = None; for each item in Inventory: its class is
           WoodClass --> LightWood = it
       --> IsValid(LightWood): take it out of Inventory and destroy it;
           EquippedIndex = where Held is now
       --> trace down in front of the player; spawn CampfireClass on the ground
+      --> Multicast_Match: the match, heard by everyone where the fire is laid
+
+The wood, the bag and the place are the server's own: a client says only
+that it struck, and the fire it gets is the server's replicated actor
+(survival/campfire.py), which every client is sent.
 
 The matches are never spent, and a strike with no wood in the bag does
 nothing. The wood is an actor in the bag like any item, so spending it is the
@@ -34,8 +44,16 @@ from combat.light_tuning import (
     CAMPFIRE_AHEAD_CM, CAMPFIRE_CLASS_VAR, CAMPFIRE_FEET_CM, CAMPFIRE_TRACE_DOWN_CM,
     CAMPFIRE_TRACE_UP_CM, LIGHT_WOOD_VAR, LIGHTS_VAR,
 )
+from combat.fire_vars import SERVER_LIGHT
+from combat.fx_vars import LOCATION_PARAM, MATCH, SOUND_AT_PARAMS
+from combat.paths import ITEM_CLASS_PATH
+from combat.weapon_component import fx
 from combat.weapon_component.common import _prop, _trace_defaults
-from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_DESTROY
+from combat.weapon_component.shot import _author_alive
+from combat.weapon_component.slot_nodes import valid
+from uebp import net
+from uebp.g import _G
+from uebp.nodes.actor import FN_ACTOR_FORWARD, FN_ACTOR_LOC, FN_DESTROY, FN_GET_OWNER
 from uebp.nodes.array import FN_ARR_FIND, FN_ARR_REMOVE_ITEM
 from uebp.nodes.math import (
     FN_ADD_VV, FN_CLASS_EQ, FN_MAKE_TRANSFORM, FN_MUL_VF, FN_SELECT_VECTOR)
@@ -49,10 +67,11 @@ def _get(ed, name):
     return out(ed.add_get_member_variable_node(name), name)
 
 
-def _author_light_press(ed, held, owner, tap, not_lighter):
-    """Branch an item that Lights off the fire gate; a tap strikes it. Anything
-    else goes on to ``not_lighter`` (the ready gate). Returns (the gate's exec
-    input, its exits)."""
+def _author_light_press(ed, held, tap, not_lighter):
+    """Branch an item that Lights off the fire gate; a tap strikes it, which
+    is asked of the server (Server_Light). Anything else goes on to
+    ``not_lighter`` (the ready gate). Returns (the gate's exec input, its
+    exits)."""
     lights, lights_n = _prop(ed, LIGHTS_VAR, held)
     gate = ed.add_branch_node()
     _connect(lights, _pin(gate, "Condition"))
@@ -60,12 +79,39 @@ def _author_light_press(ed, held, owner, tap, not_lighter):
     press = ed.add_branch_node()
     _connect(tap, _pin(press, "Condition"))
     _connect(then(gate), _pin(press, "execute"))
-    exits = _author_campfire(ed, held, owner, then(press))
+    ask = _node(ed, SERVER_LIGHT)
+    _connect(then(press), _pin(ask, "execute"))
     ed.add_comment_to_nodes(
         "The held item Lights (the matches): a tap strikes it (light.py) "
-        "instead of firing it. Anything else goes on to the guns' ready gate.",
-        [lights_n, gate, press])
-    return _pin(gate, "execute"), exits + (else_(press),)
+        f"instead of firing it, and the strike is the server's ({SERVER_LIGHT}). "
+        "Anything else goes on to the guns' ready gate.",
+        [lights_n, gate, press, ask])
+    return _pin(gate, "execute"), (then(ask), else_(press))
+
+
+def author_light_fx(ed):
+    """The match's cosmetic pair (fx.py): heard on every screen, where the
+    fire is laid. Before the Server event, which tells it."""
+    fx.pair(ed, MATCH, SOUND_AT_PARAMS,
+            lambda g, e, ev: _author_sound(ed, WV.MatchSounds, out(ev, LOCATION_PARAM), e),
+            fx.SCREEN)
+
+
+def author_light_event(ed):
+    """Server_Light(): the strike, on the machine that owns the inventory.
+    Refused unless the owner is alive and its own Held is there and Lights.
+    Before the Tick, which calls it by name."""
+    g = _G(ed, ITEM_CLASS_PATH)
+    event = g.keep(net.server_event(ed, SERVER_LIGHT))
+    alive = _author_alive(g, [then(event)])
+    held = g.get(WV.Held)
+    armed, _bare = g.branch(valid(g, held), alive)
+    lighter, _other = g.branch(g.iget(held, LIGHTS_VAR), [armed])
+    ed.add_comment_to_nodes(
+        f"{SERVER_LIGHT} (light.py): the owning client's strike of the matches. "
+        "Refused unless the owner is alive and this machine's Held Lights; the "
+        "wood, the bag and where the fire stands are this machine's own.", g.made)
+    _author_campfire(ed, held, out(g.call(FN_GET_OWNER)), lighter)
 
 
 def _author_campfire(ed, held, owner, exec_in):
@@ -164,8 +210,8 @@ def _author_campfire(ed, held, owner, exec_in):
     _connect(out(at), _pin(fire, "SpawnTransform"))
     _set(fire, "CollisionHandlingOverride", "AlwaysSpawn")
     _connect(then(floor), _pin(fire, "execute"))
-    # The match itself, heard where the fire is laid.
-    struck = _author_sound(ed, WV.MatchSounds, out(rests), then(fire))
+    # The match itself, heard where the fire is laid, by everyone (fx.py).
+    struck = fx.tell(_G(ed), MATCH, [then(fire)], **{LOCATION_PARAM: out(rests)})
 
     ed.add_comment_to_nodes(
         "A strike of the matches. With a campfire class to spawn and a piece "

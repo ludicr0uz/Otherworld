@@ -41,7 +41,7 @@ from combat.paths import MAT_HOT_METAL
 from combat.weapon_items import build_model
 from uebp.nodes.actor import FN_SET_OVERLAY, FN_SET_VISIBILITY
 from uebp.nodes.math import FN_AND, FN_GE_FF
-from uebp.nodes.system import FN_TIME_SECONDS
+from uebp.nodes.system import FN_IS_SERVER, FN_TIME_SECONDS
 
 
 def build_hot_material():
@@ -151,9 +151,14 @@ def _author_cooling(ed, tick):
     spent = _node(ed, FN_GE_FF)
     _connect(out(now), _pin(spent, "A"))
     _connect(get(COOL_VAR), _pin(spent, "B"))
+    due = _node(ed, FN_AND)
+    _connect(get(HOT_VAR), _pin(due, "A"))
+    _connect(out(spent), _pin(due, "B"))
+    # The server's clock alone (and single player's): a client's copy, the
+    # world's or its picture of a carried one, is told (combat/fire_vars.py).
     over = _node(ed, FN_AND)
-    _connect(get(HOT_VAR), _pin(over, "A"))
-    _connect(out(spent), _pin(over, "B"))
+    _connect(out(due), _pin(over, "A"))
+    _connect(out(_node(ed, FN_IS_SERVER)), _pin(over, "B"))
     cooled = ed.add_branch_node()
     _connect(out(over), _pin(cooled, "Condition"))
     _connect(then(tick), _pin(cooled, "execute"))

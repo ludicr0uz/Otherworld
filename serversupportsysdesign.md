@@ -409,6 +409,9 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
     compensation".)
 24. Multicast cosmetics: shot sounds, impacts, blood, tracers, montages.
 25. Pick-up, drop, loot, wear, chop, light, heat and cauterise as server actions.
+    (Done, M23-M25: `Scripts/net/CLAUDE.md`, "Picking up, dropping and looting",
+    "Clothing" and "Fire and heat". The campfire is a replicated actor; a burning
+    stick and a hot blade are two more columns of the inventory's record.)
 26. Survival: a replicated ability system; hunger, thirst, cold and bleeding applied on the
     server.
 

@@ -349,9 +349,9 @@ of them, plain data (`combat/record_vars.py`):
   `BlockForced`, the use key's `SightsForced`, the throw's `ThrowKeyForced` and
   `ThrowClickForced` and the take's `InteractForced` (M20); the next Server event
   needs one of the same kind.
-- **Not yet in the record:** a heated blade and a burning stick
-  (the item's own state, M25). The dev-all-guns cheat
-  still spawns on the machine it is pressed on.
+- **A burning stick and a hot blade are in it** (M25, "Fire and heat", below): two
+  more columns, `InvLit` and `InvHot`, and `HandLit` and `HandHot` beside `HandClass`.
+  The dev-all-guns cheat still spawns on the machine it is pressed on.
 - `combat/verify/record.py` checks the flags and the wiring. Proof: `uepy.py --net
   --clients 2 --probe Scripts/probes/probe_net_inventory.py` (client 1 moves the axe to
   another bag slot, brings the pistol to hand and asks for a move no rule allows; the
@@ -490,7 +490,7 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
   a strike pending, so only it sweeps. The chop (the blow on a tree) and the hot
   blade's double hang off that same blow, so they are the server's too: **the double
   is read off the server's item**, and a client that only says its blade is hot gets
-  nothing. (Heating one on a server is M25: until then the server's item is cold.)
+  nothing. (The server's item is heated by `Server_Heat`: "Fire and heat", below.)
 - **The owning client predicts the swing it can see:** its own cooldown, the clip and
   the swing's sound, off the false arm of a Branch on HasAuthority. Not the blow.
 - **The guard and the use key are reported, not trusted** (`weapon_component/holds.py`):
@@ -501,8 +501,8 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
   **its own** stick, and those are what a wanderer's swing (`npc/block.py`) and a
   wendigo (`npc/ward.py`) read. `Blocking` replicates to everyone but the owner, so
   another player's copy poses the guard; `FireWard` goes nowhere (the stick held out
-  is seen as `LookPose`). The server's stick is lit by M25; until then a client's
-  ward holds no wendigo off.
+  is seen as `LookPose`). The server's stick is lit by `Server_Kindle` ("Fire and
+  heat", below).
 - **A thrown item is a replicated actor** (`combat/item_world.py`). What is carried is
   the server's unreplicated item actors and each client's picture of the record
   (above); the release (`Server_Throw`) sets `InWorld` on the server's actor and calls
@@ -536,7 +536,7 @@ judges it from its own copy. `combat/strike_vars.py` has the picture.
   unless it is `p.set` (no edit notification): written with the default on a
   wanderer, the server's body got fresh components and each client's copy of it lost
   its health component.
-- **Not here:** lag compensation of a sweep or a throw; lighting the stick and heating the blade on the server (M25). The swing, the throw and
+- **Not here:** lag compensation of a sweep or a throw. Lighting the stick and heating the blade are "Fire and heat", below. The swing, the throw and
   the hit as other players see and hear them are the next section.
 - `combat/verify/strike.py` and `verify/pickup.py` check the flags and the wiring.
   Proof: `uepy.py --net --clients 2 --probe-timeout 240 --probe
@@ -592,8 +592,8 @@ setting one down is a reliable Server event on the weapon component.
   `SetReplicates(true)` sends the item to no one.
 - **Not here:** a client that joins after a placed item was taken
   still shows its own copy of it, and asks for it in vain (M31). A body's loot is still
-  classes, so a looted gun is a fresh one. Eating a mushroom (M26) and the campfire and
-  the wood's chop (M25) are their own tasks.
+  classes, so a looted gun is a fresh one. Eating a mushroom is M26; the campfire and the wood's chop are "Fire and heat",
+  below.
 - `combat/verify/world_items.py`, `verify/asks.py` and `graphics_menu/loot_checks.py`
   are the wiring. Proof: `uepy.py --net --clients 2 --probe-timeout 300 --probe
   Scripts/probes/probe_net_take.py` (both clients take one row of a body at once and one
@@ -652,6 +652,62 @@ and the owning client's `Worn` is a picture of the record.
 - **Not here:** a garment worn on a server shows on nobody's body (nothing is drawn
   worn), and the single-player profile still saves the bag and not `Worn`
   (`Scripts/clothing/CLAUDE.md`).
+
+## Fire and heat: the tree, the campfire, the stick, the blade (M25, done)
+
+What changes the world happens once, on the server, and everyone sees it.
+`combat/fire_vars.py` has the picture; each event is its owner's module.
+
+| the client asks | the server checks, on its own copy | then |
+|---|---|---|
+| `Server_Light()` (the fire key tapped, the matches in hand) | alive, its item in hand `Lights`, a `CampfireClass` to spawn, a piece of wood in its bag | the wood is spent, a campfire is spawned 130 cm in front of its copy, `Multicast_Match` |
+| `Server_Kindle()` (the use key pressed, a stick that `Burns` in hand) | alive, its item `Burns` and is not `Lit`, a campfire within 3 m of its copy | `Lit` until `BurnOutTime` |
+| `Server_Heat(Fire)` (E on a campfire) | `Fire` is there and a `CampfireClass`, within `HEAT_REACH_CM` of its copy, alive, its item `Heats` | `Hot` until `CoolTime` |
+| `Server_Cauterize()` (the use key pressed, a `Hot` blade in hand) | alive, its item `Hot`, its ability system | every effect granting the bleeding tag comes off |
+
+- **The campfire is a replicated actor** (`survival/campfire.py`: `net.replicate_actor`,
+  after the compile). Only the server spawns one, so every client is sent it; its model,
+  glow and crackle are components and need nothing more. Its life span and its warmth
+  are behind HasAuthority: `Temperature` is the server's (it does not replicate until
+  M26, so a client's own HUD bar does not show the fire yet), and the server's destroy
+  takes every copy.
+- **`Lit` and `Hot` are the item's own, and so are their clocks.** The burn-out and
+  the cooling (`combat/stick.py`, `combat/heat.py`) run behind `IsServer`, not
+  HasAuthority: a client's picture of a carried item is a local actor it has
+  authority over, and would otherwise put itself out by its own clock (its
+  `BurnOutTime` is 0). A client is told, three ways:
+  - an item in the world: `Lit` and `Hot` replicate on the actor (`item_world.REPLICATED`);
+  - an item its owner carries: the record's `InvLit` and `InvHot`, which `ViewRow` writes
+    onto the picture;
+  - the item in another player's hand: `HandLit` and `HandHot` (`COND_SKIP_OWNER`),
+    written when either changes.
+  How long is left does not travel: it is the server's clock, and no client draws it.
+  A save that wants it writes the server's item's `BurnOutTime` less the time.
+- **The chop needed nothing new.** It hangs off the server's blow (M20), its count
+  (`ChopCount`, per chopper, on the server's component) is the tree's whole state (a tree
+  never runs out), its chips are `Multicast_Chop` and the wood it leaves lies `Dropped`,
+  which replicates by itself (`item_world.py`).
+- **The match is a cosmetic pair** (`Fx_Match`/`Multicast_Match`, gate `screen`): it was
+  a sound played where the strike was decided, which on a dedicated server nobody hears.
+- **A client decides none of it.** Its key's arm only asks: the wood, the bag, the place,
+  the reach and the item's flags are read off the server's copy. `Server_Cauterize`
+  called with a cold blade in the server's hand seals nothing.
+- **The probes' doors** are the keys' stand-ins that already existed: `FireForced` (the
+  strike), `SightsForced` (the use key: kindle, cauterise) and `InteractForced` (heat).
+- **In single player** each is a plain call, and `IsServer` is true: nothing changed.
+- **Not here:** `Temperature`, the bleed and the other debuffs on a client's HUD (M26);
+  a client that joins after a fire was lit is sent it like any replicated actor, but
+  what a late joiner is told of the items is M31.
+- `combat/verify/fire.py` checks the events and how `Lit` and `Hot` travel;
+  `verify/light.py`, `torch.py` and `heat.py` what each event asks first;
+  `survival/verify/campfire.py` the fire. Proof: `uepy.py --net --clients 2
+  --probe-timeout 300 --probe Scripts/probes/probe_net_campfire.py` (client 1 cuts wood,
+  takes it, lights a campfire, lights its stick at it, heats its knife and cauterises a
+  bleed the server gave it, then sets the burning stick down; client 2 sees the wood,
+  the fire, the burning stick and the hot knife in client 1's hand and the stick on the
+  ground, and the server's `Temperature` of client 2 rises beside the fire); clean with
+  `--lag 120`. Single player's are `probe_campfire`, `probe_chop_tree`,
+  `probe_lit_stick` and `probe_hot_blade`.
 
 ## Everyone sees and hears the fight (M21, done)
 
@@ -767,17 +823,15 @@ only varies how something looks or sounds is each machine's own.
 | `npc/ward.py` | state | held off by fire: which way it circles and when it turns | the AIController, as the patrol |
 | `npc/ward_roar.py` | state | held off by fire: when the first roar comes (it stands for it) | the AIController, as the patrol |
 | `combat/weapon_component/firing.py` | state | where in the gun's cloud a round or a pellet goes | inside `Server_Fire`, which only the server runs (single player: a plain call); the owning client draws nothing, and what the pellets did replicates as health |
-| `combat/weapon_component/chop.py` | state | where the wood lands beside the trunk, and how it lies | the weapon component of whoever chops; the server's once the chop is a server action (**M25**) |
+| `combat/weapon_component/chop.py` | state | where the wood lands beside the trunk, and how it lies | the weapon component of whoever chops, on the server alone: the chop hangs off the server's blow, and the wood it leaves replicates |
 | `world/day_night_graph.py` | state | the time of day a level starts at | every machine's own BP_DayNightCycle at BeginPlay; one clock, the server's, replicated (**M30**) |
 | `Sound/play.py` | cosmetic | which take of a sound plays (every sound with more than one) | wherever the sound plays |
 | `combat/hit_reaction.py` | cosmetic | which of the three front flinches a blow from the front plays | every machine's copy of the health component, off its own Tick |
 | `combat/weapon_component/recoil.py` | cosmetic | the kick's sideways drift, on the view of the player who fired | the owning client: it turns its own controller, as the mouse does |
 | `npc/stats.py` | cosmetic | the gap before a wanderer's next growl | the AIController (the server's); every client hears the growl once sounds are multicast (**M21**) |
 
-- **Still drawn by the machine that acts,** each until its action is the server's: where
-  chopped wood lands (M25), the hour a level starts at (M30: every machine's sky is its
-  own today). A client of a server changes nothing with the first yet (its wood is its
-  own copy's).
+- **Still drawn by the machine that acts,** until its action is the server's: the hour
+  a level starts at (M30: every machine's sky is its own today).
 - **A dropped gun is rolled by the server and spawned there;** it reaches a client as
   every item lying in the world does (M23: its own Tick replicates it). A landed bleed is the target's ability
   system's on the server; the owner's HUD reads it when the attributes replicate (M26).

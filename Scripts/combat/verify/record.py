@@ -9,7 +9,7 @@ moves an item on a client of a server and reads the server's copy.
 
 from uebp import net
 from combat.record_vars import (
-    HandClass, RECORD, REPLICATED, VIEW_ROW, VIEW_TRIM, VIEW_WORN, ViewDirty, WornClass)
+    HAND, HandClass, RECORD, REPLICATED, VIEW_ROW, VIEW_TRIM, VIEW_WORN, ViewDirty, WornClass)
 from combat.slot_tuning import SLOT_WANT_VAR
 from combat.verify.common import BEL, PIN, by_pins, check, graph, in_pins
 from combat.verify.fixtures import _is_exec, wc, wc_cdo, wg
@@ -61,9 +61,10 @@ def _authority_branches():
 def check_replication():
     declared = {str(v): net.variable_replication(wc, str(v)) for v in REPLICATED}
     want = {str(v): (net.REP_NOTIFY, f"OnRep_{v}",
-                     SKIP_OWNER if v == HandClass else OWNER_ONLY) for v in REPLICATED}
-    check("the record's four arrays and the worn slots' classes replicate to the owning "
-          "client alone, and the class in hand to everyone else; each is a RepNotify",
+                     SKIP_OWNER if v in HAND else OWNER_ONLY) for v in REPLICATED}
+    check("the record's arrays and the worn slots' classes replicate to the owning "
+          "client alone, and the class in hand, with whether it burns or is hot, to "
+          "everyone else; each is a RepNotify",
           {k: (a, b, c.upper()) for k, (a, b, c) in declared.items()} == want, str(declared))
     compiled = {str(v): net.compiled_replication(wc, str(v)) for v in REPLICATED}
     check("...and compiled so", all(k == (net.REP_NOTIFY, f"OnRep_{v}")

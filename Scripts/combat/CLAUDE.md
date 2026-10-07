@@ -262,6 +262,16 @@ body 10 s later (`player_respawn.py`); `docs/health.md`, "Dying", and
     local arm, so on a client they go through the Server events. A probe that calls
     `Server_Fire` itself does so on the server (or in single player).
     `probes/probe_net_fire.py` is the two-client proof; `verify/shot.py` the wiring.
+- **The pellet is judged where the shooter saw the target** (M22; `lag_tuning.py`,
+  `uebp/nodes/shot.py`; the C++ is `Source/Otherworld`'s `OtherworldHitHistory` and
+  `OtherworldShotLibrary`; `Scripts/net/CLAUDE.md`, "Lag compensation"). firing.py's
+  pellet trace is one C++ node, `ShotTrace`: the Visibility trace and, for a struck
+  character, its bodies along the same line (`bBodyHit`, `BodyBone`, `BodyPoint`, which
+  impact.py's hit zone reads in place of its own `K2_LineTraceComponent`). On a server a
+  remote shooter's pellets are traced against where every character stood its round
+  trip ago (plus `EXTRA_REWIND_S`, at most `MAX_REWIND_S`); a local shooter's, so single
+  player's, against the present, the same two engine traces as before.
+  `probes/probe_net_lag_hits.py` is the proof, with and without `--lag 150`.
 - **Melee, the guard, the throw and the take are server requests too** (M20;
   `strike_vars.py`; `Scripts/net/CLAUDE.md`, "Melee, the guard, the throw and the take").
   Five reliable Server events on the component, each a plain call in single player:

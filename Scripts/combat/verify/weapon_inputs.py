@@ -21,7 +21,8 @@ from combat.verify.knife import is_melee_play, is_melee_sweep
 from combat.verify.throw import is_throw_play, is_throw_trace, launch_nodes
 from combat.verify.throw_aim import is_ready_node
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, graph, in_pins, load, out_pins, pin_value, titled,
+    BEL, PIN, by_pins, cdo, check, graph, in_pins, load, out_pins, pin_value, shot_traces,
+    titled,
 )
 
 
@@ -132,11 +133,11 @@ def check_keys_are_variables():
     # decides what is being aimed at, the muzzle line decides whether the gun can
     # reach it, and the pellets fly down the muzzle line. Getting this wrong is not
     # a compile error -- it is a gun that shoots from behind the player's shoulder.
-    traces = [n for n in by_pins(wg, "Start", "End", "TraceChannel")
+    traces = [n for n in by_pins(wg, "Start", "End", "TraceChannel") + shot_traces(wg)
               if not is_melee_sweep(n) and not is_throw_trace(n)
               and not is_chop_node(n) and not is_light_trace(n)]
-    check("there are five traces (camera aim, muzzle clearance, pellets, the drop key's "
-          "probe and the dragged drop's)",
+    check("there are five traces (camera aim, muzzle clearance, the pellets' ShotTrace, "
+          "the drop key's probe and the dragged drop's)",
           len(traces) == 5, str(len(traces)))
 
 

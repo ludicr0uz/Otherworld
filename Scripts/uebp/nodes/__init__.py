@@ -15,6 +15,8 @@ Scripts/dev/check_node_catalog.py.
   move.py     the game's own movement library (C++, Source/Otherworld): the
               sprint key, the stance and the aim handed to the player's
               movement component, its state read back, the server's writes
+  shot.py     the game's own shot library (C++, Source/Otherworld): the
+              pellet's trace, rewound to the shooter's view on a server (M22)
   palette.py  palette nodes (events, casts, break/make) and the standard, actor
               and component macros
 """

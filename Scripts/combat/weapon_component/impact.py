@@ -26,12 +26,11 @@ from combat.weapon_component.common import _prop
 from combat.weapon_component.headshot import _author_headshot
 from combat.weapon_component.surface_impact import _author_surface_impact
 from uebp.g import _G
-from uebp.nodes.actor import FN_GET_COMP, FN_TRACE_COMPONENT
+from uebp.nodes.actor import FN_GET_COMP
 from uebp.nodes.array import FN_ARR_CONTAINS
 from uebp.nodes.math import FN_CLAMP, FN_DIV_FF, FN_MUL_FF, FN_SELECT_FF
 from uebp.nodes.palette import NODE_CAST_CHARACTER, NODE_CAST_HEALTH
 from uebp.nodes.system import FN_CONCAT, FN_DRAW_STRING, FN_FLOAT_TO_STR
-from uebp import props as EP
 from combat import item_vars as IV
 
 
@@ -51,8 +50,9 @@ def author_pellet_fx(ed):
     fx.pair(ed, PELLET_HIT, PELLET_HIT_PARAMS, _author_pellet_hit, fx.SCREEN)
 
 
-def _author_impact(ed, brk, held, exec_in):
+def _author_impact(ed, brk, held, exec_in, body):
     """A pellet that hit something: blood, then subtract the damage.
+    ``body`` is the pellet trace's (bBodyHit, BodyBone, BodyPoint) pins.
 
     Both are behind the health cast, so trees and terrain produce no blood
     -- only things carrying BP_HealthComponent bleed. What the cast refuses
@@ -107,7 +107,7 @@ def _author_impact(ed, brk, held, exec_in):
 
     # The zone runs BEFORE the blood it is drawn to the right of: only a
     # pellet that struck a body (or a thing with health and no body) bleeds.
-    zoned, zone_nodes = _author_hit_zone(ed, brk, then(cast))
+    zoned, zone_nodes = _author_hit_zone(ed, brk, then(cast), body)
     bled = fx.tell(g, PELLET_HIT, zoned,
                    **{LOCATION_PARAM: out(landed, HIT_POINT_VAR), NORMAL_PARAM: normal,
                       SCALE_PARAM: out(spray), BLOOD_PARAM: True})
@@ -208,32 +208,33 @@ def _author_damage_readout(ed, brk, damage, worth, exec_in):
     return made
 
 
-def _author_hit_zone(ed, brk, exec_in):
+def _author_hit_zone(ed, brk, exec_in, body):
     """Did this pellet strike the body, and which bone? Written into HitBone.
 
     The pellet trace stops at the capsule -- make_shootable makes the capsule,
     not the mesh, block Visibility, and that is what keeps the aim trace and
     the reticle predictable. So the capsule answers *whether* a character was
-    hit, and a second trace along the very same line (the hit result carries
-    its TraceStart/TraceEnd) answers *where*: K2_LineTraceComponent tests one
-    component only, and on a skeletal mesh that means its physics bodies, each
-    of which reports its bone. It ignores collision channels altogether, so the
-    mesh's own profile (CharacterMesh, which ignores Visibility) is irrelevant;
-    what matters is that the mesh has query collision at all, or it has no
-    bodies at runtime -- install_hit_zones asserts that.
+    hit, and the same trace node answers *where*: ShotTrace (C++) runs the
+    struck character's physics bodies along the very same line, each of
+    which reports its bone, and hands back bBodyHit, BodyBone and BodyPoint
+    (``body``). It ignores collision channels altogether, so the mesh's own
+    profile (CharacterMesh, which ignores Visibility) is irrelevant; what
+    matters is that the mesh has query collision at all, or it has no bodies
+    at runtime -- install_hit_zones asserts that. On a server the bodies are
+    tried where they stood when the shooter fired (lag compensation, M22).
 
     The capsule is far wider than the model -- 34 cm of radius round an 18 cm
-    head -- so a trace that finds no body is a pellet that flew past the model
+    head -- so a pellet that strikes no body is one that flew past the model
     inside its capsule, and its exec ends here: it is a miss. It used to count
     as a body hit, which made every near miss round the head a hit. The bodies
     are fitted to the model for that reason (hit_bodies.py).
 
-    A trace that struck writes HitBone and moves HitPoint from the capsule's
-    surface onto the body's. HitBone is cleared first, for the one other way
-    on: an actor with health that is not a Character has no mesh to trace, and
-    takes the hit at 1x where the pellet's own trace landed.
+    A strike writes HitBone and moves HitPoint from the capsule's surface
+    onto the body's. HitBone is cleared first, for the one other way on: an
+    actor with health that is not a Character has no mesh to trace, and takes
+    the hit at 1x where the pellet's own trace landed.
 
-    Returns (exec outs that continue to the blood, nodes made, next free x).
+    Returns (exec outs that continue to the blood, nodes made).
     """
     made = []
 
@@ -241,6 +242,7 @@ def _author_hit_zone(ed, brk, exec_in):
         made.append(n)
         return n
 
+    struck_pin, bone_pin, point_pin = body
     clear = keep(ed.add_set_member_variable_node(HIT_BONE_VAR))
     _set(clear, HIT_BONE_VAR, "None")
     _connect(exec_in, _pin(clear, "execute"))
@@ -248,29 +250,16 @@ def _author_hit_zone(ed, brk, exec_in):
     as_char = keep(_palette(ed, NODE_CAST_CHARACTER))
     _connect(_loose_pin(brk, "HitActor", is_input=False), _pin(as_char, "Object"))
     _connect(then(clear), _pin(as_char, "execute"))
-    mesh = keep(ed.add_get_member_variable_node(EP.MESH, "/Script/Engine.Character"))
-    _connect(_loose_pin(as_char, "AsCharacter", is_input=False), _pin(mesh, "self"))
-
-    probe = keep(_node(ed, FN_TRACE_COMPONENT))
-    _connect(out(mesh, "Mesh"), _pin(probe, "self"))
-    _connect(_loose_pin(brk, "TraceStart", is_input=False), _pin(probe, "TraceStart"))
-    _connect(_loose_pin(brk, "TraceEnd", is_input=False), _pin(probe, "TraceEnd"))
-    # Simple collision is the physics asset's capsules and spheres, which is
-    # the point: complex would be the render mesh, which has no bone to report.
-    _set(probe, "bTraceComplex", False)
-    _set(probe, "bShowTrace", False)
-    _set(probe, "bPersistentShowTrace", False)
-    _connect(then(as_char), _pin(probe, "execute"))
 
     struck = keep(ed.add_branch_node())
-    _connect(out(probe), _pin(struck, "Condition"))
-    _connect(then(probe), _pin(struck, "execute"))
+    _connect(struck_pin, _pin(struck, "Condition"))
+    _connect(then(as_char), _pin(struck, "execute"))
     note = keep(ed.add_set_member_variable_node(HIT_BONE_VAR))
-    _connect(out(probe, "BoneName"), _pin(note, HIT_BONE_VAR))
+    _connect(bone_pin, _pin(note, HIT_BONE_VAR))
     _connect(then(struck), _pin(note, "execute"))
 
     onto = keep(ed.add_set_member_variable_node(HIT_POINT_VAR))
-    _connect(out(probe, "HitLocation"), _pin(onto, HIT_POINT_VAR))
+    _connect(point_pin, _pin(onto, HIT_POINT_VAR))
     _connect(then(note), _pin(onto, "execute"))
 
     outs = [then(onto), out(as_char, "CastFailed")]

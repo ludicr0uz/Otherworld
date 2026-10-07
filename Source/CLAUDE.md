@@ -1,8 +1,8 @@
 # Source — the C++ module
 
 Two modules and four targets. The runtime module, `Otherworld`, holds what multiplayer
-needs and a Blueprint cannot do (`serversupportsysdesign.md` 4.3): so far the player's
-predicted movement states (M12); lag compensation comes later. The editor-only
+needs and a Blueprint cannot do (`serversupportsysdesign.md` 4.3): the player's
+predicted movement states (M12) and the lag compensation of shots (M22). The editor-only
 module, `OtherworldEditor`, holds what the Python builders need and Python cannot reach.
 Everything else stays in the Python builders.
 
@@ -16,6 +16,8 @@ Everything else stays in the Python builders.
 | `Otherworld/Public/OtherworldCharacterMovement.h`, `Private/….cpp` | `UOtherworldCharacterMovement`: sprint, prone and the aim-walk as saved-move flags (`FLAG_Custom_0..2`), the speed of each state (`GetMaxSpeed`), the sprint's rules (the stamina latch, the forward cone) and the stamina, all stepped in `UpdateCharacterStateBeforeMovement` with the move's own delta time, so the owning client predicts them and the server makes the same ones. See "Predicted movement" below |
 | `Otherworld/Public/OtherworldCharacter.h`, `Private/….cpp` | `AOtherworldCharacter`: a Character whose movement component is that class, and `bProne`, the one fact a simulated copy needs beside the engine's replicated crouch to stand as the server has it (M13, below). `BP_ThirdPersonCharacter` is reparented onto it by `Scripts/combat/player_move.py` |
 | `Otherworld/Public/OtherworldMovementLibrary.h`, `Private/….cpp` | `UOtherworldMovementLibrary` (Python: `unreal.OtherworldMovementLibrary`): what the graphs and the probes say to the component and read off it, each a static taking the character's actor (`Scripts/uebp/nodes/move.py`) |
+| `Otherworld/Public/OtherworldHitHistory.h`, `Private/….cpp` | `UOtherworldHitHistory`, a world subsystem: on a server with clients, one sample per frame of every character's capsule and physics-body transforms, a second back, and the rewound trace against them (M22, below) |
+| `Otherworld/Public/OtherworldShotLibrary.h`, `Private/….cpp` | `UOtherworldShotLibrary` (Python: `unreal.OtherworldShotLibrary`): `ShotTrace`, the pellet's one trace node (`Scripts/uebp/nodes/shot.py`), the rewind a shooter gets, and what the history did, for the probes |
 | `OtherworldEditor/OtherworldEditor.Build.cs` | the editor module's dependencies (adds `UnrealEd`, `BlueprintGraph`); only the Editor target lists it, so no game or server build carries it |
 | `OtherworldEditor/Public/OtherworldBlueprintNetLibrary.h`, `Private/….cpp` | `UOtherworldBlueprintNetLibrary` (Python: `unreal.OtherworldBlueprintNetLibrary`): a custom event's net flags and parameters, a variable's replication and OnRep graph, and the same read back off a compiled class. Wrapped by `Scripts/uebp/net.py`; checked by `Scripts/dev/check_net_authoring.py` |
 
@@ -76,6 +78,28 @@ are listed under `Modules` in `Otherworld.uproject` (`OtherworldEditor` as type 
   standing offset. `GetStance(actor)` answers 0/1/2 on any machine. The aim and the pose
   on that copy are the weapon component's (`Scripts/net/CLAUDE.md`, "Other players'
   characters").
+
+## Lag compensation (`UOtherworldHitHistory`, `UOtherworldShotLibrary`, M22)
+
+`Scripts/net/CLAUDE.md`, "Lag compensation", has the design; `combat/lag_tuning.py` the
+numbers, which the fire graph hands `ShotTrace` as pin literals.
+
+- **Record after the actors tick** (`FWorldDelegates::OnWorldPostActorTick`): the mesh
+  component's tick poses the bones and the kinematic bodies follow in the same frame, so
+  that is where the frame's bodies are. A tickable subsystem would read the frame before.
+- **Only a server with clients records** (`GetNetMode()`), so single player pays nothing
+  and `ShotTrace` with a rewind of 0 is the two engine traces the graph used to make
+  (`LineTraceSingleByChannel` on Visibility, `USkeletalMeshComponent::LineTraceComponent`
+  for the bone), parameter for parameter.
+- **A rewound trace moves nothing.** `FBodyInstance::LineTrace` tests a body where it is
+  now, so the line is taken from the body's then-frame into its now-frame
+  (`Then.Inverse() * Now`: UE's `A * B` applies A first) and the hit back. The body's
+  transforms carry no scale (`GetUnrealWorldTransform`), so the move is rigid.
+- **Bodies by index:** a sample holds `Mesh->Bodies` by position. A mesh whose body count
+  differs from a sample's (collision toggled) is judged by its capsule alone that frame.
+- **The ping is a second old:** `UNetConnection::AvgLag` is averaged over its stat period
+  and the PlayerState's over four seconds, so the first shot after a join is rewound by
+  the join's inflated round trip (measured 90-250 ms on the loopback). The cap bounds it.
 
 ## Traps
 

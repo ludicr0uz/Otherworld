@@ -412,15 +412,64 @@ R  ------------------------------------>  Server_Reload: AsksServed + 1, ReloadN
   server every hit body and every muzzle stood in the reference pose. Every body with a
   health component is set to `AlwaysTickPoseAndRefreshBones` there, at BeginPlay,
   behind IsDedicatedServer. M22's history of hit boxes reads the same bones.
-- **Not here:** lag compensation (M22: the server traces against where the target is
-  now, so at 120 ms a strafing target is missed where the shooter saw a hit). The server
-  takes the shot whether or not it has the player sprinting or guarding. Melee, the throw
-  and the guard are the next section; what everyone sees and hears is the one after.
+- **Where the target was** is the next section (M22): the server judges a remote
+  shooter's pellets against where every character stood when the shooter fired.
+- **Not here:** the server takes the shot whether or not it has the player sprinting or
+  guarding. Melee, the throw and the guard are the section after; what everyone sees and
+  hears the one after that.
 - `combat/verify/shot.py` checks the flags and the wiring. Proof: `uepy.py --net
   --clients 2 --probe-timeout 240 --probe Scripts/probes/probe_net_fire.py` (client 1
   kills a wanderer down the sights and reloads; the server's rounds are client 1's, its
   count of asks client 1's, the kill client 1's, and three `Server_Fire` in one frame
   spend one round); also with `--lag 120`; `--game` runs its single-player arm.
+
+## Lag compensation (M22, done)
+
+A shot asked of the server arrives a round trip after the shooter saw the target, and
+the shooter saw the target where the server's last update put it. Traced against the
+present, a round aimed at a strafing character's chest passed behind it: with 150 ms
+of lag the old graph landed 0 pistol rounds in 8. The server now judges the shot
+against where the target stood when the shooter fired. It is C++, the `Otherworld`
+module (`serversupportsysdesign.md` 4.3: not practical in Blueprint); the numbers are
+`combat/lag_tuning.py`; the one node is `uebp/nodes/shot.py`.
+
+- **The history** (`UOtherworldHitHistory`, a world subsystem): after every actor has
+  ticked (`FWorldDelegates::OnWorldPostActorTick`, so the kinematic bodies follow the
+  frame's pose) it records, for every `ACharacter`, the capsule's transform, whether it
+  blocked Visibility, and the world transform of each of the mesh's physics bodies, a
+  second back. Only on a server with clients (`NM_DedicatedServer`, `NM_ListenServer`):
+  single player records nothing.
+- **The rewind** is the shooter's connection's round trip (`UNetConnection::AvgLag`, the
+  PlayerState's ping failing that) plus `EXTRA_REWIND_S`, at most `MAX_REWIND_S` (0.4 s:
+  a player on a worse line is at the disadvantage, not the one they shoot). A local
+  shooter (single player, a listen host's own player, an AI) gets none.
+- **The trace** (`UOtherworldShotLibrary::ShotTrace`) is the pellet's one node, in
+  place of `LineTraceSingle` and the `K2_LineTraceComponent` that followed it. With no
+  rewind it runs those two engine traces as they were. With one, it traces the world
+  with every recorded character ignored, then each character where it stood at the
+  rewound time, and the nearest wins; the struck character's bodies are tried along the
+  same line for the bone (`bBodyHit`, `BodyBone`, `BodyPoint`, which impact.py's hit
+  zone reads). The samples either side of the time are blended.
+- **Nothing is moved.** The engine traces a body where it is now
+  (`FBodyInstance::LineTrace`), so the line is carried from where the body was to where
+  it is and the hit carried back: rigid transforms both ways, so the distance, the
+  bone and the shape are the engine's own, and a shot cannot disturb a ragdoll or
+  another shot in the same frame.
+- **What it does not do:** the first second after a join is rewound by the join's
+  inflated round trip (the engine averages the ping over a second); melee, the throw
+  and the aim trace are not rewound (a sweep reaches a metre; the throw flies for
+  real); the server's record of the shooter's own muzzle is not rewound either, since
+  the shooter is not moving relative to itself.
+- **Proof:** `uepy.py --net --clients 2 --probe-timeout 240 --probe
+  Scripts/probes/probe_net_lag_hits.py`, and the same with `--lag 150`. Client 2 runs
+  across client 1's line of fire; client 1 fires eight pistol rounds down the sights
+  at the chest of its own copy of client 2; the server counts the rounds that hurt
+  and prints, per shot, the rewind it used against the one that would have put the
+  round exactly where client 1 saw the chest (how far back along the server's own
+  track of it that point lies). Measured: 6/8 without lag (rewound 43 ms: the
+  loopback's frames), 7/8 with 150 ms (rewound 178 ms, wanted 150-220). Single player:
+  `probe_headshot`, `probe_ads_hit`, `probe_net_fire --game`; `verify/hit_bodies.py`
+  and `verify/player_body.py` check the node and what reads it.
 
 ## Melee, the guard, the throw and the take (M20, done)
 

@@ -249,7 +249,9 @@ BP_WeaponComponent event graph:
   Fire: muzzle world location  -> Start
         AimPoint - muzzle      -> direction
         one draw in AimSpread  -> ShotDirection
-        N pellets in a cone    -> LineTraceSingle each
+        N pellets in a cone    -> ShotTrace each (C++: the Visibility trace and
+                              the struck body's, rewound to the shooter's
+                              view on a server; M22, combat/lag_tuning.py)
         hit -> BP_BloodSplash at the impact + Health -= Damage
                (no health component: BP_BulletImpact there instead)
 

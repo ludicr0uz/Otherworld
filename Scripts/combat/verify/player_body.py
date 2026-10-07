@@ -8,15 +8,15 @@ from combat.game_state import DEBUG_MODE_VAR, TRACE_DEBUG_SECONDS
 from uebp.graph import _component_object, _handles
 from combat.grip import _mesh_bone_names
 from combat.hit_zones import (
-    HEAD_BONES_VAR, HEAD_MULT_VAR, LIMB_BONES_VAR, hit_zones,
+    HEAD_BONES_VAR, HEAD_MULT_VAR, HIT_BONE_VAR, HIT_POINT_VAR, LIMB_BONES_VAR, hit_zones,
 )
+from combat.lag_tuning import EXTRA_REWIND_S, MAX_REWIND_S
 from combat.skin import SKIN_QUINN, player_skin
 from combat.tuning import COMBAT
 from combat.verify.fixtures import char, npc, wg
-from combat.verify.throw_strike import is_strike_node
 from combat.verify.common import (
     take_hits,
-    BEL, PIN, _mesh_asset, check, in_pins, load, num_pin, pin_value, titled,
+    BEL, PIN, _mesh_asset, check, in_pins, load, num_pin, pin_value, shot_traces, titled,
     zone_tables,
 )
 
@@ -114,25 +114,34 @@ def check_player_body():
 
 
     wt = wg
-    zone_traces = [n for n in wt if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)
-                   and not is_strike_node(n)]
-    check("one trace against the struck character's body, per pellet",
-          len(zone_traces) == 1, f"{len(zone_traces)} K2_LineTraceComponent node(s)")
+    # The pellet's trace and the struck character's body trace are one C++
+    # node since M22 (ShotTrace, uebp/nodes/shot.py): the one line serves
+    # both, so the body cannot be tested along a line the pellet did not fly.
+    zone_traces = shot_traces(wt)
+    check("one trace per pellet, which judges the capsule and the struck character's "
+          "bodies on the one line (ShotTrace, C++)",
+          len(zone_traces) == 1, f"{len(zone_traces)} ShotTrace node(s)")
     if zone_traces:
         zt = zone_traces[0]
-        fed = {pin: {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
-                     for q in PIN.list_connected_pins(BEL.find_input_pin(zt, pin))}
-               for pin in ("TraceStart", "TraceEnd", "self")}
-        # The pellet's own line, from the pellet's own hit result -- not the aim
-        # point, not the muzzle recomputed: a second line would land somewhere the
-        # first one did not.
-        check("it retraces the pellet's own line (TraceStart/TraceEnd of its hit)",
-              all(any("BreakHitResult" in t for t in fed[p])
-                  for p in ("TraceStart", "TraceEnd")), str(fed))
-        check("it traces the character's mesh, whose bodies carry bone names",
-              any("Mesh" in t for t in fed["self"]), str(fed["self"]))
-        check("it traces the simple (physics body) shapes, not the render mesh",
-              pin_value(zt, "bTraceComplex").lower() == "false")
+        shooter = {str(BEL.get_node_title(PIN.get_owning_node(q))).replace("\n", " ")
+                   for q in PIN.list_connected_pins(BEL.find_input_pin(zt, "Shooter"))}
+        check("its shooter is this component's owner, whom the pellet ignores and whose "
+              "round trip sets the rewind", any("Owner" in t for t in shooter), str(shooter))
+
+        def reads(var, pin):
+            """The Set ``var`` nodes fed from the trace's ``pin``."""
+            return [n for n in titled(wt, f"Set {var}")
+                    if any(PIN.get_owning_node(q) == zt and str(PIN.get_pin_name(q)) == pin
+                           for q in PIN.list_connected_pins(BEL.find_input_pin(n, var)))]
+        check("the struck bone is the trace's own (BodyBone -> HitBone)",
+              len(reads(HIT_BONE_VAR, "BodyBone")) == 1, f"{len(reads(HIT_BONE_VAR, 'BodyBone'))}")
+        check("...and its point on the body moves HitPoint onto the body (BodyPoint)",
+              len(reads(HIT_POINT_VAR, "BodyPoint")) == 1,
+              f"{len(reads(HIT_POINT_VAR, 'BodyPoint'))}")
+        got = (num_pin(zt, "MaxRewindSeconds"), num_pin(zt, "ExtraRewindSeconds"))
+        check(f"the rewind is capped at {MAX_REWIND_S:g} s, and allows {EXTRA_REWIND_S:g} s "
+              "over the round trip (combat/lag_tuning.py)",
+              got == (MAX_REWIND_S, EXTRA_REWIND_S), str(got))
     contains = [n for n in wt if {"TargetArray", "ItemToFind"} <= in_pins(n)]
     tables = {str(BEL.get_node_title(PIN.get_owning_node(q)))
               for n in contains

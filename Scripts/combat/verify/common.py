@@ -53,6 +53,12 @@ def by_pins(nodes, *required):
     return [n for n in nodes if want <= in_pins(n)]
 
 
+def shot_traces(nodes):
+    """The fire graph's ShotTrace nodes (C++, uebp/nodes/shot.py): the pellet's
+    trace since M22, which the sweeps that count LineTraceSingle nodes add."""
+    return [n for n in nodes if {"Shooter", "Start", "End", "MaxRewindSeconds"} <= in_pins(n)]
+
+
 def take_hits(nodes):
     """The calls of BP_HealthComponent's TakeHit (combat/damage.py): the one
     way a blow takes health. The event itself has these as outputs."""

@@ -98,6 +98,9 @@ DATA (constants and pure tables -- no Blueprint authoring)
   shot_vars         the shot and the reload as server requests (M19): the events'
                     names, AsksSent / AsksServed (which reconcile a client's
                     predicted rounds), the server's grace on the cooldown
+  lag_tuning        lag compensation for shots (M22): the cap on the rewind and
+                    the allowance over the round trip; the C++ history and trace
+                    are Source/Otherworld
   strike_vars       melee, the guard, the use key, the throw and the take as
                     server requests (M20): the five events' names, what the
                     owning machine reports and the server keeps, the limits

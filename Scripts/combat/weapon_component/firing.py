@@ -9,14 +9,17 @@ from combat.paths import ITEM_CLASS_PATH
 from net.state_consts import GAME_STATE_CLASS_PATH
 from net.state_graph import game_state
 from combat.weapon_component.accuracy import AIM_SPREAD_VAR
-from combat.weapon_component.common import _prop, _trace_defaults
+from combat.lag_tuning import EXTRA_REWIND_S, MAX_REWIND_S
+from combat.weapon_component.common import _prop
 from combat.weapon_component.impact import _author_impact
 from combat.weapon_component.tracer import _author_tracer
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_VV, FN_DEG2RAD, FN_MAX_FF, FN_MUL_VF, FN_NORMAL, FN_RAND_CONE, FN_SUB_II,
     FN_SUB_VV)
+from uebp.nodes.actor import FN_GET_OWNER
 from uebp.nodes.palette import MACRO_FOR_LOOP, NODE_BREAK_HIT
-from uebp.nodes.system import FN_TIME_SECONDS, FN_TRACE
+from uebp.nodes.shot import FN_SHOT_TRACE
+from uebp.nodes.system import FN_TIME_SECONDS
 from combat import item_vars as IV
 
 # The shot's direction, drawn once per trigger pull inside AimSpread.
@@ -137,11 +140,21 @@ def _author_fire(ed, held, muzzle, aim, exec_in):
     _connect(muzzle, _pin(end, "A"))
     _connect(out(reach), _pin(end, "B"))
 
-    trace = keep(_node(ed, FN_TRACE))
+    # The pellet's one trace (C++, uebp/nodes/shot.py): Visibility, simple
+    # collision, the shooter ignored; and if it stops on a character, that
+    # character's physics bodies along the same line (bBodyHit, BodyBone,
+    # BodyPoint). On a server a remote shooter's shot is judged against
+    # where every character stood when it fired, by its round trip, within
+    # the cap (combat/lag_tuning.py); a local shooter's against the present.
+    trace = keep(_node(ed, FN_SHOT_TRACE))
+    shooter = keep(_node(ed, FN_GET_OWNER))
+    _connect(out(shooter), _pin(trace, "Shooter"))
     _connect(muzzle, _pin(trace, "Start"))
     _connect(out(end), _pin(trace, "End"))
-    _trace_defaults(trace)
+    _set(trace, "MaxRewindSeconds", MAX_REWIND_S)
+    _set(trace, "ExtraRewindSeconds", EXTRA_REWIND_S)
     _connect(_loose_pin(loop, "LoopBody", is_input=False), _pin(trace, "execute"))
+    body = (out(trace, "bBodyHit"), out(trace, "BodyBone"), out(trace, "BodyPoint"))
 
     brk = keep(_palette(ed, NODE_BREAK_HIT))
     _connect(out(trace, "OutHit"), _loose_pin(brk, "Hit"))
@@ -164,12 +177,13 @@ def _author_fire(ed, held, muzzle, aim, exec_in):
         "Fire, on the machine that owns the shot: one round and one cooldown stamp "
         "first, then origin at the muzzle, direction muzzle -> the shooter's "
         "AimPoint drawn once inside AimSpread, "
-        "then each pellet inside the weapon's own pattern. "
+        "then each pellet inside the weapon's own pattern, each judged where "
+        "the shooter saw the others (ShotTrace: C++, lag compensation). "
         "The tracer leaves the barrel and ends where the pellet stopped "
         "-- when DebugMode is on, which is the only time it is drawn at all.",
         made)
 
-    _author_impact(ed, brk, held, then(hit))
+    _author_impact(ed, brk, held, then(hit), body)
     # The direction goes back too, so the shot's noise cone is the pellets' line.
     return _loose_pin(loop, "Completed", is_input=False), direction
 

@@ -55,7 +55,8 @@ def _is_hit_result(n):
 def _by_the_trace(node, pin_name):
     """Is this pin wired from the pellet trace's own "did it hit"?"""
     wired = _wired(node, pin_name)
-    return len(wired) == 1 and "TraceChannel" in _in_names(wired[0])
+    return len(wired) == 1 and ("TraceChannel" in _in_names(wired[0])
+                                or "MaxRewindSeconds" in _in_names(wired[0]))
 
 
 def check_tracer():

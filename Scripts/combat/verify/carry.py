@@ -15,7 +15,7 @@ from combat.verify.fixtures import titles, w, wg
 from combat.verify.knife import is_melee_play
 from combat.torch_tuning import BURNS_VAR
 from combat.verify.common import (
-    BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins,
+    BEL, PIN, by_pins, cdo, check, in_pins, load, num_pin, out_pins, shot_traces,
 )
 
 
@@ -135,7 +135,7 @@ def check_shot_origin():
           f"{len(picks)} found")
     for pick in picks:
         _check_origin_pick(pick)
-    starts = [len([n for n in by_pins(wg, "Start", "End", "TraceChannel")
+    starts = [len([n for n in by_pins(wg, "Start", "End", "TraceChannel") + shot_traces(wg)
                    if BEL.find_output_pin(pick, "ReturnValue")
                    in PIN.list_connected_pins(BEL.find_input_pin(n, "Start"))])
               for pick in picks]

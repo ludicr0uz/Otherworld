@@ -400,7 +400,13 @@ the rest of Phases 2–7 fits the Python-builder workflow once task 2 exists.
     server's record from handing rounds back. A dedicated server now refreshes
     every body's bones. `Scripts/net/CLAUDE.md`, "The shot and the reload".
     Melee, throw and block are M20.)
-23. Server-side shot traces with lag compensation (C++).
+23. Server-side shot traces with lag compensation (C++). (Done, M22: a world subsystem
+    records every character's capsule and physics bodies each server frame, a second
+    back; the pellet's one C++ trace node judges a remote shooter's shot against where
+    they stood its round trip ago, within a 0.4 s cap, and a local shooter's against
+    the present. With 150 ms of lag the pistol lands 7 rounds in 8 on a strafing
+    player where the old graph landed none. `Scripts/net/CLAUDE.md`, "Lag
+    compensation".)
 24. Multicast cosmetics: shot sounds, impacts, blood, tracers, montages.
 25. Pick-up, drop, loot, wear, chop, light, heat and cauterise as server actions.
 26. Survival: a replicated ability system; hunger, thirst, cold and bleeding applied on the

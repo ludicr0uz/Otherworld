@@ -10,9 +10,8 @@ from combat.hit_bodies import (
 )
 from combat.hit_zones import HIT_BONE_VAR, HIT_POINT_VAR
 from combat.ragdoll import RAGDOLL_MESH_ROOT
-from combat.verify.common import BEL, PIN, check, in_pins, titled
+from combat.verify.common import BEL, PIN, check, in_pins, shot_traces, titled
 from combat.verify.fixtures import wg
-from combat.verify.throw_strike import is_strike_node
 
 
 def _near(a, b, tol=0.05):
@@ -82,22 +81,30 @@ def _fed_by(node, pin):
             for q in PIN.list_connected_pins(BEL.find_input_pin(node, pin))}
 
 
+def _fed_pins(node, pin):
+    """{(output pin name, its node)} feeding ``node``'s input ``pin``."""
+    return {(str(PIN.get_pin_name(q)), PIN.get_owning_node(q))
+            for q in PIN.list_connected_pins(BEL.find_input_pin(node, pin))}
+
+
 def check_body_miss_is_a_miss():
     # The capsule stops the pellet and is twice the model's width. The body
     # trace used to pick the multiplier only, so a round through the air
     # beside the head still bled and still did its damage at 1x.
     # (A thrown blade's stage has a body trace of its own: verify/throw_strike.)
-    traces = [n for n in wg if {"TraceStart", "TraceEnd", "bTraceComplex"} <= in_pins(n)
-              and not is_strike_node(n)]
-    if not check_one("one body trace in the fire graph", traces):
+    # Since M22 the pellet's trace and the body's are one C++ node, ShotTrace
+    # (uebp/nodes/shot.py), whose bBodyHit, BodyBone and BodyPoint are the
+    # body trace's answer.
+    traces = shot_traces(wg)
+    if not check_one("one shot trace (ShotTrace, C++) in the fire graph: the pellet's "
+                     "line, and the struck character's bodies along it", traces):
         return
-    branches = _then(traces[0])
-    if not check_one("the body trace is followed by one Branch", branches):
+    trace = traces[0]
+    branches = [n for n in wg if "Condition" in in_pins(n)
+                and ("bBodyHit", trace) in _fed_pins(n, "Condition")]
+    if not check_one("one Branch asks it whether a body was struck (bBodyHit)", branches):
         return
     struck = branches[0]
-    check("...on whether it struck a body",
-          any("LineTraceComponent" in t or "Line Trace Component" in t
-              for t in _fed_by(struck, "Condition")), str(_fed_by(struck, "Condition")))
     missed = PIN.list_connected_pins(BEL.find_else_pin(struck))
     check("a pellet that strikes no body ends there: no blood, no damage",
           len(missed) == 0, f"{len(missed)} link(s) on the Branch's False")

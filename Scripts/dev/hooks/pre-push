@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# pre-push -- upload Git LFS objects with the push.
+#
+# core.hooksPath points here, so the hook git-lfs installs in .git/hooks never
+# runs; without this one a push sends pointers whose objects stay on this machine.
+command -v git-lfs >/dev/null 2>&1 || { echo "pre-push: git-lfs not found; Content/ needs it." >&2; exit 2; }
+git lfs pre-push "$@"

@@ -420,6 +420,22 @@ FAB = (
              "Unreal Engine projects.",
     ),
     AssetSource(
+        dest="Content/GAS",
+        kind="fab",
+        builders=("(manual) the Epic launcher: Samples > Game Animation "
+                  "Sample, UE 5.8, to ~/Documents/Unreal Projects/"
+                  "GameAnimationSample; then "
+                  "python3 Scripts/asset_pipeline/import_gas.py",
+                  "Scripts/asset_pipeline/patch_gas_notifies.py"),
+        note="Epic's Game Animation Sample, the part the player's motion "
+             "matching is built from: 2723 packages, 2.7 GB, listed in "
+             "Scripts/asset_pipeline/gas_manifest.txt; not committed "
+             "(.gitignore). The sample's /Game/<Folder> is /Game/GAS/<Folder> "
+             "here, found through [CoreRedirects] in DefaultEngine.ini. "
+             "Scripts/asset_pipeline/CLAUDE.md has the rest. Epic's sample "
+             "content may be used only in Unreal Engine projects.",
+    ),
+    AssetSource(
         dest="Content/Fab",
         kind="fab",
         builders=("(manual) the Fab plugin in the editor -- see "
@@ -504,6 +520,10 @@ RESTORE_ORDER = (
     # from the mannequin.
     "python3 Scripts/asset_pipeline/import_metahuman.py",
     "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/build_metahuman_retarget.py",
+    # The Game Animation Sample's motion-matching set (Content/GAS, copied
+    # like the MetaHuman; see FAB), and its two Mover-only notifies emptied.
+    "python3 Scripts/asset_pipeline/import_gas.py",
+    "Scripts/dev/uepy.py --cold Scripts/asset_pipeline/patch_gas_notifies.py",
     "Scripts/dev/uepy.py --cold Scripts/build_weapons_and_combat.py",
     "Scripts/dev/uepy.py --cold Scripts/build_graphics_menu.py",
     "Scripts/dev/uepy.py --cold Scripts/build_npc_blueprints.py",

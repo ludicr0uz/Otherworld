@@ -17,6 +17,12 @@ Host-side (no ``unreal``):
     fab_scan.py                 entry point: scan a downloaded Fab pack, then copy it
                                 into Content/ (the checks: fab_intake/, which has
                                 its own map; tests: dev/tests/test_fab_intake.py)
+    import_gas.py               entry point: copy the Game Animation Sample's
+                                motion-matching set into Content/GAS (the list:
+                                gas_manifest.txt; what was cut: gas_manifest_cut.txt;
+                                tests: dev/tests/test_gas_import.py)
+    gas_paths.py                constants: where that copy lies, what comes
+                                across, what stays, and the redirects it loads by
     bind_to_mannequin.py        entry point: bind cached bodies to the mannequin's
                                 skeleton -> assets/cache/meshy/<id>/bound/
     mannequin_bind/             the bind itself (its __init__.py is its module
@@ -54,6 +60,10 @@ Editor-side, in pipeline order:
     retarget_player_clips.py    entry point: the UAL clips onto the player's body
                                 alone, from the packs as imported (the swap's step)
     ual_retarget.py             IK_UAL1/2, RTG_<Character>_from_UAL1/2, batch retarget
+    patch_gas_notifies.py       entry point: empty the two GAS notifies only the
+                                sample's Mover character answers, so they compile
+    check_gas_load.py           entry point: load everything under /Game/GAS and
+                                read the editor's log back for what was missing
     import_bound.py             entry point: bound GLBs -> /Game/Sourced/Bound on
                                 SK_Mannequin, and the checks only an editor can make
     retarget_ual_to_mannequin.py  entry point: the Quaternius clips onto SK_Mannequin,

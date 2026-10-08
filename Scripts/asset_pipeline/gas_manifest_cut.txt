@@ -1,0 +1,2 @@
+hard /Game/Blueprints/AnimNotifies/BP_AnimNotify_TriggerRagdoll -> /Game/Blueprints/SandboxCharacter_Mover_Ragdoll
+hard /Game/Blueprints/AnimNotifies/BP_NotifyState_OverrideMovementMode -> /Game/Blueprints/SandboxCharacter_Mover

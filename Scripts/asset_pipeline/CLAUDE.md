@@ -205,3 +205,68 @@ python3 Scripts/dev/uepy.py --game --windowed --probe Scripts/probes/probe_metah
   `weapon_component/body_parts.py`: a loop over OwnerMesh's children.
 - Measured (probe_metahuman_body): the MetaHuman's head, hands and feet land within 7 cm of
   the mannequin's standing, falling and dead; the face and garments within 0 cm of the body.
+
+## The Game Animation Sample: the motion-matching set, copied and not yet used (2026-10-08)
+
+Epic's Game Animation Sample ("GAS" here; nothing to do with the Gameplay Ability System) is
+in the project under `/Game/GAS`: **2723 packages, 2.7 GB** (the MetaHuman's 441 and 1.1 GB
+beside it), not committed (`.gitignore`). Nothing in the game references it yet.
+
+```bash
+python3 Scripts/asset_pipeline/import_gas.py                 # host-side copy; --check, --manifest
+python3 Scripts/dev/uepy.py Scripts/asset_pipeline/patch_gas_notifies.py
+python3 Scripts/dev/uepy.py Scripts/asset_pipeline/check_gas_load.py   # in a fresh editor
+```
+
+- **What came across** (`gas_paths.py`, `gas_manifest.txt`): the UEFN mannequin's meshes,
+  rigs and every clip (2355 packages under `Characters/UEFN_Mannequin`: 155 PoseSearch
+  databases, their schemas, and the `CHT_PoseSearchDatabases`, `_Dense`, `_Sparse` and
+  `_ExtremeSparse` choosers), `SandboxCharacter_CMC_ABP` and what it reaches
+  (`BPI_SandboxCharacter_ABP`/`_Pawn`, `Blueprints/Data`, the notifies, two anim modifiers,
+  the foley sounds and their submixes, the curve compression settings), and two components
+  the anim blueprint does not reach but the wiring will: `AC_PostABPTick` and
+  `AC_TraversalLogic` (with `LevelBlock_Traversable`, the block it looks for).
+- **What stayed** (`gas_paths.EXCLUDED`): the Mover variant and its three choosers, the smart
+  objects, the isolated examples, the other characters. Also `SandboxCharacter_CMC` itself,
+  and so `AC_PreCMCTick` and `AC_VisualOverrideManager`, which cast to it or to `GM_Sandbox`
+  and would bring the sample's cameras, game mode and `/Game/Input`.
+  `gas_manifest_cut.txt` lists each reference into the excluded set that was cut.
+- **It lies one folder down, and loads through redirects.** The sample mounts its content at
+  `/Game/Characters`, `/Game/Blueprints`, `/Game/Audio`; a copy to the same paths would land
+  in the game's own `Content/Audio`. So `/Game/<Folder>` there is `/Game/GAS/<Folder>` here
+  (`gas_paths.gas()`), the files are still byte copies that name each other by the sample's
+  paths, and `[CoreRedirects]` in `Config/DefaultEngine.ini` points those names here
+  (`gas_paths.REDIRECTED`; one line per folder, and never a folder the game keeps content
+  in: `dev/tests/test_gas_import.py`). **Name a GAS asset by its `/Game/GAS` path.** A
+  package saved in this project is written with the new paths. The asset registry applies
+  the redirects too: a copied package's dependencies read back as `/Game/GAS` names.
+- **Two packages are changed after the copy** (`gas_paths.PATCHED`,
+  `patch_gas_notifies.py`): `BP_AnimNotify_TriggerRagdoll` and
+  `BP_NotifyState_OverrideMovementMode` cast to the Mover character and do nothing for any
+  other, so without it they fail to compile on every load of a clip that carries one. Their
+  graphs are removed; the class and its variables stay. The copy keeps a patched file.
+- **Plugins** it needs, now in the .uproject: PoseSearch, Chooser, AnimationWarping,
+  MotionWarping, AnimationLocomotionLibrary, AnimationLayering, and four the first load
+  asked for by name: DrawDebugLibrary (`BFL_HelpfulFunctions`), CurveExpression and
+  MovieSceneAnimMixer (the anim blueprint's nodes), and Mover (the anim blueprint imports
+  `/Script/Mover` though the Mover variant is not here; it enables NetworkPrediction).
+- **Settings carried from the sample's config:** its `Foley.*` and `MotionMatching.*`
+  gameplay tags (`Config/Tags/GAS.ini`; without them the first load logged 3,300 invalid-tag warnings as the clips
+  load), the 13 `DDCvar.*` console variables its blueprints read by name, the PoseSearch
+  buffer size, and its three collision channels in the sample's slots (the traversal trace is
+  stored as `ECC_GameTraceChannel1`; all three ignore everything by default). Not carried:
+  the sample's change to the `Ragdoll` profile.
+- **A missing package is a log line, not a Python error.** `check_gas_load.py` loads all
+  2723 and reads the editor's log back between two markers; `Saved/gas_load.txt` is the
+  report. Clean today but for one of the sample's own montage warnings
+  (`M_LookAtPOI_test_patrol_walk_01`).
+- **The game-wide Blueprint scans leave `/Game/GAS` out**, as they do `/Game/Fab` and
+  `/Game/Sourced` (`net/state_checks.EXCLUDED`, `dev/graph_fingerprint.py`): it is content
+  nobody here authors. What they found in it the day it arrived is what the wiring has to
+  face when one of these goes onto the player:
+  - `AC_TraversalLogic` has a Server event of its own, `PerformTraversalAction_Server`, that
+    asks no RPC guard (`combat/verify/guard.py` allows Server events on the weapon component
+    alone);
+  - `SandboxCharacter_CMC_ABP`'s `Debug_ExperimentalStateMachine` asks for a player by index
+    (`net/input_checks.py`);
+  - `LevelBlock` draws a random number no row of `net/random_consts.py` covers.

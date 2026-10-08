@@ -21,7 +21,7 @@ PIN = unreal.BlueprintGraphPinLibrary
 
 # Content nobody here authors (dev/graph_fingerprint.py's list).
 EXCLUDED = ("/Game/Fab", "/Game/Sourced", "/Game/FPS_Weapon_Bundle", "/Game/Characters",
-            "/Game/LevelPrototyping", "/Game/Tmp", "/Game/Scratch")
+            "/Game/LevelPrototyping", "/Game/Tmp", "/Game/Scratch", "/Game/GAS")
 # Classes whose instances exist on the server alone (and in single player):
 # a client has no GameMode, no AI controller and runs no behaviour tree.
 SERVER_ONLY = ("GameModeBase", "AIController", "BTNode")

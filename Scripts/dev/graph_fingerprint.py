@@ -31,7 +31,7 @@ FINGERPRINT_ROOT = os.path.join(PROJECT, "Saved", "uepy", "fingerprint")
 REQUEST = os.path.join(FINGERPRINT_ROOT, "_request.json")
 
 EXCLUDED = ("/Game/Fab", "/Game/Sourced", "/Game/FPS_Weapon_Bundle", "/Game/Characters",
-            "/Game/LevelPrototyping", "/Game/Tmp")
+            "/Game/LevelPrototyping", "/Game/Tmp", "/Game/GAS")
 PATCHED_STOCK = ("ABP_Unarmed", "BP_ThirdPersonCharacter", "BP_ThirdPersonGameMode")
 CLASSES = ("Blueprint", "WidgetBlueprint")
 

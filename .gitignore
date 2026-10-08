@@ -61,6 +61,10 @@ __pycache__/
 #     python3 Scripts/sync_assets.py --plan      how to rebuild it from nothing
 Content/Python/__pycache__/
 
+# The Game Animation Sample's motion-matching set: 2.9 GB copied from Epic's
+# sample project by Scripts/asset_pipeline/import_gas.py, which puts it back.
+/Content/GAS/
+
 # Generator sidecars: megabytes apiece, and fully determined by the seed.
 Scripts/generated_levels/*/grass_*.json
 Scripts/generated_levels/*/*.obj

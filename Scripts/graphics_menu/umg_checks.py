@@ -31,8 +31,8 @@ WRITTEN = {
                + tuple(C.stat_bar(s) for s, _c in C.SURVIVAL_BARS)
                + tuple(C.stat_group(s) for s, _c in C.SURVIVAL_BARS)
                + tuple(C.debuff_text(s) for _t, _l, s in C.DEBUFF_LABELS),
-    C.WBP_MAIN_MENU: (C.SETTINGS_PANEL, C.SETTINGS_ROWS_BOX, C.HINT_IDLE,
-                      C.HINT_CAPTURE),
+    C.WBP_MAIN_MENU: (C.SETTINGS_PANEL, C.SETTINGS_BACK, C.SETTINGS_ROWS_BOX,
+                      C.HINT_IDLE, C.HINT_CAPTURE),
     C.WBP_PAUSE_MENU: (C.PAUSE_ROWS,),
     C.WBP_DEATH_MENU: (C.DEATH_SCORE, C.DEATH_PLAYER_SCORE, C.DEATH_HINT_LINE),
     C.WBP_MENU_ROW: (C.ROW_CARET, C.ROW_LABEL_BOX, C.ROW_LABEL, C.ROW_VALUE,
@@ -107,13 +107,19 @@ def check_trees(check):
           "and nothing else with rows",
           not {"TitlePanel", "TitleRows"} & set(main), str(sorted(main)))
     rows = _labels(main, C.SETTINGS_ROWS_BOX)
-    check(f"the settings page has its {S.SETTINGS_ROWS} rows in the order MenuRow "
-          "indexes them",
-          len(rows) == S.SETTINGS_ROWS
+    check(f"the settings page has its {S.BACK_ROW} rows under {S.BACK_LABEL} in the "
+          "order MenuRow indexes them",
+          len(rows) == S.BACK_ROW == S.SETTINGS_ROWS - 1
           and rows[:len(S.SLIDERS)] == [sl.label for sl in S.SLIDERS]
           and rows[S.DIFFICULTY_ROW] == S.DIFFICULTY_LABEL
-          and rows[S.FIRST_BIND_ROW:S.BACK_ROW] == list(S.BIND_LABELS)
-          and rows[S.BACK_ROW] == S.BACK_LABEL, str(rows))
+          and rows[S.FIRST_BIND_ROW:] == list(S.BIND_LABELS), str(rows))
+    back, box = main.get(C.SETTINGS_BACK, (None, False))[0], main[C.SETTINGS_ROWS_BOX][0]
+    stack = back.get_parent() if back else None
+    check(f"...and {S.BACK_LABEL} is the page's top row, a row of its own over them",
+          bool(stack) and str(back.get_editor_property(C.ROW_TEXT_VAR)) == S.BACK_LABEL
+          and box.get_parent() == stack
+          and stack.get_child_index(back) < stack.get_child_index(box),
+          str(back))
     check("...with one bind row per BIND_VARS entry",
           len(S.BIND_LABELS) == len(S.BIND_VARS), f"{len(S.BIND_LABELS)} labels")
     pause_rows = _labels(pause, C.PAUSE_ROWS)
@@ -305,9 +311,9 @@ def check_hud_graph(check, nodes):
             for eq in _sources(pick, "bPickA"):
                 for b in _sources(eq, "B"):
                     selected.append(_title(b))
-                # A tab's BACK row, outside its list: lit while the caret is
-                # past the list (row >= a literal). A tab's save row, between
-                # the two: lit while the caret is on it (row == a literal).
+                # A BACK row (a tab's, the settings page's), outside its list:
+                # lit while the caret is past the list (row >= a literal). A
+                # tab's save row: lit while the caret is on it (row == a literal).
                 if not _sources(eq, "B"):
                     at_or_past = ">=" in _title(eq) or "GreaterEqual" in _title(eq).replace(" ", "")
                     (backs if at_or_past else saves).extend(_source_titles(eq, "A"))
@@ -321,9 +327,9 @@ def check_hud_graph(check, nodes):
                f"Get {C.PAUSE_ROW_VAR}", "Get PlayerTuneRow", "Get SoundTuneRow",
                "Get TuneRow", "Get WorldTuneRow"]),
           str(sorted(selected)))
-    check("...and each tab's BACK row, and each mode page's, lights its caret "
+    check("...and each tab's BACK row, the settings page's and each mode page's, lights its caret "
           "while the caret is on it",
-          sorted(backs) == ["Get GfxTuneRow", "Get MenuRow", "Get MenuRow",
+          sorted(backs) == ["Get GfxTuneRow", "Get MenuRow", "Get MenuRow", "Get MenuRow",
                             "Get MonTuneRow", "Get PlayerTuneRow",
                             "Get SoundTuneRow", "Get TuneRow", "Get WorldTuneRow"], str(sorted(backs)))
     check("...and the graphics tab's SAVE DEFAULT row lights its own while the caret "

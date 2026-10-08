@@ -3,13 +3,13 @@ BACK, and the save written after every change.
 """
 
 from uebp.graph import _connect, _loose_pin, _node, _pin, _set, else_, out, then
-from graphics_menu.cursor import author_row_cursor
+from graphics_menu.cursor import author_button_row, author_row_cursor
 from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR
 from graphics_menu.difficulty import emit_difficulty_nudge
 from graphics_menu.menu_nav import (
     NAV_LEFT, NAV_RIGHT, _emit_accept, _emit_row_nav, escape_pressed)
 from graphics_menu.ui_graph import part
-from graphics_menu.umg_consts import SETTINGS_ROWS_BOX, WBP_MAIN_MENU
+from graphics_menu.umg_consts import SETTINGS_BACK, SETTINGS_ROWS_BOX, WBP_MAIN_MENU
 from graphics_menu.settings_rows import (
     BACK_ROW, FIRST_BIND_ROW, PAGE_TITLE, SETTINGS_CLASS_PATH, SETTINGS_SLOT,
     SETTINGS_USER_INDEX, SLIDERS)
@@ -112,9 +112,13 @@ def _author_capture(ed, settings_out, in_execs, made):
     # The mouse first: the row under the cursor takes the caret, and a click
     # on it is Enter. Not while a capture is armed -- that click is the bind.
     hovered = author_row_cursor(
-        ed, part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX), BACK_ROW + 1,
+        ed, part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX), BACK_ROW,
         [else_(listening)], row_var="MenuRow",
         click=(CURSOR_ACCEPT_VAR, "true"))
+    # BACK is a row of its own, over the box's.
+    hovered = author_button_row(
+        ed, part(ed, WBP_MAIN_MENU, SETTINGS_BACK), "MenuRow", BACK_ROW,
+        (CURSOR_ACCEPT_VAR, "true"), hovered)
     moved, nav = _emit_row_nav(ed, pc_out, BACK_ROW, hovered)
     made += nav
 

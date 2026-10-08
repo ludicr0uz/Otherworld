@@ -16,10 +16,13 @@ from graphics_menu import umg_consts as UC
 from graphics_menu.menu_nav import NAV_DOWN, NAV_UP
 from graphics_menu.menu_still import MENU_STILL_VAR
 from graphics_menu.settings_rows import BACK_LABEL
+from graphics_menu.tune_tab import TUNE_DOWN, TUNE_UP
 from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_checks import _tree
 
 BEL = unreal.BlueprintEditorLibrary
+# The title of Percent_IntInt, the caret's wrap.
+MOD = "%"
 PIN = unreal.BlueprintGraphPinLibrary
 
 
@@ -98,6 +101,32 @@ def row_serves(nodes, action, var):
     return False
 
 
+def _wraps(nodes, var, count):
+    """The Sets of ``var`` fed by a sum mod ``count``: a caret's Up and Down,
+    wrapped (menu_nav._emit_row_nav, tune_tick._author_keys)."""
+    return [n for n in _sets(nodes, var)
+            if any(MOD in _title(m) and int(_value(m, "B") or 0) == count
+                   for m in _sources(n, var))]
+
+
+def _steps(sets, var):
+    """What each of ``_wraps``' Sets adds to the caret before the mod, sorted:
+    1 for Down, the count less one for Up."""
+    return sorted(int(_value(a, "B") or 0) for n in sets for m in _sources(n, var)
+                  for a in _sources(m, "A"))
+
+
+def _over(widget, other):
+    """``widget`` stands over ``other`` in the stack they share: its place
+    among its parent's children comes before that of ``other`` (or of the
+    window ``other`` is in)."""
+    stack = widget.get_parent()
+    while other and other.get_parent() != stack:
+        other = other.get_parent()
+    return bool(stack and other
+                and stack.get_child_index(widget) < stack.get_child_index(other))
+
+
 def _check_rows(check, nodes):
     check("the menu has no quality-preset rows and no hotkey in any row's label: "
           "single player, multiplayer, settings, debug, save and exit, the cheat, "
@@ -105,14 +134,15 @@ def _check_rows(check, nodes):
           len(UC.PAUSE_ROW_LABELS) == len(UC.PAUSE_ROW_ACTIONS) == 13
           and not any("[" in label for label in UC.PAUSE_ROW_LABELS),
           str(UC.PAUSE_ROW_LABELS))
-    # Up / Down on PauseRow, kept in the rows.
-    steps = [n for n in _sets(nodes, UC.PAUSE_ROW_VAR)
-             if any(t in ("Min", "Max") or "MIN" in t.upper() or "MAX" in t.upper()
-                    for t in _feeds(n, UC.PAUSE_ROW_VAR))]
+    # Up / Down on PauseRow, round the rows.
+    steps = _wraps(nodes, UC.PAUSE_ROW_VAR, len(UC.PAUSE_ROW_LABELS))
     keys = sorted(_value(k, "Key") for n in steps for g in _gates(n)
                   for k in _sources(g, "Condition") if "Key" in _pins(k))
-    check("Up / Down move the M panel's caret (PauseRow), held inside its rows",
-          keys == sorted([NAV_DOWN, NAV_UP]), f"{len(steps)} steps, {keys}")
+    check("Up / Down move the M panel's caret (PauseRow) round its rows: Down on "
+          "the last is the first, Up on the first the last",
+          keys == sorted([NAV_DOWN, NAV_UP])
+          and _steps(steps, UC.PAUSE_ROW_VAR) == [1, len(UC.PAUSE_ROW_LABELS) - 1],
+          f"{len(steps)} steps, {keys}, by {_steps(steps, UC.PAUSE_ROW_VAR)}")
     takes = [n for n in _sets(nodes, CC.PAUSE_CLICK_VAR)
              if _feeds(n, CC.PAUSE_CLICK_VAR) == [f"Get {UC.PAUSE_ROW_VAR}"]]
     polled = [_value(k, "Key") for n in takes for g in _gates(n)
@@ -147,9 +177,20 @@ def _check_one_menu(check, nodes):
     missing = [t.back_widget for t in TABS
                if not tree.get(t.back_widget) or not tree[t.back_widget][1]
                or str(tree[t.back_widget][0].get_editor_property(UC.ROW_TEXT_VAR))
-               != BACK_LABEL]
-    check(f"every tuning tab has a {BACK_LABEL} row, a variable under its list",
-          not missing, str(missing))
+               != BACK_LABEL
+               or not _over(tree[t.back_widget][0], tree[t.rows_box][0])]
+    check(f"every tuning tab has a {BACK_LABEL} row, a variable over its list: "
+          "the tab's top row", not missing, str(missing))
+    stuck = []
+    for t in TABS:
+        steps = _wraps(nodes, t.row_var, t.back_row + 1)
+        keys = sorted(_value(k, "Key") for n in steps for g in _gates(n)
+                      for k in _sources(g, "Condition") if "Key" in _pins(k))
+        if (keys != sorted([TUNE_DOWN, TUNE_UP])
+                or _steps(steps, t.row_var) != [1, t.back_row]):
+            stuck.append((t.row_var, keys, _steps(steps, t.row_var)))
+    check(f"Up / Down move each tab's caret round its stops: Down on the last is "
+          f"{BACK_LABEL}, Up on {BACK_LABEL} the last", not stuck, str(stuck))
     wrong = []
     for t in TABS:
         backs = [n for n in _sets(nodes, t.open_var) if _value(n, t.open_var) == "false"

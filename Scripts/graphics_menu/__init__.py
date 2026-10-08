@@ -66,7 +66,8 @@ Input, settings and state
                   request, countdown, body or movement written from the HUD
   presets         the quality presets' names and the CSV's default one;
                   picking one sets Quality
-  menu_nav        Up/Down caret movement and the accept keys, shared by pages;
+  menu_nav        Up/Down caret movement (round the rows) and the accept keys,
+                  shared by pages;
                   what a key poll gains from the wheel; Tick's test for a
                   taken M-panel row (the rows have no hotkeys); the Escape
                   poll (BACK in every menu) and "a tuning tab is open"

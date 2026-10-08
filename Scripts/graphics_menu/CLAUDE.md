@@ -22,6 +22,10 @@ it pauses nothing. The code and the notes below still call it "the M panel".
 
 **The keys:**
 - **M** toggles the menu in play: the only key it has. On the title it cannot be shut.
+- **Up / Down go round**, in the menu, the settings page and every tab: Down on the bottom
+  row is the top row, Up on the top row the bottom one (`menu_nav._emit_row_nav`,
+  `tune_tick._author_keys`: `(row + step) mod rows`, Up's step the row count less one). The
+  loot window and the I panel still stop at their ends.
 - **Up / Down** move the menu's caret and **Enter** takes the row it is on; a click on a
   row takes it too. **No row has a hotkey** (the 1-4, D, X, K, T, N, O and P keys are gone).
 - **Escape is BACK**, in every menu that has somewhere to go back to (below: "Escape").
@@ -36,7 +40,7 @@ it pauses nothing. The code and the notes below still call it "the M panel".
   saving nothing). The quality presets are not
   rows: Low / Medium / High / Custom is the graphics tab's first row.
 - **The settings page or a tuning tab stands in place of the menu's rows**, and its **BACK**
-  row returns to them (below: "The M panel as a menu").
+  row, its top row, returns to them (below: "The M panel as a menu").
 - **Tab** (near any body) kneels and opens the loot window; **Up/Down** and **Enter** in it
   (`loot_tick.py`; the rules are `Scripts/loot/CLAUDE.md`).
 - **I** opens the inventory (the I panel): the worn garments and the backpack, bottom
@@ -185,9 +189,16 @@ Escape goes back one step, from any row:
 - **One menu on screen.** `WBP_PauseMenu.Panel` (the panel's own artwork and rows) is
   collapsed while the settings page is up or any tab's open flag is, and the page or the open tab's panel shows instead; the five
   developer tabs sit where the panel does (`TUNE_POS`), the graphics tab in the corner.
-- **BACK is a `WBP_MenuRow` under each tab's list**, the caret's last stop
-  (`TuneTab.back_row`: one past the list, or two in the graphics tab, whose SAVE DEFAULT
-  row comes between). A click on it, or Enter with the caret on it, lowers
+- **BACK is a `WBP_MenuRow` over each tab's list, its top row**, and on the settings page
+  too (`SettingsBack`, over `SettingsRows`). **Its number in the caret's order is still the
+  last** (`TuneTab.back_row`: one past the list, or two in the graphics tab, whose SAVE
+  DEFAULT row, under the list, comes before it; `settings_rows.BACK_ROW`). The caret goes
+  round, so the stop after the last is the one over the first: Up from the first row is
+  BACK, Down from BACK the first row. That keeps a list's rows numbered from 0, as its
+  box's children are, with BACK a widget outside the box. Opening a tab or the page puts
+  the caret on row 0, the first row under BACK. A scrolling list stays where it is while
+  the caret is on BACK (`tune_draw._author_follow`): the cursor crosses BACK on its way
+  down to a row. A click on it, or Enter with the caret on it, lowers
   the tab's open flag. **That is DrawHUD's** (`cursor.author_back_row`), though the rest of a
   tab's keys are Tick's: Enter is "just pressed" for the whole frame, the panel's own Enter is
   polled in DrawHUD *before* the tab's fragment and only while no tab is open, so the Enter
@@ -213,8 +224,8 @@ Escape goes back one step, from any row:
     up, which is what lets `probe_menu_scroll.py` drag without a mouse.
   - Its sum is plain arithmetic and Min / Max: `verify_graphics_menu.py` counts every
     FClamp and MapRangeClamped of the HUD as a slider's or the clock's.
-  - **A row scrolled out of the window keeps its geometry**, and lies over the hint and BACK
-    below: the row test is ANDed with "the cursor is over the box" (`author_row_cursor`'s
+  - **A row scrolled out of the window keeps its geometry**, and lies over BACK above and
+    the hint below: the row test is ANDed with "the cursor is over the box" (`author_row_cursor`'s
     `within`).
   - `TUNE_ROW_H` (22.5) is a `WBP_MenuRow`'s desired height read off a rendered run
     (`get_desired_size()` works in a windowed `-game`; cached geometry still reads zeros).
@@ -223,7 +234,8 @@ Escape goes back one step, from any row:
   (the graphics tab's five rows under the cursor and no more, the list scrolled to its end);
   `probe_menu_scroll.py` (the bar dragged to the bottom, the middle and the top in both
   scrolling tabs, the caret brought along, the list staying put once let go).
-- **Still needs a play session:** Enter and the arrows themselves, the click on BACK,
+- **Still needs a play session:** Enter and the arrows themselves (the caret going round
+  at both ends: no probe can press a key, `pause_checks.py` checks the graph), the click on BACK,
   dragging the bar with a real mouse (no probe can press a button), and how the corner
   panel reads.
 
@@ -476,7 +488,7 @@ into the HUD. Enter on a number saves nothing in this tab.
   It reopens the level twice (`open_level`, once with no save and once with one), and sets
   aside the CSV and `Saved/SaveGames/OtherworldGraphics.sav` and puts them back.
   `OW_GFX_SHOTS=1` with `--windowed` saves a picture of the panel.
-  `probe_menu_cursor_window.py` (windowed) sweeps the cursor onto SAVE DEFAULT, then BACK.
+  `probe_menu_cursor_window.py` (windowed) sweeps the cursor onto BACK, down the rows, then SAVE DEFAULT.
 - **Run a tab's probe in a game of its own.** Batched after `probe_umg_screens.py` in one
   `--game` call, the monster and world probes time out: that probe leaves the game on the
   title page.
@@ -487,14 +499,15 @@ into the HUD. Enter on a number saves nothing in this tab.
 
 - **The way in:** the menu's `settings` row, on the title or in play (above: "One menu").
 - **The settings page:**
+  - BACK, the top row (a row of its own, `SettingsBack`; `MenuRow`'s number for it is the
+    last, `BACK_ROW`: above, "The M panel as a menu");
   - mouse sensitivity (Left/Right, clamped to a minimum above zero);
   - DIFFICULTY: EASY / MEDIUM / SURVIVOR (Left/Right cycle it; default EASY). Saved as the int
     `BP_Settings.Difficulty` and copied onto the GameState's `Difficulty` every `DrawHUD`
     (`difficulty.py`), where this machine owns the GameState: a client plays at the server's. Only EASY does anything yet (the mushroom heal). `-nullrhi` runs no
     `DrawHUD`, so a headless game keeps the GameState's own default, EASY;
   - the keybinds, one row per `BIND_VARS` entry (Enter arms a capture; the next key from `KEY_POOL` becomes the bind;
-    navigation keys are not in the pool);
-  - BACK.
+    navigation keys are not in the pool).
 - **`BP_Settings`** is a `USaveGame` saved to slot `OtherworldSettings` on **every change**.
   - `build_weapons_and_combat.py` builds it, because both consumers need the class and that
     builder runs first.

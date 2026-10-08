@@ -26,9 +26,9 @@ PIN = unreal.BlueprintGraphPinLibrary
 # pages (mode_draw.py).
 ROW_LISTS = 4 + len(TABS) + len(SLOT_BOXES) + len(PAGES)
 # ...and the single lines a click lands on: the death menu's hint, the loot
-# window's and the I panel's close buttons, each tab's hint and each tab's
-# BACK row, and each mode page's BACK row.
-CLICK_LINES = 3 + 2 * len(TABS) + len(PAGES)
+# window's and the I panel's close buttons, the settings page's BACK row, each
+# tab's hint and each tab's BACK row, and each mode page's BACK row.
+CLICK_LINES = 4 + 2 * len(TABS) + len(PAGES)
 # A scrolling tab's rows count only inside its list's window: one more test.
 # Its bar's drag reads the list's box twice more: the press on it, and how far
 # down it the cursor is (tune_scroll.py).
@@ -170,9 +170,9 @@ def _check_rows(check, nodes):
     stirred = [n for n in nodes if _pins(n) == {"A", "B"}
                and f"Get {CC.CURSOR_MOVED_VAR}" in _feeders(n, "A")]
     # One per list (PauseClick and PageClick are clicks, not carets), one per
-    # BACK row (the tabs', the mode pages') and one per save row (the graphics
-    # tab's SAVE DEFAULT).
-    buttons = len(TABS) + len(PAGES) + sum(1 for t in TABS if t.save_widget)
+    # BACK row (the tabs', the settings page's, the mode pages') and one per
+    # save row (the graphics tab's SAVE DEFAULT).
+    buttons = len(TABS) + 1 + len(PAGES) + sum(1 for t in TABS if t.save_widget)
     check("...only once the mouse moves or clicks, so a resting cursor does "
           "not hold the caret against Up/Down",
           len(stirred) == len(want) - len(clicks) + buttons, str(len(stirred)))
@@ -320,10 +320,10 @@ def _check_clicks(check, nodes):
     _check_scroll_drag(check, nodes)
 
     accepts = [_value(n, CC.CURSOR_ACCEPT_VAR) for n in _sets(nodes, CC.CURSOR_ACCEPT_VAR)]
-    check("a click on a settings row, or on the death menu's hint, "
-          "raises CursorAccept, and each accept lowers it as it serves it; "
+    check("a click on a settings row, on the page's BACK row or on the death "
+          "menu's hint raises CursorAccept, and each accept lowers it as it serves it; "
           "the death menu of a client of a server lowers it unserved",
-          sorted(accepts) == ["false"] * 3 + ["true"] * 2, str(accepts))
+          sorted(accepts) == ["false"] * 3 + ["true"] * 3, str(accepts))
 
     lowered = [n for n in _sets(nodes, CC.PAUSE_CLICK_VAR)
                if not _feeders(n, CC.PAUSE_CLICK_VAR)]

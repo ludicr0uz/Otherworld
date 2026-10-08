@@ -15,8 +15,10 @@ and the game's sound mix.
 
     its row in the M panel        open the tab (and shut the others). An open
                                   tab stands in place of the panel's rows
-    Up / Down                     pick a row: the subject, then one per stat,
-                                  then BACK
+    Up / Down                     pick a row: BACK (over the list), the
+                                  subject, then one per stat; round and
+                                  round, Down on the last stop is BACK and
+                                  Up on BACK the last stop
     Left / Right                  the subject row: the previous / next one;
                                   a stat: one step down / up, never under
                                   its minimum (nor, where the tab has
@@ -25,7 +27,7 @@ and the game's sound mix.
                                   shut the tab: the M panel's rows return
 
 A tab with a save_widget (GRAPHICS SETTINGS's SAVE DEFAULT) has a row for the
-save instead, between the list and BACK: Enter saves only with the caret on
+save instead, under the list: Enter saves only with the caret on
 it, as does a click on it, and Enter on a number does nothing.
 
 Every tab's table but GRAPHICS SETTINGS' is kept between sessions in a save
@@ -64,7 +66,7 @@ class TuneTab:
     panel: str
     rows_box: str
     saved_text: str
-    back_widget: str      # a WBP_MenuRow under the list: BACK
+    back_widget: str      # a WBP_MenuRow over the list: BACK
     title_widget: str
     hint_widget: str
     title_text: str
@@ -83,7 +85,7 @@ class TuneTab:
     # mouse drags (tune_scroll.py); 0 = every row, no scrolling.
     visible_rows: int = 0
     corner: bool = False      # bottom right of the screen; else where the M panel is
-    # A WBP_MenuRow between the list and BACK that saves, and its words;
+    # A WBP_MenuRow under the list that saves, and its words;
     # "" = Enter anywhere in the list saves (and a click on the hint).
     save_widget: str = ""
     save_label: str = ""
@@ -119,8 +121,10 @@ class TuneTab:
 
     @property
     def back_row(self):
-        """BACK's place in the caret's order: last, after the list and the
-        save row if there is one."""
+        """BACK's number in the caret's order: the last one, after the list
+        and the save row if there is one. The widget is the tab's top row all
+        the same: the caret runs round (tune_tick._author_keys), so the stop
+        after the last is the one over the first."""
         return self.row_count + (1 if self.save_widget else 0)
 
 

@@ -7,15 +7,17 @@ from uebp.graph import _connect, _loose_pin, _node, _palette, _pin, _set, else_,
 from graphics_menu.difficulty import author_difficulty_name
 from graphics_menu.settings_input import _author_capture
 from graphics_menu.settings_rows import (
-    BIND_VARS, DIFFICULTY_ROW, FIRST_BIND_ROW, SETTINGS_CLASS_PATH, SETTINGS_ROWS,
+    BACK_ROW, BIND_VARS, DIFFICULTY_ROW, FIRST_BIND_ROW, SETTINGS_CLASS_PATH, SETTINGS_ROWS,
     SETTINGS_SLOT, SLIDERS)
-from graphics_menu.ui_graph import mark_rows, part, row_value, set_shown
+from graphics_menu.ui_graph import mark_rows, member, part, row_value, set_shown
 from graphics_menu.umg_consts import (
-    HINT_CAPTURE, HINT_IDLE, SETTINGS_ROWS_BOX, WBP_MAIN_MENU)
+    HINT_CAPTURE, HINT_IDLE, ROW_CARET, SETTINGS_BACK, SETTINGS_ROWS_BOX, WBP_MAIN_MENU,
+    WBP_MENU_ROW)
 from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN
 from uebp.nodes.array import FN_ARR_GET
-from uebp.nodes.math import FN_ADD_II
+from uebp.nodes.math import FN_ADD_II, FN_GE_II, FN_SELECT_FF
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
+from uebp.nodes.umg import FN_SET_OPACITY
 from uebp.nodes.system import FN_FLOAT_TO_STR, FN_IS_VALID, FN_KEY_DISPLAY
 from graphics_menu import hud_vars as MV
 from combat import settings_vars as SV
@@ -118,7 +120,23 @@ def _author_settings_page(ed, in_exec):
     rows = part(ed, WBP_MAIN_MENU, SETTINGS_ROWS_BOX)
 
     row = keep(ed.add_get_member_variable_node(MV.MenuRow))
-    flow = (mark_rows(ed, rows, SETTINGS_ROWS, out(row, MV.MenuRow), [in_exec]),)
+    # The box's rows, then BACK, a row of its own over them: its caret is
+    # lit while MenuRow is its number, the last.
+    marked = mark_rows(ed, rows, BACK_ROW, out(row, MV.MenuRow), [in_exec])
+    on_back = keep(_node(ed, FN_GE_II))
+    _connect(out(keep(ed.add_get_member_variable_node(MV.MenuRow)), MV.MenuRow),
+             _pin(on_back, "A"))
+    _set(on_back, "B", BACK_ROW)
+    lit = keep(_node(ed, FN_SELECT_FF))
+    _set(lit, "A", 1.0)
+    _set(lit, "B", 0.0)
+    _connect(out(on_back), _loose_pin(lit, "bPickA"))
+    fade = keep(_node(ed, FN_SET_OPACITY))
+    _connect(member(ed, part(ed, WBP_MAIN_MENU, SETTINGS_BACK), WBP_MENU_ROW, ROW_CARET),
+             _pin(fade, "self"))
+    _connect(out(lit), _pin(fade, "InOpacity"))
+    _connect(marked, _pin(fade, "execute"))
+    flow = (then(fade),)
 
     # --- the slider rows: the value each is set to --------------------------
     for i, slider in enumerate(SLIDERS):
@@ -168,7 +186,7 @@ def _author_settings_page(ed, in_exec):
 
     ed.add_comment_to_nodes(
         f"The settings page. {SETTINGS_ROWS} rows: {len(SLIDERS)} sliders, the "
-        f"difficulty, the {len(BIND_VARS)} binds, and BACK. Everything it changes is written "
+        f"difficulty, the {len(BIND_VARS)} binds, and BACK (drawn over them). Everything it changes is written "
         f"to slot {SETTINGS_SLOT!r} the moment it changes, which is what makes "
         f"it survive a restart -- see _emit_save.",
         made)

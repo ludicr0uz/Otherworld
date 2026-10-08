@@ -225,6 +225,50 @@ the client. The tuning CSVs become server config.
 
 ---
 
+### 4.8 Single player and multiplayer from one code path
+
+Single player and multiplayer are both shipped modes of one game, and both exist when the
+multiplayer work is finished. The title menu offers "Single Player" (today's New Game /
+Continue Game) and "Multiplayer" (a server address and Join Server); a player can leave a
+server and start a single-player game from the same title, and the two characters share
+nothing. Neither mode is a fork, a test mode or a fallback of the other. Single player is the
+engine's *standalone* net mode: the one process is the server and the only client at once.
+`HasAuthority` is true, a Server RPC runs locally as a plain call, and a Multicast runs once.
+So a graph written to the authority pattern of 4.1 works unchanged with no server at all.
+
+The rules every multiplayer task follows:
+
+1. **One implementation.** No "if multiplayer" copy of a system. Write it server-authoritative
+   and let standalone run the same graph.
+2. **Three questions, not one.** A graph asks *am I the authority* (change state),
+   *am I locally controlled* (read input, draw the HUD, play first-person cosmetics), or
+   *is this standalone* (the short list in rule 3). It never asks "is this multiplayer".
+3. **What differs by mode, and nothing else:**
+
+   | | standalone (single player) | client of a server |
+   |---|---|---|
+   | pause (title menu, M, loot window) | pauses the world, as today | never pauses; the menu is an overlay |
+   | the character save | the local `OtherworldProfile` slot, written by the client | a file on the server keyed to the player; the client writes none |
+   | death | as today: the profile is deleted, back to the title | gear onto a corpse, respawn |
+   | dev settings tabs and cheats | available | read-only unless the server allows them |
+   | wanderer population | the level's fixed count | a budget that follows the players |
+   | the title menu | the game opens on it, paused: Single Player and Multiplayer are chosen there | none: a connected client is in its game, however it joined (the title or an address on the command line). Leaving, a failed join or a dropped connection returns the process to standalone, and so to the title |
+
+   The title's row (task M6): the title is where a mode is chosen, so a process that is
+   already a client of a server has passed it. Asked with IsStandalone at the HUD's BeginPlay.
+
+4. **The table above is the whole list.** A new difference between the modes is added to it
+   with its reason in the same change, or not made. A feature added later to one mode works
+   in the other unless the table excludes it.
+5. **The two characters never mix.** The single-player profile is local and editable by the
+   player; nothing from it is ever read by a server, and leaving a server never writes it.
+6. **Both modes are tested by every task.** The verifier sweep and the existing `--game`
+   probes are the single-player check and must stay green; the `--net` probes (task M3) are
+   the multiplayer check.
+7. **Local only.** Multiplayer is developed against the installed editor binary run with
+   `-server`, on `Lvl_Forest_200m`. No task in `Scripts/dev/plans/multiplayer_tasks.md`
+   needs GCP.
+
 ## 5. Developing on a local server
 
 Everything in Phases 0 and 2–8 is developed and proved on localhost, with one server and
@@ -324,6 +368,17 @@ the installed engine. The scripts that reproduce all of this are in `Scripts/ser
 ---
 
 ## 7. Task list
+
+**How this list relates to the dev-team queue.** The numbers below (1–45) are the whole
+road, GCP included. The part that is built and proved on the Mac is queued for dev-team as
+tasks **M1–M36**, each sized for one session and each carrying its own design goal:
+M1–M26 (phases 0–4) in `Scripts/dev/tasks.md`, M27–M36 (phases 5–8) in
+`Scripts/dev/plans/multiplayer_tasks.md`. The M phases are: 0 foundations (1–4 below),
+1 framework (9–14), 2 movement (15–16), 3 health and death (17–20), 4 weapons and inventory
+(21–26), 5 wanderers and world (27–30), 6 teams (31–32), 7 persistence (34–35), 8 close out.
+What the M tasks leave for later is everything that needs GCP or an account service: 5–8,
+33, 36–45 below.
+
 
 The owner can join a server on GCP at the end of Phase 1. The game is playable PvP at the
 end of Phase 5 and fully supported at the end of Phase 10. Tasks 15–16, 23 and 39 are C++;

@@ -56,7 +56,11 @@ SLIDERS = (
 )
 
 # Rows 0..len(SLIDERS)-1 are the sliders, then DIFFICULTY, then BIND_VARS in
-# order, then BACK. The arithmetic "row - FIRST_BIND_ROW is the bind index"
+# order, then BACK: the last number, though it is drawn as the page's top row,
+# over the others (umg_consts.SETTINGS_BACK). The caret runs round (Down on the
+# last bind is BACK, Down on BACK the first slider, and Up the other way:
+# menu_nav._emit_row_nav), so the stop after the last is the one over the
+# first, and rows 0.. stay the box's children in order. The arithmetic "row - FIRST_BIND_ROW is the bind index"
 # appears in the graph twice and is the reason the binds are contiguous.
 # DIFFICULTY sits with the sliders because the arrows are its control too, and
 # above FIRST_BIND_ROW so Enter on it arms no capture.

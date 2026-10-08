@@ -8,7 +8,7 @@ in place of the M panel's own rows (menu_screens.author_pause_menu).
   (tab.corner)           caret), "saved to ..." after a save, the keys' hint,
                          a save row if the tab has one (tab.save_widget:
                          GRAPHICS SETTINGS's SAVE DEFAULT), and BACK, a row
-                         of its own under the list
+                         of its own over the list: the tab's top row
 
 A tab with visible_rows keeps its list in a ScrollBox that many rows high:
 the bar always shows, and the HUD scrolls the caret's row into view
@@ -71,8 +71,13 @@ def _author_tab(bp, root, tab):
     title = U.text(bp, stack, tab.title_widget, tab.title_text,
                    tab.title_font or TUNE_TITLE_FONT, COL_TITLE, bold=True)
     U.pad(title, bottom=6.0 if tab.corner else 10.0)
-    rows = _list(bp, stack, tab)
     width = tab.label_w or TUNE_ROW_LABEL_W
+    # BACK: the top row, and the caret's stop before the list's first (and
+    # after its last: the caret runs round). Enter on it or a click shuts
+    # the tab.
+    back = _row(bp, stack, tab.back_widget, BACK_LABEL, width, variable=True)
+    U.pad(back, bottom=8.0)
+    rows = _list(bp, stack, tab)
     for i, label in enumerate(tab.row_labels):
         row = _row(bp, rows, f"{tab.rows_box}{i}", label, width)
         # The subject row stands apart from the stats under it; in a
@@ -91,7 +96,4 @@ def _author_tab(bp, root, tab):
         # tune_draw.py). Such a tab's hint is only words.
         save = _row(bp, stack, tab.save_widget, tab.save_label, width, variable=True)
         U.pad(save, top=8.0)
-    # BACK: the caret's last stop. Enter on it or a click shuts the tab.
-    back = _row(bp, stack, tab.back_widget, BACK_LABEL, width, variable=True)
-    U.pad(back, top=8.0)
     U.hide(outer)

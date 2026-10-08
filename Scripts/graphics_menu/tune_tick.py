@@ -65,7 +65,7 @@ from uebp.nodes.actor import FN_GET_COMP, FN_GET_OWNING_PAWN, FN_WAS_PRESSED
 from uebp.nodes.array import FN_ARR_FIND, FN_ARR_GET, FN_ARR_SET
 from uebp.nodes.math import (
     FN_ADD_FF, FN_ADD_II, FN_AND, FN_EQ_II, FN_FMIN, FN_GE_II, FN_INT_TO_FLOAT, FN_LESS_II,
-    FN_MAX_FF, FN_MAX_II, FN_MIN_II, FN_MOD_II, FN_MUL_FF, FN_MUL_II, FN_NOT, FN_ROUND,
+    FN_MAX_FF, FN_MOD_II, FN_MUL_FF, FN_MUL_II, FN_NOT, FN_ROUND,
     FN_SUB_II)
 from uebp.nodes.palette import MACRO_FOR_EACH, NODE_CAST_WEAPON
 from uebp.nodes.system import FN_EXEC_PYTHON
@@ -149,11 +149,13 @@ def _author_keys(ed, pc_out, in_execs, made, tab, closes):
     one panel shows and takes the arrows, and puts the caret on the subject.
     Returns the exec tails.
 
-    The caret runs past the list, onto BACK (tab.back_row). There Left,
-    Right and Enter are not this fragment's: BACK has no cell to nudge, and
-    Enter on it shuts the tab, which is DrawHUD's (tune_draw.py). A tab with
-    a save row (tab.save_widget) stops on it before BACK, and Enter saves
-    there and nowhere else."""
+    The caret runs round: past the list's last row (and the save row of a
+    tab that has one, tab.save_widget, where Enter saves and nowhere else)
+    Down comes to BACK (tab.back_row), which stands over the list, and Down
+    again to the first row; Up goes the other way, (row + step) mod the
+    stops as in menu_nav._emit_row_nav. On BACK Left, Right and Enter are not
+    this fragment's: it has no cell to nudge, and Enter on it shuts the tab,
+    which is DrawHUD's (tune_draw.py)."""
     flip, no_t = _branch(ed, pause_row_taken(ed, tab.action, made), in_execs, made)
     opened = _call(ed, FN_NOT, made, A=_get(ed, tab.open_var, made))
     flow = put(ed, tab.open_var, out(opened), [flip], made)
@@ -164,13 +166,12 @@ def _author_keys(ed, pc_out, in_execs, made, tab, closes):
     active = _call(ed, FN_AND, made, A=_get(ed, MV.MenuOpen, made), B=_get(ed, tab.open_var, made))
     on, off = _branch(ed, out(active), [flow, no_t], made)
     flow = [on]
-    for key, step, limit, bound in (
-            (TUNE_UP, FN_SUB_II, FN_MAX_II, 0),
-            (TUNE_DOWN, FN_ADD_II, FN_MIN_II, tab.back_row)):
+    stops = tab.back_row + 1
+    for key, step in ((TUNE_UP, stops - 1), (TUNE_DOWN, 1)):
         asked = _pressed(ed, pc_out, key, made)
         hit, miss = _branch(ed, asked, flow, made)
-        moved = _call(ed, step, made, A=_get(ed, tab.row_var, made), B=1)
-        held = _call(ed, limit, made, A=out(moved), B=bound)
+        moved = _call(ed, FN_ADD_II, made, A=_get(ed, tab.row_var, made), B=step)
+        held = _call(ed, FN_MOD_II, made, A=out(moved), B=stops)
         flow = [put(ed, tab.row_var, out(held), [hit], made), miss]
     in_list = _call(ed, FN_LESS_II, made, A=_get(ed, tab.row_var, made), B=tab.row_count)
     listed, on_back = _branch(ed, out(in_list), flow, made)

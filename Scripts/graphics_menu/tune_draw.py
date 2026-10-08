@@ -7,8 +7,8 @@ from the tab's variables. For the guns:
                    the tab's fraction_digits decimals, no grouping; a dash
                    where the tab's live mask says the stat is not the
                    subject's own), the
-                   caret on TuneRow -- on BACK when it is past the list, or
-                   on the save row of a tab that has one --
+                   caret on TuneRow -- on BACK, over the list, when it is
+                   past the list, or on the save row of a tab that has one --
                    and "saved to ..." while TuneSaved. A scrolling tab's
                    list is scrolled to the caret's row, or
                    by the mouse dragging its bar (tune_scroll.py)
@@ -75,9 +75,9 @@ def _author_stats(ed, tab, box, in_execs, made):
 
 
 def _author_under_caret(ed, tab, widget, test, row, in_execs, made):
-    """The caret of a row under the list (BACK, the save row), lit while the
-    tab's caret ``test`` ``row``: at or past it for BACK, the last stop, and
-    on it for the save row. Returns then."""
+    """The caret of a row outside the list (BACK over it, the save row under
+    it), lit while the tab's caret ``test`` ``row``: at or past it for BACK,
+    the last number, and on it for the save row. Returns then."""
     on_it = _call(ed, test, made, A=_get(ed, tab.row_var, made), B=row)
     lit = _call(ed, FN_SELECT_FF, made, A=1.0, B=0.0, bPickA=out(on_it))
     fade = _call(ed, FN_SET_OPACITY, made,
@@ -90,14 +90,17 @@ def _author_under_caret(ed, tab, widget, test, row, in_execs, made):
 
 def _author_follow(ed, tab, box, in_execs, made):
     """A scrolling tab: the caret's row brought into the list's window. On
-    BACK the list stays where it is (the last row is already in view).
-    Returns then."""
+    the save row under the list that is the last row. On BACK, over the
+    list, the list stays where it is: BACK is no row of it, and the cursor
+    crossing BACK on its way to a row must not pull the list from under it.
+    Returns the exec tails."""
+    on_back = _call(ed, FN_GE_II, made, A=_get(ed, tab.row_var, made), B=tab.back_row)
+    stay, go = _branch(ed, out(on_back), in_execs, made)
     row = _call(ed, FN_MIN_II, made, A=_get(ed, tab.row_var, made), B=tab.stat_count)
     child = _call(ed, FN_CHILD_AT, made, self=box, Index=out(row))
     seek = _call(ed, FN_SCROLL_TO, made, self=box, WidgetToFind=out(child), AnimateScroll="false")
-    for e in in_execs:
-        _connect(e, _pin(seek, "execute"))
-    return then(seek)
+    _connect(go, _pin(seek, "execute"))
+    return [then(seek), stay]
 
 
 def author_tune_panel(ed, in_execs, tab=GUN_TAB):
@@ -139,8 +142,9 @@ def author_tune_panel(ed, in_execs, tab=GUN_TAB):
     flow = _author_under_caret(ed, tab, back, FN_GE_II, tab.back_row, [flow], made)
     if tab.save_widget:
         flow = _author_under_caret(ed, tab, save, FN_EQ_II, tab.save_row, [flow], made)
+    flow = [flow]
     if tab.visible_rows:
-        flow = _author_follow(ed, tab, box, [flow], made)
+        flow = _author_follow(ed, tab, box, flow, made)
     saved = part(ed, WBP_PAUSE_MENU, tab.saved_text)
-    tails = show_if(ed, saved, _get(ed, tab.saved_var, made), [flow])
+    tails = show_if(ed, saved, _get(ed, tab.saved_var, made), flow)
     return [closed, *tails]

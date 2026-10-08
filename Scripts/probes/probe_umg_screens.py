@@ -24,7 +24,8 @@ from graphics_menu import umg_consts as C
 from net.session_consts import SERVER_ADDRESS_VAR
 from graphics_menu.profile_consts import (
     PROFILE_CLASS_PATH, PROFILE_SLOT, PROFILE_USER_INDEX)
-from graphics_menu.settings_rows import DIFFICULTY_LABELS, DIFFICULTY_ROW, FIRST_BIND_ROW
+from graphics_menu.settings_rows import (
+    BACK_ROW, DIFFICULTY_LABELS, DIFFICULTY_ROW, FIRST_BIND_ROW)
 from survival.paths import SURVIVAL_BP_PATH, SURVIVAL_CLASS_PATH
 from combat import health_vars as HV
 from graphics_menu import hud_vars as MV
@@ -301,12 +302,22 @@ def probe(p):
               for i in range(len(C.SETTINGS_ROW_LABELS))]
     p.check("the settings page stands in the menu's place",
             settings.get_visibility() == SHOWN and panel.get_visibility() == HIDDEN)
-    p.check("...every setting row shows its value and BACK shows none",
-            all(values[:-1]) and values[-1] == ""
+    back = main.get_editor_property(C.SETTINGS_BACK)
+    p.check("...every setting row shows its value and BACK, the row over them, "
+            "shows none",
+            all(values) and _text(back.get_editor_property(C.ROW_VALUE)) == ""
             and values[DIFFICULTY_ROW] in DIFFICULTY_LABELS, str(values))
     carets = _carets(rows, len(C.SETTINGS_ROW_LABELS))
     p.check("...and the caret is on MenuRow's row",
-            carets.index(1.0) == FIRST_BIND_ROW and carets.count(1.0) == 1, str(carets))
+            carets.index(1.0) == FIRST_BIND_ROW and carets.count(1.0) == 1
+            and back.get_editor_property(C.ROW_CARET).get_render_opacity() == 0.0,
+            str(carets))
+    p.set(hud, "MenuRow", BACK_ROW)
+    _draw(hud)
+    carets = _carets(rows, len(C.SETTINGS_ROW_LABELS))
+    p.check("...and on BACK's row with MenuRow on its number, the last",
+            back.get_editor_property(C.ROW_CARET).get_render_opacity() == 1.0
+            and carets.count(1.0) == 0, str(carets))
     p.set(hud, "MenuPage", 0)
     _draw(hud)
     p.check("...and back on the menu's rows the page is gone",

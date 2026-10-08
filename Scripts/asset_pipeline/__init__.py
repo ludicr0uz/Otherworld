@@ -14,6 +14,9 @@ Host-side (no ``unreal``):
                                 and the clothing base body
     swap_player_body.py         entry point: write that setting, import, rebuild, verify
     fab_library.py              Fab manifest (fab_library.json) + CLI; acquisition is manual
+    fab_scan.py                 entry point: scan a downloaded Fab pack, then copy it
+                                into Content/ (the checks: fab_intake/, which has
+                                its own map; tests: dev/tests/test_fab_intake.py)
     bind_to_mannequin.py        entry point: bind cached bodies to the mannequin's
                                 skeleton -> assets/cache/meshy/<id>/bound/
     mannequin_bind/             the bind itself (its __init__.py is its module

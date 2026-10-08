@@ -15,7 +15,7 @@ from graphics_menu.cursor_consts import CURSOR_ACCEPT_VAR, ESCAPE_KEY, PAUSE_CLI
 from graphics_menu.tune_tabs import TABS
 from graphics_menu.umg_consts import PAUSE_ROW_ACTIONS
 from uebp.nodes.actor import FN_WAS_PRESSED
-from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MAX_II, FN_MIN_II, FN_OR, FN_SUB_II
+from uebp.nodes.math import FN_ADD_II, FN_EQ_II, FN_MOD_II, FN_OR
 
 
 # Enter and Space accept. The left mouse button is not a third key here: a
@@ -33,7 +33,9 @@ NAV_RIGHT = "Right"
 
 def _emit_row_nav(ed, pc_out, last_row, in_exec, row_var="MenuRow"):
     """Up and Down move ``row_var`` (the settings page's MenuRow, or the
-    menu's PauseRow), clamped at both ends rather than wrapped.
+    menu's PauseRow), wrapped at both ends: Down on the last row is the first
+    row, Up on the first the last. One sum for both keys, (row + step) mod the
+    row count, with Up's step the count less one, so nothing goes negative.
 
     Two branches in series rather than one Select: MenuRow is read fresh by
     each, so pressing both in a frame nets to no movement instead of to
@@ -52,8 +54,8 @@ def _emit_row_nav(ed, pc_out, last_row, in_exec, row_var="MenuRow"):
         return n
 
     flow = tuple(in_exec) if isinstance(in_exec, (list, tuple)) else (in_exec,)
-    for key, step, limit, bound in ((NAV_UP, FN_SUB_II, FN_MAX_II, 0),
-                                    (NAV_DOWN, FN_ADD_II, FN_MIN_II, last_row)):
+    count = last_row + 1
+    for key, step in ((NAV_UP, count - 1), (NAV_DOWN, 1)):
         was = keep(_node(ed, FN_WAS_PRESSED))
         _connect(pc_out, _pin(was, "self"))
         _set(was, "Key", key)
@@ -63,12 +65,12 @@ def _emit_row_nav(ed, pc_out, last_row, in_exec, row_var="MenuRow"):
             _connect(e, _pin(br, "execute"))
 
         row = keep(ed.add_get_member_variable_node(row_var))
-        moved = keep(_node(ed, step))
+        moved = keep(_node(ed, FN_ADD_II))
         _connect(out(row, row_var), _pin(moved, "A"))
-        _set(moved, "B", 1)
-        held = keep(_node(ed, limit))
+        _set(moved, "B", step)
+        held = keep(_node(ed, FN_MOD_II))
         _connect(out(moved), _pin(held, "A"))
-        _set(held, "B", bound)
+        _set(held, "B", count)
         put = keep(ed.add_set_member_variable_node(row_var))
         _connect(out(held), _pin(put, row_var))
         _connect(then(br), _pin(put, "execute"))

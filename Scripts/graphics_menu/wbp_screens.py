@@ -26,10 +26,11 @@ from graphics_menu.umg_consts import (
     PAUSE_ROW_LABELS,
     PAUSE_ROW_SCALE, PAUSE_ROWS, PAUSE_TITLE, PAUSE_TITLE_FONT, PAUSE_W, ROW_COLOR_VAR,
     ROW_GAP, ROW_LABEL_W, ROW_TEXT_VAR, ROW_WIDTH_VAR, SET_HINT_FONT, SET_TITLE_FONT,
-    SETTINGS_PANEL, SETTINGS_PANEL_W, SETTINGS_ROW_LABELS, SETTINGS_ROWS_BOX,
+    SETTINGS_BACK, SETTINGS_PANEL, SETTINGS_PANEL_W, SETTINGS_ROW_LABELS, SETTINGS_ROWS_BOX,
     SETTINGS_TITLE_TEXT, WBP_DEATH_MENU, WBP_MAIN_MENU,
     WBP_MENU_ROW, WBP_PAUSE_MENU,
 )
+from graphics_menu.settings_rows import BACK_LABEL
 
 CENTRE = ((0.5, 0.5), (0.5, 0.5), (0.0, 0.0))
 
@@ -67,6 +68,14 @@ def build_main_menu():
     U.at(settings, (0.0, 0.0), (0.0, 0.0), PAUSE_POS)
     _line(bp, stack, "SettingsTitle", SETTINGS_TITLE_TEXT, SET_TITLE_FONT, COL_TITLE,
           bold=True, bottom=18.0, centred=False)
+    # BACK: the page's top row, a variable of its own outside the rows' box
+    # (settings_rows.py says why its number is still the last).
+    back = U.add(bp, BEL.generated_class(_must_load(WBP_MENU_ROW)), SETTINGS_BACK, stack,
+                 variable=True)
+    back.set_editor_property(ROW_TEXT_VAR, BACK_LABEL)
+    back.set_editor_property(ROW_WIDTH_VAR, float(ROW_LABEL_W))
+    back.set_editor_property(ROW_COLOR_VAR, U.slate_colour(COL_ROW))
+    U.pad(back, bottom=ROW_GAP)
     _rows(bp, stack, SETTINGS_ROWS_BOX, SETTINGS_ROW_LABELS, ROW_LABEL_W, COL_ROW)
     _line(bp, stack, HINT_IDLE, HINT_IDLE_TEXT, SET_HINT_FONT, COL_MAIN_HINT,
           top=4.0, variable=True, centred=False)

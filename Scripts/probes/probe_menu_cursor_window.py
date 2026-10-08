@@ -76,11 +76,14 @@ def probe(p):
     yield 0.5
     seen, carets = [], []
     yield from _sweep(p, hud, 0.82, seen, tab.row_var, carets)
-    p.check(f"sweeping down the graphics tab finds its first {tab.visible_rows} rows "
-            "and no more (the rest are scrolled out of its window), then SAVE DEFAULT "
-            "and then BACK take the caret",
+    p.check(f"sweeping down the graphics tab BACK, its top row, takes the caret "
+            f"first, then the sweep finds its first {tab.visible_rows} rows and no "
+            "more (the rest are scrolled out of its window), and SAVE DEFAULT takes "
+            "the caret last",
             seen == list(range(tab.visible_rows))
-            and carets[-2:] == [tab.save_row, tab.back_row],
+            and tab.back_row in carets
+            and carets[carets.index(tab.back_row):]
+            == [tab.back_row, *range(tab.visible_rows), tab.save_row],
             f"{seen}, carets {carets} (SAVE DEFAULT is {tab.save_row}, BACK "
             f"{tab.back_row})")
     pc.set_mouse_location(8, 8)
@@ -94,6 +97,14 @@ def probe(p):
             offset > 0.0 and seen == list(range(tab.row_count - tab.visible_rows,
                                                 tab.row_count)),
             f"offset {offset:.1f}, {seen}")
+    # BACK is no row of the list: the caret on it (Down from the last stop, or
+    # the cursor crossing it) leaves the list where it is.
+    pc.set_mouse_location(8, 8)
+    p.set(hud, tab.row_var, tab.back_row)
+    yield 0.5
+    p.check("with the caret on BACK, the top row, the list stays where it was",
+            abs(rows.get_scroll_offset() - offset) < 1e-3,
+            f"offset {rows.get_scroll_offset():.1f}, was {offset:.1f}")
     p.set(hud, tab.open_var, False)
     p.set(hud, "MenuOpen", False)
     yield 0.3
@@ -124,10 +135,14 @@ def probe(p):
     yield 0.5
     seen = []
     # The page stands where the menu does.
-    yield from _sweep(p, hud, 0.12, seen)
-    p.check("sweeping down the settings page finds every row down to BACK",
-            seen == list(range(BACK_ROW + 1)) and p.get(hud, "MenuRow") == BACK_ROW,
-            f"{seen}, caret {p.get(hud, 'MenuRow')}")
+    carets = []
+    yield from _sweep(p, hud, 0.12, seen, "MenuRow", carets)
+    p.check("sweeping down the settings page BACK, its top row, takes the caret "
+            "first, then every row under it in turn",
+            seen == list(range(BACK_ROW))
+            and BACK_ROW in carets
+            and carets[carets.index(BACK_ROW):] == [BACK_ROW, *range(BACK_ROW)],
+            f"{seen}, carets {carets}")
     p.set(hud, "MenuPage", PAGE_TITLE)
     p.set(hud, C.GAME_STARTED_VAR, True)
     p.set(hud, "MenuOpen", False)

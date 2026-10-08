@@ -20,7 +20,7 @@ from graphics_menu.player_tune_consts import PLAYER_TUNE_ACTION, PLAYER_TUNE_ROW
 from graphics_menu.sound_tune_consts import SOUND_TUNE_ACTION, SOUND_TUNE_ROW_LABEL
 from graphics_menu.world_tune_consts import WORLD_TUNE_ACTION, WORLD_TUNE_ROW_LABEL
 from graphics_menu.settings_rows import (
-    BACK_LABEL, BIND_LABELS, DIFFICULTY_LABEL, SETTINGS_TITLE, SLIDERS)
+    BIND_LABELS, DIFFICULTY_LABEL, SETTINGS_TITLE, SLIDERS)
 from combat.tuning import BLEEDING_TAG
 from survival.tuning import DEHYDRATED_TAG, STARVING_TAG
 
@@ -201,10 +201,13 @@ FLASH_DIM = 0.25
 # ─── WBP_MainMenu: the settings page (and the legal notice) ───────────────────
 # The page the menu's settings row opens, in the menu's own place.
 SETTINGS_PANEL, SETTINGS_ROWS_BOX = "SettingsPanel", "SettingsRows"
+# BACK: a row of its own over the rows' box, the page's top row. MenuRow's
+# number for it is still the last (settings_rows.BACK_ROW): the caret runs round.
+SETTINGS_BACK = "SettingsBack"
 HINT_IDLE, HINT_CAPTURE = "HintIdle", "HintCapture"
 GAME_TITLE = "OTHERWORLD"
 SETTINGS_ROW_LABELS = (tuple(sl.label for sl in SLIDERS) + (DIFFICULTY_LABEL,)
-                       + BIND_LABELS + (BACK_LABEL,))
+                       + BIND_LABELS)
 SETTINGS_TITLE_TEXT = SETTINGS_TITLE
 SETTINGS_PANEL_W = 620.0
 SET_TITLE_FONT, SET_HINT_FONT = 22.0, 12.0

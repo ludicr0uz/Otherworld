@@ -119,7 +119,10 @@ ALLOW = [
     "Bash(python3 Scripts/dev/uepy.py *)",
     "Bash(python3 -m unittest discover -s Scripts/dev/tests*)",
 ]
-SETTINGS = {"permissions": {"allow": ALLOW}}
+# No session touches the cloud: the GCP build VM (Scripts/server/gcp) bills by the hour and
+# is the owner's to start. Denied here, and session_env() takes gcloud's credentials away.
+DENY = ["Bash(gcloud:*)", "Bash(gsutil:*)", "Bash(bq:*)"]
+SETTINGS = {"permissions": {"allow": ALLOW, "deny": DENY}}
 
 
 def build_prompt(task, n, total, progress_path, baseline_table, commit):
@@ -188,6 +191,12 @@ def session_env(base, serve_dir):
     env["UEPY_SERVE"] = serve_dir        # its own warm editor, never the user's
     env["UEPY_OUTPUT"] = "summary"       # counts and failures, not 2,000 lines
     env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"
+    # An empty config directory: gcloud and gsutil find no account, so nothing a
+    # session runs can reach GCP. Scripts/server/gcp/config.sh refuses on OW_NO_GCP.
+    env["CLOUDSDK_CONFIG"] = os.path.join(serve_dir, "no-gcloud")
+    env["BOTO_CONFIG"] = os.devnull
+    env.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+    env["OW_NO_GCP"] = "1"
     return env
 
 

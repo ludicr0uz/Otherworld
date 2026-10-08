@@ -2,6 +2,12 @@
 # Shared settings for the GCP build VM scripts. Sourced, never run.
 # Override any of these from the environment, e.g. OW_ZONE=us-east4-a ./vm_create.sh
 
+# dev-team sessions set OW_NO_GCP=1: these scripts spend money and are the owner's to run.
+if [ "${OW_NO_GCP:-0}" = 1 ]; then
+  echo "GCP is disabled in this session (OW_NO_GCP=1)." >&2
+  exit 3
+fi
+
 OW_PROJECT="${OW_PROJECT:-play-history-service}"
 OW_ZONE="${OW_ZONE:-us-central1-a}"
 OW_VM="${OW_VM:-otherworld-build}"
